@@ -34,16 +34,6 @@ int[] property oid_arrest_allowUnconsciousArrest auto
 int[] property oid_arrest_unequipHandBounty auto
 int[] property oid_arrest_unequipHeadBounty auto
 int[] property oid_arrest_unequipFootBounty auto
-
-GlobalVariable property Arrest_MinimumBounty_Whiterun auto
-GlobalVariable property Arrest_MinimumBounty_Winterhold auto
-GlobalVariable property Arrest_MinimumBounty_Eastmarch auto
-GlobalVariable property Arrest_MinimumBounty_Falkreath auto
-GlobalVariable property Arrest_MinimumBounty_Haafingar auto
-GlobalVariable property Arrest_MinimumBounty_Hjaalmarch auto
-GlobalVariable property Arrest_MinimumBounty_TheRift auto
-GlobalVariable property Arrest_MinimumBounty_TheReach auto
-GlobalVariable property Arrest_MinimumBounty_ThePale auto
 ; =======================================
 
 ; Frisking
@@ -61,27 +51,6 @@ int[] property oid_frisking_stripSearchStolenItemsNumber auto
 bool[] property oid_frisking_allow_state auto
 bool[] property oid_frisking_stripSearchStolenItems_state auto
 
-; int property oid_frisking_allow auto
-; int property oid_frisking_minimumBounty auto
-; int property oid_frisking_guaranteedPayableBounty auto
-; int property oid_frisking_maximumPayableBounty auto
-; int property oid_frisking_maximumPayableBountyChance auto
-; int property oid_frisking_friskSearchThoroughness auto
-; int property oid_frisking_confiscateStolenItems auto
-; int property oid_frisking_stripSearchStolenItems auto
-; int property oid_frisking_stripSearchStolenItemsNumber auto
-
-int property oid_frisking_stripSearchStolenItems_Value auto
-
-GlobalVariable property Frisking_MinimumBounty_Whiterun auto
-GlobalVariable property Frisking_MinimumBounty_Winterhold auto
-GlobalVariable property Frisking_MinimumBounty_Eastmarch auto
-GlobalVariable property Frisking_MinimumBounty_Falkreath auto
-GlobalVariable property Frisking_MinimumBounty_Haafingar auto
-GlobalVariable property Frisking_MinimumBounty_Hjaalmarch auto
-GlobalVariable property Frisking_MinimumBounty_TheRift auto
-GlobalVariable property Frisking_MinimumBounty_TheReach auto
-GlobalVariable property Frisking_MinimumBounty_ThePale auto
 ; =======================================
 
 ; Undressing
@@ -227,22 +196,6 @@ int property RightPanelSize
     endFunction
 endProperty
 
-int map
-
-
-; bool function SetToggleState(int oid, int checked)
-;     if (! map)
-;         map = JMap.object()
-;     endif
-
-;     JMap.setInt(map, "prison_" + oid, oid_prison_sentencePaysBounty)
-; endFunction
-
-; bool function GetToggleState(int oid)
-;     int data = JMap.getInt(map, "prison_" + oid)
-;     return 
-; endFunction
-
 function InitializePages()
     Pages = new string[11]
     Pages[0] = RealisticPrisonAndBounty_MCM_General.GetPageName()
@@ -309,29 +262,8 @@ function InitializeOptions()
     oid_frisking_stripSearchStolenItems = new int[9]
     oid_frisking_stripSearchStolenItemsNumber = new int[9]
 
-    ; oid_frisking_allow                          = JIntMap.object()
-    ; oid_frisking_minimumBounty                  = JIntMap.object()
-    ; oid_frisking_guaranteedPayableBounty        = JIntMap.object()
-    ; oid_frisking_maximumPayableBounty           = JIntMap.object()
-    ; oid_frisking_maximumPayableBountyChance     = JIntMap.object()
-    ; oid_frisking_friskSearchThoroughness        = JIntMap.object()
-    ; oid_frisking_confiscateStolenItems          = JIntMap.object()
-    ; oid_frisking_stripSearchStolenItems         = JIntMap.object()
-    ; oid_frisking_stripSearchStolenItemsNumber   = JIntMap.object()
-
-    ; JValue.retain(oid_frisking_allow)
-    ; JValue.retain(oid_frisking_minimumBounty)
-    ; JValue.retain(oid_frisking_guaranteedPayableBounty)
-    ; JValue.retain(oid_frisking_maximumPayableBounty)
-    ; JValue.retain(oid_frisking_maximumPayableBountyChance)
-    ; JValue.retain(oid_frisking_friskSearchThoroughness)
-    ; JValue.retain(oid_frisking_confiscateStolenItems)
-    ; JValue.retain(oid_frisking_stripSearchStolenItems)
-    ; JValue.retain(oid_frisking_stripSearchStolenItemsNumber)
-
     oid_frisking_allow_state = new bool[9]
     oid_frisking_stripSearchStolenItems_state = new bool[9]
-    oid_frisking_stripSearchStolenItems_Value = JIntMap.object()
 ; ============================================================
 
 ; Undressing
@@ -486,69 +418,11 @@ event OnConfigInit()
     InitializePages()
     InitializeOptions()
 
-    map_frisking = JMap.object()
-    JValue.retain(map_frisking)
-
-    ; JMap.setInt(map_frisking, "minimumBounty", 500)
-    ; JMap.setInt(map_frisking, "guaranteedPayableBounty", 1000)
-    ; JMap.setInt(map_frisking, "maximumPayableBounty", 2000)
-    list_frisking_minimumBounty = JArray.object()
-    whiterun_options = JMap.object()
-
-    int x = 0
-    int DEFAULT_MINIMUM_BOUNTY = 1000
-    while (x < 9)
-        JArray.addInt(list_frisking_minimumBounty, DEFAULT_MINIMUM_BOUNTY)
-        x += 1
-    endWhile
-
-    ; int i = 0
-    ; while (i < 9)
-    ;     JMap.setObj(map_frisking, "minimumBounty", list_frisking_minimumBounty)
-    ;     JMap.setInt(map_frisking, "minimumBounty", 500)
-    ;     JMap.setInt(map_frisking, "guaranteedPayableBounty", 1000)
-    ;     JMap.setInt(map_frisking, "maximumPayableBounty", 2000)
-    ;     i += 1
-    ; endWhile
-
     JDB.solveIntSetter(".whiterun.frisking.minimumBounty", 1000, true)
     JDB.solveIntSetter(".winterhold.frisking.minimumBounty", 782, true)
 
     SetOptionAtIndex(0, "frisking", "minimumBounty", 1784)
     SetOptionAtIndex(1, "frisking", "minimumBounty", 2502)
-
-    ; list_oid_frisking_allow = JIntMap.object()
-    ; JValue.retain(list_oid_frisking_allow, "RPB")
-
-    ; int whiterunMinimumBounty = JDB.solveInt(".whiterun.frisking.minimumBounty")
-    ; int winterholdMinimumBounty = JDB.solveInt(".winterhold.frisking.minimumBounty")
-    ; int whiterunMinimumBounty = GetOptionAtIndex(0, "frisking", "minimumBounty")
-    ; int winterholdMinimumBounty = GetOptionAtIndex(1, "frisking", "minimumBounty")
-
-    ; Log(self, "This", "whiterunMinimumBounty = " + whiterunMinimumBounty)
-    ; Log(self, "This", "winterholdMinimumBounty = " + winterholdMinimumBounty)
-
-
-
-    ; int minBounty = JMap.getInt(map_frisking, "minimumBounty")
-    ; int guaranteedPayableBounty = JMap.getInt(map_frisking, "guaranteedPayableBounty")
-    ; int maximumPayableBounty = JMap.getInt(map_frisking, "maximumPayableBounty")
-
-    JValue.writeToFile(map_frisking, "jmap.txt")
-    
-    ; Log(self, "OnConfigInit", "minBounty = " + minBounty + "\n" + "guaranteedPayableBounty = " + guaranteedPayableBounty + "\n" + "maximumPayableBounty = " + maximumPayableBounty)
-
-    ; list_frisking_minimumBounty = JArray.object()
-    ; JValue.retain(list_frisking_minimumBounty, "RealisticPrisonAndBounty")
-
-    ; int i = 0
-    ; ; _holds = GetHoldNames()
-    ; int DEFAULT_MINIMUM_BOUNTY = 1000
-    ; while (i < 9)
-    ;     JArray.addInt(list_frisking_minimumBounty, DEFAULT_MINIMUM_BOUNTY)
-    ;     i += 1
-    ; endWhile
-
 endEvent
 
 ; Event Handling

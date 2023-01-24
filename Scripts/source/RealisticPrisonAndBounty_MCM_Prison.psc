@@ -116,7 +116,6 @@ function OnOptionSelect(RealisticPrisonAndBounty_MCM mcm, int oid, int index) gl
     if (oid == mcm.oid_prison_allowBountylessImprisonment[index])
         mcm.oid_prison_allowBountylessImprisonment_checked[index] = ! mcm.oid_prison_allowBountylessImprisonment_checked[index]
         mcm.SetToggleOptionValue(oid, mcm.oid_prison_allowBountylessImprisonment_checked[index])
-        ; mcm.SetToggleState(oid, (mcm.GetToggleState(oid) as int))
 
     elseif (oid == mcm.oid_prison_sentencePaysBounty[index])
         mcm.oid_prison_sentencePaysBounty_checked[index] = ! mcm.oid_prison_sentencePaysBounty_checked[index]
