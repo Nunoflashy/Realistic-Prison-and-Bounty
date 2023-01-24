@@ -72,37 +72,48 @@ function OnOptionHighlight(RealisticPrisonAndBounty_MCM mcm, int oid, int index)
 
     if (oid == mcm.oid_prison_bountyToDays[index])
         mcm.SetInfoText("Sets the relation between bounty and days in prison.")
+        return
 
     elseif (oid == mcm.oid_prison_minimumSentenceDays[index])
         mcm.SetInfoText("Determines the minimum sentence in prison for " + holds[index] + ".")
+        return
 
     elseif (oid == mcm.oid_prison_maximumSentenceDays[index])
         mcm.SetInfoText("Determines the maximum sentence in prison for " + holds[index] + ".")
+        return
 
     elseif (oid == mcm.oid_prison_allowBountylessImprisonment[index])
         mcm.SetInfoText("Whether to allow unconditional imprisonment without a bounty.\n" + \
                         "The sentence will be the minimum possible configured.")
+        return
 
     elseif (oid == mcm.oid_prison_sentencePaysBounty[index])
         mcm.SetInfoText("Determines if serving the sentence pays the bounty.\nIf disabled, the bounty must be paid after serving the sentence.")
-    
+        return
+
     elseif (oid == mcm.oid_prison_fastForward[index])
         mcm.SetInfoText("Whether to fast forward to release.")
+        return
 
     elseif (oid == mcm.oid_prison_dayToFastForwardFrom[index])
         mcm.SetInfoText("The day to start fast forward to release." )
+        return
 
     elseif (oid == mcm.oid_prison_handsBoundInPrison[index])
         mcm.SetInfoText("Whether to have bound hands during imprisonment.")
+        return
 
     elseif (oid == mcm.oid_prison_handsBoundMinimumBounty[index])
         mcm.SetInfoText("The minimum bounty required to have hands bound.")
-
+        return
+        
     elseif (oid == mcm.oid_prison_handsBoundRandomize[index])
         mcm.SetInfoText("Whether to randomize if the hands are bound or not if the bounty is met.")
-        
+        return
+
     elseif (oid == mcm.oid_prison_cellLockLevel[index])
         mcm.SetInfoText("Determines the cell's door lock level.")
+        return
     endif
 endFunction
 

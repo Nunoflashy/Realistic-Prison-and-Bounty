@@ -55,18 +55,23 @@ endFunction
 function OnOptionHighlight(RealisticPrisonAndBounty_MCM mcm, int oid, int index) global
     if (oid == mcm.oid_escape_escapeBountyPercent[index])
         mcm.SetInfoText("The amount of bounty to add as a percentage of the current bounty, when escaping.")
+        return
 
     elseif (oid == mcm.oid_escape_escapeBountyFlat[index])
         mcm.SetInfoText("The amount of bounty to add as a flat amount, when escaping.")
+        return
 
     elseif (oid == mcm.oid_escape_allowSurrender[index])
         mcm.SetInfoText("Whether the guards will allow the player to surrender after escaping.")
+        return
 
     elseif (oid == mcm.oid_escape_friskUponCapture[index])
         mcm.SetInfoText("Whether to allow a frisk search upon being captured.\n(Note: The search will take into consideration all conditions configured in Frisking)")
+        return
 
     elseif (oid == mcm.oid_escape_undressUponCapture[index])
         mcm.SetInfoText("Whether to allow being undressed upon being captured.\n(Note: Undressing will only take place if the conditions are met in Undressing)")
+        return
     endif
 endFunction
 

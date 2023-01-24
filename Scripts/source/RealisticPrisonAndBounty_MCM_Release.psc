@@ -23,7 +23,7 @@ endFunction
 function RenderOptions(RealisticPrisonAndBounty_MCM mcm, int index) global
     mcm.oid_release_giveItemsBackOnRelease[index]           = mcm.AddToggleOption("Give items back on Release", true)
     mcm.oid_release_giveItemsBackOnReleaseMaxBounty[index]  = mcm.AddSliderOption("Give items back on Release (Bounty)", 1.0)
-    mcm.oid_release_redressOnRelease[index]                 = mcm.AddToggleOption("Redress on Release", true)
+    mcm.oid_release_redressOnRelease[index]                 = mcm.AddToggleOption("Re-dress on Release", true)
     ; mcm.oid_release_giveItemsBackOnDefeat[index]            = mcm.AddToggleOption("Give items back on Defeat", 1.0)
 endFunction
 
@@ -58,7 +58,7 @@ function OnOptionHighlight(RealisticPrisonAndBounty_MCM mcm, int oid, int index)
         mcm.SetInfoText("Determines whether the items should be given back on release if undressed while in prison.")
 
     elseif (oid == mcm.oid_release_redressOnRelease[index])
-        mcm.SetInfoText("Determines whether the player should be redressed on release if undressed in " + holds[index] + " prison.")
+        mcm.SetInfoText("Determines whether the player should be re-dressed on release if undressed in " + holds[index] + " prison.")
     elseif (oid == mcm.oid_release_giveItemsBackOnReleaseMaxBounty[index])
         mcm.SetInfoText("The maximum amount of bounty in order to have the items given back when released from " + holds[index] + " prison.")
     ; elseif (oid == mcm.oid_release_giveItemsBackOnDefeat[index])

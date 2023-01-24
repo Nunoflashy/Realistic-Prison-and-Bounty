@@ -62,15 +62,19 @@ function OnOptionHighlight(RealisticPrisonAndBounty_MCM mcm, int oid, int index)
 
     if (oid == mcm.oid_bounty_enableBountyDecay[index])
         mcm.SetInfoText("Whether to enable bounty decaying for " + holds[index] + ".")
+        return
 
     elseif (oid == mcm.oid_bounty_decayInPrison[index])
         mcm.SetInfoText("Whether to allow bounty decaying while in " + holds[index] + " prison.")
+        return
 
     elseif (oid == mcm.oid_bounty_bountyLostPercent[index])
         mcm.SetInfoText("The amount of bounty lost as a percentage of the current bounty in " + holds[index] + ".")
+        return
         
     elseif (oid == mcm.oid_bounty_bountyLostFlat[index])
         mcm.SetInfoText("The amount of bounty lost as a flat value.")
+        return
     endif
 endFunction
 

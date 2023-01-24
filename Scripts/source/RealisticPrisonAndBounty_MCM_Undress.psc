@@ -32,10 +32,10 @@ function RenderOptions(RealisticPrisonAndBounty_MCM mcm, int index) global
     mcm.oid_undressing_forcedUndressingWhenDefeated[index]  = mcm.AddToggleOption("Forced Undressing when Defeated", true)
     mcm.oid_undressing_stripSearchThoroughness[index]       = mcm.AddSliderOption("Strip Search Thoroughness", 1.0) ; -1 to Disable
     mcm.oid_undressing_allowWearingClothes[index]           = mcm.AddToggleOption("Allow Wearing Clothes", true)
-    mcm.oid_undressing_redressBounty[index]                 = mcm.AddSliderOption("Bounty to Redress", 1.0)  ; -1 to Disable
-    mcm.oid_undressing_redressWhenDefeated[index]           = mcm.AddToggleOption("Redress when Defeated", true)
-    mcm.oid_undressing_redressAtCell[index]                 = mcm.AddToggleOption("Redress at Cell", true)
-    mcm.oid_undressing_redressAtChest[index]                = mcm.AddToggleOption("Redress at Chest", true)
+    mcm.oid_undressing_redressBounty[index]                 = mcm.AddSliderOption("Bounty to Re-dress", 1.0)  ; -1 to Disable
+    mcm.oid_undressing_redressWhenDefeated[index]           = mcm.AddToggleOption("Re-dress when Defeated", true)
+    mcm.oid_undressing_redressAtCell[index]                 = mcm.AddToggleOption("Re-dress at Cell", true)
+    mcm.oid_undressing_redressAtChest[index]                = mcm.AddToggleOption("Re-dress at Chest", true)
 endFunction
 
 function Left(RealisticPrisonAndBounty_MCM mcm) global
@@ -89,22 +89,22 @@ function OnOptionHighlight(RealisticPrisonAndBounty_MCM mcm, int oid, int index)
         Log(mcm, "Undressing::OnHighlight", "Option = " + oid)
     elseif (oid == mcm.oid_undressing_stripSearchThoroughness[index])
         mcm.SetInfoText("The thoroughness of the strip search when undressed, higher values mean a more thorough search and possibly less items kept.\n" + \
-                        "Due to the nature of a strip search, most items are removed, this value will only determine small objects such as Lockpicks, Keys, Rings, etc...")
+                        "Due to the nature of a strip search, most items are removed, this value will only determine small objects that could be hidden when stripped bare. (Lockpicks, Keys, Rings, etc...)")
         Log(mcm, "Undressing::OnHighlight", "Option = " + oid)
     elseif (oid == mcm.oid_undressing_allowWearingClothes[index])
         mcm.SetInfoText("Whether to allow wearing clothes in prison after being undressed.")
         Log(mcm, "Undressing::OnHighlight", "Option = " + oid)
     elseif (oid == mcm.oid_undressing_redressBounty[index])
-        mcm.SetInfoText("The maximum bounty to have the player be redressed.")
+        mcm.SetInfoText("The maximum bounty to have the player be re-dressed.")
         Log(mcm, "Undressing::OnHighlight", "Option = " + oid)
     elseif (oid == mcm.oid_undressing_redressWhenDefeated[index])
-        mcm.SetInfoText("Whether to redress the player when defeated (Note: If the bounty exceeds the maximum, this has no effect if enabled, the player will still be undressed).")
+        mcm.SetInfoText("Whether to re-dress the player when defeated (Note: If the bounty exceeds the maximum, this has no effect if enabled, the player will still be undressed).")
         Log(mcm, "Undressing::OnHighlight", "Option = " + oid)
     elseif (oid == mcm.oid_undressing_redressAtCell[index])
-        mcm.SetInfoText("Should the player be redressed at the cell?")
+        mcm.SetInfoText("Should the player be re-dressed at the cell?")
         Log(mcm, "Undressing::OnHighlight", "Option = " + oid)
     elseif (oid == mcm.oid_undressing_redressAtChest[index])
-        mcm.SetInfoText("Should the player be redressed at the chest?")
+        mcm.SetInfoText("Should the player be re-dressed at the chest?")
         Log(mcm, "Undressing::OnHighlight", "Option = " + oid)
     endif
 endFunction

@@ -8,6 +8,17 @@ GlobalVariable property NormalTimescale auto
 GlobalVariable property PrisonTimescale auto
 ; =======================================
 
+; Toggle used for Toggle options
+; The value is stored through SetOptionValue() and retrieved with GetOptionValue(),
+; so we can use a temporary toggle just to display it.
+bool temporary_toggle
+
+bool function GetToggleState()
+    temporary_toggle = bool_if(temporary_toggle, false, true)
+    Log(self, "GetToggleState", "Toggle is now " + temporary_toggle)
+    return temporary_toggle
+endFunction
+
 ; FormLists
 ; =======================================
 FormList property Arrest_AdditionalBountyWhenDefeatedFlat auto
@@ -50,7 +61,6 @@ int[] property oid_frisking_stripSearchStolenItemsNumber auto
 
 bool[] property oid_frisking_allow_state auto
 bool[] property oid_frisking_stripSearchStolenItems_state auto
-
 ; =======================================
 
 ; Undressing
@@ -377,8 +387,13 @@ string property StoragePrefix
     endFunction
 endProperty
 
-bool function SetOptionOID(int oid, int value)
+bool function SetOptionValue(int oid, int value)
+    Log(self, "SetOptionValue", "Option ID: " + oid + " (value: " + value + ")" + " has been saved successfully!")
     return JDB.solveIntSetter(StoragePrefix + "OPTION_ID." + oid, value, true)
+endFunction
+
+bool function SetOptionValueBool(int oid, bool value)
+    SetOptionValue(oid, value as int)
 endFunction
 
 bool function SetOptionStringValue(int oid, string value)
@@ -393,7 +408,7 @@ bool function SetOptionBoolValue(int oid, bool value)
     return JDB.solveIntSetter(StoragePrefix + "OPTION_ID." + oid, value as int, true)
 endFunction
 
-int function GetOptionOID(int oid)
+int function GetOptionValue(int oid)
     return JDB.solveInt(StoragePrefix + "OPTION_ID." + oid)
 endFunction
 
@@ -403,15 +418,39 @@ int function GetOptionAtIndex(int index, string category, string option)
     return JDB.solveInt("." + holds[index] + "." + category + "." + option)
 endFunction
 
-; Returns the OptionID of the object at list[index]
-int function GetOptionValue(int list, int index)
-    return JIntMap.getInt(list, index)
+int _currentOptionIndex
+int property CurrentOptionIndex
+    int function get()
+        if (_currentOptionIndex < 0)
+            LogProperty(self, "CurrentOptionIndex", "Value is undefined " + "(" + _currentOptionIndex + ")", LOG_ERROR())
+        endif
+
+        return _currentOptionIndex
+    endFunction
+endProperty
+
+int function GetOptionInListByOID(int[] optionList, int optionId)
+    int i = 0
+    while (i < GetHoldCount())
+        if (optionList[i] == optionId)
+            _currentOptionIndex = i
+            return optionId
+        endif
+        i += 1
+    endWhile
+
+    return -1
 endFunction
 
-; Sets the OptionID to list[index]
-function SetOptionValue(int list, int index, int value)
-    JIntMap.setInt(list, index, value)
-endFunction
+; ; Returns the OptionID of the object at list[index]
+; int function GetOptionValue(int list, int index)
+;     return JIntMap.getInt(list, index)
+; endFunction
+
+; ; Sets the OptionID to list[index]
+; function SetOptionValue(int list, int index, int value)
+;     JIntMap.setInt(list, index, value)
+; endFunction
 
 event OnConfigInit()
     ModName = "Realistic Prison and Bounty"

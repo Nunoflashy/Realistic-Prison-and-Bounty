@@ -69,54 +69,67 @@ function OnOptionHighlight(RealisticPrisonAndBounty_MCM mcm, int oid, int index)
     if (oid == mcm.oid_arrest_minimumBounty[index])
         mcm.SetInfoText("The minimum bounty required to be arrested in " + holds[index] + ".")
         Log(mcm, "Arrest::OnOptionHighlight", "Option = " + oid)
+        return
 
     elseif (oid == mcm.oid_arrest_guaranteedPayableBounty[index])
         mcm.SetInfoText("The guaranteed amount of bounty that a guard will accept before arresting in " + holds[index] + ".")
         Log(mcm, "Arrest::OnOptionHighlight", "Option = " + oid)
+        return
 
     elseif (oid == mcm.oid_arrest_maximumPayableBounty[index])
         mcm.SetInfoText("The maximum amount of bounty that is payable before being arrested in " + holds[index] + ".\n(Note: The chance will be determined)")
         Log(mcm, "Arrest::OnOptionHighlight", "Option = " + oid)
+        return
 
     elseif (oid == mcm.oid_arrest_additionalBountyWhenResistingPercent[index])
         mcm.SetInfoText("The amount of bounty that will be added as a percentage of the current bounty, when resisting arrest in " + holds[index] + ".")
         Log(mcm, "Arrest::OnOptionHighlight", "Option = " + oid)
+        return
 
     elseif (oid == mcm.oid_arrest_additionalBountyWhenResistingFlat[index])
         mcm.SetInfoText("The amount of bounty that will be added when resisting arrest in " + holds[index] + ".")
         Log(mcm, "Arrest::OnOptionHighlight", "Option = " + oid)
+        return
 
     elseif (oid == mcm.oid_arrest_additionalBountyWhenDefeatedPercent[index])
         mcm.SetInfoText("The amount of bounty that will be added as a percentage of the current bounty, when defeated in " + holds[index] + ".")
         Log(mcm, "Arrest::OnOptionHighlight", "Option = " + oid)
+        return
 
     elseif (oid == mcm.oid_arrest_additionalBountyWhenDefeatedFlat[index])
         mcm.SetInfoText("The amount of bounty that will be added when defeated in " + holds[index] + ".")
         Log(mcm, "Arrest::OnOptionHighlight", "Option = " + oid)
+        return
 
     elseif (oid == mcm.oid_arrest_allowCivilianCapture[index])
         mcm.SetInfoText("Whether to allow civilians to bring the player to a guard in " + holds[index] + ".")
         Log(mcm, "Arrest::OnOptionHighlight", "Option = " + oid)
-        
+        return
+
     elseif (oid == mcm.oid_arrest_allowArrestTransfer[index])
         mcm.SetInfoText("Whether to allow a guard to take over the arrest if the current captor dies.")
         Log(mcm, "Arrest::OnOptionHighlight", "Option = " + oid)
+        return
 
     elseif (oid == mcm.oid_arrest_allowUnconsciousArrest[index])
         mcm.SetInfoText("Whether to allow an unconscious arrest after defeated (the player will wake up in prison).")
         Log(mcm, "Arrest::OnOptionHighlight", "Option = " + oid)
+        return
 
     elseif (oid == mcm.oid_arrest_unequipHandBounty[index])
         mcm.SetInfoText("Whether to unequip any hand garment when arrested.\n-1 - Disable\n0 - Always unequip.\n Any other value is the bounty required")
         Log(mcm, "Arrest::OnOptionHighlight", "Option = " + oid)
-        
+        return
+
     elseif (oid == mcm.oid_arrest_unequipHeadBounty[index])
         mcm.SetInfoText("Whether to unequip any head garment when arrested.\n-1 - Disable\n0 - Always unequip.\n Any other value is the bounty required")
         Log(mcm, "Arrest::OnOptionHighlight", "Option = " + oid)
+        return
 
     elseif (oid == mcm.oid_arrest_unequipFootBounty[index])
         mcm.SetInfoText("Whether to unequip any foot garment when arrested.\n-1 - Disable\n0 - Always unequip.\n Any other value is the bounty required")
         Log(mcm, "Arrest::OnOptionHighlight", "Option = " + oid)
+        return
     endif
 endFunction
 

@@ -56,15 +56,19 @@ function OnOptionHighlight(RealisticPrisonAndBounty_MCM mcm, int oid, int index)
 
     if (oid == mcm.oid_bhunters_enableBountyHunters[index])
         mcm.SetInfoText("Whether to enable bounty hunters in " + holds[index] + ".")
+        return
 
     elseif (oid == mcm.oid_bhunters_allowOutlawBountyHunters[index])
         mcm.SetInfoText("Whether to allow outlaw bounty hunters working for " + holds[index] + ".")
+        return
 
     elseif (oid == mcm.oid_bhunters_minimumBounty[index])
         mcm.SetInfoText("The minimum bounty required to have bounty hunters hunt you in " + holds[index] + ".")
+        return
 
     elseif (oid == mcm.oid_bhunters_bountyPosse[index])
         mcm.SetInfoText("The bounty required to have a posse hunt you in " + holds[index] + ".")
+        return
     endif
 endFunction
 
