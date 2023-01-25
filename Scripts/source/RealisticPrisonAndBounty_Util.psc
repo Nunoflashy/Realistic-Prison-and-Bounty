@@ -368,3 +368,32 @@ function UnwearItemIf(Actor akActor, Form akItem, bool condition, int count = 1,
         UnwearItem(akActor, akItem, count, forced, silent)
     endif
 endfunction
+
+
+string function StoragePrefix() global
+    return ".__" + ModName() + "__."
+endFunction
+
+int function GetOptionValue(int oid) global
+    return JDB.solveInt(StoragePrefix() + "OPTION_ID." + oid)
+endFunction
+
+bool function SetOptionValueBool(int optionId, bool value) global
+    return JDB.solveIntSetter(StoragePrefix() + "OPTION_ID." + optionId, value as int, true)
+endFunction
+
+bool function SetOptionValueInt(int optionId, int value) global
+    return JDB.solveIntSetter(StoragePrefix() + "OPTION_ID." + optionId, value, true)
+endFunction
+
+bool function SetOptionValueFloat(int optionId, float value) global
+    return JDB.solveFltSetter(StoragePrefix() + "OPTION_ID." + optionId, value, true)
+endFunction
+
+bool function SetOptionValueString(int optionId, string value) global
+    return JDB.solveStrSetter(StoragePrefix() + "OPTION_ID." + optionId, value, true)
+endFunction
+
+bool function SetOptionValueForm(int optionId, Form value) global
+    return JDB.solveFormSetter(StoragePrefix() + "OPTION_ID." + optionId, value, true)
+endFunction

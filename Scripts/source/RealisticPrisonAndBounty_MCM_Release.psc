@@ -1,5 +1,7 @@
 Scriptname RealisticPrisonAndBounty_MCM_Release hidden
 
+import RealisticPrisonAndBounty_Util
+
 string function GetPageName() global
     return "Release"
 endFunction
@@ -49,80 +51,83 @@ function Right(RealisticPrisonAndBounty_MCM mcm) global
     endWhile
 endFunction
 
-; Events
 
-function OnOptionHighlight(RealisticPrisonAndBounty_MCM mcm, int oid, int index) global
+; =====================================================
+; Events
+; =====================================================
+
+function OnOptionHighlight(RealisticPrisonAndBounty_MCM mcm, int oid) global
+
     string[] holds = mcm.GetHoldNames()
 
-    if (oid == mcm.oid_release_giveItemsBackOnRelease[index])
-        mcm.SetInfoText("Determines whether the items should be given back on release if undressed while in prison.")
+    int giveItemsBackOnRelease          = mcm.GetOptionInListByID(mcm.oid_release_giveItemsBackOnRelease, oid)
+    int giveItemsBackOnReleaseMaxBounty = mcm.GetOptionInListByID(mcm.oid_release_giveItemsBackOnRelease, oid)
+    int redressOnRelease                = mcm.GetOptionInListByID(mcm.oid_release_giveItemsBackOnRelease, oid)
 
-    elseif (oid == mcm.oid_release_redressOnRelease[index])
-        mcm.SetInfoText("Determines whether the player should be re-dressed on release if undressed in " + holds[index] + " prison.")
-    elseif (oid == mcm.oid_release_giveItemsBackOnReleaseMaxBounty[index])
-        mcm.SetInfoText("The maximum amount of bounty in order to have the items given back when released from " + holds[index] + " prison.")
-    ; elseif (oid == mcm.oid_release_giveItemsBackOnDefeat[index])
-    ;     mcm.SetInfoText("Determines whether the items should be given back when defeated and released from " + holds[index] + " prison.")
-    endif
+    mcm.SetInfoText( \
+        string_if (oid == giveItemsBackOnRelease, "Determines whether the items should be given back on release, if undressed while in " + holds[mcm.CurrentOptionIndex] + "'s prison'.", \
+        string_if (oid == giveItemsBackOnReleaseMaxBounty, "The maximum bounty in order to have the items given back when released from " + holds[mcm.CurrentOptionIndex] + "'s prison'.", \
+        string_if (oid == redressOnRelease, "Determines whether you should be re-dressed on release, if undressed while in " + holds[mcm.CurrentOptionIndex] + "'s prison'.", \
+        "No description defined for this option." \
+    ))) \
+)
+
 endFunction
 
-function OnOptionDefault(RealisticPrisonAndBounty_MCM mcm, int oid, int index) global
+function OnOptionDefault(RealisticPrisonAndBounty_MCM mcm, int oid) global
     
 endFunction
 
-function OnOptionSelect(RealisticPrisonAndBounty_MCM mcm, int oid, int index) global
+function OnOptionSelect(RealisticPrisonAndBounty_MCM mcm, int oid) global
+
+endFunction
+
+function OnOptionSliderOpen(RealisticPrisonAndBounty_MCM mcm, int oid) global
+
+endFunction
+
+function OnOptionSliderAccept(RealisticPrisonAndBounty_MCM mcm, int oid, float value) global
+
+endFunction
+
+function OnOptionMenuOpen(RealisticPrisonAndBounty_MCM mcm, int oid) global
+
+endFunction
+
+function OnOptionMenuAccept(RealisticPrisonAndBounty_MCM mcm, int oid, int menuIndex) global
     
 endFunction
 
-function OnOptionSliderOpen(RealisticPrisonAndBounty_MCM mcm, int oid, int index) global
-
-endFunction
-
-function OnOptionSliderAccept(RealisticPrisonAndBounty_MCM mcm, int oid, float value, int index) global
+function OnOptionColorOpen(RealisticPrisonAndBounty_MCM mcm, int oid) global
     
 endFunction
 
-function OnOptionMenuOpen(RealisticPrisonAndBounty_MCM mcm, int oid, int index) global
-
-endFunction
-
-function OnOptionMenuAccept(RealisticPrisonAndBounty_MCM mcm, int oid, int menuIndex, int itemIndex) global
+function OnOptionColorAccept(RealisticPrisonAndBounty_MCM mcm, int oid, int color) global
     
 endFunction
 
-function OnOptionColorOpen(RealisticPrisonAndBounty_MCM mcm, int oid, int index) global
+function OnOptionInputOpen(RealisticPrisonAndBounty_MCM mcm, int oid) global
     
 endFunction
 
-function OnOptionColorAccept(RealisticPrisonAndBounty_MCM mcm, int oid, int color, int index) global
+function OnOptionInputAccept(RealisticPrisonAndBounty_MCM mcm, int oid, string input) global
     
 endFunction
 
-function OnOptionInputOpen(RealisticPrisonAndBounty_MCM mcm, int oid, int index) global
+function OnOptionKeymapChange(RealisticPrisonAndBounty_MCM mcm, int oid, int keyCode, string conflictControl, string conflictName) global
     
 endFunction
 
-function OnOptionInputAccept(RealisticPrisonAndBounty_MCM mcm, int oid, string input, int index) global
-    
-endFunction
-
-function OnOptionKeymapChange(RealisticPrisonAndBounty_MCM mcm, int oid, int keyCode, string conflictControl, string conflictName, int index) global
-    
-endFunction
-
-
+; =====================================================
+; Event Handlers
+; =====================================================
 
 function OnHighlight(RealisticPrisonAndBounty_MCM mcm, int oid) global
-
     if (! ShouldHandleEvent(mcm))
         return
     endif
 
-    int i = 0
-    while (i < mcm.GetHoldCount())
-        OnOptionHighlight(mcm, oid, i)
-        i += 1
-    endWhile
+    OnOptionHighlight(mcm, oid)
 endFunction
 
 function OnDefault(RealisticPrisonAndBounty_MCM mcm, int oid) global
@@ -131,139 +136,85 @@ function OnDefault(RealisticPrisonAndBounty_MCM mcm, int oid) global
         return
     endif
 
-    int i = 0
-    while (i < mcm.GetHoldCount())
-        OnOptionDefault(mcm, oid, i)
-        i += 1
-    endWhile
+    OnOptionDefault(mcm, oid)
 endFunction
 
 function OnSelect(RealisticPrisonAndBounty_MCM mcm, int oid) global
-
     if (! ShouldHandleEvent(mcm))
         return
     endif
 
-    int i = 0
-    while (i < mcm.GetHoldCount())
-        OnOptionSelect(mcm, oid, i)
-        i += 1
-    endWhile
+    OnOptionSelect(mcm, oid)
 endFunction
 
 function OnSliderOpen(RealisticPrisonAndBounty_MCM mcm, int oid) global
-
     if (! ShouldHandleEvent(mcm))
         return
     endif
 
-    int i = 0
-    while (i < mcm.GetHoldCount())
-        OnOptionSliderOpen(mcm, oid, i)
-        i += 1
-    endWhile
+    OnOptionSliderOpen(mcm, oid)
 endFunction
 
 function OnSliderAccept(RealisticPrisonAndBounty_MCM mcm, int oid, float value) global
-
     if (! ShouldHandleEvent(mcm))
         return
     endif
 
-    int i = 0
-    while (i < mcm.GetHoldCount())
-        OnOptionSliderAccept(mcm, oid, value, i)
-        i += 1
-    endWhile
+    OnOptionSliderAccept(mcm, oid, value)
 endFunction
 
 function OnMenuOpen(RealisticPrisonAndBounty_MCM mcm, int oid) global
-
     if (! ShouldHandleEvent(mcm))
         return
     endif
 
-    int i = 0
-    while (i < mcm.GetHoldCount())
-        OnOptionMenuOpen(mcm, oid, i)
-        i += 1
-    endWhile
+    OnOptionMenuOpen(mcm, oid)
 endFunction
 
 function OnMenuAccept(RealisticPrisonAndBounty_MCM mcm, int oid, int menuIndex) global
-
     if (! ShouldHandleEvent(mcm))
         return
     endif
 
-    int i = 0
-    while (i < mcm.GetHoldCount())
-        OnOptionMenuAccept(mcm, oid, menuIndex, i)
-        i += 1
-    endWhile
+    OnOptionMenuAccept(mcm, oid, menuIndex)
 endFunction
 
 function OnColorOpen(RealisticPrisonAndBounty_MCM mcm, int oid) global
-
     if (! ShouldHandleEvent(mcm))
         return
     endif
 
-    int i = 0
-    while (i < mcm.GetHoldCount())
-        OnOptionColorOpen(mcm, oid, i)
-        i += 1
-    endWhile
+    OnOptionColorOpen(mcm, oid)
 endFunction
 
 function OnColorAccept(RealisticPrisonAndBounty_MCM mcm, int oid, int color) global
-
     if (! ShouldHandleEvent(mcm))
         return
     endif
 
-    int i = 0
-    while (i < mcm.GetHoldCount())
-        OnOptionColorAccept(mcm, oid, color, i)
-        i += 1
-    endWhile
+    OnOptionColorAccept(mcm, oid, color)
 endFunction
 
 function OnKeymapChange(RealisticPrisonAndBounty_MCM mcm, int oid, int keycode, string conflictControl, string conflictName) global
-    
     if (! ShouldHandleEvent(mcm))
         return
     endif
 
-    int i = 0
-    while (i < mcm.GetHoldCount())
-        OnOptionKeymapChange(mcm, oid, keycode, conflictControl, conflictName, i)
-        i += 1
-    endWhile
+    OnOptionKeymapChange(mcm, oid, keycode, conflictControl, conflictName)
 endFunction
 
 function OnInputOpen(RealisticPrisonAndBounty_MCM mcm, int oid) global
-
     if (! ShouldHandleEvent(mcm))
         return
     endif
 
-    int i = 0
-    while (i < mcm.GetHoldCount())
-        OnOptionInputOpen(mcm, oid, i)
-        i += 1
-    endWhile
+    OnOptionInputOpen(mcm, oid)
 endFunction
 
 function OnInputAccept(RealisticPrisonAndBounty_MCM mcm, int oid, string inputValue) global
-
     if (! ShouldHandleEvent(mcm))
         return
     endif
     
-    int i = 0
-    while (i < mcm.GetHoldCount())
-        OnOptionInputAccept(mcm, oid, inputValue, i)
-        i += 1
-    endWhile
+    OnOptionInputAccept(mcm, oid, inputValue)
 endFunction

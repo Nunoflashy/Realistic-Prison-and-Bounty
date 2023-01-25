@@ -8,23 +8,6 @@ GlobalVariable property NormalTimescale auto
 GlobalVariable property PrisonTimescale auto
 ; =======================================
 
-; Toggle used for Toggle options
-; The value is stored through SetOptionValue() and retrieved with GetOptionValue(),
-; so we can use a temporary toggle just to display it.
-bool temporary_toggle
-
-bool function GetToggleState()
-    temporary_toggle = bool_if(temporary_toggle, false, true)
-    Log(self, "GetToggleState", "Toggle is now " + temporary_toggle)
-    return temporary_toggle
-endFunction
-
-int function GetOptionStatusFlag(int oid)
-    bool condition = bool_if(GetOptionValue(oid) <= 0, false, true)
-    Log(self, "GetOptionStatusFlag", "oid: " + oid + ", value: " + GetOptionValue(oid) as bool)
-   return int_if (GetOptionValue(oid) as bool, OPTION_FLAG_NONE, OPTION_FLAG_DISABLED) 
-endFunction
-
 ; FormLists
 ; =======================================
 FormList property Arrest_AdditionalBountyWhenDefeatedFlat auto
@@ -126,6 +109,9 @@ int[] property oid_escape_undressUponCapture auto
 ; Bounty
 ; =======================================
 int   property oid_bounty_enableBountyDecayGeneral auto
+int   property oid_bounty_updateInterval auto
+int[] property oid_bounty_currentBounty auto
+int[] property oid_bounty_largestBounty auto
 int[] property oid_bounty_enableBountyDecay auto
 int[] property oid_bounty_decayInPrison auto
 int[] property oid_bounty_bountyLostPercent auto
@@ -179,15 +165,6 @@ int function GetHoldCount()
     return _holds.Length
 endFunction
 
-int function GetLeftIndex()
-    return 0
-endFunction
-
-; {Returns the index of the hold where the right panel starts}
-int function GetRightIndex()
-    return 5
-endFunction
-
 int property LeftPanelIndex
     int function get()
         return 0
@@ -238,10 +215,7 @@ function InitializeOptions()
 
 ; Timescale
 ; ============================================================
-    ; NormalTimescale = Game.GetFormFromFile(0x2851, "RealisticPrisonAndBounty.esp") as GlobalVariable
-    ; PrisonTimescale = Game.GetFormFromFile(0x2850, "RealisticPrisonAndBounty.esp") as GlobalVariable
 
-    ; SetDefaultTimescales()
 ; ============================================================
 
 ; General
@@ -336,6 +310,8 @@ function InitializeOptions()
 
 ; Bounty
 ; ============================================================
+    oid_bounty_currentBounty = new int[9]
+    oid_bounty_largestBounty = new int[9]
     oid_bounty_enableBountyDecay = new int[9]
     oid_bounty_decayInPrison = new int[9]
     oid_bounty_bountyLostPercent = new int[9]
@@ -382,54 +358,54 @@ int property list_frisking_minimumBounty auto
 int property map_frisking auto
 int property whiterun_options auto
 
-bool function SetOptionAtIndex(int index, string category, string option, int value)
-    string[] holds = GetHoldNames()
-    return JDB.solveIntSetter("." + holds[index] + "." + category + "." + option, value, true)
-endFunction
+; bool function SetOptionAtIndex(int index, string category, string option, int value)
+;     string[] holds = GetHoldNames()
+;     return JDB.solveIntSetter("." + holds[index] + "." + category + "." + option, value, true)
+; endFunction
 
-string property StoragePrefix
-    string function get()
-        return ".__REALISTIC_PRISON_AND_BOUNTY__."
-    endFunction
-endProperty
+; string property StoragePrefix
+;     string function get()
+;         return ".__REALISTIC_PRISON_AND_BOUNTY__."
+;     endFunction
+; endProperty
 
-bool function SetOptionValue(int oid, int value)
-    Log(self, "SetOptionValue", "Option ID: " + oid + " (value: " + value + ")" + " has been saved successfully!")
-    return JDB.solveIntSetter(StoragePrefix + "OPTION_ID." + oid, value, true)
-endFunction
+; bool function SetOptionValue(int oid, int value)
+;     Log(self, "SetOptionValue", "Option ID: " + oid + " (value: " + value + ")" + " has been saved successfully!")
+;     return JDB.solveIntSetter(StoragePrefix + "OPTION_ID." + oid, value, true)
+; endFunction
 
-bool function SetOptionValueBool(int oid, bool value)
-    SetOptionValue(oid, value as int)
-endFunction
+; bool function SetOptionValueBool(int oid, bool value)
+;     SetOptionValue(oid, value as int)
+; endFunction
 
-bool function SetOptionStringValue(int oid, string value)
-    return JDB.solveStrSetter(StoragePrefix + "OPTION_ID." + oid, value, true)
-endFunction
+; bool function SetOptionStringValue(int oid, string value)
+;     return JDB.solveStrSetter(StoragePrefix + "OPTION_ID." + oid, value, true)
+; endFunction
 
-bool function SetOptionIntValue(int oid, int value)
-    return JDB.solveIntSetter(StoragePrefix + "OPTION_ID." + oid, value, true)
-endFunction
+; bool function SetOptionIntValue(int oid, int value)
+;     return JDB.solveIntSetter(StoragePrefix + "OPTION_ID." + oid, value, true)
+; endFunction
 
-bool function SetOptionBoolValue(int oid, bool value)
-    return JDB.solveIntSetter(StoragePrefix + "OPTION_ID." + oid, value as int, true)
-endFunction
+; bool function SetOptionBoolValue(int oid, bool value)
+;     return JDB.solveIntSetter(StoragePrefix + "OPTION_ID." + oid, value as int, true)
+; endFunction
 
-int function GetOptionValue(int oid)
-    return JDB.solveInt(StoragePrefix + "OPTION_ID." + oid)
-endFunction
+; int function GetOptionValue(int oid)
+;     return JDB.solveInt(StoragePrefix + "OPTION_ID." + oid)
+; endFunction
 
-int function GetOptionAtIndex(int index, string category, string option)
-    string[] holds = GetHoldNames()
+; int function GetOptionAtIndex(int index, string category, string option)
+;     string[] holds = GetHoldNames()
 
-    return JDB.solveInt("." + holds[index] + "." + category + "." + option)
-endFunction
+;     return JDB.solveInt("." + holds[index] + "." + category + "." + option)
+; endFunction
 
 
 ;/ 
     Sets the enabled flag to an option based on its ID if it the dependency is met, disabled otherwise.
     The option could be a toggle that depends on another toggle,
     in which case, if the dependency toggle is not met, the option will not be enabled.
-    
+
     returns true if the option was enabled, false if the option was disabled.
 /;   
 bool function SetOptionDependencyBool(int optionId, bool dependency)
@@ -490,6 +466,19 @@ int function GetOptionInListByOID(int[] optionList, int optionId)
     return -1
 endFunction
 
+int function GetOptionInListByID(int[] optionList, int optionId)
+    int i = 0
+    while (i < optionList.Length)
+        if (optionList[i] == optionId)
+            _currentOptionIndex = i
+            return optionId
+        endif
+        i += 1
+    endWhile
+
+    return -1
+endFunction
+
 ; ; Returns the OptionID of the object at list[index]
 ; int function GetOptionValue(int list, int index)
 ;     return JIntMap.getInt(list, index)
@@ -505,11 +494,11 @@ event OnConfigInit()
     InitializePages()
     InitializeOptions()
 
-    JDB.solveIntSetter(".whiterun.frisking.minimumBounty", 1000, true)
-    JDB.solveIntSetter(".winterhold.frisking.minimumBounty", 782, true)
+    ; JDB.solveIntSetter(".whiterun.frisking.minimumBounty", 1000, true)
+    ; JDB.solveIntSetter(".winterhold.frisking.minimumBounty", 782, true)
 
-    SetOptionAtIndex(0, "frisking", "minimumBounty", 1784)
-    SetOptionAtIndex(1, "frisking", "minimumBounty", 2502)
+    ; SetOptionAtIndex(0, "frisking", "minimumBounty", 1784)
+    ; SetOptionAtIndex(1, "frisking", "minimumBounty", 2502)
 endEvent
 
 ; Event Handling
