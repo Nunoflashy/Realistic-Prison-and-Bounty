@@ -424,6 +424,48 @@ int function GetOptionAtIndex(int index, string category, string option)
     return JDB.solveInt("." + holds[index] + "." + category + "." + option)
 endFunction
 
+
+;/ 
+    Sets the enabled flag to an option based on its ID if it the dependency is met, disabled otherwise.
+    The option could be a toggle that depends on another toggle,
+    in which case, if the dependency toggle is not met, the option will not be enabled.
+    
+    returns true if the option was enabled, false if the option was disabled.
+/;   
+bool function SetOptionDependencyBool(int optionId, bool dependency)
+    int enabled  = OPTION_FLAG_NONE
+    int disabled = OPTION_FLAG_DISABLED
+
+    SetOptionFlags(optionId, int_if (dependency, enabled, disabled))
+    
+    if (dependency)
+        return true
+    endif
+
+    return false
+endFunction
+
+;/
+    Toggles the specified option by id, optionally stores it persistently into the save
+
+    returns the toggle state after it has been toggled.
+/;
+bool function ToggleOption(int optionId, bool storePersistently = true)
+    bool optionState = GetOptionValue(optionId)
+    
+    ; Set the toggle option value (display checked or unchecked)
+    ; If the option was checked, uncheck it and vice versa.
+    SetToggleOptionValue(optionId, bool_if (optionState, false, true))
+
+    ; Store the value persistently
+    if (storePersistently)
+        SetOptionValueBool(optionId, bool_if (optionState, false, true))
+    endif
+
+    ; Return the inverse since that's what we stored it as when we toggled.
+    return ! optionState
+endFunction
+
 int _currentOptionIndex
 int property CurrentOptionIndex
     int function get()

@@ -112,10 +112,7 @@ endFunction
 
 function OnOptionSelect(RealisticPrisonAndBounty_MCM mcm, int oid) global
 
-    bool optionState = mcm.GetOptionValue(oid) as bool
-    mcm.SetToggleOptionValue(oid, bool_if(optionState, false, true))
-    mcm.SetOptionValueBool(oid, bool_if(optionState, false, true))
-    optionState = mcm.GetOptionValue(oid) as bool
+    bool optionState = mcm.ToggleOption(oid)
 
     int allowFrisking               = mcm.GetOptionInListByOID(mcm.oid_frisking_allow, oid)
     int minimumBounty               = mcm.GetOptionInListByOID(mcm.oid_frisking_minimumBounty, oid)
@@ -128,91 +125,53 @@ function OnOptionSelect(RealisticPrisonAndBounty_MCM mcm, int oid) global
     int stripSearchStolenItemsNumber= mcm.GetOptionInListByOID(mcm.oid_frisking_stripSearchStolenItemsNumber, oid)
 
     if (oid == allowFrisking)
-        int enabled  = mcm.OPTION_FLAG_NONE
-        int disabled = mcm.OPTION_FLAG_DISABLED
-        
-        int flags = int_if(optionState, enabled, disabled)
+        ; Enable all options except confiscating/stripping related, if allowFrisking is enabled, otherwise disable them.
+        mcm.SetOptionDependencyBool(mcm.oid_frisking_minimumBounty[mcm.CurrentOptionIndex], mcm.GetOptionValue(oid))
+        mcm.SetOptionDependencyBool(mcm.oid_frisking_guaranteedPayableBounty[mcm.CurrentOptionIndex], mcm.GetOptionValue(oid))
+        mcm.SetOptionDependencyBool(mcm.oid_frisking_maximumPayableBounty[mcm.CurrentOptionIndex], mcm.GetOptionValue(oid))
+        mcm.SetOptionDependencyBool(mcm.oid_frisking_maximumPayableBountyChance[mcm.CurrentOptionIndex], mcm.GetOptionValue(oid))
+        mcm.SetOptionDependencyBool(mcm.oid_frisking_friskSearchThoroughness[mcm.CurrentOptionIndex], mcm.GetOptionValue(oid))
+        mcm.SetOptionDependencyBool(mcm.oid_frisking_confiscateStolenItems[mcm.CurrentOptionIndex], mcm.GetOptionValue(oid))
 
-        mcm.SetOptionFlags(mcm.oid_frisking_minimumBounty[mcm.CurrentOptionIndex], flags)
-        mcm.SetOptionFlags(mcm.oid_frisking_guaranteedPayableBounty[mcm.CurrentOptionIndex], flags)
-        mcm.SetOptionFlags(mcm.oid_frisking_maximumPayableBounty[mcm.CurrentOptionIndex], flags)
-        mcm.SetOptionFlags(mcm.oid_frisking_maximumPayableBountyChance[mcm.CurrentOptionIndex], flags)
-        mcm.SetOptionFlags(mcm.oid_frisking_friskSearchThoroughness[mcm.CurrentOptionIndex], flags)
-        mcm.SetOptionFlags(mcm.oid_frisking_confiscateStolenItems[mcm.CurrentOptionIndex], flags)
+        ; Only enable stripSearchStolenItems if allowFrisking and confiscateStolenItems are active, otherwise disable it.
+        mcm.SetOptionDependencyBool( \
+            mcm.oid_frisking_stripSearchStolenItems[mcm.CurrentOptionIndex], \
+            optionState && mcm.GetOptionValue(mcm.oid_frisking_confiscateStolenItems[mcm.CurrentOptionIndex]) \
+        )
 
-        bool confiscateStolenItemsValue         = mcm.GetOptionValue(mcm.oid_frisking_confiscateStolenItems[mcm.CurrentOptionIndex])
-        bool stripSearchStolenItemsValue        = mcm.GetOptionValue(mcm.oid_frisking_stripSearchStolenItems[mcm.CurrentOptionIndex])
-        bool stripSearchStolenItemsNumberValue  = mcm.GetOptionValue(mcm.oid_frisking_stripSearchStolenItemsNumber[mcm.CurrentOptionIndex])
-
-        int stripFlags          = int_if (optionState && confiscateStolenItemsValue, enabled, disabled)
-        int stripNoOfItemsFlags = int_if (stripFlags == enabled && stripSearchStolenItemsValue, enabled, disabled)
-
-        mcm.SetOptionFlags(mcm.oid_frisking_stripSearchStolenItems[mcm.CurrentOptionIndex], stripFlags)
-        mcm.SetOptionFlags(mcm.oid_frisking_stripSearchStolenItemsNumber[mcm.CurrentOptionIndex], stripNoOfItemsFlags)
+        ; Only enable stripSearchStolenItemsNumber if allowFrisking, confiscateStolenItems and stripSearchStolenItems are active, otherwise disable it.
+        mcm.SetOptionDependencyBool( \
+            mcm.oid_frisking_stripSearchStolenItemsNumber[mcm.CurrentOptionIndex], \
+            optionState && mcm.GetOptionValue(mcm.oid_frisking_confiscateStolenItems[mcm.CurrentOptionIndex]) && \
+            mcm.GetOptionValue(mcm.oid_frisking_stripSearchStolenItems[mcm.CurrentOptionIndex]) \
+        )
     endif
 
     ; if the option selected is confiscateStolenItems
     if (oid == confiscateStolenItems)
-        int enabled  = mcm.OPTION_FLAG_NONE
-        int disabled = mcm.OPTION_FLAG_DISABLED
 
-        bool confiscateStolenItemsValue         = mcm.GetOptionValue(mcm.oid_frisking_confiscateStolenItems[mcm.CurrentOptionIndex])
-        bool stripSearchStolenItemsValue        = mcm.GetOptionValue(mcm.oid_frisking_stripSearchStolenItems[mcm.CurrentOptionIndex])
-        bool stripSearchStolenItemsNumberValue  = mcm.GetOptionValue(mcm.oid_frisking_stripSearchStolenItemsNumber[mcm.CurrentOptionIndex])
+        ; Only enable stripSearchStolenItems if this toggle is active, otherwise disable it.
+        mcm.SetOptionDependencyBool( \
+            mcm.oid_frisking_stripSearchStolenItems[mcm.CurrentOptionIndex], \
+            optionState \
+        )
 
-        int stripFlags          = int_if (optionState && confiscateStolenItemsValue, enabled, disabled)
-        int stripNoOfItemsFlags = int_if (stripFlags == enabled && stripSearchStolenItemsValue, enabled, disabled)
+        ; Only enable stripSearchStolenItemsNumber if this and the toggle stripSearchStolenItems is active, otherwise disable it.
+        mcm.SetOptionDependencyBool( \
+            mcm.oid_frisking_stripSearchStolenItemsNumber[mcm.CurrentOptionIndex], \
+            optionState && \
+            mcm.GetOptionValue(mcm.oid_frisking_stripSearchStolenItems[mcm.CurrentOptionIndex]) \
+         )
 
-        mcm.SetOptionFlags(mcm.oid_frisking_stripSearchStolenItems[mcm.CurrentOptionIndex], stripFlags)
-        mcm.SetOptionFlags(mcm.oid_frisking_stripSearchStolenItemsNumber[mcm.CurrentOptionIndex], stripNoOfItemsFlags)
-        ; ; Get the toggle value
-        ; bool toggleValue = mcm.GetOptionValue(oid) as bool
-
-        ; if (! toggleValue) ; if confiscate stolen items is not enabled
-        ;     ; disable strip search if stolen items found
-        ;     mcm.SetOptionFlags(mcm.oid_frisking_stripSearchStolenItems[mcm.CurrentOptionIndex], mcm.OPTION_FLAG_DISABLED)
-        ;     ; disable minimum no....
-        ;     mcm.SetOptionFlags(mcm.oid_frisking_stripSearchStolenItemsNumber[mcm.CurrentOptionIndex], mcm.OPTION_FLAG_DISABLED)
-
-        ; else ; if confiscate stolen items is enabled
-        ;     ; enable strip search if stolen items found
-        ;     mcm.SetOptionFlags(mcm.oid_frisking_stripSearchStolenItems[mcm.CurrentOptionIndex], mcm.OPTION_FLAG_NONE)
-        ;     ; enable minimum no....
-        ;     if (mcm.GetOptionValue(mcm.oid_frisking_stripSearchStolenItems[mcm.CurrentOptionIndex]))
-        ;         mcm.SetOptionFlags(mcm.oid_frisking_stripSearchStolenItemsNumber[mcm.CurrentOptionIndex], mcm.OPTION_FLAG_NONE)
-        ;     endif
-        ; endif
     endif
 
-    ; if the option selected is stripSearchStolenItems
     if (oid == stripSearchStolenItems)
-        bool toggleValue = mcm.GetOptionValue(oid) as bool
-
-        ; if strip search if stolen items found is not enabled
-        if (! toggleValue)
-            ; disable minimum no...
-            mcm.SetOptionFlags(mcm.oid_frisking_stripSearchStolenItemsNumber[mcm.CurrentOptionIndex], mcm.OPTION_FLAG_DISABLED)
-        else
-            ; enable minimum no...
-            mcm.SetOptionFlags(mcm.oid_frisking_stripSearchStolenItemsNumber[mcm.CurrentOptionIndex], mcm.OPTION_FLAG_NONE)
-        endif
+        ; Only enable stripSearchStolenItemsNumber if this toggle is active, otherwise disable it.
+        mcm.SetOptionDependencyBool( \
+            mcm.oid_frisking_stripSearchStolenItemsNumber[mcm.CurrentOptionIndex], \
+            optionState \
+        )
     endif
-
-
-    ; elseif (oid == confiscateStolenItems)
-    ;     mcm.SetOptionFlags(mcm.oid_frisking_stripSearchStolenItems[mcm.CurrentOptionIndex], mcm.GetOptionStatusFlag(oid))
-    ;     Log(mcm, "OnOptionSelect", "oid_frisking_confiscateStolenItems(value): " + mcm.GetOptionStatusFlag(mcm.oid_frisking_confiscateStolenItems [mcm.CurrentOptionIndex]))
-    ;     Log(mcm, "OnOptionSelect", "oid_frisking_stripSearchStolenItems(value): " + mcm.GetOptionStatusFlag(mcm.oid_frisking_stripSearchStolenItems[mcm.CurrentOptionIndex]))
-    ;     if (! mcm.GetOptionStatusFlag(mcm.oid_frisking_stripSearchStolenItems[mcm.CurrentOptionIndex]))
-    ;         Log(mcm, "OnOptionSelect", "Strip search option is disabled, returning!")
-    ;         return
-    ;     endif
-        
-    ;     mcm.SetOptionFlags(mcm.oid_frisking_stripSearchStolenItemsNumber[mcm.CurrentOptionIndex], mcm.GetOptionStatusFlag(oid))
-
-    ; elseif (oid == stripSearchStolenItems)
-    ;     mcm.SetOptionFlags(mcm.oid_frisking_stripSearchStolenItemsNumber[mcm.CurrentOptionIndex], mcm.GetOptionStatusFlag(oid))
-    ; endif
 endFunction
 
 function OnOptionSliderOpen(RealisticPrisonAndBounty_MCM mcm, int oid) global
