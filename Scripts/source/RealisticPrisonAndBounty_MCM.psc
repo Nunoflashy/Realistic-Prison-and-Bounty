@@ -19,6 +19,12 @@ bool function GetToggleState()
     return temporary_toggle
 endFunction
 
+int function GetOptionStatusFlag(int oid)
+    bool condition = bool_if(GetOptionValue(oid) <= 0, false, true)
+    Log(self, "GetOptionStatusFlag", "oid: " + oid + ", value: " + GetOptionValue(oid) as bool)
+   return int_if (GetOptionValue(oid) as bool, OPTION_FLAG_NONE, OPTION_FLAG_DISABLED) 
+endFunction
+
 ; FormLists
 ; =======================================
 FormList property Arrest_AdditionalBountyWhenDefeatedFlat auto

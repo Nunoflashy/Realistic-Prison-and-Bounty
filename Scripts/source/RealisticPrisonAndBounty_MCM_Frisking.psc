@@ -106,7 +106,7 @@ function OnOptionHighlight(RealisticPrisonAndBounty_MCM mcm, int oid) global
     Log(mcm, "Frisking::OnHighlight", "execution took " + elapsedTime + " seconds.")
 endFunction
 
-function OnOptionDefault(RealisticPrisonAndBounty_MCM mcm, int oid, int index) global
+function OnOptionDefault(RealisticPrisonAndBounty_MCM mcm, int oid) global
     
 endFunction
 
@@ -128,7 +128,10 @@ function OnOptionSelect(RealisticPrisonAndBounty_MCM mcm, int oid) global
     int stripSearchStolenItemsNumber= mcm.GetOptionInListByOID(mcm.oid_frisking_stripSearchStolenItemsNumber, oid)
 
     if (oid == allowFrisking)
-        int flags = int_if(!optionState, mcm.OPTION_FLAG_DISABLED, mcm.OPTION_FLAG_NONE)
+        int enabled  = mcm.OPTION_FLAG_NONE
+        int disabled = mcm.OPTION_FLAG_DISABLED
+        
+        int flags = int_if(optionState, enabled, disabled)
 
         mcm.SetOptionFlags(mcm.oid_frisking_minimumBounty[mcm.CurrentOptionIndex], flags)
         mcm.SetOptionFlags(mcm.oid_frisking_guaranteedPayableBounty[mcm.CurrentOptionIndex], flags)
@@ -136,124 +139,195 @@ function OnOptionSelect(RealisticPrisonAndBounty_MCM mcm, int oid) global
         mcm.SetOptionFlags(mcm.oid_frisking_maximumPayableBountyChance[mcm.CurrentOptionIndex], flags)
         mcm.SetOptionFlags(mcm.oid_frisking_friskSearchThoroughness[mcm.CurrentOptionIndex], flags)
         mcm.SetOptionFlags(mcm.oid_frisking_confiscateStolenItems[mcm.CurrentOptionIndex], flags)
-        mcm.SetOptionFlags(mcm.oid_frisking_stripSearchStolenItems[mcm.CurrentOptionIndex], flags)
-        mcm.SetOptionFlags(mcm.oid_frisking_stripSearchStolenItemsNumber[mcm.CurrentOptionIndex], flags)
 
-        ; mcm.oid_frisking_allow_state[index] = ! mcm.oid_frisking_allow_state[index]
-        ; mcm.SetToggleOptionValue(oid, mcm.oid_frisking_allow_state[index])
-        ; mcm.SetOptionValue(oid, mcm.oid_frisking_allow_state[index] as int)
-        return
+        bool confiscateStolenItemsValue         = mcm.GetOptionValue(mcm.oid_frisking_confiscateStolenItems[mcm.CurrentOptionIndex])
+        bool stripSearchStolenItemsValue        = mcm.GetOptionValue(mcm.oid_frisking_stripSearchStolenItems[mcm.CurrentOptionIndex])
+        bool stripSearchStolenItemsNumberValue  = mcm.GetOptionValue(mcm.oid_frisking_stripSearchStolenItemsNumber[mcm.CurrentOptionIndex])
 
-    elseif (oid == stripSearchStolenItems)
-        mcm.SetOptionFlags( \
-        stripSearchStolenItemsNumber, \
-            int_if(optionState, mcm.OPTION_FLAG_NONE, mcm.OPTION_FLAG_DISABLED) \
-        )
-        return
+        int stripFlags          = int_if (optionState && confiscateStolenItemsValue, enabled, disabled)
+        int stripNoOfItemsFlags = int_if (stripFlags == enabled && stripSearchStolenItemsValue, enabled, disabled)
 
+        mcm.SetOptionFlags(mcm.oid_frisking_stripSearchStolenItems[mcm.CurrentOptionIndex], stripFlags)
+        mcm.SetOptionFlags(mcm.oid_frisking_stripSearchStolenItemsNumber[mcm.CurrentOptionIndex], stripNoOfItemsFlags)
     endif
+
+    ; if the option selected is confiscateStolenItems
+    if (oid == confiscateStolenItems)
+        int enabled  = mcm.OPTION_FLAG_NONE
+        int disabled = mcm.OPTION_FLAG_DISABLED
+
+        bool confiscateStolenItemsValue         = mcm.GetOptionValue(mcm.oid_frisking_confiscateStolenItems[mcm.CurrentOptionIndex])
+        bool stripSearchStolenItemsValue        = mcm.GetOptionValue(mcm.oid_frisking_stripSearchStolenItems[mcm.CurrentOptionIndex])
+        bool stripSearchStolenItemsNumberValue  = mcm.GetOptionValue(mcm.oid_frisking_stripSearchStolenItemsNumber[mcm.CurrentOptionIndex])
+
+        int stripFlags          = int_if (optionState && confiscateStolenItemsValue, enabled, disabled)
+        int stripNoOfItemsFlags = int_if (stripFlags == enabled && stripSearchStolenItemsValue, enabled, disabled)
+
+        mcm.SetOptionFlags(mcm.oid_frisking_stripSearchStolenItems[mcm.CurrentOptionIndex], stripFlags)
+        mcm.SetOptionFlags(mcm.oid_frisking_stripSearchStolenItemsNumber[mcm.CurrentOptionIndex], stripNoOfItemsFlags)
+        ; ; Get the toggle value
+        ; bool toggleValue = mcm.GetOptionValue(oid) as bool
+
+        ; if (! toggleValue) ; if confiscate stolen items is not enabled
+        ;     ; disable strip search if stolen items found
+        ;     mcm.SetOptionFlags(mcm.oid_frisking_stripSearchStolenItems[mcm.CurrentOptionIndex], mcm.OPTION_FLAG_DISABLED)
+        ;     ; disable minimum no....
+        ;     mcm.SetOptionFlags(mcm.oid_frisking_stripSearchStolenItemsNumber[mcm.CurrentOptionIndex], mcm.OPTION_FLAG_DISABLED)
+
+        ; else ; if confiscate stolen items is enabled
+        ;     ; enable strip search if stolen items found
+        ;     mcm.SetOptionFlags(mcm.oid_frisking_stripSearchStolenItems[mcm.CurrentOptionIndex], mcm.OPTION_FLAG_NONE)
+        ;     ; enable minimum no....
+        ;     if (mcm.GetOptionValue(mcm.oid_frisking_stripSearchStolenItems[mcm.CurrentOptionIndex]))
+        ;         mcm.SetOptionFlags(mcm.oid_frisking_stripSearchStolenItemsNumber[mcm.CurrentOptionIndex], mcm.OPTION_FLAG_NONE)
+        ;     endif
+        ; endif
+    endif
+
+    ; if the option selected is stripSearchStolenItems
+    if (oid == stripSearchStolenItems)
+        bool toggleValue = mcm.GetOptionValue(oid) as bool
+
+        ; if strip search if stolen items found is not enabled
+        if (! toggleValue)
+            ; disable minimum no...
+            mcm.SetOptionFlags(mcm.oid_frisking_stripSearchStolenItemsNumber[mcm.CurrentOptionIndex], mcm.OPTION_FLAG_DISABLED)
+        else
+            ; enable minimum no...
+            mcm.SetOptionFlags(mcm.oid_frisking_stripSearchStolenItemsNumber[mcm.CurrentOptionIndex], mcm.OPTION_FLAG_NONE)
+        endif
+    endif
+
+
+    ; elseif (oid == confiscateStolenItems)
+    ;     mcm.SetOptionFlags(mcm.oid_frisking_stripSearchStolenItems[mcm.CurrentOptionIndex], mcm.GetOptionStatusFlag(oid))
+    ;     Log(mcm, "OnOptionSelect", "oid_frisking_confiscateStolenItems(value): " + mcm.GetOptionStatusFlag(mcm.oid_frisking_confiscateStolenItems [mcm.CurrentOptionIndex]))
+    ;     Log(mcm, "OnOptionSelect", "oid_frisking_stripSearchStolenItems(value): " + mcm.GetOptionStatusFlag(mcm.oid_frisking_stripSearchStolenItems[mcm.CurrentOptionIndex]))
+    ;     if (! mcm.GetOptionStatusFlag(mcm.oid_frisking_stripSearchStolenItems[mcm.CurrentOptionIndex]))
+    ;         Log(mcm, "OnOptionSelect", "Strip search option is disabled, returning!")
+    ;         return
+    ;     endif
+        
+    ;     mcm.SetOptionFlags(mcm.oid_frisking_stripSearchStolenItemsNumber[mcm.CurrentOptionIndex], mcm.GetOptionStatusFlag(oid))
+
+    ; elseif (oid == stripSearchStolenItems)
+    ;     mcm.SetOptionFlags(mcm.oid_frisking_stripSearchStolenItemsNumber[mcm.CurrentOptionIndex], mcm.GetOptionStatusFlag(oid))
+    ; endif
 endFunction
 
-function OnOptionSliderOpen(RealisticPrisonAndBounty_MCM mcm, int oid, int index) global
+function OnOptionSliderOpen(RealisticPrisonAndBounty_MCM mcm, int oid) global
 
     int optionValue = mcm.GetOptionValue(oid)
 
-    if (oid == mcm.oid_frisking_minimumBounty[index])
+    int minimumBounty               = mcm.GetOptionInListByOID(mcm.oid_frisking_minimumBounty, oid)
+    int guaranteedPayableBounty     = mcm.GetOptionInListByOID(mcm.oid_frisking_guaranteedPayableBounty, oid)
+    int maximumPayableBounty        = mcm.GetOptionInListByOID(mcm.oid_frisking_maximumPayableBounty, oid)
+    int maximumPayableBountyChance  = mcm.GetOptionInListByOID(mcm.oid_frisking_maximumPayableBountyChance, oid)
+    int friskSearchThoroughness     = mcm.GetOptionInListByOID(mcm.oid_frisking_friskSearchThoroughness, oid)     
+    int stripSearchStolenItemsNumber= mcm.GetOptionInListByOID(mcm.oid_frisking_stripSearchStolenItemsNumber, oid)
+
+    if (oid == minimumBounty)
         mcm.SetSliderOptions(minRange = 1, maxRange = 100000, intervalSteps = 1, defaultValue = 500, startValue = int_if(optionValue, optionValue, 500))
         Log(mcm, "OnOptionSliderOpen", "This is a test: " + "[oid: " + oid + ", startValue: " + optionValue + "]")
 
-    elseif (oid == mcm.oid_frisking_guaranteedPayableBounty[index])
+    elseif (oid == guaranteedPayableBounty)
         mcm.SetSliderOptions(minRange = 1, maxRange = 100000, intervalSteps = 1, defaultValue = 1000, startValue = int_if(optionValue, optionValue, 1000))
         Log(mcm, "OnOptionSliderOpen", "This is a test: " + "[oid: " + oid + ", startValue: " + optionValue + "]")
 
-    elseif (oid == mcm.oid_frisking_maximumPayableBounty[index])
+    elseif (oid == maximumPayableBounty)
         mcm.SetSliderOptions(minRange = 1, maxRange = 100000, intervalSteps = 1, defaultValue = 2000, startValue = int_if(optionValue, optionValue, 2000))
         Log(mcm, "OnOptionSliderOpen", "This is a test: " + "[oid: " + oid + ", startValue: " + optionValue + "]")
 
-    elseif (oid == mcm.oid_frisking_maximumPayableBountyChance[index])
+    elseif (oid == maximumPayableBountyChance)
         mcm.SetSliderOptions(minRange = 1, maxRange = 100, intervalSteps = 1, defaultValue = 25, startValue = int_if(optionValue, optionValue, 25))
         Log(mcm, "OnOptionSliderOpen", "This is a test: " + "[oid: " + oid + ", startValue: " + optionValue + "]")
 
-    elseif (oid == mcm.oid_frisking_friskSearchThoroughness[index])
+    elseif (oid == friskSearchThoroughness)
         mcm.SetSliderOptions(minRange = 1, maxRange = 1000, intervalSteps = 1, defaultValue = 400, startValue = int_if(optionValue, optionValue, 400))
         Log(mcm, "OnOptionSliderOpen", "This is a test: " + "[oid: " + oid + ", startValue: " + optionValue + "]")
 
-    elseif (oid == mcm.oid_frisking_stripSearchStolenItemsNumber[index])
+    elseif (oid == stripSearchStolenItemsNumber)
         mcm.SetSliderOptions(minRange = 1, maxRange = 10000, intervalSteps = 1, defaultValue = 10, startValue = int_if(optionValue, optionValue, 10))
         Log(mcm, "OnOptionSliderOpen", "This is a test: " + "[oid: " + oid + ", startValue: " + optionValue + "]")
     endif
 endFunction
 
-function OnOptionSliderAccept(RealisticPrisonAndBounty_MCM mcm, int oid, float value, int index) global
-    if (oid == mcm.oid_frisking_minimumBounty[index])
-        mcm.SetSliderOptionValue(oid, value)
-        mcm.SetOptionValue(oid, value as int)
+function OnOptionSliderAccept(RealisticPrisonAndBounty_MCM mcm, int oid, float value) global
 
-    elseif (oid == mcm.oid_frisking_guaranteedPayableBounty[index])
-        mcm.SetSliderOptionValue(oid, value)
-        mcm.SetOptionValue(oid, value as int)
+    ; int allowFrisking               = mcm.GetOptionInListByOID(mcm.oid_frisking_allow, oid)
+    ; int minimumBounty               = mcm.GetOptionInListByOID(mcm.oid_frisking_minimumBounty, oid)
+    ; int guaranteedPayableBounty     = mcm.GetOptionInListByOID(mcm.oid_frisking_guaranteedPayableBounty, oid)
+    ; int maximumPayableBounty        = mcm.GetOptionInListByOID(mcm.oid_frisking_maximumPayableBounty, oid)
+    int maximumPayableBountyChance  = mcm.GetOptionInListByOID(mcm.oid_frisking_maximumPayableBountyChance, oid)
+    ; int friskSearchThoroughness     = mcm.GetOptionInListByOID(mcm.oid_frisking_friskSearchThoroughness, oid)     
+    ; int confiscateStolenItems       = mcm.GetOptionInListByOID(mcm.oid_frisking_confiscateStolenItems, oid)
+    ; int stripSearchStolenItems      = mcm.GetOptionInListByOID(mcm.oid_frisking_stripSearchStolenItems, oid)  
+    ; int stripSearchStolenItemsNumber= mcm.GetOptionInListByOID(mcm.oid_frisking_stripSearchStolenItemsNumber, oid)
 
-    elseif (oid == mcm.oid_frisking_maximumPayableBounty[index])
-        mcm.SetSliderOptionValue(oid, value)
-        mcm.SetOptionValue(oid, value as int)
+    mcm.SetSliderOptionValue(oid, value, string_if(oid == maximumPayableBountyChance, "{0}%", "{0}"))
+    mcm.SetOptionValue(oid, value as int)
+    ; if (oid == mcm.oid_frisking_minimumBounty[index])
+    ;     mcm.SetSliderOptionValue(oid, value)
+    ;     mcm.SetOptionValue(oid, value as int)
 
-    elseif (oid == mcm.oid_frisking_maximumPayableBountyChance[index])
-        mcm.SetSliderOptionValue(oid, value, "{0}%")
-        mcm.SetOptionValue(oid, value as int)
+    ; elseif (oid == mcm.oid_frisking_guaranteedPayableBounty[index])
+    ;     mcm.SetSliderOptionValue(oid, value)
+    ;     mcm.SetOptionValue(oid, value as int)
 
-    elseif (oid == mcm.oid_frisking_friskSearchThoroughness[index])
-        mcm.SetSliderOptionValue(oid, value)
-        mcm.SetOptionValue(oid, value as int)
+    ; elseif (oid == mcm.oid_frisking_maximumPayableBounty[index])
+    ;     mcm.SetSliderOptionValue(oid, value)
+    ;     mcm.SetOptionValue(oid, value as int)
+
+    ; elseif (oid == mcm.oid_frisking_maximumPayableBountyChance[index])
+    ;     mcm.SetSliderOptionValue(oid, value, "{0}%")
+    ;     mcm.SetOptionValue(oid, value as int)
+
+    ; elseif (oid == mcm.oid_frisking_friskSearchThoroughness[index])
+    ;     mcm.SetSliderOptionValue(oid, value)
+    ;     mcm.SetOptionValue(oid, value as int)
         
-    elseif (oid == mcm.oid_frisking_stripSearchStolenItemsNumber[index])
-        mcm.SetSliderOptionValue(oid, value)
-        mcm.SetOptionValue(oid, value as int)
-    endif
+    ; elseif (oid == mcm.oid_frisking_stripSearchStolenItemsNumber[index])
+    ;     mcm.SetSliderOptionValue(oid, value)
+    ;     mcm.SetOptionValue(oid, value as int)
+    ; endif
 endFunction
 
-function OnOptionMenuOpen(RealisticPrisonAndBounty_MCM mcm, int oid, int index) global
+function OnOptionMenuOpen(RealisticPrisonAndBounty_MCM mcm, int oid) global
 
 endFunction
 
-function OnOptionMenuAccept(RealisticPrisonAndBounty_MCM mcm, int oid, int menuIndex, int itemIndex) global
+function OnOptionMenuAccept(RealisticPrisonAndBounty_MCM mcm, int oid, int menuIndex) global
     
 endFunction
 
-function OnOptionColorOpen(RealisticPrisonAndBounty_MCM mcm, int oid, int index) global
+function OnOptionColorOpen(RealisticPrisonAndBounty_MCM mcm, int oid) global
     
 endFunction
 
-function OnOptionColorAccept(RealisticPrisonAndBounty_MCM mcm, int oid, int color, int index) global
+function OnOptionColorAccept(RealisticPrisonAndBounty_MCM mcm, int oid, int color) global
     
 endFunction
 
-function OnOptionInputOpen(RealisticPrisonAndBounty_MCM mcm, int oid, int index) global
+function OnOptionInputOpen(RealisticPrisonAndBounty_MCM mcm, int oid) global
     
 endFunction
 
-function OnOptionInputAccept(RealisticPrisonAndBounty_MCM mcm, int oid, string input, int index) global
+function OnOptionInputAccept(RealisticPrisonAndBounty_MCM mcm, int oid, string input) global
     
 endFunction
 
-function OnOptionKeymapChange(RealisticPrisonAndBounty_MCM mcm, int oid, int keyCode, string conflictControl, string conflictName, int index) global
+function OnOptionKeymapChange(RealisticPrisonAndBounty_MCM mcm, int oid, int keyCode, string conflictControl, string conflictName) global
     
 endFunction
 
 
 
 function OnHighlight(RealisticPrisonAndBounty_MCM mcm, int oid) global
-
     if (! ShouldHandleEvent(mcm))
         return
     endif
 
     OnOptionHighlight(mcm, oid)
-
-    ; int i = 0
-    ; while (i < mcm.GetHoldCount())
-    ;     OnOptionHighlight(mcm, oid, i)
-    ;     i += 1
-    ; endWhile
 endFunction
 
 function OnDefault(RealisticPrisonAndBounty_MCM mcm, int oid) global
@@ -262,148 +336,85 @@ function OnDefault(RealisticPrisonAndBounty_MCM mcm, int oid) global
         return
     endif
 
-    int i = 0
-    while (i < mcm.GetHoldCount())
-        OnOptionDefault(mcm, oid, i)
-        i += 1
-    endWhile
+    OnOptionDefault(mcm, oid)
 endFunction
 
 function OnSelect(RealisticPrisonAndBounty_MCM mcm, int oid) global
-
     if (! ShouldHandleEvent(mcm))
         return
     endif
 
     OnOptionSelect(mcm, oid)
-
-
-    ; int i = 0
-    ; while (i < mcm.GetHoldCount())
-    ;     OnOptionSelect(mcm, oid, i)
-    ;     i += 1
-    ; endWhile
-
-    ; bool optionState = mcm.GetOptionValue(oid) as bool
-
-    ; mcm.SetToggleOptionValue(oid, bool_if(optionState, false, true))
-    ; mcm.SetOptionValueBool(oid, bool_if(optionState, false, true))
-
 endFunction
 
 function OnSliderOpen(RealisticPrisonAndBounty_MCM mcm, int oid) global
-
     if (! ShouldHandleEvent(mcm))
         return
     endif
 
-    int i = 0
-    while (i < mcm.GetHoldCount())
-        OnOptionSliderOpen(mcm, oid, i)
-        i += 1
-    endWhile
+    OnOptionSliderOpen(mcm, oid)
 endFunction
 
 function OnSliderAccept(RealisticPrisonAndBounty_MCM mcm, int oid, float value) global
-
     if (! ShouldHandleEvent(mcm))
         return
     endif
 
-    int i = 0
-    while (i < mcm.GetHoldCount())
-        OnOptionSliderAccept(mcm, oid, value, i)
-        i += 1
-    endWhile
+    OnOptionSliderAccept(mcm, oid, value)
 endFunction
 
 function OnMenuOpen(RealisticPrisonAndBounty_MCM mcm, int oid) global
-
     if (! ShouldHandleEvent(mcm))
         return
     endif
 
-    int i = 0
-    while (i < mcm.GetHoldCount())
-        OnOptionMenuOpen(mcm, oid, i)
-        i += 1
-    endWhile
+    OnOptionMenuOpen(mcm, oid)
 endFunction
 
 function OnMenuAccept(RealisticPrisonAndBounty_MCM mcm, int oid, int menuIndex) global
-
     if (! ShouldHandleEvent(mcm))
         return
     endif
 
-    int i = 0
-    while (i < mcm.GetHoldCount())
-        OnOptionMenuAccept(mcm, oid, menuIndex, i)
-        i += 1
-    endWhile
+    OnOptionMenuAccept(mcm, oid, menuIndex)
 endFunction
 
 function OnColorOpen(RealisticPrisonAndBounty_MCM mcm, int oid) global
-
     if (! ShouldHandleEvent(mcm))
         return
     endif
 
-    int i = 0
-    while (i < mcm.GetHoldCount())
-        OnOptionColorOpen(mcm, oid, i)
-        i += 1
-    endWhile
+    OnOptionColorOpen(mcm, oid)
 endFunction
 
 function OnColorAccept(RealisticPrisonAndBounty_MCM mcm, int oid, int color) global
-
     if (! ShouldHandleEvent(mcm))
         return
     endif
 
-    int i = 0
-    while (i < mcm.GetHoldCount())
-        OnOptionColorAccept(mcm, oid, color, i)
-        i += 1
-    endWhile
+    OnOptionColorAccept(mcm, oid, color)
 endFunction
 
 function OnKeymapChange(RealisticPrisonAndBounty_MCM mcm, int oid, int keycode, string conflictControl, string conflictName) global
-    
     if (! ShouldHandleEvent(mcm))
         return
     endif
 
-    int i = 0
-    while (i < mcm.GetHoldCount())
-        OnOptionKeymapChange(mcm, oid, keycode, conflictControl, conflictName, i)
-        i += 1
-    endWhile
+    OnOptionKeymapChange(mcm, oid, keycode, conflictControl, conflictName)
 endFunction
 
 function OnInputOpen(RealisticPrisonAndBounty_MCM mcm, int oid) global
-
     if (! ShouldHandleEvent(mcm))
         return
     endif
 
-    int i = 0
-    while (i < mcm.GetHoldCount())
-        OnOptionInputOpen(mcm, oid, i)
-        i += 1
-    endWhile
+    OnOptionInputOpen(mcm, oid)
 endFunction
 
 function OnInputAccept(RealisticPrisonAndBounty_MCM mcm, int oid, string inputValue) global
-
     if (! ShouldHandleEvent(mcm))
         return
     endif
     
-    int i = 0
-    while (i < mcm.GetHoldCount())
-        OnOptionInputAccept(mcm, oid, inputValue, i)
-        i += 1
-    endWhile
+    OnOptionInputAccept(mcm, oid, inputValue)
 endFunction
