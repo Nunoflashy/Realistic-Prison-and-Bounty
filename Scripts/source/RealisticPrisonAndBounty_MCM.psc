@@ -408,11 +408,12 @@ int property whiterun_options auto
 
     returns true if the option was enabled, false if the option was disabled.
 /;   
-bool function SetOptionDependencyBool(int optionId, bool dependency)
+bool function SetOptionDependencyBool(int optionId, bool dependency, bool storePersistently = true)
     int enabled  = OPTION_FLAG_NONE
     int disabled = OPTION_FLAG_DISABLED
 
     SetOptionFlags(optionId, int_if (dependency, enabled, disabled))
+
     
     if (dependency)
         return true
@@ -477,6 +478,12 @@ int function GetOptionInListByID(int[] optionList, int optionId)
     endWhile
 
     return -1
+endFunction
+
+
+
+int function GetCurrentHoldOption(int[] optionList)
+    return optionList[CurrentOptionIndex]
 endFunction
 
 ; ; Returns the OptionID of the object at list[index]

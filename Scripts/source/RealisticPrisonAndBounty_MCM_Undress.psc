@@ -85,24 +85,53 @@ function OnOptionHighlight(RealisticPrisonAndBounty_MCM mcm, int oid) global
     int redressAtChest                  = mcm.GetOptionInListByOID(mcm.oid_undressing_redressAtChest, oid)
 
 
-    mcm.SetInfoText( \
-        string_if (oid == allowUndressing, "Determines if you can be undressed while imprisoned in " + hold + ".", \
-        string_if (oid == minimumBounty, "The minimum bounty required to be undressed in " + hold + "'s prison.", \
-        string_if (oid == undressWhenDefeated, "Whether to have you undressed when defeated and imprisoned in " + hold + ".", \
-        string_if (oid == undressAtCell, "Whether to be undressed at the cell in " + hold + "'s prison.", \
-        string_if (oid == undressAtChest, "Whether to be undressed at the chest in "  + hold + "'prison.", \
-        string_if (oid == forcedUndressingMinBounty, "The minimum bounty required to be force undressed (You will have no possibility of action)", \
-        string_if (oid == forcedUndressingWhenDefeated, "Whether to be force undressed when defeated and imprisoned in " + hold + ".", \
-        string_if (oid == stripSearchThoroughness, "The thoroughness of the strip search when undressed, higher values mean a more thorough search and therefore possibly less items kept.\n" + \
-            "Due to the nature of a strip search, most items will be removed, this value will only determine small objects that could be hidden when stripped bare.", \
-        string_if (oid == allowWearingClothes, "Whether to allow wearing clothes while imprisoned in " + hold + ".", \
-        string_if (oid == redressBounty, "The maximum bounty you can have in order to be re-dressed while imprisoned in " + hold + ".", \
-        string_if (oid == redressWhenDefeated, "Whether to have you re-dressed when defeated (Note: If the bounty exceeds the maximum, this option will have no effect.)", \
-        string_if (oid == redressAtCell, "Whether to be re-dressed at the cell in " + hold + "'prison.", \
-        string_if (oid == redressAtChest, "Whether to be re-dressed at the chest in " + hold + "'prison.", \
-        "No description defined for this option." \
-        ))))))))))))) \
-    )
+    ; mcm.SetInfoText( \
+    ;     string_if (oid == allowUndressing, "Determines if you can be undressed while imprisoned in " + hold + ".", \
+    ;     string_if (oid == minimumBounty, "The minimum bounty required to be undressed in " + hold + "'s prison.", \
+    ;     string_if (oid == undressWhenDefeated, "Whether to have you undressed when defeated and imprisoned in " + hold + ".", \
+    ;     string_if (oid == undressAtCell, "Whether to be undressed at the cell in " + hold + "'s prison.", \
+    ;     string_if (oid == undressAtChest, "Whether to be undressed at the chest in "  + hold + "'prison.", \
+    ;     string_if (oid == forcedUndressingMinBounty, "The minimum bounty required to be force undressed (You will have no possibility of action)", \
+    ;     string_if (oid == forcedUndressingWhenDefeated, "Whether to be force undressed when defeated and imprisoned in " + hold + ".", \
+    ;     string_if (oid == stripSearchThoroughness, "The thoroughness of the strip search when undressed, higher values mean a more thorough search and therefore possibly less items kept.\n" + \
+    ;         "Due to the nature of a strip search, most items will be removed, this value will only determine small objects that could be hidden when stripped bare.", \
+    ;     string_if (oid == allowWearingClothes, "Whether to allow wearing clothes while imprisoned in " + hold + ".", \
+    ;     string_if (oid == redressBounty, "The maximum bounty you can have in order to be re-dressed while imprisoned in " + hold + ".", \
+    ;     string_if (oid == redressWhenDefeated, "Whether to have you re-dressed when defeated (Note: If the bounty exceeds the maximum, this option will have no effect.)", \
+    ;     string_if (oid == redressAtCell, "Whether to be re-dressed at the cell in " + hold + "'prison.", \
+    ;     string_if (oid == redressAtChest, "Whether to be re-dressed at the chest in " + hold + "'prison.", \
+    ;     "No description defined for this option." \
+    ;     ))))))))))))) \
+    ; )
+
+    if (oid == allowUndressing)
+        mcm.SetInfoText("Determines if you can be undressed while imprisoned in " + hold + ".")
+    elseif (oid == minimumBounty)
+        mcm.SetInfoText("The minimum bounty required to be undressed in " + hold + "'s prison.")
+    elseif (oid == undressWhenDefeated)
+        mcm.SetInfoText("Whether to have you undressed when defeated and imprisoned in " + hold + ".")
+    elseif (oid == undressAtCell)
+        mcm.SetInfoText("Whether to be undressed at the cell in " + hold + "'s prison.")
+    elseif (oid == undressAtChest)
+        mcm.SetInfoText("Whether to be undressed at the chest in "  + hold + "'prison.")
+    elseif (oid == forcedUndressingMinBounty)
+        mcm.SetInfoText("The minimum bounty required to be force undressed (You will have no possibility of action)")
+    elseif (oid == forcedUndressingWhenDefeated)
+        mcm.SetInfoText("Whether to be force undressed when defeated and imprisoned in " + hold + ".")
+    elseif (oid == stripSearchThoroughness)
+        mcm.SetInfoText("The thoroughness of the strip search when undressed, higher values mean a more thorough search and therefore possibly less items kept.\n" + \
+                 "Due to the nature of a strip search, most items will be removed, this value will only determine small objects that could be hidden when stripped bare.")
+    elseif (oid == allowWearingClothes)
+        mcm.SetInfoText("Whether to allow wearing clothes while imprisoned in " + hold + ".")
+    elseif (oid == redressBounty)
+        mcm.SetInfoText("The maximum bounty you can have in order to be re-dressed while imprisoned in " + hold + ".")
+    elseif (oid == redressWhenDefeated)
+        mcm.SetInfoText("Whether to have you re-dressed when defeated (Note: If the bounty exceeds the maximum, this option will have no effect.)")
+    elseif (oid == redressAtCell)
+        mcm.SetInfoText("Whether to be re-dressed at the cell in " + hold + "'prison.")
+    elseif (oid == redressAtChest)
+        mcm.SetInfoText("Whether to be re-dressed at the chest in " + hold + "'prison.")
+    endif
 
 endFunction
 

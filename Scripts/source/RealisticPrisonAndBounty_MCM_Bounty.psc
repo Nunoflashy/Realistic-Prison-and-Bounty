@@ -75,16 +75,30 @@ function OnOptionHighlight(RealisticPrisonAndBounty_MCM mcm, int oid) global
     int bountyLostPercent   = mcm.GetOptionInListByOID(mcm.oid_bounty_bountyLostPercent, oid)
     int bountyLostFlat      = mcm.GetOptionInListByOID(mcm.oid_bounty_bountyLostFlat, oid)
 
-    mcm.SetInfoText( \
-        string_if (oid == currentBounty, "Your current bounty in " + holds[mcm.CurrentOptionIndex] + ".", \
-        string_if (oid == largestBounty, "The largest bounty you acquired in " + holds[mcm.CurrentOptionIndex] + ".", \
-        string_if (oid == enableBountyDecay, "Whether to enable bounty decaying for " + holds[mcm.CurrentOptionIndex] + ".", \
-        string_if (oid == decayInPrison, "Whether to allow bounty decaying while imprisoned in " + holds[mcm.CurrentOptionIndex] + ".", \
-        string_if (oid == bountyLostPercent, "The amount of bounty lost as a percentage of the current bounty in " + holds[mcm.CurrentOptionIndex] + ".", \
-        string_if (oid == bountyLostFlat, "The amount of bounty lost in " + holds[mcm.CurrentOptionIndex] + ".", \
-        "No description defined for this property." \
-        )))))) \
-    )
+    ; mcm.SetInfoText( \
+    ;     string_if (oid == currentBounty, "Your current bounty in " + holds[mcm.CurrentOptionIndex] + ".", \
+    ;     string_if (oid == largestBounty, "The largest bounty you acquired in " + holds[mcm.CurrentOptionIndex] + ".", \
+    ;     string_if (oid == enableBountyDecay, "Whether to enable bounty decaying for " + holds[mcm.CurrentOptionIndex] + ".", \
+    ;     string_if (oid == decayInPrison, "Whether to allow bounty decaying while imprisoned in " + holds[mcm.CurrentOptionIndex] + ".", \
+    ;     string_if (oid == bountyLostPercent, "The amount of bounty lost as a percentage of the current bounty in " + holds[mcm.CurrentOptionIndex] + ".", \
+    ;     string_if (oid == bountyLostFlat, "The amount of bounty lost in " + holds[mcm.CurrentOptionIndex] + ".", \
+    ;     "No description defined for this property." \
+    ;     )))))) \
+    ; )
+
+    if (oid == currentBounty)
+        mcm.SetInfoText("Your current bounty in " + holds[mcm.CurrentOptionIndex] + ".")
+    elseif (oid == largestBounty)
+        mcm.SetInfoText("The largest bounty you acquired in " + holds[mcm.CurrentOptionIndex] + ".")
+    elseif (oid == enableBountyDecay)
+        mcm.SetInfoText("Whether to enable bounty decaying for " + holds[mcm.CurrentOptionIndex] + ".")
+    elseif (oid == decayInPrison)
+        mcm.SetInfoText("Whether to allow bounty decaying while imprisoned in " + holds[mcm.CurrentOptionIndex] + ".")
+    elseif (oid == bountyLostPercent)
+        mcm.SetInfoText("The amount of bounty lost as a percentage of the current bounty in " + holds[mcm.CurrentOptionIndex] + ".")
+    elseif (oid == bountyLostFlat)
+        mcm.SetInfoText("The amount of bounty lost in " + holds[mcm.CurrentOptionIndex] + ".")
+    endif
 
 endFunction
 

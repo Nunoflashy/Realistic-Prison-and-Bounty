@@ -64,13 +64,20 @@ function OnOptionHighlight(RealisticPrisonAndBounty_MCM mcm, int oid) global
     int giveItemsBackOnReleaseMaxBounty = mcm.GetOptionInListByID(mcm.oid_release_giveItemsBackOnRelease, oid)
     int redressOnRelease                = mcm.GetOptionInListByID(mcm.oid_release_giveItemsBackOnRelease, oid)
 
-    mcm.SetInfoText( \
-        string_if (oid == giveItemsBackOnRelease, "Determines whether the items should be given back on release, if undressed while in " + holds[mcm.CurrentOptionIndex] + "'s prison'.", \
-        string_if (oid == giveItemsBackOnReleaseMaxBounty, "The maximum bounty in order to have the items given back when released from " + holds[mcm.CurrentOptionIndex] + "'s prison'.", \
-        string_if (oid == redressOnRelease, "Determines whether you should be re-dressed on release, if undressed while in " + holds[mcm.CurrentOptionIndex] + "'s prison'.", \
-        "No description defined for this option." \
-    ))) \
-)
+    ; mcm.SetInfoText( \
+    ;     string_if (oid == giveItemsBackOnRelease, "Determines whether the items should be given back on release, if undressed while in " + holds[mcm.CurrentOptionIndex] + "'s prison'.", \
+    ;     string_if (oid == giveItemsBackOnReleaseMaxBounty, "The maximum bounty in order to have the items given back when released from " + holds[mcm.CurrentOptionIndex] + "'s prison'.", \
+    ;     string_if (oid == redressOnRelease, "Determines whether you should be re-dressed on release, if undressed while in " + holds[mcm.CurrentOptionIndex] + "'s prison'.", \
+    ;     "No description defined for this option." \
+    ; ))) \
+
+    if (oid == giveItemsBackOnRelease)
+        mcm.SetInfoText("Determines whether the items should be given back on release, if undressed while in " + holds[mcm.CurrentOptionIndex] + "'s prison'.")
+    elseif (oid == giveItemsBackOnReleaseMaxBounty)
+        mcm.SetInfoText("The maximum bounty in order to have the items given back when released from " + holds[mcm.CurrentOptionIndex] + "'s prison'.")
+    elseif (oid == redressOnRelease)
+        mcm.SetInfoText("Determines whether you should be re-dressed on release, if undressed while in " + holds[mcm.CurrentOptionIndex] + "'s prison'.")
+    endif
 
 endFunction
 

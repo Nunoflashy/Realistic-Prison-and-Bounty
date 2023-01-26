@@ -66,14 +66,25 @@ function OnOptionHighlight(RealisticPrisonAndBounty_MCM mcm, int oid) global
     int minimumBounty = mcm.GetOptionInListByOID(mcm.oid_bhunters_minimumBounty, oid)
     int bountyPosse = mcm.GetOptionInListByOID(mcm.oid_bhunters_bountyPosse, oid)
 
-    mcm.SetInfoText( \
-        string_if (oid == enableBountyHunters, "Whether to enable bounty hunters for " + hold + ".", \
-        string_if (oid == allowOutlawBountyHunters, "Whether to allow outlaw bounty hunters working for " + hold + ".", \
-        string_if (oid == minimumBounty, "The minimum bounty required to have bounty hunters hunt you in " + hold + ".", \
-        string_if (oid == bountyPosse, "The bounty required to have a group of bounty hunters hunt you in " + hold + ".", \
-        "No description defined for this option." \
-        )))) \
-    )
+    ; mcm.SetInfoText( \
+    ;     string_if (oid == enableBountyHunters, "Whether to enable bounty hunters for " + hold + ".", \
+    ;     string_if (oid == allowOutlawBountyHunters, "Whether to allow outlaw bounty hunters working for " + hold + ".", \
+    ;     string_if (oid == minimumBounty, "The minimum bounty required to have bounty hunters hunt you in " + hold + ".", \
+    ;     string_if (oid == bountyPosse, "The bounty required to have a group of bounty hunters hunt you in " + hold + ".", \
+    ;     "No description defined for this option." \
+    ;     )))) \
+    ; )
+
+    if (oid == enableBountyHunters)
+        mcm.SetInfoText("Whether to enable bounty hunters for " + hold + ".")
+    elseif (oid == allowOutlawBountyHunters)
+        mcm.SetInfoText("Whether to allow outlaw bounty hunters working for " + hold + ".")
+    elseif (oid == minimumBounty)
+        mcm.SetInfoText("The minimum bounty required to have bounty hunters hunt you in " + hold + ".")
+    elseif (oid == bountyPosse)
+        mcm.SetInfoText("The bounty required to have a group of bounty hunters hunt you in " + hold + ".")
+    endif
+
 endFunction
 
 function OnOptionDefault(RealisticPrisonAndBounty_MCM mcm, int oid) global
