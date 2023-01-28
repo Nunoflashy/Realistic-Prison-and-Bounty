@@ -23,16 +23,16 @@ function Render(RealisticPrisonAndBounty_MCM mcm) global
 endFunction
 
 function RenderOptions(RealisticPrisonAndBounty_MCM mcm, int index) global
-    mcm.oid_prison_bountyToDays[index]                  = mcm.AddSliderOption("Bounty to Days",                 GetOptionValue(mcm.oid_prison_bountyToDays[index]), "{0} Bounty")
-    mcm.oid_prison_minimumSentenceDays[index]           = mcm.AddSliderOption("Minimum Sentence (Days)",        GetOptionValue(mcm.oid_prison_minimumSentenceDays[index]))
-    mcm.oid_prison_maximumSentenceDays[index]           = mcm.AddSliderOption("Maximum Sentence (Days)",        GetOptionValue(mcm.oid_prison_maximumSentenceDays[index]))
-    mcm.oid_prison_allowBountylessImprisonment[index]   = mcm.AddToggleOption("Allow Bountyless Imprisonment",  GetOptionValue(mcm.oid_prison_allowBountylessImprisonment[index]))
-    mcm.oid_prison_sentencePaysBounty[index]            = mcm.AddToggleOption("Sentence pays Bounty",           GetOptionValue(mcm.oid_prison_sentencePaysBounty[index]))
-    mcm.oid_prison_fastForward[index]                   = mcm.AddToggleOption("Fast Forward",                   GetOptionValue(mcm.oid_prison_fastForward[index]))
-    mcm.oid_prison_dayToFastForwardFrom[index]          = mcm.AddSliderOption("Day to fast forward from",       GetOptionValue(mcm.oid_prison_dayToFastForwardFrom[index]))
-    mcm.oid_prison_handsBoundInPrison[index]            = mcm.AddToggleOption("Hands Bound in Prison",          GetOptionValue(mcm.oid_prison_handsBoundInPrison[index]))
-    mcm.oid_prison_handsBoundMinimumBounty[index]       = mcm.AddSliderOption("Hands Bound (Minimum Bounty)",   GetOptionValue(mcm.oid_prison_handsBoundMinimumBounty[index]))
-    mcm.oid_prison_handsBoundRandomize[index]           = mcm.AddToggleOption("Hands Bound (Randomize)",        GetOptionValue(mcm.oid_prison_handsBoundRandomize[index]))
+    mcm.oid_prison_bountyToDays[index]                  = mcm.AddSliderOption("Bounty to Days",                 GetOptionIntValue(mcm.oid_prison_bountyToDays[index]), "{0} Bounty")
+    mcm.oid_prison_minimumSentenceDays[index]           = mcm.AddSliderOption("Minimum Sentence (Days)",        GetOptionIntValue(mcm.oid_prison_minimumSentenceDays[index]))
+    mcm.oid_prison_maximumSentenceDays[index]           = mcm.AddSliderOption("Maximum Sentence (Days)",        GetOptionIntValue(mcm.oid_prison_maximumSentenceDays[index]))
+    mcm.oid_prison_allowBountylessImprisonment[index]   = mcm.AddToggleOption("Allow Bountyless Imprisonment",  GetOptionIntValue(mcm.oid_prison_allowBountylessImprisonment[index]))
+    mcm.oid_prison_sentencePaysBounty[index]            = mcm.AddToggleOption("Sentence pays Bounty",           GetOptionIntValue(mcm.oid_prison_sentencePaysBounty[index]))
+    mcm.oid_prison_fastForward[index]                   = mcm.AddToggleOption("Fast Forward",                   GetOptionIntValue(mcm.oid_prison_fastForward[index]))
+    mcm.oid_prison_dayToFastForwardFrom[index]          = mcm.AddSliderOption("Day to fast forward from",       GetOptionIntValue(mcm.oid_prison_dayToFastForwardFrom[index]))
+    mcm.oid_prison_handsBoundInPrison[index]            = mcm.AddToggleOption("Hands Bound in Prison",          GetOptionIntValue(mcm.oid_prison_handsBoundInPrison[index]))
+    mcm.oid_prison_handsBoundMinimumBounty[index]       = mcm.AddSliderOption("Hands Bound (Minimum Bounty)",   GetOptionIntValue(mcm.oid_prison_handsBoundMinimumBounty[index]))
+    mcm.oid_prison_handsBoundRandomize[index]           = mcm.AddToggleOption("Hands Bound (Randomize)",        GetOptionIntValue(mcm.oid_prison_handsBoundRandomize[index]))
     mcm.oid_prison_cellLockLevel[index]                 = mcm.AddMenuOption("Cell Lock Level", "SELECT")
 endFunction
 
@@ -155,9 +155,9 @@ function OnOptionSelect(RealisticPrisonAndBounty_MCM mcm, int oid) global
     int cellLockLevel                   = mcm.GetOptionInListByOID(mcm.oid_prison_cellLockLevel, oid)
 
     if (oid == handsBoundInPrison)
-        mcm.SetOptionDependencyBool(mcm.oid_prison_handsBoundMinimumBounty[mcm.CurrentOptionIndex], optionState)
-        mcm.SetOptionDependencyBool(mcm.oid_prison_handsBoundMinimumBounty[mcm.CurrentOptionIndex], optionState)
-        mcm.SetOptionDependencyBool(mcm.oid_prison_handsBoundRandomize[mcm.CurrentOptionIndex], optionState)
+        mcm.SetOptionDependencyBool(mcm.oid_prison_handsBoundMinimumBounty, optionState)
+        mcm.SetOptionDependencyBool(mcm.oid_prison_handsBoundMinimumBounty, optionState)
+        mcm.SetOptionDependencyBool(mcm.oid_prison_handsBoundRandomize, optionState)
     endif
 
 endFunction

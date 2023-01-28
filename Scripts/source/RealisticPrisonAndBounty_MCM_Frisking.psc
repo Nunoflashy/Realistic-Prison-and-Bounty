@@ -24,31 +24,63 @@ endFunction
 
 function RenderOptions(RealisticPrisonAndBounty_MCM mcm, int index) global
 
-    int flags = mcm.OPTION_FLAG_NONE
+    ; int flags = mcm.OPTION_FLAG_NONE
 
-    ; Allow Frisk search is off, disable all options
-    if (! GetOptionValue(mcm.oid_frisking_allow[index]))
-        flags = mcm.OPTION_FLAG_DISABLED
-    endif
 
-    mcm.oid_frisking_allow[index]                        = mcm.AddToggleOption("Allow Frisk Search",                    GetOptionValue(mcm.oid_frisking_allow[index]))
-    mcm.oid_frisking_minimumBounty[index]                = mcm.AddSliderOption("Minimum Bounty for Frisking",           GetOptionValue(mcm.oid_frisking_minimumBounty[index]), "{0}", flags)
-    mcm.oid_frisking_guaranteedPayableBounty[index]      = mcm.AddSliderOption("Guaranteed Payable Bounty",             GetOptionValue(mcm.oid_frisking_guaranteedPayableBounty[index]), "{0}", flags)  ; -1 to Disable
-    mcm.oid_frisking_maximumPayableBounty[index]         = mcm.AddSliderOption("Maximum Payable Bounty",                GetOptionValue(mcm.oid_frisking_maximumPayableBounty[index]), "{0}", flags)  ; -1 to Disable
-    mcm.oid_frisking_maximumPayableBountyChance[index]   = mcm.AddSliderOption("Maximum Payable Bounty (Chance)",       GetOptionValue(mcm.oid_frisking_maximumPayableBountyChance[index]), "{0}%", flags)  ; -1 to Disable
-    mcm.oid_frisking_friskSearchThoroughness[index]      = mcm.AddSliderOption("Frisk Search Thoroughness",             GetOptionValue(mcm.oid_frisking_friskSearchThoroughness[index]), "{0}", flags) ; -1 to Disable
-    mcm.oid_frisking_confiscateStolenItems[index]        = mcm.AddToggleOption("Confiscate Stolen Items",               GetOptionValue(mcm.oid_frisking_confiscateStolenItems[index]), flags)
-    mcm.oid_frisking_stripSearchStolenItems[index]       = mcm.AddToggleOption("Strip Search if Stolen Items Found",    GetOptionValue(mcm.oid_frisking_stripSearchStolenItems[index]), flags)
-    mcm.oid_frisking_stripSearchStolenItemsNumber[index] = mcm.AddSliderOption("Minimum No. of Stolen Items Required",  GetOptionValue(mcm.oid_frisking_stripSearchStolenItemsNumber[index]), "{0}", flags) ; -1 to Disable
 
-    mcm.SetOptionDependencyBool( \
-        mcm.oid_frisking_stripSearchStolenItems[index], \ 
-        GetOptionValue(mcm.oid_frisking_confiscateStolenItems[index]) \
+    ; ; mcm.oid_frisking_allow[index]                        = mcm.AddToggleOption("Allow Frisk Search",                    false)
+    
+    ; ; Allow Frisk search is off, disable all options
+    ; if (! GetOptionBoolValue(mcm.oid_frisking_allow[index]))
+    ;     flags = mcm.OPTION_FLAG_DISABLED
+    ; endif
+
+    ; mcm.oid_frisking_minimumBounty[index]                = mcm.AddSliderOption("Minimum Bounty for Frisking",           1, "{0}")
+    ; mcm.oid_frisking_guaranteedPayableBounty[index]      = mcm.AddSliderOption("Guaranteed Payable Bounty",             1, "{0}")  ; -1 to Disable
+    ; mcm.oid_frisking_maximumPayableBounty[index]         = mcm.AddSliderOption("Maximum Payable Bounty",                1, "{0}")  ; -1 to Disable
+    ; mcm.oid_frisking_maximumPayableBountyChance[index]   = mcm.AddSliderOption("Maximum Payable Bounty (Chance)",       1, "{0}%")  ; -1 to Disable
+    ; mcm.oid_frisking_friskSearchThoroughness[index]      = mcm.AddSliderOption("Frisk Search Thoroughness",             1, "{0}") ; -1 to Disable
+    ; mcm.oid_frisking_confiscateStolenItems[index]        = mcm.AddToggleOption("Confiscate Stolen Items",               false)
+    ; mcm.oid_frisking_stripSearchStolenItems[index]       = mcm.AddToggleOption("Strip Search if Stolen Items Found",    false)
+    ; mcm.oid_frisking_stripSearchStolenItemsNumber[index] = mcm.AddSliderOption("Minimum No. of Stolen Items Required",  1, "{0}") ; -1 to Disable
+    ; mcm.oid_frisking_allow[index]                        = mcm.AddToggleOption("Allow Frisk Search",                    GetOptionIntValue(mcm.oid_frisking_allow[index]))
+    ; mcm.oid_frisking_minimumBounty[index]                = mcm.AddSliderOption("Minimum Bounty for Frisking",           GetOptionIntValue(mcm.oid_frisking_minimumBounty[index]), "{0}", flags)
+    ; mcm.oid_frisking_guaranteedPayableBounty[index]      = mcm.AddSliderOption("Guaranteed Payable Bounty",             GetOptionIntValue(mcm.oid_frisking_guaranteedPayableBounty[index]), "{0}", flags)  ; -1 to Disable
+    ; mcm.oid_frisking_maximumPayableBounty[index]         = mcm.AddSliderOption("Maximum Payable Bounty",                GetOptionIntValue(mcm.oid_frisking_maximumPayableBounty[index]), "{0}", flags)  ; -1 to Disable
+    ; mcm.oid_frisking_maximumPayableBountyChance[index]   = mcm.AddSliderOption("Maximum Payable Bounty (Chance)",       GetOptionIntValue(mcm.oid_frisking_maximumPayableBountyChance[index]), "{0}%", flags)  ; -1 to Disable
+    ; mcm.oid_frisking_friskSearchThoroughness[index]      = mcm.AddSliderOption("Frisk Search Thoroughness",             GetOptionIntValue(mcm.oid_frisking_friskSearchThoroughness[index]), "{0}", flags) ; -1 to Disable
+    ; mcm.oid_frisking_confiscateStolenItems[index]        = mcm.AddToggleOption("Confiscate Stolen Items",               GetOptionIntValue(mcm.oid_frisking_confiscateStolenItems[index]), flags)
+    ; mcm.oid_frisking_stripSearchStolenItems[index]       = mcm.AddToggleOption("Strip Search if Stolen Items Found",    GetOptionIntValue(mcm.oid_frisking_stripSearchStolenItems[index]), flags)
+    ; mcm.oid_frisking_stripSearchStolenItemsNumber[index] = mcm.AddSliderOption("Minimum No. of Stolen Items Required",  GetOptionIntValue(mcm.oid_frisking_stripSearchStolenItemsNumber[index]), "{0}", flags) ; -1 to Disable
+    mcm.oid_frisking_allow[index]                        = mcm.AddToggleOption("Allow Frisk Search",                     GetOptionBoolValue(mcm.oid_frisking_allow[index],                         mcm.FRISKING_DEFAULT_ALLOW))
+
+    int flags = int_if (GetOptionBoolValue(mcm.oid_frisking_allow[index]), mcm.OPTION_ENABLED, mcm.OPTION_DISABLED)
+
+    mcm.oid_frisking_minimumBounty[index]                = mcm.AddSliderOption("Minimum Bounty for Frisking",            GetOptionIntValue(mcm.oid_frisking_minimumBounty[index],                  mcm.FRISKING_DEFAULT_MIN_BOUNTY), "{0}", flags)
+    mcm.oid_frisking_guaranteedPayableBounty[index]      = mcm.AddSliderOption("Guaranteed Payable Bounty",              GetOptionIntValue(mcm.oid_frisking_guaranteedPayableBounty[index],        mcm.FRISKING_DEFAULT_GUARANTEED_PAYABLE_BOUNTY), "{0}", flags)
+    mcm.oid_frisking_maximumPayableBounty[index]         = mcm.AddSliderOption("Maximum Payable Bounty",                 GetOptionIntValue(mcm.oid_frisking_maximumPayableBounty[index],           mcm.FRISKING_DEFAULT_MAXIMUM_PAYABLE_BOUNTY), "{0}", flags)
+    mcm.oid_frisking_maximumPayableBountyChance[index]   = mcm.AddSliderOption("Maximum Payable Bounty (Chance)",        GetOptionIntValue(mcm.oid_frisking_maximumPayableBountyChance[index],     mcm.FRISKING_DEFAULT_MAXIMUM_PAYABLE_BOUNTY_CHANCE), "{0}", flags)
+    mcm.oid_frisking_friskSearchThoroughness[index]      = mcm.AddSliderOption("Frisk Search Thoroughness",              GetOptionIntValue(mcm.oid_frisking_friskSearchThoroughness[index],        mcm.FRISKING_DEFAULT_FRISK_THOROUGHNESS), "{0}", flags)
+    mcm.oid_frisking_confiscateStolenItems[index]        = mcm.AddToggleOption("Confiscate Stolen Items",                GetOptionBoolValue(mcm.oid_frisking_confiscateStolenItems[index],         mcm.FRISKING_DEFAULT_CONFISCATE_ITEMS), flags)
+    mcm.oid_frisking_stripSearchStolenItems[index]       = mcm.AddToggleOption("Strip Search if Stolen Items Found",     GetOptionBoolValue(mcm.oid_frisking_stripSearchStolenItems[index],        mcm.FRISKING_DEFAULT_STRIP_IF_STOLEN_FOUND), flags)
+    mcm.oid_frisking_stripSearchStolenItemsNumber[index] = mcm.AddSliderOption("Minimum No. of Stolen Items Required",   GetOptionIntValue(mcm.oid_frisking_stripSearchStolenItemsNumber[index],   mcm.FRISKING_DEFAULT_NUMBER_STOLEN_ITEMS_REQUIRED), "{0}", flags)
+
+
+    mcm.SetOptionDependencyBoolSingle( \
+        mcm.oid_frisking_confiscateStolenItems[index], \ 
+        GetOptionIntValue(mcm.oid_frisking_allow[index]) \
     )
-    mcm.SetOptionDependencyBool( \
+
+    mcm.SetOptionDependencyBoolSingle( \
+        mcm.oid_frisking_stripSearchStolenItems[index], \ 
+        GetOptionIntValue(mcm.oid_frisking_confiscateStolenItems[index]) && \
+        GetOptionIntValue(mcm.oid_frisking_allow[index]) \
+    )
+    mcm.SetOptionDependencyBoolSingle( \
         mcm.oid_frisking_stripSearchStolenItemsNumber[index], \ 
-        GetOptionValue(mcm.oid_frisking_confiscateStolenItems[index]) && \
-        GetOptionValue(mcm.oid_frisking_confiscateStolenItems[index]) \
+        GetOptionIntValue(mcm.oid_frisking_confiscateStolenItems[index]) && \
+        GetOptionIntValue(mcm.oid_frisking_confiscateStolenItems[index]) && \
+        GetOptionIntValue(mcm.oid_frisking_allow[index]) \
     )
 
 endFunction
@@ -159,25 +191,25 @@ function OnOptionSelect(RealisticPrisonAndBounty_MCM mcm, int oid) global
 
     if (oid == allowFrisking)
         ; Enable all options except confiscating/stripping related, if allowFrisking is enabled, otherwise disable them.
-        mcm.SetOptionDependencyBool(mcm.oid_frisking_minimumBounty[mcm.CurrentOptionIndex], GetOptionValue(oid))
-        mcm.SetOptionDependencyBool(mcm.oid_frisking_guaranteedPayableBounty[mcm.CurrentOptionIndex], GetOptionValue(oid))
-        mcm.SetOptionDependencyBool(mcm.oid_frisking_maximumPayableBounty[mcm.CurrentOptionIndex], GetOptionValue(oid))
-        mcm.SetOptionDependencyBool(mcm.oid_frisking_maximumPayableBountyChance[mcm.CurrentOptionIndex], GetOptionValue(oid))
-        mcm.SetOptionDependencyBool(mcm.oid_frisking_friskSearchThoroughness[mcm.CurrentOptionIndex], GetOptionValue(oid))
-        mcm.SetOptionDependencyBool(mcm.oid_frisking_confiscateStolenItems[mcm.CurrentOptionIndex], GetOptionValue(oid))
+        mcm.SetOptionDependencyBool(mcm.oid_frisking_minimumBounty, GetOptionIntValue(oid))
+        mcm.SetOptionDependencyBool(mcm.oid_frisking_guaranteedPayableBounty, GetOptionIntValue(oid))
+        mcm.SetOptionDependencyBool(mcm.oid_frisking_maximumPayableBounty, GetOptionIntValue(oid))
+        mcm.SetOptionDependencyBool(mcm.oid_frisking_maximumPayableBountyChance, GetOptionIntValue(oid))
+        mcm.SetOptionDependencyBool(mcm.oid_frisking_friskSearchThoroughness, GetOptionIntValue(oid))
+        mcm.SetOptionDependencyBool(mcm.oid_frisking_confiscateStolenItems, GetOptionIntValue(oid))
 
-        ; Only enable stripSearchStolenItems if allowFrisking and confiscateStolenItems are active, otherwise disable it.
+        ; ; Only enable stripSearchStolenItems if allowFrisking and confiscateStolenItems are active, otherwise disable it.
         mcm.SetOptionDependencyBool( \
-            mcm.oid_frisking_stripSearchStolenItems[mcm.CurrentOptionIndex], \
+            mcm.oid_frisking_stripSearchStolenItems, \
             optionState && \ 
-            GetOptionValue(mcm.oid_frisking_confiscateStolenItems[mcm.CurrentOptionIndex]) \
+            GetOptionIntValue(mcm.oid_frisking_confiscateStolenItems[mcm.CurrentOptionIndex]) \
         )
 
         ; Only enable stripSearchStolenItemsNumber if allowFrisking, confiscateStolenItems and stripSearchStolenItems are active, otherwise disable it.
         mcm.SetOptionDependencyBool( \
-            mcm.oid_frisking_stripSearchStolenItemsNumber[mcm.CurrentOptionIndex], \
-            optionState && GetOptionValue(mcm.oid_frisking_confiscateStolenItems[mcm.CurrentOptionIndex]) && \
-            GetOptionValue(mcm.oid_frisking_stripSearchStolenItems[mcm.CurrentOptionIndex]) \
+            mcm.oid_frisking_stripSearchStolenItemsNumber, \
+            optionState && GetOptionIntValue(mcm.oid_frisking_confiscateStolenItems[mcm.CurrentOptionIndex]) && \
+            GetOptionIntValue(mcm.oid_frisking_stripSearchStolenItems[mcm.CurrentOptionIndex]) \
         )
     endif
 
@@ -186,15 +218,15 @@ function OnOptionSelect(RealisticPrisonAndBounty_MCM mcm, int oid) global
 
         ; Only enable stripSearchStolenItems if this toggle is active, otherwise disable it.
         mcm.SetOptionDependencyBool( \
-            mcm.oid_frisking_stripSearchStolenItems[mcm.CurrentOptionIndex], \
+            mcm.oid_frisking_stripSearchStolenItems, \
             optionState \
         )
 
         ; Only enable stripSearchStolenItemsNumber if this and the toggle stripSearchStolenItems is active, otherwise disable it.
         mcm.SetOptionDependencyBool( \
-            mcm.oid_frisking_stripSearchStolenItemsNumber[mcm.CurrentOptionIndex], \
+            mcm.oid_frisking_stripSearchStolenItemsNumber, \
             optionState && \
-            GetOptionValue(mcm.oid_frisking_stripSearchStolenItems[mcm.CurrentOptionIndex]) \
+            GetOptionIntValue(mcm.oid_frisking_stripSearchStolenItems[mcm.CurrentOptionIndex]) \
          )
 
     endif
@@ -202,7 +234,7 @@ function OnOptionSelect(RealisticPrisonAndBounty_MCM mcm, int oid) global
     if (oid == stripSearchStolenItems)
         ; Only enable stripSearchStolenItemsNumber if this toggle is active, otherwise disable it.
         mcm.SetOptionDependencyBool( \
-            mcm.oid_frisking_stripSearchStolenItemsNumber[mcm.CurrentOptionIndex], \
+            mcm.oid_frisking_stripSearchStolenItemsNumber, \
             optionState \
         )
     endif
@@ -210,7 +242,7 @@ endFunction
 
 function OnOptionSliderOpen(RealisticPrisonAndBounty_MCM mcm, int oid) global
 
-    int optionValue = GetOptionValue(oid)
+    int optionValue = GetOptionIntValue(oid)
 
     int minimumBounty               = mcm.GetOptionInListByOID(mcm.oid_frisking_minimumBounty, oid)
     int guaranteedPayableBounty     = mcm.GetOptionInListByOID(mcm.oid_frisking_guaranteedPayableBounty, oid)
@@ -220,7 +252,7 @@ function OnOptionSliderOpen(RealisticPrisonAndBounty_MCM mcm, int oid) global
     int stripSearchStolenItemsNumber= mcm.GetOptionInListByOID(mcm.oid_frisking_stripSearchStolenItemsNumber, oid)
 
     if (oid == minimumBounty)
-        mcm.SetSliderOptions(minRange = 1, maxRange = 100000, intervalSteps = 1, defaultValue = 500, startValue = int_if(optionValue, optionValue, 500))
+        mcm.SetSliderOptions(minRange = 1, maxRange = 100000, intervalSteps = 1, defaultValue = 500, startValue = int_if(optionValue != -1, optionValue, 500))
         Log(mcm, "OnOptionSliderOpen", "This is a test: " + "[oid: " + oid + ", startValue: " + optionValue + "]")
 
     elseif (oid == guaranteedPayableBounty)

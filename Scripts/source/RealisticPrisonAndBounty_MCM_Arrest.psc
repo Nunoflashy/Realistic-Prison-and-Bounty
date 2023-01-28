@@ -24,19 +24,19 @@ function Render(RealisticPrisonAndBounty_MCM mcm) global
 endFunction
 
 function RenderOptions(RealisticPrisonAndBounty_MCM mcm, int index) global
-    mcm.oid_arrest_minimumBounty[index]                         = mcm.AddSliderOption("Minimum Bounty to Arrest",                           GetOptionValue(mcm.oid_arrest_minimumBounty[index]))
-    mcm.oid_arrest_guaranteedPayableBounty[index]               = mcm.AddSliderOption("Guaranteed Payable Bounty",                          GetOptionValue(mcm.oid_arrest_guaranteedPayableBounty[index]))
-    mcm.oid_arrest_maximumPayableBounty[index]                  = mcm.AddSliderOption("Maximum Payable Bounty",                             GetOptionValue(mcm.oid_arrest_maximumPayableBounty[index]))
-    mcm.oid_arrest_additionalBountyWhenResistingPercent[index]  = mcm.AddSliderOption("Additional Bounty when Resisting (% of Bounty)",     GetOptionValue(mcm.oid_arrest_additionalBountyWhenResistingPercent[index]))
-    mcm.oid_arrest_additionalBountyWhenResistingFlat[index]     = mcm.AddSliderOption("Additional Bounty when Resisting (Flat)",            GetOptionValue(mcm.oid_arrest_additionalBountyWhenResistingFlat[index]))
-    mcm.oid_arrest_additionalBountyWhenDefeatedPercent[index]   = mcm.AddSliderOption("Additional Bounty when Defeated (% of Bounty)",      GetOptionValue(mcm.oid_arrest_additionalBountyWhenDefeatedPercent[index]))
-    mcm.oid_arrest_additionalBountyWhenDefeatedFlat[index]      = mcm.AddSliderOption("Additional Bounty when Defeated (Flat)",             GetOptionValue(mcm.oid_arrest_additionalBountyWhenDefeatedFlat[index]))
-    mcm.oid_arrest_allowCivilianCapture[index]                  = mcm.AddToggleOption("Allow Civilian Capture",                             GetOptionValue(mcm.oid_arrest_allowCivilianCapture[index]))
-    mcm.oid_arrest_allowArrestTransfer[index]                   = mcm.AddToggleOption("Allow Arrest Transfer",                              GetOptionValue(mcm.oid_arrest_allowArrestTransfer[index]))
-    mcm.oid_arrest_allowUnconsciousArrest[index]                = mcm.AddToggleOption("Allow Unconscious Arrest",                           GetOptionValue(mcm.oid_arrest_allowUnconsciousArrest[index]))
-    mcm.oid_arrest_unequipHandBounty[index]                     = mcm.AddSliderOption("Unequip Hand Garments (Minimum Bounty)",             GetOptionValue(mcm.oid_arrest_unequipHandBounty[index])) ; -1 to Disable
-    mcm.oid_arrest_unequipHeadBounty[index]                     = mcm.AddSliderOption("Unequip Head Garments (Minimum Bounty)",             GetOptionValue(mcm.oid_arrest_unequipHeadBounty[index])) ; -1 to Disable
-    mcm.oid_arrest_unequipFootBounty[index]                     = mcm.AddSliderOption("Unequip Foot Garments (Minimum Bounty)",             GetOptionValue(mcm.oid_arrest_unequipFootBounty[index])) ; -1 to Disable
+    mcm.oid_arrest_minimumBounty[index]                         = mcm.AddSliderOption("Minimum Bounty to Arrest",                       GetOptionIntValue(mcm.oid_arrest_minimumBounty[index]))
+    mcm.oid_arrest_guaranteedPayableBounty[index]               = mcm.AddSliderOption("Guaranteed Payable Bounty",                      GetOptionIntValue(mcm.oid_arrest_guaranteedPayableBounty[index]))
+    mcm.oid_arrest_maximumPayableBounty[index]                  = mcm.AddSliderOption("Maximum Payable Bounty",                         GetOptionIntValue(mcm.oid_arrest_maximumPayableBounty[index]))
+    mcm.oid_arrest_additionalBountyWhenResistingPercent[index]  = mcm.AddSliderOption("Additional Bounty when Resisting (% of Bounty)", GetOptionIntValue(mcm.oid_arrest_additionalBountyWhenResistingPercent[index]))
+    mcm.oid_arrest_additionalBountyWhenResistingFlat[index]     = mcm.AddSliderOption("Additional Bounty when Resisting (Flat)",        GetOptionIntValue(mcm.oid_arrest_additionalBountyWhenResistingFlat[index]))
+    mcm.oid_arrest_additionalBountyWhenDefeatedPercent[index]   = mcm.AddSliderOption("Additional Bounty when Defeated (% of Bounty)",  GetOptionIntValue(mcm.oid_arrest_additionalBountyWhenDefeatedPercent[index]))
+    mcm.oid_arrest_additionalBountyWhenDefeatedFlat[index]      = mcm.AddSliderOption("Additional Bounty when Defeated (Flat)",         GetOptionIntValue(mcm.oid_arrest_additionalBountyWhenDefeatedFlat[index]))
+    mcm.oid_arrest_allowCivilianCapture[index]                  = mcm.AddToggleOption("Allow Civilian Capture",                         GetOptionIntValue(mcm.oid_arrest_allowCivilianCapture[index]))
+    mcm.oid_arrest_allowArrestTransfer[index]                   = mcm.AddToggleOption("Allow Arrest Transfer",                          GetOptionIntValue(mcm.oid_arrest_allowArrestTransfer[index]))
+    mcm.oid_arrest_allowUnconsciousArrest[index]                = mcm.AddToggleOption("Allow Unconscious Arrest",                       GetOptionIntValue(mcm.oid_arrest_allowUnconsciousArrest[index]))
+    mcm.oid_arrest_unequipHandBounty[index]                     = mcm.AddSliderOption("Unequip Hand Garments (Minimum Bounty)",         GetOptionIntValue(mcm.oid_arrest_unequipHandBounty[index]))
+    mcm.oid_arrest_unequipHeadBounty[index]                     = mcm.AddSliderOption("Unequip Head Garments (Minimum Bounty)",         GetOptionIntValue(mcm.oid_arrest_unequipHeadBounty[index]))
+    mcm.oid_arrest_unequipFootBounty[index]                     = mcm.AddSliderOption("Unequip Foot Garments (Minimum Bounty)",         GetOptionIntValue(mcm.oid_arrest_unequipFootBounty[index]))
 endFunction
 
 function Left(RealisticPrisonAndBounty_MCM mcm) global
@@ -156,7 +156,7 @@ endFunction
 
 function OnOptionSliderOpen(RealisticPrisonAndBounty_MCM mcm, int oid) global
 
-    int optionValue = GetOptionValue(oid)
+    int optionValue = GetOptionIntValue(oid)
 
     ; Slider Options
     int minimumBounty                           = mcm.GetOptionInListByID(mcm.oid_arrest_minimumBounty, oid)

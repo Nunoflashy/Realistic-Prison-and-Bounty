@@ -29,7 +29,7 @@ bool function LOG_CALL_HIDDEN() global
 endFunction
 
 function local_log(string caller, string logInfo, int logLevel = 0, bool hideCall = false) global
-    string _scriptName = "PrisonUtil"
+    string _scriptName = ModName()
 
     string logLvl  = string_if(logLevel == LOG_NOTYPE(), "", \
               string_if(logLevel == LOG_INFO(), "info:", \
@@ -374,8 +374,37 @@ string function StoragePrefix() global
     return ".__" + ModName() + "__."
 endFunction
 
-int function GetOptionValue(int oid) global
-    return JDB.solveInt(StoragePrefix() + "OPTION_ID." + oid)
+function __setOptionEnabled(string _key) global
+    JDB.solveIntSetter(StoragePrefix() + "OPTION_ID.ENABLED." + _key, true as int)
+endFunction
+
+bool function IsOptionSet(string _key) global
+    return JDB.solveInt(StoragePrefix() + "OPTION_ID.ENABLED." + _key)
+endFunction
+
+int function GetOptionIntValue(int oid, int default = -1) global
+    int NOT_DEFINED = -1
+    return JDB.solveInt(StoragePrefix() + "OPTION_ID." + oid, default)
+endFunction
+
+bool function GetOptionBoolValue(int oid, bool default = false) global
+    return GetOptionIntValue(oid, default as int)
+endFunction
+
+float function GetOptionIntValueFloat(int oid) global
+    return JDB.solveFlt(StoragePrefix() + "OPTION_ID." + oid)
+endFunction
+
+bool function SetOptionValueBoolByKey(string _key, bool value) global
+    return JDB.solveIntSetter(StoragePrefix() + "OPTION_ID." + _key, value as int, true)
+endFunction
+
+bool function SetOptionValueIntByKey(string _key, int value) global
+    return JDB.solveIntSetter(StoragePrefix() + "OPTION_ID." + _key, value, true)
+endFunction
+
+int function GetOptionIntValueByKey(string _key) global
+    return JDB.solveInt(StoragePrefix() + "OPTION_ID." + _key)
 endFunction
 
 bool function SetOptionValueBool(int optionId, bool value) global

@@ -2,6 +2,109 @@ Scriptname RealisticPrisonAndBounty_MCM extends SKI_ConfigBase
 
 import RealisticPrisonAndBounty_Util
 
+; ==============================================================================
+; Constants
+; ==============================================================================
+
+bool property IS_DEBUG = true autoreadonly
+
+; ==============================================================================
+; MCM Option Flags
+int property OPTION_ENABLED  = 0x00 autoreadonly
+int property OPTION_DISABLED = 0x01 autoreadonly
+; ==============================================================================
+
+; ==============================================================================
+; GENERAL
+int property GENERAL_DEFAULT_ATTACK_ON_SIGHT_BOUNTY = 3000 autoreadonly
+
+; ==============================================================================
+; ARREST
+int  property ARREST_DEFAULT_MIN_BOUNTY                     = 500 autoreadonly
+int  property ARREST_DEFAULT_GUARANTEED_PAYABLE_BOUNTY      = 1500 autoreadonly
+int  property ARREST_DEFAULT_MAXIMUM_PAYABLE_BOUNTY         = 1500 autoreadonly
+int  property ARREST_DEFAULT_BOUNTY_WHEN_RESISTING_PERCENT  = 33 autoreadonly
+int  property ARREST_DEFAULT_BOUNTY_WHEN_RESISTING_FLAT     = 200 autoreadonly
+int  property ARREST_DEFAULT_BOUNTY_WHEN_DEFEATED_PERCENT   = 33 autoreadonly
+int  property ARREST_DEFAULT_BOUNTY_WHEN_DEFEATED_FLAT      = 200 autoreadonly
+bool property ARREST_DEFAULT_ALLOW_CIVILIAN_CAPTURE         = true autoreadonly
+bool property ARREST_DEFAULT_ALLOW_ARREST_TRANSFER          = true autoreadonly
+bool property ARREST_DEFAULT_ALLOW_UNCONSCIOUS_ARREST       = true autoreadonly
+int  property ARREST_DEFAULT_UNEQUIP_HAND_BOUNTY            = 0 autoreadonly
+int  property ARREST_DEFAULT_UNEQUIP_HEAD_BOUNTY            = 1000 autoreadonly
+int  property ARREST_DEFAULT_UNEQUIP_FOOT_BOUNTY            = 4000 autoreadonly
+; ==============================================================================
+; FRISKING
+bool property FRISKING_DEFAULT_ALLOW                            = true autoreadonly
+int  property FRISKING_DEFAULT_MIN_BOUNTY                       = 500 autoreadonly
+int  property FRISKING_DEFAULT_GUARANTEED_PAYABLE_BOUNTY        = 1500 autoreadonly
+int  property FRISKING_DEFAULT_MAXIMUM_PAYABLE_BOUNTY           = 2000 autoreadonly
+int  property FRISKING_DEFAULT_MAXIMUM_PAYABLE_BOUNTY_CHANCE    = 33 autoreadonly
+int  property FRISKING_DEFAULT_FRISK_THOROUGHNESS               = 400 autoreadonly
+int  property FRISKING_DEFAULT_CONFISCATE_ITEMS                 = 3000 autoreadonly
+bool property FRISKING_DEFAULT_STRIP_IF_STOLEN_FOUND            = true autoreadonly
+int  property FRISKING_DEFAULT_NUMBER_STOLEN_ITEMS_REQUIRED     = 10 autoreadonly
+; ==============================================================================
+; UNDRESSING
+bool property UNDRESSING_DEFAULT_ALLOW                  = true autoreadonly
+int  property UNDRESSING_DEFAULT_MIN_BOUNTY             = 1500 autoreadonly
+bool property UNDRESSING_DEFAULT_WHEN_DEFEATED          = true autoreadonly
+bool property UNDRESSING_DEFAULT_AT_CELL                = true autoreadonly
+bool property UNDRESSING_DEFAULT_AT_CHEST               = true autoreadonly
+int  property UNDRESSING_DEFAULT_FORCED_MIN_BOUNTY      = 3000 autoreadonly
+bool property UNDRESSING_DEFAULT_FORCED_WHEN_DEFEATED   = true autoreadonly
+int  property UNDRESSING_DEFAULT_STRIP_THOROUGHNESS     = 10 autoreadonly
+bool property UNDRESSING_DEFAULT_ALLOW_CLOTHES          = false autoreadonly
+int  property UNDRESSING_DEFAULT_REDRESS_BOUNTY         = 2000 autoreadonly
+bool property UNDRESSING_DEFAULT_REDRESS_WHEN_DEFEATED  = true autoreadonly
+bool property UNDRESSING_DEFAULT_REDRESS_AT_CELL        = true autoreadonly
+bool property UNDRESSING_DEFAULT_REDRESS_AT_CHEST       = true autoreadonly
+; ==============================================================================
+; PRISON
+int    property PRISON_DEFAULT_TIMESCALE                    = 60 autoreadonly
+int    property PRISON_DEFAULT_BOUNTY_TO_DAYS               = 100 autoreadonly
+int    property PRISON_DEFAULT_MIN_SENTENCE_DAYS            = 10 autoreadonly
+int    property PRISON_DEFAULT_MAX_SENTENCE_DAYS            = 365 autoreadonly
+bool   property PRISON_DEFAULT_ALLOW_UNCONDITIONAL_PRISON   = false autoreadonly
+bool   property PRISON_DEFAULT_SENTENCE_PAYS_BOUNTY         = false autoreadonly
+bool   property PRISON_DEFAULT_FAST_FORWARD                 = true autoreadonly
+int    property PRISON_DEFAULT_DAY_FAST_FORWARD             = 5 autoreadonly
+bool   property PRISON_DEFAULT_HANDS_BOUND                  = false autoreadonly
+int    property PRISON_DEFAULT_HANDS_BOUND_BOUNTY           = 4000 autoreadonly
+bool   property PRISON_DEFAULT_HANDS_BOUND_RANDOMIZE        = true autoreadonly
+string property PRISON_DEFAULT_CELL_LOCK_LEVEL              = "Expert" autoreadonly
+; ==============================================================================
+; RELEASE
+bool property RELEASE_DEFAULT_GIVE_ITEMS_BACK           = true autoreadonly
+int  property RELEASE_DEFAULT_GIVE_ITEMS_BACK_BOUNTY    = 0 autoreadonly
+bool property RELEASE_DEFAULT_REDRESS                   = true autoreadonly
+; ==============================================================================
+; ESCAPE
+int property ESCAPE_DEFAULT_BOUNTY_PERCENT          = 15 autoreadonly
+int  property ESCAPE_DEFAULT_BOUNTY_FLAT            = 1000 autoreadonly
+bool property ESCAPE_DEFAULT_ALLOW_SURRENDER        = true autoreadonly
+bool property ESCAPE_DEFAULT_FRISK_ON_CAPTURE       = true autoreadonly
+bool property ESCAPE_DEFAULT_UNDRESS_ON_CAPTURE     = true autoreadonly
+; ==============================================================================
+; BOUNTY
+bool property BOUNTY_DEFAULT_GENERAL_ENABLE_DECAY   = true autoreadonly
+bool property BOUNTY_DEFAULT_GENERAL_UPDATE_HOURS   = 1 autoreadonly
+bool property BOUNTY_DEFAULT_ENABLE_DECAY           = true autoreadonly
+bool property BOUNTY_DEFAULT_DECAY_IN_PRISON        = true autoreadonly
+int  property BOUNTY_DEFAULT_BOUNTY_LOST_PERCENT    = 5 autoreadonly
+int  property BOUNTY_DEFAULT_BOUNTY_LOST_FLAT       = 200 autoreadonly
+; ==============================================================================
+; BOUNTY HUNTERS
+bool property BOUNTY_HUNTERS_DEFAULT_ENABLE            = true autoreadonly
+bool property BOUNTY_HUNTERS_DEFAULT_ALLOW_OUTLAWS     = true autoreadonly
+int  property BOUNTY_HUNTERS_DEFAULT_MIN_BOUNTY        = 2500 autoreadonly
+int  property BOUNTY_HUNTERS_DEFAULT_MIN_BOUNTY_GROUP  = 6000 autoreadonly
+
+; ==============================================================================
+; End Constants
+; ==============================================================================
+
+
 ; Timescales
 ; =======================================
 GlobalVariable property NormalTimescale auto
@@ -67,6 +170,8 @@ int[] property oid_undressing_redressBounty auto
 int[] property oid_undressing_redressWhenDefeated auto
 int[] property oid_undressing_redressAtCell auto
 int[] property oid_undressing_redressAtChest auto
+
+bool[] property undressing_allow_state auto
 ; =======================================
 
 ; Prison
@@ -271,6 +376,8 @@ function InitializeOptions()
     oid_undressing_redressWhenDefeated = new int[9]
     oid_undressing_redressAtCell = new int[9]
     oid_undressing_redressAtChest = new int[9]
+
+    undressing_allow_state = new bool[9]
 ; ============================================================
 
 ; Prison
@@ -326,7 +433,9 @@ function InitializeOptions()
     oid_bhunters_bountyPosse = new int[9]
 ; ============================================================
 
+
 endFunction
+
 
 ; IO Functions
 ; ============================================================
@@ -352,74 +461,124 @@ function SetSliderOptions(float minRange, float maxRange, float intervalSteps = 
     SetSliderDialogStartValue(startValue)
 endFunction
 
+function SetOptionToggleDefault(int optionId, bool value)
+    if (GetOptionIntValue(optionId) == -1)
+        SetOptionValueBool(optionId, value)
+        SetToggleOptionValue(optionId, value)
+    endif
+endFunction
+
+function SetOptionSliderDefault(int optionId, float value)
+    if (GetOptionIntValue(optionId) == -1)
+        SetOptionValueFloat(optionId, value)
+        SetSliderOptionValue(optionId, value)
+    endif
+endFunction
+
+function SetOptionMenuDefault(int optionId, string value)
+    if (GetOptionIntValue(optionId) == -1)
+        SetOptionValueString(optionId, value)
+        SetMenuOptionValue(optionId, value)
+    endif
+endFunction
+
 ; ============================================================
 
-int property list_frisking_minimumBounty auto
-int property map_frisking auto
-int property whiterun_options auto
+;/
+    Add a toggle option with the specified parameters,
+    and assign its stored value to it
 
-; bool function SetOptionAtIndex(int index, string category, string option, int value)
-;     string[] holds = GetHoldNames()
-;     return JDB.solveIntSetter("." + holds[index] + "." + category + "." + option, value, true)
+    returns the optionId passed
+/;
+int function AddToggleOptionWithValue(string text, int optionId, int flags = 0)
+    AddToggleOption(text, GetOptionIntValue(optionId), flags)
+    return optionId
+endFunction
+
+;/
+    Add a slider option with the specified parameters,
+    and assign its stored value to it
+
+    returns the optionId passed
+/;
+int function AddSliderOptionWithValue(string text, int optionId, string format = "{0}", int flags = 0)
+    AddSliderOption(text, GetOptionIntValue(optionId), format, flags)
+    return optionId
+endFunction
+
+int function AtCurrent(int[] optionList)
+    return optionList[CurrentOptionIndex]
+endFunction
+
+; ;/ 
+;     Sets the enabled flag to an option based on its ID if it the dependency is met, disabled otherwise.
+;     The option could be a toggle that depends on another toggle,
+;     in which case, if the dependency toggle is not met, the option will not be enabled.
+
+;     returns true if the option was enabled, false if the option was disabled.
+; /;   
+; bool function SetOptionDependencyBool(int optionId, bool dependency, bool storePersistently = true)
+;     int enabled  = OPTION_FLAG_NONE
+;     int disabled = OPTION_FLAG_DISABLED
+
+;     SetOptionFlags(optionId, int_if (dependency, enabled, disabled))
+
+    
+;     if (dependency)
+;         return true
+;     endif
+
+;     return false
 ; endFunction
 
-; string property StoragePrefix
-;     string function get()
-;         return ".__REALISTIC_PRISON_AND_BOUNTY__."
-;     endFunction
-; endProperty
+;/
+    Sets a flag to an option for the current index (the hold) based on its ID.
+    If the dependency is met, the flag will be ENABLED, otherwise it will be DISABLED.
 
-; bool function SetOptionValue(int oid, int value)
-;     Log(self, "SetOptionValue", "Option ID: " + oid + " (value: " + value + ")" + " has been saved successfully!")
-;     return JDB.solveIntSetter(StoragePrefix + "OPTION_ID." + oid, value, true)
-; endFunction
+    The option could be a toggle, that depends on another toggle, in which case
+    the toggle passed in will only be ENABLED if the dependency toggle is active.
 
-; bool function SetOptionValueBool(int oid, bool value)
-;     SetOptionValue(oid, value as int)
-; endFunction
-
-; bool function SetOptionStringValue(int oid, string value)
-;     return JDB.solveStrSetter(StoragePrefix + "OPTION_ID." + oid, value, true)
-; endFunction
-
-; bool function SetOptionIntValue(int oid, int value)
-;     return JDB.solveIntSetter(StoragePrefix + "OPTION_ID." + oid, value, true)
-; endFunction
-
-; bool function SetOptionBoolValue(int oid, bool value)
-;     return JDB.solveIntSetter(StoragePrefix + "OPTION_ID." + oid, value as int, true)
-; endFunction
-
-; int function GetOptionValue(int oid)
-;     return JDB.solveInt(StoragePrefix + "OPTION_ID." + oid)
-; endFunction
-
-; int function GetOptionAtIndex(int index, string category, string option)
-;     string[] holds = GetHoldNames()
-
-;     return JDB.solveInt("." + holds[index] + "." + category + "." + option)
-; endFunction
-
-
-;/ 
-    Sets the enabled flag to an option based on its ID if it the dependency is met, disabled otherwise.
-    The option could be a toggle that depends on another toggle,
-    in which case, if the dependency toggle is not met, the option will not be enabled.
-
-    returns true if the option was enabled, false if the option was disabled.
-/;   
-bool function SetOptionDependencyBool(int optionId, bool dependency, bool storePersistently = true)
+    returns true if the option from optionIdList was ENABLED, false if the option was DISABLED.
+/;
+bool function SetOptionDependencyBool(int[] optionIdList, bool dependency, bool storePersistently = true)
     int enabled  = OPTION_FLAG_NONE
     int disabled = OPTION_FLAG_DISABLED
 
-    SetOptionFlags(optionId, int_if (dependency, enabled, disabled))
+    ; LogProperty(self, "SetOptionDependencyBool", "Value is " + "(" + _currentOptionIndex + ")", LOG_WARNING())
 
-    
+    SetOptionFlags(optionIdList[CurrentOptionIndex], int_if (dependency, enabled, disabled))
+
+
     if (dependency)
         return true
     endif
 
     return false
+endFunction
+
+bool function SetOptionDependencyBoolSingle(int optionId, bool dependency, bool storePersistently = true)
+    int enabled  = OPTION_FLAG_NONE
+    int disabled = OPTION_FLAG_DISABLED
+
+    ; Log(self, "SetOptionDependencyBoolSingle", "Value is " + "(" + _currentOptionIndex + ")", LOG_WARNING())
+
+    SetOptionFlags(optionId, int_if (dependency, enabled, disabled))
+    ; Log(self, "SetOptionDependencyBoolSingle", "optionId " + "(" + _currentOptionIndex + ")", LOG_WARNING())
+
+
+    if (dependency)
+        return true
+    endif
+
+    return false
+endFunction
+
+; bool function SetDependencyBoolOnCurrentOption(int[] optionList, bool dependency, bool storePersistently = true)
+;     SetOptionDependencyBool(optionList[CurrentOptionIndex], dependency, storePersistently)
+; endFunction
+
+int function GetCurrentOptionValue(int[] optionList)
+    return GetOptionIntValue(optionList[CurrentOptionIndex])
 endFunction
 
 ;/
@@ -428,11 +587,13 @@ endFunction
     returns the toggle state after it has been toggled.
 /;
 bool function ToggleOption(int optionId, bool storePersistently = true)
-    bool optionState = GetOptionValue(optionId)
+    bool optionState = GetOptionIntValue(optionId)
     
     ; Set the toggle option value (display checked or unchecked)
     ; If the option was checked, uncheck it and vice versa.
     SetToggleOptionValue(optionId, bool_if (optionState, false, true))
+
+    ; string _key = GetKeyFromOption(optionId)
 
     ; Store the value persistently
     if (storePersistently)
@@ -480,32 +641,14 @@ int function GetOptionInListByID(int[] optionList, int optionId)
     return -1
 endFunction
 
-
-
 int function GetCurrentHoldOption(int[] optionList)
     return optionList[CurrentOptionIndex]
 endFunction
-
-; ; Returns the OptionID of the object at list[index]
-; int function GetOptionValue(int list, int index)
-;     return JIntMap.getInt(list, index)
-; endFunction
-
-; ; Sets the OptionID to list[index]
-; function SetOptionValue(int list, int index, int value)
-;     JIntMap.setInt(list, index, value)
-; endFunction
 
 event OnConfigInit()
     ModName = "Realistic Prison and Bounty"
     InitializePages()
     InitializeOptions()
-
-    ; JDB.solveIntSetter(".whiterun.frisking.minimumBounty", 1000, true)
-    ; JDB.solveIntSetter(".winterhold.frisking.minimumBounty", 782, true)
-
-    ; SetOptionAtIndex(0, "frisking", "minimumBounty", 1784)
-    ; SetOptionAtIndex(1, "frisking", "minimumBounty", 2502)
 endEvent
 
 ; Event Handling
