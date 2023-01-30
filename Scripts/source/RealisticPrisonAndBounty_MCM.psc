@@ -255,7 +255,7 @@ string[] function GetHoldNames()
         _holds[6] = "The Rift"
         _holds[7] = "The Reach"
         _holds[8] = "The Pale"
-        Log(self, "MCM::GetHoldNames", "Allocated holds string[]", LOG_WARNING())
+        Log(self, "MCM::GetHoldNames", "Allocated holds string[]", LOG_WARN())
     endif
 
     return _holds
@@ -433,6 +433,296 @@ function InitializeOptions()
     oid_bhunters_bountyPosse = new int[9]
 ; ============================================================
 
+    optionsMap = JMap.object()
+    optionToValue = JIntMap.object()
+
+    JValue.retain(optionsMap)
+    JValue.retain(optionToValue)
+
+endFunction
+
+int optionsMap ; optionsMap[undressing::allowUndressing] = container
+int optionToValue ; optionToValue[oid] = value
+
+int function AddOptionToggleEx(string text, bool defaultValue, int index)
+    int optionId = AddToggleOption(text, defaultValue)
+
+    string _key = CurrentPage + "::" + TrimString(text)
+
+    int localOptionToValueMap
+
+    if (JIntMap.hasKey(localOptionToValueMap, optionId))
+        Log(self, "AddOptionToggleEx", "Key " + optionId + " already exists in map, returning!")
+    else
+        localOptionToValueMap = JIntMap.object()
+        JIntMap.setInt(localOptionToValueMap, optionId, defaultValue as int)
+
+        int arr = JArray.object()
+        JArray.addObj(arr, localOptionToValueMap)
+
+        Log(self, "AddOptionToggleEx", "Added Option" + optionId + " to map!")
+
+        JMap.setObj(optionsMap, _key, arr)
+        Log(self, "AddOptionToggleEx", "Added" + localOptionToValueMap + " container to map at key " + _key + "!")
+    endif
+
+
+    return optionId
+endFunction
+
+; int function AddOptionToggleEx(string text, bool defaultValue, int index)
+;     ;/
+;         if it has a stored value, pass that instead of defaultValue
+;     /;
+;     bool value = defaultValue
+;     int optionId = AddToggleOption(text, value)
+    
+;     string _key = CurrentPage + "::" + TrimString(text) ; undressing::allowUndressing
+    
+;     if (!JIntMap.hasKey(optionToValue, optionId))
+;         JIntMap.setInt(optionToValue, optionId, value as int) ; option[1026] = 1 (true)
+;         LogIf(self, "AddOptionToggleEx", "optionToValue" + "["+ optionId +"]" + " = " + value + " ( added at key " + _key + ")", IS_DEBUG)
+;         int[] optionToValueKeys = JIntMap.allKeysPArray(optionToValue)
+;         ; LogIf(self, "AddOptionToggleEx", "optionToValue length:" + optionToValueKeys.Length, IS_DEBUG)
+;         int _object = optionToValue
+        
+;         int[] objKeys = JIntMap.allKeysPArray(optionToValue)
+;         int i = 0
+;         while (i < objKeys.Length)
+;             Log(self, "AddOptionToggleEx", "ObjKeys[" + i + "] = " + objKeys[i])
+;             i += 1
+;         endWhile
+
+;         if (!JMap.hasKey(optionsMap, _key))
+;             JMap.setObj(optionsMap, _key, optionToValue)
+;             LogIf(self, "AddOptionSliderEx", "Added container " + _object + " at key: " + _key , IS_DEBUG)
+;         else
+;             LogIf(self, "AddOptionSliderEx", "Container " + _object + " already exists at key: " + _key , IS_DEBUG)
+;         endif
+;     else
+;         LogIf(self, "AddOptionToggleEx", "Option " + optionId + " already exists at key: " + _key + ", skipping...", IS_DEBUG)
+;     endif
+
+
+
+;     return optionId
+; endFunction
+
+int function AddOptionSliderEx(string text, float defaultValue, int index)
+    ;/
+        if it has a stored value, pass that instead of defaultValue
+    /;
+    float value = defaultValue
+    int optionId = AddSliderOption(text, value)
+    ; return optionId
+    
+    string _key = CurrentPage + "::" + TrimString(text) ; undressing::minimumBountyToUndress
+
+    if (!JIntMap.hasKey(optionToValue, optionId))
+        JIntMap.setInt(optionToValue, optionId, value as int) ; option[1026] = 1200
+        LogIf(self, "AddOptionSliderEx", "optionToValue" + "["+ optionId +"]" + " = " + value + " ( added at key " + _key + ")", IS_DEBUG)
+        int[] optionToValueKeys = JIntMap.allKeysPArray(optionToValue)
+        ; LogIf(self, "AddOptionSliderEx", "optionToValue length:" + optionToValueKeys.Length, IS_DEBUG)
+        int _object = JIntMap.getObj(optionToValue, optionId)
+
+        if (!JMap.hasKey(optionsMap, _key))
+            JMap.setObj(optionsMap, _key, optionToValue)
+            LogIf(self, "AddOptionSliderEx", "Added container " + _object + " at key: " + _key , IS_DEBUG)
+        else
+            LogIf(self, "AddOptionSliderEx", "Container " + _object + " already exists at key: " + _key , IS_DEBUG)
+        endif
+    else
+        LogIf(self, "AddOptionSliderEx", "Option " + optionId + " already exists at key: " + _key + ", skipping...", IS_DEBUG)
+    endif
+
+
+
+    return optionId
+endFunction
+
+bool function IsKeyInMap(string _key, int optionKey)
+    string[] keys = JMap.allKeysPArray(optionsMap)
+
+    int keyIndex = 0
+    while (keyIndex < keys.Length)
+        if (JMap.hasKey(optionsMap, _key))
+            int keyContainer = JMap.getObj(optionsMap, keys[keyIndex])
+            if (JIntMap.hasKey(keyContainer, optionKey))
+                Log(self, "IsKeyInMap", "[Container ID: " + keyContainer + "] " + "Found OptionID: " + optionKey + " from key: " + _key)
+                return JMap.hasKey(optionsMap, _key) && JIntMap.hasKey(keyContainer, optionKey)
+            endif
+        endif
+        keyIndex += 1
+    endWhile
+
+endFunction
+
+function ListMap(string _key)
+    string[] keys = JMap.allKeysPArray(optionsMap)
+
+    int keyIndex = 0
+    while (keyIndex < keys.Length)
+        if (keys[keyIndex] == _key)
+            if (JMap.hasKey(optionsMap, _key))
+                int optionIndex = 0
+                int optionKeyContainer = JMap.getObj(optionsMap, "undressing::allowUndressing")
+                int[] optionKeys = JIntMap.allKeysPArray(optionKeyContainer)
+                Log(self, "ListMap", _key + ": ")
+                while (optionIndex < optionKeys.Length)
+                    Log(self, "ListMap", "\t" + optionKeys[optionIndex])
+                    optionIndex += 1
+                endWhile
+            endif
+        endif
+        keyIndex += 1
+    endWhile
+endFunction
+
+function ListMapPK()
+    string[] keys = JMap.allKeysPArray(optionsMap)
+
+    int keyIndex = 0
+    while (keyIndex < keys.Length)
+        Log(self, "ListMapPK", "Key: " + keys[keyIndex])
+        keyIndex += 1
+    endWhile
+endFunction
+
+; GetOptionByKey("undressing_allowUndressing")
+int function GetOptionByKey(string _key, int oid)
+    int KEY_NOT_FOUND = -1
+    ;/
+        1: Get the container that contains the options with the specified key (undressing::allowUndressing)
+        2: Get the container that contains the options with the specified key (undressing::minimumBountyToUndress)
+
+        1: Output:
+            options[1026] => true,
+            options[1054] => true,
+            options[1082] => true,
+            options[1110] => true,
+            options[1138] => true,
+
+        2: Output:
+            options[1028] => 1200,
+            options[1056] => 1200,
+            options[1084] => 1200,
+            options[1112] => 1200,
+            options[1140] => 1200,
+    /;
+    int options = JMap.getObj(object = optionsMap, key = _key, default = KEY_NOT_FOUND)
+
+    ;/
+        1: Get all the keys (option id's):
+            1026,
+            1054,
+            1082,
+            1110,
+            1138
+
+        2: Get all the keys (option id's):
+            1028,
+            1056,
+            1084,
+            1112,
+            1140
+    /;
+    int[] opKeys = JIntMap.allKeysPArray(options)
+    int i = 0
+    ;/
+        1: While there are keys (1026 ... 1138)
+        2: While there are keys (1028 ... 1140)
+    /;
+    while (i < opKeys.Length)
+        ;/
+            1: if i is 0 && undressing::allowUndressing exists
+            2: if i is 0 && undressing::minimumBountyToUndress exists
+        /;
+        if (i == CurrentOptionIndex && JMap.hasKey(options, _key))
+            ;/
+                1: Return the key at i, which is 1026.
+                2: Return the key at i, which is 1028.
+            /;
+            Log(self, "GetOptionByKey", "Key: " + opKeys[i])
+            return opKeys[i]
+        endif
+        i += 1
+    endWhile
+
+    if (options == KEY_NOT_FOUND)
+        return KEY_NOT_FOUND
+    endif
+
+    ; Log(self, "MCM::GetOptionByKey", "CurrentOptionIndex: " + CurrentOptionIndex)
+    int optionId = JIntMap.getNthKey(options, CurrentOptionIndex)
+    Log(self, "GetOptionByKey", "Returned OID " + optionId + " from key " + _key)
+    if (oid == optionId)
+        return optionId
+    endif
+    return -1
+    ; string[] keys = JMap.allKeysPArray(optionsMap)
+    ; int i = 0
+    ; while (i < keys.Length)
+    ;     if (keys[i] == _key)
+    ;         int optionId = JIntMap.getNthKey(options, CurrentOptionIndex)
+    ;         Log(self, "GetOptionByKey", "Returned OID " + optionId + " from key " + _key)
+    ;         return optionId
+    ;         ; int[] optionIds = JIntMap.allKeysPArray(options)
+    ;         ; int j = 0
+    ;         ; while (j < optionIds.Length)
+    ;         ;     ; Log(self, "MCM::GetOptionByKey", "\tOID: " + optionIds[j])
+    ;         ;     j += 1
+    ;         ; endWhile
+    ;     endif
+    ;     ; Log(self, "MCM::GetOptionByKey", "Key: " + keys[i])
+
+    ;     i += 1
+    ; endWhile
+
+    ; Log(self, "MCM::GetOptionByKey", "Returned OID: " + optionId)
+endFunction
+
+function ListOIDMap()
+    string[] _keys = JMap.allKeysPArray(optionsMap)
+    int i = 0
+    while (i < _keys.Length)
+        int optionIdContainer = JMap.getObj(optionsMap, _keys[i])
+        ; Log(self, "MCM::ListOIDMap", "Key: " + _keys[i] + ", Value: " + optionIdContainer)
+        ; if (i == 0)
+            int[] optionIds = JIntMap.allKeysPArray(optionIdContainer)
+            int j = 0
+            while (j < optionIds.Length)
+                int oidValue = JIntMap.getInt(optionIdContainer, optionIds[j])
+                ; Log(self, "MCM::ListOIDMap", "Keys inside (OID's): " + optionIds[j] + ", Value: " + oidValue)
+                Log(self, "MCM::ListOIDMap", "optionsMap" + "[" + _keys[i] +"] = " + "["+ optionIds[j] + " => " + oidValue + "]")
+                j += 1
+            endWhile
+        ; endif
+        i +=1
+    endWhile
+endFunction
+
+function UpdateCurrentIndex(int optionId)
+    float startTime = Utility.GetCurrentRealTime()
+    string[] optionKeys = JMap.allKeysPArray(optionsMap)
+
+    int optionIndex = 0
+    while (optionIndex < optionKeys.Length)
+        string optionKey = optionKeys[optionIndex]
+        int optionGroup = JMap.getObj(optionsMap, optionKey)
+        int[] groupKeys = JIntMap.allKeysPArray(optionGroup)
+        int index = 0
+        while (index < groupKeys.Length)
+            if (groupKeys[index] == optionId)
+                _currentOptionIndex = index
+                Log(self, "MCM::UpdateCurrentIndex", "Updated Current Option Index: " + _currentOptionIndex)
+            endif
+            index += 1
+        endWhile
+        optionIndex += 1
+    endWhile
+    float endTime = Utility.GetCurrentRealTime()
+    float elapsedTime = endTime - startTime
+    LogIf(self, "UpdateCurrentIndex", "execution took " + elapsedTime + " seconds.", IS_DEBUG)
 
 endFunction
 
@@ -544,7 +834,7 @@ bool function SetOptionDependencyBool(int[] optionIdList, bool dependency, bool 
     int enabled  = OPTION_FLAG_NONE
     int disabled = OPTION_FLAG_DISABLED
 
-    ; LogProperty(self, "SetOptionDependencyBool", "Value is " + "(" + _currentOptionIndex + ")", LOG_WARNING())
+    ; LogProperty(self, "SetOptionDependencyBool", "Value is " + "(" + _currentOptionIndex + ")", LOG_WARN())
 
     SetOptionFlags(optionIdList[CurrentOptionIndex], int_if (dependency, enabled, disabled))
 
@@ -560,10 +850,10 @@ bool function SetOptionDependencyBoolSingle(int optionId, bool dependency, bool 
     int enabled  = OPTION_FLAG_NONE
     int disabled = OPTION_FLAG_DISABLED
 
-    ; Log(self, "SetOptionDependencyBoolSingle", "Value is " + "(" + _currentOptionIndex + ")", LOG_WARNING())
+    ; Log(self, "SetOptionDependencyBoolSingle", "Value is " + "(" + _currentOptionIndex + ")", LOG_WARN())
 
     SetOptionFlags(optionId, int_if (dependency, enabled, disabled))
-    ; Log(self, "SetOptionDependencyBoolSingle", "optionId " + "(" + _currentOptionIndex + ")", LOG_WARNING())
+    ; Log(self, "SetOptionDependencyBoolSingle", "optionId " + "(" + _currentOptionIndex + ")", LOG_WARN())
 
 
     if (dependency)
@@ -620,6 +910,8 @@ int function GetOptionInListByOID(int[] optionList, int optionId)
     while (i < GetHoldCount())
         if (optionList[i] == optionId)
             _currentOptionIndex = i
+            Log(self, "MCM::GetOptionInListByOID", "Current Option Index: " + CurrentOptionIndex)
+
             return optionId
         endif
         i += 1
@@ -649,22 +941,283 @@ event OnConfigInit()
     ModName = "Realistic Prison and Bounty"
     InitializePages()
     InitializeOptions()
+
+    normalMap = JMap.object()
+    JValue.retain(normalMap)
 endEvent
+
+int normalMap
+
+function AddToNormalMap(string _key, int optionId)
+    int localOptionToValueMap
+
+    if (JIntMap.hasKey(localOptionToValueMap, optionId))
+        Log(self, "AddToNormalMap", "Key " + optionId + " already exists in map, returning!")
+    else
+        localOptionToValueMap = JIntMap.object()
+        JIntMap.setInt(localOptionToValueMap, optionId, 1000)
+
+        int arr = JMap.getObj(normalMap, _key)
+        Log(self, "AddToNormalMap", "arr id: " + arr)
+
+        ; if the array doesn't exist at the specified key
+        if (arr == 0)
+            ; create it
+            arr = JArray.object()
+            Log(self, "AddToNormalMap", "Created Array with ID: " + arr + " for Key: " + _key + ", OID: " + optionId)
+        else
+            Log(self, "AddToNormalMap", "Array ID: " + arr + " already exists for Key: " + _key + ", OID: " + optionId + " (skipping creation...)")
+        endif
+        arr = JArray.object()
+
+        JArray.addObj(arr, localOptionToValueMap)
+
+        if (JArray.findObj(arr, localOptionToValueMap) != -1)
+            int ctIndex = JArray.findObj(arr, localOptionToValueMap)
+            int ct = JArray.getObj(arr, ctIndex)
+            int ctKey = JIntMap.getNthKey(ct, ctIndex)
+            int ctOID = JIntMap.getInt(ct, optionId)
+            Log(self, "AddToNormalMap", "Added Option ID: " + ctKey + " with value " + ctOID + " to container " + arr + " (array id: " + arr + ")!")
+        else
+            Log(self, "AddToNormalMap", "Could not find container with OptionID: " + optionId + " in " + arr + " (array id: " + arr + ")!")
+        endif
+
+        JMap.setObj(normalMap, _key, arr)
+        Log(self, "AddToNormalMap", "Added Container ID: " + arr + " container to map at key " + _key + "!")
+
+        int arrLen = JArray.count(arr)
+        int i = 0
+        while (i < arrLen)
+            int arrayContainer = JArray.getObj(arr, i)
+            int oid = JIntMap.getNthKey(arrayContainer, i)
+            int optionValue = JIntMap.getInt(arrayContainer, oid)
+            Log(self, "AddToNormalMap", "[ID: " + arr + "] Container in Array: " + arrayContainer + " (Option ID: " + oid + ", has value: " + optionValue + ")")
+            i += 1
+        endWhile
+
+    endif
+
+
+endFunction
+
+function ListNormalMap(string _key)
+    int _map = JMap.getObj(normalMap, _key)
+    int[] keys = JIntMap.allKeysPArray(_map)
+
+    int i = 0
+    while (i < keys.Length)
+        int value = JMap.getObj(_map, keys[i])
+        Log(self, "ListNormalMap", "key: " + keys[i] + "value: " + value)
+        i += 1
+    endWhile
+
+endFunction
+
+;/
+    Example array of option maps:
+    If the array has an ID of 3, and the maps have their respective ID (4, 6, 8, 10, 12)
+    3:  [
+            4:  [1026 => true]
+            6:  [1028 => false]
+            8:  [1054 => true]
+            10: [1086 => true]
+            12: [1110 => false]
+        ]
+/;
+bool function IsOptionInArray(int arrayID, int optionID)
+    int i = 0
+    while (i < JArray.count(arrayID))
+        int _container = JArray.getObj(arrayID, i) ; Gets the container inside the array at i
+        int _containerKey = JIntMap.getNthKey(_container, i) ; Gets the container's key at i (this is the container inside the array at i, the option map.)
+
+        if (_containerKey == optionID)
+            ; We found the option map inside the array
+            return true
+        endif
+        i += 1
+    endWhile
+    
+    Trace(self, "MCM::IsOptionInArray", "Array does not exist or has no items!", i == 0 && IS_DEBUG)
+    Trace(self, "MCM::IsOptionInArray", "Option not found in array!", i != 0 && IS_DEBUG)
+
+    return false
+endFunction
+
+;/
+    Add to map:
+    normalMap["undressing::allowUndressing"] = 3
+    where 3 is the container containing all the options related to this key
+    
+    3 (array): [10, 11, 12, 13, 14]: where 10 through 14 are maps to their respective options.
+    10-14 (int map): key: 1026, value: true
+/;
+int function AddOptionToggle(string text, bool defaultValue, int optionId)
+    float startTime = StartBenchmark(IS_DEBUG)
+
+    ; int optionId = AddToggleOption(text, defaultValue)
+
+    string _key = CurrentPage + "::" + TrimString(text) ; undressing::allowUndressing
+
+    ; if the array exists in the map at the passed in key
+    bool arrayExists = JMap.getObj(normalMap, _key) != 0
+    if (arrayExists)
+        int mapArray = JMap.getObj(normalMap, _key)
+        Debug(self, "MCM::AddOptionToggle", "Array ID " + mapArray + " exists in normalMap[" +_key + "]", IS_DEBUG)
+        ; Does this option map exist in the array?
+        if (IsOptionInArray(mapArray, optionId))
+            Debug(self, "AddOptionToggle", "Option ID " + optionId + " already exists in map inside Array ID " + mapArray + ", returning...")
+            EndBenchmark(startTime, IS_DEBUG)
+
+            return optionId
+        endif
+        ; int i = 0
+        ; while (i < JArray.count(mapArray))
+        ;     ; Get the current internal container inside the array (option map)
+        ;     int internalContainer = JArray.getObj(mapArray, i)
+        ;     ; Find if the container's key matches optionId, if so, it's already added
+        ;     ; Example key: 1026 (which is option id)
+        ;     int internalContainerKey = JIntMap.getNthKey(internalContainer, i)
+        ;     int internalContainerValue = JIntMap.getInt(internalContainer, internalContainerKey)
+
+        ;     LogIf(self, "MCM::AddOptionToggle", \
+        ;         "Map ID: " + internalContainer + " inside array (Key: " + internalContainerKey + ", Value: " + internalContainerValue + ")", IS_DEBUG)
+
+        ;     ; Get the value at the map key, if internalContainer[1026] = true, this will return true
+        ;     ; int internalContainerValue = JIntMap.getInt(internalContainer, internalContainerKey)
+
+        ;     if (internalContainerKey == optionId)
+        ;         ; Option already inside the array, don't add anything
+        ;         Log(self, "AddOptionToggle", "Option ID " + optionId + " already exists in map inside Array ID " + mapArray + ", returning...")
+        ;         return optionId
+        ;     endif
+        ;     i += 1
+        ; endWhile
+
+        ; Option doesnt exist, but array does.
+
+        ; Create and add option to map
+        ; mapOptionToValue[optionId] = defaultValue
+        int mapOptionToValue = JIntMap.object()
+        JIntMap.setInt(mapOptionToValue, optionId, defaultValue as int)
+
+        Debug(self, "MCM::AddOptionToggle", "Creating MAP ID: " + mapOptionToValue + ", adding Option (id: " + optionId + ", value: " + defaultValue + ")", IS_DEBUG)
+
+        ; Add map to array
+        JArray.addObj(mapArray, mapOptionToValue)
+
+        Debug(self, "MCM::AddOptionToggle", "Adding MAP ID: " + mapOptionToValue + " to ARRAY ID: " + mapArray, IS_DEBUG)
+
+        ; Add the array containing all containers related to _key to the map at _key
+        JMap.setObj(normalMap, _key, mapArray)
+
+        Debug(self, "MCM::AddOptionToggle", "Adding ARRAY ID: " + mapArray + " to normalMap[" +_key + "]", IS_DEBUG)
+        EndBenchmark(startTime, IS_DEBUG)
+
+        return optionId
+    endif
+
+    ; Array for this key does not exist yet, create it
+    int mapArray = JArray.object()
+    Debug(self, "MCM::AddOptionToggle", "Array does not exist yet, created ARRAY with ID: " + mapArray, IS_DEBUG)
+
+    ; Option doesn't exist yet, proceed...
+    ; Create and add option to map
+    ; mapOptionToValue[optionId] = defaultValue
+    int mapOptionToValue = JIntMap.object()
+    JIntMap.setInt(mapOptionToValue, optionId, defaultValue as int)
+
+    Debug(self, "MCM::AddOptionToggle", "Creating MAP ID: " + mapOptionToValue + ", adding Option (id: " + optionId + ", value: " + defaultValue + ")", IS_DEBUG)
+
+    ; Add map to array
+    JArray.addObj(mapArray, mapOptionToValue)
+
+    Debug(self, "MCM::AddOptionToggle", "Adding MAP ID: " + mapOptionToValue + " to ARRAY ID: " + mapArray, IS_DEBUG)
+
+    ; Add the array containing all containers related to _key to the map at _key
+    JMap.setObj(normalMap, _key, mapArray)
+
+    Debug(self, "MCM::AddOptionToggle", "Adding ARRAY ID: " + mapArray + " to normalMap[" +_key + "]", IS_DEBUG)
+
+    EndBenchmark(startTime, IS_DEBUG)
+endFunction
+
+int function GetOptionFromMap(string _key)
+    float startTime = StartBenchmark(IS_DEBUG)
+
+    int arrayInsideMap = JMap.getObj(normalMap, _key) ; Get the array inside the map
+    bool keyExists = arrayInsideMap != 0
+
+    if (!keyExists)
+        Debug(self, "MCM::GetOptionFromMap", "Key: " + _key + " does not exist in the map, returning...", IS_DEBUG)
+        return -1
+    endif
+
+
+    ; int testIntMap = JIntMap.object()
+    ; JIntMap.setInt(testIntMap, 1100, 1900)
+    ; JArray.clear(arrayInsideMap)
+
+    ; int testIntMap2 = JIntMap.object()
+    ; JIntMap.setInt(testIntMap2, 1102, 2100)
+
+    ; JArray.addObj(arrayInsideMap, testIntMap)
+    ; JArray.addObj(arrayInsideMap, testIntMap2)
+
+    int i = 0
+    while (i < JArray.count(arrayInsideMap))
+        ; Get the map inside the array at i
+        int _container      = JArray.getObj(arrayInsideMap, i)
+        int _containerKey   = JIntMap.nextKey(_container)
+        int _containerValue = JIntMap.getInt(_container, _containerKey)
+
+        Debug(self, "MCM::GetOptionFromMap", "[ARRAY ID: " + arrayInsideMap + " (" + _key + ")] " + "_container id: " + _container + " (key: " + _containerKey + ", value: " + (_containerValue) + ")", IS_DEBUG)
+        i += 1
+    endWhile
+
+    Debug(self, "MCM::GetOptionFromMap", "Returned OPTION_NOT_FOUND", IS_DEBUG)
+    EndBenchmark(startTime, IS_DEBUG)
+
+    return -1 ; OPTION_NOT_FOUND
+endFunction
 
 ; Event Handling
 ; ============================================================================
 event OnPageReset(string page)
     RealisticPrisonAndBounty_MCM_General.Render(self)
-    RealisticPrisonAndBounty_MCM_Arrest.Render(self)
-    RealisticPrisonAndBounty_MCM_Frisking.Render(self)
-    RealisticPrisonAndBounty_MCM_Undress.Render(self)
-    RealisticPrisonAndBounty_MCM_Prison.Render(self)
-    RealisticPrisonAndBounty_MCM_Release.Render(self)
-    RealisticPrisonAndBounty_MCM_Escape.Render(self)
-    RealisticPrisonAndBounty_MCM_Bounty.Render(self)
-    RealisticPrisonAndBounty_MCM_BHunters.Render(self)
-    RealisticPrisonAndBounty_MCM_Leveling.Render(self)
-    RealisticPrisonAndBounty_MCM_Status.Render(self)
+    ; RealisticPrisonAndBounty_MCM_Arrest.Render(self)
+    ; RealisticPrisonAndBounty_MCM_Frisking.Render(self)
+    ; RealisticPrisonAndBounty_MCM_Undress.Render(self)
+    ; RealisticPrisonAndBounty_MCM_Prison.Render(self)
+    ; RealisticPrisonAndBounty_MCM_Release.Render(self)
+    ; RealisticPrisonAndBounty_MCM_Escape.Render(self)
+    ; RealisticPrisonAndBounty_MCM_Bounty.Render(self)
+    ; RealisticPrisonAndBounty_MCM_BHunters.Render(self)
+    ; RealisticPrisonAndBounty_MCM_Leveling.Render(self)
+    ; RealisticPrisonAndBounty_MCM_Status.Render(self)
+
+    AddOptionToggle("Allow Undressing", true, 1026)
+    AddOptionToggle("Allow Undressing", true, 1026)
+    AddOptionToggle("Allow Undressing", true, 1027)
+    AddOptionToggle("Allow Undressing", true, 1023)
+    AddOptionToggle("Allow Undressing", true, 1028)
+    AddOptionToggle("Allow Frisking", false, 1084)
+    AddOptionToggle("Allow Frisking", true, 1026)
+
+
+    GetOptionFromMap("::allowUndressing")
+    GetOptionFromMap("::allowFrisking")
+
+    ; AddToNormalMap("undressing::allowUndressing", 1026)
+    ; AddToNormalMap("undressing::allowUndressing", 1027)
+    ; AddToNormalMap("undressing::allowUndressing", 1028)
+    ; AddToNormalMap("undressing::allowUndressing", 1028)
+    ; AddToNormalMap("undressing::allowUndressing", 1028)
+    ; AddToNormalMap("undressing::allowUndressing", 1028)
+    ; AddToNormalMap("undressing::allowUndressing", 1028)
+    ; AddToNormalMap("undressing::minimumBounty", 1150)
+    ; AddToNormalMap("undressing::minimumBounty", 1150)
+    ; AddToNormalMap("undressing::minimumBountyDefeated", 1150)
+    ; ListNormalMap("undressing::allowUndressing")
 endEvent
 
 event OnOptionHighlight(int option)
@@ -679,6 +1232,8 @@ event OnOptionHighlight(int option)
     RealisticPrisonAndBounty_MCM_BHunters.OnHighlight(self, option)
     RealisticPrisonAndBounty_MCM_Leveling.OnHighlight(self, option)
     RealisticPrisonAndBounty_MCM_Status.OnHighlight(self, option)
+
+    ; ListOIDMap()
 endEvent
 
 event OnOptionDefault(int option)
@@ -707,6 +1262,12 @@ event OnOptionSelect(int option)
     RealisticPrisonAndBounty_MCM_BHunters.OnSelect(self, option)
     RealisticPrisonAndBounty_MCM_Leveling.OnSelect(self, option)
     ; RealisticPrisonAndBounty_MCM_Status.OnDefault(self, option)
+
+    ListMap("undressing::allowUndressing")
+    ; ListMapPK()
+
+    ; IsKeyInMap("undressing::allowUndressing", 1026)
+    ; IsKeyInMap("undressing::allowUndressing", 1028)
 endEvent
 
 
