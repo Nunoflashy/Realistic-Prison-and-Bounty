@@ -12,30 +12,49 @@ int function LOG_NOTYPE() global
     return -1
 endFunction
 
-int function LOG_INFO() global
+int function LOG_TRACE() global
     return 0
 endFunction
 
-int function LOG_WARNING() global
+int function LOG_DEBUG() global
     return 1
 endFunction
 
-int function LOG_ERROR() global
+int function LOG_INFO() global
     return 2
+endFunction
+
+int function LOG_WARN() global
+    return 3
+endFunction
+
+int function LOG_ERROR() global
+    return 4
+endFunction
+
+int function LOG_FATAL() global
+    return 4
 endFunction
 
 bool function LOG_CALL_HIDDEN() global
     return true
 endFunction
 
+string function __getLogLevel(int _level) global
+    return \ 
+        string_if(_level == LOG_NOTYPE(), "", \
+        string_if(_level == LOG_TRACE(), "trace:", \
+        string_if(_level == LOG_DEBUG(), "debug:", \
+        string_if(_level == LOG_INFO(), "info:", \
+        string_if(_level == LOG_WARN(), "warn:", \
+        string_if(_level == LOG_ERROR(), "error:", \
+        string_if(_level == LOG_FATAL(), "fatal:")))))))
+endFunction
+
+
 function local_log(string caller, string logInfo, int logLevel = 0, bool hideCall = false) global
     string _scriptName = ModName()
-
-    string logLvl  = string_if(logLevel == LOG_NOTYPE(), "", \
-              string_if(logLevel == LOG_INFO(), "info:", \
-              string_if(logLevel == LOG_WARNING(), "warning:", \
-              string_if(logLevel == LOG_ERROR(), "error:"))) \
-    )
+    string logLvl  = __getLogLevel(logLevel)
 
     bool noCall = caller == "" || hideCall
     debug.trace( \
@@ -52,11 +71,7 @@ function local_log_if(string caller, string logInfo, bool condition, int logLeve
 endfunction
 
 function Log(Form script, string caller, string logInfo, int logLevel = 0, bool hideCall = false) global
-    string logLvl  = string_if(logLevel == LOG_NOTYPE(), "", \
-              string_if(logLevel == LOG_INFO(), "info:", \
-              string_if(logLevel == LOG_WARNING(), "warning:", \
-              string_if(logLevel == LOG_ERROR(), "error:"))) \
-    )
+    string logLvl  = __getLogLevel(logLevel)
 
     if(caller == "" || hideCall)
         ; We didn't pass any function name nor a state scope, let the log be anonymous
@@ -80,12 +95,34 @@ function Log(Form script, string caller, string logInfo, int logLevel = 0, bool 
 endFunction
 ; //////////////////////////
 
-function Warn(Form script, string caller, string logInfo, bool hideCall = false) global
-    Log(script, caller, logInfo, LOG_WARNING(), hideCall)
+function Trace(Form script, string caller, string logInfo, bool condition = true, bool hideCall = false) global
+    LogIf(script, caller, logInfo, condition, LOG_TRACE(), hideCall)
+    ; Log(script, caller, logInfo, LOG_TRACE(), hideCall)
 endfunction
 
-function Error(Form script, string caller, string logInfo, bool hideCall = false) global
-    Log(script, caller, logInfo, LOG_ERROR(), hideCall)
+function Debug(Form script, string caller, string logInfo, bool condition = true, bool hideCall = false) global
+    LogIf(script, caller, logInfo, condition, LOG_DEBUG(), hideCall)
+    ; Log(script, caller, logInfo, LOG_DEBUG(), hideCall)
+endfunction
+
+function Info(Form script, string caller, string logInfo, bool condition = true, bool hideCall = false) global
+    LogIf(script, caller, logInfo, condition, LOG_INFO(), hideCall)
+    ; Log(script, caller, logInfo, LOG_INFO(), hideCall)
+endfunction
+
+function Warn(Form script, string caller, string logInfo, bool condition = true, bool hideCall = false) global
+    LogIf(script, caller, logInfo, condition, LOG_WARN(), hideCall)
+    ; Log(script, caller, logInfo, LOG_WARN(), hideCall)
+endfunction
+
+function Error(Form script, string caller, string logInfo, bool condition = true, bool hideCall = false) global
+    LogIf(script, caller, logInfo, condition, LOG_ERROR(), hideCall)
+    ; Log(script, caller, logInfo, LOG_ERROR(), hideCall)
+endfunction
+
+function Fatal(Form script, string caller, string logInfo, bool condition = true, bool hideCall = false) global
+    LogIf(script, caller, logInfo, condition, LOG_FATAL(), hideCall)
+    ; Log(script, caller, logInfo, LOG_FATAL(), hideCall)
 endfunction
 
 function LogIf(Form script, string caller, string logInfo, bool condition, int logLevel = 0, bool hideCall = false) global
@@ -95,7 +132,7 @@ function LogIf(Form script, string caller, string logInfo, bool condition, int l
 endfunction
 
 function WarnIf(Form script, string caller, string logInfo, bool condition, bool hideCall = false) global
-    LogIf(script, caller, logInfo, condition, LOG_WARNING(), hideCall)
+    LogIf(script, caller, logInfo, condition, LOG_WARN(), hideCall)
 endfunction
 
 function ErrorIf(Form script, string caller, string logInfo, bool condition, bool hideCall = false) global
@@ -103,11 +140,7 @@ function ErrorIf(Form script, string caller, string logInfo, bool condition, boo
 endfunction
 
 function LogProperty(Form script, string prop, string logInfo, int logLevel = 0) global
-    string logLvl = string_if(logLevel == LOG_NOTYPE(), "", \
-              string_if(logLevel == LOG_INFO(), "info:", \
-              string_if(logLevel == LOG_WARNING(), "warning:", \
-              string_if(logLevel == LOG_ERROR(), "error:"))) \
-    )
+    string logLvl  = __getLogLevel(logLevel)
 
     if(prop == "")
         ; We didn't pass any function name nor a state scope, let the log be anonymous
@@ -146,11 +179,7 @@ function LogPropertyIf(Form script, string prop, string logInfo, bool condition,
 endfunction
 
 function LogParams(Form script, string caller, string logInfo, string args, int logLevel = 0, bool hideCall = false) global
-    string logLvl = string_if(logLevel == LOG_NOTYPE(), "", \
-              string_if(logLevel == LOG_INFO(), "info:", \
-              string_if(logLevel == LOG_WARNING(), "warning:", \
-              string_if(logLevel == LOG_ERROR(), "error:"))) \
-    )
+    string logLvl  = __getLogLevel(logLevel)
 
     if(caller == "" || hideCall)
         ; We didn't pass any function name nor a state scope, let the log be anonymous
@@ -369,6 +398,11 @@ function UnwearItemIf(Actor akActor, Form akItem, bool condition, int count = 1,
     endif
 endfunction
 
+string function TrimString(string source) global
+    string[] split = PapyrusUtil.StringSplit(source, " ")
+    string joined = PapyrusUtil.StringJoin(split, "")
+    return joined
+endFunction
 
 string function StoragePrefix() global
     return ".__" + ModName() + "__."
@@ -425,4 +459,20 @@ endFunction
 
 bool function SetOptionValueForm(int optionId, Form value) global
     return JDB.solveFormSetter(StoragePrefix() + "OPTION_ID." + optionId, value, true)
+endFunction
+
+float function StartBenchmark(bool condition = true) global
+    if (condition)
+        float startTime = Utility.GetCurrentRealTime()
+        return startTime
+    endif
+endFunction
+
+float function EndBenchmark(float startTime, bool condition = true) global
+    if (condition)
+        float endTime = Utility.GetCurrentRealTime()
+        float elapsedTime = endTime - startTime
+        local_log(none, "execution took " + ((elapsedTime * 1000)) + " ms", LOG_DEBUG(), hideCall = true)
+        return elapsedTime
+    endif
 endFunction

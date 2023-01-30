@@ -18,6 +18,7 @@
     <Imports>
         <Import>@ModsFolder\SKSE64 - Scripts\Scripts\Source</Import>
         <Import>@ModsFolder\JContainers SE\Scripts\Source</Import>
+        <Import>@ModsFolder\PapyrusUtil SE - Modders Scripting Utility Functions\Scripts\Source</Import>
         <Import>D:\Games\Modded Skyrim SE\Skyrim Special Edition\Data\Scripts\Source</Import>
     </Imports>
     <Folders>
