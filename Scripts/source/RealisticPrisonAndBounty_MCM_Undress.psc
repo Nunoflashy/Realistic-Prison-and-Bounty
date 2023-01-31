@@ -22,30 +22,19 @@ function Render(RealisticPrisonAndBounty_MCM mcm) global
 endFunction
 
 function RenderOptions(RealisticPrisonAndBounty_MCM mcm, int index) global
-    mcm.oid_undressing_allow[index] = mcm.AddToggleOption("Allow Undressing", mcm.undressing_allow_state[index])
-;     mcm.oid_undressing_allow[index]                         = mcm.AddToggleOption("Allow Undressing",                       bool_if(GetOptionBoolValue(mcm.oid_undressing_allow[index],                         mcm.UNDRESSING_DEFAULT_ALLOW) == TRUE, true, false))
-    ; Allow Undressing is off, disable all options, else enabled them.
-    int flags = int_if (mcm.undressing_allow_state[mcm.CurrentOptionIndex], mcm.OPTION_ENABLED, mcm.OPTION_DISABLED)
-
-    int redressBountyFlags          = int_if (GetOptionIntValue(mcm.oid_undressing_allowWearingClothes[index]) && mcm.undressing_allow_state[mcm.CurrentOptionIndex], mcm.OPTION_ENABLED, mcm.OPTION_DISABLED)
-    int redressWhenDefeatedFlags    = int_if (GetOptionIntValue(mcm.oid_undressing_allowWearingClothes[index]) && mcm.undressing_allow_state[mcm.CurrentOptionIndex], mcm.OPTION_ENABLED, mcm.OPTION_DISABLED)
-    int redressAtCellFlags          = int_if (GetOptionIntValue(mcm.oid_undressing_allowWearingClothes[index]) && mcm.undressing_allow_state[mcm.CurrentOptionIndex], mcm.OPTION_ENABLED, mcm.OPTION_DISABLED)
-    int redressAtChestFlags         = int_if (GetOptionIntValue(mcm.oid_undressing_allowWearingClothes[index]) && mcm.undressing_allow_state[mcm.CurrentOptionIndex], mcm.OPTION_ENABLED, mcm.OPTION_DISABLED)
-
-
-    mcm.oid_undressing_whenDefeated[index]                  = mcm.AddToggleOption("Undress when Defeated",                  GetOptionBoolValue(mcm.oid_undressing_whenDefeated[index],                  mcm.UNDRESSING_DEFAULT_WHEN_DEFEATED), flags)
-    mcm.oid_undressing_atCell[index]                        = mcm.AddToggleOption("Undress at Cell",                        GetOptionBoolValue(mcm.oid_undressing_atCell[index],                        mcm.UNDRESSING_DEFAULT_AT_CELL), flags)
-    mcm.oid_undressing_atChest[index]                       = mcm.AddToggleOption("Undress at Chest",                       GetOptionBoolValue(mcm.oid_undressing_atChest[index],                       mcm.UNDRESSING_DEFAULT_AT_CHEST), flags)
-    mcm.oid_undressing_forcedUndressingMinBounty[index]     = mcm.AddSliderOption("Forced Undressing (Minimum Bounty)",     GetOptionIntValue(mcm.oid_undressing_forcedUndressingMinBounty[index],      mcm.UNDRESSING_DEFAULT_FORCED_MIN_BOUNTY), "{0} Bounty", flags)
-    mcm.oid_undressing_forcedUndressingWhenDefeated[index]  = mcm.AddToggleOption("Forced Undressing when Defeated",        GetOptionBoolValue(mcm.oid_undressing_forcedUndressingWhenDefeated[index],  mcm.UNDRESSING_DEFAULT_FORCED_WHEN_DEFEATED), flags)
-    mcm.oid_undressing_stripSearchThoroughness[index]       = mcm.AddSliderOption("Strip Search Thoroughness",              GetOptionIntValue(mcm.oid_undressing_stripSearchThoroughness[index],        mcm.UNDRESSING_DEFAULT_STRIP_THOROUGHNESS), "{0}x", flags)
-    mcm.oid_undressing_allowWearingClothes[index]           = mcm.AddToggleOption("Allow Wearing Clothes",                  GetOptionBoolValue(mcm.oid_undressing_allowWearingClothes[index],           mcm.UNDRESSING_DEFAULT_ALLOW_CLOTHES), flags)
-
-    mcm.oid_undressing_redressBounty[index]                 = mcm.AddSliderOption("Bounty to Re-dress",                     GetOptionIntValue(mcm.oid_undressing_redressBounty[index],                  mcm.UNDRESSING_DEFAULT_REDRESS_BOUNTY), "{0} Bounty", redressBountyFlags)
-    mcm.oid_undressing_redressWhenDefeated[index]           = mcm.AddToggleOption("Re-dress when Defeated",                 GetOptionBoolValue(mcm.oid_undressing_redressWhenDefeated[index],           mcm.UNDRESSING_DEFAULT_REDRESS_WHEN_DEFEATED), redressWhenDefeatedFlags)
-    mcm.oid_undressing_redressAtCell[index]                 = mcm.AddToggleOption("Re-dress at Cell",                       GetOptionBoolValue(mcm.oid_undressing_redressAtCell[index],                 mcm.UNDRESSING_DEFAULT_REDRESS_AT_CELL), redressAtCellFlags)
-    mcm.oid_undressing_redressAtChest[index]                = mcm.AddToggleOption("Re-dress at Chest",                      GetOptionBoolValue(mcm.oid_undressing_redressAtChest[index],                mcm.UNDRESSING_DEFAULT_REDRESS_AT_CHEST), redressAtChestFlags)
-
+    mcm.AddOptionToggle("Allow Undressing",                 mcm.UNDRESSING_DEFAULT_ALLOW, index)
+    mcm.AddOptionSlider("Minimum Bounty to Undress",        mcm.UNDRESSING_DEFAULT_MIN_BOUNTY, index)
+    mcm.AddOptionToggle("Undress when Defeated",            mcm.UNDRESSING_DEFAULT_WHEN_DEFEATED, index)
+    mcm.AddOptionToggle("Undress at Cell",                  mcm.UNDRESSING_DEFAULT_AT_CELL, index)
+    mcm.AddOptionToggle("Undress at Chest",                 mcm.UNDRESSING_DEFAULT_AT_CHEST, index)
+    mcm.AddOptionSlider("Forced Undressing (Bounty)",       mcm.UNDRESSING_DEFAULT_FORCED_MIN_BOUNTY, index)
+    mcm.AddOptionToggle("Forced Undressing when Defeated",  mcm.UNDRESSING_DEFAULT_FORCED_WHEN_DEFEATED, index)
+    mcm.AddOptionSlider("Strip Search Thoroughness",        mcm.UNDRESSING_DEFAULT_STRIP_THOROUGHNESS, index)
+    ; mcm.AddOptionToggle("Allow Wearing Clothes",            mcm.UNDRESSING_DEFAULT_ALLOW_CLOTHES, index)
+    ; mcm.AddOptionSlider("Bounty to Re-dress",               mcm.UNDRESSING_DEFAULT_REDRESS_BOUNTY, index)
+    ; mcm.AddOptionToggle("Re-dress when Defeated",           mcm.UNDRESSING_DEFAULT_REDRESS_WHEN_DEFEATED, index)
+    ; mcm.AddOptionToggle("Re-dress at Cell",                 mcm.UNDRESSING_DEFAULT_REDRESS_AT_CELL, index)
+    ; mcm.AddOptionToggle("Re-dress at Chest",                mcm.UNDRESSING_DEFAULT_REDRESS_AT_CHEST, index)
 endFunction
 
 ;  function RenderOptions(RealisticPrisonAndBounty_MCM mcm, int index) global
@@ -112,50 +101,53 @@ endFunction
 function OnOptionHighlight(RealisticPrisonAndBounty_MCM mcm, int oid) global
 
     string[] holds = mcm.GetHoldNames()
+
+    mcm.UpdateIndex(oid)
+
     string hold = holds[mcm.CurrentOptionIndex]
 
-    int allowUndressing                 = mcm.GetOptionInListByOID(mcm.oid_undressing_allow, oid)
-    int minimumBounty                   = mcm.GetOptionInListByOID(mcm.oid_undressing_minimumBounty, oid)
-    int undressWhenDefeated             = mcm.GetOptionInListByOID(mcm.oid_undressing_whenDefeated, oid)
-    int undressAtCell                   = mcm.GetOptionInListByOID(mcm.oid_undressing_atCell, oid)
-    int undressAtChest                  = mcm.GetOptionInListByOID(mcm.oid_undressing_atChest, oid)
-    int forcedUndressingMinBounty       = mcm.GetOptionInListByOID(mcm.oid_undressing_forcedUndressingMinBounty, oid)     
-    int forcedUndressingWhenDefeated    = mcm.GetOptionInListByOID(mcm.oid_undressing_forcedUndressingWhenDefeated, oid)
-    int stripSearchThoroughness         = mcm.GetOptionInListByOID(mcm.oid_undressing_stripSearchThoroughness, oid)  
-    int allowWearingClothes             = mcm.GetOptionInListByOID(mcm.oid_undressing_allowWearingClothes, oid)
-    int redressBounty                   = mcm.GetOptionInListByOID(mcm.oid_undressing_redressBounty, oid)
-    int redressWhenDefeated             = mcm.GetOptionInListByOID(mcm.oid_undressing_redressWhenDefeated, oid)
-    int redressAtCell                   = mcm.GetOptionInListByOID(mcm.oid_undressing_redressAtCell, oid)
-    int redressAtChest                  = mcm.GetOptionInListByOID(mcm.oid_undressing_redressAtChest, oid)
-
-    if (oid == allowUndressing)
+    if (oid == mcm.GetOptionCurrentIndex("undressing::allowUndressing"))
         mcm.SetInfoText("Determines if you can be undressed while imprisoned in " + hold + ".")
-    elseif (oid == minimumBounty)
+
+    elseif (oid == mcm.GetOptionCurrentIndex("undressing::minimumBountyToUndress"))
         mcm.SetInfoText("The minimum bounty required to be undressed in " + hold + "'s prison.")
-    elseif (oid == undressWhenDefeated)
+
+    elseif (oid == mcm.GetOptionCurrentIndex("undressing::undressWhenDefeated"))
         mcm.SetInfoText("Whether to have you undressed when defeated and imprisoned in " + hold + ".")
-    elseif (oid == undressAtCell)
+
+    elseif (oid == mcm.GetOptionCurrentIndex("undressing::undressAtCell"))
         mcm.SetInfoText("Whether to be undressed at the cell in " + hold + "'s prison.")
-    elseif (oid == undressAtChest)
-        mcm.SetInfoText("Whether to be undressed at the chest in "  + hold + "'prison.")
-    elseif (oid == forcedUndressingMinBounty)
+
+    elseif (oid == mcm.GetOptionCurrentIndex("undressing::undressAtChest"))
+        mcm.SetInfoText("Whether to be undressed at the chest in "  + hold + "'s prison.")
+
+    elseif (oid == mcm.GetOptionCurrentIndex("undressing::forcedUndressing(bounty)"))
         mcm.SetInfoText("The minimum bounty required to be force undressed (You will have no possibility of action)")
-    elseif (oid == forcedUndressingWhenDefeated)
+
+    elseif (oid == mcm.GetOptionCurrentIndex("undressing::forcedUndressingWhenDefeated"))
         mcm.SetInfoText("Whether to be force undressed when defeated and imprisoned in " + hold + ".")
-    elseif (oid == stripSearchThoroughness)
+
+    elseif (oid == mcm.GetOptionCurrentIndex("undressing::stripSearchThoroughness"))
         mcm.SetInfoText("The thoroughness of the strip search when undressed, higher values mean a more thorough search and therefore possibly less items kept.\n" + \
-                 "Due to the nature of a strip search, most items will be removed, this value will only determine small objects that could be hidden when stripped bare.")
-    elseif (oid == allowWearingClothes)
+                     "Due to the nature of a strip search, most items will be removed, this value will only determine small objects that could be hidden when stripped bare.")
+
+    elseif (oid == mcm.GetOptionCurrentIndex("undressing::allowWearingClothes"))
         mcm.SetInfoText("Whether to allow wearing clothes while imprisoned in " + hold + ".")
-    elseif (oid == redressBounty)
+
+    elseif (oid == mcm.GetOptionCurrentIndex("undressing::bountyToRe-dress"))
         mcm.SetInfoText("The maximum bounty you can have in order to be re-dressed while imprisoned in " + hold + ".")
-    elseif (oid == redressWhenDefeated)
+
+    elseif (oid == mcm.GetOptionCurrentIndex("undressing::Re-dressWhenDefeated"))
         mcm.SetInfoText("Whether to have you re-dressed when defeated (Note: If the bounty exceeds the maximum, this option will have no effect.)")
-    elseif (oid == redressAtCell)
+
+    elseif (oid == mcm.GetOptionCurrentIndex("undressing::Re-dressAtCell"))
         mcm.SetInfoText("Whether to be re-dressed at the cell in " + hold + "'prison.")
-    elseif (oid == redressAtChest)
+
+    elseif (oid == mcm.GetOptionCurrentIndex("undressing::Re-dressAtChest"))
         mcm.SetInfoText("Whether to be re-dressed at the chest in " + hold + "'prison.")
     endif
+
+    Debug(mcm, "OnOptionHighlight", "Expected OID: " + oid, mcm.IS_DEBUG)
 
 endFunction
 
@@ -164,11 +156,17 @@ function OnOptionDefault(RealisticPrisonAndBounty_MCM mcm, int oid) global
 endFunction
 
 function OnOptionSelect(RealisticPrisonAndBounty_MCM mcm, int oid) global
-    if (oid == mcm.oid_undressing_allow[mcm.CurrentOptionIndex])
-        mcm.undressing_allow_state[mcm.CurrentOptionIndex] = ! mcm.undressing_allow_state[mcm.CurrentOptionIndex]
-        mcm.SetToggleOptionValue(mcm.oid_undressing_allow[mcm.CurrentOptionIndex], mcm.undressing_allow_state[mcm.CurrentOptionIndex])
-        Log(mcm, "Undressing::OnOptionSelect", "mcm.undressing_allow_state[" + mcm.CurrentOptionIndex + "] = " + mcm.undressing_allow_state[mcm.CurrentOptionIndex])
+    Log(mcm, "OnOptionSelect", "Option ID: " + oid)
+
+    if (oid == mcm.GetOptionCurrentIndex("undressing::allowUndressing"))
+        mcm.ToggleOption("undressing::allowUndressing")
     endif
+
+    ; if (oid == mcm.oid_undressing_allow[mcm.CurrentOptionIndex])
+    ;     mcm.undressing_allow_state[mcm.CurrentOptionIndex] = ! mcm.undressing_allow_state[mcm.CurrentOptionIndex]
+    ;     mcm.SetToggleOptionValue(mcm.oid_undressing_allow[mcm.CurrentOptionIndex], mcm.undressing_allow_state[mcm.CurrentOptionIndex])
+    ;     Log(mcm, "Undressing::OnOptionSelect", "mcm.undressing_allow_state[" + mcm.CurrentOptionIndex + "] = " + mcm.undressing_allow_state[mcm.CurrentOptionIndex])
+    ; endif
     mcm.SetOptionDependencyBool(mcm.oid_undressing_minimumBounty,                   mcm.undressing_allow_state[mcm.CurrentOptionIndex])
     mcm.SetOptionDependencyBool(mcm.oid_undressing_whenDefeated,                    mcm.undressing_allow_state[mcm.CurrentOptionIndex])
     mcm.SetOptionDependencyBool(mcm.oid_undressing_atCell,                          mcm.undressing_allow_state[mcm.CurrentOptionIndex])

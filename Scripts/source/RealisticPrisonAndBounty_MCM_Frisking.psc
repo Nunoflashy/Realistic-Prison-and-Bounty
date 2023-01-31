@@ -114,10 +114,9 @@ endFunction
 function OnOptionHighlight(RealisticPrisonAndBounty_MCM mcm, int oid) global
     string[] holds = mcm.GetHoldNames()
     string hold = holds[mcm.CurrentOptionIndex]
-
     int highlightedOption = oid
 
-    float startTime = Utility.GetCurrentRealTime()
+    ; float startTime = Utility.GetCurrentRealTime()
 
     int allowFrisking               = mcm.GetOptionInListByOID(mcm.oid_frisking_allow, oid)
     int minimumBounty               = mcm.GetOptionInListByOID(mcm.oid_frisking_minimumBounty, highlightedOption)
@@ -164,11 +163,11 @@ function OnOptionHighlight(RealisticPrisonAndBounty_MCM mcm, int oid) global
         mcm.SetInfoText("The minimum number of stolen items required to have the player undressed.")
     endif
 
-    Log(mcm, "Frisking::OnOptionHighlight", "Option = " + oid)
+    ; Log(mcm, "Frisking::OnOptionHighlight", "Option = " + oid)
 
-    float endTime = Utility.GetCurrentRealTime()
-    float elapsedTime = endTime - startTime
-    Log(mcm, "Frisking::OnHighlight", "execution took " + elapsedTime + " seconds.")
+    ; float endTime = Utility.GetCurrentRealTime()
+    ; float elapsedTime = endTime - startTime
+    ; Log(mcm, "Frisking::OnHighlight", "execution took " + elapsedTime + " seconds.")
 endFunction
 
 function OnOptionDefault(RealisticPrisonAndBounty_MCM mcm, int oid) global

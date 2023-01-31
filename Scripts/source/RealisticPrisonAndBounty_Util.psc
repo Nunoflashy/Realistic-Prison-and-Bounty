@@ -51,6 +51,24 @@ string function __getLogLevel(int _level) global
         string_if(_level == LOG_FATAL(), "fatal:")))))))
 endFunction
 
+; string function __getLogLevel(int _level) global
+;     if (_level == LOG_NOTYPE())
+;         return ""
+;     elseif (_level == LOG_TRACE())
+;         return "trace:"
+;     elseif (_level == LOG_DEBUG())
+;         return "debug:"
+;     elseif (_level == LOG_INFO())
+;         return "info:"
+;     elseif (_level == LOG_WARN())
+;         return "warn:"
+;     elseif (_level == LOG_ERROR())
+;         return "error:"
+;     elseif (_level == LOG_FATAL())
+;         return "fatal:"
+;     endif
+; endFunction
+
 
 function local_log(string caller, string logInfo, int logLevel = 0, bool hideCall = false) global
     string _scriptName = ModName()
@@ -104,6 +122,10 @@ function Debug(Form script, string caller, string logInfo, bool condition = true
     LogIf(script, caller, logInfo, condition, LOG_DEBUG(), hideCall)
     ; Log(script, caller, logInfo, LOG_DEBUG(), hideCall)
 endfunction
+
+; function Debug(Form script, string caller, string logInfo, bool condition = true, bool hideCall = false) global
+;     debug.trace(ModName() + " " + logInfo)
+; endfunction
 
 function Info(Form script, string caller, string logInfo, bool condition = true, bool hideCall = false) global
     LogIf(script, caller, logInfo, condition, LOG_INFO(), hideCall)
