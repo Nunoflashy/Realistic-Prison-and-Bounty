@@ -23,24 +23,26 @@ function Render(RealisticPrisonAndBounty_MCM mcm) global
 endFunction
 
 function RenderOptions(RealisticPrisonAndBounty_MCM mcm, int index) global
-    mcm.oid_prison_bountyToDays[index]                  = mcm.AddSliderOption("Bounty to Days",                 GetOptionIntValue(mcm.oid_prison_bountyToDays[index]), "{0} Bounty")
-    mcm.oid_prison_minimumSentenceDays[index]           = mcm.AddSliderOption("Minimum Sentence (Days)",        GetOptionIntValue(mcm.oid_prison_minimumSentenceDays[index]))
-    mcm.oid_prison_maximumSentenceDays[index]           = mcm.AddSliderOption("Maximum Sentence (Days)",        GetOptionIntValue(mcm.oid_prison_maximumSentenceDays[index]))
-    mcm.oid_prison_allowBountylessImprisonment[index]   = mcm.AddToggleOption("Allow Bountyless Imprisonment",  GetOptionIntValue(mcm.oid_prison_allowBountylessImprisonment[index]))
-    mcm.oid_prison_sentencePaysBounty[index]            = mcm.AddToggleOption("Sentence pays Bounty",           GetOptionIntValue(mcm.oid_prison_sentencePaysBounty[index]))
-    mcm.oid_prison_fastForward[index]                   = mcm.AddToggleOption("Fast Forward",                   GetOptionIntValue(mcm.oid_prison_fastForward[index]))
-    mcm.oid_prison_dayToFastForwardFrom[index]          = mcm.AddSliderOption("Day to fast forward from",       GetOptionIntValue(mcm.oid_prison_dayToFastForwardFrom[index]))
-    mcm.oid_prison_handsBoundInPrison[index]            = mcm.AddToggleOption("Hands Bound in Prison",          GetOptionIntValue(mcm.oid_prison_handsBoundInPrison[index]))
-    mcm.oid_prison_handsBoundMinimumBounty[index]       = mcm.AddSliderOption("Hands Bound (Minimum Bounty)",   GetOptionIntValue(mcm.oid_prison_handsBoundMinimumBounty[index]))
-    mcm.oid_prison_handsBoundRandomize[index]           = mcm.AddToggleOption("Hands Bound (Randomize)",        GetOptionIntValue(mcm.oid_prison_handsBoundRandomize[index]))
-    mcm.oid_prison_cellLockLevel[index]                 = mcm.AddMenuOption("Cell Lock Level", "SELECT")
+    mcm.AddOptionSlider("Bounty to Days",               mcm.ARREST_DEFAULT_BOUNTY_WHEN_DEFEATED_FLAT, index)
+    mcm.AddOptionSlider("Minimum Sentence (Days)",               mcm.ARREST_DEFAULT_BOUNTY_WHEN_DEFEATED_FLAT, index)
+    mcm.AddOptionSlider("Maximum Sentence (Days)",               mcm.ARREST_DEFAULT_BOUNTY_WHEN_DEFEATED_FLAT, index)
+    mcm.AddOptionToggle("Allow Bountyless Imprisonment",        mcm.ARREST_DEFAULT_ALLOW_CIVILIAN_CAPTURE, index)
+    mcm.AddOptionToggle("Sentence pays Bounty",        mcm.ARREST_DEFAULT_ALLOW_CIVILIAN_CAPTURE, index)
+    mcm.AddOptionToggle("Fast Forward",        mcm.ARREST_DEFAULT_ALLOW_CIVILIAN_CAPTURE, index)
+    mcm.AddOptionSlider("Day to fast forward from",               mcm.ARREST_DEFAULT_BOUNTY_WHEN_DEFEATED_FLAT, index)
+    mcm.AddOptionToggle("Hands Bound in Prison",        mcm.ARREST_DEFAULT_ALLOW_CIVILIAN_CAPTURE, index)
+    mcm.AddOptionSlider("Hands Bound (Minimum Bounty)",               mcm.ARREST_DEFAULT_BOUNTY_WHEN_DEFEATED_FLAT, index)
+    mcm.AddOptionToggle("Hands Bound (Randomize)",        mcm.ARREST_DEFAULT_ALLOW_CIVILIAN_CAPTURE, index)
+    ; mcm.oid_prison_cellLockLevel[index]                 = mcm.AddMenuOption("Cell Lock Level", "SELECT")
+
+
 endFunction
 
 function Left(RealisticPrisonAndBounty_MCM mcm) global
     string[] holds = mcm.GetHoldNames()
 
     mcm.AddHeaderOption("General")
-    mcm.oid_prison_prisonTimeScale = mcm.AddSliderOption("Timescale in Prison", int_if(mcm.PrisonTimescale.GetValueInt() != 0, mcm.PrisonTimescale.GetValueInt(), 10))
+    ; mcm.oid_prison_prisonTimeScale = mcm.AddSliderOption("Timescale in Prison", int_if(mcm.PrisonTimescale.GetValueInt() != 0, mcm.PrisonTimescale.GetValueInt(), 10))
 
     int i = mcm.LeftPanelIndex
     while (i < mcm.LeftPanelSize)
@@ -74,61 +76,61 @@ function OnOptionHighlight(RealisticPrisonAndBounty_MCM mcm, int oid) global
     string[] holds = mcm.GetHoldNames()
     string hold = holds[mcm.CurrentOptionIndex]
 
-    int prisonTimescale                 = mcm.oid_prison_prisonTimeScale 
-    int bountyToDays                    = mcm.GetOptionInListByOID(mcm.oid_prison_bountyToDays, oid)
-    int minimumSentenceDays             = mcm.GetOptionInListByOID(mcm.oid_prison_minimumSentenceDays, oid)
-    int maximumSentenceDays             = mcm.GetOptionInListByOID(mcm.oid_prison_maximumSentenceDays, oid)
-    int allowUnconditionalImprisonment  = mcm.GetOptionInListByOID(mcm.oid_prison_allowBountylessImprisonment, oid)
-    int sentencePaysBounty              = mcm.GetOptionInListByOID(mcm.oid_prison_sentencePaysBounty, oid)
-    int fastForward                     = mcm.GetOptionInListByOID(mcm.oid_prison_fastForward, oid)
-    int dayToFastForwardFrom            = mcm.GetOptionInListByOID(mcm.oid_prison_dayToFastForwardFrom, oid)
-    int handsBoundInPrison              = mcm.GetOptionInListByOID(mcm.oid_prison_handsBoundInPrison, oid)
-    int handsBoundMinimumBounty         = mcm.GetOptionInListByOID(mcm.oid_prison_handsBoundMinimumBounty, oid)
-    int handsBoundRandomize             = mcm.GetOptionInListByOID(mcm.oid_prison_handsBoundRandomize, oid)
-    int cellLockLevel                   = mcm.GetOptionInListByOID(mcm.oid_prison_cellLockLevel, oid)
+    ; int prisonTimescale                 = mcm.oid_prison_prisonTimeScale 
+    ; int bountyToDays                    = mcm.GetOptionInListByOID(mcm.oid_prison_bountyToDays, oid)
+    ; int minimumSentenceDays             = mcm.GetOptionInListByOID(mcm.oid_prison_minimumSentenceDays, oid)
+    ; int maximumSentenceDays             = mcm.GetOptionInListByOID(mcm.oid_prison_maximumSentenceDays, oid)
+    ; int allowUnconditionalImprisonment  = mcm.GetOptionInListByOID(mcm.oid_prison_allowBountylessImprisonment, oid)
+    ; int sentencePaysBounty              = mcm.GetOptionInListByOID(mcm.oid_prison_sentencePaysBounty, oid)
+    ; int fastForward                     = mcm.GetOptionInListByOID(mcm.oid_prison_fastForward, oid)
+    ; int dayToFastForwardFrom            = mcm.GetOptionInListByOID(mcm.oid_prison_dayToFastForwardFrom, oid)
+    ; int handsBoundInPrison              = mcm.GetOptionInListByOID(mcm.oid_prison_handsBoundInPrison, oid)
+    ; int handsBoundMinimumBounty         = mcm.GetOptionInListByOID(mcm.oid_prison_handsBoundMinimumBounty, oid)
+    ; int handsBoundRandomize             = mcm.GetOptionInListByOID(mcm.oid_prison_handsBoundRandomize, oid)
+    ; int cellLockLevel                   = mcm.GetOptionInListByOID(mcm.oid_prison_cellLockLevel, oid)
 
-    ; mcm.SetInfoText( \
-    ;     string_if (oid == prisonTimescale, "Sets the timescale while imprisoned.", \
-    ;     string_if (oid == bountyToDays, "Sets the relation between bounty and days in " + hold + "'s prison.", \
-    ;     string_if (oid == minimumSentenceDays, "Determines the minimum sentence in days for " + hold + "'s prison.", \
-    ;     string_if (oid == maximumSentenceDays, "Determines the maximum sentence in days for " + hold + "'s prison.", \
-    ;     string_if (oid == allowUnconditionalImprisonment, "Whether to allow unconditional imprisonment without a bounty in " + hold + "'s prison.", \
-    ;     string_if (oid == sentencePaysBounty, "Determines if serving the sentence pays the bounty in "  + hold + ".\nIf disabled, the bounty must be paid after serving the sentence.", \
-    ;     string_if (oid == fastForward, "Whether to fast forward to the release in " + hold + ".", \
-    ;     string_if (oid == dayToFastForwardFrom, "The day to fast forward from to release in " + hold + ".", \
-    ;     string_if (oid == handsBoundInPrison, "Whether to have hands restrained during imprisonment in " + hold + ".", \
-    ;     string_if (oid == handsBoundMinimumBounty, "The minimum bounty required to have hands restrained during imprisonment in " + hold + ".", \
-    ;     string_if (oid == handsBoundRandomize, "Randomize whether to be restrained or not, while in prison in " + hold + ".", \
-    ;     string_if (oid == cellLockLevel, "Determines the cell's door lock level", \
-    ;     "No description defined for this option." \
-    ;     )))))))))))) \
-    ; )
+    ; ; mcm.SetInfoText( \
+    ; ;     string_if (oid == prisonTimescale, "Sets the timescale while imprisoned.", \
+    ; ;     string_if (oid == bountyToDays, "Sets the relation between bounty and days in " + hold + "'s prison.", \
+    ; ;     string_if (oid == minimumSentenceDays, "Determines the minimum sentence in days for " + hold + "'s prison.", \
+    ; ;     string_if (oid == maximumSentenceDays, "Determines the maximum sentence in days for " + hold + "'s prison.", \
+    ; ;     string_if (oid == allowUnconditionalImprisonment, "Whether to allow unconditional imprisonment without a bounty in " + hold + "'s prison.", \
+    ; ;     string_if (oid == sentencePaysBounty, "Determines if serving the sentence pays the bounty in "  + hold + ".\nIf disabled, the bounty must be paid after serving the sentence.", \
+    ; ;     string_if (oid == fastForward, "Whether to fast forward to the release in " + hold + ".", \
+    ; ;     string_if (oid == dayToFastForwardFrom, "The day to fast forward from to release in " + hold + ".", \
+    ; ;     string_if (oid == handsBoundInPrison, "Whether to have hands restrained during imprisonment in " + hold + ".", \
+    ; ;     string_if (oid == handsBoundMinimumBounty, "The minimum bounty required to have hands restrained during imprisonment in " + hold + ".", \
+    ; ;     string_if (oid == handsBoundRandomize, "Randomize whether to be restrained or not, while in prison in " + hold + ".", \
+    ; ;     string_if (oid == cellLockLevel, "Determines the cell's door lock level", \
+    ; ;     "No description defined for this option." \
+    ; ;     )))))))))))) \
+    ; ; )
 
-    if (oid == prisonTimescale)
-        mcm.SetInfoText("Sets the timescale while imprisoned.")
-    elseif (oid == bountyToDays)
-        mcm.SetInfoText("Sets the relation between bounty and days in " + hold + "'s prison.")
-    elseif (oid == minimumSentenceDays)
-        mcm.SetInfoText("Determines the minimum sentence in days for " + hold + "'s prison.")
-    elseif (oid == maximumSentenceDays)
-        mcm.SetInfoText("Determines the maximum sentence in days for " + hold + "'s prison.")
-    elseif (oid == allowUnconditionalImprisonment)
-        mcm.SetInfoText("Whether to allow unconditional imprisonment without a bounty in " + hold + "'s prison.")
-    elseif (oid == sentencePaysBounty)
-        mcm.SetInfoText("Determines if serving the sentence pays the bounty in "  + hold + ".\nIf disabled, the bounty must be paid after serving the sentence.")
-    elseif (oid == fastForward)
-        mcm.SetInfoText("Whether to fast forward to the release in " + hold + ".")
-    elseif (oid == dayToFastForwardFrom)
-        mcm.SetInfoText("The day to fast forward from to release in " + hold + ".")
-    elseif (oid == handsBoundInPrison)
-        mcm.SetInfoText("Whether to have hands restrained during imprisonment in " + hold + ".")
-    elseif (oid == handsBoundMinimumBounty)
-        mcm.SetInfoText("The minimum bounty required to have hands restrained during imprisonment in " + hold + ".")
-    elseif (oid == handsBoundRandomize) 
-        mcm.SetInfoText("Randomize whether to be restrained or not, while in prison in " + hold + ".")
-    elseif (oid == cellLockLevel)
-        mcm.SetInfoText("Determines the cell's door lock level")
-    endif
+    ; if (oid == prisonTimescale)
+    ;     mcm.SetInfoText("Sets the timescale while imprisoned.")
+    ; elseif (oid == bountyToDays)
+    ;     mcm.SetInfoText("Sets the relation between bounty and days in " + hold + "'s prison.")
+    ; elseif (oid == minimumSentenceDays)
+    ;     mcm.SetInfoText("Determines the minimum sentence in days for " + hold + "'s prison.")
+    ; elseif (oid == maximumSentenceDays)
+    ;     mcm.SetInfoText("Determines the maximum sentence in days for " + hold + "'s prison.")
+    ; elseif (oid == allowUnconditionalImprisonment)
+    ;     mcm.SetInfoText("Whether to allow unconditional imprisonment without a bounty in " + hold + "'s prison.")
+    ; elseif (oid == sentencePaysBounty)
+    ;     mcm.SetInfoText("Determines if serving the sentence pays the bounty in "  + hold + ".\nIf disabled, the bounty must be paid after serving the sentence.")
+    ; elseif (oid == fastForward)
+    ;     mcm.SetInfoText("Whether to fast forward to the release in " + hold + ".")
+    ; elseif (oid == dayToFastForwardFrom)
+    ;     mcm.SetInfoText("The day to fast forward from to release in " + hold + ".")
+    ; elseif (oid == handsBoundInPrison)
+    ;     mcm.SetInfoText("Whether to have hands restrained during imprisonment in " + hold + ".")
+    ; elseif (oid == handsBoundMinimumBounty)
+    ;     mcm.SetInfoText("The minimum bounty required to have hands restrained during imprisonment in " + hold + ".")
+    ; elseif (oid == handsBoundRandomize) 
+    ;     mcm.SetInfoText("Randomize whether to be restrained or not, while in prison in " + hold + ".")
+    ; elseif (oid == cellLockLevel)
+    ;     mcm.SetInfoText("Determines the cell's door lock level")
+    ; endif
 
 endFunction
 
@@ -140,25 +142,25 @@ endFunction
 
 function OnOptionSelect(RealisticPrisonAndBounty_MCM mcm, int oid) global
 
-    bool optionState = mcm.ToggleOption(oid)
+    ; bool optionState = mcm.ToggleOption(oid)
 
-    int bountyToDays                    = mcm.GetOptionInListByOID(mcm.oid_prison_bountyToDays, oid)
-    int minimumSentenceDays             = mcm.GetOptionInListByOID(mcm.oid_prison_minimumSentenceDays, oid)
-    int maximumSentenceDays             = mcm.GetOptionInListByOID(mcm.oid_prison_maximumSentenceDays, oid)
-    int allowUnconditionalImprisonment  = mcm.GetOptionInListByOID(mcm.oid_prison_allowBountylessImprisonment, oid)
-    int sentencePaysBounty              = mcm.GetOptionInListByOID(mcm.oid_prison_sentencePaysBounty, oid)
-    int fastForward                     = mcm.GetOptionInListByOID(mcm.oid_prison_fastForward, oid)
-    int dayToFastForwardFrom            = mcm.GetOptionInListByOID(mcm.oid_prison_dayToFastForwardFrom, oid)
-    int handsBoundInPrison              = mcm.GetOptionInListByOID(mcm.oid_prison_handsBoundInPrison, oid)
-    int handsBoundMinimumBounty         = mcm.GetOptionInListByOID(mcm.oid_prison_handsBoundMinimumBounty, oid)
-    int handsBoundRandomize             = mcm.GetOptionInListByOID(mcm.oid_prison_handsBoundRandomize, oid)
-    int cellLockLevel                   = mcm.GetOptionInListByOID(mcm.oid_prison_cellLockLevel, oid)
+    ; int bountyToDays                    = mcm.GetOptionInListByOID(mcm.oid_prison_bountyToDays, oid)
+    ; int minimumSentenceDays             = mcm.GetOptionInListByOID(mcm.oid_prison_minimumSentenceDays, oid)
+    ; int maximumSentenceDays             = mcm.GetOptionInListByOID(mcm.oid_prison_maximumSentenceDays, oid)
+    ; int allowUnconditionalImprisonment  = mcm.GetOptionInListByOID(mcm.oid_prison_allowBountylessImprisonment, oid)
+    ; int sentencePaysBounty              = mcm.GetOptionInListByOID(mcm.oid_prison_sentencePaysBounty, oid)
+    ; int fastForward                     = mcm.GetOptionInListByOID(mcm.oid_prison_fastForward, oid)
+    ; int dayToFastForwardFrom            = mcm.GetOptionInListByOID(mcm.oid_prison_dayToFastForwardFrom, oid)
+    ; int handsBoundInPrison              = mcm.GetOptionInListByOID(mcm.oid_prison_handsBoundInPrison, oid)
+    ; int handsBoundMinimumBounty         = mcm.GetOptionInListByOID(mcm.oid_prison_handsBoundMinimumBounty, oid)
+    ; int handsBoundRandomize             = mcm.GetOptionInListByOID(mcm.oid_prison_handsBoundRandomize, oid)
+    ; int cellLockLevel                   = mcm.GetOptionInListByOID(mcm.oid_prison_cellLockLevel, oid)
 
-    if (oid == handsBoundInPrison)
-        mcm.SetOptionDependencyBool(mcm.oid_prison_handsBoundMinimumBounty, optionState)
-        mcm.SetOptionDependencyBool(mcm.oid_prison_handsBoundMinimumBounty, optionState)
-        mcm.SetOptionDependencyBool(mcm.oid_prison_handsBoundRandomize, optionState)
-    endif
+    ; if (oid == handsBoundInPrison)
+    ;     mcm.SetOptionDependencyBool(mcm.oid_prison_handsBoundMinimumBounty, optionState)
+    ;     mcm.SetOptionDependencyBool(mcm.oid_prison_handsBoundMinimumBounty, optionState)
+    ;     mcm.SetOptionDependencyBool(mcm.oid_prison_handsBoundRandomize, optionState)
+    ; endif
 
 endFunction
 
@@ -166,77 +168,77 @@ function OnOptionSliderOpen(RealisticPrisonAndBounty_MCM mcm, int oid) global
     float startTime = Utility.GetCurrentRealTime()
     string[] holds = mcm.GetHoldNames()
 
-    if (oid == mcm.oid_prison_prisonTimeScale)
-        mcm.SetSliderDialogStartValue(mcm.PrisonTimescale.GetValueInt())
-        mcm.SetSliderDialogRange(0, 1000)
-        mcm.SetSliderDialogInterval(1)
-        mcm.SetSliderDialogDefaultValue(mcm.PrisonTimescale.GetValueInt())
-        Log(mcm, "Prison::OnSingleOptionSliderOpen", "(oid: " + oid + ")")
-    endif
+    ; if (oid == mcm.oid_prison_prisonTimeScale)
+    ;     mcm.SetSliderDialogStartValue(mcm.PrisonTimescale.GetValueInt())
+    ;     mcm.SetSliderDialogRange(0, 1000)
+    ;     mcm.SetSliderDialogInterval(1)
+    ;     mcm.SetSliderDialogDefaultValue(mcm.PrisonTimescale.GetValueInt())
+    ;     Log(mcm, "Prison::OnSingleOptionSliderOpen", "(oid: " + oid + ")")
+    ; endif
 
-    int bountyToDays = mcm.GetOptionInListByOID(mcm.oid_prison_bountyToDays, oid)
-    int minimumSentenceDays = mcm.GetOptionInListByOID(mcm.oid_prison_minimumSentenceDays, oid)
-    int maximumSentenceDays = mcm.GetOptionInListByOID(mcm.oid_prison_maximumSentenceDays, oid)
-    int allowUnconditionalImprisonment = mcm.GetOptionInListByOID(mcm.oid_prison_allowBountylessImprisonment, oid)
-    int sentencePaysBounty = mcm.GetOptionInListByOID(mcm.oid_prison_sentencePaysBounty, oid)
-    int fastForward = mcm.GetOptionInListByOID(mcm.oid_prison_fastForward, oid)
-    int dayToFastForwardFrom = mcm.GetOptionInListByOID(mcm.oid_prison_dayToFastForwardFrom, oid)
-    int handsBoundInPrison = mcm.GetOptionInListByOID(mcm.oid_prison_handsBoundInPrison, oid)
-    int handsBoundMinimumBounty = mcm.GetOptionInListByOID(mcm.oid_prison_handsBoundMinimumBounty, oid)
-    int handsBoundRandomize = mcm.GetOptionInListByOID(mcm.oid_prison_handsBoundRandomize, oid)
-    int cellLockLevel = mcm.GetOptionInListByOID(mcm.oid_prison_cellLockLevel, oid)
+    ; int bountyToDays = mcm.GetOptionInListByOID(mcm.oid_prison_bountyToDays, oid)
+    ; int minimumSentenceDays = mcm.GetOptionInListByOID(mcm.oid_prison_minimumSentenceDays, oid)
+    ; int maximumSentenceDays = mcm.GetOptionInListByOID(mcm.oid_prison_maximumSentenceDays, oid)
+    ; int allowUnconditionalImprisonment = mcm.GetOptionInListByOID(mcm.oid_prison_allowBountylessImprisonment, oid)
+    ; int sentencePaysBounty = mcm.GetOptionInListByOID(mcm.oid_prison_sentencePaysBounty, oid)
+    ; int fastForward = mcm.GetOptionInListByOID(mcm.oid_prison_fastForward, oid)
+    ; int dayToFastForwardFrom = mcm.GetOptionInListByOID(mcm.oid_prison_dayToFastForwardFrom, oid)
+    ; int handsBoundInPrison = mcm.GetOptionInListByOID(mcm.oid_prison_handsBoundInPrison, oid)
+    ; int handsBoundMinimumBounty = mcm.GetOptionInListByOID(mcm.oid_prison_handsBoundMinimumBounty, oid)
+    ; int handsBoundRandomize = mcm.GetOptionInListByOID(mcm.oid_prison_handsBoundRandomize, oid)
+    ; int cellLockLevel = mcm.GetOptionInListByOID(mcm.oid_prison_cellLockLevel, oid)
 
-    if (oid == bountyToDays)
-        mcm.SetSliderDialogStartValue(1.0)
-        mcm.SetSliderDialogRange(0, 10000)
-        mcm.SetSliderDialogInterval(1)
-    elseif (oid == minimumSentenceDays)
-        mcm.SetSliderDialogStartValue(1.0)
-        mcm.SetSliderDialogRange(0, 365)
-        mcm.SetSliderDialogInterval(1)
-    elseif (oid == maximumSentenceDays)
-        mcm.SetSliderDialogStartValue(1.0)
-        mcm.SetSliderDialogRange(0, 365)
-        mcm.SetSliderDialogInterval(1)
-    elseif (oid == dayToFastForwardFrom)
-        mcm.SetSliderDialogStartValue(1.0)
-        mcm.SetSliderDialogRange(0, 365)
-        mcm.SetSliderDialogInterval(1)
-    elseif (oid == handsBoundMinimumBounty)
-        mcm.SetSliderDialogStartValue(1.0)
-        mcm.SetSliderDialogRange(0, 10000)
-        mcm.SetSliderDialogInterval(1)
-    endif
+    ; if (oid == bountyToDays)
+    ;     mcm.SetSliderDialogStartValue(1.0)
+    ;     mcm.SetSliderDialogRange(0, 10000)
+    ;     mcm.SetSliderDialogInterval(1)
+    ; elseif (oid == minimumSentenceDays)
+    ;     mcm.SetSliderDialogStartValue(1.0)
+    ;     mcm.SetSliderDialogRange(0, 365)
+    ;     mcm.SetSliderDialogInterval(1)
+    ; elseif (oid == maximumSentenceDays)
+    ;     mcm.SetSliderDialogStartValue(1.0)
+    ;     mcm.SetSliderDialogRange(0, 365)
+    ;     mcm.SetSliderDialogInterval(1)
+    ; elseif (oid == dayToFastForwardFrom)
+    ;     mcm.SetSliderDialogStartValue(1.0)
+    ;     mcm.SetSliderDialogRange(0, 365)
+    ;     mcm.SetSliderDialogInterval(1)
+    ; elseif (oid == handsBoundMinimumBounty)
+    ;     mcm.SetSliderDialogStartValue(1.0)
+    ;     mcm.SetSliderDialogRange(0, 10000)
+    ;     mcm.SetSliderDialogInterval(1)
+    ; endif
 
-    float endTime = Utility.GetCurrentRealTime()
-    float elapsedTime = endTime - startTime
+    ; float endTime = Utility.GetCurrentRealTime()
+    ; float elapsedTime = endTime - startTime
 
-    Log(mcm, "OnOptionSliderOpen", "This is the new way without loops! (took " + elapsedTime + " seconds)")
+    ; Log(mcm, "OnOptionSliderOpen", "This is the new way without loops! (took " + elapsedTime + " seconds)")
 endFunction
 
 function OnOptionSliderAccept(RealisticPrisonAndBounty_MCM mcm, int oid, float value) global
-    if (oid == mcm.oid_prison_prisonTimeScale)
-        mcm.SetSliderOptionValue(oid, value)
-        mcm.PrisonTimescale.SetValueInt((value as int))
-        Log(mcm, "Prison::OnSingleOptionSliderAccept", "(oid: " + oid + ")")
-    endif
+    ; if (oid == mcm.oid_prison_prisonTimeScale)
+    ;     mcm.SetSliderOptionValue(oid, value)
+    ;     mcm.PrisonTimescale.SetValueInt((value as int))
+    ;     Log(mcm, "Prison::OnSingleOptionSliderAccept", "(oid: " + oid + ")")
+    ; endif
 endFunction
 
 function OnOptionMenuOpen(RealisticPrisonAndBounty_MCM mcm, int oid) global
     float startTime = Utility.GetCurrentRealTime()
     string[] holds = mcm.GetHoldNames()
 
-    int bountyToDays = mcm.GetOptionInListByOID(mcm.oid_prison_bountyToDays, oid)
-    int minimumSentenceDays = mcm.GetOptionInListByOID(mcm.oid_prison_minimumSentenceDays, oid)
-    int maximumSentenceDays = mcm.GetOptionInListByOID(mcm.oid_prison_maximumSentenceDays, oid)
-    int allowUnconditionalImprisonment = mcm.GetOptionInListByOID(mcm.oid_prison_allowBountylessImprisonment, oid)
-    int sentencePaysBounty = mcm.GetOptionInListByOID(mcm.oid_prison_sentencePaysBounty, oid)
-    int fastForward = mcm.GetOptionInListByOID(mcm.oid_prison_fastForward, oid)
-    int dayToFastForwardFrom = mcm.GetOptionInListByOID(mcm.oid_prison_dayToFastForwardFrom, oid)
-    int handsBoundInPrison = mcm.GetOptionInListByOID(mcm.oid_prison_handsBoundInPrison, oid)
-    int handsBoundMinimumBounty = mcm.GetOptionInListByOID(mcm.oid_prison_handsBoundMinimumBounty, oid)
-    int handsBoundRandomize = mcm.GetOptionInListByOID(mcm.oid_prison_handsBoundRandomize, oid)
-    int cellLockLevel = mcm.GetOptionInListByOID(mcm.oid_prison_cellLockLevel, oid)
+    ; int bountyToDays = mcm.GetOptionInListByOID(mcm.oid_prison_bountyToDays, oid)
+    ; int minimumSentenceDays = mcm.GetOptionInListByOID(mcm.oid_prison_minimumSentenceDays, oid)
+    ; int maximumSentenceDays = mcm.GetOptionInListByOID(mcm.oid_prison_maximumSentenceDays, oid)
+    ; int allowUnconditionalImprisonment = mcm.GetOptionInListByOID(mcm.oid_prison_allowBountylessImprisonment, oid)
+    ; int sentencePaysBounty = mcm.GetOptionInListByOID(mcm.oid_prison_sentencePaysBounty, oid)
+    ; int fastForward = mcm.GetOptionInListByOID(mcm.oid_prison_fastForward, oid)
+    ; int dayToFastForwardFrom = mcm.GetOptionInListByOID(mcm.oid_prison_dayToFastForwardFrom, oid)
+    ; int handsBoundInPrison = mcm.GetOptionInListByOID(mcm.oid_prison_handsBoundInPrison, oid)
+    ; int handsBoundMinimumBounty = mcm.GetOptionInListByOID(mcm.oid_prison_handsBoundMinimumBounty, oid)
+    ; int handsBoundRandomize = mcm.GetOptionInListByOID(mcm.oid_prison_handsBoundRandomize, oid)
+    ; int cellLockLevel = mcm.GetOptionInListByOID(mcm.oid_prison_cellLockLevel, oid)
 endFunction
 
 function OnOptionMenuAccept(RealisticPrisonAndBounty_MCM mcm, int oid, int menuIndex) global

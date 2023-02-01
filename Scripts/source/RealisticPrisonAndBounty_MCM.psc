@@ -118,126 +118,6 @@ GlobalVariable property NormalTimescale auto
 GlobalVariable property PrisonTimescale auto
 ; =======================================
 
-; FormLists
-; =======================================
-FormList property Arrest_AdditionalBountyWhenDefeatedFlat auto
-; =======================================
-
-; General
-; =======================================
-int   property oid_general_normalTimeScale auto
-int[] property oid_general_attackOnSightBounty auto
-; =======================================
-
-; Arrest
-; =======================================
-int[] property oid_arrest_minimumBounty auto
-int[] property oid_arrest_guaranteedPayableBounty auto
-int[] property oid_arrest_maximumPayableBounty auto
-int[] property oid_arrest_additionalBountyWhenResistingPercent auto
-int[] property oid_arrest_additionalBountyWhenResistingFlat auto
-int[] property oid_arrest_additionalBountyWhenDefeatedPercent auto
-int[] property oid_arrest_additionalBountyWhenDefeatedFlat auto
-int[] property oid_arrest_allowCivilianCapture auto
-int[] property oid_arrest_allowArrestTransfer auto
-int[] property oid_arrest_allowUnconsciousArrest auto
-int[] property oid_arrest_unequipHandBounty auto
-int[] property oid_arrest_unequipHeadBounty auto
-int[] property oid_arrest_unequipFootBounty auto
-; =======================================
-
-; Frisking
-; =======================================
-int[] property oid_frisking_allow auto
-int[] property oid_frisking_minimumBounty auto
-int[] property oid_frisking_guaranteedPayableBounty auto
-int[] property oid_frisking_maximumPayableBounty auto
-int[] property oid_frisking_maximumPayableBountyChance auto
-int[] property oid_frisking_friskSearchThoroughness auto
-int[] property oid_frisking_confiscateStolenItems auto
-int[] property oid_frisking_stripSearchStolenItems auto
-int[] property oid_frisking_stripSearchStolenItemsNumber auto
-
-bool[] property oid_frisking_allow_state auto
-bool[] property oid_frisking_stripSearchStolenItems_state auto
-; =======================================
-
-; Undressing
-; =======================================
-int[] property oid_undressing_allow auto
-int[] property oid_undressing_minimumBounty auto
-int[] property oid_undressing_whenDefeated auto
-int[] property oid_undressing_atCell auto
-int[] property oid_undressing_atChest auto
-int[] property oid_undressing_forcedUndressingMinBounty auto
-int[] property oid_undressing_forcedUndressingWhenDefeated auto
-int[] property oid_undressing_stripSearchThoroughness auto
-int[] property oid_undressing_allowWearingClothes auto
-int[] property oid_undressing_redressBounty auto
-int[] property oid_undressing_redressWhenDefeated auto
-int[] property oid_undressing_redressAtCell auto
-int[] property oid_undressing_redressAtChest auto
-
-bool[] property undressing_allow_state auto
-; =======================================
-
-; Prison
-; =======================================
-int   property oid_prison_prisonTimeScale auto
-int[] property oid_prison_bountyToDays auto
-int[] property oid_prison_minimumSentenceDays auto
-int[] property oid_prison_maximumSentenceDays auto
-int[] property oid_prison_allowBountylessImprisonment auto
-int[] property oid_prison_sentencePaysBounty auto
-int[] property oid_prison_fastForward auto
-int[] property oid_prison_dayToFastForwardFrom auto
-int[] property oid_prison_handsBoundInPrison auto
-int[] property oid_prison_handsBoundMinimumBounty auto
-int[] property oid_prison_handsBoundRandomize auto
-int[] property oid_prison_cellLockLevel auto
-
-bool[] property oid_prison_allowBountylessImprisonment_checked auto
-bool[] property oid_prison_sentencePaysBounty_checked auto
-
-; =======================================
-
-; Release
-; =======================================
-int[] property oid_release_giveItemsBackOnRelease auto
-int[] property oid_release_redressOnRelease auto
-int[] property oid_release_giveItemsBackOnReleaseMaxBounty auto
-int[] property oid_release_giveItemsBackOnDefeat auto
-; =======================================
-
-; Escape
-; =======================================
-int[] property oid_escape_escapeBountyPercent auto
-int[] property oid_escape_escapeBountyFlat auto
-int[] property oid_escape_allowSurrender auto
-int[] property oid_escape_friskUponCapture auto
-int[] property oid_escape_undressUponCapture auto
-; =======================================
-
-; Bounty
-; =======================================
-int   property oid_bounty_enableBountyDecayGeneral auto
-int   property oid_bounty_updateInterval auto
-int[] property oid_bounty_currentBounty auto
-int[] property oid_bounty_largestBounty auto
-int[] property oid_bounty_enableBountyDecay auto
-int[] property oid_bounty_decayInPrison auto
-int[] property oid_bounty_bountyLostPercent auto
-int[] property oid_bounty_bountyLostFlat auto
-; =======================================
-
-; Bounty Hunters
-; =======================================
-int[] property oid_bhunters_enableBountyHunters auto
-int[] property oid_bhunters_allowOutlawBountyHunters auto
-int[] property oid_bhunters_minimumBounty auto
-int[] property oid_bhunters_bountyPosse auto
-; =======================================
-
 string[] _holds
 
 int property INDEX_WHITERUN     = 0 autoreadonly
@@ -331,116 +211,6 @@ function InitializeOptions()
 
 ; ============================================================
 
-; General
-; ============================================================
-    oid_general_attackOnSightBounty = new int[9]
-; ============================================================
-
-; Arrest
-; ============================================================
-    oid_arrest_minimumBounty = new int[9]
-    oid_arrest_guaranteedPayableBounty = new int[9]
-    oid_arrest_maximumPayableBounty = new int[9]
-    oid_arrest_additionalBountyWhenResistingPercent = new int[9]
-    oid_arrest_additionalBountyWhenResistingFlat = new int[9]
-    oid_arrest_additionalBountyWhenDefeatedPercent = new int[9]
-    oid_arrest_additionalBountyWhenDefeatedFlat = new int[9]
-    oid_arrest_allowCivilianCapture = new int[9]
-    oid_arrest_allowArrestTransfer = new int[9]
-    oid_arrest_allowUnconsciousArrest = new int[9]
-    oid_arrest_unequipHandBounty = new int[9]
-    oid_arrest_unequipHeadBounty = new int[9]
-    oid_arrest_unequipFootBounty = new int[9]
-; ============================================================
-
-; Frisking
-; ============================================================
-    oid_frisking_allow = new int[9]
-    oid_frisking_minimumBounty = new int[9]
-    oid_frisking_guaranteedPayableBounty = new int[9]
-    oid_frisking_maximumPayableBounty = new int[9]
-    oid_frisking_maximumPayableBountyChance = new int[9]
-    oid_frisking_friskSearchThoroughness = new int[9]
-    oid_frisking_confiscateStolenItems = new int[9]
-    oid_frisking_stripSearchStolenItems = new int[9]
-    oid_frisking_stripSearchStolenItemsNumber = new int[9]
-
-    oid_frisking_allow_state = new bool[9]
-    oid_frisking_stripSearchStolenItems_state = new bool[9]
-; ============================================================
-
-; Undressing
-; ============================================================
-    oid_undressing_allow = new int[9]
-    oid_undressing_minimumBounty = new int[9]
-    oid_undressing_whenDefeated = new int[9]
-    oid_undressing_atCell = new int[9]
-    oid_undressing_atChest = new int[9]
-    oid_undressing_forcedUndressingMinBounty = new int[9]
-    oid_undressing_forcedUndressingWhenDefeated = new int[9]
-    oid_undressing_stripSearchThoroughness = new int[9]
-    oid_undressing_allowWearingClothes = new int[9]
-    oid_undressing_redressBounty = new int[9]
-    oid_undressing_redressWhenDefeated = new int[9]
-    oid_undressing_redressAtCell = new int[9]
-    oid_undressing_redressAtChest = new int[9]
-
-    undressing_allow_state = new bool[9]
-; ============================================================
-
-; Prison
-; ============================================================
-    oid_prison_bountyToDays = new int[9]
-    oid_prison_minimumSentenceDays = new int[9]
-    oid_prison_maximumSentenceDays = new int[9]
-    oid_prison_allowBountylessImprisonment = new int[9]
-    oid_prison_sentencePaysBounty = new int[9]
-    oid_prison_fastForward = new int[9]
-    oid_prison_dayToFastForwardFrom = new int[9]
-    oid_prison_handsBoundInPrison = new int[9]
-    oid_prison_handsBoundMinimumBounty = new int[9]
-    oid_prison_handsBoundRandomize = new int[9]
-    oid_prison_cellLockLevel = new int[9]
-
-    oid_prison_allowBountylessImprisonment_checked = new bool[9]
-    oid_prison_sentencePaysBounty_checked = new bool[9]
-; ============================================================
-
-; Release
-; ============================================================
-    oid_release_giveItemsBackOnRelease = new int[9]
-    oid_release_redressOnRelease = new int[9]
-    oid_release_giveItemsBackOnReleaseMaxBounty = new int[9]
-    oid_release_giveItemsBackOnDefeat = new int[9]
-; ============================================================
-
-; Escape
-; ============================================================
-    oid_escape_escapeBountyPercent = new int[9]
-    oid_escape_escapeBountyFlat = new int[9]
-    oid_escape_allowSurrender = new int[9]
-    oid_escape_friskUponCapture = new int[9]
-    oid_escape_undressUponCapture = new int[9]
-; ============================================================
-
-; Bounty
-; ============================================================
-    oid_bounty_currentBounty = new int[9]
-    oid_bounty_largestBounty = new int[9]
-    oid_bounty_enableBountyDecay = new int[9]
-    oid_bounty_decayInPrison = new int[9]
-    oid_bounty_bountyLostPercent = new int[9]
-    oid_bounty_bountyLostFlat = new int[9]
-; ============================================================
-
-; Bounty Hunters
-; ============================================================
-    oid_bhunters_enableBountyHunters = new int[9]
-    oid_bhunters_allowOutlawBountyHunters = new int[9]
-    oid_bhunters_minimumBounty = new int[9]
-    oid_bhunters_bountyPosse = new int[9]
-; ============================================================
-
     optionsMap = JMap.object()
     optionToValue = JIntMap.object()
 
@@ -452,287 +222,26 @@ endFunction
 int optionsMap ; optionsMap[undressing::allowUndressing] = container
 int optionToValue ; optionToValue[oid] = value
 
-int function AddOptionToggleEx(string text, bool defaultValue, int index)
-    int optionId = AddToggleOption(text, defaultValue)
 
-    string _key = CurrentPage + "::" + TrimString(text)
-
-    int localOptionToValueMap
-
-    if (JIntMap.hasKey(localOptionToValueMap, optionId))
-        Log(self, "AddOptionToggleEx", "Key " + optionId + " already exists in map, returning!")
-    else
-        localOptionToValueMap = JIntMap.object()
-        JIntMap.setInt(localOptionToValueMap, optionId, defaultValue as int)
-
-        int arr = JArray.object()
-        JArray.addObj(arr, localOptionToValueMap)
-
-        Log(self, "AddOptionToggleEx", "Added Option" + optionId + " to map!")
-
-        JMap.setObj(optionsMap, _key, arr)
-        Log(self, "AddOptionToggleEx", "Added" + localOptionToValueMap + " container to map at key " + _key + "!")
-    endif
-
-
-    return optionId
-endFunction
-
-; int function AddOptionToggleEx(string text, bool defaultValue, int index)
-;     ;/
-;         if it has a stored value, pass that instead of defaultValue
-;     /;
-;     bool value = defaultValue
-;     int optionId = AddToggleOption(text, value)
-    
-;     string _key = CurrentPage + "::" + TrimString(text) ; undressing::allowUndressing
-    
-;     if (!JIntMap.hasKey(optionToValue, optionId))
-;         JIntMap.setInt(optionToValue, optionId, value as int) ; option[1026] = 1 (true)
-;         LogIf(self, "AddOptionToggleEx", "optionToValue" + "["+ optionId +"]" + " = " + value + " ( added at key " + _key + ")", IS_DEBUG)
-;         int[] optionToValueKeys = JIntMap.allKeysPArray(optionToValue)
-;         ; LogIf(self, "AddOptionToggleEx", "optionToValue length:" + optionToValueKeys.Length, IS_DEBUG)
-;         int _object = optionToValue
-        
-;         int[] objKeys = JIntMap.allKeysPArray(optionToValue)
-;         int i = 0
-;         while (i < objKeys.Length)
-;             Log(self, "AddOptionToggleEx", "ObjKeys[" + i + "] = " + objKeys[i])
-;             i += 1
-;         endWhile
-
-;         if (!JMap.hasKey(optionsMap, _key))
-;             JMap.setObj(optionsMap, _key, optionToValue)
-;             LogIf(self, "AddOptionSliderEx", "Added container " + _object + " at key: " + _key , IS_DEBUG)
-;         else
-;             LogIf(self, "AddOptionSliderEx", "Container " + _object + " already exists at key: " + _key , IS_DEBUG)
-;         endif
-;     else
-;         LogIf(self, "AddOptionToggleEx", "Option " + optionId + " already exists at key: " + _key + ", skipping...", IS_DEBUG)
-;     endif
-
-
-
-;     return optionId
+; function ListOIDMap()
+;     string[] _keys = JMap.allKeysPArray(optionsMap)
+;     int i = 0
+;     while (i < _keys.Length)
+;         int optionIdContainer = JMap.getObj(optionsMap, _keys[i])
+;         ; Log(self, "MCM::ListOIDMap", "Key: " + _keys[i] + ", Value: " + optionIdContainer)
+;         ; if (i == 0)
+;             int[] optionIds = JIntMap.allKeysPArray(optionIdContainer)
+;             int j = 0
+;             while (j < optionIds.Length)
+;                 int oidValue = JIntMap.getInt(optionIdContainer, optionIds[j])
+;                 ; Log(self, "MCM::ListOIDMap", "Keys inside (OID's): " + optionIds[j] + ", Value: " + oidValue)
+;                 Log(self, "MCM::ListOIDMap", "optionsMap" + "[" + _keys[i] +"] = " + "["+ optionIds[j] + " => " + oidValue + "]")
+;                 j += 1
+;             endWhile
+;         ; endif
+;         i +=1
+;     endWhile
 ; endFunction
-
-int function AddOptionSliderEx(string text, float defaultValue, int index)
-    ;/
-        if it has a stored value, pass that instead of defaultValue
-    /;
-    float value = defaultValue
-    int optionId = AddSliderOption(text, value)
-    ; return optionId
-    
-    string _key = CurrentPage + "::" + TrimString(text) ; undressing::minimumBountyToUndress
-
-    if (!JIntMap.hasKey(optionToValue, optionId))
-        JIntMap.setInt(optionToValue, optionId, value as int) ; option[1026] = 1200
-        LogIf(self, "AddOptionSliderEx", "optionToValue" + "["+ optionId +"]" + " = " + value + " ( added at key " + _key + ")", IS_DEBUG)
-        int[] optionToValueKeys = JIntMap.allKeysPArray(optionToValue)
-        ; LogIf(self, "AddOptionSliderEx", "optionToValue length:" + optionToValueKeys.Length, IS_DEBUG)
-        int _object = JIntMap.getObj(optionToValue, optionId)
-
-        if (!JMap.hasKey(optionsMap, _key))
-            JMap.setObj(optionsMap, _key, optionToValue)
-            LogIf(self, "AddOptionSliderEx", "Added container " + _object + " at key: " + _key , IS_DEBUG)
-        else
-            LogIf(self, "AddOptionSliderEx", "Container " + _object + " already exists at key: " + _key , IS_DEBUG)
-        endif
-    else
-        LogIf(self, "AddOptionSliderEx", "Option " + optionId + " already exists at key: " + _key + ", skipping...", IS_DEBUG)
-    endif
-
-
-
-    return optionId
-endFunction
-
-bool function IsKeyInMap(string _key, int optionKey)
-    string[] keys = JMap.allKeysPArray(optionsMap)
-
-    int keyIndex = 0
-    while (keyIndex < keys.Length)
-        if (JMap.hasKey(optionsMap, _key))
-            int keyContainer = JMap.getObj(optionsMap, keys[keyIndex])
-            if (JIntMap.hasKey(keyContainer, optionKey))
-                Log(self, "IsKeyInMap", "[Container ID: " + keyContainer + "] " + "Found OptionID: " + optionKey + " from key: " + _key)
-                return JMap.hasKey(optionsMap, _key) && JIntMap.hasKey(keyContainer, optionKey)
-            endif
-        endif
-        keyIndex += 1
-    endWhile
-
-endFunction
-
-function ListMap(string _key)
-    string[] keys = JMap.allKeysPArray(optionsMap)
-
-    int keyIndex = 0
-    while (keyIndex < keys.Length)
-        if (keys[keyIndex] == _key)
-            if (JMap.hasKey(optionsMap, _key))
-                int optionIndex = 0
-                int optionKeyContainer = JMap.getObj(optionsMap, "undressing::allowUndressing")
-                int[] optionKeys = JIntMap.allKeysPArray(optionKeyContainer)
-                Log(self, "ListMap", _key + ": ")
-                while (optionIndex < optionKeys.Length)
-                    Log(self, "ListMap", "\t" + optionKeys[optionIndex])
-                    optionIndex += 1
-                endWhile
-            endif
-        endif
-        keyIndex += 1
-    endWhile
-endFunction
-
-function ListMapPK()
-    string[] keys = JMap.allKeysPArray(optionsMap)
-
-    int keyIndex = 0
-    while (keyIndex < keys.Length)
-        Log(self, "ListMapPK", "Key: " + keys[keyIndex])
-        keyIndex += 1
-    endWhile
-endFunction
-
-; GetOptionByKey("undressing_allowUndressing")
-int function GetOptionByKey(string _key, int oid)
-    int KEY_NOT_FOUND = -1
-    ;/
-        1: Get the container that contains the options with the specified key (undressing::allowUndressing)
-        2: Get the container that contains the options with the specified key (undressing::minimumBountyToUndress)
-
-        1: Output:
-            options[1026] => true,
-            options[1054] => true,
-            options[1082] => true,
-            options[1110] => true,
-            options[1138] => true,
-
-        2: Output:
-            options[1028] => 1200,
-            options[1056] => 1200,
-            options[1084] => 1200,
-            options[1112] => 1200,
-            options[1140] => 1200,
-    /;
-    int options = JMap.getObj(object = optionsMap, key = _key, default = KEY_NOT_FOUND)
-
-    ;/
-        1: Get all the keys (option id's):
-            1026,
-            1054,
-            1082,
-            1110,
-            1138
-
-        2: Get all the keys (option id's):
-            1028,
-            1056,
-            1084,
-            1112,
-            1140
-    /;
-    int[] opKeys = JIntMap.allKeysPArray(options)
-    int i = 0
-    ;/
-        1: While there are keys (1026 ... 1138)
-        2: While there are keys (1028 ... 1140)
-    /;
-    while (i < opKeys.Length)
-        ;/
-            1: if i is 0 && undressing::allowUndressing exists
-            2: if i is 0 && undressing::minimumBountyToUndress exists
-        /;
-        if (i == CurrentOptionIndex && JMap.hasKey(options, _key))
-            ;/
-                1: Return the key at i, which is 1026.
-                2: Return the key at i, which is 1028.
-            /;
-            Log(self, "GetOptionByKey", "Key: " + opKeys[i])
-            return opKeys[i]
-        endif
-        i += 1
-    endWhile
-
-    if (options == KEY_NOT_FOUND)
-        return KEY_NOT_FOUND
-    endif
-
-    ; Log(self, "MCM::GetOptionByKey", "CurrentOptionIndex: " + CurrentOptionIndex)
-    int optionId = JIntMap.getNthKey(options, CurrentOptionIndex)
-    Log(self, "GetOptionByKey", "Returned OID " + optionId + " from key " + _key)
-    if (oid == optionId)
-        return optionId
-    endif
-    return -1
-    ; string[] keys = JMap.allKeysPArray(optionsMap)
-    ; int i = 0
-    ; while (i < keys.Length)
-    ;     if (keys[i] == _key)
-    ;         int optionId = JIntMap.getNthKey(options, CurrentOptionIndex)
-    ;         Log(self, "GetOptionByKey", "Returned OID " + optionId + " from key " + _key)
-    ;         return optionId
-    ;         ; int[] optionIds = JIntMap.allKeysPArray(options)
-    ;         ; int j = 0
-    ;         ; while (j < optionIds.Length)
-    ;         ;     ; Log(self, "MCM::GetOptionByKey", "\tOID: " + optionIds[j])
-    ;         ;     j += 1
-    ;         ; endWhile
-    ;     endif
-    ;     ; Log(self, "MCM::GetOptionByKey", "Key: " + keys[i])
-
-    ;     i += 1
-    ; endWhile
-
-    ; Log(self, "MCM::GetOptionByKey", "Returned OID: " + optionId)
-endFunction
-
-function ListOIDMap()
-    string[] _keys = JMap.allKeysPArray(optionsMap)
-    int i = 0
-    while (i < _keys.Length)
-        int optionIdContainer = JMap.getObj(optionsMap, _keys[i])
-        ; Log(self, "MCM::ListOIDMap", "Key: " + _keys[i] + ", Value: " + optionIdContainer)
-        ; if (i == 0)
-            int[] optionIds = JIntMap.allKeysPArray(optionIdContainer)
-            int j = 0
-            while (j < optionIds.Length)
-                int oidValue = JIntMap.getInt(optionIdContainer, optionIds[j])
-                ; Log(self, "MCM::ListOIDMap", "Keys inside (OID's): " + optionIds[j] + ", Value: " + oidValue)
-                Log(self, "MCM::ListOIDMap", "optionsMap" + "[" + _keys[i] +"] = " + "["+ optionIds[j] + " => " + oidValue + "]")
-                j += 1
-            endWhile
-        ; endif
-        i +=1
-    endWhile
-endFunction
-
-function UpdateCurrentIndex(int optionId)
-    float startTime = Utility.GetCurrentRealTime()
-    string[] optionKeys = JMap.allKeysPArray(optionsMap)
-
-    int optionIndex = 0
-    while (optionIndex < optionKeys.Length)
-        string optionKey = optionKeys[optionIndex]
-        int optionGroup = JMap.getObj(optionsMap, optionKey)
-        int[] groupKeys = JIntMap.allKeysPArray(optionGroup)
-        int index = 0
-        while (index < groupKeys.Length)
-            if (groupKeys[index] == optionId)
-                _currentOptionIndex = index
-                Log(self, "MCM::UpdateCurrentIndex", "Updated Current Option Index: " + _currentOptionIndex)
-            endif
-            index += 1
-        endWhile
-        optionIndex += 1
-    endWhile
-    float endTime = Utility.GetCurrentRealTime()
-    float elapsedTime = endTime - startTime
-    LogIf(self, "UpdateCurrentIndex", "execution took " + elapsedTime + " seconds.", IS_DEBUG)
-
-endFunction
 
 function UpdateIndex(int optionId)
     float startTime = StartBenchmark()
@@ -772,18 +281,6 @@ function UpdateIndex(int optionId)
     EndBenchmark(startTime)
 endFunction
 
-
-; IO Functions
-; ============================================================
-
-function LoadData()
-
-endFunction
-
-function SaveData()
-
-endFunction
-
 ; ============================================================
 
 
@@ -797,75 +294,7 @@ function SetSliderOptions(float minRange, float maxRange, float intervalSteps = 
     SetSliderDialogStartValue(startValue)
 endFunction
 
-function SetOptionToggleDefault(int optionId, bool value)
-    if (GetOptionIntValue(optionId) == -1)
-        SetOptionValueBool(optionId, value)
-        SetToggleOptionValue(optionId, value)
-    endif
-endFunction
-
-function SetOptionSliderDefault(int optionId, float value)
-    if (GetOptionIntValue(optionId) == -1)
-        SetOptionValueFloat(optionId, value)
-        SetSliderOptionValue(optionId, value)
-    endif
-endFunction
-
-function SetOptionMenuDefault(int optionId, string value)
-    if (GetOptionIntValue(optionId) == -1)
-        SetOptionValueString(optionId, value)
-        SetMenuOptionValue(optionId, value)
-    endif
-endFunction
-
 ; ============================================================
-
-;/
-    Add a toggle option with the specified parameters,
-    and assign its stored value to it
-
-    returns the optionId passed
-/;
-int function AddToggleOptionWithValue(string text, int optionId, int flags = 0)
-    AddToggleOption(text, GetOptionIntValue(optionId), flags)
-    return optionId
-endFunction
-
-;/
-    Add a slider option with the specified parameters,
-    and assign its stored value to it
-
-    returns the optionId passed
-/;
-int function AddSliderOptionWithValue(string text, int optionId, string format = "{0}", int flags = 0)
-    AddSliderOption(text, GetOptionIntValue(optionId), format, flags)
-    return optionId
-endFunction
-
-int function AtCurrent(int[] optionList)
-    return optionList[CurrentOptionIndex]
-endFunction
-
-; ;/ 
-;     Sets the enabled flag to an option based on its ID if it the dependency is met, disabled otherwise.
-;     The option could be a toggle that depends on another toggle,
-;     in which case, if the dependency toggle is not met, the option will not be enabled.
-
-;     returns true if the option was enabled, false if the option was disabled.
-; /;   
-; bool function SetOptionDependencyBool(int optionId, bool dependency, bool storePersistently = true)
-;     int enabled  = OPTION_FLAG_NONE
-;     int disabled = OPTION_FLAG_DISABLED
-
-;     SetOptionFlags(optionId, int_if (dependency, enabled, disabled))
-
-    
-;     if (dependency)
-;         return true
-;     endif
-
-;     return false
-; endFunction
 
 ;/
     Sets a flag to an option for the current index (the hold) based on its ID.
@@ -909,14 +338,6 @@ bool function SetOptionDependencyBoolSingle(int optionId, bool dependency, bool 
     return false
 endFunction
 
-; bool function SetDependencyBoolOnCurrentOption(int[] optionList, bool dependency, bool storePersistently = true)
-;     SetOptionDependencyBool(optionList[CurrentOptionIndex], dependency, storePersistently)
-; endFunction
-
-int function GetCurrentOptionValue(int[] optionList)
-    return GetOptionIntValue(optionList[CurrentOptionIndex])
-endFunction
-
 ;/
     Toggles the specified option by id, optionally stores it persistently into the save
 
@@ -951,37 +372,6 @@ int property CurrentOptionIndex
     endFunction
 endProperty
 
-int function GetOptionInListByOID(int[] optionList, int optionId)
-    int i = 0
-    while (i < GetHoldCount())
-        if (optionList[i] == optionId)
-            _currentOptionIndex = i
-            Log(self, "MCM::GetOptionInListByOID", "Current Option Index: " + CurrentOptionIndex)
-
-            return optionId
-        endif
-        i += 1
-    endWhile
-
-    return -1
-endFunction
-
-int function GetOptionInListByID(int[] optionList, int optionId)
-    int i = 0
-    while (i < optionList.Length)
-        if (optionList[i] == optionId)
-            _currentOptionIndex = i
-            return optionId
-        endif
-        i += 1
-    endWhile
-
-    return -1
-endFunction
-
-int function GetCurrentHoldOption(int[] optionList)
-    return optionList[CurrentOptionIndex]
-endFunction
 
 event OnConfigInit()
     ModName = "Realistic Prison and Bounty"
@@ -993,20 +383,6 @@ event OnConfigInit()
 endEvent
 
 int normalMap
-
-
-function ListNormalMap(string _key)
-    int _map = JMap.getObj(normalMap, _key)
-    int[] keys = JIntMap.allKeysPArray(_map)
-
-    int i = 0
-    while (i < keys.Length)
-        int value = JMap.getObj(_map, keys[i])
-        Log(self, "ListNormalMap", "key: " + keys[i] + "value: " + value)
-        i += 1
-    endWhile
-
-endFunction
 
 ;/
     Example array of option maps:
@@ -1280,11 +656,6 @@ int function GetOptionFromMap(string _key)
         string _hold = GetHoldNames()[i]
 
         Debug(self, "MCM::GetOptionFromMap", "[" + _hold + "] " + "\t[ARRAY ID: " + arrayInsideMap + " (" + _key + ")] " + "_container id: " + _container + " (key: " + _containerKey + ", value: " + (_containerValue) + ")", IS_DEBUG)
-        
-        ; if (i == CurrentOptionIndex)
-        ;     Debug(self, "MCM::GetOptionFromMap", "_containerKey: " + _containerKey, IS_DEBUG)
-        ;     return _containerKey ; Option ID
-        ; endif
 
         i += 1
     endWhile
@@ -1295,46 +666,26 @@ int function GetOptionFromMap(string _key)
     return -1 ; OPTION_NOT_FOUND
 endFunction
 
-int function GetOptionCurrentIndex(string _key)
-    float startTime = StartBenchmark(IS_DEBUG)
+int function GetOption(string _key)
+    int optionArray = __getOptionsArrayAtKey(_key) ; Get the array for this key
 
-    int arrayInsideMap = JMap.getObj(normalMap, _key) ; Get the array inside the map
-    bool keyExists = arrayInsideMap != 0
-
-    if (!keyExists)
-        Debug(self, "MCM::GetOptionCurrentIndex", "Key: " + _key + " does not exist in the map, returning...", IS_DEBUG)
+    if (optionArray == -1)
+        Error(self, "MCM::GetOptionCurrentIndex", "Key: " + _key + " does not exist in the map, returning...")
         return -1
     endif
 
-    int _optionMap = JArray.getObj(arrayInsideMap, CurrentOptionIndex)
-    int _optionId  = JIntMap.nextKey(_optionMap)
+    int _optionMap = JArray.getObj(optionArray, CurrentOptionIndex)
+
+    if (_optionMap == 0)
+        Error(self, "MCM::GetOptionCurrentIndex", "Container: " + _optionMap + " does not exist at key " + _key + ", returning...")
+        return -1
+    endif
+
+    int _optionId  = JIntMap.getNthKey(_optionMap, 0)
     int _optionValue = JIntMap.getInt(_optionMap, _optionId)
 
     Debug(self, "MCM::GetOptionCurrentIndex", "[CurrentOptionIndex: " + CurrentOptionIndex + "] Returned Option ID: " + _optionId + ", with value: " + _optionValue, IS_DEBUG)
-
     return _optionId
-
-    int i = 0
-    while (i < JArray.count(arrayInsideMap))
-        ; Get the map inside the array at i
-        int _container      = JArray.getObj(arrayInsideMap, i)
-        int _containerKey   = JIntMap.nextKey(_container)
-        int _containerValue = JIntMap.getInt(_container, _containerKey)
-
-        Debug(self, "MCM::GetOptionCurrentIndex", "[ARRAY ID: " + arrayInsideMap + " (" + _key + ")] " + "_container id: " + _container + " (key: " + _containerKey + ", value: " + (_containerValue) + ")", IS_DEBUG)
-        
-        ; if (i == CurrentOptionIndex)
-        ;     Debug(self, "MCM::GetOptionFromMap", "_containerKey: " + _containerKey, IS_DEBUG)
-        ;     return _containerKey ; Option ID
-        ; endif
-
-        i += 1
-    endWhile
-
-    Debug(self, "MCM::GetOptionCurrentIndex", "Returned OPTION_NOT_FOUND", IS_DEBUG)
-    EndBenchmark(startTime, IS_DEBUG)
-
-    return -1 ; OPTION_NOT_FOUND
 endFunction
 
 string function GetKeyFromOption(int optionId)
@@ -1344,27 +695,22 @@ string function GetKeyFromOption(int optionId)
     while (keyIndex < keys.Length)
         string _key = keys[keyIndex]
 
-        ; Search all containers inside each key till we find optionId
+        ; Search all containers inside this key till we find optionId
         int _array = JMap.getObj(normalMap, _key)
 
         int arrayIndex = 0
         while (arrayIndex < JArray.count(_array))
-            int _container = JArray.getObj(_array, arrayIndex)
-            int _containerKey = JIntMap.nextKey(_container)
+            int _container      = JArray.getObj(_array, arrayIndex)
+            int _containerKey   = JIntMap.getNthKey(_container, 0)
 
             if (_containerKey == optionId)
                 Debug(self, "GetKeyFromOption", "Found match for key: " + _key + " (Option ID: " +  optionId + ")", IS_DEBUG)
-                ; Found match, return key
                 return _key
             endif
-
             arrayIndex += 1
         endWhile
-
-
         keyIndex += 1
     endWhile
-
 endFunction
 
 ; Event Handling
@@ -1427,7 +773,12 @@ event OnOptionSelect(int option)
     RealisticPrisonAndBounty_MCM_BHunters.OnSelect(self, option)
     RealisticPrisonAndBounty_MCM_Leveling.OnSelect(self, option)
     ; RealisticPrisonAndBounty_MCM_Status.OnDefault(self, option)
-    
+
+    if (IS_DEBUG)
+        string optionKey = GetKeyFromOption(option)
+        Debug(self, "MCM::OnOptionSelect", "Option ID: " + option + " (" + optionKey + ")")
+    endif
+
     GetOptionFromMap(GetKeyFromOption(option))
 endEvent
 
@@ -1446,6 +797,11 @@ event OnOptionSliderOpen(int option)
     RealisticPrisonAndBounty_MCM_BHunters.OnSliderOpen(self, option)
     RealisticPrisonAndBounty_MCM_Leveling.OnSliderOpen(self, option)
     RealisticPrisonAndBounty_MCM_Status.OnSliderOpen(self, option)
+
+    if (IS_DEBUG)
+        string optionKey = GetKeyFromOption(option)
+        Debug(self, "MCM::OnOptionSliderOpen", "Option ID: " + option + " (" + optionKey + ")")
+    endif
 
     GetOptionFromMap(GetKeyFromOption(option))
 
@@ -1479,6 +835,11 @@ event OnOptionMenuOpen(int option)
     RealisticPrisonAndBounty_MCM_BHunters.OnMenuOpen(self, option)
     RealisticPrisonAndBounty_MCM_Leveling.OnMenuOpen(self, option)
     ; RealisticPrisonAndBounty_MCM_Status.OnMenuOpen(self, option)
+
+    if (IS_DEBUG)
+        string optionKey = GetKeyFromOption(option)
+        Debug(self, "MCM::OnOptionMenuOpen", "Option ID: " + option + " (" + optionKey + ")")
+    endif
 
     GetOptionFromMap(GetKeyFromOption(option))
 

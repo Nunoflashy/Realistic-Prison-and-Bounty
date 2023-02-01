@@ -23,10 +23,10 @@ function Render(RealisticPrisonAndBounty_MCM mcm) global
 endFunction
 
 function RenderOptions(RealisticPrisonAndBounty_MCM mcm, int index) global
-    mcm.oid_bhunters_enableBountyHunters[index]         = mcm.AddToggleOption("Enable Bounty Hunters", true)
-    mcm.oid_bhunters_allowOutlawBountyHunters[index]    = mcm.AddToggleOption("Allow Outlaw Bounty Hunters", true)
-    mcm.oid_bhunters_minimumBounty[index]               = mcm.AddSliderOption("Minimum Bounty", 1.0)
-    mcm.oid_bhunters_bountyPosse[index]                 = mcm.AddSliderOption("Bounty (Posse)", 1.0)
+    mcm.AddOptionToggle("Enable Bounty Hunters",        mcm.ARREST_DEFAULT_ALLOW_CIVILIAN_CAPTURE, index)
+    mcm.AddOptionToggle("Allow Outlaw Bounty Hunters",  mcm.ARREST_DEFAULT_ALLOW_ARREST_TRANSFER, index)
+    mcm.AddOptionSlider("Minimum Bounty",               mcm.ARREST_DEFAULT_BOUNTY_WHEN_DEFEATED_FLAT, index)
+    mcm.AddOptionSlider("Bounty (Posse)",               mcm.ARREST_DEFAULT_BOUNTY_WHEN_DEFEATED_FLAT, index)
 endFunction
 
 function Left(RealisticPrisonAndBounty_MCM mcm) global
@@ -61,29 +61,29 @@ function OnOptionHighlight(RealisticPrisonAndBounty_MCM mcm, int oid) global
     string[] holds = mcm.GetHoldNames()
     string hold = holds[mcm.CurrentOptionIndex]
 
-    int enableBountyHunters = mcm.GetOptionInListByOID(mcm.oid_bhunters_enableBountyHunters, oid)
-    int allowOutlawBountyHunters = mcm.GetOptionInListByOID(mcm.oid_bhunters_allowOutlawBountyHunters, oid)
-    int minimumBounty = mcm.GetOptionInListByOID(mcm.oid_bhunters_minimumBounty, oid)
-    int bountyPosse = mcm.GetOptionInListByOID(mcm.oid_bhunters_bountyPosse, oid)
+    ; int enableBountyHunters = mcm.GetOptionInListByOID(mcm.oid_bhunters_enableBountyHunters, oid)
+    ; int allowOutlawBountyHunters = mcm.GetOptionInListByOID(mcm.oid_bhunters_allowOutlawBountyHunters, oid)
+    ; int minimumBounty = mcm.GetOptionInListByOID(mcm.oid_bhunters_minimumBounty, oid)
+    ; int bountyPosse = mcm.GetOptionInListByOID(mcm.oid_bhunters_bountyPosse, oid)
 
-    ; mcm.SetInfoText( \
-    ;     string_if (oid == enableBountyHunters, "Whether to enable bounty hunters for " + hold + ".", \
-    ;     string_if (oid == allowOutlawBountyHunters, "Whether to allow outlaw bounty hunters working for " + hold + ".", \
-    ;     string_if (oid == minimumBounty, "The minimum bounty required to have bounty hunters hunt you in " + hold + ".", \
-    ;     string_if (oid == bountyPosse, "The bounty required to have a group of bounty hunters hunt you in " + hold + ".", \
-    ;     "No description defined for this option." \
-    ;     )))) \
-    ; )
+    ; ; mcm.SetInfoText( \
+    ; ;     string_if (oid == enableBountyHunters, "Whether to enable bounty hunters for " + hold + ".", \
+    ; ;     string_if (oid == allowOutlawBountyHunters, "Whether to allow outlaw bounty hunters working for " + hold + ".", \
+    ; ;     string_if (oid == minimumBounty, "The minimum bounty required to have bounty hunters hunt you in " + hold + ".", \
+    ; ;     string_if (oid == bountyPosse, "The bounty required to have a group of bounty hunters hunt you in " + hold + ".", \
+    ; ;     "No description defined for this option." \
+    ; ;     )))) \
+    ; ; )
 
-    if (oid == enableBountyHunters)
-        mcm.SetInfoText("Whether to enable bounty hunters for " + hold + ".")
-    elseif (oid == allowOutlawBountyHunters)
-        mcm.SetInfoText("Whether to allow outlaw bounty hunters working for " + hold + ".")
-    elseif (oid == minimumBounty)
-        mcm.SetInfoText("The minimum bounty required to have bounty hunters hunt you in " + hold + ".")
-    elseif (oid == bountyPosse)
-        mcm.SetInfoText("The bounty required to have a group of bounty hunters hunt you in " + hold + ".")
-    endif
+    ; if (oid == enableBountyHunters)
+    ;     mcm.SetInfoText("Whether to enable bounty hunters for " + hold + ".")
+    ; elseif (oid == allowOutlawBountyHunters)
+    ;     mcm.SetInfoText("Whether to allow outlaw bounty hunters working for " + hold + ".")
+    ; elseif (oid == minimumBounty)
+    ;     mcm.SetInfoText("The minimum bounty required to have bounty hunters hunt you in " + hold + ".")
+    ; elseif (oid == bountyPosse)
+    ;     mcm.SetInfoText("The bounty required to have a group of bounty hunters hunt you in " + hold + ".")
+    ; endif
 
 endFunction
 

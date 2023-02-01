@@ -24,19 +24,19 @@ function Render(RealisticPrisonAndBounty_MCM mcm) global
 endFunction
 
 function RenderOptions(RealisticPrisonAndBounty_MCM mcm, int index) global
-    mcm.oid_arrest_minimumBounty[index]                         = mcm.AddSliderOption("Minimum Bounty to Arrest",                       GetOptionIntValue(mcm.oid_arrest_minimumBounty[index]))
-    mcm.oid_arrest_guaranteedPayableBounty[index]               = mcm.AddSliderOption("Guaranteed Payable Bounty",                      GetOptionIntValue(mcm.oid_arrest_guaranteedPayableBounty[index]))
-    mcm.oid_arrest_maximumPayableBounty[index]                  = mcm.AddSliderOption("Maximum Payable Bounty",                         GetOptionIntValue(mcm.oid_arrest_maximumPayableBounty[index]))
-    mcm.oid_arrest_additionalBountyWhenResistingPercent[index]  = mcm.AddSliderOption("Additional Bounty when Resisting (% of Bounty)", GetOptionIntValue(mcm.oid_arrest_additionalBountyWhenResistingPercent[index]))
-    mcm.oid_arrest_additionalBountyWhenResistingFlat[index]     = mcm.AddSliderOption("Additional Bounty when Resisting (Flat)",        GetOptionIntValue(mcm.oid_arrest_additionalBountyWhenResistingFlat[index]))
-    mcm.oid_arrest_additionalBountyWhenDefeatedPercent[index]   = mcm.AddSliderOption("Additional Bounty when Defeated (% of Bounty)",  GetOptionIntValue(mcm.oid_arrest_additionalBountyWhenDefeatedPercent[index]))
-    mcm.oid_arrest_additionalBountyWhenDefeatedFlat[index]      = mcm.AddSliderOption("Additional Bounty when Defeated (Flat)",         GetOptionIntValue(mcm.oid_arrest_additionalBountyWhenDefeatedFlat[index]))
-    mcm.oid_arrest_allowCivilianCapture[index]                  = mcm.AddToggleOption("Allow Civilian Capture",                         GetOptionIntValue(mcm.oid_arrest_allowCivilianCapture[index]))
-    mcm.oid_arrest_allowArrestTransfer[index]                   = mcm.AddToggleOption("Allow Arrest Transfer",                          GetOptionIntValue(mcm.oid_arrest_allowArrestTransfer[index]))
-    mcm.oid_arrest_allowUnconsciousArrest[index]                = mcm.AddToggleOption("Allow Unconscious Arrest",                       GetOptionIntValue(mcm.oid_arrest_allowUnconsciousArrest[index]))
-    mcm.oid_arrest_unequipHandBounty[index]                     = mcm.AddSliderOption("Unequip Hand Garments (Minimum Bounty)",         GetOptionIntValue(mcm.oid_arrest_unequipHandBounty[index]))
-    mcm.oid_arrest_unequipHeadBounty[index]                     = mcm.AddSliderOption("Unequip Head Garments (Minimum Bounty)",         GetOptionIntValue(mcm.oid_arrest_unequipHeadBounty[index]))
-    mcm.oid_arrest_unequipFootBounty[index]                     = mcm.AddSliderOption("Unequip Foot Garments (Minimum Bounty)",         GetOptionIntValue(mcm.oid_arrest_unequipFootBounty[index]))
+    mcm.AddOptionSlider("Minimum Bounty to Arrest",                         mcm.ARREST_DEFAULT_MIN_BOUNTY, index)
+    mcm.AddOptionSlider("Guaranteed Payable Bounty",                        mcm.ARREST_DEFAULT_GUARANTEED_PAYABLE_BOUNTY, index)
+    mcm.AddOptionSlider("Maximum Payable Bounty",                           mcm.ARREST_DEFAULT_MAXIMUM_PAYABLE_BOUNTY, index)
+    mcm.AddOptionSlider("Additional Bounty when Resisting (% of Bounty)",   mcm.ARREST_DEFAULT_BOUNTY_WHEN_RESISTING_PERCENT, index)
+    mcm.AddOptionSlider("Additional Bounty when Resisting (Flat)",          mcm.ARREST_DEFAULT_BOUNTY_WHEN_RESISTING_FLAT, index)
+    mcm.AddOptionSlider("Additional Bounty when Defeated (% of Bounty)",    mcm.ARREST_DEFAULT_BOUNTY_WHEN_DEFEATED_PERCENT, index)
+    mcm.AddOptionSlider("Additional Bounty when Defeated (Flat)",           mcm.ARREST_DEFAULT_BOUNTY_WHEN_DEFEATED_FLAT, index)
+    mcm.AddOptionToggle("Allow Civilian Capture",                           mcm.ARREST_DEFAULT_ALLOW_CIVILIAN_CAPTURE, index)
+    mcm.AddOptionToggle("Allow Arrest Transfer",                            mcm.ARREST_DEFAULT_ALLOW_ARREST_TRANSFER, index)
+    mcm.AddOptionToggle("Allow Unconscious Arrest",                         mcm.ARREST_DEFAULT_ALLOW_UNCONSCIOUS_ARREST, index)
+    mcm.AddOptionSlider("Unequip Hand Garments (Minimum Bounty)",           mcm.ARREST_DEFAULT_UNEQUIP_HAND_BOUNTY, index)
+    mcm.AddOptionSlider("Unequip Head Garments (Minimum Bounty)",           mcm.ARREST_DEFAULT_UNEQUIP_HEAD_BOUNTY, index)
+    mcm.AddOptionSlider("Unequip Foot Garments (Minimum Bounty)",           mcm.ARREST_DEFAULT_UNEQUIP_FOOT_BOUNTY, index)
 endFunction
 
 function Left(RealisticPrisonAndBounty_MCM mcm) global
@@ -69,19 +69,19 @@ endFunction
 function OnOptionHighlight(RealisticPrisonAndBounty_MCM mcm, int oid) global
     string[] holds = mcm.GetHoldNames()
 
-    int minimumBounty                           = mcm.GetOptionInListByID(mcm.oid_arrest_minimumBounty, oid)
-    int guaranteedPayableBounty                 = mcm.GetOptionInListByID(mcm.oid_arrest_guaranteedPayableBounty, oid)
-    int maximumPayableBounty                    = mcm.GetOptionInListByID(mcm.oid_arrest_maximumPayableBounty, oid)
-    int additionalBountyWhenResistingPercent    = mcm.GetOptionInListByID(mcm.oid_arrest_additionalBountyWhenResistingPercent, oid)
-    int additionalBountyWhenResistingFlat       = mcm.GetOptionInListByID(mcm.oid_arrest_additionalBountyWhenResistingFlat, oid)
-    int additionalBountyWhenDefeatedPercent     = mcm.GetOptionInListByID(mcm.oid_arrest_additionalBountyWhenDefeatedPercent, oid)
-    int additionalBountyWhenDefeatedFlat        = mcm.GetOptionInListByID(mcm.oid_arrest_additionalBountyWhenDefeatedFlat, oid)
-    int allowCivilianCapture                    = mcm.GetOptionInListByID(mcm.oid_arrest_allowCivilianCapture, oid)
-    int allowArrestTransfer                     = mcm.GetOptionInListByID(mcm.oid_arrest_allowArrestTransfer, oid)
-    int allowUnconsciousArrest                  = mcm.GetOptionInListByID(mcm.oid_arrest_allowUnconsciousArrest, oid)
-    int unequipHandBounty                       = mcm.GetOptionInListByID(mcm.oid_arrest_unequipHandBounty, oid)
-    int unequipHeadBounty                       = mcm.GetOptionInListByID(mcm.oid_arrest_unequipHeadBounty, oid)
-    int unequipFootBounty                       = mcm.GetOptionInListByID(mcm.oid_arrest_unequipFootBounty, oid)
+    ; int minimumBounty                           = mcm.GetOptionInListByID(mcm.oid_arrest_minimumBounty, oid)
+    ; int guaranteedPayableBounty                 = mcm.GetOptionInListByID(mcm.oid_arrest_guaranteedPayableBounty, oid)
+    ; int maximumPayableBounty                    = mcm.GetOptionInListByID(mcm.oid_arrest_maximumPayableBounty, oid)
+    ; int additionalBountyWhenResistingPercent    = mcm.GetOptionInListByID(mcm.oid_arrest_additionalBountyWhenResistingPercent, oid)
+    ; int additionalBountyWhenResistingFlat       = mcm.GetOptionInListByID(mcm.oid_arrest_additionalBountyWhenResistingFlat, oid)
+    ; int additionalBountyWhenDefeatedPercent     = mcm.GetOptionInListByID(mcm.oid_arrest_additionalBountyWhenDefeatedPercent, oid)
+    ; int additionalBountyWhenDefeatedFlat        = mcm.GetOptionInListByID(mcm.oid_arrest_additionalBountyWhenDefeatedFlat, oid)
+    ; int allowCivilianCapture                    = mcm.GetOptionInListByID(mcm.oid_arrest_allowCivilianCapture, oid)
+    ; int allowArrestTransfer                     = mcm.GetOptionInListByID(mcm.oid_arrest_allowArrestTransfer, oid)
+    ; int allowUnconsciousArrest                  = mcm.GetOptionInListByID(mcm.oid_arrest_allowUnconsciousArrest, oid)
+    ; int unequipHandBounty                       = mcm.GetOptionInListByID(mcm.oid_arrest_unequipHandBounty, oid)
+    ; int unequipHeadBounty                       = mcm.GetOptionInListByID(mcm.oid_arrest_unequipHeadBounty, oid)
+    ; int unequipFootBounty                       = mcm.GetOptionInListByID(mcm.oid_arrest_unequipFootBounty, oid)
 
     ; mcm.SetInfoText( \
     ;     string_if (oid == minimumBounty, "The minimum bounty required in order to be arrested in " + holds[mcm.CurrentOptionIndex] + ".", \
@@ -101,45 +101,45 @@ function OnOptionHighlight(RealisticPrisonAndBounty_MCM mcm, int oid) global
     ;     ))))))))))))) \
     ; )
 
-    if (oid == minimumBounty) 
-        "The minimum bounty required in order to be arrested in " + holds[mcm.CurrentOptionIndex] + "."
+    ; if (oid == minimumBounty) 
+    ;     "The minimum bounty required in order to be arrested in " + holds[mcm.CurrentOptionIndex] + "."
 
-    elseif (oid == guaranteedPayableBounty)
-            mcm.SetInfoText("The guaranteed amount of bounty that a guard will accept as payment before arresting you in " + holds[mcm.CurrentOptionIndex] + ".")
+    ; elseif (oid == guaranteedPayableBounty)
+    ;         mcm.SetInfoText("The guaranteed amount of bounty that a guard will accept as payment before arresting you in " + holds[mcm.CurrentOptionIndex] + ".")
 
-    elseif (oid == maximumPayableBounty)
-            mcm.SetInfoText("The maximum amount of bounty that is payable before arresting you in " + holds[mcm.CurrentOptionIndex] + ".")
+    ; elseif (oid == maximumPayableBounty)
+    ;         mcm.SetInfoText("The maximum amount of bounty that is payable before arresting you in " + holds[mcm.CurrentOptionIndex] + ".")
 
-    elseif (oid == additionalBountyWhenResistingPercent)
-            mcm.SetInfoText("The bounty that will be added as a percentage of your current bounty, when resisting arrest in "  + holds[mcm.CurrentOptionIndex] + ".\n" + "If the bounty exceeds the guaranteed but is within the maximum, there's a chance not to go to prison.")
+    ; elseif (oid == additionalBountyWhenResistingPercent)
+    ;         mcm.SetInfoText("The bounty that will be added as a percentage of your current bounty, when resisting arrest in "  + holds[mcm.CurrentOptionIndex] + ".\n" + "If the bounty exceeds the guaranteed but is within the maximum, there's a chance not to go to prison.")
 
-    elseif (oid == additionalBountyWhenResistingFlat)
-            mcm.SetInfoText("The bounty that will be added when resisting arrest in " + holds[mcm.CurrentOptionIndex] + ".")
+    ; elseif (oid == additionalBountyWhenResistingFlat)
+    ;         mcm.SetInfoText("The bounty that will be added when resisting arrest in " + holds[mcm.CurrentOptionIndex] + ".")
 
-    elseif (oid == additionalBountyWhenDefeatedPercent)
-            mcm.SetInfoText("The bounty that will be added as a percentage of your current bounty, when defeated and arrested in " + holds[mcm.CurrentOptionIndex] + ".")
+    ; elseif (oid == additionalBountyWhenDefeatedPercent)
+    ;         mcm.SetInfoText("The bounty that will be added as a percentage of your current bounty, when defeated and arrested in " + holds[mcm.CurrentOptionIndex] + ".")
 
-    elseif (oid == additionalBountyWhenDefeatedFlat)
-            mcm.SetInfoText("The bounty that will be added when defeated and arrested in " + holds[mcm.CurrentOptionIndex])
+    ; elseif (oid == additionalBountyWhenDefeatedFlat)
+    ;         mcm.SetInfoText("The bounty that will be added when defeated and arrested in " + holds[mcm.CurrentOptionIndex])
 
-    elseif (oid == allowCivilianCapture)
-            mcm.SetInfoText("Whether to allow civilians to bring you to a guard, to be arrested in " + holds[mcm.CurrentOptionIndex])
+    ; elseif (oid == allowCivilianCapture)
+    ;         mcm.SetInfoText("Whether to allow civilians to bring you to a guard, to be arrested in " + holds[mcm.CurrentOptionIndex])
 
-    elseif (oid == allowArrestTransfer)
-            mcm.SetInfoText("Whether to allow a guard to take over the arrest if the current one dies.")
+    ; elseif (oid == allowArrestTransfer)
+    ;         mcm.SetInfoText("Whether to allow a guard to take over the arrest if the current one dies.")
 
-    elseif (oid == allowUnconsciousArrest)
-            mcm.SetInfoText("Whether to allow an unconscious arrest after being defeated (You will wake up in prison).")
+    ; elseif (oid == allowUnconsciousArrest)
+    ;         mcm.SetInfoText("Whether to allow an unconscious arrest after being defeated (You will wake up in prison).")
 
-    elseif (oid == unequipHandBounty)
-            mcm.SetInfoText("Whether to unequip any hand garment when arrested.\n-1 - Disable\n0 - Always unequip.\n Any other value is the bounty required")
+    ; elseif (oid == unequipHandBounty)
+    ;         mcm.SetInfoText("Whether to unequip any hand garment when arrested.\n-1 - Disable\n0 - Always unequip.\n Any other value is the bounty required")
 
-    elseif (oid == unequipHeadBounty)
-            mcm.SetInfoText("Whether to unequip any head garment when arrested.\n-1 - Disable\n0 - Always unequip.\n Any other value is the bounty required")
+    ; elseif (oid == unequipHeadBounty)
+    ;         mcm.SetInfoText("Whether to unequip any head garment when arrested.\n-1 - Disable\n0 - Always unequip.\n Any other value is the bounty required")
 
-    elseif (oid == unequipFootBounty)
-            mcm.SetInfoText("Whether to unequip any foot garment when arrested.\n-1 - Disable\n0 - Always unequip.\n Any other value is the bounty required")
-    endif
+    ; elseif (oid == unequipFootBounty)
+    ;         mcm.SetInfoText("Whether to unequip any foot garment when arrested.\n-1 - Disable\n0 - Always unequip.\n Any other value is the bounty required")
+    ; endif
 
 
 endFunction
@@ -159,70 +159,70 @@ function OnOptionSliderOpen(RealisticPrisonAndBounty_MCM mcm, int oid) global
     int optionValue = GetOptionIntValue(oid)
 
     ; Slider Options
-    int minimumBounty                           = mcm.GetOptionInListByID(mcm.oid_arrest_minimumBounty, oid)
-    int guaranteedPayableBounty                 = mcm.GetOptionInListByID(mcm.oid_arrest_guaranteedPayableBounty, oid)
-    int maximumPayableBounty                    = mcm.GetOptionInListByID(mcm.oid_arrest_maximumPayableBounty, oid)
-    int additionalBountyWhenResistingPercent    = mcm.GetOptionInListByID(mcm.oid_arrest_additionalBountyWhenResistingPercent, oid)
-    int additionalBountyWhenResistingFlat       = mcm.GetOptionInListByID(mcm.oid_arrest_additionalBountyWhenResistingFlat, oid)
-    int additionalBountyWhenDefeatedPercent     = mcm.GetOptionInListByID(mcm.oid_arrest_additionalBountyWhenDefeatedPercent, oid)
-    int additionalBountyWhenDefeatedFlat        = mcm.GetOptionInListByID(mcm.oid_arrest_additionalBountyWhenDefeatedFlat, oid)
-    int unequipHandBounty                       = mcm.GetOptionInListByID(mcm.oid_arrest_unequipHandBounty, oid)
-    int unequipHeadBounty                       = mcm.GetOptionInListByID(mcm.oid_arrest_unequipHeadBounty, oid)
-    int unequipFootBounty                       = mcm.GetOptionInListByID(mcm.oid_arrest_unequipFootBounty, oid)
+    ; int minimumBounty                           = mcm.GetOptionInListByID(mcm.oid_arrest_minimumBounty, oid)
+    ; int guaranteedPayableBounty                 = mcm.GetOptionInListByID(mcm.oid_arrest_guaranteedPayableBounty, oid)
+    ; int maximumPayableBounty                    = mcm.GetOptionInListByID(mcm.oid_arrest_maximumPayableBounty, oid)
+    ; int additionalBountyWhenResistingPercent    = mcm.GetOptionInListByID(mcm.oid_arrest_additionalBountyWhenResistingPercent, oid)
+    ; int additionalBountyWhenResistingFlat       = mcm.GetOptionInListByID(mcm.oid_arrest_additionalBountyWhenResistingFlat, oid)
+    ; int additionalBountyWhenDefeatedPercent     = mcm.GetOptionInListByID(mcm.oid_arrest_additionalBountyWhenDefeatedPercent, oid)
+    ; int additionalBountyWhenDefeatedFlat        = mcm.GetOptionInListByID(mcm.oid_arrest_additionalBountyWhenDefeatedFlat, oid)
+    ; int unequipHandBounty                       = mcm.GetOptionInListByID(mcm.oid_arrest_unequipHandBounty, oid)
+    ; int unequipHeadBounty                       = mcm.GetOptionInListByID(mcm.oid_arrest_unequipHeadBounty, oid)
+    ; int unequipFootBounty                       = mcm.GetOptionInListByID(mcm.oid_arrest_unequipFootBounty, oid)
 
-    if (oid == minimumBounty)
-        mcm.SetSliderOptions(minRange = 1, maxRange = 100000, intervalSteps = 1, defaultValue = 500, startValue = int_if(optionValue, optionValue, 500))
-        Log(mcm, "OnOptionSliderOpen", "This is a test: " + "[oid: " + oid + ", startValue: " + optionValue + "]")
+    ; if (oid == minimumBounty)
+    ;     mcm.SetSliderOptions(minRange = 1, maxRange = 100000, intervalSteps = 1, defaultValue = 500, startValue = int_if(optionValue, optionValue, 500))
+    ;     Log(mcm, "OnOptionSliderOpen", "This is a test: " + "[oid: " + oid + ", startValue: " + optionValue + "]")
 
-    elseif (oid == guaranteedPayableBounty)
-        mcm.SetSliderOptions(minRange = 1, maxRange = 100000, intervalSteps = 1, defaultValue = 1000, startValue = int_if(optionValue, optionValue, 1000))
-        Log(mcm, "OnOptionSliderOpen", "This is a test: " + "[oid: " + oid + ", startValue: " + optionValue + "]")
+    ; elseif (oid == guaranteedPayableBounty)
+    ;     mcm.SetSliderOptions(minRange = 1, maxRange = 100000, intervalSteps = 1, defaultValue = 1000, startValue = int_if(optionValue, optionValue, 1000))
+    ;     Log(mcm, "OnOptionSliderOpen", "This is a test: " + "[oid: " + oid + ", startValue: " + optionValue + "]")
 
-    elseif (oid == maximumPayableBounty)
-        mcm.SetSliderOptions(minRange = 1, maxRange = 100000, intervalSteps = 1, defaultValue = 2000, startValue = int_if(optionValue, optionValue, 2000))
-        Log(mcm, "OnOptionSliderOpen", "This is a test: " + "[oid: " + oid + ", startValue: " + optionValue + "]")
+    ; elseif (oid == maximumPayableBounty)
+    ;     mcm.SetSliderOptions(minRange = 1, maxRange = 100000, intervalSteps = 1, defaultValue = 2000, startValue = int_if(optionValue, optionValue, 2000))
+    ;     Log(mcm, "OnOptionSliderOpen", "This is a test: " + "[oid: " + oid + ", startValue: " + optionValue + "]")
 
-    elseif (oid == additionalBountyWhenResistingPercent)
-        mcm.SetSliderOptions(minRange = 1, maxRange = 100, intervalSteps = 1, defaultValue = 25, startValue = int_if(optionValue, optionValue, 25))
-        Log(mcm, "OnOptionSliderOpen", "This is a test: " + "[oid: " + oid + ", startValue: " + optionValue + "]")
+    ; elseif (oid == additionalBountyWhenResistingPercent)
+    ;     mcm.SetSliderOptions(minRange = 1, maxRange = 100, intervalSteps = 1, defaultValue = 25, startValue = int_if(optionValue, optionValue, 25))
+    ;     Log(mcm, "OnOptionSliderOpen", "This is a test: " + "[oid: " + oid + ", startValue: " + optionValue + "]")
 
-    elseif (oid == additionalBountyWhenResistingFlat)
-        mcm.SetSliderOptions(minRange = 1, maxRange = 100000, intervalSteps = 1, defaultValue = 400, startValue = int_if(optionValue, optionValue, 400))
-        Log(mcm, "OnOptionSliderOpen", "This is a test: " + "[oid: " + oid + ", startValue: " + optionValue + "]")
+    ; elseif (oid == additionalBountyWhenResistingFlat)
+    ;     mcm.SetSliderOptions(minRange = 1, maxRange = 100000, intervalSteps = 1, defaultValue = 400, startValue = int_if(optionValue, optionValue, 400))
+    ;     Log(mcm, "OnOptionSliderOpen", "This is a test: " + "[oid: " + oid + ", startValue: " + optionValue + "]")
 
-    elseif (oid == additionalBountyWhenDefeatedPercent)
-        mcm.SetSliderOptions(minRange = 1, maxRange = 100, intervalSteps = 1, defaultValue = 10, startValue = int_if(optionValue, optionValue, 10))
-        Log(mcm, "OnOptionSliderOpen", "This is a test: " + "[oid: " + oid + ", startValue: " + optionValue + "]")
+    ; elseif (oid == additionalBountyWhenDefeatedPercent)
+    ;     mcm.SetSliderOptions(minRange = 1, maxRange = 100, intervalSteps = 1, defaultValue = 10, startValue = int_if(optionValue, optionValue, 10))
+    ;     Log(mcm, "OnOptionSliderOpen", "This is a test: " + "[oid: " + oid + ", startValue: " + optionValue + "]")
 
-    elseif (oid == additionalBountyWhenDefeatedFlat)
-        mcm.SetSliderOptions(minRange = 1, maxRange = 100000, intervalSteps = 1, defaultValue = 10, startValue = int_if(optionValue, optionValue, 10))
-        Log(mcm, "OnOptionSliderOpen", "This is a test: " + "[oid: " + oid + ", startValue: " + optionValue + "]")
+    ; elseif (oid == additionalBountyWhenDefeatedFlat)
+    ;     mcm.SetSliderOptions(minRange = 1, maxRange = 100000, intervalSteps = 1, defaultValue = 10, startValue = int_if(optionValue, optionValue, 10))
+    ;     Log(mcm, "OnOptionSliderOpen", "This is a test: " + "[oid: " + oid + ", startValue: " + optionValue + "]")
 
-    elseif (oid == unequipHandBounty)
-        mcm.SetSliderOptions(minRange = 1, maxRange = 100000, intervalSteps = 1, defaultValue = 10, startValue = int_if(optionValue, optionValue, 10))
-        Log(mcm, "OnOptionSliderOpen", "This is a test: " + "[oid: " + oid + ", startValue: " + optionValue + "]")
+    ; elseif (oid == unequipHandBounty)
+    ;     mcm.SetSliderOptions(minRange = 1, maxRange = 100000, intervalSteps = 1, defaultValue = 10, startValue = int_if(optionValue, optionValue, 10))
+    ;     Log(mcm, "OnOptionSliderOpen", "This is a test: " + "[oid: " + oid + ", startValue: " + optionValue + "]")
 
-    elseif (oid == unequipHeadBounty)
-        mcm.SetSliderOptions(minRange = 1, maxRange = 100000, intervalSteps = 1, defaultValue = 10, startValue = int_if(optionValue, optionValue, 10))
-        Log(mcm, "OnOptionSliderOpen", "This is a test: " + "[oid: " + oid + ", startValue: " + optionValue + "]")
+    ; elseif (oid == unequipHeadBounty)
+    ;     mcm.SetSliderOptions(minRange = 1, maxRange = 100000, intervalSteps = 1, defaultValue = 10, startValue = int_if(optionValue, optionValue, 10))
+    ;     Log(mcm, "OnOptionSliderOpen", "This is a test: " + "[oid: " + oid + ", startValue: " + optionValue + "]")
 
-    elseif (oid == unequipFootBounty)
-        mcm.SetSliderOptions(minRange = 1, maxRange = 100000, intervalSteps = 1, defaultValue = 10, startValue = int_if(optionValue, optionValue, 10))
-        Log(mcm, "OnOptionSliderOpen", "This is a test: " + "[oid: " + oid + ", startValue: " + optionValue + "]")
-    endif
+    ; elseif (oid == unequipFootBounty)
+    ;     mcm.SetSliderOptions(minRange = 1, maxRange = 100000, intervalSteps = 1, defaultValue = 10, startValue = int_if(optionValue, optionValue, 10))
+    ;     Log(mcm, "OnOptionSliderOpen", "This is a test: " + "[oid: " + oid + ", startValue: " + optionValue + "]")
+    ; endif
 
 endFunction
 
 function OnOptionSliderAccept(RealisticPrisonAndBounty_MCM mcm, int oid, float value) global
 
-    ; Slider Options
-    int additionalBountyWhenResistingPercent    = mcm.GetOptionInListByID(mcm.oid_arrest_additionalBountyWhenResistingPercent, oid)
-    int additionalBountyWhenDefeatedPercent     = mcm.GetOptionInListByID(mcm.oid_arrest_additionalBountyWhenDefeatedPercent, oid)
+    ; ; Slider Options
+    ; int additionalBountyWhenResistingPercent    = mcm.GetOptionInListByID(mcm.oid_arrest_additionalBountyWhenResistingPercent, oid)
+    ; int additionalBountyWhenDefeatedPercent     = mcm.GetOptionInListByID(mcm.oid_arrest_additionalBountyWhenDefeatedPercent, oid)
 
-    mcm.SetSliderOptionValue(oid, value, string_if (oid == additionalBountyWhenResistingPercent || oid == additionalBountyWhenDefeatedPercent, "{0}%", "{0}"))
+    ; mcm.SetSliderOptionValue(oid, value, string_if (oid == additionalBountyWhenResistingPercent || oid == additionalBountyWhenDefeatedPercent, "{0}%", "{0}"))
     
-    ; Store value persistently
-    SetOptionValueInt(oid, value as int)
+    ; ; Store value persistently
+    ; SetOptionValueInt(oid, value as int)
 
 endFunction
 
