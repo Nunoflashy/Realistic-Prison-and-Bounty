@@ -23,9 +23,9 @@ function Render(RealisticPrisonAndBounty_MCM mcm) global
 endFunction
 
 function RenderOptions(RealisticPrisonAndBounty_MCM mcm, int index) global
-    mcm.AddOptionToggle("Give items back on Release",        mcm.ARREST_DEFAULT_ALLOW_CIVILIAN_CAPTURE, index)
-    mcm.AddOptionSlider("Give items back on Release (Bounty)",               mcm.ARREST_DEFAULT_BOUNTY_WHEN_DEFEATED_FLAT, index)
-    mcm.AddOptionToggle("Re-dress on Release",        mcm.ARREST_DEFAULT_ALLOW_CIVILIAN_CAPTURE, index)
+    mcm.AddOptionToggleEx("Give items back on Release",        mcm.ARREST_DEFAULT_ALLOW_CIVILIAN_CAPTURE, index)
+    mcm.AddOptionSliderEx("Give items back on Release (Bounty)",               mcm.ARREST_DEFAULT_BOUNTY_WHEN_DEFEATED_FLAT, index)
+    mcm.AddOptionToggleEx("Re-dress on Release",        mcm.ARREST_DEFAULT_ALLOW_CIVILIAN_CAPTURE, index)
     ; mcm.oid_release_giveItemsBackOnDefeat[index]            = mcm.AddToggleOption("Give items back on Defeat", 1.0)
 endFunction
 
@@ -133,7 +133,8 @@ function OnHighlight(RealisticPrisonAndBounty_MCM mcm, int oid) global
     if (! ShouldHandleEvent(mcm))
         return
     endif
-
+    
+    mcm.UpdateIndex(oid)
     OnOptionHighlight(mcm, oid)
 endFunction
 

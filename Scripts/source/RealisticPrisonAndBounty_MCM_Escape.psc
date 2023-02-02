@@ -23,11 +23,11 @@ function Render(RealisticPrisonAndBounty_MCM mcm) global
 endFunction
 
 function RenderOptions(RealisticPrisonAndBounty_MCM mcm, int index) global
-    mcm.AddOptionSlider("Escape Bounty (% of Bounty)",               mcm.ARREST_DEFAULT_BOUNTY_WHEN_DEFEATED_FLAT, index)
-    mcm.AddOptionSlider("Escape Bounty (Flat)",               mcm.ARREST_DEFAULT_BOUNTY_WHEN_DEFEATED_FLAT, index)
-    mcm.AddOptionToggle("Allow Surrendering",        mcm.ARREST_DEFAULT_ALLOW_CIVILIAN_CAPTURE, index)
-    mcm.AddOptionToggle("Frisk Search upon Captured",        mcm.ARREST_DEFAULT_ALLOW_CIVILIAN_CAPTURE, index)
-    mcm.AddOptionToggle("Undress upon Captured",  mcm.ARREST_DEFAULT_ALLOW_ARREST_TRANSFER, index)
+    mcm.AddOptionSliderEx("Escape Bounty (% of Bounty)",               mcm.ARREST_DEFAULT_BOUNTY_WHEN_DEFEATED_FLAT, index)
+    mcm.AddOptionSliderEx("Escape Bounty (Flat)",               mcm.ARREST_DEFAULT_BOUNTY_WHEN_DEFEATED_FLAT, index)
+    mcm.AddOptionToggleEx("Allow Surrendering",        mcm.ARREST_DEFAULT_ALLOW_CIVILIAN_CAPTURE, index)
+    mcm.AddOptionToggleEx("Frisk Search upon Captured",        mcm.ARREST_DEFAULT_ALLOW_CIVILIAN_CAPTURE, index)
+    mcm.AddOptionToggleEx("Undress upon Captured",  mcm.ARREST_DEFAULT_ALLOW_ARREST_TRANSFER, index)
 endFunction
 
 function Left(RealisticPrisonAndBounty_MCM mcm) global
@@ -142,7 +142,8 @@ function OnHighlight(RealisticPrisonAndBounty_MCM mcm, int oid) global
     if (! ShouldHandleEvent(mcm))
         return
     endif
-
+    
+    mcm.UpdateIndex(oid)
     OnOptionHighlight(mcm, oid)
 endFunction
 

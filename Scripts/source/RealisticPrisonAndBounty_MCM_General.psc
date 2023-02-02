@@ -23,14 +23,14 @@ function Render(RealisticPrisonAndBounty_MCM mcm) global
 endFunction
 
 function RenderOptions(RealisticPrisonAndBounty_MCM mcm, int index) global
-    mcm.AddOptionSlider("Attack on Sight Bounty",               mcm.ARREST_DEFAULT_BOUNTY_WHEN_DEFEATED_FLAT, index)
+    mcm.AddOptionSliderEx("Attack on Sight Bounty",               mcm.ARREST_DEFAULT_BOUNTY_WHEN_DEFEATED_FLAT, index)
 endFunction
 
 function Left(RealisticPrisonAndBounty_MCM mcm) global
     string[] holds = mcm.GetHoldNames()
 
     mcm.AddHeaderOption("General")
-    ; mcm.AddOptionSlider("Timescale", 10)
+    mcm.AddOptionSlider("Timescale", 10)
     mcm.AddEmptyOption()
 
     int i = mcm.LeftPanelIndex
@@ -118,7 +118,8 @@ function OnHighlight(RealisticPrisonAndBounty_MCM mcm, int oid) global
     if (! ShouldHandleEvent(mcm))
         return
     endif
-
+    
+    mcm.UpdateIndex(oid)
     OnOptionHighlight(mcm, oid)
 endFunction
 

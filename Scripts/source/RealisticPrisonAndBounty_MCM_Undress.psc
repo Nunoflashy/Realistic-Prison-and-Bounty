@@ -14,6 +14,7 @@ function Render(RealisticPrisonAndBounty_MCM mcm) global
     if (! ShouldHandleEvent(mcm))
         return
     endif
+
     mcm.SetCursorFillMode(mcm.TOP_TO_BOTTOM)
     Left(mcm)
 
@@ -22,19 +23,19 @@ function Render(RealisticPrisonAndBounty_MCM mcm) global
 endFunction
 
 function RenderOptions(RealisticPrisonAndBounty_MCM mcm, int index) global
-    mcm.AddOptionToggle("Allow Undressing",                 mcm.UNDRESSING_DEFAULT_ALLOW, index)
-    mcm.AddOptionSlider("Minimum Bounty to Undress",        mcm.UNDRESSING_DEFAULT_MIN_BOUNTY, index)
-    mcm.AddOptionToggle("Undress when Defeated",            mcm.UNDRESSING_DEFAULT_WHEN_DEFEATED, index)
-    mcm.AddOptionToggle("Undress at Cell",                  mcm.UNDRESSING_DEFAULT_AT_CELL, index)
-    mcm.AddOptionToggle("Undress at Chest",                 mcm.UNDRESSING_DEFAULT_AT_CHEST, index)
-    mcm.AddOptionSlider("Forced Undressing (Bounty)",       mcm.UNDRESSING_DEFAULT_FORCED_MIN_BOUNTY, index)
-    mcm.AddOptionToggle("Forced Undressing when Defeated",  mcm.UNDRESSING_DEFAULT_FORCED_WHEN_DEFEATED, index)
-    mcm.AddOptionSlider("Strip Search Thoroughness",        mcm.UNDRESSING_DEFAULT_STRIP_THOROUGHNESS, index)
-    ; mcm.AddOptionToggle("Allow Wearing Clothes",            mcm.UNDRESSING_DEFAULT_ALLOW_CLOTHES, index)
-    ; mcm.AddOptionSlider("Bounty to Re-dress",               mcm.UNDRESSING_DEFAULT_REDRESS_BOUNTY, index)
-    ; mcm.AddOptionToggle("Re-dress when Defeated",           mcm.UNDRESSING_DEFAULT_REDRESS_WHEN_DEFEATED, index)
-    ; mcm.AddOptionToggle("Re-dress at Cell",                 mcm.UNDRESSING_DEFAULT_REDRESS_AT_CELL, index)
-    ; mcm.AddOptionToggle("Re-dress at Chest",                mcm.UNDRESSING_DEFAULT_REDRESS_AT_CHEST, index)
+    mcm.AddOptionToggleEx("Allow Undressing",                 mcm.UNDRESSING_DEFAULT_ALLOW, index)
+    mcm.AddOptionSliderEx("Minimum Bounty to Undress",        mcm.UNDRESSING_DEFAULT_MIN_BOUNTY, index)
+    mcm.AddOptionToggleEx("Undress when Defeated",            mcm.UNDRESSING_DEFAULT_WHEN_DEFEATED, index)
+    mcm.AddOptionToggleEx("Undress at Cell",                  mcm.UNDRESSING_DEFAULT_AT_CELL, index)
+    mcm.AddOptionToggleEx("Undress at Chest",                 mcm.UNDRESSING_DEFAULT_AT_CHEST, index)
+    mcm.AddOptionSliderEx("Forced Undressing (Bounty)",       mcm.UNDRESSING_DEFAULT_FORCED_MIN_BOUNTY, index)
+    mcm.AddOptionToggleEx("Forced Undressing when Defeated",  mcm.UNDRESSING_DEFAULT_FORCED_WHEN_DEFEATED, index)
+    mcm.AddOptionSliderEx("Strip Search Thoroughness",        mcm.UNDRESSING_DEFAULT_STRIP_THOROUGHNESS, index)
+    ; mcm.AddOptionToggleEx("Allow Wearing Clothes",            mcm.UNDRESSING_DEFAULT_ALLOW_CLOTHES, index)
+    ; mcm.AddOptionSliderEx("Bounty to Re-dress",               mcm.UNDRESSING_DEFAULT_REDRESS_BOUNTY, index)
+    ; mcm.AddOptionToggleEx("Re-dress when Defeated",           mcm.UNDRESSING_DEFAULT_REDRESS_WHEN_DEFEATED, index)
+    ; mcm.AddOptionToggleEx("Re-dress at Cell",                 mcm.UNDRESSING_DEFAULT_REDRESS_AT_CELL, index)
+    ; mcm.AddOptionToggleEx("Re-dress at Chest",                mcm.UNDRESSING_DEFAULT_REDRESS_AT_CHEST, index)
 endFunction
 
 function Left(RealisticPrisonAndBounty_MCM mcm) global
@@ -67,8 +68,6 @@ endFunction
 function OnOptionHighlight(RealisticPrisonAndBounty_MCM mcm, int oid) global
 
     string[] holds = mcm.GetHoldNames()
-
-    mcm.UpdateIndex(oid)
 
     string hold = holds[mcm.CurrentOptionIndex]
 
@@ -134,6 +133,12 @@ endFunction
 function OnOptionSliderOpen(RealisticPrisonAndBounty_MCM mcm, int oid) global
     string optionKey = mcm.GetKeyFromOption(oid)
     Log(mcm, "OnOptionSliderOpen", "Option ID: " + oid + " (" + optionKey + ")")
+
+    if (optionKey == "undressing::minimumBountyToUndress")
+        mcm.SetSliderOptions(minRange = 1, maxRange = 100000, intervalSteps = 1, defaultValue = 500, startValue = mcm.UNDRESSING_DEFAULT_MIN_BOUNTY)
+    elseif (optionKey == "undressing::stripSearchThoroughness")
+        mcm.SetSliderOptions(minRange = 1, maxRange = 1000, intervalSteps = 1, defaultValue = 200, startValue = mcm.UNDRESSING_DEFAULT_STRIP_THOROUGHNESS)
+    endif
 
     ; int optionValue = GetOptionIntValue(oid)
 
@@ -218,7 +223,8 @@ function OnHighlight(RealisticPrisonAndBounty_MCM mcm, int oid) global
     if (! ShouldHandleEvent(mcm))
         return
     endif
-
+    
+    mcm.UpdateIndex(oid)
     OnOptionHighlight(mcm, oid)
 endFunction
 

@@ -106,7 +106,8 @@ function OnHighlight(RealisticPrisonAndBounty_MCM mcm, int oid) global
     if (! ShouldHandleEvent(mcm))
         return
     endif
-
+    
+    mcm.UpdateIndex(oid)
     OnOptionHighlight(mcm, oid)
 endFunction
 

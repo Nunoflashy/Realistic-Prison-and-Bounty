@@ -7,6 +7,7 @@ import RealisticPrisonAndBounty_Util
 ; ==============================================================================
 
 bool property IS_DEBUG = false autoreadonly
+bool property ENABLE_TRACE = false autoreadonly
 
 ; ==============================================================================
 ; MCM Option Flags
@@ -142,7 +143,7 @@ string[] function GetHoldNames()
         _holds[6] = "The Rift"
         _holds[7] = "The Reach"
         _holds[8] = "The Pale"
-        Log(self, "MCM::GetHoldNames", "Allocated holds string[]", LOG_WARN())
+        Debug(self, "MCM::GetHoldNames", "Allocated holds string[]", IS_DEBUG)
     endif
 
     return _holds
@@ -204,54 +205,45 @@ function SetDefaultTimescales()
     endif
 endFunction
 
-function InitializeOptions()
+int function __findCachedOption(int optionId)
+    int _optionsArray = JMap.getObj(cacheMap, CurrentPage)
 
-; Timescale
-; ============================================================
+    int i = 0
+    while (i < JArray.count(_optionsArray))
+        int keyHolder       = JArray.getObj(_optionsArray, i)
+        int containerKey    = JIntMap.getNthKey(keyHolder, 0)
+        int containerValue  = JIntMap.getInt(keyHolder, containerKey)
 
-; ============================================================
-
-    optionsMap = JMap.object()
-    optionToValue = JIntMap.object()
-
-    JValue.retain(optionsMap)
-    JValue.retain(optionToValue)
-
+        if (optionId == containerValue)
+            Debug(self, "MCM::__findCachedOption", "Found cached option at index " + containerKey + ", option: " + containerValue)
+            return containerKey
+        endif
+        i += 1
+    endWhile
+    
+    Warn(self, "__findCachedOption", "Could not find a cached option for " + CurrentPage + "::" + optionId + "!")
+    return -1
 endFunction
 
-int optionsMap ; optionsMap[undressing::allowUndressing] = container
-int optionToValue ; optionToValue[oid] = value
-
-
-; function ListOIDMap()
-;     string[] _keys = JMap.allKeysPArray(optionsMap)
-;     int i = 0
-;     while (i < _keys.Length)
-;         int optionIdContainer = JMap.getObj(optionsMap, _keys[i])
-;         ; Log(self, "MCM::ListOIDMap", "Key: " + _keys[i] + ", Value: " + optionIdContainer)
-;         ; if (i == 0)
-;             int[] optionIds = JIntMap.allKeysPArray(optionIdContainer)
-;             int j = 0
-;             while (j < optionIds.Length)
-;                 int oidValue = JIntMap.getInt(optionIdContainer, optionIds[j])
-;                 ; Log(self, "MCM::ListOIDMap", "Keys inside (OID's): " + optionIds[j] + ", Value: " + oidValue)
-;                 Log(self, "MCM::ListOIDMap", "optionsMap" + "[" + _keys[i] +"] = " + "["+ optionIds[j] + " => " + oidValue + "]")
-;                 j += 1
-;             endWhile
-;         ; endif
-;         i +=1
-;     endWhile
-; endFunction
-
 function UpdateIndex(int optionId)
-    float startTime = StartBenchmark()
+    ; float start = StartBenchmark()
 
-    string[] optionKeys = JMap.allKeysPArray(normalMap)
+    int cachedOption = __findCachedOption(optionId)
+    if (cachedOption != -1)
+        _currentOptionIndex = cachedOption
+        ; EndBenchmark(start)
+        return
+    endif
+
+    ; Cache not found, proceed with the slow approach
+    string[] optionKeys = JMap.allKeysPArray(optionsMap)
 
     int optionIndex = 0
     while (optionIndex < optionKeys.Length)
         string optionKey = optionKeys[optionIndex]
-        int _optionsArray = JMap.getObj(normalMap, optionKey) ; normalMap[undressing::allowUndressing]
+
+        Debug(self, "UpdateIndex", "Key is " + optionKey + ", updating index...", IS_DEBUG)
+        int _optionsArray = JMap.getObj(optionsMap, optionKey) ; optionsMap[undressing::allowUndressing]
 
         int i = 0
         while (i < JArray.count(_optionsArray))
@@ -260,25 +252,16 @@ function UpdateIndex(int optionId)
             int _containerKey = JIntMap.nextKey(_container)
             int _containerValue = JIntMap.getInt(_container, _containerKey)
 
-            ; Debug(self, "UpdateIndex", \
-            ;     "[optionIndex: " + optionIndex + "] " + \
-            ;     "[Map Key: " + optionKey + "] " + \
-            ;     "[Array ID: " + _optionsArray  + "] " + \
-            ;     " [Option Container ID: " + _container + " (key: " + _containerKey + ", value: " + _containerValue + ")" + "]" , IS_DEBUG \
-            ; )
-            
             if (_containerKey == optionId)
-                Debug(self, "UpdateIndex", "Found a match for Option ID: " + optionId + ", updating CurrentOptionIndex to " + i, IS_DEBUG)
+                __addOptionCache(optionId, i) ; Create cache for this option at this index, for next time
                 _currentOptionIndex = i
-                EndBenchmark(startTime)
                 return
             endif
             i += 1
         endWhile
         optionIndex += 1
     endWhile
-
-    EndBenchmark(startTime)
+    ; EndBenchmark(start)
 endFunction
 
 ; ============================================================
@@ -376,13 +359,16 @@ endProperty
 event OnConfigInit()
     ModName = "Realistic Prison and Bounty"
     InitializePages()
-    InitializeOptions()
 
-    normalMap = JMap.object()
-    JValue.retain(normalMap)
+    optionsMap = JMap.object()
+    JValue.retain(optionsMap)
+
+    cacheMap = JMap.object()
+    JValue.retain(cacheMap)
 endEvent
 
-int normalMap
+int optionsMap
+int cacheMap
 
 ;/
     Example array of option maps:
@@ -408,13 +394,13 @@ bool function IsOptionInArray(int arrayID, int optionID)
         i += 1
     endWhile
     
-    Trace(self, "MCM::IsOptionInArray", "Array does not exist or has no items!", i == 0 && IS_DEBUG)
-    Trace(self, "MCM::IsOptionInArray", "Option not found in array!", i != 0 && IS_DEBUG)
+    Trace(self, "MCM::IsOptionInArray", "Array does not exist or has no items!", i == 0 && ENABLE_TRACE)
+    Trace(self, "MCM::IsOptionInArray", "Option not found in array!", i != 0 && ENABLE_TRACE)
 
     return false
 endFunction
 
-bool function GetBoolOptionValue(string _key, int index)
+bool function __getBoolOptionValue(string _key, int index)
     int _array = __getOptionsArrayAtKey(_key)
 
     if (_array == -1)
@@ -425,8 +411,53 @@ bool function GetBoolOptionValue(string _key, int index)
     int _containerKey = JIntMap.getNthKey(_container, 0)
     bool _containerValue = JIntMap.getInt(_container, _containerKey) as bool
 
-    Debug(self, "GetBoolOptionValue", "[" + _key + " (" + index + ")] " + "CT: " + _container + ", CT_KEY: " + _containerKey + ", CT_VALUE: " + _containerValue)
+    Trace(self, "__getBoolOptionValue", "[" + _key + " (" + index + ")] " + "CT: " + _container + ", CT_KEY: " + _containerKey + ", CT_VALUE: " + _containerValue, ENABLE_TRACE)
 
+    return _containerValue
+endFunction
+
+int function __getIntOptionValue(string _key, int index)
+    int _array = __getOptionsArrayAtKey(_key)
+
+    if (_array == -1)
+        return -1 ; Array does not exist
+    endif
+
+    int _container = JArray.getObj(_array, index)
+    int _containerKey = JIntMap.getNthKey(_container, 0)
+    int _containerValue = JIntMap.getInt(_container, _containerKey)
+
+    Trace(self, "MCM::__getFloatOptionValue", "[" + _key + " (" + index + ")] " + "CT: " + _container + ", CT_KEY: " + _containerKey + ", CT_VALUE: " + _containerValue, ENABLE_TRACE)
+    return _containerValue
+endFunction
+
+float function __getFloatOptionValue(string _key, int index)
+    int _array = __getOptionsArrayAtKey(_key)
+
+    if (_array == -1)
+        return -1 ; Array does not exist
+    endif
+
+    int _container = JArray.getObj(_array, index)
+    int _containerKey = JIntMap.getNthKey(_container, 0)
+    float _containerValue = JIntMap.getFlt(_container, _containerKey)
+
+    Trace(self, "MCM::__getFloatOptionValue", "[" + _key + " (" + index + ")] " + "CT: " + _container + ", CT_KEY: " + _containerKey + ", CT_VALUE: " + _containerValue, ENABLE_TRACE)
+    return _containerValue
+endFunction
+
+string function __getStringOptionValue(string _key, int index)
+    int _array = __getOptionsArrayAtKey(_key)
+
+    if (_array == -1)
+        return -1 ; Array does not exist
+    endif
+
+    int _container = JArray.getObj(_array, index)
+    int _containerKey = JIntMap.getNthKey(_container, 0)
+    string _containerValue = JIntMap.getStr(_container, _containerKey)
+
+    Trace(self, "MCM::__getFloatOptionValue", "[" + _key + " (" + index + ")] " + "CT: " + _container + ", CT_KEY: " + _containerKey + ", CT_VALUE: " + _containerValue, ENABLE_TRACE)
     return _containerValue
 endFunction
 
@@ -445,7 +476,7 @@ function SetBoolOptionValue(string _key, bool value)
 
     bool retrievedValue = JIntMap.getInt(_container, _containerKey)
 
-    Debug(self, "SetBoolOptionValue", "Set new value of " + (retrievedValue as bool) + " to Option ID " + _containerKey + " for key " + _key, IS_DEBUG)
+    Trace(self, "SetBoolOptionValue", "Set new value of " + (retrievedValue as bool) + " to Option ID " + _containerKey + " for key " + _key, ENABLE_TRACE)
 endFunction
 
 function ToggleOption(string _key)
@@ -481,164 +512,292 @@ endFunction
     returns: the array containing the options at @_key, or -1 on failure if @handleError is true. 
 /;
 int function __getOptionsArrayAtKey(string _key, bool handleError = true)
-    int _array = JMap.getObj(normalMap, _key)
+    int _array = JMap.getObj(optionsMap, _key)
     if (_array == 0 && handleError)
-        Error(self, "MCM::__getOptionsArrayAtKey", "__getOptionsArrayAtKey(" + _key + "): Container does not exist!")
+        Error(self, "MCM::__getOptionsArrayAtKey", "__getOptionsArrayAtKey(" + _key + "): Container does not exist! (this error is normal the first time the MCM is rendered)")
         return -1
     endif
 
     return _array
 endFunction
 
+bool function __unloadOption(string _key)
+    float startTime = StartBenchmark()
+
+    int keyHolder = __getOptionsArrayAtKey(_key)
+
+    if (keyHolder == -1)
+        return false ; Array does not exist
+    endif
+
+    JDB.solveObjSetter(".storage::options::" + _key, keyHolder)
+    JMap.setObj(optionsMap, _key, 0)
+    EndBenchmark(startTime)
+    Debug(self, "__unloadOption", "Finished execution")
+
+    return true
+endFunction
+
+bool function __loadOption(string _key)
+    float startTime = StartBenchmark()
+
+    int option = JDB.solveObj(".storage::options::" + _key)
+    JMap.setObj(optionsMap, _key, option)
+
+    EndBenchmark(startTime)
+    Debug(self, "__loadOption", "Finished execution")
+    return option
+endFunction
+
+
+function __unloadAllOptionsExceptPage(string page)
+    string[] keys = JMap.allKeysPArray(optionsMap)
+
+    int keyIndex = 0
+    while (keyIndex < keys.Length)
+        string _key = keys[keyIndex]
+        int keyHolder = __getOptionsArrayAtKey(_key, false)
+
+        if (StringUtil.Find(page, _key) == -1)
+            if (!keyHolder)
+                Debug(self, "__unloadAllOptionsExceptPage", "The key " + _key + " does not exist.", IS_DEBUG)
+            else
+                __unloadOption(_key)
+            endif
+        else
+            Debug(self, "__unloadAllOptionsExceptPage", "Key " + _key + " is part of page, ignoring unload...", IS_DEBUG)
+        endif
+        keyIndex += 1
+    endWhile
+
+
+endFunction
+
+function __unloadAllOptions()
+    string[] keys = JMap.allKeysPArray(optionsMap)
+
+    int keyIndex = 0
+    while (keyIndex < keys.Length)
+        string _key = keys[keyIndex]
+        int keyHolder = __getOptionsArrayAtKey(_key, false)
+
+        if (!keyHolder)
+            Debug(self, "__unloadAllOptions", "The key " + _key + " does not exist.", IS_DEBUG)
+        else
+            __unloadOption(_key)
+        endif
+        keyIndex += 1
+    endWhile
+endFunction
 
 ;/
+    Adds the specified option container to an array at the specified key to the underlying internal map.
+
+    string  @_key: The key to add the option into.
+    int     @optionContainer: The option to be added.
+/;
+function __addOptionAtKey(string _key, int optionContainer)
+    int _array = __getOptionsArrayAtKey(_key, false)
+
+    if (_array == 0)
+        Trace(self, "MCM::__addOptionAtKey", "Array at key " + _key + " does not exist yet, created ARRAY with ID: " + _array, ENABLE_TRACE)
+        _array = JArray.object()
+    endif
+
+    ; Add option container map to array
+    JArray.addObj(_array, optionContainer)
+
+    Trace(self, "MCM::__addOptionAtKey", "Adding MAP ID: " + optionContainer + " to ARRAY ID: " + _array, ENABLE_TRACE)
+    Trace(self, "MCM::__addOptionAtKey", "Adding ARRAY ID: " + _array + " to optionsMap[" +_key + "]", ENABLE_TRACE)
+    Debug(self, "MCM::__addOptionAtKey", "Adding Option " + optionContainer + " to " + "[" +_key + "]", IS_DEBUG)
+
+    ; Add the array containing all containers related to _key to the map at _key
+    JMap.setObj(optionsMap, _key, _array)
+endFunction
+
+;/
+    Adds caching to the specified option when updating anything based on its Option ID.
+    The cache should contain all of the page's Option ID's with their respective index,
+    hence, this function should be used when rendering multiple options for a page.
+
+    int     @optionId: The option's id to be cached.
+    int     @index: The index to bind to this option to know what to update.
+/;
+function __addOptionCache(int optionId, int index)
+    int _cacheArray = JMap.getObj(cacheMap, CurrentPage)
+    if (!_cacheArray)
+        _cacheArray = JArray.object()
+    endif
+    
+    JArray.addObj(_cacheArray, __createPairInt(index, optionId))
+    JMap.setObj(cacheMap, CurrentPage, _cacheArray)
+endFunction
+
+;/
+    Creates a pair structure for integers.
+
+    int     @first: The first element in the pair.
+    int     @second: The second element in the pair.
+
+    returns: The pair as a container ID.
+/;
+int function __createPairInt(int first, int second)
+    int _container = JIntMap.object()
+    JIntMap.setInt(_container, first, second)
+    return _container
+endFunction
+
+;/
+    Creates a container (JIntMap) with the specified optionId and a bool value.
+
+    int     @optionId: The id of the option to be created.
+    bool    @value: The default value of the option.
+    
+    returns: The container's id.
+/;
+int function __createOptionBool(int optionId, bool value)
+    int _container = __createPairInt(optionId, (value as int))
+    Debug(self, "MCM::__createOptionBool", "Created MAP ID: " + _container + ", adding Option (id: " + optionId + ", value: " + value + ")", IS_DEBUG)
+    return _container
+endFunction
+
+;/
+    Creates a container (JIntMap) with the specified optionId and an int value.
+
+    int     @optionId: The id of the option to be created.
+    int    @value: The default value of the option.
+    
+    returns: The container's id.
+/;
+int function __createOptionInt(int optionId, int value)
+    int _container = __createPairInt(optionId, value)
+    Debug(self, "MCM::__createOptionInt", "Created MAP ID: " + _container + ", adding Option (id: " + optionId + ", value: " + value + ")")
+    return _container
+endFunction
+
+;/
+    Creates a container (JIntMap) with the specified optionId and a float value.
+
+    int     @optionId: The id of the option to be created.
+    float   @value: The default value of the option.
+    
+    returns: The container's id.
+/;
+int function __createOptionFloat(int optionId, float value)
+    int _container = JIntMap.object()
+    JIntMap.setFlt(_container, optionId, value)
+
+    Debug(self, "MCM::__createOptionFloat", "Created MAP ID: " + _container + ", adding Option (id: " + optionId + ", value: " + value + ")", IS_DEBUG)
+    return _container
+endFunction
+
+;/
+    Creates a container (JIntMap) with the specified optionId and a string value.
+
+    int     @optionId: The id of the option to be created.
+    string  @value: The default value of the option.
+    
+    returns: The container's id.
+/;
+int function __createOptionString(int optionId, string value)
+    int _container = JIntMap.object()
+    JIntMap.setStr(_container, optionId, value)
+
+    Debug(self, "MCM::__createOptionString", "Created MAP ID: " + _container + ", adding Option (id: " + optionId + ", value: " + value + ")", IS_DEBUG)
+    return _container
+endFunction
+
+int function AddOptionToggle(string text, bool defaultValue)
+    return AddOptionToggleEx(text, defaultValue, 0)
+endFunction
+
+int function AddOptionSlider(string text, float defaultValue)
+    return AddOptionSliderEx(text, defaultValue, 0)
+endFunction
+
+int function AddOptionMenu(string text, string defaultValue)
+    return AddOptionMenuEx(text, defaultValue, 0)
+endFunction
+;/
     Add to map:
-    normalMap["undressing::allowUndressing"] = 3
+    optionsMap["undressing::allowUndressing"] = 3
     where 3 is the container containing all the options related to this key
     
     3 (array): [10, 11, 12, 13, 14]: where 10 through 14 are maps to their respective options.
     10-14 (int map): key: 1026, value: true
 /;
-int function AddOptionToggle(string text, bool defaultValue, int index)
-    ; float startTime = StartBenchmark()
-
+int function AddOptionToggleEx(string text, bool defaultValue, int index)
     string _key = CurrentPage + "::" + TrimString(text) ; undressing::allowUndressing
-    bool value = GetBoolOptionValue(_key, index)
+    bool value = __getBoolOptionValue(_key, index)
     int optionId = AddToggleOption(text, bool_if (value != -1, value, defaultValue))
     
     int mapArray = __getOptionsArrayAtKey(_key, false)
 
-    ; if the array exists in the map at the passed in key
-    bool arrayExists = mapArray != 0
-    if (arrayExists)
-        Debug(self, "MCM::AddOptionToggle", "Array ID " + mapArray + " exists in normalMap[" +_key + "]", IS_DEBUG)
-        ; Does this option map exist in the array?
-        if (IsOptionInArray(mapArray, optionId))
-            Debug(self, "AddOptionToggle", "Option ID " + optionId + " already exists in map inside Array ID " + mapArray + ", returning...", IS_DEBUG)
-            ; EndBenchmark(startTime)
-            return optionId
-        endif
+    Trace(self, "MCM::AddOptionToggleEx", "Array ID " + mapArray + " exists in optionsMap[" +_key + "]", mapArray != 0 && ENABLE_TRACE)
 
-        ; Option doesnt exist, but array does.
-
-        ; Create and add option to map
-        ; mapOptionToValue[optionId] = defaultValue
-        int mapOptionToValue = JIntMap.object()
-        JIntMap.setInt(mapOptionToValue, optionId, defaultValue as int)
-
-        Debug(self, "MCM::AddOptionToggle", "Creating MAP ID: " + mapOptionToValue + ", adding Option (id: " + optionId + ", value: " + defaultValue + ")", IS_DEBUG)
-
-        ; Add map to array
-        JArray.addObj(mapArray, mapOptionToValue)
-
-        Debug(self, "MCM::AddOptionToggle", "Adding MAP ID: " + mapOptionToValue + " to ARRAY ID: " + mapArray, IS_DEBUG)
-
-        ; Add the array containing all containers related to _key to the map at _key
-        JMap.setObj(normalMap, _key, mapArray)
-
-        Debug(self, "MCM::AddOptionToggle", "Adding ARRAY ID: " + mapArray + " to normalMap[" +_key + "]", IS_DEBUG)
-        ; EndBenchmark(startTime)
-
+    ; Does this option map exist in the array?
+    if (mapArray && IsOptionInArray(mapArray, optionId))
+        Trace(self, "AddOptionToggleEx", "Option ID " + optionId + " already exists in map inside Array ID " + mapArray + ", returning...", ENABLE_TRACE)
         return optionId
     endif
 
-    ; Array for this key does not exist yet, create it
-    mapArray = JArray.object()
-    Debug(self, "MCM::AddOptionToggle", "Array does not exist yet, created ARRAY with ID: " + mapArray, IS_DEBUG)
+    __addOptionAtKey(_key, __createOptionBool(optionId, defaultValue))
+    __addOptionCache(optionId, index)
 
-    ; Option doesn't exist yet, proceed...
-    ; Create and add option to map
-    ; mapOptionToValue[optionId] = defaultValue
-    int mapOptionToValue = JIntMap.object()
-    JIntMap.setInt(mapOptionToValue, optionId, defaultValue as int)
-
-    Debug(self, "MCM::AddOptionToggle", "Creating MAP ID: " + mapOptionToValue + ", adding Option (id: " + optionId + ", value: " + defaultValue + ")", IS_DEBUG)
-
-    ; Add map to array
-    JArray.addObj(mapArray, mapOptionToValue)
-
-    Debug(self, "MCM::AddOptionToggle", "Adding MAP ID: " + mapOptionToValue + " to ARRAY ID: " + mapArray, IS_DEBUG)
-
-    ; Add the array containing all containers related to _key to the map at _key
-    JMap.setObj(normalMap, _key, mapArray)
-
-    Debug(self, "MCM::AddOptionToggle", "Adding ARRAY ID: " + mapArray + " to normalMap[" +_key + "]", IS_DEBUG)
-
-    ; EndBenchmark(startTime)
+    Debug(self, "MCM::AddOptionToggleEx", "cacheMap["+ CurrentPage +"]: " + "{" + index + ": " + optionId + "}")
+    return optionId
 endFunction
 
-int function AddOptionSlider(string text, float defaultValue, int index)
-    ; float startTime = StartBenchmark()
-
-    int optionId = AddSliderOption(text, defaultValue)
-
-    string _key = CurrentPage + "::" + TrimString(text) ; undressing::allowUndressing
+int function AddOptionSliderEx(string text, float defaultValue, int index)
+    string _key = CurrentPage + "::" + TrimString(text) ; undressing::minimumBountyToUndress
+    float value = __getFloatOptionValue(_key, index)
+    int optionId = AddSliderOption(text, float_if (value != -1, value, defaultValue))
     
-    int mapArray = JMap.getObj(normalMap, _key)
+    int mapArray = __getOptionsArrayAtKey(_key, false)
 
-    ; if the array exists in the map at the passed in key
-    bool arrayExists = mapArray != 0
-    if (arrayExists)
-        Debug(self, "MCM::AddOptionSlider", "Array ID " + mapArray + " exists in normalMap[" +_key + "]", IS_DEBUG)
-        ; Does this option map exist in the array?
-        if (IsOptionInArray(mapArray, optionId))
-            Debug(self, "AddOptionSlider", "Option ID " + optionId + " already exists in map inside Array ID " + mapArray + ", returning...", IS_DEBUG)
-            ; EndBenchmark(startTime)
-            return optionId
-        endif
+    Trace(self, "MCM::AddOptionSliderEx", "Array ID " + mapArray + " exists in optionsMap[" +_key + "]", mapArray != 0 && ENABLE_TRACE)
 
-        ; Option doesnt exist, but array does.
-
-        ; Create and add option to map
-        ; mapOptionToValue[optionId] = defaultValue
-        int mapOptionToValue = JIntMap.object()
-        JIntMap.setInt(mapOptionToValue, optionId, defaultValue as int)
-
-        Debug(self, "MCM::AddOptionSlider", "Creating MAP ID: " + mapOptionToValue + ", adding Option (id: " + optionId + ", value: " + defaultValue + ")", IS_DEBUG)
-
-        ; Add map to array
-        JArray.addObj(mapArray, mapOptionToValue)
-
-        Debug(self, "MCM::AddOptionSlider", "Adding MAP ID: " + mapOptionToValue + " to ARRAY ID: " + mapArray, IS_DEBUG)
-
-        ; Add the array containing all containers related to _key to the map at _key
-        JMap.setObj(normalMap, _key, mapArray)
-
-        Debug(self, "MCM::AddOptionSlider", "Adding ARRAY ID: " + mapArray + " to normalMap[" +_key + "]", IS_DEBUG)
-        ; EndBenchmark(startTime)
-
+    ; Does this option map exist in the array?
+    if (mapArray && IsOptionInArray(mapArray, optionId))
+        Trace(self, "AddOptionSliderEx", "Option ID " + optionId + " already exists in map inside Array ID " + mapArray + ", returning...", ENABLE_TRACE)
         return optionId
     endif
 
-    ; Array for this key does not exist yet, create it
-    mapArray = JArray.object()
-    Debug(self, "MCM::AddOptionSlider", "Array does not exist yet, created ARRAY with ID: " + mapArray, IS_DEBUG)
+    __addOptionAtKey(_key, __createOptionFloat(optionId, defaultValue))
+    __addOptionCache(optionId, index)
 
-    ; Option doesn't exist yet, proceed...
-    ; Create and add option to map
-    ; mapOptionToValue[optionId] = defaultValue
-    int mapOptionToValue = JIntMap.object()
-    JIntMap.setInt(mapOptionToValue, optionId, defaultValue as int)
+    Debug(self, "MCM::AddOptionSliderEx", "cacheMap["+ CurrentPage +"]: " + "{" + index + ": " + optionId + "}")
 
-    Debug(self, "MCM::AddOptionSlider", "Creating MAP ID: " + mapOptionToValue + ", adding Option (id: " + optionId + ", value: " + defaultValue + ")", IS_DEBUG)
+    return optionId
+endFunction
 
-    ; Add map to array
-    JArray.addObj(mapArray, mapOptionToValue)
+int function AddOptionMenuEx(string text, string defaultValue, int index)
+    string _key = CurrentPage + "::" + TrimString(text) ; prison::cellDoorLockLevel
+    string value = __getStringOptionValue(_key, index)
+    int optionId = AddMenuOption(text, string_if (value != -1, value, defaultValue))
+    
+    int mapArray = __getOptionsArrayAtKey(_key, false)
 
-    Debug(self, "MCM::AddOptionSlider", "Adding MAP ID: " + mapOptionToValue + " to ARRAY ID: " + mapArray, IS_DEBUG)
+    Trace(self, "MCM::AddOptionMenuEx", "Array ID " + mapArray + " exists in optionsMap[" +_key + "]", mapArray != 0 && ENABLE_TRACE)
 
-    ; Add the array containing all containers related to _key to the map at _key
-    JMap.setObj(normalMap, _key, mapArray)
+    ; Does this option map exist in the array?
+    if (mapArray && IsOptionInArray(mapArray, optionId))
+        Debug(self, "AddOptionMenuEx", "Option ID " + optionId + " already exists in map inside Array ID " + mapArray + ", returning...")
+        return optionId
+    endif
 
-    Debug(self, "MCM::AddOptionSlider", "Adding ARRAY ID: " + mapArray + " to normalMap[" +_key + "]", IS_DEBUG)
+    __addOptionAtKey(_key, __createOptionString(optionId, defaultValue))
+    __addOptionCache(optionId, index)
 
-    ; EndBenchmark(startTime)
+    Debug(self, "MCM::AddOptionMenuEx", "cacheMap["+ CurrentPage +"]: " + "{" + index + ": " + optionId + "}")
+
+    return optionId
 endFunction
 
 int function GetOptionFromMap(string _key)
     float startTime = StartBenchmark()
 
-    int arrayInsideMap = JMap.getObj(normalMap, _key) ; Get the array inside the map
+    int arrayInsideMap = JMap.getObj(optionsMap, _key) ; Get the array inside the map
     bool keyExists = arrayInsideMap != 0
 
     if (!keyExists)
@@ -666,6 +825,16 @@ int function GetOptionFromMap(string _key)
     return -1 ; OPTION_NOT_FOUND
 endFunction
 
+;/
+    Retrieves the option specified by the key for the current option index,
+    the index is invisible to the user and will update based on where the cursor is in the menu to account for all holds.
+
+    e.g: GetOption(undressing::allowUndressing) with a CurrentOptionIndex of 0, will retrieve that option for Whiterun,
+    whereas with the index set to 1, it will retrieve Winterhold's instead.
+
+    string  @_key: The key to retrieve the option from.
+    returns: The option's id on success, -1 on failure.
+ /;
 int function GetOption(string _key)
     int optionArray = __getOptionsArrayAtKey(_key) ; Get the array for this key
 
@@ -688,15 +857,21 @@ int function GetOption(string _key)
     return _optionId
 endFunction
 
+;/
+    Retrieves the option's key from its id.
+
+    int @optionId: The option's id.
+    returns: The key for the option passed in.
+/;
 string function GetKeyFromOption(int optionId)
-    string[] keys = JMap.allKeysPArray(normalMap)
+    string[] keys = JMap.allKeysPArray(optionsMap)
 
     int keyIndex = 0
     while (keyIndex < keys.Length)
         string _key = keys[keyIndex]
 
         ; Search all containers inside this key till we find optionId
-        int _array = JMap.getObj(normalMap, _key)
+        int _array = JMap.getObj(optionsMap, _key)
 
         int arrayIndex = 0
         while (arrayIndex < JArray.count(_array))
@@ -707,6 +882,28 @@ string function GetKeyFromOption(int optionId)
                 Debug(self, "GetKeyFromOption", "Found match for key: " + _key + " (Option ID: " +  optionId + ")", IS_DEBUG)
                 return _key
             endif
+            arrayIndex += 1
+        endWhile
+        keyIndex += 1
+    endWhile
+endFunction
+
+function ListOptionMap()
+    string[] keys = JMap.allKeysPArray(optionsMap)
+
+    int keyIndex = 0
+    while (keyIndex < keys.Length)
+        string _key = keys[keyIndex]
+        int _keyArray = JMap.getObj(optionsMap, _key)
+        
+        int arrayIndex = 0
+        while (arrayIndex < JArray.count(_keyArray))
+            int _optionContainer = JArray.getObj(_keyArray, arrayIndex)
+            int _optionKey       = JIntMap.getNthKey(_optionContainer, 0)
+            int _optionValue     = JIntMap.getInt(_optionContainer, _optionKey)
+
+            string _hold = GetHoldNames()[arrayIndex]
+            Info(self, "MCM::GetOptionFromMap", "[" + _hold + "] " + "\t[ARRAY ID: " + _keyArray + " (" + _key + ")] " + "container id: " + _optionContainer + " (key: " + _optionKey + ", value: " + (_optionValue) + ")", IS_DEBUG)
             arrayIndex += 1
         endWhile
         keyIndex += 1
@@ -773,7 +970,7 @@ event OnOptionSelect(int option)
     RealisticPrisonAndBounty_MCM_BHunters.OnSelect(self, option)
     RealisticPrisonAndBounty_MCM_Leveling.OnSelect(self, option)
     ; RealisticPrisonAndBounty_MCM_Status.OnDefault(self, option)
-
+    
     if (IS_DEBUG)
         string optionKey = GetKeyFromOption(option)
         Debug(self, "MCM::OnOptionSelect", "Option ID: " + option + " (" + optionKey + ")")
@@ -804,6 +1001,7 @@ event OnOptionSliderOpen(int option)
     endif
 
     GetOptionFromMap(GetKeyFromOption(option))
+
 
 endEvent
 

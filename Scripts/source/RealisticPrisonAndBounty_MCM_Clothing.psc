@@ -22,11 +22,11 @@ function Render(RealisticPrisonAndBounty_MCM mcm) global
 endFunction
 
 function RenderOptions(RealisticPrisonAndBounty_MCM mcm, int index) global
-    mcm.AddOptionToggle("Allow Wearing Clothes",            mcm.UNDRESSING_DEFAULT_ALLOW_CLOTHES, index)
-    mcm.AddOptionSlider("Bounty to Re-dress",               mcm.UNDRESSING_DEFAULT_REDRESS_BOUNTY, index)
-    mcm.AddOptionToggle("Re-dress when Defeated",           mcm.UNDRESSING_DEFAULT_REDRESS_WHEN_DEFEATED, index)
-    mcm.AddOptionToggle("Re-dress at Cell",                 mcm.UNDRESSING_DEFAULT_REDRESS_AT_CELL, index)
-    mcm.AddOptionToggle("Re-dress at Chest",                mcm.UNDRESSING_DEFAULT_REDRESS_AT_CHEST, index)
+    mcm.AddOptionToggleEx("Allow Wearing Clothes",            mcm.UNDRESSING_DEFAULT_ALLOW_CLOTHES, index)
+    mcm.AddOptionSliderEx("Bounty to Re-dress",               mcm.UNDRESSING_DEFAULT_REDRESS_BOUNTY, index)
+    mcm.AddOptionToggleEx("Re-dress when Defeated",           mcm.UNDRESSING_DEFAULT_REDRESS_WHEN_DEFEATED, index)
+    mcm.AddOptionToggleEx("Re-dress at Cell",                 mcm.UNDRESSING_DEFAULT_REDRESS_AT_CELL, index)
+    mcm.AddOptionToggleEx("Re-dress at Chest",                mcm.UNDRESSING_DEFAULT_REDRESS_AT_CHEST, index)
 endFunction
 
 
@@ -67,7 +67,7 @@ function OnOptionDefault(RealisticPrisonAndBounty_MCM mcm, int oid) global
 endFunction
 
 function OnOptionSelect(RealisticPrisonAndBounty_MCM mcm, int oid) global
-
+    mcm.ToggleOption(mcm.GetKeyFromOption(oid))
 endFunction
 
 
@@ -115,7 +115,8 @@ function OnHighlight(RealisticPrisonAndBounty_MCM mcm, int oid) global
     if (! ShouldHandleEvent(mcm))
         return
     endif
-
+    
+    mcm.UpdateIndex(oid)
     OnOptionHighlight(mcm, oid)
 endFunction
 

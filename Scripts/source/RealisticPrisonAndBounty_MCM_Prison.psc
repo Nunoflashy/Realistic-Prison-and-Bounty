@@ -23,18 +23,17 @@ function Render(RealisticPrisonAndBounty_MCM mcm) global
 endFunction
 
 function RenderOptions(RealisticPrisonAndBounty_MCM mcm, int index) global
-    mcm.AddOptionSlider("Bounty to Days",               mcm.ARREST_DEFAULT_BOUNTY_WHEN_DEFEATED_FLAT, index)
-    mcm.AddOptionSlider("Minimum Sentence (Days)",               mcm.ARREST_DEFAULT_BOUNTY_WHEN_DEFEATED_FLAT, index)
-    mcm.AddOptionSlider("Maximum Sentence (Days)",               mcm.ARREST_DEFAULT_BOUNTY_WHEN_DEFEATED_FLAT, index)
-    mcm.AddOptionToggle("Allow Bountyless Imprisonment",        mcm.ARREST_DEFAULT_ALLOW_CIVILIAN_CAPTURE, index)
-    mcm.AddOptionToggle("Sentence pays Bounty",        mcm.ARREST_DEFAULT_ALLOW_CIVILIAN_CAPTURE, index)
-    mcm.AddOptionToggle("Fast Forward",        mcm.ARREST_DEFAULT_ALLOW_CIVILIAN_CAPTURE, index)
-    mcm.AddOptionSlider("Day to fast forward from",               mcm.ARREST_DEFAULT_BOUNTY_WHEN_DEFEATED_FLAT, index)
-    mcm.AddOptionToggle("Hands Bound in Prison",        mcm.ARREST_DEFAULT_ALLOW_CIVILIAN_CAPTURE, index)
-    mcm.AddOptionSlider("Hands Bound (Minimum Bounty)",               mcm.ARREST_DEFAULT_BOUNTY_WHEN_DEFEATED_FLAT, index)
-    mcm.AddOptionToggle("Hands Bound (Randomize)",        mcm.ARREST_DEFAULT_ALLOW_CIVILIAN_CAPTURE, index)
-    ; mcm.oid_prison_cellLockLevel[index]                 = mcm.AddMenuOption("Cell Lock Level", "SELECT")
-
+    mcm.AddOptionSliderEx("Bounty to Days",               mcm.ARREST_DEFAULT_BOUNTY_WHEN_DEFEATED_FLAT, index)
+    mcm.AddOptionSliderEx("Minimum Sentence (Days)",               mcm.ARREST_DEFAULT_BOUNTY_WHEN_DEFEATED_FLAT, index)
+    mcm.AddOptionSliderEx("Maximum Sentence (Days)",               mcm.ARREST_DEFAULT_BOUNTY_WHEN_DEFEATED_FLAT, index)
+    mcm.AddOptionToggleEx("Allow Bountyless Imprisonment",        mcm.ARREST_DEFAULT_ALLOW_CIVILIAN_CAPTURE, index)
+    mcm.AddOptionToggleEx("Sentence pays Bounty",        mcm.ARREST_DEFAULT_ALLOW_CIVILIAN_CAPTURE, index)
+    mcm.AddOptionToggleEx("Fast Forward",        mcm.ARREST_DEFAULT_ALLOW_CIVILIAN_CAPTURE, index)
+    mcm.AddOptionSliderEx("Day to fast forward from",               mcm.ARREST_DEFAULT_BOUNTY_WHEN_DEFEATED_FLAT, index)
+    mcm.AddOptionToggleEx("Hands Bound in Prison",        mcm.ARREST_DEFAULT_ALLOW_CIVILIAN_CAPTURE, index)
+    mcm.AddOptionSliderEx("Hands Bound (Minimum Bounty)",               mcm.ARREST_DEFAULT_BOUNTY_WHEN_DEFEATED_FLAT, index)
+    mcm.AddOptionToggleEx("Hands Bound (Randomize)",        mcm.ARREST_DEFAULT_ALLOW_CIVILIAN_CAPTURE, index)
+    mcm.AddOptionMenuEx("Cell Lock Level", "SELECT", index)
 
 endFunction
 
@@ -42,7 +41,7 @@ function Left(RealisticPrisonAndBounty_MCM mcm) global
     string[] holds = mcm.GetHoldNames()
 
     mcm.AddHeaderOption("General")
-    ; mcm.oid_prison_prisonTimeScale = mcm.AddSliderOption("Timescale in Prison", int_if(mcm.PrisonTimescale.GetValueInt() != 0, mcm.PrisonTimescale.GetValueInt(), 10))
+    mcm.AddOptionSlider("Timescale in Prison", 10)
 
     int i = mcm.LeftPanelIndex
     while (i < mcm.LeftPanelSize)
@@ -275,6 +274,7 @@ function OnHighlight(RealisticPrisonAndBounty_MCM mcm, int oid) global
         return
     endif
 
+    mcm.UpdateIndex(oid)
     OnOptionHighlight(mcm, oid)
 endFunction
 

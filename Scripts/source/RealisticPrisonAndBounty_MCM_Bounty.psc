@@ -30,16 +30,18 @@ function RenderOptions(RealisticPrisonAndBounty_MCM mcm, int index) global
     mcm.AddEmptyOption()
 
     mcm.AddTextOption("", "Bounty Decay", mcm.OPTION_FLAG_DISABLED)
-    mcm.AddOptionToggle("Enable Bounty Decay",        mcm.ARREST_DEFAULT_ALLOW_CIVILIAN_CAPTURE, index)
-    mcm.AddOptionToggle("Decay while Imprisoned",  mcm.ARREST_DEFAULT_ALLOW_ARREST_TRANSFER, index)
-    mcm.AddOptionSlider("Bounty Lost (% of Bounty)",               mcm.ARREST_DEFAULT_BOUNTY_WHEN_DEFEATED_FLAT, index)
-    mcm.AddOptionSlider("Bounty Lost (Flat)",               mcm.ARREST_DEFAULT_BOUNTY_WHEN_DEFEATED_FLAT, index)
+    mcm.AddOptionToggleEx("Enable Bounty Decay",        mcm.ARREST_DEFAULT_ALLOW_CIVILIAN_CAPTURE, index)
+    mcm.AddOptionToggleEx("Decay while Imprisoned",  mcm.ARREST_DEFAULT_ALLOW_ARREST_TRANSFER, index)
+    mcm.AddOptionSliderEx("Bounty Lost (% of Bounty)",               mcm.ARREST_DEFAULT_BOUNTY_WHEN_DEFEATED_FLAT, index)
+    mcm.AddOptionSliderEx("Bounty Lost (Flat)",               mcm.ARREST_DEFAULT_BOUNTY_WHEN_DEFEATED_FLAT, index)
     
 endFunction
 
 function Left(RealisticPrisonAndBounty_MCM mcm) global
     string[] holds = mcm.GetHoldNames()
 
+    mcm.AddOptionToggle("Enable Bounty Decay", true)
+    mcm.AddOptionToggle("Update Interval (In-Game Time)", 12.0)
     ; mcm.oid_bounty_enableBountyDecayGeneral = mcm.AddToggleOption("Enable Bounty Decay", true)
     ; mcm.oid_bounty_updateInterval           = mcm.AddSliderOption("Update Interval (In-Game Time)", 1.0)
 
@@ -155,7 +157,8 @@ function OnHighlight(RealisticPrisonAndBounty_MCM mcm, int oid) global
     if (! ShouldHandleEvent(mcm))
         return
     endif
-
+    
+    mcm.UpdateIndex(oid)
     OnOptionHighlight(mcm, oid)
 endFunction
 
