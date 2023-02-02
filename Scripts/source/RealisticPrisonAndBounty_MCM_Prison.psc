@@ -140,7 +140,9 @@ endFunction
 
 
 function OnOptionSelect(RealisticPrisonAndBounty_MCM mcm, int oid) global
+    string optionKey = mcm.GetKeyFromOption(oid)
 
+    mcm.ToggleOption(optionKey)
     ; bool optionState = mcm.ToggleOption(oid)
 
     ; int bountyToDays                    = mcm.GetOptionInListByOID(mcm.oid_prison_bountyToDays, oid)

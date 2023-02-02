@@ -110,7 +110,9 @@ function OnOptionDefault(RealisticPrisonAndBounty_MCM mcm, int oid) global
 endFunction
 
 function OnOptionSelect(RealisticPrisonAndBounty_MCM mcm, int oid) global
+    string optionKey = mcm.GetKeyFromOption(oid)
 
+    mcm.ToggleOption(optionKey)
 endFunction
 
 function OnOptionSliderOpen(RealisticPrisonAndBounty_MCM mcm, int oid) global

@@ -6,7 +6,7 @@ import RealisticPrisonAndBounty_Util
 ; Constants
 ; ==============================================================================
 
-bool property IS_DEBUG = false autoreadonly
+bool property IS_DEBUG = true autoreadonly
 bool property ENABLE_TRACE = false autoreadonly
 
 ; ==============================================================================
@@ -111,7 +111,6 @@ int  property BOUNTY_HUNTERS_DEFAULT_MIN_BOUNTY_GROUP  = 6000 autoreadonly
 ; ==============================================================================
 ; End Constants
 ; ==============================================================================
-
 
 ; Timescales
 ; =======================================
@@ -221,7 +220,7 @@ int function __findCachedOption(int optionId)
         i += 1
     endWhile
     
-    Warn(self, "__findCachedOption", "Could not find a cached option for " + CurrentPage + "::" + optionId + "!")
+    Warn(self, "MCM::__findCachedOption", "Could not find a cached option for " + CurrentPage + "::" + optionId + "!")
     return -1
 endFunction
 
@@ -367,7 +366,52 @@ event OnConfigInit()
     JValue.retain(cacheMap)
 endEvent
 
+;/
+     Stores every Option in the menu.
+     This is a map of arrays, which themselves contain maps of options.
+
+     The map is implemented as follows:
+     optionsMap[optionKey] : StringMap = [
+        {key: optionId, value: optionValue}, : IntMap
+        {key: optionId, value: optionValue}, : IntMap
+        {key: optionId, value: optionValue}, : IntMap
+        ...
+     ]
+
+     Example:
+     optionsMap[undressing::allowUndressing] = [
+        {key: 1026, value: true},
+        {key: 1028, value: true},
+        {key: 1030, value: false},
+        ...
+     ]
+
+     Single Options:
+     optionsMap[prison::single::timescale] = {key: 1881, value: 20.0}
+/;
 int optionsMap
+
+;/
+    Stores the cache of every Option ID in the menu.
+    This map contains an array for every page existing in the menu,
+    each page array will contain all Option ID's and their respective index for that particular page.
+
+    Implementation:
+    cacheMap[PageName] : StringMap = [
+        {key: optionId, value: index}, : IntMap
+        {key: optionId, value: index}, : IntMap
+        {key: optionId, value: index}, : IntMap
+        ...
+    ]
+
+    Example:
+    cacheMap[undressing] = [
+        {key: 1771, value: 2},
+        {key: 1786, value: 4},
+        {key: 1764, value: 0},
+        ...
+    ]
+/;
 int cacheMap
 
 ;/
@@ -400,20 +444,44 @@ bool function IsOptionInArray(int arrayID, int optionID)
     return false
 endFunction
 
-bool function __getBoolOptionValue(string _key, int index)
+bool function __singleOptionExists(string _key)
+    int option = __getOptionSingle(_key)
+
+    if (!option)
+        Debug(self, "MCM::__singleOptionExists", "Single option " + _key + " does not exist!", IS_DEBUG)
+        return false
+    endif
+
+    return true
+endFunction
+
+bool function __getBoolSingleOptionValue(string _key)
+    int option = __getOptionSingle(_key)
+
+    int optionKey   = JIntMap.getNthKey(option, 0)
+    int optionValue = JIntMap.getInt(option, optionKey)
+
+    return optionValue
+endFunction
+
+int function __getBoolOptionValue(string _key, int index)
     int _array = __getOptionsArrayAtKey(_key)
 
     if (_array == -1)
-        return false ; Array does not exist
+        return -1 ; Array does not exist
     endif
 
     int _container = JArray.getObj(_array, index)
     int _containerKey = JIntMap.getNthKey(_container, 0)
     bool _containerValue = JIntMap.getInt(_container, _containerKey) as bool
 
+    if (_container == 0)
+        return -2 ; Option does not exist
+    endif
+
     Trace(self, "__getBoolOptionValue", "[" + _key + " (" + index + ")] " + "CT: " + _container + ", CT_KEY: " + _containerKey + ", CT_VALUE: " + _containerValue, ENABLE_TRACE)
 
-    return _containerValue
+    return (_containerValue as int)
 endFunction
 
 int function __getIntOptionValue(string _key, int index)
@@ -427,12 +495,17 @@ int function __getIntOptionValue(string _key, int index)
     int _containerKey = JIntMap.getNthKey(_container, 0)
     int _containerValue = JIntMap.getInt(_container, _containerKey)
 
+    if (_container == 0)
+        return -2 ; Option does not exist
+    endif
+
     Trace(self, "MCM::__getFloatOptionValue", "[" + _key + " (" + index + ")] " + "CT: " + _container + ", CT_KEY: " + _containerKey + ", CT_VALUE: " + _containerValue, ENABLE_TRACE)
     return _containerValue
 endFunction
 
 float function __getFloatOptionValue(string _key, int index)
     int _array = __getOptionsArrayAtKey(_key)
+    Debug(self, "MCM::__getFloatOptionValue", "[" + _key + " (" + index + ")]: Returned: " + _array, IS_DEBUG)
 
     if (_array == -1)
         return -1 ; Array does not exist
@@ -442,7 +515,12 @@ float function __getFloatOptionValue(string _key, int index)
     int _containerKey = JIntMap.getNthKey(_container, 0)
     float _containerValue = JIntMap.getFlt(_container, _containerKey)
 
+    if (_container == 0)
+        return -2 ; Option does not exist
+    endif
+
     Trace(self, "MCM::__getFloatOptionValue", "[" + _key + " (" + index + ")] " + "CT: " + _container + ", CT_KEY: " + _containerKey + ", CT_VALUE: " + _containerValue, ENABLE_TRACE)
+    Debug(self, "MCM::__getFloatOptionValue", "[" + _key + " (" + index + ")] " + "CT: " + _container + ", CT_KEY: " + _containerKey + ", CT_VALUE: " + _containerValue, IS_DEBUG)
     return _containerValue
 endFunction
 
@@ -456,6 +534,10 @@ string function __getStringOptionValue(string _key, int index)
     int _container = JArray.getObj(_array, index)
     int _containerKey = JIntMap.getNthKey(_container, 0)
     string _containerValue = JIntMap.getStr(_container, _containerKey)
+
+    if (_container == 0)
+        return -2 ; Option does not exist
+    endif
 
     Trace(self, "MCM::__getFloatOptionValue", "[" + _key + " (" + index + ")] " + "CT: " + _container + ", CT_KEY: " + _containerKey + ", CT_VALUE: " + _containerValue, ENABLE_TRACE)
     return _containerValue
@@ -590,6 +672,10 @@ function __unloadAllOptions()
     endWhile
 endFunction
 
+function __addSingleOptionAtKey(string _key, int optionContainer)
+    JMap.setObj(optionsMap, _key, optionContainer)
+endFunction
+
 ;/
     Adds the specified option container to an array at the specified key to the underlying internal map.
 
@@ -645,6 +731,18 @@ int function __createPairInt(int first, int second)
     int _container = JIntMap.object()
     JIntMap.setInt(_container, first, second)
     return _container
+endFunction
+
+;/
+    Creates a pair structure for bools.
+
+    bool     @first: The first element in the pair.
+    bool     @second: The second element in the pair.
+
+    returns: The pair as a container ID.
+/;
+int function __createPairBool(bool first, bool second)
+    return __createPairInt((first as int), (second as int))
 endFunction
 
 ;/
@@ -708,7 +806,16 @@ int function __createOptionString(int optionId, string value)
 endFunction
 
 int function AddOptionToggle(string text, bool defaultValue)
-    return AddOptionToggleEx(text, defaultValue, 0)
+    string _key = __getSingleOptionsKey(TrimString(_key))
+    bool value  = __getBoolSingleOptionValue(_key)
+    int optionId = AddToggleOption(text, bool_if (value, value, defaultValue))
+
+    if (!__singleOptionExists(_key))
+        __addSingleOptionAtKey(_key, __createOptionBool(optionId, defaultValue))
+        Debug(self, "MCM::AddOptionToggle", "Added Single Option: optionsMap["+ _key +"]: " + "{" + optionId + ": " + defaultValue + "}")
+    endif
+
+    return optionId
 endFunction
 
 int function AddOptionSlider(string text, float defaultValue)
@@ -728,9 +835,11 @@ endFunction
 /;
 int function AddOptionToggleEx(string text, bool defaultValue, int index)
     string _key = CurrentPage + "::" + TrimString(text) ; undressing::allowUndressing
-    bool value = __getBoolOptionValue(_key, index)
-    int optionId = AddToggleOption(text, bool_if (value != -1, value, defaultValue))
+    int value = __getBoolOptionValue(_key, index)
+    int optionId = AddToggleOption(text, bool_if (value < 0, defaultValue, (value as bool)))
     
+    Debug(self, "MCM::AddOptionToggleEx", "["+ _key +"]: {id: " + optionId + ", value: " + value + ", defaultValue: " + defaultValue + "}")
+
     int mapArray = __getOptionsArrayAtKey(_key, false)
 
     Trace(self, "MCM::AddOptionToggleEx", "Array ID " + mapArray + " exists in optionsMap[" +_key + "]", mapArray != 0 && ENABLE_TRACE)
@@ -751,7 +860,9 @@ endFunction
 int function AddOptionSliderEx(string text, float defaultValue, int index)
     string _key = CurrentPage + "::" + TrimString(text) ; undressing::minimumBountyToUndress
     float value = __getFloatOptionValue(_key, index)
-    int optionId = AddSliderOption(text, float_if (value != -1, value, defaultValue))
+    int optionId = AddSliderOption(text, float_if (value < 0, defaultValue, value))
+
+    ; Debug(self, "MCM::AddOptionSliderEx", "["+ _key +"]: {id: " + optionId + ", value: " + value + ", defaultValue: " + defaultValue + "}")
     
     int mapArray = __getOptionsArrayAtKey(_key, false)
 
@@ -766,7 +877,7 @@ int function AddOptionSliderEx(string text, float defaultValue, int index)
     __addOptionAtKey(_key, __createOptionFloat(optionId, defaultValue))
     __addOptionCache(optionId, index)
 
-    Debug(self, "MCM::AddOptionSliderEx", "cacheMap["+ CurrentPage +"]: " + "{" + index + ": " + optionId + "}")
+    ; Debug(self, "MCM::AddOptionSliderEx", "cacheMap["+ CurrentPage +"]: " + "{" + index + ": " + optionId + "}")
 
     return optionId
 endFunction
@@ -774,7 +885,7 @@ endFunction
 int function AddOptionMenuEx(string text, string defaultValue, int index)
     string _key = CurrentPage + "::" + TrimString(text) ; prison::cellDoorLockLevel
     string value = __getStringOptionValue(_key, index)
-    int optionId = AddMenuOption(text, string_if (value != -1, value, defaultValue))
+    int optionId = AddMenuOption(text, string_if (value < 0, defaultValue, value))
     
     int mapArray = __getOptionsArrayAtKey(_key, false)
 
@@ -823,6 +934,19 @@ int function GetOptionFromMap(string _key)
     ; EndBenchmark(startTime)
 
     return -1 ; OPTION_NOT_FOUND
+endFunction
+
+string function __getSingleOptionsKey(string _key)
+    return CurrentPage + "::single::" + _key
+endFunction
+
+int function __getOptionSingle(string _key)
+    int option = JMap.getObj(optionsMap, __getSingleOptionsKey(_key)) ; prison::single::timescale
+    return option
+endFunction
+
+int function GetOptionSingle(string _key)
+    return JIntMap.getNthKey(__getOptionSingle(_key), 0)
 endFunction
 
 ;/
