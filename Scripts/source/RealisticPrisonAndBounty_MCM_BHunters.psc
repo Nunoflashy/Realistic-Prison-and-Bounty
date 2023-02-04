@@ -56,7 +56,7 @@ endFunction
 ; Events
 ; =====================================================
 
-function OnOptionHighlight(RealisticPrisonAndBounty_MCM mcm, int oid) global
+function OnOptionHighlight(RealisticPrisonAndBounty_MCM mcm, string option) global
 
     string[] holds = mcm.GetHoldNames()
     string hold = holds[mcm.CurrentOptionIndex]
@@ -87,49 +87,49 @@ function OnOptionHighlight(RealisticPrisonAndBounty_MCM mcm, int oid) global
 
 endFunction
 
-function OnOptionDefault(RealisticPrisonAndBounty_MCM mcm, int oid) global
+function OnOptionDefault(RealisticPrisonAndBounty_MCM mcm, string option) global
     
 endFunction
 
-function OnOptionSelect(RealisticPrisonAndBounty_MCM mcm, int oid) global
-    string optionKey = mcm.GetKeyFromOption(oid)
+function OnOptionSelect(RealisticPrisonAndBounty_MCM mcm, string option) global
+    string optionKey = option
 
     mcm.ToggleOption(optionKey)
 endFunction
 
-function OnOptionSliderOpen(RealisticPrisonAndBounty_MCM mcm, int oid) global
+function OnOptionSliderOpen(RealisticPrisonAndBounty_MCM mcm, string option) global
 
 endFunction
 
-function OnOptionSliderAccept(RealisticPrisonAndBounty_MCM mcm, int oid, float value) global
+function OnOptionSliderAccept(RealisticPrisonAndBounty_MCM mcm, string option, float value) global
 
 endFunction
 
-function OnOptionMenuOpen(RealisticPrisonAndBounty_MCM mcm, int oid) global
+function OnOptionMenuOpen(RealisticPrisonAndBounty_MCM mcm, string option) global
 
 endFunction
 
-function OnOptionMenuAccept(RealisticPrisonAndBounty_MCM mcm, int oid, int menuIndex) global
+function OnOptionMenuAccept(RealisticPrisonAndBounty_MCM mcm, string option, int menuIndex) global
     
 endFunction
 
-function OnOptionColorOpen(RealisticPrisonAndBounty_MCM mcm, int oid) global
+function OnOptionColorOpen(RealisticPrisonAndBounty_MCM mcm, string option) global
     
 endFunction
 
-function OnOptionColorAccept(RealisticPrisonAndBounty_MCM mcm, int oid, int color) global
+function OnOptionColorAccept(RealisticPrisonAndBounty_MCM mcm, string option, int color) global
     
 endFunction
 
-function OnOptionInputOpen(RealisticPrisonAndBounty_MCM mcm, int oid) global
+function OnOptionInputOpen(RealisticPrisonAndBounty_MCM mcm, string option) global
     
 endFunction
 
-function OnOptionInputAccept(RealisticPrisonAndBounty_MCM mcm, int oid, string input) global
+function OnOptionInputAccept(RealisticPrisonAndBounty_MCM mcm, string option, string input) global
     
 endFunction
 
-function OnOptionKeymapChange(RealisticPrisonAndBounty_MCM mcm, int oid, int keyCode, string conflictControl, string conflictName) global
+function OnOptionKeymapChange(RealisticPrisonAndBounty_MCM mcm, string option, int keyCode, string conflictControl, string conflictName) global
     
 endFunction
 
@@ -143,7 +143,7 @@ function OnHighlight(RealisticPrisonAndBounty_MCM mcm, int oid) global
     endif
     
     mcm.UpdateIndex(oid)
-    OnOptionHighlight(mcm, oid)
+    OnOptionHighlight(mcm, mcm.GetKeyFromOption(oid))
 endFunction
 
 function OnDefault(RealisticPrisonAndBounty_MCM mcm, int oid) global
@@ -152,7 +152,7 @@ function OnDefault(RealisticPrisonAndBounty_MCM mcm, int oid) global
         return
     endif
 
-    OnOptionDefault(mcm, oid)
+    OnOptionDefault(mcm, mcm.GetKeyFromOption(oid))
 endFunction
 
 function OnSelect(RealisticPrisonAndBounty_MCM mcm, int oid) global
@@ -160,7 +160,7 @@ function OnSelect(RealisticPrisonAndBounty_MCM mcm, int oid) global
         return
     endif
 
-    OnOptionSelect(mcm, oid)
+    OnOptionSelect(mcm, mcm.GetKeyFromOption(oid))
 endFunction
 
 function OnSliderOpen(RealisticPrisonAndBounty_MCM mcm, int oid) global
@@ -168,7 +168,7 @@ function OnSliderOpen(RealisticPrisonAndBounty_MCM mcm, int oid) global
         return
     endif
 
-    OnOptionSliderOpen(mcm, oid)
+    OnOptionSliderOpen(mcm, mcm.GetKeyFromOption(oid))
 endFunction
 
 function OnSliderAccept(RealisticPrisonAndBounty_MCM mcm, int oid, float value) global
@@ -176,7 +176,7 @@ function OnSliderAccept(RealisticPrisonAndBounty_MCM mcm, int oid, float value) 
         return
     endif
 
-    OnOptionSliderAccept(mcm, oid, value)
+    OnOptionSliderAccept(mcm, mcm.GetKeyFromOption(oid), value)
 endFunction
 
 function OnMenuOpen(RealisticPrisonAndBounty_MCM mcm, int oid) global
@@ -184,7 +184,7 @@ function OnMenuOpen(RealisticPrisonAndBounty_MCM mcm, int oid) global
         return
     endif
 
-    OnOptionMenuOpen(mcm, oid)
+    OnOptionMenuOpen(mcm, mcm.GetKeyFromOption(oid))
 endFunction
 
 function OnMenuAccept(RealisticPrisonAndBounty_MCM mcm, int oid, int menuIndex) global
@@ -192,7 +192,7 @@ function OnMenuAccept(RealisticPrisonAndBounty_MCM mcm, int oid, int menuIndex) 
         return
     endif
 
-    OnOptionMenuAccept(mcm, oid, menuIndex)
+    OnOptionMenuAccept(mcm, mcm.GetKeyFromOption(oid), menuIndex)
 endFunction
 
 function OnColorOpen(RealisticPrisonAndBounty_MCM mcm, int oid) global
@@ -200,7 +200,7 @@ function OnColorOpen(RealisticPrisonAndBounty_MCM mcm, int oid) global
         return
     endif
 
-    OnOptionColorOpen(mcm, oid)
+    OnOptionColorOpen(mcm, mcm.GetKeyFromOption(oid))
 endFunction
 
 function OnColorAccept(RealisticPrisonAndBounty_MCM mcm, int oid, int color) global
@@ -208,7 +208,7 @@ function OnColorAccept(RealisticPrisonAndBounty_MCM mcm, int oid, int color) glo
         return
     endif
 
-    OnOptionColorAccept(mcm, oid, color)
+    OnOptionColorAccept(mcm, mcm.GetKeyFromOption(oid), color)
 endFunction
 
 function OnKeymapChange(RealisticPrisonAndBounty_MCM mcm, int oid, int keycode, string conflictControl, string conflictName) global
@@ -216,7 +216,7 @@ function OnKeymapChange(RealisticPrisonAndBounty_MCM mcm, int oid, int keycode, 
         return
     endif
 
-    OnOptionKeymapChange(mcm, oid, keycode, conflictControl, conflictName)
+    OnOptionKeymapChange(mcm, mcm.GetKeyFromOption(oid), keycode, conflictControl, conflictName)
 endFunction
 
 function OnInputOpen(RealisticPrisonAndBounty_MCM mcm, int oid) global
@@ -224,7 +224,7 @@ function OnInputOpen(RealisticPrisonAndBounty_MCM mcm, int oid) global
         return
     endif
 
-    OnOptionInputOpen(mcm, oid)
+    OnOptionInputOpen(mcm, mcm.GetKeyFromOption(oid))
 endFunction
 
 function OnInputAccept(RealisticPrisonAndBounty_MCM mcm, int oid, string inputValue) global
@@ -232,5 +232,5 @@ function OnInputAccept(RealisticPrisonAndBounty_MCM mcm, int oid, string inputVa
         return
     endif
     
-    OnOptionInputAccept(mcm, oid, inputValue)
+    OnOptionInputAccept(mcm, mcm.GetKeyFromOption(oid), inputValue)
 endFunction

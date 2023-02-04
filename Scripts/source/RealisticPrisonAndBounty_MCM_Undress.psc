@@ -65,74 +65,79 @@ endFunction
 ; Events
 ; =====================================================
 
-function OnOptionHighlight(RealisticPrisonAndBounty_MCM mcm, int oid) global
+function OnOptionHighlight(RealisticPrisonAndBounty_MCM mcm, string option) global
 
     string[] holds = mcm.GetHoldNames()
 
     string hold = holds[mcm.CurrentOptionIndex]
 
-    if (oid == mcm.GetOption("undressing::allowUndressing"))
+    if (option == "Allow Undressing")
         mcm.SetInfoText("Determines if you can be undressed while imprisoned in " + hold + ".")
 
-    elseif (oid == mcm.GetOption("undressing::minimumBountyToUndress"))
+    elseif (option == "Minimum Bounty to Undress")
         mcm.SetInfoText("The minimum bounty required to be undressed in " + hold + "'s prison.")
 
-    elseif (oid == mcm.GetOption("undressing::undressWhenDefeated"))
+    elseif (option == "Undress when Defeated")
         mcm.SetInfoText("Whether to have you undressed when defeated and imprisoned in " + hold + ".")
 
-    elseif (oid == mcm.GetOption("undressing::undressAtCell"))
+    elseif (option == "Undress at Cell")
         mcm.SetInfoText("Whether to be undressed at the cell in " + hold + "'s prison.")
 
-    elseif (oid == mcm.GetOption("undressing::undressAtChest"))
+    elseif (option == "Undress at Chest")
         mcm.SetInfoText("Whether to be undressed at the chest in "  + hold + "'s prison.")
 
-    elseif (oid == mcm.GetOption("undressing::forcedUndressing(bounty)"))
+    elseif (option == "Forced Undressing (Bounty)")
         mcm.SetInfoText("The minimum bounty required to be force undressed (You will have no possibility of action)")
 
-    elseif (oid == mcm.GetOption("undressing::forcedUndressingWhenDefeated"))
+    elseif (option == "Forced Undressing when Defeated")
         mcm.SetInfoText("Whether to be force undressed when defeated and imprisoned in " + hold + ".")
 
-    elseif (oid == mcm.GetOption("undressing::stripSearchThoroughness"))
+    elseif (option == "Strip Search Thoroughness")
         mcm.SetInfoText("The thoroughness of the strip search when undressed, higher values mean a more thorough search and therefore possibly less items kept.\n" + \
                      "Due to the nature of a strip search, most items will be removed, this value will only determine small objects that could be hidden when stripped bare.")
 
-    elseif (oid == mcm.GetOption("undressing::allowWearingClothes"))
+    elseif (option == "undressing::allowWearingClothes")
         mcm.SetInfoText("Whether to allow wearing clothes while imprisoned in " + hold + ".")
 
-    elseif (oid == mcm.GetOption("undressing::bountyToRe-dress"))
+    elseif (option == "undressing::bountyToRe-dress")
         mcm.SetInfoText("The maximum bounty you can have in order to be re-dressed while imprisoned in " + hold + ".")
 
-    elseif (oid == mcm.GetOption("undressing::Re-dressWhenDefeated"))
+    elseif (option == "undressing::Re-dressWhenDefeated")
         mcm.SetInfoText("Whether to have you re-dressed when defeated (Note: If the bounty exceeds the maximum, this option will have no effect.)")
 
-    elseif (oid == mcm.GetOption("undressing::Re-dressAtCell"))
+    elseif (option == "undressing::Re-dressAtCell")
         mcm.SetInfoText("Whether to be re-dressed at the cell in " + hold + "'prison.")
 
-    elseif (oid == mcm.GetOption("undressing::Re-dressAtChest"))
+    elseif (option == "undressing::Re-dressAtChest")
         mcm.SetInfoText("Whether to be re-dressed at the chest in " + hold + "'prison.")
     endif
 
-    Debug(mcm, "OnOptionHighlight", "Expected OID: " + oid, mcm.IS_DEBUG)
+    ; Debug(mcm, "OnOptionHighlight", "Expected OID: " + oid, mcm.IS_DEBUG)
 
 endFunction
 
-function OnOptionDefault(RealisticPrisonAndBounty_MCM mcm, int oid) global
+function OnOptionDefault(RealisticPrisonAndBounty_MCM mcm, string option) global
     
 endFunction
 
-function OnOptionSelect(RealisticPrisonAndBounty_MCM mcm, int oid) global
-    string optionKey = mcm.GetKeyFromOption(oid)
+function OnOptionSelect(RealisticPrisonAndBounty_MCM mcm, string option) global
+    string optionKey = GetPageName() + "::" + option
 
-    if (oid == mcm.GetOption("undressing::allowUndressing"))
-        ; mcm.ToggleOption("undressing::allowUndressing")
-    endif
+    ; if (oid == mcm.GetOption("undressing::allowUndressing"))
+    ;     ; mcm.ToggleOption("undressing::allowUndressing")
+    ; endif
 
+    ; mcm.GetOptionValueBool("Undressing", "Allow Undressing", mcm.CurrentOptionIndex)
+    ; mcm.GetOptionValueBool("Undressing", "Allow Undressing", mcm.INDEX_EASTMARCH)
+    ; mcm.GetOptionValueBool("Clothing", "Allow Wearing Clothes", mcm.CurrentOptionIndex)
+
+    ; mcm.Debug("Test", "OptionKey: " + optionKey)
     mcm.ToggleOption(optionKey)
 endFunction
 
-function OnOptionSliderOpen(RealisticPrisonAndBounty_MCM mcm, int oid) global
-    string optionKey = mcm.GetKeyFromOption(oid)
-    Log(mcm, "OnOptionSliderOpen", "Option ID: " + oid + " (" + optionKey + ")")
+function OnOptionSliderOpen(RealisticPrisonAndBounty_MCM mcm, string option) global
+    string optionKey = option
+    ; Log(mcm, "OnOptionSliderOpen", "Option ID: " + oid + " (" + optionKey + ")")
 
     if (optionKey == "undressing::minimumBountyToUndress")
         mcm.SetSliderOptions(minRange = 1, maxRange = 100000, intervalSteps = 1, defaultValue = 500, startValue = mcm.UNDRESSING_DEFAULT_MIN_BOUNTY)
@@ -166,7 +171,7 @@ function OnOptionSliderOpen(RealisticPrisonAndBounty_MCM mcm, int oid) global
 
 endFunction
 
-function OnOptionSliderAccept(RealisticPrisonAndBounty_MCM mcm, int oid, float value) global
+function OnOptionSliderAccept(RealisticPrisonAndBounty_MCM mcm, string option, float value) global
 
     ; int minimumBounty                   = mcm.GetOptionInListByOID(mcm.oid_undressing_minimumBounty, oid)
     ; int forcedUndressingMinBounty       = mcm.GetOptionInListByOID(mcm.oid_undressing_forcedUndressingMinBounty, oid)     
@@ -187,31 +192,31 @@ function OnOptionSliderAccept(RealisticPrisonAndBounty_MCM mcm, int oid, float v
     ; SetOptionValueInt(oid, value as int)
 endFunction
 
-function OnOptionMenuOpen(RealisticPrisonAndBounty_MCM mcm, int oid) global
+function OnOptionMenuOpen(RealisticPrisonAndBounty_MCM mcm, string option) global
 
 endFunction
 
-function OnOptionMenuAccept(RealisticPrisonAndBounty_MCM mcm, int oid, int menuIndex) global
+function OnOptionMenuAccept(RealisticPrisonAndBounty_MCM mcm, string option, int menuIndex) global
     
 endFunction
 
-function OnOptionColorOpen(RealisticPrisonAndBounty_MCM mcm, int oid) global
+function OnOptionColorOpen(RealisticPrisonAndBounty_MCM mcm, string option) global
     
 endFunction
 
-function OnOptionColorAccept(RealisticPrisonAndBounty_MCM mcm, int oid, int color) global
+function OnOptionColorAccept(RealisticPrisonAndBounty_MCM mcm, string option, int color) global
     
 endFunction
 
-function OnOptionInputOpen(RealisticPrisonAndBounty_MCM mcm, int oid) global
+function OnOptionInputOpen(RealisticPrisonAndBounty_MCM mcm, string option) global
     
 endFunction
 
-function OnOptionInputAccept(RealisticPrisonAndBounty_MCM mcm, int oid, string input) global
+function OnOptionInputAccept(RealisticPrisonAndBounty_MCM mcm, string option, string input) global
     
 endFunction
 
-function OnOptionKeymapChange(RealisticPrisonAndBounty_MCM mcm, int oid, int keyCode, string conflictControl, string conflictName) global
+function OnOptionKeymapChange(RealisticPrisonAndBounty_MCM mcm, string option, int keyCode, string conflictControl, string conflictName) global
     
 endFunction
 
@@ -225,7 +230,7 @@ function OnHighlight(RealisticPrisonAndBounty_MCM mcm, int oid) global
     endif
     
     mcm.UpdateIndex(oid)
-    OnOptionHighlight(mcm, oid)
+    OnOptionHighlight(mcm, mcm.GetKeyFromOption(oid))
 endFunction
 
 function OnDefault(RealisticPrisonAndBounty_MCM mcm, int oid) global
@@ -234,7 +239,7 @@ function OnDefault(RealisticPrisonAndBounty_MCM mcm, int oid) global
         return
     endif
 
-    OnOptionDefault(mcm, oid)
+    OnOptionDefault(mcm, mcm.GetKeyFromOption(oid))
 endFunction
 
 function OnSelect(RealisticPrisonAndBounty_MCM mcm, int oid) global
@@ -242,7 +247,7 @@ function OnSelect(RealisticPrisonAndBounty_MCM mcm, int oid) global
         return
     endif
 
-    OnOptionSelect(mcm, oid)
+    OnOptionSelect(mcm, mcm.GetKeyFromOption(oid))
 endFunction
 
 function OnSliderOpen(RealisticPrisonAndBounty_MCM mcm, int oid) global
@@ -250,7 +255,7 @@ function OnSliderOpen(RealisticPrisonAndBounty_MCM mcm, int oid) global
         return
     endif
 
-    OnOptionSliderOpen(mcm, oid)
+    OnOptionSliderOpen(mcm, mcm.GetKeyFromOption(oid))
 endFunction
 
 function OnSliderAccept(RealisticPrisonAndBounty_MCM mcm, int oid, float value) global
@@ -258,7 +263,7 @@ function OnSliderAccept(RealisticPrisonAndBounty_MCM mcm, int oid, float value) 
         return
     endif
 
-    OnOptionSliderAccept(mcm, oid, value)
+    OnOptionSliderAccept(mcm, mcm.GetKeyFromOption(oid), value)
 endFunction
 
 function OnMenuOpen(RealisticPrisonAndBounty_MCM mcm, int oid) global
@@ -266,7 +271,7 @@ function OnMenuOpen(RealisticPrisonAndBounty_MCM mcm, int oid) global
         return
     endif
 
-    OnOptionMenuOpen(mcm, oid)
+    OnOptionMenuOpen(mcm, mcm.GetKeyFromOption(oid))
 endFunction
 
 function OnMenuAccept(RealisticPrisonAndBounty_MCM mcm, int oid, int menuIndex) global
@@ -274,7 +279,7 @@ function OnMenuAccept(RealisticPrisonAndBounty_MCM mcm, int oid, int menuIndex) 
         return
     endif
 
-    OnOptionMenuAccept(mcm, oid, menuIndex)
+    OnOptionMenuAccept(mcm, mcm.GetKeyFromOption(oid), menuIndex)
 endFunction
 
 function OnColorOpen(RealisticPrisonAndBounty_MCM mcm, int oid) global
@@ -282,7 +287,7 @@ function OnColorOpen(RealisticPrisonAndBounty_MCM mcm, int oid) global
         return
     endif
 
-    OnOptionColorOpen(mcm, oid)
+    OnOptionColorOpen(mcm, mcm.GetKeyFromOption(oid))
 endFunction
 
 function OnColorAccept(RealisticPrisonAndBounty_MCM mcm, int oid, int color) global
@@ -290,7 +295,7 @@ function OnColorAccept(RealisticPrisonAndBounty_MCM mcm, int oid, int color) glo
         return
     endif
 
-    OnOptionColorAccept(mcm, oid, color)
+    OnOptionColorAccept(mcm, mcm.GetKeyFromOption(oid), color)
 endFunction
 
 function OnKeymapChange(RealisticPrisonAndBounty_MCM mcm, int oid, int keycode, string conflictControl, string conflictName) global
@@ -298,7 +303,7 @@ function OnKeymapChange(RealisticPrisonAndBounty_MCM mcm, int oid, int keycode, 
         return
     endif
 
-    OnOptionKeymapChange(mcm, oid, keycode, conflictControl, conflictName)
+    OnOptionKeymapChange(mcm, mcm.GetKeyFromOption(oid), keycode, conflictControl, conflictName)
 endFunction
 
 function OnInputOpen(RealisticPrisonAndBounty_MCM mcm, int oid) global
@@ -306,7 +311,7 @@ function OnInputOpen(RealisticPrisonAndBounty_MCM mcm, int oid) global
         return
     endif
 
-    OnOptionInputOpen(mcm, oid)
+    OnOptionInputOpen(mcm, mcm.GetKeyFromOption(oid))
 endFunction
 
 function OnInputAccept(RealisticPrisonAndBounty_MCM mcm, int oid, string inputValue) global
@@ -314,5 +319,5 @@ function OnInputAccept(RealisticPrisonAndBounty_MCM mcm, int oid, string inputVa
         return
     endif
     
-    OnOptionInputAccept(mcm, oid, inputValue)
+    OnOptionInputAccept(mcm, mcm.GetKeyFromOption(oid), inputValue)
 endFunction
