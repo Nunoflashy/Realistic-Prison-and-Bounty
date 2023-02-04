@@ -653,32 +653,32 @@ endFunction
     Retrieves the option specified by the key for the current option index,
     the index is invisible to the user and will update based on where the cursor is in the menu to account for all holds.
 
-    e.g: GetOption(undressing::allowUndressing) with a CurrentOptionIndex of 0, will retrieve that option for Whiterun,
+    e.g: GetOption(Undressing::Allow Undressing) with a CurrentOptionIndex of 0, will retrieve that option for Whiterun,
     whereas with the index set to 1, it will retrieve Winterhold's instead.
 
     string  @_key: The key to retrieve the option from.
     returns: The option's id on success, -1 on failure.
  /;
-int function GetOption(string _key)
+ int function GetOption(string _key)
     string _formattedKey = CurrentPage + "::" + _key ; Append current page to allow retrieving options simply by name
-    int optionArray = __getOptionsArrayAtKey(_key) ; Get the array for this key
+    int optionArray = __getOptionsArrayAtKey(_formattedKey) ; Get the array for this key
 
     if (optionArray == -1)
         Error("GetOption", "Key: " + _key + " does not exist in the map, returning...")
         return -1
     endif
 
-    int _optionMap = JArray.getObj(optionArray, CurrentOptionIndex)
+    int _optionMap = __getOption(optionArray, CurrentOptionIndex)
 
     if (_optionMap == 0)
         Error("GetOption", "Container: " + _optionMap + " does not exist at key " + _key + ", returning...")
         return -1
     endif
 
-    int _optionId  = JIntMap.getNthKey(_optionMap, 0)
-    int _optionValue = JIntMap.getInt(_optionMap, _optionId)
+    int _optionId       = __getOptionKey(_optionMap)
+    int _optionValue    = __getOptionValue(_optionMap, _optionId)
 
-    Debug("GetOption", "[CurrentOptionIndex: " + CurrentOptionIndex + "] Returned Option ID: " + _optionId + ", with value: " + _optionValue, IS_DEBUG)
+    Trace("GetOption", "[CurrentOptionIndex: " + CurrentOptionIndex + "] Returned Option ID: " + _optionId + ", with value: " + _optionValue, ENABLE_TRACE)
     return _optionId
 endFunction
 
@@ -1175,6 +1175,58 @@ int function __createOptionString(int optionId, string value)
     return _container
 endFunction
 
+;/
+    Retrieves the option from the specified options container at a particular index.
+
+    JIntMap[]   @cacheOptionsContainer: The container with all the options for the specified page.
+    int         @optionIndex: The index of the item to retrieve from the container.
+
+    returns:    The option inside @cacheOptionsContainer at @optionIndex. : JIntMap
+        { key: optionId, value: optionValue }
+/;
+int function __getOption(int optionsContainer, int optionIndex)
+    return JArray.getObj(optionsContainer, optionIndex)
+endFunction
+
+;/
+    Retrieves the key of the passed in option.
+
+    JIntMap     @option: The option passed in.
+
+    returns:    The option's key, which is the Option ID. : int
+/;
+int function __getOptionKey(int option)
+    return JIntMap.getNthKey(option, 0)
+endFunction
+
+;/
+    Retrieves the value of the passed in option at the specified key.
+    JIntMap     @option: The option passed in.
+    int         @optionKey: The option's key.
+
+    returns:    The option's value. : int
+/;
+int function __getOptionValue(int option, int optionKey)
+    return JIntMap.getInt(option, optionKey)
+endFunction
+;/
+    Checks whether the option is a single option.
+
+    Example of a single option container:
+    optionsMap[clothing::Allow Wearing Clothes (Cidhna Mine)] = [
+        {key: 1319, value: true}
+     ]
+
+     Cached option:
+     cacheMap[clothing] = [
+        { key: 1319, value: [Allow Wearing Clothes (Cidhna Mine), -1] } 
+        -1 index means single option
+     ]
+
+     JArray    @array: The container with the option.
+
+     returns: true if it's a single option, false otherwise.
+/;
 bool function __isSingleOption(int _array)
     return JArray.count(_array) == 1
 endFunction
