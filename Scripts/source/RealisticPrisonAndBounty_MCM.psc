@@ -6,7 +6,7 @@ import RealisticPrisonAndBounty_Util
 ; Constants
 ; ==============================================================================
 
-bool property IS_DEBUG      = false autoreadonly
+bool property IS_DEBUG      = true autoreadonly
 bool property ENABLE_TRACE  = false autoreadonly
 
 ; ==============================================================================
@@ -455,12 +455,17 @@ function ToggleOption(string _key, bool storePersistently = true)
         return ; Array does not exist
     endif
 
-    int _container = JArray.getObj(_array, CurrentOptionIndex)
+    int index = int_if (__isSingleOption(_array), 0, CurrentOptionIndex) ; Single options will have 0 index
+    int _container = JArray.getObj(_array, index) 
+    Debug("ToggleOption", "[" + _key +"] " + "Container: " + _container + ", Array: " + _array, IS_DEBUG)
+
     int i = 0
     while (i < JArray.count(_array))
         int _containerKey = JIntMap.nextKey(_container)
         bool _containerValue = JIntMap.getInt(_container, _containerKey) as bool
-        if (i == CurrentOptionIndex)
+        Debug("ToggleOption", "[" + _key +"] " + "Key: " + _containerKey + ", Value: " + _containerValue, IS_DEBUG)
+
+        if (i == index)
             JIntMap.setInt(_container, _containerKey, (!_containerValue) as int) ; Toggle value
             SetToggleOptionValue(_containerKey, !_containerValue)
             Debug("ToggleOption", "[" + _key +"] " + "Container: " + _container  + ", Container Key: " + _containerKey + " (" + i + " iterations)", IS_DEBUG)
@@ -497,7 +502,11 @@ int function AddOptionMenu(string text, string defaultValue)
 endFunction
 
 
-int function AddOptionToggleEx(string text, bool defaultValue, int index)
+int function AddOptionToggleEx(string text, bool defaultValue, int index = -1)
+    if (index == -1)
+        ; Render Single Option Toggle
+        ; __addSingleOptionToggle()
+    endif
     string _key = CurrentPage + "::" + text ; undressing::allowUndressing
     int value = __getBoolOptionValue(_key, index)
     int optionId = AddToggleOption(text, bool_if (value < 0, defaultValue, (value as bool)))
@@ -512,11 +521,37 @@ int function AddOptionToggleEx(string text, bool defaultValue, int index)
         return optionId
     endif
 
-    ; optionsMap[Allow Undressing]
+    ; string optionKey    = string_if (overrideKey, CurrentPage + "::" + overrideKey, _key)   ; optionKey = Undressing::Allow Undressing
+    ; string cacheKey     = string_if (overrideKey, overrideKey, text)                        ; cacheKey  = Allow Undressing
+
     __addOptionAtKey(_key, __createOptionBool(optionId, defaultValue))
     __addOptionCache(optionId, text, index)
 
     Trace("AddOptionToggleEx", "cacheMap["+ CurrentPage +"]: " + "{" + index + ": " + optionId + "}", ENABLE_TRACE)
+    return optionId
+endFunction
+
+int function AddOptionToggleExOverride(string displayedText, string overrideKey, bool defaultValue, int index = -1)
+    string optionKey    = CurrentPage + "::" + overrideKey   ; optionKey = Undressing::Allow Undressing
+    string cacheKey     = overrideKey                        ; cacheKey  = Allow Undressing
+
+    int value = __getBoolOptionValue(optionKey, int_if (index == -1, 0, index)) ; if index was not set, this is a single option, therefore index starts at 0
+    int optionId = AddToggleOption(displayedText, bool_if (value < 0, defaultValue, (value as bool)))
+
+    int mapArray = __getOptionsArrayAtKey(optionKey, false)
+
+    Trace("AddOptionToggleExOverride", "Array ID " + mapArray + " exists in optionsMap[" + optionKey + "]", mapArray != 0 && ENABLE_TRACE)
+
+    ; Does this option map exist in the array?
+    if (mapArray && IsOptionInArray(mapArray, optionId))
+        Trace("AddOptionToggleExOverride", "Option ID " + optionId + " already exists in map inside Array ID " + mapArray + ", returning...", ENABLE_TRACE)
+        return optionId
+    endif
+
+    __addOptionAtKey(optionKey, __createOptionBool(optionId, defaultValue))
+    __addOptionCache(optionId, cacheKey, index)
+
+    Trace("AddOptionToggleExOverride", "cacheMap["+ CurrentPage +"]: " + "{" + index + ": " + optionId + "}", ENABLE_TRACE)
     return optionId
 endFunction
 
@@ -1061,15 +1096,15 @@ function __addOptionAtKey(string _key, int optionContainer)
     int _array = __getOptionsArrayAtKey(_key, false)
 
     if (_array == 0)
-        Trace("__addOptionAtKey", "Array at key " + _key + " does not exist yet, created ARRAY with ID: " + _array, ENABLE_TRACE)
         _array = JArray.object()
+        Trace("__addOptionAtKey", "Array at key " + _key + " does not exist yet, created ARRAY with ID: " + _array, IS_DEBUG)
     endif
 
     ; Add option container map to array
     JArray.addObj(_array, optionContainer)
 
-    Trace("__addOptionAtKey", "Adding MAP ID: " + optionContainer + " to ARRAY ID: " + _array, ENABLE_TRACE)
-    Trace("__addOptionAtKey", "Adding ARRAY ID: " + _array + " to optionsMap[" +_key + "]", ENABLE_TRACE)
+    Trace("__addOptionAtKey", "Adding MAP ID: " + optionContainer + " to ARRAY ID: " + _array, IS_DEBUG)
+    Trace("__addOptionAtKey", "Adding ARRAY ID: " + _array + " to optionsMap[" +_key + "]", IS_DEBUG)
     Debug("__addOptionAtKey", "Adding Option " + optionContainer + " to " + "[" +_key + "]", IS_DEBUG)
 
     ; Add the array containing all containers related to _key to the map at _key
@@ -1136,6 +1171,10 @@ int function __createOptionString(int optionId, string value)
     return _container
 endFunction
 
+bool function __isSingleOption(int _array)
+    return JArray.count(_array) == 1
+endFunction
+
 ; ============================================================================
 ;                               Utility Functions
 
@@ -1145,7 +1184,7 @@ endFunction
     int     @first: The first element in the pair.
     int     @second: The second element in the pair.
 
-    returns: The pair as a container ID.
+    returns: The pair as a container ID. : JIntMap
 /;
 int function __createPairInt(int first, int second)
     int _container = JIntMap.object()
@@ -1159,7 +1198,7 @@ endFunction
     bool     @first: The first element in the pair.
     bool     @second: The second element in the pair.
 
-    returns: The pair as a container ID.
+    returns: The pair as a container ID. : JIntMap
 /;
 int function __createPairBool(bool first, bool second)
     return __createPairInt((first as int), (second as int))
@@ -1167,7 +1206,6 @@ endFunction
 
 
 ; ============================================================================
-
 ;                               Caching Functions
 ;/
     Stores the cache of every Option ID in the menu.
@@ -1240,9 +1278,6 @@ endFunction
     returns:    The option inside @cacheOptionsContainer at @optionIndex. : JIntMap
         { key: optionId, value: [index, optionName] }
 /;
-; int function __getCacheOption(int cacheOptionsContainer, int optionIndex)
-;     return JArray.getObj(cacheOptionsContainer, optionIndex)
-; endFunction
 int function __getCacheOption(int cacheOptionsContainer, int optionIndex)
     return JArray.getObj(cacheOptionsContainer, optionIndex)
 endFunction

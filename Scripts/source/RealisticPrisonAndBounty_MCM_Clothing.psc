@@ -30,7 +30,7 @@ function RenderOptions(RealisticPrisonAndBounty_MCM mcm, int index) global
 
     if (index == mcm.INDEX_THE_REACH)
         mcm.AddTextOption("", "In Cidhna Mine", mcm.OPTION_DISABLED)
-        mcm.AddOptionToggleEx("Allow Wearing Clothes",            mcm.CLOTHING_DEFAULT_ALLOW_CLOTHES, index)
+        mcm.AddOptionToggleExOverride("Allow Wearing Clothes", "Allow Wearing Clothes (Cidhna Mine)", mcm.CLOTHING_DEFAULT_ALLOW_CLOTHES)
     endif
 endFunction
 
@@ -68,6 +68,9 @@ function OnOptionHighlight(RealisticPrisonAndBounty_MCM mcm, string option) glob
 
     if (option == "Allow Wearing Clothes")
         mcm.SetInfoText("Determines if you can be undressed while imprisoned in " + hold + ".")
+
+    elseif (option == "Allow Wearing Clothes (Cidhna Mine)")
+        mcm.SetInfoText("Determines if you can be undressed while imprisoned in Cidhna Mine")
 
     elseif (option == "Re-dress when Defeated")
         mcm.SetInfoText("The minimum bounty required to be undressed in " + hold + "'s prison.")
