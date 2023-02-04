@@ -16,6 +16,10 @@ int property CACHED_OPTION_NAME     = 1 autoreadonly
 ; ==============================================================================
 
 ; ==============================================================================
+; Single Options
+int property SINGLE_OPTION_INDEX    = 0 autoreadonly
+
+; ==============================================================================
 ; MCM Option Flags
 int property OPTION_ENABLED  = 0x00 autoreadonly
 int property OPTION_DISABLED = 0x01 autoreadonly
@@ -455,7 +459,7 @@ function ToggleOption(string _key, bool storePersistently = true)
         return ; Array does not exist
     endif
 
-    int index = int_if (__isSingleOption(_array), 0, CurrentOptionIndex) ; Single options will have 0 index
+    int index = int_if (__isSingleOption(_array), SINGLE_OPTION_INDEX, CurrentOptionIndex) ; Single options will have 0 index
     int _container = JArray.getObj(_array, index) 
     Debug("ToggleOption", "[" + _key +"] " + "Container: " + _container + ", Array: " + _array, IS_DEBUG)
 
