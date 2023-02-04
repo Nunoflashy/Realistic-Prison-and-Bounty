@@ -58,35 +58,23 @@ endFunction
 
 function OnOptionHighlight(RealisticPrisonAndBounty_MCM mcm, string option) global
 
-    string[] holds = mcm.GetHoldNames()
+    string hold = mcm.CurrentHold
 
-    ; int escapeBountyPercent = mcm.GetOptionInListByOID(mcm.oid_escape_escapeBountyPercent, oid)
-    ; int escapeBountyFlat    = mcm.GetOptionInListByOID(mcm.oid_escape_escapeBountyFlat, oid)
-    ; int allowSurrender      = mcm.GetOptionInListByOID(mcm.oid_escape_allowSurrender, oid)
-    ; int friskUponCapture    = mcm.GetOptionInListByOID(mcm.oid_escape_friskUponCapture, oid)
-    ; int undressUponCapture  = mcm.GetOptionInListByOID(mcm.oid_escape_undressUponCapture, oid)
+    if (option == "Escape Bounty (% of Bounty)")
+        mcm.SetInfoText("The bounty added as a percentage of your current bounty, when escaping prison in " + hold + ".")
 
-    ; ; mcm.SetInfoText( \
-    ; ;     string_if (oid == escapeBountyPercent, "The bounty added as a percentage of your current bounty, when escaping prison in " + holds[mcm.CurrentOptionIndex] + ".", \
-    ; ;     string_if (oid == escapeBountyFlat, "The bounty added when escaping prison in " + holds[mcm.CurrentOptionIndex] + ".", \
-    ; ;     string_if (oid == allowSurrender, "Whether the guards will allow you to surrender after escaping prison in " + holds[mcm.CurrentOptionIndex] + ".", \
-    ; ;     string_if (oid == friskUponCapture, "Whether to allow a frisk upon being captured in "  + holds[mcm.CurrentOptionIndex] + ".\n" + "(Note: The frisk will only take place if the conditions are met in Frisking)", \
-    ; ;     string_if (oid == undressUponCapture, "Whether to allow being undressed upon being captured in " + holds[mcm.CurrentOptionIndex] + ".\n (Note: Undressing will only take place if the conditions are met in Undressing)", \
-    ; ;     "No description defined for this option." \
-    ; ;     ))))) \
-    ; ; )
+    elseif (option == "Escape Bounty (Flat)")
+        mcm.SetInfoText("The bounty added when escaping prison in " + hold + ".")
 
-    ; if (oid == escapeBountyPercent)
-    ;     mcm.SetInfoText("The bounty added as a percentage of your current bounty, when escaping prison in " + holds[mcm.CurrentOptionIndex] + ".")
-    ; elseif (oid == escapeBountyFlat)
-    ;     mcm.SetInfoText("The bounty added when escaping prison in " + holds[mcm.CurrentOptionIndex] + ".")
-    ; elseif (oid == allowSurrender)
-    ;     mcm.SetInfoText("Whether the guards will allow you to surrender after escaping prison in " + holds[mcm.CurrentOptionIndex] + ".")
-    ; elseif (oid == friskUponCapture)
-    ;     mcm.SetInfoText("Whether to allow a frisk upon being captured in "  + holds[mcm.CurrentOptionIndex] + ".\n" + "(Note: The frisk will only take place if the conditions are met in Frisking)")
-    ; elseif (oid == undressUponCapture)
-    ;     mcm.SetInfoText("Whether to allow being undressed upon being captured in " + holds[mcm.CurrentOptionIndex] + ".\n (Note: Undressing will only take place if the conditions are met in Undressing)")
-    ; endif
+    elseif (option == "Allow Surrendering")
+        mcm.SetInfoText("Whether the guards will allow you to surrender after escaping prison in " + hold + ".")
+
+    elseif (option == "Frisk Search upon Captured")
+        mcm.SetInfoText("Whether to allow a frisk upon being captured in "  + hold + ".\n" + "(Note: The frisk will only take place if the conditions are met in Frisking)")
+
+    elseif (option == "Undress upon Captured")
+        mcm.SetInfoText("Whether to allow being undressed upon being captured in " + hold + ".\n (Note: Undressing will only take place if the conditions are met in Undressing)")
+    endif
 
 endFunction
 

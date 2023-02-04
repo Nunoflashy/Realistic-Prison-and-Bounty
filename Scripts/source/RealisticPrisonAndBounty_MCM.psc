@@ -6,14 +6,13 @@ import RealisticPrisonAndBounty_Util
 ; Constants
 ; ==============================================================================
 
-bool property IS_DEBUG = false autoreadonly
-bool property ENABLE_TRACE = false autoreadonly
-bool property ENABLE_BENCHMARK = true autoreadonly
+bool property IS_DEBUG      = false autoreadonly
+bool property ENABLE_TRACE  = false autoreadonly
 
 ; ==============================================================================
 ; Cached Option
-int property CACHED_OPTION_INDEX  = 0 autoreadonly
-int property CACHED_OPTION_NAME = 1 autoreadonly
+int property CACHED_OPTION_INDEX    = 0 autoreadonly
+int property CACHED_OPTION_NAME     = 1 autoreadonly
 ; ==============================================================================
 
 ; ==============================================================================
@@ -116,6 +115,17 @@ int  property BOUNTY_HUNTERS_DEFAULT_MIN_BOUNTY        = 2500 autoreadonly
 int  property BOUNTY_HUNTERS_DEFAULT_MIN_BOUNTY_GROUP  = 6000 autoreadonly
 
 ; ==============================================================================
+; Holds
+int property INDEX_WHITERUN     = 0 autoreadonly
+int property INDEX_WINTERHOLD   = 1 autoreadonly
+int property INDEX_EASTMARCH    = 2 autoreadonly
+int property INDEX_FALKREATH    = 3 autoreadonly
+int property INDEX_HAAFINGAR    = 4 autoreadonly
+int property INDEX_HJAALMARCH   = 5 autoreadonly
+int property INDEX_THE_RIFT     = 6 autoreadonly
+int property INDEX_THE_REACH    = 7 autoreadonly
+int property INDEX_THE_PALE     = 8 autoreadonly
+; ==============================================================================
 ; End Constants
 ; ==============================================================================
 
@@ -127,15 +137,7 @@ GlobalVariable property PrisonTimescale auto
 
 string[] _holds
 
-int property INDEX_WHITERUN     = 0 autoreadonly
-int property INDEX_WINTERHOLD   = 1 autoreadonly
-int property INDEX_EASTMARCH    = 2 autoreadonly
-int property INDEX_FALKREATH    = 3 autoreadonly
-int property INDEX_HAAFINGAR    = 4 autoreadonly
-int property INDEX_HJAALMARCH   = 5 autoreadonly
-int property INDEX_THE_RIFT     = 6 autoreadonly
-int property INDEX_THE_REACH    = 7 autoreadonly
-int property INDEX_THE_PALE     = 8 autoreadonly
+
 
 string[] function GetHoldNames()
     if (! _holds)
@@ -196,6 +198,12 @@ int property CurrentOptionIndex
         endif
 
         return _currentOptionIndex
+    endFunction
+endProperty
+
+string property CurrentHold
+    string function get()
+        return _holds[CurrentOptionIndex]
     endFunction
 endProperty
 
@@ -366,14 +374,7 @@ endFunction
 
 
 
-event OnConfigInit()
-    ModName = "Realistic Prison and Bounty"
-    InitializePages()
 
-    __initializeOptionsMap()
-    __initializeCacheMap()
-
-endEvent
 
 
 
@@ -721,6 +722,15 @@ endFunction
 
 ; Event Handling
 ; ============================================================================
+event OnConfigInit()
+    ModName = "Realistic Prison and Bounty"
+    InitializePages()
+
+    __initializeOptionsMap()
+    __initializeCacheMap()
+
+endEvent
+
 event OnPageReset(string page)
     RealisticPrisonAndBounty_MCM_General.Render(self)
     RealisticPrisonAndBounty_MCM_Arrest.Render(self)

@@ -31,11 +31,6 @@ function RenderOptions(RealisticPrisonAndBounty_MCM mcm, int index) global
     mcm.AddOptionSliderEx("Forced Undressing (Bounty)",       mcm.UNDRESSING_DEFAULT_FORCED_MIN_BOUNTY, index)
     mcm.AddOptionToggleEx("Forced Undressing when Defeated",  mcm.UNDRESSING_DEFAULT_FORCED_WHEN_DEFEATED, index)
     mcm.AddOptionSliderEx("Strip Search Thoroughness",        mcm.UNDRESSING_DEFAULT_STRIP_THOROUGHNESS, index)
-    ; mcm.AddOptionToggleEx("Allow Wearing Clothes",            mcm.UNDRESSING_DEFAULT_ALLOW_CLOTHES, index)
-    ; mcm.AddOptionSliderEx("Bounty to Re-dress",               mcm.UNDRESSING_DEFAULT_REDRESS_BOUNTY, index)
-    ; mcm.AddOptionToggleEx("Re-dress when Defeated",           mcm.UNDRESSING_DEFAULT_REDRESS_WHEN_DEFEATED, index)
-    ; mcm.AddOptionToggleEx("Re-dress at Cell",                 mcm.UNDRESSING_DEFAULT_REDRESS_AT_CELL, index)
-    ; mcm.AddOptionToggleEx("Re-dress at Chest",                mcm.UNDRESSING_DEFAULT_REDRESS_AT_CHEST, index)
 endFunction
 
 function Left(RealisticPrisonAndBounty_MCM mcm) global
@@ -67,9 +62,7 @@ endFunction
 
 function OnOptionHighlight(RealisticPrisonAndBounty_MCM mcm, string option) global
 
-    string[] holds = mcm.GetHoldNames()
-
-    string hold = holds[mcm.CurrentOptionIndex]
+    string hold = mcm.CurrentHold
 
     if (option == "Allow Undressing")
         mcm.SetInfoText("Determines if you can be undressed while imprisoned in " + hold + ".")

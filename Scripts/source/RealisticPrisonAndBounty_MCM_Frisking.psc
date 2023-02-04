@@ -80,61 +80,36 @@ endFunction
 ; =====================================================
 
 function OnOptionHighlight(RealisticPrisonAndBounty_MCM mcm, string option) global
-    string[] holds = mcm.GetHoldNames()
-    string hold = holds[mcm.CurrentOptionIndex]
+    string hold = mcm.CurrentHold
 
-    ; float startTime = Utility.GetCurrentRealTime()
+    if (option == "Allow Frisk Search")
+        mcm.SetInfoText("Determines if you can be frisk searched in " + hold + ".")
 
-    ; int allowFrisking               = mcm.GetOptionInListByOID(mcm.oid_frisking_allow, oid)
-    ; int minimumBounty               = mcm.GetOptionInListByOID(mcm.oid_frisking_minimumBounty, highlightedOption)
-    ; int guaranteedPayableBounty     = mcm.GetOptionInListByOID(mcm.oid_frisking_guaranteedPayableBounty, highlightedOption)
-    ; int maximumPayableBounty        = mcm.GetOptionInListByOID(mcm.oid_frisking_maximumPayableBounty, highlightedOption)
-    ; int maximumPayableBountyChance  = mcm.GetOptionInListByOID(mcm.oid_frisking_maximumPayableBountyChance, highlightedOption)
-    ; int friskSearchThoroughness     = mcm.GetOptionInListByOID(mcm.oid_frisking_friskSearchThoroughness, highlightedOption)     
-    ; int confiscateStolenItems       = mcm.GetOptionInListByOID(mcm.oid_frisking_confiscateStolenItems, highlightedOption)
-    ; int stripSearchStolenItems      = mcm.GetOptionInListByOID(mcm.oid_frisking_stripSearchStolenItems, highlightedOption)  
-    ; int stripSearchStolenItemsNumber= mcm.GetOptionInListByOID(mcm.oid_frisking_stripSearchStolenItemsNumber, highlightedOption)
+    elseif (option == "Minimum Bounty for Frisking")
+        mcm.SetInfoText("The minimum bounty required to be frisk searched in " + hold + ".")
 
+    elseif (option == "Guaranteed Payable Bounty")
+        mcm.SetInfoText("The guaranteed amount of bounty that is payable during frisking before considering imprisonment in " + hold + ".")
 
-    ; ; mcm.SetInfoText( \
-    ; ;     string_if (oid == allowFrisking, "Determines if you can be frisk searched in " + holds[mcm.CurrentOptionIndex] + ".", \
-    ; ;     string_if (oid == minimumBounty, "The minimum bounty required to be frisk searched in " + holds[mcm.CurrentOptionIndex] + ".", \
-    ; ;     string_if (oid == guaranteedPayableBounty, "The guaranteed amount of bounty that is payable during frisking before considering imprisonment in " + holds[mcm.CurrentOptionIndex] + ".", \
-    ; ;     string_if (oid == maximumPayableBounty, "The maximum amount of bounty that is payable during frisking before considering imprisonment in "  + holds[mcm.CurrentOptionIndex] + ".\n" + "If the bounty exceeds the guaranteed but is within the maximum, there's a chance not to go to prison.", \
-    ; ;     string_if (oid == maximumPayableBountyChance, "The chance of being able to pay the bounty if it exceeds the guaranteed amount but is within the maximum limit.", \
-    ; ;     string_if (oid == friskSearchThoroughness, "The thoroughness of the frisk search, higher values mean a more thorough search and possibly less items kept.", \
-    ; ;     string_if (oid == confiscateStolenItems, "Whether to confiscate any stolen items found during the frisking.", \
-    ; ;     string_if (oid == stripSearchStolenItems, "Whether to have the player undressed if stolen items are found.", \
-    ; ;     string_if (oid == stripSearchStolenItemsNumber, "The minimum number of stolen items required to have the player undressed.", \
-    ; ;     "No description defined for this option." \
-    ; ;     ))))))))) \
-    ; ; )
+    elseif (option == "Maximum Payable Bounty")
+        mcm.SetInfoText("The maximum amount of bounty that is payable during frisking before considering imprisonment in "  + hold + ".\n" + "If the bounty exceeds the guaranteed but is within the maximum, there's a chance not to go to prison.")
 
-    ; if (oid == allowFrisking)
-    ;     mcm.SetInfoText("Determines if you can be frisk searched in " + holds[mcm.CurrentOptionIndex] + ".")
-    ; elseif (oid == minimumBounty)
-    ;     mcm.SetInfoText("The minimum bounty required to be frisk searched in " + holds[mcm.CurrentOptionIndex] + ".")
-    ; elseif (oid == guaranteedPayableBounty)
-    ;     mcm.SetInfoText("The guaranteed amount of bounty that is payable during frisking before considering imprisonment in " + holds[mcm.CurrentOptionIndex] + ".")
-    ; elseif (oid == maximumPayableBounty)
-    ;     mcm.SetInfoText("The maximum amount of bounty that is payable during frisking before considering imprisonment in "  + holds[mcm.CurrentOptionIndex] + ".\n" + "If the bounty exceeds the guaranteed but is within the maximum, there's a chance not to go to prison.")
-    ; elseif (oid == maximumPayableBountyChance)
-    ;     mcm.SetInfoText("The chance of being able to pay the bounty if it exceeds the guaranteed amount but is within the maximum limit.")
-    ; elseif (oid == friskSearchThoroughness)
-    ;     mcm.SetInfoText("The thoroughness of the frisk search, higher values mean a more thorough search and possibly less items kept.")
-    ; elseif (oid == confiscateStolenItems)
-    ;     mcm.SetInfoText("Whether to confiscate any stolen items found during the frisking.")
-    ; elseif (oid == stripSearchStolenItems)
-    ;     mcm.SetInfoText("Whether to have the player undressed if stolen items are found.")
-    ; elseif (oid == stripSearchStolenItemsNumber)
-    ;     mcm.SetInfoText("The minimum number of stolen items required to have the player undressed.")
-    ; endif
+    elseif (option == "Maximum Payable Bounty (Chance)")
+        mcm.SetInfoText("The chance of being able to pay the bounty if it exceeds the guaranteed amount but is within the maximum limit.")
 
-    ; Log(mcm, "Frisking::OnOptionHighlight", "Option = " + oid)
+    elseif (option == "Frisk Search Thoroughness")
+        mcm.SetInfoText("The thoroughness of the frisk search, higher values mean a more thorough search and possibly less items kept.")
 
-    ; float endTime = Utility.GetCurrentRealTime()
-    ; float elapsedTime = endTime - startTime
-    ; Log(mcm, "Frisking::OnHighlight", "execution took " + elapsedTime + " seconds.")
+    elseif (option == "Confiscate Stolen Items")
+        mcm.SetInfoText("Whether to confiscate any stolen items found during the frisking.")
+
+    elseif (option == "Strip Search if Stolen Items Found")
+        mcm.SetInfoText("Whether to have the player undressed if stolen items are found.")
+
+    elseif (option == "Minimum No. of Stolen Items Required")
+        mcm.SetInfoText("The minimum number of stolen items required to have the player undressed.")
+    endif
+
 endFunction
 
 function OnOptionDefault(RealisticPrisonAndBounty_MCM mcm, string option) global

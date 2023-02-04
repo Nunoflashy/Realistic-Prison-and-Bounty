@@ -22,17 +22,16 @@ function Render(RealisticPrisonAndBounty_MCM mcm) global
 endFunction
 
 function RenderOptions(RealisticPrisonAndBounty_MCM mcm, int index) global
+    mcm.AddOptionToggleEx("Allow Wearing Clothes",            mcm.CLOTHING_DEFAULT_ALLOW_CLOTHES, index)
     mcm.AddOptionToggleEx("Re-dress when Defeated",           mcm.CLOTHING_DEFAULT_REDRESS_WHEN_DEFEATED, index)
     mcm.AddOptionSliderEx("Bounty to Re-dress",               mcm.CLOTHING_DEFAULT_REDRESS_BOUNTY, index)
-
-    if (index == mcm.INDEX_THE_PALE)
-        mcm.AddTextOption("", "In Cidhna Mine", mcm.OPTION_DISABLED)
-        mcm.AddOptionToggleEx("Allow Wearing Clothes",            mcm.CLOTHING_DEFAULT_ALLOW_CLOTHES, index)
-        mcm.AddTextOption("", "In Prison")
-    endif
-    mcm.AddOptionToggleEx("Allow Wearing Clothes",            mcm.CLOTHING_DEFAULT_ALLOW_CLOTHES, index)
     mcm.AddOptionToggleEx("Re-dress at Cell",                 mcm.CLOTHING_DEFAULT_REDRESS_AT_CELL, index)
     mcm.AddOptionToggleEx("Re-dress at Chest",                mcm.CLOTHING_DEFAULT_REDRESS_AT_CHEST, index)
+
+    if (index == mcm.INDEX_THE_REACH)
+        mcm.AddTextOption("", "In Cidhna Mine", mcm.OPTION_DISABLED)
+        mcm.AddOptionToggleEx("Allow Wearing Clothes",            mcm.CLOTHING_DEFAULT_ALLOW_CLOTHES, index)
+    endif
 endFunction
 
 
@@ -65,7 +64,23 @@ endFunction
 
 function OnOptionHighlight(RealisticPrisonAndBounty_MCM mcm, string option) global
 
+    string hold = mcm.CurrentHold
 
+    if (option == "Allow Wearing Clothes")
+        mcm.SetInfoText("Determines if you can be undressed while imprisoned in " + hold + ".")
+
+    elseif (option == "Re-dress when Defeated")
+        mcm.SetInfoText("The minimum bounty required to be undressed in " + hold + "'s prison.")
+
+    elseif (option == "Bounty to Re-dress")
+        mcm.SetInfoText("Whether to have you undressed when defeated and imprisoned in " + hold + ".")
+
+    elseif (option == "Re-dress at Cell")
+        mcm.SetInfoText("Whether to be undressed at the cell in " + hold + "'s prison.")
+
+    elseif (option == "Re-dress at Chest")
+        mcm.SetInfoText("Whether to be undressed at the chest in "  + hold + "'s prison.")
+    endif
 endFunction
 
 function OnOptionDefault(RealisticPrisonAndBounty_MCM mcm, string option) global

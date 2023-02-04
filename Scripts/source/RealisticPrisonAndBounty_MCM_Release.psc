@@ -57,27 +57,18 @@ endFunction
 ; =====================================================
 
 function OnOptionHighlight(RealisticPrisonAndBounty_MCM mcm, string option) global
+    string hold = mcm.CurrentHold
 
-    string[] holds = mcm.GetHoldNames()
+    if (option == "Give items back on Release")
+        mcm.SetInfoText("Determines whether the items should be given back on release, if undressed while in " + hold + "'s prison'.")
 
-    ; int giveItemsBackOnRelease          = mcm.GetOptionInListByID(mcm.oid_release_giveItemsBackOnRelease, oid)
-    ; int giveItemsBackOnReleaseMaxBounty = mcm.GetOptionInListByID(mcm.oid_release_giveItemsBackOnRelease, oid)
-    ; int redressOnRelease                = mcm.GetOptionInListByID(mcm.oid_release_giveItemsBackOnRelease, oid)
+    elseif (option == "Give items back on Release (Bounty)")
+        mcm.SetInfoText("The maximum bounty in order to have the items given back when released from " + hold + "'s prison'.")
 
-    ; ; mcm.SetInfoText( \
-    ; ;     string_if (oid == giveItemsBackOnRelease, "Determines whether the items should be given back on release, if undressed while in " + holds[mcm.CurrentOptionIndex] + "'s prison'.", \
-    ; ;     string_if (oid == giveItemsBackOnReleaseMaxBounty, "The maximum bounty in order to have the items given back when released from " + holds[mcm.CurrentOptionIndex] + "'s prison'.", \
-    ; ;     string_if (oid == redressOnRelease, "Determines whether you should be re-dressed on release, if undressed while in " + holds[mcm.CurrentOptionIndex] + "'s prison'.", \
-    ; ;     "No description defined for this option." \
-    ; ; ))) \
+    elseif (option == "Re-dress on Release")
+        mcm.SetInfoText("Determines whether you should be re-dressed on release, if undressed while in " + hold + "'s prison'.")
 
-    ; if (oid == giveItemsBackOnRelease)
-    ;     mcm.SetInfoText("Determines whether the items should be given back on release, if undressed while in " + holds[mcm.CurrentOptionIndex] + "'s prison'.")
-    ; elseif (oid == giveItemsBackOnReleaseMaxBounty)
-    ;     mcm.SetInfoText("The maximum bounty in order to have the items given back when released from " + holds[mcm.CurrentOptionIndex] + "'s prison'.")
-    ; elseif (oid == redressOnRelease)
-    ;     mcm.SetInfoText("Determines whether you should be re-dressed on release, if undressed while in " + holds[mcm.CurrentOptionIndex] + "'s prison'.")
-    ; endif
+    endif
 
 endFunction
 

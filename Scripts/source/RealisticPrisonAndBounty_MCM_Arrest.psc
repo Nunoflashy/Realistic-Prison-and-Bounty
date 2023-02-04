@@ -67,47 +67,47 @@ endFunction
 ; =====================================================
 
 function OnOptionHighlight(RealisticPrisonAndBounty_MCM mcm, string option) global
-    string[] holds = mcm.GetHoldNames()
+    string hold = mcm.CurrentHold
 
-    ; if (oid == mcm.GetOption("arrest::minimumBountyToArrest")) 
-    ;     mcm.SetInfoText("The minimum bounty required in order to be arrested in " + holds[mcm.CurrentOptionIndex] + ".")
+    if (option == "Minimum Bounty to Arrest") 
+        mcm.SetInfoText("The minimum bounty required in order to be arrested in " + hold + ".")
 
-    ; elseif (oid == mcm.GetOption("arrest::guaranteedPayableBounty"))
-    ;         mcm.SetInfoText("The guaranteed amount of bounty that a guard will accept as payment before arresting you in " + holds[mcm.CurrentOptionIndex] + ".")
+    elseif (option == "Guaranteed Payable Bounty")
+            mcm.SetInfoText("The guaranteed amount of bounty that a guard will accept as payment before arresting you in " + hold + ".")
 
-    ; elseif (oid == mcm.GetOption("arrest::maximumPayableBounty"))
-    ;         mcm.SetInfoText("The maximum amount of bounty that is payable before arresting you in " + holds[mcm.CurrentOptionIndex] + ".")
+    elseif (option == "Maximum Payable Bounty")
+            mcm.SetInfoText("The maximum amount of bounty that is payable before arresting you in " + hold + ".")
 
-    ; elseif (oid == mcm.GetOption("arrest::additionalBountyWhenResisting(%ofBounty)"))
-    ;         mcm.SetInfoText("The bounty that will be added as a percentage of your current bounty, when resisting arrest in "  + holds[mcm.CurrentOptionIndex] + ".\n" + "If the bounty exceeds the guaranteed but is within the maximum, there's a chance not to go to prison.")
+    elseif (option == "Additional Bounty when Resisting (% of Bounty)")
+            mcm.SetInfoText("The bounty that will be added as a percentage of your current bounty, when resisting arrest in "  + hold + ".\n" + "If the bounty exceeds the guaranteed but is within the maximum, there's a chance not to go to prison.")
 
-    ; elseif (oid == mcm.GetOption("arrest::additionalBountyWhenResisting(flat)"))
-    ;         mcm.SetInfoText("The bounty that will be added when resisting arrest in " + holds[mcm.CurrentOptionIndex] + ".")
+    elseif (option == "Additional Bounty when Resisting (Flat)")
+            mcm.SetInfoText("The bounty that will be added when resisting arrest in " + hold + ".")
 
-    ; elseif (oid == mcm.GetOption("arrest::additionalBountyWhenDefeated(%ofBounty)"))
-    ;         mcm.SetInfoText("The bounty that will be added as a percentage of your current bounty, when defeated and arrested in " + holds[mcm.CurrentOptionIndex] + ".")
+    elseif (option == "Additional Bounty when Defeated (% of Bounty)")
+            mcm.SetInfoText("The bounty that will be added as a percentage of your current bounty, when defeated and arrested in " + hold + ".")
 
-    ; elseif (oid == mcm.GetOption("arrest::additionalBountyWhenDefeated(flat)"))
-    ;         mcm.SetInfoText("The bounty that will be added when defeated and arrested in " + holds[mcm.CurrentOptionIndex])
+    elseif (option == "Additional Bounty when Defeated (Flat)")
+            mcm.SetInfoText("The bounty that will be added when defeated and arrested in " + hold)
 
-    ; elseif (oid == mcm.GetOption("arrest::allowCivilianCapture"))
-    ;         mcm.SetInfoText("Whether to allow civilians to bring you to a guard, to be arrested in " + holds[mcm.CurrentOptionIndex])
+    elseif (option == "Allow Civilian Capture")
+            mcm.SetInfoText("Whether to allow civilians to bring you to a guard, to be arrested in " + hold)
 
-    ; elseif (oid == mcm.GetOption("arrest::allowArrestTransfer"))
-    ;         mcm.SetInfoText("Whether to allow a guard to take over the arrest if the current one dies.")
+    elseif (option == "Allow Arrest Transfer")
+            mcm.SetInfoText("Whether to allow a guard to take over the arrest if the current one dies.")
 
-    ; elseif (oid == mcm.GetOption("arrest::allowUnconsciousArrest"))
-    ;         mcm.SetInfoText("Whether to allow an unconscious arrest after being defeated (You will wake up in prison).")
+    elseif (option == "Allow Unconscious Arrest")
+            mcm.SetInfoText("Whether to allow an unconscious arrest after being defeated (You will wake up in prison).")
 
-    ; elseif (oid == mcm.GetOption("arrest::unequipHandGarments(minimumBounty)"))
-    ;         mcm.SetInfoText("Whether to unequip any hand garment when arrested.\n-1 - Disable\n0 - Always unequip.\n Any other value is the bounty required")
+    elseif (option == "Unequip Hand Garments (Minimum Bounty)")
+            mcm.SetInfoText("Whether to unequip any hand garment when arrested.\n-1 - Disable\n0 - Always unequip.\n Any other value is the bounty required")
 
-    ; elseif (oid == mcm.GetOption("arrest::unequipHeadGarments(minimumBounty)"))
-    ;         mcm.SetInfoText("Whether to unequip any head garment when arrested.\n-1 - Disable\n0 - Always unequip.\n Any other value is the bounty required")
+    elseif (option == "Unequip Head Garments (Minimum Bounty)")
+            mcm.SetInfoText("Whether to unequip any head garment when arrested.\n-1 - Disable\n0 - Always unequip.\n Any other value is the bounty required")
 
-    ; elseif (oid == mcm.GetOption("arrest::unequipFootGarments(minimumBounty)"))
-    ;         mcm.SetInfoText("Whether to unequip any foot garment when arrested.\n-1 - Disable\n0 - Always unequip.\n Any other value is the bounty required")
-    ; endif
+    elseif (option == "Unequip Foot Garments (Minimum Bounty)")
+            mcm.SetInfoText("Whether to unequip any foot garment when arrested.\n-1 - Disable\n0 - Always unequip.\n Any other value is the bounty required")
+    endif
 
 
 endFunction

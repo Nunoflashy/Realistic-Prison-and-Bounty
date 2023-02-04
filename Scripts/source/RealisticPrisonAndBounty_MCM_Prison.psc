@@ -71,65 +71,45 @@ endFunction
 ; =====================================================
 
 function OnOptionHighlight(RealisticPrisonAndBounty_MCM mcm, string option) global
+    string hold = mcm.CurrentHold
 
-    string[] holds = mcm.GetHoldNames()
-    string hold = holds[mcm.CurrentOptionIndex]
+    if (option == "Timescale in Prison")
+        mcm.SetInfoText("Sets the timescale while imprisoned.")
 
-    ; int prisonTimescale                 = mcm.oid_prison_prisonTimeScale 
-    ; int bountyToDays                    = mcm.GetOptionInListByOID(mcm.oid_prison_bountyToDays, oid)
-    ; int minimumSentenceDays             = mcm.GetOptionInListByOID(mcm.oid_prison_minimumSentenceDays, oid)
-    ; int maximumSentenceDays             = mcm.GetOptionInListByOID(mcm.oid_prison_maximumSentenceDays, oid)
-    ; int allowUnconditionalImprisonment  = mcm.GetOptionInListByOID(mcm.oid_prison_allowBountylessImprisonment, oid)
-    ; int sentencePaysBounty              = mcm.GetOptionInListByOID(mcm.oid_prison_sentencePaysBounty, oid)
-    ; int fastForward                     = mcm.GetOptionInListByOID(mcm.oid_prison_fastForward, oid)
-    ; int dayToFastForwardFrom            = mcm.GetOptionInListByOID(mcm.oid_prison_dayToFastForwardFrom, oid)
-    ; int handsBoundInPrison              = mcm.GetOptionInListByOID(mcm.oid_prison_handsBoundInPrison, oid)
-    ; int handsBoundMinimumBounty         = mcm.GetOptionInListByOID(mcm.oid_prison_handsBoundMinimumBounty, oid)
-    ; int handsBoundRandomize             = mcm.GetOptionInListByOID(mcm.oid_prison_handsBoundRandomize, oid)
-    ; int cellLockLevel                   = mcm.GetOptionInListByOID(mcm.oid_prison_cellLockLevel, oid)
+    elseif (option == "Bounty to Days")
+        mcm.SetInfoText("Sets the relation between bounty and days in " + hold + "'s prison.")
 
-    ; ; mcm.SetInfoText( \
-    ; ;     string_if (oid == prisonTimescale, "Sets the timescale while imprisoned.", \
-    ; ;     string_if (oid == bountyToDays, "Sets the relation between bounty and days in " + hold + "'s prison.", \
-    ; ;     string_if (oid == minimumSentenceDays, "Determines the minimum sentence in days for " + hold + "'s prison.", \
-    ; ;     string_if (oid == maximumSentenceDays, "Determines the maximum sentence in days for " + hold + "'s prison.", \
-    ; ;     string_if (oid == allowUnconditionalImprisonment, "Whether to allow unconditional imprisonment without a bounty in " + hold + "'s prison.", \
-    ; ;     string_if (oid == sentencePaysBounty, "Determines if serving the sentence pays the bounty in "  + hold + ".\nIf disabled, the bounty must be paid after serving the sentence.", \
-    ; ;     string_if (oid == fastForward, "Whether to fast forward to the release in " + hold + ".", \
-    ; ;     string_if (oid == dayToFastForwardFrom, "The day to fast forward from to release in " + hold + ".", \
-    ; ;     string_if (oid == handsBoundInPrison, "Whether to have hands restrained during imprisonment in " + hold + ".", \
-    ; ;     string_if (oid == handsBoundMinimumBounty, "The minimum bounty required to have hands restrained during imprisonment in " + hold + ".", \
-    ; ;     string_if (oid == handsBoundRandomize, "Randomize whether to be restrained or not, while in prison in " + hold + ".", \
-    ; ;     string_if (oid == cellLockLevel, "Determines the cell's door lock level", \
-    ; ;     "No description defined for this option." \
-    ; ;     )))))))))))) \
-    ; ; )
+    elseif (option == "Minimum Sentence (Days)")
+        mcm.SetInfoText("Determines the minimum sentence in days for " + hold + "'s prison.")
 
-    ; if (oid == prisonTimescale)
-    ;     mcm.SetInfoText("Sets the timescale while imprisoned.")
-    ; elseif (oid == bountyToDays)
-    ;     mcm.SetInfoText("Sets the relation between bounty and days in " + hold + "'s prison.")
-    ; elseif (oid == minimumSentenceDays)
-    ;     mcm.SetInfoText("Determines the minimum sentence in days for " + hold + "'s prison.")
-    ; elseif (oid == maximumSentenceDays)
-    ;     mcm.SetInfoText("Determines the maximum sentence in days for " + hold + "'s prison.")
-    ; elseif (oid == allowUnconditionalImprisonment)
-    ;     mcm.SetInfoText("Whether to allow unconditional imprisonment without a bounty in " + hold + "'s prison.")
-    ; elseif (oid == sentencePaysBounty)
-    ;     mcm.SetInfoText("Determines if serving the sentence pays the bounty in "  + hold + ".\nIf disabled, the bounty must be paid after serving the sentence.")
-    ; elseif (oid == fastForward)
-    ;     mcm.SetInfoText("Whether to fast forward to the release in " + hold + ".")
-    ; elseif (oid == dayToFastForwardFrom)
-    ;     mcm.SetInfoText("The day to fast forward from to release in " + hold + ".")
-    ; elseif (oid == handsBoundInPrison)
-    ;     mcm.SetInfoText("Whether to have hands restrained during imprisonment in " + hold + ".")
-    ; elseif (oid == handsBoundMinimumBounty)
-    ;     mcm.SetInfoText("The minimum bounty required to have hands restrained during imprisonment in " + hold + ".")
-    ; elseif (oid == handsBoundRandomize) 
-    ;     mcm.SetInfoText("Randomize whether to be restrained or not, while in prison in " + hold + ".")
-    ; elseif (oid == cellLockLevel)
-    ;     mcm.SetInfoText("Determines the cell's door lock level")
-    ; endif
+    elseif (option == "Maximum Sentence (Days)")
+        mcm.SetInfoText("Determines the maximum sentence in days for " + hold + "'s prison.")
+
+    elseif (option == "Allow Bountyless Imprisonment")
+        mcm.SetInfoText("Whether to allow unconditional imprisonment without a bounty in " + hold + "'s prison.")
+
+    elseif (option == "Sentence pays Bounty")
+        mcm.SetInfoText("Determines if serving the sentence pays the bounty in "  + hold + ".\nIf disabled, the bounty must be paid after serving the sentence.")
+
+    elseif (option == "Fast Forward")
+        mcm.SetInfoText("Whether to fast forward to the release in " + hold + ".")
+
+    elseif (option == "Day to fast forward from")
+        mcm.SetInfoText("The day to fast forward from to release in " + hold + ".")
+
+    elseif (option == "Hands Bound in Prison")
+        mcm.SetInfoText("Whether to have hands restrained during imprisonment in " + hold + ".")
+
+    elseif (option == "Hands Bound (Minimum Bounty)")
+        mcm.SetInfoText("The minimum bounty required to have hands restrained during imprisonment in " + hold + ".")
+
+    elseif (option == "Hands Bound (Randomize)") 
+        mcm.SetInfoText("Randomize whether to be restrained or not, while in prison in " + hold + ".")
+
+    elseif (option == "Cell Lock Level")
+        mcm.SetInfoText("Determines the cell's door lock level")
+
+    endif
 
 endFunction
 

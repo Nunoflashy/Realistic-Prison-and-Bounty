@@ -51,7 +51,48 @@ endFunction
 ; =====================================================
 
 function OnOptionHighlight(RealisticPrisonAndBounty_MCM mcm, string option) global
+    ; string hold = mcm.CurrentHold
 
+    ; if (option == "Allow Undressing")
+    ;     mcm.SetInfoText("Determines if you can be undressed while imprisoned in " + hold + ".")
+
+    ; elseif (option == "Minimum Bounty to Undress")
+    ;     mcm.SetInfoText("The minimum bounty required to be undressed in " + hold + "'s prison.")
+
+    ; elseif (option == "Undress when Defeated")
+    ;     mcm.SetInfoText("Whether to have you undressed when defeated and imprisoned in " + hold + ".")
+
+    ; elseif (option == "Undress at Cell")
+    ;     mcm.SetInfoText("Whether to be undressed at the cell in " + hold + "'s prison.")
+
+    ; elseif (option == "Undress at Chest")
+    ;     mcm.SetInfoText("Whether to be undressed at the chest in "  + hold + "'s prison.")
+
+    ; elseif (option == "Forced Undressing (Bounty)")
+    ;     mcm.SetInfoText("The minimum bounty required to be force undressed (You will have no possibility of action)")
+
+    ; elseif (option == "Forced Undressing when Defeated")
+    ;     mcm.SetInfoText("Whether to be force undressed when defeated and imprisoned in " + hold + ".")
+
+    ; elseif (option == "Strip Search Thoroughness")
+    ;     mcm.SetInfoText("The thoroughness of the strip search when undressed, higher values mean a more thorough search and therefore possibly less items kept.\n" + \
+    ;                  "Due to the nature of a strip search, most items will be removed, this value will only determine small objects that could be hidden when stripped bare.")
+
+    ; elseif (option == "undressing::allowWearingClothes")
+    ;     mcm.SetInfoText("Whether to allow wearing clothes while imprisoned in " + hold + ".")
+
+    ; elseif (option == "undressing::bountyToRe-dress")
+    ;     mcm.SetInfoText("The maximum bounty you can have in order to be re-dressed while imprisoned in " + hold + ".")
+
+    ; elseif (option == "undressing::Re-dressWhenDefeated")
+    ;     mcm.SetInfoText("Whether to have you re-dressed when defeated (Note: If the bounty exceeds the maximum, this option will have no effect.)")
+
+    ; elseif (option == "undressing::Re-dressAtCell")
+    ;     mcm.SetInfoText("Whether to be re-dressed at the cell in " + hold + "'prison.")
+
+    ; elseif (option == "undressing::Re-dressAtChest")
+    ;     mcm.SetInfoText("Whether to be re-dressed at the chest in " + hold + "'prison.")
+    ; endif
 endFunction
 
 function OnOptionDefault(RealisticPrisonAndBounty_MCM mcm, string option) global
