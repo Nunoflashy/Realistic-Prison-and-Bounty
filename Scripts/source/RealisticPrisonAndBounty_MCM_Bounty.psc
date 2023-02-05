@@ -30,10 +30,10 @@ function RenderOptions(RealisticPrisonAndBounty_MCM mcm, int index) global
     mcm.AddEmptyOption()
 
     mcm.AddTextOption("", "Bounty Decay", mcm.OPTION_FLAG_DISABLED)
-    mcm.AddOptionToggleEx("Enable Bounty Decay",        mcm.ARREST_DEFAULT_ALLOW_CIVILIAN_CAPTURE, index)
-    mcm.AddOptionToggleEx("Decay while Imprisoned",  mcm.ARREST_DEFAULT_ALLOW_ARREST_TRANSFER, index)
-    mcm.AddOptionSliderEx("Bounty Lost (% of Bounty)",               mcm.ARREST_DEFAULT_BOUNTY_WHEN_DEFEATED_FLAT, index)
-    mcm.AddOptionSliderEx("Bounty Lost (Flat)",               mcm.ARREST_DEFAULT_BOUNTY_WHEN_DEFEATED_FLAT, index)
+    mcm.AddOptionToggle("Enable Bounty Decay",        mcm.ARREST_DEFAULT_ALLOW_CIVILIAN_CAPTURE, index)
+    mcm.AddOptionToggle("Decay while Imprisoned",  mcm.ARREST_DEFAULT_ALLOW_ARREST_TRANSFER, index)
+    mcm.AddOptionSlider("Bounty Lost (% of Bounty)",               mcm.ARREST_DEFAULT_BOUNTY_WHEN_DEFEATED_FLAT, index)
+    mcm.AddOptionSlider("Bounty Lost (Flat)",               mcm.ARREST_DEFAULT_BOUNTY_WHEN_DEFEATED_FLAT, index)
     
 endFunction
 

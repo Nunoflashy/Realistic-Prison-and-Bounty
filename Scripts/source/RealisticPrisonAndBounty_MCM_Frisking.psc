@@ -23,15 +23,15 @@ function Render(RealisticPrisonAndBounty_MCM mcm) global
 endFunction
 
 function RenderOptions(RealisticPrisonAndBounty_MCM mcm, int index) global
-    mcm.AddOptionToggleEx("Allow Frisk Search",                     mcm.FRISKING_DEFAULT_ALLOW, index)
-    mcm.AddOptionSliderEx("Minimum Bounty for Frisking",            mcm.FRISKING_DEFAULT_MIN_BOUNTY, index)
-    mcm.AddOptionSliderEx("Guaranteed Payable Bounty",              mcm.FRISKING_DEFAULT_GUARANTEED_PAYABLE_BOUNTY, index)
-    mcm.AddOptionSliderEx("Maximum Payable Bounty",                 mcm.FRISKING_DEFAULT_MAXIMUM_PAYABLE_BOUNTY, index)
-    mcm.AddOptionSliderEx("Maximum Payable Bounty (Chance)",        mcm.FRISKING_DEFAULT_MAXIMUM_PAYABLE_BOUNTY_CHANCE, index)
-    mcm.AddOptionSliderEx("Frisk Search Thoroughness",              mcm.FRISKING_DEFAULT_FRISK_THOROUGHNESS, index)
-    mcm.AddOptionToggleEx("Confiscate Stolen Items",                mcm.FRISKING_DEFAULT_CONFISCATE_ITEMS, index)
-    mcm.AddOptionToggleEx("Strip Search if Stolen Items Found",     mcm.FRISKING_DEFAULT_STRIP_IF_STOLEN_FOUND, index)
-    mcm.AddOptionSliderEx("Minimum No. of Stolen Items Required",   mcm.FRISKING_DEFAULT_NUMBER_STOLEN_ITEMS_REQUIRED, index)
+    mcm.AddOptionToggle("Allow Frisk Search",                     mcm.FRISKING_DEFAULT_ALLOW, index)
+    mcm.AddOptionSlider("Minimum Bounty for Frisking",            mcm.FRISKING_DEFAULT_MIN_BOUNTY, index)
+    mcm.AddOptionSlider("Guaranteed Payable Bounty",              mcm.FRISKING_DEFAULT_GUARANTEED_PAYABLE_BOUNTY, index)
+    mcm.AddOptionSlider("Maximum Payable Bounty",                 mcm.FRISKING_DEFAULT_MAXIMUM_PAYABLE_BOUNTY, index)
+    mcm.AddOptionSlider("Maximum Payable Bounty (Chance)",        mcm.FRISKING_DEFAULT_MAXIMUM_PAYABLE_BOUNTY_CHANCE, index)
+    mcm.AddOptionSlider("Frisk Search Thoroughness",              mcm.FRISKING_DEFAULT_FRISK_THOROUGHNESS, index)
+    mcm.AddOptionToggle("Confiscate Stolen Items",                mcm.FRISKING_DEFAULT_CONFISCATE_ITEMS, index)
+    mcm.AddOptionToggle("Strip Search if Stolen Items Found",     mcm.FRISKING_DEFAULT_STRIP_IF_STOLEN_FOUND, index)
+    mcm.AddOptionSlider("Minimum No. of Stolen Items Required",   mcm.FRISKING_DEFAULT_NUMBER_STOLEN_ITEMS_REQUIRED, index)
 
 
     ; mcm.SetOptionDependencyBoolSingle( \

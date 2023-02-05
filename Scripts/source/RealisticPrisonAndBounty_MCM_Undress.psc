@@ -23,14 +23,14 @@ function Render(RealisticPrisonAndBounty_MCM mcm) global
 endFunction
 
 function RenderOptions(RealisticPrisonAndBounty_MCM mcm, int index) global
-    mcm.AddOptionToggleEx("Allow Undressing",                 mcm.UNDRESSING_DEFAULT_ALLOW, index)
-    mcm.AddOptionSliderEx("Minimum Bounty to Undress",        mcm.UNDRESSING_DEFAULT_MIN_BOUNTY, index)
-    mcm.AddOptionToggleEx("Undress when Defeated",            mcm.UNDRESSING_DEFAULT_WHEN_DEFEATED, index)
-    mcm.AddOptionToggleEx("Undress at Cell",                  mcm.UNDRESSING_DEFAULT_AT_CELL, index)
-    mcm.AddOptionToggleEx("Undress at Chest",                 mcm.UNDRESSING_DEFAULT_AT_CHEST, index)
-    mcm.AddOptionSliderEx("Forced Undressing (Bounty)",       mcm.UNDRESSING_DEFAULT_FORCED_MIN_BOUNTY, index)
-    mcm.AddOptionToggleEx("Forced Undressing when Defeated",  mcm.UNDRESSING_DEFAULT_FORCED_WHEN_DEFEATED, index)
-    mcm.AddOptionSliderEx("Strip Search Thoroughness",        mcm.UNDRESSING_DEFAULT_STRIP_THOROUGHNESS, index)
+    mcm.AddOptionToggle("Allow Undressing",                 mcm.UNDRESSING_DEFAULT_ALLOW, index)
+    mcm.AddOptionSlider("Minimum Bounty to Undress",        mcm.UNDRESSING_DEFAULT_MIN_BOUNTY, index)
+    mcm.AddOptionToggle("Undress when Defeated",            mcm.UNDRESSING_DEFAULT_WHEN_DEFEATED, index)
+    mcm.AddOptionToggle("Undress at Cell",                  mcm.UNDRESSING_DEFAULT_AT_CELL, index)
+    mcm.AddOptionToggle("Undress at Chest",                 mcm.UNDRESSING_DEFAULT_AT_CHEST, index)
+    mcm.AddOptionSlider("Forced Undressing (Bounty)",       mcm.UNDRESSING_DEFAULT_FORCED_MIN_BOUNTY, index)
+    mcm.AddOptionToggle("Forced Undressing when Defeated",  mcm.UNDRESSING_DEFAULT_FORCED_WHEN_DEFEATED, index)
+    mcm.AddOptionSlider("Strip Search Thoroughness",        mcm.UNDRESSING_DEFAULT_STRIP_THOROUGHNESS, index)
 endFunction
 
 function Left(RealisticPrisonAndBounty_MCM mcm) global
@@ -63,6 +63,10 @@ endFunction
 function OnOptionHighlight(RealisticPrisonAndBounty_MCM mcm, string option) global
 
     string hold = mcm.CurrentHold
+
+    int optionId = mcm.GetOption(option)
+
+    mcm.Debug("OnOptionHighlight", "Option ID: " + optionId)
 
     if (option == "Allow Undressing")
         mcm.SetInfoText("Determines if you can be undressed while imprisoned in " + hold + ".")

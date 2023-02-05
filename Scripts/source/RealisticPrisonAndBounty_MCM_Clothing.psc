@@ -22,15 +22,19 @@ function Render(RealisticPrisonAndBounty_MCM mcm) global
 endFunction
 
 function RenderOptions(RealisticPrisonAndBounty_MCM mcm, int index) global
-    mcm.AddOptionToggleEx("Allow Wearing Clothes",            mcm.CLOTHING_DEFAULT_ALLOW_CLOTHES, index)
-    mcm.AddOptionToggleEx("Re-dress when Defeated",           mcm.CLOTHING_DEFAULT_REDRESS_WHEN_DEFEATED, index)
-    mcm.AddOptionSliderEx("Bounty to Re-dress",               mcm.CLOTHING_DEFAULT_REDRESS_BOUNTY, index)
-    mcm.AddOptionToggleEx("Re-dress at Cell",                 mcm.CLOTHING_DEFAULT_REDRESS_AT_CELL, index)
-    mcm.AddOptionToggleEx("Re-dress at Chest",                mcm.CLOTHING_DEFAULT_REDRESS_AT_CHEST, index)
+    mcm.AddOptionToggle("Allow Wearing Clothes",            mcm.CLOTHING_DEFAULT_ALLOW_CLOTHES, index)
+    mcm.AddOptionToggle("When Defeated",           mcm.CLOTHING_DEFAULT_REDRESS_WHEN_DEFEATED, index)
+    mcm.AddOptionSlider("Max. Bounty",                    mcm.CLOTHING_DEFAULT_REDRESS_BOUNTY, index)
+    ; mcm.AddOptionToggle("Re-dress at Cell",                 mcm.CLOTHING_DEFAULT_REDRESS_AT_CELL, index)
+    ; mcm.AddOptionToggle("Re-dress at Chest",                mcm.CLOTHING_DEFAULT_REDRESS_AT_CHEST, index)
 
     if (index == mcm.INDEX_THE_REACH)
         mcm.AddTextOption("", "In Cidhna Mine", mcm.OPTION_DISABLED)
-        mcm.AddOptionToggleExOverride("Allow Wearing Clothes", "Allow Wearing Clothes (Cidhna Mine)", mcm.CLOTHING_DEFAULT_ALLOW_CLOTHES)
+        mcm.AddOptionToggleWithKey("Allow Wearing Clothes", "Allow Wearing Clothes (Cidhna Mine)",  mcm.CLOTHING_DEFAULT_ALLOW_CLOTHES)
+        mcm.AddOptionToggleWithKey("When Defeated", "When Defeated (Cidhna Mine)",                  mcm.CLOTHING_DEFAULT_REDRESS_WHEN_DEFEATED)
+        mcm.AddTextOption("", "OR")
+        mcm.AddOptionSliderWithKey("Max. Bounty",  "Max. Bounty (Cidhna Mine)",                     mcm.CLOTHING_DEFAULT_REDRESS_BOUNTY)
+
     endif
 endFunction
 
@@ -67,22 +71,28 @@ function OnOptionHighlight(RealisticPrisonAndBounty_MCM mcm, string option) glob
     string hold = mcm.CurrentHold
 
     if (option == "Allow Wearing Clothes")
-        mcm.SetInfoText("Determines if you can be undressed while imprisoned in " + hold + ".")
+        mcm.SetInfoText("Determines if you are allowed to wear any clothes when imprisoned in " + hold + ".")
 
     elseif (option == "Allow Wearing Clothes (Cidhna Mine)")
-        mcm.SetInfoText("Determines if you can be undressed while imprisoned in Cidhna Mine")
+        mcm.SetInfoText("Determines if you are allowed to wear any clothes when imprisoned in Cidhna Mine.")
 
-    elseif (option == "Re-dress when Defeated")
-        mcm.SetInfoText("The minimum bounty required to be undressed in " + hold + "'s prison.")
+    elseif (option == "When Defeated")
+        mcm.SetInfoText("Determines if you are given clothes when defeated and imprisoned in " + hold + "'s prison.")
 
-    elseif (option == "Bounty to Re-dress")
-        mcm.SetInfoText("Whether to have you undressed when defeated and imprisoned in " + hold + ".")
+    elseif (option == "When Defeated (Cidhna Mine)")
+        mcm.SetInfoText("Determines if you are given clothes when defeated and imprisoned in Cidhna Mine.")
 
-    elseif (option == "Re-dress at Cell")
-        mcm.SetInfoText("Whether to be undressed at the cell in " + hold + "'s prison.")
+    elseif (option == "Max. Bounty")
+        mcm.SetInfoText("The maximum amount of bounty you can have in order to be given clothes when imprisoned in " + hold + ".")
+    
+    elseif (option == "Max. Bounty (Cidhna Mine)")
+        mcm.SetInfoText("The maximum amount of bounty you can have in order to be given clothes when imprisoned in Cidhna Mine.")
 
-    elseif (option == "Re-dress at Chest")
-        mcm.SetInfoText("Whether to be undressed at the chest in "  + hold + "'s prison.")
+    ; elseif (option == "Re-dress at Cell")
+    ;     mcm.SetInfoText("Whether to be undressed at the cell in " + hold + "'s prison.")
+
+    ; elseif (option == "Re-dress at Chest")
+    ;     mcm.SetInfoText("Whether to be undressed at the chest in "  + hold + "'s prison.")
     endif
 endFunction
 
