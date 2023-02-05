@@ -18,7 +18,6 @@ int property CACHED_OPTION_NAME     = 1 autoreadonly
 ; ==============================================================================
 ; Single Options
 int property SINGLE_OPTION_INDEX    = 0 autoreadonly
-
 ; ==============================================================================
 ; Error Codes
 int property GENERAL_ERROR     = -1500000 autoreadonly
@@ -105,7 +104,7 @@ int  property RELEASE_DEFAULT_GIVE_ITEMS_BACK_BOUNTY    = 0 autoreadonly
 bool property RELEASE_DEFAULT_REDRESS                   = true autoreadonly
 ; ==============================================================================
 ; ESCAPE
-int property ESCAPE_DEFAULT_BOUNTY_PERCENT          = 15 autoreadonly
+int  property ESCAPE_DEFAULT_BOUNTY_PERCENT         = 15 autoreadonly
 int  property ESCAPE_DEFAULT_BOUNTY_FLAT            = 1000 autoreadonly
 bool property ESCAPE_DEFAULT_ALLOW_SURRENDER        = true autoreadonly
 bool property ESCAPE_DEFAULT_FRISK_ON_CAPTURE       = true autoreadonly
@@ -233,6 +232,11 @@ function InitializePages()
     Pages[9] = RealisticPrisonAndBounty_MCM_BHunters.GetPageName()
     Pages[10] = RealisticPrisonAndBounty_MCM_Leveling.GetPageName()
     Pages[11] = RealisticPrisonAndBounty_MCM_Status.GetPageName()
+    ; Pages[12] = RealisticPrisonAndBounty_MCM_Whiterun.GetPageName()
+endFunction
+
+int function GetGlobalTimescale()
+    return Game.GetGameSettingInt("Timescale")
 endFunction
 
 int function GetOptionValue(string page, string optionName, int index)
@@ -262,7 +266,6 @@ function UpdateIndex(int optionId)
 
     ; Cache not found, proceed with the slow approach
     __updateIndexSlowInternal(optionId)
-
 endFunction
 
 ; ============================================================
@@ -337,7 +340,6 @@ endFunction
 int function AddOptionToggle(string text, bool defaultValue, int index = -1)
     return AddOptionToggleWithKey(text, text, defaultValue, index)
 endFunction
-
 
 ;/
     Adds and renders a Slider Option with the possibility of specifying a Key for its storage.
@@ -459,6 +461,35 @@ endFunction
 endFunction
 
 ;/
+    Gets a slider option's value.
+
+    string      @option: The name of the option to retrieve the value from.
+
+    returns:    The option's value
+/;
+int function GetOptionSliderValue(string option)
+    string _key = __makeOptionKey(option)
+    return __getIntOptionValue(_key, CurrentOptionIndex) ; TODO: case for Single Options (-1 index)
+endFunction
+
+;/
+    Sets a slider option's value.
+
+    string      @option: The name of the option to be changed.
+    float       @value: The new value for the option.
+/;
+function SetOptionSliderValue(string option, float value)
+    string _key = CurrentPage + "::" + option
+    int optionId = GetOption(option)
+
+    ; Change the value of the slider
+    SetSliderOptionValue(optionId, value)
+
+    ; Store the value
+    __setFloatOptionValue(_key, value, CurrentOptionIndex)
+endFunction
+
+;/
     Retrieves the option's key (how it's stored in the save) from its id.
 
     int @optionId: The option's id.
@@ -534,6 +565,7 @@ event OnPageReset(string page)
     RealisticPrisonAndBounty_MCM_BHunters.Render(self)
     RealisticPrisonAndBounty_MCM_Leveling.Render(self)
     RealisticPrisonAndBounty_MCM_Status.Render(self)
+    ; RealisticPrisonAndBounty_MCM_Whiterun.Render(self)
 endEvent
 
 event OnOptionHighlight(int option)
@@ -549,6 +581,8 @@ event OnOptionHighlight(int option)
     RealisticPrisonAndBounty_MCM_BHunters.OnHighlight(self, option)
     RealisticPrisonAndBounty_MCM_Leveling.OnHighlight(self, option)
     RealisticPrisonAndBounty_MCM_Status.OnHighlight(self, option)
+    ; RealisticPrisonAndBounty_MCM_Whiterun.OnHighlight(self, option)
+
 endEvent
 
 event OnOptionDefault(int option)
@@ -850,6 +884,30 @@ string function __getStringOptionValue(string _key, int index)
 endFunction
 
 ;/
+    Sets an option's value (float-based options only) in storage.
+
+    string      @_key: The option's key.
+    float       @value: The new value for this option
+    int         @index: The index of where this option is rendered in storage.
+/;
+function __setFloatOptionValue(string _key, float value, int index)
+    int _array = __getOptionsArrayAtKey(_key)
+    if (_array == ARRAY_NOT_EXIST)
+        return ; Array does not exist
+    endif
+
+    int _container = JArray.getObj(_array, index)
+    int _containerKey = JIntMap.getNthKey(_container, 0)
+    float _containerValue = JIntMap.getFlt(_container, _containerKey)
+
+    JIntMap.setFlt(_container, _containerKey, value)
+
+    if (_container == 0)
+        return ; Option does not exist
+    endif
+endFunction
+
+;/
     Gets the options array at the specified key from the underlying internal map.
 
     string  @_key: The key to retrieve the array from.
@@ -892,6 +950,13 @@ function __addOptionAtKey(string _key, int optionContainer)
     JMap.setObj(optionsMap, _key, _array)
 endFunction
 
+;/
+    Creates a key for an option based on the displayed text.
+
+    string      @displayedText: The option's displayed text in the menu.
+
+    returns:    The key based on the text passed in.
+/;
 string function __makeOptionKey(string displayedText)
     return CurrentPage + "::" + displayedText
 endFunction
@@ -1126,8 +1191,7 @@ endFunction
         ]
 /;
 int function __getCacheOptionsAtPage(string page)
-    int _container = JMap.getObj(cacheMap, page)
-    return _container
+    return JMap.getObj(cacheMap, page)
 endFunction
 
 ;/
@@ -1227,7 +1291,7 @@ bool function __optionExists(string _key, int optionId)
         i += 1
     endWhile
 
-    Debug("__optionExists", "Execution end, did not find key")
+    Trace("__optionExists", "Execution end, did not find key", ENABLE_TRACE)
     Trace("__optionExists", "Array does not exist or has no items!", i == 0 && ENABLE_TRACE)
     Trace("__optionExists", "Option not found in array!", i != 0 && ENABLE_TRACE)
 
@@ -1238,7 +1302,12 @@ endFunction
     Finds the cached option by its ID if it exists in the Cache Map.
     The search is performed on the CurrentPage from the cache map to avoid any unnecessary slowdowns.
     Traverses through the IntMaps in the CurrentPage array inside CacheMap until it finds the optionId,
-    which then retrieves the index from that optionId value
+    which then retrieves the value from that optionId key container
+
+    int     @optionId: The option's ID.
+
+    returns: The container with the option's name and index. : Array
+        [index, optionName]
 
     Cache Map implementation:
     cacheMap[CurrentPage] = [

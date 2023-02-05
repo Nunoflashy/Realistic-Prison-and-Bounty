@@ -25,8 +25,6 @@ function RenderOptions(RealisticPrisonAndBounty_MCM mcm, int index) global
     mcm.AddOptionToggle("Allow Wearing Clothes",            mcm.CLOTHING_DEFAULT_ALLOW_CLOTHES, index)
     mcm.AddOptionToggle("When Defeated",           mcm.CLOTHING_DEFAULT_REDRESS_WHEN_DEFEATED, index)
     mcm.AddOptionSlider("Maximum Bounty",                    mcm.CLOTHING_DEFAULT_REDRESS_BOUNTY, index)
-    ; mcm.AddOptionToggle("Re-dress at Cell",                 mcm.CLOTHING_DEFAULT_REDRESS_AT_CELL, index)
-    ; mcm.AddOptionToggle("Re-dress at Chest",                mcm.CLOTHING_DEFAULT_REDRESS_AT_CHEST, index)
 
     if (index == mcm.INDEX_THE_REACH)
         mcm.AddTextOption("", "In Cidhna Mine", mcm.OPTION_DISABLED)
@@ -34,7 +32,6 @@ function RenderOptions(RealisticPrisonAndBounty_MCM mcm, int index) global
         mcm.AddOptionToggleWithKey("When Defeated", "When Defeated (Cidhna Mine)",                  mcm.CLOTHING_DEFAULT_REDRESS_WHEN_DEFEATED)
         mcm.AddTextOption("", "OR")
         mcm.AddOptionSliderWithKey("Maximum Bounty",  "Maximum Bounty (Cidhna Mine)",                     mcm.CLOTHING_DEFAULT_REDRESS_BOUNTY)
-
     endif
 endFunction
 
@@ -87,12 +84,6 @@ function OnOptionHighlight(RealisticPrisonAndBounty_MCM mcm, string option) glob
     
     elseif (option == "Maximum Bounty (Cidhna Mine)")
         mcm.SetInfoText("The maximum amount of bounty you can have in order to be given clothes when imprisoned in Cidhna Mine.")
-
-    ; elseif (option == "Re-dress at Cell")
-    ;     mcm.SetInfoText("Whether to be undressed at the cell in " + hold + "'s prison.")
-
-    ; elseif (option == "Re-dress at Chest")
-    ;     mcm.SetInfoText("Whether to be undressed at the chest in "  + hold + "'s prison.")
     endif
 endFunction
 
@@ -108,11 +99,26 @@ endFunction
 
 
 function OnOptionSliderOpen(RealisticPrisonAndBounty_MCM mcm, string option) global
+    int sliderOptionValue = mcm.GetOptionSliderValue(option)
+
+    if (option == "Maximum Bounty")
+        mcm.SetSliderOptions(minRange = 1, \
+        maxRange = 100000, \
+        intervalSteps = 1, \
+        defaultValue = mcm.CLOTHING_DEFAULT_REDRESS_BOUNTY, \
+        startValue = int_if(sliderOptionValue, sliderOptionValue, mcm.CLOTHING_DEFAULT_REDRESS_BOUNTY))
+    elseif (option == "Maximum Bounty (Cidhna Mine)")
+        mcm.SetSliderOptions(minRange = 1, \
+        maxRange = 100000, \
+        intervalSteps = 1, \
+        defaultValue = mcm.CLOTHING_DEFAULT_REDRESS_BOUNTY, \
+        startValue = int_if(sliderOptionValue, sliderOptionValue, mcm.CLOTHING_DEFAULT_REDRESS_BOUNTY))
+    endif
 
 endFunction
 
 function OnOptionSliderAccept(RealisticPrisonAndBounty_MCM mcm, string option, float value) global
-
+    mcm.SetOptionSliderValue(option, value)
 endFunction
 
 function OnOptionMenuOpen(RealisticPrisonAndBounty_MCM mcm, string option) global

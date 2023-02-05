@@ -80,17 +80,33 @@ function OnOptionDefault(RealisticPrisonAndBounty_MCM mcm, string option) global
 endFunction
 
 function OnOptionSelect(RealisticPrisonAndBounty_MCM mcm, string option) global
-    string optionKey = option
+    string optionKey = GetPageName() + "::" + option
 
     mcm.ToggleOption(optionKey)
 endFunction
 
 function OnOptionSliderOpen(RealisticPrisonAndBounty_MCM mcm, string option) global
+    int sliderOptionValue = mcm.GetOptionSliderValue(option)
+
+    if (option == "Minimum Bounty")
+        mcm.SetSliderOptions(minRange = 1, \
+        maxRange = 100000, \
+        intervalSteps = 1, \
+        defaultValue = mcm.BOUNTY_HUNTERS_DEFAULT_MIN_BOUNTY, \
+        startValue = int_if(sliderOptionValue, sliderOptionValue, mcm.BOUNTY_HUNTERS_DEFAULT_MIN_BOUNTY))
+
+    elseif (option == "Bounty (Posse)")
+        mcm.SetSliderOptions(minRange = 1, \
+        maxRange = 100000, \
+        intervalSteps = 1, \
+        defaultValue = mcm.BOUNTY_HUNTERS_DEFAULT_MIN_BOUNTY_GROUP, \
+        startValue = int_if(sliderOptionValue, sliderOptionValue, mcm.BOUNTY_HUNTERS_DEFAULT_MIN_BOUNTY_GROUP))
+    endif
 
 endFunction
 
 function OnOptionSliderAccept(RealisticPrisonAndBounty_MCM mcm, string option, float value) global
-
+    mcm.SetOptionSliderValue(option, value)
 endFunction
 
 function OnOptionMenuOpen(RealisticPrisonAndBounty_MCM mcm, string option) global

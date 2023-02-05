@@ -100,7 +100,7 @@ function OnOptionDefault(RealisticPrisonAndBounty_MCM mcm, string option) global
 endFunction
 
 function OnOptionSelect(RealisticPrisonAndBounty_MCM mcm, string option) global
-    string optionKey = option
+    string optionKey = GetPageName() + "::" + option
 
     mcm.ToggleOption(optionKey)
 endFunction
@@ -110,7 +110,7 @@ function OnOptionSliderOpen(RealisticPrisonAndBounty_MCM mcm, string option) glo
 endFunction
 
 function OnOptionSliderAccept(RealisticPrisonAndBounty_MCM mcm, string option, float value) global
-
+    mcm.SetOptionSliderValue(option, value)
 endFunction
 
 function OnOptionMenuOpen(RealisticPrisonAndBounty_MCM mcm, string option) global

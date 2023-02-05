@@ -83,17 +83,31 @@ function OnOptionDefault(RealisticPrisonAndBounty_MCM mcm, string option) global
 endFunction
 
 function OnOptionSelect(RealisticPrisonAndBounty_MCM mcm, string option) global
-    string optionKey = option
+    string optionKey = GetPageName() + "::" + option
 
     mcm.ToggleOption(optionKey)
 endFunction
 
 function OnOptionSliderOpen(RealisticPrisonAndBounty_MCM mcm, string option) global
+    int sliderOptionValue = mcm.GetOptionSliderValue(option)
 
+    if (option == "Escape Bounty (% of Bounty)")
+        mcm.SetSliderOptions(minRange = 1, \
+         maxRange = 100, \
+         intervalSteps = 1, \
+         defaultValue = mcm.ESCAPE_DEFAULT_BOUNTY_PERCENT, \
+         startValue = int_if(sliderOptionValue, sliderOptionValue, mcm.ESCAPE_DEFAULT_BOUNTY_PERCENT))
+    elseif (option == "Escape Bounty (Flat)")
+        mcm.SetSliderOptions(minRange = 1, \
+         maxRange = 100000, \
+         intervalSteps = 1, \
+         defaultValue = mcm.ESCAPE_DEFAULT_BOUNTY_FLAT, \
+         startValue = int_if(sliderOptionValue, sliderOptionValue, mcm.ESCAPE_DEFAULT_BOUNTY_FLAT))
+    endif
 endFunction
 
 function OnOptionSliderAccept(RealisticPrisonAndBounty_MCM mcm, string option, float value) global
-
+    mcm.SetOptionSliderValue(option, value)
 endFunction
 
 function OnOptionMenuOpen(RealisticPrisonAndBounty_MCM mcm, string option) global

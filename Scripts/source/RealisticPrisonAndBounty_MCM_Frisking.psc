@@ -117,7 +117,7 @@ function OnOptionDefault(RealisticPrisonAndBounty_MCM mcm, string option) global
 endFunction
 
 function OnOptionSelect(RealisticPrisonAndBounty_MCM mcm, string option) global
-    string optionKey = option
+    string optionKey = GetPageName() + "::" + option
 
     mcm.ToggleOption(optionKey)
     ; bool optionState = mcm.ToggleOption(oid)
@@ -185,79 +185,50 @@ endFunction
 
 function OnOptionSliderOpen(RealisticPrisonAndBounty_MCM mcm, string option) global
 
-    ; int optionValue = GetOptionIntValue(oid)
+    int sliderOptionValue = mcm.GetOptionSliderValue(option)
 
-    ; int minimumBounty               = mcm.GetOptionInListByOID(mcm.oid_frisking_minimumBounty, oid)
-    ; int guaranteedPayableBounty     = mcm.GetOptionInListByOID(mcm.oid_frisking_guaranteedPayableBounty, oid)
-    ; int maximumPayableBounty        = mcm.GetOptionInListByOID(mcm.oid_frisking_maximumPayableBounty, oid)
-    ; int maximumPayableBountyChance  = mcm.GetOptionInListByOID(mcm.oid_frisking_maximumPayableBountyChance, oid)
-    ; int friskSearchThoroughness     = mcm.GetOptionInListByOID(mcm.oid_frisking_friskSearchThoroughness, oid)     
-    ; int stripSearchStolenItemsNumber= mcm.GetOptionInListByOID(mcm.oid_frisking_stripSearchStolenItemsNumber, oid)
+    if (option == "Minimum Bounty for Frisking")
+        mcm.SetSliderOptions(minRange = 1, \
+         maxRange = 100000, \
+         intervalSteps = 1, \
+         defaultValue = mcm.FRISKING_DEFAULT_MIN_BOUNTY, \
+         startValue = int_if(sliderOptionValue, sliderOptionValue, mcm.FRISKING_DEFAULT_MIN_BOUNTY))
+    elseif (option == "Guaranteed Payable Bounty")
+        mcm.SetSliderOptions(minRange = 1, \
+         maxRange = 100000, \
+         intervalSteps = 1, \
+         defaultValue = mcm.FRISKING_DEFAULT_GUARANTEED_PAYABLE_BOUNTY, \
+         startValue = int_if(sliderOptionValue, sliderOptionValue, mcm.FRISKING_DEFAULT_GUARANTEED_PAYABLE_BOUNTY))
+    elseif (option == "Maximum Payable Bounty")
+        mcm.SetSliderOptions(minRange = 1, \
+         maxRange = 100000, \
+         intervalSteps = 1, \
+         defaultValue = mcm.FRISKING_DEFAULT_MAXIMUM_PAYABLE_BOUNTY, \
+         startValue = int_if(sliderOptionValue, sliderOptionValue, mcm.FRISKING_DEFAULT_MAXIMUM_PAYABLE_BOUNTY))
+    elseif (option == "Maximum Payable Bounty (Chance)")
+        mcm.SetSliderOptions(minRange = 1, \
+         maxRange = 100, \
+         intervalSteps = 1, \
+         defaultValue = mcm.FRISKING_DEFAULT_MAXIMUM_PAYABLE_BOUNTY_CHANCE, \
+         startValue = int_if(sliderOptionValue, sliderOptionValue, mcm.FRISKING_DEFAULT_MAXIMUM_PAYABLE_BOUNTY_CHANCE))
+    elseif (option == "Frisk Search Thoroughness")
+        mcm.SetSliderOptions(minRange = 1, \
+         maxRange = 10, \
+         intervalSteps = 1, \
+         defaultValue = mcm.FRISKING_DEFAULT_FRISK_THOROUGHNESS, \
+         startValue = int_if(sliderOptionValue, sliderOptionValue, mcm.FRISKING_DEFAULT_FRISK_THOROUGHNESS))
+    elseif (option == "Minimum No. of Stolen Items Required")
+        mcm.SetSliderOptions(minRange = 1, \
+         maxRange = 1000, \
+         intervalSteps = 1, \
+         defaultValue = mcm.FRISKING_DEFAULT_NUMBER_STOLEN_ITEMS_REQUIRED, \
+         startValue = int_if(sliderOptionValue, sliderOptionValue, mcm.FRISKING_DEFAULT_NUMBER_STOLEN_ITEMS_REQUIRED))
+    endif
 
-    ; if (oid == minimumBounty)
-    ;     mcm.SetSliderOptions(minRange = 1, maxRange = 100000, intervalSteps = 1, defaultValue = 500, startValue = int_if(optionValue != -1, optionValue, 500))
-    ;     Log(mcm, "OnOptionSliderOpen", "This is a test: " + "[oid: " + oid + ", startValue: " + optionValue + "]")
-
-    ; elseif (oid == guaranteedPayableBounty)
-    ;     mcm.SetSliderOptions(minRange = 1, maxRange = 100000, intervalSteps = 1, defaultValue = 1000, startValue = int_if(optionValue, optionValue, 1000))
-    ;     Log(mcm, "OnOptionSliderOpen", "This is a test: " + "[oid: " + oid + ", startValue: " + optionValue + "]")
-
-    ; elseif (oid == maximumPayableBounty)
-    ;     mcm.SetSliderOptions(minRange = 1, maxRange = 100000, intervalSteps = 1, defaultValue = 2000, startValue = int_if(optionValue, optionValue, 2000))
-    ;     Log(mcm, "OnOptionSliderOpen", "This is a test: " + "[oid: " + oid + ", startValue: " + optionValue + "]")
-
-    ; elseif (oid == maximumPayableBountyChance)
-    ;     mcm.SetSliderOptions(minRange = 1, maxRange = 100, intervalSteps = 1, defaultValue = 25, startValue = int_if(optionValue, optionValue, 25))
-    ;     Log(mcm, "OnOptionSliderOpen", "This is a test: " + "[oid: " + oid + ", startValue: " + optionValue + "]")
-
-    ; elseif (oid == friskSearchThoroughness)
-    ;     mcm.SetSliderOptions(minRange = 1, maxRange = 1000, intervalSteps = 1, defaultValue = 400, startValue = int_if(optionValue, optionValue, 400))
-    ;     Log(mcm, "OnOptionSliderOpen", "This is a test: " + "[oid: " + oid + ", startValue: " + optionValue + "]")
-
-    ; elseif (oid == stripSearchStolenItemsNumber)
-    ;     mcm.SetSliderOptions(minRange = 1, maxRange = 10000, intervalSteps = 1, defaultValue = 10, startValue = int_if(optionValue, optionValue, 10))
-    ;     Log(mcm, "OnOptionSliderOpen", "This is a test: " + "[oid: " + oid + ", startValue: " + optionValue + "]")
-    ; endif
 endFunction
 
 function OnOptionSliderAccept(RealisticPrisonAndBounty_MCM mcm, string option, float value) global
-
-    ; ; int allowFrisking               = mcm.GetOptionInListByOID(mcm.oid_frisking_allow, oid)
-    ; ; int minimumBounty               = mcm.GetOptionInListByOID(mcm.oid_frisking_minimumBounty, oid)
-    ; ; int guaranteedPayableBounty     = mcm.GetOptionInListByOID(mcm.oid_frisking_guaranteedPayableBounty, oid)
-    ; ; int maximumPayableBounty        = mcm.GetOptionInListByOID(mcm.oid_frisking_maximumPayableBounty, oid)
-    ; int maximumPayableBountyChance  = mcm.GetOptionInListByOID(mcm.oid_frisking_maximumPayableBountyChance, oid)
-    ; ; int friskSearchThoroughness     = mcm.GetOptionInListByOID(mcm.oid_frisking_friskSearchThoroughness, oid)     
-    ; ; int confiscateStolenItems       = mcm.GetOptionInListByOID(mcm.oid_frisking_confiscateStolenItems, oid)
-    ; ; int stripSearchStolenItems      = mcm.GetOptionInListByOID(mcm.oid_frisking_stripSearchStolenItems, oid)  
-    ; ; int stripSearchStolenItemsNumber= mcm.GetOptionInListByOID(mcm.oid_frisking_stripSearchStolenItemsNumber, oid)
-
-    ; mcm.SetSliderOptionValue(oid, value, string_if(oid == maximumPayableBountyChance, "{0}%", "{0}"))
-    ; SetOptionValueInt(oid, value as int)
-    ; ; if (oid == mcm.oid_frisking_minimumBounty[index])
-    ; ;     mcm.SetSliderOptionValue(oid, value)
-    ; ;     mcm.SetOptionValue(oid, value as int)
-
-    ; ; elseif (oid == mcm.oid_frisking_guaranteedPayableBounty[index])
-    ; ;     mcm.SetSliderOptionValue(oid, value)
-    ; ;     mcm.SetOptionValue(oid, value as int)
-
-    ; ; elseif (oid == mcm.oid_frisking_maximumPayableBounty[index])
-    ; ;     mcm.SetSliderOptionValue(oid, value)
-    ; ;     mcm.SetOptionValue(oid, value as int)
-
-    ; ; elseif (oid == mcm.oid_frisking_maximumPayableBountyChance[index])
-    ; ;     mcm.SetSliderOptionValue(oid, value, "{0}%")
-    ; ;     mcm.SetOptionValue(oid, value as int)
-
-    ; ; elseif (oid == mcm.oid_frisking_friskSearchThoroughness[index])
-    ; ;     mcm.SetSliderOptionValue(oid, value)
-    ; ;     mcm.SetOptionValue(oid, value as int)
-        
-    ; ; elseif (oid == mcm.oid_frisking_stripSearchStolenItemsNumber[index])
-    ; ;     mcm.SetSliderOptionValue(oid, value)
-    ; ;     mcm.SetOptionValue(oid, value as int)
-    ; ; endif
+    mcm.SetOptionSliderValue(option, value)
 endFunction
 
 function OnOptionMenuOpen(RealisticPrisonAndBounty_MCM mcm, string option) global

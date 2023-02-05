@@ -24,8 +24,8 @@ endFunction
 
 function RenderOptions(RealisticPrisonAndBounty_MCM mcm, int index) global
     mcm.AddTextOption("", "Stats", mcm.OPTION_FLAG_DISABLED)
-    ; mcm.oid_bounty_currentBounty[index] = mcm.AddTextOption("Current Bounty ", 4000.0 as int)
-    ; mcm.oid_bounty_largestBounty[index] = mcm.AddTextOption("Largest Bounty ", 15000.0 as int)
+    mcm.AddTextOption("Current Bounty", 15000.0 as int)
+    mcm.AddTextOption("Largest Bounty", 4000.0 as int)
     mcm.AddTextOption("Bounty History", 15000.0 as int)
     mcm.AddEmptyOption()
 
@@ -42,8 +42,6 @@ function Left(RealisticPrisonAndBounty_MCM mcm) global
 
     mcm.AddOptionToggle("Enable Bounty Decay", true)
     mcm.AddOptionToggle("Update Interval (In-Game Time)", 12.0)
-    ; mcm.oid_bounty_enableBountyDecayGeneral = mcm.AddToggleOption("Enable Bounty Decay", true)
-    ; mcm.oid_bounty_updateInterval           = mcm.AddSliderOption("Update Interval (In-Game Time)", 1.0)
 
     int i = mcm.LeftPanelIndex
     while (i < mcm.LeftPanelSize)
@@ -112,38 +110,6 @@ function OnOptionHighlight(RealisticPrisonAndBounty_MCM mcm, string option) glob
         mcm.SetInfoText("Whether to be re-dressed at the chest in " + hold + "'prison.")
     endif
 
-    ; int currentBounty   = mcm.GetOptionInListByOID(mcm.oid_bounty_currentBounty, oid)
-    ; int largestBounty   = mcm.GetOptionInListByOID(mcm.oid_bounty_largestBounty, oid)
-    ; int enableBountyDecay   = mcm.GetOptionInListByOID(mcm.oid_bounty_enableBountyDecay, oid)
-    ; int decayInPrison       = mcm.GetOptionInListByOID(mcm.oid_bounty_decayInPrison, oid)
-    ; int bountyLostPercent   = mcm.GetOptionInListByOID(mcm.oid_bounty_bountyLostPercent, oid)
-    ; int bountyLostFlat      = mcm.GetOptionInListByOID(mcm.oid_bounty_bountyLostFlat, oid)
-
-    ; ; mcm.SetInfoText( \
-    ; ;     string_if (oid == currentBounty, "Your current bounty in " + holds[mcm.CurrentOptionIndex] + ".", \
-    ; ;     string_if (oid == largestBounty, "The largest bounty you acquired in " + holds[mcm.CurrentOptionIndex] + ".", \
-    ; ;     string_if (oid == enableBountyDecay, "Whether to enable bounty decaying for " + holds[mcm.CurrentOptionIndex] + ".", \
-    ; ;     string_if (oid == decayInPrison, "Whether to allow bounty decaying while imprisoned in " + holds[mcm.CurrentOptionIndex] + ".", \
-    ; ;     string_if (oid == bountyLostPercent, "The amount of bounty lost as a percentage of the current bounty in " + holds[mcm.CurrentOptionIndex] + ".", \
-    ; ;     string_if (oid == bountyLostFlat, "The amount of bounty lost in " + holds[mcm.CurrentOptionIndex] + ".", \
-    ; ;     "No description defined for this property." \
-    ; ;     )))))) \
-    ; ; )
-
-    ; if (oid == currentBounty)
-    ;     mcm.SetInfoText("Your current bounty in " + holds[mcm.CurrentOptionIndex] + ".")
-    ; elseif (oid == largestBounty)
-    ;     mcm.SetInfoText("The largest bounty you acquired in " + holds[mcm.CurrentOptionIndex] + ".")
-    ; elseif (oid == enableBountyDecay)
-    ;     mcm.SetInfoText("Whether to enable bounty decaying for " + holds[mcm.CurrentOptionIndex] + ".")
-    ; elseif (oid == decayInPrison)
-    ;     mcm.SetInfoText("Whether to allow bounty decaying while imprisoned in " + holds[mcm.CurrentOptionIndex] + ".")
-    ; elseif (oid == bountyLostPercent)
-    ;     mcm.SetInfoText("The amount of bounty lost as a percentage of the current bounty in " + holds[mcm.CurrentOptionIndex] + ".")
-    ; elseif (oid == bountyLostFlat)
-    ;     mcm.SetInfoText("The amount of bounty lost in " + holds[mcm.CurrentOptionIndex] + ".")
-    ; endif
-
 endFunction
 
 function OnOptionDefault(RealisticPrisonAndBounty_MCM mcm, string option) global
@@ -151,7 +117,7 @@ function OnOptionDefault(RealisticPrisonAndBounty_MCM mcm, string option) global
 endFunction
 
 function OnOptionSelect(RealisticPrisonAndBounty_MCM mcm, string option) global
-    string optionKey = option
+    string optionKey = GetPageName() + "::" + option
 
     mcm.ToggleOption(optionKey)
 endFunction
@@ -161,7 +127,7 @@ function OnOptionSliderOpen(RealisticPrisonAndBounty_MCM mcm, string option) glo
 endFunction
 
 function OnOptionSliderAccept(RealisticPrisonAndBounty_MCM mcm, string option, float value) global
-
+    mcm.SetOptionSliderValue(option, value)
 endFunction
 
 function OnOptionMenuOpen(RealisticPrisonAndBounty_MCM mcm, string option) global

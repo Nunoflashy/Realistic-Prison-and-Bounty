@@ -26,7 +26,6 @@ function RenderOptions(RealisticPrisonAndBounty_MCM mcm, int index) global
     mcm.AddOptionToggle("Give items back on Release",        mcm.ARREST_DEFAULT_ALLOW_CIVILIAN_CAPTURE, index)
     mcm.AddOptionSlider("Give items back on Release (Bounty)",               mcm.ARREST_DEFAULT_BOUNTY_WHEN_DEFEATED_FLAT, index)
     mcm.AddOptionToggle("Re-dress on Release",        mcm.ARREST_DEFAULT_ALLOW_CIVILIAN_CAPTURE, index)
-    ; mcm.oid_release_giveItemsBackOnDefeat[index]            = mcm.AddToggleOption("Give items back on Defeat", 1.0)
 endFunction
 
 function Left(RealisticPrisonAndBounty_MCM mcm) global
@@ -77,17 +76,26 @@ function OnOptionDefault(RealisticPrisonAndBounty_MCM mcm, string option) global
 endFunction
 
 function OnOptionSelect(RealisticPrisonAndBounty_MCM mcm, string option) global
-    string optionKey = option
+    string optionKey = GetPageName() + "::" + option
 
     mcm.ToggleOption(optionKey)
 endFunction
 
 function OnOptionSliderOpen(RealisticPrisonAndBounty_MCM mcm, string option) global
+    int sliderOptionValue = mcm.GetOptionSliderValue(option)
+
+    if (option == "Give items back on Release (Bounty)")
+        mcm.SetSliderOptions(minRange = 1, \
+        maxRange = 100000, \
+        intervalSteps = 1, \
+        defaultValue = mcm.RELEASE_DEFAULT_GIVE_ITEMS_BACK_BOUNTY, \
+        startValue = int_if(sliderOptionValue, sliderOptionValue, mcm.RELEASE_DEFAULT_GIVE_ITEMS_BACK_BOUNTY))
+    endif
 
 endFunction
 
 function OnOptionSliderAccept(RealisticPrisonAndBounty_MCM mcm, string option, float value) global
-
+    mcm.SetOptionSliderValue(option, value)
 endFunction
 
 function OnOptionMenuOpen(RealisticPrisonAndBounty_MCM mcm, string option) global

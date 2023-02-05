@@ -92,24 +92,7 @@ function OnOptionHighlight(RealisticPrisonAndBounty_MCM mcm, string option) glob
     elseif (option == "Strip Search Thoroughness")
         mcm.SetInfoText("The thoroughness of the strip search when undressed, higher values mean a more thorough search and therefore possibly less items kept.\n" + \
                      "Due to the nature of a strip search, most items will be removed, this value will only determine small objects that could be hidden when stripped bare.")
-
-    elseif (option == "undressing::allowWearingClothes")
-        mcm.SetInfoText("Whether to allow wearing clothes while imprisoned in " + hold + ".")
-
-    elseif (option == "undressing::bountyToRe-dress")
-        mcm.SetInfoText("The maximum bounty you can have in order to be re-dressed while imprisoned in " + hold + ".")
-
-    elseif (option == "undressing::Re-dressWhenDefeated")
-        mcm.SetInfoText("Whether to have you re-dressed when defeated (Note: If the bounty exceeds the maximum, this option will have no effect.)")
-
-    elseif (option == "undressing::Re-dressAtCell")
-        mcm.SetInfoText("Whether to be re-dressed at the cell in " + hold + "'prison.")
-
-    elseif (option == "undressing::Re-dressAtChest")
-        mcm.SetInfoText("Whether to be re-dressed at the chest in " + hold + "'prison.")
     endif
-
-    ; Debug(mcm, "OnOptionHighlight", "Expected OID: " + oid, mcm.IS_DEBUG)
 
 endFunction
 
@@ -119,74 +102,37 @@ endFunction
 
 function OnOptionSelect(RealisticPrisonAndBounty_MCM mcm, string option) global
     string optionKey = GetPageName() + "::" + option
-
-    ; if (oid == mcm.GetOption("undressing::allowUndressing"))
-    ;     ; mcm.ToggleOption("undressing::allowUndressing")
-    ; endif
-
-    ; mcm.GetOptionValueBool("Undressing", "Allow Undressing", mcm.CurrentOptionIndex)
-    ; mcm.GetOptionValueBool("Undressing", "Allow Undressing", mcm.INDEX_EASTMARCH)
-    ; mcm.GetOptionValueBool("Clothing", "Allow Wearing Clothes", mcm.CurrentOptionIndex)
-
-    ; mcm.Debug("Test", "OptionKey: " + optionKey)
     mcm.ToggleOption(optionKey)
 endFunction
 
 function OnOptionSliderOpen(RealisticPrisonAndBounty_MCM mcm, string option) global
-    string optionKey = option
-    ; Log(mcm, "OnOptionSliderOpen", "Option ID: " + oid + " (" + optionKey + ")")
 
-    if (optionKey == "undressing::minimumBountyToUndress")
-        mcm.SetSliderOptions(minRange = 1, maxRange = 100000, intervalSteps = 1, defaultValue = 500, startValue = mcm.UNDRESSING_DEFAULT_MIN_BOUNTY)
-    elseif (optionKey == "undressing::stripSearchThoroughness")
-        mcm.SetSliderOptions(minRange = 1, maxRange = 1000, intervalSteps = 1, defaultValue = 200, startValue = mcm.UNDRESSING_DEFAULT_STRIP_THOROUGHNESS)
+    int sliderOptionValue = mcm.GetOptionSliderValue(option)
+
+    if (option == "Minimum Bounty to Undress")
+        mcm.SetSliderOptions(minRange = 1, \
+         maxRange = 100000, \
+         intervalSteps = 1, \
+         defaultValue = mcm.UNDRESSING_DEFAULT_MIN_BOUNTY, \
+         startValue = int_if(sliderOptionValue, sliderOptionValue, mcm.UNDRESSING_DEFAULT_MIN_BOUNTY))
+    elseif (option == "Forced Undressing (Bounty)")
+        mcm.SetSliderOptions(minRange = 1, \
+         maxRange = 100000, \
+         intervalSteps = 1, \
+         defaultValue = mcm.UNDRESSING_DEFAULT_FORCED_MIN_BOUNTY, \
+         startValue = int_if(sliderOptionValue, sliderOptionValue, mcm.UNDRESSING_DEFAULT_FORCED_MIN_BOUNTY))
+    elseif (option == "Strip Search Thoroughness")
+        mcm.SetSliderOptions(minRange = 1, \
+         maxRange = 10, \
+         intervalSteps = 1, \
+         defaultValue = mcm.UNDRESSING_DEFAULT_STRIP_THOROUGHNESS, \
+         startValue = int_if(sliderOptionValue, sliderOptionValue, mcm.UNDRESSING_DEFAULT_STRIP_THOROUGHNESS))
     endif
-
-    ; int optionValue = GetOptionIntValue(oid)
-
-    ; int minimumBounty                   = mcm.GetOptionInListByOID(mcm.oid_undressing_minimumBounty, oid)
-    ; int forcedUndressingMinBounty       = mcm.GetOptionInListByOID(mcm.oid_undressing_forcedUndressingMinBounty, oid)     
-    ; int stripSearchThoroughness         = mcm.GetOptionInListByOID(mcm.oid_undressing_stripSearchThoroughness, oid)  
-    ; int redressBounty                   = mcm.GetOptionInListByOID(mcm.oid_undressing_redressBounty, oid)
-
-    ; if (oid == minimumBounty)
-    ;     mcm.SetSliderOptions(minRange = 1, maxRange = 100000, intervalSteps = 1, defaultValue = 500, startValue = int_if(optionValue, optionValue, 500))
-    ;     Log(mcm, "OnOptionSliderOpen", "This is a test: " + "[oid: " + oid + ", startValue: " + optionValue + "]")
-
-    ; elseif (oid == forcedUndressingMinBounty)
-    ;     mcm.SetSliderOptions(minRange = 1, maxRange = 100000, intervalSteps = 1, defaultValue = 1000, startValue = int_if(optionValue, optionValue, 1000))
-    ;     Log(mcm, "OnOptionSliderOpen", "This is a test: " + "[oid: " + oid + ", startValue: " + optionValue + "]")
-
-    ; elseif (oid == stripSearchThoroughness)
-    ;     mcm.SetSliderOptions(minRange = 1, maxRange = 1000, intervalSteps = 1, defaultValue = 200, startValue = int_if(optionValue, optionValue, 200))
-    ;     Log(mcm, "OnOptionSliderOpen", "This is a test: " + "[oid: " + oid + ", startValue: " + optionValue + "]")
-
-    ; elseif (oid == redressBounty)
-    ;     mcm.SetSliderOptions(minRange = 1, maxRange = 100000, intervalSteps = 1, defaultValue = 25, startValue = int_if(optionValue, optionValue, 25))
-    ;     Log(mcm, "OnOptionSliderOpen", "This is a test: " + "[oid: " + oid + ", startValue: " + optionValue + "]")
-    ; endif
 
 endFunction
 
 function OnOptionSliderAccept(RealisticPrisonAndBounty_MCM mcm, string option, float value) global
-
-    ; int minimumBounty                   = mcm.GetOptionInListByOID(mcm.oid_undressing_minimumBounty, oid)
-    ; int forcedUndressingMinBounty       = mcm.GetOptionInListByOID(mcm.oid_undressing_forcedUndressingMinBounty, oid)     
-    ; int stripSearchThoroughness         = mcm.GetOptionInListByOID(mcm.oid_undressing_stripSearchThoroughness, oid)  
-    ; int redressBounty                   = mcm.GetOptionInListByOID(mcm.oid_undressing_redressBounty, oid)
-
-    ; mcm.SetSliderOptionValue(oid, value, string_if(oid == stripSearchThoroughness, "{0}", "{0} Bounty"))
-    ; ; if (oid == minimumBounty)
-    ; ;     SetOptionValueIntByKey("oid_undressing_minimumBounty" + mcm.CurrentOptionIndex , value as int)
-    ; ; elseif (oid == forcedUndressingMinBounty)
-    ; ;     SetOptionValueIntByKey("oid_undressing_forcedUndressingMinBounty" + mcm.CurrentOptionIndex , value as int)
-    ; ; elseif (oid == stripSearchThoroughness)
-    ; ;     SetOptionValueIntByKey("oid_undressing_stripSearchThoroughness" + mcm.CurrentOptionIndex , value as int)
-    ; ; elseif (oid == redressBounty)
-    ; ;     SetOptionValueIntByKey("oid_undressing_redressBounty" + mcm.CurrentOptionIndex , value as int)
-    ; ; endif
-
-    ; SetOptionValueInt(oid, value as int)
+    mcm.SetOptionSliderValue(option, value)
 endFunction
 
 function OnOptionMenuOpen(RealisticPrisonAndBounty_MCM mcm, string option) global
