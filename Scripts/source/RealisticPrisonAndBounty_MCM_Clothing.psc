@@ -24,7 +24,7 @@ endFunction
 function RenderOptions(RealisticPrisonAndBounty_MCM mcm, int index) global
     mcm.AddOptionToggle("Allow Wearing Clothes",            mcm.CLOTHING_DEFAULT_ALLOW_CLOTHES, index)
     mcm.AddOptionToggle("When Defeated",           mcm.CLOTHING_DEFAULT_REDRESS_WHEN_DEFEATED, index)
-    mcm.AddOptionSlider("Max. Bounty",                    mcm.CLOTHING_DEFAULT_REDRESS_BOUNTY, index)
+    mcm.AddOptionSlider("Maximum Bounty",                    mcm.CLOTHING_DEFAULT_REDRESS_BOUNTY, index)
     ; mcm.AddOptionToggle("Re-dress at Cell",                 mcm.CLOTHING_DEFAULT_REDRESS_AT_CELL, index)
     ; mcm.AddOptionToggle("Re-dress at Chest",                mcm.CLOTHING_DEFAULT_REDRESS_AT_CHEST, index)
 
@@ -33,7 +33,7 @@ function RenderOptions(RealisticPrisonAndBounty_MCM mcm, int index) global
         mcm.AddOptionToggleWithKey("Allow Wearing Clothes", "Allow Wearing Clothes (Cidhna Mine)",  mcm.CLOTHING_DEFAULT_ALLOW_CLOTHES)
         mcm.AddOptionToggleWithKey("When Defeated", "When Defeated (Cidhna Mine)",                  mcm.CLOTHING_DEFAULT_REDRESS_WHEN_DEFEATED)
         mcm.AddTextOption("", "OR")
-        mcm.AddOptionSliderWithKey("Max. Bounty",  "Max. Bounty (Cidhna Mine)",                     mcm.CLOTHING_DEFAULT_REDRESS_BOUNTY)
+        mcm.AddOptionSliderWithKey("Maximum Bounty",  "Maximum Bounty (Cidhna Mine)",                     mcm.CLOTHING_DEFAULT_REDRESS_BOUNTY)
 
     endif
 endFunction
@@ -82,10 +82,10 @@ function OnOptionHighlight(RealisticPrisonAndBounty_MCM mcm, string option) glob
     elseif (option == "When Defeated (Cidhna Mine)")
         mcm.SetInfoText("Determines if you are given clothes when defeated and imprisoned in Cidhna Mine.")
 
-    elseif (option == "Max. Bounty")
+    elseif (option == "Maximum Bounty")
         mcm.SetInfoText("The maximum amount of bounty you can have in order to be given clothes when imprisoned in " + hold + ".")
     
-    elseif (option == "Max. Bounty (Cidhna Mine)")
+    elseif (option == "Maximum Bounty (Cidhna Mine)")
         mcm.SetInfoText("The maximum amount of bounty you can have in order to be given clothes when imprisoned in Cidhna Mine.")
 
     ; elseif (option == "Re-dress at Cell")

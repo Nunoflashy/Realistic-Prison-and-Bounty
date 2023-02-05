@@ -66,10 +66,10 @@ function OnOptionHighlight(RealisticPrisonAndBounty_MCM mcm, string option) glob
     string hold = mcm.CurrentHold
 
     if (option == "Timescale")
-        mcm.SetInfoText("Determines if you can be undressed while imprisoned in " + hold + ".")
+        mcm.SetInfoText("Sets the normal Timescale of the game.")
 
     elseif (option == "Attack on Sight Bounty")
-        mcm.SetInfoText("Whether to have you undressed when defeated and imprisoned in " + hold + ".")
+        mcm.SetInfoText("The amount of bounty required to be attacked on sight by the guards in " + hold + ".")
     endif
 endFunction
 

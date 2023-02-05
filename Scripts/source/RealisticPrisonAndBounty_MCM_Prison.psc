@@ -33,7 +33,7 @@ function RenderOptions(RealisticPrisonAndBounty_MCM mcm, int index) global
     mcm.AddOptionToggle("Hands Bound in Prison",        mcm.ARREST_DEFAULT_ALLOW_CIVILIAN_CAPTURE, index)
     mcm.AddOptionSlider("Hands Bound (Minimum Bounty)",               mcm.ARREST_DEFAULT_BOUNTY_WHEN_DEFEATED_FLAT, index)
     mcm.AddOptionToggle("Hands Bound (Randomize)",        mcm.ARREST_DEFAULT_ALLOW_CIVILIAN_CAPTURE, index)
-    mcm.AddOptionMenuEx("Cell Lock Level", "SELECT", index)
+    mcm.AddOptionMenu("Cell Lock Level", "SELECT", index)
 
 endFunction
 
