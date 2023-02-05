@@ -235,14 +235,6 @@ function InitializePages()
     Pages[11] = RealisticPrisonAndBounty_MCM_Status.GetPageName()
 endFunction
 
-function SetDefaultTimescales()
-    if (! NormalTimescale)
-        NormalTimescale.SetValueInt(Game.GetGameSettingInt("TimeScale"))
-        Log(self, "SetDefaultTimescales", "Timescale has been set = " + NormalTimescale.GetValueInt())
-    endif
-endFunction
-
-
 int function GetOptionValue(string page, string optionName, int index)
     float startBench = StartBenchmark()
     string _key = page + "::" + optionName
@@ -258,11 +250,6 @@ int function GetOptionValue(string page, string optionName, int index)
 
     return containerValue
 endFunction
-
-bool function GetOptionValueBool(string page, string optionName, int index)
-    return GetOptionValue(page, optionName, index) as bool
-endFunction
-
 
 
 function UpdateIndex(int optionId)
@@ -293,93 +280,6 @@ endFunction
 
 ; ============================================================
 
-;/
-    Sets a flag to an option for the current index (the hold) based on its ID.
-    If the dependency is met, the flag will be ENABLED, otherwise it will be DISABLED.
-
-    The option could be a toggle, that depends on another toggle, in which case
-    the toggle passed in will only be ENABLED if the dependency toggle is active.
-
-    returns true if the option from optionIdList was ENABLED, false if the option was DISABLED.
-/;
-bool function SetOptionDependencyBool(int[] optionIdList, bool dependency, bool storePersistently = true)
-    int enabled  = OPTION_FLAG_NONE
-    int disabled = OPTION_FLAG_DISABLED
-
-    ; LogProperty(self, "SetOptionDependencyBool", "Value is " + "(" + _currentOptionIndex + ")", LOG_WARN())
-
-    SetOptionFlags(optionIdList[CurrentOptionIndex], int_if (dependency, enabled, disabled))
-
-
-    if (dependency)
-        return true
-    endif
-
-    return false
-endFunction
-
-bool function SetOptionDependencyBoolSingle(int optionId, bool dependency, bool storePersistently = true)
-    int enabled  = OPTION_FLAG_NONE
-    int disabled = OPTION_FLAG_DISABLED
-
-    ; Log(self, "SetOptionDependencyBoolSingle", "Value is " + "(" + _currentOptionIndex + ")", LOG_WARN())
-
-    SetOptionFlags(optionId, int_if (dependency, enabled, disabled))
-    ; Log(self, "SetOptionDependencyBoolSingle", "optionId " + "(" + _currentOptionIndex + ")", LOG_WARN())
-
-
-    if (dependency)
-        return true
-    endif
-
-    return false
-endFunction
-
-
-bool function IsOptionInArray(int arrayID, int optionID)
-    float start = StartBenchmark()
-    int i = 0
-    while (i < JArray.count(arrayID))
-        int _container = JArray.getObj(arrayID, i) ; Gets the container inside the array at i
-        int _containerKey = JIntMap.nextKey(_container) ; Gets the container's next key for each iteration
-
-        if (_containerKey == optionID)
-            ; We found the option map inside the array
-            EndBenchmark(start)
-            Debug("IsOptionInArray", "Execution end, found key")
-            return true
-        endif
-        i += 1
-    endWhile
-
-    EndBenchmark(start)
-    Debug("IsOptionInArray", "Execution end, did not find key")
-    Trace("IsOptionInArray", "Array does not exist or has no items!", i == 0 && ENABLE_TRACE)
-    Trace("IsOptionInArray", "Option not found in array!", i != 0 && ENABLE_TRACE)
-
-    return false
-endFunction
-
-
-
-function SetBoolOptionValue(string _key, bool value)
-    int _array = __getOptionsArrayAtKey(_key)
-
-    if (_array == ARRAY_NOT_EXIST)
-        return ; Array does not exist
-    endif
-
-    int _container = JArray.getObj(_array, CurrentOptionIndex)
-    int _containerKey = JIntMap.getNthKey(_container, 0)
-
-    JIntMap.setInt(_container, _containerKey, value as int)
-    SetToggleOptionValue(_containerKey, value)
-
-    bool retrievedValue = JIntMap.getInt(_container, _containerKey)
-
-    Trace("SetBoolOptionValue", "Set new value of " + (retrievedValue as bool) + " to Option ID " + _containerKey + " for key " + _key, ENABLE_TRACE)
-endFunction
-
 function ToggleOption(string _key, bool storePersistently = true)
     int _array = __getOptionsArrayAtKey(_key)
 
@@ -409,10 +309,17 @@ function ToggleOption(string _key, bool storePersistently = true)
 
 endFunction
 
-int function AddOptionToggle(string text, bool defaultValue, int index = -1)
-    return AddOptionToggleWithKey(text, text, defaultValue, index)
-endFunction
 
+;/
+    Adds and renders a Toggle Option with the possibility of specifying a Key for its storage.
+
+    string      @displayedText: The text that will be displayed in the menu.
+    string      @overrideKey: The key to be used to set values to and from storage.
+    bool        @defaultValue: The default value before being rendered for the first time.
+    int         @index: The index of where to render this option in storage. (-1 means it is a Single Option)
+
+    returns:    The option's ID.
+/;
 int function AddOptionToggleWithKey(string displayedText, string overrideKey, bool defaultValue, int index = -1)
     string optionKey    = __makeOptionKey(overrideKey)          ; optionKey = Undressing::Allow Undressing
     string cacheKey     = __makeCacheOptionKey(overrideKey)     ; cacheKey  = Allow Undressing
@@ -427,10 +334,21 @@ int function AddOptionToggleWithKey(string displayedText, string overrideKey, bo
     return optionId
 endFunction
 
-int function AddOptionSlider(string text, float defaultValue, int index = -1)
-    return AddOptionSliderWithKey(text, text, defaultValue, index)
+int function AddOptionToggle(string text, bool defaultValue, int index = -1)
+    return AddOptionToggleWithKey(text, text, defaultValue, index)
 endFunction
 
+
+;/
+    Adds and renders a Slider Option with the possibility of specifying a Key for its storage.
+
+    string      @displayedText: The text that will be displayed in the menu.
+    string      @overrideKey: The key to be used to set values to and from storage.
+    float       @defaultValue: The default value before being rendered for the first time.
+    int         @index: The index of where to render this option in storage. (-1 means it is a Single Option)
+
+    returns:    The option's ID.
+/;
 int function AddOptionSliderWithKey(string displayedText, string overrideKey, float defaultValue, int index = -1)
     string optionKey        = __makeOptionKey(overrideKey)          ; optionKey = Undressing::Allow Undressing
     string cacheKey         = __makeCacheOptionKey(overrideKey)     ; cacheKey  = Allow Undressing
@@ -445,10 +363,20 @@ int function AddOptionSliderWithKey(string displayedText, string overrideKey, fl
     return optionId
 endFunction
 
-int function AddOptionMenu(string text, string defaultValue, int index = -1)
-    return AddOptionMenuWithKey(text, text, defaultValue, index)
+int function AddOptionSlider(string text, float defaultValue, int index = -1)
+    return AddOptionSliderWithKey(text, text, defaultValue, index)
 endFunction
 
+;/
+    Adds and renders a Menu Option with the possibility of specifying a Key for its storage.
+
+    string      @displayedText: The text that will be displayed in the menu.
+    string      @overrideKey: The key to be used to set values to and from storage.
+    string      @defaultValue: The default value before being rendered for the first time.
+    int         @index: The index of where to render this option in storage. (-1 means it is a Single Option)
+
+    returns:    The option's ID.
+/;
 int function AddOptionMenuWithKey(string displayedText, string overrideKey, string defaultValue, int index = -1)
     string optionKey        = __makeOptionKey(overrideKey)          ; optionKey = Undressing::Allow Undressing
     string cacheKey         = __makeCacheOptionKey(overrideKey)     ; cacheKey  = Allow Undressing
@@ -462,6 +390,11 @@ int function AddOptionMenuWithKey(string displayedText, string overrideKey, stri
 
     return optionId
 endFunction
+
+int function AddOptionMenu(string text, string defaultValue, int index = -1)
+    return AddOptionMenuWithKey(text, text, defaultValue, index)
+endFunction
+
 
 int function GetOptionFromMap(string _key)
     float startTime = StartBenchmark()
@@ -556,32 +489,6 @@ string function GetKeyFromOption(int optionId)
     EndBenchmark(s)
 endFunction
 
-; string function GetKeyFromOption(int optionId)
-;     string[] keys = JMap.allKeysPArray(optionsMap)
-
-;     int keyIndex = 0
-;     while (keyIndex < keys.Length)
-;         string _key = keys[keyIndex]
-;         ; Debug(self, "GetKeyFromOption", "Key: " + _key)
-
-;         ; Search all containers inside this key till we find optionId
-;         int _array = JMap.getObj(optionsMap, _key)
-
-;         int arrayIndex = 0
-;         while (arrayIndex < JArray.count(_array))
-;             int _container      = JArray.getObj(_array, arrayIndex)
-;             int _containerKey   = JIntMap.getNthKey(_container, 0)
-
-;             if (_containerKey == optionId)
-;                 Debug(self, "GetKeyFromOption", "Found match for key: " + _key + " (Option ID: " +  optionId + ")", IS_DEBUG)
-;                 return _key
-;             endif
-;             arrayIndex += 1
-;         endWhile
-;         keyIndex += 1
-;     endWhile
-; endFunction
-
 function ListOptionMap()
     string[] keys = JMap.allKeysPArray(optionsMap)
 
@@ -612,7 +519,6 @@ event OnConfigInit()
 
     __initializeOptionsMap()
     __initializeCacheMap()
-
 endEvent
 
 event OnPageReset(string page)
@@ -793,7 +699,6 @@ endFunction
 
 ; ============================================================================
 ;                               Option Functions
-
 ;/
      Stores every Option in the menu.
      This is a map of arrays, which themselves contain maps of options.
@@ -813,23 +718,6 @@ endFunction
         {key: 1030, value: false},
         ...
      ]
-
-     New Implementation:
-     optionsMap[undressing] = [
-        "allowUndressing" = [
-            {key: 1026, value: true},
-            {key: 1028, value: true},
-            {key: 1030, value: false},
-        ],
-        "minimumBountyToUndress" = [
-            {key: 1066, value: 1200},
-            {key: 1078, value: 1700},
-            {key: 1080, value: 3300},
-        ]
-     ]
-
-     Single Options:
-     optionsMap[prison::single::timescale] = {key: 1881, value: 20.0}
 /;
 int optionsMap
 
@@ -854,6 +742,14 @@ function __addOptionInternal(string displayedText, int optionId, string optionKe
     __addOptionCache(optionId, cacheKey, index)
 endFunction
 
+;/
+    Retrieves a bool value for a specified option from the internal storage.
+
+    string      @_key: The key of the option to retrieve the value from.
+    int         @index: The index in the array of the option to retrieve.
+
+    returns:    If the option exists and has a bool value, returns the value, otherwise returns < GENERAL_ERROR.
+/;
 int function __getBoolOptionValue(string _key, int index)
     int _array = __getOptionsArrayAtKey(_key)
 
@@ -874,6 +770,14 @@ int function __getBoolOptionValue(string _key, int index)
     return (_containerValue as int)
 endFunction
 
+;/
+    Retrieves an int value for a specified option from the internal storage.
+
+    string      @_key: The key of the option to retrieve the value from.
+    int         @index: The index in the array of the option to retrieve.
+
+    returns:    If the option exists and has an int value, returns the value, otherwise returns < GENERAL_ERROR.
+/;
 int function __getIntOptionValue(string _key, int index)
     int _array = __getOptionsArrayAtKey(_key)
 
@@ -893,6 +797,14 @@ int function __getIntOptionValue(string _key, int index)
     return _containerValue
 endFunction
 
+;/
+    Retrieves a float value for a specified option from the internal storage.
+
+    string      @_key: The key of the option to retrieve the value from.
+    int         @index: The index in the array of the option to retrieve.
+
+    returns:    If the option exists and has a float value, returns the value, otherwise returns < GENERAL_ERROR.
+/;
 float function __getFloatOptionValue(string _key, int index)
     int _array = __getOptionsArrayAtKey(_key)
     if (_array == ARRAY_NOT_EXIST)
@@ -911,6 +823,14 @@ float function __getFloatOptionValue(string _key, int index)
     return _containerValue
 endFunction
 
+;/
+    Retrieves a string value for a specified option from the internal storage.
+
+    string      @_key: The key of the option to retrieve the value from.
+    int         @index: The index in the array of the option to retrieve.
+
+    returns:    If the option exists and has a string value, returns the value, otherwise returns < GENERAL_ERROR.
+/;
 string function __getStringOptionValue(string _key, int index)
     int _array = __getOptionsArrayAtKey(_key)
     if (_array == ARRAY_NOT_EXIST)
@@ -1135,7 +1055,6 @@ function __updateIndexSlowInternal(int optionId)
 endFunction
 ; ============================================================================
 ;                               Utility Functions
-
 ;/
     Creates a pair structure for integers.
 
@@ -1172,22 +1091,6 @@ endFunction
 
     Implementation:
     cacheMap[PageName] : StringMap = [
-        {key: optionId, value: index}, : IntMap
-        {key: optionId, value: index}, : IntMap
-        {key: optionId, value: index}, : IntMap
-        ...
-    ]
-
-    Example:
-    cacheMap[undressing] = [
-        {key: 1771, value: 2},
-        {key: 1786, value: 4},
-        {key: 1764, value: 0},
-        ...
-    ]
-
-    New Implementation:
-    cacheMap[PageName] : StringMap = [
         { key: optionId, value: [index, optionName] }, : IntMap
         { key: optionId, value: [index, optionName] }, : IntMap
         { key: optionId, value: [index, optionName] }, : IntMap
@@ -1195,7 +1098,7 @@ endFunction
     ]
     
     Example:
-    cacheMap[undressing] = [
+    cacheMap[Undressing] = [
         { key: 1771, value: [1, "Allow Undressing"] },
         { key: 1786, value: [4, "Undress at Cell"] },
         { key: 1764, value: [2, "Strip Search Thoroughness"] },
@@ -1296,7 +1199,7 @@ int function __getCachedOptionsCount(int cachedOptionsArray)
 endFunction
 
 ;/
-    Placeholder function for a future change of the cache key
+    Placeholder function for a future change of the cache key.
 /;
 string function __makeCacheOptionKey(string displayedText)
     return displayedText
