@@ -220,18 +220,29 @@ endProperty
 
 function InitializePages()
     Pages = new string[12]
-    Pages[0] = RealisticPrisonAndBounty_MCM_General.GetPageName()
-    Pages[1] = RealisticPrisonAndBounty_MCM_Arrest.GetPageName()
-    Pages[2] = RealisticPrisonAndBounty_MCM_Frisking.GetPageName()
-    Pages[3] = RealisticPrisonAndBounty_MCM_Undress.GetPageName()
-    Pages[4] = RealisticPrisonAndBounty_MCM_Clothing.GetPageName()
-    Pages[5] = RealisticPrisonAndBounty_MCM_Prison.GetPageName()
-    Pages[6] = RealisticPrisonAndBounty_MCM_Release.GetPageName()
-    Pages[7] = RealisticPrisonAndBounty_MCM_Escape.GetPageName()
-    Pages[8] = RealisticPrisonAndBounty_MCM_Bounty.GetPageName()
-    Pages[9] = RealisticPrisonAndBounty_MCM_BHunters.GetPageName()
-    Pages[10] = RealisticPrisonAndBounty_MCM_Leveling.GetPageName()
-    Pages[11] = RealisticPrisonAndBounty_MCM_Status.GetPageName()
+
+    Pages[0] = "Whiterun"
+    Pages[1] = "Winterhold"
+    Pages[2] = "Eastmarch"
+    Pages[3] = "Falkreath"
+    Pages[4] = "Haafingar"
+    Pages[5] = "Hjaalmarch"
+    Pages[6] = "The Rift"
+    Pages[7] = "The Reach"
+    Pages[8] = "The Pale"
+
+    ; Pages[0] = RealisticPrisonAndBounty_MCM_General.GetPageName()
+    ; Pages[1] = RealisticPrisonAndBounty_MCM_Arrest.GetPageName()
+    ; Pages[2] = RealisticPrisonAndBounty_MCM_Frisking.GetPageName()
+    ; Pages[3] = RealisticPrisonAndBounty_MCM_Undress.GetPageName()
+    ; Pages[4] = RealisticPrisonAndBounty_MCM_Clothing.GetPageName()
+    ; Pages[5] = RealisticPrisonAndBounty_MCM_Prison.GetPageName()
+    ; Pages[6] = RealisticPrisonAndBounty_MCM_Release.GetPageName()
+    ; Pages[7] = RealisticPrisonAndBounty_MCM_Escape.GetPageName()
+    ; Pages[8] = RealisticPrisonAndBounty_MCM_Bounty.GetPageName()
+    ; Pages[9] = RealisticPrisonAndBounty_MCM_BHunters.GetPageName()
+    ; Pages[10] = RealisticPrisonAndBounty_MCM_Leveling.GetPageName()
+    ; Pages[11] = RealisticPrisonAndBounty_MCM_Status.GetPageName()
     ; Pages[12] = RealisticPrisonAndBounty_MCM_Whiterun.GetPageName()
 endFunction
 
@@ -565,7 +576,7 @@ event OnPageReset(string page)
     RealisticPrisonAndBounty_MCM_BHunters.Render(self)
     RealisticPrisonAndBounty_MCM_Leveling.Render(self)
     RealisticPrisonAndBounty_MCM_Status.Render(self)
-    ; RealisticPrisonAndBounty_MCM_Whiterun.Render(self)
+    RealisticPrisonAndBounty_MCM_Whiterun.Render(self)
 endEvent
 
 event OnOptionHighlight(int option)
@@ -581,7 +592,7 @@ event OnOptionHighlight(int option)
     RealisticPrisonAndBounty_MCM_BHunters.OnHighlight(self, option)
     RealisticPrisonAndBounty_MCM_Leveling.OnHighlight(self, option)
     RealisticPrisonAndBounty_MCM_Status.OnHighlight(self, option)
-    ; RealisticPrisonAndBounty_MCM_Whiterun.OnHighlight(self, option)
+    RealisticPrisonAndBounty_MCM_Whiterun.OnHighlight(self, option)
 
 endEvent
 
