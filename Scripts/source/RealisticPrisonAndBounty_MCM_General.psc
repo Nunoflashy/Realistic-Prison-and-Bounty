@@ -24,6 +24,16 @@ endFunction
 
 function RenderOptions(RealisticPrisonAndBounty_MCM mcm, int index) global
     mcm.AddOptionSlider("Attack on Sight Bounty",               mcm.ARREST_DEFAULT_BOUNTY_WHEN_DEFEATED_FLAT, index)
+
+    mcm.AddTextOption("", "When Arrested", mcm.OPTION_DISABLED)
+    mcm.AddOptionToggle("Allow Civilian Capture",                           mcm.ARREST_DEFAULT_ALLOW_CIVILIAN_CAPTURE, index)
+    mcm.AddOptionToggle("Allow Arrest Transfer",                            mcm.ARREST_DEFAULT_ALLOW_ARREST_TRANSFER, index)
+    mcm.AddOptionToggle("Allow Unconscious Arrest",                         mcm.ARREST_DEFAULT_ALLOW_UNCONSCIOUS_ARREST, index)
+
+    mcm.AddTextOption("", "When Imprisoned",                                mcm.OPTION_DISABLED)
+    mcm.AddOptionToggle("Fast Forward",                                     mcm.PRISON_DEFAULT_FAST_FORWARD, index)
+    mcm.AddOptionSlider("Day to fast forward from",                         mcm.PRISON_DEFAULT_DAY_FAST_FORWARD, index)
+
 endFunction
 
 function Left(RealisticPrisonAndBounty_MCM mcm) global
