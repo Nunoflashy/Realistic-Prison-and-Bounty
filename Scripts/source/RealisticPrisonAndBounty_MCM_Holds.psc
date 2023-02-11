@@ -1,14 +1,9 @@
-Scriptname RealisticPrisonAndBounty_MCM_Whiterun hidden
+Scriptname RealisticPrisonAndBounty_MCM_Holds hidden
 
 import RealisticPrisonAndBounty_Util
 
-string function GetPageName() global
-    return "Whiterun"
-endFunction
-
 bool function ShouldHandleEvent(RealisticPrisonAndBounty_MCM mcm) global
-    return mcm.CurrentPage != ""
-    return mcm.CurrentPage == GetPageName()
+    return mcm.CurrentPage != "" ; If the page is any hold, handle events
 endFunction
 
 function Render(RealisticPrisonAndBounty_MCM mcm) global
@@ -345,52 +340,84 @@ function OnOptionSelect(RealisticPrisonAndBounty_MCM mcm, string option) global
 endFunction
 
 function OnOptionSliderOpen(RealisticPrisonAndBounty_MCM mcm, string option) global
-    
+
     int sliderOptionValue = mcm.GetOptionSliderValue(option)
 
-    if (option == "Minimum Bounty to Undress")
+    if (option == "Arrest::Minimum Bounty to Arrest")
         mcm.SetSliderOptions(minRange = 1, \
          maxRange = 100000, \
          intervalSteps = 1, \
-         defaultValue = mcm.UNDRESSING_DEFAULT_MIN_BOUNTY, \
-         startValue = int_if(sliderOptionValue, sliderOptionValue, mcm.UNDRESSING_DEFAULT_MIN_BOUNTY))
+         defaultValue = mcm.ARREST_DEFAULT_MIN_BOUNTY, \
+         startValue = int_if(sliderOptionValue > mcm.GENERAL_ERROR, sliderOptionValue, mcm.ARREST_DEFAULT_MIN_BOUNTY))
 
-    elseif (option == "Forced Undressing (Bounty)")
+    elseif (option == "Arrest::Guaranteed Payable Bounty")
         mcm.SetSliderOptions(minRange = 1, \
          maxRange = 100000, \
          intervalSteps = 1, \
-         defaultValue = mcm.UNDRESSING_DEFAULT_FORCED_MIN_BOUNTY, \
-         startValue = int_if(sliderOptionValue, sliderOptionValue, mcm.UNDRESSING_DEFAULT_FORCED_MIN_BOUNTY))
-         
-    elseif (option == "Strip Search Thoroughness")
+         defaultValue = mcm.ARREST_DEFAULT_GUARANTEED_PAYABLE_BOUNTY, \
+         startValue = int_if(sliderOptionValue > mcm.GENERAL_ERROR, sliderOptionValue, mcm.ARREST_DEFAULT_GUARANTEED_PAYABLE_BOUNTY))
+
+    elseif (option == "Arrest::Maximum Payable Bounty")
         mcm.SetSliderOptions(minRange = 1, \
-         maxRange = 10, \
+         maxRange = 100000, \
          intervalSteps = 1, \
-         defaultValue = mcm.UNDRESSING_DEFAULT_STRIP_THOROUGHNESS, \
-         startValue = int_if(sliderOptionValue, sliderOptionValue, mcm.UNDRESSING_DEFAULT_STRIP_THOROUGHNESS))
+         defaultValue = mcm.ARREST_DEFAULT_MAXIMUM_PAYABLE_BOUNTY, \
+         startValue = int_if(sliderOptionValue > mcm.GENERAL_ERROR, sliderOptionValue, mcm.ARREST_DEFAULT_MAXIMUM_PAYABLE_BOUNTY))
+
+    elseif (option == "Arrest::Additional Bounty when Resisting (% of Bounty)")
+        mcm.SetSliderOptions(minRange = 1, \
+         maxRange = 100, \
+         intervalSteps = 1, \
+         defaultValue = mcm.ARREST_DEFAULT_BOUNTY_WHEN_RESISTING_PERCENT, \
+         startValue = int_if(sliderOptionValue > mcm.GENERAL_ERROR, sliderOptionValue, mcm.ARREST_DEFAULT_BOUNTY_WHEN_RESISTING_PERCENT))
+
+    elseif (option == "Arrest::Additional Bounty when Resisting (Flat)")
+        mcm.SetSliderOptions(minRange = 1, \
+         maxRange = 100000, \
+         intervalSteps = 1, \
+         defaultValue = mcm.ARREST_DEFAULT_BOUNTY_WHEN_RESISTING_FLAT, \
+         startValue = int_if(sliderOptionValue > mcm.GENERAL_ERROR, sliderOptionValue, mcm.ARREST_DEFAULT_BOUNTY_WHEN_RESISTING_FLAT))
+
+    elseif (option == "Arrest::Additional Bounty when Defeated (% of Bounty)")
+        mcm.SetSliderOptions(minRange = 1, \
+         maxRange = 100, \
+         intervalSteps = 1, \
+         defaultValue = mcm.ARREST_DEFAULT_BOUNTY_WHEN_DEFEATED_PERCENT, \
+         startValue = int_if(sliderOptionValue > mcm.GENERAL_ERROR, sliderOptionValue, mcm.ARREST_DEFAULT_BOUNTY_WHEN_DEFEATED_PERCENT))
+
+    elseif (option == "Arrest::Additional Bounty when Defeated (Flat)")
+        mcm.SetSliderOptions(minRange = 1, \
+         maxRange = 100000, \
+         intervalSteps = 1, \
+         defaultValue = mcm.ARREST_DEFAULT_BOUNTY_WHEN_DEFEATED_FLAT, \
+         startValue = int_if(sliderOptionValue > mcm.GENERAL_ERROR, sliderOptionValue, mcm.ARREST_DEFAULT_BOUNTY_WHEN_DEFEATED_FLAT))
+
+    elseif (option == "Arrest::Unequip Hand Garments (Minimum Bounty)")
+        mcm.SetSliderOptions(minRange = 1, \
+         maxRange = 100000, \
+         intervalSteps = 1, \
+         defaultValue = mcm.ARREST_DEFAULT_UNEQUIP_HAND_BOUNTY, \
+         startValue = int_if(sliderOptionValue > mcm.GENERAL_ERROR, sliderOptionValue, mcm.ARREST_DEFAULT_UNEQUIP_HAND_BOUNTY))
+
+    elseif (option == "Arrest::Unequip Head Garments (Minimum Bounty)")
+        mcm.SetSliderOptions(minRange = 1, \
+         maxRange = 100000, \
+         intervalSteps = 1, \
+         defaultValue = mcm.ARREST_DEFAULT_UNEQUIP_HEAD_BOUNTY, \
+         startValue = int_if(sliderOptionValue > mcm.GENERAL_ERROR, sliderOptionValue, mcm.ARREST_DEFAULT_UNEQUIP_HEAD_BOUNTY))
+
+    elseif (option == "Arrest::Unequip Foot Garments (Minimum Bounty)")
+        mcm.SetSliderOptions(minRange = 1, \
+         maxRange = 100000, \
+         intervalSteps = 1, \
+         defaultValue = mcm.ARREST_DEFAULT_UNEQUIP_FOOT_BOUNTY, \
+         startValue = int_if(sliderOptionValue > mcm.GENERAL_ERROR, sliderOptionValue, mcm.ARREST_DEFAULT_UNEQUIP_FOOT_BOUNTY))
+
     endif
 
 endFunction
 
 function OnOptionSliderAccept(RealisticPrisonAndBounty_MCM mcm, string option, float value) global
-
-    ; int minimumBounty                   = mcm.GetOptionInListByOID(mcm.oid_undressing_minimumBounty, oid)
-    ; int forcedUndressingMinBounty       = mcm.GetOptionInListByOID(mcm.oid_undressing_forcedUndressingMinBounty, oid)     
-    ; int stripSearchThoroughness         = mcm.GetOptionInListByOID(mcm.oid_undressing_stripSearchThoroughness, oid)  
-    ; int redressBounty                   = mcm.GetOptionInListByOID(mcm.oid_undressing_redressBounty, oid)
-
-    ; mcm.SetSliderOptionValue(oid, value, string_if(oid == stripSearchThoroughness, "{0}", "{0} Bounty"))
-    ; ; if (oid == minimumBounty)
-    ; ;     SetOptionValueIntByKey("oid_undressing_minimumBounty" + mcm.CurrentOptionIndex , value as int)
-    ; ; elseif (oid == forcedUndressingMinBounty)
-    ; ;     SetOptionValueIntByKey("oid_undressing_forcedUndressingMinBounty" + mcm.CurrentOptionIndex , value as int)
-    ; ; elseif (oid == stripSearchThoroughness)
-    ; ;     SetOptionValueIntByKey("oid_undressing_stripSearchThoroughness" + mcm.CurrentOptionIndex , value as int)
-    ; ; elseif (oid == redressBounty)
-    ; ;     SetOptionValueIntByKey("oid_undressing_redressBounty" + mcm.CurrentOptionIndex , value as int)
-    ; ; endif
-
-    ; SetOptionValueInt(oid, value as int)
     mcm.SetOptionSliderValue(option, value)
 endFunction
 
@@ -431,7 +458,6 @@ function OnHighlight(RealisticPrisonAndBounty_MCM mcm, int oid) global
         return
     endif
     
-    mcm.UpdateIndex(oid)
     OnOptionHighlight(mcm, mcm.GetKeyFromOption(oid))
 endFunction
 

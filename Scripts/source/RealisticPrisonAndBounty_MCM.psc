@@ -127,16 +127,17 @@ int  property BOUNTY_HUNTERS_DEFAULT_MIN_BOUNTY_GROUP  = 6000 autoreadonly
 
 ; ==============================================================================
 ; Holds
-int property INDEX_WHITERUN     = 0 autoreadonly
-int property INDEX_WINTERHOLD   = 1 autoreadonly
-int property INDEX_EASTMARCH    = 2 autoreadonly
-int property INDEX_FALKREATH    = 3 autoreadonly
-int property INDEX_HAAFINGAR    = 4 autoreadonly
-int property INDEX_HJAALMARCH   = 5 autoreadonly
-int property INDEX_THE_RIFT     = 6 autoreadonly
-int property INDEX_THE_REACH    = 7 autoreadonly
-int property INDEX_THE_PALE     = 8 autoreadonly
+int property INDEX_WHITERUN             = 0 autoreadonly
+int property INDEX_WINTERHOLD           = 1 autoreadonly
+int property INDEX_EASTMARCH            = 2 autoreadonly
+int property INDEX_FALKREATH            = 3 autoreadonly
+int property INDEX_HAAFINGAR            = 4 autoreadonly
+int property INDEX_HJAALMARCH           = 5 autoreadonly
+int property INDEX_THE_RIFT             = 6 autoreadonly
+int property INDEX_THE_REACH            = 7 autoreadonly
+int property INDEX_THE_PALE             = 8 autoreadonly
 
+; Categories
 int property CATEGORY_ARREST            = 0 autoreadonly
 int property CATEGORY_FRISKING          = 1 autoreadonly
 int property CATEGORY_RELEASE           = 2 autoreadonly
@@ -208,30 +209,10 @@ int property RightPanelSize
     endFunction
 endProperty
 
-int _currentOptionIndex = -1
-int property CurrentOptionIndex
-    int function get()
-        if (_currentOptionIndex == -1)
-            LogPropertyIf(self, "CurrentOptionIndex", "No index set, current option is of type SINGLE." + " (" + _currentOptionIndex + ")", IS_DEBUG, LOG_INFO())
-        
-        elseif (_currentOptionIndex < -1)
-            LogProperty(self, "CurrentOptionIndex", "Value is undefined " + "(" + _currentOptionIndex + ")", LOG_ERROR())
-        endif
-
-        return _currentOptionIndex
-    endFunction
-endProperty
-
 string _currentRenderedCategory
 string property CurrentRenderedCategory
     string function get()
         return _currentRenderedCategory
-    endFunction
-endProperty
-
-string property CurrentHold
-    string function get()
-        return _holds[CurrentOptionIndex]
     endFunction
 endProperty
 
@@ -247,20 +228,6 @@ function InitializePages()
     Pages[6] = "The Rift"
     Pages[7] = "The Reach"
     Pages[8] = "The Pale"
-
-    ; Pages[0] = RealisticPrisonAndBounty_MCM_General.GetPageName()
-    ; Pages[1] = RealisticPrisonAndBounty_MCM_Arrest.GetPageName()
-    ; Pages[2] = RealisticPrisonAndBounty_MCM_Frisking.GetPageName()
-    ; Pages[3] = RealisticPrisonAndBounty_MCM_Undress.GetPageName()
-    ; Pages[4] = RealisticPrisonAndBounty_MCM_Clothing.GetPageName()
-    ; Pages[5] = RealisticPrisonAndBounty_MCM_Prison.GetPageName()
-    ; Pages[6] = RealisticPrisonAndBounty_MCM_Release.GetPageName()
-    ; Pages[7] = RealisticPrisonAndBounty_MCM_Escape.GetPageName()
-    ; Pages[8] = RealisticPrisonAndBounty_MCM_Bounty.GetPageName()
-    ; Pages[9] = RealisticPrisonAndBounty_MCM_BHunters.GetPageName()
-    ; Pages[10] = RealisticPrisonAndBounty_MCM_Leveling.GetPageName()
-    ; Pages[11] = RealisticPrisonAndBounty_MCM_Status.GetPageName()
-    ; Pages[12] = RealisticPrisonAndBounty_MCM_Whiterun.GetPageName()
 endFunction
 
 int function GetGlobalTimescale()
@@ -281,19 +248,6 @@ int function GetOptionValue(string page, string optionName, int index)
     Debug("GetOptionValue", "Page: " + page + ", Option Name: " + optionName + ", Index: " + index)
 
     return containerValue
-endFunction
-
-
-function UpdateIndex(int optionId)
-    int cachedOption = __findCachedOption(optionId)
-
-    if (cachedOption != INVALID_VALUE)
-        _currentOptionIndex = __getCachedOptionIndex(cachedOption)
-        return
-    endif
-
-    ; Cache not found, proceed with the slow approach
-    __updateIndexSlowInternal(optionId)
 endFunction
 
 ; ============================================================
@@ -319,56 +273,18 @@ function ToggleOption(string _key, bool storePersistently = true)
         return ; Array does not exist
     endif
 
-    int index = int_if (__isSingleOption(_array), SINGLE_OPTION_INDEX, CurrentOptionIndex) ; Single options will have 0 index
-    int _container = JArray.getObj(_array, index) 
-    Trace("ToggleOption", "[" + _key +"] " + "Container: " + _container + ", Array: " + _array, ENABLE_TRACE)
+    int _container = JArray.getObj(_array, 0)
+    Debug("ToggleOption", "[" + _key +"] " + "Container: " + _container + ", Array: " + _array)
+    int _containerKey = JIntMap.nextKey(_container)
+    bool _containerValue = JIntMap.getInt(_container, _containerKey) as bool
+    Debug("ToggleOption", "[" + _key +"] " + "Key: " + _containerKey + ", Value: " + _containerValue)
+    JIntMap.setInt(_container, _containerKey, (!_containerValue) as int) ; Toggle value
+    SetToggleOptionValue(_containerKey, !_containerValue)
+    Debug("ToggleOption", "[" + _key +"] " + "Container: " + _container  + ", Container Key: " + _containerKey + " (" + 0 + " iterations)")
+    Debug("ToggleOption", "Set new value of " + !_containerValue + " to Option ID " + _containerKey + " for key " + _key)
 
-    int i = 0
-    while (i < JArray.count(_array))
-        int _containerKey = JIntMap.nextKey(_container)
-        bool _containerValue = JIntMap.getInt(_container, _containerKey) as bool
-        Trace("ToggleOption", "[" + _key +"] " + "Key: " + _containerKey + ", Value: " + _containerValue, ENABLE_TRACE)
-
-        if (i == index)
-            JIntMap.setInt(_container, _containerKey, (!_containerValue) as int) ; Toggle value
-            SetToggleOptionValue(_containerKey, !_containerValue)
-            Trace("ToggleOption", "[" + _key +"] " + "Container: " + _container  + ", Container Key: " + _containerKey + " (" + i + " iterations)", ENABLE_TRACE)
-            Trace("ToggleOption", "Set new value of " + !_containerValue + " to Option ID " + _containerKey + " for key " + _key, ENABLE_TRACE)
-            return
-        endif
-        i += 1
-    endWhile
 
 endFunction
-
-; function ToggleOption(string _key, bool storePersistently = true)
-;     int _array = __getOptionsArrayAtKey(_key)
-
-;     if (_array == ARRAY_NOT_EXIST)
-;         return ; Array does not exist
-;     endif
-
-;     int index = int_if (__isSingleOption(_array), SINGLE_OPTION_INDEX, CurrentOptionIndex) ; Single options will have 0 index
-;     int _container = JArray.getObj(_array, index) 
-;     Trace("ToggleOption", "[" + _key +"] " + "Container: " + _container + ", Array: " + _array, ENABLE_TRACE)
-
-;     int i = 0
-;     while (i < JArray.count(_array))
-;         int _containerKey = JIntMap.nextKey(_container)
-;         bool _containerValue = JIntMap.getInt(_container, _containerKey) as bool
-;         Trace("ToggleOption", "[" + _key +"] " + "Key: " + _containerKey + ", Value: " + _containerValue, ENABLE_TRACE)
-
-;         if (i == index)
-;             JIntMap.setInt(_container, _containerKey, (!_containerValue) as int) ; Toggle value
-;             SetToggleOptionValue(_containerKey, !_containerValue)
-;             Trace("ToggleOption", "[" + _key +"] " + "Container: " + _container  + ", Container Key: " + _containerKey + " (" + i + " iterations)", ENABLE_TRACE)
-;             Trace("ToggleOption", "Set new value of " + !_containerValue + " to Option ID " + _containerKey + " for key " + _key, ENABLE_TRACE)
-;             return
-;         endif
-;         i += 1
-;     endWhile
-
-; endFunction
 
 
 int function AddOptionCategory(string text, int flags = 0)
@@ -571,7 +487,7 @@ endFunction
         return ARRAY_NOT_EXIST
     endif
 
-    int _optionMap = __getOption(optionArray, CurrentOptionIndex)
+    int _optionMap = __getOption(optionArray, 0)
 
     if (_optionMap == 0)
         Error("GetOption", "Container: " + _optionMap + " does not exist at key " + _key + ", returning...")
@@ -581,7 +497,7 @@ endFunction
     int _optionId       = __getOptionKey(_optionMap)
     int _optionValue    = __getOptionValue(_optionMap, _optionId)
 
-    Trace("GetOption", "[CurrentOptionIndex: " + CurrentOptionIndex + "] Returned Option ID: " + _optionId + ", with value: " + _optionValue, ENABLE_TRACE)
+    Trace("GetOption", "[CurrentOptionIndex: " + 0 + "] Returned Option ID: " + _optionId + ", with value: " + _optionValue, ENABLE_TRACE)
     return _optionId
 endFunction
 
@@ -593,7 +509,8 @@ endFunction
     returns:    The option's value
 /;
 int function GetOptionSliderValue(string option)
-    string _key = __makeOptionKey(option)
+    string _key = __makeOptionKey(option, includeCurrentCategory = false)
+    Debug("GetOptionSliderValue", "Key is: " + _key)
     return __getIntOptionValue(_key)
 endFunction
 
@@ -605,6 +522,7 @@ endFunction
 /;
 function SetOptionSliderValue(string option, float value)
     string _key = CurrentPage + "::" + option
+    Debug("SetOptionSliderValue", "Key is: " + _key)
     int optionId = GetOption(option)
 
     ; Change the value of the slider
@@ -616,19 +534,19 @@ endFunction
 
 string function GetKeyFromOption(int optionId)
     float s = StartBenchmark()
-    int _currentPageArray = JMap.getObj(cacheMap, CurrentPage)
+    int _currentPageArray = __getCacheOptionsAtPage(CurrentPage)
 
     int i = 0
     while (i < JValue.count(_currentPageArray))
-        int optionMap       = JArray.getObj(_currentPageArray, i)
-        int optionKey       = JIntMap.getNthKey(optionMap, 0)
+        int optionMap       = __getCacheOption(_currentPageArray, i)
+        int optionKey       = __getCacheOptionKey(optionMap)
 
         ; Debug("GetKeyFromOption", "The key is: " + optionKey + ", Value is: " +  optionValue)
 
         ; Debug("GetKeyFromOption", "The key is: " + optionName + ", Container is: " +  "(key: " + optionKey + ", value: "+ optionValue +")")
 
         if (optionId == optionKey)
-            string optionValue  = JIntMap.getStr(optionMap, optionKey)
+            string optionValue  = __getCacheOptionValue(optionMap, optionKey)
             EndBenchmark(s)
             Debug("GetKeyFromOption", "Found matching key for Option ID " + optionKey + "! Key is: " + optionValue)
             return optionValue ; We found the key that matches the option id.
@@ -639,30 +557,6 @@ string function GetKeyFromOption(int optionId)
 
     EndBenchmark(s)
 endFunction
-
-; string function GetKeyFromOption(int optionId)
-;     float s = StartBenchmark()
-;     int _optionsArray = __getCacheOptionsAtPage(CurrentPage) ; Array with all options for page
-
-;     int i = 0
-;     while (i < __getCachedOptionsCount(_optionsArray))
-;         int keyHolder       = __getCacheOption(_optionsArray, i) ; JIntMap { key: optionId, value: [index, optionName] }
-;         int containerKey    = __getCacheOptionKey(keyHolder) ; Option Key
-;         int containerValue  = __getCacheOptionValue(keyHolder, containerKey);  Array: [index, optionName]
-
-;         if (optionId == containerKey)
-;             ; We can get the option key string now!
-;             string optionName = __getCachedOptionName(containerValue)
-;             EndBenchmark(s)
-;             int index = JArray.getInt(containerValue, CACHED_OPTION_INDEX)
-;             Trace("GetKeyFromOption", "Found match for key: " + optionName + " (Option ID: " +  optionId + "), index: " + index, ENABLE_TRACE)
-;             return optionName
-;         endif
-
-;         i += 1
-;     endWhile
-;     EndBenchmark(s)
-; endFunction
 
 function ListOptionMap()
     string[] keys = JMap.allKeysPArray(optionsMap)
@@ -697,161 +591,37 @@ event OnConfigInit()
 endEvent
 
 event OnPageReset(string page)
-    RealisticPrisonAndBounty_MCM_General.Render(self)
-    RealisticPrisonAndBounty_MCM_Arrest.Render(self)
-    RealisticPrisonAndBounty_MCM_Frisking.Render(self)
-    RealisticPrisonAndBounty_MCM_Undress.Render(self)
-    RealisticPrisonAndBounty_MCM_Clothing.Render(self)
-    RealisticPrisonAndBounty_MCM_Prison.Render(self)
-    RealisticPrisonAndBounty_MCM_Release.Render(self)
-    RealisticPrisonAndBounty_MCM_Escape.Render(self)
-    RealisticPrisonAndBounty_MCM_Bounty.Render(self)
-    RealisticPrisonAndBounty_MCM_BHunters.Render(self)
-    RealisticPrisonAndBounty_MCM_Leveling.Render(self)
-    RealisticPrisonAndBounty_MCM_Status.Render(self)
-    RealisticPrisonAndBounty_MCM_Whiterun.Render(self)
+    RealisticPrisonAndBounty_MCM_Holds.Render(self)
 endEvent
 
 event OnOptionHighlight(int option)
-    RealisticPrisonAndBounty_MCM_General.OnHighlight(self, option)
-    RealisticPrisonAndBounty_MCM_Arrest.OnHighlight(self, option)
-    RealisticPrisonAndBounty_MCM_Frisking.OnHighlight(self, option)
-    RealisticPrisonAndBounty_MCM_Undress.OnHighlight(self, option)
-    RealisticPrisonAndBounty_MCM_Clothing.OnHighlight(self, option)
-    RealisticPrisonAndBounty_MCM_Prison.OnHighlight(self, option)
-    RealisticPrisonAndBounty_MCM_Release.OnHighlight(self, option)
-    RealisticPrisonAndBounty_MCM_Escape.OnHighlight(self, option)
-    RealisticPrisonAndBounty_MCM_Bounty.OnHighlight(self, option)
-    RealisticPrisonAndBounty_MCM_BHunters.OnHighlight(self, option)
-    RealisticPrisonAndBounty_MCM_Leveling.OnHighlight(self, option)
-    RealisticPrisonAndBounty_MCM_Status.OnHighlight(self, option)
-    RealisticPrisonAndBounty_MCM_Whiterun.OnHighlight(self, option)
+    RealisticPrisonAndBounty_MCM_Holds.OnHighlight(self, option)
 endEvent
 
 event OnOptionDefault(int option)
-    RealisticPrisonAndBounty_MCM_General.OnDefault(self, option)
-    RealisticPrisonAndBounty_MCM_Arrest.OnDefault(self, option)
-    RealisticPrisonAndBounty_MCM_Frisking.OnDefault(self, option)
-    RealisticPrisonAndBounty_MCM_Undress.OnDefault(self, option)
-    RealisticPrisonAndBounty_MCM_Clothing.OnDefault(self, option)
-    RealisticPrisonAndBounty_MCM_Prison.OnDefault(self, option)
-    RealisticPrisonAndBounty_MCM_Release.OnDefault(self, option)
-    RealisticPrisonAndBounty_MCM_Escape.OnDefault(self, option)
-    RealisticPrisonAndBounty_MCM_Bounty.OnDefault(self, option)
-    RealisticPrisonAndBounty_MCM_BHunters.OnDefault(self, option)
-    RealisticPrisonAndBounty_MCM_Leveling.OnDefault(self, option)
-    RealisticPrisonAndBounty_MCM_Whiterun.OnDefault(self, option)
-
-    ; RealisticPrisonAndBounty_MCM_Status.OnDefault(self, option)
+    RealisticPrisonAndBounty_MCM_Holds.OnDefault(self, option)
 endEvent
 
 event OnOptionSelect(int option)
-    RealisticPrisonAndBounty_MCM_General.OnSelect(self, option)
-    RealisticPrisonAndBounty_MCM_Arrest.OnSelect(self, option)
-    RealisticPrisonAndBounty_MCM_Frisking.OnSelect(self, option)
-    RealisticPrisonAndBounty_MCM_Undress.OnSelect(self, option)
-    RealisticPrisonAndBounty_MCM_Clothing.OnSelect(self, option)
-    RealisticPrisonAndBounty_MCM_Prison.OnSelect(self, option)
-    RealisticPrisonAndBounty_MCM_Release.OnSelect(self, option)
-    RealisticPrisonAndBounty_MCM_Escape.OnSelect(self, option)
-    RealisticPrisonAndBounty_MCM_Bounty.OnSelect(self, option)
-    RealisticPrisonAndBounty_MCM_BHunters.OnSelect(self, option)
-    RealisticPrisonAndBounty_MCM_Leveling.OnSelect(self, option)
-    RealisticPrisonAndBounty_MCM_Whiterun.OnSelect(self, option)
-
-    ; RealisticPrisonAndBounty_MCM_Status.OnDefault(self, option)
-    
-    ; if (IS_DEBUG)
-    ;     string optionKey = GetKeyFromOption(option)
-    ;     Debug(self, "MCM::OnOptionSelect", "Option ID: " + option + " (" + optionKey + ")")
-    ; endif
-
-    ; GetOptionFromMap(GetKeyFromOption(option))
+    RealisticPrisonAndBounty_MCM_Holds.OnSelect(self, option)
 endEvent
 
 
 
 event OnOptionSliderOpen(int option)
-    RealisticPrisonAndBounty_MCM_General.OnSliderOpen(self, option)
-    RealisticPrisonAndBounty_MCM_Arrest.OnSliderOpen(self, option)
-    RealisticPrisonAndBounty_MCM_Frisking.OnSliderOpen(self, option)
-    RealisticPrisonAndBounty_MCM_Undress.OnSliderOpen(self, option)
-    RealisticPrisonAndBounty_MCM_Clothing.OnSliderOpen(self, option)
-    RealisticPrisonAndBounty_MCM_Prison.OnSliderOpen(self, option)
-    RealisticPrisonAndBounty_MCM_Release.OnSliderOpen(self, option)
-    RealisticPrisonAndBounty_MCM_Escape.OnSliderOpen(self, option)
-    RealisticPrisonAndBounty_MCM_Bounty.OnSliderOpen(self, option)
-    RealisticPrisonAndBounty_MCM_BHunters.OnSliderOpen(self, option)
-    RealisticPrisonAndBounty_MCM_Leveling.OnSliderOpen(self, option)
-    RealisticPrisonAndBounty_MCM_Status.OnSliderOpen(self, option)
-    RealisticPrisonAndBounty_MCM_Whiterun.OnSliderOpen(self, option)
-
-    ; if (IS_DEBUG)
-    ;     string optionKey = GetKeyFromOption(option)
-    ;     Debug(self, "MCM::OnOptionSliderOpen", "Option ID: " + option + " (" + optionKey + ")")
-    ; endif
-
-    ; GetOptionFromMap(GetKeyFromOption(option))
-
-
+    RealisticPrisonAndBounty_MCM_Holds.OnSliderOpen(self, option)
 endEvent
 
 event OnOptionSliderAccept(int option, float value)
-    RealisticPrisonAndBounty_MCM_General.OnSliderAccept(self, option, value)
-    RealisticPrisonAndBounty_MCM_Arrest.OnSliderAccept(self, option, value)
-    RealisticPrisonAndBounty_MCM_Frisking.OnSliderAccept(self, option, value)
-    RealisticPrisonAndBounty_MCM_Undress.OnSliderAccept(self, option, value)
-    RealisticPrisonAndBounty_MCM_Clothing.OnSliderAccept(self, option, value)
-    RealisticPrisonAndBounty_MCM_Prison.OnSliderAccept(self, option, value)
-    RealisticPrisonAndBounty_MCM_Release.OnSliderAccept(self, option, value)
-    RealisticPrisonAndBounty_MCM_Escape.OnSliderAccept(self, option, value)
-    RealisticPrisonAndBounty_MCM_Bounty.OnSliderAccept(self, option, value)
-    RealisticPrisonAndBounty_MCM_BHunters.OnSliderAccept(self, option, value)
-    RealisticPrisonAndBounty_MCM_Leveling.OnSliderAccept(self, option, value)
-    RealisticPrisonAndBounty_MCM_Status.OnSliderAccept(self, option, value)
-    RealisticPrisonAndBounty_MCM_Whiterun.OnSliderAccept(self, option, value)
+    RealisticPrisonAndBounty_MCM_Holds.OnSliderAccept(self, option, value)
 endEvent
 
 event OnOptionMenuOpen(int option)
-    RealisticPrisonAndBounty_MCM_General.OnMenuOpen(self, option)
-    RealisticPrisonAndBounty_MCM_Arrest.OnMenuOpen(self, option)
-    RealisticPrisonAndBounty_MCM_Frisking.OnMenuOpen(self, option)
-    RealisticPrisonAndBounty_MCM_Undress.OnMenuOpen(self, option)
-    RealisticPrisonAndBounty_MCM_Clothing.OnMenuOpen(self, option)
-    RealisticPrisonAndBounty_MCM_Prison.OnMenuOpen(self, option)
-    RealisticPrisonAndBounty_MCM_Release.OnMenuOpen(self, option)
-    RealisticPrisonAndBounty_MCM_Escape.OnMenuOpen(self, option)
-    RealisticPrisonAndBounty_MCM_Bounty.OnMenuOpen(self, option)
-    RealisticPrisonAndBounty_MCM_BHunters.OnMenuOpen(self, option)
-    RealisticPrisonAndBounty_MCM_Leveling.OnMenuOpen(self, option)
-    RealisticPrisonAndBounty_MCM_Whiterun.OnMenuOpen(self, option)
-
-    ; RealisticPrisonAndBounty_MCM_Status.OnMenuOpen(self, option)
-
-    ; if (IS_DEBUG)
-    ;     string optionKey = GetKeyFromOption(option)
-    ;     Debug(self, "MCM::OnOptionMenuOpen", "Option ID: " + option + " (" + optionKey + ")")
-    ; endif
-
-    ; GetOptionFromMap(GetKeyFromOption(option))
-
+    RealisticPrisonAndBounty_MCM_Holds.OnMenuOpen(self, option)
 endEvent
 
 event OnOptionMenuAccept(int option, int index)
-    RealisticPrisonAndBounty_MCM_General.OnMenuAccept(self, option, index)
-    RealisticPrisonAndBounty_MCM_Arrest.OnMenuAccept(self, option, index)
-    RealisticPrisonAndBounty_MCM_Frisking.OnMenuAccept(self, option, index)
-    RealisticPrisonAndBounty_MCM_Undress.OnMenuAccept(self, option, index)
-    RealisticPrisonAndBounty_MCM_Clothing.OnMenuAccept(self, option, index)
-    RealisticPrisonAndBounty_MCM_Prison.OnMenuAccept(self, option, index)
-    RealisticPrisonAndBounty_MCM_Release.OnMenuAccept(self, option, index)
-    RealisticPrisonAndBounty_MCM_Escape.OnMenuAccept(self, option, index)
-    RealisticPrisonAndBounty_MCM_Bounty.OnMenuAccept(self, option, index)
-    RealisticPrisonAndBounty_MCM_BHunters.OnMenuAccept(self, option, index)
-    RealisticPrisonAndBounty_MCM_Leveling.OnMenuAccept(self, option, index)
-    RealisticPrisonAndBounty_MCM_Whiterun.OnMenuAccept(self, option, index)
-
-    ; RealisticPrisonAndBounty_MCM_Status.OnMenuOpen(self, option)
+    RealisticPrisonAndBounty_MCM_Holds.OnMenuAccept(self, option, index)
 endEvent
 
 ; ============================================================================
@@ -1192,8 +962,12 @@ endFunction
 
     returns:    The key based on the text passed in.
 /;
-string function __makeOptionKey(string displayedText)
-    return CurrentPage + "::" + CurrentRenderedCategory + "::" + displayedText
+string function __makeOptionKey(string displayedText, bool includeCurrentCategory = true)
+    if (includeCurrentCategory)
+        return CurrentPage + "::" + CurrentRenderedCategory + "::" + displayedText
+    else
+        return CurrentPage + "::" + displayedText
+    endif
 endFunction
 
 ;/
@@ -1320,35 +1094,6 @@ bool function __isSingleOption(int _array)
     return JArray.count(_array) == 1
 endFunction
 
-function __updateIndexSlowInternal(int optionId)
-    ; Cache not found, proceed with the slow approach
-    string[] optionKeys = JMap.allKeysPArray(optionsMap)
-
-    int optionIndex = 0
-    while (optionIndex < optionKeys.Length)
-        string optionKey = optionKeys[optionIndex]
-
-        Trace("__updateIndexSlowInternal", "Key is " + optionKey + ", updating index...", ENABLE_TRACE)
-        int _optionsArray = JMap.getObj(optionsMap, optionKey) ; optionsMap[undressing::allowUndressing]
-
-        int i = 0
-        while (i < JArray.count(_optionsArray))
-            ; Get containers inside the array (Option Maps)
-            int _container = JArray.getObj(_optionsArray, i)
-            int _containerKey = JIntMap.nextKey(_container)
-            int _containerValue = JIntMap.getInt(_container, _containerKey)
-
-            if (_containerKey == optionId)
-                __addOptionCache(optionId, optionKey, i) ; Create cache for this option at this index, for next time (TODO: test this optionKey)
-                Info("__updateIndexSlowInternal", "Created cache option for ID: " + optionId + ", Name: " + optionKey + ", index: " + i)
-                _currentOptionIndex = i
-                return
-            endif
-            i += 1
-        endWhile
-        optionIndex += 1
-    endWhile
-endFunction
 ; ============================================================================
 ;                               Utility Functions
 ;/
@@ -1387,17 +1132,17 @@ endFunction
 
     Implementation:
     cacheMap[PageName] : StringMap = [
-        { key: optionId, value: [index, optionName] }, : IntMap
-        { key: optionId, value: [index, optionName] }, : IntMap
-        { key: optionId, value: [index, optionName] }, : IntMap
+        { key: optionId, value: optionName }, : IntMap
+        { key: optionId, value: optionName }, : IntMap
+        { key: optionId, value: optionName }, : IntMap
         ...
     ]
     
     Example:
-    cacheMap[Undressing] = [
-        { key: 1771, value: [1, "Allow Undressing"] },
-        { key: 1786, value: [4, "Undress at Cell"] },
-        { key: 1764, value: [2, "Strip Search Thoroughness"] },
+    cacheMap[Whiterun] = [
+        { key: 1771, value: "Undressing::Allow Undressing" },
+        { key: 1786, value: "Undressing::Undress at Cell" },
+        { key: 1764, value: "Undressing::Strip Search Thoroughness" },
         ...
     ]
 /;
@@ -1454,11 +1199,11 @@ endFunction
     JIntMap     @cachedOption: The option passed in.
     int         @cachedOptionKey: The option's key.
 
-    returns:    The option's value. : JArray 
-        [index, optionName]
+    returns:    The option's value. : string 
+        optionName
 /;
-int function __getCacheOptionValue(int cachedOption, int cachedOptionKey)
-    return JIntMap.getObj(cachedOption, cachedOptionKey)
+string function __getCacheOptionValue(int cachedOption, int cachedOptionKey)
+    return JIntMap.getStr(cachedOption, cachedOptionKey)
 endFunction
 
 ;/
@@ -1535,47 +1280,13 @@ bool function __optionExists(string _key, int optionId)
 endFunction
 
 ;/
-    Finds the cached option by its ID if it exists in the Cache Map.
-    The search is performed on the CurrentPage from the cache map to avoid any unnecessary slowdowns.
-    Traverses through the IntMaps in the CurrentPage array inside CacheMap until it finds the optionId,
-    which then retrieves the value from that optionId key container
-
-    int     @optionId: The option's ID.
-
-    returns: The container with the option's name and index. : Array
-        [index, optionName]
-
-    Cache Map implementation:
-    cacheMap[CurrentPage] = [
-        { key: optionId, value: [index, optionName] } : IntMap
-    ]
-/;
-int function __findCachedOption(int optionId)
-    int _cacheOptions = __getCacheOptionsAtPage(CurrentPage)
-
-    int i = 0
-    while (i < JArray.count(_cacheOptions))
-        int option          = __getCacheOption(_cacheOptions, i) ; JIntMap { key: optionId, value: [index, optionName] }
-        int optionKey       = __getCacheOptionKey(option) ; int optionId
-
-        if (optionId == optionKey)
-            return __getCacheOptionValue(option, optionKey) ; Array: [index, optionName]
-        endif
-        i += 1
-    endWhile
-    
-    Warn("__findCachedOption", "Could not find a cached option for " + CurrentPage + "::" + optionId + "!")
-    return INVALID_VALUE
-endFunction
-
-;/
     Adds caching to the specified option when updating anything based on its Option ID.
     The cache should contain all of the page's Option ID's with their respective index,
     hence, this function should be used when rendering multiple options for a page.
 
     int     @optionId: The option's id to be cached.
     string  @optionName: The name of the option.
-    int     @index: The index to bind to this option to know what to update.
+
 /;
 function __addOptionCache(int optionId, string optionName, int index)
     ;/
@@ -1607,19 +1318,6 @@ function __addOptionCache(int optionId, string optionName, int index)
 
     Debug("__addOptionCache", "Created cache option: " + "(key: " + optionId + ", value: "+ optionName +")")
 endFunction
-
-int function __createCachedOptionContainer(int optionId, string optionName, int index)
-    int _container = JIntMap.object()
-    int _nameIndexArray = JArray.object()
-    JArray.addInt(_nameIndexArray, index)
-    JArray.addStr(_nameIndexArray, optionName)
-    JIntMap.setObj(_container, optionId, _nameIndexArray) ; { key: optionId, value: [index, optionName] }
-
-    Trace("__createCachedOptionContainer", "Created cached option container: " + "{ key: "+ optionId +", value: ["+ optionName +", " + index + "]}", ENABLE_TRACE)
-
-    return _container
-endFunction
-
 
 ; ============================================================================
 ;                                   end private
