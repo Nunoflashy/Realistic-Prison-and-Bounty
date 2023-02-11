@@ -41,14 +41,30 @@ bool function LOG_CALL_HIDDEN() global
 endFunction
 
 string function __getLogLevel(int _level) global
-    return \ 
-        string_if(_level == LOG_NOTYPE(), "", \
-        string_if(_level == LOG_TRACE(), "trace:", \
-        string_if(_level == LOG_DEBUG(), "debug:", \
-        string_if(_level == LOG_INFO(), "info:", \
-        string_if(_level == LOG_WARN(), "warn:", \
-        string_if(_level == LOG_ERROR(), "error:", \
-        string_if(_level == LOG_FATAL(), "fatal:")))))))
+    if (_level == LOG_NOTYPE())
+        return ""
+    elseif (_level == LOG_TRACE())
+        return "TRACE:"
+    elseif (_level == LOG_DEBUG())
+        return "DEBUG:"
+    elseif (_level == LOG_INFO())
+        return "INFO:"
+    elseif (_level == LOG_WARN())
+        return "WARN:"
+    elseif (_level == LOG_ERROR())
+        return "ERROR:"
+    elseif (_level == LOG_FATAL())
+        return "FATAL:"
+    endif
+
+    ; return \ 
+    ;     string_if(_level == LOG_NOTYPE(), "", \
+    ;     string_if(_level == LOG_TRACE(), "trace:", \
+    ;     string_if(_level == LOG_DEBUG(), "debug:", \
+    ;     string_if(_level == LOG_INFO(), "info:", \
+    ;     string_if(_level == LOG_WARN(), "warn:", \
+    ;     string_if(_level == LOG_ERROR(), "error:", \
+    ;     string_if(_level == LOG_FATAL(), "fatal:")))))))
 endFunction
 
 ; string function __getLogLevel(int _level) global
@@ -88,7 +104,7 @@ function local_log_if(string caller, string logInfo, bool condition, int logLeve
     endif
 endfunction
 
-function Log(Form script, string caller, string logInfo, int logLevel = 0, bool hideCall = false) global
+function Log(string caller, string logInfo, int logLevel = 0, bool hideCall = false) global
     string logLvl  = __getLogLevel(logLevel)
 
     if(caller == "" || hideCall)
@@ -96,14 +112,6 @@ function Log(Form script, string caller, string logInfo, int logLevel = 0, bool 
         debug.trace("[" + ModName() + "] " +  logLvl + " " + logInfo)
     else
         caller += "()" ; Append to caller name
-
-        if(script.GetState() != "")
-            ; We are currently in a state, let the caller know
-            string scopedState = script.GetState() + "::" + caller
-
-            ; Since the caller was appended to the scoped state, the caller becomes part of the state
-            caller = scopedState
-        endif
         debug.trace("[" + ModName() + "] " +  logLvl + " " + caller + " -> " + logInfo)
     endif
 
@@ -111,6 +119,30 @@ function Log(Form script, string caller, string logInfo, int logLevel = 0, bool 
     ; With caller from empty state: [ModName] INFO: OnUpdateGameTime() -> Message
     ; Without caller:               [ModName] INFO: Message
 endFunction
+
+; function Log(Form script, string caller, string logInfo, int logLevel = 0, bool hideCall = false) global
+;     string logLvl  = __getLogLevel(logLevel)
+
+;     if(caller == "" || hideCall)
+;         ; We didn't pass any function name nor a state scope, let the log be anonymous
+;         debug.trace("[" + ModName() + "] " +  logLvl + " " + logInfo)
+;     else
+;         caller += "()" ; Append to caller name
+
+;         if(script.GetState() != "")
+;             ; We are currently in a state, let the caller know
+;             string scopedState = script.GetState() + "::" + caller
+
+;             ; Since the caller was appended to the scoped state, the caller becomes part of the state
+;             caller = scopedState
+;         endif
+;         debug.trace("[" + ModName() + "] " +  logLvl + " " + caller + " -> " + logInfo)
+;     endif
+
+;     ; With caller from a state:     [ModName] INFO: State::OnUpdateGameTime() -> Message
+;     ; With caller from empty state: [ModName] INFO: OnUpdateGameTime() -> Message
+;     ; Without caller:               [ModName] INFO: Message
+; endFunction
 ; //////////////////////////
 
 function Trace(Form script, string caller, string logInfo, bool condition = true, bool hideCall = false) global
@@ -147,9 +179,25 @@ function Fatal(Form script, string caller, string logInfo, bool condition = true
     ; Log(script, caller, logInfo, LOG_FATAL(), hideCall)
 endfunction
 
+function Assert(Form script, string caller, string description) global
+    string logLvl  = "ASSERT:"
+
+    if(caller == "")
+        ; We didn't pass any function name nor a state scope, let the log be anonymous
+        debug.trace("[" + ModName() + "] " +  logLvl + " " + description)
+    else
+        caller += "()" ; Append to caller name
+        debug.trace("[" + ModName() + "] " +  logLvl + " " + caller + " -> " + description)
+    endif
+
+    ; With caller from a state:     [ModName] INFO: State::OnUpdateGameTime() -> Message
+    ; With caller from empty state: [ModName] INFO: OnUpdateGameTime() -> Message
+    ; Without caller:               [ModName] INFO: Message
+endFunction
+
 function LogIf(Form script, string caller, string logInfo, bool condition, int logLevel = 0, bool hideCall = false) global
     if(condition)
-        Log(script, caller, logInfo, logLevel, hideCall)
+        Log(caller, logInfo, logLevel, hideCall)
     endif
 endfunction
 

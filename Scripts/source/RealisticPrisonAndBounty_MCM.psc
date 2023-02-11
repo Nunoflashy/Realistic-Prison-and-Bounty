@@ -8,6 +8,7 @@ import RealisticPrisonAndBounty_Util
 
 bool property IS_DEBUG      = true autoreadonly
 bool property ENABLE_TRACE  = false autoreadonly
+bool property ENABLE_ASSERTIONS = true autoreadonly
 
 ; ==============================================================================
 ; Cached Option
@@ -135,6 +136,15 @@ int property INDEX_HJAALMARCH   = 5 autoreadonly
 int property INDEX_THE_RIFT     = 6 autoreadonly
 int property INDEX_THE_REACH    = 7 autoreadonly
 int property INDEX_THE_PALE     = 8 autoreadonly
+
+int property CATEGORY_ARREST            = 0 autoreadonly
+int property CATEGORY_FRISKING          = 1 autoreadonly
+int property CATEGORY_RELEASE           = 2 autoreadonly
+int property CATEGORY_BOUNTY_HUNTING    = 3 autoreadonly
+int property CATEGORY_PRISON            = 4 autoreadonly
+int property CATEGORY_UNDRESSING        = 5 autoreadonly
+int property CATEGORY_ESCAPE            = 6 autoreadonly
+int property CATEGORY_BOUNTY            = 7 autoreadonly
 ; ==============================================================================
 ; End Constants
 ; ==============================================================================
@@ -212,6 +222,13 @@ int property CurrentOptionIndex
     endFunction
 endProperty
 
+string _currentRenderedCategory
+string property CurrentRenderedCategory
+    string function get()
+        return _currentRenderedCategory
+    endFunction
+endProperty
+
 string property CurrentHold
     string function get()
         return _holds[CurrentOptionIndex]
@@ -219,7 +236,7 @@ string property CurrentHold
 endProperty
 
 function InitializePages()
-    Pages = new string[12]
+    Pages = new string[9]
 
     Pages[0] = "Whiterun"
     Pages[1] = "Winterhold"
@@ -296,7 +313,8 @@ endFunction
 
 function ToggleOption(string _key, bool storePersistently = true)
     int _array = __getOptionsArrayAtKey(_key)
-
+    Debug("ToggleOption", "Key: " + _key)
+    
     if (_array == ARRAY_NOT_EXIST)
         return ; Array does not exist
     endif
@@ -323,6 +341,40 @@ function ToggleOption(string _key, bool storePersistently = true)
 
 endFunction
 
+; function ToggleOption(string _key, bool storePersistently = true)
+;     int _array = __getOptionsArrayAtKey(_key)
+
+;     if (_array == ARRAY_NOT_EXIST)
+;         return ; Array does not exist
+;     endif
+
+;     int index = int_if (__isSingleOption(_array), SINGLE_OPTION_INDEX, CurrentOptionIndex) ; Single options will have 0 index
+;     int _container = JArray.getObj(_array, index) 
+;     Trace("ToggleOption", "[" + _key +"] " + "Container: " + _container + ", Array: " + _array, ENABLE_TRACE)
+
+;     int i = 0
+;     while (i < JArray.count(_array))
+;         int _containerKey = JIntMap.nextKey(_container)
+;         bool _containerValue = JIntMap.getInt(_container, _containerKey) as bool
+;         Trace("ToggleOption", "[" + _key +"] " + "Key: " + _containerKey + ", Value: " + _containerValue, ENABLE_TRACE)
+
+;         if (i == index)
+;             JIntMap.setInt(_container, _containerKey, (!_containerValue) as int) ; Toggle value
+;             SetToggleOptionValue(_containerKey, !_containerValue)
+;             Trace("ToggleOption", "[" + _key +"] " + "Container: " + _container  + ", Container Key: " + _containerKey + " (" + i + " iterations)", ENABLE_TRACE)
+;             Trace("ToggleOption", "Set new value of " + !_containerValue + " to Option ID " + _containerKey + " for key " + _key, ENABLE_TRACE)
+;             return
+;         endif
+;         i += 1
+;     endWhile
+
+; endFunction
+
+
+int function AddOptionCategory(string text, int flags = 0)
+    _currentRenderedCategory = text
+    AddHeaderOption(text, flags)
+endFunction
 
 ;/
     Adds and renders a Toggle Option with the possibility of specifying a Key for its storage.
@@ -334,11 +386,34 @@ endFunction
 
     returns:    The option's ID.
 /;
+int function AddOptionToggleWithCategoryAndKey(string displayedText, string overrideKey, bool defaultValue, int index = -1)
+    string optionKey    = __makeOptionKey(overrideKey) ; optionKey = Whiterun::Undressing::Allow Undressing
+    string cacheKey     = __makeCacheOptionKey(overrideKey)     ; cacheKey  = Allow Undressing
+
+    int value           = __getBoolOptionValue(optionKey)
+    int optionId        = AddToggleOption(displayedText, bool_if (value < GENERAL_ERROR, defaultValue, (value as bool)))
+
+
+    ; Debug("AddOptionToggleWithCategoryAndKey", "Key: " + optionKey, IS_DEBUG)
+
+    if (!__optionExists(optionKey, optionId))
+        __addOptionInternal(displayedText, optionId, optionKey, cacheKey, __createOptionBool(optionId, defaultValue), index)
+        ;  displayedText: Minimum Bounty to Arrest, optionId: 1026, optionKey: Whiterun::Arrest::Minimum Bounty to Arrest
+    endif
+
+    return optionId
+endFunction
+
+int function AddOptionToggleWithCategory(string text, bool defaultValue, int index = -1)
+    return AddOptionToggleWithCategoryAndKey(text, text, defaultValue, index)
+endFunction
+
+
 int function AddOptionToggleWithKey(string displayedText, string overrideKey, bool defaultValue, int index = -1)
     string optionKey    = __makeOptionKey(overrideKey)          ; optionKey = Undressing::Allow Undressing
     string cacheKey     = __makeCacheOptionKey(overrideKey)     ; cacheKey  = Allow Undressing
 
-    int value           = __getBoolOptionValue(optionKey, int_if (index == -1, SINGLE_OPTION_INDEX, index)) ; if index was not set, this is a single option.
+    int value           ;= __getBoolOptionValue(optionKey, int_if (index == -1, SINGLE_OPTION_INDEX, index))
     int optionId        = AddToggleOption(displayedText, bool_if (value < GENERAL_ERROR, defaultValue, (value as bool)))
     
     if (!__optionExists(optionKey, optionId))
@@ -348,8 +423,29 @@ int function AddOptionToggleWithKey(string displayedText, string overrideKey, bo
     return optionId
 endFunction
 
+
+
 int function AddOptionToggle(string text, bool defaultValue, int index = -1)
     return AddOptionToggleWithKey(text, text, defaultValue, index)
+endFunction
+
+
+int function AddOptionSliderWithCategoryAndKey(string displayedText, string overrideKey, float defaultValue, int index = -1)
+    string optionKey        = __makeOptionKey(overrideKey) ; optionKey = Whiterun::Undressing::Allow Undressing
+    string cacheKey         = __makeCacheOptionKey(overrideKey)     ; cacheKey  = Allow Undressing
+
+    float value             = __getFloatOptionValue(optionKey)
+    int optionId            = AddSliderOption(displayedText, float_if (value < GENERAL_ERROR, defaultValue, value))
+    
+    if (!__optionExists(optionKey, optionId))
+        __addOptionInternal(displayedText, optionId, optionKey, cacheKey, __createOptionFloat(optionId, defaultValue), index)
+    endif
+
+    return optionId
+endFunction
+
+int function AddOptionSliderWithCategory(string text, float defaultValue, int index = -1)
+    AddOptionSliderWithCategoryAndKey(text, text, defaultValue, index)
 endFunction
 
 ;/
@@ -366,7 +462,7 @@ int function AddOptionSliderWithKey(string displayedText, string overrideKey, fl
     string optionKey        = __makeOptionKey(overrideKey)          ; optionKey = Undressing::Allow Undressing
     string cacheKey         = __makeCacheOptionKey(overrideKey)     ; cacheKey  = Allow Undressing
 
-    float value             = __getFloatOptionValue(optionKey, int_if (index == -1, SINGLE_OPTION_INDEX, index)) ; if index was not set, this is a single option.
+    float value             = __getFloatOptionValue(optionKey)
     int optionId            = AddSliderOption(displayedText, float_if (value < GENERAL_ERROR, defaultValue, value))
     
     if (!__optionExists(optionKey, optionId))
@@ -378,6 +474,24 @@ endFunction
 
 int function AddOptionSlider(string text, float defaultValue, int index = -1)
     return AddOptionSliderWithKey(text, text, defaultValue, index)
+endFunction
+
+int function AddOptionMenuWithCategoryAndKey(string displayedText, string overrideKey, string defaultValue, int index = -1)
+    string optionKey        = __makeOptionKey(overrideKey) ; optionKey = Whiterun::Undressing::Allow Undressing
+    string cacheKey         = __makeCacheOptionKey(overrideKey)     ; cacheKey  = Allow Undressing
+
+    string value            = __getStringOptionValue(optionKey)
+    int optionId            = AddMenuOption(displayedText, string_if (value < GENERAL_ERROR, defaultValue, value))
+    
+    if (!__optionExists(optionKey, optionId))
+        __addOptionInternal(displayedText, optionId, optionKey, cacheKey, __createOptionString(optionId, defaultValue), index)
+    endif
+
+    return optionId
+endFunction
+
+int function AddOptionMenuWithCategory(string text, string defaultValue, int index = -1)
+    AddOptionMenuWithCategoryAndKey(text, text, defaultValue, index)
 endFunction
 
 ;/
@@ -394,11 +508,11 @@ int function AddOptionMenuWithKey(string displayedText, string overrideKey, stri
     string optionKey        = __makeOptionKey(overrideKey)          ; optionKey = Undressing::Allow Undressing
     string cacheKey         = __makeCacheOptionKey(overrideKey)     ; cacheKey  = Allow Undressing
 
-    string value            = __getStringOptionValue(optionKey, int_if (index == -1, SINGLE_OPTION_INDEX, index)) ; if index was not set, this is a single option.
+    string value            = __getStringOptionValue(optionKey)
     int optionId            = AddMenuOption(displayedText, string_if (value < GENERAL_ERROR, defaultValue, value))
     
     if (!__optionExists(optionKey, optionId))
-        __addOptionInternal(displayedText, optionId, optionKey, cacheKey, __createOptionString(optionId, defaultValue), index)
+        ; __addOptionInternal(displayedText, optionId, optionKey, cacheKey, __createOptionString(optionKey, optionId, defaultValue), index)
     endif
 
     return optionId
@@ -480,7 +594,7 @@ endFunction
 /;
 int function GetOptionSliderValue(string option)
     string _key = __makeOptionKey(option)
-    return __getIntOptionValue(_key, CurrentOptionIndex) ; TODO: case for Single Options (-1 index)
+    return __getIntOptionValue(_key)
 endFunction
 
 ;/
@@ -497,39 +611,58 @@ function SetOptionSliderValue(string option, float value)
     SetSliderOptionValue(optionId, value)
 
     ; Store the value
-    __setFloatOptionValue(_key, value, CurrentOptionIndex)
+    __setFloatOptionValue(_key, value)
 endFunction
 
-;/
-    Retrieves the option's key (how it's stored in the save) from its id.
-
-    int @optionId: The option's id.
-
-    returns: The key for the option passed in. : string
-/;
 string function GetKeyFromOption(int optionId)
     float s = StartBenchmark()
-    int _optionsArray = __getCacheOptionsAtPage(CurrentPage) ; Array with all options for page
+    int _currentPageArray = JMap.getObj(cacheMap, CurrentPage)
 
     int i = 0
-    while (i < __getCachedOptionsCount(_optionsArray))
-        int keyHolder       = __getCacheOption(_optionsArray, i) ; JIntMap { key: optionId, value: [index, optionName] }
-        int containerKey    = __getCacheOptionKey(keyHolder) ; Option Key
-        int containerValue  = __getCacheOptionValue(keyHolder, containerKey);  Array: [index, optionName]
+    while (i < JValue.count(_currentPageArray))
+        int optionMap       = JArray.getObj(_currentPageArray, i)
+        int optionKey       = JIntMap.getNthKey(optionMap, 0)
 
-        if (optionId == containerKey)
-            ; We can get the option key string now!
-            string optionName = __getCachedOptionName(containerValue)
+        ; Debug("GetKeyFromOption", "The key is: " + optionKey + ", Value is: " +  optionValue)
+
+        ; Debug("GetKeyFromOption", "The key is: " + optionName + ", Container is: " +  "(key: " + optionKey + ", value: "+ optionValue +")")
+
+        if (optionId == optionKey)
+            string optionValue  = JIntMap.getStr(optionMap, optionKey)
             EndBenchmark(s)
-            int index = JArray.getInt(containerValue, CACHED_OPTION_INDEX)
-            Trace("GetKeyFromOption", "Found match for key: " + optionName + " (Option ID: " +  optionId + "), index: " + index, ENABLE_TRACE)
-            return optionName
+            Debug("GetKeyFromOption", "Found matching key for Option ID " + optionKey + "! Key is: " + optionValue)
+            return optionValue ; We found the key that matches the option id.
         endif
 
         i += 1
     endWhile
+
     EndBenchmark(s)
 endFunction
+
+; string function GetKeyFromOption(int optionId)
+;     float s = StartBenchmark()
+;     int _optionsArray = __getCacheOptionsAtPage(CurrentPage) ; Array with all options for page
+
+;     int i = 0
+;     while (i < __getCachedOptionsCount(_optionsArray))
+;         int keyHolder       = __getCacheOption(_optionsArray, i) ; JIntMap { key: optionId, value: [index, optionName] }
+;         int containerKey    = __getCacheOptionKey(keyHolder) ; Option Key
+;         int containerValue  = __getCacheOptionValue(keyHolder, containerKey);  Array: [index, optionName]
+
+;         if (optionId == containerKey)
+;             ; We can get the option key string now!
+;             string optionName = __getCachedOptionName(containerValue)
+;             EndBenchmark(s)
+;             int index = JArray.getInt(containerValue, CACHED_OPTION_INDEX)
+;             Trace("GetKeyFromOption", "Found match for key: " + optionName + " (Option ID: " +  optionId + "), index: " + index, ENABLE_TRACE)
+;             return optionName
+;         endif
+
+;         i += 1
+;     endWhile
+;     EndBenchmark(s)
+; endFunction
 
 function ListOptionMap()
     string[] keys = JMap.allKeysPArray(optionsMap)
@@ -593,7 +726,6 @@ event OnOptionHighlight(int option)
     RealisticPrisonAndBounty_MCM_Leveling.OnHighlight(self, option)
     RealisticPrisonAndBounty_MCM_Status.OnHighlight(self, option)
     RealisticPrisonAndBounty_MCM_Whiterun.OnHighlight(self, option)
-
 endEvent
 
 event OnOptionDefault(int option)
@@ -608,6 +740,8 @@ event OnOptionDefault(int option)
     RealisticPrisonAndBounty_MCM_Bounty.OnDefault(self, option)
     RealisticPrisonAndBounty_MCM_BHunters.OnDefault(self, option)
     RealisticPrisonAndBounty_MCM_Leveling.OnDefault(self, option)
+    RealisticPrisonAndBounty_MCM_Whiterun.OnDefault(self, option)
+
     ; RealisticPrisonAndBounty_MCM_Status.OnDefault(self, option)
 endEvent
 
@@ -623,6 +757,8 @@ event OnOptionSelect(int option)
     RealisticPrisonAndBounty_MCM_Bounty.OnSelect(self, option)
     RealisticPrisonAndBounty_MCM_BHunters.OnSelect(self, option)
     RealisticPrisonAndBounty_MCM_Leveling.OnSelect(self, option)
+    RealisticPrisonAndBounty_MCM_Whiterun.OnSelect(self, option)
+
     ; RealisticPrisonAndBounty_MCM_Status.OnDefault(self, option)
     
     ; if (IS_DEBUG)
@@ -648,6 +784,7 @@ event OnOptionSliderOpen(int option)
     RealisticPrisonAndBounty_MCM_BHunters.OnSliderOpen(self, option)
     RealisticPrisonAndBounty_MCM_Leveling.OnSliderOpen(self, option)
     RealisticPrisonAndBounty_MCM_Status.OnSliderOpen(self, option)
+    RealisticPrisonAndBounty_MCM_Whiterun.OnSliderOpen(self, option)
 
     ; if (IS_DEBUG)
     ;     string optionKey = GetKeyFromOption(option)
@@ -672,6 +809,7 @@ event OnOptionSliderAccept(int option, float value)
     RealisticPrisonAndBounty_MCM_BHunters.OnSliderAccept(self, option, value)
     RealisticPrisonAndBounty_MCM_Leveling.OnSliderAccept(self, option, value)
     RealisticPrisonAndBounty_MCM_Status.OnSliderAccept(self, option, value)
+    RealisticPrisonAndBounty_MCM_Whiterun.OnSliderAccept(self, option, value)
 endEvent
 
 event OnOptionMenuOpen(int option)
@@ -686,6 +824,8 @@ event OnOptionMenuOpen(int option)
     RealisticPrisonAndBounty_MCM_Bounty.OnMenuOpen(self, option)
     RealisticPrisonAndBounty_MCM_BHunters.OnMenuOpen(self, option)
     RealisticPrisonAndBounty_MCM_Leveling.OnMenuOpen(self, option)
+    RealisticPrisonAndBounty_MCM_Whiterun.OnMenuOpen(self, option)
+
     ; RealisticPrisonAndBounty_MCM_Status.OnMenuOpen(self, option)
 
     ; if (IS_DEBUG)
@@ -709,6 +849,8 @@ event OnOptionMenuAccept(int option, int index)
     RealisticPrisonAndBounty_MCM_Bounty.OnMenuAccept(self, option, index)
     RealisticPrisonAndBounty_MCM_BHunters.OnMenuAccept(self, option, index)
     RealisticPrisonAndBounty_MCM_Leveling.OnMenuAccept(self, option, index)
+    RealisticPrisonAndBounty_MCM_Whiterun.OnMenuAccept(self, option, index)
+
     ; RealisticPrisonAndBounty_MCM_Status.OnMenuOpen(self, option)
 endEvent
 
@@ -722,12 +864,12 @@ endEvent
 ; ============================================================================
 ;                               Logging Functions
 
-function Trace(string caller, string logInfo, bool condition = true)
-    RealisticPrisonAndBounty_Util.Trace(self, CurrentPage + "::" + caller, logInfo, condition)
+function Trace(string caller, string logInfo, bool condition = false)
+    RealisticPrisonAndBounty_Util.Trace(self, CurrentPage + "::" + caller, logInfo, condition || ENABLE_TRACE)
 endFunction
 
-function Debug(string caller, string logInfo, bool condition = true)
-    RealisticPrisonAndBounty_Util.Debug(self, CurrentPage + "::" + caller, logInfo, condition)
+function Debug(string caller, string logInfo, bool condition = false)
+    RealisticPrisonAndBounty_Util.Debug(self, CurrentPage + "::" + caller, logInfo, condition || IS_DEBUG)
 endFunction
 
 function Info(string caller, string logInfo, bool condition = true)
@@ -740,6 +882,55 @@ endFunction
 
 function Error(string caller, string logInfo, bool condition = true)
     RealisticPrisonAndBounty_Util.Error(self, CurrentPage + "::" + caller, logInfo, condition)
+endFunction
+
+; ============================================================================
+;                               Assertion Functions
+
+function assertIsOptionCreated(string page, string category, string optionName, string expectedKey, int expectedOptionId, float expectedValue)
+    if (!ENABLE_ASSERTIONS)
+        return
+    endif
+
+    Info("assertIsOptionCreated", "Assertion started: [page: "+ page +", category: "+ category +", optionName: "+ optionName +", expectedKey: "+ expectedKey +", expectedOptionId: "+ expectedOptionId +", expectedValue: "+ expectedValue +"]")
+    Info("assertIsOptionCreated", "__getCategoryToIndex("+category+"): " + __getCategoryToIndex(category))
+
+    int pageArray = JMap.getObj(optionsMap, page) ; JMap[]
+
+    if (pageArray == 0)
+        Assert(self, "assertIsOptionCreated", "Page array is empty!")
+        return
+    endif
+
+    int option  = JArray.getObj(pageArray, __getCategoryToIndex(category)) ; JMap : { key: optionName, value: [optionId, value]  }
+    if (option == 0)
+        Assert(self, "assertIsOptionCreated", "Option array is empty!")
+        return
+    endif
+
+    string optionKey    = JMap.getNthKey(option, 0)         ; string : optionName
+    int optionContainer = JMap.getObj(option, optionKey)    ; Array  : [optionId, value]
+    int optionId        = JArray.getInt(optionContainer, 0) ; int    : optionId
+    float optionValue   = JArray.getFlt(optionContainer, 1) ; float  : value
+
+    if (optionKey != expectedKey)
+        Assert(self, "assertIsOptionCreated", "ASSERTION FAILED: Option key does not match (optionKey != expectedKey)\n" + \ 
+            "\tExpected: " + expectedKey + ", Got: " + optionKey + "\n\n")
+        return
+    endif
+
+    if (optionId != expectedOptionId)
+        Assert(self, "assertIsOptionCreated", "ASSERTION FAILED: Option ID does not match (optionId != expectedOptionId)\n" + \ 
+            "\tExpected: " + expectedOptionId + ", Got: " + optionId + "\n\n")
+        return
+    endif
+
+    if (optionValue != expectedValue)
+        Assert(self, "assertIsOptionCreated", "ASSERTION FAILED: Option value does not match (optionValue != expectedValue)\n" + \ 
+            "\tExpected: " + expectedValue + ", Got: " + optionValue + "\n\n")
+        return
+    endif
+
 endFunction
 
 ; ============================================================================
@@ -771,6 +962,29 @@ function __initializeOptionsMap()
     JValue.retain(optionsMap)
 endFunction
 
+int function __getCategoryToIndex(string category)
+    if (category == "Arrest")
+        return CATEGORY_ARREST
+    elseif (category == "Frisking")
+        return CATEGORY_FRISKING
+    elseif (category == "Release")
+        return CATEGORY_RELEASE
+    elseif (category == "Bounty Hunting")
+        return CATEGORY_BOUNTY_HUNTING
+    elseif (category == "Prison")
+        return CATEGORY_PRISON
+    elseif (category == "Undressing")
+        return CATEGORY_UNDRESSING
+    elseif (category == "Escape")
+        return CATEGORY_ESCAPE
+    elseif (category == "Bounty")
+        return CATEGORY_BOUNTY
+    endif
+
+    return -1
+
+endFunction
+
 ;/
     Internal function to add any type of option to storage and cache.
 
@@ -789,20 +1003,18 @@ endFunction
 
 ;/
     Retrieves a bool value for a specified option from the internal storage.
-
     string      @_key: The key of the option to retrieve the value from.
     int         @index: The index in the array of the option to retrieve.
-
     returns:    If the option exists and has a bool value, returns the value, otherwise returns < GENERAL_ERROR.
 /;
-int function __getBoolOptionValue(string _key, int index)
+int function __getBoolOptionValue(string _key)
     int _array = __getOptionsArrayAtKey(_key)
 
     if (_array == ARRAY_NOT_EXIST)
         return ARRAY_NOT_EXIST ; Array does not exist
     endif
 
-    int _container = JArray.getObj(_array, index)
+    int _container = JArray.getObj(_array, 0)
     int _containerKey = JIntMap.getNthKey(_container, 0)
     bool _containerValue = JIntMap.getInt(_container, _containerKey) as bool
 
@@ -810,27 +1022,25 @@ int function __getBoolOptionValue(string _key, int index)
         return OPTION_NOT_EXIST ; Option does not exist
     endif
 
-    Trace("__getBoolOptionValue", "[" + _key + " (" + index + ")] " + "CT: " + _container + ", CT_KEY: " + _containerKey + ", CT_VALUE: " + _containerValue, ENABLE_TRACE)
+    Debug("__getBoolOptionValue", "[" + _key + " (" + 0 + ")] " + "CT: " + _container + ", CT_KEY: " + _containerKey + ", CT_VALUE: " + _containerValue)
 
     return (_containerValue as int)
 endFunction
 
 ;/
     Retrieves an int value for a specified option from the internal storage.
-
     string      @_key: The key of the option to retrieve the value from.
     int         @index: The index in the array of the option to retrieve.
-
     returns:    If the option exists and has an int value, returns the value, otherwise returns < GENERAL_ERROR.
 /;
-int function __getIntOptionValue(string _key, int index)
+int function __getIntOptionValue(string _key)
     int _array = __getOptionsArrayAtKey(_key)
 
     if (_array == ARRAY_NOT_EXIST)
         return ARRAY_NOT_EXIST ; Array does not exist
     endif
 
-    int _container = JArray.getObj(_array, index)
+    int _container = JArray.getObj(_array, 0)
     int _containerKey = JIntMap.getNthKey(_container, 0)
     int _containerValue = JIntMap.getInt(_container, _containerKey)
 
@@ -838,25 +1048,23 @@ int function __getIntOptionValue(string _key, int index)
         return OPTION_NOT_EXIST ; Option does not exist
     endif
 
-    Trace("__getFloatOptionValue", "[" + _key + " (" + index + ")] " + "CT: " + _container + ", CT_KEY: " + _containerKey + ", CT_VALUE: " + _containerValue, ENABLE_TRACE)
+    Debug("__getFloatOptionValue", "[" + _key + " (" + 0 + ")] " + "CT: " + _container + ", CT_KEY: " + _containerKey + ", CT_VALUE: " + _containerValue)
     return _containerValue
 endFunction
 
 ;/
     Retrieves a float value for a specified option from the internal storage.
-
     string      @_key: The key of the option to retrieve the value from.
     int         @index: The index in the array of the option to retrieve.
-
     returns:    If the option exists and has a float value, returns the value, otherwise returns < GENERAL_ERROR.
 /;
-float function __getFloatOptionValue(string _key, int index)
+float function __getFloatOptionValue(string _key)
     int _array = __getOptionsArrayAtKey(_key)
     if (_array == ARRAY_NOT_EXIST)
         return ARRAY_NOT_EXIST ; Array does not exist
     endif
 
-    int _container = JArray.getObj(_array, index)
+    int _container = JArray.getObj(_array, 0)
     int _containerKey = JIntMap.getNthKey(_container, 0)
     float _containerValue = JIntMap.getFlt(_container, _containerKey)
 
@@ -864,25 +1072,23 @@ float function __getFloatOptionValue(string _key, int index)
         return OPTION_NOT_EXIST ; Option does not exist
     endif
 
-    Trace("__getFloatOptionValue", "[" + _key + " (" + index + ")] " + "CT: " + _container + ", CT_KEY: " + _containerKey + ", CT_VALUE: " + _containerValue, ENABLE_TRACE)
+    Debug("__getFloatOptionValue", "[" + _key + " (" + 0 + ")] " + "CT: " + _container + ", CT_KEY: " + _containerKey + ", CT_VALUE: " + _containerValue)
     return _containerValue
 endFunction
 
 ;/
     Retrieves a string value for a specified option from the internal storage.
-
     string      @_key: The key of the option to retrieve the value from.
     int         @index: The index in the array of the option to retrieve.
-
     returns:    If the option exists and has a string value, returns the value, otherwise returns < GENERAL_ERROR.
 /;
-string function __getStringOptionValue(string _key, int index)
+string function __getStringOptionValue(string _key)
     int _array = __getOptionsArrayAtKey(_key)
     if (_array == ARRAY_NOT_EXIST)
         return ARRAY_NOT_EXIST ; Array does not exist
     endif
 
-    int _container = JArray.getObj(_array, index)
+    int _container = JArray.getObj(_array, 0)
     int _containerKey = JIntMap.getNthKey(_container, 0)
     string _containerValue = JIntMap.getStr(_container, _containerKey)
 
@@ -890,9 +1096,9 @@ string function __getStringOptionValue(string _key, int index)
         return OPTION_NOT_EXIST ; Option does not exist
     endif
 
-    Trace("__getFloatOptionValue", "[" + _key + " (" + index + ")] " + "CT: " + _container + ", CT_KEY: " + _containerKey + ", CT_VALUE: " + _containerValue, ENABLE_TRACE)
+    Debug("__getFloatOptionValue", "[" + _key + " (" + 0 + ")] " + "CT: " + _container + ", CT_KEY: " + _containerKey + ", CT_VALUE: " + _containerValue)
     return _containerValue
-endFunction
+endFunction 
 
 ;/
     Sets an option's value (float-based options only) in storage.
@@ -901,13 +1107,13 @@ endFunction
     float       @value: The new value for this option
     int         @index: The index of where this option is rendered in storage.
 /;
-function __setFloatOptionValue(string _key, float value, int index)
+function __setFloatOptionValue(string _key, float value)
     int _array = __getOptionsArrayAtKey(_key)
     if (_array == ARRAY_NOT_EXIST)
         return ; Array does not exist
     endif
 
-    int _container = JArray.getObj(_array, index)
+    int _container = JArray.getObj(_array, 0)
     int _containerKey = JIntMap.getNthKey(_container, 0)
     float _containerValue = JIntMap.getFlt(_container, _containerKey)
 
@@ -916,6 +1122,10 @@ function __setFloatOptionValue(string _key, float value, int index)
     if (_container == 0)
         return ; Option does not exist
     endif
+
+    int optionContainer = JMap.getObj(optionsMap, _key) ; JIntMap
+    int optionKey       = JIntMap.getNthKey(optionContainer, 0)
+
 endFunction
 
 ;/
@@ -929,7 +1139,7 @@ endFunction
 int function __getOptionsArrayAtKey(string _key, bool handleError = true)
     int _array = JMap.getObj(optionsMap, _key)
     if (_array == 0 && handleError)
-        Error("__getOptionsArrayAtKey", "__getOptionsArrayAtKey(" + _key + "): Container does not exist! (this error is normal the first time the MCM is rendered)")
+        ; Error("__getOptionsArrayAtKey", "__getOptionsArrayAtKey(" + _key + "): Container does not exist! (this error is normal the first time the MCM is rendered)")
         return ARRAY_NOT_EXIST
     endif
 
@@ -939,6 +1149,20 @@ endFunction
 ;/
     Adds the specified option container to an array at the specified key to the underlying internal map.
 
+    int     @optionContainer: The option to be added.
+
+    structure:
+        optionsMap[CurrentPage::Category::OptionName] = [
+            { key: optionName, value: [optionId, value] } : optionContainer,
+            { key: optionName, value: [optionId, value] } : optionContainer,
+            { key: optionName, value: [optionId, value] } : optionContainer,
+            { key: optionName, value: [optionId, value] } : optionContainer,
+            ...
+        ]
+/;
+
+;/
+    Adds the specified option container to an array at the specified key to the underlying internal map.
     string  @_key: The key to add the option into.
     int     @optionContainer: The option to be added.
 /;
@@ -954,7 +1178,7 @@ function __addOptionAtKey(string _key, int optionContainer)
     JArray.addObj(_array, optionContainer)
 
     Trace("__addOptionAtKey", "Adding MAP ID: " + optionContainer + " to ARRAY ID: " + _array, ENABLE_TRACE)
-    Trace("__addOptionAtKey", "Adding ARRAY ID: " + _array + " to optionsMap[" +_key + "]", ENABLE_TRACE)
+    Debug("__addOptionAtKey", "Adding ARRAY ID: " + _array + " to optionsMap[" +_key + "]")
     Trace("__addOptionAtKey", "Adding Option " + optionContainer + " to " + "[" +_key + "]", ENABLE_TRACE)
 
     ; Add the array containing all containers related to _key to the map at _key
@@ -969,12 +1193,11 @@ endFunction
     returns:    The key based on the text passed in.
 /;
 string function __makeOptionKey(string displayedText)
-    return CurrentPage + "::" + displayedText
+    return CurrentPage + "::" + CurrentRenderedCategory + "::" + displayedText
 endFunction
 
 ;/
     Creates a container (JIntMap) with the specified optionId and a bool value.
-
     int     @optionId: The id of the option to be created.
     bool    @value: The default value of the option.
     
@@ -988,7 +1211,6 @@ endFunction
 
 ;/
     Creates a container (JIntMap) with the specified optionId and an int value.
-
     int     @optionId: The id of the option to be created.
     int    @value: The default value of the option.
     
@@ -1002,7 +1224,6 @@ endFunction
 
 ;/
     Creates a container (JIntMap) with the specified optionId and a float value.
-
     int     @optionId: The id of the option to be created.
     float   @value: The default value of the option.
     
@@ -1018,7 +1239,6 @@ endFunction
 
 ;/
     Creates a container (JIntMap) with the specified optionId and a string value.
-
     int     @optionId: The id of the option to be created.
     string  @value: The default value of the option.
     
@@ -1277,7 +1497,8 @@ endFunction
     Placeholder function for a future change of the cache key.
 /;
 string function __makeCacheOptionKey(string displayedText)
-    return displayedText
+    ; Undressing::Allow Undressing
+    return CurrentRenderedCategory + "::" + displayedText
 endFunction
 
 ;/
@@ -1290,6 +1511,10 @@ endFunction
 /;
 bool function __optionExists(string _key, int optionId)
     int optionArray = __getOptionsArrayAtKey(_key)
+
+    if (optionArray == ARRAY_NOT_EXIST)
+        return false
+    endif
 
     int i = 0
     while (i < __getOptionsCount(optionArray))
@@ -1349,16 +1574,38 @@ endFunction
     hence, this function should be used when rendering multiple options for a page.
 
     int     @optionId: The option's id to be cached.
+    string  @optionName: The name of the option.
     int     @index: The index to bind to this option to know what to update.
 /;
 function __addOptionCache(int optionId, string optionName, int index)
-    int _cacheArray = JMap.getObj(cacheMap, CurrentPage)
-    if (!_cacheArray)
-        _cacheArray = JArray.object()
+    ;/
+    cacheMap[Whiterun] = 
+    [
+        { key: 1026, value: Undressing::Allow Undressing }
+        { key: 1028, value: Undressing::Minimum Bounty to Undress }
+        ...
+        { key: 1126, value: Prison::Minimum Sentence }
+        { key: 1127, value: Prison::Maximum Sentence }
+        ...
+    ]
+/;
+    ; Get the array for the current page, if it exists.
+    int _cachePageArray = JMap.getObj(cacheMap, CurrentPage)
+    if (!_cachePageArray)
+        _cachePageArray = JArray.object()
     endif
 
-    JArray.addObj(_cacheArray, __createCachedOptionContainer(optionId, optionName, index))
-    JMap.setObj(cacheMap, CurrentPage, _cacheArray)
+    ; Option container
+    int _optionContainer = JIntMap.object()
+    JIntMap.setStr(_optionContainer, optionId, optionName)
+
+    ; Add option to array
+    JArray.addObj(_cachePageArray, _optionContainer)
+
+    ; Add array with options belonging to page to cache map
+    JMap.setObj(cacheMap, CurrentPage, _cachePageArray)
+
+    Debug("__addOptionCache", "Created cache option: " + "(key: " + optionId + ", value: "+ optionName +")")
 endFunction
 
 int function __createCachedOptionContainer(int optionId, string optionName, int index)
