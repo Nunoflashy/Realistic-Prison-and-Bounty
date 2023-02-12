@@ -204,10 +204,10 @@ function OnOptionHighlight(RealisticPrisonAndBounty_MCM mcm, string option) glob
     elseif (option == "Prison::Bounty to Sentence")
         mcm.SetInfoText("Sets the relation between bounty and the sentence given in " + mcm.CurrentPage + "'s prison.")
 
-    elseif (option == "Prison::Minimum Sentence (Days)")
+    elseif (option == "Prison::Minimum Sentence")
         mcm.SetInfoText("Determines the minimum sentence in days for " + mcm.CurrentPage + "'s prison.")
 
-    elseif (option == "Prison::Maximum Sentence (Days)")
+    elseif (option == "Prison::Maximum Sentence")
         mcm.SetInfoText("Determines the maximum sentence in days for " + mcm.CurrentPage + "'s prison.")
 
     elseif (option == "Prison::Allow Unconditional Imprisonment")
@@ -339,8 +339,8 @@ function OnOptionSelect(RealisticPrisonAndBounty_MCM mcm, string option) global
 endFunction
 
 function LoadSliderOptions(RealisticPrisonAndBounty_MCM mcm, string option, float currentSliderValue) global
-    int minRange = 1
-    int maxRange = 100000
+    float minRange = 1
+    float maxRange = 100000
     int intervalSteps = 1
     float defaultValue = 0.0
 
@@ -425,16 +425,18 @@ function LoadSliderOptions(RealisticPrisonAndBounty_MCM mcm, string option, floa
         defaultValue = mcm.PRISON_DEFAULT_BOUNTY_TO_SENTENCE
 
     elseif (option == "Prison::Minimum Sentence")
-        maxRange = 10
-        defaultValue = mcm.PRISON_DEFAULT_MIN_SENTENCE_DAYS
+        maxRange =  mcm.GetOptionSliderValue("Prison::Maximum Sentence") - 1
+        defaultValue = float_if(mcm.PRISON_DEFAULT_MIN_SENTENCE_DAYS > maxRange, maxRange, mcm.PRISON_DEFAULT_MIN_SENTENCE_DAYS)
 
     elseif (option == "Prison::Maximum Sentence")
+        minRange = mcm.GetOptionSliderValue("Prison::Minimum Sentence") + 1
         maxRange = 365
-        defaultValue = mcm.PRISON_DEFAULT_MAX_SENTENCE_DAYS
+        defaultValue = float_if(mcm.PRISON_DEFAULT_MAX_SENTENCE_DAYS > maxRange, maxRange, mcm.PRISON_DEFAULT_MAX_SENTENCE_DAYS)
 
     elseif (option == "Prison::Day to fast forward from")
-        maxRange = 365
+        maxRange = mcm.GetOptionSliderValue("Prison::Maximum Sentence")
         defaultValue = mcm.PRISON_DEFAULT_DAY_FAST_FORWARD
+        defaultValue = float_if(mcm.PRISON_DEFAULT_DAY_FAST_FORWARD > maxRange, maxRange, mcm.PRISON_DEFAULT_DAY_FAST_FORWARD)
 
     elseif (option == "Prison::Hands Bound (Minimum Bounty)")
         intervalSteps = 100
@@ -453,6 +455,7 @@ function LoadSliderOptions(RealisticPrisonAndBounty_MCM mcm, string option, floa
         defaultValue = mcm.UNDRESSING_DEFAULT_FORCED_MIN_BOUNTY
 
     elseif (option == "Undressing::Strip Search Thoroughness")
+        maxRange = 10
         defaultValue = mcm.UNDRESSING_DEFAULT_STRIP_THOROUGHNESS
 
     ; ==========================================================

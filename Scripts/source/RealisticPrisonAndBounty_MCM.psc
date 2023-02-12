@@ -371,7 +371,7 @@ endFunction
     string      @_key: The key to be used to set values to and from storage.
     string      @defaultValue: The default value before being rendered for the first time.
 
-    returns:    The option's ID.
+    returns:    The Option's ID.
 /;
 int function AddOptionMenuKey(string displayedText, string _key, string defaultValue)
     string optionKey        = __makeOptionKey(_key) ; optionKey = Whiterun::Undressing::Allow Undressing
