@@ -87,7 +87,7 @@ bool property CLOTHING_DEFAULT_REDRESS_AT_CHEST       = true autoreadonly
 ; ==============================================================================
 ; PRISON
 int    property PRISON_DEFAULT_TIMESCALE                    = 60 autoreadonly
-int    property PRISON_DEFAULT_BOUNTY_TO_DAYS               = 100 autoreadonly
+int    property PRISON_DEFAULT_BOUNTY_TO_SENTENCE               = 100 autoreadonly
 int    property PRISON_DEFAULT_MIN_SENTENCE_DAYS            = 10 autoreadonly
 int    property PRISON_DEFAULT_MAX_SENTENCE_DAYS            = 365 autoreadonly
 bool   property PRISON_DEFAULT_ALLOW_UNCONDITIONAL_PRISON   = false autoreadonly
@@ -155,6 +155,22 @@ int property CATEGORY_BOUNTY            = 7 autoreadonly
 GlobalVariable property NormalTimescale auto
 GlobalVariable property PrisonTimescale auto
 ; =======================================
+
+string[] _lockLevels
+string[] property LockLevels
+    string[] function get()
+        if (!_locklevels)
+            _lockLevels = new string[6]
+            _lockLevels[0] = "Novice"
+            _lockLevels[1] = "Apprentice"
+            _lockLevels[2] = "Adept"
+            _lockLevels[3] = "Expert"
+            _lockLevels[4] = "Master"
+            _lockLevels[5] = "Requires Key"
+        endif
+        return _lockLevels
+    endFunction
+endProperty
 
 string[] _holds
 
@@ -251,7 +267,6 @@ int function GetOptionValue(string page, string optionName, int index)
 endFunction
 
 ; ============================================================
-
 
 ; Utility Functions
 ; ============================================================
@@ -363,7 +378,7 @@ int function AddOptionMenuKey(string displayedText, string _key, string defaultV
     string cacheKey         = __makeCacheOptionKey(_key)     ; cacheKey  = Allow Undressing
 
     string value            = __getStringOptionValue(optionKey)
-    int optionId            = AddMenuOption(displayedText, string_if (value < GENERAL_ERROR, defaultValue, value))
+    int optionId            = AddMenuOption(displayedText, string_if (value == "", defaultValue, value))
     
     if (!__optionExists(optionKey, optionId))
         int option = __createOptionString(optionId, defaultValue)
@@ -447,10 +462,10 @@ endFunction
 
     returns:    The option's value
 /;
-int function GetOptionSliderValue(string option)
+float function GetOptionSliderValue(string option)
     string _key = __makeOptionKey(option, includeCurrentCategory = false)
     Debug("GetOptionSliderValue", "Key is: " + _key)
-    return __getIntOptionValue(_key)
+    return __getFloatOptionValue(_key)
 endFunction
 
 ;/
@@ -469,6 +484,17 @@ function SetOptionSliderValue(string option, float value)
 
     ; Store the value
     __setFloatOptionValue(_key, value)
+endFunction
+
+function SetOptionMenuValue(string option, int value)
+    string _key = CurrentPage + "::" + option
+    int optionId = GetOption(option)
+
+    ; Change the value of the menu option
+    SetMenuOptionValue(optionId, LockLevels[value])
+
+    ; Store the value
+    __setStringOptionValue(_key, LockLevels[value])
 endFunction
 
 string function GetKeyFromOption(int optionId)
@@ -682,7 +708,7 @@ int function __getBoolOptionValue(string _key)
         return OPTION_NOT_EXIST ; Option does not exist
     endif
 
-    Debug("__getBoolOptionValue", "[" + _key + " (" + 0 + ")] " + "CT: " + _container + ", CT_KEY: " + _containerKey + ", CT_VALUE: " + _containerValue)
+    Debug("__getBoolOptionValue", "[" + _key + "] " + "CT: " + _container + ", CT_KEY: " + _containerKey + ", CT_VALUE: " + _containerValue)
 
     return (_containerValue as int)
 endFunction
@@ -708,7 +734,7 @@ int function __getIntOptionValue(string _key)
         return OPTION_NOT_EXIST ; Option does not exist
     endif
 
-    Debug("__getFloatOptionValue", "[" + _key + " (" + 0 + ")] " + "CT: " + _container + ", CT_KEY: " + _containerKey + ", CT_VALUE: " + _containerValue)
+    Debug("__getIntOptionValue", "[" + _key + "] " + "CT: " + _container + ", CT_KEY: " + _containerKey + ", CT_VALUE: " + _containerValue)
     return _containerValue
 endFunction
 
@@ -732,7 +758,7 @@ float function __getFloatOptionValue(string _key)
         return OPTION_NOT_EXIST ; Option does not exist
     endif
 
-    Debug("__getFloatOptionValue", "[" + _key + " (" + 0 + ")] " + "CT: " + _container + ", CT_KEY: " + _containerKey + ", CT_VALUE: " + _containerValue)
+    Debug("__getFloatOptionValue", "[" + _key + "] " + "CT: " + _container + ", CT_KEY: " + _containerKey + ", CT_VALUE: " + _containerValue)
     return _containerValue
 endFunction
 
@@ -745,7 +771,7 @@ endFunction
 string function __getStringOptionValue(string _key)
     int _array = __getOptionsArrayAtKey(_key)
     if (_array == ARRAY_NOT_EXIST)
-        return ARRAY_NOT_EXIST ; Array does not exist
+        return ""
     endif
 
     int _container = JArray.getObj(_array, 0)
@@ -753,10 +779,10 @@ string function __getStringOptionValue(string _key)
     string _containerValue = JIntMap.getStr(_container, _containerKey)
 
     if (_container == 0)
-        return OPTION_NOT_EXIST ; Option does not exist
+        return ""
     endif
 
-    Debug("__getFloatOptionValue", "[" + _key + " (" + 0 + ")] " + "CT: " + _container + ", CT_KEY: " + _containerKey + ", CT_VALUE: " + _containerValue)
+    Debug("__getStringOptionValue", "[" + _key + "] " + "CT: " + _container + ", CT_KEY: " + _containerKey + ", CT_VALUE: " + _containerValue)
     return _containerValue
 endFunction 
 
@@ -773,18 +799,35 @@ function __setFloatOptionValue(string _key, float value)
     endif
 
     int _container = JArray.getObj(_array, 0)
-    int _containerKey = JIntMap.getNthKey(_container, 0)
-    float _containerValue = JIntMap.getFlt(_container, _containerKey)
-
-    JIntMap.setFlt(_container, _containerKey, value)
 
     if (_container == 0)
         return ; Option does not exist
     endif
 
-    int optionContainer = JMap.getObj(optionsMap, _key) ; JIntMap
-    int optionKey       = JIntMap.getNthKey(optionContainer, 0)
+    int _containerKey = JIntMap.getNthKey(_container, 0)
+    JIntMap.setFlt(_container, _containerKey, value)
+endFunction
 
+;/
+    Sets an option's value (string-based options only) in storage.
+
+    string      @_key: The option's key.
+    string       @value: The new value for this option
+/;
+function __setStringOptionValue(string _key, string value)
+    int _array = __getOptionsArrayAtKey(_key)
+    if (_array == ARRAY_NOT_EXIST)
+        return ; Array does not exist
+    endif
+
+    int _container = JArray.getObj(_array, 0)
+
+    if (_container == 0)
+        return ; Option does not exist
+    endif
+
+    int _containerKey = JIntMap.getNthKey(_container, 0)
+    JIntMap.setStr(_container, _containerKey, value)
 endFunction
 
 ;/
