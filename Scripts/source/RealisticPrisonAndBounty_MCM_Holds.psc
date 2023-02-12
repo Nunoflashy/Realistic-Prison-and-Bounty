@@ -20,41 +20,41 @@ endFunction
 
 function Left(RealisticPrisonAndBounty_MCM mcm) global
     mcm.AddOptionCategory("Arrest")
-    mcm.AddOptionSlider("Minimum Bounty to Arrest",                         mcm.ARREST_DEFAULT_MIN_BOUNTY)
-    mcm.AddOptionSlider("Guaranteed Payable Bounty",                        mcm.ARREST_DEFAULT_GUARANTEED_PAYABLE_BOUNTY)
-    mcm.AddOptionSlider("Maximum Payable Bounty",                           mcm.ARREST_DEFAULT_MAXIMUM_PAYABLE_BOUNTY)
+    mcm.AddOptionSlider("Minimum Bounty to Arrest",                         mcm.ARREST_DEFAULT_MIN_BOUNTY, "{0} Bounty")
+    mcm.AddOptionSlider("Guaranteed Payable Bounty",                        mcm.ARREST_DEFAULT_GUARANTEED_PAYABLE_BOUNTY, "{0} Bounty")
+    mcm.AddOptionSlider("Maximum Payable Bounty",                           mcm.ARREST_DEFAULT_MAXIMUM_PAYABLE_BOUNTY, "{0} Bounty")
     mcm.AddTextOption("", "When Resisting", mcm.OPTION_DISABLED)
-    mcm.AddOptionSlider("Additional Bounty when Resisting (% of Bounty)",   mcm.ARREST_DEFAULT_BOUNTY_WHEN_RESISTING_PERCENT)
-    mcm.AddOptionSlider("Additional Bounty when Resisting (Flat)",          mcm.ARREST_DEFAULT_BOUNTY_WHEN_RESISTING_FLAT)
+    mcm.AddOptionSlider("Additional Bounty when Resisting (%)",   mcm.ARREST_DEFAULT_BOUNTY_WHEN_RESISTING_PERCENT, "{0}% of Bounty")
+    mcm.AddOptionSlider("Additional Bounty when Resisting",          mcm.ARREST_DEFAULT_BOUNTY_WHEN_RESISTING_FLAT, "{0} Bounty")
 
     mcm.AddTextOption("", "When Defeated", mcm.OPTION_DISABLED)
-    mcm.AddOptionSlider("Additional Bounty when Defeated (% of Bounty)",    mcm.ARREST_DEFAULT_BOUNTY_WHEN_DEFEATED_PERCENT)
-    mcm.AddOptionSlider("Additional Bounty when Defeated (Flat)",           mcm.ARREST_DEFAULT_BOUNTY_WHEN_DEFEATED_FLAT)
+    mcm.AddOptionSlider("Additional Bounty when Defeated (%)",    mcm.ARREST_DEFAULT_BOUNTY_WHEN_DEFEATED_PERCENT, "{0}% of Bounty")
+    mcm.AddOptionSlider("Additional Bounty when Defeated",           mcm.ARREST_DEFAULT_BOUNTY_WHEN_DEFEATED_FLAT, "{0} Bounty")
 
     mcm.AddOptionToggle("Allow Civilian Capture",                           mcm.ARREST_DEFAULT_ALLOW_CIVILIAN_CAPTURE)
     mcm.AddOptionToggle("Allow Arrest Transfer",                            mcm.ARREST_DEFAULT_ALLOW_ARREST_TRANSFER)
     mcm.AddOptionToggle("Allow Unconscious Arrest",                         mcm.ARREST_DEFAULT_ALLOW_UNCONSCIOUS_ARREST)
     mcm.AddTextOption("", "When Arrested", mcm.OPTION_DISABLED)
-    mcm.AddOptionSlider("Unequip Hand Garments (Minimum Bounty)",           mcm.ARREST_DEFAULT_UNEQUIP_HAND_BOUNTY)
-    mcm.AddOptionSlider("Unequip Head Garments (Minimum Bounty)",           mcm.ARREST_DEFAULT_UNEQUIP_HEAD_BOUNTY)
-    mcm.AddOptionSlider("Unequip Foot Garments (Minimum Bounty)",           mcm.ARREST_DEFAULT_UNEQUIP_FOOT_BOUNTY)
+    mcm.AddOptionSlider("Unequip Hand Garments",           mcm.ARREST_DEFAULT_UNEQUIP_HAND_BOUNTY, "{0} Bounty")
+    mcm.AddOptionSlider("Unequip Head Garments",           mcm.ARREST_DEFAULT_UNEQUIP_HEAD_BOUNTY, "{0} Bounty")
+    mcm.AddOptionSlider("Unequip Foot Garments",           mcm.ARREST_DEFAULT_UNEQUIP_FOOT_BOUNTY, "{0} Bounty")
     
     mcm.AddOptionCategory("Frisking")
     mcm.AddOptionToggle("Allow Frisk Search",                     mcm.FRISKING_DEFAULT_ALLOW)
-    mcm.AddOptionSlider("Minimum Bounty for Frisking",            mcm.FRISKING_DEFAULT_MIN_BOUNTY)
-    mcm.AddOptionSlider("Guaranteed Payable Bounty",              mcm.FRISKING_DEFAULT_GUARANTEED_PAYABLE_BOUNTY)
-    mcm.AddOptionSlider("Maximum Payable Bounty",                 mcm.FRISKING_DEFAULT_MAXIMUM_PAYABLE_BOUNTY)
-    mcm.AddOptionSlider("Maximum Payable Bounty (Chance)",        mcm.FRISKING_DEFAULT_MAXIMUM_PAYABLE_BOUNTY_CHANCE)
-    mcm.AddOptionSlider("Frisk Search Thoroughness",              mcm.FRISKING_DEFAULT_FRISK_THOROUGHNESS)
+    mcm.AddOptionSlider("Minimum Bounty for Frisking",            mcm.FRISKING_DEFAULT_MIN_BOUNTY, "{0} Bounty")
+    mcm.AddOptionSlider("Guaranteed Payable Bounty",              mcm.FRISKING_DEFAULT_GUARANTEED_PAYABLE_BOUNTY, "{0} Bounty")
+    mcm.AddOptionSlider("Maximum Payable Bounty",                 mcm.FRISKING_DEFAULT_MAXIMUM_PAYABLE_BOUNTY, "{0} Bounty")
+    mcm.AddOptionSlider("Maximum Payable Bounty (Chance)",        mcm.FRISKING_DEFAULT_MAXIMUM_PAYABLE_BOUNTY_CHANCE, "{0}%")
+    mcm.AddOptionSlider("Frisk Search Thoroughness",              mcm.FRISKING_DEFAULT_FRISK_THOROUGHNESS, "{0}x")
 
     mcm.AddTextOption("", "When Frisked", mcm.OPTION_DISABLED)
     mcm.AddOptionToggle("Confiscate Stolen Items",                mcm.FRISKING_DEFAULT_CONFISCATE_ITEMS)
     mcm.AddOptionToggle("Strip Search if Stolen Items Found",     mcm.FRISKING_DEFAULT_STRIP_IF_STOLEN_FOUND)
-    mcm.AddOptionSlider("Minimum No. of Stolen Items Required",   mcm.FRISKING_DEFAULT_NUMBER_STOLEN_ITEMS_REQUIRED)
+    mcm.AddOptionSlider("Minimum No. of Stolen Items Required",   mcm.FRISKING_DEFAULT_NUMBER_STOLEN_ITEMS_REQUIRED, "{0} Items")
 
     mcm.AddOptionCategory("Release")
     mcm.AddOptionToggle("Give items back on Release",             mcm.RELEASE_DEFAULT_GIVE_ITEMS_BACK)
-    mcm.AddOptionSlider("Give items back on Release (Bounty)",    mcm.RELEASE_DEFAULT_GIVE_ITEMS_BACK_BOUNTY)
+    mcm.AddOptionSlider("Give items back on Release (Bounty)",    mcm.RELEASE_DEFAULT_GIVE_ITEMS_BACK_BOUNTY, "{0} Bounty")
     mcm.AddOptionToggle("Re-dress on Release",                    mcm.RELEASE_DEFAULT_REDRESS)
 
     mcm.AddEmptyOption()
@@ -62,22 +62,22 @@ function Left(RealisticPrisonAndBounty_MCM mcm) global
     mcm.AddOptionCategory("Bounty Hunting")
     mcm.AddOptionToggle("Enable Bounty Hunters",        mcm.BOUNTY_HUNTERS_DEFAULT_ENABLE)
     mcm.AddOptionToggle("Allow Outlaw Bounty Hunters",  mcm.BOUNTY_HUNTERS_DEFAULT_ALLOW_OUTLAWS)
-    mcm.AddOptionSlider("Minimum Bounty",               mcm.BOUNTY_HUNTERS_DEFAULT_MIN_BOUNTY)
-    mcm.AddOptionSlider("Bounty (Posse)",               mcm.BOUNTY_HUNTERS_DEFAULT_MIN_BOUNTY_GROUP)
+    mcm.AddOptionSlider("Minimum Bounty",               mcm.BOUNTY_HUNTERS_DEFAULT_MIN_BOUNTY, "{0} Bounty")
+    mcm.AddOptionSlider("Bounty (Posse)",               mcm.BOUNTY_HUNTERS_DEFAULT_MIN_BOUNTY_GROUP, "{0} Bounty")
 endFunction
 
 function Right(RealisticPrisonAndBounty_MCM mcm) global
     mcm.AddOptionCategory("Prison")
-    mcm.AddOptionSlider("Bounty to Sentence",                   mcm.PRISON_DEFAULT_BOUNTY_TO_SENTENCE)
-    mcm.AddOptionSlider("Minimum Sentence",                 mcm.PRISON_DEFAULT_MAX_SENTENCE_DAYS)
-    mcm.AddOptionSlider("Maximum Sentence",                 mcm.PRISON_DEFAULT_MAX_SENTENCE_DAYS)
+    mcm.AddOptionSlider("Bounty to Sentence",                   mcm.PRISON_DEFAULT_BOUNTY_TO_SENTENCE, "{0} Bounty = 1 Day")
+    mcm.AddOptionSlider("Minimum Sentence",                 mcm.PRISON_DEFAULT_MAX_SENTENCE_DAYS, "{0} Days")
+    mcm.AddOptionSlider("Maximum Sentence",                 mcm.PRISON_DEFAULT_MAX_SENTENCE_DAYS, "{0} Days")
     mcm.AddOptionToggle("Allow Unconditional Imprisonment",    mcm.PRISON_DEFAULT_ALLOW_UNCONDITIONAL_PRISON)
     mcm.AddOptionToggle("Sentence pays Bounty",             mcm.PRISON_DEFAULT_SENTENCE_PAYS_BOUNTY)
     mcm.AddOptionToggle("Fast Forward",                     mcm.PRISON_DEFAULT_FAST_FORWARD)
     mcm.AddTextOption("", "When Imprisoned",                mcm.OPTION_DISABLED)
     mcm.AddOptionSlider("Day to fast forward from",         mcm.PRISON_DEFAULT_DAY_FAST_FORWARD)
     mcm.AddOptionToggle("Hands Bound in Prison",            mcm.PRISON_DEFAULT_HANDS_BOUND)
-    mcm.AddOptionSlider("Hands Bound (Minimum Bounty)",     mcm.PRISON_DEFAULT_HANDS_BOUND_BOUNTY)
+    mcm.AddOptionSlider("Hands Bound (Minimum Bounty)",     mcm.PRISON_DEFAULT_HANDS_BOUND_BOUNTY, "{0} Bounty")
     mcm.AddOptionToggle("Hands Bound (Randomize)",          mcm.PRISON_DEFAULT_HANDS_BOUND_RANDOMIZE)
     mcm.AddOptionMenu("Cell Lock Level",                    mcm.PRISON_DEFAULT_CELL_LOCK_LEVEL)
 
@@ -85,22 +85,28 @@ function Right(RealisticPrisonAndBounty_MCM mcm) global
     mcm.AddEmptyOption()
     mcm.AddOptionCategory("Undressing")
     mcm.AddOptionToggle("Allow Undressing",                 mcm.UNDRESSING_DEFAULT_ALLOW)
-    mcm.AddOptionSlider("Minimum Bounty to Undress",        mcm.UNDRESSING_DEFAULT_MIN_BOUNTY)
+    mcm.AddOptionSlider("Minimum Bounty to Undress",        mcm.UNDRESSING_DEFAULT_MIN_BOUNTY, "{0} Bounty")
     mcm.AddOptionToggle("Undress when Defeated",            mcm.UNDRESSING_DEFAULT_WHEN_DEFEATED)
     mcm.AddOptionToggle("Undress at Cell",                  mcm.UNDRESSING_DEFAULT_AT_CELL)
     mcm.AddOptionToggle("Undress at Chest",                 mcm.UNDRESSING_DEFAULT_AT_CHEST)
-    mcm.AddOptionSlider("Forced Undressing (Bounty)",       mcm.UNDRESSING_DEFAULT_FORCED_MIN_BOUNTY)
+    mcm.AddOptionSlider("Forced Undressing (Bounty)",       mcm.UNDRESSING_DEFAULT_FORCED_MIN_BOUNTY, "{0} Bounty")
     mcm.AddOptionToggle("Forced Undressing when Defeated",  mcm.UNDRESSING_DEFAULT_FORCED_WHEN_DEFEATED)
-    mcm.AddOptionSlider("Strip Search Thoroughness",        mcm.UNDRESSING_DEFAULT_STRIP_THOROUGHNESS)
+    mcm.AddOptionSlider("Strip Search Thoroughness",        mcm.UNDRESSING_DEFAULT_STRIP_THOROUGHNESS, "{0}x")
 
     mcm.AddTextOption("", "When Undressed", mcm.OPTION_DISABLED)
-    mcm.AddOptionToggle("Allow Wearing Clothes",            mcm.CLOTHING_DEFAULT_ALLOW_CLOTHES)
-    mcm.AddOptionToggle("When Defeated",                    mcm.CLOTHING_DEFAULT_REDRESS_WHEN_DEFEATED)
-    mcm.AddOptionSlider("Maximum Bounty",                   mcm.CLOTHING_DEFAULT_REDRESS_BOUNTY)
+    mcm.AddOptionToggle("Allow Wearing Clothes",            mcm.UNDRESSING_DEFAULT_ALLOW_CLOTHES)
+    mcm.AddOptionToggle("When Defeated",                    mcm.UNDRESSING_DEFAULT_REDRESS_WHEN_DEFEATED)
+    mcm.AddOptionSlider("Maximum Bounty",                   mcm.UNDRESSING_DEFAULT_REDRESS_BOUNTY, "{0} Bounty")
+
+    if (mcm.CurrentPage == "The Pale")
+        mcm.AddOptionToggleKey("Allow Wearing Clothes", "Allow Wearing Clothes (Cidhna Mine)",   mcm.UNDRESSING_DEFAULT_ALLOW_CLOTHES)
+        mcm.AddOptionToggleKey("When Defeated",  "When Defeated (Cidhna Mine)",                  mcm.UNDRESSING_DEFAULT_REDRESS_WHEN_DEFEATED)
+        mcm.AddOptionSliderKey("Maximum Bounty",  "Maximum Bounty (Cidhna Mine)",                 mcm.UNDRESSING_DEFAULT_REDRESS_BOUNTY, "{0} Bounty")
+    endif
 
     mcm.AddOptionCategory("Escape")
-    mcm.AddOptionSlider("Escape Bounty (% of Bounty)",      mcm.ESCAPE_DEFAULT_BOUNTY_PERCENT)
-    mcm.AddOptionSlider("Escape Bounty (Flat)",             mcm.ESCAPE_DEFAULT_BOUNTY_FLAT)
+    mcm.AddOptionSlider("Escape Bounty (%)",      mcm.ESCAPE_DEFAULT_BOUNTY_PERCENT, "{0}% of Bounty")
+    mcm.AddOptionSlider("Escape Bounty",             mcm.ESCAPE_DEFAULT_BOUNTY_FLAT, "{0} Bounty")
     mcm.AddOptionToggle("Allow Surrendering",               mcm.ESCAPE_DEFAULT_ALLOW_SURRENDER)
     mcm.AddOptionToggle("Frisk Search upon Captured",       mcm.ESCAPE_DEFAULT_FRISK_ON_CAPTURE)
     mcm.AddOptionToggle("Undress upon Captured",            mcm.ESCAPE_DEFAULT_UNDRESS_ON_CAPTURE)
@@ -109,8 +115,8 @@ function Right(RealisticPrisonAndBounty_MCM mcm) global
     mcm.AddTextOption("", "Bounty Decay", mcm.OPTION_FLAG_DISABLED)
     mcm.AddOptionToggle("Enable Bounty Decay",          mcm.BOUNTY_DEFAULT_ENABLE_DECAY)
     mcm.AddOptionToggle("Decay while Imprisoned",       mcm.BOUNTY_DEFAULT_DECAY_IN_PRISON)
-    mcm.AddOptionSlider("Bounty Lost (% of Bounty)",    mcm.BOUNTY_DEFAULT_BOUNTY_LOST_PERCENT)
-    mcm.AddOptionSlider("Bounty Lost (Flat)",           mcm.BOUNTY_DEFAULT_BOUNTY_LOST_FLAT)
+    mcm.AddOptionSlider("Bounty Lost (%)",    mcm.BOUNTY_DEFAULT_BOUNTY_LOST_PERCENT, "{0}% of Bounty")
+    mcm.AddOptionSlider("Bounty Lost",           mcm.BOUNTY_DEFAULT_BOUNTY_LOST_FLAT, "{0} Bounty")
 endFunction
 
 
@@ -133,16 +139,16 @@ function OnOptionHighlight(RealisticPrisonAndBounty_MCM mcm, string option) glob
     elseif (option == "Arrest::Maximum Payable Bounty")
             mcm.SetInfoText("The maximum amount of bounty that is payable before arresting you in " + mcm.CurrentPage + ".")
 
-    elseif (option == "Arrest::Additional Bounty when Resisting (% of Bounty)")
+    elseif (option == "Arrest::Additional Bounty when Resisting (%)")
             mcm.SetInfoText("The bounty that will be added as a percentage of your current bounty, when resisting arrest in "  + mcm.CurrentPage + ".\n" + "If the bounty exceeds the guaranteed but is within the maximum, there's a chance not to go to prison.")
 
-    elseif (option == "Arrest::Additional Bounty when Resisting (Flat)")
+    elseif (option == "Arrest::Additional Bounty when Resisting")
             mcm.SetInfoText("The bounty that will be added when resisting arrest in " + mcm.CurrentPage + ".")
 
-    elseif (option == "Arrest::Additional Bounty when Defeated (% of Bounty)")
+    elseif (option == "Arrest::Additional Bounty when Defeated (%)")
             mcm.SetInfoText("The bounty that will be added as a percentage of your current bounty, when defeated and arrested in " + mcm.CurrentPage + ".")
 
-    elseif (option == "Arrest::Additional Bounty when Defeated (Flat)")
+    elseif (option == "Arrest::Additional Bounty when Defeated")
             mcm.SetInfoText("The bounty that will be added when defeated and arrested in " + mcm.CurrentPage)
 
     elseif (option == "Arrest::Allow Civilian Capture")
@@ -154,13 +160,13 @@ function OnOptionHighlight(RealisticPrisonAndBounty_MCM mcm, string option) glob
     elseif (option == "Arrest::Allow Unconscious Arrest")
             mcm.SetInfoText("Whether to allow an unconscious arrest after being defeated (You will wake up in prison).")
 
-    elseif (option == "Arrest::Unequip Hand Garments (Minimum Bounty)")
+    elseif (option == "Arrest::Unequip Hand Garments")
             mcm.SetInfoText("Whether to unequip any hand garment when arrested.\n-1 - Disable\n0 - Always unequip.\n Any other value is the bounty required")
 
-    elseif (option == "Arrest::Unequip Head Garments (Minimum Bounty)")
+    elseif (option == "Arrest::Unequip Head Garments")
             mcm.SetInfoText("Whether to unequip any head garment when arrested.\n-1 - Disable\n0 - Always unequip.\n Any other value is the bounty required")
 
-    elseif (option == "Arrest::Unequip Foot Garments (Minimum Bounty)")
+    elseif (option == "Arrest::Unequip Foot Garments")
             mcm.SetInfoText("Whether to unequip any foot garment when arrested.\n-1 - Disable\n0 - Always unequip.\n Any other value is the bounty required")
     
     ; ==========================================================
@@ -263,6 +269,26 @@ function OnOptionHighlight(RealisticPrisonAndBounty_MCM mcm, string option) glob
         mcm.SetInfoText("The thoroughness of the strip search when undressed, higher values mean a more thorough search and therefore possibly less items kept.\n" + \
                      "Due to the nature of a strip search, most items will be removed, this value will only determine small objects that could be hidden when stripped off.")
 
+    elseif (option == "Allow Wearing Clothes")
+        mcm.SetInfoText("Determines if you are allowed to wear any clothes when imprisoned in " + mcm.CurrentPage + ".")
+
+    elseif (option == "When Defeated")
+        mcm.SetInfoText("Determines if you are given clothes when defeated and imprisoned in " + mcm.CurrentPage + ".")
+
+    elseif (option == "Maximum Bounty")
+        mcm.SetInfoText("The maximum amount of bounty you can have in order to be given clothes when imprisoned in " + mcm.CurrentPage + ".")
+        
+    if (mcm.CurrentPage == "The Pale")
+        if (option == "Allow Wearing Clothes (Cidhna Mine)")
+            mcm.SetInfoText("Determines if you are allowed to wear any clothes when imprisoned in Cidhna Mine.")
+
+        elseif (option == "When Defeated (Cidhna Mine)")
+            mcm.SetInfoText("Determines if you are given clothes when defeated and imprisoned in Cidhna Mine.")
+            
+        elseif (option == "Maximum Bounty (Cidhna Mine)")
+            mcm.SetInfoText("The maximum amount of bounty you can have in order to be given clothes when imprisoned in Cidhna Mine.")
+        endif
+    endif
     ; ==========================================================
     ;                           RELEASE
     ; ==========================================================
@@ -280,10 +306,10 @@ function OnOptionHighlight(RealisticPrisonAndBounty_MCM mcm, string option) glob
     ;                           ESCAPE
     ; ==========================================================
 
-    elseif (option == "Escape::Escape Bounty (% of Bounty)")
+    elseif (option == "Escape::Escape Bounty (%)")
         mcm.SetInfoText("The bounty added as a percentage of your current bounty, when escaping prison in " + mcm.CurrentPage + ".")
 
-    elseif (option == "Escape::Escape Bounty (Flat)")
+    elseif (option == "Escape::Escape Bounty")
         mcm.SetInfoText("The bounty added when escaping prison in " + mcm.CurrentPage + ".")
 
     elseif (option == "Escape::Allow Surrendering")
@@ -360,31 +386,34 @@ function LoadSliderOptions(RealisticPrisonAndBounty_MCM mcm, string option, floa
         intervalSteps = 100
         defaultValue = mcm.ARREST_DEFAULT_MAXIMUM_PAYABLE_BOUNTY
 
-    elseif (option == "Arrest::Additional Bounty when Resisting (% of Bounty)")
+    elseif (option == "Arrest::Additional Bounty when Resisting (%)")
         maxRange = 100
         defaultValue = mcm.ARREST_DEFAULT_BOUNTY_WHEN_RESISTING_PERCENT
 
-    elseif (option == "Arrest::Additional Bounty when Resisting (Flat)")
+    elseif (option == "Arrest::Additional Bounty when Resisting")
         intervalSteps = 100
         defaultValue = mcm.ARREST_DEFAULT_BOUNTY_WHEN_RESISTING_FLAT
 
-    elseif (option == "Arrest::Additional Bounty when Defeated (% of Bounty)")
+    elseif (option == "Arrest::Additional Bounty when Defeated (%)")
         maxRange = 100
         defaultValue = mcm.ARREST_DEFAULT_BOUNTY_WHEN_DEFEATED_PERCENT
 
-    elseif (option == "Arrest::Additional Bounty when Defeated (Flat)")
+    elseif (option == "Arrest::Additional Bounty when Defeated")
         intervalSteps = 100
         defaultValue = mcm.ARREST_DEFAULT_BOUNTY_WHEN_DEFEATED_FLAT
 
-    elseif (option == "Arrest::Unequip Hand Garments (Minimum Bounty)")
+    elseif (option == "Arrest::Unequip Hand Garments")
+        minRange = -1
         intervalSteps = 100
         defaultValue = mcm.ARREST_DEFAULT_UNEQUIP_HAND_BOUNTY
 
-    elseif (option == "Arrest::Unequip Head Garments (Minimum Bounty)")
+    elseif (option == "Arrest::Unequip Head Garments")
+        minRange = -1
         intervalSteps = 100
         defaultValue = mcm.ARREST_DEFAULT_UNEQUIP_HEAD_BOUNTY
 
-    elseif (option == "Arrest::Unequip Foot Garments (Minimum Bounty)")
+    elseif (option == "Arrest::Unequip Foot Garments")
+        minRange = -1
         intervalSteps = 100
         defaultValue = mcm.ARREST_DEFAULT_UNEQUIP_FOOT_BOUNTY
 
@@ -435,7 +464,6 @@ function LoadSliderOptions(RealisticPrisonAndBounty_MCM mcm, string option, floa
 
     elseif (option == "Prison::Day to fast forward from")
         maxRange = mcm.GetOptionSliderValue("Prison::Maximum Sentence")
-        defaultValue = mcm.PRISON_DEFAULT_DAY_FAST_FORWARD
         defaultValue = float_if(mcm.PRISON_DEFAULT_DAY_FAST_FORWARD > maxRange, maxRange, mcm.PRISON_DEFAULT_DAY_FAST_FORWARD)
 
     elseif (option == "Prison::Hands Bound (Minimum Bounty)")
@@ -468,16 +496,16 @@ function LoadSliderOptions(RealisticPrisonAndBounty_MCM mcm, string option, floa
     ; ==========================================================
     ;                           ESCAPE
     ; ==========================================================
-    elseif (option == "Escape::Escape Bounty (% of Bounty)")
+    elseif (option == "Escape::Escape Bounty (%)")
         maxRange = 100
         defaultValue = mcm.ESCAPE_DEFAULT_BOUNTY_PERCENT
 
-    elseif (option == "Escape::Escape Bounty (Flat)")
+    elseif (option == "Escape::Escape Bounty")
         intervalSteps = 100
         defaultValue = mcm.ESCAPE_DEFAULT_BOUNTY_FLAT
 
     ; ==========================================================
-    ;                       BOUNTY HUNTERS
+    ;                       BOUNTY HUNTING
     ; ==========================================================
 
     elseif (option == "Bounty Hunting::Minimum Bounty")
@@ -492,6 +520,13 @@ function LoadSliderOptions(RealisticPrisonAndBounty_MCM mcm, string option, floa
     ;                           BOUNTY
     ; ==========================================================
 
+    elseif (option == "Bounty::Bounty Lost (%)")
+        maxRange = 100
+        defaultValue = mcm.BOUNTY_DEFAULT_BOUNTY_LOST_PERCENT
+
+    elseif (option == "Bounty::Bounty Lost")
+        intervalSteps = 50
+        defaultValue = mcm.BOUNTY_DEFAULT_BOUNTY_LOST_FLAT
     endif
 
     float startValue = float_if (currentSliderValue > mcm.GENERAL_ERROR, currentSliderValue, defaultValue)
@@ -504,7 +539,117 @@ function OnOptionSliderOpen(RealisticPrisonAndBounty_MCM mcm, string option) glo
 endFunction
 
 function OnOptionSliderAccept(RealisticPrisonAndBounty_MCM mcm, string option, float value) global
-    mcm.SetOptionSliderValue(option, value)
+    string formatString = "{0} Bounty"
+
+    ; ==========================================================
+    ;                           ARREST
+    ; ==========================================================
+
+    if (option == "Arrest::Minimum Bounty to Arrest")
+
+    elseif (option == "Arrest::Guaranteed Payable Bounty")
+
+    elseif (option == "Arrest::Maximum Payable Bounty")
+
+    elseif (option == "Arrest::Additional Bounty when Resisting (%)")
+        formatString = "{0}% of Bounty"
+
+    elseif (option == "Arrest::Additional Bounty when Resisting")
+
+    elseif (option == "Arrest::Additional Bounty when Defeated (%)")
+        formatString = "{0}% of Bounty"
+
+    elseif (option == "Arrest::Additional Bounty when Defeated")
+
+    elseif (option == "Arrest::Unequip Hand Garments")
+
+    elseif (option == "Arrest::Unequip Head Garments")
+
+    elseif (option == "Arrest::Unequip Foot Garments")
+
+
+    ; ==========================================================
+    ;                           FRISKING
+    ; ==========================================================
+
+    elseif (option == "Frisking::Minimum Bounty for Frisking")
+
+    elseif (option == "Frisking::Guaranteed Payable Bounty")
+
+    elseif (option == "Frisking::Maximum Payable Bounty")
+
+    elseif (option == "Frisking::Maximum Payable Bounty (Chance)")
+        formatString = "{0}%"
+
+    elseif (option == "Frisking::Frisk Search Thoroughness")
+        formatString = "{0}x"
+
+    elseif (option == "Frisking::Minimum No. of Stolen Items Required")
+        formatString = "{0} Items"
+
+    ; ==========================================================
+    ;                           PRISON
+    ; ==========================================================
+
+    elseif (option == "Prison::Bounty to Sentence")
+        formatString = "{0} Bounty = 1 Day"
+
+    elseif (option == "Prison::Minimum Sentence")
+        formatString = "{0} Days"
+
+    elseif (option == "Prison::Maximum Sentence")
+        formatString = "{0} Days"
+
+    elseif (option == "Prison::Day to fast forward from")
+
+    elseif (option == "Prison::Hands Bound (Minimum Bounty)")
+
+    ; ==========================================================
+    ;                         UNDRESSING
+    ; ==========================================================
+
+    elseif (option == "Undressing::Minimum Bounty to Undress")
+
+    elseif (option == "Undressing::Forced Undressing (Bounty)")
+
+    elseif (option == "Undressing::Strip Search Thoroughness")
+        formatString = "{0}x"
+
+    ; ==========================================================
+    ;                           RELEASE
+    ; ==========================================================
+
+    elseif (option == "Release::Give items back on Release (Bounty)")
+
+    ; ==========================================================
+    ;                           ESCAPE
+    ; ==========================================================
+
+    elseif (option == "Escape::Escape Bounty (%)")
+        formatString = "{0}% of Bounty"
+
+    elseif (option == "Escape::Escape Bounty")
+
+    ; ==========================================================
+    ;                       BOUNTY HUNTING
+    ; ==========================================================
+
+    elseif (option == "Bounty Hunting::Minimum Bounty")
+
+    elseif (option == "Bounty Hunting::Bounty (Posse)")
+
+    ; ==========================================================
+    ;                           BOUNTY
+    ; ==========================================================
+
+    elseif (option == "Bounty::Bounty Lost (%)")
+        formatString = "{0}% of Bounty"
+
+    elseif (option == "Bounty::Bounty Lost")
+
+    endif
+
+    mcm.SetOptionSliderValue(option, value, formatString)
 endFunction
 
 function OnOptionMenuOpen(RealisticPrisonAndBounty_MCM mcm, string option) global
@@ -517,7 +662,7 @@ function OnOptionMenuAccept(RealisticPrisonAndBounty_MCM mcm, string option, int
     if (option == "Prison::Cell Lock Level")
         if (menuIndex != -1)
             mcm.Debug("OnOptionMenuAccept", "Chosen option: " + mcm.LockLevels[menuIndex])
-            mcm.SetOptionMenuValue(option, menuIndex)
+            mcm.SetOptionMenuValue(option, mcm.LockLevels[menuIndex])
         endif
     endif
 endFunction

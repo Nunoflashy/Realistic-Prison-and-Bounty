@@ -58,7 +58,7 @@ int  property FRISKING_DEFAULT_MIN_BOUNTY                       = 500 autoreadon
 int  property FRISKING_DEFAULT_GUARANTEED_PAYABLE_BOUNTY        = 1500 autoreadonly
 int  property FRISKING_DEFAULT_MAXIMUM_PAYABLE_BOUNTY           = 2000 autoreadonly
 int  property FRISKING_DEFAULT_MAXIMUM_PAYABLE_BOUNTY_CHANCE    = 33 autoreadonly
-int  property FRISKING_DEFAULT_FRISK_THOROUGHNESS               = 400 autoreadonly
+int  property FRISKING_DEFAULT_FRISK_THOROUGHNESS               = 10 autoreadonly
 int  property FRISKING_DEFAULT_CONFISCATE_ITEMS                 = 3000 autoreadonly
 bool property FRISKING_DEFAULT_STRIP_IF_STOLEN_FOUND            = true autoreadonly
 int  property FRISKING_DEFAULT_NUMBER_STOLEN_ITEMS_REQUIRED     = 10 autoreadonly
@@ -77,13 +77,6 @@ int  property UNDRESSING_DEFAULT_REDRESS_BOUNTY         = 2000 autoreadonly
 bool property UNDRESSING_DEFAULT_REDRESS_WHEN_DEFEATED  = true autoreadonly
 bool property UNDRESSING_DEFAULT_REDRESS_AT_CELL        = true autoreadonly
 bool property UNDRESSING_DEFAULT_REDRESS_AT_CHEST       = true autoreadonly
-; ==============================================================================
-; CLOTHING
-bool property CLOTHING_DEFAULT_ALLOW_CLOTHES          = false autoreadonly
-int  property CLOTHING_DEFAULT_REDRESS_BOUNTY         = 2000 autoreadonly
-bool property CLOTHING_DEFAULT_REDRESS_WHEN_DEFEATED  = true autoreadonly
-bool property CLOTHING_DEFAULT_REDRESS_AT_CELL        = true autoreadonly
-bool property CLOTHING_DEFAULT_REDRESS_AT_CHEST       = true autoreadonly
 ; ==============================================================================
 ; PRISON
 int    property PRISON_DEFAULT_TIMESCALE                    = 60 autoreadonly
@@ -345,12 +338,12 @@ endFunction
 
     returns:    The Option's ID.
 /;
-int function AddOptionSliderKey(string displayedText, string _key, float defaultValue)
+int function AddOptionSliderKey(string displayedText, string _key, float defaultValue, string formatString = "{0}")
     string optionKey        = __makeOptionKey(_key) ; optionKey = Whiterun::Undressing::Allow Undressing
     string cacheKey         = __makeCacheOptionKey(_key)     ; cacheKey  = Allow Undressing
 
     float value             = __getFloatOptionValue(optionKey)
-    int optionId            = AddSliderOption(displayedText, float_if (value < GENERAL_ERROR, defaultValue, value))
+    int optionId            = AddSliderOption(displayedText, float_if (value < GENERAL_ERROR, defaultValue, value), formatString)
     
     if (!__optionExists(optionKey, optionId))
         int option = __createOptionFloat(optionId, defaultValue)
@@ -360,8 +353,8 @@ int function AddOptionSliderKey(string displayedText, string _key, float default
     return optionId
 endFunction
 
-int function AddOptionSlider(string text, float defaultValue)
-    return AddOptionSliderKey(text, text, defaultValue)
+int function AddOptionSlider(string text, float defaultValue, string formatString = "{0}")
+    return AddOptionSliderKey(text, text, defaultValue, formatString)
 endFunction
 
 ;/
@@ -474,27 +467,27 @@ endFunction
     string      @option: The name of the option to be changed.
     float       @value: The new value for the option.
 /;
-function SetOptionSliderValue(string option, float value)
+function SetOptionSliderValue(string option, float value, string formatString = "{0}")
     string _key = CurrentPage + "::" + option
     Debug("SetOptionSliderValue", "Key is: " + _key)
     int optionId = GetOption(option)
 
     ; Change the value of the slider
-    SetSliderOptionValue(optionId, value)
+    SetSliderOptionValue(optionId, value, formatString)
 
     ; Store the value
     __setFloatOptionValue(_key, value)
 endFunction
 
-function SetOptionMenuValue(string option, int value)
+function SetOptionMenuValue(string option, string value)
     string _key = CurrentPage + "::" + option
     int optionId = GetOption(option)
 
     ; Change the value of the menu option
-    SetMenuOptionValue(optionId, LockLevels[value])
+    SetMenuOptionValue(optionId, value)
 
     ; Store the value
-    __setStringOptionValue(_key, LockLevels[value])
+    __setStringOptionValue(_key, value)
 endFunction
 
 string function GetKeyFromOption(int optionId)
@@ -708,7 +701,7 @@ int function __getBoolOptionValue(string _key)
         return OPTION_NOT_EXIST ; Option does not exist
     endif
 
-    Debug("__getBoolOptionValue", "[" + _key + "] " + "CT: " + _container + ", CT_KEY: " + _containerKey + ", CT_VALUE: " + _containerValue)
+    Debug("__getBoolOptionValue", "[" + _key + "] OptionID: " + _containerKey + ", Value: " + _containerValue)
 
     return (_containerValue as int)
 endFunction
@@ -734,7 +727,7 @@ int function __getIntOptionValue(string _key)
         return OPTION_NOT_EXIST ; Option does not exist
     endif
 
-    Debug("__getIntOptionValue", "[" + _key + "] " + "CT: " + _container + ", CT_KEY: " + _containerKey + ", CT_VALUE: " + _containerValue)
+    Debug("__getIntOptionValue", "[" + _key + "] OptionID: " + _containerKey + ", Value: " + _containerValue)
     return _containerValue
 endFunction
 
@@ -758,7 +751,7 @@ float function __getFloatOptionValue(string _key)
         return OPTION_NOT_EXIST ; Option does not exist
     endif
 
-    Debug("__getFloatOptionValue", "[" + _key + "] " + "CT: " + _container + ", CT_KEY: " + _containerKey + ", CT_VALUE: " + _containerValue)
+    Debug("__getFloatOptionValue", "[" + _key + "] OptionID: " + _containerKey + ", Value: " + _containerValue)
     return _containerValue
 endFunction
 
@@ -766,7 +759,7 @@ endFunction
     Retrieves a string value for a specified option from the internal storage.
     string      @_key: The key of the option to retrieve the value from.
 
-    returns:    If the option exists and has a string value, returns the value, otherwise returns < GENERAL_ERROR.
+    returns:    If the option exists and has a string value, returns the value, otherwise returns empty string.
 /;
 string function __getStringOptionValue(string _key)
     int _array = __getOptionsArrayAtKey(_key)
@@ -782,7 +775,7 @@ string function __getStringOptionValue(string _key)
         return ""
     endif
 
-    Debug("__getStringOptionValue", "[" + _key + "] " + "CT: " + _container + ", CT_KEY: " + _containerKey + ", CT_VALUE: " + _containerValue)
+    Debug("__getStringOptionValue", "[" + _key + "] OptionID: " + _containerKey + ", Value: " + _containerValue)
     return _containerValue
 endFunction 
 
