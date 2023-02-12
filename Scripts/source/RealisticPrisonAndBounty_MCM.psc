@@ -292,150 +292,89 @@ int function AddOptionCategory(string text, int flags = 0)
     AddHeaderOption(text, flags)
 endFunction
 
+
 ;/
     Adds and renders a Toggle Option with the possibility of specifying a Key for its storage.
 
     string      @displayedText: The text that will be displayed in the menu.
-    string      @overrideKey: The key to be used to set values to and from storage.
+    string      @_key: The key to be used to set values to and from storage.
     bool        @defaultValue: The default value before being rendered for the first time.
-    int         @index: The index of where to render this option in storage. (-1 means it is a Single Option)
 
-    returns:    The option's ID.
+    returns:    The Option's ID.
 /;
-int function AddOptionToggleWithCategoryAndKey(string displayedText, string overrideKey, bool defaultValue, int index = -1)
-    string optionKey    = __makeOptionKey(overrideKey) ; optionKey = Whiterun::Undressing::Allow Undressing
-    string cacheKey     = __makeCacheOptionKey(overrideKey)     ; cacheKey  = Allow Undressing
+int function AddOptionToggleKey(string displayedText, string _key, bool defaultValue)
+    string optionKey    = __makeOptionKey(_key)             ; optionKey = Whiterun::Undressing::Allow Undressing
+    string cacheKey     = __makeCacheOptionKey(_key)        ; cacheKey  = Undressing::Allow Undressing
 
     int value           = __getBoolOptionValue(optionKey)
-    int optionId        = AddToggleOption(displayedText, bool_if (value < GENERAL_ERROR, defaultValue, (value as bool)))
-
-
-    ; Debug("AddOptionToggleWithCategoryAndKey", "Key: " + optionKey, IS_DEBUG)
+    int optionId        = AddToggleOption(displayedText, bool_if (value < GENERAL_ERROR, defaultValue, value as bool))
 
     if (!__optionExists(optionKey, optionId))
-        __addOptionInternal(displayedText, optionId, optionKey, cacheKey, __createOptionBool(optionId, defaultValue), index)
-        ;  displayedText: Minimum Bounty to Arrest, optionId: 1026, optionKey: Whiterun::Arrest::Minimum Bounty to Arrest
+        int option = __createOptionBool(optionId, defaultValue)
+        __addOptionInternal(displayedText, optionId, optionKey, cacheKey, option)
     endif
 
     return optionId
 endFunction
 
-int function AddOptionToggleWithCategory(string text, bool defaultValue, int index = -1)
-    return AddOptionToggleWithCategoryAndKey(text, text, defaultValue, index)
-endFunction
-
-
-int function AddOptionToggleWithKey(string displayedText, string overrideKey, bool defaultValue, int index = -1)
-    string optionKey    = __makeOptionKey(overrideKey)          ; optionKey = Undressing::Allow Undressing
-    string cacheKey     = __makeCacheOptionKey(overrideKey)     ; cacheKey  = Allow Undressing
-
-    int value           ;= __getBoolOptionValue(optionKey, int_if (index == -1, SINGLE_OPTION_INDEX, index))
-    int optionId        = AddToggleOption(displayedText, bool_if (value < GENERAL_ERROR, defaultValue, (value as bool)))
-    
-    if (!__optionExists(optionKey, optionId))
-        __addOptionInternal(displayedText, optionId, optionKey, cacheKey, __createOptionBool(optionId, defaultValue), index)
-    endif
-
-    return optionId
-endFunction
-
-
-
-int function AddOptionToggle(string text, bool defaultValue, int index = -1)
-    return AddOptionToggleWithKey(text, text, defaultValue, index)
-endFunction
-
-
-int function AddOptionSliderWithCategoryAndKey(string displayedText, string overrideKey, float defaultValue, int index = -1)
-    string optionKey        = __makeOptionKey(overrideKey) ; optionKey = Whiterun::Undressing::Allow Undressing
-    string cacheKey         = __makeCacheOptionKey(overrideKey)     ; cacheKey  = Allow Undressing
-
-    float value             = __getFloatOptionValue(optionKey)
-    int optionId            = AddSliderOption(displayedText, float_if (value < GENERAL_ERROR, defaultValue, value))
-    
-    if (!__optionExists(optionKey, optionId))
-        __addOptionInternal(displayedText, optionId, optionKey, cacheKey, __createOptionFloat(optionId, defaultValue), index)
-    endif
-
-    return optionId
-endFunction
-
-int function AddOptionSliderWithCategory(string text, float defaultValue, int index = -1)
-    AddOptionSliderWithCategoryAndKey(text, text, defaultValue, index)
+int function AddOptionToggle(string text, bool defaultValue)
+    return AddOptionToggleKey(text, text, defaultValue)
 endFunction
 
 ;/
-    Adds and renders a Slider Option with the possibility of specifying a Key for its storage.
+    Adds and renders a Slide Option with the possibility of specifying a Key for its storage.
 
     string      @displayedText: The text that will be displayed in the menu.
-    string      @overrideKey: The key to be used to set values to and from storage.
+    string      @_key: The key to be used to set values to and from storage.
     float       @defaultValue: The default value before being rendered for the first time.
-    int         @index: The index of where to render this option in storage. (-1 means it is a Single Option)
 
-    returns:    The option's ID.
+    returns:    The Option's ID.
 /;
-int function AddOptionSliderWithKey(string displayedText, string overrideKey, float defaultValue, int index = -1)
-    string optionKey        = __makeOptionKey(overrideKey)          ; optionKey = Undressing::Allow Undressing
-    string cacheKey         = __makeCacheOptionKey(overrideKey)     ; cacheKey  = Allow Undressing
+int function AddOptionSliderKey(string displayedText, string _key, float defaultValue)
+    string optionKey        = __makeOptionKey(_key) ; optionKey = Whiterun::Undressing::Allow Undressing
+    string cacheKey         = __makeCacheOptionKey(_key)     ; cacheKey  = Allow Undressing
 
     float value             = __getFloatOptionValue(optionKey)
     int optionId            = AddSliderOption(displayedText, float_if (value < GENERAL_ERROR, defaultValue, value))
     
     if (!__optionExists(optionKey, optionId))
-        __addOptionInternal(displayedText, optionId, optionKey, cacheKey, __createOptionFloat(optionId, defaultValue), index)
+        int option = __createOptionFloat(optionId, defaultValue)
+        __addOptionInternal(displayedText, optionId, optionKey, cacheKey, option)
     endif
 
     return optionId
 endFunction
 
-int function AddOptionSlider(string text, float defaultValue, int index = -1)
-    return AddOptionSliderWithKey(text, text, defaultValue, index)
-endFunction
-
-int function AddOptionMenuWithCategoryAndKey(string displayedText, string overrideKey, string defaultValue, int index = -1)
-    string optionKey        = __makeOptionKey(overrideKey) ; optionKey = Whiterun::Undressing::Allow Undressing
-    string cacheKey         = __makeCacheOptionKey(overrideKey)     ; cacheKey  = Allow Undressing
-
-    string value            = __getStringOptionValue(optionKey)
-    int optionId            = AddMenuOption(displayedText, string_if (value < GENERAL_ERROR, defaultValue, value))
-    
-    if (!__optionExists(optionKey, optionId))
-        __addOptionInternal(displayedText, optionId, optionKey, cacheKey, __createOptionString(optionId, defaultValue), index)
-    endif
-
-    return optionId
-endFunction
-
-int function AddOptionMenuWithCategory(string text, string defaultValue, int index = -1)
-    AddOptionMenuWithCategoryAndKey(text, text, defaultValue, index)
+int function AddOptionSlider(string text, float defaultValue)
+    return AddOptionSliderKey(text, text, defaultValue)
 endFunction
 
 ;/
     Adds and renders a Menu Option with the possibility of specifying a Key for its storage.
 
     string      @displayedText: The text that will be displayed in the menu.
-    string      @overrideKey: The key to be used to set values to and from storage.
+    string      @_key: The key to be used to set values to and from storage.
     string      @defaultValue: The default value before being rendered for the first time.
-    int         @index: The index of where to render this option in storage. (-1 means it is a Single Option)
 
     returns:    The option's ID.
 /;
-int function AddOptionMenuWithKey(string displayedText, string overrideKey, string defaultValue, int index = -1)
-    string optionKey        = __makeOptionKey(overrideKey)          ; optionKey = Undressing::Allow Undressing
-    string cacheKey         = __makeCacheOptionKey(overrideKey)     ; cacheKey  = Allow Undressing
+int function AddOptionMenuKey(string displayedText, string _key, string defaultValue)
+    string optionKey        = __makeOptionKey(_key) ; optionKey = Whiterun::Undressing::Allow Undressing
+    string cacheKey         = __makeCacheOptionKey(_key)     ; cacheKey  = Allow Undressing
 
     string value            = __getStringOptionValue(optionKey)
     int optionId            = AddMenuOption(displayedText, string_if (value < GENERAL_ERROR, defaultValue, value))
     
     if (!__optionExists(optionKey, optionId))
-        ; __addOptionInternal(displayedText, optionId, optionKey, cacheKey, __createOptionString(optionKey, optionId, defaultValue), index)
+        int option = __createOptionString(optionId, defaultValue)
+        __addOptionInternal(displayedText, optionId, optionKey, cacheKey, option)
     endif
 
     return optionId
 endFunction
 
-int function AddOptionMenu(string text, string defaultValue, int index = -1)
-    return AddOptionMenuWithKey(text, text, defaultValue, index)
+int function AddOptionMenu(string text, string defaultValue)
+    AddOptionMenuKey(text, text, defaultValue)
 endFunction
 
 
@@ -655,62 +594,13 @@ function Error(string caller, string logInfo, bool condition = true)
 endFunction
 
 ; ============================================================================
-;                               Assertion Functions
-
-function assertIsOptionCreated(string page, string category, string optionName, string expectedKey, int expectedOptionId, float expectedValue)
-    if (!ENABLE_ASSERTIONS)
-        return
-    endif
-
-    Info("assertIsOptionCreated", "Assertion started: [page: "+ page +", category: "+ category +", optionName: "+ optionName +", expectedKey: "+ expectedKey +", expectedOptionId: "+ expectedOptionId +", expectedValue: "+ expectedValue +"]")
-    Info("assertIsOptionCreated", "__getCategoryToIndex("+category+"): " + __getCategoryToIndex(category))
-
-    int pageArray = JMap.getObj(optionsMap, page) ; JMap[]
-
-    if (pageArray == 0)
-        Assert(self, "assertIsOptionCreated", "Page array is empty!")
-        return
-    endif
-
-    int option  = JArray.getObj(pageArray, __getCategoryToIndex(category)) ; JMap : { key: optionName, value: [optionId, value]  }
-    if (option == 0)
-        Assert(self, "assertIsOptionCreated", "Option array is empty!")
-        return
-    endif
-
-    string optionKey    = JMap.getNthKey(option, 0)         ; string : optionName
-    int optionContainer = JMap.getObj(option, optionKey)    ; Array  : [optionId, value]
-    int optionId        = JArray.getInt(optionContainer, 0) ; int    : optionId
-    float optionValue   = JArray.getFlt(optionContainer, 1) ; float  : value
-
-    if (optionKey != expectedKey)
-        Assert(self, "assertIsOptionCreated", "ASSERTION FAILED: Option key does not match (optionKey != expectedKey)\n" + \ 
-            "\tExpected: " + expectedKey + ", Got: " + optionKey + "\n\n")
-        return
-    endif
-
-    if (optionId != expectedOptionId)
-        Assert(self, "assertIsOptionCreated", "ASSERTION FAILED: Option ID does not match (optionId != expectedOptionId)\n" + \ 
-            "\tExpected: " + expectedOptionId + ", Got: " + optionId + "\n\n")
-        return
-    endif
-
-    if (optionValue != expectedValue)
-        Assert(self, "assertIsOptionCreated", "ASSERTION FAILED: Option value does not match (optionValue != expectedValue)\n" + \ 
-            "\tExpected: " + expectedValue + ", Got: " + optionValue + "\n\n")
-        return
-    endif
-
-endFunction
-
-; ============================================================================
 ;                               Option Functions
 ;/
      Stores every Option in the menu.
      This is a map of arrays, which themselves contain maps of options.
 
      The map is implemented as follows:
-     optionsMap[optionKey] : StringMap = [
+     optionsMap[page::optionKey] : StringMap = [
         {key: optionId, value: optionValue}, : IntMap
         {key: optionId, value: optionValue}, : IntMap
         {key: optionId, value: optionValue}, : IntMap
@@ -718,7 +608,7 @@ endFunction
      ]
 
      Example:
-     optionsMap[undressing::allowUndressing] = [
+     optionsMap[whiterun::undressing::allowUndressing] = [
         {key: 1026, value: true},
         {key: 1028, value: true},
         {key: 1030, value: false},
@@ -765,16 +655,16 @@ endFunction
     JIntMap     @optionContainer: The structure containing the option's key, as well as its other various values.
     int         @index: The index in the internal array of where to store this option.
 /;
-function __addOptionInternal(string displayedText, int optionId, string optionKey, string cacheKey, int optionContainer, int index = -1)
-    Debug("__addOptionInternal", "Option (ID: " + optionId + ", Key: " + optionKey + "), Cache (ID: " + optionId + ", Key: "+ cacheKey +") [index: "+ index +"] does not exist, creating it...", IS_DEBUG)
+function __addOptionInternal(string displayedText, int optionId, string optionKey, string cacheKey, int optionContainer)
+    Debug("__addOptionInternal", "Option (ID: " + optionId + ", Key: " + optionKey + "), Cache (ID: " + optionId + ", Key: "+ cacheKey +") does not exist, creating it...", IS_DEBUG)
     __addOptionAtKey(optionKey, optionContainer)
-    __addOptionCache(optionId, cacheKey, index)
+    __addOptionCache(optionId, cacheKey)
 endFunction
 
 ;/
     Retrieves a bool value for a specified option from the internal storage.
     string      @_key: The key of the option to retrieve the value from.
-    int         @index: The index in the array of the option to retrieve.
+
     returns:    If the option exists and has a bool value, returns the value, otherwise returns < GENERAL_ERROR.
 /;
 int function __getBoolOptionValue(string _key)
@@ -800,7 +690,7 @@ endFunction
 ;/
     Retrieves an int value for a specified option from the internal storage.
     string      @_key: The key of the option to retrieve the value from.
-    int         @index: The index in the array of the option to retrieve.
+
     returns:    If the option exists and has an int value, returns the value, otherwise returns < GENERAL_ERROR.
 /;
 int function __getIntOptionValue(string _key)
@@ -825,7 +715,7 @@ endFunction
 ;/
     Retrieves a float value for a specified option from the internal storage.
     string      @_key: The key of the option to retrieve the value from.
-    int         @index: The index in the array of the option to retrieve.
+
     returns:    If the option exists and has a float value, returns the value, otherwise returns < GENERAL_ERROR.
 /;
 float function __getFloatOptionValue(string _key)
@@ -849,7 +739,7 @@ endFunction
 ;/
     Retrieves a string value for a specified option from the internal storage.
     string      @_key: The key of the option to retrieve the value from.
-    int         @index: The index in the array of the option to retrieve.
+
     returns:    If the option exists and has a string value, returns the value, otherwise returns < GENERAL_ERROR.
 /;
 string function __getStringOptionValue(string _key)
@@ -875,7 +765,6 @@ endFunction
 
     string      @_key: The option's key.
     float       @value: The new value for this option
-    int         @index: The index of where this option is rendered in storage.
 /;
 function __setFloatOptionValue(string _key, float value)
     int _array = __getOptionsArrayAtKey(_key)
@@ -948,7 +837,7 @@ function __addOptionAtKey(string _key, int optionContainer)
     JArray.addObj(_array, optionContainer)
 
     Trace("__addOptionAtKey", "Adding MAP ID: " + optionContainer + " to ARRAY ID: " + _array, ENABLE_TRACE)
-    Debug("__addOptionAtKey", "Adding ARRAY ID: " + _array + " to optionsMap[" +_key + "]")
+    Trace("__addOptionAtKey", "Adding ARRAY ID: " + _array + " to optionsMap[" +_key + "]")
     Trace("__addOptionAtKey", "Adding Option " + optionContainer + " to " + "[" +_key + "]", ENABLE_TRACE)
 
     ; Add the array containing all containers related to _key to the map at _key
@@ -978,7 +867,8 @@ endFunction
     returns: The container's id.
 /;
 int function __createOptionBool(int optionId, bool value)
-    int _container = __createPairInt(optionId, (value as int))
+    int _container = JIntMap.object()
+    JIntMap.setInt(_container, optionId, value as int)
     Trace("__createOptionBool", "Created MAP ID: " + _container + ", adding Option (id: " + optionId + ", value: " + value + ")", ENABLE_TRACE)
     return _container
 endFunction
@@ -991,7 +881,8 @@ endFunction
     returns: The container's id.
 /;
 int function __createOptionInt(int optionId, int value)
-    int _container = __createPairInt(optionId, value)
+    int _container = JIntMap.object()
+    JIntMap.setInt(_container, optionId, value)
     Debug("__createOptionInt", "Created MAP ID: " + _container + ", adding Option (id: " + optionId + ", value: " + value + ")")
     return _container
 endFunction
@@ -1092,34 +983,6 @@ endFunction
 /;
 bool function __isSingleOption(int _array)
     return JArray.count(_array) == 1
-endFunction
-
-; ============================================================================
-;                               Utility Functions
-;/
-    Creates a pair structure for integers.
-
-    int     @first: The first element in the pair.
-    int     @second: The second element in the pair.
-
-    returns: The pair as a container ID. : JIntMap
-/;
-int function __createPairInt(int first, int second)
-    int _container = JIntMap.object()
-    JIntMap.setInt(_container, first, second)
-    return _container
-endFunction
-
-;/
-    Creates a pair structure for bools.
-
-    bool     @first: The first element in the pair.
-    bool     @second: The second element in the pair.
-
-    returns: The pair as a container ID. : JIntMap
-/;
-int function __createPairBool(bool first, bool second)
-    return __createPairInt((first as int), (second as int))
 endFunction
 
 
@@ -1288,7 +1151,7 @@ endFunction
     string  @optionName: The name of the option.
 
 /;
-function __addOptionCache(int optionId, string optionName, int index)
+function __addOptionCache(int optionId, string optionName)
     ;/
     cacheMap[Whiterun] = 
     [
@@ -1316,7 +1179,7 @@ function __addOptionCache(int optionId, string optionName, int index)
     ; Add array with options belonging to page to cache map
     JMap.setObj(cacheMap, CurrentPage, _cachePageArray)
 
-    Debug("__addOptionCache", "Created cache option: " + "(key: " + optionId + ", value: "+ optionName +")")
+    Trace("__addOptionCache", "Created cache option: " + "(key: " + optionId + ", value: "+ optionName +")")
 endFunction
 
 ; ============================================================================
