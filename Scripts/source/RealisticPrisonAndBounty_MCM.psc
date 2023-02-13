@@ -225,18 +225,23 @@ string property CurrentRenderedCategory
     endFunction
 endProperty
 
+int _pagesArray
 function InitializePages()
-    Pages = new string[9]
+    _pagesArray = JArray.object()
 
-    Pages[0] = "Whiterun"
-    Pages[1] = "Winterhold"
-    Pages[2] = "Eastmarch"
-    Pages[3] = "Falkreath"
-    Pages[4] = "Haafingar"
-    Pages[5] = "Hjaalmarch"
-    Pages[6] = "The Rift"
-    Pages[7] = "The Reach"
-    Pages[8] = "The Pale"
+    JArray.addStr(_pagesArray, "General")
+    JArray.addStr(_pagesArray, "")
+    JArray.addStr(_pagesArray, "Whiterun")
+    JArray.addStr(_pagesArray, "Winterhold")
+    JArray.addStr(_pagesArray, "Eastmarch")
+    JArray.addStr(_pagesArray, "Falkreath")
+    JArray.addStr(_pagesArray, "Haafingar")
+    JArray.addStr(_pagesArray, "Hjaalmarch")
+    JArray.addStr(_pagesArray, "The Rift")
+    JArray.addStr(_pagesArray, "The Reach")
+    JArray.addStr(_pagesArray, "The Pale")
+
+    Pages = JArray.asStringArray(_pagesArray)
 endFunction
 
 int function GetGlobalTimescale()

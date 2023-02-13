@@ -3,7 +3,7 @@ Scriptname RealisticPrisonAndBounty_MCM_Holds hidden
 import RealisticPrisonAndBounty_Util
 
 bool function ShouldHandleEvent(RealisticPrisonAndBounty_MCM mcm) global
-    return mcm.CurrentPage != "" ; If the page is any hold, handle events
+    return mcm.CurrentPage != "" && mcm.CurrentPage != "General" ; If the page is any hold, handle events
 endFunction
 
 function Render(RealisticPrisonAndBounty_MCM mcm) global
