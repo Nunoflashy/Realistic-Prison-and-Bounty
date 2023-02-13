@@ -282,13 +282,13 @@ function ToggleOption(string _key, bool storePersistently = true)
     endif
 
     int _container = JArray.getObj(_array, 0)
-    Debug("ToggleOption", "[" + _key +"] " + "Container: " + _container + ", Array: " + _array)
+    ; Debug("ToggleOption", "[" + _key +"] " + "Container: " + _container + ", Array: " + _array)
     int _containerKey = JIntMap.nextKey(_container)
     bool _containerValue = JIntMap.getInt(_container, _containerKey) as bool
-    Debug("ToggleOption", "[" + _key +"] " + "Key: " + _containerKey + ", Value: " + _containerValue)
+    ; Debug("ToggleOption", "[" + _key +"] " + "Key: " + _containerKey + ", Value: " + _containerValue)
     JIntMap.setInt(_container, _containerKey, (!_containerValue) as int) ; Toggle value
     SetToggleOptionValue(_containerKey, !_containerValue)
-    Debug("ToggleOption", "[" + _key +"] " + "Container: " + _container  + ", Container Key: " + _containerKey + " (" + 0 + " iterations)")
+    ; Debug("ToggleOption", "[" + _key +"] " + "Container: " + _container  + ", Container Key: " + _containerKey + " (" + 0 + " iterations)")
     Debug("ToggleOption", "Set new value of " + !_containerValue + " to Option ID " + _containerKey + " for key " + _key)
 
 

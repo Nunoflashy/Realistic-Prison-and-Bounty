@@ -96,11 +96,14 @@ function Right(RealisticPrisonAndBounty_MCM mcm) global
     mcm.AddTextOption("", "When Undressed", mcm.OPTION_DISABLED)
     mcm.AddOptionToggle("Allow Wearing Clothes",            mcm.UNDRESSING_DEFAULT_ALLOW_CLOTHES)
     mcm.AddOptionToggle("When Defeated",                    mcm.UNDRESSING_DEFAULT_REDRESS_WHEN_DEFEATED)
+    mcm.AddTextOption("OR", "", mcm.OPTION_DISABLED)
     mcm.AddOptionSlider("Maximum Bounty",                   mcm.UNDRESSING_DEFAULT_REDRESS_BOUNTY, "{0} Bounty")
 
     if (mcm.CurrentPage == "The Pale")
+        mcm.AddTextOption("", "Cidhna Mine", mcm.OPTION_DISABLED)
         mcm.AddOptionToggleKey("Allow Wearing Clothes", "Allow Wearing Clothes (Cidhna Mine)",   mcm.UNDRESSING_DEFAULT_ALLOW_CLOTHES)
         mcm.AddOptionToggleKey("When Defeated",  "When Defeated (Cidhna Mine)",                  mcm.UNDRESSING_DEFAULT_REDRESS_WHEN_DEFEATED)
+        mcm.AddTextOption("OR", "", mcm.OPTION_DISABLED)
         mcm.AddOptionSliderKey("Maximum Bounty",  "Maximum Bounty (Cidhna Mine)",                 mcm.UNDRESSING_DEFAULT_REDRESS_BOUNTY, "{0} Bounty")
     endif
 
@@ -269,23 +272,23 @@ function OnOptionHighlight(RealisticPrisonAndBounty_MCM mcm, string option) glob
         mcm.SetInfoText("The thoroughness of the strip search when undressed, higher values mean a more thorough search and therefore possibly less items kept.\n" + \
                      "Due to the nature of a strip search, most items will be removed, this value will only determine small objects that could be hidden when stripped off.")
 
-    elseif (option == "Allow Wearing Clothes")
+    elseif (option == "Undressing::Allow Wearing Clothes")
         mcm.SetInfoText("Determines if you are allowed to wear any clothes when imprisoned in " + mcm.CurrentPage + ".")
 
-    elseif (option == "When Defeated")
+    elseif (option == "Undressing::When Defeated")
         mcm.SetInfoText("Determines if you are given clothes when defeated and imprisoned in " + mcm.CurrentPage + ".")
 
-    elseif (option == "Maximum Bounty")
+    elseif (option == "Undressing::Maximum Bounty")
         mcm.SetInfoText("The maximum amount of bounty you can have in order to be given clothes when imprisoned in " + mcm.CurrentPage + ".")
         
     if (mcm.CurrentPage == "The Pale")
-        if (option == "Allow Wearing Clothes (Cidhna Mine)")
+        if (option == "Undressing::Allow Wearing Clothes (Cidhna Mine)")
             mcm.SetInfoText("Determines if you are allowed to wear any clothes when imprisoned in Cidhna Mine.")
 
-        elseif (option == "When Defeated (Cidhna Mine)")
+        elseif (option == "Undressing::When Defeated (Cidhna Mine)")
             mcm.SetInfoText("Determines if you are given clothes when defeated and imprisoned in Cidhna Mine.")
             
-        elseif (option == "Maximum Bounty (Cidhna Mine)")
+        elseif (option == "Undressing::Maximum Bounty (Cidhna Mine)")
             mcm.SetInfoText("The maximum amount of bounty you can have in order to be given clothes when imprisoned in Cidhna Mine.")
         endif
     endif
