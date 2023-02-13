@@ -69,7 +69,7 @@ endFunction
 function Right(RealisticPrisonAndBounty_MCM mcm) global
     mcm.AddOptionCategory("Prison")
     mcm.AddOptionSlider("Bounty to Sentence",                   mcm.PRISON_DEFAULT_BOUNTY_TO_SENTENCE, "{0} Bounty = 1 Day")
-    mcm.AddOptionSlider("Minimum Sentence",                 mcm.PRISON_DEFAULT_MAX_SENTENCE_DAYS, "{0} Days")
+    mcm.AddOptionSlider("Minimum Sentence",                 mcm.PRISON_DEFAULT_MIN_SENTENCE_DAYS, "{0} Days")
     mcm.AddOptionSlider("Maximum Sentence",                 mcm.PRISON_DEFAULT_MAX_SENTENCE_DAYS, "{0} Days")
     mcm.AddOptionToggle("Allow Unconditional Imprisonment",    mcm.PRISON_DEFAULT_ALLOW_UNCONDITIONAL_PRISON)
     mcm.AddOptionToggle("Sentence pays Bounty",             mcm.PRISON_DEFAULT_SENTENCE_PAYS_BOUNTY)
@@ -281,17 +281,14 @@ function OnOptionHighlight(RealisticPrisonAndBounty_MCM mcm, string option) glob
     elseif (option == "Undressing::Maximum Bounty")
         mcm.SetInfoText("The maximum amount of bounty you can have in order to be given clothes when imprisoned in " + mcm.CurrentPage + ".")
         
-    if (mcm.CurrentPage == "The Pale")
-        if (option == "Undressing::Allow Wearing Clothes (Cidhna Mine)")
+    elseif (option == "Undressing::Allow Wearing Clothes (Cidhna Mine)")
             mcm.SetInfoText("Determines if you are allowed to wear any clothes when imprisoned in Cidhna Mine.")
 
-        elseif (option == "Undressing::When Defeated (Cidhna Mine)")
-            mcm.SetInfoText("Determines if you are given clothes when defeated and imprisoned in Cidhna Mine.")
-            
-        elseif (option == "Undressing::Maximum Bounty (Cidhna Mine)")
-            mcm.SetInfoText("The maximum amount of bounty you can have in order to be given clothes when imprisoned in Cidhna Mine.")
-        endif
-    endif
+    elseif (option == "Undressing::When Defeated (Cidhna Mine)")
+        mcm.SetInfoText("Determines if you are given clothes when defeated and imprisoned in Cidhna Mine.")
+        
+    elseif (option == "Undressing::Maximum Bounty (Cidhna Mine)")
+        mcm.SetInfoText("The maximum amount of bounty you can have in order to be given clothes when imprisoned in Cidhna Mine.")
     ; ==========================================================
     ;                           RELEASE
     ; ==========================================================

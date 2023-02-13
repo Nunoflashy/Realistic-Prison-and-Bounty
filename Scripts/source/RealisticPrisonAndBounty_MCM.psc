@@ -80,7 +80,7 @@ bool property UNDRESSING_DEFAULT_REDRESS_AT_CHEST       = true autoreadonly
 ; ==============================================================================
 ; PRISON
 int    property PRISON_DEFAULT_TIMESCALE                    = 60 autoreadonly
-int    property PRISON_DEFAULT_BOUNTY_TO_SENTENCE               = 100 autoreadonly
+int    property PRISON_DEFAULT_BOUNTY_TO_SENTENCE           = 100 autoreadonly
 int    property PRISON_DEFAULT_MIN_SENTENCE_DAYS            = 10 autoreadonly
 int    property PRISON_DEFAULT_MAX_SENTENCE_DAYS            = 365 autoreadonly
 bool   property PRISON_DEFAULT_ALLOW_UNCONDITIONAL_PRISON   = false autoreadonly
@@ -321,6 +321,8 @@ int function AddOptionToggleKey(string displayedText, string _key, bool defaultV
         int option = __createOptionBool(optionId, defaultValue)
         __addOptionInternal(displayedText, optionId, optionKey, cacheKey, option)
     endif
+
+    Debug("AddOptionToggleKey", "displayedText: " + displayedText + ", _key: " + _key + ", optionKey: " + optionKey, ", cacheKey: " + cacheKey)
 
     return optionId
 endFunction
