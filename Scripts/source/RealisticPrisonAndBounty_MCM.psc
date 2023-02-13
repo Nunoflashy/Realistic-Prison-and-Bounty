@@ -244,6 +244,21 @@ function InitializePages()
     Pages = JArray.asStringArray(_pagesArray)
 endFunction
 
+bool function SetOptionDependencyBool(string option, bool dependency, bool storePersistently = true)
+    string optionKey = __makeOptionKey(option, includeCurrentCategory = false)
+
+    int enabled  = OPTION_FLAG_NONE
+    int disabled = OPTION_FLAG_DISABLED
+    int optionId = GetOption(option)
+    int flag = int_if (dependency, enabled, disabled)
+
+    SetOptionFlags(optionId, flag)
+
+    if (storePersistently)
+        JMap.setInt(optionsFlagMap, optionKey, flag)
+    endif
+endFunction
+
 int function GetGlobalTimescale()
     return Game.GetGameSettingInt("Timescale")
 endFunction
@@ -318,16 +333,16 @@ endFunction
 int function AddOptionToggleKey(string displayedText, string _key, bool defaultValue)
     string optionKey    = __makeOptionKey(_key)             ; optionKey = Whiterun::Undressing::Allow Undressing
     string cacheKey     = __makeCacheOptionKey(_key)        ; cacheKey  = Undressing::Allow Undressing
-
+    string flagKey      = __makeOptionFlagKey(_key)         ; flagKey   = Whiterun::Undressing::Allow Undressing::flag
+    
     int value           = __getBoolOptionValue(optionKey)
-    int optionId        = AddToggleOption(displayedText, bool_if (value < GENERAL_ERROR, defaultValue, value as bool))
+    int flags           = __getOptionFlag(optionKey)
+    int optionId        = AddToggleOption(displayedText, bool_if (value < GENERAL_ERROR, defaultValue, value as bool), flags)
 
     if (!__optionExists(optionKey, optionId))
         int option = __createOptionBool(optionId, defaultValue)
-        __addOptionInternal(displayedText, optionId, optionKey, cacheKey, option)
+        __addOptionInternal(displayedText, optionId, optionKey, cacheKey, option, flags)
     endif
-
-    Debug("AddOptionToggleKey", "displayedText: " + displayedText + ", _key: " + _key + ", optionKey: " + optionKey, ", cacheKey: " + cacheKey)
 
     return optionId
 endFunction
@@ -346,15 +361,17 @@ endFunction
     returns:    The Option's ID.
 /;
 int function AddOptionSliderKey(string displayedText, string _key, float defaultValue, string formatString = "{0}")
-    string optionKey        = __makeOptionKey(_key) ; optionKey = Whiterun::Undressing::Allow Undressing
-    string cacheKey         = __makeCacheOptionKey(_key)     ; cacheKey  = Allow Undressing
+    string optionKey        = __makeOptionKey(_key)         ; optionKey = Whiterun::Undressing::Allow Undressing
+    string cacheKey         = __makeCacheOptionKey(_key)    ; cacheKey  = Allow Undressing
+    string flagKey          = __makeOptionFlagKey(_key)     ; flagKey   = Whiterun::Undressing::Allow Undressing::flag
 
     float value             = __getFloatOptionValue(optionKey)
-    int optionId            = AddSliderOption(displayedText, float_if (value < GENERAL_ERROR, defaultValue, value), formatString)
+    int flags               = __getOptionFlag(optionKey)
+    int optionId            = AddSliderOption(displayedText, float_if (value < GENERAL_ERROR, defaultValue, value), formatString, flags)
     
     if (!__optionExists(optionKey, optionId))
         int option = __createOptionFloat(optionId, defaultValue)
-        __addOptionInternal(displayedText, optionId, optionKey, cacheKey, option)
+        __addOptionInternal(displayedText, optionId, optionKey, cacheKey, option, flags)
     endif
 
     return optionId
@@ -376,13 +393,16 @@ endFunction
 int function AddOptionMenuKey(string displayedText, string _key, string defaultValue)
     string optionKey        = __makeOptionKey(_key) ; optionKey = Whiterun::Undressing::Allow Undressing
     string cacheKey         = __makeCacheOptionKey(_key)     ; cacheKey  = Allow Undressing
+    string flagKey      = __makeOptionFlagKey(_key)         ; flagKey   = Whiterun::Undressing::Allow Undressing::flag
+
 
     string value            = __getStringOptionValue(optionKey)
+    int flags               = __getOptionFlag(optionKey)
     int optionId            = AddMenuOption(displayedText, string_if (value == "", defaultValue, value))
     
     if (!__optionExists(optionKey, optionId))
         int option = __createOptionString(optionId, defaultValue)
-        __addOptionInternal(displayedText, optionId, optionKey, cacheKey, option)
+        __addOptionInternal(displayedText, optionId, optionKey, cacheKey, option, flags)
     endif
 
     return optionId
@@ -437,7 +457,7 @@ endFunction
     int optionArray = __getOptionsArrayAtKey(_formattedKey) ; Get the array for this key
 
     if (optionArray == ARRAY_NOT_EXIST)
-        Error("GetOption", "Key: " + _key + " does not exist in the map, returning...")
+        Error("GetOption","Option " + _key + " does not exist, returning...")
         return ARRAY_NOT_EXIST
     endif
 
@@ -451,8 +471,20 @@ endFunction
     int _optionId       = __getOptionKey(_optionMap)
     int _optionValue    = __getOptionValue(_optionMap, _optionId)
 
-    Trace("GetOption", "[CurrentOptionIndex: " + 0 + "] Returned Option ID: " + _optionId + ", with value: " + _optionValue, ENABLE_TRACE)
+    Trace("GetOption", "Returned Option ID: " + _optionId + ", with value: " + _optionValue, ENABLE_TRACE)
     return _optionId
+endFunction
+
+;/
+    Gets a toggle option's state.
+
+    string      @option: The name of the option to retrieve the value from.
+
+    returns:    The option's value
+/;
+bool function GetOptionToggleState(string option)
+    string _key = __makeOptionKey(option, includeCurrentCategory = false)
+    return __getBoolOptionValue(_key)
 endFunction
 
 ;/
@@ -464,8 +496,13 @@ endFunction
 /;
 float function GetOptionSliderValue(string option)
     string _key = __makeOptionKey(option, includeCurrentCategory = false)
-    Debug("GetOptionSliderValue", "Key is: " + _key)
     return __getFloatOptionValue(_key)
+endFunction
+
+function SetFlags(string option, int flags)
+    int optionId = GetOption(option)
+    SetOptionFlags(optionId, flags)
+    Debug("SetFlags", "Set flag " + flags + " to option key " + option + ", id: " + optionId)
 endFunction
 
 ;/
@@ -476,7 +513,6 @@ endFunction
 /;
 function SetOptionSliderValue(string option, float value, string formatString = "{0}")
     string _key = CurrentPage + "::" + option
-    Debug("SetOptionSliderValue", "Key is: " + _key)
     int optionId = GetOption(option)
 
     ; Change the value of the slider
@@ -643,9 +679,23 @@ endFunction
 /;
 int optionsMap
 
+;/
+    Stores every option's flags.
+    Map implementation:
+        optionsFlagMap[Page::OptionKey] = Flag
+
+    Example:
+        optionsFlagMap[whiterun::undressing::allowUndressing] = 1 (OPTION_DISABLED)
+        optionsFlagMap[whiterun::frisking::allowFrisking]     = 0 (OPTION_ENABLED)
+/;
+int optionsFlagMap
+
 function __initializeOptionsMap()
     optionsMap = JMap.object()
     JValue.retain(optionsMap)
+
+    optionsFlagMap = JMap.object()
+    JValue.retain(optionsFlagMap)
 endFunction
 
 int function __getCategoryToIndex(string category)
@@ -679,12 +729,13 @@ endFunction
     string      @optionKey: The key used to refer to this option (Usually same as displayedText).
     string      @cacheKey: The key used to refer to this option when caching.
     JIntMap     @optionContainer: The structure containing the option's key, as well as its other various values.
-    int         @index: The index in the internal array of where to store this option.
+    int         @flags: The stored flags used for this option.
 /;
-function __addOptionInternal(string displayedText, int optionId, string optionKey, string cacheKey, int optionContainer)
+function __addOptionInternal(string displayedText, int optionId, string optionKey, string cacheKey, int optionContainer, int flags)
     Debug("__addOptionInternal", "Option (ID: " + optionId + ", Key: " + optionKey + "), Cache (ID: " + optionId + ", Key: "+ cacheKey +") does not exist, creating it...", IS_DEBUG)
     __addOptionAtKey(optionKey, optionContainer)
     __addOptionCache(optionId, cacheKey)
+    __setOptionFlag(optionKey, flags)
 endFunction
 
 ;/
@@ -736,6 +787,11 @@ int function __getIntOptionValue(string _key)
 
     Debug("__getIntOptionValue", "[" + _key + "] OptionID: " + _containerKey + ", Value: " + _containerValue)
     return _containerValue
+endFunction
+
+int function __getOptionFlag(string _key)
+    int value = JMap.getInt(optionsFlagMap, _key)
+    return value
 endFunction
 
 ;/
@@ -830,6 +886,10 @@ function __setStringOptionValue(string _key, string value)
     JIntMap.setStr(_container, _containerKey, value)
 endFunction
 
+function __setOptionFlag(string _key, int flag)
+    JMap.setInt(optionsFlagMap, _key, flag)
+endFunction
+
 ;/
     Gets the options array at the specified key from the underlying internal map.
 
@@ -899,6 +959,14 @@ string function __makeOptionKey(string displayedText, bool includeCurrentCategor
         return CurrentPage + "::" + CurrentRenderedCategory + "::" + displayedText
     else
         return CurrentPage + "::" + displayedText
+    endif
+endFunction
+
+string function __makeOptionFlagKey(string displayedText, bool includeCurrentCategory = true)
+    if (includeCurrentCategory)
+        return CurrentPage + "::" + CurrentRenderedCategory + "::" + displayedText + "::flags"
+    else
+        return CurrentPage + "::" + displayedText + "::flags"
     endif
 endFunction
 
