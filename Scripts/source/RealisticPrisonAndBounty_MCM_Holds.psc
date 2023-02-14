@@ -78,12 +78,13 @@ function Right(RealisticPrisonAndBounty_MCM mcm) global
     mcm.AddOptionSlider("Maximum Sentence",                 mcm.PRISON_DEFAULT_MAX_SENTENCE_DAYS, "{0} Days")
     mcm.AddOptionToggle("Allow Unconditional Imprisonment",    mcm.PRISON_DEFAULT_ALLOW_UNCONDITIONAL_PRISON)
     mcm.AddOptionToggle("Sentence pays Bounty",             mcm.PRISON_DEFAULT_SENTENCE_PAYS_BOUNTY)
-    mcm.AddOptionToggle("Fast Forward",                     mcm.PRISON_DEFAULT_FAST_FORWARD)
+    
     mcm.AddTextOption("", "When Imprisoned",                mcm.OPTION_DISABLED)
+    mcm.AddOptionToggle("Fast Forward",                     mcm.PRISON_DEFAULT_FAST_FORWARD)
     mcm.AddOptionSlider("Day to fast forward from",         mcm.PRISON_DEFAULT_DAY_FAST_FORWARD)
-    mcm.AddOptionToggle("Hands Bound in Prison",            mcm.PRISON_DEFAULT_HANDS_BOUND)
-    mcm.AddOptionSlider("Hands Bound (Minimum Bounty)",     mcm.PRISON_DEFAULT_HANDS_BOUND_BOUNTY, "{0} Bounty")
-    mcm.AddOptionToggle("Hands Bound (Randomize)",          mcm.PRISON_DEFAULT_HANDS_BOUND_RANDOMIZE)
+    ; mcm.AddOptionToggle("Hands Bound in Prison",            mcm.PRISON_DEFAULT_HANDS_BOUND)
+    ; mcm.AddOptionSlider("Hands Bound (Minimum Bounty)",     mcm.PRISON_DEFAULT_HANDS_BOUND_BOUNTY, "{0} Bounty")
+    ; mcm.AddOptionToggle("Hands Bound (Randomize)",          mcm.PRISON_DEFAULT_HANDS_BOUND_RANDOMIZE)
     mcm.AddOptionMenu("Cell Lock Level",                    mcm.PRISON_DEFAULT_CELL_LOCK_LEVEL)
 
     mcm.AddEmptyOption()
@@ -185,6 +186,16 @@ function HandleDependencies(RealisticPrisonAndBounty_MCM mcm) global
     mcm.SetOptionDependencyBool("Bounty::Decay while Imprisoned",  enableBountyDecay)
     mcm.SetOptionDependencyBool("Bounty::Bounty Lost (%)",         enableBountyDecay)
     mcm.SetOptionDependencyBool("Bounty::Bounty Lost",             enableBountyDecay)
+
+    
+    ; ==========================================================
+    ;                           ESCAPE
+    ; ==========================================================
+    
+    bool friskSearchUponCaptured = mcm.GetOptionToggleState("Escape::Frisk Search upon Captured")
+    bool undressUponCaptured     = mcm.GetOptionToggleState("Escape::Undress upon Captured")
+
+    mcm.SetOptionDependencyBool("Escape::Frisk Search upon Captured", !undressUponCaptured)
 
 endFunction
 
@@ -381,10 +392,10 @@ function OnOptionHighlight(RealisticPrisonAndBounty_MCM mcm, string option) glob
         mcm.SetInfoText("Whether the guards will allow you to surrender after escaping prison in " + mcm.CurrentPage + ".")
 
     elseif (option == "Escape::Frisk Search upon Captured")
-        mcm.SetInfoText("Whether to allow a frisk upon being captured in "  + mcm.CurrentPage + ".\n" + "(Note: The frisk will only take place if the conditions are met in Frisking)")
+        mcm.SetInfoText("Whether to allow a frisk upon being captured in "  + mcm.CurrentPage + ".\n" + "(Note: The frisk will take place regardless of whether the conditions are met in Frisking)")
 
     elseif (option == "Escape::Undress upon Captured")
-        mcm.SetInfoText("Whether to allow being undressed upon being captured in " + mcm.CurrentPage + ".\n (Note: Undressing will only take place if the conditions are met in Undressing)")
+        mcm.SetInfoText("Whether to allow being undressed upon being captured in " + mcm.CurrentPage + ".\n (Note: Undressing will take place regardless of whether the conditions are met in Undressing)")
 
     ; ==========================================================
     ;                       BOUNTY HUNTING
