@@ -8,7 +8,6 @@ import RealisticPrisonAndBounty_Util
 
 bool property IS_DEBUG      = true autoreadonly
 bool property ENABLE_TRACE  = false autoreadonly
-bool property ENABLE_ASSERTIONS = true autoreadonly
 
 ; ==============================================================================
 ; Cached Option
@@ -273,9 +272,6 @@ int function GetOptionValue(string page, string optionName, int index)
     int containerValue = JIntMap.getInt(_container, containerKey)
 
     EndBenchmark(startBench)
-    Debug("GetOptionValue", "Get Option Value: optionsMap["+ containerKey +"] = " + containerValue)
-    Debug("GetOptionValue", "Page: " + page + ", Option Name: " + optionName + ", Index: " + index)
-
     return containerValue
 endFunction
 
@@ -295,23 +291,18 @@ endFunction
 
 function ToggleOption(string _key, bool storePersistently = true)
     int _array = __getOptionsArrayAtKey(_key)
-    Debug("ToggleOption", "Key: " + _key)
     
     if (_array == ARRAY_NOT_EXIST)
         return ; Array does not exist
     endif
 
     int _container = JArray.getObj(_array, 0)
-    ; Debug("ToggleOption", "[" + _key +"] " + "Container: " + _container + ", Array: " + _array)
     int _containerKey = JIntMap.nextKey(_container)
     bool _containerValue = JIntMap.getInt(_container, _containerKey) as bool
-    ; Debug("ToggleOption", "[" + _key +"] " + "Key: " + _containerKey + ", Value: " + _containerValue)
+
     JIntMap.setInt(_container, _containerKey, (!_containerValue) as int) ; Toggle value
     SetToggleOptionValue(_containerKey, !_containerValue)
-    ; Debug("ToggleOption", "[" + _key +"] " + "Container: " + _container  + ", Container Key: " + _containerKey + " (" + 0 + " iterations)")
     Debug("ToggleOption", "Set new value of " + !_containerValue + " to Option ID " + _containerKey + " for key " + _key)
-
-
 endFunction
 
 
@@ -333,7 +324,6 @@ endFunction
 int function AddOptionToggleKey(string displayedText, string _key, bool defaultValue)
     string optionKey    = __makeOptionKey(_key)             ; optionKey = Whiterun::Undressing::Allow Undressing
     string cacheKey     = __makeCacheOptionKey(_key)        ; cacheKey  = Undressing::Allow Undressing
-    string flagKey      = __makeOptionFlagKey(_key)         ; flagKey   = Whiterun::Undressing::Allow Undressing::flag
     
     int value           = __getBoolOptionValue(optionKey)
     int flags           = __getOptionFlag(optionKey)
@@ -363,7 +353,6 @@ endFunction
 int function AddOptionSliderKey(string displayedText, string _key, float defaultValue, string formatString = "{0}")
     string optionKey        = __makeOptionKey(_key)         ; optionKey = Whiterun::Undressing::Allow Undressing
     string cacheKey         = __makeCacheOptionKey(_key)    ; cacheKey  = Allow Undressing
-    string flagKey          = __makeOptionFlagKey(_key)     ; flagKey   = Whiterun::Undressing::Allow Undressing::flag
 
     float value             = __getFloatOptionValue(optionKey)
     int flags               = __getOptionFlag(optionKey)
@@ -393,8 +382,6 @@ endFunction
 int function AddOptionMenuKey(string displayedText, string _key, string defaultValue)
     string optionKey        = __makeOptionKey(_key) ; optionKey = Whiterun::Undressing::Allow Undressing
     string cacheKey         = __makeCacheOptionKey(_key)     ; cacheKey  = Allow Undressing
-    string flagKey      = __makeOptionFlagKey(_key)         ; flagKey   = Whiterun::Undressing::Allow Undressing::flag
-
 
     string value            = __getStringOptionValue(optionKey)
     int flags               = __getOptionFlag(optionKey)
@@ -502,7 +489,6 @@ endFunction
 function SetFlags(string option, int flags)
     int optionId = GetOption(option)
     SetOptionFlags(optionId, flags)
-    Debug("SetFlags", "Set flag " + flags + " to option key " + option + ", id: " + optionId)
 endFunction
 
 ;/
@@ -542,14 +528,10 @@ string function GetKeyFromOption(int optionId)
         int optionMap       = __getCacheOption(_currentPageArray, i)
         int optionKey       = __getCacheOptionKey(optionMap)
 
-        ; Debug("GetKeyFromOption", "The key is: " + optionKey + ", Value is: " +  optionValue)
-
-        ; Debug("GetKeyFromOption", "The key is: " + optionName + ", Container is: " +  "(key: " + optionKey + ", value: "+ optionValue +")")
-
         if (optionId == optionKey)
             string optionValue  = __getCacheOptionValue(optionMap, optionKey)
             EndBenchmark(s)
-            Debug("GetKeyFromOption", "Found matching key for Option ID " + optionKey + "! Key is: " + optionValue)
+            Trace("GetKeyFromOption", "Found matching key for Option ID " + optionKey + "! Key is: " + optionValue)
             return optionValue ; We found the key that matches the option id.
         endif
 
@@ -593,39 +575,43 @@ endEvent
 
 event OnPageReset(string page)
     RealisticPrisonAndBounty_MCM_Holds.Render(self)
+    RealisticPrisonAndBounty_MCM_General.Render(self)
 endEvent
 
 event OnOptionHighlight(int option)
     RealisticPrisonAndBounty_MCM_Holds.OnHighlight(self, option)
+    RealisticPrisonAndBounty_MCM_General.OnHighlight(self, option)
 endEvent
 
 event OnOptionDefault(int option)
     RealisticPrisonAndBounty_MCM_Holds.OnDefault(self, option)
+    RealisticPrisonAndBounty_MCM_General.OnDefault(self, option)
 endEvent
 
 event OnOptionSelect(int option)
     RealisticPrisonAndBounty_MCM_Holds.OnSelect(self, option)
+    RealisticPrisonAndBounty_MCM_General.OnSelect(self, option)
 endEvent
-
-
 
 event OnOptionSliderOpen(int option)
     RealisticPrisonAndBounty_MCM_Holds.OnSliderOpen(self, option)
+    RealisticPrisonAndBounty_MCM_General.OnSliderOpen(self, option)
 endEvent
 
 event OnOptionSliderAccept(int option, float value)
     RealisticPrisonAndBounty_MCM_Holds.OnSliderAccept(self, option, value)
+    RealisticPrisonAndBounty_MCM_General.OnSliderAccept(self, option, value)
 endEvent
 
 event OnOptionMenuOpen(int option)
     RealisticPrisonAndBounty_MCM_Holds.OnMenuOpen(self, option)
+    RealisticPrisonAndBounty_MCM_General.OnMenuOpen(self, option)
 endEvent
 
 event OnOptionMenuAccept(int option, int index)
     RealisticPrisonAndBounty_MCM_Holds.OnMenuAccept(self, option, index)
+    RealisticPrisonAndBounty_MCM_General.OnMenuAccept(self, option, index)
 endEvent
-
-; ============================================================================
 
 
 ; ============================================================================
@@ -759,7 +745,7 @@ int function __getBoolOptionValue(string _key)
         return OPTION_NOT_EXIST ; Option does not exist
     endif
 
-    Debug("__getBoolOptionValue", "[" + _key + "] OptionID: " + _containerKey + ", Value: " + _containerValue)
+    Trace("__getBoolOptionValue", "[" + _key + "] OptionID: " + _containerKey + ", Value: " + _containerValue)
 
     return (_containerValue as int)
 endFunction
@@ -785,7 +771,7 @@ int function __getIntOptionValue(string _key)
         return OPTION_NOT_EXIST ; Option does not exist
     endif
 
-    Debug("__getIntOptionValue", "[" + _key + "] OptionID: " + _containerKey + ", Value: " + _containerValue)
+    Trace("__getIntOptionValue", "[" + _key + "] OptionID: " + _containerKey + ", Value: " + _containerValue)
     return _containerValue
 endFunction
 
@@ -814,7 +800,7 @@ float function __getFloatOptionValue(string _key)
         return OPTION_NOT_EXIST ; Option does not exist
     endif
 
-    Debug("__getFloatOptionValue", "[" + _key + "] OptionID: " + _containerKey + ", Value: " + _containerValue)
+    Trace("__getFloatOptionValue", "[" + _key + "] OptionID: " + _containerKey + ", Value: " + _containerValue)
     return _containerValue
 endFunction
 
@@ -838,7 +824,7 @@ string function __getStringOptionValue(string _key)
         return ""
     endif
 
-    Debug("__getStringOptionValue", "[" + _key + "] OptionID: " + _containerKey + ", Value: " + _containerValue)
+    Trace("__getStringOptionValue", "[" + _key + "] OptionID: " + _containerKey + ", Value: " + _containerValue)
     return _containerValue
 endFunction 
 
@@ -962,14 +948,6 @@ string function __makeOptionKey(string displayedText, bool includeCurrentCategor
     endif
 endFunction
 
-string function __makeOptionFlagKey(string displayedText, bool includeCurrentCategory = true)
-    if (includeCurrentCategory)
-        return CurrentPage + "::" + CurrentRenderedCategory + "::" + displayedText + "::flags"
-    else
-        return CurrentPage + "::" + displayedText + "::flags"
-    endif
-endFunction
-
 ;/
     Creates a container (JIntMap) with the specified optionId and a bool value.
     int     @optionId: The id of the option to be created.
@@ -994,7 +972,7 @@ endFunction
 int function __createOptionInt(int optionId, int value)
     int _container = JIntMap.object()
     JIntMap.setInt(_container, optionId, value)
-    Debug("__createOptionInt", "Created MAP ID: " + _container + ", adding Option (id: " + optionId + ", value: " + value + ")")
+    Trace("__createOptionInt", "Created MAP ID: " + _container + ", adding Option (id: " + optionId + ", value: " + value + ")")
     return _container
 endFunction
 
