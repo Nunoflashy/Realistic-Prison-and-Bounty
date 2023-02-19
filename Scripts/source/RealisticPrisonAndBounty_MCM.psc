@@ -86,6 +86,7 @@ bool   property PRISON_DEFAULT_ALLOW_UNCONDITIONAL_PRISON   = false autoreadonly
 bool   property PRISON_DEFAULT_SENTENCE_PAYS_BOUNTY         = false autoreadonly
 bool   property PRISON_DEFAULT_FAST_FORWARD                 = true autoreadonly
 int    property PRISON_DEFAULT_DAY_FAST_FORWARD             = 5 autoreadonly
+int    property PRISON_DEFAULT_DAY_START_LOSING_SKILLS      = 1 autoreadonly
 bool   property PRISON_DEFAULT_HANDS_BOUND                  = false autoreadonly
 int    property PRISON_DEFAULT_HANDS_BOUND_BOUNTY           = 4000 autoreadonly
 bool   property PRISON_DEFAULT_HANDS_BOUND_RANDOMIZE        = true autoreadonly
@@ -148,19 +149,57 @@ GlobalVariable property NormalTimescale auto
 GlobalVariable property PrisonTimescale auto
 ; =======================================
 
-string[] _lockLevels
+
+int _lockLevels
 string[] property LockLevels
     string[] function get()
-        if (!_locklevels)
-            _lockLevels = new string[6]
-            _lockLevels[0] = "Novice"
-            _lockLevels[1] = "Apprentice"
-            _lockLevels[2] = "Adept"
-            _lockLevels[3] = "Expert"
-            _lockLevels[4] = "Master"
-            _lockLevels[5] = "Requires Key"
+        if (JArray.count(_locklevels) == 0)
+            _lockLevels = JArray.object()
+            ; JValue.retain(_lockLevels)
+            JArray.addStr(_lockLevels, "Novice")
+            JArray.addStr(_lockLevels, "Apprentice")
+            JArray.addStr(_lockLevels, "Adept")
+            JArray.addStr(_lockLevels, "Expert")
+            JArray.addStr(_lockLevels, "Master")
+            JArray.addStr(_lockLevels, "Requires Key")
+
+            Debug("LockLevels::get", "Initialized array with a size of: " + JArray.count(_lockLevels))
         endif
-        return _lockLevels
+        return JArray.asStringArray(_lockLevels)
+    endFunction
+endProperty
+
+int _skills
+string[] property Skills
+    string[] function get()
+        if (JArray.count(_skills) == 0)
+            _skills = JArray.object()
+
+            JArray.addStr(_skills, "Max. Health")
+            JArray.addStr(_skills, "Max. Stamina")
+            JArray.addStr(_skills, "Max. Magicka")
+            JArray.addStr(_skills, "Heavy Armor")
+            JArray.addStr(_skills, "Light Armor")
+            JArray.addStr(_skills, "Sneak")
+            JArray.addStr(_skills, "One-Handed")
+            JArray.addStr(_skills, "Two-Handed")
+            JArray.addStr(_skills, "Archery")
+            JArray.addStr(_skills, "Block")
+            JArray.addStr(_skills, "Smithing")
+            JArray.addStr(_skills, "Speechcraft")
+            JArray.addStr(_skills, "Pickpocketing")
+            JArray.addStr(_skills, "Lockpicking")
+            JArray.addStr(_skills, "Alteration")
+            JArray.addStr(_skills, "Conjuration")
+            JArray.addStr(_skills, "Destruction")
+            JArray.addStr(_skills, "Illusion")
+            JArray.addStr(_skills, "Restoration")
+            JArray.addStr(_skills, "Enchanting")
+            JArray.addStr(_skills, "Alchemy")
+
+            Debug("Skills::get", "Initialized array with a size of: " + JArray.count(_lockLevels))
+        endif
+        return JArray.asStringArray(_skills)
     endFunction
 endProperty
 
@@ -224,6 +263,19 @@ string property CurrentRenderedCategory
     endFunction
 endProperty
 
+function ResetRenderedCategory()
+    _currentRenderedCategory = ""
+endFunction
+
+function SetRenderedCategory(string categoryName)
+    _currentRenderedCategory = categoryName
+endFunction
+
+string function GetOptionNameWithoutCategory(string option)
+    int startIndex = StringUtil.Find(option, "::") + 2 ; +2 to skip double colon, start after Category::
+    return StringUtil.Substring(option, startIndex)
+endFunction
+
 int _pagesArray
 function InitializePages()
     _pagesArray = JArray.object()
@@ -239,6 +291,8 @@ function InitializePages()
     JArray.addStr(_pagesArray, "The Rift")
     JArray.addStr(_pagesArray, "The Reach")
     JArray.addStr(_pagesArray, "The Pale")
+
+    Debug("Pages::get", "Initialized array with a size of: " + JArray.count(_pagesArray))
 
     Pages = JArray.asStringArray(_pagesArray)
 endFunction
@@ -276,7 +330,6 @@ int function GetOptionValue(string page, string optionName, int index)
 endFunction
 
 ; ============================================================
-
 ; Utility Functions
 ; ============================================================
 
@@ -302,7 +355,7 @@ function ToggleOption(string _key, bool storePersistently = true)
 
     JIntMap.setInt(_container, _containerKey, (!_containerValue) as int) ; Toggle value
     SetToggleOptionValue(_containerKey, !_containerValue)
-    Debug("ToggleOption", "Set new value of " + !_containerValue + " to Option ID " + _containerKey + " for key " + _key)
+    Debug("ToggleOption", "Set new value of " + !_containerValue + " for " + _key + " (option_id: " + _containerKey + ")")
 endFunction
 
 
@@ -481,8 +534,9 @@ endFunction
 
     returns:    The option's value
 /;
-float function GetOptionSliderValue(string option)
-    string _key = __makeOptionKey(option, includeCurrentCategory = false)
+float function GetOptionSliderValue(string option, string thePage = "")
+    string _page = string_if (thePage == "", CurrentPage, thePage)
+    string _key = __makeOptionKeyFromPage(_page, option, includeCurrentCategory = false)
     return __getFloatOptionValue(_key)
 endFunction
 
@@ -506,6 +560,8 @@ function SetOptionSliderValue(string option, float value, string formatString = 
 
     ; Store the value
     __setFloatOptionValue(_key, value)
+
+    Debug("SetOptionSliderValue", "Set new value of " + value + " for " + _key + " (option_id: " + optionId + ")")
 endFunction
 
 function SetOptionMenuValue(string option, string value)
@@ -517,6 +573,8 @@ function SetOptionMenuValue(string option, string value)
 
     ; Store the value
     __setStringOptionValue(_key, value)
+
+    Debug("SetOptionMenuValue", "Set new value of " + value + " for " + _key + " (option_id: " + optionId + ")")
 endFunction
 
 string function GetKeyFromOption(int optionId)
@@ -945,6 +1003,22 @@ string function __makeOptionKey(string displayedText, bool includeCurrentCategor
         return CurrentPage + "::" + CurrentRenderedCategory + "::" + displayedText
     else
         return CurrentPage + "::" + displayedText
+    endif
+endFunction
+
+;/
+    Creates a key for an option based on the displayed text from the specified page.
+
+    string      @page: The page to create the key from.
+    string      @displayedText: The option's displayed text in the menu.
+
+    returns:    The key based on the text passed in.
+/;
+string function __makeOptionKeyFromPage(string page, string displayedText, bool includeCurrentCategory = true)
+    if (includeCurrentCategory)
+        return page + "::" + CurrentRenderedCategory + "::" + displayedText
+    else
+        return page + "::" + displayedText
     endif
 endFunction
 
