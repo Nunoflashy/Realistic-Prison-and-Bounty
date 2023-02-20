@@ -50,6 +50,7 @@ function Left(RealisticPrisonAndBounty_MCM mcm) global
     mcm.AddOptionSlider("Unequip Foot Garments",           mcm.ARREST_DEFAULT_UNEQUIP_FOOT_BOUNTY, "{0} Bounty")
     
     mcm.AddOptionCategory("Frisking")
+    mcm.AddTextOption("", "When Arrested", mcm.OPTION_DISABLED)
     mcm.AddOptionToggle("Allow Frisking",                         mcm.FRISKING_DEFAULT_ALLOW)
     mcm.AddOptionSlider("Minimum Bounty for Frisking",            mcm.FRISKING_DEFAULT_MIN_BOUNTY, "{0} Bounty")
     mcm.AddOptionSlider("Guaranteed Payable Bounty",              mcm.FRISKING_DEFAULT_GUARANTEED_PAYABLE_BOUNTY, "{0} Bounty")
@@ -89,12 +90,14 @@ function Right(RealisticPrisonAndBounty_MCM mcm) global
     mcm.AddOptionToggle("Fast Forward",                     mcm.PRISON_DEFAULT_FAST_FORWARD)
     mcm.AddOptionSlider("Day to fast forward from",         mcm.PRISON_DEFAULT_DAY_FAST_FORWARD)
     mcm.AddOptionSlider("Day to start losing Skills",       mcm.PRISON_DEFAULT_DAY_START_LOSING_SKILLS)
+    mcm.AddOptionSlider("Chance to lose Skills each Day",   mcm.PRISON_DEFAULT_CHANCE_START_LOSING_SKILLS, "{0}%")
     mcm.AddOptionMenu("Cell Lock Level",                    mcm.PRISON_DEFAULT_CELL_LOCK_LEVEL)
 
     mcm.AddEmptyOption()
     mcm.AddEmptyOption()
 
     mcm.AddOptionCategory("Undressing")
+    mcm.AddTextOption("", "When Going to Prison", mcm.OPTION_DISABLED)
     mcm.AddOptionToggle("Allow Undressing",                 mcm.UNDRESSING_DEFAULT_ALLOW)
     mcm.AddOptionSlider("Minimum Bounty to Undress",        mcm.UNDRESSING_DEFAULT_MIN_BOUNTY, "{0} Bounty")
     mcm.AddOptionToggle("Undress when Defeated",            mcm.UNDRESSING_DEFAULT_WHEN_DEFEATED)
@@ -251,7 +254,7 @@ function OnOptionHighlight(RealisticPrisonAndBounty_MCM mcm, string option) glob
             mcm.SetInfoText("Whether to allow a guard to take over the arrest if the current one dies.")
 
     elseif (option == "Arrest::Allow Unconscious Arrest")
-            mcm.SetInfoText("Whether to allow an unconscious arrest after being defeated (You will wake up in prison).")
+            mcm.SetInfoText("Whether to allow an unconscious arrest after being defeated.")
 
     elseif (option == "Arrest::Unequip Hand Garments")
             mcm.SetInfoText("Whether to unequip any hand garment when arrested.\n-100 - Disable\n0 - Always unequip.\n Any other value is the bounty required")
@@ -288,7 +291,7 @@ function OnOptionHighlight(RealisticPrisonAndBounty_MCM mcm, string option) glob
         mcm.SetInfoText("Whether to confiscate any stolen items found during the frisking.")
 
     elseif (option == "Frisking::Strip Search if Stolen Items Found")
-        mcm.SetInfoText("Whether to have the player undressed if stolen items are found.")
+        mcm.SetInfoText("Whether to have the player undressed if stolen items are found. \n (Note: If the strip search takes place, you will be imprisoned regardless of the bounty for the arrest)")
 
     elseif (option == "Frisking::Minimum No. of Stolen Items Required")
         mcm.SetInfoText("The minimum number of stolen items required to have the player undressed.")
@@ -322,7 +325,10 @@ function OnOptionHighlight(RealisticPrisonAndBounty_MCM mcm, string option) glob
         mcm.SetInfoText("The day to fast forward from to release in " + mcm.CurrentPage + ".")
 
     elseif (option == "Prison::Day to start losing Skills")
-        mcm.SetInfoText("The day to start losing skills when in prison. (Configured individually in General page)")
+        mcm.SetInfoText("The day to start losing skills when in prison in " + mcm.CurrentPage + ". \n(Configured individually in General page)")
+
+    elseif (option == "Prison::Chance to lose Skills each Day")
+        mcm.SetInfoText("The chance to lose skills each day while in prison in " + mcm.CurrentPage + ". \n(Stats lost are configured in General page)")
 
     elseif (option == "Prison::Cell Search Thoroughness")
         mcm.SetInfoText("The thoroughness of the cell search, higher values mean a more thorough searching of the cell and possibly any items you left there to be confiscated.")
@@ -565,6 +571,10 @@ function LoadSliderOptions(RealisticPrisonAndBounty_MCM mcm, string option, floa
         maxRange = mcm.GetOptionSliderValue("Prison::Maximum Sentence")
         defaultValue = float_if(mcm.PRISON_DEFAULT_DAY_FAST_FORWARD > maxRange, maxRange, mcm.PRISON_DEFAULT_DAY_FAST_FORWARD)
 
+    elseif (option == "Prison::Chance to lose Skills each Day")
+        maxRange = 100
+        defaultValue = mcm.PRISON_DEFAULT_CHANCE_START_LOSING_SKILLS
+
     elseif (option == "Prison::Day to start losing Skills")
         minRange = 1
         maxRange = mcm.GetOptionSliderValue("Prison::Maximum Sentence")
@@ -674,7 +684,6 @@ function OnOptionSliderAccept(RealisticPrisonAndBounty_MCM mcm, string option, f
 
     elseif (option == "Arrest::Unequip Foot Garments")
 
-
     ; ==========================================================
     ;                           FRISKING
     ; ==========================================================
@@ -715,6 +724,9 @@ function OnOptionSliderAccept(RealisticPrisonAndBounty_MCM mcm, string option, f
 
     elseif (option == "Prison::Day to start losing Skills")
         formatString = "{0}"
+
+    elseif (option == "Prison::Chance to lose Skills each Day")
+        formatString = "{0}%"
 
     elseif (option == "Prison::Hands Bound (Minimum Bounty)")
 

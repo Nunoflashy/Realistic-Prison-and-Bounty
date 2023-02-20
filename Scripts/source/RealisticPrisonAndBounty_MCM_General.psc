@@ -22,7 +22,7 @@ function Left(RealisticPrisonAndBounty_MCM mcm) global
     mcm.AddOptionCategory("General")
     mcm.AddTextOption("", "WHEN FREE", mcm.OPTION_DISABLED)
     mcm.AddOptionSlider("Timescale", 10)
-    mcm.AddOptionSlider("Bounty Decay (Update Interval)", 12)
+    mcm.AddOptionSlider("Bounty Decay (Update Interval)", 12, "{0} Hours")
 
     mcm.AddEmptyOption()
 
@@ -30,7 +30,8 @@ function Left(RealisticPrisonAndBounty_MCM mcm) global
 
     int i = 0
     while (i < 10)
-        mcm.AddOptionSlider(mcm.Skills[i], 0)
+        string skill = mcm.Skills[i]
+        mcm.AddOptionSlider(skill, 0, string_if (StringUtil.Find(skill, "Max.") != -1, "{0} Points", "{0} EXP"))
         i += 1
     endWhile
 
@@ -50,7 +51,8 @@ function Right(RealisticPrisonAndBounty_MCM mcm) global
     mcm.SetRenderedCategory("Deleveling")
     int i = 0
     while (i < 11)
-        mcm.AddOptionSlider(mcm.Skills[i+10], 0)
+        string skill = mcm.Skills[i+10]
+        mcm.AddOptionSlider(skill, 0, string_if (StringUtil.Find(skill, "Max.") != -1, "{0} Points", "{0} EXP"))
         i += 1
     endWhile
 

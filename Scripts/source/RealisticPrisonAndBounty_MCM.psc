@@ -87,6 +87,7 @@ bool   property PRISON_DEFAULT_SENTENCE_PAYS_BOUNTY         = false autoreadonly
 bool   property PRISON_DEFAULT_FAST_FORWARD                 = true autoreadonly
 int    property PRISON_DEFAULT_DAY_FAST_FORWARD             = 5 autoreadonly
 int    property PRISON_DEFAULT_DAY_START_LOSING_SKILLS      = 1 autoreadonly
+int    property PRISON_DEFAULT_CHANCE_START_LOSING_SKILLS   = 100 autoreadonly
 bool   property PRISON_DEFAULT_HANDS_BOUND                  = false autoreadonly
 int    property PRISON_DEFAULT_HANDS_BOUND_BOUNTY           = 4000 autoreadonly
 bool   property PRISON_DEFAULT_HANDS_BOUND_RANDOMIZE        = true autoreadonly
@@ -740,29 +741,6 @@ function __initializeOptionsMap()
 
     optionsFlagMap = JMap.object()
     JValue.retain(optionsFlagMap)
-endFunction
-
-int function __getCategoryToIndex(string category)
-    if (category == "Arrest")
-        return CATEGORY_ARREST
-    elseif (category == "Frisking")
-        return CATEGORY_FRISKING
-    elseif (category == "Release")
-        return CATEGORY_RELEASE
-    elseif (category == "Bounty Hunting")
-        return CATEGORY_BOUNTY_HUNTING
-    elseif (category == "Prison")
-        return CATEGORY_PRISON
-    elseif (category == "Undressing")
-        return CATEGORY_UNDRESSING
-    elseif (category == "Escape")
-        return CATEGORY_ESCAPE
-    elseif (category == "Bounty")
-        return CATEGORY_BOUNTY
-    endif
-
-    return -1
-
 endFunction
 
 ;/
