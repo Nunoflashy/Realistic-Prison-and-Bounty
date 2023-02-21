@@ -3,7 +3,7 @@ Scriptname RealisticPrisonAndBounty_MCM_Holds hidden
 import RealisticPrisonAndBounty_Util
 
 bool function ShouldHandleEvent(RealisticPrisonAndBounty_MCM mcm) global
-    return mcm.CurrentPage != "" && mcm.CurrentPage != "General" ; If the page is any hold, handle events
+    return mcm.CurrentPage != "" && mcm.CurrentPage != "General" && mcm.CurrentPage != "Statistics" ; If the page is any hold, handle events
 endFunction
 
 function Render(RealisticPrisonAndBounty_MCM mcm) global
@@ -22,7 +22,7 @@ endFunction
 
 function Left(RealisticPrisonAndBounty_MCM mcm) global
     mcm.AddOptionCategory("Arrest")
-    mcm.AddTextOption("", "WHEN FREE", mcm.OPTION_DISABLED)
+    mcm.AddTextOption("", "When Free", mcm.OPTION_DISABLED)
     mcm.AddOptionSlider("Minimum Bounty to Arrest",                         mcm.ARREST_DEFAULT_MIN_BOUNTY, "{0} Bounty")
     mcm.AddOptionSlider("Guaranteed Payable Bounty",                        mcm.ARREST_DEFAULT_GUARANTEED_PAYABLE_BOUNTY, "{0} Bounty")
     mcm.AddOptionSlider("Maximum Payable Bounty",                           mcm.ARREST_DEFAULT_MAXIMUM_PAYABLE_BOUNTY, "{0} Bounty")
@@ -97,7 +97,7 @@ function Right(RealisticPrisonAndBounty_MCM mcm) global
     mcm.AddEmptyOption()
 
     mcm.AddOptionCategory("Undressing")
-    mcm.AddTextOption("", "When Going to Prison", mcm.OPTION_DISABLED)
+    ; mcm.AddTextOption("", "When Going to Prison", mcm.OPTION_DISABLED)
     mcm.AddOptionToggle("Allow Undressing",                 mcm.UNDRESSING_DEFAULT_ALLOW)
     mcm.AddOptionSlider("Minimum Bounty to Undress",        mcm.UNDRESSING_DEFAULT_MIN_BOUNTY, "{0} Bounty")
     mcm.AddOptionToggle("Undress when Defeated",            mcm.UNDRESSING_DEFAULT_WHEN_DEFEATED)

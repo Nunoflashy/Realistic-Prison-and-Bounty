@@ -1,9 +1,9 @@
-Scriptname RealisticPrisonAndBounty_MCM_General hidden
+Scriptname RealisticPrisonAndBounty_MCM_Stats hidden
 
 import RealisticPrisonAndBounty_Util
 
 bool function ShouldHandleEvent(RealisticPrisonAndBounty_MCM mcm) global
-    return mcm.CurrentPage == "General"
+    return mcm.CurrentPage == "Statistics"
 endFunction
 
 function Render(RealisticPrisonAndBounty_MCM mcm) global
@@ -19,45 +19,45 @@ function Render(RealisticPrisonAndBounty_MCM mcm) global
 endFunction
 
 function Left(RealisticPrisonAndBounty_MCM mcm) global
-    mcm.AddOptionCategory("General")
-    mcm.AddOptionSlider("Update Interval", 10, "{0} Hours")
-    mcm.AddOptionSlider("Bounty Decay (Update Interval)", 12, "{0} Hours")
+    string[] holds = mcm.GetHoldNames()
     
-    mcm.AddTextOption("", "WHEN FREE", mcm.OPTION_DISABLED)
-    mcm.AddOptionSlider("Timescale", 10)
-
-    mcm.AddEmptyOption()
-
-    mcm.AddOptionCategory("Deleveling")
-
-    int i = 0
-    while (i < 10)
-        string skill = mcm.Skills[i]
-        mcm.AddOptionSlider(skill, 0, string_if (StringUtil.Find(skill, "Max.") != -1, "{0} Points", "{0} EXP"))
+    int i = mcm.LeftPanelIndex
+    while (i < mcm.LeftPanelSize)
+        mcm.AddOptionCategory(holds[i])
+        mcm.AddTextOption("Current Bounty", "0")
+        mcm.AddTextOption("Largest Bounty", "0")
+        mcm.AddTextOption("Total Bounty", "0")
+        mcm.AddEmptyOption()
+        mcm.AddTextOption("Days in Prison", "0")
+        mcm.AddTextOption("Longest Sentence", "0")
+        mcm.AddTextOption("Total Sentence Time", "0")
+        mcm.AddEmptyOption()
+        mcm.AddTextOption("Times Frisked", "0")
+        mcm.AddTextOption("Times Undressed", "0")
+        mcm.AddTextOption("Times Escaped", "0")
         i += 1
-    endWhile
-
+    endWhile 
 endFunction
 
 function Right(RealisticPrisonAndBounty_MCM mcm) global
-    mcm.AddEmptyOption()
-    mcm.AddTextOption("", "WHEN IN PRISON", mcm.OPTION_DISABLED)
-
-    mcm.SetRenderedCategory("General")
-    mcm.AddOptionSliderKey("Timescale", "TimescalePrison", 10)
-
-    mcm.AddEmptyOption()
-    mcm.AddEmptyOption()
-    mcm.AddEmptyOption()
-
-    mcm.SetRenderedCategory("Deleveling")
-    int i = 0
-    while (i < 11)
-        string skill = mcm.Skills[i+10]
-        mcm.AddOptionSlider(skill, 0, string_if (StringUtil.Find(skill, "Max.") != -1, "{0} Points", "{0} EXP"))
+    string[] holds = mcm.GetHoldNames()
+    
+    int i = mcm.RightPanelIndex
+    while (i < mcm.RightPanelSize)
+        mcm.AddOptionCategory(holds[i])
+        mcm.AddTextOption("Current Bounty", "0")
+        mcm.AddTextOption("Largest Bounty", "0")
+        mcm.AddTextOption("Total Bounty", "0")
+        mcm.AddEmptyOption()
+        mcm.AddTextOption("Days in Prison", "0")
+        mcm.AddTextOption("Longest Sentence", "0")
+        mcm.AddTextOption("Total Sentence Time", "0")
+        mcm.AddEmptyOption()
+        mcm.AddTextOption("Times Frisked", "0")
+        mcm.AddTextOption("Times Undressed", "0")
+        mcm.AddTextOption("Times Escaped", "0")
         i += 1
-    endWhile
-
+    endWhile 
 endFunction
 
 ; =====================================================
@@ -66,24 +66,6 @@ endFunction
 
 function OnOptionHighlight(RealisticPrisonAndBounty_MCM mcm, string option) global
 
-    string optionName = mcm.GetOptionNameWithoutCategory(option)
-
-    ; Deleveling Stats
-    if (StringUtil.Find(option, "Deleveling") != -1)
-        mcm.SetInfoText("Sets how much progress you will lose in " + optionName + " for each day imprisoned.")
-
-    elseif (option == "General::Timescale")
-        mcm.SetInfoText("Sets the timescale when free.")
-
-    elseif (option == "General::TimescalePrison")
-        mcm.SetInfoText("Sets the timescale when in prison.")
-    
-    elseif (option == "General::Bounty Decay (Update Interval)")
-        mcm.SetInfoText("Sets the time between updates in in-game hours for when the bounty should decay for all holds.")
-    endif
- 
-    mcm.Debug("OnOptionHighlight", option + ", find: " + StringUtil.Find(option, "Deleveling") + ", optionName: " + optionName)
-
 endFunction
 
 function OnOptionDefault(RealisticPrisonAndBounty_MCM mcm, string option) global
@@ -91,69 +73,15 @@ function OnOptionDefault(RealisticPrisonAndBounty_MCM mcm, string option) global
 endFunction
 
 function OnOptionSelect(RealisticPrisonAndBounty_MCM mcm, string option) global
-    string optionKey = mcm.CurrentPage + "::" + option
-    mcm.ToggleOption(optionKey)
-endFunction
 
-function LoadSliderOptions(RealisticPrisonAndBounty_MCM mcm, string option, float currentSliderValue) global
-    float minRange = 1
-    float maxRange = 100
-    int intervalSteps = 1
-    float defaultValue = 0.0
-
-    ; ==========================================================
-    ;                     GENERAL / DELEVELING
-    ; ==========================================================
-
-    if (option == "General::Timescale")
-
-    elseif (option == "General::TimescalePrison")
-
-    elseif (option == "General::Bounty Decay (Update Interval)")
-        minRange = 1
-        maxRange = 24
-        defaultValue = 12
-
-    elseif (StringUtil.Find(option, "Deleveling") != -1)
-        intervalSteps = 1
-        maxRange = 1000
-    endif
-
-    float startValue = float_if (currentSliderValue > mcm.GENERAL_ERROR, currentSliderValue, defaultValue)
-    mcm.SetSliderOptions(minRange, maxRange, intervalSteps, defaultValue, startValue)
 endFunction
 
 function OnOptionSliderOpen(RealisticPrisonAndBounty_MCM mcm, string option) global
-    float sliderOptionValue = mcm.GetOptionSliderValue(option)
-    LoadSliderOptions(mcm, option, sliderOptionValue)
-    mcm.Debug("OnOptionSliderOpen", "Option: " + option + ", Value: " + sliderOptionValue)
+
 endFunction
 
 function OnOptionSliderAccept(RealisticPrisonAndBounty_MCM mcm, string option, float value) global
-    string formatString = "{0}"
 
-    ; ==========================================================
-    ;                     GENERAL / DELEVELING
-    ; ==========================================================
-
-    if (option == "General::Timescale")
-        formatString = "{0}"
-
-    elseif (option == "General::TimescalePrison")
-
-    elseif (option == "General::Bounty Decay (Update Interval)")
-        formatString = "{0} Hours"
-
-    elseif (StringUtil.Find(option, "Deleveling") != -1)
-        if (StringUtil.Find(option, "Max.") != -1)
-            formatString = "{0} Points"
-        else
-            formatString = "{0} EXP"
-        endif
-
-    endif
-
-    mcm.SetOptionSliderValue(option, value, formatString)
 endFunction
 
 function OnOptionMenuOpen(RealisticPrisonAndBounty_MCM mcm, string option) global

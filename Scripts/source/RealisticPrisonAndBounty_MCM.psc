@@ -282,6 +282,7 @@ function InitializePages()
     _pagesArray = JArray.object()
 
     JArray.addStr(_pagesArray, "General")
+    JArray.addStr(_pagesArray, "Statistics")
     JArray.addStr(_pagesArray, "")
     JArray.addStr(_pagesArray, "Whiterun")
     JArray.addStr(_pagesArray, "Winterhold")
@@ -635,41 +636,49 @@ endEvent
 event OnPageReset(string page)
     RealisticPrisonAndBounty_MCM_Holds.Render(self)
     RealisticPrisonAndBounty_MCM_General.Render(self)
+    RealisticPrisonAndBounty_MCM_Stats.Render(self)
 endEvent
 
 event OnOptionHighlight(int option)
     RealisticPrisonAndBounty_MCM_Holds.OnHighlight(self, option)
     RealisticPrisonAndBounty_MCM_General.OnHighlight(self, option)
+    RealisticPrisonAndBounty_MCM_Stats.OnHighlight(self, option)
 endEvent
 
 event OnOptionDefault(int option)
     RealisticPrisonAndBounty_MCM_Holds.OnDefault(self, option)
     RealisticPrisonAndBounty_MCM_General.OnDefault(self, option)
+    RealisticPrisonAndBounty_MCM_Stats.OnDefault(self, option)
 endEvent
 
 event OnOptionSelect(int option)
     RealisticPrisonAndBounty_MCM_Holds.OnSelect(self, option)
     RealisticPrisonAndBounty_MCM_General.OnSelect(self, option)
+    RealisticPrisonAndBounty_MCM_Stats.OnSelect(self, option)
 endEvent
 
 event OnOptionSliderOpen(int option)
     RealisticPrisonAndBounty_MCM_Holds.OnSliderOpen(self, option)
     RealisticPrisonAndBounty_MCM_General.OnSliderOpen(self, option)
+    RealisticPrisonAndBounty_MCM_Stats.OnSliderOpen(self, option)
 endEvent
 
 event OnOptionSliderAccept(int option, float value)
     RealisticPrisonAndBounty_MCM_Holds.OnSliderAccept(self, option, value)
     RealisticPrisonAndBounty_MCM_General.OnSliderAccept(self, option, value)
+    RealisticPrisonAndBounty_MCM_Stats.OnSliderAccept(self, option, value)
 endEvent
 
 event OnOptionMenuOpen(int option)
     RealisticPrisonAndBounty_MCM_Holds.OnMenuOpen(self, option)
     RealisticPrisonAndBounty_MCM_General.OnMenuOpen(self, option)
+    RealisticPrisonAndBounty_MCM_Stats.OnMenuOpen(self, option)
 endEvent
 
 event OnOptionMenuAccept(int option, int index)
     RealisticPrisonAndBounty_MCM_Holds.OnMenuAccept(self, option, index)
     RealisticPrisonAndBounty_MCM_General.OnMenuAccept(self, option, index)
+    RealisticPrisonAndBounty_MCM_Stats.OnMenuAccept(self, option, index)
 endEvent
 
 
