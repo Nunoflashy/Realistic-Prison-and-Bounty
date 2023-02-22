@@ -22,7 +22,8 @@ function Left(RealisticPrisonAndBounty_MCM mcm) global
     mcm.AddOptionCategory("General")
     mcm.AddOptionSlider("Update Interval", 10, "{0} Hours")
     mcm.AddOptionSlider("Bounty Decay (Update Interval)", 12, "{0} Hours")
-    
+
+    mcm.AddEmptyOption()
     mcm.AddTextOption("", "WHEN FREE", mcm.OPTION_DISABLED)
     mcm.AddOptionSlider("Timescale", 10)
 
@@ -41,12 +42,15 @@ endFunction
 
 function Right(RealisticPrisonAndBounty_MCM mcm) global
     mcm.AddEmptyOption()
+    mcm.AddEmptyOption()
+    mcm.AddEmptyOption()
+    mcm.AddEmptyOption()
+
     mcm.AddTextOption("", "WHEN IN PRISON", mcm.OPTION_DISABLED)
 
     mcm.SetRenderedCategory("General")
     mcm.AddOptionSliderKey("Timescale", "TimescalePrison", 10)
 
-    mcm.AddEmptyOption()
     mcm.AddEmptyOption()
     mcm.AddEmptyOption()
 

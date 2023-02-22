@@ -396,6 +396,26 @@ int function AddOptionToggle(string text, bool defaultValue)
     return AddOptionToggleKey(text, text, defaultValue)
 endFunction
 
+int function AddOptionTextKey(string displayedText, string _key, string defaultValue)
+    string optionKey            = __makeOptionKey(_key)         ; optionKey = Statistics::Whiterun::Current Bounty
+    string cacheKey             = __makeCacheOptionKey(_key)    ; cacheKey = Whiterun::Current Bounty
+
+    string value                = __getStringOptionValue(optionKey)
+    int flags                   = __getOptionFlag(optionKey)
+    int optionId                = AddTextOption(displayedText, string_if (value == "", defaultValue, value), flags)
+
+    if (!__optionExists(optionKey, optionId))
+        int option = __createOptionString(optionId, defaultValue)
+        __addOptionInternal(displayedText, optionId, optionKey, cacheKey, option, flags)
+    endif
+
+    return optionId
+endFunction
+
+int function AddOptionText(string text, string defaultValue)
+    AddOptionTextKey(text, text, defaultValue)
+endFunction
+
 ;/
     Adds and renders a Slide Option with the possibility of specifying a Key for its storage.
 
@@ -407,7 +427,7 @@ endFunction
 /;
 int function AddOptionSliderKey(string displayedText, string _key, float defaultValue, string formatString = "{0}")
     string optionKey        = __makeOptionKey(_key)         ; optionKey = Whiterun::Undressing::Allow Undressing
-    string cacheKey         = __makeCacheOptionKey(_key)    ; cacheKey  = Allow Undressing
+    string cacheKey         = __makeCacheOptionKey(_key)    ; cacheKey  = Undressing::Allow Undressing
 
     float value             = __getFloatOptionValue(optionKey)
     int flags               = __getOptionFlag(optionKey)
@@ -435,8 +455,8 @@ endFunction
     returns:    The Option's ID.
 /;
 int function AddOptionMenuKey(string displayedText, string _key, string defaultValue)
-    string optionKey        = __makeOptionKey(_key) ; optionKey = Whiterun::Undressing::Allow Undressing
-    string cacheKey         = __makeCacheOptionKey(_key)     ; cacheKey  = Allow Undressing
+    string optionKey        = __makeOptionKey(_key)             ; optionKey = Whiterun::Undressing::Allow Undressing
+    string cacheKey         = __makeCacheOptionKey(_key)        ; cacheKey  = Undressing::Allow Undressing
 
     string value            = __getStringOptionValue(optionKey)
     int flags               = __getOptionFlag(optionKey)

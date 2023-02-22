@@ -24,17 +24,7 @@ function Left(RealisticPrisonAndBounty_MCM mcm) global
     int i = mcm.LeftPanelIndex
     while (i < mcm.LeftPanelSize)
         mcm.AddOptionCategory(holds[i])
-        mcm.AddTextOption("Current Bounty", "0")
-        mcm.AddTextOption("Largest Bounty", "0")
-        mcm.AddTextOption("Total Bounty", "0")
-        mcm.AddEmptyOption()
-        mcm.AddTextOption("Days in Prison", "0")
-        mcm.AddTextOption("Longest Sentence", "0")
-        mcm.AddTextOption("Total Sentence Time", "0")
-        mcm.AddEmptyOption()
-        mcm.AddTextOption("Times Frisked", "0")
-        mcm.AddTextOption("Times Undressed", "0")
-        mcm.AddTextOption("Times Escaped", "0")
+        AddOptions(mcm)
         i += 1
     endWhile 
 endFunction
@@ -45,19 +35,27 @@ function Right(RealisticPrisonAndBounty_MCM mcm) global
     int i = mcm.RightPanelIndex
     while (i < mcm.RightPanelSize)
         mcm.AddOptionCategory(holds[i])
-        mcm.AddTextOption("Current Bounty", "0")
-        mcm.AddTextOption("Largest Bounty", "0")
-        mcm.AddTextOption("Total Bounty", "0")
-        mcm.AddEmptyOption()
-        mcm.AddTextOption("Days in Prison", "0")
-        mcm.AddTextOption("Longest Sentence", "0")
-        mcm.AddTextOption("Total Sentence Time", "0")
-        mcm.AddEmptyOption()
-        mcm.AddTextOption("Times Frisked", "0")
-        mcm.AddTextOption("Times Undressed", "0")
-        mcm.AddTextOption("Times Escaped", "0")
+        AddOptions(mcm)
         i += 1
     endWhile 
+endFunction
+
+function AddOptions(RealisticPrisonAndBounty_MCM mcm) global
+    mcm.AddOptionText("Current Bounty", "0")
+    mcm.AddOptionText("Largest Bounty", "0")
+    mcm.AddOptionText("Total Bounty", "0")
+
+    ; mcm.AddEmptyOption()
+    mcm.AddOptionText("Days in Prison", "0")
+    mcm.AddOptionText("Longest Sentence", "0")
+    mcm.AddOptionText("Total Sentence Time", "0")
+
+    ; mcm.AddEmptyOption()
+    mcm.AddOptionText("Times Arrested", "0")
+    mcm.AddOptionText("Times Frisked", "0")
+    mcm.AddOptionText("Times Undressed", "0")
+    mcm.AddOptionText("Times Jailed", "0")
+    mcm.AddOptionText("Times Escaped", "0")
 endFunction
 
 ; =====================================================
@@ -65,7 +63,14 @@ endFunction
 ; =====================================================
 
 function OnOptionHighlight(RealisticPrisonAndBounty_MCM mcm, string option) global
+    if (StringUtil.Find(option, "Current Bounty") != -1)
+        mcm.SetInfoText("The bounty you currently have in the HOLD.\n(Note: Inactive unpaid bounty after serving a sentence also counts towards this.)")
 
+    elseif (StringUtil.Find(option, "Largest Bounty") != -1)
+        mcm.SetInfoText("The largest bounty you've accumulated in the HOLD.")
+    endif
+
+    mcm.Debug("OnOptionHighlight", "Option: " + option)
 endFunction
 
 function OnOptionDefault(RealisticPrisonAndBounty_MCM mcm, string option) global

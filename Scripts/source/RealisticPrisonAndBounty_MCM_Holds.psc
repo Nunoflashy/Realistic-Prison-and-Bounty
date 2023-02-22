@@ -230,40 +230,40 @@ function OnOptionHighlight(RealisticPrisonAndBounty_MCM mcm, string option) glob
         mcm.SetInfoText("The minimum bounty required in order to be arrested in " + mcm.CurrentPage + ".")
 
     elseif (option == "Arrest::Guaranteed Payable Bounty")
-            mcm.SetInfoText("The guaranteed amount of bounty that a guard will accept as payment before arresting you in " + mcm.CurrentPage + ".")
+        mcm.SetInfoText("The guaranteed amount of bounty that a guard will accept as payment before arresting you in " + mcm.CurrentPage + ".")
 
     elseif (option == "Arrest::Maximum Payable Bounty")
-            mcm.SetInfoText("The maximum amount of bounty that is payable before arresting you in " + mcm.CurrentPage + ".")
+        mcm.SetInfoText("The maximum amount of bounty that is payable before arresting you in " + mcm.CurrentPage + ".")
 
     elseif (option == "Arrest::Additional Bounty when Resisting (%)")
-            mcm.SetInfoText("The bounty that will be added as a percentage of your current bounty, when resisting arrest in "  + mcm.CurrentPage + ".\n" + "If the bounty exceeds the guaranteed but is within the maximum, there's a chance not to go to prison.")
+        mcm.SetInfoText("The bounty that will be added as a percentage of your current bounty, when resisting arrest in "  + mcm.CurrentPage + ".\n" + "If the bounty exceeds the guaranteed but is within the maximum, there's a chance not to go to prison.")
 
     elseif (option == "Arrest::Additional Bounty when Resisting")
-            mcm.SetInfoText("The bounty that will be added when resisting arrest in " + mcm.CurrentPage + ".")
+        mcm.SetInfoText("The bounty that will be added when resisting arrest in " + mcm.CurrentPage + ".")
 
     elseif (option == "Arrest::Additional Bounty when Defeated (%)")
-            mcm.SetInfoText("The bounty that will be added as a percentage of your current bounty, when defeated and arrested in " + mcm.CurrentPage + ".")
+        mcm.SetInfoText("The bounty that will be added as a percentage of your current bounty, when defeated and arrested in " + mcm.CurrentPage + ".")
 
     elseif (option == "Arrest::Additional Bounty when Defeated")
-            mcm.SetInfoText("The bounty that will be added when defeated and arrested in " + mcm.CurrentPage)
+        mcm.SetInfoText("The bounty that will be added when defeated and arrested in " + mcm.CurrentPage)
 
     elseif (option == "Arrest::Allow Civilian Capture")
-            mcm.SetInfoText("Whether to allow civilians to bring you to a guard, to be arrested in " + mcm.CurrentPage)
+        mcm.SetInfoText("Whether to allow civilians to bring you to a guard, to be arrested in " + mcm.CurrentPage)
 
     elseif (option == "Arrest::Allow Arrest Transfer")
-            mcm.SetInfoText("Whether to allow a guard to take over the arrest if the current one dies.")
+        mcm.SetInfoText("Whether to allow a guard to take over the arrest if the current one dies.")
 
     elseif (option == "Arrest::Allow Unconscious Arrest")
-            mcm.SetInfoText("Whether to allow an unconscious arrest after being defeated.")
+        mcm.SetInfoText("Whether to allow an unconscious arrest after being defeated.")
 
     elseif (option == "Arrest::Unequip Hand Garments")
-            mcm.SetInfoText("Whether to unequip any hand garment when arrested.\n-100 - Disable\n0 - Always unequip.\n Any other value is the bounty required")
+        mcm.SetInfoText("Whether to unequip any hand garment when arrested.\n-100 - Disable\n0 - Always unequip.\n Any other value is the bounty required")
 
     elseif (option == "Arrest::Unequip Head Garments")
-            mcm.SetInfoText("Whether to unequip any head garment when arrested.\n-100 - Disable\n0 - Always unequip.\n Any other value is the bounty required")
+        mcm.SetInfoText("Whether to unequip any head garment when arrested.\n-100 - Disable\n0 - Always unequip.\n Any other value is the bounty required")
 
     elseif (option == "Arrest::Unequip Foot Garments")
-            mcm.SetInfoText("Whether to unequip any foot garment when arrested.\n-100 - Disable\n0 - Always unequip.\n Any other value is the bounty required")
+        mcm.SetInfoText("Whether to unequip any foot garment when arrested.\n-100 - Disable\n0 - Always unequip.\n Any other value is the bounty required")
     
     ; ==========================================================
     ;                           FRISKING
