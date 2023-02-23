@@ -151,6 +151,51 @@ GlobalVariable property NormalTimescale auto
 GlobalVariable property PrisonTimescale auto
 ; =======================================
 
+int _prisonSkillHandlingOptions
+string[] property PrisonSkillHandlingOptions
+    string[] function get()
+        if (JArray.count(_prisonSkillHandlingOptions) == 0)
+            _prisonSkillHandlingOptions = JArray.object()
+
+            JArray.addStr(_prisonSkillHandlingOptions, "All Skills")
+            JArray.addStr(_prisonSkillHandlingOptions, "Stat Skills (Health, Stamina, Magicka)")
+            JArray.addStr(_prisonSkillHandlingOptions, "Perk Skills")
+            JArray.addStr(_prisonSkillHandlingOptions, "Random")
+        endif
+        return JArray.asStringArray(_prisonSkillHandlingOptions)
+    endFunction
+endProperty
+
+int _undressingHandlingOptions
+string[] property UndressingHandlingOptions
+    string[] function get()
+        if (JArray.count(_undressingHandlingOptions) == 0)
+            _undressingHandlingOptions = JArray.object()
+
+            JArray.addStr(_undressingHandlingOptions, "Minimum Bounty")
+            JArray.addStr(_undressingHandlingOptions, "Minimum Sentence")
+        endif
+        return JArray.asStringArray(_undressingHandlingOptions)
+    endFunction
+endProperty
+
+int _undressingClothingHandlingOptions
+string[] property ClothingHandlingOptions
+    string[] function get()
+        if (JArray.count(_undressingClothingHandlingOptions) == 0)
+            _undressingClothingHandlingOptions = JArray.object()
+
+            JArray.addStr(_undressingClothingHandlingOptions, "Maximum Bounty")
+            JArray.addStr(_undressingClothingHandlingOptions, "Maximum Sentence")
+        endif
+        return JArray.asStringArray(_undressingClothingHandlingOptions)
+    endFunction
+endProperty
+
+int function GetOptionIndexFromKey(string[] _array, string _key) global
+    int internalContainer = JArray.objectWithStrings(_array)
+    return JArray.findStr(internalContainer, _key)
+endFunction
 
 int _lockLevels
 string[] property LockLevels
@@ -426,7 +471,7 @@ endFunction
 
     returns:    The Option's ID.
 /;
-int function AddOptionSliderKey(string displayedText, string _key, float defaultValue, string formatString = "{0}")
+int function AddOptionSliderKey(string displayedText, string _key, float defaultValue, string formatString = "{0}", int defaultFlags = 0)
     string optionKey        = __makeOptionKey(_key)         ; optionKey = Whiterun::Undressing::Allow Undressing
     string cacheKey         = __makeCacheOptionKey(_key)    ; cacheKey  = Undressing::Allow Undressing
 
@@ -461,7 +506,7 @@ int function AddOptionMenuKey(string displayedText, string _key, string defaultV
 
     string value            = __getStringOptionValue(optionKey)
     int flags               = __getOptionFlag(optionKey)
-    int optionId            = AddMenuOption(displayedText, string_if (value == "", defaultValue, value))
+    int optionId            = AddMenuOption(displayedText, string_if (value == "", defaultValue, value), flags)
     
     if (!__optionExists(optionKey, optionId))
         int option = __createOptionString(optionId, defaultValue)
@@ -562,6 +607,13 @@ float function GetOptionSliderValue(string option, string thePage = "")
     string _key = __makeOptionKeyFromPage(_page, option, includeCurrentCategory = false)
     return __getFloatOptionValue(_key)
 endFunction
+
+string function GetOptionMenuValue(string option, string thePage = "")
+    string _page = string_if (thePage == "", CurrentPage, thePage)
+    string _key = __makeOptionKeyFromPage(_page, option, includeCurrentCategory = false)
+    return __getStringOptionValue(_key)
+endFunction
+
 
 function SetFlags(string option, int flags)
     int optionId = GetOption(option)
