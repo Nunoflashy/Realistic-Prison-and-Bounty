@@ -538,11 +538,11 @@ float function StartBenchmark(bool condition = true) global
     endif
 endFunction
 
-float function EndBenchmark(float startTime, bool condition = true) global
+float function EndBenchmark(float startTime, string _message = "", bool condition = true) global
     if (condition)
         float endTime = Utility.GetCurrentRealTime()
         float elapsedTime = endTime - startTime
-        local_log(none, "execution took " + ((elapsedTime * 1000)) + " ms", LOG_DEBUG(), hideCall = true)
+        local_log(none, string_if(_message != "", _message + " ", "") + "execution took " + ((elapsedTime * 1000)) + " ms", LOG_DEBUG(), hideCall = true)
         return elapsedTime
     endif
 endFunction

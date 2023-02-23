@@ -21,7 +21,7 @@ function Render(RealisticPrisonAndBounty_MCM mcm) global
 
     HandleDependencies(mcm)
 
-    EndBenchmark(bench)
+    EndBenchmark(bench, mcm.CurrentPage + " page loaded -")
 endFunction
 
 function Left(RealisticPrisonAndBounty_MCM mcm) global
@@ -125,9 +125,9 @@ function Right(RealisticPrisonAndBounty_MCM mcm) global
     mcm.AddOptionCategory("Undressing")
     mcm.AddOptionToggle("Allow Undressing",                 mcm.UNDRESSING_DEFAULT_ALLOW)
     mcm.AddOptionMenuKey("Handle Undressing On", "Handle Based On (Undressing)",                     "Minimum Sentence")
-    mcm.AddOptionSlider("Minimum Bounty to Undress",        mcm.UNDRESSING_DEFAULT_MIN_BOUNTY, "{0} Bounty")    ; TODO: render only if handling type is based on this
-    mcm.AddOptionSlider("Minimum Violent Bounty to Undress",        mcm.UNDRESSING_DEFAULT_MIN_BOUNTY, "{0} Violent Bounty")    ; TODO: render only if handling type is based on this
-    mcm.AddOptionSlider("Minimum Sentence to Undress",      0, "{0} Days")                                      ; TODO: same thing here
+    mcm.AddOptionSlider("Minimum Bounty to Undress",        mcm.UNDRESSING_DEFAULT_MIN_BOUNTY, "{0} Bounty")
+    mcm.AddOptionSlider("Minimum Violent Bounty to Undress",        mcm.UNDRESSING_DEFAULT_MIN_BOUNTY, "{0} Violent Bounty")
+    mcm.AddOptionSlider("Minimum Sentence to Undress",      0, "{0} Days")
     mcm.AddOptionToggle("Undress when Defeated",            mcm.UNDRESSING_DEFAULT_WHEN_DEFEATED)
     mcm.AddOptionToggle("Undress at Cell",                  mcm.UNDRESSING_DEFAULT_AT_CELL)
     mcm.AddOptionToggle("Undress at Chest",                 mcm.UNDRESSING_DEFAULT_AT_CHEST)

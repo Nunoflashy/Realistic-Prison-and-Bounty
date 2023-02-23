@@ -34,7 +34,7 @@ function Left(RealisticPrisonAndBounty_MCM mcm) global
     int i = 0
     while (i < 10)
         string skill = mcm.Skills[i]
-        mcm.AddOptionSlider(skill, 0, string_if (StringUtil.Find(skill, "Max.") != -1, "{0} Points", "{0} EXP"))
+        mcm.AddOptionSlider(skill, 0, string_if (StringUtil.Find(skill, "Max.") != -1, "{0} Points", "{0}% EXP"))
         i += 1
     endWhile
 
@@ -58,7 +58,7 @@ function Right(RealisticPrisonAndBounty_MCM mcm) global
     int i = 0
     while (i < 11)
         string skill = mcm.Skills[i+10]
-        mcm.AddOptionSlider(skill, 0, string_if (StringUtil.Find(skill, "Max.") != -1, "{0} Points", "{0} EXP"))
+        mcm.AddOptionSlider(skill, 0, string_if (StringUtil.Find(skill, "Max.") != -1, "{0} Points", "{0}% EXP"))
         i += 1
     endWhile
 
@@ -115,12 +115,12 @@ function LoadSliderOptions(RealisticPrisonAndBounty_MCM mcm, string option, floa
 
     elseif (option == "General::Bounty Decay (Update Interval)")
         minRange = 1
-        maxRange = 24
+        maxRange = 96 ; 4d
         defaultValue = 12
 
     elseif (StringUtil.Find(option, "Deleveling") != -1)
         intervalSteps = 1
-        maxRange = 1000
+        maxRange = 100
     endif
 
     float startValue = float_if (currentSliderValue > mcm.GENERAL_ERROR, currentSliderValue, defaultValue)
@@ -152,7 +152,7 @@ function OnOptionSliderAccept(RealisticPrisonAndBounty_MCM mcm, string option, f
         if (StringUtil.Find(option, "Max.") != -1)
             formatString = "{0} Points"
         else
-            formatString = "{0} EXP"
+            formatString = "{0}% EXP"
         endif
 
     endif
