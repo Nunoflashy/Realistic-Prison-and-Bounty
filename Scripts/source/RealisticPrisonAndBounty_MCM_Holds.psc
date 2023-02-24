@@ -946,12 +946,15 @@ function OnOptionMenuOpen(RealisticPrisonAndBounty_MCM mcm, string option) globa
 
     elseif (option == "Prison::Handle Skill Loss")
         mcm.SetMenuDialogOptions(mcm.PrisonSkillHandlingOptions)
+        mcm.SetMenuDialogDefaultIndex(GetOptionIndexFromKey(mcm.PrisonSkillHandlingOptions, "Random"))
 
     elseif (option == "Undressing::Handle Based On (Undressing)")
         mcm.SetMenuDialogOptions(mcm.UndressingHandlingOptions)
+        mcm.SetMenuDialogDefaultIndex(GetOptionIndexFromKey(mcm.UndressingHandlingOptions, "Minimum Sentence"))
 
     elseif (option == "Undressing::Handle Based On (Clothing)")
         mcm.SetMenuDialogOptions(mcm.ClothingHandlingOptions)
+        mcm.SetMenuDialogDefaultIndex(GetOptionIndexFromKey(mcm.ClothingHandlingOptions, "Maximum Sentence"))
     endif
 endFunction
 
