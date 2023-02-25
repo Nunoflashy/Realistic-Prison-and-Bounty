@@ -422,13 +422,15 @@ endFunction
 
     returns:    The Option's ID.
 /;
-int function AddOptionToggleKey(string displayedText, string _key, bool defaultValue)
+int function AddOptionToggleKey(string displayedText, string _key, bool defaultValue, int defaultFlags = 0)
     string optionKey    = __makeOptionKey(_key)             ; optionKey = Whiterun::Undressing::Allow Undressing
     string cacheKey     = __makeCacheOptionKey(_key)        ; cacheKey  = Undressing::Allow Undressing
     
     int value           = __getBoolOptionValue(optionKey)
     int flags           = __getOptionFlag(optionKey)
-    int optionId        = AddToggleOption(displayedText, bool_if (value < GENERAL_ERROR, defaultValue, value as bool), flags)
+    int optionId        = AddToggleOption(displayedText, bool_if (value < GENERAL_ERROR, defaultValue, value as bool), int_if (flags == OPTION_NOT_EXIST, defaultFlags, flags))
+
+    Debug("AddOptionToggleKey", "["+ _key +"] "+"Flags: " + int_if (flags == OPTION_NOT_EXIST, defaultFlags, flags) + ", Value: " + bool_if (value < GENERAL_ERROR, defaultValue, value as bool))
 
     if (!__optionExists(optionKey, optionId))
         int option = __createOptionBool(optionId, defaultValue)
@@ -438,17 +440,17 @@ int function AddOptionToggleKey(string displayedText, string _key, bool defaultV
     return optionId
 endFunction
 
-int function AddOptionToggle(string text, bool defaultValue)
-    return AddOptionToggleKey(text, text, defaultValue)
+int function AddOptionToggle(string text, bool defaultValue, int defaultFlags = 0)
+    return AddOptionToggleKey(text, text, defaultValue, defaultFlags)
 endFunction
 
-int function AddOptionTextKey(string displayedText, string _key, string defaultValue)
+int function AddOptionTextKey(string displayedText, string _key, string defaultValue, int defaultFlags = 0)
     string optionKey            = __makeOptionKey(_key)         ; optionKey = Statistics::Whiterun::Current Bounty
     string cacheKey             = __makeCacheOptionKey(_key)    ; cacheKey = Whiterun::Current Bounty
 
     string value                = __getStringOptionValue(optionKey)
     int flags                   = __getOptionFlag(optionKey)
-    int optionId                = AddTextOption(displayedText, string_if (value == "", defaultValue, value), flags)
+    int optionId                = AddTextOption(displayedText, string_if (value == "", defaultValue, value), int_if (flags == OPTION_NOT_EXIST, defaultFlags, flags))
 
     if (!__optionExists(optionKey, optionId))
         int option = __createOptionString(optionId, defaultValue)
@@ -458,8 +460,8 @@ int function AddOptionTextKey(string displayedText, string _key, string defaultV
     return optionId
 endFunction
 
-int function AddOptionText(string text, string defaultValue)
-    AddOptionTextKey(text, text, defaultValue)
+int function AddOptionText(string text, string defaultValue, int defaultFlags = 0)
+    AddOptionTextKey(text, text, defaultValue, defaultFlags)
 endFunction
 
 ;/
@@ -477,7 +479,7 @@ int function AddOptionSliderKey(string displayedText, string _key, float default
 
     float value             = __getFloatOptionValue(optionKey)
     int flags               = __getOptionFlag(optionKey)
-    int optionId            = AddSliderOption(displayedText, float_if (value < GENERAL_ERROR, defaultValue, value), formatString, flags)
+    int optionId            = AddSliderOption(displayedText, float_if (value < GENERAL_ERROR, defaultValue, value), formatString, int_if (flags == OPTION_NOT_EXIST, defaultFlags, flags))
     
     if (!__optionExists(optionKey, optionId))
         int option = __createOptionFloat(optionId, defaultValue)
@@ -487,8 +489,8 @@ int function AddOptionSliderKey(string displayedText, string _key, float default
     return optionId
 endFunction
 
-int function AddOptionSlider(string text, float defaultValue, string formatString = "{0}")
-    return AddOptionSliderKey(text, text, defaultValue, formatString)
+int function AddOptionSlider(string text, float defaultValue, string formatString = "{0}", int defaultFlags = 0)
+    return AddOptionSliderKey(text, text, defaultValue, formatString, defaultFlags)
 endFunction
 
 ;/
@@ -500,13 +502,13 @@ endFunction
 
     returns:    The Option's ID.
 /;
-int function AddOptionMenuKey(string displayedText, string _key, string defaultValue)
+int function AddOptionMenuKey(string displayedText, string _key, string defaultValue, int defaultFlags = 0)
     string optionKey        = __makeOptionKey(_key)             ; optionKey = Whiterun::Undressing::Allow Undressing
     string cacheKey         = __makeCacheOptionKey(_key)        ; cacheKey  = Undressing::Allow Undressing
 
     string value            = __getStringOptionValue(optionKey)
     int flags               = __getOptionFlag(optionKey)
-    int optionId            = AddMenuOption(displayedText, string_if (value == "", defaultValue, value), flags)
+    int optionId            = AddMenuOption(displayedText, string_if (value == "", defaultValue, value), int_if (flags == OPTION_NOT_EXIST, defaultFlags, flags))
     
     if (!__optionExists(optionKey, optionId))
         int option = __createOptionString(optionId, defaultValue)
@@ -516,8 +518,8 @@ int function AddOptionMenuKey(string displayedText, string _key, string defaultV
     return optionId
 endFunction
 
-int function AddOptionMenu(string text, string defaultValue)
-    AddOptionMenuKey(text, text, defaultValue)
+int function AddOptionMenu(string text, string defaultValue, int defaultFlags = 0)
+    AddOptionMenuKey(text, text, defaultValue, defaultFlags)
 endFunction
 
 
@@ -894,8 +896,14 @@ int function __getIntOptionValue(string _key)
 endFunction
 
 int function __getOptionFlag(string _key)
-    int value = JMap.getInt(optionsFlagMap, _key)
-    return value
+    if (JMap.hasKey(optionsFlagMap, _key))
+        int value = JMap.getInt(optionsFlagMap, _key)
+        Debug("__getOptionFlag", "Found key: " + _key + ", value: " + value)
+        return value
+    endif
+    return OPTION_NOT_EXIST
+    ; int value = JMap.getInt(optionsFlagMap, _key)
+    ; return value
 endFunction
 
 ;/
