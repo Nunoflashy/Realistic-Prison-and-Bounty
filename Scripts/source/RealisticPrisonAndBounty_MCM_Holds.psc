@@ -218,7 +218,7 @@ function HandleDependencies(RealisticPrisonAndBounty_MCM mcm) global
     mcm.SetOptionDependencyBool("Clothing::Maximum Bounty",                   allowUndressing && allowWearingClothes && isClothingBountyHandling)
     mcm.SetOptionDependencyBool("Clothing::Maximum Violent Bounty",           allowUndressing && allowWearingClothes && isClothingBountyHandling)
     mcm.SetOptionDependencyBool("Clothing::Maximum Sentence",                 allowUndressing && allowWearingClothes && isClothingSentenceHandling)
-    mcm.SetOptionDependencyBool("Clothing::Prison Outfit",                    allowUndressing && allowWearingClothes)
+    ; mcm.SetOptionDependencyBool("Clothing::Prison Outfit",                    allowUndressing && allowWearingClothes)
 
     ; ==========================================================
     ;                      FRISKING:UNDRESSING

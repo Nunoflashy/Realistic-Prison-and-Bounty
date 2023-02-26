@@ -1,9 +1,9 @@
-Scriptname RealisticPrisonAndBounty_MCM_Stats hidden
+Scriptname RealisticPrisonAndBounty_MCM_Outfits hidden
 
 import RealisticPrisonAndBounty_Util
 
 bool function ShouldHandleEvent(RealisticPrisonAndBounty_MCM mcm) global
-    return mcm.CurrentPage == "Statistics"
+    return mcm.CurrentPage == "Outfits"
 endFunction
 
 function Render(RealisticPrisonAndBounty_MCM mcm) global
@@ -19,43 +19,11 @@ function Render(RealisticPrisonAndBounty_MCM mcm) global
 endFunction
 
 function Left(RealisticPrisonAndBounty_MCM mcm) global
-    string[] holds = mcm.GetHoldNames()
     
-    int i = mcm.LeftPanelIndex
-    while (i < mcm.LeftPanelSize)
-        mcm.AddOptionCategory(holds[i])
-        AddOptions(mcm)
-        i += 1
-    endWhile 
 endFunction
 
 function Right(RealisticPrisonAndBounty_MCM mcm) global
-    string[] holds = mcm.GetHoldNames()
-    
-    int i = mcm.RightPanelIndex
-    while (i < mcm.RightPanelSize)
-        mcm.AddOptionCategory(holds[i])
-        AddOptions(mcm)
-        i += 1
-    endWhile 
-endFunction
 
-function AddOptions(RealisticPrisonAndBounty_MCM mcm) global
-    mcm.AddOptionText("Current Bounty", "0")
-    mcm.AddOptionText("Largest Bounty", "0")
-    mcm.AddOptionText("Total Bounty", "0")
-
-    ; mcm.AddEmptyOption()
-    mcm.AddOptionText("Days in Prison", "0")
-    mcm.AddOptionText("Longest Sentence", "0")
-    mcm.AddOptionText("Total Sentence Time", "0")
-
-    ; mcm.AddEmptyOption()
-    mcm.AddOptionText("Times Arrested", "0")
-    mcm.AddOptionText("Times Frisked", "0")
-    mcm.AddOptionText("Times Undressed", "0")
-    mcm.AddOptionText("Times Jailed", "0")
-    mcm.AddOptionText("Times Escaped", "0")
 endFunction
 
 ; =====================================================

@@ -347,7 +347,7 @@ function InitializePages()
     _pagesArray = JArray.object()
 
     JArray.addStr(_pagesArray, "General")
-    JArray.addStr(_pagesArray, "Statistics")
+    ; JArray.addStr(_pagesArray, "Outfits")
     JArray.addStr(_pagesArray, "")
     JArray.addStr(_pagesArray, "Whiterun")
     JArray.addStr(_pagesArray, "Winterhold")
