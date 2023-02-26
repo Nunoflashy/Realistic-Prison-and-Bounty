@@ -29,8 +29,8 @@ function Left(RealisticPrisonAndBounty_MCM mcm) global
     mcm.AddOptionText("Current Bounty", "0 Bounty")
     mcm.AddOptionText("Largest Bounty", "0 Bounty")
     mcm.AddOptionText("Total Bounty", "0 Bounty")
-    mcm.AddOptionText("Times Arrested", "0")
-    mcm.AddOptionText("Times Frisked", "0")
+    mcm.AddOptionText("Times Arrested", "0 Times")
+    mcm.AddOptionText("Times Frisked", "0 Times")
     mcm.AddEmptyOption()
 
     mcm.AddOptionCategory("Arrest")
@@ -93,13 +93,12 @@ endFunction
 
 function Right(RealisticPrisonAndBounty_MCM mcm) global
     mcm.SetRenderedCategory("Stats")
-    ; mcm.AddEmptyOption()
     mcm.AddTextOption("", mcm.CurrentPage, mcm.OPTION_DISABLED)
     mcm.AddOptionText("Days in Prison", "0 Days")
     mcm.AddOptionText("Longest Sentence", "0 Days")
-    mcm.AddOptionText("Times Jailed", "0")
-    mcm.AddOptionText("Times Escaped", "0")
-    mcm.AddOptionText("Times Undressed", "0")
+    mcm.AddOptionText("Times Jailed", "0 Times")
+    mcm.AddOptionText("Times Escaped", "0 Times")
+    mcm.AddOptionText("Times Stripped", "0 Times")
     mcm.AddEmptyOption()
 
     mcm.AddOptionCategory("Prison")
@@ -119,36 +118,40 @@ function Right(RealisticPrisonAndBounty_MCM mcm) global
     mcm.AddOptionSlider("Chance to lose Skills",            mcm.PRISON_DEFAULT_CHANCE_START_LOSING_SKILLS, "{0}% Each Day")
     mcm.AddOptionMenu("Cell Lock Level",                    mcm.PRISON_DEFAULT_CELL_LOCK_LEVEL)
 
-    mcm.AddEmptyOption()
-    mcm.AddEmptyOption()
+    mcm.AddOptionCategoryKey("Stripping", "Undressing")
+    mcm.AddOptionToggle("Allow Undressing",                     mcm.UNDRESSING_DEFAULT_ALLOW)
+    mcm.AddOptionMenu("Handle Undressing On",                   mcm.UNDRESSING_DEFAULT_HANDLING_OPTION)
+    mcm.AddOptionSlider("Minimum Bounty to Undress",            mcm.UNDRESSING_DEFAULT_MIN_BOUNTY, "{0} Bounty", mcm.OPTION_DISABLED)
+    mcm.AddOptionSlider("Minimum Violent Bounty to Undress",    mcm.UNDRESSING_DEFAULT_MIN_BOUNTY, "{0} Violent Bounty", mcm.OPTION_DISABLED)
+    mcm.AddOptionSlider("Minimum Sentence to Undress",          mcm.GetOptionSliderValue("Prison::Minimum Sentence"), "{0} Days")
+    mcm.AddOptionToggle("Undress when Defeated",                mcm.UNDRESSING_DEFAULT_WHEN_DEFEATED)
+    mcm.AddOptionSlider("Forced Undressing (Bounty)",           mcm.UNDRESSING_DEFAULT_FORCED_MIN_BOUNTY, "{0} Bounty")
+    mcm.AddOptionToggle("Forced Undressing when Defeated",      mcm.UNDRESSING_DEFAULT_FORCED_WHEN_DEFEATED)
+    mcm.AddOptionSlider("Strip Search Thoroughness",            mcm.UNDRESSING_DEFAULT_STRIP_THOROUGHNESS, "{0}x")
 
-    mcm.AddOptionCategory("Undressing")
-    mcm.AddOptionToggle("Allow Undressing",                 mcm.UNDRESSING_DEFAULT_ALLOW)
-    mcm.AddOptionMenu("Handle Undressing On",                     "Minimum Sentence")
-    mcm.AddOptionSlider("Minimum Bounty to Undress",        mcm.UNDRESSING_DEFAULT_MIN_BOUNTY, "{0} Bounty", mcm.OPTION_DISABLED)
-    mcm.AddOptionSlider("Minimum Violent Bounty to Undress",        mcm.UNDRESSING_DEFAULT_MIN_BOUNTY, "{0} Violent Bounty", mcm.OPTION_DISABLED)
-    mcm.AddOptionSlider("Minimum Sentence to Undress",      mcm.GetOptionSliderValue("Prison::Minimum Sentence"), "{0} Days")
-    mcm.AddOptionToggle("Undress when Defeated",            mcm.UNDRESSING_DEFAULT_WHEN_DEFEATED)
-    mcm.AddOptionToggle("Undress at Cell",                  mcm.UNDRESSING_DEFAULT_AT_CELL)
-    mcm.AddOptionToggle("Undress at Chest",                 mcm.UNDRESSING_DEFAULT_AT_CHEST)
-    mcm.AddOptionSlider("Forced Undressing (Bounty)",       mcm.UNDRESSING_DEFAULT_FORCED_MIN_BOUNTY, "{0} Bounty")
-    mcm.AddOptionToggle("Forced Undressing when Defeated",  mcm.UNDRESSING_DEFAULT_FORCED_WHEN_DEFEATED)
-    mcm.AddOptionSlider("Strip Search Thoroughness",        mcm.UNDRESSING_DEFAULT_STRIP_THOROUGHNESS, "{0}x")
-
+    mcm.AddOptionCategory("Clothing")
     mcm.AddTextOption("", "When Undressed", mcm.OPTION_DISABLED)
-    mcm.AddOptionToggle("Allow Wearing Clothes",            mcm.UNDRESSING_DEFAULT_ALLOW_CLOTHES)
-    mcm.AddOptionMenu("Handle Clothing On",                    "Maximum Sentence", mcm.OPTION_DISABLED)
-    mcm.AddOptionToggleKey("Clothe When Defeated", "When Defeated",                    mcm.UNDRESSING_DEFAULT_REDRESS_WHEN_DEFEATED, mcm.OPTION_DISABLED)
-    mcm.AddOptionSlider("Maximum Bounty",                   mcm.UNDRESSING_DEFAULT_REDRESS_BOUNTY, "{0} Bounty", mcm.OPTION_DISABLED)
-    mcm.AddOptionSlider("Maximum Violent Bounty",                   mcm.UNDRESSING_DEFAULT_REDRESS_BOUNTY, "{0} Violent Bounty", mcm.OPTION_DISABLED)
-    mcm.AddOptionSlider("Maximum Sentence",                   mcm.GetOptionSliderValue("Prison::Maximum Sentence"), "{0} Days", mcm.OPTION_DISABLED)
+    mcm.AddOptionToggle("Allow Wearing Clothes",                                            mcm.CLOTHING_DEFAULT_ALLOW_CLOTHES)
+    mcm.AddOptionMenu("Handle Clothing On",                                                 mcm.CLOTHING_DEFAULT_HANDLING_OPTION, mcm.OPTION_DISABLED)
+    mcm.AddOptionSliderKey("Maximum Bounty to Clothe", "Maximum Bounty",                    mcm.CLOTHING_DEFAULT_REDRESS_BOUNTY, "{0} Bounty", mcm.OPTION_DISABLED)
+    mcm.AddOptionSliderKey("Maximum Violent Bounty to Clothe", "Maximum Violent Bounty",    mcm.CLOTHING_DEFAULT_REDRESS_BOUNTY, "{0} Violent Bounty", mcm.OPTION_DISABLED)
+    mcm.AddOptionSliderKey("Maximum Sentence to Clothe", "Maximum Sentence",                mcm.GetOptionSliderValue("Prison::Maximum Sentence"), "{0} Days", mcm.OPTION_DISABLED)
+    mcm.AddOptionToggleKey("Clothe When Defeated", "When Defeated",                         mcm.CLOTHING_DEFAULT_REDRESS_WHEN_DEFEATED, mcm.OPTION_DISABLED)
+    mcm.AddOptionMenu("Prison Outfit",                                                      "Prisoner Tunic", mcm.OPTION_DISABLED)
 
     if (mcm.CurrentPage == "The Reach")
         mcm.AddTextOption("", "Cidhna Mine", mcm.OPTION_DISABLED)
         mcm.AddOptionToggleKey("Allow Wearing Clothes", "Allow Wearing Clothes (Cidhna Mine)",   mcm.UNDRESSING_DEFAULT_ALLOW_CLOTHES)
         mcm.AddOptionToggleKey("When Defeated",  "When Defeated (Cidhna Mine)",                  mcm.UNDRESSING_DEFAULT_REDRESS_WHEN_DEFEATED)
-        mcm.AddOptionSliderKey("Maximum Bounty",  "Maximum Bounty (Cidhna Mine)",                 mcm.UNDRESSING_DEFAULT_REDRESS_BOUNTY, "{0} Bounty")
+        mcm.AddOptionSliderKey("Maximum Bounty",  "Maximum Bounty (Cidhna Mine)",                mcm.UNDRESSING_DEFAULT_REDRESS_BOUNTY, "{0} Bounty")
     endif
+
+    mcm.AddOptionCategory("Additional Charges")
+    mcm.AddTextOption("", "During Frisk or Strip Search", mcm.OPTION_DISABLED)
+    mcm.AddOptionSlider("Bounty for Stolen Item", 0, "{0} Bounty")
+    mcm.AddOptionSlider("Bounty for Contraband", 0, "{0} Bounty")
+    mcm.AddOptionSlider("Bounty for Cell Key", 0, "{0} Bounty")
+    mcm.AddOptionSlider("Bounty for Hold Equipment", 0, "{0} Bounty")
 
     mcm.AddOptionCategory("Escape")
     mcm.AddOptionSlider("Escape Bounty (%)",                mcm.ESCAPE_DEFAULT_BOUNTY_PERCENT, "{0}% of Bounty")
@@ -158,7 +161,6 @@ function Right(RealisticPrisonAndBounty_MCM mcm) global
     mcm.AddOptionToggle("Undress upon Captured",            mcm.ESCAPE_DEFAULT_UNDRESS_ON_CAPTURE)
 
     mcm.AddOptionCategory("Bounty Decaying")
-    ; mcm.AddTextOption("", "Bounty Decay", mcm.OPTION_FLAG_DISABLED)
     mcm.AddOptionToggle("Enable Bounty Decaying",   mcm.BOUNTY_DEFAULT_ENABLE_DECAY)
     mcm.AddOptionToggle("Decay while in Prison",    mcm.BOUNTY_DEFAULT_DECAY_IN_PRISON)
     mcm.AddOptionSlider("Bounty Lost (%)",          mcm.BOUNTY_DEFAULT_BOUNTY_LOST_PERCENT, "{0}% of Bounty")
@@ -187,11 +189,8 @@ function HandleDependencies(RealisticPrisonAndBounty_MCM mcm) global
     ; ==========================================================
 
     bool allowUndressing                = mcm.GetOptionToggleState("Undressing::Allow Undressing")
-    bool allowWearingClothes            = mcm.GetOptionToggleState("Undressing::Allow Wearing Clothes")
     bool isUndressingBountyHandling     = mcm.GetOptionMenuValue("Undressing::Handle Undressing On") == "Minimum Bounty"
     bool isUndressingSentenceHandling   = mcm.GetOptionMenuValue("Undressing::Handle Undressing On") == "Minimum Sentence"
-    bool isClothingBountyHandling       = mcm.GetOptionMenuValue("Undressing::Handle Clothing On")   == "Maximum Bounty"
-    bool isClothingSentenceHandling     = mcm.GetOptionMenuValue("Undressing::Handle Clothing On")   == "Maximum Sentence"
 
     mcm.SetOptionDependencyBool("Undressing::Handle Undressing On",                 allowUndressing)
     mcm.SetOptionDependencyBool("Undressing::Minimum Bounty to Undress",            allowUndressing && isUndressingBountyHandling)
@@ -204,13 +203,20 @@ function HandleDependencies(RealisticPrisonAndBounty_MCM mcm) global
     mcm.SetOptionDependencyBool("Undressing::Forced Undressing when Defeated",      allowUndressing)
     mcm.SetOptionDependencyBool("Undressing::Strip Search Thoroughness",            allowUndressing)
 
-    ; Clothing
-    mcm.SetOptionDependencyBool("Undressing::Allow Wearing Clothes",            allowUndressing)
-    mcm.SetOptionDependencyBool("Undressing::Handle Clothing On",               allowUndressing && allowWearingClothes)
-    mcm.SetOptionDependencyBool("Undressing::When Defeated",                    allowUndressing && allowWearingClothes)
-    mcm.SetOptionDependencyBool("Undressing::Maximum Bounty",                   allowUndressing && allowWearingClothes && isClothingBountyHandling)
-    mcm.SetOptionDependencyBool("Undressing::Maximum Violent Bounty",           allowUndressing && allowWearingClothes && isClothingBountyHandling)
-    mcm.SetOptionDependencyBool("Undressing::Maximum Sentence",                 allowUndressing && allowWearingClothes && isClothingSentenceHandling)
+    ; ==========================================================
+    ;                           CLOTHING
+    ; ==========================================================
+
+    bool allowWearingClothes            = mcm.GetOptionToggleState("Clothing::Allow Wearing Clothes")
+    bool isClothingBountyHandling       = mcm.GetOptionMenuValue("Clothing::Handle Clothing On")   == "Maximum Bounty"
+    bool isClothingSentenceHandling     = mcm.GetOptionMenuValue("Clothing::Handle Clothing On")   == "Maximum Sentence"
+    
+    mcm.SetOptionDependencyBool("Clothing::Allow Wearing Clothes",            allowUndressing)
+    mcm.SetOptionDependencyBool("Clothing::Handle Clothing On",               allowUndressing && allowWearingClothes)
+    mcm.SetOptionDependencyBool("Clothing::When Defeated",                    allowUndressing && allowWearingClothes)
+    mcm.SetOptionDependencyBool("Clothing::Maximum Bounty",                   allowUndressing && allowWearingClothes && isClothingBountyHandling)
+    mcm.SetOptionDependencyBool("Clothing::Maximum Violent Bounty",           allowUndressing && allowWearingClothes && isClothingBountyHandling)
+    mcm.SetOptionDependencyBool("Clothing::Maximum Sentence",                 allowUndressing && allowWearingClothes && isClothingSentenceHandling)
 
     ; ==========================================================
     ;                      FRISKING:UNDRESSING
@@ -259,6 +265,39 @@ function HandleDependencies(RealisticPrisonAndBounty_MCM mcm) global
 
 endFunction
 
+function HandleSliderOptionDependency(RealisticPrisonAndBounty_MCM mcm, string option, float value) global
+
+    ; ==========================================================
+    ;                           PRISON
+    ; ==========================================================
+    
+    if (option == "Prison::Minimum Sentence")
+        string formatString = "{0} Days"
+        float minimumSentenceToUndressValue = mcm.GetOptionSliderValue("Undressing::Minimum Sentence to Undress")
+        float maximumSentenceToClothe       = mcm.GetOptionSliderValue("Undressing::Maximum Sentence")
+
+        if (minimumSentenceToUndressValue < value)
+            mcm.SetOptionSliderValue("Undressing::Minimum Sentence to Undress", value, formatString)
+        endif
+
+        if(maximumSentenceToClothe < value)
+            mcm.SetOptionSliderValue("Clothing::Maximum Sentence", value, formatString)
+        endif
+
+    elseif (option == "Prison::Maximum Sentence")
+        string formatString = "{0} Days"
+        float minimumSentenceToUndressValue = mcm.GetOptionSliderValue("Undressing::Minimum Sentence to Undress")
+        float maximumSentenceToClothe       = mcm.GetOptionSliderValue("Undressing::Maximum Sentence")
+
+        if (minimumSentenceToUndressValue > value)
+            mcm.SetOptionSliderValue("Undressing::Minimum Sentence to Undress", value, formatString)
+        endif
+
+        if(maximumSentenceToClothe > value)
+            mcm.SetOptionSliderValue("Clothing::Maximum Sentence", value, formatString)
+        endif
+    endif
+endFunction
 
 ; =====================================================
 ; Events
@@ -297,7 +336,7 @@ function OnOptionHighlight(RealisticPrisonAndBounty_MCM mcm, string option) glob
     elseif (option == "Stats::Times Escaped")
         mcm.SetInfoText("The times you have escaped from " + mcm.CurrentPage + "'s prison.")
 
-    elseif (option == "Stats::Times Undressed")
+    elseif (option == "Stats::Times Stripped")
         mcm.SetInfoText("The times you have been stripped off in " + mcm.CurrentPage + "'s prison.")
 
     ; ==========================================================
@@ -436,6 +475,9 @@ function OnOptionHighlight(RealisticPrisonAndBounty_MCM mcm, string option) glob
     elseif (option == "Undressing::Allow Undressing")
         mcm.SetInfoText("Determines if you can be stripped off when imprisoned in " + mcm.CurrentPage + ".")
 
+    elseif (option == "Undressing::Handle Undressing On")
+        mcm.SetInfoText("Determines which rules to use to know whether a strip search should be performed in " + mcm.CurrentPage + ".")
+
     elseif (option == "Undressing::Minimum Bounty to Undress")
         mcm.SetInfoText("The minimum bounty required to be undressed in " + mcm.CurrentPage + "'s prison.")
 
@@ -464,28 +506,31 @@ function OnOptionHighlight(RealisticPrisonAndBounty_MCM mcm, string option) glob
         mcm.SetInfoText("The thoroughness of the strip search when undressed, higher values mean a more thorough search and therefore possibly less items kept.\n" + \
                      "Due to the nature of a strip search, most items will be removed, this value will only determine small objects that could be hidden when stripped off.")
 
-    elseif (option == "Undressing::Allow Wearing Clothes")
+    elseif (option == "Clothing::Allow Wearing Clothes")
         mcm.SetInfoText("Determines if you are allowed to wear any clothes when imprisoned in " + mcm.CurrentPage + ".")
 
-    elseif (option == "Undressing::When Defeated")
+    elseif (option == "Clothing::Handle Clothing On")
+        mcm.SetInfoText("Determines which rules to use to know whether clothes should be given in " + mcm.CurrentPage + ".")
+
+    elseif (option == "Clothing::When Defeated")
         mcm.SetInfoText("Determines if you are given clothes when defeated and imprisoned in " + mcm.CurrentPage + ".")
 
-    elseif (option == "Undressing::Maximum Bounty")
+    elseif (option == "Clothing::Maximum Bounty")
         mcm.SetInfoText("The maximum amount of bounty you can have in order to be given clothes when imprisoned in " + mcm.CurrentPage + ".")
         
-    elseif (option == "Undressing::Maximum Violent Bounty")
+    elseif (option == "Clothing::Maximum Violent Bounty")
         mcm.SetInfoText("The maximum amount of violent bounty you can have in order to be given clothes when imprisoned in " + mcm.CurrentPage + ".")
 
-    elseif (option == "Undressing::Maximum Sentence")
+    elseif (option == "Clothing::Maximum Sentence")
         mcm.SetInfoText("The maximum sentence you can be given in order to be given clothes when imprisoned in " + mcm.CurrentPage + ".")
 
-    elseif (option == "Undressing::Allow Wearing Clothes (Cidhna Mine)")
+    elseif (option == "Clothing::Allow Wearing Clothes (Cidhna Mine)")
             mcm.SetInfoText("Determines if you are allowed to wear any clothes when imprisoned in Cidhna Mine.")
 
-    elseif (option == "Undressing::When Defeated (Cidhna Mine)")
+    elseif (option == "Clothing::When Defeated (Cidhna Mine)")
         mcm.SetInfoText("Determines if you are given clothes when defeated and imprisoned in Cidhna Mine.")
 
-    elseif (option == "Undressing::Maximum Bounty (Cidhna Mine)")
+    elseif (option == "Clothing::Maximum Bounty (Cidhna Mine)")
         mcm.SetInfoText("The maximum amount of bounty you can have in order to be given clothes when imprisoned in Cidhna Mine.")
 
     ; ==========================================================
@@ -727,15 +772,15 @@ function LoadSliderOptions(RealisticPrisonAndBounty_MCM mcm, string option, floa
         maxRange = 10
         defaultValue = mcm.UNDRESSING_DEFAULT_STRIP_THOROUGHNESS
 
-    elseif (option == "Undressing::Maximum Bounty")
+    elseif (option == "Clothing::Maximum Bounty")
         intervalSteps = 100
         defaultValue = mcm.UNDRESSING_DEFAULT_FORCED_MIN_BOUNTY
 
-    elseif (option == "Undressing::Maximum Violent Bounty")
+    elseif (option == "Clothing::Maximum Violent Bounty")
         intervalSteps = 10
         defaultValue = mcm.UNDRESSING_DEFAULT_FORCED_MIN_BOUNTY
 
-    elseif (option == "Undressing::Maximum Sentence")
+    elseif (option == "Clothing::Maximum Sentence")
         minRange = mcm.GetOptionSliderValue("Prison::Minimum Sentence")
         maxRange = mcm.GetOptionSliderValue("Prison::Maximum Sentence")
         defaultValue = float_if(60 > maxRange, maxRange, 60)
@@ -858,18 +903,9 @@ function OnOptionSliderAccept(RealisticPrisonAndBounty_MCM mcm, string option, f
 
     elseif (option == "Prison::Minimum Sentence")
         formatString = "{0} Days"
-
+    
     elseif (option == "Prison::Maximum Sentence")
         formatString = "{0} Days"
-        float minimumSentenceToUndressValue = mcm.GetOptionSliderValue("Undressing::Minimum Sentence to Undress")
-        float maximumSentenceToClothe       = mcm.GetOptionSliderValue("Undressing::Maximum Sentence")
-
-        if (minimumSentenceToUndressValue >= value)
-            mcm.SetOptionSliderValue("Undressing::Minimum Sentence to Undress", value, formatString)
-
-        elseif(maximumSentenceToClothe >= value)
-            mcm.SetOptionSliderValue("Undressing::Maximum Sentence", value, formatString)
-        endif
 
     elseif (option == "Prison::Cell Search Thoroughness")
         formatString = "{0}x"
@@ -902,12 +938,12 @@ function OnOptionSliderAccept(RealisticPrisonAndBounty_MCM mcm, string option, f
     elseif (option == "Undressing::Strip Search Thoroughness")
         formatString = "{0}x"
 
-    elseif (option == "Undressing::Maximum Bounty")
+    elseif (option == "Clothing::Maximum Bounty")
 
-    elseif (option == "Undressing::Maximum Violent Bounty")
+    elseif (option == "Clothing::Maximum Violent Bounty")
         formatString = "{0} Violent Bounty"
 
-    elseif (option == "Undressing::Maximum Sentence")
+    elseif (option == "Clothing::Maximum Sentence")
         formatString = "{0} Days"
 
     ; ==========================================================
@@ -944,6 +980,10 @@ function OnOptionSliderAccept(RealisticPrisonAndBounty_MCM mcm, string option, f
 
     endif
 
+    ; Handle any slider option that depends on the current option being set
+    HandleSliderOptionDependency(mcm, option, value)
+
+    ; Set the main option value
     mcm.SetOptionSliderValue(option, value, formatString)
 endFunction
 
@@ -960,7 +1000,7 @@ function OnOptionMenuOpen(RealisticPrisonAndBounty_MCM mcm, string option) globa
         mcm.SetMenuDialogOptions(mcm.UndressingHandlingOptions)
         mcm.SetMenuDialogDefaultIndex(GetOptionIndexFromKey(mcm.UndressingHandlingOptions, "Minimum Sentence"))
 
-    elseif (option == "Undressing::Handle Clothing On")
+    elseif (option == "Clothing::Handle Clothing On")
         mcm.SetMenuDialogOptions(mcm.ClothingHandlingOptions)
         mcm.SetMenuDialogDefaultIndex(GetOptionIndexFromKey(mcm.ClothingHandlingOptions, "Maximum Sentence"))
     endif
@@ -988,15 +1028,15 @@ function OnOptionMenuAccept(RealisticPrisonAndBounty_MCM mcm, string option, int
             mcm.SetOptionDependencyBool("Undressing::Minimum Sentence to Undress",          allowUndressing && menuIndex == GetOptionIndexFromKey(mcm.UndressingHandlingOptions, "Minimum Sentence"))
         endif
 
-    elseif (option == "Undressing::Handle Clothing On")
+    elseif (option == "Clothing::Handle Clothing On")
         if (menuIndex != -1)
             mcm.SetOptionMenuValue(option, mcm.ClothingHandlingOptions[menuIndex])
 
-            bool allowWearingClothes = mcm.GetOptionToggleState("Undressing::Allow Wearing Clothes")
+            bool allowWearingClothes = mcm.GetOptionToggleState("Clothing::Allow Wearing Clothes")
 
-            mcm.SetOptionDependencyBool("Undressing::Maximum Bounty",           allowWearingClothes && menuIndex == GetOptionIndexFromKey(mcm.ClothingHandlingOptions, "Maximum Bounty"))
-            mcm.SetOptionDependencyBool("Undressing::Maximum Violent Bounty",   allowWearingClothes && menuIndex == GetOptionIndexFromKey(mcm.ClothingHandlingOptions, "Maximum Bounty"))
-            mcm.SetOptionDependencyBool("Undressing::Maximum Sentence",         allowWearingClothes && menuIndex == GetOptionIndexFromKey(mcm.ClothingHandlingOptions, "Maximum Sentence"))
+            mcm.SetOptionDependencyBool("Clothing::Maximum Bounty",           allowWearingClothes && menuIndex == GetOptionIndexFromKey(mcm.ClothingHandlingOptions, "Maximum Bounty"))
+            mcm.SetOptionDependencyBool("Clothing::Maximum Violent Bounty",   allowWearingClothes && menuIndex == GetOptionIndexFromKey(mcm.ClothingHandlingOptions, "Maximum Bounty"))
+            mcm.SetOptionDependencyBool("Clothing::Maximum Sentence",         allowWearingClothes && menuIndex == GetOptionIndexFromKey(mcm.ClothingHandlingOptions, "Maximum Sentence"))
         endif
     endif
 endFunction

@@ -64,19 +64,24 @@ bool property FRISKING_DEFAULT_STRIP_IF_STOLEN_FOUND            = true autoreado
 int  property FRISKING_DEFAULT_NUMBER_STOLEN_ITEMS_REQUIRED     = 10 autoreadonly
 ; ==============================================================================
 ; UNDRESSING
-bool property UNDRESSING_DEFAULT_ALLOW                  = true autoreadonly
-int  property UNDRESSING_DEFAULT_MIN_BOUNTY             = 1500 autoreadonly
-bool property UNDRESSING_DEFAULT_WHEN_DEFEATED          = true autoreadonly
-bool property UNDRESSING_DEFAULT_AT_CELL                = true autoreadonly
-bool property UNDRESSING_DEFAULT_AT_CHEST               = true autoreadonly
-int  property UNDRESSING_DEFAULT_FORCED_MIN_BOUNTY      = 3000 autoreadonly
-bool property UNDRESSING_DEFAULT_FORCED_WHEN_DEFEATED   = true autoreadonly
-int  property UNDRESSING_DEFAULT_STRIP_THOROUGHNESS     = 10 autoreadonly
-bool property UNDRESSING_DEFAULT_ALLOW_CLOTHES          = false autoreadonly
-int  property UNDRESSING_DEFAULT_REDRESS_BOUNTY         = 2000 autoreadonly
-bool property UNDRESSING_DEFAULT_REDRESS_WHEN_DEFEATED  = true autoreadonly
-bool property UNDRESSING_DEFAULT_REDRESS_AT_CELL        = true autoreadonly
-bool property UNDRESSING_DEFAULT_REDRESS_AT_CHEST       = true autoreadonly
+bool    property UNDRESSING_DEFAULT_ALLOW                  = true autoreadonly
+string  property UNDRESSING_DEFAULT_HANDLING_OPTION        = "Minimum Sentence" autoreadonly
+int     property UNDRESSING_DEFAULT_MIN_BOUNTY             = 1500 autoreadonly
+bool    property UNDRESSING_DEFAULT_WHEN_DEFEATED          = true autoreadonly
+bool    property UNDRESSING_DEFAULT_AT_CELL                = true autoreadonly
+bool    property UNDRESSING_DEFAULT_AT_CHEST               = true autoreadonly
+int     property UNDRESSING_DEFAULT_FORCED_MIN_BOUNTY      = 3000 autoreadonly
+bool    property UNDRESSING_DEFAULT_FORCED_WHEN_DEFEATED   = true autoreadonly
+int     property UNDRESSING_DEFAULT_STRIP_THOROUGHNESS     = 10 autoreadonly
+; ==============================================================================
+; CLOTHING
+bool   property CLOTHING_DEFAULT_ALLOW_CLOTHES          = false autoreadonly
+string property CLOTHING_DEFAULT_HANDLING_OPTION        = "Maximum Sentence" autoreadonly
+int    property CLOTHING_DEFAULT_REDRESS_BOUNTY         = 2000 autoreadonly
+bool   property CLOTHING_DEFAULT_REDRESS_WHEN_DEFEATED  = true autoreadonly
+bool   property CLOTHING_DEFAULT_REDRESS_AT_CELL        = true autoreadonly
+bool   property CLOTHING_DEFAULT_REDRESS_AT_CHEST       = true autoreadonly
+string property CLOTHING_DEFAULT_PRISON_OUTFIT          = "Prisoner Tunic" autoreadonly
 ; ==============================================================================
 ; PRISON
 int    property PRISON_DEFAULT_TIMESCALE                    = 60 autoreadonly
@@ -158,8 +163,10 @@ string[] property PrisonSkillHandlingOptions
             _prisonSkillHandlingOptions = JArray.object()
 
             JArray.addStr(_prisonSkillHandlingOptions, "All Skills")
-            JArray.addStr(_prisonSkillHandlingOptions, "Stat Skills (Health, Stamina, Magicka)")
-            JArray.addStr(_prisonSkillHandlingOptions, "Perk Skills")
+            JArray.addStr(_prisonSkillHandlingOptions, "All Stat Skills (Health, Stamina, Magicka)")
+            JArray.addStr(_prisonSkillHandlingOptions, "All Perk Skills")
+            JArray.addStr(_prisonSkillHandlingOptions, "1x Random Stat Skill")
+            JArray.addStr(_prisonSkillHandlingOptions, "1x Random Perk Skill")
             JArray.addStr(_prisonSkillHandlingOptions, "Random")
         endif
         return JArray.asStringArray(_prisonSkillHandlingOptions)
@@ -406,6 +413,10 @@ function ToggleOption(string _key, bool storePersistently = true)
     Debug("ToggleOption", "Set new value of " + !_containerValue + " for " + _key + " (option_id: " + _containerKey + ")")
 endFunction
 
+int function AddOptionCategoryKey(string text, string _key, int flags = 0)
+    _currentRenderedCategory = _key
+    AddHeaderOption(text, flags)
+endFunction
 
 int function AddOptionCategory(string text, int flags = 0)
     _currentRenderedCategory = text
@@ -485,6 +496,9 @@ int function AddOptionSliderKey(string displayedText, string _key, float default
         int option = __createOptionFloat(optionId, defaultValue)
         __addOptionInternal(displayedText, optionId, optionKey, cacheKey, option, flags)
     endif
+
+    Debug("AddOptionSliderKey", "["+ _key +"] "+"Flags: " + int_if (flags == OPTION_NOT_EXIST, defaultFlags, flags) + ", Value: " + float_if (value < GENERAL_ERROR, defaultValue, value))
+
 
     return optionId
 endFunction
