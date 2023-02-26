@@ -53,6 +53,7 @@ function Left(RealisticPrisonAndBounty_MCM mcm) global
     mcm.AddOptionSlider("Additional Bounty when Defeated",              mcm.ARREST_DEFAULT_BOUNTY_WHEN_DEFEATED_FLAT, "{0} Bounty")
     mcm.AddOptionToggle("Allow Civilian Capture",                       mcm.ARREST_DEFAULT_ALLOW_CIVILIAN_CAPTURE)
     mcm.AddOptionToggle("Allow Unconscious Arrest",                     mcm.ARREST_DEFAULT_ALLOW_UNCONSCIOUS_ARREST)
+    mcm.AddOptionToggle("Allow Unconditional Arrest",                   mcm.ARREST_DEFAULT_ALLOW_UNCONDITIONAL_ARREST)
 
     mcm.AddEmptyOption()
 
@@ -137,13 +138,13 @@ function Right(RealisticPrisonAndBounty_MCM mcm) global
     mcm.AddOptionSliderKey("Maximum Violent Bounty to Clothe", "Maximum Violent Bounty",    mcm.CLOTHING_DEFAULT_REDRESS_BOUNTY, "{0} Violent Bounty", mcm.OPTION_DISABLED)
     mcm.AddOptionSliderKey("Maximum Sentence to Clothe", "Maximum Sentence",                mcm.GetOptionSliderValue("Prison::Maximum Sentence"), "{0} Days", mcm.OPTION_DISABLED)
     mcm.AddOptionToggleKey("Clothe When Defeated", "When Defeated",                         mcm.CLOTHING_DEFAULT_REDRESS_WHEN_DEFEATED, mcm.OPTION_DISABLED)
-    mcm.AddOptionMenu("Prison Outfit",                                                      "Prisoner Tunic", mcm.OPTION_DISABLED)
+    mcm.AddOptionMenu("Prison Outfit",                                                      mcm.CLOTHING_DEFAULT_PRISON_OUTFIT, mcm.OPTION_DISABLED)
 
     if (mcm.CurrentPage == "The Reach")
         mcm.AddTextOption("", "Cidhna Mine", mcm.OPTION_DISABLED)
-        mcm.AddOptionToggleKey("Allow Wearing Clothes", "Allow Wearing Clothes (Cidhna Mine)",   mcm.UNDRESSING_DEFAULT_ALLOW_CLOTHES)
-        mcm.AddOptionToggleKey("When Defeated",  "When Defeated (Cidhna Mine)",                  mcm.UNDRESSING_DEFAULT_REDRESS_WHEN_DEFEATED)
-        mcm.AddOptionSliderKey("Maximum Bounty",  "Maximum Bounty (Cidhna Mine)",                mcm.UNDRESSING_DEFAULT_REDRESS_BOUNTY, "{0} Bounty")
+        mcm.AddOptionToggleKey("Allow Wearing Clothes", "Allow Wearing Clothes (Cidhna Mine)",   mcm.CLOTHING_DEFAULT_ALLOW_CLOTHES)
+        mcm.AddOptionToggleKey("When Defeated",  "When Defeated (Cidhna Mine)",                  mcm.CLOTHING_DEFAULT_REDRESS_WHEN_DEFEATED)
+        mcm.AddOptionSliderKey("Maximum Bounty",  "Maximum Bounty (Cidhna Mine)",                mcm.CLOTHING_DEFAULT_REDRESS_BOUNTY, "{0} Bounty")
     endif
 
     mcm.AddOptionCategory("Additional Charges")
@@ -217,6 +218,7 @@ function HandleDependencies(RealisticPrisonAndBounty_MCM mcm) global
     mcm.SetOptionDependencyBool("Clothing::Maximum Bounty",                   allowUndressing && allowWearingClothes && isClothingBountyHandling)
     mcm.SetOptionDependencyBool("Clothing::Maximum Violent Bounty",           allowUndressing && allowWearingClothes && isClothingBountyHandling)
     mcm.SetOptionDependencyBool("Clothing::Maximum Sentence",                 allowUndressing && allowWearingClothes && isClothingSentenceHandling)
+    mcm.SetOptionDependencyBool("Clothing::Prison Outfit",                    allowUndressing && allowWearingClothes)
 
     ; ==========================================================
     ;                      FRISKING:UNDRESSING
@@ -274,7 +276,7 @@ function HandleSliderOptionDependency(RealisticPrisonAndBounty_MCM mcm, string o
     if (option == "Prison::Minimum Sentence")
         string formatString = "{0} Days"
         float minimumSentenceToUndressValue = mcm.GetOptionSliderValue("Undressing::Minimum Sentence to Undress")
-        float maximumSentenceToClothe       = mcm.GetOptionSliderValue("Undressing::Maximum Sentence")
+        float maximumSentenceToClothe       = mcm.GetOptionSliderValue("Clothing::Maximum Sentence")
 
         if (minimumSentenceToUndressValue < value)
             mcm.SetOptionSliderValue("Undressing::Minimum Sentence to Undress", value, formatString)
@@ -287,7 +289,7 @@ function HandleSliderOptionDependency(RealisticPrisonAndBounty_MCM mcm, string o
     elseif (option == "Prison::Maximum Sentence")
         string formatString = "{0} Days"
         float minimumSentenceToUndressValue = mcm.GetOptionSliderValue("Undressing::Minimum Sentence to Undress")
-        float maximumSentenceToClothe       = mcm.GetOptionSliderValue("Undressing::Maximum Sentence")
+        float maximumSentenceToClothe       = mcm.GetOptionSliderValue("Clothing::Maximum Sentence")
 
         if (minimumSentenceToUndressValue > value)
             mcm.SetOptionSliderValue("Undressing::Minimum Sentence to Undress", value, formatString)
@@ -375,6 +377,9 @@ function OnOptionHighlight(RealisticPrisonAndBounty_MCM mcm, string option) glob
 
     elseif (option == "Arrest::Allow Unconscious Arrest")
         mcm.SetInfoText("Whether to allow an unconscious arrest after being defeated.")
+
+    elseif (option == "Arrest::Allow Unconditional Arrest")
+        mcm.SetInfoText("Whether to allow an unconditional arrest without a bounty in " + mcm.CurrentPage + ".")
 
     elseif (option == "Arrest::Unequip Hand Garments")
         mcm.SetInfoText("Whether to unequip any hand garment when arrested.\n-100 - Disable\n0 - Always unequip.\n Any other value is the bounty required")

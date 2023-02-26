@@ -48,6 +48,7 @@ int  property ARREST_DEFAULT_BOUNTY_WHEN_DEFEATED_FLAT      = 200 autoreadonly
 bool property ARREST_DEFAULT_ALLOW_CIVILIAN_CAPTURE         = true autoreadonly
 bool property ARREST_DEFAULT_ALLOW_ARREST_TRANSFER          = true autoreadonly
 bool property ARREST_DEFAULT_ALLOW_UNCONSCIOUS_ARREST       = true autoreadonly
+bool property ARREST_DEFAULT_ALLOW_UNCONDITIONAL_ARREST     = false autoreadonly
 int  property ARREST_DEFAULT_UNEQUIP_HAND_BOUNTY            = 0 autoreadonly
 int  property ARREST_DEFAULT_UNEQUIP_HEAD_BOUNTY            = 1000 autoreadonly
 int  property ARREST_DEFAULT_UNEQUIP_FOOT_BOUNTY            = 4000 autoreadonly
@@ -81,7 +82,7 @@ int    property CLOTHING_DEFAULT_REDRESS_BOUNTY         = 2000 autoreadonly
 bool   property CLOTHING_DEFAULT_REDRESS_WHEN_DEFEATED  = true autoreadonly
 bool   property CLOTHING_DEFAULT_REDRESS_AT_CELL        = true autoreadonly
 bool   property CLOTHING_DEFAULT_REDRESS_AT_CHEST       = true autoreadonly
-string property CLOTHING_DEFAULT_PRISON_OUTFIT          = "Prisoner Tunic" autoreadonly
+string property CLOTHING_DEFAULT_PRISON_OUTFIT          = "Prisoner Outfit" autoreadonly
 ; ==============================================================================
 ; PRISON
 int    property PRISON_DEFAULT_TIMESCALE                    = 60 autoreadonly
@@ -186,16 +187,27 @@ string[] property UndressingHandlingOptions
     endFunction
 endProperty
 
-int _undressingClothingHandlingOptions
+int _clothingHandlingOptions
 string[] property ClothingHandlingOptions
     string[] function get()
-        if (JArray.count(_undressingClothingHandlingOptions) == 0)
-            _undressingClothingHandlingOptions = JArray.object()
+        if (JArray.count(_clothingHandlingOptions) == 0)
+            _clothingHandlingOptions = JArray.object()
 
-            JArray.addStr(_undressingClothingHandlingOptions, "Maximum Bounty")
-            JArray.addStr(_undressingClothingHandlingOptions, "Maximum Sentence")
+            JArray.addStr(_clothingHandlingOptions, "Maximum Bounty")
+            JArray.addStr(_clothingHandlingOptions, "Maximum Sentence")
         endif
-        return JArray.asStringArray(_undressingClothingHandlingOptions)
+        return JArray.asStringArray(_clothingHandlingOptions)
+    endFunction
+endProperty
+
+int _clothingOutfits
+string[] property ClothingOutfits
+    string[] function get()
+        if (JArray.count(_clothingOutfits) == 0)
+            _clothingOutfits = JArray.object()
+            JValue.retain(_clothingOutfits)
+        endif
+
     endFunction
 endProperty
 
