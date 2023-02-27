@@ -453,7 +453,7 @@ int function AddOptionToggleKey(string displayedText, string _key, bool defaultV
     int flags           = __getOptionFlag(optionKey)
     int optionId        = AddToggleOption(displayedText, bool_if (value < GENERAL_ERROR, defaultValue, value as bool), int_if (flags == OPTION_NOT_EXIST, defaultFlags, flags))
 
-    Debug("AddOptionToggleKey", "["+ _key +"] "+"Flags: " + int_if (flags == OPTION_NOT_EXIST, defaultFlags, flags) + ", Value: " + bool_if (value < GENERAL_ERROR, defaultValue, value as bool))
+    ; Trace("AddOptionToggleKey", "["+ _key +"] "+"Flags: " + int_if (flags == OPTION_NOT_EXIST, defaultFlags, flags) + ", Value: " + bool_if (value < GENERAL_ERROR, defaultValue, value as bool))
 
     if (!__optionExists(optionKey, optionId))
         int option = __createOptionBool(optionId, defaultValue)
@@ -509,7 +509,7 @@ int function AddOptionSliderKey(string displayedText, string _key, float default
         __addOptionInternal(displayedText, optionId, optionKey, cacheKey, option, flags)
     endif
 
-    Debug("AddOptionSliderKey", "["+ _key +"] "+"Flags: " + int_if (flags == OPTION_NOT_EXIST, defaultFlags, flags) + ", Value: " + float_if (value < GENERAL_ERROR, defaultValue, value))
+    ; Trace("AddOptionSliderKey", "["+ _key +"] "+"Flags: " + int_if (flags == OPTION_NOT_EXIST, defaultFlags, flags) + ", Value: " + float_if (value < GENERAL_ERROR, defaultValue, value))
 
 
     return optionId
@@ -586,7 +586,7 @@ endFunction
     whereas with the index set to 1, it will retrieve Winterhold's instead.
 
     string  @_key: The key to retrieve the option from.
-    returns: The option's id on success, -1 on failure.
+    returns: The option's id on success, < GENERAL_ERROR on failure.
  /;
  int function GetOption(string _key)
     string _formattedKey = CurrentPage + "::" + _key ; Append current page to allow retrieving options simply by name
@@ -737,49 +737,41 @@ endEvent
 event OnPageReset(string page)
     RealisticPrisonAndBounty_MCM_Holds.Render(self)
     RealisticPrisonAndBounty_MCM_General.Render(self)
-    RealisticPrisonAndBounty_MCM_Stats.Render(self)
 endEvent
 
 event OnOptionHighlight(int option)
     RealisticPrisonAndBounty_MCM_Holds.OnHighlight(self, option)
     RealisticPrisonAndBounty_MCM_General.OnHighlight(self, option)
-    RealisticPrisonAndBounty_MCM_Stats.OnHighlight(self, option)
 endEvent
 
 event OnOptionDefault(int option)
     RealisticPrisonAndBounty_MCM_Holds.OnDefault(self, option)
     RealisticPrisonAndBounty_MCM_General.OnDefault(self, option)
-    RealisticPrisonAndBounty_MCM_Stats.OnDefault(self, option)
 endEvent
 
 event OnOptionSelect(int option)
     RealisticPrisonAndBounty_MCM_Holds.OnSelect(self, option)
     RealisticPrisonAndBounty_MCM_General.OnSelect(self, option)
-    RealisticPrisonAndBounty_MCM_Stats.OnSelect(self, option)
 endEvent
 
 event OnOptionSliderOpen(int option)
     RealisticPrisonAndBounty_MCM_Holds.OnSliderOpen(self, option)
     RealisticPrisonAndBounty_MCM_General.OnSliderOpen(self, option)
-    RealisticPrisonAndBounty_MCM_Stats.OnSliderOpen(self, option)
 endEvent
 
 event OnOptionSliderAccept(int option, float value)
     RealisticPrisonAndBounty_MCM_Holds.OnSliderAccept(self, option, value)
     RealisticPrisonAndBounty_MCM_General.OnSliderAccept(self, option, value)
-    RealisticPrisonAndBounty_MCM_Stats.OnSliderAccept(self, option, value)
 endEvent
 
 event OnOptionMenuOpen(int option)
     RealisticPrisonAndBounty_MCM_Holds.OnMenuOpen(self, option)
     RealisticPrisonAndBounty_MCM_General.OnMenuOpen(self, option)
-    RealisticPrisonAndBounty_MCM_Stats.OnMenuOpen(self, option)
 endEvent
 
 event OnOptionMenuAccept(int option, int index)
     RealisticPrisonAndBounty_MCM_Holds.OnMenuAccept(self, option, index)
     RealisticPrisonAndBounty_MCM_General.OnMenuAccept(self, option, index)
-    RealisticPrisonAndBounty_MCM_Stats.OnMenuAccept(self, option, index)
 endEvent
 
 
@@ -924,7 +916,7 @@ endFunction
 int function __getOptionFlag(string _key)
     if (JMap.hasKey(optionsFlagMap, _key))
         int value = JMap.getInt(optionsFlagMap, _key)
-        Debug("__getOptionFlag", "Found key: " + _key + ", value: " + value)
+        ; Trace("__getOptionFlag", "Found key: " + _key + ", value: " + value)
         return value
     endif
     return OPTION_NOT_EXIST
@@ -952,7 +944,7 @@ float function __getFloatOptionValue(string _key)
         return OPTION_NOT_EXIST ; Option does not exist
     endif
 
-    Trace("__getFloatOptionValue", "[" + _key + "] OptionID: " + _containerKey + ", Value: " + _containerValue)
+    ; Trace("__getFloatOptionValue", "[" + _key + "] OptionID: " + _containerKey + ", Value: " + _containerValue)
     return _containerValue
 endFunction
 
