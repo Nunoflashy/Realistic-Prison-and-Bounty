@@ -90,8 +90,8 @@ function Left(RealisticPrisonAndBounty_MCM mcm) global
     mcm.AddOptionSlider("Escape Bounty (%)",                mcm.ESCAPE_DEFAULT_BOUNTY_PERCENT, "{0}% of Bounty")
     mcm.AddOptionSlider("Escape Bounty",                    mcm.ESCAPE_DEFAULT_BOUNTY_FLAT, "{0} Bounty")
     mcm.AddOptionToggle("Allow Surrendering",               mcm.ESCAPE_DEFAULT_ALLOW_SURRENDER)
-    mcm.AddOptionToggle("Frisk Search upon Captured",       mcm.ESCAPE_DEFAULT_FRISK_ON_CAPTURE)
-    mcm.AddOptionToggle("Undress upon Captured",            mcm.ESCAPE_DEFAULT_UNDRESS_ON_CAPTURE)
+    mcm.AddOptionToggle("Frisk Search upon Captured",       mcm.ESCAPE_DEFAULT_FRISK_ON_CAPTURE, mcm.OPTION_DISABLED)
+    mcm.AddOptionToggle("Strip Search upon Captured",            mcm.ESCAPE_DEFAULT_UNDRESS_ON_CAPTURE)
 
 
 endFunction
@@ -280,10 +280,10 @@ function HandleDependencies(RealisticPrisonAndBounty_MCM mcm) global
     ; ==========================================================
     
     bool friskSearchUponCaptured = mcm.GetOptionToggleState("Escape::Frisk Search upon Captured")
-    bool undressUponCaptured     = mcm.GetOptionToggleState("Escape::Undress upon Captured")
+    bool undressUponCaptured     = mcm.GetOptionToggleState("Escape::Strip Search upon Captured")
 
     mcm.SetOptionDependencyBool("Escape::Frisk Search upon Captured",   !undressUponCaptured && allowFrisking)
-    mcm.SetOptionDependencyBool("Escape::Undress upon Captured",        allowUndressing)
+    mcm.SetOptionDependencyBool("Escape::Strip Search upon Captured",        allowUndressing)
 
     ; ==========================================================
     ;                           RELEASE
@@ -378,16 +378,16 @@ function OnOptionHighlight(RealisticPrisonAndBounty_MCM mcm, string option) glob
         mcm.SetInfoText("The minimum bounty required in order to be arrested in " + mcm.CurrentPage + ".")
 
     elseif (option == "Arrest::Guaranteed Payable Bounty")
-        mcm.SetInfoText("The guaranteed amount of bounty that a guard will accept as payment before arresting you in " + mcm.CurrentPage + ".")
+        mcm.SetInfoText("The guaranteed amount of bounty that a guard will accept as payment before being arrested in " + mcm.CurrentPage + ".")
 
     elseif (option == "Arrest::Maximum Payable Bounty")
-        mcm.SetInfoText("The maximum amount of bounty that is payable before arresting you in " + mcm.CurrentPage + ".")
+        mcm.SetInfoText("The maximum amount of bounty that is payable before being arrested in " + mcm.CurrentPage + ".")
 
     elseif (option == "Arrest::Maximum Payable Bounty (Chance)")
         mcm.SetInfoText("The chance of being able to pay the bounty if it exceeds the guaranteed amount but is within the maximum limit.")
 
     elseif (option == "Arrest::Additional Bounty when Resisting (%)")
-        mcm.SetInfoText("The bounty that will be added as a percentage of your current bounty, when resisting arrest in "  + mcm.CurrentPage + ".\n" + "If the bounty exceeds the guaranteed but is within the maximum, there's a chance not to go to prison.")
+        mcm.SetInfoText("The bounty that will be added as a percentage of your current bounty, when resisting arrest in "  + mcm.CurrentPage + ".")
 
     elseif (option == "Arrest::Additional Bounty when Resisting")
         mcm.SetInfoText("The bounty that will be added when resisting arrest in " + mcm.CurrentPage + ".")
@@ -411,23 +411,23 @@ function OnOptionHighlight(RealisticPrisonAndBounty_MCM mcm, string option) glob
         mcm.SetInfoText("Whether to allow an unconditional arrest without a bounty in " + mcm.CurrentPage + ".")
 
     elseif (option == "Arrest::Unequip Hand Garments")
-        mcm.SetInfoText("Whether to unequip any hand garment when arrested.\n-100 - Disable\n0 - Always unequip.\n Any other value is the bounty required")
+        mcm.SetInfoText("Whether to unequip any hand garment when arrested.\n-100 - Disable\n0 - Always unequip.\n Any other value is the bounty required.")
 
     elseif (option == "Arrest::Unequip Head Garments")
-        mcm.SetInfoText("Whether to unequip any head garment when arrested.\n-100 - Disable\n0 - Always unequip.\n Any other value is the bounty required")
+        mcm.SetInfoText("Whether to unequip any head garment when arrested.\n-100 - Disable\n0 - Always unequip.\n Any other value is the bounty required.")
 
     elseif (option == "Arrest::Unequip Foot Garments")
-        mcm.SetInfoText("Whether to unequip any foot garment when arrested.\n-100 - Disable\n0 - Always unequip.\n Any other value is the bounty required")
+        mcm.SetInfoText("Whether to unequip any foot garment when arrested.\n-100 - Disable\n0 - Always unequip.\n Any other value is the bounty required.")
     
     ; ==========================================================
     ;                           FRISKING
     ; ==========================================================
 
     elseif (option == "Frisking::Allow Frisking")
-        mcm.SetInfoText("Determines if you can be frisk searched in " + mcm.CurrentPage + ".")
+        mcm.SetInfoText("Determines if you can be frisked in " + mcm.CurrentPage + ".")
 
     elseif (option == "Frisking::Minimum Bounty for Frisking")
-        mcm.SetInfoText("The minimum bounty required to be frisk searched in " + mcm.CurrentPage + ".")
+        mcm.SetInfoText("The minimum bounty required to be frisked in " + mcm.CurrentPage + ".")
 
     elseif (option == "Frisking::Guaranteed Payable Bounty")
         mcm.SetInfoText("The guaranteed amount of bounty that is payable during frisking before considering imprisonment in " + mcm.CurrentPage + ".")
@@ -439,16 +439,16 @@ function OnOptionHighlight(RealisticPrisonAndBounty_MCM mcm, string option) glob
         mcm.SetInfoText("The chance of being able to pay the bounty if it exceeds the guaranteed amount but is within the maximum limit.")
 
     elseif (option == "Frisking::Frisk Search Thoroughness")
-        mcm.SetInfoText("The thoroughness of the frisk search, higher values mean a more thorough search and possibly less items kept.")
+        mcm.SetInfoText("The thoroughness of the frisk, higher values mean a more thorough search, more items found by the jailhouse, and possibly less items kept.")
 
     elseif (option == "Frisking::Confiscate Stolen Items")
         mcm.SetInfoText("Whether to confiscate any stolen items found during the frisking.")
 
     elseif (option == "Frisking::Strip Search if Stolen Items Found")
-        mcm.SetInfoText("Whether to have the player undressed if stolen items are found. \n (Note: If the strip search takes place, you will be imprisoned regardless of the bounty for the arrest)")
+        mcm.SetInfoText("Whether to have the player strip searched if stolen items are found. \n (Note: If the strip search takes place, you will be jailed regardless of the bounty for the arrest)")
 
     elseif (option == "Frisking::Minimum No. of Stolen Items Required")
-        mcm.SetInfoText("The minimum number of stolen items required to have the player undressed.")
+        mcm.SetInfoText("The minimum number of stolen items required to have the player be strip searched.")
 
     ; ==========================================================
     ;                           PRISON
@@ -510,7 +510,7 @@ function OnOptionHighlight(RealisticPrisonAndBounty_MCM mcm, string option) glob
         mcm.SetInfoText("Determines if you can be stripped off when imprisoned in " + mcm.CurrentPage + ".")
 
     elseif (option == "Undressing::Handle Undressing On")
-        mcm.SetInfoText("Determines which rules to use to know whether a strip search should be performed in " + mcm.CurrentPage + ".")
+        mcm.SetInfoText("Determines which rules to use to know whether a strip search should take place in " + mcm.CurrentPage + ".")
 
     elseif (option == "Undressing::Minimum Bounty to Undress")
         mcm.SetInfoText("The minimum bounty required to be undressed in " + mcm.CurrentPage + "'s prison.")
@@ -524,20 +524,8 @@ function OnOptionHighlight(RealisticPrisonAndBounty_MCM mcm, string option) glob
     elseif (option == "Undressing::Undress when Defeated")
         mcm.SetInfoText("Whether to have you undressed when defeated and imprisoned in " + mcm.CurrentPage + ".")
 
-    elseif (option == "Undressing::Undress at Cell")
-        mcm.SetInfoText("Whether to be undressed at the cell in " + mcm.CurrentPage + "'s prison.")
-
-    elseif (option == "Undressing::Undress at Chest")
-        mcm.SetInfoText("Whether to be undressed at the chest in "  + mcm.CurrentPage + "'s prison.")
-
-    elseif (option == "Undressing::Forced Undressing (Bounty)")
-        mcm.SetInfoText("The minimum bounty required to be force undressed (You will have no possibility of action)")
-
-    elseif (option == "Undressing::Forced Undressing when Defeated")
-        mcm.SetInfoText("Whether to be force undressed when defeated and imprisoned in " + mcm.CurrentPage + ".")
-
     elseif (option == "Undressing::Strip Search Thoroughness")
-        mcm.SetInfoText("The thoroughness of the strip search when undressed, higher values mean a more thorough search and therefore possibly less items kept.\n" + \
+        mcm.SetInfoText("The thoroughness of the strip search, higher values mean a more thorough search and therefore possibly less items kept.\n" + \
                      "Due to the nature of a strip search, most items will be removed, this value will only determine small objects that could be hidden when stripped off.")
 
     elseif (option == "Clothing::Allow Wearing Clothes")
@@ -613,10 +601,10 @@ function OnOptionHighlight(RealisticPrisonAndBounty_MCM mcm, string option) glob
         mcm.SetInfoText("Whether the guards will allow you to surrender after escaping prison in " + mcm.CurrentPage + ".")
 
     elseif (option == "Escape::Frisk Search upon Captured")
-        mcm.SetInfoText("Whether to allow a frisk upon being captured in "  + mcm.CurrentPage + ".\n" + "(Note: The frisk will take place regardless of whether the conditions are met in Frisking)")
+        mcm.SetInfoText("Whether to have a frisk search be performed upon being captured in "  + mcm.CurrentPage + ".\n" + "(Note: The frisk will take place regardless of whether the conditions are met in Frisking)")
 
-    elseif (option == "Escape::Undress upon Captured")
-        mcm.SetInfoText("Whether to allow being undressed upon being captured in " + mcm.CurrentPage + ".\n (Note: Undressing will take place regardless of whether the conditions are met in Undressing)")
+    elseif (option == "Escape::Strip Search upon Captured")
+        mcm.SetInfoText("Whether to have a strip search be performed upon being captured in " + mcm.CurrentPage + ".\n (Note: Undressing will take place regardless of whether the conditions are met in Undressing)")
 
     ; ==========================================================
     ;                       BOUNTY HUNTING
