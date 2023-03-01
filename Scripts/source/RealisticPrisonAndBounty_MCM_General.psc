@@ -46,7 +46,7 @@ function Right(RealisticPrisonAndBounty_MCM mcm) global
     mcm.AddEmptyOption()
     mcm.AddEmptyOption()
 
-    mcm.AddTextOption("", "WHEN IN PRISON", mcm.OPTION_DISABLED)
+    mcm.AddTextOption("", "WHEN IN JAIL", mcm.OPTION_DISABLED)
 
     mcm.SetRenderedCategory("General")
     mcm.AddOptionSliderKey("Timescale", "TimescalePrison", 10)
@@ -74,13 +74,13 @@ function OnOptionHighlight(RealisticPrisonAndBounty_MCM mcm, string option) glob
 
     ; Deleveling Stats
     if (StringUtil.Find(option, "Deleveling") != -1)
-        mcm.SetInfoText("Sets how much progress you will lose in " + optionName + " for each day imprisoned.")
+        mcm.SetInfoText("Sets how much progress you will lose in " + optionName + " for each day in jail.")
 
     elseif (option == "General::Timescale")
         mcm.SetInfoText("Sets the timescale when free.")
 
     elseif (option == "General::TimescalePrison")
-        mcm.SetInfoText("Sets the timescale when in prison.")
+        mcm.SetInfoText("Sets the timescale when in jail.")
     
     elseif (option == "General::Bounty Decay (Update Interval)")
         mcm.SetInfoText("Sets the time between updates in in-game hours for when the bounty should decay for all holds.")
