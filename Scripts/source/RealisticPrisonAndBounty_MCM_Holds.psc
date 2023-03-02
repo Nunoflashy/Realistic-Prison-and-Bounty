@@ -70,9 +70,9 @@ function Left(RealisticPrisonAndBounty_MCM mcm) global
     mcm.AddTextOption("", "When Arrested", mcm.OPTION_DISABLED)
     mcm.AddOptionToggle("Allow Frisking",                         mcm.FRISKING_DEFAULT_ALLOW)
     mcm.AddOptionSlider("Minimum Bounty for Frisking",            mcm.FRISKING_DEFAULT_MIN_BOUNTY, "{0} Bounty")
-    mcm.AddOptionSlider("Guaranteed Payable Bounty",              mcm.FRISKING_DEFAULT_GUARANTEED_PAYABLE_BOUNTY, "{0} Bounty")
-    mcm.AddOptionSlider("Maximum Payable Bounty",                 mcm.FRISKING_DEFAULT_MAXIMUM_PAYABLE_BOUNTY, "{0} Bounty")
-    mcm.AddOptionSlider("Maximum Payable Bounty (Chance)",        mcm.FRISKING_DEFAULT_MAXIMUM_PAYABLE_BOUNTY_CHANCE, "{0}%")
+    ; mcm.AddOptionSlider("Guaranteed Payable Bounty",              mcm.FRISKING_DEFAULT_GUARANTEED_PAYABLE_BOUNTY, "{0} Bounty")
+    ; mcm.AddOptionSlider("Maximum Payable Bounty",                 mcm.FRISKING_DEFAULT_MAXIMUM_PAYABLE_BOUNTY, "{0} Bounty")
+    ; mcm.AddOptionSlider("Maximum Payable Bounty (Chance)",        mcm.FRISKING_DEFAULT_MAXIMUM_PAYABLE_BOUNTY_CHANCE, "{0}%")
     mcm.AddOptionSlider("Frisk Search Thoroughness",              mcm.FRISKING_DEFAULT_FRISK_THOROUGHNESS, "{0}x")
 
     mcm.AddEmptyOption()
@@ -114,6 +114,12 @@ function Right(RealisticPrisonAndBounty_MCM mcm) global
     mcm.AddEmptyOption()
 
     mcm.AddOptionCategory("Jail")
+    mcm.AddOptionSlider("Guaranteed Payable Bounty",              mcm.FRISKING_DEFAULT_GUARANTEED_PAYABLE_BOUNTY, "{0} Bounty")
+    mcm.AddOptionSlider("Maximum Payable Bounty",                 mcm.FRISKING_DEFAULT_MAXIMUM_PAYABLE_BOUNTY, "{0} Bounty")
+    mcm.AddOptionSlider("Maximum Payable Bounty (Chance)",        mcm.FRISKING_DEFAULT_MAXIMUM_PAYABLE_BOUNTY_CHANCE, "{0}%")
+
+    mcm.AddEmptyOption()
+
     mcm.AddOptionSlider("Bounty Exchange",                      mcm.PRISON_DEFAULT_BOUNTY_TO_SENTENCE, "{0} Violent Bounty = 100 Bounty")
     mcm.AddOptionSlider("Bounty to Sentence",                   mcm.PRISON_DEFAULT_BOUNTY_TO_SENTENCE, "{0} Bounty = 1 Day")
     mcm.AddOptionSlider("Minimum Sentence",                     mcm.PRISON_DEFAULT_MIN_SENTENCE_DAYS, "{0} Days")
@@ -135,12 +141,12 @@ function Right(RealisticPrisonAndBounty_MCM mcm) global
     mcm.AddEmptyOption()
 
     mcm.AddOptionCategory("Stripping")
-    mcm.AddOptionToggle("Allow Undressing",                     mcm.UNDRESSING_DEFAULT_ALLOW)
-    mcm.AddOptionMenu("Handle Undressing On",                   mcm.UNDRESSING_DEFAULT_HANDLING_OPTION)
-    mcm.AddOptionSlider("Minimum Bounty to Undress",            mcm.UNDRESSING_DEFAULT_MIN_BOUNTY, "{0} Bounty", mcm.OPTION_DISABLED)
-    mcm.AddOptionSlider("Minimum Violent Bounty to Undress",    mcm.UNDRESSING_DEFAULT_MIN_BOUNTY, "{0} Violent Bounty", mcm.OPTION_DISABLED)
-    mcm.AddOptionSlider("Minimum Sentence to Undress",          mcm.GetOptionSliderValue("Jail::Minimum Sentence"), "{0} Days")
-    mcm.AddOptionToggle("Undress when Defeated",                mcm.UNDRESSING_DEFAULT_WHEN_DEFEATED)
+    mcm.AddOptionToggle("Allow Stripping",                     mcm.UNDRESSING_DEFAULT_ALLOW)
+    mcm.AddOptionMenu("Handle Stripping On",                   mcm.UNDRESSING_DEFAULT_HANDLING_OPTION)
+    mcm.AddOptionSlider("Minimum Bounty to Strip",            mcm.UNDRESSING_DEFAULT_MIN_BOUNTY, "{0} Bounty", mcm.OPTION_DISABLED)
+    mcm.AddOptionSlider("Minimum Violent Bounty to Strip",    mcm.UNDRESSING_DEFAULT_MIN_BOUNTY, "{0} Violent Bounty", mcm.OPTION_DISABLED)
+    mcm.AddOptionSlider("Minimum Sentence to Strip",          mcm.GetOptionSliderValue("Jail::Minimum Sentence"), "{0} Days")
+    mcm.AddOptionToggle("Strip when Defeated",                mcm.UNDRESSING_DEFAULT_WHEN_DEFEATED)
     ; mcm.AddOptionSlider("Forced Undressing (Bounty)",           mcm.UNDRESSING_DEFAULT_FORCED_MIN_BOUNTY, "{0} Bounty")
     ; mcm.AddOptionToggle("Forced Undressing when Defeated",      mcm.UNDRESSING_DEFAULT_FORCED_WHEN_DEFEATED)
     mcm.AddOptionSlider("Strip Search Thoroughness",            mcm.UNDRESSING_DEFAULT_STRIP_THOROUGHNESS, "{0}x")
@@ -219,15 +225,15 @@ function HandleDependencies(RealisticPrisonAndBounty_MCM mcm) global
     ;                          UNDRESSING
     ; ==========================================================
 
-    bool allowUndressing                = mcm.GetOptionToggleState("Stripping::Allow Undressing")
-    bool isUndressingBountyHandling     = mcm.GetOptionMenuValue("Stripping::Handle Undressing On") == "Minimum Bounty"
-    bool isUndressingSentenceHandling   = mcm.GetOptionMenuValue("Stripping::Handle Undressing On") == "Minimum Sentence"
+    bool allowUndressing                = mcm.GetOptionToggleState("Stripping::Allow Stripping")
+    bool isUndressingBountyHandling     = mcm.GetOptionMenuValue("Stripping::Handle Stripping On") == "Minimum Bounty"
+    bool isUndressingSentenceHandling   = mcm.GetOptionMenuValue("Stripping::Handle Stripping On") == "Minimum Sentence"
 
-    mcm.SetOptionDependencyBool("Stripping::Handle Undressing On",                 allowUndressing)
-    mcm.SetOptionDependencyBool("Stripping::Minimum Bounty to Undress",            allowUndressing && isUndressingBountyHandling)
-    mcm.SetOptionDependencyBool("Stripping::Minimum Violent Bounty to Undress",    allowUndressing && isUndressingBountyHandling)
-    mcm.SetOptionDependencyBool("Stripping::Minimum Sentence to Undress",          allowUndressing && isUndressingSentenceHandling)
-    mcm.SetOptionDependencyBool("Stripping::Undress when Defeated",                allowUndressing)
+    mcm.SetOptionDependencyBool("Stripping::Handle Stripping On",                 allowUndressing)
+    mcm.SetOptionDependencyBool("Stripping::Minimum Bounty to Strip",            allowUndressing && isUndressingBountyHandling)
+    mcm.SetOptionDependencyBool("Stripping::Minimum Violent Bounty to Strip",    allowUndressing && isUndressingBountyHandling)
+    mcm.SetOptionDependencyBool("Stripping::Minimum Sentence to Strip",          allowUndressing && isUndressingSentenceHandling)
+    mcm.SetOptionDependencyBool("Stripping::Strip when Defeated",                allowUndressing)
     mcm.SetOptionDependencyBool("Stripping::Undress at Cell",                      allowUndressing)
     mcm.SetOptionDependencyBool("Stripping::Undress at Chest",                     allowUndressing)
     mcm.SetOptionDependencyBool("Stripping::Forced Undressing (Bounty)",           allowUndressing)
@@ -266,7 +272,7 @@ function HandleDependencies(RealisticPrisonAndBounty_MCM mcm) global
     mcm.SetOptionDependencyBool("Additional Charges::Bounty for Cell Key",      (allowFrisking && confiscateStolenItems) || allowUndressing)
 
     ; ==========================================================
-    ;                           PRISON
+    ;                           JAIL
     ; ==========================================================
 
     bool enableFastForward = mcm.GetOptionToggleState("Jail::Fast Forward")
@@ -317,16 +323,16 @@ endFunction
 function HandleSliderOptionDependency(RealisticPrisonAndBounty_MCM mcm, string option, float value) global
 
     ; ==========================================================
-    ;                           PRISON
+    ;                           JAIL
     ; ==========================================================
     
     if (option == "Jail::Minimum Sentence")
         string formatString = "{0} Days"
-        float minimumSentenceToUndressValue = mcm.GetOptionSliderValue("Stripping::Minimum Sentence to Undress")
+        float minimumSentenceToUndressValue = mcm.GetOptionSliderValue("Stripping::Minimum Sentence to Strip")
         float maximumSentenceToClothe       = mcm.GetOptionSliderValue("Clothing::Maximum Sentence")
 
         if (minimumSentenceToUndressValue < value)
-            mcm.SetOptionSliderValue("Stripping::Minimum Sentence to Undress", value, formatString)
+            mcm.SetOptionSliderValue("Stripping::Minimum Sentence to Strip", value, formatString)
         endif
 
         if(maximumSentenceToClothe < value)
@@ -335,11 +341,11 @@ function HandleSliderOptionDependency(RealisticPrisonAndBounty_MCM mcm, string o
 
     elseif (option == "Jail::Maximum Sentence")
         string formatString = "{0} Days"
-        float minimumSentenceToUndressValue = mcm.GetOptionSliderValue("Stripping::Minimum Sentence to Undress")
+        float minimumSentenceToUndressValue = mcm.GetOptionSliderValue("Stripping::Minimum Sentence to Strip")
         float maximumSentenceToClothe       = mcm.GetOptionSliderValue("Clothing::Maximum Sentence")
 
         if (minimumSentenceToUndressValue > value)
-            mcm.SetOptionSliderValue("Stripping::Minimum Sentence to Undress", value, formatString)
+            mcm.SetOptionSliderValue("Stripping::Minimum Sentence to Strip", value, formatString)
         endif
 
         if(maximumSentenceToClothe > value)
@@ -469,11 +475,20 @@ function OnOptionHighlight(RealisticPrisonAndBounty_MCM mcm, string option) glob
         mcm.SetInfoText("The minimum number of stolen items required to have the player be strip searched.")
 
     ; ==========================================================
-    ;                           PRISON
+    ;                           JAIL
     ; ==========================================================
 
+    elseif (option == "Jail::Guaranteed Payable Bounty")
+        mcm.SetInfoText("The guaranteed amount of bounty that is payable when arriving at the jail, before considering imprisonment in " + mcm.CurrentPage + ".")
+
+    elseif (option == "Jail::Maximum Payable Bounty")
+        mcm.SetInfoText("The maximum amount of bounty that is payable when arriving at the jail, before imprisonment in "  + mcm.CurrentPage + ".")
+
+    elseif (option == "Jail::Maximum Payable Bounty (Chance)")
+        mcm.SetInfoText("The chance of being able to pay the bounty if it exceeds the guaranteed amount but is within the maximum limit.")
+
     elseif (option == "Jail::Bounty Exchange")
-        mcm.SetInfoText("The amount of violent bounty to be exchanged to normal bounty in order to determine the sentence in " + mcm.CurrentPage + ".")
+        mcm.SetInfoText("The amount of violent bounty to be exchanged to normal bounty in order to determine the jail sentence in " + mcm.CurrentPage + ".")
 
     elseif (option == "Jail::Bounty to Sentence")
         mcm.SetInfoText("Sets the relation between bounty and the sentence given in " + mcm.CurrentPage + "'s jail.")
@@ -521,48 +536,52 @@ function OnOptionHighlight(RealisticPrisonAndBounty_MCM mcm, string option) glob
         mcm.SetInfoText("Determines the cell's door lock level")
 
     ; ==========================================================
-    ;                         UNDRESSING
+    ;                         STRIPPING
     ; ==========================================================
 
-    elseif (option == "Stripping::Allow Undressing")
-        mcm.SetInfoText("Determines if you can be stripped off when imprisoned in " + mcm.CurrentPage + ".")
+    elseif (option == "Stripping::Allow Stripping")
+        mcm.SetInfoText("Determines if you can be stripped off in " + mcm.CurrentPage + "'s jail.")
 
-    elseif (option == "Stripping::Handle Undressing On")
-        mcm.SetInfoText("Determines which rules to use to know whether a strip search should take place in " + mcm.CurrentPage + ".")
+    elseif (option == "Stripping::Handle Stripping On")
+        mcm.SetInfoText("Determines which rules to use to know whether a strip search should take place in " + mcm.CurrentPage + "'s jail'.")
 
-    elseif (option == "Stripping::Minimum Bounty to Undress")
-        mcm.SetInfoText("The minimum bounty required to be undressed in " + mcm.CurrentPage + "'s jail.")
+    elseif (option == "Stripping::Minimum Bounty to Strip")
+        mcm.SetInfoText("The minimum bounty required to be stripped off in " + mcm.CurrentPage + "'s jail.")
 
-    elseif (option == "Stripping::Minimum Violent Bounty to Undress")
-        mcm.SetInfoText("The minimum violent bounty required to be undressed in " + mcm.CurrentPage + "'s jail.")
+    elseif (option == "Stripping::Minimum Violent Bounty to Strip")
+        mcm.SetInfoText("The minimum violent bounty required to be stripped off in " + mcm.CurrentPage + "'s jail.")
 
-    elseif (option == "Stripping::Minimum Sentence to Undress")
-        mcm.SetInfoText("The minimum sentence required to be undressed in " + mcm.CurrentPage + "'s jail.")
+    elseif (option == "Stripping::Minimum Sentence to Strip")
+        mcm.SetInfoText("The minimum sentence required to be stripped off in " + mcm.CurrentPage + "'s jail.")
 
-    elseif (option == "Stripping::Undress when Defeated")
-        mcm.SetInfoText("Whether to have you undressed when defeated and imprisoned in " + mcm.CurrentPage + ".")
+    elseif (option == "Stripping::Strip when Defeated")
+        mcm.SetInfoText("Whether to have you stripped off when defeated in " + mcm.CurrentPage + "'s jail.")
 
     elseif (option == "Stripping::Strip Search Thoroughness")
         mcm.SetInfoText("The thoroughness of the strip search, higher values mean a more thorough search and therefore possibly less items kept.\n" + \
                      "Due to the nature of a strip search, most items will be removed, this value will only determine small objects that could be hidden when stripped off.")
 
+    ; ==========================================================
+    ;                         CLOTHING
+    ; ==========================================================
+
     elseif (option == "Clothing::Allow Wearing Clothes")
-        mcm.SetInfoText("Determines if you are allowed to wear any clothes when imprisoned in " + mcm.CurrentPage + ".")
+        mcm.SetInfoText("Determines if you are allowed to wear any clothes in " + mcm.CurrentPage + " jail.")
 
     elseif (option == "Clothing::Handle Clothing On")
-        mcm.SetInfoText("Determines which rules to use to know whether clothes should be given in " + mcm.CurrentPage + ".")
+        mcm.SetInfoText("Determines which rules to use to know whether clothes should be given in " + mcm.CurrentPage + " jail.")
 
     elseif (option == "Clothing::When Defeated")
-        mcm.SetInfoText("Determines if you are given clothes when defeated and imprisoned in " + mcm.CurrentPage + ".")
+        mcm.SetInfoText("Determines if you are given clothes when defeated in " + mcm.CurrentPage + " jail.")
 
     elseif (option == "Clothing::Maximum Bounty")
-        mcm.SetInfoText("The maximum amount of bounty you can have in order to be given clothes when imprisoned in " + mcm.CurrentPage + ".")
+        mcm.SetInfoText("The maximum amount of bounty you can have in order to be given clothes in " + mcm.CurrentPage + " jail.")
         
     elseif (option == "Clothing::Maximum Violent Bounty")
-        mcm.SetInfoText("The maximum amount of violent bounty you can have in order to be given clothes when imprisoned in " + mcm.CurrentPage + ".")
+        mcm.SetInfoText("The maximum amount of violent bounty you can have in order to be given clothes in " + mcm.CurrentPage + " jail.")
 
     elseif (option == "Clothing::Maximum Sentence")
-        mcm.SetInfoText("The maximum sentence you can be given in order to be given clothes when imprisoned in " + mcm.CurrentPage + ".")
+        mcm.SetInfoText("The maximum sentence you can be given in order to be given clothes in " + mcm.CurrentPage + " jail.")
 
     elseif (option == "Clothing::Allow Wearing Clothes (Cidhna Mine)")
             mcm.SetInfoText("Determines if you are allowed to wear any clothes when imprisoned in Cidhna Mine.")
@@ -765,7 +784,7 @@ function LoadSliderOptions(RealisticPrisonAndBounty_MCM mcm, string option, floa
         defaultValue = mcm.FRISKING_DEFAULT_NUMBER_STOLEN_ITEMS_REQUIRED
 
     ; ==========================================================
-    ;                           PRISON
+    ;                           JAIL
     ; ==========================================================
 
     elseif (option == "Jail::Bounty Exchange")
@@ -807,18 +826,18 @@ function LoadSliderOptions(RealisticPrisonAndBounty_MCM mcm, string option, floa
         defaultValue = mcm.PRISON_DEFAULT_HANDS_BOUND_BOUNTY
 
     ; ==========================================================
-    ;                         UNDRESSING
+    ;                         STRIPPING
     ; ==========================================================
 
-    elseif (option == "Stripping::Minimum Bounty to Undress")
+    elseif (option == "Stripping::Minimum Bounty to Strip")
         intervalSteps = 100
         defaultValue = mcm.UNDRESSING_DEFAULT_MIN_BOUNTY
 
-    elseif (option == "Stripping::Minimum Violent Bounty to Undress")
+    elseif (option == "Stripping::Minimum Violent Bounty to Strip")
         intervalSteps = 10
         defaultValue = mcm.UNDRESSING_DEFAULT_MIN_BOUNTY
 
-    elseif (option == "Stripping::Minimum Sentence to Undress")
+    elseif (option == "Stripping::Minimum Sentence to Strip")
         minRange = mcm.GetOptionSliderValue("Jail::Minimum Sentence")
         maxRange = mcm.GetOptionSliderValue("Jail::Maximum Sentence")
         defaultValue = 20
@@ -970,7 +989,7 @@ function OnOptionSliderAccept(RealisticPrisonAndBounty_MCM mcm, string option, f
         formatString = "{0} Items"
 
     ; ==========================================================
-    ;                           PRISON
+    ;                           JAIL
     ; ==========================================================
     
     elseif (option == "Jail::Bounty Exchange")
@@ -1000,15 +1019,15 @@ function OnOptionSliderAccept(RealisticPrisonAndBounty_MCM mcm, string option, f
     elseif (option == "Jail::Hands Bound (Minimum Bounty)")
 
     ; ==========================================================
-    ;                         UNDRESSING
+    ;                         STRIPPING
     ; ==========================================================
 
-    elseif (option == "Stripping::Minimum Bounty to Undress")
+    elseif (option == "Stripping::Minimum Bounty to Strip")
 
-    elseif (option == "Stripping::Minimum Violent Bounty to Undress")
+    elseif (option == "Stripping::Minimum Violent Bounty to Strip")
         formatString = "{0} Violent Bounty"
 
-    elseif (option == "Stripping::Minimum Sentence to Undress")
+    elseif (option == "Stripping::Minimum Sentence to Strip")
         formatString = "{0} Days"
 
     elseif (option == "Stripping::Forced Undressing (Bounty)")
@@ -1074,7 +1093,7 @@ function OnOptionMenuOpen(RealisticPrisonAndBounty_MCM mcm, string option) globa
         mcm.SetMenuDialogOptions(mcm.PrisonSkillHandlingOptions)
         mcm.SetMenuDialogDefaultIndex(GetOptionIndexFromKey(mcm.PrisonSkillHandlingOptions, "Random"))
 
-    elseif (option == "Stripping::Handle Undressing On")
+    elseif (option == "Stripping::Handle Stripping On")
         mcm.SetMenuDialogOptions(mcm.UndressingHandlingOptions)
         mcm.SetMenuDialogDefaultIndex(GetOptionIndexFromKey(mcm.UndressingHandlingOptions, "Minimum Sentence"))
 
@@ -1095,15 +1114,15 @@ function OnOptionMenuAccept(RealisticPrisonAndBounty_MCM mcm, string option, int
             mcm.SetOptionMenuValue(option, mcm.PrisonSkillHandlingOptions[menuIndex])
         endif
 
-    elseif (option == "Stripping::Handle Undressing On")
+    elseif (option == "Stripping::Handle Stripping On")
         if (menuIndex != -1)
             mcm.SetOptionMenuValue(option, mcm.UndressingHandlingOptions[menuIndex])
 
-            bool allowUndressing = mcm.GetOptionToggleState("Stripping::Allow Undressing")
+            bool allowUndressing = mcm.GetOptionToggleState("Stripping::Allow Stripping")
 
-            mcm.SetOptionDependencyBool("Stripping::Minimum Bounty to Undress",            allowUndressing && menuIndex == GetOptionIndexFromKey(mcm.UndressingHandlingOptions, "Minimum Bounty"))
-            mcm.SetOptionDependencyBool("Stripping::Minimum Violent Bounty to Undress",    allowUndressing && menuIndex == GetOptionIndexFromKey(mcm.UndressingHandlingOptions, "Minimum Bounty"))
-            mcm.SetOptionDependencyBool("Stripping::Minimum Sentence to Undress",          allowUndressing && menuIndex == GetOptionIndexFromKey(mcm.UndressingHandlingOptions, "Minimum Sentence"))
+            mcm.SetOptionDependencyBool("Stripping::Minimum Bounty to Strip",            allowUndressing && menuIndex == GetOptionIndexFromKey(mcm.UndressingHandlingOptions, "Minimum Bounty"))
+            mcm.SetOptionDependencyBool("Stripping::Minimum Violent Bounty to Strip",    allowUndressing && menuIndex == GetOptionIndexFromKey(mcm.UndressingHandlingOptions, "Minimum Bounty"))
+            mcm.SetOptionDependencyBool("Stripping::Minimum Sentence to Strip",          allowUndressing && menuIndex == GetOptionIndexFromKey(mcm.UndressingHandlingOptions, "Minimum Sentence"))
         endif
 
     elseif (option == "Clothing::Handle Clothing On")
