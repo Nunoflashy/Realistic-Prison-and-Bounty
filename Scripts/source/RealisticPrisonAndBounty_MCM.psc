@@ -41,6 +41,7 @@ int  property ARREST_DEFAULT_MIN_BOUNTY                     = 500 autoreadonly
 int  property ARREST_DEFAULT_GUARANTEED_PAYABLE_BOUNTY      = 1500 autoreadonly
 int  property ARREST_DEFAULT_MAXIMUM_PAYABLE_BOUNTY         = 1500 autoreadonly
 int  property ARREST_DEFAULT_MAXIMUM_PAYABLE_BOUNTY_CHANCE  = 33 autoreadonly
+bool property ARREST_DEFAULT_ALWAYS_ARREST_VIOLENT_CRIMES   = true autoreadonly
 int  property ARREST_DEFAULT_BOUNTY_WHEN_RESISTING_PERCENT  = 33 autoreadonly
 int  property ARREST_DEFAULT_BOUNTY_WHEN_RESISTING_FLAT     = 200 autoreadonly
 int  property ARREST_DEFAULT_BOUNTY_WHEN_DEFEATED_PERCENT   = 33 autoreadonly
@@ -55,6 +56,7 @@ int  property ARREST_DEFAULT_UNEQUIP_FOOT_BOUNTY            = 4000 autoreadonly
 ; ==============================================================================
 ; FRISKING
 bool property FRISKING_DEFAULT_ALLOW                            = true autoreadonly
+bool property FRISKING_DEFAULT_UNCONDITIONAL                    = false autoreadonly
 int  property FRISKING_DEFAULT_MIN_BOUNTY                       = 500 autoreadonly
 int  property FRISKING_DEFAULT_GUARANTEED_PAYABLE_BOUNTY        = 1500 autoreadonly
 int  property FRISKING_DEFAULT_MAXIMUM_PAYABLE_BOUNTY           = 2000 autoreadonly
@@ -84,15 +86,16 @@ bool   property CLOTHING_DEFAULT_REDRESS_AT_CELL        = true autoreadonly
 bool   property CLOTHING_DEFAULT_REDRESS_AT_CHEST       = true autoreadonly
 string property CLOTHING_DEFAULT_PRISON_OUTFIT          = "Prisoner Outfit" autoreadonly
 ; ==============================================================================
-; PRISON
+; JAIL
 int    property PRISON_DEFAULT_TIMESCALE                    = 60 autoreadonly
 int    property PRISON_DEFAULT_BOUNTY_TO_SENTENCE           = 100 autoreadonly
 int    property PRISON_DEFAULT_MIN_SENTENCE_DAYS            = 10 autoreadonly
 int    property PRISON_DEFAULT_MAX_SENTENCE_DAYS            = 365 autoreadonly
-bool   property PRISON_DEFAULT_ALLOW_UNCONDITIONAL_PRISON   = false autoreadonly
+bool   property PRISON_DEFAULT_UNCONDITIONAL_PRISON         = false autoreadonly
 bool   property PRISON_DEFAULT_SENTENCE_PAYS_BOUNTY         = false autoreadonly
 bool   property PRISON_DEFAULT_FAST_FORWARD                 = true autoreadonly
 int    property PRISON_DEFAULT_DAY_FAST_FORWARD             = 5 autoreadonly
+string property PRISON_DEFAULT_HANDLE_SKILL_LOSS            = "Random" autoreadonly
 int    property PRISON_DEFAULT_DAY_START_LOSING_SKILLS      = 1 autoreadonly
 int    property PRISON_DEFAULT_CHANCE_START_LOSING_SKILLS   = 100 autoreadonly
 bool   property PRISON_DEFAULT_HANDS_BOUND                  = false autoreadonly
@@ -125,28 +128,8 @@ bool property BOUNTY_HUNTERS_DEFAULT_ENABLE            = true autoreadonly
 bool property BOUNTY_HUNTERS_DEFAULT_ALLOW_OUTLAWS     = true autoreadonly
 int  property BOUNTY_HUNTERS_DEFAULT_MIN_BOUNTY        = 2500 autoreadonly
 int  property BOUNTY_HUNTERS_DEFAULT_MIN_BOUNTY_GROUP  = 6000 autoreadonly
-
 ; ==============================================================================
-; Holds
-int property INDEX_WHITERUN             = 0 autoreadonly
-int property INDEX_WINTERHOLD           = 1 autoreadonly
-int property INDEX_EASTMARCH            = 2 autoreadonly
-int property INDEX_FALKREATH            = 3 autoreadonly
-int property INDEX_HAAFINGAR            = 4 autoreadonly
-int property INDEX_HJAALMARCH           = 5 autoreadonly
-int property INDEX_THE_RIFT             = 6 autoreadonly
-int property INDEX_THE_REACH            = 7 autoreadonly
-int property INDEX_THE_PALE             = 8 autoreadonly
 
-; Categories
-int property CATEGORY_ARREST            = 0 autoreadonly
-int property CATEGORY_FRISKING          = 1 autoreadonly
-int property CATEGORY_RELEASE           = 2 autoreadonly
-int property CATEGORY_BOUNTY_HUNTING    = 3 autoreadonly
-int property CATEGORY_PRISON            = 4 autoreadonly
-int property CATEGORY_UNDRESSING        = 5 autoreadonly
-int property CATEGORY_ESCAPE            = 6 autoreadonly
-int property CATEGORY_BOUNTY            = 7 autoreadonly
 ; ==============================================================================
 ; End Constants
 ; ==============================================================================
@@ -182,6 +165,7 @@ string[] property UndressingHandlingOptions
 
             JArray.addStr(_undressingHandlingOptions, "Minimum Bounty")
             JArray.addStr(_undressingHandlingOptions, "Minimum Sentence")
+            JArray.addStr(_undressingHandlingOptions, "Unconditionally")
         endif
         return JArray.asStringArray(_undressingHandlingOptions)
     endFunction
@@ -195,6 +179,7 @@ string[] property ClothingHandlingOptions
 
             JArray.addStr(_clothingHandlingOptions, "Maximum Bounty")
             JArray.addStr(_clothingHandlingOptions, "Maximum Sentence")
+            JArray.addStr(_clothingHandlingOptions, "Unconditionally")
         endif
         return JArray.asStringArray(_clothingHandlingOptions)
     endFunction
@@ -269,59 +254,6 @@ string[] property Skills
     endFunction
 endProperty
 
-string[] _holds
-
-string[] function GetHoldNames()
-    if (! _holds)
-        _holds = new string[9]
-        _holds[0] = "Whiterun"
-        _holds[1] = "Winterhold"
-        _holds[2] = "Eastmarch"
-        _holds[3] = "Falkreath"
-        _holds[4] = "Haafingar"
-        _holds[5] = "Hjaalmarch"
-        _holds[6] = "The Rift"
-        _holds[7] = "The Reach"
-        _holds[8] = "The Pale"
-        Debug("GetHoldNames", "Allocated holds string[]", IS_DEBUG)
-    endif
-
-    return _holds
-endFunction
-
-int function GetHoldCount()
-    if (! _holds)
-        Warn("GetHoldCount", "_holds has not been initialized! (cannot retrieve count)")
-        return -1
-    endif
-
-    return _holds.Length
-endFunction
-
-int property LeftPanelIndex
-    int function get()
-        return 0
-    endFunction
-endProperty
-
-int property RightPanelIndex
-    int function get()
-        return 5
-    endFunction
-endProperty
-
-int property LeftPanelSize
-    int function get()
-        return RightPanelIndex
-    endFunction
-endProperty
-
-int property RightPanelSize
-    int function get()
-        return _holds.Length
-    endFunction
-endProperty
-
 string _currentRenderedCategory
 string property CurrentRenderedCategory
     string function get()
@@ -383,14 +315,72 @@ int function GetGlobalTimescale()
     return Game.GetGameSettingInt("Timescale")
 endFunction
 
-int function GetOptionValue(string page, string optionName, int index)
+string function GetOptionFormatString(string optionName)
+    if (StringUtil.Find(optionName, "Bounty") != -1)
+        return "Bounty"
+    elseif (StringUtil.Find(optionName, "Times") != -1)
+        return "Times"
+    elseif (StringUtil.Find(optionName, "Days") != -1 || StringUtil.Find(optionName, "Sentence") != -1)
+        return "Days"
+    endif
+endFunction
+
+function IncrementStat(string hold, string statName)
+    string _key = "Stats::" + statName
+
+    int value = GetOptionStatValue(_key, hold)
+    int newValue = value + 1
+    string formatString = GetOptionFormatString(statName)
+
+    SetOptionStatValue(_key, newValue, formatString)
+    Debug("IncrementStat", "Incrementing Stat: " + statName + " Old: " + value + ", New: " + newValue + ", FormatString: " + formatString)
+endFunction
+
+function DecrementStat(string hold, string statName)
+    string _key = "Stats::" + statName
+
+    int value = GetOptionStatValue(_key, hold)
+    int newValue = value - 1
+    string formatString = GetOptionFormatString(statName)
+
+    SetOptionStatValue(_key, newValue, formatString)
+    Debug("DecrementStat", "Decrementing Stat: " + statName + " Old: " + value + ", New: " + newValue + ", FormatString: " + formatString)
+endFunction
+
+int function GetToggleOptionValue(string page, string optionName)
     float startBench = StartBenchmark()
     string _key = page + "::" + optionName
 
     int optionsArray = __getOptionsArrayAtKey(_key)  ; Array of option maps for each index
-    int _container = JArray.getObj(optionsArray, index)
+    int _container = JArray.getObj(optionsArray, 0)
     int containerKey = JIntMap.getNthKey(_container,  0)
     int containerValue = JIntMap.getInt(_container, containerKey)
+
+    EndBenchmark(startBench)
+    return containerValue
+endFunction
+
+float function GetSliderOptionValue(string page, string optionName)
+    float startBench = StartBenchmark()
+    string _key = page + "::" + optionName
+
+    int optionsArray = __getOptionsArrayAtKey(_key)  ; Array of option maps for each index
+    int _container = JArray.getObj(optionsArray, 0)
+    int containerKey = JIntMap.getNthKey(_container,  0)
+    float containerValue = JIntMap.getFlt(_container, containerKey)
+
+    EndBenchmark(startBench)
+    return containerValue
+endFunction
+
+string function GetMenuOptionValue(string page, string optionName)
+    float startBench = StartBenchmark()
+    string _key = page + "::" + optionName
+
+    int optionsArray = __getOptionsArrayAtKey(_key)  ; Array of option maps for each index
+    int _container = JArray.getObj(optionsArray, 0)
+    int containerKey = JIntMap.getNthKey(_container,  0)
+    string containerValue = JIntMap.getStr(_container, containerKey)
 
     EndBenchmark(startBench)
     return containerValue
@@ -471,6 +461,8 @@ int function AddOptionTextKey(string displayedText, string _key, string defaultV
     string optionKey            = __makeOptionKey(_key)         ; optionKey = Statistics::Whiterun::Current Bounty
     string cacheKey             = __makeCacheOptionKey(_key)    ; cacheKey = Whiterun::Current Bounty
 
+    Debug("AddOptionTextKey", "OptionKey: " + optionKey + ", CacheKey: " + cacheKey)
+
     string value                = __getStringOptionValue(optionKey)
     int flags                   = __getOptionFlag(optionKey)
     int optionId                = AddTextOption(displayedText, string_if (value == "", defaultValue, value), int_if (flags == OPTION_NOT_EXIST, defaultFlags, flags))
@@ -484,7 +476,27 @@ int function AddOptionTextKey(string displayedText, string _key, string defaultV
 endFunction
 
 int function AddOptionText(string text, string defaultValue, int defaultFlags = 0)
-    AddOptionTextKey(text, text, defaultValue, defaultFlags)
+    return AddOptionTextKey(text, text, defaultValue, defaultFlags)
+endFunction
+
+int function AddOptionStatKey(string displayedText, string _key, int defaultValue, string formatString, int defaultFlags = 0)
+    string optionKey            = __makeOptionKey(_key)         ; optionKey = Whiterun::Stats::Current Bounty
+    string cacheKey             = __makeCacheOptionKey(_key)    ; cacheKey = Stats::Current Bounty
+
+    int value       = __getIntOptionValue(optionKey)
+    int flags       = __getOptionFlag(optionKey)
+    int optionId    = AddTextOption(displayedText, int_if (value < GENERAL_ERROR, defaultValue, value) + " " + formatString, flags)
+
+    if (!__optionExists(optionKey, optionId))
+        int option = __createOptionInt(optionId, defaultValue)
+        __addOptionInternal(displayedText, optionId, optionKey, cacheKey, option, flags)
+    endif
+
+    return optionId
+endFunction
+
+int function AddOptionStat(string text, int defaultValue, string formatString, int defaultFlags = 0)
+    return AddOptionStatKey(text, text, defaultValue, formatString, defaultFlags)
 endFunction
 
 ;/
@@ -545,7 +557,7 @@ int function AddOptionMenuKey(string displayedText, string _key, string defaultV
 endFunction
 
 int function AddOptionMenu(string text, string defaultValue, int defaultFlags = 0)
-    AddOptionMenuKey(text, text, defaultValue, defaultFlags)
+    return AddOptionMenuKey(text, text, defaultValue, defaultFlags)
 endFunction
 
 
@@ -566,7 +578,7 @@ int function GetOptionFromMap(string _key)
         int _containerKey   = __getOptionKey(_container)
         int _containerValue = __getOptionValue(_container, _containerKey)
 
-        string _hold = GetHoldNames()[i]
+        string _hold = CurrentPage
 
         Trace("GetOptionFromMap", "[" + _hold + "] " + "\t[ARRAY ID: " + optionsArray + " (" + _key + ")] " + "_container id: " + _container + " (key: " + _containerKey + ", value: " + (_containerValue) + ")", ENABLE_TRACE)
 
@@ -636,6 +648,12 @@ float function GetOptionSliderValue(string option, string thePage = "")
     return __getFloatOptionValue(_key)
 endFunction
 
+int function GetOptionStatValue(string option, string thePage = "")
+    string _page = string_if (thePage == "", CurrentPage, thePage)
+    string _key = __makeOptionKeyFromPage(_page, option, includeCurrentCategory = false)
+    return __getIntOptionValue(_key)
+endFunction
+
 string function GetOptionMenuValue(string option, string thePage = "")
     string _page = string_if (thePage == "", CurrentPage, thePage)
     string _key = __makeOptionKeyFromPage(_page, option, includeCurrentCategory = false)
@@ -665,6 +683,19 @@ function SetOptionSliderValue(string option, float value, string formatString = 
     __setFloatOptionValue(_key, value)
 
     Debug("SetOptionSliderValue", "Set new value of " + value + " for " + _key + " (option_id: " + optionId + ")")
+endFunction
+
+function SetOptionStatValue(string option, int value, string formatString = "{0}")
+    string _key = CurrentPage + "::" + option
+    int optionId = GetOption(option)
+
+    ; Change the value of the text option
+    SetTextOptionValue(optionId, value + " " + formatString)
+
+    ; Store the value
+    __setIntOptionValue(_key, value)
+
+    Debug("SetOptionStatValue", "Set new value of " + value + " for " + _key + " (option_id: " + optionId + ")")
 endFunction
 
 function SetOptionMenuValue(string option, string value)
@@ -702,27 +733,27 @@ string function GetKeyFromOption(int optionId)
     EndBenchmark(s)
 endFunction
 
-function ListOptionMap()
-    string[] keys = JMap.allKeysPArray(optionsMap)
+; function ListOptionMap()
+;     string[] keys = JMap.allKeysPArray(optionsMap)
 
-    int keyIndex = 0
-    while (keyIndex < keys.Length)
-        string _key = keys[keyIndex]
-        int _keyArray = JMap.getObj(optionsMap, _key)
+;     int keyIndex = 0
+;     while (keyIndex < keys.Length)
+;         string _key = keys[keyIndex]
+;         int _keyArray = JMap.getObj(optionsMap, _key)
         
-        int arrayIndex = 0
-        while (arrayIndex < JArray.count(_keyArray))
-            int _optionContainer = JArray.getObj(_keyArray, arrayIndex)
-            int _optionKey       = JIntMap.getNthKey(_optionContainer, 0)
-            int _optionValue     = JIntMap.getInt(_optionContainer, _optionKey)
+;         int arrayIndex = 0
+;         while (arrayIndex < JArray.count(_keyArray))
+;             int _optionContainer = JArray.getObj(_keyArray, arrayIndex)
+;             int _optionKey       = JIntMap.getNthKey(_optionContainer, 0)
+;             int _optionValue     = JIntMap.getInt(_optionContainer, _optionKey)
 
-            string _hold = GetHoldNames()[arrayIndex]
-            Info("GetOptionFromMap", "[" + _hold + "] " + "\t[ARRAY ID: " + _keyArray + " (" + _key + ")] " + "container id: " + _optionContainer + " (key: " + _optionKey + ", value: " + (_optionValue) + ")", IS_DEBUG)
-            arrayIndex += 1
-        endWhile
-        keyIndex += 1
-    endWhile
-endFunction
+;             string _hold = GetHoldNames()[arrayIndex]
+;             Info("GetOptionFromMap", "[" + _hold + "] " + "\t[ARRAY ID: " + _keyArray + " (" + _key + ")] " + "container id: " + _optionContainer + " (key: " + _optionKey + ", value: " + (_optionValue) + ")", IS_DEBUG)
+;             arrayIndex += 1
+;         endWhile
+;         keyIndex += 1
+;     endWhile
+; endFunction
 
 ; Event Handling
 ; ============================================================================
@@ -971,6 +1002,28 @@ string function __getStringOptionValue(string _key)
     Trace("__getStringOptionValue", "[" + _key + "] OptionID: " + _containerKey + ", Value: " + _containerValue)
     return _containerValue
 endFunction 
+
+;/
+    Sets an option's value (int-based options only) in storage.
+
+    string      @_key: The option's key.
+    int       @value: The new value for this option
+/;
+function __setIntOptionValue(string _key, int value)
+    int _array = __getOptionsArrayAtKey(_key)
+    if (_array == ARRAY_NOT_EXIST)
+        return ; Array does not exist
+    endif
+
+    int _container = JArray.getObj(_array, 0)
+
+    if (_container == 0)
+        return ; Option does not exist
+    endif
+
+    int _containerKey = JIntMap.getNthKey(_container, 0)
+    JIntMap.setFlt(_container, _containerKey, value)
+endFunction
 
 ;/
     Sets an option's value (float-based options only) in storage.
