@@ -66,7 +66,7 @@ int  property FRISKING_DEFAULT_CONFISCATE_ITEMS                 = 3000 autoreado
 bool property FRISKING_DEFAULT_STRIP_IF_STOLEN_FOUND            = true autoreadonly
 int  property FRISKING_DEFAULT_NUMBER_STOLEN_ITEMS_REQUIRED     = 10 autoreadonly
 ; ==============================================================================
-; UNDRESSING
+; STRIPPING
 bool    property UNDRESSING_DEFAULT_ALLOW                  = true autoreadonly
 string  property UNDRESSING_DEFAULT_HANDLING_OPTION        = "Minimum Sentence" autoreadonly
 int     property UNDRESSING_DEFAULT_MIN_BOUNTY             = 1500 autoreadonly
@@ -315,7 +315,7 @@ int function GetGlobalTimescale()
     return Game.GetGameSettingInt("Timescale")
 endFunction
 
-string function GetOptionFormatString(string optionName)
+string function __getStatOptionFormatString(string optionName)
     if (StringUtil.Find(optionName, "Bounty") != -1)
         return "Bounty"
     elseif (StringUtil.Find(optionName, "Times") != -1)
@@ -330,7 +330,7 @@ function IncrementStat(string hold, string statName)
 
     int value = GetOptionStatValue(_key, hold)
     int newValue = value + 1
-    string formatString = GetOptionFormatString(statName)
+    string formatString = __getStatOptionFormatString(statName)
 
     SetOptionStatValue(_key, newValue, formatString)
     Debug("IncrementStat", "Incrementing Stat: " + statName + " Old: " + value + ", New: " + newValue + ", FormatString: " + formatString)
@@ -341,7 +341,7 @@ function DecrementStat(string hold, string statName)
 
     int value = GetOptionStatValue(_key, hold)
     int newValue = value - 1
-    string formatString = GetOptionFormatString(statName)
+    string formatString = __getStatOptionFormatString(statName)
 
     SetOptionStatValue(_key, newValue, formatString)
     Debug("DecrementStat", "Decrementing Stat: " + statName + " Old: " + value + ", New: " + newValue + ", FormatString: " + formatString)
@@ -805,11 +805,6 @@ event OnOptionMenuAccept(int option, int index)
     RealisticPrisonAndBounty_MCM_General.OnMenuAccept(self, option, index)
 endEvent
 
-
-; ============================================================================
-;                                   private
-; ============================================================================
-
 ; ============================================================================
 ;                               Logging Functions
 
@@ -833,6 +828,9 @@ function Error(string caller, string logInfo, bool condition = true)
     RealisticPrisonAndBounty_Util.Error(self, CurrentPage + "::" + caller, logInfo, condition)
 endFunction
 
+; ============================================================================
+;                                   private
+; ============================================================================
 ; ============================================================================
 ;                               Option Functions
 ;/
