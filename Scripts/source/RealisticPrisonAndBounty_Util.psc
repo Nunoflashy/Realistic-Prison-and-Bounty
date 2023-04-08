@@ -291,6 +291,14 @@ bool function IsWithin(int aiValue, int aiMin, int aiMax, bool abMinInclusive = 
     ;return (aiChance >= aiMin && aiChance <= aiMax)
 endfunction
 
+float function Max(float a, float b) global
+    if (a > b)
+        return a
+    else
+        return b
+    endif
+endFunction
+
 ;/
     Caps the value of a variable
 
@@ -467,6 +475,72 @@ function UnwearItemIf(Actor akActor, Form akItem, bool condition, int count = 1,
         UnwearItem(akActor, akItem, count, forced, silent)
     endif
 endfunction
+
+int function GetSlotMask(string bodyPart) global
+    int kSlotMask30 = 0x00000001 ; HEAD
+    int kSlotMask31 = 0x00000002 ; Hair
+    int kSlotMask32 = 0x00000004 ; BODY
+    int kSlotMask33 = 0x00000008 ; Hands
+    int kSlotMask34 = 0x00000010 ; Forearms
+    int kSlotMask35 = 0x00000020 ; Amulet
+    int kSlotMask36 = 0x00000040 ; Ring
+    int kSlotMask37 = 0x00000080 ; Feet
+    int kSlotMask38 = 0x00000100 ; Calves
+    int kSlotMask39 = 0x00000200 ; SHIELD
+    int kSlotMask40 = 0x00000400 ; TAIL
+    int kSlotMask41 = 0x00000800 ; LongHair
+    int kSlotMask42 = 0x00001000 ; Circlet
+    int kSlotMask43 = 0x00002000 ; Ears
+
+    if (bodyPart == "Head")
+        return kSlotMask30
+    elseif (bodyPart == "Hair")
+        return kSlotMask31
+    elseif (bodyPart == "Body")
+        return kSlotMask32
+    elseif (bodyPart == "Hands")
+        return kSlotMask33
+    elseif (bodyPart == "Forearms")
+        return kSlotMask34
+    elseif (bodyPart == "Amulet")
+        return kSlotMask35
+    elseif (bodyPart == "Ring")
+        return kSlotMask36
+    elseif (bodyPart == "Feet")
+        return kSlotMask37
+    elseif (bodyPart == "Calves")
+        return kSlotMask38
+    elseif (bodyPart == "Shield")
+        return kSlotMask39
+    elseif (bodyPart == "Tail")
+        return kSlotMask40
+    elseif (bodyPart == "LongHair")
+        return kSlotMask41
+    elseif (bodyPart == "Circlet")
+        return kSlotMask42
+    elseif (bodyPart == "Ears")
+        return kSlotMask43
+    endif
+
+endFunction
+
+int function GetSlotMaskValue(int slotMask) global
+    ; int slotMaskMap = JIntMap.object()
+
+    int currentSlotMask = 30
+    int slotMaskValue = 0x00000001
+    while (currentSlotMask <= 61)
+        ; JIntMap.setInt(slotMaskMap, currentSlotMask, slotMaskValue)
+        if (slotMask == currentSlotMask)
+            return slotMaskValue
+            ; return JIntMap.getInt(slotMaskMap, slotMask)
+        endif
+        currentSlotMask += 1
+        slotMaskValue *= 2 ; Get next slot mask by doubling the value
+    endWhile
+
+    return -1
+endFunction
 
 string function TrimString(string source) global
     string[] split = PapyrusUtil.StringSplit(source, " ")
