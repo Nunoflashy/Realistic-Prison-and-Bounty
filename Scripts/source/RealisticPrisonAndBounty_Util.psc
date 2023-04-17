@@ -56,35 +56,7 @@ string function __getLogLevel(int _level) global
     elseif (_level == LOG_FATAL())
         return "FATAL:"
     endif
-
-    ; return \ 
-    ;     string_if(_level == LOG_NOTYPE(), "", \
-    ;     string_if(_level == LOG_TRACE(), "trace:", \
-    ;     string_if(_level == LOG_DEBUG(), "debug:", \
-    ;     string_if(_level == LOG_INFO(), "info:", \
-    ;     string_if(_level == LOG_WARN(), "warn:", \
-    ;     string_if(_level == LOG_ERROR(), "error:", \
-    ;     string_if(_level == LOG_FATAL(), "fatal:")))))))
 endFunction
-
-; string function __getLogLevel(int _level) global
-;     if (_level == LOG_NOTYPE())
-;         return ""
-;     elseif (_level == LOG_TRACE())
-;         return "trace:"
-;     elseif (_level == LOG_DEBUG())
-;         return "debug:"
-;     elseif (_level == LOG_INFO())
-;         return "info:"
-;     elseif (_level == LOG_WARN())
-;         return "warn:"
-;     elseif (_level == LOG_ERROR())
-;         return "error:"
-;     elseif (_level == LOG_FATAL())
-;         return "fatal:"
-;     endif
-; endFunction
-
 
 function local_log(string caller, string logInfo, int logLevel = 0, bool hideCall = false) global
     string _scriptName = ModName()
@@ -435,6 +407,10 @@ bool function call_if(bool condition, string _if, string _else = "")
     GotoState(functionToCall)
     return calledSuccessfully
 endfunction
+
+float function ToPercent(float percentToConvertToDecimal) global
+    return percentToConvertToDecimal / 100
+endFunction
 
 ;/
     Item Functions

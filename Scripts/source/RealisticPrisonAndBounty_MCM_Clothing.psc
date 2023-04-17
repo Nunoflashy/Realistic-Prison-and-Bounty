@@ -155,7 +155,7 @@ function LoadSliderOptions(RealisticPrisonAndBounty_MCM mcm, string option, floa
     float minRange = 0
     float maxRange = 100
     float intervalSteps = 1
-    float defaultValue = 0.0
+    float defaultValue = mcm.__getFloatOptionDefault(option)
 
     ; ==========================================================
     ;                          ITEM SLOTS
@@ -164,12 +164,10 @@ function LoadSliderOptions(RealisticPrisonAndBounty_MCM mcm, string option, floa
     if (option == "Item Slots::Underwear (Top)")
         minRange = 44
         maxRange = 61
-        defaultValue = mcm.__getFloatOptionDefault(option)
 
     elseif (option == "Item Slots::Underwear (Bottom)")
         minRange = 44
         maxRange = 61
-        defaultValue = mcm.__getFloatOptionDefault(option)
 
     ; ==========================================================
     ;                          OUTFITS
@@ -210,7 +208,7 @@ function OnOptionHighlight(RealisticPrisonAndBounty_MCM mcm, string option) glob
     elseif (option == "Configuration::UnderwearModInstalled")
         mcm.SetInfoText("Determines if you have a wearable underwear mod, that is, any mod that is capable of having the Player as well as the NPC's wear underwear.\n" + \
             "Check this if you have a wearable underwear mod installed, the underwear must be an equipable piece of clothing.\n" + \
-            "The mod will take this option into consideration when stripped off in jail. " + \ 
+            "The mod will take this option into consideration when being stripped off in jail. " + \ 
             "For the best immersion, do not check this if you don't have a wearable underwear mod.")
 
     ; ==========================================================

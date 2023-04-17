@@ -23,8 +23,8 @@ function Left(RealisticPrisonAndBounty_MCM mcm) global
     mcm.AddOptionCategory("General")
     mcm.AddOptionSlider("Update Interval", "{0} Hours")
     mcm.AddOptionSlider("Bounty Decay (Update Interval)", "{0} Hours")
+    mcm.AddOptionSlider("Infamy Decay (Update Interval)", "{0} Days")
 
-    mcm.AddEmptyOption()
     mcm.AddEmptyOption()
     mcm.AddEmptyOption()
     mcm.AddTextOption("", "WHEN FREE", mcm.OPTION_DISABLED)
@@ -108,6 +108,9 @@ function OnOptionHighlight(RealisticPrisonAndBounty_MCM mcm, string option) glob
     
     elseif (option == "General::Bounty Decay (Update Interval)")
         mcm.SetInfoText("Sets the time between updates in in-game hours for when the bounty should decay for all holds.")
+
+    elseif (option == "General::Infamy Decay (Update Interval)")
+        mcm.SetInfoText("Sets the time between updates in in-game days for when infamy should be lost over time for all holds that have it enabled.")
     endif
  
     mcm.Debug("OnOptionHighlight", option + ", find: " + StringUtil.Find(option, "Deleveling") + ", optionName: " + optionName)
@@ -127,7 +130,7 @@ function LoadSliderOptions(RealisticPrisonAndBounty_MCM mcm, string option, floa
     float minRange = 1
     float maxRange = 100
     float intervalSteps = 1
-    float defaultValue = 0.0
+    float defaultValue = mcm.__getFloatOptionDefault(option)
 
     ; ==========================================================
     ;                     GENERAL / DELEVELING
@@ -140,47 +143,48 @@ function LoadSliderOptions(RealisticPrisonAndBounty_MCM mcm, string option, floa
     elseif (option == "General::Bounty Decay (Update Interval)")
         minRange = 1
         maxRange = 96 ; 4d
-        defaultValue = mcm.__getFloatOptionDefault(option)
+
+    elseif (option == "General::Infamy Decay (Update Interval)")
+        minRange = 1
+        maxRange = 30
 
     elseif (option == "Outfit::Item Slot: Underwear (Top)")
         minRange = 0
         maxRange = 100
-        defaultValue = mcm.__getFloatOptionDefault(option)
 
     elseif (option == "Outfit::Item Slot: Underwear (Bottom)")
         minRange = 0
         maxRange = 100
-        defaultValue = mcm.__getFloatOptionDefault(option)
+
+    elseif (option == "Bounty for Actions::Trespassing")
+        minRange = 10
+        maxRange = 10000
+        intervalSteps = 10
 
     elseif (option == "Bounty for Actions::Assault")
         minRange = 10
         maxRange = 10000
         intervalSteps = 10
-        defaultValue = mcm.__getFloatOptionDefault(option)
 
     elseif (option == "Bounty for Actions::Theft")
         minRange = 0.1
         maxRange = 10
         intervalSteps = 0.1
-        defaultValue = mcm.__getFloatOptionDefault(option)
 
     elseif (option == "Bounty for Actions::Pickpocketing")
         minRange = 10
         maxRange = 10000
         intervalSteps = 10
-        defaultValue = mcm.__getFloatOptionDefault(option)
 
     elseif (option == "Bounty for Actions::Lockpicking")
         minRange = 10
         maxRange = 10000
         intervalSteps = 10
-        defaultValue = mcm.__getFloatOptionDefault(option)
 
     elseif (option == "Bounty for Actions::Disturbing the Peace")
         minRange = 10
         maxRange = 10000
         intervalSteps = 10
-        defaultValue = mcm.__getFloatOptionDefault(option)
 
     elseif (StringUtil.Find(option, "Deleveling") != -1)
         intervalSteps = 1
@@ -211,6 +215,9 @@ function OnOptionSliderAccept(RealisticPrisonAndBounty_MCM mcm, string option, f
 
     elseif (option == "General::Bounty Decay (Update Interval)")
         formatString = "{0} Hours"
+
+    elseif (option == "General::Infamy Decay (Update Interval)")
+        formatString = "{0} Days"
 
     elseif (option == "Outfit::Item Slot: Underwear (Top)")
         formatString = "Slot {0}"

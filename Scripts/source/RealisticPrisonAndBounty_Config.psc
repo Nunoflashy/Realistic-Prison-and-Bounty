@@ -2,15 +2,40 @@ Scriptname RealisticPrisonAndBounty_Config extends Quest
 
 import RealisticPrisonAndBounty_Util
 import PO3_SKSEFunctions
+import Math
 
 
 string function GetPluginName() global
     return "RealisticPrisonAndBounty.esp"
 endFunction
 
+Form function GetFormFromMod(int formId) global
+    return Game.GetFormFromFile(formId, GetPluginName())
+endFunction
+
 RealisticPrisonAndBounty_MCM property mcm
     RealisticPrisonAndBounty_MCM function get()
         return Game.GetFormFromFile(0x0D61, GetPluginName()) as RealisticPrisonAndBounty_MCM
+    endFunction
+endProperty
+
+string[] property Holds
+    string[] function get()
+        int _holds = JArray.object()
+        
+        if (JArray.count(_holds) == 0)
+            JArray.addStr(_holds, "Whiterun")
+            JArray.addStr(_holds, "Winterhold")
+            JArray.addStr(_holds, "Eastmarch")
+            JArray.addStr(_holds, "Falkreath")
+            JArray.addStr(_holds, "Haafingar")
+            JArray.addStr(_holds, "Hjaalmarch")
+            JArray.addStr(_holds, "The Rift")
+            JArray.addStr(_holds, "The Reach")
+            JArray.addStr(_holds, "The Pale")
+        endif
+
+        return JArray.asStringArray(_holds)
     endFunction
 endProperty
 
@@ -20,8 +45,18 @@ Actor property Player
     endFunction
 endProperty
 
+; Map with all variables needed to process the player when in jail
+int jailVars
+; __setJailVar("hold", "Haafingar")
+; __setJailVar("", 1)
+; __setJailVar("jailCellIndex", 1)
+; __setJailVar("minSentence", 40)
+; __setJailVar("maxSentence", 200)
+; __setJailVar("arrestBounty", 6000)
+; __setJailVar("sentence", 40)
+
 int factionMap
-function InitializeFactions()
+function __initializeFactionsMapping()
     factionMap = JMap.object()
     JValue.retain(factionMap)
 
@@ -40,7 +75,206 @@ function InitializeFactions()
     mcm.Debug("InitializeFactions", "Factions were initialized.")
 endFunction
 
-Faction function GetFaction(string factionName)
+int jailMarkersMap
+function __initializeJailMarkersMapping()
+    jailMarkersMap = JMap.object()
+    JValue.retain(jailMarkersMap)
+
+    int whiterunMarkers = JArray.object()
+    JArray.addForm(whiterunMarkers, GetFormFromMod(0x3885)) ; Jail Cell 01
+    JArray.addForm(whiterunMarkers, GetFormFromMod(0x3886)) ; Jail Cell 02
+    JArray.addForm(whiterunMarkers, GetFormFromMod(0x3887)) ; Jail Cell 03
+    JArray.addForm(whiterunMarkers, GetFormFromMod(0x3888)) ; Jail Cell 04 (Alik'r Cell)
+
+    ; missing Winterhold markers
+
+    int windhelmMarkers = JArray.object()
+    JArray.addForm(windhelmMarkers, Game.GetForm(0x58CF8)) ; Jail Cell 01
+    JArray.addForm(windhelmMarkers, GetFormFromMod(0x388A)) ; Jail Cell 02
+    JArray.addForm(windhelmMarkers, GetFormFromMod(0x388B)) ; Jail Cell 03
+    JArray.addForm(windhelmMarkers, GetFormFromMod(0x388C)) ; Jail Cell 04
+
+    int falkreathMarkers = JArray.object()
+    JArray.addForm(falkreathMarkers, Game.GetForm(0x3EF07)) ; Jail Cell 01
+
+    int solitudeMarkers = JArray.object()
+    JArray.addForm(solitudeMarkers, Game.GetForm(0x36897)) ; Jail Cell 01 (Original)
+    JArray.addForm(solitudeMarkers, GetFormFromMod(0x3880)) ; Jail Cell 02
+    JArray.addForm(solitudeMarkers, GetFormFromMod(0x3879)) ; Jail Cell 03
+    JArray.addForm(solitudeMarkers, GetFormFromMod(0x3881)) ; Jail Cell 04
+    JArray.addForm(solitudeMarkers, GetFormFromMod(0x3882)) ; Jail Cell 05
+    JArray.addForm(solitudeMarkers, GetFormFromMod(0x3883)) ; Jail Cell 06
+    JArray.addForm(solitudeMarkers, GetFormFromMod(0x3884)) ; Jail Cell 07 (Bjartur Cell)
+
+    int morthalMarkers = JArray.object()
+    JArray.addForm(morthalMarkers, Game.GetForm(0x3EF08)) ; Jail Cell 01
+
+    ; missing The Reach markers (Markarth)
+
+    int riftenMarkers = JArray.object()
+    JArray.addForm(riftenMarkers, Game.GetForm(0x6128D)) ; Jail Cell 01 (Original)
+    JArray.addForm(riftenMarkers, GetFormFromMod(0x388D)) ; Jail Cell 02
+    JArray.addForm(riftenMarkers, GetFormFromMod(0x388E)) ; Jail Cell 03
+    ; JArray.addForm(riftenMarkers, GetFormFromMod(0x388F)) ; Jail Cell 04 (Sibbi's Cell [RESERVED])
+    JArray.addForm(riftenMarkers, GetFormFromMod(0x3890)) ; Jail Cell 05
+    JArray.addForm(riftenMarkers, GetFormFromMod(0x3893)) ; Jail Cell 06
+    JArray.addForm(riftenMarkers, GetFormFromMod(0x3894)) ; Jail Cell 07
+    JArray.addForm(riftenMarkers, GetFormFromMod(0x3895)) ; Jail Cell 08
+
+    int dawnstarMarkers = JArray.object()
+    JArray.addForm(dawnstarMarkers, Game.GetForm(0x3896)) ; Jail Cell 01
+
+    JMap.setObj(jailMarkersMap, "Whiterun", whiterunMarkers)
+    ; JMap.setObj(jailMarkersMap, "Winterhold", solitudeMarkers)
+    JMap.setObj(jailMarkersMap, "Eastmarch", windhelmMarkers)
+    JMap.setObj(jailMarkersMap, "Falkreath", falkreathMarkers)
+    JMap.setObj(jailMarkersMap, "Haafingar", solitudeMarkers)
+    JMap.setObj(jailMarkersMap, "Hjaalmarch", morthalMarkers)
+    JMap.setObj(jailMarkersMap, "The Rift", riftenMarkers)
+    ; JMap.setObj(jailMarkersMap, "The Reach", solitudeMarkers)
+    JMap.setObj(jailMarkersMap, "The Pale", dawnstarMarkers)
+endFunction
+
+int locationsToHoldMap
+function __initializeLocationsMapping()
+    locationsToHoldMap = JMap.object()
+    JValue.retain(locationsToHoldMap)
+
+    int whiterunLocations = JArray.object() ; Whiterun
+    JArray.addForm(whiterunLocations, Game.GetForm(0x00018A56)) ; WhiterunLocation
+    JArray.addForm(whiterunLocations, Game.GetForm(0x00016772)) ; WhiterunHoldLocation
+
+    int winterholdLocations = JArray.object() ; Winterhold
+    JArray.addForm(winterholdLocations, Game.GetForm(0x00018A51)) ; WinterholdLocation
+    JArray.addForm(winterholdLocations, Game.GetForm(0x0001676B)) ; WinterholdHoldLocation
+
+    int eastmarchLocations = JArray.object() ; Windhelm
+    JArray.addForm(eastmarchLocations, Game.GetForm(0x00018A57)) ; WindhelmLocation
+    JArray.addForm(eastmarchLocations, Game.GetForm(0x0001676A)) ; EastmarchHoldLocation
+
+    int falkreathLocations = JArray.object() ; Falkreath
+    JArray.addForm(falkreathLocations, Game.GetForm(0x00018A49)) ; FalkreathLocation
+    JArray.addForm(falkreathLocations, Game.GetForm(0x0001676F)) ; FalkreathHoldLocation
+
+    int haafingarLocations = JArray.object() ; Solitude
+    JArray.addForm(haafingarLocations, Game.GetForm(0x00018A5A)) ; SolitudeLocation
+    JArray.addForm(haafingarLocations, Game.GetForm(0x00016770)) ; HaafingarHoldLocation
+
+    int hjaalmarchLocations = JArray.object() ; Morthal
+    JArray.addForm(hjaalmarchLocations, Game.GetForm(0x00018A53)) ; MorthalLocation
+    JArray.addForm(hjaalmarchLocations, Game.GetForm(0x0001676E)) ; HjaalmarchHoldLocation
+
+    int riftLocations = JArray.object() ; Riften
+    JArray.addForm(riftLocations, Game.GetForm(0x00018A58)) ; RiftenLocation
+    JArray.addForm(riftLocations, Game.GetForm(0x0001676C)) ; RiftHoldLocation 
+
+    int reachLocations = JArray.object() ; Markarth
+    JArray.addForm(reachLocations, Game.GetForm(0x00018A59)) ; MarkarthLocation 
+    JArray.addForm(reachLocations, Game.GetForm(0x00016769)) ; ReachHoldLocation 
+
+    int paleLocations = JArray.object() ; Dawnstar
+    JArray.addForm(paleLocations, Game.GetForm(0x00018A50)) ; DawnstarLocation 
+    JArray.addForm(paleLocations, Game.GetForm(0x0001676D)) ; PaleHoldLocation
+
+    JMap.setObj(locationsToHoldMap, "Whiterun", whiterunLocations)
+    JMap.setObj(locationsToHoldMap, "Winterhold", winterholdLocations)
+    JMap.setObj(locationsToHoldMap, "Eastmarch", eastmarchLocations)
+    JMap.setObj(locationsToHoldMap, "Falkreath", falkreathLocations)
+    JMap.setObj(locationsToHoldMap, "Haafingar", haafingarLocations)
+    JMap.setObj(locationsToHoldMap, "Hjaalmarch", hjaalmarchLocations)
+    JMap.setObj(locationsToHoldMap, "The Rift", riftLocations)
+    JMap.setObj(locationsToHoldMap, "The Reach", reachLocations)
+    JMap.setObj(locationsToHoldMap, "The Pale", paleLocations)
+endFunction
+
+bool function IsInLocationFromHold(string hold)
+    if (!JMap.hasKey(locationsToHoldMap, hold))
+        Warn(none, "IsInLocationFromHold", "Location does not exist for this hold.")
+        return false
+    endif
+
+    int holdArray = JMap.getObj(locationsToHoldMap, hold) ; Form[]
+
+    int i = 0
+    while (i < JArray.count(holdArray))
+        Location holdLocation = JArray.getForm(holdArray, i) as Location
+        ; As soon as the player is in any location for this hold, return.
+        if (Player.IsInLocation(holdLocation))
+            Debug(none, "IsInLocationFromHold", "Player is in location: " + holdLocation.GetName() + " ("+ holdLocation.GetFormID() +")", mcm.IS_DEBUG)
+            return true
+        endif
+        i += 1
+    endWhile
+
+    return false
+endFunction
+
+string function GetCurrentPlayerHoldLocation()
+    int holdIndex = 0
+    while (holdIndex < Holds.Length)
+        int holdArray = JMap.getObj(locationsToHoldMap, Holds[holdIndex]) ; Form[]
+
+        int locationIndex = 0
+        while (locationIndex < JArray.count(holdArray))
+            Location holdLocation = JArray.getForm(holdArray, locationIndex) as Location
+            if (Player.IsInLocation(holdLocation))
+                Debug(none, "IsInLocationFromHold", "Player is currently in hold: " + Holds[holdIndex])
+                return Holds[holdIndex]
+            endif
+            locationIndex += 1
+        endWhile
+
+        holdIndex += 1
+    endWhile
+
+    return ""
+endFunction
+
+string function GetCityNameFromHold(string hold)
+    int holdToCityMap = JMap.object()
+
+    JMap.setStr(holdToCityMap, "Whiterun", "Whiterun")
+    JMap.setStr(holdToCityMap, "Winterhold", "Winterhold")
+    JMap.setStr(holdToCityMap, "Eastmarch", "Windhelm")
+    JMap.setStr(holdToCityMap, "Falkreath", "Falkreath")
+    JMap.setStr(holdToCityMap, "Haafingar", "Solitude")
+    JMap.setStr(holdToCityMap, "Hjaalmarch", "Morthal")
+    JMap.setStr(holdToCityMap, "The Rift", "Riften")
+    JMap.setStr(holdToCityMap, "The Reach", "Markarth")
+    JMap.setStr(holdToCityMap, "The Pale", "Dawnstar")
+
+    return JMap.getStr(holdToCityMap, hold)
+endFunction
+
+string function GetHoldNameFromCity(string city)
+endFunction
+
+Form[] function GetJailMarkers(string hold)
+    if (!JMap.hasKey(jailMarkersMap, hold))
+        mcm.Error("Config::getJailMakers", "The marker does not exist!")
+        return none
+    endif
+
+    int holdJailMarkerArray = JMap.getObj(jailMarkersMap, hold)
+    return JArray.asFormArray(holdJailMarkerArray)
+endFunction
+
+; To be refactored into the Jail or Imprisoned script
+ObjectReference function getRandomJailMarker(string hold)
+    Form[] markers = GetJailMarkers(hold)
+    if (!markers)
+        mcm.Error("Config::getJailMakers", "The markers do not exist!")
+        return none
+    endif
+
+    int len = markers.length
+    int markerIndex = Utility.RandomInt(0, len - 1)
+
+    mcm.Debug("Config::getRandomJailMarker", "Got the " + markerIndex + " marker for " + hold + "!")
+    return markers[markerIndex] as ObjectReference
+endFunction
+
+Faction function getFaction(string factionName)
     if (JMap.hasKey(factionMap, factionName))
         return JMap.getForm(factionMap, factionName) as Faction
     endif
@@ -49,7 +283,34 @@ Faction function GetFaction(string factionName)
 endFunction
 
 event OnInit()
-    InitializeFactions()
+    __initializeFactionsMapping()
+    __initializeJailMarkersMapping()
+    __initializeLocationsMapping()
+
+    RegisterForKey(0x58) ; F12
+endEvent
+
+event OnKeyDown(int keyCode)
+    if (keyCode == 0x58)
+        int playerItemsValue = 0
+        int i = 0
+        while (i < Player.GetNumItems())
+            Form item = Player.GetNthForm(i)
+            int itemCount = Player.GetItemCount(item)
+            playerItemsValue += item.GetGoldValue() * itemCount
+            Debug(self, "OnKeyDown", "Item: " + item.GetName() + ", Value: " + item.GetGoldValue() + ", Count: " + itemCount)
+            i += 1
+        endWhile
+        int bountyChargeStolenItems = getAdditionalCharge("The Rift", "Bounty for Stolen Items") as int
+        float bountyChargePerItem = ToPercent(getAdditionalCharge("The Rift", "Bounty for Stolen Item"))
+        int bountyToAdd = floor((playerItemsValue * bountyChargePerItem) + bountyChargeStolenItems)
+        Debug(self, "OnKeyDown", "playerItemsValue * bountyChargePerItem: " + playerItemsValue * bountyChargePerItem + ", Player Items: " + Player.GetNumItems())
+        Debug(self, "OnKeyDown", "Bounty Charge Stolen Items: " + bountyChargeStolenItems + ", Bounty Charge Per Item: " + bountyChargePerItem + ", Total Charge: " + bountyToAdd)
+
+        notifyBounty("The Rift", bountyToAdd)
+    endif
+
+    Debug(self, "OnKeyDown", "Key Pressed: " + keyCode)
 endEvent
 
 function IncrementStat(string hold, string stat)
@@ -58,6 +319,162 @@ endFunction
 
 function DecrementStat(string hold, string stat)
     mcm.DecrementStat(hold, stat)
+endFunction
+
+int property FreeTimescale
+    int function get()
+        return mcm.GetSliderOptionValue("General", "General::Timescale") as int
+    endFunction
+endProperty
+
+int property JailedTimescale
+    int function get()
+        return mcm.GetSliderOptionValue("General", "General::TimescalePrison") as int
+    endFunction
+endProperty
+
+float property BountyDecayUpdateInterval
+    float function get()
+        return mcm.GetSliderOptionValue("General", "General::Bounty Decay (Update Interval)")
+    endFunction
+endProperty
+
+float property InfamyDecayUpdateInterval
+    float function get()
+        return mcm.GetSliderOptionValue("General", "General::Infamy Decay (Update Interval)")
+    endFunction
+endProperty
+
+bool property ShouldDisplayArrestNotifications
+    bool function get()
+        return mcm.GetToggleOptionValue("General", "General::ArrestNotifications")
+    endFunction
+endProperty
+
+bool property ShouldDisplayJailNotifications
+    bool function get()
+        return mcm.GetToggleOptionValue("General", "General::JailedNotifications")
+    endFunction
+endProperty
+
+bool property ShouldDisplayBountyDecayNotifications
+    bool function get()
+        return mcm.GetToggleOptionValue("General", "General::BountyDecayNotifications")
+    endFunction
+endProperty
+
+bool property ShouldDisplayInfamyNotifications
+    bool function get()
+        return mcm.GetToggleOptionValue("General", "General::InfamyNotifications")
+    endFunction
+endProperty
+
+bool property HasNudeBodyModInstalled
+    bool function get()
+        return mcm.GetToggleOptionValue("Clothing", "Configuration::NudeBodyModInstalled")
+    endFunction
+endProperty
+
+bool property HasUnderwearBodyModInstalled
+    bool function get()
+        return mcm.GetToggleOptionValue("Clothing", "Configuration::UnderwearModInstalled")
+    endFunction
+endProperty
+
+; Temporary functions
+function PrepareActorForJail(Actor akActor)
+    ; Undress actor
+    akActor.UnequipAll()
+
+    AddOutfit("Outfit 1", none, Game.GetFormEx(0x3C9FE) as Armor, none, none)
+    AddOutfit("Outfit 2", none, Game.GetFormEx(0x3C9FE) as Armor, none, Game.GetFormEx(0x3CA00) as Armor)
+    WearOutfitOnActor(akActor, "Outfit 1")
+endFunction
+
+int function getDelevelingStatValue(string statName)
+    return mcm.GetSliderOptionValue("General", "Deleveling::" + statName) as int
+endFunction
+
+int function getArrestRequiredBounty(string hold)
+    return mcm.GetSliderOptionValue(hold, "Arrest::Minimum Bounty to Arrest") as int
+endFunction
+
+int function getArrestGuaranteedPayableBounty(string hold)
+    return mcm.GetSliderOptionValue(hold, "Arrest::Guaranteed Payable Bounty") as int
+endFunction
+
+int function getArrestMaximumPayableBounty(string hold)
+    return mcm.GetSliderOptionValue(hold, "Arrest::Maximum Payable Bounty") as int
+endFunction
+
+int function getArrestMaximumPayableChance(string hold)
+    return mcm.GetSliderOptionValue(hold, "Arrest::Maximum Payable Bounty (Chance)") as int
+endFunction
+
+float function getArrestAdditionalBountyResistingFromCurrentBounty(string hold)
+    return mcm.GetSliderOptionValue(hold, "Arrest::Additional Bounty when Resisting (%)")
+endFunction
+
+int function getArrestAdditionalBountyResistingFlat(string hold)
+    return mcm.GetSliderOptionValue(hold, "Arrest::Additional Bounty when Resisting") as int
+endFunction
+
+int function getArrestAdditionalBountyResisting(string hold)
+    float bountyPercentModifier = getArrestAdditionalBountyResistingFromCurrentBounty(hold) / 100
+    int bountyFlat              = getArrestAdditionalBountyResistingFlat(hold)
+    Faction crimeFaction        = getFaction(hold)
+    int bounty                  = floor(crimeFaction.GetCrimeGold() * bountyPercentModifier) + bountyFlat
+
+    return bounty
+endFunction
+
+float function getArrestAdditionalBountyDefeatedFromCurrentBounty(string hold)
+    return mcm.GetSliderOptionValue(hold, "Arrest::Additional Bounty when Defeated (%)")
+endFunction
+ 
+int function getArrestAdditionalBountyDefeatedFlat(string hold)
+    return mcm.GetSliderOptionValue(hold, "Arrest::Additional Bounty when Defeated") as int
+endFunction
+
+int function getArrestAdditionalBountyDefeated(string hold)
+    float bountyPercentModifier = ToPercent(getArrestAdditionalBountyDefeatedFromCurrentBounty(hold))
+    int bountyFlat              = getArrestAdditionalBountyDefeatedFlat(hold)
+    Faction crimeFaction        = getFaction(hold)
+    int bounty                  = floor(crimeFaction.GetCrimeGold() * bountyPercentModifier) + bountyFlat
+    
+    return bounty
+endFunction
+
+bool function isFriskingEnabled(string hold)
+    return mcm.GetToggleOptionValue(hold, "Frisking::Allow Frisking")
+endFunction
+
+bool function isFriskingUnconditional(string hold)
+    return mcm.GetToggleOptionValue(hold, "Frisking::Unconditional Frisking") == 1
+endFunction
+
+int function getFriskingBountyRequired(string hold)
+    return mcm.GetSliderOptionValue(hold, "Frisking::Frisk Search Thoroughness") as int
+endFunction
+
+int function getFriskingThoroughness(string hold)
+    return mcm.GetSliderOptionValue(hold, "Frisking::Minimum Bounty for Frisking") as int
+endFunction
+
+bool function isFriskingStolenItemsConfiscated(string hold)
+    return mcm.GetToggleOptionValue(hold, "Frisking::Confiscate Stolen Items") == 1
+endFunction
+
+bool function isFriskingStripSearchWhenStolenItemsFound(string hold)
+    return mcm.GetToggleOptionValue(hold, "Frisking::Strip Search if Stolen Items Found") == 1
+endFunction
+
+int function getFriskingStolenItemsRequiredForStripping(string hold)
+    return mcm.GetSliderOptionValue(hold, "Frisking::Minimum No. of Stolen Items Required") as int
+endFunction
+
+bool function isStrippingEnabled(string hold)
+    return mcm.GetToggleOptionValue(hold, "Stripping::Allow Stripping")
 endFunction
 
 bool function isStrippingUnconditional(string hold)
@@ -72,6 +489,22 @@ bool function isStrippingBasedOnBounty(string hold)
     return mcm.GetMenuOptionValue(hold, "Stripping::Handle Stripping On") == "Minimum Bounty"
 endFunction
 
+int function getStrippingMinimumSentence(string hold)
+    return mcm.GetSliderOptionValue(hold, "Stripping::Minimum Sentence") as int
+endFunction
+
+int function getStrippingMinimumBounty(string hold)
+    return mcm.GetSliderOptionValue(hold, "Stripping::Minimum Bounty") as int
+endFunction
+
+int function getStrippingMinimumViolentBounty(string hold)
+    return mcm.GetSliderOptionValue(hold, "Stripping::Minimum Violent Bounty") as int
+endFunction
+
+int function getStrippingThoroughness(string hold)
+    return mcm.GetSliderOptionValue(hold, "Stripping::Strip Search Thoroughness") as int
+endFunction
+
 bool function isClothingUnconditional(string hold)
     return mcm.GetMenuOptionValue(hold, "Clothing::Handle Clothing On") == "Unconditionally"
 endFunction
@@ -82,6 +515,134 @@ endFunction
 
 bool function isClothingBasedOnBounty(string hold)
     return mcm.GetMenuOptionValue(hold, "Clothing::Handle Stripping On") == "Maximum Bounty"
+endFunction
+
+bool function isInfamyEnabled(string hold)
+    return mcm.GetToggleOptionValue(hold, "Infamy::Enable Infamy") == 1
+endFunction
+
+float function getInfamyGainedDailyFromArrestBounty(string hold)
+    return mcm.GetSliderOptionValue(hold, "Infamy::Infamy Gained (%)")
+endFunction
+
+int function getInfamyGainedDaily(string hold)
+    return mcm.GetSliderOptionValue(hold, "Infamy::Infamy Gained") as int
+endFunction
+
+float function getInfamyLostFromCurrentInfamy(string hold)
+    return mcm.GetSliderOptionValue(hold, "Infamy::Infamy Lost (%)")
+endFunction
+
+int function getInfamyLost(string hold)
+    return mcm.GetSliderOptionValue(hold, "Infamy::Infamy Lost)") as int
+endFunction
+
+; TODO: Change how the stat is parsed
+int function getTotalInfamy(string hold)
+    return mcm.GetStatOptionValue(hold, "Infamy::Infamy Gained")
+endFunction
+
+bool function isInfamyRecognized(string hold)
+    return isInfamyEnabled(hold) && getTotalInfamy(hold) >= getInfamyRecognizedThreshold(hold)
+endFunction
+
+bool function isInfamyKnown(string hold)
+    return isInfamyEnabled(hold) && getTotalInfamy(hold) >= getInfamyKnownThreshold(hold)
+endFunction
+
+int function getInfamyRecognizedThreshold(string hold)
+    return mcm.GetSliderOptionValue(hold, "Infamy::Infamy Recognized Threshold") as int
+endFunction
+
+int function getInfamyKnownThreshold(string hold)
+    return mcm.GetSliderOptionValue(hold, "Infamy::Infamy Known Threshold") as int
+endFunction
+
+bool function isBountyDecayEnabled(string hold)
+    return mcm.GetToggleOptionValue(hold, "Bounty Decaying::Enable Bounty Decaying") == 1
+endFunction
+
+bool function isBountyDecayableAsCriminal(string hold)
+    return isBountyDecayEnabled(hold) && isInfamyEnabled(hold) && mcm.GetToggleOptionValue(hold, "Bounty Decaying::Decay if Known as Criminal") == 1
+endFunction
+
+float function getAdditionalCharge(string hold, string charge)
+    return mcm.GetSliderOptionValue(hold, "Additional Charges::" + charge)
+endFunction
+
+bool function isJailUnconditional(string hold)
+    return mcm.GetToggleOptionValue(hold, "Jail::Unconditional Imprisonment") == 1
+endFunction
+
+int function getJailGuaranteedPayableBounty(string hold)
+    return mcm.GetSliderOptionValue(hold, "Jail::Guaranteed Payable Bounty") as int
+endFunction
+
+int function getJailMaximumPayableBounty(string hold)
+    return mcm.GetSliderOptionValue(hold, "Jail::Maximum Payable Bounty") as int
+endFunction
+
+int function getJailMaximumPayableChance(string hold)
+    return mcm.GetSliderOptionValue(hold, "Jail::Maximum Payable Bounty (Chance)") as int
+endFunction
+
+int function getJailMinimumSentence(string hold)
+    return mcm.GetSliderOptionValue(hold, "Jail::Minimum Sentence") as int
+endFunction
+
+int function getJailMaximumSentence(string hold)
+    return mcm.GetSliderOptionValue(hold, "Jail::Maximum Sentence") as int
+endFunction
+
+int function getJailCellSearchThoroughness(string hold)
+    return mcm.GetSliderOptionValue(hold, "Jail::Cell Search Thoroughness") as int
+endFunction
+
+string function getJailCellDoorLockLevel(string hold)
+    return mcm.GetMenuOptionValue(hold, "Jail::Cell Lock Level")
+endFunction
+
+bool function isJailFastForwardEnabled(string hold)
+    return mcm.GetToggleOptionValue(hold, "Jail::Fast Forward") == 1
+endFunction
+
+int function getJailFastForwardDay(string hold)
+    return mcm.GetSliderOptionValue(hold, "Jail::Day to fast forward from") as int
+endFunction
+
+bool function canBeArrested(string hold)
+    Faction crimeFaction = getFaction(hold)
+    int holdBounty = crimeFaction.GetCrimeGold()
+
+    if (!crimeFaction)
+        return false
+    endif
+
+    int minBountyRequired = getArrestRequiredBounty(hold)
+
+    if (holdBounty <= minBountyRequired)
+        return false
+    endif
+
+    return true
+endFunction
+
+function notifyBounty(string hold, int bounty)
+    if (ShouldDisplayBountyDecayNotifications)
+        debug.notification(bounty + " Bounty gained in " + hold)
+    endif
+endFunction
+
+bool function isBountyDecayable(string hold)
+    bool isDecayable = false
+
+    if (isBountyDecayableAsCriminal(hold) && !isInfamyKnown(hold))
+        isDecayable = true
+    elseif (isBountyDecayEnabled(hold))
+        isDecayable = true
+    endif
+
+    return isDecayable
 endFunction
 
 Armor function GetActorEquippedClothingForBodyPart(Actor actorTarget, string bodyPart)
@@ -121,33 +682,6 @@ Armor function GetActorEquippedClothingForBodyPart(Actor actorTarget, string bod
     endWhile
 
     return none
-endFunction
-
-int function GetOutfitMinimumBounty(string outfitId)
-    ; To be changed to GetInputOptionValue (to use defaults)
-    string inputField = mcm.GetOptionInputValue(outfitId + "::BountyCondition", "Clothing")
-    int minimumBountyLen = StringUtil.Find(inputField, "-")
-    string minBountyString = StringUtil.Substring(inputField, 0, minimumBountyLen)
-
-    int minimumBounty = StringToInt(minBountyString)
-
-    return minimumBounty
-endFunction
-
-int function GetOutfitMaximumBounty(string outfitId)
-    ; To be changed to GetInputOptionValue (to use defaults)
-    string inputField = mcm.GetOptionInputValue(outfitId + "::BountyCondition", "Clothing")
-    int minimumBountyLen = StringUtil.Find(inputField, "-")
-
-    if (minimumBountyLen == -1)
-        ; There's no maximum bounty
-        return 0
-    endif
-
-    string maxBountyString = StringUtil.Substring(inputField, minimumBountyLen + 1)
-    int maximumBounty = StringToInt(maxBountyString)
-    
-    return maximumBounty
 endFunction
 
 function WearOutfitOnActor(Actor actorTarget, string outfitId, bool unequipAllItems = true)

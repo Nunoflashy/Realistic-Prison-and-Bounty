@@ -1,11 +1,10 @@
-Scriptname RealisticPrisonAndBounty_MCM_Debug hidden
+Scriptname RealisticPrisonAndBounty_MCM_Stats hidden
 
 import RealisticPrisonAndBounty_Util
 import RealisticPrisonAndBounty_MCM
-import PO3_SKSEFunctions
 
 bool function ShouldHandleEvent(RealisticPrisonAndBounty_MCM mcm) global
-    return mcm.CurrentPage == "Debug"
+    return mcm.CurrentPage == "Stats"
 endFunction
 
 function Render(RealisticPrisonAndBounty_MCM mcm) global
@@ -13,54 +12,43 @@ function Render(RealisticPrisonAndBounty_MCM mcm) global
         return
     endif
 
-    float bench = StartBenchmark()
     mcm.SetCursorFillMode(mcm.TOP_TO_BOTTOM)
     Left(mcm)
 
     mcm.SetCursorPosition(1)
     Right(mcm)
-
-    HandleDependencies(mcm)
-
-    EndBenchmark(bench, mcm.CurrentPage + " page loaded -")
 endFunction
 
 function Left(RealisticPrisonAndBounty_MCM mcm) global
-    mcm.AddOptionCategory("Jail")
-    int holdIndex = 0
-    while (holdIndex < mcm.config.Holds.Length)
-        string hold = mcm.config.Holds[holdIndex]
-        string city = mcm.config.GetCityNameFromHold(hold)
-        mcm.AddOptionTextKey("Teleport to " + city + " Jail Cell", "TeleportJailCell" + hold, "Click to Test")
-        holdIndex += 1
-    endWhile
-
-    mcm.AddOptionCategory("Outfits")
-    int i = 1
-    while (i <= mcm.OUTFIT_COUNT)
-        string outfitId = "Outfit " + i
-        string outfitName = mcm.GetOptionInputValue(outfitId + "::Name", "Clothing")
-        mcm.AddOptionTextKey(string_if(outfitName == "", outfitId, outfitName), outfitId, "Click to Test")
+    int i = 0
+    while (i < mcm.config.Holds.Length)
+        ; mcm.AddTextOption("", mcm.config.Holds[i], mcm.OPTION_DISABLED)
+        mcm.AddOptionCategory(mcm.config.Holds[i])
+        ; mcm.AddOptionCategory("Stats")
+        mcm.AddOptionStat("Current Bounty", 0, "Bounty")
+        mcm.AddOptionStat("Largest Bounty", 0, "Bounty")
+        mcm.AddOptionStat("Total Bounty", 0, "Bounty")
+        mcm.AddOptionStat("Times Arrested", 0, "Times")
+        mcm.AddOptionStat("Times Frisked", 0, "Times")
+        mcm.AddOptionStat("Fees Owed", 0, "Gold")
         i += 1
     endWhile
-    mcm.AddEmptyOption()
-    mcm.AddOptionMenuKey("Test Condition For Hold", "OutfitCondition", "Whiterun")
 endFunction
 
 function Right(RealisticPrisonAndBounty_MCM mcm) global
-    
-endFunction
-
-function HandleDependencies(RealisticPrisonAndBounty_MCM mcm) global
-
-endFunction
-
-function HandleSliderOptionDependency(RealisticPrisonAndBounty_MCM mcm, string option, float value) global
-
-endFunction
-
-function LoadSliderOptions(RealisticPrisonAndBounty_MCM mcm, string option, float currentSliderValue) global
-
+    int i = 0
+    while (i < mcm.config.Holds.Length)
+        mcm.SetRenderedCategory(mcm.config.Holds[i])
+        ; mcm.SetRenderedCategory("Stats")
+        mcm.AddHeaderOption("")
+        mcm.AddOptionStat("Days in Jail", 0, "Days")
+        mcm.AddOptionStat("Longest Sentence", 0, "Days")
+        mcm.AddOptionStat("Times Jailed", 0, "Times")
+        mcm.AddOptionStat("Times Escaped", 0, "Times")
+        mcm.AddOptionStat("Times Stripped", 0, "Times")
+        mcm.AddOptionStat("Infamy Gained", 0, "Infamy")
+    i += 1
+    endWhile
 endFunction
 
 ; =====================================================
@@ -68,7 +56,48 @@ endFunction
 ; =====================================================
 
 function OnOptionHighlight(RealisticPrisonAndBounty_MCM mcm, string option) global
-    mcm.Trace("OnOptionHighlight", "Option: " + option)
+
+    string optionName   = GetOptionNameNoCategory(option)
+    string hold         = GetOptionCategory(option)
+    string city         = mcm.config.GetCityNameFromHold(hold)
+
+    if (option == hold + "::Current Bounty")
+        mcm.SetInfoText("The bounty you currently have in " + hold + ".")
+
+    elseif (option == hold + "::Largest Bounty")
+        mcm.SetInfoText("The largest bounty you've had in " + hold + ".")
+    
+    elseif (option == hold + "::Total Bounty")
+        mcm.SetInfoText("The total bounty you've accumulated in " + hold + ".")
+
+    elseif (option == hold + "::Times Arrested")
+        mcm.SetInfoText("The times you have been arrested in " + hold + ".")
+
+    elseif (option == hold + "::Times Frisked")
+        mcm.SetInfoText("The times you have been frisk searched in " + city + "'s jail.")
+
+    elseif (option == hold + "::Fees Owed")
+        mcm.SetInfoText("The amount of gold you owe in fees to " + hold + ".")
+
+    elseif (option == hold + "::Days in Jail")
+        mcm.SetInfoText("The amount of days you have spent in " + city + "'s jail.")
+
+    elseif (option == hold + "::Longest Sentence")
+        mcm.SetInfoText("The longest sentence you have been given in " + city + "'s jail.")
+
+    elseif (option == hold + "::Times Jailed")
+        mcm.SetInfoText("The times you have been jailed in " + city + ".")
+
+    elseif (option == hold + "::Times Escaped")
+        mcm.SetInfoText("The times you have escaped from " + city + "'s jail.")
+
+    elseif (option == hold + "::Times Stripped")
+        mcm.SetInfoText("The times you have been stripped off in " + city + "'s jail.")
+
+    elseif (option == hold + "::Infamy Gained")
+        mcm.SetInfoText("The infamy you have accumulated over time in " + city + "'s jail.")
+    endif
+
 endFunction
 
 function OnOptionDefault(RealisticPrisonAndBounty_MCM mcm, string option) global
@@ -76,65 +105,31 @@ function OnOptionDefault(RealisticPrisonAndBounty_MCM mcm, string option) global
 endFunction
 
 function OnOptionSelect(RealisticPrisonAndBounty_MCM mcm, string option) global
-    string optionKey = mcm.CurrentPage + "::" + option
-
-    if (IsSelectedOption(option, "Outfit"))
-        string outfitId = GetOptionNameNoCategory(option) ; Outfit 1, Outfit 2 ...
-        string testHold = mcm.GetOptionMenuValue("Outfits::OutfitCondition")
-        ; int outfitMinBounty = mcm.config.GetOutfitMinimumBounty(outfitId)
-        ; int outfitMaxBounty = mcm.config.GetOutfitMaximumBounty(outfitId)
-
-        ; mcm.Debug("OnOptionSelect", "outfitMinBounty: " + outfitMinBounty + ", outfitMaxBounty: " + outfitMaxBounty)
-
-        if (!mcm.config.Debug_OutfitMeetsCondition(mcm.config.GetFaction(testHold), outfitId))
-            string outfitName = mcm.GetOptionInputValue(outfitId + "::Name", "Clothing")
-            Debug.MessageBox(outfitId + " (" + outfitName + ") does not meet the condition to be worn in " + testHold)
-            return
-        endif
-
-        ; Call wear method for the specified outfit
-        mcm.config.WearOutfit(outfitId)
+    mcm.Debug("OnOptionSelect", "MCM Holds: " + mcm.Holds.Length)
+    mcm.Debug("OnOptionSelect", "Config Holds: " + mcm.config.Holds.Length)
+    if (mcm.IsStatOption(option))
+        string hold = GetOptionCategory(option)
+        string statName = GetOptionNameNoCategory(option)
+        mcm.IncrementStat(hold, statName)
+        mcm.Debug("OnOptionSelect", "Incrementing Stat: " + hold + "::" + statName + "(option: " + option +")")
         return
-    
-    elseif (IsSelectedOption(option, "TeleportJailCell"))
-        string hold = StringUtil.Substring(option, StringUtil.Find(option, "TeleportJailCell") + 16)
-        mcm.config.notifyBounty(hold, 1700)
-        ObjectReference jailCellRef = mcm.config.getRandomJailMarker(hold)
-        mcm.config.Player.MoveTo(jailCellRef)
     endif
-
-    mcm.ToggleOption(optionKey)
-    HandleDependencies(mcm)
 endFunction
 
 function OnOptionSliderOpen(RealisticPrisonAndBounty_MCM mcm, string option) global
-    float sliderOptionValue = mcm.GetOptionSliderValue(option)
-    LoadSliderOptions(mcm, option, sliderOptionValue)
-    mcm.Trace("OnOptionSliderOpen", "Option: " + option + ", Value: " + sliderOptionValue)
+
 endFunction
 
 function OnOptionSliderAccept(RealisticPrisonAndBounty_MCM mcm, string option, float value) global
-    string formatString = "{0}"
-
-    ; Handle any slider option that depends on the current option being set
-    HandleSliderOptionDependency(mcm, option, value)
-
-    mcm.SetOptionSliderValue(option, value, formatString)
+   
 endFunction
 
 function OnOptionMenuOpen(RealisticPrisonAndBounty_MCM mcm, string option) global
-    if (IsSelectedOption(option, "OutfitCondition"))
-        mcm.SetMenuDialogOptions(mcm.Holds)
-        mcm.SetMenuDialogDefaultIndex(GetOptionIndexFromKey(mcm.Holds, "Whiterun"))
-    endif
+
 endFunction
 
 function OnOptionMenuAccept(RealisticPrisonAndBounty_MCM mcm, string option, int menuIndex) global
-    if (IsSelectedOption(option, "OutfitCondition"))
-        if (menuIndex != -1)
-            mcm.SetOptionMenuValue(option, mcm.Holds[menuIndex])
-        endif
-    endif
+
 endFunction
 
 function OnOptionColorOpen(RealisticPrisonAndBounty_MCM mcm, string option) global
@@ -146,16 +141,12 @@ function OnOptionColorAccept(RealisticPrisonAndBounty_MCM mcm, string option, in
 endFunction
 
 function OnOptionInputOpen(RealisticPrisonAndBounty_MCM mcm, string option) global
-    string inputOptionValue = mcm.GetOptionInputValue(option)
-    mcm.SetInputDialogStartText(inputOptionValue)
-
-    mcm.Trace("OnOptionInputOpen", "GetOptionInputValue("+  option +") = " + mcm.GetOptionInputValue(option, mcm.CurrentPage))
+    
 endFunction
 
-function OnOptionInputAccept(RealisticPrisonAndBounty_MCM mcm, string option, string inputValue) global
-
+function OnOptionInputAccept(RealisticPrisonAndBounty_MCM mcm, string option, string input) global
+    
 endFunction
-
 
 function OnOptionKeymapChange(RealisticPrisonAndBounty_MCM mcm, string option, int keyCode, string conflictControl, string conflictName) global
     
@@ -174,6 +165,7 @@ function OnHighlight(RealisticPrisonAndBounty_MCM mcm, int oid) global
 endFunction
 
 function OnDefault(RealisticPrisonAndBounty_MCM mcm, int oid) global
+
     if (! ShouldHandleEvent(mcm))
         return
     endif

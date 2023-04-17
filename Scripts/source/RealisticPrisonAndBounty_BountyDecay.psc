@@ -23,9 +23,15 @@ RealisticPrisonAndBounty_MCM property mcm
     endFunction
 endProperty
 
+RealisticPrisonAndBounty_Config property config
+    RealisticPrisonAndBounty_Config function get()
+        return Game.GetFormFromFile(0x3317, GetPluginName()) as RealisticPrisonAndBounty_Config
+    endFunction
+endProperty
+
 float property UpdateInterval
     float function get()
-        return mcm.GetSliderOptionValue("General", "General::Bounty Decay (Update Interval)")
+        return config.BountyDecayUpdateInterval
     endFunction
 endProperty
 
@@ -48,7 +54,10 @@ event OnUpdateGameTime()
     while (i < FactionCount)
         string hold = GetHoldAt(i)
 
-        if (HasDecayingEnabled(hold))
+        ; Infamy conditions
+        bool isDecayable  = (config.isBountyDecayableAsCriminal(hold) && !config.isInfamyKnown(hold)) || config.isBountyDecayEnabled(hold)
+
+        if (isDecayable)
             float holdTimer = __getHoldDecayTimer(hold)
 
             Debug(none, "OnUpdateGameTime", "holdTimer (" + hold + "): " + holdTimer, mcm.IS_DEBUG)

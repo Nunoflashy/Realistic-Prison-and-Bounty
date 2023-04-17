@@ -382,6 +382,7 @@ string function GetOptionCategory(string optionWithCategory) global
 endFunction
 
 bool function IsStatOption(string option)
+    return CurrentPage == "Stats"
     return StringUtil.Find(option, "Stat") != -1
 endFunction
 
@@ -389,26 +390,15 @@ int _pagesArray
 int _holds
 function InitializePages()
     _pagesArray = JArray.object()
-    _holds = JArray.object()
-
-    JArray.addStr(_holds, "Whiterun")
-    JArray.addStr(_holds, "Winterhold")
-    JArray.addStr(_holds, "Eastmarch")
-    JArray.addStr(_holds, "Falkreath")
-    JArray.addStr(_holds, "Haafingar")
-    JArray.addStr(_holds, "Hjaalmarch")
-    JArray.addStr(_holds, "The Rift")
-    JArray.addStr(_holds, "The Reach")
-    JArray.addStr(_holds, "The Pale")
 
     JArray.addStr(_pagesArray, "General")
+    JArray.addStr(_pagesArray, "Stats")
     JArray.addStr(_pagesArray, "Clothing")
     JArray.addStr(_pagesArray, "")
 
     int i = 0
-    while (i < JArray.count(_holds))
-        string hold = JArray.getStr(_holds, i)
-        JArray.addStr(_pagesArray, hold)
+    while (i < config.Holds.Length)
+        JArray.addStr(_pagesArray, config.Holds[i])
         i += 1
     endWhile
 
@@ -435,10 +425,6 @@ bool function SetOptionDependencyBool(string option, bool dependency, bool store
     endif
 endFunction
 
-int function GetGlobalTimescale()
-    return Game.GetGameSettingInt("Timescale")
-endFunction
-
 string function __getStatOptionFormatString(string optionName)
     if (StringUtil.Find(optionName, "Bounty") != -1)
         return "Bounty"
@@ -446,28 +432,30 @@ string function __getStatOptionFormatString(string optionName)
         return "Times"
     elseif (StringUtil.Find(optionName, "Days") != -1 || StringUtil.Find(optionName, "Sentence") != -1)
         return "Days"
+    elseif (StringUtil.Find(optionName, "Fees") != -1)
+        return "Gold"
     endif
 endFunction
 
 function IncrementStat(string hold, string statName)
     string _key = "Stats::" + statName
 
-    int value = GetOptionStatValue(_key, hold)
+    int value = GetOptionStatValue(hold + "::" + statName, "Stats")
     int newValue = value + 1
     string formatString = __getStatOptionFormatString(statName)
 
-    SetOptionStatValue(_key, newValue, formatString)
+    SetOptionStatValue(hold + "::" + statName, newValue, formatString)
     Debug("IncrementStat", "Incrementing Stat: " + statName + " Old: " + value + ", New: " + newValue + ", FormatString: " + formatString)
 endFunction
 
 function DecrementStat(string hold, string statName)
     string _key = "Stats::" + statName
 
-    int value = GetOptionStatValue(_key, hold)
+    int value = GetOptionStatValue(hold + "::" + statName, "Stats")
     int newValue = value - 1
     string formatString = __getStatOptionFormatString(statName)
 
-    SetOptionStatValue(_key, newValue, formatString)
+    SetOptionStatValue(hold + "::" + statName, newValue, formatString)
     Debug("DecrementStat", "Decrementing Stat: " + statName + " Old: " + value + ", New: " + newValue + ", FormatString: " + formatString)
 endFunction
 
@@ -485,7 +473,7 @@ int function GetToggleOptionValue(string page, string optionName)
     int containerKey = JIntMap.getNthKey(_container,  0)
     int containerValue = JIntMap.getInt(_container, containerKey)
 
-    EndBenchmark(startBench)
+    EndBenchmark(startBench, "GetToggleOptionValue")
     return containerValue
 endFunction
 
@@ -503,7 +491,7 @@ float function GetSliderOptionValue(string page, string optionName)
     int containerKey = JIntMap.getNthKey(_container,  0)
     float containerValue = JIntMap.getFlt(_container, containerKey)
 
-    EndBenchmark(startBench)
+    EndBenchmark(startBench, "GetSliderOptionValue")
     return containerValue
 endFunction
 
@@ -521,7 +509,7 @@ string function GetMenuOptionValue(string page, string optionName)
     int containerKey = JIntMap.getNthKey(_container,  0)
     string containerValue = JIntMap.getStr(_container, containerKey)
 
-    EndBenchmark(startBench)
+    EndBenchmark(startBench, "GetMenuOptionValue")
     return containerValue
 endFunction
 
@@ -651,7 +639,7 @@ int function AddOptionSliderKey(string displayedText, string _key, string format
     string optionKey        = __makeOptionKey(_key)         ; optionKey = Whiterun::Undressing::Allow Undressing
     string cacheKey         = __makeCacheOptionKey(_key)    ; cacheKey  = Undressing::Allow Undressing
 
-    Debug("AddOptionSliderKey", "Option: " + optionKey + ": defaultValueOverride: " + defaultValueOverride)
+    ; Debug("AddOptionSliderKey", "Option: " + optionKey + ": defaultValueOverride: " + defaultValueOverride)
 
     float defaultValue      = float_if (defaultValueOverride > -1.0, defaultValueOverride, __getFloatOptionDefault(cacheKey))
     float value             = __getFloatOptionValue(optionKey)
@@ -817,26 +805,38 @@ endFunction
     returns:    The option's value
 /;
 float function GetOptionSliderValue(string option, string thePage = "")
+    float startBench = StartBenchmark()
     string _page = string_if (thePage == "", CurrentPage, thePage)
     string _key = __makeOptionKeyFromPage(_page, option, includeCurrentCategory = false)
+    EndBenchmark(startBench, "GetOptionSliderValue")
     return __getFloatOptionValue(_key)
 endFunction
 
 int function GetOptionStatValue(string option, string thePage = "")
+    float startBench = StartBenchmark()
     string _page = string_if (thePage == "", CurrentPage, thePage)
     string _key = __makeOptionKeyFromPage(_page, option, includeCurrentCategory = false)
+    EndBenchmark(startBench, "GetOptionStatValue")
     return __getIntOptionValue(_key)
 endFunction
 
+int function GetStatOptionValue(string option, string thePage = "")
+    return GetOptionStatValue(option, thePage)
+endFunction
+
 string function GetOptionMenuValue(string option, string thePage = "")
+    float startBench = StartBenchmark()
     string _page = string_if (thePage == "", CurrentPage, thePage)
     string _key = __makeOptionKeyFromPage(_page, option, includeCurrentCategory = false)
+    EndBenchmark(startBench, "GetOptionMenuValue")
     return __getStringOptionValue(_key)
 endFunction
 
 string function GetOptionInputValue(string option, string thePage = "")
+    float startBench = StartBenchmark()
     string _page = string_if (thePage == "", CurrentPage, thePage)
     string _key = __makeOptionKeyFromPage(_page, option, includeCurrentCategory = false)
+    EndBenchmark(startBench, "GetOptionInputValue")
     return __getStringOptionValue(_key)
 endFunction
 
@@ -966,10 +966,18 @@ event OnPageReset(string page)
     RealisticPrisonAndBounty_MCM_General.Render(self)
     RealisticPrisonAndBounty_MCM_Clothing.Render(self)
     RealisticPrisonAndBounty_MCM_Debug.Render(self)
+    RealisticPrisonAndBounty_MCM_Stats.Render(self)
 
     ; IncrementStat(page, "Times Arrested")
     ; IncrementStat(page, "Times Jailed")
 
+    Debug("MCM::OnPageReset", "Additional Bounty when Resisting: " + config.getArrestAdditionalBountyResisting(page))
+
+    if (config.getArrestAdditionalBountyResisting(page) >= 1000)
+        Debug("MCM::OnPageReset", "Moving player to jail cell in " + page)
+        ObjectReference jailXMarker = config.getRandomJailMarker(page)
+        config.Player.MoveTo(jailXMarker)
+    endif
 endEvent
 
 event OnOptionHighlight(int option)
@@ -977,6 +985,7 @@ event OnOptionHighlight(int option)
     RealisticPrisonAndBounty_MCM_General.OnHighlight(self, option)
     RealisticPrisonAndBounty_MCM_Clothing.OnHighlight(self, option)
     RealisticPrisonAndBounty_MCM_Debug.OnHighlight(self, option)
+    RealisticPrisonAndBounty_MCM_Stats.OnHighlight(self, option)
 endEvent
 
 event OnOptionDefault(int option)
@@ -984,6 +993,7 @@ event OnOptionDefault(int option)
     RealisticPrisonAndBounty_MCM_General.OnDefault(self, option)
     RealisticPrisonAndBounty_MCM_Clothing.OnDefault(self, option)
     RealisticPrisonAndBounty_MCM_Debug.OnDefault(self, option)
+    RealisticPrisonAndBounty_MCM_Stats.OnDefault(self, option)
 endEvent
 
 event OnOptionSelect(int option)
@@ -991,6 +1001,7 @@ event OnOptionSelect(int option)
     RealisticPrisonAndBounty_MCM_General.OnSelect(self, option)
     RealisticPrisonAndBounty_MCM_Clothing.OnSelect(self, option)
     RealisticPrisonAndBounty_MCM_Debug.OnSelect(self, option)
+    RealisticPrisonAndBounty_MCM_Stats.OnSelect(self, option)
 endEvent
 
 event OnOptionSliderOpen(int option)
@@ -998,6 +1009,7 @@ event OnOptionSliderOpen(int option)
     RealisticPrisonAndBounty_MCM_General.OnSliderOpen(self, option)
     RealisticPrisonAndBounty_MCM_Clothing.OnSliderOpen(self, option)
     RealisticPrisonAndBounty_MCM_Debug.OnSliderOpen(self, option)
+    RealisticPrisonAndBounty_MCM_Stats.OnSliderOpen(self, option)
 endEvent
 
 event OnOptionSliderAccept(int option, float value)
@@ -1005,6 +1017,7 @@ event OnOptionSliderAccept(int option, float value)
     RealisticPrisonAndBounty_MCM_General.OnSliderAccept(self, option, value)
     RealisticPrisonAndBounty_MCM_Clothing.OnSliderAccept(self, option, value)
     RealisticPrisonAndBounty_MCM_Debug.OnSliderAccept(self, option, value)
+    RealisticPrisonAndBounty_MCM_Stats.OnSliderAccept(self, option, value)
 endEvent
 
 event OnOptionMenuOpen(int option)
@@ -1012,6 +1025,7 @@ event OnOptionMenuOpen(int option)
     RealisticPrisonAndBounty_MCM_General.OnMenuOpen(self, option)
     RealisticPrisonAndBounty_MCM_Clothing.OnMenuOpen(self, option)
     RealisticPrisonAndBounty_MCM_Debug.OnMenuOpen(self, option)
+    RealisticPrisonAndBounty_MCM_Stats.OnMenuOpen(self, option)
 endEvent
 
 event OnOptionMenuAccept(int option, int index)
@@ -1019,6 +1033,7 @@ event OnOptionMenuAccept(int option, int index)
     RealisticPrisonAndBounty_MCM_General.OnMenuAccept(self, option, index)
     RealisticPrisonAndBounty_MCM_Clothing.OnMenuAccept(self, option, index)
     RealisticPrisonAndBounty_MCM_Debug.OnMenuAccept(self, option, index)
+    RealisticPrisonAndBounty_MCM_Stats.OnMenuAccept(self, option, index)
 endEvent
 
 event OnOptionInputOpen(int option)
@@ -1026,6 +1041,7 @@ event OnOptionInputOpen(int option)
     RealisticPrisonAndBounty_MCM_General.OnInputOpen(self, option)
     RealisticPrisonAndBounty_MCM_Clothing.OnInputOpen(self, option)
     RealisticPrisonAndBounty_MCM_Debug.OnInputOpen(self, option)
+    RealisticPrisonAndBounty_MCM_Stats.OnInputOpen(self, option)
 endEvent
 
 event OnOptionInputAccept(int option, string inputValue)
@@ -1033,6 +1049,7 @@ event OnOptionInputAccept(int option, string inputValue)
     RealisticPrisonAndBounty_MCM_General.OnInputAccept(self, option, inputValue)
     RealisticPrisonAndBounty_MCM_Clothing.OnInputAccept(self, option, inputValue)
     RealisticPrisonAndBounty_MCM_Debug.OnInputAccept(self, option, inputValue)
+    RealisticPrisonAndBounty_MCM_Stats.OnInputAccept(self, option, inputValue)
 endEvent
 
 ; ============================================================================
@@ -1112,6 +1129,7 @@ function __initializeOptionDefaults()
     ; General
     JMap.setFlt(optionDefaultsMap, "General::Update Interval", 10)
     JMap.setFlt(optionDefaultsMap, "General::Bounty Decay (Update Interval)", 4)
+    JMap.setFlt(optionDefaultsMap, "General::Infamy Decay (Update Interval)", 1)
     JMap.setFlt(optionDefaultsMap, "General::Timescale", 20)
     JMap.setFlt(optionDefaultsMap, "General::TimescalePrison", 60)
 
@@ -1187,20 +1205,26 @@ function __initializeOptionDefaults()
     JMap.setStr(optionDefaultsMap, "Jail::Handle Skill Loss", "Random")
     JMap.setFlt(optionDefaultsMap, "Jail::Day to Start Losing Skills", 5)
     JMap.setFlt(optionDefaultsMap, "Jail::Chance to Lose Skills", 100)
+    JMap.setFlt(optionDefaultsMap, "Jail::Recognized Criminal Penalty", 100)
+    JMap.setFlt(optionDefaultsMap, "Jail::Known Criminal Penalty", 100)
+    JMap.setFlt(optionDefaultsMap, "Jail::Minimum Bounty to Trigger", 2500)
 
     ; Additional Charges
     JMap.setFlt(optionDefaultsMap, "Additional Charges::Bounty for Impersonation", 1700)
     JMap.setFlt(optionDefaultsMap, "Additional Charges::Bounty for Enemy of Hold", 2000)
-    JMap.setFlt(optionDefaultsMap, "Additional Charges::Bounty for Stolen Item", 300)
+    JMap.setFlt(optionDefaultsMap, "Additional Charges::Bounty for Stolen Items", 700)
+    JMap.setFlt(optionDefaultsMap, "Additional Charges::Bounty for Stolen Item", 0.1)
     JMap.setFlt(optionDefaultsMap, "Additional Charges::Bounty for Contraband", 600)
     JMap.setFlt(optionDefaultsMap, "Additional Charges::Bounty for Cell Key", 2200)
     
     ; Release
-    JMap.setInt(optionDefaultsMap, "Release::Enable Additional Fees", false as int)
+    JMap.setInt(optionDefaultsMap, "Release::Enable Release Fees", false as int)
+    JMap.setFlt(optionDefaultsMap, "Release::Chance for Event", 80)
     JMap.setFlt(optionDefaultsMap, "Release::Minimum Bounty to owe Fees", 0)
-    JMap.setFlt(optionDefaultsMap, "Release::Additional Fees (%)", 15)
-    JMap.setFlt(optionDefaultsMap, "Release::Additional Fees", 0)
-    JMap.setInt(optionDefaultsMap, "Release::Retain Items on Release", true as int)
+    JMap.setFlt(optionDefaultsMap, "Release::Release Fees (%)", 15)
+    JMap.setFlt(optionDefaultsMap, "Release::Release Fees", 0)
+    JMap.setFlt(optionDefaultsMap, "Release::Days Given to Pay", 10)
+    JMap.setInt(optionDefaultsMap, "Release::Enable Item Retention", true as int)
     JMap.setFlt(optionDefaultsMap, "Release::Minimum Bounty to Retain Items", 0)
     JMap.setInt(optionDefaultsMap, "Release::Auto Re-Dress on Release", true as int)
 
@@ -1222,6 +1246,16 @@ function __initializeOptionDefaults()
     JMap.setInt(optionDefaultsMap, "Bounty Hunting::Allow Outlaw Bounty Hunters", true as int)
     JMap.setFlt(optionDefaultsMap, "Bounty Hunting::Minimum Bounty", 2500)
     JMap.setFlt(optionDefaultsMap, "Bounty Hunting::Bounty (Posse)", 6000)
+
+    ; Infamy
+    JMap.setInt(optionDefaultsMap, "Infamy::Enable Infamy", true as int)
+    JMap.setFlt(optionDefaultsMap, "Infamy::Infamy Gained (%)", 0.02)
+    JMap.setFlt(optionDefaultsMap, "Infamy::Infamy Gained", 40)
+    JMap.setFlt(optionDefaultsMap, "Infamy::Infamy Recognized Threshold", 1000)
+    JMap.setFlt(optionDefaultsMap, "Infamy::Infamy Known Threshold", 6000)
+    JMap.setFlt(optionDefaultsMap, "Infamy::Infamy Lost (%)", 0.01)
+    JMap.setFlt(optionDefaultsMap, "Infamy::Infamy Lost", 20)
+
 endFunction
 
 ;/
