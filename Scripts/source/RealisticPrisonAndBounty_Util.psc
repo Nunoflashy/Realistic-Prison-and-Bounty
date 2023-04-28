@@ -416,6 +416,14 @@ endFunction
     Item Functions
 /;
 
+function RemoveKeysFromActor(Actor akActor, ObjectReference akContainer = none) global
+
+endFunction
+
+function RemoveWeaponsFromActor(Actor akActor, ObjectReference akContainer = none) global
+
+endFunction
+
 function WearItem(Actor akActor, Form akItem, int count = 1, bool forced = false, bool silent = true) global
     bool invalidParams = is_null(akActor) || is_null(akItem)
 

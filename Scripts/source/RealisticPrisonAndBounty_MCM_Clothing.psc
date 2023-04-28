@@ -31,7 +31,7 @@ endFunction
 function Left(RealisticPrisonAndBounty_MCM mcm) global
     mcm.AddOptionCategory("Configuration")
     mcm.AddOptionToggleKey("Do you have a nude body mod installed?", "NudeBodyModInstalled")
-    mcm.AddOptionToggleKey("Do you have a wearable underwear mod installed?", "UnderwearModInstalled")
+    mcm.AddOptionToggleKey("Do you have a wearable underwear mod installed?", "UnderwearModInstalled", defaultFlags = mcm.OPTION_DISABLED)
 
     mcm.AddEmptyOption()
 

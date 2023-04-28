@@ -12,11 +12,14 @@ function Render(RealisticPrisonAndBounty_MCM mcm) global
         return
     endif
 
+    float x = StartBenchmark()
     mcm.SetCursorFillMode(mcm.TOP_TO_BOTTOM)
     Left(mcm)
 
     mcm.SetCursorPosition(1)
     Right(mcm)
+
+    EndBenchmark(x)
 endFunction
 
 function Left(RealisticPrisonAndBounty_MCM mcm) global
@@ -105,13 +108,11 @@ function OnOptionDefault(RealisticPrisonAndBounty_MCM mcm, string option) global
 endFunction
 
 function OnOptionSelect(RealisticPrisonAndBounty_MCM mcm, string option) global
-    mcm.Debug("OnOptionSelect", "MCM Holds: " + mcm.Holds.Length)
-    mcm.Debug("OnOptionSelect", "Config Holds: " + mcm.config.Holds.Length)
     if (mcm.IsStatOption(option))
-        string hold = GetOptionCategory(option)
+        string hold     = GetOptionCategory(option)
         string statName = GetOptionNameNoCategory(option)
-        mcm.IncrementStat(hold, statName)
-        mcm.Debug("OnOptionSelect", "Incrementing Stat: " + hold + "::" + statName + "(option: " + option +")")
+        mcm.config.IncrementStat(hold, statName)
+        ; mcm.Debug("OnOptionSelect", "Incrementing Stat: " + hold + "::" + statName + "(option: " + option +")")
         return
     endif
 endFunction

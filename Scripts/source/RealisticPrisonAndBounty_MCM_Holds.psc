@@ -4,7 +4,7 @@ import RealisticPrisonAndBounty_Util
 import RealisticPrisonAndBounty_MCM
 
 bool function ShouldHandleEvent(RealisticPrisonAndBounty_MCM mcm) global
-    return mcm.CurrentPage != "" && mcm.CurrentPage != "General" && mcm.CurrentPage != "Statistics" && mcm.CurrentPage != "Clothing" && mcm.CurrentPage != "Debug" && mcm.CurrentPage != "Stats" ; If the page is any hold, handle events
+    return mcm.IsHoldCurrentPage() ; Only handle if the page rendered if any of the holds
 endFunction
 
 function Render(RealisticPrisonAndBounty_MCM mcm) global
@@ -226,7 +226,7 @@ function Right(RealisticPrisonAndBounty_MCM mcm) global
     mcm.AddOptionSliderKey("Maximum Violent Bounty to Clothe", "Maximum Violent Bounty", "{0} Violent Bounty",                                  defaultFlags = mcm.OPTION_DISABLED)
     mcm.AddOptionSliderKey("Maximum Sentence to Clothe", "Maximum Sentence", "{0} Days",                                                        defaultFlags = mcm.OPTION_DISABLED)
     mcm.AddOptionToggleKey("Clothe When Defeated", "When Defeated",                                                                             defaultFlags = mcm.OPTION_DISABLED)
-    mcm.AddOptionMenu("Outfit", mcm.CLOTHING_DEFAULT_PRISON_OUTFIT,                                                                             defaultFlags = mcm.OPTION_DISABLED)
+    mcm.AddOptionMenu("Outfit",                                                                                                                 defaultFlags = mcm.OPTION_DISABLED)
 endFunction
 
 function HandleDependencies(RealisticPrisonAndBounty_MCM mcm) global
@@ -1324,25 +1324,27 @@ function OnOptionSliderAccept(RealisticPrisonAndBounty_MCM mcm, string option, f
 endFunction
 
 function OnOptionMenuOpen(RealisticPrisonAndBounty_MCM mcm, string option) global
+    string defaultValue = mcm.__getStringOptionDefault(option)
+
     if (option == "Jail::Cell Lock Level")
         mcm.SetMenuDialogOptions(mcm.LockLevels)
-        mcm.SetMenuDialogDefaultIndex(GetOptionIndexFromKey(mcm.LockLevels, mcm.PRISON_DEFAULT_CELL_LOCK_LEVEL))
+        mcm.SetMenuDialogDefaultIndex(GetOptionIndexFromKey(mcm.LockLevels, defaultValue))
 
     elseif (option == "Jail::Handle Skill Loss")
         mcm.SetMenuDialogOptions(mcm.PrisonSkillHandlingOptions)
-        mcm.SetMenuDialogDefaultIndex(GetOptionIndexFromKey(mcm.PrisonSkillHandlingOptions, mcm.PRISON_DEFAULT_HANDLE_SKILL_LOSS))
+        mcm.SetMenuDialogDefaultIndex(GetOptionIndexFromKey(mcm.PrisonSkillHandlingOptions, defaultValue))
 
     elseif (option == "Stripping::Handle Stripping On")
         mcm.SetMenuDialogOptions(mcm.UndressingHandlingOptions)
-        mcm.SetMenuDialogDefaultIndex(GetOptionIndexFromKey(mcm.UndressingHandlingOptions, mcm.UNDRESSING_DEFAULT_HANDLING_OPTION))
+        mcm.SetMenuDialogDefaultIndex(GetOptionIndexFromKey(mcm.UndressingHandlingOptions, defaultValue))
 
     elseif (option == "Clothing::Handle Clothing On")
         mcm.SetMenuDialogOptions(mcm.ClothingHandlingOptions)
-        mcm.SetMenuDialogDefaultIndex(GetOptionIndexFromKey(mcm.ClothingHandlingOptions, mcm.CLOTHING_DEFAULT_HANDLING_OPTION))
+        mcm.SetMenuDialogDefaultIndex(GetOptionIndexFromKey(mcm.ClothingHandlingOptions, defaultValue))
 
     elseif (option == "Clothing::Outfit")
         mcm.SetMenuDialogOptions(mcm.ClothingOutfits)
-        mcm.SetMenuDialogDefaultIndex(GetOptionIndexFromKey(mcm.ClothingOutfits, mcm.ClothingOutfits[0]))
+        mcm.SetMenuDialogDefaultIndex(GetOptionIndexFromKey(mcm.ClothingOutfits, defaultValue))
     endif
 endFunction
 

@@ -98,7 +98,7 @@ function OnOptionSelect(RealisticPrisonAndBounty_MCM mcm, string option) global
     
     elseif (IsSelectedOption(option, "TeleportJailCell"))
         string hold = StringUtil.Substring(option, StringUtil.Find(option, "TeleportJailCell") + 16)
-        mcm.config.notifyBounty(hold, 1700)
+        ; mcm.config.notifyBounty(hold, 1700)
         ObjectReference jailCellRef = mcm.config.getRandomJailMarker(hold)
         mcm.config.Player.MoveTo(jailCellRef)
     endif
@@ -124,15 +124,15 @@ endFunction
 
 function OnOptionMenuOpen(RealisticPrisonAndBounty_MCM mcm, string option) global
     if (IsSelectedOption(option, "OutfitCondition"))
-        mcm.SetMenuDialogOptions(mcm.Holds)
-        mcm.SetMenuDialogDefaultIndex(GetOptionIndexFromKey(mcm.Holds, "Whiterun"))
+        mcm.SetMenuDialogOptions(mcm.config.Holds)
+        mcm.SetMenuDialogDefaultIndex(GetOptionIndexFromKey(mcm.config.Holds, "Whiterun"))
     endif
 endFunction
 
 function OnOptionMenuAccept(RealisticPrisonAndBounty_MCM mcm, string option, int menuIndex) global
     if (IsSelectedOption(option, "OutfitCondition"))
         if (menuIndex != -1)
-            mcm.SetOptionMenuValue(option, mcm.Holds[menuIndex])
+            mcm.SetOptionMenuValue(option, mcm.config.Holds[menuIndex])
         endif
     endif
 endFunction

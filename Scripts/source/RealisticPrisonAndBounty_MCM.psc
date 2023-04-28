@@ -14,11 +14,7 @@ bool property ENABLE_TRACE  = false autoreadonly
 ; Cached Option
 int property CACHED_OPTION_INDEX    = 0 autoreadonly
 int property CACHED_OPTION_NAME     = 1 autoreadonly
-; ==============================================================================
 
-; ==============================================================================
-; Single Options
-int property SINGLE_OPTION_INDEX    = 0 autoreadonly
 ; ==============================================================================
 ; Error Codes
 int property GENERAL_ERROR     = -1500000 autoreadonly
@@ -34,111 +30,6 @@ int property OPTION_DISABLED = 0x01 autoreadonly
 
 int property OUTFIT_COUNT = 10 autoreadonly
 
-; ==============================================================================
-; GENERAL
-int property GENERAL_DEFAULT_ATTACK_ON_SIGHT_BOUNTY = 3000 autoreadonly
-float property GENERAL_DEFAULT_UPDATE_INTERVAL = 10 autoreadonly
-float property GENERAL_DEFAULT_BOUNTY_DECAY_UPDATE_INTERVAL = 12 autoreadonly
-
-; ==============================================================================
-; ARREST
-int  property ARREST_DEFAULT_MIN_BOUNTY                     = 500 autoreadonly
-int  property ARREST_DEFAULT_GUARANTEED_PAYABLE_BOUNTY      = 1500 autoreadonly
-int  property ARREST_DEFAULT_MAXIMUM_PAYABLE_BOUNTY         = 1500 autoreadonly
-int  property ARREST_DEFAULT_MAXIMUM_PAYABLE_BOUNTY_CHANCE  = 33 autoreadonly
-bool property ARREST_DEFAULT_ALWAYS_ARREST_VIOLENT_CRIMES   = true autoreadonly
-int  property ARREST_DEFAULT_BOUNTY_WHEN_RESISTING_PERCENT  = 33 autoreadonly
-int  property ARREST_DEFAULT_BOUNTY_WHEN_RESISTING_FLAT     = 200 autoreadonly
-int  property ARREST_DEFAULT_BOUNTY_WHEN_DEFEATED_PERCENT   = 33 autoreadonly
-int  property ARREST_DEFAULT_BOUNTY_WHEN_DEFEATED_FLAT      = 200 autoreadonly
-bool property ARREST_DEFAULT_ALLOW_CIVILIAN_CAPTURE         = true autoreadonly
-bool property ARREST_DEFAULT_ALLOW_ARREST_TRANSFER          = true autoreadonly
-bool property ARREST_DEFAULT_ALLOW_UNCONSCIOUS_ARREST       = true autoreadonly
-bool property ARREST_DEFAULT_ALLOW_UNCONDITIONAL_ARREST     = false autoreadonly
-int  property ARREST_DEFAULT_UNEQUIP_HAND_BOUNTY            = 0 autoreadonly
-int  property ARREST_DEFAULT_UNEQUIP_HEAD_BOUNTY            = 1000 autoreadonly
-int  property ARREST_DEFAULT_UNEQUIP_FOOT_BOUNTY            = 4000 autoreadonly
-; ==============================================================================
-; FRISKING
-bool property FRISKING_DEFAULT_ALLOW                            = true autoreadonly
-bool property FRISKING_DEFAULT_UNCONDITIONAL                    = false autoreadonly
-int  property FRISKING_DEFAULT_MIN_BOUNTY                       = 500 autoreadonly
-int  property FRISKING_DEFAULT_GUARANTEED_PAYABLE_BOUNTY        = 1500 autoreadonly
-int  property FRISKING_DEFAULT_MAXIMUM_PAYABLE_BOUNTY           = 2000 autoreadonly
-int  property FRISKING_DEFAULT_MAXIMUM_PAYABLE_BOUNTY_CHANCE    = 33 autoreadonly
-int  property FRISKING_DEFAULT_FRISK_THOROUGHNESS               = 10 autoreadonly
-int  property FRISKING_DEFAULT_CONFISCATE_ITEMS                 = 3000 autoreadonly
-bool property FRISKING_DEFAULT_STRIP_IF_STOLEN_FOUND            = true autoreadonly
-int  property FRISKING_DEFAULT_NUMBER_STOLEN_ITEMS_REQUIRED     = 10 autoreadonly
-; ==============================================================================
-; STRIPPING
-bool    property UNDRESSING_DEFAULT_ALLOW                  = true autoreadonly
-string  property UNDRESSING_DEFAULT_HANDLING_OPTION        = "Minimum Sentence" autoreadonly
-int     property UNDRESSING_DEFAULT_MIN_BOUNTY             = 1500 autoreadonly
-bool    property UNDRESSING_DEFAULT_WHEN_DEFEATED          = true autoreadonly
-bool    property UNDRESSING_DEFAULT_AT_CELL                = true autoreadonly
-bool    property UNDRESSING_DEFAULT_AT_CHEST               = true autoreadonly
-int     property UNDRESSING_DEFAULT_FORCED_MIN_BOUNTY      = 3000 autoreadonly
-bool    property UNDRESSING_DEFAULT_FORCED_WHEN_DEFEATED   = true autoreadonly
-int     property UNDRESSING_DEFAULT_STRIP_THOROUGHNESS     = 10 autoreadonly
-; ==============================================================================
-; CLOTHING
-bool   property CLOTHING_DEFAULT_ALLOW_CLOTHES          = false autoreadonly
-string property CLOTHING_DEFAULT_HANDLING_OPTION        = "Maximum Sentence" autoreadonly
-int    property CLOTHING_DEFAULT_REDRESS_BOUNTY         = 2000 autoreadonly
-bool   property CLOTHING_DEFAULT_REDRESS_WHEN_DEFEATED  = true autoreadonly
-bool   property CLOTHING_DEFAULT_REDRESS_AT_CELL        = true autoreadonly
-bool   property CLOTHING_DEFAULT_REDRESS_AT_CHEST       = true autoreadonly
-string property CLOTHING_DEFAULT_PRISON_OUTFIT          = "Prisoner Outfit" autoreadonly
-; ==============================================================================
-; JAIL
-int    property PRISON_DEFAULT_TIMESCALE                    = 60 autoreadonly
-int    property PRISON_DEFAULT_BOUNTY_TO_SENTENCE           = 100 autoreadonly
-int    property PRISON_DEFAULT_MIN_SENTENCE_DAYS            = 10 autoreadonly
-int    property PRISON_DEFAULT_MAX_SENTENCE_DAYS            = 365 autoreadonly
-bool   property PRISON_DEFAULT_UNCONDITIONAL_PRISON         = false autoreadonly
-bool   property PRISON_DEFAULT_SENTENCE_PAYS_BOUNTY         = false autoreadonly
-bool   property PRISON_DEFAULT_FAST_FORWARD                 = true autoreadonly
-int    property PRISON_DEFAULT_DAY_FAST_FORWARD             = 5 autoreadonly
-string property PRISON_DEFAULT_HANDLE_SKILL_LOSS            = "Random" autoreadonly
-int    property PRISON_DEFAULT_DAY_START_LOSING_SKILLS      = 1 autoreadonly
-int    property PRISON_DEFAULT_CHANCE_START_LOSING_SKILLS   = 100 autoreadonly
-bool   property PRISON_DEFAULT_HANDS_BOUND                  = false autoreadonly
-int    property PRISON_DEFAULT_HANDS_BOUND_BOUNTY           = 4000 autoreadonly
-bool   property PRISON_DEFAULT_HANDS_BOUND_RANDOMIZE        = true autoreadonly
-string property PRISON_DEFAULT_CELL_LOCK_LEVEL              = "Expert" autoreadonly
-; ==============================================================================
-; RELEASE
-bool property RELEASE_DEFAULT_GIVE_ITEMS_BACK           = true autoreadonly
-int  property RELEASE_DEFAULT_GIVE_ITEMS_BACK_BOUNTY    = 0 autoreadonly
-bool property RELEASE_DEFAULT_REDRESS                   = true autoreadonly
-; ==============================================================================
-; ESCAPE
-int  property ESCAPE_DEFAULT_BOUNTY_PERCENT         = 15 autoreadonly
-int  property ESCAPE_DEFAULT_BOUNTY_FLAT            = 1000 autoreadonly
-bool property ESCAPE_DEFAULT_ALLOW_SURRENDER        = true autoreadonly
-bool property ESCAPE_DEFAULT_FRISK_ON_CAPTURE       = true autoreadonly
-bool property ESCAPE_DEFAULT_UNDRESS_ON_CAPTURE     = true autoreadonly
-; ==============================================================================
-; BOUNTY
-bool property BOUNTY_DEFAULT_GENERAL_ENABLE_DECAY   = true autoreadonly
-bool property BOUNTY_DEFAULT_GENERAL_UPDATE_HOURS   = 1 autoreadonly
-bool property BOUNTY_DEFAULT_ENABLE_DECAY           = true autoreadonly
-bool property BOUNTY_DEFAULT_DECAY_IN_PRISON        = true autoreadonly
-int  property BOUNTY_DEFAULT_BOUNTY_LOST_PERCENT    = 5 autoreadonly
-int  property BOUNTY_DEFAULT_BOUNTY_LOST_FLAT       = 200 autoreadonly
-; ==============================================================================
-; BOUNTY HUNTERS
-bool property BOUNTY_HUNTERS_DEFAULT_ENABLE            = true autoreadonly
-bool property BOUNTY_HUNTERS_DEFAULT_ALLOW_OUTLAWS     = true autoreadonly
-int  property BOUNTY_HUNTERS_DEFAULT_MIN_BOUNTY        = 2500 autoreadonly
-int  property BOUNTY_HUNTERS_DEFAULT_MIN_BOUNTY_GROUP  = 6000 autoreadonly
-; ==============================================================================
-
-; ==============================================================================
-; End Constants
-; ==============================================================================
-
 RealisticPrisonAndBounty_Config property config
     RealisticPrisonAndBounty_Config function get()
         return Game.GetFormFromFile(0x3317, GetPluginName()) as RealisticPrisonAndBounty_Config
@@ -150,6 +41,28 @@ endProperty
 GlobalVariable property NormalTimescale auto
 GlobalVariable property PrisonTimescale auto
 ; =======================================
+
+; int _statList
+; string[] property StatList
+;     string[] function get()
+;         if (JArray.count(_statList) == 0)
+;             _statList = JArray.object()
+;             JArray.addStr(_statList, "Current Bounty")
+;             JArray.addStr(_statList, "Largest Bounty")
+;             JArray.addStr(_statList, "Total Bounty")
+;             JArray.addStr(_statList, "Times Arrested")
+;             JArray.addStr(_statList, "Times Frisked")
+;             JArray.addStr(_statList, "Fees Owed")
+;             JArray.addStr(_statList, "Days in Jail")
+;             JArray.addStr(_statList, "Longest Sentence")
+;             JArray.addStr(_statList, "Times Jailed")
+;             JArray.addStr(_statList, "Times Escaped")
+;             JArray.addStr(_statList, "Times Stripped")
+;             JArray.addStr(_statList, "Infamy Gained")
+;         endif
+;         return JArray.asStringArray(_statList)
+;     endFunction
+; endProperty
 
 int _prisonSkillHandlingOptions
 string[] property PrisonSkillHandlingOptions
@@ -273,25 +186,6 @@ string[] property Skills
     endFunction
 endProperty
 
-int _holds2
-string[] property Holds
-    string[] function get()
-        if (JArray.count(_holds) == 0)
-            _holds2 = JArray.object()
-            JArray.addStr(_holds2, "Whiterun")
-            JArray.addStr(_holds2, "Winterhold")
-            JArray.addStr(_holds2, "Eastmarch")
-            JArray.addStr(_holds2, "Falkreath")
-            JArray.addStr(_holds2, "Haafingar")
-            JArray.addStr(_holds2, "Hjaalmarch")
-            JArray.addStr(_holds2, "The Rift")
-            JArray.addStr(_holds2, "The Reach")
-            JArray.addStr(_holds2, "The Pale")
-        endif
-        return JArray.asStringArray(_holds2)
-    endFunction
-endProperty
-
 bool function IsSelectedOption(string optionParam, string optionName) global
     return StringUtil.Find(optionParam, optionName) != -1
 endFunction
@@ -328,8 +222,6 @@ bool function IsValidClothingForBodyPart(string bodyPart, int slotMask) global
     return false
 endFunction
 
-int outfitsFormMap
-
 function AddOutfitPiece(string outfitId, string outfitBodyPart, Armor outfitObject)
     string outfitKey = outfitId + "::" + outfitBodyPart
     
@@ -343,11 +235,8 @@ endFunction
 
 function RemoveOutfitPiece(string outfitId, string outfitBodyPart)
     string outfitKey = outfitId + "::" + outfitBodyPart
-
     SetOptionInputValue(outfitKey, "")
-
     Armor outfitObject = JMap.getForm(outfitsFormMap, outfitKey) as Armor
-
     JMap.setForm(outfitsFormMap, outfitKey, none)
     Debug("RemoveOutfitPiece", "Removed Outfit Piece: " + outfitObject.GetName() + " (FormID: " + outfitObject.GetFormID() +") from Body Part: " + outfitBodyPart)
 endFunction
@@ -363,19 +252,25 @@ string property CurrentRenderedCategory
     endFunction
 endProperty
 
-function ResetRenderedCategory()
-    _currentRenderedCategory = ""
-endFunction
-
 function SetRenderedCategory(string categoryName)
     _currentRenderedCategory = categoryName
 endFunction
 
+;/
+    Returns the option's name without the category associated with it.
+
+    e.g: Stripping::Allow Stripping as the option will return "Allow Stripping"
+/;
 string function GetOptionNameNoCategory(string option) global
     int startIndex = StringUtil.Find(option, "::") + 2 ; +2 to skip double colon, start after Category::
     return StringUtil.Substring(option, startIndex)
 endFunction
 
+;/
+    Returns the option's category without its name.
+
+    e.g: Stripping::Allow Stripping as the option will return "Stripping"
+/;
 string function GetOptionCategory(string optionWithCategory) global
     int len = StringUtil.Find(optionWithCategory, "::") ; Outfit 1::Equipped Outfit
     return StringUtil.Substring(optionWithCategory, 0, len) ; Outfit 1
@@ -383,13 +278,21 @@ endFunction
 
 bool function IsStatOption(string option)
     return CurrentPage == "Stats"
-    return StringUtil.Find(option, "Stat") != -1
 endFunction
 
-int _pagesArray
-int _holds
+bool function IsHoldCurrentPage()
+    int i = 0
+    while (i < config.Holds.Length)
+        if (CurrentPage == config.Holds[i])
+            return true
+        endif
+        i += 1
+    endWhile
+    return false
+endFunction
+
 function InitializePages()
-    _pagesArray = JArray.object()
+    int _pagesArray = JArray.object()
 
     JArray.addStr(_pagesArray, "General")
     JArray.addStr(_pagesArray, "Stats")
@@ -425,6 +328,7 @@ bool function SetOptionDependencyBool(string option, bool dependency, bool store
     endif
 endFunction
 
+
 string function __getStatOptionFormatString(string optionName)
     if (StringUtil.Find(optionName, "Bounty") != -1)
         return "Bounty"
@@ -434,89 +338,141 @@ string function __getStatOptionFormatString(string optionName)
         return "Days"
     elseif (StringUtil.Find(optionName, "Fees") != -1)
         return "Gold"
+    elseif (StringUtil.Find(optionName, "Infamy") != -1)
+        return "Infamy"
     endif
 endFunction
 
-function IncrementStat(string hold, string statName)
-    string _key = "Stats::" + statName
 
-    int value = GetOptionStatValue(hold + "::" + statName, "Stats")
-    int newValue = value + 1
-    string formatString = __getStatOptionFormatString(statName)
+; ============================================================
+; Option Getters
+; ============================================================
 
-    SetOptionStatValue(hold + "::" + statName, newValue, formatString)
-    Debug("IncrementStat", "Incrementing Stat: " + statName + " Old: " + value + ", New: " + newValue + ", FormatString: " + formatString)
-endFunction
+;/
+    Gets a toggle option's state.
 
-function DecrementStat(string hold, string statName)
-    string _key = "Stats::" + statName
+    string      @page: The page where this option is rendered.
+    string      @optionName: The name of the option to retrieve the state from.
 
-    int value = GetOptionStatValue(hold + "::" + statName, "Stats")
-    int newValue = value - 1
-    string formatString = __getStatOptionFormatString(statName)
-
-    SetOptionStatValue(hold + "::" + statName, newValue, formatString)
-    Debug("DecrementStat", "Decrementing Stat: " + statName + " Old: " + value + ", New: " + newValue + ", FormatString: " + formatString)
-endFunction
-
-int function GetToggleOptionValue(string page, string optionName)
-    float startBench = StartBenchmark()
-    string _key = page + "::" + optionName
+    returns [bool]:    The option's state.
+/;
+bool function GetToggleOptionState(string page, string optionName)
+    string _key = __makeOptionKeyFromPage(page, optionName, includeCurrentCategory = false)
 
     if (!JMap.hasKey(optionsMap, _key))
         ; Option not loaded yet (MCM page not loaded), so load default value for this option.
-        return __getIntOptionDefault(optionName)
+        return __getBoolOptionDefault(optionName)
     endif
 
-    int optionsArray = __getOptionsArrayAtKey(_key)  ; Array of option maps for each index
-    int _container = JArray.getObj(optionsArray, 0)
-    int containerKey = JIntMap.getNthKey(_container,  0)
-    int containerValue = JIntMap.getInt(_container, containerKey)
-
-    EndBenchmark(startBench, "GetToggleOptionValue")
-    return containerValue
+    return __getBoolOptionValue(_key)
 endFunction
 
+bool function GetOptionToggleState(string option, string thePage = "")
+    return GetToggleOptionState(thePage, option)
+endFunction
+
+;/
+    Gets a slider option's value.
+
+    string      @page: The page where this option is rendered.
+    string      @optionName: The name of the option to retrieve the value from.
+
+    returns [float]:    The option's value.
+/;
 float function GetSliderOptionValue(string page, string optionName)
-    float startBench = StartBenchmark()
-    string _key = page + "::" + optionName
+    string _key = __makeOptionKeyFromPage(page, optionName, includeCurrentCategory = false)
 
     if (!JMap.hasKey(optionsMap, _key))
         ; Option not loaded yet (MCM page not loaded), so load default value for this option.
         return __getFloatOptionDefault(optionName)
     endif
 
-    int optionsArray = __getOptionsArrayAtKey(_key)  ; Array of option maps for each index
-    int _container = JArray.getObj(optionsArray, 0)
-    int containerKey = JIntMap.getNthKey(_container,  0)
-    float containerValue = JIntMap.getFlt(_container, containerKey)
-
-    EndBenchmark(startBench, "GetSliderOptionValue")
-    return containerValue
+    return __getFloatOptionValue(_key)
 endFunction
 
+float function GetOptionSliderValue(string option, string thePage = "")
+    return GetSliderOptionValue(thePage, option)
+endFunction
+
+;/
+    Gets a menu option's value.
+
+    string      @page: The page where this option is rendered.
+    string      @optionName: The name of the option to retrieve the value from.
+
+    returns [string]:    The option's value.
+/;
 string function GetMenuOptionValue(string page, string optionName)
-    float startBench = StartBenchmark()
-    string _key = page + "::" + optionName
+    string _key = __makeOptionKeyFromPage(page, optionName, includeCurrentCategory = false)
 
     if (!JMap.hasKey(optionsMap, _key))
         ; Option not loaded yet (MCM page not loaded), so load default value for this option.
         return __getStringOptionDefault(optionName)
     endif
 
-    int optionsArray = __getOptionsArrayAtKey(_key)  ; Array of option maps for each index
-    int _container = JArray.getObj(optionsArray, 0)
-    int containerKey = JIntMap.getNthKey(_container,  0)
-    string containerValue = JIntMap.getStr(_container, containerKey)
-
-    EndBenchmark(startBench, "GetMenuOptionValue")
-    return containerValue
+    return __getStringOptionValue(_key)
 endFunction
 
-; ============================================================
-; Utility Functions
-; ============================================================
+string function GetOptionMenuValue(string option, string thePage = "")
+    return GetMenuOptionValue(thePage, option)
+endFunction
 
+;/
+    Gets an input option's value.
+
+    string      @page: The page where this option is rendered.
+    string      @optionName: The name of the option to retrieve the value from.
+
+    returns [string]:    The option's value.
+/;
+string function GetInputOptionValue(string page, string optionName)
+    string _key = __makeOptionKeyFromPage(page, optionName, includeCurrentCategory = false)
+
+    if (!JMap.hasKey(optionsMap, _key))
+        ; Option not loaded yet (MCM page not loaded), so load default value for this option.
+        return __getStringOptionDefault(optionName)
+    endif
+
+    return __getStringOptionValue(_key)
+endFunction
+
+string function GetOptionInputValue(string option, string thePage = "")
+    return GetInputOptionValue(thePage, option)
+endFunction
+
+;/
+    Gets a stat option's value.
+
+    string      @page: The page where this option is rendered.
+    string      @optionName: The name of the option to retrieve the value from.
+
+    returns [int]:    The option's value.
+/;
+int function GetStatOptionValue(string page, string option)
+    string _key = __makeOptionKeyFromPage(page, option, includeCurrentCategory = false)
+    Debug("GetStatOptionValue", "_key: " + _key)
+
+    if (!JMap.hasKey(optionsMap, _key))
+        ; Option not loaded yet (MCM page not loaded), so load default value for this option.
+        return __getIntOptionDefault(option)
+    endif
+
+    return __getIntOptionValue(_key)
+endFunction
+
+int function GetOptionStatValue(string option, string thePage = "")
+    return GetStatOptionValue(thePage, option)
+endFunction
+
+;/
+    Sets a slider's multiple options with just a single call.
+
+    float   @minRange: The minimum value for this slider
+    float   @maxRange: The maximum value for this slider
+    float   @intervalSteps: The value used to determine how much to increment or decrement by each time.
+    float   @defaultValue: The slider's default value. (Hotkey: R)
+    float   @startValue: The slider's start value, the one that is shown when seeing this option for the first time.
+/;
 function SetSliderOptions(float minRange, float maxRange, float intervalSteps = 1.0, float defaultValue = 1.0, float startValue = 1.0)
     SetSliderDialogRange(minRange, maxRange)
     SetSliderDialogInterval(intervalSteps)
@@ -524,8 +480,12 @@ function SetSliderOptions(float minRange, float maxRange, float intervalSteps = 
     SetSliderDialogStartValue(startValue)
 endFunction
 
-; ============================================================
+;/
+    Sets a toggle option on or off based on its state.
 
+    string  @_key: The key of the option of which to change the state.
+    bool    @storePersistently: Whether to store the value in internal storage.
+/;
 function ToggleOption(string _key, bool storePersistently = true)
     int _array = __getOptionsArrayAtKey(_key)
     
@@ -542,6 +502,10 @@ function ToggleOption(string _key, bool storePersistently = true)
     Debug("ToggleOption", "Set new value of " + !_containerValue + " for " + _key + " (option_id: " + _containerKey + ")")
 endFunction
 
+
+; Option Rendering Functions
+; ============================================================
+
 int function AddOptionCategoryKey(string text, string _key, int flags = 0)
     _currentRenderedCategory = _key
     AddHeaderOption(text, flags)
@@ -552,13 +516,12 @@ int function AddOptionCategory(string text, int flags = 0)
     AddHeaderOption(text, flags)
 endFunction
 
-
 ;/
     Adds and renders a Toggle Option with the possibility of specifying a Key for its storage.
 
     string      @displayedText: The text that will be displayed in the menu.
     string      @_key: The key to be used to set values to and from storage.
-    bool        @defaultValue: The default value before being rendered for the first time.
+    int         @defaultValueOverride: The default value before being rendered for the first time.
 
     returns:    The Option's ID.
 /;
@@ -585,6 +548,15 @@ int function AddOptionToggle(string text, int defaultValueOverride = -1, int def
     return AddOptionToggleKey(text, text, defaultValueOverride, defaultFlags)
 endFunction
 
+;/
+    Adds and renders a Text Option with the possibility of specifying a Key for its storage.
+
+    string      @displayedText: The text that will be displayed in the menu.
+    string      @_key: The key to be used to set values to and from storage.
+    string       @defaultValueOverride: The default value before being rendered for the first time.
+
+    returns:    The Option's ID.
+/;
 int function AddOptionTextKey(string displayedText, string _key, string defaultValueOverride = "", int defaultFlags = 0)
     string optionKey            = __makeOptionKey(_key)         ; optionKey = Statistics::Whiterun::Current Bounty
     string cacheKey             = __makeCacheOptionKey(_key)    ; cacheKey = Whiterun::Current Bounty
@@ -606,13 +578,24 @@ int function AddOptionText(string text, string defaultValueOverride = "", int de
     return AddOptionTextKey(text, text, defaultValueOverride, defaultFlags)
 endFunction
 
-int function AddOptionStatKey(string displayedText, string _key, int defaultValue, string formatString, int defaultFlags = 0)
+;/
+    Adds and renders a Stat Option with the possibility of specifying a Key for its storage.
+
+    string      @displayedText: The text that will be displayed in the menu.
+    string      @_key: The key to be used to set values to and from storage.
+
+    returns:    The Option's ID.
+/;
+int function AddOptionStatKey(string displayedText, string _key, int defaultValueOverride = -1, string formatString = "{0}", int defaultFlags = 0)
     string optionKey            = __makeOptionKey(_key)         ; optionKey = Whiterun::Stats::Current Bounty
     string cacheKey             = __makeCacheOptionKey(_key)    ; cacheKey = Stats::Current Bounty
 
-    int value       = __getIntOptionValue(optionKey)
-    int flags       = __getOptionFlag(optionKey)
-    int optionId    = AddTextOption(displayedText, int_if (value < GENERAL_ERROR, defaultValue, value) + " " + formatString, flags)
+    int defaultValue            = int_if (defaultValueOverride != -1, defaultValueOverride, __getIntOptionDefault(cacheKey))
+    int value                   = __getIntOptionValue(optionKey)
+    int flags                   = __getOptionFlag(optionKey)
+    int optionId                = AddTextOption(displayedText, int_if (value < GENERAL_ERROR, defaultValue, value) + " " + formatString, flags)
+
+    ; Trace("AddOptionStatKey", "["+ _key +"] "+"Flags: " + int_if (flags == OPTION_NOT_EXIST, defaultFlags, flags) + ", Value: " + string_if (value < GENERAL_ERROR, defaultValue, value))
 
     if (!__optionExists(optionKey, optionId))
         int option = __createOptionInt(optionId, defaultValue)
@@ -622,8 +605,8 @@ int function AddOptionStatKey(string displayedText, string _key, int defaultValu
     return optionId
 endFunction
 
-int function AddOptionStat(string text, int defaultValue, string formatString, int defaultFlags = 0)
-    return AddOptionStatKey(text, text, defaultValue, formatString, defaultFlags)
+int function AddOptionStat(string text, int defaultValueOverride = -1, string formatString = "{0}", int defaultFlags = 0)
+    return AddOptionStatKey(text, text, defaultValueOverride, formatString, defaultFlags)
 endFunction
 
 ;/
@@ -639,14 +622,10 @@ int function AddOptionSliderKey(string displayedText, string _key, string format
     string optionKey        = __makeOptionKey(_key)         ; optionKey = Whiterun::Undressing::Allow Undressing
     string cacheKey         = __makeCacheOptionKey(_key)    ; cacheKey  = Undressing::Allow Undressing
 
-    ; Debug("AddOptionSliderKey", "Option: " + optionKey + ": defaultValueOverride: " + defaultValueOverride)
-
     float defaultValue      = float_if (defaultValueOverride > -1.0, defaultValueOverride, __getFloatOptionDefault(cacheKey))
     float value             = __getFloatOptionValue(optionKey)
     int flags               = __getOptionFlag(optionKey)
-    ; int optionId            = AddSliderOption(displayedText, float_if (value < GENERAL_ERROR, defaultValue, value), formatString, int_if (flags == OPTION_NOT_EXIST, defaultFlags, flags))
     int optionId            = AddSliderOption(displayedText, float_if (value < GENERAL_ERROR, defaultValue, value), formatString, int_if (flags == OPTION_NOT_EXIST, defaultFlags, flags))
-    ; int optionId            = AddSliderOption(displayedText, GetSliderOptionValue(CurrentPage, CurrentRenderedCategory + "::" + _key), formatString, int_if (flags == OPTION_NOT_EXIST, defaultFlags, flags))
 
     if (!__optionExists(optionKey, optionId))
         int option = __createOptionFloat(optionId, defaultValue)
@@ -654,8 +633,6 @@ int function AddOptionSliderKey(string displayedText, string _key, string format
     endif
 
     ; Trace("AddOptionSliderKey", "["+ _key +"] "+"Flags: " + int_if (flags == OPTION_NOT_EXIST, defaultFlags, flags) + ", Value: " + float_if (value < GENERAL_ERROR, defaultValue, value))
-
-
     return optionId
 endFunction
 
@@ -723,41 +700,10 @@ int function AddOptionInput(string text, string defaultValueOverride = "", int d
     return AddOptionInputKey(text, text, defaultValueOverride, defaultFlags)
 endFunction
 
-int function GetOptionFromMap(string _key)
-    float startTime = StartBenchmark()
-
-    int optionsArray = __getOptionsArrayAtKey(_key) ; Get the array inside the map
-
-    if (optionsArray == ARRAY_NOT_EXIST)
-        Trace("GetOptionFromMap", "Key: " + _key + " does not exist in the map, returning...")
-        return ARRAY_NOT_EXIST
-    endif
-
-    int i = 0
-    while (i < __getOptionsCount(optionsArray))
-        ; Get the map inside the array at i
-        int _container      = __getOption(optionsArray, i)
-        int _containerKey   = __getOptionKey(_container)
-        int _containerValue = __getOptionValue(_container, _containerKey)
-
-        string _hold = CurrentPage
-
-        Trace("GetOptionFromMap", "[" + _hold + "] " + "\t[ARRAY ID: " + optionsArray + " (" + _key + ")] " + "_container id: " + _container + " (key: " + _containerKey + ", value: " + (_containerValue) + ")")
-
-        i += 1
-    endWhile
-
-    ; EndBenchmark(startTime)
-
-    return -1 ; OPTION_NOT_FOUND
-endFunction
+; ============================================================
 
 ;/
-    Retrieves the option specified by the key for the current option index,
-    the index is invisible to the user and will update based on where the cursor is in the menu to account for all holds.
-
-    e.g: GetOption(Undressing::Allow Undressing) with a CurrentOptionIndex of 0, will retrieve that option for Whiterun,
-    whereas with the index set to 1, it will retrieve Winterhold's instead.
+    Retrieves the option specified by the key.
 
     string  @_key: The key to retrieve the option from.
     returns: The option's id on success, < GENERAL_ERROR on failure.
@@ -785,71 +731,21 @@ endFunction
     return _optionId
 endFunction
 
-;/
-    Gets a toggle option's state.
-
-    string      @option: The name of the option to retrieve the value from.
-
-    returns:    The option's value
-/;
-bool function GetOptionToggleState(string option)
-    string _key = __makeOptionKey(option, includeCurrentCategory = false)
-    return __getBoolOptionValue(_key)
-endFunction
-
-;/
-    Gets a slider option's value.
-
-    string      @option: The name of the option to retrieve the value from.
-
-    returns:    The option's value
-/;
-float function GetOptionSliderValue(string option, string thePage = "")
-    float startBench = StartBenchmark()
-    string _page = string_if (thePage == "", CurrentPage, thePage)
-    string _key = __makeOptionKeyFromPage(_page, option, includeCurrentCategory = false)
-    EndBenchmark(startBench, "GetOptionSliderValue")
-    return __getFloatOptionValue(_key)
-endFunction
-
-int function GetOptionStatValue(string option, string thePage = "")
-    float startBench = StartBenchmark()
-    string _page = string_if (thePage == "", CurrentPage, thePage)
-    string _key = __makeOptionKeyFromPage(_page, option, includeCurrentCategory = false)
-    EndBenchmark(startBench, "GetOptionStatValue")
-    return __getIntOptionValue(_key)
-endFunction
-
-int function GetStatOptionValue(string option, string thePage = "")
-    return GetOptionStatValue(option, thePage)
-endFunction
-
-string function GetOptionMenuValue(string option, string thePage = "")
-    float startBench = StartBenchmark()
-    string _page = string_if (thePage == "", CurrentPage, thePage)
-    string _key = __makeOptionKeyFromPage(_page, option, includeCurrentCategory = false)
-    EndBenchmark(startBench, "GetOptionMenuValue")
-    return __getStringOptionValue(_key)
-endFunction
-
-string function GetOptionInputValue(string option, string thePage = "")
-    float startBench = StartBenchmark()
-    string _page = string_if (thePage == "", CurrentPage, thePage)
-    string _key = __makeOptionKeyFromPage(_page, option, includeCurrentCategory = false)
-    EndBenchmark(startBench, "GetOptionInputValue")
-    return __getStringOptionValue(_key)
-endFunction
-
 function SetFlags(string option, int flags)
     int optionId = GetOption(option)
     SetOptionFlags(optionId, flags)
 endFunction
+
+; ============================================================
+; Option Setters
+; ============================================================
 
 ;/
     Sets a slider option's value.
 
     string      @option: The name of the option to be changed.
     float       @value: The new value for the option.
+    string      @formatString: The format string used when displaying the option.
 /;
 function SetOptionSliderValue(string option, float value, string formatString = "{0}")
     string _key = CurrentPage + "::" + option
@@ -864,9 +760,36 @@ function SetOptionSliderValue(string option, float value, string formatString = 
     Trace("SetOptionSliderValue", "Set new value of " + value + " for " + _key + " (option_id: " + optionId + ")")
 endFunction
 
-function SetOptionStatValue(string option, int value, string formatString = "{0}")
-    string _key = CurrentPage + "::" + option
+;/
+    Sets a stat option's value.
+
+    string      @option: The name of the option to be changed.
+    int         @value: The new value for the option.
+/;
+; function SetOptionStatValue(string option, int value)
+;     string _key = CurrentPage + "::" + option
+;     int optionId = GetOption(option)
+
+;     ; Get the correct format string for this stat option
+;     string formatString = __getStatOptionFormatString(option)
+
+;     ; Change the value of the text option
+;     SetTextOptionValue(optionId, value + " " + formatString)
+
+;     ; Store the value
+;     __setIntOptionValue(_key, value)
+
+;     Debug("SetOptionStatValue", "Set new value of " + value + " for " + _key + " (option_id: " + optionId + ")")
+; endFunction
+
+function SetOptionStatValue(string option, int value)
+    string _key = "Stats::" + option ; option = Hold::Stat (The Rift::Infamy Gained)
     int optionId = GetOption(option)
+
+    ; int currentValue = GetStatOptionValue("Stats", option)
+
+    ; Get the correct format string for this stat option
+    string formatString = __getStatOptionFormatString(option)
 
     ; Change the value of the text option
     SetTextOptionValue(optionId, value + " " + formatString)
@@ -874,9 +797,30 @@ function SetOptionStatValue(string option, int value, string formatString = "{0}
     ; Store the value
     __setIntOptionValue(_key, value)
 
-    Trace("SetOptionStatValue", "Set new value of " + value + " for " + _key + " (option_id: " + optionId + ")")
+    Debug("SetOptionStatValue", "Set new value of " + value + " for " + _key + " (option_id: " + optionId + ")")
+    ; Debug("SetOptionStatValue", "Stats["+ _key +"]: " + "{ currentValue: " + currentValue  + ", value: " + value + " }")
 endFunction
 
+; function SetStat(string hold, string statName, int value)
+;     string _key = hold + "::" + statName
+;     int currentValue = GetStatOptionValue("Stats", _key)
+    
+;     if (currentValue == OPTION_NOT_EXIST)
+;         Error("MCM", "Stats["+ _key +"]: The stat does not exist!")
+;         return    
+;     endif
+
+;     SetOptionStatValue(_key, value)
+
+;     Debug("SetStat", "Stats["+ _key +"]: " + "{ currentValue: " + currentValue  + ", value: " + value + " }")
+; endFunction
+
+;/
+    Sets a menu option's value.
+
+    string      @option: The name of the option to be changed.
+    string      @value: The new value for the option.
+/;
 function SetOptionMenuValue(string option, string value)
     string _key = CurrentPage + "::" + option
     int optionId = GetOption(option)
@@ -890,6 +834,12 @@ function SetOptionMenuValue(string option, string value)
     Trace("SetOptionMenuValue", "Set new value of " + value + " for " + _key + " (option_id: " + optionId + ")")
 endFunction
 
+;/
+    Sets an input option's value.
+
+    string      @option: The name of the option to be changed.
+    string      @value: The new value for the option.
+/;
 function SetOptionInputValue(string option, string value)
     string _key = CurrentPage + "::" + option
     int optionId = GetOption(option)
@@ -904,7 +854,6 @@ function SetOptionInputValue(string option, string value)
 endFunction
 
 string function GetKeyFromOption(int optionId)
-    float s = StartBenchmark()
     int _currentPageArray = __getCacheOptionsAtPage(CurrentPage)
 
     int i = 0
@@ -914,38 +863,13 @@ string function GetKeyFromOption(int optionId)
 
         if (optionId == optionKey)
             string optionValue  = __getCacheOptionValue(optionMap, optionKey)
-            EndBenchmark(s)
             Trace("GetKeyFromOption", "Found matching key for Option ID " + optionKey + "! Key is: " + optionValue)
             return optionValue ; We found the key that matches the option id.
         endif
 
         i += 1
     endWhile
-
-    EndBenchmark(s)
 endFunction
-
-; function ListOptionMap()
-;     string[] keys = JMap.allKeysPArray(optionsMap)
-
-;     int keyIndex = 0
-;     while (keyIndex < keys.Length)
-;         string _key = keys[keyIndex]
-;         int _keyArray = JMap.getObj(optionsMap, _key)
-        
-;         int arrayIndex = 0
-;         while (arrayIndex < JArray.count(_keyArray))
-;             int _optionContainer = JArray.getObj(_keyArray, arrayIndex)
-;             int _optionKey       = JIntMap.getNthKey(_optionContainer, 0)
-;             int _optionValue     = JIntMap.getInt(_optionContainer, _optionKey)
-
-;             string _hold = GetHoldNames()[arrayIndex]
-;             Info("GetOptionFromMap", "[" + _hold + "] " + "\t[ARRAY ID: " + _keyArray + " (" + _key + ")] " + "container id: " + _optionContainer + " (key: " + _optionKey + ", value: " + (_optionValue) + ")", IS_DEBUG)
-;             arrayIndex += 1
-;         endWhile
-;         keyIndex += 1
-;     endWhile
-; endFunction
 
 ; Event Handling
 ; ============================================================================
@@ -956,9 +880,7 @@ event OnConfigInit()
     __initializeOptionsMap()
     __initializeOptionDefaults()
     __initializeCacheMap()
-
-    outfitsFormMap = JMap.object()
-    JValue.retain(outfitsFormMap)
+    __initializeOutfitsMap()
 endEvent
 
 event OnPageReset(string page)
@@ -971,12 +893,13 @@ event OnPageReset(string page)
     ; IncrementStat(page, "Times Arrested")
     ; IncrementStat(page, "Times Jailed")
 
-    Debug("MCM::OnPageReset", "Additional Bounty when Resisting: " + config.getArrestAdditionalBountyResisting(page))
+    Debug("MCM::OnPageReset", "Additional Bounty when Resisting: " + config.GetArrestAdditionalBountyResisting(page))
 
-    if (config.getArrestAdditionalBountyResisting(page) >= 1000)
+    if (config.GetArrestAdditionalBountyResisting(page) >= 1000)
         Debug("MCM::OnPageReset", "Moving player to jail cell in " + page)
-        ObjectReference jailXMarker = config.getRandomJailMarker(page)
+        ObjectReference jailXMarker = config.GetRandomJailMarker(page)
         config.Player.MoveTo(jailXMarker)
+        SendModEvent("PlayerArrestBegin")
     endif
 endEvent
 
@@ -1124,7 +1047,7 @@ endFunction
 
 function __initializeOptionDefaults()
     optionDefaultsMap = JMap.object()
-    JValue.retain(optionDefaultsMap)
+    JValue.retain(optionDefaultsMap) ; may not be needed
 
     ; General
     JMap.setFlt(optionDefaultsMap, "General::Update Interval", 10)
@@ -1132,6 +1055,13 @@ function __initializeOptionDefaults()
     JMap.setFlt(optionDefaultsMap, "General::Infamy Decay (Update Interval)", 1)
     JMap.setFlt(optionDefaultsMap, "General::Timescale", 20)
     JMap.setFlt(optionDefaultsMap, "General::TimescalePrison", 60)
+    JMap.setInt(optionDefaultsMap, "General::ArrestNotifications", 1)
+    JMap.setInt(optionDefaultsMap, "General::JailedNotifications", 0)
+    JMap.setInt(optionDefaultsMap, "General::BountyDecayNotifications", 0)
+    JMap.setInt(optionDefaultsMap, "General::InfamyNotifications", 0)
+
+    ; Stats dont have defaults, only storage
+    JMap.setInt(optionsMap, "Stats::The Rift::Infamy Gained", 20)
 
     ; Bounty for Actions
     JMap.setFlt(optionDefaultsMap, "Bounty for Actions::Trespassing", 300)
@@ -1140,6 +1070,10 @@ function __initializeOptionDefaults()
     JMap.setFlt(optionDefaultsMap, "Bounty for Actions::Pickpocketing", 200)
     JMap.setFlt(optionDefaultsMap, "Bounty for Actions::Lockpicking", 100)
     JMap.setFlt(optionDefaultsMap, "Bounty for Actions::Disturbing the Peace", 100)
+
+    ; Clothing::Configuration
+    JMap.setInt(optionDefaultsMap, "Configuration::NudeBodyModInstalled", false as int)
+    JMap.setInt(optionDefaultsMap, "Configuration::UnderwearModInstalled", false as int)
 
     ; Clothing::Item Slots
     JMap.setFlt(optionDefaultsMap, "Item Slots::Underwear (Top)", 56)
@@ -1187,6 +1121,7 @@ function __initializeOptionDefaults()
     JMap.setFlt(optionDefaultsMap, "Clothing::Maximum Violent Bounty", 1500)
     JMap.setFlt(optionDefaultsMap, "Clothing::Maximum Sentence", 100)
     JMap.setInt(optionDefaultsMap, "Clothing::When Defeated", true as int)
+    JMap.setStr(optionDefaultsMap, "Clothing::Outfit", "Default")
     
     ; Jail
     JMap.setInt(optionDefaultsMap, "Jail::Unconditional Imprisonment", false as int)
@@ -1213,7 +1148,7 @@ function __initializeOptionDefaults()
     JMap.setFlt(optionDefaultsMap, "Additional Charges::Bounty for Impersonation", 1700)
     JMap.setFlt(optionDefaultsMap, "Additional Charges::Bounty for Enemy of Hold", 2000)
     JMap.setFlt(optionDefaultsMap, "Additional Charges::Bounty for Stolen Items", 700)
-    JMap.setFlt(optionDefaultsMap, "Additional Charges::Bounty for Stolen Item", 0.1)
+    JMap.setFlt(optionDefaultsMap, "Additional Charges::Bounty for Stolen Item", 75)
     JMap.setFlt(optionDefaultsMap, "Additional Charges::Bounty for Contraband", 600)
     JMap.setFlt(optionDefaultsMap, "Additional Charges::Bounty for Cell Key", 2200)
     
@@ -1269,7 +1204,7 @@ endFunction
     int         @flags: The stored flags used for this option.
 /;
 function __addOptionInternal(string displayedText, int optionId, string optionKey, string cacheKey, int optionContainer, int flags)
-    Trace("__addOptionInternal", "Option (ID: " + optionId + ", Key: " + optionKey + "), Cache (ID: " + optionId + ", Key: "+ cacheKey +") does not exist, creating it...")
+    ; Trace("__addOptionInternal", "Option (ID: " + optionId + ", Key: " + optionKey + "), Cache (ID: " + optionId + ", Key: "+ cacheKey +") does not exist, creating it...")
     __addOptionAtKey(optionKey, optionContainer)
     __addOptionCache(optionId, cacheKey)
     __setOptionFlag(optionKey, flags)
@@ -1284,12 +1219,8 @@ endFunction
 
     returns: The default value of the option passed in, if the option does not exist, returns OPTION_NOT_EXIST.
 /;
-int function __getBoolOptionDefault(string optionName)
-    if (JMap.hasKey(optionDefaultsMap, optionName))
-        return JMap.getInt(optionDefaultsMap, optionName)
-    endif
-
-    return OPTION_NOT_EXIST
+bool function __getBoolOptionDefault(string optionName)
+    return __getIntOptionDefault(optionName) as bool
 endFunction
 
 ;/
@@ -1342,8 +1273,6 @@ string function __getStringOptionDefault(string optionName)
 
     return OPTION_NOT_EXIST
 endFunction
-
-
 
 ;/
     Retrieves a bool value for a specified option from the internal storage.
@@ -1402,9 +1331,8 @@ int function __getOptionFlag(string _key)
         ; Trace("__getOptionFlag", "Found key: " + _key + ", value: " + value)
         return value
     endif
+
     return OPTION_NOT_EXIST
-    ; int value = JMap.getInt(optionsFlagMap, _key)
-    ; return value
 endFunction
 
 ;/
@@ -1474,7 +1402,7 @@ function __setIntOptionValue(string _key, int value)
     endif
 
     int _containerKey = JIntMap.getNthKey(_container, 0)
-    JIntMap.setFlt(_container, _containerKey, value)
+    JIntMap.setInt(_container, _containerKey, value)
 endFunction
 
 ;/
@@ -1503,7 +1431,7 @@ endFunction
     Sets an option's value (string-based options only) in storage.
 
     string      @_key: The option's key.
-    string       @value: The new value for this option
+    string      @value: The new value for this option
 /;
 function __setStringOptionValue(string _key, string value)
     int _array = __getOptionsArrayAtKey(_key)
@@ -1534,18 +1462,19 @@ endFunction
     returns: the array containing the options at @_key, or ARRAY_NOT_EXIST on failure if @handleError is true. 
 /;
 int function __getOptionsArrayAtKey(string _key, bool handleError = true)
-    int _array = JMap.getObj(optionsMap, _key)
-    if (_array == 0 && handleError)
+    int dataArray = JMap.getObj(optionsMap, _key)
+    if (dataArray == 0 && handleError)
         Trace("__getOptionsArrayAtKey", "__getOptionsArrayAtKey(" + _key + "): Container does not exist! (this error is normal the first time the MCM is rendered)")
         return ARRAY_NOT_EXIST
     endif
 
-    return _array
+    return dataArray
 endFunction
 
 ;/
     Adds the specified option container to an array at the specified key to the underlying internal map.
 
+    string  @_key: The location key where the option array will be placed in the map.
     int     @optionContainer: The option to be added.
 
     structure:
@@ -1564,22 +1493,22 @@ endFunction
     int     @optionContainer: The option to be added.
 /;
 function __addOptionAtKey(string _key, int optionContainer)
-    int _array = __getOptionsArrayAtKey(_key, false)
+    int dataArray = __getOptionsArrayAtKey(_key, false)
 
-    if (_array == 0)
-        _array = JArray.object()
-        Trace("__addOptionAtKey", "Array at key " + _key + " does not exist yet, created ARRAY with ID: " + _array)
+    if (dataArray == 0)
+        dataArray = JArray.object()
+        Trace("__addOptionAtKey", "Array at key " + _key + " does not exist yet, created ARRAY with ID: " + dataArray)
     endif
 
     ; Add option container map to array
-    JArray.addObj(_array, optionContainer)
+    JArray.addObj(dataArray, optionContainer)
 
-    ; Trace("__addOptionAtKey", "Adding MAP ID: " + optionContainer + " to ARRAY ID: " + _array, ENABLE_TRACE)
-    ; Trace("__addOptionAtKey", "Adding ARRAY ID: " + _array + " to optionsMap[" +_key + "]")
+    ; Trace("__addOptionAtKey", "Adding MAP ID: " + optionContainer + " to ARRAY ID: " + dataArray, ENABLE_TRACE)
+    ; Trace("__addOptionAtKey", "Adding ARRAY ID: " + dataArray + " to optionsMap[" +_key + "]")
     ; Trace("__addOptionAtKey", "Adding Option " + optionContainer + " to " + "[" +_key + "]", ENABLE_TRACE)
 
     ; Add the array containing all containers related to _key to the map at _key
-    JMap.setObj(optionsMap, _key, _array)
+    JMap.setObj(optionsMap, _key, dataArray)
 endFunction
 
 ;/
@@ -1607,9 +1536,9 @@ endFunction
 /;
 string function __makeOptionKeyFromPage(string page, string displayedText, bool includeCurrentCategory = true)
     if (includeCurrentCategory)
-        return page + "::" + CurrentRenderedCategory + "::" + displayedText
+        return string_if(page == "", CurrentPage, page) + "::" + CurrentRenderedCategory + "::" + displayedText
     else
-        return page + "::" + displayedText
+        return string_if(page == "", CurrentPage, page) + "::" + displayedText
     endif
 endFunction
 
@@ -1706,7 +1635,6 @@ int function __getOptionValue(int option, int optionKey)
     return JIntMap.getInt(option, optionKey)
 endFunction
 
-
 ;/
     Retrieves the amount of options in the container.
     JArray      @optionsArray: The array containing all the options for the parent map.
@@ -1715,28 +1643,6 @@ endFunction
 /;
 int function __getOptionsCount(int optionsArray)
     return JArray.count(optionsArray)
-endFunction
-
-;/
-    Checks whether the option is a single option.
-
-    Example of a single option container:
-    optionsMap[clothing::Allow Wearing Clothes (Cidhna Mine)] = [
-        {key: 1319, value: true}
-     ]
-
-     Cached option:
-     cacheMap[clothing] = [
-        { key: 1319, value: [Allow Wearing Clothes (Cidhna Mine), -1] } 
-        -1 index means single option
-     ]
-
-     JArray    @array: The container with the option.
-
-     returns: true if it's a single option, false otherwise.
-/;
-bool function __isSingleOption(int _array)
-    return JArray.count(_array) == 1
 endFunction
 
 
@@ -1859,8 +1765,7 @@ endFunction
     Placeholder function for a future change of the cache key.
 /;
 string function __makeCacheOptionKey(string displayedText)
-    ; Undressing::Allow Undressing
-    return CurrentRenderedCategory + "::" + displayedText
+    return CurrentRenderedCategory + "::" + displayedText ; Undressing::Allow Undressing
 endFunction
 
 ;/
@@ -1883,7 +1788,7 @@ bool function __optionExists(string _key, int optionId)
         int _container      = __getOption(optionArray, i) ; Gets the container inside the array at i
         int _containerKey   = __getOptionKey(_container) ; Gets the container's next key for each iteration
 
-        if (_containerKey == optionID)
+        if (_containerKey == optionId)
             return true
         endif
         i += 1
@@ -1934,6 +1839,13 @@ function __addOptionCache(int optionId, string optionName)
     JMap.setObj(cacheMap, CurrentPage, _cachePageArray)
 
     Trace("__addOptionCache", "Created cache option: " + "(key: " + optionId + ", value: "+ optionName +")")
+endFunction
+
+int outfitsFormMap
+
+function __initializeOutfitsMap()
+    outfitsFormMap = JMap.object()
+    JValue.retain(outfitsFormMap)
 endFunction
 
 ; ============================================================================
