@@ -45,6 +45,7 @@ endFunction
 event OnInit()
     RegisterEvents()
     RegisterForKey(0x58) ; F12
+    RegisterForKey(0x57) ; F11
 endEvent
 
 event OnPlayerLoadGame()
@@ -81,26 +82,41 @@ function SetArrestParams()
     ObjectReference jailCellMarker = config.GetRandomJailMarker("Haafingar")
     ObjectReference jailCellMarkerRift = config.GetRandomJailMarker("The Rift")
 
-    int testFormMap2 = JFormMap.object()
-    JFormMap.setForm(testFormMap2, config.Player, config.Player)
-    JFormMap.setForm(testFormMap2, jailCellMarker, jailCellMarker)
+    ; int testFormMap2 = JFormMap.object()
+    ; JFormMap.setForm(testFormMap2, config.Player, config.Player)
+    ; JFormMap.setForm(testFormMap2, jailCellMarker, jailCellMarker)
 
-    int testFormMap = JFormMap.object()
-    JFormMap.setForm(testFormMap, config.Player, config.Player)
-    JFormMap.setForm(testFormMap, jailCellMarker, jailCellMarker)
-    JFormMap.setObj(testFormMap, jailCellMarkerRift, testFormMap2)
+    ; int testFormMap = JFormMap.object()
+    ; JFormMap.setForm(testFormMap, config.Player, config.Player)
+    ; JFormMap.setForm(testFormMap, jailCellMarker, jailCellMarker)
+    ; JFormMap.setObj(testFormMap, jailCellMarkerRift, testFormMap2)
 
     int testArray = JArray.object()
-    JArray.addStr(testArray, "Gata")
-    JArray.addStr(testArray, "Portatil")
-    JArray.addObj(testArray, testFormMap)
+    ; JArray.addStr(testArray, "Gata")
+    ; JArray.addStr(testArray, "Portatil")
+
+    int testMap4 = JMap.object()
+    JMap.setStr(testMap4, "Gata", "Gatinha")
+    JMap.setStr(testMap4, "Portatil", "Legions")
+
+    int testMap3 = JMap.object()
+    ; JMap.setStr(testMap3, "Gata", "Gatinha")
+    ; JMap.setStr(testMap3, "Portatil", "Legion")
+    ; JMap.setObj(testMap3, "testMap4", testMap4)
+
+    int testMap2 = JMap.object()
+    JMap.setStr(testMap2, "Gata", "Gatinha")
+    JMap.setStr(testMap2, "Portatil", "Legion")
+    JMap.setObj(testMap2, "testMap3", testMap3)
+
 
     int testMap = JMap.object()
     JMap.setStr(testMap, "Gata", "Gatinha")
     JMap.setStr(testMap, "Portatil", "Legion")
-    JMap.setObj(testMap, "TestArray", testArray)
+    JMap.setObj(testMap, "testMap2", testMap2)
+    JMap.setObj(testMap, "testArray", testArray)
 
-    AddArrestParamObject("TestMap", testMap)
+    ; AddArrestParamObject("TestMap", testMap)
 
     ; int arrestParams = JMap.object()
     ; JMap.setInt(arrestParams, "Bounty Non-Violent", 1700)
@@ -186,6 +202,9 @@ event OnKeyDown(int keyCode)
 
         config.NotifyArrest("You have been arrested in " + currentHold)
         crimeFaction.SendModEvent("ArrestBegin", numArg = config.GetArrestVarInt("Arrest::Arrest Params"))
+
+    elseif (keyCode == 0x57)
+        Game.QuitToMainMenu()
     endif
 endEvent
 

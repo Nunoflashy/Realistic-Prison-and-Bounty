@@ -460,7 +460,7 @@ endFunction
 
 function ShowArrestParams()
     int arrestParams = config.GetArrestVarInt("Arrest::Arrest Params")
-    Debug(self, "ShowArrestParams", "\n" + Hold + " Arrest Params: " + GetMapList(arrestParams, 1))
+    Debug(self, "ShowArrestParams", "\n" + Hold + " Arrest Params: " + GetContainerList(arrestParams, 1))
     ; string paramOutput
 
     ; int i = 0
