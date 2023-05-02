@@ -11,6 +11,12 @@ RealisticPrisonAndBounty_Config property config
     endFunction
 endProperty
 
+float property TimeOfArrest
+    float function get()
+        return config.GetArrestVarFloat("Arrest::Time of Arrest")
+    endFunction
+endProperty
+
 bool property InfamyEnabled
     bool function get()
         return config.GetArrestVarBool("Jail::Infamy Enabled")
@@ -38,6 +44,12 @@ endProperty
 int property MaximumSentence
     int function get()
         return config.GetArrestVarFloat("Jail::Maximum Sentence") as int
+    endFunction
+endProperty
+
+int property BountyExchange
+    int function get()
+        return config.GetArrestVarFloat("Jail::Bounty Exchange") as int
     endFunction
 endProperty
 
@@ -101,25 +113,6 @@ float property TimeOfImprisonment
     endFunction
 endProperty
 
-; float _timeOfImprisonment
-; float property TimeOfImprisonment
-;     float function get()
-;         if (!_timeOfImprisonment)
-;             Error(self, "Property::TimeOfImprisonment", "Property not set. (Not initialized in Jailed::OnStateBegin()?)")
-;         endif
-;         return _timeOfImprisonment
-;     endFunction
-
-;     function set(float value)
-;         if (self.GetState() != "Jailed")
-;             Error(self, "Property::TimeOfImprisonment", "Cannot change this property outside of the Jailed state, aborting!")
-;             return
-;         endif
-
-;         _timeOfImprisonment = value
-;     endFunction
-; endProperty
-
 float property ReleaseTime
     float function get()
         float gameHour = 0.04166666666666666666666666666667
@@ -127,11 +120,86 @@ float property ReleaseTime
     endFunction
 endProperty
 
-; float property CurrentTimeServed
-;     float function get()
-;         return TimeOfImprisonment * (24 * Sentence)
-;     endFunction
-; endProperty
+float property TimeServed
+    float function get()
+        return CurrentTime - TimeOfImprisonment
+    endFunction
+endProperty
+
+float property TimeLeftInSentence
+    float function get()
+        return (ReleaseTime - TimeOfImprisonment) - TimeServed
+    endFunction
+endProperty
+
+float property LastUpdate auto
+
+;/
+    Gets the time since the last update.
+    1 Hour In-Game = 0.04166666666666666666666666666667
+    Formula: Hours / 24
+    f(h / 24) = hours in game
+/;
+float property TimeSinceLastUpdate
+    float function get()
+        return CurrentTime - LastUpdate
+    endFunction
+endProperty
+
+int property InfamyGainedDaily
+    ;/
+        infamyGainedFlat: 40
+        infamyGainedFromCurrentBounty: 1.44%
+        Bounty: 3000
+        <=> floor(3000 * (1.44/100) + 40)
+        <=> floor(3000 * 0.0144) + 40
+        <=> floor(43.2) + 40
+        <=> 43 + 40 = 83
+    /;
+    int function get()
+        int infamyGainedFlat                    = config.GetArrestVarFloat("Jail::Infamy Gained Daily") as int
+        float infamyGainedFromCurrentBounty     = config.GetArrestVarFloat("Jail::Infamy Gained Daily from Current Bounty")
+
+        return floor(Bounty * percent(infamyGainedFromCurrentBounty)) + infamyGainedFlat
+    endFunction
+endProperty
+
+int property InfamyGainedPerUpdate
+    ;/
+        InfamyGainedDaily: 83
+        TimeSinceLastUpdate: 0.16666666666666666666666666666667 (4 / 24) [4 Hours passed since last update]
+        <=> ceil(83 * 0.16666666666666666666666666666667)
+        <=> ceil(13.833333333333333333333333333334)
+        <=> 14
+
+        if 1 hour passed then TimeSinceLastUpdate = 0.16666666666666666666666666666667 / 4
+        <=> TimeSinceLastUpdate: 0.04166666666666666666666666666667
+        <=> ceil (83 * 0.04166666666666666666666666666667)
+        <=> ceil (3.4583333333333333333333333333334)
+        <=> 4
+    /;
+    int function get()
+        return ceiling(InfamyGainedDaily * TimeSinceLastUpdate)
+    endFunction
+endProperty
+
+bool property IsInfamyRecognized
+    bool function get()
+        int currentInfamy = config.GetInfamyGained(Hold)
+        int recognizedThreshold = config.GetArrestVarFloat("Jail::Infamy Recognized Threshold") as int
+
+        return currentInfamy >= recognizedThreshold
+    endFunction
+endProperty
+
+bool property IsInfamyKnown
+    bool function get()
+        int currentInfamy = config.GetInfamyGained(Hold)
+        int knownThreshold = config.GetArrestVarFloat("Jail::Infamy Known Threshold") as int
+        
+        return currentInfamy >= knownThreshold
+    endFunction
+endProperty
 
 ObjectReference property JailCell
     ObjectReference function get()
@@ -200,14 +268,6 @@ int property OutfitMaxBounty
     endFunction
 endProperty
 
-; Has enough time elapsed in order to serve the sentence?
-bool function ShouldBeReleased()
-    return true
-endFunction
-
-bool hasInfamyRecognizedMessageBeenShown = false
-bool hasInfamyKnownMessageBeenShown = false
-
 ReferenceAlias property CaptorRef auto
 
 function RegisterEvents()
@@ -239,6 +299,7 @@ function SetupJailVars()
     config.SetArrestVarFloat("Jail::Infamy Known Threshold", config.GetInfamyKnownThreshold(Hold))
     config.SetArrestVarFloat("Jail::Infamy Gained Daily from Current Bounty", config.GetInfamyGainedDailyFromArrestBounty(Hold))
     config.SetArrestVarFloat("Jail::Infamy Gained Daily", config.GetInfamyGainedDaily(Hold))
+    config.SetArrestVarFloat("Jail::Bounty Exchange", config.GetJailBountyExchange(Hold))
     config.SetArrestVarFloat("Jail::Bounty to Sentence", config.GetJailBountyToSentence(Hold))
     config.SetArrestVarFloat("Jail::Minimum Sentence", config.GetJailMinimumSentence(Hold))
     config.SetArrestVarFloat("Jail::Maximum Sentence", config.GetJailMaximumSentence(Hold))
@@ -306,12 +367,22 @@ function SetupJailVars()
     config.SetArrestVarFloat("Clothing::Outfit::Maximum Bounty", config.GetClothingOutfitMaximumBounty(Hold))
 
     ; Dynamic Vars
+    int arrestParams = config.GetArrestVarInt("Arrest::Arrest Params")
+    int sentenceOverride = JMap.getInt(arrestParams, "Sentence")
+    bool hasSentenceOverride = JMap.hasKey(arrestParams, "Sentence")
     config.SetArrestVarForm("Arrest::Arrest Faction", config.GetFaction(Hold))
-    config.SetArrestVarFloat("Jail::Sentence", (BountyNonViolent + BountyViolent) / BountyToSentence)
+    config.SetArrestVarFloat("Jail::Sentence", int_if(hasSentenceOverride, sentenceOverride, (BountyNonViolent + GetViolentBountyConverted()) / BountyToSentence))
     config.SetArrestVarFloat("Jail::Time of Imprisonment", CurrentTime)
     config.SetArrestVarBool("Jail::Jailed", true)
 
     Debug(self, "SetupJailVars", "Finished setting up jail variables...")
+endFunction
+
+int function GetViolentBountyConverted()
+    Debug(self, "GetViolentBountyConverted", "Violent Bounty Exchanged: " + floor(BountyViolent * (100 / BountyExchange)))
+    Debug(self, "GetViolentBountyConverted", "Violent Bounty: " + BountyViolent)
+    Debug(self, "GetViolentBountyConverted", "Bounty Exchange: " + BountyExchange)
+    return floor(BountyViolent * (100 / BountyExchange))
 endFunction
 
 ; Should be called everytime the actor gets to jail (initial jailing and on escape fail)
@@ -321,7 +392,7 @@ function UpdateSentence()
 
     config.SetArrestVarFloat("Arrest::Bounty Non-Violent", _bountyNonViolent)
     config.SetArrestVarFloat("Arrest::Bounty Violent", _bountyViolent)
-    config.SetArrestVarFloat("Jail::Sentence", (_bountyNonViolent + _bountyViolent) / BountyToSentence)
+    config.SetArrestVarFloat("Jail::Sentence", (_bountyNonViolent + GetViolentBountyConverted()) / BountyToSentence)
 endFunction
 
 ; Get the bounty from storage and add it into active bounty for this faction.
@@ -338,7 +409,7 @@ int function GetInfamyGainedDaily()
 
     ; floor(7000 * ToPercent(1.44) + 40 = 7000 * 0.0144 + 40 = 100.8 + 40 = 140.8)
     ; <=> floor(140.8) = 140
-    return floor((Bounty * ToPercent(infamyGainedFromCurrentBounty)) + infamyGainedFlat)
+    return floor((Bounty * percent(infamyGainedFromCurrentBounty)) + infamyGainedFlat)
 endFunction
 
 bool function IncreaseSentence(int daysToIncreaseBy, bool shouldAffectBounty = false)
@@ -384,6 +455,114 @@ function ShowJailVars()
         "Sentence: " + Sentence + " Days, \n\t" + \
         "Time of Imprisonment: " + TimeOfImprisonment + ", \n\t" + \
         "Release Time: " + ReleaseTime + "\n" + \
+    " }")
+endFunction
+
+function ShowArrestParams()
+    int arrestParams = config.GetArrestVarInt("Arrest::Arrest Params")
+    Debug(self, "ShowArrestParams", "\n" + Hold + " Arrest Params: " + GetMapList(arrestParams, 1))
+    ; string paramOutput
+
+    ; int i = 0
+    ; while (i < JMap.count(arrestParams))
+    ;     string paramName = JMap.getNthKey(arrestParams, i)
+    ;     int paramValue = JMap.getInt(arrestParams, paramName)
+    ;     paramOutput += paramName + ": " + paramValue + "\n" + string_if(i != JMap.count(arrestParams) - 1, "\t")
+    ;     i += 1
+    ; endWhile
+
+    ; Debug(self, "ShowArrestParams", "\n" + Hold + " Arrest Params: { \n\t" + \
+    ;     paramOutput + \
+    ; " }")
+    ; Debug(self, "ShowArrestParams", "\n" + Hold + " Arrest Params: { \n\t" + \
+    ;     "Bounty Non-Violent: " + JMap.getInt(arrestParams, "Bounty Non-Violent") + ", \n\t" + \
+    ;     "Bounty Violent: " + JMap.getInt(arrestParams, "Bounty Violent") + ", \n\t" + \
+    ;     "Arrestee: " + JMap.getInt(arrestParams, "Arrestee") + ", \n\t" + \
+    ; " }")
+endFunction
+
+int function GetTimeServedDays()
+    return floor(TimeServed)
+endFunction
+
+int function GetTimeServedHoursOfDay()
+    float timeLeftOverOfDay = (TimeServed - GetTimeServedDays()) * 24 ; Hours and Minutes
+    return floor(timeLeftOverOfDay)
+endFunction
+
+int function GetTimeServedMinutesOfHour()
+    float timeLeftOverOfDay = (TimeServed - GetTimeServedDays()) * 24 ; Hours and Minutes
+    float timeLeftOverOfHour = (timeLeftOverOfDay - floor(timeLeftOverOfDay)) * 60 ; Minutes
+    return floor(timeLeftOverOfHour)
+endFunction
+
+int function GetTimeServedSecondsOfMinute()
+    float timeLeftOverOfDay = (TimeServed - GetTimeServedHoursOfDay()) * 24 ; Hours and Minutes
+    float timeLeftOverOfHour = (timeLeftOverOfDay - floor(timeLeftOverOfDay)) * 60 ; Minutes
+    float timeLeftOverOfMinute = (timeLeftOverOfHour - floor(timeLeftOverOfHour)) * 60 ; Seconds
+    return floor(timeLeftOverOfMinute)
+endFunction
+
+int function GetTimeLeftDays()
+    return floor(TimeLeftInSentence)
+endFunction
+
+int function GetTimeLeftHours()
+    float timeLeftToServeLeftOverOfDay = (TimeLeftInSentence - GetTimeLeftDays()) * 24; Hours and Minutes
+    return floor(timeLeftToServeLeftOverOfDay)
+endFunction
+
+int function GetTimeLeftMinutes()
+    float timeLeftToServeLeftOverOfDay = (TimeLeftInSentence - GetTimeLeftDays()) * 24; Hours and Minutes
+    float timeLeftToServeLeftOverOfHour = (timeLeftToServeLeftOverOfDay - floor(timeLeftToServeLeftOverOfDay)) * 60 ; Minutes
+    return floor(timeLeftToServeLeftOverOfHour)
+endFunction
+
+int function GetTimeLeftSeconds()
+    float timeLeftToServeLeftOverOfDay = (TimeLeftInSentence - GetTimeLeftDays()) * 24; Hours and Minutes
+    float timeLeftToServeLeftOverOfHour = (timeLeftToServeLeftOverOfDay - floor(timeLeftToServeLeftOverOfDay)) * 60 ; Minutes
+    float timeLeftToServeLeftOverOfMinute = (timeLeftToServeLeftOverOfHour - floor(timeLeftToServeLeftOverOfHour)) * 60 ; Seconds
+    return floor(timeLeftToServeLeftOverOfMinute)
+endFunction
+
+function ShowSentenceInfo()
+    ; int timeServedDays = floor(TimeServed) ; Days
+    ; float timeLeftOverOfDay = (TimeServed - timeServedDays) * 24; Hours and Minutes
+    ; float timeLeftOverOfHour = (timeLeftOverOfDay - floor(timeLeftOverOfDay)) * 60 ; Minutes
+    ; float timeLeftOverOfMinute = (timeLeftOverOfHour - floor(timeLeftOverOfHour)) * 60 ; Seconds
+
+    ; int timeLeftToServeDays = floor(TimeLeftInSentence) ; Days
+    ; float timeLeftToServeLeftOverOfDay = (TimeLeftInSentence - timeLeftToServeDays) * 24; Hours and Minutes
+    ; float timeLeftToServeLeftOverOfHour = (timeLeftToServeLeftOverOfDay - floor(timeLeftToServeLeftOverOfDay)) * 60 ; Minutes
+    ; float timeLeftToServeLeftOverOfMinute = (timeLeftToServeLeftOverOfHour - floor(timeLeftToServeLeftOverOfHour)) * 60 ; Seconds
+
+    ; int timeServedHours = floor(timeLeftOverOfDay)
+    ; int timeServedMinutes = floor(timeLeftOverOfHour)
+    ; int timeServedSeconds = floor(timeLeftOverOfMinute)
+
+    ; int timeLeftToServeHours = floor(timeLeftToServeLeftOverOfDay)
+    ; int timeLeftToServeMinutes = floor(timeLeftToServeLeftOverOfHour)
+    ; int timeLeftToServeSeconds = floor(timeLeftToServeLeftOverOfMinute)
+
+    int timeServedDays      = GetTimeServedDays()
+    int timeServedHours     = GetTimeServedHoursOfDay()
+    int timeServedMinutes   = GetTimeServedMinutesOfHour()
+    int timeServedSeconds   = GetTimeServedSecondsOfMinute()
+
+    int timeLeftToServeDays      = GetTimeLeftDays()
+    int timeLeftToServeHours     = GetTimeLeftHours()
+    int timeLeftToServeMinutes   = GetTimeLeftMinutes()
+    int timeLeftToServeSeconds   = GetTimeLeftSeconds()
+
+    Debug(self, "ShowJailVars", "\n" + Hold + " Sentence: { \n\t" + \
+        "Minimum Sentence: " + MinimumSentence + " Days, \n\t" + \
+        "Maximum Sentence: " + MaximumSentence + " Days, \n\t" + \
+        "Sentence: " + Sentence + " Days, \n\t" + \
+        "Time of Arrest: " + TimeOfArrest+ ", \n\t" + \
+        "Time of Imprisonment: " + TimeOfImprisonment + ", \n\t" + \
+        "Time Served: " + TimeServed + " ("+ (TimeServed * 24) + " Hours" +") ["+ timeServedDays + " Days, " + timeServedHours + " Hours, " +  timeServedMinutes + " Minutes, " + timeServedSeconds + " Seconds" +"], \n\t" + \
+        "Time Left: " + TimeLeftInSentence + " ("+ (TimeLeftInSentence * 24) + " Hours" +") ["+ timeLeftToServeDays + " Days, " + timeLeftToServeHours + " Hours, " +  timeLeftToServeMinutes + " Minutes, " + timeLeftToServeSeconds + " Seconds" +"], \n\t" + \
+        "Release Time: " + ReleaseTime + "\n\t" + \
     " }")
 endFunction
 
@@ -458,6 +637,7 @@ state Jailed
         ShowJailVars()
         ShowOutfitInfo()
         ShowHoldStats()
+        ShowArrestParams()
 
         config.NotifyJail("You have been sentenced to " + Sentence + " days in jail")
 
@@ -467,6 +647,7 @@ state Jailed
         ;     config.Player.EquipItem(OutfitHands)
         ;     config.Player.EquipItem(OutfitFeet)
         ; endif
+        LastUpdate = Utility.GetCurrentGameTime()
 
         RegisterForSingleUpdateGameTime(1.0)
     endEvent
@@ -474,26 +655,30 @@ state Jailed
     event OnUpdateGameTime()
         ; Check if sentence is served, if so, get out of this state
         ; Check if the actor has escaped, if so, go to that state (might be better to leave this for a door event OnOpen or something...)
-        Debug(self, "OnUpdateGameTime", "Time passed")
+
+        ; float timeSinceLastUpdate = CurrentTime - LastUpdate
+        Debug(self, "OnUpdateGameTime", "{ timeSinceLastUpdate: "+ TimeSinceLastUpdate +", CurrentTime: "+ CurrentTime +", LastUpdate: "+ LastUpdate +" }")
+
+        ;/
+            if (CurrentTime - TimeOfImprisonment) - LastUpdate >= 1 
+        /;
+ 
+        ShowSentenceInfo()
 
         if (InfamyEnabled)
             ; Update infamy
-            config.IncrementStat(Hold, "Infamy Gained", GetInfamyGainedDaily())
-            config.NotifyInfamy(GetInfamyGainedDaily() + " Infamy gained in " + config.GetCityNameFromHold(Hold))
+            config.IncrementStat(Hold, "Infamy Gained", InfamyGainedPerUpdate)
+            config.NotifyInfamy(InfamyGainedPerUpdate + " Infamy gained in " + config.GetCityNameFromHold(Hold), config.IS_DEBUG)
 
             ; Notify once when Recognized/Known Threshold is met
-            int currentInfamy = config.GetInfamyGained(Hold)
 
-            if (currentInfamy >= config.GetArrestVarFloat("Jail::Infamy Known Threshold"))
-                config.NotifyInfamyKnownThresholdMet(Hold, hasInfamyKnownMessageBeenShown)
-                hasInfamyKnownMessageBeenShown = true
+            if (IsInfamyKnown)
+                config.NotifyInfamyKnownThresholdMet(Hold)
 
-            elseif (currentInfamy >= config.GetArrestVarFloat("Jail::Infamy Recognized Threshold"))
-                config.NotifyInfamyRecognizedThresholdMet(Hold, hasInfamyRecognizedMessageBeenShown)
-                hasInfamyRecognizedMessageBeenShown = true
+            elseif (IsInfamyRecognized)
+                config.NotifyInfamyRecognizedThresholdMet(Hold)
             endif
-
-
+            
         endif
 
         if (SentenceServed)
@@ -502,15 +687,13 @@ state Jailed
 
         ; IncreaseSentence(12, true)
 
-        ; Display time served
-        float timeServed = Utility.GetCurrentGameTime() - TimeOfImprisonment
-        float timeLeftInSentence = (ReleaseTime - TimeOfImprisonment) - timeServed
-        Debug(self, "Jailed::OnUpdateGameTime", "Time { Served: " + timeServed + ", Left: " + timeLeftInSentence + " }")
-        Debug(self, "Jailed::OnUpdateGameTime", "Bounty { Non-Violent: " + BountyNonViolent + ", Violent: " + BountyViolent + " } [Total: " + Bounty + "]")
-
-        config.IncrementStat(Hold, "Days Jailed")
-        Game.IncrementStat("Days Jailed")
+        if ((CurrentTime - TimeOfImprisonment) - LastUpdate >= 1)
+            config.IncrementStat(Hold, "Days in Jail")
+            Game.IncrementStat("Days Jailed")
+            config.NotifyJail("Increasing Days Jailed by " + floor((CurrentTime - TimeOfImprisonment) - LastUpdate))
+        endif
     
+        LastUpdate = Utility.GetCurrentGameTime()
         ; Keep updating while in jail
         RegisterForSingleUpdateGameTime(1.0)
     endEvent
@@ -584,5 +767,5 @@ endState
 
 ; Placeholders for State events
 event OnEscapeFail()
-    Error(self, "OnEscapeFail", "Not currently in the Escaped state, invalid call!")
+    Error(self, "OnEscapeFail", "Not currently Escaping, invalid call!")
 endEvent

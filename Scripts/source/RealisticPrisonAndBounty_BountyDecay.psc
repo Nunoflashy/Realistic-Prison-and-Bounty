@@ -39,17 +39,17 @@ event OnUpdateGameTime()
         if (isDecayable)
             float holdTimer = getHoldDecayTimer(hold)
 
-            Debug(none, "OnUpdateGameTime", "holdTimer (" + hold + "): " + holdTimer)
+            ; Debug(none, "OnUpdateGameTime", "holdTimer (" + hold + "): " + holdTimer)
 
             if (timeHasElapsed(hold))
                 ; Decay Bounty depending on conditions
                 ; if not in hold and has bounty
                 if (config.hasBountyInHold(hold) && !config.IsInLocationFromHold(hold))
-                    Debug(none, "OnUpdateGameTime", "Bounty detected and currently not in any of the hold's locations, begin bounty decay. (Hold: " + hold + ")")
+                    ; Debug(none, "OnUpdateGameTime", "Bounty detected and currently not in any of the hold's locations, begin bounty decay. (Hold: " + hold + ")")
                     DecayForHold(hold)
                     ; reset timer
                     holdTimer = resetHoldDecayTimer(hold)
-                    Debug(none, "OnUpdateGameTime", "Resetting timer for " + hold + " ... (next update in: " + holdTimer + " hours)")
+                    ; Debug(none, "OnUpdateGameTime", "Resetting timer for " + hold + " ... (next update in: " + holdTimer + " hours)")
 
                 endif
             endif
@@ -59,7 +59,7 @@ event OnUpdateGameTime()
             if (config.isInLocationFromHold(hold))
                 ; if in hold, reset hold decay timer
                 holdTimer = resetHoldDecayTimer(hold)
-                Debug(none, "OnUpdateGameTime", "You are in one of the hold's locations, hold timer for " + hold + " reset. (next update in: " + holdTimer + " hours)")
+                ; Debug(none, "OnUpdateGameTime", "You are in one of the hold's locations, hold timer for " + hold + " reset. (next update in: " + holdTimer + " hours)")
             endif
         endif
 
@@ -76,7 +76,7 @@ event OnLocationChange(Location oldLocation, Location newLocation)
         if (config.isBountyDecayEnabled(hold))
             if (config.isLocationFromHold(hold, newLocation) || config.isLocationFromHold(hold, oldLocation))
                 float holdTimer = resetHoldDecayTimer(hold)
-                Debug(none, "OnLocationChange", "Resetting timer for " + hold + " ... (next update in: " + holdTimer + " hours)")
+                ; Debug(none, "OnLocationChange", "Resetting timer for " + hold + " ... (next update in: " + holdTimer + " hours)")
             endif
         endif
         i += 1
@@ -85,7 +85,7 @@ endEvent
 
 
 function RegisterForBountyDecayingUpdate()
-    Debug(self.GetOwningQuest(), "RegisterForBountyDecaying", "UpdateInterval: " + UpdateInterval)
+    ; Debug(self.GetOwningQuest(), "RegisterForBountyDecaying", "UpdateInterval: " + UpdateInterval)
     RegisterForSingleUpdateGameTime(UpdateInterval)
 endFunction
 
@@ -96,7 +96,7 @@ function DecayForHold(string hold)
     int bountyLost          = config.getBountyDecayLostBounty(hold)
     int decayTo = currentBounty - bountyLost - int_if(bountyLostPercent > 0, floor(currentBounty * bountyLostPercent))
     crimeFaction.SetCrimeGold(decayTo)
-    Debug(none, "BountyDecay::DecayForHold", "Decaying Bounty for " + hold + ": Old Bounty = " + currentBounty + ", New Bounty: " + decayTo + ", Bounty Lost = " + floor((bountyLost + (currentBounty * bountyLostPercent))) + " (% = " + (bountyLostPercent * 100) + ", Flat = " + bountyLost + ")")
+    ; Debug(none, "BountyDecay::DecayForHold", "Decaying Bounty for " + hold + ": Old Bounty = " + currentBounty + ", New Bounty: " + decayTo + ", Bounty Lost = " + floor((bountyLost + (currentBounty * bountyLostPercent))) + " (% = " + (bountyLostPercent * 100) + ", Flat = " + bountyLost + ")")
 endFunction
 
 function initializeTimers()
@@ -107,7 +107,7 @@ function initializeTimers()
     while (i < config.FactionCount)
         string hold = config.Holds[i]
         setHoldDecayTimer(hold, UpdateInterval)
-        Debug(none, "initializeTimers", "Initializing " + hold + " timer to " + getHoldDecayTimer(hold))
+        ; Debug(none, "initializeTimers", "Initializing " + hold + " timer to " + getHoldDecayTimer(hold))
         i += 1
     endWhile
 

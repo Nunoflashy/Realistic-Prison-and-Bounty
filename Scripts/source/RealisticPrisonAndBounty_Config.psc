@@ -4,6 +4,12 @@ import RealisticPrisonAndBounty_Util
 import PO3_SKSEFunctions
 import Math
 
+; ==============================================================================
+; Constants
+; ==============================================================================
+
+bool property IS_DEBUG      = true autoreadonly
+
 float function GetVersion() global
     return 1.00
 endFunction
@@ -53,6 +59,10 @@ function SetArrestVarBool(string varName, bool value)
     JMap.setInt(_arrestVars, varName, value as int)
 endFunction
 
+function SetArrestVarInt(string varName, int value)
+    JMap.setInt(_arrestVars, varName, value)
+endFunction
+
 function SetArrestVarFloat(string varName, float value)
     JMap.setFlt(_arrestVars, varName, value)
 endFunction
@@ -67,6 +77,10 @@ endFunction
 
 bool function GetArrestVarBool(string varName)
     return JMap.getInt(_arrestVars, varName) as bool
+endFunction
+
+int function GetArrestVarInt(string varName)
+    return JMap.getInt(_arrestVars, varName)
 endFunction
 
 float function GetArrestVarFloat(string varName)
@@ -395,36 +409,36 @@ event OnInit()
     __initializeLocationsMapping()
     __initializeArrestVars()
 
-    RegisterForKey(0x58) ; F12
+    ; RegisterForKey(0x58) ; F12
 
     RegisterForModEvent("PlayerArrestBegin", "OnPlayerBeginArrest")
     mcm.Debug("OnInit", "Config::Init Script")
 endEvent
 
-event OnKeyDown(int keyCode)
-    if (keyCode == 0x58)
-        SendModEvent("PlayerArrestBegin")
-        IncrementInfamy("The Rift", 3000)
-        ; int playerItemsValue = 0
-        ; int i = 0
-        ; while (i < Player.GetNumItems())
-        ;     Form item = Player.GetNthForm(i)
-        ;     int itemCount = Player.GetItemCount(item)
-        ;     playerItemsValue += item.GetGoldValue() * itemCount
-        ;     Debug(self, "OnKeyDown", "Item: " + item.GetName() + ", Value: " + item.GetGoldValue() + ", Count: " + itemCount)
-        ;     i += 1
-        ; endWhile
-        ; int bountyChargeStolenItems = getAdditionalCharge("The Rift", "Bounty for Stolen Items") as int
-        ; float bountyChargePerItem = ToPercent(getAdditionalCharge("The Rift", "Bounty for Stolen Item"))
-        ; int bountyToAdd = floor((playerItemsValue * bountyChargePerItem) + bountyChargeStolenItems)
-        ; Debug(self, "OnKeyDown", "playerItemsValue * bountyChargePerItem: " + playerItemsValue * bountyChargePerItem + ", Player Items: " + Player.GetNumItems())
-        ; Debug(self, "OnKeyDown", "Bounty Charge Stolen Items: " + bountyChargeStolenItems + ", Bounty Charge Per Item: " + bountyChargePerItem + ", Total Charge: " + bountyToAdd)
+; event OnKeyDown(int keyCode)
+;     if (keyCode == 0x58)
+;         SendModEvent("PlayerArrestBegin")
+;         IncrementInfamy("The Rift", 3000)
+;         ; int playerItemsValue = 0
+;         ; int i = 0
+;         ; while (i < Player.GetNumItems())
+;         ;     Form item = Player.GetNthForm(i)
+;         ;     int itemCount = Player.GetItemCount(item)
+;         ;     playerItemsValue += item.GetGoldValue() * itemCount
+;         ;     Debug(self, "OnKeyDown", "Item: " + item.GetName() + ", Value: " + item.GetGoldValue() + ", Count: " + itemCount)
+;         ;     i += 1
+;         ; endWhile
+;         ; int bountyChargeStolenItems = getAdditionalCharge("The Rift", "Bounty for Stolen Items") as int
+;         ; float bountyChargePerItem = ToPercent(getAdditionalCharge("The Rift", "Bounty for Stolen Item"))
+;         ; int bountyToAdd = floor((playerItemsValue * bountyChargePerItem) + bountyChargeStolenItems)
+;         ; Debug(self, "OnKeyDown", "playerItemsValue * bountyChargePerItem: " + playerItemsValue * bountyChargePerItem + ", Player Items: " + Player.GetNumItems())
+;         ; Debug(self, "OnKeyDown", "Bounty Charge Stolen Items: " + bountyChargeStolenItems + ", Bounty Charge Per Item: " + bountyChargePerItem + ", Total Charge: " + bountyToAdd)
 
-        ; notifyBounty("The Rift", bountyToAdd)
-    endif
+;         ; notifyBounty("The Rift", bountyToAdd)
+;     endif
 
-    Debug(self, "OnKeyDown", "Key Pressed: " + keyCode)
-endEvent
+;     Debug(self, "OnKeyDown", "Key Pressed: " + keyCode)
+; endEvent
 
 string function GetGlobalEquivalentOfLocalStat(string localStat)
     int localToGlobalMap = JMap.object()
@@ -825,6 +839,10 @@ endFunction
 
 int function GetJailMaximumPayableChance(string hold)
     return mcm.GetSliderOptionValue(hold, "Jail::Maximum Payable Bounty (Chance)") as int
+endFunction
+
+int function GetJailBountyExchange(string hold)
+    return mcm.GetSliderOptionValue(hold, "Jail::Bounty Exchange") as int
 endFunction
 
 int function GetJailBountyToSentence(string hold)

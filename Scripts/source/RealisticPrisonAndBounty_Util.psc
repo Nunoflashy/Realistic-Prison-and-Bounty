@@ -408,7 +408,340 @@ bool function call_if(bool condition, string _if, string _else = "")
     return calledSuccessfully
 endfunction
 
+string function GetMapList(int _map, int indentLevel = 1) global
+    float start = StartBenchmark()
+    string paramOutput
+    int mapLength = JMap.count(_map)
+
+    int i = 0
+    while (i < mapLength)
+        string paramName = JMap.getNthKey(_map, i)
+        
+        bool paramValueBool = JMap.getInt(_map, paramName) as bool
+        int paramValueInt = JMap.getInt(_map, paramName)
+        float paramValueFlt = JMap.getFlt(_map, paramName)
+        string paramValueStr = JMap.getStr(_map, paramName)
+        int paramValueObj = JMap.getObj(_map, paramName)
+        Form paramValueForm = JMap.getForm(_map, paramName)
+
+        bool isBoolValue = paramValueBool == false || paramValueBool == true
+        bool isIntValue = paramValueInt != 0
+        bool isFloatValue = paramValueFlt != 0
+        bool isStringValue = paramValueStr != ""
+        bool isObjValue = paramValueObj != 0
+        bool isFormValue = paramValueForm != none
+
+        if (indentLevel > 1)
+            int currentIndentLevel = 0
+            while (currentIndentLevel != indentLevel)
+                paramOutput += "  "
+                currentIndentLevel += 1
+            endWhile
+        endif
+
+        if (isStringValue)
+            string paramValue = paramValueStr
+            paramOutput += paramName + ": " + paramValue + "\n" + string_if(i != mapLength - 1, "\t")
+
+        elseif (isIntValue)
+            int paramValue = paramValueInt
+            paramOutput += paramName + ": " + paramValue + "\n" + string_if(i != mapLength - 1, "\t")
+
+        elseif (isFloatValue)
+            float paramValue = paramValueFlt
+            paramOutput += paramName + ": " + paramValue + "\n" + string_if(i != mapLength - 1, "\t")
+
+        elseif (isObjValue)
+            int paramValue = paramValueObj
+            string objListFunction
+            if (JValue.isMap(paramValue))
+                objListFunction = GetMapList(paramValue, indentLevel + 1)
+            elseif (JValue.isIntegerMap(paramValue))
+                objListFunction = GetIntegerMapList(paramValue, indentLevel + 1)
+            elseif (JValue.isFormMap(paramValue))
+                objListFunction = GetFormMapList(paramValue, indentLevel + 1)
+            elseif (JValue.isArray(paramValue))
+                objListFunction = GetArrayList(paramValue, indentLevel + 1)
+            endif
+
+            paramOutput += paramName + ": " + objListFunction + "\n" + string_if(i != mapLength - 1, "\t")
+
+        elseif (isFormValue)
+            Form paramValue = paramValueForm
+            paramOutput += paramName + ": " + paramValue + "\n" + string_if(i != mapLength - 1, "\t")
+
+        elseif (isBoolValue)
+            bool paramValue = paramValueBool
+            paramOutput += paramName + ": " + paramValue + "\n" + string_if(i != mapLength - 1, "\t")
+        endif
+
+        i += 1
+    endWhile
+
+    if (indentLevel > 1)
+        int currentIndentLevel = 0
+        while (currentIndentLevel < indentLevel - 1)
+            paramOutput += "     "
+            currentIndentLevel += 1
+        endWhile
+    endif
+
+    EndBenchmark(start, "GetMapList [Length: "+ mapLength +", indentLevel: "+ indentLevel +"]")
+    return "{ \n\t" + paramOutput + " }"
+endFunction
+
+string function GetIntegerMapList(int _map, int indentLevel = 1) global
+    float start = StartBenchmark()
+    string paramOutput
+    int mapLength = JMap.count(_map)
+
+    int i = 0
+    while (i < mapLength)
+        int paramKey = JIntMap.getNthKey(_map, i)
+        
+        bool paramValueBool = JMap.getInt(_map, paramKey) as bool
+        int paramValueInt = JMap.getInt(_map, paramKey)
+        float paramValueFlt = JMap.getFlt(_map, paramKey)
+        string paramValueStr = JMap.getStr(_map, paramKey)
+        int paramValueObj = JMap.getObj(_map, paramKey)
+        Form paramValueForm = JMap.getForm(_map, paramKey)
+
+        bool isBoolValue = paramValueBool == false || paramValueBool == true
+        bool isIntValue = paramValueInt != 0
+        bool isFloatValue = paramValueFlt != 0
+        bool isStringValue = paramValueStr != ""
+        bool isObjValue = paramValueObj != 0
+        bool isFormValue = paramValueForm != none
+
+        if (indentLevel > 1)
+            int currentIndentLevel = 0
+            while (currentIndentLevel != indentLevel)
+                paramOutput += "  "
+                currentIndentLevel += 1
+            endWhile
+        endif
+
+        if (isStringValue)
+            string paramValue = paramValueStr
+            paramOutput += paramKey + ": " + paramValue + "\n" + string_if(i != mapLength - 1, "\t")
+
+        elseif (isIntValue)
+            int paramValue = paramValueInt
+            paramOutput += paramKey + ": " + paramValue + "\n" + string_if(i != mapLength - 1, "\t")
+
+        elseif (isFloatValue)
+            float paramValue = paramValueFlt
+            paramOutput += paramKey + ": " + paramValue + "\n" + string_if(i != mapLength - 1, "\t")
+
+        elseif (isObjValue)
+            int paramValue = paramValueObj
+            string objListFunction
+            if (JValue.isMap(paramValue))
+                objListFunction = GetMapList(paramValue, indentLevel + 1)
+            elseif (JValue.isIntegerMap(paramValue))
+                objListFunction = GetIntegerMapList(paramValue, indentLevel + 1)
+            elseif (JValue.isFormMap(paramValue))
+                objListFunction = GetFormMapList(paramValue, indentLevel + 1)
+            elseif (JValue.isArray(paramValue))
+                objListFunction = GetArrayList(paramValue, indentLevel + 1)
+            endif
+
+            paramOutput += paramKey + ": " + objListFunction + "\n" + string_if(i != mapLength - 1, "\t")
+
+        elseif (isFormValue)
+            Form paramValue = paramValueForm
+            paramOutput += paramKey + ": " + paramValue + "\n" + string_if(i != mapLength - 1, "\t")
+
+        elseif (isBoolValue)
+            bool paramValue = paramValueBool
+            paramOutput += paramKey + ": " + paramValue + "\n" + string_if(i != mapLength - 1, "\t")
+        endif
+
+        i += 1
+    endWhile
+
+    if (indentLevel > 1)
+        int currentIndentLevel = 0
+        while (currentIndentLevel < indentLevel - 1)
+            paramOutput += "     "
+            currentIndentLevel += 1
+        endWhile
+    endif
+
+    EndBenchmark(start, "GetIntegerMapList [Length: "+ mapLength +", indentLevel: "+ indentLevel +"]")
+    return "{ \n\t" + paramOutput + " }"
+endFunction
+
+string function GetFormMapList(int _map, int indentLevel = 1) global
+    float start = StartBenchmark()
+    string paramOutput
+    int mapLength = JFormMap.count(_map)
+
+    int i = 0
+    while (i < mapLength)
+        Form paramKey = JFormMap.getNthKey(_map, i)
+        
+        bool paramValueBool = JFormMap.getInt(_map, paramKey) as bool
+        int paramValueInt = JFormMap.getInt(_map, paramKey)
+        float paramValueFlt = JFormMap.getFlt(_map, paramKey)
+        string paramValueStr = JFormMap.getStr(_map, paramKey)
+        int paramValueObj = JFormMap.getObj(_map, paramKey)
+        Form paramValueForm = JFormMap.getForm(_map, paramKey)
+
+        bool isBoolValue = paramValueBool == false || paramValueBool == true
+        bool isIntValue = paramValueInt != 0
+        bool isFloatValue = paramValueFlt != 0
+        bool isStringValue = paramValueStr != ""
+        bool isObjValue = paramValueObj != 0
+        bool isFormValue = paramValueForm != none
+
+        if (indentLevel > 1)
+            int currentIndentLevel = 0
+            while (currentIndentLevel != indentLevel)
+                paramOutput += "  "
+                currentIndentLevel += 1
+            endWhile
+        endif
+
+        if (isStringValue)
+            string paramValue = paramValueStr
+            paramOutput += paramKey + ": " + paramValue + "\n" + string_if(i != mapLength - 1, "\t")
+
+        elseif (isIntValue)
+            int paramValue = paramValueInt
+            paramOutput += paramKey + ": " + paramValue + "\n" + string_if(i != mapLength - 1, "\t")
+
+        elseif (isFloatValue)
+            float paramValue = paramValueFlt
+            paramOutput += paramKey + ": " + paramValue + "\n" + string_if(i != mapLength - 1, "\t")
+
+        elseif (isObjValue)
+            int paramValue = paramValueObj
+            string objListFunction
+            if (JValue.isMap(paramValue))
+                objListFunction = GetMapList(paramValue, indentLevel + 1)
+            elseif (JValue.isIntegerMap(paramValue))
+                objListFunction = GetIntegerMapList(paramValue, indentLevel + 1)
+            elseif (JValue.isFormMap(paramValue))
+                objListFunction = GetFormMapList(paramValue, indentLevel + 1)
+            elseif (JValue.isArray(paramValue))
+                objListFunction = GetArrayList(paramValue, indentLevel + 1)
+            endif
+
+            paramOutput += paramKey + ": " + objListFunction + "\n" + string_if(i != mapLength - 1, "\t")
+
+        elseif (isFormValue)
+            Form paramValue = paramValueForm
+            paramOutput += paramKey + ": " + paramValue + "\n" + string_if(i != mapLength - 1, "\t")
+
+        elseif (isBoolValue)
+            bool paramValue = paramValueBool
+            paramOutput += paramKey + ": " + paramValue + "\n" + string_if(i != mapLength - 1, "\t")
+        endif
+
+        i += 1
+    endWhile
+
+    if (indentLevel > 1)
+        int currentIndentLevel = 0
+        while (currentIndentLevel < indentLevel - 1)
+            paramOutput += "     "
+            currentIndentLevel += 1
+        endWhile
+    endif
+
+    EndBenchmark(start, "GetIntegerMapList [Length: "+ mapLength +", indentLevel: "+ indentLevel +"]")
+    return "{ \n\t" + paramOutput + " }"
+endFunction
+
+string function GetArrayList(int _array, int indentLevel = 1) global
+    float start = StartBenchmark()
+    string paramOutput
+    int arrayLength = JArray.count(_array)
+
+    int i = 0
+    while (i < arrayLength)
+        
+        bool paramValueBool = JArray.getInt(_array, i) as bool
+        int paramValueInt = JArray.getInt(_array, i)
+        float paramValueFlt = JArray.getFlt(_array, i)
+        string paramValueStr = JArray.getStr(_array, i)
+        int paramValueObj = JArray.getObj(_array, i)
+        Form paramValueForm = JArray.getForm(_array, i)
+
+        bool isBoolValue = paramValueBool == false || paramValueBool == true
+        bool isIntValue = paramValueInt != 0
+        bool isFloatValue = paramValueFlt != 0
+        bool isStringValue = paramValueStr != ""
+        bool isObjValue = paramValueObj != 0
+        bool isFormValue = paramValueForm != none
+
+        if (indentLevel > 1)
+            int currentIndentLevel = 0
+            while (currentIndentLevel != indentLevel)
+                paramOutput += "  "
+                currentIndentLevel += 1
+            endWhile
+        endif
+
+        if (isStringValue)
+            string paramValue = paramValueStr
+            paramOutput += i + ": " + paramValue + "\n" + string_if(i != arrayLength - 1, "\t")
+
+        elseif (isIntValue)
+            int paramValue = paramValueInt
+            paramOutput += i + ": " + paramValue + "\n" + string_if(i != arrayLength - 1, "\t")
+
+        elseif (isFloatValue)
+            float paramValue = paramValueFlt
+            paramOutput += i + ": " + paramValue + "\n" + string_if(i != arrayLength - 1, "\t")
+
+        elseif (isObjValue)
+            int paramValue = paramValueObj
+            string objListFunction
+            if (JValue.isMap(paramValue))
+                objListFunction = GetMapList(paramValue, indentLevel + 1)
+            elseif (JValue.isIntegerMap(paramValue))
+                objListFunction = GetIntegerMapList(paramValue, indentLevel + 1)
+            elseif (JValue.isFormMap(paramValue))
+                objListFunction = GetFormMapList(paramValue, indentLevel + 1)
+            elseif (JValue.isArray(paramValue))
+                objListFunction = GetArrayList(paramValue, indentLevel + 1)
+            endif
+
+            paramOutput += i + ": " + objListFunction + "\n" + string_if(i != arrayLength - 1, "\t")
+
+        elseif (isFormValue)
+            Form paramValue = paramValueForm
+            paramOutput += i + ": " + paramValue + "\n" + string_if(i != arrayLength - 1, "\t")
+
+        elseif (isBoolValue)
+            bool paramValue = paramValueBool
+            paramOutput += i + ": " + paramValue + "\n" + string_if(i != arrayLength - 1, "\t")
+        endif
+
+        i += 1
+    endWhile
+
+    if (indentLevel > 1)
+        int currentIndentLevel = 0
+        while (currentIndentLevel < indentLevel - 1)
+            paramOutput += "     "
+            currentIndentLevel += 1
+        endWhile
+    endif
+
+    EndBenchmark(start, "GetArrayList [Length: "+ arrayLength +", indentLevel: "+ indentLevel +"]")
+    return "[ \n\t" + paramOutput + " ]"
+endFunction
+
 float function ToPercent(float percentToConvertToDecimal) global
+    return percentToConvertToDecimal / 100
+endFunction
+
+; Converts the passed in percent number to its equivalent decimal percentage to do calculations.
+; e.g: 5 becomes 0.05
+float function Percent(float percentToConvertToDecimal) global
     return percentToConvertToDecimal / 100
 endFunction
 
