@@ -91,13 +91,25 @@ endProperty
 
 int property BountyNonViolent
     int function get()
-        return config.GetArrestVarFloat("Arrest::Bounty Non-Violent") as int
+        return config.GetArrestVarInt("Arrest::Bounty Non-Violent")
     endFunction
 endProperty
 
 int property BountyViolent
     int function get()
-        return config.GetArrestVarFloat("Arrest::Bounty Violent") as int
+        return config.GetArrestVarInt("Arrest::Bounty Violent")
+    endFunction
+endProperty
+
+float property EscapeBountyFromCurrentArrest
+    float function get()
+        return config.GetArrestVarFloat("Escape::Escape Bounty from Current Arrest")
+    endFunction
+endProperty
+
+int property EscapeBounty
+    int function get()
+        return config.GetArrestVarFloat("Escape::Escape Bounty Flat") as int
     endFunction
 endProperty
 
@@ -207,16 +219,57 @@ ObjectReference property JailCell
     endFunction
 endProperty
 
-ObjectReference property JailCellDoor
+ObjectReference property CellDoor
     ObjectReference function get()
-        ; TODO: Scan for nearby ObjectReferences near this Marker, once the Cell Door is found, return that reference.
-        ObjectReference jailCellMarker = config.GetArrestVarForm("Jail::Cell") as ObjectReference
+        return config.GetArrestVarForm("Jail::Cell Door") as ObjectReference
+    endFunction
+endProperty
+
+Actor property Arrestee
+    Actor function get()
+        return config.GetArrestVarForm("Arrest::Arrestee") as Actor
+    endFunction
+endProperty
+
+bool property IsStrippingEnabled
+    bool function get()
+        return config.GetArrestVarBool("Stripping::Allow Stripping")
     endFunction
 endProperty
 
 bool property IsClothingEnabled
     bool function get()
         return config.GetArrestVarBool("Clothing::Allow Clothing")
+    endFunction
+endProperty
+
+string property ClothingHandling
+    string function get()
+        return config.GetArrestVarString("Clothing::Handle Clothing On")
+    endFunction
+endProperty
+
+int property ClothingMaxBounty
+    int function get()
+        return config.GetArrestVarInt("Clothing::Maximum Bounty to Clothe")
+    endFunction
+endProperty
+
+int property ClothingMaxBountyViolent
+    int function get()
+        return config.GetArrestVarInt("Clothing::Maximum Violent Bounty to Clothe")
+    endFunction
+endProperty
+
+int property ClothingMaxSentence
+    int function get()
+        return config.GetArrestVarInt("Clothing::Maximum Sentence to Clothe")
+    endFunction
+endProperty
+
+bool property ClotheWhenDefeated
+    bool function get()
+        return config.GetArrestVarBool("Clothing::Clothe when Defeated")
     endFunction
 endProperty
 
@@ -268,7 +321,69 @@ int property OutfitMaxBounty
     endFunction
 endProperty
 
+bool property IsStripped
+    bool function get()
+        return config.GetArrestVarBool("Jail::Stripped")
+    endFunction
+endProperty
+
+bool property IsClothed
+    bool function get()
+        return config.GetArrestVarBool("Jail::Clothed")
+    endFunction
+endProperty
+
+bool property ShouldBeStripped
+    bool function get()
+        if (IsStrippingEnabled)
+            string strippingHandling        = config.GetArrestVarString("Stripping::Handle Stripping On")
+            int strippingMinBounty          = config.GetArrestVarInt("Stripping::Bounty to Strip")
+            int strippingMinViolentBounty   = config.GetArrestVarInt("Stripping::Violent Bounty to Strip")
+            int strippingMinSentence        = config.GetArrestVarInt("Stripping::Sentence to Strip")
+    
+            bool meetsBountyRequirements = (BountyNonViolent >= strippingMinBounty) || (BountyViolent >= strippingMinViolentBounty)
+            bool meetsSentenceRequirements = Sentence >= strippingMinSentence
+            bool shouldStrip =  (strippingHandling == "Unconditionally") || \
+                                (strippingHandling == "Minimum Bounty" && meetsBountyRequirements) || \
+                                (strippingHandling == "Minimum Sentence" && meetsSentenceRequirements)
+            
+            LogProperty(self, "ShouldBeStripped", "\n" + \
+                "strippingHandling: " + strippingHandling + "\n" + \
+                "strippingMinBounty: " + strippingMinBounty + "\n" + \
+                "strippingMinViolentBounty: " + strippingMinViolentBounty + "\n" + \
+                "strippingMinSentence: " + strippingMinSentence + "\n" + \
+                "meetsBountyRequirements: " + meetsBountyRequirements + "\n" + \
+                "meetsSentenceRequirements: " + meetsSentenceRequirements + "\n" + \
+                "shouldStrip: " + shouldStrip + "\n" \
+            )
+
+            return shouldStrip
+        endif
+    
+        return false
+    endFunction
+endProperty
+
+bool property ShouldBeClothed
+    bool function get()
+        if (IsClothingEnabled)
+            bool meetsBountyRequirements = (BountyNonViolent <= ClothingMaxBounty) && (BountyViolent <= ClothingMaxBountyViolent)
+            bool meetsSentenceRequirements = Sentence <= ClothingMaxSentence
+            bool shouldClothe = (ClothingHandling == "Unconditionally") || \
+                                (ClothingHandling == "Maximum Bounty" && meetsBountyRequirements) || \
+                                (ClothingHandling == "Maximum Sentence" && meetsSentenceRequirements)
+            
+            return shouldClothe
+        endif
+    
+        return false
+    endFunction
+endProperty
+
+
+
 ReferenceAlias property CaptorRef auto
+ReferenceAlias property CellDoorRef auto
 
 function RegisterEvents()
     RegisterForModEvent("JailBegin", "OnJailedBegin")
@@ -305,7 +420,6 @@ function SetupJailVars()
     config.SetArrestVarFloat("Jail::Maximum Sentence", config.GetJailMaximumSentence(Hold))
     config.SetArrestVarFloat("Jail::Cell Search Thoroughness", config.GetJailCellSearchThoroughness(Hold))
     config.SetArrestVarString("Jail::Cell Lock Level", config.GetJailCellDoorLockLevel(Hold))
-    ; config.SetArrestVarString("Jail::Old Cell Lock Level", ;/Get the cell's lock level through a ObjectReference scan near XMarker/;)
     config.SetArrestVarBool("Jail::Fast Forward", config.IsJailFastForwardEnabled(Hold))
     config.SetArrestVarFloat("Jail::Day to Fast Forward From", config.GetJailFastForwardDay(Hold))
     config.SetArrestVarString("Jail::Handle Skill Loss", config.GetJailHandleSkillLoss(Hold))
@@ -343,9 +457,9 @@ function SetupJailVars()
     config.SetArrestVarFloat("Frisking::Stolen Items Required for Stripping", config.GetFriskingStolenItemsRequiredForStripping(Hold))
     config.SetArrestVarBool("Stripping::Allow Stripping", config.IsStrippingEnabled(Hold))
     config.SetArrestVarString("Stripping::Handle Stripping On", config.GetStrippingHandlingCondition(Hold))
-    config.SetArrestVarFloat("Stripping::Bounty to Strip", config.GetStrippingMinimumBounty(Hold))
-    config.SetArrestVarFloat("Stripping::Violent Bounty to Strip", config.GetStrippingMinimumViolentBounty(Hold))
-    config.SetArrestVarFloat("Stripping::Sentence to Strip", config.GetStrippingMinimumSentence(Hold))
+    config.SetArrestVarInt("Stripping::Bounty to Strip", config.GetStrippingMinimumBounty(Hold))
+    config.SetArrestVarInt("Stripping::Violent Bounty to Strip", config.GetStrippingMinimumViolentBounty(Hold))
+    config.SetArrestVarInt("Stripping::Sentence to Strip", config.GetStrippingMinimumSentence(Hold))
     config.SetArrestVarBool("Stripping::Strip when Defeated", config.IsStrippedOnDefeat(Hold))
     config.SetArrestVarFloat("Stripping::Stripping Thoroughness", config.GetStrippingThoroughness(Hold))
     config.SetArrestVarBool("Clothing::Allow Clothing", config.IsClothingEnabled(Hold))
@@ -367,13 +481,15 @@ function SetupJailVars()
     config.SetArrestVarFloat("Clothing::Outfit::Maximum Bounty", config.GetClothingOutfitMaximumBounty(Hold))
 
     ; Dynamic Vars
-    int arrestParams = config.GetArrestVarInt("Arrest::Arrest Params")
+    int arrestParams = config.GetArrestVarObj("Arrest::Arrest Params")
     int sentenceOverride = JMap.getInt(arrestParams, "Sentence")
     bool hasSentenceOverride = JMap.hasKey(arrestParams, "Sentence")
     config.SetArrestVarForm("Arrest::Arrest Faction", config.GetFaction(Hold))
     config.SetArrestVarFloat("Jail::Sentence", int_if(hasSentenceOverride, sentenceOverride, (BountyNonViolent + GetViolentBountyConverted()) / BountyToSentence))
     config.SetArrestVarFloat("Jail::Time of Imprisonment", CurrentTime)
     config.SetArrestVarBool("Jail::Jailed", true)
+    config.SetArrestVarInt("Jail::Cell Door Old Lock Level", CellDoor.GetLockLevel())
+    config.SetArrestVarForm("Jail::Cell Door", GetNearestDoor(Arrestee, 200))
 
     Debug(self, "SetupJailVars", "Finished setting up jail variables...")
 endFunction
@@ -395,19 +511,55 @@ function UpdateSentence()
     config.SetArrestVarFloat("Jail::Sentence", (_bountyNonViolent + GetViolentBountyConverted()) / BountyToSentence)
 endFunction
 
+function UpdateSentenceFromBounty()
+    int _bountyNonViolent    = ArrestFaction.GetCrimeGoldNonViolent()
+    int _bountyViolent       = ArrestFaction.GetCrimeGoldViolent()
+
+    ; Debug(self, "UpdateSentenceFromBounty", "_bountyNonViolent: " + _bountyNonViolent)
+    ; Debug(self, "UpdateSentenceFromBounty", "_bountyViolent: " + _bountyViolent)
+    ; Debug(self, "UpdateSentenceFromBounty", "BountyNonViolent: " + _bountyViolent)
+
+    config.SetArrestVarFloat("Arrest::Bounty Non-Violent", BountyNonViolent + _bountyNonViolent)
+    config.SetArrestVarFloat("Arrest::Bounty Violent", BountyViolent + _bountyViolent)
+    config.SetArrestVarFloat("Jail::Sentence", (BountyNonViolent + GetViolentBountyConverted()) / BountyToSentence)
+
+    ClearBountyFromFaction()
+endFunction
+
+function ClearBountyFromFaction()
+    ArrestFaction.SetCrimeGold(0)
+    ArrestFaction.SetCrimeGoldViolent(0)
+endFunction
+
 ; Get the bounty from storage and add it into active bounty for this faction.
 function RevertBounty()
     ArrestFaction.SetCrimeGold(BountyNonViolent)
     ArrestFaction.SetCrimeGoldViolent(BountyViolent)
 
     ; Should we clear it from storage vars?
+    config.SetArrestVarInt("Arrest::Bounty Non-Violent", 0)
+    config.SetArrestVarInt("Arrest::Bounty Violent", 0)
+endFunction
+
+int function GetCellDoorLockLevel()
+    string configuredLockLevel = config.GetArrestVarString("Jail::Cell Lock Level")
+    return  int_if (configuredLockLevel == "Novice", 1, \
+            int_if (configuredLockLevel == "Apprentice", 25, \
+            int_if (configuredLockLevel == "Adept", 50, \
+            int_if (configuredLockLevel == "Expert", 75, \
+            int_if (configuredLockLevel == "Master", 100, \
+            int_if (configuredLockLevel == "Requires Key", 255))))))
+endFunction
+
+function AddEscapedBounty()
+    ArrestFaction.ModCrimeGold(floor((BountyNonViolent * percent(EscapeBountyFromCurrentArrest))) + EscapeBounty)
 endFunction
 
 int function GetInfamyGainedDaily()
     int infamyGainedFlat                    = config.GetArrestVarFloat("Jail::Infamy Gained Daily") as int
     float infamyGainedFromCurrentBounty     = config.GetArrestVarFloat("Jail::Infamy Gained Daily from Current Bounty")
 
-    ; floor(7000 * ToPercent(1.44) + 40 = 7000 * 0.0144 + 40 = 100.8 + 40 = 140.8)
+    ; floor(7000 * percent(1.44) + 40 = 7000 * 0.0144 + 40 = 100.8 + 40 = 140.8)
     ; <=> floor(140.8) = 140
     return floor((Bounty * percent(infamyGainedFromCurrentBounty)) + infamyGainedFlat)
 endFunction
@@ -458,27 +610,16 @@ function ShowJailVars()
     " }")
 endFunction
 
+function ShowArrestVars()
+    Debug(self, "ShowArrestVars", "\n" + Hold + " Arrest Vars: " + GetContainerList(config.GetArrestVars()))
+endFunction
+
 function ShowArrestParams()
-    int arrestParams = config.GetArrestVarInt("Arrest::Arrest Params")
-    Debug(self, "ShowArrestParams", "\n" + Hold + " Arrest Params: " + GetContainerList(arrestParams, 1))
-    ; string paramOutput
-
-    ; int i = 0
-    ; while (i < JMap.count(arrestParams))
-    ;     string paramName = JMap.getNthKey(arrestParams, i)
-    ;     int paramValue = JMap.getInt(arrestParams, paramName)
-    ;     paramOutput += paramName + ": " + paramValue + "\n" + string_if(i != JMap.count(arrestParams) - 1, "\t")
-    ;     i += 1
-    ; endWhile
-
-    ; Debug(self, "ShowArrestParams", "\n" + Hold + " Arrest Params: { \n\t" + \
-    ;     paramOutput + \
-    ; " }")
-    ; Debug(self, "ShowArrestParams", "\n" + Hold + " Arrest Params: { \n\t" + \
-    ;     "Bounty Non-Violent: " + JMap.getInt(arrestParams, "Bounty Non-Violent") + ", \n\t" + \
-    ;     "Bounty Violent: " + JMap.getInt(arrestParams, "Bounty Violent") + ", \n\t" + \
-    ;     "Arrestee: " + JMap.getInt(arrestParams, "Arrestee") + ", \n\t" + \
-    ; " }")
+    int arrestParams = config.GetArrestVarObj("Arrest::Arrest Params")
+    int arrestParamsObj = JMap.getObj(config.GetArrestVars(), "Arrest::Arrest Params")
+    int arrestParamsBV = JMap.getInt(config.GetArrestVars(), "Arrest::Bounty Violent")
+    bool isObject = JValue.isMap(arrestParamsObj)
+    Debug(self, "ShowArrestParams (id: "+ arrestParamsObj +", isObject: "+ isObject +", arrestParamsBV: "+ arrestParamsBV +")", "\n" + Hold + " Arrest Params: " + GetContainerList(arrestParams))
 endFunction
 
 int function GetTimeServedDays()
@@ -526,24 +667,6 @@ int function GetTimeLeftSeconds()
 endFunction
 
 function ShowSentenceInfo()
-    ; int timeServedDays = floor(TimeServed) ; Days
-    ; float timeLeftOverOfDay = (TimeServed - timeServedDays) * 24; Hours and Minutes
-    ; float timeLeftOverOfHour = (timeLeftOverOfDay - floor(timeLeftOverOfDay)) * 60 ; Minutes
-    ; float timeLeftOverOfMinute = (timeLeftOverOfHour - floor(timeLeftOverOfHour)) * 60 ; Seconds
-
-    ; int timeLeftToServeDays = floor(TimeLeftInSentence) ; Days
-    ; float timeLeftToServeLeftOverOfDay = (TimeLeftInSentence - timeLeftToServeDays) * 24; Hours and Minutes
-    ; float timeLeftToServeLeftOverOfHour = (timeLeftToServeLeftOverOfDay - floor(timeLeftToServeLeftOverOfDay)) * 60 ; Minutes
-    ; float timeLeftToServeLeftOverOfMinute = (timeLeftToServeLeftOverOfHour - floor(timeLeftToServeLeftOverOfHour)) * 60 ; Seconds
-
-    ; int timeServedHours = floor(timeLeftOverOfDay)
-    ; int timeServedMinutes = floor(timeLeftOverOfHour)
-    ; int timeServedSeconds = floor(timeLeftOverOfMinute)
-
-    ; int timeLeftToServeHours = floor(timeLeftToServeLeftOverOfDay)
-    ; int timeLeftToServeMinutes = floor(timeLeftToServeLeftOverOfHour)
-    ; int timeLeftToServeSeconds = floor(timeLeftToServeLeftOverOfMinute)
-
     int timeServedDays      = GetTimeServedDays()
     int timeServedHours     = GetTimeServedHoursOfDay()
     int timeServedMinutes   = GetTimeServedMinutesOfHour()
@@ -609,14 +732,86 @@ function ShowHoldStats()
     " }")
 endFunction
 
+; Sets the jail outfit for @undressedActor.
+; This function assumes the actor is already undressed.
+; TODO: In case of the actor escaping, the outfit should be the same if the condition is met, and the default outfit should also be the same
+; if they already worn it for the first time
+function SetJailOutfit(Actor undressedActor, bool useDefaultOutfits = false, bool includeFeetClothingOnDefaultOutfit = true)
+    Armor headClothing  = none
+    Armor bodyClothing  = none
+    Armor handsClothing = none
+    Armor feetClothing  = none
+
+    if (OutfitName == "Default" || useDefaultOutfits)
+        ; Set default jail outfits
+        int OUTFIT_DEFAULT_ROUGHSPUN_TUNIC  = 0
+        int OUTFIT_DEFAULT_RAGGED_TROUSERS  = 1
+        int OUTFIT_DEFAULT_RAGGED_ROBES     = 2
+
+        int whichDefaultOutfit = Utility.RandomInt(0, 2)
+
+        if (whichDefaultOutfit == OUTFIT_DEFAULT_ROUGHSPUN_TUNIC)
+            bodyClothing = Game.GetFormEx(0x3C9FE) as Armor ; Roughspun Tunic
+            feetClothing = form_if (includeFeetClothingOnDefaultOutfit, Game.GetFormEx(0x3CA00), none)  as Armor ; Footwraps
+
+        elseif (whichDefaultOutfit == OUTFIT_DEFAULT_RAGGED_TROUSERS)
+            bodyClothing = Game.GetFormEx(0x8F19A) as Armor ; Ragged Trousers
+            feetClothing = form_if (includeFeetClothingOnDefaultOutfit, Game.GetFormEx(0x3CA00), none)  as Armor ; Footwraps
+
+        elseif (whichDefaultOutfit == OUTFIT_DEFAULT_RAGGED_ROBES)
+            bodyClothing = Game.GetFormEx(0x13105) as Armor ; Ragged Robes
+            feetClothing = form_if (includeFeetClothingOnDefaultOutfit, Game.GetFormEx(0x3CA00), none)  as Armor ; Footwraps
+        endif
+
+        string defaultOutfitReturned =  string_if (whichDefaultOutfit == OUTFIT_DEFAULT_ROUGHSPUN_TUNIC, "Roughspun Tunic", \
+                                        string_if (whichDefaultOutfit == OUTFIT_DEFAULT_RAGGED_TROUSERS, "Ragged Trousers", \
+                                        string_if (whichDefaultOutfit == OUTFIT_DEFAULT_RAGGED_ROBES, "Ragged Robes")))
+
+        Debug(self, "SetJailOutfit", "Got the " + defaultOutfitReturned + " default outfit. (" + "got feet clothing: " + (feetClothing != none) + ")")
+
+    else
+        ; TODO: if max bounty is the same as min bounty, then the condition should be removed
+        bool meetsCondition = !IsOutfitConditional || (IsOutfitConditional && Bounty >= OutfitMinBounty && Bounty <= OutfitMaxBounty)
+
+        if (meetsCondition)
+            headClothing    = OutfitHead
+            bodyClothing    = OutfitBody
+            handsClothing   = OutfitHands
+            feetClothing    = OutfitFeet
+        
+        else
+            ; Condition not met for this outfit, revert to defaults
+            bool includeFeetClothing = Utility.RandomInt(0, 3) >= 1 ; 75% chance to include feet clothing
+            SetJailOutfit(undressedActor, true, includeFeetClothing)
+        endif
+
+    endif
+
+    if (!AlreadyHasWornOutfit())
+        ; Set currently worn outfit, if the actor escapes, the outfit will always be the same
+        config.SetArrestVarForm("Jail::Worn Outfit::Head", headClothing)
+        config.SetArrestVarForm("Jail::Worn Outfit::Body", bodyClothing)
+        config.SetArrestVarForm("Jail::Worn Outfit::Hands", handsClothing)
+        config.SetArrestVarForm("Jail::Worn Outfit::Feet", feetClothing)
+    endif
+
+    undressedActor.EquipItem(headClothing)
+    undressedActor.EquipItem(bodyClothing)
+    undressedActor.EquipItem(handsClothing)
+    undressedActor.EquipItem(feetClothing)
+endFunction
+
+bool function AlreadyHasWornOutfit()
+    return  config.GetArrestVarForm("Jail::Worn Outfit::Head") || \
+            config.GetArrestVarForm("Jail::Worn Outfit::Body") || \
+            config.GetArrestVarForm("Jail::Worn Outfit::Hands") || \
+            config.GetArrestVarForm("Jail::Worn Outfit::Feet")
+endFunction
+
 event OnJailedBegin(string eventName, string strArg, float numArg, Form sender)
     Debug(self, "OnJailedBegin", "Starting jailing process...")
     SetupJailVars()
     GotoState("Jailed")
-endEvent
-
-event OnUndressed(string eventName, string strArg, float numArg, Form sender)
-    
 endEvent
 
 
@@ -625,6 +820,25 @@ event OnJailedEnd(string eventName, string strArg, float numArg, Form sender)
     config.ResetArrestVars()
 endEvent
 
+; ObjectReference function GetNearestCellDoor()
+;     int i = 10
+;     float range = 200.0
+
+;     while (i > 0)
+;         ObjectReference _cellDoor = Game.FindRandomReferenceOfTypeFromRef(config.DoorRef.GetBaseObject(), config.Player, range)
+;         if (_cellDoor)
+;             return _cellDoor
+;         endif
+
+;         if (range < 8000)
+;             range *= 2
+;         endif
+;         i -= 1
+;     endWhile
+
+;     return none
+; endFunction
+
 state Jailed
     event OnBeginState()
         Debug(self, "OnBeginState", "Jailed state begin")
@@ -632,24 +846,144 @@ state Jailed
         ; Switch timescale to prison timescale
         config.IncrementStat(Hold, "Times Jailed")
 
+        if (JailCell)
+            CellDoor.SetOpen(false)
+            CellDoor.Lock()
+        endif
+
+        if (ShouldBeStripped)
+            float strippingThoroughness = config.GetArrestVarFloat("Stripping::Stripping Thoroughness")
+
+            ; Determine what to strip based on thoroughness
+
+            if (strippingThoroughness >= 20.0)
+                ; Strip naked, leaving no chance for lockpicks
+
+            elseif (strippingThoroughness >= 10.0)
+                ; Strip naked, leaving very little chance for lockpicks
+
+            elseif (strippingThoroughness >= 8)
+                ; Strip naked, leaving little chance for lockpicks
+
+            elseif (strippingThoroughness >= 6)
+                ; Strip naked, leaving some chance for lockpicks
+
+            elseif (strippingThoroughness >= 4)
+                ; Strip to underwear, leaving average chance for lockpicks
+
+            elseif (strippingThoroughness >= 2)
+                ; Strip to underwear, leaving high chance for lockpicks and 1 key
+
+            elseif (strippingThoroughness >= 0)
+                ; Strip to underwear, leaving high chance for lockpicks and high chance for keys
+
+            endif
+
+            ; Stripping naked should only be allowed if a nude body mod is installed
+            ; Likewise, stripping to underwear should only be allowed if a nude body mod AND a wearable underwear mod are installed, or if no nude body mod is installed (underwear by default)
+            Debug(self, "OnBeginState", "Undressed Actor: " + Arrestee)
+
+            Arrestee.RemoveAllItems()
+            OnUndressed(Arrestee)
+
+        elseif (ShouldBeClothed && !ActorHasClothing(Arrestee))
+            ; Only handle clothing here when not stripped, which means the Actor did not have any clothing
+            SetJailOutfit(Arrestee, includeFeetClothingOnDefaultOutfit = Utility.RandomInt(0, 3) == 0) ; 25% Chance to include feet clothing
+            OnClothed(Arrestee)
+        endif
+
+
         int currentLongestSentence = config.GetStat(Hold, "Longest Sentence")
         config.SetStat(Hold, "Longest Sentence", int_if (currentLongestSentence < Sentence, Sentence, currentLongestSentence))
         ShowJailVars()
-        ShowOutfitInfo()
-        ShowHoldStats()
+        ; ShowOutfitInfo()
+        ; ShowHoldStats()
         ShowArrestParams()
+        ShowArrestVars()
 
-        config.NotifyJail("You have been sentenced to " + Sentence + " days in jail")
+        config.NotifyJail("Your sentence in " + Hold + " was set to " + Sentence + " days in jail")
 
-        ; if (IsClothingEnabled)
-        ;     config.Player.EquipItem(OutfitHead)
-        ;     config.Player.EquipItem(OutfitBody)
-        ;     config.Player.EquipItem(OutfitHands)
-        ;     config.Player.EquipItem(OutfitFeet)
-        ; endif
+        CellDoorRef.ForceRefTo(CellDoor)
+        
+        ; Debug(self, "OnBeginState", "DoorRef: " + config.DoorRef + ", DoorRef.Type: " + config.DoorRef.GetType() + ", JailCellMarker: " + JailCell + ", Found cell door: " + jailCellDoorRef)
+
         LastUpdate = Utility.GetCurrentGameTime()
-
         RegisterForSingleUpdateGameTime(1.0)
+    endEvent
+
+    event OnFriskBegin(Actor friskSearchPerformer, Actor actorToFrisk)
+        ; Happens when the actor is beginning to be frisked
+    endEvent
+
+    event OnFriskEnd(Actor friskSearchPerformer, Actor friskedActor)
+        ; Happens when the actor has been frisked
+    endEvent
+
+    event OnStripBegin(Actor stripSearchPerformer, Actor actorToStrip)
+        ; Happens when the actor is about to be stripped
+    endEvent
+
+    event OnStripEnd(Actor stripSearchPerformer, Actor strippedActor)
+        ; Happens when the actor has been stripped
+    endEvent
+
+    event OnEscortToCellBegin(Actor escortActor, Actor escortedActor)
+        ; Happens when the actor is being escorted to their cell
+    endEvent
+
+    event OnEscortToCellEnd(Actor escortActor, Actor escortedActor)
+        ; Happens when the actor has been escorted to their cell
+    endEvent
+
+    event OnEscortFromCellBegin(Actor escortActor, Actor escortedActor, ObjectReference destination)
+        ; Happens when the actor is being escorted from their cell to the destination
+    endEvent
+
+    event OnEscortFromCellEnd(Actor escortActor, Actor escortedActor, ObjectReference destination)
+        ; Happens when the actor has been escorted from their cell to the destination
+    endEvent
+
+    event OnActorCuffed(Actor cuffedActor, bool hands, bool feet)
+        ; Happens when the actor has been cuffed (hands bound, maybe feet?)
+    endEvent
+
+    event OnActorUncuffed(Actor uncuffedActor, bool hands, bool feet)
+        ; Happens when the actor has been uncuffed (hands unbound, maybe feet?)
+    endEvent
+
+    event OnUndressed(Actor undressedActor)
+        ; Actor should be undressed at this point
+        if (ShouldBeClothed)
+            SetJailOutfit(undressedActor, true, false)
+            OnClothed(undressedActor)
+        endif
+
+        Debug(self, "OnUndressed", "undressedActor: " + undressedActor)
+    endEvent
+
+    event OnClothed(Actor clothedActor)
+        ; Do anything that needs to be done after the actor has been stripped and clothed.
+        Debug(self, "OnClothed", "clothedActor: " + clothedActor)
+
+    endEvent
+
+    event OnCellDoorOpen(ObjectReference _cellDoor, Actor whoOpened)
+        if (whoOpened == Arrestee)
+            GotoState("Escaped")
+        endif
+    endEvent
+
+    event OnCellDoorClosed(ObjectReference _cellDoor, Actor whoClosed)
+        if (whoClosed == Arrestee)
+            ;/ 
+                If the prisoner closed the door, that means that it has been lockpicked or unlocked with the key
+                Maybe make a guard suspicion system that checks if the door is unlocked, and locks it when he passes by (optionally adding bounty for unlocking the door)
+            /;
+        endif
+        ; Lock the cell door when it's closed
+        Debug(self, "OnCellDoorClosed", "Locked Cell Door with a " + config.GetArrestVarString("Jail::Cell Door Lock Level") + " ("+ GetCellDoorLockLevel() +") " + "lock level")
+        _cellDoor.SetLockLevel(GetCellDoorLockLevel())
+        _cellDoor.Lock()
     endEvent
 
     event OnUpdateGameTime()
@@ -662,7 +996,11 @@ state Jailed
         ;/
             if (CurrentTime - TimeOfImprisonment) - LastUpdate >= 1 
         /;
+
+        ObjectReference jailCellDoorRef = Game.FindClosestReferenceOfTypeFromRef(config.DoorRef, JailCell, 50.0)
+        Debug(self, "OnBeginState", "Found cell door: " + jailCellDoorRef)
  
+        UpdateSentenceFromBounty()
         ShowSentenceInfo()
 
         if (InfamyEnabled)
@@ -715,7 +1053,12 @@ state Escaped
         ; Begin Escaped process, Actor is arrested and is trying to escape
         ; Add back bounty to active from storage and apply the escape penalty if there's any
         ; Optionally, make guards aggressive (maybe depending on the bounty?)
+
+        int escapeBountyGotten = floor((BountyNonViolent * percent(EscapeBountyFromCurrentArrest))) + EscapeBounty
+
+        config.NotifyJail("You have gained " + escapeBountyGotten + " Bounty in " + Hold + " for Escaping")
         RevertBounty()
+        AddEscapedBounty()
     endEvent
 
     event OnUpdateGameTime()
@@ -764,6 +1107,85 @@ state Free
         ; Terminate Free process, Processing after Actor is free should be done by now.
     endEvent
 endState
+
+event OnFriskBegin(Actor friskSearchPerformer, Actor actorToFrisk)
+    ; Happens when the actor is beginning to be frisked
+endEvent
+
+event OnFriskEnd(Actor friskSearchPerformer, Actor friskedActor)
+    ; Happens when the actor has been frisked
+endEvent
+
+event OnStripBegin(Actor stripSearchPerformer, Actor actorToStrip)
+    ; Happens when the actor is about to be stripped
+endEvent
+
+event OnStripEnd(Actor stripSearchPerformer, Actor strippedActor)
+    ; Happens when the actor has been stripped
+endEvent
+
+event OnEscortToCellBegin(Actor escortActor, Actor escortedActor)
+    ; Happens when the actor is being escorted to their cell
+endEvent
+
+event OnEscortToCellEnd(Actor escortActor, Actor escortedActor)
+    ; Happens when the actor has been escorted to their cell
+endEvent
+
+event OnEscortFromCellBegin(Actor escortActor, Actor escortedActor, ObjectReference destination)
+    ; Happens when the actor is being escorted from their cell to the destination
+endEvent
+
+event OnEscortFromCellEnd(Actor escortActor, Actor escortedActor, ObjectReference destination)
+    ; Happens when the actor has been escorted from their cell to the destination
+endEvent
+
+event OnActorCuffed(Actor cuffedActor, bool hands, bool feet)
+    ; Happens when the actor has been cuffed (hands bound, maybe feet?)
+endEvent
+
+event OnActorUncuffed(Actor uncuffedActor, bool hands, bool feet)
+    ; Happens when the actor has been uncuffed (hands unbound, maybe feet?)
+endEvent
+
+event OnUndressed(Actor undressedActor)
+
+endEvent
+
+event OnClothed(Actor clothedActor)
+    ; Do anything that needs to be done after the actor has been stripped and clothed.
+endEvent
+
+event OnCellDoorLocked(ObjectReference _cellDoor, Actor whoLocked)
+
+endEvent
+
+event OnCellDoorUnlocked(ObjectReference _cellDoor, Actor whoUnlocked)
+
+endEvent
+
+event OnCellDoorOpen(ObjectReference _cellDoor, Actor whoOpened)
+    ; If the cell door was open by the player, and they are not jailed, this must mean that they lockpicked the door either just because or to get someone out of jail.
+    if (whoOpened == config.Player)
+        Faction jailFaction = config.GetFaction(config.GetCurrentPlayerHoldLocation())
+        ; Add bounty for lockpicking / breaking someone out of jail  if they are witnessed
+        ; if (witnessedCrime)
+        jailFaction.ModCrimeGold(2000) ; TODO: Test if this works, the faction gotten from the door may not be the crime faction
+        Debug(self, "OnCellDoorOpen", "jailFaction: " + jailFaction + ", bounty: " + jailFaction.GetCrimeGold())
+    endif
+endEvent
+
+event OnCellDoorClosed(ObjectReference _cellDoor, Actor whoOpened)
+    ; TODO: Use this event to trigger the Jailed state when the jailor closes the door for the escort scenario
+    ; Error(self, "OnCellDoorClosed", "Not currently Jailed, invalid call!")
+    ; CellDoorRef.Clear()
+    ; Lock the cell door when it's closed
+    Debug(self, "OnCellDoorClosed", "Locked Cell Door with a " + config.GetArrestVarString("Jail::Cell Door Lock Level") + " ("+ GetCellDoorLockLevel() +") " + "lock level")
+    _cellDoor.SetLockLevel(GetCellDoorLockLevel())
+    _cellDoor.Lock()
+    CellDoorRef.Clear()
+    Debug(self, "OnCellDoorClosed", "Locked Cell Door with a " + config.GetArrestVarString("Jail::Cell Door Lock Level") + " ("+ GetCellDoorLockLevel() +") " + "lock level")
+endEvent
 
 ; Placeholders for State events
 event OnEscapeFail()
