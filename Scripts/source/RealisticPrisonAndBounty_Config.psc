@@ -54,6 +54,14 @@ Actor property Player
     endFunction
 endProperty
 
+; ObjectReference property DoorRef
+;     ObjectReference function get()
+;         return Game.GetFormEx(0x5E922) as ObjectReference
+;     endFunction
+; endProperty
+
+ObjectReference property DoorRef auto
+
 int _arrestVars
 function SetArrestVarBool(string varName, bool value)
     JMap.setInt(_arrestVars, varName, value as int)
@@ -75,6 +83,10 @@ function SetArrestVarForm(string varName, Form value)
     JMap.setForm(_arrestVars, varName, value)
 endFunction
 
+function SetArrestVarObj(string varName, int value)
+    JMap.setObj(_arrestVars, varName, value)
+endFunction
+
 bool function GetArrestVarBool(string varName)
     return JMap.getInt(_arrestVars, varName) as bool
 endFunction
@@ -93,6 +105,15 @@ endFunction
 
 Form function GetArrestVarForm(string varName)
     return JMap.getForm(_arrestVars, varName)
+endFunction
+
+int function GetArrestVarObj(string varName)
+    return JMap.getObj(_arrestVars, varName)
+endFunction
+
+; Returns the container with the Arrest variables
+int function GetArrestVars()
+    return _arrestVars
 endFunction
 
 function ResetArrestVars()
@@ -669,15 +690,15 @@ bool function IsStrippingBasedOnBounty(string hold)
 endFunction
 
 int function GetStrippingMinimumSentence(string hold)
-    return mcm.GetSliderOptionValue(hold, "Stripping::Minimum Sentence") as int
+    return mcm.GetSliderOptionValue(hold, "Stripping::Minimum Sentence to Strip") as int
 endFunction
 
 int function GetStrippingMinimumBounty(string hold)
-    return mcm.GetSliderOptionValue(hold, "Stripping::Minimum Bounty") as int
+    return mcm.GetSliderOptionValue(hold, "Stripping::Minimum Bounty to Strip") as int
 endFunction
 
 int function GetStrippingMinimumViolentBounty(string hold)
-    return mcm.GetSliderOptionValue(hold, "Stripping::Minimum Violent Bounty") as int
+    return mcm.GetSliderOptionValue(hold, "Stripping::Minimum Violent Bounty to Strip") as int
 endFunction
 
 bool function IsStrippedOnDefeat(string hold)
@@ -763,40 +784,6 @@ int function GetInfamyLost(string hold)
     return mcm.GetSliderOptionValue(hold, "Infamy::Infamy Lost)") as int
 endFunction
 
-function IncrementInfamy(string hold, int incrementBy)
-    int currentInfamy = GetInfamyGained(hold)
-    string option = hold + "::Infamy Gained"
-    mcm.SetOptionStatValue(option, currentInfamy + incrementBy)
-    NotifyInfamy("You have gained " + incrementBy + " Infamy in " + hold)
-endFunction
-
-function DecrementInfamy(string hold, int decrementBy)
-    int currentInfamy = GetInfamyGained(hold)
-    string option = hold + "::Infamy Gained"
-    mcm.SetOptionStatValue(option, currentInfamy - decrementBy)
-endFunction
-
-; TODO: Change how the stat is parsed
-int function GetInfamyGained(string hold)
-    return mcm.GetStatOptionValue("Stats", hold + "::Infamy Gained")
-endFunction
-
-int function GetStat(string hold, string stat)
-    return mcm.GetStatOptionValue("Stats", hold + "::" + stat)
-endFunction
-
-int function QueryStat(string hold, string stat)
-    return GetStat(hold, stat)
-endFunction
-
-bool function IsInfamyRecognized(string hold)
-    return isInfamyEnabled(hold) && getInfamyGained(hold) >= getInfamyRecognizedThreshold(hold)
-endFunction
-
-bool function IsInfamyKnown(string hold)
-    return isInfamyEnabled(hold) && getInfamyGained(hold) >= getInfamyKnownThreshold(hold)
-endFunction
-
 int function GetInfamyRecognizedThreshold(string hold)
     return mcm.GetSliderOptionValue(hold, "Infamy::Infamy Recognized Threshold") as int
 endFunction
@@ -809,6 +796,7 @@ bool function IsBountyDecayEnabled(string hold)
     return mcm.GetToggleOptionState(hold, "Bounty Decaying::Enable Bounty Decaying")
 endFunction
 
+; TODO: Finish conditions for this function
 bool function IsBountyDecayableAsCriminal(string hold)
     return isBountyDecayEnabled(hold) && isInfamyEnabled(hold) && mcm.GetToggleOptionState(hold, "Bounty Decaying::Decay if Known as Criminal")
 endFunction
@@ -975,6 +963,40 @@ endFunction
 
 float function GetChargeBountyForCellKey(string hold)
     return mcm.GetSliderOptionValue(hold, "Additional Charges::Bounty for Cell Key")
+endFunction
+
+function IncrementInfamy(string hold, int incrementBy)
+    int currentInfamy = GetInfamyGained(hold)
+    string option = hold + "::Infamy Gained"
+    mcm.SetOptionStatValue(option, currentInfamy + incrementBy)
+    NotifyInfamy("You have gained " + incrementBy + " Infamy in " + hold)
+endFunction
+
+function DecrementInfamy(string hold, int decrementBy)
+    int currentInfamy = GetInfamyGained(hold)
+    string option = hold + "::Infamy Gained"
+    mcm.SetOptionStatValue(option, currentInfamy - decrementBy)
+endFunction
+
+; TODO: Change how the stat is parsed
+int function GetInfamyGained(string hold)
+    return mcm.GetStatOptionValue("Stats", hold + "::Infamy Gained")
+endFunction
+
+int function GetStat(string hold, string stat)
+    return mcm.GetStatOptionValue("Stats", hold + "::" + stat)
+endFunction
+
+int function QueryStat(string hold, string stat)
+    return GetStat(hold, stat)
+endFunction
+
+bool function IsInfamyRecognized(string hold)
+    return isInfamyEnabled(hold) && getInfamyGained(hold) >= getInfamyRecognizedThreshold(hold)
+endFunction
+
+bool function IsInfamyKnown(string hold)
+    return isInfamyEnabled(hold) && getInfamyGained(hold) >= getInfamyKnownThreshold(hold)
 endFunction
 
 function RemoveKeys(ObjectReference akContainer = none)

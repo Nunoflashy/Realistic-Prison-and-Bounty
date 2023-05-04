@@ -127,12 +127,12 @@ function SetArrestParams()
 endFunction
 
 bool function AddArrestParam(string paramName, int value, bool checkIntegrity = true)
-    int arrestParams = config.GetArrestVarInt("Arrest::Arrest Params")
+    int arrestParams = config.GetArrestVarObj("Arrest::Arrest Params")
 
     if (!arrestParams)
         arrestParams = JMap.object()
         JValue.retain(arrestParams)
-        config.SetArrestVarInt("Arrest::Arrest Params", arrestParams)
+        config.SetArrestVarObj("Arrest::Arrest Params", arrestParams)
     endif
 
     JMap.setInt(arrestParams, paramName, value)
@@ -141,12 +141,12 @@ bool function AddArrestParam(string paramName, int value, bool checkIntegrity = 
 endFunction
 
 bool function AddArrestParamObject(string paramName, int value, bool checkIntegrity = true)
-    int arrestParams = config.GetArrestVarInt("Arrest::Arrest Params")
+    int arrestParams = config.GetArrestVarObj("Arrest::Arrest Params")
 
     if (!arrestParams)
         arrestParams = JMap.object()
         JValue.retain(arrestParams)
-        config.SetArrestVarInt("Arrest::Arrest Params", arrestParams)
+        config.SetArrestVarObj("Arrest::Arrest Params", arrestParams)
     endif
 
     JMap.setObj(arrestParams, paramName, value)
@@ -155,12 +155,12 @@ bool function AddArrestParamObject(string paramName, int value, bool checkIntegr
 endFunction
 
 bool function AddArrestParamBool(string paramName, bool value, bool checkIntegrity = true)
-    int arrestParams = config.GetArrestVarInt("Arrest::Arrest Params")
+    int arrestParams = config.GetArrestVarObj("Arrest::Arrest Params")
 
     if (!arrestParams)
         arrestParams = JMap.object()
         JValue.retain(arrestParams)
-        config.SetArrestVarInt("Arrest::Arrest Params", arrestParams)
+        config.SetArrestVarObj("Arrest::Arrest Params", arrestParams)
     endif
 
     JMap.setInt(arrestParams, paramName, value as int)
@@ -169,12 +169,12 @@ bool function AddArrestParamBool(string paramName, bool value, bool checkIntegri
 endFunction
 
 bool function AddArrestParamString(string paramName, string value, bool checkIntegrity = true)
-    int arrestParams = config.GetArrestVarInt("Arrest::Arrest Params")
+    int arrestParams = config.GetArrestVarObj("Arrest::Arrest Params")
 
     if (!arrestParams)
         arrestParams = JMap.object()
         JValue.retain(arrestParams)
-        config.SetArrestVarInt("Arrest::Arrest Params", arrestParams)
+        config.SetArrestVarObj("Arrest::Arrest Params", arrestParams)
     endif
 
     JMap.setStr(arrestParams, paramName, value)
@@ -201,7 +201,7 @@ event OnKeyDown(int keyCode)
         SetArrestParams()
 
         config.NotifyArrest("You have been arrested in " + currentHold)
-        crimeFaction.SendModEvent("ArrestBegin", numArg = config.GetArrestVarInt("Arrest::Arrest Params"))
+        crimeFaction.SendModEvent("ArrestBegin", numArg = config.GetArrestVarObj("Arrest::Arrest Params"))
 
     elseif (keyCode == 0x57)
         Game.QuitToMainMenu()
@@ -221,8 +221,11 @@ event OnArrestBegin(string eventName, string unusedStr, float arrestParams, Form
     int bountyNonViolentOverride = JMap.getInt(arrestParams as int, "Bounty Non-Violent")
     int bountyViolentOverride = JMap.getInt(arrestParams as int, "Bounty Violent")
 
+    if (arrestParams == 0x14)
+        arresteeRefId = 0x14
+    endif
+
     Actor arresteeRef = Game.GetForm(arresteeRefId) as Actor
-    ; Actor arresteeRef = Game.GetCurrentConsoleRef() as Actor
 
     if (!arresteeRef)
         Error(self, "OnArrestBegin", "Arrestee not found for this arrest, aborting!")
@@ -240,16 +243,20 @@ event OnArrestBegin(string eventName, string unusedStr, float arrestParams, Form
     config.SetArrestVarFloat("Arrest::Bounty Non-Violent", int_if(bountyNonViolentOverride > 0, bountyNonViolentOverride, crimeFaction.GetCrimeGoldNonViolent()))
     config.SetArrestVarFloat("Arrest::Bounty Violent", int_if (bountyViolentOverride > 0, bountyViolentOverride, crimeFaction.GetCrimeGoldViolent()))
     config.SetArrestVarForm("Arrest::Arrest Faction", crimeFaction)
+    config.SetArrestVarForm("Arrest::Arrestee", arresteeRef)
 
     Debug(self, "OnArrestBegin", "Vars: ["+ "Hold: " + crimeFaction.GetName() + ", BountyNonViolent: " + crimeFaction.GetCrimeGoldNonViolent() + ", BountyViolent: " + crimeFaction.GetCrimeGoldViolent() + "]")
     Debug(self, "OnArrestBegin", "StoredVars: ["+ "Hold: " + config.GetArrestVarString("Arrest::Hold") + ", BountyNonViolent: " + config.GetArrestVarFloat("Arrest::BountyNonViolent") + ", BountyViolent: " + config.GetArrestVarFloat("Arrest::BountyViolent") + "]")
 
     string hold = crimeFaction.GetName()
-    ObjectReference jailCellMarker = config.GetRandomJailMarker(hold)
 
-    ; Setup which jail cell to go to
-    ; TODO: Refactor this into the jail script, since Arrested does not necessarily mean jailed, the Actor might still pay their bounty.
-    config.SetArrestVarForm("Jail::Cell", jailCellMarker)
+    if (!config.GetArrestVarForm("Jail::Cell"))
+        ObjectReference jailCellMarker = config.GetRandomJailMarker(hold)
+
+        ; Setup which jail cell to go to
+        ; TODO: Refactor this into the jail script, since Arrested does not necessarily mean jailed, the Actor might still pay their bounty.
+        config.SetArrestVarForm("Jail::Cell", jailCellMarker)
+    endif
 
     config.NotifyArrest("You have been arrested in " + hold)
 
@@ -263,9 +270,8 @@ event OnArrestBegin(string eventName, string unusedStr, float arrestParams, Form
 
     if (captor || crimeFaction)
         crimeFaction.SetCrimeGold(0)
-        arresteeRef.RemoveAllItems()
+        crimeFaction.SetCrimeGoldViolent(0)
         arresteeRef.MoveTo(config.JailCell)
-        config.PrepareActorForJail(arresteeRef)
         SendModEvent("JailBegin")
     endif
 

@@ -409,7 +409,18 @@ bool function call_if(bool condition, string _if, string _else = "")
 endfunction
 
 
-string function __internal_GetMapElement(int map, string paramKey, int indentLevel = 1) global
+string function __internal_GetMapElement( \
+    int map, \
+    string paramKey, \
+    string includeStringFilter = "", \
+    string excludeStringFilter = "", \
+    int includeIntegerFilter = -1, \
+    int excludeIntegerFilter = -1, \
+    Form includeFormFilter = none, \
+    Form excludeFormFilter = none, \
+    int indentLevel = 1 \
+) global
+
     int mapLength = JMap.count(map)
 
     if (mapLength == 0)
@@ -427,48 +438,59 @@ string function __internal_GetMapElement(int map, string paramKey, int indentLev
     bool isIntValue = paramValueInt != 0
     bool isFloatValue = paramValueFlt != 0
     bool isStringValue = paramValueStr != ""
-    bool isObjValue = paramValueObj != 0
     bool isFormValue = paramValueForm != none
+    bool isObjValue = paramValueObj != 0
 
     if (isStringValue)
         string paramValue = paramValueStr
-        ; Debug(none, "__internal_GetMapElement", "Output: " + paramKey + ": " + paramValue)
         return paramKey + ": " + paramValue
 
     elseif (isIntValue)
         int paramValue = paramValueInt
-        ; Debug(none, "__internal_GetMapElement", "Output: " + paramKey + ": " + paramValue)
-
         return paramKey + ": " + paramValue
 
     elseif (isFloatValue)
         float paramValue = paramValueFlt
-        ; Debug(none, "__internal_GetMapElement", "Output: " + paramKey + ": " + paramValue)
-
         return paramKey + ": " + paramValue
 
     elseif (isObjValue)
         int paramValue = paramValueObj
-        string objListFunction = GetContainerList(paramValue, indentLevel + 1)
+        string objListFunction = GetContainerList( \
+            paramValue, \
+            includeStringFilter = includeStringFilter, \
+            excludeStringFilter = excludeStringFilter, \
+            includeIntegerFilter = includeIntegerFilter, \
+            excludeIntegerFilter = excludeIntegerFilter, \
+            includeFormFilter = includeFormFilter, \
+            excludeFormFilter = excludeFormFilter, \
+            indentLevel = indentLevel + 1 \
+        )
         return paramKey + ": " + objListFunction
 
     elseif (isFormValue)
         Form paramValue = paramValueForm
-        ; Debug(none, "__internal_GetMapElement", "Output: " + paramKey + ": " + paramValue)
-
         return paramKey + ": " + paramValue
 
     elseif (isBoolValue)
         bool paramValue = paramValueBool
-        ; Debug(none, "__internal_GetMapElement", "Output: " + paramKey + ": " + paramValue)
-
         return paramKey + ": " + paramValue
     endif
 
     return ""
 endFunction
 
-string function __internal_GetIntegerMapElement(int map, int paramKey, int indentLevel = 1) global
+string function __internal_GetIntegerMapElement( \
+    int map, \
+    int paramKey, \
+    string includeStringFilter = "", \
+    string excludeStringFilter = "", \
+    int includeIntegerFilter = -1, \
+    int excludeIntegerFilter = -1, \
+    Form includeFormFilter = none, \
+    Form excludeFormFilter = none, \
+    int indentLevel = 1 \
+) global
+
     int mapLength = JIntMap.count(map)
 
     if (mapLength == 0)
@@ -503,7 +525,16 @@ string function __internal_GetIntegerMapElement(int map, int paramKey, int inden
 
     elseif (isObjValue)
         int paramValue = paramValueObj
-        string objListFunction = GetContainerList(paramValue, indentLevel + 1)
+        string objListFunction = GetContainerList( \
+            paramValue, \
+            includeStringFilter = includeStringFilter, \
+            excludeStringFilter = excludeStringFilter, \
+            includeIntegerFilter = includeIntegerFilter, \
+            excludeIntegerFilter = excludeIntegerFilter, \
+            includeFormFilter = includeFormFilter, \
+            excludeFormFilter = excludeFormFilter, \
+            indentLevel = indentLevel + 1 \
+        )
         return paramKey + ": " + objListFunction
 
     elseif (isFormValue)
@@ -518,7 +549,18 @@ string function __internal_GetIntegerMapElement(int map, int paramKey, int inden
     return ""
 endFunction
 
-string function __internal_GetFormMapElement(int map, Form paramKey, int indentLevel = 1) global
+string function __internal_GetFormMapElement( \
+    int map, \
+    Form paramKey, \
+    string includeStringFilter = "", \
+    string excludeStringFilter = "", \
+    int includeIntegerFilter = -1, \
+    int excludeIntegerFilter = -1, \
+    Form includeFormFilter = none, \
+    Form excludeFormFilter = none, \
+    int indentLevel = 1 \
+) global
+
     int mapLength = JFormMap.count(map)
 
     if (mapLength == 0)
@@ -553,7 +595,16 @@ string function __internal_GetFormMapElement(int map, Form paramKey, int indentL
 
     elseif (isObjValue)
         int paramValue = paramValueObj
-        string objListFunction = GetContainerList(paramValue, indentLevel + 1)
+        string objListFunction = GetContainerList( \
+            paramValue, \
+            includeStringFilter = includeStringFilter, \
+            excludeStringFilter = excludeStringFilter, \
+            includeIntegerFilter = includeIntegerFilter, \
+            excludeIntegerFilter = excludeIntegerFilter, \
+            includeFormFilter = includeFormFilter, \
+            excludeFormFilter = excludeFormFilter, \
+            indentLevel = indentLevel + 1 \
+        )
         return paramKey + ": " + objListFunction
 
     elseif (isFormValue)
@@ -568,7 +619,18 @@ string function __internal_GetFormMapElement(int map, Form paramKey, int indentL
     return ""
 endFunction
 
-string function __internal_GetArrayElement(int array, int index, int indentLevel = 1) global
+string function __internal_GetArrayElement( \
+    int array, \
+    int index, \
+    string includeStringFilter = "", \
+    string excludeStringFilter = "", \
+    int includeIntegerFilter = -1, \
+    int excludeIntegerFilter = -1, \
+    Form includeFormFilter = none, \
+    Form excludeFormFilter = none, \
+    int indentLevel = 1 \
+) global
+
     int arrayLength = JArray.count(array)
 
     if (arrayLength == 0)
@@ -603,7 +665,16 @@ string function __internal_GetArrayElement(int array, int index, int indentLevel
 
     elseif (isObjValue)
         int paramValue = paramValueObj
-        string objListFunction = GetContainerList(paramValue, indentLevel + 1)
+        string objListFunction = GetContainerList( \
+            paramValue, \
+            includeStringFilter = includeStringFilter, \
+            excludeStringFilter = excludeStringFilter, \
+            includeIntegerFilter = includeIntegerFilter, \
+            excludeIntegerFilter = excludeIntegerFilter, \
+            includeFormFilter = includeFormFilter, \
+            excludeFormFilter = excludeFormFilter, \
+            indentLevel = indentLevel + 1 \
+        )
         return index + ": " + objListFunction
 
     elseif (isFormValue)
@@ -631,7 +702,17 @@ string function __internal_GetIndentLevel(int indentLevel) global
     return output
 endFunction
 
-string function GetContainerList(int _container, int indentLevel = 1) global
+string function GetContainerList( \
+    int _container, \
+    string includeStringFilter = "", \
+    string excludeStringFilter = "", \
+    int includeIntegerFilter = -1, \
+    int excludeIntegerFilter = -1, \
+    Form includeFormFilter = none, \
+    Form excludeFormFilter = none, \
+    int indentLevel = 1 \
+) global
+
     float start = StartBenchmark()
     string paramOutput
 
@@ -646,22 +727,78 @@ string function GetContainerList(int _container, int indentLevel = 1) global
     while (i < containerLength)
         ; Add indentation before getting the element
         paramOutput += __internal_GetIndentLevel(indentLevel)
-
+        string elementSpacing = "\n" + string_if(i != containerLength - 1, "\t")
+        
         if (JValue.isMap(_container))
             string paramKey = JMap.getNthKey(_container, i)
-            paramOutput += __internal_GetMapElement(_container, paramKey, indentLevel) + "\n" + string_if(i != containerLength - 1, "\t")
+            bool hasIncludeFilter = includeStringFilter != "" && StringUtil.Find(paramKey, includeStringFilter) != -1
+            bool hasExcludeFilter = excludeStringFilter != "" && StringUtil.Find(paramKey, excludeStringFilter) != -1
+
+            ; if ((hasIncludeFilter && !hasExcludeFilter) || (!hasIncludeFilter && !hasExcludeFilter))
+                paramOutput += __internal_GetMapElement( \
+                    _container, \
+                    paramKey, \
+                    includeStringFilter = includeStringFilter, \
+                    excludeStringFilter = excludeStringFilter, \
+                    includeIntegerFilter = includeIntegerFilter, \
+                    excludeIntegerFilter = excludeIntegerFilter, \
+                    includeFormFilter = includeFormFilter, \
+                    excludeFormFilter = excludeFormFilter, \
+                    indentLevel = indentLevel + 1 \
+                ) + elementSpacing
+            ; endif
 
         elseif (JValue.isIntegerMap(_container))
             int paramKey = JIntMap.getNthKey(_container, i)
-            paramOutput += __internal_GetIntegerMapElement(_container, paramKey, indentLevel) + "\n" + string_if(i != containerLength - 1, "\t")
+            bool hasIncludeFilter = includeIntegerFilter != -1 && paramKey == includeIntegerFilter
+            bool hasExcludeFilter = excludeIntegerFilter != -1 && paramKey == excludeIntegerFilter
+
+            ; if ((hasIncludeFilter && !hasExcludeFilter) || (!hasIncludeFilter && !hasExcludeFilter))
+                paramOutput += __internal_GetIntegerMapElement( \
+                    _container, \
+                    paramKey, \
+                    includeStringFilter = includeStringFilter, \
+                    excludeStringFilter = excludeStringFilter, \
+                    includeIntegerFilter = includeIntegerFilter, \
+                    excludeIntegerFilter = excludeIntegerFilter, \
+                    includeFormFilter = includeFormFilter, \
+                    excludeFormFilter = excludeFormFilter, \
+                    indentLevel = indentLevel + 1 \
+                ) + elementSpacing
+            ; endif
 
         elseif (JValue.isFormMap(_container))
             Form paramKey = JFormMap.getNthKey(_container, i)
-            paramOutput += __internal_GetFormMapElement(_container, paramKey, indentLevel) + "\n" + string_if(i != containerLength - 1, "\t")
+            bool hasIncludeFilter = includeFormFilter != none && paramKey == includeFormFilter
+            bool hasExcludeFilter = excludeFormFilter != none && paramKey == excludeFormFilter
+
+            ; if ((hasIncludeFilter && !hasExcludeFilter) || (!hasIncludeFilter && !hasExcludeFilter))
+                paramOutput += __internal_GetFormMapElement( \
+                    _container, \
+                    paramKey, \
+                    includeStringFilter = includeStringFilter, \
+                    excludeStringFilter = excludeStringFilter, \
+                    includeIntegerFilter = includeIntegerFilter, \
+                    excludeIntegerFilter = excludeIntegerFilter, \
+                    includeFormFilter = includeFormFilter, \
+                    excludeFormFilter = excludeFormFilter, \
+                    indentLevel = indentLevel + 1 \
+                ) + elementSpacing
+            ; endif
 
         elseif (isArray)
             int index = i
-            paramOutput += __internal_GetArrayElement(_container, index, indentLevel) + "\n" + string_if(i != containerLength - 1, "\t")
+            paramOutput += __internal_GetArrayElement( \
+                _container, \
+                index, \
+                includeStringFilter = includeStringFilter, \
+                excludeStringFilter = excludeStringFilter, \
+                includeIntegerFilter = includeIntegerFilter, \
+                excludeIntegerFilter = excludeIntegerFilter, \
+                includeFormFilter = includeFormFilter, \
+                excludeFormFilter = excludeFormFilter, \
+                indentLevel = indentLevel + 1 \
+            ) + elementSpacing
         endif
 
         i += 1
@@ -732,6 +869,13 @@ function UnwearItemIf(Actor akActor, Form akItem, bool condition, int count = 1,
     endif
 endfunction
 
+bool function ActorHasClothing(Actor akActor) global
+    ;/
+        TODO: Possibly check for more slotMasks, but for now Body should be fine.
+    /;
+    return akActor.GetWornForm(GetSlotMask("Body")) != none
+endFunction
+
 int function GetSlotMask(string bodyPart) global
     int kSlotMask30 = 0x00000001 ; HEAD
     int kSlotMask31 = 0x00000002 ; Hair
@@ -796,6 +940,26 @@ int function GetSlotMaskValue(int slotMask) global
     endWhile
 
     return -1
+endFunction
+
+ObjectReference function GetNearestDoor(ObjectReference centerRef, float radius) global
+    int i = 10
+
+    ObjectReference doorRef = Game.GetFormEx(0x5E91F) as ObjectReference
+
+    while (i > 0)
+        ObjectReference _cellDoor = Game.FindRandomReferenceOfTypeFromRef(doorRef.GetBaseObject(), centerRef, radius)
+        if (_cellDoor)
+            return _cellDoor
+        endif
+
+        if (radius < 8000)
+            radius *= 2
+        endif
+        i -= 1
+    endWhile
+
+    return none
 endFunction
 
 string function TrimString(string source) global

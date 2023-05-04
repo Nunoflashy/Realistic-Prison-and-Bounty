@@ -199,6 +199,7 @@ function Right(RealisticPrisonAndBounty_MCM mcm) global
     mcm.SetRenderedCategory("Escape")
     mcm.AddOptionSliderKey("Escape Bounty", "Escape Bounty (%)", "{1}% of Bounty")
     mcm.AddOptionSlider("Escape Bounty", "{0} Bounty")
+    ; mcm.AddOptionSlider("Escape Attempt Modifier", "{2}x per Escape")
     mcm.AddOptionToggle("Allow Surrendering")
     mcm.AddOptionToggle("Frisk Search upon Captured", defaultFlags = mcm.OPTION_DISABLED)
     mcm.AddOptionToggle("Strip Search upon Captured")
