@@ -28,6 +28,12 @@ RealisticPrisonAndBounty_MCM property mcm
     endFunction
 endProperty
 
+RealisticPrisonAndBounty_ArrestVars property arrestVars
+    RealisticPrisonAndBounty_ArrestVars function get()
+        return Game.GetFormFromFile(0x3DF8, GetPluginName()) as RealisticPrisonAndBounty_ArrestVars
+    endFunction
+endProperty
+
 string[] property Holds
     string[] function get()
         int _holds = JArray.object()
@@ -62,103 +68,9 @@ endProperty
 
 ObjectReference property DoorRef auto
 
-int _arrestVars
-function SetArrestVarBool(string varName, bool value)
-    JMap.setInt(_arrestVars, varName, value as int)
-endFunction
-
-function SetArrestVarInt(string varName, int value)
-    JMap.setInt(_arrestVars, varName, value)
-endFunction
-
-function SetArrestVarFloat(string varName, float value)
-    JMap.setFlt(_arrestVars, varName, value)
-endFunction
-
-function SetArrestVarString(string varName, string value)
-    JMap.setStr(_arrestVars, varName, value)
-endFunction
-
-function SetArrestVarForm(string varName, Form value)
-    JMap.setForm(_arrestVars, varName, value)
-endFunction
-
-function SetArrestVarObj(string varName, int value)
-    JMap.setObj(_arrestVars, varName, value)
-endFunction
-
-bool function GetArrestVarBool(string varName)
-    return JMap.getInt(_arrestVars, varName) as bool
-endFunction
-
-int function GetArrestVarInt(string varName)
-    return JMap.getInt(_arrestVars, varName)
-endFunction
-
-float function GetArrestVarFloat(string varName)
-    return JMap.getFlt(_arrestVars, varName)
-endFunction
-
-string function GetArrestVarString(string varName)
-    return JMap.getStr(_arrestVars, varName)
-endFunction
-
-Form function GetArrestVarForm(string varName)
-    return JMap.getForm(_arrestVars, varName)
-endFunction
-
-int function GetArrestVarObj(string varName)
-    return JMap.getObj(_arrestVars, varName)
-endFunction
-
-; Returns the container with the Arrest variables
-int function GetArrestVars()
-    return _arrestVars
-endFunction
-
-function ResetArrestVars()
-    JMap.clear(_arrestVars)
-endFunction
-
-bool property IsArrested
-    bool function get()
-        return JMap.hasKey(_arrestVars, "Arrest::Arrested") && JMap.getInt(_arrestVars, "Arrest::Arrested") == 1
-    endFunction
-endProperty
-
-bool property IsJailed
-    bool function get()
-        return JMap.hasKey(_arrestVars, "Jail::Jailed") && JMap.getInt(_arrestVars, "Jail::Jailed") == 1
-    endFunction
-endProperty
-
 ObjectReference property JailCell
     ObjectReference function get()
-        return form_if (IsArrested && JMap.hasKey(_arrestVars, "Jail::Cell"), JMap.getForm(_arrestVars, "Jail::Cell"), none) as ObjectReference
-    endFunction
-endProperty
-
-int property MinimumSentence
-    int function get()
-        return int_if (JMap.hasKey(_arrestVars, "Jail::Minimum Sentence"), JMap.getInt(_arrestVars, "Jail::Minimum Sentence"), -1)
-    endFunction
-endProperty
-
-int property MaximumSentence
-    int function get()
-        return int_if (JMap.hasKey(_arrestVars, "Jail::Maximum Sentence"), JMap.getInt(_arrestVars, "Jail::Maximum Sentence"), -1)
-    endFunction
-endProperty
-
-int property Sentence
-    int function get()
-        return int_if (JMap.hasKey(_arrestVars, "Jail::Sentence"), JMap.getInt(_arrestVars, "Jail::Sentence"), -1)
-    endFunction
-endProperty
-
-bool property InfamyEnabled
-    bool function get()
-        return bool_if (JMap.hasKey(_arrestVars, "Jail::Infamy Enabled"), JMap.getInt(_arrestVars, "Jail::Infamy Enabled")) as bool
+        return arrestVars.GetReference("Jail::Cell")
     endFunction
 endProperty
 
@@ -190,11 +102,6 @@ function __initializeFactionsMapping()
     ; TODO: Possibly load more factions from a file (custom factions and holds?)
 
     mcm.Debug("InitializeFactions", "Factions were initialized.")
-endFunction
-
-function __initializeArrestVars()
-    _arrestVars = JMap.object()
-    JValue.retain(_arrestVars)
 endFunction
 
 int jailMarkersMap
@@ -428,7 +335,6 @@ event OnInit()
     __initializeFactionsMapping()
     __initializeJailMarkersMapping()
     __initializeLocationsMapping()
-    __initializeArrestVars()
 
     ; RegisterForKey(0x58) ; F12
 
@@ -650,11 +556,11 @@ bool function IsFriskingUnconditional(string hold)
 endFunction
 
 int function GetFriskingBountyRequired(string hold)
-    return mcm.GetSliderOptionValue(hold, "Frisking::Frisk Search Thoroughness") as int
+    return mcm.GetSliderOptionValue(hold, "Frisking::Minimum Bounty for Frisking") as int
 endFunction
 
 int function GetFriskingThoroughness(string hold)
-    return mcm.GetSliderOptionValue(hold, "Frisking::Minimum Bounty for Frisking") as int
+    return mcm.GetSliderOptionValue(hold, "Frisking::Frisk Search Thoroughness") as int
 endFunction
 
 bool function IsFriskingStolenItemsConfiscated(string hold)
