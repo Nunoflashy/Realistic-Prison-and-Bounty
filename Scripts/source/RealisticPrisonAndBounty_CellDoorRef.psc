@@ -1,4 +1,4 @@
-Scriptname RealisticPrisonAndBounty_CellDoorRef extends ReferenceAlias  
+Scriptname RealisticPrisonAndBounty_CellDoorRef extends ObjectReference
 
 import RealisticPrisonAndBounty_Util
 import RealisticPrisonAndBounty_Config
@@ -11,7 +11,7 @@ endProperty
 
 ObjectReference property this
     ObjectReference function get()
-        return self.GetReference()
+        return self
     endFunction
 endProperty
 
@@ -30,10 +30,16 @@ bool property IsClosed
 endProperty
 
 event OnActivate(ObjectReference akActionRef)
-
+    if (!jail.IsRunning())
+        return
+    endif
 endEvent
 
 event OnLockStateChanged()
+    if (!jail.IsRunning())
+        return
+    endif
+
     if (this.isLocked())
         jail.OnCellDoorLocked(this, none)
     else
@@ -42,9 +48,17 @@ event OnLockStateChanged()
 endEvent
 
 event OnOpen(ObjectReference akActionRef)
+    if (!jail.IsRunning())
+        return
+    endif
+
     jail.OnCellDoorOpen(this, akActionRef as Actor)
 endevent
 
 event OnClose(ObjectReference akActionRef)
+    if (!jail.IsRunning())
+        return
+    endif
+
     jail.OnCellDoorClosed(this, akActionRef as Actor)
 endevent
