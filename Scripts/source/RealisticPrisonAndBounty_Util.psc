@@ -962,6 +962,43 @@ ObjectReference function GetNearestDoor(ObjectReference centerRef, float radius)
     return none
 endFunction
 
+Actor function GetNearestActor(ObjectReference centerRef, float radius) global
+    int i = 10
+
+    while (i > 0)
+        Actor _actor = Game.FindRandomActorFromRef(centerRef, radius)
+        if (_actor)
+            return _actor
+        endif
+
+        if (radius < 8000)
+            radius *= 2
+        endif
+        i -= 1
+    endWhile
+
+    return none
+endFunction
+
+bool function IsActorNearReference(Actor akActor, ObjectReference akReference, float radius = 80.0) global
+    ObjectReference referenceToFind = Game.FindClosestReferenceOfTypeFromRef(akReference.GetBaseObject(), akActor, radius)
+    if (referenceToFind)
+        return true
+    endif
+
+    return false
+endFunction
+
+function ClearBounty(Faction akFaction, bool nonViolent = true, bool violent = true) global
+    if (nonViolent)
+        akFaction.SetCrimeGold(0)
+    endif
+
+    if (violent)
+        akFaction.SetCrimeGoldViolent(0)
+    endif
+endFunction
+
 string function TrimString(string source) global
     string[] split = PapyrusUtil.StringSplit(source, " ")
     string joined = PapyrusUtil.StringJoin(split, "")
