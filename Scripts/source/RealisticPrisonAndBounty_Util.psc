@@ -818,6 +818,10 @@ endFunction
 ; Converts the passed in percent number to its equivalent decimal percentage to do calculations.
 ; e.g: 5 becomes 0.05
 float function Percent(float percentToConvertToDecimal) global
+    if (percentToConvertToDecimal <= 0)
+        return 0.0
+    endif
+    
     return percentToConvertToDecimal / 100
 endFunction
 
