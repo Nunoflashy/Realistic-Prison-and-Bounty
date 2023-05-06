@@ -7,7 +7,7 @@ import RealisticPrisonAndBounty_Config
 ; Constants
 ; ==============================================================================
 
-bool property IS_DEBUG      = true autoreadonly
+bool property IS_DEBUG      = false autoreadonly
 bool property ENABLE_TRACE  = false autoreadonly
 
 ; ==============================================================================

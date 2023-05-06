@@ -22,6 +22,12 @@ Form function GetFormFromMod(int formId) global
     return Game.GetFormFromFile(formId, GetPluginName())
 endFunction
 
+Form property mainAPI
+    Form function get()
+        return Game.GetFormFromFile(0x3DF8, GetPluginName())
+    endFunction
+endProperty
+
 RealisticPrisonAndBounty_MCM property mcm
     RealisticPrisonAndBounty_MCM function get()
         return Game.GetFormFromFile(0x0D61, GetPluginName()) as RealisticPrisonAndBounty_MCM
@@ -30,7 +36,7 @@ endProperty
 
 RealisticPrisonAndBounty_ArrestVars property arrestVars
     RealisticPrisonAndBounty_ArrestVars function get()
-        return Game.GetFormFromFile(0x3DF8, GetPluginName()) as RealisticPrisonAndBounty_ArrestVars
+        return mainAPI as RealisticPrisonAndBounty_ArrestVars
     endFunction
 endProperty
 
@@ -660,6 +666,18 @@ bool function IsClothingOutfitConditional(string hold)
     return mcm.GetToggleOptionState("Clothing", holdOutfit + "::Conditional Outfit")
 endFunction
 
+bool function IsClothingOutfitConditionalFromID(string outfitId)
+    return mcm.GetToggleOptionState("Clothing", outfitId + "::Conditional Outfit")
+endFunction
+
+int function GetClothingOutfitMinimumBountyFromID(string outfitId)
+    return mcm.GetSliderOptionValue("Clothing", outfitId + "::Minimum Bounty") as int
+endFunction
+
+int function GetClothingOutfitMaximumBountyFromID(string outfitId)
+    return mcm.GetSliderOptionValue("Clothing", outfitId + "::Maximum Bounty") as int
+endFunction
+
 int function GetClothingOutfitMinimumBounty(string hold)
     string holdOutfit = GetClothingOutfit(hold)
     return mcm.GetSliderOptionValue("Clothing", holdOutfit + "::Minimum Bounty") as int
@@ -894,6 +912,7 @@ int function GetStat(string hold, string stat)
 endFunction
 
 int function QueryStat(string hold, string stat)
+    ; return actorVars.Get("["+ Player.GetFormID() +"]" + hold + "::" + stat)
     return GetStat(hold, stat)
 endFunction
 
