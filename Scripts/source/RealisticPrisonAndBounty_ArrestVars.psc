@@ -1,5 +1,6 @@
 scriptname RealisticPrisonAndBounty_ArrestVars extends Quest
 
+import Math
 import RealisticPrisonAndBounty_Util
 import RealisticPrisonAndBounty_Config
 
@@ -9,141 +10,13 @@ RealisticPrisonAndBounty_Config property config
     endFunction
 endProperty
 
-float property TimeOfArrest
-    float function get()
-        return self.GetFloat("Arrest::Time of Arrest")
-    endFunction
-endProperty
+; ==========================================================
+; Static Variables (Configured in MCM)
+; ==========================================================
 
 bool property InfamyEnabled
     bool function get()
         return self.GetBool("Jail::Infamy Enabled")
-    endFunction
-endProperty
-
-int property MinimumSentence
-    int function get()
-        return self.GetFloat("Jail::Minimum Sentence") as int
-    endFunction
-endProperty
-
-int property MaximumSentence
-    int function get()
-        return self.GetFloat("Jail::Maximum Sentence") as int
-    endFunction
-endProperty
-
-int property BountyExchange
-    int function get()
-        return self.GetFloat("Jail::Bounty Exchange") as int
-    endFunction
-endProperty
-
-int property BountyToSentence
-    int function get()
-        return self.GetFloat("Jail::Bounty to Sentence") as int
-    endFunction
-endProperty
-
-int property Sentence
-    int function get()
-        return self.GetFloat("Jail::Sentence") as int
-    endFunction
-endProperty
-
-bool property IsArrested
-    bool function get()
-        return self.GetBool("Arrest::Arrested")
-    endFunction
-endProperty
-
-bool property IsJailed
-    bool function get()
-        return self.GetBool("Jail::Jailed")
-    endFunction
-endProperty
-
-string property Hold
-    string function get()
-        return self.GetString("Arrest::Hold")
-    endFunction
-endProperty
-
-Faction property ArrestFaction
-    Faction function get()
-        return self.GetForm("Arrest::Arrest Faction") as Faction
-    endFunction
-endProperty
-
-int property BountyNonViolent
-    int function get()
-        return self.GetInt("Arrest::Bounty Non-Violent")
-    endFunction
-endProperty
-
-int property BountyViolent
-    int function get()
-        return self.GetInt("Arrest::Bounty Violent")
-    endFunction
-endProperty
-
-float property EscapeBountyFromCurrentArrest
-    float function get()
-        return self.GetFloat("Escape::Escape Bounty from Current Arrest")
-    endFunction
-endProperty
-
-int property EscapeBounty
-    int function get()
-        return self.GetFloat("Escape::Escape Bounty Flat") as int
-    endFunction
-endProperty
-
-int property Bounty
-    int function get()
-        return BountyNonViolent + BountyViolent
-    endFunction
-endProperty
-
-float property TimeOfImprisonment
-    float function get()
-        return self.GetFloat("Jail::Time of Imprisonment")
-    endFunction
-endProperty
-
-bool property IsInfamyRecognized
-    bool function get()
-        int currentInfamy = config.GetInfamyGained(Hold)
-        int recognizedThreshold = self.GetFloat("Jail::Infamy Recognized Threshold") as int
-
-        return currentInfamy >= recognizedThreshold
-    endFunction
-endProperty
-
-bool property IsInfamyKnown
-    bool function get()
-        int currentInfamy = config.GetInfamyGained(Hold)
-        int knownThreshold = self.GetFloat("Jail::Infamy Known Threshold") as int
-        
-        return currentInfamy >= knownThreshold
-    endFunction
-endProperty
-
-ObjectReference property JailCell
-    ObjectReference function get()
-        return self.GetForm("Jail::Cell") as ObjectReference
-    endFunction
-endProperty
-
-ObjectReference property CellDoor
-    ObjectReference function get()
-        return self.GetForm("Jail::Cell Door") as ObjectReference
-    endFunction
-endProperty
-
-Actor property Arrestee
-    Actor function get()
-        return self.GetForm("Arrest::Arrestee") as Actor
     endFunction
 endProperty
 
@@ -237,6 +110,142 @@ int property OutfitMaxBounty
     endFunction
 endProperty
 
+float property EscapeBountyFromCurrentArrest
+    float function get()
+        return self.GetFloat("Escape::Escape Bounty from Current Arrest")
+    endFunction
+endProperty
+
+int property EscapeBounty
+    int function get()
+        return self.GetFloat("Escape::Escape Bounty Flat") as int
+    endFunction
+endProperty
+
+int property MinimumSentence
+    int function get()
+        return self.GetFloat("Jail::Minimum Sentence") as int
+    endFunction
+endProperty
+
+int property MaximumSentence
+    int function get()
+        return self.GetFloat("Jail::Maximum Sentence") as int
+    endFunction
+endProperty
+
+int property BountyExchange
+    int function get()
+        return self.GetFloat("Jail::Bounty Exchange") as int
+    endFunction
+endProperty
+
+int property BountyToSentence
+    int function get()
+        return self.GetFloat("Jail::Bounty to Sentence") as int
+    endFunction
+endProperty
+
+; ==========================================================
+; Dynamic Variables
+; ==========================================================
+
+float property CurrentTime
+    float function get()
+        return Utility.GetCurrentGameTime()
+    endFunction
+endProperty
+
+float property TimeOfArrest
+    float function get()
+        return self.GetFloat("Arrest::Time of Arrest")
+    endFunction
+endProperty
+
+float property TimeOfImprisonment
+    float function get()
+        return self.GetFloat("Jail::Time of Imprisonment")
+    endFunction
+endProperty
+
+int property Sentence
+    int function get()
+        return self.GetFloat("Jail::Sentence") as int
+    endFunction
+endProperty
+
+bool property IsArrested
+    bool function get()
+        return self.GetBool("Arrest::Arrested")
+    endFunction
+endProperty
+
+bool property IsJailed
+    bool function get()
+        return self.GetBool("Jail::Jailed")
+    endFunction
+endProperty
+
+string property Hold
+    string function get()
+        return self.GetString("Arrest::Hold")
+    endFunction
+endProperty
+
+Faction property ArrestFaction
+    Faction function get()
+        return self.GetForm("Arrest::Arrest Faction") as Faction
+    endFunction
+endProperty
+
+Actor property Captor
+    Actor function get()
+        return self.GetForm("Arrest::Arresting Guard") as Actor
+    endFunction
+endProperty
+
+int property BountyNonViolent
+    int function get()
+        return self.GetInt("Arrest::Bounty Non-Violent")
+    endFunction
+endProperty
+
+int property BountyViolent
+    int function get()
+        return self.GetInt("Arrest::Bounty Violent")
+    endFunction
+endProperty
+
+int property Bounty
+    int function get()
+        return BountyNonViolent + BountyViolent
+    endFunction
+endProperty
+
+bool property IsInfamyRecognized
+    bool function get()
+        int currentInfamy = config.GetInfamyGained(Hold)
+        int recognizedThreshold = self.GetFloat("Jail::Infamy Recognized Threshold") as int
+
+        return currentInfamy >= recognizedThreshold
+    endFunction
+endProperty
+
+bool property IsInfamyKnown
+    bool function get()
+        int currentInfamy = config.GetInfamyGained(Hold)
+        int knownThreshold = self.GetFloat("Jail::Infamy Known Threshold") as int
+        
+        return currentInfamy >= knownThreshold
+    endFunction
+endProperty
+
+bool property MeetsOutfitConditions
+    bool function get()
+        return Bounty >= OutfitMinBounty && Bounty <= OutfitMaxBounty
+    endFunction
+endProperty
+
 bool property IsStripped
     bool function get()
         return self.GetBool("Jail::Stripped")
@@ -249,9 +258,28 @@ bool property IsClothed
     endFunction
 endProperty
 
-int function GetContainer()
-    return _arrestVarsContainer
-endFunction
+ObjectReference property JailCell
+    ObjectReference function get()
+        return self.GetForm("Jail::Cell") as ObjectReference
+    endFunction
+endProperty
+
+ObjectReference property CellDoor
+    ObjectReference function get()
+        return self.GetForm("Jail::Cell Door") as ObjectReference
+    endFunction
+endProperty
+
+Actor property Arrestee
+    Actor function get()
+        return self.GetForm("Arrest::Arrestee") as Actor
+    endFunction
+endProperty
+
+
+; ==========================================================
+; Functions & Events
+; ==========================================================
 
 function SetBool(string paramKey, bool value)
     JMap.setInt(_arrestVarsContainer, paramKey, value as int)
@@ -285,24 +313,34 @@ function SetObject(string paramKey, int value)
     JMap.setObj(_arrestVarsContainer, paramKey, value)
 endFunction
 
-bool function GetBool(string paramKey)
-    return JMap.getInt(_arrestVarsContainer, paramKey) as bool
+function ModInt(string paramKey, int value)
+    int currentValue = self.GetInt(paramKey)
+    self.SetInt(paramKey, currentValue + value)
 endFunction
 
-int function GetInt(string paramKey)
-    return JMap.getInt(_arrestVarsContainer, paramKey)
+function ModFloat(string paramKey, float value)
+    float currentValue = self.GetFloat(paramKey)
+    self.SetFloat(paramKey, currentValue + value)
 endFunction
 
-float function GetFloat(string paramKey)
-    return JMap.getFlt(_arrestVarsContainer, paramKey)
+bool function GetBool(string paramKey, bool allowOverrides = true)
+    return JMap.getInt(_arrestVarsContainer, __getUsedKey(paramKey, allowOverrides)) as bool
 endFunction
 
-string function GetString(string paramKey)
-    return JMap.getStr(_arrestVarsContainer, paramKey)
+int function GetInt(string paramKey, bool allowOverrides = true)
+    return JMap.getInt(_arrestVarsContainer, __getUsedKey(paramKey, allowOverrides))
 endFunction
 
-Form function GetForm(string paramKey)
-    return JMap.getForm(_arrestVarsContainer, paramKey)
+float function GetFloat(string paramKey, bool allowOverrides = true)
+    return JMap.getFlt(_arrestVarsContainer, __getUsedKey(paramKey, allowOverrides))
+endFunction
+
+string function GetString(string paramKey, bool allowOverrides = true)
+    return JMap.getStr(_arrestVarsContainer, __getUsedKey(paramKey, allowOverrides))
+endFunction
+
+Form function GetForm(string paramKey, bool allowOverrides = true)
+    return JMap.getForm(_arrestVarsContainer, __getUsedKey(paramKey, allowOverrides))
 endFunction
 
 ObjectReference function GetReference(string paramKey)
@@ -313,12 +351,16 @@ Actor function GetActor(string paramKey)
     return GetForm(paramKey) as Actor
 endFunction
 
-int function GetObject(string paramKey)
-    return JMap.getObj(_arrestVarsContainer, paramKey)
+int function GetObject(string paramKey, bool allowOverrides = true)
+    return JMap.getObj(_arrestVarsContainer, __getUsedKey(paramKey, allowOverrides))
 endFunction
 
 function Remove(string paramKey)
     JMap.removeKey(_arrestVarsContainer, paramKey)
+    
+    if (self.HasOverride(paramKey))
+        JMap.removeKey(_arrestVarsContainer, GetOverride(paramKey))
+    endif
 endFunction
 
 function Delete()
@@ -329,6 +371,25 @@ bool function Exists(string paramKey)
     return JMap.hasKey(_arrestVarsContainer, paramKey)
 endFunction
 
+bool function HasOverride(string paramKey)
+    return JMap.hasKey(_arrestVarsContainer, GetOverride(paramKey))
+endFunction
+
+string function GetOverride(string paramKey)
+    return OverrideKey + paramKey
+endFunction
+
+; Returns the made overriden key for this param
+string function __getUsedKey(string paramKey, bool allowOverrides)
+    return string_if (allowOverrides && self.HasOverride(paramKey), GetOverride(paramKey), paramKey)
+endFunction
+
+string property OverrideKey
+    string function get()
+        return "Override::"
+    endFunction
+endProperty
+
 event OnInit()
     __init()
 endEvent
@@ -337,6 +398,10 @@ function __init()
     _arrestVarsContainer = JMap.object()
     JValue.retain(_arrestVarsContainer)
     Debug(self, "__init", "Initialized Arrest Vars Container")
+endFunction
+
+int function GetContainer()
+    return _arrestVarsContainer
 endFunction
 
 int _arrestVarsContainer
