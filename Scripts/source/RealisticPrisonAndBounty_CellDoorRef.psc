@@ -29,6 +29,10 @@ bool property IsClosed
     endFunction
 endProperty
 
+event OnInit()
+    
+endEvent
+
 event OnActivate(ObjectReference akActionRef)
     if (!jail.IsRunning())
         return
@@ -51,6 +55,7 @@ event OnOpen(ObjectReference akActionRef)
     if (!jail.IsRunning())
         return
     endif
+    Debug(self, "OnOpen", "Cell Door Open")
 
     jail.OnCellDoorOpen(this, akActionRef as Actor)
 endevent
@@ -59,6 +64,7 @@ event OnClose(ObjectReference akActionRef)
     if (!jail.IsRunning())
         return
     endif
+    Debug(self, "OnClose", "Cell Door Closed")
 
     jail.OnCellDoorClosed(this, akActionRef as Actor)
 endevent

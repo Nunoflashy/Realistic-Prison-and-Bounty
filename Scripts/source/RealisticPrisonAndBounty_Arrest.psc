@@ -23,29 +23,7 @@ RealisticPrisonAndBounty_ArrestVars property arrestVars
     endFunction
 endProperty
 
-Faction property ArrestFaction
-    Faction function get()
-        return arrestVars.GetForm("Arrest::Arrest Faction") as Faction
-    endFunction
-endProperty
-
-int property BountyNonViolent
-    int function get()
-        return arrestVars.GetFloat("Arrest::Bounty Non-Violent") as int
-    endFunction
-endProperty
-
-int property BountyViolent
-    int function get()
-        return arrestVars.GetFloat("Arrest::Bounty Violent") as int
-    endFunction
-endProperty
-
-int property Bounty
-    int function get()
-        return BountyNonViolent + BountyViolent
-    endFunction
-endProperty
+string property STATE_ARRESTED = "Arrested" autoreadonly
 
 ReferenceAlias property CaptorRef auto
 
@@ -84,145 +62,25 @@ endEvent
 ;     Debug(self, "OnKeyDown", "Key Pressed: " + keyCode)
 ; endEvent
 
-function SetArrestParams()
-    AddArrestParam("Bounty Non-Violent", 1700)
-    AddArrestParam("Bounty Violent", 300)
-    AddArrestParam("Arrestee", config.Player.GetFormID())
-    ; AddArrestParam("Sentence", 38)
-    AddArrestParamString("TestParam", "TestParamValue")
-    AddArrestParamBool("Enemy of Hold", true)
-
-    ObjectReference jailCellMarker = config.GetRandomJailMarker("Haafingar")
-    ObjectReference jailCellMarkerRift = config.GetRandomJailMarker("The Rift")
-
-    ; int testFormMap2 = JFormMap.object()
-    ; JFormMap.setForm(testFormMap2, config.Player, config.Player)
-    ; JFormMap.setForm(testFormMap2, jailCellMarker, jailCellMarker)
-
-    ; int testFormMap = JFormMap.object()
-    ; JFormMap.setForm(testFormMap, config.Player, config.Player)
-    ; JFormMap.setForm(testFormMap, jailCellMarker, jailCellMarker)
-    ; JFormMap.setObj(testFormMap, jailCellMarkerRift, testFormMap2)
-
-    int testArray = JArray.object()
-    ; JArray.addStr(testArray, "Gata")
-    ; JArray.addStr(testArray, "Portatil")
-
-    int testMap4 = JMap.object()
-    JMap.setStr(testMap4, "Gata", "Gatinha")
-    JMap.setStr(testMap4, "Portatil", "Legions")
-
-    int testMap3 = JMap.object()
-    ; JMap.setStr(testMap3, "Gata", "Gatinha")
-    ; JMap.setStr(testMap3, "Portatil", "Legion")
-    ; JMap.setObj(testMap3, "testMap4", testMap4)
-
-    int testMap2 = JMap.object()
-    JMap.setStr(testMap2, "Gata", "Gatinha")
-    JMap.setStr(testMap2, "Portatil", "Legion")
-    JMap.setObj(testMap2, "testMap3", testMap3)
-
-
-    int testMap = JMap.object()
-    JMap.setStr(testMap, "Gata", "Gatinha")
-    JMap.setStr(testMap, "Portatil", "Legion")
-    JMap.setObj(testMap, "testMap2", testMap2)
-    JMap.setObj(testMap, "testArray", testArray)
-
-    ; AddArrestParamObject("TestMap", testMap)
-
-    ; int arrestParams = JMap.object()
-    ; JMap.setInt(arrestParams, "Bounty Non-Violent", 1700)
-    ; JMap.setInt(arrestParams, "Bounty Violent", 300)
-    ; JMap.setInt(arrestParams, "Arrestee", config.Player.GetFormID())
-
-    ; config.SetArrestVarInt("Arrest::Arrest Params", arrestParams)
-endFunction
-
-bool function AddArrestParam(string paramName, int value, bool checkIntegrity = true)
-    int arrestParams = arrestVars.GetObject("Arrest::Arrest Params")
-
-    if (!arrestParams)
-        arrestParams = JMap.object()
-        JValue.retain(arrestParams)
-        arrestVars.SetObject("Arrest::Arrest Params", arrestParams)
-    endif
-
-    JMap.setInt(arrestParams, paramName, value)
-
-    return bool_if (checkIntegrity, JMap.hasKey(arrestParams, paramName), true)
-endFunction
-
-bool function AddArrestParamObject(string paramName, int value, bool checkIntegrity = true)
-    int arrestParams = arrestVars.GetObject("Arrest::Arrest Params")
-
-    if (!arrestParams)
-        arrestParams = JMap.object()
-        JValue.retain(arrestParams)
-        arrestVars.SetObject("Arrest::Arrest Params", arrestParams)
-    endif
-
-    JMap.setObj(arrestParams, paramName, value)
-
-    return bool_if (checkIntegrity, JMap.hasKey(arrestParams, paramName), true)
-endFunction
-
-bool function AddArrestParamBool(string paramName, bool value, bool checkIntegrity = true)
-    int arrestParams = arrestVars.GetObject("Arrest::Arrest Params")
-
-    if (!arrestParams)
-        arrestParams = JMap.object()
-        JValue.retain(arrestParams)
-        arrestVars.SetObject("Arrest::Arrest Params", arrestParams)
-    endif
-
-    JMap.setInt(arrestParams, paramName, value as int)
-
-    return bool_if (checkIntegrity, JMap.hasKey(arrestParams, paramName), true)
-endFunction
-
-bool function AddArrestParamString(string paramName, string value, bool checkIntegrity = true)
-    int arrestParams = arrestVars.GetObject("Arrest::Arrest Params")
-
-    if (!arrestParams)
-        arrestParams = JMap.object()
-        JValue.retain(arrestParams)
-        arrestVars.SetObject("Arrest::Arrest Params", arrestParams)
-    endif
-
-    JMap.setStr(arrestParams, paramName, value)
-
-    return bool_if (checkIntegrity, JMap.hasKey(arrestParams, paramName), true)
-endFunction
-
 event OnKeyDown(int keyCode)
     if (keyCode == 0x58)
         string currentHold = config.GetCurrentPlayerHoldLocation()
-        Faction crimeFaction = config.GetFaction(currentHold)
+        arrestVars.SetForm("Arrest::Arrest Faction", config.GetFaction(currentHold))
 
-        ; ; Get a random jail cell for the current hold's prison
-        ; ObjectReference jailCellMarker = config.GetRandomJailMarker(currentHold)
+        ; arrestVars.SetInt("Override::Arrest::Bounty Non-Violent", 6000)
+        ; arrestVars.SetInt("Override::Arrest::Bounty Violent", 1500)
+        ; arrestVars.SetInt("Override::Jail::Sentence", 30)
+        ; arrestVars.SetForm("Override::Arrest::Arrest Faction", config.GetFaction("The Rift"))
+        
+        arrestVars.ArrestFaction.SendModEvent("ArrestBegin", numArg = 0x14 as int)
 
-        ; arrestVars.SetBool("Arrest::Arrested", true)
-        ; arrestVars.SetString("Arrest::Hold", crimeFaction.GetName())
-        ; arrestVars.SetFloat("Arrest::Bounty Non-Violent", crimeFaction.GetCrimeGoldNonViolent())
-        ; arrestVars.SetFloat("Arrest::Bounty Violent", crimeFaction.GetCrimeGoldViolent())
-        ; arrestVars.SetForm("Arrest::Arrest Faction", crimeFaction)
-
-        ; ; TODO: Refactor this into the jail script, since Arrested does not necessarily mean jailed, the Actor might still pay their bounty.
-        ; arrestVars.SetForm("Jail::Cell", jailCellMarker)
-        arrestVars.Delete()
-        SetArrestParams()
-
-        config.NotifyArrest("You have been arrested in " + currentHold)
-        crimeFaction.SendModEvent("ArrestBegin", numArg = arrestVars.GetObject("Arrest::Arrest Params"))
 
     elseif (keyCode == 0x57)
         Game.QuitToMainMenu()
     endif
 endEvent
 
-event OnArrestBegin(string eventName, string unusedStr, float arrestParams, Form sender)
+event OnArrestBegin(string eventName, string unusedStr, float arresteeId, Form sender)
     Actor captor            = (sender as Actor)
     Faction crimeFaction    = form_if ((sender as Faction), (sender as Faction), captor.GetCrimeFaction()) as Faction
 
@@ -231,52 +89,17 @@ event OnArrestBegin(string eventName, string unusedStr, float arrestParams, Form
         return
     endif
 
-    int arresteeRefId = JMap.getInt(arrestParams as int, "Arrestee") as int
-    int bountyNonViolentOverride = JMap.getInt(arrestParams as int, "Bounty Non-Violent")
-    int bountyViolentOverride = JMap.getInt(arrestParams as int, "Bounty Violent")
-
-    if (arrestParams == 0x14)
-        arresteeRefId = 0x14
+    if (arrestVars.Arrestee == config.Player && arrestVars.IsArrested)
+        self.UpdateArrest()
+        return
     endif
 
-    Actor arresteeRef = Game.GetForm(arresteeRefId) as Actor
+    Actor arresteeRef = Game.GetForm(arresteeId as int) as Actor
 
     if (!arresteeRef)
         Error(self, "OnArrestBegin", "Arrestee not found for this arrest, aborting!")
         return
     endif
-
-    if (bountyNonViolentOverride || bountyViolentOverride)
-        Debug(self, "OnArrestBegin", "Arresting with a bounty override of: { "+ "Non-Violent: "+ bountyNonViolentOverride + ", Violent: " + bountyViolentOverride + " }")
-    endif
-
-    SetupArrestVars()
-
-    arrestVars.SetBool("Arrest::Arrested", true)
-    arrestVars.SetString("Arrest::Hold", crimeFaction.GetName())
-    arrestVars.SetFloat("Arrest::Bounty Non-Violent", int_if(bountyNonViolentOverride > 0, bountyNonViolentOverride, crimeFaction.GetCrimeGoldNonViolent()))
-    arrestVars.SetFloat("Arrest::Bounty Violent", int_if (bountyViolentOverride > 0, bountyViolentOverride, crimeFaction.GetCrimeGoldViolent()))
-    arrestVars.SetForm("Arrest::Arrest Faction", crimeFaction)
-    arrestVars.SetForm("Arrest::Arrestee", arresteeRef)
-    arrestVars.SetForm("Arrest::Arresting Guard", captor)
-
-    Debug(self, "OnArrestBegin", "Vars: ["+ "Hold: " + crimeFaction.GetName() + ", BountyNonViolent: " + crimeFaction.GetCrimeGoldNonViolent() + ", BountyViolent: " + crimeFaction.GetCrimeGoldViolent() + "]")
-    Debug(self, "OnArrestBegin", "StoredVars: ["+ "Hold: " + arrestVars.GetString("Arrest::Hold") + ", BountyNonViolent: " + arrestVars.GetFloat("Arrest::BountyNonViolent") + ", BountyViolent: " + arrestVars.GetFloat("Arrest::BountyViolent") + "]")
-
-    string hold = crimeFaction.GetName()
-
-    Debug(self, "OnArrestBegin", "Has Jail Cell: " + (arrestVars.GetForm("Jail::Cell") != none) + ", REF: " + arrestVars.GetForm("Jail::Cell"))
-
-    if (!arrestVars.GetForm("Jail::Cell"))
-        ObjectReference jailCellMarker = config.GetRandomJailMarker(hold)
-
-        ; Setup which jail cell to go to
-        ; TODO: Refactor this into the jail script, since Arrested does not necessarily mean jailed, the Actor might still pay their bounty.
-        arrestVars.SetForm("Jail::Cell", jailCellMarker)
-        Debug(self, "OnArrestBegin", "Set up new Jail Cell: " + arrestVars.GetReference("Jail::Cell") + "(original ref: "+ jailCellMarker +")")
-    endif
-
-    config.NotifyArrest("You have been arrested in " + hold)
 
     if (captor)
         CaptorRef.ForceRefTo(captor)
@@ -286,88 +109,13 @@ event OnArrestBegin(string eventName, string unusedStr, float arrestParams, Form
         Debug(self, "OnArrestBegin", "Arrest is being done through a faction directly")
     endif
 
-    if (captor || crimeFaction)
-        crimeFaction.SetCrimeGold(0)
-        crimeFaction.SetCrimeGoldViolent(0)
-        crimeFaction.PlayerPayCrimeGold(false, false)
-        arresteeRef.StopCombat()
-        arresteeRef.StopCombatAlarm()
-        arresteeRef.MoveTo(config.JailCell)
-        SendModEvent("JailBegin")
-    endif
+    arrestVars.SetForm("Arrest::Arrest Faction", crimeFaction)
+    arrestVars.SetString("Arrest::Hold", crimeFaction.GetName())
+    arrestVars.SetForm("Arrest::Arrestee", arresteeRef)
+    arrestVars.SetForm("Arrest::Arresting Guard", captor)
 
-    config.IncrementStat(hold, "Times Arrested")
-    config.SetStat(hold, "Current Bounty", Bounty)
-
-    int currentLargestBounty = config.GetStat(hold, "Largest Bounty")
-    config.SetStat(hold, "Largest Bounty", int_if (currentLargestBounty < Bounty, Bounty, currentLargestBounty))
-    config.IncrementStat(hold, "Total Bounty", Bounty)
-    
-    Debug(self, "OnArrestBegin", "Beginning arrest process for Actor: " + arresteeRef + ", Hold is " + hold)
+    self.BeginArrest()
 endEvent
-
-; event OnArrestBegin(string eventName, string unusedStr, float arresteeRefId, Form sender)
-;     Actor captor            = (sender as Actor)
-;     Faction crimeFaction    = form_if ((sender as Faction), (sender as Faction), captor.GetCrimeFaction()) as Faction
-
-;     if (!captor && !crimeFaction)
-;         Error(self, "OnArrestBegin", "Captor or Faction are invalid ["+ "Captor: "+ captor + ", Faction: " + crimeFaction +"], cannot start arrest process!")
-;         return
-;     endif
-
-;     Actor arresteeRef = Game.GetForm(arresteeRefId as int) as Actor
-;     ; Actor arresteeRef = Game.GetCurrentConsoleRef() as Actor
-
-;     if (!arresteeRef)
-;         Error(self, "OnArrestBegin", "Arrestee not found for this arrest, aborting!")
-;         return
-;     endif
-
-;     SetupArrestVars()
-
-;     arrestVars.SetBool("Arrest::Arrested", true)
-;     arrestVars.SetString("Arrest::Hold", crimeFaction.GetName())
-;     arrestVars.SetFloat("Arrest::Bounty Non-Violent", crimeFaction.GetCrimeGoldNonViolent())
-;     arrestVars.SetFloat("Arrest::Bounty Violent", crimeFaction.GetCrimeGoldViolent())
-;     arrestVars.SetForm("Arrest::Arrest Faction", crimeFaction)
-
-;     Debug(self, "OnArrestBegin", "Vars: ["+ "Hold: " + crimeFaction.GetName() + ", BountyNonViolent: " + crimeFaction.GetCrimeGoldNonViolent() + ", BountyViolent: " + crimeFaction.GetCrimeGoldViolent() + "]")
-;     Debug(self, "OnArrestBegin", "StoredVars: ["+ "Hold: " + arrestVars.GetString("Arrest::Hold") + ", BountyNonViolent: " + arrestVars.GetFloat("Arrest::BountyNonViolent") + ", BountyViolent: " + arrestVars.GetFloat("Arrest::BountyViolent") + "]")
-
-;     string hold = crimeFaction.GetName()
-;     ObjectReference jailCellMarker = config.GetRandomJailMarker(hold)
-
-;     ; Setup which jail cell to go to
-;     ; TODO: Refactor this into the jail script, since Arrested does not necessarily mean jailed, the Actor might still pay their bounty.
-;     arrestVars.SetForm("Jail::Cell", jailCellMarker)
-
-;     config.NotifyArrest("You have been arrested in " + hold)
-
-;     if (captor)
-;         CaptorRef.ForceRefTo(captor)
-;         Debug(self, "OnArrestBegin", "Arrest is being done through a captor")
-
-;     elseif (crimeFaction)
-;         Debug(self, "OnArrestBegin", "Arrest is being done through a faction directly")
-;     endif
-
-;     if (captor || crimeFaction)
-;         crimeFaction.SetCrimeGold(0)
-;         arresteeRef.RemoveAllItems()
-;         arresteeRef.MoveTo(config.JailCell)
-;         config.PrepareActorForJail(arresteeRef)
-;         SendModEvent("JailBegin")
-;     endif
-
-;     config.IncrementStat(hold, "Times Arrested")
-;     config.SetStat(hold, "Current Bounty", Bounty)
-
-;     int currentLargestBounty = config.GetStat(hold, "Largest Bounty")
-;     config.SetStat(hold, "Largest Bounty", int_if (currentLargestBounty < Bounty, Bounty, currentLargestBounty))
-;     config.IncrementStat(hold, "Total Bounty", Bounty)
-    
-;     Debug(self, "OnArrestBegin", "Beginning arrest process for Actor: " + arresteeRef + ", Hold is " + hold)
-; endEvent
 
 event OnEscortToJailBegin()
 
@@ -382,17 +130,13 @@ event OnArrestEnd(string eventName, string strArg, float numArg, Form sender)
     arrestVars.SetBool("Arrest::Arrested", false)
 endEvent
 
-function SetupArrestVars()
-    arrestVars.SetFloat("Arrest::Time of Arrest", Utility.GetCurrentGameTime())
-
-endFunction
-
-function StartArrestFromCaptor()
-
-endFunction
-
 state Arrested
     event OnArrestBegin(string eventName, string unusedStr, float arresteeRefId, Form sender)
+        if (arrestVars.Arrestee == config.Player && arrestVars.IsArrested)
+            self.UpdateArrest()
+            return
+        endif
+        
         Error(self, "OnArrestBegin", "Actor is already in the Arrested state, aborting call!")
     endEvent
 
@@ -401,19 +145,123 @@ state Arrested
     endEvent
     
     event OnEscortToJailEnd()
-        ; End escort to jail, the Actor should now be at the processing stage at the jail
-        if (jail.IsInfamyEnabled)
-            bool hasBountyToTriggerPenalty = (Bounty >= arrestVars.GetInt("Jail::Bounty to Trigger Infamy"))
-            if (jail.IsInfamyRecognized || jail.IsInfamyKnown)
-                int currentInfamy  = config.GetInfamyGained(jail.Hold)
-                float criminalPenalty  = float_if (jail.IsInfamyKnown, arrestVars.GetFloat("Jail::Known Criminal Penalty"), arrestVars.GetFloat("Jail::Recognized Criminal Penalty"))
-                int currentNonViolentBounty = arrestVars.GetFloat("Arrest::Bounty Non-Violent") as int
-                arrestVars.SetFloat("Arrest::Bounty Non-Violent", currentNonViolentBounty + (currentInfamy * floor(percent(criminalPenalty))))
-            endif
-        endif
-
         ; if (ShouldBeImprisoned)
         ;     jail.OnEscortToJailEnd()
         ; endif
     endEvent
 endState
+
+function BeginArrest()
+    string hold             = arrestVars.Hold
+    Faction arrestFaction   = arrestVars.ArrestFaction
+    Actor arrestee          = arrestVars.Arrestee
+    Actor captor            = arrestVars.Captor ; May be undefined if the arrest is not done through a captor
+
+    self.SetBounty()
+    bool assignedJailCellSuccessfully = jail.AssignJailCell(arrestee) ; Not guaranteed to go to jail, but we set it up here either way
+
+    if (!assignedJailCellSuccessfully)
+        arrestVars.Delete()
+        Error(self, "BeginArrest", "Could not assign a jail cell to " + arrestee + ". (Aborting arrest...)")
+        return
+    endif
+
+    int bountyNonViolent        = arrestVars.BountyNonViolent
+    int bountyViolent           = arrestVars.BountyViolent
+    int bounty                  = bountyNonViolent + bountyViolent
+    ObjectReference jailCell    = arrestVars.JailCell
+
+    arrestVars.SetBool("Arrest::Arrested", true)
+    arrestVars.SetFloat("Arrest::Time of Arrest", Utility.GetCurrentGameTime())
+
+    arrestee.StopCombat()
+    arrestee.StopCombatAlarm()
+
+    arrestee.MoveTo(jailCell)
+    SendModEvent("JailBegin")
+
+    config.SetStat(hold, "Current Bounty", bounty)
+    int currentLargestBounty = config.GetStat(hold, "Largest Bounty")
+    config.SetStat(hold, "Largest Bounty", int_if (currentLargestBounty < bounty, bounty, currentLargestBounty))
+    config.IncrementStat(hold, "Total Bounty", bounty)
+    config.IncrementStat(hold, "Times Arrested")
+
+    config.NotifyArrest("You have been arrested in " + hold)
+    GotoState(STATE_ARRESTED)
+endFunction
+
+function UpdateArrest()
+    ; Already arrested, we dont want to proceed, this probably happened with 0 bounty,
+    ; but in case it didn't, update the bounty to the sentence
+    if (arrestVars.IsJailed && jail.Prisoner.HasActiveBounty())
+        jail.Prisoner.UpdateSentenceFromCurrentBounty()
+    endif
+
+    ClearBounty(arrestVars.ArrestFaction)
+
+    bool isArresteeInsideCell = IsActorNearReference(arrestVars.Arrestee, arrestVars.JailCell)
+    
+    if (arrestVars.IsJailed && !isArresteeInsideCell)
+        ; Possibly have an event to escort the prisoner to the cell
+        ; OnEscortToCellBegin()
+        jail.MovePrisonerToCell()
+    endif
+
+    Debug(self, "UpdateArrest", "\n" + \
+        "Arrested: " + arrestVars.IsArrested + "\n" + \
+        "Jailed: " + arrestVars.IsJailed + "\n" + \
+        "Has Active Bounty: " + jail.Prisoner.HasActiveBounty() + "\n" + \
+        "Is Inside Jail Cell: " + isArresteeInsideCell + "\n" \
+    )
+endFunction
+
+function SetBounty()
+    Faction arrestFaction = arrestVars.ArrestFaction
+
+    arrestVars.SetFloat("Arrest::Bounty Non-Violent", arrestFaction.GetCrimeGoldNonViolent())
+    arrestVars.SetFloat("Arrest::Bounty Violent", arrestFaction.GetCrimeGoldViolent())
+
+    if (arrestVars.HasOverride("Arrest::Bounty Non-Violent"))
+        Debug(self, "SetBounty", "\n" + \
+            "(Overriden) Arrest::Bounty Non-Violent: " + arrestVars.BountyNonViolent + "\n" \
+        )
+    endif
+
+    if (arrestVars.HasOverride("Arrest::Bounty Non-Violent"))
+        Debug(self, "SetBounty", "\n" + \
+            "(Overriden) Arrest::Bounty Violent: " + arrestVars.BountyViolent + "\n" \
+        )
+    endif
+
+    ClearBounty(arrestFaction)
+    arrestFaction.PlayerPayCrimeGold(false, false) ; Just in case?
+endFunction
+
+; bool function SetJailCell()
+;     string hold = arrestVars.Hold
+
+;     if (arrestVars.HasOverride("Jail::Cell"))
+;         Debug(self, "SetJailCell", "\n" + \
+;             "(Overriden) Jail::Cell: " + arrestVars.JailCell + "\n" \
+;         )
+;     endif
+
+;     Debug(self, "SetJailCell", "\n" + \
+;         "Jail::Cell: " + arrestVars.JailCell + "\n" \
+;     )
+
+;     Debug(self, "SetJailCell", "\n" + \
+;         "Hold: " + arrestVars.Hold + "\n" + \
+;         "Faction: " + arrestVars.ArrestFaction + "\n" \
+;     )
+
+;     ; Get the jail cell for this arrestee
+;     ; Possibly check later if there are NPC's in this cell, the number of beds available if we want shared cells, etc...
+;     if (!arrestVars.GetForm("Jail::Cell"))
+;         ObjectReference jailCellMarker = config.GetRandomJailMarker(hold)
+;         arrestVars.SetForm("Jail::Cell", jailCellMarker)
+;         Debug(self, "SetJailCell", "Set up new Jail Cell: " + arrestVars.JailCell + "(original ref: "+ jailCellMarker +")")
+;     endif
+
+;     return arrestVars.JailCell != none
+; endFunction
