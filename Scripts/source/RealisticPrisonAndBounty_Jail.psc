@@ -528,8 +528,10 @@ function SetupJailVars()
     arrestVars.SetFloat("Jail::Sentence", (BountyNonViolent + GetViolentBountyConverted()) / BountyToSentence)
     arrestVars.SetFloat("Jail::Time of Imprisonment", CurrentTime)
     arrestVars.SetBool("Jail::Jailed", true)
-    arrestVars.SetForm("Jail::Cell Door", GetNearestDoor(Arrestee, 200))
+    arrestVars.SetForm("Jail::Cell Door", GetNearestJailDoorOfType(GetJailBaseDoorID(arrestVars.Hold), Arrestee, 10000))
     arrestVars.SetInt("Jail::Cell Door Old Lock Level", arrestVars.CellDoor.GetLockLevel())
+
+    Debug(self, "SetupJailVars", "Found Cell Door: " + arrestVars.CellDoor)
 
     OverrideInfamy(700)
 
@@ -570,26 +572,6 @@ endFunction
 
 function AddEscapedBounty()
     ArrestFaction.ModCrimeGold(floor((BountyNonViolent * percent(EscapeBountyFromCurrentArrest))) + EscapeBounty)
-endFunction
-
-function IncreaseSentence(int daysToIncreaseBy, bool shouldAffectBounty = false)
-    int previousSentence = Sentence
-    int newSentence = Sentence + Max(0, daysToIncreaseBy) as int
-    arrestVars.SetFloat("Jail::Sentence", newSentence)
-
-    if (shouldAffectBounty)
-        arrestVars.SetFloat("Arrest::Bounty Non-Violent", BountyNonViolent + (daysToIncreaseBy * BountyToSentence))
-    endif
-endFunction
-
-function DecreaseSentence(int daysToDecreaseBy, bool shouldAffectBounty = false)
-    int previousSentence = Sentence
-    int newSentence = Sentence - Max(0, daysToDecreaseBy) as int
-    arrestVars.SetFloat("Jail::Sentence", newSentence)
-
-    if (shouldAffectBounty)
-        arrestVars.SetFloat("Arrest::Bounty Non-Violent", BountyNonViolent - (daysToDecreaseBy * BountyToSentence))
-    endif
 endFunction
 
 function ShowArrestVars()
@@ -742,11 +724,11 @@ state Jailed
         
         if (hasSentenceIncreased)
             int daysIncreased = newSentence - oldSentence
-            config.NotifyJail("Your sentence was increased by " + daysIncreased + " days")
+            config.NotifyJail("Your sentence was extended by " + daysIncreased + " days")
             ; config.NotifyJail("Your bounty has also increased by " + (daysIncreased * BountyToSentence), condition = bountyAffected)
         else
             int daysDecreased = oldSentence - newSentence
-            config.NotifyJail("Your sentence was decreased by " + daysDecreased + " days")
+            config.NotifyJail("Your sentence was reduced by " + daysDecreased + " days")
             ; config.NotifyJail("Your bounty has also decreased by " + (daysDecreased * BountyToSentence), condition = bountyAffected)
         endif
 
@@ -1111,6 +1093,25 @@ endFunction
 
 function MovePrisonerToCell()
     Prisoner.MoveToCell()
+endFunction
+
+; Temporary - Testing
+function StartEscortToCell()
+    Actor guard = arrestVars.Captor
+    Actor _prisoner = arrestVars.Arrestee
+
+    Game.SetPlayerAIDriven()
+    guard.MoveTo(arrestVars.JailCell)
+    arrestVars.JailCell.SetOpen()
+    
+    _prisoner.PathToReference(arrestVars.JailCell, 1.0)
+    arrestVars.JailCell.SetOpen(false)
+    arrestVars.JailCell.Lock()
+    Game.SetPlayerAIDriven(false)
+endFunction
+
+function StartTeleportToCell()
+    arrestVars.Arrestee.MoveTo(arrestVars.JailCell)
 endFunction
 
 bool function AssignJailCell(Actor akPrisoner)

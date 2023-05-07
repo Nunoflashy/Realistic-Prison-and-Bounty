@@ -946,15 +946,70 @@ int function GetSlotMaskValue(int slotMask) global
     return -1
 endFunction
 
-ObjectReference function GetNearestDoor(ObjectReference centerRef, float radius) global
+float function UnitsToCentimeters(int unit)
+    return unit * 1.428
+endFunction
+
+;/
+    Temporary function
+    Gets the Base Jail Door ID for the specified hold
+
+    SDoorJail01 - 5E91D (Solitude) [Haafingar]
+    WRJailDoor01 - A7613 (Whiterun) [Whiterun]
+    ImpJailDoor01 - 40BB2 (Windhelm, Riften) [Eastmarch, The Rift]
+    FarmhouseJailDoor01 - EC563 (Falkreath, Morthal, Dawnstar) [Falkreath, Hjaalmarch, The Pale]
+/;
+int function GetJailBaseDoorID(string hold) global
+    if (hold == "Haafingar")
+        return 0x5E91D
+
+    elseif (hold == "Whiterun")
+        return 0xA7613
+
+    elseif (hold == "Windhelm" || hold == "The Rift")
+        return 0x40BB2
+
+    elseif (hold == "Falkreath" || hold == "Hjaalmarch" || hold == "The Pale")
+        return 0xEC563
+    endif
+endFunction
+
+ObjectReference function GetNearestJailDoorOfType(int jailBaseDoorId, ObjectReference centerRef, float radius) global
     int i = 10
 
-    ObjectReference doorRef = Game.GetFormEx(0x5E91F) as ObjectReference
+    Form doorRef = Game.GetFormEx(jailBaseDoorId)
+    ObjectReference _cellDoor = Game.FindClosestReferenceOfTypeFromRef(doorRef, centerRef, radius)
+    return _cellDoor
+
+    ; while (i > 0)
+    ;     ObjectReference _cellDoor = Game.FindClosestReferenceOfTypeFromRef(doorRef.GetBaseObject(), centerRef, radius)
+    ;     if (_cellDoor)
+    ;         return _cellDoor
+    ;     endif
+
+    ;     if (radius < 8000)
+    ;         radius *= 2
+    ;     endif
+    ;     i -= 1
+    ; endWhile
+
+    return none
+endFunction
+
+function OpenMultipleDoorsOfType(int jailBaseDoorId, ObjectReference scanFromWhere, float radius) global
+    int i = 10
+
+    Form doorRef = Game.GetFormEx(jailBaseDoorId)
 
     while (i > 0)
-        ObjectReference _cellDoor = Game.FindRandomReferenceOfTypeFromRef(doorRef.GetBaseObject(), centerRef, radius)
+        ObjectReference _cellDoor = Game.FindRandomReferenceOfTypeFromRef(doorRef, scanFromWhere, radius)
+        bool isOpen = _cellDoor.GetOpenState() == 1 || _cellDoor.GetOpenState() == 2
+        if (isOpen)
+            OpenMultipleDoorsOfType(jailBaseDoorId, scanFromWhere, radius)
+        endif
+
         if (_cellDoor)
-            return _cellDoor
+            _cellDoor.SetOpen(true)
         endif
 
         if (radius < 8000)
@@ -962,8 +1017,6 @@ ObjectReference function GetNearestDoor(ObjectReference centerRef, float radius)
         endif
         i -= 1
     endWhile
-
-    return none
 endFunction
 
 Actor function GetNearestActor(ObjectReference centerRef, float radius) global

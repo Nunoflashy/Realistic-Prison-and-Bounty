@@ -139,7 +139,7 @@ function __initializeJailMarkersMapping()
     JArray.addForm(solitudeMarkers, GetFormFromMod(0x3881)) ; Jail Cell 04
     JArray.addForm(solitudeMarkers, GetFormFromMod(0x3882)) ; Jail Cell 05
     JArray.addForm(solitudeMarkers, GetFormFromMod(0x3883)) ; Jail Cell 06
-    JArray.addForm(solitudeMarkers, GetFormFromMod(0x3884)) ; Jail Cell 07 (Bjartur Cell)
+    ; JArray.addForm(solitudeMarkers, GetFormFromMod(0x3884)) ; Jail Cell 07 (Bjartur Cell)
 
     int morthalMarkers = JArray.object()
     JArray.addForm(morthalMarkers, Game.GetForm(0x3EF08)) ; Jail Cell 01
@@ -148,7 +148,7 @@ function __initializeJailMarkersMapping()
 
     int riftenMarkers = JArray.object()
     JArray.addForm(riftenMarkers, Game.GetForm(0x6128D)) ; Jail Cell 01 (Original)
-    JArray.addForm(riftenMarkers, GetFormFromMod(0x388D)) ; Jail Cell 02
+    ; JArray.addForm(riftenMarkers, GetFormFromMod(0x388D)) ; Jail Cell 02 (Threki the Innocent)
     JArray.addForm(riftenMarkers, GetFormFromMod(0x388E)) ; Jail Cell 03
     ; JArray.addForm(riftenMarkers, GetFormFromMod(0x388F)) ; Jail Cell 04 (Sibbi's Cell [RESERVED])
     JArray.addForm(riftenMarkers, GetFormFromMod(0x3890)) ; Jail Cell 05

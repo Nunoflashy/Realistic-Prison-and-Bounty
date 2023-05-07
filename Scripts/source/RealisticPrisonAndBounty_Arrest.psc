@@ -70,9 +70,9 @@ event OnKeyDown(int keyCode)
         ; arrestVars.SetInt("Override::Arrest::Bounty Non-Violent", 6000)
         ; arrestVars.SetInt("Override::Arrest::Bounty Violent", 1500)
         ; arrestVars.SetInt("Override::Jail::Sentence", 30)
-        ; arrestVars.SetForm("Override::Arrest::Arrest Faction", config.GetFaction("The Rift"))
+        arrestVars.SetForm("Override::Arrest::Arrest Faction", config.GetFaction("The Rift"))
         
-        arrestVars.ArrestFaction.SendModEvent("ArrestBegin", numArg = 0x14 as int)
+        arrestVars.ArrestFaction.SendModEvent("ArrestBegin", "TeleportToCell", 0x14)
 
 
     elseif (keyCode == 0x57)
@@ -80,7 +80,7 @@ event OnKeyDown(int keyCode)
     endif
 endEvent
 
-event OnArrestBegin(string eventName, string unusedStr, float arresteeId, Form sender)
+event OnArrestBegin(string eventName, string arrestType, float arresteeId, Form sender)
     Actor captor            = (sender as Actor)
     Faction crimeFaction    = form_if ((sender as Faction), (sender as Faction), captor.GetCrimeFaction()) as Faction
 
@@ -156,7 +156,7 @@ function BeginArrest()
     Faction arrestFaction   = arrestVars.ArrestFaction
     Actor arrestee          = arrestVars.Arrestee
     Actor captor            = arrestVars.Captor ; May be undefined if the arrest is not done through a captor
-
+                      
     self.SetBounty()
     bool assignedJailCellSuccessfully = jail.AssignJailCell(arrestee) ; Not guaranteed to go to jail, but we set it up here either way
 
@@ -177,7 +177,11 @@ function BeginArrest()
     arrestee.StopCombat()
     arrestee.StopCombatAlarm()
 
-    arrestee.MoveTo(jailCell)
+    ; OpenMultipleDoorsOfType(GetJailBaseDoorID(arrestVars.Hold), arrestee, 1000)
+
+    arrestVars.SetForm("Jail::Cell Door", GetNearestJailDoorOfType(GetJailBaseDoorID(arrestVars.Hold), Arrestee, 10000))
+    ; jail.StartEscortToCell()
+    jail.StartTeleportToCell()
     SendModEvent("JailBegin")
 
     config.SetStat(hold, "Current Bounty", bounty)

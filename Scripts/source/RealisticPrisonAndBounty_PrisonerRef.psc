@@ -158,6 +158,30 @@ function UpdateSentenceFromCurrentBounty()
     endif
 endFunction
 
+function IncreaseSentence(int daysToIncreaseBy, bool shouldAffectBounty = true)
+    int previousSentence = arrestVars.Sentence
+    int newSentence = previousSentence + Max(0, daysToIncreaseBy) as int
+    arrestVars.SetFloat("Jail::Sentence", newSentence)
+
+    if (shouldAffectBounty)
+        arrestVars.SetFloat("Arrest::Bounty Non-Violent", arrestVars.BountyNonViolent + (daysToIncreaseBy * arrestVars.BountyToSentence))
+    endif
+
+    OnSentenceChanged(previousSentence, newSentence, daysToIncreaseBy > 0, shouldAffectBounty)
+endFunction
+
+function DecreaseSentence(int daysToDecreaseBy, bool shouldAffectBounty = true)
+    int previousSentence = arrestVars.Sentence
+    int newSentence = previousSentence + Max(0, daysToDecreaseBy) as int
+    arrestVars.SetFloat("Jail::Sentence", newSentence)
+
+    if (shouldAffectBounty)
+        arrestVars.SetFloat("Arrest::Bounty Non-Violent", arrestVars.BountyNonViolent - (daysToDecreaseBy * arrestVars.BountyToSentence))
+    endif
+
+    OnSentenceChanged(previousSentence, newSentence, daysToDecreaseBy > 0, shouldAffectBounty)
+endFunction
+
 function UpdateInfamy()
     string city = config.GetCityNameFromHold(arrestVars.Hold)
     ;/
@@ -360,9 +384,9 @@ endFunction
 function __updateSentenceForPlayer()
     int _bountyNonViolent    = arrestVars.ArrestFaction.GetCrimeGoldNonViolent()
     int _bountyViolent       = arrestVars.ArrestFaction.GetCrimeGoldViolent()
+    int violentBountyConverted = floor(arrestVars.BountyViolent * (100 / arrestVars.BountyExchange))
 
     int oldSentence = arrestVars.GetInt("Jail::Sentence")
-    int violentBountyConverted = floor(arrestVars.BountyViolent * (100 / arrestVars.BountyExchange))
 
     arrestVars.SetFloat("Arrest::Bounty Non-Violent", _bountyNonViolent)
     arrestVars.SetFloat("Arrest::Bounty Violent", _bountyViolent)
