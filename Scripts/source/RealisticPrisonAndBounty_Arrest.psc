@@ -25,6 +25,11 @@ endProperty
 
 string property STATE_ARRESTED = "Arrested" autoreadonly
 
+string property ARREST_TYPE_TELEPORT_TO_JAIL    = "TeleportToJail" autoreadonly
+string property ARREST_TYPE_TELEPORT_TO_CELL    = "TeleportToCell" autoreadonly
+string property ARREST_TYPE_ESCORT_TO_JAIL      = "EscortToJail" autoreadonly
+string property ARREST_TYPE_ESCORT_TO_CELL      = "EscortToCell" autoreadonly
+
 ReferenceAlias property CaptorRef auto
 
 function RegisterEvents()
@@ -43,25 +48,6 @@ event OnPlayerLoadGame()
     RegisterEvents()
 endEvent
 
-; event OnKeyDown(int keyCode)
-;     if (keyCode == 0x58)
-;         ObjectReference consoleRef = Game.GetCurrentConsoleRef()
-;         Debug(self, "OnKeyDown", "ConsoleRef: " + consoleRef.GetFormID() + " ("+ consoleRef.GetBaseObject().GetName() +")")
-
-;         CaptorRef.ForceRefTo(consoleRef)
-;         ; (consoleRef as Actor).EvaluatePackage()
-        
-;         ; Game.SetPlayerAIDriven()
-;         ; config.Player.PathToReference(consoleRef, 1.0)
-
-;         Debug(self, "OnKeyDown", "Bound CaptorRef ReferenceAlias to " + consoleRef + "("+ consoleRef.GetBaseObject().GetName() +")")
-;         Faction theRift = config.GetFaction("The Rift")
-;         theRift.SendModEvent("ArrestBegin", numArg = consoleRef.GetFormID())
-;     endif
-
-;     Debug(self, "OnKeyDown", "Key Pressed: " + keyCode)
-; endEvent
-
 event OnKeyDown(int keyCode)
     if (keyCode == 0x58)
         string currentHold = config.GetCurrentPlayerHoldLocation()
@@ -69,11 +55,16 @@ event OnKeyDown(int keyCode)
 
         ; arrestVars.SetInt("Override::Arrest::Bounty Non-Violent", 6000)
         ; arrestVars.SetInt("Override::Arrest::Bounty Violent", 1500)
-        ; arrestVars.SetInt("Override::Jail::Sentence", 30)
-        arrestVars.SetForm("Override::Arrest::Arrest Faction", config.GetFaction("The Rift"))
-        
-        arrestVars.ArrestFaction.SendModEvent("ArrestBegin", "TeleportToCell", 0x14)
-
+        ; arrestVars.SetInt("Override::Jail::Sentence", 400)
+        ; arrestVars.SetForm("Override::Arrest::Arrest Faction", config.GetFaction("The Rift"))
+        ; arrestVars.SetString("Override::Stripping::Handle Stripping On", "Unconditionally")
+        ; arrestVars.SetString("Override::Stripping::Handle Stripping On Does Not Exist", "Unconditionally")
+        arrestVars.SetInt("Override::Jail::Infamy Gained Daily", 100)
+        ; arrestVars.SetInt("Override::Jail::Sentence", 700)
+        ; arrestVars.SetBool("Override::Stripping::Allow Stripping", false)
+        ; arrestVars.SetInt("Override::Jail::Sentence", 200)
+        Actor arrestee = Game.GetCurrentConsoleRef() as Actor
+        arrestVars.ArrestFaction.SendModEvent("ArrestBegin", "TeleportToCell", arrestee.GetFormID())
 
     elseif (keyCode == 0x57)
         Game.QuitToMainMenu()
@@ -83,6 +74,11 @@ endEvent
 event OnArrestBegin(string eventName, string arrestType, float arresteeId, Form sender)
     Actor captor            = (sender as Actor)
     Faction crimeFaction    = form_if ((sender as Faction), (sender as Faction), captor.GetCrimeFaction()) as Faction
+
+    if (!self.ValidateArrestType(arrestType))
+        Error(self, "Arrest::OnArrestBegin", "Arrest Type is invalid, got: " + arrestType + ". (valid options: "+ self.GetValidArrestTypes() +") ")
+        return
+    endif
 
     if (!captor && !crimeFaction)
         Error(self, "OnArrestBegin", "Captor or Faction are invalid ["+ "Captor: "+ captor + ", Faction: " + crimeFaction +"], cannot start arrest process!")
@@ -113,6 +109,7 @@ event OnArrestBegin(string eventName, string arrestType, float arresteeId, Form 
     arrestVars.SetString("Arrest::Hold", crimeFaction.GetName())
     arrestVars.SetForm("Arrest::Arrestee", arresteeRef)
     arrestVars.SetForm("Arrest::Arresting Guard", captor)
+    arrestVars.SetString("Arrest::Arrest Type", arrestType)
 
     self.BeginArrest()
 endEvent
@@ -132,7 +129,7 @@ endEvent
 
 state Arrested
     event OnArrestBegin(string eventName, string unusedStr, float arresteeRefId, Form sender)
-        if (arrestVars.Arrestee == config.Player && arrestVars.IsArrested)
+        if (arrestVars.IsArrested && arrestVars.Arrestee == config.Player)
             self.UpdateArrest()
             return
         endif
@@ -153,6 +150,7 @@ endState
 
 function BeginArrest()
     string hold             = arrestVars.Hold
+    string arrestType       = arrestVars.ArrestType
     Faction arrestFaction   = arrestVars.ArrestFaction
     Actor arrestee          = arrestVars.Arrestee
     Actor captor            = arrestVars.Captor ; May be undefined if the arrest is not done through a captor
@@ -177,18 +175,25 @@ function BeginArrest()
     arrestee.StopCombat()
     arrestee.StopCombatAlarm()
 
-    ; OpenMultipleDoorsOfType(GetJailBaseDoorID(arrestVars.Hold), arrestee, 1000)
-
-    arrestVars.SetForm("Jail::Cell Door", GetNearestJailDoorOfType(GetJailBaseDoorID(arrestVars.Hold), Arrestee, 10000))
-    ; jail.StartEscortToCell()
-    jail.StartTeleportToCell()
     SendModEvent("JailBegin")
 
-    config.SetStat(hold, "Current Bounty", bounty)
-    int currentLargestBounty = config.GetStat(hold, "Largest Bounty")
-    config.SetStat(hold, "Largest Bounty", int_if (currentLargestBounty < bounty, bounty, currentLargestBounty))
-    config.IncrementStat(hold, "Total Bounty", bounty)
-    config.IncrementStat(hold, "Times Arrested")
+    ; Will most likely be used when the arrestee has no chance to pay their bounty, and therefore will get immediately thrown into the cell
+    if (arrestType == ARREST_TYPE_TELEPORT_TO_CELL)
+        jail.StartTeleportToCell()
+    
+    ; Could be used when the arrestee still has a chance to pay their bounty, and not go to the cell immediately
+    elseif (arrestType == ARREST_TYPE_TELEPORT_TO_JAIL) ; Not implemented yet (Idea: Arrestee will be teleported to some location in jail and then either escorted or teleported to the cell)
+        ; jail.StartTeleportToJail()
+    
+    ; Will most likely be used when the arrestee has no chance to pay their bounty, and therefore will get immediately escorted into the cell
+    elseif (arrestType == ARREST_TYPE_ESCORT_TO_CELL) ; Not implemented yet (Idea: Arrestee will be escorted directly to the cell)
+        jail.StartEscortToCell()
+
+    elseif (arrestType == ARREST_TYPE_ESCORT_TO_JAIL) ; Not implemented yet (Idea: Arrestee will be escorted to the jail, and then processed before being escorted into the cell)
+        ; jail.StartEscortToJail()
+    endif
+
+    self.UpdateArrestStats()
 
     config.NotifyArrest("You have been arrested in " + hold)
     GotoState(STATE_ARRESTED)
@@ -239,6 +244,43 @@ function SetBounty()
 
     ClearBounty(arrestFaction)
     arrestFaction.PlayerPayCrimeGold(false, false) ; Just in case?
+endFunction
+
+function UpdateArrestStats()
+    Actor arrestee  = arrestVars.Arrestee
+
+    if (arrestee == config.Player)
+        string hold     = arrestVars.Hold
+        int bounty      = arrestVars.Bounty
+
+        config.SetStat(hold, "Current Bounty", bounty)
+        int currentLargestBounty = config.GetStat(hold, "Largest Bounty")
+        config.SetStat(hold, "Largest Bounty", int_if (currentLargestBounty < bounty, bounty, currentLargestBounty))
+        config.IncrementStat(hold, "Total Bounty", bounty)
+        config.IncrementStat(hold, "Times Arrested")
+
+    else ; Processing for NPC stats later
+        ; e.g:
+        ; Actor arrestee  = arrestVars.Arrestee
+        ; string hold = arrestVars.GetString("["+ arrestee.GetFormID() +"]Arrest::Hold")
+        ; int bounty  = arrestVars.GetInt("["+ arrestee.GetFormID() +"]Arrest::Bounty")
+
+        ; actorVars.SetStat(hold, "["+ arrestee.GetFormID() +"]Current Bounty", bounty)
+    endif
+endFunction
+
+bool function ValidateArrestType(string arrestType)
+    return  arrestType == ARREST_TYPE_TELEPORT_TO_JAIL || \ 
+            arrestType == ARREST_TYPE_TELEPORT_TO_CELL || \ 
+            arrestType == ARREST_TYPE_ESCORT_TO_JAIL || \
+            arrestType == ARREST_TYPE_ESCORT_TO_CELL
+endFunction
+
+string function GetValidArrestTypes()
+    return  ARREST_TYPE_TELEPORT_TO_JAIL + ", " + \ 
+            ARREST_TYPE_TELEPORT_TO_CELL + ", " + \ 
+            ARREST_TYPE_ESCORT_TO_JAIL + ", " + \ 
+            ARREST_TYPE_ESCORT_TO_CELL
 endFunction
 
 ; bool function SetJailCell()

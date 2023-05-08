@@ -9,11 +9,11 @@ RealisticPrisonAndBounty_Config property config
     endFunction
 endProperty
 
-function FriskActor(Actor actorToFrisk, float friskingThoroughness)
+function FriskActor(Actor actorToFrisk, float friskingThoroughness, ObjectReference transferItemsTo = none)
     Debug(self, "FriskActor", "Frisked Actor: " + actorToFrisk)
 endFunction
 
-function StripActor(Actor actorToStrip, float strippingThoroughness)
+function StripActor(Actor actorToStrip, float strippingThoroughness, ObjectReference transferItemsTo = none)
     ; Determine what to strip based on thoroughness
     if (strippingThoroughness >= 100.0)
         ; Strip naked, ask to spread cheeks, etc...
@@ -50,6 +50,14 @@ function StripActor(Actor actorToStrip, float strippingThoroughness)
     ; Stripping naked should only be allowed if a nude body mod is installed
     ; Likewise, stripping to underwear should only be allowed if a nude body mod AND a wearable underwear mod are installed, or if no nude body mod is installed (underwear by default)
 
-    actorToStrip.RemoveAllItems()
+    ; int itemCount = actorToStrip.GetNumItems()
+    ; int i = 0
+    ; while (i < itemCount)
+    ;     Form currentItem = actorToStrip.GetNthForm(i)
+    ;     actorToStrip.RemoveItem(currentItem, absilent = true)
+    ;     i += 1
+    ; endWhile
+
+    actorToStrip.RemoveAllItems(akTransferTo = transferItemsTo, abRemoveQuestItems = true)
 endFunction
 

@@ -15,7 +15,7 @@ EndFunction
 Function Fragment_4(ObjectReference akSpeakerRef)
 Actor akSpeaker = akSpeakerRef as Actor
 ;BEGIN CODE
-akSpeaker.SendModEvent("ArrestBegin", numArg = 0x14)
+akSpeaker.SendModEvent("ArrestBegin", "TeleportToCell", 0x14)
 ;END CODE
 EndFunction
 ;END FRAGMENT

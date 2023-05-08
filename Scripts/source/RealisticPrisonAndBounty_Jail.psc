@@ -152,7 +152,7 @@ endProperty
 float property ReleaseTime
     float function get()
         float gameHour = 0.04166666666666666666666666666667
-        return TimeOfImprisonment + (gameHour * 24 * Sentence)
+        return TimeOfImprisonment + (gameHour * 24 * arrestVars.Sentence)
     endFunction
 endProperty
 
@@ -386,7 +386,7 @@ bool property ShouldBeStripped
             int strippingMinSentence        = arrestVars.GetInt("Stripping::Sentence to Strip")
     
             bool meetsBountyRequirements = (BountyNonViolent >= strippingMinBounty) || (BountyViolent >= strippingMinViolentBounty)
-            bool meetsSentenceRequirements = Sentence >= strippingMinSentence
+            bool meetsSentenceRequirements = arrestVars.Sentence >= strippingMinSentence
             bool shouldStrip =  (strippingHandling == "Unconditionally") || \
                                 (strippingHandling == "Minimum Bounty" && meetsBountyRequirements) || \
                                 (strippingHandling == "Minimum Sentence" && meetsSentenceRequirements)
@@ -408,11 +408,23 @@ bool property ShouldBeStripped
     endFunction
 endProperty
 
+bool property ShouldItemsBeRetained
+    bool function get()
+        bool itemRetentionEnabled = arrestVars.GetBool("Release::Item Retention Enabled")
+        if (!itemRetentionEnabled)
+            return false
+        endif
+
+        int minBountyToRetainItems = arrestVars.GetInt("Release::Bounty to Retain Items")
+        return arrestVars.Bounty >= minBountyToRetainItems
+    endFunction
+endProperty
+
 bool property ShouldBeClothed
     bool function get()
         if (IsClothingEnabled)
             bool meetsBountyRequirements = (BountyNonViolent <= ClothingMaxBounty) && (BountyViolent <= ClothingMaxBountyViolent)
-            bool meetsSentenceRequirements = Sentence <= ClothingMaxSentence
+            bool meetsSentenceRequirements = arrestVars.Sentence <= ClothingMaxSentence
             bool shouldClothe = (ClothingHandling == "Unconditionally") || \
                                 (ClothingHandling == "Maximum Bounty" && meetsBountyRequirements) || \
                                 (ClothingHandling == "Maximum Sentence" && meetsSentenceRequirements)
@@ -422,7 +434,7 @@ bool property ShouldBeClothed
                 "meetsBountyRequirements: " + meetsBountyRequirements + "\n" + \
                 "meetsSentenceRequirements: " + meetsSentenceRequirements + "\n" + \
                 "ClothingMaxSentence: " + ClothingMaxSentence + "\n" + \
-                "Sentence: " + Sentence + "\n" + \
+                "Sentence: " + arrestVars.Sentence + "\n" + \
                 "shouldClothe: " + shouldClothe + "\n" \
             )
 
@@ -530,6 +542,11 @@ function SetupJailVars()
     arrestVars.SetBool("Jail::Jailed", true)
     arrestVars.SetForm("Jail::Cell Door", GetNearestJailDoorOfType(GetJailBaseDoorID(arrestVars.Hold), Arrestee, 10000))
     arrestVars.SetInt("Jail::Cell Door Old Lock Level", arrestVars.CellDoor.GetLockLevel())
+    arrestVars.SetForm("Jail::Teleport Release Location", config.GetJailTeleportReleaseMarker(arrestVars.Hold))
+    arrestVars.SetForm("Jail::Prisoner Items Container", config.GetJailPrisonerItemsContainer(arrestVars.Hold))
+
+    ; inventation time
+    arrestVars.SetObject("Jail::Prisoner Equipped Items", JArray.object())
 
     Debug(self, "SetupJailVars", "Found Cell Door: " + arrestVars.CellDoor)
 
@@ -725,7 +742,16 @@ state Jailed
         if (hasSentenceIncreased)
             int daysIncreased = newSentence - oldSentence
             config.NotifyJail("Your sentence was extended by " + daysIncreased + " days")
-            ; config.NotifyJail("Your bounty has also increased by " + (daysIncreased * BountyToSentence), condition = bountyAffected)
+
+            if (ShouldBeStripped)
+                ; Strip since the sentence got extended
+                ; StartGuardWalkToCellToStrip()
+                Prisoner.Strip()
+
+            elseif (ShouldBeFrisked)
+                Prisoner.Frisk()
+            endif
+
         else
             int daysDecreased = oldSentence - newSentence
             config.NotifyJail("Your sentence was reduced by " + daysDecreased + " days")
@@ -752,6 +778,9 @@ state Jailed
         endif
 
         Prisoner.ShowSentenceInfo()
+        ; arrestVars.List("Stripping")
+        arrestVars.List("Jail")
+        ; arrestVars.ListOverrides("Stripping")
     
         LastUpdate = Utility.GetCurrentGameTime()
         ; Keep updating while in jail
@@ -901,6 +930,14 @@ state Released
         Debug(self, "OnBeginState", CurrentState + " state begin")
         ; Begin Release process, Actor is arrested and not yet free
         arrestVars.CellDoor.SetOpen()
+        if (arrestVars.ArrestType == arrest.ARREST_TYPE_TELEPORT_TO_CELL)
+            if (!ShouldItemsBeRetained)
+                Prisoner.GiveItemsBack()
+            endif
+
+            Prisoner.MoveToReleaseLocation()
+        endif
+
         GotoState("Free")
     endEvent
 
@@ -1038,7 +1075,7 @@ function TriggerEscape()
 
     int escapeBountyGotten = floor((BountyNonViolent * percent(EscapeBountyFromCurrentArrest))) + EscapeBounty
 
-    config.NotifyJail("You have gained " + escapeBountyGotten + " Bounty in " + Hold + " for Escaping")
+    config.NotifyJail("You have gained " + escapeBountyGotten + " Bounty in " + Hold + " for escaping")
     Prisoner.RevertBounty()
     Prisoner.AddEscapeBounty()
 endFunction
@@ -1086,7 +1123,7 @@ function TriggerImprisonment()
     ; ShowArrestParams()
     ; ShowArrestVars()
 
-    config.NotifyJail("Your sentence in " + Hold + " was set to " + Sentence + " days in jail")
+    config.NotifyJail("Your sentence in " + Hold + " was set to " + arrestVars.Sentence + " days in jail")
     EndBenchmark(startBench, "TriggerImprisonment")
     
 endFunction
@@ -1097,21 +1134,46 @@ endFunction
 
 ; Temporary - Testing
 function StartEscortToCell()
-    Actor guard = arrestVars.Captor
-    Actor _prisoner = arrestVars.Arrestee
+    Actor guard                     = arrestVars.Captor
+    Actor _prisoner                 = arrestVars.Arrestee
+    ObjectReference jailCellDoor    = arrestVars.CellDoor
+    ObjectReference _jailCell       = arrestVars.JailCell
 
     Game.SetPlayerAIDriven()
-    guard.MoveTo(arrestVars.JailCell)
-    arrestVars.JailCell.SetOpen()
+    guard.MoveTo(_jailCell)
+    jailCellDoor.SetOpen()
     
-    _prisoner.PathToReference(arrestVars.JailCell, 1.0)
-    arrestVars.JailCell.SetOpen(false)
-    arrestVars.JailCell.Lock()
+    guard.EnableAI(false)
+    _prisoner.PathToReference(_jailCell, 1.0)
+    jailCellDoor.SetOpen(false)
+    jailCellDoor.Lock()
     Game.SetPlayerAIDriven(false)
+    guard.EnableAI()
 endFunction
 
 function StartTeleportToCell()
     arrestVars.Arrestee.MoveTo(arrestVars.JailCell)
+endFunction
+
+function StartGuardWalkToCellToStrip()
+    Actor guard                     = arrestVars.Captor
+    Actor thePrisoner               = arrestVars.Arrestee
+    ObjectReference jailCellDoor    = arrestVars.CellDoor
+    ObjectReference _jailCell        = arrestVars.JailCell
+
+    _jailCell.MoveTo(guard) ; Put a temporary marker on the guard's location
+
+    guard.PathToReference(jailCellDoor, 1.0)
+    jailCellDoor.SetOpen()
+    Game.SetPlayerAIDriven() ; Disable player controls
+    guard.PathToReference(thePrisoner, 1.0)
+    Prisoner.Strip()
+    guard.PathToReference(jailCellDoor, 1.0)
+    jailCellDoor.SetOpen(false)
+    jailCellDoor.Lock()
+    Game.SetPlayerAIDriven(false)
+    guard.PathToReference(_jailCell, 1.0)
+    _jailCell.MoveTo(thePrisoner)
 endFunction
 
 bool function AssignJailCell(Actor akPrisoner)

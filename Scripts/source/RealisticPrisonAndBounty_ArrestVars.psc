@@ -146,6 +146,12 @@ int property BountyToSentence
     endFunction
 endProperty
 
+bool property RedressOnRelease
+    bool function get()
+        return self.GetBool("Release::Redress on Release")
+    endFunction
+endProperty
+
 ; ==========================================================
 ; Dynamic Variables
 ; ==========================================================
@@ -170,7 +176,20 @@ endProperty
 
 int property Sentence
     int function get()
-        return self.GetFloat("Jail::Sentence") as int
+        ; self.SetInt("Min::Jail::Sentence", self.MinimumSentence)
+        ; self.SetInt("Max::Jail::Sentence", self.MaximumSentence)
+        ; int minSentence  = self.MinimumSentence
+        ; int maxSentence  = self.MaximumSentence
+        ; int thisSentence = self.GetInt("Jail::Sentence")
+
+        ; if (thisSentence > maxSentence)
+        ;     return maxSentence
+
+        ; elseif (thisSentence < minSentence)
+        ;     return minSentence
+        ; endif
+
+        return self.GetInt("Jail::Sentence")
     endFunction
 endProperty
 
@@ -182,7 +201,7 @@ endProperty
 
 bool property IsJailed
     bool function get()
-        return self.GetBool("Jail::Jailed")
+        return self.GetBool("Jail::Jailed")                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           
     endFunction
 endProperty
 
@@ -276,6 +295,18 @@ Actor property Arrestee
     endFunction
 endProperty
 
+string property ArrestType
+    string function get()
+        return self.GetString("Arrest::Arrest Type")
+    endFunction
+endProperty
+
+ObjectReference property PrisonerItemsContainer
+    ObjectReference function get()
+        return self.GetReference("Jail::Prisoner Items Container")
+    endFunction
+endProperty
+
 
 ; ==========================================================
 ; Functions & Events
@@ -328,18 +359,61 @@ bool function GetBool(string paramKey, bool allowOverrides = true)
 endFunction
 
 int function GetInt(string paramKey, bool allowOverrides = true)
-    return JMap.getInt(_arrestVarsContainer, __getUsedKey(paramKey, allowOverrides))
+    int thisValue = JMap.getInt(_arrestVarsContainer, __getUsedKey(paramKey, allowOverrides))
+
+    bool hasMin = self.HasMinimumValue(paramKey)
+    bool hasMax = self.HasMaximumValue(paramKey)
+    
+    if (hasMin || hasMax)
+        int minValue = self.GetIntMin(paramKey)
+        int maxValue = self.GetIntMax(paramKey)
+
+        if (hasMax && thisValue > maxValue)
+            return maxValue
+
+        elseif (hasMin && thisValue < minValue)
+            return minValue
+        endif
+    endif
+
+    return thisValue
 endFunction
 
 float function GetFloat(string paramKey, bool allowOverrides = true)
-    return JMap.getFlt(_arrestVarsContainer, __getUsedKey(paramKey, allowOverrides))
+    float thisValue = JMap.getFlt(_arrestVarsContainer, __getUsedKey(paramKey, allowOverrides))
+
+    bool hasMin = self.HasMinimumValue(paramKey)
+    bool hasMax = self.HasMaximumValue(paramKey)
+
+    if (hasMin || hasMax)
+        float minValue = self.GetFloatMin(paramKey)
+        float maxValue = self.GetFloatMax(paramKey)
+
+        if (hasMax && thisValue > maxValue)
+            return maxValue
+
+        elseif (hasMin && thisValue < minValue)
+            return minValue
+        endif
+    endif
+
+    return thisValue
 endFunction
 
 string function GetString(string paramKey, bool allowOverrides = true)
+    if (!self.Exists(paramKey))
+        Error(self, "ArrestVars::Get", "Arrest Variable ["+ paramKey +"] does not exist!")
+        return ""
+    endif
+
     return JMap.getStr(_arrestVarsContainer, __getUsedKey(paramKey, allowOverrides))
 endFunction
 
 Form function GetForm(string paramKey, bool allowOverrides = true)
+    if (!self.Exists(paramKey))
+        Error(self, "ArrestVars::Get", "Arrest Variable ["+ paramKey +"] does not exist!")
+        return none
+    endif
     return JMap.getForm(_arrestVarsContainer, __getUsedKey(paramKey, allowOverrides))
 endFunction
 
@@ -352,13 +426,17 @@ Actor function GetActor(string paramKey)
 endFunction
 
 int function GetObject(string paramKey, bool allowOverrides = true)
+    if (!self.Exists(paramKey))
+        Error(self, "ArrestVars::Get", "Arrest Variable ["+ paramKey +"] does not exist!")
+        return -1
+    endif
     return JMap.getObj(_arrestVarsContainer, __getUsedKey(paramKey, allowOverrides))
 endFunction
 
-function Remove(string paramKey)
+function Remove(string paramKey, bool removeOverrides = true)
     JMap.removeKey(_arrestVarsContainer, paramKey)
     
-    if (self.HasOverride(paramKey))
+    if (self.HasOverride(paramKey) && removeOverrides)
         JMap.removeKey(_arrestVarsContainer, GetOverride(paramKey))
     endif
 endFunction
@@ -376,17 +454,72 @@ bool function HasOverride(string paramKey)
 endFunction
 
 string function GetOverride(string paramKey)
-    return OverrideKey + paramKey
+    return _overrideKey + paramKey
 endFunction
 
-; Returns the made overriden key for this param
+bool function HasMinimumValue(string paramKey)
+    return JMap.hasKey(_arrestVarsContainer, _minimumKey + paramKey)
+endFunction
+
+bool function HasMaximumValue(string paramKey)
+    return JMap.hasKey(_arrestVarsContainer, _maximumKey + paramKey)
+endFunction
+
+int function GetIntMin(string paramKey)
+    return JMap.getInt(_arrestVarsContainer, _minimumKey + paramKey)
+endFunction
+
+int function GetIntMax(string paramKey)
+    return JMap.getInt(_arrestVarsContainer, _maximumKey + paramKey)
+endFunction
+
+float function GetFloatMin(string paramKey)
+    return JMap.getFlt(_arrestVarsContainer, _minimumKey + paramKey)
+endFunction
+
+float function GetFloatMax(string paramKey)
+    return JMap.getFlt(_arrestVarsContainer, _maximumKey + paramKey)
+endFunction
+
+string function GetList(string category = "")
+    bool hasCategory = category != ""
+    string categoryKey = string_if (!hasCategory, "", category + "::")
+    return GetContainerList(_arrestVarsContainer, includeStringFilter = categoryKey)
+endFunction
+
+function List(string category = "")
+    bool hasCategory = category != ""
+    string categoryKey = string_if (!hasCategory, "", category + "::")
+    Debug(self, string_if (!hasCategory, "ArrestVars::List", "ArrestVars::List("+ category +")"), GetContainerList(_arrestVarsContainer, includeStringFilter = categoryKey))
+endFunction
+
+function ListOverrides(string category = "")
+    bool hasCategory = category != ""
+    string categoryKey = string_if (!hasCategory, _overrideKey, _overrideKey + category + "::")
+    Debug(self, string_if (!hasCategory, "ArrestVars::ListOverrides", "ArrestVars::ListOverrides("+ category +")"), GetContainerList(_arrestVarsContainer, includeStringFilter = categoryKey))
+endFunction
+
+; Returns the made overriden key for this param if the var has an override and overriding is enabled,
+; otherwise, returns the normal var key
 string function __getUsedKey(string paramKey, bool allowOverrides)
     return string_if (allowOverrides && self.HasOverride(paramKey), GetOverride(paramKey), paramKey)
 endFunction
 
-string property OverrideKey
+string property _overrideKey
     string function get()
         return "Override::"
+    endFunction
+endProperty
+
+string property _minimumKey
+    string function get()
+        return "Min::"
+    endFunction
+endProperty
+
+string property _maximumKey
+    string function get()
+        return "Max::"
     endFunction
 endProperty
 

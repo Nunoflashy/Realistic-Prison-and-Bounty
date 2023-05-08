@@ -66,16 +66,21 @@ bool function HasActiveBounty()
 endFunction
 
 function Frisk()
+    ObjectReference prisonerItemsContainer = arrestVars.PrisonerItemsContainer
+    
     float friskingThoroughness = arrestVars.GetFloat("Frisking::Frisking Thoroughness")
-    bodySearcher.FriskActor(this, friskingThoroughness)
+    bodySearcher.FriskActor(this, friskingThoroughness, prisonerItemsContainer)
 endFunction
 
 function Strip()
     Debug(self.GetOwningQuest(), "Strip", "Prisoner Strip")
+
+    ObjectReference prisonerItemsContainer = arrestVars.PrisonerItemsContainer
+
     float strippingThoroughness = arrestVars.GetFloat("Stripping::Stripping Thoroughness")
     bool isStrippedNaked = strippingThoroughness >= 6
     config.IncrementStat(arrestVars.Hold, "Times Stripped")
-    bodySearcher.StripActor(this, strippingThoroughness)
+    bodySearcher.StripActor(this, strippingThoroughness, prisonerItemsContainer)
     OnUndressed(isStrippedNaked)
 endFunction
 
@@ -103,6 +108,27 @@ function Clothe()
     OnClothed(outfitToUse)
 endFunction
 
+function GiveItemsBack()
+    ObjectReference prisonerItemsContainer = arrestVars.PrisonerItemsContainer
+    bool redressOnRelease = arrestVars.RedressOnRelease
+
+    prisonerItemsContainer.RemoveAllItems(this, abRemoveQuestItems = true)
+    if (redressOnRelease)
+        int itemsArray = arrestVars.GetObject("Jail::Prisoner Equipped Items")
+        int i = 0
+        while (i < JArray.count(itemsArray))
+            Form currentItem = JArray.getForm(itemsArray, i)
+            this.EquipItem(currentItem)
+            i += 1
+        endWhile
+    endif
+
+endFunction
+
+function MoveToReleaseLocation()
+    this.MoveTo(arrestVars.GetForm("Jail::Teleport Release Location") as ObjectReference)
+endFunction
+
 ; Get the bounty from storage and add it into active bounty for this faction.
 function RevertBounty()
     arrestVars.ArrestFaction.SetCrimeGold(arrestVars.BountyNonViolent)
@@ -128,8 +154,8 @@ function TriggerCrimimalPenalty()
             int infamyPenalty = (currentInfamy * floor(percent(criminalPenalty)))
             Debug(self.GetOwningQuest(), "TriggerCrimimalPenalty", "infamyPenalty: " + infamyPenalty)
 
-            arrestVars.SetInt("Jail::Sentence", arrestVars.Sentence + 100)
-            config.NotifyJail(string_if (arrestVars.IsInfamyKnown, "Due to being a known criminal in the hold, your sentence has been increased", "Due to being a recognized criminal in the hold, your sentence has been increased"))
+            arrestVars.SetInt("Jail::Sentence", arrestVars.Sentence + infamyPenalty)
+            config.NotifyJail(string_if (arrestVars.IsInfamyKnown, "Due to being a known criminal in the hold, your sentence has been extended", "Due to being a recognized criminal in the hold, your sentence has been extended"))
         endif
     endif
 endFunction
@@ -321,6 +347,15 @@ endEvent
 
 event OnSentenceChanged(int oldSentence, int newSentence, bool hasSentenceIncreased, bool bountyAffected)
     jail.OnSentenceChanged(this, oldSentence, newSentence, hasSentenceIncreased, bountyAffected)
+endEvent
+
+event OnObjectUnequipped(Form akBaseObject, ObjectReference akReference)
+    JArray.addForm(arrestVars.GetObject("Jail::Prisoner Equipped Items"), akBaseObject)
+    int wasItemAdded = JArray.findForm(arrestVars.GetObject("Jail::Prisoner Equipped Items"), akBaseObject)
+    Debug(self.GetOwningQuest(), "PrisonerRef::OnObjectUnequipped", "\n" + \
+        "Unequipped: " + akBaseObject + \
+        "Was it added: " + wasItemAdded \
+    )
 endEvent
 
 int function GetTimeServed(string timeUnit)

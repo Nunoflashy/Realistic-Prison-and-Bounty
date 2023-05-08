@@ -66,12 +66,6 @@ Actor property Player
     endFunction
 endProperty
 
-; ObjectReference property DoorRef
-;     ObjectReference function get()
-;         return Game.GetFormEx(0x5E922) as ObjectReference
-;     endFunction
-; endProperty
-
 ObjectReference property DoorRef auto
 
 ObjectReference property JailCell
@@ -79,16 +73,6 @@ ObjectReference property JailCell
         return arrestVars.GetReference("Jail::Cell")
     endFunction
 endProperty
-
-; Map with all variables needed to process the player when in jail
-int jailVars
-; __setJailVar("hold", "Haafingar")
-; __setJailVar("", 1)
-; __setJailVar("jailCellIndex", 1)
-; __setJailVar("minSentence", 40)
-; __setJailVar("maxSentence", 200)
-; __setJailVar("arrestBounty", 6000)
-; __setJailVar("sentence", 40)
 
 int factionMap
 function __initializeFactionsMapping()
@@ -168,6 +152,54 @@ function __initializeJailMarkersMapping()
     JMap.setObj(jailMarkersMap, "The Rift", riftenMarkers)
     ; JMap.setObj(jailMarkersMap, "The Reach", solitudeMarkers)
     JMap.setObj(jailMarkersMap, "The Pale", dawnstarMarkers)
+endFunction
+
+int jailTeleportReleaseMarkersMap
+function __initializeJailTeleportReleaseMarkersMapping()
+    jailTeleportReleaseMarkersMap = JMap.object()
+    JValue.retain(jailTeleportReleaseMarkersMap)
+
+    Form whiterunReleaseMarker  = Game.GetFormEx(0x3EF19)
+    Form windhelmReleaseMarker  = Game.GetFormEx(0x3EF19)
+    Form falkreathReleaseMarker = Game.GetFormEx(0x3EF19)
+    Form solitudeReleaseMarker  = Game.GetFormEx(0x3EF19)
+    Form morthalReleaseMarker   = Game.GetFormEx(0x3EF19)
+    Form riftenReleaseMarker    = Game.GetFormEx(0x3EF19)
+    Form dawnstarReleaseMarker  = Game.GetFormEx(0x3EF19)
+
+    JMap.setForm(jailTeleportReleaseMarkersMap, "Whiterun", whiterunReleaseMarker)
+    ; JMap.setForm(jailTeleportReleaseMarkersMap, "Winterhold", solitudeMarkers)
+    JMap.setForm(jailTeleportReleaseMarkersMap, "Eastmarch", windhelmReleaseMarker)
+    JMap.setForm(jailTeleportReleaseMarkersMap, "Falkreath", falkreathReleaseMarker)
+    JMap.setForm(jailTeleportReleaseMarkersMap, "Haafingar", solitudeReleaseMarker)
+    JMap.setForm(jailTeleportReleaseMarkersMap, "Hjaalmarch", morthalReleaseMarker)
+    JMap.setForm(jailTeleportReleaseMarkersMap, "The Rift", riftenReleaseMarker)
+    ; JMap.setForm(jailTeleportReleaseMarkersMap, "The Reach", solitudeMarkers)
+    JMap.setForm(jailTeleportReleaseMarkersMap, "The Pale", dawnstarReleaseMarker)
+endFunction
+
+int jailPrisonerContainersMarkersMap
+function __initializeJailPrisonerContainersMapping()
+    jailPrisonerContainersMarkersMap = JMap.object()
+    JValue.retain(jailPrisonerContainersMarkersMap)
+
+    Form whiterunReleaseMarker  = Game.GetFormEx(0x3EEFF)
+    Form windhelmReleaseMarker  = Game.GetFormEx(0x3EEFF)
+    Form falkreathReleaseMarker = Game.GetFormEx(0x3EEFF)
+    Form solitudeReleaseMarker  = Game.GetFormEx(0x3EEFF)
+    Form morthalReleaseMarker   = Game.GetFormEx(0x3EEFF)
+    Form riftenReleaseMarker    = Game.GetFormEx(0x3EEFF)
+    Form dawnstarReleaseMarker  = Game.GetFormEx(0x3EEFF)
+
+    JMap.setForm(jailPrisonerContainersMarkersMap, "Whiterun", whiterunReleaseMarker)
+    ; JMap.setForm(jailPrisonerContainersMarkersMap, "Winterhold", solitudeMarkers)
+    JMap.setForm(jailPrisonerContainersMarkersMap, "Eastmarch", windhelmReleaseMarker)
+    JMap.setForm(jailPrisonerContainersMarkersMap, "Falkreath", falkreathReleaseMarker)
+    JMap.setForm(jailPrisonerContainersMarkersMap, "Haafingar", solitudeReleaseMarker)
+    JMap.setForm(jailPrisonerContainersMarkersMap, "Hjaalmarch", morthalReleaseMarker)
+    JMap.setForm(jailPrisonerContainersMarkersMap, "The Rift", riftenReleaseMarker)
+    ; JMap.setForm(jailPrisonerContainersMarkersMap, "The Reach", solitudeMarkers)
+    JMap.setForm(jailPrisonerContainersMarkersMap, "The Pale", dawnstarReleaseMarker)
 endFunction
 
 int locationsToHoldMap
@@ -305,12 +337,30 @@ endFunction
 
 Form[] function GetJailMarkers(string hold)
     if (!JMap.hasKey(jailMarkersMap, hold))
-        mcm.Error("Config::getJailMakers", "The marker does not exist!")
+        mcm.Error("Config::GetJailMarkers", "The marker does not exist!")
         return none
     endif
 
     int holdJailMarkerArray = JMap.getObj(jailMarkersMap, hold)
     return JArray.asFormArray(holdJailMarkerArray)
+endFunction
+
+Form function GetJailTeleportReleaseMarker(string hold)
+    if (!JMap.hasKey(jailTeleportReleaseMarkersMap, hold))
+        mcm.Error("Config::GetJailTeleportReleaseMarker", "The marker does not exist!")
+        return none
+    endif
+
+    return JMap.getForm(jailTeleportReleaseMarkersMap, hold)
+endFunction
+
+Form function GetJailPrisonerItemsContainer(string hold)
+    if (!JMap.hasKey(jailPrisonerContainersMarkersMap, hold))
+        mcm.Error("Config::GetJailPrisonerItemsContainer", "The container does not exist!")
+        return none
+    endif
+
+    return JMap.getForm(jailPrisonerContainersMarkersMap, hold)
 endFunction
 
 ; To be refactored into the Jail or Imprisoned script
@@ -337,9 +387,15 @@ Faction function GetFaction(string hold)
     return none
 endFunction
 
+event OnPlayerLoadGame()
+    __initializeJailTeleportReleaseMarkersMapping()
+endEvent
+
 event OnInit()
     __initializeFactionsMapping()
     __initializeJailMarkersMapping()
+    __initializeJailTeleportReleaseMarkersMapping()
+    __initializeJailPrisonerContainersMapping()
     __initializeLocationsMapping()
 
     ; RegisterForKey(0x58) ; F12
@@ -347,31 +403,6 @@ event OnInit()
     RegisterForModEvent("PlayerArrestBegin", "OnPlayerBeginArrest")
     mcm.Debug("OnInit", "Config::Init Script")
 endEvent
-
-; event OnKeyDown(int keyCode)
-;     if (keyCode == 0x58)
-;         SendModEvent("PlayerArrestBegin")
-;         IncrementInfamy("The Rift", 3000)
-;         ; int playerItemsValue = 0
-;         ; int i = 0
-;         ; while (i < Player.GetNumItems())
-;         ;     Form item = Player.GetNthForm(i)
-;         ;     int itemCount = Player.GetItemCount(item)
-;         ;     playerItemsValue += item.GetGoldValue() * itemCount
-;         ;     Debug(self, "OnKeyDown", "Item: " + item.GetName() + ", Value: " + item.GetGoldValue() + ", Count: " + itemCount)
-;         ;     i += 1
-;         ; endWhile
-;         ; int bountyChargeStolenItems = getAdditionalCharge("The Rift", "Bounty for Stolen Items") as int
-;         ; float bountyChargePerItem = ToPercent(getAdditionalCharge("The Rift", "Bounty for Stolen Item"))
-;         ; int bountyToAdd = floor((playerItemsValue * bountyChargePerItem) + bountyChargeStolenItems)
-;         ; Debug(self, "OnKeyDown", "playerItemsValue * bountyChargePerItem: " + playerItemsValue * bountyChargePerItem + ", Player Items: " + Player.GetNumItems())
-;         ; Debug(self, "OnKeyDown", "Bounty Charge Stolen Items: " + bountyChargeStolenItems + ", Bounty Charge Per Item: " + bountyChargePerItem + ", Total Charge: " + bountyToAdd)
-
-;         ; notifyBounty("The Rift", bountyToAdd)
-;     endif
-
-;     Debug(self, "OnKeyDown", "Key Pressed: " + keyCode)
-; endEvent
 
 string function GetGlobalEquivalentOfLocalStat(string localStat)
     int localToGlobalMap = JMap.object()

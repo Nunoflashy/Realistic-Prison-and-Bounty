@@ -7,7 +7,7 @@ Function Fragment_7(ObjectReference akSpeakerRef)
 Actor akSpeaker = akSpeakerRef as Actor
 ;BEGIN CODE
 ; Send the ArrestBegin event with the player as the arrestee
-akSpeaker.SendModEvent("ArrestBegin", numArg = 0x14)
+akSpeaker.SendModEvent("ArrestBegin", "TeleportToCell", 0x14)
 ;END CODE
 EndFunction
 ;END FRAGMENT

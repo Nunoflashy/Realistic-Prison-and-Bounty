@@ -713,7 +713,6 @@ string function GetContainerList( \
     int indentLevel = 1 \
 ) global
 
-    float start = StartBenchmark()
     string paramOutput
 
     int containerLength = JValue.count(_container)
@@ -734,7 +733,7 @@ string function GetContainerList( \
             bool hasIncludeFilter = includeStringFilter != "" && StringUtil.Find(paramKey, includeStringFilter) != -1
             bool hasExcludeFilter = excludeStringFilter != "" && StringUtil.Find(paramKey, excludeStringFilter) != -1
 
-            ; if ((hasIncludeFilter && !hasExcludeFilter) || (!hasIncludeFilter && !hasExcludeFilter))
+            if (hasIncludeFilter || includeStringFilter == "")
                 paramOutput += __internal_GetMapElement( \
                     _container, \
                     paramKey, \
@@ -746,14 +745,14 @@ string function GetContainerList( \
                     excludeFormFilter = excludeFormFilter, \
                     indentLevel = indentLevel + 1 \
                 ) + elementSpacing
-            ; endif
+            endif
 
         elseif (JValue.isIntegerMap(_container))
             int paramKey = JIntMap.getNthKey(_container, i)
             bool hasIncludeFilter = includeIntegerFilter != -1 && paramKey == includeIntegerFilter
             bool hasExcludeFilter = excludeIntegerFilter != -1 && paramKey == excludeIntegerFilter
 
-            ; if ((hasIncludeFilter && !hasExcludeFilter) || (!hasIncludeFilter && !hasExcludeFilter))
+            if ((hasIncludeFilter && !hasExcludeFilter) || (!hasIncludeFilter && !hasExcludeFilter))
                 paramOutput += __internal_GetIntegerMapElement( \
                     _container, \
                     paramKey, \
@@ -765,14 +764,14 @@ string function GetContainerList( \
                     excludeFormFilter = excludeFormFilter, \
                     indentLevel = indentLevel + 1 \
                 ) + elementSpacing
-            ; endif
+            endif
 
         elseif (JValue.isFormMap(_container))
             Form paramKey = JFormMap.getNthKey(_container, i)
             bool hasIncludeFilter = includeFormFilter != none && paramKey == includeFormFilter
             bool hasExcludeFilter = excludeFormFilter != none && paramKey == excludeFormFilter
 
-            ; if ((hasIncludeFilter && !hasExcludeFilter) || (!hasIncludeFilter && !hasExcludeFilter))
+            if ((hasIncludeFilter && !hasExcludeFilter) || (!hasIncludeFilter && !hasExcludeFilter))
                 paramOutput += __internal_GetFormMapElement( \
                     _container, \
                     paramKey, \
@@ -784,7 +783,7 @@ string function GetContainerList( \
                     excludeFormFilter = excludeFormFilter, \
                     indentLevel = indentLevel + 1 \
                 ) + elementSpacing
-            ; endif
+            endif
 
         elseif (isArray)
             int index = i
@@ -803,11 +802,15 @@ string function GetContainerList( \
 
         i += 1
     endWhile
-    
+
+    if (paramOutput == "")
+        return string_if (!isArray, "{}", "[]")
+    endif
+
     ; Add indentation after getting the element
     paramOutput += __internal_GetIndentLevel(indentLevel)
 
-    EndBenchmark(start, "GetContainerList [Length: "+ containerLength +", indentLevel: "+ indentLevel +"]")
+    ; EndBenchmark(start, "GetContainerList [Length: "+ containerLength +", indentLevel: "+ indentLevel +"]")
     return string_if (!isArray, "{\n\t" + paramOutput + "}", "[\n\t" + paramOutput + "]")
 endFunction
 
@@ -996,6 +999,12 @@ ObjectReference function GetNearestJailDoorOfType(int jailBaseDoorId, ObjectRefe
     return none
 endFunction
 
+ObjectReference function GetRandomJailDoorOfType(int jailBaseDoorId, ObjectReference centerRef, float radius) global
+    Form doorRef = Game.GetFormEx(jailBaseDoorId)
+    ObjectReference _cellDoor = Game.FindRandomReferenceOfTypeFromRef(doorRef, centerRef, radius)
+    return _cellDoor
+endFunction
+
 function OpenMultipleDoorsOfType(int jailBaseDoorId, ObjectReference scanFromWhere, float radius) global
     int i = 10
 
@@ -1130,7 +1139,8 @@ float function EndBenchmark(float startTime, string _message = "", bool conditio
     if (condition)
         float endTime = Utility.GetCurrentRealTime()
         float elapsedTime = endTime - startTime
-        local_log(none, string_if(_message != "", _message + " ", "") + "execution took " + ((elapsedTime * 1000)) + " ms", LOG_DEBUG(), hideCall = true)
+        debug.trace("[Realistic Prison and Bounty] DEBUG: " + _message + " execution took: " + ((elapsedTime * 1000)) + " ms")
+        ; local_log(none, string_if(_message != "", _message + " ", "") + "execution took " + ((elapsedTime * 1000)) + " ms", LOG_DEBUG(), hideCall = true)
         return elapsedTime
     endif
 endFunction
