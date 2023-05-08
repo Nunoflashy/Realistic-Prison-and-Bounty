@@ -81,6 +81,7 @@ function Strip()
     bool isStrippedNaked = strippingThoroughness >= 6
     config.IncrementStat(arrestVars.Hold, "Times Stripped")
     bodySearcher.StripActor(this, strippingThoroughness, prisonerItemsContainer)
+    arrestVars.SetBool("Jail::Stripped", true)
     OnUndressed(isStrippedNaked)
 endFunction
 
@@ -344,18 +345,26 @@ endEvent
 event OnClothed(RealisticPrisonAndBounty_Outfit prisonerOutfit)
     jail.OnClothed(this, prisonerOutfit)
 endEvent
-
+; akSpeaker.SetPlayerResistingArrest()
 event OnSentenceChanged(int oldSentence, int newSentence, bool hasSentenceIncreased, bool bountyAffected)
     jail.OnSentenceChanged(this, oldSentence, newSentence, hasSentenceIncreased, bountyAffected)
 endEvent
 
 event OnObjectUnequipped(Form akBaseObject, ObjectReference akReference)
-    JArray.addForm(arrestVars.GetObject("Jail::Prisoner Equipped Items"), akBaseObject)
-    int wasItemAdded = JArray.findForm(arrestVars.GetObject("Jail::Prisoner Equipped Items"), akBaseObject)
-    Debug(self.GetOwningQuest(), "PrisonerRef::OnObjectUnequipped", "\n" + \
-        "Unequipped: " + akBaseObject + \
-        "Was it added: " + wasItemAdded \
-    )
+    if (akBaseObject as Armor) ; Only store equipped Clothing/Armor
+        int prisonerEquippedItemsContainer = arrestVars.GetObject("Jail::Prisoner Equipped Items")
+
+        ; if (!prisonerEquippedItemsContainer)
+        ;     arrestVars.SetObject("Jail::Prisoner Equipped Items", JArray.object())
+        ; endif
+
+        JArray.addForm(prisonerEquippedItemsContainer, akBaseObject)
+        int wasItemAdded = JArray.findForm(prisonerEquippedItemsContainer, akBaseObject)
+        Debug(self.GetOwningQuest(), "PrisonerRef::OnObjectUnequipped", "\n" + \
+            "Unequipped: " + akBaseObject + " (persistent ref: "+ akReference +")" + "\n" + \
+            "Was it added: " + wasItemAdded \
+        )
+    endif
 endEvent
 
 int function GetTimeServed(string timeUnit)

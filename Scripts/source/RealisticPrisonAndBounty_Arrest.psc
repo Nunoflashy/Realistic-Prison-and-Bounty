@@ -35,6 +35,7 @@ ReferenceAlias property CaptorRef auto
 function RegisterEvents()
     RegisterForModEvent("ArrestBegin", "OnArrestBegin")
     RegisterForModEvent("ArrestEnd", "OnArrestEnd")
+    RegisterForModEvent("RPB_ResistArrest", "OnArrestResist")
     Debug(self, "RegisterEvents", "Registered Events")
 endFunction
 
@@ -42,10 +43,20 @@ event OnInit()
     RegisterEvents()
     RegisterForKey(0x58) ; F12
     RegisterForKey(0x57) ; F11
+    RegisterForKey(0x44) ; F10
+    RegisterForKey(0x42) ; F8
+    RegisterForKey(0x41) ; F7
+    RegisterForKey(0x40) ; F6
 endEvent
 
 event OnPlayerLoadGame()
     RegisterEvents()
+    RegisterForKey(0x58) ; F12
+    RegisterForKey(0x57) ; F11
+    RegisterForKey(0x44) ; F10
+    RegisterForKey(0x42) ; F8
+    RegisterForKey(0x41) ; F7
+    RegisterForKey(0x40) ; F6
 endEvent
 
 event OnKeyDown(int keyCode)
@@ -68,7 +79,41 @@ event OnKeyDown(int keyCode)
 
     elseif (keyCode == 0x57)
         Game.QuitToMainMenu()
+
+    elseif (keyCode == 0x44 || keyCode == 0x42 || keyCode == 0x41 || keyCode == 0x40) ; Surrender (Testing)
+        self.TriggerSurrender()
+        debug.notification("Is this working or what")
     endif
+endEvent
+
+event OnArrestResist(string eventName, string unusedStr, float arrestResisterId, Form sender)
+    int resisterId = arrestResisterId as int
+    Actor akSpeaker = sender as Actor
+    Faction crimeFaction = akSpeaker.GetCrimeFaction()
+    string hold = crimeFaction.GetName()
+
+    if (resisterId == 0x14 && !arrestVars.GetBool("Arrest::"+ hold +"::Arrest Resisted")) ; Player, and hasn't resisted arrest yet in the last 3h
+        int resistBountyFlat                    = config.GetArrestAdditionalBountyResistingFlat(hold)
+        float resistBountyFromCurrentBounty     = config.GetArrestAdditionalBountyDefeatedFromCurrentBounty(hold)
+        float resistBountyPercentModifier       = percent(resistBountyFromCurrentBounty)
+        int resistArrestPenalty                 = floor(crimeFaction.GetCrimeGold() * resistBountyPercentModifier) + resistBountyFlat
+
+        crimeFaction.ModCrimeGold(resistArrestPenalty)
+        config.NotifyArrest("You have gained " + resistArrestPenalty + " Bounty for resisting arrest!")
+        arrestVars.SetBool("Arrest::"+ hold +"::Arrest Resisted", true)
+        RegisterForSingleUpdateGameTime(3.0)
+    endif
+
+    akSpeaker.SetPlayerResistingArrest()
+endEvent
+
+event OnUpdateGameTime()
+    int i = 0
+    while (i < config.Holds.Length)
+        ; Set arrest resist to false on all holds, enough time has passed to reset it
+        string hold = config.Holds[i]
+        arrestVars.SetBool("Arrest::"+ hold +"::Arrest Resisted", false)
+    endWhile
 endEvent
 
 event OnArrestBegin(string eventName, string arrestType, float arresteeId, Form sender)
@@ -99,6 +144,7 @@ event OnArrestBegin(string eventName, string arrestType, float arresteeId, Form 
 
     if (captor)
         CaptorRef.ForceRefTo(captor)
+        arrestVars.SetForm("Arrest::Arresting Guard", captor)
         Debug(self, "OnArrestBegin", "Arrest is being done through a captor")
 
     elseif (crimeFaction)
@@ -108,7 +154,6 @@ event OnArrestBegin(string eventName, string arrestType, float arresteeId, Form 
     arrestVars.SetForm("Arrest::Arrest Faction", crimeFaction)
     arrestVars.SetString("Arrest::Hold", crimeFaction.GetName())
     arrestVars.SetForm("Arrest::Arrestee", arresteeRef)
-    arrestVars.SetForm("Arrest::Arresting Guard", captor)
     arrestVars.SetString("Arrest::Arrest Type", arrestType)
 
     self.BeginArrest()
@@ -197,6 +242,23 @@ function BeginArrest()
 
     config.NotifyArrest("You have been arrested in " + hold)
     GotoState(STATE_ARRESTED)
+endFunction
+
+function TriggerResistArrest()
+
+endFunction
+
+function TriggerSurrender()
+    string currentHold = config.GetCurrentPlayerHoldLocation()
+    config.NotifyArrest("You have surrendered to the guards in " + currentHold)
+    config.NotifyArrest(config.Player.GetBaseObject().GetName() + " is to be arrested in " + currentHold)
+
+    config.Player.StopCombat()
+    config.Player.StopCombatAlarm()
+    Utility.Wait(3.0)
+
+    Faction currentHoldFaction = config.GetFaction(currentHold)
+    currentHoldFaction.SendModEvent("ArrestBegin", "TeleportToCell", 0x14)
 endFunction
 
 function UpdateArrest()

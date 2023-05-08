@@ -374,6 +374,10 @@ endProperty
 
 bool property ShouldBeStripped
     bool function get()
+        if (arrestVars.IsStripped) ; Already stripped
+            return false
+        endif
+
         if (IsStrippingEnabled)
             bool stripOnEscape = arrestVars.GetBool("Escape::Should Strip Search")
             if (Prisoner.IsEscapee() && stripOnEscape)
@@ -545,7 +549,7 @@ function SetupJailVars()
     arrestVars.SetForm("Jail::Teleport Release Location", config.GetJailTeleportReleaseMarker(arrestVars.Hold))
     arrestVars.SetForm("Jail::Prisoner Items Container", config.GetJailPrisonerItemsContainer(arrestVars.Hold))
 
-    ; inventation time
+    ; ; inventation time
     arrestVars.SetObject("Jail::Prisoner Equipped Items", JArray.object())
 
     Debug(self, "SetupJailVars", "Found Cell Door: " + arrestVars.CellDoor)
