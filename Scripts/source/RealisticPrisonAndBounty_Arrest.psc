@@ -121,8 +121,10 @@ event OnArrestResist(string eventName, string unusedStr, float arrestResisterId,
         return
     endif
 
-    if (arrestVars.GetBool("Arrest::" + crimeFaction.GetName() + "::Arrest Resisted"))
-        Error(self, "Arrest::OnArrestResist", "You have already resisted arrest recently, this will not count as it most likely is the same arrest")
+    bool hasResistedArrestRecentlyInThisHold = arrestVars.GetBool("Arrest::" + crimeFaction.GetName() + "::Arrest Resisted")
+
+    if (hasResistedArrestRecentlyInThisHold)
+        Info(self, "Arrest::OnArrestResist", "You have already resisted arrest recently, this will not count as it most likely is the same arrest")
         return
     endif
 
@@ -136,6 +138,7 @@ event OnUpdateGameTime()
         string hold = config.Holds[i]
         arrestVars.SetBool("Arrest::"+ hold +"::Arrest Resisted", false)
     endWhile
+    Debug(self, "Arrest::OnUpdateGameTime", "Lets see how many times this gets called")
 endEvent
 
 event OnArrestBegin(string eventName, string arrestType, float arresteeId, Form sender)
@@ -283,7 +286,7 @@ function TriggerResistArrest(Actor akGuard, Faction akCrimeFaction)
     akCrimeFaction.ModCrimeGold(resistArrestPenalty)
     config.NotifyArrest("You have gained " + resistArrestPenalty + " Bounty in " + hold +" for resisting arrest!")
 
-    arrestVars.SetBool("Arrest::"+ hold +"::Arrest Resisted", true)
+    arrestVars.SetBool("Arrest::"+ hold +"::Arrest Resisted", true) ; Set arrest resisted flag
     RegisterForSingleUpdateGameTime(1.0)
 endFunction
 
@@ -311,7 +314,6 @@ function TriggerSurrender()
     endif
 
     config.NotifyArrest("You have surrendered to the guards in " + currentHold)
-    ; config.NotifyArrest(config.Player.GetBaseObject().GetName() + " is to be arrested in " + currentHold)
 
     self.RestrainArrestee(arresteeRef)
     Utility.Wait(2.0)
