@@ -596,13 +596,13 @@ function AddEscapedBounty()
 endFunction
 
 function ShowArrestVars()
-    Debug(self, "ShowArrestVars", "\n" + Hold + " Arrest Vars: " + GetContainerList(arrestVars.GetContainer()))
+    Debug(self, "ShowArrestVars", "\n" + Hold + " Arrest Vars: " + GetContainerList(arrestVars.GetHandle()))
 endFunction
 
 function ShowArrestParams()
     int arrestParams = arrestVars.GetObject("Arrest::Arrest Params")
-    int arrestParamsObj = JMap.getObj(arrestVars.GetContainer(), "Arrest::Arrest Params")
-    int arrestParamsBV = JMap.getInt(arrestVars.GetContainer(), "Arrest::Bounty Violent")
+    int arrestParamsObj = JMap.getObj(arrestVars.GetHandle(), "Arrest::Arrest Params")
+    int arrestParamsBV = JMap.getInt(arrestVars.GetHandle(), "Arrest::Bounty Violent")
     bool isObject = JValue.isMap(arrestParamsObj)
     Debug(self, "ShowArrestParams (id: "+ arrestParamsObj +", isObject: "+ isObject +", arrestParamsBV: "+ arrestParamsBV +")", "\n" + Hold + " Arrest Params: " + GetContainerList(arrestParams))
 endFunction
@@ -618,7 +618,7 @@ endEvent
 
 event OnJailedEnd(string eventName, string strArg, float numArg, Form sender)
     Debug(self, "OnJailedEnd", "Ending jailing process... (Released, Escaped?)")
-    arrestVars.Delete()
+    arrestVars.Clear()
 endEvent
 
 state Jailed
@@ -949,7 +949,7 @@ state Released
         ; Terminate Release process, Actor should be free at this point
         Debug(self, "OnEndState", CurrentState + " state end")
         arrest.GotoState("")
-        arrestVars.Delete()
+        arrestVars.Clear()
     endEvent
 endState
 
@@ -957,7 +957,7 @@ state Free
     event OnBeginState()
         Debug(self, "OnBeginState", CurrentState + " state begin")
         ; Begin Free process, Actor is not arrested and is Free
-        arrestVars.Delete()
+        arrestVars.Clear()
     endEvent
 
     event OnEndState()

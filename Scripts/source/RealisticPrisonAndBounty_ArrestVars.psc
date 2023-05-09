@@ -10,6 +10,12 @@ RealisticPrisonAndBounty_Config property config
     endFunction
 endProperty
 
+RPB_ContainerManager property containerManager
+    RPB_ContainerManager function get()
+        return Game.GetFormFromFile(0x3DF8, GetPluginName()) as RPB_ContainerManager
+    endFunction
+endProperty
+
 ; ==========================================================
 ; Static Variables (Configured in MCM)
 ; ==========================================================
@@ -176,18 +182,8 @@ endProperty
 
 int property Sentence
     int function get()
-        ; self.SetInt("Min::Jail::Sentence", self.MinimumSentence)
-        ; self.SetInt("Max::Jail::Sentence", self.MaximumSentence)
-        ; int minSentence  = self.MinimumSentence
-        ; int maxSentence  = self.MaximumSentence
-        ; int thisSentence = self.GetInt("Jail::Sentence")
-
-        ; if (thisSentence > maxSentence)
-        ;     return maxSentence
-
-        ; elseif (thisSentence < minSentence)
-        ;     return minSentence
-        ; endif
+        self.SetIntMin("Jail::Sentence", self.MinimumSentence)
+        self.SetIntMax("Jail::Sentence", self.MaximumSentence)
 
         return self.GetInt("Jail::Sentence")
     endFunction
@@ -313,35 +309,35 @@ endProperty
 ; ==========================================================
 
 function SetBool(string paramKey, bool value)
-    JMap.setInt(_arrestVarsContainer, paramKey, value as int)
+    containerManager.SetInt(ContainerName, paramKey, value as int)
 endFunction
 
 function SetInt(string paramKey, int value)
-    JMap.setInt(_arrestVarsContainer, paramKey, value)
+    containerManager.SetInt(ContainerName, paramKey, value as int)
 endFunction
 
 function SetFloat(string paramKey, float value)
-    JMap.setFlt(_arrestVarsContainer, paramKey, value)
+    containerManager.SetFloat(ContainerName, paramKey, value)
 endFunction
 
 function SetString(string paramKey, string value)
-    JMap.setStr(_arrestVarsContainer, paramKey, value)
+    containerManager.SetString(ContainerName, paramKey, value)
 endFunction
 
 function SetForm(string paramKey, Form value)
-    JMap.setForm(_arrestVarsContainer, paramKey, value)
+    containerManager.SetForm(ContainerName, paramKey, value)
 endFunction
 
 function SetReference(string paramKey, ObjectReference value)
-    JMap.setForm(_arrestVarsContainer, paramKey, value)
+    containerManager.SetForm(ContainerName, paramKey, value as ObjectReference)
 endFunction
 
 function SetActor(string paramKey, Actor value)
-    JMap.setForm(_arrestVarsContainer, paramKey, value)
+    containerManager.SetForm(ContainerName, paramKey, value as Actor)
 endFunction
 
 function SetObject(string paramKey, int value)
-    JMap.setObj(_arrestVarsContainer, paramKey, value)
+    containerManager.SetObject(ContainerName, paramKey, value)
 endFunction
 
 function ModInt(string paramKey, int value)
@@ -355,11 +351,21 @@ function ModFloat(string paramKey, float value)
 endFunction
 
 bool function GetBool(string paramKey, bool allowOverrides = true)
-    return JMap.getInt(_arrestVarsContainer, __getUsedKey(paramKey, allowOverrides)) as bool
+    if (!self.Exists(paramKey))
+        Error(self, "ArrestVars::Get", "Arrest Variable <"+ paramKey +"> does not exist!")
+        return false
+    endif
+
+    return containerManager.GetBool(ContainerName, __getUsedKey(paramKey, allowOverrides))
 endFunction
 
 int function GetInt(string paramKey, bool allowOverrides = true)
-    int thisValue = JMap.getInt(_arrestVarsContainer, __getUsedKey(paramKey, allowOverrides))
+    if (!self.Exists(paramKey))
+        Error(self, "ArrestVars::Get", "Arrest Variable <"+ paramKey +"> does not exist!")
+        return 0
+    endif
+
+    int thisValue = containerManager.GetInt(ContainerName, __getUsedKey(paramKey, allowOverrides))
 
     bool hasMin = self.HasMinimumValue(paramKey)
     bool hasMax = self.HasMaximumValue(paramKey)
@@ -380,7 +386,12 @@ int function GetInt(string paramKey, bool allowOverrides = true)
 endFunction
 
 float function GetFloat(string paramKey, bool allowOverrides = true)
-    float thisValue = JMap.getFlt(_arrestVarsContainer, __getUsedKey(paramKey, allowOverrides))
+    if (!self.Exists(paramKey))
+        Error(self, "ArrestVars::Get", "Arrest Variable <"+ paramKey +"> does not exist!")
+        return 0.0
+    endif
+
+    float thisValue = containerManager.GetFloat(ContainerName, __getUsedKey(paramKey, allowOverrides))
 
     bool hasMin = self.HasMinimumValue(paramKey)
     bool hasMax = self.HasMaximumValue(paramKey)
@@ -402,19 +413,20 @@ endFunction
 
 string function GetString(string paramKey, bool allowOverrides = true)
     if (!self.Exists(paramKey))
-        Error(self, "ArrestVars::Get", "Arrest Variable ["+ paramKey +"] does not exist!")
+        Error(self, "ArrestVars::Get", "Arrest Variable <"+ paramKey +"> does not exist!")
         return ""
     endif
 
-    return JMap.getStr(_arrestVarsContainer, __getUsedKey(paramKey, allowOverrides))
+    return containerManager.GetString(ContainerName, __getUsedKey(paramKey, allowOverrides))
 endFunction
 
 Form function GetForm(string paramKey, bool allowOverrides = true)
     if (!self.Exists(paramKey))
-        Error(self, "ArrestVars::Get", "Arrest Variable ["+ paramKey +"] does not exist!")
+        Error(self, "ArrestVars::Get", "Arrest Variable <"+ paramKey +"> does not exist!")
         return none
     endif
-    return JMap.getForm(_arrestVarsContainer, __getUsedKey(paramKey, allowOverrides))
+
+    return containerManager.GetForm(ContainerName, __getUsedKey(paramKey, allowOverrides))
 endFunction
 
 ObjectReference function GetReference(string paramKey)
@@ -430,111 +442,129 @@ int function GetObject(string paramKey, bool allowOverrides = true)
         Error(self, "ArrestVars::Get", "Arrest Variable ["+ paramKey +"] does not exist!")
         return -1
     endif
-    return JMap.getObj(_arrestVarsContainer, __getUsedKey(paramKey, allowOverrides))
+    return containerManager.GetObject(ContainerName, __getUsedKey(paramKey, allowOverrides))
 endFunction
 
 function Remove(string paramKey, bool removeOverrides = true)
-    JMap.removeKey(_arrestVarsContainer, paramKey)
+    containerManager.RemoveElement(ContainerName, paramKey)
     
     if (self.HasOverride(paramKey) && removeOverrides)
-        JMap.removeKey(_arrestVarsContainer, GetOverride(paramKey))
+        containerManager.RemoveElement(ContainerName, GetOverrideKey(paramKey))
     endif
 endFunction
 
-function Delete()
-    JMap.clear(_arrestVarsContainer)
+function Clear()
+    containerManager.ClearContainer(ContainerName)
 endFunction
 
 bool function Exists(string paramKey)
-    return JMap.hasKey(_arrestVarsContainer, paramKey)
+    return containerManager.HasKey(ContainerName, paramKey)
 endFunction
 
 bool function HasOverride(string paramKey)
-    return JMap.hasKey(_arrestVarsContainer, GetOverride(paramKey))
+    return containerManager.HasKey(ContainerName, GetOverrideKey(paramKey))
 endFunction
 
-string function GetOverride(string paramKey)
-    return _overrideKey + paramKey
+string function GetOverrideKey(string paramKey)
+    return "Override::" + paramKey
 endFunction
 
 bool function HasMinimumValue(string paramKey)
-    return JMap.hasKey(_arrestVarsContainer, _minimumKey + paramKey)
+    return containerManager.HasKey(ContainerName, "Min::" + paramKey)
 endFunction
 
 bool function HasMaximumValue(string paramKey)
-    return JMap.hasKey(_arrestVarsContainer, _maximumKey + paramKey)
+    return containerManager.HasKey(ContainerName, "Max::" + paramKey)
+endFunction
+
+function SetIntMin(string paramKey, int minValue, bool allowNewRecords = false)
+    if (!self.HasMinimumValue(paramKey) || allowNewRecords)
+        containerManager.SetInt(ContainerName, "Min::" + paramKey, minValue)
+    endif
+endFunction
+
+function SetIntMax(string paramKey, int minValue, bool allowNewRecords = false)
+    if (!self.HasMaximumValue(paramKey) || allowNewRecords)
+        containerManager.SetInt(ContainerName, "Max::" + paramKey, minValue)
+    endif
+endFunction
+
+function SetFloatMin(string paramKey, float minValue, bool allowNewRecords = false)
+    if (!self.HasMinimumValue(paramKey) || allowNewRecords)
+        containerManager.SetFloat(ContainerName, "Min::" + paramKey, minValue)
+    endif
+endFunction
+
+function SetFloatMax(string paramKey, float minValue, bool allowNewRecords = false)
+    if (!self.HasMaximumValue(paramKey) || allowNewRecords)
+        containerManager.SetFloat(ContainerName, "Max::" + paramKey, minValue)
+    endif
 endFunction
 
 int function GetIntMin(string paramKey)
-    return JMap.getInt(_arrestVarsContainer, _minimumKey + paramKey)
+    return containerManager.GetInt(ContainerName, "Min::" + paramKey)
 endFunction
 
 int function GetIntMax(string paramKey)
-    return JMap.getInt(_arrestVarsContainer, _maximumKey + paramKey)
+    return containerManager.GetInt(ContainerName, "Max::" + paramKey)
 endFunction
 
 float function GetFloatMin(string paramKey)
-    return JMap.getFlt(_arrestVarsContainer, _minimumKey + paramKey)
+    return containerManager.GetFloat(ContainerName, "Min::" + paramKey)
 endFunction
 
 float function GetFloatMax(string paramKey)
-    return JMap.getFlt(_arrestVarsContainer, _maximumKey + paramKey)
+    return containerManager.GetFloat(ContainerName, "Max::" + paramKey)
 endFunction
 
+; string function GetList(string category = "")
+;     bool hasCategory = category != ""
+;     string categoryKey = string_if (!hasCategory, "", category + "::")
+;     return GetContainerList(_arrestVarsContainer, includeStringFilter = categoryKey)
+; endFunction
+
+; function List(string category = "")
+;     bool hasCategory = category != ""
+;     string categoryKey = string_if (!hasCategory, "", category + "::")
+;     Debug(self, string_if (!hasCategory, "ArrestVars::List", "ArrestVars::List("+ category +")"), GetContainerList(_arrestVarsContainer, includeStringFilter = categoryKey))
+; endFunction
+
+; function ListOverrides(string category = "")
+;     bool hasCategory = category != ""
+;     string categoryKey = string_if (!hasCategory, "Override::", "Override::" + category + "::")
+;     Debug(self, string_if (!hasCategory, "ArrestVars::ListOverrides", "ArrestVars::ListOverrides("+ category +")"), GetContainerList(_arrestVarsContainer, includeStringFilter = categoryKey))
+; endFunction
+
 string function GetList(string category = "")
-    bool hasCategory = category != ""
-    string categoryKey = string_if (!hasCategory, "", category + "::")
-    return GetContainerList(_arrestVarsContainer, includeStringFilter = categoryKey)
 endFunction
 
 function List(string category = "")
-    bool hasCategory = category != ""
-    string categoryKey = string_if (!hasCategory, "", category + "::")
-    Debug(self, string_if (!hasCategory, "ArrestVars::List", "ArrestVars::List("+ category +")"), GetContainerList(_arrestVarsContainer, includeStringFilter = categoryKey))
 endFunction
 
 function ListOverrides(string category = "")
-    bool hasCategory = category != ""
-    string categoryKey = string_if (!hasCategory, _overrideKey, _overrideKey + category + "::")
-    Debug(self, string_if (!hasCategory, "ArrestVars::ListOverrides", "ArrestVars::ListOverrides("+ category +")"), GetContainerList(_arrestVarsContainer, includeStringFilter = categoryKey))
 endFunction
 
 ; Returns the made overriden key for this param if the var has an override and overriding is enabled,
 ; otherwise, returns the normal var key
 string function __getUsedKey(string paramKey, bool allowOverrides)
-    return string_if (allowOverrides && self.HasOverride(paramKey), GetOverride(paramKey), paramKey)
+    if (allowOverrides && self.HasOverride(paramKey))
+        return GetOverrideKey(paramKey)
+    endif
+    
+    return paramKey
 endFunction
-
-string property _overrideKey
-    string function get()
-        return "Override::"
-    endFunction
-endProperty
-
-string property _minimumKey
-    string function get()
-        return "Min::"
-    endFunction
-endProperty
-
-string property _maximumKey
-    string function get()
-        return "Max::"
-    endFunction
-endProperty
 
 event OnInit()
     __init()
 endEvent
 
 function __init()
-    _arrestVarsContainer = JMap.object()
-    JValue.retain(_arrestVarsContainer)
+    containerManager.CreateMap(ContainerName)
     Debug(self, "__init", "Initialized Arrest Vars Container")
 endFunction
 
-int function GetContainer()
-    return _arrestVarsContainer
+int function GetHandle()
+    return containerManager.GetContainer(ContainerName)
 endFunction
 
-int _arrestVarsContainer
+string property ContainerName = "ArrestVars" autoreadonly

@@ -169,7 +169,8 @@ event OnArrestBegin(string eventName, string arrestType, float arresteeId, Form 
         return
     endif
 
-    if (!self.HasLatentBounty() && !self.HasActiveBounty(crimeFaction))
+    bool isJailUnconditional = config.IsJailUnconditional(crimeFaction.GetName())
+    if (!self.HasLatentBounty() && !self.HasActiveBounty(crimeFaction) && !isJailUnconditional)
         Error(self, "OnArrestBegin", arresteeRef.GetBaseObject().GetName() + " has no bounty, cannot arrest for "+ crimeFaction.GetName() +", aborting!")
         return
     endif
@@ -236,7 +237,7 @@ function BeginArrest()
     bool assignedJailCellSuccessfully = jail.AssignJailCell(arrestee) ; Not guaranteed to go to jail, but we set it up here either way
 
     if (!assignedJailCellSuccessfully)
-        arrestVars.Delete()
+        arrestVars.Clear()
         Error(self, "BeginArrest", "Could not assign a jail cell to " + arrestee + ". (Aborting arrest...)")
         return
     endif
@@ -302,13 +303,15 @@ function TriggerSurrender()
         return
     endif
 
-    if (!self.HasLatentBounty() && !self.HasActiveBounty(currentHoldFaction))
+    bool isJailUnconditional = config.IsJailUnconditional(currentHold)
+
+    if (!self.HasLatentBounty() && !self.HasActiveBounty(currentHoldFaction) && !isJailUnconditional)
         config.NotifyArrest("You can't be arrested in " + currentHold + " since you have no bounty in this hold")
         Error(self, "Arrest::OnArrestBegin", arresteeRef.GetBaseObject().GetName() + " has no bounty, cannot arrest for "+ currentHoldFaction.GetName() +", aborting!")
         return
     endif
 
-    if (!self.MeetsBountyRequirements(currentHoldFaction))
+    if (!self.MeetsBountyRequirements(currentHoldFaction) && !isJailUnconditional)
         config.NotifyArrest("You can't be arrested in " + currentHold + " since you do not have enough bounty in this hold")
         Error(self, "Arrest::OnArrestBegin", arresteeRef.GetBaseObject().GetName() + " does not have enough bounty, cannot arrest for "+ currentHoldFaction.GetName() +", aborting!")
         return
@@ -317,7 +320,7 @@ function TriggerSurrender()
     config.NotifyArrest("You have surrendered to the guards in " + currentHold)
 
     self.RestrainArrestee(arresteeRef)
-    Utility.Wait(2.0)
+    ; Utility.Wait(2.0)
 
     arrestVars.SetInt("Arrest::Bounty Non-Violent", currentHoldFaction.GetCrimeGoldNonViolent())
     arrestVars.SetInt("Arrest::Bounty Violent", currentHoldFaction.GetCrimeGoldViolent())
