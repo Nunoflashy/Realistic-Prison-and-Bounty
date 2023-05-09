@@ -74,6 +74,10 @@ ObjectReference property JailCell
     endFunction
 endProperty
 
+event OnSliderOptionChanged(string eventName, string optionName, float optionValue, Form sender)
+    Debug(self, "Config::OnSliderOptionChanged", "Option received: " + optionName + ", value: " + optionValue)
+endEvent
+
 int factionMap
 function __initializeFactionsMapping()
     factionMap = JMap.object()
@@ -389,6 +393,7 @@ endFunction
 
 event OnPlayerLoadGame()
     __initializeJailTeleportReleaseMarkersMapping()
+    RegisterForModEvent("RPB_OptionChanged", "OnOptionChanged")
 endEvent
 
 event OnInit()
@@ -398,10 +403,7 @@ event OnInit()
     __initializeJailPrisonerContainersMapping()
     __initializeLocationsMapping()
 
-    ; RegisterForKey(0x58) ; F12
-
-    RegisterForModEvent("PlayerArrestBegin", "OnPlayerBeginArrest")
-    mcm.Debug("OnInit", "Config::Init Script")
+    RegisterForModEvent("RPB_SliderOptionChanged", "OnSliderOptionChanged")
 endEvent
 
 string function GetGlobalEquivalentOfLocalStat(string localStat)
@@ -1043,10 +1045,6 @@ bool function IsBountyDecayable(string hold)
 
     return isDecayable
 endFunction
-
-event OnPlayerBeginArrest(string eventName, string strArg, float numArg, Form sender)
-    mcm.Debug("OnPlayerBeginArrest", "Begin Arrest Event")
-endEvent
 
 Armor function GetActorEquippedClothingForBodyPart(Actor actorTarget, string bodyPart)
     int validSlotMasks = JArray.object()

@@ -27,6 +27,7 @@ function Left(RealisticPrisonAndBounty_MCM mcm) global
 
     mcm.AddEmptyOption()
     mcm.AddEmptyOption()
+
     mcm.AddTextOption("", "WHEN FREE", mcm.OPTION_DISABLED)
     mcm.AddOptionSlider("Timescale")
 
@@ -53,8 +54,8 @@ function Left(RealisticPrisonAndBounty_MCM mcm) global
 endFunction
 
 function Right(RealisticPrisonAndBounty_MCM mcm) global
-    mcm.SetRenderedCategory("General")
-    mcm.AddEmptyOption()
+    mcm.AddOptionCategoryKey("", "General")
+    ; mcm.SetRenderedCategory("General")
     mcm.AddOptionToggleKey("Display Arrest Notifications", "ArrestNotifications")
     mcm.AddOptionToggleKey("Display Jail Notifications", "JailedNotifications")
     mcm.AddOptionToggleKey("Display Bounty Decay Notifications", "BountyDecayNotifications")
@@ -68,16 +69,16 @@ function Right(RealisticPrisonAndBounty_MCM mcm) global
     mcm.AddOptionSliderKey("Timescale", "TimescalePrison")
 
     mcm.AddEmptyOption()
-    mcm.AddEmptyOption()
-    mcm.AddEmptyOption()        
+    mcm.AddEmptyOption()     
 
+    mcm.AddOptionCategory("")
     mcm.SetRenderedCategory("Bounty for Actions")
     mcm.AddOptionSlider("Pickpocketing", "{0} Bounty")
     mcm.AddOptionSlider("Lockpicking", "{0} Bounty")
     mcm.AddOptionSlider("Disturbing the Peace", "{0} Bounty")
     mcm.AddEmptyOption()
-    mcm.AddEmptyOption()
 
+    mcm.AddOptionCategory("")
     mcm.SetRenderedCategory("Deleveling")
     int i = 0
     while (i < 11)
@@ -251,6 +252,9 @@ function OnOptionSliderAccept(RealisticPrisonAndBounty_MCM mcm, string option, f
         endif
 
     endif
+
+    ; Send option changed event
+    mcm.SendModEvent("RPB_SliderOptionChanged", option, value)
 
     mcm.SetOptionSliderValue(option, value, formatString)
 endFunction

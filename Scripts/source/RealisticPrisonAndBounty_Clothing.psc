@@ -117,10 +117,10 @@ function WearOutfit(Actor actorToClothe, RealisticPrisonAndBounty_Outfit outfitT
         actorToClothe.UnequipAll()
     endif
 
-    actorToClothe.EquipItem(outfitToWear.Head)
-    actorToClothe.EquipItem(outfitToWear.Body)
-    actorToClothe.EquipItem(outfitToWear.Hands)
-    actorToClothe.EquipItem(outfitToWear.Feet)
+    actorToClothe.EquipItem(outfitToWear.Head, abSilent = true)
+    actorToClothe.EquipItem(outfitToWear.Body, abSilent = true)
+    actorToClothe.EquipItem(outfitToWear.Hands, abSilent = true)
+    actorToClothe.EquipItem(outfitToWear.Feet, abSilent = true)
 
     Debug(self, "Clothing::WearOutfit", "\n" + \
         "Equipped Head: " + outfitToWear.Head + "\n" + \

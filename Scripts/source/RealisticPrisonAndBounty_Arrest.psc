@@ -82,29 +82,51 @@ event OnKeyDown(int keyCode)
 
     elseif (keyCode == 0x44 || keyCode == 0x42 || keyCode == 0x41 || keyCode == 0x40) ; Surrender (Testing)
         self.TriggerSurrender()
-        debug.notification("Is this working or what")
     endif
 endEvent
 
+; event OnArrestResist(string eventName, string unusedStr, float arrestResisterId, Form sender)
+;     int resisterId = arrestResisterId as int
+;     Actor akSpeaker = sender as Actor
+;     Faction crimeFaction = akSpeaker.GetCrimeFaction()
+;     string hold = crimeFaction.GetName()
+
+;     if (resisterId == 0x14 && !arrestVars.GetBool("Arrest::"+ hold +"::Arrest Resisted")) ; Player, and hasn't resisted arrest yet in the last 3h
+;         int resistBountyFlat                    = config.GetArrestAdditionalBountyResistingFlat(hold)
+;         float resistBountyFromCurrentBounty     = config.GetArrestAdditionalBountyDefeatedFromCurrentBounty(hold)
+;         float resistBountyPercentModifier       = percent(resistBountyFromCurrentBounty)
+;         int resistArrestPenalty                 = floor(crimeFaction.GetCrimeGold() * resistBountyPercentModifier) + resistBountyFlat
+
+;         crimeFaction.ModCrimeGold(resistArrestPenalty)
+;         config.NotifyArrest("You have gained " + resistArrestPenalty + " Bounty for resisting arrest!")
+;         arrestVars.SetBool("Arrest::"+ hold +"::Arrest Resisted", true)
+;         RegisterForSingleUpdateGameTime(3.0)
+;     endif
+
+;     akSpeaker.SetPlayerResistingArrest()
+; endEvent
+
 event OnArrestResist(string eventName, string unusedStr, float arrestResisterId, Form sender)
-    int resisterId = arrestResisterId as int
-    Actor akSpeaker = sender as Actor
-    Faction crimeFaction = akSpeaker.GetCrimeFaction()
-    string hold = crimeFaction.GetName()
+    Actor guard            = (sender as Actor)
+    Faction crimeFaction    = form_if ((sender as Faction), (sender as Faction), guard.GetCrimeFaction()) as Faction
 
-    if (resisterId == 0x14 && !arrestVars.GetBool("Arrest::"+ hold +"::Arrest Resisted")) ; Player, and hasn't resisted arrest yet in the last 3h
-        int resistBountyFlat                    = config.GetArrestAdditionalBountyResistingFlat(hold)
-        float resistBountyFromCurrentBounty     = config.GetArrestAdditionalBountyDefeatedFromCurrentBounty(hold)
-        float resistBountyPercentModifier       = percent(resistBountyFromCurrentBounty)
-        int resistArrestPenalty                 = floor(crimeFaction.GetCrimeGold() * resistBountyPercentModifier) + resistBountyFlat
-
-        crimeFaction.ModCrimeGold(resistArrestPenalty)
-        config.NotifyArrest("You have gained " + resistArrestPenalty + " Bounty for resisting arrest!")
-        arrestVars.SetBool("Arrest::"+ hold +"::Arrest Resisted", true)
-        RegisterForSingleUpdateGameTime(3.0)
+    if (!guard && !crimeFaction)
+        Error(self, "Arrest::OnArrestResist", "Guard or Faction are invalid ["+ "Guard: "+ guard + ", Faction: " + crimeFaction +"], cannot start arrest process!")
+        return
     endif
 
-    akSpeaker.SetPlayerResistingArrest()
+    ; Not the player
+    if ((arrestResisterId as int) != 0x14)
+        Error(self, "Arrest::OnArrestResist", "Someone other than the player ("+ Game.GetFormEx(arrestResisterId as int) +") has resisted arrest (how?), returning...")
+        return
+    endif
+
+    if (arrestVars.GetBool("Arrest::" + crimeFaction.GetName() + "::Arrest Resisted"))
+        Error(self, "Arrest::OnArrestResist", "You have already resisted arrest recently, this will not count as it most likely is the same arrest")
+        return
+    endif
+
+    self.TriggerResistArrest(guard, crimeFaction)
 endEvent
 
 event OnUpdateGameTime()
@@ -139,6 +161,11 @@ event OnArrestBegin(string eventName, string arrestType, float arresteeId, Form 
 
     if (!arresteeRef)
         Error(self, "OnArrestBegin", "Arrestee not found for this arrest, aborting!")
+        return
+    endif
+
+    if (!self.HasLatentBounty() && !self.HasActiveBounty(crimeFaction))
+        Error(self, "OnArrestBegin", arresteeRef.GetBaseObject().GetName() + " has no bounty, cannot arrest for "+ crimeFaction.GetName() +", aborting!")
         return
     endif
 
@@ -244,21 +271,71 @@ function BeginArrest()
     GotoState(STATE_ARRESTED)
 endFunction
 
-function TriggerResistArrest()
+function TriggerResistArrest(Actor akGuard, Faction akCrimeFaction)
+    string hold = akCrimeFaction.GetName()
 
+    int resistBountyFlat                    = config.GetArrestAdditionalBountyResistingFlat(hold)
+    float resistBountyFromCurrentBounty     = config.GetArrestAdditionalBountyDefeatedFromCurrentBounty(hold)
+    float resistBountyPercentModifier       = percent(resistBountyFromCurrentBounty)
+    int resistArrestPenalty                 = floor(akCrimeFaction.GetCrimeGold() * resistBountyPercentModifier) + resistBountyFlat
+
+    akGuard.SetPlayerResistingArrest()
+    akCrimeFaction.ModCrimeGold(resistArrestPenalty)
+    config.NotifyArrest("You have gained " + resistArrestPenalty + " Bounty in " + hold +" for resisting arrest!")
+
+    arrestVars.SetBool("Arrest::"+ hold +"::Arrest Resisted", true)
+    RegisterForSingleUpdateGameTime(1.0)
 endFunction
 
 function TriggerSurrender()
     string currentHold = config.GetCurrentPlayerHoldLocation()
+    Faction currentHoldFaction = config.GetFaction(currentHold)
+    Actor arresteeRef = config.Player
+
+    if (arrestVars.IsArrested)
+        config.NotifyArrest("You are already arrested")
+        Error(self, "Arrest::OnArrestBegin", arresteeRef.GetBaseObject().GetName() + " is already arrested, cannot arrest for "+ currentHoldFaction.GetName() +", aborting!")
+        return
+    endif
+
+    if (!self.HasLatentBounty() && !self.HasActiveBounty(currentHoldFaction))
+        config.NotifyArrest("You can't be arrested in " + currentHold + " since you have no bounty in this hold")
+        Error(self, "Arrest::OnArrestBegin", arresteeRef.GetBaseObject().GetName() + " has no bounty, cannot arrest for "+ currentHoldFaction.GetName() +", aborting!")
+        return
+    endif
+
+    if (!self.MeetsBountyRequirements(currentHoldFaction))
+        config.NotifyArrest("You can't be arrested in " + currentHold + " since you do not have enough bounty in this hold")
+        Error(self, "Arrest::OnArrestBegin", arresteeRef.GetBaseObject().GetName() + " does not have enough bounty, cannot arrest for "+ currentHoldFaction.GetName() +", aborting!")
+        return
+    endif
+
     config.NotifyArrest("You have surrendered to the guards in " + currentHold)
-    config.NotifyArrest(config.Player.GetBaseObject().GetName() + " is to be arrested in " + currentHold)
+    ; config.NotifyArrest(config.Player.GetBaseObject().GetName() + " is to be arrested in " + currentHold)
+
+    self.RestrainArrestee(arresteeRef)
+    Utility.Wait(2.0)
+
+    arrestVars.SetInt("Arrest::Bounty Non-Violent", currentHoldFaction.GetCrimeGoldNonViolent())
+    arrestVars.SetInt("Arrest::Bounty Violent", currentHoldFaction.GetCrimeGoldViolent())
+
+    ClearBounty(currentHoldFaction)
 
     config.Player.StopCombat()
     config.Player.StopCombatAlarm()
-    Utility.Wait(3.0)
 
-    Faction currentHoldFaction = config.GetFaction(currentHold)
-    currentHoldFaction.SendModEvent("ArrestBegin", "TeleportToCell", 0x14)
+    currentHoldFaction.SendModEvent("ArrestBegin", "TeleportToCell", arresteeRef.GetFormID())
+endFunction
+
+function RestrainArrestee(Actor akArrestee)
+    ; Hand Cuffs Backside Rusty - 0xA081D2F
+    ; Hand Cuffs Front Rusty - 0xA081D33
+    ; Hand Cuffs Front Shiny - 0xA081D34
+    ; Hand Cuffs Crossed Front 01 - 0xA033D9D
+    ; Hands Crossed Front in Scarfs - 0xA073A14
+    ; Hands in Irons Front Black - 0xA033D9E
+    Form cuffs = Game.GetFormEx(0xA081D2F)
+    akArrestee.EquipItem(cuffs, true, true)
 endFunction
 
 function UpdateArrest()
@@ -286,11 +363,31 @@ function UpdateArrest()
     )
 endFunction
 
+bool function HasLatentBounty()
+    return arrestVars.Bounty > 0
+endFunction
+
+bool function HasActiveBounty(Faction akCrimeFaction)
+    return akCrimeFaction.GetCrimeGold() > 0
+endFunction
+
+bool function MeetsBountyRequirements(Faction akCrimeFaction)
+    int minBountyToArrest = config.GetArrestRequiredBounty(akCrimeFaction.GetName())
+    return akCrimeFaction.GetCrimeGold() >= minBountyToArrest || arrestVars.Bounty >= minBountyToArrest
+endFunction
+
 function SetBounty()
     Faction arrestFaction = arrestVars.ArrestFaction
 
-    arrestVars.SetFloat("Arrest::Bounty Non-Violent", arrestFaction.GetCrimeGoldNonViolent())
-    arrestVars.SetFloat("Arrest::Bounty Violent", arrestFaction.GetCrimeGoldViolent())
+    if (self.HasLatentBounty())
+        ; Add the "active bounty" if there's any, to the latent bounty
+        arrestVars.ModInt("Arrest::Bounty Non-Violent", arrestFaction.GetCrimeGoldNonViolent())
+        arrestVars.ModInt("Arrest::Bounty Violent", arrestFaction.GetCrimeGoldViolent())
+    else
+        ; Set the bounties to be latent
+        arrestVars.SetFloat("Arrest::Bounty Non-Violent", arrestFaction.GetCrimeGoldNonViolent())
+        arrestVars.SetFloat("Arrest::Bounty Violent", arrestFaction.GetCrimeGoldViolent())
+    endif
 
     if (arrestVars.HasOverride("Arrest::Bounty Non-Violent"))
         Debug(self, "SetBounty", "\n" + \

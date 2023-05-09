@@ -949,8 +949,8 @@ function LoadSliderOptions(RealisticPrisonAndBounty_MCM mcm, string option, floa
         maxRange = 100
 
     elseif (option == "Jail::Bounty to Sentence")
-        minRange = 100
-        intervalSteps = 100
+        minRange = 10
+        intervalSteps = 10
 
     elseif (option == "Jail::Minimum Sentence")
         maxRange = mcm.GetOptionSliderValue("Jail::Maximum Sentence") - 1
@@ -1320,6 +1320,9 @@ function OnOptionSliderAccept(RealisticPrisonAndBounty_MCM mcm, string option, f
 
     ; Set the main option value
     mcm.SetOptionSliderValue(option, value, formatString)
+
+    ; Send option changed event
+    mcm.SendModEvent("RPB_SliderOptionChanged", option, value)
 
     mcm.Debug("OnSliderAccept", "GetSliderOptionValue("+  option +") = " + mcm.GetSliderOptionValue(mcm.CurrentPage, option))
 endFunction
