@@ -121,6 +121,8 @@ event OnArrestResist(string eventName, string unusedStr, float arrestResisterId,
         return
     endif
 
+    guard.SetPlayerResistingArrest() ; Needed to make the guards attack the player, otherwise they will loop arrest dialogue
+
     bool hasResistedArrestRecentlyInThisHold = arrestVars.GetBool("Arrest::" + crimeFaction.GetName() + "::Arrest Resisted")
 
     if (hasResistedArrestRecentlyInThisHold)
@@ -282,7 +284,6 @@ function TriggerResistArrest(Actor akGuard, Faction akCrimeFaction)
     float resistBountyPercentModifier       = percent(resistBountyFromCurrentBounty)
     int resistArrestPenalty                 = floor(akCrimeFaction.GetCrimeGold() * resistBountyPercentModifier) + resistBountyFlat
 
-    akGuard.SetPlayerResistingArrest()
     akCrimeFaction.ModCrimeGold(resistArrestPenalty)
     config.NotifyArrest("You have gained " + resistArrestPenalty + " Bounty in " + hold +" for resisting arrest!")
 
