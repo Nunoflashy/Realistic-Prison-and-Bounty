@@ -395,15 +395,15 @@ bool property ShouldBeStripped
                                 (strippingHandling == "Minimum Bounty" && meetsBountyRequirements) || \
                                 (strippingHandling == "Minimum Sentence" && meetsSentenceRequirements)
             
-            LogProperty(self, "ShouldBeStripped", "\n" + \
-                "strippingHandling: " + strippingHandling + "\n" + \
-                "strippingMinBounty: " + strippingMinBounty + "\n" + \
-                "strippingMinViolentBounty: " + strippingMinViolentBounty + "\n" + \
-                "strippingMinSentence: " + strippingMinSentence + "\n" + \
-                "meetsBountyRequirements: " + meetsBountyRequirements + "\n" + \
-                "meetsSentenceRequirements: " + meetsSentenceRequirements + "\n" + \
-                "shouldStrip: " + shouldStrip + "\n" \
-            )
+            ; LogProperty(self, "ShouldBeStripped", "\n" + \
+            ;     "strippingHandling: " + strippingHandling + "\n" + \
+            ;     "strippingMinBounty: " + strippingMinBounty + "\n" + \
+            ;     "strippingMinViolentBounty: " + strippingMinViolentBounty + "\n" + \
+            ;     "strippingMinSentence: " + strippingMinSentence + "\n" + \
+            ;     "meetsBountyRequirements: " + meetsBountyRequirements + "\n" + \
+            ;     "meetsSentenceRequirements: " + meetsSentenceRequirements + "\n" + \
+            ;     "shouldStrip: " + shouldStrip + "\n" \
+            ; )
 
             return shouldStrip
         endif
@@ -433,14 +433,14 @@ bool property ShouldBeClothed
                                 (ClothingHandling == "Maximum Bounty" && meetsBountyRequirements) || \
                                 (ClothingHandling == "Maximum Sentence" && meetsSentenceRequirements)
             
-            LogProperty(self, "ShouldBeClothed", "\n" + \
-                "ClothingHandling: " + ClothingHandling + "\n" + \
-                "meetsBountyRequirements: " + meetsBountyRequirements + "\n" + \
-                "meetsSentenceRequirements: " + meetsSentenceRequirements + "\n" + \
-                "ClothingMaxSentence: " + ClothingMaxSentence + "\n" + \
-                "Sentence: " + arrestVars.Sentence + "\n" + \
-                "shouldClothe: " + shouldClothe + "\n" \
-            )
+            ; LogProperty(self, "ShouldBeClothed", "\n" + \
+            ;     "ClothingHandling: " + ClothingHandling + "\n" + \
+            ;     "meetsBountyRequirements: " + meetsBountyRequirements + "\n" + \
+            ;     "meetsSentenceRequirements: " + meetsSentenceRequirements + "\n" + \
+            ;     "ClothingMaxSentence: " + ClothingMaxSentence + "\n" + \
+            ;     "Sentence: " + arrestVars.Sentence + "\n" + \
+            ;     "shouldClothe: " + shouldClothe + "\n" \
+            ; )
 
             return shouldClothe
         endif
@@ -608,10 +608,8 @@ function ShowArrestParams()
 endFunction
 
 event OnJailedBegin(string eventName, string strArg, float numArg, Form sender)
-    Debug(self, "OnJailedBegin", "Starting jailing process...")
     SetupJailVars()
     Prisoner.ForceRefTo(arrestVars.Arrestee)
-    Debug(self, "OnJailedBegin", "Forced Prisoner ref to " + arrestVars.Arrestee + "...")
     GotoState(STATE_JAILED)
     TriggerImprisonment()
 endEvent
@@ -781,11 +779,14 @@ state Jailed
             GotoState(STATE_RELEASED)
         endif
 
+        
+
         Prisoner.ShowSentenceInfo()
         ; arrestVars.List("Stripping")
-        arrestVars.List("Jail")
+        ; arrestVars.List("Jail")
         ; arrestVars.ListOverrides("Stripping")
-    
+        Prisoner.ShowActorVars()
+
         LastUpdate = Utility.GetCurrentGameTime()
         ; Keep updating while in jail
         RegisterForSingleUpdateGameTime(1.0)
@@ -942,7 +943,7 @@ state Released
             Prisoner.MoveToReleaseLocation()
         endif
 
-        GotoState("Free")
+        GotoState(STATE_FREE)
     endEvent
 
     event OnEndState()
@@ -1038,10 +1039,10 @@ event OnCellDoorUnlocked(ObjectReference _cellDoor, Actor whoUnlocked)
 endEvent
 
 event OnCellDoorOpen(ObjectReference _cellDoor, Actor whoOpened)
-    ; If the cell door was open by the player, and they are not jailed, this must mean that they lockpicked the door either just because or to get someone out of jail.
+    ; If the cell door was opened by the player, and they are not jailed, this must mean that they lockpicked the door either just because or to get someone out of jail.
     if (whoOpened == config.Player && config.Player != Arrestee)
         Faction jailFaction = config.GetFaction(config.GetCurrentPlayerHoldLocation())
-        ; Add bounty for lockpicking / breaking someone out of jail  if they are witnessed
+        ; Add bounty for lockpicking / breaking someone out of jail if they are witnessed
         ; if (witnessedCrime)
         jailFaction.ModCrimeGold(2000)
         Debug(self, "OnCellDoorOpen", "jailFaction: " + jailFaction + ", bounty: " + jailFaction.GetCrimeGold())
@@ -1115,13 +1116,15 @@ function TriggerImprisonment()
         ; Only handle clothing here when not stripped, which means the Actor did not have any clothing
         Prisoner.Clothe()
     endif
+    ShowArrestVars()
+
 
     ; Prisoner.UpdateSentence()
-    ; Prisoner.SetTimeOfImprisonment() ; Start the sentence from this point
+    Prisoner.SetTimeOfImprisonment() ; Start the sentence from this point
 
     int currentLongestSentence = config.GetStat(Hold, "Longest Sentence")
     config.SetStat(Hold, "Longest Sentence", int_if (currentLongestSentence < Sentence, Sentence, currentLongestSentence))
-    Prisoner.ShowJailInfo()
+    ; Prisoner.ShowJailInfo()
     ; Prisoner.ShowOutfitInfo()
     ; Prisoner.ShowHoldStats()
     ; ShowArrestParams()
@@ -1182,6 +1185,7 @@ endFunction
 
 bool function AssignJailCell(Actor akPrisoner)
     ObjectReference randomJailCell = config.GetRandomJailMarker(hold)
+    Debug(self, "AssignJailCell", "jail cell: " + randomJailCell)
 
     if (akPrisoner == config.Player)
         if (arrestVars.JailCell)
