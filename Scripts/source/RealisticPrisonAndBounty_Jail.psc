@@ -779,7 +779,6 @@ state Jailed
             GotoState(STATE_RELEASED)
         endif
 
-        
 
         Prisoner.ShowSentenceInfo()
         ; arrestVars.List("Stripping")
@@ -1184,7 +1183,7 @@ function StartGuardWalkToCellToStrip()
 endFunction
 
 bool function AssignJailCell(Actor akPrisoner)
-    ObjectReference randomJailCell = config.GetRandomJailMarker(hold)
+    ObjectReference randomJailCell = config.GetRandomJailMarker(Hold)
     Debug(self, "AssignJailCell", "jail cell: " + randomJailCell)
 
     if (akPrisoner == config.Player)

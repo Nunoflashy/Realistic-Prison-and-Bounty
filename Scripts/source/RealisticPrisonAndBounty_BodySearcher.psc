@@ -44,7 +44,6 @@ function StripActor(Actor actorToStrip, float strippingThoroughness, ObjectRefer
 
     elseif (strippingThoroughness >= 0)
         ; Strip to underwear, leaving high chance for lockpicks and high chance for keys
-
     endif
 
     ; Stripping naked should only be allowed if a nude body mod is installed
@@ -61,3 +60,18 @@ function StripActor(Actor actorToStrip, float strippingThoroughness, ObjectRefer
     actorToStrip.RemoveAllItems(akTransferTo = transferItemsTo, abRemoveQuestItems = true)
 endFunction
 
+function UnequipWeaponsFromActor(Actor akActor)
+    
+endFunction
+
+function RemoveKeysFromActor(Actor akActor, ObjectReference akTransferContainer = none)
+
+endFunction
+
+function RemoveLockpicksFromActor(Actor akActor, ObjectReference akTransferContainer = none)
+    
+endFunction
+
+function RemoveWeaponsFromActor(Actor akActor, ObjectReference akTransferContainer = none)
+    
+endFunction

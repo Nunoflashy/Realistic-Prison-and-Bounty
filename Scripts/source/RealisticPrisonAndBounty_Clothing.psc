@@ -122,13 +122,13 @@ function WearOutfit(Actor actorToClothe, RealisticPrisonAndBounty_Outfit outfitT
     actorToClothe.EquipItem(outfitToWear.Hands, abSilent = true)
     actorToClothe.EquipItem(outfitToWear.Feet, abSilent = true)
 
-    Debug(self, "Clothing::WearOutfit", "\n" + \
-        "Equipped Head: " + outfitToWear.Head + "\n" + \
-        "Equipped Body: " + outfitToWear.Body + "\n" + \
-        "Equipped Hands: " + outfitToWear.Hands + "\n" + \
-        "Equipped Feet: " + outfitToWear.Feet + "\n" +  \
-        "Undressed: " + undressActor + "\n" \
-    )
+    ; Debug(self, "Clothing::WearOutfit", "\n" + \
+    ;     "Equipped Head: " + outfitToWear.Head + "\n" + \
+    ;     "Equipped Body: " + outfitToWear.Body + "\n" + \
+    ;     "Equipped Hands: " + outfitToWear.Hands + "\n" + \
+    ;     "Equipped Feet: " + outfitToWear.Feet + "\n" +  \
+    ;     "Undressed: " + undressActor + "\n" \
+    ; )
 endFunction
 
 function UnwearOutfit(Actor actorToUndress, bool preventEquip = false)
@@ -177,12 +177,12 @@ RealisticPrisonAndBounty_Outfit function GetOutfit(string outfitName)
     outfitInstance.MinimumBounty = config.GetClothingOutfitMinimumBountyFromID(outfitName)
     outfitInstance.MaximumBounty = config.GetClothingOutfitMaximumBountyFromID(outfitName)
 
-    Debug(self, "Clothing::GetOutfit", "\n" + \
-        "Head: " + outfitInstance.Head + "\n" + \
-        "Body: " + outfitInstance.Body + "\n" + \
-        "Hands: " + outfitInstance.Hands + "\n" + \
-        "Feet: " + outfitInstance.Feet + "\n" \
-    )
+    ; Debug(self, "Clothing::GetOutfit", "\n" + \
+    ;     "Head: " + outfitInstance.Head + "\n" + \
+    ;     "Body: " + outfitInstance.Body + "\n" + \
+    ;     "Hands: " + outfitInstance.Hands + "\n" + \
+    ;     "Feet: " + outfitInstance.Feet + "\n" \
+    ; )
 
     ; __setOutfitInstance(outfitName + "::" + "Head", outfitInstance.Head)
     ; __setOutfitInstance(outfitName + "::" + "Body", outfitInstance.Body)
@@ -245,11 +245,11 @@ RealisticPrisonAndBounty_Outfit function GetDefaultOutfit(bool includeFeetClothi
     ; __setOutfitInstance(outfitKey + "::" + "Hands", __getOutfitObject().Hands)
     ; __setOutfitInstance(outfitKey + "::" + "Feet", __getOutfitObject().Feet)
 
-    Debug(self, "Clothing::GetDefaultOutfit", "\n" + \
-        "Body: " + defaultBodyClothing + " ("+ defaultBodyClothing.GetName() +")" + "\n" + \
-        "Feet: " + defaultFeetClothing + " ("+ defaultFeetClothing.GetName() +")" + "\n" + \
-        "whichDefaultOutfit: " +whichDefaultOutfit + "\n" \
-    )
+    ; Debug(self, "Clothing::GetDefaultOutfit", "\n" + \
+    ;     "Body: " + defaultBodyClothing + " ("+ defaultBodyClothing.GetName() +")" + "\n" + \
+    ;     "Feet: " + defaultFeetClothing + " ("+ defaultFeetClothing.GetName() +")" + "\n" + \
+    ;     "whichDefaultOutfit: " +whichDefaultOutfit + "\n" \
+    ; )
 
     return __getOutfitObject()
 endFunction

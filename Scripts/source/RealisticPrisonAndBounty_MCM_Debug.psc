@@ -98,8 +98,7 @@ function OnOptionSelect(RealisticPrisonAndBounty_MCM mcm, string option) global
     
     elseif (IsSelectedOption(option, "TeleportJailCell"))
         string hold = StringUtil.Substring(option, StringUtil.Find(option, "TeleportJailCell") + 16)
-        ; mcm.config.notifyBounty(hold, 1700)
-        ObjectReference jailCellRef = mcm.config.getRandomJailMarker(hold)
+        ObjectReference jailCellRef = mcm.config.GetRandomJailMarker(hold)
         mcm.config.Player.MoveTo(jailCellRef)
     endif
 
