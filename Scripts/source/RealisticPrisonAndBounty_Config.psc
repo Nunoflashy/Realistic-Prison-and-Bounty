@@ -8,7 +8,7 @@ import Math
 ; Constants
 ; ==============================================================================
 
-bool property IS_DEBUG      = true autoreadonly
+bool property IS_DEBUG = true autoreadonly
 
 float function GetVersion() global
     return 1.00
@@ -28,37 +28,56 @@ Form property mainAPI
     endFunction
 endProperty
 
-RealisticPrisonAndBounty_MCM property mcm
-    RealisticPrisonAndBounty_MCM function get()
-        return Game.GetFormFromFile(0x0D61, GetPluginName()) as RealisticPrisonAndBounty_MCM
-    endFunction
-endProperty
+RealisticPrisonAndBounty_MCM property mcm auto
+RealisticPrisonAndBounty_ArrestVars property arrestVars auto
+RealisticPrisonAndBounty_ActorVars property actorVars auto
+RealisticPrisonAndBounty_MiscVars property miscVars auto
 
-RealisticPrisonAndBounty_ArrestVars property arrestVars
-    RealisticPrisonAndBounty_ArrestVars function get()
-        return mainAPI as RealisticPrisonAndBounty_ArrestVars
-    endFunction
-endProperty
+event OnInit()
+    ; Defer heavy calls to OnUpdate
+    GotoState("Initialization")
+    RegisterForSingleUpdate(1.0)
+endEvent
+
+state Initialization
+    event OnUpdate()
+        self.SetHolds()
+        self.SetCities()
+        self.SetHoldLocations()
+        self.SetJailTeleportReleaseLocations()
+        self.SetJailPrisonerContainers()
+        self.SetFactions()
+        self.SetJailCells()
+
+        mcm.Debug("Config::OnUpdate", "Initialization complete?", true)
+    
+        GotoState("")
+    endEvent
+endState
+
+event OnPlayerLoadGame()
+    mcm.Trace("Config::OnPlayerLoadGame", "This is a test to see if it gets called", true)
+endEvent
 
 string[] property Holds
     string[] function get()
-        int _holds = JArray.object()
-
-        if (JArray.count(_holds) == 0)
-            JArray.addStr(_holds, "Whiterun")
-            JArray.addStr(_holds, "Winterhold")
-            JArray.addStr(_holds, "Eastmarch")
-            JArray.addStr(_holds, "Falkreath")
-            JArray.addStr(_holds, "Haafingar")
-            JArray.addStr(_holds, "Hjaalmarch")
-            JArray.addStr(_holds, "The Rift")
-            JArray.addStr(_holds, "The Reach")
-            JArray.addStr(_holds, "The Pale")
+        if (miscVars.GetLengthOf("Holds") == 0)
+            miscVars.CreateArray("Holds")
+            miscVars.AddStringToArray("Holds", "Whiterun")
+            miscVars.AddStringToArray("Holds", "Winterhold")
+            miscVars.AddStringToArray("Holds", "Eastmarch")
+            miscVars.AddStringToArray("Holds", "Falkreath")
+            miscVars.AddStringToArray("Holds", "Haafingar")
+            miscVars.AddStringToArray("Holds", "Hjaalmarch")
+            miscVars.AddStringToArray("Holds", "The Rift")
+            miscVars.AddStringToArray("Holds", "The Reach")
+            miscVars.AddStringToArray("Holds", "The Pale")
         endif
 
-        return JArray.asStringArray(_holds)
+        return miscVars.GetPapyrusStringArray("Holds")
     endFunction
 endProperty
+
 
 Actor property Player
     Actor function get()
@@ -66,256 +85,201 @@ Actor property Player
     endFunction
 endProperty
 
-ObjectReference property DoorRef auto
+function SetFactions()
+    miscVars.SetForm("Faction::Crime[Whiterun]", Game.GetForm(0x000267EA))
+    miscVars.SetForm("Faction::Crime[Winterhold]", Game.GetForm(0x0002816F))
+    miscVars.SetForm("Faction::Crime[Eastmarch]", Game.GetForm(0x000267E3))
+    miscVars.SetForm("Faction::Crime[Falkreath]", Game.GetForm(0x00028170))
+    miscVars.SetForm("Faction::Crime[Haafingar]", Game.GetForm(0x00029DB0))
+    miscVars.SetForm("Faction::Crime[Hjaalmarch]", Game.GetForm(0x0002816D))
+    miscVars.SetForm("Faction::Crime[The Rift]", Game.GetForm(0x0002816B))
+    miscVars.SetForm("Faction::Crime[The Reach]", Game.GetForm(0x0002816C))
+    miscVars.SetForm("Faction::Crime[The Pale]", Game.GetForm(0x0002816E))
 
-ObjectReference property JailCell
-    ObjectReference function get()
-        return arrestVars.GetReference("Jail::Cell")
-    endFunction
-endProperty
+    miscVars.CreateArray("Factions")
+    int i = 0
+    while (i < Holds.Length)
+        string hold = Holds[i]
+        miscVars.AddContainerToArray("Factions", "Faction::Crime["+ hold +"]")
+        i += 1
+    endWhile
 
-event OnSliderOptionChanged(string eventName, string optionName, float optionValue, Form sender)
-    Debug(self, "Config::OnSliderOptionChanged", "Option received: " + optionName + ", value: " + optionValue)
-endEvent
-
-int factionMap
-function __initializeFactionsMapping()
-    factionMap = JMap.object()
-    JValue.retain(factionMap)
-
-    JMap.setForm(factionMap, "Whiterun",    Game.GetForm(0x000267EA))
-    JMap.setForm(factionMap, "Winterhold",  Game.GetForm(0x0002816F))
-    JMap.setForm(factionMap, "Eastmarch",   Game.GetForm(0x000267E3))
-    JMap.setForm(factionMap, "Falkreath",   Game.GetForm(0x00028170))
-    JMap.setForm(factionMap, "Haafingar",   Game.GetForm(0x00029DB0))
-    JMap.setForm(factionMap, "Hjaalmarch",  Game.GetForm(0x0002816D))
-    JMap.setForm(factionMap, "The Rift",    Game.GetForm(0x0002816B))
-    JMap.setForm(factionMap, "The Reach",   Game.GetForm(0x0002816C))
-    JMap.setForm(factionMap, "The Pale",    Game.GetForm(0x0002816E))
-
-    ; TODO: Possibly load more factions from a file (custom factions and holds?)
-
-    mcm.Debug("InitializeFactions", "Factions were initialized.")
+    mcm.Debug("Config::SetFactions", "Crime factions were initialized. (Factions: "+ FactionCount +")", true)
 endFunction
 
-int jailMarkersMap
-function __initializeJailMarkersMapping()
-    jailMarkersMap = JMap.object()
-    JValue.retain(jailMarkersMap)
 
-    int whiterunMarkers = JArray.object()
-    JArray.addForm(whiterunMarkers, GetFormFromMod(0x3885)) ; Jail Cell 01
-    JArray.addForm(whiterunMarkers, GetFormFromMod(0x3886)) ; Jail Cell 02
-    JArray.addForm(whiterunMarkers, GetFormFromMod(0x3887)) ; Jail Cell 03
-    JArray.addForm(whiterunMarkers, GetFormFromMod(0x3888)) ; Jail Cell 04 (Alik'r Cell)
+function SetJailCells()
+    miscVars.CreateStringMap("Jail::Cells")
+    float x = StartBenchmark()
+    miscVars.AddFormToArray("Jail::Cells[Whiterun]", GetFormFromMod(0x3885)) ; Jail Cell 01
+    miscVars.AddFormToArray("Jail::Cells[Whiterun]", GetFormFromMod(0x3886)) ; Jail Cell 02
+    miscVars.AddFormToArray("Jail::Cells[Whiterun]", GetFormFromMod(0x3887)) ; Jail Cell 03
+    miscVars.AddFormToArray("Jail::Cells[Whiterun]", GetFormFromMod(0x3888)) ; Jail Cell 04 (Alik'r Cell)
 
     ; missing Winterhold markers
 
-    int windhelmMarkers = JArray.object()
-    JArray.addForm(windhelmMarkers, Game.GetForm(0x58CF8)) ; Jail Cell 01
-    JArray.addForm(windhelmMarkers, GetFormFromMod(0x388A)) ; Jail Cell 02
-    JArray.addForm(windhelmMarkers, GetFormFromMod(0x388B)) ; Jail Cell 03
-    JArray.addForm(windhelmMarkers, GetFormFromMod(0x388C)) ; Jail Cell 04
+    miscVars.AddFormToArray("Jail::Cells[Eastmarch]", Game.GetForm(0x58CF8)) ; Jail Cell 01
+    miscVars.AddFormToArray("Jail::Cells[Eastmarch]", GetFormFromMod(0x388A)) ; Jail Cell 02
+    miscVars.AddFormToArray("Jail::Cells[Eastmarch]", GetFormFromMod(0x388B)) ; Jail Cell 03
+    miscVars.AddFormToArray("Jail::Cells[Eastmarch]", GetFormFromMod(0x388C)) ; Jail Cell 04
 
-    int falkreathMarkers = JArray.object()
-    JArray.addForm(falkreathMarkers, Game.GetForm(0x3EF07)) ; Jail Cell 01
+    miscVars.AddFormToArray("Jail::Cells[Falkreath]", Game.GetForm(0x3EF07)) ; Jail Cell 01
 
-    int solitudeMarkers = JArray.object()
-    JArray.addForm(solitudeMarkers, Game.GetForm(0x36897)) ; Jail Cell 01 (Original)
-    JArray.addForm(solitudeMarkers, GetFormFromMod(0x3880)) ; Jail Cell 02
-    JArray.addForm(solitudeMarkers, GetFormFromMod(0x3879)) ; Jail Cell 03
-    JArray.addForm(solitudeMarkers, GetFormFromMod(0x3881)) ; Jail Cell 04
-    JArray.addForm(solitudeMarkers, GetFormFromMod(0x3882)) ; Jail Cell 05
-    JArray.addForm(solitudeMarkers, GetFormFromMod(0x3883)) ; Jail Cell 06
-    ; JArray.addForm(solitudeMarkers, GetFormFromMod(0x3884)) ; Jail Cell 07 (Bjartur Cell)
+    miscVars.AddFormToArray("Jail::Cells[Haafingar]", Game.GetForm(0x36897)) ; Jail Cell 01 (Original)
+    miscVars.AddFormToArray("Jail::Cells[Haafingar]", GetFormFromMod(0x3880)) ; Jail Cell 02
+    miscVars.AddFormToArray("Jail::Cells[Haafingar]", GetFormFromMod(0x3879)) ; Jail Cell 03
+    miscVars.AddFormToArray("Jail::Cells[Haafingar]", GetFormFromMod(0x3881)) ; Jail Cell 04
+    miscVars.AddFormToArray("Jail::Cells[Haafingar]", GetFormFromMod(0x3882)) ; Jail Cell 05
+    miscVars.AddFormToArray("Jail::Cells[Haafingar]", GetFormFromMod(0x3883)) ; Jail Cell 06
+    ; miscVars.AddFormToArray(solitudeMarkers, GetFormFromMod(0x3884)) ; Jail Cell 07 (Bjartur Cell)
 
-    int morthalMarkers = JArray.object()
-    JArray.addForm(morthalMarkers, Game.GetForm(0x3EF08)) ; Jail Cell 01
+    miscVars.AddFormToArray("Jail::Cells[Hjaalmarch]", Game.GetForm(0x3EF08)) ; Jail Cell 01
 
     ; missing The Reach markers (Markarth)
 
-    int riftenMarkers = JArray.object()
-    JArray.addForm(riftenMarkers, Game.GetForm(0x6128D)) ; Jail Cell 01 (Original)
-    ; JArray.addForm(riftenMarkers, GetFormFromMod(0x388D)) ; Jail Cell 02 (Threki the Innocent)
-    JArray.addForm(riftenMarkers, GetFormFromMod(0x388E)) ; Jail Cell 03
-    ; JArray.addForm(riftenMarkers, GetFormFromMod(0x388F)) ; Jail Cell 04 (Sibbi's Cell [RESERVED])
-    JArray.addForm(riftenMarkers, GetFormFromMod(0x3890)) ; Jail Cell 05
-    JArray.addForm(riftenMarkers, GetFormFromMod(0x3893)) ; Jail Cell 06
-    JArray.addForm(riftenMarkers, GetFormFromMod(0x3894)) ; Jail Cell 07
-    JArray.addForm(riftenMarkers, GetFormFromMod(0x3895)) ; Jail Cell 08
+    miscVars.AddFormToArray("Jail::Cells[The Rift]", Game.GetForm(0x6128D)) ; Jail Cell 01 (Original)
+    ; miscVars.AddFormToArray("Jail::Cells[The Rift]", GetFormFromMod(0x388D)) ; Jail Cell 02 (Threki the Innocent)
+    miscVars.AddFormToArray("Jail::Cells[The Rift]", GetFormFromMod(0x388E)) ; Jail Cell 03
+    ; miscVars.AddFormToArray("Jail::Cells[The Rift]", GetFormFromMod(0x388F)) ; Jail Cell 04 (Sibbi's Cell [RESERVED])
+    miscVars.AddFormToArray("Jail::Cells[The Rift]", GetFormFromMod(0x3890)) ; Jail Cell 05
+    miscVars.AddFormToArray("Jail::Cells[The Rift]", GetFormFromMod(0x3893)) ; Jail Cell 06
+    miscVars.AddFormToArray("Jail::Cells[The Rift]", GetFormFromMod(0x3894)) ; Jail Cell 07
+    miscVars.AddFormToArray("Jail::Cells[The Rift]", GetFormFromMod(0x3895)) ; Jail Cell 08
 
-    int dawnstarMarkers = JArray.object()
-    JArray.addForm(dawnstarMarkers, GetFormFromMod(0x3896)) ; Jail Cell 01
+    miscVars.AddFormToArray("Jail::Cells[The Pale]", GetFormFromMod(0x3896)) ; Jail Cell 01
 
-    JMap.setObj(jailMarkersMap, "Whiterun", whiterunMarkers)
-    ; JMap.setObj(jailMarkersMap, "Winterhold", solitudeMarkers)
-    JMap.setObj(jailMarkersMap, "Eastmarch", windhelmMarkers)
-    JMap.setObj(jailMarkersMap, "Falkreath", falkreathMarkers)
-    JMap.setObj(jailMarkersMap, "Haafingar", solitudeMarkers)
-    JMap.setObj(jailMarkersMap, "Hjaalmarch", morthalMarkers)
-    JMap.setObj(jailMarkersMap, "The Rift", riftenMarkers)
-    ; JMap.setObj(jailMarkersMap, "The Reach", solitudeMarkers)
-    JMap.setObj(jailMarkersMap, "The Pale", dawnstarMarkers)
+    int i = 0
+    while (i < Holds.Length)
+        string hold = Holds[i]
+        miscVars.AddToContainer("Jail::Cells", "Jail::Cells["+ hold +"]")
+        i += 1
+    endWhile
+
+    EndBenchmark(x, "SetJailCells")
 endFunction
 
-int jailTeleportReleaseMarkersMap
-function __initializeJailTeleportReleaseMarkersMapping()
-    jailTeleportReleaseMarkersMap = JMap.object()
-    JValue.retain(jailTeleportReleaseMarkersMap)
-
-    Form whiterunReleaseMarker  = Game.GetFormEx(0x3EF19)
-    Form windhelmReleaseMarker  = Game.GetFormEx(0x3EF19)
-    Form falkreathReleaseMarker = Game.GetFormEx(0x3EF19)
-    Form solitudeReleaseMarker  = Game.GetFormEx(0x3EF19)
-    Form morthalReleaseMarker   = Game.GetFormEx(0x3EF19)
-    Form riftenReleaseMarker    = Game.GetFormEx(0x3EF19)
-    Form dawnstarReleaseMarker  = Game.GetFormEx(0x3EF19)
-
-    JMap.setForm(jailTeleportReleaseMarkersMap, "Whiterun", whiterunReleaseMarker)
-    ; JMap.setForm(jailTeleportReleaseMarkersMap, "Winterhold", solitudeMarkers)
-    JMap.setForm(jailTeleportReleaseMarkersMap, "Eastmarch", windhelmReleaseMarker)
-    JMap.setForm(jailTeleportReleaseMarkersMap, "Falkreath", falkreathReleaseMarker)
-    JMap.setForm(jailTeleportReleaseMarkersMap, "Haafingar", solitudeReleaseMarker)
-    JMap.setForm(jailTeleportReleaseMarkersMap, "Hjaalmarch", morthalReleaseMarker)
-    JMap.setForm(jailTeleportReleaseMarkersMap, "The Rift", riftenReleaseMarker)
-    ; JMap.setForm(jailTeleportReleaseMarkersMap, "The Reach", solitudeMarkers)
-    JMap.setForm(jailTeleportReleaseMarkersMap, "The Pale", dawnstarReleaseMarker)
+function SetJailTeleportReleaseLocations()
+    miscVars.SetForm("Jail::Release::Teleport[Whiterun]", Game.GetFormEx(0x3EF19)) ; FormID Invalid
+    miscVars.SetForm("Jail::Release::Teleport[Eastmarch]", Game.GetFormEx(0x3EF19)) ; FormID Invalid
+    miscVars.SetForm("Jail::Release::Teleport[Falkreath]", Game.GetFormEx(0x3EF19)) ; FormID Invalid
+    miscVars.SetForm("Jail::Release::Teleport[Haafingar]", Game.GetFormEx(0x3EF19))
+    miscVars.SetForm("Jail::Release::Teleport[Hjaalmarch]", Game.GetFormEx(0x3EF19)) ; FormID Invalid
+    miscVars.SetForm("Jail::Release::Teleport[The Rift]", Game.GetFormEx(0x3EF19)) ; FormID Invalid
+    miscVars.SetForm("Jail::Release::Teleport[The Pale]", Game.GetFormEx(0x3EF19)) ; FormID Invalid
 endFunction
 
-int jailPrisonerContainersMarkersMap
-function __initializeJailPrisonerContainersMapping()
-    jailPrisonerContainersMarkersMap = JMap.object()
-    JValue.retain(jailPrisonerContainersMarkersMap)
-
-    Form whiterunReleaseMarker  = Game.GetFormEx(0x3EEFF)
-    Form windhelmReleaseMarker  = Game.GetFormEx(0x3EEFF)
-    Form falkreathReleaseMarker = Game.GetFormEx(0x3EEFF)
-    Form solitudeReleaseMarker  = Game.GetFormEx(0x3EEFF)
-    Form morthalReleaseMarker   = Game.GetFormEx(0x3EEFF)
-    Form riftenReleaseMarker    = Game.GetFormEx(0x3EEFF)
-    Form dawnstarReleaseMarker  = Game.GetFormEx(0x3EEFF)
-
-    JMap.setForm(jailPrisonerContainersMarkersMap, "Whiterun", whiterunReleaseMarker)
-    ; JMap.setForm(jailPrisonerContainersMarkersMap, "Winterhold", solitudeMarkers)
-    JMap.setForm(jailPrisonerContainersMarkersMap, "Eastmarch", windhelmReleaseMarker)
-    JMap.setForm(jailPrisonerContainersMarkersMap, "Falkreath", falkreathReleaseMarker)
-    JMap.setForm(jailPrisonerContainersMarkersMap, "Haafingar", solitudeReleaseMarker)
-    JMap.setForm(jailPrisonerContainersMarkersMap, "Hjaalmarch", morthalReleaseMarker)
-    JMap.setForm(jailPrisonerContainersMarkersMap, "The Rift", riftenReleaseMarker)
-    ; JMap.setForm(jailPrisonerContainersMarkersMap, "The Reach", solitudeMarkers)
-    JMap.setForm(jailPrisonerContainersMarkersMap, "The Pale", dawnstarReleaseMarker)
+function SetJailPrisonerContainers()
+    miscVars.SetForm("Jail::Containers[Whiterun]", Game.GetFormEx(0x3EEFF)) ; FormID Invalid
+    miscVars.SetForm("Jail::Containers[Eastmarch]", Game.GetFormEx(0x3EEFF)) ; FormID Invalid
+    miscVars.SetForm("Jail::Containers[Falkreath]", Game.GetFormEx(0x3EEFF)) ; FormID Invalid
+    miscVars.SetForm("Jail::Containers[Haafingar]", Game.GetFormEx(0x3EEFF))
+    miscVars.SetForm("Jail::Containers[Hjaalmarch]", Game.GetFormEx(0x3EEFF)) ; FormID Invalid
+    miscVars.SetForm("Jail::Containers[The Rift]", Game.GetFormEx(0x3EEFF)) ; FormID Invalid
+    miscVars.SetForm("Jail::Containers[The Pale]", Game.GetFormEx(0x3EEFF)) ; FormID Invalid
 endFunction
 
-int locationsToHoldMap
-function __initializeLocationsMapping()
-    locationsToHoldMap = JMap.object()
-    JValue.retain(locationsToHoldMap)
+function SetHoldLocations()
+    miscVars.AddFormToArray("Locations[Whiterun]", Game.GetForm(0x00018A56))
+    miscVars.AddFormToArray("Locations[Whiterun]", Game.GetForm(0x00016772))
 
-    int whiterunLocations = JArray.object() ; Whiterun
-    JArray.addForm(whiterunLocations, Game.GetForm(0x00018A56)) ; WhiterunLocation
-    JArray.addForm(whiterunLocations, Game.GetForm(0x00016772)) ; WhiterunHoldLocation
+    miscVars.AddFormToArray("Locations[Winterhold]", Game.GetForm(0x00018A51))
+    miscVars.AddFormToArray("Locations[Winterhold]", Game.GetForm(0x0001676B))
 
-    int winterholdLocations = JArray.object() ; Winterhold
-    JArray.addForm(winterholdLocations, Game.GetForm(0x00018A51)) ; WinterholdLocation
-    JArray.addForm(winterholdLocations, Game.GetForm(0x0001676B)) ; WinterholdHoldLocation
+    miscVars.AddFormToArray("Locations[Eastmarch]", Game.GetForm(0x00018A57))
+    miscVars.AddFormToArray("Locations[Eastmarch]", Game.GetForm(0x0001676A))
 
-    int eastmarchLocations = JArray.object() ; Windhelm
-    JArray.addForm(eastmarchLocations, Game.GetForm(0x00018A57)) ; WindhelmLocation
-    JArray.addForm(eastmarchLocations, Game.GetForm(0x0001676A)) ; EastmarchHoldLocation
+    miscVars.AddFormToArray("Locations[Falkreath]", Game.GetForm(0x00018A49))
+    miscVars.AddFormToArray("Locations[Falkreath]", Game.GetForm(0x0001676F))
 
-    int falkreathLocations = JArray.object() ; Falkreath
-    JArray.addForm(falkreathLocations, Game.GetForm(0x00018A49)) ; FalkreathLocation
-    JArray.addForm(falkreathLocations, Game.GetForm(0x0001676F)) ; FalkreathHoldLocation
+    miscVars.AddFormToArray("Locations[Haafingar]", Game.GetForm(0x00018A5A))
+    miscVars.AddFormToArray("Locations[Haafingar]", Game.GetForm(0x00016770))
 
-    int haafingarLocations = JArray.object() ; Solitude
-    JArray.addForm(haafingarLocations, Game.GetForm(0x00018A5A)) ; SolitudeLocation
-    JArray.addForm(haafingarLocations, Game.GetForm(0x00016770)) ; HaafingarHoldLocation
+    miscVars.AddFormToArray("Locations[Hjaalmarch]", Game.GetForm(0x00018A53))
+    miscVars.AddFormToArray("Locations[Hjaalmarch]", Game.GetForm(0x0001676E))
 
-    int hjaalmarchLocations = JArray.object() ; Morthal
-    JArray.addForm(hjaalmarchLocations, Game.GetForm(0x00018A53)) ; MorthalLocation
-    JArray.addForm(hjaalmarchLocations, Game.GetForm(0x0001676E)) ; HjaalmarchHoldLocation
+    miscVars.AddFormToArray("Locations[The Rift]", Game.GetForm(0x00018A58))
+    miscVars.AddFormToArray("Locations[The Rift]", Game.GetForm(0x0001676C))
 
-    int riftLocations = JArray.object() ; Riften
-    JArray.addForm(riftLocations, Game.GetForm(0x00018A58)) ; RiftenLocation
-    JArray.addForm(riftLocations, Game.GetForm(0x0001676C)) ; RiftHoldLocation 
+    miscVars.AddFormToArray("Locations[The Reach]", Game.GetForm(0x00018A59))
+    miscVars.AddFormToArray("Locations[The Reach]", Game.GetForm(0x00016769))
 
-    int reachLocations = JArray.object() ; Markarth
-    JArray.addForm(reachLocations, Game.GetForm(0x00018A59)) ; MarkarthLocation 
-    JArray.addForm(reachLocations, Game.GetForm(0x00016769)) ; ReachHoldLocation 
+    miscVars.AddFormToArray("Locations[The Pale]", Game.GetForm(0x00018A50))
+    miscVars.AddFormToArray("Locations[The Pale]", Game.GetForm(0x0001676D))
 
-    int paleLocations = JArray.object() ; Dawnstar
-    JArray.addForm(paleLocations, Game.GetForm(0x00018A50)) ; DawnstarLocation 
-    JArray.addForm(paleLocations, Game.GetForm(0x0001676D)) ; PaleHoldLocation
+    miscVars.CreateStringMap("Locations")
+    int i = 0
+    while (i < Holds.Length)
+        string hold = Holds[i]
+        miscVars.AddToContainer("Locations", "Locations["+ hold +"]")
+        i += 1
+    endWhile
 
-    JMap.setObj(locationsToHoldMap, "Whiterun", whiterunLocations)
-    JMap.setObj(locationsToHoldMap, "Winterhold", winterholdLocations)
-    JMap.setObj(locationsToHoldMap, "Eastmarch", eastmarchLocations)
-    JMap.setObj(locationsToHoldMap, "Falkreath", falkreathLocations)
-    JMap.setObj(locationsToHoldMap, "Haafingar", haafingarLocations)
-    JMap.setObj(locationsToHoldMap, "Hjaalmarch", hjaalmarchLocations)
-    JMap.setObj(locationsToHoldMap, "The Rift", riftLocations)
-    JMap.setObj(locationsToHoldMap, "The Reach", reachLocations)
-    JMap.setObj(locationsToHoldMap, "The Pale", paleLocations)
+    Debug(self, "Config::SetHoldLocations", "Length: " + miscVars.GetLengthOf("Locations"))
 endFunction
 
 bool function IsInLocationFromHold(string hold)
-    if (!JMap.hasKey(locationsToHoldMap, hold))
-        Warn(none, "IsInLocationFromHold", "Location does not exist for this hold.")
+; float x = StartBenchmark()
+
+    if (!miscVars.Exists("Locations["+ hold +"]"))
+        Error(none, "Config::IsInLocationFromHold", "Location does not exist for this hold.")
         return false
     endif
 
-    int holdArray = JMap.getObj(locationsToHoldMap, hold) ; Form[]
-
     int i = 0
-    while (i < JArray.count(holdArray))
-        Location holdLocation = JArray.getForm(holdArray, i) as Location
+    while (i < miscVars.GetLengthOf("Locations["+ hold +"]"))
+        Location holdLocation = miscVars.GetFormFromArray("Locations["+ hold +"]", i) as Location
         ; As soon as the player is in any location for this hold, return.
         if (Player.IsInLocation(holdLocation))
             Debug(none, "IsInLocationFromHold", "Player is in location: " + holdLocation.GetName() + " ("+ holdLocation.GetFormID() +")", mcm.IS_DEBUG)
+        ;    EndBenchmark(x, i + " iterations (IsLocationFromHold): returned true")
+
             return true
         endif
         i += 1
     endWhile
+; EndBenchmark(x, i + " iterations (IsInLocationFromHold): returned false")
 
     return false
 endFunction
 
-int function GetHoldLocations(string hold)
-    return JMap.getObj(locationsToHoldMap, hold) 
-endFunction
+bool function IsLocationFromHold(string hold, Location akLocation)
+; float x = StartBenchmark()
 
-bool function IsLocationFromHold(string hold, Location loc)
-    int holdLocations = getHoldLocations(hold)
-    
     int i = 0
-    while (i < JArray.count(holdLocations))
-        Location iterLoc = JArray.getForm(holdLocations, i) as Location
-        if (iterLoc == loc)
+    while (i < miscVars.Exists("Locations["+ hold +"]"))
+        Location currentIteration = miscVars.GetFormFromArray("Locations["+ hold +"]", i) as Location
+        if (currentIteration == akLocation)
+; EndBenchmark(x, i + " iterations (IsLocationFromHold): returned true")
+
             return true
         endif
         i += 1
     endWhile
+; EndBenchmark(x, i + " iterations (IsInLocationFromHold): returned false")
 
     return false
 endFunction
 
 string function GetCurrentPlayerHoldLocation()
+;    float x = StartBenchmark()
+
     int holdIndex = 0
     while (holdIndex < Holds.Length)
-        int holdArray = JMap.getObj(locationsToHoldMap, Holds[holdIndex]) ; Form[]
-
+        string hold = Holds[holdIndex]
+        int holdArrayLen = miscVars.GetLengthOf("Locations["+ hold +"]")
         int locationIndex = 0
-        while (locationIndex < JArray.count(holdArray))
-            Location holdLocation = JArray.getForm(holdArray, locationIndex) as Location
+        while (locationIndex < holdArrayLen)
+            Location holdLocation = miscVars.GetFormFromArray("Locations["+ hold +"]", locationIndex) as Location
             if (Player.IsInLocation(holdLocation))
-                Debug(none, "IsInLocationFromHold", "Player is currently in hold: " + Holds[holdIndex])
-                return Holds[holdIndex]
+            ;    EndBenchmark(x, (locationIndex * holdIndex) + " iterations (GetCurrentPlayerHoldLocation): returned " + Holds[holdIndex])
+
+                return hold
             endif
             locationIndex += 1
         endWhile
-
         holdIndex += 1
     endWhile
+;    EndBenchmark(x, holdIndex + " iterations (GetCurrentPlayerHoldLocation): returned nothing")
 
     return ""
 endFunction
@@ -336,35 +300,60 @@ string function GetCityNameFromHold(string hold)
     return JMap.getStr(holdToCityMap, hold)
 endFunction
 
+function SetCities()
+    miscVars.SetString("City[Whiterun]", "Whiterun")
+    miscVars.SetString("City[Winterhold]", "Winterhold")
+    miscVars.SetString("City[Eastmarch]", "Windhelm")
+    miscVars.SetString("City[Falkreath]", "Falkreath")
+    miscVars.SetString("City[Haafingar]", "Solitude")
+    miscVars.SetString("City[Hjaalmarch]", "Morthal")
+    miscVars.SetString("City[The Rift]", "Riften")
+    miscVars.SetString("City[The Reach]", "Markarth")
+    miscVars.SetString("City[The Pale]", "Dawnstar")
+endFunction
+
+function SetHolds()
+    miscVars.SetString("Hold[Whiterun]", "Whiterun")
+    miscVars.SetString("Hold[Winterhold]", "Winterhold")
+    miscVars.SetString("Hold[Windhelm]", "Eastmarch")
+    miscVars.SetString("Hold[Falkreath]", "Falkreath")
+    miscVars.SetString("Hold[Solitude]", "Haafingar")
+    miscVars.SetString("Hold[Morthal]", "Hjaalmarch")
+    miscVars.SetString("Hold[Riften]", "The Rift")
+    miscVars.SetString("Hold[Markarth]", "The Reach")
+    miscVars.SetString("Hold[Dawnstar]", "The Pale")
+endFunction
+
 string function GetHoldNameFromCity(string city)
 endFunction
 
 Form[] function GetJailMarkers(string hold)
-    if (!JMap.hasKey(jailMarkersMap, hold))
+    float x = StartBenchmark()
+    if (!miscVars.Exists("Jail::Cells["+ hold +"]"))
         mcm.Error("Config::GetJailMarkers", "The marker does not exist!")
         return none
     endif
-
-    int holdJailMarkerArray = JMap.getObj(jailMarkersMap, hold)
-    return JArray.asFormArray(holdJailMarkerArray)
+    Form[] jailCells = miscVars.GetPapyrusFormArray("Jail::Cells["+ hold +"]")
+    EndBenchmark(x, "GetJailMarkers")
+    return jailCells
 endFunction
 
 Form function GetJailTeleportReleaseMarker(string hold)
-    if (!JMap.hasKey(jailTeleportReleaseMarkersMap, hold))
+    if (!miscVars.Exists("Jail::Release::Teleport["+ hold +"]"))
         mcm.Error("Config::GetJailTeleportReleaseMarker", "The marker does not exist!")
         return none
     endif
 
-    return JMap.getForm(jailTeleportReleaseMarkersMap, hold)
+    return miscVars.GetForm("Jail::Release::Teleport["+ hold +"]")
 endFunction
 
 Form function GetJailPrisonerItemsContainer(string hold)
-    if (!JMap.hasKey(jailPrisonerContainersMarkersMap, hold))
+    if (!miscVars.Exists("Jail::Containers["+ hold +"]"))
         mcm.Error("Config::GetJailPrisonerItemsContainer", "The container does not exist!")
         return none
     endif
-
-    return JMap.getForm(jailPrisonerContainersMarkersMap, hold)
+    
+    return miscVars.GetForm("Jail::Containers["+ hold +"]")
 endFunction
 
 ; To be refactored into the Jail or Imprisoned script
@@ -378,63 +367,33 @@ ObjectReference function GetRandomJailMarker(string hold)
     int len = markers.length
     int markerIndex = Utility.RandomInt(0, len - 1)
 
-    ; mcm.Debug("Config::getRandomJailMarker", "Got the " + markerIndex + " marker for " + hold + "!")
     mcm.Debug("Config::GetRandomJailMarker", "Got Jail Cell " + (markerIndex + 1) + " (" + markers[markerIndex] + " [Index: "+ markerIndex +"]) marker for " + hold + "!")
     return markers[markerIndex] as ObjectReference
 endFunction
 
+; Faction function GetFaction(string hold)
+;     float x = StartBenchmark()
+;     if (JMap.hasKey(factionMap, hold))
+;         Faction obj = JMap.getForm(factionMap, hold) as Faction
+;         EndBenchmark(x, "GetFaction JMap()")
+;         return obj
+;     endif
+
+;     EndBenchmark(x, "GetFaction JMap()")
+;     return none
+; endFunction
+
 Faction function GetFaction(string hold)
-    if (JMap.hasKey(factionMap, hold))
-        return JMap.getForm(factionMap, hold) as Faction
+    if (miscVars.Exists("Faction::Crime["+ hold +"]"))
+        return miscVars.GetForm("Faction::Crime["+ hold +"]") as Faction
     endif
 
     return none
 endFunction
 
-event OnPlayerLoadGame()
-    __initializeJailTeleportReleaseMarkersMapping()
-    RegisterForModEvent("RPB_OptionChanged", "OnOptionChanged")
-endEvent
-
-event OnInit()
-    __initializeFactionsMapping()
-    __initializeJailMarkersMapping()
-    __initializeJailTeleportReleaseMarkersMapping()
-    __initializeJailPrisonerContainersMapping()
-    __initializeLocationsMapping()
-
-    RegisterForModEvent("RPB_SliderOptionChanged", "OnSliderOptionChanged")
-endEvent
-
-string function GetGlobalEquivalentOfLocalStat(string localStat)
-    int localToGlobalMap = JMap.object()
-
-    JMap.setStr(localToGlobalMap, "Largest Bounty", "Largest Bounty")
-    ; JMap.setStr(localToGlobalMap, "Total Bounty", "Total Lifetime Bounty")
-    JMap.setStr(localToGlobalMap, "Days in Jail", "Days Jailed")
-    JMap.setStr(localToGlobalMap, "Times Jailed", "Times Jailed")
-    JMap.setStr(localToGlobalMap, "Times Escaped", "Jail Escapes")
-
-    if (!JMap.hasKey(localToGlobalMap, localStat))
-        Error(self, "GetGlobalEquivalentOfLocalStat", "Call failed because the stat: " + localStat + " does not exist globally!")
-        return none
-    endif
-
-    return JMap.getStr(localToGlobalMap, localStat)
-endFunction
-
 function SetStat(string hold, string stat, int value)
     string _key = hold + "::" + stat ; e.g: The Rift::Current Bounty
     mcm.SetOptionStatValue(_key, value)
-
-    ; if (includeGlobalStat)
-    ;     string globalEquivalent = GetGlobalEquivalentOfLocalStat(stat)
-    ;     if (globalEquivalent)
-    ;         int globalStatValue = Game.QueryStat(globalEquivalent)
-    ;         Game.IncrementStat(globalEquivalent, -globalStatValue) ; Set the stat to 0
-    ;         Game.IncrementStat(globalEquivalent, value) ; Change to new value
-    ;     endif
-    ; endif
 endFunction
 
 function IncrementStat(string hold, string stat, int incrementBy = 1)
@@ -443,13 +402,6 @@ function IncrementStat(string hold, string stat, int incrementBy = 1)
     int newValue        = Max(0, currentValue + incrementBy) as int
     
     mcm.SetOptionStatValue(_key, newValue)
-
-    ; if (includeGlobalStat)
-    ;     string globalEquivalent = GetGlobalEquivalentOfLocalStat(stat)
-    ;     if (globalEquivalent)
-    ;         Game.IncrementStat(globalEquivalent, incrementBy)
-    ;     endif
-    ; endif
 endFunction
 
 function DecrementStat(string hold, string stat, int decrementBy = 1)
@@ -458,7 +410,7 @@ endFunction
 
 int property FactionCount
     int function get()
-        return JMap.count(factionMap)
+        return miscVars.GetLengthOf("Factions")
     endFunction
 endProperty
 

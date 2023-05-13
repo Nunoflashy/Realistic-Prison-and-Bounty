@@ -32,6 +32,24 @@ bool property IsClothingEnabled
     endFunction
 endProperty
 
+bool property IsFriskingEnabled
+    bool function get()
+        return self.GetBool("Frisking::Allow Frisking")
+    endFunction
+endProperty
+
+bool property IsFriskingUnconditional
+    bool function get()
+        return self.GetBool("Frisking::Unconditional Frisking")
+    endFunction
+endProperty
+
+int property FriskingMinBounty
+    int function get()
+        return self.GetInt("Frisking::Bounty for Frisking")
+    endFunction
+endProperty
+
 string property ClothingHandling
     string function get()
         return self.GetString("Clothing::Handle Clothing On")
@@ -59,6 +77,12 @@ endProperty
 bool property ClotheWhenDefeated
     bool function get()
         return self.GetBool("Clothing::Clothe when Defeated")
+    endFunction
+endProperty
+
+bool property IsClothingUnconditional
+    bool function get()
+        return self.ClothingHandling == "Unconditionally"
     endFunction
 endProperty
 
@@ -149,6 +173,43 @@ endProperty
 bool property RedressOnRelease
     bool function get()
         return self.GetBool("Release::Redress on Release")
+    endFunction
+endProperty
+
+string property StrippingHandling
+    string function get()
+        return self.GetString("Stripping::Handle Stripping On")
+    endFunction
+endProperty
+
+int property StrippingMinBounty
+    int function get()
+        return self.GetInt("Stripping::Bounty to Strip")
+    endFunction
+endProperty
+
+int property StrippingMinViolentBounty
+    int function get()
+        return self.GetInt("Stripping::Violent Bounty to Strip")
+    endFunction
+endProperty
+
+int property StrippingMinSentence
+    int function get()
+        return self.GetInt("Stripping::Sentence to Strip")
+    endFunction
+endProperty
+
+
+bool property ShouldStripOnEscape
+    bool function get()
+        return self.GetBool("Escape::Should Strip Search")
+    endFunction
+endProperty
+
+bool property IsStrippingUnconditional
+    bool function get()
+        return self.StrippingHandling == "Unconditionally"
     endFunction
 endProperty
 

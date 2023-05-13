@@ -6,7 +6,7 @@ Scriptname RPB_TIF__000AD7C8 Extends TopicInfo Hidden
 Function Fragment_5(ObjectReference akSpeakerRef)
 Actor akSpeaker = akSpeakerRef as Actor
 ;BEGIN CODE
-akSpeaker.SendModEvent("ArrestBegin", "TeleportToCell", 0x14)
+akSpeaker.SendModEvent("RPB_ArrestBegin", "TeleportToCell", 0x14)
 ;END CODE
 EndFunction
 ;END FRAGMENT
