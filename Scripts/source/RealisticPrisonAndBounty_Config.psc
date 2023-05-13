@@ -9,6 +9,7 @@ import Math
 ; ==============================================================================
 
 bool property IS_DEBUG = true autoreadonly
+bool property ENABLE_BENCHMARK = true autoreadonly
 
 float function GetVersion() global
     return 1.00
@@ -61,7 +62,7 @@ endEvent
 
 string[] property Holds
     string[] function get()
-        if (miscVars.GetLengthOf("Holds") == 0)
+        if (!miscVars.Exists("Holds"))
             miscVars.CreateArray("Holds")
             miscVars.AddStringToArray("Holds", "Whiterun")
             miscVars.AddStringToArray("Holds", "Winterhold")
@@ -77,7 +78,6 @@ string[] property Holds
         return miscVars.GetPapyrusStringArray("Holds")
     endFunction
 endProperty
-
 
 Actor property Player
     Actor function get()
@@ -96,21 +96,14 @@ function SetFactions()
     miscVars.SetForm("Faction::Crime[The Reach]", Game.GetForm(0x0002816C))
     miscVars.SetForm("Faction::Crime[The Pale]", Game.GetForm(0x0002816E))
 
-    miscVars.CreateArray("Factions")
-    int i = 0
-    while (i < Holds.Length)
-        string hold = Holds[i]
-        miscVars.AddContainerToArray("Factions", "Faction::Crime["+ hold +"]")
-        i += 1
-    endWhile
-
-    mcm.Debug("Config::SetFactions", "Crime factions were initialized. (Factions: "+ FactionCount +")", true)
+    Debug(self, "Config::SetFactions", "Crime factions were initialized. (Factions: "+ FactionCount +")")
 endFunction
 
 
 function SetJailCells()
+    float x = StartBenchmark(ENABLE_BENCHMARK)
     miscVars.CreateStringMap("Jail::Cells")
-    float x = StartBenchmark()
+
     miscVars.AddFormToArray("Jail::Cells[Whiterun]", GetFormFromMod(0x3885)) ; Jail Cell 01
     miscVars.AddFormToArray("Jail::Cells[Whiterun]", GetFormFromMod(0x3886)) ; Jail Cell 02
     miscVars.AddFormToArray("Jail::Cells[Whiterun]", GetFormFromMod(0x3887)) ; Jail Cell 03
@@ -151,11 +144,14 @@ function SetJailCells()
     int i = 0
     while (i < Holds.Length)
         string hold = Holds[i]
-        miscVars.AddToContainer("Jail::Cells", "Jail::Cells["+ hold +"]")
+        if (miscVars.Exists("Jail::Cells["+ hold +"]"))
+            miscVars.AddToContainer("Jail::Cells", "Jail::Cells["+ hold +"]")
+            Debug(self, "Config::SetJailCells", "Added " + "Jail::Cells["+ hold +"]" + " to container: " + "Jail::Cells" + " (container length: "+ miscVars.GetLengthOf("Jail::Cells") +")\n")
+        endif
         i += 1
     endWhile
 
-    EndBenchmark(x, "SetJailCells")
+    EndBenchmark(x, "SetJailCells", ENABLE_BENCHMARK)
 endFunction
 
 function SetJailTeleportReleaseLocations()
@@ -210,7 +206,9 @@ function SetHoldLocations()
     int i = 0
     while (i < Holds.Length)
         string hold = Holds[i]
-        miscVars.AddToContainer("Locations", "Locations["+ hold +"]")
+        if (miscVars.Exists("Locations["+ hold +"]"))
+            miscVars.AddToContainer("Locations", "Locations["+ hold +"]")
+        endif
         i += 1
     endWhile
 
@@ -218,7 +216,7 @@ function SetHoldLocations()
 endFunction
 
 bool function IsInLocationFromHold(string hold)
-; float x = StartBenchmark()
+float x = StartBenchmark()
 
     if (!miscVars.Exists("Locations["+ hold +"]"))
         Error(none, "Config::IsInLocationFromHold", "Location does not exist for this hold.")
@@ -231,13 +229,13 @@ bool function IsInLocationFromHold(string hold)
         ; As soon as the player is in any location for this hold, return.
         if (Player.IsInLocation(holdLocation))
             Debug(none, "IsInLocationFromHold", "Player is in location: " + holdLocation.GetName() + " ("+ holdLocation.GetFormID() +")", mcm.IS_DEBUG)
-        ;    EndBenchmark(x, i + " iterations (IsLocationFromHold): returned true")
+           EndBenchmark(x, i + " iterations (IsLocationFromHold): returned true")
 
             return true
         endif
         i += 1
     endWhile
-; EndBenchmark(x, i + " iterations (IsInLocationFromHold): returned false")
+EndBenchmark(x, i + " iterations (IsInLocationFromHold): returned false")
 
     return false
 endFunction
@@ -370,18 +368,6 @@ ObjectReference function GetRandomJailMarker(string hold)
     mcm.Debug("Config::GetRandomJailMarker", "Got Jail Cell " + (markerIndex + 1) + " (" + markers[markerIndex] + " [Index: "+ markerIndex +"]) marker for " + hold + "!")
     return markers[markerIndex] as ObjectReference
 endFunction
-
-; Faction function GetFaction(string hold)
-;     float x = StartBenchmark()
-;     if (JMap.hasKey(factionMap, hold))
-;         Faction obj = JMap.getForm(factionMap, hold) as Faction
-;         EndBenchmark(x, "GetFaction JMap()")
-;         return obj
-;     endif
-
-;     EndBenchmark(x, "GetFaction JMap()")
-;     return none
-; endFunction
 
 Faction function GetFaction(string hold)
     if (miscVars.Exists("Faction::Crime["+ hold +"]"))

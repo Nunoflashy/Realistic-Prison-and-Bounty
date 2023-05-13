@@ -228,27 +228,94 @@ endFunction
 ; ==========================================================
 
 ;/
-    Creates a string map with the specified key
+    Base method for the creation of containers.
+    Creates a container with the specified key, optionally inside another parent container.
 
-    returns: The handle of the container
+    string  @containerKey: The key of the container to create
+    string  @containerType: The type of the container (Array, Map, IntMap, FormMap...)
+    string? @parentContainerKey: The key of the parent container to put this container into
+    bool?   @retainInSave: Whether to retain this container in the save file
+
+    returns: The key of the created container
 /;
-int function CreateStringMap(string containerKey)
-    int _container = JMap.object()
-    JValue.retain(_container)
+string function CreateContainer(string containerKey, string containerType, string parentContainerKey = "", bool retainInSave = true)
+    int _container
+    if (containerType == "Array")
+        _container = JArray.object()
 
-    JMap.setObj(_miscVarsContainer, containerKey, _container)
-    return _container
-endFunction
+    elseif (containerType == "StringMap" || containerType == "Map")
+        _container = JMap.object()
 
-int function CreateArray(string containerKey, bool retainInMemory = true)
-    int _container = JArray.object()
+    elseif (containerType == "IntegerMap" || "IntMap")
+        _container = JIntMap.object()
 
-    if (retainInMemory)
+    elseif (containerType == "FormMap")
+        _container = JFormMap.object()
+
+    else
+        Error(self, "MiscVars::CreateContainer", "The container type specified is invalid!")
+        return ""
+    endif
+
+    if (retainInSave)
         JValue.retain(_container)
     endif
-    
-    JMap.setObj(_miscVarsContainer, containerKey, _container)
-    return _container
+
+    int parentContainer = _miscVarsContainer
+    if (parentContainerKey)
+        parentContainer = JMap.getObj(_miscVarsContainer, parentContainerKey)
+    endif
+
+    JMap.setObj(parentContainer, containerKey, _container)
+    return containerKey
+endFunction
+
+;/
+    Creates a string map with the specified key
+
+    string  @containerKey: The key of the container to create
+    bool?   @retainInSave: Whether to retain this container in the save file
+
+    returns: The key of the container
+/;
+string function CreateStringMap(string containerKey, bool retainInSave = true)
+    return self.CreateContainer(containerKey, "StringMap", "", retainInSave)
+endFunction
+
+;/
+    Creates an array with the specified key
+
+    string  @containerKey: The key of the container to create
+    bool?   @retainInSave: Whether to retain this container in the save file
+
+    returns: The key of the container
+/;
+string function CreateArray(string containerKey, bool retainInSave = true)
+    return self.CreateContainer(containerKey, "Array", "", retainInSave)
+endFunction
+
+;/
+    Creates an integer map with the specified key
+
+    string  @containerKey: The key of the container to create
+    bool?   @retainInSave: Whether to retain this container in the save file
+
+    returns: The key of the container
+/;
+string function CreateIntegerMap(string containerKey, bool retainInSave = true)
+    return self.CreateContainer(containerKey, "IntegerMap", "", retainInSave)
+endFunction
+
+;/
+    Creates a form map with the specified key
+
+    string  @containerKey: The key of the container to create
+    bool?   @retainInSave: Whether to retain this container in the save file
+
+    returns: The key of the container
+/;
+string function CreateFormMap(string containerKey, bool retainInSave = true)
+    return self.CreateContainer(containerKey, "FormMap", "", retainInSave)
 endFunction
 
 ;/
@@ -309,82 +376,82 @@ endFunction
     string  @paramKey: The key of the array
     int     @index: The index to get the string from
 /;
-float function GetFloatFromArray(string paramKey, int index)
-    return JArray.getFlt(JMap.getObj(_miscVarsContainer, paramKey), index)
+float function GetFloatFromArray(string arrayKey, int index)
+    return JArray.getFlt(JMap.getObj(_miscVarsContainer, arrayKey), index)
 endFunction
 
 ;/
     Retrieves an integer from the array at index n
 
-    string  @paramKey: The key of the array
+    string  @arrayKey: The key of the array
     int     @index: The index to get the string from
 /;
-int function GetIntegerFromArray(string paramKey, int index)
-    return JArray.getInt(JMap.getObj(_miscVarsContainer, paramKey), index)
+int function GetIntegerFromArray(string arrayKey, int index)
+    return JArray.getInt(JMap.getObj(_miscVarsContainer, arrayKey), index)
 endFunction
 
 ;/
     Retrieves a form from the array at index n
 
-    string  @paramKey: The key of the array
+    string  @arrayKey: The key of the array
     int     @index: The index to get the string from
 /;
-Form function GetFormFromArray(string paramKey, int index)
-    return JArray.getForm(JMap.getObj(_miscVarsContainer, paramKey), index)
+Form function GetFormFromArray(string arrayKey, int index)
+    return JArray.getForm(JMap.getObj(_miscVarsContainer, arrayKey), index)
 endFunction
 
 ;/
     Retrieves a string from the array at index n
 
-    string  @paramKey: The key of the array
+    string  @arrayKey: The key of the array
     int     @index: The index to get the string from
 /;
-string function GetStringFromArray(string paramKey, int index)
-    return JArray.getStr(JMap.getObj(_miscVarsContainer, paramKey), index)
+string function GetStringFromArray(string arrayKey, int index)
+    return JArray.getStr(JMap.getObj(_miscVarsContainer, arrayKey), index)
 endFunction
 
 ;/
     Converts an integer array into a papyrus integer array
 
-    string  @paramKey: The key of the array.
+    string  @arrayKey: The key of the array.
 
     returns: The papyrus equivalent of this array.
 /;
-int[] function GetPapyrusIntegerArray(string paramKey)
-    return JArray.asIntArray(JMap.getObj(_miscVarsContainer, paramKey))
+int[] function GetPapyrusIntegerArray(string arrayKey)
+    return JArray.asIntArray(JMap.getObj(_miscVarsContainer, arrayKey))
 endFunction
 
 ;/
     Converts a float array into a papyrus float array
 
-    string  @paramKey: The key of the array.
+    string  @arrayKey: The key of the array.
 
     returns: The papyrus equivalent of this array.
 /;
-float[] function GetPapyrusFloatArray(string paramKey)
-    return JArray.asFloatArray(JMap.getObj(_miscVarsContainer, paramKey))
+float[] function GetPapyrusFloatArray(string arrayKey)
+    return JArray.asFloatArray(JMap.getObj(_miscVarsContainer, arrayKey))
 endFunction
 
 ;/
     Converts a form array into a papyrus form array
 
-    string  @paramKey: The key of the array.
+    string  @arrayKey: The key of the array.
 
     returns: The papyrus equivalent of this array.
 /;
-Form[] function GetPapyrusFormArray(string paramKey)
-    return JArray.asFormArray(JMap.getObj(_miscVarsContainer, paramKey))
+Form[] function GetPapyrusFormArray(string arrayKey)
+    return JArray.asFormArray(JMap.getObj(_miscVarsContainer, arrayKey))
 endFunction
 
 ;/
     Converts a string array into a papyrus string array
 
-    string  @paramKey: The key of the array.
+    string  @arrayKey: The key of the array.
 
     returns: The papyrus equivalent of this array.
 /;
-string[] function GetPapyrusStringArray(string paramKey)
-    return JArray.asStringArray(JMap.getObj(_miscVarsContainer, paramKey))
+string[] function GetPapyrusStringArray(string arrayKey)
+    return JArray.asStringArray(JMap.getObj(_miscVarsContainer, arrayKey))
 endFunction
 
 ;/
