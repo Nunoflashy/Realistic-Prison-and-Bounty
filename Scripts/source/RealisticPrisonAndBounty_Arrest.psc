@@ -5,6 +5,10 @@ import RealisticPrisonAndBounty_Util
 import RealisticPrisonAndBounty_Config
 import PO3_SKSEFunctions
 
+string property STATE_RESISTED = "Resisted" autoreadonly
+string property STATE_ARRESTED = "Arrested" autoreadonly
+string property STATE_SURRENDER = "Surrender" autoreadonly
+
 string property ARREST_TYPE_TELEPORT_TO_JAIL    = "TeleportToJail" autoreadonly
 string property ARREST_TYPE_TELEPORT_TO_CELL    = "TeleportToCell" autoreadonly
 string property ARREST_TYPE_ESCORT_TO_JAIL      = "EscortToJail" autoreadonly
@@ -33,6 +37,8 @@ RealisticPrisonAndBounty_MiscVars property miscVars
         return config.miscVars
     endFunction
 endProperty
+
+ReferenceAlias property CaptorRef auto
 
 function RegisterEvents()
     RegisterForModEvent("RPB_ArrestBegin", "OnArrestBegin")
@@ -63,7 +69,7 @@ endEvent
 event OnKeyDown(int keyCode)
     if (keyCode == 0x58) ; F12
         string currentHold = config.GetCurrentPlayerHoldLocation()
-        arrestVars.SetForm("Arrest::Arrest Faction", config.GetFaction(currentHold))
+        arrestVars.SetForm("Arrest::Arrest Faction", config.GetCrimeFaction(currentHold))
         Faction crimeFaction = arrestVars.GetForm("Arrest::Arrest Faction") as Faction
         crimeFaction.SendModEvent("RPB_ArrestBegin", ARREST_TYPE_TELEPORT_TO_CELL)
     
@@ -72,12 +78,149 @@ event OnKeyDown(int keyCode)
     endif
 endEvent
 
+function PlaySurrenderAnimation(Actor akActorSurrendering)
+    Debug.SendAnimationEvent(akActorSurrendering, "IdleSurrender")
+endFunction
+
+;/
+    Resets the arrest resisted flag for all the holds.
+
+    This flag is used to determine whether an actor should be punished for resisting arrest,
+    and is set to true upon resisting, and for the remainder of that time, no further resists will
+    incur another penalty, unless enough time has passed to where the flag gets set to false here
+    in this function, at which point the resist will be punished again.
+/;
+function ResetResistedFlag()
+    int i = 0
+    while (i < miscVars.GetLengthOf("Holds"))
+        string hold = miscVars.GetStringFromArray("Holds", i) ; To be tested
+        string arrestResistKey = "Arrest::"+ hold +"::Arrest Resisted"
+
+        if (arrestVars.Exists(arrestResistKey))
+            arrestVars.SetBool(arrestResistKey, false)
+            Info(self, "Arrest::ResetResistedFlag", "The resist arrest flag for " + hold +" has been reset.")
+        endif
+        i += 1
+    endWhile
+endFunction
+
+;/
+    Sets the arrest resisted flag to true.
+    While the flag is active, further arrests of this faction will no longer incur a penalty upon resisting again. 
+    This is to prevent multiple guards trying to arrest the player
+    and eventually end up with multiple penalties from each guard for something that should only be punished once.
+    After some time, this flag will be set to false and the next arrest will be punished once again.
+    For more info, see the Resisted state
+/;
+function SetResistedFlag(Faction akFaction)
+    arrestVars.SetBool("Arrest::"+ akFaction.GetName() +"::Arrest Resisted", true) ; Set arrest resisted flag
+    GotoState(STATE_RESISTED)
+endFunction
+
+;/
+    Sets the passed in actor as arrested for this faction to the system.
+/;
+function SetAsArrested(Actor akArrestee, Faction akFaction)
+    if (akArrestee == config.Player)
+        arrestVars.SetBool("Arrest::Arrested", true)
+        arrestVars.SetFloat("Arrest::Time of Arrest", Utility.GetCurrentGameTime())
+        config.NotifyArrest("You have been arrested in " + akFaction.GetName())
+        Info(self, "Arrest::SetAsArrested", akArrestee.GetBaseObject().GetName() + " has been arrested in " + akFaction.GetName() + " at " + Utility.GetCurrentGameTime())
+    endif
+
+    GotoState(STATE_ARRESTED)
+endFunction
+
+;/
+    The state where the actor should be upon being arrested.
+/;
+state Arrested
+    event OnBeginState()
+        Info(self, "Arrest::OnBeginState", "Begin State " + self.GetState())
+    endEvent
+
+    event OnUpdateGameTime()
+    endEvent
+
+    event OnEndState()
+        Info(self, "Arrest::OnEndState", "End State " + self.GetState())
+    endEvent
+endState
+
+;/
+    The state where the actor should be upon resisting arrest.
+/;
+state Resisted
+    event OnBeginState()
+        Debug(self, "Arrest::OnBeginState", "Begin State " + self.GetState(), config.IS_DEBUG)
+        RegisterForSingleUpdateGameTime(1.0)
+    endEvent
+
+    event OnUpdateGameTime()
+        GotoState("")
+    endEvent
+
+    event OnEndState()
+        Debug(self, "Arrest::OnEndState", "End State " + self.GetState(), config.IS_DEBUG)
+        self.ResetResistedFlag()
+    endEvent
+endState
+
+state Surrender
+    event OnBeginState()
+        self.PlaySurrenderAnimation(arrestVars.Arrestee)
+    endEvent
+
+    event OnUpdate()
+    endEvent
+
+    event OnEndState()
+        ; Actually arrest the actor
+        string currentHold = config.GetCurrentPlayerHoldLocation()
+        Faction currentHoldFaction = config.GetFaction(currentHold)
+        currentHoldFaction.SendModEvent("RPB_ArrestBegin", ARREST_TYPE_TELEPORT_TO_CELL)
+    endEvent
+endState
+
 event OnArrestBegin(string eventName, string arrestType, float arresteeId, Form sender)
     Actor captor            = (sender as Actor)
     Faction crimeFaction    = form_if ((sender as Faction), (sender as Faction), captor.GetCrimeFaction()) as Faction 
 
+    if (!self.ValidateArrestType(arrestType))
+        Error(self, "Arrest::OnArrestBegin", "Arrest Type is invalid, got: " + arrestType + ". (valid options: "+ self.GetValidArrestTypes() +") ")
+        return
+    endif
+
+    if (!captor && !crimeFaction)
+        Error(self, "Arrest::OnArrestBegin", "Captor or Faction are invalid ["+ "Captor: "+ captor + ", Faction: " + crimeFaction +"], cannot start arrest process!")
+        return
+    endif
+
     ; If no arresteeId passed in, arrest the player by default
     Actor arrestee = Game.GetFormEx(int_if (!arresteeId, 0x14, arresteeId as int)) as Actor
+
+    if (!arrestee)
+        Error(self, "OnArrestBegin", "Arrestee not found for this arrest, aborting!")
+        return
+    endif
+
+    if (arrestVars.IsArrested)
+        config.NotifyArrest("You are already arrested")
+        Error(self, "Arrest::OnArrestBegin", arrestee.GetBaseObject().GetName() + " is already arrested, cannot arrest for "+ crimeFaction.GetName() +", aborting!")
+        return
+    endif
+
+    if (!self.HasLatentBounty() && !self.HasActiveBounty(crimeFaction))
+        config.NotifyArrest("You can't be arrested in " + crimeFaction.GetName() + " since you do not have a bounty in the hold")
+        Error(self, "OnArrestBegin", arrestee.GetBaseObject().GetName() + " has no bounty, cannot arrest for "+ crimeFaction.GetName() +", aborting!")
+        return
+    endif
+
+    if (captor)
+        CaptorRef.ForceRefTo(captor)
+        arrestVars.SetForm("Arrest::Arresting Guard", captor)
+        Debug(self, "OnArrestBegin", "Arrest is being done through a captor ("+ captor +")")
+    endif
 
     arrestVars.SetForm("Arrest::Arrest Faction", crimeFaction)
     arrestVars.SetString("Arrest::Hold", crimeFaction.GetName())
@@ -87,28 +230,103 @@ event OnArrestBegin(string eventName, string arrestType, float arresteeId, Form 
     self.BeginArrest()
 endEvent
 
+event OnArrestResist(string eventName, string unusedStr, float arrestResisterId, Form sender)
+    Actor guard            = (sender as Actor)
+    Faction crimeFaction   = form_if ((sender as Faction), (sender as Faction), guard.GetCrimeFaction()) as Faction
+
+    if (!guard && !crimeFaction)
+        Error(self, "Arrest::OnArrestResist", "Guard or Faction are invalid ["+ "Guard: "+ guard + ", Faction: " + crimeFaction +"], cannot start arrest process!")
+        return
+    endif
+
+    ; Not the player
+    if ((arrestResisterId as int) != 0x14)
+        Error(self, "Arrest::OnArrestResist", "Someone other than the player ("+ Game.GetFormEx(arrestResisterId as int) +") has resisted arrest (how?), returning...")
+        return
+    endif
+
+    guard.SetPlayerResistingArrest() ; Needed to make the guards attack the player, otherwise they will loop arrest dialogue
+
+    bool hasResistedArrestRecentlyInThisHold = arrestVars.GetBool("Arrest::" + crimeFaction.GetName() + "::Arrest Resisted")
+
+    if (hasResistedArrestRecentlyInThisHold)
+        Info(self, "Arrest::OnArrestResist", "You have already resisted arrest recently, no bounty will be added as it most likely is the same arrest.")
+        return
+    endif
+
+    self.TriggerResistArrest(guard, crimeFaction)
+endEvent
+
 function BeginArrest()
-    Actor arrestee = arrestVars.GetForm("Arrest::Arrestee") as Actor
-    Faction arrestFaction = arrestVars.GetForm("Arrest::Arrest Faction") as Faction
+    string hold             = arrestVars.Hold
+    string arrestType       = arrestVars.ArrestType
+    Faction arrestFaction   = arrestVars.ArrestFaction
+    Actor arrestee          = arrestVars.Arrestee
+    Actor captor            = arrestVars.Captor ; May be undefined if the arrest is not done through a captor
 
-    arrestVars.SetFloat("Arrest::Bounty Non-Violent", arrestFaction.GetCrimeGoldNonViolent())
-    arrestVars.SetFloat("Arrest::Bounty Violent", arrestFaction.GetCrimeGoldViolent())
-    ClearBounty(arrestFaction)
-    jail.AssignJailCell(arrestee)
+    self.SetBounty()
 
-    arrestVars.SetBool("Arrest::Arrested", true)
-    arrestVars.SetFloat("Arrest::Time of Arrest", Utility.GetCurrentGameTime())
+    bool assignedJailCellSuccessfully = jail.AssignJailCell(arrestee) ; Not guaranteed to go to jail, but we set it up here either way
+    
+    if (!assignedJailCellSuccessfully)
+        self.ResetArrest("Could not assign a jail cell to " + arrestee + ". (Aborting arrest...)")
+        return
+    endif
 
     arrestee.StopCombat()
     arrestee.StopCombatAlarm()
-    jail.StartTeleportToCell()
+
+    ; Will most likely be used when the arrestee has no chance to pay their bounty, and therefore will get immediately thrown into the cell
+    if (arrestType == ARREST_TYPE_TELEPORT_TO_CELL)
+        jail.StartTeleportToCell()
+    
+    ; Could be used when the arrestee still has a chance to pay their bounty, and not go to the cell immediately
+    elseif (arrestType == ARREST_TYPE_TELEPORT_TO_JAIL) ; Not implemented yet (Idea: Arrestee will be teleported to some location in jail and then either escorted or teleported to the cell)
+        ; jail.StartTeleportToJail()
+    
+    ; Will most likely be used when the arrestee has no chance to pay their bounty, and therefore will get immediately escorted into the cell
+    elseif (arrestType == ARREST_TYPE_ESCORT_TO_CELL) ; Not implemented yet (Idea: Arrestee will be escorted directly to the cell)
+        jail.StartEscortToCell()
+
+    elseif (arrestType == ARREST_TYPE_ESCORT_TO_JAIL) ; Not implemented yet (Idea: Arrestee will be escorted to the jail, and then processed before being escorted into the cell)
+        ; jail.StartEscortToJail()
+    endif
+
     SendModEvent("JailBegin")
-    config.NotifyArrest("You have been arrested in " + arrestFaction.GetName())
+    
+    self.UpdateArrestStats()
+    self.SetAsArrested(arrestee, arrestFaction)
+
     ; ================== TESTING ==================
-    miscVars.ListContainer("Locations")
+    ; miscVars.ListContainer("Locations")
+    ; miscVars.ListContainer("Factions")
+    ; miscVars.ListContainer("Jail::Cells")
+    ; miscVars.ListContainer("Holds")
+    ; miscVars.List()
+    ; miscVars.ListContainer("Jail::Cells")
+    ; Debug(self, "Arrest::ArrestBegin", "\n" + \
+    ;     "LengthOf(Jail::Cells): " + miscVars.GetLengthOf("Jail::Cells") + "\n" + \
+    ;     "LengthOf(Locations): " + miscVars.GetLengthOf("Locations") + "\n" + \
+    ;     "LengthOf(Holds): " + miscVars.GetLengthOf("Holds") + "\n" \
+    ; )
     ; miscVars.List()
     ; =============================================
+endFunction
 
+function TriggerResistArrest(Actor akGuard, Faction akCrimeFaction)
+    string hold = akCrimeFaction.GetName()
+
+    int resistBountyFlat                    = config.GetArrestAdditionalBountyResistingFlat(hold)
+    float resistBountyFromCurrentBounty     = config.GetArrestAdditionalBountyDefeatedFromCurrentBounty(hold)
+    float resistBountyPercentModifier       = percent(resistBountyFromCurrentBounty)
+    int resistArrestPenalty                 = floor(akCrimeFaction.GetCrimeGold() * resistBountyPercentModifier) + resistBountyFlat
+
+    if (resistArrestPenalty > 0)
+        akCrimeFaction.ModCrimeGold(resistArrestPenalty)
+        config.NotifyArrest("You have gained " + resistArrestPenalty + " Bounty in " + hold +" for resisting arrest!")
+    endif
+
+    self.SetResistedFlag(akCrimeFaction)
 endFunction
 
 function TriggerSurrender()
@@ -122,7 +340,92 @@ function TriggerSurrender()
         return
     endif
 
-    currentHoldFaction.SendModEvent("RPB_ArrestBegin", ARREST_TYPE_TELEPORT_TO_CELL)
+    self.PlaySurrenderAnimation(arrestVars.Arrestee)
+    
+    GotoState(STATE_SURRENDER)
+    RegisterForSingleUpdate(4.0)
+
+    ; currentHoldFaction.SendModEvent("RPB_ArrestBegin", ARREST_TYPE_TELEPORT_TO_CELL)
+endFunction
+
+bool function HasLatentBounty()
+    return arrestVars.Bounty > 0
+endFunction
+
+bool function HasActiveBounty(Faction akCrimeFaction)
+    return akCrimeFaction.GetCrimeGold() > 0
+endFunction
+
+function ResetArrest(string reason = "")
+    ; Clear all arrest related vars
+    arrestVars.Clear()
+    Info(self, "ResetArrest", reason, reason != "")
+endFunction
+
+function SetBounty()
+    Faction arrestFaction = arrestVars.ArrestFaction
+
+    if (self.HasLatentBounty())
+        ; Add the "active bounty" if there's any, to the latent bounty
+        arrestVars.ModInt("Arrest::Bounty Non-Violent", arrestFaction.GetCrimeGoldNonViolent())
+        arrestVars.ModInt("Arrest::Bounty Violent", arrestFaction.GetCrimeGoldViolent())
+    else
+        ; Set the bounties to be latent
+        arrestVars.SetFloat("Arrest::Bounty Non-Violent", arrestFaction.GetCrimeGoldNonViolent())
+        arrestVars.SetFloat("Arrest::Bounty Violent", arrestFaction.GetCrimeGoldViolent())
+    endif
+
+    if (arrestVars.HasOverride("Arrest::Bounty Non-Violent"))
+        Debug(self, "SetBounty", "\n" + \
+            "(Overriden) Arrest::Bounty Non-Violent: " + arrestVars.BountyNonViolent + "\n" \
+        )
+    endif
+
+    if (arrestVars.HasOverride("Arrest::Bounty Non-Violent"))
+        Debug(self, "SetBounty", "\n" + \
+            "(Overriden) Arrest::Bounty Violent: " + arrestVars.BountyViolent + "\n" \
+        )
+    endif
+
+    ClearBounty(arrestFaction)
+    arrestFaction.PlayerPayCrimeGold(false, false) ; Just in case?
+endFunction
+
+function UpdateArrestStats()
+    Actor arrestee  = arrestVars.Arrestee
+
+    if (arrestee == config.Player)
+        string hold     = arrestVars.Hold
+        int bounty      = arrestVars.Bounty
+
+        config.SetStat(hold, "Current Bounty", bounty)
+        int currentLargestBounty = config.GetStat(hold, "Largest Bounty")
+        config.SetStat(hold, "Largest Bounty", int_if (currentLargestBounty < bounty, bounty, currentLargestBounty))
+        config.IncrementStat(hold, "Total Bounty", bounty)
+        config.IncrementStat(hold, "Times Arrested")
+
+    else ; Processing for NPC stats later
+        ; e.g:
+        ; Actor arrestee  = arrestVars.Arrestee
+        ; string hold = arrestVars.GetString("["+ arrestee.GetFormID() +"]Arrest::Hold")
+        ; int bounty  = arrestVars.GetInt("["+ arrestee.GetFormID() +"]Arrest::Bounty")
+
+        ; actorVars.SetStat(hold, "["+ arrestee.GetFormID() +"]Current Bounty", bounty)
+    endif
+endFunction
+
+bool function ValidateArrestType(string arrestType)
+    return  arrestType == ARREST_TYPE_TELEPORT_TO_JAIL || \ 
+            arrestType == ARREST_TYPE_TELEPORT_TO_CELL || \ 
+            arrestType == ARREST_TYPE_ESCORT_TO_JAIL || \
+            arrestType == ARREST_TYPE_ESCORT_TO_CELL
+endFunction
+
+string function GetValidArrestTypes()
+    return  ARREST_TYPE_TELEPORT_TO_JAIL + ", " + \ 
+            ARREST_TYPE_TELEPORT_TO_CELL + ", " + \ 
+            ARREST_TYPE_ESCORT_TO_JAIL + ", " + \ 
+            ARREST_TYPE_ESCORT_TO_CELL
 endFunction
 
 function RestrainArrestee(Actor akArrestee)

@@ -79,6 +79,25 @@ string[] property Holds
     endFunction
 endProperty
 
+string[] property Cities
+    string[] function get()
+        if (!miscVars.Exists("Cities"))
+            miscVars.CreateArray("Cities")
+            miscVars.AddStringToArray("Cities", "Whiterun")
+            miscVars.AddStringToArray("Cities", "Winterhold")
+            miscVars.AddStringToArray("Cities", "Windhelm")
+            miscVars.AddStringToArray("Cities", "Falkreath")
+            miscVars.AddStringToArray("Cities", "Solitude")
+            miscVars.AddStringToArray("Cities", "Morthal")
+            miscVars.AddStringToArray("Cities", "Riften")
+            miscVars.AddStringToArray("Cities", "Markarth")
+            miscVars.AddStringToArray("Cities", "Dawnstar")
+        endif
+
+        return miscVars.GetPapyrusStringArray("Cities")
+    endFunction
+endProperty
+
 Actor property Player
     Actor function get()
         return Game.GetForm(0x00014) as Actor
@@ -282,6 +301,14 @@ string function GetCurrentPlayerHoldLocation()
     return ""
 endFunction
 
+string function GetHold(string city)
+    return miscVars.GetString("Hold["+ city +"]")
+endFunction
+
+string function GetCity(string hold)
+    return miscVars.GetString("City["+ hold +"]")
+endFunction
+
 string function GetCityNameFromHold(string hold)
     int holdToCityMap = JMap.object()
 
@@ -375,6 +402,11 @@ Faction function GetFaction(string hold)
     endif
 
     return none
+endFunction
+
+; Temporary, to be implemented here later
+Faction function GetCrimeFaction(string hold)
+    return self.GetFaction(hold)
 endFunction
 
 function SetStat(string hold, string stat, int value)
