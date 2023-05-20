@@ -19,6 +19,10 @@ string function GetPluginName() global
     return "RealisticPrisonAndBounty.esp"
 endFunction
 
+string function GetModName() global
+    return "Realistic Prison and Bounty"
+endFunction
+
 Form function GetFormFromMod(int formId) global
     return Game.GetFormFromFile(formId, GetPluginName())
 endFunction
@@ -29,36 +33,37 @@ Form property mainAPI
     endFunction
 endProperty
 
+RealisticPrisonAndBounty_Arrest property arrest
+    RealisticPrisonAndBounty_Arrest function get()
+        return mainAPI as RealisticPrisonAndBounty_Arrest
+    endFunction
+endProperty
+
+RealisticPrisonAndBounty_Jail property jail
+    RealisticPrisonAndBounty_Jail function get()
+        return mainAPI as RealisticPrisonAndBounty_Jail
+    endFunction
+endProperty
+
 RealisticPrisonAndBounty_MCM property mcm auto
 RealisticPrisonAndBounty_ArrestVars property arrestVars auto
 RealisticPrisonAndBounty_ActorVars property actorVars auto
 RealisticPrisonAndBounty_MiscVars property miscVars auto
 
-event OnInit()
-    ; Defer heavy calls to OnUpdate
-    GotoState("Initialization")
-    RegisterForSingleUpdate(1.0)
-endEvent
+; Called from ConfigAlias
+bool function RegisterEvents()
+; ==========================================================
+;                       Arrest Events
+; ==========================================================
+    arrest.RegisterEvents()
 
-state Initialization
-    event OnUpdate()
-        self.SetHolds()
-        self.SetCities()
-        self.SetHoldLocations()
-        self.SetJailTeleportReleaseLocations()
-        self.SetJailPrisonerContainers()
-        self.SetFactions()
-        self.SetJailCells()
+ ; ==========================================================
+ ;                       Prison Events
+ ; ==========================================================
+    jail.RegisterEvents()
 
-        mcm.Debug("Config::OnUpdate", "Initialization complete?", true)
-    
-        GotoState("")
-    endEvent
-endState
-
-event OnPlayerLoadGame()
-    mcm.Trace("Config::OnPlayerLoadGame", "This is a test to see if it gets called", true)
-endEvent
+    return true
+endFunction
 
 string[] property Holds
     string[] function get()
@@ -104,7 +109,7 @@ Actor property Player
     endFunction
 endProperty
 
-function SetFactions()
+bool function SetFactions()
     miscVars.SetForm("Faction::Crime[Whiterun]", Game.GetForm(0x000267EA))
     miscVars.SetForm("Faction::Crime[Winterhold]", Game.GetForm(0x0002816F))
     miscVars.SetForm("Faction::Crime[Eastmarch]", Game.GetForm(0x000267E3))
@@ -116,10 +121,15 @@ function SetFactions()
     miscVars.SetForm("Faction::Crime[The Pale]", Game.GetForm(0x0002816E))
 
     Debug(self, "Config::SetFactions", "Crime factions were initialized. (Factions: "+ FactionCount +")")
+    return true
 endFunction
 
 
-function SetJailCells()
+bool function SetJailCells()
+    if (miscVars.Exists("Jail::Cells"))
+        return true
+    endif
+    
     float x = StartBenchmark(ENABLE_BENCHMARK)
     miscVars.CreateStringMap("Jail::Cells")
 
@@ -171,9 +181,10 @@ function SetJailCells()
     endWhile
 
     EndBenchmark(x, "SetJailCells", ENABLE_BENCHMARK)
+    return true
 endFunction
 
-function SetJailTeleportReleaseLocations()
+bool function SetJailTeleportReleaseLocations()
     miscVars.SetForm("Jail::Release::Teleport[Whiterun]", Game.GetFormEx(0x3EF19)) ; FormID Invalid
     miscVars.SetForm("Jail::Release::Teleport[Eastmarch]", Game.GetFormEx(0x3EF19)) ; FormID Invalid
     miscVars.SetForm("Jail::Release::Teleport[Falkreath]", Game.GetFormEx(0x3EF19)) ; FormID Invalid
@@ -181,9 +192,11 @@ function SetJailTeleportReleaseLocations()
     miscVars.SetForm("Jail::Release::Teleport[Hjaalmarch]", Game.GetFormEx(0x3EF19)) ; FormID Invalid
     miscVars.SetForm("Jail::Release::Teleport[The Rift]", Game.GetFormEx(0x3EF19)) ; FormID Invalid
     miscVars.SetForm("Jail::Release::Teleport[The Pale]", Game.GetFormEx(0x3EF19)) ; FormID Invalid
+
+    return true
 endFunction
 
-function SetJailPrisonerContainers()
+bool function SetJailPrisonerContainers()
     miscVars.SetForm("Jail::Containers[Whiterun]", Game.GetFormEx(0x3EEFF)) ; FormID Invalid
     miscVars.SetForm("Jail::Containers[Eastmarch]", Game.GetFormEx(0x3EEFF)) ; FormID Invalid
     miscVars.SetForm("Jail::Containers[Falkreath]", Game.GetFormEx(0x3EEFF)) ; FormID Invalid
@@ -191,9 +204,15 @@ function SetJailPrisonerContainers()
     miscVars.SetForm("Jail::Containers[Hjaalmarch]", Game.GetFormEx(0x3EEFF)) ; FormID Invalid
     miscVars.SetForm("Jail::Containers[The Rift]", Game.GetFormEx(0x3EEFF)) ; FormID Invalid
     miscVars.SetForm("Jail::Containers[The Pale]", Game.GetFormEx(0x3EEFF)) ; FormID Invalid
+
+    return true
 endFunction
 
-function SetHoldLocations()
+bool function SetHoldLocations()
+    if (miscVars.Exists("Locations"))
+        return true
+    endif
+
     miscVars.AddFormToArray("Locations[Whiterun]", Game.GetForm(0x00018A56))
     miscVars.AddFormToArray("Locations[Whiterun]", Game.GetForm(0x00016772))
 
@@ -232,6 +251,8 @@ function SetHoldLocations()
     endWhile
 
     Debug(self, "Config::SetHoldLocations", "Length: " + miscVars.GetLengthOf("Locations"))
+
+    return true
 endFunction
 
 bool function IsInLocationFromHold(string hold)
@@ -325,7 +346,7 @@ string function GetCityNameFromHold(string hold)
     return JMap.getStr(holdToCityMap, hold)
 endFunction
 
-function SetCities()
+bool function SetCities()
     miscVars.SetString("City[Whiterun]", "Whiterun")
     miscVars.SetString("City[Winterhold]", "Winterhold")
     miscVars.SetString("City[Eastmarch]", "Windhelm")
@@ -335,9 +356,11 @@ function SetCities()
     miscVars.SetString("City[The Rift]", "Riften")
     miscVars.SetString("City[The Reach]", "Markarth")
     miscVars.SetString("City[The Pale]", "Dawnstar")
+
+    return true
 endFunction
 
-function SetHolds()
+bool function SetHolds()
     miscVars.SetString("Hold[Whiterun]", "Whiterun")
     miscVars.SetString("Hold[Winterhold]", "Winterhold")
     miscVars.SetString("Hold[Windhelm]", "Eastmarch")
@@ -347,6 +370,8 @@ function SetHolds()
     miscVars.SetString("Hold[Riften]", "The Rift")
     miscVars.SetString("Hold[Markarth]", "The Reach")
     miscVars.SetString("Hold[Dawnstar]", "The Pale")
+
+    return true
 endFunction
 
 string function GetHoldNameFromCity(string city)
@@ -411,15 +436,15 @@ endFunction
 
 function SetStat(string hold, string stat, int value)
     string _key = hold + "::" + stat ; e.g: The Rift::Current Bounty
-    mcm.SetOptionStatValue(_key, value)
+    ; mcm.SetOptionStatValue(_key, value)
 endFunction
 
 function IncrementStat(string hold, string stat, int incrementBy = 1)
-    string _key = hold + "::" + stat ; e.g: The Rift::Infamy Gained
-    int currentValue    = mcm.GetStatOptionValue("Stats", _key)
-    int newValue        = Max(0, currentValue + incrementBy) as int
+    ; string _key = hold + "::" + stat ; e.g: The Rift::Infamy Gained
+    ; int currentValue    = mcm.GetStatOptionValue("Stats", _key)
+    ; int newValue        = Max(0, currentValue + incrementBy) as int
     
-    mcm.SetOptionStatValue(_key, newValue)
+    ; mcm.SetOptionStatValue(_key, newValue)
 endFunction
 
 function DecrementStat(string hold, string stat, int decrementBy = 1)
@@ -895,23 +920,23 @@ endFunction
 function IncrementInfamy(string hold, int incrementBy)
     int currentInfamy = GetInfamyGained(hold)
     string option = hold + "::Infamy Gained"
-    mcm.SetOptionStatValue(option, currentInfamy + incrementBy)
+    ; mcm.SetOptionStatValue(option, currentInfamy + incrementBy)
     NotifyInfamy("You have gained " + incrementBy + " Infamy in " + hold)
 endFunction
 
 function DecrementInfamy(string hold, int decrementBy)
     int currentInfamy = GetInfamyGained(hold)
     string option = hold + "::Infamy Gained"
-    mcm.SetOptionStatValue(option, currentInfamy - decrementBy)
+    ; mcm.SetOptionStatValue(option, currentInfamy - decrementBy)
 endFunction
 
 ; TODO: Change how the stat is parsed
 int function GetInfamyGained(string hold)
-    return mcm.GetStatOptionValue("Stats", hold + "::Infamy Gained")
+    ; return mcm.GetStatOptionValue("Stats", hold + "::Infamy Gained")
 endFunction
 
 int function GetStat(string hold, string stat)
-    return mcm.GetStatOptionValue("Stats", hold + "::" + stat)
+    ; return mcm.GetStatOptionValue("Stats", hold + "::" + stat)
 endFunction
 
 int function QueryStat(string hold, string stat)

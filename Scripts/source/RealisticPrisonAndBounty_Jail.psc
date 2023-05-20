@@ -35,212 +35,9 @@ string property CurrentState
     endFunction
 endProperty
 
-float property TimeOfArrest
-    float function get()
-        return arrestVars.GetFloat("Arrest::Time of Arrest")
-    endFunction
-endProperty
-
-bool property IsInfamyEnabled
-    bool function get()
-        return arrestVars.GetBool("Jail::Infamy Enabled")
-    endFunction
-endProperty
-
-float property CurrentTime
-    float function get()
-        return Utility.GetCurrentGameTime()
-    endFunction
-endProperty
-
-bool property SentenceServed
-    bool function get()
-        return CurrentTime >= ReleaseTime
-    endFunction
-endProperty
-
-int property MinimumSentence
-    int function get()
-        return arrestVars.GetFloat("Jail::Minimum Sentence") as int
-    endFunction
-endProperty
-
-int property MaximumSentence
-    int function get()
-        return arrestVars.GetFloat("Jail::Maximum Sentence") as int
-    endFunction
-endProperty
-
-int property BountyExchange
-    int function get()
-        return arrestVars.GetFloat("Jail::Bounty Exchange") as int
-    endFunction
-endProperty
-
-int property BountyToSentence
-    int function get()
-        return arrestVars.GetFloat("Jail::Bounty to Sentence") as int
-    endFunction
-endProperty
-
-int property Sentence
-    int function get()
-        return arrestVars.GetFloat("Jail::Sentence") as int
-    endFunction
-endProperty
-
-bool property IsArrested
-    bool function get()
-        return arrestVars.GetBool("Arrest::Arrested")
-    endFunction
-endProperty
-
-bool property IsJailed
-    bool function get()
-        return arrestVars.GetBool("Jail::Jailed")
-    endFunction
-endProperty
-
 string property Hold
     string function get()
         return arrestVars.GetString("Arrest::Hold")
-    endFunction
-endProperty
-
-Faction property ArrestFaction
-    Faction function get()
-        return arrestVars.GetForm("Arrest::Arrest Faction") as Faction
-    endFunction
-endProperty
-
-int property BountyNonViolent
-    int function get()
-        return arrestVars.GetInt("Arrest::Bounty Non-Violent")
-    endFunction
-endProperty
-
-int property BountyViolent
-    int function get()
-        return arrestVars.GetInt("Arrest::Bounty Violent")
-    endFunction
-endProperty
-
-float property EscapeBountyFromCurrentArrest
-    float function get()
-        return arrestVars.GetFloat("Escape::Escape Bounty from Current Arrest")
-    endFunction
-endProperty
-
-int property EscapeBounty
-    int function get()
-        return arrestVars.GetFloat("Escape::Escape Bounty Flat") as int
-    endFunction
-endProperty
-
-int property Bounty
-    int function get()
-        return BountyNonViolent + BountyViolent
-    endFunction
-endProperty
-
-float property TimeOfImprisonment
-    float function get()
-        return arrestVars.GetFloat("Jail::Time of Imprisonment")
-    endFunction
-endProperty
-
-float property ReleaseTime
-    float function get()
-        float gameHour = 0.04166666666666666666666666666667
-        return TimeOfImprisonment + (gameHour * 24 * arrestVars.Sentence)
-    endFunction
-endProperty
-
-float property TimeServed
-    float function get()
-        return CurrentTime - TimeOfImprisonment
-    endFunction
-endProperty
-
-float property TimeLeftInSentence
-    float function get()
-        return (ReleaseTime - TimeOfImprisonment) - TimeServed
-    endFunction
-endProperty
-
-float property LastUpdate auto
-float property TimeOfEscape auto
-
-;/
-    Gets the time since the last update.
-    1 Hour In-Game = 0.04166666666666666666666666666667
-    Formula: Hours / 24
-    f(h / 24) = hours in game
-/;
-float property TimeSinceLastUpdate
-    float function get()
-        return CurrentTime - LastUpdate
-    endFunction
-endProperty
-
-int property InfamyGainedDaily
-    ;/
-        infamyGainedFlat: 40
-        infamyGainedFromCurrentBounty: 1.44%
-        Bounty: 3000
-        <=> floor(3000 * (1.44/100) + 40)
-        <=> floor(3000 * 0.0144) + 40
-        <=> floor(43.2) + 40
-        <=> 43 + 40 = 83
-    /;
-    int function get()
-        int infamyGainedFlat                    = arrestVars.GetFloat("Jail::Infamy Gained Daily") as int
-        float infamyGainedFromCurrentBounty     = arrestVars.GetFloat("Jail::Infamy Gained Daily from Current Bounty")
-
-        return floor(Bounty * percent(infamyGainedFromCurrentBounty)) + infamyGainedFlat
-    endFunction
-endProperty
-
-int property InfamyGainedPerUpdate
-    ;/
-        InfamyGainedDaily: 83
-        TimeSinceLastUpdate: 0.16666666666666666666666666666667 (4 / 24) [4 Hours passed since last update]
-        <=> ceil(83 * 0.16666666666666666666666666666667)
-        <=> ceil(13.833333333333333333333333333334)
-        <=> 14
-
-        if 1 hour passed then TimeSinceLastUpdate = 0.16666666666666666666666666666667 / 4
-        <=> TimeSinceLastUpdate: 0.04166666666666666666666666666667
-        <=> ceil (83 * 0.04166666666666666666666666666667)
-        <=> ceil (3.4583333333333333333333333333334)
-        <=> 4
-    /;
-    int function get()
-        return ceiling(InfamyGainedDaily * TimeSinceLastUpdate)
-    endFunction
-endProperty
-
-bool property IsInfamyRecognized
-    bool function get()
-        int currentInfamy = config.GetInfamyGained(Hold)
-        int recognizedThreshold = arrestVars.GetFloat("Jail::Infamy Recognized Threshold") as int
-
-        return currentInfamy >= recognizedThreshold
-    endFunction
-endProperty
-
-bool property IsInfamyKnown
-    bool function get()
-        int currentInfamy = config.GetInfamyGained(Hold)
-        int knownThreshold = arrestVars.GetFloat("Jail::Infamy Known Threshold") as int
-        
-        return currentInfamy >= knownThreshold
-    endFunction
-endProperty
-
-ObjectReference property JailCell
-    ObjectReference function get()
-        return arrestVars.GetForm("Jail::Cell") as ObjectReference
     endFunction
 endProperty
 
@@ -250,225 +47,19 @@ Actor property Arrestee
     endFunction
 endProperty
 
-bool property IsFriskingEnabled
-    bool function get()
-        return arrestVars.GetBool("Frisking::Allow Frisking")
-    endFunction
-endProperty
-
-bool property IsStrippingEnabled
-    bool function get()
-        return arrestVars.GetBool("Stripping::Allow Stripping")
-    endFunction
-endProperty
-
-bool property IsClothingEnabled
-    bool function get()
-        return arrestVars.GetBool("Clothing::Allow Clothing")
-    endFunction
-endProperty
-
-string property ClothingHandling
-    string function get()
-        return arrestVars.GetString("Clothing::Handle Clothing On")
-    endFunction
-endProperty
-
-int property ClothingMaxBounty
-    int function get()
-        return arrestVars.GetInt("Clothing::Maximum Bounty to Clothe")
-    endFunction
-endProperty
-
-int property ClothingMaxBountyViolent
-    int function get()
-        return arrestVars.GetInt("Clothing::Maximum Violent Bounty to Clothe")
-    endFunction
-endProperty
-
-int property ClothingMaxSentence
-    int function get()
-        return arrestVars.GetInt("Clothing::Maximum Sentence to Clothe")
-    endFunction
-endProperty
-
-bool property ClotheWhenDefeated
-    bool function get()
-        return arrestVars.GetBool("Clothing::Clothe when Defeated")
-    endFunction
-endProperty
-
-string property OutfitName
-    string function get()
-        return arrestVars.GetString("Clothing::Outfit::Name")
-    endFunction
-endProperty
-
-Armor property OutfitHead
-    Armor function get()
-        return arrestVars.GetForm("Clothing::Outfit::Head") as Armor
-    endFunction
-endProperty
-
-Armor property OutfitBody
-    Armor function get()
-        return arrestVars.GetForm("Clothing::Outfit::Body") as Armor
-    endFunction
-endProperty
-
-Armor property OutfitHands
-    Armor function get()
-        return arrestVars.GetForm("Clothing::Outfit::Hands") as Armor
-    endFunction
-endProperty
-
-Armor property OutfitFeet
-    Armor function get()
-        return arrestVars.GetForm("Clothing::Outfit::Feet") as Armor
-    endFunction
-endProperty
-
-bool property IsOutfitConditional
-    bool function get()
-        return arrestVars.GetBool("Clothing::Outfit::Conditional")
-    endFunction
-endProperty
-
-int property OutfitMinBounty
-    int function get()
-        return arrestVars.GetFloat("Clothing::Outfit::Minimum Bounty") as int
-    endFunction
-endProperty
-
-int property OutfitMaxBounty
-    int function get()
-        return arrestVars.GetFloat("Clothing::Outfit::Maximum Bounty") as int
-    endFunction
-endProperty
-
-bool property IsStripped
-    bool function get()
-        return arrestVars.GetBool("Jail::Stripped")
-    endFunction
-endProperty
-
-bool property IsClothed
-    bool function get()
-        return arrestVars.GetBool("Jail::Clothed")
-    endFunction
-endProperty
-
-bool property ShouldBeFrisked
-    bool function get()
-        if (!IsFriskingEnabled)
-            return false
-        endif
-
-        bool isFriskingUnconditional    = arrestVars.GetBool("Frisking::Unconditional Frisking")
-        int friskingMinBounty           = arrestVars.GetInt("Frisking::Bounty for Frisking")
-        bool shouldFrisk                = isFriskingUnconditional || (!isFriskingUnconditional && Bounty >= friskingMinBounty) 
-
-        return shouldFrisk
-    endFunction
-endProperty
-
-bool property ShouldBeStripped
-    bool function get()
-        if (arrestVars.IsStripped) ; Already stripped
-            return false
-        endif
-
-        if (IsStrippingEnabled)
-            bool stripOnEscape = arrestVars.GetBool("Escape::Should Strip Search")
-            if (Prisoner.IsEscapee() && stripOnEscape)
-                return true
-            endif
-
-            string strippingHandling        = arrestVars.GetString("Stripping::Handle Stripping On")
-            int strippingMinBounty          = arrestVars.GetInt("Stripping::Bounty to Strip")
-            int strippingMinViolentBounty   = arrestVars.GetInt("Stripping::Violent Bounty to Strip")
-            int strippingMinSentence        = arrestVars.GetInt("Stripping::Sentence to Strip")
-    
-            bool meetsBountyRequirements = (BountyNonViolent >= strippingMinBounty) || (BountyViolent >= strippingMinViolentBounty)
-            bool meetsSentenceRequirements = arrestVars.Sentence >= strippingMinSentence
-            bool shouldStrip =  (strippingHandling == "Unconditionally") || \
-                                (strippingHandling == "Minimum Bounty" && meetsBountyRequirements) || \
-                                (strippingHandling == "Minimum Sentence" && meetsSentenceRequirements)
-            
-            ; LogProperty(self, "ShouldBeStripped", "\n" + \
-            ;     "strippingHandling: " + strippingHandling + "\n" + \
-            ;     "strippingMinBounty: " + strippingMinBounty + "\n" + \
-            ;     "strippingMinViolentBounty: " + strippingMinViolentBounty + "\n" + \
-            ;     "strippingMinSentence: " + strippingMinSentence + "\n" + \
-            ;     "meetsBountyRequirements: " + meetsBountyRequirements + "\n" + \
-            ;     "meetsSentenceRequirements: " + meetsSentenceRequirements + "\n" + \
-            ;     "shouldStrip: " + shouldStrip + "\n" \
-            ; )
-
-            return shouldStrip
-        endif
-    
-        return false
-    endFunction
-endProperty
-
-bool property ShouldItemsBeRetained
-    bool function get()
-        bool itemRetentionEnabled = arrestVars.GetBool("Release::Item Retention Enabled")
-        if (!itemRetentionEnabled)
-            return false
-        endif
-
-        int minBountyToRetainItems = arrestVars.GetInt("Release::Bounty to Retain Items")
-        return arrestVars.Bounty >= minBountyToRetainItems
-    endFunction
-endProperty
-
-bool property ShouldBeClothed
-    bool function get()
-        if (IsClothingEnabled)
-            bool meetsBountyRequirements = (BountyNonViolent <= ClothingMaxBounty) && (BountyViolent <= ClothingMaxBountyViolent)
-            bool meetsSentenceRequirements = arrestVars.Sentence <= ClothingMaxSentence
-            bool shouldClothe = (ClothingHandling == "Unconditionally") || \
-                                (ClothingHandling == "Maximum Bounty" && meetsBountyRequirements) || \
-                                (ClothingHandling == "Maximum Sentence" && meetsSentenceRequirements)
-            
-            ; LogProperty(self, "ShouldBeClothed", "\n" + \
-            ;     "ClothingHandling: " + ClothingHandling + "\n" + \
-            ;     "meetsBountyRequirements: " + meetsBountyRequirements + "\n" + \
-            ;     "meetsSentenceRequirements: " + meetsSentenceRequirements + "\n" + \
-            ;     "ClothingMaxSentence: " + ClothingMaxSentence + "\n" + \
-            ;     "Sentence: " + arrestVars.Sentence + "\n" + \
-            ;     "shouldClothe: " + shouldClothe + "\n" \
-            ; )
-
-            return shouldClothe
-        endif
-    
-        return false
-    endFunction
-endProperty
-
-
+float property LastUpdate auto
 
 RealisticPrisonAndBounty_CaptorRef property CaptorRef auto
 RealisticPrisonAndBounty_PrisonerRef property Prisoner auto
 
 function RegisterEvents()
-    RegisterForModEvent("JailBegin", "OnJailedBegin")
-    RegisterForModEvent("JailEnd", "OnJailedEnd")
-    Debug(self, "RegisterEvents", "Registered Events")
+    RegisterForModEvent("RPB_JailBegin", "OnJailedBegin")
+    RegisterForModEvent("RPB_JailEnd", "OnJailedEnd")
+    Debug(self, "Jail::RegisterEvents", "Registered Jail Events")
 endFunction
 
-event OnInit()
-    RegisterEvents()
-endEvent
-
-event OnPlayerLoadGame()
-    RegisterEvents()
-endEvent
-
 function SetupJailVars()
+    float x = StartBenchmark()
     arrestVars.SetBool("Jail::Infamy Enabled", config.IsInfamyEnabled(Hold))
     arrestVars.SetFloat("Jail::Infamy Recognized Threshold", config.GetInfamyRecognizedThreshold(Hold))
     arrestVars.SetFloat("Jail::Infamy Known Threshold", config.GetInfamyKnownThreshold(Hold))
@@ -540,46 +131,22 @@ function SetupJailVars()
     arrestVars.SetFloat("Clothing::Outfit::Minimum Bounty", config.GetClothingOutfitMinimumBounty(Hold))
     arrestVars.SetFloat("Clothing::Outfit::Maximum Bounty", config.GetClothingOutfitMaximumBounty(Hold))
 
-    ; Dynamic Vars
-    arrestVars.SetFloat("Jail::Sentence", (BountyNonViolent + GetViolentBountyConverted()) / BountyToSentence)
-    arrestVars.SetFloat("Jail::Time of Imprisonment", CurrentTime)
-    arrestVars.SetBool("Jail::Jailed", true)
-    arrestVars.SetForm("Jail::Cell Door", GetNearestJailDoorOfType(GetJailBaseDoorID(arrestVars.Hold), Arrestee, 10000))
-    arrestVars.SetInt("Jail::Cell Door Old Lock Level", arrestVars.CellDoor.GetLockLevel())
-    arrestVars.SetForm("Jail::Teleport Release Location", config.GetJailTeleportReleaseMarker(arrestVars.Hold))
-    arrestVars.SetForm("Jail::Prisoner Items Container", config.GetJailPrisonerItemsContainer(arrestVars.Hold))
-
-    ; ; inventation time
-    arrestVars.SetObject("Jail::Prisoner Equipped Items", JArray.object())
-
-    Debug(self, "SetupJailVars", "Found Cell Door: " + arrestVars.CellDoor)
-
-    OverrideInfamy(700)
-
-    Debug(self, "SetupJailVars", "Finished setting up jail variables...")
-endFunction
-
-function OverrideInfamy(int value)
-    config.IncrementStat(arrestVars.Hold, "Infamy Gained", value) ; To fix with an override function, since it keeps adding each time we are jailed
-    Debug(self, "OverrideInfamy", "Overriden infamy for " + arrestVars.Hold +" with a value of: " + value)
-endFunction
-
-int function GetViolentBountyConverted()
-    Debug(self, "GetViolentBountyConverted", "Violent Bounty Exchanged: " + floor(BountyViolent * (100 / BountyExchange)))
-    Debug(self, "GetViolentBountyConverted", "Violent Bounty: " + BountyViolent)
-    Debug(self, "GetViolentBountyConverted", "Bounty Exchange: " + BountyExchange)
-    return floor(BountyViolent * (100 / BountyExchange))
+    arrestVars.SetBool("Override::Release::Item Retention Enabled", false)
+    ; arrestVars.SetInt("Override::Jail::Minimum Sentence", 1)
+    arrestVars.SetString("Override::Stripping::Handle Stripping On", "Unconditionally")
+    arrestVars.SetString("Override::Clothing::Handle Clothing On", "Unconditionally")
+    EndBenchmark(x, "SetupJailVars")
 endFunction
 
 ; Get the bounty from storage and add it into active bounty for this faction.
-function RevertBounty()
-    ArrestFaction.SetCrimeGold(BountyNonViolent)
-    ArrestFaction.SetCrimeGoldViolent(BountyViolent)
+; function RevertBounty()
+;     ArrestFaction.SetCrimeGold(BountyNonViolent)
+;     ArrestFaction.SetCrimeGoldViolent(BountyViolent)
 
-    ; Should we clear it from storage vars?
-    ; config.SetArrestVarInt("Arrest::Bounty Non-Violent", 0)
-    ; config.SetArrestVarInt("Arrest::Bounty Violent", 0)
-endFunction
+;     ; Should we clear it from storage vars?
+;     ; config.SetArrestVarInt("Arrest::Bounty Non-Violent", 0)
+;     ; config.SetArrestVarInt("Arrest::Bounty Violent", 0)
+; endFunction
 
 int function GetCellDoorLockLevel()
     string configuredLockLevel = arrestVars.GetString("Jail::Cell Lock Level")
@@ -589,10 +156,6 @@ int function GetCellDoorLockLevel()
             int_if (configuredLockLevel == "Expert", 75, \
             int_if (configuredLockLevel == "Master", 100, \
             int_if (configuredLockLevel == "Requires Key", 255))))))
-endFunction
-
-function AddEscapedBounty()
-    ArrestFaction.ModCrimeGold(floor((BountyNonViolent * percent(EscapeBountyFromCurrentArrest))) + EscapeBounty)
 endFunction
 
 function ShowArrestVars()
@@ -609,7 +172,8 @@ endFunction
 
 event OnJailedBegin(string eventName, string strArg, float numArg, Form sender)
     SetupJailVars()
-    Prisoner.ForceRefTo(arrestVars.Arrestee)
+    Prisoner.ForceRefTo(arrestVars.Arrestee) ; To be changed later to ActiveMagicEffect in order to attach to multiple Actors
+    Prisoner.SetupPrisonerVars()
     GotoState(STATE_JAILED)
     TriggerImprisonment()
 endEvent
@@ -624,7 +188,7 @@ state Jailed
         Debug(self, "OnBeginState", CurrentState + " state begin")
 
         ; First jail update
-        LastUpdate = Utility.GetCurrentGameTime()
+        Prisoner.RegisterLastUpdate()
         RegisterForSingleUpdateGameTime(1.0)
     endEvent
 
@@ -634,7 +198,7 @@ state Jailed
 
     event OnFriskEnd(Actor friskSearchPerformer, Actor friskedActor)
         ; Happens when the actor has been frisked
-        if (IsStrippingEnabled)
+        if (arrestVars.IsStrippingEnabled)
             ; We dont use ShouldBeStripped since it contains bounty and sentence conditions,
             ; here we already know we want the actor to be stripped because of the Frisking condition,
             ; so we only need to check if stripping is enabled
@@ -684,7 +248,7 @@ state Jailed
 
     event OnUndressed(Actor undressedActor)
         ; Actor should be undressed at this point
-        if (ShouldBeClothed)
+        if (Prisoner.ShouldBeClothed())
             Prisoner.Clothe()
         endif
 
@@ -703,7 +267,7 @@ state Jailed
             ; Make noise to attract guards attention,
             ; if the guard sees the door open, goto Escaped state
             _cellDoor.CreateDetectionEvent(Arrestee, 300)
-            GotoState("Escaping")
+            GotoState(STATE_ESCAPING)
             Actor captor = arrestVars.GetForm("Arrest::Arresting Guard") as Actor
             CaptorRef.RegisterForLOS(captor, Arrestee)
 
@@ -722,10 +286,10 @@ state Jailed
     endEvent
 
     event OnEscapeFail()
-        if (ShouldBeStripped)
+        if (Prisoner.ShouldBeStripped())
             Prisoner.Strip()
 
-        elseif (ShouldBeClothed && !ActorHasClothing(Arrestee))
+        elseif (Prisoner.ShouldBeClothed() && Prisoner.IsNaked())
             ; Only handle clothing here when not stripped, which means the Actor did not have any clothing
             Prisoner.Clothe()
         endif
@@ -745,48 +309,48 @@ state Jailed
             int daysIncreased = newSentence - oldSentence
             config.NotifyJail("Your sentence was extended by " + daysIncreased + " days")
 
-            if (ShouldBeStripped)
+            if (Prisoner.ShouldBeStripped())
                 ; Strip since the sentence got extended
                 ; StartGuardWalkToCellToStrip()
                 Prisoner.Strip()
 
-            elseif (ShouldBeFrisked)
+            elseif (Prisoner.ShouldBeFrisked())
                 Prisoner.Frisk()
             endif
 
         else
             int daysDecreased = oldSentence - newSentence
             config.NotifyJail("Your sentence was reduced by " + daysDecreased + " days")
-            ; config.NotifyJail("Your bounty has also decreased by " + (daysDecreased * BountyToSentence), condition = bountyAffected)
         endif
-
-        ; config.NotifyJail("Your sentence in " + arrestVars.Hold + " was set to " + arrestVars.Sentence + " days in jail")
     endEvent
 
     event OnUpdateGameTime()
-        Debug(self, "OnUpdateGameTime", "{ timeSinceLastUpdate: "+ TimeSinceLastUpdate +", CurrentTime: "+ CurrentTime +", LastUpdate: "+ LastUpdate +" }")
+        Debug(self, "OnUpdateGameTime", "{ timeSinceLastUpdate: "+ Prisoner.TimeSinceLastUpdate +", CurrentTime: "+ Prisoner.CurrentTime +", LastUpdate: "+ Prisoner.LastUpdate +" }")
         
         if (Prisoner.HasActiveBounty())
             ; Update any active bounty the prisoner may have while in jail, and add it to the sentence
             Prisoner.UpdateSentenceFromCurrentBounty()
         endif
 
-        if (IsInfamyEnabled)
+        if (arrestVars.InfamyEnabled)
             Prisoner.UpdateInfamy()
         endif
 
-        if (SentenceServed)
+        if (Prisoner.SentenceServed)
             GotoState(STATE_RELEASED)
         endif
 
+        ; config.miscVars.List()
 
-        Prisoner.ShowSentenceInfo()
+        ; Prisoner.ShowJailInfo()
+        ; Prisoner.ShowSentenceInfo()
         ; arrestVars.List("Stripping")
         ; arrestVars.List("Jail")
         ; arrestVars.ListOverrides("Stripping")
-        Prisoner.ShowActorVars()
-
-        LastUpdate = Utility.GetCurrentGameTime()
+        ; Prisoner.ShowActorVars()
+        ; LastUpdate = Utility.GetCurrentGameTime()
+        Prisoner.RegisterLastUpdate() ; Registers the last update in-game time for the prisoner
+        ; LastUpdate = Utility.GetCurrentGameTime()
         ; Keep updating while in jail
         RegisterForSingleUpdateGameTime(1.0)
     endEvent
@@ -810,11 +374,11 @@ state Escaping
     event OnUpdateGameTime()
         ; Prisoner is trying to escape, but they are still inside the prison,
         ; infamy should still be updated
-        if (IsInfamyEnabled)
+        if (arrestVars.InfamyEnabled)
             Prisoner.UpdateInfamy()
         endif
 
-        LastUpdate = Utility.GetCurrentGameTime()
+        Prisoner.RegisterLastUpdate()
         RegisterForSingleUpdateGameTime(1.0)
     endEvent
 
@@ -822,7 +386,7 @@ state Escaping
         Debug(self, "OnGuardSeesPrisoner", akGuard + " is seeing " + Arrestee)
         akGuard.SetAlert()
         akGuard.StartCombat(Arrestee)
-        GotoState("Escaped")
+        GotoState(STATE_ESCAPED)
         TriggerEscape()
     endEvent
 
@@ -842,13 +406,13 @@ state Escaping
                 _cellDoor.Lock()
             endif
 
-            bool isArresteeInsideCell = IsActorNearReference(Arrestee, JailCell)
+            bool isArresteeInsideCell = IsActorNearReference(Arrestee, Prisoner.JailCell)
 
             if (isArresteeInsideCell)
                 Debug(self, "OnCellDoorClosed", Arrestee + " is inside the cell.")
                 GotoState("Jailed") ; Revert to Jailed since we have not been found escaping yet
             endif
-            float distanceFromMarkerToDoor = JailCell.GetDistance(arrestVars.CellDoor)
+            float distanceFromMarkerToDoor = Prisoner.JailCell.GetDistance(arrestVars.CellDoor)
             Debug(self, "OnCellDoorClosed", "Distance from marker to cell door: " + distanceFromMarkerToDoor)
         endif
         Debug(self, "OnCellDoorClosed", "Cell door closed")
@@ -881,7 +445,7 @@ state Escaped
 
     event OnCellDoorClosed(ObjectReference _cellDoor, Actor whoClosed)
         if (whoClosed == Arrestee)
-            bool isArresteeInsideCell = IsActorNearReference(Arrestee, JailCell)
+            bool isArresteeInsideCell = IsActorNearReference(Arrestee, Prisoner.JailCell)
 
             Actor captor = arrestVars.GetForm("Arrest::Arresting Guard") as Actor
             if (captor.IsInCombat() && isArresteeInsideCell)
@@ -893,14 +457,14 @@ state Escaped
                 GotoState(STATE_JAILED)
                 OnEscapeFail()
 
-                ShowArrestVars()
+                ; ShowArrestVars()
             endif
         endif
     endEvent
 
     event OnUndressed(Actor undressedActor)
         ; Actor should be undressed at this point
-        if (ShouldBeClothed)
+        if (Prisoner.ShouldBeClothed())
             Prisoner.Clothe()
         endif
 
@@ -916,11 +480,11 @@ state Escaped
     event OnUpdateGameTime()
         ; Prisoner is escaping, but they are still inside the prison,
         ; infamy should still be updated
-        if (IsInfamyEnabled)
+        if (arrestVars.InfamyEnabled)
             Prisoner.UpdateInfamy()
         endif
 
-        LastUpdate = Utility.GetCurrentGameTime()
+        Prisoner.RegisterLastUpdate()
         RegisterForSingleUpdateGameTime(1.0)
     endEvent
 
@@ -934,8 +498,9 @@ state Released
         Debug(self, "OnBeginState", CurrentState + " state begin")
         ; Begin Release process, Actor is arrested and not yet free
         arrestVars.CellDoor.SetOpen()
+        ; Prisoner.ForceRefTo(arrestVars.Arrestee)
         if (arrestVars.ArrestType == arrest.ARREST_TYPE_TELEPORT_TO_CELL)
-            if (!ShouldItemsBeRetained)
+            if (!Prisoner.ShouldItemsBeRetained())
                 Prisoner.GiveItemsBack()
             endif
 
@@ -1077,9 +642,6 @@ function TriggerEscape()
     config.IncrementStat(Hold, "Times Escaped")
     Game.IncrementStat("Jail Escapes")
 
-    int escapeBountyGotten = floor((BountyNonViolent * percent(EscapeBountyFromCurrentArrest))) + EscapeBounty
-
-    config.NotifyJail("You have gained " + escapeBountyGotten + " Bounty in " + Hold + " for escaping")
     Prisoner.RevertBounty()
     Prisoner.AddEscapeBounty()
 endFunction
@@ -1099,39 +661,38 @@ function TriggerImprisonment()
     ; Trigger infamy penalty, only if infamy is enabled
     Prisoner.TriggerCrimimalPenalty()
 
-    if (JailCell)
+    if (Prisoner.JailCell)
         arrestVars.CellDoor.SetOpen(false)
         arrestVars.CellDoor.Lock()
     endif
 
-    if (ShouldBeFrisked)
+    if (Prisoner.ShouldBeFrisked())
         Prisoner.Frisk()
     endif
 
-    if (ShouldBeStripped)
+    if (Prisoner.ShouldBeStripped())
         Prisoner.Strip()
 
-    elseif (ShouldBeClothed && Prisoner.IsNaked())
+    elseif (Prisoner.ShouldBeClothed() && Prisoner.IsNaked())
         ; Only handle clothing here when not stripped, which means the Actor did not have any clothing
         Prisoner.Clothe()
     endif
-    ShowArrestVars()
-
+    
+    ; ShowArrestVars()
 
     ; Prisoner.UpdateSentence()
     Prisoner.SetTimeOfImprisonment() ; Start the sentence from this point
 
     int currentLongestSentence = config.GetStat(Hold, "Longest Sentence")
-    config.SetStat(Hold, "Longest Sentence", int_if (currentLongestSentence < Sentence, Sentence, currentLongestSentence))
-    ; Prisoner.ShowJailInfo()
+    config.SetStat(Hold, "Longest Sentence", int_if (currentLongestSentence < Prisoner.Sentence, Prisoner.Sentence, currentLongestSentence))
+    Prisoner.ShowJailInfo()
     ; Prisoner.ShowOutfitInfo()
     ; Prisoner.ShowHoldStats()
     ; ShowArrestParams()
     ; ShowArrestVars()
 
-    config.NotifyJail("Your sentence in " + Hold + " was set to " + arrestVars.Sentence + " days in jail")
+    config.NotifyJail("Your sentence in " + Hold + " was set to " + Prisoner.Sentence + " days in jail")
     EndBenchmark(startBench, "TriggerImprisonment")
-    
 endFunction
 
 function MovePrisonerToCell()

@@ -44,7 +44,7 @@ function RegisterEvents()
     RegisterForModEvent("RPB_ArrestBegin", "OnArrestBegin")
     RegisterForModEvent("RPB_ArrestEnd", "OnArrestEnd")
     RegisterForModEvent("RPB_ResistArrest", "OnArrestResist")
-    Debug(self, "RegisterEvents", "Registered Events")
+    Debug(self, "Arrest::RegisterEvents", "Registered Arrest Events")
 endFunction
 
 function RegisterHotkeys()
@@ -57,12 +57,10 @@ function RegisterHotkeys()
 endFunction
 
 event OnInit()
-    RegisterEvents()
     RegisterHotkeys()
 endEvent
 
 event OnPlayerLoadGame()
-    RegisterEvents()
     RegisterHotkeys()
 endEvent
 
@@ -80,6 +78,10 @@ endEvent
 
 function PlaySurrenderAnimation(Actor akActorSurrendering)
     Debug.SendAnimationEvent(akActorSurrendering, "IdleSurrender")
+endFunction
+
+bool function HasResistedArrest(string hold)
+    return arrestVars.GetBool("Arrest::" + hold + "Arrest Resisted")
 endFunction
 
 ;/
@@ -166,6 +168,9 @@ state Resisted
     endEvent
 endState
 
+;/
+    The state where the actor should be upon surrendering.
+/;
 state Surrender
     event OnBeginState()
         self.PlaySurrenderAnimation(arrestVars.Arrestee)
@@ -286,13 +291,14 @@ function BeginArrest()
     
     ; Will most likely be used when the arrestee has no chance to pay their bounty, and therefore will get immediately escorted into the cell
     elseif (arrestType == ARREST_TYPE_ESCORT_TO_CELL) ; Not implemented yet (Idea: Arrestee will be escorted directly to the cell)
+        arrestVars.SetReference("Jail::Cell Door", GetNearestJailDoorOfType(GetJailBaseDoorID(arrestVars.Hold), arrestVars.JailCell, 10000))
         jail.StartEscortToCell()
 
     elseif (arrestType == ARREST_TYPE_ESCORT_TO_JAIL) ; Not implemented yet (Idea: Arrestee will be escorted to the jail, and then processed before being escorted into the cell)
         ; jail.StartEscortToJail()
     endif
 
-    SendModEvent("JailBegin")
+    SendModEvent("RPB_JailBegin")
     
     self.UpdateArrestStats()
     self.SetAsArrested(arrestee, arrestFaction)
@@ -311,6 +317,25 @@ function BeginArrest()
     ; )
     ; miscVars.List()
     ; =============================================
+endFunction
+
+function SetAsDefeated(Faction akCrimeFaction)
+    if (!self.HasResistedArrest(akCrimeFaction.GetName()))
+        ; Do not punish if the player hasn't resisted arrest upon being defeated
+        return
+    endif
+
+    string hold = akCrimeFaction.GetName()
+
+    int defeatBountyFlat                = config.GetArrestAdditionalBountyDefeatedFlat(hold)
+    float defeatBountyFromCurrentBounty = config.GetArrestAdditionalBountyDefeatedFromCurrentBounty(hold)
+    float defeatBountyPercentModifier   = percent(defeatBountyFromCurrentBounty)
+    int defeatArrestPenalty             = floor(akCrimeFaction.GetCrimeGold() * defeatBountyPercentModifier) + defeatBountyFlat
+
+    if (defeatArrestPenalty > 0)
+        arrestVars.ModInt("Arrest::Bounty Non-Violent", defeatArrestPenalty)
+        config.NotifyArrest("You have gained " + defeatArrestPenalty + " Bounty in " + hold +" for being defeated")
+    endif
 endFunction
 
 function TriggerResistArrest(Actor akGuard, Faction akCrimeFaction)
@@ -341,9 +366,12 @@ function TriggerSurrender()
     endif
 
     self.PlaySurrenderAnimation(arrestVars.Arrestee)
-    
-    GotoState(STATE_SURRENDER)
-    RegisterForSingleUpdate(4.0)
+
+    self.SetAsDefeated(currentHoldFaction)
+    currentHoldFaction.SendModEvent("RPB_ArrestBegin", ARREST_TYPE_TELEPORT_TO_CELL)
+
+    ; GotoState(STATE_SURRENDER)
+    ; RegisterForSingleUpdate(4.0)
 
     ; currentHoldFaction.SendModEvent("RPB_ArrestBegin", ARREST_TYPE_TELEPORT_TO_CELL)
 endFunction
