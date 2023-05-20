@@ -19,23 +19,10 @@ function Render(RealisticPrisonAndBounty_MCM mcm) global
     mcm.SetCursorPosition(1)
     Right(mcm)
 
-    HandleDependencies(mcm)
-
     EndBenchmark(bench, mcm.CurrentPage + " page loaded -")
 endFunction
 
 function Left(RealisticPrisonAndBounty_MCM mcm) global
-    ; mcm.AddOptionCategory("Stats")
-    ; mcm.AddOptionStat("Current Bounty", 0, "Bounty")
-    ; mcm.AddOptionStat("Largest Bounty", 0, "Bounty")
-    ; mcm.AddOptionStat("Total Bounty", 0, "Bounty")
-    ; ; Temporary disabled due to not having enough space in the MCM.
-    ; ; mcm.AddOptionStat("Fees Owed", 0, "Gold")
-    ; mcm.AddOptionStat("Times Arrested", 0, "Times")
-    ; mcm.AddOptionStat("Times Frisked", 0, "Times")
-
-    ; mcm.AddEmptyOption()
-
     mcm.AddOptionCategory("Arrest")
     mcm.AddTextOption("", "When Free", mcm.OPTION_DISABLED)
     mcm.AddOptionSlider("Minimum Bounty to Arrest", "{0} Bounty")
@@ -54,13 +41,7 @@ function Left(RealisticPrisonAndBounty_MCM mcm) global
     mcm.AddOptionToggle("Allow Civilian Capture")
     mcm.AddOptionToggle("Allow Unconscious Arrest")
     mcm.AddOptionToggle("Allow Unconditional Arrest")
-    ; mcm.AddEmptyOption()
-    ; mcm.AddEmptyOption()
-    ; mcm.AddTextOption("", "When Arrested", mcm.OPTION_DISABLED)
-    ; mcm.AddOptionToggle("Allow Arrest Transfer")
-    ; mcm.AddOptionSlider("Unequip Hand Garments", "{0} Bounty")
-    ; mcm.AddOptionSlider("Unequip Head Garments", "{0} Bounty")
-    ; mcm.AddOptionSlider("Unequip Foot Garments", "{0} Bounty")
+
     mcm.AddEmptyOption()
     
     mcm.AddOptionCategory("Infamy")
@@ -115,43 +96,9 @@ function Left(RealisticPrisonAndBounty_MCM mcm) global
     mcm.AddOptionSlider("Minimum Sentence to Strip", "{0} Days")
     mcm.AddOptionToggle("Strip when Defeated")
     mcm.AddOptionSlider("Strip Search Thoroughness", "{0}x")
-
-    ; mcm.AddEmptyOption()
-
-    ; mcm.AddOptionCategory("Release")
-    ; ; Temporary disabled due to not having enough space in the MCM.
-    ; ; mcm.AddOptionToggle("Enable Release Fees")
-    ; ; mcm.AddOptionSlider("Minimum Bounty to owe Fees", "{0} Bounty", defaultFlags = mcm.OPTION_DISABLED)
-    ; ; mcm.AddOptionSlider("Release Fees (%)", "{0}% of Bounty",    defaultFlags = mcm.OPTION_DISABLED)
-    ; ; mcm.AddOptionSlider("Release Fees", "{0} Gold",              defaultFlags = mcm.OPTION_DISABLED)
-    ; mcm.AddOptionToggle("Enable Item Retention")
-    ; mcm.AddOptionSlider("Minimum Bounty to Retain Items", "{0} Bounty")
-    ; mcm.AddEmptyOption()
-    ; mcm.AddTextOption("", "When Undressed", mcm.OPTION_DISABLED)
-    ; mcm.AddOptionToggle("Auto Re-Dress on Release")
-
-    ; mcm.AddEmptyOption()
-
-    ; mcm.AddOptionCategory("Escape")
-    ; mcm.AddOptionSlider("Escape Bounty (%)", "{1}% of Bounty")
-    ; mcm.AddOptionSlider("Escape Bounty", "{0} Bounty")
-    ; mcm.AddOptionToggle("Allow Surrendering")
-    ; mcm.AddOptionToggle("Frisk Search upon Captured", defaultFlags = mcm.OPTION_DISABLED)
-    ; mcm.AddOptionToggle("Strip Search upon Captured")
-
-
 endFunction
 
 function Right(RealisticPrisonAndBounty_MCM mcm) global
-    ; mcm.SetRenderedCategory("Stats")
-    ; mcm.AddTextOption("", mcm.CurrentPage, mcm.OPTION_DISABLED)
-    ; mcm.AddOptionStat("Days in Jail", 0, "Days")
-    ; mcm.AddOptionStat("Longest Sentence", 0, "Days")
-    ; mcm.AddOptionStat("Times Jailed", 0, "Times")
-    ; mcm.AddOptionStat("Times Escaped", 0, "Times")
-    ; mcm.AddOptionStat("Times Stripped", 0, "Times")
-    ; mcm.AddEmptyOption()
-
     mcm.AddOptionCategory("Jail")
     mcm.AddOptionToggle("Unconditional Imprisonment")
     mcm.AddOptionSlider("Guaranteed Payable Bounty", "{0} Bounty")
@@ -241,6 +188,7 @@ function HandleDependencies(RealisticPrisonAndBounty_MCM mcm) global
     bool confiscateStolenItems          = mcm.GetOptionToggleState("Frisking::Confiscate Stolen Items")
     bool stripSearchStolenItemsFound    = mcm.GetOptionToggleState("Frisking::Strip Search if Stolen Items Found")
 
+    mcm.SetOptionDependencyBool("Frisking::Unconditional Frisking",                 allowFrisking)
     mcm.SetOptionDependencyBool("Frisking::Minimum Bounty for Frisking",            allowFrisking && !unconditionalFrisking)
     mcm.SetOptionDependencyBool("Frisking::Frisk Search Thoroughness",              allowFrisking)
     mcm.SetOptionDependencyBool("Frisking::Confiscate Stolen Items",                allowFrisking)
@@ -816,14 +764,7 @@ function OnOptionDefault(RealisticPrisonAndBounty_MCM mcm, string option) global
 endFunction
 
 function OnOptionSelect(RealisticPrisonAndBounty_MCM mcm, string option) global
-    string optionKey = mcm.CurrentPage + "::" + option
-
-    ; Bypass Stat Options
-    if (mcm.IsStatOption(option))
-        return
-    endif
-
-    mcm.ToggleOption(optionKey)
+    mcm.ToggleOption(option)
     HandleDependencies(mcm)
 endFunction
 
@@ -831,7 +772,7 @@ function LoadSliderOptions(RealisticPrisonAndBounty_MCM mcm, string option, floa
     float minRange = 1
     float maxRange = 100000
     float intervalSteps = 1
-    float defaultValue = mcm.__getFloatOptionDefault(option)
+    float defaultValue = mcm.GetOptionDefaultFloat(option)
 
     ; ==========================================================
     ;                           ARREST
@@ -1324,11 +1265,13 @@ function OnOptionSliderAccept(RealisticPrisonAndBounty_MCM mcm, string option, f
     ; Send option changed event
     mcm.SendModEvent("RPB_SliderOptionChanged", option, value)
 
+    mcm.Debug("Holds::OnSliderAccept", "Option: " + option + ", Value: " + value, true)
+
     mcm.Debug("OnSliderAccept", "GetSliderOptionValue("+  option +") = " + mcm.GetSliderOptionValue(mcm.CurrentPage, option))
 endFunction
 
 function OnOptionMenuOpen(RealisticPrisonAndBounty_MCM mcm, string option) global
-    string defaultValue = mcm.__getStringOptionDefault(option)
+    string defaultValue = mcm.GetOptionDefaultString(option)
 
     if (option == "Jail::Cell Lock Level")
         mcm.SetMenuDialogOptions(mcm.LockLevels)
@@ -1386,9 +1329,9 @@ function OnOptionMenuAccept(RealisticPrisonAndBounty_MCM mcm, string option, int
         endif
 
     elseif (option == "Clothing::Outfit")
-            if (menuIndex != -1)
-                mcm.SetOptionMenuValue(option, mcm.ClothingOutfits[menuIndex])
-            endif
+        if (menuIndex != -1)
+            mcm.SetOptionMenuValue(option, mcm.ClothingOutfits[menuIndex])
+        endif
     endif
 
     mcm.Debug("OnOptionMenuAccept", "GetMenuOptionValue("+  option +") = " + mcm.GetMenuOptionValue(mcm.CurrentPage, option))
@@ -1424,7 +1367,7 @@ function OnHighlight(RealisticPrisonAndBounty_MCM mcm, int oid) global
         return
     endif
     
-    OnOptionHighlight(mcm, mcm.GetKeyFromOption(oid))
+    OnOptionHighlight(mcm, mcm.GetKeyFromOption(oid, false))
 endFunction
 
 function OnDefault(RealisticPrisonAndBounty_MCM mcm, int oid) global
@@ -1433,7 +1376,7 @@ function OnDefault(RealisticPrisonAndBounty_MCM mcm, int oid) global
         return
     endif
 
-    OnOptionDefault(mcm, mcm.GetKeyFromOption(oid))
+    OnOptionDefault(mcm, mcm.GetKeyFromOption(oid, false))
 endFunction
 
 function OnSelect(RealisticPrisonAndBounty_MCM mcm, int oid) global
@@ -1441,7 +1384,7 @@ function OnSelect(RealisticPrisonAndBounty_MCM mcm, int oid) global
         return
     endif
 
-    OnOptionSelect(mcm, mcm.GetKeyFromOption(oid))
+    OnOptionSelect(mcm, mcm.GetKeyFromOption(oid, false))
 endFunction
 
 function OnSliderOpen(RealisticPrisonAndBounty_MCM mcm, int oid) global
@@ -1449,7 +1392,7 @@ function OnSliderOpen(RealisticPrisonAndBounty_MCM mcm, int oid) global
         return
     endif
 
-    OnOptionSliderOpen(mcm, mcm.GetKeyFromOption(oid))
+    OnOptionSliderOpen(mcm, mcm.GetKeyFromOption(oid, false))
 endFunction
 
 function OnSliderAccept(RealisticPrisonAndBounty_MCM mcm, int oid, float value) global
@@ -1457,7 +1400,7 @@ function OnSliderAccept(RealisticPrisonAndBounty_MCM mcm, int oid, float value) 
         return
     endif
 
-    OnOptionSliderAccept(mcm, mcm.GetKeyFromOption(oid), value)
+    OnOptionSliderAccept(mcm, mcm.GetKeyFromOption(oid, false), value)
 endFunction
 
 function OnMenuOpen(RealisticPrisonAndBounty_MCM mcm, int oid) global
@@ -1465,7 +1408,7 @@ function OnMenuOpen(RealisticPrisonAndBounty_MCM mcm, int oid) global
         return
     endif
 
-    OnOptionMenuOpen(mcm, mcm.GetKeyFromOption(oid))
+    OnOptionMenuOpen(mcm, mcm.GetKeyFromOption(oid, false))
 endFunction
 
 function OnMenuAccept(RealisticPrisonAndBounty_MCM mcm, int oid, int menuIndex) global
@@ -1473,7 +1416,7 @@ function OnMenuAccept(RealisticPrisonAndBounty_MCM mcm, int oid, int menuIndex) 
         return
     endif
 
-    OnOptionMenuAccept(mcm, mcm.GetKeyFromOption(oid), menuIndex)
+    OnOptionMenuAccept(mcm, mcm.GetKeyFromOption(oid, false), menuIndex)
 endFunction
 
 function OnColorOpen(RealisticPrisonAndBounty_MCM mcm, int oid) global
@@ -1481,7 +1424,7 @@ function OnColorOpen(RealisticPrisonAndBounty_MCM mcm, int oid) global
         return
     endif
 
-    OnOptionColorOpen(mcm, mcm.GetKeyFromOption(oid))
+    OnOptionColorOpen(mcm, mcm.GetKeyFromOption(oid, false))
 endFunction
 
 function OnColorAccept(RealisticPrisonAndBounty_MCM mcm, int oid, int color) global
@@ -1489,7 +1432,7 @@ function OnColorAccept(RealisticPrisonAndBounty_MCM mcm, int oid, int color) glo
         return
     endif
 
-    OnOptionColorAccept(mcm, mcm.GetKeyFromOption(oid), color)
+    OnOptionColorAccept(mcm, mcm.GetKeyFromOption(oid, false), color)
 endFunction
 
 function OnKeymapChange(RealisticPrisonAndBounty_MCM mcm, int oid, int keycode, string conflictControl, string conflictName) global
@@ -1497,7 +1440,7 @@ function OnKeymapChange(RealisticPrisonAndBounty_MCM mcm, int oid, int keycode, 
         return
     endif
 
-    OnOptionKeymapChange(mcm, mcm.GetKeyFromOption(oid), keycode, conflictControl, conflictName)
+    OnOptionKeymapChange(mcm, mcm.GetKeyFromOption(oid, false), keycode, conflictControl, conflictName)
 endFunction
 
 function OnInputOpen(RealisticPrisonAndBounty_MCM mcm, int oid) global
@@ -1505,13 +1448,13 @@ function OnInputOpen(RealisticPrisonAndBounty_MCM mcm, int oid) global
         return
     endif
 
-    OnOptionInputOpen(mcm, mcm.GetKeyFromOption(oid))
+    OnOptionInputOpen(mcm, mcm.GetKeyFromOption(oid, false))
 endFunction
 
 function OnInputAccept(RealisticPrisonAndBounty_MCM mcm, int oid, string inputValue) global
     if (! ShouldHandleEvent(mcm))
         return
     endif
-    
-    OnOptionInputAccept(mcm, mcm.GetKeyFromOption(oid), inputValue)
+
+    OnOptionInputAccept(mcm, mcm.GetKeyFromOption(oid, false), inputValue)
 endFunction

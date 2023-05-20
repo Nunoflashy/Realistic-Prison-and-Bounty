@@ -27,13 +27,14 @@ function Left(RealisticPrisonAndBounty_MCM mcm) global
     while (i < mcm.config.Holds.Length)
         ; mcm.AddTextOption("", mcm.config.Holds[i], mcm.OPTION_DISABLED)
         mcm.AddOptionCategory(mcm.config.Holds[i])
+        ; mcm.AddOptionCategoryKey(mcm.config.Holds[i], "[20]" + mcm.config.Holds[i]) ; 20 represents the Player FormID (0x14)
         ; mcm.AddOptionCategory("Stats")
-        mcm.AddOptionStat("Current Bounty", 0, "Bounty")
-        mcm.AddOptionStat("Largest Bounty", 0, "Bounty")
-        mcm.AddOptionStat("Total Bounty", 0, "Bounty")
-        mcm.AddOptionStat("Times Arrested", 0, "Times")
-        mcm.AddOptionStat("Times Frisked", 0, "Times")
-        mcm.AddOptionStat("Fees Owed", 0, "Gold")
+        ; mcm.AddOptionStat("Current Bounty", 0, "Bounty")
+        ; mcm.AddOptionStat("Largest Bounty", 0, "Bounty")
+        ; mcm.AddOptionStat("Total Bounty", 0, "Bounty")
+        ; mcm.AddOptionStat("Times Arrested", 0, "Times")
+        ; mcm.AddOptionStat("Times Frisked", 0, "Times")
+        ; mcm.AddOptionStat("Fees Owed", 0, "Gold")
         i += 1
     endWhile
 endFunction
@@ -42,14 +43,15 @@ function Right(RealisticPrisonAndBounty_MCM mcm) global
     int i = 0
     while (i < mcm.config.Holds.Length)
         mcm.SetRenderedCategory(mcm.config.Holds[i])
+        ; mcm.SetRenderedCategory("[20]" + mcm.config.Holds[i])
         ; mcm.SetRenderedCategory("Stats")
         mcm.AddHeaderOption("")
-        mcm.AddOptionStat("Days in Jail", 0, "Days")
-        mcm.AddOptionStat("Longest Sentence", 0, "Days")
-        mcm.AddOptionStat("Times Jailed", 0, "Times")
-        mcm.AddOptionStat("Times Escaped", 0, "Times")
-        mcm.AddOptionStat("Times Stripped", 0, "Times")
-        mcm.AddOptionStat("Infamy Gained", 0, "Infamy")
+        ; mcm.AddOptionStat("Days in Jail", 0, "Days")
+        ; mcm.AddOptionStat("Longest Sentence", 0, "Days")
+        ; mcm.AddOptionStat("Times Jailed", 0, "Times")
+        ; mcm.AddOptionStat("Times Escaped", 0, "Times")
+        ; mcm.AddOptionStat("Times Stripped", 0, "Times")
+        ; mcm.AddOptionStat("Infamy Gained", 0, "Infamy")
     i += 1
     endWhile
 endFunction
@@ -61,8 +63,19 @@ endFunction
 function OnOptionHighlight(RealisticPrisonAndBounty_MCM mcm, string option) global
 
     string optionName   = GetOptionNameNoCategory(option)
+    string statNameWithHold = GetOptionCategory(option)
+    string formattedStat = StringUtil.Substring(option, StringUtil.Find(statNameWithHold, "]") + 1) 
     string hold         = GetOptionCategory(option)
     string city         = mcm.config.GetCityNameFromHold(hold)
+    ; string hold         = miscVars.Get("[Hold["+ city +"]]")
+    ; string city         = miscVars.Get("[City["+ hold +"]]")
+    mcm.Debug("Stats::OnOptionHighlight", "\n" + \
+        "optionName: " + optionName + "\n" + \
+        "statNameWithHold: " + statNameWithHold + "\n" + \
+        "formattedStat: " + formattedStat + "\n" + \
+        "hold: " + hold + "\n" + \
+        "city: " + city + "\n" \
+    , true)
 
     if (option == hold + "::Current Bounty")
         mcm.SetInfoText("The bounty you currently have in " + hold + ".")
@@ -108,13 +121,13 @@ function OnOptionDefault(RealisticPrisonAndBounty_MCM mcm, string option) global
 endFunction
 
 function OnOptionSelect(RealisticPrisonAndBounty_MCM mcm, string option) global
-    if (mcm.IsStatOption(option))
-        string hold     = GetOptionCategory(option)
-        string statName = GetOptionNameNoCategory(option)
-        mcm.config.IncrementStat(hold, statName)
-        ; mcm.Debug("OnOptionSelect", "Incrementing Stat: " + hold + "::" + statName + "(option: " + option +")")
-        return
-    endif
+    ; if (mcm.IsStatOption(option))
+    ;     string hold     = GetOptionCategory(option)
+    ;     string statName = GetOptionNameNoCategory(option)
+    ;     mcm.config.IncrementStat(hold, statName)
+    ;     ; mcm.Debug("OnOptionSelect", "Incrementing Stat: " + hold + "::" + statName + "(option: " + option +")")
+    ;     return
+    ; endif
 endFunction
 
 function OnOptionSliderOpen(RealisticPrisonAndBounty_MCM mcm, string option) global
@@ -162,6 +175,10 @@ function OnHighlight(RealisticPrisonAndBounty_MCM mcm, int oid) global
         return
     endif
     
+    mcm.Trace(mcm, "Stats::OnHighlght", "Option ID: " + oid)
+
+    
+    ; OnOptionHighlight(mcm, mcm.TemporaryGetStatKeyFromOID(oid))
     OnOptionHighlight(mcm, mcm.GetKeyFromOption(oid))
 endFunction
 
@@ -171,7 +188,8 @@ function OnDefault(RealisticPrisonAndBounty_MCM mcm, int oid) global
         return
     endif
 
-    OnOptionDefault(mcm, mcm.GetKeyFromOption(oid))
+    ; OnOptionDefault(mcm, mcm.TemporaryGetStatKeyFromOID(oid))
+    ; OnOptionDefault(mcm, mcm.GetKeyFromOption(oid))
 endFunction
 
 function OnSelect(RealisticPrisonAndBounty_MCM mcm, int oid) global

@@ -155,7 +155,7 @@ function LoadSliderOptions(RealisticPrisonAndBounty_MCM mcm, string option, floa
     float minRange = 0
     float maxRange = 100
     float intervalSteps = 1
-    float defaultValue = mcm.__getFloatOptionDefault(option)
+    float defaultValue = mcm.GetOptionDefaultFloat(option)
 
     ; ==========================================================
     ;                          ITEM SLOTS
@@ -295,7 +295,7 @@ function OnOptionSelect(RealisticPrisonAndBounty_MCM mcm, string option) global
         return
     endif
 
-    mcm.ToggleOption(optionKey)
+    mcm.ToggleOption(option)
     HandleDependencies(mcm)
 endFunction
 
