@@ -42,34 +42,6 @@ RealisticPrisonAndBounty_MiscVars property miscVars
     endFunction
 endProperty
 
-; Timescales
-; =======================================
-GlobalVariable property NormalTimescale auto
-GlobalVariable property PrisonTimescale auto
-; =======================================
-
-; int _statList
-; string[] property StatList
-;     string[] function get()
-;         if (JArray.count(_statList) == 0)
-;             _statList = JArray.object()
-;             JArray.addStr(_statList, "Current Bounty")
-;             JArray.addStr(_statList, "Largest Bounty")
-;             JArray.addStr(_statList, "Total Bounty")
-;             JArray.addStr(_statList, "Times Arrested")
-;             JArray.addStr(_statList, "Times Frisked")
-;             JArray.addStr(_statList, "Fees Owed")
-;             JArray.addStr(_statList, "Days in Jail")
-;             JArray.addStr(_statList, "Longest Sentence")
-;             JArray.addStr(_statList, "Times Jailed")
-;             JArray.addStr(_statList, "Times Escaped")
-;             JArray.addStr(_statList, "Times Stripped")
-;             JArray.addStr(_statList, "Infamy Gained")
-;         endif
-;         return JArray.asStringArray(_statList)
-;     endFunction
-; endProperty
-
 int _prisonSkillHandlingOptions
 string[] property PrisonSkillHandlingOptions
     string[] function get()
@@ -126,6 +98,7 @@ string[] property ClothingOutfits
             while (i < 10)
                 string currentOutfitCategory = "Outfit " + (i + 1)
                 string outfitName = GetOptionInputValue(currentOutfitCategory + "::Name", "Clothing")
+                LogProperty(self, "MCM::ClothingOutfits", "Outfit Name: " + outfitName)
                 JArray.addStr(_clothingOutfits, outfitName)
                 i += 1
             endWhile
@@ -229,26 +202,27 @@ bool function IsValidClothingForBodyPart(string bodyPart, int slotMask) global
 endFunction
 
 function AddOutfitPiece(string outfitId, string outfitBodyPart, Armor outfitObject)
-    ; string outfitKey = outfitId + "::" + outfitBodyPart
-    
-    ; ; Store outfit piece name in the input field
-    ; SetOptionInputValue(outfitKey, outfitObject.GetName())
+    if (!outfitObject)
+        return
+    endif
 
-    ; ; Store persistently into the outfit list
-    ; JMap.setForm(outfitsFormMap, outfitKey, outfitObject)
-    ; Debug("AddOutfitPiece", "Added Outfit Piece: " + outfitObject.GetName() + " (FormID: " + outfitObject.GetFormID() + ") to Body Part: " + outfitBodyPart)
+    string outfitPieceKey = outfitId + "::" + outfitBodyPart
+    self.SetOptionInputValue(outfitPieceKey, outfitObject.GetName())
+
+    miscVars.SetForm(outfitPieceKey, outfitObject, "clothing/outfits")
+    Debug("AddOutfitPiece", "Added Outfit Piece: " + outfitObject.GetName() + " (FormID: " + outfitObject.GetFormID() + ") to Body Part: " + outfitBodyPart)
 endFunction
 
 function RemoveOutfitPiece(string outfitId, string outfitBodyPart)
-    ; string outfitKey = outfitId + "::" + outfitBodyPart
-    ; SetOptionInputValue(outfitKey, "")
-    ; Armor outfitObject = JMap.getForm(outfitsFormMap, outfitKey) as Armor
-    ; JMap.setForm(outfitsFormMap, outfitKey, none)
-    ; Debug("RemoveOutfitPiece", "Removed Outfit Piece: " + outfitObject.GetName() + " (FormID: " + outfitObject.GetFormID() +") from Body Part: " + outfitBodyPart)
+    string outfitPieceKey = outfitId + "::" + outfitBodyPart
+    self.SetOptionInputValue(outfitPieceKey, "")
+    Armor outfitObject = miscVars.GetForm(outfitPieceKey) as Armor
+    miscVars.SetForm(outfitPieceKey, none, "clothing/outfits")
+    Debug("RemoveOutfitPiece", "Removed Outfit Piece: " + outfitObject.GetName() + " (FormID: " + outfitObject.GetFormID() +") from Body Part: " + outfitBodyPart)
 endFunction
 
 Armor function GetOutfitPart(string outfitId, string outfitBodyPart)
-    ; return JMap.getForm(outfitsFormMap, outfitId + "::" + outfitBodyPart) as Armor
+    return miscVars.GetForm(outfitId + "::" + outfitBodyPart, "clothing/outfits") as Armor
 endFunction
 
 string _currentRenderedCategory
@@ -321,8 +295,8 @@ endFunction
 
 bool function SetOptionDependencyBool(string option, bool dependency, bool storePersistently = true)
     string optionKey = self.GetOptionAsStored(option)
-    int optionId = GetOption(optionKey)
-    int flag = int_if (dependency, OPTION_FLAG_NONE, OPTION_FLAG_DISABLED)
+    int optionId     = self.GetOption(optionKey)
+    int flag         = int_if (dependency, OPTION_FLAG_NONE, OPTION_FLAG_DISABLED)
 
     parent.SetOptionFlags(optionId, flag)
 
@@ -467,8 +441,8 @@ endFunction
 /;
 function ToggleOption(string _key, bool storePersistently = true)
     string optionKey = self.GetOptionAsStored(_key)
-    bool option = bool_if (self.OptionHasValue(_key), self.GetOptionValueBool(_key), self.GetOptionDefaultBool(_key))
-    int optionId = self.GetOption(optionKey)
+    int optionId     = self.GetOption(optionKey)
+    bool option      = bool_if (self.OptionHasValue(_key), self.GetOptionValueBool(_key), self.GetOptionDefaultBool(_key))
 
     parent.SetToggleOptionValue(optionId, !option)
 
@@ -509,12 +483,9 @@ int function AddOptionToggleKey(string displayedText, string _key, int defaultVa
     int flags           = self.GetOptionState(optionKey)
     int optionId        = AddToggleOption(displayedText, bool_if (self.OptionHasValue(optionKey), value, defaultValue), int_if (self.OptionHasState(optionKey), flags, defaultFlags))
 
-    ; Debug("MCM::AddOptionToggleKey", "Option: "+ cacheKey +", Default Value: " + defaultValue + ", Value: " + value + ", Flags: "+ flags + ", defaultFlags" + defaultFlags + ", DefaultValueOverride: " + defaultValueOverride + ", Stored Option ID: " + miscVars.GetInt(optionKey, "options/id/from-key-to-id/" + CurrentPage), true)
-
     if (!self.OptionExists(optionKey))
         self.RegisterOption(optionKey, optionId)
     endif
-    ; Debug("MCM::AddOptionToggleKey", "OptionKey: " + optionKey + " (stored as: "+ (CurrentPage + "/" + optionKey) +"), Value: " + value + ", Flags: " + flags + ", Option ID:" + optionId, true)
 
     return optionId
 endFunction
@@ -559,6 +530,24 @@ endFunction
 
     returns:    The Option's ID.
 /;
+int function AddOptionStatKey(string displayedText, string _key, int defaultValueOverride = -1, string formatString = "{0}", int defaultFlags = 0)
+    string optionKey = CurrentRenderedCategory + "::" + _key ; Whiterun::Current Bounty
+
+    int value = config.actorVars.Get("[20]" + optionKey) ; [20]Whiterun::Current Bounty
+    int optionId = AddTextOption(displayedText, value + " " + formatString, defaultFlags)
+
+    if (!self.OptionExists(optionKey))
+        self.RegisterOption(optionKey, optionId)
+    endif
+
+    Trace("MCM:AddOptionStatKey", "Option Key: " + optionKey + ", Value: " + value + ", Option ID: " + optionId)
+
+    ; ; [ActorID]::Hold::StatName - [20]Haafingar::Times Stripped
+    ; string statKey = "[20]" + CurrentRenderedCategory + "::" + _key
+    ; int optionId                = AddTextOption(displayedText, actorVars.Get(statKey) + " " + formatString, defaultFlags)
+    ; actorVars.SetString(optionId, statKey)
+    return optionId
+endFunction
 ; int function AddOptionStatKey(string displayedText, string _key, int defaultValueOverride = -1, string formatString = "{0}", int defaultFlags = 0)
 ;     string optionKey = CurrentRenderedCategory + "::" + _key
 
@@ -601,11 +590,11 @@ endFunction
 ;     return optionId
 ; endFunction
 
-; int function AddOptionStat(string text, int defaultValueOverride = -1, string formatString = "{0}", int defaultFlags = 0)
-;     ; Debug("AddOptionStatKey", "Key: " + "[20]" + CurrentRenderedCategory + "::" + text, true)
+int function AddOptionStat(string text, int defaultValueOverride = -1, string formatString = "{0}", int defaultFlags = 0)
+    ; Debug("AddOptionStatKey", "Key: " + "[20]" + CurrentRenderedCategory + "::" + text, true)
 
-;     return AddOptionStatKey(text, text, defaultValueOverride, formatString, defaultFlags)
-; endFunction
+    return AddOptionStatKey(text, text, defaultValueOverride, formatString, defaultFlags)
+endFunction
 
 ;/
     Adds and renders a Slide Option with the possibility of specifying a Key for its storage.
@@ -627,8 +616,6 @@ int function AddOptionSliderKey(string displayedText, string _key, string format
     if (!self.OptionExists(optionKey))
         self.RegisterOption(optionKey, optionId)
     endif
-
-    ; Debug("MCM::AddOptionSliderKey", "OptionKey: " + optionKey + " (stored as: "+ (CurrentPage + "/" + optionKey) +"), Value: " + value + ", Flags: " + flags + ", Option ID:" + optionId, true)
 
     return optionId
 endFunction
@@ -677,14 +664,21 @@ endFunction
 int function AddOptionInputKey(string displayedText, string _key, string defaultValueOverride = "-", int defaultFlags = 0)
     string optionKey = CurrentRenderedCategory + "::" + _key
 
-    string defaultValue         = string_if (defaultValueOverride != "", defaultValueOverride, self.GetOptionDefaultString(optionKey))
+    if (defaultValueOverride)
+        self.SetOptionDefaultString(optionKey, defaultValueOverride)
+    endif
+ 
+    ; string defaultValue         = string_if (defaultValueOverride != "", defaultValueOverride, self.GetOptionDefaultString(optionKey))
+    string defaultValue         = self.GetOptionDefaultString(optionKey)
     string value                = self.GetOptionValueString(optionKey)
     int flags                   = self.GetOptionState(optionKey)
-    int optionId                = AddMenuOption(displayedText, string_if (self.OptionHasValue(optionKey), value, defaultValue), int_if (self.OptionHasState(optionKey), flags, defaultFlags))
+    int optionId                = AddInputOption(displayedText, string_if (self.OptionHasValue(optionKey), value, defaultValue), int_if (self.OptionHasState(optionKey), flags, defaultFlags))
 
     if (!self.OptionExists(optionKey))
         self.RegisterOption(optionKey, optionId)
     endif
+
+    ; Debug("MCM::AddOptionInputKey", "Add " + optionKey)
 
     return optionId
 endFunction
@@ -706,7 +700,7 @@ endFunction
 /;
 function SetOptionSliderValue(string option, float value, string formatString = "{0}")
     string optionKey = self.GetOptionAsStored(option)
-    int optionId = GetOption(optionKey)
+    int optionId     = self.GetOption(optionKey)
 
     ; Change the value of the slider option
     parent.SetSliderOptionValue(optionId, value, formatString)
@@ -749,7 +743,7 @@ endFunction
 /;
 function SetOptionMenuValue(string option, string value)
     string optionKey = self.GetOptionAsStored(option)
-    int optionId = GetOption(optionKey)
+    int optionId     = self.GetOption(optionKey)
     
     ; Change the value of the menu option
     parent.SetMenuOptionValue(optionId, value)
@@ -768,7 +762,7 @@ endFunction
 /;
 function SetOptionInputValue(string option, string value)
     string optionKey = self.GetOptionAsStored(option)
-    int optionId = GetOption(optionKey)
+    int optionId     = self.GetOption(optionKey)
 
     ; Change the value of the input option
     parent.SetInputOptionValue(optionId, value)
@@ -786,10 +780,6 @@ event OnConfigInit()
     ModName = "Realistic Prison and Bounty"
     self.InitializePages()
     self.InitializeOptions()
-    ; __initializeOptionsMap()
-    ; __initializeOptionDefaults()
-    ; __initializeCacheMap()
-    ; __initializeOutfitsMap()
 endEvent
 
 event OnPageReset(string page)
@@ -898,13 +888,12 @@ function Error(string caller, string logInfo, bool condition = true)
 endFunction
 
 function SerializeOptions()
-    ; JValue.writeToFile(optionsMap, "optionsMap.txt")
-    ; JValue.writeToFile(cacheMap, "optionCacheMap.txt")
-    ; JValue.writeToFile(optionsFlagMap, "optionFlagsMap.txt")
-    ; JValue.writeToFile(optionDefaultsMap, "optionDefaultsMap.txt")
-    ; miscVars.Serialize("options", "optionsSerializeTest_"+ Utility.GetCurrentGameTime() +".txt")
-    ; Debug("MCM::SerializeOptions", "Serialized Options!", true)
+    if (!miscVars.Exists("clothing/outfits"))
+        miscVars.CreateStringMap("clothing/outfits")
+    endif
+
     JValue.writeToFile(generalContainer, "generalContainer.txt")
+    miscVars.serialize("root", "miscVars_all.txt")
 endFunction
 
 ; ============================================================================
@@ -927,105 +916,30 @@ function InitializeOptions()
 ; ============================================================================
 ;                                   Values
 ; ============================================================================
-    miscVars.CreateStringMap("options/value")
+    optionsValueMap         = JMap.object() ; To hold each option's value
 
 ; ============================================================================
 ;                                   ID's
 ; ============================================================================
-    miscVars.CreateStringMap("options/id")
+    optionsFromKeyToIdMap   = JMap.object() ; Identify options from key to id
+    optionsFromIdToKeyMap   = JIntMap.object() ; Identify options from id to key
 
 ; ============================================================================
 ;                                State (Flags)
 ; ============================================================================
-    miscVars.CreateStringMap("options/state")
-
-    miscVars.CreateStringMap("options")
-    ; miscVars.AddToContainer("options", "options/value")
-    ; miscVars.AddToContainer("options", "options/id")
-    ; miscVars.AddToContainer("options", "options/state")
-
-    int i = 0
-    while (i < Pages.Length)
-        if (Pages[i] != "")
-            string page = Pages[i]
-            ; string hold = miscVars.GetStringFromArray("Holds", i)
-            ; if (!miscVars.ExistsContainer("options/value/" + page, "options"))
-                ; Debug("MCM::InitializeOptions", "Container does not exist, creating it! (options/value/"+ page +")", true)
-                miscVars.CreateStringMap("options/value/" + page)
-            ; endif
-
-            ; if (!miscVars.ExistsContainer("options/id/" + page, "options"))
-                ; Debug("MCM::InitializeOptions", "Container does not exist, creating it! (options/id/"+ page +")", true)
-                ; miscVars.CreateIntegerMap("options/id/" + page)
-                ; miscVars.CreateStringMap("options/id/" + page)
-                miscVars.CreateIntegerMap("options/id/from-id-to-key/" + page)
-                miscVars.CreateStringMap("options/id/from-key-to-id/" + page)
-            ; endif
-
-            ; if (!miscVars.ExistsContainer("options/state/" + page, "options"))
-                ; Debug("MCM::InitializeOptions", "Container does not exist, creating it! (options/state/"+ page +")", true)
-                miscVars.CreateStringMap("options/state/" + page)
-            ; endif
-
-            miscVars.AddToContainer("options/value/", "options/value/" + page)
-            ; miscVars.AddToContainer("options/id", "options/id/" + page)
-            miscVars.AddToContainer("options/id", "options/id/from-key-to-id/" + page)
-            miscVars.AddToContainer("options/id", "options/id/from-id-to-key/" + page)
-            miscVars.AddToContainer("options/state", "options/state/" + page)
-        endif
-        i += 1
-    endWhile
-    ; while (i < miscVars.GetLengthOf("Holds"))
-    ;     string hold = miscVars.GetStringFromArray("Holds", i)
-    ;     if (!miscVars.ExistsContainer("options/value", "options"))
-    ;         Debug("MCM::InitializeOptions", "Container does not exist, creating it! (options/value)", true)
-    ;         miscVars.CreateStringMap("options/value/" + hold)
-    ;     endif
-
-    ;     if (!miscVars.ExistsContainer("options/id", "options"))
-    ;         Debug("MCM::InitializeOptions", "Container does not exist, creating it! (options/id)", true)
-    ;         miscVars.CreateIntegerMap("options/id/" + hold)
-    ;         ; miscVars.CreateStringMap("options/id/" + hold)
-    ;         miscVars.CreateIntegerMap("options/id/from-id-to-key/" + hold)
-    ;         miscVars.CreateStringMap("options/id/from-key-to-id/" + hold)
-    ;     endif
-
-    ;     if (!miscVars.ExistsContainer("options/state", "options"))
-    ;         Debug("MCM::InitializeOptions", "Container does not exist, creating it! (options/state)", true)
-    ;         miscVars.CreateStringMap("options/state/" + hold)
-    ;     endif
-
-    ;     miscVars.AddToContainer("options/value", "options/value/" + hold)
-    ;     ; miscVars.AddToContainer("options/id", "options/id/" + hold)
-    ;     miscVars.AddToContainer("options/id", "options/id/from-key-to-id/" + hold)
-    ;     miscVars.AddToContainer("options/id", "options/id/from-id-to-key/" + hold)
-    ;     miscVars.AddToContainer("options/state", "options/state/" + hold)
-    ;     i += 1
-    ; endWhile
-
-    ; miscVars.SetFloat("Stripping::Stripping Thoroughness", 10.0, "options/value/Haafingar")
-    ; miscVars.IntMap_SetString(Utility.RandomInt(200, 6000), "Stripping::Stripping Thoroughness", "options/id/Haafingar")
-
-    ; miscVars.CreateStringMap("options")
-    miscVars.AddToContainer("options", "options/value")
-    miscVars.AddToContainer("options", "options/id")
-    miscVars.AddToContainer("options", "options/state")
-    ; miscVars.Serialize("options", "optionsSerializeTest.txt")
-    ; Debug(self, "MCM::List", GetContainerList(miscVars.GetHandle("options")))
+    optionsStateMap         = JMap.object() ; To hold each option's state (Enabled, Disabled)
 
 ; ============================================================================
 ;                               Default Values
 ; ============================================================================
-    Debug.StartStackProfiling()
-    miscVars.CreateStringMap("options/defaults")
-    miscVars.AddToContainer("options", "options/defaults")
-
-    optionsValueMap         = JMap.object() ; To hold each option's value
-    optionsStateMap         = JMap.object() ; To hold each option's state (Enabled, Disabled)
     optionsDefaultValueMap  = JMap.object() ; Default values for options
-    optionsFromKeyToIdMap   = JMap.object() ; Identify options from key to id
-    optionsFromIdToKeyMap   = JIntMap.object() ; Identify options from id to key
-    generalContainer        = JMap.object()
+    generalContainer        = JMap.object() ; To hold all containers (temporary)
+
+; ============================================================================
+;                              Clothing & Outfits
+; ============================================================================
+    miscVars.CreateStringMap("clothing/outfits")
+
 
     ; JValue.retain(optionsValueMap)
     ; JValue.retain(optionsStateMap)
@@ -1039,6 +953,7 @@ function InitializeOptions()
     JMap.setObj(generalContainer, "options/default", optionsDefaultValueMap)
     JMap.setObj(generalContainer, "options/id/from-key-to-id", optionsFromKeyToIdMap)
     JMap.setObj(generalContainer, "options/id/from-id-to-key", optionsFromIdToKeyMap)
+    JMap.setObj(generalContainer, "clothing/outfits", miscVars.GetHandle("clothing/outfits"))
 
     self.SetOptionDefaultFloat("General::Update Interval", 20)
     self.SetOptionDefaultFloat("General::Bounty Decay (Update Interval)", 4)
@@ -1177,10 +1092,6 @@ function InitializeOptions()
     self.SetOptionDefaultFloat("Infamy::Infamy Known Threshold", 6000)
     self.SetOptionDefaultFloat("Infamy::Infamy Lost (%)", 0.01)
     self.SetOptionDefaultFloat("Infamy::Infamy Lost", 20)
-    Debug.StopStackProfiling()
-
-    ; miscVars.Serialize("options", "optionsSerializeTest.txt")
-
 endFunction
 
 int optionsValueMap

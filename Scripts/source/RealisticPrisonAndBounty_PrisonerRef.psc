@@ -444,7 +444,8 @@ function UpdateInfamy()
     int _infamyGainedPerUpdate = ceiling(InfamyGainedDaily * TimeSinceLastUpdate)
 
     ; Update infamy
-    config.IncrementStat(arrestVars.Hold, "Infamy Gained", _infamyGainedPerUpdate)
+    ; config.IncrementStat(arrestVars.Hold, "Infamy Gained", _infamyGainedPerUpdate)
+    actorVars.ModInfamy(arrestVars.ArrestFaction, this, _infamyGainedPerUpdate)
     config.NotifyInfamy(_infamyGainedPerUpdate + " Infamy gained in " + city, config.IS_DEBUG)
 
     ; Notify once when Recognized/Known Threshold is met
