@@ -487,6 +487,11 @@ function Clear(string parentContainer = "root")
     JMap.clear(_container)
 endFunction
 
+function Retain(string containerName, string parentContainer = "root")
+    int _container = self.GetHandle(parentContainer)
+    JValue.retain(JMap.getObj(_container, containerName), "RPB_MiscVarsContainer")
+endFunction
+
 bool function Exists(string paramKey, string parentContainer = "root")
     int _container = self.GetHandle(parentContainer)
     return JMap.hasKey(_container, paramKey)
@@ -605,7 +610,7 @@ string function CreateContainer(string containerKey, string containerType, strin
     elseif (containerType == "StringMap" || containerType == "Map")
         _container = JMap.object()
 
-    elseif (containerType == "IntegerMap" || "IntMap")
+    elseif (containerType == "IntegerMap" || containerType == "IntMap")
         _container = JIntMap.object()
 
     elseif (containerType == "FormMap")
