@@ -225,6 +225,16 @@ Armor function GetOutfitPart(string outfitId, string outfitBodyPart)
     return miscVars.GetForm(outfitId + "::" + outfitBodyPart, "clothing/outfits") as Armor
 endFunction
 
+;/
+    Returns the outfit id from its name.
+
+    string  @outfitName: The name of the outfit as set up in the name field through the MCM.
+    returns: The outfit's id.
+/;
+string function GetOutfitIdentifier(string outfitName)
+    return miscVars.GetString(outfitName, "clothing/outfits")
+endFunction
+
 string _currentRenderedCategory
 string property CurrentRenderedCategory
     string function get()
@@ -254,10 +264,6 @@ endFunction
 string function GetOptionCategory(string optionWithCategory) global
     int len = StringUtil.Find(optionWithCategory, "::") ; Outfit 1::Equipped Outfit
     return StringUtil.Substring(optionWithCategory, 0, len) ; Outfit 1
-endFunction
-
-bool function IsStatOption(string option)
-    return CurrentPage == "Stats"
 endFunction
 
 bool function IsHoldCurrentPage()
@@ -390,30 +396,6 @@ string function GetOptionInputValue(string option, string thePage = "")
 endFunction
 
 ;/
-    Gets a stat option's value.
-
-    string      @page: The page where this option is rendered.
-    string      @optionName: The name of the option to retrieve the value from.
-
-    returns [int]:    The option's value.
-/;
-; int function GetStatOptionValue(string page, string option)
-;     string _key = __makeOptionKeyFromPage(page, option, includeCurrentCategory = false)
-;     Debug("GetStatOptionValue", "_key: " + _key)
-
-;     if (!JMap.hasKey(optionsMap, _key))
-;         ; Option not loaded yet (MCM page not loaded), so load default value for this option.
-;         return __getIntOptionDefault(option)
-;     endif
-
-;     return __getIntOptionValue(_key)
-; endFunction
-
-; int function GetOptionStatValue(string option, string thePage = "")
-;     return GetStatOptionValue(thePage, option)
-; endFunction
-
-;/
     Sets a slider's multiple options with just a single call.
 
     float   @minRange: The minimum value for this slider
@@ -541,58 +523,11 @@ int function AddOptionStatKey(string displayedText, string _key, int defaultValu
     endif
 
     Trace("MCM:AddOptionStatKey", "Option Key: " + optionKey + ", Value: " + value + ", Option ID: " + optionId)
-
-    ; ; [ActorID]::Hold::StatName - [20]Haafingar::Times Stripped
-    ; string statKey = "[20]" + CurrentRenderedCategory + "::" + _key
-    ; int optionId                = AddTextOption(displayedText, actorVars.Get(statKey) + " " + formatString, defaultFlags)
-    ; actorVars.SetString(optionId, statKey)
     return optionId
 endFunction
-; int function AddOptionStatKey(string displayedText, string _key, int defaultValueOverride = -1, string formatString = "{0}", int defaultFlags = 0)
-;     string optionKey = CurrentRenderedCategory + "::" + _key
 
-;     int defaultValue            = int_if (defaultValueOverride != -1, defaultValueOverride, __getIntOptionDefault(optionKey))
-;     int value                   = __getIntOptionValue(optionKey)
-;     ; Debug("AddOptionStatKey", "Key: " + "[20]" + CurrentRenderedCategory + "::" + _key, true)
-;     int flags                   = __getOptionFlag(optionKey)
-;     int optionId                = AddTextOption(displayedText, int_if (value < GENERAL_ERROR, defaultValue, value) + " " + formatString, flags)
-    
-;     ; Trace("AddOptionStatKey", "["+ _key +"] "+"Flags: " + int_if (flags == OPTION_NOT_EXIST, defaultFlags, flags) + ", Value: " + string_if (value < GENERAL_ERROR, defaultValue, value))
-
-;     if (!__optionExists(optionKey, optionId))
-;         int option = __createOptionInt(optionId, defaultValue)
-;         __addOptionInternal(displayedText, optionId, optionKey, optionKey, option, flags)
-;     endif
-;     ; ; [ActorID]::Hold::StatName - [20]Haafingar::Times Stripped
-;     ; string statKey = "[20]" + CurrentRenderedCategory + "::" + _key
-;     ; int optionId                = AddTextOption(displayedText, actorVars.Get(statKey) + " " + formatString, defaultFlags)
-;     ; actorVars.SetString(optionId, statKey)
-;     return optionId
-; endFunction
-
-; string function TemporaryGetStatKeyFromOID(int oid)
-;     ; Convert oid to its stat string equivalent
-;     string statKey = actorVars.GetString(oid)
-;     Debug("TemporaryGetStatKeyFromOID", "OID: " + oid + ", StatKey: " + statKey, true)
-;     return statKey
-; endFunction
-
-; RealisticPrisonAndBounty_ActorVars property actorVars
-;     RealisticPrisonAndBounty_ActorVars function get()
-;         return config.mainAPI as RealisticPrisonAndBounty_ActorVars
-;     endFunction
-; endProperty
-
-; int function AddOptionWithStatValue(string statName, string formatString = "{0}", int defaultFlags = 0)
-;     string statKey = CurrentRenderedCategory + "::" + statName
-;     int optionId = AddTextOption(statName, actorVars.Get(statKey) + " " + formatString, defaultFlags)
-
-;     return optionId
-; endFunction
 
 int function AddOptionStat(string text, int defaultValueOverride = -1, string formatString = "{0}", int defaultFlags = 0)
-    ; Debug("AddOptionStatKey", "Key: " + "[20]" + CurrentRenderedCategory + "::" + text, true)
-
     return AddOptionStatKey(text, text, defaultValueOverride, formatString, defaultFlags)
 endFunction
 
@@ -704,36 +639,12 @@ function SetOptionSliderValue(string option, float value, string formatString = 
 
     ; Change the value of the slider option
     parent.SetSliderOptionValue(optionId, value, formatString)
-
+    
     ; Store the value
     self.SetOptionValueFloat(option, value)
 
     Trace("SetOptionSliderValue", "Set new value of " + self.GetOptionValueFloat(option) + " for " + option + " (option_id: " + optionId + ")", true)
 endFunction
-
-;/
-    Sets a stat option's value.
-
-    string      @option: The name of the option to be changed.
-    int         @value: The new value for the option.
-/;
-; function SetOptionStatValue(string option, int value)
-;     string _key = "Stats::" + option ; option = Hold::Stat (The Rift::Infamy Gained)
-;     int optionId = GetOption(option)
-
-;     ; int currentValue = GetStatOptionValue("Stats", option)
-
-;     ; Get the correct format string for this stat option
-;     string formatString = __getStatOptionFormatString(option)
-
-;     ; Change the value of the text option
-;     parent.SetTextOptionValue(optionId, value + " " + formatString)
-
-;     ; Store the value
-;     __setIntOptionValue(_key, value)
-
-;     Debug("SetOptionStatValue", "Set new value of " + value + " for " + _key + " (option_id: " + optionId + ")")
-; endFunction
 
 ;/
     Sets a menu option's value.
@@ -934,12 +845,6 @@ function InitializeOptions()
 ; ============================================================================
     optionsDefaultValueMap  = JMap.object() ; Default values for options
     generalContainer        = JMap.object() ; To hold all containers (temporary)
-
-; ============================================================================
-;                              Clothing & Outfits
-; ============================================================================
-    miscVars.CreateStringMap("clothing/outfits")
-
 
     ; JValue.retain(optionsValueMap)
     ; JValue.retain(optionsStateMap)

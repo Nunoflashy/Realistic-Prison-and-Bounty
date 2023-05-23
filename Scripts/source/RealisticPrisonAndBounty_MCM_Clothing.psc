@@ -21,11 +21,9 @@ function Render(RealisticPrisonAndBounty_MCM mcm) global
     Right(mcm)
 
     HandleDependencies(mcm)
+    SetOutfitDefaultValues(mcm)
 
     EndBenchmark(bench, mcm.CurrentPage + " page loaded -")
-
-    ; mcm.config.AddOutfit("Outfit 1", none, Game.GetFormEx(0x3C9FE) as Armor, none, none)
-    ; mcm.config.AddOutfit("Outfit 2", none, Game.GetFormEx(0x3C9FE) as Armor, none, Game.GetFormEx(0x3CA00) as Armor)
 endFunction
 
 function Left(RealisticPrisonAndBounty_MCM mcm) global
@@ -90,6 +88,22 @@ function Right(RealisticPrisonAndBounty_MCM mcm) global
         i += 1
     endWhile
 
+endFunction
+
+function SetOutfitDefaultValues(RealisticPrisonAndBounty_MCM mcm) global
+    if (mcm.miscVars.Exists("clothing/outfits"))
+        return
+    endif
+
+    ; Storage for anything related to outfits
+    mcm.miscVars.CreateStringMap("clothing/outfits")
+
+    int i = 1
+    while (i <= mcm.OUTFIT_COUNT)
+        string outfitId = "Outfit " + i
+        mcm.miscVars.SetString(outfitId, outfitId, "clothing/outfits") ; Map Outfit Name to Outfit ID (Dropdown menus for holds display the name)
+        i += 1
+    endWhile
 endFunction
 
 function HandleDependencies(RealisticPrisonAndBounty_MCM mcm) global

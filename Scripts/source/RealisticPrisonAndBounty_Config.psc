@@ -686,7 +686,7 @@ bool function IsClothedOnDefeat(string hold)
 endFunction
 
 string function GetClothingOutfit(string hold)
-    return miscVars.GetString(mcm.GetMenuOptionValue(hold, "Clothing::Outfit"), "clothing/outfits") ; Get mapped Outfit ID
+    return mcm.GetOutfitIdentifier(mcm.GetMenuOptionValue(hold, "Clothing::Outfit")) ; Get mapped Outfit ID
 endFunction
 
 bool function IsClothingOutfitConditional(string hold)

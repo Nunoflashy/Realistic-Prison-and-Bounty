@@ -81,7 +81,7 @@ function PlaySurrenderAnimation(Actor akActorSurrendering)
 endFunction
 
 bool function HasResistedArrest(string hold)
-    return arrestVars.GetBool("Arrest::" + hold + "Arrest Resisted")
+    return arrestVars.GetBool("Arrest::" + hold + "::Arrest Resisted")
 endFunction
 
 ;/
@@ -331,6 +331,13 @@ function SetAsDefeated(Faction akCrimeFaction)
     float defeatBountyFromCurrentBounty = config.GetArrestAdditionalBountyDefeatedFromCurrentBounty(hold)
     float defeatBountyPercentModifier   = percent(defeatBountyFromCurrentBounty)
     int defeatArrestPenalty             = floor(akCrimeFaction.GetCrimeGold() * defeatBountyPercentModifier) + defeatBountyFlat
+
+    Debug(self, "Arrest::SetAsDefeated", "\n" +  \
+        "defeatBountyFlat: " + defeatBountyFlat + "\n" + \
+        "defeatBountyFromCurrentBounty: " + defeatBountyFromCurrentBounty + "\n" + \
+        "defeatBountyPercentModifier: " + defeatBountyPercentModifier  + "\n" + \
+        "defeatArrestPenalty: " + defeatArrestPenalty  + "\n" \
+    )
 
     if (defeatArrestPenalty > 0)
         arrestVars.ModInt("Arrest::Bounty Non-Violent", defeatArrestPenalty)
