@@ -623,18 +623,19 @@ string function GetContainerList( \
     return string_if (!isArray, "{\n\t" + paramOutput + "}", "[\n\t" + paramOutput + "]")
 endFunction
 
-float function ToPercent(float percentToConvertToDecimal) global
-    return percentToConvertToDecimal / 100
-endFunction
-
 ; Converts the passed in percent number to its equivalent decimal percentage to do calculations.
 ; e.g: 5 becomes 0.05
-float function Percent(float percentToConvertToDecimal) global
-    if (percentToConvertToDecimal <= 0)
+float function GetPercentAsDecimal(float percentToConvert) global
+    if (percentToConvert <= 0)
         return 0.0
     endif
     
-    return percentToConvertToDecimal / 100
+    return percentToConvert / 100
+endFunction
+
+; TODO: Test if this actually checks that the item is stolen
+bool function IsStolenItem(Form akItem) global
+    
 endFunction
 
 ;/

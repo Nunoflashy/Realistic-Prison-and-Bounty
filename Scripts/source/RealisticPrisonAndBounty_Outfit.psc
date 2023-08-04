@@ -81,15 +81,15 @@ bool function validate()
 endFunction
 
 bool function IsWearable(int bounty)
-    Debug(self, "Outfit::IsWearable", "\n" + \
-        "IsConditional: " + IsConditional + "\n" + \
-        "bounty >= MaximumBounty: " + (bounty >= MaximumBounty) + "\n" + \
-        "bounty <= MinimumBounty: " + (bounty <= MinimumBounty) + "\n" + \
-        "(MaximumBounty == MinimumBounty) && bounty >= MinimumBounty: " + ((MaximumBounty == MinimumBounty) && bounty >= MinimumBounty) + "\n" + \
-        "bounty >= MinimumBounty && bounty <= MaximumBounty: " + (bounty >= MinimumBounty && bounty <= MaximumBounty) + "\n" + \
-        "MinimumBounty: " + (MinimumBounty) + "\n" + \
-        "MaximumBounty: " + (MaximumBounty) + "\n"\
-)
+    ; Debug(self, "Outfit::IsWearable", "\n" + \
+    ;     "IsConditional: " + IsConditional + "\n" + \
+    ;     "bounty >= MaximumBounty: " + (bounty >= MaximumBounty) + "\n" + \
+    ;     "bounty <= MinimumBounty: " + (bounty <= MinimumBounty) + "\n" + \
+    ;     "(MaximumBounty == MinimumBounty) && bounty >= MinimumBounty: " + ((MaximumBounty == MinimumBounty) && bounty >= MinimumBounty) + "\n" + \
+    ;     "bounty >= MinimumBounty && bounty <= MaximumBounty: " + (bounty >= MinimumBounty && bounty <= MaximumBounty) + "\n" + \
+    ;     "MinimumBounty: " + (MinimumBounty) + "\n" + \
+    ;     "MaximumBounty: " + (MaximumBounty) + "\n"\
+    ; )
     if (!IsConditional)
         return true
     endif

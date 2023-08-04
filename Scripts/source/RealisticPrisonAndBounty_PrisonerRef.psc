@@ -64,6 +64,16 @@ int property Bounty
     endFunction
 endProperty
 
+Faction property JailFaction
+    Faction function get()
+        if (this == config.Player)
+            return arrestVars.ArrestFaction
+        else
+            return arrestVars.GetForm("["+ this.GetFormID() +"]Arrest::Arrest Faction") as Faction
+        endif
+    endFunction
+endProperty
+
 float property CurrentTime
     float function get()
         return Utility.GetCurrentGameTime()
@@ -132,9 +142,9 @@ int property InfamyGainedDaily
         <=> 43 + 40 = 83
     /;
     int function get()
-        int infamyGainedFlat                    = arrestVars.GetFloat("Jail::Infamy Gained Daily") as int
-        float infamyGainedFromCurrentBounty     = arrestVars.GetFloat("Jail::Infamy Gained Daily from Current Bounty")
-        return floor(arrestVars.Bounty * percent(infamyGainedFromCurrentBounty)) + infamyGainedFlat
+        int infamyGainedFlat                            = arrestVars.GetFloat("Jail::Infamy Gained Daily") as int
+        float infamyGainedFromCurrentBountyPercent      = arrestVars.GetFloat("Jail::Infamy Gained Daily from Current Bounty")
+        return floor(arrestVars.Bounty * GetPercentAsDecimal(infamyGainedFromCurrentBountyPercent)) + infamyGainedFlat
     endFunction
 endProperty
 
@@ -260,6 +270,7 @@ function Frisk()
     
     float friskingThoroughness = arrestVars.GetFloat("Frisking::Frisking Thoroughness")
     bodySearcher.FriskActor(this, friskingThoroughness, prisonerItemsContainer)
+    self.OnFriskSearched(prisonerItemsContainer)
 endFunction
 
 function Strip()
@@ -274,6 +285,7 @@ function Strip()
     bodySearcher.StripActor(this, strippingThoroughness, prisonerItemsContainer)
     arrestVars.SetBool("Jail::Stripped", true)
     OnUndressed(isStrippedNaked)
+    self.OnStripSearched(prisonerItemsContainer)
 endFunction
 
 function Clothe()
@@ -323,7 +335,7 @@ endFunction
 
 function AddEscapeBounty()
     ; Player
-    int escapeBountyGotten = floor((arrestVars.BountyNonViolent * percent(arrestVars.EscapeBountyFromCurrentArrest))) + arrestVars.EscapeBounty
+    int escapeBountyGotten = floor((arrestVars.BountyNonViolent * GetPercentAsDecimal(arrestVars.EscapeBountyFromCurrentArrest))) + arrestVars.EscapeBounty
     arrestVars.ArrestFaction.ModCrimeGold(escapeBountyGotten)
     config.NotifyJail("You have gained " + escapeBountyGotten + " Bounty in " + arrestVars.Hold + " for escaping") ; Hold must be dynamic to each prisoner later
 
@@ -338,7 +350,8 @@ function TriggerCrimimalPenalty()
         if (arrestVars.IsInfamyRecognized || arrestVars.IsInfamyKnown)
             int currentInfamy  = 2000;config.GetInfamyGained(arrestVars.Hold)
             float criminalPenalty  = float_if (arrestVars.IsInfamyKnown, arrestVars.GetFloat("Jail::Known Criminal Penalty"), arrestVars.GetFloat("Jail::Recognized Criminal Penalty"))
-            int infamyPenalty = (currentInfamy * floor(percent(criminalPenalty)))
+            ; int infamyPenalty = (currentInfamy * floor(percent(criminalPenalty))) ; this should be invalid, floor(percent) will return less percent than configured
+            int infamyPenalty = floor(currentInfamy * GetPercentAsDecimal(criminalPenalty))
             Debug(self.GetOwningQuest(), "TriggerCrimimalPenalty", "infamyPenalty: " + infamyPenalty)
 
             arrestVars.SetInt("Jail::Sentence", arrestVars.Sentence + infamyPenalty)
@@ -364,10 +377,14 @@ function UpdateSentence()
         int violentBountyConverted = floor(arrestVars.BountyViolent * (100 / arrestVars.BountyExchange))
     
         int oldSentence = arrestVars.GetInt("Jail::Sentence")
-    
-        arrestVars.SetFloat("Arrest::Bounty Non-Violent", _bountyNonViolent)
-        arrestVars.SetFloat("Arrest::Bounty Violent", _bountyViolent)
-        arrestVars.SetFloat("Jail::Sentence", (_bountyNonViolent + violentBountyConverted) / arrestVars.BountyToSentence)
+        
+        if (_bountyNonViolent + _bountyViolent != 0)
+            arrestVars.SetFloat("Arrest::Bounty Non-Violent", _bountyNonViolent)
+            arrestVars.SetFloat("Arrest::Bounty Violent", _bountyViolent)
+        endif
+
+        ; arrestVars.SetFloat("Jail::Sentence", (_bountyNonViolent + violentBountyConverted) / arrestVars.BountyToSentence)
+        arrestVars.SetFloat("Jail::Sentence", (BountyNonViolent + violentBountyConverted) / arrestVars.BountyToSentence)
     
         int newSentence = arrestVars.GetInt("Jail::Sentence")
         ClearBounty(arrestVars.ArrestFaction)
@@ -547,7 +564,7 @@ endFunction
 
 function MoveToCell()
     ObjectReference prisonerJailCell  = arrestVars.GetReference("Jail::Cell")
-    ObjectReference jailCellDoor      = arrestVars.GetReference("Jail::Cell Door") 
+    ObjectReference jailCellDoor      = arrestVars.GetReference("Jail::Cell Door")
 
     this.MoveTo(prisonerJailCell)
     jailCellDoor.SetOpen(false)
@@ -562,6 +579,52 @@ bool function IsEscapee()
     return arrestVars.GetBool("Jail::Escaped")
 endFunction
 
+event OnSearched(ObjectReference prisonerHeldItemsContainer)
+    ; Determine how many stolen items were found upon being searched
+    ; add bounty accordingly from Additional Charges
+    int bountyForStolenItems    = arrestVars.GetInt("Additional Charges::Bounty for Stolen Items")
+    float bountyPerStolenItem   = GetPercentAsDecimal(arrestVars.GetFloat("Additional Charges::Bounty for Stolen Item"))
+
+    Debug(self.GetOwningQuest(), "Prisoner::OnSearched", "BountyForStolenItems: " + bountyForStolenItems + ", Bounty per Stolen Item: " + bountyPerStolenItem)
+
+    if ((bountyForStolenItems + bountyPerStolenItem) <= 0)
+        return
+    endif
+
+    int totalBountyAdded = 0
+    int stolenItems = 0
+    int i = 0
+    while (i < prisonerHeldItemsContainer.GetNumItems())
+        Form currentItem = prisonerHeldItemsContainer.GetNthForm(i)
+
+        ; if (IsStolenItem(currentItem))
+            stolenItems += 1
+            Debug(self.GetOwningQuest(), "Prisoner::OnSearched", "Found stolen item: " + currentItem)
+            ; int bountyAdded = floor(bountyPerStolenItem * stolenItems) + bountyForStolenItems
+            int bountyAdded = floor(currentItem.GetGoldValue() * bountyPerStolenItem)
+            arrestVars.ModInt("Arrest::Bounty Non-Violent", bountyAdded)
+            totalBountyAdded += bountyAdded
+        ; endif
+
+        i += 1
+    endWhile
+
+    if (stolenItems > 0)
+        totalBountyAdded += bountyForStolenItems
+        arrestVars.ModInt("Arrest::Bounty Non-Violent", bountyForStolenItems)
+        config.NotifyJail("You have been charged with item theft and received an additional " + totalBountyAdded + " Bounty")
+        Debug(self.GetOwningQuest(), "Prisoner::OnSearched", "Added bounty for stolen items: " + totalBountyAdded)
+    endif
+endEvent
+
+event OnFriskSearched(ObjectReference prisonerHeldItemsContainer)
+    ; self.OnSearched(prisonerHeldItemsContainer)
+endEvent
+
+event OnStripSearched(ObjectReference prisonerHeldItemsContainer)
+    ; self.OnSearched(prisonerHeldItemsContainer)
+endEvent
+
 event OnUndressed(bool isNaked)
     jail.OnUndressed(this)
 endEvent
@@ -569,9 +632,24 @@ endEvent
 event OnClothed(RealisticPrisonAndBounty_Outfit prisonerOutfit)
     jail.OnClothed(this, prisonerOutfit)
 endEvent
-; akSpeaker.SetPlayerResistingArrest()
+
 event OnSentenceChanged(int oldSentence, int newSentence, bool hasSentenceIncreased, bool bountyAffected)
     jail.OnSentenceChanged(this, oldSentence, newSentence, hasSentenceIncreased, bountyAffected)
+endEvent
+
+event OnItemRemoved(Form baseItem, int itemCount, ObjectReference itemReference, ObjectReference destContainer)
+    ; Process all stolen items that were taken away from the prisoner
+    Faction factionOwner = itemReference.GetFactionOwner()
+    ActorBase actorOwner = itemReference.GetActorOwner()
+
+    Debug(none, "Prisoner::OnItemRemoved", ", " + \
+        "Base Item: " + baseItem + ", " + \
+        "Item Reference: " + itemReference + ", " + \
+        "Faction Owner: " + factionOwner + ", " + \
+        "Actor Owner: " + actorOwner + ", " + \
+        "Item Count: " + itemCount + ", " + \
+        "Destination Container: " + destContainer \
+    )
 endEvent
 
 event OnObjectUnequipped(Form akBaseObject, ObjectReference akReference)

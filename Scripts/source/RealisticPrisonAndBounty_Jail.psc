@@ -278,7 +278,7 @@ state Jailed
     endEvent
 
     event OnCellDoorClosed(ObjectReference _cellDoor, Actor whoClosed)
-
+        
     endEvent
 
     event OnGuardSeesPrisoner(Actor akGuard)
@@ -680,7 +680,7 @@ function TriggerImprisonment()
     
     ; ShowArrestVars()
 
-    ; Prisoner.UpdateSentence()
+    Prisoner.UpdateSentence()
     Prisoner.SetTimeOfImprisonment() ; Start the sentence from this point
 
     int currentLongestSentence = config.GetStat(Hold, "Longest Sentence")

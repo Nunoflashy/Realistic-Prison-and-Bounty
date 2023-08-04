@@ -90,6 +90,21 @@ function Right(RealisticPrisonAndBounty_MCM mcm) global
 
 endFunction
 
+; TODO: Make it so it checks for all outfits individually in case one is added later (dynamic outfit count through a text file maybe?)
+; This should allow for an indefinite number of outfits to be added to the mod, however the page only goes up to 10 so the config would have
+; to be done externally or new pages would have to be made dynamically for each 10 outfits (or maybe less if less load times are desired.)
+;/
+    Like this:
+    int outfitCount = miscVars.GetLengthOf("clothing/outfits")
+    int i = 0
+    while (i < outfitCount)
+        if (!miscVars.GetString(outfitId))
+            ; Set the new outfit
+            miscVars.SetString(outfitId, outfitId, "clothing/outfits")
+        endif
+        i += 1
+    endWhile
+/;
 function SetOutfitDefaultValues(RealisticPrisonAndBounty_MCM mcm) global
     if (mcm.miscVars.Exists("clothing/outfits"))
         return

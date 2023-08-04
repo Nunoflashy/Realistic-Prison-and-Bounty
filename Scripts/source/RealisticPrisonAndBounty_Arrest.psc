@@ -329,7 +329,7 @@ function SetAsDefeated(Faction akCrimeFaction)
 
     int defeatBountyFlat                = config.GetArrestAdditionalBountyDefeatedFlat(hold)
     float defeatBountyFromCurrentBounty = config.GetArrestAdditionalBountyDefeatedFromCurrentBounty(hold)
-    float defeatBountyPercentModifier   = percent(defeatBountyFromCurrentBounty)
+    float defeatBountyPercentModifier   = GetPercentAsDecimal(defeatBountyFromCurrentBounty)
     int defeatArrestPenalty             = floor(akCrimeFaction.GetCrimeGold() * defeatBountyPercentModifier) + defeatBountyFlat
 
     Debug(self, "Arrest::SetAsDefeated", "\n" +  \
@@ -350,7 +350,7 @@ function TriggerResistArrest(Actor akGuard, Faction akCrimeFaction)
 
     int resistBountyFlat                    = config.GetArrestAdditionalBountyResistingFlat(hold)
     float resistBountyFromCurrentBounty     = config.GetArrestAdditionalBountyDefeatedFromCurrentBounty(hold)
-    float resistBountyPercentModifier       = percent(resistBountyFromCurrentBounty)
+    float resistBountyPercentModifier       = GetPercentAsDecimal(resistBountyFromCurrentBounty)
     int resistArrestPenalty                 = floor(akCrimeFaction.GetCrimeGold() * resistBountyPercentModifier) + resistBountyFlat
 
     if (resistArrestPenalty > 0)
@@ -732,7 +732,7 @@ endFunction
 
 ;     int resistBountyFlat                    = config.GetArrestAdditionalBountyResistingFlat(hold)
 ;     float resistBountyFromCurrentBounty     = config.GetArrestAdditionalBountyDefeatedFromCurrentBounty(hold)
-;     float resistBountyPercentModifier       = percent(resistBountyFromCurrentBounty)
+;     float resistBountyPercentModifier       = GetPercentAsDecimal(resistBountyFromCurrentBounty)
 ;     int resistArrestPenalty                 = floor(akCrimeFaction.GetCrimeGold() * resistBountyPercentModifier) + resistBountyFlat
 
 ;     akCrimeFaction.ModCrimeGold(resistArrestPenalty)

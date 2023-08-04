@@ -299,7 +299,14 @@ function InitializePages()
     Pages = JArray.asStringArray(_pagesArray)
 endFunction
 
-bool function SetOptionDependencyBool(string option, bool dependency, bool storePersistently = true)
+;/
+    Sets a dependency on an option in order to determine its state (flag).
+    
+    string  @option: The option to set the dependency on
+    bool    @dependency: The condition this option must pass in order to have its state be ON (OFF if false)
+    bool?   @storePersistently: Whether to save the state of the option in the save
+/;
+function SetOptionDependencyBool(string option, bool dependency, bool storePersistently = true)
     string optionKey = self.GetOptionAsStored(option)
     int optionId     = self.GetOption(optionKey)
     int flag         = int_if (dependency, OPTION_FLAG_NONE, OPTION_FLAG_DISABLED)
@@ -310,22 +317,6 @@ bool function SetOptionDependencyBool(string option, bool dependency, bool store
         self.SetOptionState(optionKey, flag)
     endif
 endFunction
-
-
-string function __getStatOptionFormatString(string optionName)
-    if (StringUtil.Find(optionName, "Bounty") != -1)
-        return "Bounty"
-    elseif (StringUtil.Find(optionName, "Times") != -1)
-        return "Times"
-    elseif (StringUtil.Find(optionName, "Days") != -1 || StringUtil.Find(optionName, "Sentence") != -1)
-        return "Days"
-    elseif (StringUtil.Find(optionName, "Fees") != -1)
-        return "Gold"
-    elseif (StringUtil.Find(optionName, "Infamy") != -1)
-        return "Infamy"
-    endif
-endFunction
-
 
 ; ============================================================
 ; Option Getters
@@ -799,10 +790,6 @@ function Error(string caller, string logInfo, bool condition = true)
 endFunction
 
 function SerializeOptions()
-    if (!miscVars.Exists("clothing/outfits"))
-        miscVars.CreateStringMap("clothing/outfits")
-    endif
-
     JValue.writeToFile(generalContainer, "generalContainer.txt")
     miscVars.serialize("root", "miscVars_all.txt")
 endFunction
@@ -1047,7 +1034,7 @@ endFunction
 
 function SetOptionValueFloat(string optionKey, float value, string page = "")
     JMap.setFlt(optionsValueMap, string_if (page == "", CurrentPage, page) + "/" + optionKey, value)
-    Debug("MCM::SetOptionValueFloat", "Set " + string_if (page == "", CurrentPage, page) + "/" + optionKey + " value to: " + value, true)
+    ; Debug("MCM::SetOptionValueFloat", "Set " + string_if (page == "", CurrentPage, page) + "/" + optionKey + " value to: " + value, true)
 endFunction
 
 function SetOptionValueString(string optionKey, string value, string page = "")
@@ -1070,7 +1057,6 @@ function RegisterOption(string optionKey, int optionId, string page = "")
     ; For bi-directional identification (option-key to option-id and option-id to option-key)
     JMap.setInt(optionsFromKeyToIdMap, string_if (page == "", CurrentPage, page) + "/" + optionKey, optionId)
     JIntMap.setStr(optionsFromIdToKeyMap, optionId, string_if (page == "", CurrentPage, page) + "/" + optionKey)
-    ; Debug("MCM::RegisterOption", "Registered " + optionKey + " (Option ID: "+ optionId +")", true)
 endFunction
 
 function SetOptionState(string optionKey, int optionState, string page = "")

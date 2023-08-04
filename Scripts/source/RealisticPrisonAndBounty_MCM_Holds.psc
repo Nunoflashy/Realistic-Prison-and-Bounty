@@ -96,6 +96,7 @@ function Left(RealisticPrisonAndBounty_MCM mcm) global
     mcm.AddOptionSlider("Minimum Sentence to Strip", "{0} Days")
     mcm.AddOptionToggle("Strip when Defeated")
     mcm.AddOptionSlider("Strip Search Thoroughness", "{0}x")
+    mcm.AddOptionSlider("Strip Search Thoroughness Modifier", "{0} Bounty = 1x")
 endFunction
 
 function Right(RealisticPrisonAndBounty_MCM mcm) global
@@ -131,11 +132,11 @@ function Right(RealisticPrisonAndBounty_MCM mcm) global
     mcm.AddTextOption("", "WHEN RELEASED", mcm.OPTION_DISABLED)
     mcm.SetRenderedCategory("Release")
     mcm.AddOptionToggle("Enable Release Fees")
-    mcm.AddOptionSlider("Chance for Event", "{0}%",                 defaultFlags = mcm.OPTION_DISABLED)
-    mcm.AddOptionSlider("Minimum Bounty to owe Fees", "{0} Bounty", defaultFlags = mcm.OPTION_DISABLED)
+    mcm.AddOptionSlider("Chance for Event", "{0}%",                                         defaultFlags = mcm.OPTION_DISABLED)
+    mcm.AddOptionSlider("Minimum Bounty to owe Fees", "{0} Bounty",                         defaultFlags = mcm.OPTION_DISABLED)
     mcm.AddOptionSliderKey("Release Fees", "Release Fees (%)", "{1}% of Bounty as Gold",    defaultFlags = mcm.OPTION_DISABLED)
-    mcm.AddOptionSlider("Release Fees", "{0} Gold",              defaultFlags = mcm.OPTION_DISABLED)
-    mcm.AddOptionSlider("Days Given to Pay", "{0} Days",            defaultFlags = mcm.OPTION_DISABLED)
+    mcm.AddOptionSlider("Release Fees", "{0} Gold",                                         defaultFlags = mcm.OPTION_DISABLED)
+    mcm.AddOptionSlider("Days Given to Pay", "{0} Days",                                    defaultFlags = mcm.OPTION_DISABLED)
     mcm.AddEmptyOption()
     mcm.AddOptionToggle("Enable Item Retention")
     mcm.AddOptionSlider("Minimum Bounty to Retain Items", "{0} Bounty")
@@ -169,12 +170,12 @@ function Right(RealisticPrisonAndBounty_MCM mcm) global
     mcm.AddOptionCategory("Clothing")
     mcm.AddTextOption("", "When Undressed", mcm.OPTION_DISABLED)
     mcm.AddOptionToggle("Allow Clothing")
-    mcm.AddOptionMenu("Handle Clothing On",                                                                                                     defaultFlags = mcm.OPTION_DISABLED)
-    mcm.AddOptionSliderKey("Maximum Bounty to Clothe", "Maximum Bounty", "{0} Bounty",                                                          defaultFlags = mcm.OPTION_DISABLED)
-    mcm.AddOptionSliderKey("Maximum Violent Bounty to Clothe", "Maximum Violent Bounty", "{0} Violent Bounty",                                  defaultFlags = mcm.OPTION_DISABLED)
-    mcm.AddOptionSliderKey("Maximum Sentence to Clothe", "Maximum Sentence", "{0} Days",                                                        defaultFlags = mcm.OPTION_DISABLED)
-    mcm.AddOptionToggleKey("Clothe When Defeated", "When Defeated",                                                                             defaultFlags = mcm.OPTION_DISABLED)
-    mcm.AddOptionMenu("Outfit",                                                                                                                 defaultFlags = mcm.OPTION_DISABLED)
+    mcm.AddOptionMenu("Handle Clothing On",                                                                     defaultFlags = mcm.OPTION_DISABLED)
+    mcm.AddOptionSliderKey("Maximum Bounty to Clothe", "Maximum Bounty", "{0} Bounty",                          defaultFlags = mcm.OPTION_DISABLED)
+    mcm.AddOptionSliderKey("Maximum Violent Bounty to Clothe", "Maximum Violent Bounty", "{0} Violent Bounty",  defaultFlags = mcm.OPTION_DISABLED)
+    mcm.AddOptionSliderKey("Maximum Sentence to Clothe", "Maximum Sentence", "{0} Days",                        defaultFlags = mcm.OPTION_DISABLED)
+    mcm.AddOptionToggleKey("Clothe When Defeated", "When Defeated",                                             defaultFlags = mcm.OPTION_DISABLED)
+    mcm.AddOptionMenu("Outfit",                                                                                 defaultFlags = mcm.OPTION_DISABLED)
 endFunction
 
 function HandleDependencies(RealisticPrisonAndBounty_MCM mcm) global
@@ -207,6 +208,7 @@ function HandleDependencies(RealisticPrisonAndBounty_MCM mcm) global
     mcm.SetOptionDependencyBool("Stripping::Minimum Sentence to Strip",             allowUndressing && isStrippingSentenceHandling)
     mcm.SetOptionDependencyBool("Stripping::Strip when Defeated",                   allowUndressing)
     mcm.SetOptionDependencyBool("Stripping::Strip Search Thoroughness",             allowUndressing)
+    mcm.SetOptionDependencyBool("Stripping::Strip Search Thoroughness Modifier",               allowUndressing)
 
     ; ==========================================================
     ;                           CLOTHING
@@ -309,7 +311,7 @@ function HandleDependencies(RealisticPrisonAndBounty_MCM mcm) global
     mcm.SetOptionDependencyBool("Release::Chance for Event",                enableAdditionalFees)
     mcm.SetOptionDependencyBool("Release::Minimum Bounty to owe Fees",      enableAdditionalFees)
     mcm.SetOptionDependencyBool("Release::Release Fees (%)",                enableAdditionalFees)
-    mcm.SetOptionDependencyBool("Release::Release Fees",                 enableAdditionalFees)
+    mcm.SetOptionDependencyBool("Release::Release Fees",                    enableAdditionalFees)
     mcm.SetOptionDependencyBool("Release::Days Given to Pay",               enableAdditionalFees)
     mcm.SetOptionDependencyBool("Release::Minimum Bounty to Retain Items",  retainItemsOnRelease)
     mcm.SetOptionDependencyBool("Release::Auto Re-Dress on Release",        allowUndressing)
@@ -364,7 +366,8 @@ endFunction
 
 function OnOptionHighlight(RealisticPrisonAndBounty_MCM mcm, string option) global
 
-    string city = mcm.config.GetCityNameFromHold(mcm.CurrentPage)
+    ; string city = mcm.config.GetCityNameFromHold(mcm.CurrentPage)
+    string city = mcm.miscVars.GetString("City["+ mcm.CurrentPage +"]")
 
     ; ==========================================================
     ;                            STATS
@@ -625,6 +628,10 @@ function OnOptionHighlight(RealisticPrisonAndBounty_MCM mcm, string option) glob
     elseif (option == "Stripping::Strip Search Thoroughness")
         mcm.SetInfoText("The thoroughness of the strip search, higher values mean a more thorough search and therefore possibly less items kept.\n" + \
                      "Due to the nature of a strip search, most items will be removed, this value will only determine small objects that could be hidden when stripped off.")
+
+    elseif (option == "Stripping::Strip Search Thoroughness Modifier")
+        mcm.SetInfoText("The amount of additional thoroughness that is applied to Strip Search Thoroughness through a bounty modifier.")
+                     
 
     ; ==========================================================
     ;                         CLOTHING
@@ -947,7 +954,11 @@ function LoadSliderOptions(RealisticPrisonAndBounty_MCM mcm, string option, floa
 
     elseif (option == "Stripping::Strip Search Thoroughness")
         maxRange = 10
-
+    
+    elseif (option == "Stripping::Strip Search Thoroughness Modifier")
+        maxRange = 10000
+        intervalSteps = 10
+    
     ; ==========================================================
     ;                         CLOTHING
     ; ==========================================================
@@ -1195,6 +1206,9 @@ function OnOptionSliderAccept(RealisticPrisonAndBounty_MCM mcm, string option, f
 
     elseif (option == "Stripping::Strip Search Thoroughness")
         formatString = "{0}x"
+
+    elseif (option == "Stripping::Strip Search Thoroughness Modifier")
+        formatString = "{0} Bounty = 1x"
 
     ; ==========================================================
     ;                         CLOTHING

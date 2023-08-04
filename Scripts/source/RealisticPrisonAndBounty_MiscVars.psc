@@ -617,7 +617,7 @@ string function CreateContainer(string containerKey, string containerType, strin
         _container = JFormMap.object()
 
     else
-        Error(self, "MiscVars::CreateContainer", "The container type specified is invalid!")
+        Error(self, "MiscVars::CreateContainer", "The container type specified is invalid! (Type: "+ containerType +")")
         return ""
     endif
 

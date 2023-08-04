@@ -556,7 +556,7 @@ int function GetArrestAdditionalBountyResistingFlat(string hold)
 endFunction
 
 int function GetArrestAdditionalBountyResisting(string hold)
-    float bountyPercentModifier = ToPercent(GetArrestAdditionalBountyResistingFromCurrentBounty(hold))
+    float bountyPercentModifier = GetPercentAsDecimal(GetArrestAdditionalBountyResistingFromCurrentBounty(hold))
     int bountyFlat              = GetArrestAdditionalBountyResistingFlat(hold)
     Faction crimeFaction        = GetFaction(hold)
     int bounty                  = floor(crimeFaction.GetCrimeGold() * bountyPercentModifier) + bountyFlat
@@ -573,7 +573,7 @@ int function GetArrestAdditionalBountyDefeatedFlat(string hold)
 endFunction
 
 int function GetArrestAdditionalBountyDefeated(string hold)
-    float bountyPercentModifier = ToPercent(getArrestAdditionalBountyDefeatedFromCurrentBounty(hold))
+    float bountyPercentModifier = GetPercentAsDecimal(getArrestAdditionalBountyDefeatedFromCurrentBounty(hold))
     int bountyFlat              = GetArrestAdditionalBountyDefeatedFlat(hold)
     Faction crimeFaction        = GetFaction(hold)
     int bounty                  = floor(crimeFaction.GetCrimeGold() * bountyPercentModifier) + bountyFlat
