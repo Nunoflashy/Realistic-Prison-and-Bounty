@@ -1,7 +1,4 @@
 meta.ini
-<<<<<<< Updated upstream
-temp/
-=======
 temp/
 *.pex
 *.jslot
@@ -15,4 +12,3 @@ Scripts/MCM_Backup/RealisticPrisonAndBounty_MCM_Debug.psc
 Scripts/MCM_Backup/RealisticPrisonAndBounty_MCM_General.psc
 Scripts/MCM_Backup/RealisticPrisonAndBounty_MCM_Holds.psc
 Scripts/MCM_Backup/RealisticPrisonAndBounty_MCM_Stats.psc
->>>>>>> Stashed changes
