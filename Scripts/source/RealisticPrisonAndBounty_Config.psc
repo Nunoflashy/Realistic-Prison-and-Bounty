@@ -649,6 +649,10 @@ int function GetStrippingThoroughness(string hold)
     return mcm.GetSliderOptionValue(hold, "Stripping::Strip Search Thoroughness") as int
 endFunction
 
+int function GetStrippingThoroughnessBountyModifier(string hold)
+    return mcm.GetSliderOptionValue(hold, "Stripping::Strip Search Thoroughness Modifier") as int
+endFunction
+
 bool function IsClothingEnabled(string hold)
     return mcm.GetToggleOptionState(hold, "Clothing::Allow Clothing")
 endFunction

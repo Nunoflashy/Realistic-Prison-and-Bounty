@@ -275,10 +275,16 @@ endFunction
 
 function Strip()
     Debug(self.GetOwningQuest(), "Strip", "Prisoner Strip")
-
     ObjectReference prisonerItemsContainer = arrestVars.PrisonerItemsContainer
 
     float strippingThoroughness = arrestVars.GetFloat("Stripping::Stripping Thoroughness")
+
+    int strippingThoroughnessModifierBounty = arrestVars.GetInt("Stripping::Stripping Thoroughness Modifier")
+    int strippingThoroughnessModifier = floor(arrestVars.Bounty / strippingThoroughnessModifierBounty)
+    strippingThoroughness += strippingThoroughnessModifier
+
+    debug.notification("Stripping Thoroughness: " + strippingThoroughness + ", modifier: " + strippingThoroughnessModifier)
+
     bool isStrippedNaked = strippingThoroughness >= 6
     config.IncrementStat(arrestVars.Hold, "Times Stripped")
     actorVars.ModTimesStripped(arrestVars.ArrestFaction, this, 1)
