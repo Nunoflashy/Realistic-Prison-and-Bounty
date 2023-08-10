@@ -264,6 +264,9 @@ state Jailed
 
     event OnCellDoorOpen(ObjectReference _cellDoor, Actor whoOpened)
         if (whoOpened == Arrestee)
+            GotoState(STATE_ESCAPED)
+            self.TriggerEscape()
+            return
             ; arrestVars.SetForm("Jail::Cell Door", _cellDoor)
             ; Make noise to attract guards attention,
             ; if the guard sees the door open, goto Escaped state
@@ -479,11 +482,16 @@ state Escaped
     endEvent
 
     event OnUpdateGameTime()
+        ; Not arrested anymore, break out of this state
+        if (!arrestVars.IsArrested)
+            GotoState("")
+            return
+        endif
         ; Prisoner is escaping, but they are still inside the prison,
         ; infamy should still be updated
-        if (arrestVars.InfamyEnabled)
-            Prisoner.UpdateInfamy()
-        endif
+        ; if (arrestVars.InfamyEnabled)
+        ;     Prisoner.UpdateInfamy()
+        ; endif
 
         Prisoner.RegisterLastUpdate()
         RegisterForSingleUpdateGameTime(1.0)
@@ -638,13 +646,10 @@ function TriggerEscape()
         return
     endif
 
-    Debug(self, "TriggerEscape", "Escaped state begin")
-    arrestVars.SetBool("Jail::Jailed", false)
-    config.IncrementStat(Hold, "Times Escaped")
-    Game.IncrementStat("Jail Escapes")
-
+    Prisoner.SetEscaped()
     Prisoner.RevertBounty()
     Prisoner.AddEscapeBounty()
+    Prisoner.ResetArrestVars() ; May change, as an escape doesn't necessarily mean all vars should be deleted.
 endFunction
 
 function TriggerImprisonment()

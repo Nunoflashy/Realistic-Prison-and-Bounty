@@ -208,6 +208,29 @@ function SetupPrisonerVars()
     arrestVars.SetObject("Jail::Prisoner Equipped Items", JArray.object())
 endFunction
 
+function ResetArrestVars()
+    if (this == config.Player)
+        ; Arrest Vars
+        arrestVars.Remove("Arrest::Arrested")
+        arrestVars.Remove("Arrest::Arrestee")
+        arrestVars.Remove("Arrest::Hold")
+        arrestVars.Remove("Arrest::Bounty Non-Violent")
+        arrestVars.Remove("Arrest::Bounty Violent")
+        arrestVars.Remove("Arrest::Arrest Faction")
+        arrestVars.Remove("Arrest::Arresting Guard")
+        arrestVars.Remove("Arrest::Time of Arrest")
+
+        ; Jail Vars
+        arrestVars.Remove("Jail::Jailed")
+        arrestVars.Remove("Jail::Stripped")
+        arrestVars.Remove("Jail::Clothed")
+        arrestVars.Remove("Jail::Sentence")
+        arrestVars.Remove("Jail::Time of Imprisonment")
+        ; arrestVars.Remove("Jail::Cell")
+        ; arrestVars.Remove("Jail::Cell Door")
+    endif
+endFunction
+
 function RegisterLastUpdate()
     LastUpdate = Utility.GetCurrentGameTime()
 endFunction
@@ -329,14 +352,28 @@ function MoveToReleaseLocation()
     this.MoveTo(arrestVars.GetForm("Jail::Teleport Release Location") as ObjectReference)
 endFunction
 
+function SetEscaped()
+    if (this == config.Player)
+        arrestVars.SetBool("Arrest::Arrested", false)
+        arrestVars.SetBool("Jail::Jailed", false)
+        arrestVars.SetBool("Jail::Escaped", true)
+
+        ; Increment the "Times Escaped" stat for this Hold
+        config.IncrementStat(arrestVars.Hold, "Times Escaped")
+
+        ; Increment the "Jail Escapes" in the regular vanilla stat menu.
+        Game.IncrementStat("Jail Escapes")
+    endif
+endFunction
+
 ; Get the bounty from storage and add it into active bounty for this faction.
 function RevertBounty()
     arrestVars.ArrestFaction.SetCrimeGold(arrestVars.BountyNonViolent)
     arrestVars.ArrestFaction.SetCrimeGoldViolent(arrestVars.BountyViolent)
 
-    ; Should we clear it from storage vars?
-    ; config.SetArrestVarInt("Arrest::Bounty Non-Violent", 0)
-    ; config.SetArrestVarInt("Arrest::Bounty Violent", 0)
+    ; ; Should we clear it from storage vars?
+    ; arrestVars.SetInt("Arrest::Bounty Non-Violent", 0)
+    ; arrestVars.SetInt("Arrest::Bounty Violent", 0)
 endFunction
 
 function AddEscapeBounty()
@@ -344,6 +381,10 @@ function AddEscapeBounty()
     int escapeBountyGotten = floor((arrestVars.BountyNonViolent * GetPercentAsDecimal(arrestVars.EscapeBountyFromCurrentArrest))) + arrestVars.EscapeBounty
     arrestVars.ArrestFaction.ModCrimeGold(escapeBountyGotten)
     config.NotifyJail("You have gained " + escapeBountyGotten + " Bounty in " + arrestVars.Hold + " for escaping") ; Hold must be dynamic to each prisoner later
+
+    ; Should we clear it from storage vars?
+    arrestVars.SetInt("Arrest::Bounty Non-Violent", 0)
+    arrestVars.SetInt("Arrest::Bounty Violent", 0)
 
     ; NPC (Later)
 endFunction

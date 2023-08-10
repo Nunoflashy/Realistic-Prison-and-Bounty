@@ -226,7 +226,7 @@ event OnArrestBegin(string eventName, string arrestType, float arresteeId, Form 
         arrestVars.SetForm("Arrest::Arresting Guard", captor)
         Debug(self, "OnArrestBegin", "Arrest is being done through a captor ("+ captor +")")
     endif
-
+    
     arrestVars.SetForm("Arrest::Arrest Faction", crimeFaction)
     arrestVars.SetString("Arrest::Hold", crimeFaction.GetName())
     arrestVars.SetForm("Arrest::Arrestee", arrestee)

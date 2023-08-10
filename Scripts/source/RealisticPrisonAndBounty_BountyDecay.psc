@@ -92,7 +92,7 @@ endFunction
 function DecayForHold(string hold)
     Faction crimeFaction    = config.getFaction(hold)
     int currentBounty       = crimeFaction.GetCrimeGold()
-    float bountyLostPercent = ToPercent(config.getBountyDecayLostFromCurrentBounty(hold))
+    float bountyLostPercent = GetPercentAsDecimal(config.getBountyDecayLostFromCurrentBounty(hold))
     int bountyLost          = config.getBountyDecayLostBounty(hold)
     int decayTo = currentBounty - bountyLost - int_if(bountyLostPercent > 0, floor(currentBounty * bountyLostPercent))
     crimeFaction.SetCrimeGold(decayTo)

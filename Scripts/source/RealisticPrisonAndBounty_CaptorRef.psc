@@ -33,14 +33,14 @@ event OnEquipped(Actor akActor)
 endEvent
 
 event OnSit(ObjectReference akFurniture)
-    Debug(self.GetOwningQuest(), "OnSit", this + " sat on " + akFurniture.GetBaseObject().GetName())
+    ; Debug(self.GetOwningQuest(), "OnSit", this + " sat on " + akFurniture.GetBaseObject().GetName())
     ; RegisterForLOS(this, jail.config.Player)
     ; Debug(self.GetOwningQuest(), "OnSit", this + " registered LOS for " + jail.config.Player)
 endEvent
 
 event OnGainLOS(Actor akViewer, ObjectReference akTarget)
     ; Debug(self.GetOwningQuest(), "OnGainLOS", akViewer + " is seeing " + akTarget)
-    jail.OnGuardSeesPrisoner(this)
+    ; jail.OnGuardSeesPrisoner(this)
 endEvent
 
 event OnLostLOS(Actor akViewer, ObjectReference akTarget)
