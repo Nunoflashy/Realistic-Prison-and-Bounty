@@ -139,16 +139,6 @@ function SetupJailVars()
     EndBenchmark(x, "SetupJailVars")
 endFunction
 
-; Get the bounty from storage and add it into active bounty for this faction.
-; function RevertBounty()
-;     ArrestFaction.SetCrimeGold(BountyNonViolent)
-;     ArrestFaction.SetCrimeGoldViolent(BountyViolent)
-
-;     ; Should we clear it from storage vars?
-;     ; config.SetArrestVarInt("Arrest::Bounty Non-Violent", 0)
-;     ; config.SetArrestVarInt("Arrest::Bounty Violent", 0)
-; endFunction
-
 int function GetCellDoorLockLevel()
     string configuredLockLevel = arrestVars.GetString("Jail::Cell Lock Level")
     return  int_if (configuredLockLevel == "Novice", 1, \
@@ -344,17 +334,17 @@ state Jailed
             GotoState(STATE_RELEASED)
         endif
 
+        Prisoner.UpdateDaysJailed()
+
         ; config.miscVars.List()
 
         ; Prisoner.ShowJailInfo()
-        ; Prisoner.ShowSentenceInfo()
+        Prisoner.ShowSentenceInfo()
         ; arrestVars.List("Stripping")
         ; arrestVars.List("Jail")
         ; arrestVars.ListOverrides("Stripping")
         ; Prisoner.ShowActorVars()
-        ; LastUpdate = Utility.GetCurrentGameTime()
         Prisoner.RegisterLastUpdate() ; Registers the last update in-game time for the prisoner
-        ; LastUpdate = Utility.GetCurrentGameTime()
         ; Keep updating while in jail
         RegisterForSingleUpdateGameTime(1.0)
     endEvent
@@ -651,7 +641,7 @@ function TriggerEscape()
     Prisoner.AddEscapeBounty()
     Prisoner.ResetArrestVars() ; May change, as an escape doesn't necessarily mean all vars should be deleted.
 endFunction
-
+ 
 function TriggerImprisonment()
     if (CurrentState != STATE_JAILED)
         Error(self, "TriggerImprisonment", "Not currently jailed, invalid call!")
@@ -662,12 +652,12 @@ function TriggerImprisonment()
     float startBench = StartBenchmark()
     ; Begin Jailed process, Actor is arrested and jailed
     ; Switch timescale to prison timescale
-    config.IncrementStat(Hold, "Times Jailed")
 
-    ; Trigger infamy penalty, only if infamy is enabled
-    Prisoner.TriggerCrimimalPenalty()
+    Prisoner.MarkAsJailed()
 
     if (Prisoner.JailCell)
+        ; Refactor idea:
+        ; Prisoner.CloseCellDoor(locked = true)
         arrestVars.CellDoor.SetOpen(false)
         arrestVars.CellDoor.Lock()
     endif
@@ -687,10 +677,14 @@ function TriggerImprisonment()
     ; ShowArrestVars()
 
     Prisoner.UpdateSentence()
+
+    ; Trigger infamy penalty, only if infamy is enabled
+    if (arrestVars.InfamyEnabled)
+        Prisoner.TriggerCrimimalPenalty()
+    endif
+
     Prisoner.SetTimeOfImprisonment() ; Start the sentence from this point
 
-    int currentLongestSentence = config.GetStat(Hold, "Longest Sentence")
-    config.SetStat(Hold, "Longest Sentence", int_if (currentLongestSentence < Prisoner.Sentence, Prisoner.Sentence, currentLongestSentence))
     Prisoner.ShowJailInfo()
     ; Prisoner.ShowOutfitInfo()
     ; Prisoner.ShowHoldStats()

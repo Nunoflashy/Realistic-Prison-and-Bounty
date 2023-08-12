@@ -649,8 +649,16 @@ int function GetStrippingThoroughness(string hold)
     return mcm.GetSliderOptionValue(hold, "Stripping::Strip Search Thoroughness") as int
 endFunction
 
+; TODO: Work needed, testing needed
 int function GetStrippingThoroughnessBountyModifier(string hold)
-    return mcm.GetSliderOptionValue(hold, "Stripping::Strip Search Thoroughness Modifier") as int
+    int bountyValue = mcm.GetSliderOptionValue(hold, "Stripping::Strip Search Thoroughness Modifier") as int
+
+    if (bountyValue == 0)
+        return 0
+    endif
+
+    
+    
 endFunction
 
 bool function IsClothingEnabled(string hold)
@@ -936,6 +944,7 @@ endFunction
 
 ; TODO: Change how the stat is parsed
 int function GetInfamyGained(string hold)
+    return actorVars.GetInfamy(self.GetFaction(hold), Player)
     ; return mcm.GetStatOptionValue("Stats", hold + "::Infamy Gained")
 endFunction
 

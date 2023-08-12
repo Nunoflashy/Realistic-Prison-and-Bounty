@@ -41,7 +41,7 @@ function Right(RealisticPrisonAndBounty_MCM mcm) global
     while (i < mcm.config.Holds.Length)
         mcm.SetRenderedCategory(mcm.config.Holds[i])
         mcm.AddHeaderOption("")
-        mcm.AddOptionStat("Days in Jail", 0, "Days")
+        mcm.AddOptionStat("Days Jailed", 0, "Days")
         mcm.AddOptionStat("Longest Sentence", 0, "Days")
         mcm.AddOptionStat("Times Jailed", 0, "Times")
         mcm.AddOptionStat("Times Escaped", 0, "Times")
@@ -91,7 +91,7 @@ function OnOptionHighlight(RealisticPrisonAndBounty_MCM mcm, string option) glob
     elseif (option == hold + "::Fees Owed")
         mcm.SetInfoText("The amount of gold you owe in fees to " + hold + ".")
 
-    elseif (option == hold + "::Days in Jail")
+    elseif (option == hold + "::Days Jailed")
         mcm.SetInfoText("The amount of days you have spent in " + city + "'s jail.")
 
     elseif (option == hold + "::Longest Sentence")

@@ -131,6 +131,14 @@ bool property SentenceServed
     endFunction
 endProperty
 
+; Maybe this should be reset upon escape/release,
+; otherwise it will keep adding the remainder of the days of previous arrests to current one,
+; which is accurate since it tracks ALL the time the actor was in jail, but maybe not what is ideal.
+; Example: 2h served right before release which doesn't account to a full day will be taken into account
+; on the next arrest, which means the actor only has to serve 22h of the following arrest for it to count as a day
+; since they already had 2h clocked in from the previous imprisonment.
+float accumulatedTimeServed
+
 int property InfamyGainedDaily
     ;/
         infamyGainedFlat: 40
@@ -228,6 +236,7 @@ function ResetArrestVars()
         arrestVars.Remove("Jail::Time of Imprisonment")
         ; arrestVars.Remove("Jail::Cell")
         ; arrestVars.Remove("Jail::Cell Door")
+        accumulatedTimeServed = 0.0
     endif
 endFunction
 
@@ -309,8 +318,8 @@ function Strip()
     debug.notification("Stripping Thoroughness: " + strippingThoroughness + ", modifier: " + strippingThoroughnessModifier)
 
     bool isStrippedNaked = strippingThoroughness >= 6
-    config.IncrementStat(arrestVars.Hold, "Times Stripped")
-    actorVars.ModTimesStripped(arrestVars.ArrestFaction, this, 1)
+    ; actorVars.ModTimesStripped(arrestVars.ArrestFaction, this, 1)
+    actorVars.IncrementStat("Times Stripped", arrestVars.ArrestFaction, this)
     bodySearcher.StripActor(this, strippingThoroughness, prisonerItemsContainer)
     arrestVars.SetBool("Jail::Stripped", true)
     OnUndressed(isStrippedNaked)
@@ -352,6 +361,18 @@ function MoveToReleaseLocation()
     this.MoveTo(arrestVars.GetForm("Jail::Teleport Release Location") as ObjectReference)
 endFunction
 
+function MarkAsJailed()
+    if (this == config.Player)
+        arrestVars.SetBool("Jail::Jailed", true)
+
+        ; Increment the "Times Jailed" stat for this Hold
+        actorVars.IncrementStat("Times Jailed", arrestVars.ArrestFaction, this)
+
+        ; Increment the "Times Jailed" in the regular vanilla stat menu.
+        Game.IncrementStat("Times Jailed")
+    endif
+endFunction
+
 function SetEscaped()
     if (this == config.Player)
         arrestVars.SetBool("Arrest::Arrested", false)
@@ -359,7 +380,8 @@ function SetEscaped()
         arrestVars.SetBool("Jail::Escaped", true)
 
         ; Increment the "Times Escaped" stat for this Hold
-        config.IncrementStat(arrestVars.Hold, "Times Escaped")
+        ; actorVars.ModTimesEscaped(arrestVars.ArrestFaction, this, 1)
+        actorVars.IncrementStat("Times Escaped", arrestVars.ArrestFaction, this)
 
         ; Increment the "Jail Escapes" in the regular vanilla stat menu.
         Game.IncrementStat("Jail Escapes")
@@ -390,20 +412,21 @@ function AddEscapeBounty()
 endFunction
 
 function TriggerCrimimalPenalty()
-    if (arrestVars.InfamyEnabled)
-        Debug(self.GetOwningQuest(), "TriggerCrimimalPenalty", "Triggered penalty?")
-        bool hasBountyToTriggerPenalty = (arrestVars.Bounty >= arrestVars.GetInt("Jail::Bounty to Trigger Infamy"))
+    Debug(self.GetOwningQuest(), "TriggerCrimimalPenalty", "Triggered penalty?")
+    bool hasBountyToTriggerPenalty = (arrestVars.Bounty >= arrestVars.GetInt("Jail::Bounty to Trigger Infamy"))
 
-        if (arrestVars.IsInfamyRecognized || arrestVars.IsInfamyKnown)
-            int currentInfamy  = 2000;config.GetInfamyGained(arrestVars.Hold)
-            float criminalPenalty  = float_if (arrestVars.IsInfamyKnown, arrestVars.GetFloat("Jail::Known Criminal Penalty"), arrestVars.GetFloat("Jail::Recognized Criminal Penalty"))
-            ; int infamyPenalty = (currentInfamy * floor(percent(criminalPenalty))) ; this should be invalid, floor(percent) will return less percent than configured
-            int infamyPenalty = floor(currentInfamy * GetPercentAsDecimal(criminalPenalty))
-            Debug(self.GetOwningQuest(), "TriggerCrimimalPenalty", "infamyPenalty: " + infamyPenalty)
+    if (arrestVars.IsInfamyRecognized || arrestVars.IsInfamyKnown)
+        int currentInfamy = config.GetInfamyGained(arrestVars.Hold)
+        float criminalPenalty  = float_if (arrestVars.IsInfamyKnown, arrestVars.GetFloat("Jail::Known Criminal Penalty"), arrestVars.GetFloat("Jail::Recognized Criminal Penalty"))
+        int infamyPenalty = floor(currentInfamy * GetPercentAsDecimal(criminalPenalty)) / arrestVars.BountyToSentence
+        Debug(self.GetOwningQuest(), "TriggerCrimimalPenalty", "Yes, infamyPenalty: " + infamyPenalty)
 
-            arrestVars.SetInt("Jail::Sentence", arrestVars.Sentence + infamyPenalty)
-            config.NotifyJail(string_if (arrestVars.IsInfamyKnown, "Due to being a known criminal in the hold, your sentence has been extended", "Due to being a recognized criminal in the hold, your sentence has been extended"))
-        endif
+        arrestVars.SetInt("Jail::Sentence", arrestVars.Sentence + infamyPenalty)
+
+        int currentLongestSentence = actorVars.GetLongestSentence(arrestVars.ArrestFaction, this)
+        actorVars.SetLongestSentence(arrestVars.ArrestFaction, this, int_if (currentLongestSentence < Sentence, Sentence, currentLongestSentence))
+
+        config.NotifyJail(string_if (arrestVars.IsInfamyKnown, "Due to being a known criminal in the hold, your sentence has been extended", "Due to being a recognized criminal in the hold, your sentence has been extended"))
     endif
 endFunction
 
@@ -414,6 +437,40 @@ function SetTimeOfImprisonment()
     else
         arrestVars.SetFloat("["+ id +"]Jail::Time of Imprisonment", arrestVars.CurrentTime)
     endif
+endFunction
+
+function UpdateDaysJailed()
+    accumulatedTimeServed += TimeSinceLastUpdate
+
+    if (accumulatedTimeServed >= 1)
+        ; A day or more has passed
+        int fullDaysPassed = floor(accumulatedTimeServed) ; Get the full days
+        Game.IncrementStat("Days Jailed", fullDaysPassed)
+        actorVars.ModDaysJailed(arrestVars.ArrestFaction, this, fullDaysPassed)
+
+        accumulatedTimeServed -= fullDaysPassed ; Remove the counted days from accumulated time served
+        float accumulatedTimeRemaining = accumulatedTimeServed - fullDaysPassed
+        Debug(none, "Prisoner::UpdateDaysJailed", "accumulatedTimeServed remaining: " + accumulatedTimeRemaining)
+    endif
+
+    Debug(none, "Prisoner::UpdateDaysJailed", "TimeServed: " + TimeServed + ", floor(TimeServed): " + floor(TimeServed))
+    Debug(none, "Prisoner::UpdateDaysJailed", "Updating Days Jailed: " + floor(accumulatedTimeServed))
+    Debug(none, "Prisoner::UpdateDaysJailed", "LastUpdate: " + LastUpdate)
+    Debug(none, "Prisoner::UpdateDaysJailed", "TimeSinceLastUpdate: " + TimeSinceLastUpdate)
+
+    ; Temporary_DaysServed += floor(TimeServed)
+    ; if (Temporary_DaysServed >= 1)
+    ;     Game.IncrementStat("Days Jailed", Temporary_DaysServed)
+    ;     actorVars.ModDaysJailed(arrestVars.ArrestFaction, this, Temporary_DaysServed)
+    ;     Temporary_DaysServed = 0 ; Reset it
+    ; endif 
+
+    ; if (TimeServed - floor(TimeServed) >= 0) ; TODO: Have last update in the calculation to determine if enough has passed since the last day incremented
+    ;     Game.IncrementStat("Days Jailed", floor(TimeServed))
+    ;     actorVars.ModDaysJailed(arrestVars.ArrestFaction, this, floor(TimeServed))
+    ; endif
+
+
 endFunction
 
 ; Should be called everytime the actor gets to jail (initial jailing and on escape fail)
@@ -435,7 +492,10 @@ function UpdateSentence()
     
         int newSentence = arrestVars.GetInt("Jail::Sentence")
         ClearBounty(arrestVars.ArrestFaction)
-    
+        
+        int currentLongestSentence = actorVars.GetLongestSentence(arrestVars.ArrestFaction, this)
+        actorVars.SetLongestSentence(arrestVars.ArrestFaction, this, int_if (currentLongestSentence < Sentence, Sentence, currentLongestSentence))
+
         if (newSentence != oldSentence)
             OnSentenceChanged(oldSentence, newSentence, (newSentence > oldSentence), true)
         endif
@@ -567,7 +627,7 @@ function ShowHoldStats()
     int timesArrested = config.QueryStat(arrestVars.Hold, "Times Arrested")
     int timesFrisked = config.QueryStat(arrestVars.Hold, "Times Frisked")
     int feesOwed = config.QueryStat(arrestVars.Hold, "Fees Owed")
-    int daysInJail = config.QueryStat(arrestVars.Hold, "Days in Jail")
+    int daysInJail = config.QueryStat(arrestVars.Hold, "Days Jailed")
     int longestSentence = config.QueryStat(arrestVars.Hold, "Longest Sentence")
     int timesJailed = config.QueryStat(arrestVars.Hold, "Times Jailed")
     int timesEscaped = config.QueryStat(arrestVars.Hold, "Times Escaped")
@@ -581,7 +641,7 @@ function ShowHoldStats()
         "Times Arrested: " + timesArrested + ", \n\t" + \
         "Times Frisked: " + timesFrisked + ", \n\t" + \
         "Fees Owed: " + feesOwed + ", \n\t" + \
-        "Days in Jail: " + daysInJail + ", \n\t" + \
+        "Days Jailed: " + daysInJail + ", \n\t" + \
         "Longest Sentence: " + longestSentence + ", \n\t" + \
         "Times Jailed: " + timesJailed + ", \n\t" + \
         "Times Escaped: " + timesEscaped + ", \n\t" + \
