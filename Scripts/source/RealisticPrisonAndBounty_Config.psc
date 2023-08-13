@@ -745,7 +745,7 @@ float function GetInfamyLostFromCurrentInfamy(string hold)
 endFunction
 
 int function GetInfamyLost(string hold)
-    return mcm.GetSliderOptionValue(hold, "Infamy::Infamy Lost)") as int
+    return mcm.GetSliderOptionValue(hold, "Infamy::Infamy Lost") as int
 endFunction
 
 int function GetInfamyRecognizedThreshold(string hold)
@@ -763,6 +763,10 @@ endFunction
 ; TODO: Finish conditions for this function
 bool function IsBountyDecayableAsCriminal(string hold)
     return isBountyDecayEnabled(hold) && isInfamyEnabled(hold) && mcm.GetToggleOptionState(hold, "Bounty Decaying::Decay if Known as Criminal")
+endFunction
+
+bool function IsTimeServedAccountedForOnEscape(string hold)
+    return mcm.GetToggleOptionState(hold, "Escape::Account for Time Served")
 endFunction
 
 float function GetBountyDecayLostFromCurrentBounty(string hold)

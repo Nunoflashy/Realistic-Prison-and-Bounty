@@ -146,6 +146,12 @@ int property EscapeBounty
     endFunction
 endProperty
 
+bool property AccountForTimeServed
+    bool function get()
+        return self.GetBool("Escape::Account for Time Served")
+    endFunction
+endProperty
+
 int property MinimumSentence
     int function get()
         return self.GetFloat("Jail::Minimum Sentence") as int
@@ -289,30 +295,6 @@ endProperty
 int property Bounty
     int function get()
         return BountyNonViolent + BountyViolent
-    endFunction
-endProperty
-
-;/
-    To be changed, this script should not depend on config
-/;
-bool property IsInfamyRecognized
-    bool function get()
-        int currentInfamy = config.GetInfamyGained(Hold)
-        int recognizedThreshold = self.GetFloat("Jail::Infamy Recognized Threshold") as int
-
-        return currentInfamy >= recognizedThreshold
-    endFunction
-endProperty
-
-;/
-    To be changed, this script should not depend on config
-/;
-bool property IsInfamyKnown
-    bool function get()
-        int currentInfamy = config.GetInfamyGained(Hold)
-        int knownThreshold = self.GetFloat("Jail::Infamy Known Threshold") as int
-        
-        return currentInfamy >= knownThreshold
     endFunction
 endProperty
 

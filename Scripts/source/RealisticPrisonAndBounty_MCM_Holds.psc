@@ -25,11 +25,11 @@ endFunction
 function Left(RealisticPrisonAndBounty_MCM mcm) global
     mcm.AddOptionCategory("Arrest")
     mcm.AddTextOption("", "When Free", mcm.OPTION_DISABLED)
-    mcm.AddOptionSlider("Minimum Bounty to Arrest", "{0} Bounty")
+    ; mcm.AddOptionSlider("Minimum Bounty to Arrest", "{0} Bounty") ; Temporarily Removed
     mcm.AddOptionSlider("Guaranteed Payable Bounty", "{0} Bounty")
     mcm.AddOptionSlider("Maximum Payable Bounty", "{0} Bounty")
     mcm.AddOptionSlider("Maximum Payable Bounty (Chance)", "{0}%")
-    mcm.AddOptionToggle("Always Arrest for Violent Crimes")
+    ; mcm.AddOptionToggle("Always Arrest for Violent Crimes") ; Temporarily Removed
     mcm.AddEmptyOption()
     mcm.AddTextOption("", "When Resisting", mcm.OPTION_DISABLED)
     mcm.AddOptionSliderKey("Additional Bounty when Resisting", "Additional Bounty when Resisting (%)", "{1}% of Bounty")
@@ -38,9 +38,9 @@ function Left(RealisticPrisonAndBounty_MCM mcm) global
     mcm.AddTextOption("", "When Defeated", mcm.OPTION_DISABLED)
     mcm.AddOptionSliderKey("Additional Bounty when Defeated", "Additional Bounty when Defeated (%)", "{1}% of Bounty")
     mcm.AddOptionSlider("Additional Bounty when Defeated", "{0} Bounty")
-    mcm.AddOptionToggle("Allow Civilian Capture")
-    mcm.AddOptionToggle("Allow Unconscious Arrest")
-    mcm.AddOptionToggle("Allow Unconditional Arrest")
+    ; mcm.AddOptionToggle("Allow Civilian Capture") ; Temporarily Removed
+    ; mcm.AddOptionToggle("Allow Unconscious Arrest") ; Temporarily Removed
+    ; mcm.AddOptionToggle("Allow Unconditional Arrest") ; Temporarily Removed
 
     mcm.AddEmptyOption()
     
@@ -52,10 +52,13 @@ function Left(RealisticPrisonAndBounty_MCM mcm) global
     mcm.AddTextOption("", "When in Jail", mcm.OPTION_DISABLED)
     mcm.AddOptionSliderKey("Infamy Gained", "Infamy Gained (%)", "{2}% of Bounty")
     mcm.AddOptionSlider("Infamy Gained", "{0} Infamy")
+    mcm.AddOptionSliderKey("Gain Modifier (Recognized)", "Infamy Gain Modifier (Recognized)", "{1}x")
+    mcm.AddOptionSliderKey("Gain Modifier (Known)", "Infamy Gain Modifier (Known)", "{1}x")
     mcm.AddEmptyOption()
     mcm.AddTextOption("", "When Free", mcm.OPTION_DISABLED)
     mcm.AddOptionSliderKey("Infamy Lost", "Infamy Lost (%)", "{2}% of Infamy")
     mcm.AddOptionSlider("Infamy Lost", "{0} Infamy")
+    mcm.AddOptionSliderKey("Loss Modifier (Recognized)", "Infamy Loss Modifier (Recognized)", "{1}x")
 
     mcm.AddEmptyOption()
 
@@ -101,7 +104,7 @@ endFunction
 
 function Right(RealisticPrisonAndBounty_MCM mcm) global
     mcm.AddOptionCategory("Jail")
-    mcm.AddOptionToggle("Unconditional Imprisonment")
+    ; mcm.AddOptionToggle("Unconditional Imprisonment")
     mcm.AddOptionSlider("Guaranteed Payable Bounty", "{0} Bounty")
     mcm.AddOptionSlider("Maximum Payable Bounty", "{0} Bounty")
     mcm.AddOptionSlider("Maximum Payable Bounty (Chance)", "{0}%")
@@ -148,6 +151,7 @@ function Right(RealisticPrisonAndBounty_MCM mcm) global
     mcm.AddOptionSliderKey("Escape Bounty", "Escape Bounty (%)", "{1}% of Bounty")
     mcm.AddOptionSlider("Escape Bounty", "{0} Bounty")
     ; mcm.AddOptionSlider("Escape Attempt Modifier", "{2}x per Escape")
+    mcm.AddOptionToggle("Account for Time Served")
     mcm.AddOptionToggle("Allow Surrendering")
     mcm.AddOptionToggle("Frisk Search upon Captured", defaultFlags = mcm.OPTION_DISABLED)
     mcm.AddOptionToggle("Strip Search upon Captured")
@@ -721,6 +725,9 @@ function OnOptionHighlight(RealisticPrisonAndBounty_MCM mcm, string option) glob
     elseif (option == "Escape::Escape Bounty")
         mcm.SetInfoText("The bounty added when escaping jail in " + city + ".")
 
+    elseif (option == "Escape::Account for Time Served")
+        mcm.SetInfoText("When escaping jail, takes into account the time already served and does not count it as a bounty.")
+
     elseif (option == "Escape::Allow Surrendering")
         mcm.SetInfoText("Whether the guards will allow you to surrender after escaping jail in " + city + ".")
 
@@ -841,6 +848,16 @@ function LoadSliderOptions(RealisticPrisonAndBounty_MCM mcm, string option, floa
         maxRange = 1000
         intervalSteps = 1
 
+    elseif (option == "Infamy::Infamy Gain Modifier (Recognized)")
+        minRange = -100
+        maxRange = 100
+        intervalSteps = 0.1
+
+    elseif (option == "Infamy::Infamy Gain Modifier (Known)")
+        minRange = -100
+        maxRange = 100
+        intervalSteps = 0.1
+
     elseif (option == "Infamy::Infamy Lost (%)")
         minRange = 0
         maxRange = 100
@@ -850,6 +867,11 @@ function LoadSliderOptions(RealisticPrisonAndBounty_MCM mcm, string option, floa
         minRange = 0
         maxRange = 1000
         intervalSteps = 1
+
+    elseif (option == "Infamy::Infamy Loss Modifier (Recognized)")
+        minRange = -100
+        maxRange = 100
+        intervalSteps = 0.1
 
     ; ==========================================================
     ;                           FRISKING
@@ -1123,11 +1145,20 @@ function OnOptionSliderAccept(RealisticPrisonAndBounty_MCM mcm, string option, f
     elseif (option == "Infamy::Infamy Gained")
         formatString = "{0} Infamy"
 
+    elseif (option == "Infamy::Infamy Gain Modifier (Recognized)")
+        formatString = "{1}x"
+
+    elseif (option == "Infamy::Infamy Gain Modifier (Known)")
+        formatString = "{1}x"
+
     elseif (option == "Infamy::Infamy Lost (%)")
         formatString = "{2}% of Infamy"
 
     elseif (option == "Infamy::Infamy Lost")
         formatString = "{0} Infamy"
+
+    elseif (option == "Infamy::Infamy Loss Modifier (Recognized)")
+        formatString = "{1}x"
 
     ; ==========================================================
     ;                           FRISKING
