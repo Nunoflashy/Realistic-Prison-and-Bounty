@@ -241,9 +241,7 @@ ObjectReference property JailCell
     endFunction
 endProperty
 
-;/
-    Increments the desired stat for this Arrest faction on this Prisoner.
-/;
+; Increments the desired stat for this Arrest faction on this Prisoner.
 function IncrementStat(string statName, int incrementBy = 1)
     actorVars.IncrementStat(statName, ArrestFaction, this, incrementBy)
 endFunction
@@ -364,11 +362,12 @@ function Strip()
     debug.notification("Stripping Thoroughness: " + strippingThoroughness + ", modifier: " + strippingThoroughnessModifier)
 
     bool isStrippedNaked = strippingThoroughness >= 6
-    ; actorVars.ModTimesStripped(ArrestFaction, this, 1)
-    actorVars.IncrementStat("Times Stripped", ArrestFaction, this)
     bodySearcher.StripActor(this, strippingThoroughness, prisonerItemsContainer)
+    
+    self.IncrementStat("Times Stripped")
     arrestVars.SetBool("Jail::Stripped", true)
-
+    
+    ; Fire Events
     self.OnUndressed(isStrippedNaked)
     self.OnStripSearched(prisonerItemsContainer)
 endFunction 
@@ -413,7 +412,7 @@ function MarkAsJailed()
         arrestVars.SetBool("Jail::Jailed", true)
 
         ; Increment the "Times Jailed" stat for this Hold
-        actorVars.IncrementStat("Times Jailed", ArrestFaction, this)
+        self.IncrementStat("Times Jailed")
 
         ; Increment the "Times Jailed" in the regular vanilla stat menu.
         Game.IncrementStat("Times Jailed")
@@ -428,7 +427,7 @@ function SetEscaped(bool escaped = true)
 
         if (escaped)
             ; Increment the "Times Escaped" stat for this Hold
-            actorVars.IncrementStat("Times Escaped", ArrestFaction, this)
+            self.IncrementStat("Times Escaped")
 
             ; Increment the "Jail Escapes" in the regular vanilla stat menu.
             Game.IncrementStat("Jail Escapes")
@@ -504,7 +503,6 @@ function UpdateDaysJailed()
         int fullDaysPassed = floor(accumulatedTimeServed) ; Get the full days
         Game.IncrementStat("Days Jailed", fullDaysPassed)
         self.IncrementStat("Days Jailed", fullDaysPassed)
-        ; actorVars.ModDaysJailed(ArrestFaction, this, fullDaysPassed)
 
         accumulatedTimeServed -= fullDaysPassed ; Remove the counted days from accumulated time served (Get the fractional part if there's any - i.e: hours)
         float accumulatedTimeRemaining = accumulatedTimeServed - fullDaysPassed
@@ -612,8 +610,7 @@ function UpdateInfamy()
     int _infamyGainedPerUpdate = ceiling(InfamyGainedDaily * TimeSinceLastUpdate)
 
     ; Update infamy
-    ; config.IncrementStat(arrestVars.Hold, "Infamy Gained", _infamyGainedPerUpdate)
-    actorVars.ModInfamy(ArrestFaction, this, _infamyGainedPerUpdate)
+    self.IncrementStat("Infamy Gained", _infamyGainedPerUpdate)
     config.NotifyInfamy(_infamyGainedPerUpdate + " Infamy gained in " + city, config.IS_DEBUG)
 
     ; Notify once when Recognized/Known Threshold is met
