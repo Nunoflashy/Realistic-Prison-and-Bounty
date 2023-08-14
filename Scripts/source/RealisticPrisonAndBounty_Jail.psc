@@ -514,7 +514,6 @@ state Released
         ; Terminate Release process, Actor should be free at this point
         Debug(self, "OnEndState", CurrentState + " state end")
         arrest.GotoState("")
-        arrestVars.Clear()
     endEvent
 endState
 
@@ -524,6 +523,7 @@ state Free
         ; Begin Free process, Actor is not arrested and is Free
         ; arrestVars.Clear()
         Prisoner.ResetArrestVars()
+        Prisoner.Clear()
         GotoState("")
     endEvent
 
