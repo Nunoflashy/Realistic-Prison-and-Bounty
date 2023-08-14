@@ -52,13 +52,13 @@ function Left(RealisticPrisonAndBounty_MCM mcm) global
     mcm.AddTextOption("", "When in Jail", mcm.OPTION_DISABLED)
     mcm.AddOptionSliderKey("Infamy Gained", "Infamy Gained (%)", "{2}% of Bounty")
     mcm.AddOptionSlider("Infamy Gained", "{0} Infamy")
-    mcm.AddOptionSliderKey("Gain Modifier (Recognized)", "Infamy Gain Modifier (Recognized)", "{1}x")
-    mcm.AddOptionSliderKey("Gain Modifier (Known)", "Infamy Gain Modifier (Known)", "{1}x")
+    mcm.AddOptionSliderKey("Gain Modifier (Recognized)", "Infamy Gain Modifier (Recognized)", "{0}x")
+    mcm.AddOptionSliderKey("Gain Modifier (Known)", "Infamy Gain Modifier (Known)", "{0}x")
     mcm.AddEmptyOption()
     mcm.AddTextOption("", "When Free", mcm.OPTION_DISABLED)
     mcm.AddOptionSliderKey("Infamy Lost", "Infamy Lost (%)", "{2}% of Infamy")
     mcm.AddOptionSlider("Infamy Lost", "{0} Infamy")
-    mcm.AddOptionSliderKey("Loss Modifier (Recognized)", "Infamy Loss Modifier (Recognized)", "{1}x")
+    mcm.AddOptionSliderKey("Loss Modifier (Recognized)", "Infamy Loss Modifier (Recognized)", "{0}x")
 
     mcm.AddEmptyOption()
 
@@ -374,55 +374,13 @@ function OnOptionHighlight(RealisticPrisonAndBounty_MCM mcm, string option) glob
     string city = mcm.miscVars.GetString("City["+ mcm.CurrentPage +"]")
 
     ; ==========================================================
-    ;                            STATS
-    ; ==========================================================
-
-    ;/
-        The bounty that will be added to the sentence if you're charged with impersonation of a hold's guard.
-        The bounty that will be added to the sentence if you're charged with being an enemy of the hold.
-        The bounty that will be added to the sentence if you're charged with the possession of the jail's cell key.
-        The bounty that will be added to the sentence if you're charged with the possession of contraband.
-        The bounty that will be added to the sentence if you're charged with the possession of stolen items.
-    /;
-
-    if (option == "Stats::Current Bounty")
-        mcm.SetInfoText("The bounty you currently have in " + mcm.CurrentPage + ".\n(Note: Inactive unpaid bounty after serving a sentence also counts towards this.)")
-
-    elseif (option == "Stats::Largest Bounty")
-        mcm.SetInfoText("The largest bounty you've had in " + mcm.CurrentPage + ".")
-    
-    elseif (option == "Stats::Total Bounty")
-        mcm.SetInfoText("The total bounty you've accumulated in " + mcm.CurrentPage + ".")
-
-    elseif (option == "Stats::Times Arrested")
-        mcm.SetInfoText("The times you have been arrested in " + mcm.CurrentPage + ".")
-
-    elseif (option == "Stats::Times Frisked")
-        mcm.SetInfoText("The times you have been frisked in " + mcm.CurrentPage + ".")
-
-    elseif (option == "Stats::Days in Jail")
-        mcm.SetInfoText("The amount of days you have spent in " + mcm.CurrentPage + "'s jail.")
-
-    elseif (option == "Stats::Longest Sentence")
-        mcm.SetInfoText("The longest sentence you have been given in " + mcm.CurrentPage + "'s jail.")
-
-    elseif (option == "Stats::Times Jailed")
-        mcm.SetInfoText("The times you have been jailed in " + mcm.CurrentPage + ".")
-
-    elseif (option == "Stats::Times Escaped")
-        mcm.SetInfoText("The times you have escaped from " + mcm.CurrentPage + "'s jail.")
-
-    elseif (option == "Stats::Times Stripped")
-        mcm.SetInfoText("The times you have been stripped in " + mcm.CurrentPage + "'s jail.")
-
-    ; ==========================================================
     ;                           ARREST
     ; ==========================================================
 
-    elseif (option == "Arrest::Minimum Bounty to Arrest") 
-        mcm.SetInfoText("The minimum bounty required in order to be arrested in " + mcm.CurrentPage + ".")
+    ; if (option == "Arrest::Minimum Bounty to Arrest") 
+    ;     mcm.SetInfoText("The minimum bounty required in order to be arrested in " + mcm.CurrentPage + ".")
 
-    elseif (option == "Arrest::Guaranteed Payable Bounty")
+    if (option == "Arrest::Guaranteed Payable Bounty")
         mcm.SetInfoText("The guaranteed amount of bounty that a guard will accept as payment before being arrested in " + mcm.CurrentPage + ".")
 
     elseif (option == "Arrest::Maximum Payable Bounty")
@@ -446,17 +404,17 @@ function OnOptionHighlight(RealisticPrisonAndBounty_MCM mcm, string option) glob
     elseif (option == "Arrest::Additional Bounty when Defeated")
         mcm.SetInfoText("The bounty that will be added when defeated and arrested in " + mcm.CurrentPage)
 
-    elseif (option == "Arrest::Allow Civilian Capture")
-        mcm.SetInfoText("Whether to allow civilians to bring you to a guard, to be arrested in " + mcm.CurrentPage)
+    ; elseif (option == "Arrest::Allow Civilian Capture")
+    ;     mcm.SetInfoText("Whether to allow civilians to bring you to a guard, to be arrested in " + mcm.CurrentPage)
 
-    elseif (option == "Arrest::Allow Arrest Transfer")
-        mcm.SetInfoText("Whether to allow a guard to take over the arrest if the current one dies.")
+    ; elseif (option == "Arrest::Allow Arrest Transfer")
+    ;     mcm.SetInfoText("Whether to allow a guard to take over the arrest if the current one dies.")
 
-    elseif (option == "Arrest::Allow Unconscious Arrest")
-        mcm.SetInfoText("Whether to allow an unconscious arrest after being defeated.")
+    ; elseif (option == "Arrest::Allow Unconscious Arrest")
+    ;     mcm.SetInfoText("Whether to allow an unconscious arrest after being defeated.")
 
-    elseif (option == "Arrest::Allow Unconditional Arrest")
-        mcm.SetInfoText("Whether to allow an unconditional arrest without a bounty in " + mcm.CurrentPage + ".")
+    ; elseif (option == "Arrest::Allow Unconditional Arrest")
+    ;     mcm.SetInfoText("Whether to allow an unconditional arrest without a bounty in " + mcm.CurrentPage + ".")
 
     ; elseif (option == "Arrest::Unequip Hand Garments")
     ;     mcm.SetInfoText("Whether to unequip any hand garment when arrested.\n-100 - Disable\n0 - Always unequip.\n Any other value is the bounty required.")
@@ -539,8 +497,8 @@ function OnOptionHighlight(RealisticPrisonAndBounty_MCM mcm, string option) glob
     ;                           JAIL
     ; ==========================================================
 
-    elseif (option == "Jail::Unconditional Imprisonment")
-        mcm.SetInfoText("If enabled, you will be jailed regardless of your bounty when you go to jail in " + city + ", otherwise, a bounty condition will be used.")
+    ; elseif (option == "Jail::Unconditional Imprisonment")
+    ;     mcm.SetInfoText("If enabled, you will be jailed regardless of your bounty when you go to jail in " + city + ", otherwise, a bounty condition will be used.")
 
     elseif (option == "Jail::Guaranteed Payable Bounty")
         mcm.SetInfoText("The guaranteed amount of bounty that is payable when arriving at the jail, before considering imprisonment in " + city + ".")
@@ -792,10 +750,10 @@ function LoadSliderOptions(RealisticPrisonAndBounty_MCM mcm, string option, floa
     ;                           ARREST
     ; ==========================================================
 
-    if (option == "Arrest::Minimum Bounty to Arrest")
-        intervalSteps = 50
+    ; if (option == "Arrest::Minimum Bounty to Arrest")
+    ;     intervalSteps = 50
 
-    elseif (option == "Arrest::Guaranteed Payable Bounty")
+    if (option == "Arrest::Guaranteed Payable Bounty")
         minRange = 0
         intervalSteps = 50
 
@@ -851,12 +809,12 @@ function LoadSliderOptions(RealisticPrisonAndBounty_MCM mcm, string option, floa
     elseif (option == "Infamy::Infamy Gain Modifier (Recognized)")
         minRange = -100
         maxRange = 100
-        intervalSteps = 0.1
+        intervalSteps = 1
 
     elseif (option == "Infamy::Infamy Gain Modifier (Known)")
         minRange = -100
         maxRange = 100
-        intervalSteps = 0.1
+        intervalSteps = 1
 
     elseif (option == "Infamy::Infamy Lost (%)")
         minRange = 0
@@ -1110,9 +1068,9 @@ function OnOptionSliderAccept(RealisticPrisonAndBounty_MCM mcm, string option, f
     ;                           ARREST
     ; ==========================================================
 
-    if (option == "Arrest::Minimum Bounty to Arrest")
+    ; if (option == "Arrest::Minimum Bounty to Arrest")
 
-    elseif (option == "Arrest::Guaranteed Payable Bounty")
+    if (option == "Arrest::Guaranteed Payable Bounty")
 
     elseif (option == "Arrest::Maximum Payable Bounty")
 

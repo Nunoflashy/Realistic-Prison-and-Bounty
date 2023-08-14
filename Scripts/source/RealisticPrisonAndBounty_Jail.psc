@@ -331,11 +331,12 @@ state Jailed
             Prisoner.UpdateInfamy()
         endif
 
+        Prisoner.UpdateDaysJailed()
+
         if (Prisoner.SentenceServed)
             GotoState(STATE_RELEASED)
+            return
         endif
-
-        Prisoner.UpdateDaysJailed()
 
         ; config.miscVars.List()
 
@@ -430,7 +431,6 @@ endState
 state Escaped
     event OnBeginState()
         Debug(self, "OnBeginState", CurrentState + " state begin")
-        Prisoner.FlagAsEscapee()
     endEvent
 
     event OnGuardSeesPrisoner(Actor akGuard)
@@ -522,7 +522,9 @@ state Free
     event OnBeginState()
         Debug(self, "OnBeginState", CurrentState + " state begin")
         ; Begin Free process, Actor is not arrested and is Free
-        arrestVars.Clear()
+        ; arrestVars.Clear()
+        Prisoner.ResetArrestVars()
+        GotoState("")
     endEvent
 
     event OnEndState()

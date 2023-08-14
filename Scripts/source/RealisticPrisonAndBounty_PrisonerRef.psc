@@ -124,6 +124,12 @@ float property TimeServed
     endFunction
 endProperty
 
+float property TimeArrested
+    float function get()
+        return CurrentTime - TimeOfArrest
+    endFunction
+endProperty
+
 float property ReleaseTime
     float function get()
         float gameHour = 0.04166666666666666666666666666667
@@ -219,10 +225,7 @@ endProperty
 
 int property Sentence
     int function get()
-        arrestVars.SetIntMin("Jail::Sentence", arrestVars.MinimumSentence)
-        arrestVars.SetIntMax("Jail::Sentence", arrestVars.MaximumSentence)
-
-        return arrestVars.GetInt("Jail::Sentence")
+        return arrestVars.Sentence
     endFunction
 endProperty
 
@@ -237,6 +240,13 @@ ObjectReference property JailCell
         endif
     endFunction
 endProperty
+
+;/
+    Increments the desired stat for this Arrest faction on this Prisoner.
+/;
+function IncrementStat(string statName, int incrementBy = 1)
+    actorVars.IncrementStat(statName, ArrestFaction, this, incrementBy)
+endFunction
 
 function SetupPrisonerVars()
     ; Dynamic Vars
@@ -286,7 +296,7 @@ bool function ShouldBeStripped()
         return false
     endif
 
-    if (self.IsEscapee() && arrestVars.ShouldStripOnEscape)
+    if (self.HasEscaped() && arrestVars.ShouldStripOnEscape)
         return true
     endif
 
@@ -348,7 +358,7 @@ function Strip()
     float strippingThoroughness = arrestVars.GetFloat("Stripping::Stripping Thoroughness")
 
     int strippingThoroughnessModifierBounty = arrestVars.GetInt("Stripping::Stripping Thoroughness Modifier")
-    int strippingThoroughnessModifier = floor(arrestVars.Bounty / strippingThoroughnessModifierBounty)
+    int strippingThoroughnessModifier = floor(Bounty / strippingThoroughnessModifierBounty)
     strippingThoroughness += strippingThoroughnessModifier
 
     debug.notification("Stripping Thoroughness: " + strippingThoroughness + ", modifier: " + strippingThoroughnessModifier)
@@ -358,7 +368,8 @@ function Strip()
     actorVars.IncrementStat("Times Stripped", ArrestFaction, this)
     bodySearcher.StripActor(this, strippingThoroughness, prisonerItemsContainer)
     arrestVars.SetBool("Jail::Stripped", true)
-    OnUndressed(isStrippedNaked)
+
+    self.OnUndressed(isStrippedNaked)
     self.OnStripSearched(prisonerItemsContainer)
 endFunction 
 
@@ -409,51 +420,56 @@ function MarkAsJailed()
     endif
 endFunction
 
-function SetEscaped()
+function SetEscaped(bool escaped = true)
     if (this == config.Player)
-        arrestVars.SetBool("Arrest::Arrested", false)
-        arrestVars.SetBool("Jail::Jailed", false)
-        arrestVars.SetBool("Jail::Escaped", true)
+        arrestVars.SetBool("Arrest::Arrested",  bool_if(escaped, false, true))
+        arrestVars.SetBool("Jail::Jailed",      bool_if(escaped, false, true))
+        arrestVars.SetBool("Jail::Escaped",     bool_if(escaped, true, false))
 
-        ; Increment the "Times Escaped" stat for this Hold
-        ; actorVars.ModTimesEscaped(ArrestFaction, this, 1)
-        actorVars.IncrementStat("Times Escaped", ArrestFaction, this)
+        if (escaped)
+            ; Increment the "Times Escaped" stat for this Hold
+            actorVars.IncrementStat("Times Escaped", ArrestFaction, this)
 
-        ; Increment the "Jail Escapes" in the regular vanilla stat menu.
-        Game.IncrementStat("Jail Escapes")
+            ; Increment the "Jail Escapes" in the regular vanilla stat menu.
+            Game.IncrementStat("Jail Escapes")
+        endif
     endif
 endFunction
 
 ; Get the bounty from storage and add it into active bounty for this faction.
 function RevertBounty()
-    ArrestFaction.SetCrimeGold(arrestVars.BountyNonViolent)
-    ArrestFaction.SetCrimeGoldViolent(arrestVars.BountyViolent)
-
-    ; ; Should we clear it from storage vars?
-    ; arrestVars.SetInt("Arrest::Bounty Non-Violent", 0)
-    ; arrestVars.SetInt("Arrest::Bounty Violent", 0)
+    ArrestFaction.SetCrimeGold(BountyNonViolent)
+    ArrestFaction.SetCrimeGoldViolent(BountyViolent)
 endFunction
 
 function AddEscapeBounty()
-    ; Player
-    int escapeBountyGotten = floor((arrestVars.BountyNonViolent * GetPercentAsDecimal(arrestVars.EscapeBountyFromCurrentArrest))) + arrestVars.EscapeBounty
+    ; ==========================================================
+    ;                           PLAYER
+    ; ==========================================================
+    float escapeBountyCurrentArrestPercent = GetPercentAsDecimal(arrestVars.EscapeBountyFromCurrentArrest)
+    int escapeBountyGotten = floor(BountyNonViolent * escapeBountyCurrentArrestPercent) + arrestVars.EscapeBounty
+
     if (arrestVars.AccountForTimeServed && TimeServed >= 1)
         escapeBountyGotten -= floor(TimeServed * arrestVars.BountyToSentence) ; 2 * 100 = 200 Bounty (2 days served decreases 200 Bounty)
         config.NotifyJail("Due to time served in jail, your escape bounty has decreased by " + floor(TimeServed * arrestVars.BountyToSentence))
     endif
+
     ArrestFaction.ModCrimeGold(escapeBountyGotten)
     config.NotifyJail("You have gained " + escapeBountyGotten + " Bounty in " + arrestVars.Hold + " for escaping") ; Hold must be dynamic to each prisoner later
-
+        
     ; Should we clear it from storage vars?
     arrestVars.SetInt("Arrest::Bounty Non-Violent", 0)
     arrestVars.SetInt("Arrest::Bounty Violent", 0)
 
-    ; NPC (Later)
+    ; ==========================================================
+;                             NPC (Later)
+    ; ==========================================================
+
 endFunction
 
 function TriggerCrimimalPenalty()
     Debug(self.GetOwningQuest(), "TriggerCrimimalPenalty", "Triggered penalty?")
-    bool hasBountyToTriggerPenalty = (arrestVars.Bounty >= arrestVars.GetInt("Jail::Bounty to Trigger Infamy"))
+    bool hasBountyToTriggerPenalty = (Bounty >= arrestVars.GetInt("Jail::Bounty to Trigger Infamy"))
 
     if (IsInfamyRecognized || IsInfamyKnown)
         int currentInfamy = config.GetInfamyGained(arrestVars.Hold)
@@ -473,22 +489,24 @@ endFunction
 function SetTimeOfImprisonment()
     int id = this.GetFormID()
     if (id == config.Player.GetFormID())
-        arrestVars.SetFloat("Jail::Time of Imprisonment", arrestVars.CurrentTime)
+        arrestVars.SetFloat("Jail::Time of Imprisonment", CurrentTime)
     else
-        arrestVars.SetFloat("["+ id +"]Jail::Time of Imprisonment", arrestVars.CurrentTime)
+        arrestVars.SetFloat("["+ id +"]Jail::Time of Imprisonment", CurrentTime)
     endif
 endFunction
 
 function UpdateDaysJailed()
+    ; Add the time served from each update this runs
     accumulatedTimeServed += TimeSinceLastUpdate
 
     if (accumulatedTimeServed >= 1)
         ; A day or more has passed
         int fullDaysPassed = floor(accumulatedTimeServed) ; Get the full days
         Game.IncrementStat("Days Jailed", fullDaysPassed)
-        actorVars.ModDaysJailed(ArrestFaction, this, fullDaysPassed)
+        self.IncrementStat("Days Jailed", fullDaysPassed)
+        ; actorVars.ModDaysJailed(ArrestFaction, this, fullDaysPassed)
 
-        accumulatedTimeServed -= fullDaysPassed ; Remove the counted days from accumulated time served
+        accumulatedTimeServed -= fullDaysPassed ; Remove the counted days from accumulated time served (Get the fractional part if there's any - i.e: hours)
         float accumulatedTimeRemaining = accumulatedTimeServed - fullDaysPassed
         Debug(none, "Prisoner::UpdateDaysJailed", "accumulatedTimeServed remaining: " + accumulatedTimeRemaining)
     endif
@@ -497,20 +515,6 @@ function UpdateDaysJailed()
     Debug(none, "Prisoner::UpdateDaysJailed", "Updating Days Jailed: " + floor(accumulatedTimeServed))
     Debug(none, "Prisoner::UpdateDaysJailed", "LastUpdate: " + LastUpdate)
     Debug(none, "Prisoner::UpdateDaysJailed", "TimeSinceLastUpdate: " + TimeSinceLastUpdate)
-
-    ; Temporary_DaysServed += floor(TimeServed)
-    ; if (Temporary_DaysServed >= 1)
-    ;     Game.IncrementStat("Days Jailed", Temporary_DaysServed)
-    ;     actorVars.ModDaysJailed(ArrestFaction, this, Temporary_DaysServed)
-    ;     Temporary_DaysServed = 0 ; Reset it
-    ; endif 
-
-    ; if (TimeServed - floor(TimeServed) >= 0) ; TODO: Have last update in the calculation to determine if enough has passed since the last day incremented
-    ;     Game.IncrementStat("Days Jailed", floor(TimeServed))
-    ;     actorVars.ModDaysJailed(ArrestFaction, this, floor(TimeServed))
-    ; endif
-
-
 endFunction
 
 ; Should be called everytime the actor gets to jail (initial jailing and on escape fail)
@@ -520,7 +524,7 @@ function UpdateSentence()
         int _bountyViolent       = ArrestFaction.GetCrimeGoldViolent()
         int violentBountyConverted = floor(arrestVars.BountyViolent * (100 / arrestVars.BountyExchange))
     
-        int oldSentence = arrestVars.GetInt("Jail::Sentence")
+        int oldSentence = Sentence
         
         if (_bountyNonViolent + _bountyViolent != 0)
             arrestVars.SetFloat("Arrest::Bounty Non-Violent", _bountyNonViolent)
@@ -530,7 +534,7 @@ function UpdateSentence()
         ; arrestVars.SetFloat("Jail::Sentence", (_bountyNonViolent + violentBountyConverted) / arrestVars.BountyToSentence)
         arrestVars.SetFloat("Jail::Sentence", (BountyNonViolent + violentBountyConverted) / arrestVars.BountyToSentence)
     
-        int newSentence = arrestVars.GetInt("Jail::Sentence")
+        int newSentence = Sentence
         ClearBounty(ArrestFaction)
         
         int currentLongestSentence = actorVars.GetLongestSentence(ArrestFaction, this)
@@ -550,13 +554,13 @@ function UpdateSentenceFromCurrentBounty()
         int _bountyViolent       = ArrestFaction.GetCrimeGoldViolent()
         int violentBountyConverted = floor(arrestVars.BountyViolent * (100 / arrestVars.BountyExchange))
     
-        int oldSentence = arrestVars.GetInt("Jail::Sentence")
+        int oldSentence = Sentence
     
         arrestVars.SetFloat("Arrest::Bounty Non-Violent", arrestVars.BountyNonViolent + _bountyNonViolent)
         arrestVars.SetFloat("Arrest::Bounty Violent", arrestVars.BountyViolent + _bountyViolent)
         arrestVars.SetFloat("Jail::Sentence", (arrestVars.BountyNonViolent + violentBountyConverted) / arrestVars.BountyToSentence)
     
-        int newSentence = arrestVars.GetInt("Jail::Sentence")
+        int newSentence = Sentence
     
         if (newSentence != oldSentence)
             OnSentenceChanged(oldSentence, newSentence, (newSentence > oldSentence), true)
@@ -718,11 +722,7 @@ function MoveToCell()
     jailCellDoor.Lock()
 endFunction
 
-function FlagAsEscapee()
-    arrestVars.SetBool("Jail::Escaped", true)
-endFunction
-
-bool function IsEscapee()
+bool function HasEscaped()
     return arrestVars.GetBool("Jail::Escaped")
 endFunction
 
