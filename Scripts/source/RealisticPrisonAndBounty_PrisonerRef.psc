@@ -272,11 +272,11 @@ endFunction
 function SetupPrisonerVars()
     ; Dynamic Vars
     arrestVars.SetFloat("Jail::Sentence", (BountyNonViolent + (floor(BountyViolent * (100 / arrestVars.BountyExchange)))) / arrestVars.BountyToSentence)
-    arrestVars.SetFloat("Jail::Time of Imprisonment", arrestVars.CurrentTime)
-    arrestVars.SetForm("Jail::Cell Door", GetNearestJailDoorOfType(GetJailBaseDoorID(arrestVars.Hold), this, 10000))
-    arrestVars.SetInt("Jail::Cell Door Old Lock Level", arrestVars.CellDoor.GetLockLevel())
-    arrestVars.SetForm("Jail::Teleport Release Location", config.GetJailTeleportReleaseMarker(arrestVars.Hold))
-    arrestVars.SetForm("Jail::Prisoner Items Container", config.GetJailPrisonerItemsContainer(arrestVars.Hold))
+    arrestVars.SetFloat("Jail::Time of Imprisonment", CurrentTime)
+    arrestVars.SetForm("Jail::Cell Door", GetNearestJailDoorOfType(GetJailBaseDoorID(Hold), this, 10000))
+    arrestVars.SetInt("Jail::Cell Door Old Lock Level", CellDoor.GetLockLevel())
+    arrestVars.SetForm("Jail::Teleport Release Location", config.GetJailTeleportReleaseMarker(Hold))
+    arrestVars.SetForm("Jail::Prisoner Items Container", config.GetJailPrisonerItemsContainer(Hold))
     arrestVars.SetBool("Jail::Jailed", true)
 
     ; ; inventation time (Later this container must be dynamic for each actor in prison)
@@ -555,7 +555,7 @@ function UpdateSentence()
     if (this == config.Player)
         int _bountyNonViolent    = ArrestFaction.GetCrimeGoldNonViolent()
         int _bountyViolent       = ArrestFaction.GetCrimeGoldViolent()
-        int violentBountyConverted = floor(arrestVars.BountyViolent * (100 / arrestVars.BountyExchange))
+        int violentBountyConverted = floor(BountyViolent * (100 / arrestVars.BountyExchange))
     
         int oldSentence = Sentence
         
@@ -576,8 +576,6 @@ function UpdateSentence()
         if (newSentence != oldSentence)
             OnSentenceChanged(oldSentence, newSentence, (newSentence > oldSentence), true)
         endif
-    ; else
-    ;     __updateSentenceForNPC()
     endif
 endFunction
 
@@ -624,12 +622,13 @@ function DecreaseSentence(int daysToDecreaseBy, bool shouldAffectBounty = true)
         arrestVars.SetFloat("Arrest::Bounty Non-Violent", BountyNonViolent - (daysToDecreaseBy * arrestVars.BountyToSentence))
     endif
 
+    ; daysToDecreaseBy > 0 is possibly a bug, since they should always be more than 0, and that doesn't imply that the sentence was increased as per the param name
     OnSentenceChanged(previousSentence, newSentence, daysToDecreaseBy > 0, shouldAffectBounty)
 endFunction
 
 function UpdateInfamy()
     string city = config.GetCityNameFromHold(arrestVars.Hold)
-
+         
     ; Update infamy
     self.IncrementStat("Infamy Gained", InfamyGainedPerUpdate)
     config.NotifyInfamy(InfamyGainedPerUpdate + " Infamy gained in " + city, config.IS_DEBUG)
@@ -671,58 +670,45 @@ function ShowSentenceInfo()
     int timeLeftToServeMinutes   = GetTimeLeftInSentence("Minutes of Hour")
     int timeLeftToServeSeconds   = GetTimeLeftInSentence("Seconds of Minute")
 
-    Debug(self.GetOwningQuest(), "ShowSentenceInfo", "\n" + arrestVars.Hold + " Sentence: { \n\t" + \
-        "Minimum Sentence: " + arrestVars.MinimumSentence + " Days, \n\t" + \
-        "Maximum Sentence: " + arrestVars.MaximumSentence + " Days, \n\t" + \
-        "Sentence: " + arrestVars.Sentence + " Days, \n\t" + \
-        "Time of Arrest: " + arrestVars.TimeOfArrest+ ", \n\t" + \
-        "Time of Imprisonment: " + arrestVars.TimeOfImprisonment + ", \n\t" + \
-        "Time Served: " + TimeServed + " ("+ (TimeServed * 24) + " Hours" +") ["+ timeServedDays + " Days, " + timeServedHours + " Hours, " +  timeServedMinutes + " Minutes, " + timeServedSeconds + " Seconds" +"], \n\t" + \
-        "Time Left: " + TimeLeftInSentence + " ("+ (TimeLeftInSentence * 24) + " Hours" +") ["+ timeLeftToServeDays + " Days, " + timeLeftToServeHours + " Hours, " +  timeLeftToServeMinutes + " Minutes, " + timeLeftToServeSeconds + " Seconds" +"], \n\t" + \
-        "Release Time: " + ReleaseTime + "\n" + \
+    Info(self.GetOwningQuest(), "ShowSentenceInfo", "\n" + arrestVars.Hold + " Sentence: { \n\t" + \
+        "Minimum Sentence: "    + arrestVars.MinimumSentence + " Days, \n\t" + \
+        "Maximum Sentence: "    + arrestVars.MaximumSentence + " Days, \n\t" + \
+        "Sentence: "            + Sentence + " Days, \n\t" + \
+        "Time of Arrest: "      + TimeOfArrest + ", \n\t" + \
+        "Time of Imprisonment: "+ TimeOfImprisonment + ", \n\t" + \
+        "Time Served: "         + TimeServed + " ("+ (TimeServed * 24) + " Hours" +") ["+ timeServedDays + " Days, " + timeServedHours + " Hours, " +  timeServedMinutes + " Minutes, " + timeServedSeconds + " Seconds" +"], \n\t" + \
+        "Time Left: "           + TimeLeftInSentence + " ("+ (TimeLeftInSentence * 24) + " Hours" +") ["+ timeLeftToServeDays + " Days, " + timeLeftToServeHours + " Hours, " +  timeLeftToServeMinutes + " Minutes, " + timeLeftToServeSeconds + " Seconds" +"], \n\t" + \
+        "Release Time: "        + ReleaseTime + "\n" + \
     " }")
 endFunction
 
 function ShowHoldStats()
-    int currentBounty = config.QueryStat(arrestVars.Hold, "Current Bounty")
-    int largestBounty = config.QueryStat(arrestVars.Hold, "Largest Bounty")
-    int totalBounty = config.QueryStat(arrestVars.Hold, "Total Bounty")
-    int timesArrested = config.QueryStat(arrestVars.Hold, "Times Arrested")
-    int timesFrisked = config.QueryStat(arrestVars.Hold, "Times Frisked")
-    int feesOwed = config.QueryStat(arrestVars.Hold, "Fees Owed")
-    int daysInJail = config.QueryStat(arrestVars.Hold, "Days Jailed")
-    int longestSentence = config.QueryStat(arrestVars.Hold, "Longest Sentence")
-    int timesJailed = config.QueryStat(arrestVars.Hold, "Times Jailed")
-    int timesEscaped = config.QueryStat(arrestVars.Hold, "Times Escaped")
-    int timesStripped = config.QueryStat(arrestVars.Hold, "Times Stripped")
-    int infamyGained = config.QueryStat(arrestVars.Hold, "Infamy Gained")
-
-    Debug(self.GetOwningQuest(), "ShowHoldStats", "\n" + arrestVars.Hold + " Stats: { \n\t" + \
-        "Current Bounty: " + currentBounty + ", \n\t" + \
-        "Largest Bounty: " + largestBounty + ", \n\t" + \
-        "Total Bounty: " + totalBounty + ", \n\t" + \
-        "Times Arrested: " + timesArrested + ", \n\t" + \
-        "Times Frisked: " + timesFrisked + ", \n\t" + \
-        "Fees Owed: " + feesOwed + ", \n\t" + \
-        "Days Jailed: " + daysInJail + ", \n\t" + \
-        "Longest Sentence: " + longestSentence + ", \n\t" + \
-        "Times Jailed: " + timesJailed + ", \n\t" + \
-        "Times Escaped: " + timesEscaped + ", \n\t" + \
-        "Times Stripped: " + timesStripped + ", \n\t" + \
-        "Infamy Gained: " + infamyGained + "\n" + \
+    Info(self.GetOwningQuest(), "ShowHoldStats", "\n" + Hold + " Stats: { \n\t" + \
+        "Current Bounty: "      + self.QueryStat("Current Bounty")      + ", \n\t" + \
+        "Largest Bounty: "      + self.QueryStat("Largest Bounty")      + ", \n\t" + \
+        "Total Bounty: "        + self.QueryStat("Total Bounty")        + ", \n\t" + \
+        "Times Arrested: "      + self.QueryStat("Times Arrested")      + ", \n\t" + \
+        "Arrests Resisted: "    + self.QueryStat("Arrests Resisted")    + ", \n\t" + \
+        "Times Frisked: "       + self.QueryStat("Times Frisked")       + ", \n\t" + \
+        "Days Jailed: "         + self.QueryStat("Days Jailed")         + ", \n\t" + \
+        "Longest Sentence: "    + self.QueryStat("Longest Sentence")    + ", \n\t" + \
+        "Times Jailed: "        + self.QueryStat("Times Jailed")        + ", \n\t" + \
+        "Times Escaped: "       + self.QueryStat("Times Escaped")       + ", \n\t" + \
+        "Times Stripped: "      + self.QueryStat("Times Stripped")      + ", \n\t" + \
+        "Infamy Gained: "       + self.QueryStat("Infamy Gained")       + "\n" + \
     " }")
 endFunction
 
 function ShowOutfitInfo()
-    Debug(self.GetOwningQuest(), "ShowOutfitInfo", "\n" + config.GetCityNameFromHold(arrestVars.Hold) + " Outfit: { \n\t" + \
-        "Name: " + arrestVars.OutfitName + ", \n\t" + \
-        "Head: " + arrestVars.OutfitHead + " ("+ arrestVars.OutfitHead.GetName() +")" + ", \n\t" + \
-        "Body: " + arrestVars.OutfitBody + " ("+ arrestVars.OutfitBody.GetName() +")" + ", \n\t" + \
-        "Hands: " + arrestVars.OutfitHands + " ("+ arrestVars.OutfitHands.GetName() +")" + ", \n\t" + \
-        "Feet: " + arrestVars.OutfitFeet + " ("+ arrestVars.OutfitFeet.GetName() +")" + ", \n\t" + \
-        "Conditional: " + arrestVars.IsOutfitConditional + ", \n\t" + \
-        "Minimum Bounty: " + arrestVars.OutfitMinBounty + ", \n\t" + \
-        "Maximum Bounty: " + arrestVars.OutfitMaxBounty + ", \n" + \
+    Info(self.GetOwningQuest(), "ShowOutfitInfo", "\n" + config.GetCityNameFromHold(arrestVars.Hold) + " Outfit: { \n\t" + \
+        "Name: "            + arrestVars.OutfitName + ", \n\t" + \
+        "Head: "            + arrestVars.OutfitHead + " ("+ arrestVars.OutfitHead.GetName() +")" + ", \n\t" + \
+        "Body: "            + arrestVars.OutfitBody + " ("+ arrestVars.OutfitBody.GetName() +")" + ", \n\t" + \
+        "Hands: "           + arrestVars.OutfitHands + " ("+ arrestVars.OutfitHands.GetName() +")" + ", \n\t" + \
+        "Feet: "            + arrestVars.OutfitFeet + " ("+ arrestVars.OutfitFeet.GetName() +")" + ", \n\t" + \
+        "Conditional: "     + arrestVars.IsOutfitConditional + ", \n\t" + \
+        "Minimum Bounty: "  + arrestVars.OutfitMinBounty + ", \n\t" + \
+        "Maximum Bounty: "  + arrestVars.OutfitMaxBounty + ", \n" + \
     " }")
 endFunction
 

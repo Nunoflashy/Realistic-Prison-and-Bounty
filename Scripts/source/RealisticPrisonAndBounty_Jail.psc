@@ -336,10 +336,9 @@ state Jailed
             return
         endif
 
-        ; config.miscVars.List()
-
         ; Prisoner.ShowJailInfo()
         Prisoner.ShowSentenceInfo()
+        Prisoner.ShowHoldStats()
         ; arrestVars.List("Stripping")
         ; arrestVars.List("Jail")
         ; arrestVars.ListOverrides("Stripping")
