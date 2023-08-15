@@ -8,7 +8,7 @@ import Math
 ; Constants
 ; ==============================================================================
 
-bool property IS_DEBUG = true autoreadonly
+bool property IS_DEBUG = false autoreadonly
 bool property ENABLE_BENCHMARK = true autoreadonly
 
 float function GetVersion() global
@@ -657,8 +657,7 @@ int function GetStrippingThoroughnessBountyModifier(string hold)
         return 0
     endif
 
-    
-    
+    return bountyValue
 endFunction
 
 bool function IsClothingEnabled(string hold)

@@ -364,6 +364,9 @@ function TriggerResistArrest(Actor akGuard, Faction akCrimeFaction)
         config.NotifyArrest("You have gained " + resistArrestPenalty + " Bounty in " + hold +" for resisting arrest!")
     endif
 
+    Actor arrestResister = config.Player ; Temporary
+
+    actorVars.IncrementStat("Arrests Resisted", akCrimeFaction, arrestResister)
     self.SetResistedFlag(akCrimeFaction)
 endFunction
 

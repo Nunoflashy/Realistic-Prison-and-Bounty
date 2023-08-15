@@ -150,6 +150,24 @@ float function Max(float a, float b) global
     endif
 endFunction
 
+float function Min(float a, float b) global
+    if (a < b)
+        return a
+    else
+        return b
+    endif
+endFunction
+
+int function Round(float value) global
+    float fractionalPart = value - math.floor(value)
+
+    if (fractionalPart >= 0.5)
+        return math.ceiling(value)
+    else
+        return math.floor(value)
+    endif
+endFunction
+
 ;/
     Caps the value of a variable
 

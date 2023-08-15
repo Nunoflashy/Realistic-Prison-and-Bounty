@@ -136,7 +136,7 @@ endProperty
 
 float property EscapeBountyFromCurrentArrest
     float function get()
-        return self.GetFloat("Escape::Escape Bounty from Current Arrest")
+        return GetPercentAsDecimal(self.GetFloat("Escape::Escape Bounty from Current Arrest"))
     endFunction
 endProperty
 
@@ -176,6 +176,48 @@ int property BountyToSentence
     endFunction
 endProperty
 
+int property InfamyRecognizedThreshold
+    int function get()
+        return self.GetInt("Jail::Infamy Recognized Threshold")
+    endFunction
+endProperty
+
+int property InfamyKnownThreshold
+    int function get()
+        return self.GetInt("Jail::Infamy Known Threshold")
+    endFunction
+endProperty
+
+int property InfamyGainedDaily
+    int function get()
+        return self.GetInt("Jail::Infamy Gained Daily")
+    endFunction
+endProperty
+
+float property InfamyGainedDailyFromBountyPercentage
+    float function get()
+        return GetPercentAsDecimal(self.GetFloat("Jail::Infamy Gained Daily from Current Bounty"))
+    endFunction
+endProperty
+
+int property InfamyBountyTrigger
+    int function get()
+        return self.GetInt("Jail::Bounty to Trigger Infamy")
+    endFunction
+endProperty
+
+float property InfamyRecognizedPenalty
+    float function get()
+        return GetPercentAsDecimal(self.GetFloat("Jail::Recognized Criminal Penalty"))
+    endFunction
+endProperty
+
+float property InfamyKnownPenalty
+    float function get()
+        return GetPercentAsDecimal(self.GetFloat("Jail::Known Criminal Penalty"))
+    endFunction
+endProperty
+
 bool property RedressOnRelease
     bool function get()
         return self.GetBool("Release::Redress on Release")
@@ -206,6 +248,17 @@ int property StrippingMinSentence
     endFunction
 endProperty
 
+float property StrippingThoroughness
+    float function get()
+        return self.GetFloat("Stripping::Stripping Thoroughness")
+    endFunction
+endProperty
+
+int property StrippingThoroughnessModifier
+    int function get()
+        return self.GetInt("Stripping::Stripping Thoroughness Modifier")
+    endFunction
+endProperty
 
 bool property ShouldStripOnEscape
     bool function get()

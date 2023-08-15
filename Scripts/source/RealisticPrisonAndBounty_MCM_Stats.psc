@@ -30,8 +30,9 @@ function Left(RealisticPrisonAndBounty_MCM mcm) global
         mcm.AddOptionStat("Largest Bounty", 0, "Bounty")
         mcm.AddOptionStat("Total Bounty", 0, "Bounty")
         mcm.AddOptionStat("Times Arrested", 0, "Times")
+        mcm.AddOptionStat("Arrests Resisted", 0, "Times")
         mcm.AddOptionStat("Times Frisked", 0, "Times")
-        mcm.AddOptionStat("Fees Owed", 0, "Gold")
+        ; mcm.AddOptionStat("Fees Owed", 0, "Gold")
         i += 1
     endWhile
 endFunction
@@ -84,6 +85,9 @@ function OnOptionHighlight(RealisticPrisonAndBounty_MCM mcm, string option) glob
 
     elseif (option == hold + "::Times Arrested")
         mcm.SetInfoText("The times you have been arrested in " + hold + ".")
+
+    elseif (option == hold + "::Arrests Resisted")
+        mcm.SetInfoText("The amount of times you have eluded or resisted arrest in " + hold + ".")
 
     elseif (option == hold + "::Times Frisked")
         mcm.SetInfoText("The times you have been frisk searched in " + city + "'s jail.")

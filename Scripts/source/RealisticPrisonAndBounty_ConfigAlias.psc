@@ -60,6 +60,10 @@ function PerformMaintenance()
         Debug.MessageBox("["+ GetModName() +"] Failed to register events, the mod may not work at all!")
     endif
 
+    ; Temporary, RefAliases are lost on Player Load, must find a way to rectify
+    configScript.jail.Prisoner.ForceRefTo(configScript.Player)
+    configScript.NotifyJail("Prisoner: " + configScript.Player + ", Ref: " + configScript.jail.Prisoner)
+
     ; configScript.miscVars.CreateStringMap("Options")
     ; configScript.miscVars.CreateStringMap("Options/Flags")
     ; configScript.miscVars.AddToContainer("Jail::Cells", "Jail::Cells[Teste]")
