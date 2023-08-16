@@ -52,8 +52,8 @@ function Left(RealisticPrisonAndBounty_MCM mcm) global
     mcm.AddTextOption("", "When in Jail", mcm.OPTION_DISABLED)
     mcm.AddOptionSliderKey("Infamy Gained", "Infamy Gained (%)", "{2}% of Bounty")
     mcm.AddOptionSlider("Infamy Gained", "{0} Infamy")
-    mcm.AddOptionSliderKey("Infamy Gain Modifier (Recognized)", "Infamy Gain Modifier (Recognized)", "{0}x")
-    mcm.AddOptionSliderKey("Infamy Gain Modifier (Known)", "Infamy Gain Modifier (Known)", "{0}x")
+    mcm.AddOptionSliderKey("Infamy Gain Modifier (Recognized)", "Infamy Gain Modifier (Recognized)", "{1}x")
+    mcm.AddOptionSliderKey("Infamy Gain Modifier (Known)", "Infamy Gain Modifier (Known)", "{1}x")
     mcm.AddEmptyOption()
     mcm.AddTextOption("", "When Free", mcm.OPTION_DISABLED)
     mcm.AddOptionSliderKey("Infamy Lost", "Infamy Lost (%)", "{2}% of Infamy")
@@ -810,12 +810,12 @@ function LoadSliderOptions(RealisticPrisonAndBounty_MCM mcm, string option, floa
     elseif (option == "Infamy::Infamy Gain Modifier (Recognized)")
         minRange = -100
         maxRange = 100
-        intervalSteps = 1
+        intervalSteps = 0.1
 
     elseif (option == "Infamy::Infamy Gain Modifier (Known)")
         minRange = -100
         maxRange = 100
-        intervalSteps = 1
+        intervalSteps = 0.1
 
     elseif (option == "Infamy::Infamy Lost (%)")
         minRange = 0

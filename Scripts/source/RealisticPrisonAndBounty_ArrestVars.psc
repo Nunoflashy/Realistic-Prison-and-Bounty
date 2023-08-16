@@ -200,6 +200,18 @@ float property InfamyGainedDailyFromBountyPercentage
     endFunction
 endProperty
 
+int property InfamyGainModifierRecognized
+    int function get()
+        return self.GetInt("Jail::Infamy Gain Modifier (Recognized)")
+    endFunction
+endProperty
+
+int property InfamyGainModifierKnown
+    int function get()
+        return self.GetInt("Jail::Infamy Gain Modifier (Known)")
+    endFunction
+endProperty
+
 int property InfamyBountyTrigger
     int function get()
         return self.GetInt("Jail::Bounty to Trigger Infamy")

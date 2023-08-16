@@ -28,6 +28,12 @@ RealisticPrisonAndBounty_ActorVars property actorVars
     endFunction
 endProperty
 
+RealisticPrisonAndBounty_MiscVars property miscVars
+    RealisticPrisonAndBounty_MiscVars function get()
+        return config.miscVars
+    endFunction
+endProperty
+
 RealisticPrisonAndBounty_BodySearcher property bodySearcher
     RealisticPrisonAndBounty_BodySearcher function get()
         return config.mainAPI as RealisticPrisonAndBounty_BodySearcher
@@ -174,6 +180,15 @@ int property InfamyGainedDaily
         <=> 43 + 40 = 83
     /;
     int function get()
+        if (IsInfamyKnown && arrestVars.InfamyGainModifierKnown != 0)
+            return (round(Bounty * arrestVars.InfamyGainedDailyFromBountyPercentage) + arrestVars.InfamyGainedDaily) * \
+                    int_if (arrestVars.InfamyGainModifierKnown < 0, (1 / abs(arrestVars.InfamyGainModifierKnown) as int), arrestVars.InfamyGainModifierKnown)
+                    
+        elseif (IsInfamyRecognized && arrestVars.InfamyGainModifierRecognized != 0)
+            return (round(Bounty * arrestVars.InfamyGainedDailyFromBountyPercentage) + arrestVars.InfamyGainedDaily) * \
+                    int_if (arrestVars.InfamyGainModifierRecognized < 0, (1 / abs(arrestVars.InfamyGainModifierRecognized) as int), arrestVars.InfamyGainModifierRecognized)
+        endif
+
         return round(Bounty * arrestVars.InfamyGainedDailyFromBountyPercentage) + arrestVars.InfamyGainedDaily
     endFunction
 endProperty
@@ -197,18 +212,12 @@ int property InfamyGainedPerUpdate
     endFunction
 endProperty
 
-;/
-    To be changed, this script should not depend on config
-/;
 bool property IsInfamyRecognized
     bool function get()
         return CurrentInfamy >= arrestVars.InfamyRecognizedThreshold
     endFunction
 endProperty
 
-;/
-    To be changed, this script should not depend on config
-/;
 bool property IsInfamyKnown
     bool function get()
         return CurrentInfamy >= arrestVars.InfamyKnownThreshold
@@ -218,6 +227,13 @@ endProperty
 int property CurrentInfamy
     int function get()
         return self.QueryStat("Infamy Gained")
+    endFunction
+endProperty
+
+int property InfamyBountyPenalty
+    int function get()
+        float infamyTypePenalty = float_if (IsInfamyKnown, arrestVars.InfamyKnownPenalty, float_if (IsInfamyRecognized, arrestVars.InfamyRecognizedPenalty))
+        return round(CurrentInfamy * infamyTypePenalty)
     endFunction
 endProperty
 
@@ -251,6 +267,7 @@ ObjectReference property CellDoor
     endFunction
 endProperty
 
+
 ; Increments the desired stat for this Arrest faction on this Prisoner.
 function IncrementStat(string statName, int incrementBy = 1)
     actorVars.IncrementStat(statName, ArrestFaction, this, incrementBy)
@@ -281,6 +298,9 @@ endFunction
 
 function ResetArrestVars()
     if (this == config.Player)
+        ; Restore jail objects original state
+        CellDoor.SetLockLevel(arrestVars.GetInt("Jail::Cell Door Old Lock Level"))
+
         ; Arrest Vars
         arrestVars.Remove("Arrest::Arrested")
         arrestVars.Remove("Arrest::Arrestee")
@@ -297,9 +317,9 @@ function ResetArrestVars()
         arrestVars.Remove("Jail::Clothed")
         arrestVars.Remove("Jail::Sentence")
         arrestVars.Remove("Jail::Time of Imprisonment")
-        ; arrestVars.Remove("Jail::Cell")
-        ; arrestVars.Remove("Jail::Cell Door")
-        CellDoor.SetLockLevel(arrestVars.GetInt("Jail::Cell Door Old Lock Level"))
+        arrestVars.Remove("Jail::Cell")
+        arrestVars.Remove("Jail::Cell Door")
+
         accumulatedTimeServed = 0.0
     endif
 endFunction
@@ -479,15 +499,31 @@ function AddEscapeBounty()
     ; ==========================================================
     int escapeBountyGotten = floor(Bounty * arrestVars.EscapeBountyFromCurrentArrest) + arrestVars.EscapeBounty
 
+    ; Account for Infamy arrests where Bounty is less than the sentence gotten from infamy alone
+
+    if (Bounty < InfamyBountyPenalty)
+        ; This is an infamy arrest, bounty decreased should be different to avoid decreasing more than the actual bounty
+        if (arrestVars.AccountForTimeServed && TimeServed >= 1)
+            ArrestFaction.SetCrimeGold(escapeBountyGotten)
+            config.NotifyJail("Due to time served in jail, your bounty was decreased by " + Max(0, (Bounty - escapeBountyGotten)), (Bounty - escapeBountyGotten) > 0)
+            config.NotifyJail("You have gained " + escapeBountyGotten + " Bounty in " + Hold + " for escaping") ; Hold must be dynamic to each prisoner later
+
+            ; Should we clear it from storage vars?
+            arrestVars.SetInt("Arrest::Bounty Non-Violent", 0)
+            arrestVars.SetInt("Arrest::Bounty Violent", 0)
+            return
+        endif
+    endif
+
     if (arrestVars.AccountForTimeServed && TimeServed >= 1)
         int bountyDecreased = floor(TimeServed * arrestVars.BountyToSentence)
         escapeBountyGotten -= bountyDecreased ; 2 * 100 = 200 Bounty (2 days served decreases 200 Bounty)
-        config.NotifyJail("Due to time served in jail, your escape bounty has decreased by " + bountyDecreased)
+        config.NotifyJail("Due to time served in jail, your bounty was decreased by " + bountyDecreased)
     endif
 
     ArrestFaction.ModCrimeGold(escapeBountyGotten)
-    config.NotifyJail("You have gained " + escapeBountyGotten + " Bounty in " + arrestVars.Hold + " for escaping") ; Hold must be dynamic to each prisoner later
-        
+    config.NotifyJail("You have gained " + escapeBountyGotten + " Bounty in " + Hold + " for escaping", escapeBountyGotten > 0) ; Hold must be dynamic to each prisoner later
+    
     ; Should we clear it from storage vars?
     arrestVars.SetInt("Arrest::Bounty Non-Violent", 0)
     arrestVars.SetInt("Arrest::Bounty Violent", 0)
@@ -503,16 +539,15 @@ function TriggerCrimimalPenalty()
     bool hasBountyToTriggerPenalty = (Bounty >= arrestVars.InfamyBountyTrigger)
 
     if (hasBountyToTriggerPenalty && (IsInfamyRecognized || IsInfamyKnown))
-        float criminalPenalty  = float_if (IsInfamyKnown, arrestVars.InfamyKnownPenalty, arrestVars.InfamyRecognizedPenalty)
-        int infamyPenalty = floor(CurrentInfamy * criminalPenalty) / arrestVars.BountyToSentence
-        Debug(self.GetOwningQuest(), "TriggerCrimimalPenalty", "Yes, infamyPenalty: " + infamyPenalty)
+        Debug(self.GetOwningQuest(), "TriggerCrimimalPenalty", "Yes, infamyPenalty: " + InfamyBountyPenalty)
 
-        arrestVars.SetInt("Jail::Sentence", arrestVars.Sentence + infamyPenalty)
+        ; arrestVars.SetInt("Jail::Sentence", arrestVars.Sentence + InfamyBountyPenalty)
+        arrestVars.ModInt("Jail::Sentence", InfamyBountyPenalty)
 
         int currentLongestSentence = actorVars.GetLongestSentence(ArrestFaction, this)
         actorVars.SetLongestSentence(ArrestFaction, this, int_if (currentLongestSentence < Sentence, Sentence, currentLongestSentence))
 
-        config.NotifyJail(string_if (IsInfamyKnown, "Due to being a known criminal in the hold, your sentence has been extended", "Due to being a recognized criminal in the hold, your sentence has been extended"))
+        config.NotifyJail(string_if (IsInfamyKnown, jail.InfamyKnownSentenceAppliedNotification, jail.InfamyRecognizedSentenceAppliedNotification))
     endif
 endFunction
 
@@ -624,17 +659,17 @@ endFunction
 
 function UpdateInfamy()
     string city = config.GetCityNameFromHold(arrestVars.Hold)
-         
+
     ; Update infamy
     self.IncrementStat("Infamy Gained", InfamyGainedPerUpdate)
     config.NotifyInfamy(InfamyGainedPerUpdate + " Infamy gained in " + city, config.IS_DEBUG)
 
     ; Notify once when Recognized/Known Threshold is met
     if (IsInfamyKnown)
-        config.NotifyInfamyKnownThresholdMet(arrestVars.Hold)
+        jail.NotifyInfamyKnownThresholdMet(Hold, jail.HasInfamyKnownNotificationFired)
 
     elseif (IsInfamyRecognized)
-        config.NotifyInfamyRecognizedThresholdMet(arrestVars.Hold)
+        jail.NotifyInfamyRecognizedThresholdMet(Hold, jail.HasInfamyRecognizedNotificationFired)
     endif
 endFunction
 

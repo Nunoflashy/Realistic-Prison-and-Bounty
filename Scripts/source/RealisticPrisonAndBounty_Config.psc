@@ -434,23 +434,6 @@ Faction function GetCrimeFaction(string hold)
     return self.GetFaction(hold)
 endFunction
 
-function SetStat(string hold, string stat, int value)
-    string _key = hold + "::" + stat ; e.g: The Rift::Current Bounty
-    ; mcm.SetOptionStatValue(_key, value)
-endFunction
-
-function IncrementStat(string hold, string stat, int incrementBy = 1)
-    ; string _key = hold + "::" + stat ; e.g: The Rift::Infamy Gained
-    ; int currentValue    = mcm.GetStatOptionValue("Stats", _key)
-    ; int newValue        = Max(0, currentValue + incrementBy) as int
-    
-    ; mcm.SetOptionStatValue(_key, newValue)
-endFunction
-
-function DecrementStat(string hold, string stat, int decrementBy = 1)
-    IncrementStat(hold, stat, -decrementBy)
-endFunction
-
 int property FactionCount
     int function get()
         return miscVars.GetLengthOf("Factions")
@@ -755,6 +738,10 @@ int function GetInfamyKnownThreshold(string hold)
     return mcm.GetSliderOptionValue(hold, "Infamy::Infamy Known Threshold") as int
 endFunction
 
+int function GetInfamyGainModifier(string hold, string infamyLevel = "Recognized")
+    return mcm.GetSliderOptionValue(hold, string_if (infamyLevel == "Recognized", "Infamy::Infamy Gain Modifier (Recognized)", "Infamy::Infamy Gain Modifier (Known)")) as int
+endFunction
+
 bool function IsBountyDecayEnabled(string hold)
     return mcm.GetToggleOptionState(hold, "Bounty Decaying::Enable Bounty Decaying")
 endFunction
@@ -951,15 +938,6 @@ int function GetInfamyGained(string hold)
     ; return mcm.GetStatOptionValue("Stats", hold + "::Infamy Gained")
 endFunction
 
-int function GetStat(string hold, string stat)
-    ; return mcm.GetStatOptionValue("Stats", hold + "::" + stat)
-endFunction
-
-int function QueryStat(string hold, string stat)
-    ; return actorVars.Get("["+ Player.GetFormID() +"]" + hold + "::" + stat)
-    return GetStat(hold, stat)
-endFunction
-
 bool function IsInfamyRecognized(string hold)
     return isInfamyEnabled(hold) && getInfamyGained(hold) >= getInfamyRecognizedThreshold(hold)
 endFunction
@@ -1025,24 +1003,6 @@ function NotifyInfamy(string msg, bool condition = true)
     if (ShouldDisplayInfamyNotifications && condition)
         debug.notification(msg)
     endif
-endFunction
-
-function NotifyInfamyRecognizedThresholdMet(string hold, bool asNotification = false)
-    if (ShouldDisplayInfamyNotifications && asNotification)
-        debug.notification("You are now recognized as a criminal in " + hold)
-        return
-    endif
-
-    debug.MessageBox("You are now recognized as a criminal in " + hold)
-endFunction
-
-function NotifyInfamyKnownThresholdMet(string hold, bool asNotification = false)
-    if (ShouldDisplayInfamyNotifications && asNotification)
-        debug.notification("You are now a known criminal in " + hold)
-        return
-    endif
-
-    debug.MessageBox("You are now a known criminal in " + hold)
 endFunction
 
 bool function IsBountyDecayable(string hold)

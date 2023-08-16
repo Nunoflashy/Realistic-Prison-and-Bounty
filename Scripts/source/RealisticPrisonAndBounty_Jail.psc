@@ -23,6 +23,12 @@ RealisticPrisonAndBounty_ArrestVars property arrestVars
     endFunction
 endProperty
 
+RealisticPrisonAndBounty_MiscVars property miscVars
+    RealisticPrisonAndBounty_MiscVars function get()
+        return config.miscVars
+    endFunction
+endProperty
+
 string property STATE_JAILED    = "Jailed" autoreadonly
 string property STATE_ESCAPING  = "Escaping" autoreadonly
 string property STATE_ESCAPED   = "Escaped" autoreadonly
@@ -34,6 +40,39 @@ string property CurrentState
         return self.GetState()
     endFunction
 endProperty
+
+; ==========================================================
+;                       Infamy Messages
+; ==========================================================
+;/
+    Properties used to determine if infamy messages have fired at least once,
+    determines for both Recognized and Known thresholds
+/;
+bool property HasInfamyRecognizedNotificationFired
+    bool function get()
+        return miscVars.GetBool("Jail::Infamy Recognized Threshold Notification")
+    endFunction
+endProperty
+
+bool property HasInfamyKnownNotificationFired
+    bool function get()
+        return miscVars.GetBool("Jail::Infamy Known Threshold Notification")
+    endFunction
+endProperty
+
+string property InfamyRecognizedSentenceAppliedNotification
+    string function get()
+        return "Due to being a recognized criminal in the hold, your sentence was extended"
+    endFunction
+endProperty
+
+string property InfamyKnownSentenceAppliedNotification
+    string function get()
+        return "Due to being a known criminal in the hold, your sentence was extended"
+    endFunction
+endProperty
+
+; ==========================================================
 
 string property Hold
     string function get()
@@ -63,6 +102,8 @@ function SetupJailVars()
     arrestVars.SetFloat("Jail::Infamy Known Threshold", config.GetInfamyKnownThreshold(Hold))
     arrestVars.SetFloat("Jail::Infamy Gained Daily from Current Bounty", config.GetInfamyGainedDailyFromArrestBounty(Hold))
     arrestVars.SetFloat("Jail::Infamy Gained Daily", config.GetInfamyGainedDaily(Hold))
+    arrestVars.SetInt("Jail::Infamy Gain Modifier (Recognized)", config.GetInfamyGainModifier(Hold, "Recognized"))
+    arrestVars.SetInt("Jail::Infamy Gain Modifier (Known)", config.GetInfamyGainModifier(Hold, "Known"))
     arrestVars.SetFloat("Jail::Bounty Exchange", config.GetJailBountyExchange(Hold))
     arrestVars.SetFloat("Jail::Bounty to Sentence", config.GetJailBountyToSentence(Hold))
     arrestVars.SetFloat("Jail::Minimum Sentence", config.GetJailMinimumSentence(Hold))
@@ -510,7 +551,6 @@ state Released
     event OnEndState()
         ; Terminate Release process, Actor should be free at this point
         Debug(self, "OnEndState", CurrentState + " state end", config.IS_DEBUG)
-        arrest.GotoState("")
     endEvent
 endState
 
@@ -521,6 +561,7 @@ state Free
         ; arrestVars.Clear()
         Prisoner.ResetArrestVars()
         Prisoner.Clear()
+        arrest.GotoState("")
         GotoState("")
     endEvent
 
@@ -769,3 +810,41 @@ bool function AssignJailCell(Actor akPrisoner)
 
     return false
 endFunction
+
+; ==========================================================
+;                       Infamy Messages
+; ==========================================================
+
+function NotifyInfamyRecognizedThresholdMet(string hold, bool asNotification = false)
+    if (miscVars.GetBool("["+ hold +"]Jail::Infamy Recognized Threshold Message Sent"))
+        return
+    endif
+
+    miscVars.SetBool("["+ hold +"]Jail::Infamy Recognized Threshold Message Sent", true)
+    miscVars.SetBool("Jail::Infamy Recognized Threshold Notification", true)
+
+    if (config.ShouldDisplayInfamyNotifications && asNotification)
+        debug.notification("You are now recognized as a criminal in " + hold)
+        return
+    endif
+
+    debug.MessageBox("You are now recognized as a criminal in " + hold)
+endFunction
+
+function NotifyInfamyKnownThresholdMet(string hold, bool asNotification = false)
+    if (miscVars.GetBool("["+ hold +"]Jail::Infamy Known Threshold Message Sent"))
+        return
+    endif
+
+    miscVars.SetBool("["+ hold +"]Jail::Infamy Known Threshold Message Sent", true)
+    miscVars.SetBool("Jail::Infamy Known Threshold Notification", true)
+
+    if (config.ShouldDisplayInfamyNotifications && asNotification)
+        debug.notification("You are now a known criminal in " + hold)
+        return
+    endif
+
+    debug.MessageBox("You are now a known criminal in " + hold)
+endFunction
+
+; ==========================================================
