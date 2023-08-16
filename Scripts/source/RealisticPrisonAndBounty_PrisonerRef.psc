@@ -165,8 +165,8 @@ float accumulatedTimeServed
 
 int property InfamyGainedDaily
     ;/
-        infamyGainedFlat: 40
-        infamyGainedFromCurrentBounty: 1.44%
+        arrestVars.InfamyGainedDaily: 40
+        arrestVars.InfamyGainedDailyFromBountyPercentage: 1.44%
         Bounty: 3000
         <=> floor(3000 * (1.44/100) + 40)
         <=> floor(3000 * 0.0144) + 40
@@ -174,11 +174,7 @@ int property InfamyGainedDaily
         <=> 43 + 40 = 83
     /;
     int function get()
-        ; int infamyGainedFlat                            = arrestVars.GetFloat("Jail::Infamy Gained Daily") as int
-        ; float infamyGainedFromCurrentBountyPercent      = arrestVars.GetFloat("Jail::Infamy Gained Daily from Current Bounty")
-        ; return floor(Bounty * GetPercentAsDecimal(infamyGainedFromCurrentBountyPercent)) + infamyGainedFlat
-
-        return floor(Bounty * arrestVars.InfamyGainedDailyFromBountyPercentage) + arrestVars.InfamyGainedDaily
+        return round(Bounty * arrestVars.InfamyGainedDailyFromBountyPercentage) + arrestVars.InfamyGainedDaily
     endFunction
 endProperty
 
@@ -197,7 +193,7 @@ int property InfamyGainedPerUpdate
         <=> 4
     /;
     int function get()
-        return ceiling(InfamyGainedDaily * TimeSinceLastUpdate)
+        return round(InfamyGainedDaily * TimeSinceLastUpdate)
     endFunction
 endProperty
 
