@@ -20,6 +20,7 @@
         <Import>@ModsFolder\JContainers SE\Scripts\Source</Import>
         <Import>@ModsFolder\powerofthree's Papyrus Extender for SSE\Source\Scripts</Import>
         <Import>@ModsFolder\PapyrusUtil SE - Modders Scripting Utility Functions\Scripts\Source</Import>
+        <Import>@ModsFolder\Death Alternative - Your Money Or Your Life\scripts\source</Import>
         <Import>D:\Games\Modded Skyrim SE\Skyrim Special Edition\Data\Scripts\Source</Import>
     </Imports>
     <Folders>

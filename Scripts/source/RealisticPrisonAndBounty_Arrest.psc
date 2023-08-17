@@ -50,6 +50,7 @@ function RegisterEvents()
     RegisterForModEvent("RPB_ArrestBegin", "OnArrestBegin")
     RegisterForModEvent("RPB_ArrestEnd", "OnArrestEnd")
     RegisterForModEvent("RPB_ResistArrest", "OnArrestResist")
+    RegisterForModEvent("RPB_SetPlayerDefeated", "OnArrestDefeated")
     Debug(self, "Arrest::RegisterEvents", "Registered Arrest Events")
 endFunction
 
@@ -241,6 +242,21 @@ event OnArrestBegin(string eventName, string arrestType, float arresteeId, Form 
     self.BeginArrest()
 endEvent
 
+event OnArrestDefeated(string eventName, string unusedStr, float unusedFlt, Form sender)
+    ; Set the player's penalty to be added to the bounty when going to jail.
+    Actor akCaptor = (sender as Actor)
+    Faction akCrimeFaction = akCaptor.GetCrimeFaction()
+    string hold = akCrimeFaction.GetName()
+
+    int defeatBountyFlat                = config.GetArrestAdditionalBountyDefeatedFlat(hold)
+    float defeatBountyFromCurrentBounty = config.GetArrestAdditionalBountyDefeatedFromCurrentBounty(hold)
+    float defeatBountyPercentModifier   = GetPercentAsDecimal(defeatBountyFromCurrentBounty)
+    int defeatArrestPenalty             = floor(akCrimeFaction.GetCrimeGold() * defeatBountyPercentModifier) + defeatBountyFlat
+
+    arrestVars.SetInt("Arrest::Bounty for Defeat", defeatArrestPenalty)
+    arrestVars.SetBool("Arrest::Defeated", true)
+endEvent
+
 event OnArrestResist(string eventName, string unusedStr, float arrestResisterId, Form sender)
     Actor guard            = (sender as Actor)
     Faction crimeFaction   = form_if ((sender as Faction), (sender as Faction), guard.GetCrimeFaction()) as Faction
@@ -417,6 +433,12 @@ function SetBounty()
         ; Set the bounties to be latent
         arrestVars.SetFloat("Arrest::Bounty Non-Violent", arrestFaction.GetCrimeGoldNonViolent())
         arrestVars.SetFloat("Arrest::Bounty Violent", arrestFaction.GetCrimeGoldViolent())
+    endif
+
+    if (arrestVars.GetBool("Arrest::Defeated"))
+        int defeatBounty = arrestVars.GetInt("Arrest::Bounty for Defeat")
+        arrestVars.ModInt("Arrest::Bounty Non-Violent", defeatBounty)
+        config.NotifyArrest("You have been defeated, " + defeatBounty + " Bounty gained in " + arrestVars.Hold)
     endif
 
     if (arrestVars.HasOverride("Arrest::Bounty Non-Violent"))

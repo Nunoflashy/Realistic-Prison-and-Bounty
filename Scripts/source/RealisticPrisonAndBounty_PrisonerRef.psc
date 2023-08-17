@@ -310,6 +310,8 @@ function ResetArrestVars()
         arrestVars.Remove("Arrest::Arrest Faction")
         arrestVars.Remove("Arrest::Arresting Guard")
         arrestVars.Remove("Arrest::Time of Arrest")
+        arrestVars.Remove("Arrest::Defeated")
+        arrestVars.Remove("Arrest::Bounty for Defeat")
 
         ; Jail Vars
         arrestVars.Remove("Jail::Jailed")
