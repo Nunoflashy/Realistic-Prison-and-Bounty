@@ -3,9 +3,12 @@ temp/
 Ideas
 *.pex
 *.jslot
+*Copy*.esp
 Ideas
 NetScriptFramework/
 Scripts/Backup/
+Scripts/Source/*_old
+Scripts/Source/*.bk*
 Scripts/MCM_Backup/RealisticPrisonAndBounty_MCM.psc
 Scripts/MCM_Backup/RealisticPrisonAndBounty_MCM_Clothing.psc
 Scripts/MCM_Backup/RealisticPrisonAndBounty_MCM_Debug.psc

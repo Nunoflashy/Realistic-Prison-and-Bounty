@@ -14,6 +14,18 @@ endProperty
 ; Static Variables (Configured in MCM)
 ; ==========================================================
 
+int property DefeatedAdditionalBounty
+    int function get()
+        return self.GetInt("Arrest::Additional Bounty when Defeated")
+    endFunction
+endProperty
+
+float property DefeatedAdditionalBountyPercentage
+    float function get()
+        return self.GetFloat("Arrest::Additional Bounty when Defeated from Current Bounty")
+    endFunction
+endProperty
+
 bool property InfamyEnabled
     bool function get()
         return self.GetBool("Jail::Infamy Enabled")
@@ -378,6 +390,12 @@ endProperty
 bool property IsClothed
     bool function get()
         return self.GetBool("Jail::Clothed")
+    endFunction
+endProperty
+
+bool property WasDefeated
+    bool function get()
+        return self.GetBool("Arrest::Defeated")
     endFunction
 endProperty
 

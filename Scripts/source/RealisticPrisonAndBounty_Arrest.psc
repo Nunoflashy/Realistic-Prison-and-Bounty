@@ -5,9 +5,11 @@ import RealisticPrisonAndBounty_Util
 import RealisticPrisonAndBounty_Config
 import PO3_SKSEFunctions
 
-string property STATE_RESISTED = "Resisted" autoreadonly
-string property STATE_ARRESTED = "Arrested" autoreadonly
-string property STATE_SURRENDER = "Surrender" autoreadonly
+string property STATE_RESISTED      = "Resisted" autoreadonly
+string property STATE_ELUDED        = "Eluded" autoreadonly
+string property STATE_UNCONSCIOUS   = "Unconscious" autoreadonly
+string property STATE_ARRESTED      = "Arrested" autoreadonly
+string property STATE_SURRENDER     = "Surrender" autoreadonly
 
 string property ARREST_TYPE_TELEPORT_TO_JAIL    = "TeleportToJail" autoreadonly
 string property ARREST_TYPE_TELEPORT_TO_CELL    = "TeleportToCell" autoreadonly
@@ -50,6 +52,7 @@ function RegisterEvents()
     RegisterForModEvent("RPB_ArrestBegin", "OnArrestBegin")
     RegisterForModEvent("RPB_ArrestEnd", "OnArrestEnd")
     RegisterForModEvent("RPB_ResistArrest", "OnArrestResist")
+    RegisterForModEvent("RPB_EludingArrest", "OnArrestElude")
     RegisterForModEvent("RPB_SetPlayerDefeated", "OnArrestDefeated")
     Debug(self, "Arrest::RegisterEvents", "Registered Arrest Events")
 endFunction
@@ -175,6 +178,25 @@ state Resisted
     endEvent
 endState
 
+state Eluded
+    event OnBeginState()
+        Debug(self, "Arrest::OnBeginState", "Begin State " + self.GetState(), config.IS_DEBUG)
+        RegisterForSingleUpdate(3.0)
+    endEvent
+
+    event OnUpdate()
+        if (config.Player.IsRunning())
+            Actor eludedCaptor = arrestVars.GetActor("Arrest::Eluded Captor")
+            eludedCaptor.StartCombat(config.Player)
+            GotoState("")
+        endif
+    endEvent
+
+    event OnEndState()
+        Debug(self, "Arrest::OnEndState", "End State " + self.GetState(), config.IS_DEBUG)
+    endEvent
+endState
+
 ;/
     The state where the actor should be upon surrendering.
 /;
@@ -191,6 +213,22 @@ state Surrender
         string currentHold = config.GetCurrentPlayerHoldLocation()
         Faction currentHoldFaction = config.GetFaction(currentHold)
         currentHoldFaction.SendModEvent("RPB_ArrestBegin", ARREST_TYPE_TELEPORT_TO_CELL)
+    endEvent
+endState
+
+state Unconscious
+    event OnBeginState()
+        config.Player.SetActorValue("Paralysis", 1)
+        config.Player.SetUnconscious(true)
+        config.Player.PushActorAway(config.Player, 4.0)
+
+        ; float randomTime = Utility.RandomFloat(1.0, 8)
+        RegisterForSingleUpdateGameTime(2.0)
+    endEvent
+
+    event OnUpdateGameTime()
+        config.Player.SetActorValue("Paralysis", 0)
+        config.Player.SetUnconscious(false)
     endEvent
 endState
 
@@ -248,13 +286,15 @@ event OnArrestDefeated(string eventName, string unusedStr, float unusedFlt, Form
     Faction akCrimeFaction = akCaptor.GetCrimeFaction()
     string hold = akCrimeFaction.GetName()
 
-    int defeatBountyFlat                = config.GetArrestAdditionalBountyDefeatedFlat(hold)
-    float defeatBountyFromCurrentBounty = config.GetArrestAdditionalBountyDefeatedFromCurrentBounty(hold)
-    float defeatBountyPercentModifier   = GetPercentAsDecimal(defeatBountyFromCurrentBounty)
-    int defeatArrestPenalty             = floor(akCrimeFaction.GetCrimeGold() * defeatBountyPercentModifier) + defeatBountyFlat
-
-    arrestVars.SetInt("Arrest::Bounty for Defeat", defeatArrestPenalty)
+    ; Setup Defeated penalties
+    arrestVars.SetInt("Arrest::Additional Bounty when Defeated", config.GetArrestAdditionalBountyDefeatedFlat(hold))
+    arrestVars.SetFloat("Arrest::Additional Bounty when Defeated from Current Bounty", GetPercentAsDecimal(config.GetArrestAdditionalBountyDefeatedFromCurrentBounty(hold)))
+    arrestVars.SetInt("Arrest::Bounty for Defeat", round(akCrimeFaction.GetCrimeGold() * arrestVars.DefeatedAdditionalBountyPercentage) + arrestVars.DefeatedAdditionalBounty)
     arrestVars.SetBool("Arrest::Defeated", true)
+
+    Form handcuffs = Game.GetFormEx(0xA033D9E)
+    config.Player.EquipItem(handcuffs, true, true)
+    ; GotoState(STATE_UNCONSCIOUS)
 endEvent
 
 event OnArrestResist(string eventName, string unusedStr, float arrestResisterId, Form sender)
@@ -282,6 +322,12 @@ event OnArrestResist(string eventName, string unusedStr, float arrestResisterId,
     endif
 
     self.TriggerResistArrest(guard, crimeFaction)
+endEvent
+
+event OnArrestElude(string eventName, string unusedStr, float unusedFlt, Form sender)
+    Actor akAggressor = sender as Actor
+    arrestVars.SetActor("Arrest::Eluded Captor", akAggressor)
+    GotoState(STATE_ELUDED)
 endEvent
 
 function BeginArrest()
@@ -371,7 +417,7 @@ function TriggerResistArrest(Actor akGuard, Faction akCrimeFaction)
     string hold = akCrimeFaction.GetName()
 
     int resistBountyFlat                    = config.GetArrestAdditionalBountyResistingFlat(hold)
-    float resistBountyFromCurrentBounty     = config.GetArrestAdditionalBountyDefeatedFromCurrentBounty(hold)
+    float resistBountyFromCurrentBounty     = config.GetArrestAdditionalBountyResistingFromCurrentBounty(hold)
     float resistBountyPercentModifier       = GetPercentAsDecimal(resistBountyFromCurrentBounty)
     int resistArrestPenalty                 = floor(akCrimeFaction.GetCrimeGold() * resistBountyPercentModifier) + resistBountyFlat
 

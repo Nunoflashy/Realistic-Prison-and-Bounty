@@ -49,7 +49,7 @@ function Left(RealisticPrisonAndBounty_MCM mcm) global
     mcm.AddOptionSlider("Infamy Recognized Threshold", "{0} Infamy")
     mcm.AddOptionSlider("Infamy Known Threshold", "{0} Infamy")
     mcm.AddEmptyOption()
-    mcm.AddTextOption("", "When in Jail", mcm.OPTION_DISABLED)
+    mcm.AddTextOption("", "While Jailed", mcm.OPTION_DISABLED)
     mcm.AddOptionSliderKey("Infamy Gained", "Infamy Gained (%)", "{2}% of Bounty")
     mcm.AddOptionSlider("Infamy Gained", "{0} Infamy")
     mcm.AddOptionSliderKey("Infamy Gain Modifier (Recognized)", "Infamy Gain Modifier (Recognized)", "{1}x")
@@ -117,7 +117,7 @@ function Right(RealisticPrisonAndBounty_MCM mcm) global
     mcm.AddOptionSlider("Cell Search Thoroughness", "{0}x")
     mcm.AddOptionMenu("Cell Lock Level")
     mcm.AddEmptyOption()
-    mcm.AddTextOption("", "WHEN IN JAIL", mcm.OPTION_DISABLED)
+    mcm.AddTextOption("", "While Jailed", mcm.OPTION_DISABLED)
     mcm.AddOptionToggle("Fast Forward")
     mcm.AddOptionSlider("Day to fast forward from")
     mcm.AddEmptyOption()
@@ -529,10 +529,10 @@ function OnOptionHighlight(RealisticPrisonAndBounty_MCM mcm, string option) glob
         mcm.SetInfoText("The day to fast forward from to release in " + city + ".")
 
     elseif (option == "Jail::Handle Skill Loss")
-        mcm.SetInfoText("The way to handle skill progression loss when jailed in " + city + ".")
+        mcm.SetInfoText("The way to handle skill progression loss while jailed in " + city + ".")
 
     elseif (option == "Jail::Day to Start Losing Skills")
-        mcm.SetInfoText("The day to start losing skills when jailed in " + city + ". \n(Configured individually in General page)")
+        mcm.SetInfoText("The day to start losing skills while jailed in " + city + ". \n(Configured individually in General page)")
 
     elseif (option == "Jail::Chance to lose Skills")
         mcm.SetInfoText("The chance to lose skills each day while jailed in " + city + ". \n(Stats lost are configured in General page)")
