@@ -15,6 +15,9 @@ endProperty
 ; =================================
 ; Setters - Changers
 ; =================================
+function SetStat(string statName, Faction akFaction, Actor akActor, int value)
+    self.Set("["+ akActor.GetFormID() +"]" + akFaction.GetName() + "::" + statName, value)
+endFunction
 
 function SetCrimeGold(Faction akFaction, Actor akActor, int value)
     ; [0x382FA]Haafingar::Bounty Non-Violent

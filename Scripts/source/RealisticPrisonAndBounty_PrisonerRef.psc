@@ -268,13 +268,17 @@ ObjectReference property CellDoor
 endProperty
 
 
-; Increments the desired stat for this Arrest faction on this Prisoner.
+; Increments the desired stat in this Arrest faction for this Prisoner.
 function IncrementStat(string statName, int incrementBy = 1)
     actorVars.IncrementStat(statName, ArrestFaction, this, incrementBy)
 endFunction
 
 int function QueryStat(string statName)
     return actorVars.GetStat(statName, ArrestFaction, this)
+endFunction
+
+function SetStat(string statName, int value)
+    actorVars.SetStat(statName, ArrestFaction, this, value)
 endFunction
 
 ; To handle both Player and NPC's later
@@ -351,6 +355,11 @@ bool function ShouldBeClothed()
         return false
     endif
 
+    ; Don't clothe if the player was defeated and it's configured to be disabled in the MCM
+    if (!arrestVars.ClotheWhenDefeated && arrestVars.WasDefeated)
+        return false
+    endif
+
     bool meetsBountyRequirements    = (BountyNonViolent <= arrestVars.ClothingMaxBounty) && (BountyViolent <= arrestVars.ClothingMaxBountyViolent)
     bool meetsSentenceRequirements  = Sentence <= arrestVars.ClothingMaxSentence
     return arrestVars.ClothingHandling || (arrestVars.ClothingHandling == "Maximum Bounty" && meetsBountyRequirements) || (arrestVars.ClothingHandling == "Maximum Sentence" && meetsSentenceRequirements)
@@ -381,6 +390,10 @@ endFunction
 
 bool function HasActiveBounty()
     return ArrestFaction.GetCrimeGold() > 0
+endFunction
+
+bool function HasEscaped()
+    return arrestVars.GetBool("Jail::Escaped")
 endFunction
 
 function Frisk()
@@ -485,6 +498,8 @@ function SetEscaped(bool escaped = true)
 
             ; Increment the "Jail Escapes" in the regular vanilla stat menu.
             Game.IncrementStat("Jail Escapes")
+
+            this.SetAttackActorOnSight()
         endif
     endif
 endFunction
@@ -541,14 +556,10 @@ function TriggerCrimimalPenalty()
     bool hasBountyToTriggerPenalty = (Bounty >= arrestVars.InfamyBountyTrigger)
 
     if (hasBountyToTriggerPenalty && (IsInfamyRecognized || IsInfamyKnown))
-        Debug(self.GetOwningQuest(), "TriggerCrimimalPenalty", "Yes, infamyPenalty: " + InfamyBountyPenalty)
+        Debug(none, "TriggerCriminalPenalty", "Infamy Extra Sentence: " + InfamyBountyPenalty / arrestVars.BountyToSentence)
+        arrestVars.ModInt("Jail::Sentence", InfamyBountyPenalty / arrestVars.BountyToSentence)
 
-        ; arrestVars.SetInt("Jail::Sentence", arrestVars.Sentence + InfamyBountyPenalty)
-        arrestVars.ModInt("Jail::Sentence", InfamyBountyPenalty)
-
-        int currentLongestSentence = actorVars.GetLongestSentence(ArrestFaction, this)
-        actorVars.SetLongestSentence(ArrestFaction, this, int_if (currentLongestSentence < Sentence, Sentence, currentLongestSentence))
-
+        self.UpdateLongestSentence()
         config.NotifyJail(string_if (IsInfamyKnown, jail.InfamyKnownSentenceAppliedNotification, jail.InfamyRecognizedSentenceAppliedNotification))
     endif
 endFunction
@@ -560,27 +571,6 @@ function SetTimeOfImprisonment()
     else
         arrestVars.SetFloat("["+ id +"]Jail::Time of Imprisonment", CurrentTime)
     endif
-endFunction
-
-function UpdateDaysJailed()
-    ; Add the time served from each update this runs
-    accumulatedTimeServed += TimeSinceLastUpdate
-
-    if (accumulatedTimeServed >= 1)
-        ; A day or more has passed
-        int fullDaysPassed = floor(accumulatedTimeServed) ; Get the full days
-        Game.IncrementStat("Days Jailed", fullDaysPassed)
-        self.IncrementStat("Days Jailed", fullDaysPassed)
-
-        accumulatedTimeServed -= fullDaysPassed ; Remove the counted days from accumulated time served (Get the fractional part if there's any - i.e: hours)
-        float accumulatedTimeRemaining = accumulatedTimeServed - fullDaysPassed
-        Debug(none, "Prisoner::UpdateDaysJailed", "accumulatedTimeServed remaining: " + accumulatedTimeRemaining)
-    endif
-
-    Debug(none, "Prisoner::UpdateDaysJailed", "TimeServed: " + TimeServed + ", floor(TimeServed): " + floor(TimeServed))
-    Debug(none, "Prisoner::UpdateDaysJailed", "Updating Days Jailed: " + floor(accumulatedTimeServed))
-    Debug(none, "Prisoner::UpdateDaysJailed", "LastUpdate: " + LastUpdate)
-    Debug(none, "Prisoner::UpdateDaysJailed", "TimeSinceLastUpdate: " + TimeSinceLastUpdate)
 endFunction
 
 ; Should be called everytime the actor gets to jail (initial jailing and on escape fail)
@@ -603,8 +593,7 @@ function UpdateSentence()
         int newSentence = Sentence
         ClearBounty(ArrestFaction)
         
-        int currentLongestSentence = actorVars.GetLongestSentence(ArrestFaction, this)
-        actorVars.SetLongestSentence(ArrestFaction, this, int_if (currentLongestSentence < Sentence, Sentence, currentLongestSentence))
+        self.UpdateLongestSentence()
 
         if (newSentence != oldSentence)
             OnSentenceChanged(oldSentence, newSentence, (newSentence > oldSentence), true)
@@ -625,7 +614,12 @@ function UpdateSentenceFromCurrentBounty()
         arrestVars.SetFloat("Jail::Sentence", (BountyNonViolent + violentBountyConverted) / arrestVars.BountyToSentence)
     
         int newSentence = Sentence
-    
+        
+        self.UpdateCurrentBounty()
+        self.UpdateLargestBounty()
+        self.UpdateTotalBounty()
+        self.UpdateLongestSentence()
+
         if (newSentence != oldSentence)
             OnSentenceChanged(oldSentence, newSentence, (newSentence > oldSentence), true)
         endif
@@ -659,6 +653,9 @@ function DecreaseSentence(int daysToDecreaseBy, bool shouldAffectBounty = true)
     OnSentenceChanged(previousSentence, newSentence, daysToDecreaseBy > 0, shouldAffectBounty)
 endFunction
 
+; ==========================================================
+;                       Stats Updates
+; ==========================================================
 function UpdateInfamy()
     string city = config.GetCityNameFromHold(arrestVars.Hold)
 
@@ -674,6 +671,49 @@ function UpdateInfamy()
         jail.NotifyInfamyRecognizedThresholdMet(Hold, jail.HasInfamyRecognizedNotificationFired)
     endif
 endFunction
+
+function UpdateDaysJailed()
+    ; Add the time served from each update this runs
+    accumulatedTimeServed += TimeSinceLastUpdate
+
+    if (accumulatedTimeServed >= 1)
+        ; A day or more has passed
+        int fullDaysPassed = floor(accumulatedTimeServed) ; Get the full days
+        Game.IncrementStat("Days Jailed", fullDaysPassed)
+        self.IncrementStat("Days Jailed", fullDaysPassed)
+
+        accumulatedTimeServed -= fullDaysPassed ; Remove the counted days from accumulated time served (Get the fractional part if there's any - i.e: hours)
+        float accumulatedTimeRemaining = accumulatedTimeServed - fullDaysPassed
+        Debug(none, "Prisoner::UpdateDaysJailed", "accumulatedTimeServed remaining: " + accumulatedTimeRemaining)
+    endif
+
+    Debug(none, "Prisoner::UpdateDaysJailed", "TimeServed: " + TimeServed + ", floor(TimeServed): " + floor(TimeServed))
+    Debug(none, "Prisoner::UpdateDaysJailed", "Updating Days Jailed: " + floor(accumulatedTimeServed))
+    Debug(none, "Prisoner::UpdateDaysJailed", "LastUpdate: " + LastUpdate)
+    Debug(none, "Prisoner::UpdateDaysJailed", "TimeSinceLastUpdate: " + TimeSinceLastUpdate)
+endFunction
+
+function UpdateLongestSentence()
+    int currentLongestSentence = self.QueryStat("Longest Sentence")
+    actorVars.SetLongestSentence(ArrestFaction, this, int_if (currentLongestSentence < Sentence, Sentence, currentLongestSentence))
+endFunction
+
+function UpdateLargestBounty()
+    int currentLargestBounty = self.QueryStat("Largest Bounty")
+    self.SetStat("Largest Bounty", int_if (currentLargestBounty < Bounty, Bounty, currentLargestBounty))
+endFunction
+
+function UpdateCurrentBounty()
+    int currentBounty = self.QueryStat("Current Bounty")
+    self.SetStat("Current Bounty", int_if (currentBounty < Bounty, Bounty, currentBounty))
+endFunction
+
+function UpdateTotalBounty()
+    int currentTotalBounty = self.QueryStat("Total Bounty")
+    self.SetStat("Total Bounty", int_if (currentTotalBounty < Bounty, Bounty, currentTotalBounty))
+endFunction
+
+; ==========================================================
 
 function ShowJailInfo()
     Debug(self.GetOwningQuest(), "ShowJailInfo", "\n" + arrestVars.Hold + " Arrest Vars: { \n\t" + \
@@ -754,10 +794,6 @@ endFunction
 function MoveToCell()
     this.MoveTo(JailCell)
     self.CloseCellDoor()
-endFunction
-
-bool function HasEscaped()
-    return arrestVars.GetBool("Jail::Escaped")
 endFunction
 
 event OnSearched(ObjectReference prisonerHeldItemsContainer)

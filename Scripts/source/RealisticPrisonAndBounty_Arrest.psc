@@ -48,13 +48,19 @@ endProperty
 
 ReferenceAlias property CaptorRef auto
 
+ReferenceAlias property EludedGuardAlias
+    ReferenceAlias function get()
+        return (Game.GetFormFromFile(0xB9B9, GetPluginName()) as Quest).GetAliasByName("GuardAlias") as ReferenceAlias
+    endFunction
+endProperty
+
 function RegisterEvents()
     RegisterForModEvent("RPB_ArrestBegin", "OnArrestBegin")
     RegisterForModEvent("RPB_ArrestEnd", "OnArrestEnd")
     RegisterForModEvent("RPB_ResistArrest", "OnArrestResist")
     RegisterForModEvent("RPB_EludingArrest", "OnArrestElude")
     RegisterForModEvent("RPB_SetPlayerDefeated", "OnArrestDefeated")
-    Debug(self, "Arrest::RegisterEvents", "Registered Arrest Events")
+    Info(self, "Arrest::RegisterEvents", "Registered Arrest Events")
 endFunction
 
 function RegisterHotkeys()
@@ -181,15 +187,32 @@ endState
 state Eluded
     event OnBeginState()
         Debug(self, "Arrest::OnBeginState", "Begin State " + self.GetState(), config.IS_DEBUG)
-        RegisterForSingleUpdate(3.0)
+        string eludeType = arrestVars.GetString("Arrest::Elude Type")
+
+        if (eludeType == "Pursuit")
+            RegisterForSingleUpdate(3.0) ; Wait 3 sec before making guards attack if not stopped by then
+        
+        elseif (eludeType == "Dialogue")
+            RegisterForSingleUpdate(20.0) ; Wait 20 sec before clearing the guard's suspicion after dialogue
+        endif
     endEvent
 
     event OnUpdate()
-        if (config.Player.IsRunning())
-            Actor eludedCaptor = arrestVars.GetActor("Arrest::Eluded Captor")
-            eludedCaptor.StartCombat(config.Player)
-            GotoState("")
+        string eludeType = arrestVars.GetString("Arrest::Elude Type")
+
+        if (eludeType == "Pursuit")
+            if (config.Player.IsRunning())
+                Actor eludedCaptor = arrestVars.GetActor("Arrest::Eluded Captor")
+                eludedCaptor.StartCombat(config.Player)
+            endif
         endif
+
+        if (eludeType == "Dialogue")
+            ; Clear the eluded guard alias for Dialogue type eluded arrests.
+            EludedGuardAlias.Clear()
+        endif
+
+        GotoState("")
     endEvent
 
     event OnEndState()
@@ -293,6 +316,7 @@ event OnArrestDefeated(string eventName, string unusedStr, float unusedFlt, Form
     arrestVars.SetBool("Arrest::Defeated", true)
 
     Form handcuffs = Game.GetFormEx(0xA033D9E)
+    config.Player.StopCombatAlarm()
     config.Player.EquipItem(handcuffs, true, true)
     ; GotoState(STATE_UNCONSCIOUS)
 endEvent
@@ -324,10 +348,37 @@ event OnArrestResist(string eventName, string unusedStr, float arrestResisterId,
     self.TriggerResistArrest(guard, crimeFaction)
 endEvent
 
-event OnArrestElude(string eventName, string unusedStr, float unusedFlt, Form sender)
-    Actor akAggressor = sender as Actor
-    arrestVars.SetActor("Arrest::Eluded Captor", akAggressor)
-    GotoState(STATE_ELUDED)
+;/
+    Event that happens when the player is eluding arrest.
+
+    string  @eludeType: How the arrest is being eluded, options are: [Dialogue, Pursuit]
+        Eluding arrest through Dialogue means that the player has tried to avoid the "Wait, I know you..." guard dialogue
+        but they caught up and demanded an explanation.
+
+        Eluding arrest through Pursuit means that the player is trying to run away from the guards after they say lines such as:
+        "In the name of the Jarl, I command you to stop!", or "Come quietly or face the Jarl's justice!"
+
+    Form    @sender: Can only be cast to Actor, this is either akSpeaker in case of Dialogue or akAggressor in case of Pursuit.
+/;
+event OnArrestElude(string eventName, string eludeType, float unusedFlt, Form sender)
+    if (eludeType == "Dialogue")
+        Actor akSpeaker = sender as Actor
+        EludedGuardAlias.ForceRefTo(akSpeaker)
+        akSpeaker.EvaluatePackage()
+        arrestVars.SetActor("Arrest::Eluded Captor", akSpeaker)
+        arrestVars.SetString("Arrest::Elude Type", eludeType)
+        GotoState(STATE_ELUDED)
+        return
+
+    elseif (eludeType == "Pursuit")
+        Actor akAggressor = sender as Actor
+        arrestVars.SetActor("Arrest::Eluded Captor", akAggressor)
+        arrestVars.SetString("Arrest::Elude Type", eludeType)
+        GotoState(STATE_ELUDED)
+        return
+    endif
+
+    Error(self, "OnArrestElude", "The passed in parameters are invalid, the event failed!")
 endEvent
 
 function BeginArrest()

@@ -676,7 +676,7 @@ int function GetClothingMaximumViolentBounty(string hold)
 endFunction
 
 bool function IsClothedOnDefeat(string hold)
-    return mcm.GetToggleOptionState(hold, "Clothing::Clothe when Defeated")
+    return mcm.GetToggleOptionState(hold, "Clothing::When Defeated")
 endFunction
 
 string function GetClothingOutfit(string hold)

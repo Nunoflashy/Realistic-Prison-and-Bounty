@@ -535,7 +535,7 @@ state Released
     event OnBeginState()
         Debug(self, "OnBeginState", CurrentState + " state begin", config.IS_DEBUG)
         ; Begin Release process, Actor is arrested and not yet free
-        arrestVars.CellDoor.SetOpen()
+        Prisoner.OpenCellDoor()
         ; Prisoner.ForceRefTo(arrestVars.Arrestee)
         if (arrestVars.ArrestType == arrest.ARREST_TYPE_TELEPORT_TO_CELL)
             if (!Prisoner.ShouldItemsBeRetained())
@@ -729,7 +729,8 @@ function TriggerImprisonment()
     ; ShowArrestParams()
     ; ShowArrestVars()
 
-    config.NotifyJail("Your sentence in " + Hold + " was set to " + Prisoner.Sentence + " days in jail")
+    ; config.NotifyJail("Your sentence in " + Hold + " was set to " + Prisoner.Sentence + " days in jail")
+    config.NotifyJail("You have been sentenced to " + Prisoner.Sentence + " days in jail for " + Hold)
     EndBenchmark(startBench, "TriggerImprisonment")
 endFunction
 
