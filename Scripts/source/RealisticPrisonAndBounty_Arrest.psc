@@ -55,13 +55,14 @@ ReferenceAlias property EludedGuardAlias
 endProperty
 
 function RegisterEvents()
-    RegisterForModEvent("RPB_ArrestBegin", "OnArrestBegin")
-    RegisterForModEvent("RPB_ArrestEnd", "OnArrestEnd")
-    RegisterForModEvent("RPB_ResistArrest", "OnArrestResist")
-    RegisterForModEvent("RPB_EludingArrest", "OnArrestEludeStart")
-    RegisterForModEvent("RPB_SendEludingArrestDialogue", "OnEludingArrestDialogue")
-    RegisterForModEvent("RPB_SendArrestWait", "OnArrestWait")
-    RegisterForModEvent("RPB_SetPlayerDefeated", "OnArrestDefeated")
+    RegisterForModEvent("RPB_ArrestBegin", "OnArrestBegin")                         ; Start the Arrest
+    RegisterForModEvent("RPB_ArrestEnd", "OnArrestEnd")                             ; Undefined
+    RegisterForModEvent("RPB_ResistArrest", "OnArrestResist")                       ; Resisting Arrest
+    RegisterForModEvent("RPB_EludingArrest", "OnArrestEludeStart")                  ; Eluding Arrest (Start)
+    RegisterForModEvent("RPB_SendEludingArrestDialogue", "OnEludingArrestDialogue") ; Eluding Arrest through Dialogue (End)
+    RegisterForModEvent("RPB_SendArrestWait", "OnArrestWait")                       ; Wait the response from player during Arrest
+    RegisterForModEvent("RPB_SendArrestWaitStop", "OnArrestWaitStop")               ; Something happened to prevent OnArrestWait, cancel the state
+    RegisterForModEvent("RPB_SetPlayerDefeated", "OnArrestDefeated")                ; Happens after the player is defeated through DA
     Info(self, "Arrest::RegisterEvents", "Registered Arrest Events")
 endFunction
 
@@ -291,12 +292,15 @@ state WaitingOnArrest
     endEvent
 
     event OnUpdate()
-        Actor akWaitingCaptor = arrestVars.GetActor("Arrest::Waiting Captor")
-        akWaitingCaptor.GetCrimeFaction().ModCrimeGold(4000)
+        Debug(self, "Arrest::OnUpdate", "IsAwaitingArrest: " + arrestVars.IsAwaitingArrest + ", Explicitly: " + arrestVars.GetBool("Arrest::Awaiting Arrest"))
+        bool isAwaitingArrest = arrestVars.GetBool("Arrest::Awaiting Arrest")
+        if (isAwaitingArrest)
+            Actor akWaitingCaptor = arrestVars.GetActor("Arrest::Waiting Captor")
+            akWaitingCaptor.GetCrimeFaction().ModCrimeGold(4000)
 
-        ; Idea for later: Have the captor walk towards the player and arrest them then
-        akWaitingCaptor.SendModEvent("RPB_ArrestBegin", "TeleportToCell", 0x14)
-
+            ; Idea for later: Have the captor walk towards the player and arrest them then
+            akWaitingCaptor.SendModEvent("RPB_ArrestBegin", "TeleportToCell", 0x14)
+        endif
     endEvent
 
     event OnEndState()
@@ -396,6 +400,12 @@ event OnArrestResist(string eventName, string unusedStr, float arrestResisterId,
         return
     endif
 
+    bool isAwaitingArrest = arrestVars.GetBool("Arrest::Awaiting Arrest")
+    if (isAwaitingArrest)
+        Info(self, "Arrest::OnArrestResist", "The suspect is currently awaiting arrest, this should not count as resisting, returning...")
+        return
+    endif
+
     guard.SetPlayerResistingArrest() ; Needed to make the guards attack the player, otherwise they will loop arrest dialogue
 
     bool hasResistedArrestRecentlyInThisHold = arrestVars.GetBool("Arrest::" + crimeFaction.GetName() + "::Arrest Resisted")
@@ -458,9 +468,15 @@ endEvent
 event OnArrestWait(string eventName, string unusedStr, float unusedFlt, Form sender)
     Actor akSpeaker = sender as Actor
     arrestVars.SetActor("Arrest::Waiting Captor", akSpeaker)
+    arrestVars.SetBool("Arrest::Awaiting Arrest", true)
+    Debug(self, "Arrest::OnArrestWaitStop", "Set the Awaiting Arrest flag to true")
     GotoState("WaitingOnArrest")
 endEvent
 
+event OnArrestWaitStop(string eventName, string unusedStr, float unusedFlt, Form sender)
+    arrestVars.SetBool("Arrest::Awaiting Arrest", false)
+    Debug(self, "Arrest::OnArrestWaitStop", "Set the Awaiting Arrest flag to false")
+endEvent
 
 function BeginArrest()
     string hold             = arrestVars.Hold

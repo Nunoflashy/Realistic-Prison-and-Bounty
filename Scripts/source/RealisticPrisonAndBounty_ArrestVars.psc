@@ -411,6 +411,12 @@ bool property HasEludedArrest
     endFunction
 endProperty
 
+bool property IsAwaitingArrest
+    bool function get()
+        self.GetBool("Arrest::Awaiting Arrest")
+    endFunction
+endProperty
+
 ObjectReference property JailCell
     ObjectReference function get()
         return self.GetForm("Jail::Cell") as ObjectReference

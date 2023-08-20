@@ -17,6 +17,7 @@ Function Fragment_6(ObjectReference akSpeakerRef)
 Actor akSpeaker = akSpeakerRef as Actor
 ;BEGIN CODE
 pTGRSS.TGArrestedCheck()
+akSpeaker.SendModEvent("RPB_SendArrestWaitStop")
 ;END CODE
 EndFunction
 ;END FRAGMENT
