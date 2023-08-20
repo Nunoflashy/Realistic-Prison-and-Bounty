@@ -400,11 +400,11 @@ event OnArrestResist(string eventName, string unusedStr, float arrestResisterId,
         return
     endif
 
-    bool isAwaitingArrest = arrestVars.GetBool("Arrest::Awaiting Arrest")
-    if (isAwaitingArrest)
-        Info(self, "Arrest::OnArrestResist", "The suspect is currently awaiting arrest, this should not count as resisting, returning...")
-        return
-    endif
+    ; bool isAwaitingArrest = arrestVars.GetBool("Arrest::Awaiting Arrest")
+    ; if (isAwaitingArrest)
+    ;     Info(self, "Arrest::OnArrestResist", "The suspect is currently awaiting arrest, this should not count as resisting, returning...")
+    ;     return
+    ; endif
 
     guard.SetPlayerResistingArrest() ; Needed to make the guards attack the player, otherwise they will loop arrest dialogue
 
