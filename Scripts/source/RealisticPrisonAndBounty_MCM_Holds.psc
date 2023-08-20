@@ -31,6 +31,10 @@ function Left(RealisticPrisonAndBounty_MCM mcm) global
     mcm.AddOptionSlider("Maximum Payable Bounty (Chance)", "{0}%")
     ; mcm.AddOptionToggle("Always Arrest for Violent Crimes") ; Temporarily Removed
     mcm.AddEmptyOption()
+    mcm.AddTextOption("", "When Eluding", mcm.OPTION_DISABLED)
+    mcm.AddOptionSliderKey("Additional Bounty when Eluding", "Additional Bounty when Eluding (%)", "{1}% of Bounty")
+    mcm.AddOptionSlider("Additional Bounty when Eluding", "{0} Bounty")
+    mcm.AddEmptyOption()
     mcm.AddTextOption("", "When Resisting", mcm.OPTION_DISABLED)
     mcm.AddOptionSliderKey("Additional Bounty when Resisting", "Additional Bounty when Resisting (%)", "{1}% of Bounty")
     mcm.AddOptionSlider("Additional Bounty when Resisting", "{0} Bounty")
@@ -213,7 +217,7 @@ function HandleDependencies(RealisticPrisonAndBounty_MCM mcm) global
     mcm.SetOptionDependencyBool("Stripping::Minimum Sentence to Strip",             allowUndressing && isStrippingSentenceHandling)
     mcm.SetOptionDependencyBool("Stripping::Strip when Defeated",                   allowUndressing)
     mcm.SetOptionDependencyBool("Stripping::Strip Search Thoroughness",             allowUndressing)
-    mcm.SetOptionDependencyBool("Stripping::Strip Search Thoroughness Modifier",               allowUndressing)
+    mcm.SetOptionDependencyBool("Stripping::Strip Search Thoroughness Modifier",    allowUndressing)
 
     ; ==========================================================
     ;                           CLOTHING
@@ -392,6 +396,12 @@ function OnOptionHighlight(RealisticPrisonAndBounty_MCM mcm, string option) glob
 
     elseif (option == "Arrest::Always Arrest for Violent Crimes")
         mcm.SetInfoText("Whether to always arrest if any of the crimes committed are violent.")
+
+    elseif (option == "Arrest::Additional Bounty when Eluding (%)")
+        mcm.SetInfoText("The bounty that will be added as a percentage of your current bounty, when eluding arrest in "  + mcm.CurrentPage + ".")
+
+    elseif (option == "Arrest::Additional Bounty when Eluding")
+        mcm.SetInfoText("The bounty that will be added when eluding arrest in " + mcm.CurrentPage + ".")
 
     elseif (option == "Arrest::Additional Bounty when Resisting (%)")
         mcm.SetInfoText("The bounty that will be added as a percentage of your current bounty, when resisting arrest in "  + mcm.CurrentPage + ".")
@@ -765,6 +775,15 @@ function LoadSliderOptions(RealisticPrisonAndBounty_MCM mcm, string option, floa
         minRange = 0
         maxRange = 100
 
+    elseif (option == "Arrest::Additional Bounty when Eluding (%)")
+        minRange = 0
+        maxRange = 100
+        intervalSteps = 0.1
+
+    elseif (option == "Arrest::Additional Bounty when Eluding")
+        minRange = 0
+        intervalSteps = 100
+
     elseif (option == "Arrest::Additional Bounty when Resisting (%)")
         minRange = 0
         maxRange = 100
@@ -1077,6 +1096,11 @@ function OnOptionSliderAccept(RealisticPrisonAndBounty_MCM mcm, string option, f
 
     elseif (option == "Arrest::Maximum Payable Bounty (Chance)")
         formatString = "{0}%"
+
+    elseif (option == "Arrest::Additional Bounty when Eluding (%)")
+        formatString = "{1}% of Bounty"
+
+    elseif (option == "Arrest::Additional Bounty when Eluding")
 
     elseif (option == "Arrest::Additional Bounty when Resisting (%)")
         formatString = "{1}% of Bounty"

@@ -399,6 +399,18 @@ bool property WasDefeated
     endFunction
 endProperty
 
+int property DefeatedBounty
+    int function get()
+        return self.GetInt("Arrest::Bounty for Defeat")
+    endFunction
+endProperty
+
+bool property HasEludedArrest
+    bool function get()
+        self.GetBool("Arrest::Eluded")
+    endFunction
+endProperty
+
 ObjectReference property JailCell
     ObjectReference function get()
         return self.GetForm("Jail::Cell") as ObjectReference

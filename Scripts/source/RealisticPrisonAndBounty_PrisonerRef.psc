@@ -155,7 +155,7 @@ float property TimeLeftInSentence
     endFunction
 endProperty
 
-bool property SentenceServed
+bool property IsSentenceServed
     bool function get()
         return CurrentTime >= ReleaseTime
     endFunction

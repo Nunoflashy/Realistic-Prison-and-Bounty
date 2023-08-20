@@ -464,6 +464,12 @@ float property InfamyDecayUpdateInterval
     endFunction
 endProperty
 
+int property ArrestEludeWarningTime
+    int function get()
+        return mcm.GetSliderOptionValue("General", "General::Arrest Elude Warning Time") as int
+    endFunction
+endProperty
+
 bool property ShouldDisplayArrestNotifications
     bool function get()
         return mcm.GetToggleOptionState("General", "General::ArrestNotifications")
@@ -528,6 +534,14 @@ endFunction
 
 int function GetArrestMaximumPayableChance(string hold)
     return mcm.GetSliderOptionValue(hold, "Arrest::Maximum Payable Bounty (Chance)") as int
+endFunction
+
+float function GetArrestAdditionalBountyEludingFromCurrentBounty(string hold)
+    return mcm.GetSliderOptionValue(hold, "Arrest::Additional Bounty when Eluding (%)")
+endFunction
+
+int function GetArrestAdditionalBountyEludingFlat(string hold)
+    return mcm.GetSliderOptionValue(hold, "Arrest::Additional Bounty when Eluding") as int
 endFunction
 
 float function GetArrestAdditionalBountyResistingFromCurrentBounty(string hold)

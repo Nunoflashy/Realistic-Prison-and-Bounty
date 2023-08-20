@@ -32,6 +32,11 @@ function Left(RealisticPrisonAndBounty_MCM mcm) global
     mcm.AddOptionSlider("Timescale")
 
     mcm.AddEmptyOption()
+
+    mcm.AddTextOption("", "When Eluding Arrest", mcm.OPTION_DISABLED)
+    mcm.AddOptionSliderKey("Guards Warning Time", "Arrest Elude Warning Time", "{0} Seconds")
+
+    mcm.AddEmptyOption()
     mcm.AddEmptyOption() ; maybe
 
     mcm.AddOptionCategory("Bounty for Actions")
@@ -60,13 +65,15 @@ function Right(RealisticPrisonAndBounty_MCM mcm) global
     mcm.AddOptionToggleKey("Display Jail Notifications", "JailedNotifications")
     mcm.AddOptionToggleKey("Display Bounty Decay Notifications", "BountyDecayNotifications")
     mcm.AddOptionToggleKey("Display Infamy Notifications", "InfamyNotifications")
-    ; mcm.AddEmptyOption()
-    ; mcm.AddEmptyOption()
+
     mcm.AddEmptyOption()
 
     mcm.AddTextOption("", "WHEN IN JAIL", mcm.OPTION_DISABLED)
-
     mcm.AddOptionSliderKey("Timescale", "TimescalePrison")
+
+    mcm.AddEmptyOption()
+    mcm.AddEmptyOption()
+    mcm.AddEmptyOption()
 
     mcm.AddEmptyOption()
     mcm.AddEmptyOption()     
@@ -112,6 +119,9 @@ function OnOptionHighlight(RealisticPrisonAndBounty_MCM mcm, string option) glob
 
     elseif (option == "General::Infamy Decay (Update Interval)")
         mcm.SetInfoText("Sets the time between updates in in-game days for when infamy should be lost over time for all holds that have it enabled.")
+
+    elseif (option == "General::Arrest Elude Warning Time")
+        mcm.SetInfoText("Determines the time after pursuit that guards will wait for you to stop and surrender before they consider you as being eluding arrest and start attacking.")
     endif
  
     mcm.Debug("OnOptionHighlight", option + ", find: " + StringUtil.Find(option, "Deleveling") + ", optionName: " + optionName)
@@ -147,6 +157,10 @@ function LoadSliderOptions(RealisticPrisonAndBounty_MCM mcm, string option, floa
     elseif (option == "General::Infamy Decay (Update Interval)")
         minRange = 1
         maxRange = 30
+
+    elseif (option == "General::Arrest Elude Warning Time")
+        minRange = 1
+        maxRange = 60
 
     elseif (option == "Outfit::Item Slot: Underwear (Top)")
         minRange = 0
@@ -221,6 +235,9 @@ function OnOptionSliderAccept(RealisticPrisonAndBounty_MCM mcm, string option, f
 
     elseif (option == "General::Infamy Decay (Update Interval)")
         formatString = "{0} Days"
+
+    elseif (option == "General::Arrest Elude Warning Time")
+        formatString = "{0} Seconds"
 
     elseif (option == "Outfit::Item Slot: Underwear (Top)")
         formatString = "Slot {0}"

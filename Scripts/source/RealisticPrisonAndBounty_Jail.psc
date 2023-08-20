@@ -372,7 +372,7 @@ state Jailed
 
         Prisoner.UpdateDaysJailed()
 
-        if (Prisoner.SentenceServed)
+        if (Prisoner.IsSentenceServed)
             GotoState(STATE_RELEASED)
             return
         endif

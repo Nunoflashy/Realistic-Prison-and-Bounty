@@ -58,7 +58,9 @@ function RegisterEvents()
     RegisterForModEvent("RPB_ArrestBegin", "OnArrestBegin")
     RegisterForModEvent("RPB_ArrestEnd", "OnArrestEnd")
     RegisterForModEvent("RPB_ResistArrest", "OnArrestResist")
-    RegisterForModEvent("RPB_EludingArrest", "OnArrestElude")
+    RegisterForModEvent("RPB_EludingArrest", "OnArrestEludeStart")
+    RegisterForModEvent("RPB_SendEludingArrestDialogue", "OnEludingArrestDialogue")
+    RegisterForModEvent("RPB_SendArrestWait", "OnArrestWait")
     RegisterForModEvent("RPB_SetPlayerDefeated", "OnArrestDefeated")
     Info(self, "Arrest::RegisterEvents", "Registered Arrest Events")
 endFunction
@@ -149,6 +151,57 @@ function SetAsArrested(Actor akArrestee, Faction akFaction)
     GotoState(STATE_ARRESTED)
 endFunction
 
+function ApplyArrestEludedPenalty(Faction akArrestFaction)
+    string hold = akArrestFaction.GetName()
+
+    int eludeBountyFlat = config.GetArrestAdditionalBountyEludingFlat(akArrestFaction.GetName())
+    float eludeBountyPercent = GetPercentAsDecimal(config.GetArrestAdditionalBountyEludingFromCurrentBounty(akArrestFaction.GetName()))
+    int totalEludeBounty = int_if (eludeBountyPercent > 0, round(akArrestFaction.GetCrimeGold() * eludeBountyPercent)) + eludeBountyFlat
+
+    if (totalEludeBounty > 0)
+        akArrestFaction.ModCrimeGold(totalEludeBounty)
+        config.NotifyArrest("You have gained " + totalEludeBounty + " Bounty in " + hold + " for eluding arrest!")
+    endif
+
+    arrestVars.SetBool("Arrest::Eluded", true)
+endFunction
+
+function ApplyArrestResistedPenalty(Faction akArrestFaction)
+    string hold = akArrestFaction.GetName()
+
+    int resistBountyFlat                    = config.GetArrestAdditionalBountyResistingFlat(hold)
+    float resistBountyFromCurrentBounty     = GetPercentAsDecimal(config.GetArrestAdditionalBountyResistingFromCurrentBounty(hold))
+    int resistArrestPenalty                 = int_if (resistBountyFromCurrentBounty > 0, floor(akArrestFaction.GetCrimeGold() * resistBountyFromCurrentBounty)) + resistBountyFlat
+
+    if (resistArrestPenalty > 0)
+        akArrestFaction.ModCrimeGold(resistArrestPenalty)
+        config.NotifyArrest("You have gained " + resistArrestPenalty + " Bounty in " + hold +" for resisting arrest!")
+    endif
+
+    Actor arrestResister = config.Player ; Temporary
+
+    actorVars.IncrementStat("Arrests Resisted", akArrestFaction, arrestResister)
+    self.SetResistedFlag(akArrestFaction)
+endFunction
+
+;/
+    Refactor idea:
+    Have an ArresteeRef or SuspectRef script that is attached to each character arrested, storing their arrest state and then:
+    Arrestee.ApplyDefeatedPenalty()
+    Since the state is known, the hold, bounty and everything will be handled internally by the function without any need for params
+/;
+function ApplyArrestDefeatedPenalty(Faction akArrestFaction)
+    string hold = akArrestFaction.GetName()
+
+    ; Setup Defeated penalties
+    arrestVars.SetInt("Arrest::Additional Bounty when Defeated", config.GetArrestAdditionalBountyDefeatedFlat(hold))
+    arrestVars.SetFloat("Arrest::Additional Bounty when Defeated from Current Bounty", GetPercentAsDecimal(config.GetArrestAdditionalBountyDefeatedFromCurrentBounty(hold)))
+    arrestVars.SetInt("Arrest::Bounty for Defeat", int_if (arrestVars.DefeatedAdditionalBountyPercentage > 0, round(akArrestFaction.GetCrimeGold() * arrestVars.DefeatedAdditionalBountyPercentage)) + arrestVars.DefeatedAdditionalBounty)
+    arrestVars.SetBool("Arrest::Defeated", true)
+
+    ; Bounty is applied later at the Arrest stage.
+endFunction
+
 ;/
     The state where the actor should be upon being arrested.
 /;
@@ -190,10 +243,7 @@ state Eluded
         string eludeType = arrestVars.GetString("Arrest::Elude Type")
 
         if (eludeType == "Pursuit")
-            RegisterForSingleUpdate(3.0) ; Wait 3 sec before making guards attack if not stopped by then
-        
-        elseif (eludeType == "Dialogue")
-            RegisterForSingleUpdate(20.0) ; Wait 20 sec before clearing the guard's suspicion after dialogue
+            RegisterForSingleUpdate(config.ArrestEludeWarningTime) ; Wait X sec before making guards attack if not stopped by then
         endif
     endEvent
 
@@ -204,12 +254,8 @@ state Eluded
             if (config.Player.IsRunning())
                 Actor eludedCaptor = arrestVars.GetActor("Arrest::Eluded Captor")
                 eludedCaptor.StartCombat(config.Player)
+                self.ApplyArrestEludedPenalty(eludedCaptor.GetCrimeFaction()) ; Set as eluding arrest from this captor
             endif
-        endif
-
-        if (eludeType == "Dialogue")
-            ; Clear the eluded guard alias for Dialogue type eluded arrests.
-            EludedGuardAlias.Clear()
         endif
 
         GotoState("")
@@ -236,6 +282,25 @@ state Surrender
         string currentHold = config.GetCurrentPlayerHoldLocation()
         Faction currentHoldFaction = config.GetFaction(currentHold)
         currentHoldFaction.SendModEvent("RPB_ArrestBegin", ARREST_TYPE_TELEPORT_TO_CELL)
+    endEvent
+endState
+
+state WaitingOnArrest
+    event OnBeginState()
+        RegisterForSingleUpdate(5.0)
+    endEvent
+
+    event OnUpdate()
+        Actor akWaitingCaptor = arrestVars.GetActor("Arrest::Waiting Captor")
+        akWaitingCaptor.GetCrimeFaction().ModCrimeGold(4000)
+
+        ; Idea for later: Have the captor walk towards the player and arrest them then
+        akWaitingCaptor.SendModEvent("RPB_ArrestBegin", "TeleportToCell", 0x14)
+
+    endEvent
+
+    event OnEndState()
+        
     endEvent
 endState
 
@@ -307,13 +372,8 @@ event OnArrestDefeated(string eventName, string unusedStr, float unusedFlt, Form
     ; Set the player's penalty to be added to the bounty when going to jail.
     Actor akCaptor = (sender as Actor)
     Faction akCrimeFaction = akCaptor.GetCrimeFaction()
-    string hold = akCrimeFaction.GetName()
 
-    ; Setup Defeated penalties
-    arrestVars.SetInt("Arrest::Additional Bounty when Defeated", config.GetArrestAdditionalBountyDefeatedFlat(hold))
-    arrestVars.SetFloat("Arrest::Additional Bounty when Defeated from Current Bounty", GetPercentAsDecimal(config.GetArrestAdditionalBountyDefeatedFromCurrentBounty(hold)))
-    arrestVars.SetInt("Arrest::Bounty for Defeat", round(akCrimeFaction.GetCrimeGold() * arrestVars.DefeatedAdditionalBountyPercentage) + arrestVars.DefeatedAdditionalBounty)
-    arrestVars.SetBool("Arrest::Defeated", true)
+    self.ApplyArrestDefeatedPenalty(akCrimeFaction)
 
     Form handcuffs = Game.GetFormEx(0xA033D9E)
     config.Player.StopCombatAlarm()
@@ -345,11 +405,15 @@ event OnArrestResist(string eventName, string unusedStr, float arrestResisterId,
         return
     endif
 
-    self.TriggerResistArrest(guard, crimeFaction)
+    self.ApplyArrestResistedPenalty(crimeFaction)
 endEvent
 
 ;/
-    Event that happens when the player is eluding arrest.
+    Event that happens when the player is beginning to elude arrest.
+    For Pursuit type arrest eludes, this is the only event that happens, because once the state is changed to Eluded,
+    the penalty is given there. However, for Dialogue type arrest eluding, this is the event that is first fired upon making
+    contact with a guard, which then gives way to their new dialogue that triggers OnEludingArrestDialogue which is where the penalties are given
+    for that arrest elude type.
 
     string  @eludeType: How the arrest is being eluded, options are: [Dialogue, Pursuit]
         Eluding arrest through Dialogue means that the player has tried to avoid the "Wait, I know you..." guard dialogue
@@ -358,9 +422,9 @@ endEvent
         Eluding arrest through Pursuit means that the player is trying to run away from the guards after they say lines such as:
         "In the name of the Jarl, I command you to stop!", or "Come quietly or face the Jarl's justice!"
 
-    Form    @sender: Can only be cast to Actor, this is either akSpeaker in case of Dialogue or akAggressor in case of Pursuit.
+    Form    @sender: Can only be cast to Actor, this is either akSpeaker in case of Dialogue or akPursuer in case of Pursuit.
 /;
-event OnArrestElude(string eventName, string eludeType, float unusedFlt, Form sender)
+event OnArrestEludeStart(string eventName, string eludeType, float unusedFlt, Form sender)
     if (eludeType == "Dialogue")
         Actor akSpeaker = sender as Actor
         EludedGuardAlias.ForceRefTo(akSpeaker)
@@ -371,15 +435,32 @@ event OnArrestElude(string eventName, string eludeType, float unusedFlt, Form se
         return
 
     elseif (eludeType == "Pursuit")
-        Actor akAggressor = sender as Actor
-        arrestVars.SetActor("Arrest::Eluded Captor", akAggressor)
+        Actor akPursuer = sender as Actor
+        arrestVars.SetActor("Arrest::Eluded Captor", akPursuer)
         arrestVars.SetString("Arrest::Elude Type", eludeType)
         GotoState(STATE_ELUDED)
         return
     endif
 
-    Error(self, "OnArrestElude", "The passed in parameters are invalid, the event failed!")
+    Error(self, "OnArrestEludeStart", "The passed in parameters are invalid, the event failed!")
 endEvent
+
+event OnEludingArrestDialogue(string eventName, string eludeType, float unusedFlt, Form sender)
+    Actor eludedCaptor = arrestVars.GetActor("Arrest::Eluded Captor")
+    self.ApplyArrestEludedPenalty(eludedCaptor.GetCrimeFaction()) ; Set as eluding arrest from this speaker
+
+    if (eludeType == "Dialogue") ; Irrelevant check, but why not
+        ; Clear the eluded guard alias for Dialogue type eluded arrests.
+        EludedGuardAlias.Clear()
+    endif
+endEvent
+
+event OnArrestWait(string eventName, string unusedStr, float unusedFlt, Form sender)
+    Actor akSpeaker = sender as Actor
+    arrestVars.SetActor("Arrest::Waiting Captor", akSpeaker)
+    GotoState("WaitingOnArrest")
+endEvent
+
 
 function BeginArrest()
     string hold             = arrestVars.Hold
@@ -390,6 +471,7 @@ function BeginArrest()
 
     self.SetBounty()
 
+    ; Idea for refactor: bool assignedJailCellSuccessfully = jail.AssignJailCell(SuspectRef) where SuspectRef is a script that handles anything related to the arrest Suspect
     bool assignedJailCellSuccessfully = jail.AssignJailCell(arrestee) ; Not guaranteed to go to jail, but we set it up here either way
     
     if (!assignedJailCellSuccessfully)
@@ -464,25 +546,6 @@ function SetAsDefeated(Faction akCrimeFaction)
     endif
 endFunction
 
-function TriggerResistArrest(Actor akGuard, Faction akCrimeFaction)
-    string hold = akCrimeFaction.GetName()
-
-    int resistBountyFlat                    = config.GetArrestAdditionalBountyResistingFlat(hold)
-    float resistBountyFromCurrentBounty     = config.GetArrestAdditionalBountyResistingFromCurrentBounty(hold)
-    float resistBountyPercentModifier       = GetPercentAsDecimal(resistBountyFromCurrentBounty)
-    int resistArrestPenalty                 = floor(akCrimeFaction.GetCrimeGold() * resistBountyPercentModifier) + resistBountyFlat
-
-    if (resistArrestPenalty > 0)
-        akCrimeFaction.ModCrimeGold(resistArrestPenalty)
-        config.NotifyArrest("You have gained " + resistArrestPenalty + " Bounty in " + hold +" for resisting arrest!")
-    endif
-
-    Actor arrestResister = config.Player ; Temporary
-
-    actorVars.IncrementStat("Arrests Resisted", akCrimeFaction, arrestResister)
-    self.SetResistedFlag(akCrimeFaction)
-endFunction
-
 function TriggerSurrender()
     string currentHold = config.GetCurrentPlayerHoldLocation()
     Faction currentHoldFaction = config.GetFaction(currentHold)
@@ -532,10 +595,9 @@ function SetBounty()
         arrestVars.SetFloat("Arrest::Bounty Violent", arrestFaction.GetCrimeGoldViolent())
     endif
 
-    if (arrestVars.GetBool("Arrest::Defeated"))
-        int defeatBounty = arrestVars.GetInt("Arrest::Bounty for Defeat")
-        arrestVars.ModInt("Arrest::Bounty Non-Violent", defeatBounty)
-        config.NotifyArrest("You have been defeated, " + defeatBounty + " Bounty gained in " + arrestVars.Hold)
+    if (arrestVars.WasDefeated && arrestVars.DefeatedBounty > 0)
+        arrestVars.ModInt("Arrest::Bounty Non-Violent", arrestVars.DefeatedBounty)
+        config.NotifyArrest("You were defeated, " + arrestVars.DefeatedBounty + " Bounty gained in " + arrestVars.Hold)
     endif
 
     if (arrestVars.HasOverride("Arrest::Bounty Non-Violent"))
