@@ -506,6 +506,18 @@ bool property HasUnderwearBodyModInstalled
     endFunction
 endProperty
 
+int property UnderwearTopSlot
+    int function get()
+        return mcm.GetSliderOptionValue("Clothing", "Item Slots::Underwear (Top)") as int
+    endFunction
+endProperty
+
+int property UnderwearBottomSlot
+    int function get()
+        return mcm.GetSliderOptionValue("Clothing", "Item Slots::Underwear (Bottom)") as int
+    endFunction
+endProperty
+
 ; Temporary functions
 function PrepareActorForJail(Actor akActor)
     ; Undress actor
