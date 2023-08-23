@@ -267,6 +267,19 @@ ObjectReference property CellDoor
     endFunction
 endProperty
 
+Location property PrisonLocation
+    Location function get()
+        return arrestVars.GetForm("Jail::Prison Location") as Location
+    endFunction
+endProperty
+
+bool property IsJailed
+    bool function get()
+        return arrestVars.GetBool("Jail::Jailed")
+    endFunction
+endProperty
+
+bool alreadyLeftPrisonLocationOnce = false
 
 ; Increments the desired stat in this Arrest faction for this Prisoner.
 function IncrementStat(string statName, int incrementBy = 1)
@@ -290,6 +303,7 @@ function SetupPrisonerVars()
     ; Dynamic Vars
     arrestVars.SetFloat("Jail::Sentence", (BountyNonViolent + (floor(BountyViolent * (100 / arrestVars.BountyExchange)))) / arrestVars.BountyToSentence)
     arrestVars.SetFloat("Jail::Time of Imprisonment", CurrentTime)
+    arrestVars.SetForm("Jail::Prison Location", this.GetCurrentLocation()) ; Since we are in the prison, this is the prison location
     arrestVars.SetForm("Jail::Cell Door", GetNearestJailDoorOfType(GetJailBaseDoorID(Hold), this, 10000))
     arrestVars.SetInt("Jail::Cell Door Old Lock Level", CellDoor.GetLockLevel())
     arrestVars.SetForm("Jail::Teleport Release Location", config.GetJailTeleportReleaseMarker(Hold))
@@ -389,7 +403,7 @@ bool function IsNaked()
 endFunction
 
 bool function HasActiveBounty()
-    return ArrestFaction.GetCrimeGold() > 0
+    return ArrestFaction.GetCrimeGold() > 0 || (arrestVars.GetInt("Jail::Bounty Non-Violent") + arrestVars.GetInt("Jail::Bounty Violent")) > 0
 endFunction
 
 bool function HasEscaped()
@@ -528,6 +542,9 @@ function AddEscapeBounty()
             ; Should we clear it from storage vars?
             arrestVars.SetInt("Arrest::Bounty Non-Violent", 0)
             arrestVars.SetInt("Arrest::Bounty Violent", 0)
+
+            arrestVars.SetInt("Escape::Bounty Non-Violent", ArrestFaction.GetCrimeGoldNonViolent())
+            arrestVars.SetInt("Escape::Bounty Violent", ArrestFaction.GetCrimeGoldViolent())
             return
         endif
     endif
@@ -544,6 +561,9 @@ function AddEscapeBounty()
     ; Should we clear it from storage vars?
     arrestVars.SetInt("Arrest::Bounty Non-Violent", 0)
     arrestVars.SetInt("Arrest::Bounty Violent", 0)
+
+    arrestVars.SetInt("Escape::Bounty Non-Violent", ArrestFaction.GetCrimeGoldNonViolent())
+    arrestVars.SetInt("Escape::Bounty Violent", ArrestFaction.GetCrimeGoldViolent())
 
     ; ==========================================================
     ;                         NPC (Later)
@@ -575,6 +595,19 @@ endFunction
 
 ; Should be called everytime the actor gets to jail (initial jailing and on escape fail)
 function UpdateSentence()
+    ; Temporary, to be refactored into something more elegant and dynamic
+    ; if (arrestVars.GetBool("Jail::Escaped"))
+    ;     config.NotifyJail("Due to a failed escape attempt, your Bounty was restored to its original state")
+
+    ;     int escapeBountyNonViolent = arrestVars.GetInt("Escape::Bounty Non-Violent")
+    ;     int escapeBountyViolent = arrestVars.GetInt("Escape::Bounty Violent")
+
+    ;     int bountyGainedSinceEscape = (escapeBountyNonViolent + escapeBountyViolent) - (Bounty - (escapeBountyNonViolent + escapeBountyViolent))
+    ;     config.NotifyJail("Additionally, you have gained " + bountyGainedSinceEscape + " Bounty since then", bountyGainedSinceEscape > 0)
+
+    ;     Debug(none, "UpdateSentence", "bountyGainedSinceEscape: " + bountyGainedSinceEscape)
+    ; endif
+
     if (this == config.Player)
         int _bountyNonViolent    = ArrestFaction.GetCrimeGoldNonViolent()
         int _bountyViolent       = ArrestFaction.GetCrimeGoldViolent()
@@ -608,9 +641,12 @@ function UpdateSentenceFromCurrentBounty()
         int violentBountyConverted = floor(BountyViolent * (100 / arrestVars.BountyExchange))
     
         int oldSentence = Sentence
-    
-        arrestVars.SetFloat("Arrest::Bounty Non-Violent", BountyNonViolent + _bountyNonViolent)
-        arrestVars.SetFloat("Arrest::Bounty Violent", BountyViolent + _bountyViolent)
+        
+        int bountyNonViolentGainedInJail    = arrestVars.GetInt("Jail::Bounty Non-Violent")
+        int bountyViolentGainedInJail       = arrestVars.GetInt("Jail::Bounty Violent")
+
+        arrestVars.SetFloat("Arrest::Bounty Non-Violent", BountyNonViolent + _bountyNonViolent + bountyNonViolentGainedInJail)
+        arrestVars.SetFloat("Arrest::Bounty Violent", BountyViolent + _bountyViolent + bountyViolentGainedInJail)
         arrestVars.SetFloat("Jail::Sentence", (BountyNonViolent + violentBountyConverted) / arrestVars.BountyToSentence)
     
         int newSentence = Sentence
@@ -619,6 +655,10 @@ function UpdateSentenceFromCurrentBounty()
         self.UpdateLargestBounty()
         self.UpdateTotalBounty()
         self.UpdateLongestSentence()
+
+        ; Clear bounty gained in jail
+        arrestVars.Remove("Jail::Bounty Non-Violent")
+        arrestVars.Remove("Jail::Bounty Violent")
 
         if (newSentence != oldSentence)
             OnSentenceChanged(oldSentence, newSentence, (newSentence > oldSentence), true)
@@ -853,6 +893,24 @@ endEvent
 event OnSentenceChanged(int oldSentence, int newSentence, bool hasSentenceIncreased, bool bountyAffected)
     jail.OnSentenceChanged(this, oldSentence, newSentence, hasSentenceIncreased, bountyAffected)
 endEvent
+
+event OnLocationChange(Location akOldLocation, Location akNewLocation)
+    jail.OnPrisonerLocationChanged(self, akOldLocation, akNewLocation)
+endEvent
+
+; event OnLocationChange(Location akOldLocation, Location akNewLocation)
+;     if (self.HasEscaped() && !alreadyLeftPrisonLocationOnce && !this.IsInCombat())
+;         if (akNewLocation != arrestVars.GetForm("Jail::Prison Location") as Location)
+;             ; if we are not in the Prison location anymore (to be tested)
+;             JailFaction.SetCrimeGold(1000)
+;             config.NotifyJail("You have escaped from the prison location undetected, Bounty set to 1000")
+;             arrestVars.Remove("Arrest::Arrested") ; temporary for OnUpdate to succeed
+;             alreadyLeftPrisonLocationOnce = true
+;         endif
+
+;         Debug(none, "OnLocationChange", "Prison Location: " + arrestVars.GetForm("Jail::Prison Location") as Location)
+;     endif
+; endEvent
 
 event OnItemRemoved(Form baseItem, int itemCount, ObjectReference itemReference, ObjectReference destContainer)
     ; Process all stolen items that were taken away from the prisoner
