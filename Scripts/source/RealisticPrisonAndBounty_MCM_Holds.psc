@@ -386,10 +386,10 @@ function OnOptionHighlight(RealisticPrisonAndBounty_MCM mcm, string option) glob
     ;     mcm.SetInfoText("The minimum bounty required in order to be arrested in " + mcm.CurrentPage + ".")
 
     if (option == "Arrest::Guaranteed Payable Bounty")
-        mcm.SetInfoText("The guaranteed amount of bounty that a guard will accept as payment before being arrested in " + mcm.CurrentPage + ".")
+        mcm.SetInfoText("The guaranteed amount of bounty that a guard will accept as payment before arresting you in " + mcm.CurrentPage + ".")
 
     elseif (option == "Arrest::Maximum Payable Bounty")
-        mcm.SetInfoText("The maximum amount of bounty that is payable before being arrested in " + mcm.CurrentPage + ".")
+        mcm.SetInfoText("The maximum amount of bounty that a guard will accept as payment before arresting you in " + mcm.CurrentPage + ".")
 
     elseif (option == "Arrest::Maximum Payable Bounty (Chance)")
         mcm.SetInfoText("The chance of being able to pay the bounty if it exceeds the guaranteed amount but is within the maximum limit.")
