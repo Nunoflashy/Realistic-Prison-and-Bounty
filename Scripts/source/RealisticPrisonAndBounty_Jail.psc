@@ -206,7 +206,7 @@ event OnJailedBegin(string eventName, string strArg, float numArg, Form sender)
     Prisoner.ForceRefTo(arrestVars.Arrestee) ; To be changed later to ActiveMagicEffect in order to attach to multiple Actors
     Prisoner.SetupPrisonerVars()
     GotoState(STATE_JAILED)
-    TriggerImprisonment()
+    self.TriggerImprisonment()
 endEvent
 
 event OnJailedEnd(string eventName, string strArg, float numArg, Form sender)
@@ -510,9 +510,14 @@ state Escaped
 
     endEvent
 
+    event OnLocationChange(Location akOldLocation, Location akNewLocation)
+        Debug(self, "Jail::OnLocationChange", "akOldLocation: " + akOldLocation + ", akNewLocation: " + akNewLocation)
+    endEvent
+
     event OnUpdateGameTime()
         ; Not arrested anymore, break out of this state
         if (!arrestVars.IsArrested)
+            Prisoner.ResetArrestVars() ; May change, as an escape doesn't necessarily mean all vars should be deleted.
             GotoState("")
             return
         endif
@@ -523,7 +528,7 @@ state Escaped
         ; endif
 
         Prisoner.RegisterLastUpdate()
-        RegisterForSingleUpdateGameTime(1.0)
+        RegisterForSingleUpdateGameTime(12.0)
     endEvent
 
     event OnEndState()
@@ -671,6 +676,22 @@ event OnSentenceChanged(Actor akPrisoner, int oldSentence, int newSentence, bool
     Debug(self, "OnSentenceChanged", CurrentState + " event invoked", config.IS_DEBUG)
 endEvent
 
+event OnPrisonerLocationChanged(RealisticPrisonAndBounty_PrisonerRef akPrisoner, Location akOldLocation, Location akNewLocation)
+    Debug(self, "OnPrisonerLocationChanged", CurrentState + " event invoked")
+
+    if (akPrisoner.IsJailed && akNewLocation != akPrisoner.PrisonLocation)
+        akPrisoner.SetEscaped()
+        akPrisoner.RevertBounty()
+        akPrisoner.AddEscapeBounty()
+    endif
+
+endEvent
+ 
+event OnLocationChange(Location akOldLocation, Location akNewLocation)
+    Debug(self, "OnLocationChange", CurrentState + " event invoked")
+endEvent
+
+
 function TriggerEscape()
     if (CurrentState != STATE_ESCAPED)
         Error(self, "TriggerEscape", "Not currently Escaping, invalid call!")
@@ -680,7 +701,7 @@ function TriggerEscape()
     Prisoner.SetEscaped()
     Prisoner.RevertBounty()
     Prisoner.AddEscapeBounty()
-    Prisoner.ResetArrestVars() ; May change, as an escape doesn't necessarily mean all vars should be deleted.
+    ; Prisoner.ResetArrestVars() ; May change, as an escape doesn't necessarily mean all vars should be deleted.
 endFunction
  
 function TriggerImprisonment()
