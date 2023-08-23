@@ -14,6 +14,20 @@ function FriskActor(Actor actorToFrisk, float friskingThoroughness, ObjectRefere
 endFunction
 
 function StripActor(Actor actorToStrip, float strippingThoroughness, ObjectReference transferItemsTo = none)
+    int underwearTopSlotMask = GetSlotMaskValue(config.UnderwearTopSlot)
+    int underwearBottomSlotMask = GetSlotMaskValue(config.UnderwearBottomSlot)
+
+    Armor underwearTop = actorToStrip.GetWornForm(underwearTopSlotMask) as Armor
+    Armor underwearBottom = actorToStrip.GetWornForm(underwearBottomSlotMask) as Armor
+
+    Debug(self, "BodySearcher::StripActor", "\n" + \
+        "Underwear (Top): ["+ "Slot: " + config.UnderwearTopSlot +", Slot Mask: "+ underwearTopSlotMask +", FormID: "+ underwearTop +"]" + "\n" + \
+        "Underwear (Bottom): ["+ "Slot: " + config.UnderwearBottomSlot +", Slot Mask: "+ underwearBottomSlotMask +", FormID: "+ underwearBottom +"]" + "\n" \ 
+    )
+
+    actorToStrip.RemoveAllItems(transferItemsTo, true, true)
+    ; transferItemsTo.RemoveAllItems(actorToStrip, false, true)
+
     ; Determine what to strip based on thoroughness
     if (strippingThoroughness >= 100.0)
         ; Strip naked, ask to spread cheeks, etc...
@@ -38,12 +52,24 @@ function StripActor(Actor actorToStrip, float strippingThoroughness, ObjectRefer
 
     elseif (strippingThoroughness >= 4)
         ; Strip to underwear, leaving average chance for lockpicks
+        transferItemsTo.RemoveItem(underwearTop, abSilent = true, akOtherContainer = actorToStrip)
+        transferItemsTo.RemoveItem(underwearBottom, abSilent = true, akOtherContainer = actorToStrip)
+        actorToStrip.EquipItem(underwearTop, false, true)
+        actorToStrip.EquipItem(underwearBottom, false, true)
 
     elseif (strippingThoroughness >= 2)
         ; Strip to underwear, leaving high chance for lockpicks and 1 key
+        transferItemsTo.RemoveItem(underwearTop, abSilent = true, akOtherContainer = actorToStrip)
+        transferItemsTo.RemoveItem(underwearBottom, abSilent = true, akOtherContainer = actorToStrip)
+        actorToStrip.EquipItem(underwearTop, false, true)
+        actorToStrip.EquipItem(underwearBottom, false, true)
 
     elseif (strippingThoroughness >= 0)
         ; Strip to underwear, leaving high chance for lockpicks and high chance for keys
+        transferItemsTo.RemoveItem(underwearTop, abSilent = true, akOtherContainer = actorToStrip)
+        transferItemsTo.RemoveItem(underwearBottom, abSilent = true, akOtherContainer = actorToStrip)
+        actorToStrip.EquipItem(underwearTop, false, true)
+        actorToStrip.EquipItem(underwearBottom, false, true)
     endif
 
     ; Stripping naked should only be allowed if a nude body mod is installed
@@ -57,7 +83,6 @@ function StripActor(Actor actorToStrip, float strippingThoroughness, ObjectRefer
     ;     i += 1
     ; endWhile
 
-    actorToStrip.RemoveAllItems(akTransferTo = transferItemsTo, abRemoveQuestItems = true)
 endFunction
 
 function UnequipWeaponsFromActor(Actor akActor)
