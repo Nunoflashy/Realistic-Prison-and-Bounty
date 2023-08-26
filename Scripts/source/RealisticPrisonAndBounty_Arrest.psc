@@ -75,14 +75,53 @@ function RegisterHotkeys()
     RegisterForKey(0x40) ; F6
 endFunction
 
-function RegisterForDelayedEvent(string stateName, float delay)
-    RegisterForSingleUpdate(delay)
+;/
+    Registers a delayed event through a state's OnUpdate()
+    string  @stateName: The name of the state that represents the event name
+    float   @delaySeconds: The time waited in seconds before the event is fired
+/;
+function RegisterForDelayedEvent(string stateName, float delaySeconds)
+    RegisterForSingleUpdate(delaySeconds)
     GotoState(stateName)
 endFunction
 
-function RegisterForDelayedEventGameTime(string stateName, float delay)
-    RegisterForSingleUpdateGameTime(delay)
+;/
+    Registers a delayed event through a state's OnUpdateGameTime()
+    string  @stateName: The name of the state that represents the event name
+    float   @delayGameTime: The time waited in game-time before the event is fired (1 = 1 Day | 1/24 = 1h)
+/;
+function RegisterForDelayedEventGameTime(string stateName, float delayGameTime)
+    RegisterForSingleUpdateGameTime(delayGameTime)
     GotoState(stateName)
+endFunction
+
+function AddBountyGainedWhileJailed(Faction akArrestFaction)
+    arrestVars.ModInt("Jail::Bounty Non-Violent", akArrestFaction.GetCrimeGoldNonViolent())
+    arrestVars.ModInt("Jail::Bounty Violent", akArrestFaction.GetCrimeGoldViolent())
+    ClearBounty(akArrestFaction)
+endFunction
+
+function TriggerForcegreetEluding(Actor akEludedGuard)
+    EludedGuardAlias.ForceRefTo(akEludedGuard)  ; Set the alias to the guard that has the Forcegreet package
+    akEludedGuard.EvaluatePackage()             ; Evaluate the AI packages to force the new package to run
+    arrestVars.SetActor("Arrest::Eluded Captor", akEludedGuard)
+    arrestVars.SetString("Arrest::Elude Type", "Dialogue")
+endFunction
+
+function ResetEludeGuardForcegreet()
+    string eludeType = arrestVars.GetString("Arrest::Elude Type")
+
+    if (eludeType == "Dialogue") ; Irrelevant check, but why not
+        ; Clear the eluded guard alias for Dialogue type eluded arrests.
+        EludedGuardAlias.Clear()
+    endif
+endFunction
+
+
+function TriggerPursuitEluding(Actor akEludedGuard)
+    arrestVars.SetActor("Arrest::Eluded Captor", akEludedGuard)
+    arrestVars.SetString("Arrest::Elude Type", "Pursuit")
+    RegisterForDelayedEvent("Eluding", config.ArrestEludeWarningTime) ; Register for a delayed event on Eluding::OnUpdate()
 endFunction
 
 event OnInit()
@@ -270,9 +309,7 @@ event OnArrestBegin(string eventName, string arrestType, float arresteeId, Form 
         Error(self, "Arrest::OnArrestBegin", arrestee.GetBaseObject().GetName() + " is already arrested, cannot arrest for "+ crimeFaction.GetName() +", aborting!")
 
         ; Add the bounty gained while in jail and clear the active faction bounty
-        arrestVars.ModInt("Jail::Bounty Non-Violent", captor.GetCrimeFaction().GetCrimeGoldNonViolent())
-        arrestVars.ModInt("Jail::Bounty Violent", captor.GetCrimeFaction().GetCrimeGoldViolent())
-        ClearBounty(captor.GetCrimeFaction())
+        self.AddBountyGainedWhileJailed(crimeFaction)
         return
     endif
 
@@ -359,17 +396,12 @@ endEvent
 event OnArrestEludeStart(string eventName, string eludeType, float unusedFlt, Form sender)
     if (eludeType == "Dialogue")
         Actor akSpeaker = sender as Actor
-        EludedGuardAlias.ForceRefTo(akSpeaker)
-        akSpeaker.EvaluatePackage()
-        arrestVars.SetActor("Arrest::Eluded Captor", akSpeaker)
-        arrestVars.SetString("Arrest::Elude Type", eludeType)
+        self.TriggerForcegreetEluding(akSpeaker)
         return
 
     elseif (eludeType == "Pursuit")
         Actor akPursuer = sender as Actor
-        arrestVars.SetActor("Arrest::Eluded Captor", akPursuer)
-        arrestVars.SetString("Arrest::Elude Type", eludeType)
-        RegisterForDelayedEvent("Eluding", config.ArrestEludeWarningTime)
+        self.TriggerPursuitEluding(akPursuer)
         return
     endif
 
@@ -379,11 +411,7 @@ endEvent
 event OnEludingArrestDialogue(string eventName, string eludeType, float unusedFlt, Form sender)
     Actor eludedCaptor = arrestVars.GetActor("Arrest::Eluded Captor")
     self.ApplyArrestEludedPenalty(eludedCaptor.GetCrimeFaction()) ; Set as eluding arrest from this speaker
-
-    if (eludeType == "Dialogue") ; Irrelevant check, but why not
-        ; Clear the eluded guard alias for Dialogue type eluded arrests.
-        EludedGuardAlias.Clear()
-    endif
+    self.ResetEludeGuardForcegreet()
 endEvent
 
 event OnArrestWait(string eventName, string unusedStr, float unusedFlt, Form sender)
