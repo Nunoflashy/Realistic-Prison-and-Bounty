@@ -879,6 +879,50 @@ function ClearBounty(Faction akFaction, bool nonViolent = true, bool violent = t
     endif
 endFunction
 
+function UnequipHandsForActor(Actor akActor) global
+    UnequipWeaponForActor(akActor, false)
+    UnequipWeaponForActor(akActor, false)
+    UnequipWeaponForActor(akActor, true)
+    UnequipSpellForActor(akActor)
+    UnequipShieldForActor(akActor)
+endFunction
+
+function UnequipWeaponForActor(Actor akActor, bool abLeftHand = false, bool abPreventEquip = false, bool abSilentUnequip = true) global
+    Weapon kWeapon = akActor.GetEquippedWeapon(abLeftHand)
+    if (kWeapon != None)
+        akActor.UnequipItem(kWeapon, abPreventEquip, abSilentUnequip)
+    endif
+endFunction
+
+function UnequipShieldForActor(Actor akActor, bool abPreventEquip = false, bool abSilentUnequip = true) global
+    Armor kShield = akActor.GetEquippedShield()
+    if (kShield != None)
+        akActor.UnequipItem(kShield, abPreventEquip, abSilentUnequip)
+    endif
+endFunction
+
+function UnequipSpellForActor(Actor akActor) global
+    int leftHand  = 0
+    int rightHand = 1
+
+    Spell kSpell = akActor.GetEquippedSpell(leftHand)
+    if (kSpell != None)
+        akActor.UnequipSpell(kSpell, leftHand)
+    endif
+
+    kSpell = akActor.GetEquippedSpell(rightHand)
+    if (kSpell != None)
+        akActor.UnequipSpell(kSpell, rightHand)
+    endif
+endFunction
+
+function UnequipShoutForActor(Actor akActor) global
+    Shout kShout = akActor.GetEquippedShout()
+    if (kShout != None)
+        akActor.UnequipShout(kShout)
+    endif
+endFunction
+
 float function StartBenchmark(bool condition = true) global
     if (condition)
         float startTime = Utility.GetCurrentRealTime()

@@ -344,6 +344,10 @@ function ResetArrestVars()
     endif
 endFunction
 
+;/
+    Registers the last update for the prisoner, 
+    this is a crucial variable used to determine updated sentences, infamy gained, and so on...
+/;
 function RegisterLastUpdate()
     LastUpdate = Utility.GetCurrentGameTime()
 endFunction
@@ -359,7 +363,7 @@ bool function ShouldBeStripped()
     endif
 
     bool meetsBountyRequirements    = (BountyNonViolent >= arrestVars.StrippingMinBounty) || (BountyViolent >= arrestVars.StrippingMinViolentBounty)
-    bool meetsSentenceRequirements  = Sentence >= arrestVars.StrippingMinSentence
+    bool meetsSentenceRequirements  = TimeLeftInSentence >= arrestVars.StrippingMinSentence
     return arrestVars.IsStrippingUnconditional || (arrestVars.StrippingHandling == "Minimum Bounty" && meetsBountyRequirements) || (arrestVars.StrippingHandling == "Minimum Sentence" && meetsSentenceRequirements)
 endFunction
 

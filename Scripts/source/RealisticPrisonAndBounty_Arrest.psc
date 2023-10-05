@@ -437,6 +437,7 @@ function BeginArrest()
     self.SetBounty()
 
     ; Idea for refactor: bool assignedJailCellSuccessfully = jail.AssignJailCell(SuspectRef) where SuspectRef is a script that handles anything related to the arrest Suspect
+    ; OR: SuspectRef.AssignToJailCell()
     bool assignedJailCellSuccessfully = jail.AssignJailCell(arrestee) ; Not guaranteed to go to jail, but we set it up here either way
     
     if (!assignedJailCellSuccessfully)
@@ -468,6 +469,7 @@ function BeginArrest()
     
     self.UpdateArrestStats()
     self.SetAsArrested(arrestee, arrestFaction)
+    self.RestrainArrestee(arrestee)
 
     ; ================== TESTING ==================
     ; miscVars.ListContainer("Locations")
@@ -639,6 +641,7 @@ function RestrainArrestee(Actor akArrestee)
     ; Hands Crossed Front in Scarfs - 0xA073A14
     ; Hands in Irons Front Black - 0xA033D9E
     Form cuffs = Game.GetFormEx(0xA081D2F)
+    akArrestee.SheatheWeapon()
     akArrestee.EquipItem(cuffs, true, true)
 endFunction
 

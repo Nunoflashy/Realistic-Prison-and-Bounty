@@ -222,7 +222,7 @@ state Jailed
         Prisoner.RegisterLastUpdate()
         RegisterForSingleUpdateGameTime(1.0)
     endEvent
-
+ 
     event OnFriskBegin(Actor friskSearchPerformer, Actor actorToFrisk)
         ; Happens when the actor is beginning to be frisked
     endEvent
@@ -686,7 +686,7 @@ event OnPrisonerLocationChanged(RealisticPrisonAndBounty_PrisonerRef akPrisoner,
     endif
 
 endEvent
- 
+
 event OnLocationChange(Location akOldLocation, Location akNewLocation)
     Debug(self, "OnLocationChange", CurrentState + " event invoked")
 endEvent
@@ -703,7 +703,7 @@ function TriggerEscape()
     Prisoner.AddEscapeBounty()
     ; Prisoner.ResetArrestVars() ; May change, as an escape doesn't necessarily mean all vars should be deleted.
 endFunction
- 
+
 function TriggerImprisonment()
     if (CurrentState != STATE_JAILED)
         Error(self, "TriggerImprisonment", "Not currently jailed, invalid call!")
