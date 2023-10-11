@@ -49,6 +49,13 @@ RealisticPrisonAndBounty_MCM property mcm auto
 RealisticPrisonAndBounty_ArrestVars property arrestVars auto
 RealisticPrisonAndBounty_ActorVars property actorVars auto
 RealisticPrisonAndBounty_MiscVars property miscVars auto
+RealisticPrisonAndBounty_SceneManager property sceneManager auto
+; RealisticPrisonAndBounty_SceneManager property sceneManager
+;     RealisticPrisonAndBounty_SceneManager function get()
+;         return (Game.GetFormFromFile(0xC9F5, GetPluginName())) as RealisticPrisonAndBounty_SceneManager
+;     endFunction
+; endProperty
+
 
 ; Called from ConfigAlias
 bool function RegisterEvents()
@@ -61,6 +68,11 @@ bool function RegisterEvents()
  ;                       Prison Events
  ; ==========================================================
     jail.RegisterEvents()
+
+ ; ==========================================================
+ ;                       Scene Events
+ ; ==========================================================
+    sceneManager.RegisterEvents()
 
     return true
 endFunction
@@ -147,7 +159,7 @@ bool function SetJailCells()
 
     miscVars.AddFormToArray("Jail::Cells[Falkreath]", Game.GetForm(0x3EF07)) ; Jail Cell 01
 
-    miscVars.AddFormToArray("Jail::Cells[Haafingar]", Game.GetForm(0x36897)) ; Jail Cell 01 (Original)
+    ; miscVars.AddFormToArray("Jail::Cells[Haafingar]", Game.GetForm(0x36897)) ; Jail Cell 01 (Original)
     miscVars.AddFormToArray("Jail::Cells[Haafingar]", GetFormFromMod(0x3880)) ; Jail Cell 02
     miscVars.AddFormToArray("Jail::Cells[Haafingar]", GetFormFromMod(0x3879)) ; Jail Cell 03
     miscVars.AddFormToArray("Jail::Cells[Haafingar]", GetFormFromMod(0x3881)) ; Jail Cell 04

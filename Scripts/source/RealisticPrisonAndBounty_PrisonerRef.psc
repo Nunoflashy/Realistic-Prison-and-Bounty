@@ -304,11 +304,18 @@ function SetupPrisonerVars()
     arrestVars.SetFloat("Jail::Sentence", (BountyNonViolent + (floor(BountyViolent * (100 / arrestVars.BountyExchange)))) / arrestVars.BountyToSentence)
     arrestVars.SetFloat("Jail::Time of Imprisonment", CurrentTime)
     arrestVars.SetForm("Jail::Prison Location", this.GetCurrentLocation()) ; Since we are in the prison, this is the prison location
-    arrestVars.SetForm("Jail::Cell Door", GetNearestJailDoorOfType(GetJailBaseDoorID(Hold), this, 10000))
+    arrestVars.SetForm("Jail::Cell Door", GetNearestJailDoorOfType(GetJailBaseDoorID(Hold), JailCell, 10000))
     arrestVars.SetInt("Jail::Cell Door Old Lock Level", CellDoor.GetLockLevel())
     arrestVars.SetForm("Jail::Teleport Release Location", config.GetJailTeleportReleaseMarker(Hold))
     arrestVars.SetForm("Jail::Prisoner Items Container", config.GetJailPrisonerItemsContainer(Hold))
     arrestVars.SetBool("Jail::Jailed", true)
+
+    Debug(none, "PrisonerRef::SetupPrisonerVars", "Vars: [ \n" + \
+        "Captor: " + arrestVars.Captor + "\n" + \
+        "Arrestee: " + arrestVars.Arrestee + "\n" + \
+        "Cell Door: " + arrestVars.GetReference("Jail::Cell Door") + "\n" + \
+        "Cell: " + arrestVars.JailCell + "\n" + \
+    "]")
 
     ; ; inventation time (Later this container must be dynamic for each actor in prison)
     arrestVars.SetObject("Jail::Prisoner Equipped Items", JArray.object())
@@ -431,9 +438,9 @@ function Strip()
 
     ; Total stripping thoroughness after modifier is applied if there's any
     float strippingThoroughness = arrestVars.StrippingThoroughness + strippingThoroughnessModifier
-
+    "Stripping::Stripping Thoroughness"
     debug.notification("Stripping Thoroughness: " + strippingThoroughness + ", modifier: " + strippingThoroughnessModifier)
-
+    Debug(none, "Prisoner::Strip", "Stripping Thoroughness: " + strippingThoroughness + ", modifier: " + strippingThoroughnessModifier)
     bool isStrippedNaked = strippingThoroughness >= 6
     bodySearcher.StripActor(this, strippingThoroughness, prisonerItemsContainer)
     
@@ -445,6 +452,10 @@ function Strip()
     self.OnStripSearched(prisonerItemsContainer)
 endFunction
 
+function RemoveUnderwear()
+    bodySearcher.RemoveUnderwearFromActor(this, arrestVars.PrisonerItemsContainer)
+endFunction
+
 function Clothe()
     RealisticPrisonAndBounty_Outfit outfitToUse = prisonerDresser.GetOutfit(arrestVars.OutfitName)
 
@@ -454,7 +465,7 @@ function Clothe()
         Debug(this, "Prisoner::Clothe", "Outfit condition not met, reverting to default outfit!")
     endif
 
-    prisonerDresser.WearOutfit(this, outfitToUse)
+    prisonerDresser.WearOutfit(this, outfitToUse, undressActor = false)
 
     OnClothed(outfitToUse)
 endFunction
@@ -474,6 +485,22 @@ function GiveItemsBack()
         endWhile
     endif
 
+endFunction
+
+function Restrain(bool inFront = false)
+    ; Hand Cuffs Backside Rusty - 0xA081D2F
+    ; Hand Cuffs Front Rusty - 0xA081D33
+    ; Hand Cuffs Front Shiny - 0xA081D34
+    ; Hand Cuffs Crossed Front 01 - 0xA033D9D
+    ; Hands Crossed Front in Scarfs - 0xA073A14
+    ; Hands in Irons Front Black - 0xA033D9E
+    Form cuffs = Game.GetFormEx(0xA081D2F)
+    if (inFront)
+        cuffs = Game.GetFormEx(0xA081D33)
+    endif
+
+    this.SheatheWeapon()
+    this.EquipItem(cuffs, true, true)
 endFunction
 
 function MoveToReleaseLocation()
@@ -625,7 +652,7 @@ function UpdateSentence()
         endif
 
         ; arrestVars.SetFloat("Jail::Sentence", (_bountyNonViolent + violentBountyConverted) / arrestVars.BountyToSentence)
-        arrestVars.SetFloat("Jail::Sentence", (BountyNonViolent + violentBountyConverted) / arrestVars.BountyToSentence)
+        arrestVars.SetFloat("Jail::Sentence", (BountyNonViolent + violentBountyConverted) / arrestVars.BountyToSentence) ; round() maybe?
     
         int newSentence = Sentence
         ClearBounty(ArrestFaction)

@@ -11,6 +11,8 @@ endProperty
 
 function FriskActor(Actor actorToFrisk, float friskingThoroughness, ObjectReference transferItemsTo = none)
     Debug(self, "FriskActor", "Frisked Actor: " + actorToFrisk)
+    UnequipHandsForActor(actorToFrisk)
+    actorToFrisk.SheatheWeapon()
 endFunction
 
 function StripActor(Actor actorToStrip, float strippingThoroughness, ObjectReference transferItemsTo = none)
@@ -26,6 +28,8 @@ function StripActor(Actor actorToStrip, float strippingThoroughness, ObjectRefer
     )
 
     actorToStrip.RemoveAllItems(transferItemsTo, true, true)
+    UnequipHandsForActor(actorToStrip)
+    actorToStrip.SheatheWeapon()
     ; transferItemsTo.RemoveAllItems(actorToStrip, false, true)
 
     ; Determine what to strip based on thoroughness
@@ -83,6 +87,19 @@ function StripActor(Actor actorToStrip, float strippingThoroughness, ObjectRefer
     ;     i += 1
     ; endWhile
 
+endFunction
+
+function RemoveUnderwearFromActor(Actor actorToStrip, ObjectReference transferItemsTo = none)
+    int underwearTopSlotMask = GetSlotMaskValue(config.UnderwearTopSlot)
+    int underwearBottomSlotMask = GetSlotMaskValue(config.UnderwearBottomSlot)
+
+    Armor underwearTop = actorToStrip.GetWornForm(underwearTopSlotMask) as Armor
+    Armor underwearBottom = actorToStrip.GetWornForm(underwearBottomSlotMask) as Armor
+
+    if (underwearTop != None || underwearBottom != None)
+        actorToStrip.RemoveItem(underwearTop, 1, true, transferItemsTo)
+        actorToStrip.RemoveItem(underwearBottom, 1, true, transferItemsTo)
+    endif
 endFunction
 
 function UnequipWeaponsFromActor(Actor akActor)

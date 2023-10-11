@@ -847,7 +847,7 @@ Actor function GetNearestActor(ObjectReference centerRef, float radius) global
 
     while (i > 0)
         Actor _actor = Game.FindRandomActorFromRef(centerRef, radius)
-        if (_actor)
+        if (_actor && _actor.GetActorBase().GetSex() == 1 && _actor.GetFormID() != 0x14)
             return _actor
         endif
 
@@ -867,6 +867,14 @@ bool function IsActorNearReference(Actor akActor, ObjectReference akReference, f
     endif
 
     return false
+endFunction
+
+function BindAliasTo(ReferenceAlias akAlias, ObjectReference akObjectReference) global
+    if (akObjectReference != None)
+        akAlias.ForceRefTo(akObjectReference)
+    else
+        akAlias.Clear()
+    endif
 endFunction
 
 function ClearBounty(Faction akFaction, bool nonViolent = true, bool violent = true) global

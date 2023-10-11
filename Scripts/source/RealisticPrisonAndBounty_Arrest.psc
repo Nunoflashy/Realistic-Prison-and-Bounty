@@ -16,6 +16,7 @@ string property ARREST_TYPE_TELEPORT_TO_CELL    = "TeleportToCell" autoreadonly
 string property ARREST_TYPE_ESCORT_TO_JAIL      = "EscortToJail" autoreadonly
 string property ARREST_TYPE_ESCORT_TO_CELL      = "EscortToCell" autoreadonly
 
+
 RealisticPrisonAndBounty_Config property config
     RealisticPrisonAndBounty_Config function get()
         return Game.GetFormFromFile(0x3317, GetPluginName()) as RealisticPrisonAndBounty_Config
@@ -46,7 +47,21 @@ RealisticPrisonAndBounty_MiscVars property miscVars
     endFunction
 endProperty
 
+; RealisticPrisonAndBounty_SceneManager property sceneManager
+;     RealisticPrisonAndBounty_SceneManager function get()
+;         return config.sceneManager
+;     endFunction
+; endProperty
+
+RealisticPrisonAndBounty_SceneManager property sceneManager
+    RealisticPrisonAndBounty_SceneManager function get()
+        return (Game.GetFormFromFile(0xC9F5, GetPluginName())) as RealisticPrisonAndBounty_SceneManager
+    endFunction
+endProperty
+
 ReferenceAlias property CaptorRef auto
+ReferenceAlias property Player_TravelTo auto
+Scene property Scene_Player_TravelTo auto
 
 ReferenceAlias property EludedGuardAlias
     ReferenceAlias function get()
@@ -286,6 +301,9 @@ event OnArrestBegin(string eventName, string arrestType, float arresteeId, Form 
     Actor captor            = (sender as Actor)
     Faction crimeFaction    = form_if ((sender as Faction), (sender as Faction), captor.GetCrimeFaction()) as Faction 
 
+    arrestType = ARREST_TYPE_ESCORT_TO_JAIL
+    Debug(self, "Arrest::OnArrestBegin", "Overriding Arrest Type: ARREST_TYPE_ESCORT_TO_JAIL")
+
     if (!self.ValidateArrestType(arrestType))
         Error(self, "Arrest::OnArrestBegin", "Arrest Type is invalid, got: " + arrestType + ". (valid options: "+ self.GetValidArrestTypes() +") ")
         return
@@ -325,6 +343,7 @@ event OnArrestBegin(string eventName, string arrestType, float arresteeId, Form 
         Debug(self, "OnArrestBegin", "Arrest is being done through a captor ("+ captor +")")
     endif
     
+    arrestVars.SetBool("Arrest::Resisted Arrest", false)
     arrestVars.SetForm("Arrest::Arrest Faction", crimeFaction)
     arrestVars.SetString("Arrest::Hold", crimeFaction.GetName())
     arrestVars.SetForm("Arrest::Arrestee", arrestee)
@@ -361,6 +380,12 @@ event OnArrestResist(string eventName, string unusedStr, float arrestResisterId,
         return
     endif
 
+    bool resistedArrest = arrestVars.GetBool("Arrest::Resisted Arrest")
+    if (!resistedArrest)
+        Actor buggedArrestResister = Game.GetFormEx(arrestResisterId as int) as Actor
+        Warn(self, "Arrest::OnArrestResist", buggedArrestResister.GetName() + " was arrested, no arrest was resisted (maybe multiple guards talked at once and triggered resist arrest?) [BUG]")
+        return
+    endif
     ; bool isAwaitingArrest = arrestVars.GetBool("Arrest::Awaiting Arrest")
     ; if (isAwaitingArrest)
     ;     Info(self, "Arrest::OnArrestResist", "The suspect is currently awaiting arrest, this should not count as resisting, returning...")
@@ -451,21 +476,46 @@ function BeginArrest()
     ; Will most likely be used when the arrestee has no chance to pay their bounty, and therefore will get immediately thrown into the cell
     if (arrestType == ARREST_TYPE_TELEPORT_TO_CELL)
         jail.StartTeleportToCell()
-    
+
     ; Could be used when the arrestee still has a chance to pay their bounty, and not go to the cell immediately
     elseif (arrestType == ARREST_TYPE_TELEPORT_TO_JAIL) ; Not implemented yet (Idea: Arrestee will be teleported to some location in jail and then either escorted or teleported to the cell)
-        ; jail.StartTeleportToJail()
+        jail.TeleportToJail()
     
     ; Will most likely be used when the arrestee has no chance to pay their bounty, and therefore will get immediately escorted into the cell
     elseif (arrestType == ARREST_TYPE_ESCORT_TO_CELL) ; Not implemented yet (Idea: Arrestee will be escorted directly to the cell)
-        arrestVars.SetReference("Jail::Cell Door", GetNearestJailDoorOfType(GetJailBaseDoorID(arrestVars.Hold), arrestVars.JailCell, 10000))
-        jail.StartEscortToCell()
+        jail.EscortToCell()
+        ; arrestVars.SetReference("Jail::Cell Door", GetNearestJailDoorOfType(GetJailBaseDoorID(arrestVars.Hold), arrestVars.JailCell, 10000))
+        ; jail.StartEscortToCell()
+        ; jail.StartEscortToJail()
+        
+    ;     arrestVars.SetForm("Jail::Prisoner Items Container", config.GetJailPrisonerItemsContainer(arrestVars.Hold))
+    ;     ObjectReference prisonerChest   = arrestVars.PrisonerItemsContainer
+    
+    ;     sceneManager.StartEscortToJail(captor, arrestee, prisonerChest)
+    ;     ; sceneManager.StartStripping(captor, arrestee, prisonerChest)
+    ;     ; jail.StartUndressScene()
+
+    ;     Debug(self, "BeginArrest", "Aliases: [ \n" + \
+    ;     "Captor: " + captor + "\n" + \
+    ;     "Arrestee: " + arrestee + "\n" + \
+    ;     "Cell Door: " + arrestVars.GetReference("Jail::Cell Door") + "\n" + \
+    ;     "EscortLocation: " + arrestVars.JailCell + "\n" + \
+    ;     "Escort: " + sceneManager.Escort + "(Object: "+ sceneManager.Escort.GetReference() +")\n" + \
+    ;     "Escortee: " + sceneManager.Escortee + "(Object: "+ sceneManager.Escortee.GetReference() +")\n" + \
+    ;     "Player_EscortLocation: " + sceneManager.Player_EscortLocation + "(Object: "+ sceneManager.Player_EscortLocation.GetReference() + ", " + sceneManager.Player_EscortLocation.GetReference().GetName() +")\n" + \
+    ; "]")
+
+    ;     Debug(self, "StartEscortToCell", "Aliases: [ \n" + \
+    ;     "CaptorRef: " + CaptorRef + "(Object: "+ CaptorRef.GetReference() +")\n" + \
+    ;     "Prisoner: " + jail.Prisoner + "(Object: "+ jail.Prisoner.GetReference() +")\n" + \
+    ;     "Player_TravelTo: " + Player_TravelTo + "(Object: "+ Player_TravelTo.GetReference() + ", " + Player_TravelTo.GetReference().GetName() +")\n" + \
+    ; "]")
 
     elseif (arrestType == ARREST_TYPE_ESCORT_TO_JAIL) ; Not implemented yet (Idea: Arrestee will be escorted to the jail, and then processed before being escorted into the cell)
-        ; jail.StartEscortToJail()
+        jail.EscortToJail()
     endif
 
-    SendModEvent("RPB_JailBegin")
+    ; SendModEvent("RPB_JailBegin")
     
     self.UpdateArrestStats()
     self.SetAsArrested(arrestee, arrestFaction)
@@ -642,6 +692,7 @@ function RestrainArrestee(Actor akArrestee)
     ; Hands in Irons Front Black - 0xA033D9E
     Form cuffs = Game.GetFormEx(0xA081D2F)
     akArrestee.SheatheWeapon()
+    UnequipHandsForActor(akArrestee)
     akArrestee.EquipItem(cuffs, true, true)
 endFunction
 
