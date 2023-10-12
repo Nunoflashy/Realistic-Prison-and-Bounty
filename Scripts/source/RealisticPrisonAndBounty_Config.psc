@@ -50,6 +50,11 @@ RealisticPrisonAndBounty_ArrestVars property arrestVars auto
 RealisticPrisonAndBounty_ActorVars property actorVars auto
 RealisticPrisonAndBounty_MiscVars property miscVars auto
 RealisticPrisonAndBounty_SceneManager property sceneManager auto
+RealisticPrisonAndBounty_EventManager property eventManager
+    RealisticPrisonAndBounty_EventManager function get()
+        return GetFormFromMod(0xEA67) as RealisticPrisonAndBounty_EventManager
+    endFunction
+endProperty
 ; RealisticPrisonAndBounty_SceneManager property sceneManager
 ;     RealisticPrisonAndBounty_SceneManager function get()
 ;         return (Game.GetFormFromFile(0xC9F5, GetPluginName())) as RealisticPrisonAndBounty_SceneManager
@@ -60,6 +65,11 @@ RealisticPrisonAndBounty_SceneManager property sceneManager auto
 ; Called from ConfigAlias
 bool function RegisterEvents()
 ; ==========================================================
+;                     EventManager Events
+; ==========================================================
+    eventManager.RegisterEvents()
+
+; ==========================================================
 ;                       Arrest Events
 ; ==========================================================
     arrest.RegisterEvents()
@@ -68,11 +78,6 @@ bool function RegisterEvents()
  ;                       Prison Events
  ; ==========================================================
     jail.RegisterEvents()
-
- ; ==========================================================
- ;                       Scene Events
- ; ==========================================================
-    sceneManager.RegisterEvents()
 
     return true
 endFunction

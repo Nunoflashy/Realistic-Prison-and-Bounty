@@ -207,7 +207,15 @@ function ShowArrestParams()
     Debug(self, "ShowArrestParams (id: "+ arrestParamsObj +", isObject: "+ isObject +", arrestParamsBV: "+ arrestParamsBV +")", "\n" + Hold + " Arrest Params: " + GetContainerList(arrestParams))
 endFunction
 
-event OnJailedBegin(string eventName, string strArg, float numArg, Form sender)
+; event OnJailedBegin(string eventName, string strArg, float numArg, Form sender)
+;     self.SetupJailVars()
+;     Prisoner.ForceRefTo(arrestVars.Arrestee) ; To be changed later to ActiveMagicEffect in order to attach to multiple Actors
+;     Prisoner.SetupPrisonerVars()
+;     GotoState(STATE_JAILED)
+;     self.TriggerImprisonment()
+; endEvent
+
+event OnJailBegin()
     self.SetupJailVars()
     Prisoner.ForceRefTo(arrestVars.Arrestee) ; To be changed later to ActiveMagicEffect in order to attach to multiple Actors
     Prisoner.SetupPrisonerVars()
@@ -645,7 +653,9 @@ event OnStripEnd(Actor stripSearchPerformer, Actor strippedActor)
     
     if (Prisoner.ShouldBeClothed())
         sceneManager.StartGiveClothing(arrestVars.Captor, Prisoner.this)
+        sceneManager.StartEscortToCell(arrestVars.Captor, arrestVars.Arrestee, arrestVars.JailCell, arrestVars.CellDoor)
     else
+        ; sceneManager.StartNoClothing(stripSearchPerformer, strippedActor)
         sceneManager.StartEscortToCell(arrestVars.Captor, arrestVars.Arrestee, arrestVars.JailCell, arrestVars.CellDoor)
     endif
 
@@ -668,8 +678,8 @@ endEvent
 event OnEscortToJailEnd(Actor escortActor, Actor escortedActor)
     ; Happens when the Actor has been escorted to the jail location
     Debug(self, "OnEscortToJailEnd", CurrentState + " event invoked")
-    sceneManager.StartBountyPaymentFail(escortActor, escortedActor)
-    ; sceneManager.StartStripping(escortActor, escortedActor)
+    ; sceneManager.StartForcedStripping(escortActor, escortedActor)
+    sceneManager.StartStripping(escortActor, escortedActor)
 endEvent
 
 event OnEscortToCellBegin(Actor escortActor, Actor escortedActor)
@@ -702,7 +712,7 @@ event OnClothingGiven(Actor clothingGiver, Actor clothingPrisoner)
     Debug(self, "OnClothingGiven", CurrentState + " event invoked")
     Prisoner.Clothe()
     ; if still in jail, not in the cell
-    sceneManager.StartEscortToCell(clothingGiver, clothingPrisoner, arrestVars.JailCell, arrestVars.CellDoor)
+    ; sceneManager.StartEscortToCell(clothingGiver, clothingPrisoner, arrestVars.JailCell, arrestVars.CellDoor)
 endEvent
 
 event OnActorCuffed(Actor cuffedActor, bool hands, bool feet)
@@ -802,9 +812,9 @@ function TriggerImprisonment()
 
     Prisoner.MarkAsJailed()
 
-    if (Prisoner.JailCell)
-        Prisoner.CloseCellDoor()
-    endif
+    ; if (Prisoner.JailCell)
+    ;     Prisoner.CloseCellDoor()
+    ; endif
     
     ; ShowArrestVars()
 
@@ -844,24 +854,6 @@ function MovePrisonerToCell()
     Prisoner.MoveToCell()
 endFunction
 
-; function StartEscortToCell()
-;     Actor guard                     = arrestVars.Captor
-;     Actor _prisoner                 = arrestVars.Arrestee
-;     ObjectReference jailCellDoor    = arrestVars.CellDoor
-;     ObjectReference _jailCell       = arrestVars.JailCell
-
-;     Game.SetPlayerAIDriven()
-;     guard.MoveTo(_jailCell)
-;     jailCellDoor.SetOpen()
-    
-;     guard.EnableAI(false)
-;     _prisoner.PathToReference(_jailCell, 1.0)
-;     jailCellDoor.SetOpen(false)
-;     jailCellDoor.Lock()
-;     Game.SetPlayerAIDriven(false)
-;     guard.EnableAI()
-; endFunction
-
 function StartTeleportToCell()
     SendModEvent("RPB_JailBegin")
     arrestVars.Arrestee.MoveTo(arrestVars.JailCell)
@@ -886,7 +878,9 @@ function EscortToJail()
     arrestVars.SetForm("Jail::Prisoner Items Container", config.GetJailPrisonerItemsContainer(Hold))
     ObjectReference prisonerChest  = arrestVars.PrisonerItemsContainer
 
+    ; Prisoner.SetupPrisonerVars()
     ; Start the escorting scene
+    ; sceneManager.StartEscortToCell(arrestVars.Captor, arrestVars.Arrestee, arrestVars.JailCell, arrestVars.CellDoor)
     sceneManager.StartEscortToJail(arrestVars.Captor, arrestVars.Arrestee, prisonerChest)
 endFunction
 
@@ -901,27 +895,6 @@ function TeleportToJail()
     arrestVars.Captor.MoveTo(prisonerChest)
 
     sceneManager.StartEscortToCell(arrestVars.Captor, arrestVars.Arrestee, arrestVars.JailCell, arrestVars.CellDoor)
-endFunction
-
-function StartGuardWalkToCellToStrip()
-    Actor guard                     = arrestVars.Captor
-    Actor thePrisoner               = arrestVars.Arrestee
-    ObjectReference jailCellDoor    = arrestVars.CellDoor
-    ObjectReference _jailCell        = arrestVars.JailCell
-
-    _jailCell.MoveTo(guard) ; Put a temporary marker on the guard's location
-
-    guard.PathToReference(jailCellDoor, 1.0)
-    jailCellDoor.SetOpen()
-    Game.SetPlayerAIDriven() ; Disable player controls
-    guard.PathToReference(thePrisoner, 1.0)
-    Prisoner.Strip()
-    guard.PathToReference(jailCellDoor, 1.0)
-    jailCellDoor.SetOpen(false)
-    jailCellDoor.Lock()
-    Game.SetPlayerAIDriven(false)
-    guard.PathToReference(_jailCell, 1.0)
-    _jailCell.MoveTo(thePrisoner)
 endFunction
 
 bool function AssignJailCell(Actor akPrisoner)

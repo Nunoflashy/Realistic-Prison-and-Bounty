@@ -484,42 +484,17 @@ function BeginArrest()
     ; Will most likely be used when the arrestee has no chance to pay their bounty, and therefore will get immediately escorted into the cell
     elseif (arrestType == ARREST_TYPE_ESCORT_TO_CELL) ; Not implemented yet (Idea: Arrestee will be escorted directly to the cell)
         jail.EscortToCell()
-        ; arrestVars.SetReference("Jail::Cell Door", GetNearestJailDoorOfType(GetJailBaseDoorID(arrestVars.Hold), arrestVars.JailCell, 10000))
-        ; jail.StartEscortToCell()
-        ; jail.StartEscortToJail()
-        
-    ;     arrestVars.SetForm("Jail::Prisoner Items Container", config.GetJailPrisonerItemsContainer(arrestVars.Hold))
-    ;     ObjectReference prisonerChest   = arrestVars.PrisonerItemsContainer
-    
-    ;     sceneManager.StartEscortToJail(captor, arrestee, prisonerChest)
-    ;     ; sceneManager.StartStripping(captor, arrestee, prisonerChest)
-    ;     ; jail.StartUndressScene()
-
-    ;     Debug(self, "BeginArrest", "Aliases: [ \n" + \
-    ;     "Captor: " + captor + "\n" + \
-    ;     "Arrestee: " + arrestee + "\n" + \
-    ;     "Cell Door: " + arrestVars.GetReference("Jail::Cell Door") + "\n" + \
-    ;     "EscortLocation: " + arrestVars.JailCell + "\n" + \
-    ;     "Escort: " + sceneManager.Escort + "(Object: "+ sceneManager.Escort.GetReference() +")\n" + \
-    ;     "Escortee: " + sceneManager.Escortee + "(Object: "+ sceneManager.Escortee.GetReference() +")\n" + \
-    ;     "Player_EscortLocation: " + sceneManager.Player_EscortLocation + "(Object: "+ sceneManager.Player_EscortLocation.GetReference() + ", " + sceneManager.Player_EscortLocation.GetReference().GetName() +")\n" + \
-    ; "]")
-
-    ;     Debug(self, "StartEscortToCell", "Aliases: [ \n" + \
-    ;     "CaptorRef: " + CaptorRef + "(Object: "+ CaptorRef.GetReference() +")\n" + \
-    ;     "Prisoner: " + jail.Prisoner + "(Object: "+ jail.Prisoner.GetReference() +")\n" + \
-    ;     "Player_TravelTo: " + Player_TravelTo + "(Object: "+ Player_TravelTo.GetReference() + ", " + Player_TravelTo.GetReference().GetName() +")\n" + \
-    ; "]")
 
     elseif (arrestType == ARREST_TYPE_ESCORT_TO_JAIL) ; Not implemented yet (Idea: Arrestee will be escorted to the jail, and then processed before being escorted into the cell)
-        jail.EscortToJail()
+        sceneManager.StartArrestStart(captor, arrestee)
+        ; jail.EscortToJail()
     endif
 
     ; SendModEvent("RPB_JailBegin")
     
     self.UpdateArrestStats()
     self.SetAsArrested(arrestee, arrestFaction)
-    self.RestrainArrestee(arrestee)
+    ; self.RestrainArrestee(arrestee)
 
     ; ================== TESTING ==================
     ; miscVars.ListContainer("Locations")
@@ -536,6 +511,14 @@ function BeginArrest()
     ; miscVars.List()
     ; =============================================
 endFunction
+
+event OnArrestStart(Actor akCaptor, Actor akArrestee)
+    jail.EscortToJail()
+endEvent
+
+event OnArresting(Actor akCaptor, Actor akArrestee)
+    self.RestrainArrestee(akArrestee)
+endEvent
 
 function SetAsDefeated(Faction akCrimeFaction)
     if (!self.HasResistedArrestRecently(akCrimeFaction))

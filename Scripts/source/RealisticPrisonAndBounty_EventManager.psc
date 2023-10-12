@@ -27,219 +27,71 @@ RealisticPrisonAndBounty_SceneManager property sceneManager
     endFunction
 endProperty
 
+function RegisterEvents()
+    RegisterForModEvent("RPB_SceneStart", "OnSceneStart")
+    RegisterForModEvent("RPB_ScenePlayingStart", "OnScenePlayingStart")
+    RegisterForModEvent("RPB_ScenePlayingEnd", "OnScenePlayingEnd")
+    RegisterForModEvent("RPB_SceneEnd", "OnSceneEnd")
+
+    ; temp
+    RegisterForModEvent("RPB_PackageEnd", "OnPackageEnd")
+    RegisterForModEvent("RPB_PackageStart", "OnPackageStart")
+endFunction
 
 ; ==========================================================
 ;                        Scene Events
 ; ==========================================================
 
-event OnSceneStart(string sceneName, ObjectReference[] data, Scene sender)
-    if (sceneName == sceneManager.SCENE_ESCORT_TO_CELL)
-        Actor escort   = data[0] as Actor
-        Actor escortee = data[1] as Actor
-
-        if (escortee == config.Player)
-            Game.SetPlayerAIDriven(true)
-        endif
-
-        int i = 0
-        while (i < data.Length)
-            if (data[i] != None && data[i] != escort)
-                jail.OnEscortToCellBegin(escort, data[i] as Actor)
-            endif
-            i += 1
-        endWhile
-
-    elseif (sceneName == sceneManager.SCENE_ESCORT_TO_JAIL)
-        Actor escort   = data[0] as Actor
-        Actor escortee = data[1] as Actor
-        Actor escortee02 = data[2] as Actor
-        Actor escortee03 = data[3] as Actor
-
-        if (escortee == config.Player)
-            Game.SetPlayerAIDriven(true)
-        endif
-
-        int i = 0
-        while (i < data.Length)
-            if (data[i] != None && data[i] != escort)
-                jail.OnEscortToJailBegin(escort, data[i] as Actor)
-            endif
-            i += 1
-        endWhile
-
-        ; jail.OnEscortToJailBegin(escort, escortee)
-
-    elseif (sceneName == sceneManager.SCENE_STRIPPING)
-        Actor stripperGuard     = data[0] as Actor
-        Actor strippedPrisoner  = data[1] as Actor
-
-        if (strippedPrisoner == config.Player)
-            Game.SetPlayerAIDriven(true)
-        endif
-
-        jail.OnStripBegin(stripperGuard, strippedPrisoner)
-
-    elseif (sceneName == sceneManager.SCENE_FRISKING)
-        Actor searcherGuard     = data[0] as Actor
-        Actor searchedPrisoner  = data[1] as Actor
-
-        if (searchedPrisoner == config.Player)
-            Game.SetPlayerAIDriven(true)
-        endif
-        
-        jail.OnFriskBegin(searcherGuard, searchedPrisoner)
-
-    elseif (sceneName == sceneManager.SCENE_PAYMENT_FAIL)
-        Actor guard     = data[0] as Actor
-        Actor prisoner  = data[1] as Actor
-
-        if (prisoner == config.Player)
-            Game.SetPlayerAIDriven(true)
-        endif
-        
-        ; jail.OnBountyPaymentFailed(guard, prisoner)
-    endif
-
-    Debug(self, "EventManager::OnSceneStart", "Scene: " + sender +", Scene name: " + sender.GetName())
-    Debug(self, "EventManager::OnSceneStart", sceneManager.GetSceneParametersDebugInfo(sceneName, data))
+event OnSceneStart(string eventName, string sceneName, float unusedFlt, Form sender)
+    sceneManager.OnSceneStart(sceneName, (sender as Scene))
 endEvent
 
-event OnScenePlaying(string sceneName, int scenePart, int phase, ObjectReference[] data, Scene sender)
-    Debug(self, "EventManager::OnScenePlaying", string_if (scenePart == sceneManager.SCENE_PLAYING_START, "(Start) Playing", "(End) Played") + " Phase " + phase + " of " + sceneName)
-    
-    if (sceneName == sceneManager.SCENE_ESCORT_TO_CELL)
-        if (scenePart == sceneManager.SCENE_PLAYING_START)
-            if (phase == 4)
-                debug.notification("Phase 4 played for " + sceneName)
-            endif
-            
-        elseif (scenePart == sceneManager.SCENE_PLAYING_END)
-
-        endif
-
-    elseif (sceneName == sceneManager.SCENE_ESCORT_TO_JAIL)
-
-        if (scenePart == sceneManager.SCENE_PLAYING_START)
-            
-        elseif (scenePart == sceneManager.SCENE_PLAYING_END)
-
-        endif
-
-    elseif (sceneName == sceneManager.SCENE_STRIPPING)
-        Actor stripperGuard     = data[0] as Actor
-        Actor strippedPrisoner  = data[1] as Actor
-
-        if (scenePart == sceneManager.SCENE_PLAYING_START)
-            if (phase == 7)
-                ; Remove underwear
-                jail.Prisoner.RemoveUnderwear()
-            endif
-            
-        elseif (scenePart == sceneManager.SCENE_PLAYING_END)
-            if (phase == 3)
-                debug.notification("Played Phase " + phase + " of " + sceneName)
-                int i = 0
-                while (i < data.Length)
-                    if (data[i] != None && data[i] != stripperGuard)
-                        jail.OnStripping(stripperGuard, data[i] as Actor)
-                    endif
-                    i += 1
-                endWhile
-                ; jail.OnStripping(stripperGuard, strippedPrisoner)
-            endif
-        endif
-
-    elseif (sceneName == sceneManager.SCENE_FRISKING)
-
-        if (scenePart == sceneManager.SCENE_PLAYING_START)
-            
-        elseif (scenePart == sceneManager.SCENE_PLAYING_END)
-
-        endif
-
-    elseif (sceneName == sceneManager.SCENE_GIVE_CLOTHING)
-
-        if (scenePart == sceneManager.SCENE_PLAYING_START)
-            
-        elseif (scenePart == sceneManager.SCENE_PLAYING_END)
-
-        endif
-
-    elseif (sceneName == sceneManager.SCENE_UNLOCK_CELL)
-
-        if (scenePart == sceneManager.SCENE_PLAYING_START)
-            
-        elseif (scenePart == sceneManager.SCENE_PLAYING_END)
-            if (phase == 3)
-                debug.notification("Phase 3 played for " + sceneName)
-            endif
-        endif
-
-    endif
+event OnScenePlayingStart(string eventName, string sceneName, float scenePhaseFlt, Form sender)
+    sceneManager.OnScenePlaying(sceneName, sceneManager.SCENE_PLAYING_START, (scenePhaseFlt as int), (sender as Scene))
 endEvent
 
-event OnSceneEnd(string sceneName, ObjectReference[] data, Scene sender)
-    if (sceneName == sceneManager.SCENE_ESCORT_TO_CELL)
-        Actor escort   = data[0] as Actor
-        Actor escortee = data[1] as Actor
-
-        if (escortee == config.Player)
-            Game.SetPlayerAIDriven(false)
-        endif
-
-        jail.OnEscortToCellEnd(escort, escortee)
-
-    elseif (sceneName == sceneManager.SCENE_ESCORT_TO_JAIL)
-        Actor escort   = data[0] as Actor
-        Actor escortee = data[1] as Actor
-
-        jail.OnEscortToJailEnd(escort, escortee)
-
-    elseif (sceneName == sceneManager.SCENE_STRIPPING)
-        Actor stripperGuard     = data[0] as Actor
-        Actor strippedPrisoner  = data[1] as Actor
-
-        int i = 0
-        while (i < data.Length)
-            Form cuffs = Game.GetFormEx(0xA081D33)
-
-            if (data[i] != None && data[i] != stripperGuard)
-                (data[i] as Actor).SheatheWeapon()
-                (data[i] as Actor).EquipItem(cuffs, true, true)
-            endif
-            i += 1
-        endWhile
-
-        jail.OnStripEnd(stripperGuard, strippedPrisoner)
-
-    elseif (sceneName == sceneManager.SCENE_FRISKING)
-        Actor searcherGuard     = data[0] as Actor
-        Actor searchedPrisoner  = data[1] as Actor
-
-        jail.OnFriskEnd(searcherGuard, searchedPrisoner)
-
-    elseif (sceneName == sceneManager.SCENE_GIVE_CLOTHING)
-        Actor searcherGuard     = data[0] as Actor
-        Actor searchedPrisoner  = data[1] as Actor
-
-        if (searchedPrisoner == config.Player)
-            Game.SetPlayerAIDriven(false)
-        endif
-
-        jail.OnClothingGiven(searcherGuard, searchedPrisoner)
-
-    elseif (sceneName == sceneManager.SCENE_PAYMENT_FAIL)
-        Actor guard     = data[0] as Actor
-        Actor prisoner  = data[1] as Actor
-
-        if (prisoner == config.Player)
-            Game.SetPlayerAIDriven(true)
-        endif
-
-        jail.OnBountyPaymentFailed(guard, prisoner)
-    endif
-
-    Debug(self, "EventManager::OnSceneEnd", "Scene: " + sender +", Scene name: " + sender.GetName())
-    Debug(self, "EventManager::OnSceneEnd", sceneManager.GetSceneParametersDebugInfo(sceneName, data))
+event OnScenePlayingEnd(string eventName, string sceneName, float scenePhaseFlt, Form sender)
+    sceneManager.OnScenePlaying(sceneName, sceneManager.SCENE_PLAYING_END, (scenePhaseFlt as int), (sender as Scene))
 endEvent
 
+event OnSceneEnd(string eventName, string sceneName, float unusedFlt, Form sender)
+    sceneManager.OnSceneEnd(sceneName, (sender as Scene))
+endEvent
+
+; ==========================================================
+;                        Package Events
+; ==========================================================
+
+; event OnPackageEnd(string eventName, string packageName, float unusedFlt, Form sender)
+;     ObjectReference[] data = new ObjectReference[10]
+
+;     data[0] = Guard_EscortLocation.GetReference()
+;     data[1] = Escort.GetActorReference()
+
+;     ; AIPackageManager.OnPackageEnd(packageName, data, (sender as Package))
+; endEvent
+
+
+; event OnPackageStart(string eventName, string packageName, float unusedFlt, Form sender)
+;     ObjectReference[] data = new ObjectReference[10]
+
+;     data[0] = Guard_EscortLocation.GetReference()
+;     data[1] = Escort.GetActorReference()
+
+;     ; AIPackageManager.OnPackageStart(packageName, data, (sender as Package))
+; endEvent
+
+
+; AIPackageManager.psc
+; event OnPackageStart(string packageName, ObjectReference[] data, Package sender)
+;     ; if (packageName == "RPB_LockCellDoor")
+;     ;     OrientRelative(data[1], data[0], afRotZ = 180)
+;     ; endif
+; endEvent
+
+; event OnPackageEnd(string packageName, ObjectReference[] data, Package sender)
+;     ; if (packageName == "RPB_LockCellDoor")
+;     ;     data[0].SetLockLevel(100)
+;     ;     data[0].Lock()
+;     ; endif
+; endEvent
