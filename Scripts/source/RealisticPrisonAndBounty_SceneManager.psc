@@ -137,9 +137,28 @@ Scene _nextScene
 ;                       Scene Aliases
 ; ==========================================================
 
-; Possible Escortees
-ReferenceAlias function GetEscortee(int index)
-    return self.GetAliasByName("Escortee" + index) as ReferenceAlias
+ReferenceAlias function GetEscort(int index = 0)
+    return self.GetAliasByName(string_if (index == 0, "Escort", "Escort" + index)) as ReferenceAlias
+endFunction
+
+ReferenceAlias function GetEscortee(int index = 0)
+    return self.GetAliasByName(string_if (index == 0, "Escortee", "Escortee" + index)) as ReferenceAlias
+endFunction
+
+ReferenceAlias function GetGuard(int index = 0)
+    return self.GetAliasByName(string_if (index == 0, "Guard", "Guard" + index)) as ReferenceAlias
+endFunction
+
+ReferenceAlias function GetPrisoner(int index = 0)
+    return self.GetAliasByName(string_if (index == 0, "Prisoner", "Prisoner" + index)) as ReferenceAlias
+endFunction
+
+ReferenceAlias function GetCell(int index = 0)
+    return self.GetAliasByName(string_if (index == 0, "Player_EscortLocation", "Player_EscortLocation" + index)) as ReferenceAlias
+endFunction
+
+ReferenceAlias function GetGuardLocation(int index = 0)
+    return self.GetAliasByName(string_if (index == 0, "Guard_EscortLocation", "Guard_EscortLocation" + index)) as ReferenceAlias
 endFunction
 
 ReferenceAlias property EscorteeRef auto
@@ -217,82 +236,98 @@ function ClearAliases()
 endFunction
 
 ObjectReference[] function GetSceneParameters(string sceneName)
-    ObjectReference[] data = new ObjectReference[10]
+    ObjectReference[] params = new ObjectReference[10]
     ; int i = 0
-    ; while (i < data.Length)
+    ; while (i < params.Length)
     ;     ReferenceAlias currentEscort = self.GetAliasByName("Escort00" + i) as ReferenceAlias
     ;     if (currentEscort != None)
-    ;         data[i] = currentEscort.GetReference()
+    ;         params[i] = currentEscort.GetReference()
     ;     endif
     ;     i += 1
     ; endWhile
 
     if (sceneName == SCENE_ESCORT_TO_CELL)
-        data[0] = EscortRef.GetActorReference()
-        data[1] = EscorteeRef.GetActorReference()
-        data[2] = Escortee1Ref.GetActorReference()
-        data[3] = Escortee2Ref.GetActorReference()
-        data[4] = Player_EscortLocationRef.GetReference()
-        data[5] = Guard_EscortLocationRef.GetReference()
+        ;/
+            self.AddEscort(1)
+            self.AddEscortee(3)
+        /;
+        params[0] = self.GetEscort().GetActorReference()
+        params[1] = self.GetEscortee().GetActorReference()
+        params[2] = self.GetEscortee(1).GetActorReference()
+        params[3] = self.GetEscortee(2).GetActorReference()
+        params[4] = self.GetCell().GetReference()
+        params[5] = self.GetGuardLocation().GetReference()
+
+        ; params[0] = EscortRef.GetActorReference()
+        ; params[1] = EscorteeRef.GetActorReference()
+        ; params[2] = Escortee1Ref.GetActorReference()
+        ; params[3] = Escortee2Ref.GetActorReference()
+        ; params[4] = Player_EscortLocationRef.GetReference()
+        ; params[5] = Guard_EscortLocationRef.GetReference()
 
     elseif (sceneName == SCENE_ESCORT_TO_JAIL)
-        data[0] = EscortRef.GetActorReference()
-        data[1] = EscorteeRef.GetActorReference()
-        data[2] = Escortee1Ref.GetActorReference()
-        data[3] = Escortee2Ref.GetActorReference()
+        params[0] = self.GetEscort().GetActorReference()
+        params[1] = self.GetEscortee().GetActorReference()
+        params[2] = self.GetEscortee(1).GetActorReference()
+        params[3] = self.GetEscortee(2).GetActorReference()
+
+        ; params[0] = EscortRef.GetActorReference()
+        ; params[1] = EscorteeRef.GetActorReference()
+        ; params[2] = Escortee1Ref.GetActorReference()
+        ; params[3] = Escortee2Ref.GetActorReference()
 
     elseif (sceneName == SCENE_STRIPPING)
-        data[0] = GuardRef.GetActorReference()
-        data[1] = PrisonerRef.GetActorReference()
-        data[2] = Prisoner1Ref.GetActorReference()
-        data[3] = Prisoner2Ref.GetActorReference()
+        params[0] = self.GetGuard().GetActorReference()
+        params[1] = self.GetPrisoner().GetActorReference()
+        params[2] = self.GetPrisoner(1).GetActorReference()
+        params[3] = self.GetPrisoner(2).GetActorReference()
 
     elseif (sceneName == SCENE_STRIPPING)
-        data[0] = GuardRef.GetActorReference()
-        data[1] = PrisonerRef.GetActorReference()
+        params[0] = self.GetGuard().GetActorReference()
+        params[1] = self.GetPrisoner().GetActorReference()
 
     elseif (sceneName == SCENE_FRISKING)
-        data[0] = GuardRef.GetActorReference()
-        data[1] = PrisonerRef.GetActorReference()
+        params[0] = self.GetGuard().GetActorReference()
+        params[1] = self.GetPrisoner().GetActorReference()
 
     elseif (sceneName == SCENE_GIVE_CLOTHING)
-        data[0] = GuardRef.GetActorReference()
-        data[1] = PrisonerRef.GetActorReference()
+        params[0] = self.GetGuard().GetActorReference()
+        params[1] = self.GetPrisoner().GetActorReference()
 
     elseif (sceneName == SCENE_PAYMENT_FAIL)
-        data[0] = GuardRef.GetActorReference()
-        data[1] = PrisonerRef.GetActorReference()
+        params[0] = self.GetGuard().GetActorReference()
+        params[1] = self.GetPrisoner().GetActorReference()
 
     elseif (sceneName == SCENE_ARREST_START)
-        data[0] = EscortRef.GetActorReference()
-        data[1] = EscorteeRef.GetActorReference()
+        params[0] = self.GetEscort().GetActorReference()
+        params[1] = self.GetEscortee().GetActorReference()
 
     elseif (sceneName == SCENE_NO_CLOTHING)
-        data[0] = GuardRef.GetActorReference()
-        data[1] = PrisonerRef.GetActorReference()
-        data[2] = Prisoner1Ref.GetActorReference()
-        data[3] = Prisoner2Ref.GetActorReference()
-        data[4] = Prisoner3Ref.GetActorReference()
+        params[0] = self.GetGuard().GetActorReference()
+        params[1] = self.GetPrisoner().GetActorReference()
+        params[2] = self.GetPrisoner(1).GetActorReference()
+        params[3] = self.GetPrisoner(2).GetActorReference()
+        params[4] = self.GetPrisoner(3).GetActorReference()
 
     elseif (sceneName == SCENE_FORCED_STRIPPING_01)
-        data[0] = GuardRef.GetActorReference()
-        data[1] = PrisonerRef.GetActorReference()
+        params[0] = self.GetGuard().GetActorReference()
+        params[1] = self.GetPrisoner().GetActorReference()
     endif
 
-    return data
+    return params
 endFunction
 
-string function GetSceneParametersDebugInfo(Scene sender, string sceneName, ObjectReference[] data)
+string function GetSceneParametersDebugInfo(Scene sender, string sceneName, ObjectReference[] params)
     string debugInfo = ""
 
     int i = 0
-    while (i < data.Length)
-        if (data[i] != None)
-            string baseId     = "[BaseID: " + data[i].GetBaseObject().GetFormID() + "] "
-            string formId     = "[FormID: " + data[i].GetFormID() + "] "
-            string objectName = "[Name: " + data[i].GetBaseObject().GetName() + "] "
+    while (i < params.Length)
+        if (params[i] != none)
+            string baseId     = "[BaseID: " + params[i].GetBaseObject().GetFormID() + "] "
+            string formId     = "[FormID: " + params[i].GetFormID() + "] "
+            string objectName = "[Name: " + params[i].GetBaseObject().GetName() + "] "
 
-            debugInfo += "\t["+i+"]: " + data[i] + " " + formId + baseId + string_if (objectName != "[Name: ]", objectName) + "\n"
+            debugInfo += "\t["+i+"]: " + params[i] + " " + formId + baseId + string_if (objectName != "[Name: ] ", objectName) + "\n"
         endif
         i += 1
     endWhile
@@ -302,41 +337,41 @@ string function GetSceneParametersDebugInfo(Scene sender, string sceneName, Obje
     return "Scene: " + sceneName + " " + sender + "\nParameters: [\n" + debugInfo
 endFunction
 
-
-
 event OnSceneStart(string name, Scene sender)
-    ObjectReference[] data = self.GetSceneParameters(name)
+    ObjectReference[] params = self.GetSceneParameters(name)
 
     if (name == SCENE_ESCORT_TO_CELL)
-        Actor escort   = data[0] as Actor
-        Actor escortee = data[1] as Actor
+        Actor escort   = params[0] as Actor
+        Actor escortee = params[1] as Actor
+        ; self.GetParams("Escort", max = 1)
+        ; self.GetParams("Escortee", max = 3)
 
         if (escortee == config.Player)
             Game.SetPlayerAIDriven(true)
         endif
 
         int i = 0
-        while (i < data.Length)
-            if (data[i] != None && data[i] != escort)
-                jail.OnEscortToCellBegin(escort, data[i] as Actor)
+        while (i < params.Length)
+            if (params[i] != none && params[i] != escort)
+                jail.OnEscortToCellBegin(escort, params[i] as Actor)
             endif
             i += 1
         endWhile
 
     elseif (name == SCENE_ESCORT_TO_JAIL)
-        Actor escort   = data[0] as Actor
-        Actor escortee = data[1] as Actor
-        Actor escortee02 = data[2] as Actor
-        Actor escortee03 = data[3] as Actor
+        Actor escort   = params[0] as Actor
+        Actor escortee = params[1] as Actor
+        Actor escortee02 = params[2] as Actor
+        Actor escortee03 = params[3] as Actor
 
         if (escortee == config.Player)
             Game.SetPlayerAIDriven(true)
         endif
 
         int i = 0
-        while (i < data.Length)
-            if (data[i] != None && data[i] != escort)
-                jail.OnEscortToJailBegin(escort, data[i] as Actor)
+        while (i < params.Length)
+            if (params[i] != none && params[i] != escort)
+                jail.OnEscortToJailBegin(escort, params[i] as Actor)
             endif
             i += 1
         endWhile
@@ -344,8 +379,8 @@ event OnSceneStart(string name, Scene sender)
         ; jail.OnEscortToJailBegin(escort, escortee)
 
     elseif (name == SCENE_STRIPPING)
-        Actor stripperGuard     = data[0] as Actor
-        Actor strippedPrisoner  = data[1] as Actor
+        Actor stripperGuard     = params[0] as Actor
+        Actor strippedPrisoner  = params[1] as Actor
 
         if (strippedPrisoner == config.Player)
             Game.SetPlayerAIDriven(true)
@@ -354,8 +389,8 @@ event OnSceneStart(string name, Scene sender)
         jail.OnStripBegin(stripperGuard, strippedPrisoner)
 
     elseif (name == SCENE_FRISKING)
-        Actor searcherGuard     = data[0] as Actor
-        Actor searchedPrisoner  = data[1] as Actor
+        Actor searcherGuard     = params[0] as Actor
+        Actor searchedPrisoner  = params[1] as Actor
 
         if (searchedPrisoner == config.Player)
             Game.SetPlayerAIDriven(true)
@@ -364,8 +399,8 @@ event OnSceneStart(string name, Scene sender)
         jail.OnFriskBegin(searcherGuard, searchedPrisoner)
 
     elseif (name == SCENE_PAYMENT_FAIL)
-        Actor guard     = data[0] as Actor
-        Actor prisoner  = data[1] as Actor
+        Actor guard     = params[0] as Actor
+        Actor prisoner  = params[1] as Actor
 
         if (prisoner == config.Player)
             Game.SetPlayerAIDriven(true)
@@ -374,8 +409,8 @@ event OnSceneStart(string name, Scene sender)
         ; jail.OnBountyPaymentFailed(guard, prisoner)
 
     elseif (name == SCENE_ARREST_START)
-        Actor escort   = data[0] as Actor
-        Actor escortee = data[1] as Actor
+        Actor escort   = params[0] as Actor
+        Actor escortee = params[1] as Actor
 
         if (escortee == config.Player)
             Game.SetPlayerAIDriven(true)
@@ -384,19 +419,19 @@ event OnSceneStart(string name, Scene sender)
         ; arrest.OnArrestStart()
     endif
 
-    Debug(self, "SceneManager::OnSceneStart", self.GetSceneParametersDebugInfo(sender, name, data))
+    Debug(self, "SceneManager::OnSceneStart", self.GetSceneParametersDebugInfo(sender, name, params))
 endEvent
 
 event OnScenePlaying(string name, int scenePart, int phase, Scene sender)
-    ObjectReference[] data = self.GetSceneParameters(name)
+    ObjectReference[] params = self.GetSceneParameters(name)
 
     Debug(self, "SceneManager::OnScenePlaying", string_if (scenePart == SCENE_PLAYING_START, "(Start) Playing", "(End) Played") + " Phase " + phase + " of " + name)
     
     if (name == SCENE_ESCORT_TO_CELL)
-        Actor guard     = data[0] as Actor
-        Actor prisoner  = data[1] as Actor
-        ObjectReference jailCell  = data[4]
-        ObjectReference cellDoor  = data[5]
+        Actor guard     = params[0] as Actor
+        Actor prisoner  = params[1] as Actor
+        ObjectReference jailCell  = params[4]
+        ObjectReference cellDoor  = params[5]
 
         if (scenePart == SCENE_PLAYING_START)
             if (phase == 4)
@@ -429,16 +464,16 @@ event OnScenePlaying(string name, int scenePart, int phase, Scene sender)
         endif
 
     elseif (name == SCENE_STRIPPING)
-        Actor stripperGuard     = data[0] as Actor
-        Actor strippedPrisoner  = data[1] as Actor
+        Actor stripperGuard     = params[0] as Actor
+        Actor strippedPrisoner  = params[1] as Actor
 
         if (scenePart == SCENE_PLAYING_START)
             if (phase == 2)
                 debug.notification("Played Phase " + phase + " of " + name)
                 int i = 0
-                while (i < data.Length)
-                    if (data[i] != None && data[i] != stripperGuard)
-                        jail.OnStripping(stripperGuard, data[i] as Actor)
+                while (i < params.Length)
+                    if (params[i] != None && params[i] != stripperGuard)
+                        jail.OnStripping(stripperGuard, params[i] as Actor)
                     endif
                     i += 1
                 endWhile
@@ -453,9 +488,9 @@ event OnScenePlaying(string name, int scenePart, int phase, Scene sender)
             ; if (phase == 2)
             ;     debug.notification("Played Phase " + phase + " of " + name)
             ;     int i = 0
-            ;     while (i < data.Length)
-            ;         if (data[i] != None && data[i] != stripperGuard)
-            ;             jail.OnStripping(stripperGuard, data[i] as Actor)
+            ;     while (i < params.Length)
+            ;         if (params[i] != None && params[i] != stripperGuard)
+            ;             jail.OnStripping(stripperGuard, params[i] as Actor)
             ;         endif
             ;         i += 1
             ;     endWhile
@@ -488,8 +523,8 @@ event OnScenePlaying(string name, int scenePart, int phase, Scene sender)
         endif
 
     elseif (name == SCENE_ARREST_START)
-        Actor escort   = data[0] as Actor
-        Actor escortee = data[1] as Actor
+        Actor escort   = params[0] as Actor
+        Actor escortee = params[1] as Actor
 
         if (scenePart == SCENE_PLAYING_START)
             if (phase == 3)
@@ -504,8 +539,8 @@ event OnScenePlaying(string name, int scenePart, int phase, Scene sender)
         endif
 
     elseif (name == SCENE_FORCED_STRIPPING_01)
-        Actor stripperGuard     = data[0] as Actor
-        Actor strippedPrisoner  = data[1] as Actor
+        Actor stripperGuard     = params[0] as Actor
+        Actor strippedPrisoner  = params[1] as Actor
 
         if (scenePart == SCENE_PLAYING_START)
             
@@ -529,13 +564,13 @@ event OnScenePlaying(string name, int scenePart, int phase, Scene sender)
 endEvent
 
 event OnSceneEnd(string name, Scene sender)
-    ObjectReference[] data = self.GetSceneParameters(name)
+    ObjectReference[] params = self.GetSceneParameters(name)
 
     if (name == SCENE_ESCORT_TO_CELL)
-        Actor escort   = data[0] as Actor
-        Actor escortee = data[1] as Actor
-        ObjectReference jailCell  = data[4]
-        ObjectReference cellDoor  = data[5]
+        Actor escort   = params[0] as Actor
+        Actor escortee = params[1] as Actor
+        ObjectReference jailCell  = params[4]
+        ObjectReference cellDoor  = params[5]
 
         if (escortee == config.Player)
             Game.SetPlayerAIDriven(false)
@@ -547,22 +582,22 @@ event OnSceneEnd(string name, Scene sender)
         jail.OnEscortToCellEnd(escort, escortee)
 
     elseif (name == SCENE_ESCORT_TO_JAIL)
-        Actor escort   = data[0] as Actor
-        Actor escortee = data[1] as Actor
+        Actor escort   = params[0] as Actor
+        Actor escortee = params[1] as Actor
 
         jail.OnEscortToJailEnd(escort, escortee)
 
     elseif (name == SCENE_STRIPPING)
-        Actor stripperGuard     = data[0] as Actor
-        Actor strippedPrisoner  = data[1] as Actor
+        Actor stripperGuard     = params[0] as Actor
+        Actor strippedPrisoner  = params[1] as Actor
 
         int i = 0
-        while (i < data.Length)
+        while (i < params.Length)
             Form cuffs = Game.GetFormEx(0xA081D33)
 
-            if (data[i] != None && data[i] != stripperGuard)
-                (data[i] as Actor).SheatheWeapon()
-                (data[i] as Actor).EquipItem(cuffs, true, true)
+            if (params[i] != None && params[i] != stripperGuard)
+                (params[i] as Actor).SheatheWeapon()
+                (params[i] as Actor).EquipItem(cuffs, true, true)
             endif
             i += 1
         endWhile
@@ -570,14 +605,14 @@ event OnSceneEnd(string name, Scene sender)
         jail.OnStripEnd(stripperGuard, strippedPrisoner)
 
     elseif (name == SCENE_FRISKING)
-        Actor searcherGuard     = data[0] as Actor
-        Actor searchedPrisoner  = data[1] as Actor
+        Actor searcherGuard     = params[0] as Actor
+        Actor searchedPrisoner  = params[1] as Actor
 
         jail.OnFriskEnd(searcherGuard, searchedPrisoner)
 
     elseif (name == SCENE_GIVE_CLOTHING)
-        Actor searcherGuard     = data[0] as Actor
-        Actor searchedPrisoner  = data[1] as Actor
+        Actor searcherGuard     = params[0] as Actor
+        Actor searchedPrisoner  = params[1] as Actor
 
         if (searchedPrisoner == config.Player)
             Game.SetPlayerAIDriven(false)
@@ -586,20 +621,20 @@ event OnSceneEnd(string name, Scene sender)
         jail.OnClothingGiven(searcherGuard, searchedPrisoner)
 
     elseif (name == SCENE_PAYMENT_FAIL)
-        Actor guard     = data[0] as Actor
-        Actor prisoner  = data[1] as Actor
+        Actor guard     = params[0] as Actor
+        Actor prisoner  = params[1] as Actor
 
         jail.OnBountyPaymentFailed(guard, prisoner)
 
     elseif (name == SCENE_ARREST_START)
-        Actor escort   = data[0] as Actor
-        Actor escortee = data[1] as Actor
+        Actor escort   = params[0] as Actor
+        Actor escortee = params[1] as Actor
 
         arrest.OnArrestStart(escort, escortee)
 
     elseif (name == SCENE_FORCED_STRIPPING_01)
-        Actor stripperGuard     = data[0] as Actor
-        Actor strippedPrisoner  = data[1] as Actor
+        Actor stripperGuard     = params[0] as Actor
+        Actor strippedPrisoner  = params[1] as Actor
 
         ; strippedPrisoner.SetAV("Paralysis", 0)
         Debug.SendAnimationEvent(strippedPrisoner, "IdleLayDownExit")
@@ -608,7 +643,7 @@ event OnSceneEnd(string name, Scene sender)
         jail.OnStripEnd(stripperGuard, strippedPrisoner)
     endif
 
-    Debug(self, "SceneManager::OnSceneEnd", self.GetSceneParametersDebugInfo(sender, name, data))
+    Debug(self, "SceneManager::OnSceneEnd", self.GetSceneParametersDebugInfo(sender, name, params))
 endEvent
 
 ReferenceAlias function GetAvailableAlias(string aliasType)

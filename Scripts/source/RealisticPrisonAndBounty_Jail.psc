@@ -96,9 +96,7 @@ RealisticPrisonAndBounty_CaptorRef property Captor auto
 RealisticPrisonAndBounty_PrisonerRef property Prisoner auto
 
 function RegisterEvents()
-    RegisterForModEvent("RPB_JailBegin", "OnJailedBegin")
-    RegisterForModEvent("RPB_JailEnd", "OnJailedEnd")
-    Debug(self, "Jail::RegisterEvents", "Registered Jail Events")
+    
 endFunction
 
 function SetupJailVars()
@@ -179,7 +177,7 @@ function SetupJailVars()
     arrestVars.SetFloat("Clothing::Outfit::Maximum Bounty", config.GetClothingOutfitMaximumBounty(Hold))
 
     arrestVars.SetBool("Override::Release::Item Retention Enabled", false)
-    arrestVars.SetInt("Override::Jail::Minimum Sentence", 1)
+    ; arrestVars.SetInt("Override::Jail::Minimum Sentence", 1)
     ; arrestVars.SetString("Override::Stripping::Handle Stripping On", "Unconditionally")
     ; arrestVars.SetString("Override::Clothing::Handle Clothing On", "Unconditionally")
     EndBenchmark(x, "SetupJailVars")
@@ -679,7 +677,20 @@ event OnEscortToJailEnd(Actor escortActor, Actor escortedActor)
     ; Happens when the Actor has been escorted to the jail location
     Debug(self, "OnEscortToJailEnd", CurrentState + " event invoked")
     ; sceneManager.StartForcedStripping(escortActor, escortedActor)
-    sceneManager.StartStripping(escortActor, escortedActor)
+    Prisoner.SetupPrisonerVars()
+    if (Prisoner.ShouldBeFrisked())
+        sceneManager.StartFrisking(escortActor, escortedActor)
+
+    elseif (Prisoner.ShouldBeStripped())
+        sceneManager.StartStripping(escortActor, escortedActor)
+
+    else
+        sceneManager.StartEscortToCell(escortActor, escortedActor, arrestVars.JailCell, arrestVars.CellDoor)
+    endif
+    
+    ; if (Prisoner.ShouldBeStripped())
+    ;     sceneManager.StartStripping(escortActor, escortedActor)
+    ; endif
 endEvent
 
 event OnEscortToCellBegin(Actor escortActor, Actor escortedActor)

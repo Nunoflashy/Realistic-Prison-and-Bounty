@@ -847,7 +847,7 @@ Actor function GetNearestActor(ObjectReference centerRef, float radius) global
 
     while (i > 0)
         Actor _actor = Game.FindRandomActorFromRef(centerRef, radius)
-        if (_actor && _actor.GetActorBase().GetSex() == 1 && _actor.GetFormID() != 0x14)
+        if (_actor && _actor.GetActorBase().GetSex() == 1 && _actor.GetFormID() != 0x14 && !_actor.IsChild())
             return _actor
         endif
 
@@ -929,6 +929,20 @@ function UnequipShoutForActor(Actor akActor) global
     if (kShout != None)
         akActor.UnequipShout(kShout)
     endif
+endFunction
+
+; Faces akObjA relative to akObjB
+; 
+; Examples:
+; OrientRelative(objA, objB) 					; Sets A to face directly away from B
+; OrientRelative(objA, objB, afRotZ = 180.0) 	; Sets A to face toward B
+; 
+function OrientRelative(ObjectReference akObjA, ObjectReference akObjB, Float afRotX = 0.0, Float afRotY = 0.0, Float afRotZ = 0.0) Global
+	Float rotX = akObjB.GetAngleX()
+	Float rotY = akObjB.GetAngleY()
+	Float rotZ = akObjB.GetAngleZ()
+
+	akObjA.SetAngle(rotX, rotY, rotZ)
 endFunction
 
 float function StartBenchmark(bool condition = true) global
