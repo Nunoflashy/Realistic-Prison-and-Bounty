@@ -847,7 +847,27 @@ Actor function GetNearestActor(ObjectReference centerRef, float radius) global
 
     while (i > 0)
         Actor _actor = Game.FindRandomActorFromRef(centerRef, radius)
-        if (_actor && _actor.GetActorBase().GetSex() == 1 && _actor.GetFormID() != 0x14 && !_actor.IsChild())
+        ; if (_actor && _actor.GetActorBase().GetSex() == 1 && _actor.GetFormID() != 0x14 && !_actor.IsChild())
+        if (_actor && _actor.GetFormID() != 0x14 && !_actor.IsChild() && _actor.IsGuard())
+            return _actor
+        endif
+
+        if (radius < 8000)
+            radius *= 2
+        endif
+        i -= 1
+    endWhile
+
+    return none
+endFunction
+
+Actor function GetNearestGuard(ObjectReference centerRef, float radius, ObjectReference exclude) global
+    int i = 30
+
+    while (i > 0)
+        Actor _actor = Game.FindRandomActorFromRef(centerRef, radius)
+        bool notPlayer = _actor.GetFormID() != 0x14
+        if (_actor && notPlayer && !_actor.IsChild() && _actor.IsGuard() && _actor != exclude)
             return _actor
         endif
 

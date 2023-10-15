@@ -53,6 +53,12 @@ RealisticPrisonAndBounty_SceneManager property sceneManager
     endFunction
 endProperty
 
+GlobalVariable property RPB_AllowArrestForcegreet
+    GlobalVariable function get()
+        return GetFormFromMod(0x130D7) as GlobalVariable
+    endFunction
+endProperty
+
 ReferenceAlias property CaptorRef auto
 ReferenceAlias property Player_TravelTo auto
 Scene property Scene_Player_TravelTo auto
@@ -103,19 +109,28 @@ function AddBountyGainedWhileJailed(Faction akArrestFaction)
 endFunction
 
 function TriggerForcegreetEluding(Actor akEludedGuard)
-    EludedGuardAlias.ForceRefTo(akEludedGuard)  ; Set the alias to the guard that has the Forcegreet package
-    akEludedGuard.EvaluatePackage()             ; Evaluate the AI packages to force the new package to run
+    sceneManager.StartEludingArrest(akEludedGuard, config.Player)
+
+    Debug(self, "Arrest::TriggerForcegreetEluding", "Aliases: [ \n" + \
+        "\tEludedGuardAlias: " + EludedGuardAlias +  " (Ref: "+ EludedGuardAlias.GetReference() +")" + "\n" + \
+        "\tGuardRef: " + sceneManager.GuardRef +  " (Ref: "+ sceneManager.GuardRef .GetReference() +")" + "\n" + \
+        "]" \
+    )
+
+    ; EludedGuardAlias.ForceRefTo(akEludedGuard)  ; Set the alias to the guard that has the Forcegreet package
+    ; akEludedGuard.EvaluatePackage()             ; Evaluate the AI packages to force the new package to run
     arrestVars.SetActor("Arrest::Eluded Captor", akEludedGuard)
     arrestVars.SetString("Arrest::Elude Type", "Dialogue")
+    self.ResetEludeGuardForcegreet()
 endFunction
 
 function ResetEludeGuardForcegreet()
-    string eludeType = arrestVars.GetString("Arrest::Elude Type")
+    ; string eludeType = arrestVars.GetString("Arrest::Elude Type")
 
-    if (eludeType == "Dialogue") ; Irrelevant check, but why not
-        ; Clear the eluded guard alias for Dialogue type eluded arrests.
-        EludedGuardAlias.Clear()
-    endif
+    ; if (eludeType == "Dialogue") ; Irrelevant check, but why not
+    ;     ; Clear the eluded guard alias for Dialogue type eluded arrests.
+    ;     EludedGuardAlias.Clear()
+    ; endif
 endFunction
 
 function TriggerPursuitEluding(Actor akEludedGuard)
@@ -141,7 +156,14 @@ event OnKeyDown(int keyCode)
         nearbyGuard.SendModEvent("RPB_ArrestBegin", ARREST_TYPE_TELEPORT_TO_CELL)
     
     elseif (keyCode == 0x44) ; F10
-        self.TriggerSurrender()
+        ; Actor nearbyGuard = GetNearestActor(config.Player, 7000)
+        ; nearbyGuard.GetCrimeFaction().SendPlayerToJail(true, true)
+        Actor nearbyGuard = GetNearestGuard(config.Player, 3500, none)
+        Debug(self, "Arrest::OnKeyDown", "Guard: " + nearbyGuard)
+        ; sceneManager.StartEscortFromCell(arrestVars.Captor, arrestVars.Arrestee, arrestVars.CellDoor, arrestVars.PrisonerItemsContainer)
+        ; Debug(self, "Arrest::OnKeyDown", "F10 Pressed - SceneManager")
+
+        ; self.TriggerSurrender()
     endif
 endEvent
 
@@ -226,6 +248,41 @@ function SetAsArrested(Actor akArrestee, Faction akFaction)
     ; GotoState(STATE_ARRESTED)
 endFunction
 
+function AllowArrestForcegreets(bool allow = true)
+    if (allow)
+        ; Reallow Forcegreets (used in AI package RPB_DGForcegreet for Arrest eludes)
+        RPB_AllowArrestForcegreet.SetValueInt(1)
+    else
+        ; Disallow Forcegreets (used in AI package RPB_DGForcegreet for Arrest eludes)
+        RPB_AllowArrestForcegreet.SetValueInt(0)
+    endif
+endFunction
+
+function ReleaseDetainee(Actor akCaptor, Actor akDetainee)
+    ; Revert Bounty
+    Faction crimeFaction = akCaptor.GetCrimeFaction()
+    crimeFaction.SetCrimeGold(arrestVars.BountyNonViolent)
+    crimeFaction.SetCrimeGoldViolent(arrestVars.BountyViolent)
+
+    arrestVars.Remove("Arrest::Captured")
+    arrestVars.Remove("Arrest::Arrest Faction")
+    arrestVars.Remove("Arrest::Hold")
+    arrestVars.Remove("Arrest::Arrestee")
+    arrestVars.Remove("Arrest::Arrest Type")
+    arrestVars.Remove("Arrest::Arrested")
+    arrestVars.Remove("Arrest::Time of Arrest")
+
+    self.AllowArrestForcegreets()
+    Game.SetPlayerAIDriven(false)
+endFunction
+
+function ChangeArrestEscort(Actor akNewEscort, Actor akDetainee)
+    ; A new guard was found, escort Detainee to jail
+    arrestVars.SetReference("Arrest::Arresting Guard", akNewEscort) ; Change the captor for further scenes and to lead to the cell
+    BindAliasTo(CaptorRef, akNewEscort)
+    sceneManager.StartEscortToJail(akNewEscort, arrestVars.Arrestee, arrestVars.PrisonerItemsContainer)
+endFunction
+
 function ApplyArrestEludedPenalty(Faction akArrestFaction)
     if (self.HasEludedArrestRecently(akArrestFaction))
         Info(self, "Arrest::ApplyArrestEludedPenalty", "You have already eluded arrest recently, no bounty will be added as it most likely is the same arrest.")
@@ -275,6 +332,8 @@ function ApplyArrestDefeatedPenalty(Faction akArrestFaction)
     string hold = akArrestFaction.GetName()
 
     ; Setup Defeated penalties
+    ; Helper.GetArrestAdditionalBountyOnDefeat(hold)
+    ; arrestVars.SetInt("Arrest::Bounty for Defeat", Helper.GetArrestAdditionalBountyOnDefeat(hold))
     arrestVars.SetInt("Arrest::Additional Bounty when Defeated", config.GetArrestAdditionalBountyDefeatedFlat(hold))
     arrestVars.SetFloat("Arrest::Additional Bounty when Defeated from Current Bounty", GetPercentAsDecimal(config.GetArrestAdditionalBountyDefeatedFromCurrentBounty(hold)))
     arrestVars.SetInt("Arrest::Bounty for Defeat", int_if (arrestVars.DefeatedAdditionalBountyPercentage > 0, round(akArrestFaction.GetCrimeGold() * arrestVars.DefeatedAdditionalBountyPercentage)) + arrestVars.DefeatedAdditionalBounty)
@@ -313,12 +372,14 @@ event OnArrestBegin(Actor akArrestee, Actor akCaptor, Faction akCrimeFaction, st
         Debug(self, "Arrest::OnArrestBegin", "Arrest is being done through a captor ("+ akCaptor +")")
     endif
 
+
     arrestVars.SetBool("Arrest::Captured", true)
     arrestVars.SetForm("Arrest::Arrest Faction", akCrimeFaction)
     arrestVars.SetString("Arrest::Hold", akCrimeFaction.GetName())
     arrestVars.SetForm("Arrest::Arrestee", akArrestee)
     arrestVars.SetString("Arrest::Arrest Type", ARREST_TYPE_ESCORT_TO_JAIL)
 
+    self.AllowArrestForcegreets(false)
     self.BeginArrest()
 endEvent
 
@@ -382,10 +443,39 @@ event OnArrestEludeStart(string eludeType, Actor akEludedGuard)
     Error(self, "Arrest::OnArrestEludeStart", "The passed in Elude Type is invalid, the event failed!")
 endEvent
 
-event OnArrestEludeEnd(Actor akSpeaker)
-    ; Actor eludedCaptor = arrestVars.GetActor("Arrest::Eluded Captor")
-    self.ApplyArrestEludedPenalty(akSpeaker.GetCrimeFaction()) ; Set as eluding arrest from this speaker
-    self.ResetEludeGuardForcegreet()
+event OnArrestEludeTriggered(Actor akEludedGuard, string asEludeType)
+    self.ApplyArrestEludedPenalty(akEludedGuard.GetCrimeFaction()) ; Set as eluding arrest from this guard
+
+    if (asEludeType == "Pursuit")
+        akEludedGuard.StartCombat(config.Player)
+    
+    elseif (asEludeType == "Dialogue")
+        sceneManager.ReleaseAlias("Guard") ; Unbind alias running the AI package from eluded guard
+        sceneManager.ReleaseAlias("Detainee") ; Unbind alias from the player
+    endif
+endEvent
+
+event OnArrestCaptorDeath(Actor akCaptor, Actor akCaptorKiller)
+    Actor anotherGuard = GetNearestGuard(arrestVars.Arrestee, 3500, exclude = akCaptor)
+
+    if (!anotherGuard)
+        config.NotifyArrest("Your captor has died, you may now try to break free")
+        self.ReleaseDetainee(akCaptor, arrestVars.Arrestee)
+        return
+    endif
+
+    config.NotifyArrest("Your captor has died, you are being escorted by another guard")
+    self.ChangeArrestEscort(anotherGuard, arrestVars.Arrestee)
+
+    if (akCaptorKiller == none) ; to be changed to Player later, but this is easier to test
+        int bounty = 10000
+        config.NotifyArrest("You have gained " + bounty + " Bounty in " + arrestVars.Hold + " for killing your captor!")
+    endif
+
+    Debug(self, "Arrest::OnArrestCaptorDeath", "[\n"+ \ 
+        "\tOld Captor: "+ akCaptor +"\n" + \
+        "\tNew Captor: "+ anotherGuard +"\n" \
+    +"]")
 endEvent
 
 ; event OnArrestWait(string eventName, string unusedStr, float unusedFlt, Form sender)
@@ -439,7 +529,10 @@ function BeginArrest()
         ; Captor.EscortToCell(Suspect)
 
     elseif (arrestType == ARREST_TYPE_ESCORT_TO_JAIL) ; Not implemented yet (Idea: Arrestee will be escorted to the jail, and then processed before being escorted into the cell)
-        sceneManager.StartArrestStart(captor, arrestee)
+        if (arrestee.GetDistance(captor))
+            ; Later have several ArrestStart scenes happen depending on the distance and maybe have a more hostile version for the arrests eluded / resisted etc.
+        endif
+        sceneManager.StartArrestStart02(captor, arrestee)
         ; jail.EscortToJail()
     endif
 
@@ -679,8 +772,7 @@ state Eluding
         if (eludeType == "Pursuit")
             if (config.Player.IsRunning() || config.Player.IsSprinting())
                 Actor eludedCaptor = arrestVars.GetActor("Arrest::Eluded Captor")
-                eludedCaptor.StartCombat(config.Player)
-                self.ApplyArrestEludedPenalty(eludedCaptor.GetCrimeFaction()) ; Set as eluding arrest from this captor
+                self.OnArrestEludeTriggered(eludedCaptor, eludeType) ; Explicitly call Event
             endif
         endif
 

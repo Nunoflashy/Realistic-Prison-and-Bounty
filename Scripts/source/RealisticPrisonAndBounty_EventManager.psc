@@ -139,24 +139,26 @@ event OnArrestEludeStart(string eventName, string eludeType, float unusedFlt, Fo
 
     if ((!config.Player.IsRunning() || !config.Player.IsSprinting()) && eludeType == "Pursuit")
         ; Player is not running, therefore this doesn't count as eluding arrest if we're processing Pursuit eludes.
+        ; This verification is in place to avoid triggering Eluding when going to jail / speaking to the guards,
+        ; because those dialogue lines do trigger this since the script is attached to them.
         return
     endif
 
     arrest.OnArrestEludeStart(eludeType, eludedGuard)
 endEvent
 
-event OnArrestEludeEnd(string eventName, string unusedStr, float unusedFlt, Form sender)
-    Debug(self, "EventManager::OnArrestEludeEnd", "This is called")
+; event OnArrestEludeEnd(string eventName, string unusedStr, float unusedFlt, Form sender)
+;     Debug(self, "EventManager::OnArrestEludeEnd", "This is called")
 
-    Actor eludedGuard = (sender as Actor)
+;     Actor eludedGuard = (sender as Actor)
 
-    if (!eludedGuard)
-        Error(self, "EventManager::OnArrestEludeStart", "sender is not an Actor, failed check! [sender: "+ sender +"]")
-        return
-    endif
+;     if (!eludedGuard)
+;         Error(self, "EventManager::OnArrestEludeStart", "sender is not an Actor, failed check! [sender: "+ sender +"]")
+;         return
+;     endif
 
-    arrest.OnArrestEludeEnd(eludedGuard)
-endEvent
+;     arrest.OnArrestEludeEnd(eludedGuard)
+; endEvent
 
 
 ; ==========================================================
@@ -182,30 +184,30 @@ endEvent
 
 event OnScenePlayingStart(string eventName, string sceneName, float scenePhaseFlt, Form sender)
     if (sceneName == "" || !(sender as Scene))
-        Error(self, "EventManager::OnScenePlayingStart", "There's either no Scene Name, or the event sender is not a Scene, returning!")
+        Error(self, "EventManager::OnScenePlayingStart", "[" + sceneName + ": SCENE_START] There's either no Scene Name, or the event sender is not a Scene, returning!")
         return
     endif
 
     if ((scenePhaseFlt as int) < 1 || !scenePhaseFlt)
-        Error(self, "EventManager::OnScenePlayingStart", "There's no passed in Scene Phase as a parameter, returning!");
+        Error(self, "EventManager::OnScenePlayingStart", "[" + sceneName + ": SCENE_START] There's no passed in Scene Phase as a parameter, returning!");
         return
     endif
     
-    sceneManager.OnScenePlaying(sceneName, sceneManager.SCENE_PLAYING_START, (scenePhaseFlt as int), (sender as Scene))
+    sceneManager.OnScenePlaying(sceneName, sceneManager.SCENE_START, (scenePhaseFlt as int), (sender as Scene))
 endEvent
 
 event OnScenePlayingEnd(string eventName, string sceneName, float scenePhaseFlt, Form sender)
     if (sceneName == "" || !(sender as Scene))
-        Error(self, "EventManager::OnScenePlayingEnd", "There's either no Scene Name, or the event sender is not a Scene, returning!")
+        Error(self, "EventManager::OnScenePlayingEnd", "[" + sceneName + ": SCENE_END] There's either no Scene Name, or the event sender is not a Scene, returning!")
         return
     endif
 
     if ((scenePhaseFlt as int) < 1 || !scenePhaseFlt)
-        Error(self, "EventManager::OnScenePlayingEnd", "There's no passed in Scene Phase as a parameter, returning!");
+        Error(self, "EventManager::OnScenePlayingEnd", "[" + sceneName + ": SCENE_END] There's no passed in Scene Phase as a parameter, returning!");
         return
     endif
     
-    sceneManager.OnScenePlaying(sceneName, sceneManager.SCENE_PLAYING_END, (scenePhaseFlt as int), (sender as Scene))
+    sceneManager.OnScenePlaying(sceneName, sceneManager.SCENE_END, (scenePhaseFlt as int), (sender as Scene))
 endEvent
 
 event OnSceneEnd(string eventName, string sceneName, float unusedFlt, Form sender)
@@ -232,25 +234,25 @@ endEvent
 
 
 event OnPackageStart(string eventName, string packageName, float unusedFlt, Form sender)
-    OnPackageStart1(packageName, none, sender)
+    AIPackageManager_OnPackageStart(packageName, none, sender)
     ; AIPackageManager.OnPackageStart(packageName, data, (sender as Package))
 endEvent
 
 
 ; AIPackageManager.psc
-event OnPackageStart1(string packageName, ObjectReference[] data, Form sender)
+event AIPackageManager_OnPackageStart(string packageName, ObjectReference[] data, Form sender)
     if (packageName == "RPB_DGForcegreetPackage")
         Actor speaker = (sender as Actor)
         arrest.ApplyArrestEludedPenalty(speaker.GetCrimeFaction())
+
+    elseif (packageName == "RPB_LockCellDoor")
+        OrientRelative(data[1], data[0], afRotZ = 180)
     endif
-    ; if (packageName == "RPB_LockCellDoor")
-    ;     OrientRelative(data[1], data[0], afRotZ = 180)
-    ; endif
 endEvent
 
-event OnPackageEnd(string packageName, ObjectReference[] data, Package sender)
-    ; if (packageName == "RPB_LockCellDoor")
-    ;     data[0].SetLockLevel(100)
-    ;     data[0].Lock()
-    ; endif
+event AIPackageManager_OnPackageEnd(string packageName, ObjectReference[] data, Package sender)
+    if (packageName == "RPB_LockCellDoor")
+        data[0].SetLockLevel(100)
+        data[0].Lock()
+    endif
 endEvent

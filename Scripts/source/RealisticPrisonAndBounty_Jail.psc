@@ -96,7 +96,7 @@ RealisticPrisonAndBounty_CaptorRef property Captor auto
 RealisticPrisonAndBounty_PrisonerRef property Prisoner auto
 
 function RegisterEvents()
-    
+
 endFunction
 
 function SetupJailVars()
@@ -635,8 +635,8 @@ event OnStripEnd(Actor stripSearchPerformer, Actor strippedActor)
 
     debug.notification("OnStripEnd: Called from within the Jail Script")
     self.SetupJailVars()
-    ; Prisoner.Strip()
-    Prisoner.Restrain(inFront = true)
+    Prisoner.Strip()
+    ; Prisoner.Restrain(inFront = true)
     arrestVars.Captor.EvaluatePackage() ; temp
 
     debug.notification("Jail::OnStripEnd")
@@ -678,11 +678,16 @@ event OnEscortToJailEnd(Actor escortActor, Actor escortedActor)
     Debug(self, "OnEscortToJailEnd", CurrentState + " event invoked")
     ; sceneManager.StartForcedStripping(escortActor, escortedActor)
     Prisoner.SetupPrisonerVars()
+    sceneManager.StartForcedStripping02(escortActor, escortedActor)
+    return
+    ; sceneManager.StartStripping(escortActor, escortedActor)
+    ; return
     if (Prisoner.ShouldBeFrisked())
         sceneManager.StartFrisking(escortActor, escortedActor)
 
     elseif (Prisoner.ShouldBeStripped())
-        sceneManager.StartStripping(escortActor, escortedActor)
+        ; sceneManager.StartStripping(escortActor, escortedActor)
+        sceneManager.StartForcedStripping02(escortActor, escortedActor)
 
     else
         sceneManager.StartEscortToCell(escortActor, escortedActor, arrestVars.JailCell, arrestVars.CellDoor)
@@ -716,7 +721,12 @@ endEvent
 
 event OnEscortFromCellEnd(Actor escortActor, Actor escortedActor, ObjectReference destination)
     ; Happens when the actor has been escorted from their cell to the destination
-    Debug(self, "OnEscortFromCellEnd", CurrentState + " event invoked", config.IS_DEBUG)
+    Debug(self, "Jail::OnEscortFromCellEnd", CurrentState + " event invoked")
+
+    ; Release Prisoner (later this Event can be used for more things and not just Release, but lets keep it simple for now)
+    Prisoner.GiveItemsBack()
+    Prisoner.ResetArrestVars()
+    BindAliasTo(Prisoner, none)
 endEvent
 
 event OnClothingGiven(Actor clothingGiver, Actor clothingPrisoner)
