@@ -897,6 +897,18 @@ function BindAliasTo(ReferenceAlias akAlias, ObjectReference akObjectReference) 
     endif
 endFunction
 
+function RetainAI(bool condition = true) global
+    if (condition)
+        Game.SetPlayerAIDriven(true)
+    endif
+endFunction
+
+function ReleaseAI(bool condition = true) global
+    if (condition)
+        Game.SetPlayerAIDriven(false)
+    endif
+endFunction
+
 function ClearBounty(Faction akFaction, bool nonViolent = true, bool violent = true) global
     if (nonViolent)
         akFaction.SetCrimeGold(0)

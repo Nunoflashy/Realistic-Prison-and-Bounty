@@ -443,10 +443,8 @@ event OnSceneStart(string name, Scene sender)
         Actor escortee = params[1] as Actor
         ; self.GetParams("Escort", max = 1)
         ; self.GetParams("Escortee", max = 3)
+        RetainAI(escortee == config.Player)
 
-        if (escortee == config.Player)
-            Game.SetPlayerAIDriven(true)
-        endif
 
         int i = 0
         while (i < params.Length)
@@ -472,9 +470,7 @@ event OnSceneStart(string name, Scene sender)
         Actor escortee02 = params[2] as Actor
         Actor escortee03 = params[3] as Actor
 
-        if (escortee == config.Player)
-            Game.SetPlayerAIDriven(true)
-        endif
+        RetainAI(escortee == config.Player)
 
         int i = 0
         while (i < params.Length)
@@ -490,9 +486,7 @@ event OnSceneStart(string name, Scene sender)
         Actor stripperGuard     = params[0] as Actor
         Actor strippedPrisoner  = params[1] as Actor
 
-        if (strippedPrisoner == config.Player)
-            Game.SetPlayerAIDriven(true)
-        endif
+        RetainAI(strippedPrisoner == config.Player)
 
         jail.OnStripBegin(stripperGuard, strippedPrisoner)
 
@@ -506,9 +500,7 @@ event OnSceneStart(string name, Scene sender)
         Actor searcherGuard     = params[0] as Actor
         Actor searchedPrisoner  = params[1] as Actor
 
-        if (searchedPrisoner == config.Player)
-            Game.SetPlayerAIDriven(true)
-        endif
+        RetainAI(searchedPrisoner == config.Player)
         
         jail.OnFriskBegin(searcherGuard, searchedPrisoner)
 
@@ -516,9 +508,7 @@ event OnSceneStart(string name, Scene sender)
         Actor guard     = params[0] as Actor
         Actor prisoner  = params[1] as Actor
 
-        if (prisoner == config.Player)
-            Game.SetPlayerAIDriven(true)
-        endif
+        RetainAI(prisoner == config.Player)
         
         ; jail.OnBountyPaymentFailed(guard, prisoner)
 
@@ -526,9 +516,7 @@ event OnSceneStart(string name, Scene sender)
         Actor escort   = params[0] as Actor
         Actor escortee = params[1] as Actor
 
-        if (escortee == config.Player)
-            Game.SetPlayerAIDriven(true)
-        endif
+        RetainAI(escortee == config.Player)
 
         ; arrest.OnArrestStart()
 
@@ -536,17 +524,13 @@ event OnSceneStart(string name, Scene sender)
         Actor escort   = params[0] as Actor
         Actor escortee = params[1] as Actor
 
-        if (escortee == config.Player)
-            Game.SetPlayerAIDriven(true)
-        endif
+        RetainAI(escortee == config.Player)
 
     elseif (name == SCENE_ARREST_START_03)
         Actor escort   = params[0] as Actor
         Actor escortee = params[1] as Actor
 
-        if (escortee == config.Player)
-            Game.SetPlayerAIDriven(true)
-        endif
+        RetainAI(escortee == config.Player)
 
     elseif (name == SCENE_ELUDING_ARREST_01)
         Actor guard     = params[0] as Actor
@@ -599,9 +583,7 @@ event OnScenePlaying(string name, int scenePart, int phase, Scene sender)
             
         elseif (scenePart == SCENE_END)
             if (phase == 1)
-                if (prisoner == config.Player)
-                    Game.SetPlayerAIDriven(true)
-                endif
+                RetainAI(prisoner == config.Player)
             endif
 
         endif
@@ -778,9 +760,7 @@ event OnSceneEnd(string name, Scene sender)
         ObjectReference jailCell  = params[4]
         ObjectReference cellDoor  = params[5]
 
-        if (escortee == config.Player)
-            Game.SetPlayerAIDriven(false)
-        endif
+        ReleaseAI(escortee == config.Player)
 
         cellDoor.SetLockLevel(100)
         cellDoor.Lock()
@@ -791,9 +771,7 @@ event OnSceneEnd(string name, Scene sender)
         Actor guard     = params[0] as Actor
         Actor prisoner  = params[1] as Actor
 
-        if (prisoner == config.Player)
-            Game.SetPlayerAIDriven(false)
-        endif
+        ReleaseAI(prisoner == config.Player)
 
         jail.OnEscortFromCellEnd(guard, prisoner, none)
 
@@ -841,9 +819,7 @@ event OnSceneEnd(string name, Scene sender)
         Actor searcherGuard     = params[0] as Actor
         Actor searchedPrisoner  = params[1] as Actor
 
-        if (searchedPrisoner == config.Player)
-            Game.SetPlayerAIDriven(false)
-        endif
+        ReleaseAI(searchedPrisoner == config.Player)
 
         jail.OnClothingGiven(searcherGuard, searchedPrisoner)
 
