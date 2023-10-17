@@ -33,51 +33,22 @@ Form property mainAPI
     endFunction
 endProperty
 
-RealisticPrisonAndBounty_Arrest property arrest
-    RealisticPrisonAndBounty_Arrest function get()
-        return mainAPI as RealisticPrisonAndBounty_Arrest
-    endFunction
-endProperty
-
-RealisticPrisonAndBounty_Jail property jail
-    RealisticPrisonAndBounty_Jail function get()
-        return mainAPI as RealisticPrisonAndBounty_Jail
-    endFunction
-endProperty
-
-RealisticPrisonAndBounty_MCM property mcm auto
-RealisticPrisonAndBounty_ArrestVars property arrestVars auto
-RealisticPrisonAndBounty_ActorVars property actorVars auto
-RealisticPrisonAndBounty_MiscVars property miscVars auto
-RealisticPrisonAndBounty_SceneManager property sceneManager auto
-RealisticPrisonAndBounty_EventManager property eventManager
-    RealisticPrisonAndBounty_EventManager function get()
-        return GetFormFromMod(0xEA67) as RealisticPrisonAndBounty_EventManager
-    endFunction
-endProperty
-; RealisticPrisonAndBounty_SceneManager property sceneManager
-;     RealisticPrisonAndBounty_SceneManager function get()
-;         return (Game.GetFormFromFile(0xC9F5, GetPluginName())) as RealisticPrisonAndBounty_SceneManager
-;     endFunction
-; endProperty
+RealisticPrisonAndBounty_Arrest         property Arrest auto
+RealisticPrisonAndBounty_Jail           property Jail auto
+RealisticPrisonAndBounty_MCM            property MCM auto
+RealisticPrisonAndBounty_ArrestVars     property ArrestVars auto
+RealisticPrisonAndBounty_ActorVars      property ActorVars auto
+RealisticPrisonAndBounty_MiscVars       property MiscVars auto
+RealisticPrisonAndBounty_SceneManager   property SceneManager auto
+RealisticPrisonAndBounty_EventManager   property EventManager auto
 
 
 ; Called from ConfigAlias
-bool function RegisterEvents()
+bool function HandleEvents()
 ; ==========================================================
 ;                     EventManager Events
 ; ==========================================================
     eventManager.RegisterEvents()
-
-; ==========================================================
-;                       Arrest Events
-; ==========================================================
-    arrest.RegisterEvents()
-
- ; ==========================================================
- ;                       Prison Events
- ; ==========================================================
-    jail.RegisterEvents()
 
     return true
 endFunction
@@ -164,7 +135,7 @@ bool function SetJailCells()
 
     miscVars.AddFormToArray("Jail::Cells[Falkreath]", Game.GetForm(0x3EF07)) ; Jail Cell 01
 
-    ; miscVars.AddFormToArray("Jail::Cells[Haafingar]", Game.GetForm(0x36897)) ; Jail Cell 01 (Original)
+    miscVars.AddFormToArray("Jail::Cells[Haafingar]", Game.GetForm(0x36897)) ; Jail Cell 01 (Original)
     miscVars.AddFormToArray("Jail::Cells[Haafingar]", GetFormFromMod(0x3880)) ; Jail Cell 02
     miscVars.AddFormToArray("Jail::Cells[Haafingar]", GetFormFromMod(0x3879)) ; Jail Cell 03
     miscVars.AddFormToArray("Jail::Cells[Haafingar]", GetFormFromMod(0x3881)) ; Jail Cell 04
@@ -285,7 +256,7 @@ float x = StartBenchmark()
         Location holdLocation = miscVars.GetFormFromArray("Locations["+ hold +"]", i) as Location
         ; As soon as the player is in any location for this hold, return.
         if (Player.IsInLocation(holdLocation))
-            Debug(none, "IsInLocationFromHold", "Player is in location: " + holdLocation.GetName() + " ("+ holdLocation.GetFormID() +")", mcm.IS_DEBUG)
+            Debug(none, "IsInLocationFromHold", "Player is in location: " + holdLocation.GetName() + " ("+ holdLocation.GetFormID() +")", MCM.IS_DEBUG)
            EndBenchmark(x, i + " iterations (IsLocationFromHold): returned true")
 
             return true
@@ -397,7 +368,7 @@ endFunction
 Form[] function GetJailMarkers(string hold)
     float x = StartBenchmark()
     if (!miscVars.Exists("Jail::Cells["+ hold +"]"))
-        mcm.Error("Config::GetJailMarkers", "The marker does not exist!")
+        MCM.Error("Config::GetJailMarkers", "The marker does not exist!")
         return none
     endif
     Form[] jailCells = miscVars.GetPapyrusFormArray("Jail::Cells["+ hold +"]")
@@ -407,7 +378,7 @@ endFunction
 
 Form function GetJailTeleportReleaseMarker(string hold)
     if (!miscVars.Exists("Jail::Release::Teleport["+ hold +"]"))
-        mcm.Error("Config::GetJailTeleportReleaseMarker", "The marker does not exist!")
+        MCM.Error("Config::GetJailTeleportReleaseMarker", "The marker does not exist!")
         return none
     endif
 
@@ -416,7 +387,7 @@ endFunction
 
 Form function GetJailPrisonerItemsContainer(string hold)
     if (!miscVars.Exists("Jail::Containers["+ hold +"]"))
-        mcm.Error("Config::GetJailPrisonerItemsContainer", "The container does not exist!")
+        MCM.Error("Config::GetJailPrisonerItemsContainer", "The container does not exist!")
         return none
     endif
     
@@ -427,14 +398,14 @@ endFunction
 ObjectReference function GetRandomJailMarker(string hold)
     Form[] markers = GetJailMarkers(hold)
     if (!markers)
-        mcm.Error("Config::getJailMakers", "The markers do not exist!")
+        MCM.Error("Config::getJailMakers", "The markers do not exist!")
         return none
     endif
 
     int len = markers.length
     int markerIndex = Utility.RandomInt(0, len - 1)
 
-    mcm.Debug("Config::GetRandomJailMarker", "Got Jail Cell " + (markerIndex + 1) + " (" + markers[markerIndex] + " [Index: "+ markerIndex +"]) marker for " + hold + "!")
+    MCM.Debug("Config::GetRandomJailMarker", "Got Jail Cell " + (markerIndex + 1) + " (" + markers[markerIndex] + " [Index: "+ markerIndex +"]) marker for " + hold + "!")
     return markers[markerIndex] as ObjectReference
 endFunction
 
@@ -459,79 +430,79 @@ endProperty
 
 int property FreeTimescale
     int function get()
-        return mcm.GetSliderOptionValue("General", "General::Timescale") as int
+        return MCM.GetSliderOptionValue("General", "General::Timescale") as int
     endFunction
 endProperty
 
 int property JailedTimescale
     int function get()
-        return mcm.GetSliderOptionValue("General", "General::TimescalePrison") as int
+        return MCM.GetSliderOptionValue("General", "General::TimescalePrison") as int
     endFunction
 endProperty
 
 float property BountyDecayUpdateInterval
     float function get()
-        return mcm.GetSliderOptionValue("General", "General::Bounty Decay (Update Interval)")
+        return MCM.GetSliderOptionValue("General", "General::Bounty Decay (Update Interval)")
     endFunction
 endProperty
 
 float property InfamyDecayUpdateInterval
     float function get()
-        return mcm.GetSliderOptionValue("General", "General::Infamy Decay (Update Interval)")
+        return MCM.GetSliderOptionValue("General", "General::Infamy Decay (Update Interval)")
     endFunction
 endProperty
 
 int property ArrestEludeWarningTime
     int function get()
-        return mcm.GetSliderOptionValue("General", "General::Arrest Elude Warning Time") as int
+        return MCM.GetSliderOptionValue("General", "General::Arrest Elude Warning Time") as int
     endFunction
 endProperty
 
 bool property ShouldDisplayArrestNotifications
     bool function get()
-        return mcm.GetToggleOptionState("General", "General::ArrestNotifications")
+        return MCM.GetToggleOptionState("General", "General::ArrestNotifications")
     endFunction
 endProperty
 
 bool property ShouldDisplayJailNotifications
     bool function get()
-        return mcm.GetToggleOptionState("General", "General::JailedNotifications")
+        return MCM.GetToggleOptionState("General", "General::JailedNotifications")
     endFunction
 endProperty
 
 bool property ShouldDisplayBountyDecayNotifications
     bool function get()
-        return mcm.GetToggleOptionState("General", "General::BountyDecayNotifications")
+        return MCM.GetToggleOptionState("General", "General::BountyDecayNotifications")
     endFunction
 endProperty
 
 bool property ShouldDisplayInfamyNotifications
     bool function get()
-        return mcm.GetToggleOptionState("General", "General::InfamyNotifications")
+        return MCM.GetToggleOptionState("General", "General::InfamyNotifications")
     endFunction
 endProperty
 
 bool property HasNudeBodyModInstalled
     bool function get()
-        return mcm.GetToggleOptionState("Clothing", "Configuration::NudeBodyModInstalled")
+        return MCM.GetToggleOptionState("Clothing", "Configuration::NudeBodyModInstalled")
     endFunction
 endProperty
 
 bool property HasUnderwearBodyModInstalled
     bool function get()
-        return mcm.GetToggleOptionState("Clothing", "Configuration::UnderwearModInstalled")
+        return MCM.GetToggleOptionState("Clothing", "Configuration::UnderwearModInstalled")
     endFunction
 endProperty
 
 int property UnderwearTopSlot
     int function get()
-        return mcm.GetSliderOptionValue("Clothing", "Item Slots::Underwear (Top)") as int
+        return MCM.GetSliderOptionValue("Clothing", "Item Slots::Underwear (Top)") as int
     endFunction
 endProperty
 
 int property UnderwearBottomSlot
     int function get()
-        return mcm.GetSliderOptionValue("Clothing", "Item Slots::Underwear (Bottom)") as int
+        return MCM.GetSliderOptionValue("Clothing", "Item Slots::Underwear (Bottom)") as int
     endFunction
 endProperty
 
@@ -546,39 +517,39 @@ function PrepareActorForJail(Actor akActor)
 endFunction
 
 int function GetDelevelingStatValue(string statName)
-    return mcm.GetSliderOptionValue("General", "Deleveling::" + statName) as int
+    return MCM.GetSliderOptionValue("General", "Deleveling::" + statName) as int
 endFunction
 
 int function GetArrestRequiredBounty(string hold)
-    return mcm.GetSliderOptionValue(hold, "Arrest::Minimum Bounty to Arrest") as int
+    return MCM.GetSliderOptionValue(hold, "Arrest::Minimum Bounty to Arrest") as int
 endFunction
 
 int function GetArrestGuaranteedPayableBounty(string hold)
-    return mcm.GetSliderOptionValue(hold, "Arrest::Guaranteed Payable Bounty") as int
+    return MCM.GetSliderOptionValue(hold, "Arrest::Guaranteed Payable Bounty") as int
 endFunction
 
 int function GetArrestMaximumPayableBounty(string hold)
-    return mcm.GetSliderOptionValue(hold, "Arrest::Maximum Payable Bounty") as int
+    return MCM.GetSliderOptionValue(hold, "Arrest::Maximum Payable Bounty") as int
 endFunction
 
 int function GetArrestMaximumPayableChance(string hold)
-    return mcm.GetSliderOptionValue(hold, "Arrest::Maximum Payable Bounty (Chance)") as int
+    return MCM.GetSliderOptionValue(hold, "Arrest::Maximum Payable Bounty (Chance)") as int
 endFunction
 
 float function GetArrestAdditionalBountyEludingFromCurrentBounty(string hold)
-    return mcm.GetSliderOptionValue(hold, "Arrest::Additional Bounty when Eluding (%)")
+    return MCM.GetSliderOptionValue(hold, "Arrest::Additional Bounty when Eluding (%)")
 endFunction
 
 int function GetArrestAdditionalBountyEludingFlat(string hold)
-    return mcm.GetSliderOptionValue(hold, "Arrest::Additional Bounty when Eluding") as int
+    return MCM.GetSliderOptionValue(hold, "Arrest::Additional Bounty when Eluding") as int
 endFunction
 
 float function GetArrestAdditionalBountyResistingFromCurrentBounty(string hold)
-    return mcm.GetSliderOptionValue(hold, "Arrest::Additional Bounty when Resisting (%)")
+    return MCM.GetSliderOptionValue(hold, "Arrest::Additional Bounty when Resisting (%)")
 endFunction
 
 int function GetArrestAdditionalBountyResistingFlat(string hold)
-    return mcm.GetSliderOptionValue(hold, "Arrest::Additional Bounty when Resisting") as int
+    return MCM.GetSliderOptionValue(hold, "Arrest::Additional Bounty when Resisting") as int
 endFunction
 
 int function GetArrestAdditionalBountyResisting(string hold)
@@ -591,11 +562,11 @@ int function GetArrestAdditionalBountyResisting(string hold)
 endFunction
 
 float function GetArrestAdditionalBountyDefeatedFromCurrentBounty(string hold)
-    return mcm.GetSliderOptionValue(hold, "Arrest::Additional Bounty when Defeated (%)")
+    return MCM.GetSliderOptionValue(hold, "Arrest::Additional Bounty when Defeated (%)")
 endFunction
  
 int function GetArrestAdditionalBountyDefeatedFlat(string hold)
-    return mcm.GetSliderOptionValue(hold, "Arrest::Additional Bounty when Defeated") as int
+    return MCM.GetSliderOptionValue(hold, "Arrest::Additional Bounty when Defeated") as int
 endFunction
 
 int function GetArrestAdditionalBountyDefeated(string hold)
@@ -608,76 +579,76 @@ int function GetArrestAdditionalBountyDefeated(string hold)
 endFunction
 
 bool function IsFriskingEnabled(string hold)
-    return mcm.GetToggleOptionState(hold, "Frisking::Allow Frisking")
+    return MCM.GetToggleOptionState(hold, "Frisking::Allow Frisking")
 endFunction
 
 bool function IsFriskingUnconditional(string hold)
-    return mcm.GetToggleOptionState(hold, "Frisking::Unconditional Frisking")
+    return MCM.GetToggleOptionState(hold, "Frisking::Unconditional Frisking")
 endFunction
 
 int function GetFriskingBountyRequired(string hold)
-    return mcm.GetSliderOptionValue(hold, "Frisking::Minimum Bounty for Frisking") as int
+    return MCM.GetSliderOptionValue(hold, "Frisking::Minimum Bounty for Frisking") as int
 endFunction
 
 int function GetFriskingThoroughness(string hold)
-    return mcm.GetSliderOptionValue(hold, "Frisking::Frisk Search Thoroughness") as int
+    return MCM.GetSliderOptionValue(hold, "Frisking::Frisk Search Thoroughness") as int
 endFunction
 
 bool function IsFriskingStolenItemsConfiscated(string hold)
-    return mcm.GetToggleOptionState(hold, "Frisking::Confiscate Stolen Items")
+    return MCM.GetToggleOptionState(hold, "Frisking::Confiscate Stolen Items")
 endFunction
 
 bool function IsFriskingStripSearchWhenStolenItemsFound(string hold)
-    return mcm.GetToggleOptionState(hold, "Frisking::Strip Search if Stolen Items Found")
+    return MCM.GetToggleOptionState(hold, "Frisking::Strip Search if Stolen Items Found")
 endFunction
 
 int function GetFriskingStolenItemsRequiredForStripping(string hold)
-    return mcm.GetSliderOptionValue(hold, "Frisking::Minimum No. of Stolen Items Required") as int
+    return MCM.GetSliderOptionValue(hold, "Frisking::Minimum No. of Stolen Items Required") as int
 endFunction
 
 bool function IsStrippingEnabled(string hold)
-    return mcm.GetToggleOptionState(hold, "Stripping::Allow Stripping")
+    return MCM.GetToggleOptionState(hold, "Stripping::Allow Stripping")
 endFunction
 
 string function GetStrippingHandlingCondition(string hold)
-    return mcm.GetMenuOptionValue(hold, "Stripping::Handle Stripping On")
+    return MCM.GetMenuOptionValue(hold, "Stripping::Handle Stripping On")
 endFunction
 
 bool function IsStrippingUnconditional(string hold)
-    return mcm.GetMenuOptionValue(hold, "Stripping::Handle Stripping On") == "Unconditionally"
+    return MCM.GetMenuOptionValue(hold, "Stripping::Handle Stripping On") == "Unconditionally"
 endFunction
 
 bool function IsStrippingBasedOnSentence(string hold)
-    return mcm.GetMenuOptionValue(hold, "Stripping::Handle Stripping On") == "Minimum Sentence"
+    return MCM.GetMenuOptionValue(hold, "Stripping::Handle Stripping On") == "Minimum Sentence"
 endFunction
 
 bool function IsStrippingBasedOnBounty(string hold)
-    return mcm.GetMenuOptionValue(hold, "Stripping::Handle Stripping On") == "Minimum Bounty"
+    return MCM.GetMenuOptionValue(hold, "Stripping::Handle Stripping On") == "Minimum Bounty"
 endFunction
 
 int function GetStrippingMinimumSentence(string hold)
-    return mcm.GetSliderOptionValue(hold, "Stripping::Minimum Sentence to Strip") as int
+    return MCM.GetSliderOptionValue(hold, "Stripping::Minimum Sentence to Strip") as int
 endFunction
 
 int function GetStrippingMinimumBounty(string hold)
-    return mcm.GetSliderOptionValue(hold, "Stripping::Minimum Bounty to Strip") as int
+    return MCM.GetSliderOptionValue(hold, "Stripping::Minimum Bounty to Strip") as int
 endFunction
 
 int function GetStrippingMinimumViolentBounty(string hold)
-    return mcm.GetSliderOptionValue(hold, "Stripping::Minimum Violent Bounty to Strip") as int
+    return MCM.GetSliderOptionValue(hold, "Stripping::Minimum Violent Bounty to Strip") as int
 endFunction
 
 bool function IsStrippedOnDefeat(string hold)
-    return mcm.GetToggleOptionState(hold, "Stripping::Strip when Defeated")
+    return MCM.GetToggleOptionState(hold, "Stripping::Strip when Defeated")
 endFunction
 
 int function GetStrippingThoroughness(string hold)
-    return mcm.GetSliderOptionValue(hold, "Stripping::Strip Search Thoroughness") as int
+    return MCM.GetSliderOptionValue(hold, "Stripping::Strip Search Thoroughness") as int
 endFunction
 
 ; TODO: Work needed, testing needed
 int function GetStrippingThoroughnessBountyModifier(string hold)
-    int bountyValue = mcm.GetSliderOptionValue(hold, "Stripping::Strip Search Thoroughness Modifier") as int
+    int bountyValue = MCM.GetSliderOptionValue(hold, "Stripping::Strip Search Thoroughness Modifier") as int
 
     if (bountyValue == 0)
         return 0
@@ -687,298 +658,298 @@ int function GetStrippingThoroughnessBountyModifier(string hold)
 endFunction
 
 bool function IsClothingEnabled(string hold)
-    return mcm.GetToggleOptionState(hold, "Clothing::Allow Clothing")
+    return MCM.GetToggleOptionState(hold, "Clothing::Allow Clothing")
 endFunction
 
 string function GetClothingHandlingCondition(string hold)
-    return mcm.GetMenuOptionValue(hold, "Clothing::Handle Clothing On")
+    return MCM.GetMenuOptionValue(hold, "Clothing::Handle Clothing On")
 endFunction
 
 bool function IsClothingUnconditional(string hold)
-    return mcm.GetMenuOptionValue(hold, "Clothing::Handle Clothing On") == "Unconditionally"
+    return MCM.GetMenuOptionValue(hold, "Clothing::Handle Clothing On") == "Unconditionally"
 endFunction
 
 bool function IsClothingBasedOnSentence(string hold)
-    return mcm.GetMenuOptionValue(hold, "Clothing::Handle Clothing On") == "Maximum Sentence"
+    return MCM.GetMenuOptionValue(hold, "Clothing::Handle Clothing On") == "Maximum Sentence"
 endFunction
 
 bool function IsClothingBasedOnBounty(string hold)
-    return mcm.GetMenuOptionValue(hold, "Clothing::Handle Stripping On") == "Maximum Bounty"
+    return MCM.GetMenuOptionValue(hold, "Clothing::Handle Stripping On") == "Maximum Bounty"
 endFunction
 
 int function GetClothingMaximumSentence(string hold)
-    return mcm.GetSliderOptionValue(hold, "Clothing::Maximum Sentence") as int
+    return MCM.GetSliderOptionValue(hold, "Clothing::Maximum Sentence") as int
 endFunction
 
 int function GetClothingMaximumBounty(string hold)
-    return mcm.GetSliderOptionValue(hold, "Clothing::Maximum Bounty") as int
+    return MCM.GetSliderOptionValue(hold, "Clothing::Maximum Bounty") as int
 endFunction
 
 int function GetClothingMaximumViolentBounty(string hold)
-    return mcm.GetSliderOptionValue(hold, "Clothing::Maximum Violent Bounty") as int
+    return MCM.GetSliderOptionValue(hold, "Clothing::Maximum Violent Bounty") as int
 endFunction
 
 bool function IsClothedOnDefeat(string hold)
-    return mcm.GetToggleOptionState(hold, "Clothing::When Defeated")
+    return MCM.GetToggleOptionState(hold, "Clothing::When Defeated")
 endFunction
 
 string function GetClothingOutfit(string hold)
-    return mcm.GetOutfitIdentifier(mcm.GetMenuOptionValue(hold, "Clothing::Outfit")) ; Get mapped Outfit ID
+    return MCM.GetOutfitIdentifier(MCM.GetMenuOptionValue(hold, "Clothing::Outfit")) ; Get mapped Outfit ID
 endFunction
 
 bool function IsClothingOutfitConditional(string hold)
     string holdOutfit = GetClothingOutfit(hold)
-    return mcm.GetToggleOptionState("Clothing", holdOutfit + "::Conditional Outfit")
+    return MCM.GetToggleOptionState("Clothing", holdOutfit + "::Conditional Outfit")
 endFunction
 
 bool function IsClothingOutfitConditionalFromID(string outfitId)
-    return mcm.GetToggleOptionState("Clothing", outfitId + "::Conditional Outfit")
+    return MCM.GetToggleOptionState("Clothing", outfitId + "::Conditional Outfit")
 endFunction
 
 int function GetClothingOutfitMinimumBountyFromID(string outfitId)
-    return mcm.GetSliderOptionValue("Clothing", outfitId + "::Minimum Bounty") as int
+    return MCM.GetSliderOptionValue("Clothing", outfitId + "::Minimum Bounty") as int
 endFunction
 
 int function GetClothingOutfitMaximumBountyFromID(string outfitId)
-    return mcm.GetSliderOptionValue("Clothing", outfitId + "::Maximum Bounty") as int
+    return MCM.GetSliderOptionValue("Clothing", outfitId + "::Maximum Bounty") as int
 endFunction
 
 int function GetClothingOutfitMinimumBounty(string hold)
     string holdOutfit = GetClothingOutfit(hold)
-    return mcm.GetSliderOptionValue("Clothing", holdOutfit + "::Minimum Bounty") as int
+    return MCM.GetSliderOptionValue("Clothing", holdOutfit + "::Minimum Bounty") as int
 endFunction
 
 int function GetClothingOutfitMaximumBounty(string hold)
     string holdOutfit = GetClothingOutfit(hold)
-    return mcm.GetSliderOptionValue("Clothing", holdOutfit + "::Maximum Bounty") as int
+    return MCM.GetSliderOptionValue("Clothing", holdOutfit + "::Maximum Bounty") as int
 endFunction
 
 bool function IsInfamyEnabled(string hold)
-    return mcm.GetToggleOptionState(hold, "Infamy::Enable Infamy")
+    return MCM.GetToggleOptionState(hold, "Infamy::Enable Infamy")
 endFunction
 
 float function GetInfamyGainedDailyFromArrestBounty(string hold)
-    return mcm.GetSliderOptionValue(hold, "Infamy::Infamy Gained (%)")
+    return MCM.GetSliderOptionValue(hold, "Infamy::Infamy Gained (%)")
 endFunction
 
 int function GetInfamyGainedDaily(string hold)
-    return mcm.GetSliderOptionValue(hold, "Infamy::Infamy Gained") as int
+    return MCM.GetSliderOptionValue(hold, "Infamy::Infamy Gained") as int
 endFunction
 
 float function GetInfamyLostFromCurrentInfamy(string hold)
-    return mcm.GetSliderOptionValue(hold, "Infamy::Infamy Lost (%)")
+    return MCM.GetSliderOptionValue(hold, "Infamy::Infamy Lost (%)")
 endFunction
 
 int function GetInfamyLost(string hold)
-    return mcm.GetSliderOptionValue(hold, "Infamy::Infamy Lost") as int
+    return MCM.GetSliderOptionValue(hold, "Infamy::Infamy Lost") as int
 endFunction
 
 int function GetInfamyRecognizedThreshold(string hold)
-    return mcm.GetSliderOptionValue(hold, "Infamy::Infamy Recognized Threshold") as int
+    return MCM.GetSliderOptionValue(hold, "Infamy::Infamy Recognized Threshold") as int
 endFunction
 
 int function GetInfamyKnownThreshold(string hold)
-    return mcm.GetSliderOptionValue(hold, "Infamy::Infamy Known Threshold") as int
+    return MCM.GetSliderOptionValue(hold, "Infamy::Infamy Known Threshold") as int
 endFunction
 
 int function GetInfamyGainModifier(string hold, string infamyLevel = "Recognized")
-    return mcm.GetSliderOptionValue(hold, string_if (infamyLevel == "Recognized", "Infamy::Infamy Gain Modifier (Recognized)", "Infamy::Infamy Gain Modifier (Known)")) as int
+    return MCM.GetSliderOptionValue(hold, string_if (infamyLevel == "Recognized", "Infamy::Infamy Gain Modifier (Recognized)", "Infamy::Infamy Gain Modifier (Known)")) as int
 endFunction
 
 bool function IsBountyDecayEnabled(string hold)
-    return mcm.GetToggleOptionState(hold, "Bounty Decaying::Enable Bounty Decaying")
+    return MCM.GetToggleOptionState(hold, "Bounty Decaying::Enable Bounty Decaying")
 endFunction
 
 ; TODO: Finish conditions for this function
 bool function IsBountyDecayableAsCriminal(string hold)
-    return isBountyDecayEnabled(hold) && isInfamyEnabled(hold) && mcm.GetToggleOptionState(hold, "Bounty Decaying::Decay if Known as Criminal")
+    return isBountyDecayEnabled(hold) && isInfamyEnabled(hold) && MCM.GetToggleOptionState(hold, "Bounty Decaying::Decay if Known as Criminal")
 endFunction
 
 bool function IsTimeServedAccountedForOnEscape(string hold)
-    return mcm.GetToggleOptionState(hold, "Escape::Account for Time Served")
+    return MCM.GetToggleOptionState(hold, "Escape::Account for Time Served")
 endFunction
 
 float function GetBountyDecayLostFromCurrentBounty(string hold)
-    return mcm.GetSliderOptionValue(hold, "Bounty Decaying::Bounty Lost (%)")
+    return MCM.GetSliderOptionValue(hold, "Bounty Decaying::Bounty Lost (%)")
 endFunction
 
 int function GetBountyDecayLostBounty(string hold)
-    return mcm.GetSliderOptionValue(hold, "Bounty Decaying::Bounty Lost") as int
+    return MCM.GetSliderOptionValue(hold, "Bounty Decaying::Bounty Lost") as int
 endFunction
 
 float function GetAdditionalCharge(string hold, string charge)
-    return mcm.GetSliderOptionValue(hold, "Additional Charges::" + charge)
+    return MCM.GetSliderOptionValue(hold, "Additional Charges::" + charge)
 endFunction
 
 bool function IsJailUnconditional(string hold)
-    return mcm.GetToggleOptionState(hold, "Jail::Unconditional Imprisonment")
+    return MCM.GetToggleOptionState(hold, "Jail::Unconditional Imprisonment")
 endFunction
 
 int function GetJailGuaranteedPayableBounty(string hold)
-    return mcm.GetSliderOptionValue(hold, "Jail::Guaranteed Payable Bounty") as int
+    return MCM.GetSliderOptionValue(hold, "Jail::Guaranteed Payable Bounty") as int
 endFunction
 
 int function GetJailMaximumPayableBounty(string hold)
-    return mcm.GetSliderOptionValue(hold, "Jail::Maximum Payable Bounty") as int
+    return MCM.GetSliderOptionValue(hold, "Jail::Maximum Payable Bounty") as int
 endFunction
 
 int function GetJailMaximumPayableChance(string hold)
-    return mcm.GetSliderOptionValue(hold, "Jail::Maximum Payable Bounty (Chance)") as int
+    return MCM.GetSliderOptionValue(hold, "Jail::Maximum Payable Bounty (Chance)") as int
 endFunction
 
 int function GetJailBountyExchange(string hold)
-    return mcm.GetSliderOptionValue(hold, "Jail::Bounty Exchange") as int
+    return MCM.GetSliderOptionValue(hold, "Jail::Bounty Exchange") as int
 endFunction
 
 int function GetJailBountyToSentence(string hold)
-    return mcm.GetSliderOptionValue(hold, "Jail::Bounty to Sentence") as int
+    return MCM.GetSliderOptionValue(hold, "Jail::Bounty to Sentence") as int
 endFunction
 
 int function GetJailMinimumSentence(string hold)
-    return mcm.GetSliderOptionValue(hold, "Jail::Minimum Sentence") as int
+    return MCM.GetSliderOptionValue(hold, "Jail::Minimum Sentence") as int
 endFunction
 
 int function GetJailMaximumSentence(string hold)
-    return mcm.GetSliderOptionValue(hold, "Jail::Maximum Sentence") as int
+    return MCM.GetSliderOptionValue(hold, "Jail::Maximum Sentence") as int
 endFunction
 
 int function GetJailCellSearchThoroughness(string hold)
-    return mcm.GetSliderOptionValue(hold, "Jail::Cell Search Thoroughness") as int
+    return MCM.GetSliderOptionValue(hold, "Jail::Cell Search Thoroughness") as int
 endFunction
 
 string function GetJailCellDoorLockLevel(string hold)
-    return mcm.GetMenuOptionValue(hold, "Jail::Cell Lock Level")
+    return MCM.GetMenuOptionValue(hold, "Jail::Cell Lock Level")
 endFunction
 
 bool function IsJailFastForwardEnabled(string hold)
-    return mcm.GetToggleOptionState(hold, "Jail::Fast Forward")
+    return MCM.GetToggleOptionState(hold, "Jail::Fast Forward")
 endFunction
 
 int function GetJailFastForwardDay(string hold)
-    return mcm.GetSliderOptionValue(hold, "Jail::Day to fast forward from") as int
+    return MCM.GetSliderOptionValue(hold, "Jail::Day to fast forward from") as int
 endFunction
 
 string function GetJailHandleSkillLoss(string hold)
-    return mcm.GetMenuOptionValue(hold, "Jail::Handle Skill Loss")
+    return MCM.GetMenuOptionValue(hold, "Jail::Handle Skill Loss")
 endFunction
 
 int function GetJailDayToStartLosingSkills(string hold)
-    return mcm.GetSliderOptionValue(hold, "Jail::Day to Start Losing Skills") as int
+    return MCM.GetSliderOptionValue(hold, "Jail::Day to Start Losing Skills") as int
 endFunction
 
 int function GetJailChanceToLoseSkillsDaily(string hold)
-    return mcm.GetSliderOptionValue(hold, "Jail::Chance to Lose Skills") as int
+    return MCM.GetSliderOptionValue(hold, "Jail::Chance to Lose Skills") as int
 endFunction
 
 float function GetJailRecognizedCriminalPenalty(string hold)
-    return mcm.GetSliderOptionValue(hold, "Jail::Recognized Criminal Penalty")
+    return MCM.GetSliderOptionValue(hold, "Jail::Recognized Criminal Penalty")
 endFunction
 
 float function GetJailKnownCriminalPenalty(string hold)
-    return mcm.GetSliderOptionValue(hold, "Jail::Known Criminal Penalty")
+    return MCM.GetSliderOptionValue(hold, "Jail::Known Criminal Penalty")
 endFunction
 
 int function GetJailBountyToTriggerCriminalPenalty(string hold)
-    return mcm.GetSliderOptionValue(hold, "Jail::Minimum Bounty to Trigger") as int
+    return MCM.GetSliderOptionValue(hold, "Jail::Minimum Bounty to Trigger") as int
 endFunction
 
 bool function IsJailReleaseFeesEnabled(string hold)
-    return mcm.GetToggleOptionState(hold, "Release::Enable Release Fees")
+    return MCM.GetToggleOptionState(hold, "Release::Enable Release Fees")
 endFunction
 
 int function GetReleaseChanceForReleaseFeesEvent(string hold)
-    return mcm.GetSliderOptionValue(hold, "Release::Chance for Event") as int
+    return MCM.GetSliderOptionValue(hold, "Release::Chance for Event") as int
 endFunction
 
 int function GetReleaseBountyToOweFees(string hold)
-    return mcm.GetSliderOptionValue(hold, "Release::Minimum Bounty to owe Fees") as int
+    return MCM.GetSliderOptionValue(hold, "Release::Minimum Bounty to owe Fees") as int
 endFunction
 
 float function GetReleaseReleaseFeesFromBounty(string hold)
-    return mcm.GetSliderOptionValue(hold, "Release::Release Fees (%)")
+    return MCM.GetSliderOptionValue(hold, "Release::Release Fees (%)")
 endFunction
 
 int function GetReleaseReleaseFeesFlat(string hold)
-    return mcm.GetSliderOptionValue(hold, "Release::Release Fees") as int
+    return MCM.GetSliderOptionValue(hold, "Release::Release Fees") as int
 endFunction
 
 int function GetReleaseDaysGivenToPayReleaseFees(string hold)
-    return mcm.GetSliderOptionValue(hold, "Release::Days Given to Pay") as int
+    return MCM.GetSliderOptionValue(hold, "Release::Days Given to Pay") as int
 endFunction
 
 bool function IsItemRetentionEnabledOnRelease(string hold)
-    return mcm.GetToggleOptionState(hold, "Release::Enable Item Retention")
+    return MCM.GetToggleOptionState(hold, "Release::Enable Item Retention")
 endFunction
 
 int function GetReleaseBountyToRetainItems(string hold)
-    return mcm.GetSliderOptionValue(hold, "Release::Minimum Bounty to Retain Items") as int
+    return MCM.GetSliderOptionValue(hold, "Release::Minimum Bounty to Retain Items") as int
 endFunction
 
 bool function IsAutoDressingEnabledOnRelease(string hold)
-    return mcm.GetToggleOptionState(hold, "Release::Auto Re-Dress on Release")
+    return MCM.GetToggleOptionState(hold, "Release::Auto Re-Dress on Release")
 endFunction
 
 float function GetEscapedBountyFromCurrentArrest(string hold)
-    return mcm.GetSliderOptionValue(hold, "Escape::Escape Bounty (%)")
+    return MCM.GetSliderOptionValue(hold, "Escape::Escape Bounty (%)")
 endFunction
 
 int function GetEscapedBountyFlat(string hold)
-    return mcm.GetSliderOptionValue(hold, "Escape::Escape Bounty") as int
+    return MCM.GetSliderOptionValue(hold, "Escape::Escape Bounty") as int
 endFunction
 
 bool function IsSurrenderEnabledOnEscape(string hold)
-    return mcm.GetToggleOptionState(hold, "Escape::Allow Surrendering")
+    return MCM.GetToggleOptionState(hold, "Escape::Allow Surrendering")
 endFunction
 
 bool function ShouldFriskOnEscape(string hold)
-    return mcm.GetToggleOptionState(hold, "Escape::Frisk Search upon Captured")
+    return MCM.GetToggleOptionState(hold, "Escape::Frisk Search upon Captured")
 endFunction
 
 bool function ShouldStripOnEscape(string hold)
-    return mcm.GetToggleOptionState(hold, "Escape::Strip Search upon Captured")
+    return MCM.GetToggleOptionState(hold, "Escape::Strip Search upon Captured")
 endFunction
 
 float function GetChargeBountyForImpersonation(string hold)
-    return mcm.GetSliderOptionValue(hold, "Additional Charges::Bounty for Impersonation")
+    return MCM.GetSliderOptionValue(hold, "Additional Charges::Bounty for Impersonation")
 endFunction
 
 float function GetChargeBountyForEnemyOfHold(string hold)
-    return mcm.GetSliderOptionValue(hold, "Additional Charges::Bounty for Enemy of Hold")
+    return MCM.GetSliderOptionValue(hold, "Additional Charges::Bounty for Enemy of Hold")
 endFunction
 
 float function GetChargeBountyForStolenItems(string hold)
-    return mcm.GetSliderOptionValue(hold, "Additional Charges::Bounty for Stolen Items")
+    return MCM.GetSliderOptionValue(hold, "Additional Charges::Bounty for Stolen Items")
 endFunction
 
 float function GetChargeBountyForStolenItemFromItemValue(string hold)
-    return mcm.GetSliderOptionValue(hold, "Additional Charges::Bounty for Stolen Item")
+    return MCM.GetSliderOptionValue(hold, "Additional Charges::Bounty for Stolen Item")
 endFunction
 
 float function GetChargeBountyForContraband(string hold)
-    return mcm.GetSliderOptionValue(hold, "Additional Charges::Bounty for Contraband")
+    return MCM.GetSliderOptionValue(hold, "Additional Charges::Bounty for Contraband")
 endFunction
 
 float function GetChargeBountyForCellKey(string hold)
-    return mcm.GetSliderOptionValue(hold, "Additional Charges::Bounty for Cell Key")
+    return MCM.GetSliderOptionValue(hold, "Additional Charges::Bounty for Cell Key")
 endFunction
 
 function IncrementInfamy(string hold, int incrementBy)
     int currentInfamy = GetInfamyGained(hold)
     string option = hold + "::Infamy Gained"
-    ; mcm.SetOptionStatValue(option, currentInfamy + incrementBy)
+    ; MCM.SetOptionStatValue(option, currentInfamy + incrementBy)
     NotifyInfamy("You have gained " + incrementBy + " Infamy in " + hold)
 endFunction
 
 function DecrementInfamy(string hold, int decrementBy)
     int currentInfamy = GetInfamyGained(hold)
     string option = hold + "::Infamy Gained"
-    ; mcm.SetOptionStatValue(option, currentInfamy - decrementBy)
+    ; MCM.SetOptionStatValue(option, currentInfamy - decrementBy)
 endFunction
 
 ; TODO: Change how the stat is parsed
 int function GetInfamyGained(string hold)
     return actorVars.GetInfamy(self.GetFaction(hold), Player)
-    ; return mcm.GetStatOptionValue("Stats", hold + "::Infamy Gained")
+    ; return MCM.GetStatOptionValue("Stats", hold + "::Infamy Gained")
 endFunction
 
 bool function IsInfamyRecognized(string hold)
@@ -1100,10 +1071,10 @@ Armor function GetActorEquippedClothingForBodyPart(Actor actorTarget, string bod
 endFunction
 
 function WearOutfitOnActor(Actor actorTarget, string outfitId, bool unequipAllItems = true)
-    Armor bodyPartHead = mcm.GetOutfitPart(outfitId, "Head")
-    Armor bodyPartBody = mcm.GetOutfitPart(outfitId, "Body")
-    Armor bodyPartHands = mcm.GetOutfitPart(outfitId, "Hands")
-    Armor bodyPartFeet = mcm.GetOutfitPart(outfitId, "Feet")
+    Armor bodyPartHead = MCM.GetOutfitPart(outfitId, "Head")
+    Armor bodyPartBody = MCM.GetOutfitPart(outfitId, "Body")
+    Armor bodyPartHands = MCM.GetOutfitPart(outfitId, "Hands")
+    Armor bodyPartFeet = MCM.GetOutfitPart(outfitId, "Feet")
 
     string actorName = actorTarget.GetActorBase().GetName()
 
@@ -1111,26 +1082,26 @@ function WearOutfitOnActor(Actor actorTarget, string outfitId, bool unequipAllIt
         actorTarget.UnequipAll()
     endif
 
-    mcm.Debug("WearOutfit", "Test call for this outfit for " + actorName + ", body parts: ["+ bodyPartHead + ", " + bodyPartBody + ", " + bodyPartHands + ", " + bodyPartFeet +"]")
+    MCM.Debug("WearOutfit", "Test call for this outfit for " + actorName + ", body parts: ["+ bodyPartHead + ", " + bodyPartBody + ", " + bodyPartHands + ", " + bodyPartFeet +"]")
 
     if (bodyPartHead != none)
         actorTarget.EquipItem(bodyPartHead, false, abSilent = true)
-        mcm.Debug("WearOutfit", "Equipped " + bodyPartHead.GetName() + " from " + outfitId + "::Head" + " on " + actorName)
+        MCM.Debug("WearOutfit", "Equipped " + bodyPartHead.GetName() + " from " + outfitId + "::Head" + " on " + actorName)
     endif
 
     if (bodyPartBody != none)
         actorTarget.EquipItem(bodyPartBody, false, abSilent = true)
-        mcm.Debug("WearOutfit", "Equipped " + bodyPartBody.GetName() + " from " + outfitId + "::Body" + " on " + actorName)
+        MCM.Debug("WearOutfit", "Equipped " + bodyPartBody.GetName() + " from " + outfitId + "::Body" + " on " + actorName)
     endif
     
     if (bodyPartHands != none)
         actorTarget.EquipItem(bodyPartHands, false, abSilent = true)
-        mcm.Debug("WearOutfit", "Equipped " + bodyPartHands.GetName() + " from " + outfitId + "::Hands" + " on " + actorName)
+        MCM.Debug("WearOutfit", "Equipped " + bodyPartHands.GetName() + " from " + outfitId + "::Hands" + " on " + actorName)
     endif
 
     if (bodyPartFeet != none)
         actorTarget.EquipItem(bodyPartFeet, false, abSilent = true)
-        mcm.Debug("WearOutfit", "Equipped " + bodyPartFeet.GetName() + " from " + outfitId + "::Feet" + " on " + actorName)
+        MCM.Debug("WearOutfit", "Equipped " + bodyPartFeet.GetName() + " from " + outfitId + "::Feet" + " on " + actorName)
     endif
 
 endFunction
@@ -1142,24 +1113,24 @@ function AddOutfit(string outfitId, Armor headClothing, Armor bodyClothing, Armo
     endif
 
     ; Set each outfit part's name in the input fields for the outfit
-    mcm.SetOptionInputValue(outfitId + "::Head", headClothing.GetName())
-    mcm.SetOptionInputValue(outfitId + "::Body", bodyClothing.GetName())
-    mcm.SetOptionInputValue(outfitId + "::Hands", handsClothing.GetName())
-    mcm.SetOptionInputValue(outfitId + "::Feet", feetClothing.GetName())
+    MCM.SetOptionInputValue(outfitId + "::Head", headClothing.GetName())
+    MCM.SetOptionInputValue(outfitId + "::Body", bodyClothing.GetName())
+    MCM.SetOptionInputValue(outfitId + "::Hands", handsClothing.GetName())
+    MCM.SetOptionInputValue(outfitId + "::Feet", feetClothing.GetName())
 
     ; Add each clothing piece to this outfit (store persistently into the outfit list)
-    mcm.AddOutfitPiece(outfitId, "Head", headClothing)
-    mcm.AddOutfitPiece(outfitId, "Body", bodyClothing)
-    mcm.AddOutfitPiece(outfitId, "Hands", handsClothing)
-    mcm.AddOutfitPiece(outfitId, "Feet", feetClothing)
+    MCM.AddOutfitPiece(outfitId, "Head", headClothing)
+    MCM.AddOutfitPiece(outfitId, "Body", bodyClothing)
+    MCM.AddOutfitPiece(outfitId, "Hands", handsClothing)
+    MCM.AddOutfitPiece(outfitId, "Feet", feetClothing)
 
-    mcm.Trace("AddOutfit", "headClothing: " + headClothing + ", bodyClothing: " + bodyClothing + ", handsClothing: " + handsClothing + ", feetClothing: " + feetClothing)
-    mcm.Trace("AddOutfit", "Slot Masks [headClothing: " + headClothing.GetSlotMask() + ", bodyClothing: " + bodyClothing.GetSlotMask() + ", handsClothing: " + handsClothing.GetSlotMask() + ", feetClothing: " + feetClothing.GetSlotMask() + "]")
+    MCM.Trace("AddOutfit", "headClothing: " + headClothing + ", bodyClothing: " + bodyClothing + ", handsClothing: " + handsClothing + ", feetClothing: " + feetClothing)
+    MCM.Trace("AddOutfit", "Slot Masks [headClothing: " + headClothing.GetSlotMask() + ", bodyClothing: " + bodyClothing.GetSlotMask() + ", handsClothing: " + handsClothing.GetSlotMask() + ", feetClothing: " + feetClothing.GetSlotMask() + "]")
 endFunction
 
 Armor function GetOutfitPart(string hold, string bodyPart)
     string holdOutfit = GetClothingOutfit(hold)
-    return mcm.GetOutfitPart("Outfit 6", bodyPart)
+    return MCM.GetOutfitPart("Outfit 6", bodyPart)
 endFunction
 
 ; Player function aliases for param Actor
@@ -1174,16 +1145,16 @@ endFunction
 
 bool function Debug_OutfitMeetsCondition(Faction crimeFaction, string outfitId)
     int bounty = crimeFaction.GetCrimeGold()
-    int outfitMinimumBounty = mcm.GetSliderOptionValue("Clothing", outfitId + "::Minimum Bounty") as int
-    int outfitMaximumBounty = mcm.GetSliderOptionValue("Clothing", outfitId + "::Maximum Bounty") as int
+    int outfitMinimumBounty = MCM.GetSliderOptionValue("Clothing", outfitId + "::Minimum Bounty") as int
+    int outfitMaximumBounty = MCM.GetSliderOptionValue("Clothing", outfitId + "::Maximum Bounty") as int
 
     bool onlyMinBountyRequired = outfitMinimumBounty == outfitMaximumBounty && bounty >= outfitMinimumBounty
     bool isBountyWithinRange = IsWithin(bounty, outfitMinimumBounty, outfitMaximumBounty)
-    bool hasCondition = mcm.GetToggleOptionState("Clothing", outfitId + "::Conditional Outfit") as bool
+    bool hasCondition = MCM.GetToggleOptionState("Clothing", outfitId + "::Conditional Outfit") as bool
     bool meetsCondition = !hasCondition || isBountyWithinRange && !onlyMinBountyRequired || onlyMinBountyRequired
 
-    mcm.Debug("Debug_OutfitMeetsCondition", "Bounty for " + crimeFaction.GetName() + ": " + bounty)
-    mcm.Debug("Debug_OutfitMeetsCondition", outfitId + " [Minimum Bounty: " + outfitMinimumBounty + ", Maximum Bounty: " + outfitMaximumBounty + "] ("+ "isBountyWithinRange: " + isBountyWithinRange + ", hasCondition: "+ hasCondition +") (meets condition: " + meetsCondition + ")")
+    MCM.Debug("Debug_OutfitMeetsCondition", "Bounty for " + crimeFaction.GetName() + ": " + bounty)
+    MCM.Debug("Debug_OutfitMeetsCondition", outfitId + " [Minimum Bounty: " + outfitMinimumBounty + ", Maximum Bounty: " + outfitMaximumBounty + "] ("+ "isBountyWithinRange: " + isBountyWithinRange + ", hasCondition: "+ hasCondition +") (meets condition: " + meetsCondition + ")")
 
     return meetsCondition
 endFunction
@@ -1201,25 +1172,25 @@ endFunction
 
 ;     bool isBountyWithinRange = !isSingleBounty && isBountyRange && IsWithin(bounty, outfitMinimumBounty, outfitMaximumBounty)
 
-;     bool hasCondition = mcm.GetToggleOptionState("Clothing", outfitId + "::Conditional Outfit") as bool
+;     bool hasCondition = MCM.GetToggleOptionState("Clothing", outfitId + "::Conditional Outfit") as bool
 ;     bool meetsCondition = !hasCondition || (isSingleBounty && bounty >= outfitMinimumBounty) || isBountyWithinRange
 
-;     mcm.Debug("Debug_OutfitMeetsCondition", "Bounty for " + crimeFaction.GetName() + ": " + bounty)
-;     mcm.Debug("Debug_OutfitMeetsCondition", outfitId + " [Minimum Bounty: " + outfitMinimumBounty + ", Maximum Bounty: " + outfitMaximumBounty + "] ("+ "isBountyWithinRange: " + isBountyWithinRange + ", hasCondition: "+ hasCondition +") (meets condition: " + meetsCondition + ")")
+;     MCM.Debug("Debug_OutfitMeetsCondition", "Bounty for " + crimeFaction.GetName() + ": " + bounty)
+;     MCM.Debug("Debug_OutfitMeetsCondition", outfitId + " [Minimum Bounty: " + outfitMinimumBounty + ", Maximum Bounty: " + outfitMaximumBounty + "] ("+ "isBountyWithinRange: " + isBountyWithinRange + ", hasCondition: "+ hasCondition +") (meets condition: " + meetsCondition + ")")
 
 ;     return meetsCondition
 ; endFunction
 
 bool function OutfitMeetsCondition(Faction crimeFaction, string outfitId)
-    bool hasCondition = mcm.GetToggleOptionState("Clothing", outfitId + "::Conditional Outfit") as bool
+    bool hasCondition = MCM.GetToggleOptionState("Clothing", outfitId + "::Conditional Outfit") as bool
 
     if (!hasCondition)
         return true
     endif
 
     int bounty = crimeFaction.GetCrimeGold()
-    int outfitMinimumBounty = mcm.GetSliderOptionValue("Clothing", outfitId + "::Minimum Bounty") as int
-    int outfitMaximumBounty = mcm.GetSliderOptionValue("Clothing", outfitId + "::Maximum Bounty") as int
+    int outfitMinimumBounty = MCM.GetSliderOptionValue("Clothing", outfitId + "::Minimum Bounty") as int
+    int outfitMaximumBounty = MCM.GetSliderOptionValue("Clothing", outfitId + "::Maximum Bounty") as int
 
     bool isBountyWithinRange = IsWithin(bounty, outfitMinimumBounty, outfitMaximumBounty)
     bool meetsCondition = !hasCondition || isBountyWithinRange

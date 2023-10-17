@@ -5,7 +5,7 @@ Scriptname RPB_SF_Scene_Stripping02 Extends Scene Hidden
 ;BEGIN FRAGMENT Fragment_9
 Function Fragment_9()
 ;BEGIN CODE
-self.SendModEvent("RPB_ScenePlayingEnd", "RPB_Stripping", 2)
+self.SendModEvent("RPB_ScenePlayingEnd", "RPB_Stripping02", 2)
 ;END CODE
 EndFunction
 ;END FRAGMENT
@@ -13,7 +13,7 @@ EndFunction
 ;BEGIN FRAGMENT Fragment_19
 Function Fragment_19()
 ;BEGIN CODE
-self.SendModEvent("RPB_ScenePlayingStart", "RPB_Stripping", 2)
+self.SendModEvent("RPB_ScenePlayingStart", "RPB_Stripping02", 2)
 ;END CODE
 EndFunction
 ;END FRAGMENT
@@ -21,7 +21,7 @@ EndFunction
 ;BEGIN FRAGMENT Fragment_6
 Function Fragment_6()
 ;BEGIN CODE
-self.SendModEvent("RPB_SceneEnd", "RPB_Stripping")
+self.SendModEvent("RPB_SceneEnd", "RPB_Stripping02")
 ;END CODE
 EndFunction
 ;END FRAGMENT
@@ -29,7 +29,7 @@ EndFunction
 ;BEGIN FRAGMENT Fragment_13
 Function Fragment_13()
 ;BEGIN CODE
-self.SendModEvent("RPB_ScenePlayingStart", "RPB_Stripping", 6)
+self.SendModEvent("RPB_ScenePlayingStart", "RPB_Stripping02", 6)
 ;END CODE
 EndFunction
 ;END FRAGMENT
@@ -37,7 +37,7 @@ EndFunction
 ;BEGIN FRAGMENT Fragment_15
 Function Fragment_15()
 ;BEGIN CODE
-self.SendModEvent("RPB_SceneStart", "RPB_Stripping")
+self.SendModEvent("RPB_SceneStart", "RPB_Stripping02")
 ;END CODE
 EndFunction
 ;END FRAGMENT

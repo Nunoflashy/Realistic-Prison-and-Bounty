@@ -3,17 +3,21 @@ Scriptname RealisticPrisonAndBounty_ConfigAlias extends ReferenceAlias
 import RealisticPrisonAndBounty_Util
 import RealisticPrisonAndBounty_Config
 
-function PerformSetup()
-    RealisticPrisonAndBounty_Config configScript = (self.GetOwningQuest() as RealisticPrisonAndBounty_Config)
+RealisticPrisonAndBounty_Config property Config
+    RealisticPrisonAndBounty_Config function get()
+        return self.GetOwningQuest() as RealisticPrisonAndBounty_Config
+    endFunction
+endProperty
 
-    bool registeredEvents               = configScript.RegisterEvents()
-    bool holdsSetup                     = configScript.SetHolds()
-    bool citiesSetup                    = configScript.SetCities()
-    bool holdLocations                  = configScript.SetHoldLocations()
-    bool jailTeleportReleaseLocations   = configScript.SetJailTeleportReleaseLocations()
-    bool jailPrisonerContainers         = configScript.SetJailPrisonerContainers()
-    bool factionsSetup                  = configScript.SetFactions()
-    bool jailCellsSetup                 = configScript.SetJailCells()
+function PerformSetup()
+    bool registeredEvents               = Config.HandleEvents()
+    bool holdsSetup                     = Config.SetHolds()
+    bool citiesSetup                    = Config.SetCities()
+    bool holdLocations                  = Config.SetHoldLocations()
+    bool jailTeleportReleaseLocations   = Config.SetJailTeleportReleaseLocations()
+    bool jailPrisonerContainers         = Config.SetJailPrisonerContainers()
+    bool factionsSetup                  = Config.SetFactions()
+    bool jailCellsSetup                 = Config.SetJailCells()
 
     Info(\
         "==========================================================\n" + \
@@ -37,9 +41,7 @@ function PerformSetup()
 endFunction
 
 function PerformMaintenance()
-    RealisticPrisonAndBounty_Config configScript = (self.GetOwningQuest() as RealisticPrisonAndBounty_Config)
-
-    bool registeredEvents = configScript.RegisterEvents()
+    bool registeredEvents = Config.HandleEvents()
 
     ;/
         TODO: If at any point a new hold, city, jail cell, jail location etc gets added,
@@ -61,17 +63,17 @@ function PerformMaintenance()
     endif
 
     ; Temporary, RefAliases are lost on Player Load, must find a way to rectify
-    configScript.jail.Prisoner.ForceRefTo(configScript.Player)
-    configScript.NotifyJail("Prisoner: " + configScript.Player + ", Ref: " + configScript.jail.Prisoner)
+    Config.jail.Prisoner.ForceRefTo(Config.Player)
+    Config.NotifyJail("Prisoner: " + Config.Player + ", Ref: " + Config.jail.Prisoner)
 
-    ; configScript.miscVars.CreateStringMap("Options")
-    ; configScript.miscVars.CreateStringMap("Options/Flags")
-    ; configScript.miscVars.AddToContainer("Jail::Cells", "Jail::Cells[Teste]")
-    ; configScript.miscVars.AddToContainer("Options", "Jail::Cells")
-    ; configScript.miscVars.Serialize("Options", "OptionsContainer.txt")
-    ; configScript.miscVars.Serialize("root", "newRootContainer.txt")
+    ; Config.miscVars.CreateStringMap("Options")
+    ; Config.miscVars.CreateStringMap("Options/Flags")
+    ; Config.miscVars.AddToContainer("Jail::Cells", "Jail::Cells[Teste]")
+    ; Config.miscVars.AddToContainer("Options", "Jail::Cells")
+    ; Config.miscVars.Serialize("Options", "OptionsContainer.txt")
+    ; Config.miscVars.Serialize("root", "newRootContainer.txt")
 
-    ; configScript.miscVars.Serialize("root", "rootTest.txt")
+    ; Config.miscVars.Serialize("root", "rootTest.txt")
 endFunction
 
 state Initialization

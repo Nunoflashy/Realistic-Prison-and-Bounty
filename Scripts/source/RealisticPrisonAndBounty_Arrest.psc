@@ -60,14 +60,6 @@ GlobalVariable property RPB_AllowArrestForcegreet
 endProperty
 
 ReferenceAlias property CaptorRef auto
-ReferenceAlias property Player_TravelTo auto
-Scene property Scene_Player_TravelTo auto
-
-ReferenceAlias property EludedGuardAlias
-    ReferenceAlias function get()
-        return (Game.GetFormFromFile(0xB9B9, GetPluginName()) as Quest).GetAliasByName("GuardAlias") as ReferenceAlias
-    endFunction
-endProperty
 
 function RegisterEvents()
 
@@ -108,34 +100,18 @@ function AddBountyGainedWhileJailed(Faction akArrestFaction)
     ClearBounty(akArrestFaction)
 endFunction
 
-function TriggerForcegreetEluding(Actor akEludedGuard)
-    sceneManager.StartEludingArrest(akEludedGuard, config.Player)
-
-    Debug(self, "Arrest::TriggerForcegreetEluding", "Aliases: [ \n" + \
-        "\tEludedGuardAlias: " + EludedGuardAlias +  " (Ref: "+ EludedGuardAlias.GetReference() +")" + "\n" + \
-        "\tGuardRef: " + sceneManager.GuardRef +  " (Ref: "+ sceneManager.GuardRef .GetReference() +")" + "\n" + \
-        "]" \
-    )
-
-    ; EludedGuardAlias.ForceRefTo(akEludedGuard)  ; Set the alias to the guard that has the Forcegreet package
-    ; akEludedGuard.EvaluatePackage()             ; Evaluate the AI packages to force the new package to run
+function SetEludedGuard(Actor akEludedGuard, string asEludeType)
     arrestVars.SetActor("Arrest::Eluded Captor", akEludedGuard)
-    arrestVars.SetString("Arrest::Elude Type", "Dialogue")
-    self.ResetEludeGuardForcegreet()
+    arrestVars.SetString("Arrest::Elude Type", asEludeType)
 endFunction
 
-function ResetEludeGuardForcegreet()
-    ; string eludeType = arrestVars.GetString("Arrest::Elude Type")
-
-    ; if (eludeType == "Dialogue") ; Irrelevant check, but why not
-    ;     ; Clear the eluded guard alias for Dialogue type eluded arrests.
-    ;     EludedGuardAlias.Clear()
-    ; endif
+function TriggerForcegreetEluding(Actor akEludedGuard)
+    self.SetEludedGuard(akEludedGuard, "Dialogue")
+    sceneManager.StartEludingArrest(akEludedGuard, config.Player)
 endFunction
 
 function TriggerPursuitEluding(Actor akEludedGuard)
-    arrestVars.SetActor("Arrest::Eluded Captor", akEludedGuard)
-    arrestVars.SetString("Arrest::Elude Type", "Pursuit")
+    self.SetEludedGuard(akEludedGuard, "Pursuit")
     RegisterForDelayedEvent("Eluding", config.ArrestEludeWarningTime) ; Register for a delayed event on Eluding::OnUpdate()
 endFunction
 
@@ -158,12 +134,26 @@ event OnKeyDown(int keyCode)
     elseif (keyCode == 0x44) ; F10
         ; Actor nearbyGuard = GetNearestActor(config.Player, 7000)
         ; nearbyGuard.GetCrimeFaction().SendPlayerToJail(true, true)
-        Actor nearbyGuard = GetNearestGuard(config.Player, 3500, none)
-        Debug(self, "Arrest::OnKeyDown", "Guard: " + nearbyGuard)
+        ; Actor nearbyGuard = GetNearestGuard(config.Player, 3500, none)
+        ; Debug(self, "Arrest::OnKeyDown", "Guard: " + nearbyGuard)
+        Quest WIRemoveItem01 = Game.GetFormEx(0x2C6AB) as Quest
+
+        WIRemoveItem01.Start()
+
+        Actor solitudeGuard = Game.GetFormEx(0xF684E) as Actor
+        config.Player.PlaceActorAtMe(config.Player.GetBaseObject() as ActorBase, 1, none)
+        Debug(self, "Arrest::OnKeyDown", "F10 Pressed")
         ; sceneManager.StartEscortFromCell(arrestVars.Captor, arrestVars.Arrestee, arrestVars.CellDoor, arrestVars.PrisonerItemsContainer)
         ; Debug(self, "Arrest::OnKeyDown", "F10 Pressed - SceneManager")
 
         ; self.TriggerSurrender()
+    elseif (keyCode == 0x42)
+        Debug(self, "Arrest::OnKeyDown", "F8 Pressed")
+        ; Actor solitudeGuard = Game.GetFormEx(0xF684E) as Actor
+        ; Actor theGuard = config.Player.PlaceActorAtMe(solitudeGuard.GetBaseObject() as ActorBase, 1, none)
+        Actor nearbyGuard = GetNearestGuard(config.Player, 3500, none)
+        ObjectReference arrestee = Game.GetCurrentCrosshairRef()
+        nearbyGuard.SendModEvent("RPB_ArrestBegin", ARREST_TYPE_ESCORT_TO_JAIL, arrestee.GetFormID())
     endif
 endEvent
 
@@ -244,8 +234,6 @@ function SetAsArrested(Actor akArrestee, Faction akFaction)
         config.NotifyArrest("You have been arrested in " + akFaction.GetName())
         Info(self, "Arrest::SetAsArrested", akArrestee.GetBaseObject().GetName() + " has been arrested in " + akFaction.GetName() + " at " + Utility.GetCurrentGameTime())
     endif
-
-    ; GotoState(STATE_ARRESTED)
 endFunction
 
 function AllowArrestForcegreets(bool allow = true)
@@ -304,6 +292,10 @@ function ApplyArrestEludedPenalty(Faction akArrestFaction)
     self.SetEludedFlag(akArrestFaction)
 endFunction
 
+bool function MeetsPursuitEludeRequirements(Actor akEluder)
+    return akEluder.IsRunning() || akEluder.IsSprinting()
+endFunction
+
 function ApplyArrestResistedPenalty(Faction akArrestFaction)
     string hold = akArrestFaction.GetName()
 
@@ -342,44 +334,69 @@ function ApplyArrestDefeatedPenalty(Faction akArrestFaction)
     ; Bounty is applied later at the Arrest stage.
 endFunction
 
-event OnArrestBegin(Actor akArrestee, Actor akCaptor, Faction akCrimeFaction, string arrestType)
-    arrestType = ARREST_TYPE_ESCORT_TO_JAIL
-    Debug(self, "Arrest::OnArrestBegin", "Overriding Arrest Type: ARREST_TYPE_ESCORT_TO_JAIL")
+function SetArrestParams(string asArrestType, Actor akArrestee, Actor akCaptor, Faction akCrimeFaction = none)
+    Faction crimeFaction = akCrimeFaction
 
-    if (!self.ValidateArrestType(arrestType))
-        Error(self, "Arrest::OnArrestBegin", "Arrest Type is invalid, got: " + arrestType + ". (valid options: "+ self.GetValidArrestTypes() +") ")
+    if (akCaptor)
+        crimeFaction = akCaptor.GetCrimeFaction()
+        arrestVars.SetForm("Arrest::Arresting Guard", akCaptor)
+        CaptorRef.ForceRefTo(akCaptor)
+        Debug(self, "Arrest::SetArrestParams", "Arrest is being done through a captor ("+ akCaptor +")")
+    endif
+
+    if (!crimeFaction)
+        Error(self, "Arrest::SetArrestParams", "Both the captor and faction are none, cannot proceed with the arrest! (returning...)")
+        return
+    endif
+
+    arrestVars.SetBool("Arrest::Captured", true)
+    arrestVars.SetForm("Arrest::Arrest Faction", crimeFaction)
+    arrestVars.SetString("Arrest::Hold", crimeFaction.GetName())
+    arrestVars.SetForm("Arrest::Arrestee", akArrestee)
+    arrestVars.SetString("Arrest::Arrest Type", ARREST_TYPE_ESCORT_TO_JAIL)
+
+    Debug(self, "Arrest::SetArrestParams", "[\n" + \ 
+        "\tCaptured: "+ arrestVars.GetBool("Arrest::Captured") +" \n" + \
+        "\tArrest Faction: "+ arrestVars.GetForm("Arrest::Arrest Faction") +"\n" + \
+        "\tHold: "+ arrestVars.GetString("Arrest::Hold") +"\n" + \
+        "\tArrestee: "+ arrestVars.GetForm("Arrest::Arrestee") +"\n" + \
+        "\tArrest Type: "+ arrestVars.GetString("Arrest::Arrest Type") +"\n" + \
+    "]")
+
+endFunction
+
+event OnArrestBegin(Actor akArrestee, Actor akCaptor, Faction akCrimeFaction, string asArrestType)
+    if (!self.ValidateArrestType(asArrestType))
+        Error(self, "Arrest::OnArrestBegin", "Arrest Type is invalid, got: " + asArrestType + ". (valid options: "+ self.GetValidArrestTypes() +") ")
         return
     endif
 
     if (arrestVars.IsArrested)
-        config.NotifyArrest("You are already arrested")
-        Error(self, "Arrest::OnArrestBegin", akArrestee.GetBaseObject().GetName() + " is already arrested, cannot arrest for "+ akCrimeFaction.GetName() +", aborting!")
+        config.NotifyArrest("You are already under arrest")
+        Error(self, "Arrest::OnArrestBegin", akArrestee.GetBaseObject().GetName() + " has already been arrested, cannot arrest for "+ akCrimeFaction.GetName() +", aborting!")
 
         ; Add the bounty gained while in jail and clear the active faction bounty
         self.AddBountyGainedWhileJailed(akCrimeFaction)
         return
     endif
 
-    if (!self.HasLatentBounty() && !self.HasActiveBounty(akCrimeFaction))
+    if (!self.HasLatentBounty() && !self.HasActiveBounty(akCrimeFaction) && akArrestee == config.Player)
         config.NotifyArrest("You can't be arrested in " + akCrimeFaction.GetName() + " since you do not have a bounty in the hold")
         Error(self, "Arrest::OnArrestBegin", akArrestee.GetBaseObject().GetName() + " has no bounty, cannot arrest for "+ akCrimeFaction.GetName() +", aborting!")
         return
     endif
 
-    if (akCaptor)
-        CaptorRef.ForceRefTo(akCaptor)
-        arrestVars.SetForm("Arrest::Arresting Guard", akCaptor)
-        Debug(self, "Arrest::OnArrestBegin", "Arrest is being done through a captor ("+ akCaptor +")")
+    self.SetArrestParams( \
+        asArrestType    = ARREST_TYPE_ESCORT_TO_JAIL, \
+        akArrestee      = akArrestee, \
+        akCaptor        = akCaptor, \
+        akCrimeFaction  = akCrimeFaction \
+    )
+
+    if (akArrestee == config.Player)
+        self.AllowArrestForcegreets(false)
     endif
 
-
-    arrestVars.SetBool("Arrest::Captured", true)
-    arrestVars.SetForm("Arrest::Arrest Faction", akCrimeFaction)
-    arrestVars.SetString("Arrest::Hold", akCrimeFaction.GetName())
-    arrestVars.SetForm("Arrest::Arrestee", akArrestee)
-    arrestVars.SetString("Arrest::Arrest Type", ARREST_TYPE_ESCORT_TO_JAIL)
-
-    self.AllowArrestForcegreets(false)
     self.BeginArrest()
 endEvent
 
@@ -428,14 +445,14 @@ endEvent
         Eluding arrest through Pursuit means that the player is trying to run away from the guards after they say lines such as:
         "In the name of the Jarl, I command you to stop!", or "Come quietly or face the Jarl's justice!"
 /;
-event OnArrestEludeStart(string eludeType, Actor akEludedGuard)
-    Debug(self, "Arrest::OnArrestEludeStart", "This is called - Elude Type: " + eludeType)
+event OnArrestEludeStart(Actor akEludedGuard, string asEludeType)
+    Debug(self, "Arrest::OnArrestEludeStart", "This is called - Elude Type: " + asEludeType)
 
-    if (eludeType == "Dialogue")
+    if (asEludeType == "Dialogue")
         self.TriggerForcegreetEluding(akEludedGuard)
         return
 
-    elseif (eludeType == "Pursuit")
+    elseif (asEludeType == "Pursuit")
         self.TriggerPursuitEluding(akEludedGuard)
         return
     endif
@@ -451,7 +468,7 @@ event OnArrestEludeTriggered(Actor akEludedGuard, string asEludeType)
     
     elseif (asEludeType == "Dialogue")
         sceneManager.ReleaseAlias("Guard") ; Unbind alias running the AI package from eluded guard
-        sceneManager.ReleaseAlias("Detainee") ; Unbind alias from the player
+        sceneManager.ReleaseAlias("Eluder") ; Unbind alias from the player
     endif
 endEvent
 
@@ -770,7 +787,7 @@ state Eluding
         string eludeType = arrestVars.GetString("Arrest::Elude Type")
 
         if (eludeType == "Pursuit")
-            if (config.Player.IsRunning() || config.Player.IsSprinting())
+            if (self.MeetsPursuitEludeRequirements(arrestVars.Arrestee))
                 Actor eludedCaptor = arrestVars.GetActor("Arrest::Eluded Captor")
                 self.OnArrestEludeTriggered(eludedCaptor, eludeType) ; Explicitly call Event
             endif

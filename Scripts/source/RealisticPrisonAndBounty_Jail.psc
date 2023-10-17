@@ -5,7 +5,7 @@ import RealisticPrisonAndBounty_Util
 import RealisticPrisonAndBounty_Config
 import PO3_SKSEFunctions
 
-RealisticPrisonAndBounty_Config property config
+RealisticPrisonAndBounty_Config property Config
     RealisticPrisonAndBounty_Config function get()
         return Game.GetFormFromFile(0x3317, GetPluginName()) as RealisticPrisonAndBounty_Config
     endFunction
@@ -13,25 +13,25 @@ endProperty
 
 RealisticPrisonAndBounty_Arrest property arrest
     RealisticPrisonAndBounty_Arrest function get()
-        return Game.GetFormFromFile(0x3DF8, GetPluginName()) as RealisticPrisonAndBounty_Arrest
+        return config.Arrest
     endFunction
 endProperty
 
-RealisticPrisonAndBounty_ArrestVars property arrestVars
+RealisticPrisonAndBounty_ArrestVars property ArrestVars
     RealisticPrisonAndBounty_ArrestVars function get()
-        return config.arrestVars
+        return config.ArrestVars
     endFunction
 endProperty
 
-RealisticPrisonAndBounty_MiscVars property miscVars
+RealisticPrisonAndBounty_MiscVars property MiscVars
     RealisticPrisonAndBounty_MiscVars function get()
-        return config.miscVars
+        return config.MiscVars
     endFunction
 endProperty
 
-RealisticPrisonAndBounty_SceneManager property sceneManager
+RealisticPrisonAndBounty_SceneManager property SceneManager
     RealisticPrisonAndBounty_SceneManager function get()
-        return config.sceneManager
+        return config.SceneManager
     endFunction
 endProperty
 
@@ -678,10 +678,13 @@ event OnEscortToJailEnd(Actor escortActor, Actor escortedActor)
     Debug(self, "OnEscortToJailEnd", CurrentState + " event invoked")
     ; sceneManager.StartForcedStripping(escortActor, escortedActor)
     Prisoner.SetupPrisonerVars()
-    sceneManager.StartForcedStripping02(escortActor, escortedActor)
+    BindAliasTo(Prisoner, escortedActor)
+    self.SetupJailVars()
+    Prisoner.SetupPrisonerVars()
+    ; sceneManager.StartEscortToCell(escortActor, escortedActor, arrestVars.JailCell, arrestVars.CellDoor)
+    sceneManager.StartStripping_02(escortActor, escortedActor)
     return
-    ; sceneManager.StartStripping(escortActor, escortedActor)
-    ; return
+
     if (Prisoner.ShouldBeFrisked())
         sceneManager.StartFrisking(escortActor, escortedActor)
 
@@ -690,7 +693,7 @@ event OnEscortToJailEnd(Actor escortActor, Actor escortedActor)
         sceneManager.StartForcedStripping02(escortActor, escortedActor)
 
     else
-        sceneManager.StartEscortToCell(escortActor, escortedActor, arrestVars.JailCell, arrestVars.CellDoor)
+        sceneManager.StartEscortToCell_02(escortActor, escortedActor, arrestVars.JailCell, arrestVars.CellDoor)
     endif
     
     ; if (Prisoner.ShouldBeStripped())
@@ -922,33 +925,52 @@ bool function AssignJailCell(Actor akPrisoner)
     ObjectReference randomJailCell = config.GetRandomJailMarker(Hold)
     Debug(self, "AssignJailCell", "jail cell: " + randomJailCell, config.IS_DEBUG)
 
-    if (akPrisoner == config.Player)
-        if (arrestVars.JailCell)
-            Debug(self, "AssignJailCell", "A jail cell has already been assigned to " + akPrisoner + ": " + arrestVars.JailCell, config.IS_DEBUG)
-            return true
-        endif
-
-        arrestVars.SetForm("Jail::Cell", randomJailCell) ; Assign cell to Player
-        arrestVars.SetReference("Jail::Cell Door", GetNearestJailDoorOfType(GetJailBaseDoorID(arrestVars.Hold), randomJailCell, 10000))
-
-        Debug(self, "AssignJailCell", "Set up new Jail Cell for " + akPrisoner + ": " + arrestVars.JailCell, config.IS_DEBUG)
-        return arrestVars.JailCell != none
-
-    else
-        string jailCellId = "["+ akPrisoner.GetFormID() +"]Jail::Cell"
-        Form npcJailCell = arrestVars.GetForm(jailCellId)
-        if (npcJailCell)
-            Debug(self, "AssignJailCell", "A jail cell has already been assigned to " + akPrisoner + ": " + npcJailCell, config.IS_DEBUG)
-            return true
-        endif
-
-        arrestVars.SetForm(jailCellId, randomJailCell) ; Assign cell to NPC
-        Debug(self, "AssignJailCell", "Set up new Jail Cell for " + akPrisoner + ": " + npcJailCell, config.IS_DEBUG)
-        return arrestVars.GetForm(jailCellId) != none
+    if (arrestVars.JailCell && arrestVars.CellDoor.GetFormID() != 0x5E922)
+        Debug(self, "AssignJailCell", "A jail cell has already been assigned to " + akPrisoner + ": " + arrestVars.JailCell, config.IS_DEBUG)
+        return true
     endif
 
-    return false
+    ; arrestVars.SetForm("Jail::Cell", randomJailCell) ; Assign cell to Player
+    arrestVars.SetForm("Jail::Cell", Game.GetFormEx(0x36897)) ; Assign cell to Player
+    ; arrestVars.SetReference("Jail::Cell Door", GetNearestJailDoorOfType(GetJailBaseDoorID(arrestVars.Hold), randomJailCell, 10000))
+    arrestVars.SetReference("Jail::Cell Door", Game.GetFormEx(0x5E921) as ObjectReference)
+
+    Debug(self, "AssignJailCell", "Set up new Jail Cell for " + akPrisoner + ": " + arrestVars.JailCell)
+    return arrestVars.JailCell != none
+
 endFunction
+
+; bool function AssignJailCell(Actor akPrisoner)
+;     ObjectReference randomJailCell = config.GetRandomJailMarker(Hold)
+;     Debug(self, "AssignJailCell", "jail cell: " + randomJailCell, config.IS_DEBUG)
+
+;     if (akPrisoner == config.Player)
+;         if (arrestVars.JailCell)
+;             Debug(self, "AssignJailCell", "A jail cell has already been assigned to " + akPrisoner + ": " + arrestVars.JailCell, config.IS_DEBUG)
+;             return true
+;         endif
+
+;         arrestVars.SetForm("Jail::Cell", randomJailCell) ; Assign cell to Player
+;         arrestVars.SetReference("Jail::Cell Door", GetNearestJailDoorOfType(GetJailBaseDoorID(arrestVars.Hold), randomJailCell, 10000))
+
+;         Debug(self, "AssignJailCell", "Set up new Jail Cell for " + akPrisoner + ": " + arrestVars.JailCell, config.IS_DEBUG)
+;         return arrestVars.JailCell != none
+
+;     else
+;         string jailCellId = "["+ akPrisoner.GetFormID() +"]Jail::Cell"
+;         Form npcJailCell = arrestVars.GetForm(jailCellId)
+;         if (npcJailCell)
+;             Debug(self, "AssignJailCell", "A jail cell has already been assigned to " + akPrisoner + ": " + npcJailCell, config.IS_DEBUG)
+;             return true
+;         endif
+
+;         arrestVars.SetForm(jailCellId, randomJailCell) ; Assign cell to NPC
+;         Debug(self, "AssignJailCell", "Set up new Jail Cell for " + akPrisoner + ": " + npcJailCell, config.IS_DEBUG)
+;         return arrestVars.GetForm(jailCellId) != none
+;     endif
+
+;     return false
+; endFunction
 
 ; ==========================================================
 ;                       Infamy Messages

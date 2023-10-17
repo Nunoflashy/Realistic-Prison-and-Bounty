@@ -3,15 +3,21 @@ Scriptname RealisticPrisonAndBounty_CaptorRef extends ReferenceAlias
 import RealisticPrisonAndBounty_Util
 import RealisticPrisonAndBounty_Config
 
-RealisticPrisonAndBounty_Arrest property arrest
-    RealisticPrisonAndBounty_Arrest function get()
-        return Game.GetFormFromFile(0x3DF8, GetPluginName()) as RealisticPrisonAndBounty_Arrest
+RealisticPrisonAndBounty_Config property Config
+    RealisticPrisonAndBounty_Config function get()
+        return Game.GetFormFromFile(0x3317, GetPluginName()) as RealisticPrisonAndBounty_Config
     endFunction
 endProperty
 
-RealisticPrisonAndBounty_Jail property jail
+RealisticPrisonAndBounty_Arrest property Arrest
+    RealisticPrisonAndBounty_Arrest function get()
+        return Config.Arrest
+    endFunction
+endProperty
+
+RealisticPrisonAndBounty_Jail property Jail
     RealisticPrisonAndBounty_Jail function get()
-        return Game.GetFormFromFile(0x3DF8, GetPluginName()) as RealisticPrisonAndBounty_Jail
+        return Config.Jail
     endFunction
 endProperty
 

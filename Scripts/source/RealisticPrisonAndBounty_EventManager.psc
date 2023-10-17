@@ -32,7 +32,6 @@ function RegisterEvents()
     RegisterForModEvent("RPB_ArrestBegin", "OnArrestBegin")             ; Start the Arrest
     RegisterForModEvent("RPB_ResistArrest", "OnArrestResist")           ; Resisting Arrest
     RegisterForModEvent("RPB_EludingArrest", "OnArrestEludeStart")      ; Eluding Arrest (Start)
-    RegisterForModEvent("RPB_EludingArrestEnd", "OnArrestEludeEnd")     ; Eluding Arrest through Dialogue (End)
     RegisterForModEvent("RPB_ArrestDefeated", "OnArrestDefeat")         ; Happens after the player is defeated through DA
     ; RegisterForModEvent("RPB_ArrestWaiting", "OnArrestWait")            ; Wait the response from player during Arrest
     ; RegisterForModEvent("RPB_ArrestWaitingStop", "OnArrestWaitStop")    ; Something happened to prevent OnArrestWait, cancel the state
@@ -137,28 +136,15 @@ event OnArrestEludeStart(string eventName, string eludeType, float unusedFlt, Fo
         return
     endif
 
-    if ((!config.Player.IsRunning() || !config.Player.IsSprinting()) && eludeType == "Pursuit")
+    if (!arrest.MeetsPursuitEludeRequirements(config.Player) && eludeType == "Pursuit")
         ; Player is not running, therefore this doesn't count as eluding arrest if we're processing Pursuit eludes.
         ; This verification is in place to avoid triggering Eluding when going to jail / speaking to the guards,
         ; because those dialogue lines do trigger this since the script is attached to them.
         return
     endif
 
-    arrest.OnArrestEludeStart(eludeType, eludedGuard)
+    arrest.OnArrestEludeStart(eludedGuard, eludeType)
 endEvent
-
-; event OnArrestEludeEnd(string eventName, string unusedStr, float unusedFlt, Form sender)
-;     Debug(self, "EventManager::OnArrestEludeEnd", "This is called")
-
-;     Actor eludedGuard = (sender as Actor)
-
-;     if (!eludedGuard)
-;         Error(self, "EventManager::OnArrestEludeStart", "sender is not an Actor, failed check! [sender: "+ sender +"]")
-;         return
-;     endif
-
-;     arrest.OnArrestEludeEnd(eludedGuard)
-; endEvent
 
 
 ; ==========================================================

@@ -10,45 +10,45 @@ Actor property this
     endFunction
 endProperty
 
-RealisticPrisonAndBounty_Config property config
+RealisticPrisonAndBounty_Config property Config
     RealisticPrisonAndBounty_Config function get()
         return Game.GetFormFromFile(0x3317, GetPluginName()) as RealisticPrisonAndBounty_Config
     endFunction
 endProperty
 
-RealisticPrisonAndBounty_ArrestVars property arrestVars
+RealisticPrisonAndBounty_ArrestVars property ArrestVars
     RealisticPrisonAndBounty_ArrestVars function get()
-        return config.arrestVars
+        return Config.ArrestVars
     endFunction
 endProperty
 
-RealisticPrisonAndBounty_ActorVars property actorVars
+RealisticPrisonAndBounty_ActorVars property ActorVars
     RealisticPrisonAndBounty_ActorVars function get()
-        return config.actorVars
+        return Config.ActorVars
     endFunction
 endProperty
 
-RealisticPrisonAndBounty_MiscVars property miscVars
+RealisticPrisonAndBounty_MiscVars property MiscVars
     RealisticPrisonAndBounty_MiscVars function get()
-        return config.miscVars
+        return Config.MiscVars
     endFunction
 endProperty
 
-RealisticPrisonAndBounty_BodySearcher property bodySearcher
+RealisticPrisonAndBounty_BodySearcher property BodySearcher
     RealisticPrisonAndBounty_BodySearcher function get()
-        return config.mainAPI as RealisticPrisonAndBounty_BodySearcher
+        return Config.mainAPI as RealisticPrisonAndBounty_BodySearcher
     endFunction
 endProperty
 
-RealisticPrisonAndBounty_Clothing property prisonerDresser
+RealisticPrisonAndBounty_Clothing property PrisonerDresser
     RealisticPrisonAndBounty_Clothing function get()
-        return config.mainAPI as RealisticPrisonAndBounty_Clothing
+        return Config.mainAPI as RealisticPrisonAndBounty_Clothing
     endFunction
 endProperty
 
-RealisticPrisonAndBounty_Jail property jail
+RealisticPrisonAndBounty_Jail property Jail
     RealisticPrisonAndBounty_Jail function get()
-        return config.mainAPI as RealisticPrisonAndBounty_Jail
+        return Config.Jail
     endFunction
 endProperty
 
@@ -304,7 +304,8 @@ function SetupPrisonerVars()
     arrestVars.SetFloat("Jail::Sentence", (BountyNonViolent + (floor(BountyViolent * (100 / arrestVars.BountyExchange)))) / arrestVars.BountyToSentence)
     arrestVars.SetFloat("Jail::Time of Imprisonment", CurrentTime)
     arrestVars.SetForm("Jail::Prison Location", this.GetCurrentLocation()) ; Since we are in the prison, this is the prison location
-    arrestVars.SetForm("Jail::Cell Door", GetNearestJailDoorOfType(GetJailBaseDoorID(Hold), JailCell, 10000))
+    ; arrestVars.SetForm("Jail::Cell Door", GetNearestJailDoorOfType(GetJailBaseDoorID(Hold), JailCell, 10000))
+    arrestVars.SetReference("Jail::Cell Door", Game.GetFormEx(0x5E921) as ObjectReference)
     arrestVars.SetInt("Jail::Cell Door Old Lock Level", CellDoor.GetLockLevel())
     arrestVars.SetForm("Jail::Teleport Release Location", config.GetJailTeleportReleaseMarker(Hold))
     arrestVars.SetForm("Jail::Prisoner Items Container", config.GetJailPrisonerItemsContainer(Hold))

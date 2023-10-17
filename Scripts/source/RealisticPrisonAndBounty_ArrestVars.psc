@@ -4,7 +4,7 @@ import Math
 import RealisticPrisonAndBounty_Util
 import RealisticPrisonAndBounty_Config
 
-RealisticPrisonAndBounty_Config property config
+RealisticPrisonAndBounty_Config property Config
     RealisticPrisonAndBounty_Config function get()
         return Game.GetFormFromFile(0x3317, GetPluginName()) as RealisticPrisonAndBounty_Config
     endFunction

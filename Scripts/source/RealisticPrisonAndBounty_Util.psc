@@ -900,12 +900,24 @@ endFunction
 function RetainAI(bool condition = true) global
     if (condition)
         Game.SetPlayerAIDriven(true)
+        Game.DisablePlayerControls( \
+            abMovement = true, \
+            abFighting = true, \
+            abCamSwitch = false, \
+            abLooking = false, \
+            abSneaking = true, \
+            abMenu = true, \
+            abActivate = true, \
+            abJournalTabs = false, \
+            aiDisablePOVType = 0 \
+        )
     endif
 endFunction
 
 function ReleaseAI(bool condition = true) global
     if (condition)
         Game.SetPlayerAIDriven(false)
+        Game.EnablePlayerControls()
     endif
 endFunction
 
