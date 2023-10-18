@@ -24,6 +24,41 @@ endProperty
 Idle property LockpickingIdle auto
 
 ; ==========================================================
+;                   Scene Phase Overriding
+; ==========================================================
+
+GlobalVariable property RPB_SceneBlockNormalExecution
+    GlobalVariable function get()
+        return GetFormFromMod(0x14C3A) as GlobalVariable
+    endFunction
+endProperty
+
+GlobalVariable property RPB_SceneStartAtPhase
+    GlobalVariable function get()
+        return GetFormFromMod(0x14C39) as GlobalVariable
+    endFunction
+endProperty
+
+GlobalVariable property RPB_SceneCurrentPhase
+    GlobalVariable function get()
+        return GetFormFromMod(0x14C3B) as GlobalVariable
+    endFunction
+endProperty
+
+function StartSceneAtPhase(int phase)
+    RPB_SceneBlockNormalExecution.SetValueInt(1)
+    RPB_SceneStartAtPhase.SetValueInt(phase)
+endFunction
+
+function SetSceneAtPhase(int phase)
+    RPB_SceneCurrentPhase.SetValueInt(phase)
+endFunction
+
+function ResetSceneOverride()
+    RPB_SceneBlockNormalExecution.SetValueInt(0)
+    RPB_SceneStartAtPhase.SetValueInt(0)
+endFunction
+; ==========================================================
 ;                           Scenes
 ; ==========================================================
 Scene property UnlockCell auto
@@ -50,6 +85,12 @@ endProperty
 Scene property ArrestStart04
     Scene function get()
         return Game.GetFormFromFile(0x13663, GetPluginName()) as Scene
+    endFunction
+endProperty
+
+Scene property ArrestStartPrison01
+    Scene function get()
+        return Game.GetFormFromFile(0x14C14, GetPluginName()) as Scene
     endFunction
 endProperty
 
@@ -148,8 +189,8 @@ endProperty
 ; ==========================================================
 
 ; Type of Event during OnScenePlaying
-int property SCENE_START    = 0 autoreadonly
-int property SCENE_END      = 1 autoreadonly
+int property PHASE_START    = 0 autoreadonly
+int property PHASE_END      = 1 autoreadonly
 
 ; ==========================================================
 ;                         Scene Names
@@ -159,6 +200,7 @@ string property SCENE_ARREST_START_01               = "RPB_ArrestStart" autoread
 string property SCENE_ARREST_START_02               = "RPB_ArrestStart02" autoreadonly
 string property SCENE_ARREST_START_03               = "RPB_ArrestStart03" autoreadonly
 string property SCENE_ARREST_START_04               = "RPB_ArrestStart04" autoreadonly
+string property SCENE_ARREST_START_PRISON_01        = "RPB_ArrestStartPrison01" autoreadonly
 string property SCENE_GENERIC_ESCORT                = "RPB_GenericEscort" autoreadonly
 string property SCENE_ESCORT_FROM_CELL              = "RPB_EscortFromCell" autoreadonly
 string property SCENE_ESCORT_TO_JAIL                = "RPB_EscortToJail" autoreadonly
@@ -309,6 +351,11 @@ ObjectReference[] function GetSceneParameters(string sceneName)
         params[0] = self.GetCaptor().GetActorReference()
         params[1] = self.GetArrestee().GetActorReference()
 
+    elseif (sceneName == SCENE_ARREST_START_PRISON_01)
+        params[0] = self.GetEscort().GetActorReference()
+        params[1] = self.GetEscortee().GetActorReference()
+
+
     elseif (sceneName == SCENE_ESCORT_TO_CELL)
         ;/
             self.AddEscort(1)
@@ -428,6 +475,8 @@ endFunction
 event OnSceneStart(string name, Scene sender)
     ObjectReference[] params = self.GetSceneParameters(name)
 
+    self.SetSceneAtPhase(1)
+
     if (name == SCENE_ARREST_START_01)
         Actor escort   = params[0] as Actor
         Actor escortee = params[1] as Actor
@@ -449,10 +498,11 @@ event OnSceneStart(string name, Scene sender)
         RetainAI(escortee == config.Player)
 
     elseif (name == SCENE_ARREST_START_04)
+    elseif (name == SCENE_ARREST_START_PRISON_01)
         Actor captor   = params[0] as Actor
         Actor arrestee = params[1] as Actor
 
-        RetainAI(arrestee == config.Player)
+        RetainAI(arrestee == Config.Player)
 
     elseif (name == SCENE_ESCORT_TO_CELL)
         Actor escort   = params[0] as Actor
@@ -557,29 +607,31 @@ event OnSceneStart(string name, Scene sender)
     Debug(self, "SceneManager::OnSceneStart", self.GetSceneParametersDebugInfo(sender, name, params))
 endEvent
 
-event OnScenePlaying(string name, int scenePart, int phase, Scene sender)
+event OnScenePlaying(string name, int phaseEvent, int phase, Scene sender)
     ObjectReference[] params = self.GetSceneParameters(name)
 
-    Debug(self, "SceneManager::OnScenePlaying", string_if (scenePart == SCENE_START, "(Start) Playing", "(End) Played") + " Phase " + phase + " of " + name)
+    Debug(self, "SceneManager::OnScenePlaying", string_if (phaseEvent == PHASE_START, "(Start) Playing", "(End) Played") + " Phase " + phase + " of " + name)
     
+    self.SetSceneAtPhase(phase)
+
     if (name == SCENE_ARREST_START_01)
         Actor escort   = params[0] as Actor
         Actor escortee = params[1] as Actor
 
-        if (scenePart == SCENE_START)
-        elseif (scenePart == SCENE_END)
+        if (phaseEvent == PHASE_START)
+        elseif (phaseEvent == PHASE_END)
         endif
 
     elseif (name == SCENE_ARREST_START_02)
         Actor escort   = params[0] as Actor
         Actor escortee = params[1] as Actor
 
-        if (scenePart == SCENE_START)
+        if (phaseEvent == PHASE_START)
             if (phase == 3)
                 arrest.OnArresting(escort, escortee)
             endif
 
-        elseif (scenePart == SCENE_END)
+        elseif (phaseEvent == PHASE_END)
             if (phase == 1)
                 OrientRelative(escortee, escort)
                 Debug.SendAnimationEvent(escortee, "ZazAPC001")
@@ -590,12 +642,12 @@ event OnScenePlaying(string name, int scenePart, int phase, Scene sender)
         Actor escort   = params[0] as Actor
         Actor escortee = params[1] as Actor
 
-        if (scenePart == SCENE_START)
+        if (phaseEvent == PHASE_START)
             if (phase == 4)
                 arrest.OnArresting(escort, escortee)
             endif
 
-        elseif (scenePart == SCENE_END)
+        elseif (phaseEvent == PHASE_END)
             if (phase == 1)
                 ; OrientRelative(escortee, escort)
                 Debug.SendAnimationEvent(escortee, "ZazAPC018")
@@ -606,14 +658,31 @@ event OnScenePlaying(string name, int scenePart, int phase, Scene sender)
         Actor captor   = params[0] as Actor
         Actor arrestee = params[1] as Actor
 
-        if (scenePart == SCENE_START)
+        if (phaseEvent == PHASE_START)
 
-        elseif (scenePart == SCENE_END)
+        elseif (phaseEvent == PHASE_END)
             if (phase == 1)
                 ; Make arrestee lie down
                 Debug.SendAnimationEvent(arrestee, "ZazAPC011")
             elseif (phase == 6)
                 ; Make arrestee get up (by restraining the animation is canceled)
+                arrest.OnArresting(captor, arrestee)
+            endif
+        endif
+
+    elseif (name == SCENE_ARREST_START_PRISON_01)
+        Actor captor   = params[0] as Actor
+        Actor arrestee = params[1] as Actor
+
+        if (phaseEvent == PHASE_START)
+
+        elseif (phaseEvent == PHASE_END)
+            if (phase == 1)
+                ; Make arrestee put their hands behind the back
+                OrientRelative(arrestee, captor)
+                Debug.SendAnimationEvent(arrestee, "ZazAPC001")
+            elseif (phase == 2)
+                ; Restrain
                 arrest.OnArresting(captor, arrestee)
             endif
         endif
@@ -624,7 +693,7 @@ event OnScenePlaying(string name, int scenePart, int phase, Scene sender)
         ObjectReference jailCell  = params[4]
         ObjectReference cellDoor  = params[5]
 
-        if (scenePart == SCENE_START)
+        if (phaseEvent == PHASE_START)
             if (phase == 4)
                 debug.notification("Phase 4 played for " + name)
 
@@ -635,11 +704,14 @@ event OnScenePlaying(string name, int scenePart, int phase, Scene sender)
                 Debug.SendAnimationEvent(guard, "IdleLockpick")
             endif
             
-        elseif (scenePart == SCENE_END)
+        elseif (phaseEvent == PHASE_END)
             if (phase == 4)
                 Debug.SendAnimationEvent(guard, "IdleLockpick")
                 cellDoor.Lock(false)
                 cellDoor.SetOpen(true)
+
+            elseif (phase == 5)
+                ; Jail.OnEscortToCellDoorOpen(guard, prisoner)
 
             elseif (phase == 6)
 
@@ -652,8 +724,8 @@ event OnScenePlaying(string name, int scenePart, int phase, Scene sender)
         ObjectReference jailCell    = params[2]
         ObjectReference cellDoor    = params[3]
 
-        if (scenePart == SCENE_START)
-        elseif(scenePart == SCENE_END)
+        if (phaseEvent == PHASE_START)
+        elseif(phaseEvent == PHASE_END)
             if (phase == 1)
                 ; Make prisoner put their hands behind their back
                 OrientRelative(prisoner, guard, afRotZ = 180)
@@ -673,9 +745,9 @@ event OnScenePlaying(string name, int scenePart, int phase, Scene sender)
         Actor guard     = params[0] as Actor
         Actor prisoner  = params[1] as Actor
 
-        if (scenePart == SCENE_START)
+        if (phaseEvent == PHASE_START)
             
-        elseif (scenePart == SCENE_END)
+        elseif (phaseEvent == PHASE_END)
             if (phase == 1)
                 RetainAI(prisoner == config.Player)
             endif
@@ -684,8 +756,8 @@ event OnScenePlaying(string name, int scenePart, int phase, Scene sender)
 
     elseif (name == SCENE_ESCORT_TO_JAIL)
 
-        if (scenePart == SCENE_START)
-        elseif (scenePart == SCENE_END)
+        if (phaseEvent == PHASE_START)
+        elseif (phaseEvent == PHASE_END)
         endif
 
     elseif (name == SCENE_STRIPPING)
@@ -700,7 +772,7 @@ event OnScenePlaying(string name, int scenePart, int phase, Scene sender)
         Actor stripperGuard     = params[0] as Actor
         Actor strippedPrisoner  = params[1] as Actor
 
-        if (scenePart == SCENE_START)
+        if (phaseEvent == PHASE_START)
             if (phase == 2)
                 debug.notification("Played Phase " + phase + " of " + name)
                 int i = 0
@@ -717,7 +789,7 @@ event OnScenePlaying(string name, int scenePart, int phase, Scene sender)
                 jail.Prisoner.RemoveUnderwear()
             endif
             
-        elseif (scenePart == SCENE_END)
+        elseif (phaseEvent == PHASE_END)
             ; if (phase == 2)
             ;     debug.notification("Played Phase " + phase + " of " + name)
             ;     int i = 0
@@ -735,9 +807,9 @@ event OnScenePlaying(string name, int scenePart, int phase, Scene sender)
         Actor stripperGuard     = params[0] as Actor
         Actor strippedPrisoner  = params[1] as Actor
 
-        if (scenePart == SCENE_START)
+        if (phaseEvent == PHASE_START)
 
-        elseif (scenePart == SCENE_END)
+        elseif (phaseEvent == PHASE_END)
             if (phase == 1)
                 ; Make Prisoner lie down
                 OrientRelative(strippedPrisoner, stripperGuard, afRotZ = 180)
@@ -761,20 +833,20 @@ event OnScenePlaying(string name, int scenePart, int phase, Scene sender)
 
     elseif (name == SCENE_FRISKING)
 
-        if (scenePart == SCENE_START)
-        elseif (scenePart == SCENE_END)
+        if (phaseEvent == PHASE_START)
+        elseif (phaseEvent == PHASE_END)
         endif
 
     elseif (name == SCENE_GIVE_CLOTHING)
 
-        if (scenePart == SCENE_START)
-        elseif (scenePart == SCENE_END)
+        if (phaseEvent == PHASE_START)
+        elseif (phaseEvent == PHASE_END)
         endif
 
     elseif (name == SCENE_UNLOCK_CELL)
 
-        if (scenePart == SCENE_START)
-        elseif (scenePart == SCENE_END)
+        if (phaseEvent == PHASE_START)
+        elseif (phaseEvent == PHASE_END)
         endif
 
 
@@ -782,9 +854,9 @@ event OnScenePlaying(string name, int scenePart, int phase, Scene sender)
         Actor stripperGuard     = params[0] as Actor
         Actor strippedPrisoner  = params[1] as Actor
 
-        if (scenePart == SCENE_START)
+        if (phaseEvent == PHASE_START)
             
-        elseif (scenePart == SCENE_END)
+        elseif (phaseEvent == PHASE_END)
             if (phase == 0)
                 
             endif
@@ -825,6 +897,12 @@ event OnSceneEnd(string name, Scene sender)
         arrest.OnArrestStart(escort, escortee)
 
     elseif (name == SCENE_ARREST_START_04)
+        Actor captor   = params[0] as Actor
+        Actor arrestee = params[1] as Actor
+
+        arrest.OnArrestStart(captor, arrestee)
+
+    elseif (name == SCENE_ARREST_START_PRISON_01)
         Actor captor   = params[0] as Actor
         Actor arrestee = params[1] as Actor
 
@@ -947,6 +1025,8 @@ event OnSceneEnd(string name, Scene sender)
         Actor eluder    = params[1] as Actor
 
     endif
+
+    self.ResetSceneOverride()
 
     Debug(self, "SceneManager::OnSceneEnd", self.GetSceneParametersDebugInfo(sender, name, params))
 endEvent
@@ -1175,6 +1255,16 @@ function StartArrestStart04(Actor akGuard, Actor akPrisoner)
     BindAliasTo(self.GetArrestee(), akPrisoner)
 
     ArrestStart04.Start()
+endFunction
+
+function StartArrestStartPrison_01(Actor akGuard, Actor akPrisoner)
+    ; Bind the captor
+    BindAliasTo(self.GetEscort(), akGuard)
+
+    ; Bind the Arrestee, who's getting arrested
+    BindAliasTo(self.GetEscortee(), akPrisoner)
+
+    ArrestStartPrison01.Start()
 endFunction
 
 function StartNoClothing(Actor akGuard, Actor akPrisoner)

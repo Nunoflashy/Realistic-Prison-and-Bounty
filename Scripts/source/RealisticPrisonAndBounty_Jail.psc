@@ -618,6 +618,7 @@ endEvent
 event OnStripBegin(Actor stripSearchPerformer, Actor actorToStrip)
     ; Happens when the actor is about to be stripped
     Debug(self, "OnStripBegin", CurrentState + " event invoked")
+    actorToStrip.UnequipItemSlot(59)
 endEvent
 
 event OnStripping(Actor stripSearchPerformer, Actor actorToStrip)
@@ -695,26 +696,33 @@ event OnEscortToJailEnd(Actor escortActor, Actor escortedActor)
     else
         sceneManager.StartEscortToCell_02(escortActor, escortedActor, arrestVars.JailCell, arrestVars.CellDoor)
     endif
-    
-    ; if (Prisoner.ShouldBeStripped())
-    ;     sceneManager.StartStripping(escortActor, escortedActor)
-    ; endif
 endEvent
 
 event OnEscortToCellBegin(Actor escortActor, Actor escortedActor)
     ; Happens when the actor is being escorted to their cell
     Debug(self, "Jail::OnEscortToCellBegin", CurrentState + " event invoked")
     Debug(self, "Jail::OnEscortToCellBegin", "Escorted Actor: " + escortedActor)
+    Arrest.RestrainArrestee(escortedActor)
 endEvent
 
 event OnEscortToCellEnd(Actor escortActor, Actor escortedActor)
     ; Happens when the actor has been escorted to their cell
     Debug(self, "OnEscortToCellEnd", CurrentState + " event invoked")
     debug.notification("OnEscortToCellEnd: Called from within the Jail Script")
+    ; if (Prisoner.ShouldBeStripped())
+    ;     SceneManager.StartStripping_02(escortActor, escortedActor)
+    ; endif
+    
     if (Prisoner.ShouldBeClothed())
         sceneManager.StartGiveClothing(escortActor, escortedActor)
     endif
     SendModEvent("RPB_JailBegin") ; Start the imprisonment
+endEvent
+
+event OnEscortToCellDoorOpen(Actor akGuard, Actor akPrisoner)
+    ; if (Prisoner.ShouldBeStripped())
+        SceneManager.StartStripping_02(akGuard, akPrisoner)
+    ; endif
 endEvent
 
 event OnEscortFromCellBegin(Actor escortActor, Actor escortedActor, ObjectReference destination)

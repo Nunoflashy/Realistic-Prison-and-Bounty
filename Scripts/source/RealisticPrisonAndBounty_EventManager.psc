@@ -3,27 +3,27 @@ scriptname RealisticPrisonAndBounty_EventManager extends Quest
 import RealisticPrisonAndBounty_Config
 import RealisticPrisonAndBounty_Util
 
-RealisticPrisonAndBounty_Config property config
+RealisticPrisonAndBounty_Config property Config
     RealisticPrisonAndBounty_Config function get()
         return Game.GetFormFromFile(0x3317, GetPluginName()) as RealisticPrisonAndBounty_Config
     endFunction
 endProperty
 
-RealisticPrisonAndBounty_Arrest property arrest
+RealisticPrisonAndBounty_Arrest property Arrest
     RealisticPrisonAndBounty_Arrest function get()
-        return config.arrest
+        return Config.Arrest
     endFunction
 endProperty
 
-RealisticPrisonAndBounty_Jail property jail
+RealisticPrisonAndBounty_Jail property Jail
     RealisticPrisonAndBounty_Jail function get()
-        return config.jail
+        return Config.Jail
     endFunction
 endProperty
 
-RealisticPrisonAndBounty_SceneManager property sceneManager
+RealisticPrisonAndBounty_SceneManager property SceneManager
     RealisticPrisonAndBounty_SceneManager function get()
-        return config.sceneManager
+        return Config.SceneManager
     endFunction
 endProperty
 
@@ -33,8 +33,9 @@ function RegisterEvents()
     RegisterForModEvent("RPB_ResistArrest", "OnArrestResist")           ; Resisting Arrest
     RegisterForModEvent("RPB_EludingArrest", "OnArrestEludeStart")      ; Eluding Arrest (Start)
     RegisterForModEvent("RPB_ArrestDefeated", "OnArrestDefeat")         ; Happens after the player is defeated through DA
-    ; RegisterForModEvent("RPB_ArrestWaiting", "OnArrestWait")            ; Wait the response from player during Arrest
-    ; RegisterForModEvent("RPB_ArrestWaitingStop", "OnArrestWaitStop")    ; Something happened to prevent OnArrestWait, cancel the state
+    RegisterForModEvent("RPB_CombatSpared", "OnCombatSpared")           ; Happens when the player is spared after yielding
+    ; RegisterForModEvent("RPB_ArrestWaiting", "OnArrestWait")          ; Wait the response from player during Arrest
+    ; RegisterForModEvent("RPB_ArrestWaitingStop", "OnArrestWaitStop")  ; Something happened to prevent OnArrestWait, cancel the state
 
     ; Jail Event Handlers
     RegisterForModEvent("RPB_JailBegin", "OnJailBegin")
@@ -72,7 +73,7 @@ event OnArrestBegin(string eventName, string arrestType, float arresteeIdFlt, Fo
         return
     endif
 
-    arrest.OnArrestBegin(arrestee, captor, crimeFaction, arrestType)
+    Arrest.OnArrestBegin(arrestee, captor, crimeFaction, arrestType)
 endEvent
 
 event OnArrestResist(string eventName, string unusedStr, float arrestResisterIdFlt, Form sender)
@@ -91,7 +92,7 @@ event OnArrestResist(string eventName, string unusedStr, float arrestResisterIdF
         return
     endif
 
-    arrest.OnArrestResist(arrestResister, guard, crimeFaction)
+    Arrest.OnArrestResist(arrestResister, guard, crimeFaction)
 endEvent
 
 event OnArrestDefeat(string eventName, string unusedStr, float unusedFlt, Form sender)
@@ -103,7 +104,7 @@ event OnArrestDefeat(string eventName, string unusedStr, float unusedFlt, Form s
         return
     endif
 
-    arrest.OnArrestDefeat(attacker)
+    Arrest.OnArrestDefeat(attacker)
 endEvent
 
 ;/
@@ -136,14 +137,34 @@ event OnArrestEludeStart(string eventName, string eludeType, float unusedFlt, Fo
         return
     endif
 
-    if (!arrest.MeetsPursuitEludeRequirements(config.Player) && eludeType == "Pursuit")
+    if (!Arrest.MeetsPursuitEludeRequirements(config.Player) && eludeType == "Pursuit")
         ; Player is not running, therefore this doesn't count as eluding arrest if we're processing Pursuit eludes.
         ; This verification is in place to avoid triggering Eluding when going to jail / speaking to the guards,
         ; because those dialogue lines do trigger this since the script is attached to them.
         return
     endif
 
-    arrest.OnArrestEludeStart(eludedGuard, eludeType)
+    Arrest.OnArrestEludeStart(eludedGuard, eludeType)
+endEvent
+
+event OnCombatSpared(string eventName, string unusedStr, float unusedFlt, Form sender)
+    Debug(self, "EventManager::OnCombatSpared", "This is called")
+
+    Actor sparerGuard = (sender as Actor)
+
+    if (!sparerGuard)
+        Error(self, "EventManager::OnCombatSpared", "sender is not an Actor, failed check! [sender: "+ sender +"]")
+        return
+    endif
+
+    if (!sparerGuard.IsGuard())
+        Info(self, "EventManager::OnCombatSpared", "Actor is not a guard, the event will not proceed")
+        return
+    endif
+
+    Actor sparedToBeArrestedActor = sparerGuard.GetDialogueTarget()
+
+    Arrest.OnCombatSpared(sparerGuard, sparedToBeArrestedActor)
 endEvent
 
 
@@ -152,7 +173,7 @@ endEvent
 ; ==========================================================
 
 event OnJailBegin(string eventName, string strArg, float numArg, Form sender)
-    jail.OnJailBegin()
+    Jail.OnJailBegin()
 endEvent
 
 ; ==========================================================
@@ -170,30 +191,30 @@ endEvent
 
 event OnScenePlayingStart(string eventName, string sceneName, float scenePhaseFlt, Form sender)
     if (sceneName == "" || !(sender as Scene))
-        Error(self, "EventManager::OnScenePlayingStart", "[" + sceneName + ": SCENE_START] There's either no Scene Name, or the event sender is not a Scene, returning!")
+        Error(self, "EventManager::OnScenePlayingStart", "[" + sceneName + ": PHASE_START] There's either no Scene Name, or the event sender is not a Scene, returning!")
         return
     endif
 
     if ((scenePhaseFlt as int) < 1 || !scenePhaseFlt)
-        Error(self, "EventManager::OnScenePlayingStart", "[" + sceneName + ": SCENE_START] There's no passed in Scene Phase as a parameter, returning!");
+        Error(self, "EventManager::OnScenePlayingStart", "[" + sceneName + ": PHASE_START] There's no passed in Scene Phase as a parameter, returning!");
         return
     endif
     
-    sceneManager.OnScenePlaying(sceneName, sceneManager.SCENE_START, (scenePhaseFlt as int), (sender as Scene))
+    SceneManager.OnScenePlaying(sceneName, SceneManager.PHASE_START, (scenePhaseFlt as int), (sender as Scene))
 endEvent
 
 event OnScenePlayingEnd(string eventName, string sceneName, float scenePhaseFlt, Form sender)
     if (sceneName == "" || !(sender as Scene))
-        Error(self, "EventManager::OnScenePlayingEnd", "[" + sceneName + ": SCENE_END] There's either no Scene Name, or the event sender is not a Scene, returning!")
+        Error(self, "EventManager::OnScenePlayingEnd", "[" + sceneName + ": PHASE_END] There's either no Scene Name, or the event sender is not a Scene, returning!")
         return
     endif
 
     if ((scenePhaseFlt as int) < 1 || !scenePhaseFlt)
-        Error(self, "EventManager::OnScenePlayingEnd", "[" + sceneName + ": SCENE_END] There's no passed in Scene Phase as a parameter, returning!");
+        Error(self, "EventManager::OnScenePlayingEnd", "[" + sceneName + ": PHASE_END] There's no passed in Scene Phase as a parameter, returning!");
         return
     endif
     
-    sceneManager.OnScenePlaying(sceneName, sceneManager.SCENE_END, (scenePhaseFlt as int), (sender as Scene))
+    SceneManager.OnScenePlaying(sceneName, SceneManager.PHASE_END, (scenePhaseFlt as int), (sender as Scene))
 endEvent
 
 event OnSceneEnd(string eventName, string sceneName, float unusedFlt, Form sender)
@@ -202,7 +223,7 @@ event OnSceneEnd(string eventName, string sceneName, float unusedFlt, Form sende
         return
     endif
 
-    sceneManager.OnSceneEnd(sceneName, (sender as Scene))
+    SceneManager.OnSceneEnd(sceneName, (sender as Scene))
 endEvent
 
 ; ==========================================================
@@ -227,13 +248,13 @@ endEvent
 
 ; AIPackageManager.psc
 event AIPackageManager_OnPackageStart(string packageName, ObjectReference[] data, Form sender)
-    if (packageName == "RPB_DGForcegreetPackage")
-        Actor speaker = (sender as Actor)
-        arrest.ApplyArrestEludedPenalty(speaker.GetCrimeFaction())
+    ; if (packageName == "RPB_DGForcegreetPackage")
+    ;     Actor speaker = (sender as Actor)
+    ;     Arrest.ApplyArrestEludedPenalty(speaker.GetCrimeFaction())
 
-    elseif (packageName == "RPB_LockCellDoor")
-        OrientRelative(data[1], data[0], afRotZ = 180)
-    endif
+    ; elseif (packageName == "RPB_LockCellDoor")
+    ;     OrientRelative(data[1], data[0], afRotZ = 180)
+    ; endif
 endEvent
 
 event AIPackageManager_OnPackageEnd(string packageName, ObjectReference[] data, Package sender)

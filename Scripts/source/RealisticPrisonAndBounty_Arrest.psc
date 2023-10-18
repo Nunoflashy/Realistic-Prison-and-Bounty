@@ -17,7 +17,7 @@ string property ARREST_TYPE_ESCORT_TO_JAIL      = "EscortToJail" autoreadonly
 string property ARREST_TYPE_ESCORT_TO_CELL      = "EscortToCell" autoreadonly
 
 
-RealisticPrisonAndBounty_Config property config
+RealisticPrisonAndBounty_Config property Config
     RealisticPrisonAndBounty_Config function get()
         return Game.GetFormFromFile(0x3317, GetPluginName()) as RealisticPrisonAndBounty_Config
     endFunction
@@ -25,31 +25,31 @@ endProperty
 
 RealisticPrisonAndBounty_Jail property jail
     RealisticPrisonAndBounty_Jail function get()
-        return config.jail
+        return Config.jail
     endFunction
 endProperty
 
 RealisticPrisonAndBounty_ArrestVars property arrestVars
     RealisticPrisonAndBounty_ArrestVars function get()
-        return config.arrestVars
+        return Config.arrestVars
     endFunction
 endProperty
 
 RealisticPrisonAndBounty_ActorVars property actorVars
     RealisticPrisonAndBounty_ActorVars function get()
-        return config.actorVars
+        return Config.actorVars
     endFunction
 endProperty
 
 RealisticPrisonAndBounty_MiscVars property miscVars
     RealisticPrisonAndBounty_MiscVars function get()
-        return config.miscVars
+        return Config.miscVars
     endFunction
 endProperty
 
 RealisticPrisonAndBounty_SceneManager property sceneManager
     RealisticPrisonAndBounty_SceneManager function get()
-        return config.sceneManager
+        return Config.sceneManager
     endFunction
 endProperty
 
@@ -353,7 +353,16 @@ function SetArrestParams(string asArrestType, Actor akArrestee, Actor akCaptor, 
     arrestVars.SetForm("Arrest::Arrest Faction", crimeFaction)
     arrestVars.SetString("Arrest::Hold", crimeFaction.GetName())
     arrestVars.SetForm("Arrest::Arrestee", akArrestee)
-    arrestVars.SetString("Arrest::Arrest Type", ARREST_TYPE_ESCORT_TO_JAIL)
+    arrestVars.SetString("Arrest::Arrest Type", asArrestType)
+
+    if (asArrestType == ARREST_TYPE_ESCORT_TO_JAIL || \
+        asArrestType == ARREST_TYPE_ESCORT_TO_CELL)
+        
+        ; Default Scene
+        if (!ArrestVars.Exists("Arrest::Arrest Scene"))
+            ArrestVars.SetString("Arrest::Arrest Scene", "ArrestStart02")
+        endif
+    endif
 
     Debug(self, "Arrest::SetArrestParams", "[\n" + \ 
         "\tCaptured: "+ arrestVars.GetBool("Arrest::Captured") +" \n" + \
@@ -429,6 +438,15 @@ event OnArrestResist(Actor akArrestResister, Actor akGuard, Faction akCrimeFacti
     endif
 
     self.ApplyArrestResistedPenalty(akCrimeFaction)
+endEvent
+
+event OnCombatSpared(Actor akSparerGuard, Actor akSparedToBeArrested)
+    ; Only begin arrest if they are within this distance,
+    ; this is to avoid Guards triggering their dialogue while the player has already ran away.
+    if (akSparedToBeArrested.GetDistance(akSparerGuard) <= 2000)
+        ArrestVars.SetString("Arrest::Arrest Scene", "ArrestStartFree01")
+        akSparerGuard.SendModEvent("RPB_ArrestBegin", ARREST_TYPE_ESCORT_TO_JAIL, akSparedToBeArrested.GetFormID())
+    endif
 endEvent
 
 ;/
@@ -549,7 +567,9 @@ function BeginArrest()
         if (arrestee.GetDistance(captor))
             ; Later have several ArrestStart scenes happen depending on the distance and maybe have a more hostile version for the arrests eluded / resisted etc.
         endif
-        sceneManager.StartArrestStart02(captor, arrestee)
+        ; sceneManager.StartArrestStart02(captor, arrestee)
+        SceneManager.StartSceneAtPhase(1)
+        SceneManager.StartArrestStartPrison_01(captor, arrestee)
         ; jail.EscortToJail()
     endif
 
@@ -576,7 +596,9 @@ function BeginArrest()
 endFunction
 
 event OnArrestStart(Actor akCaptor, Actor akArrestee)
-    jail.EscortToJail()
+    ; Jail.EscortToCell()
+    SceneManager.StartStripping_02(akCaptor, akArrestee)
+    ; jail.EscortToJail()
 endEvent
 
 event OnArresting(Actor akCaptor, Actor akArrestee)

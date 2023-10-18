@@ -1,27 +1,19 @@
 ;BEGIN FRAGMENT CODE - Do not edit anything between this and the end comment
-;NEXT FRAGMENT INDEX 27
+;NEXT FRAGMENT INDEX 29
 Scriptname RPB_SF_Scene_EscortToCell Extends Scene Hidden
-
-;BEGIN FRAGMENT Fragment_18
-Function Fragment_18()
-;BEGIN CODE
-self.SendModEvent("RPB_ScenePlayingEnd", "RPB_EscortToCell", 4)
-;END CODE
-EndFunction
-;END FRAGMENT
-
-;BEGIN FRAGMENT Fragment_25
-Function Fragment_25()
-;BEGIN CODE
-self.SendModEvent("RPB_ScenePlayingEnd", "RPB_EscortToCell", 3)
-;END CODE
-EndFunction
-;END FRAGMENT
 
 ;BEGIN FRAGMENT Fragment_8
 Function Fragment_8()
 ;BEGIN CODE
 self.SendModEvent("RPB_SceneStart", "RPB_EscortToCell")
+;END CODE
+EndFunction
+;END FRAGMENT
+
+;BEGIN FRAGMENT Fragment_27
+Function Fragment_27()
+;BEGIN CODE
+self.SendModEvent("RPB_ScenePlayingEnd", "RPB_EscortToCell", 5)
 ;END CODE
 EndFunction
 ;END FRAGMENT
@@ -46,6 +38,22 @@ EndFunction
 Function Fragment_21()
 ;BEGIN CODE
 self.SendModEvent("RPB_SceneEnd", "RPB_EscortToCell")
+;END CODE
+EndFunction
+;END FRAGMENT
+
+;BEGIN FRAGMENT Fragment_25
+Function Fragment_25()
+;BEGIN CODE
+self.SendModEvent("RPB_ScenePlayingEnd", "RPB_EscortToCell", 3)
+;END CODE
+EndFunction
+;END FRAGMENT
+
+;BEGIN FRAGMENT Fragment_18
+Function Fragment_18()
+;BEGIN CODE
+self.SendModEvent("RPB_ScenePlayingEnd", "RPB_EscortToCell", 4)
 ;END CODE
 EndFunction
 ;END FRAGMENT
