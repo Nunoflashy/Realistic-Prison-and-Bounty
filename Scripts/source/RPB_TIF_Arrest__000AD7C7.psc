@@ -2,21 +2,21 @@
 ;NEXT FRAGMENT INDEX 6
 Scriptname RPB_TIF_Arrest__000AD7C7 Extends TopicInfo Hidden
 
-;BEGIN FRAGMENT Fragment_4
-Function Fragment_4(ObjectReference akSpeakerRef)
-Actor akSpeaker = akSpeakerRef as Actor
-;BEGIN CODE
-akSpeaker.SendModEvent("RPB_ArrestBegin", "EscortToJail", 0x14)
-;END CODE
-EndFunction
-;END FRAGMENT
-
 ;BEGIN FRAGMENT Fragment_5
 Function Fragment_5(ObjectReference akSpeakerRef)
 Actor akSpeaker = akSpeakerRef as Actor
 ;BEGIN CODE
 pTGRSS.TGArrestedCheck()
 akSpeaker.SendModEvent("RPB_SendArrestWaitStop")
+;END CODE
+EndFunction
+;END FRAGMENT
+
+;BEGIN FRAGMENT Fragment_4
+Function Fragment_4(ObjectReference akSpeakerRef)
+Actor akSpeaker = akSpeakerRef as Actor
+;BEGIN CODE
+akSpeaker.SendModEvent("RPB_TopicInfoEnd", "You're going to rot in the Dragonsreach Dungeon.", 20)
 ;END CODE
 EndFunction
 ;END FRAGMENT

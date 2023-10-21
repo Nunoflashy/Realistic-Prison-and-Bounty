@@ -74,7 +74,8 @@ endfunction
 
 function Error(Form script, string caller, string logInfo, bool condition = true, bool hideCall = false) global
     if (condition)
-        debug.trace("[" + ModName() + "] " +  "ERROR: " + logInfo)
+        caller += "()"
+        debug.trace("[" + ModName() + "] " +  "ERROR: " + caller + " -> " + logInfo)
     endif
 endfunction
 

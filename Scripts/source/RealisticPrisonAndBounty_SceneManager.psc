@@ -21,6 +21,12 @@ RealisticPrisonAndBounty_Jail property Jail
     endFunction
 endProperty
 
+RealisticPrisonAndBounty_MiscVars property MiscVars
+    RealisticPrisonAndBounty_MiscVars function get()
+        return Config.MiscVars
+    endFunction
+endProperty
+
 Idle property LockpickingIdle auto
 
 ; ==========================================================
@@ -39,19 +45,9 @@ GlobalVariable property RPB_SceneStartAtPhase
     endFunction
 endProperty
 
-GlobalVariable property RPB_SceneCurrentPhase
-    GlobalVariable function get()
-        return GetFormFromMod(0x14C3B) as GlobalVariable
-    endFunction
-endProperty
-
 function StartSceneAtPhase(int phase)
     RPB_SceneBlockNormalExecution.SetValueInt(1)
     RPB_SceneStartAtPhase.SetValueInt(phase)
-endFunction
-
-function SetSceneAtPhase(int phase)
-    RPB_SceneCurrentPhase.SetValueInt(phase)
 endFunction
 
 function ResetSceneOverride()
@@ -184,6 +180,110 @@ Scene property EludingArrest
     endFunction
 endProperty
 
+int sceneContainer
+
+function SetupScenes()
+    float x = StartBenchmark()
+    sceneContainer = JMap.object()
+    JMap.setInt(sceneContainer, SCENE_ARREST_START_01,       0xF569) ; Arrest Start 01
+    JMap.setInt(sceneContainer, SCENE_ARREST_START_02,       0xFAF6) ; Arrest Start 02
+    JMap.setInt(sceneContainer, SCENE_ARREST_START_03,       0x130DD) ; Arrest Start 03
+    JMap.setInt(sceneContainer, SCENE_ARREST_START_04,       0x13663) ; Arrest Start 04
+    JMap.setInt(sceneContainer, SCENE_ARREST_START_PRISON_01, 0x14C14)
+    JMap.setInt(sceneContainer, SCENE_ESCORT_TO_JAIL,        0xF532) ; Escort to Jail
+    JMap.setInt(sceneContainer, SCENE_ESCORT_TO_CELL,        0xCF58) ; Escort to Cell 01
+    JMap.setInt(sceneContainer, SCENE_ESCORT_TO_CELL_02,     0x1367D) ; Escort to Cell 02
+    JMap.setInt(sceneContainer, SCENE_ESCORT_FROM_CELL,      0x115E6) ; Escort from Cell
+    ; JMap.setInt(sceneContainer, SCENE_SEARCH_START,          0xF55C) ; SearchStart
+    JMap.setInt(sceneContainer, SCENE_FRISKING,              0xCF5A) ; Frisking
+    ; JMap.setInt(sceneContainer, SCENE_STRIPPING_START,       0xF561) ; Stripping Start
+    JMap.setInt(sceneContainer, SCENE_STRIPPING,             0xCF59) ; Stripping
+    JMap.setInt(sceneContainer, SCENE_STRIPPING_02,          0xEA60) ; Stripping 02
+    JMap.setInt(sceneContainer, SCENE_FORCED_STRIPPING_01,   0xF587) ; Forced Stripping 01
+    JMap.setInt(sceneContainer, SCENE_FORCED_STRIPPING_02,   0x120A9) ; Forced Stripping 02
+    JMap.setInt(sceneContainer, SCENE_GIVE_CLOTHING,         0xF52A) ; Give Clothing
+    JMap.setInt(sceneContainer, SCENE_NO_CLOTHING,           0xF571) ; No Clothing
+    JMap.setInt(sceneContainer, SCENE_PAYMENT_FAIL,          0xF54E) ; Bounty Payment Fail
+    JMap.setInt(sceneContainer, SCENE_ELUDING_ARREST_01,     0x12613) ; Eluding Arrest
+    JMap.setInt(sceneContainer, SCENE_RESTRAIN_PRISONER_01,  0x15702) ; Restrain Prisoner 01
+    JMap.setInt(sceneContainer, SCENE_RESTRAIN_PRISONER_02,  0x15C66) ; Restrain Prisoner 02
+
+    string scenesAdded = ""
+    int i = 0
+    while (i < JValue.count(sceneContainer))
+        scenesAdded += "\t["+i+"]: "+ JMap.getNthKey(sceneContainer, i) +"\n"
+        i += 1
+    endWhile
+    EndBenchmark(x, "SetupScenes")
+    Debug(self, "SceneManager::SetupScenes", "Loaded "+ JValue.count(sceneContainer) +" Scenes: [\n" + scenesAdded + "]")
+    JValue.retain(sceneContainer)
+endFunction
+
+; function SetupScenes()
+;     float x = StartBenchmark()
+;     string scenes = MiscVars.CreateStringMap("SceneManager/Scenes")
+
+;     MiscVars.SetInt(SCENE_ARREST_START_01,          0xF569, scenes)
+;     MiscVars.SetInt(SCENE_ARREST_START_02,          0xFAF6, scenes)
+;     MiscVars.SetInt(SCENE_ARREST_START_03,          0x130DD, scenes)
+;     MiscVars.SetInt(SCENE_ARREST_START_04,          0x13663, scenes)
+;     MiscVars.SetInt(SCENE_ARREST_START_PRISON_01,   0x14C14, scenes)
+;     MiscVars.SetInt(SCENE_ESCORT_TO_JAIL,           0xF532, scenes)
+;     MiscVars.SetInt(SCENE_ESCORT_TO_CELL,           0xCF58, scenes)
+;     MiscVars.SetInt(SCENE_ESCORT_TO_CELL_02,        0x1367D, scenes)
+;     MiscVars.SetInt(SCENE_ESCORT_FROM_CELL,         0x115E6, scenes)
+;     ; MiscVars.SetInt(SCENE_SEARCH_START,             0xF55C, scenes)
+;     MiscVars.SetInt(SCENE_FRISKING,                 0xCF5A, scenes)
+;     ; MiscVars.SetInt(SCENE_STRIPPING_START,          0xF561, scenes)
+;     MiscVars.SetInt(SCENE_STRIPPING,                0xCF59, scenes)
+;     MiscVars.SetInt(SCENE_STRIPPING_02,             0xEA60, scenes)
+;     MiscVars.SetInt(SCENE_FORCED_STRIPPING_01,      0xF587, scenes)
+;     MiscVars.SetInt(SCENE_FORCED_STRIPPING_02,      0x120A9, scenes)
+;     MiscVars.SetInt(SCENE_GIVE_CLOTHING,            0xF52A, scenes)
+;     MiscVars.SetInt(SCENE_NO_CLOTHING,              0xF571, scenes)
+;     MiscVars.SetInt(SCENE_PAYMENT_FAIL,             0xF54E, scenes)
+;     MiscVars.SetInt(SCENE_ELUDING_ARREST_01,        0x12613, scenes)
+;     MiscVars.SetInt(SCENE_RESTRAIN_PRISONER_01,     0x15702, scenes)
+;     MiscVars.SetInt(SCENE_RESTRAIN_PRISONER_02,     0x15C66, scenes)
+
+;     string scenesAdded = ""
+;     int i = 0
+;     while (i < MiscVars.GetLengthOf(scenes))
+;         scenesAdded += "\t["+i+"]: "+ MiscVars.GetNthKey(scenes, i) +"\n"
+;         i += 1
+;     endWhile
+
+;     EndBenchmark(x, "SetupScenes")
+
+;     Debug(self, "SceneManager::SetupScenes", "Loaded "+ MiscVars.GetLengthOf(scenes) +" Scenes: [\n" + scenesAdded + "]")
+; endFunction
+
+; Scene function GetScene(string name)
+;     float x = StartBenchmark()
+
+;     if (!MiscVars.Exists(name, "SceneManager/Scenes"))
+;         Error(self, "SceneManager::GetScene", "Scene " + name + " does not exist!")
+;         return none
+;     endif
+
+;     Info(self, "SceneManager::GetScene", "Scenes: " + MiscVars.GetLengthOf("SceneManager/Scenes"))
+;     Scene obj = Game.GetFormFromFile(MiscVars.GetInt(name, "SceneManager/Scenes"), GetPluginName()) as Scene
+;     EndBenchmark(x, "GetScene")
+
+;     return obj
+;     ; return Game.GetFormFromFile(JMap.getInt(sceneContainer, name), GetPluginName()) as Scene
+; endFunction
+
+Scene function GetScene(string name)
+    if (!JMap.hasKey(sceneContainer, name))
+        Error(self, "SceneManager::GetScene", "Scene " + name + " does not exist!")
+        return none
+    endif
+
+    Info(self, "SceneManager::GetScene", "Scenes: " + JValue.count(sceneContainer))
+    return Game.GetFormFromFile(JMap.getInt(sceneContainer, name), GetPluginName()) as Scene
+endFunction
+
 ; ==========================================================
 ;                      Scene Event Types
 ; ==========================================================
@@ -218,6 +318,8 @@ string property SCENE_UNLOCK_CELL                   = "RPB_UnlockCell" autoreado
 string property SCENE_PAYMENT_FAIL                  = "RPB_BountyPaymentFail" autoreadonly
 string property SCENE_NO_CLOTHING                   = "RPB_NoClothing" autoreadonly
 string property SCENE_ELUDING_ARREST_01             = "RPB_EludingArrest01" autoreadonly
+string property SCENE_RESTRAIN_PRISONER_01          = "RPB_RestrainPrisoner01" autoreadonly
+string property SCENE_RESTRAIN_PRISONER_02          = "RPB_RestrainPrisoner02" autoreadonly
 
 
 ; ==========================================================
@@ -230,6 +332,11 @@ Scene _nextScene
 ; ==========================================================
 ;                       Scene Aliases
 ; ==========================================================
+
+ReferenceAlias function GetRefAlias(string aliasGroup, int index = 0)
+    string refAliasGroup = string_if (index == 0, aliasGroup, aliasGroup + index)
+    return self.GetAliasByName(refAliasGroup) as ReferenceAlias
+endFunction
 
 ReferenceAlias function GetEscort(int index = 0)
     return self.GetAliasByName(string_if (index == 0, "Escort", "Escort" + index)) as ReferenceAlias
@@ -279,6 +386,10 @@ ReferenceAlias function GetPrisonerLocation(int index = 0)
     return self.GetAliasByName(string_if (index == 0, "Player_EscortLocation", "Player_EscortLocation" + index)) as ReferenceAlias
 endFunction
 
+ReferenceAlias function GetGuardWaitingSpot(int index = 0)
+    return self.GetAliasByName(string_if (index == 0, "GuardWaitingSpot", "GuardWaitingSpot" + index)) as ReferenceAlias
+endFunction
+
 string function GetAliasName(string aliasName, int aliasIndex, bool checkForExistence = false)
     string finalName
     if (aliasIndex == 0)
@@ -295,9 +406,6 @@ string function GetAliasName(string aliasName, int aliasIndex, bool checkForExis
     return finalName
 endFunction
 
-Scene function GetSceneByName(string sceneName)
-
-endFunction
 
 function ReleaseAlias(string aliasName, int aliasIndex = 0)
     string finalName = self.GetAliasName(aliasName, aliasIndex , true)
@@ -331,9 +439,39 @@ RealisticPrisonAndBounty_EventManager property eventManager
     endFunction
 endProperty
 
+function AddRefsToScene(string asSceneName, string asRefAliasGroup, int aiRefCount = 1)
+    int refKeyMap = JMap.object()
+
+    JMap.setForm(refKeyMap, "Escort",       self.GetEscort().GetReference())
+    JMap.setForm(refKeyMap, "Escortee",     self.GetEscortee().GetReference())
+    JMap.setForm(refKeyMap, "Guard",        self.GetGuard().GetReference())
+    JMap.setForm(refKeyMap, "Prisoner",     self.GetPrisoner().GetReference())
+
+    int i = 0
+    while (i < aiRefCount)
+        if (asRefAliasGroup == "Escort")
+            
+        endif
+        i += 1
+    endWhile
+endFunction
+
+int sceneParamsMap
+ObjectReference[] function GetSceneParams(string asSceneName)
+    int sceneParams = JMap.getObj(sceneParamsMap, asSceneName) ; JMap containing Params
+
+    int i = 0
+    while (i < JValue.count(sceneParams))
+        ; Get the map for this Scene
+
+    endWhile
+endFunction
+
 ObjectReference[] function GetSceneParameters(string sceneName)
     ObjectReference[] params = new ObjectReference[10]
 
+    ; self.AddRefsToScene(SCENE_ARREST_START_01, "Escort", 3)
+    ; self.AddRefsToScene(SCENE_ARREST_START_01, "Escortee", 9)
         
     if (sceneName == SCENE_ARREST_START_01)
         params[0] = self.GetEscort().GetActorReference()
@@ -368,13 +506,6 @@ ObjectReference[] function GetSceneParameters(string sceneName)
         params[4] = self.GetCell().GetReference()
         params[5] = self.GetGuardLocation().GetReference()
 
-        ; params[0] = self.GetEscort().GetActorReference()
-        ; params[1] = EscorteeRef.GetActorReference()
-        ; params[2] = self.GetEscortee(1).GetActorReference()
-        ; params[3] = self.GetEscortee(2).GetActorReference()
-        ; params[4] = self.GetPrisonerLocation().GetReference()
-        ; params[5] = self.GetGuardLocation().GetReference()
-
     elseif (sceneName == SCENE_ESCORT_TO_CELL_02)
         params[0] = self.GetGuard().GetReference()
         params[1] = self.GetPrisoner().GetReference()
@@ -392,11 +523,6 @@ ObjectReference[] function GetSceneParameters(string sceneName)
         params[1] = self.GetEscortee().GetActorReference()
         params[2] = self.GetEscortee(1).GetActorReference()
         params[3] = self.GetEscortee(2).GetActorReference()
-
-        ; params[0] = self.GetEscort().GetActorReference()
-        ; params[1] = EscorteeRef.GetActorReference()
-        ; params[2] = self.GetEscortee(1).GetActorReference()
-        ; params[3] = self.GetEscortee(2).GetActorReference()
 
     elseif (sceneName == SCENE_STRIPPING)
         params[0] = self.GetGuard().GetActorReference()
@@ -441,6 +567,14 @@ ObjectReference[] function GetSceneParameters(string sceneName)
         params[0] = self.GetGuard().GetActorReference()
         params[1] = self.GetEluder().GetActorReference()
 
+    elseif (sceneName == SCENE_RESTRAIN_PRISONER_01)
+        params[0] = self.GetGuard().GetReference()
+        params[1] = self.GetPrisoner().GetReference()
+
+    elseif (sceneName == SCENE_RESTRAIN_PRISONER_02)
+        params[0] = self.GetGuard().GetReference()
+        params[1] = self.GetPrisoner().GetReference()
+
     endif
 
     return params
@@ -475,11 +609,13 @@ endFunction
 event OnSceneStart(string name, Scene sender)
     ObjectReference[] params = self.GetSceneParameters(name)
 
-    self.SetSceneAtPhase(1)
-
     if (name == SCENE_ARREST_START_01)
         Actor escort   = params[0] as Actor
         Actor escortee = params[1] as Actor
+
+        ; if (JMap.hasKey(container, name))
+        ; int sceneParams = JMap.getObj(sceneParamsMap, name)
+        ; JMap.getForm(sceneParams, "Escort") ; Get all escorts for this Scene
 
         RetainAI(escortee == config.Player)
 
@@ -602,6 +738,15 @@ event OnSceneStart(string name, Scene sender)
         Actor eluder    = params[1] as Actor
 
         arrest.OnArrestEludeTriggered(guard, "Dialogue")
+
+    elseif (name == SCENE_RESTRAIN_PRISONER_01)
+        Actor guard     = params[0] as Actor
+        Actor prisoner  = params[1] as Actor
+
+    elseif (name == SCENE_RESTRAIN_PRISONER_02)
+        Actor guard     = params[0] as Actor
+        Actor prisoner  = params[1] as Actor
+
     endif
 
     Debug(self, "SceneManager::OnSceneStart", self.GetSceneParametersDebugInfo(sender, name, params))
@@ -611,8 +756,6 @@ event OnScenePlaying(string name, int phaseEvent, int phase, Scene sender)
     ObjectReference[] params = self.GetSceneParameters(name)
 
     Debug(self, "SceneManager::OnScenePlaying", string_if (phaseEvent == PHASE_START, "(Start) Playing", "(End) Played") + " Phase " + phase + " of " + name)
-    
-    self.SetSceneAtPhase(phase)
 
     if (name == SCENE_ARREST_START_01)
         Actor escort   = params[0] as Actor
@@ -705,7 +848,16 @@ event OnScenePlaying(string name, int phaseEvent, int phase, Scene sender)
             endif
             
         elseif (phaseEvent == PHASE_END)
-            if (phase == 4)
+            if (phase == 3)
+                ; Put XMarker on this spot, which is where the guard is waiting before obstructing the cell
+                ObjectReference guardWaitingSpotMarker = GetFormFromMod(0x15700) as ObjectReference
+                guard.PlaceAtMe(guardWaitingSpotMarker)
+                BindAliasTo(self.GetGuardWaitingSpot(), guardWaitingSpotMarker)
+                Debug(self, "SceneManager::OnScenePlaying", "Placed GuardWaitingSpotMarker: " + guardWaitingSpotMarker + " near " + guard)
+                Debug(self, "SceneManager::OnScenePlaying", "GuardWaitingSpotMarker Alias: " + self.GetGuardWaitingSpot() + " References ("+ self.GetGuardWaitingSpot() .GetReference() +")")
+
+
+            elseif (phase == 4)
                 Debug.SendAnimationEvent(guard, "IdleLockpick")
                 cellDoor.Lock(false)
                 cellDoor.SetOpen(true)
@@ -732,7 +884,7 @@ event OnScenePlaying(string name, int phaseEvent, int phase, Scene sender)
                 Debug.SendAnimationEvent(prisoner, "ZazAPC001")
             elseif (phase == 2)
                 ; Restrain prisoner
-                arrest.RestrainArrestee(prisoner) ; Later the jail script should have a restrain method too, as this is not the arrest, but imprisonment
+                Jail.RestrainPrisoner(prisoner) ; Later the jail script should have a restrain method too, as this is not the arrest, but imprisonment
             elseif (phase == 8)
                 ; Lock cell
                 cellDoor.SetLockLevel(100)
@@ -871,6 +1023,37 @@ event OnScenePlaying(string name, int phaseEvent, int phase, Scene sender)
                 jail.OnStripping(stripperGuard, strippedPrisoner)
             endif
         endif
+
+    elseif (name == SCENE_RESTRAIN_PRISONER_01)
+        Actor guard     = params[0] as Actor
+        Actor prisoner  = params[1] as Actor
+
+        if (phaseEvent == PHASE_START)
+            
+        elseif (phaseEvent == PHASE_END)
+            if (phase == 1)
+                Debug.SendAnimationEvent(prisoner, "IdleWarmHands") ; Give hands to the guard
+
+            elseif (phase == 2)
+                Jail.RestrainPrisoner(prisoner, abRestrainInFront = true)
+            endif
+        endif
+
+    elseif (name == SCENE_RESTRAIN_PRISONER_02)
+        Actor guard     = params[0] as Actor
+        Actor prisoner  = params[1] as Actor
+
+        if (phaseEvent == PHASE_START)
+            
+        elseif (phaseEvent == PHASE_END)
+            if (phase == 1)
+                Debug.SendAnimationEvent(prisoner, "ZazAPC001") ; Make prisoner put their hands behind the back
+
+            elseif (phase == 2)
+                Jail.RestrainPrisoner(prisoner)
+            endif
+        endif
+
 
     endif
 endEvent
@@ -1027,23 +1210,36 @@ event OnSceneEnd(string name, Scene sender)
     endif
 
     self.ResetSceneOverride()
-
     Debug(self, "SceneManager::OnSceneEnd", self.GetSceneParametersDebugInfo(sender, name, params))
 endEvent
 
-function StartScene(Scene akScene, string sceneName, bool abForceStart = false)
-    if (akScene.IsPlaying())
-        Info(self, "SceneManager::" + sceneName, "Scene " + akScene +" is currently playing, aborting call!")
+bool function SceneExists(string asSceneName)
+    return JMap.hasKey(sceneContainer, asSceneName)
+endFunction
+
+function StartScene(string asSceneName, int akSceneParameters, int aiStartingPhase = 1, bool abForceStart = false)
+    if (!self.SceneExists(asSceneName))
+        Error(self, "SceneManager::StartScene", "Tried to start Scene " + asSceneName + ": Scene does not exist!")
         return
     endif
 
-    ; Get Scene params
-    ;
+    Scene sceneObject = self.GetScene(asSceneName)
+
+    if (sceneObject.IsPlaying() && !abForceStart)
+        Info(self, "SceneManager::StartScene", "Scene " + sceneObject + " is currently playing, aborting call!")
+        return
+    endif
+
+    ; Setup parameters
+
+    ; Setup starting phase
+    self.StartSceneAtPhase(aiStartingPhase)
 
     if (abForceStart)
-        akScene.ForceStart()
+        sceneObject.ForceStart()
+    
     else
-        akScene.Start()
+        sceneObject.Start()
     endif
 endFunction
 
@@ -1225,6 +1421,7 @@ function StartArrestStart01(Actor akGuard, Actor akPrisoner)
     BindAliasTo(self.GetEscortee(), akPrisoner)
 
     ArrestStart01.Start()
+    ; self.GetScene(SCENE_ARREST_START_01).Start()
 endFunction
 
 function StartArrestStart02(Actor akGuard, Actor akPrisoner)
@@ -1244,7 +1441,7 @@ function StartArrestStart03(Actor akGuard, Actor akPrisoner)
     ; Bind the Prisoner, who's getting arrested
     BindAliasTo(self.GetEscortee(), akPrisoner)
 
-    ArrestStart03.Start()
+    self.GetScene(SCENE_ARREST_START_03).Start()
 endFunction
 
 function StartArrestStart04(Actor akGuard, Actor akPrisoner)
@@ -1257,14 +1454,31 @@ function StartArrestStart04(Actor akGuard, Actor akPrisoner)
     ArrestStart04.Start()
 endFunction
 
-function StartArrestStartPrison_01(Actor akGuard, Actor akPrisoner)
+function StartArrestStartPrison_01(Actor akGuard, Actor akPrisoner, int aiStartingPhase = 1)
     ; Bind the captor
     BindAliasTo(self.GetEscort(), akGuard)
 
     ; Bind the Arrestee, who's getting arrested
     BindAliasTo(self.GetEscortee(), akPrisoner)
 
-    ArrestStartPrison01.Start()
+    self.StartSceneAtPhase(aiStartingPhase)
+    self.GetScene(SCENE_ARREST_START_PRISON_01).Start()
+endFunction
+
+function StartRestrainPrisoner_01(Actor akGuard, Actor akPrisoner, int aiStartingPhase = 1)
+    BindAliasTo(self.GetGuard(), akGuard)
+    BindAliasTo(self.GetPrisoner(), akPrisoner)
+
+    self.StartSceneAtPhase(aiStartingPhase)
+    self.GetScene(SCENE_RESTRAIN_PRISONER_01).Start()
+endFunction
+
+function StartRestrainPrisoner_02(Actor akGuard, Actor akPrisoner, int aiStartingPhase = 1)
+    BindAliasTo(self.GetGuard(), akGuard)
+    BindAliasTo(self.GetPrisoner(), akPrisoner)
+
+    self.StartSceneAtPhase(aiStartingPhase)
+    self.GetScene(SCENE_RESTRAIN_PRISONER_02).Start()
 endFunction
 
 function StartNoClothing(Actor akGuard, Actor akPrisoner)

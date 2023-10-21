@@ -7,7 +7,7 @@ Function Fragment_2(ObjectReference akSpeakerRef)
 Actor akSpeaker = akSpeakerRef as Actor
 ;BEGIN CODE
 pCGS.GuildDiscount(akSpeaker)
-akSpeaker.SendModEvent("RPB_EludingArrest", "Dialogue")
+akSpeaker.SendModEvent("RPB_TopicInfoEnd", "Wait... I know you", 6)
 ;END CODE
 EndFunction
 ;END FRAGMENT

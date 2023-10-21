@@ -950,6 +950,11 @@ string function GetNthContainer(string containerKey)
     
 endFunction
 
+string function GetNthKey(string containerKey, int keyIndex)
+    int _container = JMap.getObj(_miscVarsContainer, containerKey)
+    return JMap.getNthKey(_container, keyIndex)
+endFunction
+
 function ListContainer(string containerKey, string category = "")
     int _container = JMap.getObj(_miscVarsContainer, containerKey)
     bool hasCategory = category != ""

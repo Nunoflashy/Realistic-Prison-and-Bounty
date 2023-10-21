@@ -16,7 +16,7 @@ EndFunction
 Function Fragment_5(ObjectReference akSpeakerRef)
 Actor akSpeaker = akSpeakerRef as Actor
 ;BEGIN CODE
-akSpeaker.SendModEvent("RPB_ArrestBegin", "EscortToJail", 0x14)
+akSpeaker.SendModEvent("RPB_TopicInfoEnd", "A stretch in the Castle Dour Dungeon will straighten you right out.", 20)
 ;END CODE
 EndFunction
 ;END FRAGMENT

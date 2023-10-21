@@ -6,7 +6,7 @@ Scriptname RPB_TIF_ArrestElude__0006B945 Extends TopicInfo Hidden
 Function Fragment_0(ObjectReference akSpeakerRef)
 Actor akSpeaker = akSpeakerRef as Actor
 ;BEGIN CODE
-akSpeaker.SendModEvent("RPB_EludingArrest", "Pursuit")
+akSpeaker.SendModEvent("RPB_TopicInfoEnd", "You really thought you could get away with it?", 7)
 ;END CODE
 EndFunction
 ;END FRAGMENT

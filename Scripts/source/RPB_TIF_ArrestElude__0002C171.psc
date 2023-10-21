@@ -6,7 +6,7 @@ Scriptname RPB_TIF_ArrestElude__0002C171 Extends TopicInfo Hidden
 Function Fragment_0(ObjectReference akSpeakerRef)
 Actor akSpeaker = akSpeakerRef as Actor
 ;BEGIN CODE
-akSpeaker.SendModEvent("RPB_EludingArrest", "Pursuit")
+akSpeaker.SendModEvent("RPB_TopicInfoEnd", "Come quietly or taste the Jarl's justice!", 7)
 ;END CODE
 EndFunction
 ;END FRAGMENT

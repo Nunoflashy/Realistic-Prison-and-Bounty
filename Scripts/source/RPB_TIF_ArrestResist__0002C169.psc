@@ -6,8 +6,7 @@ Scriptname RPB_TIF_ArrestResist__0002C169 Extends TopicInfo Hidden
 Function Fragment_0(ObjectReference akSpeakerRef)
 Actor akSpeaker = akSpeakerRef as Actor
 ;BEGIN CODE
-; debug.trace(self + "SetPlayerResistingArrest")
-akSpeaker.SendModEvent("RPB_ResistArrest", "", 0x14)
+akSpeaker.SendModEvent("RPB_TopicInfoStart", "So be it.", 15)
 ;END CODE
 EndFunction
 ;END FRAGMENT

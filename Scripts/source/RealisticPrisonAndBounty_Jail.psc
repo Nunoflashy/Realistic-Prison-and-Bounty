@@ -650,6 +650,8 @@ event OnStripEnd(Actor stripSearchPerformer, Actor strippedActor)
     "arrestVars.CellDoor: " + arrestVars.CellDoor + "(Object: "+ arrestVars.CellDoor.GetBaseObject().GetName() +")\n" + \
 "]")
     
+    SceneManager.StartRestrainPrisoner_02(stripSearchPerformer, strippedActor)
+
     if (Prisoner.ShouldBeClothed())
         sceneManager.StartGiveClothing(arrestVars.Captor, Prisoner.this)
         sceneManager.StartEscortToCell(arrestVars.Captor, arrestVars.Arrestee, arrestVars.JailCell, arrestVars.CellDoor)
@@ -702,7 +704,6 @@ event OnEscortToCellBegin(Actor escortActor, Actor escortedActor)
     ; Happens when the actor is being escorted to their cell
     Debug(self, "Jail::OnEscortToCellBegin", CurrentState + " event invoked")
     Debug(self, "Jail::OnEscortToCellBegin", "Escorted Actor: " + escortedActor)
-    Arrest.RestrainArrestee(escortedActor)
 endEvent
 
 event OnEscortToCellEnd(Actor escortActor, Actor escortedActor)
@@ -927,6 +928,24 @@ function TeleportToJail()
     arrestVars.Captor.MoveTo(prisonerChest)
 
     sceneManager.StartEscortToCell(arrestVars.Captor, arrestVars.Arrestee, arrestVars.JailCell, arrestVars.CellDoor)
+endFunction
+
+function RestrainPrisoner(Actor akPrisoner, bool abRestrainInFront = false)
+    ; Temporary cuffs using ZaZ
+    ; Hand Cuffs Backside Rusty - 0xA081D2F
+    ; Hand Cuffs Front Rusty - 0xA081D33
+    ; Hand Cuffs Front Shiny - 0xA081D34
+    ; Hand Cuffs Crossed Front 01 - 0xA033D9D
+    ; Hands Crossed Front in Scarfs - 0xA073A14
+    ; Hands in Irons Front Black - 0xA033D9E
+    Form cuffs = Game.GetFormEx(0xA081D2F)
+    if (abRestrainInFront)
+        cuffs = Game.GetFormEx(0xA081D33)
+    endif
+
+    akPrisoner.SheatheWeapon()
+    UnequipHandsForActor(akPrisoner)
+    akPrisoner.EquipItem(cuffs, true, true)
 endFunction
 
 bool function AssignJailCell(Actor akPrisoner)

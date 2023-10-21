@@ -33,7 +33,7 @@ function RegisterEvents()
     RegisterForModEvent("RPB_ResistArrest", "OnArrestResist")           ; Resisting Arrest
     RegisterForModEvent("RPB_EludingArrest", "OnArrestEludeStart")      ; Eluding Arrest (Start)
     RegisterForModEvent("RPB_ArrestDefeated", "OnArrestDefeat")         ; Happens after the player is defeated through DA
-    RegisterForModEvent("RPB_CombatSpared", "OnCombatSpared")           ; Happens when the player is spared after yielding
+    RegisterForModEvent("RPB_CombatYield", "OnCombatYield")             ; Happens when the player is spared after yielding
     ; RegisterForModEvent("RPB_ArrestWaiting", "OnArrestWait")          ; Wait the response from player during Arrest
     ; RegisterForModEvent("RPB_ArrestWaitingStop", "OnArrestWaitStop")  ; Something happened to prevent OnArrestWait, cancel the state
 
@@ -41,11 +41,15 @@ function RegisterEvents()
     RegisterForModEvent("RPB_JailBegin", "OnJailBegin")
     RegisterForModEvent("RPB_JailEnd", "OnJailEnd")
 
-    ; Scene Event Handlers
+    ; Scene Event Handlers (SF_Scene Scripts)
     RegisterForModEvent("RPB_SceneStart", "OnSceneStart")               ; Handles Scene start events, whenever a Scene begins playing.
     RegisterForModEvent("RPB_ScenePlayingStart", "OnScenePlayingStart") ; Handles Scene ongoing events, divided by phases at the beginning of the phase.
     RegisterForModEvent("RPB_ScenePlayingEnd", "OnScenePlayingEnd")     ; Handles Scene ongoing events, divided by phases at the end of the phase.
     RegisterForModEvent("RPB_SceneEnd", "OnSceneEnd")                   ; Handles Scene end events, whenever a Scene ends playing.
+
+    ; Topic Info Event Handlers (TIF Scripts)
+    RegisterForModEvent("RPB_TopicInfoStart", "OnDialogueTopicStart")
+    RegisterForModEvent("RPB_TopicInfoEnd", "OnDialogueTopicEnd")
 
     ; Package Event Handlers
     RegisterForModEvent("RPB_PackageEnd", "OnPackageEnd")
@@ -124,7 +128,6 @@ endEvent
     Form    @sender: Can only be cast to Actor, this is either akSpeaker in case of Dialogue or akPursuer in case of Pursuit.
 /;
 event OnArrestEludeStart(string eventName, string eludeType, float unusedFlt, Form sender)
-    Debug(self, "EventManager::OnArrestEludeStart", "This is called")
     Actor eludedGuard = (sender as Actor)
 
     if (!eludeType)
@@ -147,24 +150,45 @@ event OnArrestEludeStart(string eventName, string eludeType, float unusedFlt, Fo
     Arrest.OnArrestEludeStart(eludedGuard, eludeType)
 endEvent
 
-event OnCombatSpared(string eventName, string unusedStr, float unusedFlt, Form sender)
-    Debug(self, "EventManager::OnCombatSpared", "This is called")
+event OnCombatYield(string eventName, string unusedStr, float unusedFlt, Form sender)
+    Actor guard = (sender as Actor)
 
-    Actor sparerGuard = (sender as Actor)
-
-    if (!sparerGuard)
-        Error(self, "EventManager::OnCombatSpared", "sender is not an Actor, failed check! [sender: "+ sender +"]")
+    if (!guard)
+        Error(self, "EventManager::OnCombatYield", "sender is not an Actor, failed check! [sender: "+ sender +"]")
         return
     endif
 
-    if (!sparerGuard.IsGuard())
-        Info(self, "EventManager::OnCombatSpared", "Actor is not a guard, the event will not proceed")
+    if (!guard.IsGuard())
+        Info(self, "EventManager::OnCombatYield", "Actor is not a guard, the event will not proceed!")
         return
     endif
 
-    Actor sparedToBeArrestedActor = sparerGuard.GetDialogueTarget()
+    Actor yieldedArrestee = guard.GetDialogueTarget()
 
-    Arrest.OnCombatSpared(sparerGuard, sparedToBeArrestedActor)
+    ; Fallback to Player if nearby, since GetDialogueTarget() fails if there are many guards talking at once, yieldedArrestee will be none
+    if (!yieldedArrestee && guard.GetDistance(Config.Player) <= 1000)
+        yieldedArrestee = Config.Player
+        Debug(self, "EventManager::OnCombatYield", "Could not get the dialogue target of " + guard + ", falling back to Player since they are nearby.")
+    endif
+
+    ; Failed to get dialogue target even with fallback, player must not be near
+    if (!yieldedArrestee)
+        Error(self, "EventManager::OnCombatYield", "Could not get the dialogue target of " + guard + ", returning...")
+        Trace(self, "EventManager::OnCombatYield", "Stack Trace: [\n" + \
+            "\teventName: " + eventName + "\n" + \
+            "\tsender: " + sender + "\n" + \
+            "\tguard: " + guard + "\n" + \
+            "\tyieldedArrestee: " + yieldedArrestee + "\n" + \
+        "\n]")
+        return
+    endif
+
+    if (!yieldedArrestee)
+        Error(self, "EventManager::OnCombatYield", "Could not get the dialogue target of " + guard + ", returning...")
+        return
+    endif
+
+    Arrest.OnCombatYield(guard, yieldedArrestee)
 endEvent
 
 
@@ -186,7 +210,7 @@ event OnSceneStart(string eventName, string sceneName, float unusedFlt, Form sen
         return
     endif
 
-    sceneManager.OnSceneStart(sceneName, (sender as Scene))
+    SceneManager.OnSceneStart(sceneName, (sender as Scene))
 endEvent
 
 event OnScenePlayingStart(string eventName, string sceneName, float scenePhaseFlt, Form sender)
@@ -224,6 +248,94 @@ event OnSceneEnd(string eventName, string sceneName, float unusedFlt, Form sende
     endif
 
     SceneManager.OnSceneEnd(sceneName, (sender as Scene))
+endEvent
+
+; ==========================================================
+;                    Topic Dialogue Events
+; ==========================================================
+
+event OnDialogueTopicStart(string eventName, string topicInfoDialogue, float topicInfoTypeFlt, Form sender)
+    int topicInfoType = (topicInfoTypeFlt as int)
+    Actor akSpeaker = (sender as Actor)
+
+    if (!topicInfoType)
+        Error(self, "EventManager::OnDialogueTopicStart", "Topic Info Type is none or invalid, returning...")
+        return
+    endif
+
+    if (!akSpeaker)
+        Error(self, "EventManager::OnDialogueTopicStart", "sender is not an Actor, failed check! [sender: "+ sender +"]")
+        return
+    endif
+
+    Actor akSpokenTo = akSpeaker.GetDialogueTarget()
+
+    ; Fallback to Player if nearby, since GetDialogueTarget() fails if there are many guards talking at once, akSpokenTo will be none
+    if (!akSpokenTo && akSpeaker.GetDistance(Config.Player) <= 1000)
+        akSpokenTo = Config.Player
+        Debug(self, "EventManager::OnDialogueTopicStart", "Could not get the dialogue target of " + akSpeaker + ", falling back to Player since they are nearby.")
+    endif
+
+    ; Failed to get dialogue target even with fallback, player must not be near
+    if (!akSpokenTo)
+        Error(self, "EventManager::OnDialogueTopicStart", "Could not get the dialogue target of " + akSpeaker + ", returning...")
+        Trace(self, "EventManager::OnDialogueTopicStart", "Stack Trace: [\n" + \
+            "\teventName: " + eventName + "\n" + \
+            "\ttopicInfoDialogue: " + topicInfoDialogue + "\n" + \
+            "\ttopicInfoType: " + topicInfoType + "\n" + \
+            "\tsender: " + sender + "\n" + \
+            "\takSpeaker: " + akSpeaker + "\n" + \
+            "\takSpokenTo: " + akSpokenTo + "\n" + \
+        "\n]")
+        return
+    endif
+
+    ; Only handle Arrest Events
+    if (topicInfoType >= Arrest.TOPIC_TYPE_ARREST_SUSPICIOUS && topicInfoType <= Arrest.TOPIC_TYPE_ARREST_GO_TO_JAIL)
+        Arrest.OnArrestDialogue(Arrest.TOPIC_START, topicInfoType, topicInfoDialogue, akSpeaker, akSpokenTo)
+    endif
+endEvent
+
+event OnDialogueTopicEnd(string eventName, string topicInfoDialogue, float topicInfoTypeFlt, Form sender)
+    int topicInfoType   = (topicInfoTypeFlt as int)
+    Actor akSpeaker     = (sender as Actor)
+
+    if (!topicInfoType)
+        Error(self, "EventManager::OnDialogueTopicEnd", "Topic Info Type is none or invalid, returning...")
+        return
+    endif
+
+    if (!akSpeaker)
+        Error(self, "EventManager::OnDialogueTopicEnd", "sender is not an Actor, failed check! [sender: "+ sender +"]")
+        return
+    endif
+
+    Actor akSpokenTo = akSpeaker.GetDialogueTarget()
+
+    ; Fallback to Player if nearby, since GetDialogueTarget() fails if there are many guards talking at once, akSpokenTo will be none
+    if (!akSpokenTo && akSpeaker.GetDistance(Config.Player) <= 1000)
+        akSpokenTo = Config.Player
+        Debug(self, "EventManager::OnDialogueTopicStart", "Could not get the dialogue target of " + akSpeaker + ", falling back to Player since they are nearby.")
+    endif
+
+    ; Failed to get dialogue target even with fallback, player must not be near
+    if (!akSpokenTo)
+        Error(self, "EventManager::OnDialogueTopicEnd", "Could not get the dialogue target of " + akSpeaker + ", returning...")
+        Trace(self, "EventManager::OnDialogueTopicEnd", "Stack Trace: [\n" + \
+            "\teventName: " + eventName + "\n" + \
+            "\ttopicInfoDialogue: " + topicInfoDialogue + "\n" + \
+            "\ttopicInfoType: " + topicInfoType + "\n" + \
+            "\tsender: " + sender + "\n" + \
+            "\takSpeaker: " + akSpeaker + "\n" + \
+            "\takSpokenTo: " + akSpokenTo + "\n" + \
+        "\n]")
+        return
+    endif
+
+    ; Only handle Arrest Events
+    if (topicInfoType >= Arrest.TOPIC_TYPE_ARREST_SUSPICIOUS && topicInfoType <= Arrest.TOPIC_TYPE_ARREST_GO_TO_JAIL)
+        Arrest.OnArrestDialogue(Arrest.TOPIC_END, topicInfoType, topicInfoDialogue, akSpeaker, akSpokenTo)
+    endif
 endEvent
 
 ; ==========================================================

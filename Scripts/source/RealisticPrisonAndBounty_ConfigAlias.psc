@@ -9,6 +9,12 @@ RealisticPrisonAndBounty_Config property Config
     endFunction
 endProperty
 
+RealisticPrisonAndBounty_SceneManager property SceneManager
+    RealisticPrisonAndBounty_SceneManager function get()
+        return Config.SceneManager
+    endFunction
+endProperty
+
 function PerformSetup()
     bool registeredEvents               = Config.HandleEvents()
     bool holdsSetup                     = Config.SetHolds()
@@ -57,6 +63,8 @@ function PerformMaintenance()
         "\n" + \
         "Registering Events: " + string_if (registeredEvents, "OK", "Failed") \
     )
+    
+    SceneManager.SetupScenes()
 
     if (!registeredEvents)
         Debug.MessageBox("["+ GetModName() +"] Failed to register events, the mod may not work at all!")

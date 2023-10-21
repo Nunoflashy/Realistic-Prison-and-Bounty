@@ -11,6 +11,25 @@ string property STATE_UNCONSCIOUS   = "Unconscious" autoreadonly
 string property STATE_ARRESTED      = "Arrested" autoreadonly
 string property STATE_SURRENDER     = "Surrender" autoreadonly
 
+; ==========================================================
+;                      Arrest Topic Types
+; ==========================================================
+int property TOPIC_START    = 0 autoreadonly
+int property TOPIC_END      = 1 autoreadonly
+
+int property TOPIC_TYPE_ARREST_SUSPICIOUS       = 5 autoreadonly
+int property TOPIC_TYPE_ARREST_DIALOGUE_ELUDING = 6 autoreadonly
+int property TOPIC_TYPE_ARREST_PURSUIT_ELUDING  = 7 autoreadonly
+int property TOPIC_TYPE_ARREST_CONFRONT         = 10 autoreadonly
+int property TOPIC_TYPE_ARREST_PAY_BOUNTY       = 11 autoreadonly
+int property TOPIC_TYPE_ARREST_RESIST           = 15 autoreadonly
+int property TOPIC_TYPE_COMBAT_YIELD            = 16 autoreadonly
+int property TOPIC_TYPE_ARREST_GO_TO_JAIL       = 20 autoreadonly
+
+; ==========================================================
+;                         Arrest Types
+; ==========================================================
+
 string property ARREST_TYPE_TELEPORT_TO_JAIL    = "TeleportToJail" autoreadonly
 string property ARREST_TYPE_TELEPORT_TO_CELL    = "TeleportToCell" autoreadonly
 string property ARREST_TYPE_ESCORT_TO_JAIL      = "EscortToJail" autoreadonly
@@ -23,33 +42,33 @@ RealisticPrisonAndBounty_Config property Config
     endFunction
 endProperty
 
-RealisticPrisonAndBounty_Jail property jail
+RealisticPrisonAndBounty_Jail property Jail
     RealisticPrisonAndBounty_Jail function get()
-        return Config.jail
+        return Config.Jail
     endFunction
 endProperty
 
-RealisticPrisonAndBounty_ArrestVars property arrestVars
+RealisticPrisonAndBounty_ArrestVars property ArrestVars
     RealisticPrisonAndBounty_ArrestVars function get()
-        return Config.arrestVars
+        return Config.ArrestVars
     endFunction
 endProperty
 
-RealisticPrisonAndBounty_ActorVars property actorVars
+RealisticPrisonAndBounty_ActorVars property ActorVars
     RealisticPrisonAndBounty_ActorVars function get()
-        return Config.actorVars
+        return Config.ActorVars
     endFunction
 endProperty
 
-RealisticPrisonAndBounty_MiscVars property miscVars
+RealisticPrisonAndBounty_MiscVars property MiscVars
     RealisticPrisonAndBounty_MiscVars function get()
-        return Config.miscVars
+        return Config.MiscVars
     endFunction
 endProperty
 
-RealisticPrisonAndBounty_SceneManager property sceneManager
+RealisticPrisonAndBounty_SceneManager property SceneManager
     RealisticPrisonAndBounty_SceneManager function get()
-        return Config.sceneManager
+        return Config.SceneManager
     endFunction
 endProperty
 
@@ -76,6 +95,7 @@ endFunction
 
 ;/
     Registers a delayed event through a state's OnUpdate()
+
     string  @stateName: The name of the state that represents the event name
     float   @delaySeconds: The time waited in seconds before the event is fired
 /;
@@ -86,6 +106,7 @@ endFunction
 
 ;/
     Registers a delayed event through a state's OnUpdateGameTime()
+    
     string  @stateName: The name of the state that represents the event name
     float   @delayGameTime: The time waited in game-time before the event is fired (1 = 1 Day | 1/24 = 1h)
 /;
@@ -95,24 +116,123 @@ function RegisterForDelayedEventGameTime(string stateName, float delayGameTime)
 endFunction
 
 function AddBountyGainedWhileJailed(Faction akArrestFaction)
-    arrestVars.ModInt("Jail::Bounty Non-Violent", akArrestFaction.GetCrimeGoldNonViolent())
-    arrestVars.ModInt("Jail::Bounty Violent", akArrestFaction.GetCrimeGoldViolent())
+    ArrestVars.ModInt("Jail::Bounty Non-Violent", akArrestFaction.GetCrimeGoldNonViolent())
+    ArrestVars.ModInt("Jail::Bounty Violent", akArrestFaction.GetCrimeGoldViolent())
     ClearBounty(akArrestFaction)
 endFunction
 
 function SetEludedGuard(Actor akEludedGuard, string asEludeType)
-    arrestVars.SetActor("Arrest::Eluded Captor", akEludedGuard)
-    arrestVars.SetString("Arrest::Elude Type", asEludeType)
+    ArrestVars.SetActor("Arrest::Eluded Captor", akEludedGuard)
+    ArrestVars.SetString("Arrest::Elude Type", asEludeType)
 endFunction
 
 function TriggerForcegreetEluding(Actor akEludedGuard)
+    Debug(self, "Arrest::TriggerForcegreetEluding", "RPB_AllowArrestForcegreet: " + RPB_AllowArrestForcegreet.GetValueInt())
+    Debug(self, "Arrest::TriggerForcegreetEluding", "Distance from Speaker: " + akEludedGuard.GetDistance(akEludedGuard.GetDialogueTarget()))
     self.SetEludedGuard(akEludedGuard, "Dialogue")
-    sceneManager.StartEludingArrest(akEludedGuard, config.Player)
+    SceneManager.StartEludingArrest(akEludedGuard, config.Player)
 endFunction
 
 function TriggerPursuitEluding(Actor akEludedGuard)
     self.SetEludedGuard(akEludedGuard, "Pursuit")
     RegisterForDelayedEvent("Eluding", config.ArrestEludeWarningTime) ; Register for a delayed event on Eluding::OnUpdate()
+endFunction
+
+function SetupArrestPayableBountyVars(Faction akCrimeFaction)
+    GlobalVariable RPB_ArrestGuaranteedPayableBounty = GetFormFromMod(0x161D2) as GlobalVariable
+    GlobalVariable RPB_ArrestMaxPayableBounty        = GetFormFromMod(0x161D4) as GlobalVariable
+    GlobalVariable RPB_ArrestRollDiceResult          = GetFormFromMod(0x16737) as GlobalVariable
+    
+    ; Update Globals (Determines if the arrest will be payable for sure, or if it falls within the maximum payable, which needs a roll of the dice)
+    RPB_ArrestGuaranteedPayableBounty.SetValueInt(Config.GetArrestGuaranteedPayableBounty(akCrimeFaction.GetName()))
+    RPB_ArrestMaxPayableBounty.SetValueInt(Config.GetArrestMaximumPayableBounty(akCrimeFaction.GetName()))
+
+    ; Roll the dice for max payable bounty chance
+    int maxPayableChance = Config.GetArrestMaximumPayableChance(akCrimeFaction.GetName())
+    int random = Utility.RandomInt(1, 100)
+    if (random <= maxPayableChance)
+        RPB_ArrestRollDiceResult.SetValueInt(random) ; Any value other than 0 will represent success
+    endif
+    Debug(self, "Arrest::SetupArrestPayableBountyVars", "Needed: <= " + maxPayableChance + ", Got: " + random)
+endFunction
+
+;/
+    Master Event for all types of dialogue concerning Arrest, anything to do with arrest through dialogue is
+    handled here.
+
+    int     @aiTopicInfoType: The type of the dialogue, Arrest to Jail, Arrest Resist, Arrest Confront, etc...
+    int     @aiTopicInfoEvent: The time of the event, at the Start or End of the dialogue.
+    string  @asTopicInfoDialogue: The dialogue lines, used if a unique action should be done depending on the dialogue.
+    Actor   @akSpeakerArrester: The guard actively trying to arrest the player.
+    Actor   @akSpokenToArrestee: The Actor that is being spoken to by @akSpeakerArrester, in most cases, an arrestee.
+
+    Dialogue Lines (@asTopicInfoDialogue):
+        - TOPIC_TYPE_ARREST_DIALOGUE_ELUDING
+            - Wait... I know you.
+
+        - TOPIC_TYPE_ARREST_PURSUIT_ELUDING
+            - That'll teach you to break the law on my watch.
+            - I thought it was finally going to be a quiet day.
+            - You really thought you could get away with it?
+            - Don't get any bright ideas.
+            - Stop, in the name of the Jarl!
+            - Come quietly or face the Jarl's justice!
+            - By order of the Jarl, I command you to halt!
+            - Sheathe your wepaons and come quietly!
+
+        - TOPIC_TYPE_ARREST_CONFRONT
+            - By order of the Jarl, stop right there!
+            - You have committed crimes against Skyrim and her people. What say you in your defense?
+
+        - TOPIC_TYPE_ARREST_PAY_BOUNTY
+            - Smart man. Now come along with us. We'll take any stolen goods and you'll be free to go. After you pay the fine, of course.
+            - Smart woman. Now come along with us. We'll take any stolen goods and you'll be free to go. After you pay the fine, of course.
+            - Good enough. I'll just confiscate any stolen goods you're carrying, then you're free to go.
+
+        - TOPIC_TYPE_COMBAT_YIELD
+            - I'll let you live. This time
+            - I'll spare you - for now.
+            - All right, you've had enough.
+            - You're not worth it.
+            - I didn't think you had the stomach for it.
+
+        - TOPIC_TYPE_ARREST_RESIST
+            - Time to cleanse the Empire of its filth.
+            - Then suffer the Emperor's wrath.
+            - Skyrim has no use for your kind.
+            - Then let me speed your passage to Sovngarde!
+            - Then pay with your blood.
+            - That can be arranged.
+            - So be it.
+/;
+event OnArrestDialogue(int aiTopicInfoEvent, int aiTopicInfoType, string asTopicInfoDialogue, Actor akSpeakerArrester, Actor akSpokenToArrestee)
+    if (aiTopicInfoEvent == TOPIC_START)
+        if (aiTopicInfoType == TOPIC_TYPE_ARREST_CONFRONT)
+            self.SetupArrestPayableBountyVars(akSpeakerArrester.GetCrimeFaction()) ; Setup arrest payable bounty vars
+
+        elseif (aiTopicInfoType == TOPIC_TYPE_ARREST_RESIST)
+            akSpeakerArrester.SendModEvent("RPB_ResistArrest", "", akSpokenToArrestee.GetFormID())
+
+        elseif (aiTopicInfoType == TOPIC_TYPE_COMBAT_YIELD)
+            akSpeakerArrester.SendModEvent("RPB_CombatYield", "", akSpokenToArrestee.GetFormID())
+        endif
+
+    elseif (aiTopicInfoEvent == TOPIC_END)
+        if (aiTopicInfoType == TOPIC_TYPE_ARREST_DIALOGUE_ELUDING)
+            akSpeakerArrester.SendModEvent("RPB_EludingArrest", "Dialogue")
+
+        elseif (aiTopicInfoType == TOPIC_TYPE_ARREST_PURSUIT_ELUDING)
+            akSpeakerArrester.SendModEvent("RPB_EludingArrest", "Pursuit")
+
+        elseif (aiTopicInfoType == TOPIC_TYPE_ARREST_GO_TO_JAIL)
+            akSpeakerArrester.SendModEvent("RPB_ArrestBegin", ARREST_TYPE_ESCORT_TO_JAIL, akSpokenToArrestee.GetFormID())
+        endif
+    endif
+endEvent
+
+function ResetDiceRollForMaxPayableBounty()
+    GlobalVariable RPB_ArrestRollDiceResult = GetFormFromMod(0x16737) as GlobalVariable
+    RPB_ArrestRollDiceResult.SetValueInt(0)
 endFunction
 
 event OnInit()
@@ -126,16 +246,13 @@ endEvent
 event OnKeyDown(int keyCode)
     if (keyCode == 0x58) ; F12
         string currentHold = config.GetCurrentPlayerHoldLocation()
-        arrestVars.SetForm("Arrest::Arrest Faction", config.GetCrimeFaction(currentHold))
-        Faction crimeFaction = arrestVars.GetForm("Arrest::Arrest Faction") as Faction
+        ArrestVars.SetForm("Arrest::Arrest Faction", config.GetCrimeFaction(currentHold))
+        Faction crimeFaction = ArrestVars.GetForm("Arrest::Arrest Faction") as Faction
         Actor nearbyGuard = GetNearestActor(config.Player, 7000)
         nearbyGuard.SendModEvent("RPB_ArrestBegin", ARREST_TYPE_TELEPORT_TO_CELL)
     
     elseif (keyCode == 0x44) ; F10
-        ; Actor nearbyGuard = GetNearestActor(config.Player, 7000)
-        ; nearbyGuard.GetCrimeFaction().SendPlayerToJail(true, true)
-        ; Actor nearbyGuard = GetNearestGuard(config.Player, 3500, none)
-        ; Debug(self, "Arrest::OnKeyDown", "Guard: " + nearbyGuard)
+
         Quest WIRemoveItem01 = Game.GetFormEx(0x2C6AB) as Quest
 
         WIRemoveItem01.Start()
@@ -143,7 +260,7 @@ event OnKeyDown(int keyCode)
         Actor solitudeGuard = Game.GetFormEx(0xF684E) as Actor
         config.Player.PlaceActorAtMe(config.Player.GetBaseObject() as ActorBase, 1, none)
         Debug(self, "Arrest::OnKeyDown", "F10 Pressed")
-        ; sceneManager.StartEscortFromCell(arrestVars.Captor, arrestVars.Arrestee, arrestVars.CellDoor, arrestVars.PrisonerItemsContainer)
+        ; sceneManager.StartEscortFromCell(ArrestVars.Captor, ArrestVars.Arrestee, ArrestVars.CellDoor, ArrestVars.PrisonerItemsContainer)
         ; Debug(self, "Arrest::OnKeyDown", "F10 Pressed - SceneManager")
 
         ; self.TriggerSurrender()
@@ -175,8 +292,8 @@ function ResetResistedFlag()
         string hold = miscVars.GetStringFromArray("Holds", i) ; To be tested
         string arrestResistKey = "Arrest::"+ hold +"::Arrest Resisted"
 
-        if (arrestVars.Exists(arrestResistKey))
-            arrestVars.Remove(arrestResistKey)
+        if (ArrestVars.Exists(arrestResistKey))
+            ArrestVars.Remove(arrestResistKey)
             Info(self, "Arrest::ResetResistedFlag", "The resist arrest flag for " + hold +" has been reset.")
         endif
         i += 1
@@ -190,8 +307,8 @@ function ResetEludedFlag()
         string hold = miscVars.GetStringFromArray("Holds", i) ; To be tested
         string arrestEludeKey = "Arrest::"+ hold +"::Arrest Eluded"
 
-        if (arrestVars.Exists(arrestEludeKey))
-            arrestVars.Remove(arrestEludeKey)
+        if (ArrestVars.Exists(arrestEludeKey))
+            ArrestVars.Remove(arrestEludeKey)
             Info(self, "Arrest::ResetEludedFlag", "The eluding arrest flag for " + hold +" has been reset.")
         endif
         i += 1
@@ -205,23 +322,35 @@ endFunction
     and eventually end up with multiple penalties from each guard for something that should only be punished once.
     After some time, this flag will be set to false and the next arrest will be punished once again.
     For more info, see the Resisted state
+
+    Faction     @akFaction: The arresting faction
 /;
 function SetResistedFlag(Faction akFaction)
-    arrestVars.SetBool("Arrest::"+ akFaction.GetName() +"::Arrest Resisted", true) ; Set arrest resisted flag
-    RegisterForDelayedEventGameTime("Resisted", 1.0)
+    ArrestVars.SetBool("Arrest::"+ akFaction.GetName() +"::Arrest Resisted", true) ; Set arrest resisted flag
 endFunction
 
+;/
+    Sets the Eluded Arrest flag to be active.
+    While this flag is active, further arrest attempts of this Faction will no longer incur a penalty upon eluding again.
+
+    This is to prevent multiple guards attempting to arrest the player and eventually end up with multiple penalties from each
+    guard for something that should only be punished once.
+
+    After some time, this flag will be inactive again and the next arrest attempt will be punished once again.
+
+    Faction     @akFaction: The arresting faction
+/;
 function SetEludedFlag(Faction akFaction)
-    arrestVars.SetBool("Arrest::"+ akFaction.GetName() +"::Arrest Eluded", true) ; Set arrest eluded flag
+    ArrestVars.SetBool("Arrest::"+ akFaction.GetName() +"::Arrest Eluded", true) ; Set arrest eluded flag
     RegisterForDelayedEventGameTime("Eluding", 1.0)
 endFunction
 
 bool function HasResistedArrestRecently(Faction akArrestFaction)
-    return arrestVars.GetBool("Arrest::" + akArrestFaction.GetName() + "::Arrest Resisted")
+    return ArrestVars.GetBool("Arrest::" + akArrestFaction.GetName() + "::Arrest Resisted")
 endFunction
 
 bool function HasEludedArrestRecently(Faction akArrestFaction)
-    return arrestVars.GetBool("Arrest::" + akArrestFaction.GetName() + "::Arrest Eluded")
+    return ArrestVars.GetBool("Arrest::" + akArrestFaction.GetName() + "::Arrest Eluded")
 endFunction
 
 ;/
@@ -229,8 +358,8 @@ endFunction
 /;
 function SetAsArrested(Actor akArrestee, Faction akFaction)
     if (akArrestee == config.Player)
-        arrestVars.SetBool("Arrest::Arrested", true)
-        arrestVars.SetFloat("Arrest::Time of Arrest", Utility.GetCurrentGameTime())
+        ArrestVars.SetBool("Arrest::Arrested", true)
+        ArrestVars.SetFloat("Arrest::Time of Arrest", Utility.GetCurrentGameTime())
         config.NotifyArrest("You have been arrested in " + akFaction.GetName())
         Info(self, "Arrest::SetAsArrested", akArrestee.GetBaseObject().GetName() + " has been arrested in " + akFaction.GetName() + " at " + Utility.GetCurrentGameTime())
     endif
@@ -249,16 +378,16 @@ endFunction
 function ReleaseDetainee(Actor akCaptor, Actor akDetainee)
     ; Revert Bounty
     Faction crimeFaction = akCaptor.GetCrimeFaction()
-    crimeFaction.SetCrimeGold(arrestVars.BountyNonViolent)
-    crimeFaction.SetCrimeGoldViolent(arrestVars.BountyViolent)
+    crimeFaction.SetCrimeGold(ArrestVars.BountyNonViolent)
+    crimeFaction.SetCrimeGoldViolent(ArrestVars.BountyViolent)
 
-    arrestVars.Remove("Arrest::Captured")
-    arrestVars.Remove("Arrest::Arrest Faction")
-    arrestVars.Remove("Arrest::Hold")
-    arrestVars.Remove("Arrest::Arrestee")
-    arrestVars.Remove("Arrest::Arrest Type")
-    arrestVars.Remove("Arrest::Arrested")
-    arrestVars.Remove("Arrest::Time of Arrest")
+    ArrestVars.Remove("Arrest::Captured")
+    ArrestVars.Remove("Arrest::Arrest Faction")
+    ArrestVars.Remove("Arrest::Hold")
+    ArrestVars.Remove("Arrest::Arrestee")
+    ArrestVars.Remove("Arrest::Arrest Type")
+    ArrestVars.Remove("Arrest::Arrested")
+    ArrestVars.Remove("Arrest::Time of Arrest")
 
     self.AllowArrestForcegreets()
     Game.SetPlayerAIDriven(false)
@@ -266,9 +395,9 @@ endFunction
 
 function ChangeArrestEscort(Actor akNewEscort, Actor akDetainee)
     ; A new guard was found, escort Detainee to jail
-    arrestVars.SetReference("Arrest::Arresting Guard", akNewEscort) ; Change the captor for further scenes and to lead to the cell
+    ArrestVars.SetReference("Arrest::Arresting Guard", akNewEscort) ; Change the captor for further scenes and to lead to the cell
     BindAliasTo(CaptorRef, akNewEscort)
-    sceneManager.StartEscortToJail(akNewEscort, arrestVars.Arrestee, arrestVars.PrisonerItemsContainer)
+    sceneManager.StartEscortToJail(akNewEscort, ArrestVars.Arrestee, ArrestVars.PrisonerItemsContainer)
 endFunction
 
 function ApplyArrestEludedPenalty(Faction akArrestFaction)
@@ -288,7 +417,7 @@ function ApplyArrestEludedPenalty(Faction akArrestFaction)
         config.NotifyArrest("You have gained " + totalEludeBounty + " Bounty in " + hold + " for eluding arrest!")
     endif
 
-    arrestVars.SetBool("Arrest::Eluded", true)
+    ArrestVars.SetBool("Arrest::Eluded", true)
     self.SetEludedFlag(akArrestFaction)
 endFunction
 
@@ -325,11 +454,11 @@ function ApplyArrestDefeatedPenalty(Faction akArrestFaction)
 
     ; Setup Defeated penalties
     ; Helper.GetArrestAdditionalBountyOnDefeat(hold)
-    ; arrestVars.SetInt("Arrest::Bounty for Defeat", Helper.GetArrestAdditionalBountyOnDefeat(hold))
-    arrestVars.SetInt("Arrest::Additional Bounty when Defeated", config.GetArrestAdditionalBountyDefeatedFlat(hold))
-    arrestVars.SetFloat("Arrest::Additional Bounty when Defeated from Current Bounty", GetPercentAsDecimal(config.GetArrestAdditionalBountyDefeatedFromCurrentBounty(hold)))
-    arrestVars.SetInt("Arrest::Bounty for Defeat", int_if (arrestVars.DefeatedAdditionalBountyPercentage > 0, round(akArrestFaction.GetCrimeGold() * arrestVars.DefeatedAdditionalBountyPercentage)) + arrestVars.DefeatedAdditionalBounty)
-    arrestVars.SetBool("Arrest::Defeated", true)
+    ; ArrestVars.SetInt("Arrest::Bounty for Defeat", Helper.GetArrestAdditionalBountyOnDefeat(hold))
+    ArrestVars.SetInt("Arrest::Additional Bounty when Defeated", config.GetArrestAdditionalBountyDefeatedFlat(hold))
+    ArrestVars.SetFloat("Arrest::Additional Bounty when Defeated from Current Bounty", GetPercentAsDecimal(config.GetArrestAdditionalBountyDefeatedFromCurrentBounty(hold)))
+    ArrestVars.SetInt("Arrest::Bounty for Defeat", int_if (ArrestVars.DefeatedAdditionalBountyPercentage > 0, round(akArrestFaction.GetCrimeGold() * ArrestVars.DefeatedAdditionalBountyPercentage)) + ArrestVars.DefeatedAdditionalBounty)
+    ArrestVars.SetBool("Arrest::Defeated", true)
 
     ; Bounty is applied later at the Arrest stage.
 endFunction
@@ -339,7 +468,7 @@ function SetArrestParams(string asArrestType, Actor akArrestee, Actor akCaptor, 
 
     if (akCaptor)
         crimeFaction = akCaptor.GetCrimeFaction()
-        arrestVars.SetForm("Arrest::Arresting Guard", akCaptor)
+        ArrestVars.SetForm("Arrest::Arresting Guard", akCaptor)
         CaptorRef.ForceRefTo(akCaptor)
         Debug(self, "Arrest::SetArrestParams", "Arrest is being done through a captor ("+ akCaptor +")")
     endif
@@ -349,11 +478,11 @@ function SetArrestParams(string asArrestType, Actor akArrestee, Actor akCaptor, 
         return
     endif
 
-    arrestVars.SetBool("Arrest::Captured", true)
-    arrestVars.SetForm("Arrest::Arrest Faction", crimeFaction)
-    arrestVars.SetString("Arrest::Hold", crimeFaction.GetName())
-    arrestVars.SetForm("Arrest::Arrestee", akArrestee)
-    arrestVars.SetString("Arrest::Arrest Type", asArrestType)
+    ArrestVars.SetBool("Arrest::Captured", true)
+    ArrestVars.SetForm("Arrest::Arrest Faction", crimeFaction)
+    ArrestVars.SetString("Arrest::Hold", crimeFaction.GetName())
+    ArrestVars.SetForm("Arrest::Arrestee", akArrestee)
+    ArrestVars.SetString("Arrest::Arrest Type", asArrestType)
 
     if (asArrestType == ARREST_TYPE_ESCORT_TO_JAIL || \
         asArrestType == ARREST_TYPE_ESCORT_TO_CELL)
@@ -365,11 +494,11 @@ function SetArrestParams(string asArrestType, Actor akArrestee, Actor akCaptor, 
     endif
 
     Debug(self, "Arrest::SetArrestParams", "[\n" + \ 
-        "\tCaptured: "+ arrestVars.GetBool("Arrest::Captured") +" \n" + \
-        "\tArrest Faction: "+ arrestVars.GetForm("Arrest::Arrest Faction") +"\n" + \
-        "\tHold: "+ arrestVars.GetString("Arrest::Hold") +"\n" + \
-        "\tArrestee: "+ arrestVars.GetForm("Arrest::Arrestee") +"\n" + \
-        "\tArrest Type: "+ arrestVars.GetString("Arrest::Arrest Type") +"\n" + \
+        "\tCaptured: "+ ArrestVars.GetBool("Arrest::Captured") +" \n" + \
+        "\tArrest Faction: "+ ArrestVars.GetForm("Arrest::Arrest Faction") +"\n" + \
+        "\tHold: "+ ArrestVars.GetString("Arrest::Hold") +"\n" + \
+        "\tArrestee: "+ ArrestVars.GetForm("Arrest::Arrestee") +"\n" + \
+        "\tArrest Type: "+ ArrestVars.GetString("Arrest::Arrest Type") +"\n" + \
     "]")
 
 endFunction
@@ -380,7 +509,7 @@ event OnArrestBegin(Actor akArrestee, Actor akCaptor, Faction akCrimeFaction, st
         return
     endif
 
-    if (arrestVars.IsArrested)
+    if (ArrestVars.IsArrested)
         config.NotifyArrest("You are already under arrest")
         Error(self, "Arrest::OnArrestBegin", akArrestee.GetBaseObject().GetName() + " has already been arrested, cannot arrest for "+ akCrimeFaction.GetName() +", aborting!")
 
@@ -415,20 +544,13 @@ event OnArrestDefeat(Actor akAttacker)
     Form handcuffs = Game.GetFormEx(0xA033D9E)
     config.Player.StopCombatAlarm()
     config.Player.EquipItem(handcuffs, true, true)
-    ; GotoState(STATE_UNCONSCIOUS)
 endEvent
 
 event OnArrestResist(Actor akArrestResister, Actor akGuard, Faction akCrimeFaction)
-    bool captured = arrestVars.GetBool("Arrest::Captured")
-    if (captured)
+    if (ArrestVars.GetBool("Arrest::Captured"))
         Warn(self, "Arrest::OnArrestResist", akArrestResister.GetBaseObject().GetName() + " was arrested, no arrest was resisted (maybe multiple guards talked at once and triggered resist arrest?) [BUG]")
         return
     endif
-    ; bool isAwaitingArrest = arrestVars.GetBool("Arrest::Awaiting Arrest")
-    ; if (isAwaitingArrest)
-    ;     Info(self, "Arrest::OnArrestResist", "The suspect is currently awaiting arrest, this should not count as resisting, returning...")
-    ;     return
-    ; endif
 
     akGuard.SetPlayerResistingArrest() ; Needed to make the guards attack the player, otherwise they will loop arrest dialogue
 
@@ -440,12 +562,12 @@ event OnArrestResist(Actor akArrestResister, Actor akGuard, Faction akCrimeFacti
     self.ApplyArrestResistedPenalty(akCrimeFaction)
 endEvent
 
-event OnCombatSpared(Actor akSparerGuard, Actor akSparedToBeArrested)
+event OnCombatYield(Actor akGuard, Actor akYieldedArrestee)
     ; Only begin arrest if they are within this distance,
     ; this is to avoid Guards triggering their dialogue while the player has already ran away.
-    if (akSparedToBeArrested.GetDistance(akSparerGuard) <= 2000)
+    if (akYieldedArrestee.GetDistance(akGuard) <= 1200)
         ArrestVars.SetString("Arrest::Arrest Scene", "ArrestStartFree01")
-        akSparerGuard.SendModEvent("RPB_ArrestBegin", ARREST_TYPE_ESCORT_TO_JAIL, akSparedToBeArrested.GetFormID())
+        akGuard.SendModEvent("RPB_ArrestBegin", ARREST_TYPE_ESCORT_TO_JAIL, akYieldedArrestee.GetFormID())
     endif
 endEvent
 
@@ -464,7 +586,7 @@ endEvent
         "In the name of the Jarl, I command you to stop!", or "Come quietly or face the Jarl's justice!"
 /;
 event OnArrestEludeStart(Actor akEludedGuard, string asEludeType)
-    Debug(self, "Arrest::OnArrestEludeStart", "This is called - Elude Type: " + asEludeType)
+    Debug(self, "Arrest::OnArrestEludeStart", "Started Eluding Arrest with Elude Type: " + asEludeType + ", akEludedGuard: " + akEludedGuard)
 
     if (asEludeType == "Dialogue")
         self.TriggerForcegreetEluding(akEludedGuard)
@@ -485,26 +607,26 @@ event OnArrestEludeTriggered(Actor akEludedGuard, string asEludeType)
         akEludedGuard.StartCombat(config.Player)
     
     elseif (asEludeType == "Dialogue")
-        sceneManager.ReleaseAlias("Guard") ; Unbind alias running the AI package from eluded guard
-        sceneManager.ReleaseAlias("Eluder") ; Unbind alias from the player
+        SceneManager.ReleaseAlias("Guard") ; Unbind alias running the AI package from eluded guard
+        SceneManager.ReleaseAlias("Eluder") ; Unbind alias from the player
     endif
 endEvent
 
 event OnArrestCaptorDeath(Actor akCaptor, Actor akCaptorKiller)
-    Actor anotherGuard = GetNearestGuard(arrestVars.Arrestee, 3500, exclude = akCaptor)
+    Actor anotherGuard = GetNearestGuard(ArrestVars.Arrestee, 3500, exclude = akCaptor)
 
     if (!anotherGuard)
         config.NotifyArrest("Your captor has died, you may now try to break free")
-        self.ReleaseDetainee(akCaptor, arrestVars.Arrestee)
+        self.ReleaseDetainee(akCaptor, ArrestVars.Arrestee)
         return
     endif
 
     config.NotifyArrest("Your captor has died, you are being escorted by another guard")
-    self.ChangeArrestEscort(anotherGuard, arrestVars.Arrestee)
+    self.ChangeArrestEscort(anotherGuard, ArrestVars.Arrestee)
 
     if (akCaptorKiller == none) ; to be changed to Player later, but this is easier to test
         int bounty = 10000
-        config.NotifyArrest("You have gained " + bounty + " Bounty in " + arrestVars.Hold + " for killing your captor!")
+        config.NotifyArrest("You have gained " + bounty + " Bounty in " + ArrestVars.Hold + " for killing your captor!")
     endif
 
     Debug(self, "Arrest::OnArrestCaptorDeath", "[\n"+ \ 
@@ -513,25 +635,12 @@ event OnArrestCaptorDeath(Actor akCaptor, Actor akCaptorKiller)
     +"]")
 endEvent
 
-; event OnArrestWait(string eventName, string unusedStr, float unusedFlt, Form sender)
-;     Actor akSpeaker = sender as Actor
-;     arrestVars.SetActor("Arrest::Waiting Captor", akSpeaker)
-;     arrestVars.SetBool("Arrest::Awaiting Arrest", true)
-;     Debug(self, "Arrest::OnArrestWaitStop", "Set the Awaiting Arrest flag to true")
-;     ; GotoState("WaitingOnArrest")
-; endEvent
-
-; event OnArrestWaitStop(string eventName, string unusedStr, float unusedFlt, Form sender)
-;     arrestVars.SetBool("Arrest::Awaiting Arrest", false)
-;     Debug(self, "Arrest::OnArrestWaitStop", "Set the Awaiting Arrest flag to false")
-; endEvent
-
 function BeginArrest()
-    string hold             = arrestVars.Hold
-    string arrestType       = arrestVars.ArrestType
-    Faction arrestFaction   = arrestVars.ArrestFaction
-    Actor arrestee          = arrestVars.Arrestee
-    Actor captor            = arrestVars.Captor ; May be undefined if the arrest is not done through a captor
+    string hold             = ArrestVars.Hold
+    string arrestType       = ArrestVars.ArrestType
+    Faction arrestFaction   = ArrestVars.ArrestFaction
+    Actor arrestee          = ArrestVars.Arrestee
+    Actor captor            = ArrestVars.Captor ; May be undefined if the arrest is not done through a captor
 
     self.SetBounty()
 
@@ -567,9 +676,13 @@ function BeginArrest()
         if (arrestee.GetDistance(captor))
             ; Later have several ArrestStart scenes happen depending on the distance and maybe have a more hostile version for the arrests eluded / resisted etc.
         endif
-        ; sceneManager.StartArrestStart02(captor, arrestee)
-        SceneManager.StartSceneAtPhase(1)
-        SceneManager.StartArrestStartPrison_01(captor, arrestee)
+
+        ; SceneManager.StartArrestStartPrison_01(captor, arrestee)
+        SceneManager.StartArrestStart03(captor, arrestee)
+        ; int sceneParams = JMap.object()
+        ; JMap.setForm(sceneParams, "Escort", captor)
+        ; JMap.setForm(sceneParams, "Escortee", arrestee)
+        ; SceneManager.StartScene(SceneManager.SCENE_ARREST_START_PRISON_01, sceneParams)
         ; jail.EscortToJail()
     endif
 
@@ -596,9 +709,7 @@ function BeginArrest()
 endFunction
 
 event OnArrestStart(Actor akCaptor, Actor akArrestee)
-    ; Jail.EscortToCell()
-    SceneManager.StartStripping_02(akCaptor, akArrestee)
-    ; jail.EscortToJail()
+    Jail.EscortToJail()
 endEvent
 
 event OnArresting(Actor akCaptor, Actor akArrestee)
@@ -626,7 +737,7 @@ function SetAsDefeated(Faction akCrimeFaction)
     )
 
     if (defeatArrestPenalty > 0)
-        arrestVars.ModInt("Arrest::Bounty Non-Violent", defeatArrestPenalty)
+        ArrestVars.ModInt("Arrest::Bounty Non-Violent", defeatArrestPenalty)
         config.NotifyArrest("You have gained " + defeatArrestPenalty + " Bounty in " + hold +" for being defeated")
     endif
 endFunction
@@ -636,25 +747,20 @@ function TriggerSurrender()
     Faction currentHoldFaction = config.GetFaction(currentHold)
     Actor arresteeRef = config.Player
 
-    if (arrestVars.IsArrested)
+    if (ArrestVars.IsArrested)
         config.NotifyArrest("You are already arrested")
         Error(self, "Arrest::OnArrestBegin", arresteeRef.GetBaseObject().GetName() + " is already arrested, cannot arrest for "+ currentHoldFaction.GetName() +", aborting!")
         return
     endif
 
-    self.PlaySurrenderAnimation(arrestVars.Arrestee)
+    self.PlaySurrenderAnimation(ArrestVars.Arrestee)
 
     self.SetAsDefeated(currentHoldFaction)
     currentHoldFaction.SendModEvent("RPB_ArrestBegin", ARREST_TYPE_TELEPORT_TO_CELL)
-
-    ; GotoState(STATE_SURRENDER)
-    ; RegisterForSingleUpdate(4.0)
-
-    ; currentHoldFaction.SendModEvent("RPB_ArrestBegin", ARREST_TYPE_TELEPORT_TO_CELL)
 endFunction
 
 bool function HasLatentBounty()
-    return arrestVars.Bounty > 0
+    return ArrestVars.Bounty > 0
 endFunction
 
 bool function HasActiveBounty(Faction akCrimeFaction)
@@ -663,50 +769,50 @@ endFunction
 
 function ResetArrest(string reason = "")
     ; Clear all arrest related vars
-    arrestVars.Clear()
+    ArrestVars.Clear()
     Info(self, "ResetArrest", reason, reason != "")
 endFunction
 
 function SetBounty()
-    Faction arrestFaction = arrestVars.ArrestFaction
+    Faction arrestFaction = ArrestVars.ArrestFaction
 
     if (self.HasLatentBounty())
         ; Add the "active bounty" if there's any, to the latent bounty
-        arrestVars.ModInt("Arrest::Bounty Non-Violent", arrestFaction.GetCrimeGoldNonViolent())
-        arrestVars.ModInt("Arrest::Bounty Violent", arrestFaction.GetCrimeGoldViolent())
+        ArrestVars.ModInt("Arrest::Bounty Non-Violent", arrestFaction.GetCrimeGoldNonViolent())
+        ArrestVars.ModInt("Arrest::Bounty Violent", arrestFaction.GetCrimeGoldViolent())
     else
         ; Set the bounties to be latent
-        arrestVars.SetFloat("Arrest::Bounty Non-Violent", arrestFaction.GetCrimeGoldNonViolent())
-        arrestVars.SetFloat("Arrest::Bounty Violent", arrestFaction.GetCrimeGoldViolent())
+        ArrestVars.SetFloat("Arrest::Bounty Non-Violent", arrestFaction.GetCrimeGoldNonViolent())
+        ArrestVars.SetFloat("Arrest::Bounty Violent", arrestFaction.GetCrimeGoldViolent())
     endif
 
-    if (arrestVars.WasDefeated && arrestVars.DefeatedBounty > 0)
-        arrestVars.ModInt("Arrest::Bounty Non-Violent", arrestVars.DefeatedBounty)
-        config.NotifyArrest("You were defeated, " + arrestVars.DefeatedBounty + " Bounty gained in " + arrestVars.Hold)
+    if (ArrestVars.WasDefeated && ArrestVars.DefeatedBounty > 0)
+        ArrestVars.ModInt("Arrest::Bounty Non-Violent", ArrestVars.DefeatedBounty)
+        config.NotifyArrest("You were defeated, " + ArrestVars.DefeatedBounty + " Bounty gained in " + ArrestVars.Hold)
     endif
 
-    ; if (arrestVars.GetBool("Jail::Escaped"))
-    ;     int currentBounty = arrestVars.BountyNonViolent - 1000 ; Subtract 1000 which is the bounty given after escape success
-    ;     int currentBountyViolent = arrestVars.BountyViolent
-    ;     int escapeBountyNonViolent = arrestVars.GetInt("Escape::Bounty Non-Violent")
-    ;     int escapeBountyViolent = arrestVars.GetInt("Escape::Bounty Violent")
+    ; if (ArrestVars.GetBool("Jail::Escaped"))
+    ;     int currentBounty = ArrestVars.BountyNonViolent - 1000 ; Subtract 1000 which is the bounty given after escape success
+    ;     int currentBountyViolent = ArrestVars.BountyViolent
+    ;     int escapeBountyNonViolent = ArrestVars.GetInt("Escape::Bounty Non-Violent")
+    ;     int escapeBountyViolent = ArrestVars.GetInt("Escape::Bounty Violent")
     ;     int totalBounty = (currentBounty + escapeBountyNonViolent) + (currentBountyViolent + escapeBountyViolent)
 
-    ;     arrestVars.SetFloat("Arrest::Bounty Non-Violent", currentBounty + escapeBountyNonViolent)
-    ;     arrestVars.SetFloat("Arrest::Bounty Violent", currentBountyViolent + escapeBountyViolent)
+    ;     ArrestVars.SetFloat("Arrest::Bounty Non-Violent", currentBounty + escapeBountyNonViolent)
+    ;     ArrestVars.SetFloat("Arrest::Bounty Violent", currentBountyViolent + escapeBountyViolent)
 
     ;     Debug(none, "SetBounty", "currentBounty: " + currentBounty + ", currentBountyV: " + currentBountyViolent + ", escapeBountyNv: " + escapeBountyNonViolent + ", escapeBountyV: " + escapeBountyViolent + ", totalBounty: " + totalBounty)
     ; endif
 
-    if (arrestVars.HasOverride("Arrest::Bounty Non-Violent"))
+    if (ArrestVars.HasOverride("Arrest::Bounty Non-Violent"))
         Debug(self, "SetBounty", "\n" + \
-            "(Overridden) Arrest::Bounty Non-Violent: " + arrestVars.BountyNonViolent + "\n" \
+            "(Overridden) Arrest::Bounty Non-Violent: " + ArrestVars.BountyNonViolent + "\n" \
         )
     endif
 
-    if (arrestVars.HasOverride("Arrest::Bounty Non-Violent"))
+    if (ArrestVars.HasOverride("Arrest::Bounty Non-Violent"))
         Debug(self, "SetBounty", "\n" + \
-            "(Overridden) Arrest::Bounty Violent: " + arrestVars.BountyViolent + "\n" \
+            "(Overridden) Arrest::Bounty Violent: " + ArrestVars.BountyViolent + "\n" \
         )
     endif
 
@@ -715,23 +821,23 @@ function SetBounty()
 endFunction
 
 function UpdateArrestStats()
-    Actor arrestee  = arrestVars.Arrestee
+    Actor arrestee  = ArrestVars.Arrestee
 
     if (arrestee == config.Player)
-        string hold     = arrestVars.Hold
-        int bounty      = arrestVars.Bounty
+        string hold     = ArrestVars.Hold
+        int bounty      = ArrestVars.Bounty
 
-        int currentLargestBounty = actorVars.GetLargestBounty(arrestVars.ArrestFaction, arrestVars.Arrestee)
-        actorVars.SetCurrentBounty(arrestVars.ArrestFaction, arrestVars.Arrestee, bounty)
-        actorVars.SetLargestBounty(arrestVars.ArrestFaction, arrestVars.Arrestee, int_if (currentLargestBounty < bounty, bounty, currentLargestBounty))
-        actorVars.ModTotalBounty(arrestVars.ArrestFaction, arrestVars.Arrestee, bounty)
-        actorVars.ModTimesArrested(arrestVars.ArrestFaction, arrestVars.Arrestee, 1)
+        int currentLargestBounty = actorVars.GetLargestBounty(ArrestVars.ArrestFaction, ArrestVars.Arrestee)
+        actorVars.SetCurrentBounty(ArrestVars.ArrestFaction, ArrestVars.Arrestee, bounty)
+        actorVars.SetLargestBounty(ArrestVars.ArrestFaction, ArrestVars.Arrestee, int_if (currentLargestBounty < bounty, bounty, currentLargestBounty))
+        actorVars.ModTotalBounty(ArrestVars.ArrestFaction, ArrestVars.Arrestee, bounty)
+        actorVars.ModTimesArrested(ArrestVars.ArrestFaction, ArrestVars.Arrestee, 1)
 
     else ; Processing for NPC stats later
         ; e.g:
-        ; Actor arrestee  = arrestVars.Arrestee
-        ; string hold = arrestVars.GetString("["+ arrestee.GetFormID() +"]Arrest::Hold")
-        ; int bounty  = arrestVars.GetInt("["+ arrestee.GetFormID() +"]Arrest::Bounty")
+        ; Actor arrestee  = ArrestVars.Arrestee
+        ; string hold = ArrestVars.GetString("["+ arrestee.GetFormID() +"]Arrest::Hold")
+        ; int bounty  = ArrestVars.GetInt("["+ arrestee.GetFormID() +"]Arrest::Bounty")
 
         ; actorVars.SetStat(hold, "["+ arrestee.GetFormID() +"]Current Bounty", bounty)
     endif
@@ -770,56 +876,21 @@ endFunction
 ;                   States & Delayed Events
 ; ==========================================================
 
-;/
-    The state where the actor should be upon being arrested.
-/;
-state Arrested
-    event OnBeginState()
-        Info(self, "Arrest::OnBeginState", "Begin State " + self.GetState())
-    endEvent
-
-    event OnUpdateGameTime()
-    endEvent
-
-    event OnEndState()
-        Info(self, "Arrest::OnEndState", "End State " + self.GetState())
-    endEvent
-endState
-
-;/
-    The state where the actor should be upon resisting arrest.
-/;
-state Resisted
-    event OnUpdateGameTime()
-        self.ResetResistedFlag()
-        GotoState("")
-    endEvent
-
-    event OnEndState()
-        Debug(self, "Arrest::OnEndState", "End State " + self.GetState(), config.IS_DEBUG)
-    endEvent
-endState
-
 state Eluding
     event OnBeginState()
         Debug(self, "Arrest::OnBeginState", "Begin State " + self.GetState())
     endEvent
 
     event OnUpdate()
-        string eludeType = arrestVars.GetString("Arrest::Elude Type")
+        string eludeType = ArrestVars.GetString("Arrest::Elude Type")
 
         if (eludeType == "Pursuit")
-            if (self.MeetsPursuitEludeRequirements(arrestVars.Arrestee))
-                Actor eludedCaptor = arrestVars.GetActor("Arrest::Eluded Captor")
+            if (self.MeetsPursuitEludeRequirements(Config.Player))
+                Actor eludedCaptor = ArrestVars.GetActor("Arrest::Eluded Captor")
                 self.OnArrestEludeTriggered(eludedCaptor, eludeType) ; Explicitly call Event
             endif
         endif
 
-        GotoState("")
-    endEvent
-
-    event OnUpdateGameTime()
-        self.ResetEludedFlag()
         GotoState("")
     endEvent
 
@@ -828,59 +899,7 @@ state Eluding
     endEvent
 endState
 
-;/
-    The state where the actor should be upon surrendering.
-/;
-state Surrender
-    event OnBeginState()
-        self.PlaySurrenderAnimation(arrestVars.Arrestee)
-    endEvent
-
-    event OnUpdate()
-    endEvent
-
-    event OnEndState()
-        ; Actually arrest the actor
-        string currentHold = config.GetCurrentPlayerHoldLocation()
-        Faction currentHoldFaction = config.GetFaction(currentHold)
-        currentHoldFaction.SendModEvent("RPB_ArrestBegin", ARREST_TYPE_TELEPORT_TO_CELL)
-    endEvent
-endState
-
-state WaitingOnArrest
-    event OnBeginState()
-        RegisterForSingleUpdate(5.0)
-    endEvent
-
-    event OnUpdate()
-        Debug(self, "Arrest::OnUpdate", "IsAwaitingArrest: " + arrestVars.IsAwaitingArrest + ", Explicitly: " + arrestVars.GetBool("Arrest::Awaiting Arrest"))
-        bool isAwaitingArrest = arrestVars.GetBool("Arrest::Awaiting Arrest")
-        if (isAwaitingArrest)
-            Actor akWaitingCaptor = arrestVars.GetActor("Arrest::Waiting Captor")
-            akWaitingCaptor.GetCrimeFaction().ModCrimeGold(4000)
-
-            ; Idea for later: Have the captor walk towards the player and arrest them then
-            akWaitingCaptor.SendModEvent("RPB_ArrestBegin", "TeleportToCell", 0x14)
-        endif
-    endEvent
-
-    event OnEndState()
-        
-    endEvent
-endState
-
-state Unconscious
-    event OnBeginState()
-        config.Player.SetActorValue("Paralysis", 1)
-        config.Player.SetUnconscious(true)
-        config.Player.PushActorAway(config.Player, 4.0)
-
-        ; float randomTime = Utility.RandomFloat(1.0, 8)
-        RegisterForSingleUpdateGameTime(2.0)
-    endEvent
-
-    event OnUpdateGameTime()
-        config.Player.SetActorValue("Paralysis", 0)
-        config.Player.SetUnconscious(false)
-    endEvent
-endState
+event OnUpdateGameTime()
+    self.ResetEludedFlag()      ; Reset Eluded Arrest flags for all Holds
+    self.ResetResistedFlag()    ; Reset Resisted Arrest flags for all Holds
+endEvent

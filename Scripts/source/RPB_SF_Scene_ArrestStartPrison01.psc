@@ -1,11 +1,44 @@
 ;BEGIN FRAGMENT CODE - Do not edit anything between this and the end comment
-;NEXT FRAGMENT INDEX 14
+;NEXT FRAGMENT INDEX 22
 Scriptname RPB_SF_Scene_ArrestStartPrison01 Extends Scene Hidden
 
-;BEGIN FRAGMENT Fragment_8
-Function Fragment_8()
+;BEGIN FRAGMENT Fragment_18
+Function Fragment_18()
 ;BEGIN CODE
-self.SendModEvent("RPB_ScenePlayingStart", "RPB_ArrestStartPrison01", 2)
+self.SendModEvent("RPB_ScenePlayingStart", "RPB_ArrestStartPrison01", 4)
+;END CODE
+EndFunction
+;END FRAGMENT
+
+;BEGIN FRAGMENT Fragment_4
+Function Fragment_4()
+;BEGIN CODE
+self.SendModEvent("RPB_ScenePlayingEnd", "RPB_ArrestStartPrison01", 5)
+self.SendModEvent("RPB_SceneEnd", "RPB_ArrestStartPrison01")
+;END CODE
+EndFunction
+;END FRAGMENT
+
+;BEGIN FRAGMENT Fragment_10
+Function Fragment_10()
+;BEGIN CODE
+self.SendModEvent("RPB_ScenePlayingEnd", "RPB_ArrestStartPrison01", 2)
+;END CODE
+EndFunction
+;END FRAGMENT
+
+;BEGIN FRAGMENT Fragment_20
+Function Fragment_20()
+;BEGIN CODE
+self.SendModEvent("RPB_ScenePlayingEnd", "RPB_ArrestStartPrison01", 4)
+;END CODE
+EndFunction
+;END FRAGMENT
+
+;BEGIN FRAGMENT Fragment_16
+Function Fragment_16()
+;BEGIN CODE
+self.SendModEvent("RPB_ScenePlayingEnd", "RPB_ArrestStartPrison01", 3)
 ;END CODE
 EndFunction
 ;END FRAGMENT
@@ -26,11 +59,10 @@ self.SendModEvent("RPB_ScenePlayingStart", "RPB_ArrestStartPrison01", 5)
 EndFunction
 ;END FRAGMENT
 
-;BEGIN FRAGMENT Fragment_4
-Function Fragment_4()
+;BEGIN FRAGMENT Fragment_8
+Function Fragment_8()
 ;BEGIN CODE
-self.SendModEvent("RPB_ScenePlayingEnd", "RPB_ArrestStartPrison01", 5)
-self.SendModEvent("RPB_SceneEnd", "RPB_ArrestStartPrison01")
+self.SendModEvent("RPB_ScenePlayingStart", "RPB_ArrestStartPrison01", 2)
 ;END CODE
 EndFunction
 ;END FRAGMENT
@@ -43,10 +75,10 @@ self.SendModEvent("RPB_SceneStart", "RPB_ArrestStartPrison01")
 EndFunction
 ;END FRAGMENT
 
-;BEGIN FRAGMENT Fragment_10
-Function Fragment_10()
+;BEGIN FRAGMENT Fragment_14
+Function Fragment_14()
 ;BEGIN CODE
-self.SendModEvent("RPB_ScenePlayingEnd", "RPB_ArrestStartPrison01", 2)
+self.SendModEvent("RPB_ScenePlayingStart", "RPB_ArrestStartPrison01", 3)
 ;END CODE
 EndFunction
 ;END FRAGMENT
