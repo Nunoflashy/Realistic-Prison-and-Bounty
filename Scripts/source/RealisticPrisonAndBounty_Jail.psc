@@ -612,7 +612,7 @@ event OnFriskEnd(Actor friskSearchPerformer, Actor friskedActor)
     arrestVars.Captor.EvaluatePackage() ; temp
     ; Game.SetPlayerAIDriven(false)
     debug.notification("Jail::OnFriskEnd")
-    sceneManager.StartEscortToCell(arrestVars.Captor, arrestVars.Arrestee, arrestVars.JailCell, arrestVars.CellDoor)
+    SceneManager.StartEscortToCell(arrestVars.Captor, arrestVars.Arrestee, arrestVars.JailCell, arrestVars.CellDoor)
 endEvent
 
 event OnStripBegin(Actor stripSearchPerformer, Actor actorToStrip)
@@ -653,18 +653,18 @@ event OnStripEnd(Actor stripSearchPerformer, Actor strippedActor)
     SceneManager.StartRestrainPrisoner_02(stripSearchPerformer, strippedActor)
 
     if (Prisoner.ShouldBeClothed())
-        sceneManager.StartGiveClothing(arrestVars.Captor, Prisoner.this)
-        sceneManager.StartEscortToCell(arrestVars.Captor, arrestVars.Arrestee, arrestVars.JailCell, arrestVars.CellDoor)
+        SceneManager.StartGiveClothing(arrestVars.Captor, Prisoner.this)
+        SceneManager.StartEscortToCell(arrestVars.Captor, arrestVars.Arrestee, arrestVars.JailCell, arrestVars.CellDoor)
     else
-        ; sceneManager.StartNoClothing(stripSearchPerformer, strippedActor)
-        sceneManager.StartEscortToCell(arrestVars.Captor, arrestVars.Arrestee, arrestVars.JailCell, arrestVars.CellDoor)
+        ; SceneManager.StartNoClothing(stripSearchPerformer, strippedActor)
+        SceneManager.StartEscortToCell(arrestVars.Captor, arrestVars.Arrestee, arrestVars.JailCell, arrestVars.CellDoor)
     endif
 
 endEvent
 
 event OnBountyPaymentFailed(Actor akGuard, Actor akPrisoner)
     Debug(self, "Jail::OnBountyPaymentFailed", CurrentState + " event invoked")
-    sceneManager.StartStripping(akGuard, akPrisoner)
+    SceneManager.StartStripping(akGuard, akPrisoner)
 endEvent
 
 event OnEscortToJailBegin(Actor escortActor, Actor escortedActor)
@@ -679,24 +679,36 @@ endEvent
 event OnEscortToJailEnd(Actor escortActor, Actor escortedActor)
     ; Happens when the Actor has been escorted to the jail location
     Debug(self, "OnEscortToJailEnd", CurrentState + " event invoked")
-    ; sceneManager.StartForcedStripping(escortActor, escortedActor)
+
+    if (Arrest.GetActorIsPayingBounty(escortedActor))
+        ; If frisking is enabled and conditions are met, perform a frisk search here
+        
+        ; We don't want to imprison the arrestee, only pay their bounty
+        Arrest.PayCrimeGold(escortedActor, escortActor.GetCrimeFaction())
+        Arrest.UnrestrainArrestee(escortedActor)
+        Arrest.ResetArrestVars(escortedActor)
+        ArrestVars.List("Arrest")
+        return
+    endif
+
+    ; SceneManager.StartForcedStripping(escortActor, escortedActor)
     Prisoner.SetupPrisonerVars()
     BindAliasTo(Prisoner, escortedActor)
     self.SetupJailVars()
     Prisoner.SetupPrisonerVars()
-    ; sceneManager.StartEscortToCell(escortActor, escortedActor, arrestVars.JailCell, arrestVars.CellDoor)
-    sceneManager.StartStripping_02(escortActor, escortedActor)
+    ; SceneManager.StartEscortToCell(escortActor, escortedActor, arrestVars.JailCell, arrestVars.CellDoor)
+    SceneManager.StartStripping_02(escortActor, escortedActor)
     return
 
     if (Prisoner.ShouldBeFrisked())
-        sceneManager.StartFrisking(escortActor, escortedActor)
+        SceneManager.StartFrisking(escortActor, escortedActor)
 
     elseif (Prisoner.ShouldBeStripped())
-        ; sceneManager.StartStripping(escortActor, escortedActor)
-        sceneManager.StartForcedStripping02(escortActor, escortedActor)
+        ; SceneManager.StartStripping(escortActor, escortedActor)
+        SceneManager.StartForcedStripping02(escortActor, escortedActor)
 
     else
-        sceneManager.StartEscortToCell_02(escortActor, escortedActor, arrestVars.JailCell, arrestVars.CellDoor)
+        SceneManager.StartEscortToCell_02(escortActor, escortedActor, arrestVars.JailCell, arrestVars.CellDoor)
     endif
 endEvent
 
@@ -715,7 +727,7 @@ event OnEscortToCellEnd(Actor escortActor, Actor escortedActor)
     ; endif
     
     if (Prisoner.ShouldBeClothed())
-        sceneManager.StartGiveClothing(escortActor, escortedActor)
+        SceneManager.StartGiveClothing(escortActor, escortedActor)
     endif
     SendModEvent("RPB_JailBegin") ; Start the imprisonment
 endEvent
@@ -745,7 +757,7 @@ event OnClothingGiven(Actor clothingGiver, Actor clothingPrisoner)
     Debug(self, "OnClothingGiven", CurrentState + " event invoked")
     Prisoner.Clothe()
     ; if still in jail, not in the cell
-    ; sceneManager.StartEscortToCell(clothingGiver, clothingPrisoner, arrestVars.JailCell, arrestVars.CellDoor)
+    ; SceneManager.StartEscortToCell(clothingGiver, clothingPrisoner, arrestVars.JailCell, arrestVars.CellDoor)
 endEvent
 
 event OnActorCuffed(Actor cuffedActor, bool hands, bool feet)
@@ -913,12 +925,12 @@ function EscortToJail()
 
     ; Prisoner.SetupPrisonerVars()
     ; Start the escorting scene
-    ; sceneManager.StartEscortToCell(arrestVars.Captor, arrestVars.Arrestee, arrestVars.JailCell, arrestVars.CellDoor)
-    sceneManager.StartEscortToJail(arrestVars.Captor, arrestVars.Arrestee, prisonerChest)
+    ; SceneManager.StartEscortToCell(arrestVars.Captor, arrestVars.Arrestee, arrestVars.JailCell, arrestVars.CellDoor)
+    SceneManager.StartEscortToJail(arrestVars.Captor, arrestVars.Arrestee, prisonerChest)
 endFunction
 
 function EscortToCell()
-    sceneManager.StartEscortToCell(arrestVars.Captor, arrestVars.Arrestee, arrestVars.JailCell, arrestVars.CellDoor)
+    SceneManager.StartEscortToCell(arrestVars.Captor, arrestVars.Arrestee, arrestVars.JailCell, arrestVars.CellDoor)
 endFunction
 
 function TeleportToJail()
@@ -927,7 +939,7 @@ function TeleportToJail()
     arrestVars.Arrestee.MoveTo(prisonerChest)
     arrestVars.Captor.MoveTo(prisonerChest)
 
-    sceneManager.StartEscortToCell(arrestVars.Captor, arrestVars.Arrestee, arrestVars.JailCell, arrestVars.CellDoor)
+    SceneManager.StartEscortToCell(arrestVars.Captor, arrestVars.Arrestee, arrestVars.JailCell, arrestVars.CellDoor)
 endFunction
 
 function RestrainPrisoner(Actor akPrisoner, bool abRestrainInFront = false)

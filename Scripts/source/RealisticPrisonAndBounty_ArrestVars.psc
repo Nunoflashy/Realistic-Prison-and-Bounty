@@ -568,8 +568,23 @@ function Remove(string paramKey, bool removeOverrides = true)
     endif
 endFunction
 
+function RemoveForActor(Actor akActor, string paramKey, bool removeOverrides = true)
+    string fullKey = "["+ akActor.GetFormID() +"]" + paramKey
+    JMap.removeKey(_arrestVarsContainer, fullKey)
+
+    if (self.HasOverride(fullKey) && removeOverrides)
+        JMap.removeKey(_arrestVarsContainer, GetOverrideKey(fullKey))
+    endif
+endFunction
+
 function Clear()
     JMap.clear(_arrestVarsContainer)
+endFunction
+
+; Clears all Arrest vars for this Actor
+; Idea: add every actor to a sub-container inside the main container, and then clear the sub-container only which belongs to that Actor
+function ClearActor(Actor akActor)
+
 endFunction
 
 bool function Exists(string paramKey)

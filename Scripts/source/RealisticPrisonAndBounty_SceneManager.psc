@@ -207,6 +207,8 @@ function SetupScenes()
     JMap.setInt(sceneContainer, SCENE_ELUDING_ARREST_01,     0x12613) ; Eluding Arrest
     JMap.setInt(sceneContainer, SCENE_RESTRAIN_PRISONER_01,  0x15702) ; Restrain Prisoner 01
     JMap.setInt(sceneContainer, SCENE_RESTRAIN_PRISONER_02,  0x15C66) ; Restrain Prisoner 02
+    JMap.setInt(sceneContainer, SCENE_ARREST_PAY_BOUNTY_FOLLOW_WILLINGLY,  0x1776B) ; Pay Bounty Follow Willingly
+    JMap.setInt(sceneContainer, SCENE_ARREST_PAY_BOUNTY_FOLLOW_BY_FORCE,  0x1776E) ; Pay Bounty Follow By Force
 
     string scenesAdded = ""
     int i = 0
@@ -284,6 +286,19 @@ Scene function GetScene(string name)
     return Game.GetFormFromFile(JMap.getInt(sceneContainer, name), GetPluginName()) as Scene
 endFunction
 
+bool function SceneExists(string asSceneName)
+    return JMap.hasKey(sceneContainer, asSceneName)
+endFunction
+
+bool function IsValidScene(string asSceneCategory, string asSceneName)
+    if (asSceneCategory == "ArrestStart")
+        return  asSceneName == SCENE_ARREST_START_01 || \
+                asSceneName == SCENE_ARREST_START_02 || \ 
+                asSceneName == SCENE_ARREST_START_03 || \
+                asSceneName == SCENE_ARREST_START_04
+    endif
+endFunction
+
 ; ==========================================================
 ;                      Scene Event Types
 ; ==========================================================
@@ -293,33 +308,41 @@ int property PHASE_START    = 0 autoreadonly
 int property PHASE_END      = 1 autoreadonly
 
 ; ==========================================================
+;                       Scene Categories
+; ==========================================================
+
+string property CATEGORY_ARREST_START = "ArrestStart" autoreadonly
+
+; ==========================================================
 ;                         Scene Names
 ; ==========================================================
 
-string property SCENE_ARREST_START_01               = "RPB_ArrestStart" autoreadonly
-string property SCENE_ARREST_START_02               = "RPB_ArrestStart02" autoreadonly
-string property SCENE_ARREST_START_03               = "RPB_ArrestStart03" autoreadonly
-string property SCENE_ARREST_START_04               = "RPB_ArrestStart04" autoreadonly
-string property SCENE_ARREST_START_PRISON_01        = "RPB_ArrestStartPrison01" autoreadonly
-string property SCENE_GENERIC_ESCORT                = "RPB_GenericEscort" autoreadonly
-string property SCENE_ESCORT_FROM_CELL              = "RPB_EscortFromCell" autoreadonly
-string property SCENE_ESCORT_TO_JAIL                = "RPB_EscortToJail" autoreadonly
-string property SCENE_ESCORT_TO_CELL                = "RPB_EscortToCell" autoreadonly
-string property SCENE_ESCORT_TO_CELL_02             = "RPB_EscortToCell02" autoreadonly
-string property SCENE_ESCORT_TO_CELL_03             = "RPB_EscortToCell03" autoreadonly
-string property SCENE_STRIPPING                     = "RPB_Stripping" autoreadonly
-string property SCENE_STRIPPING_02                  = "RPB_Stripping02" autoreadonly
-string property SCENE_FORCED_STRIPPING_START_01     = "RPB_ForcedStrippingStart01" autoreadonly
-string property SCENE_FORCED_STRIPPING_01           = "RPB_ForcedStripping01" autoreadonly
-string property SCENE_FORCED_STRIPPING_02           = "RPB_ForcedStripping02" autoreadonly
-string property SCENE_FRISKING                      = "RPB_Frisking" autoreadonly
-string property SCENE_GIVE_CLOTHING                 = "RPB_GiveClothing" autoreadonly
-string property SCENE_UNLOCK_CELL                   = "RPB_UnlockCell" autoreadonly
-string property SCENE_PAYMENT_FAIL                  = "RPB_BountyPaymentFail" autoreadonly
-string property SCENE_NO_CLOTHING                   = "RPB_NoClothing" autoreadonly
-string property SCENE_ELUDING_ARREST_01             = "RPB_EludingArrest01" autoreadonly
-string property SCENE_RESTRAIN_PRISONER_01          = "RPB_RestrainPrisoner01" autoreadonly
-string property SCENE_RESTRAIN_PRISONER_02          = "RPB_RestrainPrisoner02" autoreadonly
+string property SCENE_ARREST_START_01                       = "RPB_ArrestStart" autoreadonly
+string property SCENE_ARREST_START_02                       = "RPB_ArrestStart02" autoreadonly
+string property SCENE_ARREST_START_03                       = "RPB_ArrestStart03" autoreadonly
+string property SCENE_ARREST_START_04                       = "RPB_ArrestStart04" autoreadonly
+string property SCENE_ARREST_START_PRISON_01                = "RPB_ArrestStartPrison01" autoreadonly
+string property SCENE_GENERIC_ESCORT                        = "RPB_GenericEscort" autoreadonly
+string property SCENE_ESCORT_FROM_CELL                      = "RPB_EscortFromCell" autoreadonly
+string property SCENE_ESCORT_TO_JAIL                        = "RPB_EscortToJail" autoreadonly
+string property SCENE_ESCORT_TO_CELL                        = "RPB_EscortToCell" autoreadonly
+string property SCENE_ESCORT_TO_CELL_02                     = "RPB_EscortToCell02" autoreadonly
+string property SCENE_ESCORT_TO_CELL_03                     = "RPB_EscortToCell03" autoreadonly
+string property SCENE_STRIPPING                             = "RPB_Stripping" autoreadonly
+string property SCENE_STRIPPING_02                          = "RPB_Stripping02" autoreadonly
+string property SCENE_FORCED_STRIPPING_START_01             = "RPB_ForcedStrippingStart01" autoreadonly
+string property SCENE_FORCED_STRIPPING_01                   = "RPB_ForcedStripping01" autoreadonly
+string property SCENE_FORCED_STRIPPING_02                   = "RPB_ForcedStripping02" autoreadonly
+string property SCENE_FRISKING                              = "RPB_Frisking" autoreadonly
+string property SCENE_GIVE_CLOTHING                         = "RPB_GiveClothing" autoreadonly
+string property SCENE_UNLOCK_CELL                           = "RPB_UnlockCell" autoreadonly
+string property SCENE_PAYMENT_FAIL                          = "RPB_BountyPaymentFail" autoreadonly
+string property SCENE_NO_CLOTHING                           = "RPB_NoClothing" autoreadonly
+string property SCENE_ELUDING_ARREST_01                     = "RPB_EludingArrest01" autoreadonly
+string property SCENE_RESTRAIN_PRISONER_01                  = "RPB_RestrainPrisoner01" autoreadonly
+string property SCENE_RESTRAIN_PRISONER_02                  = "RPB_RestrainPrisoner02" autoreadonly
+string property SCENE_ARREST_PAY_BOUNTY_FOLLOW_WILLINGLY    = "RPB_ArrestPayBountyFollowWillingly" autoreadonly
+string property SCENE_ARREST_PAY_BOUNTY_FOLLOW_BY_FORCE     = "RPB_ArrestPayBountyFollowByForce" autoreadonly
 
 
 ; ==========================================================
@@ -575,6 +598,18 @@ ObjectReference[] function GetSceneParameters(string sceneName)
         params[0] = self.GetGuard().GetReference()
         params[1] = self.GetPrisoner().GetReference()
 
+    elseif (sceneName == SCENE_ARREST_PAY_BOUNTY_FOLLOW_WILLINGLY)
+        params[0] = self.GetEscort().GetActorReference()
+        params[1] = self.GetEscortee().GetActorReference()
+        params[2] = self.GetGuardLocation().GetReference()
+        params[3] = self.GetPrisonerLocation().GetReference()
+
+    elseif (sceneName == SCENE_ARREST_PAY_BOUNTY_FOLLOW_BY_FORCE)
+        params[0] = self.GetEscort().GetActorReference()
+        params[1] = self.GetEscortee().GetActorReference()
+        params[2] = self.GetGuardLocation().GetReference()
+        params[3] = self.GetPrisonerLocation().GetReference()
+
     endif
 
     return params
@@ -746,6 +781,16 @@ event OnSceneStart(string name, Scene sender)
     elseif (name == SCENE_RESTRAIN_PRISONER_02)
         Actor guard     = params[0] as Actor
         Actor prisoner  = params[1] as Actor
+
+    elseif (name == SCENE_ARREST_PAY_BOUNTY_FOLLOW_WILLINGLY)
+        Actor escort                    = params[0] as Actor
+        Actor escortee                  = params[1] as Actor
+        ObjectReference escortLocation  = params[2]
+
+    elseif (name == SCENE_ARREST_PAY_BOUNTY_FOLLOW_BY_FORCE)
+        Actor escort                    = params[0] as Actor
+        Actor escortee                  = params[1] as Actor
+        ObjectReference escortLocation  = params[2]
 
     endif
 
@@ -1054,6 +1099,26 @@ event OnScenePlaying(string name, int phaseEvent, int phase, Scene sender)
             endif
         endif
 
+    elseif (name == SCENE_ARREST_PAY_BOUNTY_FOLLOW_WILLINGLY)
+        Actor escort                    = params[0] as Actor
+        Actor escortee                  = params[1] as Actor
+        ObjectReference escortLocation  = params[2]
+
+    elseif (name == SCENE_ARREST_PAY_BOUNTY_FOLLOW_BY_FORCE)
+        Actor escort                    = params[0] as Actor
+        Actor escortee                  = params[1] as Actor
+        ObjectReference escortLocation  = params[2]
+
+        if (phaseEvent == PHASE_START)
+            
+        elseif (phaseEvent == PHASE_END)
+            if (phase == 3)
+                RetainAI(escortee == Config.Player)
+                OrientRelative(escortee, escort, afRotZ = 180)
+                Debug.SendAnimationEvent(escortee, "ZazAPC001") ; Make arrestee put their hands behind the back
+                Arrest.RestrainArrestee(escortee)
+            endif
+        endif
 
     endif
 endEvent
@@ -1207,15 +1272,25 @@ event OnSceneEnd(string name, Scene sender)
         Actor guard     = params[0] as Actor
         Actor eluder    = params[1] as Actor
 
+    elseif (name == SCENE_ARREST_PAY_BOUNTY_FOLLOW_WILLINGLY)
+        Actor escort                    = params[0] as Actor
+        Actor escortee                  = params[1] as Actor
+        ObjectReference escortLocation  = params[2]
+
+        Arrest.OnArrestPayBountyEnd(escort, escortee, escort.GetCrimeFaction(), false)
+
+    elseif (name == SCENE_ARREST_PAY_BOUNTY_FOLLOW_BY_FORCE)
+        Actor escort                    = params[0] as Actor
+        Actor escortee                  = params[1] as Actor
+        ObjectReference escortLocation  = params[2]
+
+        Arrest.OnArrestPayBountyEnd(escort, escortee, escort.GetCrimeFaction(), true)
+        ReleaseAI(escortee == Config.Player)
     endif
 
     self.ResetSceneOverride()
     Debug(self, "SceneManager::OnSceneEnd", self.GetSceneParametersDebugInfo(sender, name, params))
 endEvent
-
-bool function SceneExists(string asSceneName)
-    return JMap.hasKey(sceneContainer, asSceneName)
-endFunction
 
 function StartScene(string asSceneName, int akSceneParameters, int aiStartingPhase = 1, bool abForceStart = false)
     if (!self.SceneExists(asSceneName))
@@ -1454,6 +1529,16 @@ function StartArrestStart04(Actor akGuard, Actor akPrisoner)
     ArrestStart04.Start()
 endFunction
 
+function StartArrestScene(Actor akGuard, Actor akArrestee, string asScene)
+    ; Bind the captor
+    BindAliasTo(self.GetEscort(), akGuard)
+
+    ; Bind the Arrestee, who's getting arrested
+    BindAliasTo(self.GetEscortee(), akArrestee)
+
+    self.GetScene(asScene).Start()
+endFunction
+
 function StartArrestStartPrison_01(Actor akGuard, Actor akPrisoner, int aiStartingPhase = 1)
     ; Bind the captor
     BindAliasTo(self.GetEscort(), akGuard)
@@ -1526,4 +1611,13 @@ function StartEludingArrest(Actor akGuard, Actor akEluder)
     Debug(self, "SceneManager::StartEludingArrest", "Scene: "+ EludingArrest +" Params ["+ akGuard + ", " + akEluder + "] | Aliases: ["+ self.GetGuard() + ", " + self.GetEluder() + "]")
 
     EludingArrest.Start()
+endFunction
+
+function StartArrestPayBountyFollowByForce(Actor akEscort, Actor akEscortee, ObjectReference akEscortLocation)
+    BindAliasTo(self.GetEscort(), akEscort)
+    BindAliasTo(self.GetEscortee(), akEscortee)
+    BindAliasTo(self.GetGuardLocation(), akEscortLocation)
+    BindAliasTo(self.GetPrisonerLocation(), akEscortLocation)
+
+    self.GetScene(SCENE_ARREST_PAY_BOUNTY_FOLLOW_BY_FORCE).Start()
 endFunction

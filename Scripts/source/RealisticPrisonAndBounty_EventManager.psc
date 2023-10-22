@@ -34,8 +34,7 @@ function RegisterEvents()
     RegisterForModEvent("RPB_EludingArrest", "OnArrestEludeStart")      ; Eluding Arrest (Start)
     RegisterForModEvent("RPB_ArrestDefeated", "OnArrestDefeat")         ; Happens after the player is defeated through DA
     RegisterForModEvent("RPB_CombatYield", "OnCombatYield")             ; Happens when the player is spared after yielding
-    ; RegisterForModEvent("RPB_ArrestWaiting", "OnArrestWait")          ; Wait the response from player during Arrest
-    ; RegisterForModEvent("RPB_ArrestWaitingStop", "OnArrestWaitStop")  ; Something happened to prevent OnArrestWait, cancel the state
+    RegisterForModEvent("RPB_SetArrestScene", "OnArrestSceneChanged")   ; Happens when there's a request to change the Arrest scene
 
     ; Jail Event Handlers
     RegisterForModEvent("RPB_JailBegin", "OnJailBegin")
@@ -50,6 +49,8 @@ function RegisterEvents()
     ; Topic Info Event Handlers (TIF Scripts)
     RegisterForModEvent("RPB_TopicInfoStart", "OnDialogueTopicStart")
     RegisterForModEvent("RPB_TopicInfoEnd", "OnDialogueTopicEnd")
+
+    RegisterForModEvent("RPB_PayBounty", "OnPayBounty")               ; Happens when the player is about to pay their bounty
 
     ; Package Event Handlers
     RegisterForModEvent("RPB_PackageEnd", "OnPackageEnd")
@@ -183,14 +184,75 @@ event OnCombatYield(string eventName, string unusedStr, float unusedFlt, Form se
         return
     endif
 
-    if (!yieldedArrestee)
-        Error(self, "EventManager::OnCombatYield", "Could not get the dialogue target of " + guard + ", returning...")
-        return
-    endif
-
     Arrest.OnCombatYield(guard, yieldedArrestee)
 endEvent
 
+event OnArrestSceneChanged(string eventName, string sceneName, float unusedFlt, Form sender)
+    Actor arrestee = (sender as Actor)
+
+    if (sceneName == "")
+        Error(self, "EventManager::OnArrestSceneChanged", "There was no Scene passed in to the request.")
+        return
+    endif
+
+    if (!arrestee)
+        Error(self, "EventManager::OnArrestSceneChanged", "sender is not an Actor, failed check! [sender: "+ sender +"]")
+        return
+    endif
+
+    if (!SceneManager.SceneExists(sceneName))
+        Error(self, "EventManager::OnArrestSceneChanged", "The Scene " + sceneName + " does not exist, returning...")
+        return
+    endif
+
+    string sceneCategoryArrestStart = SceneManager.CATEGORY_ARREST_START
+    
+    if (!SceneManager.IsValidScene(sceneCategoryArrestStart, sceneName))
+        Error(self, "EventManager::OnArrestSceneChanged", "The Scene " + sceneName + " is not a valid Scene for the type "+ sceneCategoryArrestStart +", returning...")
+        return
+    endif
+
+    Arrest.OnArrestSceneChange(arrestee, sceneName)
+endEvent
+
+event OnPayBounty(string eventName, string categoryPayBounty, float arresteeFormIdFlt, Form sender)
+    Actor guard = (sender as Actor)
+
+    if (!guard)
+        Error(self, "EventManager::OnPayBounty", "sender is not an Actor, failed check! [sender: "+ sender +"]")
+        return
+    endif
+
+    if (!guard.IsGuard())
+        Info(self, "EventManager::OnPayBounty", "Actor is not a Guard, the event will not proceed!")
+        return
+    endif
+
+    Actor arrestee = guard.GetDialogueTarget()
+
+    ; Fallback to Player if nearby, since GetDialogueTarget() fails if there are many guards talking at once, arrestee will be none
+    if (!arrestee && guard.GetDistance(Config.Player) <= 1000)
+        arrestee = Config.Player
+        Debug(self, "EventManager::OnPayBounty", "Could not get the dialogue target of " + guard + ", falling back to Player since they are nearby.")
+    endif
+
+    ; Failed to get dialogue target even with fallback, player must not be near
+    if (!arrestee)
+        Error(self, "EventManager::OnPayBounty", "Could not get the dialogue target of " + guard + ", returning...")
+        Trace(self, "EventManager::OnPayBounty", "Stack Trace: [\n" + \
+            "\teventName: " + eventName + "\n" + \
+            "\tsender: " + sender + "\n" + \
+            "\tguard: " + guard + "\n" + \
+            "\tarrestee: " + arrestee + "\n" + \
+        "\n]")
+        return
+    endif
+
+    Faction crimeFaction = guard.GetCrimeFaction()
+
+    Arrest.OnArrestPayBounty(guard, arrestee, crimeFaction, categoryPayBounty)
+
+endEvent
 
 ; ==========================================================
 ;                         Jail Events
