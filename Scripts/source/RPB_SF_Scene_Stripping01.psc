@@ -5,7 +5,7 @@ Scriptname RPB_SF_Scene_Stripping01 Extends Scene Hidden
 ;BEGIN FRAGMENT Fragment_5
 Function Fragment_5()
 ;BEGIN CODE
-self.SendModEvent("RPB_SceneStart", "RPB_Stripping")
+self.SendModEvent("RPB_SceneStart", "RPB_Stripping01")
 ;END CODE
 EndFunction
 ;END FRAGMENT
@@ -14,7 +14,7 @@ EndFunction
 Function Fragment_0()
 ;BEGIN CODE
 ; SendModEvent("RPB_UndressActor")
-self.SendModEvent("RPB_SceneEnd", "RPB_Stripping")
+self.SendModEvent("RPB_SceneEnd", "RPB_Stripping01")
 debug.notification("Called from within the Scene SF Script")
 debug.notification("Started Stripping Scene: Phase 2")
 ;END CODE

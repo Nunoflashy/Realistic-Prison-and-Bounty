@@ -6,7 +6,7 @@ Scriptname RPB_TIF_ArrestPayBounty__000267E0 Extends TopicInfo Hidden
 Function Fragment_0(ObjectReference akSpeakerRef)
 Actor akSpeaker = akSpeakerRef as Actor
 ;BEGIN CODE
-akSpeaker.SendModEvent("RPB_TopicInfoEnd", "Smart man. Now come along with us. We'll take any stolen goods, and you'll be free to go. After you pay the fine, of course.", 13)
+akSpeaker.SendModEvent("RPB_TopicInfoEnd", "Smart man. Now come along with us. We'll take any stolen goods, and you'll be free to go. After you pay the fine, of course.", 12)
 ;END CODE
 EndFunction
 ;END FRAGMENT

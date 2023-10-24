@@ -11,27 +11,34 @@ RealisticPrisonAndBounty_Config property Config
     endFunction
 endProperty
 
-RealisticPrisonAndBounty_Arrest property arrest
+RealisticPrisonAndBounty_Arrest property Arrest
     RealisticPrisonAndBounty_Arrest function get()
-        return config.Arrest
+        return Config.Arrest
     endFunction
 endProperty
 
 RealisticPrisonAndBounty_ArrestVars property ArrestVars
     RealisticPrisonAndBounty_ArrestVars function get()
-        return config.ArrestVars
+        return Config.ArrestVars
     endFunction
 endProperty
 
+RealisticPrisonAndBounty_ArrestVars property JailVars
+    RealisticPrisonAndBounty_ArrestVars function get()
+        return Config.ArrestVars
+    endFunction
+endProperty
+
+
 RealisticPrisonAndBounty_MiscVars property MiscVars
     RealisticPrisonAndBounty_MiscVars function get()
-        return config.MiscVars
+        return Config.MiscVars
     endFunction
 endProperty
 
 RealisticPrisonAndBounty_SceneManager property SceneManager
     RealisticPrisonAndBounty_SceneManager function get()
-        return config.SceneManager
+        return Config.SceneManager
     endFunction
 endProperty
 
@@ -101,82 +108,82 @@ endFunction
 
 function SetupJailVars()
     float x = StartBenchmark()
-    arrestVars.SetBool("Jail::Infamy Enabled", config.IsInfamyEnabled(Hold))
-    arrestVars.SetFloat("Jail::Infamy Recognized Threshold", config.GetInfamyRecognizedThreshold(Hold))
-    arrestVars.SetFloat("Jail::Infamy Known Threshold", config.GetInfamyKnownThreshold(Hold))
-    arrestVars.SetFloat("Jail::Infamy Gained Daily from Current Bounty", config.GetInfamyGainedDailyFromArrestBounty(Hold))
-    arrestVars.SetFloat("Jail::Infamy Gained Daily", config.GetInfamyGainedDaily(Hold))
-    arrestVars.SetInt("Jail::Infamy Gain Modifier (Recognized)", config.GetInfamyGainModifier(Hold, "Recognized"))
-    arrestVars.SetInt("Jail::Infamy Gain Modifier (Known)", config.GetInfamyGainModifier(Hold, "Known"))
-    arrestVars.SetFloat("Jail::Bounty Exchange", config.GetJailBountyExchange(Hold))
-    arrestVars.SetFloat("Jail::Bounty to Sentence", config.GetJailBountyToSentence(Hold))
-    arrestVars.SetFloat("Jail::Minimum Sentence", config.GetJailMinimumSentence(Hold))
-    arrestVars.SetFloat("Jail::Maximum Sentence", config.GetJailMaximumSentence(Hold))
-    arrestVars.SetFloat("Jail::Cell Search Thoroughness", config.GetJailCellSearchThoroughness(Hold))
-    arrestVars.SetString("Jail::Cell Lock Level", config.GetJailCellDoorLockLevel(Hold))
-    arrestVars.SetBool("Jail::Fast Forward", config.IsJailFastForwardEnabled(Hold))
-    arrestVars.SetFloat("Jail::Day to Fast Forward From", config.GetJailFastForwardDay(Hold))
-    arrestVars.SetString("Jail::Handle Skill Loss", config.GetJailHandleSkillLoss(Hold))
-    arrestVars.SetFloat("Jail::Day to Start Losing Skills", config.GetJailDayToStartLosingSkills(Hold))
-    arrestVars.SetFloat("Jail::Chance to Lose Skills", config.GetJailChanceToLoseSkillsDaily(Hold))
-    arrestVars.SetFloat("Jail::Recognized Criminal Penalty", config.GetJailRecognizedCriminalPenalty(Hold))
-    arrestVars.SetFloat("Jail::Known Criminal Penalty", config.GetJailKnownCriminalPenalty(Hold))
-    arrestVars.SetFloat("Jail::Bounty to Trigger Infamy", config.GetJailBountyToTriggerCriminalPenalty(Hold))
-    arrestVars.SetBool("Release::Release Fees Enabled", config.IsJailReleaseFeesEnabled(Hold))
-    arrestVars.SetFloat("Release::Chance for Release Fees Event", config.GetReleaseChanceForReleaseFeesEvent(Hold))
-    arrestVars.SetFloat("Release::Bounty to Owe Fees", config.GetReleaseBountyToOweFees(Hold))
-    arrestVars.SetFloat("Release::Release Fees from Arrest Bounty", config.GetReleaseReleaseFeesFromBounty(Hold))
-    arrestVars.SetFloat("Release::Release Fees Flat", config.GetReleaseReleaseFeesFlat(Hold))
-    arrestVars.SetFloat("Release::Days Given to Pay Release Fees", config.GetReleaseDaysGivenToPayReleaseFees(Hold))
-    arrestVars.SetBool("Release::Item Retention Enabled", config.IsItemRetentionEnabledOnRelease(Hold))
-    arrestVars.SetFloat("Release::Bounty to Retain Items", config.GetReleaseBountyToRetainItems(Hold))
-    arrestVars.SetBool("Release::Redress on Release", config.IsAutoDressingEnabledOnRelease(Hold))
-    arrestVars.SetFloat("Escape::Escape Bounty from Current Arrest", config.GetEscapedBountyFromCurrentArrest(Hold))
-    arrestVars.SetFloat("Escape::Escape Bounty Flat", config.GetEscapedBountyFlat(Hold))
-    arrestVars.SetBool("Escape::Allow Surrendering", config.IsSurrenderEnabledOnEscape(Hold))
-    arrestVars.SetBool("Escape::Account for Time Served", config.IsTimeServedAccountedForOnEscape(Hold))
-    arrestVars.SetBool("Escape::Should Frisk Search", config.ShouldFriskOnEscape(Hold))
-    arrestVars.SetBool("Escape::Should Strip Search", config.ShouldStripOnEscape(Hold))
-    arrestVars.SetFloat("Additional Charges::Bounty for Impersonation", config.GetChargeBountyForImpersonation(Hold))
-    arrestVars.SetFloat("Additional Charges::Bounty for Enemy of Hold", config.GetChargeBountyForEnemyOfHold(Hold))
-    arrestVars.SetFloat("Additional Charges::Bounty for Stolen Items", config.GetChargeBountyForStolenItems(Hold))
-    arrestVars.SetFloat("Additional Charges::Bounty for Stolen Item", config.GetChargeBountyForStolenItemFromItemValue(Hold))
-    arrestVars.SetFloat("Additional Charges::Bounty for Contraband", config.GetChargeBountyForContraband(Hold))
-    arrestVars.SetFloat("Additional Charges::Bounty for Cell Key", config.GetChargeBountyForCellKey(Hold))
-    arrestVars.SetBool("Frisking::Allow Frisking", config.IsFriskingEnabled(Hold))
-    arrestVars.SetBool("Frisking::Unconditional Frisking", config.IsFriskingUnconditional(Hold))
-    arrestVars.SetFloat("Frisking::Bounty for Frisking", config.GetFriskingBountyRequired(Hold))
-    arrestVars.SetFloat("Frisking::Frisking Thoroughness", config.GetFriskingThoroughness(Hold))
-    arrestVars.SetBool("Frisking::Confiscate Stolen Items", config.IsFriskingStolenItemsConfiscated(Hold))
-    arrestVars.SetBool("Frisking::Strip if Stolen Items Found", config.IsFriskingStripSearchWhenStolenItemsFound(Hold))
-    arrestVars.SetFloat("Frisking::Stolen Items Required for Stripping", config.GetFriskingStolenItemsRequiredForStripping(Hold))
-    arrestVars.SetBool("Stripping::Allow Stripping", config.IsStrippingEnabled(Hold))
-    arrestVars.SetString("Stripping::Handle Stripping On", config.GetStrippingHandlingCondition(Hold))
-    arrestVars.SetInt("Stripping::Bounty to Strip", config.GetStrippingMinimumBounty(Hold))
-    arrestVars.SetInt("Stripping::Violent Bounty to Strip", config.GetStrippingMinimumViolentBounty(Hold))
-    arrestVars.SetInt("Stripping::Sentence to Strip", config.GetStrippingMinimumSentence(Hold))
-    arrestVars.SetBool("Stripping::Strip when Defeated", config.IsStrippedOnDefeat(Hold))
-    arrestVars.SetFloat("Stripping::Stripping Thoroughness", config.GetStrippingThoroughness(Hold))
-    arrestVars.SetInt("Stripping::Stripping Thoroughness Modifier", config.GetStrippingThoroughnessBountyModifier(Hold))
-    arrestVars.SetBool("Clothing::Allow Clothing", config.IsClothingEnabled(Hold))
-    arrestVars.SetString("Clothing::Handle Clothing On", config.GetClothingHandlingCondition(Hold))
-    arrestVars.SetFloat("Clothing::Maximum Bounty to Clothe", config.GetClothingMaximumBounty(Hold))
-    arrestVars.SetFloat("Clothing::Maximum Violent Bounty to Clothe", config.GetClothingMaximumViolentBounty(Hold))
-    arrestVars.SetFloat("Clothing::Maximum Sentence to Clothe", config.GetClothingMaximumSentence(Hold))
-    arrestVars.SetBool("Clothing::Clothe when Defeated", config.IsClothedOnDefeat(Hold))
-    arrestVars.SetString("Clothing::Outfit", config.GetClothingOutfit(Hold))
+    JailVars.SetBool("Jail::Infamy Enabled", config.IsInfamyEnabled(Hold))
+    JailVars.SetFloat("Jail::Infamy Recognized Threshold", config.GetInfamyRecognizedThreshold(Hold))
+    JailVars.SetFloat("Jail::Infamy Known Threshold", config.GetInfamyKnownThreshold(Hold))
+    JailVars.SetFloat("Jail::Infamy Gained Daily from Current Bounty", config.GetInfamyGainedDailyFromArrestBounty(Hold))
+    JailVars.SetFloat("Jail::Infamy Gained Daily", config.GetInfamyGainedDaily(Hold))
+    JailVars.SetInt("Jail::Infamy Gain Modifier (Recognized)", config.GetInfamyGainModifier(Hold, "Recognized"))
+    JailVars.SetInt("Jail::Infamy Gain Modifier (Known)", config.GetInfamyGainModifier(Hold, "Known"))
+    JailVars.SetFloat("Jail::Bounty Exchange", config.GetJailBountyExchange(Hold))
+    JailVars.SetFloat("Jail::Bounty to Sentence", config.GetJailBountyToSentence(Hold))
+    JailVars.SetFloat("Jail::Minimum Sentence", config.GetJailMinimumSentence(Hold))
+    JailVars.SetFloat("Jail::Maximum Sentence", config.GetJailMaximumSentence(Hold))
+    JailVars.SetFloat("Jail::Cell Search Thoroughness", config.GetJailCellSearchThoroughness(Hold))
+    JailVars.SetString("Jail::Cell Lock Level", config.GetJailCellDoorLockLevel(Hold))
+    JailVars.SetBool("Jail::Fast Forward", config.IsJailFastForwardEnabled(Hold))
+    JailVars.SetFloat("Jail::Day to Fast Forward From", config.GetJailFastForwardDay(Hold))
+    JailVars.SetString("Jail::Handle Skill Loss", config.GetJailHandleSkillLoss(Hold))
+    JailVars.SetFloat("Jail::Day to Start Losing Skills", config.GetJailDayToStartLosingSkills(Hold))
+    JailVars.SetFloat("Jail::Chance to Lose Skills", config.GetJailChanceToLoseSkillsDaily(Hold))
+    JailVars.SetFloat("Jail::Recognized Criminal Penalty", config.GetJailRecognizedCriminalPenalty(Hold))
+    JailVars.SetFloat("Jail::Known Criminal Penalty", config.GetJailKnownCriminalPenalty(Hold))
+    JailVars.SetFloat("Jail::Bounty to Trigger Infamy", config.GetJailBountyToTriggerCriminalPenalty(Hold))
+    JailVars.SetBool("Release::Release Fees Enabled", config.IsJailReleaseFeesEnabled(Hold))
+    JailVars.SetFloat("Release::Chance for Release Fees Event", config.GetReleaseChanceForReleaseFeesEvent(Hold))
+    JailVars.SetFloat("Release::Bounty to Owe Fees", config.GetReleaseBountyToOweFees(Hold))
+    JailVars.SetFloat("Release::Release Fees from Arrest Bounty", config.GetReleaseReleaseFeesFromBounty(Hold))
+    JailVars.SetFloat("Release::Release Fees Flat", config.GetReleaseReleaseFeesFlat(Hold))
+    JailVars.SetFloat("Release::Days Given to Pay Release Fees", config.GetReleaseDaysGivenToPayReleaseFees(Hold))
+    JailVars.SetBool("Release::Item Retention Enabled", config.IsItemRetentionEnabledOnRelease(Hold))
+    JailVars.SetFloat("Release::Bounty to Retain Items", config.GetReleaseBountyToRetainItems(Hold))
+    JailVars.SetBool("Release::Redress on Release", config.IsAutoDressingEnabledOnRelease(Hold))
+    JailVars.SetFloat("Escape::Escape Bounty from Current Arrest", config.GetEscapedBountyFromCurrentArrest(Hold))
+    JailVars.SetFloat("Escape::Escape Bounty Flat", config.GetEscapedBountyFlat(Hold))
+    JailVars.SetBool("Escape::Allow Surrendering", config.IsSurrenderEnabledOnEscape(Hold))
+    JailVars.SetBool("Escape::Account for Time Served", config.IsTimeServedAccountedForOnEscape(Hold))
+    JailVars.SetBool("Escape::Should Frisk Search", config.ShouldFriskOnEscape(Hold))
+    JailVars.SetBool("Escape::Should Strip Search", config.ShouldStripOnEscape(Hold))
+    JailVars.SetFloat("Additional Charges::Bounty for Impersonation", config.GetChargeBountyForImpersonation(Hold))
+    JailVars.SetFloat("Additional Charges::Bounty for Enemy of Hold", config.GetChargeBountyForEnemyOfHold(Hold))
+    JailVars.SetFloat("Additional Charges::Bounty for Stolen Items", config.GetChargeBountyForStolenItems(Hold))
+    JailVars.SetFloat("Additional Charges::Bounty for Stolen Item", config.GetChargeBountyForStolenItemFromItemValue(Hold))
+    JailVars.SetFloat("Additional Charges::Bounty for Contraband", config.GetChargeBountyForContraband(Hold))
+    JailVars.SetFloat("Additional Charges::Bounty for Cell Key", config.GetChargeBountyForCellKey(Hold))
+    JailVars.SetBool("Frisking::Allow Frisking", config.IsFriskingEnabled(Hold))
+    JailVars.SetBool("Frisking::Unconditional Frisking", config.IsFriskingUnconditional(Hold))
+    JailVars.SetFloat("Frisking::Bounty for Frisking", config.GetFriskingBountyRequired(Hold))
+    JailVars.SetFloat("Frisking::Frisking Thoroughness", config.GetFriskingThoroughness(Hold))
+    JailVars.SetBool("Frisking::Confiscate Stolen Items", config.IsFriskingStolenItemsConfiscated(Hold))
+    JailVars.SetBool("Frisking::Strip if Stolen Items Found", config.IsFriskingStripSearchWhenStolenItemsFound(Hold))
+    JailVars.SetFloat("Frisking::Stolen Items Required for Stripping", config.GetFriskingStolenItemsRequiredForStripping(Hold))
+    JailVars.SetBool("Stripping::Allow Stripping", config.IsStrippingEnabled(Hold))
+    JailVars.SetString("Stripping::Handle Stripping On", config.GetStrippingHandlingCondition(Hold))
+    JailVars.SetInt("Stripping::Bounty to Strip", config.GetStrippingMinimumBounty(Hold))
+    JailVars.SetInt("Stripping::Violent Bounty to Strip", config.GetStrippingMinimumViolentBounty(Hold))
+    JailVars.SetInt("Stripping::Sentence to Strip", config.GetStrippingMinimumSentence(Hold))
+    JailVars.SetBool("Stripping::Strip when Defeated", config.IsStrippedOnDefeat(Hold))
+    JailVars.SetFloat("Stripping::Stripping Thoroughness", config.GetStrippingThoroughness(Hold))
+    JailVars.SetInt("Stripping::Stripping Thoroughness Modifier", config.GetStrippingThoroughnessBountyModifier(Hold))
+    JailVars.SetBool("Clothing::Allow Clothing", config.IsClothingEnabled(Hold))
+    JailVars.SetString("Clothing::Handle Clothing On", config.GetClothingHandlingCondition(Hold))
+    JailVars.SetFloat("Clothing::Maximum Bounty to Clothe", config.GetClothingMaximumBounty(Hold))
+    JailVars.SetFloat("Clothing::Maximum Violent Bounty to Clothe", config.GetClothingMaximumViolentBounty(Hold))
+    JailVars.SetFloat("Clothing::Maximum Sentence to Clothe", config.GetClothingMaximumSentence(Hold))
+    JailVars.SetBool("Clothing::Clothe when Defeated", config.IsClothedOnDefeat(Hold))
+    JailVars.SetString("Clothing::Outfit", config.GetClothingOutfit(Hold))
 
     ; Outfit
-    arrestVars.SetString("Clothing::Outfit::Name", config.GetClothingOutfit(Hold))
-    arrestVars.SetForm("Clothing::Outfit::Head", config.GetOutfitPart(Hold, "Head"))
-    arrestVars.SetForm("Clothing::Outfit::Body", config.GetOutfitPart(Hold, "Body"))
-    arrestVars.SetForm("Clothing::Outfit::Hands", config.GetOutfitPart(Hold, "Hands"))
-    arrestVars.SetForm("Clothing::Outfit::Feet", config.GetOutfitPart(Hold, "Feet"))
-    arrestVars.SetBool("Clothing::Outfit::Conditional", config.IsClothingOutfitConditional(Hold))
-    arrestVars.SetFloat("Clothing::Outfit::Minimum Bounty", config.GetClothingOutfitMinimumBounty(Hold))
-    arrestVars.SetFloat("Clothing::Outfit::Maximum Bounty", config.GetClothingOutfitMaximumBounty(Hold))
+    JailVars.SetString("Clothing::Outfit::Name", config.GetClothingOutfit(Hold))
+    JailVars.SetForm("Clothing::Outfit::Head", config.GetOutfitPart(Hold, "Head"))
+    JailVars.SetForm("Clothing::Outfit::Body", config.GetOutfitPart(Hold, "Body"))
+    JailVars.SetForm("Clothing::Outfit::Hands", config.GetOutfitPart(Hold, "Hands"))
+    JailVars.SetForm("Clothing::Outfit::Feet", config.GetOutfitPart(Hold, "Feet"))
+    JailVars.SetBool("Clothing::Outfit::Conditional", config.IsClothingOutfitConditional(Hold))
+    JailVars.SetFloat("Clothing::Outfit::Minimum Bounty", config.GetClothingOutfitMinimumBounty(Hold))
+    JailVars.SetFloat("Clothing::Outfit::Maximum Bounty", config.GetClothingOutfitMaximumBounty(Hold))
 
-    arrestVars.SetBool("Override::Release::Item Retention Enabled", false)
+    JailVars.SetBool("Override::Release::Item Retention Enabled", false)
     ; arrestVars.SetInt("Override::Jail::Minimum Sentence", 1)
     ; arrestVars.SetString("Override::Stripping::Handle Stripping On", "Unconditionally")
     ; arrestVars.SetString("Override::Clothing::Handle Clothing On", "Unconditionally")
@@ -680,9 +687,9 @@ event OnEscortToJailEnd(Actor escortActor, Actor escortedActor)
     ; Happens when the Actor has been escorted to the jail location
     Debug(self, "OnEscortToJailEnd", CurrentState + " event invoked")
 
-    if (Arrest.GetActorIsPayingBounty(escortedActor))
+    if (Arrest.IsActorToPayBounty(escortedActor))
         ; If frisking is enabled and conditions are met, perform a frisk search here
-        
+
         ; We don't want to imprison the arrestee, only pay their bounty
         Arrest.PayCrimeGold(escortedActor, escortActor.GetCrimeFaction())
         Arrest.UnrestrainArrestee(escortedActor)

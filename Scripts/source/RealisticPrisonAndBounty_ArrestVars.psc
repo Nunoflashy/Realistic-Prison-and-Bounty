@@ -1,4 +1,8 @@
 scriptname RealisticPrisonAndBounty_ArrestVars extends Quest
+{
+    Serves as storage for Arrest and Jail variables,
+    anything to do with Bounty, Sentence, MCM Options related to Arrest, etc...
+}
 
 import Math
 import RealisticPrisonAndBounty_Util

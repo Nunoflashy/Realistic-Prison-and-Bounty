@@ -35,6 +35,7 @@ function RegisterEvents()
     RegisterForModEvent("RPB_ArrestDefeated", "OnArrestDefeat")         ; Happens after the player is defeated through DA
     RegisterForModEvent("RPB_CombatYield", "OnCombatYield")             ; Happens when the player is spared after yielding
     RegisterForModEvent("RPB_SetArrestScene", "OnArrestSceneChanged")   ; Happens when there's a request to change the Arrest scene
+    RegisterForModEvent("RPB_SetArrestGoal", "OnArrestGoalChanged")   ; Happens when there's a request to change the Arrest scene
 
     ; Jail Event Handlers
     RegisterForModEvent("RPB_JailBegin", "OnJailBegin")
@@ -75,6 +76,11 @@ event OnArrestBegin(string eventName, string arrestType, float arresteeIdFlt, Fo
 
     if (!arrestee)
         Error(self, "EventManager::OnArrestBegin", "There's no one to be arrested! (Arrestee is "+ arrestee +")")
+        return
+    endif
+
+    if (!Arrest.ValidateArrestType(arrestType))
+        Error(Arrest, "EventManager::OnArrestBegin", "Arrest Type is invalid, got: " + arrestType + ". (valid options: "+ Arrest.GetValidArrestTypes() +") ")
         return
     endif
 
@@ -206,13 +212,41 @@ event OnArrestSceneChanged(string eventName, string sceneName, float unusedFlt, 
     endif
 
     string sceneCategoryArrestStart = SceneManager.CATEGORY_ARREST_START
-    
+
     if (!SceneManager.IsValidScene(sceneCategoryArrestStart, sceneName))
         Error(self, "EventManager::OnArrestSceneChanged", "The Scene " + sceneName + " is not a valid Scene for the type "+ sceneCategoryArrestStart +", returning...")
         return
     endif
 
-    Arrest.OnArrestSceneChange(arrestee, sceneName)
+    Arrest.OnArrestSceneChanged(arrestee, sceneName)
+endEvent
+
+event OnArrestGoalChanged(string eventName, string newArrestGoal, float unusedFlt, Form sender)
+    Actor arrestee = (sender as Actor)
+    
+    if (newArrestGoal == "")
+        Error(self, "EventManager::OnArrestGoalChanged", "There was no Arrest Goal passed in to the request.")
+        return
+    endif
+
+    string currentArrestGoal = Arrest.GetArrestGoal(arrestee)
+
+    if (newArrestGoal == currentArrestGoal)
+        Debug(self, "EventManager::OnArrestGoalChanged", "The requested arrest goal is the same as the current one set, returning...")
+        return
+    endif
+
+    if (!arrestee)
+        Error(self, "EventManager::OnArrestGoalChanged", "sender is not an Actor, failed check! [sender: "+ sender +"]")
+        return
+    endif
+
+    if (!Arrest.IsValidArrestGoal(newArrestGoal))
+        Error(self, "EventManager::OnArrestGoalChanged", "The Arrest Goal Type " + newArrestGoal + " is not a valid goal, returning...")
+        return
+    endif
+
+    Arrest.OnArrestGoalChanged(arrestee, currentArrestGoal, newArrestGoal)
 endEvent
 
 event OnPayBounty(string eventName, string categoryPayBounty, float arresteeFormIdFlt, Form sender)
@@ -312,9 +346,9 @@ event OnSceneEnd(string eventName, string sceneName, float unusedFlt, Form sende
     SceneManager.OnSceneEnd(sceneName, (sender as Scene))
 endEvent
 
-; ==========================================================
-;                    Topic Dialogue Events
-; ==========================================================
+; ====================================================================================================================
+;                                                   Topic Dialogue Events
+; ====================================================================================================================
 
 event OnDialogueTopicStart(string eventName, string topicInfoDialogue, float topicInfoTypeFlt, Form sender)
     int topicInfoType = (topicInfoTypeFlt as int)

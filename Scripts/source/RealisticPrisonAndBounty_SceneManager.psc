@@ -190,14 +190,15 @@ function SetupScenes()
     JMap.setInt(sceneContainer, SCENE_ARREST_START_03,       0x130DD) ; Arrest Start 03
     JMap.setInt(sceneContainer, SCENE_ARREST_START_04,       0x13663) ; Arrest Start 04
     JMap.setInt(sceneContainer, SCENE_ARREST_START_PRISON_01, 0x14C14)
-    JMap.setInt(sceneContainer, SCENE_ESCORT_TO_JAIL,        0xF532) ; Escort to Jail
+    JMap.setInt(sceneContainer, SCENE_ESCORT_TO_JAIL_01,        0xF532) ; Escort to Jail
+    JMap.setInt(sceneContainer, SCENE_ESCORT_TO_JAIL_02,     0x17CDA) ; Escort to Jail 02
     JMap.setInt(sceneContainer, SCENE_ESCORT_TO_CELL,        0xCF58) ; Escort to Cell 01
     JMap.setInt(sceneContainer, SCENE_ESCORT_TO_CELL_02,     0x1367D) ; Escort to Cell 02
     JMap.setInt(sceneContainer, SCENE_ESCORT_FROM_CELL,      0x115E6) ; Escort from Cell
     ; JMap.setInt(sceneContainer, SCENE_SEARCH_START,          0xF55C) ; SearchStart
     JMap.setInt(sceneContainer, SCENE_FRISKING,              0xCF5A) ; Frisking
     ; JMap.setInt(sceneContainer, SCENE_STRIPPING_START,       0xF561) ; Stripping Start
-    JMap.setInt(sceneContainer, SCENE_STRIPPING,             0xCF59) ; Stripping
+    JMap.setInt(sceneContainer, SCENE_STRIPPING_01,             0xCF59) ; Stripping
     JMap.setInt(sceneContainer, SCENE_STRIPPING_02,          0xEA60) ; Stripping 02
     JMap.setInt(sceneContainer, SCENE_FORCED_STRIPPING_01,   0xF587) ; Forced Stripping 01
     JMap.setInt(sceneContainer, SCENE_FORCED_STRIPPING_02,   0x120A9) ; Forced Stripping 02
@@ -230,14 +231,14 @@ endFunction
 ;     MiscVars.SetInt(SCENE_ARREST_START_03,          0x130DD, scenes)
 ;     MiscVars.SetInt(SCENE_ARREST_START_04,          0x13663, scenes)
 ;     MiscVars.SetInt(SCENE_ARREST_START_PRISON_01,   0x14C14, scenes)
-;     MiscVars.SetInt(SCENE_ESCORT_TO_JAIL,           0xF532, scenes)
+;     MiscVars.SetInt(SCENE_ESCORT_TO_JAIL_01,           0xF532, scenes)
 ;     MiscVars.SetInt(SCENE_ESCORT_TO_CELL,           0xCF58, scenes)
 ;     MiscVars.SetInt(SCENE_ESCORT_TO_CELL_02,        0x1367D, scenes)
 ;     MiscVars.SetInt(SCENE_ESCORT_FROM_CELL,         0x115E6, scenes)
 ;     ; MiscVars.SetInt(SCENE_SEARCH_START,             0xF55C, scenes)
 ;     MiscVars.SetInt(SCENE_FRISKING,                 0xCF5A, scenes)
 ;     ; MiscVars.SetInt(SCENE_STRIPPING_START,          0xF561, scenes)
-;     MiscVars.SetInt(SCENE_STRIPPING,                0xCF59, scenes)
+;     MiscVars.SetInt(SCENE_STRIPPING_01,                0xCF59, scenes)
 ;     MiscVars.SetInt(SCENE_STRIPPING_02,             0xEA60, scenes)
 ;     MiscVars.SetInt(SCENE_FORCED_STRIPPING_01,      0xF587, scenes)
 ;     MiscVars.SetInt(SCENE_FORCED_STRIPPING_02,      0x120A9, scenes)
@@ -291,11 +292,15 @@ bool function SceneExists(string asSceneName)
 endFunction
 
 bool function IsValidScene(string asSceneCategory, string asSceneName)
-    if (asSceneCategory == "ArrestStart")
+    if (asSceneCategory == CATEGORY_ARREST_START)
         return  asSceneName == SCENE_ARREST_START_01 || \
                 asSceneName == SCENE_ARREST_START_02 || \ 
                 asSceneName == SCENE_ARREST_START_03 || \
                 asSceneName == SCENE_ARREST_START_04
+
+    elseif (asSceneCategory == CATEGORY_ESCORT_TO_JAIL)
+        return asSceneName == SCENE_ESCORT_TO_JAIL_01
+
     endif
 endFunction
 
@@ -311,24 +316,26 @@ int property PHASE_END      = 1 autoreadonly
 ;                       Scene Categories
 ; ==========================================================
 
-string property CATEGORY_ARREST_START = "ArrestStart" autoreadonly
+string property CATEGORY_ARREST_START   = "ArrestStart" autoreadonly
+string property CATEGORY_ESCORT_TO_JAIL = "EscortToJail" autoreadonly
 
 ; ==========================================================
 ;                         Scene Names
 ; ==========================================================
 
-string property SCENE_ARREST_START_01                       = "RPB_ArrestStart" autoreadonly
+string property SCENE_ARREST_START_01                       = "RPB_ArrestStart01" autoreadonly
 string property SCENE_ARREST_START_02                       = "RPB_ArrestStart02" autoreadonly
 string property SCENE_ARREST_START_03                       = "RPB_ArrestStart03" autoreadonly
 string property SCENE_ARREST_START_04                       = "RPB_ArrestStart04" autoreadonly
 string property SCENE_ARREST_START_PRISON_01                = "RPB_ArrestStartPrison01" autoreadonly
 string property SCENE_GENERIC_ESCORT                        = "RPB_GenericEscort" autoreadonly
 string property SCENE_ESCORT_FROM_CELL                      = "RPB_EscortFromCell" autoreadonly
-string property SCENE_ESCORT_TO_JAIL                        = "RPB_EscortToJail" autoreadonly
+string property SCENE_ESCORT_TO_JAIL_01                     = "RPB_EscortToJail01" autoreadonly
+string property SCENE_ESCORT_TO_JAIL_02                     = "RPB_EscortToJail02" autoreadonly
 string property SCENE_ESCORT_TO_CELL                        = "RPB_EscortToCell" autoreadonly
 string property SCENE_ESCORT_TO_CELL_02                     = "RPB_EscortToCell02" autoreadonly
 string property SCENE_ESCORT_TO_CELL_03                     = "RPB_EscortToCell03" autoreadonly
-string property SCENE_STRIPPING                             = "RPB_Stripping" autoreadonly
+string property SCENE_STRIPPING_01                          = "RPB_Stripping01" autoreadonly
 string property SCENE_STRIPPING_02                          = "RPB_Stripping02" autoreadonly
 string property SCENE_FORCED_STRIPPING_START_01             = "RPB_ForcedStrippingStart01" autoreadonly
 string property SCENE_FORCED_STRIPPING_01                   = "RPB_ForcedStripping01" autoreadonly
@@ -406,6 +413,10 @@ ReferenceAlias function GetGuardLocation(int index = 0)
 endFunction
 
 ReferenceAlias function GetPrisonerLocation(int index = 0)
+    return self.GetAliasByName(string_if (index == 0, "Player_EscortLocation", "Player_EscortLocation" + index)) as ReferenceAlias
+endFunction
+
+ReferenceAlias function GetEscorteeLocation(int index = 0)
     return self.GetAliasByName(string_if (index == 0, "Player_EscortLocation", "Player_EscortLocation" + index)) as ReferenceAlias
 endFunction
 
@@ -541,13 +552,17 @@ ObjectReference[] function GetSceneParameters(string sceneName)
         params[2] = self.GetGuardLocation().GetReference()
         params[3] = self.GetPrisonerLocation().GetReference()
 
-    elseif (sceneName == SCENE_ESCORT_TO_JAIL)
+    elseif (sceneName == SCENE_ESCORT_TO_JAIL_01)
         params[0] = self.GetEscort().GetActorReference()
         params[1] = self.GetEscortee().GetActorReference()
         params[2] = self.GetEscortee(1).GetActorReference()
         params[3] = self.GetEscortee(2).GetActorReference()
 
-    elseif (sceneName == SCENE_STRIPPING)
+    elseif (sceneName == SCENE_ESCORT_TO_JAIL_02)
+        params[0] = self.GetEscort().GetActorReference()
+        params[1] = self.GetEscortee().GetActorReference()
+
+    elseif (sceneName == SCENE_STRIPPING_01)
         params[0] = self.GetGuard().GetActorReference()
         params[1] = self.GetPrisoner().GetActorReference()
         params[2] = self.GetPrisoner(1).GetActorReference()
@@ -669,6 +684,7 @@ event OnSceneStart(string name, Scene sender)
         RetainAI(escortee == config.Player)
 
     elseif (name == SCENE_ARREST_START_04)
+
     elseif (name == SCENE_ARREST_START_PRISON_01)
         Actor captor   = params[0] as Actor
         Actor arrestee = params[1] as Actor
@@ -712,7 +728,7 @@ event OnSceneStart(string name, Scene sender)
         
         jail.OnEscortFromCellBegin(guard, prisoner, none)
 
-    elseif (name == SCENE_ESCORT_TO_JAIL)
+    elseif (name == SCENE_ESCORT_TO_JAIL_01)
         Actor escort   = params[0] as Actor
         Actor escortee = params[1] as Actor
         Actor escortee02 = params[2] as Actor
@@ -730,7 +746,21 @@ event OnSceneStart(string name, Scene sender)
 
         ; jail.OnEscortToJailBegin(escort, escortee)
 
-    elseif (name == SCENE_STRIPPING)
+    elseif (name == SCENE_ESCORT_TO_JAIL_02)
+        Actor escort   = params[0] as Actor
+        Actor escortee = params[1] as Actor
+
+        RetainAI(escortee == config.Player)
+
+        int i = 0
+        while (i < params.Length)
+            if (params[i] != none && params[i] != escort)
+                jail.OnEscortToJailBegin(escort, params[i] as Actor)
+            endif
+            i += 1
+        endWhile
+
+    elseif (name == SCENE_STRIPPING_01)
         Actor stripperGuard     = params[0] as Actor
         Actor strippedPrisoner  = params[1] as Actor
 
@@ -772,7 +802,7 @@ event OnSceneStart(string name, Scene sender)
         Actor guard     = params[0] as Actor
         Actor eluder    = params[1] as Actor
 
-        arrest.OnArrestEludeTriggered(guard, "Dialogue")
+        Arrest.OnArrestEludeTriggered(guard, "Dialogue")
 
     elseif (name == SCENE_RESTRAIN_PRISONER_01)
         Actor guard     = params[0] as Actor
@@ -951,13 +981,19 @@ event OnScenePlaying(string name, int phaseEvent, int phase, Scene sender)
 
         endif
 
-    elseif (name == SCENE_ESCORT_TO_JAIL)
+    elseif (name == SCENE_ESCORT_TO_JAIL_01)
 
         if (phaseEvent == PHASE_START)
         elseif (phaseEvent == PHASE_END)
         endif
 
-    elseif (name == SCENE_STRIPPING)
+    elseif (name == SCENE_ESCORT_TO_JAIL_02)
+
+        if (phaseEvent == PHASE_START)
+        elseif (phaseEvent == PHASE_END)
+        endif
+
+    elseif (name == SCENE_STRIPPING_01)
         Actor stripperGuard     = params[0] as Actor
         Actor strippedPrisoner  = params[1] as Actor
 
@@ -1186,13 +1222,19 @@ event OnSceneEnd(string name, Scene sender)
 
         jail.OnEscortFromCellEnd(guard, prisoner, none)
 
-    elseif (name == SCENE_ESCORT_TO_JAIL)
+    elseif (name == SCENE_ESCORT_TO_JAIL_01)
         Actor escort   = params[0] as Actor
         Actor escortee = params[1] as Actor
 
         jail.OnEscortToJailEnd(escort, escortee)
 
-    elseif (name == SCENE_STRIPPING)
+    elseif (name == SCENE_ESCORT_TO_JAIL_02)
+        Actor escort   = params[0] as Actor
+        Actor escortee = params[1] as Actor
+
+        jail.OnEscortToJailEnd(escort, escortee)
+
+    elseif (name == SCENE_STRIPPING_01)
         Actor stripperGuard     = params[0] as Actor
         Actor strippedPrisoner  = params[1] as Actor
 
@@ -1539,6 +1581,16 @@ function StartArrestScene(Actor akGuard, Actor akArrestee, string asScene)
     self.GetScene(asScene).Start()
 endFunction
 
+function StartEscortToJailScene(Actor akGuard, Actor akArrestee, string asScene)
+    ; Bind the captor
+    BindAliasTo(self.GetEscort(), akGuard)
+
+    ; Bind the Arrestee, who's getting arrested
+    BindAliasTo(self.GetEscortee(), akArrestee)
+
+    self.GetScene(asScene).Start()
+endFunction
+
 function StartArrestStartPrison_01(Actor akGuard, Actor akPrisoner, int aiStartingPhase = 1)
     ; Bind the captor
     BindAliasTo(self.GetEscort(), akGuard)
@@ -1613,6 +1665,15 @@ function StartEludingArrest(Actor akGuard, Actor akEluder)
     EludingArrest.Start()
 endFunction
 
+function StartArrestBountyPaymentFollowWillingly(Actor akEscort, Actor akEscortee, ObjectReference akEscortLocation)
+    BindAliasTo(self.GetEscort(), akEscort)
+    BindAliasTo(self.GetEscortee(), akEscortee)
+    BindAliasTo(self.GetGuardLocation(), akEscortLocation)
+    BindAliasTo(self.GetPrisonerLocation(), akEscortLocation)
+
+    self.GetScene(SCENE_ARREST_PAY_BOUNTY_FOLLOW_WILLINGLY).Start()
+endFunction
+
 function StartArrestPayBountyFollowByForce(Actor akEscort, Actor akEscortee, ObjectReference akEscortLocation)
     BindAliasTo(self.GetEscort(), akEscort)
     BindAliasTo(self.GetEscortee(), akEscortee)
@@ -1620,4 +1681,67 @@ function StartArrestPayBountyFollowByForce(Actor akEscort, Actor akEscortee, Obj
     BindAliasTo(self.GetPrisonerLocation(), akEscortLocation)
 
     self.GetScene(SCENE_ARREST_PAY_BOUNTY_FOLLOW_BY_FORCE).Start()
+endFunction
+
+function StartSceneGeneric( \
+    string asSceneName, \
+    Actor akEscort01 = none, \
+    Actor akEscort02 = none, \
+    Actor akEscort03 = none, \
+    Actor akEscortee01 = none, \
+    Actor akEscortee02 = none, \
+    Actor akEscortee03 = none, \
+    Actor akEscortee04 = none, \
+    Actor akEscortee05 = none, \
+    Actor akEscortee06 = none, \
+    Actor akEscortee07 = none, \
+    Actor akEscortee08 = none, \
+    Actor akEscortee09 = none, \
+    Actor akEscortee10 = none, \
+    ObjectReference akEscortLocation01 = none, \
+    ObjectReference akEscortLocation02 = none, \
+    ObjectReference akEscortLocation03 = none, \
+    ObjectReference akEscorteeLocation01 = none, \
+    ObjectReference akEscorteeLocation02 = none, \
+    ObjectReference akEscorteeLocation03 = none, \
+    ObjectReference akEscorteeLocation04 = none, \
+    ObjectReference akEscorteeLocation05 = none, \
+    ObjectReference akEscorteeLocation06 = none, \
+    ObjectReference akEscorteeLocation07 = none, \
+    ObjectReference akEscorteeLocation08 = none, \
+    ObjectReference akEscorteeLocation09 = none, \
+    ObjectReference akEscorteeLocation10 = none \
+)
+
+    BindAliasTo(self.GetEscort(), akEscort01)
+    BindAliasTo(self.GetEscort(1), akEscort02)
+    BindAliasTo(self.GetEscort(2), akEscort03)
+
+    BindAliasTo(self.GetEscortee(), akEscortee01)
+    BindAliasTo(self.GetEscortee(1), akEscortee02)
+    BindAliasTo(self.GetEscortee(2), akEscortee03)
+    BindAliasTo(self.GetEscortee(3), akEscortee04)
+    BindAliasTo(self.GetEscortee(4), akEscortee05)
+    BindAliasTo(self.GetEscortee(5), akEscortee06)
+    BindAliasTo(self.GetEscortee(6), akEscortee07)
+    BindAliasTo(self.GetEscortee(7), akEscortee08)
+    BindAliasTo(self.GetEscortee(8), akEscortee09)
+    BindAliasTo(self.GetEscortee(9), akEscortee10)
+
+    BindAliasTo(self.GetGuardLocation(), akEscortLocation01)
+    BindAliasTo(self.GetGuardLocation(1), akEscortLocation02)
+    BindAliasTo(self.GetGuardLocation(2), akEscortLocation03)
+
+    BindAliasTo(self.GetEscorteeLocation(), akEscorteeLocation01)
+    BindAliasTo(self.GetEscorteeLocation(1), akEscorteeLocation02)
+    BindAliasTo(self.GetEscorteeLocation(2), akEscorteeLocation03)
+    BindAliasTo(self.GetEscorteeLocation(3), akEscorteeLocation04)
+    BindAliasTo(self.GetEscorteeLocation(4), akEscorteeLocation05)
+    BindAliasTo(self.GetEscorteeLocation(5), akEscorteeLocation06)
+    BindAliasTo(self.GetEscorteeLocation(6), akEscorteeLocation07)
+    BindAliasTo(self.GetEscorteeLocation(7), akEscorteeLocation08)
+    BindAliasTo(self.GetEscorteeLocation(8), akEscorteeLocation09)
+    BindAliasTo(self.GetEscorteeLocation(9), akEscorteeLocation10)
+
+    self.GetScene(asSceneName).Start()
 endFunction

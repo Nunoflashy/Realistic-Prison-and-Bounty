@@ -27,6 +27,12 @@ Actor property this
     endFunction
 endProperty
 
+Actor _arrestee = none
+
+function AssignArrestee(Actor akArrestee)
+    _arrestee = akArrestee
+endFunction
+
 event OnInit()
     Debug(self.GetOwningQuest(), "OnInit", "Initialized alias to reference: " + self.GetActorRef().GetActorBase().GetName())
     ; RegisterForLOS(self.GetActorReference(), jail.Arrestee)
@@ -58,4 +64,20 @@ endEvent
 
 event OnLostLOS(Actor akViewer, ObjectReference akTarget)
     Debug(self.GetOwningQuest(), "OnLostLOS", akViewer + " is not seeing " + akTarget + " anymore")
+endEvent
+
+event OnUpdate()
+    if (!_arrestee)
+        return
+    endif
+
+    ; Keep track of the arrestee's distance to the captor,
+    ; only if we are in the Bounty Payment scenario
+    if (Arrest.GetActorIsPayingBounty(_arrestee))
+        if (this.GetDistance(_arrestee) >= 800)
+            Arrest.PunishPaymentEvader(this, _arrestee)
+        endif
+    
+        RegisterForSingleUpdate(5.0)
+    endif
 endEvent
