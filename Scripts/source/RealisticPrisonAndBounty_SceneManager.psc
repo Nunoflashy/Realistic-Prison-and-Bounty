@@ -1019,7 +1019,9 @@ event OnScenePlaying(string name, int phaseEvent, int phase, Scene sender)
 
             elseif (phase == 6)
                 ; Remove underwear
-                jail.Prisoner.RemoveUnderwear()
+                strippedPrisoner.SendModEvent("RPB_SendPrisonActionRequest", "RemoveUnderwear")
+                ; Jail.OnPrisonActionRequest("RemoveUnderwear")
+                ; jail.Prisoner.RemoveUnderwear()
             endif
             
         elseif (phaseEvent == PHASE_END)
@@ -1166,31 +1168,32 @@ event OnSceneEnd(string name, Scene sender)
         Actor escort   = params[0] as Actor
         Actor escortee = params[1] as Actor
 
-        arrest.OnArrestStart(escort, escortee)
+        ; arrest.OnArrestStart(escort, escortee)
 
     elseif (name == SCENE_ARREST_START_02)
         Actor escort   = params[0] as Actor
         Actor escortee = params[1] as Actor
 
-        arrest.OnArrestStart(escort, escortee)
+        ; arrest.OnArrestStart(escort, escortee)
 
     elseif (name == SCENE_ARREST_START_03)
         Actor escort   = params[0] as Actor
         Actor escortee = params[1] as Actor
 
-        arrest.OnArrestStart(escort, escortee)
+        ; arrest.OnArrestStart(escort, escortee)
+        ; sender.SendModEvent("RPB_RequestArrestAction", "OnArrestStart")
 
     elseif (name == SCENE_ARREST_START_04)
         Actor captor   = params[0] as Actor
         Actor arrestee = params[1] as Actor
 
-        arrest.OnArrestStart(captor, arrestee)
+        ; arrest.OnArrestStart(captor, arrestee)
 
     elseif (name == SCENE_ARREST_START_PRISON_01)
         Actor captor   = params[0] as Actor
         Actor arrestee = params[1] as Actor
 
-        arrest.OnArrestStart(captor, arrestee)
+        ; arrest.OnArrestStart(captor, arrestee)
 
     elseif (name == SCENE_ESCORT_TO_CELL)
         Actor escort   = params[0] as Actor
@@ -1307,7 +1310,9 @@ event OnSceneEnd(string name, Scene sender)
         ; strippedPrisoner.SetAV("Paralysis", 0)
         Debug.SendAnimationEvent(strippedPrisoner, "IdleLayDownExit")
         Debug(self, "SceneManager::OnSceneEnd", "Reached Forced Stripping block")
-        jail.Prisoner.RemoveUnderwear()
+        
+        strippedPrisoner.SendModEvent("RPB_SendPrisonActionRequest", "RemoveUnderwear")
+        ; jail.Prisoner.RemoveUnderwear()
         jail.OnStripEnd(stripperGuard, strippedPrisoner)
 
     elseif (name == SCENE_ELUDING_ARREST_01)

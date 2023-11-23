@@ -8,3 +8,4 @@ RealisticPrisonAndBounty_ActorVars      property ActorVars auto
 RealisticPrisonAndBounty_MiscVars       property MiscVars auto
 RealisticPrisonAndBounty_SceneManager   property SceneManager auto
 RealisticPrisonAndBounty_EventManager   property EventManager auto
+RPB_PrisonManager                       property PrisonManager auto

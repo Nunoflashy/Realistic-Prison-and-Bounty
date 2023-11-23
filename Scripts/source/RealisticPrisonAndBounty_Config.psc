@@ -113,6 +113,21 @@ bool function SetFactions()
     return true
 endFunction
 
+bool function SetPrisons()
+    RPB_PrisonManager prisonManager = GetFormFromMod(0x1B825) as RPB_PrisonManager
+
+    int i = 0
+    while (i < Holds.Length)
+        RPB_Prison prison = prisonManager.AvailableSlot.ConfigurePrison( \
+            akLocation  = (Game.GetFormEx(0xBED97) as Location), \
+            akFaction   = self.GetCrimeFaction(Holds[i]), \
+            asHold      = Holds[i] \
+        )
+        i += 1
+    endWhile
+
+    return true
+endFunction
 
 bool function SetJailCells()
     if (miscVars.Exists("Jail::Cells"))
@@ -766,10 +781,6 @@ bool function IsBountyDecayableAsCriminal(string hold)
     return isBountyDecayEnabled(hold) && isInfamyEnabled(hold) && MCM.GetToggleOptionState(hold, "Bounty Decaying::Decay if Known as Criminal")
 endFunction
 
-bool function IsTimeServedAccountedForOnEscape(string hold)
-    return MCM.GetToggleOptionState(hold, "Escape::Account for Time Served")
-endFunction
-
 float function GetBountyDecayLostFromCurrentBounty(string hold)
     return MCM.GetSliderOptionValue(hold, "Bounty Decaying::Bounty Lost (%)")
 endFunction
@@ -896,6 +907,10 @@ endFunction
 
 int function GetEscapedBountyFlat(string hold)
     return MCM.GetSliderOptionValue(hold, "Escape::Escape Bounty") as int
+endFunction
+
+bool function IsTimeServedAccountedForOnEscape(string hold)
+    return MCM.GetToggleOptionState(hold, "Escape::Account for Time Served")
 endFunction
 
 bool function IsSurrenderEnabledOnEscape(string hold)

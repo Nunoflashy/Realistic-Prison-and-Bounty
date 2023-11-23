@@ -439,7 +439,7 @@ function Strip()
 
     ; Total stripping thoroughness after modifier is applied if there's any
     float strippingThoroughness = arrestVars.StrippingThoroughness + strippingThoroughnessModifier
-    "Stripping::Stripping Thoroughness"
+    
     debug.notification("Stripping Thoroughness: " + strippingThoroughness + ", modifier: " + strippingThoroughnessModifier)
     Debug(none, "Prisoner::Strip", "Stripping Thoroughness: " + strippingThoroughness + ", modifier: " + strippingThoroughnessModifier)
     bool isStrippedNaked = strippingThoroughness >= 6

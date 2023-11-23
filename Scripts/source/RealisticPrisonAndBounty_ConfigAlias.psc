@@ -20,6 +20,7 @@ function PerformSetup()
     bool holdsSetup                     = Config.SetHolds()
     bool citiesSetup                    = Config.SetCities()
     bool holdLocations                  = Config.SetHoldLocations()
+    bool prisons                        = Config.SetPrisons()
     bool jailTeleportReleaseLocations   = Config.SetJailTeleportReleaseLocations()
     bool jailPrisonerContainers         = Config.SetJailPrisonerContainers()
     bool factionsSetup                  = Config.SetFactions()
@@ -48,6 +49,7 @@ endFunction
 
 function PerformMaintenance()
     bool registeredEvents = Config.HandleEvents()
+    bool prisons          = Config.SetPrisons()
 
     ;/
         TODO: If at any point a new hold, city, jail cell, jail location etc gets added,
@@ -61,7 +63,8 @@ function PerformMaintenance()
                         "\t\t"+ GetModName() +"\n" + \
         "==========================================================\n" + \
         "\n" + \
-        "Registering Events: " + string_if (registeredEvents, "OK", "Failed") \
+        "Registering Events: " + string_if (registeredEvents, "OK", "Failed") + "\n" + \
+        "Registering Prisons: " + string_if (prisons, "OK", "Failed") + "\n" \
     )
     
     SceneManager.SetupScenes()
@@ -71,8 +74,8 @@ function PerformMaintenance()
     endif
 
     ; Temporary, RefAliases are lost on Player Load, must find a way to rectify
-    Config.jail.Prisoner.ForceRefTo(Config.Player)
-    Config.NotifyJail("Prisoner: " + Config.Player + ", Ref: " + Config.jail.Prisoner)
+    ; Config.jail.Prisoner.ForceRefTo(Config.Player)
+    ; Config.NotifyJail("Prisoner: " + Config.Player + ", Ref: " + Config.jail.Prisoner)
 
     ; Config.miscVars.CreateStringMap("Options")
     ; Config.miscVars.CreateStringMap("Options/Flags")

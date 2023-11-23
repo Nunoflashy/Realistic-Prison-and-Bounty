@@ -40,6 +40,7 @@ function RegisterEvents()
     ; Jail Event Handlers
     RegisterForModEvent("RPB_JailBegin", "OnJailBegin")
     RegisterForModEvent("RPB_JailEnd", "OnJailEnd")
+    RegisterForModEvent("RPB_SendPrisonActionRequest", "OnPrisonActionRequest")
 
     ; Scene Event Handlers (SF_Scene Scripts)
     RegisterForModEvent("RPB_SceneStart", "OnSceneStart")               ; Handles Scene start events, whenever a Scene begins playing.
@@ -84,6 +85,7 @@ event OnArrestBegin(string eventName, string arrestType, float arresteeIdFlt, Fo
         return
     endif
 
+    Arrest.MarkActorAsArrestee(arrestee)  ; Mark this Actor as one that is to be arrested (Cast the spell in order to have Arrestee related functions on them through RPB_Arrestee)
     Arrest.OnArrestBegin(arrestee, captor, crimeFaction, arrestType)
 endEvent
 
@@ -293,8 +295,41 @@ endEvent
 ; ==========================================================
 
 event OnJailBegin(string eventName, string strArg, float numArg, Form sender)
-    Jail.OnJailBegin()
+    Actor prisoner = (sender as Actor)
+
+    if (!prisoner)
+        Error(self, "EventManager::OnJailBegin", "sender is not an Actor, failed check! [sender: "+ sender +"]")
+        return
+    endif
+
+    RPB_Prisoner prisonerRef = Jail.GetPrisonerReference(prisoner)
+
+    if (!prisonerRef)
+        Error(self, "EventManager::OnJailBegin", "Actor " + prisoner + " is not registered as a prisoner, there is no reference. Returning...")
+        return
+    endif
+
+    Jail.OnJailBegin(prisonerRef)
 endEvent
+
+event OnPrisonActionRequest(string eventName, string actionName, float numArg, Form sender)
+    Actor prisoner = (sender as Actor)
+
+    if (!prisoner)
+        Error(self, "EventManager::OnPrisonActionRequest", "sender is not an Actor, failed check! [sender: "+ sender +"]")
+        return
+    endif
+
+    RPB_Prisoner prisonerRef = Jail.GetPrisonerReference(prisoner)
+
+    if (!prisonerRef)
+        Error(self, "EventManager::OnPrisonActionRequest", "Actor " + prisoner + " is not registered as a prisoner, there is no reference. Returning...")
+        return
+    endif
+
+    Jail.OnPrisonActionRequest(actionName, prisonerRef)
+endEvent
+
 
 ; ==========================================================
 ;                        Scene Events

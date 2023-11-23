@@ -47,7 +47,7 @@ string property ARREST_TYPE_ESCORT_TO_CELL      = "EscortToCell" autoreadonly
 
 string property ARREST_GOAL_IMPRISONMENT        = "Imprisonment" autoreadonly
 string property ARREST_GOAL_BOUNTY_PAYMENT      = "BountyPayment" autoreadonly
-string property ARREST_GOAL_TEMPORARY_HOLD      = "TemporaryHold" autoreadonly ; Unused for Now
+string property ARREST_GOAL_TEMPORARY_HOLD      = "TemporaryHold" autoreadonly ; Unused for Now, later will be used to hold suspects (temporary imprisonment, short term), should they be considered a RPB_Prisoner though?
 
 
 RealisticPrisonAndBounty_Config property Config
@@ -86,18 +86,123 @@ RealisticPrisonAndBounty_SceneManager property SceneManager
     endFunction
 endProperty
 
-GlobalVariable property RPB_AllowArrestForcegreet
-    GlobalVariable function get()
-        return GetFormFromMod(0x130D7) as GlobalVariable
+RealisticPrisonAndBounty_CaptorRef property CaptorRef auto
+
+RPB_ActiveMagicEffectContainer property ArresteeList
+    RPB_ActiveMagicEffectContainer function get()
+        return Config.MainAPI as RPB_ActiveMagicEffectContainer
     endFunction
 endProperty
 
-RealisticPrisonAndBounty_CaptorRef property CaptorRef auto
+;/
+    Reference to container to store every possible Arrestee's state Script,
+    this makes it possible to retrieve this script's actions that are attached to the Actor that is arrested
+    without having them been passed through an Event.
+
+    Making it possible then to do something like this in another script to control the behavior of an Arrestee:
+        RPB_Arrestee arresteeRef = ArrestedActors.GetAt(akArrestee) as RPB_Arrestee
+
+    Since we can add or remove this reference from the list through this script, 
+    it also makes it possible to manage the lifetime of this object through an individual Arrestee script attached to the Actor,
+    instead of managing it in some other script and checking for the Actor's state.
+/;
+RPB_ActiveMagicEffectContainer property ArrestedActors ; ArrestList extends RPB_ActiveMagicEffectContainer or something
+    RPB_ActiveMagicEffectContainer function get()
+        return Config.MainAPI as RPB_ActiveMagicEffectContainer
+    endFunction
+endProperty
+
+RPB_ActiveMagicEffectContainer property Captors ; Should have a script of type RPB_CaptorList extends RPB_ActiveMagicEffectContainer or something
+    RPB_ActiveMagicEffectContainer function get()
+        return Config.MainAPI as RPB_ActiveMagicEffectContainer
+    endFunction
+endProperty
+
+RPB_ActiveMagicEffectContainer property Prisons
+    RPB_ActiveMagicEffectContainer function get()
+        return Config.MainAPI as RPB_ActiveMagicEffectContainer
+    endFunction
+endProperty
+
+; RPB_Arrestee function RegisterArrestee(Actor akArrestee)
+;     Spell arresteeSpell = GetFormFromMod(0x187B3) as Spell
+;     if (!akArrestee.HasSpell(arresteeSpell))
+;         ; Actor is not an arrestee, register and add them to the list
+;         akArrestee.AddSpell(arresteeSpell, false)
+;         Utility.Wait(0.2)
+
+;         RPB_Arrestee arresteeRef = self.GetArresteeReference(akArrestee)
+
+;         if (!arresteeRef)
+;             Debug(self, "Arrest::RegisterArrestee", "The Actor does not have the spell attached to them! (This is possibly a bug!)")
+;             return none
+;         endif
+
+;         ArrestedActors.AddAt(arresteeRef, "Arrestee["+ akArrestee.GetFormID() +"]")
+;         return arresteeRef
+;     endif
+
+;     return self.GetArresteeReference(akArrestee)
+; endFunction
+
+;/
+    Binds @akArrestee to an instance of RPB_Arrestee,
+    giving us the arrest state of the Actor bound to this reference.
+
+    Used when this Actor is Arrested, lasts until Release or Imprisonment.
+/;
+bool function RegisterArrestedActor(RPB_Arrestee akArresteeRef, Actor akArrestee)
+    string containerKey = "Arrestee["+ akArrestee.GetFormID() +"]"
+    ArrestedActors.AddAt(akArresteeRef, containerKey)
+
+    Debug(self, "Arrest::RegisterArrestedActor", "Added Actor " + akArrestee + " to the arrested list " + akArresteeRef + " with key: " + containerKey)
+    return ArrestedActors.GetAt(containerKey) == akArresteeRef ; Did it register successfully?
+endFunction
+
+;/
+    Removes @akArrestee from its currently bound instance of RPB_Arrestee.
+
+    Used when this Actor is Released or Imprisoned.
+/;
+function UnregisterArrestedActor(Actor akArrestee)
+    RPB_Arrestee arresteeRef = self.GetArresteeReference(akArrestee)
+    string containerKey = "Arrestee["+ akArrestee.GetFormID() +"]"
+
+    if (arresteeRef)
+        ArrestedActors.Remove(containerKey)
+    endif
+endFunction
+
+;/
+    Binds @akCaptorRef to an instance of RPB_Captor,
+    giving us the captor state of the Actor bound to this reference.
+
+    Used when this Actor is arresting an Actor, lasts until Escort end or Death.
+/;
+bool function RegisterCaptor(RPB_Captor akCaptorRef, Actor akCaptor)
+    string containerKey = "Captor["+ akCaptor.GetFormID() +"]"
+    Captors.AddAt(akCaptorRef, containerKey)
+
+    Debug(self, "Arrest::RegisterArrestedActor", "Added Actor " + akCaptor + " to the captor list " + akCaptorRef + " with key: " + containerKey)
+    return Captors.GetAt(containerKey) == akCaptorRef ; Did it register successfully?
+endFunction
+
+function UnregisterCaptor(Actor akCaptor)
+    RPB_Captor captor = self.GetCaptorReference(akCaptor)
+    string containerKey = "Captor["+ akCaptor.GetFormID() +"]"
+
+    if (captor)
+        Captors.Remove(containerKey)
+    endif
+endFunction
 
 function RegisterEvents()
 
 endFunction
 
+bool function IsActorArrested(Actor akActor)
+    return ArrestVars.GetBool(string_if (akActor == Config.Player, "Arrest::Arrested", "["+ akActor.GetFormID() +"]Arrest::Arrested"))
+endFunction
 
 event OnInit()
     RegisterHotkeys()
@@ -106,6 +211,40 @@ endEvent
 event OnPlayerLoadGame()
     RegisterHotkeys()
 endEvent
+
+function MarkActorAsPrisonHolder(Actor akActor, bool abDelayExecution = true)
+    Spell prisonSpell = GetFormFromMod(0x1B2C2) as Spell
+
+    if (!akActor.HasSpell(prisonSpell))
+        akActor.AddSpell(prisonSpell, false)
+    endif
+
+    if (abDelayExecution)
+        Utility.Wait(0.2)
+    endif
+endFunction
+
+bool function RegisterPrison(RPB_Prison akArresteeRef, Actor akArrestee)
+    ; ; string containerKey = "Prison["+ akArrestee.GetFormID() +"]"
+    ; Prisons.AddAt(akArresteeRef, akArrestee)
+
+    ; Debug(self, "Arrest::RegisterPrison", "Added Actor " + akArrestee + " to the prison list " + akArresteeRef + " with key: " + akArrestee)
+    ; return Prisons.GetAt(akArrestee) == akArresteeRef ; Did it register successfully?
+endFunction
+
+
+RPB_Prison function GetPrisonReference(Actor akArrestee, string prisonKey) ; TEST
+    ; ; string prisonKey = "Prison["+ akArrestee.GetFormID() +"]"
+
+    ; RPB_Prison prisonRef = Prisons.GetAt(prisonKey) as RPB_Prison
+
+    ; if (!prisonRef)
+    ;     Warn(self, "Arrest::GetPrisonReference", "The Actor " + akArrestee + " is not bound to an RPB_Prison reference")
+    ;     return none
+    ; endif
+
+    ; return prisonRef
+endFunction
 
 event OnKeyDown(int keyCode)
     if (keyCode == 0x58) ; F12
@@ -116,14 +255,76 @@ event OnKeyDown(int keyCode)
         nearbyGuard.SendModEvent("RPB_ArrestBegin", ARREST_TYPE_TELEPORT_TO_CELL)
     
     elseif (keyCode == 0x44) ; F10
+        ; Actor playerCopy = config.Player.PlaceActorAtMe(config.Player.GetBaseObject() as ActorBase, 1, none)
+        ; Actor playerCopy2 = config.Player.PlaceActorAtMe(config.Player.GetBaseObject() as ActorBase, 1, none)
 
-        Quest WIRemoveItem01 = Game.GetFormEx(0x2C6AB) as Quest
+        ; RPB_Arrestee playerCopyArrestee = self.MarkActorAsArrestee(playerCopy)
+        ; playerCopyArrestee.SetActiveBounty(2500)
 
-        WIRemoveItem01.Start()
+        ; Actor nearbyGuard = GetNearestGuard(config.Player, 3500, none)
+        ; self.ArrestActor(nearbyGuard, playerCopy, ARREST_TYPE_ESCORT_TO_JAIL)
 
-        Actor solitudeGuard = Game.GetFormEx(0xF684E) as Actor
-        config.Player.PlaceActorAtMe(config.Player.GetBaseObject() as ActorBase, 1, none)
-        Debug(self, "Arrest::OnKeyDown", "F10 Pressed")
+        Actor nearbyGuard = GetNearestGuard(config.Player, 3500, none)
+        ; Actor anotherGuard = Config.Player.PlaceActorAtMe(nearbyGuard.GetBaseObject() as ActorBase, 1, none)
+        ; Actor anotherGuard2 = Config.Player.PlaceActorAtMe(nearbyGuard.GetBaseObject() as ActorBase, 1, none)
+        ; Actor anotherGuard3 = Config.Player.PlaceActorAtMe(nearbyGuard.GetBaseObject() as ActorBase, 1, none)
+        ; Actor anotherGuard4 = Config.Player.PlaceActorAtMe(nearbyGuard.GetBaseObject() as ActorBase, 1, none)
+        ; Actor anotherGuard5 = Config.Player.PlaceActorAtMe(nearbyGuard.GetBaseObject() as ActorBase, 1, none)
+
+
+        ; RPB_Arrestee anotherGuardArrestee = self.MarkActorAsArrestee(anotherGuard)
+        ; self.MarkActorAsArrestee(anotherGuard)
+        ; self.MarkActorAsArrestee(anotherGuard2)
+        ; self.MarkActorAsArrestee(anotherGuard3)
+        ; self.MarkActorAsArrestee(anotherGuard4)
+        ; self.MarkActorAsArrestee(anotherGuard5)
+        ; anotherGuardArrestee.SetActiveBounty(2500)
+
+        RPB_PrisonManager prisonManager = GetFormFromMod(0x1B825) as RPB_PrisonManager
+        RPB_Prison haafingarPrison      = prisonManager.GetPrison("Haafingar")
+
+        int actorsToArrestCount = 15
+        Actor[] actorsToArrest = new Actor[15]
+
+        int i = 0
+        while (i < actorsToArrestCount)
+            actorsToArrest[i] = Config.Player.PlaceActorAtMe(nearbyGuard.GetBaseObject() as ActorBase, 1, none)
+            ; self.MarkActorAsArrestee(actorsToArrest[i], false)
+            ; actorsToArrest[i].MoveTo(Config.GetRandomJailMarker("Haafingar"))
+            haafingarPrison.ImprisonActorImmediately(actorsToArrest[i])
+            ; Actor nearActor = GetNearestActor(nearbyGuard, 2000)
+            ; self.MarkActorAsArrestee(nearActor)
+            ; self.ArrestActor(nearbyGuard, nearActor, ARREST_TYPE_ESCORT_TO_JAIL)
+            i += 1
+        endWhile
+        ; Actor[] actorsToArrest = new Actor[5]
+        ; actorsToArrest[0] = anotherGuard
+        ; actorsToArrest[1] = anotherGuard2
+        ; actorsToArrest[2] = anotherGuard3
+        ; actorsToArrest[3] = anotherGuard4
+        ; actorsToArrest[4] = anotherGuard5
+
+        ; self.ArrestActors(nearbyGuard, actorsToArrest, ARREST_TYPE_ESCORT_TO_JAIL)
+
+        ; self.ArrestActor(nearbyGuard, anotherGuard, ARREST_TYPE_ESCORT_TO_JAIL)
+        ; Utility.Wait(0.5)
+        ; self.ArrestActor(nearbyGuard, anotherGuard2, ARREST_TYPE_ESCORT_TO_JAIL)
+        ; Utility.Wait(0.5)
+        ; self.ArrestActor(nearbyGuard, anotherGuard3, ARREST_TYPE_ESCORT_TO_JAIL)
+        ; Utility.Wait(0.5)
+        ; self.ArrestActor(nearbyGuard, anotherGuard4, ARREST_TYPE_ESCORT_TO_JAIL)
+        ; Utility.Wait(0.5)
+        ; self.ArrestActor(nearbyGuard, anotherGuard5, ARREST_TYPE_ESCORT_TO_JAIL)
+
+        ; ==================================
+
+        ; Quest WIRemoveItem01 = Game.GetFormEx(0x2C6AB) as Quest
+        ; WIRemoveItem01.Start()
+
+        ; Actor solitudeGuard = Game.GetFormEx(0xF684E) as Actor
+        ; Actor playerCopy = config.Player.PlaceActorAtMe(config.Player.GetBaseObject() as ActorBase, 1, none)
+        ; self.MarkActorAsArrested(playerCopy)
+        ; Debug(self, "Arrest::OnKeyDown", "Keys: " + ArresteeList.GetKeys())
         ; sceneManager.StartEscortFromCell(ArrestVars.Captor, ArrestVars.Arrestee, ArrestVars.CellDoor, ArrestVars.PrisonerItemsContainer)
         ; Debug(self, "Arrest::OnKeyDown", "F10 Pressed - SceneManager")
 
@@ -140,7 +341,7 @@ endEvent
 
 ; Temporary Event Handlers
 event OnArrestStart(Actor akCaptor, Actor akArrestee)
-    Jail.EscortToJail()
+    ; Jail.EscortToJail()
 endEvent
 
 event OnArresting(Actor akCaptor, Actor akArrestee)
@@ -237,41 +438,80 @@ event OnArrestDialogue(int aiTopicInfoEvent, int aiTopicInfoType, string asTopic
     endif
 endEvent
 
+;/
+
+    Actor   @akArrestee: The actor that will be arrested.
+    Actor?  @akCaptor: The actor that is performing the arrest. (Can be none if a Faction arrest is performed)
+    Faction @akCrimeFaction: The crime faction for this arrest.
+    string  @asArrestType: The type of the arrest, whether to escort or to move to jail, etc... (for more info, see ARREST_TYPES)
+/;
 event OnArrestBegin(Actor akArrestee, Actor akCaptor, Faction akCrimeFaction, string asArrestType)
-    ; This verification must be changed later to account for every possible Actor, something like:
-    ;/
-        if (self.IsArrested(akArrestee)) -> Where a verification will happen on a script that is attached to the ref passed in to this function and check the state of the Actor
-            
-        endif
-    /;
-    if (ArrestVars.IsArrested)
-        config.NotifyArrest("You are already under arrest")
-        Error(self, "Arrest::OnArrestBegin", akArrestee.GetBaseObject().GetName() + " has already been arrested, cannot arrest for "+ akCrimeFaction.GetName() +", aborting!")
+    RPB_Arrestee arresteeRef = self.GetArresteeReference(akArrestee)
+
+    if (self.IsActorArrested(akArrestee))
+        Config.NotifyArrest("You are already under arrest", akArrestee == Config.Player)
+        Error(self, "Arrest::OnArrestBegin", arresteeRef.GetName() + " has already been arrested, cannot arrest for "+ akCrimeFaction.GetName() +", aborting!")
 
         ; Add the bounty gained while in jail and clear the active faction bounty
-        self.AddBountyGainedWhileJailed(akCrimeFaction)
+        arresteeRef.AddBountyGainedWhileJailed() ; this might be temporary, bounty should be handled through RPB_Actor::OnStatChanged()
         return
     endif
 
-    if (!self.HasLatentBounty() && !self.HasActiveBounty(akCrimeFaction) && akArrestee == config.Player)
-        config.NotifyArrest("You can't be arrested in " + akCrimeFaction.GetName() + " since you do not have a bounty in the hold")
-        Error(self, "Arrest::OnArrestBegin", akArrestee.GetBaseObject().GetName() + " has no bounty, cannot arrest for "+ akCrimeFaction.GetName() +", aborting!")
+    arresteeRef.SetArrestParameters(ARREST_TYPE_TELEPORT_TO_CELL, akCaptor, akCrimeFaction)
+    arresteeRef.SetActiveBounty(Utility.RandomInt(1200, 7800))
+    ; Trace(self, "Arrest::OnArrestBegin", "ArresteeRef: [\n" + \
+    ;     "\t arresteeRef: " + arresteeRef + "\n" + \
+    ;     "\t arresteeRef.HasLatentBounty(): " + arresteeRef.HasLatentBounty() + "\n" + \
+    ;     "\t arresteeRef.HasActiveBounty(): " + arresteeRef.HasActiveBounty() + "\n" + \
+    ;     "\t arresteeRef.GetActiveBounty(): " + arresteeRef.GetActiveBounty() + "\n" + \
+    ;     "\t arresteeRef.GetLatentBounty(): " + arresteeRef.GetLatentBounty() + "\n" + \
+    ; "]")
+
+    if (!arresteeRef.HasLatentBounty() && !arresteeRef.HasActiveBounty())
+        Config.NotifyArrest("You can't be arrested in " + akCrimeFaction.GetName() + " since you do not have a bounty in the hold", akArrestee == Config.Player)
+        Error(self, "Arrest::OnArrestBegin", arresteeRef.GetName() + " has no bounty, cannot arrest for "+ akCrimeFaction.GetName() +", aborting!")
         return
     endif
-
-    self.SetArrestParams( \
-        asArrestType    = asArrestType, \
-        akArrestee      = akArrestee, \
-        akCaptor        = akCaptor, \
-        akCrimeFaction  = akCrimeFaction \
-    )
 
     if (akArrestee == Config.Player)
         self.AllowArrestForcegreets(false)
     endif
 
-    self.BeginArrest()
+    self.BeginArrest(arresteeRef)
 endEvent
+
+; event OnArrestBegin(Actor akArrestee, Actor akCaptor, Faction akCrimeFaction, string asArrestType)
+;     self.AddActorToArrestedList(akArrestee) ; Add this Actor to the Arrest list to be arrested
+;     RPB_Arrestee arresteeRef = self.GetArresteeReference(akArrestee)
+;     ; This verification must be changed later to account for every possible Actor, something like:
+;     ;/
+;         if (self.IsArrested(akArrestee)) -> Where a verification will happen on a script that is attached to the ref passed in to this function and check the state of the Actor
+            
+;         endif
+;     /;
+;     if (ArrestVars.IsArrested)
+;         config.NotifyArrest("You are already under arrest")
+;         Error(self, "Arrest::OnArrestBegin", akArrestee.GetBaseObject().GetName() + " has already been arrested, cannot arrest for "+ akCrimeFaction.GetName() +", aborting!")
+
+;         ; Add the bounty gained while in jail and clear the active faction bounty
+;         self.AddBountyGainedWhileJailed(akCrimeFaction)
+;         return
+;     endif
+
+;     if (!self.HasLatentBounty() && !self.HasActiveBounty(akCrimeFaction) && akArrestee == config.Player)
+;         config.NotifyArrest("You can't be arrested in " + akCrimeFaction.GetName() + " since you do not have a bounty in the hold")
+;         Error(self, "Arrest::OnArrestBegin", akArrestee.GetBaseObject().GetName() + " has no bounty, cannot arrest for "+ akCrimeFaction.GetName() +", aborting!")
+;         return
+;     endif
+
+;     arresteeRef.SetArrestParameters(asArrestType, akCaptor, akCrimeFaction)
+
+;     if (akArrestee == Config.Player)
+;         self.AllowArrestForcegreets(false)
+;     endif
+
+;     self.BeginArrest(arresteeRef)
+; endEvent
 
 ;/
     Event that happens when the player is beginning to elude arrest.
@@ -445,9 +685,142 @@ event OnArrestGoalChanged(Actor akArrestee, string asOldArrestGoal, string asNew
     Debug(self, "Arrest::OnArrestGoalChanged", "Arrest Goal for Actor " + akArrestee + " was changed from " + asOldArrestGoal + " to " + asNewArrestGoal, asOldArrestGoal != "")
 endEvent
 
+; Prototype may be different later, like this:
+; event OnArrestFailed(RPB_Captor akCaptorRef, RPB_Arrestee akArresteeRef, string asFailReason)
+event OnArrestFailed(Actor akCaptor, Actor akArrestee, string asFailReason)
+    Error(self, "Arrest::OnArrestFailed", asFailReason)
+    self.UnregisterArrestedActor(akArrestee)
+endEvent
+
 event OnUpdateGameTime()
     self.ResetEludedFlag()      ; Reset Eluded Arrest flags for all Holds
     self.ResetResistedFlag()    ; Reset Resisted Arrest flags for all Holds
+endEvent
+
+; ==========================================================
+;                 Event Handlers - Arrestee
+; ==========================================================
+
+RPB_Arrestee function GetArrestedActorReference(Actor akArrestee)
+    string arresteeKey = "Arrestee["+ akArrestee.GetFormID() +"]"
+
+    RPB_Arrestee arresteeRef = ArrestedActors.GetAt(arresteeKey) as RPB_Arrestee
+
+    if (!arresteeRef)
+        Warn(self, "Arrest::GetArrestedActorReference", "The Actor " + akArrestee + " is not arrested or there was a state mismatch!")
+        return none
+    endif
+
+    return arresteeRef
+endFunction
+
+RPB_Arrestee function GetArresteeReference(Actor akArrestee)
+    RPB_ActiveMagicEffectContainer ActiveMagicEffectList = Config.MainAPI as RPB_ActiveMagicEffectContainer
+    string arresteeKey = "Arrestee["+ akArrestee.GetFormID() +"]"
+
+    RPB_Arrestee arresteeRef = ActiveMagicEffectList.GetAt(arresteeKey) as RPB_Arrestee
+
+    if (!arresteeRef)
+        Warn(self, "Arrest::GetArresteeReference", "The Actor " + akArrestee + " is not arrested or there was a state mismatch!")
+        return none
+    endif
+
+    return arresteeRef
+endFunction
+
+RPB_Captor function GetCaptorReference(Actor akCaptor)
+    string listKey = "Captor["+ akCaptor.GetFormID() +"]"
+
+    RPB_Captor captor = Captors.GetAt(listKey) as RPB_Captor
+
+    if (!captor)
+        Warn(self, "Arrest::GetCaptorReference", "The Actor " + akCaptor + " is not a captor or there was a state mismatch!")
+        return none
+    endif
+
+    return captor
+endFunction
+
+RPB_Arrestee[] function GetArrestees(Actor akCaptor = none)
+    if (akCaptor)
+        RPB_Captor captorReference = self.GetCaptorReference(akCaptor)
+        return captorReference.GetArrestees()
+    endif
+
+    ; Get all captors in Captors list
+    ; Iterate through them all and get an array of all arrestees
+    RPB_Arrestee[] arrestees = new RPB_Arrestee[128] ; how to make size dynamic in this case?
+    int i = 0
+    while (i < Captors.GetSize())
+        
+        i += 1
+    endWhile
+endFunction
+
+function MarkActorAsArrested(Actor akActor, bool abDelayExecution = true)
+    Spell arrestSpell = GetFormFromMod(0x187B3) as Spell
+
+    if (!akActor.HasSpell(arrestSpell))
+        akActor.AddSpell(arrestSpell, false)
+    endif
+
+    if (abDelayExecution)
+        Utility.Wait(0.2)
+    endif
+endFunction
+
+RPB_Arrestee function MarkActorAsArrestee(Actor akActor, bool abDelayExecution = true)
+    Spell arrestSpell = GetFormFromMod(0x187B3) as Spell
+    akActor.AddSpell(arrestSpell, false)
+
+    if (abDelayExecution)
+        Utility.Wait(0.2)
+    endif
+
+    ; Since the spell is cast, a reference of type RPB_Arrestee is now available for akActor
+    return self.GetArresteeReference(akActor)
+endFunction
+
+function UnregisterArrestee(RPB_Arrestee akArrestee)
+    Spell arrestSpell = GetFormFromMod(0x187B3) as Spell
+
+    akArrestee.GetActor().RemoveSpell(arrestSpell)
+endFunction
+
+RPB_Captor function MarkActorAsCaptor(Actor akActor, bool abDelayExecution = true)
+    Spell arrestSpell = GetFormFromMod(0x187B3) as Spell ; change formid
+    akActor.AddSpell(arrestSpell, false)
+
+    if (abDelayExecution)
+        Utility.Wait(0.2)
+    endif
+
+    if (akActor.HasSpell(arrestSpell))
+        Debug(self, "Arrest::MarkActorAsCaptor", "The Actor does not have the spell attached to them! (This is possibly a bug!)")
+        return none
+    endif
+
+    ; Since the spell is cast, a reference of type RPB_Captor is now available for akActor
+    return self.GetCaptorReference(akActor)
+endFunction
+
+event OnActorArrested(Actor akArrestee, Actor akArrestGuard)
+    ; RPB_Arrestee arresteeRef = self.GetArresteeReference(akArrestee)
+
+    ; arresteeRef.Restrain()
+    ; Debug(self, "Arrest::OnActorArrested", "arresteeRef: " + arresteeRef + ", Targets Actor: " + arresteeRef.GetArrestedActor())
+endEvent
+
+event OnArresteeDeath(Actor akArrestee, Actor akArrestGuard, Actor akKiller)
+
+endEvent
+
+event OnArresteeRestrained(Actor akArrestee, Actor akRestrainer)
+
+endEvent
+
+event OnArresteeFreed(Actor akArrestee, Actor akGuard)
+
 endEvent
 
 ; ==========================================================
@@ -497,6 +870,41 @@ function ArrestActor(Actor akArrester, Actor akArrestee, string asArrestType)
 endFunction
 
 ;/
+    Arrests the passed in Actors.
+
+    Wrapper to handle multiple actors using ArrestActor()
+
+    Actor   @akArrester: The Actor that is performing the arrest, usually a guard.
+    Actor[] @akArrestees: The Actors that will be arrested.
+    string  @asArrestType: The type of the arrest, whether to escort to jail, cell, or teleport to jail or cell.
+    float   @afWaitTimeBetweenArrests: The delay to wait between each actor arrest, since the event can only handle one at once.
+/;
+function ArrestActors(Actor akArrester, Actor[] akArrestees, string asArrestType, bool abEnsureAllArrested = true, float afWaitTimeBetweenArrests = 0.3)
+    int i = 0
+    while (i < akArrestees.Length)
+        if (akArrestees[i])
+            self.ArrestActor(akArrester, akArrestees[i], asArrestType)
+        endif
+
+        Utility.Wait(afWaitTimeBetweenArrests)
+        if (abEnsureAllArrested && !self.IsActorArrested(akArrestees[i])) ; If they are not arrested yet
+            int arrestAttempt = 0
+            int arrestTries = 20
+
+            while (arrestAttempt < arrestTries)
+                if (!self.IsActorArrested(akArrestees[i]))
+                    self.ArrestActor(akArrester, akArrestees[i], asArrestType)
+                    Utility.Wait(afWaitTimeBetweenArrests)
+                endif
+
+                arrestAttempt += 1
+            endWhile
+        endif
+        i += 1
+    endWhile
+endFunction
+
+;/
     Sets the passed in Actor as being eluding arrest.
 
     The verification is handled through EventManager,
@@ -542,7 +950,7 @@ endFunction
     The verification is handled through EventManager,
     and it's handled by OnArrestPayBounty
 
-    Actor   @akGuard: The Actor that isrequesting the payment, usually a guard.
+    Actor   @akGuard: The Actor that is requesting the payment, usually a guard.
     Actor   @akPayerArrestee: The Actor that is going to pay the bounty.
     string  @asBountyPaymentScenario: Whether the payer will pay the bounty on the spot, be escorted willingly or restrained and escorted forcefully
 /;
@@ -553,74 +961,43 @@ endFunction
 ; ==========================================================
 ;                       Arrest-Specific
 
-function BeginArrest()
-    string hold             = ArrestVars.Hold
-    string arrestType       = ArrestVars.ArrestType
-    Faction arrestFaction   = ArrestVars.ArrestFaction
-    Actor arrestee          = ArrestVars.Arrestee
-    Actor captor            = ArrestVars.Captor ; May be undefined if the arrest is not done through a captor
+function BeginArrest(RPB_Arrestee akArresteeRef)
+    Actor arrestee          = akArresteeRef.GetActor()
+    Actor captor            = akArresteeRef.GetCaptor()
+    Faction arrestFaction   = akArresteeRef.GetFaction()
+    string arrestType       = akArresteeRef.GetArrestType()
+    string hold             = akArresteeRef.GetHold()
 
-    self.SetBounty()
+    akArresteeRef.HideBounty()
+    akArresteeRef.StopCombat()
 
-    ; Idea for refactor: bool assignedJailCellSuccessfully = jail.AssignJailCell(SuspectRef) where SuspectRef is a script that handles anything related to the arrest Suspect
-    ; OR: SuspectRef.AssignToJailCell()
-    bool assignedJailCellSuccessfully = jail.AssignJailCell(arrestee) ; Not guaranteed to go to jail, but we set it up here either way
-    
-    if (!assignedJailCellSuccessfully)
-        self.ResetArrest("Could not assign a jail cell to " + arrestee + ". (Aborting arrest...)")
-        return
-    endif
+    ; Actually consider the actor Arrested
+    akArresteeRef.Arrest()
 
-    arrestee.StopCombat()
-    arrestee.StopCombatAlarm()
-
-    ; Will most likely be used when the arrestee has no chance to pay their bounty, and therefore will get immediately thrown into the cell
+    ; Next step, escort/move to prison
     if (arrestType == ARREST_TYPE_TELEPORT_TO_CELL)
-        jail.StartTeleportToCell()
-        ; Suspect.TeleportToCell()
+        akArresteeRef.MoveToPrison(abMoveDirectlyToCell = true)
 
     ; Could be used when the arrestee still has a chance to pay their bounty, and not go to the cell immediately
     elseif (arrestType == ARREST_TYPE_TELEPORT_TO_JAIL) ; Not implemented yet (Idea: Arrestee will be teleported to some location in jail and then either escorted or teleported to the cell)
-        jail.TeleportToJail()
-        ; Suspect.TeleportToJail()
-    
+        akArresteeRef.MoveToPrison()
+
     ; Will most likely be used when the arrestee has no chance to pay their bounty, and therefore will get immediately escorted into the cell
-    elseif (arrestType == ARREST_TYPE_ESCORT_TO_CELL) ; Not implemented yet (Idea: Arrestee will be escorted directly to the cell)
-        jail.EscortToCell()
-        ; Suspect.EscortToCell()
-        ; Captor.EscortToCell(Suspect)
+    elseif (arrestType == ARREST_TYPE_ESCORT_TO_CELL)
+        akArresteeRef.EscortToPrison(abEscortDirectlyToCell = true)
 
-    elseif (arrestType == ARREST_TYPE_ESCORT_TO_JAIL) ; Not implemented yet (Idea: Arrestee will be escorted to the jail, and then processed before being escorted into the cell)
-        if (arrestee.GetDistance(captor))
-            ; Later have several ArrestStart scenes happen depending on the distance and maybe have a more hostile version for the arrests eluded / resisted etc.
-        endif
-
-        ; SceneManager.StartArrestStart01(captor, arrestee)
-        SceneManager.StartArrestScene( \
-            akGuard     = captor, \
-            akArrestee  = arrestee, \
-            asScene     = self.GetArrestScene(arrestee) \
-        )
+    elseif (arrestType == ARREST_TYPE_ESCORT_TO_JAIL)
+        akArresteeRef.EscortToPrison()
 
         ; Reset Arrest scene for future arrests
         self.SetArrestScene(arrestee, SceneManager.SCENE_ARREST_START_02)
     endif
-    
-    self.UpdateArrestStats()
-    self.SetAsArrested(arrestee, arrestFaction)
-    self.SetArrestGoal(arrestee, ARREST_GOAL_IMPRISONMENT)
-endFunction
 
-;/
-    Sets the passed in actor as arrested for this faction to the system.
-/;
-function SetAsArrested(Actor akArrestee, Faction akFaction)
-    if (akArrestee == config.Player)
-        ArrestVars.SetBool("Arrest::Arrested", true)
-        ArrestVars.SetFloat("Arrest::Time of Arrest", Utility.GetCurrentGameTime())
-        config.NotifyArrest("You have been arrested in " + akFaction.GetName())
-        Info(self, "Arrest::SetAsArrested", akArrestee.GetBaseObject().GetName() + " has been arrested in " + akFaction.GetName() + " at " + Utility.GetCurrentGameTime())
-    endif
+    ; if (!self.GetCaptorReference(captor))
+    ;     ; Bind the captor to their state script
+    ;     RPB_Captor captorReference = self.MarkActorAsCaptor(captor)
+    ;     captorReference.AddArrestee(akArresteeRef)
+    ; endif
 endFunction
 
 function PunishPaymentEvader(Actor akGuard, Actor akPayerArrestee)
@@ -925,7 +1302,6 @@ function SetEludedGuard(Actor akEludedGuard, string asEludeType)
 endFunction
 
 function TriggerForcegreetEluding(Actor akEludedGuard)
-    Debug(self, "Arrest::TriggerForcegreetEluding", "RPB_AllowArrestForcegreet: " + RPB_AllowArrestForcegreet.GetValueInt())
     Debug(self, "Arrest::TriggerForcegreetEluding", "Distance from Speaker: " + akEludedGuard.GetDistance(akEludedGuard.GetDialogueTarget()))
     self.SetEludedGuard(akEludedGuard, "Dialogue")
     SceneManager.StartEludingArrest(akEludedGuard, config.Player)
@@ -991,58 +1367,6 @@ function PayCrimeGold(Actor akPayer, Faction akCrimeFaction)
     endif
 endFunction
 
-function UpdateArrestStats()
-    Actor arrestee  = ArrestVars.Arrestee
-
-    if (arrestee == config.Player)
-        string hold     = ArrestVars.Hold
-        int bounty      = ArrestVars.Bounty
-
-        int currentLargestBounty = actorVars.GetLargestBounty(ArrestVars.ArrestFaction, ArrestVars.Arrestee)
-        actorVars.SetCurrentBounty(ArrestVars.ArrestFaction, ArrestVars.Arrestee, bounty)
-        actorVars.SetLargestBounty(ArrestVars.ArrestFaction, ArrestVars.Arrestee, int_if (currentLargestBounty < bounty, bounty, currentLargestBounty))
-        actorVars.ModTotalBounty(ArrestVars.ArrestFaction, ArrestVars.Arrestee, bounty)
-        actorVars.ModTimesArrested(ArrestVars.ArrestFaction, ArrestVars.Arrestee, 1)
-
-    else ; Processing for NPC stats later
-        ; e.g:
-        ; Actor arrestee  = ArrestVars.Arrestee
-        ; string hold = ArrestVars.GetString("["+ arrestee.GetFormID() +"]Arrest::Hold")
-        ; int bounty  = ArrestVars.GetInt("["+ arrestee.GetFormID() +"]Arrest::Bounty")
-
-        ; actorVars.SetStat(hold, "["+ arrestee.GetFormID() +"]Current Bounty", bounty)
-    endif
-endFunction
-
-function ResetArrestVars(Actor akArrestee)
-    Debug(self, "Arrest::ResetArrestVars", "Resetting Arrest Variables for " + akArrestee)
-
-    if (akArrestee == Config.Player) ; Should be dynamic later for all Actors
-        ArrestVars.Remove("Arrest::Arrest Faction")
-        ArrestVars.Remove("Arrest::Arrest Scene")
-        ArrestVars.Remove("Arrest::Arrest Type")
-        ArrestVars.Remove("Arrest::Arrested")
-        ArrestVars.Remove("Arrest::Arrestee")
-        ArrestVars.Remove("Arrest::Arresting Guard")
-        ArrestVars.Remove("Arrest::Captured")
-        ArrestVars.Remove("Arrest::Hold")
-        ArrestVars.Remove("Arrest::Scenario")
-        ArrestVars.Remove("Arrest::Time of Arrest")
-
-    else
-        ArrestVars.RemoveForActor(akArrestee, "Arrest::Arrest Faction")
-        ArrestVars.RemoveForActor(akArrestee, "Arrest::Arrest Scene")
-        ArrestVars.RemoveForActor(akArrestee, "Arrest::Arrest Type")
-        ArrestVars.RemoveForActor(akArrestee, "Arrest::Arrested")
-        ArrestVars.RemoveForActor(akArrestee, "Arrest::Arrestee")
-        ArrestVars.RemoveForActor(akArrestee, "Arrest::Arresting Guard")
-        ArrestVars.RemoveForActor(akArrestee, "Arrest::Captured")
-        ArrestVars.RemoveForActor(akArrestee, "Arrest::Hold")
-        ArrestVars.RemoveForActor(akArrestee, "Arrest::Scenario")
-        ArrestVars.RemoveForActor(akArrestee, "Arrest::Time of Arrest")
-    endif
-endFunction
-
 function ResetArrest(string reason = "")
     ; Clear all arrest related vars
     ArrestVars.Clear()
@@ -1051,7 +1375,6 @@ endFunction
 
 ; ==========================================================
 ;                           Utility
-
 ;/
     Registers a delayed event through a state's OnUpdate()
 
@@ -1144,6 +1467,7 @@ endFunction
 
 function AllowArrestForcegreets(bool allow = true)
     ; Allow/Disallow Forcegreets (used in AI package RPB_DGForcegreet for Arrest eludes)
+    GlobalVariable RPB_AllowArrestForcegreet = GetFormFromMod(0x130D7) as GlobalVariable
     RPB_AllowArrestForcegreet.SetValueInt(int_if (allow, 1, 0))
 endFunction
 

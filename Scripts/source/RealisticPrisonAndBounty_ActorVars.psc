@@ -17,6 +17,7 @@ endProperty
 ; =================================
 function SetStat(string statName, Faction akFaction, Actor akActor, int value)
     self.Set("["+ akActor.GetFormID() +"]" + akFaction.GetName() + "::" + statName, value)
+    ; self.OnTrackedStatChanged(statName, akFaction, akActor, value)
 endFunction
 
 function SetCrimeGold(Faction akFaction, Actor akActor, int value)
@@ -210,6 +211,14 @@ endFunction
 int function GetInfamy(Faction akFaction, Actor akActor)
     return self.Get("["+ akActor.GetFormID() +"]" + akFaction.GetName() + "::Infamy Gained")
 endFunction
+
+; =================================
+; Events
+; =================================
+
+event OnTrackedStatChanged(string asStatName, Faction akFaction, Actor akActor, int aiValue)
+    
+endEvent
 
 
 ; =================================
