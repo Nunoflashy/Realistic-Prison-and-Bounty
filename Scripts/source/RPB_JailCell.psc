@@ -209,7 +209,7 @@ event OnPrisonerEnter(RPB_Prisoner akPrisoner)
     self.RegisterPrisoner(akPrisoner)
     self.DetermineCellParameters()
 
-    Debug(self, "JailCell::OnPrisonerEnter", "Cell Props: " + self.DEBUG_GetCellProperties())
+    Debug(self, "JailCell::OnPrisonerEnter", "Cell Properties: " + self.DEBUG_GetCellProperties())
 endEvent
 
 ; Happens when the prisoner leaves this cell (when they are removed)
@@ -217,7 +217,7 @@ event OnPrisonerLeave(RPB_Prisoner akPrisoner)
     self.UnregisterPrisoner(akPrisoner)
     self.DetermineCellParameters()
 
-    Debug(self, "JailCell::OnPrisonerLeave", "Cell Props: " + self.DEBUG_GetCellProperties())
+    Debug(self, "JailCell::OnPrisonerLeave", "Cell Properties: " + self.DEBUG_GetCellProperties())
 endEvent
 
 ; =========================================================
@@ -245,8 +245,6 @@ function BindPrison(RPB_Prison akPrison)
         return
     endif
 
-    ; Debug(self, "JailCell::BindPrison", "Bound jail cell " + self + " to prison " + akPrison.Hold)
-
     ; Start out as an empty cell
     __isEmpty = true
 
@@ -267,8 +265,6 @@ function BindCellDoor(RPB_CellDoor akCellDoor)
     ; Bind the cell door to this jail cell
     __cellDoor = akCellDoor
 
-    ; Debug(self, "JailCell::BindCellDoor", "Cell door " + __cellDoor + " bound to jail cell " + self)
-
     ; Bind this jail cell to the cell door (to retrieve this from the cell door)
     akCellDoor.BindCell(self)
 endFunction
@@ -281,6 +277,7 @@ endFunction
 function RegisterPrisoner(RPB_Prisoner akPrisoner)
     if (!__prisonersInCell)
         __prisonersInCell = JMap.object()
+        JValue.retain(__prisonersInCell)
     endif
 
     ; Helper.IntMap_SetForm(self.GetIdentifier(), akPrisoner.GetIdentifier(), akPrisoner.GetActor())
@@ -339,7 +336,7 @@ endFunction
 ; =========================================================
 
 string function __getCellIdentifierVarKey(string asVarName)
-    return "["+ this.GetFormID() +"]Cell::" + asVarName
+    return "["+ self.GetFormID() +"]Cell::" + asVarName
 endFunction
 
 ;                           Getters
@@ -415,13 +412,6 @@ function Cell_SetActor(string asVarName, Actor akValue)
 
 endFunction
 
-ObjectReference __this
-ObjectReference property this
-    ObjectReference function get()
-        return __this
-    endFunction
-endProperty
-
 ; =========================================================
 ;                          Debug                      
 ; =========================================================
@@ -451,6 +441,6 @@ string function DEBUG_GetCellProperties()
         "\t Empty: " + self.IsEmpty + "\n" + \
         "\t Available: " + self.IsAvailable + "\n" + \
         "\t Gender Exclusive: " + isGenderExclusive + string_if (isGenderExclusive, " ("+ getGenderExclusivenessAsString +")") + "\n" + \
-        "\t Prisoners: " + self.PrisonerCount + string_if (_hasPrisoners, " (\n"+ self.DEBUG_GetPrisoners() +"\t)") + "\n" + \
+        "\t Prisoners: " + self.PrisonerCount + string_if (_hasPrisoners, " [\n"+ self.DEBUG_GetPrisoners() +"\t]") + "\n" + \
     "]"
 endFunction

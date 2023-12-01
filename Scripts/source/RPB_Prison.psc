@@ -636,6 +636,15 @@ bool function HasMaleOnlyCells()
 endFunction
 
 ;/
+    Determines the options for jail cells belonging to this Prison,
+    this means what type of jail cell has the highest priority,
+    what are the only types allowed (if set), and so on...
+/;
+bool function DetermineCellOptions()
+
+endFunction
+
+;/
     Requests a jail cell for the given prisoner, based on this Prison's config.
 
     RPB_Prisoner    @akPrisoner: The prisoner that is requesting the jail cell.
@@ -670,35 +679,22 @@ RPB_JailCell function RequestCellForPrisoner(RPB_Prisoner akPrisoner)
     endif
 
     ; Determine cell to request through Prisoner related config
-    if (akPrisoner.OnlyAllowImprisonmentInEmptyCell && outputCell == none)
+    if (akPrisoner.OnlyAllowImprisonmentInEmptyCell)
         outputCell = self.GetEmptyJailCell()
         Debug(none, "Prison::RequestCellForPrisoner", "Got empty cell: " + outputCell)
 
-    elseif (akPrisoner.OnlyAllowImprisonmentInGenderCell && outputCell == none)
+    elseif (akPrisoner.OnlyAllowImprisonmentInGenderCell)
         outputCell = self.GetJailCellOfGender(akPrisoner.GetSex())
         Debug(none, "Prison::RequestCellForPrisoner", "Got gender exclusive cell: " + outputCell)
 
-    elseif (akPrisoner.OnlyAllowImprisonmentInEmptyOrGenderCell && outputCell == none)
-        ; Try empty cell first, if it doesn't exist, get a cell of the prisoner's gender
-        outputCell = self.GetEmptyJailCell()
-
-        if (outputCell == none)
-            outputCell = self.GetJailCellOfGender(akPrisoner.GetSex())
-            Debug(none, "Prison::RequestCellForPrisoner", "Got gender exclusive cell: " + outputCell, outputCell != none)
-        else
-            Debug(none, "Prison::RequestCellForPrisoner", "Got empty cell: " + outputCell, outputCell != none)
-        endif
+    elseif (akPrisoner.OnlyAllowImprisonmentInEmptyOrGenderCell)
+        ; Get the cell based on prison's priorities, and do not allow random cells
+        outputCell = self.GetJailCellBasedOnPriority(akPrisoner.GetSex())
     endif
 
-    ; Determine cell to request through Prison related config and priorities
-    if (self.PrioritizeEmptyCells && outputCell == none)
-        ; Try to get an empty cell
-        outputCell = self.GetEmptyJailCell()
-    endif
-
-    if (self.PrioritizeGenderCells && outputCell == none)
-        ; Try to get gender exclusive cell (same gender as the prisoner)
-        outputCell = self.GetJailCellOfGender(akPrisoner.GetSex())
+    if (outputCell == none)
+        ; Get a jail cell based on this prison's priorities, allow random cells
+        outputCell = self.GetJailCellBasedOnPriority(akPrisoner.GetSex(), true)
     endif
 
     ; Cells must either be empty or gender exclusive, and none was found for this prisoner
@@ -987,6 +983,45 @@ RPB_JailCell function GetJailCellOfGender(string asSex)
     Debug(none, "Prison::GetJailCellOfGender", "Gender Cell returned: " + genderCell)
 
     return genderCell
+endFunction
+
+;/
+    Retrieves a jail cell based on this prison's priorities.
+
+    string  @asSex: The gender of the cell in case a gender exclusive cell is returned
+    bool    @abAllowRandomCells: Whether to allow random jail cells as a fallback in case either empty or gender exclusive cells could not be returned
+
+    returns: A jail cell based on the prison's priorities, random if the priorities could not be met, or none if no jail cells could be returned.
+
+/;
+RPB_JailCell function GetJailCellBasedOnPriority(string asSex, bool abAllowRandomCells = false)
+    RPB_JailCell returnedCell = none
+
+    if (self.PrioritizeEmptyCells)
+        returnedCell = self.GetEmptyJailCell()
+
+    elseif (self.PrioritizeGenderCells)
+        returnedCell = self.GetJailCellOfGender(asSex)
+
+    else ; No priority
+        ; Get empty cell first, if that fails, get a gender exclusive one, else get a random cell if @abAllowRandomCells is true
+        returnedCell = self.GetEmptyJailCell()
+
+        if (returnedCell == none)
+            returnedCell = self.GetJailCellOfGender(asSex)
+        endif
+
+        if (returnedCell == none && abAllowRandomCells)
+            returnedCell = self.GetRandomJailCell()
+        endif
+    endif
+
+    if (returnedCell == none)
+        ; Could not return any cell, error here
+        return none
+    endif
+
+    return returnedCell
 endFunction
 
 RPB_JailCell function GetRandomJailCell( \
