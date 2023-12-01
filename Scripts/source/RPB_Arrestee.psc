@@ -67,6 +67,12 @@ int property BountyViolent
     endFunction
 endProperty
 
+int property Bounty
+    int function get()
+        return self.GetLatentBounty()
+    endFunction
+endProperty
+
 float property TimeOfArrest
     float function get()
         return Arrest_GetFloat("Time of Arrest")
@@ -79,12 +85,6 @@ float property TimeArrested
     endFunction
 endProperty
 
-int property Bounty
-    int function get()
-        return self.GetLatentBounty()
-    endFunction
-endProperty
-
 bool property Defeated
     bool function get()
         return Arrest_GetBool("Defeated")
@@ -94,7 +94,6 @@ endProperty
 int property DefeatedBounty
     int function get()
         return Arrest_GetInt("Bounty for Defeat")
-        ; return ArrestVars.GetInt("Arrest::Bounty for Defeat")
     endFunction
 endProperty
 
@@ -196,7 +195,7 @@ RPB_Prisoner function MakePrisoner()
     ; debug.messagebox("Prison: " + prison + ", Hold: " + hold + ", Actor: " + this + ", PrisonerRef: " + prisonerRef)
 
     ; TODO: Remove arrest reference possibly
-    self.Destroy() ; To be tested
+    ; self.Destroy() ; To be tested
     return prisonerRef
 endFunction
 
@@ -260,6 +259,26 @@ function UpdateArrestStats()
     self.UpdateTotalBounty()
 endFunction
 
+function RevertArrest()
+    self.UnregisterForTrackedStats()
+    self.RestoreBounty()
+
+    ; Ideally these vars should be deleted and not set to none/null, but ArrestVars needs a refactor to do so on a per-actor basis if we want to delete all vars belonging to an actor
+    Arrest_Remove("Arrest Faction")
+    Arrest_Remove("Arrestee") ; Might be temp, we already have the Arrestee reference through this instance of RPB_Arrestee
+    Arrest_Remove("Arrest Type")
+    Arrest_Remove("Arrest Scene")
+    Arrest_Remove("Hold")
+    Arrest_Remove("Arrested")
+    Arrest_Remove("Arresting Guard")
+    Arrest_Remove("Captured")
+    Arrest_Remove("Scenario")
+    Arrest_Remove("Time of Arrest")
+
+    Utility.Wait(0.5)
+    self.Destroy()
+endFunction
+
 function ResetArrest()
     self.RestoreBounty()
     ArrestVars.RemoveForActor(this, "Arrest::Arrest Faction")
@@ -317,8 +336,10 @@ function EscortToPrison(bool abEscortDirectlyToCell = false)
         RPB_Prisoner prisonerRef = self.MakePrisoner()
         if (!prisonerRef.AssignCell())
             Debug(this, "Arrestee::EscortToPrison", "Could not assign a cell to arrestee " + this)
+            self.RevertArrest()
             return
         endif
+
         Debug(this, "Arrestee::EscortToPrison", "Started escorting " + this + " directly to a cell")
         Arrest.SceneManager.StartEscortToCell( \
             akEscortLeader      = captor, \
@@ -344,8 +365,12 @@ function MoveToPrison(bool abMoveDirectlyToCell = false)
         captor.MoveTo(prisonerChest)
     else
         RPB_Prisoner prisonerRef = self.MakePrisoner()
+        prisonerRef.OnlyAllowImprisonmentInEmptyOrGenderCell = true ; temporary
         if (!prisonerRef.AssignCell())
             Debug(this, "Arrestee::MoveToPrison", "Could not assign a cell to arrestee " + this)
+            ; Terminate arrest, could not assign cell
+            prisonerRef.Destroy()
+            self.RevertArrest()
             return
         endif
 
@@ -450,6 +475,8 @@ endEvent
 ; ==========================================================
 
 function Destroy()
+    ; TODO: Unset all properties related to this Arrestee
+
     Arrest.UnregisterArrestedActor(this)
 endFunction
 

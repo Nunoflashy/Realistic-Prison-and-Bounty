@@ -28,9 +28,10 @@ endProperty
 
 ; ==========================================================
 
+RPB_JailCell __jailCell
 RPB_JailCell property JailCell
     RPB_JailCell function get()
-        
+        return __jailCell
     endFunction
 endProperty
 
@@ -102,6 +103,8 @@ event OnOpen(ObjectReference akActionRef)
         return
     endif
 
+    Debug(self, "CellDoor::OnOpen", akActionRef + " opened cell door " + self + ", which belongs to jail cell " + self.JailCell)
+
 endevent
 
 event OnClose(ObjectReference akActionRef)
@@ -123,6 +126,11 @@ endevent
 /;
 bool function IsRegisteredCellDoor()
     return JailCell.IsRegisteredCellDoorInPrison(this.GetFormID())
+endFunction
+
+function BindCell(RPB_JailCell akJailCell)
+    __jailCell = akJailCell
+    ; Debug(self, "JailCell::BindCell", "Jail cell " + __jailCell + " bound to cell door " + self)
 endFunction
 
 ; =========================================================

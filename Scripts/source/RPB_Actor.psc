@@ -64,7 +64,17 @@ endProperty
 ;     ; Override
 ; endEvent
 
+; ==========================================================
+;                          Clothing
+; ==========================================================
 
+bool function IsNaked()
+    ; TOOD: Logic to determine when the actor is naked
+endFunction
+
+bool function IsInUnderwear()
+    ; TOOD: Logic to determine when the actor is only wearing underwear
+endFunction
 
 ; ==========================================================
 ;                           Bounty
@@ -448,6 +458,18 @@ endFunction
 ;                           Utility
 ; ==========================================================
 
+bool property IsFemale
+    bool function get()
+        return this.GetActorBase().GetSex() == 1
+    endFunction
+endProperty
+
+bool property IsMale
+    bool function get()
+        return this.GetActorBase().GetSex() == 0
+    endFunction
+endProperty
+
 function StopCombat(bool abStopCombatAlarm = true)
     this.StopCombat()
 
@@ -456,18 +478,10 @@ function StopCombat(bool abStopCombatAlarm = true)
     endif
 endFunction
 
-bool function IsFemale()
-    return this.GetActorBase().GetSex() == 1
-endFunction
-
-bool function IsMale()
-    return this.GetActorBase().GetSex() == 0
-endFunction
-
-string function GetSex(bool abShortValue = true)
-    if (self.IsFemale())
+string function GetSex(bool abShortValue = false)
+    if (self.IsFemale)
         return string_if (abShortValue, "F", "Female")
-    elseif (self.IsMale())
+    elseif (self.IsMale)
         return string_if (abShortValue, "M", "Male")
     endif
 endFunction
@@ -548,6 +562,10 @@ endFunction
 
 string function GetName()
     return this.GetBaseObject().GetName()
+endFunction
+
+string function GetIdentifier()
+    return this.GetFormID()
 endFunction
 
 ;/

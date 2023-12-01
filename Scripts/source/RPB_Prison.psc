@@ -464,7 +464,7 @@ endProperty
 ; ==========================================================
 
 ; ==========================================================
-;                        Prison Config
+;                       Prison Identity
 ; ==========================================================
 
 Location __prisonLocation
@@ -499,6 +499,21 @@ RPB_Prisoner[] property Prisoners
     endFunction
 endProperty
  
+; Give priority to empty jail cells when placing a prisoner
+bool property PrioritizeEmptyCells auto
+
+; Give priority to gender exclusive cells when placing a prisoner
+bool property PrioritizeGenderCells auto
+
+; When assigning a cell to a prisoner, only allow empty ones
+bool property AllowOnlyEmptyCells auto
+
+; When assigning a cell to a prisoner, only allow gender exclusive ones
+bool property AllowOnlyGenderExclusiveCells auto
+
+; When assigning a cell to a prisoner, it must either be empty or a gender exclusive cell
+bool property AllowOnlyEmptyOrGenderCells auto
+
 ; ==========================================================
 ;                         Prisoners
 ; ==========================================================
@@ -549,12 +564,35 @@ endFunction
 ;                          Cell
 ; ==========================================================
 
-RPB_JailCell[] function GetEmptyCells()
-    ; Prison_GetInt("Cell 01")
-    ; Get all Prisoners from Cell 01
-    ; If no prisoners, the cell is empty, add it to an array
-    ; do the same for the remaining cells
+; Must be cast to RPB_JailCell when used to have the properties
+Form[] function GetJailCells()
+    return Config.GetJailMarkers(Hold)
 endFunction
+
+Form[] function GetEmptyCells()
+    Form[] cells = self.GetJailCells()
+
+    int i = 0
+    while (i < cells.Length)
+        RPB_JailCell jailCellRef = cells[i] as RPB_JailCell
+        ; ObjectReference debug_jailCellRef = cells[i] as ObjectReference
+        ; Debug(none, "Prison::GetEmptyCells", "Ref: " + debug_jailCellRef + ", Cell Props: " + jailCellRef.DEBUG_GetCellProperties())
+
+        if (jailCellRef && jailCellRef.IsEmpty)
+            MiscVars.AddFormToArray("Cells/Empty", jailCellRef)
+        endif
+        i += 1
+    endWhile
+
+    return MiscVars.GetPapyrusFormArray("Cells/Empty")
+endFunction
+
+; RPB_JailCell[] function GetEmptyCells()
+;     ; Prison_GetInt("Cell 01")
+;     ; Get all Prisoners from Cell 01
+;     ; If no prisoners, the cell is empty, add it to an array
+;     ; do the same for the remaining cells
+; endFunction
 
 ; Available does not mean empty, if the cell has two beds and one prisoner, it is considered available, if it has two beds and two prisoners, it's not available.
 ; RPB_JailCell should have a property determing if the cell is available: IsAvailable, and another IsEmpty, etc
@@ -589,6 +627,94 @@ RPB_JailCell[] function GetCellsWithMixedPrisoners()
     ; If all the prisoners are not the same sex, this cell has both male and female prisoners
 endFunction
 
+bool function HasFemaleOnlyCells()
+
+endFunction
+
+bool function HasMaleOnlyCells()
+
+endFunction
+
+;/
+    Requests a jail cell for the given prisoner, based on this Prison's config.
+
+    RPB_Prisoner    @akPrisoner: The prisoner that is requesting the jail cell.
+
+    return: The jail cell as an instance of RPB_JailCell that was requested for this prisoner, based on their criteria if it exists, otherwise returns none.
+/;
+RPB_JailCell function RequestCellForPrisoner(RPB_Prisoner akPrisoner)
+    RPB_JailCell outputCell = none
+
+    ; Determine what type of cell this prisoner should go to
+    akPrisoner.DetermineCellOptions()
+
+    if (self.AllowOnlyEmptyCells && akPrisoner.OnlyAllowImprisonmentInGenderCell)
+        ; Error, conflicting options
+        Debug(none, "Prison::RequestCellForPrisoner", "There are conflicting properties, cannot request a jail cell for this prisoner! [\n"+ \
+            "\t Prison: " + self.Hold + "\n" + \
+            "\t Prisoner: " + akPrisoner + ", identified by: " + akPrisoner.GetIdentifier() + \
+            "\t Prison.AllowOnlyEmptyCells: " + self.AllowOnlyEmptyCells + "\n" + \
+            "\t Prisoner.OnlyAllowImprisonmentInGenderCell: " + akPrisoner.OnlyAllowImprisonmentInGenderCell + "\n" + \
+        "]")
+        return none
+
+    elseif (self.AllowOnlyGenderExclusiveCells && akPrisoner.OnlyAllowImprisonmentInEmptyCell)
+        ; Error, conflicting options
+        Debug(none, "Prison::RequestCellForPrisoner", "There are conflicting properties, cannot request a jail cell for this prisoner! [\n"+ \
+            "\t Prison: " + self.Hold + "\n" + \
+            "\t Prisoner: " + akPrisoner + ", identified by: " + akPrisoner.GetIdentifier() + \
+            "\t Prison.AllowOnlyGenderExclusiveCells: " + self.AllowOnlyGenderExclusiveCells + "\n" + \
+            "\t Prisoner.OnlyAllowImprisonmentInEmptyCell: " + akPrisoner.OnlyAllowImprisonmentInEmptyCell + "\n" + \
+        "]")
+        return none
+    endif
+
+    ; Determine cell to request through Prisoner related config
+    if (akPrisoner.OnlyAllowImprisonmentInEmptyCell && outputCell == none)
+        outputCell = self.GetEmptyJailCell()
+        Debug(none, "Prison::RequestCellForPrisoner", "Got empty cell: " + outputCell)
+
+    elseif (akPrisoner.OnlyAllowImprisonmentInGenderCell && outputCell == none)
+        outputCell = self.GetJailCellOfGender(akPrisoner.GetSex())
+        Debug(none, "Prison::RequestCellForPrisoner", "Got gender exclusive cell: " + outputCell)
+
+    elseif (akPrisoner.OnlyAllowImprisonmentInEmptyOrGenderCell && outputCell == none)
+        ; Try empty cell first, if it doesn't exist, get a cell of the prisoner's gender
+        outputCell = self.GetEmptyJailCell()
+
+        if (outputCell == none)
+            outputCell = self.GetJailCellOfGender(akPrisoner.GetSex())
+            Debug(none, "Prison::RequestCellForPrisoner", "Got gender exclusive cell: " + outputCell, outputCell != none)
+        else
+            Debug(none, "Prison::RequestCellForPrisoner", "Got empty cell: " + outputCell, outputCell != none)
+        endif
+    endif
+
+    ; Determine cell to request through Prison related config and priorities
+    if (self.PrioritizeEmptyCells && outputCell == none)
+        ; Try to get an empty cell
+        outputCell = self.GetEmptyJailCell()
+    endif
+
+    if (self.PrioritizeGenderCells && outputCell == none)
+        ; Try to get gender exclusive cell (same gender as the prisoner)
+        outputCell = self.GetJailCellOfGender(akPrisoner.GetSex())
+    endif
+
+    ; Cells must either be empty or gender exclusive, and none was found for this prisoner
+    if ((self.AllowOnlyEmptyCells || self.AllowOnlyGenderExclusiveCells) && outputCell == none)
+        ; Could not assign a cell based on criteria.
+    endif
+
+    if (outputCell == none)
+        ; If no criteria was passed and a cell was not retrieved yet, get a random cell
+        outputCell = self.GetRandomPrisonCell() as RPB_JailCell
+        Debug(none, "Prison::RequestCellForPrisoner", "Got random cell: " + outputCell)
+    endif
+
+    return outputCell
+endFunction
+
 ; ==========================================================
 
 function AwaitPrisonersRelease()
@@ -611,14 +737,15 @@ function AwaitPrisonersRelease()
                 ; int timeServedDays  = currentPrisoner.GetTimeServed("Days")
                 ; int timeLeftDays    = currentPrisoner.GetTimeLeftInSentence("Days")
                 ; Debug(none, "Prison::AwaitPrisonersRelease", "Prisoner:  " + currentPrisoner.GetActor() + " has not served their sentence yet ("+ timeServedDays + " days served, " +  timeLeftDays +" days left).")
-                Debug(none, "Prison::AwaitPrisonersRelease", currentPrisoner + " " + currentPrisoner.GetActor() + " ("+ currentPrisoner.GetSex() +")" + " has not served their sentence yet in "+ Hold +".")
+                Debug(none, "Prison::AwaitPrisonersRelease", currentPrisoner + " " + currentPrisoner.GetActor() + " ("+ currentPrisoner.GetSex(true) +")" + " has not served their sentence yet in "+ Hold +".")
             endif
         endif
         i += 1
     endWhile
     
-    ; Debug(none, "Prison::AwaitPrisonersRelease", "Checked Prisoners in " + Hold + ": " + prisonerCount)
-    Debug(none, "Prison::AwaitPrisonersRelease", "Awaiting release for " + prisonerCount + " prisoners in " + Hold)
+    if (prisonerCount > 0)
+        Debug(none, "Prison::AwaitPrisonersRelease", "Awaiting release for " + prisonerCount + " prisoners in " + Hold)
+    endif
 endFunction
 
 function AwaitPrisonersQueuedImprisonment()
@@ -680,6 +807,11 @@ event OnCellDoorClosed(RPB_JailCell akPrisonCell, Actor akCloser)
     
 endEvent
 
+event OnJailCellAssigned(RPB_JailCell akJailCell, RPB_Prisoner akPrisoner)
+    ; if (akJailCell.IsEmpty)
+    ;     akJailCell.SetExclusiveToPrisonerSex(akPrisoner)
+    ; endif
+endEvent
 
 ; ==========================================================
 ;                          Management
@@ -689,17 +821,17 @@ endEvent
 RPB_Prisoner[] checkedPrisoners
 int checkedPrisonersIndex
 
-function ProcessPrisonerState(RPB_Prisoner akPrisoner)
-    if (self.EnableInfamy)
-        akPrisoner.UpdateInfamy()
-    endif
+; function ProcessPrisonerState(RPB_Prisoner akPrisoner)
+;     if (self.EnableInfamy)
+;         akPrisoner.UpdateInfamy()
+;     endif
 
-    akPrisoner.UpdateDaysImprisoned()
-    ; akPrisoner.DEBUG_ShowPrisonInfo()
-    self.DEBUG_ShowPrisonerSentenceInfo(akPrisoner, true)
-    akPrisoner.RegisterLastUpdate()
+;     akPrisoner.UpdateDaysImprisoned()
+;     ; akPrisoner.DEBUG_ShowPrisonInfo()
+;     self.DEBUG_ShowPrisonerSentenceInfo(akPrisoner, true)
+;     akPrisoner.RegisterLastUpdate()
 
-endFunction
+; endFunction
 
 event OnInit()
     ; Temporary, to hold periodically updates prisoners for now
@@ -711,9 +843,14 @@ event OnInit()
 
 
     Debug(none, "Prison::OnInit", "OnInit PRISON")
-
-    MiscVars.CreateStringMap("prison/cell")
+    
+    MiscVars.CreateArray("Prison/Cells")
+    ; MiscVars.CreateStringMap("prison/cell")
     MiscVars.CreateStringMap("prison/cell/door")
+
+    ; ; Initialize all of the jail cells belonging to this prison
+    ; Utility.Wait(2.0)
+    ; self.SetupCells()
 endEvent
 
 event OnUpdateGameTime()
@@ -737,6 +874,10 @@ function ConfigurePrison( \
 
     __isInitialized     = true
 
+    ; Initialize all of the jail cells belonging to this prison
+    ; Utility.Wait(2.0)
+    self.SetupCells()
+
     Debug(self.GetOwningQuest(), "Prison::ConfigurePrison", "Prison Location: " + PrisonLocation + ", Prison Faction: " + PrisonFaction + ", Prison Hold: " + Hold)
 endFunction
 
@@ -744,9 +885,142 @@ function AddPrisonCell(RPB_JailCell akPrisonCell)
 
 endFunction
 
+bool function BindCellToPrisoner(ObjectReference akJailCell, RPB_Prisoner akPrisoner)
+    ; Add this jail cell to the prisoner for ease of access
+    ; akPrisoner.BindCell(akJailCell) ; Bind the Prisoner to the Cell
+    ; MiscVars.SetReference("["+ akPrisoner.GetIdentifier() +"]Cell", akJailCell) ; Bind the Prisoner to the Cell
+    ; Debug(self.GetOwningQuest(), "Prison::BindCellToPrisoner", akJailCell + " jail cell bound to " + akPrisoner.GetActor())
+
+    ; Get the door of the jail cell (the marker)
+    ; ObjectReference cellDoor = GetNearestJailDoorOfType(GetJailBaseDoorID(Hold), akJailCell, 4000) ; this should return RPB_CellDoor (TODO: new save)
+
+    RPB_JailCell jailCell = (akJailCell as RPB_JailCell)
+
+    ; Registers the prisoner into this cell, to let the prison system know how many prisoners and of what gender are in a given cell
+    ; jailCell.RegisterPrisoner(akPrisoner)
+
+    ; Debug(none, "Prison::BindCellToPrisoner", "CellDoor: " + cellDoor + ", JailCell: " + jailCell + ", WasInitialized: " + jailCell.WasInitialized())
+
+    ; The bind process with this prison has already happened
+    if (!jailCell.IsInitialized())
+        ; Binds the jail cell to this Prison
+        jailCell.BindPrison(self)
+    endif
+
+    ; ; Binds the jail cell to this Prison
+    ; jailCell.BindPrison(self)
+
+    ; Handle the events related to the prisoner entering the cell
+    jailCell.OnPrisonerEnter(akPrisoner)
+
+    return true
+    ; Now possible to get this prisoner's jail cell through: MiscVars.GetReference("["+ akPrisoner.GetIdentifier() +"]Cell")
+endFunction
+
+
+function SetupCells()
+    Form[] cells = self.GetJailCells()
+
+    int i = 0
+    while (i < cells.Length)
+        RPB_JailCell jailCell = cells[i] as RPB_JailCell
+        if (!jailCell.IsInitialized())
+            jailCell.BindPrison(self)
+        endif
+        i += 1
+    endWhile
+endFunction
+
+; function SetupCells()
+;     Form[] jailMarkers = Config.GetJailMarkers(Hold)
+
+;     int i = 0
+;     while (i < jailMarkers.Length)
+;         MiscVars.AddFormToArray("Prison/Cells", jailMarkers[i])
+;         i += 1
+;     endWhile
+; endFunction
+
+
+
+;/
+    Gets all the jail cells in this prison that match the sex passed in.
+
+    For a jail cell to be of a specific sex, it must have at least one prisoner of that sex,
+    which means these jail cells are never empty.
+/;
+Form[] function GetGenderExclusiveCells(string asSex)
+    Form[] cells = self.GetJailCells()
+
+    int i = 0
+    while (i < cells.Length)
+        RPB_JailCell jailCellRef = cells[i] as RPB_JailCell
+        ObjectReference debug_jailCellRef = cells[i] as ObjectReference
+        ; Debug(none, "Prison::GetGenderExclusiveCells", "Ref: " + debug_jailCellRef + ", Cell Props: " + jailCellRef.DEBUG_GetCellProperties())
+        if (jailCellRef && (asSex == "Male" && jailCellRef.IsMaleOnly) || (asSex == "Female" && jailCellRef.IsFemaleOnly))
+            MiscVars.AddFormToArray("Cells/Gender", jailCellRef)
+        endif
+        i += 1
+    endWhile
+
+    return MiscVars.GetPapyrusFormArray("Cells/Gender")
+endFunction
+
+ObjectReference function GetJailCell(int aiIndex)
+    return MiscVars.GetFormFromArray("Prison/Cells", aiIndex) as ObjectReference
+endFunction
+
 ; Return type later to be changed to RPB_PrisonCell
 ObjectReference function GetRandomPrisonCell(bool abPrioritizeEmptyCells = true)
-    return Config.GetRandomJailMarker(Hold)
+    ObjectReference returnedCell = Config.GetRandomJailMarker(Hold)
+    return returnedCell
+endFunction
+
+RPB_JailCell function GetEmptyJailCell()
+    Form[] emptyCells = self.GetEmptyCells()
+    return emptyCells[Utility.RandomInt(0, emptyCells.Length - 1)] as RPB_JailCell
+endFunction
+
+RPB_JailCell function GetJailCellOfGender(string asSex)
+    Form[] genderCells = self.GetGenderExclusiveCells(asSex)
+    RPB_JailCell genderCell = genderCells[Utility.RandomInt(0, genderCells.Length - 1)] as RPB_JailCell
+    Debug(none, "Prison::GetJailCellOfGender", "Gender Cell returned: " + genderCell)
+
+    return genderCell
+endFunction
+
+RPB_JailCell function GetRandomJailCell( \
+    bool abFemaleOnly = false, \
+    bool abMaleOnly = false, \
+    bool abMustBeEmpty = false, \
+    bool abMustBeAvailable = true \
+)
+    if (abFemaleOnly && abMaleOnly)
+        ; Error, can't be both genders
+        return none
+    endif
+
+    if (abMustBeEmpty && abMustBeAvailable)
+        ; Error, can't ask for both empty and available, it's either one or the other (although available cells can be considered empty, the opposite is not true.)
+        return none
+    endif
+
+    ; Return only jail cells based on criteria params,
+    ; or return all if they are all false
+    RPB_JailCell output = none
+
+    if (!abFemaleOnly && !abMaleOnly && !abMustBeEmpty && !abMustBeAvailable)
+        output = Config.GetRandomJailMarker(self.Hold) as RPB_JailCell
+        return output
+    endif
+
+    if (abMustBeEmpty)
+        output = self.GetEmptyJailCell()
+        return output
+    elseif (abMustBeAvailable && (abFemaleOnly || abMaleOnly))
+        ; Get available cell that is of type gender
+    endif
+
 endFunction
 
 ObjectReference function GetPrisonerCell(RPB_Prisoner akPrisoner)
@@ -810,16 +1084,15 @@ endFunction
     a reference to the script as of now.
 
     RPB_Prisoner    @akPrisonerRef: The Prisoner reference to bind to the Actor.
-    Actor           @akActor: The actor to be registered into prison.
 /;
-bool function RegisterPrisoner(RPB_Prisoner akPrisonerRef, Actor akActor)
-    string containerKey = "Prisoner["+ akActor.GetFormID() +"]"
+bool function RegisterPrisoner(RPB_Prisoner akPrisonerRef)
     RPB_ActiveMagicEffectContainer prisonerList = Config.MainAPI as RPB_ActiveMagicEffectContainer
+    string containerKey = "Prisoner["+ akPrisonerRef.GetActor().GetFormID() +"]"
 
     prisonerList.AddAt(akPrisonerRef, containerKey)
     __prisoners[__prisonersIndex] = akPrisonerRef
 
-    Debug(none, "Prison::RegisterPrisoner", "Added Actor " + akActor + " to the prisoner list " + akPrisonerRef + " with key: " + containerKey + " for prison " + self.Hold)
+    Debug(none, "Prison::RegisterPrisoner", "Added Actor " + akPrisonerRef.GetActor() + " to the prisoner list " + akPrisonerRef + " with key: " + containerKey + " for prison " + self.Hold)
     return prisonerList.GetAt(containerKey) == akPrisonerRef ; Did it register successfully?
 endFunction
 
@@ -898,17 +1171,17 @@ bool isProcessingQueuedPrisonersForImprisonment
 int queuedPrisonerAvailableIndex
 
 bool function IsPrisonerQueuedForImprisonment(RPB_Prisoner akPrisoner)
-    float startBench = StartBenchmark()
+    ; float startBench = StartBenchmark()
     int i = 0
     while (i < queuedPrisonersForImprisonment.Length)
         if (queuedPrisonersForImprisonment[i] == akPrisoner)
-            EndBenchmark(startBench, "IsPrisonerQueuedForImprisonment -> returned true")
+            ; EndBenchmark(startBench, "IsPrisonerQueuedForImprisonment -> returned true")
             return true
         endif
         i += 1
     endWhile
     
-    EndBenchmark(startBench, "IsPrisonerQueuedForImprisonment -> returned false")
+    ; EndBenchmark(startBench, "IsPrisonerQueuedForImprisonment -> returned false")
     return false
 endFunction
 
@@ -931,7 +1204,7 @@ function QueuePrisonerForImprisonment(RPB_Prisoner akPrisoner)
         queuedPrisonersForImprisonment = new RPB_Prisoner[128]
         queuedPrisonerAvailableIndex = 0
     endif
-    Debug(none, "Prison::QueuePrisonerForImprisonment", "queuedPrisonersForImprisonment.Length: " + queuedPrisonersForImprisonment.Length)
+    ; Debug(none, "Prison::QueuePrisonerForImprisonment", "queuedPrisonersForImprisonment.Length: " + queuedPrisonersForImprisonment.Length)
 
     queuedPrisonersForImprisonment[queuedPrisonerAvailableIndex] = akPrisoner
     Debug(none, "Prison::QueuePrisonerForImprisonment", "Queued " + queuedPrisonersForImprisonment[queuedPrisonerAvailableIndex] + " for imprisonment.")
@@ -986,6 +1259,7 @@ function ImprisonActorImmediately(Actor akActor)
 
     if (!prisonerRef.AssignCell())
         Debug(akActor, "Prison::ImprisonActorImmediately", "Could not assign a cell to actor " + akActor)
+        akActor.Disable()
         return
     endif
 

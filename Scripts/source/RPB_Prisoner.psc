@@ -31,7 +31,7 @@ endProperty
 
 RPB_JailCell property JailCell
     RPB_JailCell function get()
-        return none
+        return self.GetCell()
     endFunction
 endProperty
 
@@ -257,47 +257,119 @@ int property InfamyBountyPenalty
     endFunction
 endProperty
 
+bool property IsStrippedNaked
+    bool function get()
+        return Prison_GetBool("IsStrippedNaked")
+    endFunction
+    function set(bool value)
+        Prison_SetBool("IsStrippedNaked", value)
+    endFunction
+endProperty
+
+bool property IsStrippedToUnderwear
+    bool function get()
+        return Prison_GetBool("IsStrippedToUnderwear")
+    endFunction
+    function set(bool value)
+        Prison_SetBool("IsStrippedToUnderwear", value)
+    endFunction
+endProperty
+
+; Whether this prisoner should only be imprisoned in an empty cell
+bool property OnlyAllowImprisonmentInEmptyCell
+    bool function get()
+        return Prison_GetBool("OnlyAllowImprisonmentInEmptyCell")
+    endFunction
+
+    function set(bool value)
+        if (value && (self.OnlyAllowImprisonmentInGenderCell || self.OnlyAllowImprisonmentInEmptyOrGenderCell))
+            self.OnlyAllowImprisonmentInGenderCell          = false
+            self.OnlyAllowImprisonmentInEmptyOrGenderCell   = false
+        endif
+
+        Prison_SetBool("OnlyAllowImprisonmentInEmptyCell", value)
+    endFunction
+endProperty
+
+; Whether this prisoner should only be imprisoned in a gender exclusive cell
+bool property OnlyAllowImprisonmentInGenderCell
+    bool function get()
+        return Prison_GetBool("OnlyAllowImprisonmentInGenderCell")
+    endFunction
+
+    function set(bool value)
+        if (value && (self.OnlyAllowImprisonmentInEmptyCell || self.OnlyAllowImprisonmentInEmptyOrGenderCell))
+            self.OnlyAllowImprisonmentInEmptyCell           = false
+            self.OnlyAllowImprisonmentInEmptyOrGenderCell   = false
+        endif
+
+        Prison_SetBool("OnlyAllowImprisonmentInGenderCell", value)
+    endFunction
+endProperty
+
+; Whether this prisoner should only be imprisoned in either an empty or gender exclusive cell
+bool property OnlyAllowImprisonmentInEmptyOrGenderCell
+    bool function get()
+        return Prison_GetBool("OnlyAllowImprisonmentInEmptyOrGenderCell")
+    endFunction
+
+    function set(bool value)
+        if (value && (self.OnlyAllowImprisonmentInEmptyCell || self.OnlyAllowImprisonmentInGenderCell))
+            self.OnlyAllowImprisonmentInEmptyCell       = false
+            self.OnlyAllowImprisonmentInGenderCell      = false
+        endif
+
+        Prison_SetBool("OnlyAllowImprisonmentInEmptyOrGenderCell", value)
+    endFunction
+endProperty
+
+; Determines what type of jail cell should be assigned to this prisoner - called from RPB_Prison
+function DetermineCellOptions()
+    if (self.IsStrippedNaked)
+        ; Only allow imprisonment in either empty cells or cells of the same gender where the prisoners are also stripped naked / possibly to underwear
+        self.OnlyAllowImprisonmentInEmptyOrGenderCell = true
+
+    elseif (self.IsStrippedToUnderwear)
+        ; Only allow imprisonment in either empty cells or cells of the same gender where the prisoners are also stripped to underwear / possibly naked
+        self.OnlyAllowImprisonmentInEmptyOrGenderCell = true
+    endif
+endFunction
+
 ;/
     Assigns a jail cell to this prisoner
 /;
 bool function AssignCell()
-    ; Get a random jail cell
-    ObjectReference randomCell  = Prison.GetRandomPrisonCell()
-    ObjectReference cellDoor    = Prison.GetCellDoor(randomCell)
-
-    if (self.GetCell() && self.GetCellDoor())
-        Debug(this, "Prisoner::AssignCell", "A prison cell has already been assigned to prisoner " + this + ": [" +"Cell: " + self.GetCell() + ", Door: " + self.GetCellDoor() + "]")
-        ; Debug(this, "Prisoner::AssignCell", "A prison cell has already been assigned to prisoner " + this + ": [\n" + \
-        ;     "Cell: " + self.GetCell() + "\n" + \
-        ;     "Cell Door: " + self.GetCellDoor() + "\n" + \
-        ; "]")
-
+    if (self.JailCell)
+        Debug(this, "Prisoner::AssignCell", "A prison cell has already been assigned to prisoner " + this + ": [" +"Cell: " + self.JailCell + ", Door: " + self.JailCell.CellDoor + "]")
         return true
     endif
 
-    Prison_SetReference("Cell", randomCell)
-    Prison_SetReference("Cell Door", cellDoor)
-    ; ArrestVars.SetReference("Jail::Cell", Game.GetFormEx(0x36897) as ObjectReference) ; Temp, later random or available one will be used
-    ; ArrestVars.SetReference("Jail::Cell Door", Game.GetFormEx(0x5E921) as ObjectReference) ; Temp, later random or available one will be used
+    RPB_JailCell assignedCell = Prison.RequestCellForPrisoner(self)
 
-    Debug(this, "Prisoner::AssignCell", this + " has been assigned a prison cell" + ": [\n" + \
-        "Cell: " + self.GetCell() + "\n" + \
-        "Cell Door: " + self.GetCellDoor() + "\n" + \
-    "]")
+    if (assignedCell == none)
+        ; Could not assign a cell to this prisoner, abort imprisonment?
+        Debug(this, "Prisoner::AssignCell", "A jail cell could not be assigned to prisoner " + this + ", aborting imprisonment...!")
+        self.Destroy() ; We might destroy this instance somewhere else, because in the case of failing to assign a cell, we may still want to try other imprisonment options (maybe transfer to another hold?)
+        return false
+    endif
 
-    return self.GetCell() != none
+    ; Actually bind this jail cell to the prisoner, it has been assigned.
+    if (Prison.BindCellToPrisoner(assignedCell, self))
+        Prison_SetReference("Cell", assignedCell)
+    endif
+
+    ; Debug(this, "Prisoner::AssignCell", this + " has been assigned a prison cell" + ": [\n" + \
+    ;     "Cell: " + self.JailCell + "\n" + \
+    ;     "Cell Door: " + self.JailCell.CellDoor + "\n" + \
+    ; "]")
+
+    return self.JailCell != none
 endFunction
 
-; RPB_JailCell function GetCell()
-;     ; RPB_JailCell jailCellRef = Jail.GetPrisonerCell(this) ; maybe?
-; endFunction
-
-; TODO: Change what this returns later to be dynamic
-ObjectReference function GetCell()
-    return Prison_GetReference("Cell")
+RPB_JailCell function GetCell()
+    return Prison_GetReference("Cell") as RPB_JailCell
 endFunction
 
-; TODO: Change what this returns later to be dynamic
 ObjectReference function GetCellDoor()
     return Prison_GetReference("Cell Door")
 endFunction
@@ -424,13 +496,14 @@ endFunction
 function Strip(bool abRemoveUnderwear = true)
     this.RemoveAllItems(ItemsContainer, false, true)
     self.IncrementStat("Times Stripped")
+    self.IsStrippedNaked = true
     Prison_SetBool("Stripped", true) ; No use for now, might be changed
     return
     Debug(self.GetActor(), "Prisoner::Strip", "Strip called")
 
     Config.NotifyJail("Stripping Thoroughness: " + StrippingThoroughness)
 
-    bool isStrippedNaked = StrippingThoroughness >= 6
+    bool _isStrippedNaked = StrippingThoroughness >= 6
 
     ; Get underwear
     int underwearTopSlotMask    = GetSlotMaskValue(config.UnderwearTopSlot)
@@ -444,7 +517,7 @@ function Strip(bool abRemoveUnderwear = true)
 
     ; TODO: Determine what is required to happen to have the Prisoner be in underwear
 
-    ; Unequip anything currently held in the hands for this Prisoner
+    ; Unequip anything currently held in the hands of this Prisoner
     UnequipHandsForActor(this)
     this.SheatheWeapon()
 
@@ -919,19 +992,29 @@ event OnInitialize()
 
     if (NPC_RestorePrisonerState())
         ; Actor was already a prisoner, do not initialize normally and instead proceed to restoring their previous state
-        Prison.RegisterPrisoner(self, this) ; Registers this prisoner into the prisoner list since they were unregistered OnDestroy()
+        ; Prison.RegisterPrisoner(self) ; Registers this prisoner into the prisoner list since they were unregistered OnDestroy()
         self.RegisterForTrackedStats()
         return
     endif
 
-    Prison.RegisterPrisoner(self, this) ; Registers this prisoner into the prisoner list
+    if (!self.IsEnabledForBackgroundUpdates)
+        Prison.RegisterPrisoner(self) ; Registers this prisoner into the prisoner list
+    endif
 
     ; Debug(this, "Prisoner::OnInitialize", "Initialized Prisoner, this: " + this)
     self.RegisterForTrackedStats()
     self.LockPrisonerSettings()
 endEvent
 
-bool property IsEnabledForBackgroundUpdates auto
+bool property IsEnabledForBackgroundUpdates
+    bool function get()
+        return Prison_GetBool("IsEnabledForBackgroundUpdates")
+    endFunction
+
+    function set(bool value)
+        Prison_SetBool("IsEnabledForBackgroundUpdates", value)
+    endFunction
+endProperty
 
 event OnDestroy()
     __isEffectActive = false
@@ -982,6 +1065,11 @@ endEvent
 ; ==========================================================
 ;                          Management
 ; ==========================================================
+
+function Destroy()
+    ; TODO: Unset all properties related to this Prisoner
+    Prison.UnregisterPrisoner(self)
+endFunction
 
 ;/
     Registers the last update for the prisoner, 

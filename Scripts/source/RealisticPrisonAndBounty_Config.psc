@@ -152,11 +152,11 @@ bool function SetJailCells()
     miscVars.AddFormToArray("Jail::Cells[Falkreath]", Game.GetForm(0x3EF07)) ; Jail Cell 01
 
     miscVars.AddFormToArray("Jail::Cells[Haafingar]", Game.GetForm(0x36897)) ; Jail Cell 01 (Original)
-    miscVars.AddFormToArray("Jail::Cells[Haafingar]", GetFormFromMod(0x3880)) ; Jail Cell 02
-    miscVars.AddFormToArray("Jail::Cells[Haafingar]", GetFormFromMod(0x3879)) ; Jail Cell 03
-    miscVars.AddFormToArray("Jail::Cells[Haafingar]", GetFormFromMod(0x3881)) ; Jail Cell 04
-    miscVars.AddFormToArray("Jail::Cells[Haafingar]", GetFormFromMod(0x3882)) ; Jail Cell 05
-    miscVars.AddFormToArray("Jail::Cells[Haafingar]", GetFormFromMod(0x3883)) ; Jail Cell 06
+    ; miscVars.AddFormToArray("Jail::Cells[Haafingar]", GetFormFromMod(0x3880)) ; Jail Cell 02
+    ; miscVars.AddFormToArray("Jail::Cells[Haafingar]", GetFormFromMod(0x3879)) ; Jail Cell 03
+    ; miscVars.AddFormToArray("Jail::Cells[Haafingar]", GetFormFromMod(0x3881)) ; Jail Cell 04
+    ; miscVars.AddFormToArray("Jail::Cells[Haafingar]", GetFormFromMod(0x3882)) ; Jail Cell 05
+    ; miscVars.AddFormToArray("Jail::Cells[Haafingar]", GetFormFromMod(0x3883)) ; Jail Cell 06
     ; miscVars.AddFormToArray(solitudeMarkers, GetFormFromMod(0x3884)) ; Jail Cell 07 (Bjartur Cell)
 
     miscVars.AddFormToArray("Jail::Cells[Hjaalmarch]", Game.GetForm(0x3EF08)) ; Jail Cell 01
@@ -260,7 +260,7 @@ bool function SetHoldLocations()
 endFunction
 
 bool function IsInLocationFromHold(string hold)
-float x = StartBenchmark()
+; float x = StartBenchmark()
 
     if (!miscVars.Exists("Locations["+ hold +"]"))
         Error(none, "Config::IsInLocationFromHold", "Location does not exist for this hold.")
@@ -273,13 +273,13 @@ float x = StartBenchmark()
         ; As soon as the player is in any location for this hold, return.
         if (Player.IsInLocation(holdLocation))
             Debug(none, "IsInLocationFromHold", "Player is in location: " + holdLocation.GetName() + " ("+ holdLocation.GetFormID() +")", MCM.IS_DEBUG)
-           EndBenchmark(x, i + " iterations (IsLocationFromHold): returned true")
+        ;    EndBenchmark(x, i + " iterations (IsLocationFromHold): returned true")
 
             return true
         endif
         i += 1
     endWhile
-EndBenchmark(x, i + " iterations (IsInLocationFromHold): returned false")
+; EndBenchmark(x, i + " iterations (IsInLocationFromHold): returned false")
 
     return false
 endFunction
@@ -382,13 +382,13 @@ string function GetHoldNameFromCity(string city)
 endFunction
 
 Form[] function GetJailMarkers(string hold)
-    float x = StartBenchmark()
+    ; float x = StartBenchmark()
     if (!miscVars.Exists("Jail::Cells["+ hold +"]"))
         MCM.Error("Config::GetJailMarkers", "The marker does not exist!")
         return none
     endif
     Form[] jailCells = miscVars.GetPapyrusFormArray("Jail::Cells["+ hold +"]")
-    EndBenchmark(x, "GetJailMarkers")
+    ; EndBenchmark(x, "GetJailMarkers")
     return jailCells
 endFunction
 
