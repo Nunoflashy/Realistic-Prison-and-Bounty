@@ -257,28 +257,29 @@ int property InfamyBountyPenalty
     endFunction
 endProperty
 
-bool property IsStrippedNaked
+bool property IsSentenceSet
     bool function get()
-        return Prison_GetBool("IsStrippedNaked")
-    endFunction
-    function set(bool value)
-        Prison_SetBool("IsStrippedNaked", value)
+        return self.Sentence != 0
     endFunction
 endProperty
 
-bool property IsStrippedToUnderwear
-    bool function get()
-        return Prison_GetBool("IsStrippedToUnderwear")
-    endFunction
-    function set(bool value)
-        Prison_SetBool("IsStrippedToUnderwear", value)
-    endFunction
-endProperty
+; Whether this prisoner will be stripped naked (used for determing jail cell type before actually assigning a cell, or any other action in the future that makes use of such property.)
+bool property WillBeStrippedNaked auto
+
+; Whether this prisoner will be stripped to their underwear (used for determing jail cell type before actually assigning a cell, or any other action in the future that makes use of such property.)
+bool property WillBeStrippedToUnderwear auto
+
+; Whether this prisoner was stripped naked
+bool property IsStrippedNaked auto
+
+; Whether this prisoner was stripped to their underwear
+bool property IsStrippedToUnderwear auto
 
 ; Whether this prisoner should only be imprisoned in an empty cell
+bool __onlyAllowImprisonmentInEmptyCell
 bool property OnlyAllowImprisonmentInEmptyCell
     bool function get()
-        return Prison_GetBool("OnlyAllowImprisonmentInEmptyCell")
+        return __onlyAllowImprisonmentInEmptyCell
     endFunction
 
     function set(bool value)
@@ -287,14 +288,15 @@ bool property OnlyAllowImprisonmentInEmptyCell
             self.OnlyAllowImprisonmentInEmptyOrGenderCell   = false
         endif
 
-        Prison_SetBool("OnlyAllowImprisonmentInEmptyCell", value)
+        __onlyAllowImprisonmentInEmptyCell = value
     endFunction
 endProperty
 
 ; Whether this prisoner should only be imprisoned in a gender exclusive cell
+bool __onlyAllowImprisonmentInGenderCell
 bool property OnlyAllowImprisonmentInGenderCell
     bool function get()
-        return Prison_GetBool("OnlyAllowImprisonmentInGenderCell")
+        return __onlyAllowImprisonmentInGenderCell
     endFunction
 
     function set(bool value)
@@ -303,14 +305,15 @@ bool property OnlyAllowImprisonmentInGenderCell
             self.OnlyAllowImprisonmentInEmptyOrGenderCell   = false
         endif
 
-        Prison_SetBool("OnlyAllowImprisonmentInGenderCell", value)
+        __onlyAllowImprisonmentInGenderCell = value
     endFunction
 endProperty
 
 ; Whether this prisoner should only be imprisoned in either an empty or gender exclusive cell
+bool __onlyAllowImprisonmentInEmptyOrGenderCell
 bool property OnlyAllowImprisonmentInEmptyOrGenderCell
     bool function get()
-        return Prison_GetBool("OnlyAllowImprisonmentInEmptyOrGenderCell")
+        return __onlyAllowImprisonmentInEmptyOrGenderCell
     endFunction
 
     function set(bool value)
@@ -319,17 +322,17 @@ bool property OnlyAllowImprisonmentInEmptyOrGenderCell
             self.OnlyAllowImprisonmentInGenderCell      = false
         endif
 
-        Prison_SetBool("OnlyAllowImprisonmentInEmptyOrGenderCell", value)
+        __onlyAllowImprisonmentInEmptyOrGenderCell = value
     endFunction
 endProperty
 
 ; Determines what type of jail cell should be assigned to this prisoner - called from RPB_Prison
 function DetermineCellOptions()
-    if (self.IsStrippedNaked)
+    if (self.WillBeStrippedNaked || self.IsStrippedNaked)
         ; Only allow imprisonment in either empty cells or cells of the same gender where the prisoners are also stripped naked / possibly to underwear
         self.OnlyAllowImprisonmentInEmptyOrGenderCell = true
 
-    elseif (self.IsStrippedToUnderwear)
+    elseif (self.WillBeStrippedToUnderwear || self.IsStrippedToUnderwear)
         ; Only allow imprisonment in either empty cells or cells of the same gender where the prisoners are also stripped to underwear / possibly naked
         self.OnlyAllowImprisonmentInEmptyOrGenderCell = true
     endif
@@ -343,6 +346,9 @@ bool function AssignCell()
         Debug(this, "Prisoner::AssignCell", "A prison cell has already been assigned to prisoner " + this + ": [" +"Cell: " + self.JailCell + ", Door: " + self.JailCell.CellDoor + "]")
         return true
     endif
+
+    ; Determine if prisoner will be stripped etc
+    self.WillBeStrippedNaked = true
 
     RPB_JailCell assignedCell = Prison.RequestCellForPrisoner(self)
 
@@ -1027,7 +1033,8 @@ event OnDestroy()
         endif
     endif
 
-    Prison.UnregisterPrisoner(self) ; Remove this Actor from the AME list since they are no longer a prisoner
+    ; We don't unregister the prisoner (remove from the AME list) because OnDestroy will get called as soon as the Player is out of range, meaning it's not a proper way to handle the destruction of the object
+    ; Prison.UnregisterPrisoner(self) ; Remove this Actor from the AME list since they are no longer a prisoner
     self.UnregisterForTrackedStats()
 endEvent
 

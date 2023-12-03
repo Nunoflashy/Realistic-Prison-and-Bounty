@@ -83,6 +83,12 @@ bool property IsMaleOnly
     endFunction
 endProperty
 
+bool property IsGenderExclusive
+    bool function get()
+        return __isMaleOnly || __isFemaleOnly
+    endFunction
+endProperty
+
 int __prisonersInCell
 Form[] property PrisonersInCell
     Form[] function get()
@@ -224,15 +230,13 @@ endEvent
 ;                         Management
 ; =========================================================
 
+;/
+    Determines if this JailCell... this should be in CellDoor
+/;
 bool function IsRegisteredCellDoorInPrison(int aiCellDoorFormID)
     return true ; temporary
 endFunction
 
-;/
-    Assuming it was initialized, both the jail cell instance and cell door are already bound.
-    This instance is bound to the jail cell marker (ObjectReference), whereas the Cell Door is the object
-    that this script is attached to, however it is still bound through BindCellDoor in case the reference changes in the future.
-/;
 bool function IsInitialized()
     return self.Prison && self.CellDoor
 endFunction
@@ -301,8 +305,8 @@ function DetermineCellParameters()
         Form prisonerForm = JMap.getForm(__prisonersInCell, JMap.getNthKey(__prisonersInCell, 0)) ; Get the first prisoner
         RPB_Prisoner prisonerRef = Prison.GetPrisonerReference(prisonerForm as Actor)
 
-        ; If the first prisoner is stripped naked / to underwear, set this cell as gender exclusive for them
-        if (prisonerRef.IsStrippedNaked || prisonerRef.IsStrippedToUnderwear)
+        ; If the first prisoner will be/is stripped naked / to underwear, set this cell as gender exclusive for them if the cell is not yet gender exclusive
+        if (!self.IsGenderExclusive && (prisonerRef.WillBeStrippedNaked || prisonerRef.WillBeStrippedToUnderwear) || (prisonerRef.IsStrippedNaked || prisonerRef.IsStrippedToUnderwear))
             self.SetExclusiveToPrisonerSex(prisonerRef)
         endif
 
@@ -422,7 +426,11 @@ string function DEBUG_GetPrisoners()
     while (i < JValue.count(__prisonersInCell))
         Form prisonerForm = JMap.getForm(__prisonersInCell, JMap.getNthKey(__prisonersInCell, i))
         RPB_Prisoner prisonerRef = Prison.GetPrisonerReference(prisonerForm as Actor)
-        outputPrisoners += "\t\t"+ prisonerRef.GetActor() + " " + "(" + prisonerRef.GetSex(true) + ")\n"
+
+        ; string sentenceInfo = Prison.DEBUG_GetPrisonerSentenceInfo(prisonerRef, true)
+        ; outputPrisoners += "\t\t"+ prisonerRef.GetActor() + " " + prisonerRef.GetName() + " " + "(" + prisonerRef.GetSex(true) + ")" + string_if (prisonerRef.IsSentenceSet, ": " + sentenceInfo) + "\n"
+        outputPrisoners += "\t\t"+ prisonerRef.GetActor() + " " + prisonerRef.GetName() + " " + "(" + prisonerRef.GetSex(true) + ")" + "\n"
+
         i += 1
     endWhile
 
@@ -430,7 +438,6 @@ string function DEBUG_GetPrisoners()
 endFunction
 
 string function DEBUG_GetCellProperties()
-    bool isGenderExclusive = (self.IsFemaleOnly || self.IsMaleOnly)
     string getGenderExclusivenessAsString = string_if (self.IsFemaleOnly, "Female Only", string_if(self.IsMaleOnly, "Male Only"))
 
     bool _hasPrisoners = self.PrisonerCount > 0
@@ -440,7 +447,7 @@ string function DEBUG_GetCellProperties()
         "\t Door: " + self.CellDoor + "\n" + \
         "\t Empty: " + self.IsEmpty + "\n" + \
         "\t Available: " + self.IsAvailable + "\n" + \
-        "\t Gender Exclusive: " + isGenderExclusive + string_if (isGenderExclusive, " ("+ getGenderExclusivenessAsString +")") + "\n" + \
-        "\t Prisoners: " + self.PrisonerCount + string_if (_hasPrisoners, " [\n"+ self.DEBUG_GetPrisoners() +"\t]") + "\n" + \
+        "\t Gender Exclusive: " + self.IsGenderExclusive + string_if (self.IsGenderExclusive, " ("+ getGenderExclusivenessAsString +")") + "\n" + \
+        "\t Prisoners: " + self.PrisonerCount + string_if (_hasPrisoners, " -> [\n"+ self.DEBUG_GetPrisoners() +"\t]") + "\n" + \
     "]"
 endFunction

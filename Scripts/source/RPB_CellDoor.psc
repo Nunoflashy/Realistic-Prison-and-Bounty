@@ -35,22 +35,16 @@ RPB_JailCell property JailCell
     endFunction
 endProperty
 
-ObjectReference property this
-    ObjectReference function get()
-        return self
-    endFunction
-endProperty
-
 bool property IsOpen
     bool function get()
-        int openState = this.GetOpenState()
+        int openState = self.GetOpenState()
         return openState == 1 || openState == 2
     endFunction
 endProperty
 
 bool property IsClosed
     bool function get()
-        int openState = this.GetOpenState()
+        int openState = self.GetOpenState()
         return openState == 3 || openState == 4
     endFunction
 endProperty
@@ -75,6 +69,10 @@ function Lock(bool abLock = true, bool abAsOwner = false)
     ; TODO: Implement lock logic
 endFunction
 
+function Unlock()
+
+endFunction
+
 ; =========================================================
 ;                          Events
 ; =========================================================
@@ -91,7 +89,7 @@ event OnLockStateChanged()
         return
     endif
 
-    if (this.IsLocked())
+    if (self.IsLocked())
         
     else
         
@@ -125,7 +123,19 @@ endevent
     to avoid execution of this script on other cell doors that were not registered for this Prison/Cell.
 /;
 bool function IsRegisteredCellDoor()
-    return JailCell.IsRegisteredCellDoorInPrison(this.GetFormID())
+    return JailCell.IsRegisteredCellDoorInPrison(self.GetFormID())
+    ;/
+        Form[] registeredCellDoors = JailCell.Prison.GetRegisteredCellDoors()
+        int i = 0
+        while (i < registeredCellDoors.Length)
+            if (self.GetFormID() == registeredCellDoors[i].GetFormID())
+                return true
+            endif
+            i += 1
+        endWhile
+
+        return false
+    /;
 endFunction
 
 function BindCell(RPB_JailCell akJailCell)
@@ -138,7 +148,7 @@ endFunction
 ; =========================================================
 
 string function __getCellIdentifierVarKey(string asVarName)
-    return "["+ this.GetFormID() +"]Cell::" + asVarName
+    return "["+ self.GetFormID() +"]Cell::" + asVarName
 endFunction
 
 ;                           Getters

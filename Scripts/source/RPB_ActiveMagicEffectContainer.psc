@@ -28,23 +28,16 @@ int function GetAvailableIndex()
 endFunction
 
 string[] function GetKeys()
-    int mapKeys = JArray.object()
-    int i = 0
-    while (i < JValue.count(dataIds))
-        JArray.addStr(mapKeys, JMap.getNthKey(dataIds, i))
-        i += 1
-    endWhile
-
-    return JArray.asStringArray(mapKeys)
+    return JMap.allKeysPArray(dataIds)
 endFunction
 
 function AddAt(ActiveMagicEffect apActiveMagicEffect, string asKey)
     ; Initialize array
-    if (!dataIds || !data)
-        dataIds = JMap.object()
-        JValue.retain(dataIds)
-        data = new ActiveMagicEffect[128]
-    endif
+    ; if (!dataIds || !data)
+    ;     dataIds = JMap.object()
+    ;     JValue.retain(dataIds)
+    ;     data = new ActiveMagicEffect[128]
+    ; endif
 
     ; int availableIndex = self.GetAvailableIndex()
 
@@ -60,6 +53,10 @@ ActiveMagicEffect function GetAt(string asKey)
     int arrayIndex = JMap.getInt(dataIds, asKey)
     ; Debug(self, "ActiveMagicEffectList::Get", "Retrieved ActiveMagicEffect: " + data[arrayIndex] + " at index: " + arrayIndex + ", from key: " + asKey)
     return data[arrayIndex]
+endFunction
+
+ActiveMagicEffect[] function GetAsArray()
+    return data
 endFunction
 
 function Remove(string asKey, bool dispel = true)
@@ -123,3 +120,10 @@ function Initialize()
     endif
     Debug(self, "ActiveMagicEffectList::Initialize", "Initialized list")
 endFunction
+
+event OnInit()
+    Debug(self, "ActiveMagicEffectList::OnInit", "OnInit")
+    dataIds = JMap.object()
+    JValue.retain(dataIds)
+    data = new ActiveMagicEffect[128]
+endEvent

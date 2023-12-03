@@ -283,8 +283,8 @@ event OnKeyDown(int keyCode)
         RPB_PrisonManager prisonManager = GetFormFromMod(0x1B825) as RPB_PrisonManager
         RPB_Prison haafingarPrison      = prisonManager.GetPrison("Haafingar")
 
-        int actorsToArrestCount = 15
-        Actor[] actorsToArrest = new Actor[15]
+        int actorsToArrestCount = 8
+        Actor[] actorsToArrest = new Actor[8]
 
         int i = 0
         while (i < actorsToArrestCount)
@@ -330,6 +330,18 @@ event OnKeyDown(int keyCode)
 
     elseif (keyCode == 0x42)
         Debug(self, "Arrest::OnKeyDown", "F8 Pressed")
+        RPB_ActiveMagicEffectContainer prisonerList = Config.MainAPI as RPB_ActiveMagicEffectContainer
+        Debug(none, "Arrest::OnKeyDown", "Prisoner Keys: " + prisonerList.GetKeys())
+
+        int i = 0
+        ActiveMagicEffect[] prisonersAsArray =  prisonerList.GetAsArray()
+        while (i < prisonersAsArray.Length)
+            RPB_Prisoner prisonerRef = prisonersAsArray[i] as RPB_Prisoner
+            Debug(none, "Arrest::OnKeyDown", "IsStrippedNaked: " + prisonerRef.IsStrippedNaked + ", IsStrippedToUnderwear: " + prisonerRef.IsStrippedToUnderwear)
+            i += 1
+        endWhile
+
+        return
         ; Actor solitudeGuard = Game.GetFormEx(0xF684E) as Actor
         ; Actor theGuard = config.Player.PlaceActorAtMe(solitudeGuard.GetBaseObject() as ActorBase, 1, none)
         Actor nearbyGuard = GetNearestGuard(config.Player, 3500, none)

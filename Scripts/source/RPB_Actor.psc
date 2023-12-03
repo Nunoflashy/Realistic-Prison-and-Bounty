@@ -620,3 +620,7 @@ endFunction
 bool function IsPlayer()
     return __wasActorAssigned && __isPlayer
 endFunction
+
+bool function IsNPC()
+    return __wasActorAssigned && !__isPlayer
+endFunction

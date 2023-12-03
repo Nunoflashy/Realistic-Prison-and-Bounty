@@ -365,7 +365,7 @@ function MoveToPrison(bool abMoveDirectlyToCell = false)
         captor.MoveTo(prisonerChest)
     else
         RPB_Prisoner prisonerRef = self.MakePrisoner()
-        prisonerRef.OnlyAllowImprisonmentInEmptyOrGenderCell = true ; temporary
+
         if (!prisonerRef.AssignCell())
             Debug(this, "Arrestee::MoveToPrison", "Could not assign a cell to arrestee " + this)
             ; Terminate arrest, could not assign cell

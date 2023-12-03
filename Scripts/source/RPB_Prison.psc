@@ -564,6 +564,13 @@ endFunction
 ;                          Cell
 ; ==========================================================
 
+int __emptyCellsArray
+; Form[] property EmptyCells
+;     Form[] function get()
+;         return JArray.asFormArray(__emptyCellsArray)
+;     endFunction
+; endProperty
+
 ; Must be cast to RPB_JailCell when used to have the properties
 Form[] function GetJailCells()
     return Config.GetJailMarkers(Hold)
@@ -571,21 +578,43 @@ endFunction
 
 Form[] function GetEmptyCells()
     Form[] cells = self.GetJailCells()
+    int emptyCellsArray = JArray.object()
 
     int i = 0
     while (i < cells.Length)
         RPB_JailCell jailCellRef = cells[i] as RPB_JailCell
-        ; ObjectReference debug_jailCellRef = cells[i] as ObjectReference
-        ; Debug(none, "Prison::GetEmptyCells", "Ref: " + debug_jailCellRef + ", Cell Props: " + jailCellRef.DEBUG_GetCellProperties())
 
         if (jailCellRef && jailCellRef.IsEmpty)
-            MiscVars.AddFormToArray("Cells/Empty", jailCellRef)
+            Debug(none, "Prison::GetEmptyCells", "Cell: " + jailCellRef + ", IsEmpty: " + jailCellRef.IsEmpty + ", Gender: " + jailCellRef.IsGenderExclusive)
+            JArray.addForm(emptyCellsArray, jailCellRef)
         endif
         i += 1
     endWhile
 
-    return MiscVars.GetPapyrusFormArray("Cells/Empty")
+    if (JValue.count(emptyCellsArray) <= 0)
+        return none
+    endif
+
+    return JArray.asFormArray(emptyCellsArray)
 endFunction
+
+; Form[] function GetEmptyCells()
+;     Form[] cells = self.GetJailCells()
+
+;     int i = 0
+;     while (i < cells.Length)
+;         RPB_JailCell jailCellRef = cells[i] as RPB_JailCell
+;         ; ObjectReference debug_jailCellRef = cells[i] as ObjectReference
+;         ; Debug(none, "Prison::GetEmptyCells", "Ref: " + debug_jailCellRef + ", Cell Props: " + jailCellRef.DEBUG_GetCellProperties())
+
+;         if (jailCellRef && jailCellRef.IsEmpty)
+;             MiscVars.AddFormToArray("Cells/Empty", jailCellRef)
+;         endif
+;         i += 1
+;     endWhile
+
+;     return MiscVars.GetPapyrusFormArray("Cells/Empty")
+; endFunction
 
 ; RPB_JailCell[] function GetEmptyCells()
 ;     ; Prison_GetInt("Cell 01")
@@ -654,6 +683,8 @@ endFunction
 RPB_JailCell function RequestCellForPrisoner(RPB_Prisoner akPrisoner)
     RPB_JailCell outputCell = none
 
+    self.PrioritizeGenderCells = true
+
     ; Determine what type of cell this prisoner should go to
     akPrisoner.DetermineCellOptions()
 
@@ -681,20 +712,29 @@ RPB_JailCell function RequestCellForPrisoner(RPB_Prisoner akPrisoner)
     ; Determine cell to request through Prisoner related config
     if (akPrisoner.OnlyAllowImprisonmentInEmptyCell)
         outputCell = self.GetEmptyJailCell()
-        Debug(none, "Prison::RequestCellForPrisoner", "Got empty cell: " + outputCell)
+        Debug(none, "Prison::RequestCellForPrisoner", "Tried getting empty cell: " + outputCell, outputCell == none)
+        Debug(none, "Prison::RequestCellForPrisoner", "Got empty cell: " + outputCell, outputCell != none)
+        return outputCell
 
     elseif (akPrisoner.OnlyAllowImprisonmentInGenderCell)
         outputCell = self.GetJailCellOfGender(akPrisoner.GetSex())
-        Debug(none, "Prison::RequestCellForPrisoner", "Got gender exclusive cell: " + outputCell)
+        Debug(none, "Prison::RequestCellForPrisoner", "Tried getting gender exclusive cell: " + outputCell, outputCell == none)
+        Debug(none, "Prison::RequestCellForPrisoner", "Got gender exclusive cell: " + outputCell, outputCell != none)
+        return outputCell
 
     elseif (akPrisoner.OnlyAllowImprisonmentInEmptyOrGenderCell)
         ; Get the cell based on prison's priorities, and do not allow random cells
         outputCell = self.GetJailCellBasedOnPriority(akPrisoner.GetSex())
+        Debug(none, "Prison::RequestCellForPrisoner", "Tried getting priority based cell (empty or gender exclusive): " + outputCell + ", Prisoner Gender: " + akPrisoner.GetSex(), outputCell == none)
+        Debug(none, "Prison::RequestCellForPrisoner", "Got priority based cell (empty or gender exclusive): " + outputCell + ", Prisoner Gender: " + akPrisoner.GetSex(), outputCell != none)
+        return outputCell
     endif
 
     if (outputCell == none)
         ; Get a jail cell based on this prison's priorities, allow random cells
         outputCell = self.GetJailCellBasedOnPriority(akPrisoner.GetSex(), true)
+        Debug(none, "Prison::RequestCellForPrisoner", "Tried getting priority based or random cell: " + outputCell + ", Prisoner Gender: " + akPrisoner.GetSex(), outputCell == none)
+        Debug(none, "Prison::RequestCellForPrisoner", "Got priority based or random cell: " + outputCell + ", Prisoner Gender: " + akPrisoner.GetSex(), outputCell != none)
     endif
 
     ; Cells must either be empty or gender exclusive, and none was found for this prisoner
@@ -705,7 +745,8 @@ RPB_JailCell function RequestCellForPrisoner(RPB_Prisoner akPrisoner)
     if (outputCell == none)
         ; If no criteria was passed and a cell was not retrieved yet, get a random cell
         outputCell = self.GetRandomPrisonCell() as RPB_JailCell
-        Debug(none, "Prison::RequestCellForPrisoner", "Got random cell: " + outputCell)
+        Debug(none, "Prison::RequestCellForPrisoner", "Tried getting random cell: " + outputCell, outputCell == none)
+        Debug(none, "Prison::RequestCellForPrisoner", "Got random cell: " + outputCell, outputCell != none)
     endif
 
     return outputCell
@@ -730,10 +771,10 @@ function AwaitPrisonersRelease()
                 currentPrisoner.Release()
                 checkedPrisoners[i] = none
             else
-                ; int timeServedDays  = currentPrisoner.GetTimeServed("Days")
-                ; int timeLeftDays    = currentPrisoner.GetTimeLeftInSentence("Days")
+                int timeServedDays  = currentPrisoner.GetTimeServed("Days")
+                int timeLeftDays    = currentPrisoner.GetTimeLeftInSentence("Days")
                 ; Debug(none, "Prison::AwaitPrisonersRelease", "Prisoner:  " + currentPrisoner.GetActor() + " has not served their sentence yet ("+ timeServedDays + " days served, " +  timeLeftDays +" days left).")
-                Debug(none, "Prison::AwaitPrisonersRelease", currentPrisoner + " " + currentPrisoner.GetActor() + " ("+ currentPrisoner.GetSex(true) +")" + " has not served their sentence yet in "+ Hold +".")
+                ; Debug(none, "Prison::AwaitPrisonersRelease", currentPrisoner + " " + currentPrisoner.GetActor() + " ("+ currentPrisoner.GetSex(true) +")" + " has not served their sentence yet in "+ Hold +".")
             endif
         endif
         i += 1
@@ -767,6 +808,17 @@ endFunction
 event OnPrisonPeriodicUpdate()
     self.AwaitPrisonersQueuedImprisonment() ; Delayed Imprisonment for registered Prisoners
     self.AwaitPrisonersRelease()            ; Keep checking for Prisoners to Release
+
+    ; Get all jail cells
+    ; Show relevant info from each
+    int i = 0
+    Form[] cells = self.GetJailCells()
+    while (i < cells.Length)
+        RPB_JailCell theCell = cells[i] as RPB_JailCell
+        string debugInfo = theCell.DEBUG_GetCellProperties()
+        Debug(none, "Prison::OnPrisonPeriodicUpdate", "Cell " + theCell + ": " + debugInfo)
+        i += 1
+    endWhile
 
     Debug(none, "Prison::OnPrisonPeriodicUpdate", "Prisoners in " + Hold + ": " + Prisoners.Length)
 
@@ -816,6 +868,12 @@ endEvent
 ; Temporary, to hold periodically updates prisoners for now
 RPB_Prisoner[] checkedPrisoners
 int checkedPrisonersIndex
+
+RPB_Prisoner[] property CheckedPrisonersList
+    RPB_Prisoner[] function get()
+        return checkedPrisoners
+    endFunction
+endProperty
 
 ; function ProcessPrisonerState(RPB_Prisoner akPrisoner)
 ;     if (self.EnableInfamy)
@@ -871,7 +929,6 @@ function ConfigurePrison( \
     __isInitialized     = true
 
     ; Initialize all of the jail cells belonging to this prison
-    ; Utility.Wait(2.0)
     self.SetupCells()
 
     Debug(self.GetOwningQuest(), "Prison::ConfigurePrison", "Prison Location: " + PrisonLocation + ", Prison Faction: " + PrisonFaction + ", Prison Hold: " + Hold)
@@ -927,16 +984,6 @@ function SetupCells()
     endWhile
 endFunction
 
-; function SetupCells()
-;     Form[] jailMarkers = Config.GetJailMarkers(Hold)
-
-;     int i = 0
-;     while (i < jailMarkers.Length)
-;         MiscVars.AddFormToArray("Prison/Cells", jailMarkers[i])
-;         i += 1
-;     endWhile
-; endFunction
-
 
 
 ;/
@@ -945,21 +992,43 @@ endFunction
     For a jail cell to be of a specific sex, it must have at least one prisoner of that sex,
     which means these jail cells are never empty.
 /;
+; Form[] function GetGenderExclusiveCells(string asSex)
+;     Form[] cells = self.GetJailCells()
+
+;     int i = 0
+;     while (i < cells.Length)
+;         RPB_JailCell jailCellRef = cells[i] as RPB_JailCell
+;         ObjectReference debug_jailCellRef = cells[i] as ObjectReference
+;         ; Debug(none, "Prison::GetGenderExclusiveCells", "Ref: " + debug_jailCellRef + ", Cell Props: " + jailCellRef.DEBUG_GetCellProperties())
+;         if (jailCellRef && (asSex == "Male" && jailCellRef.IsMaleOnly) || (asSex == "Female" && jailCellRef.IsFemaleOnly))
+;             MiscVars.AddFormToArray("Cells/Gender", jailCellRef)
+;         endif
+;         i += 1
+;     endWhile
+
+;     return MiscVars.GetPapyrusFormArray("Cells/Gender")
+; endFunction
+
 Form[] function GetGenderExclusiveCells(string asSex)
     Form[] cells = self.GetJailCells()
+    int genderCellsArray = JArray.object()
 
     int i = 0
     while (i < cells.Length)
         RPB_JailCell jailCellRef = cells[i] as RPB_JailCell
-        ObjectReference debug_jailCellRef = cells[i] as ObjectReference
-        ; Debug(none, "Prison::GetGenderExclusiveCells", "Ref: " + debug_jailCellRef + ", Cell Props: " + jailCellRef.DEBUG_GetCellProperties())
+
         if (jailCellRef && (asSex == "Male" && jailCellRef.IsMaleOnly) || (asSex == "Female" && jailCellRef.IsFemaleOnly))
-            MiscVars.AddFormToArray("Cells/Gender", jailCellRef)
+            ; Debug(none, "Prison::GetGenderExclusiveCells", "Cell: " + jailCellRef + ", IsEmpty: " + jailCellRef.IsEmpty + ", Gender: " + jailCellRef.IsGenderExclusive)
+            JArray.addForm(genderCellsArray, jailCellRef)
         endif
         i += 1
     endWhile
 
-    return MiscVars.GetPapyrusFormArray("Cells/Gender")
+    if (JValue.count(genderCellsArray) <= 0)
+        return none
+    endif
+
+    return JArray.asFormArray(genderCellsArray)
 endFunction
 
 ObjectReference function GetJailCell(int aiIndex)
@@ -980,7 +1049,6 @@ endFunction
 RPB_JailCell function GetJailCellOfGender(string asSex)
     Form[] genderCells = self.GetGenderExclusiveCells(asSex)
     RPB_JailCell genderCell = genderCells[Utility.RandomInt(0, genderCells.Length - 1)] as RPB_JailCell
-    Debug(none, "Prison::GetJailCellOfGender", "Gender Cell returned: " + genderCell)
 
     return genderCell
 endFunction
@@ -999,27 +1067,35 @@ RPB_JailCell function GetJailCellBasedOnPriority(string asSex, bool abAllowRando
 
     if (self.PrioritizeEmptyCells)
         returnedCell = self.GetEmptyJailCell()
+        Debug(none, "Prison::GetJailCellBasedOnPriority", "Got empty cell: " + returnedCell + ", Prisoner Gender: " + asSex, returnedCell != none)
 
     elseif (self.PrioritizeGenderCells)
         returnedCell = self.GetJailCellOfGender(asSex)
+        Debug(none, "Prison::GetJailCellBasedOnPriority", "Got gender exclusive cell: " + returnedCell + ", Prisoner Gender: " + asSex, returnedCell != none)
+    endif
 
-    else ; No priority
-        ; Get empty cell first, if that fails, get a gender exclusive one, else get a random cell if @abAllowRandomCells is true
+        
+    ; No priority
+    ; Get empty cell first, if that fails, get a gender exclusive one, else get a random cell if @abAllowRandomCells is true
+    if (returnedCell == none)
         returnedCell = self.GetEmptyJailCell()
-
-        if (returnedCell == none)
-            returnedCell = self.GetJailCellOfGender(asSex)
-        endif
-
-        if (returnedCell == none && abAllowRandomCells)
-            returnedCell = self.GetRandomJailCell()
-        endif
+        Debug(none, "Prison::GetJailCellBasedOnPriority", "Got empty cell: " + returnedCell + ", Prisoner Gender: " + asSex, returnedCell != none)
     endif
 
     if (returnedCell == none)
-        ; Could not return any cell, error here
-        return none
+        returnedCell = self.GetJailCellOfGender(asSex)
+        Debug(none, "Prison::GetJailCellBasedOnPriority", "Got gender exclusive cell: " + returnedCell + ", Prisoner Gender: " + asSex, returnedCell != none)
+
     endif
+
+    if (returnedCell == none && abAllowRandomCells)
+        returnedCell = self.GetRandomJailCell()
+        Debug(none, "Prison::GetJailCellBasedOnPriority", "Got random cell: " + returnedCell + ", Prisoner Gender: " + asSex, returnedCell != none)
+
+    endif
+
+    ; Could not return any cell, error here
+    Debug(none, "Prison::GetJailCellBasedOnPriority", "Could not retrieve any cell!  Prisoner Gender: " + asSex, returnedCell == none)
 
     return returnedCell
 endFunction
@@ -1325,6 +1401,48 @@ endFunction
 ; ==========================================================
 ;                            Debug
 ; ==========================================================
+
+string function DEBUG_GetPrisonerSentenceInfo(RPB_Prisoner akPrisoner, bool abShort = false, bool abIncludeCellInfo = false)
+    if (abShort)
+        ; Time Served
+        int timeServedDays           = akPrisoner.GetTimeServed("Days")
+        int timeServedHours          = akPrisoner.GetTimeServed("Hours of Day")
+
+        ; Time Left
+        int timeLeftToServeDays      = akPrisoner.GetTimeLeftInSentence("Days")
+        int timeLeftToServeHours     = akPrisoner.GetTimeLeftInSentence("Hours of Day")
+
+        string sentenceString   = "Sentence: " + akPrisoner.Sentence + " Days"
+        string timeServedString = timeServedDays + " Days, " + timeServedHours + " Hours"
+        string timeLeftString   = timeLeftToServeDays + " Days, " + timeLeftToServeHours + " Hours"
+        
+        return "{"+ sentenceString +", (Served: "+ timeServedString +"), (Left: "+ timeLeftString +")}" + string_if (abIncludeCellInfo, " (Cell: " + akPrisoner.Prison_GetReference("Cell") + ", Door: " + akPrisoner.Prison_GetReference("Cell Door") + ")")
+    else
+        ; Time Served
+        int timeServedDays           = akPrisoner.GetTimeServed("Days")
+        int timeServedHours          = akPrisoner.GetTimeServed("Hours of Day")
+        int timeServedMinutes        = akPrisoner.GetTimeServed("Minutes of Hour")
+        int timeServedSeconds        = akPrisoner.GetTimeServed("Seconds of Minute")
+
+        ; Time Left
+        int timeLeftToServeDays      = akPrisoner.GetTimeLeftInSentence("Days")
+        int timeLeftToServeHours     = akPrisoner.GetTimeLeftInSentence("Hours of Day")
+        int timeLeftToServeMinutes   = akPrisoner.GetTimeLeftInSentence("Minutes of Hour")
+        int timeLeftToServeSeconds   = akPrisoner.GetTimeLeftInSentence("Seconds of Minute")
+
+        return Hold + " Sentence: { \n\t" + \
+            "Prisoner: "            + "(Name: " + akPrisoner.GetName() + ", Prisoner Reference: " + akPrisoner +  ", Actor Reference: " + akPrisoner.GetActor() + ")" + "\n\t" + \
+            "Minimum Sentence: "    + MinimumSentence + " Days, \n\t" + \
+            "Maximum Sentence: "    + MaximumSentence + " Days, \n\t" + \
+            "Sentence: "            + akPrisoner.Sentence + " Days, \n\t" + \
+            "Time of Arrest: "      + akPrisoner.TimeOfArrest + ", \n\t" + \
+            "Time of Imprisonment: "+ akPrisoner.TimeOfImprisonment + ", \n\t" + \
+            "Time Served: "         + akPrisoner.TimeServed + " ("+ (akPrisoner.TimeServed * 24) + " Hours" +") ["+ timeServedDays + " Days, " + timeServedHours + " Hours, " +  timeServedMinutes + " Minutes, " + timeServedSeconds + " Seconds" +"], \n\t" + \
+            "Time Left: "           + akPrisoner.TimeLeftInSentence + " ("+ (akPrisoner.TimeLeftInSentence * 24) + " Hours" +") ["+ timeLeftToServeDays + " Days, " + timeLeftToServeHours + " Hours, " +  timeLeftToServeMinutes + " Minutes, " + timeLeftToServeSeconds + " Seconds" +"], \n\t" + \
+            "Release Time: "        + akPrisoner.ReleaseTime + "\n" + \
+        " }"
+    endif
+endFunction
 
 function DEBUG_ShowPrisonerSentenceInfo(RPB_Prisoner akPrisoner, bool abShort = false)
     if (abShort)
