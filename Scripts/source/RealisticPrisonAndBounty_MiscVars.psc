@@ -883,6 +883,11 @@ bool function ExistsInContainer(string containerKey, string elementKey)
     return JMap.hasKey(JMap.getObj(_miscVarsContainer, containerKey), elementKey)
 endFunction
 
+function DeleteContainer(string containerKey)
+    int containerObject = JMap.getObj(_miscVarsContainer, containerKey)
+    JMap.clear(containerObject)
+endFunction
+
 ;/
     Stores the contents of a container in a file.
 

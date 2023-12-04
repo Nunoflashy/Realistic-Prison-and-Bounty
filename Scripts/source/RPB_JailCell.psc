@@ -42,12 +42,7 @@ RPB_CellDoor property CellDoor
     endFunction
 endProperty
 
-RPB_Guard property Guard
-    RPB_Guard function get()
-        return self.GetGuard()
-    endFunction
-endProperty
-
+; The prisoners living in this cell
 RPB_Prisoner[] __prisoners
 RPB_Prisoner[] property Prisoners
     RPB_Prisoner[] function get()
@@ -55,17 +50,72 @@ RPB_Prisoner[] property Prisoners
     endFunction
 endProperty
 
-bool __isEmpty
-bool property IsEmpty
-    bool function get()
-        return __isEmpty
+; The beds inside this cell
+Form[] __beds
+Form[] property Beds
+    Form[] function get()
+        return __beds
     endFunction
 endProperty
 
-bool __isAvailable
+; Containers in the cell, such as Sacks, Wardrobes, Dressers, Chests, Bedside Tables...
+Form[] __containers
+Form[] property Containers
+    Form[] function get()
+        return __containers
+    endFunction
+endProperty
+
+; Other miscellaneous props in a cell, such as buckets, plates, food, etc...
+Form[] __otherProps
+Form[] property OtherProps
+    Form[] function get()
+        return __otherProps
+    endFunction
+endProperty
+
+bool property HasBeds
+    bool function get()
+        return self.Beds.Length > 0
+    endFunction
+endProperty
+
+bool property HasContainers
+    bool function get()
+        return self.Containers.Length > 0
+    endFunction
+endProperty
+
+bool property HasOtherProps
+    bool function get()
+        return self.OtherProps.Length > 0
+    endFunction
+endProperty
+
+bool property IsEmpty
+    bool function get()
+        return self.PrisonerCount == 0
+    endFunction
+endProperty
+
+bool property IsFull
+    bool function get()
+        return self.PrisonerCount >= self.MaxPrisoners
+    endFunction
+endProperty
+
+bool property IsOvercrowded
+    bool function get()
+        return self.PrisonerCount > self.MaxPrisoners
+    endFunction
+endProperty
+
+; Whether to allow more prisoners to live in this cell (despite there not being enough beds for all, this bypasses that.)
+bool property AllowOvercrowding auto
+
 bool property IsAvailable
     bool function get()
-        return __isAvailable
+        return (self.PrisonerCount < self.MaxPrisoners) || self.AllowOvercrowding
     endFunction
 endProperty
 
@@ -89,6 +139,25 @@ bool property IsGenderExclusive
     endFunction
 endProperty
 
+; Not yet used, since the caller needs a reference to Prisoner to pass to SetExclusiveToPrisonerSex
+; Workaround might be to store the first prisoner reference just for this purpose, so we don't retrieve it twice and waste cycles/performance
+bool property ShouldBeGenderExclusive
+    bool function get()
+        Form prisonerForm = JMap.getForm(__prisonersInCell, JMap.getNthKey(__prisonersInCell, 0)) ; Get the first prisoner
+        RPB_Prisoner prisonerRef = Prison.GetPrisonerReference(prisonerForm as Actor)
+
+        ; If the first prisoner will be/is stripped naked / to underwear, set this cell as gender exclusive for them if the cell is not yet gender exclusive
+        return !self.IsGenderExclusive && (prisonerRef.WillBeStrippedNaked || prisonerRef.WillBeStrippedToUnderwear) || (prisonerRef.IsStrippedNaked || prisonerRef.IsStrippedToUnderwear)
+    endFunction
+endProperty
+
+
+; The approximate size of this cell from the center point (this reference) as a radius
+float property CellRadius auto
+
+; How many prisoners can this jail cell take (if AllowOvercrowding is false)
+int property MaxPrisoners auto
+
 int __prisonersInCell
 Form[] property PrisonersInCell
     Form[] function get()
@@ -107,30 +176,6 @@ endProperty
 ObjectReference function GetCellObject(Keyword akPropType)
 
 endFunction
-
-; ;/
-;     Retrieves the door of this jail cell.
-; /;
-; RPB_CellDoor function GetCellDoor()
-
-; endFunction
-
-
-ObjectReference function GetMarker()
-    
-endFunction
-
-;/
-    Retrieves the guard this jail cell is assigned to
-/;
-RPB_Guard function GetGuard()
-
-endFunction
-
-ObjectReference[] function GetBeds()
-    
-endFunction
-
 
 ; =========================================================
 ;                           Cell                        
@@ -166,13 +211,101 @@ function RemoveGenderExclusiveness()
     Debug(self, "JailCell::RemoveGenderExclusiveness", self + " is no longer a gender exclusive cell.")
 endFunction
 
-function SetMaxPrisoners(int aiPrisonerCount)
-
-endFunction
-
 ; Scans the jail cell to update any properties accordingly
 function Scan()
 
+endFunction
+
+ObjectReference function GetBedExcept(Form akBedBase, ObjectReference akCenterPoint, float afRadius, Form akExceptBed = none)
+    int i = 0
+    while (i < 20)
+        ObjectReference scannedBed = Game.FindRandomReferenceOfTypeFromRef(akBedBase, akCenterPoint, afRadius)
+        if (scannedBed.GetFormID() != akExceptBed.GetFormID())
+            return scannedBed
+        endif
+
+        i += 1
+    endWhile
+endFunction
+
+; Unreliable, since it can scan beds from other cells that are near one of the scanned beds in this cell. (this is because beds are not in the same place on all the cells, and the radius of the scan will get other beds from other cells.)
+function ScanBeds()
+    int bedExclusions   = JMap.object()
+    int bedsScanned     = JArray.object()
+
+    Form bedRollHay01 = Game.GetFormEx(0x1899D)
+    FormList RPB_BedFormList = GetFormFromMod(0x1CDAA) as FormList
+
+    int i = 0
+    while (i < 5) ; 10 scans
+        ObjectReference scannedBed = Game.FindRandomReferenceOfAnyTypeInListFromRef(RPB_BedFormList, self, self.CellRadius)
+
+        if (scannedBed && !JMap.hasKey(bedExclusions, scannedBed.GetFormID()))
+            self.MaxPrisoners += 1
+            JMap.setForm(bedExclusions, scannedBed.GetFormID(), scannedBed)
+            JArray.addForm(bedsScanned, scannedBed) ; Add the bed to this local array
+            Debug(self, "[Prison: "+ self.Prison.City +"] JailCell::ScanBeds", "Scanned " + scannedBed + " (Name: "+ scannedBed.GetBaseObject().GetName() +") Bed in " + self + ", Max Prisoners for this Cell: " + self.MaxPrisoners)
+        endif
+        i += 1
+    endWhile
+    
+    ; If there were beds caught in the scan, add it to the cell beds array
+    if (JValue.count(bedsScanned) > 0)
+        __beds = JArray.asFormArray(bedsScanned)
+    endif
+
+    Debug(self, "[Prison: "+ self.Prison.City +"] JailCell::ScanBeds", "Beds in " + self + ": " + self.Beds + " Beds.Length: " + self.Beds.Length)
+    Debug(self, "[Prison: "+ self.Prison.City +"] JailCell::ScanBeds", "Finished bed scan for cell " + self + ", found " + JValue.count(bedExclusions) + " beds.")
+endFunction
+
+function ScanContainers()
+    FormList RPB_ContainerFormList = GetFormFromMod(0x1CDAB) as FormList
+    int containersAlreadyAdded  = JMap.object()
+    int containersScanned       = JArray.object()
+
+    int i = 0
+    while (i < 5)
+        ObjectReference scannedContainer = Game.FindRandomReferenceOfAnyTypeInListFromRef(RPB_ContainerFormList, self, self.CellRadius)
+        bool containerExistsInList = JMap.hasKey(containersAlreadyAdded, scannedContainer.GetFormID())
+        if (scannedContainer && !containerExistsInList)
+            JMap.setForm(containersAlreadyAdded, scannedContainer.GetFormID(), scannedContainer)
+            JArray.addForm(containersScanned, scannedContainer)
+            Debug(self, "[Prison: "+ self.Prison.City +"] JailCell::ScanContainers", "Scanned " + scannedContainer + " (Name: "+ scannedContainer.GetBaseObject().GetName() +") container in " + self)
+        endif
+        i += 1
+    endWhile
+
+    if (JValue.count(containersScanned) > 0)
+        __containers = JArray.asFormArray(containersScanned)
+    endif
+
+    Debug(self, "[Prison: "+ self.Prison.City +"] JailCell::ScanContainers", "Containers in " + self + ": " + self.Containers + " Containers.Length: " + self.Containers.Length)
+    Debug(self, "[Prison: "+ self.Prison.City +"] JailCell::ScanContainers", "Finished container scan for cell " + self + ", found " + JValue.count(containersScanned) + " containers.")
+endFunction
+
+function ScanMiscProps()
+    FormList RPB_MiscPropsFormList = GetFormFromMod(0x1CDAC) as FormList
+    int propsAlreadyAdded  = JMap.object()
+    int propsScanned       = JArray.object()
+
+    int i = 0
+    while (i < 5)
+        ObjectReference scannedProp = Game.FindRandomReferenceOfAnyTypeInListFromRef(RPB_MiscPropsFormList, self, self.CellRadius)
+        bool propExistsInList = JMap.hasKey(propsAlreadyAdded, scannedProp.GetFormID())
+        if (scannedProp && !propExistsInList)
+            JMap.setForm(propsAlreadyAdded, scannedProp.GetFormID(), scannedProp)
+            JArray.addForm(propsScanned, scannedProp)
+            Debug(self, "[Prison: "+ self.Prison.City +"] JailCell::ScanMiscProps", "Scanned " + scannedProp + " (Name: "+ scannedProp.GetBaseObject().GetName() +") prop in " + self)
+        endif
+        i += 1
+    endWhile
+
+    if (JValue.count(propsScanned) > 0)
+        __otherProps = JArray.asFormArray(propsScanned)
+    endif
+
+    Debug(self, "[Prison: "+ self.Prison.City +"] JailCell::ScanMiscProps", "Props in " + self + ": " + self.OtherProps + " OtherProps.Length: " + self.OtherProps.Length)
+    Debug(self, "[Prison: "+ self.Prison.City +"] JailCell::ScanMiscProps", "Finished prop scan for cell " + self + ", found " + JValue.count(propsScanned) + " props.")
 endFunction
 
 ; =========================================================
@@ -249,11 +382,8 @@ function BindPrison(RPB_Prison akPrison)
         return
     endif
 
-    ; Start out as an empty cell
-    __isEmpty = true
-
-    ; Which means it is also available
-    __isAvailable = true
+    ; To be loaded depending on jail cell size
+    self.CellRadius = 300
 
     ; Get the cell door belonging to this jail cell (by scanning for the nearest door of the type requested)
     int jailBaseDoorIdForPrison = GetJailBaseDoorID(self.Prison.Hold)
@@ -294,14 +424,12 @@ function UnregisterPrisoner(RPB_Prisoner akPrisoner)
 endFunction
 
 function DetermineCellParameters()
-    if (!self.IsEmpty)
-        ; Don't do anything, cell is not empty which means the parameters have already been set most likely
-        return
-    endif
+    ; if (!self.IsEmpty)
+    ;     ; Don't do anything, cell is not empty which means the parameters have already been set most likely
+    ;     return
+    ; endif
 
     if (self.PrisonerCount > 0)
-        __isEmpty = false
-
         Form prisonerForm = JMap.getForm(__prisonersInCell, JMap.getNthKey(__prisonersInCell, 0)) ; Get the first prisoner
         RPB_Prisoner prisonerRef = Prison.GetPrisonerReference(prisonerForm as Actor)
 
@@ -312,8 +440,6 @@ function DetermineCellParameters()
 
     else
         ; No prisoners in this cell
-        __isEmpty = true
-
         ; Unset this cell as being female/male only, as it is now empty
         self.RemoveGenderExclusiveness()
     endif
@@ -446,8 +572,11 @@ string function DEBUG_GetCellProperties()
         "\t Cell: " + self + "\n" + \
         "\t Door: " + self.CellDoor + "\n" + \
         "\t Empty: " + self.IsEmpty + "\n" + \
+        "\t Full: " + self.IsFull + "\n" + \
+        "\t Overcrowded: " + self.IsOvercrowded + "\n" + \
         "\t Available: " + self.IsAvailable + "\n" + \
         "\t Gender Exclusive: " + self.IsGenderExclusive + string_if (self.IsGenderExclusive, " ("+ getGenderExclusivenessAsString +")") + "\n" + \
+        "\t Maximum Prisoners: " + self.MaxPrisoners + "\n" + \
         "\t Prisoners: " + self.PrisonerCount + string_if (_hasPrisoners, " -> [\n"+ self.DEBUG_GetPrisoners() +"\t]") + "\n" + \
     "]"
 endFunction

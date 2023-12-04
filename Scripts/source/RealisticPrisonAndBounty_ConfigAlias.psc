@@ -20,11 +20,12 @@ function PerformSetup()
     bool holdsSetup                     = Config.SetHolds()
     bool citiesSetup                    = Config.SetCities()
     bool holdLocations                  = Config.SetHoldLocations()
-    bool prisons                        = Config.SetPrisons()
     bool jailTeleportReleaseLocations   = Config.SetJailTeleportReleaseLocations()
     bool jailPrisonerContainers         = Config.SetJailPrisonerContainers()
     bool factionsSetup                  = Config.SetFactions()
     bool jailCellsSetup                 = Config.SetJailCells()
+    bool prisons                        = Config.SetPrisons()
+
 
     Info(\
         "==========================================================\n" + \
@@ -49,7 +50,9 @@ endFunction
 
 function PerformMaintenance()
     bool registeredEvents = Config.HandleEvents()
+    bool jailCellsSetup   = Config.SetJailCells()
     bool prisons          = Config.SetPrisons()
+
 
     ;/
         TODO: If at any point a new hold, city, jail cell, jail location etc gets added,

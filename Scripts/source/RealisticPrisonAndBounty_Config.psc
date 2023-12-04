@@ -130,11 +130,17 @@ bool function SetPrisons()
 endFunction
 
 bool function SetJailCells()
-    if (miscVars.Exists("Jail::Cells"))
-        return true
-    endif
+    ; if (miscVars.Exists("Jail::Cells"))
+    ;     return true
+    ; endif
     
     float x = StartBenchmark(ENABLE_BENCHMARK)
+    miscVars.DeleteContainer("Jail::Cells")
+    miscVars.DeleteContainer("Jail::Cells[Haafingar]")
+    int cellsObject = MiscVars.GetHandle("Jail::Cells[Haafingar]")
+    JArray.clear(cellsObject)
+    JValue.release(cellsObject)
+
     miscVars.CreateStringMap("Jail::Cells")
 
     miscVars.AddFormToArray("Jail::Cells[Whiterun]", GetFormFromMod(0x3885)) ; Jail Cell 01
@@ -152,12 +158,12 @@ bool function SetJailCells()
     miscVars.AddFormToArray("Jail::Cells[Falkreath]", Game.GetForm(0x3EF07)) ; Jail Cell 01
 
     miscVars.AddFormToArray("Jail::Cells[Haafingar]", Game.GetForm(0x36897)) ; Jail Cell 01 (Original)
-    ; miscVars.AddFormToArray("Jail::Cells[Haafingar]", GetFormFromMod(0x3880)) ; Jail Cell 02
-    ; miscVars.AddFormToArray("Jail::Cells[Haafingar]", GetFormFromMod(0x3879)) ; Jail Cell 03
-    ; miscVars.AddFormToArray("Jail::Cells[Haafingar]", GetFormFromMod(0x3881)) ; Jail Cell 04
-    ; miscVars.AddFormToArray("Jail::Cells[Haafingar]", GetFormFromMod(0x3882)) ; Jail Cell 05
-    ; miscVars.AddFormToArray("Jail::Cells[Haafingar]", GetFormFromMod(0x3883)) ; Jail Cell 06
-    ; miscVars.AddFormToArray(solitudeMarkers, GetFormFromMod(0x3884)) ; Jail Cell 07 (Bjartur Cell)
+    miscVars.AddFormToArray("Jail::Cells[Haafingar]", GetFormFromMod(0x3880)) ; Jail Cell 02
+    miscVars.AddFormToArray("Jail::Cells[Haafingar]", GetFormFromMod(0x3879)) ; Jail Cell 03
+    miscVars.AddFormToArray("Jail::Cells[Haafingar]", GetFormFromMod(0x3881)) ; Jail Cell 04
+    miscVars.AddFormToArray("Jail::Cells[Haafingar]", GetFormFromMod(0x3882)) ; Jail Cell 05
+    miscVars.AddFormToArray("Jail::Cells[Haafingar]", GetFormFromMod(0x3883)) ; Jail Cell 06
+    miscVars.AddFormToArray("Jail::Cells[Haafingar]", GetFormFromMod(0x3884)) ; Jail Cell 07 (Bjartur Cell)
 
     miscVars.AddFormToArray("Jail::Cells[Hjaalmarch]", Game.GetForm(0x3EF08)) ; Jail Cell 01
 
@@ -380,6 +386,19 @@ endFunction
 
 string function GetHoldNameFromCity(string city)
 endFunction
+
+; Form[] function GetJailMarkers(string hold)
+;     Form[] haafingarCells = new Form[10]
+;     haafingarCells[0] = Game.GetForm(0x36897) ; Jail Cell 01 (Original)
+;     haafingarCells[1] = GetFormFromMod(0x3880) ; Jail Cell 02
+;     haafingarCells[2] = GetFormFromMod(0x3879) ; Jail Cell 03
+;     haafingarCells[3] = GetFormFromMod(0x3881) ; Jail Cell 04
+;     haafingarCells[4] = GetFormFromMod(0x3882) ; Jail Cell 05
+;     haafingarCells[5] = GetFormFromMod(0x3883) ; Jail Cell 06
+;     haafingarCells[6] = GetFormFromMod(0x3884) ; Jail Cell 07 (Bjartur Cell)
+
+;     return haafingarCells
+; endFunction
 
 Form[] function GetJailMarkers(string hold)
     ; float x = StartBenchmark()

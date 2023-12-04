@@ -488,6 +488,13 @@ string property Hold
     endFunction
 endProperty
 
+string property City
+    string function get()
+        return Config.GetCity(self.Hold)
+    endFunction
+endProperty
+
+
 ; ==========================================================
 ;                     Prison Properties
 ; ==========================================================
@@ -966,6 +973,21 @@ bool function BindCellToPrisoner(ObjectReference akJailCell, RPB_Prisoner akPris
     ; Handle the events related to the prisoner entering the cell
     jailCell.OnPrisonerEnter(akPrisoner)
 
+    if (jailCell.HasContainers)
+        ; Get a random container, and add a lockpick to it
+        Form lockpick = Game.GetForm(0xA)
+        ObjectReference chosenContainer = jailCell.Containers[Utility.RandomInt(0, jailCell.Containers.Length - 1)] as ObjectReference
+        chosenContainer.AddItem(lockpick, 1, true)
+        Debug(none, "Prison::BindCellToPrisoner", "Added 1 Lockpick to container " + chosenContainer + " ("+ chosenContainer.GetBaseObject().GetName() +")")
+    endif
+
+    if (jailCell.HasOtherProps)
+        Form lockpick = Game.GetForm(0xA)
+        ObjectReference chosenProp = jailCell.OtherProps[Utility.RandomInt(0, jailCell.OtherProps.Length - 1)] as ObjectReference
+        chosenProp.PlaceAtMe(lockpick, 1)
+        Debug(none, "Prison::BindCellToPrisoner", "Placed 1 Lockpick near misc prop " + chosenProp + " ("+ chosenProp.GetBaseObject().GetName() +")")
+    endif
+
     return true
     ; Now possible to get this prisoner's jail cell through: MiscVars.GetReference("["+ akPrisoner.GetIdentifier() +"]Cell")
 endFunction
@@ -979,6 +1001,9 @@ function SetupCells()
         RPB_JailCell jailCell = cells[i] as RPB_JailCell
         if (!jailCell.IsInitialized())
             jailCell.BindPrison(self)
+            jailCell.ScanBeds()
+            jailCell.ScanContainers()
+            jailCell.ScanMiscProps()
         endif
         i += 1
     endWhile
@@ -1263,6 +1288,11 @@ bool __isInitialized
 ; ==========================================================
 ;                            Test
 ; ==========================================================
+
+Form[] function GetBedBaseObjects()
+    Form bedRollHay01 = Game.GetFormEx(0x1899D)
+
+endFunction
 
 bool __isAwaitingUpdateForGameTime
 bool property IsAwaitingUpdateForGameTime
