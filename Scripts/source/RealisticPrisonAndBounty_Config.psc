@@ -44,6 +44,7 @@ RealisticPrisonAndBounty_SceneManager   property SceneManager auto
 RealisticPrisonAndBounty_EventManager   property EventManager auto
 
 
+
 ; Called from ConfigAlias
 bool function HandleEvents()
 ; ==========================================================
@@ -56,39 +57,23 @@ endFunction
 
 string[] property Holds
     string[] function get()
-        if (!miscVars.Exists("Holds"))
-            miscVars.CreateArray("Holds")
-            miscVars.AddStringToArray("Holds", "Whiterun")
-            miscVars.AddStringToArray("Holds", "Winterhold")
-            miscVars.AddStringToArray("Holds", "Eastmarch")
-            miscVars.AddStringToArray("Holds", "Falkreath")
-            miscVars.AddStringToArray("Holds", "Haafingar")
-            miscVars.AddStringToArray("Holds", "Hjaalmarch")
-            miscVars.AddStringToArray("Holds", "The Rift")
-            miscVars.AddStringToArray("Holds", "The Reach")
-            miscVars.AddStringToArray("Holds", "The Pale")
-        endif
-
-        return miscVars.GetPapyrusStringArray("Holds")
+        int cellsMap = RPB_Data.Unserialize()
+        string[] _holds = JMap.allKeysPArray(cellsMap)
+        return _holds
     endFunction
 endProperty
 
 string[] property Cities
     string[] function get()
-        if (!miscVars.Exists("Cities"))
-            miscVars.CreateArray("Cities")
-            miscVars.AddStringToArray("Cities", "Whiterun")
-            miscVars.AddStringToArray("Cities", "Winterhold")
-            miscVars.AddStringToArray("Cities", "Windhelm")
-            miscVars.AddStringToArray("Cities", "Falkreath")
-            miscVars.AddStringToArray("Cities", "Solitude")
-            miscVars.AddStringToArray("Cities", "Morthal")
-            miscVars.AddStringToArray("Cities", "Riften")
-            miscVars.AddStringToArray("Cities", "Markarth")
-            miscVars.AddStringToArray("Cities", "Dawnstar")
-        endif
+        int citiesArray = JArray.object()
+        int i = 0
+        while (i < Holds.Length)
+            int rootItem = RPB_Data.GetRootObject(Holds[i])
+            JArray.addStr(citiesArray, RPB_Data.GetHoldCity(rootItem))
+            i += 1
+        endWhile
 
-        return miscVars.GetPapyrusStringArray("Cities")
+        return JArray.asStringArray(citiesArray)
     endFunction
 endProperty
 
@@ -130,68 +115,68 @@ bool function SetPrisons()
 endFunction
 
 bool function SetJailCells()
-    ; if (miscVars.Exists("Jail::Cells"))
-    ;     return true
-    ; endif
+    ; ; if (miscVars.Exists("Jail::Cells"))
+    ; ;     return true
+    ; ; endif
     
-    float x = StartBenchmark(ENABLE_BENCHMARK)
-    miscVars.DeleteContainer("Jail::Cells")
-    miscVars.DeleteContainer("Jail::Cells[Haafingar]")
-    int cellsObject = MiscVars.GetHandle("Jail::Cells[Haafingar]")
-    JArray.clear(cellsObject)
-    JValue.release(cellsObject)
+    ; float x = StartBenchmark(ENABLE_BENCHMARK)
+    ; ; miscVars.DeleteContainer("Jail::Cells")
+    ; ; miscVars.DeleteContainer("Jail::Cells[Haafingar]")
+    ; int cellsObject = MiscVars.GetHandle("Jail::Cells[Haafingar]")
+    ; ; JArray.clear(cellsObject)
+    ; ; JValue.release(cellsObject)
 
-    miscVars.CreateStringMap("Jail::Cells")
+    ; miscVars.CreateStringMap("Jail::Cells")
 
-    miscVars.AddFormToArray("Jail::Cells[Whiterun]", GetFormFromMod(0x3885)) ; Jail Cell 01
-    miscVars.AddFormToArray("Jail::Cells[Whiterun]", GetFormFromMod(0x3886)) ; Jail Cell 02
-    miscVars.AddFormToArray("Jail::Cells[Whiterun]", GetFormFromMod(0x3887)) ; Jail Cell 03
-    miscVars.AddFormToArray("Jail::Cells[Whiterun]", GetFormFromMod(0x3888)) ; Jail Cell 04 (Alik'r Cell)
+    ; miscVars.AddFormToArray("Jail::Cells[Whiterun]", GetFormFromMod(0x3885)) ; Jail Cell 01
+    ; miscVars.AddFormToArray("Jail::Cells[Whiterun]", GetFormFromMod(0x3886)) ; Jail Cell 02
+    ; miscVars.AddFormToArray("Jail::Cells[Whiterun]", GetFormFromMod(0x3887)) ; Jail Cell 03
+    ; miscVars.AddFormToArray("Jail::Cells[Whiterun]", GetFormFromMod(0x3888)) ; Jail Cell 04 (Alik'r Cell)
 
-    ; missing Winterhold markers
+    ; ; missing Winterhold markers
 
-    miscVars.AddFormToArray("Jail::Cells[Eastmarch]", Game.GetForm(0x58CF8)) ; Jail Cell 01
-    miscVars.AddFormToArray("Jail::Cells[Eastmarch]", GetFormFromMod(0x388A)) ; Jail Cell 02
-    miscVars.AddFormToArray("Jail::Cells[Eastmarch]", GetFormFromMod(0x388B)) ; Jail Cell 03
-    miscVars.AddFormToArray("Jail::Cells[Eastmarch]", GetFormFromMod(0x388C)) ; Jail Cell 04
+    ; miscVars.AddFormToArray("Jail::Cells[Eastmarch]", Game.GetForm(0x58CF8)) ; Jail Cell 01
+    ; miscVars.AddFormToArray("Jail::Cells[Eastmarch]", GetFormFromMod(0x388A)) ; Jail Cell 02
+    ; miscVars.AddFormToArray("Jail::Cells[Eastmarch]", GetFormFromMod(0x388B)) ; Jail Cell 03
+    ; miscVars.AddFormToArray("Jail::Cells[Eastmarch]", GetFormFromMod(0x388C)) ; Jail Cell 04
 
-    miscVars.AddFormToArray("Jail::Cells[Falkreath]", Game.GetForm(0x3EF07)) ; Jail Cell 01
+    ; miscVars.AddFormToArray("Jail::Cells[Falkreath]", Game.GetForm(0x3EF07)) ; Jail Cell 01
 
-    miscVars.AddFormToArray("Jail::Cells[Haafingar]", Game.GetForm(0x36897)) ; Jail Cell 01 (Original)
-    miscVars.AddFormToArray("Jail::Cells[Haafingar]", GetFormFromMod(0x3880)) ; Jail Cell 02
-    miscVars.AddFormToArray("Jail::Cells[Haafingar]", GetFormFromMod(0x3879)) ; Jail Cell 03
-    miscVars.AddFormToArray("Jail::Cells[Haafingar]", GetFormFromMod(0x3881)) ; Jail Cell 04
-    miscVars.AddFormToArray("Jail::Cells[Haafingar]", GetFormFromMod(0x3882)) ; Jail Cell 05
-    miscVars.AddFormToArray("Jail::Cells[Haafingar]", GetFormFromMod(0x3883)) ; Jail Cell 06
-    miscVars.AddFormToArray("Jail::Cells[Haafingar]", GetFormFromMod(0x3884)) ; Jail Cell 07 (Bjartur Cell)
+    ; miscVars.AddFormToArray("Jail::Cells[Haafingar]", Game.GetForm(0x36897)) ; Jail Cell 01 (Original)
+    ; miscVars.AddFormToArray("Jail::Cells[Haafingar]", GetFormFromMod(0x3880)) ; Jail Cell 02
+    ; miscVars.AddFormToArray("Jail::Cells[Haafingar]", GetFormFromMod(0x3879)) ; Jail Cell 03
+    ; miscVars.AddFormToArray("Jail::Cells[Haafingar]", GetFormFromMod(0x3881)) ; Jail Cell 04
+    ; miscVars.AddFormToArray("Jail::Cells[Haafingar]", GetFormFromMod(0x3882)) ; Jail Cell 05
+    ; miscVars.AddFormToArray("Jail::Cells[Haafingar]", GetFormFromMod(0x3883)) ; Jail Cell 06
+    ; miscVars.AddFormToArray("Jail::Cells[Haafingar]", GetFormFromMod(0x3884)) ; Jail Cell 07 (Bjartur Cell)
 
-    miscVars.AddFormToArray("Jail::Cells[Hjaalmarch]", Game.GetForm(0x3EF08)) ; Jail Cell 01
+    ; miscVars.AddFormToArray("Jail::Cells[Hjaalmarch]", Game.GetForm(0x3EF08)) ; Jail Cell 01
 
-    ; missing The Reach markers (Markarth)
+    ; ; missing The Reach markers (Markarth)
 
-    miscVars.AddFormToArray("Jail::Cells[The Rift]", Game.GetForm(0x6128D)) ; Jail Cell 01 (Original)
-    ; miscVars.AddFormToArray("Jail::Cells[The Rift]", GetFormFromMod(0x388D)) ; Jail Cell 02 (Threki the Innocent)
-    miscVars.AddFormToArray("Jail::Cells[The Rift]", GetFormFromMod(0x388E)) ; Jail Cell 03
-    ; miscVars.AddFormToArray("Jail::Cells[The Rift]", GetFormFromMod(0x388F)) ; Jail Cell 04 (Sibbi's Cell [RESERVED])
-    miscVars.AddFormToArray("Jail::Cells[The Rift]", GetFormFromMod(0x3890)) ; Jail Cell 05
-    miscVars.AddFormToArray("Jail::Cells[The Rift]", GetFormFromMod(0x3893)) ; Jail Cell 06
-    miscVars.AddFormToArray("Jail::Cells[The Rift]", GetFormFromMod(0x3894)) ; Jail Cell 07
-    miscVars.AddFormToArray("Jail::Cells[The Rift]", GetFormFromMod(0x3895)) ; Jail Cell 08
+    ; miscVars.AddFormToArray("Jail::Cells[The Rift]", Game.GetForm(0x6128D)) ; Jail Cell 01 (Original)
+    ; ; miscVars.AddFormToArray("Jail::Cells[The Rift]", GetFormFromMod(0x388D)) ; Jail Cell 02 (Threki the Innocent)
+    ; miscVars.AddFormToArray("Jail::Cells[The Rift]", GetFormFromMod(0x388E)) ; Jail Cell 03
+    ; ; miscVars.AddFormToArray("Jail::Cells[The Rift]", GetFormFromMod(0x388F)) ; Jail Cell 04 (Sibbi's Cell [RESERVED])
+    ; miscVars.AddFormToArray("Jail::Cells[The Rift]", GetFormFromMod(0x3890)) ; Jail Cell 05
+    ; miscVars.AddFormToArray("Jail::Cells[The Rift]", GetFormFromMod(0x3893)) ; Jail Cell 06
+    ; miscVars.AddFormToArray("Jail::Cells[The Rift]", GetFormFromMod(0x3894)) ; Jail Cell 07
+    ; miscVars.AddFormToArray("Jail::Cells[The Rift]", GetFormFromMod(0x3895)) ; Jail Cell 08
 
-    miscVars.AddFormToArray("Jail::Cells[The Pale]", GetFormFromMod(0x3896)) ; Jail Cell 01
+    ; miscVars.AddFormToArray("Jail::Cells[The Pale]", GetFormFromMod(0x3896)) ; Jail Cell 01
 
-    int i = 0
-    while (i < Holds.Length)
-        string hold = Holds[i]
-        if (miscVars.Exists("Jail::Cells["+ hold +"]"))
-            miscVars.AddToContainer("Jail::Cells", "Jail::Cells["+ hold +"]")
-            Debug(self, "Config::SetJailCells", "Added " + "Jail::Cells["+ hold +"]" + " to container: " + "Jail::Cells" + " (container length: "+ miscVars.GetLengthOf("Jail::Cells") +")\n")
-        endif
-        i += 1
-    endWhile
+    ; int i = 0
+    ; while (i < Holds.Length)
+    ;     string hold = Holds[i]
+    ;     if (miscVars.Exists("Jail::Cells["+ hold +"]"))
+    ;         miscVars.AddToContainer("Jail::Cells", "Jail::Cells["+ hold +"]")
+    ;         Debug(self, "Config::SetJailCells", "Added " + "Jail::Cells["+ hold +"]" + " to container: " + "Jail::Cells" + " (container length: "+ miscVars.GetLengthOf("Jail::Cells") +")\n")
+    ;     endif
+    ;     i += 1
+    ; endWhile
 
-    EndBenchmark(x, "SetJailCells", ENABLE_BENCHMARK)
-    return true
+    ; EndBenchmark(x, "SetJailCells", ENABLE_BENCHMARK)
+    ; return true
 endFunction
 
 bool function SetJailTeleportReleaseLocations()
@@ -308,6 +293,27 @@ bool function IsLocationFromHold(string hold, Location akLocation)
     return false
 endFunction
 
+string function GetCurrentPlayerHoldLocationEx()
+    int holdIndex = 0
+    while (holdIndex < Holds.Length)
+        int holdRootItem        = RPB_Data.GetRootObject(Holds[holdIndex])
+        Form[] holdLocations    = RPB_Data.GetHoldLocations(holdRootItem)
+
+        int locationIndex = 0
+        while (locationIndex < holdLocations.Length)
+            Location holdLocation = holdLocations[locationIndex] as Location
+            if (Player.IsInLocation(holdLocation))
+                return Holds[holdIndex]
+            endif
+            locationIndex += 1
+        endWhile
+        holdIndex += 1
+
+    endWhile
+
+    return ""
+endFunction
+
 string function GetCurrentPlayerHoldLocation()
 ;    float x = StartBenchmark()
 
@@ -400,16 +406,70 @@ endFunction
 ;     return haafingarCells
 ; endFunction
 
-Form[] function GetJailMarkers(string hold)
-    ; float x = StartBenchmark()
-    if (!miscVars.Exists("Jail::Cells["+ hold +"]"))
-        MCM.Error("Config::GetJailMarkers", "The marker does not exist!")
-        return none
-    endif
-    Form[] jailCells = miscVars.GetPapyrusFormArray("Jail::Cells["+ hold +"]")
-    ; EndBenchmark(x, "GetJailMarkers")
-    return jailCells
-endFunction
+; bool function SetJailCells()
+;     ; if (miscVars.Exists("Jail::Cells"))
+;     ;     return true
+;     ; endif
+    
+;     float x = StartBenchmark(ENABLE_BENCHMARK)
+;     ; miscVars.DeleteContainer("Jail::Cells")
+;     ; miscVars.DeleteContainer("Jail::Cells[Haafingar]")
+;     int cellsObject = MiscVars.GetHandle("Jail::Cells[Haafingar]")
+;     ; JArray.clear(cellsObject)
+;     ; JValue.release(cellsObject)
+
+;     miscVars.CreateStringMap("Jail::Cells")
+
+;     miscVars.AddFormToArray("Jail::Cells[Whiterun]", GetFormFromMod(0x3885)) ; Jail Cell 01
+;     miscVars.AddFormToArray("Jail::Cells[Whiterun]", GetFormFromMod(0x3886)) ; Jail Cell 02
+;     miscVars.AddFormToArray("Jail::Cells[Whiterun]", GetFormFromMod(0x3887)) ; Jail Cell 03
+;     miscVars.AddFormToArray("Jail::Cells[Whiterun]", GetFormFromMod(0x3888)) ; Jail Cell 04 (Alik'r Cell)
+
+;     ; missing Winterhold markers
+
+;     miscVars.AddFormToArray("Jail::Cells[Eastmarch]", Game.GetForm(0x58CF8)) ; Jail Cell 01
+;     miscVars.AddFormToArray("Jail::Cells[Eastmarch]", GetFormFromMod(0x388A)) ; Jail Cell 02
+;     miscVars.AddFormToArray("Jail::Cells[Eastmarch]", GetFormFromMod(0x388B)) ; Jail Cell 03
+;     miscVars.AddFormToArray("Jail::Cells[Eastmarch]", GetFormFromMod(0x388C)) ; Jail Cell 04
+
+;     miscVars.AddFormToArray("Jail::Cells[Falkreath]", Game.GetForm(0x3EF07)) ; Jail Cell 01
+
+;     miscVars.AddFormToArray("Jail::Cells[Haafingar]", Game.GetForm(0x36897)) ; Jail Cell 01 (Original)
+;     miscVars.AddFormToArray("Jail::Cells[Haafingar]", GetFormFromMod(0x3880)) ; Jail Cell 02
+;     miscVars.AddFormToArray("Jail::Cells[Haafingar]", GetFormFromMod(0x3879)) ; Jail Cell 03
+;     miscVars.AddFormToArray("Jail::Cells[Haafingar]", GetFormFromMod(0x3881)) ; Jail Cell 04
+;     miscVars.AddFormToArray("Jail::Cells[Haafingar]", GetFormFromMod(0x3882)) ; Jail Cell 05
+;     miscVars.AddFormToArray("Jail::Cells[Haafingar]", GetFormFromMod(0x3883)) ; Jail Cell 06
+;     miscVars.AddFormToArray("Jail::Cells[Haafingar]", GetFormFromMod(0x3884)) ; Jail Cell 07 (Bjartur Cell)
+
+;     miscVars.AddFormToArray("Jail::Cells[Hjaalmarch]", Game.GetForm(0x3EF08)) ; Jail Cell 01
+
+;     ; missing The Reach markers (Markarth)
+
+;     miscVars.AddFormToArray("Jail::Cells[The Rift]", Game.GetForm(0x6128D)) ; Jail Cell 01 (Original)
+;     ; miscVars.AddFormToArray("Jail::Cells[The Rift]", GetFormFromMod(0x388D)) ; Jail Cell 02 (Threki the Innocent)
+;     miscVars.AddFormToArray("Jail::Cells[The Rift]", GetFormFromMod(0x388E)) ; Jail Cell 03
+;     ; miscVars.AddFormToArray("Jail::Cells[The Rift]", GetFormFromMod(0x388F)) ; Jail Cell 04 (Sibbi's Cell [RESERVED])
+;     miscVars.AddFormToArray("Jail::Cells[The Rift]", GetFormFromMod(0x3890)) ; Jail Cell 05
+;     miscVars.AddFormToArray("Jail::Cells[The Rift]", GetFormFromMod(0x3893)) ; Jail Cell 06
+;     miscVars.AddFormToArray("Jail::Cells[The Rift]", GetFormFromMod(0x3894)) ; Jail Cell 07
+;     miscVars.AddFormToArray("Jail::Cells[The Rift]", GetFormFromMod(0x3895)) ; Jail Cell 08
+
+;     miscVars.AddFormToArray("Jail::Cells[The Pale]", GetFormFromMod(0x3896)) ; Jail Cell 01
+
+;     int i = 0
+;     while (i < Holds.Length)
+;         string hold = Holds[i]
+;         if (miscVars.Exists("Jail::Cells["+ hold +"]"))
+;             miscVars.AddToContainer("Jail::Cells", "Jail::Cells["+ hold +"]")
+;             Debug(self, "Config::SetJailCells", "Added " + "Jail::Cells["+ hold +"]" + " to container: " + "Jail::Cells" + " (container length: "+ miscVars.GetLengthOf("Jail::Cells") +")\n")
+;         endif
+;         i += 1
+;     endWhile
+
+;     EndBenchmark(x, "SetJailCells", ENABLE_BENCHMARK)
+;     return true
+; endFunction
 
 Form function GetJailTeleportReleaseMarker(string hold)
     if (!miscVars.Exists("Jail::Release::Teleport["+ hold +"]"))
@@ -431,7 +491,7 @@ endFunction
 
 ; To be refactored into the Jail or Imprisoned script
 ObjectReference function GetRandomJailMarker(string hold)
-    Form[] markers = GetJailMarkers(hold)
+    Form[] markers = RPB_Data.GetJailMarkers(hold) ; To be tested, probably not working now
     if (!markers)
         MCM.Error("Config::getJailMakers", "The markers do not exist!")
         return none

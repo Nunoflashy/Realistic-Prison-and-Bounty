@@ -90,7 +90,8 @@ RealisticPrisonAndBounty_CaptorRef property CaptorRef auto
 
 RPB_ActiveMagicEffectContainer property ArresteeList
     RPB_ActiveMagicEffectContainer function get()
-        return Config.MainAPI as RPB_ActiveMagicEffectContainer
+        ; return Config.MainAPI as RPB_ActiveMagicEffectContainer
+        return self.GetAliasByName("ArresteeList") as RPB_ActiveMagicEffectContainer
     endFunction
 endProperty
 
@@ -106,23 +107,25 @@ endProperty
     it also makes it possible to manage the lifetime of this object through an individual Arrestee script attached to the Actor,
     instead of managing it in some other script and checking for the Actor's state.
 /;
-RPB_ActiveMagicEffectContainer property ArrestedActors ; ArrestList extends RPB_ActiveMagicEffectContainer or something
-    RPB_ActiveMagicEffectContainer function get()
-        return Config.MainAPI as RPB_ActiveMagicEffectContainer
+RPB_ArresteeList property ArrestedActors ; ArrestList extends RPB_ActiveMagicEffectContainer or something
+    RPB_ArresteeList function get()
+        ; return Config.MainAPI as RPB_ActiveMagicEffectContainer
+        return self.GetAliasByName("ArresteeList") as RPB_ArresteeList
     endFunction
 endProperty
 
-RPB_ActiveMagicEffectContainer property Captors ; Should have a script of type RPB_CaptorList extends RPB_ActiveMagicEffectContainer or something
-    RPB_ActiveMagicEffectContainer function get()
-        return Config.MainAPI as RPB_ActiveMagicEffectContainer
+RPB_CaptorList property Captors ; Should have a script of type RPB_CaptorList extends RPB_ActiveMagicEffectContainer or something
+    RPB_CaptorList function get()
+        ; return Config.MainAPI as RPB_ActiveMagicEffectContainer
+        return self.GetAliasByName("CaptorList") as RPB_CaptorList ; TODO: Change to CaptorList
     endFunction
 endProperty
 
-RPB_ActiveMagicEffectContainer property Prisons
-    RPB_ActiveMagicEffectContainer function get()
-        return Config.MainAPI as RPB_ActiveMagicEffectContainer
-    endFunction
-endProperty
+; RPB_ActiveMagicEffectContainer property Prisons
+;     RPB_ActiveMagicEffectContainer function get()
+;         return Config.MainAPI as RPB_ActiveMagicEffectContainer
+;     endFunction
+; endProperty
 
 ; RPB_Arrestee function RegisterArrestee(Actor akArrestee)
 ;     Spell arresteeSpell = GetFormFromMod(0x187B3) as Spell
@@ -169,7 +172,7 @@ function UnregisterArrestedActor(Actor akArrestee)
     string containerKey = "Arrestee["+ akArrestee.GetFormID() +"]"
 
     if (arresteeRef)
-        ArrestedActors.Remove(containerKey)
+        ArrestedActors.Remove(arresteeRef)
     endif
 endFunction
 
@@ -192,7 +195,7 @@ function UnregisterCaptor(Actor akCaptor)
     string containerKey = "Captor["+ akCaptor.GetFormID() +"]"
 
     if (captor)
-        Captors.Remove(containerKey)
+        Captors.Remove(captor)
     endif
 endFunction
 
@@ -328,18 +331,53 @@ event OnKeyDown(int keyCode)
         ; sceneManager.StartEscortFromCell(ArrestVars.Captor, ArrestVars.Arrestee, ArrestVars.CellDoor, ArrestVars.PrisonerItemsContainer)
         ; Debug(self, "Arrest::OnKeyDown", "F10 Pressed - SceneManager")
 
-    elseif (keyCode == 0x42)
-        Debug(self, "Arrest::OnKeyDown", "F8 Pressed")
-        RPB_ActiveMagicEffectContainer prisonerList = Config.MainAPI as RPB_ActiveMagicEffectContainer
-        Debug(none, "Arrest::OnKeyDown", "Prisoner Keys: " + prisonerList.GetKeys())
+    elseif (keyCode == 0x41) ; F7
+        Debug(self, "Arrest::OnKeyDown", "F7 Pressed")
+
+        int rootItem            = RPB_Data.GetRootObject()
+        int haafingarRootItem   = RPB_Data.GetRootObject("Haafingar")
+        int haafingarJailItem   = RPB_Data.GetHoldJailObject(haafingarRootItem)
+
+        Form[] jailCellParents = RPB_Data.GetJailCellParents(haafingarJailItem)
 
         int i = 0
-        ActiveMagicEffect[] prisonersAsArray =  prisonerList.GetAsArray()
-        while (i < prisonersAsArray.Length)
-            RPB_Prisoner prisonerRef = prisonersAsArray[i] as RPB_Prisoner
-            Debug(none, "Arrest::OnKeyDown", "IsStrippedNaked: " + prisonerRef.IsStrippedNaked + ", IsStrippedToUnderwear: " + prisonerRef.IsStrippedToUnderwear)
+        while (i < jailCellParents.Length)
+            RPB_JailCell jailCell = jailCellParents[i] as RPB_JailCell
+            int jailCellParentObject = RPB_Data.GetRawObject_JailCellParent(haafingarJailItem, jailCell)
             i += 1
         endWhile
+
+    elseif (keyCode == 0x42) ; F8
+        Debug(self, "Arrest::OnKeyDown", "F8 Pressed")
+
+        int rootItem = RPB_Data.GetRootObject()
+        int haafingarRootItem = RPB_Data.GetRootObject("Haafingar")
+        int haafingarJailItem = RPB_Data.GetHoldJailObject(haafingarRootItem)
+        ; Config.AddJailCellMarker(Config.Player, haafingarJailItem, "Interior", true)
+        ; Form[] forms = Config.GetJailCellParentMarkers(haafingarJailItem, "Interior")
+        Form[] forms = RPB_Data.GetJailCellParents(haafingarJailItem)
+
+        int i = 0
+        while (i < forms.Length)
+            ; Config.GetJailCellChildMarkers(haafingarJailItem, forms[i])
+            ; Config.GetJailCellChildMarkers(haafingarJailItem, forms[i], "Exterior")
+            RPB_Data.GetJailCellChildren(haafingarJailItem, forms[i], "Interior")
+            RPB_Data.GetJailCellChildren(haafingarJailItem, forms[i], "Exterior")
+            i += 1
+        endWhile
+        ; Config.SaveData()
+
+        return
+        Debug(none, "Arrest::OnKeyDown", "Prisoner Keys: " + ArresteeList.GetKeys())
+        Debug(none, "Arrest::OnKeyDown", "Cities: " + Config.Cities)
+
+        ; int i = 0
+        ; ActiveMagicEffect[] prisonersAsArray =  ArresteeList.GetAsArray()
+        ; while (i < prisonersAsArray.Length)
+        ;     RPB_Prisoner prisonerRef = prisonersAsArray[i] as RPB_Prisoner
+        ;     Debug(none, "Arrest::OnKeyDown", "IsStrippedNaked: " + prisonerRef.IsStrippedNaked + ", IsStrippedToUnderwear: " + prisonerRef.IsStrippedToUnderwear)
+        ;     i += 1
+        ; endWhile
 
         return
         ; Actor solitudeGuard = Game.GetFormEx(0xF684E) as Actor
@@ -727,10 +765,10 @@ RPB_Arrestee function GetArrestedActorReference(Actor akArrestee)
 endFunction
 
 RPB_Arrestee function GetArresteeReference(Actor akArrestee)
-    RPB_ActiveMagicEffectContainer ActiveMagicEffectList = Config.MainAPI as RPB_ActiveMagicEffectContainer
+    ; RPB_ActiveMagicEffectContainer ActiveMagicEffectList = Config.MainAPI as RPB_ActiveMagicEffectContainer
     string arresteeKey = "Arrestee["+ akArrestee.GetFormID() +"]"
 
-    RPB_Arrestee arresteeRef = ActiveMagicEffectList.GetAt(arresteeKey) as RPB_Arrestee
+    RPB_Arrestee arresteeRef = ArresteeList.GetAt(arresteeKey) as RPB_Arrestee
 
     if (!arresteeRef)
         Warn(self, "Arrest::GetArresteeReference", "The Actor " + akArrestee + " is not arrested or there was a state mismatch!")
@@ -739,6 +777,20 @@ RPB_Arrestee function GetArresteeReference(Actor akArrestee)
 
     return arresteeRef
 endFunction
+
+; RPB_Arrestee function GetArresteeReference(Actor akArrestee)
+;     RPB_ActiveMagicEffectContainer ActiveMagicEffectList = Config.MainAPI as RPB_ActiveMagicEffectContainer
+;     string arresteeKey = "Arrestee["+ akArrestee.GetFormID() +"]"
+
+;     RPB_Arrestee arresteeRef = ActiveMagicEffectList.GetAt(arresteeKey) as RPB_Arrestee
+
+;     if (!arresteeRef)
+;         Warn(self, "Arrest::GetArresteeReference", "The Actor " + akArrestee + " is not arrested or there was a state mismatch!")
+;         return none
+;     endif
+
+;     return arresteeRef
+; endFunction
 
 RPB_Captor function GetCaptorReference(Actor akCaptor)
     string listKey = "Captor["+ akCaptor.GetFormID() +"]"

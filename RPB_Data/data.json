@@ -1,0 +1,337 @@
+{
+  "Eastmarch": {
+    "City": "Windhelm",
+    "Crime Faction": "__formData|Skyrim.esm|0x267e3",
+    "Jail": {
+      "Cells": {
+        "Exterior": {
+          "0x388C": [
+            "__formData|RealisticPrisonAndBounty.esp|0x388c"
+          ],
+          "0x58CF8": [
+            "__formData|RealisticPrisonAndBounty.esp|0x388b"
+          ]
+        },
+        "Interior": {
+          "0x388A": [
+            "__formData|Skyrim.esm|0x388a"
+          ],
+          "0x388B": [
+            "__formData|Skyrim.esm|0x388b"
+          ],
+          "0x388C": [
+            "__formData|Skyrim.esm|0x388c"
+          ],
+          "0x58CF8": [
+            "__formData|Skyrim.esm|0x58cf8"
+          ]
+        }
+      },
+      "Prisoner Containers": [
+        "__formData|Skyrim.esm|0x3ef19"
+      ],
+      "Release": {
+        "Escort": [
+          "__formData|Skyrim.esm|0x3ef19"
+        ],
+        "Teleport": [
+          "__formData|Skyrim.esm|0x3ef19"
+        ]
+      }
+    },
+    "Locations": [
+      "__formData|Skyrim.esm|0x18a57",
+      "__formData|Skyrim.esm|0x1676a"
+    ]
+  },
+  "Falkreath": {
+    "City": "Falkreath",
+    "Crime Faction": "__formData|Skyrim.esm|0x267e3",
+    "Jail": {
+      "Cells": {
+        "Exterior": [],
+        "Interior": [
+          "__formData|Skyrim.esm|0x3ef07"
+        ]
+      },
+      "Prisoner Containers": [
+        "__formData|Skyrim.esm|0x3ef19"
+      ],
+      "Release": {
+        "Escort": [
+          "__formData|Skyrim.esm|0x3ef19"
+        ],
+        "Teleport": [
+          "__formData|Skyrim.esm|0x3ef19"
+        ]
+      }
+    },
+    "Locations": [
+      "__formData|Skyrim.esm|0x18a57",
+      "__formData|Skyrim.esm|0x1676a"
+    ]
+  },
+  "Haafingar": {
+    "City": "Solitude",
+    "Crime Faction": "__formData|Skyrim.esm|0x267e3",
+    "Jail": {
+      "Guards": [
+        "__formData|Skyrim.esm|0x7DF2",
+        "__formData|Skyrim.esm|0x7DF4"
+      ],
+      "Cells": {
+        "__metaInfo": {
+          "typeName": "JFormMap"
+        },
+        "__formData|Skyrim.esm|0x36897": {
+          "Main Interior": "__formData|Skyrim.esm|0x36897",
+          "Exterior": [
+            "__formData|RealisticPrisonAndBounty.esp|0x1DDD0",
+            "__formData|RealisticPrisonAndBounty.esp|0x1DDD1",
+            "__formData|RealisticPrisonAndBounty.esp|0x1DDD2"
+          ],
+          "Interior": [
+
+          ]
+        },
+        "__formData|RealisticPrisonAndBounty.esp|0x3879": {
+          "Main Interior": "__formData|RealisticPrisonAndBounty.esp|0x3879",
+          "Main Exterior": null,
+		  "Objects": {
+			"Beds": [
+				"__formData|Skyrim.esm|0xCE7EB"
+			],
+			"Containers": [
+				"__formData|RealisticPrisonAndBounty.esp|0x1DDD6"
+			],
+			"Props": []
+          },
+		  "Options": {
+            "Scan": {
+              "Interior Radius": 300.0,
+              "Exterior Radius": 200.0,
+              "Iterations": 5
+            }
+          },
+          "Exterior": [
+            "__formData|RealisticPrisonAndBounty.esp|0x1DDD6",
+            "__formData|RealisticPrisonAndBounty.esp|0x1DDD7",
+            "__formData|RealisticPrisonAndBounty.esp|0x1DDD8"
+          ],
+          "Interior": [
+
+          ]
+        },
+        "__formData|RealisticPrisonAndBounty.esp|0x3880": {
+          "Main Interior": "__formData|RealisticPrisonAndBounty.esp|0x3880",
+          "Main Exterior": null,
+          "Objects": {
+			"Beds": [
+		
+			],
+			"Containers": [],
+			"Props": []
+          },
+          "Options": {
+            "Allow Overcrowding": true,
+            "Maximum Prisoners": 2,
+            "Scan": {
+              "Interior Radius": 500.0,
+              "Exterior Radius": 200.0,
+              "Iterations": 5
+            }
+          },
+          "Exterior": [
+            "__formData|RealisticPrisonAndBounty.esp|0x1DDD3",
+            "__formData|RealisticPrisonAndBounty.esp|0x1DDD4",
+            "__formData|RealisticPrisonAndBounty.esp|0x1DDD5"
+          ],
+          "Interior": [
+
+          ]
+        },
+        "__formData|RealisticPrisonAndBounty.esp|0x3881": {
+          "Main Interior": "__formData|RealisticPrisonAndBounty.esp|0x3881",
+          "Main Exterior": null,
+          "Exterior": [
+            "__formData|RealisticPrisonAndBounty.esp|0x1DDD9",
+            "__formData|RealisticPrisonAndBounty.esp|0x1DDDA",
+            "__formData|RealisticPrisonAndBounty.esp|0x1DDDB"
+          ],
+          "Interior": [
+
+          ]
+        },
+        "__formData|RealisticPrisonAndBounty.esp|0x3882": {
+          "Main Interior": "__formData|RealisticPrisonAndBounty.esp|0x3882",
+          "Main Exterior": null,
+          "Exterior": [
+            "__formData|RealisticPrisonAndBounty.esp|0x1DDDC",
+            "__formData|RealisticPrisonAndBounty.esp|0x1DDDD",
+            "__formData|RealisticPrisonAndBounty.esp|0x1DDDE"
+          ],
+          "Interior": [
+
+          ]
+        },
+        "__formData|RealisticPrisonAndBounty.esp|0x3883": {
+          "Main Interior": "__formData|RealisticPrisonAndBounty.esp|0x3883",
+          "Main Exterior": null,
+          "Exterior": [
+            "__formData|RealisticPrisonAndBounty.esp|0x1DDDF",
+            "__formData|RealisticPrisonAndBounty.esp|0x1DDE0",
+            "__formData|RealisticPrisonAndBounty.esp|0x1DDE1"
+          ],
+          "Interior": [
+
+          ]
+        },
+        "__formData|RealisticPrisonAndBounty.esp|0x3884": {
+          "Main Interior": "__formData|RealisticPrisonAndBounty.esp|0x3884",
+          "Main Exterior": null,
+          "Exterior": [
+            "__formData|RealisticPrisonAndBounty.esp|0x1DDE2",
+            "__formData|RealisticPrisonAndBounty.esp|0x1DDE3",
+            "__formData|RealisticPrisonAndBounty.esp|0x1DDE4"
+          ],
+          "Interior": [
+
+          ]
+        }
+      },
+      "Prisoner Containers": [
+        "__formData|Skyrim.esm|0x3ef19"
+      ],
+      "Release": {
+        "Escort": [
+          "__formData|Skyrim.esm|0x3ef19"
+        ],
+        "Teleport": [
+          "__formData|Skyrim.esm|0x3ef19"
+        ]
+      }
+    },
+    "Locations": [
+      "__formData|Skyrim.esm|0x18a57",
+      "__formData|Skyrim.esm|0x1676a"
+    ]
+  },
+  "Hjaalmarch": {
+    "City": "Morthal",
+    "Crime Faction": "__formData|Skyrim.esm|0x267e3",
+    "Jail": {
+      "Cells": {
+        "Exterior": [],
+        "Interior": [
+          "__formData|Skyrim.esm|0x3ef08"
+        ]
+      },
+      "Prisoner Containers": [
+        "__formData|Skyrim.esm|0x3ef19"
+      ],
+      "Release": {
+        "Escort": [
+          "__formData|Skyrim.esm|0x3ef19"
+        ],
+        "Teleport": [
+          "__formData|Skyrim.esm|0x3ef19"
+        ]
+      }
+    },
+    "Locations": [
+      "__formData|Skyrim.esm|0x18a57",
+      "__formData|Skyrim.esm|0x1676a"
+    ]
+  },
+  "The Pale": {
+    "City": "Dawnstar",
+    "Crime Faction": "__formData|Skyrim.esm|0x267e3",
+    "Jail": {
+      "Cells": {
+        "Exterior": [],
+        "Interior": [
+          "__formData|RealisticPrisonAndBounty.esp|0x3896"
+        ]
+      },
+      "Prisoner Containers": [
+        "__formData|Skyrim.esm|0x3ef19"
+      ],
+      "Release": {
+        "Escort": [
+          "__formData|Skyrim.esm|0x3ef19"
+        ],
+        "Teleport": [
+          "__formData|Skyrim.esm|0x3ef19"
+        ]
+      }
+    },
+    "Locations": [
+      "__formData|Skyrim.esm|0x18a57",
+      "__formData|Skyrim.esm|0x1676a"
+    ]
+  },
+  "The Rift": {
+    "City": "Riften",
+    "Crime Faction": "__formData|Skyrim.esm|0x267e3",
+    "Jail": {
+      "Cells": {
+        "Exterior": [],
+        "Interior": [
+          "__formData|Skyrim.esm|0x6128d",
+          "__formData|RealisticPrisonAndBounty.esp|0x388d",
+          "__formData|RealisticPrisonAndBounty.esp|0x388e",
+          "__formData|RealisticPrisonAndBounty.esp|0x388f",
+          "__formData|RealisticPrisonAndBounty.esp|0x3890",
+          "__formData|RealisticPrisonAndBounty.esp|0x3893",
+          "__formData|RealisticPrisonAndBounty.esp|0x3894",
+          "__formData|RealisticPrisonAndBounty.esp|0x3895"
+        ]
+      },
+      "Prisoner Containers": [
+        "__formData|Skyrim.esm|0x3ef19"
+      ],
+      "Release": {
+        "Escort": [
+          "__formData|Skyrim.esm|0x3ef19"
+        ],
+        "Teleport": [
+          "__formData|Skyrim.esm|0x3ef19"
+        ]
+      }
+    },
+    "Locations": [
+      "__formData|Skyrim.esm|0x18a57",
+      "__formData|Skyrim.esm|0x1676a"
+    ]
+  },
+  "Whiterun": {
+    "City": "Whiterun",
+    "Crime Faction": "__formData|Skyrim.esm|0x267e3",
+    "Jail": {
+      "Cells": {
+        "Exterior": [],
+        "Interior": [
+          "__formData|RealisticPrisonAndBounty.esp|0x3885",
+          "__formData|RealisticPrisonAndBounty.esp|0x3886",
+          "__formData|RealisticPrisonAndBounty.esp|0x3887",
+          "__formData|RealisticPrisonAndBounty.esp|0x3888"
+        ]
+      },
+      "Prisoner Containers": [
+        "__formData|Skyrim.esm|0x3ef19"
+      ],
+      "Release": {
+        "Escort": [
+          "__formData|Skyrim.esm|0x3ef19"
+        ],
+        "Teleport": [
+          "__formData|Skyrim.esm|0x3ef19"
+        ]
+      }
+    },
+    "Locations": [
+      "__formData|Skyrim.esm|0x18a57",
+      "__formData|Skyrim.esm|0x1676a"
+    ]
+  }
+}

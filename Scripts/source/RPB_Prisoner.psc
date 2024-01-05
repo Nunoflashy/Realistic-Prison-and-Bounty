@@ -35,18 +35,6 @@ RPB_JailCell property JailCell
     endFunction
 endProperty
 
-
-;/
-    This Prison relation would also allow to retrieve the prison cells from it, like: Prison.GetPrisonCells(), return type: RPB_PrisonCell[]
-    then this prisoner could have it retrieved as such:
-
-    RPB_PrisonCell property PrisonCell
-        RPB_PrisonCell function get()
-            return Prison.GetPrisonCells().WherePrisonerIs(akPrisoner = this) ; something like this
-        endFunction
-    endProperty
-/;
-
 float property CurrentTime
     float function get()
         return Utility.GetCurrentGameTime()
@@ -912,7 +900,7 @@ endFunction
 function MoveToCell(bool abBeginImprisonment = true)
     wasMoved = true
 
-    this.MoveTo(self.GetCell())
+    this.MoveTo(self.JailCell)
 
     if (abBeginImprisonment)
         if (Prison.IsPrisonerQueuedForImprisonment(self))
@@ -1215,6 +1203,7 @@ function LockPrisonerSettings()
     Prison_SetFloat("Outfit::Minimum Bounty",                       Prison.OutfitMinimumBounty, "Clothing")
     Prison_SetFloat("Outfit::Maximum Bounty",                       Prison.OutfitMaximumBounty, "Clothing")
 
+    ; ArrestVars.Serialize("Prisoner#" + self.GetIdentifier())
     hasSettingsLocked = true
 endFunction
 

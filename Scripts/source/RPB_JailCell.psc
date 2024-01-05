@@ -42,6 +42,38 @@ RPB_CellDoor property CellDoor
     endFunction
 endProperty
 
+RPB_JailCell property ParentInteriorMarker
+    RPB_JailCell function get()
+        return self
+    endFunction
+endProperty
+
+Form[] __interiorMarkers
+Form[] property InteriorMarkers
+    Form[] function get()
+        return __interiorMarkers
+    endFunction
+endProperty
+
+Form[] __exteriorMarkers
+Form[] property ExteriorMarkers
+    Form[] function get()
+        return __exteriorMarkers
+    endFunction
+endProperty
+
+bool property HasInteriorMarkers
+    bool function get()
+        return self.InteriorMarkers.Length > 0
+    endFunction
+endProperty
+
+bool property HasExteriorMarkers
+    bool function get()
+        return self.ExteriorMarkers.Length > 0
+    endFunction
+endProperty
+
 ; The prisoners living in this cell
 RPB_Prisoner[] __prisoners
 RPB_Prisoner[] property Prisoners
@@ -54,6 +86,9 @@ endProperty
 Form[] __beds
 Form[] property Beds
     Form[] function get()
+        if (!__beds)
+            __beds = self.GetConfigObjects("Beds")
+        endif
         return __beds
     endFunction
 endProperty
@@ -111,7 +146,16 @@ bool property IsOvercrowded
 endProperty
 
 ; Whether to allow more prisoners to live in this cell (despite there not being enough beds for all, this bypasses that.)
-bool property AllowOvercrowding auto
+bool __allowOvercrowding
+bool property AllowOvercrowding
+    bool function get()
+        if (!__allowOvercrowding)
+            __allowOvercrowding = self.GetOptionBool("Allow Overcrowding")
+        endif
+
+        return __allowOvercrowding
+    endFunction
+endProperty
 
 bool property IsAvailable
     bool function get()
@@ -139,6 +183,16 @@ bool property IsGenderExclusive
     endFunction
 endProperty
 
+; ==========================================================
+;                       Private Getters
+; ==========================================================
+
+bool __scannedBeds
+bool __scannedContainers
+bool __scannedOtherProps
+
+; ==========================================================
+
 ; Not yet used, since the caller needs a reference to Prisoner to pass to SetExclusiveToPrisonerSex
 ; Workaround might be to store the first prisoner reference just for this purpose, so we don't retrieve it twice and waste cycles/performance
 bool property ShouldBeGenderExclusive
@@ -153,10 +207,61 @@ endProperty
 
 
 ; The approximate size of this cell from the center point (this reference) as a radius
-float property CellRadius auto
+float __cellRadius
+float property CellRadius
+    float function get()
+        if (!__cellRadius)
+            __cellRadius = self.GetOptionFloat("Interior Radius", "Scan")
+        endif
+
+        return __cellRadius
+    endFunction
+endProperty
+
+; The amount of times a scan should be performed
+int __scanIterations
+int property ScanIterations
+    int function get()
+        if (!__scanIterations)
+            __scanIterations = self.GetOptionInt("Iterations", "Scan")
+        endif
+
+        return __scanIterations
+    endFunction
+endProperty
 
 ; How many prisoners can this jail cell take (if AllowOvercrowding is false)
-int property MaxPrisoners auto
+int __maxPrisoners
+int property MaxPrisoners
+    int function get()
+        if (!__maxPrisoners)
+            __maxPrisoners = self.GetOptionInt("Maximum Prisoners")
+
+            if (!__maxPrisoners)
+                ; Since there's no Max Prisoners property, make the max the same as the number of beds in the cell
+                __maxPrisoners = self.GetConfigObjects("Beds").Length
+
+                ; Default to 1 if no config found
+                if (!__maxPrisoners)
+                    __maxPrisoners = 1
+                endif
+
+            endif
+        endif
+
+        return __maxPrisoners
+    endFunction
+
+    function set(int value)
+        int configOption = self.GetOptionInt("Maximum Prisoners")
+
+        if (configOption)
+            LogProperty(none, "JailCell::MaxPrisoners", "Property is retrieved from data file, make sure the value is supposed to be changing!")
+        endif
+
+        __maxPrisoners = value
+    endFunction
+endProperty
 
 int __prisonersInCell
 Form[] property PrisonersInCell
@@ -175,6 +280,46 @@ endProperty
 
 ObjectReference function GetCellObject(Keyword akPropType)
 
+endFunction
+
+function DetermineMarkers()
+    int jailItem = Prison.GetDataObject()
+    ; Form[] interiorChildMarkers = Config.GetJailCellChildMarkers(jailItem, self, "Interior")
+    ; Form[] exteriorChildMarkers = Config.GetJailCellChildMarkers(jailItem, self, "Exterior")
+
+    Form[] interiorChildMarkers = RPB_Data.JailCell_GetChildren(Prison.GetDataObject("Cells"), self, "Interior")
+    Form[] exteriorChildMarkers = RPB_Data.JailCell_GetChildren(Prison.GetDataObject("Cells"), self, "Exterior")
+
+    Debug(none, "[Prison: "+ self.Prison.City +"] JailCell::DetermineMarkers", "Cell: " + self + ", Main Marker: " + RPB_Data.JailCell_GetMainMarker(Prison.GetDataObject("Cells"), self))
+    Debug(none, "[Prison: "+ self.Prison.City +"] JailCell::DetermineMarkers", "Cell: " + self + ", interiorChildMarkers: " + interiorChildMarkers)
+    Debug(none, "[Prison: "+ self.Prison.City +"] JailCell::DetermineMarkers", "Cell: " + self + ", exteriorChildMarkers: " + exteriorChildMarkers)
+
+    ; Convert to JArray
+    int arrayInteriorChildMarkers = JArray.objectWithForms(interiorChildMarkers)
+    int arrayExteriorChildMarkers = JArray.objectWithForms(exteriorChildMarkers)
+
+    ; Debug(none, "[Prison: "+ self.Prison.City +"] JailCell::DetermineMarkers", "arrayInteriorChildMarkers: " + GetContainerList(arrayInteriorChildMarkers))
+    ; Debug(none, "[Prison: "+ self.Prison.City +"] JailCell::DetermineMarkers", "arrayExteriorChildMarkers: " + GetContainerList(arrayExteriorChildMarkers))
+
+    int arrayAllInteriorMarkers = JArray.object()
+    int arrayAllExteriorMarkers = JArray.object()
+    
+    ; Add parent
+    JArray.addForm(arrayAllInteriorMarkers, self)
+
+    ; Merge the arrays
+    JArray.addFromArray(arrayAllInteriorMarkers, arrayInteriorChildMarkers)
+    JArray.addFromArray(arrayAllExteriorMarkers, arrayExteriorChildMarkers)
+
+    ; Debug(none, "[Prison: "+ self.Prison.City +"] JailCell::DetermineMarkers", "arrayAllInteriorMarkers: " + GetContainerList(arrayAllInteriorMarkers))
+    ; Debug(none, "[Prison: "+ self.Prison.City +"] JailCell::DetermineMarkers", "arrayAllExteriorMarkers: " + GetContainerList(arrayAllExteriorMarkers))
+
+    ; Set properties
+    __interiorMarkers       = JArray.asFormArray(arrayAllInteriorMarkers)
+    __exteriorMarkers       = JArray.asFormArray(arrayAllExteriorMarkers)
+    
+    Debug(none, "[Prison: "+ self.Prison.City +"] JailCell::DetermineMarkers", "InteriorMarkers: " + InteriorMarkers)
+    Debug(none, "[Prison: "+ self.Prison.City +"] JailCell::DetermineMarkers", "ExteriorMarkers: " + ExteriorMarkers)
 endFunction
 
 ; =========================================================
@@ -216,18 +361,6 @@ function Scan()
 
 endFunction
 
-ObjectReference function GetBedExcept(Form akBedBase, ObjectReference akCenterPoint, float afRadius, Form akExceptBed = none)
-    int i = 0
-    while (i < 20)
-        ObjectReference scannedBed = Game.FindRandomReferenceOfTypeFromRef(akBedBase, akCenterPoint, afRadius)
-        if (scannedBed.GetFormID() != akExceptBed.GetFormID())
-            return scannedBed
-        endif
-
-        i += 1
-    endWhile
-endFunction
-
 ; Unreliable, since it can scan beds from other cells that are near one of the scanned beds in this cell. (this is because beds are not in the same place on all the cells, and the radius of the scan will get other beds from other cells.)
 function ScanBeds()
     int bedExclusions   = JMap.object()
@@ -236,12 +369,15 @@ function ScanBeds()
     Form bedRollHay01 = Game.GetFormEx(0x1899D)
     FormList RPB_BedFormList = GetFormFromMod(0x1CDAA) as FormList
 
+    Debug(self, "[Prison: "+ self.Prison.City +"] JailCell::ScanBeds", "Scan Iterations: " + self.ScanIterations + ", Cell Radius: " + self.CellRadius)
+
+
     int i = 0
-    while (i < 5) ; 10 scans
+    while (i < self.ScanIterations)
         ObjectReference scannedBed = Game.FindRandomReferenceOfAnyTypeInListFromRef(RPB_BedFormList, self, self.CellRadius)
 
         if (scannedBed && !JMap.hasKey(bedExclusions, scannedBed.GetFormID()))
-            self.MaxPrisoners += 1
+            ; self.MaxPrisoners += 1
             JMap.setForm(bedExclusions, scannedBed.GetFormID(), scannedBed)
             JArray.addForm(bedsScanned, scannedBed) ; Add the bed to this local array
             Debug(self, "[Prison: "+ self.Prison.City +"] JailCell::ScanBeds", "Scanned " + scannedBed + " (Name: "+ scannedBed.GetBaseObject().GetName() +") Bed in " + self + ", Max Prisoners for this Cell: " + self.MaxPrisoners)
@@ -252,10 +388,11 @@ function ScanBeds()
     ; If there were beds caught in the scan, add it to the cell beds array
     if (JValue.count(bedsScanned) > 0)
         __beds = JArray.asFormArray(bedsScanned)
+        __scannedBeds = true
+        self.MaxPrisoners = JValue.count(bedsScanned)
     endif
 
-    Debug(self, "[Prison: "+ self.Prison.City +"] JailCell::ScanBeds", "Beds in " + self + ": " + self.Beds + " Beds.Length: " + self.Beds.Length)
-    Debug(self, "[Prison: "+ self.Prison.City +"] JailCell::ScanBeds", "Finished bed scan for cell " + self + ", found " + JValue.count(bedExclusions) + " beds.")
+    Debug(self, "[Prison: "+ self.Prison.City +"] JailCell::ScanBeds", "Beds in " + self + ": " + self.Beds)
 endFunction
 
 function ScanContainers()
@@ -264,7 +401,7 @@ function ScanContainers()
     int containersScanned       = JArray.object()
 
     int i = 0
-    while (i < 5)
+    while (i < self.ScanIterations)
         ObjectReference scannedContainer = Game.FindRandomReferenceOfAnyTypeInListFromRef(RPB_ContainerFormList, self, self.CellRadius)
         bool containerExistsInList = JMap.hasKey(containersAlreadyAdded, scannedContainer.GetFormID())
         if (scannedContainer && !containerExistsInList)
@@ -277,10 +414,10 @@ function ScanContainers()
 
     if (JValue.count(containersScanned) > 0)
         __containers = JArray.asFormArray(containersScanned)
+        __scannedContainers = true
     endif
 
     Debug(self, "[Prison: "+ self.Prison.City +"] JailCell::ScanContainers", "Containers in " + self + ": " + self.Containers + " Containers.Length: " + self.Containers.Length)
-    Debug(self, "[Prison: "+ self.Prison.City +"] JailCell::ScanContainers", "Finished container scan for cell " + self + ", found " + JValue.count(containersScanned) + " containers.")
 endFunction
 
 function ScanMiscProps()
@@ -289,7 +426,7 @@ function ScanMiscProps()
     int propsScanned       = JArray.object()
 
     int i = 0
-    while (i < 5)
+    while (i < self.ScanIterations)
         ObjectReference scannedProp = Game.FindRandomReferenceOfAnyTypeInListFromRef(RPB_MiscPropsFormList, self, self.CellRadius)
         bool propExistsInList = JMap.hasKey(propsAlreadyAdded, scannedProp.GetFormID())
         if (scannedProp && !propExistsInList)
@@ -302,10 +439,21 @@ function ScanMiscProps()
 
     if (JValue.count(propsScanned) > 0)
         __otherProps = JArray.asFormArray(propsScanned)
+        __scannedOtherProps = true
     endif
 
-    Debug(self, "[Prison: "+ self.Prison.City +"] JailCell::ScanMiscProps", "Props in " + self + ": " + self.OtherProps + " OtherProps.Length: " + self.OtherProps.Length)
-    Debug(self, "[Prison: "+ self.Prison.City +"] JailCell::ScanMiscProps", "Finished prop scan for cell " + self + ", found " + JValue.count(propsScanned) + " props.")
+    Debug(self, "[Prison: "+ self.Prison.City +"] JailCell::ScanMiscProps", "Props in " + self + ": " + self.OtherProps)
+endFunction
+
+ObjectReference function GetRandomMarker(string asInteriorOrExterior = "Interior")
+    if (asInteriorOrExterior == "Interior")
+        return self.InteriorMarkers[Utility.RandomInt(0, self.InteriorMarkers.Length - 1)] as ObjectReference
+
+    elseif (asInteriorOrExterior == "Exterior")
+        return self.ExteriorMarkers[Utility.RandomInt(0, self.ExteriorMarkers.Length - 1)] as ObjectReference
+    endif
+
+    return none
 endFunction
 
 ; =========================================================
@@ -363,6 +511,26 @@ endEvent
 ;                         Management
 ; =========================================================
 
+bool function ShouldPerformScan(string asScanTarget)
+    if (!self.HasOption("Iterations", "Scan") || !self.HasOption("Interior Radius", "Scan"))
+        ; Iterations and Radius not configured, cannot perform scan
+        return false
+    endif
+
+    if (asScanTarget == "Beds")
+        return !self.HasObjects("Beds") && !self.HasOption("Maximum Prisoners")
+
+    elseif (asScanTarget == "Containers")
+        return !self.HasObjects("Containers")
+
+    elseif (asScanTarget == "Props")
+        return !self.HasObjects("Props")
+    endif
+
+    Error(none, "JailCell::ShouldPerformScan", "Unable to perform scan for the jail cell, the scan target " + asScanTarget + " is invalid!")
+    return false
+endFunction
+
 ;/
     Determines if this JailCell... this should be in CellDoor
 /;
@@ -382,8 +550,8 @@ function BindPrison(RPB_Prison akPrison)
         return
     endif
 
-    ; To be loaded depending on jail cell size
-    self.CellRadius = 300
+    ; ; Assign all of the child markers for this jail cell (Done in RPB_Prison::SetupCells())
+    ; self.DetermineMarkers()
 
     ; Get the cell door belonging to this jail cell (by scanning for the nearest door of the type requested)
     int jailBaseDoorIdForPrison = GetJailBaseDoorID(self.Prison.Hold)
@@ -443,6 +611,39 @@ function DetermineCellParameters()
         ; Unset this cell as being female/male only, as it is now empty
         self.RemoveGenderExclusiveness()
     endif
+endFunction
+
+bool function GetOptionBool(string asOption, string asOptionCategory = "null")
+    return RPB_Data.JailCell_GetOptionOfTypeBool(Prison.GetDataObject("Cells"), self, asOption, asOptionCategory)
+endFunction
+
+int function GetOptionInt(string asOption, string asOptionCategory = "null")
+    return RPB_Data.JailCell_GetOptionOfTypeInt(Prison.GetDataObject("Cells"), self, asOption, asOptionCategory)
+endFunction
+
+float function GetOptionFloat(string asOption, string asOptionCategory = "null")
+    return RPB_Data.JailCell_GetOptionOfTypeFloat(Prison.GetDataObject("Cells"), self, asOption, asOptionCategory)
+endFunction
+
+string function GetOptionString(string asOption, string asOptionCategory = "null")
+    return RPB_Data.JailCell_GetOptionOfTypeString(Prison.GetDataObject("Cells"), self, asOption, asOptionCategory)
+endFunction
+
+Form function GetOptionForm(string asOption, string asOptionCategory = "null")
+    return RPB_Data.JailCell_GetOptionOfTypeForm(Prison.GetDataObject("Cells"), self, asOption, asOptionCategory)
+endFunction
+
+Form[] function GetConfigObjects(string asObjectCategory)
+    return RPB_Data.JailCell_GetObjects(Prison.GetDataObject("Cells"), self, asObjectCategory)
+endFunction
+
+bool function HasOption(string asOption, string asOptionCategory = "null")
+    ; Debug(none, "JailCell::HasOption", self + "["+ asOptionCategory + "::" + asOption +"] Meets Criteria: " + RPB_Data.HasJailCellOption(Prison.GetDataObject(), self, asOption, asOptionCategory))
+    return RPB_Data.JailCell_HasOption(Prison.GetDataObject("Cells"), self, asOption, asOptionCategory)
+endFunction
+
+bool function HasObjects(string asObjectCategory)
+    return RPB_Data.JailCell_HasObjects(Prison.GetDataObject("Cells"), self, asObjectCategory, true)
 endFunction
 
 function DetermineCellAvailability()

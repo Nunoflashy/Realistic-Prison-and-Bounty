@@ -1,4 +1,4 @@
-scriptname RPB_ActiveMagicEffectContainer extends Quest
+scriptname RPB_ActiveMagicEffectContainer extends ReferenceAlias
 
 ;/
     TODO: Sort list after removing an element, or adding it.
@@ -55,11 +55,16 @@ ActiveMagicEffect function GetAt(string asKey)
     return data[arrayIndex]
 endFunction
 
+ActiveMagicEffect function FromIndex(int aiIndex)
+    return data[aiIndex]
+endFunction
+
+
 ActiveMagicEffect[] function GetAsArray()
     return data
 endFunction
 
-function Remove(string asKey, bool dispel = true)
+function protected_remove(string asKey, bool dispel = true)
     int index = JMap.getInt(dataIds, asKey)
 
     if (dispel)
@@ -69,6 +74,17 @@ function Remove(string asKey, bool dispel = true)
     data[index] = none
     JMap.removeKey(dataIds, asKey)
 endFunction
+
+; function Remove(string asKey, bool dispel = true)
+;     int index = JMap.getInt(dataIds, asKey)
+
+;     if (dispel)
+;         data[index].Dispel()
+;     endif
+    
+;     data[index] = none
+;     JMap.removeKey(dataIds, asKey)
+; endFunction
 
 ; function AddAt(ActiveMagicEffect ame, int id)
 ;     self.Initialize()
@@ -118,11 +134,11 @@ function Initialize()
         dataIds = JIntMap.object()
         data = new ActiveMagicEffect[100]
     endif
-    Debug(self, "ActiveMagicEffectList::Initialize", "Initialized list")
+    Debug(none, "ActiveMagicEffectList::Initialize", "Initialized list")
 endFunction
 
 event OnInit()
-    Debug(self, "ActiveMagicEffectList::OnInit", "OnInit")
+    Debug(none, "ActiveMagicEffectList::OnInit", "OnInit")
     dataIds = JMap.object()
     JValue.retain(dataIds)
     data = new ActiveMagicEffect[128]

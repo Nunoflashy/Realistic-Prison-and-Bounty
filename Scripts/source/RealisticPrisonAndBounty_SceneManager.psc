@@ -182,109 +182,26 @@ endProperty
 
 int sceneContainer
 
-function SetupScenes()
-    float x = StartBenchmark()
-    sceneContainer = JMap.object()
-    JMap.setInt(sceneContainer, SCENE_ARREST_START_01,       0xF569) ; Arrest Start 01
-    JMap.setInt(sceneContainer, SCENE_ARREST_START_02,       0xFAF6) ; Arrest Start 02
-    JMap.setInt(sceneContainer, SCENE_ARREST_START_03,       0x130DD) ; Arrest Start 03
-    JMap.setInt(sceneContainer, SCENE_ARREST_START_04,       0x13663) ; Arrest Start 04
-    JMap.setInt(sceneContainer, SCENE_ARREST_START_PRISON_01, 0x14C14)
-    JMap.setInt(sceneContainer, SCENE_ESCORT_TO_JAIL_01,        0xF532) ; Escort to Jail
-    JMap.setInt(sceneContainer, SCENE_ESCORT_TO_JAIL_02,     0x17CDA) ; Escort to Jail 02
-    JMap.setInt(sceneContainer, SCENE_ESCORT_TO_CELL,        0xCF58) ; Escort to Cell 01
-    JMap.setInt(sceneContainer, SCENE_ESCORT_TO_CELL_02,     0x1367D) ; Escort to Cell 02
-    JMap.setInt(sceneContainer, SCENE_ESCORT_FROM_CELL,      0x115E6) ; Escort from Cell
-    ; JMap.setInt(sceneContainer, SCENE_SEARCH_START,          0xF55C) ; SearchStart
-    JMap.setInt(sceneContainer, SCENE_FRISKING,              0xCF5A) ; Frisking
-    ; JMap.setInt(sceneContainer, SCENE_STRIPPING_START,       0xF561) ; Stripping Start
-    JMap.setInt(sceneContainer, SCENE_STRIPPING_01,             0xCF59) ; Stripping
-    JMap.setInt(sceneContainer, SCENE_STRIPPING_02,          0xEA60) ; Stripping 02
-    JMap.setInt(sceneContainer, SCENE_FORCED_STRIPPING_01,   0xF587) ; Forced Stripping 01
-    JMap.setInt(sceneContainer, SCENE_FORCED_STRIPPING_02,   0x120A9) ; Forced Stripping 02
-    JMap.setInt(sceneContainer, SCENE_GIVE_CLOTHING,         0xF52A) ; Give Clothing
-    JMap.setInt(sceneContainer, SCENE_NO_CLOTHING,           0xF571) ; No Clothing
-    JMap.setInt(sceneContainer, SCENE_PAYMENT_FAIL,          0xF54E) ; Bounty Payment Fail
-    JMap.setInt(sceneContainer, SCENE_ELUDING_ARREST_01,     0x12613) ; Eluding Arrest
-    JMap.setInt(sceneContainer, SCENE_RESTRAIN_PRISONER_01,  0x15702) ; Restrain Prisoner 01
-    JMap.setInt(sceneContainer, SCENE_RESTRAIN_PRISONER_02,  0x15C66) ; Restrain Prisoner 02
-    JMap.setInt(sceneContainer, SCENE_ARREST_PAY_BOUNTY_FOLLOW_WILLINGLY,  0x1776B) ; Pay Bounty Follow Willingly
-    JMap.setInt(sceneContainer, SCENE_ARREST_PAY_BOUNTY_FOLLOW_BY_FORCE,  0x1776E) ; Pay Bounty Follow By Force
+int property SceneCount
+    int function get()
+        return JValue.count(sceneContainer)
+    endFunction
+endProperty
 
-    string scenesAdded = ""
-    int i = 0
-    while (i < JValue.count(sceneContainer))
-        scenesAdded += "\t["+i+"]: "+ JMap.getNthKey(sceneContainer, i) +"\n"
-        i += 1
-    endWhile
-    EndBenchmark(x, "SetupScenes")
-    Debug(self, "SceneManager::SetupScenes", "Loaded "+ JValue.count(sceneContainer) +" Scenes: [\n" + scenesAdded + "]")
-    JValue.retain(sceneContainer)
+function AddScene(string asSceneName, int aiSceneFormID)
+    JMap.setInt(sceneContainer, asSceneName, aiSceneFormID)
 endFunction
 
-; function SetupScenes()
-;     float x = StartBenchmark()
-;     string scenes = MiscVars.CreateStringMap("SceneManager/Scenes")
+string function GetSceneNameByIndex(int aiIndex)
+    return JMap.getNthKey(sceneContainer, aiIndex)
+endFunction
 
-;     MiscVars.SetInt(SCENE_ARREST_START_01,          0xF569, scenes)
-;     MiscVars.SetInt(SCENE_ARREST_START_02,          0xFAF6, scenes)
-;     MiscVars.SetInt(SCENE_ARREST_START_03,          0x130DD, scenes)
-;     MiscVars.SetInt(SCENE_ARREST_START_04,          0x13663, scenes)
-;     MiscVars.SetInt(SCENE_ARREST_START_PRISON_01,   0x14C14, scenes)
-;     MiscVars.SetInt(SCENE_ESCORT_TO_JAIL_01,           0xF532, scenes)
-;     MiscVars.SetInt(SCENE_ESCORT_TO_CELL,           0xCF58, scenes)
-;     MiscVars.SetInt(SCENE_ESCORT_TO_CELL_02,        0x1367D, scenes)
-;     MiscVars.SetInt(SCENE_ESCORT_FROM_CELL,         0x115E6, scenes)
-;     ; MiscVars.SetInt(SCENE_SEARCH_START,             0xF55C, scenes)
-;     MiscVars.SetInt(SCENE_FRISKING,                 0xCF5A, scenes)
-;     ; MiscVars.SetInt(SCENE_STRIPPING_START,          0xF561, scenes)
-;     MiscVars.SetInt(SCENE_STRIPPING_01,                0xCF59, scenes)
-;     MiscVars.SetInt(SCENE_STRIPPING_02,             0xEA60, scenes)
-;     MiscVars.SetInt(SCENE_FORCED_STRIPPING_01,      0xF587, scenes)
-;     MiscVars.SetInt(SCENE_FORCED_STRIPPING_02,      0x120A9, scenes)
-;     MiscVars.SetInt(SCENE_GIVE_CLOTHING,            0xF52A, scenes)
-;     MiscVars.SetInt(SCENE_NO_CLOTHING,              0xF571, scenes)
-;     MiscVars.SetInt(SCENE_PAYMENT_FAIL,             0xF54E, scenes)
-;     MiscVars.SetInt(SCENE_ELUDING_ARREST_01,        0x12613, scenes)
-;     MiscVars.SetInt(SCENE_RESTRAIN_PRISONER_01,     0x15702, scenes)
-;     MiscVars.SetInt(SCENE_RESTRAIN_PRISONER_02,     0x15C66, scenes)
+int function GetSceneFormID(string asSceneName)
+    return JMap.getInt(sceneContainer, asSceneName)
+endFunction
 
-;     string scenesAdded = ""
-;     int i = 0
-;     while (i < MiscVars.GetLengthOf(scenes))
-;         scenesAdded += "\t["+i+"]: "+ MiscVars.GetNthKey(scenes, i) +"\n"
-;         i += 1
-;     endWhile
-
-;     EndBenchmark(x, "SetupScenes")
-
-;     Debug(self, "SceneManager::SetupScenes", "Loaded "+ MiscVars.GetLengthOf(scenes) +" Scenes: [\n" + scenesAdded + "]")
-; endFunction
-
-; Scene function GetScene(string name)
-;     float x = StartBenchmark()
-
-;     if (!MiscVars.Exists(name, "SceneManager/Scenes"))
-;         Error(self, "SceneManager::GetScene", "Scene " + name + " does not exist!")
-;         return none
-;     endif
-
-;     Info(self, "SceneManager::GetScene", "Scenes: " + MiscVars.GetLengthOf("SceneManager/Scenes"))
-;     Scene obj = Game.GetFormFromFile(MiscVars.GetInt(name, "SceneManager/Scenes"), GetPluginName()) as Scene
-;     EndBenchmark(x, "GetScene")
-
-;     return obj
-;     ; return Game.GetFormFromFile(JMap.getInt(sceneContainer, name), GetPluginName()) as Scene
-; endFunction
-
-Scene function GetScene(string name)
-    if (!JMap.hasKey(sceneContainer, name))
-        Error(self, "SceneManager::GetScene", "Scene " + name + " does not exist!")
-        return none
-    endif
-
-    Info(self, "SceneManager::GetScene", "Scenes: " + JValue.count(sceneContainer))
-    return Game.GetFormFromFile(JMap.getInt(sceneContainer, name), GetPluginName()) as Scene
+string function GetSceneNameByFormID(int aiSceneFormID)
+    return JMap.getStr(sceneContainer, aiSceneFormID)
 endFunction
 
 bool function SceneExists(string asSceneName)
@@ -303,6 +220,63 @@ bool function IsValidScene(string asSceneCategory, string asSceneName)
 
     endif
 endFunction
+
+function SetupScenes()
+    float x = StartBenchmark()
+
+    if (!sceneContainer)
+        sceneContainer = JMap.object()
+        JValue.retain(sceneContainer)
+    endif
+
+    self.AddScene(SCENE_ARREST_START_01,       0xF569) ; Arrest Start 01
+    self.AddScene(SCENE_ARREST_START_02,       0xFAF6) ; Arrest Start 02
+    self.AddScene(SCENE_ARREST_START_03,       0x130DD) ; Arrest Start 03
+    self.AddScene(SCENE_ARREST_START_04,       0x13663) ; Arrest Start 04
+    self.AddScene(SCENE_ARREST_START_PRISON_01, 0x14C14)
+    self.AddScene(SCENE_ESCORT_TO_JAIL_01,        0xF532) ; Escort to Jail
+    self.AddScene(SCENE_ESCORT_TO_JAIL_02,     0x17CDA) ; Escort to Jail 02
+    self.AddScene(SCENE_ESCORT_TO_CELL,        0xCF58) ; Escort to Cell 01
+    self.AddScene(SCENE_ESCORT_TO_CELL_02,     0x1367D) ; Escort to Cell 02
+    self.AddScene(SCENE_ESCORT_FROM_CELL,      0x115E6) ; Escort from Cell
+    ; self.AddScene(SCENE_SEARCH_START,          0xF55C) ; SearchStart
+    self.AddScene(SCENE_FRISKING,              0xCF5A) ; Frisking
+    ; self.AddScene(SCENE_STRIPPING_START,       0xF561) ; Stripping Start
+    self.AddScene(SCENE_STRIPPING_01,             0xCF59) ; Stripping
+    self.AddScene(SCENE_STRIPPING_02,          0xEA60) ; Stripping 02
+    self.AddScene(SCENE_FORCED_STRIPPING_01,   0xF587) ; Forced Stripping 01
+    self.AddScene(SCENE_FORCED_STRIPPING_02,   0x120A9) ; Forced Stripping 02
+    self.AddScene(SCENE_GIVE_CLOTHING,         0xF52A) ; Give Clothing
+    self.AddScene(SCENE_NO_CLOTHING,           0xF571) ; No Clothing
+    self.AddScene(SCENE_PAYMENT_FAIL,          0xF54E) ; Bounty Payment Fail
+    self.AddScene(SCENE_ELUDING_ARREST_01,     0x12613) ; Eluding Arrest
+    self.AddScene(SCENE_RESTRAIN_PRISONER_01,  0x15702) ; Restrain Prisoner 01
+    self.AddScene(SCENE_RESTRAIN_PRISONER_02,  0x15C66) ; Restrain Prisoner 02
+    self.AddScene(SCENE_ARREST_PAY_BOUNTY_FOLLOW_WILLINGLY,  0x1776B) ; Pay Bounty Follow Willingly
+    self.AddScene(SCENE_ARREST_PAY_BOUNTY_FOLLOW_BY_FORCE,  0x1776E) ; Pay Bounty Follow By Force
+
+    string sceneListAsString = ""
+    int i = 0
+    while (i < SceneCount)
+        ; sceneListAsString += "\t["+i+"]: "+ JMap.getNthKey(sceneContainer, i) +"\n"
+        sceneListAsString += "\t["+i+"]: "+ self.GetSceneNameByIndex(i) +"\n"
+        i += 1
+    endWhile
+    EndBenchmark(x, "SetupScenes")
+    Debug(self, "SceneManager::SetupScenes", "Loaded "+ SceneCount +" Scenes: [\n" + sceneListAsString + "]")
+endFunction
+
+Scene function GetScene(string asSceneName)
+    if (!self.SceneExists(asSceneName))
+        Error(self, "SceneManager::GetScene", "Scene " + asSceneName + " does not exist!")
+        return none
+    endif
+
+    Info(self, "SceneManager::GetScene", "Scenes: " + SceneCount)
+    ; return Game.GetFormFromFile(JMap.getInt(sceneContainer, asSceneName), GetPluginasSceneName()) as Scene
+    return GetFormFromMod(self.GetSceneFormID(asSceneName)) as Scene
+endFunction
+
 
 ; ==========================================================
 ;                      Scene Event Types
@@ -998,6 +972,11 @@ event OnScenePlaying(string name, int phaseEvent, int phase, Scene sender)
         Actor strippedPrisoner  = params[1] as Actor
 
         RetainAI(strippedPrisoner == config.Player)
+
+        RPB_Prison prison               = RPB_Prison.GetPrisonForImprisonedActor(strippedPrisoner)
+        RPB_Prisoner prisonerReference  = prison.GetPrisoner(strippedPrisoner)
+        
+        prison.OnPrisonerStripBegin(prisonerReference, stripperGuard)
 
         jail.OnStripBegin(stripperGuard, strippedPrisoner)
 

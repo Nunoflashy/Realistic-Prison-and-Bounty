@@ -488,9 +488,10 @@ string property Hold
     endFunction
 endProperty
 
+string __city
 string property City
     string function get()
-        return Config.GetCity(self.Hold)
+        return __city
     endFunction
 endProperty
 
@@ -498,13 +499,6 @@ endProperty
 ; ==========================================================
 ;                     Prison Properties
 ; ==========================================================
-
-RPB_Prisoner[] __prisoners
-RPB_Prisoner[] property Prisoners
-    RPB_Prisoner[] function get()
-        return self.GetPrisoners()
-    endFunction
-endProperty
  
 ; Give priority to empty jail cells when placing a prisoner
 bool property PrioritizeEmptyCells auto
@@ -520,6 +514,76 @@ bool property AllowOnlyGenderExclusiveCells auto
 
 ; When assigning a cell to a prisoner, it must either be empty or a gender exclusive cell
 bool property AllowOnlyEmptyOrGenderCells auto
+
+RPB_PrisonerList __prisoners
+RPB_PrisonerList property Prisoners
+    RPB_PrisonerList function get()
+        if (__prisoners)
+            return __prisoners
+        endif
+
+        __prisoners = ((self as ReferenceAlias) as RPB_ActiveMagicEffectContainer) as RPB_PrisonerList
+        LogProperty(none, "Prison::Prisoners", "Initialized with a value of: " + __prisoners)
+        return __prisoners
+    endFunction
+endProperty
+
+Form[] property JailCells
+    Form[] function get()
+        return self.GetJailCells()
+    endFunction
+endProperty
+
+Form[] property EmptyJailCells
+    Form[] function get()
+        return self.GetEmptyJailCells()
+    endFunction
+endProperty
+
+Form[] property AvailableJailCells
+    Form[] function get()
+        return self.GetAvailableJailCells()
+    endFunction
+endProperty
+
+Form[] property FemaleJailCells
+    Form[] function get()
+        return self.GetGenderExclusiveCells("Female")
+    endFunction
+endProperty
+
+Form[] property MaleJailCells
+    Form[] function get()
+        return self.GetGenderExclusiveCells("Male")
+    endFunction
+endProperty
+
+; ==========================================================
+
+RPB_Prison function GetPrisonForImprisonedActor(Actor akImprisonedActor) global
+    RPB_PrisonManager prisonManager = GetFormFromMod(0x1B825) as RPB_PrisonManager
+    RPB_Prison prisonForPrisoner    = prisonManager.GetPrisonForBoundPrisoner(akImprisonedActor)
+
+    return prisonForPrisoner
+endFunction
+
+function BindPrisonerToPrison(RPB_Prisoner akPrisoner, RPB_Prison akPrison) global
+    JDB.solveIntSetter(".rpb_prison.prisoners." + akPrisoner.GetIdentifier(), akPrison.GetID(), true)
+endFunction
+
+RPB_Prison function GetPrisonForBoundPrisoner(Actor akPrisonerActor)
+    int prisonAliasID = JDB.solveInt(".rpb_prison.prisoners." + akPrisonerActor.GetFormID()) ; returns the ID of the Prison alias
+    return (self.GetOwningQuest()).GetAlias(prisonAliasID) as RPB_Prison
+endFunction
+
+Form[] function GetPrisonersInAllPrisons() global
+    int prisonersObj = JDB.solveObj(".rpb_prison.prisoners") ; Should return a int[] with the Prisoners FormID
+    return JArray.asFormArray(prisonersObj)
+endFunction
+
+RPB_Prisoner function GetPrisoner(Actor akPrisonerActor)
+    return self.Prisoners.AtKey(akPrisonerActor)
+endFunction
 
 ; ==========================================================
 ;                         Prisoners
@@ -579,11 +643,23 @@ int __emptyCellsArray
 ; endProperty
 
 ; Must be cast to RPB_JailCell when used to have the properties
+; Form[] function GetJailCells()
+;     return Config.GetJailMarkers(Hold)
+; endFunction
+
 Form[] function GetJailCells()
-    return Config.GetJailMarkers(Hold)
+    ; string rootItemContainer = GetContainerList(rootItem)
+    ; string jailItemContainer = GetContainerList(jailItem)
+    ; Form[] theCells = Config.GetJailCellParentMarkers(jailItem, "Interior")
+    Form[] theCells = RPB_Data.JailCell_GetParents(self.GetDataObject("Cells"))
+
+    ; Debug(none, "Prison::GetJailCells", "Hold: " + self.Hold + ", rootItem: " + rootItem + ", jailItem: " + jailItemContainer + ", theCells: " + theCells)
+
+    return theCells
 endFunction
 
-Form[] function GetEmptyCells()
+
+Form[] function GetEmptyJailCells()
     Form[] cells = self.GetJailCells()
     int emptyCellsArray = JArray.object()
 
@@ -592,7 +668,7 @@ Form[] function GetEmptyCells()
         RPB_JailCell jailCellRef = cells[i] as RPB_JailCell
 
         if (jailCellRef && jailCellRef.IsEmpty)
-            Debug(none, "Prison::GetEmptyCells", "Cell: " + jailCellRef + ", IsEmpty: " + jailCellRef.IsEmpty + ", Gender: " + jailCellRef.IsGenderExclusive)
+            Debug(none, "Prison::GetEmptyJailCells", "Cell: " + jailCellRef + ", IsEmpty: " + jailCellRef.IsEmpty + ", Gender: " + jailCellRef.IsGenderExclusive)
             JArray.addForm(emptyCellsArray, jailCellRef)
         endif
         i += 1
@@ -605,39 +681,28 @@ Form[] function GetEmptyCells()
     return JArray.asFormArray(emptyCellsArray)
 endFunction
 
-; Form[] function GetEmptyCells()
-;     Form[] cells = self.GetJailCells()
+Form[] function GetAvailableJailCells()
+    Form[] cells = self.GetJailCells()
+    int availableCellsArray = JArray.object()
 
-;     int i = 0
-;     while (i < cells.Length)
-;         RPB_JailCell jailCellRef = cells[i] as RPB_JailCell
-;         ; ObjectReference debug_jailCellRef = cells[i] as ObjectReference
-;         ; Debug(none, "Prison::GetEmptyCells", "Ref: " + debug_jailCellRef + ", Cell Props: " + jailCellRef.DEBUG_GetCellProperties())
+    int i = 0
+    while (i < cells.Length)
+        RPB_JailCell jailCellRef = cells[i] as RPB_JailCell
 
-;         if (jailCellRef && jailCellRef.IsEmpty)
-;             MiscVars.AddFormToArray("Cells/Empty", jailCellRef)
-;         endif
-;         i += 1
-;     endWhile
+        if (jailCellRef && jailCellRef.IsAvailable)
+            Debug(none, "Prison::GetAvailableJailCells", "Cell: " + jailCellRef + ", IsAvailable: " + jailCellRef.IsAvailable + ", Gender: " + jailCellRef.IsGenderExclusive)
+            JArray.addForm(availableCellsArray, jailCellRef)
+        endif
+        i += 1
+    endWhile
 
-;     return MiscVars.GetPapyrusFormArray("Cells/Empty")
-; endFunction
+    if (JValue.count(availableCellsArray) <= 0)
+        return none
+    endif
 
-; RPB_JailCell[] function GetEmptyCells()
-;     ; Prison_GetInt("Cell 01")
-;     ; Get all Prisoners from Cell 01
-;     ; If no prisoners, the cell is empty, add it to an array
-;     ; do the same for the remaining cells
-; endFunction
-
-; Available does not mean empty, if the cell has two beds and one prisoner, it is considered available, if it has two beds and two prisoners, it's not available.
-; RPB_JailCell should have a property determing if the cell is available: IsAvailable, and another IsEmpty, etc
-RPB_JailCell[] function GetAvailableCells()
-    ; Iterate through all the cells in the prison
-    ; Get the beds from each cell
-    ; Get the number of prisoners from each cell
-    ; If the number of prisoners is less than the number of beds, it is available, if it's equal or more, then it is not available
+    return JArray.asFormArray(availableCellsArray)
 endFunction
+
 
 RPB_JailCell[] function GetCellsWithFemalePrisoners()
     ; Iterate through all the cells in the prison
@@ -668,15 +733,6 @@ bool function HasFemaleOnlyCells()
 endFunction
 
 bool function HasMaleOnlyCells()
-
-endFunction
-
-;/
-    Determines the options for jail cells belonging to this Prison,
-    this means what type of jail cell has the highest priority,
-    what are the only types allowed (if set), and so on...
-/;
-bool function DetermineCellOptions()
 
 endFunction
 
@@ -751,7 +807,7 @@ RPB_JailCell function RequestCellForPrisoner(RPB_Prisoner akPrisoner)
 
     if (outputCell == none)
         ; If no criteria was passed and a cell was not retrieved yet, get a random cell
-        outputCell = self.GetRandomPrisonCell() as RPB_JailCell
+        outputCell = self.GetRandomJailCell() as RPB_JailCell
         Debug(none, "Prison::RequestCellForPrisoner", "Tried getting random cell: " + outputCell, outputCell == none)
         Debug(none, "Prison::RequestCellForPrisoner", "Got random cell: " + outputCell, outputCell != none)
     endif
@@ -827,7 +883,7 @@ event OnPrisonPeriodicUpdate()
         i += 1
     endWhile
 
-    Debug(none, "Prison::OnPrisonPeriodicUpdate", "Prisoners in " + Hold + ": " + Prisoners.Length)
+    Debug(none, "Prison::OnPrisonPeriodicUpdate", "Prisoners in " + Hold + ": " + Prisoners.Count)
 
     ; ; TODO: If all the prisoners do not require processing anymore, unregister the update here
 
@@ -843,6 +899,10 @@ event OnPrisonerDying(RPB_Prisoner akPrisoner, Actor akKiller)
 endEvent
 
 event OnPrisonerDeath(RPB_Prisoner akPrisoner, Actor akKiller)
+
+endEvent
+
+event OnPrisonerStripBegin(RPB_Prisoner akPrisoner, Actor akStripper)
 
 endEvent
 
@@ -872,6 +932,22 @@ endEvent
 ;                          Management
 ; ==========================================================
 
+;/
+
+    returns (JMap& | JFormMap& | JIntMap& | JArray&): The reference to the Prison data object.
+/;
+int function GetDataObject(string asPrisonObjectCategory = "null")
+    int rootObject      = RPB_Data.GetRootObject(self.Hold)         ; JMap&
+    int prisonObject    = RPB_Data.GetHoldJailObject(rootObject)    ; JMap&
+    int returnedObject  = prisonObject
+
+    if (asPrisonObjectCategory != "null")
+        returnedObject = JMap.getObj(prisonObject, asPrisonObjectCategory) ; (JMap& | JFormMap& | JIntMap& | JArray&)
+    endif
+
+    return returnedObject
+endFunction
+
 ; Temporary, to hold periodically updates prisoners for now
 RPB_Prisoner[] checkedPrisoners
 int checkedPrisonersIndex
@@ -882,24 +958,12 @@ RPB_Prisoner[] property CheckedPrisonersList
     endFunction
 endProperty
 
-; function ProcessPrisonerState(RPB_Prisoner akPrisoner)
-;     if (self.EnableInfamy)
-;         akPrisoner.UpdateInfamy()
-;     endif
-
-;     akPrisoner.UpdateDaysImprisoned()
-;     ; akPrisoner.DEBUG_ShowPrisonInfo()
-;     self.DEBUG_ShowPrisonerSentenceInfo(akPrisoner, true)
-;     akPrisoner.RegisterLastUpdate()
-
-; endFunction
-
 event OnInit()
     ; Temporary, to hold periodically updates prisoners for now
     checkedPrisoners        = new RPB_Prisoner[128]
     checkedPrisonersIndex   = 0
 
-    __prisoners             = new RPB_Prisoner[128]
+    ; __prisoners             = new RPB_Prisoner[128]
     __prisonersIndex        = 0
 
 
@@ -933,10 +997,15 @@ function ConfigurePrison( \
     __prisonFaction     = akFaction
     __hold              = asHold
 
+    int rootItem                = RPB_Data.GetRootObject(__hold)
+    string configuredCity       = RPB_Data.GetHoldCity(rootItem)
+
+    __city              = configuredCity
+
     __isInitialized     = true
 
     ; Initialize all of the jail cells belonging to this prison
-    self.SetupCells()
+    self.SetupCells() ; To be changed, this will only work if the Player is present in the scene
 
     Debug(self.GetOwningQuest(), "Prison::ConfigurePrison", "Prison Location: " + PrisonLocation + ", Prison Faction: " + PrisonFaction + ", Prison Hold: " + Hold)
 endFunction
@@ -994,48 +1063,71 @@ endFunction
 
 
 function SetupCells()
+    if (self.Hold != "Haafingar")
+        return
+    endif
+
+    float startBench = StartBenchmark()
     Form[] cells = self.GetJailCells()
 
     int i = 0
     while (i < cells.Length)
         RPB_JailCell jailCell = cells[i] as RPB_JailCell
-        if (!jailCell.IsInitialized())
-            jailCell.BindPrison(self)
-            jailCell.ScanBeds()
-            jailCell.ScanContainers()
-            jailCell.ScanMiscProps()
+
+        if (jailCell == GetFormFromMod(0x3879))
+            if (!jailCell.IsInitialized())
+                jailCell.BindPrison(self)
+                jailCell.DetermineMarkers()
+    
+                Debug(none, "Prison::SetupCells", "Jail Cell: " + jailCell + " - " + "HasOption(Maximum Prisoners):" + jailCell.HasOption("Maximum Prisoners") + ", HasObjects(Beds): " + jailCell.HasObjects("Beds"))
+    
+                if (jailCell.ShouldPerformScan("Beds"))
+                    jailCell.ScanBeds()
+                endif
+                
+                if (jailCell.ShouldPerformScan("Containers"))
+                    jailCell.ScanContainers()
+                endif
+    
+                if (jailCell.ShouldPerformScan("Props"))
+                    jailCell.ScanMiscProps()
+                endif
+    
+                Debug(none, "Prison::SetupCells", jailCell + " Maximum Prisoners: " + jailCell.MaxPrisoners)
+            endif
         endif
+
+
         i += 1
     endWhile
+
+    EndBenchmark(startBench, "Prison::SetupCells")
 endFunction
 
 
+Form[] function GetPrisonerContainers()
+    return RPB_Data.Jail_GetPrisonerContainers(self.GetDataObject())
+endFunction
+
+Form function GetRandomPrisonerContainer()
+    Form[] allPrisonerContainers = self.GetPrisonerContainers()
+    return allPrisonerContainers[Utility.RandomInt(0, allPrisonerContainers.Length - 1)]
+endFunction
+
+Form function GetJailCellExterior(RPB_JailCell akJailCell)
+
+endFunction
 
 ;/
     Gets all the jail cells in this prison that match the sex passed in.
 
+    string  @asSex: The desired sex for the exclusivity of the jail cell.
+
     For a jail cell to be of a specific sex, it must have at least one prisoner of that sex,
     which means these jail cells are never empty.
 /;
-; Form[] function GetGenderExclusiveCells(string asSex)
-;     Form[] cells = self.GetJailCells()
-
-;     int i = 0
-;     while (i < cells.Length)
-;         RPB_JailCell jailCellRef = cells[i] as RPB_JailCell
-;         ObjectReference debug_jailCellRef = cells[i] as ObjectReference
-;         ; Debug(none, "Prison::GetGenderExclusiveCells", "Ref: " + debug_jailCellRef + ", Cell Props: " + jailCellRef.DEBUG_GetCellProperties())
-;         if (jailCellRef && (asSex == "Male" && jailCellRef.IsMaleOnly) || (asSex == "Female" && jailCellRef.IsFemaleOnly))
-;             MiscVars.AddFormToArray("Cells/Gender", jailCellRef)
-;         endif
-;         i += 1
-;     endWhile
-
-;     return MiscVars.GetPapyrusFormArray("Cells/Gender")
-; endFunction
-
 Form[] function GetGenderExclusiveCells(string asSex)
-    Form[] cells = self.GetJailCells()
+    Form[] cells = self.JailCells
     int genderCellsArray = JArray.object()
 
     int i = 0
@@ -1056,18 +1148,18 @@ Form[] function GetGenderExclusiveCells(string asSex)
     return JArray.asFormArray(genderCellsArray)
 endFunction
 
-ObjectReference function GetJailCell(int aiIndex)
-    return MiscVars.GetFormFromArray("Prison/Cells", aiIndex) as ObjectReference
-endFunction
+RPB_JailCell function GetRandomJailCell(bool abPrioritizeEmptyCells = true)
+    Form[] interiorMarkers = RPB_Data.JailCell_GetParents(self.GetDataObject("Cells"))
 
-; Return type later to be changed to RPB_PrisonCell
-ObjectReference function GetRandomPrisonCell(bool abPrioritizeEmptyCells = true)
-    ObjectReference returnedCell = Config.GetRandomJailMarker(Hold)
-    return returnedCell
+    if (!interiorMarkers)
+        return none
+    endif
+
+    return interiorMarkers[Utility.RandomInt(0, interiorMarkers.Length - 1)] as RPB_JailCell
 endFunction
 
 RPB_JailCell function GetEmptyJailCell()
-    Form[] emptyCells = self.GetEmptyCells()
+    Form[] emptyCells = self.EmptyJailCells
     return emptyCells[Utility.RandomInt(0, emptyCells.Length - 1)] as RPB_JailCell
 endFunction
 
@@ -1076,6 +1168,14 @@ RPB_JailCell function GetJailCellOfGender(string asSex)
     RPB_JailCell genderCell = genderCells[Utility.RandomInt(0, genderCells.Length - 1)] as RPB_JailCell
 
     return genderCell
+endFunction
+
+RPB_JailCell function GetFemaleJailCell()
+    return self.GetJailCellOfGender("Female")
+endFunction
+
+RPB_JailCell function GetMaleJailCell()
+    return self.GetJailCellOfGender("Male")
 endFunction
 
 ;/
@@ -1125,39 +1225,39 @@ RPB_JailCell function GetJailCellBasedOnPriority(string asSex, bool abAllowRando
     return returnedCell
 endFunction
 
-RPB_JailCell function GetRandomJailCell( \
-    bool abFemaleOnly = false, \
-    bool abMaleOnly = false, \
-    bool abMustBeEmpty = false, \
-    bool abMustBeAvailable = true \
-)
-    if (abFemaleOnly && abMaleOnly)
-        ; Error, can't be both genders
-        return none
-    endif
+; RPB_JailCell function GetRandomJailCell( \
+;     bool abFemaleOnly = false, \
+;     bool abMaleOnly = false, \
+;     bool abMustBeEmpty = false, \
+;     bool abMustBeAvailable = true \
+; )
+;     if (abFemaleOnly && abMaleOnly)
+;         ; Error, can't be both genders
+;         return none
+;     endif
 
-    if (abMustBeEmpty && abMustBeAvailable)
-        ; Error, can't ask for both empty and available, it's either one or the other (although available cells can be considered empty, the opposite is not true.)
-        return none
-    endif
+;     if (abMustBeEmpty && abMustBeAvailable)
+;         ; Error, can't ask for both empty and available, it's either one or the other (although available cells can be considered empty, the opposite is not true.)
+;         return none
+;     endif
 
-    ; Return only jail cells based on criteria params,
-    ; or return all if they are all false
-    RPB_JailCell output = none
+;     ; Return only jail cells based on criteria params,
+;     ; or return all if they are all false
+;     RPB_JailCell output = none
 
-    if (!abFemaleOnly && !abMaleOnly && !abMustBeEmpty && !abMustBeAvailable)
-        output = Config.GetRandomJailMarker(self.Hold) as RPB_JailCell
-        return output
-    endif
+;     if (!abFemaleOnly && !abMaleOnly && !abMustBeEmpty && !abMustBeAvailable)
+;         output = Config.GetRandomJailMarker(self.Hold) as RPB_JailCell
+;         return output
+;     endif
 
-    if (abMustBeEmpty)
-        output = self.GetEmptyJailCell()
-        return output
-    elseif (abMustBeAvailable && (abFemaleOnly || abMaleOnly))
-        ; Get available cell that is of type gender
-    endif
+;     if (abMustBeEmpty)
+;         output = self.GetEmptyJailCell()
+;         return output
+;     elseif (abMustBeAvailable && (abFemaleOnly || abMaleOnly))
+;         ; Get available cell that is of type gender
+;     endif
 
-endFunction
+; endFunction
 
 ObjectReference function GetPrisonerCell(RPB_Prisoner akPrisoner)
     ; Search in the prison cell map for the prisoner and get their cell
@@ -1222,15 +1322,23 @@ endFunction
     RPB_Prisoner    @akPrisonerRef: The Prisoner reference to bind to the Actor.
 /;
 bool function RegisterPrisoner(RPB_Prisoner akPrisonerRef)
-    RPB_ActiveMagicEffectContainer prisonerList = Config.MainAPI as RPB_ActiveMagicEffectContainer
-    string containerKey = "Prisoner["+ akPrisonerRef.GetActor().GetFormID() +"]"
+    Prisoners.Add(akPrisonerRef)
 
-    prisonerList.AddAt(akPrisonerRef, containerKey)
-    __prisoners[__prisonersIndex] = akPrisonerRef
+    Debug(none, "Prison::RegisterPrisoner", "PrisonerList: " + Prisoners.GetKeys())
 
-    Debug(none, "Prison::RegisterPrisoner", "Added Actor " + akPrisonerRef.GetActor() + " to the prisoner list " + akPrisonerRef + " with key: " + containerKey + " for prison " + self.Hold)
-    return prisonerList.GetAt(containerKey) == akPrisonerRef ; Did it register successfully?
+    return Prisoners.Exists(akPrisonerRef)
 endFunction
+; bool function RegisterPrisoner(RPB_Prisoner akPrisonerRef)
+;     RPB_ActiveMagicEffectContainer prisonerList = Config.MainAPI as RPB_ActiveMagicEffectContainer
+;     string containerKey = "Prisoner["+ akPrisonerRef.GetActor().GetFormID() +"]"
+
+;     prisonerList.AddAt(akPrisonerRef, containerKey)
+;     ; __prisoners[__prisonersIndex] = akPrisonerRef
+;     __prisoners.Add(akPrisonerRef)
+
+;     Debug(none, "Prison::RegisterPrisoner", "Added Actor " + akPrisonerRef.GetActor() + " to the prisoner list " + akPrisonerRef + " with key: " + containerKey + " for prison " + self.Hold)
+;     return prisonerList.GetAt(containerKey) == akPrisonerRef ; Did it register successfully?
+; endFunction
 
 ;/
     Removes the Actor bound to @akPrisonerRef from its currently bound instance of RPB_Prisoner.
@@ -1240,20 +1348,22 @@ endFunction
     RPB_Prisoner   @akPrisonerRef: The prisoner to be removed from prison.
 /;
 function UnregisterPrisoner(RPB_Prisoner akPrisonerRef)
-    string containerKey = "Prisoner["+ akPrisonerRef.GetPrisoner().GetFormID() +"]"
-
     if (akPrisonerRef)
-        RPB_ActiveMagicEffectContainer prisonerList = Config.MainAPI as RPB_ActiveMagicEffectContainer
-        ; TODO: remove from __prisoners
-        prisonerList.Remove(containerKey)
+        Prisoners.Remove(akPrisonerRef)
     endif
 endFunction
+; function UnregisterPrisoner(RPB_Prisoner akPrisonerRef)
+;     string containerKey = "Prisoner["+ akPrisonerRef.GetPrisoner().GetFormID() +"]"
+
+;     if (akPrisonerRef)
+;         RPB_ActiveMagicEffectContainer prisonerList = Config.MainAPI as RPB_ActiveMagicEffectContainer
+;         ; TODO: remove from __prisoners
+;         prisonerList.Remove(containerKey)
+;     endif
+; endFunction
 
 RPB_Prisoner function GetPrisonerReference(Actor akPrisoner)
-    RPB_ActiveMagicEffectContainer prisonerList = Config.MainAPI as RPB_ActiveMagicEffectContainer
-
-    string listKey = "Prisoner["+ akPrisoner.GetFormID() +"]"
-    RPB_Prisoner prisonerRef = prisonerList.GetAt(listKey) as RPB_Prisoner
+    RPB_Prisoner prisonerRef = Prisoners.AtKey(akPrisoner)
 
     if (!prisonerRef)
         Warn(none, "Prison::GetPrisonerReference", "The Actor " + akPrisoner + " is not a prisoner or there was a state mismatch!")
@@ -1262,6 +1372,20 @@ RPB_Prisoner function GetPrisonerReference(Actor akPrisoner)
 
     return prisonerRef
 endFunction
+
+; RPB_Prisoner function GetPrisonerReference(Actor akPrisoner)
+;     RPB_ActiveMagicEffectContainer prisonerList = Config.MainAPI as RPB_ActiveMagicEffectContainer
+
+;     string listKey = "Prisoner["+ akPrisoner.GetFormID() +"]"
+;     RPB_Prisoner prisonerRef = prisonerList.GetAt(listKey) as RPB_Prisoner
+
+;     if (!prisonerRef)
+;         Warn(none, "Prison::GetPrisonerReference", "The Actor " + akPrisoner + " is not a prisoner or there was a state mismatch!")
+;         return none
+;     endif
+
+;     return prisonerRef
+; endFunction
 
 
 bool __isReceivingUpdates

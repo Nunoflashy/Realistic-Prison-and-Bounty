@@ -60,3 +60,30 @@ endFunction
 RPB_Prison[] function GetPrisons()
     
 endFunction
+
+int __global_prisonerList
+
+function BindPrisonerToPrison(RPB_Prisoner akPrisoner, RPB_Prison akPrison) global
+    ; if (!__global_prisonerList)
+    ;     __global_prisonerList = JMap.object()
+    ;     JValue.retain(__global_prisonerList)
+    ; endif
+
+    ; JMap.setInt(__global_prisonerList, akPrisoner.GetIdentifier(), akPrison.GetID())
+
+    JDB.solveIntSetter(".rpb_hidden_config.prison.prisoner." + akPrisoner.GetIdentifier(), akPrison.GetID(), true)
+endFunction
+
+RPB_Prison function GetPrisonForBoundPrisoner(Actor akPrisonerActor)
+    ; int prisonAliasID = JMap.getInt(__global_prisonerList, akPrisoner.GetIdentifier()) ; returns the ID of the Prison alias
+    ; return self.GetAlias(prisonAliasID) as RPB_Prison
+    int prisonAliasID = JDB.solveInt(".rpb_hidden_config.prison.prisoner." + akPrisonerActor.GetFormID()) ; returns the ID of the Prison alias
+    return self.GetAlias(prisonAliasID) as RPB_Prison
+endFunction
+
+; RPB_Prison function GetPrisonForBoundPrisoner(RPB_Prisoner akPrisoner)
+;     ; int prisonAliasID = JMap.getInt(__global_prisonerList, akPrisoner.GetIdentifier()) ; returns the ID of the Prison alias
+;     ; return self.GetAlias(prisonAliasID) as RPB_Prison
+;     int prisonAliasID = JDB.solveInt(".rpb_hidden_config.prison.prisoner." + akPrisoner.GetIdentifier()) ; returns the ID of the Prison alias
+;     return self.GetAlias(prisonAliasID) as RPB_Prison
+; endFunction

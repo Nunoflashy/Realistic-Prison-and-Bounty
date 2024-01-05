@@ -1223,7 +1223,7 @@ endProperty
 
 RPB_ActiveMagicEffectContainer property Prisoners
     RPB_ActiveMagicEffectContainer function get()
-        return Config.MainAPI as RPB_ActiveMagicEffectContainer
+        ; return Config.MainAPI as RPB_ActiveMagicEffectContainer
     endFunction
 endProperty
 
@@ -1723,7 +1723,7 @@ function UnregisterPrisoner(Actor akPrisoner)
     string containerKey = "Prisoner["+ akPrisoner.GetBaseObject().GetFormID() +"]"
 
     if (prisonerRef)
-        Prisoners.Remove(containerKey)
+        ; Prisoners.Remove(containerKey)
     endif
 endFunction
 

@@ -669,6 +669,14 @@ function ListOverrides(string category = "")
     Debug(self, string_if (!hasCategory, "ArrestVars::ListOverrides", "ArrestVars::ListOverrides("+ category +")"), GetContainerList(_arrestVarsContainer, includeStringFilter = categoryKey))
 endFunction
 
+function Serialize(string filePath)
+    JValue.writeToFile(_arrestVarsContainer, RPB_Data.GetModDataDirectory() + filePath)
+endFunction
+
+int function Unserialize(string filePath)
+    return JValue.readFromFile(filePath)
+endFunction
+
 ; Returns the made overriden key for this param if the var has an override and overriding is enabled,
 ; otherwise, returns the normal var key
 string function __getUsedKey(string paramKey, bool allowOverrides)
