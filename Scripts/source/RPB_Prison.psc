@@ -635,30 +635,22 @@ endFunction
 ;                          Cell
 ; ==========================================================
 
-int __emptyCellsArray
-; Form[] property EmptyCells
-;     Form[] function get()
-;         return JArray.asFormArray(__emptyCellsArray)
-;     endFunction
-; endProperty
+;/
+    Retrieves the jail cells configured for this Prison.
+    Each element is able to be cast to a RPB_JailCell.
 
-; Must be cast to RPB_JailCell when used to have the properties
-; Form[] function GetJailCells()
-;     return Config.GetJailMarkers(Hold)
-; endFunction
-
+    returns (Form[]); The jail cells for this Prison.
+/;
 Form[] function GetJailCells()
-    ; string rootItemContainer = GetContainerList(rootItem)
-    ; string jailItemContainer = GetContainerList(jailItem)
-    ; Form[] theCells = Config.GetJailCellParentMarkers(jailItem, "Interior")
-    Form[] theCells = RPB_Data.JailCell_GetParents(self.GetDataObject("Cells"))
-
-    ; Debug(none, "Prison::GetJailCells", "Hold: " + self.Hold + ", rootItem: " + rootItem + ", jailItem: " + jailItemContainer + ", theCells: " + theCells)
-
-    return theCells
+    return RPB_Data.JailCell_GetParents(self.GetDataObject("Cells"))
 endFunction
 
+;/
+    Retrieves the jail cells that are currently empty.
+    Each element is able to be cast to a RPB_JailCell.
 
+    returns (Form[]); The empty jail cells for this Prison.
+/;
 Form[] function GetEmptyJailCells()
     Form[] cells = self.GetJailCells()
     int emptyCellsArray = JArray.object()
@@ -681,6 +673,12 @@ Form[] function GetEmptyJailCells()
     return JArray.asFormArray(emptyCellsArray)
 endFunction
 
+;/
+    Retrieves the jail cells that are currently available (haven't reached the maximum amount of prisoners).
+    Each element is able to be cast to a RPB_JailCell.
+
+    returns (Form[]); The jail cells that are currently available to take more prisoners.
+/;
 Form[] function GetAvailableJailCells()
     Form[] cells = self.GetJailCells()
     int availableCellsArray = JArray.object()
@@ -741,7 +739,7 @@ endFunction
 
     RPB_Prisoner    @akPrisoner: The prisoner that is requesting the jail cell.
 
-    return: The jail cell as an instance of RPB_JailCell that was requested for this prisoner, based on their criteria if it exists, otherwise returns none.
+    returns (RPB_JaiLCell): The jail cell that was requested for this prisoner, based on their criteria if it exists, otherwise returns none.
 /;
 RPB_JailCell function RequestCellForPrisoner(RPB_Prisoner akPrisoner)
     RPB_JailCell outputCell = none
@@ -933,16 +931,19 @@ endEvent
 ; ==========================================================
 
 ;/
+    Retrieves the Prison's data object.
 
-    returns (JMap& | JFormMap& | JIntMap& | JArray&): The reference to the Prison data object.
+    string? @asPrisonObjectCategory: The category of object to get from the Prison object (e.g: Cells).
+
+    returns (any& <JContainer>): The reference to the Prison data object, or an object inside the Prison object if a category is specified.
 /;
 int function GetDataObject(string asPrisonObjectCategory = "null")
-    int rootObject      = RPB_Data.GetRootObject(self.Hold)         ; JMap&
-    int prisonObject    = RPB_Data.GetHoldJailObject(rootObject)    ; JMap&
+    int rootObject      = RPB_Data.GetRootObject(self.Hold)             ; JMap&
+    int prisonObject    = RPB_Data.Hold_GetJailObject(rootObject)       ; JMap&
     int returnedObject  = prisonObject
 
     if (asPrisonObjectCategory != "null")
-        returnedObject = JMap.getObj(prisonObject, asPrisonObjectCategory) ; (JMap& | JFormMap& | JIntMap& | JArray&)
+        returnedObject = JMap.getObj(prisonObject, asPrisonObjectCategory) ; any& <JContainer>
     endif
 
     return returnedObject
@@ -998,7 +999,7 @@ function ConfigurePrison( \
     __hold              = asHold
 
     int rootItem                = RPB_Data.GetRootObject(__hold)
-    string configuredCity       = RPB_Data.GetHoldCity(rootItem)
+    string configuredCity       = RPB_Data.Hold_GetCity(rootItem)
 
     __city              = configuredCity
 
@@ -1149,7 +1150,7 @@ Form[] function GetGenderExclusiveCells(string asSex)
 endFunction
 
 RPB_JailCell function GetRandomJailCell(bool abPrioritizeEmptyCells = true)
-    Form[] interiorMarkers = RPB_Data.JailCell_GetParents(self.GetDataObject("Cells"))
+    Form[] interiorMarkers = self.JailCells
 
     if (!interiorMarkers)
         return none

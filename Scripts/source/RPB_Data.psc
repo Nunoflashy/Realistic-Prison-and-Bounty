@@ -22,7 +22,9 @@ endFunction
     Alternatively, if no hold is specified, the root item of the data file is returned,
     containing every hold.
 
-    string?  @asHold: The hold to retrieve
+    string?  @asHold: The hold to retrieve.
+
+    returns (JMap&): A reference to the root object containing all of the Holds, or the specified Hold if specified.
 /;
 int function GetRootObject(string asHold = "/") global
     int configFile
@@ -41,14 +43,6 @@ int function GetRootObject(string asHold = "/") global
     int holdRootItem = JMap.getObj(configFile, asHold)
 
     return holdRootItem
-endFunction
-
-;/
-    Refreshes the root item currently stored in .rpb_root with the new content
-    from the data file.
-/;
-int function RefreshRootObject() global
-    return Unserialize()
 endFunction
 
 ;/
@@ -74,12 +68,22 @@ endFunction
 
 ;/
     Reads all the data from the main data file into the returned object.
+
+    returns (JMap&): A reference to the root object.
 /;
 int function Unserialize() global
     int unserializedData = JValue.readFromFile(GetModDataDirectory() + GetDataFile())
     SetRootContainer(unserializedData)
 
     return unserializedData
+endFunction
+
+;/
+    Refreshes the root item currently stored in .rpb_root with the new content
+    from the data file.
+/;
+int function RefreshRootObject() global
+    return Unserialize()
 endFunction
 
 ; Same as Unserialize()
@@ -105,18 +109,26 @@ endFunction
     JMap&           @apHoldJailObject: The reference to the jail object of the hold.
     RPB_JailCell    @akJailCell: The jail cell parent reference.
 
-    returns (JMap): A reference to the object containing the jail cell parent along with its properties.
+    returns (JMap&): A reference to the object containing the jail cell parent along with its properties.
 /;
-int function GetRawObject_JailCellParent(int apHoldJailObject, RPB_JailCell akJailCell) global
-    int formMap_cellsDataContent    = JMap.getObj(apHoldJailObject, "Cells")                ; JFormMap
-    int map_parentCellObject        = JFormMap.getObj(formMap_cellsDataContent, akJailCell)   ; JMap
+int function RawObject_GetJailCellParent(int apHoldJailObject, RPB_JailCell akJailCell) global
+    int formMap_cellsDataContent    = JMap.getObj(apHoldJailObject, "Cells")                    ; JFormMap&
+    int map_parentCellObject        = JFormMap.getObj(formMap_cellsDataContent, akJailCell)     ; JMap&
 
-    Debug(none, "Data::GetRawObject_JailCellParent", GetContainerList(map_parentCellObject))
+    Debug(none, "Data::RawObject_GetJailCellParent", GetContainerList(map_parentCellObject))
 
     return map_parentCellObject
 endFunction
 
-bool function HasPropertyFromObject(int apObject, string asPropertyName)
+;/
+    Checks if the object has the specified property.
+
+    any&    @apObject: The reference to the object to check.
+    string  @asPropertyName: The property to check the existence of in the object.
+
+    returns (bool): Whether or not the property exists in this object.
+/;
+bool function RawObject_HasProperty(int apObject, string asPropertyName)
     return JMap.hasKey(apObject, asPropertyName)
 endFunction
 
@@ -127,49 +139,33 @@ endFunction
 ;/
     Retrieves the jail object of a hold from the data file obtained from the hold's root object.
 
-    int     @apHoldRootObject: The reference to the root object of this hold
+    JMap& @apHoldRootObject: The reference to the root object of this hold.
 
-    returns (JMap): The jail object of this Hold.
+    returns (JMap&): The reference to the jail object of this Hold.
 /;
-int function GetHoldJailObject(int apHoldRootObject) global
-    int map_jail = JMap.getObj(apHoldRootObject, "Jail") ; JMap
-    return map_jail
-endFunction
-
 int function Hold_GetJailObject(int apHoldRootObject) global
-    int map_jail = JMap.getObj(apHoldRootObject, "Jail") ; JMap
-    return map_jail
+    return JMap.getObj(apHoldRootObject, "Jail") ; JMap&
 endFunction
 
 ;/
     Retrieves the locations of a specific hold through its root object
 
-    int @apHoldRootObject: The reference to the root object of this hold.
+    JMap& @apHoldRootObject: The reference to the root object of this hold.
 
     returns (Form[]): The locations of this Hold.
 /;
-Form[] function GetHoldLocations(int apHoldRootObject) global
-    int array_locations = JMap.getObj(apHoldRootObject, "Locations") ; JArray
-    return JArray.asFormArray(array_locations)
-endFunction
-
 Form[] function Hold_GetLocations(int apHoldRootObject) global
-    int array_locations = JMap.getObj(apHoldRootObject, "Locations") ; JArray
+    int array_locations = JMap.getObj(apHoldRootObject, "Locations") ; JArray&
     return JArray.asFormArray(array_locations)
 endFunction
 
 ;/
     Retrieves the hold's crime faction through its root object
 
-    int @apHoldRootObject: The reference to the root object of this hold.
+    JMap& @apHoldRootObject: The reference to the root object of this hold.
 
     returns (Faction): This Hold's Crime Faction.
 /;
-Faction function GetHoldCrimeFaction(int apHoldRootObject) global
-    Form factionForm = JMap.getForm(apHoldRootObject, "Crime Faction")
-    return factionForm as Faction
-endFunction
-
 Faction function Hold_GetCrimeFaction(int apHoldRootObject) global
     Form factionForm = JMap.getForm(apHoldRootObject, "Crime Faction")
     return factionForm as Faction
@@ -178,25 +174,25 @@ endFunction
 ;/
     Retrieves the city from the hold's root object.
     
-    int @apHoldRootObject: The reference to the root object of this hold.
-
-    returns (string): The city of this Hold.
-/;
-string function GetHoldCity(int apHoldRootObject) global
-    string city = JMap.getStr(apHoldRootObject, "City")
-    return city
-endFunction
-
-;/
-    Retrieves the city from the hold's root object.
-    
-    int @apHoldRootObject: The reference to the root object of this hold.
+    JMap& @apHoldRootObject: The reference to the root object of this hold.
 
     returns (string): The city of this Hold.
 /;
 string function Hold_GetCity(int apHoldRootObject) global
     string city = JMap.getStr(apHoldRootObject, "City")
     return city
+endFunction
+
+;/
+    Retrieves the jail cells object of a Jail from the data file obtained from the jail's object.
+
+    JMap& @apHoldJailObject: The reference to the jail object of this hold.
+
+    returns (JFormMap&): The reference to the jail cells object of this Jail.
+/;
+int function Jail_GetCellsObject(int apHoldJailObject) global
+    int formMap_jailCells = JMap.getObj(apHoldJailObject, "Cells") ; JFormMap&
+    return formMap_jailCells
 endFunction
 
 ;/
@@ -207,7 +203,7 @@ endFunction
     returns (Form[]): The guards of this prison.
 /;
 Form[] function Jail_GetGuards(int apHoldJailObject) global
-    int array_guards = JMap.getObj(apHoldJailObject, "Guards") ; JArray (Form[])
+    int array_guards = JMap.getObj(apHoldJailObject, "Guards") ; JArray& (Form[])
     return JArray.asFormArray(array_guards)
 endFunction
 
@@ -219,8 +215,8 @@ endFunction
     returns (Form[]): All the jail cell parents.
 /;
 Form[] function GetJailCellParents(int apHoldJailObject) global
-    int formMap_cellsDataContent    = JMap.getObj(apHoldJailObject, "Cells")        ; JFormMap
-    int array_cellsKeys             = JFormMap.allKeys(formMap_cellsDataContent)    ; JArray (Form[])
+    int formMap_cellsDataContent    = JMap.getObj(apHoldJailObject, "Cells")        ; JFormMap&
+    int array_cellsKeys             = JFormMap.allKeys(formMap_cellsDataContent)    ; JArray& (Form[])
 
     Form[] asFormArray = JArray.asFormArray(array_cellsKeys)
 
@@ -241,9 +237,9 @@ Form[] function GetJailCellChildren(int apHoldJailObject, Form akParentForm, str
         return none
     endif
 
-    int formMap_cells           = JMap.getObj(apHoldJailObject, "Cells")                    ; JFormMap
-    int map_cellDataContent     = JFormMap.getObj(formMap_cells, akParentForm)              ; JMap - Get the cell object with this parent key
-    int array_childrenAsObject  = JMap.getObj(map_cellDataContent, asInteriorOrExterior)    ; JArray (Form[])
+    int formMap_cells           = JMap.getObj(apHoldJailObject, "Cells")                    ; JFormMap&
+    int map_cellDataContent     = JFormMap.getObj(formMap_cells, akParentForm)              ; JMap& - Get the cell object with this parent key
+    int array_childrenAsObject  = JMap.getObj(map_cellDataContent, asInteriorOrExterior)    ; JArray& (Form[])
 
     Debug(none, "Config::GetJailCellChildMarkers", akParentForm + "'s " + asInteriorOrExterior +" Children: " + GetContainerList(array_childrenAsObject))
 
@@ -274,7 +270,7 @@ endFunction
     returns (int): A root property of type int from the Jail Cell.
 /;
 int function JailCell_GetRootPropertyOfTypeInt(int apPrisonCellsObject, RPB_JailCell akJailCell, string asProperty) global
-    int map_cellDataContent     = JFormMap.getObj(apPrisonCellsObject, akJailCell) ; JMap - Get the cell object with this parent key
+    int map_cellDataContent     = JFormMap.getObj(apPrisonCellsObject, akJailCell) ; JMap& - Get the cell object with this parent key
     int intProperty             = JMap.getInt(map_cellDataContent, asProperty)
     
     return intProperty
@@ -290,7 +286,7 @@ endFunction
     returns (float): A root property of type float from the Jail Cell.
 /;
 float function JailCell_GetRootPropertyOfTypeFloat(int apPrisonCellsObject, RPB_JailCell akJailCell, string asProperty) global
-    int map_cellDataContent     = JFormMap.getObj(apPrisonCellsObject, akJailCell) ; JMap - Get the cell object with this parent key
+    int map_cellDataContent     = JFormMap.getObj(apPrisonCellsObject, akJailCell) ; JMap& - Get the cell object with this parent key
     float floatProperty         = JMap.getFlt(map_cellDataContent, asProperty)
     
     return floatProperty
@@ -306,7 +302,7 @@ endFunction
     returns (string): A root property of type string from the Jail Cell.
 /;
 string function JailCell_GetRootPropertyOfTypeString(int apPrisonCellsObject, RPB_JailCell akJailCell, string asProperty) global
-    int map_cellDataContent     = JFormMap.getObj(apPrisonCellsObject, akJailCell) ; JMap - Get the cell object with this parent key
+    int map_cellDataContent     = JFormMap.getObj(apPrisonCellsObject, akJailCell) ; JMap& - Get the cell object with this parent key
     string stringProperty       = JMap.getStr(map_cellDataContent, asProperty)
     
     return stringProperty
@@ -322,7 +318,7 @@ endFunction
     returns (Form): A root property of type Form from the Jail Cell.
 /;
 Form function JailCell_GetRootPropertyOfTypeForm(int apPrisonCellsObject, RPB_JailCell akJailCell, string asProperty) global
-    int map_cellDataContent     = JFormMap.getObj(apPrisonCellsObject, akJailCell) ; JMap - Get the cell object with this parent key
+    int map_cellDataContent     = JFormMap.getObj(apPrisonCellsObject, akJailCell) ; JMap& - Get the cell object with this parent key
     Form formProperty           = JMap.getForm(map_cellDataContent, asProperty)
 
     return formProperty
@@ -349,15 +345,39 @@ endFunction
     Retrieves the parent Forms of the jail cells. 
     Each element is able to be cast to a RPB_JailCell.
 
-    JFormMap& @apPrisonCellsObject: The reference to the Cells object for the given Prison (Cells in the data file).
+    JFormMap&   @apPrisonCellsObject: The reference to the Cells object for the given Prison (Cells in the data file).
+    bool        @abOnlyActiveCells: Whether to retrieve only Cells marked as active.
 
     returns (Form[]): All the jail cell parents.
 /;
-Form[] function JailCell_GetParents(int apPrisonCellsObject) global
-    int array_cellsKeys = JFormMap.allKeys(apPrisonCellsObject) ; JArray (RPB_JailCell[])
-    Form[] asFormArray  = JArray.asFormArray(array_cellsKeys)
+Form[] function JailCell_GetParents(int apPrisonCellsObject, bool abOnlyActiveCells = true) global
+    int array_cellsKeys = JFormMap.allKeys(apPrisonCellsObject) ; JArray& (RPB_JailCell[])
 
-    return asFormArray
+    if (abOnlyActiveCells)
+        int array_allCellObjects    = JFormMap.allValues(apPrisonCellsObject) ; JArray& (JMap[])
+        int activeCells             = JArray.object()
+    
+        int i = 0
+        while (i < JValue.count(array_allCellObjects))
+            int currentJailCellObj = JArray.getObj(array_allCellObjects, i) ; JMap&
+            bool isActiveCell      = JMap.getInt(currentJailCellObj, "Active") as bool
+    
+            if (isActiveCell)
+                Form currentJailCellForm = JArray.getForm(array_cellsKeys, i)
+                JArray.addForm(activeCells, currentJailCellForm)
+            endif
+            i += 1
+        endWhile
+    
+        if (JValue.count(activeCells) <= 0)
+            return none
+        endif
+    
+        Form[] asFormArray  = JArray.asFormArray(activeCells)
+        return asFormArray
+    endif
+
+    return JArray.asFormArray(array_cellsKeys)
 endFunction
 
 ;/
@@ -374,10 +394,10 @@ Form[] function JailCell_GetChildren(int apPrisonCellsObject, RPB_JailCell akJai
         return none
     endif
 
-    int map_cellDataContent     = JFormMap.getObj(apPrisonCellsObject, akJailCell)              ; JMap - Get the cell object with this parent key
-    int array_childrenAsObject  = JMap.getObj(map_cellDataContent, asInteriorOrExterior)        ; JArray (Form[])
+    int map_cellDataContent     = JFormMap.getObj(apPrisonCellsObject, akJailCell)              ; JMap& - Get the cell object with this parent key
+    int array_childrenAsObject  = JMap.getObj(map_cellDataContent, asInteriorOrExterior)        ; JArray& (Form[])
 
-    Debug(none, "Config::GetJailCellChildMarkers", akJailCell + "'s " + asInteriorOrExterior +" Children: " + GetContainerList(array_childrenAsObject))
+    Debug(none, "Data::JailCell_GetChildren", akJailCell + "'s " + asInteriorOrExterior +" Children: " + GetContainerList(array_childrenAsObject))
 
     Form[] childrenAsForms = JArray.asFormArray(array_childrenAsObject)
     return childrenAsForms
@@ -395,8 +415,8 @@ endFunction
     returns (bool): An Option of type bool.
 /;
 bool function JailCell_GetOptionOfTypeBool(int apPrisonCellsObject, RPB_JailCell akJailCell, string asOption, string asOptionCategory = "null") global
-    int map_cellDataContent     = JFormMap.getObj(apPrisonCellsObject, akJailCell)     ; JMap - Get the cell object with this parent key
-    int map_options             = JMap.getObj(map_cellDataContent, "Options")       ; JMap - The options for this cell
+    int map_cellDataContent     = JFormMap.getObj(apPrisonCellsObject, akJailCell)      ; JMap& - Get the cell object with this parent key
+    int map_options             = JMap.getObj(map_cellDataContent, "Options")           ; JMap& - The options for this cell
     int map_finalOptionObject   = map_options ; Default to main Options category
 
     if (asOptionCategory != "null")
@@ -420,8 +440,8 @@ endFunction
     returns (int): An Option of type int.
 /;
 int function JailCell_GetOptionOfTypeInt(int apPrisonCellsObject, RPB_JailCell akJailCell, string asOption, string asOptionCategory = "null") global
-    int map_cellDataContent     = JFormMap.getObj(apPrisonCellsObject, akJailCell)      ; JMap - Get the cell object with this parent key
-    int map_options             = JMap.getObj(map_cellDataContent, "Options")           ; JMap - The options for this cell
+    int map_cellDataContent     = JFormMap.getObj(apPrisonCellsObject, akJailCell)      ; JMap& - Get the cell object with this parent key
+    int map_options             = JMap.getObj(map_cellDataContent, "Options")           ; JMap& - The options for this cell
     int map_finalOptionObject   = map_options ; Default to main Options category
 
     if (asOptionCategory != "null")
@@ -445,8 +465,8 @@ endFunction
     returns (float): An Option of type float.
 /;
 float function JailCell_GetOptionOfTypeFloat(int apPrisonCellsObject, RPB_JailCell akJailCell, string asOption, string asOptionCategory = "null") global
-    int map_cellDataContent     = JFormMap.getObj(apPrisonCellsObject, akJailCell)      ; JMap - Get the cell object with this parent key
-    int map_options             = JMap.getObj(map_cellDataContent, "Options")           ; JMap - The options for this cell
+    int map_cellDataContent     = JFormMap.getObj(apPrisonCellsObject, akJailCell)      ; JMap& - Get the cell object with this parent key
+    int map_options             = JMap.getObj(map_cellDataContent, "Options")           ; JMap& - The options for this cell
     int map_finalOptionObject   = map_options ; Default to main Options category
 
     if (asOptionCategory != "null")
@@ -469,10 +489,9 @@ endFunction
 
     returns (string): An Option of type string.
 /;
-string function JailCell_GetOptionOfTypeString(int apHoldJailObject, RPB_JailCell akJailCell, string asOption, string asOptionCategory = "null") global
-    int formMap_cellsMap        = JMap.getObj(apHoldJailObject, "Cells")            ; JFormMap
-    int map_cellDataContent     = JFormMap.getObj(formMap_cellsMap, akJailCell)     ; JMap - Get the cell object with this parent key
-    int map_options             = JMap.getObj(map_cellDataContent, "Options")       ; JMap - The options for this cell
+string function JailCell_GetOptionOfTypeString(int apPrisonCellsObject, RPB_JailCell akJailCell, string asOption, string asOptionCategory = "null") global
+    int map_cellDataContent     = JFormMap.getObj(apPrisonCellsObject, akJailCell)      ; JMap& - Get the cell object with this parent key
+    int map_options             = JMap.getObj(map_cellDataContent, "Options")           ; JMap& - The options for this cell
     int map_finalOptionObject   = map_options ; Default to main Options category
 
     if (asOptionCategory != "null")
@@ -496,8 +515,8 @@ endFunction
     returns (Form): An Option of type Form.
 /;
 Form function JailCell_GetOptionOfTypeForm(int apPrisonCellsObject, RPB_JailCell akJailCell, string asOption, string asOptionCategory = "null") global
-    int map_cellDataContent     = JFormMap.getObj(apPrisonCellsObject, akJailCell)     ; JMap - Get the cell object with this parent key
-    int map_options             = JMap.getObj(map_cellDataContent, "Options")       ; JMap - The options for this cell
+    int map_cellDataContent     = JFormMap.getObj(apPrisonCellsObject, akJailCell)      ; JMap& - Get the cell object with this parent key
+    int map_options             = JMap.getObj(map_cellDataContent, "Options")           ; JMap& - The options for this cell
     int map_finalOptionObject   = map_options ; Default to main Options category
 
     if (asOptionCategory != "null")
@@ -521,9 +540,9 @@ endFunction
     returns (Form[]): The objects of a specific type.
 /;
 Form[] function JailCell_GetObjects(int apPrisonCellsObject, RPB_JailCell akJailCell, string asObjectCategory) global
-    int map_cellDataContent     = JFormMap.getObj(apPrisonCellsObject, akJailCell)      ; JMap - Get the cell object with this parent key
-    int map_objects             = JMap.getObj(map_cellDataContent, "Objects")           ; JMap - The Objects for this cell
-    int array_finalObjectRef    = JMap.getObj(map_objects, asObjectCategory)            ; JArray - The actual objects content
+    int map_cellDataContent     = JFormMap.getObj(apPrisonCellsObject, akJailCell)      ; JMap& - Get the cell object with this parent key
+    int map_objects             = JMap.getObj(map_cellDataContent, "Objects")           ; JMap& - The Objects for this cell
+    int array_finalObjectRef    = JMap.getObj(map_objects, asObjectCategory)            ; JArray& - The actual objects content
 
     Form[] selectedObjects = JArray.asFormArray(array_finalObjectRef)
     return selectedObjects
@@ -542,8 +561,8 @@ endFunction
     returns (bool): Whether the jail cell has options of the specified type.
 /;
 bool function JailCell_HasOption(int apPrisonCellsObject, RPB_JailCell akJailCell, string asOption, string asOptionCategory = "null", bool abCheckEmptyContent = false) global
-    int map_cellDataContent     = JFormMap.getObj(apPrisonCellsObject, akJailCell)      ; JMap - Get the cell object with this parent key
-    int map_options             = JMap.getObj(map_cellDataContent, "Options")           ; JMap - The options for this cell
+    int map_cellDataContent     = JFormMap.getObj(apPrisonCellsObject, akJailCell)      ; JMap& - Get the cell object with this parent key
+    int map_options             = JMap.getObj(map_cellDataContent, "Options")           ; JMap& - The options for this cell
     int map_finalOptionObject   = map_options ; Default to main Options category
 
     if (asOptionCategory != "null")
@@ -601,7 +620,7 @@ endFunction
 ;/
     Retrieves the hold's jail release markers, whether they're Teleport or Escort markers depends on @asTeleportOrEscort.
 
-    int     @apHoldJailObject: The reference to the jail item of the hold.
+    JMap&   @apHoldJailObject: The reference to the jail object.
     string  @asTeleportOrEscort: Whether to retrieve Teleport or Escort markers.
 
     returns (Form[]): The jail release markers with the parameters specified.
@@ -611,8 +630,8 @@ Form[] function Jail_GetReleaseMarkers(int apHoldJailObject, string asTeleportOr
         return none
     endif
 
-    int map_release             = JMap.getObj(apHoldJailObject, "Release") ; JMap
-    int array_releaseMarkers    = JMap.getObj(map_release, asTeleportOrEscort) ; JArray (Form[]) - Either Teleport or Escort, retrieve array accordingly
+    int map_release             = JMap.getObj(apHoldJailObject, "Release")      ; JMap&
+    int array_releaseMarkers    = JMap.getObj(map_release, asTeleportOrEscort)  ; JArray& (Form[]) - Either Teleport or Escort, retrieve array accordingly
 
     return JArray.asFormArray(array_releaseMarkers)
 endFunction
@@ -625,7 +644,7 @@ endFunction
     returns (Form[]): The prisoner containers for this jail.
 /;
 Form[] function Jail_GetPrisonerContainers(int apHoldJailObject) global
-    int array_prisonerContainers  = JMap.getObj(apHoldJailObject, "Prisoner Containers") ; JArray
+    int array_prisonerContainers  = JMap.getObj(apHoldJailObject, "Prisoner Containers") ; JArray&
     return JArray.asFormArray(array_prisonerContainers)
 endFunction
 
@@ -635,7 +654,7 @@ endFunction
 ; ==========================================================
 
 bool function RemoveJailGuard(int apHoldJailObject, Form akGuard) global
-    int guardsArray = JMap.getObj(apHoldJailObject, "Guards") ; JArray
+    int guardsArray = JMap.getObj(apHoldJailObject, "Guards") ; JArray&
     bool hasElement = JArray.findForm(guardsArray, akGuard) != -1
 
     if (!hasElement)
@@ -649,7 +668,7 @@ bool function RemoveJailGuard(int apHoldJailObject, Form akGuard) global
 endFunction
 
 bool function AddJailGuard(int apHoldJailObject, Form akGuard) global
-    int guardsArray = JMap.getObj(apHoldJailObject, "Guards") ; JArray
+    int guardsArray = JMap.getObj(apHoldJailObject, "Guards") ; JArray&
     bool hasElement = JArray.findForm(guardsArray, akGuard) != -1
 
     if (hasElement)
@@ -708,7 +727,7 @@ bool function AddJailCellMarker(Form akMarker, int apHoldJailObject, string asIn
     Debug(none, "Config::AddJailCellMarker", debugInfo)
 
     ; self.AddJailCellToParent(markersArray, Game.GetForm(0x14))
-    int parentArray = GetRawObject_JailCellParent(apHoldJailObject, akMarker as RPB_JailCell) ; To be tested after the refactor to JFormMap
+    int parentArray = RawObject_GetJailCellParent(apHoldJailObject, akMarker as RPB_JailCell) ; To be tested after the refactor to JFormMap
     AddJailCellToParent(parentArray, Game.GetForm(0x14))
 
     if (abSaveData)
@@ -743,6 +762,37 @@ bool function Hold_SetCrimeFaction(int apHoldRootObject, Faction akCrimeFaction)
     JMap.setForm(apHoldRootObject, "Crime Faction", akCrimeFaction)
 endFunction
 
+
+; ==========================================================
+;                           private
+; ==========================================================
+
+;   JArray& (RPB_JailCell[]) @apCellKeysArray: The array containing every parent jail cell key 
+Form[] function private_JailCell_GetActiveParents(int apPrisonCellsObject, int apCellKeysArray) global
+    int array_allCellObjects = JFormMap.allValues(apPrisonCellsObject) ; JArray& (JMap[])
+
+    int activeCells = JArray.object()
+    ; Debug(none, "Data::JailCell_GetActiveParents","Values: " + GetContainerList(array_allCellObjects))
+
+    int i = 0
+    while (i < JValue.count(array_allCellObjects))
+        int currentJailCellObj = JArray.getObj(array_allCellObjects, i) ; JMap&
+        bool isActiveCell      = JMap.getInt(currentJailCellObj, "Active") as bool
+
+        if (isActiveCell)
+            Form currentJailCellForm = JArray.getForm(apCellKeysArray, i)
+            JArray.addForm(activeCells, currentJailCellForm)
+        endif
+        i += 1
+    endWhile
+
+    if (JValue.count(activeCells) <= 0)
+        return none
+    endif
+
+    Form[] asFormArray  = JArray.asFormArray(activeCells)
+    return asFormArray
+endFunction
 
 
 ; ==========================================================

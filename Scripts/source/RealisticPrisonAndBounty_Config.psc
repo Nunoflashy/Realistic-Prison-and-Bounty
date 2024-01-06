@@ -69,7 +69,7 @@ string[] property Cities
         int i = 0
         while (i < Holds.Length)
             int rootItem = RPB_Data.GetRootObject(Holds[i])
-            JArray.addStr(citiesArray, RPB_Data.GetHoldCity(rootItem))
+            JArray.addStr(citiesArray, RPB_Data.Hold_GetCity(rootItem))
             i += 1
         endWhile
 
@@ -297,7 +297,7 @@ string function GetCurrentPlayerHoldLocationEx()
     int holdIndex = 0
     while (holdIndex < Holds.Length)
         int holdRootItem        = RPB_Data.GetRootObject(Holds[holdIndex])
-        Form[] holdLocations    = RPB_Data.GetHoldLocations(holdRootItem)
+        Form[] holdLocations    = RPB_Data.Hold_GetLocations(holdRootItem)
 
         int locationIndex = 0
         while (locationIndex < holdLocations.Length)

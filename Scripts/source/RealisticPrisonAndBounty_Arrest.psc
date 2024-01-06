@@ -336,14 +336,15 @@ event OnKeyDown(int keyCode)
 
         int rootItem            = RPB_Data.GetRootObject()
         int haafingarRootItem   = RPB_Data.GetRootObject("Haafingar")
-        int haafingarJailItem   = RPB_Data.GetHoldJailObject(haafingarRootItem)
+        int haafingarJailItem   = RPB_Data.Hold_GetJailObject(haafingarRootItem)
+        int solitudeCells       = RPB_Data.Jail_GetCellsObject(haafingarJailItem)
 
-        Form[] jailCellParents = RPB_Data.GetJailCellParents(haafingarJailItem)
+        Form[] jailCellParents = RPB_Data.JailCell_GetParents(solitudeCells)
 
         int i = 0
         while (i < jailCellParents.Length)
             RPB_JailCell jailCell = jailCellParents[i] as RPB_JailCell
-            int jailCellParentObject = RPB_Data.GetRawObject_JailCellParent(haafingarJailItem, jailCell)
+            int jailCellParentObject = RPB_Data.RawObject_GetJailCellParent(haafingarJailItem, jailCell)
             i += 1
         endWhile
 
@@ -352,10 +353,12 @@ event OnKeyDown(int keyCode)
 
         int rootItem = RPB_Data.GetRootObject()
         int haafingarRootItem = RPB_Data.GetRootObject("Haafingar")
-        int haafingarJailItem = RPB_Data.GetHoldJailObject(haafingarRootItem)
+        int haafingarJailItem = RPB_Data.Hold_GetJailObject(haafingarRootItem)
+        int solitudeCells     = RPB_Data.Jail_GetCellsObject(haafingarJailItem)
+
         ; Config.AddJailCellMarker(Config.Player, haafingarJailItem, "Interior", true)
         ; Form[] forms = Config.GetJailCellParentMarkers(haafingarJailItem, "Interior")
-        Form[] forms = RPB_Data.GetJailCellParents(haafingarJailItem)
+        Form[] forms = RPB_Data.JailCell_GetParents(solitudeCells)
 
         int i = 0
         while (i < forms.Length)

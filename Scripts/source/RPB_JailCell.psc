@@ -531,6 +531,22 @@ bool function ShouldPerformScan(string asScanTarget)
     return false
 endFunction
 
+int function LockLevelAsInteger(string asLockLevel) global
+    if (asLockLevel == "Novice")
+        return 1
+    elseif (asLockLevel == "Apprentice")
+        return 25
+    elseif (asLockLevel == "Adept")
+        return 50
+    elseif (asLockLevel == "Expert")
+        return 75
+    elseif (asLockLevel == "Master")
+        return 100
+    elseif (asLockLevel == "Requires Key")
+        return 255
+    endif
+endFunction
+
 ;/
     Determines if this JailCell... this should be in CellDoor
 /;
@@ -540,6 +556,14 @@ endFunction
 
 bool function IsInitialized()
     return self.Prison && self.CellDoor
+endFunction
+
+function Initialize()
+    string lockLevel    = self.GetOptionString("Lock Level")
+    int lockLevelAsInt  = LockLevelAsInteger(lockLevel)
+    Debug(self, "JailCell::Initialize", "Lock Level: " + lockLevel + ", As Integer: " + lockLevelAsInt + ", Door: " + CellDoor)
+
+    CellDoor.SetLockLevel(lockLevelAsInt)
 endFunction
 
 function BindPrison(RPB_Prison akPrison)
@@ -561,6 +585,7 @@ function BindPrison(RPB_Prison akPrison)
 
     ; Bind the cell door to the jail cell
     self.BindCellDoor(_cellDoor as RPB_CellDoor)
+    self.Initialize()
 endFunction
 
 function BindCellDoor(RPB_CellDoor akCellDoor)

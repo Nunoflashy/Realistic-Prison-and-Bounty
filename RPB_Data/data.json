@@ -5,38 +5,20 @@
     "Jail": {
       "Cells": {
         "Exterior": {
-          "0x388C": [
-            "__formData|RealisticPrisonAndBounty.esp|0x388c"
-          ],
-          "0x58CF8": [
-            "__formData|RealisticPrisonAndBounty.esp|0x388b"
-          ]
+          "0x388C": ["__formData|RealisticPrisonAndBounty.esp|0x388c"],
+          "0x58CF8": ["__formData|RealisticPrisonAndBounty.esp|0x388b"]
         },
         "Interior": {
-          "0x388A": [
-            "__formData|Skyrim.esm|0x388a"
-          ],
-          "0x388B": [
-            "__formData|Skyrim.esm|0x388b"
-          ],
-          "0x388C": [
-            "__formData|Skyrim.esm|0x388c"
-          ],
-          "0x58CF8": [
-            "__formData|Skyrim.esm|0x58cf8"
-          ]
+          "0x388A": ["__formData|Skyrim.esm|0x388a"],
+          "0x388B": ["__formData|Skyrim.esm|0x388b"],
+          "0x388C": ["__formData|Skyrim.esm|0x388c"],
+          "0x58CF8": ["__formData|Skyrim.esm|0x58cf8"]
         }
       },
-      "Prisoner Containers": [
-        "__formData|Skyrim.esm|0x3ef19"
-      ],
+      "Prisoner Containers": ["__formData|Skyrim.esm|0x3ef19"],
       "Release": {
-        "Escort": [
-          "__formData|Skyrim.esm|0x3ef19"
-        ],
-        "Teleport": [
-          "__formData|Skyrim.esm|0x3ef19"
-        ]
+        "Escort": ["__formData|Skyrim.esm|0x3ef19"],
+        "Teleport": ["__formData|Skyrim.esm|0x3ef19"]
       }
     },
     "Locations": [
@@ -50,20 +32,12 @@
     "Jail": {
       "Cells": {
         "Exterior": [],
-        "Interior": [
-          "__formData|Skyrim.esm|0x3ef07"
-        ]
+        "Interior": ["__formData|Skyrim.esm|0x3ef07"]
       },
-      "Prisoner Containers": [
-        "__formData|Skyrim.esm|0x3ef19"
-      ],
+      "Prisoner Containers": ["__formData|Skyrim.esm|0x3ef19"],
       "Release": {
-        "Escort": [
-          "__formData|Skyrim.esm|0x3ef19"
-        ],
-        "Teleport": [
-          "__formData|Skyrim.esm|0x3ef19"
-        ]
+        "Escort": ["__formData|Skyrim.esm|0x3ef19"],
+        "Teleport": ["__formData|Skyrim.esm|0x3ef19"]
       }
     },
     "Locations": [
@@ -74,7 +48,19 @@
   "Haafingar": {
     "City": "Solitude",
     "Crime Faction": "__formData|Skyrim.esm|0x267e3",
+    "Arrest": {
+      "Options": {
+        "Frisking": {
+          "Location": ["Cell", "Jail"]
+        }
+      }
+    },
     "Jail": {
+      "Options": {
+        "Stripping": {
+          "Location": ["Cell", "Jail"]
+        }
+      },
       "Guards": [
         "__formData|Skyrim.esm|0x7DF2",
         "__formData|Skyrim.esm|0x7DF4"
@@ -85,28 +71,33 @@
         },
         "__formData|Skyrim.esm|0x36897": {
           "Main Interior": "__formData|Skyrim.esm|0x36897",
+          "Active": false,
+          "Options": {
+            "Lock Level": "Requires Key",
+            "Scan": {
+              "Interior Radius": 300.0,
+              "Exterior Radius": 200.0,
+              "Iterations": 5
+            }
+          },
           "Exterior": [
             "__formData|RealisticPrisonAndBounty.esp|0x1DDD0",
             "__formData|RealisticPrisonAndBounty.esp|0x1DDD1",
             "__formData|RealisticPrisonAndBounty.esp|0x1DDD2"
           ],
-          "Interior": [
-
-          ]
+          "Interior": []
         },
         "__formData|RealisticPrisonAndBounty.esp|0x3879": {
           "Main Interior": "__formData|RealisticPrisonAndBounty.esp|0x3879",
           "Main Exterior": null,
-		  "Objects": {
-			"Beds": [
-				"__formData|Skyrim.esm|0xCE7EB"
-			],
-			"Containers": [
-				"__formData|RealisticPrisonAndBounty.esp|0x1DDD6"
-			],
-			"Props": []
+          "Active": true,
+          "Objects": {
+            "Beds": ["__formData|Skyrim.esm|0xCE7EB"],
+            "Containers": ["__formData|RealisticPrisonAndBounty.esp|0x1DDD6"],
+            "Props": []
           },
-		  "Options": {
+          "Options": {
+            "Lock Level": "Requires Key",
             "Scan": {
               "Interior Radius": 300.0,
               "Exterior Radius": 200.0,
@@ -118,23 +109,20 @@
             "__formData|RealisticPrisonAndBounty.esp|0x1DDD7",
             "__formData|RealisticPrisonAndBounty.esp|0x1DDD8"
           ],
-          "Interior": [
-
-          ]
+          "Interior": []
         },
         "__formData|RealisticPrisonAndBounty.esp|0x3880": {
           "Main Interior": "__formData|RealisticPrisonAndBounty.esp|0x3880",
           "Main Exterior": null,
           "Objects": {
-			"Beds": [
-		
-			],
-			"Containers": [],
-			"Props": []
+            "Beds": [],
+            "Containers": [],
+            "Props": []
           },
           "Options": {
             "Allow Overcrowding": true,
             "Maximum Prisoners": 2,
+            "Lock Level": "Master",
             "Scan": {
               "Interior Radius": 500.0,
               "Exterior Radius": 200.0,
@@ -146,9 +134,7 @@
             "__formData|RealisticPrisonAndBounty.esp|0x1DDD4",
             "__formData|RealisticPrisonAndBounty.esp|0x1DDD5"
           ],
-          "Interior": [
-
-          ]
+          "Interior": []
         },
         "__formData|RealisticPrisonAndBounty.esp|0x3881": {
           "Main Interior": "__formData|RealisticPrisonAndBounty.esp|0x3881",
@@ -158,9 +144,7 @@
             "__formData|RealisticPrisonAndBounty.esp|0x1DDDA",
             "__formData|RealisticPrisonAndBounty.esp|0x1DDDB"
           ],
-          "Interior": [
-
-          ]
+          "Interior": []
         },
         "__formData|RealisticPrisonAndBounty.esp|0x3882": {
           "Main Interior": "__formData|RealisticPrisonAndBounty.esp|0x3882",
@@ -170,9 +154,7 @@
             "__formData|RealisticPrisonAndBounty.esp|0x1DDDD",
             "__formData|RealisticPrisonAndBounty.esp|0x1DDDE"
           ],
-          "Interior": [
-
-          ]
+          "Interior": []
         },
         "__formData|RealisticPrisonAndBounty.esp|0x3883": {
           "Main Interior": "__formData|RealisticPrisonAndBounty.esp|0x3883",
@@ -182,9 +164,7 @@
             "__formData|RealisticPrisonAndBounty.esp|0x1DDE0",
             "__formData|RealisticPrisonAndBounty.esp|0x1DDE1"
           ],
-          "Interior": [
-
-          ]
+          "Interior": []
         },
         "__formData|RealisticPrisonAndBounty.esp|0x3884": {
           "Main Interior": "__formData|RealisticPrisonAndBounty.esp|0x3884",
@@ -194,21 +174,13 @@
             "__formData|RealisticPrisonAndBounty.esp|0x1DDE3",
             "__formData|RealisticPrisonAndBounty.esp|0x1DDE4"
           ],
-          "Interior": [
-
-          ]
+          "Interior": []
         }
       },
-      "Prisoner Containers": [
-        "__formData|Skyrim.esm|0x3ef19"
-      ],
+      "Prisoner Containers": ["__formData|Skyrim.esm|0x3ef19"],
       "Release": {
-        "Escort": [
-          "__formData|Skyrim.esm|0x3ef19"
-        ],
-        "Teleport": [
-          "__formData|Skyrim.esm|0x3ef19"
-        ]
+        "Escort": ["__formData|Skyrim.esm|0x3ef19"],
+        "Teleport": ["__formData|Skyrim.esm|0x3ef19"]
       }
     },
     "Locations": [
@@ -222,20 +194,12 @@
     "Jail": {
       "Cells": {
         "Exterior": [],
-        "Interior": [
-          "__formData|Skyrim.esm|0x3ef08"
-        ]
+        "Interior": ["__formData|Skyrim.esm|0x3ef08"]
       },
-      "Prisoner Containers": [
-        "__formData|Skyrim.esm|0x3ef19"
-      ],
+      "Prisoner Containers": ["__formData|Skyrim.esm|0x3ef19"],
       "Release": {
-        "Escort": [
-          "__formData|Skyrim.esm|0x3ef19"
-        ],
-        "Teleport": [
-          "__formData|Skyrim.esm|0x3ef19"
-        ]
+        "Escort": ["__formData|Skyrim.esm|0x3ef19"],
+        "Teleport": ["__formData|Skyrim.esm|0x3ef19"]
       }
     },
     "Locations": [
@@ -249,20 +213,12 @@
     "Jail": {
       "Cells": {
         "Exterior": [],
-        "Interior": [
-          "__formData|RealisticPrisonAndBounty.esp|0x3896"
-        ]
+        "Interior": ["__formData|RealisticPrisonAndBounty.esp|0x3896"]
       },
-      "Prisoner Containers": [
-        "__formData|Skyrim.esm|0x3ef19"
-      ],
+      "Prisoner Containers": ["__formData|Skyrim.esm|0x3ef19"],
       "Release": {
-        "Escort": [
-          "__formData|Skyrim.esm|0x3ef19"
-        ],
-        "Teleport": [
-          "__formData|Skyrim.esm|0x3ef19"
-        ]
+        "Escort": ["__formData|Skyrim.esm|0x3ef19"],
+        "Teleport": ["__formData|Skyrim.esm|0x3ef19"]
       }
     },
     "Locations": [
@@ -287,16 +243,10 @@
           "__formData|RealisticPrisonAndBounty.esp|0x3895"
         ]
       },
-      "Prisoner Containers": [
-        "__formData|Skyrim.esm|0x3ef19"
-      ],
+      "Prisoner Containers": ["__formData|Skyrim.esm|0x3ef19"],
       "Release": {
-        "Escort": [
-          "__formData|Skyrim.esm|0x3ef19"
-        ],
-        "Teleport": [
-          "__formData|Skyrim.esm|0x3ef19"
-        ]
+        "Escort": ["__formData|Skyrim.esm|0x3ef19"],
+        "Teleport": ["__formData|Skyrim.esm|0x3ef19"]
       }
     },
     "Locations": [
@@ -317,16 +267,10 @@
           "__formData|RealisticPrisonAndBounty.esp|0x3888"
         ]
       },
-      "Prisoner Containers": [
-        "__formData|Skyrim.esm|0x3ef19"
-      ],
+      "Prisoner Containers": ["__formData|Skyrim.esm|0x3ef19"],
       "Release": {
-        "Escort": [
-          "__formData|Skyrim.esm|0x3ef19"
-        ],
-        "Teleport": [
-          "__formData|Skyrim.esm|0x3ef19"
-        ]
+        "Escort": ["__formData|Skyrim.esm|0x3ef19"],
+        "Teleport": ["__formData|Skyrim.esm|0x3ef19"]
       }
     },
     "Locations": [
