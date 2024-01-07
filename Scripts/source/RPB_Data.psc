@@ -123,7 +123,7 @@ endFunction
 ;/
     Checks if the object has the specified property.
 
-    any&    @apObject: The reference to the object to check.
+    JMap&   @apObject: The reference to the object to check.
     string  @asPropertyName: The property to check the existence of in the object.
 
     returns (bool): Whether or not the property exists in this object.
@@ -206,6 +206,67 @@ Form[] function Jail_GetGuards(int apHoldJailObject) global
     int array_guards = JMap.getObj(apHoldJailObject, "Guards") ; JArray& (Form[])
     return JArray.asFormArray(array_guards)
 endFunction
+
+;/
+    Retrieves a root property of type bool from a Prison.
+
+    JMap&           @apHoldJailObject: The reference to the jail object.
+    string          @asProperty: The name of the property.
+
+    returns (bool): A root property of type bool from the Prison.
+/;
+bool function Jail_GetRootPropertyOfTypeBool(int apHoldJailObject, string asProperty) global
+    return Jail_GetRootPropertyOfTypeInt(apHoldJailObject, asProperty) as bool
+endFunction
+
+;/
+    Retrieves a root property of type int from a Prison.
+
+    JMap&           @apHoldJailObject: The reference to the jail object.
+    string          @asProperty: The name of the property.
+
+    returns (int): A root property of type int from the Prison.
+/;
+int function Jail_GetRootPropertyOfTypeInt(int apHoldJailObject, string asProperty) global
+    return JMap.getInt(apHoldJailObject, asProperty)
+endFunction
+
+;/
+    Retrieves a root property of type float from a Prison.
+
+    JMap&           @apHoldJailObject: The reference to the jail object.
+    string          @asProperty: The name of the property.
+
+    returns (float): A root property of type float from the Prison.
+/;
+float function Jail_GetRootPropertyOfTypeFloat(int apHoldJailObject, string asProperty) global
+    return JMap.getFlt(apHoldJailObject, asProperty)
+endFunction
+
+;/
+    Retrieves a root property of type string from a Prison.
+
+    JMap&           @apHoldJailObject: The reference to the jail object.
+    string          @asProperty: The name of the property.
+
+    returns (string): A root property of type string from the Prison.
+/;
+string function Jail_GetRootPropertyOfTypeString(int apHoldJailObject, string asProperty) global
+    return JMap.getStr(apHoldJailObject, asProperty)
+endFunction
+
+;/
+    Retrieves a root property of type Form from a Prison.
+
+    JMap&           @apHoldJailObject: The reference to the jail object.
+    Form          @asProperty: The name of the property.
+
+    returns (Form): A root property of type Form from the Prison.
+/;
+Form function Jail_GetRootPropertyOfTypeForm(int apHoldJailObject, string asProperty) global
+    return JMap.getForm(apHoldJailObject, asProperty)
+endFunction
+
 
 ;/
     Retrieves the parent Forms of the jail cells.
@@ -555,7 +616,7 @@ endFunction
     JFormMap&       @apPrisonCellsObject: The reference to the Cells object for the given Prison (Cells in the data file).
     RPB_JailCell    @akJailCell: The jail cell to check the existence of options.
     string          @asOption: The name of the option to check.
-    string          @asOptionCategory: The category of options to check.
+    string?         @asOptionCategory: The category of options to check.
     bool?           @abCheckEmptyContent: Whether to check for the options' empty content.
 
     returns (bool): Whether the jail cell has options of the specified type.
@@ -568,7 +629,7 @@ bool function JailCell_HasOption(int apPrisonCellsObject, RPB_JailCell akJailCel
     if (asOptionCategory != "null")
         bool optionCategoryExists = JMap.hasKey(map_options, asOptionCategory)
         if (!optionCategoryExists)
-            Error(none, "Data::HasJailCellOption", "Option category " + asOptionCategory + " does not exist!")
+            Error(none, "Data::HasJailCellOption", "Option category " + asOptionCategory + " does not exist for jail cell " + akJailCell + "!")
             return false
         endif
 
@@ -608,8 +669,8 @@ bool function JailCell_HasObjects(int apPrisonCellsObject, RPB_JailCell akJailCe
         int subObjectsCategoryContainer = JMap.getObj(map_objects, asObjectCategory) ; JArray&
         bool isEmpty = JValue.empty(subObjectsCategoryContainer)
 
-        Debug(none, "Data::JailCell_HasObjects", "Objects("+ subObjectsCategoryContainer +"): " + GetContainerList(subObjectsCategoryContainer))
-        Debug(none, "Data::JailCell_HasObjects", "Empty:" + isEmpty + ", Returns: " + (map_objects && !isEmpty))
+        ; Debug(none, "Data::JailCell_HasObjects", "Objects("+ subObjectsCategoryContainer +"): " + GetContainerList(subObjectsCategoryContainer))
+        ; Debug(none, "Data::JailCell_HasObjects", "Empty:" + isEmpty + ", Returns: " + (map_objects && !isEmpty))
 
         return map_objects && !isEmpty
     endif
@@ -626,7 +687,7 @@ endFunction
     returns (Form[]): The jail release markers with the parameters specified.
 /;
 Form[] function Jail_GetReleaseMarkers(int apHoldJailObject, string asTeleportOrEscort) global
-    if (asTeleportOrEscort != "Teleport" || asTeleportOrEscort != "Escort")
+    if (asTeleportOrEscort != "Teleport" && asTeleportOrEscort != "Escort")
         return none
     endif
 
@@ -639,14 +700,28 @@ endFunction
 ;/
     Retrieves the prisoner containers from the hold's jail through the jail item.
 
-    int @apHoldJailObject: The reference to the jail item of the hold.
+    int     @apHoldJailObject: The reference to the jail item of the hold.
+    string  @asPrisonerContainerType: The type of prisoner container to get, options are: Belongings, Evidence.
 
-    returns (Form[]): The prisoner containers for this jail.
+    returns (Form[]): The prisoner containers of the specified type for this jail.
 /;
-Form[] function Jail_GetPrisonerContainers(int apHoldJailObject) global
-    int array_prisonerContainers  = JMap.getObj(apHoldJailObject, "Prisoner Containers") ; JArray&
-    return JArray.asFormArray(array_prisonerContainers)
+Form[] function Jail_GetPrisonerContainers(int apHoldJailObject, string asPrisonerContainerType = "Belongings") global
+    if (asPrisonerContainerType != "Belongings" && asPrisonerContainerType != "Evidence")
+        return none
+    endif
+
+    int map_prisonerContainers          = JMap.getObj(apHoldJailObject, "Prisoner Containers")          ; JMap&
+    int array_prisonerContainersOfType  = JMap.getObj(map_prisonerContainers, asPrisonerContainerType)  ; JArray&
+
+    Debug(none, "Data::Jail_GetPrisonerContainers", "map_prisonerContainers: " + GetContainerList(map_prisonerContainers) + ", array_prisonerContainersOfType: " + GetContainerList(array_prisonerContainersOfType))
+
+
+    return JArray.asFormArray(array_prisonerContainersOfType)
 endFunction
+; Form[] function Jail_GetPrisonerContainers(int apHoldJailObject) global
+;     int array_prisonerContainers  = JMap.getObj(apHoldJailObject, "Prisoner Containers") ; JArray&
+;     return JArray.asFormArray(array_prisonerContainers)
+; endFunction
 
 
 ; ==========================================================

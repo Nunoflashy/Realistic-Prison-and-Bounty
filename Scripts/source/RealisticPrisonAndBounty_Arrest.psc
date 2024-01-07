@@ -163,6 +163,25 @@ bool function RegisterArrestedActor(RPB_Arrestee akArresteeRef, Actor akArrestee
 endFunction
 
 ;/
+    Retrieves the Hold's data object.
+
+    string  @asHold: The hold to retrieve the data object from.
+    string? @asHoldObjectCategory: The category of object to get from the Hold object.
+
+    returns (any& <JContainer>): The reference to the Hold data object, or an object inside the Hold object if a category is specified.
+/;
+int function GetDataObjectForHold(string asHold, string asHoldObjectCategory = "null")
+    int rootObject      = RPB_Data.GetRootObject(asHold) ; JMap&
+    int returnedObject  = rootObject
+
+    if (asHoldObjectCategory != "null")
+        returnedObject = JMap.getObj(rootObject, asHoldObjectCategory) ; any& <JContainer>
+    endif
+
+    return returnedObject
+endFunction
+
+;/
     Removes @akArrestee from its currently bound instance of RPB_Arrestee.
 
     Used when this Actor is Released or Imprisoned.

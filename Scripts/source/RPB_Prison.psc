@@ -945,7 +945,7 @@ int function GetDataObject(string asPrisonObjectCategory = "null")
     if (asPrisonObjectCategory != "null")
         returnedObject = JMap.getObj(prisonObject, asPrisonObjectCategory) ; any& <JContainer>
     endif
-
+    
     return returnedObject
 endFunction
 
@@ -1005,6 +1005,16 @@ function ConfigurePrison( \
 
     __isInitialized     = true
 
+    Form randomPrisonerContainer = self.GetRandomPrisonerContainer()
+
+    Form oppositeContainer = self.GetPrisonerContainerLinkedWithOppositeType(randomPrisonerContainer, "Evidence")
+    Debug(none, "Prison::ConfigurePrison", "Evidence Link Of Belongings Container " + randomPrisonerContainer + ": " + oppositeContainer)
+    Debug(none, "Prison::ConfigurePrison", "Prisoner Containers: " + self.GetPrisonerContainers())
+
+    if (randomPrisonerContainer)
+        Config.Player.RemoveAllItems(randomPrisonerContainer as ObjectReference, true, true)
+    endif
+
     ; Initialize all of the jail cells belonging to this prison
     self.SetupCells() ; To be changed, this will only work if the Player is present in the scene
 
@@ -1035,6 +1045,7 @@ bool function BindCellToPrisoner(ObjectReference akJailCell, RPB_Prisoner akPris
     if (!jailCell.IsInitialized())
         ; Binds the jail cell to this Prison
         jailCell.BindPrison(self)
+        jailCell.ScanCellDoor()
     endif
 
     ; ; Binds the jail cell to this Prison
@@ -1063,22 +1074,21 @@ bool function BindCellToPrisoner(ObjectReference akJailCell, RPB_Prisoner akPris
 endFunction
 
 
+
 function SetupCells()
     if (self.Hold != "Haafingar")
         return
     endif
 
     float startBench = StartBenchmark()
-    Form[] cells = self.GetJailCells()
 
     int i = 0
-    while (i < cells.Length)
-        RPB_JailCell jailCell = cells[i] as RPB_JailCell
+    while (i < JailCells.Length)
+        RPB_JailCell jailCell = JailCells[i] as RPB_JailCell
 
-        if (jailCell == GetFormFromMod(0x3879))
+        if (jailCell == GetFormFromMod(0x3879) || jailCell == Game.GetFormEx(0x36897))
             if (!jailCell.IsInitialized())
-                jailCell.BindPrison(self)
-                jailCell.DetermineMarkers()
+                jailCell.Initialize(self)
     
                 Debug(none, "Prison::SetupCells", "Jail Cell: " + jailCell + " - " + "HasOption(Maximum Prisoners):" + jailCell.HasOption("Maximum Prisoners") + ", HasObjects(Beds): " + jailCell.HasObjects("Beds"))
     
@@ -1106,13 +1116,70 @@ function SetupCells()
 endFunction
 
 
-Form[] function GetPrisonerContainers()
-    return RPB_Data.Jail_GetPrisonerContainers(self.GetDataObject())
+Form[] function GetPrisonerContainers(string asPrisonerContainerType = "Belongings")
+    return RPB_Data.Jail_GetPrisonerContainers(self.GetDataObject(), asPrisonerContainerType)
 endFunction
 
-Form function GetRandomPrisonerContainer()
-    Form[] allPrisonerContainers = self.GetPrisonerContainers()
+Form function GetRandomPrisonerContainer(string asPrisonerContainerType = "Belongings")
+    Form[] allPrisonerContainers = self.GetPrisonerContainers(asPrisonerContainerType)
     return allPrisonerContainers[Utility.RandomInt(0, allPrisonerContainers.Length - 1)]
+endFunction
+
+;/
+    Retrieves a prisoner container linked with its opposite type counterpart.
+    (e.g: The first container of type Belongings will be linked to the first container of type Evidence,
+    which means that this function will always return the same container index for the opposite type.)
+
+    This function is useful if one wants to make a relationship between containers, for example make them close to eachother,
+    and when getting a random container of type Belongings to store the prisoner's items, the linked Evidence container will be used to store
+    their evidence/stolen items.
+
+    Form    @akOppositeTypePrisonerContainer: The opposite type of prisoner container to obtain the link from.
+    string  @asPrisonerContainerType: The type of prisoner container to obtain.
+
+    returns (Form): The prisoner container of the specified type with the link to its opposite counterpart.
+/;
+Form function GetPrisonerContainerLinkedWithOppositeType(Form akOppositeTypePrisonerContainer, string asPrisonerContainerType)
+    if (asPrisonerContainerType != "Belongings" && asPrisonerContainerType != "Evidence")
+        return none
+    endif
+
+    int prisonerContainersObj = self.GetDataObject("Prisoner Containers") ; JMap&
+
+    ; Get the opposite type of prisoner container
+    string oppositeContainerType = string_if (asPrisonerContainerType == "Belongings", "Evidence", "Belongings")
+
+    if (asPrisonerContainerType == oppositeContainerType) ; Invalid, must not specify the same container type
+        return none
+    endif
+
+    int oppositeContainersObj   = JMap.getObj(prisonerContainersObj, oppositeContainerType)     ; JArray& (Form[])
+    int containersObj           = JMap.getObj(prisonerContainersObj, asPrisonerContainerType)   ; JArray& (Form[])
+
+    int oppositeContainersSize  = JValue.count(oppositeContainersObj)
+    int containersSize          = JValue.count(containersObj)
+
+    ; Either one or both container types do not contain any containers, can't proceed
+    if (oppositeContainersSize == 0 || containersSize == 0)
+        return none
+    endif
+
+    int i = 0
+    while (i < oppositeContainersSize)
+        ; if (i > containersSize)
+        ;     ; Opposite container is at an index greater than what their possible link counterpart could be. can't proceed
+        ;     return none
+        ; endif
+
+        Form currentContainer = JArray.getForm(oppositeContainersObj, i)
+        if (currentContainer == akOppositeTypePrisonerContainer)
+            ; Found the linked counterpart container
+            return JArray.getForm(containersObj, i)
+        endif
+        i += 1
+    endWhile
+
+    return none
 endFunction
 
 Form function GetJailCellExterior(RPB_JailCell akJailCell)
@@ -1407,6 +1474,32 @@ int __prisonersIndex
 RPB_JailCell[] __prisonCells
 
 bool __isInitialized
+
+; =========================================================
+;                         Data Config                      
+; =========================================================
+
+;                       Root Properties                    
+; =========================================================
+bool function GetRootPropertyOfTypeBool(string asPropertyName)
+    return RPB_Data.Jail_GetRootPropertyOfTypeBool(self.GetDataObject(), asPropertyName)
+endFunction
+
+int function GetRootPropertyOfTypeInt(string asPropertyName)
+    return RPB_Data.Jail_GetRootPropertyOfTypeInt(self.GetDataObject(), asPropertyName)
+endFunction
+
+float function GetRootPropertyOfTypeFloat(string asPropertyName)
+    return RPB_Data.Jail_GetRootPropertyOfTypeFloat(self.GetDataObject(), asPropertyName)
+endFunction
+
+string function GetRootPropertyOfTypeString(string asPropertyName)
+    return RPB_Data.Jail_GetRootPropertyOfTypeString(self.GetDataObject(), asPropertyName)
+endFunction
+
+Form function GetRootPropertyOfTypeForm(string asPropertyName)
+    return RPB_Data.Jail_GetRootPropertyOfTypeForm(self.GetDataObject(), asPropertyName)
+endFunction
 
 ; ; ==========================================================
 

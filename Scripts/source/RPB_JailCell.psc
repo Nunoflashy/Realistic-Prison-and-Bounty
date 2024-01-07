@@ -31,6 +31,10 @@ endProperty
 RPB_Prison __prison
 RPB_Prison property Prison
     RPB_Prison function get()
+        if (!__prison)
+            ErrorProperty("["+ self +"] JailCell::Prison", "Prison is null, this may result in undefined behavior!")
+        endif
+
         return __prison
     endFunction
 endProperty
@@ -38,6 +42,10 @@ endProperty
 RPB_CellDoor __cellDoor
 RPB_CellDoor property CellDoor
     RPB_CellDoor function get()
+        if (!__cellDoor)
+            ErrorProperty("["+ self +"] JailCell::CellDoor", "CellDoor is null, this may result in undefined behavior!")
+        endif
+
         return __cellDoor
     endFunction
 endProperty
@@ -150,7 +158,7 @@ bool __allowOvercrowding
 bool property AllowOvercrowding
     bool function get()
         if (!__allowOvercrowding)
-            __allowOvercrowding = self.GetOptionBool("Allow Overcrowding")
+            __allowOvercrowding = self.GetOptionOfTypeBool("Allow Overcrowding")
         endif
 
         return __allowOvercrowding
@@ -211,7 +219,7 @@ float __cellRadius
 float property CellRadius
     float function get()
         if (!__cellRadius)
-            __cellRadius = self.GetOptionFloat("Interior Radius", "Scan")
+            __cellRadius = self.GetOptionOfTypeFloat("Interior Radius", "Scan")
         endif
 
         return __cellRadius
@@ -223,7 +231,7 @@ int __scanIterations
 int property ScanIterations
     int function get()
         if (!__scanIterations)
-            __scanIterations = self.GetOptionInt("Iterations", "Scan")
+            __scanIterations = self.GetOptionOfTypeInt("Iterations", "Scan")
         endif
 
         return __scanIterations
@@ -235,7 +243,7 @@ int __maxPrisoners
 int property MaxPrisoners
     int function get()
         if (!__maxPrisoners)
-            __maxPrisoners = self.GetOptionInt("Maximum Prisoners")
+            __maxPrisoners = self.GetOptionOfTypeInt("Maximum Prisoners")
 
             if (!__maxPrisoners)
                 ; Since there's no Max Prisoners property, make the max the same as the number of beds in the cell
@@ -253,7 +261,7 @@ int property MaxPrisoners
     endFunction
 
     function set(int value)
-        int configOption = self.GetOptionInt("Maximum Prisoners")
+        int configOption = self.GetOptionOfTypeInt("Maximum Prisoners")
 
         if (configOption)
             LogProperty(none, "JailCell::MaxPrisoners", "Property is retrieved from data file, make sure the value is supposed to be changing!")
@@ -283,10 +291,6 @@ ObjectReference function GetCellObject(Keyword akPropType)
 endFunction
 
 function DetermineMarkers()
-    int jailItem = Prison.GetDataObject()
-    ; Form[] interiorChildMarkers = Config.GetJailCellChildMarkers(jailItem, self, "Interior")
-    ; Form[] exteriorChildMarkers = Config.GetJailCellChildMarkers(jailItem, self, "Exterior")
-
     Form[] interiorChildMarkers = RPB_Data.JailCell_GetChildren(Prison.GetDataObject("Cells"), self, "Interior")
     Form[] exteriorChildMarkers = RPB_Data.JailCell_GetChildren(Prison.GetDataObject("Cells"), self, "Exterior")
 
@@ -356,9 +360,30 @@ function RemoveGenderExclusiveness()
     Debug(self, "JailCell::RemoveGenderExclusiveness", self + " is no longer a gender exclusive cell.")
 endFunction
 
-; Scans the jail cell to update any properties accordingly
-function Scan()
+; RPB_CellDoor function ScanCellDoor()
+;     int jailBaseDoorIdForPrison = GetJailBaseDoorID(self.Prison.Hold) ; Base ID of any Door from this Prison
+;     RPB_CellDoor _cellDoor      = GetNearestJailDoorOfType(jailBaseDoorIdForPrison, self, 4000) as RPB_CellDoor
+;     return _cellDoor
+; endFunction
 
+function ScanCellDoor(bool abForceAssignment = false)
+    if (CellDoor && !abForceAssignment)
+        return
+    endif
+
+    Form baseCellDoor = Prison.GetRootPropertyOfTypeForm("Base Cell Door")
+
+    int jailBaseDoorIdForPrison = GetJailBaseDoorID(self.Prison.Hold) ; Base ID of any Door from this Prison
+    RPB_CellDoor _cellDoor      = GetNearestJailDoorOfTypeEx(baseCellDoor, self, 4000) as RPB_CellDoor
+
+    if (_cellDoor)
+        ; Bind the cell door to the jail cell
+        self.BindCellDoor(_cellDoor)
+        Debug(self, "["+ self +"] JailCell::ScanCellDoor", "Could not find a configured cell door, scanning for the nearest one!")
+        return
+    endif
+
+    Error(self, "["+ self +"] JailCell::ScanCellDoor", "Could not assign a cell door to this jail cell!")
 endFunction
 
 ; Unreliable, since it can scan beds from other cells that are near one of the scanned beds in this cell. (this is because beds are not in the same place on all the cells, and the radius of the scan will get other beds from other cells.)
@@ -511,6 +536,19 @@ endEvent
 ;                         Management
 ; =========================================================
 
+; Probably gonna be unused, we'll see
+int function GetDataObject(string asSubCategory = "null")
+    int cellsObj    = Prison.GetDataObject("Cells")     ; JFormMap&
+    int thisCellObj = JFormMap.getObj(cellsObj, self)   ; JMap&
+    int returnedObj = thisCellObj
+
+    if (asSubCategory != "null")
+        returnedObj = JMap.getObj(thisCellObj, asSubCategory)
+    endif
+
+    return returnedObj
+endFunction
+
 bool function ShouldPerformScan(string asScanTarget)
     if (!self.HasOption("Iterations", "Scan") || !self.HasOption("Interior Radius", "Scan"))
         ; Iterations and Radius not configured, cannot perform scan
@@ -531,22 +569,6 @@ bool function ShouldPerformScan(string asScanTarget)
     return false
 endFunction
 
-int function LockLevelAsInteger(string asLockLevel) global
-    if (asLockLevel == "Novice")
-        return 1
-    elseif (asLockLevel == "Apprentice")
-        return 25
-    elseif (asLockLevel == "Adept")
-        return 50
-    elseif (asLockLevel == "Expert")
-        return 75
-    elseif (asLockLevel == "Master")
-        return 100
-    elseif (asLockLevel == "Requires Key")
-        return 255
-    endif
-endFunction
-
 ;/
     Determines if this JailCell... this should be in CellDoor
 /;
@@ -555,37 +577,34 @@ bool function IsRegisteredCellDoorInPrison(int aiCellDoorFormID)
 endFunction
 
 bool function IsInitialized()
-    return self.Prison && self.CellDoor
+    return __prison && __cellDoor
 endFunction
 
-function Initialize()
-    string lockLevel    = self.GetOptionString("Lock Level")
-    int lockLevelAsInt  = LockLevelAsInteger(lockLevel)
-    Debug(self, "JailCell::Initialize", "Lock Level: " + lockLevel + ", As Integer: " + lockLevelAsInt + ", Door: " + CellDoor)
+function Initialize(RPB_Prison apPrison)
+    int cellObj = self.GetDataObject()
+    Debug(self, "["+ self +"] JailCell::Initialize", "Jail Cell Config: " + GetContainerList(cellObj))
+    
+    ; Link the actual Prison with this Jail Cell
+    self.BindPrison(apPrison)
 
-    CellDoor.SetLockLevel(lockLevelAsInt)
+    RPB_CellDoor configuredCellDoor = self.GetRootPropertyOfTypeForm("Cell Door") as RPB_CellDoor
+
+    if (configuredCellDoor)
+        ; Bind the cell door to the jail cell
+        self.BindCellDoor(configuredCellDoor)
+    endif
+
+    ; Determine all markers for this cell
+    self.DetermineMarkers()
 endFunction
 
 function BindPrison(RPB_Prison akPrison)
     __prison = akPrison
 
     if (!self.Prison)
-        Debug(self, "JailCell::BindPrison", "Could not bind the jail cell " + self + " to the Prison " + akPrison)
+        Debug(self, "["+ self +"] JailCell::BindPrison", "Could not bind the jail cell " + self + " to the Prison " + akPrison)
         return
     endif
-
-    ; ; Assign all of the child markers for this jail cell (Done in RPB_Prison::SetupCells())
-    ; self.DetermineMarkers()
-
-    ; Get the cell door belonging to this jail cell (by scanning for the nearest door of the type requested)
-    int jailBaseDoorIdForPrison = GetJailBaseDoorID(self.Prison.Hold)
-    ; RPB_CellDoor _cellDoor = GetNearestJailDoorOfType(jailBaseDoorIdForPrison, self, 4000) as RPB_CellDoor
-    ObjectReference _cellDoor = GetNearestJailDoorOfType(jailBaseDoorIdForPrison, self, 4000)
-
-
-    ; Bind the cell door to the jail cell
-    self.BindCellDoor(_cellDoor as RPB_CellDoor)
-    self.Initialize()
 endFunction
 
 function BindCellDoor(RPB_CellDoor akCellDoor)
@@ -594,6 +613,9 @@ function BindCellDoor(RPB_CellDoor akCellDoor)
 
     ; Bind this jail cell to the cell door (to retrieve this from the cell door)
     akCellDoor.BindCell(self)
+
+    ; Initialize the cell door properties
+    akCellDoor.Initialize()
 endFunction
 
 ;/
@@ -626,7 +648,9 @@ function DetermineCellParameters()
         Form prisonerForm = JMap.getForm(__prisonersInCell, JMap.getNthKey(__prisonersInCell, 0)) ; Get the first prisoner
         RPB_Prisoner prisonerRef = Prison.GetPrisonerReference(prisonerForm as Actor)
 
-        ; If the first prisoner will be/is stripped naked / to underwear, set this cell as gender exclusive for them if the cell is not yet gender exclusive
+        ; If the first prisoner will be/is stripped naked / to underwear, set this cell as gender exclusive for them if the cell is not yet gender exclusive,
+        ; this means that the first prisoner has not been stripped naked or to underwear.
+        ; (Not implemented yet): We should probably make the first prisoner strip off (maybe in some condition, such as having more than a day left of sentence for example.)
         if (!self.IsGenderExclusive && (prisonerRef.WillBeStrippedNaked || prisonerRef.WillBeStrippedToUnderwear) || (prisonerRef.IsStrippedNaked || prisonerRef.IsStrippedToUnderwear))
             self.SetExclusiveToPrisonerSex(prisonerRef)
         endif
@@ -638,46 +662,68 @@ function DetermineCellParameters()
     endif
 endFunction
 
-bool function GetOptionBool(string asOption, string asOptionCategory = "null")
+; =========================================================
+;                         Data Config                      
+; =========================================================
+
+;                       Root Properties                    
+; =========================================================
+bool function GetRootPropertyOfTypeBool(string asPropertyName)
+    return RPB_Data.JailCell_GetRootPropertyOfTypeBool(Prison.GetDataObject("Cells"), self, asPropertyName)
+endFunction
+
+int function GetRootPropertyOfTypeInt(string asPropertyName)
+    return RPB_Data.JailCell_GetRootPropertyOfTypeInt(Prison.GetDataObject("Cells"), self, asPropertyName)
+endFunction
+
+float function GetRootPropertyOfTypeFloat(string asPropertyName)
+    return RPB_Data.JailCell_GetRootPropertyOfTypeFloat(Prison.GetDataObject("Cells"), self, asPropertyName)
+endFunction
+
+string function GetRootPropertyOfTypeString(string asPropertyName)
+    return RPB_Data.JailCell_GetRootPropertyOfTypeString(Prison.GetDataObject("Cells"), self, asPropertyName)
+endFunction
+
+Form function GetRootPropertyOfTypeForm(string asPropertyName)
+    return RPB_Data.JailCell_GetRootPropertyOfTypeForm(Prison.GetDataObject("Cells"), self, asPropertyName)
+endFunction
+
+;                           Options                        
+; =========================================================
+bool function GetOptionOfTypeBool(string asOption, string asOptionCategory = "null")
     return RPB_Data.JailCell_GetOptionOfTypeBool(Prison.GetDataObject("Cells"), self, asOption, asOptionCategory)
 endFunction
 
-int function GetOptionInt(string asOption, string asOptionCategory = "null")
+int function GetOptionOfTypeInt(string asOption, string asOptionCategory = "null")
     return RPB_Data.JailCell_GetOptionOfTypeInt(Prison.GetDataObject("Cells"), self, asOption, asOptionCategory)
 endFunction
 
-float function GetOptionFloat(string asOption, string asOptionCategory = "null")
+float function GetOptionOfTypeFloat(string asOption, string asOptionCategory = "null")
     return RPB_Data.JailCell_GetOptionOfTypeFloat(Prison.GetDataObject("Cells"), self, asOption, asOptionCategory)
 endFunction
 
-string function GetOptionString(string asOption, string asOptionCategory = "null")
+string function GetOptionOfTypeString(string asOption, string asOptionCategory = "null")
     return RPB_Data.JailCell_GetOptionOfTypeString(Prison.GetDataObject("Cells"), self, asOption, asOptionCategory)
 endFunction
 
-Form function GetOptionForm(string asOption, string asOptionCategory = "null")
+Form function GetOptionOfTypeForm(string asOption, string asOptionCategory = "null")
     return RPB_Data.JailCell_GetOptionOfTypeForm(Prison.GetDataObject("Cells"), self, asOption, asOptionCategory)
 endFunction
 
-Form[] function GetConfigObjects(string asObjectCategory)
-    return RPB_Data.JailCell_GetObjects(Prison.GetDataObject("Cells"), self, asObjectCategory)
+bool function HasOption(string asOption, string asOptionCategory = "null")
+    return RPB_Data.JailCell_HasOption(Prison.GetDataObject("Cells"), self, asOption, asOptionCategory)
 endFunction
 
-bool function HasOption(string asOption, string asOptionCategory = "null")
-    ; Debug(none, "JailCell::HasOption", self + "["+ asOptionCategory + "::" + asOption +"] Meets Criteria: " + RPB_Data.HasJailCellOption(Prison.GetDataObject(), self, asOption, asOptionCategory))
-    return RPB_Data.JailCell_HasOption(Prison.GetDataObject("Cells"), self, asOption, asOptionCategory)
+;                         Objects                          
+; =========================================================
+Form[] function GetConfigObjects(string asObjectCategory)
+    return RPB_Data.JailCell_GetObjects(Prison.GetDataObject("Cells"), self, asObjectCategory)
 endFunction
 
 bool function HasObjects(string asObjectCategory)
     return RPB_Data.JailCell_HasObjects(Prison.GetDataObject("Cells"), self, asObjectCategory, true)
 endFunction
 
-function DetermineCellAvailability()
-
-endFunction
-
-; bool function IsCellDoorBound()
-;     return MiscVars.GetReference("Cell["+ self.GetFormID() +"]->Cell/Door") != none
-; endFunction
 
 string function GetIdentifier()
     return "Cell["+ self.GetFormID() +"]"
@@ -688,7 +734,7 @@ bool function IsBoundToPrisoner(RPB_Prisoner akPrisoner)
 endFunction
 
 ; =========================================================
-;                         Cell Vars                      
+;                         Cell Vars                       
 ; =========================================================
 
 string function __getCellIdentifierVarKey(string asVarName)

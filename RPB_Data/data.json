@@ -56,6 +56,7 @@
       }
     },
     "Jail": {
+      "Base Cell Door": "__formData|Skyrim.esm|0x5E91D",
       "Options": {
         "Stripping": {
           "Location": ["Cell", "Jail"]
@@ -71,7 +72,8 @@
         },
         "__formData|Skyrim.esm|0x36897": {
           "Main Interior": "__formData|Skyrim.esm|0x36897",
-          "Active": false,
+          "Active": true,
+          "Cell Door": "__formData|Skyrim.esm|0x5E921",
           "Options": {
             "Lock Level": "Requires Key",
             "Scan": {
@@ -90,7 +92,8 @@
         "__formData|RealisticPrisonAndBounty.esp|0x3879": {
           "Main Interior": "__formData|RealisticPrisonAndBounty.esp|0x3879",
           "Main Exterior": null,
-          "Active": true,
+          "Active": false,
+          "Cell Door": "__formData|Skyrim.esm|0x5E91F",
           "Objects": {
             "Beds": ["__formData|Skyrim.esm|0xCE7EB"],
             "Containers": ["__formData|RealisticPrisonAndBounty.esp|0x1DDD6"],
@@ -177,7 +180,14 @@
           "Interior": []
         }
       },
-      "Prisoner Containers": ["__formData|Skyrim.esm|0x3ef19"],
+      "Prisoner Containers": {
+        "Belongings": [
+          "__formData|Skyrim.esm|0x3EEFF"
+        ],
+        "Evidence": [
+          "__formData|Skyrim.esm|0x108D37"
+        ]
+      },
       "Release": {
         "Escort": ["__formData|Skyrim.esm|0x3ef19"],
         "Teleport": ["__formData|Skyrim.esm|0x3ef19"]

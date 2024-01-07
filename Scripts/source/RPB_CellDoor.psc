@@ -103,21 +103,31 @@ event OnOpen(ObjectReference akActionRef)
 
     Debug(self, "CellDoor::OnOpen", akActionRef + " opened cell door " + self + ", which belongs to jail cell " + self.JailCell)
 
-endevent
+endEvent
 
 event OnClose(ObjectReference akActionRef)
     if (!self.IsRegisteredCellDoor())
         return
     endif
 
-endevent
+endEvent
 
 ; =========================================================
 ;                         Management
 ; =========================================================
 
+function Initialize()
+    ; Initialize cell door properties
+    string lockLevel    = JailCell.GetOptionOfTypeString("Lock Level") ; Later change to CellDoor.GetOptionOfTypeString() perhaps, as this is really a Cell Door option and not a Jail Cell one, or pass a param that takes this CellDoor
+    int lockLevelAsInt  = LockLevelAsInteger(lockLevel)
+
+    Debug(self, "["+ self +"] CellDoor::Initialize", "Lock Level: " + lockLevel + ", As Integer: " + lockLevelAsInt + ", Door: " + self)
+
+    self.SetLockLevel(lockLevelAsInt)
+endFunction
+
 ;/
-    Determines if this is a registered cell door for an RPB_JailCell in a RPB_Prison.
+    Determines if this is a registered cell door for a RPB_JailCell in a RPB_Prison.
 
     This is used to determine if we should process events and functions on this cell door,
     to avoid execution of this script on other cell doors that were not registered for this Prison/Cell.
@@ -142,6 +152,23 @@ function BindCell(RPB_JailCell akJailCell)
     __jailCell = akJailCell
     ; Debug(self, "JailCell::BindCell", "Jail cell " + __jailCell + " bound to cell door " + self)
 endFunction
+
+int function LockLevelAsInteger(string asLockLevel) global
+    if (asLockLevel == "Novice")
+        return 1
+    elseif (asLockLevel == "Apprentice")
+        return 25
+    elseif (asLockLevel == "Adept")
+        return 50
+    elseif (asLockLevel == "Expert")
+        return 75
+    elseif (asLockLevel == "Master")
+        return 100
+    elseif (asLockLevel == "Requires Key")
+        return 255
+    endif
+endFunction
+
 
 ; =========================================================
 ;                         Cell Vars                      

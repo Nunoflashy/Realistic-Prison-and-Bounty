@@ -107,6 +107,10 @@ function LogProperty(Form script, string prop, string logInfo, int logLevel = 0)
     ; Without property:               [ModName] INFO: Message
 endFunction
 
+function ErrorProperty(string asProperty, string asLogInfo) global
+    debug.trace("[" + ModName() + "] ERROR (PROPERTY): " + asProperty + " -> " + asLogInfo)
+endFunction
+
 function LogPropertyNull(Form script, string prop, int logLevel = 1) global
     LogProperty(script, prop, "Property is null!", logLevel)
 endfunction
@@ -812,6 +816,11 @@ ObjectReference function GetNearestJailDoorOfType(int jailBaseDoorId, ObjectRefe
     ; endWhile
 
     return none
+endFunction
+
+ObjectReference function GetNearestJailDoorOfTypeEx(Form akJailBaseDoor, ObjectReference akCenterRef, float afRadius) global
+    ObjectReference _cellDoor = Game.FindClosestReferenceOfTypeFromRef(akJailBaseDoor, akCenterRef, afRadius)
+    return _cellDoor
 endFunction
 
 ObjectReference function GetRandomJailDoorOfType(int jailBaseDoorId, ObjectReference centerRef, float radius) global
