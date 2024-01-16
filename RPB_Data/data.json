@@ -73,9 +73,34 @@
         "__formData|Skyrim.esm|0x36897": {
           "Main Interior": "__formData|Skyrim.esm|0x36897",
           "Active": true,
-          "Cell Door": "__formData|Skyrim.esm|0x5E921",
+          "String List": ["First Item", "Second Item"],
+          "Cell Doors": {
+            "__metaInfo": {
+              "typeName": "JFormMap"
+            },
+            "__formData|Skyrim.esm|0x5E921": {
+              "Lock": {
+                "Level": "Requires Key",
+                "Decay Options": {
+                  "Min. Lock Level": "Adept",
+                  "Wear Thresholds": {
+                    "Requires Key": 2,
+                    "Master": 100,
+                    "Expert": 200,
+                    "Adept": 60,
+                    "Apprentice": 150,
+                    "Novice": 700
+                  }
+                }
+              }
+            }
+          },
+          "Objects": {
+            "Beds": ["__formData|Skyrim.esm|0xCE7EB"],
+            "Containers": ["__formData|RealisticPrisonAndBounty.esp|0x1DDD6"],
+            "Props": []
+          },
           "Options": {
-            "Lock Level": "Requires Key",
             "Scan": {
               "Interior Radius": 300.0,
               "Exterior Radius": 200.0,

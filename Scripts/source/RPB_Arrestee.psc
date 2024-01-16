@@ -97,12 +97,36 @@ int property DefeatedBounty
     endFunction
 endProperty
 
+bool property IsArrested
+    bool function get()
+        return Arrest_GetBool("Arrested")
+    endFunction
+endProperty
+
+bool property IsImprisoned
+    bool function get()
+        return Arrest_GetBool("Imprisoned", "Jail")
+    endFunction
+endProperty
+
+;/
+    Retrieves an instance of RPB_Arrestee for the given RPB_Prisoner,
+    only valid until destroyed.
+
+    RPB_Prisoner @apPrisoner: The prisoner reference
+
+    returns (RPB_Arrestee): A reference to the arrest state of the prisoner.
+/;
+RPB_Arrestee function GetStateForPrisoner(RPB_Prisoner apPrisoner) global
+    return (RPB_API.GetArrest()).GetArresteeReference(apPrisoner.GetActor())
+endFunction
+
 function Frisk()
     
 endFunction
 
 function AssignCaptor(Actor akCaptor)
-    ArrestVars.SetReference("Arrest::Arresting Guard", akCaptor)
+    Arrest_SetReference("Arresting Guard", akCaptor)
 endFunction
 
 function SetArrestParameters(string asArrestType, Actor akCaptor, Faction akCrimeFaction)
@@ -118,6 +142,7 @@ function SetArrestParameters(string asArrestType, Actor akCaptor, Faction akCrim
 
     if (!akCrimeFaction)
         Error(none, "Arrestee::SetArrestParameters", "Both the captor and faction are none, cannot proceed with the arrest! (returning...)")
+        self.Destroy()
         return
     endif
 
@@ -177,48 +202,30 @@ endFunction
 
 ;/
     Transfers this Actor from being an Arrestee to a Prisoner
-
-    This function should probably return a type of RPB_Prisoner with
-    prisoner related methods where the reference to the Actor is obtained
-    and then clear them from being an Arrestee (delete ref to this instance)
 /;
 RPB_Prisoner function MakePrisoner()
-    ; Get the prison for this arrestee
-    RPB_PrisonManager prisonManager = GetFormFromMod(0x1B825) as RPB_PrisonManager
-    RPB_Prison prison               = prisonManager.GetPrison(hold)
+    RPB_Prison prison           = (RPB_API.GetPrisonManager()).GetPrison(hold)
+    RPB_Prisoner prisonerRef    = prison.MakePrisoner(this)
 
-
-    ; Mark this actor as a Prisoner (Cast the spell on them to have access to Prisoner related functions and state)
-    prison.MarkActorAsPrisoner(this)
-    Utility.Wait(0.1)
-    RPB_Prisoner prisonerRef = prison.GetPrisonerReference(this)
-    ; debug.messagebox("Prison: " + prison + ", Hold: " + hold + ", Actor: " + this + ", PrisonerRef: " + prisonerRef)
-
-    ; TODO: Remove arrest reference possibly
-    ; self.Destroy() ; To be tested
     return prisonerRef
 endFunction
+
+; ==========================================================
+;                           Bounty
+; ==========================================================
 
 bool function ShouldPayBounty()
     return Arrest.GetArrestGoal(this) == Arrest.ARREST_GOAL_BOUNTY_PAYMENT
 endFunction
 
-int function GetDefeatedBounty()
-    return Vars_GetInt("Bounty for Defeat", "Arrest")
-endFunction
-
 function PayCrimeGold()
-    int currentBountyNonViolent = Arrest_GetInt("Bounty Non-Violent")
-    int currentBountyViolent    = Arrest_GetInt("Bounty Violent")
-    int totalBounty             = currentBountyNonViolent + currentBountyViolent
+    int latentBounty    = self.GetLatentBounty()
+    Form gold           = RPB_Utility.GetFormOfType("Gold")
 
-    Form gold = Game.GetFormEx(0xF)
-    this.RemoveItem(gold, totalBounty, true)
+    self.RemoveItem(gold, latentBounty, true)
+    self.ClearLatentBounty()
 
-    Arrest_Remove("Bounty Non-Violent")
-    Arrest_Remove("Bounty Violent")
-
-    if (this == Config.Player)
+    if (self.IsPlayer())
         arrestFaction.PlayerPayCrimeGold(false, false)
         Config.NotifyArrest("Your bounty in " + hold + " has been paid")
     endif
@@ -229,15 +236,7 @@ function PayBounty()
     self.PayCrimeGold()
 endFunction
 
-;/
-    Adds the bounty gained while this Arrestee is in custody, this function is
-    most likely temporary
-/;
-function AddBountyGainedWhileJailed()
-    ArrestVars.ModInt("Jail::Bounty Non-Violent",   self.GetActiveBounty(true, false))
-    ArrestVars.ModInt("Jail::Bounty Violent",       self.GetActiveBounty(false, true))
-    ClearBounty(arrestFaction)
-endFunction
+; ==========================================================
 
 function SetArrestTime()
     Arrest_SetBool("Arrested", true)
@@ -325,11 +324,21 @@ function EscortToPrison(bool abEscortDirectlyToCell = false)
 
     if (!abEscortDirectlyToCell)
         Debug(this, "Arrestee::EscortToPrison", "Started escorting " + this + " to prison")
-        ArrestVars.SetReference("Jail::Prisoner Items Container", Config.GetJailPrisonerItemsContainer(hold) as ObjectReference) ; Temporary, later another location should be used for taking to prison
+        ; Make this arrestee a prisoner right away
+        RPB_Prisoner prisonerRef = self.MakePrisoner()
+
+        prisonerRef.SetBelongingsContainer()  ; Temporary, later another location should be used for taking to prison
+
+        if (!prisonerRef.AssignCell())
+            Debug(this, "Arrestee::EscortToPrison", "Could not assign a cell to arrestee " + this)
+            self.RevertArrest()
+            return
+        endif
+
         Arrest.SceneManager.StartEscortToJail( \
             akEscortLeader      = captor, \
             akEscortedPrisoner  = this, \
-            akPrisonerChest     = ArrestVars.GetReference("Jail::Prisoner Items Container") \
+            akPrisonerChest     = prisonerRef.PrisonerBelongingsContainer \
         )
     else
         ; Make this arrestee a prisoner right away
@@ -341,11 +350,15 @@ function EscortToPrison(bool abEscortDirectlyToCell = false)
         endif
 
         Debug(this, "Arrestee::EscortToPrison", "Started escorting " + this + " directly to a cell")
+        ; The marker where the escort will stand, waiting for the prisoner to enter the cell.
+        ObjectReference outsideJailCellEscortWaitingMarker = prisonerRef.JailCell.GetRandomMarker("Exterior") as ObjectReference
+
         Arrest.SceneManager.StartEscortToCell( \
-            akEscortLeader      = captor, \
-            akEscortedPrisoner  = prisonerRef.GetActor(), \
-            akJailCellMarker    = prisonerRef.GetCell(), \
-            akJailCellDoor      = prisonerRef.GetCellDoor() \ 
+            akEscortLeader                  = captor, \
+            akEscortedPrisoner              = prisonerRef.GetActor(), \
+            akJailCellMarker                = prisonerRef.JailCell, \
+            akJailCellDoor                  = prisonerRef.JailCell.CellDoor, \
+            akEscortWaitingMarker           = outsideJailCellEscortWaitingMarker \ 
         )
     endif
 endFunction
@@ -435,15 +448,14 @@ endFunction
 ; ==========================================================
 
 event OnInitialize()
-    Arrest.RegisterArrestedActor(self, this)
-    ; Debug(this, "Arrestee::OnInitialize", "Initialized Arrestee, this: " + this)
+    Arrest.RegisterArrestee(self)
+    Debug(this, "Arrestee::OnInitialize", "Initialized Arrestee, this: " + this)
 
     self.RegisterForTrackedStats()
 endEvent
 
 event OnDestroy()
-    Arrest.UnregisterArrestedActor(this) ; Remove this Actor from the AME list since they are no longer arrested
-    Arrest.UnregisterArrestee(self) ; remove the spell
+    Arrest.RemoveArresteeFromList(self) ; Remove this Actor from the AME list since they are no longer arrested
     self.UnregisterForTrackedStats()
 endEvent
 
@@ -475,80 +487,78 @@ endEvent
 ; ==========================================================
 
 function Destroy()
-    ; TODO: Unset all properties related to this Arrestee
-
-    Arrest.UnregisterArrestedActor(this)
+    ; Unset all properties related to this Arrestee
+    Arrest_RemoveAll()
+    Utility.Wait(0.5)
+    Arrest.UnregisterArrestee(self)
 endFunction
 
 ; ==========================================================
 ;                      -- Arrest Vars --
 ;                           Getters
 bool function Arrest_GetBool(string asVarName, string asVarCategory = "Arrest")
-    return parent.Vars_GetBool(asVarName, asVarCategory)
+    return parent.GetBool(asVarName, asVarCategory)
 endFunction
 
 int function Arrest_GetInt(string asVarName, string asVarCategory = "Arrest")
-    return parent.Vars_GetInt(asVarName, asVarCategory)
+    return parent.GetInt(asVarName, asVarCategory)
 endFunction
 
 float function Arrest_GetFloat(string asVarName, string asVarCategory = "Arrest")
-    return parent.Vars_GetFloat(asVarName, asVarCategory)
+    return parent.GetFloat(asVarName, asVarCategory)
 endFunction
 
 string function Arrest_GetString(string asVarName, string asVarCategory = "Arrest")
-    return parent.Vars_GetString(asVarName, asVarCategory)
+    return parent.GetString(asVarName, asVarCategory)
 endFunction
 
 Form function Arrest_GetForm(string asVarName, string asVarCategory = "Arrest")
-    return parent.Vars_GetForm(asVarName, asVarCategory)
+    return parent.GetForm(asVarName, asVarCategory)
 endFunction
 
 ObjectReference function Arrest_GetReference(string asVarName, string asVarCategory = "Arrest")
-    return parent.Vars_GetReference(asVarName, asVarCategory)
+    return parent.GetReference(asVarName, asVarCategory)
 endFunction
 
-Actor function Arrest_GetActor(string asVarName, string asVarCategory = "Arrest")
-    return parent.Vars_GetActor(asVarName, asVarCategory)
-endFunction
 ;                          Setters
 function Arrest_SetBool(string asVarName, bool abValue, string asVarCategory = "Arrest")
-    parent.Vars_SetBool(asVarName, abValue, asVarCategory)
+    parent.SetBool(asVarName, abValue, asVarCategory)
 endFunction
 
 function Arrest_SetInt(string asVarName, int aiValue, string asVarCategory = "Arrest")
-    parent.Vars_SetInt(asVarName, aiValue, asVarCategory)
+    parent.SetInt(asVarName, aiValue, asVarCategory)
 endFunction
 
 function Arrest_ModInt(string asVarName, int aiValue, string asVarCategory = "Arrest")
-    parent.Vars_ModInt(asVarName, aiValue, asVarCategory)
+    parent.ModInt(asVarName, aiValue, asVarCategory)
 endFunction
 
 function Arrest_SetFloat(string asVarName, float afValue, string asVarCategory = "Arrest")
-    parent.Vars_SetFloat(asVarName, afValue, asVarCategory)
+    parent.SetFloat(asVarName, afValue, asVarCategory)
 endFunction
 
 function Arrest_ModFloat(string asVarName, float afValue, string asVarCategory = "Arrest")
-    parent.Vars_ModFloat(asVarName, afValue, asVarCategory)
+    parent.ModFloat(asVarName, afValue, asVarCategory)
 endFunction
 
 function Arrest_SetString(string asVarName, string asValue, string asVarCategory = "Arrest")
-    parent.Vars_SetString(asVarName, asValue, asVarCategory)
+    parent.SetString(asVarName, asValue, asVarCategory)
 endFunction
 
 function Arrest_SetForm(string asVarName, Form akValue, string asVarCategory = "Arrest")
-    parent.Vars_SetForm(asVarName, akValue, asVarCategory)
+    parent.SetForm(asVarName, akValue, asVarCategory)
 endFunction
 
 function Arrest_SetReference(string asVarName, ObjectReference akValue, string asVarCategory = "Arrest")
-    parent.Vars_SetReference(asVarName, akValue, asVarCategory)
-endFunction
-
-function Arrest_SetActor(string asVarName, Actor akValue, string asVarCategory = "Arrest")
-    parent.Vars_SetActor(asVarName, akValue, asVarCategory)
+    parent.SetReference(asVarName, akValue, asVarCategory)
 endFunction
 
 function Arrest_Remove(string asVarName, string asVarCategory = "Arrest")
-    parent.Vars_Remove(asVarName, asVarCategory)
+    parent.Remove(asVarName, asVarCategory)
+endFunction
+
+function Arrest_RemoveAll(string asVarCategory = "Arrest")
+    parent.RemoveAll()
 endFunction
 
 ; ==========================================================

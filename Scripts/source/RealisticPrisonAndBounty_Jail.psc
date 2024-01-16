@@ -1453,7 +1453,7 @@ event OnEscortToJailEnd(Actor escortActor, Actor escortedActor)
 
     ; Set the initial state required for imprisonment
     prisonerRef.SetReleaseLocation()    ; Set the release location for this prisoner
-    prisonerRef.SetItemsContainer()     ; Set the container of where the prisoner's items will be confiscated to
+    prisonerRef.SetBelongingsContainer()     ; Set the container of where the prisoner's items will be confiscated to
     prisonerRef.AssignCell()            ; Assign a prison cell to this prisoner
     
     self.SetupJailVars()

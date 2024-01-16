@@ -25,7 +25,7 @@ Actor captor ; To be changed, a prisoner shouldn't have a captor. The correct re
 
 RPB_Prison property Prison
     RPB_Prison function get()
-        return self.GetPrison() ; where it would search for an RPB_Prison where the location matches the prison location (current location for the prisoner since they are in prison)
+        return self.GetPrison()
     endFunction
 endProperty
 
@@ -90,9 +90,9 @@ int property StrippingThoroughness
     endFunction
 endProperty
 
-ObjectReference property ItemsContainer
+ObjectReference property PrisonerBelongingsContainer
     ObjectReference function get()
-        return Prison_GetReference("Prisoner Items Container")
+        return Prison_GetReference("Prisoner Belongings Container")
     endFunction
 endProperty
 
@@ -104,7 +104,7 @@ endProperty
 
 bool property IsImprisoned
     bool function get()
-        return Prison_GetBool("Jailed")
+        return Prison_GetBool("Imprisoned")
     endFunction
 endProperty
 
@@ -364,27 +364,22 @@ RPB_JailCell function GetCell()
     return Prison_GetReference("Cell") as RPB_JailCell
 endFunction
 
-ObjectReference function GetCellDoor()
-    return Prison_GetReference("Cell Door")
-endFunction
-
 function SetReleaseLocation(bool abIsTeleportLocation = true)
     if (abIsTeleportLocation)
         Prison_SetForm("Teleport Release Location", Config.GetJailTeleportReleaseMarker(self.GetPrisonHold()))
     endif
 endFunction
 
-function SetItemsContainer()
-    Prison_SetForm("Prisoner Items Container", Config.GetJailPrisonerItemsContainer(self.GetPrisonHold()))
-    Debug(none, "Prison::SetItemsContainer", "Prisoner Items Container:  " + ItemsContainer)
-    ; ArrestVars.SetForm("Jail::Prisoner Items Container", Config.GetJailPrisonerItemsContainer(self.GetHold())) ; Where prisoners have their items confiscated to
+function SetBelongingsContainer()
+    Prison_SetForm("Prisoner Belongings Container", Prison.GetRandomPrisonerContainer("Belongings"))
+    Debug(none, "Prison::SetBelongingsContainer", "Prisoner Belongings Container:  " + PrisonerBelongingsContainer)
 endFunction
 
 ;/
     Releases this prisoner from jail
 /;
 function Release()
-    ItemsContainer.RemoveAllItems(this, false, true)
+    PrisonerBelongingsContainer.RemoveAllItems(this, false, true)
     this.MoveTo(TeleportReleaseLocation)
     self.Dispel()
 endFunction
@@ -437,7 +432,7 @@ endFunction
 function Imprison()
     float startBench = StartBenchmark()
 
-    self.SetItemsContainer()
+    self.SetBelongingsContainer()
     self.SetReleaseLocation()
 
     ; Utility.Wait(0.4)
@@ -488,7 +483,7 @@ function Clothe()
 endFunction
 
 function Strip(bool abRemoveUnderwear = true)
-    this.RemoveAllItems(ItemsContainer, false, true)
+    this.RemoveAllItems(PrisonerBelongingsContainer, false, true)
     self.IncrementStat("Times Stripped")
     self.IsStrippedNaked = true
     Prison_SetBool("Stripped", true) ; No use for now, might be changed
@@ -507,7 +502,7 @@ function Strip(bool abRemoveUnderwear = true)
     Armor underwearBottom   = this.GetWornForm(underwearBottomSlotMask) as Armor
 
     ; Remove and put all the items in the prisoner's posession in the assigned prisoner container
-    this.RemoveAllItems(ItemsContainer, false, true)
+    this.RemoveAllItems(PrisonerBelongingsContainer, false, true)
 
     ; TODO: Determine what is required to happen to have the Prisoner be in underwear
 
@@ -532,11 +527,11 @@ function RemoveUnderwear()
     Armor underwearBottom   = this.GetWornForm(underwearBottomSlotMask) as Armor
 
     if (underwearTop)
-        this.RemoveItem(underwearTop, 1, true, ItemsContainer)
+        this.RemoveItem(underwearTop, 1, true, PrisonerBelongingsContainer)
     endif
 
     if (underwearBottom)
-        this.RemoveItem(underwearBottom, 1, true, ItemsContainer)
+        this.RemoveItem(underwearBottom, 1, true, PrisonerBelongingsContainer)
     endif
 endFunction
 
@@ -574,12 +569,13 @@ endFunction
 function EscortToCell(Actor akEscort)
     Debug(self.GetActor(), "Prisoner::EscortToCell", "EscortToCell called")
     
-    ; Later ideally self.GetCell().GetDoor() where GetCell() is of type RPB_JailCell or RPB_Cell or RPB_PrisonCell
-    Jail.SceneManager.StartEscortToCell( \
-        akEscortLeader      = akEscort, \
-        akEscortedPrisoner  = this, \
-        akJailCellMarker    = self.GetCell(), \
-        akJailCellDoor      = self.GetCellDoor() \ 
+    Form outsideCellGuardWaitingMarker = JailCell.GetRandomMarker("Exterior")
+    Config.SceneManager.StartEscortToCell( \
+        akEscortLeader              = akEscort, \
+        akEscortedPrisoner          = this, \
+        akJailCellMarker            = self.JailCell, \
+        akJailCellDoor              = self.JailCell.CellDoor, \
+        akEscortWaitingMarker       = outsideCellGuardWaitingMarker as ObjectReference \ 
     )
 endFunction
 
@@ -591,7 +587,7 @@ endFunction
 
 function SetTimeOfImprisonment()
     Prison_SetFloat("Time of Imprisonment", CurrentTime) ; Set the time of imprisonment
-    Prison_SetBool("Jailed", true)
+    Prison_SetBool("Imprisoned", true)
 endFunction
 
 function SetSentence(int aiSentence = 0, bool abShouldAffectBounty = true)
@@ -731,12 +727,12 @@ state Imprisoned
         ; if (!Prison.IsReceivingUpdates()) ; if we dont destroy the instance in time, this will get called from Prison after processing queued prisoners, and since we didnt register the prisoner, this is a bug since it will report 0 prisoners
             Prison.RegisterForPrisonPeriodicUpdate(self)
         ; endif
+
+        ; At this point, we can delete the prisoner's arrest state
+        self.DestroyArrestState()
     endEvent
 
     event OnUpdateGameTime()
-        ; Debug(this, "("+ self.CurrentState +") Prisoner::OnUpdateGameTime", "Began processing for prisoner " + this)
-        ; Debug(this, "(state: "+ self.CurrentState +") Prisoner::OnUpdateGameTime", "Start Update for " + this)
-        
         if (self.HasActiveBounty())
             ; self.UpdateSentenceFromCurrentBounty() ; temp, change function later
         endif
@@ -917,7 +913,7 @@ function QueueForImprisonment()
 endFunction
 
 function MarkAsJailed()
-    Prison_SetBool("Jailed", true)
+    Prison_SetBool("Imprisoned", true)
     self.IncrementStat("Times Jailed") ; Increment the "Times Jailed" stat for this Hold
 
     if (self.IsPlayer())
@@ -965,7 +961,7 @@ endFunction
     This could also be an event that happens by chance (configured in the MCM, to make it more dynamic and random)
 /;
 RPB_Arrestee function MakeArrestee()
-    RPB_Arrestee arresteeRef = Arrest.MarkActorAsArrestee(this)
+    RPB_Arrestee arresteeRef = Arrest.MakeArrestee(this)
     ;/ arresteeRef.SetArrestParameters( \
         asArrestHold        = newArrestHold, \
         akArrestCaptor      = newArrestCaptor \
@@ -1064,6 +1060,19 @@ endEvent
 function Destroy()
     ; TODO: Unset all properties related to this Prisoner
     Prison.UnregisterPrisoner(self)
+endFunction
+
+;/
+    Destroys the prisoner's arrest state, as they are now a prisoner and the arrest state is not required anymore.
+/;
+function DestroyArrestState()
+    RPB_Arrestee arrestState = RPB_Arrestee.GetStateForPrisoner(self)
+
+    Debug(none, "Prisoner::DestroyArrestState", "Prison Hold from Arrest Vars: " + Prison_GetString("Hold", "Arrest"))
+
+    if (arrestState)
+        arrestState.Destroy()
+    endif
 endFunction
 
 ;/
@@ -1207,245 +1216,72 @@ function LockPrisonerSettings()
     hasSettingsLocked = true
 endFunction
 
-; function SetupPrisonVars()
-;     float x = StartBenchmark()
-;     JailVars.SetBool("Jail::Infamy Enabled", config.IsInfamyEnabled(hold))
-;     JailVars.SetFloat("Jail::Infamy Recognized Threshold", config.GetInfamyRecognizedThreshold(hold))
-;     JailVars.SetFloat("Jail::Infamy Known Threshold", config.GetInfamyKnownThreshold(hold))
-;     JailVars.SetFloat("Jail::Infamy Gained Daily from Current Bounty", config.GetInfamyGainedDailyFromArrestBounty(hold))
-;     JailVars.SetFloat("Jail::Infamy Gained Daily", config.GetInfamyGainedDaily(hold))
-;     JailVars.SetInt("Jail::Infamy Gain Modifier (Recognized)", config.GetInfamyGainModifier(Hold, "Recognized"))
-;     JailVars.SetInt("Jail::Infamy Gain Modifier (Known)", config.GetInfamyGainModifier(Hold, "Known"))
-;     JailVars.SetFloat("Jail::Bounty Exchange", config.GetJailBountyExchange(hold))
-;     JailVars.SetFloat("Jail::Bounty to Sentence", config.GetJailBountyToSentence(hold))
-;     JailVars.SetFloat("Jail::Minimum Sentence", config.GetJailMinimumSentence(hold))
-;     JailVars.SetFloat("Jail::Maximum Sentence", config.GetJailMaximumSentence(hold))
-;     JailVars.SetFloat("Jail::Cell Search Thoroughness", config.GetJailCellSearchThoroughness(hold))
-;     JailVars.SetString("Jail::Cell Lock Level", config.GetJailCellDoorLockLevel(hold))
-;     ; Prisoner_SetString("Cell Lock Level", Prison.CellLockLevel)
-;     JailVars.SetBool("Jail::Fast Forward", config.IsJailFastForwardEnabled(hold))
-;     JailVars.SetFloat("Jail::Day to Fast Forward From", config.GetJailFastForwardDay(hold))
-;     JailVars.SetString("Jail::Handle Skill Loss", config.GetJailHandleSkillLoss(hold))
-;     JailVars.SetFloat("Jail::Day to Start Losing Skills", config.GetJailDayToStartLosingSkills(hold))
-;     JailVars.SetFloat("Jail::Chance to Lose Skills", config.GetJailChanceToLoseSkillsDaily(hold))
-;     JailVars.SetFloat("Jail::Recognized Criminal Penalty", config.GetJailRecognizedCriminalPenalty(hold))
-;     JailVars.SetFloat("Jail::Known Criminal Penalty", config.GetJailKnownCriminalPenalty(hold))
-;     JailVars.SetFloat("Jail::Bounty to Trigger Infamy", config.GetJailBountyToTriggerCriminalPenalty(hold))
-;     JailVars.SetBool("Release::Release Fees Enabled", config.IsJailReleaseFeesEnabled(hold))
-;     JailVars.SetFloat("Release::Chance for Release Fees Event", config.GetReleaseChanceForReleaseFeesEvent(hold))
-;     JailVars.SetFloat("Release::Bounty to Owe Fees", config.GetReleaseBountyToOweFees(hold))
-;     JailVars.SetFloat("Release::Release Fees from Arrest Bounty", config.GetReleaseReleaseFeesFromBounty(hold))
-;     JailVars.SetFloat("Release::Release Fees Flat", config.GetReleaseReleaseFeesFlat(hold))
-;     JailVars.SetFloat("Release::Days Given to Pay Release Fees", config.GetReleaseDaysGivenToPayReleaseFees(hold))
-;     JailVars.SetBool("Release::Item Retention Enabled", config.IsItemRetentionEnabledOnRelease(hold))
-;     JailVars.SetFloat("Release::Bounty to Retain Items", config.GetReleaseBountyToRetainItems(hold))
-;     JailVars.SetBool("Release::Redress on Release", config.IsAutoDressingEnabledOnRelease(hold))
-;     JailVars.SetFloat("Escape::Escape Bounty from Current Arrest", config.GetEscapedBountyFromCurrentArrest(hold))
-;     JailVars.SetFloat("Escape::Escape Bounty Flat", config.GetEscapedBountyFlat(hold))
-;     JailVars.SetBool("Escape::Allow Surrendering", config.IsSurrenderEnabledOnEscape(hold))
-;     JailVars.SetBool("Escape::Account for Time Served", config.IsTimeServedAccountedForOnEscape(hold))
-;     JailVars.SetBool("Escape::Should Frisk Search", config.ShouldFriskOnEscape(hold))
-;     JailVars.SetBool("Escape::Should Strip Search", config.ShouldStripOnEscape(hold))
-;     JailVars.SetFloat("Additional Charges::Bounty for Impersonation", config.GetChargeBountyForImpersonation(hold))
-;     JailVars.SetFloat("Additional Charges::Bounty for Enemy of Hold", config.GetChargeBountyForEnemyOfHold(hold))
-;     JailVars.SetFloat("Additional Charges::Bounty for Stolen Items", config.GetChargeBountyForStolenItems(hold))
-;     JailVars.SetFloat("Additional Charges::Bounty for Stolen Item", config.GetChargeBountyForStolenItemFromItemValue(hold))
-;     JailVars.SetFloat("Additional Charges::Bounty for Contraband", config.GetChargeBountyForContraband(hold))
-;     JailVars.SetFloat("Additional Charges::Bounty for Cell Key", config.GetChargeBountyForCellKey(hold))
-;     JailVars.SetBool("Frisking::Allow Frisking", config.IsFriskingEnabled(hold))
-;     JailVars.SetBool("Frisking::Unconditional Frisking", config.IsFriskingUnconditional(hold))
-;     JailVars.SetFloat("Frisking::Bounty for Frisking", config.GetFriskingBountyRequired(hold))
-;     JailVars.SetFloat("Frisking::Frisking Thoroughness", config.GetFriskingThoroughness(hold))
-;     JailVars.SetBool("Frisking::Confiscate Stolen Items", config.IsFriskingStolenItemsConfiscated(hold))
-;     JailVars.SetBool("Frisking::Strip if Stolen Items Found", config.IsFriskingStripSearchWhenStolenItemsFound(hold))
-;     JailVars.SetFloat("Frisking::Stolen Items Required for Stripping", config.GetFriskingStolenItemsRequiredForStripping(hold))
-;     JailVars.SetBool("Stripping::Allow Stripping", config.IsStrippingEnabled(hold))
-;     JailVars.SetString("Stripping::Handle Stripping On", config.GetStrippingHandlingCondition(hold))
-;     JailVars.SetInt("Stripping::Bounty to Strip", config.GetStrippingMinimumBounty(hold))
-;     JailVars.SetInt("Stripping::Violent Bounty to Strip", config.GetStrippingMinimumViolentBounty(hold))
-;     JailVars.SetInt("Stripping::Sentence to Strip", config.GetStrippingMinimumSentence(hold))
-;     JailVars.SetBool("Stripping::Strip when Defeated", config.IsStrippedOnDefeat(hold))
-;     JailVars.SetFloat("Stripping::Stripping Thoroughness", config.GetStrippingThoroughness(hold))
-;     JailVars.SetInt("Stripping::Stripping Thoroughness Modifier", config.GetStrippingThoroughnessBountyModifier(hold))
-;     JailVars.SetBool("Clothing::Allow Clothing", config.IsClothingEnabled(hold))
-;     JailVars.SetString("Clothing::Handle Clothing On", config.GetClothingHandlingCondition(hold))
-;     JailVars.SetFloat("Clothing::Maximum Bounty to Clothe", config.GetClothingMaximumBounty(hold))
-;     JailVars.SetFloat("Clothing::Maximum Violent Bounty to Clothe", config.GetClothingMaximumViolentBounty(hold))
-;     JailVars.SetFloat("Clothing::Maximum Sentence to Clothe", config.GetClothingMaximumSentence(hold))
-;     JailVars.SetBool("Clothing::Clothe when Defeated", config.IsClothedOnDefeat(hold))
-;     JailVars.SetString("Clothing::Outfit", config.GetClothingOutfit(hold))
-
-;     ; Outfit
-;     JailVars.SetString("Clothing::Outfit::Name", config.GetClothingOutfit(hold))
-;     JailVars.SetForm("Clothing::Outfit::Head", config.GetOutfitPart(Hold, "Head"))
-;     JailVars.SetForm("Clothing::Outfit::Body", config.GetOutfitPart(Hold, "Body"))
-;     JailVars.SetForm("Clothing::Outfit::Hands", config.GetOutfitPart(Hold, "Hands"))
-;     JailVars.SetForm("Clothing::Outfit::Feet", config.GetOutfitPart(Hold, "Feet"))
-;     JailVars.SetBool("Clothing::Outfit::Conditional", config.IsClothingOutfitConditional(hold))
-;     JailVars.SetFloat("Clothing::Outfit::Minimum Bounty", config.GetClothingOutfitMinimumBounty(hold))
-;     JailVars.SetFloat("Clothing::Outfit::Maximum Bounty", config.GetClothingOutfitMaximumBounty(hold))
-
-;     JailVars.SetBool("Override::Release::Item Retention Enabled", false)
-;     ; arrestVars.SetInt("Override::Jail::Minimum Sentence", 1)
-;     ; arrestVars.SetString("Override::Stripping::Handle Stripping On", "Unconditionally")
-;     ; arrestVars.SetString("Override::Clothing::Handle Clothing On", "Unconditionally")
-;     EndBenchmark(x, "SetupJailVars")
-; endFunction
-
-; function SetupPrisonVars()
-;     float x = StartBenchmark()
-;     JailVars.SetBool("Jail::Infamy Enabled", config.IsInfamyEnabled(hold))
-;     JailVars.SetFloat("Jail::Infamy Recognized Threshold", config.GetInfamyRecognizedThreshold(hold))
-;     JailVars.SetFloat("Jail::Infamy Known Threshold", config.GetInfamyKnownThreshold(hold))
-;     JailVars.SetFloat("Jail::Infamy Gained Daily from Current Bounty", config.GetInfamyGainedDailyFromArrestBounty(hold))
-;     JailVars.SetFloat("Jail::Infamy Gained Daily", config.GetInfamyGainedDaily(hold))
-;     JailVars.SetInt("Jail::Infamy Gain Modifier (Recognized)", config.GetInfamyGainModifier(Hold, "Recognized"))
-;     JailVars.SetInt("Jail::Infamy Gain Modifier (Known)", config.GetInfamyGainModifier(Hold, "Known"))
-;     JailVars.SetFloat("Jail::Bounty Exchange", config.GetJailBountyExchange(hold))
-;     JailVars.SetFloat("Jail::Bounty to Sentence", config.GetJailBountyToSentence(hold))
-;     JailVars.SetFloat("Jail::Minimum Sentence", config.GetJailMinimumSentence(hold))
-;     JailVars.SetFloat("Jail::Maximum Sentence", config.GetJailMaximumSentence(hold))
-;     JailVars.SetFloat("Jail::Cell Search Thoroughness", config.GetJailCellSearchThoroughness(hold))
-;     JailVars.SetString("Jail::Cell Lock Level", config.GetJailCellDoorLockLevel(hold))
-;     ; Prisoner_SetString("Cell Lock Level", Prison.CellLockLevel)
-;     JailVars.SetBool("Jail::Fast Forward", config.IsJailFastForwardEnabled(hold))
-;     JailVars.SetFloat("Jail::Day to Fast Forward From", config.GetJailFastForwardDay(hold))
-;     JailVars.SetString("Jail::Handle Skill Loss", config.GetJailHandleSkillLoss(hold))
-;     JailVars.SetFloat("Jail::Day to Start Losing Skills", config.GetJailDayToStartLosingSkills(hold))
-;     JailVars.SetFloat("Jail::Chance to Lose Skills", config.GetJailChanceToLoseSkillsDaily(hold))
-;     JailVars.SetFloat("Jail::Recognized Criminal Penalty", config.GetJailRecognizedCriminalPenalty(hold))
-;     JailVars.SetFloat("Jail::Known Criminal Penalty", config.GetJailKnownCriminalPenalty(hold))
-;     JailVars.SetFloat("Jail::Bounty to Trigger Infamy", config.GetJailBountyToTriggerCriminalPenalty(hold))
-;     JailVars.SetBool("Release::Release Fees Enabled", config.IsJailReleaseFeesEnabled(hold))
-;     JailVars.SetFloat("Release::Chance for Release Fees Event", config.GetReleaseChanceForReleaseFeesEvent(hold))
-;     JailVars.SetFloat("Release::Bounty to Owe Fees", config.GetReleaseBountyToOweFees(hold))
-;     JailVars.SetFloat("Release::Release Fees from Arrest Bounty", config.GetReleaseReleaseFeesFromBounty(hold))
-;     JailVars.SetFloat("Release::Release Fees Flat", config.GetReleaseReleaseFeesFlat(hold))
-;     JailVars.SetFloat("Release::Days Given to Pay Release Fees", config.GetReleaseDaysGivenToPayReleaseFees(hold))
-;     JailVars.SetBool("Release::Item Retention Enabled", config.IsItemRetentionEnabledOnRelease(hold))
-;     JailVars.SetFloat("Release::Bounty to Retain Items", config.GetReleaseBountyToRetainItems(hold))
-;     JailVars.SetBool("Release::Redress on Release", config.IsAutoDressingEnabledOnRelease(hold))
-;     JailVars.SetFloat("Escape::Escape Bounty from Current Arrest", config.GetEscapedBountyFromCurrentArrest(hold))
-;     JailVars.SetFloat("Escape::Escape Bounty Flat", config.GetEscapedBountyFlat(hold))
-;     JailVars.SetBool("Escape::Allow Surrendering", config.IsSurrenderEnabledOnEscape(hold))
-;     JailVars.SetBool("Escape::Account for Time Served", config.IsTimeServedAccountedForOnEscape(hold))
-;     JailVars.SetBool("Escape::Should Frisk Search", config.ShouldFriskOnEscape(hold))
-;     JailVars.SetBool("Escape::Should Strip Search", config.ShouldStripOnEscape(hold))
-;     JailVars.SetFloat("Additional Charges::Bounty for Impersonation", config.GetChargeBountyForImpersonation(hold))
-;     JailVars.SetFloat("Additional Charges::Bounty for Enemy of Hold", config.GetChargeBountyForEnemyOfHold(hold))
-;     JailVars.SetFloat("Additional Charges::Bounty for Stolen Items", config.GetChargeBountyForStolenItems(hold))
-;     JailVars.SetFloat("Additional Charges::Bounty for Stolen Item", config.GetChargeBountyForStolenItemFromItemValue(hold))
-;     JailVars.SetFloat("Additional Charges::Bounty for Contraband", config.GetChargeBountyForContraband(hold))
-;     JailVars.SetFloat("Additional Charges::Bounty for Cell Key", config.GetChargeBountyForCellKey(hold))
-;     JailVars.SetBool("Frisking::Allow Frisking", config.IsFriskingEnabled(hold))
-;     JailVars.SetBool("Frisking::Unconditional Frisking", config.IsFriskingUnconditional(hold))
-;     JailVars.SetFloat("Frisking::Bounty for Frisking", config.GetFriskingBountyRequired(hold))
-;     JailVars.SetFloat("Frisking::Frisking Thoroughness", config.GetFriskingThoroughness(hold))
-;     JailVars.SetBool("Frisking::Confiscate Stolen Items", config.IsFriskingStolenItemsConfiscated(hold))
-;     JailVars.SetBool("Frisking::Strip if Stolen Items Found", config.IsFriskingStripSearchWhenStolenItemsFound(hold))
-;     JailVars.SetFloat("Frisking::Stolen Items Required for Stripping", config.GetFriskingStolenItemsRequiredForStripping(hold))
-;     JailVars.SetBool("Stripping::Allow Stripping", config.IsStrippingEnabled(hold))
-;     JailVars.SetString("Stripping::Handle Stripping On", config.GetStrippingHandlingCondition(hold))
-;     JailVars.SetInt("Stripping::Bounty to Strip", config.GetStrippingMinimumBounty(hold))
-;     JailVars.SetInt("Stripping::Violent Bounty to Strip", config.GetStrippingMinimumViolentBounty(hold))
-;     JailVars.SetInt("Stripping::Sentence to Strip", config.GetStrippingMinimumSentence(hold))
-;     JailVars.SetBool("Stripping::Strip when Defeated", config.IsStrippedOnDefeat(hold))
-;     JailVars.SetFloat("Stripping::Stripping Thoroughness", config.GetStrippingThoroughness(hold))
-;     JailVars.SetInt("Stripping::Stripping Thoroughness Modifier", config.GetStrippingThoroughnessBountyModifier(hold))
-;     JailVars.SetBool("Clothing::Allow Clothing", config.IsClothingEnabled(hold))
-;     JailVars.SetString("Clothing::Handle Clothing On", config.GetClothingHandlingCondition(hold))
-;     JailVars.SetFloat("Clothing::Maximum Bounty to Clothe", config.GetClothingMaximumBounty(hold))
-;     JailVars.SetFloat("Clothing::Maximum Violent Bounty to Clothe", config.GetClothingMaximumViolentBounty(hold))
-;     JailVars.SetFloat("Clothing::Maximum Sentence to Clothe", config.GetClothingMaximumSentence(hold))
-;     JailVars.SetBool("Clothing::Clothe when Defeated", config.IsClothedOnDefeat(hold))
-;     JailVars.SetString("Clothing::Outfit", config.GetClothingOutfit(hold))
-
-;     ; Outfit
-;     JailVars.SetString("Clothing::Outfit::Name", config.GetClothingOutfit(hold))
-;     JailVars.SetForm("Clothing::Outfit::Head", config.GetOutfitPart(Hold, "Head"))
-;     JailVars.SetForm("Clothing::Outfit::Body", config.GetOutfitPart(Hold, "Body"))
-;     JailVars.SetForm("Clothing::Outfit::Hands", config.GetOutfitPart(Hold, "Hands"))
-;     JailVars.SetForm("Clothing::Outfit::Feet", config.GetOutfitPart(Hold, "Feet"))
-;     JailVars.SetBool("Clothing::Outfit::Conditional", config.IsClothingOutfitConditional(hold))
-;     JailVars.SetFloat("Clothing::Outfit::Minimum Bounty", config.GetClothingOutfitMinimumBounty(hold))
-;     JailVars.SetFloat("Clothing::Outfit::Maximum Bounty", config.GetClothingOutfitMaximumBounty(hold))
-
-;     JailVars.SetBool("Override::Release::Item Retention Enabled", false)
-;     ; arrestVars.SetInt("Override::Jail::Minimum Sentence", 1)
-;     ; arrestVars.SetString("Override::Stripping::Handle Stripping On", "Unconditionally")
-;     ; arrestVars.SetString("Override::Clothing::Handle Clothing On", "Unconditionally")
-;     EndBenchmark(x, "SetupJailVars")
-; endFunction
-
 ; ==========================================================
 ;                      -- Arrest Vars --
 ;                           Getters
 bool function Prison_GetBool(string asVarName, string asVarCategory = "Jail")
-    return parent.Vars_GetBool(asVarName, asVarCategory)
+    return parent.GetBool(asVarName, asVarCategory)
 endFunction
 
 int function Prison_GetInt(string asVarName, string asVarCategory = "Jail")
-    return parent.Vars_GetInt(asVarName, asVarCategory)
+    return parent.GetInt(asVarName, asVarCategory)
 endFunction
 
 float function Prison_GetFloat(string asVarName, string asVarCategory = "Jail")
-    return parent.Vars_GetFloat(asVarName, asVarCategory)
+    return parent.GetFloat(asVarName, asVarCategory)
 endFunction
 
 string function Prison_GetString(string asVarName, string asVarCategory = "Jail")
-    return parent.Vars_GetString(asVarName, asVarCategory)
+    return parent.GetString(asVarName, asVarCategory)
 endFunction
 
 Form function Prison_GetForm(string asVarName, string asVarCategory = "Jail")
-    return parent.Vars_GetForm(asVarName, asVarCategory)
+    return parent.GetForm(asVarName, asVarCategory)
 endFunction
 
 ObjectReference function Prison_GetReference(string asVarName, string asVarCategory = "Jail")
-    return parent.Vars_GetReference(asVarName, asVarCategory)
+    return parent.GetReference(asVarName, asVarCategory)
 endFunction
 
-Actor function Prison_GetActor(string asVarName, string asVarCategory = "Jail")
-    return parent.Vars_GetActor(asVarName, asVarCategory)
-endFunction
 ;                          Setters
 function Prison_SetBool(string asVarName, bool abValue, string asVarCategory = "Jail")
-    parent.Vars_SetBool(asVarName, abValue, asVarCategory)
+    parent.SetBool(asVarName, abValue, asVarCategory)
 endFunction
 
 function Prison_SetInt(string asVarName, int aiValue, string asVarCategory = "Jail", int aiMinValue = 0, int aiMaxValue = 0)
-    parent.Vars_SetInt(asVarName, aiValue, asVarCategory, aiMinValue, aiMaxValue)
+    parent.SetInt(asVarName, aiValue, asVarCategory)
 endFunction
 
 function Prison_ModInt(string asVarName, int aiValue, string asVarCategory = "Jail")
-    parent.Vars_ModInt(asVarName, aiValue, asVarCategory)
+    parent.ModInt(asVarName, aiValue, asVarCategory)
 endFunction
 
 function Prison_SetFloat(string asVarName, float afValue, string asVarCategory = "Jail")
-    parent.Vars_SetFloat(asVarName, afValue, asVarCategory)
+    parent.SetFloat(asVarName, afValue, asVarCategory)
 endFunction
 
 function Prison_ModFloat(string asVarName, float afValue, string asVarCategory = "Jail")
-    parent.Vars_ModFloat(asVarName, afValue, asVarCategory)
+    parent.ModFloat(asVarName, afValue, asVarCategory)
 endFunction
 
 function Prison_SetString(string asVarName, string asValue, string asVarCategory = "Jail")
-    parent.Vars_SetString(asVarName, asValue, asVarCategory)
+    parent.SetString(asVarName, asValue, asVarCategory)
 endFunction
 
 function Prison_SetForm(string asVarName, Form akValue, string asVarCategory = "Jail")
-    parent.Vars_SetForm(asVarName, akValue, asVarCategory)
+    parent.SetForm(asVarName, akValue, asVarCategory)
 endFunction
 
 function Prison_SetReference(string asVarName, ObjectReference akValue, string asVarCategory = "Jail")
-    parent.Vars_SetReference(asVarName, akValue, asVarCategory)
-endFunction
-
-function Prison_SetActor(string asVarName, Actor akValue, string asVarCategory = "Jail")
-    parent.Vars_SetActor(asVarName, akValue, asVarCategory)
+    parent.SetReference(asVarName, akValue, asVarCategory)
 endFunction
 
 function Prison_Remove(string asVarName, string asVarCategory = "Jail")
-    parent.Vars_Remove(asVarName, asVarCategory)
+    parent.Remove(asVarName, asVarCategory)
+endFunction
+
+function Prison_RemoveAll(string asVarCategory = "Jail")
+    parent.RemoveAll()
 endFunction
 
 ; ==========================================================
@@ -1488,10 +1324,9 @@ RPB_Prison function GetPrison()
     endif
 
     ; Temporarily retrieve the hold to obtain the Prison (necessary as key to get the Prison, later retrieved through Prison.Hold)
-    string prisonHold               = Vars_GetString("Hold", "Arrest") 
-    RPB_PrisonManager prisonManager = GetFormFromMod(0x1B825) as RPB_PrisonManager
-    RPB_Prison returnedPrison       = prisonManager.GetPrison(prisonHold)
-    
+    string prisonHold               = RPB_StorageVars.GetStringOnForm("Hold", this, "Arrest")
+    RPB_Prison returnedPrison       = (RPB_API.GetPrisonManager()).GetPrison(prisonHold)
+
     __cachedPrison = returnedPrison
     return returnedPrison
 endFunction
@@ -1505,8 +1340,7 @@ function DEBUG_ShowPrisonInfo()
         "Hold: "                + Prison.Hold + ", \n\t" + \
         "Bounty Non-Violent: "  + BountyNonViolent + ", \n\t" + \
         "Bounty Violent: "      + BountyViolent + ", \n\t" + \
-        "Arrested: "            + Vars_GetBool("Arrested") + ", \n\t" + \
-        "Jailed: "              + self.IsImprisoned + ", \n\t" + \
+        "Imprisoned: "          + self.IsImprisoned + ", \n\t" + \
         "Jail Cell: "           + Prison_GetReference("Cell") + ", \n" + \
     " }")
 endFunction

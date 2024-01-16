@@ -3,6 +3,12 @@ Scriptname RPB_Captor extends RPB_Actor
 import RealisticPrisonAndBounty_Util
 import RealisticPrisonAndBounty_Config
 
+bool property IsGuard
+    bool function get()
+        return this.IsGuard()
+    endFunction
+endProperty
+
 event OnDeath(Actor akKiller)
 
 endEvent

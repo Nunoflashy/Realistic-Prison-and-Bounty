@@ -45,24 +45,66 @@ RealisticPrisonAndBounty_ActorVars property ActorVars
 endProperty
 
 ; ==========================================================
-
-
-
-; ==========================================================
-;                 Arrest Vars Undefined Values
+;                       Actor Related
 ; ==========================================================
 
-; bool    property ARREST_VARS_BOOL_UNDEFINED         = false autoreadonly
-; int     property ARREST_VARS_INT_UNDEFINED          = -170000 autoreadonly
-; float   property ARREST_VARS_FLOAT_UNDEFINED        = -170000 autoreadonly
-; string  property ARREST_VARS_STRING_UNDEFINED       = "Undefined" autoreadonly
-; Form    property ARREST_VARS_FORM_UNDEFINED         = none auto
+string property Name
+    string function get()
+        return self.GetName()
+    endFunction
+endProperty
+
+string property Sex
+    string function get()
+        return self.GetSex()
+    endFunction
+endProperty
+
+bool property IsFemale
+    bool function get()
+        return this.GetActorBase().GetSex() == 1
+    endFunction
+endProperty
+
+bool property IsMale
+    bool function get()
+        return this.GetActorBase().GetSex() == 0
+    endFunction
+endProperty
 
 ; ==========================================================
 
-; event OnArrestVarChanged(string asStatName, bool abValue, int aiValue, float afValue, string asValue, Form akValue)
-;     ; Override
-; endEvent
+function AddSpell(Spell akSpell, bool abVerbose = true)
+    this.AddSpell(akSpell, abVerbose)
+endFunction
+
+function RemoveSpell(Spell akSpell)
+    this.RemoveSpell(akSpell)
+endFunction
+
+bool function HasSpell(Spell akSpell)
+    return this.HasSpell(akSpell)
+endFunction
+
+function RemoveItem(Form akItemToRemove, int aiCount = 1, bool abSilent = true, ObjectReference akOtherContainer = none)
+    this.RemoveItem(akItemToRemove, aiCount, abSilent, akOtherContainer)
+endFunction
+
+function StopCombat(bool abStopCombatAlarm = true)
+    this.StopCombat()
+
+    if (abStopCombatAlarm)
+        this.StopCombatAlarm()
+    endif
+endFunction
+
+string function GetSex(bool abShortValue = false)
+    if (self.IsFemale)
+        return string_if (abShortValue, "F", "Female")
+    elseif (self.IsMale)
+        return string_if (abShortValue, "M", "Male")
+    endif
+endFunction
 
 ; ==========================================================
 ;                          Clothing
@@ -85,7 +127,7 @@ bool function HasActiveBounty()
 endFunction
 
 bool function HasLatentBounty()
-    return (Vars_GetInt("Bounty Non-Violent", "Arrest") + Vars_GetInt("Bounty Violent", "Arrest")) > 0
+    return (GetInt("Bounty Non-Violent", "Arrest") + GetInt("Bounty Violent", "Arrest")) > 0
 endFunction
 
 function SetActiveBounty(int aiBounty)
@@ -127,11 +169,11 @@ int function GetLatentBounty(bool abNonViolent = true, bool abViolent = true)
     int totalBounty = 0
 
     if (abNonViolent)
-        totalBounty += Vars_GetInt("Bounty Non-Violent", "Arrest")
+        totalBounty += GetInt("Bounty Non-Violent", "Arrest")
     endif
 
     if (abViolent)
-        totalBounty += Vars_GetInt("Bounty Violent", "Arrest")
+        totalBounty += GetInt("Bounty Violent", "Arrest")
     endif
 
     return totalBounty
@@ -140,11 +182,11 @@ endFunction
 ; Transfers the Active Bounty into the Latent Bounty.
 function HideBounty()
     if (self.HasLatentBounty())
-        Vars_ModInt("Bounty Non-Violent",   self.GetActiveBounty(abViolent = false), "Arrest")
-        Vars_ModInt("Bounty Violent",       self.GetActiveBounty(abNonViolent = false), "Arrest")
+        ModInt("Bounty Non-Violent",   self.GetActiveBounty(abViolent = false), "Arrest")
+        ModInt("Bounty Violent",       self.GetActiveBounty(abNonViolent = false), "Arrest")
     else
-        Vars_SetInt("Bounty Non-Violent",   self.GetActiveBounty(abViolent = false), "Arrest")
-        Vars_SetInt("Bounty Violent",       self.GetActiveBounty(abNonViolent = false), "Arrest")
+        SetInt("Bounty Non-Violent",   self.GetActiveBounty(abViolent = false), "Arrest")
+        SetInt("Bounty Violent",       self.GetActiveBounty(abNonViolent = false), "Arrest")
     endif
 
     ; if (Defeated && DefeatedBounty > 0)
@@ -182,11 +224,11 @@ endFunction
 /;
 function ClearLatentBounty(bool abNonViolent = true, bool abViolent = true)
     if (abNonViolent)
-        Vars_Remove("Bounty Non-Violent", "Arrest")
+        Remove("Bounty Non-Violent", "Arrest")
     endif
 
     if (abViolent)
-        Vars_Remove("Bounty Violent", "Arrest")
+        Remove("Bounty Violent", "Arrest")
     endif
 endFunction
 
@@ -222,6 +264,7 @@ endFunction
 /;
 function SetStat(string statName, int value)
     ActorVars.SetStat(statName, self.GetFaction(), this, value)
+    ; RPB_Actor.SetStat(statName, self.Faction, this, value)
 
     if (TrackStats)
         self.OnStatChanged(statName, value)
@@ -275,217 +318,77 @@ function ModCrimeGold(int aiAmount, bool abViolent = false)
 endFunction
 
 ; ==========================================================
-;                         Arrest Vars
+;                     State Storage Vars
 ; ==========================================================
-
-string function __getActorVarKey(string asVarName, string asVarCategory)
-    if (self.IsPlayer())
-        return asVarCategory + "::" + asVarName
-    else
-        return "["+ this.GetFormID() +"]" + asVarCategory + "::" + asVarName
-    endif
-
-    ; Fallback
-    if (this == Config.Player)
-        return asVarCategory + "::" + asVarName
-    endif
-
-    return "["+ this.GetFormID() +"]" + asVarCategory + "::" + asVarName
-endFunction
 
 ;                           Getters
-bool function Vars_GetBool(string asVarName, string asVarCategory = "Arrest")
-    string paramKey = __getActorVarKey(asVarName, asVarCategory)
-    return ArrestVars.GetBool(paramKey)
+bool function GetBool(string asVarName, string asVarCategory = "Actor")
+    return RPB_StorageVars.GetBoolOnForm(asVarName, this, asVarCategory)
 endFunction
 
-int function Vars_GetInt(string asVarName, string asVarCategory = "Arrest")
-    string paramKey = __getActorVarKey(asVarName, asVarCategory)
-    return ArrestVars.GetInt(paramKey)
+int function GetInt(string asVarName, string asVarCategory = "Actor")
+    return RPB_StorageVars.GetIntOnForm(asVarName, this, asVarCategory)
 endFunction
 
-float function Vars_GetFloat(string asVarName, string asVarCategory = "Arrest")
-    string paramKey = __getActorVarKey(asVarName, asVarCategory)
-    return ArrestVars.GetFloat(paramKey)
+float function GetFloat(string asVarName, string asVarCategory = "Actor")
+    return RPB_StorageVars.GetFloatOnForm(asVarName, this, asVarCategory)
 endFunction
 
-string function Vars_GetString(string asVarName, string asVarCategory = "Arrest")
-    string paramKey = __getActorVarKey(asVarName, asVarCategory)
-    return ArrestVars.GetString(paramKey)
+string function GetString(string asVarName, string asVarCategory = "Actor")
+    return RPB_StorageVars.GetStringOnForm(asVarName, this, asVarCategory)
 endFunction
 
-Form function Vars_GetForm(string asVarName, string asVarCategory = "Arrest")
-    string paramKey = __getActorVarKey(asVarName, asVarCategory)
-    return ArrestVars.GetForm(paramKey)
+Form function GetForm(string asVarName, string asVarCategory = "Actor")
+    return RPB_StorageVars.GetFormOnForm(asVarName, this, asVarCategory)
 endFunction
 
-ObjectReference function Vars_GetReference(string asVarName, string asVarCategory = "Arrest")
-    string paramKey = __getActorVarKey(asVarName, asVarCategory)
-    return ArrestVars.GetReference(paramKey)
+ObjectReference function GetReference(string asVarName, string asVarCategory = "Actor")
+    return RPB_StorageVars.GetFormOnForm(asVarName, this, asVarCategory) as ObjectReference
 endFunction
 
-Actor function Vars_GetActor(string asVarName, string asVarCategory = "Arrest")
-    string paramKey = __getActorVarKey(asVarName, asVarCategory)
-    return ArrestVars.GetActor(paramKey)
-endFunction
+
 ;                          Setters
-function Vars_SetBool(string asVarName, bool abValue, string asVarCategory = "Arrest")
-    string paramKey = __getActorVarKey(asVarName, asVarCategory)
-    ; self.OnArrestVarChanged( \
-    ;     asVarName, \ 
-    ;     abValue, \
-    ;     ARREST_VARS_INT_UNDEFINED, \
-    ;     ARREST_VARS_FLOAT_UNDEFINED, \
-    ;     ARREST_VARS_STRING_UNDEFINED, \
-    ;     ARREST_VARS_FORM_UNDEFINED \
-    ; )
-    return ArrestVars.SetBool(paramKey, abValue)
+function SetBool(string asVarName, bool abValue, string asVarCategory = "Actor")
+    RPB_StorageVars.SetBoolOnForm(asVarName, this, abValue, asVarCategory)
 endFunction
 
-function Vars_SetInt(string asVarName, int aiValue, string asVarCategory = "Arrest", int aiMinValue = 0, int aiMaxValue = 0)
-    string paramKey = __getActorVarKey(asVarName, asVarCategory)
-
-    if (aiMinValue != 0)
-        ArrestVars.SetIntMin(paramKey, aiMinValue)
-    endif
-
-    if (aiMaxValue != 0)
-        ArrestVars.SetIntMax(paramKey, aiMaxValue)
-    endif
-
-    return ArrestVars.SetInt(paramKey, aiValue)
+function SetInt(string asVarName, int aiValue, string asVarCategory = "Actor")
+    RPB_StorageVars.SetIntOnForm(asVarName, this, aiValue, asVarCategory)
 endFunction
 
-function Vars_ModInt(string asVarName, int aiValue, string asVarCategory = "Arrest")
-    string paramKey = __getActorVarKey(asVarName, asVarCategory)
-    ; self.OnArrestVarChanged( \
-    ;     asVarName, \ 
-    ;     ARREST_VARS_BOOL_UNDEFINED, \
-    ;     aiValue, \
-    ;     ARREST_VARS_FLOAT_UNDEFINED, \
-    ;     ARREST_VARS_STRING_UNDEFINED, \
-    ;     ARREST_VARS_FORM_UNDEFINED \
-    ; )    
-    return ArrestVars.ModInt(paramKey, aiValue)
+function ModInt(string asVarName, int aiValue, string asVarCategory = "Actor")
+    RPB_StorageVars.ModIntOnForm(asVarName, this, aiValue, asVarCategory)
 endFunction
 
-function Vars_SetFloat(string asVarName, float afValue, string asVarCategory = "Arrest")
-    string paramKey = __getActorVarKey(asVarName, asVarCategory)
-    ; self.OnArrestVarChanged( \
-    ;     asVarName, \ 
-    ;     ARREST_VARS_BOOL_UNDEFINED, \
-    ;     ARREST_VARS_INT_UNDEFINED, \
-    ;     afValue, \
-    ;     ARREST_VARS_STRING_UNDEFINED, \
-    ;     ARREST_VARS_FORM_UNDEFINED \
-    ; )        
-    return ArrestVars.SetFloat(paramKey, afValue)
+function SetFloat(string asVarName, float afValue, string asVarCategory = "Actor")
+    RPB_StorageVars.SetFloatOnForm(asVarName, this, afValue, asVarCategory)
 endFunction
 
-function Vars_ModFloat(string asVarName, float afValue, string asVarCategory = "Arrest")
-    string paramKey = __getActorVarKey(asVarName, asVarCategory)
-    ; self.OnArrestVarChanged( \
-    ;     asVarName, \ 
-    ;     ARREST_VARS_BOOL_UNDEFINED, \
-    ;     ARREST_VARS_INT_UNDEFINED, \
-    ;     afValue, \
-    ;     ARREST_VARS_STRING_UNDEFINED, \
-    ;     ARREST_VARS_FORM_UNDEFINED \
-    ; )      
-    return ArrestVars.ModFloat(paramKey, afValue)
+function ModFloat(string asVarName, float afValue, string asVarCategory = "Actor")
+    RPB_StorageVars.ModFloatOnForm(asVarName, this, afValue, asVarCategory)
 endFunction
 
-function Vars_SetString(string asVarName, string asValue, string asVarCategory = "Arrest")
-    string paramKey = __getActorVarKey(asVarName, asVarCategory)
-    ; self.OnArrestVarChanged( \
-    ;     asVarName, \ 
-    ;     ARREST_VARS_BOOL_UNDEFINED, \
-    ;     ARREST_VARS_INT_UNDEFINED, \
-    ;     ARREST_VARS_FLOAT_UNDEFINED, \
-    ;     asValue, \
-    ;     ARREST_VARS_FORM_UNDEFINED \
-    ; )      
-    return ArrestVars.SetString(paramKey, asValue)
+function SetString(string asVarName, string asValue, string asVarCategory = "Actor")
+    RPB_StorageVars.SetStringOnForm(asVarName, this, asValue, asVarCategory)
 endFunction
 
-function Vars_SetForm(string asVarName, Form akValue, string asVarCategory = "Arrest")
-    string paramKey = __getActorVarKey(asVarName, asVarCategory)
-    ; self.OnArrestVarChanged( \
-    ;     asVarName, \ 
-    ;     ARREST_VARS_BOOL_UNDEFINED, \
-    ;     ARREST_VARS_INT_UNDEFINED, \
-    ;     ARREST_VARS_FLOAT_UNDEFINED, \
-    ;     ARREST_VARS_STRING_UNDEFINED, \
-    ;     akValue \
-    ; )      
-    return ArrestVars.SetForm(paramKey, akValue)
+function SetForm(string asVarName, Form akValue, string asVarCategory = "Actor")
+    RPB_StorageVars.SetFormOnForm(asVarName, this, akValue, asVarCategory)
 endFunction
 
-function Vars_SetReference(string asVarName, ObjectReference akValue, string asVarCategory = "Arrest")
-    string paramKey = __getActorVarKey(asVarName, asVarCategory)
-    ; self.OnArrestVarChanged( \
-    ;     asVarName, \ 
-    ;     ARREST_VARS_BOOL_UNDEFINED, \
-    ;     ARREST_VARS_INT_UNDEFINED, \
-    ;     ARREST_VARS_FLOAT_UNDEFINED, \
-    ;     ARREST_VARS_STRING_UNDEFINED, \
-    ;     akValue \
-    ; )       
-    return ArrestVars.SetReference(paramKey, akValue)
+function SetReference(string asVarName, ObjectReference akValue, string asVarCategory = "Actor")
+    RPB_StorageVars.SetFormOnForm(asVarName, this, akValue, asVarCategory)
 endFunction
 
-function Vars_SetActor(string asVarName, Actor akValue, string asVarCategory = "Arrest")
-    string paramKey = __getActorVarKey(asVarName, asVarCategory)
-    ; self.OnArrestVarChanged( \
-    ;     asVarName, \ 
-    ;     ARREST_VARS_BOOL_UNDEFINED, \
-    ;     ARREST_VARS_INT_UNDEFINED, \
-    ;     ARREST_VARS_FLOAT_UNDEFINED, \
-    ;     ARREST_VARS_STRING_UNDEFINED, \
-    ;     akValue \
-    ; )       
-    return ArrestVars.SetActor(paramKey, akValue)
+function Remove(string asVarName, string asVarCategory = "Actor")
+    RPB_StorageVars.DeleteVariableOnForm(asVarName, this, asVarCategory)
 endFunction
 
-function Vars_Remove(string asVarName, string asVarCategory = "Arrest")
-    string paramKey = __getActorVarKey(asVarName, asVarCategory)
-    ArrestVars.Remove(paramKey)
+function RemoveAll(string asVarCategory = "Actor")
+    RPB_StorageVars.DeleteCategoryOnForm(this, asVarCategory)
 endFunction
 
 ; ==========================================================
-
-; ==========================================================
-;                           Utility
-; ==========================================================
-
-bool property IsFemale
-    bool function get()
-        return this.GetActorBase().GetSex() == 1
-    endFunction
-endProperty
-
-bool property IsMale
-    bool function get()
-        return this.GetActorBase().GetSex() == 0
-    endFunction
-endProperty
-
-function StopCombat(bool abStopCombatAlarm = true)
-    this.StopCombat()
-
-    if (abStopCombatAlarm)
-        this.StopCombatAlarm()
-    endif
-endFunction
-
-string function GetSex(bool abShortValue = false)
-    if (self.IsFemale)
-        return string_if (abShortValue, "F", "Female")
-    elseif (self.IsMale)
-        return string_if (abShortValue, "M", "Male")
-    endif
-endFunction
-
 
 ; ==========================================================
 ;                          Management
@@ -499,8 +402,6 @@ event OnEffectStart(Actor akTarget, Actor akCaster)
 
     ; Initialization to overriden children
     self.OnInitialize()
-
-    ; Debug(none, "RPB_Actor::OnEffectStart", this + " is now an " + self.GetExtends() + ", " + self.GetExtends() + " script bound! (Parent: RPB_Actor)")
 endEvent
 
 event OnEffectFinish(Actor akTarget, Actor akCaster)
@@ -527,7 +428,7 @@ endEvent
 event OnInitialize() ; override
 endEvent
 
-; Handles the destruction of this Actor reference
+; Handles the destruction of this Actor
 event OnDestroy() ; override
 endEvent
 

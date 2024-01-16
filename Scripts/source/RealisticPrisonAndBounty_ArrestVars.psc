@@ -545,6 +545,7 @@ float function GetFloat(string paramKey, bool allowOverrides = true)
 endFunction
 
 string function GetString(string paramKey, bool allowOverrides = true)
+    Debug(none, "ArrestVars::GetString", paramKey + " Value: " + JMap.getStr(_arrestVarsContainer, __getUsedKey(paramKey, allowOverrides)))
     return JMap.getStr(_arrestVarsContainer, __getUsedKey(paramKey, allowOverrides))
 endFunction
 

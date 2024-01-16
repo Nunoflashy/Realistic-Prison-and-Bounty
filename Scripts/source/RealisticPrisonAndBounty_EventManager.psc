@@ -85,8 +85,8 @@ event OnArrestBegin(string eventName, string arrestType, float arresteeIdFlt, Fo
         return
     endif
 
-    Arrest.MarkActorAsArrestee(arrestee)  ; Mark this Actor as one that is to be arrested (Cast the spell in order to have Arrestee related functions on them through RPB_Arrestee)
-    Arrest.OnArrestBegin(arrestee, captor, crimeFaction, arrestType)
+    RPB_Arrestee arresteeRef = Arrest.MakeArrestee(arrestee)  ; Mark this Actor as one that is to be arrested (Cast the spell in order to have Arrestee related functions on them through RPB_Arrestee)
+    Arrest.OnArrestBegin(arresteeRef, captor, crimeFaction, arrestType)
 endEvent
 
 event OnArrestResist(string eventName, string unusedStr, float arrestResisterIdFlt, Form sender)

@@ -888,23 +888,40 @@ event OnPrisonPeriodicUpdate()
     ; Debug(none, "Prison::OnPrisonPeriodicUpdate", "Prisoners in " + Hold + ": " + prisonerCount)
 endEvent
 
-event OnPrisonerTimeElapsed(RPB_Prisoner akPrisoner)
+event OnPrisonerTimeElapsed(RPB_Prisoner apPrisoner)
 
 endEvent
 
-event OnPrisonerDying(RPB_Prisoner akPrisoner, Actor akKiller)
+event OnPrisonerDying(RPB_Prisoner apPrisoner, Actor akKiller)
     
 endEvent
 
-event OnPrisonerDeath(RPB_Prisoner akPrisoner, Actor akKiller)
+event OnPrisonerDeath(RPB_Prisoner apPrisoner, Actor akKiller)
 
 endEvent
 
-event OnPrisonerStripBegin(RPB_Prisoner akPrisoner, Actor akStripper)
-
+event OnEscortPrisonerToCellEnd(RPB_Prisoner apPrisoner, RPB_JailCell akJailCell, Actor akEscort)
+    if (apPrisoner.IsStrippedNaked || apPrisoner.IsStrippedToUnderwear)
+        return
+    endif
+    
+    apPrisoner.StartStripping(akEscort)
 endEvent
 
-event OnPrisonerReleased(RPB_Prisoner akPrisoner)
+event OnPrisonerStripBegin(RPB_Prisoner apPrisoner, Actor akStripper)
+    apPrisoner.Strip()
+endEvent
+
+event OnPrisonerStripEnd(RPB_Prisoner apPrisoner, Actor akStripper)
+    if (!apPrisoner.IsInCell)
+        apPrisoner.StartRestraining(akStripper)
+        apPrisoner.EscortToCell(akStripper)
+    endif
+
+    Debug(none, "Prison::OnPrisonerStripEnd", "event invoked")
+endEvent
+
+event OnPrisonerReleased(RPB_Prisoner apPrisoner)
 
 endEvent
 
@@ -925,6 +942,30 @@ event OnJailCellAssigned(RPB_JailCell akJailCell, RPB_Prisoner akPrisoner)
     ;     akJailCell.SetExclusiveToPrisonerSex(akPrisoner)
     ; endif
 endEvent
+
+; ==========================================================
+;                           Scenes
+; ==========================================================
+
+function EscortPrisonerToCell(RPB_Prisoner apPrisoner, Actor akEscort)
+    ; The marker where the escort will stand, waiting for the prisoner to enter the cell.
+    ObjectReference outsideJailCellEscortWaitingMarker = apPrisoner.JailCell.GetRandomMarker("Exterior") as ObjectReference
+
+    Config.SceneManager.StartEscortToCell( \
+        akEscortLeader              = akEscort, \
+        akEscortedPrisoner          = apPrisoner.GetActor(), \
+        akJailCellMarker            = apPrisoner.JailCell, \
+        akJailCellDoor              = apPrisoner.JailCell.CellDoor, \ 
+        akEscortWaitingMarker       = outsideJailCellEscortWaitingMarker \ 
+    )
+endFunction
+
+function BeginStrippingPrisoner(RPB_Prisoner apPrisoner, Actor akStripper)
+    Config.SceneManager.StartStripping_02( \
+        akStripperGuard     = akStripper, \
+        akStrippedPrisoner  = apPrisoner.GetActor() \
+    )
+endFunction
 
 ; ==========================================================
 ;                          Management
@@ -1005,15 +1046,15 @@ function ConfigurePrison( \
 
     __isInitialized     = true
 
-    Form randomPrisonerContainer = self.GetRandomPrisonerContainer()
+    ; Form randomPrisonerContainer = self.GetRandomPrisonerContainer()
 
-    Form oppositeContainer = self.GetPrisonerContainerLinkedWithOppositeType(randomPrisonerContainer, "Evidence")
-    Debug(none, "Prison::ConfigurePrison", "Evidence Link Of Belongings Container " + randomPrisonerContainer + ": " + oppositeContainer)
-    Debug(none, "Prison::ConfigurePrison", "Prisoner Containers: " + self.GetPrisonerContainers())
+    ; Form oppositeContainer = self.GetPrisonerContainerLinkedWithOppositeType(randomPrisonerContainer, "Evidence")
+    ; Debug(none, "Prison::ConfigurePrison", "Evidence Link Of Belongings Container " + randomPrisonerContainer + ": " + oppositeContainer)
+    ; Debug(none, "Prison::ConfigurePrison", "Prisoner Containers: " + self.GetPrisonerContainers())
 
-    if (randomPrisonerContainer)
-        Config.Player.RemoveAllItems(randomPrisonerContainer as ObjectReference, true, true)
-    endif
+    ; if (randomPrisonerContainer)
+    ;     Config.Player.RemoveAllItems(randomPrisonerContainer as ObjectReference, true, true)
+    ; endif
 
     ; Initialize all of the jail cells belonging to this prison
     self.SetupCells() ; To be changed, this will only work if the Player is present in the scene
@@ -1420,15 +1461,6 @@ function UnregisterPrisoner(RPB_Prisoner akPrisonerRef)
         Prisoners.Remove(akPrisonerRef)
     endif
 endFunction
-; function UnregisterPrisoner(RPB_Prisoner akPrisonerRef)
-;     string containerKey = "Prisoner["+ akPrisonerRef.GetPrisoner().GetFormID() +"]"
-
-;     if (akPrisonerRef)
-;         RPB_ActiveMagicEffectContainer prisonerList = Config.MainAPI as RPB_ActiveMagicEffectContainer
-;         ; TODO: remove from __prisoners
-;         prisonerList.Remove(containerKey)
-;     endif
-; endFunction
 
 RPB_Prisoner function GetPrisonerReference(Actor akPrisoner)
     RPB_Prisoner prisonerRef = Prisoners.AtKey(akPrisoner)
@@ -1440,20 +1472,6 @@ RPB_Prisoner function GetPrisonerReference(Actor akPrisoner)
 
     return prisonerRef
 endFunction
-
-; RPB_Prisoner function GetPrisonerReference(Actor akPrisoner)
-;     RPB_ActiveMagicEffectContainer prisonerList = Config.MainAPI as RPB_ActiveMagicEffectContainer
-
-;     string listKey = "Prisoner["+ akPrisoner.GetFormID() +"]"
-;     RPB_Prisoner prisonerRef = prisonerList.GetAt(listKey) as RPB_Prisoner
-
-;     if (!prisonerRef)
-;         Warn(none, "Prison::GetPrisonerReference", "The Actor " + akPrisoner + " is not a prisoner or there was a state mismatch!")
-;         return none
-;     endif
-
-;     return prisonerRef
-; endFunction
 
 
 bool __isReceivingUpdates
@@ -1585,15 +1603,6 @@ function ProcessImprisonmentForQueuedPrisoners()
     isProcessingQueuedPrisonersForImprisonment = false
 endFunction
 
-function MarkActorAsPrisoner(Actor akActor, bool abDelayExecution = true)
-    Spell prisonerSpell = GetFormFromMod(0x197D7) as Spell
-    akActor.AddSpell(prisonerSpell, false)
-
-    if (abDelayExecution)
-        Utility.Wait(0.2)
-    endif
-endFunction
-
 RPB_Prisoner function MakePrisoner(Actor akActor, bool abDelayExecution = true)
     ; Cast the Prisoner spell (to bind the RPB_Prisoner instance script)
     Spell prisonerSpell = GetFormFromMod(0x197D7) as Spell
@@ -1609,6 +1618,11 @@ RPB_Prisoner function MakePrisoner(Actor akActor, bool abDelayExecution = true)
 endFunction
 
 function ImprisonActorImmediately(Actor akActor)
+    RPB_StorageVars.SetFormOnForm("Faction", akActor, self.PrisonFaction, "Arrest")
+    RPB_StorageVars.SetFormOnForm("Arrestee", akActor, akActor, "Arrest")
+    RPB_StorageVars.SetStringOnForm("Arrest Type", akActor, Arrest.ARREST_TYPE_TELEPORT_TO_CELL, "Arrest")
+    RPB_StorageVars.SetStringOnForm("Hold", akActor, self.Hold, "Arrest")
+
     ArrestVars.SetForm("["+ akActor.GetFormID() +"]Arrest::Faction", self.PrisonFaction)
     ArrestVars.SetForm("["+ akActor.GetFormID() +"]Arrest::Arrestee", akActor)
     ArrestVars.SetString("["+ akActor.GetFormID() +"]Arrest::Arrest Type", Arrest.ARREST_TYPE_TELEPORT_TO_CELL)
@@ -1706,7 +1720,7 @@ function DEBUG_ShowPrisonerSentenceInfo(RPB_Prisoner akPrisoner, bool abShort = 
         string timeServedString = timeServedDays + " Days, " + timeServedHours + " Hours"
         string timeLeftString   = timeLeftToServeDays + " Days, " + timeLeftToServeHours + " Hours"
         
-        Info(none, "ShowSentenceInfo", self.Hold + " Sentence for " + akPrisoner.GetActor() + ": {"+ sentenceString +", (Served: "+ timeServedString +"), (Left: "+ timeLeftString +")} (Cell: " + akPrisoner.Prison_GetReference("Cell") + ", Door: " + akPrisoner.Prison_GetReference("Cell Door") + ")")
+        Info(none, "ShowSentenceInfo", self.Hold + " Sentence for " + akPrisoner.GetActor() + ": {"+ sentenceString +", (Served: "+ timeServedString +"), (Left: "+ timeLeftString +")} (Cell: " + akPrisoner.JailCell + ", Door: " + akPrisoner.JailCell.CellDoor + ")")
         ; Info(none, "ShowSentenceInfo", self.Hold + " Sentence for " + akPrisoner.GetActor() + ": {"+ sentenceString +", Served: "+ timeServedString +", Left: "+ timeLeftString +"} (Cell: " + akPrisoner.Prison_GetReference("Cell") + ", Door: " + akPrisoner.Prison_GetReference("Cell Door") + ")")
     else
         ; Time Served

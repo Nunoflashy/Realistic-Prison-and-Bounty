@@ -28,10 +28,10 @@ endFunction
 /;
 int function GetRootObject(string asHold = "/") global
     int configFile
-    bool rootIsLoaded = JDB.hasPath(".rpb_root")
+    bool rootIsLoaded = JDB.hasPath(".rpb_root.data")
 
     if (rootIsLoaded)
-        configFile = JDB.solveObj(".rpb_root")
+        configFile = JDB.solveObj(".rpb_root.data")
     else
         configFile = Unserialize()
     endif
@@ -49,7 +49,7 @@ endFunction
     Sets @apRootContainer to be the root container of the data.
 /;
 bool function SetRootContainer(int apRootContainer) global
-    JDB.setObj("rpb_root", apRootContainer)
+    JDB.setObj("rpb_root.data", apRootContainer)
 endFunction
 
 ;/
@@ -259,7 +259,7 @@ endFunction
     Retrieves a root property of type Form from a Prison.
 
     JMap&           @apHoldJailObject: The reference to the jail object.
-    Form          @asProperty: The name of the property.
+    Form            @asProperty: The name of the property.
 
     returns (Form): A root property of type Form from the Prison.
 /;
@@ -309,6 +309,47 @@ Form[] function GetJailCellChildren(int apHoldJailObject, Form akParentForm, str
 endFunction
 
 ;/
+    Retrieves the property base object for a particular Jail Cell with the parameters specified.
+
+    JFormMap&       @apPrisonCellsObject: The reference to the Cells object for the given Prison (Cells in the data file).
+    RPB_JailCell    @akJailCell: The jail cell.
+    string          @asPropertyCategory: The root category of the property.
+    string[]?       @asArrPropertySubCategories: The nested categories within the root category for this property, if there are any.
+    int?            @aiSubCategoriesLimitSize: The number of elements to take into account for the sub-categories if the array is bigger than desired.
+
+    returns (JMap&): The base object specified through the parameters for this jail cell.
+/;
+int function JailCell_GetPropertyBaseObject(int apPrisonCellsObject, RPB_JailCell akJailCell, string asPropertyCategory = "null", string[] asArrPropertySubCategories = none, int aiSubCategoriesLimitSize = 0) global
+    int map_cellDataContent     = JFormMap.getObj(apPrisonCellsObject, akJailCell) ; JMap& - Get the cell object with this parent key
+
+    if (asPropertyCategory == "null")
+        return map_cellDataContent ; this is the root object, no categories have been specified
+    endif
+
+    int map_propertyCategory    = JMap.getObj(map_cellDataContent, asPropertyCategory)
+    int map_propertySubCategory = map_propertyCategory
+    int map_finalPropertyObject = map_propertyCategory
+
+    ; There are sub-categories to this property
+    if (asArrPropertySubCategories.Length > 0)
+        int desiredArraySize = int_if (aiSubCategoriesLimitSize > 0, Min(aiSubCategoriesLimitSize, asArrPropertySubCategories.Length) as int, asArrPropertySubCategories.Length)
+        int i = 0
+        while (i < desiredArraySize)
+            string currentStoredCategory = asArrPropertySubCategories[i]
+            if (currentStoredCategory)
+                ; Iterate through the container recursively until we find the option
+                map_propertySubCategory = JMap.getObj(map_propertySubCategory, currentStoredCategory)
+            endif
+            i += 1
+        endWhile
+
+        map_finalPropertyObject = map_propertySubCategory
+    endif
+
+    return map_finalPropertyObject
+endFunction
+
+;/
     Retrieves a root property of type bool from a Jail Cell.
 
     JFormMap&       @apPrisonCellsObject: The reference to the Cells object for the given Prison (Cells in the data file).
@@ -331,7 +372,7 @@ endFunction
     returns (int): A root property of type int from the Jail Cell.
 /;
 int function JailCell_GetRootPropertyOfTypeInt(int apPrisonCellsObject, RPB_JailCell akJailCell, string asProperty) global
-    int map_cellDataContent     = JFormMap.getObj(apPrisonCellsObject, akJailCell) ; JMap& - Get the cell object with this parent key
+    int map_cellDataContent     = JailCell_GetPropertyBaseObject(apPrisonCellsObject, akJailCell) ; JMap& - Get the cell object with this parent key
     int intProperty             = JMap.getInt(map_cellDataContent, asProperty)
     
     return intProperty
@@ -347,7 +388,7 @@ endFunction
     returns (float): A root property of type float from the Jail Cell.
 /;
 float function JailCell_GetRootPropertyOfTypeFloat(int apPrisonCellsObject, RPB_JailCell akJailCell, string asProperty) global
-    int map_cellDataContent     = JFormMap.getObj(apPrisonCellsObject, akJailCell) ; JMap& - Get the cell object with this parent key
+    int map_cellDataContent     = JailCell_GetPropertyBaseObject(apPrisonCellsObject, akJailCell) ; JMap& - Get the cell object with this parent key
     float floatProperty         = JMap.getFlt(map_cellDataContent, asProperty)
     
     return floatProperty
@@ -363,7 +404,7 @@ endFunction
     returns (string): A root property of type string from the Jail Cell.
 /;
 string function JailCell_GetRootPropertyOfTypeString(int apPrisonCellsObject, RPB_JailCell akJailCell, string asProperty) global
-    int map_cellDataContent     = JFormMap.getObj(apPrisonCellsObject, akJailCell) ; JMap& - Get the cell object with this parent key
+    int map_cellDataContent     = JailCell_GetPropertyBaseObject(apPrisonCellsObject, akJailCell) ; JMap& - Get the cell object with this parent key
     string stringProperty       = JMap.getStr(map_cellDataContent, asProperty)
     
     return stringProperty
@@ -379,10 +420,56 @@ endFunction
     returns (Form): A root property of type Form from the Jail Cell.
 /;
 Form function JailCell_GetRootPropertyOfTypeForm(int apPrisonCellsObject, RPB_JailCell akJailCell, string asProperty) global
-    int map_cellDataContent     = JFormMap.getObj(apPrisonCellsObject, akJailCell) ; JMap& - Get the cell object with this parent key
+    int map_cellDataContent     = JailCell_GetPropertyBaseObject(apPrisonCellsObject, akJailCell) ; JMap& - Get the cell object with this parent key
     Form formProperty           = JMap.getForm(map_cellDataContent, asProperty)
 
     return formProperty
+endFunction
+
+;/
+    Retrieves a root property of type Form[] from a Jail Cell.
+
+    JFormMap&       @apPrisonCellsObject: The reference to the Cells object for the given Prison (Cells in the data file).
+    RPB_JailCell    @akJailCell: The jail cell.
+    string          @asProperty: The name of the property.
+
+    returns (Form[]): A root property of type Form[] from the Jail Cell.
+/;
+Form[] function JailCell_GetRootPropertyOfTypeFormArray(int apPrisonCellsObject, RPB_JailCell akJailCell, string asProperty) global
+    int map_cellDataContent     = JailCell_GetPropertyBaseObject(apPrisonCellsObject, akJailCell) ; JMap& - Get the cell object with this parent key
+    int propertyContainer       = JMap.getObj(map_cellDataContent, asProperty) ; any& <JContainer>
+
+    if (JValue.isArray(propertyContainer))
+        return JArray.asFormArray(propertyContainer)
+
+    elseif (JValue.isFormMap(propertyContainer))
+        return JFormMap.allKeysPArray(propertyContainer)
+    endif
+
+    return none
+endFunction
+
+;/
+    Retrieves a root property of type string[] from a Jail Cell.
+
+    JFormMap&       @apPrisonCellsObject: The reference to the Cells object for the given Prison (Cells in the data file).
+    RPB_JailCell    @akJailCell: The jail cell.
+    string          @asProperty: The name of the property.
+
+    returns (string[]): A root property of type string[] from the Jail Cell.
+/;
+string[] function JailCell_GetRootPropertyOfTypeStringArray(int apPrisonCellsObject, RPB_JailCell akJailCell, string asProperty) global
+    int map_cellDataContent = JailCell_GetPropertyBaseObject(apPrisonCellsObject, akJailCell) ; JMap& - Get the cell object with this parent key
+    int propertyContainer   = JMap.getObj(map_cellDataContent, asProperty) ; any& <JContainer>
+
+    if (JValue.isArray(propertyContainer))
+        return JArray.asStringArray(propertyContainer)
+
+    elseif (JValue.isMap(propertyContainer))
+        return JMap.allKeysPArray(propertyContainer)
+    endif
+
+    return none
 endFunction
 
 ;/
@@ -513,6 +600,10 @@ int function JailCell_GetOptionOfTypeInt(int apPrisonCellsObject, RPB_JailCell a
     int selectedOption          = JMap.getInt(map_finalOptionObject, asOption)
 
     return selectedOption
+
+    ; string[] subCategories = new string[1]
+    ; subCategories[0] = asOptionCategory
+    ; int optionBaseObject = JailCell_GetPropertyBaseObject(apPrisonCellsObject, akJailCell, "Options", subCategories)
 endFunction
 
 ;/
@@ -590,6 +681,29 @@ Form function JailCell_GetOptionOfTypeForm(int apPrisonCellsObject, RPB_JailCell
     return selectedOption
 endFunction
 
+
+bool function JailCell_HasLockDecayOptions(int apPrisonCellsObject, RPB_JailCell akJailCell) global
+    int map_cellDataContent     = JFormMap.getObj(apPrisonCellsObject, akJailCell)      ; JMap& - Get the cell object with this parent key
+    int map_options             = JMap.getObj(map_cellDataContent, "Options")           ; JMap& - The options for this cell
+    int map_lockOptions         = JMap.getObj(map_options, "Lock")                      ; JMap& - The lock options for this cell
+    int map_decayOptions        = JMap.getObj(map_lockOptions, "Decay Options")         ; JMap& - The lock decay options for this cell
+
+    return !JValue.empty(map_decayOptions)
+endFunction
+
+bool function JailCell_HasLockDecayOption(int apPrisonCellsObject, RPB_JailCell akJailCell, string asOption, string asOptionCategory = "null") global
+    int map_cellDataContent     = JFormMap.getObj(apPrisonCellsObject, akJailCell)      ; JMap& - Get the cell object with this parent key
+    int map_options             = JMap.getObj(map_cellDataContent, "Options")           ; JMap& - The options for this cell
+    int map_lockOptions         = JMap.getObj(map_options, "Lock")                      ; JMap& - The lock options for this cell
+    int map_decayOptions        = JMap.getObj(map_lockOptions, "Decay Options")         ; JMap& - The lock decay options for this cell
+    int map_finalOptionObject   = map_decayOptions
+
+    if (asOptionCategory != "null")
+        map_finalOptionObject = JMap.getObj(map_decayOptions, asOptionCategory)
+    endif
+
+    return JMap.hasKey(map_finalOptionObject, asOption) ; To be tested
+endFunction
 
 ;/
     Retrieves the Objects of a Jail Cell, object type is specified through @asObjectCategory.
@@ -679,6 +793,283 @@ bool function JailCell_HasObjects(int apPrisonCellsObject, RPB_JailCell akJailCe
 endFunction
 
 ;/
+    Retrieves whether the option exists for a particular Cell Door with the parameters specified.
+
+    JMap&           @apJailCellObject: The reference to the jail cell object that owns this cell door.
+    RPB_CellDoor    @akCellDoor: The cell door reference.
+    string          @asOption: The option to retrieve.
+    string          @asOptionCategory: The category of the option.
+    string[]?       @asArrOptionsSubCategories: The nested categories within the main category for this option, if there are any.
+    int?            @aiSubCategoriesLimitSize: The number of elements to take into account for the sub-categories if the array is bigger than desired.
+
+    returns (bool): Whether the specified option exists for this cell door.
+/;
+bool function CellDoor_HasOption(int apJailCellObject, RPB_CellDoor akCellDoor, string asOption, string asOptionCategory, string[] asArrOptionsSubCategories = none, int aiSubCategoriesLimitSize = 0) global
+    int map_cellDoors           = JMap.getObj(apJailCellObject, "Cell Doors")           ; JFormMap& - The cell doors for this jail cell
+    int map_cellDoor            = JFormMap.getObj(map_cellDoors, akCellDoor)            ; JMap&
+    int map_optionCategory      = JMap.getObj(map_cellDoor, asOptionCategory)           ; JMap& - (e.g: Lock)
+    int map_optionSubCategory   = map_optionCategory ; The same category to start off, assign another if it has children
+    int map_finalOptionObject   = map_optionCategory
+
+    ; Invalid category, doesn't exist
+    if (JValue.empty(map_optionCategory))
+        return false
+    endif
+
+    ; There are sub-categories to this option
+    if (asArrOptionsSubCategories.Length > 0)
+        int desiredArraySize = int_if (aiSubCategoriesLimitSize > 0, Min(aiSubCategoriesLimitSize, asArrOptionsSubCategories.Length) as int, asArrOptionsSubCategories.Length)
+
+        int i = 0
+        while (i < desiredArraySize)
+            string currentStoredCategory = asArrOptionsSubCategories[i]
+            if (currentStoredCategory)
+                map_optionSubCategory = JMap.getObj(map_optionSubCategory, currentStoredCategory) ; (e.g: Decay Options for 1st iteration, Decay Thresholds for 2nd)
+            endif
+            i += 1
+        endWhile
+
+        map_finalOptionObject = map_optionSubCategory
+
+        ; Invalid category, doesn't exist
+        if (JValue.empty(map_finalOptionObject))
+            return false
+        endif
+    endif
+
+    return JMap.hasKey(map_finalOptionObject, asOption)
+endFunction
+
+;/
+    Retrieves the options base object for a particular Cell Door with the parameters specified.
+
+    JMap&           @apJailCellObject: The reference to the jail cell object that owns this cell door.
+    RPB_CellDoor    @akCellDoor: The cell door reference.
+    string          @asOptionCategory: The category of the option.
+    string[]?       @asArrOptionsSubCategories: The nested categories within the main category for this option, if there are any.
+    int?            @aiSubCategoriesLimitSize: The number of elements to take into account for the sub-categories if the array is bigger than desired.
+
+    returns (JMap&): The object specified through the parameters for this cell door.
+/;
+int function CellDoor_GetOptionBaseObject(int apJailCellObject, RPB_CellDoor akCellDoor, string asOptionCategory, string[] asArrOptionsSubCategories = none, int aiSubCategoriesLimitSize = 0) global
+    int map_cellDoors           = JMap.getObj(apJailCellObject, "Cell Doors")           ; JFormMap& - The cell doors for this jail cell
+    int map_cellDoor            = JFormMap.getObj(map_cellDoors, akCellDoor)            ; JMap&
+    int map_optionCategory      = JMap.getObj(map_cellDoor, asOptionCategory)           ; JMap& - (e.g: Lock)
+    int map_optionSubCategory   = map_optionCategory ; The same category to start off, assign another if it has children
+    int map_finalOptionObject   = map_optionCategory
+
+    ; There are sub-categories to this option
+    if (asArrOptionsSubCategories.Length > 0)
+        int desiredArraySize = int_if (aiSubCategoriesLimitSize > 0, Min(aiSubCategoriesLimitSize, asArrOptionsSubCategories.Length) as int, asArrOptionsSubCategories.Length)
+
+        int i = 0
+        while (i < desiredArraySize)
+            string currentStoredCategory = asArrOptionsSubCategories[i]
+            if (currentStoredCategory)
+                map_optionSubCategory = JMap.getObj(map_optionSubCategory, currentStoredCategory) ; (e.g: Decay Options for 1st iteration, Decay Thresholds for 2nd)
+            endif
+            i += 1
+        endWhile
+
+        map_finalOptionObject = map_optionSubCategory
+    endif
+
+    ; Debug(none, "Data::CellDoor_GetOptionBaseObject", "Cell Doors: " + GetContainerList(map_cellDoors))
+    ; Debug(none, "Data::CellDoor_GetOptionBaseObject", "Cell Door: " + GetContainerList(map_cellDoor))
+    ; Debug(none, "Data::CellDoor_GetOptionBaseObject", "Option Category: " + GetContainerList(map_optionCategory))
+    ; Debug(none, "Data::CellDoor_GetOptionBaseObject", "Option Sub Category: " + GetContainerList(map_optionSubCategory))
+    ; Debug(none, "Data::CellDoor_GetOptionBaseObject", "Option Final Object: " + GetContainerList(map_finalOptionObject))
+
+    return map_finalOptionObject
+endFunction
+
+;/
+    Retrieves an option of type bool from a Cell Door.
+
+    JMap&           @apJailCellObject: The reference to the jail cell object that owns this cell door.
+    RPB_CellDoor    @akCellDoor: The cell door reference.
+    string          @asOption: The option to retrieve.
+    string          @asOptionCategory: The category of the option.
+    string[]?       @asArrOptionsSubCategories: The nested categories within the main category for this option, if there are any.
+    int?            @aiSubCategoriesLimitSize: The number of elements to take into account for the sub-categories if the array is bigger than desired.
+
+    returns (bool): The specified option of type bool for this cell door.
+/;
+bool function CellDoor_GetOptionOfTypeBool(int apJailCellObject, RPB_CellDoor akCellDoor, string asOption, string asOptionCategory, string[] asArrOptionsSubCategories = none, int aiSubCategoriesLimitSize = 0) global
+    int optionBaseObject = CellDoor_GetOptionBaseObject(apJailCellObject, akCellDoor, asOptionCategory, asArrOptionsSubCategories, aiSubCategoriesLimitSize)
+    return JMap.getInt(optionBaseObject, asOption) as bool
+endFunction
+
+;/
+    Retrieves an option of type int from a Cell Door.
+
+    JMap&           @apJailCellObject: The reference to the jail cell object that owns this cell door.
+    RPB_CellDoor    @akCellDoor: The cell door reference.
+    string          @asOption: The option to retrieve.
+    string          @asOptionCategory: The category of the option.
+    string[]?       @asArrOptionsSubCategories: The nested categories within the main category for this option, if there are any.
+    int?            @aiSubCategoriesLimitSize: The number of elements to take into account for the sub-categories if the array is bigger than desired.
+
+    returns (int): The specified option of type int for this cell door.
+/;
+int function CellDoor_GetOptionOfTypeInt(int apJailCellObject, RPB_CellDoor akCellDoor, string asOption, string asOptionCategory, string[] asArrOptionsSubCategories = none, int aiSubCategoriesLimitSize = 0) global
+    int optionBaseObject = CellDoor_GetOptionBaseObject(apJailCellObject, akCellDoor, asOptionCategory, asArrOptionsSubCategories, aiSubCategoriesLimitSize)
+    return JMap.getInt(optionBaseObject, asOption)
+endFunction
+
+;/
+    Retrieves an option of type float from a Cell Door.
+
+    JMap&           @apJailCellObject: The reference to the jail cell object that owns this cell door.
+    RPB_CellDoor    @akCellDoor: The cell door reference.
+    string          @asOption: The option to retrieve.
+    string          @asOptionCategory: The category of the option.
+    string[]?       @asArrOptionsSubCategories: The nested categories within the main category for this option, if there are any.
+    int?            @aiSubCategoriesLimitSize: The number of elements to take into account for the sub-categories if the array is bigger than desired.
+
+    returns (float): The specified option of type float for this cell door.
+/;
+float function CellDoor_GetOptionOfTypeFloat(int apJailCellObject, RPB_CellDoor akCellDoor, string asOption, string asOptionCategory, string[] asArrOptionsSubCategories = none, int aiSubCategoriesLimitSize = 0) global
+    int optionBaseObject = CellDoor_GetOptionBaseObject(apJailCellObject, akCellDoor, asOptionCategory, asArrOptionsSubCategories, aiSubCategoriesLimitSize)
+    return JMap.getFlt(optionBaseObject, asOption)
+endFunction
+
+;/
+    Retrieves an option of type string from a Cell Door.
+
+    JMap&           @apJailCellObject: The reference to the jail cell object that owns this cell door.
+    RPB_CellDoor    @akCellDoor: The cell door reference.
+    string          @asOption: The option to retrieve.
+    string          @asOptionCategory: The category of the option.
+    string[]?       @asArrOptionsSubCategories: The nested categories within the main category for this option, if there are any.
+    int?            @aiSubCategoriesLimitSize: The number of elements to take into account for the sub-categories if the array is bigger than desired.
+
+    returns (string): The specified option of type string for this cell door.
+/;
+string function CellDoor_GetOptionOfTypeString(int apJailCellObject, RPB_CellDoor akCellDoor, string asOption, string asOptionCategory, string[] asArrOptionsSubCategories = none, int aiSubCategoriesLimitSize = 0) global
+    int optionBaseObject = CellDoor_GetOptionBaseObject(apJailCellObject, akCellDoor, asOptionCategory, asArrOptionsSubCategories, aiSubCategoriesLimitSize)
+    return JMap.getStr(optionBaseObject, asOption)
+endFunction
+
+;/
+    Retrieves an option of type Form from a Cell Door.
+
+    JMap&           @apJailCellObject: The reference to the jail cell object that owns this cell door.
+    RPB_CellDoor    @akCellDoor: The cell door reference.
+    string          @asOption: The option to retrieve.
+    string          @asOptionCategory: The category of the option.
+    string[]?       @asArrOptionsSubCategories: The nested categories within the main category for this option, if there are any.
+    int?            @aiSubCategoriesLimitSize: The number of elements to take into account for the sub-categories if the array is bigger than desired.
+
+    returns (Form): The specified option of type Form for this cell door.
+/;
+Form function CellDoor_GetOptionOfTypeForm(int apJailCellObject, RPB_CellDoor akCellDoor, string asOption, string asOptionCategory, string[] asArrOptionsSubCategories = none, int aiSubCategoriesLimitSize = 0) global
+    int optionBaseObject = CellDoor_GetOptionBaseObject(apJailCellObject, akCellDoor, asOptionCategory, asArrOptionsSubCategories, aiSubCategoriesLimitSize)
+    return JMap.getForm(optionBaseObject, asOption)
+endFunction
+
+;/
+    Retrieves an option of type int[] from a Cell Door.
+
+    JMap&           @apJailCellObject: The reference to the jail cell object that owns this cell door.
+    RPB_CellDoor    @akCellDoor: The cell door reference.
+    string          @asOption: The option to retrieve.
+    string          @asOptionCategory: The category of the option.
+    string[]?       @asArrOptionsSubCategories: The nested categories within the main category for this option, if there are any.
+    int?            @aiSubCategoriesLimitSize: The number of elements to take into account for the sub-categories if the array is bigger than desired.
+
+    returns (int[]): The specified option of type int[] for this cell door.
+/;
+int[] function CellDoor_GetOptionOfTypeIntArray(int apJailCellObject, RPB_CellDoor akCellDoor, string asOption, string asOptionCategory, string[] asArrOptionsSubCategories = none, int aiSubCategoriesLimitSize = 0) global
+    int optionBaseObject    = CellDoor_GetOptionBaseObject(apJailCellObject, akCellDoor, asOptionCategory, asArrOptionsSubCategories, aiSubCategoriesLimitSize)
+    int optionContainer     = JMap.getObj(optionBaseObject, asOption) ; any& <JContainer>
+
+    if (JValue.isArray(optionContainer))
+        return JArray.asIntArray(optionContainer)
+
+    elseif (JValue.isFormMap(optionContainer))
+        return JIntMap.allKeysPArray(optionContainer)
+    endif
+
+    return none
+endFunction
+
+;/
+    Retrieves an option of type float[] from a Cell Door.
+
+    JMap&           @apJailCellObject: The reference to the jail cell object that owns this cell door.
+    RPB_CellDoor    @akCellDoor: The cell door reference.
+    string          @asOption: The option to retrieve.
+    string          @asOptionCategory: The category of the option.
+    string[]?       @asArrOptionsSubCategories: The nested categories within the main category for this option, if there are any.
+    int?            @aiSubCategoriesLimitSize: The number of elements to take into account for the sub-categories if the array is bigger than desired.
+
+    returns (float[]): The specified option of type float[] for this cell door.
+/;
+float[] function CellDoor_GetOptionOfTypeFloatArray(int apJailCellObject, RPB_CellDoor akCellDoor, string asOption, string asOptionCategory, string[] asArrOptionsSubCategories = none, int aiSubCategoriesLimitSize = 0) global
+    int optionBaseObject    = CellDoor_GetOptionBaseObject(apJailCellObject, akCellDoor, asOptionCategory, asArrOptionsSubCategories, aiSubCategoriesLimitSize)
+    int optionContainer     = JMap.getObj(optionBaseObject, asOption) ; any& <JContainer>
+
+    if (JValue.isArray(optionContainer))
+        return JArray.asFloatArray(optionContainer)
+    endif
+
+    return none
+endFunction
+
+;/
+    Retrieves an option of type Form[] from a Cell Door.
+
+    JMap&           @apJailCellObject: The reference to the jail cell object that owns this cell door.
+    RPB_CellDoor    @akCellDoor: The cell door reference.
+    string          @asOption: The option to retrieve.
+    string          @asOptionCategory: The category of the option.
+    string[]?       @asArrOptionsSubCategories: The nested categories within the main category for this option, if there are any.
+    int?            @aiSubCategoriesLimitSize: The number of elements to take into account for the sub-categories if the array is bigger than desired.
+
+    returns (Form[]): The specified option of type Form[] for this cell door.
+/;
+Form[] function CellDoor_GetOptionOfTypeFormArray(int apJailCellObject, RPB_CellDoor akCellDoor, string asOption, string asOptionCategory, string[] asArrOptionsSubCategories = none, int aiSubCategoriesLimitSize = 0) global
+    int optionBaseObject    = CellDoor_GetOptionBaseObject(apJailCellObject, akCellDoor, asOptionCategory, asArrOptionsSubCategories, aiSubCategoriesLimitSize)
+    int optionContainer     = JMap.getObj(optionBaseObject, asOption) ; any& <JContainer>
+
+    if (JValue.isArray(optionContainer))
+        return JArray.asFormArray(optionContainer)
+
+    elseif (JValue.isFormMap(optionContainer))
+        return JFormMap.allKeysPArray(optionContainer)
+    endif
+
+    return none
+endFunction
+
+;/
+    Retrieves an option of type string[] from a Cell Door.
+
+    JMap&           @apJailCellObject: The reference to the jail cell object that owns this cell door.
+    RPB_CellDoor    @akCellDoor: The cell door reference.
+    string          @asOption: The option to retrieve.
+    string          @asOptionCategory: The category of the option.
+    string[]?       @asArrOptionsSubCategories: The nested categories within the main category for this option, if there are any.
+    int?            @aiSubCategoriesLimitSize: The number of elements to take into account for the sub-categories if the array is bigger than desired.
+
+    returns (string[]): The specified option of type string[] for this cell door.
+/;
+string[] function CellDoor_GetOptionOfTypeStringArray(int apJailCellObject, RPB_CellDoor akCellDoor, string asOption, string asOptionCategory, string[] asArrOptionsSubCategories = none, int aiSubCategoriesLimitSize = 0) global
+    int optionBaseObject    = CellDoor_GetOptionBaseObject(apJailCellObject, akCellDoor, asOptionCategory, asArrOptionsSubCategories, aiSubCategoriesLimitSize)
+    int optionContainer     = JMap.getObj(optionBaseObject, asOption) ; any& <JContainer>
+
+    if (JValue.isArray(optionContainer))
+        return JArray.asStringArray(optionContainer)
+
+    elseif (JValue.isFormMap(optionContainer))
+        return JMap.allKeysPArray(optionContainer)
+    endif
+
+    return none
+endFunction
+
+;/
     Retrieves the hold's jail release markers, whether they're Teleport or Escort markers depends on @asTeleportOrEscort.
 
     JMap&   @apHoldJailObject: The reference to the jail object.
@@ -722,6 +1113,15 @@ endFunction
 ;     int array_prisonerContainers  = JMap.getObj(apHoldJailObject, "Prisoner Containers") ; JArray&
 ;     return JArray.asFormArray(array_prisonerContainers)
 ; endFunction
+
+
+string[] function Jail_GetScenes(int apHoldJailObject)
+
+endFunction
+
+int function Jail_GetSceneProbability(int apHoldJailObject, string asSceneName)
+    
+endFunction
 
 
 ; ==========================================================
