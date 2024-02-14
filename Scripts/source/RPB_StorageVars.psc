@@ -253,14 +253,11 @@ endFunction
 function SetBoolOnForm(string asKey, Form akForm, bool abValue, string asCategory = "null") global
     string path = GetVarPathOnForm(asKey, akForm, asCategory)
     JDB.solveIntSetter(path, abValue as int, true)
-
-    ; Debug(none, "StorageVars::SetBoolOnForm", "path: " + path + ", value: " + JDB.solveInt(path))
 endFunction
 
 function SetIntOnForm(string asKey, Form akForm, int aiValue, string asCategory = "null") global
     string path = GetVarPathOnForm(asKey, akForm, asCategory)
     JDB.solveIntSetter(path, aiValue, true)
-    ; Debug(none, "StorageVars::SetIntOnForm", "path: " + path + ", value: " + JDB.solveInt(path))
 endFunction
 
 function SetFloatOnForm(string asKey, Form akForm, float afValue, string asCategory = "null") global

@@ -98,6 +98,10 @@ function StopCombat(bool abStopCombatAlarm = true)
     endif
 endFunction
 
+function MoveTo(ObjectReference akTarget, float afXOffset = 0.0, float afYOffset = 0.0, float afZOffset = 0.0, bool abMatchRotation = true)
+    this.MoveTo(akTarget, afXOffset, afYOffset, afZOffset, abMatchRotation)
+endFunction
+
 string function GetSex(bool abShortValue = false)
     if (self.IsFemale)
         return string_if (abShortValue, "F", "Female")
@@ -277,6 +281,8 @@ endFunction
 function IncrementStat(string statName, int incrementBy = 1)
     ActorVars.IncrementStat(statName, self.GetFaction(), this, incrementBy)
 
+    RPB_Utility.DebugWithArgs("Actor::IncrementStat", "statName: " + statName + ", incrementBy: " + incrementBy, "Incrementing stat")
+
     if (TrackStats)
         self.OnStatChanged(statName, self.QueryStat(statName))
     endif
@@ -396,6 +402,7 @@ endFunction
 
 event OnEffectStart(Actor akTarget, Actor akCaster)
     __this = akTarget
+    __isEffectActive = true
 
     ; Assigns the actor for this script, differentiating between Player and NPC to avoid retrieving properties, instead caching it in a local variable to this script
     self.__assignActor()
@@ -406,6 +413,8 @@ endEvent
 
 event OnEffectFinish(Actor akTarget, Actor akCaster)
     Debug(none, "RPB_Actor::OnEffectFinish", this + " is no longer bound to " + self as string + ", detaching script!")
+
+    __isEffectActive = false
     self.OnDestroy()
 endEvent
 
@@ -436,6 +445,10 @@ endEvent
 function RegisterForTrackedStats()
     if (self.IsPlayer())
         RegisterForTrackedStatsEvent() ; Vanilla Stats, Player only
+
+        if (self.RegisterSleepEvents)
+            RegisterForSleep()
+        endif
     endif
 
     __trackStats = true
@@ -496,9 +509,18 @@ bool property TrackStats
     endFunction
 endProperty
 
+bool property RegisterSleepEvents auto ; currently unused
+
 string property CurrentState
     string function get()
         return self.GetState()
+    endFunction
+endProperty
+
+bool __isEffectActive
+bool property IsEffectActive
+    bool function get()
+        return __isEffectActive
     endFunction
 endProperty
 

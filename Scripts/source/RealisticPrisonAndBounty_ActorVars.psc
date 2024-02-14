@@ -132,6 +132,7 @@ function IncrementStat(string statName, Faction akFaction, Actor akActor, int in
     ;     return
     ; endif
     self.Set(statKey, self.Get(statKey) + incrementBy)
+    RPB_Utility.DebugWithArgs("ActorVars::IncrementStat", "statName: " + statName + ", akFaction: " + akFaction + ", akActor: " + akActor + ", incrementBy: " + incrementBy, "Incrementing stat")
 endFunction
 
 function DecrementStat(string statName, Faction akFaction, Actor akActor, int decrementBy = 1)

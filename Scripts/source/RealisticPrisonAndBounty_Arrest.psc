@@ -264,13 +264,115 @@ event OnPlayerLoadGame()
     RegisterHotkeys()
 endEvent
 
+;/
+    GetDateFromDaysPassed(17, 8, 201, 30)
+    =
+    totalDaysPassed = 229
+    totalDaysPassed += 30 (259)
+
+    while (259 > 0)
+        daysInMonth = GetDaysOfMonth(currentMonth)
+        
+        if (259 <= daysInMonth) (false)
+            aiDay = 259
+            totalDaysPassed = 0
+        else (true)
+            currentMonth += 1 (9) (10 when totalDays is 229)
+
+            if (9 > 12) (false)
+                currentMonth = 1
+                currentYear += 1
+            endif
+
+            totalDaysPassed -= daysInMonth (229 assuming daysOfMonth is 30)
+
+        endif
+    endWhile
+/;
+
 event OnKeyDown(int keyCode)
     if (keyCode == 0x58) ; F12
+        RPB_PrisonManager prisonManager = GetFormFromMod(0x1B825) as RPB_PrisonManager
+        RPB_Prison prison       = prisonManager.GetPrison("Haafingar")
+        RPB_Prisoner prisonerReference = prison.GetPrisoner(Config.Player)
+        prisonerReference.Imprison()
+        return
         string currentHold = Config.GetCurrentPlayerHoldLocation()
         Actor nearbyGuard = GetNearestActor(config.Player, 7000)
         nearbyGuard.SendModEvent("RPB_ArrestBegin", ARREST_TYPE_TELEPORT_TO_CELL)
     
     elseif (keyCode == 0x44) ; F10
+        int daysPassed = RPB_Utility.CalculateDaysPassedFromDate(17, 8, 201)
+        RPB_Utility.Debug("Arrest::OnKeyDown", "Days Passed from 01/01/201 to 17/08/201: " + daysPassed)
+        int daysPassed2 = RPB_Utility.CalculateDaysPassedFromDate(31, 12, 201)
+        RPB_Utility.Debug("Arrest::OnKeyDown", "Days Passed from 01/01/201 to 31/12/201: " + daysPassed2)
+
+        ; int[] daysFromDate = RPB_Utility.GetDateFromDaysPassed(17, 8, 201, 30)
+        ; RPB_Utility.Debug("Arrest::OnKeyDown", "30 days after 17/08/201: " + daysFromDate[0] + "/" + daysFromDate[1] + "/" + daysFromDate[2])
+
+        ; int d = 1
+        ; int m = 3
+        ; int y = 201
+        int d = 1
+        int m = 1
+        int y = 201
+        ; int d = 1
+        ; int m = 8
+        ; int y = 201
+        int numberOfDays = 35
+        ; int numberOfDays = 32
+        while (numberOfDays <= 365)
+            int[] daysFromDate = RPB_Utility.GetDateFromDaysPassed(d, m, y, numberOfDays)
+            RPB_Utility.Debug("Arrest::OnKeyDown", numberOfDays + " days after "+ d + "/" + m + "/" + y +": " + daysFromDate[0] + "/" + daysFromDate[1] + "/" + daysFromDate[2])
+            numberOfDays += 30
+        endWhile
+
+        ; RPB_Utility.Debug("Arrest::OnKeyDown", "Day of week for 01/01/201: " + RPB_Utility.CalculateDayOfWeek(1, 1, 201))
+
+        ; int year = 201
+        ; while (year <= 220)
+        ;     string yearShown = "4E " + string_if (year < 10, "20" + year, year)
+        ;     int firstDayOfWeekInYear        = RPB_Utility.GetFirstDayOfWeek(year)
+        ;     string dayOfWeekName            = RPB_Utility.GetDayOfWeekName(firstDayOfWeekInYear)
+        ;     string dayOfWeekGregorianName   = RPB_Utility.GetDayOfWeekGregorianName(firstDayOfWeekInYear)
+        ;     RPB_Utility.Debug("Arrest::OnKeyDown", "First Day of Week " + yearShown + ": " + firstDayOfWeekInYear + " ["+ dayOfWeekName + " ("+ dayOfWeekGregorianName +")" + "]")
+        ;     RPB_Utility.Debug("Arrest::OnKeyDown", "Day of week for 12/01/" + year +": " + RPB_Utility.CalculateDayOfWeek(12, 1, year))
+
+        ;     year += 1
+        ; endWhile
+
+        int year = 201
+        while (year <= 201)
+            RPB_Utility.Debug("Arrest::OnKeyDown", "==================== 4E " + year + " ====================")
+            int month = 1
+            while (month <= 2)
+                RPB_Utility.Debug("Arrest::OnKeyDown", "========== " + RPB_Utility.GetMonthName(month) + " ==========")
+                string yearShown = "4E " + year
+                ; int firstDayOfWeekInYear        = RPB_Utility.GetFirstDayOfWeek(year)
+                ; int dayOfWeek                   = RPB_Utility.CalculateDayOfWeek(12, month, year)
+                ; string dayOfWeekName            = RPB_Utility.GetDayOfWeekName(dayOfWeek)
+                ; string dayOfWeekGregorianName   = RPB_Utility.GetDayOfWeekGregorianName(firstDayOfWeekInYear)
+                ; RPB_Utility.Debug("Arrest::OnKeyDown", "Day of week for 12/"+ month +"/" + year +": " + dayOfWeek + " ("+ dayOfWeekName +")")
+
+                int day = 1
+                while (day <= RPB_Utility.GetDaysOfMonth(month))
+                    int firstDayOfWeekInYear        = RPB_Utility.GetFirstDayOfWeek(year)
+                    int dayOfWeek                   = RPB_Utility.CalculateDayOfWeek(day, month, year)
+                    string dayOfWeekName            = RPB_Utility.GetDayOfWeekName(dayOfWeek)
+                    string dayOfWeekGregorianName   = RPB_Utility.GetDayOfWeekGregorianName(firstDayOfWeekInYear)
+                    RPB_Utility.Debug("Arrest::OnKeyDown", "Day of week for "+ day +"/"+ month +"/" + year +": " + dayOfWeek + " ("+ dayOfWeekName +")")
+                    day += 1
+                endWhile
+                RPB_Utility.Debug("Arrest::OnKeyDown", "")
+                month += 1
+            endWhile
+            RPB_Utility.Debug("Arrest::OnKeyDown", "")
+            year += 1
+        endWhile
+
+        ; RPB_Utility.Debug("Arrest::OnKeyDown", "First Day of Week 4E 201 " + RPB_Utility.GetFirstDayOfWeek(201))
+        ; RPB_Utility.Debug("Arrest::OnKeyDown", "First Day of Week 4E 202 " + RPB_Utility.GetFirstDayOfWeek(202))
+        return
         ; Actor playerCopy = config.Player.PlaceActorAtMe(config.Player.GetBaseObject() as ActorBase, 1, none)
         ; Actor playerCopy2 = config.Player.PlaceActorAtMe(config.Player.GetBaseObject() as ActorBase, 1, none)
 
@@ -345,6 +447,11 @@ event OnKeyDown(int keyCode)
 
     elseif (keyCode == 0x41) ; F7
         Debug(self, "Arrest::OnKeyDown", "F7 Pressed")
+
+        Actor nearbyGuard = GetNearestGuard(config.Player, 3500, none)
+        self.ArrestActor(nearbyGuard, config.Player, ARREST_TYPE_ESCORT_TO_JAIL)
+
+        return
 
         int rootObj     = RPB_StorageVars.GetObjectHandle()
         int arrestObj   = RPB_StorageVars.GetObjectHandleOnForm(Config.Player, "Jail")
@@ -517,6 +624,7 @@ event OnArrestDialogue(int aiTopicInfoEvent, int aiTopicInfoType, string asTopic
 endEvent
 
 ;/
+    TODO: Fix arrestee reference not being cleared after failed arrest (the actor has RPB_Arrestee bound to them)
 
     RPB_Arrestee    @apArrestee: The reference to the actor that will be arrested.
     Actor           @akCaptor: The actor that is performing the arrest. (Can be none if a Faction arrest is performed)
@@ -538,8 +646,10 @@ event OnArrestBegin(RPB_Arrestee apArrestee, Actor akCaptor, Faction akCrimeFact
 
     ; apArrestee.SetArrestParameters(ARREST_TYPE_ESCORT_TO_CELL, akCaptor, akCrimeFaction)
     ; apArrestee.SetArrestParameters(ARREST_TYPE_ESCORT_TO_JAIL, akCaptor, akCrimeFaction)
+    ; apArrestee.SetActiveBounty(7000)
     apArrestee.SetArrestParameters(ARREST_TYPE_TELEPORT_TO_CELL, akCaptor, akCrimeFaction)
-    apArrestee.SetActiveBounty(Utility.RandomInt(1200, 7800))
+    ; apArrestee.SetActiveBounty(Utility.RandomInt(1200, 7800))
+    ; apArrestee.SetActiveBounty(4200)
 
     ; Trace(self, "Arrest::OnArrestBegin", "ArresteeRef: [\n" + \
     ;     "\t arresteeRef: " + apArrestee + "\n" + \
@@ -553,7 +663,7 @@ event OnArrestBegin(RPB_Arrestee apArrestee, Actor akCaptor, Faction akCrimeFact
     if (!apArrestee.HasLatentBounty() && !apArrestee.HasActiveBounty())
         Config.NotifyArrest("You can't be arrested in " + akCrimeFaction.GetName() + " since you do not have a bounty in the hold", apArrestee.IsPlayer())
         Error(self, "Arrest::OnArrestBegin", apArrestee.Name + " has no bounty, cannot arrest for "+ akCrimeFaction.GetName() +", aborting!")
-        ; apArrestee.Destroy()
+        apArrestee.Destroy()
         return
     endif
 
@@ -571,7 +681,8 @@ endEvent
     contact with a guard, which then gives way to their new dialogue that triggers OnEludingArrestDialogue which is where the penalties are given
     for that arrest elude type.
 
-    string  @eludeType: How the arrest is being eluded, options are: [Dialogue, Pursuit]
+    Actor   @akEludedGuard: The guard that is being eluded.
+    string  @asEludeType: How the arrest is being eluded, options are: [Dialogue, Pursuit]
         Eluding arrest through Dialogue means that the player has tried to avoid the "Wait, I know you..." guard dialogue
         but they caught up and demanded an explanation.
 

@@ -17,11 +17,17 @@ import Math
 
     The value is set through Initialize().
 /;
-Actor captor ; To be changed, a prisoner shouldn't have a captor. The correct relation would be this prisoner to a prison, and multiple guards to a prison, not a prisoner
+; Actor captor ; To be changed, a prisoner shouldn't have a captor. The correct relation would be this prisoner to a prison, and multiple guards to a prison, not a prisoner
 ; Idea for the future: self.GetPrison().GetGuards() where the return type is RPB_Guard[], then each one could have prison cells assigned to them, or be selected at random to do some action
 ; Likewise, prisoners would be retrieved as such: self.GetPrison.GetPrisoners() where the return type is RPB_Prisoner[] and returns every prisoner in this particular prison by iterating through every prison cell.
 ; self.GetPrison() could return something like RPB_Prison or RPB_PrisonLocation, something akin to Faction
 ; This way, this prisoner script would no longer contain jailFaction or hold, since those would now be part of RPB_Prison
+
+Actor property Captor
+    Actor function get()
+        return Prison_GetForm("Arrest Captor") as Actor
+    endFunction
+endProperty
 
 RPB_Prison property Prison
     RPB_Prison function get()
@@ -35,8 +41,13 @@ RPB_JailCell property JailCell
     endFunction
 endProperty
 
+float __currentTimeOverride
 float property CurrentTime
     float function get()
+        if (__currentTimeOverride > 0)
+            return __currentTimeOverride
+        endif
+
         return Utility.GetCurrentGameTime()
     endFunction
 endProperty
@@ -130,7 +141,7 @@ endProperty
 
 float property TimeOfArrest
     float function get()
-        return Prison_GetFloat("Time of Arrest", "Arrest")
+        return Prison_GetFloat("Time of Arrest")
     endFunction
 endProperty
 
@@ -158,12 +169,36 @@ int property Sentence
     endFunction
 endProperty
 
+float __additionalReleaseHours
 float property ReleaseTime
     float function get()
-        float gameHour = 0.04166666666666666666666666666667
-        return TimeOfImprisonment + (gameHour * 24 * Sentence)
+        ; if (self.IsReleaseOnWeekend())
+        ;     return (self.GetReleaseTime(false) + self.GetReleaseTimeExtraHours()) + 2 ; Add 2 days, if on a Sundas, find a way to just add 1 day to round to Morndas
+        ; endif
+
+        ; if (self.IsReleaseOnLoredas())
+        ;     return (self.GetReleaseTime(false) + self.GetReleaseTimeExtraHours()) + 2 ; Add 2 days, if on a Sundas, find a way to just add 1 day to round to Morndas
+        ; elseif (self.IsReleaseOnSundas())
+        ;     return (self.GetReleaseTime(false) + self.GetReleaseTimeExtraHours()) + 2 ; Add 2 days, if on a Sundas, find a way to just add 1 day to round to Morndas
+        ; endif
+
+        ; if (self.HasReleaseTimeExtraHours())
+        ;     return self.GetReleaseTime(false) + self.GetReleaseTimeExtraHours()
+        ; endif
+
+        return self.GetReleaseTime()
     endFunction
 endProperty
+; float property ReleaseTime
+;     float function get()
+;         float gameHour = 0.04166666666666666666666666666667
+;         if (self.HasAdditionalReleaseTimeHours())
+;             return floor(TimeOfImprisonment) + (gameHour * 24 * Sentence) + __additionalReleaseHours
+;         endif
+
+;         return TimeOfImprisonment + (gameHour * 24 * Sentence)
+;     endFunction
+; endProperty
 
 float property TimeLeftInSentence
     float function get()
@@ -171,9 +206,29 @@ float property TimeLeftInSentence
     endFunction
 endProperty
 
+; Maybe this should be reset upon escape/release,
+; otherwise it will keep adding the remainder of the days of previous arrests to current one,
+; which is accurate since it tracks ALL the time the actor was in jail, but maybe not what is ideal.
+; Example: 2h served right before release which doesn't account to a full day will be taken into account
+; on the next arrest, which means the actor only has to serve 22h of the following arrest for it to count as a day
+; since they already had 2h clocked in from the previous imprisonment.
+float accumulatedTimeServed = 0.0
+
+int property DaysSinceTimeOfImprisonment
+    int function get()
+        return floor(accumulatedTimeServed)
+    endFunction
+endProperty
+
 bool property IsSentenceServed
     bool function get()
         return CurrentTime >= ReleaseTime
+    endFunction
+endProperty
+
+bool property ShouldFastForwardToRelease
+    bool function get()
+        return Prison.FastForward && TimeServed >= Prison.DayToFastForwardFrom
     endFunction
 endProperty
 
@@ -379,13 +434,19 @@ endFunction
     Releases this prisoner from jail
 /;
 function Release()
-    PrisonerBelongingsContainer.RemoveAllItems(this, false, true)
-    this.MoveTo(TeleportReleaseLocation)
-    self.Dispel()
+    Prison.ReleasePrisoner(self)
 endFunction
 
 function Restrain()
     self.Cuff()
+endFunction
+
+function ReturnBelongings()
+    PrisonerBelongingsContainer.RemoveAllItems(this, false, true)
+endFunction
+
+function TeleportToRelease()
+    self.MoveTo(TeleportReleaseLocation)
 endFunction
 
 ;/
@@ -450,6 +511,7 @@ function Imprison()
     endif
 
     self.SetTimeOfImprisonment()
+    self.DetermineReleaseTimeAdditionalHours() ; For Release Time (Minimum, Maximum) intervals
 
     Debug(this, "Prisoner::Imprison", this + " Sentence: " + Sentence + " Days")
 
@@ -483,16 +545,16 @@ function Clothe()
 endFunction
 
 function Strip(bool abRemoveUnderwear = true)
+    ; return
     this.RemoveAllItems(PrisonerBelongingsContainer, false, true)
     self.IncrementStat("Times Stripped")
     self.IsStrippedNaked = true
     Prison_SetBool("Stripped", true) ; No use for now, might be changed
     return
-    Debug(self.GetActor(), "Prisoner::Strip", "Strip called")
 
     Config.NotifyJail("Stripping Thoroughness: " + StrippingThoroughness)
 
-    bool _isStrippedNaked = StrippingThoroughness >= 6
+    bool _isStrippedNaked = StrippingThoroughness >= 10
 
     ; Get underwear
     int underwearTopSlotMask    = GetSlotMaskValue(config.UnderwearTopSlot)
@@ -585,31 +647,121 @@ endFunction
 ;                          Sentence
 ; ==========================================================
 
+int property MinuteOfArrest
+    int function get()
+        return Prison_GetInt("Minute of Arrest")
+    endFunction
+endProperty
+
+int property HourOfArrest
+    int function get()
+        return Prison_GetInt("Hour of Arrest")
+    endFunction
+endProperty
+
+int property DayOfArrest
+    int function get()
+        return Prison_GetInt("Day of Arrest")
+    endFunction
+endProperty
+
+int property MonthOfArrest
+    int function get()
+        return Prison_GetInt("Month of Arrest")
+    endFunction
+endProperty
+
+int property YearOfArrest
+    int function get()
+        return Prison_GetInt("Year of Arrest")
+    endFunction
+endProperty
+
+int property MinuteOfImprisonment
+    int function get()
+        return Prison_GetInt("Minute of Imprisonment")
+    endFunction
+endProperty
+
+int property HourOfImprisonment
+    int function get()
+        return Prison_GetInt("Hour of Imprisonment")
+    endFunction
+endProperty
+
+int property DayOfImprisonment
+    int function get()
+        return Prison_GetInt("Day of Imprisonment")
+    endFunction
+endProperty
+
+int property MonthOfImprisonment
+    int function get()
+        return Prison_GetInt("Month of Imprisonment")
+    endFunction
+endProperty
+
+int property YearOfImprisonment
+    int function get()
+        return Prison_GetInt("Year of Imprisonment")
+    endFunction
+endProperty
+
+int property ReleaseHour
+    int function get()
+        float releaseTimeHour = ReleaseTime - math.floor(ReleaseTime)
+
+        ; Get the release hour and minutes
+        float releaseHourAndMinutes = releaseTimeHour / 0.0416
+
+        return Round(releaseHourAndMinutes)
+    endFunction
+endProperty
+
+int property ReleaseMinute
+    int function get()
+        float releaseTimeHour = ReleaseTime - math.floor(ReleaseTime)
+
+        ; Get the release hour and minutes
+        float releaseHourAndMinutes = releaseTimeHour / 0.0416
+    
+        int releaseMinutes = Round((releaseHourAndMinutes - math.floor(releaseHourAndMinutes)) * 60)
+    
+        return releaseMinutes
+    endFunction
+endProperty
+
+
 function SetTimeOfImprisonment()
     Prison_SetFloat("Time of Imprisonment", CurrentTime) ; Set the time of imprisonment
+    Prison_SetInt("Minute of Imprisonment", RPB_Utility.GetCurrentMinute())
+    Prison_SetInt("Hour of Imprisonment", RPB_Utility.GetCurrentHour())
+    Prison_SetInt("Day of Imprisonment", RPB_Utility.GetCurrentDay())
+    Prison_SetInt("Month of Imprisonment", RPB_Utility.GetCurrentMonth())
+    Prison_SetInt("Year of Imprisonment", RPB_Utility.GetCurrentYear())
     Prison_SetBool("Imprisoned", true)
+endFunction
+
+int function GetReleaseTimeHour()
+    int releaseTimeHour = (ReleaseTime - math.floor(ReleaseTime)) as int
+
+    ; Get the release hour and minutes
+    float releaseHourAndMinutes = releaseTimeHour / 0.0416
+
+    int releaseMinutes = Round((releaseHourAndMinutes - math.floor(releaseHourAndMinutes)) * 60)
+
+    return releaseMinutes
 endFunction
 
 function SetSentence(int aiSentence = 0, bool abShouldAffectBounty = true)
     if (Prison_GetBool("Sentence Set"))
-        return
-    endif
-
-    Prison_SetBool("Sentence Set", true)
-
-    if (aiSentence == 0)
-        ; Set sentence based on bounty
-        Prison_SetInt("Sentence", \ 
-            aiValue     = self.GetSentenceFromBounty(), \
-            aiMinValue  = Prison.MinimumSentence, \
-            aiMaxValue  = Prison.MaximumSentence \
-        )
+        RPB_Utility.Debug("Prisoner::SetSentence", "A sentence has already been set for this prisoner ("+ self.GetIdentifier() +"). \nConsider using IncreaseSentence() or DecreaseSentence() instead.")
         return
     endif
 
     ; Set a sentence based on params
     Prison_SetInt("Sentence", \ 
-        aiValue     = aiSentence, \
+        aiValue     = int_if (aiSentence > 0, aiSentence, self.GetSentenceFromBounty()), \
         aiMinValue  = Prison.MinimumSentence, \
         aiMaxValue  = Prison.MaximumSentence \
     )
@@ -619,8 +771,9 @@ function SetSentence(int aiSentence = 0, bool abShouldAffectBounty = true)
         Prison_SetInt("Bounty Non-Violent", BountyNonViolent + bountyEquivalentOfSentence, "Arrest")
     endif
 
-    ; Fire Events
-    ; OnSentenceChanged()
+    Prison_SetBool("Sentence Set", true)
+    
+    self.OnSentenceSet(Sentence, CurrentTime)
 endFunction
 
 function IncreaseSentence(int aiDaysToIncreaseBy, bool abShouldAffectBounty = true)
@@ -628,15 +781,18 @@ function IncreaseSentence(int aiDaysToIncreaseBy, bool abShouldAffectBounty = tr
     int newSentence         = previousSentence + Max(0, aiDaysToIncreaseBy) as int
 
     ; Set the sentence
-    self.SetSentence(newSentence)
+    Prison_SetInt("Sentence", \ 
+        aiValue     = Sentence + aiDaysToIncreaseBy, \
+        aiMinValue  = Prison.MinimumSentence, \
+        aiMaxValue  = Prison.MaximumSentence \
+    )
 
     if (abShouldAffectBounty)
-        int bountyEquivalentOfSentence = aiDaysToIncreaseBy * Prison.BountyToSentence ; 2 Days = 200 Bounty if BountyToSentence = 100
-        Prison_SetInt("Bounty Non-Violent", BountyNonViolent + bountyEquivalentOfSentence)
+        int bountyEquivalentOfSentence = Sentence * Prison.BountyToSentence ; 2 Days = 200 Bounty if BountyToSentence = 100
+        Prison_SetInt("Bounty Non-Violent", BountyNonViolent + bountyEquivalentOfSentence, "Arrest")
     endif
 
-    ; TODO: Fire events
-    ; OnSentenceChanged(previousSentence, newSentence, aiDaysToIncreaseBy > 0, abShouldAffectBounty)    
+    self.OnSentenceChanged(previousSentence, newSentence, aiDaysToIncreaseBy > 0, abShouldAffectBounty)
 endFunction
 
 function DecreaseSentence(int aiDaysToDecreaseBy, bool abShouldAffectBounty = true)
@@ -644,16 +800,21 @@ function DecreaseSentence(int aiDaysToDecreaseBy, bool abShouldAffectBounty = tr
     int newSentence         = previousSentence + Max(0, aiDaysToDecreaseBy) as int
 
     ; Set the sentence
-    self.SetSentence(newSentence)
+    Prison_SetInt("Sentence", \ 
+        aiValue     = Sentence - aiDaysToDecreaseBy, \
+        aiMinValue  = Prison.MinimumSentence, \
+        aiMaxValue  = Prison.MaximumSentence \
+    )
 
     if (abShouldAffectBounty)
-        int bountyEquivalentOfSentence = aiDaysToDecreaseBy * Prison.BountyToSentence ; 2 Days = 200 Bounty if BountyToSentence = 100
-        Prison_SetInt("Bounty Non-Violent", BountyNonViolent - bountyEquivalentOfSentence)
+        int bountyEquivalentOfSentence = Sentence * Prison.BountyToSentence ; 2 Days = 200 Bounty if BountyToSentence = 100
+        Prison_SetInt("Bounty Non-Violent", BountyNonViolent + bountyEquivalentOfSentence, "Arrest")
     endif
 
-    ; TODO: Fire events
-    ; OnSentenceChanged(previousSentence, newSentence, aiDaysToDecreaseBy > 0, abShouldAffectBounty)
+    self.OnSentenceChanged(previousSentence, newSentence, newSentence > previousSentence, abShouldAffectBounty)
 endFunction
+
+; int function GetTimeOfImprisonmentDay()
 
 int function GetTimeServed(string timeUnit)
     int _timeServedDays = floor(TimeServed)
@@ -728,15 +889,13 @@ state Imprisoned
             Prison.RegisterForPrisonPeriodicUpdate(self)
         ; endif
 
+        RPB_Utility.Debug("Prisoner::Imprisoned::OnBeginState", "Prison Faction: " + self.GetFaction())
+
         ; At this point, we can delete the prisoner's arrest state
         self.DestroyArrestState()
     endEvent
 
     event OnUpdateGameTime()
-        if (self.HasActiveBounty())
-            ; self.UpdateSentenceFromCurrentBounty() ; temp, change function later
-        endif
-
         if (Prison.EnableInfamy)
             self.UpdateInfamy()
         endif
@@ -744,12 +903,13 @@ state Imprisoned
         self.UpdateDaysImprisoned()
 
         if (self.IsSentenceServed) ; implementation is not finished
+            ; Prison.SendReleaseRequest(self)
             self.Release()
             return
         endif
 
         ; DEBUG_ShowPrisonInfo()
-        Prison.DEBUG_ShowPrisonerSentenceInfo(self, true)
+        Prison.DEBUG_ShowPrisonerSentenceInfo(self)
         ; DEBUG_ShowSentenceInfo()
 
         self.RegisterLastUpdate()
@@ -764,6 +924,142 @@ endState
 ; When or while this Prisoner is escaping or has escaped
 state Escape
 endState
+
+; ==========================================================
+;                     Stats / Deleveling
+; ==========================================================
+
+int property SKILL_LOSS_HANDLING_ALL_SKILLS             = 0 autoreadonly
+int property SKILL_LOSS_HANDLING_ALL_STAT_SKILLS        = 1 autoreadonly
+int property SKILL_LOSS_HANDLING_ALL_PERK_SKILLS        = 2 autoreadonly
+int property SKILL_LOSS_HANDLING_RANDOM_STAT_SKILL      = 3 autoreadonly
+int property SKILL_LOSS_HANDLING_RANDOM_PERK_SKILL      = 4 autoreadonly
+int property SKILL_LOSS_HANDLING_RANDOM                 = 5 autoreadonly
+
+int function GetSkillLossHandlingType()
+    string handleSkillLossOn = Prison_GetString("Handle Skill Loss")
+
+    if (handleSkillLossOn == "All Skills")
+        return SKILL_LOSS_HANDLING_ALL_SKILLS
+
+    elseif (handleSkillLossOn == "All Stat Skills (Health, Stamina, Magicka)")
+        return SKILL_LOSS_HANDLING_ALL_STAT_SKILLS
+
+    elseif (handleSkillLossOn == "All Perk Skills")
+        return SKILL_LOSS_HANDLING_ALL_PERK_SKILLS
+
+    elseif (handleSkillLossOn == "1x Random Stat Skill")
+        return SKILL_LOSS_HANDLING_RANDOM_STAT_SKILL
+        
+    elseif (handleSkillLossOn == "1x Random Perk Skill")
+        return SKILL_LOSS_HANDLING_RANDOM_PERK_SKILL
+
+    elseif (handleSkillLossOn == "Random")
+        return SKILL_LOSS_HANDLING_RANDOM
+    endif
+
+    return -1
+endFunction
+
+; Returns the minimum level this stat can be when deleveled
+int function GetMinimumSkillValue(string asSkill)
+    ; TODO: Add logic depending on which skill is passed in, maybe process it from JSON
+    ; return Config.GetSkillLevelCap(asSkill)
+    if (RPB_Utility.IsStatSkill(asSkill))
+        RPB_Utility.Trace("Prisoner::GetMinimumSkillValue", "It's a stat skill: " + asSkill)
+        return 50
+    else
+        RPB_Utility.Trace("Prisoner::GetMinimumSkillValue", "It's a perk skill: " + asSkill)
+        return 10
+    endif
+endFunction
+
+bool function ShouldDelevelSkills()
+    int dayToStartLosingSkills  = Prison_GetInt("Day to Start Losing Skills")
+
+    if (dayToStartLosingSkills != 1 && dayToStartLosingSkills >= self.TimeServed)
+        ; Don't delevel, property is set to a specific day to start and the prisoner hasn't been in prison for that long yet.
+        return false
+    endif
+
+    int randomChance    = Utility.RandomInt(0, 100)
+    int skillLossChance = Prison_GetInt("Chance to Lose Skills")
+
+    if (skillLossChance == 0)
+        return false
+    endif
+
+    RPB_Utility.Debug("Prisoner::ShouldDelevelSkills", "randomChance: " + randomChance + ", skillLossChance: " + skillLossChance)
+
+    return randomChance <= skillLossChance
+endFunction
+
+bool function DelevelSkill(string asSkill)
+    if (RPB_Utility.IsPerkSkill(asSkill))
+        asSkill = "Conjuration"
+    endif
+
+    int statValue               = this.GetBaseActorValue(asSkill) as int
+    int configuredLossAmount    = Config.GetDelevelingSkillValue(asSkill)
+    int newStatValue            = statValue - configuredLossAmount
+    int minimumSkillValue       = self.GetMinimumSkillValue(asSkill)
+
+    if (RPB_Utility.IsPerkSkill(asSkill))
+        configuredLossAmount = 3 ; temporary
+        newStatValue = statValue - configuredLossAmount
+    endif
+
+    if (newStatValue <= minimumSkillValue)
+        ; Skill reached minimum level, don't delevel
+        RPB_Utility.Debug("Prisoner::PerformDeleveling", "Did not delevel Skill " + asSkill + " as it has reached the minimum level!")
+        return false
+    endif
+
+    this.SetActorValue(asSkill, newStatValue)
+    RPB_Utility.Debug("Prisoner::PerformDeleveling", "Deleveling Skill " + asSkill + " ("+ "Was: " + statValue + ", Is: " + newStatValue + ")")
+endFunction
+
+function PerformDeleveling()
+    int handlingType = self.GetSkillLossHandlingType()
+
+    if  (handlingType == SKILL_LOSS_HANDLING_RANDOM_STAT_SKILL || \
+         handlingType == SKILL_LOSS_HANDLING_RANDOM_PERK_SKILL || \
+         handlingType == SKILL_LOSS_HANDLING_RANDOM)
+
+        string skillType = none
+        if (handlingType == SKILL_LOSS_HANDLING_RANDOM_STAT_SKILL)
+            skillType = "Stat"
+        elseif (handlingType == SKILL_LOSS_HANDLING_RANDOM_PERK_SKILL)
+            skillType = "Perk"
+        else
+            int randomChance = Utility.RandomInt(0, 1)
+            skillType = string_if (randomChance == 0, "Stat", "Perk")
+        endif
+
+        string randomStat = RPB_Utility.GetRandomSkill(skillType)
+
+        if (self.ShouldDelevelSkills())
+            self.DelevelSkill(randomStat)
+        endif
+    
+    elseif (handlingType == SKILL_LOSS_HANDLING_ALL_STAT_SKILLS || \
+            handlingType == SKILL_LOSS_HANDLING_ALL_PERK_SKILLS || \
+            handlingType == SKILL_LOSS_HANDLING_ALL_SKILLS)
+
+        string[] skills = RPB_Utility.GetAllSkills( \
+            abIncludeStatSkills = (handlingType == SKILL_LOSS_HANDLING_ALL_STAT_SKILLS) || (handlingType == SKILL_LOSS_HANDLING_ALL_SKILLS), \
+            abIncludePerkSkills = (handlingType == SKILL_LOSS_HANDLING_ALL_PERK_SKILLS) || (handlingType == SKILL_LOSS_HANDLING_ALL_SKILLS) \
+        )
+
+        int i = 0
+        while (i < skills.Length)
+            if (self.ShouldDelevelSkills())
+                self.DelevelSkill(skills[i])
+            endif
+            i += 1
+        endWhile
+    endif
+endFunction
 
 ; ==========================================================
 ;                            Utility
@@ -835,35 +1131,31 @@ endFunction
 
 bool property IsQueuedForImprisonment auto
 
-bool __isEffectActive
-bool property IsEffectActive
-    bool function get()
-        return __isEffectActive
-    endFunction
-endProperty
-
-; Maybe this should be reset upon escape/release,
-; otherwise it will keep adding the remainder of the days of previous arrests to current one,
-; which is accurate since it tracks ALL the time the actor was in jail, but maybe not what is ideal.
-; Example: 2h served right before release which doesn't account to a full day will be taken into account
-; on the next arrest, which means the actor only has to serve 22h of the following arrest for it to count as a day
-; since they already had 2h clocked in from the previous imprisonment.
-float accumulatedTimeServed = 0.0
-
-function UpdateDaysImprisoned()
+; Determines if at least a day has elapsed in prison
+bool function HasDayElapsed()
     ; Add the time served from each update this runs
     accumulatedTimeServed += TimeSinceLastUpdate
 
     if (accumulatedTimeServed >= 1)
-        ; A day or more has passed
-        int fullDaysPassed = floor(accumulatedTimeServed) ; Get the full days
-        Game.IncrementStat("Days Jailed", fullDaysPassed)
-        self.IncrementStat("Days Jailed", fullDaysPassed)
-
-        accumulatedTimeServed -= fullDaysPassed ; Remove the counted days from accumulated time served (Get the fractional part if there's any - i.e: hours)
-        float accumulatedTimeRemaining = accumulatedTimeServed - fullDaysPassed
-        Debug(none, "Prisoner::UpdateDaysImprisoned", "accumulatedTimeServed remaining: " + accumulatedTimeRemaining)
+        return true
     endif
+
+    return false
+endFunction
+
+function UpdateDaysImprisoned()
+    ; if (self.HasDayElapsed())
+    ;     Game.IncrementStat("Days Jailed", DaysSinceTimeOfImprisonment) ; Pause Stat Menu
+    ;     self.IncrementStat("Days Jailed", DaysSinceTimeOfImprisonment) ; Hold Stat
+        
+    ;     accumulatedTimeServed -= DaysSinceTimeOfImprisonment ; Remove the counted days from accumulated time served (Get the fractional part if there's any - i.e: hours)
+        
+    ;     float accumulatedTimeRemaining = accumulatedTimeServed - DaysSinceTimeOfImprisonment
+    ;     ; RPB_Utility.Debug("Prisoner::UpdateDaysImprisoned", "accumulatedTimeServed remaining: " + accumulatedTimeServed)
+    ;     ; RPB_Utility.Debug("Prisoner::UpdateDaysImprisoned", "TimeOfImprisonment: " + TimeOfImprisonment)
+    ;     RPB_Utility.Debug("Prisoner::UpdateDaysImprisoned", "Days Jailed: " + self.QueryStat("Days Jailed"))
+    ;     self.OnDayPassed()
+    ; endif
 
     ; Debug(none, "Prisoner::UpdateDaysImprisoned", "TimeServed: " + TimeServed + ", floor(TimeServed): " + floor(TimeServed))
     ; Debug(none, "Prisoner::UpdateDaysImprisoned", "Updating Days Jailed: " + floor(accumulatedTimeServed))
@@ -912,6 +1204,10 @@ function QueueForImprisonment()
     Prison.QueuePrisonerForImprisonment(self)
 endFunction
 
+function QueueForScene() ; TODO: Implementation, should be used for Scenes where every prisoner may take part of, so a queue system must be created in order for the same Scene to be executed for each prisoner.
+    ; Implementation can be Release scene, Stripping / Frisking scene, etc... Any scene that a prisoner can be a part of when they are inside the cell.
+endFunction
+
 function MarkAsJailed()
     Prison_SetBool("Imprisoned", true)
     self.IncrementStat("Times Jailed") ; Increment the "Times Jailed" stat for this Hold
@@ -922,18 +1218,15 @@ function MarkAsJailed()
 endFunction
 
 function UpdateSentence()
-    Debug(this, "Prisoner::UpdateSentence", "Prison.Hold: " + Prison.Hold)
+    int nonViolent      = self.GetActiveBounty(abViolent = false)
+    int violent         = self.GetActiveBounty(abNonViolent = false)
+    int activeBounty    = nonViolent + violent
 
-    int nonViolent  = self.GetActiveBounty(abViolent = false)
-    int violent     = self.GetActiveBounty(abNonViolent = false)
-
-    if (nonViolent + violent > 0)
+    if (activeBounty > 0)
         self.HideBounty()
     endif
 
-    Prison_SetBool("Sentence Set", false) ; To be able to re-set the sentence
-    self.SetSentence()
-    self.UpdateLongestSentence()
+    self.IncreaseSentence(activeBounty / Prison.BountyToSentence, false)
 endFunction
 
 function TriggerInfamyPenalty()
@@ -945,6 +1238,109 @@ endFunction
 function MoveToCaptor()
     this.MoveTo(captor)
 endFunction
+
+bool __fastForwardedToRelease
+function FastForwardToRelease()
+    ; if (__fastForwardedToRelease)
+    ;     return false
+    ; endif
+
+    ; If the Release must fall in between Minimum and Maximum release hours, set the hour to the minimum before passing the days.
+    if (self.HasReleaseTimeExtraHours())
+        RPB_Utility.SetGameHour(Prison.ReleaseTimeMinimumHour)
+        RPB_Utility.Debug("Prisoner::FastForwardToRelease", "Setting Game Hour to Release Time Minimum Hour: " + RPB_Utility.GetTimeAs12Hour(Prison.ReleaseTimeMinimumHour))
+    endif
+
+    int timeLeft = Math.Ceiling(TimeLeftInSentence)
+    RPB_Utility.PassTimeInDays(timeLeft)
+    Game.IncrementStat("Days Jailed", timeLeft)
+    self.IncrementStat("Days Jailed", timeLeft) ; Hold Stat
+
+    float currentTimeBeforeChanges = CurrentTime
+    __currentTimeOverride = CurrentTime + timeLeft
+
+    RPB_Utility.Debug("Prisoner::FastForwardToRelease", "CurrentTime: " + currentTimeBeforeChanges + ", timeLeft: " + timeLeft + ", currentTimeOverride: " + __currentTimeOverride + ", TimeLeftInSentence: " + TimeLeftInSentence)
+
+    __fastForwardedToRelease = true
+endFunction
+
+; function DetermineReleaseTimeAdditionalHours()
+;     RPB_Utility.Debug("Prisoner::DetermineReleaseTimeAdditionalHours", "ReleaseTime: " + ReleaseTime)
+;     float currentGameHour = (Game.GetFormEx(0x38) as GlobalVariable).GetValue() ; 13.50 = 1:30 PM
+;     float oneGameHour = 0.04166666666666666666666666666667
+
+
+;     RPB_Utility.Debug("Prisoner::DetermineReleaseTimeAdditionalHours", "Prison.ReleaseTimeMinimumHour: " + Prison.ReleaseTimeMinimumHour + ", Prison.ReleaseTimeMaximumHour: " + Prison.ReleaseTimeMaximumHour)
+;     ; If the release time window has already passed
+;     if (currentGameHour > Prison.ReleaseTimeMaximumHour)
+;         __additionalReleaseHours += 1 + (Prison.ReleaseTimeMinimumHour * oneGameHour) ; Add a day and the desired hour for release (taken from Minimum Hour)
+;         RPB_Utility.Debug("Prisoner::DetermineReleaseTimeAdditionalHours", "(After Calculation) ReleaseTime: " + ReleaseTime)
+;     endif
+; endFunction
+
+function DetermineReleaseTimeAdditionalHours()
+    RPB_Utility.Debug("Prisoner::DetermineReleaseTimeAdditionalHours", "ReleaseTime: " + ReleaseTime)
+    float currentGameHour = (Game.GetFormEx(0x38) as GlobalVariable).GetValue() ; 13.50 = 1:30 PM
+
+    RPB_Utility.Debug("Prisoner::DetermineReleaseTimeAdditionalHours", "Prison.ReleaseTimeMinimumHour: " + Prison.ReleaseTimeMinimumHour + ", Prison.ReleaseTimeMaximumHour: " + Prison.ReleaseTimeMaximumHour)
+    ; If the release time window has already passed
+    if (currentGameHour > Prison.ReleaseTimeMaximumHour)
+        __hasExtraReleaseTimeHours = true
+    endif
+endFunction
+
+float function GetReleaseTime(bool abIncludeMinutes = true)
+    float oneGameHour = 0.04166666666666666666666666666667
+
+    if (abIncludeMinutes)
+        return TimeOfImprisonment + (oneGameHour * 24 * Sentence)
+    endif
+
+    return floor(TimeOfImprisonment) + (oneGameHour * 24 * Sentence)
+endFunction
+
+float function GetReleaseTimeExtraHours()
+    float gameHour = 0.04166666666666666666666666666667
+    return 1 + (Prison.ReleaseTimeMinimumHour * gameHour) ; Add 1 day and round to the time configured by Prison.ReleaseTimeMinimumHour
+endFunction
+
+bool __hasExtraReleaseTimeHours
+bool function HasReleaseTimeExtraHours()
+    return __hasExtraReleaseTimeHours
+endFunction
+
+bool function IsReleaseOnWeekend()
+    int[] releaseDate = RPB_Utility.GetDateFromDaysPassed(DayOfImprisonment, MonthOfImprisonment, YearOfImprisonment, Sentence)
+    int releaseDay      = releaseDate[0]
+    int releaseMonth    = releaseDate[1]
+    int releaseYear     = releaseDate[2]
+
+    int dayOfWeek = RPB_Utility.CalculateDayOfWeek(releaseDay, releaseMonth, releaseYear)
+    RPB_Utility.Debug("Prisoner::IsReleaseOnWeekend", "releaseDate: " + releaseDay + "/" + releaseMonth + "/" + releaseYear + ", IsWeekend: " + RPB_Utility.IsWeekend(releaseDay, releaseMonth, releaseYear) + ", Day of Week: " + RPB_Utility.GetDayOfWeekName(dayOfWeek))
+    return RPB_Utility.IsWeekend(releaseDay, releaseMonth, releaseYear)
+endFunction
+
+bool function IsReleaseOnLoredas()
+    int[] releaseDate = RPB_Utility.GetDateFromDaysPassed(DayOfImprisonment, MonthOfImprisonment, YearOfImprisonment, Sentence)
+    int releaseDay      = releaseDate[0]
+    int releaseMonth    = releaseDate[1]
+    int releaseYear     = releaseDate[2]
+
+    return RPB_Utility.IsLoredas(releaseDay, releaseMonth, releaseYear)
+endFunction
+
+bool function IsReleaseOnSundas()
+    int[] releaseDate = RPB_Utility.GetDateFromDaysPassed(DayOfImprisonment, MonthOfImprisonment, YearOfImprisonment, Sentence)
+    int releaseDay      = releaseDate[0]
+    int releaseMonth    = releaseDate[1]
+    int releaseYear     = releaseDate[2]
+
+    return RPB_Utility.IsSundas(releaseDay, releaseMonth, releaseYear)
+endFunction
+
+; bool function HasAdditionalReleaseTimeHours()
+;     return __additionalReleaseHours > 0
+; endFunction
 
 ;/
     Reverts this Prisoner to an Arrestee.
@@ -976,8 +1372,6 @@ endFunction
 ; ==========================================================
 
 event OnInitialize()
-    __isEffectActive = true
-
     ; Prison.RegisterForPrisonPeriodicUpdate(self)
 
     if (NPC_RestorePrisonerState())
@@ -991,6 +1385,7 @@ event OnInitialize()
         Prison.RegisterPrisoner(self) ; Registers this prisoner into the prisoner list
     endif
 
+    self.RegisterSleepEvents = true
     ; Debug(this, "Prisoner::OnInitialize", "Initialized Prisoner, this: " + this)
     self.RegisterForTrackedStats()
     self.LockPrisonerSettings()
@@ -1007,8 +1402,6 @@ bool property IsEnabledForBackgroundUpdates
 endProperty
 
 event OnDestroy()
-    __isEffectActive = false
-
     if (!self.IsPlayer())
         self.NPC_SavePrisonerState()
 
@@ -1044,13 +1437,38 @@ event OnBountyGained()
     self.UpdateTotalBounty()
 endEvent
 
+event OnSentenceSet(int aiSentence, float afAtWhatTime)
+    self.UpdateLongestSentence()
+endEvent
+
+event OnSentenceChanged(int aiOldSentence, int aiNewSentence, bool abHasSentenceIncreased, bool abSentenceAffectsBounty)
+    if (abHasSentenceIncreased)
+        int daysIncreasedBy = aiNewSentence - aiOldSentence
+        Config.NotifyJail("Your sentence was increased by " + daysIncreasedBy + " days.")
+        self.UpdateLongestSentence()
+    endif
+endEvent
+
+; Triggered whenever a full day has passed
+event OnDayPassed()
+    self.PerformDeleveling()
+endEvent
+
 event OnStatChanged(string asStatName, int aiValue)
-    if (asStatName == self.GetHold() + " Bounty") ; If there's bounty gained in the current prison hold
+    if (asStatName == Prison.Hold + " Bounty") ; If there's bounty gained in the current prison hold
         self.OnBountyGained()
         ; Maybe inform the prisoner of their new sentence and have them escorted out of the cell to be frisked/stripped if they are not
     endif
 
     ; Debug(this, "Prisoner::OnStatChanged", "Stat " + asStatName + " has been changed to " + aiValue)
+endEvent
+
+event OnSleepStart(float afSleepStartTime, float afSleepEndTime)
+    ; if (self.ShouldFastForwardToRelease)
+        self.FastForwardToRelease()
+        Prison.Notify("Fast forwarded to Release")
+        Prison.Notify("Sleep Start is: " + afSleepStartTime + ", Sleep End is: " + afSleepEndTime)
+    ; endif
 endEvent
 
 ; ==========================================================
@@ -1281,7 +1699,7 @@ function Prison_Remove(string asVarName, string asVarCategory = "Jail")
 endFunction
 
 function Prison_RemoveAll(string asVarCategory = "Jail")
-    parent.RemoveAll()
+    parent.RemoveAll(asVarCategory)
 endFunction
 
 ; ==========================================================

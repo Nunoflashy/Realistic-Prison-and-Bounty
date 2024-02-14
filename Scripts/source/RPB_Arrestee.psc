@@ -130,6 +130,7 @@ function AssignCaptor(Actor akCaptor)
 endFunction
 
 function SetArrestParameters(string asArrestType, Actor akCaptor, Faction akCrimeFaction)
+    RPB_Utility.Debug("Arrestee::SetArrestParameters", "akCaptor: " + akCaptor + ", akCrimeFaction: " + akCrimeFaction)
     if (akCaptor)
         akCrimeFaction = akCaptor.GetCrimeFaction()
         self.AssignCaptor(akCaptor)
@@ -156,6 +157,8 @@ function SetArrestParameters(string asArrestType, Actor akCaptor, Faction akCrim
     Arrest_SetForm("Arrestee", this)
     Arrest_SetString("Arrest Type", arrestType)
     Arrest_SetString("Hold", hold)
+
+    self.SetTimeOfArrest()
 
     ; Trace(none, "Arrestee::SetArrestParameters", "[\n" + \ 
     ;     "\tCaptured: "+ ArrestVars.GetBool("Arrest::Captured") +" \n" + \
@@ -206,6 +209,14 @@ endFunction
 RPB_Prisoner function MakePrisoner()
     RPB_Prison prison           = (RPB_API.GetPrisonManager()).GetPrison(hold)
     RPB_Prisoner prisonerRef    = prison.MakePrisoner(this)
+
+    prisonerRef.Prison_SetFloat("Time of Arrest", TimeOfArrest)
+    prisonerRef.Prison_SetInt("Minute of Arrest", Arrest_GetInt("Minute of Arrest"))
+    prisonerRef.Prison_SetInt("Hour of Arrest", Arrest_GetInt("Hour of Arrest"))
+    prisonerRef.Prison_SetInt("Day of Arrest", Arrest_GetInt("Day of Arrest"))
+    prisonerRef.Prison_SetInt("Month of Arrest", Arrest_GetInt("Month of Arrest"))
+    prisonerRef.Prison_SetInt("Year of Arrest", Arrest_GetInt("Year of Arrest"))
+    prisonerRef.Prison_SetForm("Arrest Captor", captor)
 
     return prisonerRef
 endFunction
@@ -410,6 +421,12 @@ function SetTimeOfArrest()
     Arrest_SetBool("Captured", true) ; Used to avoid further arrest resists after being arrested, may change name or implementation
     Arrest_SetFloat("Time of Arrest", CurrentTime)
 
+    Arrest_SetInt("Minute of Arrest", RPB_Utility.GetCurrentMinute())
+    Arrest_SetInt("Hour of Arrest", RPB_Utility.GetCurrentHour())
+    Arrest_SetInt("Day of Arrest", RPB_Utility.GetCurrentDay())
+    Arrest_SetInt("Month of Arrest", RPB_Utility.GetCurrentMonth())
+    Arrest_SetInt("Year of Arrest", RPB_Utility.GetCurrentYear())
+
     self.IncrementStat("Times Arrested")
 endFunction
 
@@ -554,11 +571,11 @@ function Arrest_SetReference(string asVarName, ObjectReference akValue, string a
 endFunction
 
 function Arrest_Remove(string asVarName, string asVarCategory = "Arrest")
-    parent.Remove(asVarName, asVarCategory)
+    ; parent.Remove(asVarName, asVarCategory)
 endFunction
 
 function Arrest_RemoveAll(string asVarCategory = "Arrest")
-    parent.RemoveAll()
+    ; parent.RemoveAll(asVarCategory)
 endFunction
 
 ; ==========================================================

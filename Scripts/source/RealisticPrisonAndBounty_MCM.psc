@@ -112,56 +112,15 @@ int function GetOptionIndexFromKey(string[] _array, string _key) global
     return JArray.findStr(internalContainer, _key)
 endFunction
 
-int _lockLevels
 string[] property LockLevels
     string[] function get()
-        if (JArray.count(_locklevels) == 0)
-            _lockLevels = JArray.object()
-
-            JArray.addStr(_lockLevels, "Novice")
-            JArray.addStr(_lockLevels, "Apprentice")
-            JArray.addStr(_lockLevels, "Adept")
-            JArray.addStr(_lockLevels, "Expert")
-            JArray.addStr(_lockLevels, "Master")
-            JArray.addStr(_lockLevels, "Requires Key")
-
-            Debug("LockLevels::get", "Initialized array with a size of: " + JArray.count(_lockLevels))
-        endif
-        return JArray.asStringArray(_lockLevels)
+        return RPB_Utility.GetLockLevels()
     endFunction
 endProperty
 
-int _skills
 string[] property Skills
     string[] function get()
-        if (JArray.count(_skills) == 0)
-            _skills = JArray.object()
-
-            JArray.addStr(_skills, "Max. Health")
-            JArray.addStr(_skills, "Max. Stamina")
-            JArray.addStr(_skills, "Max. Magicka")
-            JArray.addStr(_skills, "Heavy Armor")
-            JArray.addStr(_skills, "Light Armor")
-            JArray.addStr(_skills, "Sneak")
-            JArray.addStr(_skills, "One-Handed")
-            JArray.addStr(_skills, "Two-Handed")
-            JArray.addStr(_skills, "Archery")
-            JArray.addStr(_skills, "Block")
-            JArray.addStr(_skills, "Smithing")
-            JArray.addStr(_skills, "Speechcraft")
-            JArray.addStr(_skills, "Pickpocketing")
-            JArray.addStr(_skills, "Lockpicking")
-            JArray.addStr(_skills, "Alteration")
-            JArray.addStr(_skills, "Conjuration")
-            JArray.addStr(_skills, "Destruction")
-            JArray.addStr(_skills, "Illusion")
-            JArray.addStr(_skills, "Restoration")
-            JArray.addStr(_skills, "Enchanting")
-            JArray.addStr(_skills, "Alchemy")
-
-            Debug("Skills::get", "Initialized array with a size of: " + JArray.count(_skills))
-        endif
-        return JArray.asStringArray(_skills)
+        return RPB_Utility.GetAllSkills()
     endFunction
 endProperty
 
@@ -280,8 +239,13 @@ endFunction
 function InitializePages()
     int _pagesArray = JArray.object()
 
-    JArray.addStr(_pagesArray, "General")
     JArray.addStr(_pagesArray, "Stats")
+    ; if (Config.ShouldDisplaySentencePage())
+        JArray.addStr(_pagesArray, "Sentence")
+    ; endif
+    JArray.addStr(_pagesArray, "")
+    JArray.addStr(_pagesArray, "General")
+    JArray.addStr(_pagesArray, "Skills")
     JArray.addStr(_pagesArray, "Clothing")
     JArray.addStr(_pagesArray, "")
 
@@ -292,6 +256,7 @@ function InitializePages()
     endWhile
 
     JArray.addStr(_pagesArray, "")
+    JArray.addStr(_pagesArray, "Maintenance")
     JArray.addStr(_pagesArray, "Debug")
 
     Debug("Pages::get", "Initialized array with a size of: " + JArray.count(_pagesArray))
@@ -594,7 +559,6 @@ int function AddOptionInputKey(string displayedText, string _key, string default
         self.SetOptionDefaultString(optionKey, defaultValueOverride)
     endif
  
-    ; string defaultValue         = string_if (defaultValueOverride != "", defaultValueOverride, self.GetOptionDefaultString(optionKey))
     string defaultValue         = self.GetOptionDefaultString(optionKey)
     string value                = self.GetOptionValueString(optionKey)
     int flags                   = self.GetOptionState(optionKey)
@@ -682,88 +646,161 @@ event OnConfigInit()
     ModName = "Realistic Prison and Bounty"
     self.InitializePages()
     self.InitializeOptions()
+    self.RegisterEvents()
 endEvent
 
+; event OnConfigOpen()
+;     self.InitializePages()
+
+;     ; if (Config.ShouldDisplaySentencePage())
+;     ;     RPB_CurrentPage = "Sentence"
+;     ;     self.OnPageReset(RPB_CurrentPage)
+;     ; endif
+; endEvent
+
+string property RPB_CurrentPage auto
+string previousPage
+
+function RenderBasedOnPage(string page)
+    if (page == "Stats")
+        RealisticPrisonAndBounty_MCM_Stats.Render(self)
+
+    elseif (page == "General")
+        RealisticPrisonAndBounty_MCM_General.Render(self)
+
+    elseif (page == "Deleveling")
+        RealisticPrisonAndBounty_MCM_Delevel.Render(self)
+
+    elseif (page == "Clothing")
+        RealisticPrisonAndBounty_MCM_Clothing.Render(self)
+
+    elseif (page == "Debug")
+        RealisticPrisonAndBounty_MCM_Debug.Render(self)
+
+    else ; Holds
+        RealisticPrisonAndBounty_MCM_Holds.Render(self)
+    endif
+endFunction
+
 event OnPageReset(string page)
+    ; if (previousPage != "" && page == "")
+    ;     self.RenderBasedOnPage(previousPage)
+    ;     return
+    ; endif
+
+    ; if (page == "")
+    ;     RPB_CurrentPage = "Sentence"
+    ;     RPB_MCM_Sentence.Render(self)
+    ; endif
+
+    RealisticPrisonAndBounty_MCM_Delevel.Render(self)
     RealisticPrisonAndBounty_MCM_Holds.Render(self)
     RealisticPrisonAndBounty_MCM_General.Render(self)
     RealisticPrisonAndBounty_MCM_Clothing.Render(self)
     RealisticPrisonAndBounty_MCM_Debug.Render(self)
     RealisticPrisonAndBounty_MCM_Stats.Render(self)
+    RPB_MCM_Sentence.Render(self)
+
+    RPB_Utility.Debug("MCM::OnPageReset", "Page: " + page, true)
+
+    previousPage = page
 endEvent
 
 event OnOptionHighlight(int option)
+    RealisticPrisonAndBounty_MCM_Delevel.OnHighlight(self, option)
     RealisticPrisonAndBounty_MCM_Holds.OnHighlight(self, option)
     RealisticPrisonAndBounty_MCM_General.OnHighlight(self, option)
     RealisticPrisonAndBounty_MCM_Clothing.OnHighlight(self, option)
     RealisticPrisonAndBounty_MCM_Debug.OnHighlight(self, option)
     RealisticPrisonAndBounty_MCM_Stats.OnHighlight(self, option)
-    Trace("MCM::OnHighlght", "Option ID: " + option, true)
+    RPB_MCM_Sentence.OnHighlight(self, option)
+
+    Trace("MCM::OnHighlight", "Option ID: " + option, true)
     ; Trace("initDefaults", "Times Stripped in Haafingar: " + actorVars.Get("[20]Haafingar::Times Stripped"), true)
 endEvent
 
 event OnOptionDefault(int option)
+    RealisticPrisonAndBounty_MCM_Delevel.OnDefault(self, option)
     RealisticPrisonAndBounty_MCM_Holds.OnDefault(self, option)
     RealisticPrisonAndBounty_MCM_General.OnDefault(self, option)
     RealisticPrisonAndBounty_MCM_Clothing.OnDefault(self, option)
     RealisticPrisonAndBounty_MCM_Debug.OnDefault(self, option)
     RealisticPrisonAndBounty_MCM_Stats.OnDefault(self, option)
+    RPB_MCM_Sentence.OnDefault(self, option)
+
 endEvent
 
 event OnOptionSelect(int option)
+    RealisticPrisonAndBounty_MCM_Delevel.OnSelect(self, option)
     RealisticPrisonAndBounty_MCM_Holds.OnSelect(self, option)
     RealisticPrisonAndBounty_MCM_General.OnSelect(self, option)
     RealisticPrisonAndBounty_MCM_Clothing.OnSelect(self, option)
     RealisticPrisonAndBounty_MCM_Debug.OnSelect(self, option)
     RealisticPrisonAndBounty_MCM_Stats.OnSelect(self, option)
+    RPB_MCM_Sentence.OnSelect(self, option)
+
 endEvent
 
 event OnOptionSliderOpen(int option)
+    RealisticPrisonAndBounty_MCM_Delevel.OnSliderOpen(self, option)
     RealisticPrisonAndBounty_MCM_Holds.OnSliderOpen(self, option)
     RealisticPrisonAndBounty_MCM_General.OnSliderOpen(self, option)
     RealisticPrisonAndBounty_MCM_Clothing.OnSliderOpen(self, option)
     RealisticPrisonAndBounty_MCM_Debug.OnSliderOpen(self, option)
     RealisticPrisonAndBounty_MCM_Stats.OnSliderOpen(self, option)
+    RPB_MCM_Sentence.OnSliderOpen(self, option)
+
 endEvent
 
 event OnOptionSliderAccept(int option, float value)
+    RealisticPrisonAndBounty_MCM_Delevel.OnSliderAccept(self, option, value)
     RealisticPrisonAndBounty_MCM_Holds.OnSliderAccept(self, option, value)
     RealisticPrisonAndBounty_MCM_General.OnSliderAccept(self, option, value)
     RealisticPrisonAndBounty_MCM_Clothing.OnSliderAccept(self, option, value)
     RealisticPrisonAndBounty_MCM_Debug.OnSliderAccept(self, option, value)
     RealisticPrisonAndBounty_MCM_Stats.OnSliderAccept(self, option, value)
+    RPB_MCM_Sentence.OnSliderAccept(self, option, value)
 endEvent
 
 event OnOptionMenuOpen(int option)
+    RealisticPrisonAndBounty_MCM_Delevel.OnMenuOpen(self, option)
     RealisticPrisonAndBounty_MCM_Holds.OnMenuOpen(self, option)
     RealisticPrisonAndBounty_MCM_General.OnMenuOpen(self, option)
     RealisticPrisonAndBounty_MCM_Clothing.OnMenuOpen(self, option)
     RealisticPrisonAndBounty_MCM_Debug.OnMenuOpen(self, option)
     RealisticPrisonAndBounty_MCM_Stats.OnMenuOpen(self, option)
+    RPB_MCM_Sentence.OnMenuOpen(self, option)
+
 endEvent
 
 event OnOptionMenuAccept(int option, int index)
+    RealisticPrisonAndBounty_MCM_Delevel.OnMenuAccept(self, option, index)
     RealisticPrisonAndBounty_MCM_Holds.OnMenuAccept(self, option, index)
     RealisticPrisonAndBounty_MCM_General.OnMenuAccept(self, option, index)
     RealisticPrisonAndBounty_MCM_Clothing.OnMenuAccept(self, option, index)
     RealisticPrisonAndBounty_MCM_Debug.OnMenuAccept(self, option, index)
     RealisticPrisonAndBounty_MCM_Stats.OnMenuAccept(self, option, index)
+    RPB_MCM_Sentence.OnMenuAccept(self, option, index)
 endEvent
 
 event OnOptionInputOpen(int option)
+    RealisticPrisonAndBounty_MCM_Delevel.OnInputOpen(self, option)
     RealisticPrisonAndBounty_MCM_Holds.OnInputOpen(self, option)
     RealisticPrisonAndBounty_MCM_General.OnInputOpen(self, option)
     RealisticPrisonAndBounty_MCM_Clothing.OnInputOpen(self, option)
     RealisticPrisonAndBounty_MCM_Debug.OnInputOpen(self, option)
     RealisticPrisonAndBounty_MCM_Stats.OnInputOpen(self, option)
+    RPB_MCM_Sentence.OnInputOpen(self, option)
 endEvent
 
 event OnOptionInputAccept(int option, string inputValue)
+    RealisticPrisonAndBounty_MCM_Delevel.OnInputAccept(self, option, inputValue)
     RealisticPrisonAndBounty_MCM_Holds.OnInputAccept(self, option, inputValue)
     RealisticPrisonAndBounty_MCM_General.OnInputAccept(self, option, inputValue)
     RealisticPrisonAndBounty_MCM_Clothing.OnInputAccept(self, option, inputValue)
     RealisticPrisonAndBounty_MCM_Debug.OnInputAccept(self, option, inputValue)
     RealisticPrisonAndBounty_MCM_Stats.OnInputAccept(self, option, inputValue)
+    RPB_MCM_Sentence.OnInputAccept(self, option, inputValue)
 endEvent
 
 ; ============================================================================
@@ -797,6 +834,50 @@ endFunction
 ; ============================================================================
 ;                               Option Functions
 ; ============================================================================
+
+; Handling of options with additional behavior other than setting value,
+; such as setting additional variables based on the Option.
+event OnSliderOptionChanged(string eventName, string optionName, float optionValue, Form sender)
+    if (optionName == "Bounty for Actions::Trespassing")
+        Game.SetGameSettingInt("iCrimeGoldTrespass", optionValue as int)
+
+        ; int settingValue = Game.GetGameSettingInt("iCrimeGoldTrespass")
+        ; RPB_Utility.Debug("MCM::General::OnOptionSliderAccept", optionName + " value: " + settingValue)
+
+    elseif (optionName == "Bounty for Actions::Assault")
+        Game.SetGameSettingInt("iCrimeGoldAttack", optionValue as int)
+        
+        int settingValue = Game.GetGameSettingInt("iCrimeGoldAttack")
+        RPB_Utility.Debug("MCM::General::OnOptionSliderAccept", optionName + " value: " + settingValue)
+
+    elseif (optionName == "Bounty for Actions::Murder")
+        Game.SetGameSettingInt("iCrimeGoldMurder", optionValue as int)
+        
+        ; int settingValue = Game.GetGameSettingInt("iCrimeGoldMurder")
+        ; RPB_Utility.Debug("MCM::General::OnOptionSliderAccept", optionName + " value: " + settingValue)
+
+    elseif (optionName == "Bounty for Actions::Theft")
+        Game.SetGameSettingFloat("fCrimeGoldSteal", optionValue)
+        
+        ; float settingValue = Game.GetGameSettingFloat("fCrimeGoldSteal")
+        ; RPB_Utility.Debug("MCM::General::OnOptionSliderAccept", optionName + " value: " + settingValue)
+
+    elseif (optionName == "Bounty for Actions::Pickpocketing")
+        Game.SetGameSettingInt("iCrimeGoldPickpocket", optionValue as int)
+        
+        ; int settingValue = Game.GetGameSettingInt("iCrimeGoldPickpocket")
+        ; RPB_Utility.Debug("MCM::General::OnOptionSliderAccept", optionName + " value: " + settingValue)
+
+    elseif (optionName == "Bounty for Actions::Lockpicking")
+        
+    elseif (optionName == "Bounty for Actions::Disturbing the Peace")
+
+    endif
+endEvent
+
+function RegisterEvents()
+    self.RegisterForModEvent("RPB_SliderOptionChanged", "OnSliderOptionChanged")
+endFunction
 
 function CreatePageOption(string page)
     miscVars.CreateStringMap("options/value/" + page)
@@ -880,6 +961,8 @@ function InitializeOptions()
     self.SetOptionDefaultFloat("Arrest::Maximum Payable Bounty", 2500)
     self.SetOptionDefaultFloat("Arrest::Maximum Payable Bounty (Chance)", 33)
     self.SetOptionDefaultBool("Arrest::Always Arrest for Violent Crimes", true)
+    self.SetOptionDefaultFloat("Arrest::Additional Bounty when Eluding (%)", 5)
+    self.SetOptionDefaultFloat("Arrest::Additional Bounty when Eluding", 200)
     self.SetOptionDefaultFloat("Arrest::Additional Bounty when Resisting (%)", 33)
     self.SetOptionDefaultFloat("Arrest::Additional Bounty when Resisting", 200)
     self.SetOptionDefaultFloat("Arrest::Additional Bounty when Defeated (%)", 33)
@@ -932,9 +1015,11 @@ function InitializeOptions()
     self.SetOptionDefaultString("Jail::Cell Lock Level", "Adept")
     self.SetOptionDefaultBool("Jail::Fast Forward", true)
     self.SetOptionDefaultFloat("Jail::Day to Fast Forward From", 5)
-    self.SetOptionDefaultString("Jail::Handle Skill Loss", "Random")
-    self.SetOptionDefaultFloat("Jail::Day to Start Losing Skills", 5)
-    self.SetOptionDefaultFloat("Jail::Chance to Lose Skills", 100)
+    self.SetOptionDefaultString("Jail::Handle Skill Loss", "1x Random Perk Skill")
+    self.SetOptionDefaultInt("Jail::Day to Start Losing Skills (Stat)", 0)
+    self.SetOptionDefaultInt("Jail::Day to Start Losing Skills (Perk)", 5)
+    self.SetOptionDefaultInt("Jail::Chance to Lose Skills (Stat)", 0)
+    self.SetOptionDefaultInt("Jail::Chance to Lose Skills (Perk)", 80)
     self.SetOptionDefaultFloat("Jail::Recognized Criminal Penalty", 100)
     self.SetOptionDefaultFloat("Jail::Known Criminal Penalty", 100)
     self.SetOptionDefaultFloat("Jail::Minimum Bounty to Trigger", 2500)
@@ -948,12 +1033,12 @@ function InitializeOptions()
     self.SetOptionDefaultFloat("Additional Charges::Bounty for Cell Key", 2200)
     
     ; Release
-    self.SetOptionDefaultBool("Release::Enable Release Fees", false)
-    self.SetOptionDefaultFloat("Release::Chance for Event", 80)
-    self.SetOptionDefaultFloat("Release::Minimum Bounty to owe Fees", 0)
-    self.SetOptionDefaultFloat("Release::Release Fees (%)", 15)
-    self.SetOptionDefaultFloat("Release::Release Fees", 0)
-    self.SetOptionDefaultFloat("Release::Days Given to Pay", 10)
+    ; self.SetOptionDefaultBool("Release::Enable Release Fees", false)
+    ; self.SetOptionDefaultFloat("Release::Chance for Event", 80)
+    ; self.SetOptionDefaultFloat("Release::Minimum Bounty to owe Fees", 0)
+    ; self.SetOptionDefaultFloat("Release::Release Fees (%)", 15)
+    ; self.SetOptionDefaultFloat("Release::Release Fees", 0)
+    ; self.SetOptionDefaultFloat("Release::Days Given to Pay", 10)
     self.SetOptionDefaultBool("Release::Enable Item Retention", true)
     self.SetOptionDefaultFloat("Release::Minimum Bounty to Retain Items", 0)
     self.SetOptionDefaultBool("Release::Auto Re-Dress on Release", true)

@@ -1250,7 +1250,17 @@ event OnSceneEnd(string name, Scene sender)
         Actor escort   = params[0] as Actor
         Actor escortee = params[1] as Actor
 
-        jail.OnEscortToJailEnd(escort, escortee)
+        ; jail.OnEscortToJailEnd(escort, escortee)
+        RPB_PrisonManager prisonManager = GetFormFromMod(0x1B825) as RPB_PrisonManager
+        RPB_Prison prison       = prisonManager.GetPrison("Haafingar")
+
+        ; Determine if it's an Arrestee or a Prisoner
+        RPB_Actor actorReference = prison.GetPrisoner(escortee)
+        if (actorReference == none)
+            actorReference = Arrest.Arrestees.AtKey(escortee) ; to be changed the way the arrestee is retrieved
+        endif
+
+        prison.OnEscortPrisonerToJailEnd(actorReference, escort)
 
     elseif (name == SCENE_ESCORT_TO_JAIL_02)
         Actor escort   = params[0] as Actor

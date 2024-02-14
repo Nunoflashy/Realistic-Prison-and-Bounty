@@ -48,7 +48,7 @@ function Right(RealisticPrisonAndBounty_MCM mcm) global
         mcm.AddOptionStat("Times Escaped", 0, "Times")
         mcm.AddOptionStat("Times Stripped", 0, "Times")
         mcm.AddOptionStat("Infamy Gained", 0, "Infamy")
-    i += 1
+        i += 1
     endWhile
 endFunction
 

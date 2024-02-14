@@ -98,6 +98,24 @@ string property CellLockLevel
     endFunction
 endProperty
 
+int property ReleaseTimeMinimumHour
+    int function get()
+        return Config.GetJailReleaseTimeMinimumHour(Hold)
+    endFunction
+endProperty
+
+int property ReleaseTimeMaximumHour
+    int function get()
+        return Config.GetJailReleaseTimeMaximumHour(Hold)
+    endFunction
+endProperty
+
+bool property AllowReleaseOnWeekends
+    bool function get()
+        return Config.IsReleaseAllowedOnWeekends(Hold)
+    endFunction
+endProperty
+
 bool property FastForward
     bool function get()
         return Config.IsJailFastForwardEnabled(Hold)
@@ -560,6 +578,15 @@ endProperty
 
 ; ==========================================================
 
+function Notify(string asMessage, bool abCondition = true)
+    Config.NotifyJail(asMessage, abCondition)
+endFunction
+
+RPB_Prison function GetPrisonForHold(string asHold) global
+    RPB_Prison prison = (RPB_API.GetPrisonManager()).GetPrison(asHold)
+    return prison
+endFunction
+
 RPB_Prison function GetPrisonForImprisonedActor(Actor akImprisonedActor) global
     RPB_PrisonManager prisonManager = GetFormFromMod(0x1B825) as RPB_PrisonManager
     RPB_Prison prisonForPrisoner    = prisonManager.GetPrisonForBoundPrisoner(akImprisonedActor)
@@ -623,6 +650,118 @@ endFunction
 RPB_Prisoner[] function GetMalePrisoners(RPB_JailCell akPrisonCell = none)
     
 endFunction
+
+bool function ReleasePrisoner(RPB_Prisoner apPrisoner)
+    ; Temporarily give the prisoner their items back
+    apPrisoner.ReturnBelongings()
+
+    ; Teleport to release
+    apPrisoner.TeleportToRelease()
+
+    ; Let the cell know the prisoner is leaving
+    apPrisoner.JailCell.RemovePrisoner(apPrisoner)
+
+    ; Unregister the prisoner from prison
+    self.UnregisterPrisoner(apPrisoner)
+endFunction
+
+string function GetTimeOfArrestFormatted(RPB_Prisoner apPrisoner)
+    int day      = apPrisoner.DayOfArrest
+    int month    = apPrisoner.MonthOfArrest
+    int year     = apPrisoner.YearOfArrest
+
+    return RPB_Utility.GetFormattedDate(day, month, year, apPrisoner.HourOfArrest, apPrisoner.MinuteOfArrest)
+
+    ; string dayOfWeek   = RPB_Utility.GetDayOfWeekName(RPB_Utility.CalculateDayOfWeek(day, month, year))
+    ; string hour        = RPB_Utility.GetTimeAs12Hour(apPrisoner.HourOfArrest, apPrisoner.MinuteOfArrest)
+
+    ; string hourShown = hour
+    ; string dayOrdinal  = RPB_Utility.ToOrdinalNthDay(day)
+    ; string monthName   = RPB_Utility.GetMonthName(month)
+    ; string yearString  = "4E " + year
+
+    ; ; Fredas, 7:00 AM - 10:00 AM, 21st of Sun's Dusk, 4E 201 || Fredas, ~8:00 AM, 21st of Sun's Dusk, 4E 201
+    ; return dayOfWeek + ", " + hourShown + ", " + dayOrdinal + " of " + monthName + ", " + yearString
+endFunction
+
+string function GetTimeOfImprisonmentFormatted(RPB_Prisoner apPrisoner)
+    int day      = apPrisoner.DayOfImprisonment
+    int month    = apPrisoner.MonthOfImprisonment
+    int year     = apPrisoner.YearOfImprisonment
+
+    return RPB_Utility.GetFormattedDate(day, month, year, apPrisoner.HourOfImprisonment, apPrisoner.MinuteOfImprisonment)
+
+    ; string dayOfWeek   = RPB_Utility.GetDayOfWeekName(RPB_Utility.CalculateDayOfWeek(day, month, year))
+    ; string hour        = RPB_Utility.GetTimeAs12Hour(apPrisoner.HourOfImprisonment, apPrisoner.MinuteOfImprisonment)
+
+    ; string hourShown = hour
+    ; string dayOrdinal  = RPB_Utility.ToOrdinalNthDay(day)
+    ; string monthName   = RPB_Utility.GetMonthName(month)
+    ; string yearString  = "4E " + year
+
+    ; ; Fredas, 7:00 AM - 10:00 AM, 21st of Sun's Dusk, 4E 201 || Fredas, ~8:00 AM, 21st of Sun's Dusk, 4E 201
+    ; return dayOfWeek + ", " + hourShown + ", " + dayOrdinal + " of " + monthName + ", " + yearString
+endFunction
+
+string function GetTimeOfReleaseFormatted(RPB_Prisoner apPrisoner)
+    int playerSentence = apPrisoner.Sentence
+
+    ; if (apPrisoner.HasReleaseTimeExtraHours())
+    ;     playerSentence += 1
+    ; endif
+
+    ; if (apPrisoner.IsReleaseOnLoredas())
+    ;     playerSentence += 2
+    ; elseif (apPrisoner.IsReleaseOnSundas())
+    ;     playerSentence += 1
+    ; endif
+
+    ; Release date in the format d/m/Y
+    int[] releaseDate = RPB_Utility.GetDateFromDaysPassed(apPrisoner.DayOfImprisonment, apPrisoner.MonthOfImprisonment, apPrisoner.YearOfImprisonment, playerSentence)
+    int release_day     = releaseDate[0]
+    int release_month   = releaseDate[1]
+    int release_year    = releaseDate[2]
+
+    ; return RPB_Utility.GetFormattedDate(release_day, release_month, release_year, apPrisoner.ReleaseHour, apPrisoner.ReleaseMinute)
+
+    string release_dayOfWeek   = RPB_Utility.GetDayOfWeekName(RPB_Utility.CalculateDayOfWeek(release_day, release_month, release_year))
+    string release_hour        = RPB_Utility.GetTimeAs12Hour(apPrisoner.ReleaseHour, apPrisoner.ReleaseMinute)
+    string release_maxHour     = RPB_Utility.GetTimeAs12Hour(self.ReleaseTimeMaximumHour)
+
+    float release_midpointHourAndMins = (apPrisoner.ReleaseHour + self.ReleaseTimeMaximumHour) / 2
+    int release_midpointHour = math.floor(release_midpointHourAndMins)
+    int release_midpointMinutes = Round((release_midpointHourAndMins - math.floor(release_midpointHourAndMins)) * 60)
+    string release_midpointHourFormatted = RPB_Utility.GetTimeAs12Hour(release_midpointHour, release_midpointMinutes)
+
+    string release_hourShown = string_if (release_day > 9, "~" + release_midpointHourFormatted, release_hour + " - " + release_maxHour)
+    string release_dayOrdinal  = RPB_Utility.ToOrdinalNthDay(release_day)
+    string release_monthName   = RPB_Utility.GetMonthName(release_month)
+    string release_yearString  = "4E " + release_year
+
+    ; Fredas, 7:00 AM - 10:00 AM, 21st of Sun's Dusk, 4E 201 || Fredas, ~8:00 AM, 21st of Sun's Dusk, 4E 201
+    return release_dayOfWeek + ", " + release_hourShown + ", " + release_dayOrdinal + " of " + release_monthName + ", " + release_yearString
+endFunction
+
+string function GetTimeElapsedSinceArrest(RPB_Prisoner apPrisoner)
+    return RPB_Utility.GetTimeFormatted(apPrisoner.CurrentTime - apPrisoner.TimeOfArrest, asNullValue = "None")
+endFunction
+
+string function GetTimeElapsedSinceImprisonment(RPB_Prisoner apPrisoner)
+    return RPB_Utility.GetTimeFormatted(apPrisoner.CurrentTime - apPrisoner.TimeOfImprisonment, asNullValue = "None")
+endFunction
+
+string function GetTimeLeftOfSentenceFormatted(RPB_Prisoner apPrisoner)
+    return RPB_Utility.GetTimeFormatted(apPrisoner.TimeLeftInSentence, asNullValue = "None")
+endFunction
+
+string function GetSentenceFormatted(RPB_Prisoner apPrisoner)
+    return RPB_Utility.GetTimeFormatted(apPrisoner.Sentence, asNullValue = "No Sentence")
+endFunction
+
+string function GetTimeServedFormatted(RPB_Prisoner apPrisoner)
+    return RPB_Utility.GetTimeFormatted(apPrisoner.TimeServed, asNullValue = "None")
+endFunction
+
 
 ;                         Escape
 ; ==========================================================
@@ -815,22 +954,53 @@ endFunction
 
 ; ==========================================================
 
+; function AwaitPrisonersRelease()
+;     int prisonerCount = 0
+
+;     int i = 0
+;     while (i < checkedPrisoners.Length)
+;         RPB_Prisoner currentPrisoner = checkedPrisoners[i]
+
+;         if (currentPrisoner && !currentPrisoner.IsEffectActive)
+;             prisonerCount += 1
+;             ; Maybe take into account possible bounty gain and infamy updates
+
+;             if (currentPrisoner.IsSentenceServed)
+;                 ; Release Prisoner
+;                 Debug(none, "Prison::AwaitPrisonersRelease", "Released Prisoner:  " + currentPrisoner + currentPrisoner.GetPrisoner())
+;                 currentPrisoner.Release()
+;                 checkedPrisoners[i] = none
+;             else
+;                 int timeServedDays  = currentPrisoner.GetTimeServed("Days")
+;                 int timeLeftDays    = currentPrisoner.GetTimeLeftInSentence("Days")
+;                 ; Debug(none, "Prison::AwaitPrisonersRelease", "Prisoner:  " + currentPrisoner.GetActor() + " has not served their sentence yet ("+ timeServedDays + " days served, " +  timeLeftDays +" days left).")
+;                 ; Debug(none, "Prison::AwaitPrisonersRelease", currentPrisoner + " " + currentPrisoner.GetActor() + " ("+ currentPrisoner.GetSex(true) +")" + " has not served their sentence yet in "+ Hold +".")
+;             endif
+;         endif
+;         i += 1
+;     endWhile
+    
+;     if (prisonerCount > 0)
+;         Debug(none, "Prison::AwaitPrisonersRelease", "Awaiting release for " + prisonerCount + " prisoners in " + Hold)
+;     endif
+; endFunction
+
 function AwaitPrisonersRelease()
-    int prisonerCount = 0
+    int prisonersAwaitingRelease = 0
 
     int i = 0
-    while (i < checkedPrisoners.Length)
-        RPB_Prisoner currentPrisoner = checkedPrisoners[i]
+    while (i < Prisoners.Count)
+        RPB_Prisoner currentPrisoner = Prisoners.AtIndex(i)
 
         if (currentPrisoner && !currentPrisoner.IsEffectActive)
-            prisonerCount += 1
+            prisonersAwaitingRelease += 1
             ; Maybe take into account possible bounty gain and infamy updates
 
             if (currentPrisoner.IsSentenceServed)
                 ; Release Prisoner
                 Debug(none, "Prison::AwaitPrisonersRelease", "Released Prisoner:  " + currentPrisoner + currentPrisoner.GetPrisoner())
                 currentPrisoner.Release()
-                checkedPrisoners[i] = none
+                ; checkedPrisoners[i] = none
             else
                 int timeServedDays  = currentPrisoner.GetTimeServed("Days")
                 int timeLeftDays    = currentPrisoner.GetTimeLeftInSentence("Days")
@@ -841,8 +1011,8 @@ function AwaitPrisonersRelease()
         i += 1
     endWhile
     
-    if (prisonerCount > 0)
-        Debug(none, "Prison::AwaitPrisonersRelease", "Awaiting release for " + prisonerCount + " prisoners in " + Hold)
+    if (prisonersAwaitingRelease > 0)
+        Debug(none, "Prison::AwaitPrisonersRelease", "Awaiting release for " + prisonersAwaitingRelease + " prisoners in " + Hold)
     endif
 endFunction
 
@@ -900,12 +1070,25 @@ event OnPrisonerDeath(RPB_Prisoner apPrisoner, Actor akKiller)
 
 endEvent
 
+event OnEscortPrisonerToJailEnd(RPB_Actor apActor, Actor akEscort)
+    ; Retrieve or make the Actor a Prisoner
+    RPB_Prisoner prisonerRef = RPB_Utility.ame_if (apActor as RPB_Prisoner, apActor, (apActor as RPB_Arrestee).MakePrisoner()) as RPB_Prisoner
+
+    prisonerRef.SetReleaseLocation()    ; Set the release location for this prisoner
+    prisonerRef.SetBelongingsContainer()     ; Set the container of where the prisoner's items will be confiscated to
+    prisonerRef.AssignCell()            ; Assign a prison cell to this prisoner
+
+    ; if should be stripped
+    prisonerRef.StartStripping(akEscort)
+endEvent
+
 event OnEscortPrisonerToCellEnd(RPB_Prisoner apPrisoner, RPB_JailCell akJailCell, Actor akEscort)
     if (apPrisoner.IsStrippedNaked || apPrisoner.IsStrippedToUnderwear)
         return
     endif
     
-    apPrisoner.StartStripping(akEscort)
+    apPrisoner.Imprison()
+    ; apPrisoner.StartStripping(akEscort)
 endEvent
 
 event OnPrisonerStripBegin(RPB_Prisoner apPrisoner, Actor akStripper)
@@ -1029,6 +1212,8 @@ event OnUpdateGameTime()
     RegisterForSingleUpdateGameTime(5.0)
 endEvent
 
+int __holdObject
+
 function ConfigurePrison( \
     Location akLocation, \
     Faction akFaction, \
@@ -1043,6 +1228,9 @@ function ConfigurePrison( \
     string configuredCity       = RPB_Data.Hold_GetCity(rootItem)
 
     __city              = configuredCity
+    __holdObject        = rootItem
+
+    RPB_Utility.Debug("Prison::ConfigurePrison", "Hold: " + self.Hold + ", Faction: " + self.PrisonFaction + ", City: " + self.City)
 
     __isInitialized     = true
 
@@ -1483,6 +1671,13 @@ bool function WasInitialized()
     return __isInitialized
 endFunction
 
+bool function WasConfigChanged()
+    int holdRootObject = RPB_Data.GetRootObject(self.Hold)
+    RPB_Utility.Debug("Prison::WasConfigChanged", "Prison: " + self.City + ", " + "holdRootObject: " + holdRootObject + ", holdObject: " + __holdObject)
+    RPB_Utility.Debug("Prison::WasConfigChanged", "Hold: " + self.Hold + ", Faction: " + self.PrisonFaction + ", City: " + self.City)
+    return __holdObject != holdRootObject
+endFunction
+
 ; TODO: Store the prisoners for each prison here, making the AME list futile since we can always retrieve them through here,
 ; maybe map the index to a key for easier access like it's done in the AME list.
 
@@ -1744,7 +1939,13 @@ function DEBUG_ShowPrisonerSentenceInfo(RPB_Prisoner akPrisoner, bool abShort = 
             "Time of Imprisonment: "+ akPrisoner.TimeOfImprisonment + ", \n\t" + \
             "Time Served: "         + akPrisoner.TimeServed + " ("+ (akPrisoner.TimeServed * 24) + " Hours" +") ["+ timeServedDays + " Days, " + timeServedHours + " Hours, " +  timeServedMinutes + " Minutes, " + timeServedSeconds + " Seconds" +"], \n\t" + \
             "Time Left: "           + akPrisoner.TimeLeftInSentence + " ("+ (akPrisoner.TimeLeftInSentence * 24) + " Hours" +") ["+ timeLeftToServeDays + " Days, " + timeLeftToServeHours + " Hours, " +  timeLeftToServeMinutes + " Minutes, " + timeLeftToServeSeconds + " Seconds" +"], \n\t" + \
-            "Release Time: "        + akPrisoner.ReleaseTime + "\n" + \
+            "Release Time: "        + akPrisoner.ReleaseTime + "\n\t" + \
+            "Release Hour: "        + akPrisoner.ReleaseHour + "\n\t" + \
+            "Release Minute: "      + akPrisoner.ReleaseMinute + "\n\t" + \
+            "Hour of Imprisonment: "      + akPrisoner.HourOfImprisonment + "\n\t" + \
+            "Day of Imprisonment: "      + akPrisoner.DayOfImprisonment + "\n\t" + \
+            "Month of Imprisonment: "      + akPrisoner.MonthOfImprisonment + "\n\t" + \
+            "Year of Imprisonment: "      + akPrisoner.YearOfImprisonment + "\n\t" + \
         " }")
     endif
 endFunction

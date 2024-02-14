@@ -518,6 +518,13 @@ RPB_Prisoner[] function GetMalePrisoners()
     
 endFunction
 
+function RemovePrisoner(RPB_Prisoner apPrisoner)
+    if (apPrisoner)
+        self.UnregisterPrisoner(apPrisoner)
+        self.OnPrisonerLeave(apPrisoner)
+    endif
+endFunction
+
 ; =========================================================
 ;                          Events
 ; =========================================================
@@ -532,7 +539,7 @@ endEvent
 
 ; Happens when the prisoner leaves this cell (when they are removed)
 event OnPrisonerLeave(RPB_Prisoner akPrisoner)
-    self.UnregisterPrisoner(akPrisoner)
+    ; self.UnregisterPrisoner(akPrisoner)
     self.DetermineCellParameters()
 
     Debug(self, "JailCell::OnPrisonerLeave", "Cell Properties: " + self.DEBUG_GetCellProperties())
@@ -849,10 +856,11 @@ string function DEBUG_GetPrisoners()
         Form prisonerForm = JMap.getForm(__prisonersInCell, JMap.getNthKey(__prisonersInCell, i))
         RPB_Prisoner prisonerRef = Prison.GetPrisonerReference(prisonerForm as Actor)
 
-        ; string sentenceInfo = Prison.DEBUG_GetPrisonerSentenceInfo(prisonerRef, true)
-        ; outputPrisoners += "\t\t"+ prisonerRef.GetActor() + " " + prisonerRef.GetName() + " " + "(" + prisonerRef.GetSex(true) + ")" + string_if (prisonerRef.IsSentenceSet, ": " + sentenceInfo) + "\n"
-        outputPrisoners += "\t\t"+ prisonerRef.GetActor() + " " + prisonerRef.GetName() + " " + "(" + prisonerRef.GetSex(true) + ")" + "\n"
-
+        if (prisonerRef)
+            ; string sentenceInfo = Prison.DEBUG_GetPrisonerSentenceInfo(prisonerRef, true)
+            ; outputPrisoners += "\t\t"+ prisonerRef.GetActor() + " " + prisonerRef.GetName() + " " + "(" + prisonerRef.GetSex(true) + ")" + string_if (prisonerRef.IsSentenceSet, ": " + sentenceInfo) + "\n"
+            outputPrisoners += "\t\t"+ prisonerRef.GetActor() + " " + prisonerRef.GetName() + " " + "(" + prisonerRef.GetSex(true) + ")" + "\n"
+            endif
         i += 1
     endWhile
 

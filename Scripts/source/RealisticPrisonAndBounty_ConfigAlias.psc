@@ -17,15 +17,12 @@ endProperty
 
 function PerformSetup()
     bool registeredEvents               = Config.HandleEvents()
-    bool holdsSetup                     = Config.SetHolds()
-    bool citiesSetup                    = Config.SetCities()
     bool holdLocations                  = Config.SetHoldLocations()
     bool jailTeleportReleaseLocations   = Config.SetJailTeleportReleaseLocations()
     bool jailPrisonerContainers         = Config.SetJailPrisonerContainers()
-    bool factionsSetup                  = Config.SetFactions()
-    bool jailCellsSetup                 = Config.SetJailCells()
     bool prisons                        = Config.SetPrisons()
 
+    SceneManager.SetupScenes()
 
     Info(\
         "==========================================================\n" + \
@@ -34,26 +31,22 @@ function PerformSetup()
         "\n" + \
         "Performing initial mod setup...\n" + \
         "Registering Events: " + string_if (registeredEvents, "OK", "Failed") + "\n" + \
-        "Setting Holds up: " + string_if (holdsSetup, "OK", "Failed") + "\n" +  \
-        "Setting Cities up: " + string_if (citiesSetup, "OK", "Failed") + "\n" +  \
         "Setting Hold Locations up: " + string_if (holdLocations, "OK", "Failed") + "\n" +  \
         "Setting Jail Release Locations up: " + string_if (jailTeleportReleaseLocations, "OK", "Failed") + "\n" +  \
         "Setting Jail Containers up: " + string_if (jailPrisonerContainers, "OK", "Failed") + "\n" +  \
-        "Setting Factions up: " + string_if (factionsSetup, "OK", "Failed") + "\n" +  \
-        "Setting Jail Cells up: " + string_if (jailCellsSetup, "OK", "Failed") + "\n" \
+        "Setting Prisons up: " + string_if (prisons, "OK", "Failed") + "\n" \
     )
 
-    if (!registeredEvents || !holdsSetup || !citiesSetup || !holdLocations || !jailTeleportReleaseLocations || !jailPrisonerContainers || !factionsSetup || !jailCellsSetup)
+    if (!registeredEvents SetJailCells|| !holdLocations || !jailTeleportReleaseLocations || !jailPrisonerContainers || !prisons)
         Debug.MessageBox("["+ GetModName() +"] One or more components of the mod have failed, some things may not work properly!")
     endif
 endFunction
 
 function PerformMaintenance()
     bool registeredEvents = Config.HandleEvents()
-    bool jailCellsSetup   = Config.SetJailCells()
     bool prisons          = Config.SetPrisons()
 
-
+    Config.MCM.InitializePages()
     ;/
         TODO: If at any point a new hold, city, jail cell, jail location etc gets added,
         we should refresh the lists and add the new content, like:

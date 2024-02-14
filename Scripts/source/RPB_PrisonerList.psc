@@ -38,5 +38,7 @@ bool function Add(RPB_Prisoner apPrisonerRef)
 endFunction
 
 function Remove(RPB_Prisoner apPrisoner)
+    apPrisoner.Prison_RemoveAll()
+    apPrisoner.Prison_RemoveAll("Arrest")
     protected_remove(self.GetPrisonerID(apPrisoner.GetActor()))
 endFunction

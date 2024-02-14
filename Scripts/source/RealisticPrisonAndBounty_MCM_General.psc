@@ -29,7 +29,7 @@ function Left(RealisticPrisonAndBounty_MCM mcm) global
     mcm.AddEmptyOption()
 
     mcm.AddTextOption("", "WHEN FREE", mcm.OPTION_DISABLED)
-    mcm.AddOptionSlider("Timescale")
+    mcm.AddOptionSlider("Timescale", "1:{0}")
 
     mcm.AddEmptyOption()
 
@@ -40,22 +40,9 @@ function Left(RealisticPrisonAndBounty_MCM mcm) global
     mcm.AddEmptyOption() ; maybe
 
     mcm.AddOptionCategory("Bounty for Actions")
-    mcm.AddOptionSlider("Trespassing", "{0} Bounty")
-    mcm.AddOptionSlider("Assault", "{0} Bounty")
-    mcm.AddOptionSlider("Theft", "{1}x Item Worth")
-
-
-    mcm.AddEmptyOption()
-
-    mcm.AddOptionCategory("Deleveling")
-
-    int i = 0
-    while (i < 10)
-        string skill = mcm.Skills[i]
-        mcm.AddOptionSlider(skill, string_if (StringUtil.Find(skill, "Max.") != -1, "{0} Points", "{0}% EXP"), 0)
-        i += 1
-    endWhile
-
+    mcm.AddOptionSlider("Assault", "{0} Bounty",                Game.GetGameSettingInt("iCrimeGoldAttack"))
+    mcm.AddOptionSlider("Murder", "{0} Bounty",                 Game.GetGameSettingInt("iCrimeGoldMurder"))
+    mcm.AddOptionSlider("Theft", "{1}x Item Worth as Bounty",   Game.GetGameSettingFloat("fCrimeGoldSteal"))
 endFunction
 
 function Right(RealisticPrisonAndBounty_MCM mcm) global
@@ -69,31 +56,22 @@ function Right(RealisticPrisonAndBounty_MCM mcm) global
     mcm.AddEmptyOption()
 
     mcm.AddTextOption("", "WHEN IN JAIL", mcm.OPTION_DISABLED)
-    mcm.AddOptionSliderKey("Timescale", "TimescalePrison")
+    mcm.AddOptionSliderKey("Timescale", "TimescalePrison", "1:{0}")
 
     mcm.AddEmptyOption()
     mcm.AddEmptyOption()
     mcm.AddEmptyOption()
 
     mcm.AddEmptyOption()
-    mcm.AddEmptyOption()     
+    mcm.AddEmptyOption()
 
     mcm.AddOptionCategory("")
     mcm.SetRenderedCategory("Bounty for Actions")
-    mcm.AddOptionSlider("Pickpocketing", "{0} Bounty")
-    mcm.AddOptionSlider("Lockpicking", "{0} Bounty")
-    mcm.AddOptionSlider("Disturbing the Peace", "{0} Bounty")
-    mcm.AddEmptyOption()
-
-    mcm.AddOptionCategory("")
-    mcm.SetRenderedCategory("Deleveling")
-    int i = 0
-    while (i < 11)
-        string skill = mcm.Skills[i+10]
-        mcm.AddOptionSlider(skill, string_if (StringUtil.Find(skill, "Max.") != -1, "{0} Points", "{0}% EXP"), 0)
-        i += 1
-    endWhile
-
+    mcm.AddOptionSlider("Trespassing", "{0} Bounty",    Game.GetGameSettingInt("iCrimeGoldTrespass"))
+    mcm.AddOptionSlider("Pickpocketing", "{0} Bounty", Game.GetGameSettingInt("iCrimeGoldPickpocket"))
+    ; mcm.AddOptionSlider("Lockpicking", "{0} Bounty")
+    mcm.AddOptionSlider("Stealing Horse", "{0} Bounty", Game.GetGameSettingInt("iCrimeStealHorse")) ; Might have wrong ID for GetGameSettingInt()
+    ; mcm.AddOptionSlider("Disturbing the Peace", "{0} Bounty")
 endFunction
 
 ; =====================================================
@@ -101,7 +79,6 @@ endFunction
 ; =====================================================
 
 function OnOptionHighlight(RealisticPrisonAndBounty_MCM mcm, string option) global
-
     string optionName = GetOptionNameNoCategory(option)
 
     ; Deleveling Stats
@@ -109,10 +86,12 @@ function OnOptionHighlight(RealisticPrisonAndBounty_MCM mcm, string option) glob
         mcm.SetInfoText("Sets how much progress you will lose in " + optionName + " for each day in jail.")
 
     elseif (option == "General::Timescale")
-        mcm.SetInfoText("Sets the timescale when free.")
+        int timescaleValue = mcm.GetOptionSliderValue(option) as int
+        mcm.SetInfoText("Sets the timescale when free.\nThis is how fast the time passes relative to Real Life.\n1:" + timescaleValue + " means that, for each minute in real life, " + timescaleValue + " minute(s) will pass in-game.")
 
     elseif (option == "General::TimescalePrison")
-        mcm.SetInfoText("Sets the timescale when in jail.")
+        int timescaleValue = mcm.GetOptionSliderValue(option) as int
+        mcm.SetInfoText("Sets the timescale when in jail.\nThis is how fast the time passes relative to Real Life.\n1:" + timescaleValue + " means that, for each minute in real life, " + timescaleValue + " minute(s) will pass in-game.")
     
     elseif (option == "General::Bounty Decay (Update Interval)")
         mcm.SetInfoText("Sets the time between updates in in-game hours for when the bounty should decay for all holds.")
@@ -147,8 +126,10 @@ function LoadSliderOptions(RealisticPrisonAndBounty_MCM mcm, string option, floa
     ; ==========================================================
 
     if (option == "General::Timescale")
+        maxRange = 1000
 
     elseif (option == "General::TimescalePrison")
+        maxRange = 1000
 
     elseif (option == "General::Bounty Decay (Update Interval)")
         minRange = 1
@@ -199,10 +180,6 @@ function LoadSliderOptions(RealisticPrisonAndBounty_MCM mcm, string option, floa
         minRange = 10
         maxRange = 10000
         intervalSteps = 10
-
-    elseif (StringUtil.Find(option, "Deleveling") != -1)
-        intervalSteps = 1
-        maxRange = 100
     endif
 
     float startValue = float_if (currentSliderValue > mcm.GENERAL_ERROR, currentSliderValue, defaultValue)
@@ -223,9 +200,10 @@ function OnOptionSliderAccept(RealisticPrisonAndBounty_MCM mcm, string option, f
     ; ==========================================================
 
     if (option == "General::Timescale")
-        formatString = "{0}"
+        formatString = "1:{0}"
 
     elseif (option == "General::TimescalePrison")
+        formatString = "1:{0}"
 
     elseif (option == "General::Update Interval")
         formatString = "{0} Hours"
@@ -251,8 +229,11 @@ function OnOptionSliderAccept(RealisticPrisonAndBounty_MCM mcm, string option, f
     elseif (option == "Bounty for Actions::Assault")
         formatString = "{0} Bounty"
 
+    elseif (option == "Bounty for Actions::Murder")
+        formatString = "{0} Bounty"
+
     elseif (option == "Bounty for Actions::Theft")
-        formatString = "{1}x Item Worth"
+        formatString = "{1}x Item Worth as Bounty"
 
     elseif (option == "Bounty for Actions::Pickpocketing")
         formatString = "{0} Bounty"
@@ -262,14 +243,6 @@ function OnOptionSliderAccept(RealisticPrisonAndBounty_MCM mcm, string option, f
 
     elseif (option == "Bounty for Actions::Disturbing the Peace")
         formatString = "{0} Bounty"
-
-    elseif (StringUtil.Find(option, "Deleveling") != -1)
-        if (StringUtil.Find(option, "Max.") != -1)
-            formatString = "{0} Points"
-        else
-            formatString = "{0}% EXP"
-        endif
-
     endif
 
     ; Send option changed event

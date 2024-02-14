@@ -73,12 +73,7 @@ function Left(RealisticPrisonAndBounty_MCM mcm) global
     mcm.AddOptionSlider("Bounty Lost", "{0} Bounty")
 
     mcm.AddEmptyOption()
-
-    mcm.AddOptionCategory("Bounty Hunting")
-    mcm.AddOptionToggle("Enable Bounty Hunters")
-    mcm.AddOptionToggle("Allow Outlaw Bounty Hunters")
-    mcm.AddOptionSlider("Minimum Bounty", "{0} Bounty")
-    mcm.AddOptionSlider("Bounty (Posse)", "{0} Bounty")
+    mcm.AddEmptyOption()
 
     mcm.AddEmptyOption()
 
@@ -104,6 +99,8 @@ function Left(RealisticPrisonAndBounty_MCM mcm) global
     ; mcm.AddOptionToggle("Strip when Defeated")
     mcm.AddOptionSlider("Strip Search Thoroughness", "{0}x")
     mcm.AddOptionSlider("Strip Search Thoroughness Modifier", "{0} Bounty = 1x")
+    mcm.AddOptionToggle("Strip when wearing Heavy Armor")
+    mcm.AddOptionToggle("Strip when wearing Light Armor")
 endFunction
 
 function Right(RealisticPrisonAndBounty_MCM mcm) global
@@ -118,17 +115,21 @@ function Right(RealisticPrisonAndBounty_MCM mcm) global
     mcm.AddOptionSlider("Bounty to Sentence", "{0} Bounty = 1 Day")
     mcm.AddOptionSlider("Minimum Sentence", "{0} Days")
     mcm.AddOptionSlider("Maximum Sentence", "{0} Days")
-    mcm.AddOptionSlider("Cell Search Thoroughness", "{0}x")
-    mcm.AddOptionMenu("Cell Lock Level")
     mcm.AddEmptyOption()
     mcm.AddTextOption("", "While Jailed", mcm.OPTION_DISABLED)
+    mcm.AddOptionSlider("Release Time (Minimum Hour)")
+    mcm.AddOptionSlider("Release Time (Maximum Hour)")
+    mcm.AddOptionToggle("Allow Release on Weekends", true as int)
+    mcm.AddEmptyOption()
     mcm.AddOptionToggle("Fast Forward")
     mcm.AddOptionSlider("Day to fast forward from")
     mcm.AddEmptyOption()
 
     mcm.AddOptionMenu("Handle Skill Loss")
-    mcm.AddOptionSlider("Day to Start Losing Skills")
-    mcm.AddOptionSlider("Chance to lose Skills", "{0}% Each Day")
+    mcm.AddOptionSlider("Day to Start Losing Skills (Stat)")
+    mcm.AddOptionSlider("Chance to Lose Skills (Stat)", "{0}% Each Day")
+    mcm.AddOptionSlider("Day to Start Losing Skills (Perk)")
+    mcm.AddOptionSlider("Chance to Lose Skills (Perk)", "{0}% Each Day")
     mcm.AddEmptyOption()
 
     mcm.AddOptionSlider("Recognized Criminal Penalty", "{1}% of Infamy")
@@ -139,12 +140,12 @@ function Right(RealisticPrisonAndBounty_MCM mcm) global
 
     mcm.AddTextOption("", "WHEN RELEASED", mcm.OPTION_DISABLED)
     mcm.SetRenderedCategory("Release")
-    mcm.AddOptionToggle("Enable Release Fees")
-    mcm.AddOptionSlider("Chance for Event", "{0}%",                                         defaultFlags = mcm.OPTION_DISABLED)
-    mcm.AddOptionSlider("Minimum Bounty to owe Fees", "{0} Bounty",                         defaultFlags = mcm.OPTION_DISABLED)
-    mcm.AddOptionSliderKey("Release Fees", "Release Fees (%)", "{1}% of Bounty as Gold",    defaultFlags = mcm.OPTION_DISABLED)
-    mcm.AddOptionSlider("Release Fees", "{0} Gold",                                         defaultFlags = mcm.OPTION_DISABLED)
-    mcm.AddOptionSlider("Days Given to Pay", "{0} Days",                                    defaultFlags = mcm.OPTION_DISABLED)
+    ; mcm.AddOptionToggle("Enable Release Fees")
+    ; mcm.AddOptionSlider("Chance for Event", "{0}%",                                         defaultFlags = mcm.OPTION_DISABLED)
+    ; mcm.AddOptionSlider("Minimum Bounty to owe Fees", "{0} Bounty",                         defaultFlags = mcm.OPTION_DISABLED)
+    ; ; mcm.AddOptionSliderKey("Release Fees", "Release Fees (%)", "{1}% of Bounty as Gold",    defaultFlags = mcm.OPTION_DISABLED)
+    ; ; mcm.AddOptionSlider("Release Fees", "{0} Gold",                                         defaultFlags = mcm.OPTION_DISABLED)
+    ; mcm.AddOptionSlider("Days Given to Pay", "{0} Days",                                    defaultFlags = mcm.OPTION_DISABLED)
     mcm.AddEmptyOption()
     mcm.AddOptionToggle("Enable Item Retention")
     mcm.AddOptionSlider("Minimum Bounty to Retain Items", "{0} Bounty")
@@ -185,6 +186,8 @@ function Right(RealisticPrisonAndBounty_MCM mcm) global
     mcm.AddOptionSliderKey("Maximum Sentence to Clothe", "Maximum Sentence", "{0} Days",                        defaultFlags = mcm.OPTION_DISABLED)
     mcm.AddOptionToggleKey("Clothe When Defeated", "When Defeated",                                             defaultFlags = mcm.OPTION_DISABLED)
     mcm.AddOptionMenu("Outfit",                                                                                 defaultFlags = mcm.OPTION_DISABLED)
+    mcm.AddOptionToggle("Use Default Outfit as Fallback",                                                       defaultFlags = mcm.OPTION_DISABLED)
+    mcm.AddOptionToggle("Include Footwear in Default Outfit",                                                   defaultFlags = mcm.OPTION_DISABLED)
 endFunction
 
 function HandleDependencies(RealisticPrisonAndBounty_MCM mcm) global
@@ -270,11 +273,28 @@ function HandleDependencies(RealisticPrisonAndBounty_MCM mcm) global
 
     bool unconditionalImprisonment  = mcm.GetOptionToggleState("Jail::Unconditional Imprisonment")
     bool enableFastForward          = mcm.GetOptionToggleState("Jail::Fast Forward")
+    string handleSkillLossType      = mcm.GetOptionMenuValue("Jail::Handle Skill Loss")
+
+    bool handleAllSkills = \ 
+        handleSkillLossType == "All Skills" || \
+        handleSkillLossType == "Random"
+
+    bool handleStatSkills = \
+        handleSkillLossType == "All Stat Skills (Health, Stamina, Magicka)" || \ 
+        handleSkillLossType == "1x Random Stat Skill"
+
+    bool handlePerkSkills = \
+        handleSkillLossType == "All Perk Skills" || \ 
+        handleSkillLossType == "1x Random Perk Skill"
 
     mcm.SetOptionDependencyBool("Jail::Guaranteed Payable Bounty",          !unconditionalImprisonment)
     mcm.SetOptionDependencyBool("Jail::Maximum Payable Bounty",             !unconditionalImprisonment)
     mcm.SetOptionDependencyBool("Jail::Maximum Payable Bounty (Chance)",    !unconditionalImprisonment)
     mcm.SetOptionDependencyBool("Jail::Day to fast forward from",           enableFastForward)
+    mcm.SetOptionDependencyBool("Jail::Day to Start Losing Skills (Stat)",  handleAllSkills || handleStatSkills)
+    mcm.SetOptionDependencyBool("Jail::Day to Start Losing Skills (Perk)",  handleAllSkills || handlePerkSkills)
+    mcm.SetOptionDependencyBool("Jail::Chance to Lose Skills (Stat)",       handleAllSkills || handleStatSkills)
+    mcm.SetOptionDependencyBool("Jail::Chance to Lose Skills (Perk)",       handleAllSkills || handlePerkSkills)
     mcm.SetOptionDependencyBool("Jail::Recognized Criminal Penalty",        isInfamyEnabled)
     mcm.SetOptionDependencyBool("Jail::Known Criminal Penalty",             isInfamyEnabled)
     mcm.SetOptionDependencyBool("Jail::Minimum Bounty to Trigger",          isInfamyEnabled)
@@ -316,7 +336,7 @@ function HandleDependencies(RealisticPrisonAndBounty_MCM mcm) global
 
     bool retainItemsOnRelease = mcm.GetOptionToggleState("Release::Enable Item Retention")
     bool enableAdditionalFees = mcm.GetOptionToggleState("Release::Enable Release Fees")
-
+   
     mcm.SetOptionDependencyBool("Release::Chance for Event",                enableAdditionalFees)
     mcm.SetOptionDependencyBool("Release::Minimum Bounty to owe Fees",      enableAdditionalFees)
     mcm.SetOptionDependencyBool("Release::Release Fees (%)",                enableAdditionalFees)
@@ -376,7 +396,7 @@ endFunction
 function OnOptionHighlight(RealisticPrisonAndBounty_MCM mcm, string option) global
 
     ; string city = mcm.config.GetCityNameFromHold(mcm.CurrentPage)
-    string city = mcm.miscVars.GetString("City["+ mcm.CurrentPage +"]")
+    string city = mcm.Config.GetCity(mcm.CurrentPage)
 
     ; ==========================================================
     ;                           ARREST
@@ -532,6 +552,12 @@ function OnOptionHighlight(RealisticPrisonAndBounty_MCM mcm, string option) glob
     elseif (option == "Jail::Maximum Sentence")
         mcm.SetInfoText("Determines the maximum sentence in days for " + city + "'s jail.")
 
+    elseif (option == "Jail::Release Time (Minimum Hour)")
+        mcm.SetInfoText("")
+
+    elseif (option == "Jail::Release Time (Maximum Hour)")
+        mcm.SetInfoText("Determines the last possible hour that prisoners will be released")
+
     elseif (option == "Jail::Fast Forward")
         mcm.SetInfoText("Whether to fast forward to the release in " + city + ".")
 
@@ -541,11 +567,17 @@ function OnOptionHighlight(RealisticPrisonAndBounty_MCM mcm, string option) glob
     elseif (option == "Jail::Handle Skill Loss")
         mcm.SetInfoText("The way to handle skill progression loss while jailed in " + city + ".")
 
-    elseif (option == "Jail::Day to Start Losing Skills")
-        mcm.SetInfoText("The day to start losing skills while jailed in " + city + ". \n(Configured individually in General page)")
+    elseif (option == "Jail::Day to Start Losing Skills (Stat)")
+        mcm.SetInfoText("The day to start losing stat skills while jailed in " + city + ". \n(Configured individually in the Skills page)")
 
-    elseif (option == "Jail::Chance to lose Skills")
-        mcm.SetInfoText("The chance to lose skills each day while jailed in " + city + ". \n(Stats lost are configured in General page)")
+    elseif (option == "Jail::Chance to Lose Skills (Stat)")
+        mcm.SetInfoText("The chance to lose stat skills each day while jailed in " + city + ". \n(Stats lost are configured in the Skills page)")
+
+    elseif (option == "Jail::Day to Start Losing Skills (Perk)")
+        mcm.SetInfoText("The day to start losing perk skills while jailed in " + city + ". \n(Configured individually in the Skills page)")
+
+    elseif (option == "Jail::Chance to Lose Skills (Perk)")
+        mcm.SetInfoText("The chance to lose perk skills each day while jailed in " + city + ". \n(Skills lost are configured in the Skills page)")
 
     elseif (option == "Jail::Recognized Criminal Penalty")
         mcm.SetInfoText("The amount of infamy to be added as a criminal charge when you are recognized as a criminal while being sentenced in " + city + " jail.\n" + \
@@ -604,7 +636,7 @@ function OnOptionHighlight(RealisticPrisonAndBounty_MCM mcm, string option) glob
 
     elseif (option == "Stripping::Strip Search Thoroughness Modifier")
         mcm.SetInfoText("The amount of additional thoroughness that is applied to Strip Search Thoroughness through a bounty modifier.")
-                     
+    
 
     ; ==========================================================
     ;                         CLOTHING
@@ -907,15 +939,30 @@ function LoadSliderOptions(RealisticPrisonAndBounty_MCM mcm, string option, floa
         minRange = mcm.GetOptionSliderValue("Jail::Minimum Sentence") + 1
         maxRange = 365
 
-    elseif (option == "Jail::Day to fast forward from")
-        maxRange = mcm.GetOptionSliderValue("Jail::Maximum Sentence")
+    elseif (option == "Jail::Release Time (Minimum Hour)")
+        minRange = 1
+        maxRange = mcm.GetOptionSliderValue("Jail::Release Time (Maximum Hour)") - 1
 
-    elseif (option == "Jail::Chance to lose Skills")
+    elseif (option == "Jail::Release Time (Maximum Hour)")
+        minRange = mcm.GetOptionSliderValue("Jail::Release Time (Minimum Hour)") + 1
+        maxRange = 24
+
+    elseif (option == "Jail::Day to fast forward from")
+        maxRange = mcm.GetOptionSliderValue("Jail::Maximum Sentence") - 1
+
+    elseif (option == "Jail::Day to Start Losing Skills (Stat)")
+        maxRange = mcm.GetOptionSliderValue("Jail::Maximum Sentence") - 1
+
+    elseif (option == "Jail::Chance to Lose Skills (Stat)")
         minRange = 0
         maxRange = 100
 
-    elseif (option == "Jail::Day to Start Losing Skills")
-        maxRange = mcm.GetOptionSliderValue("Jail::Maximum Sentence")
+    elseif (option == "Jail::Day to Start Losing Skills (Perk)")
+        maxRange = mcm.GetOptionSliderValue("Jail::Maximum Sentence") - 1
+
+    elseif (option == "Jail::Chance to Lose Skills (Perk)")
+        minRange = 0
+        maxRange = 100
 
     elseif (option == "Jail::Recognized Criminal Penalty")
         minRange = 0
@@ -1181,13 +1228,26 @@ function OnOptionSliderAccept(RealisticPrisonAndBounty_MCM mcm, string option, f
     elseif (option == "Jail::Cell Search Thoroughness")
         formatString = "{0}x"
 
+    elseif (option == "Jail::Release Time (Minimum Hour)")
+        formatString = "{2}h"
+
+
+    elseif (option == "Jail::Release Time (Maximum Hour)")
+        formatString = "{2}h"
+
     elseif (option == "Jail::Day to fast forward from")
         formatString = "{0}"
 
-    elseif (option == "Jail::Day to Start Losing Skills")
+    elseif (option == "Jail::Day to Start Losing Skills (Stat)")
         formatString = "{0}"
 
-    elseif (option == "Jail::Chance to lose Skills")
+    elseif (option == "Jail::Chance to Lose Skills (Stat)")
+        formatString = "{0}% Each Day"
+
+    elseif (option == "Jail::Day to Start Losing Skills (Perk)")
+        formatString = "{0}"
+
+    elseif (option == "Jail::Chance to Lose Skills (Perk)")
         formatString = "{0}% Each Day"
 
     elseif (option == "Jail::Recognized Criminal Penalty")
@@ -1332,6 +1392,27 @@ function OnOptionMenuAccept(RealisticPrisonAndBounty_MCM mcm, string option, int
     elseif (option == "Jail::Handle Skill Loss")
         if (menuIndex != -1)
             mcm.SetOptionMenuValue(option, mcm.PrisonSkillHandlingOptions[menuIndex])
+
+            string handleSkillLossType = mcm.GetOptionMenuValue(option)
+            
+            bool handleAllSkills = \
+                handleSkillLossType == "All Skills" || \ 
+                handleSkillLossType == "Random"
+
+            bool handleStatSkills = \
+                handleSkillLossType == "All Stat Skills (Health, Stamina, Magicka)" || \ 
+                handleSkillLossType == "1x Random Stat Skill"
+
+            bool handlePerkSkills = \
+                handleSkillLossType == "All Perk Skills" || \ 
+                handleSkillLossType == "1x Random Perk Skill"
+
+            RPB_Utility.Debug("MCM::Holds::OnOptionMenuAccept", "handleAllSkills: " + handleAllSkills + ", handleStatSkills: " + handleStatSkills + ", handlePerkSkills: " + handlePerkSkills)
+
+            mcm.SetOptionDependencyBool("Jail::Day to Start Losing Skills (Stat)",  handleAllSkills || handleStatSkills)
+            mcm.SetOptionDependencyBool("Jail::Day to Start Losing Skills (Perk)",  handleAllSkills || handlePerkSkills)
+            mcm.SetOptionDependencyBool("Jail::Chance to Lose Skills (Stat)",       handleAllSkills || handleStatSkills)
+            mcm.SetOptionDependencyBool("Jail::Chance to Lose Skills (Perk)",       handleAllSkills || handlePerkSkills)
         endif
 
     elseif (option == "Stripping::Handle Stripping On")

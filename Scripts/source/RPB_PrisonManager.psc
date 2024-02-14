@@ -34,6 +34,13 @@ RPB_Prison function GetAvailablePrisonSlot()
     return none
 endFunction
 
+bool function WasPrisonConfigChanged(RPB_Prison apPrison)
+    int holdRootObject = RPB_Data.GetRootObject(apPrison.Hold)
+    RPB_Utility.Debug("Prison::WasConfigChanged", "Prison: " + apPrison.City + ", " + "holdRootObject: " + holdRootObject)
+    RPB_Utility.Debug("Prison::WasConfigChanged", "Hold: " + apPrison.Hold + ", Faction: " + apPrison.PrisonFaction + ", City: " + apPrison.City)
+    return true
+endFunction
+
 bool function DeletePrison(RPB_Prison akPrison)
 
 endFunction
@@ -51,6 +58,9 @@ RPB_Prison function GetPrison(string asHold)
     while (i < self.PrisonSlots)
         RPB_Prison currentPrison = self.GetNthAlias(i) as RPB_Prison
         if (currentPrison.Hold == asHold)
+            ; currentPrison.PrisonFaction = Game.GetFormEx(0x29DB0) as Faction ; temporary
+            currentPrison.ConfigurePrison(currentPrison.PrisonLocation, Game.GetFormEx(0x29DB0) as Faction, currentPrison.Hold)
+            RPB_Utility.DebugWithArgs("PrisonManager::GetPrison", asHold, "Hold: " + currentPrison.Hold + ", Faction: " + currentPrison.PrisonFaction + ", City: " + currentPrison.City)
             return currentPrison
         endif
         i += 1

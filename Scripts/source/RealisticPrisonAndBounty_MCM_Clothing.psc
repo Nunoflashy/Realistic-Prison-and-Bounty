@@ -26,6 +26,27 @@ function Render(RealisticPrisonAndBounty_MCM mcm) global
     EndBenchmark(bench, mcm.CurrentPage + " page loaded -")
 endFunction
 
+function RenderOutfitOptions(RealisticPrisonAndBounty_MCM mcm, int aiOutfitNumber) global
+    mcm.AddOptionCategory("Outfit " + aiOutfitNumber)
+    mcm.AddOptionInput("Name", "Outfit " + aiOutfitNumber)
+    mcm.AddOptionText("Equipped Outfit", "Click to Copy")
+    mcm.AddEmptyOption()
+    mcm.AddOptionInput("Head", "")
+    mcm.AddOptionInput("Body", "")
+    mcm.AddOptionInput("Hands", "")
+    mcm.AddOptionInput("Feet", "")
+    ; mcm.AddOptionInput("Underwear (Top)", "")
+    ; mcm.AddOptionInput("Underwear (Bottom)", "")
+
+    mcm.AddOptionToggle("Conditional Outfit")
+    ; mcm.AddOptionInputKey(" Strictly Wearable If Bounty Within", "BountyCondition", "2500-6000")
+    ; mcm.AddTextOption("", "STRICTLY WEARABLE IF BOUNTY WITHIN", mcm.OPTION_DISABLED)
+    mcm.AddOptionSlider("Minimum Bounty", "{0} Bounty", 0.0)
+    mcm.AddOptionSlider("Maximum Bounty", "{0} Bounty", 0.0)
+
+    mcm.AddEmptyOption()
+endFunction
+
 function Left(RealisticPrisonAndBounty_MCM mcm) global
     mcm.AddOptionCategory("Configuration")
     mcm.AddOptionToggleKey("Do you have a nude body mod installed?", "NudeBodyModInstalled")
@@ -34,25 +55,13 @@ function Left(RealisticPrisonAndBounty_MCM mcm) global
     mcm.AddEmptyOption()
 
     int i = 1
+    int outfitNumber = 1
     while (i <= mcm.OUTFIT_COUNT / 2)
-        mcm.AddOptionCategory("Outfit " + i)
-        mcm.AddOptionInput("Name", "Outfit " + i)
-        mcm.AddOptionText("Equipped Outfit", "Click to Copy")
-        mcm.AddEmptyOption()
-        mcm.AddOptionInput("Head", "")
-        mcm.AddOptionInput("Body", "")
-        mcm.AddOptionInput("Hands", "")
-        mcm.AddOptionInput("Feet", "")
-        ; mcm.AddOptionInput("Underwear (Top)", "")
-        ; mcm.AddOptionInput("Underwear (Bottom)", "")
+        if (i > 1)
+            outfitNumber = outfitNumber + 2
+        endif
 
-        mcm.AddOptionToggle("Conditional Outfit")
-        ; mcm.AddOptionInputKey(" Strictly Wearable If Bounty Within", "BountyCondition", "2500-6000")
-        ; mcm.AddTextOption("", "STRICTLY WEARABLE IF BOUNTY WITHIN", mcm.OPTION_DISABLED)
-        mcm.AddOptionSlider("Minimum Bounty", "{0} Bounty", 0.0)
-        mcm.AddOptionSlider("Maximum Bounty", "{0} Bounty", 0.0)
-
-        mcm.AddEmptyOption()
+        RenderOutfitOptions(mcm, outfitNumber)
         i += 1
     endWhile
 
@@ -66,25 +75,14 @@ function Right(RealisticPrisonAndBounty_MCM mcm) global
     mcm.AddEmptyOption()
 
     int i = 6
+    int outfitNumber = 2
+
     while (i <= mcm.OUTFIT_COUNT)
-        mcm.AddOptionCategory("Outfit " + i)
-        mcm.AddOptionInput("Name", "Outfit " + i)
-        mcm.AddOptionText("Equipped Outfit", "Click to Copy")
-        mcm.AddEmptyOption()
-        mcm.AddOptionInput("Head", "")
-        mcm.AddOptionInput("Body", "")
-        mcm.AddOptionInput("Hands", "")
-        mcm.AddOptionInput("Feet", "")
-        ; mcm.AddOptionInput("Underwear (Top)", "")
-        ; mcm.AddOptionInput("Underwear (Bottom)", "")
+        if (i > 6) ; 6 is actually Outfit 2, since we start at 2 and this is the Even column, so 6=2, 7=4, 8=6, 9=8, 10=10
+            outfitNumber = outfitNumber + 2
+        endif
 
-        mcm.AddOptionToggle("Conditional Outfit")
-        ; mcm.AddOptionInputKey(" Strictly Wearable If Bounty Within", "BountyCondition", "2500-6000")
-        ; mcm.AddTextOption("", "STRICTLY WEARABLE IF BOUNTY WITHIN", mcm.OPTION_DISABLED)
-        mcm.AddOptionSlider("Minimum Bounty", "{0} Bounty", 0.0)
-        mcm.AddOptionSlider("Maximum Bounty", "{0} Bounty", 0.0)
-
-        mcm.AddEmptyOption()
+        RenderOutfitOptions(mcm, outfitNumber)
         i += 1
     endWhile
 
