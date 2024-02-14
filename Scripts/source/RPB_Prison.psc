@@ -671,17 +671,6 @@ string function GetTimeOfArrestFormatted(RPB_Prisoner apPrisoner)
     int year     = apPrisoner.YearOfArrest
 
     return RPB_Utility.GetFormattedDate(day, month, year, apPrisoner.HourOfArrest, apPrisoner.MinuteOfArrest)
-
-    ; string dayOfWeek   = RPB_Utility.GetDayOfWeekName(RPB_Utility.CalculateDayOfWeek(day, month, year))
-    ; string hour        = RPB_Utility.GetTimeAs12Hour(apPrisoner.HourOfArrest, apPrisoner.MinuteOfArrest)
-
-    ; string hourShown = hour
-    ; string dayOrdinal  = RPB_Utility.ToOrdinalNthDay(day)
-    ; string monthName   = RPB_Utility.GetMonthName(month)
-    ; string yearString  = "4E " + year
-
-    ; ; Fredas, 7:00 AM - 10:00 AM, 21st of Sun's Dusk, 4E 201 || Fredas, ~8:00 AM, 21st of Sun's Dusk, 4E 201
-    ; return dayOfWeek + ", " + hourShown + ", " + dayOrdinal + " of " + monthName + ", " + yearString
 endFunction
 
 string function GetTimeOfImprisonmentFormatted(RPB_Prisoner apPrisoner)
@@ -690,17 +679,6 @@ string function GetTimeOfImprisonmentFormatted(RPB_Prisoner apPrisoner)
     int year     = apPrisoner.YearOfImprisonment
 
     return RPB_Utility.GetFormattedDate(day, month, year, apPrisoner.HourOfImprisonment, apPrisoner.MinuteOfImprisonment)
-
-    ; string dayOfWeek   = RPB_Utility.GetDayOfWeekName(RPB_Utility.CalculateDayOfWeek(day, month, year))
-    ; string hour        = RPB_Utility.GetTimeAs12Hour(apPrisoner.HourOfImprisonment, apPrisoner.MinuteOfImprisonment)
-
-    ; string hourShown = hour
-    ; string dayOrdinal  = RPB_Utility.ToOrdinalNthDay(day)
-    ; string monthName   = RPB_Utility.GetMonthName(month)
-    ; string yearString  = "4E " + year
-
-    ; ; Fredas, 7:00 AM - 10:00 AM, 21st of Sun's Dusk, 4E 201 || Fredas, ~8:00 AM, 21st of Sun's Dusk, 4E 201
-    ; return dayOfWeek + ", " + hourShown + ", " + dayOrdinal + " of " + monthName + ", " + yearString
 endFunction
 
 string function GetTimeOfReleaseFormatted(RPB_Prisoner apPrisoner)
@@ -717,10 +695,15 @@ string function GetTimeOfReleaseFormatted(RPB_Prisoner apPrisoner)
     ; endif
 
     ; Release date in the format d/m/Y
-    int[] releaseDate = RPB_Utility.GetDateFromDaysPassed(apPrisoner.DayOfImprisonment, apPrisoner.MonthOfImprisonment, apPrisoner.YearOfImprisonment, playerSentence)
-    int release_day     = releaseDate[0]
-    int release_month   = releaseDate[1]
-    int release_year    = releaseDate[2]
+    ; int[] releaseDate = RPB_Utility.GetDateFromDaysPassed(apPrisoner.DayOfImprisonment, apPrisoner.MonthOfImprisonment, apPrisoner.YearOfImprisonment, playerSentence)
+    ; int release_day     = releaseDate[0]
+    ; int release_month   = releaseDate[1]
+    ; int release_year    = releaseDate[2]
+
+    int releaseDateStruct = RPB_Utility.GetDateFromDaysPassedStruct(apPrisoner.DayOfImprisonment, apPrisoner.MonthOfImprisonment, apPrisoner.YearOfImprisonment, playerSentence)
+    int release_day      = RPB_Utility.GetStructMemberInt(releaseDateStruct, "day")
+    int release_month    = RPB_Utility.GetStructMemberInt(releaseDateStruct, "month")
+    int release_year     = RPB_Utility.GetStructMemberInt(releaseDateStruct, "year")
 
     ; return RPB_Utility.GetFormattedDate(release_day, release_month, release_year, apPrisoner.ReleaseHour, apPrisoner.ReleaseMinute)
 
@@ -743,11 +726,11 @@ string function GetTimeOfReleaseFormatted(RPB_Prisoner apPrisoner)
 endFunction
 
 string function GetTimeElapsedSinceArrest(RPB_Prisoner apPrisoner)
-    return RPB_Utility.GetTimeFormatted(apPrisoner.CurrentTime - apPrisoner.TimeOfArrest, asNullValue = "None")
+    return RPB_Utility.GetTimeFormatted(apPrisoner.CurrentTime - apPrisoner.TimeOfArrest)
 endFunction
 
 string function GetTimeElapsedSinceImprisonment(RPB_Prisoner apPrisoner)
-    return RPB_Utility.GetTimeFormatted(apPrisoner.CurrentTime - apPrisoner.TimeOfImprisonment, asNullValue = "None")
+    return RPB_Utility.GetTimeFormatted(apPrisoner.CurrentTime - apPrisoner.TimeOfImprisonment)
 endFunction
 
 string function GetTimeLeftOfSentenceFormatted(RPB_Prisoner apPrisoner)

@@ -37,7 +37,7 @@ function PerformSetup()
         "Setting Prisons up: " + string_if (prisons, "OK", "Failed") + "\n" \
     )
 
-    if (!registeredEvents SetJailCells|| !holdLocations || !jailTeleportReleaseLocations || !jailPrisonerContainers || !prisons)
+    if (!registeredEvents || !holdLocations || !jailTeleportReleaseLocations || !jailPrisonerContainers || !prisons)
         Debug.MessageBox("["+ GetModName() +"] One or more components of the mod have failed, some things may not work properly!")
     endif
 endFunction
@@ -107,7 +107,7 @@ endEvent
 
 event OnKeyDown(int keyCode)
     RealisticPrisonAndBounty_Config configScript = (self.GetOwningQuest() as RealisticPrisonAndBounty_Config)
-    RealisticPrisonAndBounty_MCM mcm = configScript.mcm
+    RPB_MCM mcm = configScript.mcm
 
     if (keyCode == 0x41) ; F7
         ; configScript.miscVars.CreateStringMap("Options")

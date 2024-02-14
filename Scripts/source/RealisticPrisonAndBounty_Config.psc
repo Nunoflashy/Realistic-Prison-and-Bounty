@@ -34,7 +34,7 @@ Form property mainAPI
 endProperty
 
 RPB_API                                 property API auto
-RealisticPrisonAndBounty_MCM            property MCM auto
+RPB_MCM                                 property MCM auto
 RealisticPrisonAndBounty_Arrest         property Arrest auto
 RealisticPrisonAndBounty_Jail           property Jail auto
 RealisticPrisonAndBounty_ArrestVars     property ArrestVars auto

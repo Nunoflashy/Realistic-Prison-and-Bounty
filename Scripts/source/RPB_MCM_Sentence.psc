@@ -1,13 +1,13 @@
 Scriptname RPB_MCM_Sentence hidden
 
 import RealisticPrisonAndBounty_Util
-import RealisticPrisonAndBounty_MCM
+import RPB_MCM
 
-bool function ShouldHandleEvent(RealisticPrisonAndBounty_MCM mcm) global
+bool function ShouldHandleEvent(RPB_MCM mcm) global
     return mcm.CurrentPage == "Sentence" || mcm.RPB_CurrentPage == "Sentence"
 endFunction
 
-function Render(RealisticPrisonAndBounty_MCM mcm) global
+function Render(RPB_MCM mcm) global
     if (! ShouldHandleEvent(mcm))
         return
     endif
@@ -19,7 +19,7 @@ function Render(RealisticPrisonAndBounty_MCM mcm) global
     Right(mcm)
 endFunction
 
-function Left(RealisticPrisonAndBounty_MCM mcm) global
+function Left(RPB_MCM mcm) global
     ; float currentHourWithMinutes = RPB_Utility.GetCurrentHourFloat()
     ; string dayOfWeek       = RPB_Utility.GetDayOfWeekName(RPB_Utility.CalculateDayOfWeek(RPB_Utility.GetCurrentDay(), RPB_Utility.GetCurrentMonth(), RPB_Utility.GetCurrentYear()))
     ; string currentHour     = RPB_Utility.GetTimeAs12Hour(RPB_Utility.GetCurrentHour(), RPB_Utility.GetMinutesFromHour(currentHourWithMinutes))
@@ -34,7 +34,7 @@ function Left(RealisticPrisonAndBounty_MCM mcm) global
     RPB_Prison playerPrison = RPB_Prison.GetPrisonForHold("Haafingar")
     RPB_Prisoner player = playerPrison.GetPrisonerReference(mcm.Config.Player)
     RPB_Utility.Debug("MCM::Sentence::Right", "playerPrison: " + playerPrison.City + ", Prisoners: " + playerPrison.Prisoners.GetKeys())
-    if (!player)
+    if (!player || !player.IsImprisoned)
         return
     endif
 
@@ -51,91 +51,65 @@ function Left(RealisticPrisonAndBounty_MCM mcm) global
     string releaseTimeFormatted                 = playerPrison.GetTimeOfReleaseFormatted(player)
     string timeLeftFormatted                    = playerPrison.GetTimeLeftOfSentenceFormatted(player)
 
-    ; int[] releaseDate = RPB_Utility.GetDateFromDaysPassed(player.DayOfImprisonment, player.MonthOfImprisonment, player.YearOfImprisonment, playerSentence)
-    ; int release_day = releaseDate[0]
-    ; int release_month = releaseDate[1]
-    ; int release_year = releaseDate[2]
-
-    ; string release_dayOfWeek   = RPB_Utility.GetDayOfWeekName(RPB_Utility.CalculateDayOfWeek(release_day, release_month, release_year))
-    ; string release_hour        = RPB_Utility.GetTimeAs12Hour(player.ReleaseHour, player.ReleaseMinute)
-    ; string release_maxHour     = RPB_Utility.GetTimeAs12Hour(playerPrison.ReleaseTimeMaximumHour)
-    ; float release_midpointHourAndMins = (player.ReleaseHour + playerPrison.ReleaseTimeMaximumHour) / 2
-    ; int release_midpointHour = math.floor(release_midpointHourAndMins)
-    ; int release_midpointMinutes = Round((release_midpointHourAndMins - math.floor(release_midpointHourAndMins)) * 60)
-    ; string release_midpointHourFormatted = RPB_Utility.GetTimeAs12Hour(release_midpointHour, release_midpointMinutes)
-    ; string release_hourShown = string_if (release_day> 10, "~" + release_midpointHourFormatted, release_hour + " - " + release_maxHour)
-    ; string release_dayOrdinal  = RPB_Utility.ToOrdinalNthDay(release_day)
-    ; string release_monthName   = RPB_Utility.GetMonthName(release_month)
-    ; string release_yearString  = "4E " + release_year
-
-    ; int arrest_day = player.DayOfArrest
-    ; int arrest_month = player.MonthOfArrest
-    ; int arrest_year = player.YearOfArrest
-
-    ; string arrest_dayOfWeek   = RPB_Utility.GetDayOfWeekName(RPB_Utility.CalculateDayOfWeek(arrest_day, arrest_month, arrest_year))
-    ; string arrest_hour        = RPB_Utility.GetTimeAs12Hour(player.HourOfArrest, player.MinuteOfArrest)
-    ; string arrest_dayOrdinal  = RPB_Utility.ToOrdinalNthDay(arrest_day)
-    ; string arrest_monthName   = RPB_Utility.GetMonthName(arrest_month)
-    ; string arrest_yearString  = "4E " + arrest_year
-
-    ; int imprisonment_day = player.DayOfImprisonment
-    ; int imprisonment_month = player.MonthOfImprisonment
-    ; int imprisonment_year = player.YearOfImprisonment
-
-    ; string imprisonment_dayOfWeek   = RPB_Utility.GetDayOfWeekName(RPB_Utility.CalculateDayOfWeek(imprisonment_day, imprisonment_month, imprisonment_year))
-    ; string imprisonment_hour        = RPB_Utility.GetTimeAs12Hour(player.HourOfImprisonment, player.MinuteOfImprisonment)
-    ; string imprisonment_dayOrdinal  = RPB_Utility.ToOrdinalNthDay(imprisonment_day)
-    ; string imprisonment_monthName   = RPB_Utility.GetMonthName(imprisonment_month)
-    ; string imprisonment_yearString  = "4E " + imprisonment_year
-
-    ; ; mcm.AddOptionCategory("Sentence")
     mcm.AddOptionText("\t\t\t\tCurrent Time", defaultFlags = mcm.OPTION_DISABLED)
     mcm.AddOptionText("", currentTimeFormatted, defaultFlags = mcm.OPTION_DISABLED)
-    ; mcm.AddOptionText("", dayOfWeek + ", " + currentHour + ", " + currentDay + " of " + currentMonth + ", " + currentYear, defaultFlags = mcm.OPTION_DISABLED)
     mcm.AddEmptyOption()
 
     mcm.AddOptionText("\t\t\t\tTime of Arrest", defaultFlags = mcm.OPTION_DISABLED)
-    ; mcm.AddOptionText("", arrest_dayOfWeek + ", " + arrest_hour + ", " + arrest_dayOrdinal + " of " + arrest_monthName + ", " + arrest_yearString, defaultFlags = mcm.OPTION_DISABLED)
     mcm.AddOptionText("", arrestTimeFormatted, defaultFlags = mcm.OPTION_DISABLED)
-    mcm.AddOptionText("", timeElapsedSinceArrest + " Ago", defaultFlags = mcm.OPTION_DISABLED)
+    if (timeElapsedSinceArrest)
+        mcm.AddOptionText("", timeElapsedSinceArrest + " Ago", defaultFlags = mcm.OPTION_DISABLED)
+    endif
     mcm.AddEmptyOption()
 
     mcm.AddOptionText("\t\t\t\tTime of Imprisonment", defaultFlags = mcm.OPTION_DISABLED)
-    ; mcm.AddOptionText("", imprisonment_dayOfWeek + ", " + imprisonment_hour + ", " + imprisonment_dayOrdinal + " of " + imprisonment_monthName + ", " + imprisonment_yearString, defaultFlags = mcm.OPTION_DISABLED)
     mcm.AddOptionText("", imprisonmentTimeFormatted, defaultFlags = mcm.OPTION_DISABLED)
-    mcm.AddOptionText("", timeElapsedSinceImprisonment + " Ago", defaultFlags = mcm.OPTION_DISABLED)
-    ; mcm.AddOptionText("", (Round(player.DayOfImprisonment)) + " Days Ago", defaultFlags = mcm.OPTION_DISABLED)
-
-    ; mcm.AddEmptyOption()
+    if (timeElapsedSinceImprisonment)
+        mcm.AddOptionText("", timeElapsedSinceImprisonment + " Ago", defaultFlags = mcm.OPTION_DISABLED)
+    endif
+    mcm.AddEmptyOption()
 
     mcm.AddOptionText("\t\t\t\tTime of Release", defaultFlags = mcm.OPTION_DISABLED)
     mcm.AddOptionText("", releaseTimeFormatted, defaultFlags = mcm.OPTION_DISABLED)
     mcm.AddOptionText("", timeLeftFormatted + " from Now", defaultFlags = mcm.OPTION_DISABLED)
-    ; mcm.AddOptionText("", release_dayOfWeek + ", " + release_hourShown + ", " + release_dayOrdinal + " of " + release_monthName + ", " + release_yearString, defaultFlags = mcm.OPTION_DISABLED)
-    ; mcm.AddOptionText("\t\t\t\t("+ (Round(player.TimeLeftInSentence)) + " Days from Now" +")", defaultFlags = mcm.OPTION_DISABLED)
-    ; mcm.AddOptionText("", (Round(player.TimeLeftInSentence)) + " Days from Now", defaultFlags = mcm.OPTION_DISABLED)
 
     int[] nextSundas = RPB_Utility.GetNextDayOfWeekFromDate(RPB_Utility.GetCurrentDay(), RPB_Utility.GetCurrentMonth(), RPB_Utility.GetCurrentYear(), RPB_Utility.GetDayOfWeekByName("Sundas"))
-    int sundasDay = nextSundas[0]
-    int sundasMonth = nextSundas[1]
-    int sundasYear = nextSundas[2]
+    int[] previousSundas = RPB_Utility.GetPreviousDayOfWeekFromDate(RPB_Utility.GetCurrentDay(), RPB_Utility.GetCurrentMonth(), RPB_Utility.GetCurrentYear(), RPB_Utility.GetDayOfWeekByName("Sundas"))
+    ; int sundasDay = nextSundas[0]
+    ; int sundasMonth = nextSundas[1]
+    ; int sundasYear = nextSundas[2]
     int daysTillSundas = nextSundas[3]
-    string sundasDateFormatted = RPB_Utility.GetFormattedDate(sundasDay, sundasMonth, sundasYear, RPB_Utility.GetCurrentHour(), RPB_Utility.GetCurrentMinute())
+    int daysFromPreviousSundas = previousSundas[3]
+    ; string sundasDateFormatted = RPB_Utility.GetFormattedDate(sundasDay, sundasMonth, sundasYear, RPB_Utility.GetCurrentHour(), RPB_Utility.GetCurrentMinute(), abShowTime = false)
+    string sundasDateFormatted          = RPB_Utility.GetNextDayOfWeekDateFormatted("Sundas")
+    string previousSundasDateFormatted  = RPB_Utility.GetPreviousDayOfWeekDateFormatted("Sundas")
+ 
+mcm.AddEmptyOption()
+mcm.AddEmptyOption()
+
+mcm.AddOptionText("\t\t\t\tCurrent Time", defaultFlags = mcm.OPTION_DISABLED)
+mcm.AddOptionText("", currentTimeFormatted, defaultFlags = mcm.OPTION_DISABLED)
+mcm.AddEmptyOption()
 
     mcm.AddOptionText("\t\t\t\tNext Sundas", defaultFlags = mcm.OPTION_DISABLED)
     mcm.AddOptionText("", sundasDateFormatted, defaultFlags = mcm.OPTION_DISABLED)
     mcm.AddOptionText("", "In " + daysTillSundas + " Days", defaultFlags = mcm.OPTION_DISABLED)
+    mcm.AddEmptyOption()
+
+    mcm.AddOptionText("\t\t\t\tPrevious Sundas", defaultFlags = mcm.OPTION_DISABLED)
+    mcm.AddOptionText("", previousSundasDateFormatted, defaultFlags = mcm.OPTION_DISABLED)
+    mcm.AddOptionText("", daysFromPreviousSundas + " Days Ago", defaultFlags = mcm.OPTION_DISABLED)
 
     if (player.IsReleaseOnWeekend())
         mcm.AddOptionText("Release rounded to Morndas.", defaultFlags = mcm.OPTION_DISABLED)
     endif
 endFunction
 
-function Right(RealisticPrisonAndBounty_MCM mcm) global
+function Right(RPB_MCM mcm) global
     RPB_Prison playerPrison = RPB_Prison.GetPrisonForHold("Haafingar")
     RPB_Prisoner player = playerPrison.GetPrisonerReference(mcm.Config.Player)
     RPB_Utility.Debug("MCM::Sentence::Right", "playerPrison: " + playerPrison.City + ", Prisoners: " + playerPrison.Prisoners.GetKeys())
-    if (!player)
+    if (!player || !player.IsImprisoned)
         return
     endif
 
@@ -179,7 +153,7 @@ function Right(RealisticPrisonAndBounty_MCM mcm) global
     ; mcm.AddOptionText("")
 endFunction
 
-RPB_Prison function GetPlayerPrison(RealisticPrisonAndBounty_MCM mcm) global
+RPB_Prison function GetPlayerPrison(RPB_MCM mcm) global
     RPB_Prison playerPrison = RPB_Prison.GetPrisonForImprisonedActor(mcm.Config.Player)
     
     if (!playerPrison)
@@ -190,7 +164,7 @@ RPB_Prison function GetPlayerPrison(RealisticPrisonAndBounty_MCM mcm) global
     ; return playerPrison.GetPrisoner(mcm.Config.Player)
 endFunction
 
-RPB_Prisoner function GetPlayerPrisonerReference(RealisticPrisonAndBounty_MCM mcm) global
+RPB_Prisoner function GetPlayerPrisonerReference(RPB_MCM mcm) global
     return GetPlayerPrison(mcm).GetPrisonerReference(mcm.Config.Player)
 endFunction
 
@@ -199,51 +173,51 @@ endFunction
 ; Events
 ; =====================================================
 
-function OnOptionHighlight(RealisticPrisonAndBounty_MCM mcm, string option) global
+function OnOptionHighlight(RPB_MCM mcm, string option) global
 
 endFunction
 
-function OnOptionDefault(RealisticPrisonAndBounty_MCM mcm, string option) global
+function OnOptionDefault(RPB_MCM mcm, string option) global
     
 endFunction
 
-function OnOptionSelect(RealisticPrisonAndBounty_MCM mcm, string option) global
+function OnOptionSelect(RPB_MCM mcm, string option) global
 
 endFunction
 
-function OnOptionSliderOpen(RealisticPrisonAndBounty_MCM mcm, string option) global
+function OnOptionSliderOpen(RPB_MCM mcm, string option) global
 
 endFunction
 
-function OnOptionSliderAccept(RealisticPrisonAndBounty_MCM mcm, string option, float value) global
+function OnOptionSliderAccept(RPB_MCM mcm, string option, float value) global
    
 endFunction
 
-function OnOptionMenuOpen(RealisticPrisonAndBounty_MCM mcm, string option) global
+function OnOptionMenuOpen(RPB_MCM mcm, string option) global
 
 endFunction
 
-function OnOptionMenuAccept(RealisticPrisonAndBounty_MCM mcm, string option, int menuIndex) global
+function OnOptionMenuAccept(RPB_MCM mcm, string option, int menuIndex) global
 
 endFunction
 
-function OnOptionColorOpen(RealisticPrisonAndBounty_MCM mcm, string option) global
+function OnOptionColorOpen(RPB_MCM mcm, string option) global
     
 endFunction
 
-function OnOptionColorAccept(RealisticPrisonAndBounty_MCM mcm, string option, int color) global
+function OnOptionColorAccept(RPB_MCM mcm, string option, int color) global
     
 endFunction
 
-function OnOptionInputOpen(RealisticPrisonAndBounty_MCM mcm, string option) global
+function OnOptionInputOpen(RPB_MCM mcm, string option) global
     
 endFunction
 
-function OnOptionInputAccept(RealisticPrisonAndBounty_MCM mcm, string option, string input) global
+function OnOptionInputAccept(RPB_MCM mcm, string option, string input) global
     
 endFunction
 
-function OnOptionKeymapChange(RealisticPrisonAndBounty_MCM mcm, string option, int keyCode, string conflictControl, string conflictName) global
+function OnOptionKeymapChange(RPB_MCM mcm, string option, int keyCode, string conflictControl, string conflictName) global
     
 endFunction
 
@@ -251,7 +225,7 @@ endFunction
 ; Event Handlers
 ; =====================================================
 
-function OnHighlight(RealisticPrisonAndBounty_MCM mcm, int oid) global
+function OnHighlight(RPB_MCM mcm, int oid) global
     if (! ShouldHandleEvent(mcm))
         return
     endif
@@ -263,7 +237,7 @@ function OnHighlight(RealisticPrisonAndBounty_MCM mcm, int oid) global
     OnOptionHighlight(mcm, mcm.GetKeyFromOption(oid, false))
 endFunction
 
-function OnDefault(RealisticPrisonAndBounty_MCM mcm, int oid) global
+function OnDefault(RPB_MCM mcm, int oid) global
 
     if (! ShouldHandleEvent(mcm))
         return
@@ -273,7 +247,7 @@ function OnDefault(RealisticPrisonAndBounty_MCM mcm, int oid) global
     ; OnOptionDefault(mcm, mcm.GetKeyFromOption(oid, false))
 endFunction
 
-function OnSelect(RealisticPrisonAndBounty_MCM mcm, int oid) global
+function OnSelect(RPB_MCM mcm, int oid) global
     if (! ShouldHandleEvent(mcm))
         return
     endif
@@ -281,7 +255,7 @@ function OnSelect(RealisticPrisonAndBounty_MCM mcm, int oid) global
     OnOptionSelect(mcm, mcm.GetKeyFromOption(oid, false))
 endFunction
 
-function OnSliderOpen(RealisticPrisonAndBounty_MCM mcm, int oid) global
+function OnSliderOpen(RPB_MCM mcm, int oid) global
     if (! ShouldHandleEvent(mcm))
         return
     endif
@@ -289,7 +263,7 @@ function OnSliderOpen(RealisticPrisonAndBounty_MCM mcm, int oid) global
     OnOptionSliderOpen(mcm, mcm.GetKeyFromOption(oid, false))
 endFunction
 
-function OnSliderAccept(RealisticPrisonAndBounty_MCM mcm, int oid, float value) global
+function OnSliderAccept(RPB_MCM mcm, int oid, float value) global
     if (! ShouldHandleEvent(mcm))
         return
     endif
@@ -297,7 +271,7 @@ function OnSliderAccept(RealisticPrisonAndBounty_MCM mcm, int oid, float value) 
     OnOptionSliderAccept(mcm, mcm.GetKeyFromOption(oid, false), value)
 endFunction
 
-function OnMenuOpen(RealisticPrisonAndBounty_MCM mcm, int oid) global
+function OnMenuOpen(RPB_MCM mcm, int oid) global
     if (! ShouldHandleEvent(mcm))
         return
     endif
@@ -305,7 +279,7 @@ function OnMenuOpen(RealisticPrisonAndBounty_MCM mcm, int oid) global
     OnOptionMenuOpen(mcm, mcm.GetKeyFromOption(oid, false))
 endFunction
 
-function OnMenuAccept(RealisticPrisonAndBounty_MCM mcm, int oid, int menuIndex) global
+function OnMenuAccept(RPB_MCM mcm, int oid, int menuIndex) global
     if (! ShouldHandleEvent(mcm))
         return
     endif
@@ -313,7 +287,7 @@ function OnMenuAccept(RealisticPrisonAndBounty_MCM mcm, int oid, int menuIndex) 
     OnOptionMenuAccept(mcm, mcm.GetKeyFromOption(oid, false), menuIndex)
 endFunction
 
-function OnColorOpen(RealisticPrisonAndBounty_MCM mcm, int oid) global
+function OnColorOpen(RPB_MCM mcm, int oid) global
     if (! ShouldHandleEvent(mcm))
         return
     endif
@@ -321,7 +295,7 @@ function OnColorOpen(RealisticPrisonAndBounty_MCM mcm, int oid) global
     OnOptionColorOpen(mcm, mcm.GetKeyFromOption(oid, false))
 endFunction
 
-function OnColorAccept(RealisticPrisonAndBounty_MCM mcm, int oid, int color) global
+function OnColorAccept(RPB_MCM mcm, int oid, int color) global
     if (! ShouldHandleEvent(mcm))
         return
     endif
@@ -329,7 +303,7 @@ function OnColorAccept(RealisticPrisonAndBounty_MCM mcm, int oid, int color) glo
     OnOptionColorAccept(mcm, mcm.GetKeyFromOption(oid, false), color)
 endFunction
 
-function OnKeymapChange(RealisticPrisonAndBounty_MCM mcm, int oid, int keycode, string conflictControl, string conflictName) global
+function OnKeymapChange(RPB_MCM mcm, int oid, int keycode, string conflictControl, string conflictName) global
     if (! ShouldHandleEvent(mcm))
         return
     endif
@@ -337,7 +311,7 @@ function OnKeymapChange(RealisticPrisonAndBounty_MCM mcm, int oid, int keycode, 
     OnOptionKeymapChange(mcm, mcm.GetKeyFromOption(oid, false), keycode, conflictControl, conflictName)
 endFunction
 
-function OnInputOpen(RealisticPrisonAndBounty_MCM mcm, int oid) global
+function OnInputOpen(RPB_MCM mcm, int oid) global
     if (! ShouldHandleEvent(mcm))
         return
     endif
@@ -345,7 +319,7 @@ function OnInputOpen(RealisticPrisonAndBounty_MCM mcm, int oid) global
     OnOptionInputOpen(mcm, mcm.GetKeyFromOption(oid, false))
 endFunction
 
-function OnInputAccept(RealisticPrisonAndBounty_MCM mcm, int oid, string inputValue) global
+function OnInputAccept(RPB_MCM mcm, int oid, string inputValue) global
     if (! ShouldHandleEvent(mcm))
         return
     endif

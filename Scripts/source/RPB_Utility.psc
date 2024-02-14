@@ -552,6 +552,8 @@ int[] function GetDateFromDaysPassed(int aiDay, int aiMonth, int aiYear, int aiD
     ; aiDaysPassed would be 30, resulting in 259 (which should give us the next month)
     int totalDaysPassed = daysPassedSinceStartOfYear + aiDaysPassed
 
+    DebugWithArgs("Utility::GetDateFromDaysPassed", aiDay + ", " + aiMonth + ", " + aiYear + ", " + aiDaysPassed, "totalDaysPassed: " + totalDaysPassed)
+
     int currentDay = aiDay ; 17
 
     ; Now that we have 259 as total days passed, we need to find out what month this comes down to
@@ -598,6 +600,60 @@ int[] function GetDateFromDaysPassed(int aiDay, int aiMonth, int aiYear, int aiD
     return retval
 endFunction
 
+int function GetDateFromDaysPassedStruct(int aiDay, int aiMonth, int aiYear, int aiDaysPassed) global
+    ; Get the full days from the beginning of the year till the date passed in
+    int daysPassedSinceStartOfYear = CalculateDaysPassedFromDate(aiDay, aiMonth, aiYear)
+
+    ; Add the days to totalDaysPassed (if totalDaysPassed is 229 and we want to know what date is 30d from now)
+    ; aiDaysPassed would be 30, resulting in 259 (which should give us the next month)
+    int totalDaysPassed = daysPassedSinceStartOfYear + aiDaysPassed
+
+    int currentDay = aiDay ; 17
+
+    ; Now that we have 259 as total days passed, we need to find out what month this comes down to
+    int currentMonth = aiMonth ; Assuming we start at Month 8, this starts at 8
+    ; So now 229 days passed equals month 8 since that's what we pass to totalDaysPassed and that's the result
+
+    int currentYear = aiYear
+
+    int totalDaysProcessed = totalDaysPassed
+    bool wasProcessedInLoop = false
+
+    if ((aiDay + aiDaysPassed) <= GetDaysOfMonth(aiMonth))
+        currentDay += aiDaysPassed
+    else
+        ; Debug("Utility::GetDateFromDaysPassed", "totalDaysProcessed: " + totalDaysProcessed + ", totalDaysProcessed: " + totalDaysProcessed)
+        while ((totalDaysProcessed - daysPassedSinceStartOfYear) > 0) ; while there are days to process
+            if (currentDay >= GetDaysOfMonth(currentMonth))
+                currentDay = 1
+                currentMonth += 1
+            else
+                currentDay += 1
+            endif
+
+            if (currentMonth > 12)
+                currentYear += 1 ; Go to the next year
+                currentMonth = 1 ; Start on 1st month of next year
+            endif
+
+            totalDaysProcessed -= 1
+        endWhile
+    endif
+
+    ; int remainingDays = int_if (totalDaysProcessed < daysPassedSinceStartOfYear, (daysPassedSinceStartOfYear - totalDaysProcessed), (totalDaysProcessed - daysPassedSinceStartOfYear))
+    ; int remainingDays = totalDaysProcessed - daysPassedSinceStartOfYear
+
+    ; Debug("Utility::GetDateFromDaysPassed", "totalDaysProcessed: " + totalDaysProcessed + ", daysPassedSinceStartOfYear: " + daysPassedSinceStartOfYear + ", remainingDays: " + remainingDays + ", currentDay: " + currentDay)
+    ; DebugWithArgs("Utility::GetDateFromDaysPassed", aiDay + ", " + aiMonth + ", " + aiYear + ", " + aiDaysPassed, "daysPassedSinceStartOfYear: " + daysPassedSinceStartOfYear + ", totalDaysPassed: " + totalDaysPassed + ", " + "totalDaysProcessed: " + totalDaysProcessed + ", " + currentDay + "/" + currentMonth + "/" + currentYear)
+
+    int struct = JMap.object()
+    JMap.setInt(struct, "day", currentDay)
+    JMap.setInt(struct, "month", currentMonth)
+    JMap.setInt(struct, "year", currentYear)
+
+    return struct
+endFunction
+
 ; int[] function GetDateFromDaysPassed(int aiDay, int aiMonth, int aiYear, int aiDaysPassed) global
 ;     ; Get the full days from the beginning of the year till the date passed in
 ;     int daysPassedSinceStartOfYear = CalculateDaysPassedFromDate(aiDay, aiMonth, aiYear)
@@ -681,6 +737,39 @@ endFunction
 
 ;     return retval
 ; endFunction
+
+int[] function GetPreviousDayOfWeekFromDate(int aiDay, int aiMonth, int aiYear, int aiDayOfWeek) global
+    if (aiDayOfWeek < GetDayOfWeekByName("Sundas") || aiDayOfWeek > GetDayOfWeekByName("Loredas"))
+        return none
+    endif
+
+    int dayOfWeekForPassedDate = CalculateDayOfWeek(aiDay, aiMonth, aiYear)
+
+    ; 4 - 6 (passed Middas and current date is a Fredas), that means we need to decrease by 2 days
+    ; 6 - 4 (passed Fredas and the current date is a Middas), that means we need to decrease by 1 week and increase by 2 days (or decrease by 5 days)
+    ; 6 - 6 (passed Fredas and the current date is a Fredas), we need to decrease by 1 week
+
+    ; 7 - 6 (passed Loredas and the current date is a Fredas), that means we need to get the next day.
+    ; 6 - 7 (passed Fredas and the current date is a Loredas), that means Fredas has already passed, we need to go to the next week (difference will be -1 which means one week and one day before)
+    ; 5 - 7 (passed in Turdas, and the current date is a Loredas), difference will be -2 which means one week and two days before
+    ; 4 - 4 (passed in Middas, and the current date is a Middas), difference will be 0 which means one week, same day of week
+    ; 4 - 2 (passed in Middas, and the current date is a Morndas), difference will be 2 which means two days forward
+    int dayOfWeekDifference     = aiDayOfWeek - dayOfWeekForPassedDate
+    bool dayOfWeekIsPreviousWeek = dayOfWeekDifference >= 0
+    int daysBackward            = int_if (dayOfWeekIsPreviousWeek, -7 + dayOfWeekDifference, dayOfWeekDifference)
+
+    DebugWithArgs("Utility::GetPreviousDayOfWeekFromDate", aiDay + ", " + aiMonth + ", " + aiYear + ", " + GetDayOfWeekName(aiDayOfWeek), "daysBackward: " + daysBackward)
+
+    int[] newDateForDayOfWeek = GetDateFromDaysPassed(aiDay, aiMonth, aiYear, daysBackward)
+    int[] retval = new int[4]
+
+    retval[0]   = newDateForDayOfWeek[0]
+    retval[1]   = newDateForDayOfWeek[1]
+    retval[2]   = newDateForDayOfWeek[2]
+    retval[3]   = -daysBackward
+
+    return retval
+endFunction
 
 int[] function GetNextDayOfWeekFromDate(int aiDay, int aiMonth, int aiYear, int aiDayOfWeek) global
     if (aiDayOfWeek < GetDayOfWeekByName("Sundas") || aiDayOfWeek > GetDayOfWeekByName("Loredas"))
@@ -707,14 +796,6 @@ int[] function GetNextDayOfWeekFromDate(int aiDay, int aiMonth, int aiYear, int 
     retval[3]   = daysForward
 
     return retval
-endFunction
-
-int[] function GetPreviousDayOfWeekFromDate(int aiDay, int aiMonth, int aiYear, int aiDayOfWeek) global
-    if (aiDayOfWeek < GetDayOfWeekByName("Sundas") || aiDayOfWeek > GetDayOfWeekByName("Loredas"))
-        return none
-    endif
-
-    int dayOfWeekForPassedDate = CalculateDayOfWeek(aiDay, aiMonth, aiYear)
 endFunction
 
 ; int[] function GetDateFromDaysPassed(int aiDay, int aiMonth, int aiYear, int aiDaysPassed) global
@@ -1116,15 +1197,36 @@ string function GetTimeFormatted(float afTime, bool abIncludeMinutes = false, bo
     return asNullValue
 endFunction
 
-string function GetFormattedDate(int aiDay, int aiMonth, int aiYear, int aiHour = 0, int aiMinute = 0) global
+string function GetFormattedDate(int aiDay, int aiMonth, int aiYear, int aiHour = 0, int aiMinute = 0, bool abShowDayOfWeek = true, bool abShowDay = true, bool abShowTime = true, bool abShowYear = true) global
     string dayOfWeek    = GetDayOfWeekName(CalculateDayOfWeek(aiDay, aiMonth, aiYear))
     string hour         = GetTimeAs12Hour(aiHour, aiMinute)
     string dayOrdinal   = ToOrdinalNthDay(aiDay)
     string monthName    = GetMonthName(aiMonth)
     string yearString   = "4E " + aiYear
 
+    string dateResult = ""
+
+    if (abShowDayOfWeek)
+        dateResult += dayOfWeek + ", "
+    endif
+
+    if (abShowTime)
+        dateResult += hour + ", "
+    endif
+
+    if (abShowDay)
+        dateResult += dayOrdinal + " of "
+    endif
+
+    dateResult += monthName + ", "
+
+    if (abShowYear)
+        dateResult += yearString
+    endif
+
+    return dateResult
     ; Fredas, 7:00 AM, 21st of Sun's Dusk, 4E 201
-    return dayOfWeek + ", " + hour + ", " + dayOrdinal + " of " + monthName + ", " + yearString
+    ; return dayOfWeek + ", " + hour + ", " + dayOrdinal + " of " + monthName + ", " + yearString
 endFunction
 
 string function GetFormattedDate24Hours(int aiDay, int aiMonth, int aiYear, int aiHour = 0, int aiMinute = 0) global
@@ -1139,6 +1241,26 @@ string function GetCurrentDateFormatted() global
     int minutesFromHour = GetMinutesFromHour(currentHour)
 
     return GetFormattedDate(currentDay, currentMonth, currentYear, floor(currentHour), minutesFromHour)
+endFunction
+
+string function GetNextDayOfWeekDateFormatted(string asDayOfWeek, bool abShowTime = false) global
+    int[] nextDayOfWeek = GetNextDayOfWeekFromDate(GetCurrentDay(), GetCurrentMonth(), GetCurrentYear(), GetDayOfWeekByName(asDayOfWeek))
+    int day                 = nextDayOfWeek[0]
+    int month               = nextDayOfWeek[1]
+    int year                = nextDayOfWeek[2]
+    int daysTillDayOfWeek   = nextDayOfWeek[3]
+
+    return GetFormattedDate(day, month, year, GetCurrentHour(), GetCurrentMinute(), abShowTime = abShowTime)
+endFunction
+
+string function GetPreviousDayOfWeekDateFormatted(string asDayOfWeek, bool abShowTime = false) global
+    int[] previousDayOfWeek = GetPreviousDayOfWeekFromDate(GetCurrentDay(), GetCurrentMonth(), GetCurrentYear(), GetDayOfWeekByName(asDayOfWeek))
+    int day                 = previousDayOfWeek[0]
+    int month               = previousDayOfWeek[1]
+    int year                = previousDayOfWeek[2]
+    int daysFromDayOfWeek   = previousDayOfWeek[3]
+
+    return GetFormattedDate(day, month, year, GetCurrentHour(), GetCurrentMinute(), abShowTime = abShowTime)
 endFunction
 
 bool function SetGameDay(int aiGameDay, bool abNoSafetyCheck = false) global
@@ -1226,4 +1348,18 @@ bool function PassTimeInDays(int aiPassByDays) global
         daysPassed += 1
     endWhile
     ModGameHour(-1) ; Take off one hour, for some reason, after passing the days, the time is incremented by 1h
+endFunction
+
+int function GetStructMemberInt(int apStructObject, string asMemberName) global
+    return JMap.getInt(apStructObject, asMemberName)
+endFunction
+
+function DestroyStruct(int apStructObject) global
+    if (apStructObject)
+        JValue.release(apStructObject)
+    endif
+endFunction
+
+function DestroyStructsOfType(string asStructType) global
+    JValue.releaseObjectsWithTag(asStructType)
 endFunction

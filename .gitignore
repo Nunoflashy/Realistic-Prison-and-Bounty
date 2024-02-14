@@ -11,9 +11,9 @@ RPB_Data/
 Scripts/Backup/
 Scripts/Source/*_old
 Scripts/Source/*.bk*
-Scripts/MCM_Backup/RealisticPrisonAndBounty_MCM.psc
-Scripts/MCM_Backup/RealisticPrisonAndBounty_MCM_Clothing.psc
-Scripts/MCM_Backup/RealisticPrisonAndBounty_MCM_Debug.psc
-Scripts/MCM_Backup/RealisticPrisonAndBounty_MCM_General.psc
-Scripts/MCM_Backup/RealisticPrisonAndBounty_MCM_Holds.psc
-Scripts/MCM_Backup/RealisticPrisonAndBounty_MCM_Stats.psc
+Scripts/MCM_Backup/RPB_MCM.psc
+Scripts/MCM_Backup/RPB_MCM_Clothing.psc
+Scripts/MCM_Backup/RPB_MCM_Debug.psc
+Scripts/MCM_Backup/RPB_MCM_General.psc
+Scripts/MCM_Backup/RPB_MCM_Holds.psc
+Scripts/MCM_Backup/RPB_MCM_Stats.psc

@@ -1,4 +1,4 @@
-Scriptname RealisticPrisonAndBounty_MCM extends SKI_ConfigBase  
+Scriptname RPB_MCM extends SKI_ConfigBase  
 
 import RealisticPrisonAndBounty_Util
 import RealisticPrisonAndBounty_Config
@@ -663,22 +663,22 @@ string previousPage
 
 function RenderBasedOnPage(string page)
     if (page == "Stats")
-        RealisticPrisonAndBounty_MCM_Stats.Render(self)
+        RPB_MCM_Stats.Render(self)
 
     elseif (page == "General")
-        RealisticPrisonAndBounty_MCM_General.Render(self)
+        RPB_MCM_General.Render(self)
 
     elseif (page == "Deleveling")
-        RealisticPrisonAndBounty_MCM_Delevel.Render(self)
+        RPB_MCM_Skills.Render(self)
 
     elseif (page == "Clothing")
-        RealisticPrisonAndBounty_MCM_Clothing.Render(self)
+        RPB_MCM_Clothing.Render(self)
 
     elseif (page == "Debug")
-        RealisticPrisonAndBounty_MCM_Debug.Render(self)
+        RPB_MCM_Debug.Render(self)
 
     else ; Holds
-        RealisticPrisonAndBounty_MCM_Holds.Render(self)
+        RPB_MCM_Holds.Render(self)
     endif
 endFunction
 
@@ -693,12 +693,12 @@ event OnPageReset(string page)
     ;     RPB_MCM_Sentence.Render(self)
     ; endif
 
-    RealisticPrisonAndBounty_MCM_Delevel.Render(self)
-    RealisticPrisonAndBounty_MCM_Holds.Render(self)
-    RealisticPrisonAndBounty_MCM_General.Render(self)
-    RealisticPrisonAndBounty_MCM_Clothing.Render(self)
-    RealisticPrisonAndBounty_MCM_Debug.Render(self)
-    RealisticPrisonAndBounty_MCM_Stats.Render(self)
+    RPB_MCM_Skills.Render(self)
+    RPB_MCM_Holds.Render(self)
+    RPB_MCM_General.Render(self)
+    RPB_MCM_Clothing.Render(self)
+    RPB_MCM_Debug.Render(self)
+    RPB_MCM_Stats.Render(self)
     RPB_MCM_Sentence.Render(self)
 
     RPB_Utility.Debug("MCM::OnPageReset", "Page: " + page, true)
@@ -707,12 +707,12 @@ event OnPageReset(string page)
 endEvent
 
 event OnOptionHighlight(int option)
-    RealisticPrisonAndBounty_MCM_Delevel.OnHighlight(self, option)
-    RealisticPrisonAndBounty_MCM_Holds.OnHighlight(self, option)
-    RealisticPrisonAndBounty_MCM_General.OnHighlight(self, option)
-    RealisticPrisonAndBounty_MCM_Clothing.OnHighlight(self, option)
-    RealisticPrisonAndBounty_MCM_Debug.OnHighlight(self, option)
-    RealisticPrisonAndBounty_MCM_Stats.OnHighlight(self, option)
+    RPB_MCM_Skills.OnHighlight(self, option)
+    RPB_MCM_Holds.OnHighlight(self, option)
+    RPB_MCM_General.OnHighlight(self, option)
+    RPB_MCM_Clothing.OnHighlight(self, option)
+    RPB_MCM_Debug.OnHighlight(self, option)
+    RPB_MCM_Stats.OnHighlight(self, option)
     RPB_MCM_Sentence.OnHighlight(self, option)
 
     Trace("MCM::OnHighlight", "Option ID: " + option, true)
@@ -720,86 +720,82 @@ event OnOptionHighlight(int option)
 endEvent
 
 event OnOptionDefault(int option)
-    RealisticPrisonAndBounty_MCM_Delevel.OnDefault(self, option)
-    RealisticPrisonAndBounty_MCM_Holds.OnDefault(self, option)
-    RealisticPrisonAndBounty_MCM_General.OnDefault(self, option)
-    RealisticPrisonAndBounty_MCM_Clothing.OnDefault(self, option)
-    RealisticPrisonAndBounty_MCM_Debug.OnDefault(self, option)
-    RealisticPrisonAndBounty_MCM_Stats.OnDefault(self, option)
+    RPB_MCM_Skills.OnDefault(self, option)
+    RPB_MCM_Holds.OnDefault(self, option)
+    RPB_MCM_General.OnDefault(self, option)
+    RPB_MCM_Clothing.OnDefault(self, option)
+    RPB_MCM_Debug.OnDefault(self, option)
+    RPB_MCM_Stats.OnDefault(self, option)
     RPB_MCM_Sentence.OnDefault(self, option)
-
 endEvent
 
 event OnOptionSelect(int option)
-    RealisticPrisonAndBounty_MCM_Delevel.OnSelect(self, option)
-    RealisticPrisonAndBounty_MCM_Holds.OnSelect(self, option)
-    RealisticPrisonAndBounty_MCM_General.OnSelect(self, option)
-    RealisticPrisonAndBounty_MCM_Clothing.OnSelect(self, option)
-    RealisticPrisonAndBounty_MCM_Debug.OnSelect(self, option)
-    RealisticPrisonAndBounty_MCM_Stats.OnSelect(self, option)
+    RPB_MCM_Skills.OnSelect(self, option)
+    RPB_MCM_Holds.OnSelect(self, option)
+    RPB_MCM_General.OnSelect(self, option)
+    RPB_MCM_Clothing.OnSelect(self, option)
+    RPB_MCM_Debug.OnSelect(self, option)
+    RPB_MCM_Stats.OnSelect(self, option)
     RPB_MCM_Sentence.OnSelect(self, option)
-
 endEvent
 
 event OnOptionSliderOpen(int option)
-    RealisticPrisonAndBounty_MCM_Delevel.OnSliderOpen(self, option)
-    RealisticPrisonAndBounty_MCM_Holds.OnSliderOpen(self, option)
-    RealisticPrisonAndBounty_MCM_General.OnSliderOpen(self, option)
-    RealisticPrisonAndBounty_MCM_Clothing.OnSliderOpen(self, option)
-    RealisticPrisonAndBounty_MCM_Debug.OnSliderOpen(self, option)
-    RealisticPrisonAndBounty_MCM_Stats.OnSliderOpen(self, option)
+    RPB_MCM_Skills.OnSliderOpen(self, option)
+    RPB_MCM_Holds.OnSliderOpen(self, option)
+    RPB_MCM_General.OnSliderOpen(self, option)
+    RPB_MCM_Clothing.OnSliderOpen(self, option)
+    RPB_MCM_Debug.OnSliderOpen(self, option)
+    RPB_MCM_Stats.OnSliderOpen(self, option)
     RPB_MCM_Sentence.OnSliderOpen(self, option)
-
 endEvent
 
 event OnOptionSliderAccept(int option, float value)
-    RealisticPrisonAndBounty_MCM_Delevel.OnSliderAccept(self, option, value)
-    RealisticPrisonAndBounty_MCM_Holds.OnSliderAccept(self, option, value)
-    RealisticPrisonAndBounty_MCM_General.OnSliderAccept(self, option, value)
-    RealisticPrisonAndBounty_MCM_Clothing.OnSliderAccept(self, option, value)
-    RealisticPrisonAndBounty_MCM_Debug.OnSliderAccept(self, option, value)
-    RealisticPrisonAndBounty_MCM_Stats.OnSliderAccept(self, option, value)
+    RPB_MCM_Skills.OnSliderAccept(self, option, value)
+    RPB_MCM_Holds.OnSliderAccept(self, option, value)
+    RPB_MCM_General.OnSliderAccept(self, option, value)
+    RPB_MCM_Clothing.OnSliderAccept(self, option, value)
+    RPB_MCM_Debug.OnSliderAccept(self, option, value)
+    RPB_MCM_Stats.OnSliderAccept(self, option, value)
     RPB_MCM_Sentence.OnSliderAccept(self, option, value)
 endEvent
 
 event OnOptionMenuOpen(int option)
-    RealisticPrisonAndBounty_MCM_Delevel.OnMenuOpen(self, option)
-    RealisticPrisonAndBounty_MCM_Holds.OnMenuOpen(self, option)
-    RealisticPrisonAndBounty_MCM_General.OnMenuOpen(self, option)
-    RealisticPrisonAndBounty_MCM_Clothing.OnMenuOpen(self, option)
-    RealisticPrisonAndBounty_MCM_Debug.OnMenuOpen(self, option)
-    RealisticPrisonAndBounty_MCM_Stats.OnMenuOpen(self, option)
+    RPB_MCM_Skills.OnMenuOpen(self, option)
+    RPB_MCM_Holds.OnMenuOpen(self, option)
+    RPB_MCM_General.OnMenuOpen(self, option)
+    RPB_MCM_Clothing.OnMenuOpen(self, option)
+    RPB_MCM_Debug.OnMenuOpen(self, option)
+    RPB_MCM_Stats.OnMenuOpen(self, option)
     RPB_MCM_Sentence.OnMenuOpen(self, option)
-
 endEvent
 
 event OnOptionMenuAccept(int option, int index)
-    RealisticPrisonAndBounty_MCM_Delevel.OnMenuAccept(self, option, index)
-    RealisticPrisonAndBounty_MCM_Holds.OnMenuAccept(self, option, index)
-    RealisticPrisonAndBounty_MCM_General.OnMenuAccept(self, option, index)
-    RealisticPrisonAndBounty_MCM_Clothing.OnMenuAccept(self, option, index)
-    RealisticPrisonAndBounty_MCM_Debug.OnMenuAccept(self, option, index)
-    RealisticPrisonAndBounty_MCM_Stats.OnMenuAccept(self, option, index)
+    RPB_MCM_Skills.OnMenuAccept(self, option, index)
+    RPB_MCM_Holds.OnMenuAccept(self, option, index)
+    RPB_MCM_General.OnMenuAccept(self, option, index)
+    RPB_MCM_Clothing.OnMenuAccept(self, option, index)
+    RPB_MCM_Debug.OnMenuAccept(self, option, index)
+    RPB_MCM_Stats.OnMenuAccept(self, option, index)
     RPB_MCM_Sentence.OnMenuAccept(self, option, index)
 endEvent
 
 event OnOptionInputOpen(int option)
-    RealisticPrisonAndBounty_MCM_Delevel.OnInputOpen(self, option)
-    RealisticPrisonAndBounty_MCM_Holds.OnInputOpen(self, option)
-    RealisticPrisonAndBounty_MCM_General.OnInputOpen(self, option)
-    RealisticPrisonAndBounty_MCM_Clothing.OnInputOpen(self, option)
-    RealisticPrisonAndBounty_MCM_Debug.OnInputOpen(self, option)
-    RealisticPrisonAndBounty_MCM_Stats.OnInputOpen(self, option)
+    RPB_MCM_Skills.OnInputOpen(self, option)
+    RPB_MCM_Holds.OnInputOpen(self, option)
+    RPB_MCM_General.OnInputOpen(self, option)
+    RPB_MCM_Clothing.OnInputOpen(self, option)
+    RPB_MCM_Debug.OnInputOpen(self, option)
+    RPB_MCM_Stats.OnInputOpen(self, option)
     RPB_MCM_Sentence.OnInputOpen(self, option)
 endEvent
 
 event OnOptionInputAccept(int option, string inputValue)
-    RealisticPrisonAndBounty_MCM_Delevel.OnInputAccept(self, option, inputValue)
-    RealisticPrisonAndBounty_MCM_Holds.OnInputAccept(self, option, inputValue)
-    RealisticPrisonAndBounty_MCM_General.OnInputAccept(self, option, inputValue)
-    RealisticPrisonAndBounty_MCM_Clothing.OnInputAccept(self, option, inputValue)
-    RealisticPrisonAndBounty_MCM_Debug.OnInputAccept(self, option, inputValue)
-    RealisticPrisonAndBounty_MCM_Stats.OnInputAccept(self, option, inputValue)
+    RPB_MCM_Skills.OnInputAccept(self, option, inputValue)
+    RPB_MCM_Holds.OnInputAccept(self, option, inputValue)
+    RPB_MCM_General.OnInputAccept(self, option, inputValue)
+    RPB_MCM_Clothing.OnInputAccept(self, option, inputValue)
+    RPB_MCM_Debug.OnInputAccept(self, option, inputValue)
+    RPB_MCM_Stats.OnInputAccept(self, option, inputValue)
     RPB_MCM_Sentence.OnInputAccept(self, option, inputValue)
 endEvent
 

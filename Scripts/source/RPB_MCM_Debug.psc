@@ -1,14 +1,14 @@
-Scriptname RealisticPrisonAndBounty_MCM_Debug hidden
+Scriptname RPB_MCM_Debug hidden
 
 import RealisticPrisonAndBounty_Util
-import RealisticPrisonAndBounty_MCM
+import RPB_MCM
 import PO3_SKSEFunctions
 
-bool function ShouldHandleEvent(RealisticPrisonAndBounty_MCM mcm) global
+bool function ShouldHandleEvent(RPB_MCM mcm) global
     return mcm.CurrentPage == "Debug"
 endFunction
 
-function Render(RealisticPrisonAndBounty_MCM mcm) global
+function Render(RPB_MCM mcm) global
     if (! ShouldHandleEvent(mcm))
         return
     endif
@@ -25,7 +25,7 @@ function Render(RealisticPrisonAndBounty_MCM mcm) global
     EndBenchmark(bench, mcm.CurrentPage + " page loaded -")
 endFunction
 
-function Left(RealisticPrisonAndBounty_MCM mcm) global
+function Left(RPB_MCM mcm) global
     mcm.AddOptionCategory("Jail")
     int holdIndex = 0
     while (holdIndex < mcm.config.Holds.Length)
@@ -47,19 +47,19 @@ function Left(RealisticPrisonAndBounty_MCM mcm) global
     mcm.AddOptionMenuKey("Test Condition For Hold", "OutfitCondition", "Whiterun")
 endFunction
 
-function Right(RealisticPrisonAndBounty_MCM mcm) global
+function Right(RPB_MCM mcm) global
     
 endFunction
 
-function HandleDependencies(RealisticPrisonAndBounty_MCM mcm) global
+function HandleDependencies(RPB_MCM mcm) global
 
 endFunction
 
-function HandleSliderOptionDependency(RealisticPrisonAndBounty_MCM mcm, string option, float value) global
+function HandleSliderOptionDependency(RPB_MCM mcm, string option, float value) global
 
 endFunction
 
-function LoadSliderOptions(RealisticPrisonAndBounty_MCM mcm, string option, float currentSliderValue) global
+function LoadSliderOptions(RPB_MCM mcm, string option, float currentSliderValue) global
 
 endFunction
 
@@ -67,15 +67,15 @@ endFunction
 ; Events
 ; =====================================================
 
-function OnOptionHighlight(RealisticPrisonAndBounty_MCM mcm, string option) global
+function OnOptionHighlight(RPB_MCM mcm, string option) global
     mcm.Trace("OnOptionHighlight", "Option: " + option)
 endFunction
 
-function OnOptionDefault(RealisticPrisonAndBounty_MCM mcm, string option) global
+function OnOptionDefault(RPB_MCM mcm, string option) global
     
 endFunction
 
-function OnOptionSelect(RealisticPrisonAndBounty_MCM mcm, string option) global
+function OnOptionSelect(RPB_MCM mcm, string option) global
     string optionKey = mcm.CurrentPage + "::" + option
 
     if (IsSelectedOption(option, "Outfit"))
@@ -106,13 +106,13 @@ function OnOptionSelect(RealisticPrisonAndBounty_MCM mcm, string option) global
     HandleDependencies(mcm)
 endFunction
 
-function OnOptionSliderOpen(RealisticPrisonAndBounty_MCM mcm, string option) global
+function OnOptionSliderOpen(RPB_MCM mcm, string option) global
     float sliderOptionValue = mcm.GetOptionSliderValue(option)
     LoadSliderOptions(mcm, option, sliderOptionValue)
     mcm.Trace("OnOptionSliderOpen", "Option: " + option + ", Value: " + sliderOptionValue)
 endFunction
 
-function OnOptionSliderAccept(RealisticPrisonAndBounty_MCM mcm, string option, float value) global
+function OnOptionSliderAccept(RPB_MCM mcm, string option, float value) global
     string formatString = "{0}"
 
     ; Handle any slider option that depends on the current option being set
@@ -121,14 +121,14 @@ function OnOptionSliderAccept(RealisticPrisonAndBounty_MCM mcm, string option, f
     mcm.SetOptionSliderValue(option, value, formatString)
 endFunction
 
-function OnOptionMenuOpen(RealisticPrisonAndBounty_MCM mcm, string option) global
+function OnOptionMenuOpen(RPB_MCM mcm, string option) global
     if (IsSelectedOption(option, "OutfitCondition"))
         mcm.SetMenuDialogOptions(mcm.config.Holds)
         mcm.SetMenuDialogDefaultIndex(GetOptionIndexFromKey(mcm.config.Holds, "Whiterun"))
     endif
 endFunction
 
-function OnOptionMenuAccept(RealisticPrisonAndBounty_MCM mcm, string option, int menuIndex) global
+function OnOptionMenuAccept(RPB_MCM mcm, string option, int menuIndex) global
     if (IsSelectedOption(option, "OutfitCondition"))
         if (menuIndex != -1)
             mcm.SetOptionMenuValue(option, mcm.config.Holds[menuIndex])
@@ -136,27 +136,27 @@ function OnOptionMenuAccept(RealisticPrisonAndBounty_MCM mcm, string option, int
     endif
 endFunction
 
-function OnOptionColorOpen(RealisticPrisonAndBounty_MCM mcm, string option) global
+function OnOptionColorOpen(RPB_MCM mcm, string option) global
     
 endFunction
 
-function OnOptionColorAccept(RealisticPrisonAndBounty_MCM mcm, string option, int color) global
+function OnOptionColorAccept(RPB_MCM mcm, string option, int color) global
     
 endFunction
 
-function OnOptionInputOpen(RealisticPrisonAndBounty_MCM mcm, string option) global
+function OnOptionInputOpen(RPB_MCM mcm, string option) global
     string inputOptionValue = mcm.GetOptionInputValue(option)
     mcm.SetInputDialogStartText(inputOptionValue)
 
     mcm.Trace("OnOptionInputOpen", "GetOptionInputValue("+  option +") = " + mcm.GetOptionInputValue(option, mcm.CurrentPage))
 endFunction
 
-function OnOptionInputAccept(RealisticPrisonAndBounty_MCM mcm, string option, string inputValue) global
+function OnOptionInputAccept(RPB_MCM mcm, string option, string inputValue) global
 
 endFunction
 
 
-function OnOptionKeymapChange(RealisticPrisonAndBounty_MCM mcm, string option, int keyCode, string conflictControl, string conflictName) global
+function OnOptionKeymapChange(RPB_MCM mcm, string option, int keyCode, string conflictControl, string conflictName) global
     
 endFunction
 
@@ -164,7 +164,7 @@ endFunction
 ; Event Handlers
 ; =====================================================
 
-function OnHighlight(RealisticPrisonAndBounty_MCM mcm, int oid) global
+function OnHighlight(RPB_MCM mcm, int oid) global
     if (! ShouldHandleEvent(mcm))
         return
     endif
@@ -172,7 +172,7 @@ function OnHighlight(RealisticPrisonAndBounty_MCM mcm, int oid) global
     OnOptionHighlight(mcm, mcm.GetKeyFromOption(oid, false))
 endFunction
 
-function OnDefault(RealisticPrisonAndBounty_MCM mcm, int oid) global
+function OnDefault(RPB_MCM mcm, int oid) global
     if (! ShouldHandleEvent(mcm))
         return
     endif
@@ -180,7 +180,7 @@ function OnDefault(RealisticPrisonAndBounty_MCM mcm, int oid) global
     OnOptionDefault(mcm, mcm.GetKeyFromOption(oid, false))
 endFunction
 
-function OnSelect(RealisticPrisonAndBounty_MCM mcm, int oid) global
+function OnSelect(RPB_MCM mcm, int oid) global
     if (! ShouldHandleEvent(mcm))
         return
     endif
@@ -188,7 +188,7 @@ function OnSelect(RealisticPrisonAndBounty_MCM mcm, int oid) global
     OnOptionSelect(mcm, mcm.GetKeyFromOption(oid, false))
 endFunction
 
-function OnSliderOpen(RealisticPrisonAndBounty_MCM mcm, int oid) global
+function OnSliderOpen(RPB_MCM mcm, int oid) global
     if (! ShouldHandleEvent(mcm))
         return
     endif
@@ -196,7 +196,7 @@ function OnSliderOpen(RealisticPrisonAndBounty_MCM mcm, int oid) global
     OnOptionSliderOpen(mcm, mcm.GetKeyFromOption(oid, false))
 endFunction
 
-function OnSliderAccept(RealisticPrisonAndBounty_MCM mcm, int oid, float value) global
+function OnSliderAccept(RPB_MCM mcm, int oid, float value) global
     if (! ShouldHandleEvent(mcm))
         return
     endif
@@ -204,7 +204,7 @@ function OnSliderAccept(RealisticPrisonAndBounty_MCM mcm, int oid, float value) 
     OnOptionSliderAccept(mcm, mcm.GetKeyFromOption(oid, false), value)
 endFunction
 
-function OnMenuOpen(RealisticPrisonAndBounty_MCM mcm, int oid) global
+function OnMenuOpen(RPB_MCM mcm, int oid) global
     if (! ShouldHandleEvent(mcm))
         return
     endif
@@ -212,7 +212,7 @@ function OnMenuOpen(RealisticPrisonAndBounty_MCM mcm, int oid) global
     OnOptionMenuOpen(mcm, mcm.GetKeyFromOption(oid, false))
 endFunction
 
-function OnMenuAccept(RealisticPrisonAndBounty_MCM mcm, int oid, int menuIndex) global
+function OnMenuAccept(RPB_MCM mcm, int oid, int menuIndex) global
     if (! ShouldHandleEvent(mcm))
         return
     endif
@@ -220,7 +220,7 @@ function OnMenuAccept(RealisticPrisonAndBounty_MCM mcm, int oid, int menuIndex) 
     OnOptionMenuAccept(mcm, mcm.GetKeyFromOption(oid, false), menuIndex)
 endFunction
 
-function OnColorOpen(RealisticPrisonAndBounty_MCM mcm, int oid) global
+function OnColorOpen(RPB_MCM mcm, int oid) global
     if (! ShouldHandleEvent(mcm))
         return
     endif
@@ -228,7 +228,7 @@ function OnColorOpen(RealisticPrisonAndBounty_MCM mcm, int oid) global
     OnOptionColorOpen(mcm, mcm.GetKeyFromOption(oid, false))
 endFunction
 
-function OnColorAccept(RealisticPrisonAndBounty_MCM mcm, int oid, int color) global
+function OnColorAccept(RPB_MCM mcm, int oid, int color) global
     if (! ShouldHandleEvent(mcm))
         return
     endif
@@ -236,7 +236,7 @@ function OnColorAccept(RealisticPrisonAndBounty_MCM mcm, int oid, int color) glo
     OnOptionColorAccept(mcm, mcm.GetKeyFromOption(oid, false), color)
 endFunction
 
-function OnKeymapChange(RealisticPrisonAndBounty_MCM mcm, int oid, int keycode, string conflictControl, string conflictName) global
+function OnKeymapChange(RPB_MCM mcm, int oid, int keycode, string conflictControl, string conflictName) global
     if (! ShouldHandleEvent(mcm))
         return
     endif
@@ -244,7 +244,7 @@ function OnKeymapChange(RealisticPrisonAndBounty_MCM mcm, int oid, int keycode, 
     OnOptionKeymapChange(mcm, mcm.GetKeyFromOption(oid, false), keycode, conflictControl, conflictName)
 endFunction
 
-function OnInputOpen(RealisticPrisonAndBounty_MCM mcm, int oid) global
+function OnInputOpen(RPB_MCM mcm, int oid) global
     if (! ShouldHandleEvent(mcm))
         return
     endif
@@ -252,7 +252,7 @@ function OnInputOpen(RealisticPrisonAndBounty_MCM mcm, int oid) global
     OnOptionInputOpen(mcm, mcm.GetKeyFromOption(oid, false))
 endFunction
 
-function OnInputAccept(RealisticPrisonAndBounty_MCM mcm, int oid, string inputValue) global
+function OnInputAccept(RPB_MCM mcm, int oid, string inputValue) global
     if (! ShouldHandleEvent(mcm))
         return
     endif

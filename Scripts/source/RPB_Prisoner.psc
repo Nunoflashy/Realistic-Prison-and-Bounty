@@ -500,7 +500,7 @@ function Imprison()
 
     self.RegisterLastUpdate()
     self.MarkAsJailed()
-    self.SetSentence()
+    self.SetSentence(abShouldAffectBounty = false)
     
     if (Prison_GetBool("Infamy Enabled"))
         self.TriggerInfamyPenalty()
