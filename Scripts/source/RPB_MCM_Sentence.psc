@@ -13,43 +13,31 @@ function Render(RPB_MCM mcm) global
     endif
 
     mcm.SetCursorFillMode(mcm.TOP_TO_BOTTOM)
-    Left(mcm)
-
-    mcm.SetCursorPosition(1)
-    Right(mcm)
-endFunction
-
-function Left(RPB_MCM mcm) global
-    ; float currentHourWithMinutes = RPB_Utility.GetCurrentHourFloat()
-    ; string dayOfWeek       = RPB_Utility.GetDayOfWeekName(RPB_Utility.CalculateDayOfWeek(RPB_Utility.GetCurrentDay(), RPB_Utility.GetCurrentMonth(), RPB_Utility.GetCurrentYear()))
-    ; string currentHour     = RPB_Utility.GetTimeAs12Hour(RPB_Utility.GetCurrentHour(), RPB_Utility.GetMinutesFromHour(currentHourWithMinutes))
-    ; string currentDay      = RPB_Utility.ToOrdinalNthDay(RPB_Utility.GetCurrentDay())
-    ; string currentMonth    = RPB_Utility.GetMonthName(RPB_Utility.GetCurrentMonth())
-    ; string currentYear     = "4E " + RPB_Utility.GetCurrentYear()
-
-    ; int release_day = 21
-    ; int release_month = 11
-    ; int release_year = 201
+; ==========================================================
+;                           Left
+; ==========================================================
 
     RPB_Prison playerPrison = RPB_Prison.GetPrisonForHold("Haafingar")
     RPB_Prisoner player = playerPrison.GetPrisonerReference(mcm.Config.Player)
+
     RPB_Utility.Debug("MCM::Sentence::Right", "playerPrison: " + playerPrison.City + ", Prisoners: " + playerPrison.Prisoners.GetKeys())
+    
     if (!player || !player.IsImprisoned)
         return
     endif
-
-    ; RPB_Prisoner playerPrisonerReference = GetPlayerPrisonerReference(mcm)
-    ; RPB_Utility.Debug("MCM::Sentence::Right", "playerPrisonerReference: " + playerPrisonerReference)
-
-    ; int[] releaseDate = RPB_Utility.GetDateFromDaysPassed(RPB_Utility.GetCurrentDay(), RPB_Utility.GetCurrentMonth(), RPB_Utility.GetCurrentYear(), 25)
 
     string currentTimeFormatted                 = RPB_Utility.GetCurrentDateFormatted()
     string arrestTimeFormatted                  = playerPrison.GetTimeOfArrestFormatted(player)
     string imprisonmentTimeFormatted            = playerPrison.GetTimeOfImprisonmentFormatted(player)
     string timeElapsedSinceArrest               = playerPrison.GetTimeElapsedSinceArrest(player)
     string timeElapsedSinceImprisonment         = playerPrison.GetTimeElapsedSinceImprisonment(player)
+
+    float x = StartBenchmark()
     string releaseTimeFormatted                 = playerPrison.GetTimeOfReleaseFormatted(player)
-    string timeLeftFormatted                    = playerPrison.GetTimeLeftOfSentenceFormatted(player)
+    float xBenchmark = EndBenchmark(x, "New Algorithm")
+
+
+    string timeLeftFormatted = playerPrison.GetTimeLeftOfSentenceFormatted(player)
 
     mcm.AddOptionText("\t\t\t\tCurrent Time", defaultFlags = mcm.OPTION_DISABLED)
     mcm.AddOptionText("", currentTimeFormatted, defaultFlags = mcm.OPTION_DISABLED)
@@ -72,51 +60,23 @@ function Left(RPB_MCM mcm) global
     mcm.AddOptionText("\t\t\t\tTime of Release", defaultFlags = mcm.OPTION_DISABLED)
     mcm.AddOptionText("", releaseTimeFormatted, defaultFlags = mcm.OPTION_DISABLED)
     mcm.AddOptionText("", timeLeftFormatted + " from Now", defaultFlags = mcm.OPTION_DISABLED)
+    mcm.AddOptionText("", "Execution Time: " + (xBenchmark * 1000) + " ms", defaultFlags = mcm.OPTION_DISABLED)
 
-    int[] nextSundas = RPB_Utility.GetNextDayOfWeekFromDate(RPB_Utility.GetCurrentDay(), RPB_Utility.GetCurrentMonth(), RPB_Utility.GetCurrentYear(), RPB_Utility.GetDayOfWeekByName("Sundas"))
-    int[] previousSundas = RPB_Utility.GetPreviousDayOfWeekFromDate(RPB_Utility.GetCurrentDay(), RPB_Utility.GetCurrentMonth(), RPB_Utility.GetCurrentYear(), RPB_Utility.GetDayOfWeekByName("Sundas"))
-    ; int sundasDay = nextSundas[0]
-    ; int sundasMonth = nextSundas[1]
-    ; int sundasYear = nextSundas[2]
-    int daysTillSundas = nextSundas[3]
-    int daysFromPreviousSundas = previousSundas[3]
-    ; string sundasDateFormatted = RPB_Utility.GetFormattedDate(sundasDay, sundasMonth, sundasYear, RPB_Utility.GetCurrentHour(), RPB_Utility.GetCurrentMinute(), abShowTime = false)
-    string sundasDateFormatted          = RPB_Utility.GetNextDayOfWeekDateFormatted("Sundas")
-    string previousSundasDateFormatted  = RPB_Utility.GetPreviousDayOfWeekDateFormatted("Sundas")
- 
-mcm.AddEmptyOption()
-mcm.AddEmptyOption()
 
-mcm.AddOptionText("\t\t\t\tCurrent Time", defaultFlags = mcm.OPTION_DISABLED)
-mcm.AddOptionText("", currentTimeFormatted, defaultFlags = mcm.OPTION_DISABLED)
-mcm.AddEmptyOption()
+;     if (player.IsReleaseOnWeekend())
+;         mcm.AddOptionText("Release rounded to Morndas.", defaultFlags = mcm.OPTION_DISABLED)
+;     endif
 
-    mcm.AddOptionText("\t\t\t\tNext Sundas", defaultFlags = mcm.OPTION_DISABLED)
-    mcm.AddOptionText("", sundasDateFormatted, defaultFlags = mcm.OPTION_DISABLED)
-    mcm.AddOptionText("", "In " + daysTillSundas + " Days", defaultFlags = mcm.OPTION_DISABLED)
-    mcm.AddEmptyOption()
+    ; RPB_Tests.DisplayNextDaysOfWeek()
+    ; RPB_Tests.DisplayPreviousDaysOfWeek()
 
-    mcm.AddOptionText("\t\t\t\tPrevious Sundas", defaultFlags = mcm.OPTION_DISABLED)
-    mcm.AddOptionText("", previousSundasDateFormatted, defaultFlags = mcm.OPTION_DISABLED)
-    mcm.AddOptionText("", daysFromPreviousSundas + " Days Ago", defaultFlags = mcm.OPTION_DISABLED)
-
-    if (player.IsReleaseOnWeekend())
-        mcm.AddOptionText("Release rounded to Morndas.", defaultFlags = mcm.OPTION_DISABLED)
-    endif
-endFunction
-
-function Right(RPB_MCM mcm) global
-    RPB_Prison playerPrison = RPB_Prison.GetPrisonForHold("Haafingar")
-    RPB_Prisoner player = playerPrison.GetPrisonerReference(mcm.Config.Player)
-    RPB_Utility.Debug("MCM::Sentence::Right", "playerPrison: " + playerPrison.City + ", Prisoners: " + playerPrison.Prisoners.GetKeys())
-    if (!player || !player.IsImprisoned)
-        return
-    endif
+    mcm.SetCursorPosition(1)
+; ==========================================================
+;                           Right
+; ==========================================================
 
     string sentenceFormatted    = playerPrison.GetSentenceFormatted(player)
-    string timeLeftFormatted    = playerPrison.GetTimeLeftOfSentenceFormatted(player)
     string timeServedFormatted  = playerPrison.GetTimeServedFormatted(player)
-
 
     float currentHourWithMinutes = RPB_Utility.GetCurrentHourFloat()
     string dayOfWeek       = RPB_Utility.GetDayOfWeekName(RPB_Utility.CalculateDayOfWeek(RPB_Utility.GetCurrentDay(), RPB_Utility.GetCurrentMonth(), RPB_Utility.GetCurrentYear()))
@@ -124,9 +84,6 @@ function Right(RPB_MCM mcm) global
     string currentDay      = RPB_Utility.ToOrdinalNthDay(RPB_Utility.GetCurrentDay())
     string currentMonth    = RPB_Utility.GetMonthName(RPB_Utility.GetCurrentMonth())
     string currentYear     = "4E " + RPB_Utility.GetCurrentYear()
-
-    ; RPB_Prisoner playerPrisonerReference = GetPlayerPrisonerReference(mcm)
-    ; RPB_Utility.Debug("MCM::Sentence::Right", "playerPrisonerReference: " + playerPrisonerReference)
 
     mcm.AddOptionText("Hold", "Haafingar", defaultFlags = mcm.OPTION_DISABLED)
     mcm.AddOptionText("City", "Solitude", defaultFlags = mcm.OPTION_DISABLED)

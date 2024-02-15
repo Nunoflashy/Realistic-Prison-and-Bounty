@@ -1310,10 +1310,10 @@ bool function HasReleaseTimeExtraHours()
 endFunction
 
 bool function IsReleaseOnWeekend()
-    int[] releaseDate = RPB_Utility.GetDateFromDaysPassed(DayOfImprisonment, MonthOfImprisonment, YearOfImprisonment, Sentence)
-    int releaseDay      = releaseDate[0]
-    int releaseMonth    = releaseDate[1]
-    int releaseYear     = releaseDate[2]
+    int releaseDate     = RPB_Utility.GetDateFromDaysPassed(DayOfImprisonment, MonthOfImprisonment, YearOfImprisonment, Sentence)
+    int releaseDay      = RPB_Utility.GetStructMemberInt(releaseDate, "day")
+    int releaseMonth    = RPB_Utility.GetStructMemberInt(releaseDate, "month")
+    int releaseYear     = RPB_Utility.GetStructMemberInt(releaseDate, "year")
 
     int dayOfWeek = RPB_Utility.CalculateDayOfWeek(releaseDay, releaseMonth, releaseYear)
     RPB_Utility.Debug("Prisoner::IsReleaseOnWeekend", "releaseDate: " + releaseDay + "/" + releaseMonth + "/" + releaseYear + ", IsWeekend: " + RPB_Utility.IsWeekend(releaseDay, releaseMonth, releaseYear) + ", Day of Week: " + RPB_Utility.GetDayOfWeekName(dayOfWeek))
@@ -1321,19 +1321,19 @@ bool function IsReleaseOnWeekend()
 endFunction
 
 bool function IsReleaseOnLoredas()
-    int[] releaseDate = RPB_Utility.GetDateFromDaysPassed(DayOfImprisonment, MonthOfImprisonment, YearOfImprisonment, Sentence)
-    int releaseDay      = releaseDate[0]
-    int releaseMonth    = releaseDate[1]
-    int releaseYear     = releaseDate[2]
+    int releaseDate     = RPB_Utility.GetDateFromDaysPassed(DayOfImprisonment, MonthOfImprisonment, YearOfImprisonment, Sentence)
+    int releaseDay      = RPB_Utility.GetStructMemberInt(releaseDate, "day")
+    int releaseMonth    = RPB_Utility.GetStructMemberInt(releaseDate, "month")
+    int releaseYear     = RPB_Utility.GetStructMemberInt(releaseDate, "year")
 
     return RPB_Utility.IsLoredas(releaseDay, releaseMonth, releaseYear)
 endFunction
 
 bool function IsReleaseOnSundas()
-    int[] releaseDate = RPB_Utility.GetDateFromDaysPassed(DayOfImprisonment, MonthOfImprisonment, YearOfImprisonment, Sentence)
-    int releaseDay      = releaseDate[0]
-    int releaseMonth    = releaseDate[1]
-    int releaseYear     = releaseDate[2]
+    int releaseDate     = RPB_Utility.GetDateFromDaysPassed(DayOfImprisonment, MonthOfImprisonment, YearOfImprisonment, Sentence)
+    int releaseDay      = RPB_Utility.GetStructMemberInt(releaseDate, "day")
+    int releaseMonth    = RPB_Utility.GetStructMemberInt(releaseDate, "month")
+    int releaseYear     = RPB_Utility.GetStructMemberInt(releaseDate, "year")
 
     return RPB_Utility.IsSundas(releaseDay, releaseMonth, releaseYear)
 endFunction

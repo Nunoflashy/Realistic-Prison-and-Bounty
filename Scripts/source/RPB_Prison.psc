@@ -694,13 +694,9 @@ string function GetTimeOfReleaseFormatted(RPB_Prisoner apPrisoner)
     ;     playerSentence += 1
     ; endif
 
-    ; Release date in the format d/m/Y
-    ; int[] releaseDate = RPB_Utility.GetDateFromDaysPassed(apPrisoner.DayOfImprisonment, apPrisoner.MonthOfImprisonment, apPrisoner.YearOfImprisonment, playerSentence)
-    ; int release_day     = releaseDate[0]
-    ; int release_month   = releaseDate[1]
-    ; int release_year    = releaseDate[2]
 
-    int releaseDateStruct = RPB_Utility.GetDateFromDaysPassedStruct(apPrisoner.DayOfImprisonment, apPrisoner.MonthOfImprisonment, apPrisoner.YearOfImprisonment, playerSentence)
+    int releaseDateStruct = RPB_Utility.GetDateFromDaysPassed(apPrisoner.DayOfImprisonment, apPrisoner.MonthOfImprisonment, apPrisoner.YearOfImprisonment, playerSentence)
+
     int release_day      = RPB_Utility.GetStructMemberInt(releaseDateStruct, "day")
     int release_month    = RPB_Utility.GetStructMemberInt(releaseDateStruct, "month")
     int release_year     = RPB_Utility.GetStructMemberInt(releaseDateStruct, "year")
