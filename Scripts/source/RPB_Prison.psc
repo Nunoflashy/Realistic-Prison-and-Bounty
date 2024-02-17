@@ -977,37 +977,6 @@ endFunction
 
 ; ==========================================================
 
-; function AwaitPrisonersRelease()
-;     int prisonerCount = 0
-
-;     int i = 0
-;     while (i < checkedPrisoners.Length)
-;         RPB_Prisoner currentPrisoner = checkedPrisoners[i]
-
-;         if (currentPrisoner && !currentPrisoner.IsEffectActive)
-;             prisonerCount += 1
-;             ; Maybe take into account possible bounty gain and infamy updates
-
-;             if (currentPrisoner.IsSentenceServed)
-;                 ; Release Prisoner
-;                 Debug("Prison::AwaitPrisonersRelease", "Released Prisoner:  " + currentPrisoner + currentPrisoner.GetPrisoner())
-;                 currentPrisoner.Release()
-;                 checkedPrisoners[i] = none
-;             else
-;                 int timeServedDays  = currentPrisoner.GetTimeServed("Days")
-;                 int timeLeftDays    = currentPrisoner.GetTimeLeftInSentence("Days")
-;                 ; Debug("Prison::AwaitPrisonersRelease", "Prisoner:  " + currentPrisoner.GetActor() + " has not served their sentence yet ("+ timeServedDays + " days served, " +  timeLeftDays +" days left).")
-;                 ; Debug("Prison::AwaitPrisonersRelease", currentPrisoner + " " + currentPrisoner.GetActor() + " ("+ currentPrisoner.GetSex(true) +")" + " has not served their sentence yet in "+ Hold +".")
-;             endif
-;         endif
-;         i += 1
-;     endWhile
-    
-;     if (prisonerCount > 0)
-;         Debug("Prison::AwaitPrisonersRelease", "Awaiting release for " + prisonerCount + " prisoners in " + Hold)
-;     endif
-; endFunction
-
 function AwaitPrisonersRelease()
     int prisonersAwaitingRelease = 0
 
@@ -1239,23 +1208,15 @@ RPB_Prisoner[] property CheckedPrisonersList
 endProperty
 
 event OnInit()
-    ; Temporary, to hold periodically updates prisoners for now
-    checkedPrisoners        = new RPB_Prisoner[128]
-    checkedPrisonersIndex   = 0
+    ; ; Temporary, to hold periodically updates prisoners for now
+    ; checkedPrisoners        = new RPB_Prisoner[128]
+    ; checkedPrisonersIndex   = 0
 
-    ; __prisoners             = new RPB_Prisoner[128]
-    __prisonersIndex        = 0
+    ; ; __prisoners             = new RPB_Prisoner[128]
+    ; __prisonersIndex        = 0
 
 
     Debug("Prison::OnInit", "OnInit PRISON")
-    
-    MiscVars.CreateArray("Prison/Cells")
-    ; MiscVars.CreateStringMap("prison/cell")
-    MiscVars.CreateStringMap("prison/cell/door")
-
-    ; ; Initialize all of the jail cells belonging to this prison
-    ; Utility.Wait(2.0)
-    ; self.SetupCells()
 endEvent
 
 event OnUpdateGameTime()
@@ -1589,77 +1550,6 @@ RPB_JailCell function GetJailCellBasedOnPriority(string asSex, bool abAllowRando
     return returnedCell
 endFunction
 
-; RPB_JailCell function GetRandomJailCell( \
-;     bool abFemaleOnly = false, \
-;     bool abMaleOnly = false, \
-;     bool abMustBeEmpty = false, \
-;     bool abMustBeAvailable = true \
-; )
-;     if (abFemaleOnly && abMaleOnly)
-;         ; Error, can't be both genders
-;         return none
-;     endif
-
-;     if (abMustBeEmpty && abMustBeAvailable)
-;         ; Error, can't ask for both empty and available, it's either one or the other (although available cells can be considered empty, the opposite is not true.)
-;         return none
-;     endif
-
-;     ; Return only jail cells based on criteria params,
-;     ; or return all if they are all false
-;     RPB_JailCell output = none
-
-;     if (!abFemaleOnly && !abMaleOnly && !abMustBeEmpty && !abMustBeAvailable)
-;         output = Config.GetRandomJailMarker(self.Hold) as RPB_JailCell
-;         return output
-;     endif
-
-;     if (abMustBeEmpty)
-;         output = self.GetEmptyJailCell()
-;         return output
-;     elseif (abMustBeAvailable && (abFemaleOnly || abMaleOnly))
-;         ; Get available cell that is of type gender
-;     endif
-
-; endFunction
-
-ObjectReference function GetPrisonerCell(RPB_Prisoner akPrisoner)
-    ; Search in the prison cell map for the prisoner and get their cell
-    ; OR - search in the prisoner map through a key which will be "Cell"
-    
-    ObjectReference prisonerCell = MiscVars.GetReference("["+ akPrisoner.GetPrisoner().GetFormID() +"]Cell", "Prison/" + Hold + "/Prisoner/Cell") ; something like this?
-    ; This will allow a 1:N relation, 1 Cell to N Prisoners
-    ; [20]Cell, [80]Cell, etc...
-
-
-    if (!prisonerCell)
-        ; Error out here or warning
-    endif
-
-    return prisonerCell
-endFunction
-
-; Return type later to be changed to RPB_CellDoor
-; akPrisonCell to be changed to RPB_PrisonCell
-; ObjectReference function GetCellDoor(ObjectReference akPrisonCell)
-;     ; First try to retrieve the cell door from a local map (to be created)
-;     ; If the form is already in a map, this not only allows faster retrieval, but also processing without the Player being present in the prison location (useful for NPC imprisonment)
-;     ; Map's key will be the prison cell
-
-;     ObjectReference cellDoorInMap = MiscVars.GetReference(akPrisonCell.GetFormID(), "prison/cell/door")
-;     if (cellDoorInMap)
-;         Debug(self.GetOwningQuest(), "Prison::GetCellDoor", "Retrieved Cell Door through map: " + cellDoorInMap)
-;         return cellDoorInMap
-;     endif
-
-;     ; Otherwise, scan the area and get the nearest door to the cell, and add it to the map if it doesn't exist yet
-;     ObjectReference cellDoor = GetNearestJailDoorOfType(GetJailBaseDoorID(Hold), akPrisonCell, 4000)
-;     Debug(self.GetOwningQuest(), "Prison::GetCellDoor", "Retrieved Cell Door through scanning the cell: " + cellDoor)
-;     MiscVars.SetReference(akPrisonCell.GetFormID(), cellDoor, "prison/cell/door")
-
-;     return cellDoor
-; endFunction
-
 function RegisterForPrisonPeriodicUpdate(RPB_Prisoner akPrisoner)
     Debug("Prison::RegisterForPrisonPeriodicUpdate", "Called RegisterForPrisonPeriodicUpdate()")
     ; Add this prisoner to the list of prisoners to check periodically
@@ -1693,17 +1583,6 @@ bool function RegisterPrisoner(RPB_Prisoner apPrisoner)
 
     return Prisoners.Exists(apPrisoner)
 endFunction
-; bool function RegisterPrisoner(RPB_Prisoner akPrisonerRef)
-;     RPB_ActiveMagicEffectContainer prisonerList = Config.MainAPI as RPB_ActiveMagicEffectContainer
-;     string containerKey = "Prisoner["+ akPrisonerRef.GetActor().GetFormID() +"]"
-
-;     prisonerList.AddAt(akPrisonerRef, containerKey)
-;     ; __prisoners[__prisonersIndex] = akPrisonerRef
-;     __prisoners.Add(akPrisonerRef)
-
-;     Debug("Prison::RegisterPrisoner", "Added Actor " + akPrisonerRef.GetActor() + " to the prisoner list " + akPrisonerRef + " with key: " + containerKey + " for prison " + self.Hold)
-;     return prisonerList.GetAt(containerKey) == akPrisonerRef ; Did it register successfully?
-; endFunction
 
 ;/
     Removes the Actor bound to @akPrisonerRef from its currently bound instance of RPB_Prisoner.
@@ -1945,21 +1824,6 @@ endFunction
 ; ==========================================================
 ;                           States
 ; ==========================================================
-
-;/
-    State that happens when there are prisoners awaiting to be processed for imprisonment
-/;
-; state ProcessQueuedPrisonersForImprisonment
-;     event OnUpdateGameTime()
-;         if (!isProcessingQueuedPrisonersForImprisonment)
-;             self.ProcessImprisonmentForQueuedPrisoners()
-;             isProcessingQueuedPrisonersForImprisonment = true
-;         endif
-
-;         GotoState("")
-;         self.RegisterForSingleUpdateGameTime(5.0)
-;     endEvent
-; endState
 
 ; ==========================================================
 ;                            Debug
