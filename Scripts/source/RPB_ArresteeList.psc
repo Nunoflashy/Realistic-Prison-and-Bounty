@@ -22,7 +22,8 @@ string function GetArresteeID(Actor akActor)
 endFunction
 
 RPB_Arrestee function AtKey(Actor akActor)
-    return parent.GetAt("Arrestee["+ akActor.GetFormID() +"]") as RPB_Arrestee
+    string elementKey = self.GetArresteeID(akActor)
+    return parent.GetAt(elementKey) as RPB_Arrestee
 endFunction
 
 RPB_Arrestee function AtIndex(int aiIndex)
@@ -33,10 +34,14 @@ bool function Exists(RPB_Arrestee apArrestee)
     return self.AtKey(apArrestee.GetActor()) == apArrestee
 endFunction
 
-bool function Add(RPB_Arrestee apArresteeRef)
-    parent.AddAt(apArresteeRef, self.GetArresteeID(apArresteeRef.GetActor()))
+bool function Add(RPB_Arrestee apArrestee)
+    string elementKey = self.GetArresteeID(apArrestee.GetActor())
+    parent.AddAt(apArrestee, elementKey)
 endFunction
 
 function Remove(RPB_Arrestee apArrestee)
-    protected_remove(self.GetArresteeID(apArrestee.GetActor()))
+    string elementKey = self.GetArresteeID(apArrestee.GetActor())
+    protected_remove(elementKey)
+
+    apArrestee.Arrest_RemoveAll()
 endFunction

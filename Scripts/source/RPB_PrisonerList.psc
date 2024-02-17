@@ -22,7 +22,8 @@ string function GetPrisonerID(Actor akActor)
 endFunction
 
 RPB_Prisoner function AtKey(Actor akActor)
-    return parent.GetAt("Prisoner["+ akActor.GetFormID() +"]") as RPB_Prisoner
+    string elementKey = self.GetPrisonerID(akActor)
+    return parent.GetAt(elementKey) as RPB_Prisoner
 endFunction
 
 RPB_Prisoner function AtIndex(int aiIndex)
@@ -39,7 +40,9 @@ bool function Add(RPB_Prisoner apPrisonerRef)
 endFunction
 
 function Remove(RPB_Prisoner apPrisoner)
+    string elementKey = self.GetPrisonerID(apPrisoner.GetActor())
+    protected_remove(elementKey)
+
     apPrisoner.Prison_RemoveAll()
     apPrisoner.Prison_RemoveAll("Arrest")
-    protected_remove(self.GetPrisonerID(apPrisoner.GetActor()))
 endFunction
