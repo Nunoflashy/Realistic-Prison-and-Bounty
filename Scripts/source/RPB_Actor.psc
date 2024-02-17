@@ -281,7 +281,7 @@ endFunction
 function IncrementStat(string statName, int incrementBy = 1)
     ActorVars.IncrementStat(statName, self.GetFaction(), this, incrementBy)
 
-    RPB_Utility.DebugWithArgs("Actor::IncrementStat", "statName: " + statName + ", incrementBy: " + incrementBy, "Incrementing stat")
+    ; RPB_Utility.DebugWithArgs("Actor::IncrementStat", "statName: " + statName + ", incrementBy: " + incrementBy, "Incrementing stat")
 
     if (TrackStats)
         self.OnStatChanged(statName, self.QueryStat(statName))

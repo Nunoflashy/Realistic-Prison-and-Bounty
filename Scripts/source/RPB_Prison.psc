@@ -720,7 +720,7 @@ string function GetTimeOfReleaseFormatted(RPB_Prisoner apPrisoner)
     ; endif
 
 
-    int releaseDateStruct = RPB_Utility.GetDateFromDaysPassed(apPrisoner.DayOfImprisonment, apPrisoner.MonthOfImprisonment, apPrisoner.YearOfImprisonment, int_if (apPrisoner.IsUndeterminedSentence, playerSentence))
+    int releaseDateStruct = RPB_Utility.GetDateFromDaysPassed(apPrisoner.DayOfImprisonment, apPrisoner.MonthOfImprisonment, apPrisoner.YearOfImprisonment, int_if (!apPrisoner.IsUndeterminedSentence, playerSentence))
 
     int release_day      = RPB_Utility.GetStructMemberInt(releaseDateStruct, "day")
     int release_month    = RPB_Utility.GetStructMemberInt(releaseDateStruct, "month")
@@ -761,7 +761,7 @@ string function GetTimeLeftOfSentenceFormatted(RPB_Prisoner apPrisoner)
 endFunction
 
 string function GetSentenceFormatted(RPB_Prisoner apPrisoner)
-    return RPB_Utility.GetTimeFormatted(apPrisoner.Sentence, asNullValue = "No Sentence")
+    return RPB_Utility.GetTimeFormatted(apPrisoner.Sentence, asNullValue = "None")
 endFunction
 
 string function GetTimeServedFormatted(RPB_Prisoner apPrisoner)
@@ -880,20 +880,13 @@ bool function HasMaleOnlyCells()
 endFunction
 
 bool function AssignPrisonerToCell(RPB_Prisoner apPrisoner, RPB_JailCell akJailCell)
-    if (apPrisoner.CellsAttemptedAssigning > self.AvailableJailCells.Length)
-        Error("There were too many attempts assigning a jail cell to prisoner " + apPrisoner.GetName() + ", releasing prisoner...")
-        self.UnregisterPrisoner(apPrisoner)
-        return false    
-    endif
-
     if (!akJailCell.IsAvailable)
         self.OnPrisonerCellAssignFail(apPrisoner, akJailCell)
-        apPrisoner.CellsAttemptedAssigning += 1
-        Debug("Prison::AssignPrisonerToCell", "CellsAttemptedAssigning: " + apPrisoner.CellsAttemptedAssigning)
         return false
     endif
 
     akJailCell.OnPrisonerEnter(apPrisoner)
+    return true
 endFunction
 
 ;/
@@ -1131,7 +1124,6 @@ event OnPrisonerCellAssigned(RPB_Prisoner apPrisoner, RPB_JailCell akJailCell)
 endEvent
 
 event OnPrisonerCellAssignFail(RPB_Prisoner apPrisoner, RPB_JailCell akJailCell)
-    Debug("Prison::OnPrisonerCellAssignFail", "Cells: " + self.JailCells + ", Available Cells: " + self.AvailableJailCells)
     RPB_JailCell availableCell = self.GetRandomAvailableJailCell()
 
     if (availableCell)
@@ -1333,7 +1325,7 @@ function SetupCells()
     while (i < JailCells.Length)
         RPB_JailCell jailCell = JailCells[i] as RPB_JailCell
 
-        if (jailCell == GetFormFromMod(0x3879) || jailCell == Game.GetFormEx(0x36897))
+        ; if (jailCell == GetFormFromMod(0x3879) || jailCell == Game.GetFormEx(0x36897))
             if (!jailCell.IsInitialized())
                 jailCell.Initialize(self)
     
@@ -1353,7 +1345,7 @@ function SetupCells()
     
                 Debug("Prison::SetupCells", jailCell + " Maximum Prisoners: " + jailCell.MaxPrisoners)
             endif
-        endif
+        ; endif
 
 
         i += 1
@@ -1582,6 +1574,16 @@ bool function RegisterPrisoner(RPB_Prisoner apPrisoner)
     Debug("Prison::RegisterPrisoner", "PrisonerList: " + Prisoners.GetKeys())
 
     return Prisoners.Exists(apPrisoner)
+endFunction
+
+function RegisterPrisonerTimeOfImprisonment(RPB_Prisoner apPrisoner)
+    apPrisoner.SetFloat("Time of Imprisonment", RPB_Utility.GetCurrentTime(), "Jail")
+    apPrisoner.SetFloat("Minute of Imprisonment", RPB_Utility.GetCurrentMinute(), "Jail")
+    apPrisoner.SetFloat("Hour of Imprisonment", RPB_Utility.GetCurrentHour(), "Jail")
+    apPrisoner.SetFloat("Day of Imprisonment", RPB_Utility.GetCurrentDay(), "Jail")
+    apPrisoner.SetFloat("Month of Imprisonment", RPB_Utility.GetCurrentMonth(), "Jail")
+    apPrisoner.SetFloat("Year of Imprisonment", RPB_Utility.GetCurrentYear(), "Jail")
+    apPrisoner.SetBool("Imprisoned", true, "Jail")
 endFunction
 
 ;/
@@ -1872,30 +1874,17 @@ string function DEBUG_GetPrisonerSentenceInfo(RPB_Prisoner akPrisoner, bool abSh
 endFunction
 
 function DEBUG_ShowPrisonerSentenceInfo(RPB_Prisoner apPrisoner, bool abShort = false)
+    string sentenceFormatted    = self.GetSentenceFormatted(apPrisoner)
+    string timeServedFormatted  = self.GetTimeServedFormatted(apPrisoner)
+    string timeLeftFormatted    = self.GetTimeLeftOfSentenceFormatted(apPrisoner)
+
     if (abShort)
-        ; Time Served
-        int timeServedDays           = apPrisoner.GetTimeServed("Days")
-        int timeServedHours          = apPrisoner.GetTimeServed("Hours of Day")
-
-        ; Time Left
-        int timeLeftToServeDays      = apPrisoner.GetTimeLeftInSentence("Days")
-        int timeLeftToServeHours     = apPrisoner.GetTimeLeftInSentence("Hours of Day")
-
-        string sentenceString   = "Sentence: " + apPrisoner.Sentence + " Days"
-        string timeServedString = timeServedDays + " Days, " + timeServedHours + " Hours"
-        string timeLeftString   = timeLeftToServeDays + " Days, " + timeLeftToServeHours + " Hours"
-        
-        Info(self.Hold + " Sentence for " + apPrisoner.GetActor() + ": {"+ sentenceString +", (Served: "+ timeServedString +"), (Left: "+ timeLeftString +")} (Cell: " + apPrisoner.JailCell + ", Door: " + apPrisoner.JailCell.CellDoor + ")")
-        ; Info("ShowSentenceInfo", self.Hold + " Sentence for " + apPrisoner.GetActor() + ": {"+ sentenceString +", Served: "+ timeServedString +", Left: "+ timeLeftString +"} (Cell: " + apPrisoner.Prison_GetReference("Cell") + ", Door: " + apPrisoner.Prison_GetReference("Cell Door") + ")")
+        LogNoType(apPrisoner.GetName() + " in " + self.Name + " ("+ apPrisoner.JailCell.Identifier +"): { "+ "Sentence: " + sentenceFormatted + " | Time Served: " + timeServedFormatted + string_if (!apPrisoner.IsUndeterminedSentence, " | Time Left: " + timeLeftFormatted) +" }")
     else
-        string sentenceFormatted    = self.GetSentenceFormatted(apPrisoner)
-        string timeServedFormatted  = self.GetTimeServedFormatted(apPrisoner)
-        string timeLeftFormatted    = self.GetTimeLeftOfSentenceFormatted(apPrisoner)
-
         string minSentence = RPB_Utility.GetTimeFormatted(MinimumSentence)
         string maxSentence = RPB_Utility.GetTimeFormatted(MaximumSentence)
 
-        LogNoType("\n" + "Prisoner in "+ self.Name +": { \n\t" + \
+        LogNoType("\n" + "Prisoner in "+ self.Name + " ("+ apPrisoner.JailCell.Identifier +")" +": { \n\t" + \
             "Prisoner: "            + "(Name: " + apPrisoner.GetName() + ", Prisoner Reference: " + apPrisoner +  ", Actor Reference: " + apPrisoner.GetActor() + ")" + ", \n\t" + \
             "Minimum Sentence: "    + MinimumSentence + " Days" + " ("+ minSentence +"), \n\t" + \
             "Maximum Sentence: "    + MaximumSentence + " Days" + " ("+ maxSentence +"), \n\t" + \
@@ -1906,17 +1895,5 @@ function DEBUG_ShowPrisonerSentenceInfo(RPB_Prisoner apPrisoner, bool abShort = 
             "Time Left: "           + string_if (!apPrisoner.IsUndeterminedSentence, apPrisoner.TimeLeftInSentence + " ("+ timeLeftFormatted + ")", "Not Available") + ", \n\t" + \
             "Release Time: "        + string_if (!apPrisoner.IsUndeterminedSentence, apPrisoner.ReleaseTime + " ("+ timeLeftFormatted +" from now)", "Never") + "\n\t" + \
         " }")
-
-        ; Info("\n" + Hold + " Sentence: { \n\t" + \
-        ;     "Prisoner: "            + "(Name: " + apPrisoner.GetName() + ", Prisoner Reference: " + apPrisoner +  ", Actor Reference: " + apPrisoner.GetActor() + ")" + "\n\t" + \
-        ;     "Minimum Sentence: "    + MinimumSentence + " Days, \n\t" + \
-        ;     "Maximum Sentence: "    + MaximumSentence + " Days, \n\t" + \
-        ;     "Sentence: "            + string_if (!apPrisoner.IsUndeterminedSentence, apPrisoner.Sentence + " Days", "Not Available") + ", \n\t" + \
-        ;     "Time of Arrest: "      + string_if (apPrisoner.TimeOfArrest, apPrisoner.TimeOfArrest, "None") + ", \n\t" + \
-        ;     "Time of Imprisonment: "+ string_if (apPrisoner.TimeOfImprisonment, apPrisoner.TimeOfImprisonment, "None") + ", \n\t" + \
-        ;     "Time Served: "         + apPrisoner.TimeServed + " ("+ (apPrisoner.TimeServed * 24) + " Hours" +") ["+ timeServedDays + " Days, " + timeServedHours + " Hours, " +  timeServedMinutes + " Minutes, " + timeServedSeconds + " Seconds" +"], \n\t" + \
-        ;     "Time Left: "           + string_if (!(apPrisoner.IsUndeterminedSentence), apPrisoner.TimeLeftInSentence + " ("+ (apPrisoner.TimeLeftInSentence * 24) + " Hours" +") ["+ timeLeftToServeDays + " Days, " + timeLeftToServeHours + " Hours, " +  timeLeftToServeMinutes + " Minutes, " + timeLeftToServeSeconds + " Seconds" +"]", "Undetermined") + "," + "\n\t" + \
-        ;     "Release Time: "        + string_if (!apPrisoner.IsUndeterminedSentence, apPrisoner.ReleaseTime + " (" + self.GetTimeLeftOfSentenceFormatted(apPrisoner), "None") + " from now)" + "\n\t" + \
-        ; " }")
     endif
 endFunction

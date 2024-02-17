@@ -297,6 +297,16 @@ function Test_Imprisonment_In_Cell_Should_Not_Allow_Overcrowding() global
     playerPrisonerRef.MoveToCell()
     npcPrisonerRef.MoveToCell()
 
+    playerPrisonerRef.ShowReleaseTime          = true
+    playerPrisonerRef.ShowSentence             = true
+    playerPrisonerRef.ShowTimeServed           = true
+    playerPrisonerRef.ShowTimeLeftInSentence   = true
+
+    npcPrisonerRef.ShowReleaseTime          = true
+    npcPrisonerRef.ShowSentence             = true
+    npcPrisonerRef.ShowTimeServed           = true
+    npcPrisonerRef.ShowTimeLeftInSentence   = true
+
     int cellMaxPrisoners    = selectedCell.MaxPrisoners
     int prisonersInCell     = selectedCell.PrisonerCount
 

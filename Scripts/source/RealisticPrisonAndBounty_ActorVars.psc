@@ -127,20 +127,11 @@ endFunction
 
 function IncrementStat(string statName, Faction akFaction, Actor akActor, int incrementBy = 1)
     string statKey = "["+ akActor.GetFormID() +"]" + akFaction.GetName() + "::" + statName
-    ; if (!self.Exists(statKey))
-    ;     Error(self, "ActorVars::IncrementStat", "The stat: " + statKey + " does not exist.")
-    ;     return
-    ; endif
     self.Set(statKey, self.Get(statKey) + incrementBy)
-    RPB_Utility.DebugWithArgs("ActorVars::IncrementStat", "statName: " + statName + ", akFaction: " + akFaction + ", akActor: " + akActor + ", incrementBy: " + incrementBy, "Incrementing stat")
 endFunction
 
 function DecrementStat(string statName, Faction akFaction, Actor akActor, int decrementBy = 1)
     string statKey = "["+ akActor.GetFormID() +"]" + akFaction.GetName() + "::" + statName
-    ; if (!self.Exists(statKey))
-    ;     Error(self, "ActorVars::DecrementStat", "The stat: " + statKey + " does not exist.")
-    ;     return
-    ; endif
     self.Set(statKey, self.Get(statKey) - decrementBy)
 endFunction
 

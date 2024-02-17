@@ -50,6 +50,12 @@ RPB_CellDoor property CellDoor
     endFunction
 endProperty
 
+string property Identifier
+    string function get()
+        return self.GetRootPropertyOfTypeString("Identifier")
+    endFunction
+endProperty
+
 RPB_JailCell property ParentInteriorMarker
     RPB_JailCell function get()
         return self

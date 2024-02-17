@@ -73,6 +73,7 @@
           "typeName": "JFormMap"
         },
         "__formData|Skyrim.esm|0x36897": {
+          "Identifier": "Cell 01",
           "Main Interior": "__formData|Skyrim.esm|0x36897",
           "Active": true,
           "String List": ["First Item", "Second Item"],
@@ -119,6 +120,7 @@
           "Interior": []
         },
         "__formData|RealisticPrisonAndBounty.esp|0x3879": {
+          "Identifier": "Cell 03",
           "Main Interior": "__formData|RealisticPrisonAndBounty.esp|0x3879",
           "Main Exterior": null,
           "Active": true,
@@ -164,8 +166,10 @@
           "Interior": []
         },
         "__formData|RealisticPrisonAndBounty.esp|0x3880": {
+          "Identifier": "Cell 02",
           "Main Interior": "__formData|RealisticPrisonAndBounty.esp|0x3880",
           "Main Exterior": null,
+          "Active": true,
           "Objects": {
             "Beds": [],
             "Containers": [],
@@ -181,6 +185,27 @@
               "Iterations": 5
             }
           },
+          "Cell Doors": {
+            "__metaInfo": {
+              "typeName": "JFormMap"
+            },
+            "__formData|Skyrim.esm|0x5E920": {
+              "Lock": {
+                "Level": "Requires Key",
+                "Decay Options": {
+                  "Min. Lock Level": "Adept",
+                  "Wear Thresholds": {
+                    "Requires Key": 2,
+                    "Master": 100,
+                    "Expert": 200,
+                    "Adept": 60,
+                    "Apprentice": 150,
+                    "Novice": 700
+                  }
+                }
+              }
+            }
+          },
           "Exterior": [
             "__formData|RealisticPrisonAndBounty.esp|0x1DDD3",
             "__formData|RealisticPrisonAndBounty.esp|0x1DDD4",
@@ -189,8 +214,31 @@
           "Interior": []
         },
         "__formData|RealisticPrisonAndBounty.esp|0x3881": {
+          "Identifier": "Cell 04",
           "Main Interior": "__formData|RealisticPrisonAndBounty.esp|0x3881",
           "Main Exterior": null,
+          "Active": true,
+          "Cell Doors": {
+            "__metaInfo": {
+              "typeName": "JFormMap"
+            },
+            "__formData|Skyrim.esm|0x5E91E": {
+              "Lock": {
+                "Level": "Requires Key",
+                "Decay Options": {
+                  "Min. Lock Level": "Adept",
+                  "Wear Thresholds": {
+                    "Requires Key": 2,
+                    "Master": 100,
+                    "Expert": 200,
+                    "Adept": 60,
+                    "Apprentice": 150,
+                    "Novice": 700
+                  }
+                }
+              }
+            }
+          },
           "Exterior": [
             "__formData|RealisticPrisonAndBounty.esp|0x1DDD9",
             "__formData|RealisticPrisonAndBounty.esp|0x1DDDA",

@@ -590,7 +590,7 @@ function Imprison()
         self.ProcessWhenMoved() ; Only use when moved, not when escorted (Handle all events at once)
     endif
 
-    self.SetTimeOfImprisonment()
+    self.RegisterTimeOfImprisonment()
     self.DetermineReleaseTimeAdditionalHours() ; For Release Time (Minimum, Maximum) intervals
 
     string sentenceFormatted    = RPB_Utility.GetTimeFormatted(Sentence, abIncludeHours = false)
@@ -606,6 +606,7 @@ function Imprison()
         Config.NotifyJail(self.GetName() + "'s release is due on " + releaseDateFormatted, !self.IsPlayer())
     endif
 
+    Prison_SetBool("Imprisoned", true)
     GotoState("Imprisoned") ; State when the prisoner is in the cell, check for updates for sentence, etc...
     RegisterForUpdateGameTime(1.0)
     EndBenchmark(startBench, "Ended Prisoner::Imprison")
@@ -817,14 +818,13 @@ int property ReleaseMinute
 endProperty
 
 
-function SetTimeOfImprisonment()
-    Prison_SetFloat("Time of Imprisonment", CurrentTime) ; Set the time of imprisonment
+function RegisterTimeOfImprisonment()
+    Prison_SetFloat("Time of Imprisonment", CurrentTime)
     Prison_SetInt("Minute of Imprisonment", RPB_Utility.GetCurrentMinute())
     Prison_SetInt("Hour of Imprisonment", RPB_Utility.GetCurrentHour())
     Prison_SetInt("Day of Imprisonment", RPB_Utility.GetCurrentDay())
     Prison_SetInt("Month of Imprisonment", RPB_Utility.GetCurrentMonth())
     Prison_SetInt("Year of Imprisonment", RPB_Utility.GetCurrentYear())
-    Prison_SetBool("Imprisoned", true)
 endFunction
 
 int function GetReleaseTimeHour()
@@ -994,7 +994,7 @@ state Imprisoned
         endif
 
         ; DEBUG_ShowPrisonInfo()
-        Prison.DEBUG_ShowPrisonerSentenceInfo(self)
+        Prison.DEBUG_ShowPrisonerSentenceInfo(self, true)
         ; DEBUG_ShowSentenceInfo()
 
         self.RegisterLastUpdate()
