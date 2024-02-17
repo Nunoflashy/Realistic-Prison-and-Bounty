@@ -22,6 +22,10 @@ RPB_PrisonManager function GetPrisonManager() global
     return GetFormFromMod(0x1B825) as RPB_PrisonManager
 endFunction
 
+RealisticPrisonAndBounty_SceneManager function GetSceneManager() global
+    return GetFormFromMod(0xC9F5) as RealisticPrisonAndBounty_SceneManager
+endFunction
+
 string function GetPluginName() global
     return "RealisticPrisonAndBounty.esp"
 endFunction

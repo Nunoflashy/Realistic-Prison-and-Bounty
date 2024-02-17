@@ -1,8 +1,8 @@
 scriptname RPB_JailCell extends ObjectReference
 
 import Math
-import RealisticPrisonAndBounty_Util
 import RealisticPrisonAndBounty_Config
+import RPB_Utility
 
 ; ==========================================================
 ;                     Script References
@@ -43,7 +43,7 @@ RPB_CellDoor __cellDoor
 RPB_CellDoor property CellDoor
     RPB_CellDoor function get()
         if (!__cellDoor)
-            ErrorProperty("["+ self +"] JailCell::CellDoor", "CellDoor is null, this may result in undefined behavior!")
+            ErrorProperty("["+ self +"] JailCell::CellDoor", "Cell Door for Cell "+ self +" is null, this may result in undefined behavior!")
         endif
 
         return __cellDoor
@@ -84,9 +84,10 @@ endProperty
 
 ; The prisoners living in this cell
 RPB_Prisoner[] __prisoners
-RPB_Prisoner[] property Prisoners
-    RPB_Prisoner[] function get()
-        return self.GetPrisoners()
+Form[] property Prisoners
+    Form[] function get()
+        return JArray.asFormArray(JMap.allValues(__prisonersInCell))
+        ; return self.GetPrisoners()
     endFunction
 endProperty
 
@@ -193,7 +194,7 @@ endProperty
 
 bool property IsGenderExclusive
     bool function get()
-        return __isMaleOnly || __isFemaleOnly
+        return IsMaleOnly || IsFemaleOnly
     endFunction
 endProperty
 
@@ -270,7 +271,7 @@ int property MaxPrisoners
         int configOption = self.GetOptionOfTypeInt("Maximum Prisoners")
 
         if (configOption)
-            LogProperty(none, "JailCell::MaxPrisoners", "Property is retrieved from data file, make sure the value is supposed to be changing!")
+            LogProperty("JailCell::MaxPrisoners", "Property is retrieved from data file, make sure the value is supposed to be changing!")
         endif
 
         __maxPrisoners = value
@@ -300,16 +301,16 @@ function DetermineMarkers()
     Form[] interiorChildMarkers = RPB_Data.JailCell_GetChildren(Prison.GetDataObject("Cells"), self, "Interior")
     Form[] exteriorChildMarkers = RPB_Data.JailCell_GetChildren(Prison.GetDataObject("Cells"), self, "Exterior")
 
-    Debug(none, "[Prison: "+ self.Prison.City +"] JailCell::DetermineMarkers", "Cell: " + self + ", Main Marker: " + RPB_Data.JailCell_GetMainMarker(Prison.GetDataObject("Cells"), self))
-    Debug(none, "[Prison: "+ self.Prison.City +"] JailCell::DetermineMarkers", "Cell: " + self + ", interiorChildMarkers: " + interiorChildMarkers)
-    Debug(none, "[Prison: "+ self.Prison.City +"] JailCell::DetermineMarkers", "Cell: " + self + ", exteriorChildMarkers: " + exteriorChildMarkers)
+    Debug("[Prison: "+ self.Prison.City +"] JailCell::DetermineMarkers", "Cell: " + self + ", Main Marker: " + RPB_Data.JailCell_GetMainMarker(Prison.GetDataObject("Cells"), self))
+    Debug("[Prison: "+ self.Prison.City +"] JailCell::DetermineMarkers", "Cell: " + self + ", interiorChildMarkers: " + interiorChildMarkers)
+    Debug("[Prison: "+ self.Prison.City +"] JailCell::DetermineMarkers", "Cell: " + self + ", exteriorChildMarkers: " + exteriorChildMarkers)
 
     ; Convert to JArray
     int arrayInteriorChildMarkers = JArray.objectWithForms(interiorChildMarkers)
     int arrayExteriorChildMarkers = JArray.objectWithForms(exteriorChildMarkers)
 
-    ; Debug(none, "[Prison: "+ self.Prison.City +"] JailCell::DetermineMarkers", "arrayInteriorChildMarkers: " + GetContainerList(arrayInteriorChildMarkers))
-    ; Debug(none, "[Prison: "+ self.Prison.City +"] JailCell::DetermineMarkers", "arrayExteriorChildMarkers: " + GetContainerList(arrayExteriorChildMarkers))
+    ; Debug("[Prison: "+ self.Prison.City +"] JailCell::DetermineMarkers", "arrayInteriorChildMarkers: " + GetContainerList(arrayInteriorChildMarkers))
+    ; Debug("[Prison: "+ self.Prison.City +"] JailCell::DetermineMarkers", "arrayExteriorChildMarkers: " + GetContainerList(arrayExteriorChildMarkers))
 
     int arrayAllInteriorMarkers = JArray.object()
     int arrayAllExteriorMarkers = JArray.object()
@@ -321,15 +322,15 @@ function DetermineMarkers()
     JArray.addFromArray(arrayAllInteriorMarkers, arrayInteriorChildMarkers)
     JArray.addFromArray(arrayAllExteriorMarkers, arrayExteriorChildMarkers)
 
-    ; Debug(none, "[Prison: "+ self.Prison.City +"] JailCell::DetermineMarkers", "arrayAllInteriorMarkers: " + GetContainerList(arrayAllInteriorMarkers))
-    ; Debug(none, "[Prison: "+ self.Prison.City +"] JailCell::DetermineMarkers", "arrayAllExteriorMarkers: " + GetContainerList(arrayAllExteriorMarkers))
+    ; Debug("[Prison: "+ self.Prison.City +"] JailCell::DetermineMarkers", "arrayAllInteriorMarkers: " + GetContainerList(arrayAllInteriorMarkers))
+    ; Debug("[Prison: "+ self.Prison.City +"] JailCell::DetermineMarkers", "arrayAllExteriorMarkers: " + GetContainerList(arrayAllExteriorMarkers))
 
     ; Set properties
     __interiorMarkers       = JArray.asFormArray(arrayAllInteriorMarkers)
     __exteriorMarkers       = JArray.asFormArray(arrayAllExteriorMarkers)
     
-    Debug(none, "[Prison: "+ self.Prison.City +"] JailCell::DetermineMarkers", "InteriorMarkers: " + InteriorMarkers)
-    Debug(none, "[Prison: "+ self.Prison.City +"] JailCell::DetermineMarkers", "ExteriorMarkers: " + ExteriorMarkers)
+    Debug("[Prison: "+ self.Prison.City +"] JailCell::DetermineMarkers", "InteriorMarkers: " + InteriorMarkers)
+    Debug("[Prison: "+ self.Prison.City +"] JailCell::DetermineMarkers", "ExteriorMarkers: " + ExteriorMarkers)
 endFunction
 
 ; =========================================================
@@ -385,11 +386,11 @@ function ScanCellDoor(bool abForceAssignment = false)
     if (_cellDoor)
         ; Bind the cell door to the jail cell
         self.BindCellDoor(_cellDoor)
-        Debug(self, "["+ self +"] JailCell::ScanCellDoor", "Could not find a configured cell door, scanning for the nearest one!")
+        Debug("["+ self +"] JailCell::ScanCellDoor", "Could not find a configured cell door, scanning for the nearest one!")
         return
     endif
 
-    Error(self, "["+ self +"] JailCell::ScanCellDoor", "Could not assign a cell door to this jail cell!")
+    Error("["+ self +"] JailCell::ScanCellDoor", "Could not assign a cell door to this jail cell!")
 endFunction
 
 ; Unreliable, since it can scan beds from other cells that are near one of the scanned beds in this cell. (this is because beds are not in the same place on all the cells, and the radius of the scan will get other beds from other cells.)
@@ -400,7 +401,7 @@ function ScanBeds()
     Form bedRollHay01 = Game.GetFormEx(0x1899D)
     FormList RPB_BedFormList = GetFormFromMod(0x1CDAA) as FormList
 
-    Debug(self, "[Prison: "+ self.Prison.City +"] JailCell::ScanBeds", "Scan Iterations: " + self.ScanIterations + ", Cell Radius: " + self.CellRadius)
+    Debug("[Prison: "+ self.Prison.City +"] JailCell::ScanBeds", "Scan Iterations: " + self.ScanIterations + ", Cell Radius: " + self.CellRadius)
 
 
     int i = 0
@@ -411,7 +412,7 @@ function ScanBeds()
             ; self.MaxPrisoners += 1
             JMap.setForm(bedExclusions, scannedBed.GetFormID(), scannedBed)
             JArray.addForm(bedsScanned, scannedBed) ; Add the bed to this local array
-            Debug(self, "[Prison: "+ self.Prison.City +"] JailCell::ScanBeds", "Scanned " + scannedBed + " (Name: "+ scannedBed.GetBaseObject().GetName() +") Bed in " + self + ", Max Prisoners for this Cell: " + self.MaxPrisoners)
+            Debug("[Prison: "+ self.Prison.City +"] JailCell::ScanBeds", "Scanned " + scannedBed + " (Name: "+ scannedBed.GetBaseObject().GetName() +") Bed in " + self + ", Max Prisoners for this Cell: " + self.MaxPrisoners)
         endif
         i += 1
     endWhile
@@ -423,7 +424,7 @@ function ScanBeds()
         self.MaxPrisoners = JValue.count(bedsScanned)
     endif
 
-    Debug(self, "[Prison: "+ self.Prison.City +"] JailCell::ScanBeds", "Beds in " + self + ": " + self.Beds)
+    Debug("[Prison: "+ self.Prison.City +"] JailCell::ScanBeds", "Beds in " + self + ": " + self.Beds)
 endFunction
 
 function ScanContainers()
@@ -438,7 +439,7 @@ function ScanContainers()
         if (scannedContainer && !containerExistsInList)
             JMap.setForm(containersAlreadyAdded, scannedContainer.GetFormID(), scannedContainer)
             JArray.addForm(containersScanned, scannedContainer)
-            Debug(self, "[Prison: "+ self.Prison.City +"] JailCell::ScanContainers", "Scanned " + scannedContainer + " (Name: "+ scannedContainer.GetBaseObject().GetName() +") container in " + self)
+            Debug("[Prison: "+ self.Prison.City +"] JailCell::ScanContainers", "Scanned " + scannedContainer + " (Name: "+ scannedContainer.GetBaseObject().GetName() +") container in " + self)
         endif
         i += 1
     endWhile
@@ -448,7 +449,7 @@ function ScanContainers()
         __scannedContainers = true
     endif
 
-    Debug(self, "[Prison: "+ self.Prison.City +"] JailCell::ScanContainers", "Containers in " + self + ": " + self.Containers + " Containers.Length: " + self.Containers.Length)
+    Debug("[Prison: "+ self.Prison.City +"] JailCell::ScanContainers", "Containers in " + self + ": " + self.Containers + " Containers.Length: " + self.Containers.Length)
 endFunction
 
 function ScanMiscProps()
@@ -463,7 +464,7 @@ function ScanMiscProps()
         if (scannedProp && !propExistsInList)
             JMap.setForm(propsAlreadyAdded, scannedProp.GetFormID(), scannedProp)
             JArray.addForm(propsScanned, scannedProp)
-            Debug(self, "[Prison: "+ self.Prison.City +"] JailCell::ScanMiscProps", "Scanned " + scannedProp + " (Name: "+ scannedProp.GetBaseObject().GetName() +") prop in " + self)
+            Debug("[Prison: "+ self.Prison.City +"] JailCell::ScanMiscProps", "Scanned " + scannedProp + " (Name: "+ scannedProp.GetBaseObject().GetName() +") prop in " + self)
         endif
         i += 1
     endWhile
@@ -473,7 +474,7 @@ function ScanMiscProps()
         __scannedOtherProps = true
     endif
 
-    Debug(self, "[Prison: "+ self.Prison.City +"] JailCell::ScanMiscProps", "Props in " + self + ": " + self.OtherProps)
+    Debug("[Prison: "+ self.Prison.City +"] JailCell::ScanMiscProps", "Props in " + self + ": " + self.OtherProps)
 endFunction
 
 ObjectReference function GetRandomMarker(string asInteriorOrExterior = "Interior")
@@ -534,7 +535,7 @@ event OnPrisonerEnter(RPB_Prisoner akPrisoner)
     self.RegisterPrisoner(akPrisoner)
     self.DetermineCellParameters()
 
-    Debug(self, "JailCell::OnPrisonerEnter", "Cell Properties: " + self.DEBUG_GetCellProperties())
+    Debug("JailCell::OnPrisonerEnter", "Cell Properties: " + self.DEBUG_GetCellProperties())
 endEvent
 
 ; Happens when the prisoner leaves this cell (when they are removed)
@@ -542,7 +543,7 @@ event OnPrisonerLeave(RPB_Prisoner akPrisoner)
     ; self.UnregisterPrisoner(akPrisoner)
     self.DetermineCellParameters()
 
-    Debug(self, "JailCell::OnPrisonerLeave", "Cell Properties: " + self.DEBUG_GetCellProperties())
+    Debug("JailCell::OnPrisonerLeave", "Cell Properties: " + self.DEBUG_GetCellProperties())
 endEvent
 
 ; =========================================================
@@ -578,7 +579,7 @@ bool function ShouldPerformScan(string asScanTarget)
         return !self.HasObjects("Props")
     endif
 
-    Error(none, "JailCell::ShouldPerformScan", "Unable to perform scan for the jail cell, the scan target " + asScanTarget + " is invalid!")
+    Error("JailCell::ShouldPerformScan", "Unable to perform scan for the jail cell, the scan target " + asScanTarget + " is invalid!")
     return false
 endFunction
 
@@ -602,14 +603,14 @@ function Initialize(RPB_Prison apPrison)
     self.BindPrison(apPrison)
 
     ; int cellObj = self.GetDataObject()
-    ; Debug(self, "["+ self +"] JailCell::Initialize", "Jail Cell Config: " + GetContainerList(cellObj))
+    ; Debug("["+ self +"] JailCell::Initialize", "Jail Cell Config: " + GetContainerList(cellObj))
 
     string[] stringList = self.GetRootPropertyOfTypeStringArray("String List")
-    Debug(none, "JailCell::Initialize", "String List: " + stringList)
+    Debug("JailCell::Initialize", "String List: " + stringList)
 
     ; RPB_CellDoor configuredCellDoor = self.GetRootPropertyOfTypeForm("Cell Door") as RPB_CellDoor
     RPB_CellDoor configuredCellDoor = self.GetRootPropertyOfTypeFormArray("Cell Doors")[0] as RPB_CellDoor ; Index is temporary, for now only use 1st cell door
-    Debug(none, "JailCell::Initialize", "configuredCellDoor: " + configuredCellDoor)
+    Debug("JailCell::Initialize", "configuredCellDoor: " + configuredCellDoor)
 
 
     if (configuredCellDoor)
@@ -625,7 +626,7 @@ function BindPrison(RPB_Prison akPrison)
     __prison = akPrison
 
     if (!self.Prison)
-        Debug(self, "["+ self +"] JailCell::BindPrison", "Could not bind the jail cell " + self + " to the Prison " + akPrison)
+        Debug("["+ self +"] JailCell::BindPrison", "Could not bind the jail cell " + self + " to the Prison " + akPrison)
         return
     endif
 endFunction
@@ -639,6 +640,8 @@ function BindCellDoor(RPB_CellDoor akCellDoor)
 
     ; Initialize the cell door properties
     akCellDoor.Initialize()
+
+    Error("Could not bind cell door to the jail cell " + self, (!self.CellDoor && self.CellDoor != akCellDoor))
 endFunction
 
 ;/
@@ -646,19 +649,22 @@ endFunction
     the value is stored as:
     Cell[FormID] = 0x14
 /;
-function RegisterPrisoner(RPB_Prisoner akPrisoner)
+function RegisterPrisoner(RPB_Prisoner apPrisoner)
     if (!__prisonersInCell)
         __prisonersInCell = JMap.object()
         JValue.retain(__prisonersInCell)
     endif
 
-    ; Helper.IntMap_SetForm(self.GetIdentifier(), akPrisoner.GetIdentifier(), akPrisoner.GetActor())
-    JMap.setForm(__prisonersInCell, akPrisoner.GetIdentifier(), akPrisoner.GetActor())
-    ; MiscVars.SetString("Cell[" + self.GetFormID() + "]", akPrisoner.GetIdentifier(), "Prison/Cells")
+    ; Helper.IntMap_SetForm(self.GetIdentifier(), apPrisoner.GetIdentifier(), apPrisoner.GetActor())
+    JMap.setForm(__prisonersInCell, apPrisoner.GetIdentifier(), apPrisoner.GetActor())
+    ; MiscVars.SetString("Cell[" + self.GetFormID() + "]", apPrisoner.GetIdentifier(), "Prison/Cells")
+
+    ; Pass the reference to the Prisoner
+    apPrisoner.SetForm("Cell", self, "Jail")
 endFunction
 
-function UnregisterPrisoner(RPB_Prisoner akPrisoner)
-    JMap.removeKey(__prisonersInCell, akPrisoner.GetIdentifier())
+function UnregisterPrisoner(RPB_Prisoner apPrisoner)
+    JMap.removeKey(__prisonersInCell, apPrisoner.GetIdentifier())
 endFunction
 
 function DetermineCellParameters()

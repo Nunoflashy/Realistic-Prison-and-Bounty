@@ -1,6 +1,6 @@
 Scriptname RPB_MCM_Sentence hidden
 
-import RealisticPrisonAndBounty_Util
+import RPB_Utility
 import RPB_MCM
 
 bool function ShouldHandleEvent(RPB_MCM mcm) global
@@ -20,8 +20,6 @@ function Render(RPB_MCM mcm) global
     RPB_Prison playerPrison = RPB_Prison.GetPrisonForHold("Haafingar")
     RPB_Prisoner player = playerPrison.GetPrisonerReference(mcm.Config.Player)
 
-    RPB_Utility.Debug("MCM::Sentence::Right", "playerPrison: " + playerPrison.City + ", Prisoners: " + playerPrison.Prisoners.GetKeys())
-    
     if (!player || !player.IsImprisoned)
         return
     endif
@@ -31,37 +29,37 @@ function Render(RPB_MCM mcm) global
     string imprisonmentTimeFormatted            = playerPrison.GetTimeOfImprisonmentFormatted(player)
     string timeElapsedSinceArrest               = playerPrison.GetTimeElapsedSinceArrest(player)
     string timeElapsedSinceImprisonment         = playerPrison.GetTimeElapsedSinceImprisonment(player)
-
-    float x = StartBenchmark()
+    string timeLeftFormatted                    = playerPrison.GetTimeLeftOfSentenceFormatted(player)
     string releaseTimeFormatted                 = playerPrison.GetTimeOfReleaseFormatted(player)
-    float xBenchmark = EndBenchmark(x, "New Algorithm")
 
-
-    string timeLeftFormatted = playerPrison.GetTimeLeftOfSentenceFormatted(player)
-
-    mcm.AddOptionText("\t\t\t\tCurrent Time", defaultFlags = mcm.OPTION_DISABLED)
     mcm.AddOptionText("", currentTimeFormatted, defaultFlags = mcm.OPTION_DISABLED)
+    mcm.AddOptionCategory("", flags = mcm.OPTION_DISABLED)
     mcm.AddEmptyOption()
 
-    mcm.AddOptionText("\t\t\t\tTime of Arrest", defaultFlags = mcm.OPTION_DISABLED)
-    mcm.AddOptionText("", arrestTimeFormatted, defaultFlags = mcm.OPTION_DISABLED)
-    if (timeElapsedSinceArrest)
-        mcm.AddOptionText("", timeElapsedSinceArrest + " Ago", defaultFlags = mcm.OPTION_DISABLED)
+    if (player.TimeOfArrest)
+        mcm.AddOptionText("\t\t\t\tTime of Arrest", defaultFlags = mcm.OPTION_DISABLED)
+        mcm.AddOptionText("", arrestTimeFormatted, defaultFlags = mcm.OPTION_DISABLED)
+        if (timeElapsedSinceArrest)
+            mcm.AddOptionText("", timeElapsedSinceArrest + " Ago", defaultFlags = mcm.OPTION_DISABLED)
+        endif
+        mcm.AddEmptyOption()
     endif
-    mcm.AddEmptyOption()
 
-    mcm.AddOptionText("\t\t\t\tTime of Imprisonment", defaultFlags = mcm.OPTION_DISABLED)
-    mcm.AddOptionText("", imprisonmentTimeFormatted, defaultFlags = mcm.OPTION_DISABLED)
-    if (timeElapsedSinceImprisonment)
-        mcm.AddOptionText("", timeElapsedSinceImprisonment + " Ago", defaultFlags = mcm.OPTION_DISABLED)
+    if (player.TimeOfImprisonment)
+        mcm.AddOptionText("\t\t\t\tTime of Imprisonment", defaultFlags = mcm.OPTION_DISABLED)
+        mcm.AddOptionText("", imprisonmentTimeFormatted, defaultFlags = mcm.OPTION_DISABLED)
+        if (timeElapsedSinceImprisonment)
+            mcm.AddOptionText("", timeElapsedSinceImprisonment + " Ago", defaultFlags = mcm.OPTION_DISABLED)
+        endif
+        mcm.AddEmptyOption()
     endif
-    mcm.AddEmptyOption()
 
-    mcm.AddOptionText("\t\t\t\tTime of Release", defaultFlags = mcm.OPTION_DISABLED)
-    mcm.AddOptionText("", releaseTimeFormatted, defaultFlags = mcm.OPTION_DISABLED)
-    mcm.AddOptionText("", timeLeftFormatted + " from Now", defaultFlags = mcm.OPTION_DISABLED)
-    mcm.AddOptionText("", "Execution Time: " + (xBenchmark * 1000) + " ms", defaultFlags = mcm.OPTION_DISABLED)
-
+    if (player.ShowReleaseTime && !player.IsUndeterminedSentence)
+        mcm.AddOptionText("\t\t\t\tTime of Release", defaultFlags = mcm.OPTION_DISABLED)
+        mcm.AddOptionText("", releaseTimeFormatted, defaultFlags = mcm.OPTION_DISABLED)
+        mcm.AddOptionText("", timeLeftFormatted + " from Now", defaultFlags = mcm.OPTION_DISABLED)
+        ; mcm.AddOptionText("", "Execution Time: " + xBenchmark + " ms", defaultFlags = mcm.OPTION_DISABLED)
+    endif
 
 ;     if (player.IsReleaseOnWeekend())
 ;         mcm.AddOptionText("Release rounded to Morndas.", defaultFlags = mcm.OPTION_DISABLED)
@@ -85,29 +83,44 @@ function Render(RPB_MCM mcm) global
     string currentMonth    = RPB_Utility.GetMonthName(RPB_Utility.GetCurrentMonth())
     string currentYear     = "4E " + RPB_Utility.GetCurrentYear()
 
-    mcm.AddOptionText("Hold", "Haafingar", defaultFlags = mcm.OPTION_DISABLED)
-    mcm.AddOptionText("City", "Solitude", defaultFlags = mcm.OPTION_DISABLED)
-    mcm.AddOptionText("Prison Location", "Castle Dour Dungeon", defaultFlags = mcm.OPTION_DISABLED)
-    
+    string prisonHold   = player.Prison.Hold
+    string prisonCity   = player.Prison.City
+    string prisonName   = player.Prison.Name
+    mcm.AddOptionText("", prisonHold + " | " + prisonCity + " | " + prisonName, defaultFlags = mcm.OPTION_DISABLED)
+    mcm.AddOptionCategory("", flags = mcm.OPTION_DISABLED)
     mcm.AddEmptyOption()
+
+    ; mcm.AddOptionText("Hold", "Haafingar", defaultFlags = mcm.OPTION_DISABLED)
+    ; mcm.AddOptionText("City", "Solitude", defaultFlags = mcm.OPTION_DISABLED)
+    ; mcm.AddOptionText("Prison Location", "Castle Dour Dungeon", defaultFlags = mcm.OPTION_DISABLED)
     
-    mcm.AddOptionText("Bounty for Arrest", player.BountyNonViolent + " Bounty" + string_if (player.BountyViolent > 0, " / " + player.BountyViolent + " Violent Bounty", ""), defaultFlags = mcm.OPTION_DISABLED)
+    if (player.Bounty && player.ShowBounty)
+        mcm.AddOptionText("Bounty for Arrest", player.BountyNonViolent + " Bounty" + string_if (player.BountyViolent > 0, " / " + player.BountyViolent + " Violent Bounty", ""), defaultFlags = mcm.OPTION_DISABLED)
+    endif
 
     if (player.Captor)
         mcm.AddOptionText("Captured By", player.Captor.GetBaseObject().GetName(), defaultFlags = mcm.OPTION_DISABLED)
     endif
-    mcm.AddEmptyOption()
 
-    ; mcm.AddOptionText("Sentence", math.floor(player.Sentence) + " Days", defaultFlags = mcm.OPTION_DISABLED)
-    mcm.AddOptionText("Sentence", sentenceFormatted, defaultFlags = mcm.OPTION_DISABLED)
-    mcm.AddOptionText("Time Served", timeServedFormatted, defaultFlags = mcm.OPTION_DISABLED)
-    mcm.AddOptionText("Time Remaining", timeLeftFormatted, defaultFlags = mcm.OPTION_DISABLED)
-    ; mcm.AddOptionCategoryKey("", "Sentence")
-    ; mcm.AddOptionText(currentHour + ", " + currentDay + " of " + currentMonth)
-    ; mcm.AddOptionText("")
-    ; mcm.AddOptionText("")
-    ; mcm.AddOptionText("")
-    ; mcm.AddOptionText("")
+    if (player.ShowSentence && !player.IsUndeterminedSentence)
+        mcm.AddOptionText("Sentence", sentenceFormatted, defaultFlags = mcm.OPTION_DISABLED)
+    endif
+
+    if (player.ShowTimeLeftInSentence)
+        if (!player.IsUndeterminedSentence)
+            mcm.AddOptionText("Time Remaining", timeLeftFormatted, defaultFlags = mcm.OPTION_DISABLED)
+        else
+            mcm.AddOptionText("Time Remaining", "Undetermined", defaultFlags = mcm.OPTION_DISABLED)
+        endif
+    endif
+
+    if (player.ShowTimeServed && player.TimeServed >= 1)
+        if (!player.IsUndeterminedSentence)
+            mcm.AddOptionText("Time Served", timeServedFormatted, defaultFlags = mcm.OPTION_DISABLED)
+        else
+            mcm.AddOptionText("Time in Prison", timeServedFormatted, defaultFlags = mcm.OPTION_DISABLED)
+        endif
+    endif
 endFunction
 
 RPB_Prison function GetPlayerPrison(RPB_MCM mcm) global

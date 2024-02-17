@@ -34,7 +34,8 @@ bool function Exists(RPB_Prisoner apPrisoner)
 endFunction
 
 bool function Add(RPB_Prisoner apPrisonerRef)
-    parent.AddAt(apPrisonerRef, self.GetPrisonerID(apPrisonerRef.GetActor()))
+    string elementKey = self.GetPrisonerID(apPrisonerRef.GetActor())
+    parent.AddAt(apPrisonerRef, elementKey)
 endFunction
 
 function Remove(RPB_Prisoner apPrisoner)

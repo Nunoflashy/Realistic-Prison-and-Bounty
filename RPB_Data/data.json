@@ -47,7 +47,7 @@
   },
   "Haafingar": {
     "City": "Solitude",
-    "Crime Faction": "__formData|Skyrim.esm|0x267e3",
+    "Crime Faction": "__formData|Skyrim.esm|0x29db0",
     "Arrest": {
       "Options": {
         "Frisking": {
@@ -56,6 +56,8 @@
       }
     },
     "Jail": {
+      "Location": "__formData|Skyrim.esm|0xBED97",
+      "Name": "Castle Dour Dungeon",
       "Base Cell Door": "__formData|Skyrim.esm|0x5E91D",
       "Options": {
         "Stripping": {
@@ -101,6 +103,8 @@
             "Props": []
           },
           "Options": {
+            "Allow Overcrowding": false,
+            "Maximum Prisoners": 1,
             "Scan": {
               "Interior Radius": 300.0,
               "Exterior Radius": 200.0,
@@ -117,8 +121,28 @@
         "__formData|RealisticPrisonAndBounty.esp|0x3879": {
           "Main Interior": "__formData|RealisticPrisonAndBounty.esp|0x3879",
           "Main Exterior": null,
-          "Active": false,
-          "Cell Door": "__formData|Skyrim.esm|0x5E91F",
+          "Active": true,
+          "Cell Doors": {
+            "__metaInfo": {
+              "typeName": "JFormMap"
+            },
+            "__formData|Skyrim.esm|0x5E91F": {
+              "Lock": {
+                "Level": "Requires Key",
+                "Decay Options": {
+                  "Min. Lock Level": "Adept",
+                  "Wear Thresholds": {
+                    "Requires Key": 2,
+                    "Master": 100,
+                    "Expert": 200,
+                    "Adept": 60,
+                    "Apprentice": 150,
+                    "Novice": 700
+                  }
+                }
+              }
+            }
+          },
           "Objects": {
             "Beds": ["__formData|Skyrim.esm|0xCE7EB"],
             "Containers": ["__formData|RealisticPrisonAndBounty.esp|0x1DDD6"],

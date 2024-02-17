@@ -207,20 +207,30 @@ endFunction
     Transfers this Actor from being an Arrestee to a Prisoner
 /;
 RPB_Prisoner function MakePrisoner()
-    RPB_Prison prison           = (RPB_API.GetPrisonManager()).GetPrison(hold)
-    RPB_Prisoner prisonerRef    = prison.MakePrisoner(this)
+    RPB_Prison prison  = (RPB_API.GetPrisonManager()).GetPrison(hold)
+    self.TransferArrestPropertiesToPrisoner(prison)
 
-    prisonerRef.Prison_SetFloat("Time of Arrest", TimeOfArrest)
-    prisonerRef.Prison_SetInt("Minute of Arrest", Arrest_GetInt("Minute of Arrest"))
-    prisonerRef.Prison_SetInt("Hour of Arrest", Arrest_GetInt("Hour of Arrest"))
-    prisonerRef.Prison_SetInt("Day of Arrest", Arrest_GetInt("Day of Arrest"))
-    prisonerRef.Prison_SetInt("Month of Arrest", Arrest_GetInt("Month of Arrest"))
-    prisonerRef.Prison_SetInt("Year of Arrest", Arrest_GetInt("Year of Arrest"))
-    prisonerRef.Prison_SetForm("Arrest Captor", captor)
 
-    return prisonerRef
+    return prison.MakePrisoner(this)
 endFunction
 
+function TransferArrestPropertiesToPrisoner(RPB_Prison apPrison)
+    RPB_Utility.Debug("Arrestee::TransferArrestPropertiesToPrisoner", "prison: " + apPrison)
+
+    self.SetString("Hold", hold, "Jail") ; Essential for retrieving Prison for the first time in RPB_Prisoner
+    self.SetInt("Prison ID", apPrison.GetID(), "Jail") ; Essential for retrieving Prison for the first time in RPB_Prisoner
+    self.SetFloat("Time of Arrest", TimeOfArrest, "Jail")
+    self.SetInt("Minute of Arrest", Arrest_GetInt("Minute of Arrest"), "Jail")
+    self.SetInt("Hour of Arrest", Arrest_GetInt("Hour of Arrest"), "Jail")
+    self.SetInt("Day of Arrest", Arrest_GetInt("Day of Arrest"), "Jail")
+    self.SetInt("Month of Arrest", Arrest_GetInt("Month of Arrest"), "Jail")
+    self.SetInt("Year of Arrest", Arrest_GetInt("Year of Arrest"), "Jail")
+    self.SetForm("Arrest Captor", captor, "Jail")
+
+    RPB_Utility.Debug("Arrestee::TransferArrestPropertiesToPrisoner", "Prison ID: " + self.GetString("Prison ID", "Jail"))
+    RPB_Utility.Debug("Arrestee::TransferArrestPropertiesToPrisoner", "Prison Alias ID: " + apPrison.GetID())
+
+endFunction
 ; ==========================================================
 ;                           Bounty
 ; ==========================================================
@@ -390,6 +400,8 @@ function MoveToPrison(bool abMoveDirectlyToCell = false)
     else
         RPB_Prisoner prisonerRef = self.MakePrisoner()
 
+        Utility.Wait(0.5)
+
         if (!prisonerRef.AssignCell())
             Debug(this, "Arrestee::MoveToPrison", "Could not assign a cell to arrestee " + this)
             ; Terminate arrest, could not assign cell
@@ -474,6 +486,11 @@ endEvent
 event OnDestroy()
     Arrest.RemoveArresteeFromList(self) ; Remove this Actor from the AME list since they are no longer arrested
     self.UnregisterForTrackedStats()
+
+    if (self.IsPlayer())
+        ; If for some reason AI is disabled, re-enable it
+        ReleaseAI()
+    endif
 endEvent
 
 event OnBountyGained()

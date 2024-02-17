@@ -1,5 +1,7 @@
 Scriptname RPB_PrisonManager extends Quest
 
+import RPB_Utility
+
 int property PrisonSlots
     int function get()
         return self.GetNumAliases()
@@ -12,12 +14,28 @@ RPB_Prison property AvailableSlot
     endFunction
 endProperty
 
-bool function AddPrison(RPB_Prison akPrison)
+int actorToPrison
 
+RPB_Prison function FindPrisonByPrisoner(Actor akPrisonerActor)
+    string prisonHold = RPB_StorageVars.GetString(akPrisonerActor.GetFormID(), "PrisonManager")
+
+    if (prisonHold)
+        return self.GetPrison(prisonHold)
+    endif
+
+    return none
 endFunction
 
-bool function AddPrisonCell(RPB_Prison akPrison, RPB_JailCell akPrisonCell)
-    ; akPrison.__addPrisonCell(akPrisonCell)
+event OnPrisonRegisteredPrisoner(RPB_Prison apPrison, RPB_Prisoner apPrisoner)
+    RPB_StorageVars.SetString(apPrisoner.GetIdentifier(), apPrison.Hold, "PrisonManager")
+endEvent
+
+event OnPrisonUnregisteredPrisoner(RPB_Prison apPrison, RPB_Prisoner apPrisoner)
+    self.RemovePrisonerFromPrisonRegistry(apPrisoner)
+endEvent
+
+function RemovePrisonerFromPrisonRegistry(RPB_Prisoner apPrisoner)
+    RPB_StorageVars.DeleteVariable(apPrisoner.GetIdentifier(), "PrisonManager")
 endFunction
 
 RPB_Prison function GetAvailablePrisonSlot()
@@ -45,6 +63,45 @@ bool function DeletePrison(RPB_Prison akPrison)
 
 endFunction
 
+function ReloadPrisonConfig(RPB_Prison apPrison)
+    Location prisonLocation = apPrison.GetRootPropertyOfTypeForm("Location") as Location
+    string prisonName       = apPrison.GetRootPropertyOfTypeString("Name")
+
+    apPrison.ConfigurePrison( \
+        akLocation  = prisonLocation, \
+        akFaction   = apPrison.PrisonFaction, \
+        asHold      = apPrison.Hold, \
+        asName      = prisonName \
+    )
+
+    Error("Some elements of the prison config could not be determined!", !prisonLocation || !prisonName)
+endFunction
+
+bool function InitializePrisonConfig(string asHold)
+    int rootObject      = RPB_Data.GetRootObject(asHold) ; JMap&
+    int prisonObject    = RPB_Data.Hold_GetJailObject(rootObject) ; JMap&
+
+    Location prisonLocation = RPB_Prison.Global_GetRootPropertyOfTypeForm(prisonObject, "Location") as Location
+    string prisonName       = RPB_Prison.Global_GetRootPropertyOfTypeString(prisonObject, "Name")
+    Faction prisonFaction   = RPB_Data.Hold_GetCrimeFaction(rootObject)
+
+    RPB_Prison prisonSlot = self.AvailableSlot
+
+    if (!prisonSlot)
+        Error("There are no Prison Slots available, cannot configure prison for " + asHold + "! (Prison: "+ prisonName +")")
+        return false
+    endif
+
+    prisonSlot.ConfigurePrison( \
+        akLocation  = prisonLocation, \
+        akFaction   = prisonFaction, \
+        asHold      = asHold, \
+        asName      = prisonName \
+    )
+
+    return true
+endFunction
+
 ;/
     Retrieves a Prison from the given Hold if it is known.
 
@@ -58,13 +115,18 @@ RPB_Prison function GetPrison(string asHold)
     while (i < self.PrisonSlots)
         RPB_Prison currentPrison = self.GetNthAlias(i) as RPB_Prison
         if (currentPrison.Hold == asHold)
-            ; currentPrison.PrisonFaction = Game.GetFormEx(0x29DB0) as Faction ; temporary
-            currentPrison.ConfigurePrison(currentPrison.PrisonLocation, Game.GetFormEx(0x29DB0) as Faction, currentPrison.Hold)
-            RPB_Utility.DebugWithArgs("PrisonManager::GetPrison", asHold, "Hold: " + currentPrison.Hold + ", Faction: " + currentPrison.PrisonFaction + ", City: " + currentPrison.City)
+            ; RPB_Utility.DebugWithArgs("PrisonManager::GetPrison", asHold, "Hold: " + currentPrison.Hold + ", Faction: " + currentPrison.PrisonFaction + ", City: " + currentPrison.City)
+            self.ReloadPrisonConfig(currentPrison)
             return currentPrison
         endif
         i += 1
     endWhile
+
+    return none
+endFunction
+
+RPB_Prison function GetPrisonByID(int aiPrisonID)
+    return self.GetNthAlias(aiPrisonID) as RPB_Prison
 endFunction
 
 RPB_Prison[] function GetPrisons()

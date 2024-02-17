@@ -292,6 +292,11 @@ endEvent
 
 event OnKeyDown(int keyCode)
     if (keyCode == 0x58) ; F12
+        RPB_Prison playerPrison = RPB_API.GetPrisonManager().FindPrisonByPrisoner(Config.Player)
+        RPB_Prisoner playerPrisoner = playerPrison.GetPrisonerReference(Config.Player)
+        
+        playerPrisoner.IsUndeterminedSentence   = true
+        return
         RPB_PrisonManager prisonManager = GetFormFromMod(0x1B825) as RPB_PrisonManager
         RPB_Prison prison       = prisonManager.GetPrison("Haafingar")
         RPB_Prisoner prisonerReference = prison.GetPrisoner(Config.Player)
@@ -302,76 +307,23 @@ event OnKeyDown(int keyCode)
         nearbyGuard.SendModEvent("RPB_ArrestBegin", ARREST_TYPE_TELEPORT_TO_CELL)
     
     elseif (keyCode == 0x44) ; F10
-        int daysPassed = RPB_Utility.CalculateDaysPassedFromDate(17, 8, 201)
-        RPB_Utility.Debug("Arrest::OnKeyDown", "Days Passed from 01/01/201 to 17/08/201: " + daysPassed)
-        int daysPassed2 = RPB_Utility.CalculateDaysPassedFromDate(31, 12, 201)
-        RPB_Utility.Debug("Arrest::OnKeyDown", "Days Passed from 01/01/201 to 31/12/201: " + daysPassed2)
+        ; Actor playerCopy = config.Player.PlaceActorAtMe(config.Player.GetBaseObject() as ActorBase, 1, none)
+        ; Actor playerCopy2 = config.Player.PlaceActorAtMe(config.Player.GetBaseObject() as ActorBase, 1, none)
 
-        ; int[] daysFromDate = RPB_Utility.GetDateFromDaysPassed(17, 8, 201, 30)
-        ; RPB_Utility.Debug("Arrest::OnKeyDown", "30 days after 17/08/201: " + daysFromDate[0] + "/" + daysFromDate[1] + "/" + daysFromDate[2])
+        ; RPB_Arrestee playerCopyArrestee = self.MakeArrestee(playerCopy)
+        ; playerCopyArrestee.SetActiveBounty(2500)
 
-        ; int d = 1
-        ; int m = 3
-        ; int y = 201
-        int d = 1
-        int m = 1
-        int y = 201
-        ; int d = 1
-        ; int m = 8
-        ; int y = 201
-        int numberOfDays = 35
-        ; int numberOfDays = 32
-        while (numberOfDays <= 365)
-            int[] daysFromDate = RPB_Utility.GetDateFromDaysPassed(d, m, y, numberOfDays)
-            RPB_Utility.Debug("Arrest::OnKeyDown", numberOfDays + " days after "+ d + "/" + m + "/" + y +": " + daysFromDate[0] + "/" + daysFromDate[1] + "/" + daysFromDate[2])
-            numberOfDays += 30
-        endWhile
+        ; Actor g = GetNearestGuard(config.Player, 3500, none)
+        ; self.ArrestActor(g, playerCopy, ARREST_TYPE_ESCORT_TO_JAIL)
 
-        ; RPB_Utility.Debug("Arrest::OnKeyDown", "Day of week for 01/01/201: " + RPB_Utility.CalculateDayOfWeek(1, 1, 201))
-
-        ; int year = 201
-        ; while (year <= 220)
-        ;     string yearShown = "4E " + string_if (year < 10, "20" + year, year)
-        ;     int firstDayOfWeekInYear        = RPB_Utility.GetFirstDayOfWeek(year)
-        ;     string dayOfWeekName            = RPB_Utility.GetDayOfWeekName(firstDayOfWeekInYear)
-        ;     string dayOfWeekGregorianName   = RPB_Utility.GetDayOfWeekGregorianName(firstDayOfWeekInYear)
-        ;     RPB_Utility.Debug("Arrest::OnKeyDown", "First Day of Week " + yearShown + ": " + firstDayOfWeekInYear + " ["+ dayOfWeekName + " ("+ dayOfWeekGregorianName +")" + "]")
-        ;     RPB_Utility.Debug("Arrest::OnKeyDown", "Day of week for 12/01/" + year +": " + RPB_Utility.CalculateDayOfWeek(12, 1, year))
-
-        ;     year += 1
-        ; endWhile
-
-        int year = 201
-        while (year <= 201)
-            RPB_Utility.Debug("Arrest::OnKeyDown", "==================== 4E " + year + " ====================")
-            int month = 1
-            while (month <= 2)
-                RPB_Utility.Debug("Arrest::OnKeyDown", "========== " + RPB_Utility.GetMonthName(month) + " ==========")
-                string yearShown = "4E " + year
-                ; int firstDayOfWeekInYear        = RPB_Utility.GetFirstDayOfWeek(year)
-                ; int dayOfWeek                   = RPB_Utility.CalculateDayOfWeek(12, month, year)
-                ; string dayOfWeekName            = RPB_Utility.GetDayOfWeekName(dayOfWeek)
-                ; string dayOfWeekGregorianName   = RPB_Utility.GetDayOfWeekGregorianName(firstDayOfWeekInYear)
-                ; RPB_Utility.Debug("Arrest::OnKeyDown", "Day of week for 12/"+ month +"/" + year +": " + dayOfWeek + " ("+ dayOfWeekName +")")
-
-                int day = 1
-                while (day <= RPB_Utility.GetDaysOfMonth(month))
-                    int firstDayOfWeekInYear        = RPB_Utility.GetFirstDayOfWeek(year)
-                    int dayOfWeek                   = RPB_Utility.CalculateDayOfWeek(day, month, year)
-                    string dayOfWeekName            = RPB_Utility.GetDayOfWeekName(dayOfWeek)
-                    string dayOfWeekGregorianName   = RPB_Utility.GetDayOfWeekGregorianName(firstDayOfWeekInYear)
-                    RPB_Utility.Debug("Arrest::OnKeyDown", "Day of week for "+ day +"/"+ month +"/" + year +": " + dayOfWeek + " ("+ dayOfWeekName +")")
-                    day += 1
-                endWhile
-                RPB_Utility.Debug("Arrest::OnKeyDown", "")
-                month += 1
-            endWhile
-            RPB_Utility.Debug("Arrest::OnKeyDown", "")
-            year += 1
-        endWhile
-
-        ; RPB_Utility.Debug("Arrest::OnKeyDown", "First Day of Week 4E 201 " + RPB_Utility.GetFirstDayOfWeek(201))
-        ; RPB_Utility.Debug("Arrest::OnKeyDown", "First Day of Week 4E 202 " + RPB_Utility.GetFirstDayOfWeek(202))
+        ; return
+        ; RPB_Tests.Test_Can_Get_Prison_For_Actor_Globally()
+        RPB_Tests.Test_Imprisonment_In_Cell_Should_Not_Allow_Overcrowding()
+        ; RPB_Tests.Test_Can_Imprison_Actor_Without_Arresting()
+        ; RPB_Tests.Test_Arrest_And_Imprison_Multiple_Actors_With_Scene()
+        ; RPB_Tests.Test_Can_Get_Prison_For_Actor_Globally()
+        return
+        RPB_Tests.Test_25Days_After_26th_Frostfall_Is_20th_Suns_Dusk()
         return
         ; Actor playerCopy = config.Player.PlaceActorAtMe(config.Player.GetBaseObject() as ActorBase, 1, none)
         ; Actor playerCopy2 = config.Player.PlaceActorAtMe(config.Player.GetBaseObject() as ActorBase, 1, none)
@@ -446,6 +398,16 @@ event OnKeyDown(int keyCode)
         ; Debug(self, "Arrest::OnKeyDown", "F10 Pressed - SceneManager")
 
     elseif (keyCode == 0x41) ; F7
+        RPB_Prison playerPrison = RPB_API.GetPrisonManager().FindPrisonByPrisoner(Config.Player)
+        RPB_Prisoner playerPrisoner = playerPrison.GetPrisonerReference(Config.Player)
+
+        playerPrisoner.ShowReleaseTime          = !playerPrisoner.ShowReleaseTime
+        playerPrisoner.ShowSentence             = !playerPrisoner.ShowSentence
+        playerPrisoner.ShowTimeServed           = !playerPrisoner.ShowTimeServed
+        playerPrisoner.ShowTimeLeftInSentence   = !playerPrisoner.ShowTimeLeftInSentence
+        playerPrisoner.IsUndeterminedSentence   = !playerPrisoner.IsUndeterminedSentence
+
+        return
         Debug(self, "Arrest::OnKeyDown", "F7 Pressed")
 
         Actor nearbyGuard = GetNearestGuard(config.Player, 3500, none)
@@ -481,6 +443,11 @@ event OnKeyDown(int keyCode)
         endWhile
 
     elseif (keyCode == 0x42) ; F8
+        RPB_Prison playerPrison = RPB_API.GetPrisonManager().FindPrisonByPrisoner(Config.Player)
+        RPB_Prisoner playerPrisoner = playerPrison.GetPrisonerReference(Config.Player)
+
+        playerPrisoner.IsUndeterminedSentence   = false
+        return
         Debug(self, "Arrest::OnKeyDown", "F8 Pressed")
 
         int rootItem = RPB_Data.GetRootObject()
@@ -644,21 +611,24 @@ event OnArrestBegin(RPB_Arrestee apArrestee, Actor akCaptor, Faction akCrimeFact
         return
     endif
 
+
     ; apArrestee.SetArrestParameters(ARREST_TYPE_ESCORT_TO_CELL, akCaptor, akCrimeFaction)
-    ; apArrestee.SetArrestParameters(ARREST_TYPE_ESCORT_TO_JAIL, akCaptor, akCrimeFaction)
+    apArrestee.SetArrestParameters(ARREST_TYPE_ESCORT_TO_JAIL, akCaptor, akCrimeFaction)
+    apArrestee.SetActiveBounty(4000)
+
     ; apArrestee.SetActiveBounty(7000)
-    apArrestee.SetArrestParameters(ARREST_TYPE_TELEPORT_TO_CELL, akCaptor, akCrimeFaction)
+    ; apArrestee.SetArrestParameters(ARREST_TYPE_TELEPORT_TO_CELL, akCaptor, akCrimeFaction)
     ; apArrestee.SetActiveBounty(Utility.RandomInt(1200, 7800))
     ; apArrestee.SetActiveBounty(4200)
 
-    ; Trace(self, "Arrest::OnArrestBegin", "ArresteeRef: [\n" + \
-    ;     "\t arresteeRef: " + apArrestee + "\n" + \
-    ;     "\t apArrestee.HasLatentBounty(): " + apArrestee.HasLatentBounty() + "\n" + \
-    ;     "\t apArrestee.HasActiveBounty(): " + apArrestee.HasActiveBounty() + "\n" + \
-    ;     "\t apArrestee.GetActiveBounty(): " + apArrestee.GetActiveBounty() + "\n" + \
-    ;     "\t apArrestee.GetLatentBounty(): " + apArrestee.GetLatentBounty() + "\n" + \
-    ;     "\t apArrestee.GetFaction(): " + apArrestee.GetFaction() + "\n" + \
-    ; "]")
+    Trace(self, "Arrest::OnArrestBegin", "ArresteeRef: [\n" + \
+        "\t arresteeRef: " + apArrestee + "\n" + \
+        "\t apArrestee.HasLatentBounty(): " + apArrestee.HasLatentBounty() + "\n" + \
+        "\t apArrestee.HasActiveBounty(): " + apArrestee.HasActiveBounty() + "\n" + \
+        "\t apArrestee.GetActiveBounty(): " + apArrestee.GetActiveBounty() + "\n" + \
+        "\t apArrestee.GetLatentBounty(): " + apArrestee.GetLatentBounty() + "\n" + \
+        "\t apArrestee.GetFaction(): " + apArrestee.GetFaction() + "\n" + \
+    "]")
 
     if (!apArrestee.HasLatentBounty() && !apArrestee.HasActiveBounty())
         Config.NotifyArrest("You can't be arrested in " + akCrimeFaction.GetName() + " since you do not have a bounty in the hold", apArrestee.IsPlayer())

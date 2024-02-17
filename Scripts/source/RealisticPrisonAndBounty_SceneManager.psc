@@ -1254,13 +1254,31 @@ event OnSceneEnd(string name, Scene sender)
         RPB_PrisonManager prisonManager = GetFormFromMod(0x1B825) as RPB_PrisonManager
         RPB_Prison prison       = prisonManager.GetPrison("Haafingar")
 
-        ; Determine if it's an Arrestee or a Prisoner
-        RPB_Actor actorReference = prison.GetPrisoner(escortee)
-        if (actorReference == none)
-            actorReference = Arrest.Arrestees.AtKey(escortee) ; to be changed the way the arrestee is retrieved
-        endif
+        int i = 0
+        while (i < params.Length)
+            if (params[i] != None && params[i] != escort)
+                RPB_Actor actorReference = prison.GetPrisoner(escortee)
+                if (actorReference == none)
+                    actorReference = Arrest.Arrestees.AtKey(escortee) ; to be changed the way the arrestee is retrieved
+                endif
+                if (actorReference == none)
+                    actorReference = prison.MakePrisoner(params[i] as Actor)
+                    (params[i] as Actor).UnequipAll()
+                endif
+                prison.OnEscortPrisonerToJailEnd(actorReference, escort)
+            endif
+            i += 1
+        endWhile
 
-        prison.OnEscortPrisonerToJailEnd(actorReference, escort)
+
+
+        ; ; Determine if it's an Arrestee or a Prisoner
+        ; RPB_Actor actorReference = prison.GetPrisoner(escortee)
+        ; if (actorReference == none)
+        ;     actorReference = Arrest.Arrestees.AtKey(escortee) ; to be changed the way the arrestee is retrieved
+        ; endif
+
+        ; prison.OnEscortPrisonerToJailEnd(actorReference, escort)
 
     elseif (name == SCENE_ESCORT_TO_JAIL_02)
         Actor escort   = params[0] as Actor

@@ -10,12 +10,20 @@ endFunction
 ;                        Log Functions
 ; ==========================================================
 
+function base_log(string asLogType = "DEBUG", string asLogInfo, string asCaller = "", string asCallerArgs = "") global
+    if (asCaller)
+        debug.trace("["+ ModName() +"] " + asLogType + ": " + asCaller + "("+ asCallerArgs +")" + " -> " + asLogInfo)
+    else
+        debug.trace("["+ ModName() +"] " + asLogType + ": " + asLogInfo)
+    endif
+endFunction
+
 function Trace(string asCaller, string asLogInfo, bool abCondition = true) global
     if (!abCondition)
         return
     endif
 
-    debug.trace("["+ ModName() +"] TRACE: " + asCaller + "()" + " -> " + asLogInfo)
+    base_log("TRACE", asLogInfo, asCaller)
 endFunction
 
 function Debug(string asCaller, string asLogInfo, bool abCondition = true) global
@@ -23,7 +31,7 @@ function Debug(string asCaller, string asLogInfo, bool abCondition = true) globa
         return
     endif
 
-    debug.trace("["+ ModName() +"] DEBUG: " + asCaller + "()" + " -> " + asLogInfo)
+    base_log("DEBUG", asLogInfo, asCaller)
 endFunction
 
 function DebugWithArgs(string asCaller, string asArgs, string asLogInfo, bool abCondition = true) global
@@ -31,7 +39,59 @@ function DebugWithArgs(string asCaller, string asArgs, string asLogInfo, bool ab
         return
     endif
 
-    debug.trace("["+ ModName() +"] DEBUG: " + asCaller + "("+ asArgs +")" + " -> " + asLogInfo)
+    base_log("DEBUG", asLogInfo, asCaller, asArgs)
+endFunction
+
+function LogNoType(string asLogInfo, bool abCondition = true) global
+    if (!abCondition)
+        return
+    endif
+
+    debug.trace("["+ ModName() +"] " + asLogInfo)
+endFunction
+
+function Info(string asLogInfo, bool abCondition = true) global
+    if (!abCondition)
+        return
+    endif
+
+    base_log("INFO", asLogInfo)
+endFunction
+
+function Warn(string asLogInfo, bool abCondition = true) global
+    if (!abCondition)
+        return
+    endif
+
+    base_log("WARN", asLogInfo)
+endFunction
+
+function Error(string asLogInfo, bool abCondition = true) global
+    if (!abCondition)
+        return
+    endif
+
+    base_log("ERROR", asLogInfo)
+endFunction
+
+function Fatal(string asLogInfo, bool abCondition = true) global
+    if (!abCondition)
+        return
+    endif
+
+    base_log("FATAL", asLogInfo)
+endFunction
+
+function LogProperty(string prop, string asLogInfo, bool condition = true) global
+    if (condition)
+        base_log("PROPERTY", asLogInfo)
+    endif
+endFunction
+
+function ErrorProperty(string asProperty, string asLogInfo, bool condition = true) global
+    if (condition)
+        base_log("ERROR (PROPERTY)", asLogInfo)
+    endif
 endFunction
 
 ; ==========================================================
@@ -62,6 +122,17 @@ int function Round(float value) global
     else
         return math.floor(value)
     endif
+endFunction
+
+
+; Converts the passed in percent number to its equivalent decimal percentage to do calculations.
+; e.g: 5 becomes 0.05
+float function GetPercentAsDecimal(float percentToConvert) global
+    if (percentToConvert <= 0)
+        return 0.0
+    endif
+    
+    return percentToConvert / 100
 endFunction
 
 ; ==========================================================
@@ -155,7 +226,98 @@ function ReleaseAI(bool condition = true) global
     endif
 endFunction
 
+; ==========================================================
+;                       Actor Functions
+; ==========================================================
 
+function UnequipHandsForActor(Actor akActor) global
+    UnequipWeaponForActor(akActor, false)
+    UnequipWeaponForActor(akActor, false)
+    UnequipWeaponForActor(akActor, true)
+    UnequipSpellForActor(akActor)
+    UnequipShieldForActor(akActor)
+endFunction
+
+function UnequipWeaponForActor(Actor akActor, bool abLeftHand = false, bool abPreventEquip = false, bool abSilentUnequip = true) global
+    Weapon kWeapon = akActor.GetEquippedWeapon(abLeftHand)
+    if (kWeapon != None)
+        akActor.UnequipItem(kWeapon, abPreventEquip, abSilentUnequip)
+    endif
+endFunction
+
+function UnequipShieldForActor(Actor akActor, bool abPreventEquip = false, bool abSilentUnequip = true) global
+    Armor kShield = akActor.GetEquippedShield()
+    if (kShield != None)
+        akActor.UnequipItem(kShield, abPreventEquip, abSilentUnequip)
+    endif
+endFunction
+
+function UnequipSpellForActor(Actor akActor) global
+    int leftHand  = 0
+    int rightHand = 1
+
+    Spell kSpell = akActor.GetEquippedSpell(leftHand)
+    if (kSpell != None)
+        akActor.UnequipSpell(kSpell, leftHand)
+    endif
+
+    kSpell = akActor.GetEquippedSpell(rightHand)
+    if (kSpell != None)
+        akActor.UnequipSpell(kSpell, rightHand)
+    endif
+endFunction
+
+function UnequipShoutForActor(Actor akActor) global
+    Shout kShout = akActor.GetEquippedShout()
+    if (kShout != None)
+        akActor.UnequipShout(kShout)
+    endif
+endFunction
+
+bool function ActorHasClothing(Actor akActor) global
+    ;/
+        TODO: Possibly check for more slotMasks, but for now Body should be fine.
+    /;
+    return akActor.GetWornForm(GetSlotMask("Body")) != none
+endFunction
+
+; ==========================================================
+;                       Alias Functions
+; ==========================================================
+
+function BindAliasTo(ReferenceAlias akAlias, ObjectReference akObjectReference) global
+    if (akObjectReference != None)
+        akAlias.ForceRefTo(akObjectReference)
+    else
+        akAlias.Clear()
+    endif
+endFunction
+
+; ==========================================================
+;           Distance/Position/Translation Functions
+; ==========================================================
+
+float function UnitsToCentimeters(int unit)
+    return unit * 1.428
+endFunction
+
+; Faces akObjA relative to akObjB
+; 
+; Examples:
+; OrientRelative(objA, objB) 					; Sets A to face directly away from B
+; OrientRelative(objA, objB, afRotZ = 180.0) 	; Sets A to face toward B
+; 
+function OrientRelative(ObjectReference akObjA, ObjectReference akObjB, Float afRotX = 0.0, Float afRotY = 0.0, Float afRotZ = 0.0) Global
+	Float rotX = akObjB.GetAngleX()
+	Float rotY = akObjB.GetAngleY()
+	Float rotZ = akObjB.GetAngleZ()
+
+	akObjA.SetAngle(rotX, rotY, rotZ)
+endFunction
+
+; ==========================================================
+;                       Misc Functions
+; ==========================================================
 
 Form function GetFormOfType(string asFormType) global
     if (asFormType == "Gold")
@@ -164,6 +326,72 @@ Form function GetFormOfType(string asFormType) global
     elseif (asFormType == "Lockpick")
         return Game.GetFormEx(0xA)
     endif
+endFunction
+
+int function GetSlotMask(string bodyPart) global
+    int kSlotMask30 = 0x00000001 ; HEAD
+    int kSlotMask31 = 0x00000002 ; Hair
+    int kSlotMask32 = 0x00000004 ; BODY
+    int kSlotMask33 = 0x00000008 ; Hands
+    int kSlotMask34 = 0x00000010 ; Forearms
+    int kSlotMask35 = 0x00000020 ; Amulet
+    int kSlotMask36 = 0x00000040 ; Ring
+    int kSlotMask37 = 0x00000080 ; Feet
+    int kSlotMask38 = 0x00000100 ; Calves
+    int kSlotMask39 = 0x00000200 ; SHIELD
+    int kSlotMask40 = 0x00000400 ; TAIL
+    int kSlotMask41 = 0x00000800 ; LongHair
+    int kSlotMask42 = 0x00001000 ; Circlet
+    int kSlotMask43 = 0x00002000 ; Ears
+
+    if (bodyPart == "Head")
+        return kSlotMask30
+    elseif (bodyPart == "Hair")
+        return kSlotMask31
+    elseif (bodyPart == "Body")
+        return kSlotMask32
+    elseif (bodyPart == "Hands")
+        return kSlotMask33
+    elseif (bodyPart == "Forearms")
+        return kSlotMask34
+    elseif (bodyPart == "Amulet")
+        return kSlotMask35
+    elseif (bodyPart == "Ring")
+        return kSlotMask36
+    elseif (bodyPart == "Feet")
+        return kSlotMask37
+    elseif (bodyPart == "Calves")
+        return kSlotMask38
+    elseif (bodyPart == "Shield")
+        return kSlotMask39
+    elseif (bodyPart == "Tail")
+        return kSlotMask40
+    elseif (bodyPart == "LongHair")
+        return kSlotMask41
+    elseif (bodyPart == "Circlet")
+        return kSlotMask42
+    elseif (bodyPart == "Ears")
+        return kSlotMask43
+    endif
+
+endFunction
+
+int function GetSlotMaskValue(int slotMask) global
+    ; int slotMaskMap = JIntMap.object()
+
+    int currentSlotMask = 30
+    int slotMaskValue = 0x00000001
+    while (currentSlotMask <= 61)
+        ; JIntMap.setInt(slotMaskMap, currentSlotMask, slotMaskValue)
+        if (slotMask == currentSlotMask)
+            return slotMaskValue
+            ; return JIntMap.getInt(slotMaskMap, slotMask)
+        endif
+        currentSlotMask += 1
+        slotMaskValue *= 2 ; Get next slot mask by doubling the value
+    endWhile
+
+    return -1
 endFunction
 
 ; ==========================================================
@@ -259,6 +487,10 @@ endFunction
 ;                 Game-Time Related Functions
 ; ==========================================================
 
+float function GetCurrentTime() global
+    return Utility.GetCurrentGameTime()
+endFunction
+
 int function GetDaysOfMonth(int aiMonth) global
     if (aiMonth == 2) ; Sun's Dawn
         return 28
@@ -286,7 +518,6 @@ float function GetCurrentHourFloat() global
     return GameHour.GetValue()
 endFunction
 
-
 int function GetCurrentDay() global
     GlobalVariable GameDay = Game.GetFormEx(0x37) as GlobalVariable
     return GameDay.GetValueInt()
@@ -299,6 +530,11 @@ endFunction
 
 int function GetCurrentYear() global
     GlobalVariable GameYear = Game.GetFormEx(0x35) as GlobalVariable
+    return GameYear.GetValueInt()
+endFunction
+
+int function GetDaysPassed() global
+    GlobalVariable GameYear = Game.GetFormEx(0x39) as GlobalVariable
     return GameYear.GetValueInt()
 endFunction
 
@@ -334,6 +570,38 @@ int function GetMinutesFromHour(float aiHour) global
     ; DebugWithArgs("Utility::GetMinutesFromHour", aiHour, "Getting minutes from hour " + aiHour + " = " + resultAsMinutes + " minutes" + " ("+ "minutesOfHourAsDecimal: " + minutesOfHourAsDecimal + ")")
 
     return resultAsMinutes
+endFunction
+
+string function GetClockFormat(int aiHour, int aiMinutes = 0, string format = "12 Hour") global
+    bool isTwelveHourClock = (format == "12 Hour" || format == "12h")
+
+    if (isTwelveHourClock)
+        int hourConverted = 0
+        if (aiHour >= 0 && aiHour < 12) ; AM
+            if (aiHour == 0)
+                hourConverted = 12 ; 12 AM
+            else
+                hourConverted = aiHour ; No need to convert, already in the form of 1-11 AM
+            endif
+    
+            return hourConverted + string_if (aiMinutes > 0, ":" + string_if (aiMinutes < 10, "0" + aiMinutes, aiMinutes) + " AM", ":00 AM")
+        elseif (aiHour >= 12 && aiHour < 24) ; PM
+            if (aiHour == 12)
+                hourConverted = 12 ; 12 PM
+            else
+                hourConverted = aiHour - 12
+            endif
+    
+            return hourConverted + string_if (aiMinutes > 0, ":" + string_if (aiMinutes < 10, "0" + aiMinutes, aiMinutes) + " PM", ":00 PM")
+        endif
+
+    else ; 24h
+        string shownHour    = string_if (aiHour < 10, "0" + aiHour, aiHour)
+        string shownMinutes = string_if (aiMinutes < 10, "0" + aiMinutes, aiMinutes)
+
+        return shownHour + ":" + shownMinutes
+    endif
+
 endFunction
 
 string function GetTimeAs12Hour(int aiHour, int aiMinutes = 0) global
@@ -466,7 +734,6 @@ int function GetFirstDayOfWeek(int aiYear) global
     int daysOfWeek = 7 ; (Morndas, Tirdas, Middas, Turdas, Fredas, Loredas, Sundas)
     
     ; Assign the day of week for 4E 201
-    ; int dayOfWeek4E201 = 4 ; Middas
     int dayOfWeek4E201 = 3 ; Middas
 
     int dayOfWeek4EPassedYear = dayOfWeek4E201 ; Assume it's 4E 201 as default
@@ -499,12 +766,12 @@ int function CalculateDayOfWeek(int aiDay, int aiMonth, int aiYear) global
 endFunction
 
 int function GetDateFromDaysPassed(int aiDay, int aiMonth, int aiYear, int aiDaysPassed) global
-    int currentDay = aiDay + aiDaysPassed;
-    int currentMonth = aiMonth;
-    int currentYear = aiYear;
+    int currentDay = aiDay + aiDaysPassed
+    int currentMonth = aiMonth
+    int currentYear = aiYear
 
     while (currentDay > GetDaysOfMonth(currentMonth)) 
-        currentDay -= GetDaysOfMonth(currentMonth);
+        currentDay -= GetDaysOfMonth(currentMonth)
         currentMonth += 1
 
         if (currentMonth > 12)
@@ -514,14 +781,14 @@ int function GetDateFromDaysPassed(int aiDay, int aiMonth, int aiYear, int aiDay
     endWhile
 
     int struct = new_struct()
-    JMap.setInt(struct, "day", currentDay);
-    JMap.setInt(struct, "month", currentMonth);
-    JMap.setInt(struct, "year", currentYear);
+    SetStructMemberInt(struct, "day", currentDay)
+    SetStructMemberInt(struct, "month", currentMonth)
+    SetStructMemberInt(struct, "year", currentYear)
 
     return struct;
 endFunction
 
-string function GetDateInFormat(int aiDay, int aiMonth, int aiYear, int aiHour = 0, int aiMinute = 0, string format = "d/m/Y") global
+string function GetDateFormat(int aiDay, int aiMonth, int aiYear, int aiHour = 0, int aiMinute = 0, string format = "d/m/Y") global
     string formattedDate = ""
 
     if (format == "d/m/Y")
@@ -531,7 +798,7 @@ string function GetDateInFormat(int aiDay, int aiMonth, int aiYear, int aiHour =
 
         formattedDate = day + "/" + month + "/" + year
 
-    elseif (format == "d M Y")
+    elseif (format == "D M Y")
         string day      = RPB_Utility.ToOrdinalNthDay(aiDay)
         string month    = RPB_Utility.GetMonthName(aiMonth)
         string year     = "4E " + aiYear
@@ -663,7 +930,6 @@ bool function Is31DayMonth(int aiMonth) global
     return GetDaysOfMonth(aiMonth) == 31
 endFunction
 
-
 string function ToOrdinalNthDay(int aiDay) global
     return aiDay + GetDayOrdinality(aiDay)
 endFunction
@@ -782,7 +1048,7 @@ endFunction
 
 string function GetFormattedDate(int aiDay, int aiMonth, int aiYear, int aiHour = 0, int aiMinute = 0, bool abShowDayOfWeek = true, bool abShowDay = true, bool abShowTime = true, bool abShowYear = true) global
     string dayOfWeek    = GetDayOfWeekName(CalculateDayOfWeek(aiDay, aiMonth, aiYear))
-    string hour         = GetTimeAs12Hour(aiHour, aiMinute)
+    string hour         = GetClockFormat(aiHour, aiMinute)
     string dayOrdinal   = ToOrdinalNthDay(aiDay)
     string monthName    = GetMonthName(aiMonth)
     string yearString   = "4E " + aiYear
@@ -846,76 +1112,10 @@ string function GetPreviousDayOfWeekDateFormatted(string asDayOfWeek, bool abSho
     return GetFormattedDate(day, month, year, GetCurrentHour(), GetCurrentMinute(), abShowTime = abShowTime)
 endFunction
 
-bool function SetGameDay(int aiGameDay, bool abNoSafetyCheck = false) global
-    int currentMonth = GetCurrentMonth()
-    int daysInMonth = GetDaysOfMonth(currentMonth)
-    
-    GlobalVariable GameDay = Game.GetFormEx(0x37) as GlobalVariable
-
-    if (abNoSafetyCheck)
-        GameDay.SetValueInt(aiGameDay)
-        return true
-    endif
-
-    if (aiGameDay > daysInMonth)
-        GameDay.SetValueInt(daysInMonth) ; Cap to last day
-    else
-        GameDay.SetValueInt(aiGameDay)
-    endif
-endFunction
-
-bool function SetGameMonth(int aiGameMonth) global
-    if (aiGameMonth < 1 || aiGameMonth > 12)
-        return false
-    endif
-
-    GlobalVariable GameMonth = Game.GetFormEx(0x36) as GlobalVariable
-    GameMonth.SetValueInt(aiGameMonth - 1) ; starts at 0, ends at 11, the Getters/Setters are 1-12
-endFunction
-
-bool function SetGameYear(int aiGameYear) global
-    GlobalVariable GameYear = Game.GetFormEx(0x35) as GlobalVariable
-    GameYear.SetValueInt(aiGameYear)
-endFunction
-
-; bool function PassTimeInDays(int aiPassByDays) global
-;     int currentDay      = GetCurrentDay()
-;     int currentMonth    = GetCurrentMonth()
-;     int daysInMonth     = GetDaysOfMonth(currentMonth)
-
-;     ; if (aiPassByDays <= 0)
-;     ;     return true
-;     ; endif
-
-;     GlobalVariable GameDaysPassed = Game.GetFormEx(0x39) as GlobalVariable
-
-;     int daysLeftInMonth = daysInMonth - currentDay
-
-;     if (daysLeftInMonth == 0)
-;         ; Pass the time by hours
-;         GlobalVariable GameHour = Game.GetFormEx(0x38) as GlobalVariable
-;         GameHour.SetValueInt(24)
-;         DebugWithArgs("Utility::PassTimeInDays", "int: " + aiPassByDays, "Called, there are no more days left in the month. - Day: "  + GetCurrentDay() + ", Month: " + GetCurrentMonth() + " at Hour: " + GetCurrentHour())
-
-;     elseif (aiPassByDays > daysLeftInMonth)
-;         ; More days than the month has left were passed, change the month and add the remaining days after that to the new month
-;         int nextMonth = GetCurrentMonth() + 1
-;         SetGameMonth(nextMonth)
-;         SetGameDay(1)
-;         PassTimeInDays((Math.abs(aiPassByDays - daysInMonth) - 1) as int)
-;         DebugWithArgs("Utility::PassTimeInDays", "int: " + (Math.abs(aiPassByDays - daysInMonth) - 1) as int, "Recursively called - Day: " + GetCurrentDay() + ", Month: " + GetCurrentMonth() + " at Hour: " + GetCurrentHour())
-;     else
-;         SetGameDay(GetCurrentDay() + aiPassByDays)
-;         DebugWithArgs("Utility::PassTimeInDays", "int: " + aiPassByDays, "Called, normal processing - Day: " + GetCurrentDay() + ", Month: " + GetCurrentMonth() + " at Hour: " + GetCurrentHour())
-;     endif
-
-;     Debug("Utility::PassTimeInDays", "GameDaysPassed: " + GameDaysPassed.GetValue())
-;     ; GameDaysPassed.SetValue(12.7)
-; endFunction
 
 bool function PassTimeInDays(int aiPassByDays) global
     GlobalVariable GameDaysPassed = Game.GetFormEx(0x39) as GlobalVariable
-
+    GlobalVariable GameHour = Game.GetFormEx(0x38) as GlobalVariable
 
     int daysPassed = 0
     while (daysPassed < aiPassByDays)
@@ -923,14 +1123,13 @@ bool function PassTimeInDays(int aiPassByDays) global
         int currentMonth    = GetCurrentMonth()
         int daysInMonth     = GetDaysOfMonth(currentMonth)
 
-
-        ModGameHour(24)
+        GameHour.Mod(24)
         Utility.Wait(0.01)
         string currentDate = GetCurrentDay() + "/" + GetCurrentMonth() + "/" + GetCurrentYear()
         DebugWithArgs("Utility::PassTimeInDays", aiPassByDays, "Date: " + currentDate +  " at " + GetTimeAs12Hour(GetCurrentHour()) + " ("+ GetTimeAs12Hour(GetCurrentHour()) +", "+  GetCurrentDay() +" of " + GetMonthName(GetCurrentMonth()) +")" + ", " + "GameDaysPassed: " + GameDaysPassed.GetValue())
         daysPassed += 1
     endWhile
-    ModGameHour(-1) ; Take off one hour, for some reason, after passing the days, the time is incremented by 1h
+    GameHour.Mod(-1) ; Take off one hour, for some reason, after passing the days, the time is incremented by 1h
 endFunction
 
 
@@ -996,4 +1195,158 @@ endFunction
 
 function DestroyStructsOfType(string asStructType) global
     JValue.releaseObjectsWithTag(asStructType)
+endFunction
+
+
+; ==========================================================
+;                    Benchmark Functions
+; ==========================================================
+
+float function StartBenchmark(bool condition = true) global
+    if (condition)
+        float startTime = Utility.GetCurrentRealTime()
+        return startTime
+    endif
+endFunction
+
+float function EndBenchmark(float startTime, string _message = "", bool condition = true) global
+    if (condition)
+        float endTime = Utility.GetCurrentRealTime()
+        float elapsedTime = endTime - startTime
+        debug.trace("[Realistic Prison and Bounty] DEBUG: " + _message + " execution took: " + ((elapsedTime * 1000)) + " ms")
+        ; local_log(none, string_if(_message != "", _message + " ", "") + "execution took " + ((elapsedTime * 1000)) + " ms", LOG_DEBUG(), hideCall = true)
+        return elapsedTime * 1000
+    endif
+endFunction
+
+
+; ==========================================================
+;                           Temporary
+; ==========================================================
+
+;/
+    Temporary function
+    Gets the Base Jail Door ID for the specified hold
+
+    SDoorJail01 - 5E91D (Solitude) [Haafingar]
+    WRJailDoor01 - A7613 (Whiterun) [Whiterun]
+    ImpJailDoor01 - 40BB2 (Windhelm, Riften) [Eastmarch, The Rift]
+    FarmhouseJailDoor01 - EC563 (Falkreath, Morthal, Dawnstar) [Falkreath, Hjaalmarch, The Pale]
+/;
+int function GetJailBaseDoorID(string hold) global
+    if (hold == "Haafingar")
+        return 0x5E91D
+
+    elseif (hold == "Whiterun")
+        return 0xA7613
+
+    elseif (hold == "Windhelm" || hold == "The Rift")
+        return 0x40BB2
+
+    elseif (hold == "Falkreath" || hold == "Hjaalmarch" || hold == "The Pale")
+        return 0xEC563
+    endif
+endFunction
+
+ObjectReference function GetNearestJailDoorOfType(int jailBaseDoorId, ObjectReference centerRef, float radius) global
+    int i = 10
+
+    Form doorRef = Game.GetFormEx(jailBaseDoorId)
+    ObjectReference _cellDoor = Game.FindClosestReferenceOfTypeFromRef(doorRef, centerRef, radius)
+    return _cellDoor
+
+    ; while (i > 0)
+    ;     ObjectReference _cellDoor = Game.FindClosestReferenceOfTypeFromRef(doorRef.GetBaseObject(), centerRef, radius)
+    ;     if (_cellDoor)
+    ;         return _cellDoor
+    ;     endif
+
+    ;     if (radius < 8000)
+    ;         radius *= 2
+    ;     endif
+    ;     i -= 1
+    ; endWhile
+
+    return none
+endFunction
+
+ObjectReference function GetNearestJailDoorOfTypeEx(Form akJailBaseDoor, ObjectReference akCenterRef, float afRadius) global
+    ObjectReference _cellDoor = Game.FindClosestReferenceOfTypeFromRef(akJailBaseDoor, akCenterRef, afRadius)
+    return _cellDoor
+endFunction
+
+ObjectReference function GetRandomJailDoorOfType(int jailBaseDoorId, ObjectReference centerRef, float radius) global
+    Form doorRef = Game.GetFormEx(jailBaseDoorId)
+    ObjectReference _cellDoor = Game.FindRandomReferenceOfTypeFromRef(doorRef, centerRef, radius)
+    return _cellDoor
+endFunction
+
+function OpenMultipleDoorsOfType(int jailBaseDoorId, ObjectReference scanFromWhere, float radius) global
+    int i = 10
+
+    Form doorRef = Game.GetFormEx(jailBaseDoorId)
+
+    while (i > 0)
+        ObjectReference _cellDoor = Game.FindRandomReferenceOfTypeFromRef(doorRef, scanFromWhere, radius)
+        bool isOpen = _cellDoor.GetOpenState() == 1 || _cellDoor.GetOpenState() == 2
+        if (isOpen)
+            OpenMultipleDoorsOfType(jailBaseDoorId, scanFromWhere, radius)
+        endif
+
+        if (_cellDoor)
+            _cellDoor.SetOpen(true)
+        endif
+
+        if (radius < 8000)
+            radius *= 2
+        endif
+        i -= 1
+    endWhile
+endFunction
+
+Actor function GetNearestActor(ObjectReference centerRef, float radius) global
+    int i = 10
+
+    while (i > 0)
+        Actor _actor = Game.FindRandomActorFromRef(centerRef, radius)
+        ; if (_actor && _actor.GetActorBase().GetSex() == 1 && _actor.GetFormID() != 0x14 && !_actor.IsChild())
+        if (_actor && _actor.GetFormID() != 0x14 && !_actor.IsChild() && _actor.IsGuard())
+            return _actor
+        endif
+
+        if (radius < 8000)
+            radius *= 2
+        endif
+        i -= 1
+    endWhile
+
+    return none
+endFunction
+
+Actor function GetNearestGuard(ObjectReference centerRef, float radius, ObjectReference exclude) global
+    int i = 30
+
+    while (i > 0)
+        Actor _actor = Game.FindRandomActorFromRef(centerRef, radius)
+        bool notPlayer = _actor.GetFormID() != 0x14
+        if (_actor && notPlayer && !_actor.IsChild() && _actor.IsGuard() && _actor != exclude)
+            return _actor
+        endif
+
+        if (radius < 8000)
+            radius *= 2
+        endif
+        i -= 1
+    endWhile
+
+    return none
+endFunction
+
+bool function IsActorNearReference(Actor akActor, ObjectReference akReference, float radius = 80.0) global
+    ObjectReference referenceToFind = Game.FindClosestReferenceOfTypeFromRef(akReference.GetBaseObject(), akActor, radius)
+    if (referenceToFind)
+        return true
+    endif
+
+    return false
 endFunction

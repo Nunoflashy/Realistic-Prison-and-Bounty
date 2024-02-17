@@ -92,15 +92,10 @@ bool function SetPrisons()
     RPB_PrisonManager prisonManager = GetFormFromMod(0x1B825) as RPB_PrisonManager
 
     int i = 0
-    while (i < Holds.Length)
-        RPB_Prison prisonSlot = prisonManager.AvailableSlot
-
-        if (prisonSlot)
-            prisonSlot.ConfigurePrison( \
-                akLocation  = (Game.GetFormEx(0xBED97) as Location), \
-                akFaction   = self.GetCrimeFaction(Holds[i]), \
-                asHold      = Holds[i] \
-            )
+    bool break = false
+    while (i < Holds.Length && !break)
+        if (!prisonManager.InitializePrisonConfig(Holds[i]))
+            break = true
         endif
         i += 1
     endWhile

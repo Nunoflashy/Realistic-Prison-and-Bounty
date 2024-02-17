@@ -31,6 +31,20 @@ string[] function GetKeys()
     return JMap.allKeysPArray(dataIds)
 endFunction
 
+string function GetValuesAsString()
+    int valueCount = JMap.count(dataIds)
+    string values = ""
+
+    int i = 0
+    while (i < valueCount)
+        bool hasNextElement = data[i + 1] != none
+        values += (data[i] as string) + string_if (hasNextElement, ", ")
+        i += 1
+    endWhile
+
+    return "["+ values +"]"
+endFunction
+
 function AddAt(ActiveMagicEffect apActiveMagicEffect, string asKey)
     ; Initialize array
     ; if (!dataIds || !data)
@@ -41,6 +55,10 @@ function AddAt(ActiveMagicEffect apActiveMagicEffect, string asKey)
 
     ; int availableIndex = self.GetAvailableIndex()
 
+    if (self.HasKey(asKey))
+        return
+    endif
+
     if (data[nextAvailableIndex] == none)
         data[nextAvailableIndex] = apActiveMagicEffect ; Assign AME to this index
         JMap.setInt(dataIds, asKey, nextAvailableIndex) ; Store the index at this key
@@ -49,8 +67,17 @@ function AddAt(ActiveMagicEffect apActiveMagicEffect, string asKey)
     endif
 endFunction
 
+bool function HasKey(string asKey)
+    return JMap.hasKey(dataIds, asKey)
+endFunction
+
 ActiveMagicEffect function GetAt(string asKey)
+    if (!JMap.hasKey(dataIds, asKey))
+        return none
+    endif
+
     int arrayIndex = JMap.getInt(dataIds, asKey)
+
     ; Debug(self, "ActiveMagicEffectList::Get", "Retrieved ActiveMagicEffect: " + data[arrayIndex] + " at index: " + arrayIndex + ", from key: " + asKey)
     return data[arrayIndex]
 endFunction

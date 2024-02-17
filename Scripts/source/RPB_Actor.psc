@@ -482,6 +482,22 @@ string function GetIdentifier()
     return this.GetFormID()
 endFunction
 
+string function GetPossessivePronoun()
+    if (self.IsFemale)
+        return "her"
+    elseif (self.IsMale)
+        return "his"
+    endif
+endFunction
+
+string function GetPronoun()
+    if (self.IsFemale)
+        return "her"
+    elseif (self.IsMale)
+        return "him"
+    endif
+endFunction
+
 ;/
     The Actor that is currently attached to this script.
 
