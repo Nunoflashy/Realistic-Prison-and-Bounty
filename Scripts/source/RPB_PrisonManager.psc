@@ -14,6 +14,24 @@ RPB_Prison property AvailableSlot
     endFunction
 endProperty
 
+; ==========================================================
+;                  Shared Prison Properties
+; ==========================================================
+
+Message __serveTimeMessage
+Message property ServeTimeMessage
+    Message function get()
+        if (__serveTimeMessage)
+            return __serveTimeMessage
+        endif
+
+        __serveTimeMessage = RPB_Utility.ServeTimeMessage()
+        return __serveTimeMessage
+    endFunction
+endProperty
+
+; ==========================================================
+
 int actorToPrison
 
 RPB_Prison function FindPrisonByPrisoner(Actor akPrisonerActor)

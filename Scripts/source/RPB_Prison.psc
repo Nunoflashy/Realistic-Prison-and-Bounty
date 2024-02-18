@@ -8,34 +8,27 @@ import RPB_Utility
 ;                     Script References
 ; ==========================================================
 
+RealisticPrisonAndBounty_Config __config
 RealisticPrisonAndBounty_Config property Config
     RealisticPrisonAndBounty_Config function get()
-        return Game.GetFormFromFile(0x3317, GetPluginName()) as RealisticPrisonAndBounty_Config
+        if (__config)
+            return __config
+        endif
+
+        __config = RPB_API.GetConfig()
+        return __config
     endFunction
 endProperty
 
-RealisticPrisonAndBounty_Arrest property Arrest
-    RealisticPrisonAndBounty_Arrest function get()
-        return Config.Arrest
-    endFunction
-endProperty
-
-
-RealisticPrisonAndBounty_ArrestVars property ArrestVars
-    RealisticPrisonAndBounty_ArrestVars function get()
-        return Config.ArrestVars
-    endFunction
-endProperty
-
-RealisticPrisonAndBounty_MiscVars property MiscVars
-    RealisticPrisonAndBounty_MiscVars function get()
-        return Config.MiscVars
-    endFunction
-endProperty
-
+RPB_PrisonManager __prisonManager
 RPB_PrisonManager property PrisonManager
     RPB_PrisonManager function get()
-        return RPB_API.GetPrisonManager()
+        if (__prisonManager)
+            return __prisonManager
+        endif
+
+        __prisonManager = RPB_API.GetPrisonManager()
+        return __prisonManager
     endFunction
 endProperty
 
@@ -486,6 +479,14 @@ int property OutfitMaximumBounty
 endProperty
 
 ; ==========================================================
+
+Message property ServeTimeMessage
+    Message function get()
+        return PrisonManager.ServeTimeMessage
+    endFunction
+endProperty
+
+int property SERVE_TIME_YES = 0 autoreadonly
 
 ; ==========================================================
 ;                       Prison Identity
@@ -1271,7 +1272,6 @@ endFunction
 bool function BindCellToPrisoner(ObjectReference akJailCell, RPB_Prisoner akPrisoner)
     ; Add this jail cell to the prisoner for ease of access
     ; akPrisoner.BindCell(akJailCell) ; Bind the Prisoner to the Cell
-    ; MiscVars.SetReference("["+ akPrisoner.GetIdentifier() +"]Cell", akJailCell) ; Bind the Prisoner to the Cell
     ; Debug(self.GetOwningQuest(), "Prison::BindCellToPrisoner", akJailCell + " jail cell bound to " + akPrisoner.GetActor())
 
     ; Get the door of the jail cell (the marker)
@@ -1313,7 +1313,6 @@ bool function BindCellToPrisoner(ObjectReference akJailCell, RPB_Prisoner akPris
     endif
 
     return true
-    ; Now possible to get this prisoner's jail cell through: MiscVars.GetReference("["+ akPrisoner.GetIdentifier() +"]Cell")
 endFunction
 
 
@@ -1575,9 +1574,18 @@ bool function RegisterPrisoner(RPB_Prisoner apPrisoner)
     Prisoners.Add(apPrisoner)
     self.OnPrisonerRegistered(apPrisoner)
 
+    ; Assign a Prisoner number based on the current number of prisoners in the prison
+    self.AssignPrisonerNumber(apPrisoner)
+
     Debug("Prison::RegisterPrisoner", "PrisonerList: " + Prisoners.GetKeys())
 
     return Prisoners.Exists(apPrisoner)
+endFunction
+
+function AssignPrisonerNumber(RPB_Prisoner apPrisoner)
+    int prisonerCount   = Prisoners.Count
+    int assignedNumber  = prisonerCount + 1
+    apPrisoner.Prison_SetInt("Prisoner Number", assignedNumber)
 endFunction
 
 function RegisterPrisonerTimeOfImprisonment(RPB_Prisoner apPrisoner)

@@ -23,6 +23,13 @@ import Math
 ; self.GetPrison() could return something like RPB_Prison or RPB_PrisonLocation, something akin to Faction
 ; This way, this prisoner script would no longer contain jailFaction or hold, since those would now be part of RPB_Prison
 
+; The number associated with this Prisoner
+int property Number
+    int function get()
+        return Prison_GetInt("Prisoner Number")
+    endFunction
+endProperty
+
 Actor property Captor
     Actor function get()
         return Prison_GetForm("Arrest Captor") as Actor
@@ -631,7 +638,7 @@ function Clothe()
 endFunction
 
 function Strip(bool abRemoveUnderwear = true)
-    ; return
+    return
     this.RemoveAllItems(PrisonerBelongingsContainer, false, true)
     self.IncrementStat("Times Stripped")
     self.IsStrippedNaked = true
@@ -1648,14 +1655,13 @@ event OnSleepStart(float afSleepStartTime, float afSleepEndTime)
         return
     endif
 
-    int msgResult = RPB_Utility.ServeTimeMessage().Show()
-    if (msgResult == 0)
-
-    ; if (self.ShouldFastForwardToRelease)
-        self.FastForwardToRelease()
-        Prison.Notify("Fast forwarded to Release")
-        Prison.Notify("Sleep Start is: " + afSleepStartTime + ", Sleep End is: " + afSleepEndTime)
-    ; endif
+    int msgResult = Prison.ServeTimeMessage.Show()
+    if (msgResult == Prison.SERVE_TIME_YES)
+        ; if (self.ShouldFastForwardToRelease)
+            self.FastForwardToRelease()
+            Prison.Notify("Fast forwarded to Release")
+            Prison.Notify("Sleep Start is: " + afSleepStartTime + ", Sleep End is: " + afSleepEndTime)
+        ; endif
     endif
 endEvent
 
