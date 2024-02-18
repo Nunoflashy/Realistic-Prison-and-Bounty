@@ -241,8 +241,19 @@ function InitializePages()
 
     JArray.addStr(_pagesArray, "Stats")
     ; if (Config.ShouldDisplaySentencePage())
-        JArray.addStr(_pagesArray, "Sentence")
+        ; JArray.addStr(_pagesArray, "Sentence")
     ; endif
+    RPB_Prison actorPrison = RPB_Prison.GetPrisonForHold("Haafingar")
+    string prisonName = actorPrison.Name
+    int n = 0
+    while (n < actorPrison.Prisoners.Count)
+        string prisonerName = actorPrison.Prisoners.AtIndex(n).Name
+        int prisonerFormID  = actorPrison.Prisoners.AtIndex(n).GetActor().GetFormID()
+        RPB_Utility.Debug("MCM::InitializePages", "prisonerFormID: " + prisonerFormID)
+        JArray.addStr(_pagesArray, "Sentence" + " - " + prisonerFormID)
+        n += 1
+    endWhile
+
     JArray.addStr(_pagesArray, "")
     JArray.addStr(_pagesArray, "General")
     JArray.addStr(_pagesArray, "Skills")
@@ -643,10 +654,15 @@ endFunction
 ; Event Handling
 ; ============================================================================
 event OnConfigInit()
-    ModName = "Realistic Prison and Bounty"
+    ; ModName = "Realistic Prison & Bounty"
+    ModName = "Realistic Prison & B. - Config"
     self.InitializePages()
     self.InitializeOptions()
     self.RegisterEvents()
+endEvent
+
+event OnConfigOpen()
+    self.InitializePages()
 endEvent
 
 ; event OnConfigOpen()
@@ -699,7 +715,18 @@ event OnPageReset(string page)
     RPB_MCM_Clothing.Render(self)
     RPB_MCM_Debug.Render(self)
     RPB_MCM_Stats.Render(self)
-    RPB_MCM_Sentence.Render(self)
+    ; RPB_MCM_Sentence.Render(self)
+
+    RPB_Prison actorPrison = RPB_Prison.GetPrisonForHold("Haafingar")
+    int n = 0
+    while (n < actorPrison.Prisoners.Count)
+        int prisonerFormID = actorPrison.Prisoners.AtIndex(n).GetActor().GetFormID()
+        RPB_Utility.Debug("MCM::OnPageReset", "prisonerFormID: " + prisonerFormID)
+        RPB_MCM_Sentence.Render(self, prisonerFormID)
+        n += 1
+    endWhile
+
+
 
     RPB_Utility.Debug("MCM::OnPageReset", "Page: " + page, true)
 
