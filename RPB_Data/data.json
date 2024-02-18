@@ -73,7 +73,7 @@
           "typeName": "JFormMap"
         },
         "__formData|Skyrim.esm|0x36897": {
-          "Identifier": "Cell 01",
+          "ID": "Cell 01",
           "Main Interior": "__formData|Skyrim.esm|0x36897",
           "Active": true,
           "String List": ["First Item", "Second Item"],
@@ -120,7 +120,7 @@
           "Interior": []
         },
         "__formData|RealisticPrisonAndBounty.esp|0x3879": {
-          "Identifier": "Cell 03",
+          "ID": "Cell 03",
           "Main Interior": "__formData|RealisticPrisonAndBounty.esp|0x3879",
           "Main Exterior": null,
           "Active": true,
@@ -166,7 +166,7 @@
           "Interior": []
         },
         "__formData|RealisticPrisonAndBounty.esp|0x3880": {
-          "Identifier": "Cell 02",
+          "ID": "Cell 02",
           "Main Interior": "__formData|RealisticPrisonAndBounty.esp|0x3880",
           "Main Exterior": null,
           "Active": true,
@@ -214,7 +214,7 @@
           "Interior": []
         },
         "__formData|RealisticPrisonAndBounty.esp|0x3881": {
-          "Identifier": "Cell 04",
+          "ID": "Cell 04",
           "Main Interior": "__formData|RealisticPrisonAndBounty.esp|0x3881",
           "Main Exterior": null,
           "Active": true,

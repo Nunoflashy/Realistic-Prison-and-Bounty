@@ -50,9 +50,9 @@ RPB_CellDoor property CellDoor
     endFunction
 endProperty
 
-string property Identifier
+string property ID
     string function get()
-        return self.GetRootPropertyOfTypeString("Identifier")
+        return self.GetRootPropertyOfTypeString("ID")
     endFunction
 endProperty
 

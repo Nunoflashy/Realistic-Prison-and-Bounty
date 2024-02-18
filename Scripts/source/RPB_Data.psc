@@ -269,14 +269,14 @@ endFunction
 
 
 ;/
-    Retrieves a jail cell by its identifier from a Prison.
+    Retrieves a jail cell by its ID from a Prison.
 
     JMap&   @apHoldJailObject: The reference to the prison object.
-    string  @asCellIdentifier: The identifier of the jail cell.
+    string  @asCellID: The ID of the jail cell.
 
-    returns (RPB_JailCell): An RPB_JailCell instance that has this identifier.
+    returns (RPB_JailCell): An RPB_JailCell instance that has this ID.
 /;
-RPB_JailCell function Jail_GetJailCellByIdentifier(int apHoldJailObject, string asCellIdentifier) global
+RPB_JailCell function Jail_GetJailCellByID(int apHoldJailObject, string asCellID) global
     int prisonCellsObj  = JMap.getObj(apHoldJailObject, "Cells") ; JFormMap&
     int cellsObjects    = JFormMap.allValues(prisonCellsObj) ; JArray<JMap>
     int numberOfCells   = JValue.count(prisonCellsObj)
@@ -284,9 +284,9 @@ RPB_JailCell function Jail_GetJailCellByIdentifier(int apHoldJailObject, string 
     int i = 0
     while (i < numberOfCells)
         int cellObj     = JArray.getObj(cellsObjects, i) ; JMap&
-        string cellId   = JMap.getStr(cellObj, "Identifier")
+        string cellId   = JMap.getStr(cellObj, "ID")
 
-        if (cellId == asCellIdentifier)
+        if (cellId == asCellID)
             Form cellForm = JFormMap.getNthKey(prisonCellsObj, i)
             return cellForm as RPB_JailCell
         endif

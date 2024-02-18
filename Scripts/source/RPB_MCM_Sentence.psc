@@ -90,7 +90,7 @@ function Render(RPB_MCM mcm, int aiPrisonerFormID) global
     string prisonHold   = prisoner.Prison.Hold
     string prisonCity   = prisoner.Prison.City
     string prisonName   = prisoner.Prison.Name
-    string prisonCell   = prisoner.JailCell.Identifier
+    string prisonCell   = prisoner.JailCell.ID
 
     mcm.AddOptionText("", prisonHold + " | " + prisonCity + " | " + prisonName + " | " + prisonCell, defaultFlags = mcm.OPTION_DISABLED)
     mcm.AddOptionCategory("", flags = mcm.OPTION_DISABLED)

@@ -871,8 +871,8 @@ RPB_JailCell[] function GetCellsWithMixedPrisoners()
     ; If all the prisoners are not the same sex, this cell has both male and female prisoners
 endFunction
 
-RPB_JailCell function GetCellByIdentifier(string asCellIdentifier)
-    return RPB_Data.Jail_GetJailCellByIdentifier(self.GetDataObject(), asCellIdentifier)
+RPB_JailCell function GetCellByID(string asCellIdentifier)
+    return RPB_Data.Jail_GetJailCellByID(self.GetDataObject(), asCellIdentifier)
 endFunction
 
 bool function HasFemaleOnlyCells()
@@ -1826,12 +1826,12 @@ function DEBUG_ShowPrisonerSentenceInfo(RPB_Prisoner apPrisoner, bool abShort = 
     string timeLeftFormatted    = self.GetTimeLeftOfSentenceFormatted(apPrisoner)
 
     if (abShort)
-        LogNoType(apPrisoner.GetName() + " in " + self.Name + " ("+ apPrisoner.JailCell.Identifier +"): { "+ "Sentence: " + sentenceFormatted + " | Time Served: " + timeServedFormatted + string_if (!apPrisoner.IsUndeterminedSentence, " | Time Left: " + timeLeftFormatted) +" }")
+        LogNoType(apPrisoner.GetName() + " in " + self.Name + " ("+ apPrisoner.JailCell.ID +"): { "+ "Sentence: " + sentenceFormatted + " | Time Served: " + timeServedFormatted + string_if (!apPrisoner.IsUndeterminedSentence, " | Time Left: " + timeLeftFormatted) +" }")
     else
         string minSentence = RPB_Utility.GetTimeFormatted(MinimumSentence)
         string maxSentence = RPB_Utility.GetTimeFormatted(MaximumSentence)
 
-        LogNoType("\n" + "Prisoner in "+ self.Name + " ("+ apPrisoner.JailCell.Identifier +")" +": { \n\t" + \
+        LogNoType("\n" + "Prisoner in "+ self.Name + " ("+ apPrisoner.JailCell.ID +")" +": { \n\t" + \
             "Prisoner: "            + "(Name: " + apPrisoner.GetName() + ", Prisoner Reference: " + apPrisoner +  ", Actor Reference: " + apPrisoner.GetActor() + ")" + ", \n\t" + \
             "Minimum Sentence: "    + MinimumSentence + " Days" + " ("+ minSentence +"), \n\t" + \
             "Maximum Sentence: "    + MaximumSentence + " Days" + " ("+ maxSentence +"), \n\t" + \

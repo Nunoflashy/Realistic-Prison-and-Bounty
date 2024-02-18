@@ -257,7 +257,7 @@ endFunction
 
 function Test_Imprisonment_In_Cell_Should_Not_Allow_Overcrowding() global
     RPB_Prison solitudePrison = RPB_API.GetPrisonManager().GetPrison("Haafingar")
-    RPB_JailCell selectedCell = solitudePrison.GetCellByIdentifier("Cell 01")
+    RPB_JailCell selectedCell = solitudePrison.GetCellByID("Cell 01")
     ; RPB_JailCell selectedCell = solitudePrison.JailCells[0] as RPB_JailCell
 
     bool cellCannotAllowOvercrowding = assert_false("Test_Imprisonment_In_Cell_Should_Not_Allow_Overcrowding", selectedCell.AllowOvercrowding, "Cell is allowing overcrowding") 
