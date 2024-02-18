@@ -170,7 +170,6 @@ function SetArrestParameters(string asArrestType, Actor akCaptor, Faction akCrim
 endFunction
 
 function Free()
-    self.ResetArrest()
     Arrest.OnArresteeFreed(this, captor)
 endFunction
 
@@ -178,7 +177,6 @@ endFunction
     Releases this arrestee from custody
 /;
 function Release()
-    self.ResetArrest()
     self.Dispel()
 endFunction
 
@@ -215,10 +213,6 @@ RPB_Prisoner function MakePrisoner()
 endFunction
 
 function TransferArrestPropertiesToPrisoner(RPB_Prison apPrison)
-    RPB_Utility.Debug("Arrestee::TransferArrestPropertiesToPrisoner", "prison: " + apPrison)
-
-    self.SetString("Hold", hold, "Jail") ; Essential for retrieving Prison for the first time in RPB_Prisoner
-    self.SetInt("Prison ID", apPrison.GetID(), "Jail") ; Essential for retrieving Prison for the first time in RPB_Prisoner
     self.SetFloat("Time of Arrest", TimeOfArrest, "Jail")
     self.SetInt("Minute of Arrest", Arrest_GetInt("Minute of Arrest"), "Jail")
     self.SetInt("Hour of Arrest", Arrest_GetInt("Hour of Arrest"), "Jail")
@@ -226,10 +220,6 @@ function TransferArrestPropertiesToPrisoner(RPB_Prison apPrison)
     self.SetInt("Month of Arrest", Arrest_GetInt("Month of Arrest"), "Jail")
     self.SetInt("Year of Arrest", Arrest_GetInt("Year of Arrest"), "Jail")
     self.SetForm("Arrest Captor", captor, "Jail")
-
-    RPB_Utility.Debug("Arrestee::TransferArrestPropertiesToPrisoner", "Prison ID: " + self.GetString("Prison ID", "Jail"))
-    RPB_Utility.Debug("Arrestee::TransferArrestPropertiesToPrisoner", "Prison Alias ID: " + apPrison.GetID())
-
 endFunction
 ; ==========================================================
 ;                           Bounty
@@ -297,20 +287,6 @@ function RevertArrest()
 
     Utility.Wait(0.5)
     self.Destroy()
-endFunction
-
-function ResetArrest()
-    self.RestoreBounty()
-    ArrestVars.RemoveForActor(this, "Arrest::Arrest Faction")
-    ArrestVars.RemoveForActor(this, "Arrest::Arrest Scene")
-    ArrestVars.RemoveForActor(this, "Arrest::Arrest Type")
-    ArrestVars.RemoveForActor(this, "Arrest::Arrested")
-    ArrestVars.RemoveForActor(this, "Arrest::Arrestee")
-    ArrestVars.RemoveForActor(this, "Arrest::Arresting Guard")
-    ArrestVars.RemoveForActor(this, "Arrest::Captured")
-    ArrestVars.RemoveForActor(this, "Arrest::Hold")
-    ArrestVars.RemoveForActor(this, "Arrest::Scenario")
-    ArrestVars.RemoveForActor(this, "Arrest::Time of Arrest")
 endFunction
 
 ; ==========================================================

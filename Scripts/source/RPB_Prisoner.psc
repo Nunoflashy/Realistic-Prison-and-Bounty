@@ -838,15 +838,21 @@ int function GetReleaseTimeHour()
     return releaseMinutes
 endFunction
 
-function SetSentence(int aiSentence = 0, bool abShouldAffectBounty = true)
+function SetSentence(int aiSentenceInDays = 0, bool abShouldAffectBounty = true)
     if (Prison_GetBool("Sentence Set"))
         RPB_Utility.Debug("Prisoner::SetSentence", "A sentence has already been set for this prisoner ("+ self.GetIdentifier() +"). \nConsider using IncreaseSentence() or DecreaseSentence() instead.")
         return
     endif
 
+    if (!self.IsUndeterminedSentence && aiSentenceInDays == 0)
+        Debug("Prisoner::SetSentence", "Setting an undetermined sentence for prisoner " + self.GetActor())
+        self.IsUndeterminedSentence = true
+        return
+    endif
+
     ; Set a sentence based on params
     Prison_SetInt("Sentence", \ 
-        aiValue     = int_if (aiSentence > 0, aiSentence, self.GetSentenceFromBounty()), \
+        aiValue     = int_if (aiSentenceInDays > 0, aiSentenceInDays, self.GetSentenceFromBounty()), \
         aiMinValue  = Prison.MinimumSentence, \
         aiMaxValue  = Prison.MaximumSentence \
     )

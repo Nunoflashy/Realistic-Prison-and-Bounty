@@ -257,24 +257,17 @@ endFunction
 
 function Test_Imprisonment_In_Cell_Should_Not_Allow_Overcrowding() global
     RPB_Prison solitudePrison = RPB_API.GetPrisonManager().GetPrison("Haafingar")
-    RPB_JailCell selectedCell = solitudePrison.JailCells[0] as RPB_JailCell
+    RPB_JailCell selectedCell = solitudePrison.GetCellByIdentifier("Cell 01")
+    ; RPB_JailCell selectedCell = solitudePrison.JailCells[0] as RPB_JailCell
 
     bool cellCannotAllowOvercrowding = assert_false("Test_Imprisonment_In_Cell_Should_Not_Allow_Overcrowding", selectedCell.AllowOvercrowding, "Cell is allowing overcrowding") 
 
     ; Prisoners
     Actor player = Game.GetFormEx(0x14) as Actor
-    ActorBase vivienneOnisBase = Game.GetFormEx(0x132AE) as ActorBase
-    ; ActorBase banditFemale = Game.GetFormEx(0x3CF5C) as ActorBase
     ActorBase playerBase = player.GetBaseObject() as ActorBase
 
-    Package RPB_WanderInCell = Game.GetFormEx(0x200F547) as Package
-
-    Actor playerCopy = player.PlaceActorAtMe(playerBase, 1)
-    Actor playerCopy2 = player.PlaceActorAtMe(playerBase, 1)
-
-    ; Set the prison for the prisoners
-    RPB_StorageVars.SetIntOnForm("Prison ID", playerCopy2, solitudePrison.GetID(), "Jail")
-    RPB_StorageVars.SetIntOnForm("Prison ID", playerCopy, solitudePrison.GetID(), "Jail")
+    Actor playerCopy    = selectedCell.PlaceActorAtMe(playerBase, 1)
+    Actor playerCopy2   = selectedCell.PlaceActorAtMe(playerBase, 1)
 
     RPB_Prisoner playerPrisonerRef  = solitudePrison.MakePrisoner(playerCopy2)
     RPB_Prisoner npcPrisonerRef     = solitudePrison.MakePrisoner(playerCopy)
@@ -286,10 +279,9 @@ function Test_Imprisonment_In_Cell_Should_Not_Allow_Overcrowding() global
     solitudePrison.AssignPrisonerToCell(playerPrisonerRef, selectedCell)
     solitudePrison.AssignPrisonerToCell(npcPrisonerRef, selectedCell)
 
-    ; Make their sentences undetermined
-    playerPrisonerRef.IsUndeterminedSentence = true
-    ; npcPrisonerRef.IsUndeterminedSentence = true
-    solitudePrison.SetSentence(npcPrisonerRef, 100)
+    ; Set their sentences
+    playerPrisonerRef.SetSentence()
+    npcPrisonerRef.SetSentence(100)
 
     bool playerPrisonerHasCell  = assert_equals("Test_Imprisonment_In_Cell_Should_Not_Allow_Overcrowding", selectedCell, playerPrisonerRef.JailCell, "Could not assign the selected cell to the Player Prisoner")
     bool npcPrisonerHasCell     = assert_equals("Test_Imprisonment_In_Cell_Should_Not_Allow_Overcrowding", selectedCell, npcPrisonerRef.JailCell, "Could not assign the selected cell to the NPC Prisoner")
@@ -310,9 +302,10 @@ function Test_Imprisonment_In_Cell_Should_Not_Allow_Overcrowding() global
     int cellMaxPrisoners    = selectedCell.MaxPrisoners
     int prisonersInCell     = selectedCell.PrisonerCount
 
-    bool prisonersNotOvercrowding = assert_true("Test_Imprisonment_In_Cell_Should_Not_Allow_Overcrowding", (prisonersInCell <= cellMaxPrisoners) && (prisonersInCell > 0), "Prisoners exceed the Cell's Maximum Prisoners")
-    bool result = playerPrisonerNotNull && npcPrisonerNotNull && (playerPrisonerHasCell || npcPrisonerHasCell) && prisonersNotOvercrowding && cellCannotAllowOvercrowding
+    bool prisonersNotOvercrowding   = assert_true("Test_Imprisonment_In_Cell_Should_Not_Allow_Overcrowding", (prisonersInCell <= cellMaxPrisoners), "Prisoners exceed the Cell's Maximum Prisoners")
+    bool cellHasPrisoners           = assert_true("Test_Imprisonment_In_Cell_Should_Not_Allow_Overcrowding", (prisonersInCell > 0), "No Prisoners in the cell")
 
+    bool result = playerPrisonerNotNull && npcPrisonerNotNull && (playerPrisonerHasCell || npcPrisonerHasCell) && prisonersNotOvercrowding && cellCannotAllowOvercrowding && cellHasPrisoners
     display_result("Test_Imprisonment_In_Cell_Should_Not_Allow_Overcrowding", result)
 endFunction
 

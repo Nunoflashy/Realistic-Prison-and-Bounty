@@ -871,6 +871,10 @@ RPB_JailCell[] function GetCellsWithMixedPrisoners()
     ; If all the prisoners are not the same sex, this cell has both male and female prisoners
 endFunction
 
+RPB_JailCell function GetCellByIdentifier(string asCellIdentifier)
+    return RPB_Data.Jail_GetJailCellByIdentifier(self.GetDataObject(), asCellIdentifier)
+endFunction
+
 bool function HasFemaleOnlyCells()
 
 endFunction
@@ -1603,11 +1607,8 @@ endFunction
 RPB_Prisoner function GetPrisonerReference(Actor akPrisoner)
     RPB_Prisoner prisonerRef = Prisoners.AtKey(akPrisoner)
 
-    Debug("Prison::GetPrisonerReference", "Prisoner Reference: " + prisonerRef + ", akPrisoner: " + akPrisoner)
-    Debug("Prison::GetPrisonerReference", "Prisoner Reference FormID: " + prisonerRef.GetActor().GetFormID() + ", Base ID: " + prisonerRef.GetActor().GetBaseObject().GetFormID())
-
     if (!prisonerRef)
-        Error("Prison::GetPrisonerReference", "The Actor " + akPrisoner + " is not a prisoner or there was a state mismatch!")
+        Error("The Actor " + akPrisoner + " is not a prisoner or there was a state mismatch!")
         return none
     endif
 
@@ -1782,7 +1783,9 @@ RPB_Prisoner function MakePrisoner(Actor akActor, bool abDelayExecution = true)
     ; Cast the Prisoner spell (to bind the RPB_Prisoner instance script)
     Spell prisonerSpell = GetFormFromMod(0x197D7) as Spell
     akActor.AddSpell(prisonerSpell, false)
-    Debug("Prison::MakePrisoner", "MakePrisoner for " + akActor)
+
+    ; Bind this Prison to the Prisoner (to retrieve it from RPB_Prisoner)
+    RPB_StorageVars.SetIntOnForm("Prison ID", akActor, self.GetID(), "Jail")
 
     ; Delay execution before returning an instance of the prisoner, since we need to let the RPB_Prisoner script register this Prisoner
     if (abDelayExecution)
@@ -1796,22 +1799,10 @@ RPB_Prisoner function MakePrisoner(Actor akActor, bool abDelayExecution = true)
 endFunction
 
 function ImprisonActorImmediately(Actor akActor)
-    RPB_StorageVars.SetFormOnForm("Faction", akActor, self.PrisonFaction, "Arrest")
-    RPB_StorageVars.SetFormOnForm("Arrestee", akActor, akActor, "Arrest")
-    RPB_StorageVars.SetStringOnForm("Arrest Type", akActor, Arrest.ARREST_TYPE_TELEPORT_TO_CELL, "Arrest")
-    RPB_StorageVars.SetStringOnForm("Hold", akActor, self.Hold, "Arrest")
-    RPB_StorageVars.SetFloatOnForm("Time of Arrest", akActor, RPB_Utility.GetCurrentTime(), "Jail")
-    RPB_StorageVars.SetFloatOnForm("Minute of Arrest", akActor, RPB_Utility.GetCurrentMinute(), "Jail")
-    RPB_StorageVars.SetFloatOnForm("Hour of Arrest", akActor, RPB_Utility.GetCurrentHour(), "Jail")
-    RPB_StorageVars.SetFloatOnForm("Day of Arrest", akActor, RPB_Utility.GetCurrentDay(), "Jail")
-    RPB_StorageVars.SetFloatOnForm("Month of Arrest", akActor, RPB_Utility.GetCurrentMonth(), "Jail")
-    RPB_StorageVars.SetFloatOnForm("Year of Arrest", akActor, RPB_Utility.GetCurrentYear(), "Jail")
-
     RPB_Prisoner prisonerRef = self.MakePrisoner(akActor)
 
     if (!prisonerRef.AssignCell())
         Debug(akActor, "Prison::ImprisonActorImmediately", "Could not assign a cell to actor " + akActor)
-        akActor.Disable()
         return
     endif
 
@@ -1819,8 +1810,6 @@ function ImprisonActorImmediately(Actor akActor)
     prisonerRef.MoveToCell()
     prisonerRef.ProcessWhenMoved()
     prisonerRef.SetSentence(self.GetRandomSentence(0, 75))
-
-    RPB_Utility.Debug("Prison::ImprisonActorImmediately", "TimeOfArrest: " + prisonerRef.TimeOfArrest)
 endFunction
 
 ; ==========================================================
@@ -1830,48 +1819,6 @@ endFunction
 ; ==========================================================
 ;                            Debug
 ; ==========================================================
-
-string function DEBUG_GetPrisonerSentenceInfo(RPB_Prisoner akPrisoner, bool abShort = false, bool abIncludeCellInfo = false)
-    if (abShort)
-        ; Time Served
-        int timeServedDays           = akPrisoner.GetTimeServed("Days")
-        int timeServedHours          = akPrisoner.GetTimeServed("Hours of Day")
-
-        ; Time Left
-        int timeLeftToServeDays      = akPrisoner.GetTimeLeftInSentence("Days")
-        int timeLeftToServeHours     = akPrisoner.GetTimeLeftInSentence("Hours of Day")
-
-        string sentenceString   = "Sentence: " + akPrisoner.Sentence + " Days"
-        string timeServedString = timeServedDays + " Days, " + timeServedHours + " Hours"
-        string timeLeftString   = timeLeftToServeDays + " Days, " + timeLeftToServeHours + " Hours"
-        
-        return "{"+ sentenceString +", (Served: "+ timeServedString +"), (Left: "+ timeLeftString +")}" + string_if (abIncludeCellInfo, " (Cell: " + akPrisoner.Prison_GetReference("Cell") + ", Door: " + akPrisoner.Prison_GetReference("Cell Door") + ")")
-    else
-        ; Time Served
-        int timeServedDays           = akPrisoner.GetTimeServed("Days")
-        int timeServedHours          = akPrisoner.GetTimeServed("Hours of Day")
-        int timeServedMinutes        = akPrisoner.GetTimeServed("Minutes of Hour")
-        int timeServedSeconds        = akPrisoner.GetTimeServed("Seconds of Minute")
-
-        ; Time Left
-        int timeLeftToServeDays      = akPrisoner.GetTimeLeftInSentence("Days")
-        int timeLeftToServeHours     = akPrisoner.GetTimeLeftInSentence("Hours of Day")
-        int timeLeftToServeMinutes   = akPrisoner.GetTimeLeftInSentence("Minutes of Hour")
-        int timeLeftToServeSeconds   = akPrisoner.GetTimeLeftInSentence("Seconds of Minute")
-
-        return Hold + " Sentence: { \n\t" + \
-            "Prisoner: "            + "(Name: " + akPrisoner.GetName() + ", Prisoner Reference: " + akPrisoner +  ", Actor Reference: " + akPrisoner.GetActor() + ")" + "\n\t" + \
-            "Minimum Sentence: "    + MinimumSentence + " Days, \n\t" + \
-            "Maximum Sentence: "    + MaximumSentence + " Days, \n\t" + \
-            "Sentence: "            + akPrisoner.Sentence + " Days, \n\t" + \
-            "Time of Arrest: "      + akPrisoner.TimeOfArrest + ", \n\t" + \
-            "Time of Imprisonment: "+ akPrisoner.TimeOfImprisonment + ", \n\t" + \
-            "Time Served: "         + akPrisoner.TimeServed + " ("+ (akPrisoner.TimeServed * 24) + " Hours" +") ["+ timeServedDays + " Days, " + timeServedHours + " Hours, " +  timeServedMinutes + " Minutes, " + timeServedSeconds + " Seconds" +"], \n\t" + \
-            "Time Left: "           + akPrisoner.TimeLeftInSentence + " ("+ (akPrisoner.TimeLeftInSentence * 24) + " Hours" +") ["+ timeLeftToServeDays + " Days, " + timeLeftToServeHours + " Hours, " +  timeLeftToServeMinutes + " Minutes, " + timeLeftToServeSeconds + " Seconds" +"], \n\t" + \
-            "Release Time: "        + akPrisoner.ReleaseTime + "\n" + \
-        " }"
-    endif
-endFunction
 
 function DEBUG_ShowPrisonerSentenceInfo(RPB_Prisoner apPrisoner, bool abShort = false)
     string sentenceFormatted    = self.GetSentenceFormatted(apPrisoner)
