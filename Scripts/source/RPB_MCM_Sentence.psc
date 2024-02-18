@@ -13,6 +13,9 @@ function Render(RPB_MCM mcm, int aiPrisonerFormID) global
         return
     endif
 
+    int emptySpacesLeft     = 0
+    int emptySpacesRight    = 0
+
     mcm.SetCursorFillMode(mcm.TOP_TO_BOTTOM)
 ; ==========================================================
 ;                           Left
@@ -39,6 +42,7 @@ function Render(RPB_MCM mcm, int aiPrisonerFormID) global
     mcm.AddOptionText("", currentTimeFormatted, defaultFlags = mcm.OPTION_DISABLED)
     mcm.AddOptionCategory("", flags = mcm.OPTION_DISABLED)
     mcm.AddEmptyOption()
+    emptySpacesLeft += 1
 
     if (prisoner.TimeOfArrest)
         mcm.AddOptionText("\t\t\t\tTime of Arrest", defaultFlags = mcm.OPTION_DISABLED)
@@ -47,6 +51,7 @@ function Render(RPB_MCM mcm, int aiPrisonerFormID) global
             mcm.AddOptionText("", timeElapsedSinceArrest + " Ago", defaultFlags = mcm.OPTION_DISABLED)
         endif
         mcm.AddEmptyOption()
+        emptySpacesLeft += 1
     endif
 
     if (prisoner.TimeOfImprisonment)
@@ -56,6 +61,7 @@ function Render(RPB_MCM mcm, int aiPrisonerFormID) global
             mcm.AddOptionText("", timeElapsedSinceImprisonment + " Ago", defaultFlags = mcm.OPTION_DISABLED)
         endif
         mcm.AddEmptyOption()
+        emptySpacesLeft += 1
     endif
 
     if (prisoner.ShowReleaseTime && !prisoner.IsUndeterminedSentence)
@@ -71,6 +77,10 @@ function Render(RPB_MCM mcm, int aiPrisonerFormID) global
 
     ; RPB_Tests.DisplayNextDaysOfWeek()
     ; RPB_Tests.DisplayPreviousDaysOfWeek()
+
+    mcm.AddEmptyOption()
+    emptySpacesLeft += 1
+    ; RPB_MCM_Stats.RenderPrisonLeft(mcm, "Castle Dour Dungeon")
 
     mcm.SetCursorPosition(1)
 ; ==========================================================
@@ -95,10 +105,7 @@ function Render(RPB_MCM mcm, int aiPrisonerFormID) global
     mcm.AddOptionText("", prisonHold + " | " + prisonCity + " | " + prisonName + " | " + prisonCell, defaultFlags = mcm.OPTION_DISABLED)
     mcm.AddOptionCategory("", flags = mcm.OPTION_DISABLED)
     mcm.AddEmptyOption()
-
-    ; mcm.AddOptionText("Hold", "Haafingar", defaultFlags = mcm.OPTION_DISABLED)
-    ; mcm.AddOptionText("City", "Solitude", defaultFlags = mcm.OPTION_DISABLED)
-    ; mcm.AddOptionText("Prison Location", "Castle Dour Dungeon", defaultFlags = mcm.OPTION_DISABLED)
+    ; emptySpacesRight += 1
     
     if (prisoner.Bounty && prisoner.ShowBounty)
         mcm.AddOptionText("Bounty for Arrest", prisoner.BountyNonViolent + " Bounty" + string_if (prisoner.BountyViolent > 0, " / " + prisoner.BountyViolent + " Violent Bounty", ""), defaultFlags = mcm.OPTION_DISABLED)
@@ -121,29 +128,19 @@ function Render(RPB_MCM mcm, int aiPrisonerFormID) global
     endif
 
     if (prisoner.ShowTimeServed && prisoner.TimeServed >= 1)
-        if (!prisoner.IsUndeterminedSentence)
-            mcm.AddOptionText("Time Served", timeServedFormatted, defaultFlags = mcm.OPTION_DISABLED)
-        else
-            mcm.AddOptionText("Time in Prison", timeServedFormatted, defaultFlags = mcm.OPTION_DISABLED)
-        endif
-    endif
-endFunction
-
-RPB_Prison function GetPlayerPrison(RPB_MCM mcm) global
-    RPB_Prison playerPrison = RPB_Prison.GetPrisonForImprisonedActor(mcm.Config.Player)
-    
-    if (!playerPrison)
-        return none
+        mcm.AddOptionText(string_if (!prisoner.IsUndeterminedSentence, "Time Served", "Time in Prison"), timeServedFormatted, defaultFlags = mcm.OPTION_DISABLED)
     endif
 
-    return playerPrison
-    ; return playerPrison.GetPrisoner(mcm.Config.Player)
-endFunction
+    mcm.AddEmptyOption()
+    ; emptySpacesRight += 1
 
-RPB_Prisoner function GetPlayerPrisonerReference(RPB_MCM mcm) global
-    return GetPlayerPrison(mcm).GetPrisonerReference(mcm.Config.Player)
-endFunction
+    while (emptySpacesRight < emptySpacesLeft)
+        mcm.AddEmptyOption()
+        emptySpacesRight += 1
+    endWhile
 
+    ; RPB_MCM_Stats.RenderPrisonRight(mcm, "Castle Dour Dungeon")
+endFunction
 
 ; =====================================================
 ; Events
@@ -214,13 +211,10 @@ function OnHighlight(RPB_MCM mcm, int oid) global
 endFunction
 
 function OnDefault(RPB_MCM mcm, int oid) global
-
     if (! ShouldHandleEvent(mcm))
         return
     endif
 
-    ; OnOptionDefault(mcm, mcm.TemporaryGetStatKeyFromOID(oid))
-    ; OnOptionDefault(mcm, mcm.GetKeyFromOption(oid, false))
 endFunction
 
 function OnSelect(RPB_MCM mcm, int oid) global

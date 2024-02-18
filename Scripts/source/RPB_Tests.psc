@@ -181,14 +181,14 @@ function Test_Can_Imprison_Actor_Without_Arresting() global
     ; RPB_StorageVars.SetFormOnForm("Cell", player, Game.GetFormEx(0x2003879) as RPB_JailCell, "Jail")
 
     RPB_Prisoner prisonerRef = solitudePrison.MakePrisoner(player)
+    prisonerRef.SetSentence(4)
     
     ; Set showable options
-    prisonerRef.ShowReleaseTime          = false
-    prisonerRef.ShowSentence             = false
+    prisonerRef.ShowReleaseTime          = true
+    prisonerRef.ShowSentence             = true
     prisonerRef.ShowTimeServed           = true
-    prisonerRef.ShowTimeLeftInSentence   = false
-    prisonerRef.IsUndeterminedSentence   = true
-    prisonerRef.ShowBounty               = false
+    prisonerRef.ShowTimeLeftInSentence   = true
+    prisonerRef.ShowBounty               = true
 
     prisonerRef.AssignCell()
     prisonerRef.MoveToCell()
@@ -258,7 +258,6 @@ endFunction
 function Test_Imprisonment_In_Cell_Should_Not_Allow_Overcrowding() global
     RPB_Prison solitudePrison = RPB_API.GetPrisonManager().GetPrison("Haafingar")
     RPB_JailCell selectedCell = solitudePrison.GetCellByID("Cell 01")
-    ; RPB_JailCell selectedCell = solitudePrison.JailCells[0] as RPB_JailCell
 
     bool cellCannotAllowOvercrowding = assert_false("Test_Imprisonment_In_Cell_Should_Not_Allow_Overcrowding", selectedCell.AllowOvercrowding, "Cell is allowing overcrowding") 
 

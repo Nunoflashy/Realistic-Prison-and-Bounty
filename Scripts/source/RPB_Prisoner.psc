@@ -597,7 +597,7 @@ function Imprison()
     string releaseDateFormatted = Prison.GetTimeOfReleaseFormatted(self)
 
     if (self.ShowSentence && !self.IsUndeterminedSentence)
-        Config.NotifyJail("Your sentence was set at "+ sentenceFormatted +" in prison for " + self.GetHold(), self.IsPlayer())
+        Config.NotifyJail("Your sentence was set at "+ sentenceFormatted +" in " + Prison.Name, self.IsPlayer())
         Config.NotifyJail(self.GetName() + " has been sentenced to "+ sentenceFormatted +"  in prison for " + self.GetHold(), !self.IsPlayer())
     endif
     
@@ -838,6 +838,42 @@ int function GetReleaseTimeHour()
     return releaseMinutes
 endFunction
 
+function UndetermineSentence()
+    if (self.IsUndeterminedSentence)
+        Warn("The prisoner " + self.Name + " already has an undetermined sentence.")
+        return
+    endif
+
+    self.IsUndeterminedSentence = true
+endFunction
+
+;/
+    Sets a new sentence from the point in time of the time already served in prison.
+    If the time already served goes beyond the original sentence, this is essentially increasing the sentence beyond
+    its initial purpose.
+
+    This is most useful when the time served goes beyond the sentence, in all other cases, IncreaseSentence() should be used instead.
+
+    int     @aiSentenceInDays: The days to set the new sentence from the time already served.
+    bool?   @abShouldAffectBounty: Whether the sentence should affect the bounty.
+/;
+function SetSentenceFromTimeServed(int aiSentenceInDays, bool abShouldAffectBounty = false)
+    ; Sets a new sentence from the time the prisoner has served at the point of calling this function, essentially increasing the already existing sentence
+
+    ; Original Sentence: 30
+    ; TimeServed: 40 (Exceeds sentence by 10d)
+    ; aiSentenceInDays: 20
+    ; New Sentence: 40 + 20 = 60 (20d left)
+    Prison_SetInt("Sentence", (TimeServed as int) +  aiSentenceInDays)
+
+    if (abShouldAffectBounty)
+        int bountyEquivalentOfSentence = aiSentenceInDays * Prison.BountyToSentence ; 2 Days = 200 Bounty if BountyToSentence = 100
+        Prison_SetInt("Bounty Non-Violent", BountyNonViolent + bountyEquivalentOfSentence, "Arrest")
+    endif
+
+    self.OnSentenceSet(Sentence, CurrentTime)
+endFunction
+
 function SetSentence(int aiSentenceInDays = 0, bool abShouldAffectBounty = true)
     if (Prison_GetBool("Sentence Set"))
         RPB_Utility.Debug("Prisoner::SetSentence", "A sentence has already been set for this prisoner ("+ self.GetIdentifier() +"). \nConsider using IncreaseSentence() or DecreaseSentence() instead.")
@@ -888,7 +924,7 @@ endFunction
 
 function DecreaseSentence(int aiDaysToDecreaseBy, bool abShouldAffectBounty = true)
     int previousSentence    = Sentence
-    int newSentence         = previousSentence + Max(0, aiDaysToDecreaseBy) as int
+    int newSentence         = previousSentence - Max(0, aiDaysToDecreaseBy) as int
 
     ; Set the sentence
     Prison_SetInt("Sentence", \ 
@@ -1346,7 +1382,7 @@ function FastForwardToRelease()
     ; if (__fastForwardedToRelease)
     ;     return false
     ; endif
-
+    ; Utility.Wait(8.0)
     ; If the Release must fall in between Minimum and Maximum release hours, set the hour to the minimum before passing the days.
     if (self.HasReleaseTimeExtraHours())
         RPB_Utility.SetGameHour(Prison.ReleaseTimeMinimumHour)
@@ -1612,11 +1648,15 @@ event OnSleepStart(float afSleepStartTime, float afSleepEndTime)
         return
     endif
 
+    int msgResult = RPB_Utility.ServeTimeMessage().Show()
+    if (msgResult == 0)
+
     ; if (self.ShouldFastForwardToRelease)
         self.FastForwardToRelease()
         Prison.Notify("Fast forwarded to Release")
         Prison.Notify("Sleep Start is: " + afSleepStartTime + ", Sleep End is: " + afSleepEndTime)
     ; endif
+    endif
 endEvent
 
 ; ==========================================================

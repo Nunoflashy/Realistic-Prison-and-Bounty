@@ -474,7 +474,7 @@ string property Hold
 endProperty
 
 function SetSentence(RPB_Prisoner akPrisoner, float afSentence = 0.0)
-    akPrisoner.SetSentence(float_if (afSentence != 0.0, afSentence, akPrisoner.GetSentenceFromBounty()))
+    ; akPrisoner.SetSentence(int_if (afSentence != 0.0, afSentence, akPrisoner.GetSentenceFromBounty()))
 endFunction
 
 ; ==========================================================

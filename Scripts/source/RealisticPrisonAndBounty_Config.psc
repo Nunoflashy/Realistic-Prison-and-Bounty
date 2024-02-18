@@ -1,6 +1,6 @@
 Scriptname RealisticPrisonAndBounty_Config extends Quest
 
-import RealisticPrisonAndBounty_Util
+import RPB_Utility
 import PO3_SKSEFunctions
 import Math
 
@@ -21,10 +21,6 @@ endFunction
 
 string function GetModName() global
     return "Realistic Prison and Bounty"
-endFunction
-
-Form function GetFormFromMod(int formId) global
-    return Game.GetFormFromFile(formId, GetPluginName())
 endFunction
 
 Form property mainAPI
@@ -169,7 +165,7 @@ bool function SetHoldLocations()
         i += 1
     endWhile
 
-    Debug(self, "Config::SetHoldLocations", "Length: " + miscVars.GetLengthOf("Locations"))
+    Debug("Config::SetHoldLocations", "Length: " + miscVars.GetLengthOf("Locations"))
 
     return true
 endFunction
@@ -178,7 +174,7 @@ bool function IsInLocationFromHold(string hold)
 ; float x = StartBenchmark()
 
     if (!miscVars.Exists("Locations["+ hold +"]"))
-        Error(none, "Config::IsInLocationFromHold", "Location does not exist for this hold.")
+        Error("Location does not exist for this hold.")
         return false
     endif
 
@@ -187,7 +183,7 @@ bool function IsInLocationFromHold(string hold)
         Location holdLocation = miscVars.GetFormFromArray("Locations["+ hold +"]", i) as Location
         ; As soon as the player is in any location for this hold, return.
         if (Player.IsInLocation(holdLocation))
-            Debug(none, "IsInLocationFromHold", "Player is in location: " + holdLocation.GetName() + " ("+ holdLocation.GetFormID() +")", MCM.IS_DEBUG)
+            Debug("IsInLocationFromHold", "Player is in location: " + holdLocation.GetName() + " ("+ holdLocation.GetFormID() +")", MCM.IS_DEBUG)
         ;    EndBenchmark(x, i + " iterations (IsLocationFromHold): returned true")
 
             return true
@@ -914,18 +910,10 @@ bool function IsInfamyKnown(string hold)
     return isInfamyEnabled(hold) && getInfamyGained(hold) >= getInfamyKnownThreshold(hold)
 endFunction
 
-function RemoveKeys(ObjectReference akContainer = none)
-    RemoveKeysFromActor(Player, akContainer)
-endFunction
-
-function RemoveWeapons(ObjectReference akContainer = none)
-    RemoveWeaponsFromActor(Player, akContainer)
-endFunction
-
 bool function HasBountyInHold(string hold)
     Faction crimeFaction = GetFaction(hold)
     if (!crimeFaction)
-        Error(self, "Config", "The faction does not exist. " + "(Hold: " + hold + ")")
+        Error("The faction does not exist. " + "(Hold: " + hold + ")")
         return false
     endif
 

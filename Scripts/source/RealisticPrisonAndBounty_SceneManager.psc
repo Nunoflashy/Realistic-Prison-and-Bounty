@@ -1,7 +1,8 @@
 scriptname RealisticPrisonAndBounty_SceneManager extends Quest
 
 import RealisticPrisonAndBounty_Config
-import RealisticPrisonAndBounty_Util
+; import RealisticPrisonAndBounty_Util
+import RPB_Utility
 
 RealisticPrisonAndBounty_Config property Config
     RealisticPrisonAndBounty_Config function get()
@@ -263,16 +264,16 @@ function SetupScenes()
         i += 1
     endWhile
     EndBenchmark(x, "SetupScenes")
-    Debug(self, "SceneManager::SetupScenes", "Loaded "+ SceneCount +" Scenes: [\n" + sceneListAsString + "]")
+    Debug("SceneManager::SetupScenes", "Loaded "+ SceneCount +" Scenes: [\n" + sceneListAsString + "]")
 endFunction
 
 Scene function GetScene(string asSceneName)
     if (!self.SceneExists(asSceneName))
-        Error(self, "SceneManager::GetScene", "Scene " + asSceneName + " does not exist!")
+        Error("SceneManager::GetScene", "Scene " + asSceneName + " does not exist!")
         return none
     endif
 
-    Info(self, "SceneManager::GetScene", "Scenes: " + SceneCount)
+    Info("SceneManager::GetScene", "Scenes: " + SceneCount)
     ; return Game.GetFormFromFile(JMap.getInt(sceneContainer, asSceneName), GetPluginasSceneName()) as Scene
     return GetFormFromMod(self.GetSceneFormID(asSceneName)) as Scene
 endFunction
@@ -407,7 +408,7 @@ string function GetAliasName(string aliasName, int aliasIndex, bool checkForExis
     endif
 
     if (checkForExistence && self.GetAliasByName(finalName) == none)
-        Info(self, "SceneManager::GetAliasByName", "Alias " + finalName + " does not exist!")
+        Info("SceneManager::GetAliasByName", "Alias " + finalName + " does not exist!")
         return ""
     endif
 
@@ -817,13 +818,13 @@ event OnSceneStart(string name, Scene sender)
 
     endif
 
-    Debug(self, "SceneManager::OnSceneStart", self.GetSceneParametersDebugInfo(sender, name, params))
+    Debug("SceneManager::OnSceneStart", self.GetSceneParametersDebugInfo(sender, name, params))
 endEvent
 
 event OnScenePlaying(string name, int phaseEvent, int phase, Scene sender)
     ObjectReference[] params = self.GetSceneParameters(name)
 
-    Debug(self, "SceneManager::OnScenePlaying", string_if (phaseEvent == PHASE_START, "(Start) Playing", "(End) Played") + " Phase " + phase + " of " + name)
+    Debug("SceneManager::OnScenePlaying", string_if (phaseEvent == PHASE_START, "(Start) Playing", "(End) Played") + " Phase " + phase + " of " + name)
 
     if (name == SCENE_ARREST_START_01)
         Actor escort   = params[0] as Actor
@@ -924,8 +925,8 @@ event OnScenePlaying(string name, int phaseEvent, int phase, Scene sender)
                 ; ObjectReference guardWaitingSpotMarker = GetFormFromMod(0x15700) as ObjectReference
                 ; guard.PlaceAtMe(guardWaitingSpotMarker)
                 ; BindAliasTo(self.GetGuardWaitingSpot(), guardWaitingSpotMarker)
-                ; Debug(self, "SceneManager::OnScenePlaying", "Placed GuardWaitingSpotMarker: " + guardWaitingSpotMarker + " near " + guard)
-                ; Debug(self, "SceneManager::OnScenePlaying", "GuardWaitingSpotMarker Alias: " + self.GetGuardWaitingSpot() + " References ("+ self.GetGuardWaitingSpot() .GetReference() +")")
+                ; Debug("SceneManager::OnScenePlaying", "Placed GuardWaitingSpotMarker: " + guardWaitingSpotMarker + " near " + guard)
+                ; Debug("SceneManager::OnScenePlaying", "GuardWaitingSpotMarker Alias: " + self.GetGuardWaitingSpot() + " References ("+ self.GetGuardWaitingSpot() .GetReference() +")")
 
 
             elseif (phase == 4)
@@ -1365,7 +1366,7 @@ event OnSceneEnd(string name, Scene sender)
 
         ; strippedPrisoner.SetAV("Paralysis", 0)
         Debug.SendAnimationEvent(strippedPrisoner, "IdleLayDownExit")
-        Debug(self, "SceneManager::OnSceneEnd", "Reached Forced Stripping block")
+        Debug("SceneManager::OnSceneEnd", "Reached Forced Stripping block")
         
         strippedPrisoner.SendModEvent("RPB_SendPrisonActionRequest", "RemoveUnderwear")
         ; jail.Prisoner.RemoveUnderwear()
@@ -1392,19 +1393,19 @@ event OnSceneEnd(string name, Scene sender)
     endif
 
     self.ResetSceneOverride()
-    Debug(self, "SceneManager::OnSceneEnd", self.GetSceneParametersDebugInfo(sender, name, params))
+    Debug("SceneManager::OnSceneEnd", self.GetSceneParametersDebugInfo(sender, name, params))
 endEvent
 
 function StartScene(string asSceneName, int akSceneParameters, int aiStartingPhase = 1, bool abForceStart = false)
     if (!self.SceneExists(asSceneName))
-        Error(self, "SceneManager::StartScene", "Tried to start Scene " + asSceneName + ": Scene does not exist!")
+        Error("SceneManager::StartScene", "Tried to start Scene " + asSceneName + ": Scene does not exist!")
         return
     endif
 
     Scene sceneObject = self.GetScene(asSceneName)
 
     if (sceneObject.IsPlaying() && !abForceStart)
-        Info(self, "SceneManager::StartScene", "Scene " + sceneObject + " is currently playing, aborting call!")
+        Info("SceneManager::StartScene", "Scene " + sceneObject + " is currently playing, aborting call!")
         return
     endif
 
@@ -1457,7 +1458,7 @@ function StartEscortToCell_02(Actor akGuard, Actor akPrisoner, ObjectReference a
 endFunction
 
 function StartEscortFromCell(Actor akGuard, Actor akPrisoner, ObjectReference akJailCellDoor, ObjectReference akJailChest)
-    Debug(self, "SceneManager::StartEscortFromCell", "Starting Scene " + EscortFromCell +", params: ["+ akGuard + "," + akPrisoner + "," + akJailCellDoor + "," + akJailChest + "]")
+    Debug("SceneManager::StartEscortFromCell", "Starting Scene " + EscortFromCell +", params: ["+ akGuard + "," + akPrisoner + "," + akJailCellDoor + "," + akJailChest + "]")
     ; Bind the captor to its alias to lead the escort scene
     BindAliasTo(self.GetGuard(), akGuard)
 
@@ -1714,7 +1715,7 @@ endFunction
 
 function StartEludingArrest(Actor akGuard, Actor akEluder)
     if (EludingArrest.IsPlaying())
-        Debug(self, "SceneManager::StartEludingArrest", "Scene is currently playing, aborting call!")
+        Debug("SceneManager::StartEludingArrest", "Scene is currently playing, aborting call!")
         return
     endif
 
@@ -1724,7 +1725,7 @@ function StartEludingArrest(Actor akGuard, Actor akEluder)
     ; Bind the Eluder, who is eluding arrest
     BindAliasTo(self.GetEluder(), akEluder)
 
-    Debug(self, "SceneManager::StartEludingArrest", "Scene: "+ EludingArrest +" Params ["+ akGuard + ", " + akEluder + "] | Aliases: ["+ self.GetGuard() + ", " + self.GetEluder() + "]")
+    Debug("SceneManager::StartEludingArrest", "Scene: "+ EludingArrest +" Params ["+ akGuard + ", " + akEluder + "] | Aliases: ["+ self.GetGuard() + ", " + self.GetEluder() + "]")
 
     EludingArrest.Start()
 endFunction

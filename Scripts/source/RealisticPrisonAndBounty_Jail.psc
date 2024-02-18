@@ -207,7 +207,7 @@
 ; endFunction
 
 ; function ShowArrestVars()
-;     Debug(self, "ShowArrestVars", "\n" + Hold + " Arrest Vars: " + GetContainerList(arrestVars.GetHandle()))
+;     Debug("ShowArrestVars", "\n" + Hold + " Arrest Vars: " + GetContainerList(arrestVars.GetHandle()))
 ; endFunction
 
 ; function ShowArrestParams()
@@ -215,7 +215,7 @@
 ;     int arrestParamsObj = JMap.getObj(arrestVars.GetHandle(), "Arrest::Arrest Params")
 ;     int arrestParamsBV = JMap.getInt(arrestVars.GetHandle(), "Arrest::Bounty Violent")
 ;     bool isObject = JValue.isMap(arrestParamsObj)
-;     Debug(self, "ShowArrestParams (id: "+ arrestParamsObj +", isObject: "+ isObject +", arrestParamsBV: "+ arrestParamsBV +")", "\n" + Hold + " Arrest Params: " + GetContainerList(arrestParams))
+;     Debug("ShowArrestParams (id: "+ arrestParamsObj +", isObject: "+ isObject +", arrestParamsBV: "+ arrestParamsBV +")", "\n" + Hold + " Arrest Params: " + GetContainerList(arrestParams))
 ; endFunction
 
 ; event OnJailBegin()
@@ -240,13 +240,13 @@
 ; endEvent
 
 ; event OnJailedEnd(string eventName, string strArg, float numArg, Form sender)
-;     Debug(self, "OnJailedEnd", "Ending jailing process... (Released, Escaped?)")
+;     Debug("OnJailedEnd", "Ending jailing process... (Released, Escaped?)")
 ;     arrestVars.Clear()
 ; endEvent
 
 ; state Jailed
 ;     event OnBeginState()
-;         Debug(self, "OnBeginState", CurrentState + " state begin", config.IS_DEBUG)
+;         Debug("OnBeginState", CurrentState + " state begin", config.IS_DEBUG)
 
 ;         ; First jail update
 ;         Prisoner.RegisterLastUpdate()
@@ -318,12 +318,12 @@
 ;             Prisoner.Clothe()
 ;         endif
 
-;         Debug(self, "OnUndressed", "undressedActor: " + undressedActor, config.IS_DEBUG)
+;         Debug("OnUndressed", "undressedActor: " + undressedActor, config.IS_DEBUG)
 ;     endEvent
 
 ;     event OnClothed(Actor clothedActor, RealisticPrisonAndBounty_Outfit prisonerOutfit)
 ;         ; Do anything that needs to be done after the actor has been stripped and clothed.
-;         Debug(self, "OnClothed", "clothedActor: " + clothedActor, config.IS_DEBUG)
+;         Debug("OnClothed", "clothedActor: " + clothedActor, config.IS_DEBUG)
 
 ;     endEvent
 
@@ -341,7 +341,7 @@
 ;             Captor.RegisterForLOS(_captor, Arrestee)
 
 ;             _captor.SetAlert()
-;             Debug(self, "OnCellDoorOpen", "Got Actor: " + _captor, config.IS_DEBUG)
+;             Debug("OnCellDoorOpen", "Got Actor: " + _captor, config.IS_DEBUG)
 ;             Captor.ForceRefTo(_captor)
 ;         endif
 ;     endEvent
@@ -351,7 +351,7 @@
 ;     endEvent
 
 ;     event OnGuardSeesPrisoner(Actor akGuard)
-;         Debug(self, "OnGuardSeesPrisoner", akGuard + " is seeing " + Arrestee + ", but the prisoner is in jail.", config.IS_DEBUG)
+;         Debug("OnGuardSeesPrisoner", akGuard + " is seeing " + Arrestee + ", but the prisoner is in jail.", config.IS_DEBUG)
 ;     endEvent
 
 ;     event OnEscapeFail()
@@ -394,7 +394,7 @@
 ;     endEvent
 
 ;     event OnUpdateGameTime()
-;         Debug(self, "OnUpdateGameTime", "{ timeSinceLastUpdate: "+ Prisoner.TimeSinceLastUpdate +", CurrentTime: "+ Prisoner.CurrentTime +", LastUpdate: "+ Prisoner.LastUpdate +" }", config.IS_DEBUG)
+;         Debug("OnUpdateGameTime", "{ timeSinceLastUpdate: "+ Prisoner.TimeSinceLastUpdate +", CurrentTime: "+ Prisoner.CurrentTime +", LastUpdate: "+ Prisoner.LastUpdate +" }", config.IS_DEBUG)
         
 ;         if (Prisoner.HasActiveBounty())
 ;             ; Update any active bounty the prisoner may have while in jail, and add it to the sentence
@@ -425,7 +425,7 @@
 ;     endEvent
 
 ;     event OnEndState()
-;         Debug(self, "OnEndState", CurrentState + " state end", config.IS_DEBUG)
+;         Debug("OnEndState", CurrentState + " state end", config.IS_DEBUG)
 ;         ; Terminate Jailed process, Actor should be released by now.
 ;         ; Revert to normal timescale
 ;     endEvent
@@ -437,7 +437,7 @@
 ; /;
 ; state Escaping
 ;     event OnBeginState()
-;         Debug(self, "OnBeginState", CurrentState + " state begin", config.IS_DEBUG)
+;         Debug("OnBeginState", CurrentState + " state begin", config.IS_DEBUG)
 ;     endEvent
 
 ;     event OnUpdateGameTime()
@@ -452,7 +452,7 @@
 ;     endEvent
 
 ;     event OnGuardSeesPrisoner(Actor akGuard)
-;         Debug(self, "OnGuardSeesPrisoner", akGuard + " is seeing " + Arrestee, config.IS_DEBUG)
+;         Debug("OnGuardSeesPrisoner", akGuard + " is seeing " + Arrestee, config.IS_DEBUG)
 ;         akGuard.SetAlert()
 ;         akGuard.StartCombat(Arrestee)
 ;         GotoState(STATE_ESCAPED)
@@ -460,7 +460,7 @@
 ;     endEvent
 
 ;     event OnCellDoorOpen(ObjectReference akCellDoor, Actor whoOpened)
-;         Debug(self, "OnCellDoorOpen", "Cell door open", config.IS_DEBUG)
+;         Debug("OnCellDoorOpen", "Cell door open", config.IS_DEBUG)
 ;     endEvent
 
 ;     event OnCellDoorClosed(ObjectReference akCellDoor, Actor whoClosed)
@@ -478,13 +478,13 @@
 ;             bool isArresteeInsideCell = IsActorNearReference(Arrestee, Prisoner.JailCell)
 
 ;             if (isArresteeInsideCell)
-;                 Debug(self, "OnCellDoorClosed", Arrestee + " is inside the cell.", config.IS_DEBUG)
+;                 Debug("OnCellDoorClosed", Arrestee + " is inside the cell.", config.IS_DEBUG)
 ;                 GotoState("Jailed") ; Revert to Jailed since we have not been found escaping yet
 ;             endif
 ;             float distanceFromMarkerToDoor = Prisoner.JailCell.GetDistance(arrestVars.CellDoor)
-;             Debug(self, "OnCellDoorClosed", "Distance from marker to cell door: " + distanceFromMarkerToDoor, config.IS_DEBUG)
+;             Debug("OnCellDoorClosed", "Distance from marker to cell door: " + distanceFromMarkerToDoor, config.IS_DEBUG)
 ;         endif
-;         Debug(self, "OnCellDoorClosed", "Cell door closed", config.IS_DEBUG)
+;         Debug("OnCellDoorClosed", "Cell door closed", config.IS_DEBUG)
 ;     endEvent
 
 ;     event OnEscapeFail()
@@ -492,7 +492,7 @@
 ;     endEvent
 
 ;     event OnEndState()
-;         Debug(self, "OnEndState", CurrentState + " state end", config.IS_DEBUG)
+;         Debug("OnEndState", CurrentState + " state end", config.IS_DEBUG)
 ;         ; Terminate Escaped process, Actor should have escaped by now.
 ;     endEvent
 ; endState
@@ -503,11 +503,11 @@
 ; /;
 ; state Escaped
 ;     event OnBeginState()
-;         Debug(self, "OnBeginState", CurrentState + " state begin", config.IS_DEBUG)
+;         Debug("OnBeginState", CurrentState + " state begin", config.IS_DEBUG)
 ;     endEvent
 
 ;     event OnGuardSeesPrisoner(Actor akGuard)
-;         Debug(self, "OnGuardSeesPrisoner", akGuard + " is seeing " + Arrestee + " but the prisoner has already been seen escaping.", config.IS_DEBUG)
+;         Debug("OnGuardSeesPrisoner", akGuard + " is seeing " + Arrestee + " but the prisoner has already been seen escaping.", config.IS_DEBUG)
 ;         Captor.UnregisterForLOS(akGuard, config.Player)
 ;     endEvent
 
@@ -536,17 +536,17 @@
 ;             Prisoner.Clothe()
 ;         endif
 
-;         Debug(self, "OnUndressed", "undressedActor: " + undressedActor, config.IS_DEBUG)
+;         Debug("OnUndressed", "undressedActor: " + undressedActor, config.IS_DEBUG)
 ;     endEvent
 
 ;     event OnClothed(Actor clothedActor, RealisticPrisonAndBounty_Outfit prisonerOutfit)
 ;         ; Do anything that needs to be done after the actor has been stripped and clothed.
-;         Debug(self, "OnClothed", "clothedActor: " + clothedActor, config.IS_DEBUG)
+;         Debug("OnClothed", "clothedActor: " + clothedActor, config.IS_DEBUG)
 
 ;     endEvent
 
 ;     event OnLocationChange(Location akOldLocation, Location akNewLocation)
-;         Debug(self, "Jail::OnLocationChange", "akOldLocation: " + akOldLocation + ", akNewLocation: " + akNewLocation)
+;         Debug("Jail::OnLocationChange", "akOldLocation: " + akOldLocation + ", akNewLocation: " + akNewLocation)
 ;     endEvent
 
 ;     event OnUpdateGameTime()
@@ -567,13 +567,13 @@
 ;     endEvent
 
 ;     event OnEndState()
-;         Debug(self, "OnEndState", CurrentState + " state end", config.IS_DEBUG)
+;         Debug("OnEndState", CurrentState + " state end", config.IS_DEBUG)
 ;     endEvent
 ; endState
 
 ; state Released
 ;     event OnBeginState()
-;         Debug(self, "OnBeginState", CurrentState + " state begin", config.IS_DEBUG)
+;         Debug("OnBeginState", CurrentState + " state begin", config.IS_DEBUG)
 ;         ; Begin Release process, Actor is arrested and not yet free
 ;         Prisoner.OpenCellDoor()
 ;         ; Prisoner.ForceRefTo(arrestVars.Arrestee)
@@ -590,13 +590,13 @@
 
 ;     event OnEndState()
 ;         ; Terminate Release process, Actor should be free at this point
-;         Debug(self, "OnEndState", CurrentState + " state end", config.IS_DEBUG)
+;         Debug("OnEndState", CurrentState + " state end", config.IS_DEBUG)
 ;     endEvent
 ; endState
 
 ; state Free
 ;     event OnBeginState()
-;         Debug(self, "OnBeginState", CurrentState + " state begin", config.IS_DEBUG)
+;         Debug("OnBeginState", CurrentState + " state begin", config.IS_DEBUG)
 ;         ; Begin Free process, Actor is not arrested and is Free
 ;         ; arrestVars.Clear()
 ;         Prisoner.ResetArrestVars()
@@ -606,7 +606,7 @@
 ;     endEvent
 
 ;     event OnEndState()
-;         Debug(self, "OnEndState", CurrentState + " state end", config.IS_DEBUG)
+;         Debug("OnEndState", CurrentState + " state end", config.IS_DEBUG)
 ;         ; Terminate Free process, Processing after Actor is free should be done by now.
 ;     endEvent
 ; endState
@@ -617,12 +617,12 @@
 
 ; event OnFriskBegin(Actor friskSearchPerformer, Actor actorToFrisk)
 ;     ; Happens when the actor is beginning to be frisked
-;     Debug(self, "OnFriskBegin", CurrentState + " event invoked", config.IS_DEBUG)
+;     Debug("OnFriskBegin", CurrentState + " event invoked", config.IS_DEBUG)
 ; endEvent
 
 ; event OnFriskEnd(Actor friskSearchPerformer, Actor friskedActor)
 ;     ; Happens when the actor has been frisked
-;     Debug(self, "OnFriskEnd", CurrentState + " event invoked", config.IS_DEBUG)
+;     Debug("OnFriskEnd", CurrentState + " event invoked", config.IS_DEBUG)
 ;     self.SetupJailVars()
 ;     Prisoner.Frisk()
 ;     Prisoner.Restrain()
@@ -635,7 +635,7 @@
 
 ; event OnStripBegin(Actor stripSearchPerformer, Actor actorToStrip)
 ;     ; Happens when the actor is about to be stripped
-;     Debug(self, "OnStripBegin", CurrentState + " event invoked")
+;     Debug("OnStripBegin", CurrentState + " event invoked")
 
 ;     RPB_Prisoner prisonerRef = self.GetPrisonerReference(actorToStrip)
 ;     prisonerRef.Uncuff()
@@ -646,7 +646,7 @@
 ; event OnStripping(Actor stripSearchPerformer, Actor actorToStrip)
 ;     RPB_Prisoner prisonerRef = self.GetPrisonerReference(actorToStrip)
 
-;     Debug(self, "OnStripping", CurrentState + " event invoked")
+;     Debug("OnStripping", CurrentState + " event invoked")
 
 ;     prisonerRef.Strip()
 ;     ; if (actorToStrip != Prisoner.this)
@@ -662,7 +662,7 @@
 ;     prisonerRef.EscortToCell(stripSearchPerformer)
 
 ;     ; Happens when the actor has been stripped
-;     Debug(self, "OnStripEnd", CurrentState + " event invoked")
+;     Debug("OnStripEnd", CurrentState + " event invoked")
 
 ;     ; debug.notification("OnStripEnd: Called from within the Jail Script")
 ;     ; self.SetupJailVars()
@@ -673,7 +673,7 @@
 ;     ; debug.notification("Jail::OnStripEnd")
 ;     ; ; arrestVars.SetForm("Jail::Cell Door", GetNearestJailDoorOfType(GetJailBaseDoorID(arrestVars.Hold), arrestVars.JailCell, 10000))
 ;     ; Prisoner.SetupPrisonerVars()
-;     Debug(self, "OnStripEnd", "Vars: [ \n" + \
+;     Debug("OnStripEnd", "Vars: [ \n" + \
 ;     "arrestVars.Captor: " + arrestVars.Captor + "(Object: "+ arrestVars.Captor.GetBaseObject().GetName() +")\n" + \
 ;     "arrestVars.Arrestee: " + arrestVars.Arrestee + "(Object: "+ arrestVars.Arrestee.GetBaseObject().GetName() +")\n" + \
 ;     "arrestVars.JailCell: " + arrestVars.JailCell + "(Object: "+ arrestVars.JailCell.GetBaseObject().GetName() +")\n" + \
@@ -693,13 +693,13 @@
 ; endEvent
 
 ; event OnBountyPaymentFailed(Actor akGuard, Actor akPrisoner)
-;     Debug(self, "Jail::OnBountyPaymentFailed", CurrentState + " event invoked")
+;     Debug("Jail::OnBountyPaymentFailed", CurrentState + " event invoked")
 ;     SceneManager.StartStripping(akGuard, akPrisoner)
 ; endEvent
 
 ; event OnEscortToJailBegin(Actor escortActor, Actor escortedActor)
 ;     ; Happens when the actor is being escorted to jail
-;     Debug(self, "OnEscortToJailBegin", CurrentState + " event invoked")
+;     Debug("OnEscortToJailBegin", CurrentState + " event invoked")
 ;     Form cuffs = Game.GetFormEx(0xA081D2F)
 
 ;     escortedActor.SheatheWeapon()
@@ -740,7 +740,7 @@
 ;     JailVars.List("Jail")
 
 ;     ; if (!prisonerRef.Imprison())
-;     ;     Error(self, "Jail::OnEscortToJailEnd", "Could not imprison " + prisonerRef.GetActor() + ", what to do next?")
+;     ;     Error("Jail::OnEscortToJailEnd", "Could not imprison " + prisonerRef.GetActor() + ", what to do next?")
 ;     ;     prisonerRef.Release()
 ;     ;     return
 ;     ; endif
@@ -768,8 +768,8 @@
 
 ; event OnEscortToCellBegin(Actor escortActor, Actor escortedActor)
 ;     ; Happens when the actor is being escorted to their cell
-;     Debug(self, "Jail::OnEscortToCellBegin", CurrentState + " event invoked")
-;     Debug(self, "Jail::OnEscortToCellBegin", "Escorted Actor: " + escortedActor)
+;     Debug("Jail::OnEscortToCellBegin", CurrentState + " event invoked")
+;     Debug("Jail::OnEscortToCellBegin", "Escorted Actor: " + escortedActor)
 ; endEvent
 
 ; event OnEscortToCellEnd(Actor escortActor, Actor escortedActor)
@@ -780,7 +780,7 @@
 ;     endif
 
 ;     ; Happens when the actor has been escorted to their cell
-;     Debug(self, "OnEscortToCellEnd", CurrentState + " event invoked")
+;     Debug("OnEscortToCellEnd", CurrentState + " event invoked")
 ;     debug.notification("OnEscortToCellEnd: Called from within the Jail Script")
 ;     ; if (Prisoner.ShouldBeStripped())
 ;     ;     SceneManager.StartStripping_02(escortActor, escortedActor)
@@ -801,12 +801,12 @@
 
 ; event OnEscortFromCellBegin(Actor escortActor, Actor escortedActor, ObjectReference destination)
 ;     ; Happens when the actor is being escorted from their cell to the destination
-;     Debug(self, "OnEscortFromCellBegin", CurrentState + " event invoked", config.IS_DEBUG)
+;     Debug("OnEscortFromCellBegin", CurrentState + " event invoked", config.IS_DEBUG)
 ; endEvent
 
 ; event OnEscortFromCellEnd(Actor escortActor, Actor escortedActor, ObjectReference destination)
 ;     ; Happens when the actor has been escorted from their cell to the destination
-;     Debug(self, "Jail::OnEscortFromCellEnd", CurrentState + " event invoked")
+;     Debug("Jail::OnEscortFromCellEnd", CurrentState + " event invoked")
 
 ;     ; Release Prisoner (later this Event can be used for more things and not just Release, but lets keep it simple for now)
 ;     Prisoner.GiveItemsBack()
@@ -815,7 +815,7 @@
 ; endEvent
 
 ; event OnClothingGiven(Actor clothingGiver, Actor clothingPrisoner)
-;     Debug(self, "OnClothingGiven", CurrentState + " event invoked")
+;     Debug("OnClothingGiven", CurrentState + " event invoked")
 ;     Prisoner.Clothe()
 ;     ; if still in jail, not in the cell
 ;     ; SceneManager.StartEscortToCell(clothingGiver, clothingPrisoner, arrestVars.JailCell, arrestVars.CellDoor)
@@ -823,29 +823,29 @@
 
 ; event OnActorCuffed(Actor cuffedActor, bool hands, bool feet)
 ;     ; Happens when the actor has been cuffed (hands bound, maybe feet?)
-;     Debug(self, "OnActorCuffed", CurrentState + " event invoked", config.IS_DEBUG)
+;     Debug("OnActorCuffed", CurrentState + " event invoked", config.IS_DEBUG)
 ; endEvent
 
 ; event OnActorUncuffed(Actor uncuffedActor, bool hands, bool feet)
 ;     ; Happens when the actor has been uncuffed (hands unbound, maybe feet?)
-;     Debug(self, "OnActorUncuffed", CurrentState + " event invoked", config.IS_DEBUG)
+;     Debug("OnActorUncuffed", CurrentState + " event invoked", config.IS_DEBUG)
 ; endEvent
 
 ; event OnUndressed(Actor undressedActor)
-;     Debug(self, "OnUndressed", CurrentState + " event invoked", config.IS_DEBUG)
+;     Debug("OnUndressed", CurrentState + " event invoked", config.IS_DEBUG)
 ; endEvent
 
 ; event OnClothed(Actor clothedActor, RealisticPrisonAndBounty_Outfit prisonerOutfit)
 ;     ; Do anything that needs to be done after the actor has been stripped and clothed.
-;     Debug(self, "OnClothed", CurrentState + " event invoked", config.IS_DEBUG)
+;     Debug("OnClothed", CurrentState + " event invoked", config.IS_DEBUG)
 ; endEvent
 
 ; event OnCellDoorLocked(ObjectReference _cellDoor, Actor whoLocked)
-;     Debug(self, "OnCellDoorLocked", CurrentState + " event invoked", config.IS_DEBUG)
+;     Debug("OnCellDoorLocked", CurrentState + " event invoked", config.IS_DEBUG)
 ; endEvent
 
 ; event OnCellDoorUnlocked(ObjectReference _cellDoor, Actor whoUnlocked)
-;     Debug(self, "OnCellDoorUnlocked", CurrentState + " event invoked", config.IS_DEBUG)
+;     Debug("OnCellDoorUnlocked", CurrentState + " event invoked", config.IS_DEBUG)
 ; endEvent
 
 ; event OnCellDoorOpen(ObjectReference _cellDoor, Actor whoOpened)
@@ -855,30 +855,30 @@
 ;         ; Add bounty for lockpicking / breaking someone out of jail if they are witnessed
 ;         ; if (witnessedCrime)
 ;         jailFaction.ModCrimeGold(2000)
-;         Debug(self, "OnCellDoorOpen", "jailFaction: " + jailFaction + ", bounty: " + jailFaction.GetCrimeGold(), config.IS_DEBUG)
+;         Debug("OnCellDoorOpen", "jailFaction: " + jailFaction + ", bounty: " + jailFaction.GetCrimeGold(), config.IS_DEBUG)
 ;     endif
-;     Debug(self, "OnCellDoorOpen", CurrentState + " event invoked", config.IS_DEBUG)
+;     Debug("OnCellDoorOpen", CurrentState + " event invoked", config.IS_DEBUG)
 ; endEvent
 
 ; event OnCellDoorClosed(ObjectReference _cellDoor, Actor whoOpened)
-;     Debug(self, "OnCellDoorClosed", CurrentState + " event invoked", config.IS_DEBUG)
+;     Debug("OnCellDoorClosed", CurrentState + " event invoked", config.IS_DEBUG)
 ; endEvent
 
 ; ; Placeholders for State events
 ; event OnEscapeFail()
-;     Error(self, "OnEscapeFail", "Not currently Escaping, invalid call!")
+;     Error("OnEscapeFail", "Not currently Escaping, invalid call!")
 ; endEvent
 
 ; event OnGuardSeesPrisoner(Actor akGuard)
-;     Debug(self, "OnGuardSeesPrisoner", CurrentState + " event invoked", config.IS_DEBUG)
+;     Debug("OnGuardSeesPrisoner", CurrentState + " event invoked", config.IS_DEBUG)
 ; endEvent
 
 ; event OnSentenceChanged(Actor akPrisoner, int oldSentence, int newSentence, bool hasIncreased, bool bountyAffected)
-;     Debug(self, "OnSentenceChanged", CurrentState + " event invoked", config.IS_DEBUG)
+;     Debug("OnSentenceChanged", CurrentState + " event invoked", config.IS_DEBUG)
 ; endEvent
 
 ; event OnPrisonerLocationChanged(RealisticPrisonAndBounty_PrisonerRef akPrisoner, Location akOldLocation, Location akNewLocation)
-;     Debug(self, "OnPrisonerLocationChanged", CurrentState + " event invoked")
+;     Debug("OnPrisonerLocationChanged", CurrentState + " event invoked")
 
 ;     if (akPrisoner.IsJailed && akNewLocation != akPrisoner.PrisonLocation)
 ;         akPrisoner.SetEscaped()
@@ -889,13 +889,13 @@
 ; endEvent
 
 ; event OnLocationChange(Location akOldLocation, Location akNewLocation)
-;     Debug(self, "OnLocationChange", CurrentState + " event invoked")
+;     Debug("OnLocationChange", CurrentState + " event invoked")
 ; endEvent
 
 
 ; function TriggerEscape()
 ;     if (CurrentState != STATE_ESCAPED)
-;         Error(self, "TriggerEscape", "Not currently Escaping, invalid call!")
+;         Error("TriggerEscape", "Not currently Escaping, invalid call!")
 ;         return
 ;     endif
 
@@ -907,11 +907,11 @@
 
 ; function TriggerImprisonment()
 ;     ; if (CurrentState != STATE_JAILED)
-;     ;     Error(self, "TriggerImprisonment", "Not currently jailed, invalid call!")
+;     ;     Error("TriggerImprisonment", "Not currently jailed, invalid call!")
 ;     ;     return
 ;     ; endif
 
-;     Debug(self, "TriggerImprisonment", "Triggered Imprisonment", config.IS_DEBUG)
+;     Debug("TriggerImprisonment", "Triggered Imprisonment", config.IS_DEBUG)
 ;     float startBench = StartBenchmark()
 ;     ; Begin Jailed process, Actor is arrested and jailed
 ;     ; Switch timescale to prison timescale
@@ -1030,10 +1030,10 @@
 
 ; bool function AssignJailCell(Actor akPrisoner)
 ;     ObjectReference randomJailCell = config.GetRandomJailMarker(Hold)
-;     Debug(self, "AssignJailCell", "jail cell: " + randomJailCell, config.IS_DEBUG)
+;     Debug("AssignJailCell", "jail cell: " + randomJailCell, config.IS_DEBUG)
 
 ;     if (arrestVars.JailCell && arrestVars.CellDoor.GetFormID() != 0x5E922)
-;         Debug(self, "AssignJailCell", "A jail cell has already been assigned to " + akPrisoner + ": " + arrestVars.JailCell, config.IS_DEBUG)
+;         Debug("AssignJailCell", "A jail cell has already been assigned to " + akPrisoner + ": " + arrestVars.JailCell, config.IS_DEBUG)
 ;         return true
 ;     endif
 
@@ -1042,7 +1042,7 @@
 ;     ; arrestVars.SetReference("Jail::Cell Door", GetNearestJailDoorOfType(GetJailBaseDoorID(arrestVars.Hold), randomJailCell, 10000))
 ;     arrestVars.SetReference("Jail::Cell Door", Game.GetFormEx(0x5E921) as ObjectReference)
 
-;     Debug(self, "AssignJailCell", "Set up new Jail Cell for " + akPrisoner + ": " + arrestVars.JailCell)
+;     Debug("AssignJailCell", "Set up new Jail Cell for " + akPrisoner + ": " + arrestVars.JailCell)
 ;     return arrestVars.JailCell != none
 
 ; endFunction
@@ -1061,7 +1061,7 @@
 ;     RPB_Prisoner prisonerRef = Prisoners.GetAt(listKey) as RPB_Prisoner
 
 ;     if (!prisonerRef)
-;         Warn(self, "Jail::GetPrisonerReference", "The Actor " + akPrisoner + " is not a prisoner or there was a state mismatch!")
+;         Warn("Jail::GetPrisonerReference", "The Actor " + akPrisoner + " is not a prisoner or there was a state mismatch!")
 ;         return none
 ;     endif
 
@@ -1080,7 +1080,7 @@
 ;     string containerKey = "Prisoner["+ akArrestee.GetFormID() +"]"
 ;     Prisoners.AddAt(akPrisonerRef, containerKey)
 
-;     Debug(self, "Jail::RegisterPrisoner", "Added Actor " + akArrestee + " to the prisoner list " + akPrisonerRef + " with key: " + containerKey)
+;     Debug("Jail::RegisterPrisoner", "Added Actor " + akArrestee + " to the prisoner list " + akPrisonerRef + " with key: " + containerKey)
 ;     return Prisoners.GetAt(containerKey) == akPrisonerRef ; Did it register successfully?
 ; endFunction
 
@@ -1102,30 +1102,30 @@
 
 ; ; bool function AssignJailCell(Actor akPrisoner)
 ; ;     ObjectReference randomJailCell = config.GetRandomJailMarker(Hold)
-; ;     Debug(self, "AssignJailCell", "jail cell: " + randomJailCell, config.IS_DEBUG)
+; ;     Debug("AssignJailCell", "jail cell: " + randomJailCell, config.IS_DEBUG)
 
 ; ;     if (akPrisoner == config.Player)
 ; ;         if (arrestVars.JailCell)
-; ;             Debug(self, "AssignJailCell", "A jail cell has already been assigned to " + akPrisoner + ": " + arrestVars.JailCell, config.IS_DEBUG)
+; ;             Debug("AssignJailCell", "A jail cell has already been assigned to " + akPrisoner + ": " + arrestVars.JailCell, config.IS_DEBUG)
 ; ;             return true
 ; ;         endif
 
 ; ;         arrestVars.SetForm("Jail::Cell", randomJailCell) ; Assign cell to Player
 ; ;         arrestVars.SetReference("Jail::Cell Door", GetNearestJailDoorOfType(GetJailBaseDoorID(arrestVars.Hold), randomJailCell, 10000))
 
-; ;         Debug(self, "AssignJailCell", "Set up new Jail Cell for " + akPrisoner + ": " + arrestVars.JailCell, config.IS_DEBUG)
+; ;         Debug("AssignJailCell", "Set up new Jail Cell for " + akPrisoner + ": " + arrestVars.JailCell, config.IS_DEBUG)
 ; ;         return arrestVars.JailCell != none
 
 ; ;     else
 ; ;         string jailCellId = "["+ akPrisoner.GetFormID() +"]Jail::Cell"
 ; ;         Form npcJailCell = arrestVars.GetForm(jailCellId)
 ; ;         if (npcJailCell)
-; ;             Debug(self, "AssignJailCell", "A jail cell has already been assigned to " + akPrisoner + ": " + npcJailCell, config.IS_DEBUG)
+; ;             Debug("AssignJailCell", "A jail cell has already been assigned to " + akPrisoner + ": " + npcJailCell, config.IS_DEBUG)
 ; ;             return true
 ; ;         endif
 
 ; ;         arrestVars.SetForm(jailCellId, randomJailCell) ; Assign cell to NPC
-; ;         Debug(self, "AssignJailCell", "Set up new Jail Cell for " + akPrisoner + ": " + npcJailCell, config.IS_DEBUG)
+; ;         Debug("AssignJailCell", "Set up new Jail Cell for " + akPrisoner + ": " + npcJailCell, config.IS_DEBUG)
 ; ;         return arrestVars.GetForm(jailCellId) != none
 ; ;     endif
 
@@ -1180,9 +1180,10 @@
 scriptname RealisticPrisonAndBounty_Jail extends Quest
 
 import Math
-import RealisticPrisonAndBounty_Util
+; import RealisticPrisonAndBounty_Util
 import RealisticPrisonAndBounty_Config
 import PO3_SKSEFunctions
+import RPB_Utility
 
 RealisticPrisonAndBounty_Config property Config
     RealisticPrisonAndBounty_Config function get()
@@ -1293,7 +1294,7 @@ int function GetCellDoorLockLevel()
 endFunction
 
 ; function ShowArrestVars()
-;     Debug(self, "ShowArrestVars", "\n" + Hold + " Arrest Vars: " + GetContainerList(arrestVars.GetHandle()))
+;     Debug("ShowArrestVars", "\n" + Hold + " Arrest Vars: " + GetContainerList(arrestVars.GetHandle()))
 ; endFunction
 
 ; function ShowArrestParams()
@@ -1301,7 +1302,7 @@ endFunction
 ;     int arrestParamsObj = JMap.getObj(arrestVars.GetHandle(), "Arrest::Arrest Params")
 ;     int arrestParamsBV = JMap.getInt(arrestVars.GetHandle(), "Arrest::Bounty Violent")
 ;     bool isObject = JValue.isMap(arrestParamsObj)
-;     Debug(self, "ShowArrestParams (id: "+ arrestParamsObj +", isObject: "+ isObject +", arrestParamsBV: "+ arrestParamsBV +")", "\n" + Hold + " Arrest Params: " + GetContainerList(arrestParams))
+;     Debug("ShowArrestParams (id: "+ arrestParamsObj +", isObject: "+ isObject +", arrestParamsBV: "+ arrestParamsBV +")", "\n" + Hold + " Arrest Params: " + GetContainerList(arrestParams))
 ; endFunction
 
 event OnJailBegin(RPB_Prisoner akPrisoner)
@@ -1323,7 +1324,7 @@ event OnPrisonActionRequest(string asAction, RPB_Prisoner akPrisoner)
 endEvent
 
 event OnJailedEnd(string eventName, string strArg, float numArg, Form sender)
-    Debug(self, "OnJailedEnd", "Ending jailing process... (Released, Escaped?)")
+    Debug("OnJailedEnd", "Ending jailing process... (Released, Escaped?)")
     arrestVars.Clear()
 endEvent
 
@@ -1334,12 +1335,12 @@ endEvent
 
 event OnFriskBegin(Actor friskSearchPerformer, Actor actorToFrisk)
     ; Happens when the actor is beginning to be frisked
-    Debug(self, "OnFriskBegin", CurrentState + " event invoked", config.IS_DEBUG)
+    Debug("OnFriskBegin", CurrentState + " event invoked", config.IS_DEBUG)
 endEvent
 
 event OnFriskEnd(Actor friskSearchPerformer, Actor friskedActor)
     ; Happens when the actor has been frisked
-    Debug(self, "OnFriskEnd", CurrentState + " event invoked", config.IS_DEBUG)
+    Debug("OnFriskEnd", CurrentState + " event invoked", config.IS_DEBUG)
     ; self.SetupJailVars()
     ; Prisoner.Frisk()
     ; Prisoner.Restrain()
@@ -1358,7 +1359,7 @@ endEvent
 
 event OnStripBegin(Actor stripSearchPerformer, Actor actorToStrip)
     ; Happens when the actor is about to be stripped
-    Debug(self, "OnStripBegin", CurrentState + " event invoked")
+    Debug("OnStripBegin", CurrentState + " event invoked")
 
     RPB_Prisoner prisonerRef = self.GetPrisonerReference(actorToStrip)
     prisonerRef.Uncuff()
@@ -1369,7 +1370,7 @@ endEvent
 event OnStripping(Actor stripSearchPerformer, Actor actorToStrip)
     RPB_Prisoner prisonerRef = self.GetPrisonerReference(actorToStrip)
 
-    Debug(self, "OnStripping", CurrentState + " event invoked")
+    Debug("OnStripping", CurrentState + " event invoked")
 
     prisonerRef.Strip()
     ; if (actorToStrip != Prisoner.this)
@@ -1385,7 +1386,7 @@ event OnStripEnd(Actor stripSearchPerformer, Actor strippedActor)
     prisonerRef.EscortToCell(stripSearchPerformer)
 
     ; Happens when the actor has been stripped
-    Debug(self, "OnStripEnd", CurrentState + " event invoked")
+    Debug("OnStripEnd", CurrentState + " event invoked")
 
     ; debug.notification("OnStripEnd: Called from within the Jail Script")
     ; self.SetupJailVars()
@@ -1396,7 +1397,7 @@ event OnStripEnd(Actor stripSearchPerformer, Actor strippedActor)
     ; debug.notification("Jail::OnStripEnd")
     ; ; arrestVars.SetForm("Jail::Cell Door", GetNearestJailDoorOfType(GetJailBaseDoorID(arrestVars.Hold), arrestVars.JailCell, 10000))
     ; Prisoner.SetupPrisonerVars()
-    Debug(self, "OnStripEnd", "Vars: [ \n" + \
+    Debug("OnStripEnd", "Vars: [ \n" + \
     "arrestVars.Captor: " + arrestVars.Captor + "(Object: "+ arrestVars.Captor.GetBaseObject().GetName() +")\n" + \
     "arrestVars.Arrestee: " + arrestVars.Arrestee + "(Object: "+ arrestVars.Arrestee.GetBaseObject().GetName() +")\n" + \
     "arrestVars.JailCell: " + arrestVars.JailCell + "(Object: "+ arrestVars.JailCell.GetBaseObject().GetName() +")\n" + \
@@ -1416,13 +1417,13 @@ event OnStripEnd(Actor stripSearchPerformer, Actor strippedActor)
 endEvent
 
 event OnBountyPaymentFailed(Actor akGuard, Actor akPrisoner)
-    Debug(self, "Jail::OnBountyPaymentFailed", CurrentState + " event invoked")
+    Debug("Jail::OnBountyPaymentFailed", CurrentState + " event invoked")
     SceneManager.StartStripping(akGuard, akPrisoner)
 endEvent
 
 event OnEscortToJailBegin(Actor escortActor, Actor escortedActor)
     ; Happens when the actor is being escorted to jail
-    Debug(self, "OnEscortToJailBegin", CurrentState + " event invoked")
+    Debug("OnEscortToJailBegin", CurrentState + " event invoked")
     Form cuffs = Game.GetFormEx(0xA081D2F)
 
     escortedActor.SheatheWeapon()
@@ -1463,7 +1464,7 @@ event OnEscortToJailEnd(Actor escortActor, Actor escortedActor)
     JailVars.List("Jail")
 
     ; if (!prisonerRef.Imprison())
-    ;     Error(self, "Jail::OnEscortToJailEnd", "Could not imprison " + prisonerRef.GetActor() + ", what to do next?")
+    ;     Error("Jail::OnEscortToJailEnd", "Could not imprison " + prisonerRef.GetActor() + ", what to do next?")
     ;     prisonerRef.Release()
     ;     return
     ; endif
@@ -1491,8 +1492,8 @@ endEvent
 
 event OnEscortToCellBegin(Actor escortActor, Actor escortedActor)
     ; Happens when the actor is being escorted to their cell
-    Debug(self, "Jail::OnEscortToCellBegin", CurrentState + " event invoked")
-    Debug(self, "Jail::OnEscortToCellBegin", "Escorted Actor: " + escortedActor)
+    Debug("Jail::OnEscortToCellBegin", CurrentState + " event invoked")
+    Debug("Jail::OnEscortToCellBegin", "Escorted Actor: " + escortedActor)
 endEvent
 
 event OnEscortToCellEnd(Actor escortActor, Actor escortedActor)
@@ -1503,7 +1504,7 @@ event OnEscortToCellEnd(Actor escortActor, Actor escortedActor)
     endif
 
     ; Happens when the actor has been escorted to their cell
-    Debug(self, "OnEscortToCellEnd", CurrentState + " event invoked")
+    Debug("OnEscortToCellEnd", CurrentState + " event invoked")
     debug.notification("OnEscortToCellEnd: Called from within the Jail Script")
     ; if (Prisoner.ShouldBeStripped())
     ;     SceneManager.StartStripping_02(escortActor, escortedActor)
@@ -1524,12 +1525,12 @@ endEvent
 
 event OnEscortFromCellBegin(Actor escortActor, Actor escortedActor, ObjectReference destination)
     ; Happens when the actor is being escorted from their cell to the destination
-    Debug(self, "OnEscortFromCellBegin", CurrentState + " event invoked", config.IS_DEBUG)
+    Debug("OnEscortFromCellBegin", CurrentState + " event invoked", config.IS_DEBUG)
 endEvent
 
 event OnEscortFromCellEnd(Actor escortActor, Actor escortedActor, ObjectReference destination)
     ; Happens when the actor has been escorted from their cell to the destination
-    Debug(self, "Jail::OnEscortFromCellEnd", CurrentState + " event invoked")
+    Debug("Jail::OnEscortFromCellEnd", CurrentState + " event invoked")
 
     ; Release Prisoner (later this Event can be used for more things and not just Release, but lets keep it simple for now)
     ; Prisoner.GiveItemsBack()
@@ -1538,7 +1539,7 @@ event OnEscortFromCellEnd(Actor escortActor, Actor escortedActor, ObjectReferenc
 endEvent
 
 event OnClothingGiven(Actor clothingGiver, Actor clothingPrisoner)
-    Debug(self, "OnClothingGiven", CurrentState + " event invoked")
+    Debug("OnClothingGiven", CurrentState + " event invoked")
 
     RPB_Prisoner prisoner = self.GetPrisonerReference(clothingPrisoner)
 
@@ -1549,29 +1550,29 @@ endEvent
 
 event OnActorCuffed(Actor cuffedActor, bool hands, bool feet)
     ; Happens when the actor has been cuffed (hands bound, maybe feet?)
-    Debug(self, "OnActorCuffed", CurrentState + " event invoked", config.IS_DEBUG)
+    Debug("OnActorCuffed", CurrentState + " event invoked", config.IS_DEBUG)
 endEvent
 
 event OnActorUncuffed(Actor uncuffedActor, bool hands, bool feet)
     ; Happens when the actor has been uncuffed (hands unbound, maybe feet?)
-    Debug(self, "OnActorUncuffed", CurrentState + " event invoked", config.IS_DEBUG)
+    Debug("OnActorUncuffed", CurrentState + " event invoked", config.IS_DEBUG)
 endEvent
 
 event OnUndressed(Actor undressedActor)
-    Debug(self, "OnUndressed", CurrentState + " event invoked", config.IS_DEBUG)
+    Debug("OnUndressed", CurrentState + " event invoked", config.IS_DEBUG)
 endEvent
 
 event OnClothed(Actor clothedActor, RealisticPrisonAndBounty_Outfit prisonerOutfit)
     ; Do anything that needs to be done after the actor has been stripped and clothed.
-    Debug(self, "OnClothed", CurrentState + " event invoked", config.IS_DEBUG)
+    Debug("OnClothed", CurrentState + " event invoked", config.IS_DEBUG)
 endEvent
 
 event OnCellDoorLocked(ObjectReference _cellDoor, Actor whoLocked)
-    Debug(self, "OnCellDoorLocked", CurrentState + " event invoked", config.IS_DEBUG)
+    Debug("OnCellDoorLocked", CurrentState + " event invoked", config.IS_DEBUG)
 endEvent
 
 event OnCellDoorUnlocked(ObjectReference _cellDoor, Actor whoUnlocked)
-    Debug(self, "OnCellDoorUnlocked", CurrentState + " event invoked", config.IS_DEBUG)
+    Debug("OnCellDoorUnlocked", CurrentState + " event invoked", config.IS_DEBUG)
 endEvent
 
 event OnCellDoorOpen(ObjectReference _cellDoor, Actor whoOpened)
@@ -1581,30 +1582,30 @@ event OnCellDoorOpen(ObjectReference _cellDoor, Actor whoOpened)
     ;     ; Add bounty for lockpicking / breaking someone out of jail if they are witnessed
     ;     ; if (witnessedCrime)
     ;     jailFaction.ModCrimeGold(2000)
-    ;     Debug(self, "OnCellDoorOpen", "jailFaction: " + jailFaction + ", bounty: " + jailFaction.GetCrimeGold(), config.IS_DEBUG)
+    ;     Debug("OnCellDoorOpen", "jailFaction: " + jailFaction + ", bounty: " + jailFaction.GetCrimeGold(), config.IS_DEBUG)
     ; endif
-    ; Debug(self, "OnCellDoorOpen", CurrentState + " event invoked", config.IS_DEBUG)
+    ; Debug("OnCellDoorOpen", CurrentState + " event invoked", config.IS_DEBUG)
 endEvent
 
 event OnCellDoorClosed(ObjectReference _cellDoor, Actor whoOpened)
-    Debug(self, "OnCellDoorClosed", CurrentState + " event invoked", config.IS_DEBUG)
+    Debug("OnCellDoorClosed", CurrentState + " event invoked", config.IS_DEBUG)
 endEvent
 
 ; Placeholders for State events
 event OnEscapeFail()
-    Error(self, "OnEscapeFail", "Not currently Escaping, invalid call!")
+    Error("OnEscapeFail", "Not currently Escaping, invalid call!")
 endEvent
 
 event OnGuardSeesPrisoner(Actor akGuard)
-    Debug(self, "OnGuardSeesPrisoner", CurrentState + " event invoked", config.IS_DEBUG)
+    Debug("OnGuardSeesPrisoner", CurrentState + " event invoked", config.IS_DEBUG)
 endEvent
 
 event OnSentenceChanged(Actor akPrisoner, int oldSentence, int newSentence, bool hasIncreased, bool bountyAffected)
-    Debug(self, "OnSentenceChanged", CurrentState + " event invoked", config.IS_DEBUG)
+    Debug("OnSentenceChanged", CurrentState + " event invoked", config.IS_DEBUG)
 endEvent
 
 event OnPrisonerLocationChanged(RealisticPrisonAndBounty_PrisonerRef akPrisoner, Location akOldLocation, Location akNewLocation)
-    Debug(self, "OnPrisonerLocationChanged", CurrentState + " event invoked")
+    Debug("OnPrisonerLocationChanged", CurrentState + " event invoked")
 
     if (akPrisoner.IsJailed && akNewLocation != akPrisoner.PrisonLocation)
         akPrisoner.SetEscaped()
@@ -1615,13 +1616,13 @@ event OnPrisonerLocationChanged(RealisticPrisonAndBounty_PrisonerRef akPrisoner,
 endEvent
 
 event OnLocationChange(Location akOldLocation, Location akNewLocation)
-    Debug(self, "OnLocationChange", CurrentState + " event invoked")
+    Debug("OnLocationChange", CurrentState + " event invoked")
 endEvent
 
 
 ; function TriggerEscape()
 ;     if (CurrentState != STATE_ESCAPED)
-;         Error(self, "TriggerEscape", "Not currently Escaping, invalid call!")
+;         Error("TriggerEscape", "Not currently Escaping, invalid call!")
 ;         return
 ;     endif
 
@@ -1651,10 +1652,10 @@ endFunction
 
 ; bool function AssignJailCell(Actor akPrisoner)
 ;     ObjectReference randomJailCell = config.GetRandomJailMarker(Hold)
-;     Debug(self, "AssignJailCell", "jail cell: " + randomJailCell, config.IS_DEBUG)
+;     Debug("AssignJailCell", "jail cell: " + randomJailCell, config.IS_DEBUG)
 
 ;     if (arrestVars.JailCell && arrestVars.CellDoor.GetFormID() != 0x5E922)
-;         Debug(self, "AssignJailCell", "A jail cell has already been assigned to " + akPrisoner + ": " + arrestVars.JailCell, config.IS_DEBUG)
+;         Debug("AssignJailCell", "A jail cell has already been assigned to " + akPrisoner + ": " + arrestVars.JailCell, config.IS_DEBUG)
 ;         return true
 ;     endif
 
@@ -1663,7 +1664,7 @@ endFunction
 ;     ; arrestVars.SetReference("Jail::Cell Door", GetNearestJailDoorOfType(GetJailBaseDoorID(arrestVars.Hold), randomJailCell, 10000))
 ;     arrestVars.SetReference("Jail::Cell Door", Game.GetFormEx(0x5E921) as ObjectReference)
 
-;     Debug(self, "AssignJailCell", "Set up new Jail Cell for " + akPrisoner + ": " + arrestVars.JailCell)
+;     Debug("AssignJailCell", "Set up new Jail Cell for " + akPrisoner + ": " + arrestVars.JailCell)
 ;     return arrestVars.JailCell != none
 
 ; endFunction
@@ -1682,7 +1683,7 @@ RPB_Prisoner function GetPrisonerReference(Actor akPrisoner)
     RPB_Prisoner prisonerRef = Prisoners.GetAt(listKey) as RPB_Prisoner
 
     if (!prisonerRef)
-        Warn(self, "Jail::GetPrisonerReference", "The Actor " + akPrisoner + " is not a prisoner or there was a state mismatch!")
+        Warn("Jail::GetPrisonerReference", "The Actor " + akPrisoner + " is not a prisoner or there was a state mismatch!")
         return none
     endif
 
@@ -1701,13 +1702,13 @@ bool function RegisterPrisoner(RPB_Prisoner akPrisonerRef, Actor akArrestee)
     string containerKey = "Prisoner["+ akArrestee.GetFormID() +"]"
 
     ; if (self.GetPrisonerReference(akArrestee))
-    ;     Debug(self, "Jail::RegisterPrisoner", "Actor " + akArrestee + " is already a prisoner!")
+    ;     Debug("Jail::RegisterPrisoner", "Actor " + akArrestee + " is already a prisoner!")
     ;     return false
     ; endif
 
     Prisoners.AddAt(akPrisonerRef, containerKey)
 
-    Debug(self, "Jail::RegisterPrisoner", "Added Actor " + akArrestee + " to the prisoner list " + akPrisonerRef + " with key: " + containerKey)
+    Debug("Jail::RegisterPrisoner", "Added Actor " + akArrestee + " to the prisoner list " + akPrisonerRef + " with key: " + containerKey)
     return Prisoners.GetAt(containerKey) == akPrisonerRef ; Did it register successfully?
 endFunction
 
@@ -1729,30 +1730,30 @@ endFunction
 
 ; bool function AssignJailCell(Actor akPrisoner)
 ;     ObjectReference randomJailCell = config.GetRandomJailMarker(Hold)
-;     Debug(self, "AssignJailCell", "jail cell: " + randomJailCell, config.IS_DEBUG)
+;     Debug("AssignJailCell", "jail cell: " + randomJailCell, config.IS_DEBUG)
 
 ;     if (akPrisoner == config.Player)
 ;         if (arrestVars.JailCell)
-;             Debug(self, "AssignJailCell", "A jail cell has already been assigned to " + akPrisoner + ": " + arrestVars.JailCell, config.IS_DEBUG)
+;             Debug("AssignJailCell", "A jail cell has already been assigned to " + akPrisoner + ": " + arrestVars.JailCell, config.IS_DEBUG)
 ;             return true
 ;         endif
 
 ;         arrestVars.SetForm("Jail::Cell", randomJailCell) ; Assign cell to Player
 ;         arrestVars.SetReference("Jail::Cell Door", GetNearestJailDoorOfType(GetJailBaseDoorID(arrestVars.Hold), randomJailCell, 10000))
 
-;         Debug(self, "AssignJailCell", "Set up new Jail Cell for " + akPrisoner + ": " + arrestVars.JailCell, config.IS_DEBUG)
+;         Debug("AssignJailCell", "Set up new Jail Cell for " + akPrisoner + ": " + arrestVars.JailCell, config.IS_DEBUG)
 ;         return arrestVars.JailCell != none
 
 ;     else
 ;         string jailCellId = "["+ akPrisoner.GetFormID() +"]Jail::Cell"
 ;         Form npcJailCell = arrestVars.GetForm(jailCellId)
 ;         if (npcJailCell)
-;             Debug(self, "AssignJailCell", "A jail cell has already been assigned to " + akPrisoner + ": " + npcJailCell, config.IS_DEBUG)
+;             Debug("AssignJailCell", "A jail cell has already been assigned to " + akPrisoner + ": " + npcJailCell, config.IS_DEBUG)
 ;             return true
 ;         endif
 
 ;         arrestVars.SetForm(jailCellId, randomJailCell) ; Assign cell to NPC
-;         Debug(self, "AssignJailCell", "Set up new Jail Cell for " + akPrisoner + ": " + npcJailCell, config.IS_DEBUG)
+;         Debug("AssignJailCell", "Set up new Jail Cell for " + akPrisoner + ": " + npcJailCell, config.IS_DEBUG)
 ;         return arrestVars.GetForm(jailCellId) != none
 ;     endif
 

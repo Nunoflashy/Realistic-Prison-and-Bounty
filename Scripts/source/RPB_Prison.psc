@@ -1826,7 +1826,7 @@ function DEBUG_ShowPrisonerSentenceInfo(RPB_Prisoner apPrisoner, bool abShort = 
     string timeLeftFormatted    = self.GetTimeLeftOfSentenceFormatted(apPrisoner)
 
     if (abShort)
-        LogNoType(apPrisoner.GetName() + " in " + self.Name + " ("+ apPrisoner.JailCell.ID +"): { "+ "Sentence: " + sentenceFormatted + " | Time Served: " + timeServedFormatted + string_if (!apPrisoner.IsUndeterminedSentence, " | Time Left: " + timeLeftFormatted) +" }")
+        LogNoType(apPrisoner.GetName() + " in " + self.Name + " ("+ apPrisoner.JailCell.ID +"): { "+ "Sentence: " + string_if (!apPrisoner.IsUndeterminedSentence, sentenceFormatted, "Not Available") + " | Time Served: " + timeServedFormatted + string_if (!apPrisoner.IsUndeterminedSentence, " | Time Left: " + timeLeftFormatted) +" }")
     else
         string minSentence = RPB_Utility.GetTimeFormatted(MinimumSentence)
         string maxSentence = RPB_Utility.GetTimeFormatted(MaximumSentence)
