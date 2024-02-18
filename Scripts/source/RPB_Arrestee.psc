@@ -1,6 +1,6 @@
 Scriptname RPB_Arrestee extends RPB_Actor
 
-import RealisticPrisonAndBounty_Util
+import RPB_Utility
 import RealisticPrisonAndBounty_Config
 
 ;/
@@ -16,19 +16,34 @@ import RealisticPrisonAndBounty_Config
 
     The value is set through SetArrestParameters().
 /;
-Actor captor
+Actor __captor
+Actor property Captor
+    Actor function get()
+        return __captor
+    endFunction
+endProperty
 
 ;/
     The Arresting Faction to this Arrestee (The faction that arrested this Actor).
     The value is set through SetArrestParameters().
 /;
-Faction arrestFaction
+Faction __arrestFaction
+Faction property ArrestFaction
+    Faction function get()
+        return __arrestFaction
+    endFunction
+endProperty
 
 ;/
     The Hold of where the arrest took place (usually this is the Faction name, but it might not be!)
     The value is set through SetArrestParameters().
 /;
-string hold
+string __hold
+string property Hold
+    string function get()
+        return __hold
+    endFunction
+endProperty
 
 ;/
     The arrest type for this Arrestee, representing whether this Actor should be: 
@@ -43,7 +58,12 @@ string hold
     There may be more arrest types in the future, but this is it for now.
     The value is set through SetArrestParameters().
 /;
-string arrestType
+string __arrestType
+string property ArrestType
+    string function get()
+        return __arrestType
+    endFunction
+endProperty
 
 ; ==========================================================
 ;                          Properties
@@ -142,21 +162,21 @@ function SetArrestParameters(string asArrestType, Actor akCaptor, Faction akCrim
     endif
 
     if (!akCrimeFaction)
-        Error(none, "Arrestee::SetArrestParameters", "Both the captor and faction are none, cannot proceed with the arrest! (returning...)")
+        Error("Arrestee::SetArrestParameters", "Both the captor and faction are none, cannot proceed with the arrest! (returning...)")
         self.Destroy()
         return
     endif
 
     ; Set arrest related vars to this Arrestee's state
-    captor          = akCaptor
-    arrestFaction   = akCrimeFaction
-    hold            = akCrimeFaction.GetName()
-    arrestType      = asArrestType
+    __captor        = akCaptor
+    __arrestFaction = akCrimeFaction
+    __hold          = akCrimeFaction.GetName()
+    __arrestType    = asArrestType
 
-    Arrest_SetForm("Arrest Faction", arrestFaction)
+    Arrest_SetForm("Arrest Faction", ArrestFaction)
     Arrest_SetForm("Arrestee", this)
-    Arrest_SetString("Arrest Type", arrestType)
-    Arrest_SetString("Hold", hold)
+    Arrest_SetString("Arrest Type", ArrestType)
+    Arrest_SetString("Hold", Hold)
 
     self.SetTimeOfArrest()
 
@@ -170,7 +190,7 @@ function SetArrestParameters(string asArrestType, Actor akCaptor, Faction akCrim
 endFunction
 
 function Free()
-    Arrest.OnArresteeFreed(this, captor)
+    Arrest.OnArresteeFreed(this, Captor)
 endFunction
 
 ;/
@@ -198,16 +218,15 @@ function Uncuff()
 
     this.UnequipItemSlot(cuffsItemSlot)
     this.RemoveItem(cuffs)
-    Debug(this, "Arrestee::Uncuff", "Uncuffed " + this)
+    Debug("Arrestee::Uncuff", "Uncuffed " + this)
 endFunction
 
 ;/
     Transfers this Actor from being an Arrestee to a Prisoner
 /;
 RPB_Prisoner function MakePrisoner()
-    RPB_Prison prison  = (RPB_API.GetPrisonManager()).GetPrison(hold)
+    RPB_Prison prison  = (RPB_API.GetPrisonManager()).GetPrison(Hold)
     self.TransferArrestPropertiesToPrisoner(prison)
-
 
     return prison.MakePrisoner(this)
 endFunction
@@ -219,7 +238,7 @@ function TransferArrestPropertiesToPrisoner(RPB_Prison apPrison)
     self.SetInt("Day of Arrest", Arrest_GetInt("Day of Arrest"), "Jail")
     self.SetInt("Month of Arrest", Arrest_GetInt("Month of Arrest"), "Jail")
     self.SetInt("Year of Arrest", Arrest_GetInt("Year of Arrest"), "Jail")
-    self.SetForm("Arrest Captor", captor, "Jail")
+    self.SetForm("Arrest Captor", Captor, "Jail")
 endFunction
 ; ==========================================================
 ;                           Bounty
@@ -237,8 +256,8 @@ function PayCrimeGold()
     self.ClearLatentBounty()
 
     if (self.IsPlayer())
-        arrestFaction.PlayerPayCrimeGold(false, false)
-        Config.NotifyArrest("Your bounty in " + hold + " has been paid")
+        ArrestFaction.PlayerPayCrimeGold(false, false)
+        Config.NotifyArrest("Your bounty in " + Hold + " has been paid")
     endif
 endFunction
 
@@ -254,9 +273,9 @@ function SetArrestTime()
     Arrest_SetBool("Captured", true) ; Used to avoid further arrest resists after being arrested
     Arrest_SetFloat("Time of Arrest", CurrentTime)
 
-    Config.NotifyArrest("You have been arrested in " + hold, this == Config.Player)
-    Config.NotifyArrest(self.GetName() + " has been arrested in " + hold, this != Config.Player)
-    Info(none, "Arrestee::SetArrestTime", this.GetBaseObject().GetName() + " has been arrested in " + hold + " at " + CurrentTime)
+    Config.NotifyArrest("You have been arrested in " + Hold, this == Config.Player)
+    Config.NotifyArrest(self.GetName() + " has been arrested in " + Hold, this != Config.Player)
+    Info(this.GetBaseObject().GetName() + " has been arrested in " + Hold + " at " + CurrentTime)
 endFunction
 
 function SetArrestGoal(string asArrestGoal)
@@ -294,46 +313,46 @@ endFunction
 ; ==========================================================
 
 function Arrest()
-    Debug(this, "Arrestee::Arrest", "Arrested " + this)
+    Debug("Arrestee::Arrest", "Arrested " + this)
 
     self.SetArrestGoal(Arrest.ARREST_GOAL_IMPRISONMENT)
     self.UpdateArrestStats()
     self.SetTimeOfArrest()
 
-    Config.NotifyArrest("You have been arrested in " + hold, this == Config.Player)
-    Info(none, "Arrestee::Arrest", this.GetBaseObject().GetName() + " has been arrested in " + hold + " at " + CurrentTime)
+    Config.NotifyArrest("You have been arrested in " + Hold, this == Config.Player)
+    Info(this.GetBaseObject().GetName() + " has been arrested in " + Hold + " at " + CurrentTime)
 
     ; Arrest.SceneManager.StartArrestScene( \
-    ;     akGuard     = captor, \
+    ;     akGuard     = Captor, \
     ;     akArrestee  = this, \
     ;     asScene     = Arrest.GetArrestScene(this) \
     ; )
 
-    Arrest.OnActorArrested(this, captor)
+    Arrest.OnActorArrested(this, Captor)
 endFunction
 
 function EscortToPrison(bool abEscortDirectlyToCell = false)
     Arrest.SceneManager.StartArrestScene( \
-        akGuard     = captor, \
+        akGuard     = Captor, \
         akArrestee  = this, \
         asScene     = Arrest.GetArrestScene(this) \
     )
 
     if (!abEscortDirectlyToCell)
-        Debug(this, "Arrestee::EscortToPrison", "Started escorting " + this + " to prison")
+        Debug("Arrestee::EscortToPrison", "Started escorting " + this + " to prison")
         ; Make this arrestee a prisoner right away
         RPB_Prisoner prisonerRef = self.MakePrisoner()
 
         prisonerRef.SetBelongingsContainer()  ; Temporary, later another location should be used for taking to prison
 
         if (!prisonerRef.AssignCell())
-            Debug(this, "Arrestee::EscortToPrison", "Could not assign a cell to arrestee " + this)
+            Debug("Arrestee::EscortToPrison", "Could not assign a cell to arrestee " + this)
             self.RevertArrest()
             return
         endif
 
         Arrest.SceneManager.StartEscortToJail( \
-            akEscortLeader      = captor, \
+            akEscortLeader      = Captor, \
             akEscortedPrisoner  = this, \
             akPrisonerChest     = prisonerRef.PrisonerBelongingsContainer \
         )
@@ -341,17 +360,17 @@ function EscortToPrison(bool abEscortDirectlyToCell = false)
         ; Make this arrestee a prisoner right away
         RPB_Prisoner prisonerRef = self.MakePrisoner()
         if (!prisonerRef.AssignCell())
-            Debug(this, "Arrestee::EscortToPrison", "Could not assign a cell to arrestee " + this)
+            Debug("Arrestee::EscortToPrison", "Could not assign a cell to arrestee " + this)
             self.RevertArrest()
             return
         endif
 
-        Debug(this, "Arrestee::EscortToPrison", "Started escorting " + this + " directly to a cell")
+        Debug("Arrestee::EscortToPrison", "Started escorting " + this + " directly to a cell")
         ; The marker where the escort will stand, waiting for the prisoner to enter the cell.
         ObjectReference outsideJailCellEscortWaitingMarker = prisonerRef.JailCell.GetRandomMarker("Exterior") as ObjectReference
 
         Arrest.SceneManager.StartEscortToCell( \
-            akEscortLeader                  = captor, \
+            akEscortLeader                  = Captor, \
             akEscortedPrisoner              = prisonerRef.GetActor(), \
             akJailCellMarker                = prisonerRef.JailCell, \
             akJailCellDoor                  = prisonerRef.JailCell.CellDoor, \
@@ -362,24 +381,21 @@ endFunction
 
 function MoveToPrison(bool abMoveDirectlyToCell = false)
     ; Arrest.SceneManager.StartArrestScene( \
-    ;     akGuard     = captor, \
+    ;     akGuard     = Captor, \
     ;     akArrestee  = this, \
     ;     asScene     = Arrest.GetArrestScene(this) \
     ; )
     ; Utility.Wait(6.0)
+    RPB_Prisoner prisonerRef = self.MakePrisoner()
+    RPB_Prison prison        = prisonerRef.Prison
+
     if (!abMoveDirectlyToCell)
-        Debug(this, "Arrestee::MoveToPrison", "Moving " + this + " to prison")
-        ArrestVars.SetReference("Jail::Prisoner Items Container", Config.GetJailPrisonerItemsContainer(hold) as ObjectReference) ; Temporary, later another location should be used for taking to prison
-        ObjectReference prisonerChest = ArrestVars.GetReference("Jail::Prisoner Items Container")
-        this.MoveTo(prisonerChest)
-        captor.MoveTo(prisonerChest)
+        prisonerRef.MoveToPrison(Captor)
+        ; Later when RPB_Captor is done, we should call it like
+        ; captorRef.MoveToPrison(prison) or captorRef.MoveToPrison() in case a Prison is associated with that Captor already, which probably should be
+        Debug("Arrestee::MoveToPrison", "Moving " + this + " to prison")
     else
-        RPB_Prisoner prisonerRef = self.MakePrisoner()
-
-        Utility.Wait(0.5)
-
         if (!prisonerRef.AssignCell())
-            Debug(this, "Arrestee::MoveToPrison", "Could not assign a cell to arrestee " + this)
             ; Terminate arrest, could not assign cell
             prisonerRef.Destroy()
             self.RevertArrest()
@@ -388,6 +404,8 @@ function MoveToPrison(bool abMoveDirectlyToCell = false)
 
         prisonerRef.MoveToCell()
     endif
+
+    prison.OnPrisonerMovedToPrison(prisonerRef, abMoveDirectlyToCell)
 endFunction
 
 function ChangeEscort(Actor akNewEscort)
@@ -421,7 +439,7 @@ endFunction
 function UpdateCurrentBounty()
     self.SetStat("Current Bounty", Bounty)
 
-    ; Debug(this, "Arrestee::UpdateCurrentBounty", "[\n" + \ 
+    ; Debug("Arrestee::UpdateCurrentBounty", "[\n" + \ 
     ;     "\t Current Bounty: " + self.QueryStat("Current Bounty") + "\n" + \
     ;     "\t Bounty: " + Bounty + "\n" + \
     ; "]")   
@@ -433,7 +451,7 @@ function UpdateLargestBounty()
 
     self.SetStat("Largest Bounty", newLargestBounty)
 
-    ; Debug(this, "Arrestee::UpdateLargestBounty", "[\n" + \ 
+    ; Debug("Arrestee::UpdateLargestBounty", "[\n" + \ 
     ;     "\t Current Longest Bounty: " + currentLargestBounty + "\n" + \
     ;     "\t New Longest Bounty: " + newLargestBounty + "\n" + \
     ;     "\t Bounty: " + Bounty + "\n" + \
@@ -445,7 +463,7 @@ function UpdateTotalBounty()
 endFunction
 
 function MoveToCaptor()
-    this.MoveTo(captor)
+    this.MoveTo(Captor)
 endFunction
 
 ; ==========================================================
@@ -454,7 +472,7 @@ endFunction
 
 event OnInitialize()
     Arrest.RegisterArrestee(self)
-    Debug(this, "Arrestee::OnInitialize", "Initialized Arrestee, this: " + this)
+    Debug("Arrestee::OnInitialize", "Initialized Arrestee, this: " + this)
 
     self.RegisterForTrackedStats()
 endEvent
@@ -477,11 +495,11 @@ event OnBountyGained()
 endEvent
 
 event OnStatChanged(string asStatName, int aiValue)
-    if (asStatName == hold + " Bounty") ; If there's bounty gained in the current arrest hold
+    if (asStatName == Hold + " Bounty") ; If there's bounty gained in the current arrest hold
         self.OnBountyGained()
     endif
 
-    ; Debug(this, "Arrestee::OnStatChanged", "Stat " + asStatName + " has been changed to " + aiValue)
+    ; Debug("Arrestee::OnStatChanged", "Stat " + asStatName + " has been changed to " + aiValue)
 endEvent
 
 event OnObjectUnequipped(Form akBaseObject, ObjectReference akReference)
@@ -489,7 +507,7 @@ event OnObjectUnequipped(Form akBaseObject, ObjectReference akReference)
 endEvent
 
 event OnDeath(Actor akKiller)
-    Arrest.OnArresteeDeath(this, captor, akKiller)
+    Arrest.OnArresteeDeath(this, Captor, akKiller)
 endEvent
 
 ; ==========================================================
@@ -589,18 +607,18 @@ Actor function GetActor()
 endFunction
 
 Actor function GetCaptor()
-    return captor
+    return self.Captor
 endFunction
 
 Faction function GetFaction()
-    return arrestFaction
+    return self.ArrestFaction
 endFunction
 
 string function GetHold()
-    return hold
+    return self.Hold
 endFunction
 
 string function GetArrestType()
-    return arrestType
+    return self.ArrestType
 endFunction
 

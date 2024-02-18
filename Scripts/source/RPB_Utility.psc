@@ -22,6 +22,19 @@ Message function ServeTimeMessage() global
     return GetFormFromMod(0x1EE08) as Message
 endFunction
 
+Spell function RPB_ArresteeSpell() global
+    return GetFormFromMod(0x187B3) as Spell
+endFunction
+
+Spell function RPB_PrisonerSpell() global
+    return GetFormFromMod(0x197D7) as Spell
+endFunction
+
+Spell function RPB_CaptorSpell() global
+    return none ; change form id
+    return GetFormFromMod(0x197D7) as Spell
+endFunction
+
 ; ==========================================================
 ;                        Log Functions
 ; ==========================================================

@@ -535,6 +535,10 @@ int function GetSentenceFromBounty()
     return (nonViolent + Round(violent * (100 / Prison.BountyExchange))) / Prison.BountyToSentence
 endFunction
 
+bool function IsRestrained()
+    return this.GetEquippedArmorInSlot(59) != none
+endFunction
+
 function Cuff(bool abCuffInFront = false)
     Form cuffs = Game.GetFormEx(0xA081D2F)
 
@@ -638,7 +642,7 @@ function Clothe()
 endFunction
 
 function Strip(bool abRemoveUnderwear = true)
-    return
+    ; return
     this.RemoveAllItems(PrisonerBelongingsContainer, false, true)
     self.IncrementStat("Times Stripped")
     self.IsStrippedNaked = true
@@ -1042,9 +1046,7 @@ state Imprisoned
             return
         endif
 
-        ; DEBUG_ShowPrisonInfo()
         Prison.DEBUG_ShowPrisonerSentenceInfo(self, true)
-        ; DEBUG_ShowSentenceInfo()
 
         self.RegisterLastUpdate()
         RegisterForSingleUpdateGameTime(1.0)
@@ -1317,6 +1319,18 @@ function ProcessWhenMoved()
     if (self.ShouldBeStripped)
         self.Strip()
     endif
+endFunction
+
+; Moves this prisoner to Prison (To be processed)
+function MoveToPrison(Actor akCaptor)
+    ; Assign a container for this prisoner's belongings (if applicable)
+    self.SetBelongingsContainer()
+
+    self.MoveTo(PrisonerBelongingsContainer)
+
+     ; Later maybe the captor shouldn't go, and instead there should be guards waiting in the prison
+     ; They shouldn't go especially if they are not a guard (e.g: Bounty Hunter or other NPC)
+    akCaptor.MoveTo(PrisonerBelongingsContainer)
 endFunction
 
 function MoveToCell(bool abBeginImprisonment = true)
@@ -1957,49 +1971,8 @@ endFunction
 ;                          Debug
 ; ==========================================================
 
-function DEBUG_ShowPrisonInfo()
-    Debug(this, "DEBUG_ShowPrisonInfo", "\n" + Prison.Hold + " Prison: { \n\t" + \
-        "Hold: "                + Prison.Hold + ", \n\t" + \
-        "Bounty Non-Violent: "  + BountyNonViolent + ", \n\t" + \
-        "Bounty Violent: "      + BountyViolent + ", \n\t" + \
-        "Imprisoned: "          + self.IsImprisoned + ", \n\t" + \
-        "Jail Cell: "           + Prison_GetReference("Cell") + ", \n" + \
-    " }")
-endFunction
-
-function DEBUG_ShowSentenceInfo(bool abShort = false)
-    int timeServedDays      = GetTimeServed("Days")
-    int timeServedHours     = GetTimeServed("Hours of Day")
-    int timeServedMinutes   = GetTimeServed("Minutes of Hour")
-    int timeServedSeconds   = GetTimeServed("Seconds of Minute")
-
-    int timeLeftToServeDays      = GetTimeLeftInSentence("Days")
-    int timeLeftToServeHours     = GetTimeLeftInSentence("Hours of Day")
-    int timeLeftToServeMinutes   = GetTimeLeftInSentence("Minutes of Hour")
-    int timeLeftToServeSeconds   = GetTimeLeftInSentence("Seconds of Minute")
-
-    string sentenceString   = "Sentence: " + Sentence + " Days"
-    string timeServedString = TimeServed + " ("+ (TimeServed * 24) + " Hours" +") ["+ timeServedDays + " Days, " + timeServedHours + " Hours, " +  timeServedMinutes + " Minutes, " + timeServedSeconds + " Seconds" +"]"
-    string timeLeftString   = TimeLeftInSentence + " ("+ (TimeLeftInSentence * 24) + " Hours" +") ["+ timeLeftToServeDays + " Days, " + timeLeftToServeHours + " Hours, " +  timeLeftToServeMinutes + " Minutes, " + timeLeftToServeSeconds + " Seconds" +"]"
-
-    if (abShort)
-        Info("ShowSentenceInfo", Prison.Hold + " Sentence for " + this +": {"+ sentenceString +", Served: "+ timeServedString +", Left: "+ timeLeftString +"}")
-    else
-        Info("ShowSentenceInfo", "\n" + Prison.Hold + " Sentence: { \n\t" + \
-        "Minimum Sentence: "    + Prison.MinimumSentence + " Days, \n\t" + \
-        "Maximum Sentence: "    + Prison.MaximumSentence + " Days, \n\t" + \
-        "Sentence: "            + Sentence + " Days, \n\t" + \
-        "Time of Arrest: "      + TimeOfArrest + ", \n\t" + \
-        "Time of Imprisonment: "+ TimeOfImprisonment + ", \n\t" + \
-        "Time Served: "         + TimeServed + " ("+ (TimeServed * 24) + " Hours" +") ["+ timeServedDays + " Days, " + timeServedHours + " Hours, " +  timeServedMinutes + " Minutes, " + timeServedSeconds + " Seconds" +"], \n\t" + \
-        "Time Left: "           + TimeLeftInSentence + " ("+ (TimeLeftInSentence * 24) + " Hours" +") ["+ timeLeftToServeDays + " Days, " + timeLeftToServeHours + " Hours, " +  timeLeftToServeMinutes + " Minutes, " + timeLeftToServeSeconds + " Seconds" +"], \n\t" + \
-        "Release Time: "        + ReleaseTime + "\n" + \
-    " }")
-    endif
-endFunction
-
 function DEBUG_ShowHoldStats()
-    Info("ShowHoldStats", "\n" + Prison.Hold + " Stats: { \n\t" + \
+    LogNoType("\n" + Prison.Hold + " Stats: { \n\t" + \
         "Current Bounty: "      + self.QueryStat("Current Bounty")      + ", \n\t" + \
         "Largest Bounty: "      + self.QueryStat("Largest Bounty")      + ", \n\t" + \
         "Total Bounty: "        + self.QueryStat("Total Bounty")        + ", \n\t" + \

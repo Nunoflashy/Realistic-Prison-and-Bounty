@@ -8,18 +8,6 @@ import RPB_Utility
 ;                     Script References
 ; ==========================================================
 
-RealisticPrisonAndBounty_Config __config
-RealisticPrisonAndBounty_Config property Config
-    RealisticPrisonAndBounty_Config function get()
-        if (__config)
-            return __config
-        endif
-
-        __config = RPB_API.GetConfig()
-        return __config
-    endFunction
-endProperty
-
 RPB_PrisonManager __prisonManager
 RPB_PrisonManager property PrisonManager
     RPB_PrisonManager function get()
@@ -29,6 +17,18 @@ RPB_PrisonManager property PrisonManager
 
         __prisonManager = RPB_API.GetPrisonManager()
         return __prisonManager
+    endFunction
+endProperty
+
+RealisticPrisonAndBounty_Config property Config
+    RealisticPrisonAndBounty_Config function get()
+        return PrisonManager.Config
+    endFunction
+endProperty
+
+RealisticPrisonAndBounty_SceneManager property SceneManager
+    RealisticPrisonAndBounty_SceneManager function get()
+        return PrisonManager.SceneManager
     endFunction
 endProperty
 
@@ -691,6 +691,24 @@ bool function ReleasePrisoner(RPB_Prisoner apPrisoner)
     self.UnregisterPrisoner(apPrisoner)
 endFunction
 
+bool function ProcessPrisoner(RPB_Prisoner apPrisoner)
+    apPrisoner.SetReleaseLocation()
+    apPrisoner.SetBelongingsContainer()
+
+    if (!apPrisoner.AssignCell())
+        return false
+    endif
+
+    if (apPrisoner.ShouldBeFrisked)
+        ; Prison.EnqueueScene("RPB_Stripping02")
+        ; SceneManager.EnqueueNextScene()
+    endif
+
+    if (apPrisoner.ShouldBeStripped)
+        apPrisoner.StartStripping(apPrisoner.Captor)
+    endif
+endFunction
+
 string function GetTimeOfArrestFormatted(RPB_Prisoner apPrisoner)
     int day      = apPrisoner.DayOfArrest
     int month    = apPrisoner.MonthOfArrest
@@ -1056,6 +1074,30 @@ event OnPrisonerUnregistered(RPB_Prisoner apPrisoner)
     PrisonManager.OnPrisonUnregisteredPrisoner(self, apPrisoner)
 endEvent
 
+event OnPrisonerMovedToPrison(RPB_Prisoner apPrisoner, bool abWasMovedDirectlyToCell)
+    if (abWasMovedDirectlyToCell)
+        if (apPrisoner.IsRestrained())
+            apPrisoner.Uncuff()
+        endif
+
+        return
+    endif
+
+    ; Moved to Prison
+    self.ProcessPrisoner(apPrisoner)
+    ; self.OnPrisonerProcessed(apPrisoner)
+endEvent
+
+event OnPrisonerProcessed(RPB_Prisoner apPrisoner)
+    apPrisoner.SetReleaseLocation()
+    apPrisoner.SetBelongingsContainer()
+    if (!apPrisoner.AssignCell())
+        return
+    endif
+
+    apPrisoner.StartStripping(apPrisoner.Captor)
+endEvent
+
 event OnPrisonerTimeElapsed(RPB_Prisoner apPrisoner)
 
 endEvent
@@ -1155,7 +1197,7 @@ function EscortPrisonerToCell(RPB_Prisoner apPrisoner, Actor akEscort)
     ; The marker where the escort will stand, waiting for the prisoner to enter the cell.
     ObjectReference outsideJailCellEscortWaitingMarker = apPrisoner.JailCell.GetRandomMarker("Exterior") as ObjectReference
 
-    Config.SceneManager.StartEscortToCell( \
+    SceneManager.StartEscortToCell( \
         akEscortLeader              = akEscort, \
         akEscortedPrisoner          = apPrisoner.GetActor(), \
         akJailCellMarker            = apPrisoner.JailCell, \
@@ -1165,7 +1207,7 @@ function EscortPrisonerToCell(RPB_Prisoner apPrisoner, Actor akEscort)
 endFunction
 
 function BeginStrippingPrisoner(RPB_Prisoner apPrisoner, Actor akStripper)
-    Config.SceneManager.StartStripping_02( \
+    SceneManager.StartStripping_02( \
         akStripperGuard     = akStripper, \
         akStrippedPrisoner  = apPrisoner.GetActor() \
     )
@@ -1263,10 +1305,6 @@ function ConfigurePrison( \
     self.SetupCells() ; To be changed, this will only work if the Player is present in the scene
 
     ; Debug(self.GetOwningQuest(), "Prison::ConfigurePrison", "Prison Location: " + PrisonLocation + ", Prison Faction: " + PrisonFaction + ", Prison Hold: " + Hold)
-endFunction
-
-function AddPrisonCell(RPB_JailCell akPrisonCell)
-
 endFunction
 
 bool function BindCellToPrisoner(ObjectReference akJailCell, RPB_Prisoner akPrisoner)
@@ -1582,20 +1620,13 @@ bool function RegisterPrisoner(RPB_Prisoner apPrisoner)
     return Prisoners.Exists(apPrisoner)
 endFunction
 
+;/
+    Assigns a number to this Prisoner for this Prison.
+/;
 function AssignPrisonerNumber(RPB_Prisoner apPrisoner)
     int prisonerCount   = Prisoners.Count
     int assignedNumber  = prisonerCount + 1
     apPrisoner.Prison_SetInt("Prisoner Number", assignedNumber)
-endFunction
-
-function RegisterPrisonerTimeOfImprisonment(RPB_Prisoner apPrisoner)
-    apPrisoner.SetFloat("Time of Imprisonment", RPB_Utility.GetCurrentTime(), "Jail")
-    apPrisoner.SetFloat("Minute of Imprisonment", RPB_Utility.GetCurrentMinute(), "Jail")
-    apPrisoner.SetFloat("Hour of Imprisonment", RPB_Utility.GetCurrentHour(), "Jail")
-    apPrisoner.SetFloat("Day of Imprisonment", RPB_Utility.GetCurrentDay(), "Jail")
-    apPrisoner.SetFloat("Month of Imprisonment", RPB_Utility.GetCurrentMonth(), "Jail")
-    apPrisoner.SetFloat("Year of Imprisonment", RPB_Utility.GetCurrentYear(), "Jail")
-    apPrisoner.SetBool("Imprisoned", true, "Jail")
 endFunction
 
 ;/
@@ -1787,9 +1818,15 @@ function ProcessImprisonmentForQueuedPrisoners()
     isProcessingQueuedPrisonersForImprisonment = false
 endFunction
 
+;/
+    Turns the Actor into an RPB_Prisoner and binds it to this Prison.
+
+    Actor   @akActor: The actor to turn into a Prisoner
+    bool?   @abDelayExecution: Whether to delay before obtaining a reference to the prisoner.
+/;
 RPB_Prisoner function MakePrisoner(Actor akActor, bool abDelayExecution = true)
     ; Cast the Prisoner spell (to bind the RPB_Prisoner instance script)
-    Spell prisonerSpell = GetFormFromMod(0x197D7) as Spell
+    Spell prisonerSpell = RPB_Utility.RPB_PrisonerSpell()
     akActor.AddSpell(prisonerSpell, false)
 
     ; Bind this Prison to the Prisoner (to retrieve it from RPB_Prisoner)

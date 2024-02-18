@@ -80,7 +80,9 @@ endFunction
 event OnConfigInit()
     ; ModName = "R. Prison and Bounty - Stats"
     ; ModName = "Realistic Prison & B. - Stats"
-    ModName = "Realistic Prison & B. - Stats"
+    ; ModName = "Realistic Prison & B. - Stats"
+    ; ModName = "RealisticPrison&Bounty - Stats"
+    ModName = "RPB - Stats"
 
     self.InitializePages()
 endEvent

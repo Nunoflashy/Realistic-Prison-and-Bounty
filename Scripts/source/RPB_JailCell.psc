@@ -345,12 +345,12 @@ endFunction
 
 function SetAsFemaleOnly()
     __isFemaleOnly = true
-    Debug(self, "JailCell::SetAsFemaleOnly", self + " has been set as a female only cell.")
+    Debug("JailCell::SetAsFemaleOnly", self + " has been set as a female only cell.")
 endFunction
 
 function SetAsMaleOnly()
     __isMaleOnly = true
-    Debug(self, "JailCell::SetAsMaleOnly", self + " has been set as a male only cell.")
+    Debug("JailCell::SetAsMaleOnly", self + " has been set as a male only cell.")
 endFunction
 
 function SetExclusiveToPrisonerSex(RPB_Prisoner akPrisoner)
@@ -370,7 +370,7 @@ function RemoveGenderExclusiveness()
     __isFemaleOnly  = false
     __isMaleOnly    = false
 
-    Debug(self, "JailCell::RemoveGenderExclusiveness", self + " is no longer a gender exclusive cell.")
+    Debug("JailCell::RemoveGenderExclusiveness", self + " is no longer a gender exclusive cell.")
 endFunction
 
 ; RPB_CellDoor function ScanCellDoor()

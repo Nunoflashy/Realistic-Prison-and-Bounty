@@ -18,6 +18,30 @@ endProperty
 ;                  Shared Prison Properties
 ; ==========================================================
 
+RealisticPrisonAndBounty_Config __config
+RealisticPrisonAndBounty_Config property Config
+    RealisticPrisonAndBounty_Config function get()
+        if (__config)
+            return __config
+        endif
+
+        __config = RPB_API.GetConfig()
+        return __config
+    endFunction
+endProperty
+
+RealisticPrisonAndBounty_SceneManager __sceneManager
+RealisticPrisonAndBounty_SceneManager property SceneManager
+    RealisticPrisonAndBounty_SceneManager function get()
+        if (__sceneManager)
+            return __sceneManager
+        endif
+
+        __sceneManager = RPB_API.GetSceneManager()
+        return __sceneManager
+    endFunction
+endProperty
+
 Message __serveTimeMessage
 Message property ServeTimeMessage
     Message function get()

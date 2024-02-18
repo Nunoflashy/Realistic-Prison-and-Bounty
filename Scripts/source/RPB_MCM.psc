@@ -655,7 +655,8 @@ endFunction
 ; ============================================================================
 event OnConfigInit()
     ; ModName = "Realistic Prison & Bounty"
-    ModName = "Realistic Prison & B. - Config"
+    ; ModName = "Realistic Prison & B. - Config"
+    ModName = "RPB - Config"
     self.InitializePages()
     self.InitializeOptions()
     self.RegisterEvents()

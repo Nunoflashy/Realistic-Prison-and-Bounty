@@ -273,7 +273,7 @@ Scene function GetScene(string asSceneName)
         return none
     endif
 
-    Info("SceneManager::GetScene", "Scenes: " + SceneCount)
+    Debug("SceneManager::GetScene", "Scenes: " + SceneCount)
     ; return Game.GetFormFromFile(JMap.getInt(sceneContainer, asSceneName), GetPluginasSceneName()) as Scene
     return GetFormFromMod(self.GetSceneFormID(asSceneName)) as Scene
 endFunction
@@ -408,7 +408,7 @@ string function GetAliasName(string aliasName, int aliasIndex, bool checkForExis
     endif
 
     if (checkForExistence && self.GetAliasByName(finalName) == none)
-        Info("SceneManager::GetAliasByName", "Alias " + finalName + " does not exist!")
+        Debug("SceneManager::GetAliasByName", "Alias " + finalName + " does not exist!")
         return ""
     endif
 
@@ -841,6 +841,7 @@ event OnScenePlaying(string name, int phaseEvent, int phase, Scene sender)
         if (phaseEvent == PHASE_START)
             if (phase == 3)
                 arrest.OnArresting(escort, escortee)
+                arrest.OnArresteeRestrained(escortee)
             endif
 
         elseif (phaseEvent == PHASE_END)
@@ -1405,7 +1406,7 @@ function StartScene(string asSceneName, int akSceneParameters, int aiStartingPha
     Scene sceneObject = self.GetScene(asSceneName)
 
     if (sceneObject.IsPlaying() && !abForceStart)
-        Info("SceneManager::StartScene", "Scene " + sceneObject + " is currently playing, aborting call!")
+        Debug("SceneManager::StartScene", "Scene " + sceneObject + " is currently playing, aborting call!")
         return
     endif
 

@@ -151,7 +151,7 @@ endFunction
     returns (RPB_Arrestee): A reference to the arrest state of the Actor.
 /;
 RPB_Arrestee function MakeArrestee(Actor akActor, bool abDelayExecution = true)
-    Spell arrestSpell = GetFormFromMod(0x187B3) as Spell
+    Spell arrestSpell = RPB_Utility.RPB_ArresteeSpell()
     akActor.AddSpell(arrestSpell, false)
 
     if (abDelayExecution)
@@ -178,7 +178,7 @@ endFunction
 /;
 function UnregisterArrestee(RPB_Arrestee apArrestee)
     ; Remove the spell from the arrestee
-    Spell arrestSpell = GetFormFromMod(0x187B3) as Spell
+    Spell arrestSpell = RPB_Utility.RPB_ArresteeSpell()
     if (apArrestee.HasSpell(arrestSpell))
         apArrestee.RemoveSpell(arrestSpell)
     endif
@@ -213,14 +213,14 @@ bool function RegisterCaptor(RPB_Captor apCaptor)
 endFunction
 
 RPB_Captor function MakeCaptor(Actor akActor, bool abDelayExecution = true)
-    Spell arrestSpell = GetFormFromMod(0x187B3) as Spell ; change formid
-    akActor.AddSpell(arrestSpell, false)
+    Spell captorSpell = RPB_Utility.RPB_CaptorSpell()
+    akActor.AddSpell(captorSpell, false)
 
     if (abDelayExecution)
         Utility.Wait(0.2)
     endif
 
-    if (akActor.HasSpell(arrestSpell))
+    if (akActor.HasSpell(captorSpell))
         Debug("Arrest::MakeCaptor", "The Actor does not have the spell attached to them! (This is possibly a bug!)")
         return none
     endif
@@ -265,32 +265,6 @@ event OnPlayerLoadGame()
     RegisterHotkeys()
 endEvent
 
-;/
-    GetDateFromDaysPassed(17, 8, 201, 30)
-    =
-    totalDaysPassed = 229
-    totalDaysPassed += 30 (259)
-
-    while (259 > 0)
-        daysInMonth = GetDaysOfMonth(currentMonth)
-        
-        if (259 <= daysInMonth) (false)
-            aiDay = 259
-            totalDaysPassed = 0
-        else (true)
-            currentMonth += 1 (9) (10 when totalDays is 229)
-
-            if (9 > 12) (false)
-                currentMonth = 1
-                currentYear += 1
-            endif
-
-            totalDaysPassed -= daysInMonth (229 assuming daysOfMonth is 30)
-
-        endif
-    endWhile
-/;
-
 event OnKeyDown(int keyCode)
     if (keyCode == 0x58) ; F12
         RPB_Prison playerPrison = RPB_API.GetPrisonManager().FindPrisonByPrisoner(Config.Player)
@@ -322,9 +296,9 @@ event OnKeyDown(int keyCode)
         ; self.ArrestActor(g, playerCopy, ARREST_TYPE_ESCORT_TO_JAIL)
 
         ; return
-        RPB_Tests.Test_Can_Imprison_Actor_Without_Arresting()
+        ; RPB_Tests.Test_Can_Imprison_Actor_Without_Arresting()
         ; RPB_Tests.Test_Can_Get_Prison_For_Actor_Globally()
-        ; RPB_Tests.Test_Imprisonment_In_Cell_Should_Not_Allow_Overcrowding()
+        RPB_Tests.Test_Imprisonment_In_Cell_Should_Not_Allow_Overcrowding()
         ; RPB_Tests.Test_Arrest_And_Imprison_Multiple_Actors_With_Scene()
         ; RPB_Tests.Test_Can_Get_Prison_For_Actor_Globally()
         return
@@ -618,10 +592,11 @@ event OnArrestBegin(RPB_Arrestee apArrestee, Actor akCaptor, Faction akCrimeFact
 
 
     ; apArrestee.SetArrestParameters(ARREST_TYPE_ESCORT_TO_CELL, akCaptor, akCrimeFaction)
-    apArrestee.SetArrestParameters(ARREST_TYPE_ESCORT_TO_JAIL, akCaptor, akCrimeFaction)
+    ; apArrestee.SetArrestParameters(ARREST_TYPE_ESCORT_TO_JAIL, akCaptor, akCrimeFaction)
     apArrestee.SetActiveBounty(4000)
 
     ; apArrestee.SetActiveBounty(7000)
+    apArrestee.SetArrestParameters(ARREST_TYPE_TELEPORT_TO_JAIL, akCaptor, akCrimeFaction)
     ; apArrestee.SetArrestParameters(ARREST_TYPE_TELEPORT_TO_CELL, akCaptor, akCrimeFaction)
     ; apArrestee.SetActiveBounty(Utility.RandomInt(1200, 7800))
     ; apArrestee.SetActiveBounty(4200)
@@ -871,8 +846,15 @@ event OnArresteeDeath(Actor akArrestee, Actor akArrestGuard, Actor akKiller)
 
 endEvent
 
-event OnArresteeRestrained(Actor akArrestee, Actor akRestrainer)
+event OnArresteeRestrained(Actor akArrestee)
+    RPB_Arrestee arresteeRef = self.GetArresteeReference(akArrestee)
 
+    if (arresteeRef.GetArrestType() == ARREST_TYPE_TELEPORT_TO_CELL)
+        arresteeRef.MoveToPrison(abMoveDirectlyToCell = true)
+
+    elseif (arresteeRef.GetArrestType() == ARREST_TYPE_TELEPORT_TO_JAIL)
+        arresteeRef.MoveToPrison()
+    endif
 endEvent
 
 event OnArresteeFreed(Actor akArrestee, Actor akGuard)
@@ -1037,11 +1019,21 @@ function BeginArrest(RPB_Arrestee akArresteeRef)
 
     ; Next step, escort/move to prison
     if (arrestType == ARREST_TYPE_TELEPORT_TO_CELL)
-        akArresteeRef.MoveToPrison(abMoveDirectlyToCell = true)
+        ; Handled on OnArresteeRestrained()
+        self.SceneManager.StartArrestScene( \
+            akGuard     = captor, \
+            akArrestee  = akArresteeRef.GetActor(), \
+            asScene     = self.GetArrestScene(akArresteeRef.GetActor()) \
+        )
 
     ; Could be used when the arrestee still has a chance to pay their bounty, and not go to the cell immediately
     elseif (arrestType == ARREST_TYPE_TELEPORT_TO_JAIL) ; Not implemented yet (Idea: Arrestee will be teleported to some location in jail and then either escorted or teleported to the cell)
-        akArresteeRef.MoveToPrison()
+        ; Handled on OnArresteeRestrained()
+        self.SceneManager.StartArrestScene( \
+            akGuard     = captor, \
+            akArrestee  = akArresteeRef.GetActor(), \
+            asScene     = self.GetArrestScene(akArresteeRef.GetActor()) \
+        )
 
     ; Will most likely be used when the arrestee has no chance to pay their bounty, and therefore will get immediately escorted into the cell
     elseif (arrestType == ARREST_TYPE_ESCORT_TO_CELL)
@@ -1492,7 +1484,7 @@ state Eluding
         if (eludeType == "Pursuit")
             if (self.MeetsPursuitEludeRequirements(Config.Player))
                 Actor eludedCaptor = ArrestVars.GetActor("Arrest::Eluded Captor")
-                self.OnArrestEludeTriggered(eludedCaptor, eludeType) ; Explicitly call Event
+                self.OnArrestEludeTriggered(eludedCaptor, eludeType) ; Explicitly fire Event
             endif
         endif
 
