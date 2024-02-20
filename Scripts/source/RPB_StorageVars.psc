@@ -208,12 +208,12 @@ int function GetIntOnForm(string asKey, Form akForm, string asCategory = "null")
     string path = GetVarPathOnForm(asKey, akForm, asCategory)
     ; Debug(none, "StorageVars::GetIntOnForm", "path: " + path + ", value: " + JDB.solveInt(path))
 
-    return JDB.solveInt(path)
+    return JDB.solveInt(path, -1)
 endFunction
 
 float function GetFloatOnForm(string asKey, Form akForm, string asCategory = "null") global
     string path = GetVarPathOnForm(asKey, akForm, asCategory)
-    return JDB.solveFlt(path)
+    return JDB.solveFlt(path, -1)
 endFunction
 
 string function GetStringOnForm(string asKey, Form akForm, string asCategory = "null") global
