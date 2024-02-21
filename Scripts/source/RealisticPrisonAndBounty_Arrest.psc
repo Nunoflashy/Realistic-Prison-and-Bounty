@@ -295,15 +295,6 @@ event OnKeyDown(int keyCode)
         ; Actor g = GetNearestGuard(config.Player, 3500, none)
         ; self.ArrestActor(g, playerCopy, ARREST_TYPE_ESCORT_TO_JAIL)
 
-        ; return
-        ; RPB_Tests.Test_Can_Imprison_Actor_Without_Arresting()
-        ; RPB_Tests.Test_Can_Get_Prison_For_Actor_Globally()
-        RPB_Tests.Test_Imprisonment_In_Cell_Should_Not_Allow_Overcrowding()
-        ; RPB_Tests.Test_Arrest_And_Imprison_Multiple_Actors_With_Scene()
-        ; RPB_Tests.Test_Can_Get_Prison_For_Actor_Globally()
-        return
-        RPB_Tests.Test_25Days_After_26th_Frostfall_Is_20th_Suns_Dusk()
-        return
         ; Actor playerCopy = config.Player.PlaceActorAtMe(config.Player.GetBaseObject() as ActorBase, 1, none)
         ; Actor playerCopy2 = config.Player.PlaceActorAtMe(config.Player.GetBaseObject() as ActorBase, 1, none)
 
@@ -422,6 +413,7 @@ event OnKeyDown(int keyCode)
         endWhile
 
     elseif (keyCode == 0x42) ; F8
+        return
         RPB_Prison playerPrison = RPB_API.GetPrisonManager().FindPrisonByPrisoner(Config.Player)
         RPB_Prisoner playerPrisoner = playerPrison.GetPrisonerReference(Config.Player)
 

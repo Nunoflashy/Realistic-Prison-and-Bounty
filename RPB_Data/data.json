@@ -3,6 +3,7 @@
     "City": "Windhelm",
     "Crime Faction": "__formData|Skyrim.esm|0x267e3",
     "Jail": {
+      "Name": "Windhelm Barracks",
       "Cells": {
         "Exterior": {
           "0x388C": ["__formData|RealisticPrisonAndBounty.esp|0x388c"],
@@ -30,6 +31,7 @@
     "City": "Falkreath",
     "Crime Faction": "__formData|Skyrim.esm|0x267e3",
     "Jail": {
+      "Name": "Falkreath Jail",
       "Cells": {
         "Exterior": [],
         "Interior": ["__formData|Skyrim.esm|0x3ef07"]
@@ -299,6 +301,7 @@
     "City": "Morthal",
     "Crime Faction": "__formData|Skyrim.esm|0x267e3",
     "Jail": {
+      "Name": "Morthal Jail",
       "Cells": {
         "Exterior": [],
         "Interior": ["__formData|Skyrim.esm|0x3ef08"]
@@ -318,6 +321,7 @@
     "City": "Dawnstar",
     "Crime Faction": "__formData|Skyrim.esm|0x267e3",
     "Jail": {
+      "Name": "Dawnstar Jail",
       "Cells": {
         "Exterior": [],
         "Interior": ["__formData|RealisticPrisonAndBounty.esp|0x3896"]
@@ -337,6 +341,7 @@
     "City": "Riften",
     "Crime Faction": "__formData|Skyrim.esm|0x267e3",
     "Jail": {
+      "Name": "Riften Jail",
       "Cells": {
         "Exterior": [],
         "Interior": [
@@ -365,6 +370,7 @@
     "City": "Whiterun",
     "Crime Faction": "__formData|Skyrim.esm|0x267e3",
     "Jail": {
+      "Name": "Dragonsreach Dungeon",
       "Cells": {
         "Exterior": [],
         "Interior": [

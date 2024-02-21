@@ -58,12 +58,6 @@ string[] property Holds
     endFunction
 endProperty
 
-; string[] property Factions
-;     string[] function get()
-        
-;     endFunction
-; endProperty
-
 string[] property Cities
     string[] function get()
         int citiesArray = JArray.object()
