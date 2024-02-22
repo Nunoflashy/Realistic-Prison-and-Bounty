@@ -26,7 +26,6 @@ int property INVALID_VALUE     = -1500300 autoreadonly
 ; MCM Option Flags
 int property OPTION_ENABLED  = 0x00 autoreadonly
 int property OPTION_DISABLED = 0x01 autoreadonly
-; ==============================================================================
 
 ; ==============================================================================
 ; Value Types
@@ -37,11 +36,22 @@ int property TYPE_FLOAT     = 3 autoreadonly
 int property TYPE_FORM      = 4 autoreadonly
 int property TYPE_OBJECT    = 5 autoreadonly
 int property TYPE_STRING    = 6 autoreadonly
+
 ; ==============================================================================
 
-;0 - no value, 1 - none, 2 - int, 3 - float, 4 - form, 5 - object, 6 - string
-
 int property OUTFIT_COUNT = 10 autoreadonly
+
+RPB_API __api
+RPB_API property API
+    RPB_API function get()
+        if (__api)
+            return __api
+        endif
+
+        __api = RPB_API.GetSelf()
+        return __api
+    endFunction
+endProperty
 
 RealisticPrisonAndBounty_Config property config
     RealisticPrisonAndBounty_Config function get()
@@ -268,19 +278,6 @@ function InitializePages()
     int _pagesArray = JArray.object()
 
     JArray.addStr(_pagesArray, "Stats")
-    ; if (Config.ShouldDisplaySentencePage())
-        ; JArray.addStr(_pagesArray, "Sentence")
-    ; endif
-    RPB_Prison actorPrison; = RPB_Prison.GetPrisonForHold("Haafingar")
-    string prisonName = actorPrison.Name
-    int n = 0
-    while (n < actorPrison.Prisoners.Count)
-        string prisonerName = actorPrison.Prisoners.AtIndex(n).Name
-        int prisonerFormID  = actorPrison.Prisoners.AtIndex(n).GetActor().GetFormID()
-        RPB_Utility.Debug("MCM::InitializePages", "prisonerFormID: " + prisonerFormID)
-        JArray.addStr(_pagesArray, "Sentence" + " - " + prisonerFormID)
-        n += 1
-    endWhile
 
     JArray.addStr(_pagesArray, "")
     JArray.addStr(_pagesArray, "General")
@@ -410,6 +407,14 @@ function SetSliderOptions(float minRange, float maxRange, float intervalSteps = 
     SetSliderDialogStartValue(startValue)
 endFunction
 
+;/
+    Gets the identifier of an option like it is stored.
+
+    string  @optionKey: The key of the option
+    string? @page: The page where the option is located, CurrentPage is used if null.
+
+    returns (string): The constructed string of how the option is stored.
+/;
 string function GetOptionAsStored(string optionKey, string page = "")
     if (page == "")
         return CurrentPage + "/" + optionKey
@@ -441,12 +446,27 @@ endFunction
 ; Option Rendering Functions
 ; ============================================================
 
-int function AddOptionCategoryKey(string text, string _key, int flags = 0)
+;/
+    Adds a header option displaying the passed in text
+    and changing the current rendered category to the key.
+
+    string  @text: The text to display on the header option
+    string  @_key: The key to set the current category to
+    int     @flags: The header option's flags
+/;
+function AddOptionCategoryKey(string text, string _key, int flags = 0)
     _currentRenderedCategory = _key
     AddHeaderOption(text, flags)
 endFunction
 
-int function AddOptionCategory(string text, int flags = 0)
+;/
+    Adds a header option displaying the passed in text
+    and setting the current rendered category.
+
+    string  @text: The text to display on the header option
+    int     @flags: The header option's flags
+/;
+function AddOptionCategory(string text, int flags = 0)
     _currentRenderedCategory = text
     AddHeaderOption(text, flags)
 endFunction
@@ -611,8 +631,6 @@ int function AddOptionSliderKey(string displayedText, string _key, string format
 
     optionId = AddSliderOption(displayedText, value, formatString, flags)
 
-    ; self.SendModEvent("RPB_OptionRegister", optionKey, optionId)
-
     if (!self.OptionExists(optionKey))
         RPB_Utility.DebugWithArgs("MCM::AddOptionSliderKey", "displayedText: " + displayedText + ", key: " + _key, "Option does not exist!")
         self.RegisterOption(optionKey, optionId)
@@ -620,13 +638,6 @@ int function AddOptionSliderKey(string displayedText, string _key, string format
 
     return optionId
 endFunction
-
-event OnOptionRegister(string eventName, string optionKey, float optionId, Form sender)
-    if (!self.OptionExists(optionKey))
-        self.RegisterOption(optionKey, optionId as int)
-        RPB_Utility.Debug("MCM::OnOptionRegister", "Option does not exist! Creating... ["+ optionKey +"] ("+ optionId +")")
-    endif
-endEvent
 
 int function AddOptionSlider(string text, string formatString = "{0}", float defaultValueOverride = -1.0, int defaultFlags = 0)
     return AddOptionSliderKey(text, text, formatString, defaultValueOverride, defaultFlags)
@@ -945,8 +956,8 @@ event OnSliderOptionChanged(string eventName, string optionName, float optionVal
     if (optionName == "Bounty for Actions::Trespassing")
         Game.SetGameSettingInt("iCrimeGoldTrespass", optionValue as int)
 
-        ; int settingValue = Game.GetGameSettingInt("iCrimeGoldTrespass")
-        ; RPB_Utility.Debug("MCM::General::OnOptionSliderAccept", optionName + " value: " + settingValue)
+        int settingValue = Game.GetGameSettingInt("iCrimeGoldTrespass")
+        RPB_Utility.Debug("MCM::General::OnOptionSliderAccept", optionName + " value: " + settingValue)
 
     elseif (optionName == "Bounty for Actions::Assault")
         Game.SetGameSettingInt("iCrimeGoldAttack", optionValue as int)
@@ -957,20 +968,20 @@ event OnSliderOptionChanged(string eventName, string optionName, float optionVal
     elseif (optionName == "Bounty for Actions::Murder")
         Game.SetGameSettingInt("iCrimeGoldMurder", optionValue as int)
         
-        ; int settingValue = Game.GetGameSettingInt("iCrimeGoldMurder")
-        ; RPB_Utility.Debug("MCM::General::OnOptionSliderAccept", optionName + " value: " + settingValue)
+        int settingValue = Game.GetGameSettingInt("iCrimeGoldMurder")
+        RPB_Utility.Debug("MCM::General::OnOptionSliderAccept", optionName + " value: " + settingValue)
 
     elseif (optionName == "Bounty for Actions::Theft")
         Game.SetGameSettingFloat("fCrimeGoldSteal", optionValue)
         
-        ; float settingValue = Game.GetGameSettingFloat("fCrimeGoldSteal")
-        ; RPB_Utility.Debug("MCM::General::OnOptionSliderAccept", optionName + " value: " + settingValue)
+        float settingValue = Game.GetGameSettingFloat("fCrimeGoldSteal")
+        RPB_Utility.Debug("MCM::General::OnOptionSliderAccept", optionName + " value: " + settingValue)
 
     elseif (optionName == "Bounty for Actions::Pickpocketing")
         Game.SetGameSettingInt("iCrimeGoldPickpocket", optionValue as int)
         
-        ; int settingValue = Game.GetGameSettingInt("iCrimeGoldPickpocket")
-        ; RPB_Utility.Debug("MCM::General::OnOptionSliderAccept", optionName + " value: " + settingValue)
+        int settingValue = Game.GetGameSettingInt("iCrimeGoldPickpocket")
+        RPB_Utility.Debug("MCM::General::OnOptionSliderAccept", optionName + " value: " + settingValue)
 
     elseif (optionName == "Bounty for Actions::Lockpicking")
         
@@ -984,6 +995,9 @@ function RegisterEvents()
     self.RegisterForModEvent("RPB_OptionRegister", "OnOptionRegister")
 endFunction
 
+;/
+    Loads every default option with the values provided in the config file.
+/;
 function LoadDefaults()
     int optionsObj  = RPB_Data.MCM_GetOptionObject()
     int optionCount = JValue.count(optionsObj)
@@ -1044,12 +1058,18 @@ function LoadDefaults()
     endWhile
 endFunction
 
+;/
+    Sets the value for a specific property of a string option.
+/;
 function SetStringOptionPropertyValue(string asOptionKey, string asProperty, string asValue)
     if (asProperty == "Default")
         self.SetOptionDefaultString(asOptionKey, asValue)
     endif
 endFunction
 
+;/
+    Sets the value for a specific property of a number option.
+/;
 function SetNumberOptionPropertyValue(string asOptionKey, string asProperty, float afValue)
     if (asProperty == "Minimum")
         self.SetOptionMinimum(asOptionKey, afValue)
@@ -1300,6 +1320,7 @@ function InitializeOptions()
     JMap.setObj(generalContainer, "options/id/from-id-to-key", optionsFromIdToKeyMap)
 endFunction
 
+
 int optionsValueMap         ; Holds the value for all options
 int optionsStateMap         ; Holds the state for all options (enabled, disabled)
 int optionsDefaultValueMap  ; Holds the default values for all options
@@ -1310,6 +1331,10 @@ int optionsFromKeyToIdMap   ; Holds the identifier to identify an option from Ke
 int optionsFromIdToKeyMap   ; Holds the identifier to identify an option from ID to Key
 int generalContainer        ; Holds every option container and persists them
 
+
+; ============================================================================
+;                             Option Setters/Getters
+; ============================================================================
 
 ;/
     Retrieves the option key specified from its option id.
@@ -1340,42 +1365,97 @@ int function GetOption(string optionKey)
     return JMap.getInt(optionsFromKeyToIdMap, optionKey)
 endFunction
 
+;/
+    Sets the value of a bool-type option.
+
+    string  @asOptionKey: The key of the option.
+    bool    @value: The value to assign to this option.
+    string? @page: The page where the option is rendered (will be CurrentPage if null).
+/;
 function SetOptionValueBool(string optionKey, bool value, string page = "")
     ; options/value/Whiterun/Stripping::Allow Stripping
     string optionAsStored = self.GetOptionAsStored(optionKey, page)
     JMap.setInt(optionsValueMap, optionAsStored, value as int)
 endFunction
 
+;/
+    Sets the value of an int option.
+
+    string  @asOptionKey: The key of the option.
+    int     @value: The value to assign to this option.
+    string? @page: The page where the option is rendered (will be CurrentPage if null).
+/;
 function SetOptionValueInt(string optionKey, int value, string page = "")
     string optionAsStored = self.GetOptionAsStored(optionKey, page)
     JMap.setInt(optionsValueMap, optionAsStored, value)
 endFunction
 
+;/
+    Sets the value of a float option.
+
+    string  @asOptionKey: The key of the option.
+    float   @value: The value to assign to this option.
+    string? @page: The page where the option is rendered (will be CurrentPage if null).
+/;
 function SetOptionValueFloat(string optionKey, float value, string page = "")
     string optionAsStored = self.GetOptionAsStored(optionKey, page)
     JMap.setFlt(optionsValueMap, optionAsStored, value)
 endFunction
 
+;/
+    Sets the value of a string option.
+
+    string  @asOptionKey: The key of the option.
+    string  @value: The value to assign to this option.
+    string? @page: The page where the option is rendered (will be CurrentPage if null).
+/;
 function SetOptionValueString(string optionKey, string value, string page = "")
     string optionAsStored = self.GetOptionAsStored(optionKey, page)
     JMap.setStr(optionsValueMap, optionAsStored, value)
 endFunction
 
+;/
+    Checks if the option exists in storage.
+
+    string  @asOptionKey: The key of the option.
+    string? @page: The page where the option is rendered (will be CurrentPage if null).
+/;
 bool function OptionExists(string optionKey, string page = "")
     string optionAsStored = self.GetOptionAsStored(optionKey, page)
     return JMap.hasKey(optionsFromKeyToIdMap, optionAsStored)
 endFunction
 
+;/
+    Checks if the option has any value associated with it.
+
+    string  @asOptionKey: The key of the option.
+    string? @page: The page where the option is rendered (will be CurrentPage if null).
+/;
 bool function OptionHasValue(string optionKey, string page = "")
     string optionAsStored = self.GetOptionAsStored(optionKey, page)
     return JMap.hasKey(optionsValueMap, optionAsStored)
 endFunction
 
+;/
+    Checks if the option has any state associated with it (Enabled, Disabled).
+
+    string  @asOptionKey: The key of the option.
+    string? @page: The page where the option is rendered (will be CurrentPage if null).
+/;
 bool function OptionHasState(string optionKey, string page = "")
     string optionAsStored = self.GetOptionAsStored(optionKey, page)
     return JMap.hasKey(optionsStateMap, optionAsStored)
 endFunction
 
+;/
+    Registers an option in storage.
+    Both the Option Key and Option ID are stored in order
+    to identify the option in both ways.
+
+    string  @asOptionKey: The key of the option.
+    int     @optionId: The ID of the option at the time of render.
+    string? @page: The page where the option is rendered (will be CurrentPage if null).
+/;
 function RegisterOption(string optionKey, int optionId, string page = "")
     ; For bi-directional identification (option-key to option-id and option-id to option-key)
     string optionAsStored = self.GetOptionAsStored(optionKey, page)
@@ -1384,87 +1464,200 @@ function RegisterOption(string optionKey, int optionId, string page = "")
     JIntMap.setStr(optionsFromIdToKeyMap, optionId, optionAsStored)
 endFunction
 
+;/
+    Sets an option's state value
+
+    string  @asOptionKey: The key of the option.
+    int     @optionState: The state to assign to the option (Enabled, Disabled).
+    string? @page: The page where the option is rendered (will be CurrentPage if null).
+/;
 function SetOptionState(string optionKey, int optionState, string page = "")
     JMap.setInt(optionsStateMap, optionKey, optionState)
 endFunction
 
+;/
+    Retrieves the value of a bool option.
+
+    string  @asOptionKey: The key of the option.
+    string? @page: The page where the option is rendered (will be CurrentPage if null).
+/;
 bool function GetOptionValueBool(string optionKey, string page = "")
     string optionAsStored = self.GetOptionAsStored(optionKey, page)
     return JMap.getInt(optionsValueMap, optionAsStored) as bool
 endFunction
 
+;/
+    Retrieves the value of an int option.
+
+    string  @asOptionKey: The key of the option.
+    string? @page: The page where the option is rendered (will be CurrentPage if null).
+/;
 int function GetOptionValueInt(string optionKey, string page = "")
     string optionAsStored = self.GetOptionAsStored(optionKey, page)
     return JMap.getInt(optionsValueMap, optionAsStored)
 endFunction
 
+;/
+    Retrieves the value of a float option.
+
+    string  @asOptionKey: The key of the option.
+    string? @page: The page where the option is rendered (will be CurrentPage if null).
+/;
 float function GetOptionValueFloat(string optionKey, string page = "")
     string optionAsStored = self.GetOptionAsStored(optionKey, page)
     return JMap.getFlt(optionsValueMap, optionAsStored)
 endFunction
 
+;/
+    Retrieves the value of a string option.
+
+    string  @asOptionKey: The key of the option.
+    string? @page: The page where the option is rendered (will be CurrentPage if null).
+/;
 string function GetOptionValueString(string optionKey, string page = "")
     string optionAsStored = self.GetOptionAsStored(optionKey, page)
     return JMap.getStr(optionsValueMap, optionAsStored)
 endFunction
 
+;/
+    Retrieves the current state of the option.
+
+    string  @asOptionKey: The key of the option.
+    string? @page: The page where the option is rendered (will be CurrentPage if null).
+/;
 int function GetOptionState(string optionKey, string page = "")
     string optionAsStored = self.GetOptionAsStored(optionKey, page)
     return JMap.getInt(optionsStateMap, optionAsStored)
 endFunction
 
+;/
+    Sets the default value of a bool option.
+
+    string  @asOptionKey: The key of the option.
+    bool    @value: The value to set.
+/;
 function SetOptionDefaultBool(string optionKey, bool value)
     JMap.setInt(optionsDefaultValueMap, optionKey, value as int)
 endFunction
 
+;/
+    Sets the default value of an int option.
+
+    string  @asOptionKey: The key of the option.
+    int     @value: The value to set.
+/;
 function SetOptionDefaultInt(string optionKey, int value)
     JMap.setInt(optionsDefaultValueMap, optionKey, value)
 endFunction
 
+;/
+    Sets the default value of a float option.
+
+    string  @asOptionKey: The key of the option.
+    float   @value: The value to set.
+/;
 function SetOptionDefaultFloat(string optionKey, float value)
     JMap.setFlt(optionsDefaultValueMap, optionKey, value)
 endFunction
+;/
+    Sets the default value of a string option.
 
+    string  @asOptionKey: The key of the option.
+    string  @value: The value to set.
+/;
 function SetOptionDefaultString(string optionKey, string value)
     JMap.setStr(optionsDefaultValueMap, optionKey, value)
 endFunction
 
+;/
+    Retrieves the default value of a bool option.
+
+    string  @asOptionKey: The key of the option.
+/;
 bool function GetOptionDefaultBool(string optionKey)
     return JMap.getInt(optionsDefaultValueMap, optionKey) as bool
 endFunction
 
+;/
+    Retrieves the default value of an int option.
+
+    string  @asOptionKey: The key of the option.
+/;
 int function GetOptionDefaultInt(string optionKey)
     return JMap.getInt(optionsDefaultValueMap, optionKey)
 endFunction
 
+;/
+    Retrieves the default value of a float option.
+
+    string  @asOptionKey: The key of the option.
+/;
 float function GetOptionDefaultFloat(string optionKey)
     return JMap.getFlt(optionsDefaultValueMap, optionKey)
 endFunction
 
+;/
+    Retrieves the default value of a string option.
+
+    string  @asOptionKey: The key of the option.
+/;
 string function GetOptionDefaultString(string optionKey)
     return JMap.getStr(optionsDefaultValueMap, optionKey)
 endFunction
 
+;/
+    Sets the minimum value of an option.
+
+    string  @asOptionKey: The key of the option.
+    float   @value: The value to set
+/;
 function SetOptionMinimum(string optionKey, float value)
     JMap.setFlt(optionsMinimumValueMap, optionKey, value)
 endFunction
 
-float function GetOptionMinimum(string optionKey)
-    return JMap.getFlt(optionsMinimumValueMap, optionKey)
-endFunction
+;/
+    Sets the maximum value of an option.
 
+    string  @asOptionKey: The key of the option.
+    float   @value: The value to set
+/;
 function SetOptionMaximum(string optionKey, float value)
     JMap.setFlt(optionsMaximumValueMap, optionKey, value)
 endFunction
 
-float function GetOptionMaximum(string optionKey)
-    return JMap.getFlt(optionsMaximumValueMap, optionKey)
-endFunction
+;/
+    Sets the interval steps value of an option (how much to increment or decrement by each step).
 
+    string  @asOptionKey: The key of the option.
+    float   @value: The value to set
+/;
 function SetOptionSteps(string optionKey, float value)
     JMap.setFlt(optionsStepsValueMap, optionKey, value)
 endFunction
 
+;/
+    Retrieves the minimum value of an option.
+
+    string  @asOptionKey: The key of the option.
+/;
+float function GetOptionMinimum(string optionKey)
+    return JMap.getFlt(optionsMinimumValueMap, optionKey)
+endFunction
+
+;/
+    Retrieves the maximum value of an option.
+
+    string  @asOptionKey: The key of the option.
+/;
+float function GetOptionMaximum(string optionKey)
+    return JMap.getFlt(optionsMaximumValueMap, optionKey)
+endFunction
+
+;/
+    Retrieves the interval steps value of an option.
+
+    string  @asOptionKey: The key of the option.
+/;
 float function GetOptionSteps(string optionKey)
     return JMap.getFlt(optionsStepsValueMap, optionKey)
 endFunction
