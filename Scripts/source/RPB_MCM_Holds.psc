@@ -810,10 +810,13 @@ function LoadSliderOptions(RPB_MCM mcm, string option, float currentSliderValue)
     ; mcm.LoadPropertyForOption(option, "Maximum")
     ; mcm.LoadPropertyForOption(option, "Steps")
 
-    mcm.LoadMinimumForOption(option)
-    mcm.LoadMaximumForOption(option)
-    mcm.LoadStepsForOption(option)
-    mcm.LoadDefaultForOption(option)
+
+    float benchmark2 = RPB_Utility.StartBenchmark()
+    mcm.LoadPropertyForOption(option, "Minimum")
+    mcm.LoadPropertyForOption(option, "Maximum")
+    mcm.LoadPropertyForOption(option, "Steps")
+    mcm.LoadPropertyForOption(option, "Default")
+    EndBenchmark(benchmark2, "New Load Functions")
 
     float minRange      = mcm.GetOptionMinimum(option)
     float maxRange      = mcm.GetOptionMaximum(option)
@@ -1070,7 +1073,8 @@ function OnOptionSliderAccept(RPB_MCM mcm, string option, float value) global
 endFunction
 
 function OnOptionMenuOpen(RPB_MCM mcm, string option) global
-    mcm.LoadDefaultForOption(option)
+    ; mcm.LoadDefaultForOption(option)
+    mcm.LoadPropertyForOption(option, "Default")
 
     string defaultValue = mcm.GetOptionDefaultString(option)
 

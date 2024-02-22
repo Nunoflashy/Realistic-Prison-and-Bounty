@@ -28,6 +28,19 @@ int property OPTION_ENABLED  = 0x00 autoreadonly
 int property OPTION_DISABLED = 0x01 autoreadonly
 ; ==============================================================================
 
+; ==============================================================================
+; Value Types
+int property TYPE_NO_VALUE  = 0 autoreadonly
+int property TYPE_NONE      = 1 autoreadonly
+int property TYPE_INT       = 2 autoreadonly
+int property TYPE_FLOAT     = 3 autoreadonly
+int property TYPE_FORM      = 4 autoreadonly
+int property TYPE_OBJECT    = 5 autoreadonly
+int property TYPE_STRING    = 6 autoreadonly
+; ==============================================================================
+
+;0 - no value, 1 - none, 2 - int, 3 - float, 4 - form, 5 - object, 6 - string
+
 int property OUTFIT_COUNT = 10 autoreadonly
 
 RealisticPrisonAndBounty_Config property config
@@ -786,6 +799,7 @@ event OnConfigInit()
     self.InitializePages()
     self.InitializeOptions()
     self.RegisterEvents()
+    self.LoadDefaults()
 endEvent
 
 event OnConfigOpen()
@@ -970,37 +984,6 @@ function RegisterEvents()
     self.RegisterForModEvent("RPB_OptionRegister", "OnOptionRegister")
 endFunction
 
-
-function LoadMaximums()
-    ; ; Initialize Maximums
-    ; int maximumsObj     = RPB_Data.MCM_GetMaximumsObject()
-    ; int maximumsCount   = JValue.count(maximumsObj)
-    ; RPB_Utility.Debug("MCM::LoadMaximums", "Called")
-
-    ; int optionIndex = 0
-    ; while (optionIndex < maximumsCount)
-    ;     string optionKey = JMap.getNthKey(maximumsObj, optionIndex)
-        
-    ;     if (JMap.valueType(maximumsObj, optionKey) == 5) ; object
-    ;         int optionValueObject = JMap.getObj(maximumsObj, optionKey)
-    ;         string dependsType          = JArray.getStr(optionValueObject, 0)
-    ;         string dependsOption        = JArray.getStr(optionValueObject, 1)
-    ;         float dependsOffset         = JArray.getFlt(optionValueObject, 2)
-    ;         float dependsOptionValue    = self.GetOptionSliderValue(dependsOption) ; dependency option
-    ;         ; float dependsOptionValue    = JMap.getFlt(maximumsObj, dependsOption) ; dependency option
-    ;         RPB_Utility.Debug("MCM::LoadMaximums", "optionKey: " + optionKey + ", value: " + (dependsOptionValue + dependsOffset))
-    ;         self.SetOptionMaximum(optionKey, dependsOptionValue + dependsOffset) ; set the value based on the dependency option
-
-    ;     elseif (JMap.valueType(maximumsObj, optionKey) == 3 || JMap.valueType(maximumsObj, optionKey) == 2) ; float|int
-    ;         float optionValue = JMap.getFlt(maximumsObj, optionKey)
-    ;         RPB_Utility.Debug("MCM::LoadMaximums", "optionKey: " + optionKey + ", value: " + optionValue)
-    ;         self.SetOptionMaximum(optionKey, optionValue)
-
-    ;     endif
-    ;     optionIndex += 1
-    ; endWhile
-endFunction
-
 function LoadDefaults()
     int optionsObj  = RPB_Data.MCM_GetOptionObject()
     int optionCount = JValue.count(optionsObj)
@@ -1021,7 +1004,7 @@ function LoadDefaults()
         endif
 
         if (!continue)
-            bool hasDependency = JMap.valueType(optionMap, "Default") == 5 ; 5 = object type
+            bool hasDependency = JMap.valueType(optionMap, "Default") == TYPE_OBJECT ; 5 = object type
 
             if (hasDependency)
                 int defaultObject           = JMap.getObj(optionMap, "Default")
@@ -1033,9 +1016,9 @@ function LoadDefaults()
                 self.SetOptionDefaultFloat(optionKey, float_if (hasOffset, dependencyOptionValue + offset, dependencyOptionValue))
 
             else
-                bool isFloat    = JMap.valueType(optionMap, "Default") == 3 ; 3 - float
-                bool isInteger  = JMap.valueType(optionMap, "Default") == 2 ; 2 - int|bool
-                bool isString   = JMap.valueType(optionMap, "Default") == 6 ; 6 - string
+                bool isFloat    = JMap.valueType(optionMap, "Default") == TYPE_FLOAT
+                bool isInteger  = JMap.valueType(optionMap, "Default") == TYPE_INT 
+                bool isString   = JMap.valueType(optionMap, "Default") == TYPE_STRING
         
                 if (isFloat)
                     float optionValue = JMap.getFlt(optionMap, "Default") ; int|float
@@ -1061,217 +1044,182 @@ function LoadDefaults()
     endWhile
 endFunction
 
-
-function LoadMaximumForOption(string optionKey)
-    int optionsObj       = RPB_Data.MCM_GetOptionObject()
-    bool isValidOption   = JMap.valueType(optionsObj, optionKey) == 5 ; 5 = object type (All options are comprised of an object)
-
-    if (!isValidOption)
-        return
+function SetStringOptionPropertyValue(string asOptionKey, string asProperty, string asValue)
+    if (asProperty == "Default")
+        self.SetOptionDefaultString(asOptionKey, asValue)
     endif
+endFunction
 
-    string propertyType = "Maximum"
+function SetNumberOptionPropertyValue(string asOptionKey, string asProperty, float afValue)
+    if (asProperty == "Minimum")
+        self.SetOptionMinimum(asOptionKey, afValue)
 
-    int optionMap       = JMap.getObj(optionsObj, optionKey) ; JMap&
-    bool hasProperty    = JMap.hasKey(optionMap, propertyType)
+    elseif (asProperty == "Maximum")
+        self.SetOptionMaximum(asOptionKey, afValue)
 
-    if (!hasProperty)
-        return
+    elseif (asProperty == "Default")
+        self.SetOptionDefaultFloat(asOptionKey, afValue)
+
+    elseif (asProperty == "Steps")
+        self.SetOptionSteps(asOptionKey, afValue)
     endif
+endFunction
 
-    bool hasDependency = JMap.valueType(optionMap, propertyType) == 5 ; 5 = object type
+;/
+    Internal helper function to load options with their respective
+    property values.
 
-    if (hasDependency)
-        ; Get dependency option key, get dependency option value, and get offset
-        int maximumObject           = JMap.getObj(optionMap, propertyType) ; JArray
-        string dependencyOptionKey  = JArray.getStr(maximumObject, 0) ; [0] = Dependency Option
+    Property types include: Default, Minimum, Maximum, Steps
+
+    string  @asOptionKey: The key of the option
+    string  @asPropertyType: The type of property to load the values into the option
+    JMap&   @apOptionObject: The object containing the option's properties
+/;
+function __internal_loadPropertyForOption( \
+    string asOptionKey, \
+    string asPropertyType, \
+    int apOptionObject \
+)
+    int optionMap           = apOptionObject; JMap&
+    int propertyValueType   = JMap.valueType(optionMap, asPropertyType)
+
+    if (propertyValueType == TYPE_INT)
+        int optionValue = JMap.getInt(optionMap, asPropertyType)
+        self.SetNumberOptionPropertyValue(asOptionKey, asPropertyType, optionValue)
+        RPB_Utility.DebugWithArgs("MCM::LoadPropertyForOption", "asOptionKey: " + asOptionKey + ", asPropertyType: " + asPropertyType, "[int] Setting "+ asPropertyType +" Value to: " + optionValue)
+
+    elseif (propertyValueType == TYPE_FLOAT)
+        float optionValue = JMap.getFlt(optionMap, asPropertyType)
+        self.SetNumberOptionPropertyValue(asOptionKey, asPropertyType, optionValue)
+        RPB_Utility.DebugWithArgs("MCM::LoadPropertyForOption", "asOptionKey: " + asOptionKey + ", asPropertyType: " + asPropertyType, "[float] Setting "+ asPropertyType +" Value to: " + optionValue)
+
+    elseif (propertyValueType == TYPE_STRING)
+        string optionValue = JMap.getStr(optionMap, asPropertyType)
+        self.SetStringOptionPropertyValue(asOptionKey, asPropertyType, optionValue)
+        RPB_Utility.DebugWithArgs("MCM::LoadPropertyForOption", "asOptionKey: " + asOptionKey + ", asPropertyType: " + asPropertyType, "[string] Setting "+ asPropertyType +" Value to: " + optionValue)
+
+    elseif (propertyValueType == TYPE_FORM)
+        Form optionValue = JMap.getForm(optionMap, asPropertyType)
+        ; self.SetNumberOptionPropertyValue(asOptionKey, asPropertyType, optionValue)
+
+    elseif (propertyValueType == TYPE_OBJECT)
+        ; Handle children object nesting
+        int optionValue = JMap.getObj(optionMap, asPropertyType)
+        ; self.SetNumberOptionPropertyValue(asOptionKey, asPropertyType, optionValue)
+    else
+        RPB_Utility.Error("There was an error determining the value type of the option " + asOptionKey)
+        RPB_Utility.DebugError("MCM::LoadPropertyForOption", "There was an error determining the value type of the option " + asOptionKey)
+    endif
+endFunction
+
+;/
+    Internal helper function to load options with their respective
+    property values when they have a dependency requirement.
+
+    Property types include: Default, Minimum, Maximum, Steps
+
+    string  @asOptionKey: The key of the option
+    string  @asPropertyType: The type of property to load the values into the option
+    JArray& @apDependencyObject: The object containing the dependency option's relevant properties to modify the option
+/;
+function __internal_loadPropertyForOptionWithDependency( \
+    string asOptionKey, \
+    string asPropertyType, \
+    int apDependencyObject \
+)
+    int dependencyObject            = apDependencyObject; JArray& (Dependency Array)
+    string dependencyOptionKey      = JArray.getStr(dependencyObject, 0) ; [0] = Dependency Option
+
+    ; Get the dependency value type from the default value of the dependency option.
+    ; The default option must first be initialized for this to work.
+    int dependencyOptionValueType   = JMap.valueType(optionsDefaultValueMap, dependencyOptionKey)
+
+    ; Assume the Option is of the same type as the Dependency Option
+    if (dependencyOptionValueType == TYPE_INT)
+        int dependencyOptionValue = self.GetOptionSliderValue(dependencyOptionKey) as int
+        int offset      = JArray.getInt(dependencyObject, 1) ; [1] = Option Offset
+        bool hasOffset  = (offset as bool)
+
+        int finalOptionValue = int_if (hasOffset, (dependencyOptionValue + offset), dependencyOptionValue)
+        self.SetNumberOptionPropertyValue(asOptionKey, asPropertyType, finalOptionValue)
+        RPB_Utility.DebugWithArgs( \
+            "MCM::LoadPropertyForOption", \ 
+            "asOptionKey: " + asOptionKey + ", asPropertyType: " + asPropertyType, \ 
+            "[int] [depends on: "+ dependencyOptionKey + " (value: "+ dependencyOptionValue +")" +"] Setting "+ asPropertyType +" Value to: " + finalOptionValue \
+        )
+
+    elseif (dependencyOptionValueType == TYPE_FLOAT)
         float dependencyOptionValue = self.GetOptionSliderValue(dependencyOptionKey)
-        float maximumOffset         = JArray.getFlt(maximumObject, 1) ; [1] = Option Offset
-        bool hasOffset              = (maximumOffset as bool)
-        float optionValue           = (float_if (hasOffset, dependencyOptionValue + maximumOffset, dependencyOptionValue))
+        float offset    = JArray.getFlt(dependencyObject, 1) ; [1] = Option Offset
+        bool hasOffset  = (offset as bool)
 
-        self.SetOptionMaximum(optionKey, optionValue)
-
+        float finalOptionValue = float_if (hasOffset, (dependencyOptionValue + offset), dependencyOptionValue)
+        self.SetNumberOptionPropertyValue(asOptionKey, asPropertyType, finalOptionValue)
         RPB_Utility.DebugWithArgs( \
-            "MCM::LoadMaximumForOption", \ 
-            optionKey, \ 
-            "[Depends On "+ dependencyOptionKey + " (value: "+ (dependencyOptionValue as int) +")" + "] Setting Max Value to: " + optionValue \
+            "MCM::LoadPropertyForOption", \ 
+            "asOptionKey: " + asOptionKey + ", asPropertyType: " + asPropertyType, \ 
+            "[float] [depends on: "+ dependencyOptionKey + " (value: "+ dependencyOptionValue +")" +"] Setting "+ asPropertyType +" Value to: " + finalOptionValue \
         )
-    else
-        float optionValue = JMap.getFlt(optionMap, propertyType) ; int|float
-        self.SetOptionMaximum(optionKey, optionValue)
-        RPB_Utility.DebugWithArgs("MCM::LoadMaximumForOption", optionKey, "Setting Max Value to: " + optionValue)
-    endif
-endFunction
-
-function LoadMinimumForOption(string optionKey)
-    int optionsObj       = RPB_Data.MCM_GetOptionObject()
-    bool isValidOption   = JMap.valueType(optionsObj, optionKey) == 5 ; 5 = object type (All options are comprised of an object)
-
-    if (!isValidOption)
-        return
-    endif
-
-    string propertyType = "Minimum"
-
-    int optionMap       = JMap.getObj(optionsObj, optionKey) ; JMap&
-    bool hasProperty    = JMap.hasKey(optionMap, propertyType)
-
-    if (!hasProperty)
-        return
-    endif
-
-    bool hasDependency = JMap.valueType(optionMap, propertyType) == 5 ; 5 = object type
-
-    if (hasDependency)
-        ; Get dependency option key, get dependency option value, and get offset
-        int minimumObject           = JMap.getObj(optionMap, propertyType) ; JArray
-        string dependencyOptionKey  = JArray.getStr(minimumObject, 0) ; [0] = Dependency Option
-        float dependencyOptionValue = self.GetOptionSliderValue(dependencyOptionKey)
-        float minimumOffset         = JArray.getFlt(minimumObject, 1) ; [1] = Option Offset
-        bool hasOffset              = (minimumOffset as bool)
-        float optionValue           = (float_if (hasOffset, dependencyOptionValue + minimumOffset, dependencyOptionValue))
-
-        self.SetOptionMinimum(optionKey, optionValue)
-
+    elseif (dependencyOptionValueType == TYPE_STRING)
+        string dependencyOptionValue = self.GetOptionMenuValue(dependencyOptionKey)
+        self.SetStringOptionPropertyValue(asOptionKey, asPropertyType, dependencyOptionValue)
         RPB_Utility.DebugWithArgs( \
-            "MCM::LoadMinimumForOption", \ 
-            optionKey, \ 
-            "[Depends On "+ dependencyOptionKey + " (value: "+ (dependencyOptionValue as int) +")" + "] Setting Min Value to: " + optionValue \
+            "MCM::LoadPropertyForOption", \ 
+            "asOptionKey: " + asOptionKey + ", asPropertyType: " + asPropertyType, \ 
+            "[string] [depends on: "+ dependencyOptionKey + " (value: "+ dependencyOptionValue +")" +"] Setting "+ asPropertyType +" Value to: " + dependencyOptionValue \
         )
+    elseif (dependencyOptionValueType == TYPE_FORM)
+
+    elseif (dependencyOptionValueType == TYPE_OBJECT)
+
     else
-        float optionValue = JMap.getFlt(optionMap, propertyType) ; int|float
-        self.SetOptionMinimum(optionKey, optionValue)
-        RPB_Utility.DebugWithArgs("MCM::LoadMinimumForOption", optionKey, "Setting Min Value to: " + optionValue)
+        RPB_Utility.Error("There was an error determining the value type of the dependency option " + dependencyOptionKey)
+        RPB_Utility.DebugError("MCM::LoadPropertyForOption", "There was an error determining the value type of the dependency option " + dependencyOptionKey)
     endif
 endFunction
 
-function LoadDefaultForOption(string optionKey)
-    int optionsObj       = RPB_Data.MCM_GetOptionObject()
-    bool isValidOption   = JMap.valueType(optionsObj, optionKey) == 5 ; 5 = object type (All options are comprised of an object)
+;/
+    Loads an option with its respective property value.
 
-    if (!isValidOption)
-        return
-    endif
-
-    string propertyType = "Default"
-
-    int optionMap       = JMap.getObj(optionsObj, optionKey) ; JMap&
-    bool hasProperty    = JMap.hasKey(optionMap, propertyType)
-
-    if (!hasProperty)
-        return
-    endif
-
-    bool hasDependency = JMap.valueType(optionMap, propertyType) == 5 ; 5 = object type
-
-    if (hasDependency)
-        ; Get dependency option key, get dependency option value, and get offset
-        int propertyObject          = JMap.getObj(optionMap, propertyType) ; JArray
-        string dependencyOptionKey  = JArray.getStr(propertyObject, 0) ; [0] = Dependency Option
-
-        float offset        = JArray.getFlt(propertyObject, 1) ; [1] = Option Offset
-        bool hasOffset      = (offset as bool)
-
-        ; Float only since we have no way to check for a dependency option's type,
-        ; and it wouldn't make sense to have a bool or string dependency, and float is implicitly cast to int
-        ; if required.
-
-        float optionValue = self.GetOptionSliderValue(dependencyOptionKey)
-        self.SetOptionDefaultFloat(optionKey, float_if (hasOffset, optionValue + offset, optionValue))
-        RPB_Utility.DebugWithArgs( \
-            "MCM::LoadDefaultForOption", \ 
-            optionKey, \ 
-            "[Depends On "+ dependencyOptionKey + " (value: "+ (optionValue) +")" + "] Setting Default Value to: " + optionValue \
-        )
-    else
-        bool isFloat    = JMap.valueType(optionMap, propertyType) == 3 ; 3 - float
-        bool isInteger  = JMap.valueType(optionMap, propertyType) == 2 ; 2 - int|bool
-        bool isString   = JMap.valueType(optionMap, propertyType) == 6 ; 6 - string
-
-        if (isFloat)
-            float optionValue = JMap.getFlt(optionMap, propertyType) ; int|float
-            self.SetOptionDefaultFloat(optionKey, optionValue)
-            RPB_Utility.DebugWithArgs("MCM::LoadDefaultForOption", optionKey, "[float] Setting Default Value to: " + optionValue)
-        
-        elseif (isInteger)
-            int optionValue = JMap.getInt(optionMap, propertyType) ; int|bool
-            self.SetOptionDefaultInt(optionKey, optionValue)
-            RPB_Utility.DebugWithArgs("MCM::LoadDefaultForOption", optionKey, "[int] Setting Default Value to: " + optionValue)
-
-        elseif (isString)
-            string optionValue = JMap.getStr(optionMap, propertyType) ; string
-            self.SetOptionDefaultString(optionKey, optionValue)
-            RPB_Utility.DebugWithArgs("MCM::LoadDefaultForOption", optionKey, "[string] Setting Default Value to: " + optionValue)
-        endif
-    endif
-endFunction
-
-function LoadStepsForOption(string optionKey)
-    int optionsObj       = RPB_Data.MCM_GetOptionObject()
-    bool isValidOption   = JMap.valueType(optionsObj, optionKey) == 5 ; 5 = object type (All options are comprised of an object)
-
-    if (!isValidOption)
-        return
-    endif
-
-    ; Get Maximums
-    int optionMap       = JMap.getObj(optionsObj, optionKey) ; JMap&
-    bool hasProperty    = JMap.hasKey(optionMap, "Steps")
-
-    if (!hasProperty)
-        return
-    endif
-
-    float steps = JMap.getFlt(optionMap, "Steps")
-    self.SetOptionSteps(optionKey, steps)
-    RPB_Utility.DebugWithArgs( \
-        "MCM::LoadStepsForOption", \ 
-        optionKey, \ 
-        "Setting Steps Value to: " + steps \
-    )
-endFunction
-
+    string  @asOptionKey: The key of the option
+    string  @asPropertyType: The type of property to load the values into the option
+/;
 function LoadPropertyForOption(string asOptionKey, string asPropertyType)
-    int optionsObj       = RPB_Data.MCM_GetOptionObject()
-    bool isValidOption   = JMap.valueType(optionsObj, asOptionKey) == 5 ; 5 = object type (All options are comprised of an object)
+    int optionsObj      = RPB_Data.MCM_GetOptionObject()
+    bool isObject       = JMap.valueType(optionsObj, asOptionKey) == TYPE_OBJECT ; object type (All options are comprised of an object)
+    bool isValidOption  = isObject
 
     if (!isValidOption)
+        RPB_Utility.DebugError("MCM::LoadPropertyForOption", "The option " + asOptionKey + " does not exist!")
+        RPB_Utility.Error("The option " + asOptionKey + " does not exist!")
         return
     endif
 
-    ; Get Maximums
-    int optionMap       = JMap.getObj(optionsObj, asOptionKey) ; JMap&
-    bool hasProperty    = JMap.hasKey(optionMap, asPropertyType)
+    int optionMap           = JMap.getObj(optionsObj, asOptionKey) ; JMap&
+    bool propertyExists     = JMap.hasKey(optionMap, asPropertyType)
 
-    if (!hasProperty)
+    if (!propertyExists)
+        RPB_Utility.DebugError("MCM::LoadPropertyForOption", "There was an error loading the property " + asPropertyType + " for the option " + asOptionKey)
+        RPB_Utility.Error("There was an error loading the property " + asPropertyType + " for the option " + asOptionKey)
         return
     endif
 
-    bool hasDependency = JMap.valueType(optionMap, asPropertyType) == 5 ; 5 = object type
+    int propertyValueType   = JMap.valueType(optionMap, asPropertyType)
+    bool hasDependency      = (propertyValueType == TYPE_OBJECT)
 
     if (hasDependency)
-        ; Get dependency option key, get dependency option value, and get offset
-        int minimumObject           = JMap.getObj(optionMap, asPropertyType) ; JArray
-        string dependencyOptionKey  = JArray.getStr(minimumObject, 0) ; [0] = Dependency Option
-        float dependencyOptionValue = self.GetOptionSliderValue(dependencyOptionKey)
-        float minimumOffset         = JArray.getFlt(minimumObject, 1) ; [1] = Option Offset
-        bool hasOffset              = (minimumOffset as bool)
-        float optionValue           = (float_if (hasOffset, dependencyOptionValue + minimumOffset, dependencyOptionValue))
-
-        self.SetOptionMinimum(asOptionKey, optionValue)
-
-        RPB_Utility.DebugWithArgs( \
-            "MCM::LoadMinimumForOption", \ 
-            asOptionKey, \ 
-            "[Depends On "+ dependencyOptionKey + " (value: "+ (dependencyOptionValue as int) +")" + "] Setting Min Value to: " + optionValue \
-        )
+        int dependencyObject = JMap.getObj(optionMap, asPropertyType) ; JArray& (Dependency Array)
+        __internal_loadPropertyForOptionWithDependency(asOptionKey, asPropertyType, dependencyObject)
+        return
     else
-        float optionValue = JMap.getFlt(optionMap, asPropertyType) ; int|float
-        self.SetOptionMinimum(asOptionKey, optionValue)
-        RPB_Utility.DebugWithArgs("MCM::LoadMinimumForOption", asOptionKey, "Setting Min Value to: " + optionValue)
+        __internal_loadPropertyForOption(asOptionKey, asPropertyType, optionMap)
+        return
     endif
+
+    RPB_Utility.DebugError("MCM::LoadPropertyForOption", "There was an unknown error loading the property " + asPropertyType + " for option " + asOptionKey)
+    RPB_Utility.Error("There was an unknown error loading the property " + asPropertyType + " for option " + asOptionKey)
 endFunction
+
 
 function EnsureOptionLessThan(string asOptionOneKey, string asOptionTwoKey)
     float optionOneValue = self.GetOptionSliderValue(asOptionOneKey)
