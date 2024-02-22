@@ -59,6 +59,21 @@ string[] property PrisonSkillHandlingOptions
     endFunction
 endProperty
 
+int _escapeHandlingOptions
+string[] property EscapeHandlingOptions
+    string[] function get()
+        if (JArray.count(_escapeHandlingOptions) == 0)
+            _escapeHandlingOptions = JArray.object()
+
+            JArray.addStr(_escapeHandlingOptions, "Bounty")
+            JArray.addStr(_escapeHandlingOptions, "Sentence")
+            JArray.addStr(_escapeHandlingOptions, "Bounty + Sentence")
+            JArray.addStr(_escapeHandlingOptions, "Bounty + Sentence (Conditionally)")
+        endif
+        return JArray.asStringArray(_escapeHandlingOptions)
+    endFunction
+endProperty
+
 int _undressingHandlingOptions
 string[] property UndressingHandlingOptions
     string[] function get()
@@ -181,7 +196,7 @@ function RemoveOutfitPiece(string outfitId, string outfitBodyPart)
 endFunction
 
 Armor function GetOutfitPart(string outfitId, string outfitBodyPart)
-    return miscVars.GetForm(outfitId + "::" + outfitBodyPart, "clothing/outfits") as Armor
+    ; return miscVars.GetForm(outfitId + "::" + outfitBodyPart, "clothing/outfits") as Armor
 endFunction
 
 ;/
@@ -191,7 +206,7 @@ endFunction
     returns: The outfit's id.
 /;
 string function GetOutfitIdentifier(string outfitName)
-    return miscVars.GetString(outfitName, "clothing/outfits")
+    ; return miscVars.GetString(outfitName, "clothing/outfits")
 endFunction
 
 string _currentRenderedCategory
@@ -243,7 +258,7 @@ function InitializePages()
     ; if (Config.ShouldDisplaySentencePage())
         ; JArray.addStr(_pagesArray, "Sentence")
     ; endif
-    RPB_Prison actorPrison = RPB_Prison.GetPrisonForHold("Haafingar")
+    RPB_Prison actorPrison; = RPB_Prison.GetPrisonForHold("Haafingar")
     string prisonName = actorPrison.Name
     int n = 0
     while (n < actorPrison.Prisoners.Count)
@@ -399,7 +414,7 @@ function ToggleOption(string _key, bool storePersistently = true)
         self.SetOptionValueBool(_key, !option)
     endif
 
-    Debug("MCM::ToggleOption", "Set new value of " + !option + " for " + _key + "(OptionKey: "+ optionKey +")" + "(option_id: "+ optionId +")", true)
+    Trace("MCM::ToggleOption", "Set new value of " + !option + " for " + _key + "(OptionKey: "+ optionKey +")" + "(option_id: "+ optionId +")", true)
 endFunction
 
 ; Option Rendering Functions
@@ -654,9 +669,8 @@ endFunction
 ; Event Handling
 ; ============================================================================
 event OnConfigInit()
-    ; ModName = "Realistic Prison & Bounty"
-    ; ModName = "Realistic Prison & B. - Config"
-    ModName = "RPB - Config"
+    ModName = RPB_Data.MCM_GetRootPropertyOfTypeString("Config", "Name")
+
     self.InitializePages()
     self.InitializeOptions()
     self.RegisterEvents()
@@ -666,72 +680,15 @@ event OnConfigOpen()
     self.InitializePages()
 endEvent
 
-; event OnConfigOpen()
-;     self.InitializePages()
-
-;     ; if (Config.ShouldDisplaySentencePage())
-;     ;     RPB_CurrentPage = "Sentence"
-;     ;     self.OnPageReset(RPB_CurrentPage)
-;     ; endif
-; endEvent
-
 string property RPB_CurrentPage auto
-string previousPage
-
-function RenderBasedOnPage(string page)
-    if (page == "Stats")
-        RPB_MCM_Stats.Render(self)
-
-    elseif (page == "General")
-        RPB_MCM_General.Render(self)
-
-    elseif (page == "Deleveling")
-        RPB_MCM_Skills.Render(self)
-
-    elseif (page == "Clothing")
-        RPB_MCM_Clothing.Render(self)
-
-    elseif (page == "Debug")
-        RPB_MCM_Debug.Render(self)
-
-    else ; Holds
-        RPB_MCM_Holds.Render(self)
-    endif
-endFunction
 
 event OnPageReset(string page)
-    ; if (previousPage != "" && page == "")
-    ;     self.RenderBasedOnPage(previousPage)
-    ;     return
-    ; endif
-
-    ; if (page == "")
-    ;     RPB_CurrentPage = "Sentence"
-    ;     RPB_MCM_Sentence.Render(self)
-    ; endif
-
     RPB_MCM_Skills.Render(self)
     RPB_MCM_Holds.Render(self)
     RPB_MCM_General.Render(self)
     RPB_MCM_Clothing.Render(self)
     RPB_MCM_Debug.Render(self)
     RPB_MCM_Stats.Render(self)
-    ; RPB_MCM_Sentence.Render(self)
-
-    RPB_Prison actorPrison = RPB_Prison.GetPrisonForHold("Haafingar")
-    int n = 0
-    while (n < actorPrison.Prisoners.Count)
-        int prisonerFormID = actorPrison.Prisoners.AtIndex(n).GetActor().GetFormID()
-        RPB_Utility.Debug("MCM::OnPageReset", "prisonerFormID: " + prisonerFormID)
-        RPB_MCM_Sentence.Render(self, prisonerFormID)
-        n += 1
-    endWhile
-
-
-
-    RPB_Utility.Debug("MCM::OnPageReset", "Page: " + page, true)
-
-    previousPage = page
 endEvent
 
 event OnOptionHighlight(int option)
@@ -742,9 +699,6 @@ event OnOptionHighlight(int option)
     RPB_MCM_Debug.OnHighlight(self, option)
     RPB_MCM_Stats.OnHighlight(self, option)
     RPB_MCM_Sentence.OnHighlight(self, option)
-
-    Trace("MCM::OnHighlight", "Option ID: " + option, true)
-    ; Trace("initDefaults", "Times Stripped in Haafingar: " + actorVars.Get("[20]Haafingar::Times Stripped"), true)
 endEvent
 
 event OnOptionDefault(int option)
@@ -903,17 +857,362 @@ function RegisterEvents()
     self.RegisterForModEvent("RPB_SliderOptionChanged", "OnSliderOptionChanged")
 endFunction
 
-function CreatePageOption(string page)
-    miscVars.CreateStringMap("options/value/" + page)
-    miscVars.CreateStringMap("options/state/" + page)
-    miscVars.CreateIntegerMap("options/id/from-id-to-key/" + page)
-    miscVars.CreateStringMap("options/id/from-key-to-id/" + page)
 
-    miscVars.AddToContainer("options/value/", "options/value/" + page)
-    miscVars.AddToContainer("options/state", "options/state/" + page)
-    miscVars.AddToContainer("options/id", "options/id/from-key-to-id/" + page)
-    miscVars.AddToContainer("options/id", "options/id/from-id-to-key/" + page)
+function LoadMaximums()
+    ; ; Initialize Maximums
+    ; int maximumsObj     = RPB_Data.MCM_GetMaximumsObject()
+    ; int maximumsCount   = JValue.count(maximumsObj)
+    ; RPB_Utility.Debug("MCM::LoadMaximums", "Called")
+
+    ; int optionIndex = 0
+    ; while (optionIndex < maximumsCount)
+    ;     string optionKey = JMap.getNthKey(maximumsObj, optionIndex)
+        
+    ;     if (JMap.valueType(maximumsObj, optionKey) == 5) ; object
+    ;         int optionValueObject = JMap.getObj(maximumsObj, optionKey)
+    ;         string dependsType          = JArray.getStr(optionValueObject, 0)
+    ;         string dependsOption        = JArray.getStr(optionValueObject, 1)
+    ;         float dependsOffset         = JArray.getFlt(optionValueObject, 2)
+    ;         float dependsOptionValue    = self.GetOptionSliderValue(dependsOption) ; dependency option
+    ;         ; float dependsOptionValue    = JMap.getFlt(maximumsObj, dependsOption) ; dependency option
+    ;         RPB_Utility.Debug("MCM::LoadMaximums", "optionKey: " + optionKey + ", value: " + (dependsOptionValue + dependsOffset))
+    ;         self.SetOptionMaximum(optionKey, dependsOptionValue + dependsOffset) ; set the value based on the dependency option
+
+    ;     elseif (JMap.valueType(maximumsObj, optionKey) == 3 || JMap.valueType(maximumsObj, optionKey) == 2) ; float|int
+    ;         float optionValue = JMap.getFlt(maximumsObj, optionKey)
+    ;         RPB_Utility.Debug("MCM::LoadMaximums", "optionKey: " + optionKey + ", value: " + optionValue)
+    ;         self.SetOptionMaximum(optionKey, optionValue)
+
+    ;     endif
+    ;     optionIndex += 1
+    ; endWhile
 endFunction
+
+function LoadDefaults()
+    int optionsObj  = RPB_Data.MCM_GetOptionObject()
+    int optionCount = JValue.count(optionsObj)
+
+    int optionIndex = 0
+
+    bool continue = false
+
+    while (optionIndex < optionCount)
+        string optionKey    = JMap.getNthKey(optionsObj, optionIndex) ; Current Option Key
+        int optionMap       = JMap.getObj(optionsObj, optionKey) ; JMap&
+        bool hasProperty    = JMap.hasKey(optionMap, "Default")
+
+        if (!hasProperty)
+            RPB_Utility.Error("There was an error loading the default value for option " + optionKey + ".")
+            RPB_Utility.DebugError("MCM::LoadDefaults", "There was an error loading the default value for option " + optionKey + ".")
+            continue = true
+        endif
+
+        if (!continue)
+            bool hasDependency = JMap.valueType(optionMap, "Default") == 5 ; 5 = object type
+
+            if (hasDependency)
+                int defaultObject = JMap.getObj(optionMap, "Default")
+                string dependencyOptionKey  = JArray.getStr(defaultObject, 0) ; [0] = Dependency Option
+                float offset                = JArray.getFlt(defaultObject, 1) ; [1] = Option Offset
+                bool hasOffset              = (offset as bool)
+                float dependencyOptionValue = self.GetOptionSliderValue(dependencyOptionKey)
+
+                self.SetOptionDefaultFloat(optionKey, float_if (hasOffset, dependencyOptionValue + offset, dependencyOptionValue))
+
+            else
+                bool isFloat    = JMap.valueType(optionMap, "Default") == 3 ; 3 - float
+                bool isInteger  = JMap.valueType(optionMap, "Default") == 2 ; 2 - int|bool
+                bool isString   = JMap.valueType(optionMap, "Default") == 6 ; 6 - string
+        
+                if (isFloat)
+                    float optionValue = JMap.getFlt(optionMap, "Default") ; int|float
+                    self.SetOptionDefaultFloat(optionKey, optionValue)
+                    RPB_Utility.DebugWithArgs("MCM::LoadDefaults", optionKey, "[float] Setting Default Value to: " + optionValue)
+                
+                elseif (isInteger)
+                    int optionValue = JMap.getInt(optionMap, "Default") ; int|bool
+                    self.SetOptionDefaultInt(optionKey, optionValue)
+                    RPB_Utility.DebugWithArgs("MCM::LoadDefaults", optionKey, "[int] Setting Default Value to: " + optionValue)
+        
+                elseif (isString)
+                    string optionValue = JMap.getStr(optionMap, "Default") ; string
+                    self.SetOptionDefaultString(optionKey, optionValue)
+                    RPB_Utility.DebugWithArgs("MCM::LoadDefaults", optionKey, "[string] Setting Default Value to: " + optionValue)
+                endif
+            endif
+        endif
+
+
+        continue = false
+        optionIndex += 1
+    endWhile
+endFunction
+
+; function LoadMaximumForOption(string optionKey)
+;     ; Initialize Maximums
+;     int maximumsObj     = RPB_Data.MCM_GetMaximumsObject()
+
+;     bool isObject = JMap.valueType(maximumsObj, optionKey) == 5
+
+;     if (isObject)
+;         int optionValueObject       = JMap.getObj(maximumsObj, optionKey)
+;         string dependsType          = JArray.getStr(optionValueObject, 0)
+;         string dependsOption        = JArray.getStr(optionValueObject, 1)
+;         float dependsOffset         = JArray.getFlt(optionValueObject, 2)
+;         float dependsOptionValue    = self.GetOptionSliderValue(dependsOption) ; dependency option
+;         self.SetOptionMaximum(optionKey, dependsOptionValue + dependsOffset) ; set the value based on the dependency option
+
+;     else
+;         float optionValue = JMap.getFlt(maximumsObj, optionKey)
+;         self.SetOptionMaximum(optionKey, optionValue)
+;     endif
+; endFunction
+
+function LoadMaximumForOption(string optionKey)
+    int optionsObj       = RPB_Data.MCM_GetOptionObject()
+    bool isValidOption   = JMap.valueType(optionsObj, optionKey) == 5 ; 5 = object type (All options are comprised of an object)
+
+    if (!isValidOption)
+        return
+    endif
+
+    string propertyType = "Maximum"
+
+    int optionMap       = JMap.getObj(optionsObj, optionKey) ; JMap&
+    bool hasProperty    = JMap.hasKey(optionMap, propertyType)
+
+    if (!hasProperty)
+        return
+    endif
+
+    bool hasDependency = JMap.valueType(optionMap, propertyType) == 5 ; 5 = object type
+
+    if (hasDependency)
+        ; Get dependency option key, get dependency option value, and get offset
+        int maximumObject           = JMap.getObj(optionMap, propertyType) ; JArray
+        string dependencyOptionKey  = JArray.getStr(maximumObject, 0) ; [0] = Dependency Option
+        float dependencyOptionValue = self.GetOptionSliderValue(dependencyOptionKey)
+        float maximumOffset         = JArray.getFlt(maximumObject, 1) ; [1] = Option Offset
+        bool hasOffset              = (maximumOffset as bool)
+        float optionValue           = (float_if (hasOffset, dependencyOptionValue + maximumOffset, dependencyOptionValue))
+
+        self.SetOptionMaximum(optionKey, optionValue)
+
+        RPB_Utility.DebugWithArgs( \
+            "MCM::LoadMaximumForOption", \ 
+            optionKey, \ 
+            "[Depends On "+ dependencyOptionKey + " (value: "+ (dependencyOptionValue as int) +")" + "] Setting Max Value to: " + optionValue \
+        )
+    else
+        float optionValue = JMap.getFlt(optionMap, propertyType) ; int|float
+        self.SetOptionMaximum(optionKey, optionValue)
+        RPB_Utility.DebugWithArgs("MCM::LoadMaximumForOption", optionKey, "Setting Max Value to: " + optionValue)
+    endif
+endFunction
+
+function LoadMinimumForOption(string optionKey)
+    int optionsObj       = RPB_Data.MCM_GetOptionObject()
+    bool isValidOption   = JMap.valueType(optionsObj, optionKey) == 5 ; 5 = object type (All options are comprised of an object)
+
+    if (!isValidOption)
+        return
+    endif
+
+    string propertyType = "Minimum"
+
+    int optionMap       = JMap.getObj(optionsObj, optionKey) ; JMap&
+    bool hasProperty    = JMap.hasKey(optionMap, propertyType)
+
+    if (!hasProperty)
+        return
+    endif
+
+    bool hasDependency = JMap.valueType(optionMap, propertyType) == 5 ; 5 = object type
+
+    if (hasDependency)
+        ; Get dependency option key, get dependency option value, and get offset
+        int minimumObject           = JMap.getObj(optionMap, propertyType) ; JArray
+        string dependencyOptionKey  = JArray.getStr(minimumObject, 0) ; [0] = Dependency Option
+        float dependencyOptionValue = self.GetOptionSliderValue(dependencyOptionKey)
+        float minimumOffset         = JArray.getFlt(minimumObject, 1) ; [1] = Option Offset
+        bool hasOffset              = (minimumOffset as bool)
+        float optionValue           = (float_if (hasOffset, dependencyOptionValue + minimumOffset, dependencyOptionValue))
+
+        self.SetOptionMinimum(optionKey, optionValue)
+
+        RPB_Utility.DebugWithArgs( \
+            "MCM::LoadMinimumForOption", \ 
+            optionKey, \ 
+            "[Depends On "+ dependencyOptionKey + " (value: "+ (dependencyOptionValue as int) +")" + "] Setting Min Value to: " + optionValue \
+        )
+    else
+        float optionValue = JMap.getFlt(optionMap, propertyType) ; int|float
+        self.SetOptionMinimum(optionKey, optionValue)
+        RPB_Utility.DebugWithArgs("MCM::LoadMinimumForOption", optionKey, "Setting Min Value to: " + optionValue)
+    endif
+endFunction
+
+function LoadDefaultForOption(string optionKey)
+    int optionsObj       = RPB_Data.MCM_GetOptionObject()
+    bool isValidOption   = JMap.valueType(optionsObj, optionKey) == 5 ; 5 = object type (All options are comprised of an object)
+
+    if (!isValidOption)
+        return
+    endif
+
+    string propertyType = "Default"
+
+    int optionMap       = JMap.getObj(optionsObj, optionKey) ; JMap&
+    bool hasProperty    = JMap.hasKey(optionMap, propertyType)
+
+    if (!hasProperty)
+        return
+    endif
+
+    bool hasDependency = JMap.valueType(optionMap, propertyType) == 5 ; 5 = object type
+
+    if (hasDependency)
+        ; Get dependency option key, get dependency option value, and get offset
+        int propertyObject          = JMap.getObj(optionMap, propertyType) ; JArray
+        string dependencyOptionKey  = JArray.getStr(propertyObject, 0) ; [0] = Dependency Option
+
+        float offset        = JArray.getFlt(propertyObject, 1) ; [1] = Option Offset
+        bool hasOffset      = (offset as bool)
+
+        ; Float only since we have no way to check for a dependency option's type,
+        ; and it wouldn't make sense to have a bool or string dependency, and float is implicitly cast to int
+        ; if required.
+
+        float optionValue = self.GetOptionSliderValue(dependencyOptionKey)
+        self.SetOptionDefaultFloat(optionKey, float_if (hasOffset, optionValue + offset, optionValue))
+        RPB_Utility.DebugWithArgs( \
+            "MCM::LoadDefaultForOption", \ 
+            optionKey, \ 
+            "[Depends On "+ dependencyOptionKey + " (value: "+ (optionValue) +")" + "] Setting Default Value to: " + optionValue \
+        )
+    else
+        bool isFloat    = JMap.valueType(optionMap, propertyType) == 3 ; 3 - float
+        bool isInteger  = JMap.valueType(optionMap, propertyType) == 2 ; 2 - int|bool
+        bool isString   = JMap.valueType(optionMap, propertyType) == 6 ; 6 - string
+
+        if (isFloat)
+            float optionValue = JMap.getFlt(optionMap, propertyType) ; int|float
+            self.SetOptionDefaultFloat(optionKey, optionValue)
+            RPB_Utility.DebugWithArgs("MCM::LoadDefaultForOption", optionKey, "[float] Setting Default Value to: " + optionValue)
+        
+        elseif (isInteger)
+            int optionValue = JMap.getInt(optionMap, propertyType) ; int|bool
+            self.SetOptionDefaultInt(optionKey, optionValue)
+            RPB_Utility.DebugWithArgs("MCM::LoadDefaultForOption", optionKey, "[int] Setting Default Value to: " + optionValue)
+
+        elseif (isString)
+            string optionValue = JMap.getStr(optionMap, propertyType) ; string
+            self.SetOptionDefaultString(optionKey, optionValue)
+            RPB_Utility.DebugWithArgs("MCM::LoadDefaultForOption", optionKey, "[string] Setting Default Value to: " + optionValue)
+        endif
+    endif
+endFunction
+
+function LoadStepsForOption(string optionKey)
+    int optionsObj       = RPB_Data.MCM_GetOptionObject()
+    bool isValidOption   = JMap.valueType(optionsObj, optionKey) == 5 ; 5 = object type (All options are comprised of an object)
+
+    if (!isValidOption)
+        return
+    endif
+
+    ; Get Maximums
+    int optionMap       = JMap.getObj(optionsObj, optionKey) ; JMap&
+    bool hasProperty    = JMap.hasKey(optionMap, "Steps")
+
+    if (!hasProperty)
+        return
+    endif
+
+    float steps = JMap.getFlt(optionMap, "Steps")
+    self.SetOptionSteps(optionKey, steps)
+    RPB_Utility.DebugWithArgs( \
+        "MCM::LoadStepsForOption", \ 
+        optionKey, \ 
+        "Setting Steps Value to: " + steps \
+    )
+endFunction
+
+function LoadPropertyForOption(string asOptionKey, string asPropertyType)
+    int optionsObj       = RPB_Data.MCM_GetOptionObject()
+    bool isValidOption   = JMap.valueType(optionsObj, asOptionKey) == 5 ; 5 = object type (All options are comprised of an object)
+
+    if (!isValidOption)
+        return
+    endif
+
+    ; Get Maximums
+    int optionMap       = JMap.getObj(optionsObj, asOptionKey) ; JMap&
+    bool hasProperty    = JMap.hasKey(optionMap, asPropertyType)
+
+    if (!hasProperty)
+        return
+    endif
+
+    bool hasDependency = JMap.valueType(optionMap, asPropertyType) == 5 ; 5 = object type
+
+    if (hasDependency)
+        ; Get dependency option key, get dependency option value, and get offset
+        int minimumObject           = JMap.getObj(optionMap, asPropertyType) ; JArray
+        string dependencyOptionKey  = JArray.getStr(minimumObject, 0) ; [0] = Dependency Option
+        float dependencyOptionValue = self.GetOptionSliderValue(dependencyOptionKey)
+        float minimumOffset         = JArray.getFlt(minimumObject, 1) ; [1] = Option Offset
+        bool hasOffset              = (minimumOffset as bool)
+        float optionValue           = (float_if (hasOffset, dependencyOptionValue + minimumOffset, dependencyOptionValue))
+
+        self.SetOptionMinimum(asOptionKey, optionValue)
+
+        RPB_Utility.DebugWithArgs( \
+            "MCM::LoadMinimumForOption", \ 
+            asOptionKey, \ 
+            "[Depends On "+ dependencyOptionKey + " (value: "+ (dependencyOptionValue as int) +")" + "] Setting Min Value to: " + optionValue \
+        )
+    else
+        float optionValue = JMap.getFlt(optionMap, asPropertyType) ; int|float
+        self.SetOptionMinimum(asOptionKey, optionValue)
+        RPB_Utility.DebugWithArgs("MCM::LoadMinimumForOption", asOptionKey, "Setting Min Value to: " + optionValue)
+    endif
+endFunction
+
+function EnsureOptionLessThan(string asOptionOneKey, string asOptionTwoKey)
+    float optionOneValue = self.GetOptionSliderValue(asOptionOneKey)
+    float optionTwoValue = self.GetOptionSliderValue(asOptionTwoKey)
+
+    if (optionOneValue > optionTwoValue)
+        self.SetOptionSliderValue(asOptionOneKey, optionTwoValue - 1)
+    endif
+endFunction
+
+function EnsureOptionGreaterThan(string asOptionOneKey, string asOptionTwoKey)
+    float optionOneValue = self.GetOptionSliderValue(asOptionOneKey)
+    float optionTwoValue = self.GetOptionSliderValue(asOptionTwoKey)
+
+    if (optionOneValue < optionTwoValue)
+        self.SetOptionSliderValue(asOptionOneKey, optionTwoValue + 1)
+    endif
+endFunction
+
+function EnsureOptionNotGreaterThan(string asOptionKey, float afValue, float afValueToSet = 0.0)
+    float optionOneValue = self.GetOptionSliderValue(asOptionKey)
+
+    if (optionOneValue > afValue)
+        self.SetOptionSliderValue(asOptionKey, float_if (afValueToSet, afValueToSet, afValue - 1))
+    endif
+endFunction
+
+function EnsureOptionNotLessThan(string asOptionKey, float afValue, float afValueToSet = 0.0)
+    float optionOneValue = self.GetOptionSliderValue(asOptionKey)
+
+    if (optionOneValue < afValue)
+        self.SetOptionSliderValue(asOptionKey, float_if (afValueToSet, afValueToSet, afValue + 1))
+    endif
+endFunction
+
 
 function InitializeOptions()
 ; ============================================================================
@@ -938,12 +1237,17 @@ function InitializeOptions()
     optionsDefaultValueMap  = JMap.object() ; Default values for options
     generalContainer        = JMap.object() ; To hold all containers (temporary)
 
+    optionsMinimumValueMap  = JMap.object() ; Minimum values for options
+    optionsMaximumValueMap  = JMap.object() ; Maximum values for options
+
     ; JValue.retain(optionsValueMap)
     ; JValue.retain(optionsStateMap)
     ; JValue.retain(optionsDefaultValueMap)
     ; JValue.retain(optionsFromKeyToIdMap)
     ; JValue.retain(optionsFromIdToKeyMap)
     JValue.retain(generalContainer)
+    JValue.retain(optionsMaximumValueMap)
+    JValue.retain(optionsMinimumValueMap)
 
     JMap.setObj(generalContainer, "options/value", optionsValueMap)
     JMap.setObj(generalContainer, "options/state", optionsStateMap)
@@ -951,154 +1255,13 @@ function InitializeOptions()
     JMap.setObj(generalContainer, "options/id/from-key-to-id", optionsFromKeyToIdMap)
     JMap.setObj(generalContainer, "options/id/from-id-to-key", optionsFromIdToKeyMap)
     JMap.setObj(generalContainer, "clothing/outfits", miscVars.GetHandle("clothing/outfits"))
-
-    self.SetOptionDefaultFloat("General::Update Interval", 20)
-    self.SetOptionDefaultFloat("General::Bounty Decay (Update Interval)", 4)
-    self.SetOptionDefaultFloat("General::Infamy Decay (Update Interval)", 1)
-    self.SetOptionDefaultFloat("General::Timescale", 20)
-    self.SetOptionDefaultFloat("General::TimescalePrison", 60)
-    self.SetOptionDefaultFloat("General::Arrest Elude Warning Time", 4.0)
-    self.SetOptionDefaultBool("General::ArrestNotifications", true)
-    self.SetOptionDefaultBool("General::JailedNotifications", true)
-    self.SetOptionDefaultBool("General::BountyDecayNotifications", true)
-    self.SetOptionDefaultBool("General::InfamyNotifications", true)
-
-    ; Bounty for Actions
-    self.SetOptionDefaultFloat("Bounty for Actions::Trespassing", 300)
-    self.SetOptionDefaultFloat("Bounty for Actions::Assault", 800)
-    self.SetOptionDefaultFloat("Bounty for Actions::Theft", 1.7)
-    self.SetOptionDefaultFloat("Bounty for Actions::Pickpocketing", 200)
-    self.SetOptionDefaultFloat("Bounty for Actions::Lockpicking", 100)
-    self.SetOptionDefaultFloat("Bounty for Actions::Disturbing the Peace", 100)
-
-    ; Clothing::Configuration
-    self.SetOptionDefaultBool("Configuration::NudeBodyModInstalled", false)
-    self.SetOptionDefaultBool("Configuration::UnderwearModInstalled", false)
-
-    ; Clothing::Item Slots
-    self.SetOptionDefaultFloat("Item Slots::Underwear (Top)", 56)
-    self.SetOptionDefaultFloat("Item Slots::Underwear (Bottom)", 52)
-
-    ; Arrest
-    self.SetOptionDefaultFloat("Arrest::Minimum Bounty to Arrest", 500)
-    self.SetOptionDefaultFloat("Arrest::Guaranteed Payable Bounty", 1500)
-    self.SetOptionDefaultFloat("Arrest::Maximum Payable Bounty", 2500)
-    self.SetOptionDefaultFloat("Arrest::Maximum Payable Bounty (Chance)", 33)
-    self.SetOptionDefaultBool("Arrest::Always Arrest for Violent Crimes", true)
-    self.SetOptionDefaultFloat("Arrest::Additional Bounty when Eluding (%)", 5)
-    self.SetOptionDefaultFloat("Arrest::Additional Bounty when Eluding", 200)
-    self.SetOptionDefaultFloat("Arrest::Additional Bounty when Resisting (%)", 33)
-    self.SetOptionDefaultFloat("Arrest::Additional Bounty when Resisting", 200)
-    self.SetOptionDefaultFloat("Arrest::Additional Bounty when Defeated (%)", 33)
-    self.SetOptionDefaultFloat("Arrest::Additional Bounty when Defeated", 500)
-    self.SetOptionDefaultBool("Arrest::Allow Civilian Capture", true)
-    self.SetOptionDefaultBool("Arrest::Allow Unconscious Arrest", true)
-    self.SetOptionDefaultBool("Arrest::Allow Unconditional Arrest", false)
-    self.SetOptionDefaultFloat("Arrest::Unequip Hand Garments", 0)
-    self.SetOptionDefaultFloat("Arrest::Unequip Head Garments", 1000)
-    self.SetOptionDefaultFloat("Arrest::Unequip Foot Garments", 4000)
-
-    ; Frisking
-    self.SetOptionDefaultBool("Frisking::Allow Frisking", true)
-    self.SetOptionDefaultBool("Frisking::Unconditional Frisking", false)
-    self.SetOptionDefaultFloat("Frisking::Minimum Bounty for Frisking", 500)
-    self.SetOptionDefaultFloat("Frisking::Frisk Search Thoroughness", 10)
-    self.SetOptionDefaultBool("Frisking::Confiscate Stolen Items", true)
-    self.SetOptionDefaultBool("Frisking::Strip Search if Stolen Items Found", true)
-    self.SetOptionDefaultFloat("Frisking::Minimum No. of Stolen Items Required", 10)
-
-    ; Stripping
-    self.SetOptionDefaultBool("Stripping::Allow Stripping", true)
-    self.SetOptionDefaultString("Stripping::Handle Stripping On", "Minimum Sentence")
-    self.SetOptionDefaultFloat("Stripping::Minimum Bounty to Strip", 1500)
-    self.SetOptionDefaultFloat("Stripping::Minimum Violent Bounty to Strip", 1500)
-    self.SetOptionDefaultFloat("Stripping::Minimum Sentence to Strip", 15)
-    self.SetOptionDefaultBool("Stripping::Strip when Defeated", true)
-    self.SetOptionDefaultFloat("Stripping::Strip Search Thoroughness", 10)
-
-    ; Clothing
-    self.SetOptionDefaultBool("Clothing::Allow Clothing", false)
-    self.SetOptionDefaultString("Clothing::Handle Clothing On", "Maximum Sentence")
-    self.SetOptionDefaultFloat("Clothing::Maximum Bounty", 1500)
-    self.SetOptionDefaultFloat("Clothing::Maximum Violent Bounty", 1500)
-    self.SetOptionDefaultFloat("Clothing::Maximum Sentence", 100)
-    self.SetOptionDefaultBool("Clothing::When Defeated", true)
-    self.SetOptionDefaultString("Clothing::Outfit", "Default")
-    
-    ; Jail
-    self.SetOptionDefaultBool("Jail::Unconditional Imprisonment", false)
-    self.SetOptionDefaultFloat("Jail::Guaranteed Payable Bounty", 2000)
-    self.SetOptionDefaultFloat("Jail::Maximum Payable Bounty", 4000)
-    self.SetOptionDefaultFloat("Jail::Maximum Payable Bounty (Chance)", 20)
-    self.SetOptionDefaultFloat("Jail::Bounty Exchange", 50)
-    self.SetOptionDefaultFloat("Jail::Bounty to Sentence", 100)
-    self.SetOptionDefaultFloat("Jail::Minimum Sentence", 10)
-    self.SetOptionDefaultFloat("Jail::Maximum Sentence", 365)
-    self.SetOptionDefaultBool("Jail::Sentence pays Bounty", false)
-    self.SetOptionDefaultFloat("Jail::Cell Search Thoroughness", 10)
-    self.SetOptionDefaultString("Jail::Cell Lock Level", "Adept")
-    self.SetOptionDefaultBool("Jail::Fast Forward", true)
-    self.SetOptionDefaultFloat("Jail::Day to Fast Forward From", 5)
-    self.SetOptionDefaultString("Jail::Handle Skill Loss", "1x Random Perk Skill")
-    self.SetOptionDefaultInt("Jail::Day to Start Losing Skills (Stat)", 0)
-    self.SetOptionDefaultInt("Jail::Day to Start Losing Skills (Perk)", 5)
-    self.SetOptionDefaultInt("Jail::Chance to Lose Skills (Stat)", 0)
-    self.SetOptionDefaultInt("Jail::Chance to Lose Skills (Perk)", 80)
-    self.SetOptionDefaultFloat("Jail::Recognized Criminal Penalty", 100)
-    self.SetOptionDefaultFloat("Jail::Known Criminal Penalty", 100)
-    self.SetOptionDefaultFloat("Jail::Minimum Bounty to Trigger", 2500)
-
-    ; Additional Charges
-    self.SetOptionDefaultFloat("Additional Charges::Bounty for Impersonation", 1700)
-    self.SetOptionDefaultFloat("Additional Charges::Bounty for Enemy of Hold", 2000)
-    self.SetOptionDefaultFloat("Additional Charges::Bounty for Stolen Items", 700)
-    self.SetOptionDefaultFloat("Additional Charges::Bounty for Stolen Item", 75)
-    self.SetOptionDefaultFloat("Additional Charges::Bounty for Contraband", 600)
-    self.SetOptionDefaultFloat("Additional Charges::Bounty for Cell Key", 2200)
-    
-    ; Release
-    ; self.SetOptionDefaultBool("Release::Enable Release Fees", false)
-    ; self.SetOptionDefaultFloat("Release::Chance for Event", 80)
-    ; self.SetOptionDefaultFloat("Release::Minimum Bounty to owe Fees", 0)
-    ; self.SetOptionDefaultFloat("Release::Release Fees (%)", 15)
-    ; self.SetOptionDefaultFloat("Release::Release Fees", 0)
-    ; self.SetOptionDefaultFloat("Release::Days Given to Pay", 10)
-    self.SetOptionDefaultBool("Release::Enable Item Retention", true)
-    self.SetOptionDefaultFloat("Release::Minimum Bounty to Retain Items", 0)
-    self.SetOptionDefaultBool("Release::Auto Re-Dress on Release", true)
-
-    ; Escape
-    self.SetOptionDefaultFloat("Escape::Escape Bounty (%)", 15)
-    self.SetOptionDefaultFloat("Escape::Escape Bounty", 1000)
-    self.SetOptionDefaultBool("Escape::Allow Surrendering", true)
-    self.SetOptionDefaultBool("Escape::Frisk Search upon Captured", true)
-    self.SetOptionDefaultBool("Escape::Strip Search upon Captured", true)
-
-    ; Bounty Decaying
-    self.SetOptionDefaultBool("Bounty Decaying::Enable Bounty Decaying", true)
-    self.SetOptionDefaultBool("Bounty Decaying::Decay while in Prison", true)
-    self.SetOptionDefaultFloat("Bounty Decaying::Bounty Lost (%)", 5)
-    self.SetOptionDefaultFloat("Bounty Decaying::Bounty Lost", 200)
-
-    ; Bounty Hunting
-    self.SetOptionDefaultBool("Bounty Hunting::Enable Bounty Hunters", true)
-    self.SetOptionDefaultBool("Bounty Hunting::Allow Outlaw Bounty Hunters", true)
-    self.SetOptionDefaultFloat("Bounty Hunting::Minimum Bounty", 2500)
-    self.SetOptionDefaultFloat("Bounty Hunting::Bounty (Posse)", 6000)
-
-    ; Infamy
-    self.SetOptionDefaultBool("Infamy::Enable Infamy", true)
-    self.SetOptionDefaultFloat("Infamy::Infamy Gained (%)", 0.02)
-    self.SetOptionDefaultFloat("Infamy::Infamy Gained", 40)
-    self.SetOptionDefaultFloat("Infamy::Infamy Recognized Threshold", 1000)
-    self.SetOptionDefaultFloat("Infamy::Infamy Known Threshold", 6000)
-    self.SetOptionDefaultFloat("Infamy::Infamy Lost (%)", 0.01)
-    self.SetOptionDefaultFloat("Infamy::Infamy Lost", 20)
 endFunction
 
 int optionsValueMap
 int optionsStateMap
 int optionsDefaultValueMap
+int optionsMinimumValueMap
+int optionsMaximumValueMap
 int optionsFromKeyToIdMap
 int optionsFromIdToKeyMap
 int generalContainer
@@ -1223,4 +1386,30 @@ endFunction
 
 string function GetOptionDefaultString(string optionKey)
     return JMap.getStr(optionsDefaultValueMap, optionKey)
+endFunction
+
+function SetOptionMinimum(string optionKey, float value)
+    RPB_StorageVars.SetFloatOnForm(optionKey, self, value, "MCM/Minimum")
+endFunction
+
+float function GetOptionMinimum(string optionKey)
+    return RPB_StorageVars.GetFloatOnForm(optionKey, self, "MCM/Minimum")
+endFunction
+
+function SetOptionMaximum(string optionKey, float value)
+    RPB_StorageVars.SetFloatOnForm(optionKey, self, value, "MCM/Maximum")
+    JMap.setFlt(optionsMaximumValueMap, optionKey, value)
+endFunction
+
+float function GetOptionMaximum(string optionKey)
+    return RPB_StorageVars.GetFloatOnForm(optionKey, self, "MCM/Maximum")
+    return JMap.getFlt(optionsMaximumValueMap, optionKey)
+endFunction
+
+function SetOptionSteps(string optionKey, float value)
+    RPB_StorageVars.SetFloatOnForm(optionKey, self, value, "MCM/Steps")
+endFunction
+
+float function GetOptionSteps(string optionKey)
+    return RPB_StorageVars.GetFloatOnForm(optionKey, self, "MCM/Steps")
 endFunction

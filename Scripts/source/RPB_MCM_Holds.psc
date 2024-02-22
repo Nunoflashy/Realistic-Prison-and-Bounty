@@ -23,6 +23,7 @@ function Render(RPB_MCM mcm) global
 endFunction
 
 function Left(RPB_MCM mcm) global
+    mcm.AddEmptyOption()
     mcm.AddOptionCategory("Arrest")
     mcm.AddTextOption("", "When Free", mcm.OPTION_DISABLED)
     ; mcm.AddOptionSlider("Minimum Bounty to Arrest", "{0} Bounty") ; Temporarily Removed
@@ -104,6 +105,7 @@ function Left(RPB_MCM mcm) global
 endFunction
 
 function Right(RPB_MCM mcm) global
+    mcm.AddTextOption("", "Configuration - " + mcm.CurrentPage, mcm.OPTION_DISABLED)
     mcm.AddOptionCategory("Jail")
     mcm.AddTextOption("", "When Arrested", mcm.OPTION_DISABLED)
     ; mcm.AddOptionToggle("Unconditional Imprisonment")
@@ -154,8 +156,12 @@ function Right(RPB_MCM mcm) global
     mcm.AddEmptyOption()
     mcm.AddTextOption("", "WHEN ESCAPING", mcm.OPTION_DISABLED)
     mcm.SetRenderedCategory("Escape")
+    mcm.AddOptionMenu("Handle Escape On")
     mcm.AddOptionSliderKey("Escape Bounty", "Escape Bounty (%)", "{1}% of Bounty")
     mcm.AddOptionSlider("Escape Bounty", "{0} Bounty")
+    mcm.AddOptionSliderKey("Escape Bounty", "Escape Bounty (Sentence)", "{0}x of Sentence")
+    mcm.AddOptionSlider("Escape Bounty (Bounty Condition)", "{0} of Minimum Bounty")
+    mcm.AddOptionSlider("Escape Bounty (Sentence Condition)", "{0} Minimum Days")
     ; mcm.AddOptionSlider("Escape Attempt Modifier", "{2}x per Escape")
     mcm.AddOptionToggle("Account for Time Served")
     ; mcm.AddOptionToggle("Allow Surrendering")
@@ -299,7 +305,6 @@ function HandleDependencies(RPB_MCM mcm) global
     mcm.SetOptionDependencyBool("Jail::Known Criminal Penalty",             isInfamyEnabled)
     mcm.SetOptionDependencyBool("Jail::Minimum Bounty to Trigger",          isInfamyEnabled)
 
-
     ; ==========================================================
     ;                       BOUNTY HUNTING
     ; ==========================================================
@@ -326,6 +331,21 @@ function HandleDependencies(RPB_MCM mcm) global
     
     bool friskSearchUponCaptured = mcm.GetOptionToggleState("Escape::Frisk Search upon Captured")
     bool undressUponCaptured     = mcm.GetOptionToggleState("Escape::Strip Search upon Captured")
+
+    string handleEscapeOn                                   = mcm.GetOptionMenuValue("Escape::Handle Escape On")
+    bool isEscapeBountyHandled                              = handleEscapeOn  == "Bounty"
+    bool isEscapeSentenceHandled                            = handleEscapeOn  == "Sentence"
+    bool isEscapeBountyAndSentenceHandled                   = handleEscapeOn == "Bounty + Sentence"
+    bool isEscapeBountyAndSentenceHandledConditionally      = handleEscapeOn == "Bounty + Sentence (Conditionally)"
+
+    bool onlyBounty     = isEscapeBountyHandled || isEscapeBountyAndSentenceHandled || isEscapeBountyAndSentenceHandledConditionally
+    bool onlySentence   = isEscapeSentenceHandled || isEscapeBountyAndSentenceHandled || isEscapeBountyAndSentenceHandledConditionally
+
+    mcm.SetOptionDependencyBool("Escape::Escape Bounty",                          onlyBounty)
+    mcm.SetOptionDependencyBool("Escape::Escape Bounty (%)",                      onlyBounty)
+    mcm.SetOptionDependencyBool("Escape::Escape Bounty (Sentence)",               onlySentence)
+    mcm.SetOptionDependencyBool("Escape::Escape Bounty (Sentence Condition)",     isEscapeBountyAndSentenceHandledConditionally)
+    mcm.SetOptionDependencyBool("Escape::Escape Bounty (Bounty Condition)",       isEscapeBountyAndSentenceHandledConditionally)
 
     mcm.SetOptionDependencyBool("Escape::Frisk Search upon Captured",   (!undressUponCaptured && allowFrisking) || (!allowUndressing && allowFrisking))
     mcm.SetOptionDependencyBool("Escape::Strip Search upon Captured",   allowUndressing)
@@ -784,339 +804,19 @@ function OnOptionSelect(RPB_MCM mcm, string option) global
 endFunction
 
 function LoadSliderOptions(RPB_MCM mcm, string option, float currentSliderValue) global
-    float minRange = 1
-    float maxRange = 100000
-    float intervalSteps = 1
-    float defaultValue = mcm.GetOptionDefaultFloat(option)
-
-    ; ==========================================================
-    ;                           ARREST
-    ; ==========================================================
-
-    ; if (option == "Arrest::Minimum Bounty to Arrest")
-    ;     intervalSteps = 50
-
-    if (option == "Arrest::Guaranteed Payable Bounty")
-        minRange = 0
-        intervalSteps = 50
-
-    elseif (option == "Arrest::Maximum Payable Bounty")
-        intervalSteps = 100
-
-    elseif (option == "Arrest::Maximum Payable Bounty (Chance)")
-        minRange = 0
-        maxRange = 100
-
-    elseif (option == "Arrest::Additional Bounty when Eluding (%)")
-        minRange = 0
-        maxRange = 100
-        intervalSteps = 0.1
-
-    elseif (option == "Arrest::Additional Bounty when Eluding")
-        minRange = 0
-        intervalSteps = 100
-
-    elseif (option == "Arrest::Additional Bounty when Resisting (%)")
-        minRange = 0
-        maxRange = 100
-        intervalSteps = 0.1
-
-    elseif (option == "Arrest::Additional Bounty when Resisting")
-        minRange = 0
-        intervalSteps = 100
-
-    elseif (option == "Arrest::Additional Bounty when Defeated (%)")
-        minRange = 0
-        maxRange = 100
-        intervalSteps = 0.1
-
-    elseif (option == "Arrest::Additional Bounty when Defeated")
-        minRange = 0
-        intervalSteps = 100
-
-    ; ==========================================================
-    ;                            INFAMY
-    ; ==========================================================
-
-    elseif (option == "Infamy::Infamy Recognized Threshold")
-        minRange = 100
-        maxRange = 100000
-        intervalSteps = 100
-
-    elseif (option == "Infamy::Infamy Known Threshold")
-        minRange = 100
-        maxRange = 100000
-        intervalSteps = 100
-
-    elseif (option == "Infamy::Infamy Gained (%)")
-        minRange = 0
-        maxRange = 100
-        intervalSteps = 0.01
-
-    elseif (option == "Infamy::Infamy Gained")
-        minRange = 0
-        maxRange = 1000
-        intervalSteps = 1
-
-    elseif (option == "Infamy::Infamy Gain Modifier (Recognized)")
-        minRange = -100
-        maxRange = 100
-        intervalSteps = 0.1
-
-    elseif (option == "Infamy::Infamy Gain Modifier (Known)")
-        minRange = -100
-        maxRange = 100
-        intervalSteps = 0.1
-
-    elseif (option == "Infamy::Infamy Lost (%)")
-        minRange = 0
-        maxRange = 100
-        intervalSteps = 0.01
-
-    elseif (option == "Infamy::Infamy Lost")
-        minRange = 0
-        maxRange = 1000
-        intervalSteps = 1
-
-    elseif (option == "Infamy::Infamy Loss Modifier (Recognized)")
-        minRange = -100
-        maxRange = 100
-        intervalSteps = 0.1
-
-    ; ==========================================================
-    ;                           FRISKING
-    ; ==========================================================
-
-    elseif (option == "Frisking::Minimum Bounty for Frisking")
-        minRange = 100
-        intervalSteps = 100
-
-    elseif (option == "Frisking::Guaranteed Payable Bounty")
-        minRange = 0
-        intervalSteps = 100
-
-    elseif (option == "Frisking::Maximum Payable Bounty")
-        minRange = 0
-        intervalSteps = 100
-
-    elseif (option == "Frisking::Maximum Payable Bounty (Chance)")
-        minRange = 0
-        maxRange = 100
-
-    elseif (option == "Frisking::Frisk Search Thoroughness")
-        maxRange = 10
-
-    elseif (option == "Frisking::Minimum No. of Stolen Items Required")
-        maxRange = 1000
-
-    ; ==========================================================
-    ;                           JAIL
-    ; ==========================================================
-
-    elseif (option == "Jail::Guaranteed Payable Bounty")
-        minRange = 0
-        intervalSteps = 50
-
-    elseif (option == "Jail::Maximum Payable Bounty")
-        intervalSteps = 100
-
-    elseif (option == "Jail::Maximum Payable Bounty (Chance)")
-        minRange = 0
-        maxRange = 100
-
-    elseif (option == "Jail::Bounty Exchange")
-        minRange = 1
-        maxRange = 100
-
-    elseif (option == "Jail::Bounty to Sentence")
-        minRange = 10
-        intervalSteps = 10
-
-    elseif (option == "Jail::Minimum Sentence")
-        maxRange = mcm.GetOptionSliderValue("Jail::Maximum Sentence") - 1
-
-    elseif (option == "Jail::Maximum Sentence")
-        minRange = mcm.GetOptionSliderValue("Jail::Minimum Sentence") + 1
-        maxRange = 365
-
-    elseif (option == "Jail::Release Time (Minimum Hour)")
-        minRange = 1
-        maxRange = mcm.GetOptionSliderValue("Jail::Release Time (Maximum Hour)") - 1
-
-    elseif (option == "Jail::Release Time (Maximum Hour)")
-        minRange = mcm.GetOptionSliderValue("Jail::Release Time (Minimum Hour)") + 1
-        maxRange = 24
-
-    elseif (option == "Jail::Day to fast forward from")
-        maxRange = mcm.GetOptionSliderValue("Jail::Maximum Sentence") - 1
-
-    elseif (option == "Jail::Day to Start Losing Skills (Stat)")
-        maxRange = mcm.GetOptionSliderValue("Jail::Maximum Sentence") - 1
-
-    elseif (option == "Jail::Chance to Lose Skills (Stat)")
-        minRange = 0
-        maxRange = 100
-
-    elseif (option == "Jail::Day to Start Losing Skills (Perk)")
-        maxRange = mcm.GetOptionSliderValue("Jail::Maximum Sentence") - 1
-
-    elseif (option == "Jail::Chance to Lose Skills (Perk)")
-        minRange = 0
-        maxRange = 100
-
-    elseif (option == "Jail::Recognized Criminal Penalty")
-        minRange = 0
-        maxRange = 500
-        intervalSteps = 0.1
-
-    elseif (option == "Jail::Known Criminal Penalty")
-        minRange = 0
-        maxRange = 500
-        intervalSteps = 0.1
-
-    elseif (option == "Jail::Minimum Bounty to Trigger")
-        minRange = 100
-        maxRange = 100000
-        intervalSteps = 100
-
-    elseif (option == "Jail::Cell Search Thoroughness")
-        maxRange = 10
-
-    elseif (option == "Jail::Hands Bound (Minimum Bounty)")
-        intervalSteps = 100
-
-    ; ==========================================================
-    ;                         STRIPPING
-    ; ==========================================================
-
-    elseif (option == "Stripping::Minimum Bounty to Strip")
-        intervalSteps = 100
-
-    elseif (option == "Stripping::Minimum Violent Bounty to Strip")
-        intervalSteps = 10
-
-    elseif (option == "Stripping::Minimum Sentence to Strip")
-        minRange = mcm.GetOptionSliderValue("Jail::Minimum Sentence")
-        maxRange = mcm.GetOptionSliderValue("Jail::Maximum Sentence")
-
-    elseif (option == "Stripping::Strip Search Thoroughness")
-        maxRange = 10
-    
-    elseif (option == "Stripping::Strip Search Thoroughness Modifier")
-        maxRange = 10000
-        intervalSteps = 10
-    
-    ; ==========================================================
-    ;                         CLOTHING
-    ; ==========================================================
-
-    elseif (option == "Clothing::Maximum Bounty")
-        intervalSteps = 100
-
-    elseif (option == "Clothing::Maximum Violent Bounty")
-        intervalSteps = 10
-
-    elseif (option == "Clothing::Maximum Sentence")
-        minRange = mcm.GetOptionSliderValue("Jail::Minimum Sentence")
-        maxRange = mcm.GetOptionSliderValue("Jail::Maximum Sentence")
-
-    ; ==========================================================
-    ;                      ADDITIONAL CHARGES
-    ; ==========================================================
-
-    elseif (option == "Additional Charges::Bounty for Impersonation")
-        minRange = 0
-        maxRange = 100000
-        intervalSteps = 100
-
-    elseif (option == "Additional Charges::Bounty for Enemy of Hold")
-        minRange = 0
-        maxRange = 100000
-        intervalSteps = 100
-
-    elseif (option == "Additional Charges::Bounty for Stolen Items")
-        minRange = 0
-        maxRange = 100000
-        intervalSteps = 100
-
-    elseif (option == "Additional Charges::Bounty for Stolen Item")
-        minRange = 0
-        maxRange = 100
-        intervalSteps = 0.1
-
-    elseif (option == "Additional Charges::Bounty for Contraband")
-        intervalSteps = 100
-
-    elseif (option == "Additional Charges::Bounty for Cell Key")
-        intervalSteps = 100
-
-    ; ==========================================================
-    ;                           RELEASE
-    ; ==========================================================
-
-    elseif (option == "Release::Chance for Event")
-        minRange = 1
-        maxRange = 100
-        intervalSteps = 1
-
-    elseif (option == "Release::Minimum Bounty to owe Fees")
-        minRange = 100
-        maxRange = 100000
-        intervalSteps = 100
-
-    elseif (option == "Release::Release Fees (%)")
-        minRange = 0
-        maxRange = 100
-        intervalSteps = 0.1
-
-    elseif (option == "Release::Release Fees")
-        minRange = 0
-        maxRange = 100000
-        intervalSteps = 100
-    
-    elseif (option == "Release::Days Given to Pay")
-        minRange = 1
-        maxRange = 100
-        intervalSteps = 1
-
-    elseif (option == "Release::Minimum Bounty to Retain Items")
-        intervalSteps = 100
-
-    ; ==========================================================
-    ;                           ESCAPE
-    ; ==========================================================
-
-    elseif (option == "Escape::Escape Bounty (%)")
-        minRange = 0
-        maxRange = 100
-        intervalSteps = 0.1
-
-    elseif (option == "Escape::Escape Bounty")
-        minRange = 0
-        intervalSteps = 100
-
-    ; ==========================================================
-    ;                       BOUNTY HUNTING
-    ; ==========================================================
-
-    elseif (option == "Bounty Hunting::Minimum Bounty")
-        intervalSteps = 100
-
-    elseif (option == "Bounty Hunting::Bounty (Posse)")
-        intervalSteps = 100
-
-    ; ==========================================================
-    ;                       BOUNTY DECAYING
-    ; ==========================================================
-
-    elseif (option == "Bounty Decaying::Bounty Lost (%)")
-        minRange = 0
-        maxRange = 100
-        intervalSteps = 0.1
-
-    elseif (option == "Bounty Decaying::Bounty Lost")
-        intervalSteps = 10
-    endif
+    ; mcm.LoadPropertyForOption(option, "Minimum")
+    ; mcm.LoadPropertyForOption(option, "Maximum")
+    ; mcm.LoadPropertyForOption(option, "Steps")
+
+    mcm.LoadMinimumForOption(option)
+    mcm.LoadMaximumForOption(option)
+    mcm.LoadStepsForOption(option)
+    mcm.LoadDefaultForOption(option)
+
+    float minRange      = mcm.GetOptionMinimum(option)
+    float maxRange      = mcm.GetOptionMaximum(option)
+    float intervalSteps = mcm.GetOptionSteps(option)
+    float defaultValue  = mcm.GetOptionDefaultFloat(option)
 
     defaultValue = float_if (defaultValue > maxRange, maxRange, defaultValue)
     float startValue = float_if (currentSliderValue > mcm.GENERAL_ERROR, currentSliderValue, defaultValue)
@@ -1325,6 +1025,15 @@ function OnOptionSliderAccept(RPB_MCM mcm, string option, float value) global
 
     elseif (option == "Escape::Escape Bounty")
 
+    elseif (option == "Escape::Escape Bounty (Sentence)")
+        formatString = "{0}x of Sentence"
+
+    elseif (option == "Escape::Escape Bounty (Bounty Condition)")
+        formatString = "{0} of Minimum Bounty"
+
+    elseif (option == "Escape::Escape Bounty (Sentence Condition)")
+        formatString = "{0} Minimum Days"
+
     ; ==========================================================
     ;                       BOUNTY HUNTING
     ; ==========================================================
@@ -1359,6 +1068,8 @@ function OnOptionSliderAccept(RPB_MCM mcm, string option, float value) global
 endFunction
 
 function OnOptionMenuOpen(RPB_MCM mcm, string option) global
+    mcm.LoadDefaultForOption(option)
+
     string defaultValue = mcm.GetOptionDefaultString(option)
 
     if (option == "Jail::Cell Lock Level")
@@ -1380,6 +1091,10 @@ function OnOptionMenuOpen(RPB_MCM mcm, string option) global
     elseif (option == "Clothing::Outfit")
         mcm.SetMenuDialogOptions(mcm.ClothingOutfits)
         mcm.SetMenuDialogDefaultIndex(GetOptionIndexFromKey(mcm.ClothingOutfits, defaultValue))
+
+    elseif (option == "Escape::Handle Escape On")
+        mcm.SetMenuDialogOptions(mcm.EscapeHandlingOptions)
+        mcm.SetMenuDialogDefaultIndex(GetOptionIndexFromKey(mcm.EscapeHandlingOptions, defaultValue))
     endif
 endFunction
 
@@ -1440,6 +1155,27 @@ function OnOptionMenuAccept(RPB_MCM mcm, string option, int menuIndex) global
     elseif (option == "Clothing::Outfit")
         if (menuIndex != -1)
             mcm.SetOptionMenuValue(option, mcm.ClothingOutfits[menuIndex])
+        endif
+
+    elseif (option == "Escape::Handle Escape On")
+        if (menuIndex != -1)
+            mcm.SetOptionMenuValue(option, mcm.EscapeHandlingOptions[menuIndex])
+        
+            bool onlyBounty = \
+                menuIndex == GetOptionIndexFromKey(mcm.EscapeHandlingOptions, "Bounty") || \
+                menuIndex == GetOptionIndexFromKey(mcm.EscapeHandlingOptions, "Bounty + Sentence") || \
+                menuIndex == GetOptionIndexFromKey(mcm.EscapeHandlingOptions, "Bounty + Sentence (Conditionally)")
+
+            bool onlySentence = \
+                menuIndex == GetOptionIndexFromKey(mcm.EscapeHandlingOptions, "Sentence") || \
+                menuIndex == GetOptionIndexFromKey(mcm.EscapeHandlingOptions, "Bounty + Sentence") || \
+                menuIndex == GetOptionIndexFromKey(mcm.EscapeHandlingOptions, "Bounty + Sentence (Conditionally)")
+
+            mcm.SetOptionDependencyBool("Escape::Escape Bounty", onlyBounty)
+            mcm.SetOptionDependencyBool("Escape::Escape Bounty (%)", onlyBounty)
+            mcm.SetOptionDependencyBool("Escape::Escape Bounty (Sentence)", onlySentence)
+            mcm.SetOptionDependencyBool("Escape::Escape Bounty (Bounty Condition)", menuIndex == GetOptionIndexFromKey(mcm.EscapeHandlingOptions, "Bounty + Sentence (Conditionally)"))
+            mcm.SetOptionDependencyBool("Escape::Escape Bounty (Sentence Condition)", menuIndex == GetOptionIndexFromKey(mcm.EscapeHandlingOptions, "Bounty + Sentence (Conditionally)"))
         endif
     endif
 
