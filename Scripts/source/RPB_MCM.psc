@@ -321,12 +321,16 @@ endFunction
 
     returns [bool]:    The option's state.
 /;
-bool function GetToggleOptionState(string page, string optionName)
-    return bool_if (self.OptionHasValue(optionName, page), self.GetOptionValueBool(optionName, page), self.GetOptionDefaultBool(optionName))
-endFunction
+; bool function GetToggleOptionState(string page, string optionName)
 
-bool function GetOptionToggleState(string option, string thePage = "")
-    return GetToggleOptionState(thePage, option)
+; endFunction
+
+bool function GetOptionToggleState(string option, string page = "")
+    if (self.OptionHasValue(option, page))
+        return self.GetOptionValueBool(option, page)
+    else
+        return self.GetOptionDefaultBool(option)
+    endif
 endFunction
 
 ;/
@@ -337,12 +341,12 @@ endFunction
 
     returns [float]:    The option's value.
 /;
-float function GetSliderOptionValue(string page, string optionName)
-    return float_if (self.OptionHasValue(optionName, page), self.GetOptionValueFloat(optionName, page), self.GetOptionDefaultFloat(optionName))
-endFunction
-
-float function GetOptionSliderValue(string option, string thePage = "")
-    return GetSliderOptionValue(thePage, option)
+float function GetOptionSliderValue(string option, string page = "")
+    if (self.OptionHasValue(option, page))
+        return self.GetOptionValueFloat(option, page)
+    else
+        return self.GetOptionDefaultFloat(option)
+    endif
 endFunction
 
 ;/
@@ -353,12 +357,12 @@ endFunction
 
     returns [string]:    The option's value.
 /;
-string function GetMenuOptionValue(string page, string optionName)
-    return string_if (self.OptionHasValue(optionName, page), self.GetOptionValueString(optionName, page), self.GetOptionDefaultString(optionName))
-endFunction
-
-string function GetOptionMenuValue(string option, string thePage = "")
-    return GetMenuOptionValue(thePage, option)
+string function GetOptionMenuValue(string option, string page = "")
+    if (self.OptionHasValue(option, page))
+        return self.GetOptionValueString(option, page)
+    else
+        return self.GetOptionDefaultString(option)
+    endif
 endFunction
 
 ;/
@@ -369,12 +373,12 @@ endFunction
 
     returns [string]:    The option's value.
 /;
-string function GetInputOptionValue(string page, string optionName)
-    return string_if (self.OptionHasValue(optionName, page), self.GetOptionValueString(optionName, page), self.GetOptionDefaultString(optionName))
-endFunction
-
-string function GetOptionInputValue(string option, string thePage = "")
-    return GetInputOptionValue(thePage, option)
+string function GetOptionInputValue(string option, string page = "")
+    if (self.OptionHasValue(option, page))
+        return self.GetOptionValueString(option, page)
+    else
+        return self.GetOptionDefaultString(option)
+    endif
 endFunction
 
 ;/
@@ -394,7 +398,11 @@ function SetSliderOptions(float minRange, float maxRange, float intervalSteps = 
 endFunction
 
 string function GetOptionAsStored(string optionKey, string page = "")
-    return string_if (page == "", CurrentPage, page) + "/" + optionKey
+    if (page == "")
+        return CurrentPage + "/" + optionKey
+    else
+        return page + "/" + optionKey
+    endif
 endFunction
 
 ;/
@@ -440,12 +448,32 @@ endFunction
     returns:    The Option's ID.
 /;
 int function AddOptionToggleKey(string displayedText, string _key, int defaultValueOverride = -1, int defaultFlags = 0)
+    int optionId
+    int flags
+    bool value
+
     string optionKey = CurrentRenderedCategory + "::" + _key
-    
-    bool defaultValue   = bool_if (defaultValueOverride > -1, defaultValueOverride, self.GetOptionDefaultBool(optionKey))
-    bool value          = self.GetOptionValueBool(optionKey)
-    int flags           = self.GetOptionState(optionKey)
-    int optionId        = AddToggleOption(displayedText, bool_if (self.OptionHasValue(optionKey), value, defaultValue), int_if (self.OptionHasState(optionKey), flags, defaultFlags))
+
+    bool optionHasState = self.OptionHasState(optionKey)
+    bool optionHasValue = self.OptionHasValue(optionKey)
+
+    if (optionHasState)
+        flags = self.GetOptionState(optionKey)
+    else
+        flags = defaultFlags
+    endif
+
+    if (optionHasValue)
+        value = self.GetOptionValueBool(optionKey)
+    else
+        if (defaultValueOverride > -1)
+            value = defaultValueOverride
+        else
+            value = self.GetOptionDefaultBool(optionKey)
+        endif
+    endif
+
+    optionId = AddToggleOption(displayedText, value, flags)
 
     if (!self.OptionExists(optionKey))
         self.RegisterOption(optionKey, optionId)
@@ -468,12 +496,32 @@ endFunction
     returns:    The Option's ID.
 /;
 int function AddOptionTextKey(string displayedText, string _key, string defaultValueOverride = "", int defaultFlags = 0)
+    int optionId
+    int flags
+    string value
+
     string optionKey = CurrentRenderedCategory + "::" + _key
 
-    string defaultValue   = string_if (defaultValueOverride != "", defaultValueOverride, self.GetOptionDefaultString(optionKey))
-    string value          = self.GetOptionValueString(optionKey)
-    int flags             = self.GetOptionState(optionKey)
-    int optionId          = AddTextOption(displayedText, string_if (self.OptionHasValue(optionKey), value, defaultValue), int_if (self.OptionHasState(optionKey), flags, defaultFlags))
+    bool optionHasState = self.OptionHasState(optionKey)
+    bool optionHasValue = self.OptionHasValue(optionKey)
+
+    if (optionHasState)
+        flags = self.GetOptionState(optionKey)
+    else
+        flags = defaultFlags
+    endif
+
+    if (optionHasValue)
+        value = self.GetOptionValueString(optionKey)
+    else
+        if (defaultValueOverride != "")
+            value = defaultValueOverride
+        else
+            value = self.GetOptionDefaultString(optionKey)
+        endif
+    endif
+
+    optionId = AddTextOption(displayedText, value, flags)
 
     if (!self.OptionExists(optionKey))
         self.RegisterOption(optionKey, optionId)
@@ -523,19 +571,49 @@ endFunction
     returns:    The Option's ID.
 /;
 int function AddOptionSliderKey(string displayedText, string _key, string formatString = "{0}", float defaultValueOverride = -1.0, int defaultFlags = 0)
+    int optionId
+    int flags
+    float value
+
     string optionKey = CurrentRenderedCategory + "::" + _key
 
-    float defaultValue     = float_if (defaultValueOverride > -1.0, defaultValueOverride, self.GetOptionDefaultFloat(optionKey))
-    float value            = self.GetOptionValueFloat(optionKey)
-    int flags              = self.GetOptionState(optionKey)
-    int optionId           = AddSliderOption(displayedText, float_if (self.OptionHasValue(optionKey), value, defaultValue), formatString, int_if (self.OptionHasState(optionKey), flags, defaultFlags))
-    
+    bool optionHasState = self.OptionHasState(optionKey)
+    bool optionHasValue = self.OptionHasValue(optionKey)
+
+    if (optionHasState)
+        flags = self.GetOptionState(optionKey)
+    else
+        flags = defaultFlags
+    endif
+
+    if (optionHasValue)
+        value = self.GetOptionValueFloat(optionKey)
+    else
+        if (defaultValueOverride > -1.0)
+            value = defaultValueOverride
+        else
+            value = self.GetOptionDefaultFloat(optionKey)
+        endif
+    endif
+
+    optionId = AddSliderOption(displayedText, value, formatString, flags)
+
+    ; self.SendModEvent("RPB_OptionRegister", optionKey, optionId)
+
     if (!self.OptionExists(optionKey))
+        RPB_Utility.DebugWithArgs("MCM::AddOptionSliderKey", "displayedText: " + displayedText + ", key: " + _key, "Option does not exist!")
         self.RegisterOption(optionKey, optionId)
     endif
 
     return optionId
 endFunction
+
+event OnOptionRegister(string eventName, string optionKey, float optionId, Form sender)
+    if (!self.OptionExists(optionKey))
+        self.RegisterOption(optionKey, optionId as int)
+        RPB_Utility.Debug("MCM::OnOptionRegister", "Option does not exist! Creating... ["+ optionKey +"] ("+ optionId +")")
+    endif
+endEvent
 
 int function AddOptionSlider(string text, string formatString = "{0}", float defaultValueOverride = -1.0, int defaultFlags = 0)
     return AddOptionSliderKey(text, text, formatString, defaultValueOverride, defaultFlags)
@@ -551,12 +629,32 @@ endFunction
     returns:    The Option's ID.
 /;
 int function AddOptionMenuKey(string displayedText, string _key, string defaultValueOverride = "", int defaultFlags = 0)
+    int optionId;           = AddSliderOption(displayedText, float_if (self.OptionHasValue(optionKey), value, defaultValue), formatString, int_if (self.OptionHasState(optionKey), flags, defaultFlags))
+    int flags
+    string value
+
     string optionKey = CurrentRenderedCategory + "::" + _key
 
-    string defaultValue         = string_if (defaultValueOverride != "", defaultValueOverride, self.GetOptionDefaultString(optionKey))
-    string value                = self.GetOptionValueString(optionKey)
-    int flags                   = self.GetOptionState(optionKey)
-    int optionId                = AddMenuOption(displayedText, string_if (self.OptionHasValue(optionKey), value, defaultValue), int_if (self.OptionHasState(optionKey), flags, defaultFlags))
+    bool optionHasState = self.OptionHasState(optionKey)
+    bool optionHasValue = self.OptionHasValue(optionKey)
+
+    if (optionHasState)
+        flags = self.GetOptionState(optionKey)
+    else
+        flags = defaultFlags
+    endif
+
+    if (optionHasValue)
+        value = self.GetOptionValueString(optionKey)
+    else
+        if (defaultValueOverride != "")
+            value = defaultValueOverride
+        else
+            value = self.GetOptionDefaultString(optionKey)
+        endif
+    endif
+
+    optionId = AddMenuOption(displayedText, value, flags)
 
     if (!self.OptionExists(optionKey))
         self.RegisterOption(optionKey, optionId)
@@ -579,22 +677,36 @@ endFunction
     returns:    The Option's ID.
 /;
 int function AddOptionInputKey(string displayedText, string _key, string defaultValueOverride = "-", int defaultFlags = 0)
+    int optionId
+    int flags
+    string value
+
     string optionKey = CurrentRenderedCategory + "::" + _key
 
-    if (defaultValueOverride)
-        self.SetOptionDefaultString(optionKey, defaultValueOverride)
+    bool optionHasState = self.OptionHasState(optionKey)
+    bool optionHasValue = self.OptionHasValue(optionKey)
+
+    if (optionHasState)
+        flags = self.GetOptionState(optionKey)
+    else
+        flags = defaultFlags
     endif
- 
-    string defaultValue         = self.GetOptionDefaultString(optionKey)
-    string value                = self.GetOptionValueString(optionKey)
-    int flags                   = self.GetOptionState(optionKey)
-    int optionId                = AddInputOption(displayedText, string_if (self.OptionHasValue(optionKey), value, defaultValue), int_if (self.OptionHasState(optionKey), flags, defaultFlags))
+
+    if (optionHasValue)
+        value = self.GetOptionValueString(optionKey)
+    else
+        if (defaultValueOverride != "")
+            value = defaultValueOverride
+        else
+            value = self.GetOptionDefaultString(optionKey)
+        endif
+    endif
+
+    optionId = AddInputOption(displayedText, value, flags)
 
     if (!self.OptionExists(optionKey))
         self.RegisterOption(optionKey, optionId)
     endif
-
-    ; Debug("MCM::AddOptionInputKey", "Add " + optionKey)
 
     return optionId
 endFunction
@@ -855,6 +967,7 @@ endEvent
 
 function RegisterEvents()
     self.RegisterForModEvent("RPB_SliderOptionChanged", "OnSliderOptionChanged")
+    self.RegisterForModEvent("RPB_OptionRegister", "OnOptionRegister")
 endFunction
 
 
@@ -911,7 +1024,7 @@ function LoadDefaults()
             bool hasDependency = JMap.valueType(optionMap, "Default") == 5 ; 5 = object type
 
             if (hasDependency)
-                int defaultObject = JMap.getObj(optionMap, "Default")
+                int defaultObject           = JMap.getObj(optionMap, "Default")
                 string dependencyOptionKey  = JArray.getStr(defaultObject, 0) ; [0] = Dependency Option
                 float offset                = JArray.getFlt(defaultObject, 1) ; [1] = Option Offset
                 bool hasOffset              = (offset as bool)
@@ -948,25 +1061,6 @@ function LoadDefaults()
     endWhile
 endFunction
 
-; function LoadMaximumForOption(string optionKey)
-;     ; Initialize Maximums
-;     int maximumsObj     = RPB_Data.MCM_GetMaximumsObject()
-
-;     bool isObject = JMap.valueType(maximumsObj, optionKey) == 5
-
-;     if (isObject)
-;         int optionValueObject       = JMap.getObj(maximumsObj, optionKey)
-;         string dependsType          = JArray.getStr(optionValueObject, 0)
-;         string dependsOption        = JArray.getStr(optionValueObject, 1)
-;         float dependsOffset         = JArray.getFlt(optionValueObject, 2)
-;         float dependsOptionValue    = self.GetOptionSliderValue(dependsOption) ; dependency option
-;         self.SetOptionMaximum(optionKey, dependsOptionValue + dependsOffset) ; set the value based on the dependency option
-
-;     else
-;         float optionValue = JMap.getFlt(maximumsObj, optionKey)
-;         self.SetOptionMaximum(optionKey, optionValue)
-;     endif
-; endFunction
 
 function LoadMaximumForOption(string optionKey)
     int optionsObj       = RPB_Data.MCM_GetOptionObject()
@@ -1235,36 +1329,38 @@ function InitializeOptions()
 ;                               Default Values
 ; ============================================================================
     optionsDefaultValueMap  = JMap.object() ; Default values for options
-    generalContainer        = JMap.object() ; To hold all containers (temporary)
 
+; ============================================================================
+;                              Min/Max/Step Values
+; ============================================================================
     optionsMinimumValueMap  = JMap.object() ; Minimum values for options
     optionsMaximumValueMap  = JMap.object() ; Maximum values for options
+    optionsStepsValueMap    = JMap.object() ; Interval Steps values for options
 
-    ; JValue.retain(optionsValueMap)
-    ; JValue.retain(optionsStateMap)
-    ; JValue.retain(optionsDefaultValueMap)
-    ; JValue.retain(optionsFromKeyToIdMap)
-    ; JValue.retain(optionsFromIdToKeyMap)
-    JValue.retain(generalContainer)
-    JValue.retain(optionsMaximumValueMap)
-    JValue.retain(optionsMinimumValueMap)
+
+    ; Persist the Options and assign them to a general container (this will persist the child objects)
+    generalContainer = JMap.object() ; To hold all containers (temporary)
+    JValue.retain(generalContainer, "RPB_MCM01")
 
     JMap.setObj(generalContainer, "options/value", optionsValueMap)
     JMap.setObj(generalContainer, "options/state", optionsStateMap)
     JMap.setObj(generalContainer, "options/default", optionsDefaultValueMap)
+    JMap.setObj(generalContainer, "options/minimum", optionsMinimumValueMap)
+    JMap.setObj(generalContainer, "options/maximum", optionsMaximumValueMap)
+    JMap.setObj(generalContainer, "options/steps", optionsStepsValueMap)
     JMap.setObj(generalContainer, "options/id/from-key-to-id", optionsFromKeyToIdMap)
     JMap.setObj(generalContainer, "options/id/from-id-to-key", optionsFromIdToKeyMap)
-    JMap.setObj(generalContainer, "clothing/outfits", miscVars.GetHandle("clothing/outfits"))
 endFunction
 
-int optionsValueMap
-int optionsStateMap
-int optionsDefaultValueMap
-int optionsMinimumValueMap
-int optionsMaximumValueMap
-int optionsFromKeyToIdMap
-int optionsFromIdToKeyMap
-int generalContainer
+int optionsValueMap         ; Holds the value for all options
+int optionsStateMap         ; Holds the state for all options (enabled, disabled)
+int optionsDefaultValueMap  ; Holds the default values for all options
+int optionsMinimumValueMap  ; Holds the minimum values for all options
+int optionsMaximumValueMap  ; Holds the maximum values for all options
+int optionsStepsValueMap    ; Holds the interval steps (how much to increment, or decrement by) values for all options
+int optionsFromKeyToIdMap   ; Holds the identifier to identify an option from Key to ID
+int optionsFromIdToKeyMap   ; Holds the identifier to identify an option from ID to Key
+int generalContainer        ; Holds every option container and persists them
 
 
 ;/
@@ -1298,38 +1394,46 @@ endFunction
 
 function SetOptionValueBool(string optionKey, bool value, string page = "")
     ; options/value/Whiterun/Stripping::Allow Stripping
-    JMap.setInt(optionsValueMap, string_if (page == "", CurrentPage, page) + "/" + optionKey, value as int)
+    string optionAsStored = self.GetOptionAsStored(optionKey, page)
+    JMap.setInt(optionsValueMap, optionAsStored, value as int)
 endFunction
 
 function SetOptionValueInt(string optionKey, int value, string page = "")
-    JMap.setInt(optionsValueMap, string_if (page == "", CurrentPage, page) + "/" + optionKey, value)
+    string optionAsStored = self.GetOptionAsStored(optionKey, page)
+    JMap.setInt(optionsValueMap, optionAsStored, value)
 endFunction
 
 function SetOptionValueFloat(string optionKey, float value, string page = "")
-    JMap.setFlt(optionsValueMap, string_if (page == "", CurrentPage, page) + "/" + optionKey, value)
-    ; Debug("MCM::SetOptionValueFloat", "Set " + string_if (page == "", CurrentPage, page) + "/" + optionKey + " value to: " + value, true)
+    string optionAsStored = self.GetOptionAsStored(optionKey, page)
+    JMap.setFlt(optionsValueMap, optionAsStored, value)
 endFunction
 
 function SetOptionValueString(string optionKey, string value, string page = "")
-    JMap.setStr(optionsValueMap, string_if (page == "", CurrentPage, page) + "/" + optionKey, value)
+    string optionAsStored = self.GetOptionAsStored(optionKey, page)
+    JMap.setStr(optionsValueMap, optionAsStored, value)
 endFunction
 
 bool function OptionExists(string optionKey, string page = "")
-    return JMap.hasKey(optionsFromKeyToIdMap, string_if (page == "", CurrentPage, page) + "/" + optionKey)
+    string optionAsStored = self.GetOptionAsStored(optionKey, page)
+    return JMap.hasKey(optionsFromKeyToIdMap, optionAsStored)
 endFunction
 
 bool function OptionHasValue(string optionKey, string page = "")
-    return JMap.hasKey(optionsValueMap, string_if (page == "", CurrentPage, page) + "/" + optionKey)
+    string optionAsStored = self.GetOptionAsStored(optionKey, page)
+    return JMap.hasKey(optionsValueMap, optionAsStored)
 endFunction
 
 bool function OptionHasState(string optionKey, string page = "")
-    return JMap.hasKey(optionsStateMap, string_if (page == "", CurrentPage, page) + "/" + optionKey)
+    string optionAsStored = self.GetOptionAsStored(optionKey, page)
+    return JMap.hasKey(optionsStateMap, optionAsStored)
 endFunction
 
 function RegisterOption(string optionKey, int optionId, string page = "")
     ; For bi-directional identification (option-key to option-id and option-id to option-key)
-    JMap.setInt(optionsFromKeyToIdMap, string_if (page == "", CurrentPage, page) + "/" + optionKey, optionId)
-    JIntMap.setStr(optionsFromIdToKeyMap, optionId, string_if (page == "", CurrentPage, page) + "/" + optionKey)
+    string optionAsStored = self.GetOptionAsStored(optionKey, page)
+
+    JMap.setInt(optionsFromKeyToIdMap, optionAsStored, optionId)
+    JIntMap.setStr(optionsFromIdToKeyMap, optionId, optionAsStored)
 endFunction
 
 function SetOptionState(string optionKey, int optionState, string page = "")
@@ -1337,23 +1441,28 @@ function SetOptionState(string optionKey, int optionState, string page = "")
 endFunction
 
 bool function GetOptionValueBool(string optionKey, string page = "")
-    return JMap.getInt(optionsValueMap, string_if (page == "", CurrentPage, page) + "/" + optionKey) as bool
+    string optionAsStored = self.GetOptionAsStored(optionKey, page)
+    return JMap.getInt(optionsValueMap, optionAsStored) as bool
 endFunction
 
 int function GetOptionValueInt(string optionKey, string page = "")
-    return JMap.getInt(optionsValueMap, string_if (page == "", CurrentPage, page) + "/" + optionKey)
+    string optionAsStored = self.GetOptionAsStored(optionKey, page)
+    return JMap.getInt(optionsValueMap, optionAsStored)
 endFunction
 
 float function GetOptionValueFloat(string optionKey, string page = "")
-    return JMap.getFlt(optionsValueMap, string_if (page == "", CurrentPage, page) + "/" + optionKey)
+    string optionAsStored = self.GetOptionAsStored(optionKey, page)
+    return JMap.getFlt(optionsValueMap, optionAsStored)
 endFunction
 
 string function GetOptionValueString(string optionKey, string page = "")
-    return JMap.getStr(optionsValueMap, string_if (page == "", CurrentPage, page) + "/" + optionKey)
+    string optionAsStored = self.GetOptionAsStored(optionKey, page)
+    return JMap.getStr(optionsValueMap, optionAsStored)
 endFunction
 
 int function GetOptionState(string optionKey, string page = "")
-    return JMap.getInt(optionsStateMap, string_if (page == "", CurrentPage, page) + "/" + optionKey)
+    string optionAsStored = self.GetOptionAsStored(optionKey, page)
+    return JMap.getInt(optionsStateMap, optionAsStored)
 endFunction
 
 function SetOptionDefaultBool(string optionKey, bool value)
@@ -1389,27 +1498,25 @@ string function GetOptionDefaultString(string optionKey)
 endFunction
 
 function SetOptionMinimum(string optionKey, float value)
-    RPB_StorageVars.SetFloatOnForm(optionKey, self, value, "MCM/Minimum")
+    JMap.setFlt(optionsMinimumValueMap, optionKey, value)
 endFunction
 
 float function GetOptionMinimum(string optionKey)
-    return RPB_StorageVars.GetFloatOnForm(optionKey, self, "MCM/Minimum")
+    return JMap.getFlt(optionsMinimumValueMap, optionKey)
 endFunction
 
 function SetOptionMaximum(string optionKey, float value)
-    RPB_StorageVars.SetFloatOnForm(optionKey, self, value, "MCM/Maximum")
     JMap.setFlt(optionsMaximumValueMap, optionKey, value)
 endFunction
 
 float function GetOptionMaximum(string optionKey)
-    return RPB_StorageVars.GetFloatOnForm(optionKey, self, "MCM/Maximum")
     return JMap.getFlt(optionsMaximumValueMap, optionKey)
 endFunction
 
 function SetOptionSteps(string optionKey, float value)
-    RPB_StorageVars.SetFloatOnForm(optionKey, self, value, "MCM/Steps")
+    JMap.setFlt(optionsStepsValueMap, optionKey, value)
 endFunction
 
 float function GetOptionSteps(string optionKey)
-    return RPB_StorageVars.GetFloatOnForm(optionKey, self, "MCM/Steps")
+    return JMap.getFlt(optionsStepsValueMap, optionKey)
 endFunction

@@ -7,6 +7,8 @@ bool function ShouldHandleEvent(RPB_MCM mcm) global
     return mcm.IsHoldCurrentPage() ; Only handle if the page rendered if any of the holds
 endFunction
 
+string selectedPage
+
 function Render(RPB_MCM mcm) global
     if (! ShouldHandleEvent(mcm))
         return
@@ -500,12 +502,12 @@ function OnOptionHighlight(RPB_MCM mcm, string option) global
         mcm.SetInfoText("The infamy gained daily while jailed in " + city + ".")
 
     elseif (option == "Infamy::Infamy Lost (%)")
-        int infamyDecayUpdateInterval = mcm.GetSliderOptionValue("General", "General::Infamy Decay (Update Interval)") as int
+        int infamyDecayUpdateInterval = mcm.GetOptionSliderValue("General::Infamy Decay (Update Interval)", "General") as int
         mcm.SetInfoText("The amount of infamy lost as a percentage of your current infamy in " + city + " each " + string_if(infamyDecayUpdateInterval == 1, "day.", infamyDecayUpdateInterval + " days.") + " (Configured in General page)\n" + \
             "Note: Infamy will only decay if the Known threshold has not yet been reached, at which point it becomes permanent.")
 
     elseif (option == "Infamy::Infamy Lost")
-        int infamyDecayUpdateInterval = mcm.GetSliderOptionValue("General", "General::Infamy Decay (Update Interval)") as int
+        int infamyDecayUpdateInterval = mcm.GetOptionSliderValue("General::Infamy Decay (Update Interval)", "General") as int
         mcm.SetInfoText("The amount of infamy lost in " + city + " each " + string_if(infamyDecayUpdateInterval == 1, "day.", infamyDecayUpdateInterval + " days.") + " (Configured in General page)\n" + \
             "Note: Infamy will only decay if the Known threshold has not yet been reached, at which point it becomes permanent.")
 
@@ -785,11 +787,11 @@ function OnOptionHighlight(RPB_MCM mcm, string option) global
         mcm.SetInfoText("Whether to enable bounty decaying in " + mcm.CurrentPage + " if you are a known criminal.")
 
     elseif (option == "Bounty Decaying::Bounty Lost (%)")
-        int bountyDecayUpdateInterval = mcm.GetSliderOptionValue("General", "General::Bounty Decay (Update Interval)") as int
+        int bountyDecayUpdateInterval = mcm.GetOptionSliderValue("General::Bounty Decay (Update Interval)", "General") as int
         mcm.SetInfoText("The amount of bounty lost as a percentage of your current bounty in " + mcm.CurrentPage + " each " + bountyDecayUpdateInterval + " hours. (Configured in General page)")
 
     elseif (option == "Bounty Decaying::Bounty Lost")
-        int bountyDecayUpdateInterval = mcm.GetSliderOptionValue("General", "General::Bounty Decay (Update Interval)") as int
+        int bountyDecayUpdateInterval = mcm.GetOptionSliderValue("General::Bounty Decay (Update Interval)", "General") as int
         mcm.SetInfoText("The amount of bounty lost in " + mcm.CurrentPage + " each " + bountyDecayUpdateInterval + " hours. (Configured in General page)")
     endif
 endFunction
@@ -1064,7 +1066,7 @@ function OnOptionSliderAccept(RPB_MCM mcm, string option, float value) global
 
     mcm.Debug("Holds::OnSliderAccept", "Option: " + option + ", Value: " + value, true)
 
-    mcm.Debug("OnSliderAccept", "GetSliderOptionValue("+  option +") = " + mcm.GetSliderOptionValue(mcm.CurrentPage, option))
+    mcm.Debug("OnSliderAccept", "GetSliderOptionValue("+  option +") = " + mcm.GetOptionSliderValue(option, mcm.CurrentPage))
 endFunction
 
 function OnOptionMenuOpen(RPB_MCM mcm, string option) global
@@ -1179,7 +1181,7 @@ function OnOptionMenuAccept(RPB_MCM mcm, string option, int menuIndex) global
         endif
     endif
 
-    mcm.Debug("OnOptionMenuAccept", "GetMenuOptionValue("+  option +") = " + mcm.GetMenuOptionValue(mcm.CurrentPage, option))
+    mcm.Debug("OnOptionMenuAccept", "GetMenuOptionValue("+  option +") = " + mcm.GetOptionMenuValue(option, mcm.CurrentPage))
 
 endFunction
 

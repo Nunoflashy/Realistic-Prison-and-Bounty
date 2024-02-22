@@ -156,7 +156,7 @@ function OnOptionSliderAccept(RPB_MCM mcm, string option, float value) global
     ; Send option changed event
     mcm.SendModEvent("RPB_SliderOptionChanged", option, value)
 
-    mcm.Debug("OnSliderAccept", "GetSliderOptionValue("+  option +") = " + mcm.GetSliderOptionValue(mcm.CurrentPage, option))
+    mcm.Debug("OnSliderAccept", "GetOptionSliderValue("+  option +") = " + mcm.GetOptionSliderValue(option, mcm.CurrentPage))
 endFunction
 
 function OnOptionMenuOpen(RPB_MCM mcm, string option) global
@@ -165,7 +165,7 @@ function OnOptionMenuOpen(RPB_MCM mcm, string option) global
 endFunction
 
 function OnOptionMenuAccept(RPB_MCM mcm, string option, int menuIndex) global
-    mcm.Debug("OnOptionMenuAccept", "GetMenuOptionValue("+  option +") = " + mcm.GetMenuOptionValue(mcm.CurrentPage, option))
+    mcm.Debug("OnOptionMenuAccept", "GetMenuOptionValue("+  option +") = " + mcm.GetOptionMenuValue(option, mcm.CurrentPage))
 endFunction
 
 function OnOptionColorOpen(RPB_MCM mcm, string option) global
