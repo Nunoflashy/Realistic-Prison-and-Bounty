@@ -28,7 +28,7 @@ function Left(RPB_MCM mcm) global
     mcm.AddEmptyOption()
     mcm.AddEmptyOption()
 
-    mcm.AddTextOption("", "WHEN FREE", mcm.OPTION_DISABLED)
+    mcm.AddTextOption("", "WHILE FREE", mcm.OPTION_DISABLED)
     mcm.AddOptionSlider("Timescale", "1:{0}")
 
     mcm.AddEmptyOption()
@@ -37,12 +37,11 @@ function Left(RPB_MCM mcm) global
     mcm.AddOptionSliderKey("Guards Warning Time", "Arrest Elude Warning Time", "{0} Seconds")
 
     mcm.AddEmptyOption()
-    mcm.AddEmptyOption() ; maybe
 
     mcm.AddOptionCategory("Bounty for Actions")
+    mcm.AddOptionSlider("Trespassing", "{0} Bounty",            Game.GetGameSettingInt("iCrimeGoldTrespass"))
     mcm.AddOptionSlider("Assault", "{0} Bounty",                Game.GetGameSettingInt("iCrimeGoldAttack"))
     mcm.AddOptionSlider("Murder", "{0} Bounty",                 Game.GetGameSettingInt("iCrimeGoldMurder"))
-    mcm.AddOptionSlider("Theft", "{1}x Item Worth as Bounty",   Game.GetGameSettingFloat("fCrimeGoldSteal"))
 endFunction
 
 function Right(RPB_MCM mcm) global
@@ -55,7 +54,7 @@ function Right(RPB_MCM mcm) global
 
     mcm.AddEmptyOption()
 
-    mcm.AddTextOption("", "WHEN IN JAIL", mcm.OPTION_DISABLED)
+    mcm.AddTextOption("", "WHILE IN PRISON", mcm.OPTION_DISABLED)
     mcm.AddOptionSliderKey("Timescale", "TimescalePrison", "1:{0}")
 
     mcm.AddEmptyOption()
@@ -67,10 +66,10 @@ function Right(RPB_MCM mcm) global
 
     mcm.AddOptionCategory("")
     mcm.SetRenderedCategory("Bounty for Actions")
-    mcm.AddOptionSlider("Trespassing", "{0} Bounty",    Game.GetGameSettingInt("iCrimeGoldTrespass"))
-    mcm.AddOptionSlider("Pickpocketing", "{0} Bounty", Game.GetGameSettingInt("iCrimeGoldPickpocket"))
+    mcm.AddOptionSlider("Pickpocketing", "{0} Bounty",          Game.GetGameSettingInt("iCrimeGoldPickpocket"))
     ; mcm.AddOptionSlider("Lockpicking", "{0} Bounty")
-    mcm.AddOptionSlider("Stealing Horse", "{0} Bounty", Game.GetGameSettingInt("iCrimeStealHorse")) ; Might have wrong ID for GetGameSettingInt()
+    mcm.AddOptionSlider("Theft", "{1}x Item Worth as Bounty",   Game.GetGameSettingFloat("fCrimeGoldSteal"))
+    mcm.AddOptionSlider("Horse Theft", "{0} Bounty",            Game.GetGameSettingInt("iCrimeStealHorse")) ; Might have wrong ID for GetGameSettingInt()
     ; mcm.AddOptionSlider("Disturbing the Peace", "{0} Bounty")
 endFunction
 
@@ -87,12 +86,16 @@ function OnOptionHighlight(RPB_MCM mcm, string option) global
 
     elseif (option == "General::Timescale")
         int timescaleValue = mcm.GetOptionSliderValue(option) as int
-        mcm.SetInfoText("Sets the timescale when free.\nThis is how fast the time passes relative to Real Life.\n1:" + timescaleValue + " means that, for each minute in real life, " + timescaleValue + " minute(s) will pass in-game.")
+        mcm.SetInfoText("Sets the timescale when free.\nThis is how fast the time passes relative to Real Life.\n1:" + timescaleValue + " means that, for each hour in real life, " + timescaleValue + " hour(s) will pass in-game.")
 
     elseif (option == "General::TimescalePrison")
         int timescaleValue = mcm.GetOptionSliderValue(option) as int
-        mcm.SetInfoText("Sets the timescale when in jail.\nThis is how fast the time passes relative to Real Life.\n1:" + timescaleValue + " means that, for each minute in real life, " + timescaleValue + " minute(s) will pass in-game.")
+        mcm.SetInfoText("Sets the timescale when in jail.\nThis is how fast the time passes relative to Real Life.\n1:" + timescaleValue + " means that, for each hour in real life, " + timescaleValue + " hour(s) will pass in-game.")
     
+    elseif (option == "General::TimescalePrisonOutsideGame")
+        int timescaleValue = mcm.GetOptionSliderValue(option) as int
+        mcm.SetInfoText("Sets the timescale when in jail and not playing.\nThis is how fast the time passes relative to Real Life.\n1:" + timescaleValue + " means that, for each hour in real life, " + timescaleValue + " hour(s) will pass in-game.")
+
     elseif (option == "General::Bounty Decay (Update Interval)")
         mcm.SetInfoText("Sets the time between updates in in-game hours for when the bounty should decay for all holds.")
 
@@ -116,71 +119,15 @@ function OnOptionSelect(RPB_MCM mcm, string option) global
 endFunction
 
 function LoadSliderOptions(RPB_MCM mcm, string option, float currentSliderValue) global
-    float minRange = 1
-    float maxRange = 100
-    float intervalSteps = 1
-    float defaultValue = mcm.GetOptionDefaultFloat(option)
+    mcm.LoadOptionProperties(option)
+    mcm.ValidateOption(option)
 
-    ; ==========================================================
-    ;                     GENERAL / DELEVELING
-    ; ==========================================================
+    float minRange      = mcm.GetOptionMinimum(option)
+    float maxRange      = mcm.GetOptionMaximum(option)
+    float intervalSteps = mcm.GetOptionSteps(option)
+    float defaultValue  = mcm.GetOptionDefaultFloat(option)
 
-    if (option == "General::Timescale")
-        maxRange = 1000
-
-    elseif (option == "General::TimescalePrison")
-        maxRange = 1000
-
-    elseif (option == "General::Bounty Decay (Update Interval)")
-        minRange = 1
-        maxRange = 96 ; 4d
-
-    elseif (option == "General::Infamy Decay (Update Interval)")
-        minRange = 1
-        maxRange = 30
-
-    elseif (option == "General::Arrest Elude Warning Time")
-        minRange = 1
-        maxRange = 60
-
-    elseif (option == "Outfit::Item Slot: Underwear (Top)")
-        minRange = 0
-        maxRange = 100
-
-    elseif (option == "Outfit::Item Slot: Underwear (Bottom)")
-        minRange = 0
-        maxRange = 100
-
-    elseif (option == "Bounty for Actions::Trespassing")
-        minRange = 10
-        maxRange = 10000
-        intervalSteps = 10
-
-    elseif (option == "Bounty for Actions::Assault")
-        minRange = 10
-        maxRange = 10000
-        intervalSteps = 10
-
-    elseif (option == "Bounty for Actions::Theft")
-        minRange = 0.1
-        maxRange = 10
-        intervalSteps = 0.1
-
-    elseif (option == "Bounty for Actions::Pickpocketing")
-        minRange = 10
-        maxRange = 10000
-        intervalSteps = 10
-
-    elseif (option == "Bounty for Actions::Lockpicking")
-        minRange = 10
-        maxRange = 10000
-        intervalSteps = 10
-
-    elseif (option == "Bounty for Actions::Disturbing the Peace")
-        minRange = 10
-        maxRange = 10000
-        intervalSteps = 10
-    endif
+    RPB_Utility.Debug("MCM::General::LoadSliderOptions", "minRange: " + minRange + ", maxRange: " + maxRange + ", intervalSteps: " + intervalSteps + ", defaultValue: " + defaultValue)
 
     float startValue = float_if (currentSliderValue > mcm.GENERAL_ERROR, currentSliderValue, defaultValue)
     mcm.SetSliderOptions(minRange, maxRange, intervalSteps, defaultValue, startValue)
@@ -203,6 +150,9 @@ function OnOptionSliderAccept(RPB_MCM mcm, string option, float value) global
         formatString = "1:{0}"
 
     elseif (option == "General::TimescalePrison")
+        formatString = "1:{0}"
+
+    elseif (option == "General::TimescalePrisonOutsideGame")
         formatString = "1:{0}"
 
     elseif (option == "General::Update Interval")

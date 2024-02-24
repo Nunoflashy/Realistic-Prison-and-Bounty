@@ -983,7 +983,7 @@ event OnSliderOptionChanged(string eventName, string optionName, float optionVal
         int settingValue = Game.GetGameSettingInt("iCrimeGoldPickpocket")
         RPB_Utility.Debug("MCM::General::OnOptionSliderAccept", optionName + " value: " + settingValue)
 
-    elseif (optionName == "Bounty for Actions::Lockpicking")
+    elseif (optionName == "Bounty for Actions::Horse Theft")
         
     elseif (optionName == "Bounty for Actions::Disturbing the Peace")
 
@@ -992,70 +992,351 @@ endEvent
 
 function RegisterEvents()
     self.RegisterForModEvent("RPB_SliderOptionChanged", "OnSliderOptionChanged")
-    self.RegisterForModEvent("RPB_OptionRegister", "OnOptionRegister")
 endFunction
 
 ;/
-    Loads every default option with the values provided in the config file.
+    Loads all of the option's properties from the config file.
+
+    This function does not handle sanitizing user input, 
+    as such, any input should be sanitized through the use of ValidateOption().
 /;
-function LoadDefaults()
+function LoadOptionProperties(string asOption)
+    self.LoadPropertyForOption(asOption, "Minimum")
+    self.LoadPropertyForOption(asOption, "Maximum")
+    self.LoadPropertyForOption(asOption, "Steps")
+    self.LoadPropertyForOption(asOption, "Default")
+endFunction
+
+;/
+    Validates all options that need validation, ensuring they follow a specific rule set.
+
+    As such, any options that should have rules such as having its value less than / greater than
+    or equal to another option, or a specific value, should be set here.
+/;
+function ValidateOption(string asOption)
+    if (asOption == "General::Timescale" || \
+        asOption == "General::TimescalePrison" || \
+        asOption == "General::Arrest Elude Warning Time" || \
+        asOption == "Infamy::Infamy Recognized Threshold" || \
+        asOption == "Infamy::Infamy Known Threshold" || \
+        asOption == "Frisking::Frisk Search Thoroughness" || \
+        asOption == "Frisking::Minimum No. of Stolen Items Required" || \
+        asOption == "Stripping::Minimum Sentence to Strip" || \
+        asOption == "Stripping::Strip Search Thoroughness" || \
+        asOption == "Jail::Bounty to Sentence" || \
+        asOption == "Jail::Minimum Sentence" || \
+        asOption == "Jail::Maximum Sentence" || \
+        asOption == "Jail::Release Time (Minimum Hour)" || \
+        asOption == "Jail::Release Time (Maximum Hour)" || \
+        asOption == "Jail::Day to Fast Forward From" || \
+        asOption == "Jail::Day to Start Losing Skills (Stat)" || \
+        asOption == "Jail::Day to Start Losing Skills (Perk)" || \
+        asOption == "Release::Minimum Bounty to Retain Items" || \
+        asOption == "Escape::Escape Bounty (Bounty Condition)" || \
+        asOption == "Escape::Escape Bounty (Sentence Condition)" || \
+        asOption == "Clothing::Maximum Sentence to Clothe" \
+    )
+        EnsureOptionIsNotOfType(asOption, TYPE_STRING)
+        EnsureOptionValueGreaterThanOrEqualTo(asOption, 1)
+
+    endif
+
+    if (asOption == "Arrest::Maximum Payable Bounty (Chance)" || \ 
+        asOption == "Jail::Maximum Payable Bounty (Chance)" || \
+        asOption == "Jail::Chance to Lose Skills (Stat)" || \
+        asOption == "Jail::Chance to Lose Skills (Perk)" \
+    )
+        EnsureOptionValueLessThanOrEqualTo(asOption, 100)
+    endif
+
+    if (asOption == "Jail::Release Time (Minimum Hour)" || \ 
+        asOption == "Jail::Release Time (Maximum Hour)" \ 
+    )
+        EnsureOptionValueLessThanOrEqualTo(asOption, 24)
+        EnsureOptionValueLessThanOptionValue( \ 
+            asOptionOneKey  = "Jail::Release Time (Minimum Hour)", \ 
+            asOptionTwoKey  = "Jail::Release Time (Maximum Hour)", \ 
+            afValueToSet    = self.GetOptionValueFloat("Jail::Release Time (Maximum Hour)") - 1, \
+            asValuePropertyType = "Maximum" \ 
+        )
+    endif
+
+endFunction
+
+function ValidateOptions()
+    int obj         = JMap.allKeys(optionsDefaultValueMap) ; JArray& (string[])
+    int optionCount = JValue.count(obj)
+
+    int validatedOptions = 0
+
+    int optionIndex = 0
+    while (optionIndex < optionCount)
+        string optionKey = JArray.getStr(obj, optionIndex)
+
+        self.ValidateOption(optionKey)
+        validatedOptions += 1
+        optionIndex += 1
+    endWhile
+
+    RPB_Utility.Debug("MCM::ValidateOptions", "Validated " + validatedOptions + " options.")
+endFunction
+
+bool function IsValidPropertyType(string asPropertyType)
+    return \
+        asPropertyType == "Minimum" || \
+        asPropertyType == "Maximum" || \
+        asPropertyType == "Default" || \
+        asPropertyType == "Steps" 
+endFunction
+
+string[] function GetPropertyTypes()
+    int types = JArray.object()
+    JArray.addStr(types, "Minimum")
+    JArray.addStr(types, "Maximum")
+    JArray.addStr(types, "Default")
+    JArray.addStr(types, "Steps")
+
+    return JArray.asStringArray(types)
+endFunction
+
+;/
+    JMap&   @apOptionMap: The map containing the option's properties.
+    string  @asPropertyType: The property to determine the value type of.
+
+    returns (int): The value type of the specified property.
+/;
+int function DeterminePropertyValueType(int apOptionMap, string asPropertyType)
+    int valueType = JMap.valueType(apOptionMap, asPropertyType)
+
+    if (valueType == TYPE_OBJECT)
+        ; Property specified is a dependency property, process it accordingly.
+        int dependencyObject            = JMap.getObj(apOptionMap, asPropertyType)
+        string dependencyOptionKey      = JArray.getStr(dependencyObject, 0)
+        int dependencyOptionValueType   = JMap.valueType(optionsDefaultValueMap, dependencyOptionKey) ; Might change, since default option may not be defined yet
+        
+        ; Since all default number options are stored as float, determine here if it's float or int
+        if (dependencyOptionValueType == TYPE_FLOAT)
+            float originalValue     = JMap.getFlt(optionsDefaultValueMap, dependencyOptionKey)
+            float fractionalPart    = originalValue - math.floor(originalValue)
+
+            if (fractionalPart == 0.0)
+                return TYPE_INT
+            endif
+
+            return TYPE_FLOAT
+        endif
+        
+        return dependencyOptionValueType
+            
+    elseif (valueType == TYPE_FLOAT || valueType == TYPE_INT || valueType == TYPE_STRING)
+        ; Simple property value type, just return it
+        return valueType
+    endif
+
+    RPB_Utility.Error("There was an error determining the value type of the property.")
+    RPB_Utility.DebugError("MCM::GetOptionValueTypeFromConfig", "[Property Type: "+ asPropertyType +"] There was an error determining the value type of the property.")
+endFunction
+
+; TODO: Check for dependency options value types
+; TODO: Fix error, number dependency options are always considered float, even if they should be int (should be fixed with DeterminePropertyValueType())
+int function GetOptionValueTypeFromConfig(string asOptionKey, bool abVerifyEveryProperty = true, string asReturnedPropertyTypeIfNotAllEqual = "")
+    int optionsObj  = RPB_Data.MCM_GetOptionObject()
+    int optionMap   = JMap.getObj(optionsObj, asOptionKey) ; JMap&
+
+    ;/ 
+        Check what properties it has,
+        Assume that, if 4 properties exist, it is a number option,
+        since those are: Minimum, Maximum, Default, Steps (and Minimum, Maximum only exist for number options).
+
+        If there's only one property (Default), check whether it is of type string or bool.
+    /;
+    int propertyCount = JMap.count(optionMap)
+
+    if (asOptionKey == "Infamy::Infamy Recognized Threshold")
+        RPB_Utility.Debug("MCM::GetOptionValueTypeFromConfig", "Property Count: " + propertyCount)
+    endif
+
+    if (propertyCount == 4) ; Assuming Number Option
+        int minimumPropertyValueType = self.DeterminePropertyValueType(optionMap, "Minimum")
+        int maximumPropertyValueType = self.DeterminePropertyValueType(optionMap, "Maximum")
+        int defaultPropertyValueType = self.DeterminePropertyValueType(optionMap, "Default")
+        int stepsPropertyValueType   = self.DeterminePropertyValueType(optionMap, "Steps")
+
+        RPB_Utility.DebugWithArgs( \ 
+            "MCM::GetOptionValueTypeFromConfig",  "asOptionKey: " + asOptionKey, \ 
+            "Value Types: \n" + \ 
+            "\t - minimumPropertyValueType: " + minimumPropertyValueType + "\n" + \
+            "\t - maximumPropertyValueType: " + maximumPropertyValueType + "\n" + \
+            "\t - defaultPropertyValueType: " + defaultPropertyValueType + "\n" + \
+            "\t - stepsPropertyValueType: " + stepsPropertyValueType + "\n" \
+        )
+        ; int minimumPropertyValueType = JMap.valueType(optionMap, "Minimum")
+        ; int maximumPropertyValueType = JMap.valueType(optionMap, "Maximum")
+        ; int defaultPropertyValueType = JMap.valueType(optionMap, "Default")
+        ; int stepsPropertyValueType   = JMap.valueType(optionMap, "Steps")
+
+        if (abVerifyEveryProperty)
+            bool arePropertiesOfSameType = \
+                minimumPropertyValueType == maximumPropertyValueType == \
+                defaultPropertyValueType == stepsPropertyValueType
+
+            if (arePropertiesOfSameType)
+                return minimumPropertyValueType ; They are all the same, doesn't matter which to return
+            else
+                ; Return the value type specified, if it wasn't specified or is invalid, return the Minimum value type
+                string propertyType = \
+                    string_if ( \
+                    self.IsValidPropertyType(asReturnedPropertyTypeIfNotAllEqual), \
+                    asReturnedPropertyTypeIfNotAllEqual, "Minimum" \
+                )
+
+                int returnedValueType = JMap.valueType(optionMap, propertyType)
+
+                ; if (returnedValueType == TYPE_OBJECT)
+                ;     ; Selected property is a dependency, not a value, get its value.
+                ;     int dependencyObject            = JMap.getObj(optionMap, propertyType)
+                ;     string dependencyOptionKey      = JArray.getStr(dependencyObject, 0)
+                ;     int dependencyOptionValueType   = JMap.valueType(optionsDefaultValueMap, dependencyOptionKey) ; Might change, since default option may be undefined still
+
+                ;     return dependencyOptionValueType
+
+                ;     ; ; Get the dependency property's value
+                ;     ; if (dependencyOptionValueType == TYPE_FLOAT || dependencyOptionValueType == TYPE_INT)
+                ;     ;     float dependencyOptionValue = self.GetNumberOptionPropertyValue(dependencyOptionKey, propertyType)
+                ;     ;     float offset = JArray.getFlt(dependencyObject, 1)
+                ;     ;     bool hasOffset = (offset as bool)
+
+                ;     ;     float finalOptionValue = float_if (hasOffset, (dependencyOptionValue + offset), dependencyOptionValue)
+                ;     ;     return dependencyOptionValueType
+
+                ;     ; elseif (dependencyOptionValueType == TYPE_STRING)
+                ;     ;     string dependencyOptionValue = self.GetStringOptionPropertyValue(dependencyOptionKey, propertyType)
+                ;     ;     return dependencyOptionValueType
+                ;     ; endif
+
+                ; endif
+
+                RPB_Utility.Warn("The option ["+ asOptionKey +"] is most likely an invalid option, since not all property value types are the same!")
+                RPB_Utility.DebugWarn("MCM::GetOptionValueTypeFromConfig", "[returned value type: "+ returnedValueType +"] ["+ propertyType +"] The option ["+ asOptionKey +"] is most likely an invalid option, since not all property value types are the same!")
+                return returnedValueType
+            endif
+        endif
+
+        return minimumPropertyValueType
+
+    elseif (propertyCount == 1) ; String or Bool option
+        string propertyType     = JMap.getNthKey(optionMap, 0)
+        int propertyValueType   = JMap.valueType(optionMap, propertyType)
+
+        return propertyValueType
+    endif
+
+    RPB_Utility.Error("There was an error retrieving the property value type of option [" + asOptionKey + "], make sure the option has a valid configuration!")
+    RPB_Utility.DebugError("MCM::GetOptionValueTypeFromConfig", "There was an error retrieving the property value type of option [" + asOptionKey + "], make sure the option has a valid configuration!")
+endFunction
+
+;/
+    Loads all options with the specified property type from the config file.
+/;
+function LoadOptionValues(string asPropertyType)
     int optionsObj  = RPB_Data.MCM_GetOptionObject()
     int optionCount = JValue.count(optionsObj)
 
     int optionIndex = 0
-
-    bool continue = false
+    bool continue   = false
 
     while (optionIndex < optionCount)
-        string optionKey    = JMap.getNthKey(optionsObj, optionIndex) ; Current Option Key
-        int optionMap       = JMap.getObj(optionsObj, optionKey) ; JMap&
-        bool hasProperty    = JMap.hasKey(optionMap, "Default")
+        string optionKey                = JMap.getNthKey(optionsObj, optionIndex) ; Current Option Key
+        int optionMap                   = JMap.getObj(optionsObj, optionKey) ; JMap&
+        bool hasPropertySpecified       = JMap.hasKey(optionMap, asPropertyType)
 
-        if (!hasProperty)
-            RPB_Utility.Error("There was an error loading the default value for option " + optionKey + ".")
-            RPB_Utility.DebugError("MCM::LoadDefaults", "There was an error loading the default value for option " + optionKey + ".")
+        if (!hasPropertySpecified)
+            ; Determine if it's a string or bool option, if so, we shouldn't error, otherwise we should.
+            bool hasMinimum = JMap.hasKey(optionMap, "Minimum")
+            bool hasMaximum = JMap.hasKey(optionMap, "Maximum")
+            bool hasSteps   = JMap.hasKey(optionMap, "Steps")
+            bool hasDefault = JMap.hasKey(optionMap, "Default")
+            bool hasNumberOptionProperties = hasMinimum && hasMaximum && hasSteps
+            
+            if (!hasNumberOptionProperties)
+                ; String or Bool option
+                RPB_Utility.Error("There was an error loading the option " + optionKey + ", there is no property to read!", !hasDefault)
+                RPB_Utility.DebugError("MCM::LoadOptionValues", "There was an error loading the option " + optionKey + ", there is no property to read!", !hasDefault)
+                continue = true
+            endif
+            
+            if (!continue)
+                RPB_Utility.Error("There was an error loading the "+ asPropertyType +" value for option [" + optionKey + "].")
+                RPB_Utility.DebugError("MCM::LoadOptionValues", "There was an error loading the "+ asPropertyType +" value for option [" + optionKey + "].")
+            endif
             continue = true
         endif
 
         if (!continue)
-            bool hasDependency = JMap.valueType(optionMap, "Default") == TYPE_OBJECT ; 5 = object type
+            bool hasDependency = JMap.valueType(optionMap, asPropertyType) == TYPE_OBJECT
 
             if (hasDependency)
-                int defaultObject           = JMap.getObj(optionMap, "Default")
-                string dependencyOptionKey  = JArray.getStr(defaultObject, 0) ; [0] = Dependency Option
-                float offset                = JArray.getFlt(defaultObject, 1) ; [1] = Option Offset
-                bool hasOffset              = (offset as bool)
-                float dependencyOptionValue = self.GetOptionSliderValue(dependencyOptionKey)
+                int propertyObject              = JMap.getObj(optionMap, asPropertyType)
+                string dependencyOptionKey      = JArray.getStr(propertyObject, 0) ; [0] = Dependency Option
+                int dependencyOptionValueType   = self.GetOptionValueTypeFromConfig(dependencyOptionKey)
 
-                self.SetOptionDefaultFloat(optionKey, float_if (hasOffset, dependencyOptionValue + offset, dependencyOptionValue))
+                if (dependencyOptionValueType == TYPE_FLOAT || dependencyOptionValueType == TYPE_INT)
+                    ; If of type int, cast it to float
+                    float offset                = JArray.getFlt(propertyObject, 1) ; [1] = Option Offset
+                    bool hasOffset              = (offset as bool)
+                    float dependencyOptionValue = self.GetOptionSliderValue(dependencyOptionKey)
+                    float updatedValue          = float_if (hasOffset, (dependencyOptionValue + offset), dependencyOptionValue)
+                    self.SetNumberOptionPropertyValue(optionKey, asPropertyType, updatedValue)
+                endif
 
             else
-                bool isFloat    = JMap.valueType(optionMap, "Default") == TYPE_FLOAT
-                bool isInteger  = JMap.valueType(optionMap, "Default") == TYPE_INT 
-                bool isString   = JMap.valueType(optionMap, "Default") == TYPE_STRING
-        
-                if (isFloat)
-                    float optionValue = JMap.getFlt(optionMap, "Default") ; int|float
-                    self.SetOptionDefaultFloat(optionKey, optionValue)
-                    RPB_Utility.DebugWithArgs("MCM::LoadDefaults", optionKey, "[float] Setting Default Value to: " + optionValue)
-                
+                bool isBool     = self.IsPropertyValueOfTypeBool(optionMap, asPropertyType)
+                bool isFloat    = JMap.valueType(optionMap, asPropertyType) == TYPE_FLOAT
+                bool isInteger  = JMap.valueType(optionMap, asPropertyType) == TYPE_INT 
+                bool isString   = JMap.valueType(optionMap, asPropertyType) == TYPE_STRING
+
+                if (isBool)
+                    bool optionValue = JMap.getInt(optionMap, asPropertyType) as bool
+                    self.SetBoolOptionPropertyValue(optionKey, asPropertyType, optionValue)
+                    RPB_Utility.DebugWithArgs("MCM::LoadOptionValues", asPropertyType, "[bool] Setting ["+ optionKey + "] " + asPropertyType +" Value to: " + optionValue)
+
                 elseif (isInteger)
-                    int optionValue = JMap.getInt(optionMap, "Default") ; int|bool
-                    self.SetOptionDefaultInt(optionKey, optionValue)
-                    RPB_Utility.DebugWithArgs("MCM::LoadDefaults", optionKey, "[int] Setting Default Value to: " + optionValue)
-        
+                    int optionValue = JMap.getInt(optionMap, asPropertyType) ; int|bool
+                    self.SetNumberOptionPropertyValue(optionKey, asPropertyType, optionValue)
+                    RPB_Utility.DebugWithArgs("MCM::LoadOptionValues", asPropertyType, "[int] Setting ["+ optionKey + "] " + asPropertyType +" Value to: " + optionValue)
+    
+                elseif (isFloat)
+                    float optionValue = JMap.getFlt(optionMap, asPropertyType) ; int|float
+                    self.SetNumberOptionPropertyValue(optionKey, asPropertyType, optionValue)
+                    RPB_Utility.DebugWithArgs("MCM::LoadOptionValues", asPropertyType, "[float] Setting ["+ optionKey + "] " + asPropertyType +" Value to: " + optionValue)
+                
                 elseif (isString)
-                    string optionValue = JMap.getStr(optionMap, "Default") ; string
-                    self.SetOptionDefaultString(optionKey, optionValue)
-                    RPB_Utility.DebugWithArgs("MCM::LoadDefaults", optionKey, "[string] Setting Default Value to: " + optionValue)
+                    string optionValue = JMap.getStr(optionMap, asPropertyType) ; string
+                    self.SetStringOptionPropertyValue(optionKey, asPropertyType, optionValue)
+                    RPB_Utility.DebugWithArgs("MCM::LoadOptionValues", asPropertyType, "[string] Setting ["+ optionKey + "] " + asPropertyType +" Value to: " + optionValue)
                 endif
             endif
         endif
 
-
         continue = false
         optionIndex += 1
     endWhile
+endFunction
+
+function LoadDefaults()
+    self.LoadOptionValues("Default")
+endFunction
+
+function LoadMinimums()
+    self.LoadOptionValues("Minimum")
+endFunction
+
+function LoadMaximums()
+    self.LoadOptionValues("Maximum")
+endFunction
+
+function LoadSteps()
+    self.LoadOptionValues("Steps")
 endFunction
 
 ;/
@@ -1064,6 +1345,15 @@ endFunction
 function SetStringOptionPropertyValue(string asOptionKey, string asProperty, string asValue)
     if (asProperty == "Default")
         self.SetOptionDefaultString(asOptionKey, asValue)
+    endif
+endFunction
+
+;/
+    Sets the value for a specific property of a bool option.
+/;
+function SetBoolOptionPropertyValue(string asOptionKey, string asProperty, bool abValue)
+    if (asProperty == "Default") ; bool only has Default property for now
+        self.SetOptionDefaultBool(asOptionKey, abValue)
     endif
 endFunction
 
@@ -1083,6 +1373,71 @@ function SetNumberOptionPropertyValue(string asOptionKey, string asProperty, flo
     elseif (asProperty == "Steps")
         self.SetOptionSteps(asOptionKey, afValue)
     endif
+endFunction
+
+bool function GetBoolOptionPropertyValue(string asOptionKey, string asPropertyType)
+    if (asPropertyType == "Default")
+        self.GetOptionDefaultBool(asOptionKey)
+    endif
+    
+    RPB_Utility.Error("There was an error retrieving the "+ asPropertyType +" value of option " + asOptionKey)
+    RPB_Utility.DebugError("MCM::GetBoolOptionPropertyValue", "[bool] There was an error retrieving the "+ asPropertyType +" value of option " + asOptionKey)
+    return -1
+endFunction
+
+
+float function GetNumberOptionPropertyValue(string asOptionKey, string asProperty)
+    if (asProperty == "Minimum")
+        self.GetOptionMinimum(asOptionKey)
+
+    elseif (asProperty == "Maximum")
+        self.GetOptionMaximum(asOptionKey)
+
+    elseif (asProperty == "Default")
+        self.GetOptionDefaultFloat(asOptionKey)
+
+    elseif (asProperty == "Steps")
+        self.GetOptionSteps(asOptionKey)
+    endif
+
+    return -1
+endFunction
+
+string function GetStringOptionPropertyValue(string asOptionKey, string asProperty)
+    if (asProperty == "Default")
+        return self.GetOptionDefaultString(asOptionKey)
+    endif
+
+    return none
+endFunction
+
+
+;/
+    Determines if an integer option is of type bool,
+    this must be done because both ints and bools are represented
+    as ints internally.
+
+    JMap&   @apOptionMap: The map containing the option's properties
+    string  @asPropertyType: The type to check from the property
+
+    returns (bool): Whether this option is of type bool or not.
+/;
+bool function IsPropertyValueOfTypeBool(int apOptionMap, string asPropertyType)
+    bool isInteger = JMap.valueType(apOptionMap, asPropertyType) == TYPE_INT 
+
+    if (isInteger)
+        int propertyCount   = JValue.count(apOptionMap)
+        int optionValue     = JMap.getInt(apOptionMap, asPropertyType) ; int|bool
+
+        ; Since int options usually have 4 properties, and bools only have one (Default),
+        ; it's safe to assume that if it only has that one property, it is a bool option.
+        ; If the values are only 0 or 1, and it meets the one property criteria, it most likely is a bool option.
+        bool isBool = (propertyCount == 1) && (asPropertyType == "Default") && (optionValue == 0 || optionValue == 1)
+        
+        return isBool
+    endif
+
+    return false
 endFunction
 
 ;/
@@ -1120,12 +1475,12 @@ function __internal_loadPropertyForOption( \
 
     elseif (propertyValueType == TYPE_FORM)
         Form optionValue = JMap.getForm(optionMap, asPropertyType)
-        ; self.SetNumberOptionPropertyValue(asOptionKey, asPropertyType, optionValue)
+
 
     elseif (propertyValueType == TYPE_OBJECT)
         ; Handle children object nesting
         int optionValue = JMap.getObj(optionMap, asPropertyType)
-        ; self.SetNumberOptionPropertyValue(asOptionKey, asPropertyType, optionValue)
+
     else
         RPB_Utility.Error("There was an error determining the value type of the option " + asOptionKey)
         RPB_Utility.DebugError("MCM::LoadPropertyForOption", "There was an error determining the value type of the option " + asOptionKey)
@@ -1241,40 +1596,212 @@ function LoadPropertyForOption(string asOptionKey, string asPropertyType)
 endFunction
 
 
-function EnsureOptionLessThan(string asOptionOneKey, string asOptionTwoKey)
-    float optionOneValue = self.GetOptionSliderValue(asOptionOneKey)
-    float optionTwoValue = self.GetOptionSliderValue(asOptionTwoKey)
+function EnsureOptionValueComparison(string asOptionKey, string asValuePropertyType, float afConditionValue, string asComparisonOperator = "<", float afValueToSet = 0.0, string asCallerName = "")
+    float updatedValue
+    float value
+    bool condition
 
-    if (optionOneValue > optionTwoValue)
-        self.SetOptionSliderValue(asOptionOneKey, optionTwoValue - 1)
+    if (asValuePropertyType == "Default")
+        value = self.GetOptionDefaultFloat(asOptionKey)
+        
+    elseif (asValuePropertyType == "Current")
+        value = self.GetOptionValueFloat(asOptionKey)
+
+    elseif (asValuePropertyType == "Minimum")
+        value = self.GetOptionMinimum(asOptionKey)
+
+    elseif (asValuePropertyType == "Maximum")
+        value = self.GetOptionMaximum(asOptionKey)
+
+    elseif (asValuePropertyType == "Steps")
+        value = self.GetOptionSteps(asOptionKey)
     endif
+
+    if (asComparisonOperator == "<") ; Ensure option is greater than or equal to
+        condition = (value < afConditionValue)
+
+    elseif (asComparisonOperator == ">") ; Ensure option is less than or equal to
+        condition = (value > afConditionValue)
+
+    elseif (asComparisonOperator == "<=") ; Ensure option is greater than but not equal to
+        condition = (value <= afConditionValue)
+
+    elseif (asComparisonOperator == ">=") ; Ensure option is less than but not equal to
+        condition = (value >= afConditionValue)
+
+    elseif (asComparisonOperator == "==") ; Ensure option is not equal to
+        condition = (value == afConditionValue)
+
+    elseif (asComparisonOperator == "!=") ; Ensure option is equal to
+        condition = (value != afConditionValue)
+    endif
+
+
+    if (condition)
+        float newValue = float_if (afValueToSet, max(afConditionValue, afValueToSet), afConditionValue)
+
+        if (asValuePropertyType == "Default")
+            self.SetOptionDefaultFloat(asOptionKey, newValue)
+            
+        elseif (asValuePropertyType == "Current")
+            self.SetOptionValueFloat(asOptionKey, newValue)
+    
+        elseif (asValuePropertyType == "Minimum")
+            self.SetOptionMinimum(asOptionKey, newValue)
+    
+        elseif (asValuePropertyType == "Maximum")
+            self.SetOptionMaximum(asOptionKey, newValue)
+    
+        elseif (asValuePropertyType == "Steps")
+            self.SetOptionSteps(asOptionKey, newValue)
+        endif
+    
+        updatedValue = newValue
+    endif
+
+    RPB_Utility.Error("Validation failed for the "+ asValuePropertyType +" Property for Option [" + asOptionKey + "]!", (updatedValue as bool))
+    RPB_Utility.DebugError(asCallerName, "["+ asValuePropertyType +"] Validation failed for Option [" + asOptionKey + "], setting value to " + updatedValue + ".", (updatedValue as bool))
 endFunction
 
-function EnsureOptionGreaterThan(string asOptionOneKey, string asOptionTwoKey)
-    float optionOneValue = self.GetOptionSliderValue(asOptionOneKey)
-    float optionTwoValue = self.GetOptionSliderValue(asOptionTwoKey)
+function EnsureOptionNotNull(string asOptionKey, string asValuePropertyType = "")
 
-    if (optionOneValue < optionTwoValue)
-        self.SetOptionSliderValue(asOptionOneKey, optionTwoValue + 1)
-    endif
 endFunction
 
-function EnsureOptionNotGreaterThan(string asOptionKey, float afValue, float afValueToSet = 0.0)
-    float optionOneValue = self.GetOptionSliderValue(asOptionKey)
-
-    if (optionOneValue > afValue)
-        self.SetOptionSliderValue(asOptionKey, float_if (afValueToSet, afValueToSet, afValue - 1))
-    endif
+function EnsureOptionIsNull(string asOptionKey, string asValuePropertyType = "")
+    
 endFunction
 
-function EnsureOptionNotLessThan(string asOptionKey, float afValue, float afValueToSet = 0.0)
-    float optionOneValue = self.GetOptionSliderValue(asOptionKey)
+function EnsureOptionIsOfType(string asOptionKey, int aiOptionValueType, string asValuePropertyType = "")
 
-    if (optionOneValue < afValue)
-        self.SetOptionSliderValue(asOptionKey, float_if (afValueToSet, afValueToSet, afValue + 1))
-    endif
 endFunction
 
+function EnsureOptionIsNotOfType(string asOptionKey, int aiOptionValueType, string asValuePropertyType = "")
+    
+endFunction
+
+function EnsureOptionValueLessThan(string asOptionKey, float afConditionValue, float afValueToSet = 0.0, string asValuePropertyType = "")
+    EnsureOptionValueComparison(asOptionKey, asValuePropertyType, afConditionValue, ">=", afValueToSet, "MCM::EnsureOptionValueLessThan")
+endFunction
+
+function EnsureOptionValueLessThanOrEqualTo(string asOptionKey, float afConditionValue, float afValueToSet = 0.0, string asValuePropertyType = "")
+    if (self.IsValidPropertyType(asValuePropertyType))
+        EnsureOptionValueComparison(asOptionKey, asValuePropertyType, afConditionValue, ">", afValueToSet, "MCM::EnsureOptionValueLessThanOrEqualTo")
+        return
+    endif
+
+    string[] propertyTypes = self.GetPropertyTypes()
+    int typeIndex = 0
+    while (typeIndex < propertyTypes.Length)
+        EnsureOptionValueComparison(asOptionKey, propertyTypes[typeIndex], afConditionValue, ">", afValueToSet, "MCM::EnsureOptionValueLessThanOrEqualTo")
+        typeIndex += 1
+    endWhile
+endFunction
+
+function EnsureOptionValueGreaterThan(string asOptionKey, float afConditionValue, float afValueToSet = 0.0, string asValuePropertyType = "")
+    EnsureOptionValueComparison(asOptionKey, asValuePropertyType, afConditionValue, "<=", afValueToSet, "MCM::EnsureOptionValueGreaterThan")
+endFunction
+
+function EnsureOptionValueGreaterThanOrEqualTo(string asOptionKey, float afConditionValue, float afValueToSet = 0.0, string asValuePropertyType = "")
+    if (self.IsValidPropertyType(asValuePropertyType))
+        EnsureOptionValueComparison(asOptionKey, asValuePropertyType, afConditionValue, "<", afValueToSet, "MCM::EnsureOptionValueGreaterThanOrEqualTo")
+        return
+    endif
+
+    string[] propertyTypes = self.GetPropertyTypes()
+    int typeIndex = 0
+    while (typeIndex < propertyTypes.Length)
+        EnsureOptionValueComparison(asOptionKey, propertyTypes[typeIndex], afConditionValue, "<", afValueToSet, "MCM::EnsureOptionValueGreaterThanOrEqualTo")
+        typeIndex += 1
+    endWhile
+endFunction
+
+function EnsureOptionValueLessThanOptionValue(string asOptionOneKey, string asOptionTwoKey, float afValueToSet = 0.0, string asValuePropertyType = "")
+    float propertyTwoValue
+
+    if (asValuePropertyType == "Default")
+        propertyTwoValue = self.GetOptionDefaultFloat(asOptionTwoKey)
+        
+    elseif (asValuePropertyType == "Current")
+        propertyTwoValue = self.GetOptionValueFloat(asOptionTwoKey)
+
+    elseif (asValuePropertyType == "Minimum")
+        propertyTwoValue = self.GetOptionMinimum(asOptionTwoKey)
+
+    elseif (asValuePropertyType == "Maximum")
+        propertyTwoValue = self.GetOptionMaximum(asOptionTwoKey)
+
+    elseif (asValuePropertyType == "Steps")
+        propertyTwoValue = self.GetOptionSteps(asOptionTwoKey)
+    endif
+
+    EnsureOptionValueComparison(asOptionOneKey, asValuePropertyType, propertyTwoValue, ">=", afValueToSet, "MCM::EnsureOptionValueLessThanOptionValue")
+endFunction
+
+function EnsureOptionValueLessThanOrEqualToOptionValue(string asOptionOneKey, string asOptionTwoKey, float afValueToSet = 0.0, string asValuePropertyType = "")
+    float propertyTwoValue
+
+    if (asValuePropertyType == "Default")
+        propertyTwoValue = self.GetOptionDefaultFloat(asOptionTwoKey)
+        
+    elseif (asValuePropertyType == "Current")
+        propertyTwoValue = self.GetOptionValueFloat(asOptionTwoKey)
+
+    elseif (asValuePropertyType == "Minimum")
+        propertyTwoValue = self.GetOptionMinimum(asOptionTwoKey)
+
+    elseif (asValuePropertyType == "Maximum")
+        propertyTwoValue = self.GetOptionMaximum(asOptionTwoKey)
+
+    elseif (asValuePropertyType == "Steps")
+        propertyTwoValue = self.GetOptionSteps(asOptionTwoKey)
+    endif
+
+    EnsureOptionValueComparison(asOptionOneKey, asValuePropertyType, propertyTwoValue, ">", afValueToSet, "MCM::EnsureOptionValueLessThanOrEqualToOptionValue")
+endFunction
+
+function EnsureOptionValueGreaterThanOptionValue(string asOptionOneKey, string asOptionTwoKey, float afValueToSet = 0.0, string asValuePropertyType = "")
+    float propertyTwoValue
+
+    if (asValuePropertyType == "Default")
+        propertyTwoValue = self.GetOptionDefaultFloat(asOptionTwoKey)
+        
+    elseif (asValuePropertyType == "Current")
+        propertyTwoValue = self.GetOptionValueFloat(asOptionTwoKey)
+
+    elseif (asValuePropertyType == "Minimum")
+        propertyTwoValue = self.GetOptionMinimum(asOptionTwoKey)
+
+    elseif (asValuePropertyType == "Maximum")
+        propertyTwoValue = self.GetOptionMaximum(asOptionTwoKey)
+
+    elseif (asValuePropertyType == "Steps")
+        propertyTwoValue = self.GetOptionSteps(asOptionTwoKey)
+    endif
+
+    EnsureOptionValueComparison(asOptionOneKey, asValuePropertyType, propertyTwoValue, "<=", afValueToSet, "MCM::EnsureOptionValueGreaterThanOptionValue")
+endFunction
+
+function EnsureOptionValueGreaterThanOrEqualToOptionValue(string asOptionOneKey, string asOptionTwoKey, float afValueToSet = 0.0, string asValuePropertyType = "")
+    float propertyTwoValue
+
+    if (asValuePropertyType == "Default")
+        propertyTwoValue = self.GetOptionDefaultFloat(asOptionTwoKey)
+        
+    elseif (asValuePropertyType == "Current")
+        propertyTwoValue = self.GetOptionValueFloat(asOptionTwoKey)
+
+    elseif (asValuePropertyType == "Minimum")
+        propertyTwoValue = self.GetOptionMinimum(asOptionTwoKey)
+
+    elseif (asValuePropertyType == "Maximum")
+        propertyTwoValue = self.GetOptionMaximum(asOptionTwoKey)
+
+    elseif (asValuePropertyType == "Steps")
+        propertyTwoValue = self.GetOptionSteps(asOptionTwoKey)
+    endif
+
+    EnsureOptionValueComparison(asOptionOneKey, asValuePropertyType, propertyTwoValue, "<", afValueToSet, "MCM::EnsureOptionValueGreaterThanOrEqualToOptionValue")
+endFunction
 
 function InitializeOptions()
 ; ============================================================================
@@ -1305,9 +1832,8 @@ function InitializeOptions()
     optionsMaximumValueMap  = JMap.object() ; Maximum values for options
     optionsStepsValueMap    = JMap.object() ; Interval Steps values for options
 
-
     ; Persist the Options and assign them to a general container (this will persist the child objects)
-    generalContainer = JMap.object() ; To hold all containers (temporary)
+    generalContainer = JMap.object()
     JValue.retain(generalContainer, "RPB_MCM01")
 
     JMap.setObj(generalContainer, "options/value", optionsValueMap)

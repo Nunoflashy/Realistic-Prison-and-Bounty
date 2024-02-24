@@ -56,13 +56,13 @@ function Left(RPB_MCM mcm) global
     mcm.AddOptionSlider("Infamy Recognized Threshold", "{0} Infamy")
     mcm.AddOptionSlider("Infamy Known Threshold", "{0} Infamy")
     mcm.AddEmptyOption()
-    mcm.AddTextOption("", "While Jailed", mcm.OPTION_DISABLED)
+    mcm.AddTextOption("", "While in Prison", mcm.OPTION_DISABLED)
     mcm.AddOptionSliderKey("Infamy Gained", "Infamy Gained (%)", "{2}% of Bounty")
     mcm.AddOptionSlider("Infamy Gained", "{0} Infamy")
     mcm.AddOptionSliderKey("Infamy Gain Modifier (Recognized)", "Infamy Gain Modifier (Recognized)", "{1}x")
     mcm.AddOptionSliderKey("Infamy Gain Modifier (Known)", "Infamy Gain Modifier (Known)", "{1}x")
     mcm.AddEmptyOption()
-    mcm.AddTextOption("", "When Free", mcm.OPTION_DISABLED)
+    mcm.AddTextOption("", "While Free", mcm.OPTION_DISABLED)
     mcm.AddOptionSliderKey("Infamy Lost", "Infamy Lost (%)", "{2}% of Infamy")
     mcm.AddOptionSlider("Infamy Lost", "{0} Infamy")
     mcm.AddOptionSliderKey("Infamy Loss Modifier (Recognized)", "Infamy Loss Modifier (Recognized)", "{0}x")
@@ -120,7 +120,7 @@ function Right(RPB_MCM mcm) global
     mcm.AddOptionSlider("Minimum Sentence", "{0} Days")
     mcm.AddOptionSlider("Maximum Sentence", "{0} Days")
     mcm.AddEmptyOption()
-    mcm.AddTextOption("", "While Jailed", mcm.OPTION_DISABLED)
+    mcm.AddTextOption("", "While in Prison", mcm.OPTION_DISABLED)
     mcm.AddOptionSlider("Release Time (Minimum Hour)")
     mcm.AddOptionSlider("Release Time (Maximum Hour)")
     mcm.AddOptionToggle("Allow Release on Weekends", true as int)
@@ -806,17 +806,8 @@ function OnOptionSelect(RPB_MCM mcm, string option) global
 endFunction
 
 function LoadSliderOptions(RPB_MCM mcm, string option, float currentSliderValue) global
-    ; mcm.LoadPropertyForOption(option, "Minimum")
-    ; mcm.LoadPropertyForOption(option, "Maximum")
-    ; mcm.LoadPropertyForOption(option, "Steps")
-
-
-    float benchmark2 = RPB_Utility.StartBenchmark()
-    mcm.LoadPropertyForOption(option, "Minimum")
-    mcm.LoadPropertyForOption(option, "Maximum")
-    mcm.LoadPropertyForOption(option, "Steps")
-    mcm.LoadPropertyForOption(option, "Default")
-    EndBenchmark(benchmark2, "New Load Functions")
+    mcm.LoadOptionProperties(option)
+    mcm.ValidateOption(option)
 
     float minRange      = mcm.GetOptionMinimum(option)
     float maxRange      = mcm.GetOptionMaximum(option)
