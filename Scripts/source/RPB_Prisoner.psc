@@ -474,7 +474,8 @@ bool function AssignCell()
 
     if (assignedCell == none)
         ; Could not assign a cell to this prisoner, abort imprisonment?
-        Error("Prisoner::AssignCell", "A jail cell could not be assigned to prisoner " + self.GetName() + ", aborting imprisonment...!")
+        DebugError("Prisoner::AssignCell", "A jail cell could not be assigned to prisoner " + self.Name + ", aborting imprisonment and destroying reference...!")
+        Error("A jail cell could not be assigned to " + self.Name + ", aborting imprisonment...!")
         self.Destroy() ; We might destroy this instance somewhere else, because in the case of failing to assign a cell, we may still want to try other imprisonment options (maybe transfer to another hold?)
         return false
     endif
@@ -487,10 +488,6 @@ bool function AssignCell()
     return self.JailCell != none
 endFunction
 
-RPB_JailCell function GetCell()
-    return Prison_GetReference("Cell") as RPB_JailCell
-endFunction
-
 function SetReleaseLocation(bool abIsTeleportLocation = true)
     if (abIsTeleportLocation)
         Prison_SetForm("Teleport Release Location", Config.GetJailTeleportReleaseMarker(self.GetPrisonHold()))
@@ -499,7 +496,7 @@ endFunction
 
 function SetBelongingsContainer()
     Prison_SetForm("Prisoner Belongings Container", Prison.GetRandomPrisonerContainer("Belongings"))
-    Debug(none, "Prison::SetBelongingsContainer", "Prisoner Belongings Container:  " + PrisonerBelongingsContainer)
+    Debug("Prison::SetBelongingsContainer", "Prisoner Belongings Container:  " + PrisonerBelongingsContainer)
 endFunction
 
 ;/
@@ -556,7 +553,7 @@ function Uncuff()
 
     this.UnequipItemSlot(cuffsItemSlot)
     this.RemoveItem(cuffs)
-    Debug(self.GetActor(), "Prisoner::Uncuff", "Uncuffed " + this)
+    Debug("Prisoner::Uncuff", "Uncuffed " + this)
 endFunction
 
 bool function ShouldBeClothed()
@@ -564,7 +561,7 @@ bool function ShouldBeClothed()
 endFunction
 
 bool function HasStateRequiredForImprisonment()
-    return Prison && JailCell && (Sentence || Bounty || IsUndeterminedSentence) 
+    return Prison && JailCell && (Sentence || Bounty || IsUndeterminedSentence)
 endFunction
 
 ;/
@@ -573,15 +570,21 @@ endFunction
 function Imprison()
     if (!self.HasStateRequiredForImprisonment())
         Error(self.GetName() + " does not have the required state for "+ self.GetPossessivePronoun() +" imprisonment, cannot continue!")
+        DebugError("Prisoner::Imprison", self.GetName() + " does not have the required state for "+ self.GetPossessivePronoun() +" imprisonment, cannot continue!")
         return
     endif
 
     if (self.IsImprisoned)
         Error(self.GetName() + " is already imprisoned in "+ Prison.Name + "!")
+        DebugError("Prisoner::Imprison", self.GetName() + " is already imprisoned in "+ Prison.Name + "!")
         return
     endif
 
     float startBench = StartBenchmark()
+
+    if (!self.IsPlayer())
+        Prison.BindPrisonerToCell(self)
+    endif
 
     self.SetBelongingsContainer()
     self.SetReleaseLocation()
@@ -612,12 +615,13 @@ function Imprison()
         Config.NotifyJail(self.GetName() + " has been sentenced to "+ sentenceFormatted +"  in prison for " + self.GetHold(), !self.IsPlayer())
     endif
     
-    if (self.ShowReleaseTime)
+    if (self.ShowReleaseTime && !self.IsUndeterminedSentence)
         Config.NotifyJail("Your release is due on " + releaseDateFormatted, self.IsPlayer())
         Config.NotifyJail(self.GetName() + "'s release is due on " + releaseDateFormatted, !self.IsPlayer())
     endif
 
     Prison_SetBool("Imprisoned", true)
+    RPB_StorageVars.SetBoolOnForm("Imprisoned", this, true)
     GotoState("Imprisoned") ; State when the prisoner is in the cell, check for updates for sentence, etc...
     RegisterForUpdateGameTime(1.0)
     EndBenchmark(startBench, "Ended Prisoner::Imprison")
@@ -904,10 +908,10 @@ function SetSentence(int aiSentenceInDays = 0, bool abShouldAffectBounty = true)
         aiMaxValue  = Prison.MaximumSentence \
     )
 
-    if (abShouldAffectBounty)
-        int bountyEquivalentOfSentence = Sentence * Prison.BountyToSentence ; 2 Days = 200 Bounty if BountyToSentence = 100
-        Prison_SetInt("Bounty Non-Violent", BountyNonViolent + bountyEquivalentOfSentence, "Arrest")
-    endif
+    ; if (abShouldAffectBounty)
+    ;     int bountyEquivalentOfSentence = Sentence * Prison.BountyToSentence ; 2 Days = 200 Bounty if BountyToSentence = 100
+    ;     Prison_SetInt("Bounty Non-Violent", BountyNonViolent + bountyEquivalentOfSentence, "Arrest")
+    ; endif
 
     Prison_SetBool("Sentence Set", true)
     
@@ -1031,6 +1035,7 @@ state Imprisoned
 
         ; At this point, we can delete the prisoner's arrest state
         self.DestroyArrestState()
+        ; ((self as RPB_Actor) as RPB_Arrestee).Destroy()
     endEvent
 
     event OnUpdateGameTime()
@@ -1047,6 +1052,11 @@ state Imprisoned
         endif
 
         Prison.DEBUG_ShowPrisonerSentenceInfo(self, true)
+        
+        ; Must be updated in some other way, otherwise it will reset to 0 on next imprisonment
+        float currentTimeServedStored = RPB_ActorVars.GetTimeJailed(Prison.PrisonFaction, this)
+        RPB_ActorVars.SetTimeJailed(Prison.PrisonFaction, this, currentTimeServedStored + TimeSinceLastUpdate)
+        ; RPB_Utility.Debug("Prisoner::OnUpdateGameTime", "currentTimeServedStored: " + currentTimeServedStored)
 
         self.RegisterLastUpdate()
         RegisterForSingleUpdateGameTime(1.0)
@@ -1221,6 +1231,7 @@ function UpdateLongestSentence()
     int currentLongestSentence = self.QueryStat("Longest Sentence")
     int newLongestSentence = int_if (currentLongestSentence < Sentence, Sentence, currentLongestSentence)
     self.SetStat("Longest Sentence", newLongestSentence)
+    RPB_ActorVars.SetLastSentence(Prison.PrisonFaction, this, Sentence)
 
     Debug(this, "Prisoner::UpdateLongestSentence", "[\n" + \ 
         "\t Current Longest Sentence: " + currentLongestSentence + "\n" + \
@@ -1293,10 +1304,10 @@ function UpdateDaysImprisoned()
     ;     self.OnDayPassed()
     ; endif
 
-    ; Debug(none, "Prisoner::UpdateDaysImprisoned", "TimeServed: " + TimeServed + ", floor(TimeServed): " + floor(TimeServed))
-    ; Debug(none, "Prisoner::UpdateDaysImprisoned", "Updating Days Jailed: " + floor(accumulatedTimeServed))
-    ; Debug(none, "Prisoner::UpdateDaysImprisoned", "LastUpdate: " + LastUpdate)
-    ; Debug(none, "Prisoner::UpdateDaysImprisoned", "TimeSinceLastUpdate: " + TimeSinceLastUpdate)
+    ; Debug("Prisoner::UpdateDaysImprisoned", "TimeServed: " + TimeServed + ", floor(TimeServed): " + floor(TimeServed))
+    ; Debug("Prisoner::UpdateDaysImprisoned", "Updating Days Jailed: " + floor(accumulatedTimeServed))
+    ; Debug("Prisoner::UpdateDaysImprisoned", "LastUpdate: " + LastUpdate)
+    ; Debug("Prisoner::UpdateDaysImprisoned", "TimeSinceLastUpdate: " + TimeSinceLastUpdate)
 endFunction
 
 function SetEscaped()
@@ -1347,6 +1358,10 @@ function MoveToCell(bool abBeginImprisonment = true)
 
     this.MoveTo(self.JailCell)
 
+    if (!self.IsPlayer())
+        Prison.BindPrisonerToCell(self)
+    endif
+
     if (abBeginImprisonment)
         if (Prison.IsPrisonerQueuedForImprisonment(self))
             Prison.RegisterForQueuedImprisonment()
@@ -1354,6 +1369,7 @@ function MoveToCell(bool abBeginImprisonment = true)
             self.Imprison()
         endif
     endif
+
 
     Prison_SetBool("In Cell", true)
     Prison.OnPrisonerEnterCell(self, JailCell)
@@ -1398,9 +1414,9 @@ function MoveToCaptor()
     this.MoveTo(captor)
 endFunction
 
-bool __fastForwardedToRelease
+bool __hasFastForwardedToRelease
 function FastForwardToRelease()
-    ; if (__fastForwardedToRelease)
+    ; if (__hasFastForwardedToRelease)
     ;     return false
     ; endif
     ; Utility.Wait(8.0)
@@ -1420,7 +1436,7 @@ function FastForwardToRelease()
 
     RPB_Utility.Debug("Prisoner::FastForwardToRelease", "CurrentTime: " + currentTimeBeforeChanges + ", timeLeft: " + timeLeft + ", currentTimeOverride: " + __currentTimeOverride + ", TimeLeftInSentence: " + TimeLeftInSentence)
 
-    __fastForwardedToRelease = true
+    __hasFastForwardedToRelease = true
 endFunction
 
 ; function DetermineReleaseTimeAdditionalHours()
@@ -1554,7 +1570,7 @@ endFunction
 event OnInitialize()
     ; Prison.RegisterForPrisonPeriodicUpdate(self)
     Prison.RegisterPrisoner(self) ; Registers this prisoner into the prisoner list
-
+    Debug("Prisoner::OnInitialize", "self: " + self)
     if (NPC_RestorePrisonerState())
         ; Actor was already a prisoner, do not initialize normally and instead proceed to restoring their previous state
         ; Prison.RegisterPrisoner(self) ; Registers this prisoner into the prisoner list since they were unregistered OnDestroy()
@@ -1660,6 +1676,7 @@ event OnStatChanged(string asStatName, int aiValue)
     ; Debug(this, "Prisoner::OnStatChanged", "Stat " + asStatName + " has been changed to " + aiValue)
 endEvent
 
+int __serveTimeLastDayRegistered
 event OnSleepStart(float afSleepStartTime, float afSleepEndTime)
     if (!self.ShouldProcessImprisonmentEvents())
         return
@@ -1669,14 +1686,19 @@ event OnSleepStart(float afSleepStartTime, float afSleepEndTime)
         return
     endif
 
-    int msgResult = Prison.ServeTimeMessage.Show()
-    if (msgResult == Prison.SERVE_TIME_YES)
-        ; if (self.ShouldFastForwardToRelease)
-            self.FastForwardToRelease()
-            Prison.Notify("Fast forwarded to Release")
-            Prison.Notify("Sleep Start is: " + afSleepStartTime + ", Sleep End is: " + afSleepEndTime)
-        ; endif
+    if (__serveTimeLastDayRegistered != RPB_Utility.GetCurrentDay() || __serveTimeLastDayRegistered == 0)
+        int msgResult = Prison.ServeTimeMessage.Show()
+        if (msgResult == Prison.SERVE_TIME_YES)
+            ; if (self.ShouldFastForwardToRelease)
+                self.FastForwardToRelease()
+                Prison.Notify("Fast forwarded to Release")
+                Prison.Notify("Sleep Start is: " + afSleepStartTime + ", Sleep End is: " + afSleepEndTime)
+            ; endif
+            return
+        endif
+        __serveTimeLastDayRegistered = RPB_Utility.GetCurrentDay()
     endif
+
 endEvent
 
 ; ==========================================================
@@ -1694,7 +1716,7 @@ endFunction
 function DestroyArrestState()
     RPB_Arrestee arrestState = RPB_Arrestee.GetStateForPrisoner(self)
 
-    Debug(none, "Prisoner::DestroyArrestState", "Prison Hold from Arrest Vars: " + Prison_GetString("Hold", "Arrest"))
+    Debug("Prisoner::DestroyArrestState", "Prison Hold from Arrest Vars: " + Prison_GetString("Hold", "Arrest"))
 
     if (arrestState)
         arrestState.Destroy()
@@ -1958,13 +1980,17 @@ RPB_Prison function GetPrison()
     int prisonID = Prison_GetInt("Prison ID")
 
     if (!prisonID)
-        Fatal("There was an error retrieving the Prison belonging to Prisoner: " + self.GetName())
+        Fatal("There was an error retrieving the Prison belonging to Prisoner: " + self.Name)
         __prisonFailedInitialization = true
         return none
     endif
 
     __cachedPrison = (RPB_API.GetPrisonManager()).GetPrisonByID(prisonID)
     return __cachedPrison
+endFunction
+
+RPB_JailCell function GetCell()
+    return Prison_GetReference("Cell") as RPB_JailCell
 endFunction
 
 ; ==========================================================

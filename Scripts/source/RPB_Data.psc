@@ -3,7 +3,78 @@ scriptname RPB_Data hidden
     Script responsible of handling anything related to the data required for static configuration of the Holds.
 }
 
-import RealisticPrisonAndBounty_Util
+import RPB_Utility
+
+; ==========================================================
+;                           MCM
+; ==========================================================
+
+string function MCM_GetRootPropertyOfTypeString(string asMcmObjectName, string asProperty) global
+    int mcmConfig   = JValue.readFromFile(GetModDataDirectory() + "mcm.json") ; JMap&
+    int mcmObject   = JMap.getObj(mcmConfig, asMcmObjectName) ; JMap&
+
+    string rootProperty = JMap.getStr(mcmObject, asProperty)
+    return rootProperty
+endFunction
+
+string[] function MCM_GetRootPropertyOfTypeStringArray(string asMcmObjectName, string asProperty) global
+    int mcmConfig   = JValue.readFromFile(GetModDataDirectory() + "mcm.json") ; JMap&
+    int mcmObject   = JMap.getObj(mcmConfig, asMcmObjectName) ; JMap&
+
+    int rootProperty = JMap.getObj(mcmObject, asProperty)
+    return JArray.asStringArray(rootProperty)
+endFunction
+
+int function MCM_GetOptionObject() global
+    int mcmConfig   = JValue.readFromFile(GetModDataDirectory() + "mcm.json") ; JMap&
+    int mcmObject   = JMap.getObj(mcmConfig, "Config") ; JMap&
+
+    int obj = JMap.getObj(mcmObject, "Options")
+    return obj
+endFunction
+
+int function MCM_GetDefaultsObject() global
+    int mcmConfig   = JValue.readFromFile(GetModDataDirectory() + "mcm.json") ; JMap&
+    int mcmObject   = JMap.getObj(mcmConfig, "Config") ; JMap&
+
+    int defaultsObj = JMap.getObj(mcmObject, "Defaults")
+    return defaultsObj
+endFunction
+
+int function MCM_GetMaximumsObject() global
+    int mcmConfig   = JValue.readFromFile(GetModDataDirectory() + "mcm.json") ; JMap&
+    int mcmObject   = JMap.getObj(mcmConfig, "Config") ; JMap&
+
+    int obj = JMap.getObj(mcmObject, "Maximums")
+    return obj
+endFunction
+
+string[] function MCM_GetChildPropertyOfTypeStringArray(string asMcmObjectName, string asChildName, string asProperty) global
+    int mcmConfig   = JValue.readFromFile(GetModDataDirectory() + "mcm.json") ; JMap&
+    int mcmObject   = JMap.getObj(mcmConfig, asMcmObjectName) ; JMap&
+    int childObject = JMap.getObj(mcmObject, asChildName) ; JMap&
+
+    int childProperty = JMap.getObj(childObject, asProperty)
+    return JArray.asStringArray(childProperty)
+endFunction
+
+int function MCM_GetRootPropertyOfTypeObject(string asMcmObjectName, string asProperty) global
+    int mcmConfig   = JValue.readFromFile(GetModDataDirectory() + "mcm.json") ; JMap&
+    int mcmObject   = JMap.getObj(mcmConfig, asMcmObjectName) ; JMap&
+
+    int rootProperty = JMap.getObj(mcmObject, asProperty)
+    return rootProperty
+endFunction
+
+string function MCM_GetPrisonTemplate() global
+    int mcmConfig   = JValue.readFromFile(GetModDataDirectory() + "mcm.json") ; JMap&
+    int statsObj    = JMap.getObj(mcmConfig, "Stats") ; JMap&
+    int prisonObj   = JMap.getObj(statsObj, "Prison")
+
+    string prisonTemplate = JMap.getStr(prisonObj, "Template")
+
+    return prisonTemplate
+endFunction
 
 ; ==========================================================
 ;                        Serialization
@@ -771,7 +842,8 @@ bool function JailCell_HasOption(int apPrisonCellsObject, RPB_JailCell akJailCel
     if (asOptionCategory != "null")
         bool optionCategoryExists = JMap.hasKey(map_options, asOptionCategory)
         if (!optionCategoryExists)
-            Error(none, "Data::HasJailCellOption", "Option category " + asOptionCategory + " does not exist for jail cell " + akJailCell + "!")
+            Error("Option category " + asOptionCategory + " does not exist for jail cell " + akJailCell + "!")
+            DebugError("Data::HasJailCellOption", "Option category " + asOptionCategory + " does not exist for jail cell " + akJailCell + "!")
             return false
         endif
 
@@ -1132,7 +1204,7 @@ Form[] function Jail_GetPrisonerContainers(int apHoldJailObject, string asPrison
     int map_prisonerContainers          = JMap.getObj(apHoldJailObject, "Prisoner Containers")          ; JMap&
     int array_prisonerContainersOfType  = JMap.getObj(map_prisonerContainers, asPrisonerContainerType)  ; JArray&
 
-    Debug(none, "Data::Jail_GetPrisonerContainers", "map_prisonerContainers: " + GetContainerList(map_prisonerContainers) + ", array_prisonerContainersOfType: " + GetContainerList(array_prisonerContainersOfType))
+    ; Debug(none, "Data::Jail_GetPrisonerContainers", "map_prisonerContainers: " + GetContainerList(map_prisonerContainers) + ", array_prisonerContainersOfType: " + GetContainerList(array_prisonerContainersOfType))
 
 
     return JArray.asFormArray(array_prisonerContainersOfType)

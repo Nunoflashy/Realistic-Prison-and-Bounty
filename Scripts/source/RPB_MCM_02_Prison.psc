@@ -3,7 +3,8 @@ Scriptname RPB_MCM_02_Prison hidden
 import RPB_Utility
 
 bool function ShouldHandleEvent(RPB_MCM_02 mcm, RPB_Prisoner apPrisoner = none) global
-    return StringUtil.Find(mcm.CurrentPage, "Prison - " + apPrisoner.Name + " (#"+ apPrisoner.Number +")") != -1
+    RPB_Prison prison       = apPrisoner.Prison
+    return StringUtil.Find(mcm.CurrentPage, prison.Name + " - " + apPrisoner.Name + " (#"+ apPrisoner.Number +")") != -1
 endFunction
 
 function Render(RPB_MCM_02 mcm, RPB_Prisoner apPrisoner) global
@@ -21,6 +22,11 @@ function Render(RPB_MCM_02 mcm, RPB_Prisoner apPrisoner) global
 
     RPB_Prison prison       = apPrisoner.Prison
     RPB_Prisoner prisoner   = apPrisoner
+
+    if (!prisoner.IsImprisoned)
+        Warn("The prisoner " + prisoner.Name + " (Prisoner #"+ prisoner.Number +") " + " is not imprisoned, no stats to show.")
+        return
+    endif
 
     Debug("MCM_02_Prison::Render", "prison: " + prison + ", prisoner: " + prisoner)
 
@@ -95,14 +101,40 @@ function Render(RPB_MCM_02 mcm, RPB_Prisoner apPrisoner) global
     string prisonCity   = prisoner.Prison.City
     string prisonName   = prisoner.Prison.Name
     string prisonCell   = prisoner.JailCell.ID
+    string prisonerName = prisoner.Name
 
-    mcm.AddOptionText("", prisonHold + " | " + prisonCity + " | " + prisonName + " | " + prisonCell, defaultFlags = mcm.OPTION_DISABLED)
+    string prisonTemplate = RPB_Data.MCM_GetPrisonTemplate()
+
+    int placeholders = JArray.object()
+    int replacements = JArray.object()
+
+    JArray.addStr(placeholders, "hold")
+    JArray.addStr(placeholders, "city")
+    JArray.addStr(placeholders, "prison")
+    JArray.addStr(placeholders, "cell")
+    JArray.addStr(placeholders, "prisoner")
+
+    JArray.addStr(replacements, prisonHold)
+    JArray.addStr(replacements, prisonCity)
+    JArray.addStr(replacements, prisonName)
+    JArray.addStr(replacements, prisonCell)
+    JArray.addStr(replacements, prisonerName)
+
+    string header = RPB_Utility.Replace(prisonTemplate, JArray.asStringArray(placeholders), JArray.asStringArray(replacements))
+
+    mcm.AddOptionText("", header, defaultFlags = mcm.OPTION_DISABLED)
+    ; mcm.AddOptionText("", prisonHold + " | " + prisonCity + " | " + prisonName + " | " + prisonCell, defaultFlags = mcm.OPTION_DISABLED)
     mcm.AddOptionCategory("", flags = mcm.OPTION_DISABLED)
     mcm.AddEmptyOption()
     ; emptySpacesRight += 1
     
     if (prisoner.Bounty && prisoner.ShowBounty)
-        mcm.AddOptionText("Bounty for Arrest", prisoner.BountyNonViolent + " Bounty" + string_if (prisoner.BountyViolent > 0, " / " + prisoner.BountyViolent + " Violent Bounty", ""), defaultFlags = mcm.OPTION_DISABLED)
+        mcm.AddOptionText("Bounty for Arrest", \ 
+            string_if (prisoner.BountyNonViolent > 0, prisoner.BountyNonViolent + " Bounty") + \ 
+            string_if (prisoner.BountyNonViolent && prisoner.BountyViolent, " / ") + \
+            string_if (prisoner.BountyViolent > 0, prisoner.BountyViolent + " Violent Bounty"), \ 
+            defaultFlags = mcm.OPTION_DISABLED \
+        )
     endif
 
     if (prisoner.Captor)

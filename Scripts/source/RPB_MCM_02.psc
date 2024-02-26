@@ -36,6 +36,56 @@ string[] property Holds
     endFunction
 endProperty
 
+string[] property HoldStatsTemplate
+    string[] function get()
+        return RPB_Data.MCM_GetChildPropertyOfTypeStringArray("Stats", "Hold", "Hold Stats")
+    endFunction
+endProperty
+
+string[] property HoldStatsPlaceholders
+    string[] function get()
+        int placeholders = JArray.object()
+        JArray.addStr(placeholders, "bounty")
+        JArray.addStr(placeholders, "violent bounty")
+        JArray.addStr(placeholders, "[bounty+violent bounty]")
+        JArray.addStr(placeholders, "largest bounty")
+        JArray.addStr(placeholders, "total bounty")
+        JArray.addStr(placeholders, "times arrested")
+        JArray.addStr(placeholders, "times frisked")
+        JArray.addStr(placeholders, "arrests eluded")
+        JArray.addStr(placeholders, "arrests resisted")
+        JArray.addStr(placeholders, "bounties paid")
+
+        return JArray.asStringArray(placeholders)
+    endFunction
+endProperty
+
+string[] function ConstructHoldStatValues( \
+int aiBounty, \
+int aiViolentBounty,  \
+int aiLargestBounty,  \
+int aiTotalBounty,  \
+int aiTimesArrested,  \
+int aiTimesFrisked,  \
+int aiArrestsEluded,  \
+int aiArrestsResisted, \ 
+int aiBountiesPaid \
+)
+    int values = JArray.object()
+    JArray.addStr(values, aiBounty as string)
+    JArray.addStr(values, aiViolentBounty as string)
+    JArray.addStr(values, (aiBounty + aiViolentBounty) as string)
+    JArray.addStr(values, aiLargestBounty as string)
+    JArray.addStr(values, aiTotalBounty as string)
+    JArray.addStr(values, aiTimesArrested as string)
+    JArray.addStr(values, aiTimesFrisked as string)
+    JArray.addStr(values, aiArrestsEluded as string)
+    JArray.addStr(values, aiArrestsResisted as string)
+    JArray.addStr(values, aiBountiesPaid as string)
+
+    return JArray.asStringArray(values)
+endFunction
+
 bool function IsHoldCurrentPage()
     int i = 0
     while (i < Holds.Length)
@@ -65,7 +115,7 @@ function InitializePages()
         RPB_Prisoner prisoner = actorPrison.Prisoners.AtIndex(n)
         int prisonerFormID  = actorPrison.Prisoners.AtIndex(n).GetActor().GetFormID()
         RPB_Utility.Debug("MCM_02::InitializePages", "prisoner: " + prisoner)
-        JArray.addStr(_pagesArray, "Prison - " + prisoner.Name + " (#"+ prisoner.Number +")")
+        JArray.addStr(_pagesArray, prisonName + " - " + prisoner.Name + " (#"+ prisoner.Number +")")
         n += 1
     endWhile
 
@@ -78,11 +128,7 @@ endFunction
 ; Event Handling
 ; ============================================================================
 event OnConfigInit()
-    ; ModName = "R. Prison and Bounty - Stats"
-    ; ModName = "Realistic Prison & B. - Stats"
-    ; ModName = "Realistic Prison & B. - Stats"
-    ; ModName = "RealisticPrison&Bounty - Stats"
-    ModName = "RPB - Stats"
+    ModName = RPB_Data.MCM_GetRootPropertyOfTypeString("Stats", "Name")
 
     self.InitializePages()
 endEvent

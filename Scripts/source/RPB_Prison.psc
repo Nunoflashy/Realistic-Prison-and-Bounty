@@ -492,6 +492,19 @@ int property SERVE_TIME_YES = 0 autoreadonly
 ;                       Prison Identity
 ; ==========================================================
 
+bool property Initialized
+    bool function get()
+        return __isInitialized
+        ; return ID && Name && PrisonFaction && PrisonLocation && Hold && City
+    endFunction
+endProperty
+
+int property ID
+    int function get()
+        return self.GetID()
+    endFunction
+endProperty
+
 Location __prisonLocation
 Location property PrisonLocation
     Location function get()
@@ -520,6 +533,10 @@ string property Name
         if (!__name)
             __name = PrisonLocation.GetName()
         endif
+
+        ; if (!__name)
+        ;     return "Prison " + ID
+        ; endif
 
         return __name
     endFunction
@@ -567,7 +584,8 @@ RPB_PrisonerList property Prisoners
         endif
 
         __prisoners = ((self as ReferenceAlias) as RPB_ActiveMagicEffectContainer) as RPB_PrisonerList
-        LogProperty(none, "Prison::Prisoners", "Initialized with a value of: " + __prisoners)
+        ; __prisoners = PrisonManager.GetNthAlias(self.GetID()) as RPB_PrisonerList
+        LogProperty("Prison::Prisoners", "Initialized with a value of: " + __prisoners)
         return __prisoners
     endFunction
 endProperty
@@ -604,6 +622,63 @@ endProperty
 
 ; ==========================================================
 
+function Uninitialize()
+    __isInitialized = false
+
+    __prisonLocation    = none
+    __prisonFaction     = none
+    __name              = none
+    __hold              = none
+    __city              = none
+endFunction
+
+;/
+    Binds this Prisoner to their cell (it must already be assigned),
+    this is used to make NPC's "stick" to the cell, and not wander around
+    or execute their usual AI packages.
+
+    Several AI Packages are available to bind the prisoners, their use
+    should depend on the size of the cell, as to not allow them to get out
+    and not constrain them to a very small area either.
+
+    Packages should be: S, M, L, and XL.
+
+    RPB_Prisoner    @apPrisoner: The prisoner to bind to the cell.
+/;
+function BindPrisonerToCell(RPB_Prisoner apPrisoner)
+    ; Make sure the prisoner is inside the cell before applying the AI Package (Wander in Cell),
+    ; since the package's location is set to be the same point at the time of application 
+    ; so the prisoner must be in the cell, in order to remain there.
+    apPrisoner.MoveTo(apPrisoner.JailCell)
+    Utility.Wait(0.1)
+
+    Quest cellPackages = GetFormFromMod(0x1F8CC) as Quest
+    
+    string packageType = "Short"
+    int i = 0
+    bool break = false
+    while (i < 100 && !break)
+        string packageIndex = packageType + "_000" + i
+        if (i >= 100)
+            packageIndex = packageType + "_0" + i
+            
+        elseif (i >= 10)
+            packageIndex = packageType + "_00" + i
+        endif
+
+        ReferenceAlias wanderInCellShort = cellPackages.GetAliasByName(packageIndex) as ReferenceAlias
+        if (wanderInCellShort.GetReference() == none)
+            BindAliasTo(wanderInCellShort, apPrisoner.GetActor())
+            break = true
+        endif
+        if (!break)
+            i += 1
+        endif
+    endWhile
+
+    apPrisoner.GetActor().EvaluatePackage()
+endFunction
+
 function Notify(string asMessage, bool abCondition = true)
     Config.NotifyJail(asMessage, abCondition)
 endFunction
@@ -611,27 +686,6 @@ endFunction
 RPB_Prison function GetPrisonForHold(string asHold) global
     RPB_Prison prison = (RPB_API.GetPrisonManager()).GetPrison(asHold)
     return prison
-endFunction
-
-RPB_Prison function GetPrisonForImprisonedActor(Actor akImprisonedActor) global
-    RPB_PrisonManager _prisonManager = GetFormFromMod(0x1B825) as RPB_PrisonManager
-    RPB_Prison prisonForPrisoner    = _prisonManager.GetPrisonForBoundPrisoner(akImprisonedActor)
-
-    return prisonForPrisoner
-endFunction
-
-function BindPrisonerToPrison(RPB_Prisoner akPrisoner, RPB_Prison akPrison) global
-    JDB.solveIntSetter(".rpb_prison.prisoners." + akPrisoner.GetIdentifier(), akPrison.GetID(), true)
-endFunction
-
-RPB_Prison function GetPrisonForBoundPrisoner(Actor akPrisonerActor)
-    int prisonAliasID = JDB.solveInt(".rpb_prison.prisoners." + akPrisonerActor.GetFormID()) ; returns the ID of the Prison alias
-    return (self.GetOwningQuest()).GetAlias(prisonAliasID) as RPB_Prison
-endFunction
-
-Form[] function GetPrisonersInAllPrisons() global
-    int prisonersObj = JDB.solveObj(".rpb_prison.prisoners") ; Should return a int[] with the Prisoners FormID
-    return JArray.asFormArray(prisonersObj)
 endFunction
 
 RPB_Prisoner function GetPrisoner(Actor akPrisonerActor)
@@ -689,6 +743,8 @@ bool function ReleasePrisoner(RPB_Prisoner apPrisoner)
 
     ; Unregister the prisoner from prison
     self.UnregisterPrisoner(apPrisoner)
+
+    self.OnPrisonerReleased(apPrisoner)
 endFunction
 
 bool function ProcessPrisoner(RPB_Prisoner apPrisoner)
@@ -713,16 +769,20 @@ string function GetTimeOfArrestFormatted(RPB_Prisoner apPrisoner)
     int day      = apPrisoner.DayOfArrest
     int month    = apPrisoner.MonthOfArrest
     int year     = apPrisoner.YearOfArrest
+    int hour     = apPrisoner.HourOfArrest
+    int minute   = apPrisoner.MinuteOfArrest
 
-    return RPB_Utility.GetFormattedDate(day, month, year, apPrisoner.HourOfArrest, apPrisoner.MinuteOfArrest)
+    return RPB_Utility.GetFormattedDate(day, month, year, hour, minute)
 endFunction
 
 string function GetTimeOfImprisonmentFormatted(RPB_Prisoner apPrisoner)
     int day      = apPrisoner.DayOfImprisonment
     int month    = apPrisoner.MonthOfImprisonment
     int year     = apPrisoner.YearOfImprisonment
+    int hour     = apPrisoner.HourOfImprisonment
+    int minute   = apPrisoner.MinuteOfImprisonment
 
-    return RPB_Utility.GetFormattedDate(day, month, year, apPrisoner.HourOfImprisonment, apPrisoner.MinuteOfImprisonment)
+    return RPB_Utility.GetFormattedDate(day, month, year, hour, minute)
 endFunction
 
 string function GetTimeOfReleaseFormatted(RPB_Prisoner apPrisoner)
@@ -1040,6 +1100,8 @@ function AwaitPrisonersQueuedImprisonment()
     endWhile
 endFunction
 
+
+
 ; ==========================================================
 ;                          Events
 ; ==========================================================
@@ -1067,6 +1129,7 @@ event OnPrisonPeriodicUpdate()
 endEvent
 
 event OnPrisonerRegistered(RPB_Prisoner apPrisoner)
+    self.RegisterPrisonerLastJailedStats(apPrisoner)
     PrisonManager.OnPrisonRegisteredPrisoner(self, apPrisoner)
 endEvent
 
@@ -1124,8 +1187,10 @@ endEvent
 
 event OnEscortPrisonerToCellEnd(RPB_Prisoner apPrisoner, RPB_JailCell akJailCell, Actor akEscort)
     if (apPrisoner.IsStrippedNaked || apPrisoner.IsStrippedToUnderwear)
-        return
+        ; return
     endif
+
+    apPrisoner.Uncuff()
     
     apPrisoner.Imprison()
     ; apPrisoner.StartStripping(akEscort)
@@ -1145,7 +1210,7 @@ event OnPrisonerStripEnd(RPB_Prisoner apPrisoner, Actor akStripper)
 endEvent
 
 event OnPrisonerReleased(RPB_Prisoner apPrisoner)
-
+    self.RegisterPrisonerReleaseTimeStats(apPrisoner)
 endEvent
 
 event OnGuardDeath(RPB_Guard akGuard, Actor akKiller)
@@ -1289,7 +1354,11 @@ function ConfigurePrison( \
 
     RPB_Utility.Debug("Prison::ConfigurePrison", "Name: " + self.Name + ", Hold: " + self.Hold + ", Faction: " + self.PrisonFaction + ", City: " + self.City)
 
-    __isInitialized     = true
+    ; if (PrisonLocation && PrisonFaction && Name && Hold)
+        __isInitialized     = true
+        ; RPB_StorageVars.SetBool("Prison::" + ID, true, "PrisonManager")
+    ; endif
+    Trace("Prison::ConfigurePrison", "["+ self.Name +"] Is Initialized: " + __isInitialized)
 
     ; Form randomPrisonerContainer = self.GetRandomPrisonerContainer()
 
@@ -1629,6 +1698,33 @@ function AssignPrisonerNumber(RPB_Prisoner apPrisoner)
     apPrisoner.Prison_SetInt("Prisoner Number", assignedNumber)
 endFunction
 
+function RegisterPrisonerLastJailedStats(RPB_Prisoner apPrisoner)
+    ; Only register for the player, for now
+    if (apPrisoner.IsPlayer())
+        RPB_StorageVars.SetIntOnForm("Last Jailed - Prison", self.PrisonFaction, self.ID)
+        RPB_StorageVars.SetIntOnForm("Last Jailed - Day", self.PrisonFaction, RPB_Utility.GetCurrentDay())
+        RPB_StorageVars.SetIntOnForm("Last Jailed - Month", self.PrisonFaction, RPB_Utility.GetCurrentMonth())
+        RPB_StorageVars.SetIntOnForm("Last Jailed - Year", self.PrisonFaction, RPB_Utility.GetCurrentYear())
+        RPB_StorageVars.SetIntOnForm("Last Jailed - Hour", self.PrisonFaction, RPB_Utility.GetCurrentHour())
+        RPB_StorageVars.SetIntOnForm("Last Jailed - Minute", self.PrisonFaction, RPB_Utility.GetCurrentMinute())
+        RPB_StorageVars.SetStringOnForm("Last Jailed - Cell", self.PrisonFaction, apPrisoner.JailCell.ID)
+    endif
+endFunction
+
+function RegisterPrisonerReleaseTimeStats(RPB_Prisoner apPrisoner)
+    ; Only register for the player, for now
+    if (apPrisoner.IsPlayer())
+        RPB_StorageVars.SetIntOnForm("Last Released - Prison", self.PrisonFaction, self.ID)
+        RPB_StorageVars.SetIntOnForm("Last Released - Day", self.PrisonFaction, RPB_Utility.GetCurrentDay())
+        RPB_StorageVars.SetIntOnForm("Last Released - Month", self.PrisonFaction, RPB_Utility.GetCurrentMonth())
+        RPB_StorageVars.SetIntOnForm("Last Released - Year", self.PrisonFaction, RPB_Utility.GetCurrentYear())
+        RPB_StorageVars.SetIntOnForm("Last Released - Hour", self.PrisonFaction, RPB_Utility.GetCurrentHour())
+        RPB_StorageVars.SetIntOnForm("Last Released - Minute", self.PrisonFaction, RPB_Utility.GetCurrentMinute())
+        RPB_StorageVars.SetStringOnForm("Last Released - Cell", self.PrisonFaction, apPrisoner.JailCell.ID)
+        RPB_StorageVars.SetBoolOnForm("Imprisoned", apPrisoner.GetActor(), false)
+    endif
+endFunction
+
 ;/
     Removes the Actor bound to @akPrisonerRef from its currently bound instance of RPB_Prisoner.
 
@@ -1647,7 +1743,8 @@ RPB_Prisoner function GetPrisonerReference(Actor akPrisoner)
     RPB_Prisoner prisonerRef = Prisoners.AtKey(akPrisoner)
 
     if (!prisonerRef)
-        Error("The Actor " + akPrisoner + " is not a prisoner or there was a state mismatch!")
+        DebugError("Prison::GetPrisonerReference", "The Actor " + akPrisoner + " is not a prisoner or there was a state mismatch!")
+        Error(akPrisoner.GetBaseObject().GetName() + " is not a prisoner or there was a state mismatch!")
         return none
     endif
 
@@ -1662,6 +1759,8 @@ endFunction
 
 bool function WasInitialized()
     return __isInitialized
+    ; return RPB_StorageVars.GetBool("Prison::" + ID, "PrisonManager")
+    ; return __isInitialized && (PrisonManager.GetNthAlias(ID) as RPB_Prison == self)
 endFunction
 
 bool function IsValid()

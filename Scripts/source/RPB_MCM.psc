@@ -1,6 +1,6 @@
 Scriptname RPB_MCM extends SKI_ConfigBase  
 
-import RealisticPrisonAndBounty_Util
+import RPB_Utility
 import RealisticPrisonAndBounty_Config
 
 ; ==============================================================================
@@ -632,7 +632,7 @@ int function AddOptionSliderKey(string displayedText, string _key, string format
     optionId = AddSliderOption(displayedText, value, formatString, flags)
 
     if (!self.OptionExists(optionKey))
-        RPB_Utility.DebugWithArgs("MCM::AddOptionSliderKey", "displayedText: " + displayedText + ", key: " + _key, "Option does not exist!")
+        DebugWithArgs("MCM::AddOptionSliderKey", "displayedText: " + displayedText + ", key: " + _key, "Option does not exist!")
         self.RegisterOption(optionKey, optionId)
     endif
 
@@ -918,29 +918,6 @@ event OnOptionInputAccept(int option, string inputValue)
     RPB_MCM_Sentence.OnInputAccept(self, option, inputValue)
 endEvent
 
-; ============================================================================
-;                               Logging Functions
-
-function Trace(string caller, string logInfo, bool condition = false)
-    RealisticPrisonAndBounty_Util.Trace(self, CurrentPage + "::" + caller, logInfo, condition || ENABLE_TRACE)
-endFunction
-
-function Debug(string caller, string logInfo, bool condition = false)
-    RealisticPrisonAndBounty_Util.Debug(self, CurrentPage + "::" + caller, logInfo, condition || IS_DEBUG)
-endFunction
-
-function Info(string caller, string logInfo, bool condition = true)
-    RealisticPrisonAndBounty_Util.Info(self, CurrentPage + "::" + caller, logInfo, condition)
-endFunction
-
-function Warn(string caller, string logInfo, bool condition = true)
-    RealisticPrisonAndBounty_Util.Warn(self, CurrentPage + "::" + caller, logInfo, condition)
-endFunction
-
-function Error(string caller, string logInfo, bool condition = true)
-    RealisticPrisonAndBounty_Util.Error(self, CurrentPage + "::" + caller, logInfo, condition)
-endFunction
-
 function SerializeOptions()
     JValue.writeToFile(generalContainer, "generalContainer.txt")
     miscVars.serialize("root", "miscVars_all.txt")
@@ -957,31 +934,31 @@ event OnSliderOptionChanged(string eventName, string optionName, float optionVal
         Game.SetGameSettingInt("iCrimeGoldTrespass", optionValue as int)
 
         int settingValue = Game.GetGameSettingInt("iCrimeGoldTrespass")
-        RPB_Utility.Debug("MCM::General::OnOptionSliderAccept", optionName + " value: " + settingValue)
+        Debug("MCM::General::OnOptionSliderAccept", optionName + " value: " + settingValue)
 
     elseif (optionName == "Bounty for Actions::Assault")
         Game.SetGameSettingInt("iCrimeGoldAttack", optionValue as int)
         
         int settingValue = Game.GetGameSettingInt("iCrimeGoldAttack")
-        RPB_Utility.Debug("MCM::General::OnOptionSliderAccept", optionName + " value: " + settingValue)
+        Debug("MCM::General::OnOptionSliderAccept", optionName + " value: " + settingValue)
 
     elseif (optionName == "Bounty for Actions::Murder")
         Game.SetGameSettingInt("iCrimeGoldMurder", optionValue as int)
         
         int settingValue = Game.GetGameSettingInt("iCrimeGoldMurder")
-        RPB_Utility.Debug("MCM::General::OnOptionSliderAccept", optionName + " value: " + settingValue)
+        Debug("MCM::General::OnOptionSliderAccept", optionName + " value: " + settingValue)
 
     elseif (optionName == "Bounty for Actions::Theft")
         Game.SetGameSettingFloat("fCrimeGoldSteal", optionValue)
         
         float settingValue = Game.GetGameSettingFloat("fCrimeGoldSteal")
-        RPB_Utility.Debug("MCM::General::OnOptionSliderAccept", optionName + " value: " + settingValue)
+        Debug("MCM::General::OnOptionSliderAccept", optionName + " value: " + settingValue)
 
     elseif (optionName == "Bounty for Actions::Pickpocketing")
         Game.SetGameSettingInt("iCrimeGoldPickpocket", optionValue as int)
         
         int settingValue = Game.GetGameSettingInt("iCrimeGoldPickpocket")
-        RPB_Utility.Debug("MCM::General::OnOptionSliderAccept", optionName + " value: " + settingValue)
+        Debug("MCM::General::OnOptionSliderAccept", optionName + " value: " + settingValue)
 
     elseif (optionName == "Bounty for Actions::Horse Theft")
         
@@ -1038,7 +1015,13 @@ function ValidateOption(string asOption)
     )
         EnsureOptionIsNotOfType(asOption, TYPE_STRING)
         EnsureOptionValueGreaterThanOrEqualTo(asOption, 1)
+    endif
 
+    if (asOption == "Frisking::Frisk Search Thoroughness" || \ 
+        asOption == "Stripping::Strip Search Thoroughness" \ 
+    )
+        EnsureOptionValueGreaterThanOrEqualTo(asOption, 1)
+        EnsureOptionValueLessThanOrEqualTo(asOption, 10)
     endif
 
     if (asOption == "Arrest::Maximum Payable Bounty (Chance)" || \ 
@@ -1078,7 +1061,7 @@ function ValidateOptions()
         optionIndex += 1
     endWhile
 
-    RPB_Utility.Debug("MCM::ValidateOptions", "Validated " + validatedOptions + " options.")
+    Debug("MCM::ValidateOptions", "Validated " + validatedOptions + " options.")
 endFunction
 
 bool function IsValidPropertyType(string asPropertyType)
@@ -1133,8 +1116,8 @@ int function DeterminePropertyValueType(int apOptionMap, string asPropertyType)
         return valueType
     endif
 
-    RPB_Utility.Error("There was an error determining the value type of the property.")
-    RPB_Utility.DebugError("MCM::GetOptionValueTypeFromConfig", "[Property Type: "+ asPropertyType +"] There was an error determining the value type of the property.")
+    Error("There was an error determining the value type of the property.")
+    DebugError("MCM::GetOptionValueTypeFromConfig", "[Property Type: "+ asPropertyType +"] There was an error determining the value type of the property.")
 endFunction
 
 ; TODO: Check for dependency options value types
@@ -1153,7 +1136,7 @@ int function GetOptionValueTypeFromConfig(string asOptionKey, bool abVerifyEvery
     int propertyCount = JMap.count(optionMap)
 
     if (asOptionKey == "Infamy::Infamy Recognized Threshold")
-        RPB_Utility.Debug("MCM::GetOptionValueTypeFromConfig", "Property Count: " + propertyCount)
+        Debug("MCM::GetOptionValueTypeFromConfig", "Property Count: " + propertyCount)
     endif
 
     if (propertyCount == 4) ; Assuming Number Option
@@ -1162,7 +1145,7 @@ int function GetOptionValueTypeFromConfig(string asOptionKey, bool abVerifyEvery
         int defaultPropertyValueType = self.DeterminePropertyValueType(optionMap, "Default")
         int stepsPropertyValueType   = self.DeterminePropertyValueType(optionMap, "Steps")
 
-        RPB_Utility.DebugWithArgs( \ 
+        DebugWithArgs( \ 
             "MCM::GetOptionValueTypeFromConfig",  "asOptionKey: " + asOptionKey, \ 
             "Value Types: \n" + \ 
             "\t - minimumPropertyValueType: " + minimumPropertyValueType + "\n" + \
@@ -1170,10 +1153,6 @@ int function GetOptionValueTypeFromConfig(string asOptionKey, bool abVerifyEvery
             "\t - defaultPropertyValueType: " + defaultPropertyValueType + "\n" + \
             "\t - stepsPropertyValueType: " + stepsPropertyValueType + "\n" \
         )
-        ; int minimumPropertyValueType = JMap.valueType(optionMap, "Minimum")
-        ; int maximumPropertyValueType = JMap.valueType(optionMap, "Maximum")
-        ; int defaultPropertyValueType = JMap.valueType(optionMap, "Default")
-        ; int stepsPropertyValueType   = JMap.valueType(optionMap, "Steps")
 
         if (abVerifyEveryProperty)
             bool arePropertiesOfSameType = \
@@ -1216,8 +1195,8 @@ int function GetOptionValueTypeFromConfig(string asOptionKey, bool abVerifyEvery
 
                 ; endif
 
-                RPB_Utility.Warn("The option ["+ asOptionKey +"] is most likely an invalid option, since not all property value types are the same!")
-                RPB_Utility.DebugWarn("MCM::GetOptionValueTypeFromConfig", "[returned value type: "+ returnedValueType +"] ["+ propertyType +"] The option ["+ asOptionKey +"] is most likely an invalid option, since not all property value types are the same!")
+                Warn("The option ["+ asOptionKey +"] is most likely an invalid option, since not all property value types are the same!")
+                DebugWarn("MCM::GetOptionValueTypeFromConfig", "[returned value type: "+ returnedValueType +"] ["+ propertyType +"] The option ["+ asOptionKey +"] is most likely an invalid option, since not all property value types are the same!")
                 return returnedValueType
             endif
         endif
@@ -1231,8 +1210,8 @@ int function GetOptionValueTypeFromConfig(string asOptionKey, bool abVerifyEvery
         return propertyValueType
     endif
 
-    RPB_Utility.Error("There was an error retrieving the property value type of option [" + asOptionKey + "], make sure the option has a valid configuration!")
-    RPB_Utility.DebugError("MCM::GetOptionValueTypeFromConfig", "There was an error retrieving the property value type of option [" + asOptionKey + "], make sure the option has a valid configuration!")
+    Error("There was an error retrieving the property value type of option [" + asOptionKey + "], make sure the option has a valid configuration!")
+    DebugError("MCM::GetOptionValueTypeFromConfig", "There was an error retrieving the property value type of option [" + asOptionKey + "], make sure the option has a valid configuration!")
 endFunction
 
 ;/
@@ -1260,14 +1239,14 @@ function LoadOptionValues(string asPropertyType)
             
             if (!hasNumberOptionProperties)
                 ; String or Bool option
-                RPB_Utility.Error("There was an error loading the option " + optionKey + ", there is no property to read!", !hasDefault)
-                RPB_Utility.DebugError("MCM::LoadOptionValues", "There was an error loading the option " + optionKey + ", there is no property to read!", !hasDefault)
+                Error("There was an error loading the option " + optionKey + ", there is no property to read!", !hasDefault)
+                DebugError("MCM::LoadOptionValues", "There was an error loading the option " + optionKey + ", there is no property to read!", !hasDefault)
                 continue = true
             endif
             
             if (!continue)
-                RPB_Utility.Error("There was an error loading the "+ asPropertyType +" value for option [" + optionKey + "].")
-                RPB_Utility.DebugError("MCM::LoadOptionValues", "There was an error loading the "+ asPropertyType +" value for option [" + optionKey + "].")
+                Error("There was an error loading the "+ asPropertyType +" value for option [" + optionKey + "].")
+                DebugError("MCM::LoadOptionValues", "There was an error loading the "+ asPropertyType +" value for option [" + optionKey + "].")
             endif
             continue = true
         endif
@@ -1298,22 +1277,22 @@ function LoadOptionValues(string asPropertyType)
                 if (isBool)
                     bool optionValue = JMap.getInt(optionMap, asPropertyType) as bool
                     self.SetBoolOptionPropertyValue(optionKey, asPropertyType, optionValue)
-                    RPB_Utility.DebugWithArgs("MCM::LoadOptionValues", asPropertyType, "[bool] Setting ["+ optionKey + "] " + asPropertyType +" Value to: " + optionValue)
+                    DebugWithArgs("MCM::LoadOptionValues", asPropertyType, "[bool] Setting ["+ optionKey + "] " + asPropertyType +" Value to: " + optionValue)
 
                 elseif (isInteger)
                     int optionValue = JMap.getInt(optionMap, asPropertyType) ; int|bool
                     self.SetNumberOptionPropertyValue(optionKey, asPropertyType, optionValue)
-                    RPB_Utility.DebugWithArgs("MCM::LoadOptionValues", asPropertyType, "[int] Setting ["+ optionKey + "] " + asPropertyType +" Value to: " + optionValue)
+                    DebugWithArgs("MCM::LoadOptionValues", asPropertyType, "[int] Setting ["+ optionKey + "] " + asPropertyType +" Value to: " + optionValue)
     
                 elseif (isFloat)
                     float optionValue = JMap.getFlt(optionMap, asPropertyType) ; int|float
                     self.SetNumberOptionPropertyValue(optionKey, asPropertyType, optionValue)
-                    RPB_Utility.DebugWithArgs("MCM::LoadOptionValues", asPropertyType, "[float] Setting ["+ optionKey + "] " + asPropertyType +" Value to: " + optionValue)
+                    DebugWithArgs("MCM::LoadOptionValues", asPropertyType, "[float] Setting ["+ optionKey + "] " + asPropertyType +" Value to: " + optionValue)
                 
                 elseif (isString)
                     string optionValue = JMap.getStr(optionMap, asPropertyType) ; string
                     self.SetStringOptionPropertyValue(optionKey, asPropertyType, optionValue)
-                    RPB_Utility.DebugWithArgs("MCM::LoadOptionValues", asPropertyType, "[string] Setting ["+ optionKey + "] " + asPropertyType +" Value to: " + optionValue)
+                    DebugWithArgs("MCM::LoadOptionValues", asPropertyType, "[string] Setting ["+ optionKey + "] " + asPropertyType +" Value to: " + optionValue)
                 endif
             endif
         endif
@@ -1380,8 +1359,8 @@ bool function GetBoolOptionPropertyValue(string asOptionKey, string asPropertyTy
         self.GetOptionDefaultBool(asOptionKey)
     endif
     
-    RPB_Utility.Error("There was an error retrieving the "+ asPropertyType +" value of option " + asOptionKey)
-    RPB_Utility.DebugError("MCM::GetBoolOptionPropertyValue", "[bool] There was an error retrieving the "+ asPropertyType +" value of option " + asOptionKey)
+    Error("There was an error retrieving the "+ asPropertyType +" value of option " + asOptionKey)
+    DebugError("MCM::GetBoolOptionPropertyValue", "[bool] There was an error retrieving the "+ asPropertyType +" value of option " + asOptionKey)
     return -1
 endFunction
 
@@ -1461,17 +1440,17 @@ function __internal_loadPropertyForOption( \
     if (propertyValueType == TYPE_INT)
         int optionValue = JMap.getInt(optionMap, asPropertyType)
         self.SetNumberOptionPropertyValue(asOptionKey, asPropertyType, optionValue)
-        RPB_Utility.DebugWithArgs("MCM::LoadPropertyForOption", "asOptionKey: " + asOptionKey + ", asPropertyType: " + asPropertyType, "[int] Setting "+ asPropertyType +" Value to: " + optionValue)
+        DebugWithArgs("MCM::LoadPropertyForOption", "asOptionKey: " + asOptionKey + ", asPropertyType: " + asPropertyType, "[int] Setting "+ asPropertyType +" Value to: " + optionValue)
 
     elseif (propertyValueType == TYPE_FLOAT)
         float optionValue = JMap.getFlt(optionMap, asPropertyType)
         self.SetNumberOptionPropertyValue(asOptionKey, asPropertyType, optionValue)
-        RPB_Utility.DebugWithArgs("MCM::LoadPropertyForOption", "asOptionKey: " + asOptionKey + ", asPropertyType: " + asPropertyType, "[float] Setting "+ asPropertyType +" Value to: " + optionValue)
+        DebugWithArgs("MCM::LoadPropertyForOption", "asOptionKey: " + asOptionKey + ", asPropertyType: " + asPropertyType, "[float] Setting "+ asPropertyType +" Value to: " + optionValue)
 
     elseif (propertyValueType == TYPE_STRING)
         string optionValue = JMap.getStr(optionMap, asPropertyType)
         self.SetStringOptionPropertyValue(asOptionKey, asPropertyType, optionValue)
-        RPB_Utility.DebugWithArgs("MCM::LoadPropertyForOption", "asOptionKey: " + asOptionKey + ", asPropertyType: " + asPropertyType, "[string] Setting "+ asPropertyType +" Value to: " + optionValue)
+        DebugWithArgs("MCM::LoadPropertyForOption", "asOptionKey: " + asOptionKey + ", asPropertyType: " + asPropertyType, "[string] Setting "+ asPropertyType +" Value to: " + optionValue)
 
     elseif (propertyValueType == TYPE_FORM)
         Form optionValue = JMap.getForm(optionMap, asPropertyType)
@@ -1482,8 +1461,8 @@ function __internal_loadPropertyForOption( \
         int optionValue = JMap.getObj(optionMap, asPropertyType)
 
     else
-        RPB_Utility.Error("There was an error determining the value type of the option " + asOptionKey)
-        RPB_Utility.DebugError("MCM::LoadPropertyForOption", "There was an error determining the value type of the option " + asOptionKey)
+        Error("There was an error determining the value type of the option " + "[" + asOptionKey + "].")
+        DebugError("MCM::LoadPropertyForOption", "There was an error determining the value type of the option " + "[" + asOptionKey + "].")
     endif
 endFunction
 
@@ -1517,7 +1496,7 @@ function __internal_loadPropertyForOptionWithDependency( \
 
         int finalOptionValue = int_if (hasOffset, (dependencyOptionValue + offset), dependencyOptionValue)
         self.SetNumberOptionPropertyValue(asOptionKey, asPropertyType, finalOptionValue)
-        RPB_Utility.DebugWithArgs( \
+        DebugWithArgs( \
             "MCM::LoadPropertyForOption", \ 
             "asOptionKey: " + asOptionKey + ", asPropertyType: " + asPropertyType, \ 
             "[int] [depends on: "+ dependencyOptionKey + " (value: "+ dependencyOptionValue +")" +"] Setting "+ asPropertyType +" Value to: " + finalOptionValue \
@@ -1530,7 +1509,7 @@ function __internal_loadPropertyForOptionWithDependency( \
 
         float finalOptionValue = float_if (hasOffset, (dependencyOptionValue + offset), dependencyOptionValue)
         self.SetNumberOptionPropertyValue(asOptionKey, asPropertyType, finalOptionValue)
-        RPB_Utility.DebugWithArgs( \
+        DebugWithArgs( \
             "MCM::LoadPropertyForOption", \ 
             "asOptionKey: " + asOptionKey + ", asPropertyType: " + asPropertyType, \ 
             "[float] [depends on: "+ dependencyOptionKey + " (value: "+ dependencyOptionValue +")" +"] Setting "+ asPropertyType +" Value to: " + finalOptionValue \
@@ -1538,7 +1517,7 @@ function __internal_loadPropertyForOptionWithDependency( \
     elseif (dependencyOptionValueType == TYPE_STRING)
         string dependencyOptionValue = self.GetOptionMenuValue(dependencyOptionKey)
         self.SetStringOptionPropertyValue(asOptionKey, asPropertyType, dependencyOptionValue)
-        RPB_Utility.DebugWithArgs( \
+        DebugWithArgs( \
             "MCM::LoadPropertyForOption", \ 
             "asOptionKey: " + asOptionKey + ", asPropertyType: " + asPropertyType, \ 
             "[string] [depends on: "+ dependencyOptionKey + " (value: "+ dependencyOptionValue +")" +"] Setting "+ asPropertyType +" Value to: " + dependencyOptionValue \
@@ -1548,8 +1527,8 @@ function __internal_loadPropertyForOptionWithDependency( \
     elseif (dependencyOptionValueType == TYPE_OBJECT)
 
     else
-        RPB_Utility.Error("There was an error determining the value type of the dependency option " + dependencyOptionKey)
-        RPB_Utility.DebugError("MCM::LoadPropertyForOption", "There was an error determining the value type of the dependency option " + dependencyOptionKey)
+        Error("There was an error determining the value type of the dependency option " + dependencyOptionKey)
+        DebugError("MCM::LoadPropertyForOption", "There was an error determining the value type of the dependency option " + dependencyOptionKey)
     endif
 endFunction
 
@@ -1565,8 +1544,8 @@ function LoadPropertyForOption(string asOptionKey, string asPropertyType)
     bool isValidOption  = isObject
 
     if (!isValidOption)
-        RPB_Utility.DebugError("MCM::LoadPropertyForOption", "The option " + asOptionKey + " does not exist!")
-        RPB_Utility.Error("The option " + asOptionKey + " does not exist!")
+        DebugError("MCM::LoadPropertyForOption", "The option " + asOptionKey + " does not exist!")
+        Error("The option " + asOptionKey + " does not exist!")
         return
     endif
 
@@ -1574,8 +1553,8 @@ function LoadPropertyForOption(string asOptionKey, string asPropertyType)
     bool propertyExists     = JMap.hasKey(optionMap, asPropertyType)
 
     if (!propertyExists)
-        RPB_Utility.DebugError("MCM::LoadPropertyForOption", "There was an error loading the property " + asPropertyType + " for the option " + asOptionKey)
-        RPB_Utility.Error("There was an error loading the property " + asPropertyType + " for the option " + asOptionKey)
+        DebugError("MCM::LoadPropertyForOption", "There was an error loading the property " + asPropertyType + " for the option " + asOptionKey)
+        Error("There was an error loading the property " + asPropertyType + " for the option " + asOptionKey)
         return
     endif
 
@@ -1591,10 +1570,13 @@ function LoadPropertyForOption(string asOptionKey, string asPropertyType)
         return
     endif
 
-    RPB_Utility.DebugError("MCM::LoadPropertyForOption", "There was an unknown error loading the property " + asPropertyType + " for option " + asOptionKey)
-    RPB_Utility.Error("There was an unknown error loading the property " + asPropertyType + " for option " + asOptionKey)
+    DebugError("MCM::LoadPropertyForOption", "There was an unknown error loading the property " + asPropertyType + " for option " + asOptionKey)
+    Error("There was an unknown error loading the property " + asPropertyType + " for option " + asOptionKey)
 endFunction
 
+; ============================================================================
+;                             Validation Functions
+; ============================================================================
 
 function EnsureOptionValueComparison(string asOptionKey, string asValuePropertyType, float afConditionValue, string asComparisonOperator = "<", float afValueToSet = 0.0, string asCallerName = "")
     float updatedValue
@@ -1617,7 +1599,7 @@ function EnsureOptionValueComparison(string asOptionKey, string asValuePropertyT
         value = self.GetOptionSteps(asOptionKey)
     endif
 
-    if (asComparisonOperator == "<") ; Ensure option is greater than or equal to
+    if (asComparisonOperator == "<")
         condition = (value < afConditionValue)
 
     elseif (asComparisonOperator == ">") ; Ensure option is less than or equal to
@@ -1638,7 +1620,25 @@ function EnsureOptionValueComparison(string asOptionKey, string asValuePropertyT
 
 
     if (condition)
-        float newValue = float_if (afValueToSet, max(afConditionValue, afValueToSet), afConditionValue)
+        float newValue
+
+        if (asComparisonOperator == "<")
+            newValue = float_if (afValueToSet, max(afConditionValue, afValueToSet), afConditionValue)
+    
+        elseif (asComparisonOperator == ">")
+            newValue = float_if (afValueToSet, min(afConditionValue, afValueToSet), afConditionValue)
+    
+        elseif (asComparisonOperator == "<=")
+            newValue = float_if (afValueToSet, max(afConditionValue, afValueToSet), afConditionValue)
+    
+        elseif (asComparisonOperator == ">=")
+            newValue = float_if (afValueToSet, min(afConditionValue, afValueToSet), afConditionValue)
+    
+        elseif (asComparisonOperator == "==")
+    
+        elseif (asComparisonOperator == "!=")
+
+        endif
 
         if (asValuePropertyType == "Default")
             self.SetOptionDefaultFloat(asOptionKey, newValue)
@@ -1659,24 +1659,32 @@ function EnsureOptionValueComparison(string asOptionKey, string asValuePropertyT
         updatedValue = newValue
     endif
 
-    RPB_Utility.Error("Validation failed for the "+ asValuePropertyType +" Property for Option [" + asOptionKey + "]!", (updatedValue as bool))
-    RPB_Utility.DebugError(asCallerName, "["+ asValuePropertyType +"] Validation failed for Option [" + asOptionKey + "], setting value to " + updatedValue + ".", (updatedValue as bool))
+    Error("Validation failed for the "+ asValuePropertyType +" Property for Option [" + asOptionKey + "]!", (updatedValue as bool))
+    DebugError(asCallerName, "["+ asValuePropertyType +"] Validation failed for Option [" + asOptionKey + "], setting value to " + updatedValue + ".", (updatedValue as bool))
 endFunction
 
 function EnsureOptionNotNull(string asOptionKey, string asValuePropertyType = "")
-
+    DebugWarn("MCM::EnsureOptionNotNull", "Function called but there's no implementation!")
 endFunction
 
 function EnsureOptionIsNull(string asOptionKey, string asValuePropertyType = "")
-    
+    DebugWarn("MCM::EnsureOptionIsNull", "Function called but there's no implementation!")
 endFunction
 
 function EnsureOptionIsOfType(string asOptionKey, int aiOptionValueType, string asValuePropertyType = "")
-
+    DebugWarn("MCM::EnsureOptionIsOfType", "Function called but there's no implementation!")
 endFunction
 
 function EnsureOptionIsNotOfType(string asOptionKey, int aiOptionValueType, string asValuePropertyType = "")
-    
+    DebugWarn("MCM::EnsureOptionIsNotOfType", "Function called but there's no implementation!")
+endFunction
+
+function EnsureOptionValueEqualTo(string asOptionKey, float afConditionValue, float afValueToSet = 0.0, string asValuePropertyType = "")
+    DebugWarn("MCM::EnsureOptionValueEqualTo", "Function called but there's no implementation!")
+endFunction
+
+function EnsureOptionValueNotEqualTo(string asOptionKey, float afConditionValue, float afValueToSet = 0.0, string asValuePropertyType = "")
+    DebugWarn("MCM::EnsureOptionValueNotEqualTo", "Function called but there's no implementation!")
 endFunction
 
 function EnsureOptionValueLessThan(string asOptionKey, float afConditionValue, float afValueToSet = 0.0, string asValuePropertyType = "")
@@ -1803,6 +1811,8 @@ function EnsureOptionValueGreaterThanOrEqualToOptionValue(string asOptionOneKey,
     EnsureOptionValueComparison(asOptionOneKey, asValuePropertyType, propertyTwoValue, "<", afValueToSet, "MCM::EnsureOptionValueGreaterThanOrEqualToOptionValue")
 endFunction
 
+; ============================================================================
+
 function InitializeOptions()
 ; ============================================================================
 ;                                   Values
@@ -1812,8 +1822,8 @@ function InitializeOptions()
 ; ============================================================================
 ;                                   ID's
 ; ============================================================================
-    optionsFromKeyToIdMap   = JMap.object() ; Identify options from key to id
-    optionsFromIdToKeyMap   = JIntMap.object() ; Identify options from id to key
+    optionsFromKeyToIdMap   = JMap.object()     ; Identify options from key to id
+    optionsFromIdToKeyMap   = JIntMap.object()  ; Identify options from id to key
 
 ; ============================================================================
 ;                                State (Flags)
