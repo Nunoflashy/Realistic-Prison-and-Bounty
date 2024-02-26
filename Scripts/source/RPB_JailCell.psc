@@ -777,87 +777,6 @@ bool function IsBoundToPrisoner(RPB_Prisoner akPrisoner)
 endFunction
 
 ; =========================================================
-;                         Cell Vars                       
-; =========================================================
-
-string function __getCellIdentifierVarKey(string asVarName)
-    return "["+ self.GetFormID() +"]Cell::" + asVarName
-endFunction
-
-;                           Getters
-bool function Cell_GetBool(string asVarName)
-    string identifierKey = __getCellIdentifierVarKey(asVarName)
-    return ArrestVars.GetBool(identifierKey)
-endFunction
-
-int function Cell_GetInt(string asVarName)
-    string identifierKey = __getCellIdentifierVarKey(asVarName)
-    return ArrestVars.GetInt(identifierKey)
-endFunction
-
-float function Cell_GetFloat(string asVarName)
-    string identifierKey = __getCellIdentifierVarKey(asVarName)
-    return ArrestVars.GetFloat(identifierKey)
-endFunction
-
-string function Cell_GetString(string asVarName)
-    string identifierKey = __getCellIdentifierVarKey(asVarName)
-    return ArrestVars.GetString(identifierKey)
-endFunction
-
-Form function Cell_GetForm(string asVarName)
-    string identifierKey = __getCellIdentifierVarKey(asVarName)
-    return ArrestVars.GetForm(identifierKey)
-endFunction
-
-ObjectReference function Cell_GetReference(string asVarName)
-    string identifierKey = __getCellIdentifierVarKey(asVarName)
-    return ArrestVars.GetReference(identifierKey)
-endFunction
-
-Actor function Cell_GetActor(string asVarName)
-    string identifierKey = __getCellIdentifierVarKey(asVarName)
-    return ArrestVars.GetActor(identifierKey)
-endFunction
-
-;                           Setters
-function Cell_SetBool(string asVarName, bool abValue)
-
-endFunction
-
-function Cell_SetInt(string asVarName, int aiValue, int aiMinValue = 0, int aiMaxValue = 0)
-
-endFunction
-
-function Cell_ModInt(string asVarName, int aiValue)
-
-endFunction
-
-function Cell_SetFloat(string asVarName, float afValue)
-
-endFunction
-
-function Cell_ModFloat(string asVarName, float afValue)
-
-endFunction
-
-function Cell_SetString(string asVarName, string asValue)
-
-endFunction
-
-function Cell_SetForm(string asVarName, Form akValue)
-
-endFunction
-
-function Cell_SetReference(string asVarName, ObjectReference akValue)
-
-endFunction
-
-function Cell_SetActor(string asVarName, Actor akValue)
-
-endFunction
-
-; =========================================================
 ;                          Debug                      
 ; =========================================================
 
@@ -885,7 +804,7 @@ string function DEBUG_GetCellProperties()
     bool _hasPrisoners = self.PrisonerCount > 0
 
     return "[\n" + \
-        "\t Cell: " + self + "\n" + \
+        "\t Cell: " + self.ID + " (" + self + ")" + "\n" + \
         "\t Door: " + self.CellDoor + "\n" + \
         "\t Empty: " + self.IsEmpty + "\n" + \
         "\t Full: " + self.IsFull + "\n" + \
