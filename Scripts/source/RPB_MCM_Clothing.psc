@@ -1,6 +1,6 @@
 Scriptname RPB_MCM_Clothing hidden
 
-import RealisticPrisonAndBounty_Util
+import RPB_Utility
 import RPB_MCM
 import PO3_SKSEFunctions
 
@@ -306,14 +306,14 @@ endFunction
 function OnOptionSelect(RPB_MCM mcm, string option) global
     string optionKey = mcm.CurrentPage + "::" + option
 
-    mcm.Debug("Clothing::OnOptionSelect", "Option: " + option, true)
+    Debug("Clothing::OnOptionSelect", "Option: " + option, true)
 
     ; Avoid toggle options for this type of option
     if (IsSelectedOption(option, "Equipped Outfit"))
 
         string outfitId = GetOptionCategory(option)
-        mcm.Trace("OnOptionSelect", "option: " + option)
-        mcm.Trace("OnOptionSelect", "outfitName: " + outfitId)
+        Trace("OnOptionSelect", "option: " + option)
+        Trace("OnOptionSelect", "outfitName: " + outfitId)
 
         Armor headClothing  = mcm.config.GetEquippedClothingForBodyPart("Head")
         Armor bodyClothing  = mcm.config.GetEquippedClothingForBodyPart("Body")
@@ -331,7 +331,7 @@ endFunction
 function OnOptionSliderOpen(RPB_MCM mcm, string option) global
     float sliderOptionValue = mcm.GetOptionSliderValue(option)
     LoadSliderOptions(mcm, option, sliderOptionValue)
-    mcm.Debug("OnOptionSliderOpen", "Option: " + option + ", Value: " + sliderOptionValue)
+    Debug("OnOptionSliderOpen", "Option: " + option + ", Value: " + sliderOptionValue)
 endFunction
 
 function OnOptionSliderAccept(RPB_MCM mcm, string option, float value) global
@@ -381,20 +381,20 @@ function OnOptionInputOpen(RPB_MCM mcm, string option) global
     string inputOptionValue = mcm.GetOptionInputValue(option)
     mcm.SetInputDialogStartText(inputOptionValue)
 
-    mcm.Debug("Clothing::OnOptionInputOpen", "Option: " + option, true)
+    Debug("Clothing::OnOptionInputOpen", "Option: " + option, true)
 
     if (IsSelectedOption(option, "Outfit") && !IsSelectedOption(option, "Name") && !IsSelectedOption(option, "BountyCondition"))
         string outfitId = GetOptionCategory(option)
         string bodyPartName = GetOptionNameNoCategory(option)  ; bodyPartName = Head, Body, Hands, Feet
         Armor outfitPiece = mcm.GetOutfitPart(outfitId, bodyPartName) ; Outfit 1::Body
-        mcm.Debug("OnOptionInputOpen", "Outfit Piece: " + outfitPiece.GetName() + ", FormID: " + outfitPiece.GetFormID() + ", Slot Mask: " + outfitPiece.GetSlotMask())
+        Debug("OnOptionInputOpen", "Outfit Piece: " + outfitPiece.GetName() + ", FormID: " + outfitPiece.GetFormID() + ", Slot Mask: " + outfitPiece.GetSlotMask())
     endif
 
-    mcm.Trace("OnOptionInputOpen", "GetOptionInputValue("+  option +") = " + mcm.GetOptionInputValue(option, mcm.CurrentPage))
+    Trace("OnOptionInputOpen", "GetOptionInputValue("+  option +") = " + mcm.GetOptionInputValue(option, mcm.CurrentPage))
 endFunction
 
 function OnOptionInputAccept(RPB_MCM mcm, string option, string inputValue) global
-    mcm.Debug("Clothing::OnOptionInputAccept", "Option: " + option, true)
+    Debug("Clothing::OnOptionInputAccept", "Option: " + option, true)
 
     if (IsSelectedOption(option, "Outfit") && !IsSelectedOption(option, "Name") && !IsSelectedOption(option, "BountyCondition"))
         string bodyPartName = GetOptionNameNoCategory(option)
@@ -409,8 +409,8 @@ function OnOptionInputAccept(RPB_MCM mcm, string option, string inputValue) glob
             string outfitId = GetOptionCategory(option)
             string outfitBodyPart = GetOptionNameNoCategory(option)
             mcm.AddOutfitPiece(outfitId, outfitBodyPart, bodyPart)
-            mcm.Debug("OnOptionInputAccept", "bodyPart: " + bodyPart.GetFormID() + ", slotMask: " + slotMask + ", bodyPartName: " + bodyPart.GetName())
-            mcm.Debug("OnOptionInputAccept", "outfitId: " + outfitId + ", outfitBodyPart: " + outfitBodyPart)
+            Debug("OnOptionInputAccept", "bodyPart: " + bodyPart.GetFormID() + ", slotMask: " + slotMask + ", bodyPartName: " + bodyPart.GetName())
+            Debug("OnOptionInputAccept", "outfitId: " + outfitId + ", outfitBodyPart: " + outfitBodyPart)
         elseif (inputValue == "")
             ; Remove clothing for this part of the outfit
             string outfitId = GetOptionCategory(option)
@@ -418,7 +418,7 @@ function OnOptionInputAccept(RPB_MCM mcm, string option, string inputValue) glob
             mcm.RemoveOutfitPiece(outfitId, outfitBodyPart)
         else
             ; Display error message, armor type is not compatible with slot or does not exist
-            mcm.Debug("OnOptionInputAccept", "Body part does not exist or is of the wrong type!")
+            Debug("OnOptionInputAccept", "Body part does not exist or is of the wrong type!")
             Debug.MessageBox("Body part does not exist or is of the wrong type!")
         endif
 
@@ -427,7 +427,7 @@ function OnOptionInputAccept(RPB_MCM mcm, string option, string inputValue) glob
         string outfitName = inputValue
         mcm.miscVars.SetString(outfitName, outfitId, "clothing/outfits") ; Map Outfit Name to Outfit ID (Dropdown menus for holds display the name)
         mcm.SetOptionInputValue(option, inputValue)
-        mcm.Debug("Clothing::OnOptionInputAccept", "Outfit ID: " + outfitId + ", Outfit Name: " + outfitName, true)
+        Debug("Clothing::OnOptionInputAccept", "Outfit ID: " + outfitId + ", Outfit Name: " + outfitName, true)
         
     else
         ; Normal input handling

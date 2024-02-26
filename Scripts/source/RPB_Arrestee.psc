@@ -321,6 +321,7 @@ function Arrest()
 
     Config.NotifyArrest("You have been arrested in " + Hold, this == Config.Player)
     Info(this.GetBaseObject().GetName() + " has been arrested in " + Hold + " at " + CurrentTime)
+    Debug("Arrestee::Arrest", this.GetBaseObject().GetName() + " has been arrested in " + Hold + " at " + CurrentTime)
 
     ; Arrest.SceneManager.StartArrestScene( \
     ;     akGuard     = Captor, \
@@ -332,11 +333,19 @@ function Arrest()
 endFunction
 
 function EscortToPrison(bool abEscortDirectlyToCell = false)
+    ; Arrest.SceneManager.StartArrestScene( \
+    ;     akGuard     = Captor, \
+    ;     akArrestee  = this, \
+    ;     asScene     = Arrest.GetArrestScene(this) \
+    ; )
+
     Arrest.SceneManager.StartArrestScene( \
         akGuard     = Captor, \
         akArrestee  = this, \
-        asScene     = Arrest.GetArrestScene(this) \
+        asScene     = Arrest.SceneManager.SCENE_ARREST_START_01 \
     )
+
+    Debug("Arrestee::EscortToPrison", "Captor: " + Captor + ", this: " + this + ", Arrest Scene: " + Arrest.GetArrestScene(this))
 
     if (!abEscortDirectlyToCell)
         Debug("Arrestee::EscortToPrison", "Started escorting " + this + " to prison")

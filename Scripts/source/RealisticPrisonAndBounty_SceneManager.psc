@@ -1,7 +1,6 @@
 scriptname RealisticPrisonAndBounty_SceneManager extends Quest
 
 import RealisticPrisonAndBounty_Config
-; import RealisticPrisonAndBounty_Util
 import RPB_Utility
 
 RealisticPrisonAndBounty_Config property Config
@@ -230,31 +229,31 @@ function SetupScenes()
         JValue.retain(sceneContainer)
     endif
 
-    self.AddScene(SCENE_ARREST_START_01,       0xF569) ; Arrest Start 01
-    self.AddScene(SCENE_ARREST_START_02,       0xFAF6) ; Arrest Start 02
-    self.AddScene(SCENE_ARREST_START_03,       0x130DD) ; Arrest Start 03
-    self.AddScene(SCENE_ARREST_START_04,       0x13663) ; Arrest Start 04
-    self.AddScene(SCENE_ARREST_START_PRISON_01, 0x14C14)
-    self.AddScene(SCENE_ESCORT_TO_JAIL_01,        0xF532) ; Escort to Jail
-    self.AddScene(SCENE_ESCORT_TO_JAIL_02,     0x17CDA) ; Escort to Jail 02
-    self.AddScene(SCENE_ESCORT_TO_CELL,        0xCF58) ; Escort to Cell 01
-    self.AddScene(SCENE_ESCORT_TO_CELL_02,     0x1367D) ; Escort to Cell 02
-    self.AddScene(SCENE_ESCORT_FROM_CELL,      0x115E6) ; Escort from Cell
-    ; self.AddScene(SCENE_SEARCH_START,          0xF55C) ; SearchStart
-    self.AddScene(SCENE_FRISKING,              0xCF5A) ; Frisking
-    ; self.AddScene(SCENE_STRIPPING_START,       0xF561) ; Stripping Start
-    self.AddScene(SCENE_STRIPPING_01,             0xCF59) ; Stripping
-    self.AddScene(SCENE_STRIPPING_02,          0xEA60) ; Stripping 02
-    self.AddScene(SCENE_FORCED_STRIPPING_01,   0xF587) ; Forced Stripping 01
-    self.AddScene(SCENE_FORCED_STRIPPING_02,   0x120A9) ; Forced Stripping 02
-    self.AddScene(SCENE_GIVE_CLOTHING,         0xF52A) ; Give Clothing
-    self.AddScene(SCENE_NO_CLOTHING,           0xF571) ; No Clothing
-    self.AddScene(SCENE_PAYMENT_FAIL,          0xF54E) ; Bounty Payment Fail
-    self.AddScene(SCENE_ELUDING_ARREST_01,     0x12613) ; Eluding Arrest
-    self.AddScene(SCENE_RESTRAIN_PRISONER_01,  0x15702) ; Restrain Prisoner 01
-    self.AddScene(SCENE_RESTRAIN_PRISONER_02,  0x15C66) ; Restrain Prisoner 02
-    self.AddScene(SCENE_ARREST_PAY_BOUNTY_FOLLOW_WILLINGLY,  0x1776B) ; Pay Bounty Follow Willingly
-    self.AddScene(SCENE_ARREST_PAY_BOUNTY_FOLLOW_BY_FORCE,  0x1776E) ; Pay Bounty Follow By Force
+    self.AddScene(SCENE_ARREST_START_01,                        0xF569) ; Arrest Start 01
+    self.AddScene(SCENE_ARREST_START_02,                        0xFAF6) ; Arrest Start 02
+    self.AddScene(SCENE_ARREST_START_03,                        0x130DD) ; Arrest Start 03
+    self.AddScene(SCENE_ARREST_START_04,                        0x13663) ; Arrest Start 04
+    self.AddScene(SCENE_ARREST_START_PRISON_01,                 0x14C14)
+    self.AddScene(SCENE_ESCORT_TO_JAIL_01,                      0xF532) ; Escort to Jail
+    self.AddScene(SCENE_ESCORT_TO_JAIL_02,                      0x17CDA) ; Escort to Jail 02
+    self.AddScene(SCENE_ESCORT_TO_CELL,                         0xCF58) ; Escort to Cell 01
+    self.AddScene(SCENE_ESCORT_TO_CELL_02,                      0x1367D) ; Escort to Cell 02
+    self.AddScene(SCENE_ESCORT_FROM_CELL,                       0x115E6) ; Escort from Cell
+    ; self.AddScene(SCENE_SEARCH_START,                         0xF55C) ; SearchStart
+    self.AddScene(SCENE_FRISKING,                               0xCF5A) ; Frisking
+    ; self.AddScene(SCENE_STRIPPING_START,                      0xF561) ; Stripping Start
+    self.AddScene(SCENE_STRIPPING_01,                           0xCF59) ; Stripping
+    self.AddScene(SCENE_STRIPPING_02,                           0xEA60) ; Stripping 02
+    self.AddScene(SCENE_FORCED_STRIPPING_01,                    0xF587) ; Forced Stripping 01
+    self.AddScene(SCENE_FORCED_STRIPPING_02,                    0x120A9) ; Forced Stripping 02
+    self.AddScene(SCENE_GIVE_CLOTHING,                          0xF52A) ; Give Clothing
+    self.AddScene(SCENE_NO_CLOTHING,                            0xF571) ; No Clothing
+    self.AddScene(SCENE_PAYMENT_FAIL,                           0xF54E) ; Bounty Payment Fail
+    self.AddScene(SCENE_ELUDING_ARREST_01,                      0x12613) ; Eluding Arrest
+    self.AddScene(SCENE_RESTRAIN_PRISONER_01,                   0x15702) ; Restrain Prisoner 01
+    self.AddScene(SCENE_RESTRAIN_PRISONER_02,                   0x15C66) ; Restrain Prisoner 02
+    self.AddScene(SCENE_ARREST_PAY_BOUNTY_FOLLOW_WILLINGLY,     0x1776B) ; Pay Bounty Follow Willingly
+    self.AddScene(SCENE_ARREST_PAY_BOUNTY_FOLLOW_BY_FORCE,      0x1776E) ; Pay Bounty Follow By Force
 
     string sceneListAsString = ""
     int i = 0
@@ -728,11 +727,18 @@ event OnSceneStart(string name, Scene sender)
         Actor escortee02 = params[2] as Actor
         Actor escortee03 = params[3] as Actor
 
-        RetainAI(escortee == config.Player)
+        ; RetainAI(escortee == config.Player)
+        RPB_Prison solitudePrison = RPB_API.GetPrisonManager().GetPrison("Haafingar")
 
         int i = 0
         while (i < params.Length)
             if (params[i] != none && params[i] != escort)
+                if (!solitudePrison.Prisoners.AtKey(params[i] as Actor))
+                    RPB_Prisoner prisoner = solitudePrison.MakePrisoner(params[i] as Actor)
+                    prisoner.SetSentence()
+                    solitudePrison.RegisterPrisoner(prisoner)
+                endif
+                RetainAI(params[i] == config.Player)
                 jail.OnEscortToJailBegin(escort, params[i] as Actor)
             endif
             i += 1
@@ -766,9 +772,19 @@ event OnSceneStart(string name, Scene sender)
         Actor stripperGuard     = params[0] as Actor
         Actor strippedPrisoner  = params[1] as Actor
 
-        RetainAI(strippedPrisoner == config.Player)
+        int i = 0
+        while (i < params.Length)
+            Actor currentPrisoner = params[i] as Actor
+            if (currentPrisoner != none && currentPrisoner != stripperGuard)
+                RetainAI(currentPrisoner == config.Player)
+                jail.OnStripBegin(stripperGuard, strippedPrisoner)
+            endif
+            i += 1
+        endWhile
 
-        jail.OnStripBegin(stripperGuard, strippedPrisoner)
+        ; RetainAI(strippedPrisoner == config.Player)
+
+        ; jail.OnStripBegin(stripperGuard, strippedPrisoner)
 
     elseif (name == SCENE_FORCED_STRIPPING_02)
         Actor stripperGuard     = params[0] as Actor
@@ -832,6 +848,13 @@ event OnScenePlaying(string name, int phaseEvent, int phase, Scene sender)
 
         if (phaseEvent == PHASE_START)
         elseif (phaseEvent == PHASE_END)
+            if (phase == 1)
+                ; Make arrestee put hands behind their back
+                OrientRelative(escortee, escort)
+                Debug.SendAnimationEvent(escortee, "ZazAPC001")
+                arrest.OnArresting(escort, escortee)
+                arrest.OnArresteeRestrained(escortee)
+            endif
         endif
 
     elseif (name == SCENE_ARREST_START_02)
@@ -999,7 +1022,7 @@ event OnScenePlaying(string name, int phaseEvent, int phase, Scene sender)
 
         RetainAI(strippedPrisoner == config.Player)
 
-        RPB_Prison prison               = RPB_Prison.GetPrisonForImprisonedActor(strippedPrisoner)
+        RPB_Prison prison               = none;RPB_Prison.GetPrisonForImprisonedActor(strippedPrisoner)
         RPB_Prisoner prisonerReference  = prison.GetPrisoner(strippedPrisoner)
         
         prison.OnPrisonerStripBegin(prisonerReference, stripperGuard)
@@ -1015,12 +1038,21 @@ event OnScenePlaying(string name, int phaseEvent, int phase, Scene sender)
 
         RPB_PrisonManager prisonManager = GetFormFromMod(0x1B825) as RPB_PrisonManager
         RPB_Prison prison       = prisonManager.GetPrison("Haafingar")
-        RPB_Prisoner prisonerReference = prison.GetPrisoner(strippedPrisoner)
-        Debug(none, "SceneManager::OnScenePlaying", "Prisoner Keys: " + prison.Prisoners.GetKeys() + ", prisonerReference: " + prisonerReference)
-        
-        prison.OnPrisonerStripBegin(prisonerReference, stripperGuard)
 
-        Debug(none, "SceneManager::OnScenePlaying", "SCENE_STRIPPING_02 -> strippedPrisoner: " + strippedPrisoner + ", prison: " + prison + ", prisonerReference: " + prisonerReference)
+        int i = 0
+        while (i < params.Length)
+            Actor currentPrisoner = params[i] as Actor
+            if (currentPrisoner != none && currentPrisoner != stripperGuard)
+                RPB_Prisoner prisonerReference = prison.GetPrisoner(currentPrisoner)
+                Debug(none, "SceneManager::OnScenePlaying", "Prisoner Keys: " + prison.Prisoners.GetKeys() + ", prisonerReference: " + prisonerReference)
+                prison.OnPrisonerStripBegin(prisonerReference, stripperGuard)
+                Debug(none, "SceneManager::OnScenePlaying", "SCENE_STRIPPING_02 -> strippedPrisoner: " + currentPrisoner + ", prison: " + prison + ", prisonerReference: " + prisonerReference)
+            endif
+            i += 1
+        endWhile
+        
+
+
 
         if (phaseEvent == PHASE_START)
             if (phase == 2)
@@ -1311,10 +1343,23 @@ event OnSceneEnd(string name, Scene sender)
 
         RPB_PrisonManager prisonManager = GetFormFromMod(0x1B825) as RPB_PrisonManager
         RPB_Prison prison       = prisonManager.GetPrison("Haafingar")
-        RPB_Prisoner prisonerReference = prison.GetPrisoner(strippedPrisoner)
-        Debug(none, "SceneManager::OnScenePlaying", "Prisoner Keys: " + prison.Prisoners.GetKeys() + ", prisonerReference: " + prisonerReference)
 
-        prison.OnPrisonerStripEnd(prisonerReference, stripperGuard)
+        int i = 0
+        while (i < params.Length)
+            Actor currentPrisoner = params[i] as Actor
+            if (currentPrisoner != none && currentPrisoner != stripperGuard)
+                RPB_Prisoner prisonerReference = prison.GetPrisoner(currentPrisoner)
+                Debug(none, "SceneManager::OnScenePlaying", "Prisoner Keys: " + prison.Prisoners.GetKeys() + ", prisonerReference: " + prisonerReference)
+
+                prison.OnPrisonerStripEnd(prisonerReference, stripperGuard)
+            endif
+            i += 1
+        endWhile
+
+        ; RPB_Prisoner prisonerReference = prison.GetPrisoner(strippedPrisoner)
+        ; Debug(none, "SceneManager::OnScenePlaying", "Prisoner Keys: " + prison.Prisoners.GetKeys() + ", prisonerReference: " + prisonerReference)
+
+        ; prison.OnPrisonerStripEnd(prisonerReference, stripperGuard)
 
         ; int i = 0
         ; while (i < params.Length)

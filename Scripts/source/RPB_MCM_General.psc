@@ -1,6 +1,6 @@
 Scriptname RPB_MCM_General hidden
 
-import RealisticPrisonAndBounty_Util
+import RPB_Utility
 import RPB_MCM
 
 bool function ShouldHandleEvent(RPB_MCM mcm) global
@@ -46,7 +46,6 @@ endFunction
 
 function Right(RPB_MCM mcm) global
     mcm.AddOptionCategoryKey("", "General")
-    ; mcm.SetRenderedCategory("General")
     mcm.AddOptionToggleKey("Display Arrest Notifications", "ArrestNotifications")
     mcm.AddOptionToggleKey("Display Jail Notifications", "JailedNotifications")
     mcm.AddOptionToggleKey("Display Bounty Decay Notifications", "BountyDecayNotifications")
@@ -106,7 +105,7 @@ function OnOptionHighlight(RPB_MCM mcm, string option) global
         mcm.SetInfoText("Determines the time after pursuit that guards will wait for you to stop and surrender before they consider you as being eluding arrest and start attacking.")
     endif
  
-    mcm.Debug("OnOptionHighlight", option + ", find: " + StringUtil.Find(option, "Deleveling") + ", optionName: " + optionName)
+    Debug("OnOptionHighlight", option + ", find: " + StringUtil.Find(option, "Deleveling") + ", optionName: " + optionName)
 
 endFunction
 
@@ -136,7 +135,7 @@ endFunction
 function OnOptionSliderOpen(RPB_MCM mcm, string option) global
     float sliderOptionValue = mcm.GetOptionSliderValue(option)
     LoadSliderOptions(mcm, option, sliderOptionValue)
-    mcm.Debug("OnOptionSliderOpen", "Option: " + option + ", Value: " + sliderOptionValue)
+    Debug("OnOptionSliderOpen", "Option: " + option + ", Value: " + sliderOptionValue)
 endFunction
 
 function OnOptionSliderAccept(RPB_MCM mcm, string option, float value) global

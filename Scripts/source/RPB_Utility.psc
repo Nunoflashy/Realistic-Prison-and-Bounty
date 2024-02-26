@@ -39,40 +39,89 @@ endFunction
 ;                        Log Functions
 ; ==========================================================
 
+
+bool function IsTracingEnabled() global
+    return IsDebuggingEnabled() && RPB_StorageVars.GetBool("TRACE", "Log", true)
+endFunction
+
+bool function IsDebuggingEnabled() global
+    return RPB_StorageVars.GetBool("DEBUG", "Log", true)
+endFunction
+
+bool function IsLoggingEnabled() global
+    return RPB_StorageVars.GetBool("LOG", "Log", true)
+endFunction
+
+function EnableDebugging() global
+    RPB_StorageVars.SetBool("DEBUG", true, "Log")
+endFunction
+
+function DisableDebugging() global
+    RPB_StorageVars.SetBool("DEBUG", false, "Log")
+endFunction
+
+function EnableLogging() global
+    RPB_StorageVars.SetBool("LOG", true, "Log")
+endFunction
+
+function DisableLogging() global
+    RPB_StorageVars.SetBool("LOG", false, "Log")
+endFunction
+
+function SetLoggingEnabled(string asLogType, bool abEnabled) global
+    RPB_StorageVars.SetBool(asLogType, abEnabled, "Log")
+endFunction
+
 function base_log(string asLogType = "DEBUG", string asLogInfo, string asCaller = "", string asCallerArgs = "") global
     if (asCaller)
-        debug.trace("["+ ModName() +"] " + asLogType + ": " + asCaller + "("+ asCallerArgs +")" + " -> " + asLogInfo)
+        debug.trace("["+ ModName() +"] " + asLogType + " " + asCaller + "("+ asCallerArgs +")" + " -> " + asLogInfo)
     else
-        debug.trace("["+ ModName() +"] " + asLogType + ": " + asLogInfo)
+        debug.trace("["+ ModName() +"] " + asLogType + " " + asLogInfo)
     endif
 endFunction
 
 function Trace(string asCaller, string asLogInfo, bool abCondition = true) global
-    if (!abCondition)
+    if (!abCondition || !IsTracingEnabled())
         return
     endif
 
-    base_log("TRACE", asLogInfo, asCaller)
+    base_log("TRACE:", asLogInfo, asCaller)
 endFunction
 
 function Debug(string asCaller, string asLogInfo, bool abCondition = true) global
-    if (!abCondition)
+    if (!abCondition || !IsDebuggingEnabled())
         return
     endif
 
-    base_log("DEBUG", asLogInfo, asCaller)
+    base_log("DEBUG:", asLogInfo, asCaller)
+endFunction
+
+function DebugWarn(string asCaller, string asLogInfo, bool abCondition = true) global
+    if (!abCondition || !IsDebuggingEnabled())
+        return
+    endif
+
+    base_log("WARN:", asLogInfo, asCaller)
+endFunction
+
+function DebugError(string asCaller, string asLogInfo, bool abCondition = true) global
+    if (!abCondition || !IsDebuggingEnabled())
+        return
+    endif
+
+    base_log("ERROR:", asLogInfo, asCaller)
 endFunction
 
 function DebugWithArgs(string asCaller, string asArgs, string asLogInfo, bool abCondition = true) global
-    if (!abCondition)
+    if (!abCondition || !IsDebuggingEnabled())
         return
     endif
 
-    base_log("DEBUG", asLogInfo, asCaller, asArgs)
+    base_log("DEBUG:", asLogInfo, asCaller, asArgs)
 endFunction
 
-function LogNoType(string asLogInfo, bool abCondition = true) global
-    if (!abCondition)
+function LogNoType(string asLogInfo, string asCaller = "", bool abCondition = true) global
+    if (!abCondition || !IsLoggingEnabled())
         return
     endif
 
@@ -80,47 +129,51 @@ function LogNoType(string asLogInfo, bool abCondition = true) global
 endFunction
 
 function Info(string asLogInfo, bool abCondition = true) global
-    if (!abCondition)
+    if (!abCondition || IsDebuggingEnabled() || !IsLoggingEnabled())
         return
     endif
 
-    base_log("INFO", asLogInfo)
+    base_log("INFO:", asLogInfo)
 endFunction
 
 function Warn(string asLogInfo, bool abCondition = true) global
-    if (!abCondition)
+    if (!abCondition || IsDebuggingEnabled() || !IsLoggingEnabled())
         return
     endif
 
-    base_log("WARN", asLogInfo)
+    base_log("WARN:", asLogInfo)
 endFunction
 
 function Error(string asLogInfo, bool abCondition = true) global
-    if (!abCondition)
+    if (!abCondition || IsDebuggingEnabled() || !IsLoggingEnabled())
         return
     endif
 
-    base_log("ERROR", asLogInfo)
+    base_log("ERROR:", asLogInfo)
 endFunction
 
 function Fatal(string asLogInfo, bool abCondition = true) global
-    if (!abCondition)
+    if (!abCondition || IsDebuggingEnabled() || !IsLoggingEnabled())
         return
     endif
 
-    base_log("FATAL", asLogInfo)
+    base_log("FATAL:", asLogInfo)
 endFunction
 
 function LogProperty(string prop, string asLogInfo, bool condition = true) global
-    if (condition)
-        base_log("PROPERTY", asLogInfo)
+    if (!condition || IsDebuggingEnabled() || !IsLoggingEnabled())
+        return
     endif
+    
+    base_log("PROPERTY:", asLogInfo)
 endFunction
 
 function ErrorProperty(string asProperty, string asLogInfo, bool condition = true) global
-    if (condition)
-        base_log("ERROR (PROPERTY)", asLogInfo)
+    if (!condition || IsDebuggingEnabled() || !IsLoggingEnabled())
+        return
     endif
+
+    base_log("ERROR (PROPERTY):", asLogInfo)
 endFunction
 
 ; ==========================================================
@@ -226,6 +279,249 @@ RPB_Actor function rpb_actor_if(bool condition, RPB_Actor apTrue, RPB_Actor apFa
         return apFalse
     endif
 endFunction
+
+; ==========================================================
+;                      String Functions
+; ==========================================================
+
+string[] function StringArray_Merge(string[] asArrayOne, string[] asArrayTwo) global
+    int newStringArray = JArray.object()
+    int arrayOneObj = JArray.objectWithStrings(asArrayOne)
+    int arrayTwoObj = JArray.objectWithStrings(asArrayTwo)
+
+    JArray.addFromArray(newStringArray, arrayOneObj)
+    JArray.addFromArray(newStringArray, arrayTwoObj)
+
+    return JArray.asStringArray(newStringArray)
+endFunction
+
+string function Replace(string asTemplate, string[] akPlaceholders, string[] akReplacements) global
+    int numberOfPlaceholders = akPlaceholders.Length
+    int numberOfReplacements = akReplacements.Length
+
+    if (numberOfPlaceholders != numberOfReplacements)
+        return "Error: Number of placeholders does not match the number of replacements!"
+    endif
+
+    int startIndex = StringUtil.Find(asTemplate, "{", 0)
+    int templateLength = StringUtil.GetLength(asTemplate)
+
+    string result = ""
+
+    int placeholderStartIndex = 0
+    int placeholderEndIndex = 0
+
+    bool outerBreak = false
+    while (placeholderStartIndex < templateLength && !outerBreak)
+        placeholderStartIndex = StringUtil.Find(asTemplate, "{", startIndex)
+        if (placeholderStartIndex == -1)
+            ; If no more placeholders found, append the remaining part of the template
+            result += StringUtil.Substring(asTemplate, startIndex, templateLength - startIndex)
+            Trace("Utility::Replace", "["+ placeholderStartIndex +"]: " + result)
+            outerBreak = true
+        else
+            ; Append the part of the template before the placeholder
+            if (startIndex > 0)
+                result += StringUtil.Substring(asTemplate, startIndex, placeholderStartIndex - startIndex)
+            endif
+            ; result += StringUtil.Substring(asTemplate, startIndex, placeholderStartIndex - startIndex)
+            Trace("Utility::Replace", "["+ placeholderStartIndex +"]: " + result)
+
+            ; Find the end of the placeholder
+            placeholderEndIndex = StringUtil.Find(asTemplate, "}", placeholderStartIndex)
+            if (placeholderEndIndex == -1)
+                return "Error: Unclosed placeholder."
+            endif
+
+            ; Get the placeholder name
+            string placeholder = StringUtil.Substring(asTemplate, placeholderStartIndex + 1, placeholderEndIndex - placeholderStartIndex - 1)
+
+            ; Find the index of the placeholder in the array
+            int replacementIndex = -1
+            int n = 0
+            bool innerBreak = false
+            while (n < numberOfPlaceholders && !innerBreak)
+                if (placeholder == akPlaceholders[n])
+                    replacementIndex = n
+                    innerBreak = true
+                endif
+                n += 1
+            endWhile
+
+            ; If replacement found, append it; otherwise, append the original placeholder
+            if (replacementIndex != -1)
+                result += akReplacements[replacementIndex]
+            else
+                result += "{" + placeholder + "}"
+            endif
+
+            ; Move the start index to the character after the end of the placeholder
+            startIndex = placeholderEndIndex + 1
+        endif
+    endWhile
+
+    return result
+endFunction
+
+; string function Replace(string asTemplate, string[] akPlaceholders, string[] akReplacements) global
+;     int numberOfPlaceholders = akPlaceholders.Length
+;     int numberOfReplacements = akReplacements.Length
+
+;     if (numberOfPlaceholders != numberOfReplacements)
+;         return "Error: Number of placeholders does not match the number of replacements!"
+;     endif
+
+;     int startIndex = 0
+;     int templateLength = StringUtil.GetLength(asTemplate)
+
+;     string result = ""
+
+;     bool breakOuter = false
+;     while (startIndex < templateLength && !breakOuter)
+;         int placeholderIndex = StringUtil.Find(asTemplate, "{", startIndex)
+;         if (placeholderIndex == -1)
+;             ; If no more placeholders found, append the remaining part of the template
+;             ; result += StringUtil.Substring(asTemplate, startIndex, templateLength - startIndex)
+;             breakOuter = true
+;         else
+;             ; Append the part of the template before the placeholder
+;             result += StringUtil.Substring(asTemplate, startIndex, placeholderIndex - startIndex)
+;             startIndex = endPlaceholderIndex + 1
+            
+;             int endPlaceholderIndex = StringUtil.Find(asTemplate, "}", placeholderIndex)
+;             if (endPlaceholderIndex == -1)
+;                 return "Error: Unclosed placeholder."
+;             endif
+
+;             string placeholder = StringUtil.Substring(asTemplate, placeholderIndex + 1, endPlaceholderIndex - placeholderIndex - 1)
+
+;             int replacementIndex = -1
+;             int n = 0
+;             bool breakInner = false
+;             while (n < numberOfPlaceholders && !breakInner)
+;                 if (placeholder == akPlaceholders[n])
+;                     replacementIndex = n
+;                     breakInner = true
+;                 endif
+;                 n += 1
+;             endWhile
+
+;             if (replacementIndex != -1)
+;                 ; Append the replacement string
+;                 result += akReplacements[replacementIndex]
+;             endif
+
+;             ; Update the start index to the character after the end of the placeholder
+;             startIndex = endPlaceholderIndex + 1
+;         endif
+;     endWhile
+
+;     return result
+; endFunction
+
+; string function Replace(string asTemplate, string[] akPlaceholders, string[] akReplacements) global
+;     int numberOfPlaceholders = akPlaceholders.Length
+;     int numberOfReplacements = akReplacements.Length
+
+;     if (numberOfPlaceholders != numberOfReplacements)
+;         return "Error: Number of placeholders does not match the number of replacements!"
+;     endif
+
+;     int startIndex = 0
+;     int templateLength = StringUtil.GetLength(asTemplate)
+
+;     string result = ""
+
+;     bool breakOuter = false
+;     while (startIndex < templateLength && !breakOuter)
+;         int placeholderIndex = StringUtil.Find(asTemplate, "{", startIndex)
+;         if (placeholderIndex == -1)
+;             result += StringUtil.Substring(asTemplate, startIndex, templateLength - startIndex)
+;             breakOuter = true
+;         else
+;             result += StringUtil.Substring(asTemplate, startIndex, placeholderIndex - startIndex)
+;             int endPlaceholderIndex = StringUtil.Find(asTemplate, "}", placeholderIndex)
+;             if (endPlaceholderIndex == -1)
+;                 return "Error: Unclosed placeholder."
+;             endif
+
+;             string placeholder = StringUtil.Substring(asTemplate, placeholderIndex + 1, endPlaceholderIndex - placeholderIndex - 1)
+
+;             int replacementIndex = -1
+;             int n = 0
+;             bool breakInner = false
+;             while (n < numberOfPlaceholders && !breakInner)
+;                 if (placeholder == akPlaceholders[n])
+;                     replacementIndex = n
+;                     breakInner = true
+;                 endif
+;                 n += 1
+;             endWhile
+
+;             if (replacementIndex != -1)
+;                 result += akReplacements[replacementIndex]
+;             else
+;                 result += "{" + placeholder + "}"
+;             endif
+
+;             startIndex = endPlaceholderIndex + 1
+;         endif
+;     endWhile
+
+;     return result
+; endFunction
+
+; string function Replace(string asTemplate, string[] akPlaceholders, string[] akReplacements) global
+;     int numberOfPlaceholders = akPlaceholders.Length
+;     int numberOfReplacements = akReplacements.Length
+
+;     if (numberOfPlaceholders != numberOfReplacements)
+;         return "Error: Number of placeholders does not match the number of replacements!"
+;     endif
+
+;     int startIndex = 0
+;     int templateLength = StringUtil.GetLength(asTemplate)
+
+;     string result = ""
+
+;     bool break = false
+;     while (startIndex < templateLength && !break)
+;         int placeholderIndex = StringUtil.Find(asTemplate, "{", startIndex)
+;         if (placeholderIndex == -1)
+;             result += StringUtil.Substring(asTemplate, startIndex, templateLength - startIndex)
+;             break = true
+;         else
+;             result += StringUtil.Substring(asTemplate, startIndex, placeholderIndex - startIndex)
+;             int endPlaceholderIndex = StringUtil.Find(asTemplate, "}", placeholderIndex)
+;             if (endPlaceholderIndex == -1)
+;                 return "Error: Unclosed placeholder."
+;             endif
+
+;             string placeholder = StringUtil.Substring(asTemplate, placeholderIndex + 1, endPlaceholderIndex - placeholderIndex - 1)
+
+;             int replacementIndex = -1
+;             int n = 0
+;             bool break2 = false
+;             while (n < akReplacements.Length && !break2)
+;                 if (placeholder == akReplacements[n])
+;                     replacementIndex = n
+;                     break = true
+;                 endif
+;                 n += 1
+;             endWhile
+
+;             if (replacementIndex == -1)
+;                 result += akReplacements[n]
+;             else
+;                 result += "{" + placeholder + "}"
+;             endif
+
+;             startIndex = endPlaceholderIndex + 1
+;         endif
+;     endWhile
+
+;     return result
+; endFunction
 
 ; ==========================================================
 ;                        AI Functions
@@ -515,6 +811,10 @@ endFunction
 ; ==========================================================
 ;                 Game-Time Related Functions
 ; ==========================================================
+
+float function now() global
+    return Utility.GetCurrentGameTime()
+endFunction
 
 float function GetCurrentTime() global
     return Utility.GetCurrentGameTime()
@@ -1238,13 +1538,14 @@ float function StartBenchmark(bool condition = true) global
     endif
 endFunction
 
-float function EndBenchmark(float startTime, string _message = "", bool condition = true) global
+int function EndBenchmark(float startTime, string _message = "", bool condition = true) global
     if (condition)
         float endTime = Utility.GetCurrentRealTime()
-        float elapsedTime = endTime - startTime
-        debug.trace("[Realistic Prison and Bounty] DEBUG: " + _message + " execution took: " + ((elapsedTime * 1000)) + " ms")
+        int elapsedTime = ((endTime - startTime) * 1000) as int
+        base_log("BENCHMARK:", string_if (_message != "", _message + " ") + "execution took " + elapsedTime + " ms")
+        ; debug.trace("[Realistic Prison and Bounty] DEBUG: " + _message + " execution took " + elapsedTime + " ms")
         ; local_log(none, string_if(_message != "", _message + " ", "") + "execution took " + ((elapsedTime * 1000)) + " ms", LOG_DEBUG(), hideCall = true)
-        return elapsedTime * 1000
+        return elapsedTime
     endif
 endFunction
 

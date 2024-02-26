@@ -1,6 +1,6 @@
 Scriptname RPB_MCM_Debug hidden
 
-import RealisticPrisonAndBounty_Util
+import RPB_Utility
 import RPB_MCM
 import PO3_SKSEFunctions
 
@@ -68,7 +68,7 @@ endFunction
 ; =====================================================
 
 function OnOptionHighlight(RPB_MCM mcm, string option) global
-    mcm.Trace("OnOptionHighlight", "Option: " + option)
+    Trace("OnOptionHighlight", "Option: " + option)
 endFunction
 
 function OnOptionDefault(RPB_MCM mcm, string option) global
@@ -109,7 +109,7 @@ endFunction
 function OnOptionSliderOpen(RPB_MCM mcm, string option) global
     float sliderOptionValue = mcm.GetOptionSliderValue(option)
     LoadSliderOptions(mcm, option, sliderOptionValue)
-    mcm.Trace("OnOptionSliderOpen", "Option: " + option + ", Value: " + sliderOptionValue)
+    Trace("OnOptionSliderOpen", "Option: " + option + ", Value: " + sliderOptionValue)
 endFunction
 
 function OnOptionSliderAccept(RPB_MCM mcm, string option, float value) global
@@ -148,7 +148,7 @@ function OnOptionInputOpen(RPB_MCM mcm, string option) global
     string inputOptionValue = mcm.GetOptionInputValue(option)
     mcm.SetInputDialogStartText(inputOptionValue)
 
-    mcm.Trace("OnOptionInputOpen", "GetOptionInputValue("+  option +") = " + mcm.GetOptionInputValue(option, mcm.CurrentPage))
+    Trace("OnOptionInputOpen", "GetOptionInputValue("+  option +") = " + mcm.GetOptionInputValue(option, mcm.CurrentPage))
 endFunction
 
 function OnOptionInputAccept(RPB_MCM mcm, string option, string inputValue) global

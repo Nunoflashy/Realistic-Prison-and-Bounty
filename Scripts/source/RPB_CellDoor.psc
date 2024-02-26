@@ -1,7 +1,7 @@
 scriptname RPB_CellDoor extends ObjectReference
 
 import Math
-import RealisticPrisonAndBounty_Util
+import RPB_Utility
 import RealisticPrisonAndBounty_Config
 
 ; ==========================================================

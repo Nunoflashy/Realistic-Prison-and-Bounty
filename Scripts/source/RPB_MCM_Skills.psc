@@ -1,6 +1,6 @@
 Scriptname RPB_MCM_Skills hidden
 
-import RealisticPrisonAndBounty_Util
+import RPB_Utility
 import RPB_MCM
 
 bool function ShouldHandleEvent(RPB_MCM mcm) global
@@ -126,7 +126,7 @@ endFunction
 function OnOptionSliderOpen(RPB_MCM mcm, string option) global
     float sliderOptionValue = mcm.GetOptionSliderValue(option)
     LoadSliderOptions(mcm, option, sliderOptionValue)
-    mcm.Debug("OnOptionSliderOpen", "Option: " + option + ", Value: " + sliderOptionValue)
+    Debug("OnOptionSliderOpen", "Option: " + option + ", Value: " + sliderOptionValue)
 endFunction
 
 function OnOptionSliderAccept(RPB_MCM mcm, string option, float value) global
@@ -156,7 +156,7 @@ function OnOptionSliderAccept(RPB_MCM mcm, string option, float value) global
     ; Send option changed event
     mcm.SendModEvent("RPB_SliderOptionChanged", option, value)
 
-    mcm.Debug("OnSliderAccept", "GetOptionSliderValue("+  option +") = " + mcm.GetOptionSliderValue(option, mcm.CurrentPage))
+    Debug("OnSliderAccept", "GetOptionSliderValue("+  option +") = " + mcm.GetOptionSliderValue(option, mcm.CurrentPage))
 endFunction
 
 function OnOptionMenuOpen(RPB_MCM mcm, string option) global
@@ -165,7 +165,7 @@ function OnOptionMenuOpen(RPB_MCM mcm, string option) global
 endFunction
 
 function OnOptionMenuAccept(RPB_MCM mcm, string option, int menuIndex) global
-    mcm.Debug("OnOptionMenuAccept", "GetMenuOptionValue("+  option +") = " + mcm.GetOptionMenuValue(option, mcm.CurrentPage))
+    Debug("OnOptionMenuAccept", "GetMenuOptionValue("+  option +") = " + mcm.GetOptionMenuValue(option, mcm.CurrentPage))
 endFunction
 
 function OnOptionColorOpen(RPB_MCM mcm, string option) global

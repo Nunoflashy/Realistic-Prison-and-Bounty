@@ -1,6 +1,6 @@
 scriptname RPB_StorageVars hidden
 
-import RealisticPrisonAndBounty_Util
+import RPB_Utility
 
 string function GetRootPath() global
     return ".rpb_root.storage"
@@ -44,9 +44,9 @@ endFunction
 
 ;                          Getters
 
-bool function GetBool(string asKey, string asCategory = "null") global
+bool function GetBool(string asKey, string asCategory = "null", bool abDefault = false) global
     string path = GetVarPath(asKey, asCategory)
-    return JDB.solveInt(path) as bool
+    return JDB.solveInt(path, abDefault as int) as bool
 endFunction
 
 int function GetInt(string asKey, string asCategory = "null") global
@@ -140,6 +140,20 @@ function SetForms(string asKey, Form[] akValues, string asCategory = "null") glo
     JDB.solveObjSetter(path, formToObject, true)
 endFunction
 
+function SetObject(string asKey, int akObject, string asCategory = "null") global
+    string path = GetVarPath(asKey, asCategory)
+    JDB.solveObjSetter(path, akObject, true)
+endFunction
+
+function CreateObject(string asKey, string asCategory = "null") global
+    string path = GetVarPath(asKey, asCategory)
+    JDB.solveObjSetter(path, JMap.object(), true)
+endFunction
+
+function SetStringOnObject(string asObjectKey, string asKey, string asValue, string asCategory = "null") global
+    
+endFunction
+
 ;                          Modifiers
 function ModInt(string asKey, int aiValue, string asCategory = "null")
     int currentValue = GetInt(asKey, asCategory)
@@ -208,12 +222,12 @@ int function GetIntOnForm(string asKey, Form akForm, string asCategory = "null")
     string path = GetVarPathOnForm(asKey, akForm, asCategory)
     ; Debug(none, "StorageVars::GetIntOnForm", "path: " + path + ", value: " + JDB.solveInt(path))
 
-    return JDB.solveInt(path, -1)
+    return JDB.solveInt(path)
 endFunction
 
 float function GetFloatOnForm(string asKey, Form akForm, string asCategory = "null") global
     string path = GetVarPathOnForm(asKey, akForm, asCategory)
-    return JDB.solveFlt(path, -1)
+    return JDB.solveFlt(path)
 endFunction
 
 string function GetStringOnForm(string asKey, Form akForm, string asCategory = "null") global

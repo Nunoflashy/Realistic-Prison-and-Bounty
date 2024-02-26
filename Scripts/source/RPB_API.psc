@@ -1,14 +1,97 @@
 scriptname RPB_API extends Quest Hidden
 
-RPB_MCM                                 property MCM auto
-RealisticPrisonAndBounty_Arrest         property Arrest auto
-RealisticPrisonAndBounty_Jail           property Jail auto
 RealisticPrisonAndBounty_ArrestVars     property ArrestVars auto
 RealisticPrisonAndBounty_ActorVars      property ActorVars auto
 RealisticPrisonAndBounty_MiscVars       property MiscVars auto
-RealisticPrisonAndBounty_SceneManager   property SceneManager auto
-RealisticPrisonAndBounty_EventManager   property EventManager auto
-RPB_PrisonManager                       property PrisonManager auto
+
+
+RPB_MCM __mcm
+RPB_MCM property MCM
+    RPB_MCM function get()
+        if (__mcm)
+            return __mcm
+        endif
+
+        __mcm = GetMCM()
+        return __mcm
+    endFunction
+endProperty
+
+RealisticPrisonAndBounty_Config __config
+RealisticPrisonAndBounty_Config property Config
+    RealisticPrisonAndBounty_Config function get()
+        if (__config)
+            return __config
+        endif
+
+        __config = GetConfig()
+        return __config
+    endFunction
+endProperty
+
+RealisticPrisonAndBounty_Arrest __arrest
+RealisticPrisonAndBounty_Arrest property Arrest
+    RealisticPrisonAndBounty_Arrest function get()
+        if (__arrest)
+            return __arrest
+        endif
+
+        __arrest = GetArrest()
+        return __arrest
+    endFunction
+endProperty
+
+RealisticPrisonAndBounty_Jail __jail
+RealisticPrisonAndBounty_Jail property Jail
+    RealisticPrisonAndBounty_Jail function get()
+        if (__jail)
+            return __jail
+        endif
+
+        __jail = GetJail()
+        return __jail
+    endFunction
+endProperty
+
+RealisticPrisonAndBounty_EventManager __eventManager
+RealisticPrisonAndBounty_EventManager property EventManager
+    RealisticPrisonAndBounty_EventManager function get()
+        if (__eventManager)
+            return __eventManager
+        endif
+
+        __eventManager = GetEventManager()
+        return __eventManager
+    endFunction
+endProperty
+
+RPB_PrisonManager __prisonManager
+RPB_PrisonManager property PrisonManager
+    RPB_PrisonManager function get()
+        if (__prisonManager)
+            return __prisonManager
+        endif
+
+        __prisonManager = GetPrisonManager()
+        return __prisonManager
+    endFunction
+endProperty
+
+RealisticPrisonAndBounty_SceneManager __sceneManager
+RealisticPrisonAndBounty_SceneManager property SceneManager
+    RealisticPrisonAndBounty_SceneManager function get()
+        if (__sceneManager)
+            return __sceneManager
+        endif
+
+        __sceneManager = GetSceneManager()
+        return __sceneManager
+    endFunction
+endProperty
+
+RPB_API function GetSelf() global
+    return GetFormFromMod(0x14C13) as RPB_API
+endFunction
 
 RPB_MCM function GetMCM() global
     return GetFormFromMod(0xD61) as RPB_MCM

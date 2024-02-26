@@ -1,7 +1,19 @@
 Scriptname RealisticPrisonAndBounty_ConfigAlias extends ReferenceAlias  
 
-import RealisticPrisonAndBounty_Util
+import RPB_Utility
 import RealisticPrisonAndBounty_Config
+
+RPB_API __api
+RPB_API property API
+    RPB_API function get()
+        if (__api)
+            return __api
+        endif
+
+        __api = RPB_API.GetSelf()
+        return __api
+    endFunction
+endProperty
 
 RealisticPrisonAndBounty_Config property Config
     RealisticPrisonAndBounty_Config function get()
@@ -44,7 +56,8 @@ endFunction
 
 function PerformMaintenance()
     bool registeredEvents = Config.HandleEvents()
-    bool prisons          = Config.SetPrisons()
+    bool prisons          = false;Config.SetPrisons()
+
 
     Config.MCM.InitializePages()
     ;/
@@ -108,6 +121,72 @@ endEvent
 event OnKeyDown(int keyCode)
     RealisticPrisonAndBounty_Config configScript = (self.GetOwningQuest() as RealisticPrisonAndBounty_Config)
     RPB_MCM mcm = configScript.mcm
+
+    if (keyCode == 0x3B)    ; F1
+        RPB_UIInterface uilib   = (self.GetReference() as Form) as RPB_UIInterface
+        RPB_Tests unitTest      = (self.GetReference() as Form) as RPB_Tests
+        
+        string testName = uilib.ShowList_ReturnElement("Tests", unitTest.GetTestNames(), 0, 0)
+        unitTest.ExecuteTest(testName)
+
+    elseif (keyCode == 0x3C)    ; F2
+        RPB_UIInterface uilib   = (self.GetReference() as Form) as RPB_UIInterface
+        RPB_Tests unitTest      = (self.GetReference() as Form) as RPB_Tests
+        RPB_MCM_02 mcm2         = RPB_Utility.GetFormFromMod(0x1F36A) as RPB_MCM_02
+
+        string selectedHold = uilib.ShowList_ReturnElement("Set Bounty in Hold", mcm2.Holds, 0, 0)
+
+        if (selectedHold != "")
+            Actor actorToSetBountyOn = Game.GetCurrentConsoleRef() as Actor
+            string desiredBounty = uilib.ShowInput(selectedHold + " - Bounty to set for " + actorToSetBountyOn.GetBaseObject().GetName())
+            if (desiredBounty != "")
+                string addAsViolent = uilib.ShowINput("Add Bounty as Violent?", "No")
+                int holdRootObject = RPB_Data.GetRootObject(selectedHold)
+                Faction crimeFaction = RPB_Data.Hold_GetCrimeFaction(holdRootObject)
+                if (addAsViolent == "Yes")
+                    if (actorToSetBountyOn == config.Player)
+                        crimeFaction.SetCrimeGoldViolent(desiredBounty as int)
+                    else
+                        RPB_ActorVars.SetCrimeGold(crimeFaction, actorToSetBountyOn, desiredBounty as int)
+                        int actorBounty = RPB_ActorVars.GetCrimeGoldViolent(crimeFaction, actorToSetBountyOn)                        
+                        Debug("ConfigAlias::OnKeyDown", actorToSetBountyOn.GetBaseObject().GetName() + " now has " + actorBounty + " violent bounty in " + selectedHold)
+                    endif
+                else
+                    if (actorToSetBountyOn == config.Player)
+                        crimeFaction.SetCrimeGold(desiredBounty as int)
+                    else
+                        RPB_ActorVars.SetCrimeGold(crimeFaction, actorToSetBountyOn, desiredBounty as int)
+                        int actorBounty = RPB_ActorVars.GetCrimeGold(crimeFaction, actorToSetBountyOn)                            
+                        Debug("ConfigAlias::OnKeyDown", actorToSetBountyOn.GetBaseObject().GetName() + " now has " + actorBounty + " bounty in " + selectedHold)
+                    endif
+                endif
+            endif
+        endif
+
+    elseif (keyCode == 0x3D) ; F3
+        ; bool prisons          = API.Config.SetPrisons()
+        ; API.MCM.ReloadDefaults()
+        API.MCM.LoadDefaults()
+        API.MCM.LoadMinimums()
+        API.MCM.LoadMaximums()
+        API.MCM.LoadSteps()
+
+    elseif (keyCode == 0x3E) ; F4
+        RPB_UIInterface uilib   = (self.GetReference() as Form) as RPB_UIInterface
+        int actionArrayObj = JArray.object()
+        JArray.addStr(actionArrayObj, "Don't do anything")
+        JArray.addStr(actionArrayObj, "Quit to Main Menu")
+        JArray.addStr(actionArrayObj, "Validate Options")
+
+        string[] actionArray = JArray.asStringArray(actionArrayObj)
+
+        string actionToPerform = uilib.ShowList_ReturnElement("Execute Action", actionArray, 0, 0)
+        if (actionToPerform == "Quit to Main Menu")
+            Game.QuitToMainMenu()
+        elseif (actionToPerform == "Validate Options")
+            API.MCM.ValidateOptions()
+        endif
+    endif
 
     if (keyCode == 0x41) ; F7
         ; configScript.miscVars.CreateStringMap("Options")
@@ -224,10 +303,18 @@ event OnKeyDown(int keyCode)
 endEvent
 
 function RegisterHotkeys()
-    RegisterForKey(0x41) ; F7
-    RegisterForKey(0x40) ; F6
-    RegisterForKey(0x3E) ; F4
-    RegisterForKey(0x3D) ; F3
+    int keyCode     = 59 ; F1
+    int F10         = 68
+    int F11         = 87
+    int F12         = 88
+    ; Register F1 to F10
+    while (keyCode <= F10)
+        RegisterForKey(keyCode)
+        keyCode += 1
+    endWhile
+
+    RegisterForKey(F11)
+    RegisterForKey(F12)
 endFunction
 
 function Info(string logInfo, bool condition = true, bool hideCall = false) global

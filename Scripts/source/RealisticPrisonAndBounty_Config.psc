@@ -293,7 +293,7 @@ endFunction
 
 Form function GetJailTeleportReleaseMarker(string hold)
     if (!miscVars.Exists("Jail::Release::Teleport["+ hold +"]"))
-        MCM.Error("Config::GetJailTeleportReleaseMarker", "The marker does not exist!")
+        DebugError("Config::GetJailTeleportReleaseMarker", "The marker does not exist!")
         return none
     endif
 
@@ -302,7 +302,7 @@ endFunction
 
 Form function GetJailPrisonerItemsContainer(string hold)
     if (!miscVars.Exists("Jail::Containers["+ hold +"]"))
-        MCM.Error("Config::GetJailPrisonerItemsContainer", "The container does not exist!")
+        DebugError("Config::GetJailPrisonerItemsContainer", "The container does not exist!")
         return none
     endif
     
@@ -313,14 +313,14 @@ endFunction
 ObjectReference function GetRandomJailMarker(string hold)
     Form[] markers = RPB_Data.GetJailMarkers(hold) ; To be tested, probably not working now
     if (!markers)
-        MCM.Error("Config::getJailMakers", "The markers do not exist!")
+        DebugError("Config::getJailMakers", "The markers do not exist!")
         return none
     endif
 
     int len = markers.length
     int markerIndex = Utility.RandomInt(0, len - 1)
 
-    MCM.Debug("Config::GetRandomJailMarker", "Got Jail Cell " + (markerIndex + 1) + " (" + markers[markerIndex] + " [Index: "+ markerIndex +"]) marker for " + hold + "!")
+    Debug("Config::GetRandomJailMarker", "Got Jail Cell " + (markerIndex + 1) + " (" + markers[markerIndex] + " [Index: "+ markerIndex +"]) marker for " + hold + "!")
     return markers[markerIndex] as ObjectReference
 endFunction
 
@@ -1018,26 +1018,26 @@ function WearOutfitOnActor(Actor actorTarget, string outfitId, bool unequipAllIt
         actorTarget.UnequipAll()
     endif
 
-    MCM.Debug("WearOutfit", "Test call for this outfit for " + actorName + ", body parts: ["+ bodyPartHead + ", " + bodyPartBody + ", " + bodyPartHands + ", " + bodyPartFeet +"]")
+    Debug("WearOutfit", "Test call for this outfit for " + actorName + ", body parts: ["+ bodyPartHead + ", " + bodyPartBody + ", " + bodyPartHands + ", " + bodyPartFeet +"]")
 
     if (bodyPartHead != none)
         actorTarget.EquipItem(bodyPartHead, false, abSilent = true)
-        MCM.Debug("WearOutfit", "Equipped " + bodyPartHead.GetName() + " from " + outfitId + "::Head" + " on " + actorName)
+        Debug("WearOutfit", "Equipped " + bodyPartHead.GetName() + " from " + outfitId + "::Head" + " on " + actorName)
     endif
 
     if (bodyPartBody != none)
         actorTarget.EquipItem(bodyPartBody, false, abSilent = true)
-        MCM.Debug("WearOutfit", "Equipped " + bodyPartBody.GetName() + " from " + outfitId + "::Body" + " on " + actorName)
+        Debug("WearOutfit", "Equipped " + bodyPartBody.GetName() + " from " + outfitId + "::Body" + " on " + actorName)
     endif
     
     if (bodyPartHands != none)
         actorTarget.EquipItem(bodyPartHands, false, abSilent = true)
-        MCM.Debug("WearOutfit", "Equipped " + bodyPartHands.GetName() + " from " + outfitId + "::Hands" + " on " + actorName)
+        Debug("WearOutfit", "Equipped " + bodyPartHands.GetName() + " from " + outfitId + "::Hands" + " on " + actorName)
     endif
 
     if (bodyPartFeet != none)
         actorTarget.EquipItem(bodyPartFeet, false, abSilent = true)
-        MCM.Debug("WearOutfit", "Equipped " + bodyPartFeet.GetName() + " from " + outfitId + "::Feet" + " on " + actorName)
+        Debug("WearOutfit", "Equipped " + bodyPartFeet.GetName() + " from " + outfitId + "::Feet" + " on " + actorName)
     endif
 
 endFunction
@@ -1060,8 +1060,8 @@ function AddOutfit(string outfitId, Armor headClothing, Armor bodyClothing, Armo
     MCM.AddOutfitPiece(outfitId, "Hands", handsClothing)
     MCM.AddOutfitPiece(outfitId, "Feet", feetClothing)
 
-    MCM.Trace("AddOutfit", "headClothing: " + headClothing + ", bodyClothing: " + bodyClothing + ", handsClothing: " + handsClothing + ", feetClothing: " + feetClothing)
-    MCM.Trace("AddOutfit", "Slot Masks [headClothing: " + headClothing.GetSlotMask() + ", bodyClothing: " + bodyClothing.GetSlotMask() + ", handsClothing: " + handsClothing.GetSlotMask() + ", feetClothing: " + feetClothing.GetSlotMask() + "]")
+    Trace("AddOutfit", "headClothing: " + headClothing + ", bodyClothing: " + bodyClothing + ", handsClothing: " + handsClothing + ", feetClothing: " + feetClothing)
+    Trace("AddOutfit", "Slot Masks [headClothing: " + headClothing.GetSlotMask() + ", bodyClothing: " + bodyClothing.GetSlotMask() + ", handsClothing: " + handsClothing.GetSlotMask() + ", feetClothing: " + feetClothing.GetSlotMask() + "]")
 endFunction
 
 Armor function GetOutfitPart(string hold, string bodyPart)
@@ -1089,8 +1089,8 @@ bool function Debug_OutfitMeetsCondition(Faction crimeFaction, string outfitId)
     bool hasCondition = MCM.GetOptionToggleState("Clothing", outfitId + "::Conditional Outfit") as bool
     bool meetsCondition = !hasCondition || isBountyWithinRange && !onlyMinBountyRequired || onlyMinBountyRequired
 
-    MCM.Debug("Debug_OutfitMeetsCondition", "Bounty for " + crimeFaction.GetName() + ": " + bounty)
-    MCM.Debug("Debug_OutfitMeetsCondition", outfitId + " [Minimum Bounty: " + outfitMinimumBounty + ", Maximum Bounty: " + outfitMaximumBounty + "] ("+ "isBountyWithinRange: " + isBountyWithinRange + ", hasCondition: "+ hasCondition +") (meets condition: " + meetsCondition + ")")
+    Debug("Debug_OutfitMeetsCondition", "Bounty for " + crimeFaction.GetName() + ": " + bounty)
+    Debug("Debug_OutfitMeetsCondition", outfitId + " [Minimum Bounty: " + outfitMinimumBounty + ", Maximum Bounty: " + outfitMaximumBounty + "] ("+ "isBountyWithinRange: " + isBountyWithinRange + ", hasCondition: "+ hasCondition +") (meets condition: " + meetsCondition + ")")
 
     return meetsCondition
 endFunction
@@ -1111,8 +1111,8 @@ endFunction
 ;     bool hasCondition = MCM.GetOptionToggleState("Clothing", outfitId + "::Conditional Outfit") as bool
 ;     bool meetsCondition = !hasCondition || (isSingleBounty && bounty >= outfitMinimumBounty) || isBountyWithinRange
 
-;     MCM.Debug("Debug_OutfitMeetsCondition", "Bounty for " + crimeFaction.GetName() + ": " + bounty)
-;     MCM.Debug("Debug_OutfitMeetsCondition", outfitId + " [Minimum Bounty: " + outfitMinimumBounty + ", Maximum Bounty: " + outfitMaximumBounty + "] ("+ "isBountyWithinRange: " + isBountyWithinRange + ", hasCondition: "+ hasCondition +") (meets condition: " + meetsCondition + ")")
+;     Debug("Debug_OutfitMeetsCondition", "Bounty for " + crimeFaction.GetName() + ": " + bounty)
+;     Debug("Debug_OutfitMeetsCondition", outfitId + " [Minimum Bounty: " + outfitMinimumBounty + ", Maximum Bounty: " + outfitMaximumBounty + "] ("+ "isBountyWithinRange: " + isBountyWithinRange + ", hasCondition: "+ hasCondition +") (meets condition: " + meetsCondition + ")")
 
 ;     return meetsCondition
 ; endFunction

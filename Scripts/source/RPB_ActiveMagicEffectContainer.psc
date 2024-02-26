@@ -4,7 +4,7 @@ scriptname RPB_ActiveMagicEffectContainer extends ReferenceAlias
     TODO: Sort list after removing an element, or adding it.
 /;
 
-import RealisticPrisonAndBounty_Util
+import RPB_Utility
 
 int dataIds
 ActiveMagicEffect[] data = none
@@ -65,6 +65,8 @@ function AddAt(ActiveMagicEffect apActiveMagicEffect, string asKey)
         ; Debug(self, "ActiveMagicEffectList::Add", "Added ActiveMagicEffect: " + apActiveMagicEffect + " at index: " + nextAvailableIndex + ".")
         nextAvailableIndex += 1
     endif
+
+    ; RPB_Utility.Debug("ActiveMAgicEffectList::AddAt", "data: " + data + ", self: " + GetOwningQuest())
 endFunction
 
 bool function HasKey(string asKey)

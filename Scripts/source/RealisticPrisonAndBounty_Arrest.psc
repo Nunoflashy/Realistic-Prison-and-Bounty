@@ -1,7 +1,6 @@
 scriptname RealisticPrisonAndBounty_Arrest extends Quest
 
 import Math
-; import RealisticPrisonAndBounty_Util
 import RealisticPrisonAndBounty_Config
 import PO3_SKSEFunctions
 import RPB_Utility
@@ -562,7 +561,7 @@ event OnArrestDialogue(int aiTopicInfoEvent, int aiTopicInfoType, string asTopic
 endEvent
 
 ;/
-    TODO: Fix arrestee reference not being cleared after failed arrest (the actor has RPB_Arrestee bound to them)
+    TODO: Fix arrestee reference not being cleared after failed arrest (the Actor has RPB_Arrestee bound to them)
 
     RPB_Arrestee    @apArrestee: The reference to the actor that will be arrested.
     Actor           @akCaptor: The actor that is performing the arrest. (Can be none if a Faction arrest is performed)
@@ -588,7 +587,8 @@ event OnArrestBegin(RPB_Arrestee apArrestee, Actor akCaptor, Faction akCrimeFact
     apArrestee.SetActiveBounty(4000)
 
     ; apArrestee.SetActiveBounty(7000)
-    apArrestee.SetArrestParameters(ARREST_TYPE_TELEPORT_TO_JAIL, akCaptor, akCrimeFaction)
+    apArrestee.SetArrestParameters(asArrestType, akCaptor, akCrimeFaction)
+    ; apArrestee.SetArrestParameters(ARREST_TYPE_TELEPORT_TO_JAIL, akCaptor, akCrimeFaction)
     ; apArrestee.SetArrestParameters(ARREST_TYPE_TELEPORT_TO_CELL, akCaptor, akCrimeFaction)
     ; apArrestee.SetActiveBounty(Utility.RandomInt(1200, 7800))
     ; apArrestee.SetActiveBounty(4200)
@@ -1011,6 +1011,8 @@ function BeginArrest(RPB_Arrestee akArresteeRef)
 
     ; Next step, escort/move to prison
     if (arrestType == ARREST_TYPE_TELEPORT_TO_CELL)
+        akArresteeRef.MoveToPrison(abMoveDirectlyToCell = true)
+        return
         ; Handled on OnArresteeRestrained()
         self.SceneManager.StartArrestScene( \
             akGuard     = captor, \
@@ -1402,7 +1404,7 @@ endFunction
 function AllowArrestForcegreets(bool allow = true)
     ; Allow/Disallow Forcegreets (used in AI package RPB_DGForcegreet for Arrest eludes)
     GlobalVariable RPB_AllowArrestForcegreet = GetFormFromMod(0x130D7) as GlobalVariable
-    RPB_AllowArrestForcegreet.SetValueInt(int_if (allow, 1, 0))
+    RPB_AllowArrestForcegreet.SetValueInt(allow as int)
 endFunction
 
 function SetupArrestPayableBountyVars(Faction akCrimeFaction)

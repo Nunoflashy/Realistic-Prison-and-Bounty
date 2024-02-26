@@ -45,4 +45,3 @@ function Remove(RPB_Prisoner apPrisoner)
 
     apPrisoner.Prison_RemoveAll()
     apPrisoner.Prison_RemoveAll("Arrest")
-endFunction

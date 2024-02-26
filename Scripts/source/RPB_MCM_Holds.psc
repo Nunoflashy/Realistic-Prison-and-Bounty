@@ -1,6 +1,6 @@
 Scriptname RPB_MCM_Holds hidden
 
-import RealisticPrisonAndBounty_Util
+import RPB_Utility
 import RPB_MCM
 
 bool function ShouldHandleEvent(RPB_MCM mcm) global
@@ -1058,9 +1058,9 @@ function OnOptionSliderAccept(RPB_MCM mcm, string option, float value) global
     ; Send option changed event
     mcm.SendModEvent("RPB_SliderOptionChanged", option, value)
 
-    mcm.Debug("Holds::OnSliderAccept", "Option: " + option + ", Value: " + value, true)
+    Debug("Holds::OnSliderAccept", "Option: " + option + ", Value: " + value, true)
 
-    mcm.Debug("OnSliderAccept", "GetSliderOptionValue("+  option +") = " + mcm.GetOptionSliderValue(option, mcm.CurrentPage))
+    Debug("OnSliderAccept", "GetSliderOptionValue("+  option +") = " + mcm.GetOptionSliderValue(option, mcm.CurrentPage))
 endFunction
 
 function OnOptionMenuOpen(RPB_MCM mcm, string option) global
@@ -1176,7 +1176,7 @@ function OnOptionMenuAccept(RPB_MCM mcm, string option, int menuIndex) global
         endif
     endif
 
-    mcm.Debug("OnOptionMenuAccept", "GetMenuOptionValue("+  option +") = " + mcm.GetOptionMenuValue(option, mcm.CurrentPage))
+    Debug("OnOptionMenuAccept", "GetMenuOptionValue("+  option +") = " + mcm.GetOptionMenuValue(option, mcm.CurrentPage))
 
 endFunction
 

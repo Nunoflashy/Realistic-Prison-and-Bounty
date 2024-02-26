@@ -1,6 +1,5 @@
 Scriptname RPB_Captor extends RPB_Actor  
 
-import RealisticPrisonAndBounty_Util
 import RealisticPrisonAndBounty_Config
 
 bool property IsGuard

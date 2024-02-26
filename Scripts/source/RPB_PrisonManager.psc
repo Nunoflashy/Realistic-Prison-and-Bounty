@@ -6,7 +6,7 @@ int property PrisonSlots
     int function get()
         return self.GetNumAliases()
     endFunction
-endProperty 
+endProperty
 
 RPB_Prison property AvailableSlot
     RPB_Prison function get()
@@ -17,6 +17,18 @@ endProperty
 ; ==========================================================
 ;                  Shared Prison Properties
 ; ==========================================================
+
+RPB_API __api
+RPB_API property API
+    RPB_API function get()
+        if (__api)
+            return __api
+        endif
+
+        __api = RPB_API.GetSelf()
+        return __api
+    endFunction
+endProperty
 
 RealisticPrisonAndBounty_Config __config
 RealisticPrisonAndBounty_Config property Config
@@ -33,6 +45,7 @@ endProperty
 RealisticPrisonAndBounty_SceneManager __sceneManager
 RealisticPrisonAndBounty_SceneManager property SceneManager
     RealisticPrisonAndBounty_SceneManager function get()
+        return API.SceneManager
         if (__sceneManager)
             return __sceneManager
         endif
@@ -68,6 +81,16 @@ RPB_Prison function FindPrisonByPrisoner(Actor akPrisonerActor)
     return none
 endFunction
 
+RPB_Prison function FindPrisonByHold(string asHold)
+
+endFunction
+
+;/
+    RPB_PrisonList function FindPrisonsInCity(string asCity)
+        
+    endFunction
+/;
+
 event OnPrisonRegisteredPrisoner(RPB_Prison apPrison, RPB_Prisoner apPrisoner)
     RPB_StorageVars.SetString(apPrisoner.GetIdentifier(), apPrison.Hold, "PrisonManager")
 endEvent
@@ -85,13 +108,29 @@ RPB_Prison function GetAvailablePrisonSlot()
 
     while (i < self.PrisonSlots)
         RPB_Prison currentPrisonAlias = self.GetNthAlias(i) as RPB_Prison
-        if (!currentPrisonAlias.WasInitialized())
+        Trace("PrisonManager::GetAvailablePrisonSlot", "["+ currentPrisonAlias.Name +"] Is Initialized: " + currentPrisonAlias.WasInitialized())
+        if (!currentPrisonAlias.Initialized)
             return currentPrisonAlias ; Free slot, return this one
         endif
         i += 1
     endWhile
 
     return none
+endFunction
+
+int function GetNumberOfAvailableSlots()
+    int availableSlots = 0
+
+    int i = 0
+    while (i < self.PrisonSlots)
+        RPB_Prison currentPrisonAlias = self.GetNthAlias(i) as RPB_Prison
+        if (!currentPrisonAlias.WasInitialized())
+            availableSlots += 1
+        endif
+        i += 1
+    endWhile
+
+    return availableSlots
 endFunction
 
 bool function WasPrisonConfigChanged(RPB_Prison apPrison)
@@ -119,6 +158,23 @@ function ReloadPrisonConfig(RPB_Prison apPrison)
     Error("Some elements of the prison config could not be determined!", !prisonLocation || !prisonName)
 endFunction
 
+function UninitializePrisons()
+    int i = 0
+    while (i < self.PrisonSlots)
+        RPB_Prison possiblePrison = self.GetNthAlias(i) as RPB_Prison
+        if (possiblePrison && possiblePrison.WasInitialized())
+            possiblePrison.Uninitialize()
+            ; RPB_StorageVars.SetBool("Prison::" + i, false, "PrisonManager")
+        endif
+        i += 1
+    endWhile
+endFunction
+
+int function UninitializePrisonByID(int aiPrisonID)
+    RPB_Prison possiblePrison = self.GetNthAlias(aiPrisonID) as RPB_Prison
+    possiblePrison.Uninitialize()
+endFunction
+
 bool function InitializePrisonConfig(string asHold)
     int rootObject      = RPB_Data.GetRootObject(asHold) ; JMap&
     int prisonObject    = RPB_Data.Hold_GetJailObject(rootObject) ; JMap&
@@ -128,6 +184,14 @@ bool function InitializePrisonConfig(string asHold)
     Faction prisonFaction   = RPB_Data.Hold_GetCrimeFaction(rootObject)
 
     RPB_Prison prisonSlot = self.AvailableSlot
+
+    ; Trace("PrisonManager::InitializePrisonConfig", "{\n"+ \
+    ;     "prisonLocation: " + prisonLocation + "\n" + \
+    ;     "prisonName: " + prisonName + "\n" + \
+    ;     "prisonFaction: " + prisonFaction + "\n" + \
+    ;     "prisonSlot: " + prisonSlot + "\n" + \
+    ;     "Prison Slots: " + self.PrisonSlots + "\n" \
+    ;  +"}")
 
     if (!prisonSlot)
         Error("There are no Prison Slots available, cannot configure prison for " + asHold + "! (Prison: "+ prisonName +")")
@@ -156,6 +220,7 @@ RPB_Prison function GetPrison(string asHold)
 
     while (i < self.PrisonSlots)
         RPB_Prison currentPrison = self.GetNthAlias(i) as RPB_Prison
+        ; Info("Hold: " + currentPrison.Hold + ", Faction: " + currentPrison.PrisonFaction + ", City: " + currentPrison.City)
         if (currentPrison.Hold == asHold)
             ; RPB_Utility.DebugWithArgs("PrisonManager::GetPrison", asHold, "Hold: " + currentPrison.Hold + ", Faction: " + currentPrison.PrisonFaction + ", City: " + currentPrison.City)
             self.ReloadPrisonConfig(currentPrison)
@@ -171,29 +236,6 @@ RPB_Prison function GetPrisonByID(int aiPrisonID)
     return self.GetNthAlias(aiPrisonID) as RPB_Prison
 endFunction
 
-RPB_Prison[] function GetPrisons()
-    
-endFunction
-
-int __global_prisonerList
-
-function BindPrisonerToPrison(RPB_Prisoner akPrisoner, RPB_Prison akPrison) global
-    ; if (!__global_prisonerList)
-    ;     __global_prisonerList = JMap.object()
-    ;     JValue.retain(__global_prisonerList)
-    ; endif
-
-    ; JMap.setInt(__global_prisonerList, akPrisoner.GetIdentifier(), akPrison.GetID())
-
-    JDB.solveIntSetter(".rpb_hidden_config.prison.prisoner." + akPrisoner.GetIdentifier(), akPrison.GetID(), true)
-endFunction
-
-RPB_Prison function GetPrisonForBoundPrisoner(Actor akPrisonerActor)
-    ; int prisonAliasID = JMap.getInt(__global_prisonerList, akPrisoner.GetIdentifier()) ; returns the ID of the Prison alias
-    ; return self.GetAlias(prisonAliasID) as RPB_Prison
-    int prisonAliasID = JDB.solveInt(".rpb_hidden_config.prison.prisoner." + akPrisonerActor.GetFormID()) ; returns the ID of the Prison alias
-    return self.GetAlias(prisonAliasID) as RPB_Prison
-endFunction
 
 ; RPB_Prison function GetPrisonForBoundPrisoner(RPB_Prisoner akPrisoner)
 ;     ; int prisonAliasID = JMap.getInt(__global_prisonerList, akPrisoner.GetIdentifier()) ; returns the ID of the Prison alias

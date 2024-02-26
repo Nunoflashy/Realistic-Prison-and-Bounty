@@ -1,7 +1,7 @@
 scriptname RPB_Actor extends ActiveMagicEffect
 {Base Actor script for RPB_Actor, must be inherited from to be used}
 
-import RealisticPrisonAndBounty_Util
+import RPB_Utility
 import RealisticPrisonAndBounty_Config
 
 ; ==========================================================
@@ -100,6 +100,7 @@ endFunction
 
 function MoveTo(ObjectReference akTarget, float afXOffset = 0.0, float afYOffset = 0.0, float afZOffset = 0.0, bool abMatchRotation = true)
     this.MoveTo(akTarget, afXOffset, afYOffset, afZOffset, abMatchRotation)
+    Debug("Actor::MoveTo", "Moved " + self.Name + " to " + akTarget)
 endFunction
 
 string function GetSex(bool abShortValue = false)
@@ -127,7 +128,11 @@ endFunction
 ; ==========================================================
 
 bool function HasActiveBounty()
-    return bool_if (self.IsPlayer(), self.GetFaction().GetCrimeGold() > 0, ActorVars.GetCrimeGold(self.GetFaction(), this) > 0)
+    if (self.IsPlayer())
+        return self.GetFaction().GetCrimeGold() > 0
+    else
+        return RPB_ActorVars.GetCrimeGold(self.GetFaction(), this) > 0
+    endif
 endFunction
 
 bool function HasLatentBounty()
@@ -153,13 +158,18 @@ int function GetActiveBounty(bool abNonViolent = true, bool abViolent = true)
     int totalBounty = 0
     
     if (abNonViolent)
-        totalBounty += int_if (self.IsPlayer(), self.GetFaction().GetCrimeGoldNonViolent(), ActorVars.GetCrimeGoldNonViolent(self.GetFaction(), this))
+        totalBounty += int_if (self.IsPlayer(), self.GetFaction().GetCrimeGoldNonViolent(), RPB_ActorVars.GetCrimeGoldNonViolent(self.GetFaction(), this))
+        ; totalBounty += int_if (self.IsPlayer(), self.GetFaction().GetCrimeGoldNonViolent(), ActorVars.GetCrimeGoldNonViolent(self.GetFaction(), this))
+        ; RPB_Utility.Debug("Actor::GetActiveBounty", "Bounty Non-Violent: " + totalBounty)
     endif
 
     if (abViolent)
-        totalBounty += int_if (self.IsPlayer(), self.GetFaction().GetCrimeGoldViolent(), ActorVars.GetCrimeGoldViolent(self.GetFaction(), this))
+        totalBounty += int_if (self.IsPlayer(), self.GetFaction().GetCrimeGoldViolent(), RPB_ActorVars.GetCrimeGoldViolent(self.GetFaction(), this))
+        ; totalBounty += int_if (self.IsPlayer(), self.GetFaction().GetCrimeGoldViolent(), ActorVars.GetCrimeGoldViolent(self.GetFaction(), this))
+        ; RPB_Utility.Debug("Actor::GetActiveBounty", "Bounty Violent: " + totalBounty)
     endif
 
+    ; RPB_Utility.Debug("Actor::GetActiveBounty", "Total Bounty: " + totalBounty)
     return totalBounty
 endFunction
 
@@ -260,14 +270,14 @@ endFunction
     Queries the given stat for this faction and this Actor.
 /;
 int function QueryStat(string statName)
-    return ActorVars.GetStat(statName, self.GetFaction(), this)
+    return RPB_ActorVars.GetStat(statName, self.GetFaction(), this)
 endFunction
 
 ;/
     Sets the given stat for this faction and this Actor.
 /;
 function SetStat(string statName, int value)
-    ActorVars.SetStat(statName, self.GetFaction(), this, value)
+    RPB_ActorVars.SetStat(statName, self.GetFaction(), this, value)
     ; RPB_Actor.SetStat(statName, self.Faction, this, value)
 
     if (TrackStats)
@@ -412,14 +422,14 @@ event OnEffectStart(Actor akTarget, Actor akCaster)
 endEvent
 
 event OnEffectFinish(Actor akTarget, Actor akCaster)
-    Debug(none, "RPB_Actor::OnEffectFinish", this + " is no longer bound to " + self as string + ", detaching script!")
+    Debug("RPB_Actor::OnEffectFinish", this + " is no longer bound to " + self as string + ", detaching script!")
 
     __isEffectActive = false
     self.OnDestroy()
 endEvent
 
 event OnDetach()
-    Debug(none, "Actor::OnDetach", "Detached " + self)
+    Debug("Actor::OnDetach", "Detached " + self)
 endEvent
 
 event OnTrackedStatsEvent(string asStatFilter, int aiValue)
@@ -463,11 +473,11 @@ function UnregisterForTrackedStats()
 endFunction
 
 Actor function GetActor() ; override
-    Debug(this, "Actor::GetActor", "Actor has not been overridden for " + self.GetExtends() + ", some features may not work properly! [Implement method " + self.GetExtends() + ".GetActor()]")
+    Debug("Actor::GetActor", "Actor has not been overridden for " + self.GetExtends() + ", some features may not work properly! [Implement method " + self.GetExtends() + ".GetActor()]")
 endFunction
 
 Faction function GetFaction() ; override
-    Debug(this, "Actor::GetFaction", "Faction has not been overridden for " + self.GetExtends() + ", some features may not work properly! [Implement method " + self.GetExtends() + ".GetFaction()]")
+    Debug("Actor::GetFaction", "Faction has not been overridden for " + self.GetExtends() + ", some features may not work properly! [Implement method " + self.GetExtends() + ".GetFaction()]")
 endFunction
 
 string function GetExtends()
@@ -525,7 +535,7 @@ bool property TrackStats
     endFunction
 endProperty
 
-bool property RegisterSleepEvents auto ; currently unused
+bool property RegisterSleepEvents auto
 
 string property CurrentState
     string function get()
