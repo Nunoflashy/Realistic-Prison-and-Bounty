@@ -2,45 +2,21 @@ scriptname RPB_Actor extends ActiveMagicEffect
 {Base Actor script for RPB_Actor, must be inherited from to be used}
 
 import RPB_Utility
-import RealisticPrisonAndBounty_Config
+import RPB_Config
 
 ; ==========================================================
 ;                      Script References
 ; ==========================================================
 
-RealisticPrisonAndBounty_Config property Config
-    RealisticPrisonAndBounty_Config function get()
-        return Game.GetFormFromFile(0x3317, GetPluginName()) as RealisticPrisonAndBounty_Config
+RPB_Config property Config
+    RPB_Config function get()
+        return Game.GetFormFromFile(0x3317, GetPluginName()) as RPB_Config
     endFunction
 endProperty
 
-RealisticPrisonAndBounty_Arrest property Arrest
-    RealisticPrisonAndBounty_Arrest function get()
+RPB_Arrest property Arrest
+    RPB_Arrest function get()
         return Config.Arrest
-    endFunction
-endProperty
-
-RealisticPrisonAndBounty_Jail property Jail
-    RealisticPrisonAndBounty_Jail function get()
-        return Config.Jail
-    endFunction
-endProperty
-
-RealisticPrisonAndBounty_ArrestVars property ArrestVars
-    RealisticPrisonAndBounty_ArrestVars function get()
-        return Config.ArrestVars
-    endFunction
-endProperty
-
-RealisticPrisonAndBounty_ArrestVars property JailVars
-    RealisticPrisonAndBounty_ArrestVars function get()
-        return Config.ArrestVars
-    endFunction
-endProperty
-
-RealisticPrisonAndBounty_ActorVars property ActorVars
-    RealisticPrisonAndBounty_ActorVars function get()
-        return Config.ActorVars
     endFunction
 endProperty
 
@@ -289,7 +265,7 @@ endFunction
     Increments the given stat by the amount given.
 /;
 function IncrementStat(string statName, int incrementBy = 1)
-    ActorVars.IncrementStat(statName, self.GetFaction(), this, incrementBy)
+    RPB_ActorVars.IncrementStat(statName, self.GetFaction(), this, incrementBy)
 
     ; RPB_Utility.DebugWithArgs("Actor::IncrementStat", "statName: " + statName + ", incrementBy: " + incrementBy, "Incrementing stat")
 
@@ -302,7 +278,7 @@ endFunction
     Decrements the given stat by the amount given.
 /;
 function DecrementStat(string statName, int decrementBy = 1)
-    ActorVars.DecrementStat(statName, self.GetFaction(), this, decrementBy)
+    RPB_ActorVars.DecrementStat(statName, self.GetFaction(), this, decrementBy)
 
     if (TrackStats)
         self.OnStatChanged(statName, self.QueryStat(statName))

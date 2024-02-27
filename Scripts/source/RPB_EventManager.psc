@@ -1,28 +1,22 @@
-scriptname RealisticPrisonAndBounty_EventManager extends Quest
+scriptname RPB_EventManager extends Quest
 
-import RealisticPrisonAndBounty_Config
+import RPB_Config
 import RPB_Utility
 
-RealisticPrisonAndBounty_Config property Config
-    RealisticPrisonAndBounty_Config function get()
-        return Game.GetFormFromFile(0x3317, GetPluginName()) as RealisticPrisonAndBounty_Config
+RPB_Config property Config
+    RPB_Config function get()
+        return Game.GetFormFromFile(0x3317, GetPluginName()) as RPB_Config
     endFunction
 endProperty
 
-RealisticPrisonAndBounty_Arrest property Arrest
-    RealisticPrisonAndBounty_Arrest function get()
+RPB_Arrest property Arrest
+    RPB_Arrest function get()
         return Config.Arrest
     endFunction
 endProperty
 
-RealisticPrisonAndBounty_Jail property Jail
-    RealisticPrisonAndBounty_Jail function get()
-        return Config.Jail
-    endFunction
-endProperty
-
-RealisticPrisonAndBounty_SceneManager property SceneManager
-    RealisticPrisonAndBounty_SceneManager function get()
+RPB_SceneManager property SceneManager
+    RPB_SceneManager function get()
         return Config.SceneManager
     endFunction
 endProperty
@@ -315,45 +309,45 @@ endEvent
 ;                         Jail Events
 ; ==========================================================
 
-event OnJailBegin(string eventName, string strArg, float numArg, Form sender)
-    Actor prisoner = (sender as Actor)
+; event OnJailBegin(string eventName, string strArg, float numArg, Form sender)
+;     Actor prisoner = (sender as Actor)
 
-    if (!prisoner)
-        Error("sender is not an Actor, failed check! [sender: "+ sender +"]")
-        Debug("EventManager::OnJailBegin", "sender is not an Actor, failed check! [sender: "+ sender +"]")
-        return
-    endif
+;     if (!prisoner)
+;         Error("sender is not an Actor, failed check! [sender: "+ sender +"]")
+;         Debug("EventManager::OnJailBegin", "sender is not an Actor, failed check! [sender: "+ sender +"]")
+;         return
+;     endif
 
-    RPB_Prisoner prisonerRef = Jail.GetPrisonerReference(prisoner)
+;     RPB_Prisoner prisonerRef = Jail.GetPrisonerReference(prisoner)
 
-    if (!prisonerRef)
-        Error("Actor " + prisoner + " is not registered as a prisoner, there is no reference. Returning...")
-        Debug("EventManager::OnJailBegin", "Actor " + prisoner + " is not registered as a prisoner, there is no reference. Returning...")
-        return
-    endif
+;     if (!prisonerRef)
+;         Error("Actor " + prisoner + " is not registered as a prisoner, there is no reference. Returning...")
+;         Debug("EventManager::OnJailBegin", "Actor " + prisoner + " is not registered as a prisoner, there is no reference. Returning...")
+;         return
+;     endif
 
-    Jail.OnJailBegin(prisonerRef)
-endEvent
+;     Jail.OnJailBegin(prisonerRef)
+; endEvent
 
-event OnPrisonActionRequest(string eventName, string actionName, float numArg, Form sender)
-    Actor prisoner = (sender as Actor)
+; event OnPrisonActionRequest(string eventName, string actionName, float numArg, Form sender)
+;     Actor prisoner = (sender as Actor)
 
-    if (!prisoner)
-        Error("sender is not an Actor, failed check! [sender: "+ sender +"]")
-        Debug("EventManager::OnPrisonActionRequest", "sender is not an Actor, failed check! [sender: "+ sender +"]")
-        return
-    endif
+;     if (!prisoner)
+;         Error("sender is not an Actor, failed check! [sender: "+ sender +"]")
+;         Debug("EventManager::OnPrisonActionRequest", "sender is not an Actor, failed check! [sender: "+ sender +"]")
+;         return
+;     endif
 
-    RPB_Prisoner prisonerRef = Jail.GetPrisonerReference(prisoner)
+;     RPB_Prisoner prisonerRef = Jail.GetPrisonerReference(prisoner)
 
-    if (!prisonerRef)
-        Error("Actor " + prisoner + " is not registered as a prisoner, there is no reference. Returning...")
-        Debug("EventManager::OnPrisonActionRequest", "Actor " + prisoner + " is not registered as a prisoner, there is no reference. Returning...")
-        return
-    endif
+;     if (!prisonerRef)
+;         Error("Actor " + prisoner + " is not registered as a prisoner, there is no reference. Returning...")
+;         Debug("EventManager::OnPrisonActionRequest", "Actor " + prisoner + " is not registered as a prisoner, there is no reference. Returning...")
+;         return
+;     endif
 
-    Jail.OnPrisonActionRequest(actionName, prisonerRef)
-endEvent
+;     Jail.OnPrisonActionRequest(actionName, prisonerRef)
+; endEvent
 
 
 ; ==========================================================

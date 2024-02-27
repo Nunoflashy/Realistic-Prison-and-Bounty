@@ -1,6 +1,6 @@
 scriptname RealisticPrisonAndBounty_Outfit extends Quest
 
-import RealisticPrisonAndBounty_Util
+import RPB_Utility
 
 Armor property Head
     Armor function get()

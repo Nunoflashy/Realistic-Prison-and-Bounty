@@ -151,7 +151,7 @@ endState
 
 state Test_Arrest_And_Imprison_Multiple_Actors_With_Scene
     function Setup()
-        RealisticPrisonAndBounty_Arrest arrest = RPB_API.GetArrest()
+        RPB_Arrest arrest = RPB_API.GetArrest()
 
         Actor player = Game.GetFormEx(0x14) as Actor
     
@@ -263,7 +263,7 @@ state Test_Configure_Prisons
     function Setup()
         ; Simulate LoadGame when Prisons are set up
         RPB_PrisonManager prisonManager         = RPB_API.GetPrisonManager()
-        RealisticPrisonAndBounty_Config config  = API.Config
+        RPB_Config config  = API.Config
 
         API.Config.SetPrisons()
 
@@ -336,7 +336,7 @@ state Test_Arrest_Selected_NPC_Escort_Scene
             randomGuard.GetCrimeFaction().SetCrimeGold(2000)
         endif
         ; Get reference to arrest script
-        RealisticPrisonAndBounty_Arrest arrest = API.Arrest
+        RPB_Arrest arrest = API.Arrest
         arrest.ArrestActor(randomGuard, selectedNPC, arrest.ARREST_TYPE_ESCORT_TO_JAIL)
         ; ReferenceAlias escortee1 = API.SceneManager.GetEscortee(1)
         ; BindAliasTo(escortee1, API.Config.Player)

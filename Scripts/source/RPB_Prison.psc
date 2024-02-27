@@ -1,7 +1,7 @@
 Scriptname RPB_Prison extends ReferenceAlias  
 
 import Math
-import RealisticPrisonAndBounty_Config
+import RPB_Config
 import RPB_Utility
 
 ; ==========================================================
@@ -20,14 +20,14 @@ RPB_PrisonManager property PrisonManager
     endFunction
 endProperty
 
-RealisticPrisonAndBounty_Config property Config
-    RealisticPrisonAndBounty_Config function get()
+RPB_Config property Config
+    RPB_Config function get()
         return PrisonManager.Config
     endFunction
 endProperty
 
-RealisticPrisonAndBounty_SceneManager property SceneManager
-    RealisticPrisonAndBounty_SceneManager function get()
+RPB_SceneManager property SceneManager
+    RPB_SceneManager function get()
         return PrisonManager.SceneManager
     endFunction
 endProperty
@@ -707,6 +707,25 @@ int function GetRandomSentence(int aiMinSentence, int aiMaxSentence)
     )
 endFunction
 
+function RestrainPrisoner(RPB_Prisoner apPrisoner, bool abRestrainInFront = false)
+    ; Temporary cuffs using ZaZ
+    ; Hand Cuffs Backside Rusty - 0xA081D2F
+    ; Hand Cuffs Front Rusty - 0xA081D33
+    ; Hand Cuffs Front Shiny - 0xA081D34
+    ; Hand Cuffs Crossed Front 01 - 0xA033D9D
+    ; Hands Crossed Front in Scarfs - 0xA073A14
+    ; Hands in Irons Front Black - 0xA033D9E
+    Form cuffs = Game.GetFormEx(0xA081D2F)
+    if (abRestrainInFront)
+        cuffs = Game.GetFormEx(0xA081D33)
+    endif
+
+    apPrisoner.GetActor().SheatheWeapon()
+    UnequipHandsForActor(apPrisoner.GetActor())
+    apPrisoner.GetActor().EquipItem(cuffs, true, true)
+endFunction
+
+
 bool function HasPrisoners(RPB_JailCell akPrisonCell = none)
 
 endFunction
@@ -1173,6 +1192,10 @@ event OnPrisonerDeath(RPB_Prisoner apPrisoner, Actor akKiller)
 
 endEvent
 
+event OnEscortPrisonerToJailBegin(RPB_Actor apActor, Actor akEscort)
+    (apActor as RPB_Arrestee).Cuff()
+endEvent
+
 event OnEscortPrisonerToJailEnd(RPB_Actor apActor, Actor akEscort)
     ; Retrieve or make the Actor a Prisoner
     RPB_Prisoner prisonerRef = RPB_Utility.ame_if (apActor as RPB_Prisoner, apActor, (apActor as RPB_Arrestee).MakePrisoner()) as RPB_Prisoner
@@ -1183,8 +1206,14 @@ event OnEscortPrisonerToJailEnd(RPB_Actor apActor, Actor akEscort)
 
     ; if should be stripped
     prisonerRef.StartStripping(akEscort)
+    ; prisonerRef.EscortToCell(akEscort)
 endEvent
 
+event OnEscortPrisonerToCellBegin(RPB_Prisoner apPrisoner, Actor akEscort)
+    Debug("Prison::OnEscortPrisonerToCellBegin", "Event fired but it has no implementation!")
+endEvent
+
+; TODO: Remove RPB_JailCell from params. since a Prisoner already has a jail cell assigned to them
 event OnEscortPrisonerToCellEnd(RPB_Prisoner apPrisoner, RPB_JailCell akJailCell, Actor akEscort)
     if (apPrisoner.IsStrippedNaked || apPrisoner.IsStrippedToUnderwear)
         ; return
@@ -1196,13 +1225,21 @@ event OnEscortPrisonerToCellEnd(RPB_Prisoner apPrisoner, RPB_JailCell akJailCell
     ; apPrisoner.StartStripping(akEscort)
 endEvent
 
+event OnEscortPrisonerFromCellBegin(RPB_Prisoner apPrisoner, Actor akEscort)
+    Debug("Prison::OnEscortPrisonerFromCellBegin", "Event fired but it has no implementation!")
+endEvent
+
+event OnEscortPrisonerFromCellEnd(RPB_Prisoner apPrisoner, Actor akEscort)
+    Debug("Prison::OnEscortPrisonerFromCellEnd", "Event fired but it has no implementation!")
+endEvent
+
 event OnPrisonerStripBegin(RPB_Prisoner apPrisoner, Actor akStripper)
     apPrisoner.Strip()
 endEvent
 
 event OnPrisonerStripEnd(RPB_Prisoner apPrisoner, Actor akStripper)
     if (!apPrisoner.IsInCell)
-        apPrisoner.StartRestraining(akStripper)
+        ; apPrisoner.StartRestraining(akStripper)
         apPrisoner.EscortToCell(akStripper)
     endif
 
@@ -1955,6 +1992,72 @@ function ImprisonActorImmediately(Actor akActor)
     prisonerRef.ProcessWhenMoved()
     prisonerRef.SetSentence(self.GetRandomSentence(0, 75))
 endFunction
+
+; ==========================================================
+;                       Infamy Messages
+; ==========================================================
+
+;/
+    Properties used to determine if infamy messages have fired at least once,
+    determines for both Recognized and Known thresholds
+/;
+bool property HasInfamyRecognizedNotificationFired
+    bool function get()
+        return RPB_StorageVars.GetBool("Jail::Infamy Recognized Threshold Notification")
+    endFunction
+endProperty
+
+bool property HasInfamyKnownNotificationFired
+    bool function get()
+        return RPB_StorageVars.GetBool("Jail::Infamy Known Threshold Notification")
+    endFunction
+endProperty
+
+string property InfamyRecognizedSentenceAppliedNotification
+    string function get()
+        return "Due to being a recognized criminal in the hold, your sentence was extended"
+    endFunction
+endProperty
+
+string property InfamyKnownSentenceAppliedNotification
+    string function get()
+        return "Due to being a known criminal in the hold, your sentence was extended"
+    endFunction
+endProperty
+
+function NotifyInfamyRecognizedThresholdMet(string hold, bool asNotification = false)
+    if (RPB_StorageVars.GetBool("["+ hold +"]Jail::Infamy Recognized Threshold Message Sent"))
+        return
+    endif
+
+    RPB_StorageVars.SetBool("["+ hold +"]Jail::Infamy Recognized Threshold Message Sent", true)
+    RPB_StorageVars.SetBool("Jail::Infamy Recognized Threshold Notification", true)
+
+    if (config.ShouldDisplayInfamyNotifications && asNotification)
+        debug.notification("You are now recognized as a criminal in " + hold)
+        return
+    endif
+
+    debug.MessageBox("You are now recognized as a criminal in " + hold)
+endFunction
+
+function NotifyInfamyKnownThresholdMet(string hold, bool asNotification = false)
+    if (RPB_StorageVars.GetBool("["+ hold +"]Jail::Infamy Known Threshold Message Sent"))
+        return
+    endif
+
+    RPB_StorageVars.SetBool("["+ hold +"]Jail::Infamy Known Threshold Message Sent", true)
+    RPB_StorageVars.SetBool("Jail::Infamy Known Threshold Notification", true)
+
+    if (config.ShouldDisplayInfamyNotifications && asNotification)
+        debug.notification("You are now a known criminal in " + hold)
+        return
+    endif
+
+    debug.MessageBox("You are now a known criminal in " + hold)
+endFunction
+
+; ==========================================================
 
 ; ==========================================================
 ;                           States

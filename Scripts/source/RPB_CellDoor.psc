@@ -2,27 +2,15 @@ scriptname RPB_CellDoor extends ObjectReference
 
 import Math
 import RPB_Utility
-import RealisticPrisonAndBounty_Config
+import RPB_Config
 
 ; ==========================================================
 ;                     Script References
 ; ==========================================================
 
-RealisticPrisonAndBounty_Config property Config
-    RealisticPrisonAndBounty_Config function get()
-        return Game.GetFormFromFile(0x3317, GetPluginName()) as RealisticPrisonAndBounty_Config
-    endFunction
-endProperty
-
-RealisticPrisonAndBounty_ArrestVars property ArrestVars
-    RealisticPrisonAndBounty_ArrestVars function get()
-        return Config.ArrestVars
-    endFunction
-endProperty
-
-RealisticPrisonAndBounty_MiscVars property MiscVars
-    RealisticPrisonAndBounty_MiscVars function get()
-        return Config.MiscVars
+RPB_Config property Config
+    RPB_Config function get()
+        return Game.GetFormFromFile(0x3317, GetPluginName()) as RPB_Config
     endFunction
 endProperty
 
@@ -343,85 +331,4 @@ endFunction
 
 Form function GetOptionOfTypeForm(string asOption, string asOptionCategory, string[] asArrOptionsSubCategories = none)
     return RPB_Data.CellDoor_GetOptionOfTypeForm(JailCell.GetDataObject(), self, asOption, asOptionCategory, asArrOptionsSubCategories)
-endFunction
-
-; =========================================================
-;                         Cell Vars                      
-; =========================================================
-
-string function __getCellIdentifierVarKey(string asVarName)
-    return "["+ self.GetFormID() +"]Cell::" + asVarName
-endFunction
-
-;                           Getters
-bool function Cell_GetBool(string asVarName)
-    string identifierKey = __getCellIdentifierVarKey(asVarName)
-    return ArrestVars.GetBool(identifierKey)
-endFunction
-
-int function Cell_GetInt(string asVarName)
-    string identifierKey = __getCellIdentifierVarKey(asVarName)
-    return ArrestVars.GetInt(identifierKey)
-endFunction
-
-float function Cell_GetFloat(string asVarName)
-    string identifierKey = __getCellIdentifierVarKey(asVarName)
-    return ArrestVars.GetFloat(identifierKey)
-endFunction
-
-string function Cell_GetString(string asVarName)
-    string identifierKey = __getCellIdentifierVarKey(asVarName)
-    return ArrestVars.GetString(identifierKey)
-endFunction
-
-Form function Cell_GetForm(string asVarName)
-    string identifierKey = __getCellIdentifierVarKey(asVarName)
-    return ArrestVars.GetForm(identifierKey)
-endFunction
-
-ObjectReference function Cell_GetReference(string asVarName)
-    string identifierKey = __getCellIdentifierVarKey(asVarName)
-    return ArrestVars.GetReference(identifierKey)
-endFunction
-
-Actor function Cell_GetActor(string asVarName)
-    string identifierKey = __getCellIdentifierVarKey(asVarName)
-    return ArrestVars.GetActor(identifierKey)
-endFunction
-
-;                           Setters
-function Cell_SetBool(string asVarName, bool abValue)
-
-endFunction
-
-function Cell_SetInt(string asVarName, int aiValue, int aiMinValue = 0, int aiMaxValue = 0)
-
-endFunction
-
-function Cell_ModInt(string asVarName, int aiValue)
-
-endFunction
-
-function Cell_SetFloat(string asVarName, float afValue)
-
-endFunction
-
-function Cell_ModFloat(string asVarName, float afValue)
-
-endFunction
-
-function Cell_SetString(string asVarName, string asValue)
-
-endFunction
-
-function Cell_SetForm(string asVarName, Form akValue)
-
-endFunction
-
-function Cell_SetReference(string asVarName, ObjectReference akValue)
-
-endFunction
-
-function Cell_SetActor(string asVarName, Actor akValue)
-
 endFunction

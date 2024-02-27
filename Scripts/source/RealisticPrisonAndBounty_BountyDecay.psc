@@ -1,14 +1,14 @@
 Scriptname RealisticPrisonAndBounty_BountyDecay extends ReferenceAlias  
 
-import RealisticPrisonAndBounty_Util
-import RealisticPrisonAndBounty_Config
+import RPB_Utility
+import RPB_Config
 import Math
 
 int holdDecayTimers
 
-RealisticPrisonAndBounty_Config property config
-    RealisticPrisonAndBounty_Config function get()
-        return Game.GetFormFromFile(0x3317, GetPluginName()) as RealisticPrisonAndBounty_Config
+RPB_Config property config
+    RPB_Config function get()
+        return Game.GetFormFromFile(0x3317, GetPluginName()) as RPB_Config
     endFunction
 endProperty
 

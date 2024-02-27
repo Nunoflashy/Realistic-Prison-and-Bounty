@@ -30,9 +30,9 @@ RPB_API property API
     endFunction
 endProperty
 
-RealisticPrisonAndBounty_Config __config
-RealisticPrisonAndBounty_Config property Config
-    RealisticPrisonAndBounty_Config function get()
+RPB_Config __config
+RPB_Config property Config
+    RPB_Config function get()
         if (__config)
             return __config
         endif
@@ -42,9 +42,9 @@ RealisticPrisonAndBounty_Config property Config
     endFunction
 endProperty
 
-RealisticPrisonAndBounty_SceneManager __sceneManager
-RealisticPrisonAndBounty_SceneManager property SceneManager
-    RealisticPrisonAndBounty_SceneManager function get()
+RPB_SceneManager __sceneManager
+RPB_SceneManager property SceneManager
+    RPB_SceneManager function get()
         return API.SceneManager
         if (__sceneManager)
             return __sceneManager

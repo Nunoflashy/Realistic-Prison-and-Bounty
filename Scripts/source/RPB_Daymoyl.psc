@@ -1,6 +1,6 @@
-Scriptname RealisticPrisonAndBounty_Daymoyl extends daymoyl_QuestTemplate
+Scriptname RPB_Daymoyl extends daymoyl_QuestTemplate
 
-RealisticPrisonAndBounty_Config property config auto
+RPB_Config property config auto
 
 bool function QuestCondition(Location akLocation, Actor akAggressor, Actor akFollower)
     Faction arrestFaction = akAggressor.GetCrimeFaction()

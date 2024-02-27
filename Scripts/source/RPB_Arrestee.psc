@@ -1,7 +1,7 @@
 Scriptname RPB_Arrestee extends RPB_Actor
 
 import RPB_Utility
-import RealisticPrisonAndBounty_Config
+import RPB_Config
 
 ;/
     The Actor that has arrested this Arrestee.
@@ -157,8 +157,8 @@ function SetArrestParameters(string asArrestType, Actor akCaptor, Faction akCrim
         ; Debug(none, "Arrestee::SetArrestParameters", "Arrest is being done through a captor ("+ akCaptor +")")
 
         ; Temporary
-        BindAliasTo(Arrest.CaptorRef, akCaptor)
-        Arrest.CaptorRef.AssignArrestee(this)
+        ; BindAliasTo(Arrest.CaptorRef, akCaptor)
+        ; Arrest.CaptorRef.AssignArrestee(this)
     endif
 
     if (!akCrimeFaction)
@@ -342,7 +342,7 @@ function EscortToPrison(bool abEscortDirectlyToCell = false)
     Arrest.SceneManager.StartArrestScene( \
         akGuard     = Captor, \
         akArrestee  = this, \
-        asScene     = Arrest.SceneManager.SCENE_ARREST_START_01 \
+        asScene     = Arrest.SceneManager.SCENE_ARREST_START_02 \
     )
 
     Debug("Arrestee::EscortToPrison", "Captor: " + Captor + ", this: " + this + ", Arrest Scene: " + Arrest.GetArrestScene(this))
@@ -418,13 +418,13 @@ function MoveToPrison(bool abMoveDirectlyToCell = false)
 endFunction
 
 function ChangeEscort(Actor akNewEscort)
-    Arrest_SetReference("Arresting Guard", akNewEscort)
-    ; Arrest.RegisterCaptor() || Arrest.MarkActorAsCaptor(akNewEscort)
-    Arrest.SceneManager.StartEscortToJail( \
-        akEscortLeader      = akNewEscort, \
-        akEscortedPrisoner  = this, \
-        akPrisonerChest     = ArrestVars.PrisonerItemsContainer \
-    )
+    ; Arrest_SetReference("Arresting Guard", akNewEscort)
+    ; ; Arrest.RegisterCaptor() || Arrest.MarkActorAsCaptor(akNewEscort)
+    ; Arrest.SceneManager.StartEscortToJail( \
+    ;     akEscortLeader      = akNewEscort, \
+    ;     akEscortedPrisoner  = this, \
+    ;     akPrisonerChest     = ArrestVars.PrisonerItemsContainer \
+    ; )
 endFunction
 
 ; ==========================================================

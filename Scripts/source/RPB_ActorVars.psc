@@ -67,6 +67,17 @@ function SetCurrentInfamy(Faction akFaction, Actor akActor, int value) global
     SetIntOnForm(akFaction.GetName() + "::Current Infamy", akActor, value, "ActorVars")
 endFunction
 
+function IncrementStat(string statName, Faction akFaction, Actor akActor, int incrementBy = 1) global
+    int currentValue = GetStat(statName, akFaction, akActor)
+    SetStat(statName, akFaction, akActor, currentValue + incrementBy)
+endFunction
+
+function DecrementStat(string statName, Faction akFaction, Actor akActor, int decrementBy = 1) global
+    int currentValue = GetStat(statName, akFaction, akActor)
+    SetStat(statName, akFaction, akActor, currentValue - decrementBy)
+endFunction
+
+
 ;                       Prison Related
 ; ==========================================================
 function SetTimeJailedInPrison(RPB_Prison apPrison, RPB_Prisoner apPrisoner, float value) global

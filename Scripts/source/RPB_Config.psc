@@ -1,4 +1,4 @@
-Scriptname RealisticPrisonAndBounty_Config extends Quest
+Scriptname RPB_Config extends Quest
 
 import RPB_Utility
 import PO3_SKSEFunctions
@@ -29,15 +29,11 @@ Form property mainAPI
     endFunction
 endProperty
 
-RPB_API                                 property API auto
-RPB_MCM                                 property MCM auto
-RealisticPrisonAndBounty_Arrest         property Arrest auto
-RealisticPrisonAndBounty_Jail           property Jail auto
-RealisticPrisonAndBounty_ArrestVars     property ArrestVars auto
-RealisticPrisonAndBounty_ActorVars      property ActorVars auto
-RealisticPrisonAndBounty_MiscVars       property MiscVars auto
-RealisticPrisonAndBounty_SceneManager   property SceneManager auto
-RealisticPrisonAndBounty_EventManager   property EventManager auto
+RPB_API            property API auto
+RPB_MCM            property MCM auto
+RPB_Arrest         property Arrest auto
+RPB_SceneManager   property SceneManager auto
+RPB_EventManager   property EventManager auto
 
 
 ; Called from ConfigAlias
@@ -94,97 +90,97 @@ bool function SetPrisons()
 endFunction
 
 bool function SetJailTeleportReleaseLocations()
-    miscVars.SetForm("Jail::Release::Teleport[Whiterun]", Game.GetFormEx(0x3EF19)) ; FormID Invalid
-    miscVars.SetForm("Jail::Release::Teleport[Eastmarch]", Game.GetFormEx(0x3EF19)) ; FormID Invalid
-    miscVars.SetForm("Jail::Release::Teleport[Falkreath]", Game.GetFormEx(0x3EF19)) ; FormID Invalid
-    miscVars.SetForm("Jail::Release::Teleport[Haafingar]", Game.GetFormEx(0x3EF19))
-    miscVars.SetForm("Jail::Release::Teleport[Hjaalmarch]", Game.GetFormEx(0x3EF19)) ; FormID Invalid
-    miscVars.SetForm("Jail::Release::Teleport[The Rift]", Game.GetFormEx(0x3EF19)) ; FormID Invalid
-    miscVars.SetForm("Jail::Release::Teleport[The Pale]", Game.GetFormEx(0x3EF19)) ; FormID Invalid
+    ; miscVars.SetForm("Jail::Release::Teleport[Whiterun]", Game.GetFormEx(0x3EF19)) ; FormID Invalid
+    ; miscVars.SetForm("Jail::Release::Teleport[Eastmarch]", Game.GetFormEx(0x3EF19)) ; FormID Invalid
+    ; miscVars.SetForm("Jail::Release::Teleport[Falkreath]", Game.GetFormEx(0x3EF19)) ; FormID Invalid
+    ; miscVars.SetForm("Jail::Release::Teleport[Haafingar]", Game.GetFormEx(0x3EF19))
+    ; miscVars.SetForm("Jail::Release::Teleport[Hjaalmarch]", Game.GetFormEx(0x3EF19)) ; FormID Invalid
+    ; miscVars.SetForm("Jail::Release::Teleport[The Rift]", Game.GetFormEx(0x3EF19)) ; FormID Invalid
+    ; miscVars.SetForm("Jail::Release::Teleport[The Pale]", Game.GetFormEx(0x3EF19)) ; FormID Invalid
 
     return true
 endFunction
 
 bool function SetJailPrisonerContainers()
-    miscVars.SetForm("Jail::Containers[Whiterun]", Game.GetFormEx(0x3EEFF)) ; FormID Invalid
-    miscVars.SetForm("Jail::Containers[Eastmarch]", Game.GetFormEx(0x3EEFF)) ; FormID Invalid
-    miscVars.SetForm("Jail::Containers[Falkreath]", Game.GetFormEx(0x3EEFF)) ; FormID Invalid
-    miscVars.SetForm("Jail::Containers[Haafingar]", Game.GetFormEx(0x3EEFF))
-    miscVars.SetForm("Jail::Containers[Hjaalmarch]", Game.GetFormEx(0x3EEFF)) ; FormID Invalid
-    miscVars.SetForm("Jail::Containers[The Rift]", Game.GetFormEx(0x3EEFF)) ; FormID Invalid
-    miscVars.SetForm("Jail::Containers[The Pale]", Game.GetFormEx(0x3EEFF)) ; FormID Invalid
+    ; miscVars.SetForm("Jail::Containers[Whiterun]", Game.GetFormEx(0x3EEFF)) ; FormID Invalid
+    ; miscVars.SetForm("Jail::Containers[Eastmarch]", Game.GetFormEx(0x3EEFF)) ; FormID Invalid
+    ; miscVars.SetForm("Jail::Containers[Falkreath]", Game.GetFormEx(0x3EEFF)) ; FormID Invalid
+    ; miscVars.SetForm("Jail::Containers[Haafingar]", Game.GetFormEx(0x3EEFF))
+    ; miscVars.SetForm("Jail::Containers[Hjaalmarch]", Game.GetFormEx(0x3EEFF)) ; FormID Invalid
+    ; miscVars.SetForm("Jail::Containers[The Rift]", Game.GetFormEx(0x3EEFF)) ; FormID Invalid
+    ; miscVars.SetForm("Jail::Containers[The Pale]", Game.GetFormEx(0x3EEFF)) ; FormID Invalid
 
     return true
 endFunction
 
 bool function SetHoldLocations()
-    if (miscVars.Exists("Locations"))
-        return true
-    endif
+    ; if (miscVars.Exists("Locations"))
+    ;     return true
+    ; endif
 
-    miscVars.AddFormToArray("Locations[Whiterun]", Game.GetForm(0x00018A56))
-    miscVars.AddFormToArray("Locations[Whiterun]", Game.GetForm(0x00016772))
+    ; miscVars.AddFormToArray("Locations[Whiterun]", Game.GetForm(0x00018A56))
+    ; miscVars.AddFormToArray("Locations[Whiterun]", Game.GetForm(0x00016772))
 
-    miscVars.AddFormToArray("Locations[Winterhold]", Game.GetForm(0x00018A51))
-    miscVars.AddFormToArray("Locations[Winterhold]", Game.GetForm(0x0001676B))
+    ; miscVars.AddFormToArray("Locations[Winterhold]", Game.GetForm(0x00018A51))
+    ; miscVars.AddFormToArray("Locations[Winterhold]", Game.GetForm(0x0001676B))
 
-    miscVars.AddFormToArray("Locations[Eastmarch]", Game.GetForm(0x00018A57))
-    miscVars.AddFormToArray("Locations[Eastmarch]", Game.GetForm(0x0001676A))
+    ; miscVars.AddFormToArray("Locations[Eastmarch]", Game.GetForm(0x00018A57))
+    ; miscVars.AddFormToArray("Locations[Eastmarch]", Game.GetForm(0x0001676A))
 
-    miscVars.AddFormToArray("Locations[Falkreath]", Game.GetForm(0x00018A49))
-    miscVars.AddFormToArray("Locations[Falkreath]", Game.GetForm(0x0001676F))
+    ; miscVars.AddFormToArray("Locations[Falkreath]", Game.GetForm(0x00018A49))
+    ; miscVars.AddFormToArray("Locations[Falkreath]", Game.GetForm(0x0001676F))
 
-    miscVars.AddFormToArray("Locations[Haafingar]", Game.GetForm(0x00018A5A))
-    miscVars.AddFormToArray("Locations[Haafingar]", Game.GetForm(0x00016770))
+    ; miscVars.AddFormToArray("Locations[Haafingar]", Game.GetForm(0x00018A5A))
+    ; miscVars.AddFormToArray("Locations[Haafingar]", Game.GetForm(0x00016770))
 
-    miscVars.AddFormToArray("Locations[Hjaalmarch]", Game.GetForm(0x00018A53))
-    miscVars.AddFormToArray("Locations[Hjaalmarch]", Game.GetForm(0x0001676E))
+    ; miscVars.AddFormToArray("Locations[Hjaalmarch]", Game.GetForm(0x00018A53))
+    ; miscVars.AddFormToArray("Locations[Hjaalmarch]", Game.GetForm(0x0001676E))
 
-    miscVars.AddFormToArray("Locations[The Rift]", Game.GetForm(0x00018A58))
-    miscVars.AddFormToArray("Locations[The Rift]", Game.GetForm(0x0001676C))
+    ; miscVars.AddFormToArray("Locations[The Rift]", Game.GetForm(0x00018A58))
+    ; miscVars.AddFormToArray("Locations[The Rift]", Game.GetForm(0x0001676C))
 
-    miscVars.AddFormToArray("Locations[The Reach]", Game.GetForm(0x00018A59))
-    miscVars.AddFormToArray("Locations[The Reach]", Game.GetForm(0x00016769))
+    ; miscVars.AddFormToArray("Locations[The Reach]", Game.GetForm(0x00018A59))
+    ; miscVars.AddFormToArray("Locations[The Reach]", Game.GetForm(0x00016769))
 
-    miscVars.AddFormToArray("Locations[The Pale]", Game.GetForm(0x00018A50))
-    miscVars.AddFormToArray("Locations[The Pale]", Game.GetForm(0x0001676D))
+    ; miscVars.AddFormToArray("Locations[The Pale]", Game.GetForm(0x00018A50))
+    ; miscVars.AddFormToArray("Locations[The Pale]", Game.GetForm(0x0001676D))
 
-    miscVars.CreateStringMap("Locations")
-    int i = 0
-    while (i < Holds.Length)
-        string hold = Holds[i]
-        if (miscVars.Exists("Locations["+ hold +"]"))
-            miscVars.AddToContainer("Locations", "Locations["+ hold +"]")
-        endif
-        i += 1
-    endWhile
+    ; miscVars.CreateStringMap("Locations")
+    ; int i = 0
+    ; while (i < Holds.Length)
+    ;     string hold = Holds[i]
+    ;     if (miscVars.Exists("Locations["+ hold +"]"))
+    ;         miscVars.AddToContainer("Locations", "Locations["+ hold +"]")
+    ;     endif
+    ;     i += 1
+    ; endWhile
 
-    Debug("Config::SetHoldLocations", "Length: " + miscVars.GetLengthOf("Locations"))
+    ; Debug("Config::SetHoldLocations", "Length: " + miscVars.GetLengthOf("Locations"))
 
     return true
 endFunction
 
 bool function IsInLocationFromHold(string hold)
-; float x = StartBenchmark()
+; ; float x = StartBenchmark()
 
-    if (!miscVars.Exists("Locations["+ hold +"]"))
-        Error("Location does not exist for this hold.")
-        return false
-    endif
+;     if (!miscVars.Exists("Locations["+ hold +"]"))
+;         Error("Location does not exist for this hold.")
+;         return false
+;     endif
 
-    int i = 0
-    while (i < miscVars.GetLengthOf("Locations["+ hold +"]"))
-        Location holdLocation = miscVars.GetFormFromArray("Locations["+ hold +"]", i) as Location
-        ; As soon as the player is in any location for this hold, return.
-        if (Player.IsInLocation(holdLocation))
-            Debug("IsInLocationFromHold", "Player is in location: " + holdLocation.GetName() + " ("+ holdLocation.GetFormID() +")", MCM.IS_DEBUG)
-        ;    EndBenchmark(x, i + " iterations (IsLocationFromHold): returned true")
+;     int i = 0
+;     while (i < miscVars.GetLengthOf("Locations["+ hold +"]"))
+;         Location holdLocation = miscVars.GetFormFromArray("Locations["+ hold +"]", i) as Location
+;         ; As soon as the player is in any location for this hold, return.
+;         if (Player.IsInLocation(holdLocation))
+;             Debug("IsInLocationFromHold", "Player is in location: " + holdLocation.GetName() + " ("+ holdLocation.GetFormID() +")", MCM.IS_DEBUG)
+;         ;    EndBenchmark(x, i + " iterations (IsLocationFromHold): returned true")
 
-            return true
-        endif
-        i += 1
-    endWhile
-; EndBenchmark(x, i + " iterations (IsInLocationFromHold): returned false")
+;             return true
+;         endif
+;         i += 1
+;     endWhile
+; ; EndBenchmark(x, i + " iterations (IsInLocationFromHold): returned false")
 
     return false
 endFunction
@@ -192,17 +188,17 @@ endFunction
 bool function IsLocationFromHold(string hold, Location akLocation)
 ; float x = StartBenchmark()
 
-    int i = 0
-    while (i < miscVars.Exists("Locations["+ hold +"]"))
-        Location currentIteration = miscVars.GetFormFromArray("Locations["+ hold +"]", i) as Location
-        if (currentIteration == akLocation)
-; EndBenchmark(x, i + " iterations (IsLocationFromHold): returned true")
+;     int i = 0
+;     while (i < miscVars.Exists("Locations["+ hold +"]"))
+;         Location currentIteration = miscVars.GetFormFromArray("Locations["+ hold +"]", i) as Location
+;         if (currentIteration == akLocation)
+; ; EndBenchmark(x, i + " iterations (IsLocationFromHold): returned true")
 
-            return true
-        endif
-        i += 1
-    endWhile
-; EndBenchmark(x, i + " iterations (IsInLocationFromHold): returned false")
+;             return true
+;         endif
+;         i += 1
+;     endWhile
+; ; EndBenchmark(x, i + " iterations (IsInLocationFromHold): returned false")
 
     return false
 endFunction
@@ -231,29 +227,29 @@ endFunction
 string function GetCurrentPlayerHoldLocation()
 ;    float x = StartBenchmark()
 
-    int holdIndex = 0
-    while (holdIndex < Holds.Length)
-        string hold = Holds[holdIndex]
-        int holdArrayLen = miscVars.GetLengthOf("Locations["+ hold +"]")
-        int locationIndex = 0
-        while (locationIndex < holdArrayLen)
-            Location holdLocation = miscVars.GetFormFromArray("Locations["+ hold +"]", locationIndex) as Location
-            if (Player.IsInLocation(holdLocation))
-            ;    EndBenchmark(x, (locationIndex * holdIndex) + " iterations (GetCurrentPlayerHoldLocation): returned " + Holds[holdIndex])
+;     int holdIndex = 0
+;     while (holdIndex < Holds.Length)
+;         string hold = Holds[holdIndex]
+;         int holdArrayLen = miscVars.GetLengthOf("Locations["+ hold +"]")
+;         int locationIndex = 0
+;         while (locationIndex < holdArrayLen)
+;             Location holdLocation = miscVars.GetFormFromArray("Locations["+ hold +"]", locationIndex) as Location
+;             if (Player.IsInLocation(holdLocation))
+;             ;    EndBenchmark(x, (locationIndex * holdIndex) + " iterations (GetCurrentPlayerHoldLocation): returned " + Holds[holdIndex])
 
-                return hold
-            endif
-            locationIndex += 1
-        endWhile
-        holdIndex += 1
-    endWhile
-;    EndBenchmark(x, holdIndex + " iterations (GetCurrentPlayerHoldLocation): returned nothing")
+;                 return hold
+;             endif
+;             locationIndex += 1
+;         endWhile
+;         holdIndex += 1
+;     endWhile
+; ;    EndBenchmark(x, holdIndex + " iterations (GetCurrentPlayerHoldLocation): returned nothing")
 
     return ""
 endFunction
 
 string function GetHold(string city)
-    return miscVars.GetString("Hold["+ city +"]")
+    ; return miscVars.GetString("Hold["+ city +"]")
 endFunction
 
 ; string function GetCity(string hold)
@@ -292,21 +288,21 @@ string function GetHoldNameFromCity(string city)
 endFunction
 
 Form function GetJailTeleportReleaseMarker(string hold)
-    if (!miscVars.Exists("Jail::Release::Teleport["+ hold +"]"))
-        DebugError("Config::GetJailTeleportReleaseMarker", "The marker does not exist!")
-        return none
-    endif
+    ; if (!miscVars.Exists("Jail::Release::Teleport["+ hold +"]"))
+    ;     DebugError("Config::GetJailTeleportReleaseMarker", "The marker does not exist!")
+    ;     return none
+    ; endif
 
-    return miscVars.GetForm("Jail::Release::Teleport["+ hold +"]")
+    ; return miscVars.GetForm("Jail::Release::Teleport["+ hold +"]")
 endFunction
 
 Form function GetJailPrisonerItemsContainer(string hold)
-    if (!miscVars.Exists("Jail::Containers["+ hold +"]"))
-        DebugError("Config::GetJailPrisonerItemsContainer", "The container does not exist!")
-        return none
-    endif
+    ; if (!miscVars.Exists("Jail::Containers["+ hold +"]"))
+    ;     DebugError("Config::GetJailPrisonerItemsContainer", "The container does not exist!")
+    ;     return none
+    ; endif
     
-    return miscVars.GetForm("Jail::Containers["+ hold +"]")
+    ; return miscVars.GetForm("Jail::Containers["+ hold +"]")
 endFunction
 
 ; To be refactored into the Jail or Imprisoned script
@@ -341,7 +337,7 @@ endFunction
 
 int property FactionCount
     int function get()
-        return miscVars.GetLengthOf("Factions")
+        ; return miscVars.GetLengthOf("Factions")
     endFunction
 endProperty
 
@@ -892,7 +888,7 @@ endFunction
 
 ; TODO: Change how the stat is parsed
 int function GetInfamyGained(string hold)
-    return actorVars.GetInfamy(self.GetFaction(hold), Player)
+    ; return actorVars.GetInfamy(self.GetFaction(hold), Player)
     ; return MCM.GetStatOptionValue("Stats", hold + "::Infamy Gained")
 endFunction
 

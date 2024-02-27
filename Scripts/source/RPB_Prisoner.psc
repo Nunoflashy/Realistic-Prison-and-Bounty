@@ -1,6 +1,6 @@
 Scriptname RPB_Prisoner extends RPB_Actor
 
-import RealisticPrisonAndBounty_Config
+import RPB_Config
 import RPB_Utility
 import Math
 
@@ -45,6 +45,18 @@ endProperty
 RPB_JailCell property JailCell
     RPB_JailCell function get()
         return self.GetCell()
+    endFunction
+endProperty
+
+RPB_API property API
+    RPB_API function get()
+        return Prison.PrisonManager.API
+    endFunction
+endProperty
+
+RPB_SceneManager property SceneManager
+    RPB_SceneManager function get()
+        return API.SceneManager
     endFunction
 endProperty
 
@@ -370,8 +382,8 @@ endProperty
 
 int property InfamyBountyPenalty
     int function get()
-        float infamyTypePenalty = float_if (IsInfamyKnown, arrestVars.InfamyKnownPenalty, float_if (IsInfamyRecognized, arrestVars.InfamyRecognizedPenalty))
-        return round(CurrentInfamy * infamyTypePenalty)
+        ; float infamyTypePenalty = float_if (IsInfamyKnown, arrestVars.InfamyKnownPenalty, float_if (IsInfamyRecognized, arrestVars.InfamyRecognizedPenalty))
+        ; return round(CurrentInfamy * infamyTypePenalty)
     endFunction
 endProperty
 
@@ -705,7 +717,7 @@ endFunction
 function StartRestraining(Actor akRestrainer)
     Debug(self.GetActor(), "Prisoner::StartRestraining", "StartRestraining called")
 
-    Jail.SceneManager.StartRestrainPrisoner_02( \
+    SceneManager.StartRestrainPrisoner_02( \
         akGuard     = akRestrainer, \
         akPrisoner  = this \
     )
@@ -714,7 +726,7 @@ endFunction
 function StartStripping(Actor akStripperGuard)
     Debug(self.GetActor(), "Prisoner::StartStripping", "Stripping " + this)
     
-    Jail.SceneManager.StartStripping_02( \
+    SceneManager.StartStripping_02( \
         akStripperGuard     = akStripperGuard, \
         akStrippedPrisoner  = this \
     )
@@ -723,7 +735,7 @@ endFunction
 function StartGiveClothing(Actor akClothingGiver)
     Debug(self.GetActor(), "Prisoner::StartGiveClothing", "StartGiveClothing called")
 
-    Jail.SceneManager.StartGiveClothing( \
+    SceneManager.StartGiveClothing( \
         akGuard     = akClothingGiver, \
         akPrisoner  = this \
     )
@@ -733,7 +745,7 @@ function EscortToCell(Actor akEscort)
     Debug(self.GetActor(), "Prisoner::EscortToCell", "EscortToCell called")
     
     Form outsideCellGuardWaitingMarker = JailCell.GetRandomMarker("Exterior")
-    Config.SceneManager.StartEscortToCell( \
+    SceneManager.StartEscortToCell( \
         akEscortLeader              = akEscort, \
         akEscortedPrisoner          = this, \
         akJailCellMarker            = self.JailCell, \
@@ -1220,10 +1232,10 @@ function UpdateInfamy()
     Config.NotifyInfamy(self.GetName() + " has gained " + InfamyGainedPerUpdate + " infamy in " + Prison.Name, !self.IsPlayer())
 
     if (IsInfamyKnown)
-        Jail.NotifyInfamyKnownThresholdMet(self.GetHold(), Jail.HasInfamyKnownNotificationFired)
+        Prison.NotifyInfamyKnownThresholdMet(self.GetHold(), Prison.HasInfamyKnownNotificationFired)
 
     elseif (IsInfamyRecognized)
-        Jail.NotifyInfamyRecognizedThresholdMet(self.GetHold(), Jail.HasInfamyRecognizedNotificationFired)
+        Prison.NotifyInfamyRecognizedThresholdMet(self.GetHold(), Prison.HasInfamyRecognizedNotificationFired)
     endif
 endFunction
 

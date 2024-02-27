@@ -1,7 +1,7 @@
-Scriptname RealisticPrisonAndBounty_ConfigAlias extends ReferenceAlias  
+Scriptname RPB_ConfigAlias extends ReferenceAlias  
 
 import RPB_Utility
-import RealisticPrisonAndBounty_Config
+import RPB_Config
 
 RPB_API __api
 RPB_API property API
@@ -15,14 +15,14 @@ RPB_API property API
     endFunction
 endProperty
 
-RealisticPrisonAndBounty_Config property Config
-    RealisticPrisonAndBounty_Config function get()
-        return self.GetOwningQuest() as RealisticPrisonAndBounty_Config
+RPB_Config property Config
+    RPB_Config function get()
+        return self.GetOwningQuest() as RPB_Config
     endFunction
 endProperty
 
-RealisticPrisonAndBounty_SceneManager property SceneManager
-    RealisticPrisonAndBounty_SceneManager function get()
+RPB_SceneManager property SceneManager
+    RPB_SceneManager function get()
         return Config.SceneManager
     endFunction
 endProperty
@@ -119,7 +119,7 @@ event OnPlayerLoadGame()
 endEvent
 
 event OnKeyDown(int keyCode)
-    RealisticPrisonAndBounty_Config configScript = (self.GetOwningQuest() as RealisticPrisonAndBounty_Config)
+    RPB_Config configScript = (self.GetOwningQuest() as RPB_Config)
     RPB_MCM mcm = configScript.mcm
 
     if (keyCode == 0x3B)    ; F1

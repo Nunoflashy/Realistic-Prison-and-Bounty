@@ -1,7 +1,7 @@
 Scriptname RPB_MCM extends SKI_ConfigBase  
 
 import RPB_Utility
-import RealisticPrisonAndBounty_Config
+import RPB_Config
 
 ; ==============================================================================
 ; Constants
@@ -53,15 +53,9 @@ RPB_API property API
     endFunction
 endProperty
 
-RealisticPrisonAndBounty_Config property config
-    RealisticPrisonAndBounty_Config function get()
-        return Game.GetFormFromFile(0x3317, GetPluginName()) as RealisticPrisonAndBounty_Config
-    endFunction
-endProperty
-
-RealisticPrisonAndBounty_MiscVars property miscVars
-    RealisticPrisonAndBounty_MiscVars function get()
-        return config.miscVars
+RPB_Config property config
+    RPB_Config function get()
+        return Game.GetFormFromFile(0x3317, GetPluginName()) as RPB_Config
     endFunction
 endProperty
 
@@ -206,16 +200,16 @@ function AddOutfitPiece(string outfitId, string outfitBodyPart, Armor outfitObje
     string outfitPieceKey = outfitId + "::" + outfitBodyPart
     self.SetOptionInputValue(outfitPieceKey, outfitObject.GetName())
 
-    miscVars.SetForm(outfitPieceKey, outfitObject, "clothing/outfits")
-    Debug("AddOutfitPiece", "Added Outfit Piece: " + outfitObject.GetName() + " (FormID: " + outfitObject.GetFormID() + ") to Body Part: " + outfitBodyPart)
+    ; miscVars.SetForm(outfitPieceKey, outfitObject, "clothing/outfits")
+    ; Debug("AddOutfitPiece", "Added Outfit Piece: " + outfitObject.GetName() + " (FormID: " + outfitObject.GetFormID() + ") to Body Part: " + outfitBodyPart)
 endFunction
 
 function RemoveOutfitPiece(string outfitId, string outfitBodyPart)
     string outfitPieceKey = outfitId + "::" + outfitBodyPart
     self.SetOptionInputValue(outfitPieceKey, "")
-    Armor outfitObject = miscVars.GetForm(outfitPieceKey) as Armor
-    miscVars.SetForm(outfitPieceKey, none, "clothing/outfits")
-    Debug("RemoveOutfitPiece", "Removed Outfit Piece: " + outfitObject.GetName() + " (FormID: " + outfitObject.GetFormID() +") from Body Part: " + outfitBodyPart)
+    ; Armor outfitObject = miscVars.GetForm(outfitPieceKey) as Armor
+    ; miscVars.SetForm(outfitPieceKey, none, "clothing/outfits")
+    ; Debug("RemoveOutfitPiece", "Removed Outfit Piece: " + outfitObject.GetName() + " (FormID: " + outfitObject.GetFormID() +") from Body Part: " + outfitBodyPart)
 endFunction
 
 Armor function GetOutfitPart(string outfitId, string outfitBodyPart)
@@ -576,17 +570,17 @@ endFunction
     returns:    The Option's ID.
 /;
 int function AddOptionStatKey(string displayedText, string _key, int defaultValueOverride = -1, string formatString = "{0}", int defaultFlags = 0)
-    string optionKey = CurrentRenderedCategory + "::" + _key ; Whiterun::Current Bounty
+    ; string optionKey = CurrentRenderedCategory + "::" + _key ; Whiterun::Current Bounty
 
-    int value = config.actorVars.Get("[20]" + optionKey) ; [20]Whiterun::Current Bounty
-    int optionId = AddTextOption(displayedText, value + " " + formatString, defaultFlags)
+    ; int value = config.actorVars.Get("[20]" + optionKey) ; [20]Whiterun::Current Bounty
+    ; int optionId = AddTextOption(displayedText, value + " " + formatString, defaultFlags)
 
-    if (!self.OptionExists(optionKey))
-        self.RegisterOption(optionKey, optionId)
-    endif
+    ; if (!self.OptionExists(optionKey))
+    ;     self.RegisterOption(optionKey, optionId)
+    ; endif
 
-    Trace("MCM:AddOptionStatKey", "Option Key: " + optionKey + ", Value: " + value + ", Option ID: " + optionId)
-    return optionId
+    ; Trace("MCM:AddOptionStatKey", "Option Key: " + optionKey + ", Value: " + value + ", Option ID: " + optionId)
+    ; return optionId
 endFunction
 
 
@@ -920,7 +914,7 @@ endEvent
 
 function SerializeOptions()
     JValue.writeToFile(generalContainer, "generalContainer.txt")
-    miscVars.serialize("root", "miscVars_all.txt")
+    ; miscVars.serialize("root", "miscVars_all.txt")
 endFunction
 
 ; ============================================================================

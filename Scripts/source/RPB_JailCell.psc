@@ -1,28 +1,16 @@
 scriptname RPB_JailCell extends ObjectReference
 
 import Math
-import RealisticPrisonAndBounty_Config
+import RPB_Config
 import RPB_Utility
 
 ; ==========================================================
 ;                     Script References
 ; ==========================================================
 
-RealisticPrisonAndBounty_Config property Config
-    RealisticPrisonAndBounty_Config function get()
-        return Game.GetFormFromFile(0x3317, GetPluginName()) as RealisticPrisonAndBounty_Config
-    endFunction
-endProperty
-
-RealisticPrisonAndBounty_ArrestVars property ArrestVars
-    RealisticPrisonAndBounty_ArrestVars function get()
-        return Config.ArrestVars
-    endFunction
-endProperty
-
-RealisticPrisonAndBounty_MiscVars property MiscVars
-    RealisticPrisonAndBounty_MiscVars function get()
-        return Config.MiscVars
+RPB_Config property Config
+    RPB_Config function get()
+        return Game.GetFormFromFile(0x3317, GetPluginName()) as RPB_Config
     endFunction
 endProperty
 
@@ -773,7 +761,7 @@ string function GetIdentifier()
 endFunction
 
 bool function IsBoundToPrisoner(RPB_Prisoner akPrisoner)
-    return MiscVars.GetReference("["+ akPrisoner.GetIdentifier() +"]Cell").GetFormID() == self.GetFormID()
+    ; return MiscVars.GetReference("["+ akPrisoner.GetIdentifier() +"]Cell").GetFormID() == self.GetFormID()
 endFunction
 
 ; =========================================================

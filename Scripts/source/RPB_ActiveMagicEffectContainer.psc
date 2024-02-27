@@ -163,11 +163,11 @@ function Initialize()
         dataIds = JIntMap.object()
         data = new ActiveMagicEffect[100]
     endif
-    Debug(none, "ActiveMagicEffectList::Initialize", "Initialized list")
+    Debug("ActiveMagicEffectList::Initialize", "Initialized list")
 endFunction
 
 event OnInit()
-    Debug(none, "ActiveMagicEffectList::OnInit", "OnInit")
+    Debug("ActiveMagicEffectList::OnInit", "OnInit")
     dataIds = JMap.object()
     JValue.retain(dataIds)
     data = new ActiveMagicEffect[128]

@@ -1,7 +1,7 @@
 Scriptname RPB_Guard extends RPB_Actor  
 
-import RealisticPrisonAndBounty_Util
-import RealisticPrisonAndBounty_Config
+import RPB_Utility
+import RPB_Config
 
 function ReleasePrisoner(RPB_Prisoner akPrisoner)
 

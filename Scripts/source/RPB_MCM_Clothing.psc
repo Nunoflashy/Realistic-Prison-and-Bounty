@@ -104,19 +104,19 @@ endFunction
     endWhile
 /;
 function SetOutfitDefaultValues(RPB_MCM mcm) global
-    if (mcm.miscVars.Exists("clothing/outfits"))
-        return
-    endif
+    ; if (mcm.miscVars.Exists("clothing/outfits"))
+    ;     return
+    ; endif
 
-    ; Storage for anything related to outfits
-    mcm.miscVars.CreateStringMap("clothing/outfits")
+    ; ; Storage for anything related to outfits
+    ; mcm.miscVars.CreateStringMap("clothing/outfits")
 
-    int i = 1
-    while (i <= mcm.OUTFIT_COUNT)
-        string outfitId = "Outfit " + i
-        mcm.miscVars.SetString(outfitId, outfitId, "clothing/outfits") ; Map Outfit Name to Outfit ID (Dropdown menus for holds display the name)
-        i += 1
-    endWhile
+    ; int i = 1
+    ; while (i <= mcm.OUTFIT_COUNT)
+    ;     string outfitId = "Outfit " + i
+    ;     mcm.miscVars.SetString(outfitId, outfitId, "clothing/outfits") ; Map Outfit Name to Outfit ID (Dropdown menus for holds display the name)
+    ;     i += 1
+    ; endWhile
 endFunction
 
 function HandleDependencies(RPB_MCM mcm) global
@@ -425,7 +425,7 @@ function OnOptionInputAccept(RPB_MCM mcm, string option, string inputValue) glob
     elseif (IsSelectedOption(option, "Outfit") && IsSelectedOption(option, "Name"))
         string outfitId = GetOptionCategory(option) ; Outfit 1
         string outfitName = inputValue
-        mcm.miscVars.SetString(outfitName, outfitId, "clothing/outfits") ; Map Outfit Name to Outfit ID (Dropdown menus for holds display the name)
+        ; RPB_StorageVars.SetString(outfitName, outfitId, "clothing/outfits") ; Map Outfit Name to Outfit ID (Dropdown menus for holds display the name)
         mcm.SetOptionInputValue(option, inputValue)
         Debug("Clothing::OnOptionInputAccept", "Outfit ID: " + outfitId + ", Outfit Name: " + outfitName, true)
         
