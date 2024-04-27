@@ -23,17 +23,42 @@ string function GetModName() global
     return "Realistic Prison and Bounty"
 endFunction
 
-Form property mainAPI
-    Form function get()
-        return Game.GetFormFromFile(0x3DF8, GetPluginName())
+
+RPB_API __api
+RPB_API property API
+    RPB_API function get()
+        if (__api)
+            return __api
+        endif
+
+        __api = RPB_API.GetSelf()
+        return __api
     endFunction
 endProperty
 
-RPB_API            property API auto
-RPB_MCM            property MCM auto
-RPB_Arrest         property Arrest auto
-RPB_SceneManager   property SceneManager auto
-RPB_EventManager   property EventManager auto
+RPB_MCM property MCM
+    RPB_MCM function get()
+        return API.MCM
+    endFunction
+endProperty
+
+RPB_Arrest property Arrest
+    RPB_Arrest function get()
+        return API.Arrest
+    endFunction
+endProperty
+
+RPB_SceneManager property SceneManager
+    RPB_SceneManager function get()
+        return API.SceneManager
+    endFunction
+endProperty
+
+RPB_EventManager property EventManager
+    RPB_EventManager function get()
+        return API.EventManager
+    endFunction
+endProperty
 
 
 ; Called from ConfigAlias
