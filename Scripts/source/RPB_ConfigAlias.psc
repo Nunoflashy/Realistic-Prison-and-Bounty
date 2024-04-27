@@ -17,13 +17,13 @@ endProperty
 
 RPB_Config property Config
     RPB_Config function get()
-        return self.GetOwningQuest() as RPB_Config
+        return API.Config
     endFunction
 endProperty
 
 RPB_SceneManager property SceneManager
     RPB_SceneManager function get()
-        return Config.SceneManager
+        return API.SceneManager
     endFunction
 endProperty
 
@@ -118,9 +118,22 @@ event OnPlayerLoadGame()
     self.RegisterHotkeys()
 endEvent
 
+; event OnLocationChange(Location akOldLocation, Location akNewLocation)
+;     RPB_Prison castleDourDungeon = API.PrisonManager.GetPrison("Haafingar")
+;     RPB_PrisonerList prisoners = castleDourDungeon.Prisoners
+
+;     int i = 0
+;     while (i < prisoners.Count)
+;         RPB_Prisoner prisoner = prisoners.AtIndex(i)
+;         if (!prisoner.IsPlayer())
+;             prisoner.BindToCell()
+;         endif
+;         i += 1
+;     endWhile
+; endEvent
+
 event OnKeyDown(int keyCode)
-    RPB_Config configScript = (self.GetOwningQuest() as RPB_Config)
-    RPB_MCM mcm = configScript.mcm
+    RPB_MCM mcm = Config.MCM
 
     if (keyCode == 0x3B)    ; F1
         RPB_UIInterface uilib   = (self.GetReference() as Form) as RPB_UIInterface
@@ -140,7 +153,7 @@ event OnKeyDown(int keyCode)
             Actor actorToSetBountyOn = Game.GetCurrentConsoleRef() as Actor
             string desiredBounty = uilib.ShowInput(selectedHold + " - Bounty to set for " + actorToSetBountyOn.GetBaseObject().GetName())
             if (desiredBounty != "")
-                string addAsViolent = uilib.ShowINput("Add Bounty as Violent?", "No")
+                string addAsViolent = uilib.ShowInput("Add Bounty as Violent?", "No")
                 int holdRootObject = RPB_Data.GetRootObject(selectedHold)
                 Faction crimeFaction = RPB_Data.Hold_GetCrimeFaction(holdRootObject)
                 if (addAsViolent == "Yes")
@@ -177,6 +190,8 @@ event OnKeyDown(int keyCode)
         JArray.addStr(actionArrayObj, "Don't do anything")
         JArray.addStr(actionArrayObj, "Quit to Main Menu")
         JArray.addStr(actionArrayObj, "Validate Options")
+        JArray.addStr(actionArrayObj, "Play Animation on Selected Actor")
+        JArray.addStr(actionArrayObj, "Bind All Prisoners")
 
         string[] actionArray = JArray.asStringArray(actionArrayObj)
 
@@ -185,6 +200,16 @@ event OnKeyDown(int keyCode)
             Game.QuitToMainMenu()
         elseif (actionToPerform == "Validate Options")
             API.MCM.ValidateOptions()
+        elseif (actionToPerform == "Play Animation on Selected Actor")
+            Actor selectedActor = Game.GetCurrentConsoleRef() as Actor
+            string actorName = selectedActor.GetBaseObject().GetName()
+            string animationToPlay = uilib.ShowInput(actorName + " - Play Animation")
+            Debug.SendAnimationEvent(selectedActor, animationToPlay)
+            Debug("ConfigAlias::OnKeyDown", "Playing " + animationToPlay + " on Actor " + actorName)
+
+        elseif (actionToPerform == "Bind All Prisoners")
+            RPB_Prison castleDourDungeon = API.PrisonManager.GetPrison("Haafingar")
+            castleDourDungeon.BindAllPrisonersToCell()
         endif
     endif
 
