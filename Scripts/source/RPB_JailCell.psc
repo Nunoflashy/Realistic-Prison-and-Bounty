@@ -8,12 +8,6 @@ import RPB_Utility
 ;                     Script References
 ; ==========================================================
 
-RPB_Config property Config
-    RPB_Config function get()
-        return Game.GetFormFromFile(0x3317, GetPluginName()) as RPB_Config
-    endFunction
-endProperty
-
 ; ==========================================================
 
 RPB_Prison __prison
