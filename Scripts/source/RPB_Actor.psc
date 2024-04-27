@@ -2,23 +2,10 @@ scriptname RPB_Actor extends ActiveMagicEffect
 {Base Actor script for RPB_Actor, must be inherited from to be used}
 
 import RPB_Utility
-import RPB_Config
 
 ; ==========================================================
 ;                      Script References
 ; ==========================================================
-
-RPB_Config property Config
-    RPB_Config function get()
-        return Game.GetFormFromFile(0x3317, GetPluginName()) as RPB_Config
-    endFunction
-endProperty
-
-RPB_Arrest property Arrest
-    RPB_Arrest function get()
-        return Config.Arrest
-    endFunction
-endProperty
 
 ; ==========================================================
 ;                       Actor Related
@@ -50,6 +37,53 @@ endProperty
 
 ; ==========================================================
 
+;/
+    Binds an Alias to this Actor.
+
+    ReferenceAlias @apAlias: The alias to bind to the Actor.
+/;
+function BindAlias(ReferenceAlias apAlias)
+    BindAliasTo(apAlias, this)
+endFunction
+
+;/
+    Unbinds an Alias from this Actor.
+
+    This function does not depend on this Actor, since
+    all we're doing is setting the alias to none,
+    this is just a helper function and assumes that this Alias
+    is bound to this Actor.
+
+    ReferenceAlias  @apAlias: The alias to unbind from the Actor.
+/;
+function UnbindAlias(ReferenceAlias apAlias)
+    BindAliasTo(apAlias, none)
+endFunction
+
+bool function HasAlias(ReferenceAlias apAlias)
+    int i = 0
+    while (i < this.GetNumReferenceAliases())
+        if (this.GetNthReferenceAlias(i) == apAlias)
+            return true
+        endif
+        i += 1
+    endWhile
+
+    return false
+endFunction
+
+function EnableAI()
+    this.EnableAI()
+endFunction
+
+function DisableAI()
+    this.EnableAI(false)
+endFunction
+
+bool function HasAI()
+    return this.IsAIEnabled()
+endFunction
+
 function AddSpell(Spell akSpell, bool abVerbose = true)
     this.AddSpell(akSpell, abVerbose)
 endFunction
@@ -60,6 +94,10 @@ endFunction
 
 bool function HasSpell(Spell akSpell)
     return this.HasSpell(akSpell)
+endFunction
+
+function UnequipAll()
+    this.UnequipAll()
 endFunction
 
 function RemoveItem(Form akItemToRemove, int aiCount = 1, bool abSilent = true, ObjectReference akOtherContainer = none)
@@ -135,17 +173,12 @@ int function GetActiveBounty(bool abNonViolent = true, bool abViolent = true)
     
     if (abNonViolent)
         totalBounty += int_if (self.IsPlayer(), self.GetFaction().GetCrimeGoldNonViolent(), RPB_ActorVars.GetCrimeGoldNonViolent(self.GetFaction(), this))
-        ; totalBounty += int_if (self.IsPlayer(), self.GetFaction().GetCrimeGoldNonViolent(), ActorVars.GetCrimeGoldNonViolent(self.GetFaction(), this))
-        ; RPB_Utility.Debug("Actor::GetActiveBounty", "Bounty Non-Violent: " + totalBounty)
     endif
 
     if (abViolent)
         totalBounty += int_if (self.IsPlayer(), self.GetFaction().GetCrimeGoldViolent(), RPB_ActorVars.GetCrimeGoldViolent(self.GetFaction(), this))
-        ; totalBounty += int_if (self.IsPlayer(), self.GetFaction().GetCrimeGoldViolent(), ActorVars.GetCrimeGoldViolent(self.GetFaction(), this))
-        ; RPB_Utility.Debug("Actor::GetActiveBounty", "Bounty Violent: " + totalBounty)
     endif
 
-    ; RPB_Utility.Debug("Actor::GetActiveBounty", "Total Bounty: " + totalBounty)
     return totalBounty
 endFunction
 
