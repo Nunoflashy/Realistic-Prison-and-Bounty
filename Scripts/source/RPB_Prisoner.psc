@@ -4,6 +4,28 @@ import RPB_Config
 import RPB_Utility
 import Math
 
+; ==========================================================
+;                      Script References
+; ==========================================================
+
+RPB_API property API
+    RPB_API function get()
+        return Prison.API
+    endFunction
+endProperty
+
+RPB_Config property Config
+    RPB_Config function get()
+        return API.Config
+    endFunction
+endProperty
+
+RPB_SceneManager property SceneManager
+    RPB_SceneManager function get()
+        return API.SceneManager
+    endFunction
+endProperty
+
 ;/
     The Actor that has arrested this Arrestee.
     This may be null depending on whether the arrest was done through a captor or faction (if the latter, this is null).
@@ -48,17 +70,6 @@ RPB_JailCell property JailCell
     endFunction
 endProperty
 
-RPB_API property API
-    RPB_API function get()
-        return Prison.PrisonManager.API
-    endFunction
-endProperty
-
-RPB_SceneManager property SceneManager
-    RPB_SceneManager function get()
-        return API.SceneManager
-    endFunction
-endProperty
 
 float __currentTimeOverride
 float property CurrentTime
@@ -393,8 +404,6 @@ bool property IsSentenceSet
     endFunction
 endProperty
 
-int property CellsAttemptedAssigning auto
-
 ; Whether this prisoner will be stripped naked (used for determing jail cell type before actually assigning a cell, or any other action in the future that makes use of such property.)
 bool property WillBeStrippedNaked auto
 
@@ -500,13 +509,35 @@ bool function AssignCell()
     return self.JailCell != none
 endFunction
 
+;/ @boundCellPackage: The ReferenceAlias containing the bound AI Cell Package /;
+ReferenceAlias boundCellPackage
+function BindToCell()
+    if (boundCellPackage)
+        self.UnbindAlias(boundCellPackage)
+        Debug("Prisoner::BindToCell", "Prisoner " + Name + " already had " + self.GetPossessivePronoun() + " cell package bound, unbinding it before re-application!")
+    endif
+
+    boundCellPackage = Prison.BindPrisonerToCell(self, "S")
+    Debug("Prisoner::BindToCell", "Bound " + Name + " to "+ self.GetPossessivePronoun() +" Cell.")
+endFunction
+
 function SetReleaseLocation(bool abIsTeleportLocation = true)
     if (abIsTeleportLocation)
-        Prison_SetForm("Teleport Release Location", Config.GetJailTeleportReleaseMarker(self.GetPrisonHold()))
+        Prison_SetForm("Teleport Release Location", Prison.GetRandomReleaseMarker("Teleport"))
+    else
+        Prison_SetForm("Teleport Release Location", Prison.GetRandomReleaseMarker("Escort"))
     endif
 endFunction
 
+;/
+    Sets the Prisoner's belongings container where their items will be stored
+    while they are in prison.
+/;
 function SetBelongingsContainer()
+    if (self.PrisonerBelongingsContainer)
+        return
+    endif
+
     Prison_SetForm("Prisoner Belongings Container", Prison.GetRandomPrisonerContainer("Belongings"))
     Debug("Prison::SetBelongingsContainer", "Prisoner Belongings Container:  " + PrisonerBelongingsContainer)
 endFunction
@@ -514,8 +545,25 @@ endFunction
 ;/
     Releases this prisoner from jail
 /;
+bool __isReleased
 function Release()
-    Prison.ReleasePrisoner(self)
+    if (!__isReleased)
+        Prison.ReleasePrisoner(self)
+        Debug("Prisoner::Release", "Called method")
+        __isReleased = true
+    endif
+endFunction
+
+;/
+    Removes this Prisoner reference from the assigned jail cell.
+/;
+function RemoveFromCell()
+    if (!self.JailCell)
+        DebugWarn("Prisoner::RemoveFromCell", "The prisoner " + self.Name + " is not bound to any jail cell!")
+        return
+    endif
+    
+    JailCell.RemovePrisoner(self)
 endFunction
 
 function Restrain()
@@ -595,7 +643,7 @@ function Imprison()
     float startBench = StartBenchmark()
 
     if (!self.IsPlayer())
-        Prison.BindPrisonerToCell(self)
+        self.BindToCell()
     endif
 
     self.SetBelongingsContainer()
@@ -658,7 +706,7 @@ function Clothe()
 endFunction
 
 function Strip(bool abRemoveUnderwear = true)
-    ; return
+    this.UnequipAll()
     this.RemoveAllItems(PrisonerBelongingsContainer, false, true)
     self.IncrementStat("Times Stripped")
     self.IsStrippedNaked = true
@@ -907,9 +955,8 @@ function SetSentence(int aiSentenceInDays = 0, bool abShouldAffectBounty = true)
         return
     endif
 
-    if (!self.IsUndeterminedSentence && aiSentenceInDays == 0)
+    if (self.IsUndeterminedSentence && aiSentenceInDays == 0)
         Debug("Prisoner::SetSentence", "Setting an undetermined sentence for prisoner " + self.GetActor())
-        self.IsUndeterminedSentence = true
         return
     endif
 
@@ -1036,6 +1083,11 @@ endFunction
 state Escorting
 endState
 
+state Released
+    event OnUpdateGameTime()
+    endEvent
+endState
+
 ; While this Prisoner is imprisoned in their cell
 state Imprisoned
     event OnBeginState()
@@ -1052,7 +1104,7 @@ state Imprisoned
 
     event OnUpdateGameTime()
         if (Prison.EnableInfamy)
-            self.UpdateInfamy()
+            ; self.UpdateInfamy()
         endif
 
         self.UpdateDaysImprisoned()
@@ -1060,14 +1112,17 @@ state Imprisoned
         if (self.IsSentenceServed) ; implementation is not finished
             ; Prison.SendReleaseRequest(self)
             self.Release()
+            GotoState("Released")
             return
         endif
 
         Prison.DEBUG_ShowPrisonerSentenceInfo(self, true)
         
         ; Must be updated in some other way, otherwise it will reset to 0 on next imprisonment
-        float currentTimeServedStored = RPB_ActorVars.GetTimeJailed(Prison.PrisonFaction, this)
-        RPB_ActorVars.SetTimeJailed(Prison.PrisonFaction, this, currentTimeServedStored + TimeSinceLastUpdate)
+        if (!__processTimeJailedOnRest)
+            float currentTimeServedStored = RPB_ActorVars.GetTimeJailed(Prison.PrisonFaction, this)
+            RPB_ActorVars.ModTimeJailed(Prison.PrisonFaction, this, currentTimeServedStored + TimeSinceLastUpdate) 
+        endif
         ; RPB_Utility.Debug("Prisoner::OnUpdateGameTime", "currentTimeServedStored: " + currentTimeServedStored)
 
         self.RegisterLastUpdate()
@@ -1154,7 +1209,7 @@ endFunction
 
 bool function DelevelSkill(string asSkill)
     if (RPB_Utility.IsPerkSkill(asSkill))
-        asSkill = "Conjuration"
+        asSkill = "Conjuration" ; temporary, for testing
     endif
 
     int statValue               = this.GetBaseActorValue(asSkill) as int
@@ -1371,7 +1426,8 @@ function MoveToCell(bool abBeginImprisonment = true)
     this.MoveTo(self.JailCell)
 
     if (!self.IsPlayer())
-        Prison.BindPrisonerToCell(self)
+        self.BindToCell()
+        ; Prison.BindPrisonerToCell(self)
     endif
 
     if (abBeginImprisonment)
@@ -1426,6 +1482,7 @@ function MoveToCaptor()
     this.MoveTo(captor)
 endFunction
 
+bool __processTimeJailedOnRest
 bool __hasFastForwardedToRelease
 function FastForwardToRelease()
     ; if (__hasFastForwardedToRelease)
@@ -1438,10 +1495,13 @@ function FastForwardToRelease()
         RPB_Utility.Debug("Prisoner::FastForwardToRelease", "Setting Game Hour to Release Time Minimum Hour: " + RPB_Utility.GetTimeAs12Hour(Prison.ReleaseTimeMinimumHour))
     endif
 
+    __processTimeJailedOnRest = true
+
     int timeLeft = Math.Ceiling(TimeLeftInSentence)
     RPB_Utility.PassTimeInDays(timeLeft)
     Game.IncrementStat("Days Jailed", timeLeft)
     self.IncrementStat("Days Jailed", timeLeft) ; Hold Stat
+    RPB_ActorVars.ModTimeJailed(Prison.PrisonFaction, this, timeLeft) 
 
     float currentTimeBeforeChanges = CurrentTime
     __currentTimeOverride = CurrentTime + timeLeft
@@ -1467,7 +1527,8 @@ endFunction
 
 function DetermineReleaseTimeAdditionalHours()
     RPB_Utility.Debug("Prisoner::DetermineReleaseTimeAdditionalHours", "ReleaseTime: " + ReleaseTime)
-    float currentGameHour = (Game.GetFormEx(0x38) as GlobalVariable).GetValue() ; 13.50 = 1:30 PM
+    ; float currentGameHour = (Game.GetFormEx(0x38) as GlobalVariable).GetValue() ; 13.50 = 1:30 PM
+    float currentGameHour = RPB_Utility.GetCurrentHourFloat() ; 13.50 = 1:30 PM
 
     RPB_Utility.Debug("Prisoner::DetermineReleaseTimeAdditionalHours", "Prison.ReleaseTimeMinimumHour: " + Prison.ReleaseTimeMinimumHour + ", Prison.ReleaseTimeMaximumHour: " + Prison.ReleaseTimeMaximumHour)
     ; If the release time window has already passed
@@ -1561,7 +1622,7 @@ endFunction
     This could also be an event that happens by chance (configured in the MCM, to make it more dynamic and random)
 /;
 RPB_Arrestee function MakeArrestee()
-    RPB_Arrestee arresteeRef = Arrest.MakeArrestee(this)
+    RPB_Arrestee arresteeRef = API.Arrest.MakeArrestee(this)
     ;/ arresteeRef.SetArrestParameters( \
         asArrestHold        = newArrestHold, \
         akArrestCaptor      = newArrestCaptor \
