@@ -3,6 +3,34 @@ Scriptname RPB_Arrestee extends RPB_Actor
 import RPB_Utility
 import RPB_Config
 
+; ==========================================================
+;                      Script References
+; ==========================================================
+
+RPB_API __api
+RPB_API property API
+    RPB_API function get()
+        if (__api)
+            return __api
+        endif
+
+        __api = RPB_API.GetSelf()
+        return __api
+    endFunction
+endProperty
+
+RPB_Config property Config
+    RPB_Config function get()
+        return API.Config
+    endFunction
+endProperty
+
+RPB_Arrest property Arrest
+    RPB_Arrest function get()
+        return API.Arrest
+    endFunction
+endProperty
+
 ;/
     The Actor that has arrested this Arrestee.
     This may be null depending on whether the arrest was done through a captor or faction (if the latter, this is null).
@@ -397,6 +425,7 @@ function MoveToPrison(bool abMoveDirectlyToCell = false)
     ; Utility.Wait(6.0)
     RPB_Prisoner prisonerRef = self.MakePrisoner()
     RPB_Prison prison        = prisonerRef.Prison
+    prisonerRef.IsUndeterminedSentence = false
 
     if (!abMoveDirectlyToCell)
         prisonerRef.MoveToPrison(Captor)
