@@ -20,15 +20,21 @@ RPB_PrisonManager property PrisonManager
     endFunction
 endProperty
 
+RPB_API property API
+    RPB_API function get()
+        return PrisonManager.API
+    endFunction
+endProperty
+
 RPB_Config property Config
     RPB_Config function get()
-        return PrisonManager.Config
+        return API.Config
     endFunction
 endProperty
 
 RPB_SceneManager property SceneManager
     RPB_SceneManager function get()
-        return PrisonManager.SceneManager
+        return API.SceneManager
     endFunction
 endProperty
 
@@ -641,42 +647,34 @@ endFunction
     should depend on the size of the cell, as to not allow them to get out
     and not constrain them to a very small area either.
 
-    Packages should be: S, M, L, and XL.
+    Packages should be: XS, S, M, L, and XL.
 
     RPB_Prisoner    @apPrisoner: The prisoner to bind to the cell.
+    string          @asPackageSize: The size of the AI cell package to apply.
+
+    returns (ReferenceAlias): The reference alias that binds this AI Package.
 /;
-function BindPrisonerToCell(RPB_Prisoner apPrisoner)
+ReferenceAlias function BindPrisonerToCell(RPB_Prisoner apPrisoner, string asPackageSize)
     ; Make sure the prisoner is inside the cell before applying the AI Package (Wander in Cell),
     ; since the package's location is set to be the same point at the time of application 
     ; so the prisoner must be in the cell, in order to remain there.
     apPrisoner.MoveTo(apPrisoner.JailCell)
-    Utility.Wait(0.1)
-
-    Quest cellPackages = GetFormFromMod(0x1F8CC) as Quest
+    apPrisoner.DisableAI()
     
-    string packageType = "Short"
+    ReferenceAlias cellPackage = PrisonManager.GetCellPackageOfType(asPackageSize)
+    apPrisoner.BindAlias(cellPackage)
+    apPrisoner.EnableAI()
+
+    return cellPackage
+endFunction
+
+function BindAllPrisonersToCell()
     int i = 0
-    bool break = false
-    while (i < 100 && !break)
-        string packageIndex = packageType + "_000" + i
-        if (i >= 100)
-            packageIndex = packageType + "_0" + i
-            
-        elseif (i >= 10)
-            packageIndex = packageType + "_00" + i
-        endif
-
-        ReferenceAlias wanderInCellShort = cellPackages.GetAliasByName(packageIndex) as ReferenceAlias
-        if (wanderInCellShort.GetReference() == none)
-            BindAliasTo(wanderInCellShort, apPrisoner.GetActor())
-            break = true
-        endif
-        if (!break)
-            i += 1
-        endif
+    while (i < Prisoners.Count)
+        RPB_Prisoner prisoner = Prisoners.AtIndex(i)
+        prisoner.BindToCell()
+        i += 1
     endWhile
-
-    apPrisoner.GetActor().EvaluatePackage()
 endFunction
 
 function Notify(string asMessage, bool abCondition = true)
@@ -758,7 +756,8 @@ bool function ReleasePrisoner(RPB_Prisoner apPrisoner)
     apPrisoner.TeleportToRelease()
 
     ; Let the cell know the prisoner is leaving
-    apPrisoner.JailCell.RemovePrisoner(apPrisoner)
+    apPrisoner.RemoveFromCell()
+    ; apPrisoner.JailCell.RemovePrisoner(apPrisoner)
 
     ; Unregister the prisoner from prison
     self.UnregisterPrisoner(apPrisoner)
@@ -1501,6 +1500,26 @@ function SetupCells()
     EndBenchmark(startBench, "Prison::SetupCells")
 endFunction
 
+Form[] function GetReleaseMarkers(string asReleaseMarkerType = "Teleport")
+    if (asReleaseMarkerType != "Teleport" && asReleaseMarkerType != "Escort")
+        Error("The release marker type specified ("+ asReleaseMarkerType +") is invalid!")
+        DebugError("Prison::GetReleaseMarkers", "The release marker type specified ("+ asReleaseMarkerType +") is invalid!")
+        return none
+    endif
+
+    return RPB_Data.Jail_GetReleaseMarkers(self.GetDataObject(), asReleaseMarkerType)
+endFunction
+
+Form function GetRandomReleaseMarker(string asReleaseMarkerType = "Teleport")
+    if (asReleaseMarkerType != "Teleport" && asReleaseMarkerType != "Escort")
+        Error("The release marker type specified ("+ asReleaseMarkerType +") is invalid!")
+        DebugError("Prison::GetRandomReleaseMarker", "The release marker type specified ("+ asReleaseMarkerType +") is invalid!")
+        return none
+    endif
+
+    Form[] allReleaseMarkersOfType = self.GetReleaseMarkers(asReleaseMarkerType)
+    return allReleaseMarkersOfType[Utility.RandomInt(0, allReleaseMarkersOfType.Length - 1)]
+endFunction
 
 Form[] function GetPrisonerContainers(string asPrisonerContainerType = "Belongings")
     return RPB_Data.Jail_GetPrisonerContainers(self.GetDataObject(), asPrisonerContainerType)
@@ -1966,7 +1985,7 @@ RPB_Prisoner function MakePrisoner(Actor akActor, bool abDelayExecution = true)
     akActor.AddSpell(prisonerSpell, false)
 
     ; Bind this Prison to the Prisoner (to retrieve it from RPB_Prisoner)
-    RPB_StorageVars.SetIntOnForm("Prison ID", akActor, self.GetID(), "Jail")
+    RPB_StorageVars.SetIntOnForm("Prison ID", akActor, self.ID, "Jail")
 
     ; Delay execution before returning an instance of the prisoner, since we need to let the RPB_Prisoner script register this Prisoner
     if (abDelayExecution)
