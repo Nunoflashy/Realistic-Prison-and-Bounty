@@ -53,17 +53,18 @@ function AddAt(ActiveMagicEffect apActiveMagicEffect, string asKey)
     ;     data = new ActiveMagicEffect[128]
     ; endif
 
-    ; int availableIndex = self.GetAvailableIndex()
+    ; possible point of slowdown since we iterate over all elements
+    int availableIndex = self.GetAvailableIndex()
 
     if (self.HasKey(asKey))
         return
     endif
 
-    if (data[nextAvailableIndex] == none)
-        data[nextAvailableIndex] = apActiveMagicEffect ; Assign AME to this index
-        JMap.setInt(dataIds, asKey, nextAvailableIndex) ; Store the index at this key
+    if (data[availableIndex] == none)
+        data[availableIndex] = apActiveMagicEffect ; Assign AME to this index
+        JMap.setInt(dataIds, asKey, availableIndex) ; Store the index at this key
         ; Debug(self, "ActiveMagicEffectList::Add", "Added ActiveMagicEffect: " + apActiveMagicEffect + " at index: " + nextAvailableIndex + ".")
-        nextAvailableIndex += 1
+        nextAvailableIndex = availableIndex
     endif
 
     ; RPB_Utility.Debug("ActiveMAgicEffectList::AddAt", "data: " + data + ", self: " + GetOwningQuest())
