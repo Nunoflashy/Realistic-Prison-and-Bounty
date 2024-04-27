@@ -21,14 +21,7 @@ function Render(RPB_MCM mcm, int aiPrisonerFormID) global
 ;                           Left
 ; ==========================================================
 
-    RPB_Prison playerPrison = RPB_Prison.GetPrisonForHold("Haafingar")
-    RPB_Prisoner player = playerPrison.GetPrisonerReference(mcm.Config.Player)
-
-    ; if (!player || !player.IsImprisoned)
-    ;     return
-    ; endif
-
-    RPB_Prison actorPrison = RPB_Prison.GetPrisonForHold("Haafingar")
+    RPB_Prison actorPrison; = RPB_Prison.GetPrisonForHold("Haafingar")
     RPB_Prisoner prisoner = actorPrison.GetPrisonerReference(Game.GetFormEx(aiPrisonerFormID) as Actor)
 
     string currentTimeFormatted                 = RPB_Utility.GetCurrentDateFormatted()
@@ -80,7 +73,7 @@ function Render(RPB_MCM mcm, int aiPrisonerFormID) global
 
     mcm.AddEmptyOption()
     emptySpacesLeft += 1
-    ; RPB_MCM_Stats.RenderPrisonLeft(mcm, "Castle Dour Dungeon")
+    RPB_MCM_Stats.RenderPrisonLeft(mcm, "Castle Dour Dungeon")
 
     mcm.SetCursorPosition(1)
 ; ==========================================================
@@ -139,7 +132,7 @@ function Render(RPB_MCM mcm, int aiPrisonerFormID) global
         emptySpacesRight += 1
     endWhile
 
-    ; RPB_MCM_Stats.RenderPrisonRight(mcm, "Castle Dour Dungeon")
+    RPB_MCM_Stats.RenderPrisonRight(mcm, "Castle Dour Dungeon")
 endFunction
 
 ; =====================================================
@@ -203,10 +196,9 @@ function OnHighlight(RPB_MCM mcm, int oid) global
         return
     endif
     
-    mcm.Trace(mcm, "Stats::OnHighlght", "Option ID: " + oid)
+    Trace(mcm, "Stats::OnHighlght", "Option ID: " + oid)
 
     
-    ; OnOptionHighlight(mcm, mcm.TemporaryGetStatKeyFromOID(oid))
     OnOptionHighlight(mcm, mcm.GetKeyFromOption(oid, false))
 endFunction
 

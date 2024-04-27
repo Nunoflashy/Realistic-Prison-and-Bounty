@@ -3,12 +3,12 @@ Scriptname RPB_MCM_02_Prison hidden
 import RPB_Utility
 
 bool function ShouldHandleEvent(RPB_MCM_02 mcm, RPB_Prisoner apPrisoner = none) global
-    RPB_Prison prison       = apPrisoner.Prison
+    RPB_Prison prison = apPrisoner.Prison
     return StringUtil.Find(mcm.CurrentPage, prison.Name + " - " + apPrisoner.Name + " (#"+ apPrisoner.Number +")") != -1
 endFunction
 
 function Render(RPB_MCM_02 mcm, RPB_Prisoner apPrisoner) global
-    if (! ShouldHandleEvent(mcm, apPrisoner))
+    if (!ShouldHandleEvent(mcm, apPrisoner))
         return
     endif
 
@@ -23,6 +23,7 @@ function Render(RPB_MCM_02 mcm, RPB_Prisoner apPrisoner) global
     RPB_Prison prison       = apPrisoner.Prison
     RPB_Prisoner prisoner   = apPrisoner
 
+    ; Should probably be refactored, a prisoner should always be imprisoned (maybe?)
     if (!prisoner.IsImprisoned)
         Warn("The prisoner " + prisoner.Name + " (Prisoner #"+ prisoner.Number +") " + " is not imprisoned, no stats to show.")
         return

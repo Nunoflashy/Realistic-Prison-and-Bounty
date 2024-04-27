@@ -114,7 +114,11 @@ function InitializePages()
     while (n < actorPrison.Prisoners.Count)
         RPB_Prisoner prisoner = actorPrison.Prisoners.AtIndex(n)
         int prisonerFormID  = actorPrison.Prisoners.AtIndex(n).GetActor().GetFormID()
-        RPB_Utility.Debug("MCM_02::InitializePages", "prisoner: " + prisoner)
+        RPB_Utility.Debug("MCM_02::InitializePages", "Prisoner: " + prisoner)
+        RPB_Utility.Debug("MCM_02::InitializePages", "Prisoner Name: " + prisoner.Name)
+        RPB_Utility.Debug("MCM_02::InitializePages", "Prisoner Number: " + prisoner.Number)
+        RPB_Utility.Debug("MCM_02::InitializePages", "Prisoners: " + actorPrison.Prisoners.GetKeys())
+        RPB_Utility.Debug("MCM_02::InitializePages", "Prisoners ActiveMagicEffect[]: " + actorPrison.Prisoners.GetAsArray())
         JArray.addStr(_pagesArray, prisonName + " - " + prisoner.Name + " (#"+ prisoner.Number +")")
         n += 1
     endWhile
@@ -146,9 +150,9 @@ event OnPageReset(string page)
         RPB_Prisoner prisoner = actorPrison.Prisoners.AtIndex(n)
         string prisonerName = actorPrison.Prisoners.AtIndex(n).Name
         int prisonerFormID = actorPrison.Prisoners.AtIndex(n).GetActor().GetFormID()
-        RPB_Utility.Debug("MCM_02::OnPageReset", "prisoner: " + prisoner)
-        RPB_Utility.Debug("MCM_02::OnPageReset", "prisonerName: " + prisoner.Name)
-        RPB_Utility.Debug("MCM_02::OnPageReset", "Prisoner Number: " + prisoner.Number)
+        ; RPB_Utility.Debug("MCM_02::OnPageReset", "prisoner: " + prisoner)
+        ; RPB_Utility.Debug("MCM_02::OnPageReset", "prisonerName: " + prisoner.Name)
+        ; RPB_Utility.Debug("MCM_02::OnPageReset", "Prisoner Number: " + prisoner.Number)
         RPB_MCM_02_Prison.Render(self, prisoner)
         n += 1
     endWhile

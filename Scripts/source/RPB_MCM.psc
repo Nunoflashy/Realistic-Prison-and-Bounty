@@ -53,9 +53,9 @@ RPB_API property API
     endFunction
 endProperty
 
-RPB_Config property config
+RPB_Config property Config
     RPB_Config function get()
-        return Game.GetFormFromFile(0x3317, GetPluginName()) as RPB_Config
+        return API.Config
     endFunction
 endProperty
 
@@ -259,8 +259,8 @@ endFunction
 
 bool function IsHoldCurrentPage()
     int i = 0
-    while (i < config.Holds.Length)
-        if (CurrentPage == config.Holds[i])
+    while (i < Config.Holds.Length)
+        if (CurrentPage == Config.Holds[i])
             return true
         endif
         i += 1
@@ -280,8 +280,8 @@ function InitializePages()
     JArray.addStr(_pagesArray, "")
 
     int i = 0
-    while (i < config.Holds.Length)
-        JArray.addStr(_pagesArray, config.Holds[i])
+    while (i < Config.Holds.Length)
+        JArray.addStr(_pagesArray, Config.Holds[i])
         i += 1
     endWhile
 
@@ -572,7 +572,7 @@ endFunction
 int function AddOptionStatKey(string displayedText, string _key, int defaultValueOverride = -1, string formatString = "{0}", int defaultFlags = 0)
     ; string optionKey = CurrentRenderedCategory + "::" + _key ; Whiterun::Current Bounty
 
-    ; int value = config.actorVars.Get("[20]" + optionKey) ; [20]Whiterun::Current Bounty
+    ; int value = Config.actorVars.Get("[20]" + optionKey) ; [20]Whiterun::Current Bounty
     ; int optionId = AddTextOption(displayedText, value + " " + formatString, defaultFlags)
 
     ; if (!self.OptionExists(optionKey))
