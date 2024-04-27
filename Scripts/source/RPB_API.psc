@@ -112,3 +112,4 @@ endFunction
 Form function GetFormFromMod(int formId) global
     return Game.GetFormFromFile(formId, GetPluginName())
 endFunction
+
