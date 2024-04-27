@@ -8,11 +8,6 @@ import RPB_Config
 ;                     Script References
 ; ==========================================================
 
-RPB_Config property Config
-    RPB_Config function get()
-        return Game.GetFormFromFile(0x3317, GetPluginName()) as RPB_Config
-    endFunction
-endProperty
 
 ; ==========================================================
 
@@ -164,7 +159,7 @@ event OnOpen(ObjectReference akActionRef)
         return
     endif
 
-    Debug(self, "CellDoor::OnOpen", akActionRef + " opened cell door " + self + ", which belongs to jail cell " + self.JailCell)
+    Debug("["+ self +"] CellDoor::OnOpen", akActionRef + " opened cell door " + self + ", which belongs to jail cell " + self.JailCell)
 
 endEvent
 
@@ -184,7 +179,7 @@ function Initialize()
 
     if (lockLevel)
         int lockLevelAsInt  = LockLevelAsInteger(lockLevel)
-        Debug(self, "["+ self +"] CellDoor::Initialize", "Lock Level: " + lockLevel + ", As Integer: " + lockLevelAsInt + ", Door: " + self)
+        Debug("["+ self +"] CellDoor::Initialize", "Lock Level: " + lockLevel + ", As Integer: " + lockLevelAsInt + ", Door: " + self)
         self.SetLockLevel(lockLevelAsInt)
     endif
 endFunction
@@ -299,7 +294,7 @@ function DowngradeLock()
     ; Assign the new lock level
     __currentLockLevel = nextLockLevel
 
-    Debug(self, "CellDoor::DowngradeLock", "Cell door lock has been downgraded from " + previousLockLevel + " to " + self.CurrentLockLevel)
+    Debug("CellDoor::DowngradeLock", "Cell door lock has been downgraded from " + previousLockLevel + " to " + self.CurrentLockLevel)
 endFunction
 
 
