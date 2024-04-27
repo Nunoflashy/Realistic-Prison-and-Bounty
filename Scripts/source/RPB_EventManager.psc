@@ -3,21 +3,33 @@ scriptname RPB_EventManager extends Quest
 import RPB_Config
 import RPB_Utility
 
+RPB_API __api
+RPB_API property API
+    RPB_API function get()
+        if (__api)
+            return __api
+        endif
+
+        __api = RPB_API.GetSelf()
+        return __api
+    endFunction
+endProperty
+
 RPB_Config property Config
     RPB_Config function get()
-        return Game.GetFormFromFile(0x3317, GetPluginName()) as RPB_Config
+        return API.Config
     endFunction
 endProperty
 
 RPB_Arrest property Arrest
     RPB_Arrest function get()
-        return Config.Arrest
+        return API.Arrest
     endFunction
 endProperty
 
 RPB_SceneManager property SceneManager
     RPB_SceneManager function get()
-        return Config.SceneManager
+        return API.SceneManager
     endFunction
 endProperty
 
@@ -63,7 +75,7 @@ event OnArrestBegin(string eventName, string arrestType, float arresteeIdFlt, Fo
 
     if (captor == none && crimeFaction == none)
         Error("Either there's no Captor, or no Crime Faction! (["+ "Captor: "+ captor + ", Faction: " + crimeFaction +"])")
-        Debug("EventManager::OnArrestBegin", "Either there's no Captor, or no Crime Faction! (["+ "Captor: "+ captor + ", Faction: " + crimeFaction +"])")
+        DebugError("EventManager::OnArrestBegin", "Either there's no Captor, or no Crime Faction! (["+ "Captor: "+ captor + ", Faction: " + crimeFaction +"])")
         return
     endif
 
@@ -72,13 +84,13 @@ event OnArrestBegin(string eventName, string arrestType, float arresteeIdFlt, Fo
 
     if (!arrestee)
         Error("There's no one to be arrested! (Arrestee is "+ arrestee +")")
-        Debug("EventManager::OnArrestBegin", "There's no one to be arrested! (Arrestee is "+ arrestee +")")
+        DebugError("EventManager::OnArrestBegin", "There's no one to be arrested! (Arrestee is "+ arrestee +")")
         return
     endif
 
     if (!Arrest.ValidateArrestType(arrestType))
         Error("Arrest Type is invalid, got: " + arrestType + ". (valid options: "+ Arrest.GetValidArrestTypes() +") ")
-        Debug("EventManager::OnArrestBegin", "Arrest Type is invalid, got: " + arrestType + ". (valid options: "+ Arrest.GetValidArrestTypes() +") ")
+        DebugError("EventManager::OnArrestBegin", "Arrest Type is invalid, got: " + arrestType + ". (valid options: "+ Arrest.GetValidArrestTypes() +") ")
         return
     endif
 
