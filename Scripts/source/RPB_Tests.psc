@@ -67,9 +67,10 @@ state Test_Can_Imprison_Actor_Without_Arresting
     function Setup()
         RPB_Prison solitudePrison = (RPB_API.GetPrisonManager()).GetPrison("Haafingar")
 
-        Actor player = Game.GetFormEx(0x14) as Actor
+        Actor selectedActor = Game.GetCurrentConsoleRef() as Actor
     
-        RPB_Prisoner prisonerRef = solitudePrison.MakePrisoner(player)
+        RPB_Prisoner prisonerRef = solitudePrison.MakePrisoner(selectedActor)
+        prisonerRef.SetBelongingsContainer()
         prisonerRef.SetSentence(4)
         
         bool isValidPrisoner = assert_true(prisonerRef, "Prisoner reference is null!")
@@ -422,6 +423,7 @@ function ExecuteTest(string asTestKeyName)
     string testToExecute = self.GetTest(asTestKeyName)
 
     if (testToExecute != "")
+        ; Silence logs
         SetLoggingEnabled("TRACE",  IsTracingEnabled()   && ENABLE_TRACING)
         SetLoggingEnabled("DEBUG",  IsDebuggingEnabled() && ENABLE_DEBUGGING)
         SetLoggingEnabled("LOG",    IsLoggingEnabled()   && ENABLE_LOGGING)
@@ -432,6 +434,7 @@ function ExecuteTest(string asTestKeyName)
         Teardown()
         GotoState("")
 
+        ; Return logs
         SetLoggingEnabled("TRACE",  IsTracingEnabled()   || !ENABLE_TRACING)
         SetLoggingEnabled("DEBUG",  IsDebuggingEnabled() || !ENABLE_DEBUGGING)
         SetLoggingEnabled("LOG",    IsLoggingEnabled()   || !ENABLE_LOGGING)

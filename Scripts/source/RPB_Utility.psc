@@ -18,6 +18,11 @@ endFunction
 ;                       Form References
 ; ==========================================================
 
+Quest function CellPackages() global
+    ; return GetFormFromMod(0x1F8CC) as Quest
+    return GetFormFromMod(0x21916) as Quest
+endFunction
+
 Message function ServeTimeMessage() global
     return GetFormFromMod(0x1EE08) as Message
 endFunction
@@ -317,7 +322,7 @@ string function Replace(string asTemplate, string[] akPlaceholders, string[] akR
         if (placeholderStartIndex == -1)
             ; If no more placeholders found, append the remaining part of the template
             result += StringUtil.Substring(asTemplate, startIndex, templateLength - startIndex)
-            Trace("Utility::Replace", "["+ placeholderStartIndex +"]: " + result)
+            ; Trace("Utility::Replace", "["+ placeholderStartIndex +"]: " + result)
             outerBreak = true
         else
             ; Append the part of the template before the placeholder
@@ -325,7 +330,7 @@ string function Replace(string asTemplate, string[] akPlaceholders, string[] akR
                 result += StringUtil.Substring(asTemplate, startIndex, placeholderStartIndex - startIndex)
             endif
             ; result += StringUtil.Substring(asTemplate, startIndex, placeholderStartIndex - startIndex)
-            Trace("Utility::Replace", "["+ placeholderStartIndex +"]: " + result)
+            ; Trace("Utility::Replace", "["+ placeholderStartIndex +"]: " + result)
 
             ; Find the end of the placeholder
             placeholderEndIndex = StringUtil.Find(asTemplate, "}", placeholderStartIndex)

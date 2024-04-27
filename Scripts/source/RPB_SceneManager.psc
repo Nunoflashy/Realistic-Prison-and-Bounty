@@ -3,15 +3,33 @@ scriptname RPB_SceneManager extends Quest
 import RPB_Config
 import RPB_Utility
 
+RPB_API __api
+RPB_API property API
+    RPB_API function get()
+        if (__api)
+            return __api
+        endif
+
+        __api = RPB_API.GetSelf()
+        return __api
+    endFunction
+endProperty
+
 RPB_Config property Config
     RPB_Config function get()
-        return Game.GetFormFromFile(0x3317, GetPluginName()) as RPB_Config
+        return API.Config
     endFunction
 endProperty
 
 RPB_Arrest property Arrest
     RPB_Arrest function get()
-        return Config.Arrest
+        return API.Arrest
+    endFunction
+endProperty
+
+RPB_PrisonManager property PrisonManager
+    RPB_PrisonManager function get()
+        return API.PrisonManager
     endFunction
 endProperty
 
@@ -47,126 +65,6 @@ endFunction
 ; ==========================================================
 Scene property UnlockCell auto
 Scene property LockCell auto
-
-Scene property ArrestStart01
-    Scene function get()
-        return Game.GetFormFromFile(0xF569, GetPluginName()) as Scene
-    endFunction
-endProperty
-
-Scene property ArrestStart02
-    Scene function get()
-        return Game.GetFormFromFile(0xFAF6, GetPluginName()) as Scene
-    endFunction
-endProperty
-
-Scene property ArrestStart03
-    Scene function get()
-        return Game.GetFormFromFile(0x130DD, GetPluginName()) as Scene
-    endFunction
-endProperty
-
-Scene property ArrestStart04
-    Scene function get()
-        return Game.GetFormFromFile(0x13663, GetPluginName()) as Scene
-    endFunction
-endProperty
-
-Scene property ArrestStartPrison01
-    Scene function get()
-        return Game.GetFormFromFile(0x14C14, GetPluginName()) as Scene
-    endFunction
-endProperty
-
-Scene property EscortToJail
-    Scene function get()
-        return Game.GetFormFromFile(0xF532, GetPluginName()) as Scene
-    endFunction
-endProperty
-
-Scene property EscortFromCell
-    Scene function get()
-        return Game.GetFormFromFile(0x115E6, GetPluginName()) as Scene
-    endFunction
-endProperty
-
-Scene property EscortToCell
-    Scene function get()
-        return Game.GetFormFromFile(0xCF58, GetPluginName()) as Scene
-    endFunction
-endProperty
-
-Scene property EscortToCell_02
-    Scene function get()
-        return Game.GetFormFromFile(0x1367D, GetPluginName()) as Scene
-    endFunction
-endProperty
-
-Scene property SearchStart
-    Scene function get()
-        return Game.GetFormFromFile(0xF55C, GetPluginName()) as Scene
-    endFunction
-endProperty
-
-Scene property Frisking
-    Scene function get()
-        return Game.GetFormFromFile(0xCF5A, GetPluginName()) as Scene
-    endFunction
-endProperty
-
-Scene property Stripping
-    Scene function get()
-        return Game.GetFormFromFile(0xCF59, GetPluginName()) as Scene
-    endFunction
-endProperty
-
-Scene property Stripping_02
-    Scene function get()
-        return Game.GetFormFromFile(0xEA60, GetPluginName()) as Scene
-    endFunction
-endProperty
-
-Scene property ForcedStripping01
-    Scene function get()
-        return Game.GetFormFromFile(0xF587, GetPluginName()) as Scene
-    endFunction
-endProperty
-
-Scene property ForcedStripping02
-    Scene function get()
-        return Game.GetFormFromFile(0x120A9, GetPluginName()) as Scene
-    endFunction
-endProperty
-
-Scene property StrippingStart
-    Scene function get()
-        return Game.GetFormFromFile(0xF561, GetPluginName()) as Scene
-    endFunction
-endProperty
-
-Scene property GiveClothing
-    Scene function get()
-        return Game.GetFormFromFile(0xF52A, GetPluginName()) as Scene
-    endFunction
-endProperty
-
-Scene property NoClothing
-    Scene function get()
-        return Game.GetFormFromFile(0xF571, GetPluginName()) as Scene
-    endFunction
-endProperty
-
-Scene property BountyPaymentFail
-    Scene function get()
-        return Game.GetFormFromFile(0xF54E, GetPluginName()) as Scene
-    endFunction
-endProperty
-
-Scene property EludingArrest
-    Scene function get()
-        return Game.GetFormFromFile(0x12613, GetPluginName()) as Scene
-    endFunction
-endProperty
 
 int sceneContainer
 
@@ -224,12 +122,12 @@ function SetupScenes()
     self.AddScene(SCENE_ARREST_START_PRISON_01,                 0x14C14)
     self.AddScene(SCENE_ESCORT_TO_JAIL_01,                      0xF532) ; Escort to Jail
     self.AddScene(SCENE_ESCORT_TO_JAIL_02,                      0x17CDA) ; Escort to Jail 02
-    self.AddScene(SCENE_ESCORT_TO_CELL,                         0xCF58) ; Escort to Cell 01
+    self.AddScene(SCENE_ESCORT_TO_CELL_01,                         0xCF58) ; Escort to Cell 01
     self.AddScene(SCENE_ESCORT_TO_CELL_02,                      0x1367D) ; Escort to Cell 02
     self.AddScene(SCENE_ESCORT_FROM_CELL,                       0x115E6) ; Escort from Cell
     ; self.AddScene(SCENE_SEARCH_START,                         0xF55C) ; SearchStart
     self.AddScene(SCENE_FRISKING,                               0xCF5A) ; Frisking
-    ; self.AddScene(SCENE_STRIPPING_START,                      0xF561) ; Stripping Start
+    self.AddScene(SCENE_STRIPPING_START_01,                     0xF561) ; Stripping Start
     self.AddScene(SCENE_STRIPPING_01,                           0xCF59) ; Stripping
     self.AddScene(SCENE_STRIPPING_02,                           0xEA60) ; Stripping 02
     self.AddScene(SCENE_FORCED_STRIPPING_01,                    0xF587) ; Forced Stripping 01
@@ -294,7 +192,7 @@ string property SCENE_GENERIC_ESCORT                        = "RPB_GenericEscort
 string property SCENE_ESCORT_FROM_CELL                      = "RPB_EscortFromCell" autoreadonly
 string property SCENE_ESCORT_TO_JAIL_01                     = "RPB_EscortToJail01" autoreadonly
 string property SCENE_ESCORT_TO_JAIL_02                     = "RPB_EscortToJail02" autoreadonly
-string property SCENE_ESCORT_TO_CELL                        = "RPB_EscortToCell01" autoreadonly
+string property SCENE_ESCORT_TO_CELL_01                     = "RPB_EscortToCell01" autoreadonly
 string property SCENE_ESCORT_TO_CELL_02                     = "RPB_EscortToCell02" autoreadonly
 string property SCENE_ESCORT_TO_CELL_03                     = "RPB_EscortToCell03" autoreadonly
 string property SCENE_STRIPPING_01                          = "RPB_Stripping01" autoreadonly
@@ -302,6 +200,7 @@ string property SCENE_STRIPPING_02                          = "RPB_Stripping02" 
 string property SCENE_FORCED_STRIPPING_START_01             = "RPB_ForcedStrippingStart01" autoreadonly
 string property SCENE_FORCED_STRIPPING_01                   = "RPB_ForcedStripping01" autoreadonly
 string property SCENE_FORCED_STRIPPING_02                   = "RPB_ForcedStripping02" autoreadonly
+string property SCENE_STRIPPING_START_01                    = "RPB_StrippingStart01" autoreadonly
 string property SCENE_FRISKING                              = "RPB_Frisking" autoreadonly
 string property SCENE_GIVE_CLOTHING                         = "RPB_GiveClothing" autoreadonly
 string property SCENE_UNLOCK_CELL                           = "RPB_UnlockCell" autoreadonly
@@ -429,12 +328,6 @@ endFunction
 ; Possible Escort locations for Escorts / Guards
 ; Possible guards for searching simultaneously (Stripping / Frisking)
 
-RPB_EventManager property eventManager
-    RPB_EventManager function get()
-        return Game.GetFormFromFile(0xEA67, GetPluginName()) as RPB_EventManager
-    endFunction
-endProperty
-
 function AddRefsToScene(string asSceneName, string asRefAliasGroup, int aiRefCount = 1)
     int refKeyMap = JMap.object()
 
@@ -490,7 +383,7 @@ ObjectReference[] function GetSceneParameters(string sceneName)
         params[1] = self.GetEscortee().GetActorReference()
 
 
-    elseif (sceneName == SCENE_ESCORT_TO_CELL)
+    elseif (sceneName == SCENE_ESCORT_TO_CELL_01)
         ;/
             self.AddEscort(1)
             self.AddEscortee(3)
@@ -672,73 +565,55 @@ event OnSceneStart(string name, Scene sender)
 
         RetainAI(arrestee == Config.Player)
 
-    elseif (name == SCENE_ESCORT_TO_CELL)
+    elseif (name == SCENE_ESCORT_TO_CELL_01)
         Actor escort   = params[0] as Actor
         Actor escortee = params[1] as Actor
-        ; self.GetParams("Escort", max = 1)
-        ; self.GetParams("Escortee", max = 3)
-        RetainAI(escortee == config.Player)
 
-        RPB_PrisonManager prisonManager = GetFormFromMod(0x1B825) as RPB_PrisonManager
-        RPB_Prison prison               = prisonManager.GetPrison("Haafingar")
+        RPB_Prison prison = PrisonManager.GetPrison("Haafingar")
 
         int i = 0
         while (i < params.Length)
             if (params[i] != none && params[i] != escort)
-                RPB_Prisoner prisonerReference  = prison.GetPrisoner(params[i] as Actor)
-                ; jail.OnEscortToCellBegin(escort, params[i] as Actor)
-                prison.OnEscortPrisonerToCellBegin(prisonerReference, escort)
+                RetainAI(params[i] == Config.Player)
+                RPB_Prisoner prisoner = prison.GetPrisoner(params[i] as Actor)
+                prison.OnEscortPrisonerToCellBegin(prisoner, escort)
             endif
             i += 1
         endWhile
 
     elseif (name == SCENE_ESCORT_TO_CELL_02)
         Actor guard                 = params[0] as Actor
-        Actor prisoner              = params[1] as Actor
+        Actor prisonerActor         = params[1] as Actor
         ObjectReference jailCell    = params[2]
         ObjectReference cellDoor    = params[3]
 
-        RPB_PrisonManager prisonManager = GetFormFromMod(0x1B825) as RPB_PrisonManager
-        RPB_Prison prison               = prisonManager.GetPrison("Haafingar")
-
-        RetainAI(prisoner == config.Player)
+        RPB_Prison prison = PrisonManager.GetPrison("Haafingar")
 
         int i = 0
         while (i < params.Length)
             if (params[i] != none && params[i] != guard)
-                RPB_Prisoner prisonerReference  = prison.GetPrisoner(params[i] as Actor)
-                ; jail.OnEscortToCellBegin(escort, params[i] as Actor)
-                prison.OnEscortPrisonerToCellBegin(prisonerReference, guard)
+                RetainAI(params[i] == Config.Player)
+                RPB_Prisoner prisoner = prison.GetPrisoner(params[i] as Actor)
+                prison.OnEscortPrisonerToCellBegin(prisoner, guard)
             endif
             i += 1
         endWhile
-        ; jail.OnEscortToCellBegin(guard, prisoner)
-        ; Unrestrain the prisoner
-        ; prisoner.UnequipItemSlot(59)
-
 
     elseif (name == SCENE_ESCORT_FROM_CELL)
-        Actor guard     = params[0] as Actor
-        Actor prisoner  = params[1] as Actor
+        Actor guard             = params[0] as Actor
+        Actor prisonerActor     = params[1] as Actor
 
-        RPB_PrisonManager prisonManager = GetFormFromMod(0x1B825) as RPB_PrisonManager
-        RPB_Prison prison               = prisonManager.GetPrison("Haafingar")
+        RPB_Prison prison = PrisonManager.GetPrison("Haafingar")
 
         int i = 0
         while (i < params.Length)
             if (params[i] != none && params[i] != guard)
-                RPB_Prisoner prisonerReference  = prison.GetPrisoner(params[i] as Actor)
-                ; jail.OnEscortToCellBegin(escort, params[i] as Actor)
-                prison.OnEscortPrisonerFromCellBegin(prisonerReference, guard)
+                RetainAI(params[i] == Config.Player)
+                RPB_Prisoner prisoner = prison.GetPrisoner(params[i] as Actor)
+                prison.OnEscortPrisonerFromCellBegin(prisoner, guard)
             endif
             i += 1
         endWhile
-
-        ; if (prisoner == config.Player)
-        ;     Game.SetPlayerAIDriven(true)
-        ; endif
-        
-        ; jail.OnEscortFromCellBegin(guard, prisoner, none)
 
     elseif (name == SCENE_ESCORT_TO_JAIL_01)
         Actor escort   = params[0] as Actor
@@ -746,7 +621,6 @@ event OnSceneStart(string name, Scene sender)
         Actor escortee02 = params[2] as Actor
         Actor escortee03 = params[3] as Actor
 
-        ; RetainAI(escortee == config.Player)
         RPB_Prison prison = RPB_API.GetPrisonManager().GetPrison("Haafingar")
 
         int i = 0
@@ -757,8 +631,8 @@ event OnSceneStart(string name, Scene sender)
                     prisoner.SetSentence()
                     prison.RegisterPrisoner(prisoner)
                 endif
+                RetainAI(params[i] == Config.Player)
                 RPB_Prisoner prisoner = prison.GetPrisonerReference(params[i] as Actor)
-                RetainAI(params[i] == config.Player)
                 prison.OnEscortPrisonerToJailBegin(prisoner, escort)
             endif
             i += 1
@@ -770,18 +644,15 @@ event OnSceneStart(string name, Scene sender)
         Actor escort   = params[0] as Actor
         Actor escortee = params[1] as Actor
 
-        RPB_PrisonManager prisonManager = GetFormFromMod(0x1B825) as RPB_PrisonManager
-        RPB_Prison prison               = prisonManager.GetPrison("Haafingar")
-        RPB_Prisoner prisonerReference  = prison.GetPrisoner(escortee)
+        RPB_Prison prison = PrisonManager.GetPrison("Haafingar") ; Later must be changed to get whatever Prison that belongs to this Scene
 
-
-        RetainAI(escortee == config.Player)
 
         int i = 0
         while (i < params.Length)
             if (params[i] != none && params[i] != escort)
-                ; jail.OnEscortToJailBegin(escort, params[i] as Actor)
-                prison.OnEscortPrisonerToJailBegin(prisonerReference, escort)
+                RetainAI(params[i] == Config.Player)
+                RPB_Prisoner prisoner = prison.GetPrisoner(params[i] as Actor) ; Only the escortees can be Prisoners
+                prison.OnEscortPrisonerToJailBegin(prisoner, escort)
             endif
             i += 1
         endWhile
@@ -789,58 +660,46 @@ event OnSceneStart(string name, Scene sender)
     elseif (name == SCENE_STRIPPING_01)
         Actor stripperGuard     = params[0] as Actor
         Actor strippedPrisoner  = params[1] as Actor
-
-        RPB_PrisonManager prisonManager = GetFormFromMod(0x1B825) as RPB_PrisonManager
-        RPB_Prison prison               = prisonManager.GetPrison("Haafingar")
+        RPB_Prison prison = PrisonManager.GetPrison("Haafingar")
 
         int i = 0
         while (i < params.Length)
             if (params[i] != none && params[i] != stripperGuard)
-                RPB_Prisoner prisonerReference  = prison.GetPrisoner(params[i] as Actor)
-                ; jail.OnEscortToCellBegin(escort, params[i] as Actor)
-                prison.OnPrisonerStripBegin(prisonerReference, stripperGuard)
+                RetainAI(params[i] == Config.Player)
+                RPB_Prisoner prisoner = prison.GetPrisoner(params[i] as Actor)
+                prison.OnPrisonerStripBegin(prisoner, stripperGuard)
             endif
             i += 1
         endWhile
-
-        RetainAI(strippedPrisoner == config.Player)
-
-        ; jail.OnStripBegin(stripperGuard, strippedPrisoner)
 
     elseif (name == SCENE_STRIPPING_02)
         Actor stripperGuard     = params[0] as Actor
         Actor strippedPrisoner  = params[1] as Actor
 
-        RPB_PrisonManager prisonManager = GetFormFromMod(0x1B825) as RPB_PrisonManager
-        RPB_Prison prison               = prisonManager.GetPrison("Haafingar")
+        RPB_Prison prison = PrisonManager.GetPrison("Haafingar")
 
         int i = 0
         while (i < params.Length)
             if (params[i] != none && params[i] != stripperGuard)
-                RPB_Prisoner prisonerReference  = prison.GetPrisoner(params[i] as Actor)
-                ; jail.OnEscortToCellBegin(escort, params[i] as Actor)
-                RetainAI(params[i] as Actor == config.Player)
-                prison.OnPrisonerStripBegin(prisonerReference, stripperGuard)
+                RetainAI(params[i] == Config.Player)
+                RPB_Prisoner prisoner = prison.GetPrisoner(params[i] as Actor)
+                prison.OnPrisonerStripBegin(prisoner, stripperGuard)
             endif
             i += 1
         endWhile
-
-        ; RetainAI(strippedPrisoner == config.Player)
-
-        ; jail.OnStripBegin(stripperGuard, strippedPrisoner)
 
     elseif (name == SCENE_FORCED_STRIPPING_02)
         Actor stripperGuard     = params[0] as Actor
         Actor strippedPrisoner  = params[1] as Actor
 
-        RPB_PrisonManager prisonManager = GetFormFromMod(0x1B825) as RPB_PrisonManager
-        RPB_Prison prison               = prisonManager.GetPrison("Haafingar")
+        RPB_Prison prison = PrisonManager.GetPrison("Haafingar")
 
         int i = 0
         while (i < params.Length)
             if (params[i] != none && params[i] != stripperGuard)
-                RPB_Prisoner prisonerReference  = prison.GetPrisoner(params[i] as Actor)
-                prison.OnPrisonerStripBegin(prisonerReference, stripperGuard)
+                RetainAI(params[i] == Config.Player)
+                RPB_Prisoner prisoner = prison.GetPrisoner(params[i] as Actor)
+                prison.OnPrisonerStripBegin(prisoner, stripperGuard)
             endif
             i += 1
         endWhile
@@ -908,8 +767,8 @@ event OnScenePlaying(string name, int phaseEvent, int phase, Scene sender)
                 ; Make arrestee put hands behind their back
                 OrientRelative(escortee, escort)
                 Debug.SendAnimationEvent(escortee, "ZazAPC001")
-                arrest.OnArresting(escort, escortee)
-                arrest.OnArresteeRestrained(escortee)
+                Arrest.OnArresting(escort, escortee)
+                Arrest.OnArresteeRestrained(escortee)
             endif
         endif
 
@@ -919,8 +778,8 @@ event OnScenePlaying(string name, int phaseEvent, int phase, Scene sender)
 
         if (phaseEvent == PHASE_START)
             if (phase == 3)
-                arrest.OnArresting(escort, escortee)
-                arrest.OnArresteeRestrained(escortee)
+                Arrest.OnArresting(escort, escortee)
+                Arrest.OnArresteeRestrained(escortee)
             endif
 
         elseif (phaseEvent == PHASE_END)
@@ -936,7 +795,7 @@ event OnScenePlaying(string name, int phaseEvent, int phase, Scene sender)
 
         if (phaseEvent == PHASE_START)
             if (phase == 4)
-                arrest.OnArresting(escort, escortee)
+                Arrest.OnArresting(escort, escortee)
             endif
 
         elseif (phaseEvent == PHASE_END)
@@ -958,7 +817,7 @@ event OnScenePlaying(string name, int phaseEvent, int phase, Scene sender)
                 Debug.SendAnimationEvent(arrestee, "ZazAPC011")
             elseif (phase == 6)
                 ; Make arrestee get up (by restraining the animation is canceled)
-                arrest.OnArresting(captor, arrestee)
+                Arrest.OnArresting(captor, arrestee)
             endif
         endif
 
@@ -975,11 +834,11 @@ event OnScenePlaying(string name, int phaseEvent, int phase, Scene sender)
                 Debug.SendAnimationEvent(arrestee, "ZazAPC001")
             elseif (phase == 2)
                 ; Restrain
-                arrest.OnArresting(captor, arrestee)
+                Arrest.OnArresting(captor, arrestee)
             endif
         endif
 
-    elseif (name == SCENE_ESCORT_TO_CELL)
+    elseif (name == SCENE_ESCORT_TO_CELL_01)
         Actor guard     = params[0] as Actor
         Actor prisoner  = params[1] as Actor
         ; ObjectReference jailCell  = params[4]
@@ -1031,8 +890,7 @@ event OnScenePlaying(string name, int phaseEvent, int phase, Scene sender)
         ObjectReference cellDoor    = params[3]
 
 
-        RPB_PrisonManager prisonManager = GetFormFromMod(0x1B825) as RPB_PrisonManager
-        RPB_Prison prison               = prisonManager.GetPrison("Haafingar")
+        RPB_Prison prison               = PrisonManager.GetPrison("Haafingar")
         RPB_Prisoner prisonerReference  = prison.GetPrisoner(prisoner)
 
         if (phaseEvent == PHASE_START)
@@ -1088,31 +946,23 @@ event OnScenePlaying(string name, int phaseEvent, int phase, Scene sender)
         
         prison.OnPrisonerStripBegin(prisonerReference, stripperGuard)
 
-        ; jail.OnStripBegin(stripperGuard, strippedPrisoner)
-
     elseif (name == SCENE_STRIPPING_02)
         Actor stripperGuard     = params[0] as Actor
         Actor strippedPrisoner  = params[1] as Actor
 
-        ; RPB_Prison prison               = RPB_Prison.GetPrisonForImprisonedActor(Game.GetFormEx(0x14) as Actor)
-        ; RPB_Prisoner prisonerReference  = prison.GetPrisoner(Game.GetFormEx(0x14) as Actor)
-
-        RPB_PrisonManager prisonManager = GetFormFromMod(0x1B825) as RPB_PrisonManager
-        RPB_Prison prison       = prisonManager.GetPrison("Haafingar")
+        RPB_Prison prison = PrisonManager.GetPrison("Haafingar")
 
         int i = 0
         while (i < params.Length)
             Actor currentPrisoner = params[i] as Actor
             if (currentPrisoner != none && currentPrisoner != stripperGuard)
-                RPB_Prisoner prisonerReference = prison.GetPrisoner(currentPrisoner)
-                Debug(none, "SceneManager::OnScenePlaying", "Prisoner Keys: " + prison.Prisoners.GetKeys() + ", prisonerReference: " + prisonerReference)
-                prison.OnPrisonerStripBegin(prisonerReference, stripperGuard)
-                Debug(none, "SceneManager::OnScenePlaying", "SCENE_STRIPPING_02 -> strippedPrisoner: " + currentPrisoner + ", prison: " + prison + ", prisonerReference: " + prisonerReference)
+                RetainAI(params[i] == Config.Player)
+                RPB_Prisoner prisoner = prison.GetPrisoner(params[i] as Actor)
+                prison.OnPrisonerStripBegin(prisoner, stripperGuard)
+                Debug("SceneManager::OnScenePlaying", "SCENE_STRIPPING_02 -> strippedPrisoner: " + currentPrisoner + ", prison: " + prison + ", prisoner: " + prisoner)
             endif
             i += 1
         endWhile
-        
-
 
 
         if (phaseEvent == PHASE_START)
@@ -1201,8 +1051,7 @@ event OnScenePlaying(string name, int phaseEvent, int phase, Scene sender)
         Actor stripperGuard     = params[0] as Actor
         Actor strippedPrisoner  = params[1] as Actor
 
-        RPB_PrisonManager prisonManager = GetFormFromMod(0x1B825) as RPB_PrisonManager
-        RPB_Prison prison               = prisonManager.GetPrison("Haafingar")
+        RPB_Prison prison               = PrisonManager.GetPrison("Haafingar")
         RPB_Prisoner prisonerReference  = prison.GetPrisoner(strippedPrisoner)
 
         if (phaseEvent == PHASE_START)
@@ -1227,8 +1076,7 @@ event OnScenePlaying(string name, int phaseEvent, int phase, Scene sender)
         Actor guard     = params[0] as Actor
         Actor prisoner  = params[1] as Actor
 
-        RPB_PrisonManager prisonManager = GetFormFromMod(0x1B825) as RPB_PrisonManager
-        RPB_Prison prison               = prisonManager.GetPrison("Haafingar")
+        RPB_Prison prison               = PrisonManager.GetPrison("Haafingar")
         RPB_Prisoner prisonerReference  = prison.GetPrisoner(prisoner)
 
 
@@ -1249,8 +1097,7 @@ event OnScenePlaying(string name, int phaseEvent, int phase, Scene sender)
         Actor guard     = params[0] as Actor
         Actor prisoner  = params[1] as Actor
 
-        RPB_PrisonManager prisonManager = GetFormFromMod(0x1B825) as RPB_PrisonManager
-        RPB_Prison prison               = prisonManager.GetPrison("Haafingar")
+        RPB_Prison prison               = PrisonManager.GetPrison("Haafingar")
         RPB_Prisoner prisonerReference  = prison.GetPrisoner(prisoner)
 
         if (phaseEvent == PHASE_START)
@@ -1323,22 +1170,20 @@ event OnSceneEnd(string name, Scene sender)
 
         ; arrest.OnArrestStart(captor, arrestee)
 
-    elseif (name == SCENE_ESCORT_TO_CELL)
+    elseif (name == SCENE_ESCORT_TO_CELL_01)
         Actor escort   = params[0] as Actor
         Actor escortee = params[1] as Actor
         RPB_JailCell jailCell  = params[4] as RPB_JailCell
         RPB_CellDoor cellDoor  = params[5] as RPB_CellDoor
 
-        ReleaseAI(escortee == config.Player)
+        ReleaseAI(escortee == Config.Player)
 
         cellDoor.Lock()
 
-        RPB_PrisonManager prisonManager = GetFormFromMod(0x1B825) as RPB_PrisonManager
-        RPB_Prison prison       = prisonManager.GetPrison("Haafingar")
+        RPB_Prison prison       = PrisonManager.GetPrison("Haafingar")
         RPB_Prisoner prisonerReference = prison.GetPrisoner(escortee)
 
         prison.OnEscortPrisonerToCellEnd(prisonerReference, jailCell, escort)
-        ; jail.OnEscortToCellEnd(escort, escortee)
 
     elseif (name == SCENE_ESCORT_TO_CELL_02)
         Actor guard                 = params[0] as Actor
@@ -1346,23 +1191,20 @@ event OnSceneEnd(string name, Scene sender)
         ObjectReference jailCell    = params[2] as Actor
         ObjectReference cellDoor    = params[3] as Actor
 
-        RPB_PrisonManager prisonManager = GetFormFromMod(0x1B825) as RPB_PrisonManager
-        RPB_Prison prison               = prisonManager.GetPrison("Haafingar")
+        RPB_Prison prison               = PrisonManager.GetPrison("Haafingar")
         RPB_Prisoner prisonerReference  = prison.GetPrisoner(prisoner)
 
-        ReleaseAI(prisoner == config.Player)
-        ; jail.OnEscortToCellEnd(guard, prisoner)
+        ReleaseAI(prisoner == Config.Player)
         prison.OnEscortPrisonerToCellEnd(prisonerReference, jailCell as RPB_JailCell, guard)
 
     elseif (name == SCENE_ESCORT_FROM_CELL)
         Actor guard     = params[0] as Actor
         Actor prisoner  = params[1] as Actor
 
-        RPB_PrisonManager prisonManager = GetFormFromMod(0x1B825) as RPB_PrisonManager
-        RPB_Prison prison               = prisonManager.GetPrison("Haafingar")
+        RPB_Prison prison               = PrisonManager.GetPrison("Haafingar")
         RPB_Prisoner prisonerReference  = prison.GetPrisoner(prisoner)
 
-        ReleaseAI(prisoner == config.Player)
+        ReleaseAI(prisoner == Config.Player)
 
         ; jail.OnEscortFromCellEnd(guard, prisoner, none)
         prison.OnEscortPrisonerFromCellEnd(prisonerReference, guard)
@@ -1371,53 +1213,40 @@ event OnSceneEnd(string name, Scene sender)
         Actor escort   = params[0] as Actor
         Actor escortee = params[1] as Actor
 
-        ; jail.OnEscortToJailEnd(escort, escortee)
-        RPB_PrisonManager prisonManager = GetFormFromMod(0x1B825) as RPB_PrisonManager
-        RPB_Prison prison       = prisonManager.GetPrison("Haafingar")
+        RPB_Prison prison = PrisonManager.GetPrison("Haafingar")
 
         int i = 0
         while (i < params.Length)
             if (params[i] != None && params[i] != escort)
                 RPB_Actor actorReference = prison.GetPrisoner(escortee)
                 if (actorReference == none)
-                    actorReference = Arrest.Arrestees.AtKey(escortee) ; to be changed the way the arrestee is retrieved
+                    actorReference = Arrest.GetArresteeReference(params[i] as Actor)
                 endif
+
                 if (actorReference == none)
                     actorReference = prison.MakePrisoner(params[i] as Actor)
-                    (params[i] as Actor).UnequipAll()
+                    actorReference.UnequipAll()
                 endif
+
                 prison.OnEscortPrisonerToJailEnd(actorReference, escort)
             endif
             i += 1
         endWhile
 
-
-
-        ; ; Determine if it's an Arrestee or a Prisoner
-        ; RPB_Actor actorReference = prison.GetPrisoner(escortee)
-        ; if (actorReference == none)
-        ;     actorReference = Arrest.Arrestees.AtKey(escortee) ; to be changed the way the arrestee is retrieved
-        ; endif
-
-        ; prison.OnEscortPrisonerToJailEnd(actorReference, escort)
-
     elseif (name == SCENE_ESCORT_TO_JAIL_02)
         Actor escort   = params[0] as Actor
         Actor escortee = params[1] as Actor
 
-        RPB_PrisonManager prisonManager = GetFormFromMod(0x1B825) as RPB_PrisonManager
-        RPB_Prison prison               = prisonManager.GetPrison("Haafingar")
+        RPB_Prison prison               = PrisonManager.GetPrison("Haafingar")
         RPB_Prisoner prisonerReference  = prison.GetPrisoner(escortee)
 
-        ; jail.OnEscortToJailEnd(escort, escortee)
         prison.OnEscortPrisonerToJailEnd(prisonerReference, escort)
 
     elseif (name == SCENE_STRIPPING_01)
         Actor stripperGuard     = params[0] as Actor
         Actor strippedPrisoner  = params[1] as Actor
 
-        RPB_PrisonManager prisonManager = GetFormFromMod(0x1B825) as RPB_PrisonManager
-        RPB_Prison prison               = prisonManager.GetPrison("Haafingar")
+        RPB_Prison prison               = PrisonManager.GetPrison("Haafingar")
         RPB_Prisoner prisonerReference  = prison.GetPrisoner(strippedPrisoner)
 
         int i = 0
@@ -1431,52 +1260,31 @@ event OnSceneEnd(string name, Scene sender)
             i += 1
         endWhile
 
-        ; jail.OnStripEnd(stripperGuard, strippedPrisoner)
         prison.OnPrisonerStripEnd(prisonerReference, stripperGuard)
 
     elseif (name == SCENE_STRIPPING_02)
         Actor stripperGuard     = params[0] as Actor
         Actor strippedPrisoner  = params[1] as Actor
 
-        RPB_PrisonManager prisonManager = GetFormFromMod(0x1B825) as RPB_PrisonManager
-        RPB_Prison prison       = prisonManager.GetPrison("Haafingar")
+        RPB_Prison prison       = PrisonManager.GetPrison("Haafingar")
 
         int i = 0
         while (i < params.Length)
             Actor currentPrisoner = params[i] as Actor
             if (currentPrisoner != none && currentPrisoner != stripperGuard)
-                RPB_Prisoner prisonerReference = prison.GetPrisoner(currentPrisoner)
-                Debug(none, "SceneManager::OnScenePlaying", "Prisoner Keys: " + prison.Prisoners.GetKeys() + ", prisonerReference: " + prisonerReference)
+                RPB_Prisoner prisoner = prison.GetPrisoner(currentPrisoner)
+                Debug("SceneManager::OnScenePlaying", "Prisoner Keys: " + prison.Prisoners.GetKeys() + ", prisoner: " + prisoner)
 
-                prison.OnPrisonerStripEnd(prisonerReference, stripperGuard)
+                prison.OnPrisonerStripEnd(prisoner, stripperGuard)
             endif
             i += 1
         endWhile
-
-        ; RPB_Prisoner prisonerReference = prison.GetPrisoner(strippedPrisoner)
-        ; Debug(none, "SceneManager::OnScenePlaying", "Prisoner Keys: " + prison.Prisoners.GetKeys() + ", prisonerReference: " + prisonerReference)
-
-        ; prison.OnPrisonerStripEnd(prisonerReference, stripperGuard)
-
-        ; int i = 0
-        ; while (i < params.Length)
-        ;     Form cuffs = Game.GetFormEx(0xA081D33)
-
-        ;     if (params[i] != None && params[i] != stripperGuard)
-        ;         (params[i] as Actor).SheatheWeapon()
-        ;         (params[i] as Actor).EquipItem(cuffs, true, true)
-        ;     endif
-        ;     i += 1
-        ; endWhile
-
-        ; jail.OnStripEnd(stripperGuard, strippedPrisoner)
 
     elseif (name == SCENE_FORCED_STRIPPING_02)
         Actor stripperGuard     = params[0] as Actor
         Actor strippedPrisoner  = params[1] as Actor
 
-        RPB_PrisonManager prisonManager = GetFormFromMod(0x1B825) as RPB_PrisonManager
-        RPB_Prison prison               = prisonManager.GetPrison("Haafingar")
+        RPB_Prison prison               = PrisonManager.GetPrison("Haafingar")
         RPB_Prisoner prisonerReference  = prison.GetPrisoner(strippedPrisoner)
 
 
@@ -1513,8 +1321,7 @@ event OnSceneEnd(string name, Scene sender)
         Actor stripperGuard     = params[0] as Actor
         Actor strippedPrisoner  = params[1] as Actor
 
-        RPB_PrisonManager prisonManager = GetFormFromMod(0x1B825) as RPB_PrisonManager
-        RPB_Prison prison               = prisonManager.GetPrison("Haafingar")
+        RPB_Prison prison               = PrisonManager.GetPrison("Haafingar")
         RPB_Prisoner prisonerReference  = prison.GetPrisoner(strippedPrisoner)
 
 
@@ -1593,7 +1400,8 @@ function StartEscortToCell(Actor akEscortLeader, Actor akEscortedPrisoner, Objec
     ; Bind the guard waiting marker
     BindAliasTo(self.GetGuardLocation(), akEscortWaitingMarker)
 
-    EscortToCell.Start()
+    self.GetScene(SCENE_ESCORT_TO_CELL_01).Start()
+    ; EscortToCell.Start()
 endFunction
 
 function StartEscortToCell_02(Actor akGuard, Actor akPrisoner, ObjectReference akJailCell, ObjectReference akJailCellDoor)
@@ -1609,11 +1417,12 @@ function StartEscortToCell_02(Actor akGuard, Actor akPrisoner, ObjectReference a
     ; Bind the guard's destination point, the jail cell door
     BindAliasTo(self.GetCellDoor(), akJailCellDoor)
 
-    EscortToCell_02.Start()
+    self.GetScene(SCENE_ESCORT_TO_CELL_02).Start()
+    ; EscortToCell_02.Start()
 endFunction
 
 function StartEscortFromCell(Actor akGuard, Actor akPrisoner, ObjectReference akJailCellDoor, ObjectReference akJailChest)
-    Debug("SceneManager::StartEscortFromCell", "Starting Scene " + EscortFromCell +", params: ["+ akGuard + "," + akPrisoner + "," + akJailCellDoor + "," + akJailChest + "]")
+    Debug("SceneManager::StartEscortFromCell", "Starting Scene " + self.GetScene(SCENE_ESCORT_FROM_CELL) +", params: ["+ akGuard + "," + akPrisoner + "," + akJailCellDoor + "," + akJailChest + "]")
     ; Bind the captor to its alias to lead the escort scene
     BindAliasTo(self.GetGuard(), akGuard)
 
@@ -1624,7 +1433,8 @@ function StartEscortFromCell(Actor akGuard, Actor akPrisoner, ObjectReference ak
 
     BindAliasTo(self.GetGuardLocation(), akJailCellDoor)
 
-    EscortFromCell.Start()
+    self.GetScene(SCENE_ESCORT_FROM_CELL).Start()
+    ; EscortFromCell.Start()
 endFunction
 
 function StartEscortToJail(Actor akEscortLeader, Actor akEscortedPrisoner, ObjectReference akPrisonerChest)
@@ -1642,7 +1452,8 @@ function StartEscortToJail(Actor akEscortLeader, Actor akEscortedPrisoner, Objec
     ; Bind the guard's destination point, the jail cell door
     BindAliasTo(self.GetGuardLocation(), akPrisonerChest)
 
-    EscortToJail.Start()
+    self.GetScene(SCENE_ESCORT_TO_JAIL_01).Start()
+    ; EscortToJail.Start()
 endFunction
 
 function StartMultipleEscortsToJail(Actor akEscortLeader, Actor[] akEscortedPrisoners, ObjectReference akPrisonerChest)
@@ -1675,7 +1486,9 @@ function StartStrippingStart(Actor akStripperGuard, Actor akStrippedPrisoner)
     BindAliasTo(self.GetPrisoner(2), self.GetEscortee(2).GetActorReference())
     BindAliasTo(self.GetPrisoner(3), self.GetEscortee(3).GetActorReference())
 
-    StrippingStart.Start()
+    self.GetScene(SCENE_STRIPPING_START_01).Start()
+
+    ; StrippingStart.Start()
 endFunction
 
 function StartStripping(Actor akStripperGuard, Actor akStrippedPrisoner)
@@ -1689,7 +1502,8 @@ function StartStripping(Actor akStripperGuard, Actor akStrippedPrisoner)
     BindAliasTo(self.GetPrisoner(1), self.GetEscortee(1).GetActorReference())
     BindAliasTo(self.GetPrisoner(2), self.GetEscortee(2).GetActorReference())
 
-    Stripping.Start()
+    self.GetScene(SCENE_STRIPPING_01).Start()
+    ; Stripping.Start()
 endFunction
 
 function StartStripping_02(Actor akStripperGuard, Actor akStrippedPrisoner)
@@ -1703,7 +1517,8 @@ function StartStripping_02(Actor akStripperGuard, Actor akStrippedPrisoner)
     BindAliasTo(self.GetPrisoner(1), self.GetEscortee(1).GetActorReference())
     BindAliasTo(self.GetPrisoner(2), self.GetEscortee(2).GetActorReference())
 
-    Stripping_02.Start()
+    self.GetScene(SCENE_STRIPPING_02).Start()
+    ; Stripping_02.Start()
 endFunction
 
 function StartFrisking(Actor akFriskerGuard, Actor akFriskedPrisoner)
@@ -1713,7 +1528,8 @@ function StartFrisking(Actor akFriskerGuard, Actor akFriskedPrisoner)
     ; Bind the Prisoner to be the actor being frisk searched
     BindAliasTo(self.GetPrisoner(), akFriskedPrisoner)
 
-    Frisking.Start()
+    self.GetScene(SCENE_FRISKING).Start()
+    ; Frisking.Start()
 endFunction
 
 function StartGiveClothing(Actor akGuard, Actor akPrisoner)
@@ -1723,21 +1539,22 @@ function StartGiveClothing(Actor akGuard, Actor akPrisoner)
     ; Bind the Prisoner to be the actor being given clothing
     BindAliasTo(self.GetPrisoner(), akPrisoner)
 
-    GiveClothing.Start()
+    self.GetScene(SCENE_GIVE_CLOTHING).Start()
+    ; GiveClothing.Start()
 endFunction
 
 function StartUnlockDoor(Actor akGuard, ObjectReference akJailCellDoor)
     BindAliasTo(self.GetEscort(), akGuard)
     BindAliasTo(self.GetGuardLocation(), akJailCellDoor)
 
-    UnlockCell.Start()
+    ; UnlockCell.Start()
 endFunction
 
 function StartLockDoor(Actor akGuard, ObjectReference akJailCellDoor)
     BindAliasTo(self.GetEscort(), akGuard)
     BindAliasTo(self.GetGuardLocation(), akJailCellDoor)
 
-    LockCell.Start()
+    ; LockCell.Start()
 endFunction
 
 function StartBountyPaymentFail(Actor akGuard, Actor akPrisoner)
@@ -1747,7 +1564,8 @@ function StartBountyPaymentFail(Actor akGuard, Actor akPrisoner)
     ; Bind the Prisoner, who's trying to pay the bounty
     BindAliasTo(self.GetPrisoner(), akPrisoner)
 
-    BountyPaymentFail.Start()
+    self.GetScene(SCENE_PAYMENT_FAIL).Start()
+    ; BountyPaymentFail.Start()
 endFunction
 
 function StartArrestStart01(Actor akGuard, Actor akPrisoner)
@@ -1757,8 +1575,8 @@ function StartArrestStart01(Actor akGuard, Actor akPrisoner)
     ; Bind the Prisoner, who's getting arrested
     BindAliasTo(self.GetEscortee(), akPrisoner)
 
-    ArrestStart01.Start()
-    ; self.GetScene(SCENE_ARREST_START_01).Start()
+    ; ArrestStart01.Start()
+    self.GetScene(SCENE_ARREST_START_01).Start()
 endFunction
 
 function StartArrestStart02(Actor akGuard, Actor akPrisoner)
@@ -1768,7 +1586,8 @@ function StartArrestStart02(Actor akGuard, Actor akPrisoner)
     ; Bind the Prisoner, who's getting arrested
     BindAliasTo(self.GetEscortee(), akPrisoner)
 
-    ArrestStart02.Start()
+    self.GetScene(SCENE_ARREST_START_02).Start()
+    ; ArrestStart02.Start()
 endFunction
 
 function StartArrestStart03(Actor akGuard, Actor akPrisoner)
@@ -1788,7 +1607,8 @@ function StartArrestStart04(Actor akGuard, Actor akPrisoner)
     ; Bind the Arrestee, who's getting arrested
     BindAliasTo(self.GetArrestee(), akPrisoner)
 
-    ArrestStart04.Start()
+    self.GetScene(SCENE_ARREST_START_04).Start()
+    ; ArrestStart04.Start()
 endFunction
 
 function StartArrestScene(Actor akGuard, Actor akArrestee, string asScene)
@@ -1845,7 +1665,8 @@ function StartNoClothing(Actor akGuard, Actor akPrisoner)
     ; Bind the Prisoner, who's undressed and given no clothing
     BindAliasTo(self.GetPrisoner(), akPrisoner)
 
-    NoClothing.Start()
+    self.GetScene(SCENE_NO_CLOTHING).Start()
+    ; NoClothing.Start()
 endFunction
 
 function StartForcedStripping(Actor akGuard, Actor akPrisoner)
@@ -1854,8 +1675,9 @@ function StartForcedStripping(Actor akGuard, Actor akPrisoner)
 
     ; Bind the Prisoner, who's about to be stripped
     BindAliasTo(self.GetPrisoner(), akPrisoner)
-
-    ForcedStripping01.Start()
+    
+    self.GetScene(SCENE_FORCED_STRIPPING_01).Start()
+    ; ForcedStripping01.Start()
 endFunction
 
 function StartForcedStripping02(Actor akGuard, Actor akPrisoner)
@@ -1865,11 +1687,12 @@ function StartForcedStripping02(Actor akGuard, Actor akPrisoner)
     ; Bind the Prisoner, who's about to be stripped
     BindAliasTo(self.GetPrisoner(), akPrisoner)
 
-    ForcedStripping02.Start()
+    self.GetScene(SCENE_FORCED_STRIPPING_02).Start()
+    ; ForcedStripping02.Start()
 endFunction
 
 function StartEludingArrest(Actor akGuard, Actor akEluder)
-    if (EludingArrest.IsPlaying())
+    if (self.GetScene(SCENE_ELUDING_ARREST_01).IsPlaying())
         Debug("SceneManager::StartEludingArrest", "Scene is currently playing, aborting call!")
         return
     endif
@@ -1880,9 +1703,10 @@ function StartEludingArrest(Actor akGuard, Actor akEluder)
     ; Bind the Eluder, who is eluding arrest
     BindAliasTo(self.GetEluder(), akEluder)
 
-    Debug("SceneManager::StartEludingArrest", "Scene: "+ EludingArrest +" Params ["+ akGuard + ", " + akEluder + "] | Aliases: ["+ self.GetGuard() + ", " + self.GetEluder() + "]")
+    Debug("SceneManager::StartEludingArrest", "Scene: "+ self.GetScene(SCENE_ELUDING_ARREST_01) +" Params ["+ akGuard + ", " + akEluder + "] | Aliases: ["+ self.GetGuard() + ", " + self.GetEluder() + "]")
 
-    EludingArrest.Start()
+    self.GetScene(SCENE_ELUDING_ARREST_01).Start()
+    ; EludingArrest.Start()
 endFunction
 
 function StartArrestBountyPaymentFollowWillingly(Actor akEscort, Actor akEscortee, ObjectReference akEscortLocation)
@@ -1901,67 +1725,4 @@ function StartArrestPayBountyFollowByForce(Actor akEscort, Actor akEscortee, Obj
     BindAliasTo(self.GetPrisonerLocation(), akEscortLocation)
 
     self.GetScene(SCENE_ARREST_PAY_BOUNTY_FOLLOW_BY_FORCE).Start()
-endFunction
-
-function StartSceneGeneric( \
-    string asSceneName, \
-    Actor akEscort01 = none, \
-    Actor akEscort02 = none, \
-    Actor akEscort03 = none, \
-    Actor akEscortee01 = none, \
-    Actor akEscortee02 = none, \
-    Actor akEscortee03 = none, \
-    Actor akEscortee04 = none, \
-    Actor akEscortee05 = none, \
-    Actor akEscortee06 = none, \
-    Actor akEscortee07 = none, \
-    Actor akEscortee08 = none, \
-    Actor akEscortee09 = none, \
-    Actor akEscortee10 = none, \
-    ObjectReference akEscortLocation01 = none, \
-    ObjectReference akEscortLocation02 = none, \
-    ObjectReference akEscortLocation03 = none, \
-    ObjectReference akEscorteeLocation01 = none, \
-    ObjectReference akEscorteeLocation02 = none, \
-    ObjectReference akEscorteeLocation03 = none, \
-    ObjectReference akEscorteeLocation04 = none, \
-    ObjectReference akEscorteeLocation05 = none, \
-    ObjectReference akEscorteeLocation06 = none, \
-    ObjectReference akEscorteeLocation07 = none, \
-    ObjectReference akEscorteeLocation08 = none, \
-    ObjectReference akEscorteeLocation09 = none, \
-    ObjectReference akEscorteeLocation10 = none \
-)
-
-    BindAliasTo(self.GetEscort(), akEscort01)
-    BindAliasTo(self.GetEscort(1), akEscort02)
-    BindAliasTo(self.GetEscort(2), akEscort03)
-
-    BindAliasTo(self.GetEscortee(), akEscortee01)
-    BindAliasTo(self.GetEscortee(1), akEscortee02)
-    BindAliasTo(self.GetEscortee(2), akEscortee03)
-    BindAliasTo(self.GetEscortee(3), akEscortee04)
-    BindAliasTo(self.GetEscortee(4), akEscortee05)
-    BindAliasTo(self.GetEscortee(5), akEscortee06)
-    BindAliasTo(self.GetEscortee(6), akEscortee07)
-    BindAliasTo(self.GetEscortee(7), akEscortee08)
-    BindAliasTo(self.GetEscortee(8), akEscortee09)
-    BindAliasTo(self.GetEscortee(9), akEscortee10)
-
-    BindAliasTo(self.GetGuardLocation(), akEscortLocation01)
-    BindAliasTo(self.GetGuardLocation(1), akEscortLocation02)
-    BindAliasTo(self.GetGuardLocation(2), akEscortLocation03)
-
-    BindAliasTo(self.GetEscorteeLocation(), akEscorteeLocation01)
-    BindAliasTo(self.GetEscorteeLocation(1), akEscorteeLocation02)
-    BindAliasTo(self.GetEscorteeLocation(2), akEscorteeLocation03)
-    BindAliasTo(self.GetEscorteeLocation(3), akEscorteeLocation04)
-    BindAliasTo(self.GetEscorteeLocation(4), akEscorteeLocation05)
-    BindAliasTo(self.GetEscorteeLocation(5), akEscorteeLocation06)
-    BindAliasTo(self.GetEscorteeLocation(6), akEscorteeLocation07)
-    BindAliasTo(self.GetEscorteeLocation(7), akEscorteeLocation08)
-    BindAliasTo(self.GetEscorteeLocation(8), akEscorteeLocation09)
-    BindAliasTo(self.GetEscorteeLocation(9), akEscorteeLocation10)
-
-    self.GetScene(asSceneName).Start()
 endFunction
