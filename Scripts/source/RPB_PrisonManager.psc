@@ -33,12 +33,7 @@ endProperty
 RPB_Config __config
 RPB_Config property Config
     RPB_Config function get()
-        if (__config)
-            return __config
-        endif
-
-        __config = RPB_API.GetConfig()
-        return __config
+        return API.Config
     endFunction
 endProperty
 
@@ -46,12 +41,6 @@ RPB_SceneManager __sceneManager
 RPB_SceneManager property SceneManager
     RPB_SceneManager function get()
         return API.SceneManager
-        if (__sceneManager)
-            return __sceneManager
-        endif
-
-        __sceneManager = RPB_API.GetSceneManager()
-        return __sceneManager
     endFunction
 endProperty
 
@@ -243,3 +232,61 @@ endFunction
 ;     int prisonAliasID = JDB.solveInt(".rpb_hidden_config.prison.prisoner." + akPrisoner.GetIdentifier()) ; returns the ID of the Prison alias
 ;     return self.GetAlias(prisonAliasID) as RPB_Prison
 ; endFunction
+
+; ==========================================================
+;                       AI Cell Packages
+; ==========================================================
+
+Quest cellPackagesReference
+
+ReferenceAlias function GetCellPackageOfType(string asCellPackageType)
+    if (!cellPackagesReference)
+        cellPackagesReference = RPB_Utility.CellPackages()
+    endif
+
+    int availablePackages = cellPackagesReference.GetNumAliases()
+
+    int i = 0
+    while (i < availablePackages)
+        string packageName
+
+        if (i >= 100)
+            packageName = asCellPackageType + "_0" + i
+
+        elseif (i >= 10)
+            packageName = asCellPackageType + "_00" + i
+
+        else
+            packageName = asCellPackageType + "_000" + i
+        endif
+
+        ReferenceAlias currentPackage = self.GetCellPackageByName(packageName)
+
+        if (currentPackage.GetReference() == none)
+            DebugWithArgs("PrisonManager::GetCellPackageOfType", asCellPackageType, "Retrieving Cell Package: " + packageName)
+            return currentPackage
+        endif
+
+        i += 1
+    endWhile
+
+    DebugWarn("PrisonManager:GetCellPackageOfType", "There are no available AI Cell packages to assign!")
+    Warn("There are no available AI Cell packages to assign!")
+    return none
+endFunction
+
+ReferenceAlias function GetCellPackageByIndex(int aiCellPackageIndex)
+    if (!cellPackagesReference)
+        cellPackagesReference = RPB_Utility.CellPackages()
+    endif    
+
+    return cellPackagesReference.GetNthAlias(aiCellPackageIndex) as ReferenceAlias
+endFunction
+
+ReferenceAlias function GetCellPackageByName(string asCellPackageName)
+    if (!cellPackagesReference)
+        cellPackagesReference = RPB_Utility.CellPackages()
+    endif    
+
+    return cellPackagesReference.GetAliasByName(asCellPackageName) as ReferenceAlias
+endFunction
