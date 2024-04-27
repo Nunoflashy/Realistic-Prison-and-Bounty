@@ -1,6 +1,6 @@
 scriptname RPB_Data hidden
 {
-    Script responsible of handling anything related to the data required for static configuration of the Holds.
+    Script responsible of handling anything related to the data required for static configuration of the Mod.
 }
 
 import RPB_Utility
