@@ -63,13 +63,13 @@ endProperty
 
 RPB_Config property Config
     RPB_Config function get()
-        return Game.GetFormFromFile(0x3317, GetPluginName()) as RPB_Config
+        return API.Config
     endFunction
 endProperty
 
 RPB_SceneManager property SceneManager
     RPB_SceneManager function get()
-        return Config.SceneManager
+        return API.SceneManager
     endFunction
 endProperty
 
@@ -178,8 +178,8 @@ RPB_Arrestee function GetArresteeReference(Actor akArrestee)
     RPB_Arrestee arresteeRef = Arrestees.AtKey(akArrestee)
 
     if (!arresteeRef)
-        ; Warn("The Actor " + akArrestee + " is not arrested or there was a state mismatch!")
-        Debug("Arrest::GetArresteeReference", "The Actor " + akArrestee + " is not arrested or there was a state mismatch!")
+        Warn("The Actor " + akArrestee + " is not arrested or there was a state mismatch!")
+        DebugWarn("Arrest::GetArresteeReference", "The Actor " + akArrestee + " is not arrested or there was a state mismatch!")
 
         return none
     endif
@@ -575,12 +575,10 @@ event OnArrestBegin(RPB_Arrestee apArrestee, Actor akCaptor, Faction akCrimeFact
 
     ; apArrestee.SetArrestParameters(ARREST_TYPE_ESCORT_TO_CELL, akCaptor, akCrimeFaction)
     ; apArrestee.SetArrestParameters(ARREST_TYPE_ESCORT_TO_JAIL, akCaptor, akCrimeFaction)
-    apArrestee.SetActiveBounty(4000)
 
-    ; apArrestee.SetActiveBounty(7000)
-    apArrestee.SetArrestParameters(asArrestType, akCaptor, akCrimeFaction)
+    ; apArrestee.SetArrestParameters(asArrestType, akCaptor, akCrimeFaction)
     ; apArrestee.SetArrestParameters(ARREST_TYPE_TELEPORT_TO_JAIL, akCaptor, akCrimeFaction)
-    ; apArrestee.SetArrestParameters(ARREST_TYPE_TELEPORT_TO_CELL, akCaptor, akCrimeFaction)
+    apArrestee.SetArrestParameters(ARREST_TYPE_TELEPORT_TO_CELL, akCaptor, akCrimeFaction)
     ; apArrestee.SetActiveBounty(Utility.RandomInt(1200, 7800))
     ; apArrestee.SetActiveBounty(4200)
 
@@ -804,22 +802,6 @@ event OnUpdateGameTime()
     self.ResetResistedFlag()    ; Reset Resisted Arrest flags for all Holds
 endEvent
 
-
-RPB_Arrestee[] function GetArrestees(Actor akCaptor = none)
-    if (akCaptor)
-        RPB_Captor captorReference = self.GetCaptorReference(akCaptor)
-        return captorReference.GetArrestees()
-    endif
-
-    ; Get all captors in Captors list
-    ; Iterate through them all and get an array of all arrestees
-    RPB_Arrestee[] arresteesArr = new RPB_Arrestee[128] ; how to make size dynamic in this case?
-    int i = 0
-    while (i < Captors.GetSize())
-        
-        i += 1
-    endWhile
-endFunction
 
 ; ==========================================================
 ;                 Event Handlers - Arrestee
@@ -1458,6 +1440,33 @@ string function GetValidArrestTypes()
             ARREST_TYPE_TELEPORT_TO_CELL + ", " + \ 
             ARREST_TYPE_ESCORT_TO_JAIL + ", " + \ 
             ARREST_TYPE_ESCORT_TO_CELL
+endFunction
+
+; ==========================================================
+;                   Notification Management
+; ==========================================================
+
+bool property ShouldDisplayArrestNotifications
+    bool function get()
+        return Config.ShouldDisplayArrestNotifications
+    endFunction
+endProperty
+bool property ShouldDisplayBountyDecayNotifications
+    bool function get()
+        return Config.ShouldDisplayBountyDecayNotifications
+    endFunction
+endProperty
+
+function NotifyArrest(string msg, bool condition = true)
+    if (ShouldDisplayArrestNotifications && condition)
+        debug.notification(msg)
+    endif
+endFunction
+
+function NotifyBounty(string msg, bool condition = true)
+    if (ShouldDisplayBountyDecayNotifications && condition)
+        debug.notification(msg)
+    endif
 endFunction
 
 ; ==========================================================
