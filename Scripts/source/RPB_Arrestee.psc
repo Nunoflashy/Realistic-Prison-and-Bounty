@@ -206,8 +206,6 @@ function SetArrestParameters(string asArrestType, Actor akCaptor, Faction akCrim
     Arrest_SetString("Arrest Type", ArrestType)
     Arrest_SetString("Hold", Hold)
 
-    self.SetTimeOfArrest()
-
     ; Trace(none, "Arrestee::SetArrestParameters", "[\n" + \ 
     ;     "\tCaptured: "+ ArrestVars.GetBool("Arrest::Captured") +" \n" + \
     ;     "\tArrest Faction: "+ ArrestVars.GetForm("Arrest::Arrest Faction") +"\n" + \
