@@ -481,6 +481,11 @@ function UnregisterForTrackedStats()
     __trackStats = false
 endFunction
 
+function UnregisterForUpdates()
+    self.UnregisterForUpdate()
+    self.UnregisterForUpdateGameTime()
+endFunction
+
 Actor function GetActor() ; override
     Debug("Actor::GetActor", "Actor has not been overridden for " + self.GetExtends() + ", some features may not work properly! [Implement method " + self.GetExtends() + ".GetActor()]")
 endFunction
