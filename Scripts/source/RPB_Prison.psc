@@ -1135,7 +1135,7 @@ event OnPrisonPeriodicUpdate()
     while (i < cells.Length)
         RPB_JailCell theCell = cells[i] as RPB_JailCell
         string debugInfo = theCell.DEBUG_GetCellProperties()
-        Debug("Prison::OnPrisonPeriodicUpdate", "Cell " + theCell + ": " + debugInfo)
+        ; Debug("Prison::OnPrisonPeriodicUpdate", "Cell " + theCell + ": " + debugInfo)
         i += 1
     endWhile
 
@@ -1890,6 +1890,26 @@ endFunction
 
 
 ; ; ==========================================================
+
+; ==========================================================
+;                      Global Functions
+; ==========================================================
+
+;/
+    Gets the prison where the player was last jailed for the specified crime faction.
+
+    Faction @akCrimeFaction: The faction that arrested and imprisoned the player.
+    
+    returns: The prison where the player was last jailed as an instance of RPB_Prison.
+/;
+RPB_Prison function GetLastJailedPrison(Faction akCrimeFaction) global
+    int prisonId = RPB_StorageVars.GetIntOnForm("Last Jailed - Prison", akCrimeFaction)
+    if (prisonId)
+        return RPB_API.GetPrisonManager().GetPrisonByID(prisonId)
+    endif
+
+    return none
+endFunction
 
 ; ==========================================================
 ;                            Test
