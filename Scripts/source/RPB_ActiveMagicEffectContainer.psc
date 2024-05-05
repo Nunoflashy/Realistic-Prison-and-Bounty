@@ -53,12 +53,12 @@ function AddAt(ActiveMagicEffect apActiveMagicEffect, string asKey)
     ;     data = new ActiveMagicEffect[128]
     ; endif
 
-    ; possible point of slowdown since we iterate over all elements
-    int availableIndex = self.GetAvailableIndex()
-
     if (self.HasKey(asKey))
         return
     endif
+
+    ; possible point of slowdown since we iterate over all elements
+    int availableIndex = self.GetAvailableIndex()
 
     if (data[availableIndex] == none)
         data[availableIndex] = apActiveMagicEffect ; Assign AME to this index
