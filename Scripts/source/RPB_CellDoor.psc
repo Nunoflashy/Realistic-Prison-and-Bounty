@@ -159,8 +159,19 @@ event OnOpen(ObjectReference akActionRef)
         return
     endif
 
-    Debug("["+ self +"] CellDoor::OnOpen", akActionRef + " opened cell door " + self + ", which belongs to jail cell " + self.JailCell)
+    Actor akOpener = akActionRef as Actor
+    Form[] cellPrisoners = JailCell.Prisoners
 
+    int i = 0
+    while (i < cellPrisoners.Length)
+        if (akOpener == cellPrisoners[i])
+            RPB_Prisoner prisoner = JailCell.Prison.GetPrisoner(akOpener)
+            prisoner.SetEscaped()
+        endif
+        i += 1
+    endWhile
+
+    Debug("["+ self +"] CellDoor::OnOpen", akActionRef + " opened cell door " + self + ", which belongs to jail cell " + self.JailCell)
 endEvent
 
 event OnClose(ObjectReference akActionRef)
