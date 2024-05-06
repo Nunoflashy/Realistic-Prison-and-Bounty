@@ -549,9 +549,11 @@ bool __isReleased
 function Release()
     if (!__isReleased)
         Prison.ReleasePrisoner(self)
-        Debug("Prisoner::Release", "Called method")
+        Debug("Prisoner::Release", "Released " + self.Name + " from " + Prison.Name)
         __isReleased = true
     endif
+
+    GotoState("Released")
 endFunction
 
 ;/
@@ -1104,7 +1106,7 @@ state Imprisoned
 
     event OnUpdateGameTime()
         if (Prison.EnableInfamy)
-            ; self.UpdateInfamy()
+            self.UpdateInfamy()
         endif
 
         self.UpdateDaysImprisoned()
@@ -1112,7 +1114,6 @@ state Imprisoned
         if (self.IsSentenceServed) ; implementation is not finished
             ; Prison.SendReleaseRequest(self)
             self.Release()
-            GotoState("Released")
             return
         endif
 
@@ -1385,6 +1386,7 @@ function SetEscaped()
         Game.IncrementStat("Jail Escapes")
     endif
 
+    Prison.RegisterPrisonerEscapeTimeStats(self)
     this.SetAttackActorOnSight()
 endFunction
 
@@ -1414,6 +1416,7 @@ endFunction
 function MoveToCell(bool abBeginImprisonment = true)
     if (self.IsInCell)
         RPB_Utility.Error(self.GetName() + " is already in "+ self.GetPossessivePronoun() +" cell: " + JailCell + "!")
+        RPB_Utility.DebugError("Prisoner::MoveToCell", self.GetName() + " is already in "+ self.GetPossessivePronoun() +" cell: " + JailCell + "!")
         return
     endif
 
@@ -1490,6 +1493,9 @@ function FastForwardToRelease()
     ; endif
     ; Utility.Wait(8.0)
     ; If the Release must fall in between Minimum and Maximum release hours, set the hour to the minimum before passing the days.
+
+    self.UnregisterForUpdates()
+
     if (self.HasReleaseTimeExtraHours())
         RPB_Utility.SetGameHour(Prison.ReleaseTimeMinimumHour)
         RPB_Utility.Debug("Prisoner::FastForwardToRelease", "Setting Game Hour to Release Time Minimum Hour: " + RPB_Utility.GetTimeAs12Hour(Prison.ReleaseTimeMinimumHour))
@@ -1509,6 +1515,8 @@ function FastForwardToRelease()
     RPB_Utility.Debug("Prisoner::FastForwardToRelease", "CurrentTime: " + currentTimeBeforeChanges + ", timeLeft: " + timeLeft + ", currentTimeOverride: " + __currentTimeOverride + ", TimeLeftInSentence: " + TimeLeftInSentence)
 
     __hasFastForwardedToRelease = true
+
+    self.Release()
 endFunction
 
 ; function DetermineReleaseTimeAdditionalHours()
@@ -1756,10 +1764,11 @@ event OnSleepStart(float afSleepStartTime, float afSleepEndTime)
     endif
 
     if (self.IsUndeterminedSentence)
+        Debug("Prisoner::OnSleepStart", self.Name + " currently has an undetermined sentence, cannot serve time.")
         return
     endif
 
-    if (__serveTimeLastDayRegistered != RPB_Utility.GetCurrentDay() || __serveTimeLastDayRegistered == 0)
+    if (__serveTimeLastDayRegistered != RPB_Utility.GetCurrentDay() || !__serveTimeLastDayRegistered)
         int msgResult = Prison.ServeTimeMessage.Show()
         if (msgResult == Prison.SERVE_TIME_YES)
             ; if (self.ShouldFastForwardToRelease)
