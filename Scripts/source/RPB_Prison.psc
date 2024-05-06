@@ -1757,26 +1757,44 @@ endFunction
 function RegisterPrisonerLastJailedStats(RPB_Prisoner apPrisoner)
     ; Only register for the player, for now
     if (apPrisoner.IsPlayer())
-        RPB_StorageVars.SetIntOnForm("Last Jailed - Prison", self.PrisonFaction, self.ID)
-        RPB_StorageVars.SetIntOnForm("Last Jailed - Day", self.PrisonFaction, RPB_Utility.GetCurrentDay())
-        RPB_StorageVars.SetIntOnForm("Last Jailed - Month", self.PrisonFaction, RPB_Utility.GetCurrentMonth())
-        RPB_StorageVars.SetIntOnForm("Last Jailed - Year", self.PrisonFaction, RPB_Utility.GetCurrentYear())
-        RPB_StorageVars.SetIntOnForm("Last Jailed - Hour", self.PrisonFaction, RPB_Utility.GetCurrentHour())
-        RPB_StorageVars.SetIntOnForm("Last Jailed - Minute", self.PrisonFaction, RPB_Utility.GetCurrentMinute())
-        RPB_StorageVars.SetStringOnForm("Last Jailed - Cell", self.PrisonFaction, apPrisoner.JailCell.ID)
+        ; Reset Last Released/Escaped vars
+        RPB_StorageVars.DeleteCategoryOnForm(self.PrisonFaction, "PrisonLastReleased")
+        RPB_StorageVars.DeleteCategoryOnForm(self.PrisonFaction, "PrisonLastEscaped")
+
+        RPB_StorageVars.SetIntOnForm("Last Jailed - Prison", self.PrisonFaction, self.ID, "PrisonLastJailed")
+        RPB_StorageVars.SetIntOnForm("Last Jailed - Day", self.PrisonFaction, RPB_Utility.GetCurrentDay(), "PrisonLastJailed")
+        RPB_StorageVars.SetIntOnForm("Last Jailed - Month", self.PrisonFaction, RPB_Utility.GetCurrentMonth(), "PrisonLastJailed")
+        RPB_StorageVars.SetIntOnForm("Last Jailed - Year", self.PrisonFaction, RPB_Utility.GetCurrentYear(), "PrisonLastJailed")
+        RPB_StorageVars.SetIntOnForm("Last Jailed - Hour", self.PrisonFaction, RPB_Utility.GetCurrentHour(), "PrisonLastJailed")
+        RPB_StorageVars.SetIntOnForm("Last Jailed - Minute", self.PrisonFaction, RPB_Utility.GetCurrentMinute(), "PrisonLastJailed")
+        RPB_StorageVars.SetStringOnForm("Last Jailed - Cell", self.PrisonFaction, apPrisoner.JailCell.ID, "PrisonLastJailed")
     endif
 endFunction
 
 function RegisterPrisonerReleaseTimeStats(RPB_Prisoner apPrisoner)
     ; Only register for the player, for now
     if (apPrisoner.IsPlayer())
-        RPB_StorageVars.SetIntOnForm("Last Released - Prison", self.PrisonFaction, self.ID)
-        RPB_StorageVars.SetIntOnForm("Last Released - Day", self.PrisonFaction, RPB_Utility.GetCurrentDay())
-        RPB_StorageVars.SetIntOnForm("Last Released - Month", self.PrisonFaction, RPB_Utility.GetCurrentMonth())
-        RPB_StorageVars.SetIntOnForm("Last Released - Year", self.PrisonFaction, RPB_Utility.GetCurrentYear())
-        RPB_StorageVars.SetIntOnForm("Last Released - Hour", self.PrisonFaction, RPB_Utility.GetCurrentHour())
-        RPB_StorageVars.SetIntOnForm("Last Released - Minute", self.PrisonFaction, RPB_Utility.GetCurrentMinute())
-        RPB_StorageVars.SetStringOnForm("Last Released - Cell", self.PrisonFaction, apPrisoner.JailCell.ID)
+        RPB_StorageVars.SetIntOnForm("Last Released - Prison", self.PrisonFaction, self.ID, "PrisonLastReleased")
+        RPB_StorageVars.SetIntOnForm("Last Released - Day", self.PrisonFaction, RPB_Utility.GetCurrentDay(), "PrisonLastReleased")
+        RPB_StorageVars.SetIntOnForm("Last Released - Month", self.PrisonFaction, RPB_Utility.GetCurrentMonth(), "PrisonLastReleased")
+        RPB_StorageVars.SetIntOnForm("Last Released - Year", self.PrisonFaction, RPB_Utility.GetCurrentYear(), "PrisonLastReleased")
+        RPB_StorageVars.SetIntOnForm("Last Released - Hour", self.PrisonFaction, RPB_Utility.GetCurrentHour(), "PrisonLastReleased")
+        RPB_StorageVars.SetIntOnForm("Last Released - Minute", self.PrisonFaction, RPB_Utility.GetCurrentMinute(), "PrisonLastReleased")
+        RPB_StorageVars.SetStringOnForm("Last Released - Cell", self.PrisonFaction, apPrisoner.JailCell.ID, "PrisonLastReleased")
+        RPB_StorageVars.SetBoolOnForm("Imprisoned", apPrisoner.GetActor(), false)
+    endif
+endFunction
+
+function RegisterPrisonerEscapeTimeStats(RPB_Prisoner apPrisoner)
+    ; Only register for the player, for now
+    if (apPrisoner.IsPlayer())
+        RPB_StorageVars.SetIntOnForm("Last Escaped - Prison", self.PrisonFaction, self.ID, "PrisonLastEscaped")
+        RPB_StorageVars.SetIntOnForm("Last Escaped - Day", self.PrisonFaction, RPB_Utility.GetCurrentDay(), "PrisonLastEscaped")
+        RPB_StorageVars.SetIntOnForm("Last Escaped - Month", self.PrisonFaction, RPB_Utility.GetCurrentMonth(), "PrisonLastEscaped")
+        RPB_StorageVars.SetIntOnForm("Last Escaped - Year", self.PrisonFaction, RPB_Utility.GetCurrentYear(), "PrisonLastEscaped")
+        RPB_StorageVars.SetIntOnForm("Last Escaped - Hour", self.PrisonFaction, RPB_Utility.GetCurrentHour(), "PrisonLastEscaped")
+        RPB_StorageVars.SetIntOnForm("Last Escaped - Minute", self.PrisonFaction, RPB_Utility.GetCurrentMinute(), "PrisonLastEscaped")
+        RPB_StorageVars.SetStringOnForm("Last Escaped - Cell", self.PrisonFaction, apPrisoner.JailCell.ID, "PrisonLastEscaped")
         RPB_StorageVars.SetBoolOnForm("Imprisoned", apPrisoner.GetActor(), false)
     endif
 endFunction
