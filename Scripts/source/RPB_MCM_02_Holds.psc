@@ -7,86 +7,144 @@ bool function ShouldHandleEvent(RPB_MCM_02 mcm) global
     return mcm.IsHoldCurrentPage()
 endFunction
 
-function RenderPrisonLeft(RPB_MCM_02 mcm, string asPrisonName) global
-    string prisonCity = "Solitude"
+; function RenderPrisonLeft(RPB_MCM_02 mcm, string asPrisonName) global
+;     string prisonCity = "Solitude"
 
-    string hold = mcm.CurrentPage
+;     string hold = mcm.CurrentPage
 
-    int holdObject = RPB_Data.GetRootObject(hold)
-    Faction holdCrimeFaction = RPB_Data.Hold_GetCrimeFaction(holdObject)
+;     int holdObject = RPB_Data.GetRootObject(hold)
+;     Faction holdCrimeFaction = RPB_Data.Hold_GetCrimeFaction(holdObject)
 
-    float timeJailed    = RPB_ActorVars.GetTimeJailed(holdCrimeFaction, Game.GetForm(0x14) as Actor)
-    int lastSentence    = RPB_ActorVars.GetLastSentence(holdCrimeFaction, Game.GetForm(0x14) as Actor)
+;     float timeJailed    = RPB_ActorVars.GetTimeJailed(holdCrimeFaction, Game.GetForm(0x14) as Actor)
+;     int lastSentence    = RPB_ActorVars.GetLastSentence(holdCrimeFaction, Game.GetForm(0x14) as Actor)
 
-    ; ==========================================================
-    ;                           Left
-    ; ==========================================================
-    mcm.AddOptionCategory(asPrisonName + " ("+ prisonCity +")", flags = mcm.OPTION_DISABLED)
-    ; mcm.AddOptionText("Time Jailed", RPB_Utility.GetTimeFormatted(100), defaultFlags = mcm.OPTION_DISABLED)
-    mcm.AddOptionText("Time in Prison", RPB_Utility.GetTimeFormatted(timeJailed, asNullValue = "N/A"), defaultFlags = mcm.OPTION_DISABLED)
+;     ; ==========================================================
+;     ;                           Left
+;     ; ==========================================================
+;     mcm.AddOptionCategory(asPrisonName + " ("+ prisonCity +")", flags = mcm.OPTION_DISABLED)
+;     ; mcm.AddOptionText("Time Jailed", RPB_Utility.GetTimeFormatted(100), defaultFlags = mcm.OPTION_DISABLED)
+;     mcm.AddOptionText("Time Served", RPB_Utility.GetTimeFormatted(timeJailed, asNullValue = "N/A"), defaultFlags = mcm.OPTION_DISABLED)
+;     mcm.AddOptionText("Last Sentence", RPB_Utility.GetTimeFormatted(lastSentence, asNullValue = "N/A"), defaultFlags = mcm.OPTION_DISABLED)
+;     mcm.AddOptionText("Longest Sentence", RPB_Utility.GetTimeFormatted(30*4), defaultFlags = mcm.OPTION_DISABLED)
+;     mcm.AddOptionText("Current Infamy", "50", defaultFlags = mcm.OPTION_DISABLED)
+;     mcm.AddOptionCategory("", flags = mcm.OPTION_DISABLED)
+; endFunction
+
+; function RenderPrisonRight(RPB_MCM_02 mcm, string asPrisonName) global
+;     string prisonCity = "Solitude"
+
+;     int timesFrisked = RPB_ActorVars.GetTimesFrisked()
+
+;     ; ==========================================================
+;     ;                           Right
+;     ; ==========================================================
+;     mcm.AddOptionCategory("", flags = mcm.OPTION_DISABLED)
+
+;     mcm.AddOptionText("Times Frisked", "1", defaultFlags = mcm.OPTION_DISABLED)
+;     mcm.AddOptionText("Times Stripped", "0", defaultFlags = mcm.OPTION_DISABLED)
+;     mcm.AddOptionText("Times Jailed", "1", defaultFlags = mcm.OPTION_DISABLED)
+;     mcm.AddOptionText("Times Escaped", "0", defaultFlags = mcm.OPTION_DISABLED)
+;     mcm.AddOptionCategory("", flags = mcm.OPTION_DISABLED)
+; endFunction
+
+function RenderPrisonLeft(RPB_MCM_02 mcm, RPB_Prison apPrison, Actor akActor) global
+    Faction prisonFaction = apPrison.PrisonFaction
+
+    float timeJailed        = RPB_ActorVars.GetTimeJailed(prisonFaction, akActor)
+    int lastSentence        = RPB_ActorVars.GetLastSentence(prisonFaction, akActor)
+    int longestSentence     = RPB_ActorVars.GetLongestSentence(prisonFaction, akActor)
+    int currentInfamy       = RPB_ActorVars.GetCurrentInfamy(prisonFaction, akActor)
+
+    mcm.AddOptionCategory(apPrison.Name, flags = mcm.OPTION_DISABLED)
+    mcm.AddOptionText("Time Jailed", RPB_Utility.GetTimeFormatted(timeJailed, asNullValue = "N/A"), defaultFlags = mcm.OPTION_DISABLED)
     mcm.AddOptionText("Last Sentence", RPB_Utility.GetTimeFormatted(lastSentence, asNullValue = "N/A"), defaultFlags = mcm.OPTION_DISABLED)
-    mcm.AddOptionText("Longest Sentence", RPB_Utility.GetTimeFormatted(30*4), defaultFlags = mcm.OPTION_DISABLED)
-    mcm.AddOptionText("Current Infamy", "50", defaultFlags = mcm.OPTION_DISABLED)
+    mcm.AddOptionText("Longest Sentence", RPB_Utility.GetTimeFormatted(longestSentence, asNullValue = "N/A"), defaultFlags = mcm.OPTION_DISABLED)
+    mcm.AddOptionText("Infamy", currentInfamy, defaultFlags = mcm.OPTION_DISABLED)
     mcm.AddOptionCategory("", flags = mcm.OPTION_DISABLED)
 endFunction
 
-function RenderPrisonRight(RPB_MCM_02 mcm, string asPrisonName) global
-    string prisonCity = "Solitude"
+function RenderPrisonRight(RPB_MCM_02 mcm, RPB_Prison apPrison, Actor akActor) global
+    Faction prisonFaction = apPrison.PrisonFaction
 
-    ; ==========================================================
-    ;                           Right
-    ; ==========================================================
+    int timesFrisked    = RPB_ActorVars.GetTimesFrisked(prisonFaction, akActor)
+    int timesStripped   = RPB_ActorVars.GetTimesStripped(prisonFaction, akActor)
+    int timesJailed     = RPB_ActorVars.GetTimesJailed(prisonFaction, akActor)
+    int timesEscaped    = RPB_ActorVars.GetTimesEscaped(prisonFaction, akActor)
+
     mcm.AddOptionCategory("", flags = mcm.OPTION_DISABLED)
 
-    mcm.AddOptionText("Times Frisked", "1", defaultFlags = mcm.OPTION_DISABLED)
-    mcm.AddOptionText("Times Stripped", "0", defaultFlags = mcm.OPTION_DISABLED)
-    mcm.AddOptionText("Times Jailed", "1", defaultFlags = mcm.OPTION_DISABLED)
-    mcm.AddOptionText("Times Escaped", "0", defaultFlags = mcm.OPTION_DISABLED)
+    mcm.AddOptionText("Times Jailed", timesJailed, defaultFlags = mcm.OPTION_DISABLED)
+    mcm.AddOptionText("Times Escaped", timesEscaped, defaultFlags = mcm.OPTION_DISABLED)
+    mcm.AddOptionText("Times Frisked", timesFrisked, defaultFlags = mcm.OPTION_DISABLED)
+    mcm.AddOptionText("Times Stripped", timesStripped, defaultFlags = mcm.OPTION_DISABLED)
     mcm.AddOptionCategory("", flags = mcm.OPTION_DISABLED)
 endFunction
 
-function RenderTest(RPB_MCM_02 mcm) global
+function RenderPrisons(RPB_MCM_02 mcm) global
     string hold = mcm.CurrentPage
+
+    bool isPlayerImprisoned     = RPB_Utility.IsPlayerImprisoned()
+    Faction holdCrimeFaction    = RPB_Utility.GetCrimeFactionByHold(hold)
+    RPB_Prison holdPrison       = RPB_API.GetPrisonManager().GetPrison(hold)
+
+    if (!holdPrison)
+        return
+    endif
+
+    Actor player = Game.GetForm(0x14) as Actor
 
     mcm.SetCursorFillMode(mcm.TOP_TO_BOTTOM)
     ; ==========================================================
     ;                           Left
     ; ==========================================================
 
-    int holdObject = RPB_Data.GetRootObject(hold)
-    Faction holdCrimeFaction = RPB_Data.Hold_GetCrimeFaction(holdObject)
-    int prisonId            = RPB_StorageVars.GetIntOnForm("Last Jailed - Prison", holdCrimeFaction)
-    int lastJailedDay       = RPB_StorageVars.GetIntOnForm("Last Jailed - Day", holdCrimeFaction)
-    int lastJailedMonth     = RPB_StorageVars.GetIntOnForm("Last Jailed - Month", holdCrimeFaction)
-    int lastJailedYear      = RPB_StorageVars.GetIntOnForm("Last Jailed - Year", holdCrimeFaction)
-    int lastJailedHour      = RPB_StorageVars.GetIntOnForm("Last Jailed - Hour", holdCrimeFaction)
-    int lastJailedMinute    = RPB_StorageVars.GetIntOnForm("Last Jailed - Minute", holdCrimeFaction)
-
-    RPB_Prison lastJailedPrison = RPB_API.GetPrisonManager().GetPrisonByID(prisonId)
+    int lastJailedPrisonId   = RPB_StorageVars.GetIntOnForm("Last Jailed - Prison", holdCrimeFaction, "PrisonLastJailed")
+    bool hasLastJailedPrison = RPB_Utility.WasPlayerLastJailedInHold(holdCrimeFaction)
+    bool isLastJailedPrison  = hasLastJailedPrison && holdPrison.ID == lastJailedPrisonId
 
     mcm.AddOptionText("", hold + " Statistics", defaultFlags = mcm.OPTION_DISABLED)
     mcm.AddEmptyOption()
 
-    if (prisonId && lastJailedPrison)
-        if (lastJailedDay == RPB_Utility.GetCurrentDay() && lastJailedMonth == RPB_Utility.GetCurrentMonth() && lastJailedYear == RPB_Utility.GetCurrentYear())
-            mcm.AddOptionText("", "Currently Jailed In " + lastJailedPrison.Name, defaultFlags = mcm.OPTION_DISABLED)
+    if (isLastJailedPrison)
+        if (isPlayerImprisoned)
+            RPB_Prisoner playerPrisoner = holdPrison.GetPrisoner(Game.GetForm(0x14) as Actor)
+            string cellId = playerPrisoner.JailCell.ID
+            mcm.AddOptionText("", "Currently In " + holdPrison.Name + ", " + cellId, defaultFlags = mcm.OPTION_DISABLED)
         else
-            mcm.AddOptionText("", "Last Jailed At " + RPB_Utility.GetDateFormat(lastJailedDay, lastJailedMonth, lastJailedYear, format = "D M Y"), defaultFlags = mcm.OPTION_DISABLED)
-            mcm.AddOptionText("", "In " + lastJailedPrison.Name, defaultFlags = mcm.OPTION_DISABLED)
+            int lastJailedDay       = RPB_Utility.GetPlayerPrisonLastJailedTime("Day", holdCrimeFaction)
+            int lastJailedMonth     = RPB_Utility.GetPlayerPrisonLastJailedTime("Month", holdCrimeFaction)
+            int lastJailedYear      = RPB_Utility.GetPlayerPrisonLastJailedTime("Year", holdCrimeFaction)
+
+            mcm.AddOptionText("", "Last Jailed On " + RPB_Utility.GetDateFormat(lastJailedDay, lastJailedMonth, lastJailedYear, format = "D M Y"), defaultFlags = mcm.OPTION_DISABLED)
+            mcm.AddOptionText("", "In " + holdPrison.Name, defaultFlags = mcm.OPTION_DISABLED)
         endif
+
         mcm.AddEmptyOption()
-        if (!RPB_StorageVars.GetBoolOnForm("Imprisoned", Game.GetForm(0x14)))
-            int releaseDay       = RPB_StorageVars.GetIntOnForm("Last Released - Day", holdCrimeFaction)
-            int releaseMonth     = RPB_StorageVars.GetIntOnForm("Last Released - Month", holdCrimeFaction)
-            int releaseYear      = RPB_StorageVars.GetIntOnForm("Last Released - Year", holdCrimeFaction)
-            int releaseHour      = RPB_StorageVars.GetIntOnForm("Last Released - Hour", holdCrimeFaction)
-            int releaseMinute    = RPB_StorageVars.GetIntOnForm("Last Released - Minute", holdCrimeFaction)
-            mcm.AddOptionText("", "Released On " + RPB_Utility.GetDateFormat(releaseDay, releaseMonth, releaseYear, format = "D M Y"), defaultFlags = mcm.OPTION_DISABLED)
+        if (!isPlayerImprisoned)
+            int lastReleasedPrison = RPB_StorageVars.GetIntOnForm("Last Released - Prison", holdCrimeFaction, "PrisonLastReleased")
+
+            if (lastReleasedPrison)
+                int releaseDay       = RPB_Utility.GetPlayerPrisonLastReleasedTime("Day", holdCrimeFaction)
+                int releaseMonth     = RPB_Utility.GetPlayerPrisonLastReleasedTime("Month", holdCrimeFaction)
+                int releaseYear      = RPB_Utility.GetPlayerPrisonLastReleasedTime("Year", holdCrimeFaction)
+                mcm.AddOptionText("", "Released On " + RPB_Utility.GetDateFormat(releaseDay, releaseMonth, releaseYear, format = "D M Y"), defaultFlags = mcm.OPTION_DISABLED)
+            
+            else
+                ; No Release, check for Escape
+                int lastEscapedPrison = RPB_StorageVars.GetIntOnForm("Last Escaped - Prison", holdCrimeFaction, "PrisonLastEscaped")
+                if (lastEscapedPrison)
+                    int escapeDay       = RPB_Utility.GetPlayerPrisonLastEscapedTime("Day", holdCrimeFaction)
+                    int escapeMonth     = RPB_Utility.GetPlayerPrisonLastEscapedTime("Month", holdCrimeFaction)
+                    int escapeYear      = RPB_Utility.GetPlayerPrisonLastEscapedTime("Year", holdCrimeFaction)
+                    mcm.AddOptionText("", "Escaped On " + RPB_Utility.GetDateFormat(escapeDay, escapeMonth, escapeYear, format = "D M Y"), defaultFlags = mcm.OPTION_DISABLED)
+                endif
+            endif
+
         endif
     else
-        mcm.AddOptionText("", "You have not yet been jailed", defaultFlags = mcm.OPTION_DISABLED)
+        mcm.AddOptionText("", "You have not been jailed", defaultFlags = mcm.OPTION_DISABLED)
         mcm.AddOptionText("", "In " + hold, defaultFlags = mcm.OPTION_DISABLED)
-        mcm.AddEmptyOption()        
+        mcm.AddEmptyOption()
         ; mcm.AddOptionText("", "In any of " + hold + "'s prisons", defaultFlags = mcm.OPTION_DISABLED) ; Saved for future updates when 1:N Hold to Prison
     endif
     
@@ -95,47 +153,25 @@ function RenderTest(RPB_MCM_02 mcm) global
     mcm.AddEmptyOption()
     ; mcm.AddOptionCategory("", flags = mcm.OPTION_DISABLED)
 
-    RenderPrisonLeft(mcm, "Castle Dour Dungeon")
-    RenderPrisonLeft(mcm, "Another Test Prison")
+    RenderPrisonLeft(mcm, holdPrison, player)
+    ; RenderPrisonLeft(mcm, "Another Test Prison")
 
     mcm.SetCursorPosition(1)
     ; ==========================================================
     ;                           Right
     ; ==========================================================
     
-    string[] holdPlaceholders   = mcm.HoldStatsPlaceholders
-    string[] holdStats          = mcm.ConstructHoldStatValues(250, 50, 4000, 7000, 1, 2, 1, 0, 4)
-
-    int optionIndex = 0
-    int optionCount = mcm.HoldStatsTemplate.Length
-    while (optionIndex < optionCount)
-        string currentStatLineTemplate = mcm.HoldStatsTemplate[optionIndex]
-        string statLine = RPB_Utility.Replace(currentStatLineTemplate, holdPlaceholders, holdStats)
-        mcm.AddOptionText("", statLine, defaultFlags = mcm.OPTION_DISABLED)
-        optionIndex += 1
-    endWhile
+    DisplayHoldStats(mcm, player, holdCrimeFaction)
 
     ; Temporary
-    if (prisonId && lastJailedPrison && !RPB_StorageVars.GetBoolOnForm("Imprisoned", Game.GetForm(0x14)))
+    if (isLastJailedPrison && !isPlayerImprisoned)
         mcm.AddEmptyOption()
     endif
 
-    ; mcm.AddOptionText("", "Bounty: 250 | Violent Bounty: 50", defaultFlags = mcm.OPTION_DISABLED)
-    ; mcm.AddOptionText("", "Largest Bounty: 4000 | Total Bounty: 7000", defaultFlags = mcm.OPTION_DISABLED)
-    ; mcm.AddOptionText("", "Times Arrested: 0 | Times Frisked: 0", defaultFlags = mcm.OPTION_DISABLED)
-    ; mcm.AddOptionText("", "Arrests Eluded: 0 | Arrests Resisted: 0", defaultFlags = mcm.OPTION_DISABLED)
-    ; mcm.AddOptionText("", "Bounties Paid: 0", defaultFlags = mcm.OPTION_DISABLED)
-
-    ; mcm.AddOptionText("", "250 Bounty | 50 Violent Bounty", defaultFlags = mcm.OPTION_DISABLED)
-    ; mcm.AddOptionText("", "4000 Largest Bounty | 7000 Total Bounty", defaultFlags = mcm.OPTION_DISABLED)
-    ; mcm.AddOptionText("", "0 Times Arrested | 0 Bounties Paid", defaultFlags = mcm.OPTION_DISABLED)
-    ; mcm.AddOptionText("", "0 Arrests Eluded | 0 Arrests Resisted", defaultFlags = mcm.OPTION_DISABLED)
-    ; mcm.AddOptionCategory("", flags = mcm.OPTION_DISABLED)
     mcm.AddEmptyOption()
 
-
-    RenderPrisonRight(mcm, "Castle Dour Dungeon")
-    RenderPrisonRight(mcm, "Another Test Prison")
+    RenderPrisonRight(mcm, holdPrison, player)
+    ; RenderPrisonRight(mcm, "Another Test Prison")
 endFunction
 
 function Render(RPB_MCM_02 mcm) global
@@ -143,18 +179,7 @@ function Render(RPB_MCM_02 mcm) global
         return
     endif
 
-    RenderTest(mcm)
-
-    return
-
-    float x = StartBenchmark()
-    mcm.SetCursorFillMode(mcm.TOP_TO_BOTTOM)
-    Left(mcm)
-
-    mcm.SetCursorPosition(1)
-    Right(mcm)
-
-    EndBenchmark(x)
+    RenderPrisons(mcm)
 endFunction
 
 function Left(RPB_MCM_02 mcm) global
@@ -164,5 +189,29 @@ function Right(RPB_MCM_02 mcm) global
 endFunction
 
 ; =====================================================
-; Events
+; Helpers
 ; =====================================================
+
+function DisplayHoldStats(RPB_MCM_02 mcm, Actor akActor, Faction akHoldCrimeFaction) global
+    string[] holdPlaceholders   = mcm.HoldStatsPlaceholders
+    string[] holdStats = mcm.ConstructHoldStatValues( \
+        aiBounty            = RPB_ActorVars.GetCrimeGoldNonViolent(akHoldCrimeFaction, akActor), \ 
+        aiViolentBounty     = RPB_ActorVars.GetCrimeGoldViolent(akHoldCrimeFaction, akActor), \ 
+        aiLargestBounty     = RPB_ActorVars.GetLargestBounty(akHoldCrimeFaction, akActor), \ 
+        aiTotalBounty       = RPB_ActorVars.GetTotalBounty(akHoldCrimeFaction, akActor), \ 
+        aiTimesArrested     = RPB_ActorVars.GetTimesArrested(akHoldCrimeFaction, akActor), \
+        aiTimesFrisked      = RPB_ActorVars.GetTimesFrisked(akHoldCrimeFaction, akActor), \
+        aiArrestsEluded     = RPB_ActorVars.GetArrestsEluded(akHoldCrimeFaction, akActor), \ 
+        aiArrestsResisted   = RPB_ActorVars.GetArrestsResisted(akHoldCrimeFaction, akActor), \ 
+        aiBountiesPaid      = RPB_ActorVars.GetBountiesPaid(akHoldCrimeFaction, akActor) \ 
+    )
+
+    int optionIndex = 0
+    int optionCount = mcm.HoldStatsTemplate.Length
+    while (optionIndex < optionCount)
+        string currentStatLineTemplate = mcm.HoldStatsTemplate[optionIndex]
+        string statLine = RPB_Utility.Replace(currentStatLineTemplate, holdPlaceholders, holdStats)
+        mcm.AddOptionText("", statLine, defaultFlags = mcm.OPTION_DISABLED)
+        optionIndex += 1
+    endWhile
+endFunction
