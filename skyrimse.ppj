@@ -17,6 +17,8 @@
     </Variables>
     <Imports>
         <Import>@ModsFolder\SKSE64 - Scripts\Scripts\Source</Import>
+        <Import>@ModsFolder\SkyUILib\Scripts\Source</Import>
+        <Import>@ModsFolder\No ESP\Scripts\Source</Import>
         <Import>@ModsFolder\JContainers SE\Scripts\Source</Import>
         <Import>@ModsFolder\powerofthree's Papyrus Extender for SSE\Source\Scripts</Import>
         <Import>@ModsFolder\PapyrusUtil SE - Modders Scripting Utility Functions\Scripts\Source</Import>
