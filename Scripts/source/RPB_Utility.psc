@@ -557,6 +557,66 @@ function ReleaseAI(bool condition = true) global
 endFunction
 
 ; ==========================================================
+;                      External Functions
+; ==========================================================
+
+bool function IsActorArrested(Actor akActor) global
+    return RPB_StorageVars.GetBoolOnForm("Arrested", akActor)
+endFunction
+
+bool function IsPlayerArrested() global
+    return RPB_StorageVars.GetBoolOnForm("Arrested", Game.GetForm(0x14))
+endFunction
+
+bool function IsActorImprisoned(Actor akActor) global
+    return RPB_StorageVars.GetBoolOnForm("Imprisoned", akActor)
+endFunction
+
+bool function IsPlayerImprisoned() global
+    return RPB_StorageVars.GetBoolOnForm("Imprisoned", Game.GetForm(0x14))
+endFunction
+
+;/
+    Retrieves the Hold's Crime Faction through its name
+
+    string  @asHold: The hold's crime faction.
+
+    returns (Faction): The Hold's Crime Faction.
+/;
+Faction function GetCrimeFactionByHold(string asHold) global
+    int holdObject = RPB_Data.GetRootObject(asHold)
+    return RPB_Data.Hold_GetCrimeFaction(holdObject)
+endFunction
+
+bool function WasPlayerLastJailedInHold(Faction akCrimeFaction) global
+    return RPB_StorageVars.HasVarOnForm("Last Jailed - Prison", akCrimeFaction, "PrisonLastJailed")
+endFunction
+
+int function GetPlayerPrisonLastJailedTime(string asTimeType, Faction akCrimeFaction) global
+    if (asTimeType != "Day" && asTimeType != "Month" && asTimeType != "Year" && asTimeType != "Hour" && asTimeType != "Minute")
+        return -1
+    endif
+
+    return RPB_StorageVars.GetIntOnForm("Last Jailed - " + asTimeType, akCrimeFaction, "PrisonLastJailed")
+endFunction
+
+int function GetPlayerPrisonLastReleasedTime(string asTimeType, Faction akCrimeFaction) global
+    if (asTimeType != "Day" && asTimeType != "Month" && asTimeType != "Year" && asTimeType != "Hour" && asTimeType != "Minute")
+        return -1
+    endif
+
+    return RPB_StorageVars.GetIntOnForm("Last Released - " + asTimeType, akCrimeFaction, "PrisonLastReleased")
+endFunction
+
+int function GetPlayerPrisonLastEscapedTime(string asTimeType, Faction akCrimeFaction) global
+    if (asTimeType != "Day" && asTimeType != "Month" && asTimeType != "Year" && asTimeType != "Hour" && asTimeType != "Minute")
+        return -1
+    endif
+
+    return RPB_StorageVars.GetIntOnForm("Last Escaped - " + asTimeType, akCrimeFaction, "PrisonLastEscaped")
+endFunction
+
+; ==========================================================
 ;                       Actor Functions
 ; ==========================================================
 
@@ -1119,7 +1179,7 @@ int function GetDateFromDaysPassed(int aiDay, int aiMonth, int aiYear, int aiDay
     SetStructMemberInt(struct, "month", currentMonth)
     SetStructMemberInt(struct, "year", currentYear)
 
-    return struct;
+    return struct
 endFunction
 
 string function GetDateFormat(int aiDay, int aiMonth, int aiYear, int aiHour = 0, int aiMinute = 0, string format = "d/m/Y") global
@@ -1317,9 +1377,31 @@ string function GetTimeFormatted(float afTime, bool abIncludeMinutes = false, bo
 
         timeDays = ((timeMonths - floor(timeMonths)) * 30)
         timeWeeks = (floor(timeDays) % 30) / 7
+        float timeWeeksNotRounded = ((timeMonths - floor(timeMonths)) * 30) / 7
+
+        ; Round the days to a week to display
+        if (timeWeeksNotRounded >= 0.7)
+            timeWeeks += 1
+            timeWeeksNotRounded = 0.0
+        endif
+
+        if (timeWeeks == 4)
+            timeMonths += 1
+            timeString = floor(timeMonths) + " " + string_if (floor(timeMonths) == 1, "Month", "Months")
+            timeWeeks = 0 ; The weeks were added to a full month, reset them
+            timeDays = 0
+        endif
 
         if (abIncludeWeeks && floor(timeWeeks) >= 1)
             timeString += string_if (timeString != "", ", " + floor(timeWeeks) + " " + string_if (floor(timeWeeks) == 1, "Week", "Weeks"))
+            timeDays = ((timeWeeksNotRounded - floor(timeWeeksNotRounded)) * 7)
+
+            Debug("Utility::GetTimeFormatted", "TimeMonths: " + timeMonths + ", TimeWeeks: " + timeWeeks + ", TimeDays: " + timeDays)
+
+            if (timeDays > 1)
+                timeString += string_if (timeString != "", ", " + floor(timeDays) + " " + string_if (floor(timeDays) == 1, "Day", "Days"))
+            endif
+
         elseif (abIncludeDays && floor(timeDays) >= 1)
             timeString += string_if (timeString != "", ", " + floor(timeDays) + " " + string_if (floor(timeDays) == 1, "Day", "Days"))
         endif
