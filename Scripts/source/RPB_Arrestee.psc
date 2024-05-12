@@ -530,12 +530,12 @@ event OnBountyGained()
     self.UpdateTotalBounty()
 endEvent
 
-event OnStatChanged(string asStatName, int aiValue)
+event OnStatChanged(string asStatName, float afValue)
     if (asStatName == Hold + " Bounty") ; If there's bounty gained in the current arrest hold
         self.OnBountyGained()
     endif
 
-    ; Debug("Arrestee::OnStatChanged", "Stat " + asStatName + " has been changed to " + aiValue)
+    ; Debug("Arrestee::OnStatChanged", "Stat " + asStatName + " has been changed to " + afValue)
 endEvent
 
 event OnObjectUnequipped(Form akBaseObject, ObjectReference akReference)

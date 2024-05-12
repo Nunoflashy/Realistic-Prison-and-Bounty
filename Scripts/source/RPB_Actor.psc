@@ -104,12 +104,20 @@ function RemoveItem(Form akItemToRemove, int aiCount = 1, bool abSilent = true, 
     this.RemoveItem(akItemToRemove, aiCount, abSilent, akOtherContainer)
 endFunction
 
+function RemoveAllItems(ObjectReference akTransferTo = none, bool abKeepOwnership = false, bool abRemoveQuestItems = true)
+    this.RemoveAllItems(akTransferTo, abKeepOwnership, abRemoveQuestItems)
+endFunction
+
 function StopCombat(bool abStopCombatAlarm = true)
     this.StopCombat()
 
     if (abStopCombatAlarm)
         this.StopCombatAlarm()
     endif
+endFunction
+
+function SetAttackActorOnSight(bool abAttackOnSight = true)
+    this.SetAttackActorOnSight(abAttackOnSight)
 endFunction
 
 function MoveTo(ObjectReference akTarget, float afXOffset = 0.0, float afYOffset = 0.0, float afZOffset = 0.0, bool abMatchRotation = true)
@@ -318,6 +326,14 @@ function DecrementStat(string statName, int decrementBy = 1)
     endif
 endFunction
 
+function ModifyStat(string statName, float modifyBy)
+    RPB_ActorVars.ModifyStat(statName, self.GetFaction(), this, modifyBy)
+
+    if (TrackStats)
+        self.OnStatChanged(statName, self.QueryStat(statName))
+    endif
+endFunction
+
 function SetCrimeGold(int aiGold)
     if (self.IsPlayer())
         self.GetFaction().SetCrimeGold(aiGold)
@@ -449,7 +465,7 @@ endEvent
 
 ; Handles the tracked stats when they are changed.
 ; Tracks both ActorVars for this particular Actor and all stats handled by OnTrackedStatsEvent() for the Player.
-event OnStatChanged(string asStatName, int aiValue) ; override
+event OnStatChanged(string asStatName, float afValue) ; override
 endEvent
 
 ; Handles the initialization of this Actor
