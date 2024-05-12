@@ -59,7 +59,7 @@ function RenderPrisonLeft(RPB_MCM_02 mcm, RPB_Prison apPrison, Actor akActor) gl
     mcm.AddOptionText("Time Jailed", RPB_Utility.GetTimeFormatted(timeJailed, asNullValue = "N/A"), defaultFlags = mcm.OPTION_DISABLED)
     mcm.AddOptionText("Last Sentence", RPB_Utility.GetTimeFormatted(lastSentence, asNullValue = "N/A"), defaultFlags = mcm.OPTION_DISABLED)
     mcm.AddOptionText("Longest Sentence", RPB_Utility.GetTimeFormatted(longestSentence, asNullValue = "N/A"), defaultFlags = mcm.OPTION_DISABLED)
-    mcm.AddOptionText("Infamy", currentInfamy, defaultFlags = mcm.OPTION_DISABLED)
+    mcm.AddOptionText("Infamy Gained", currentInfamy + " Infamy", defaultFlags = mcm.OPTION_DISABLED)
     mcm.AddOptionCategory("", flags = mcm.OPTION_DISABLED)
 endFunction
 
@@ -109,7 +109,7 @@ function RenderPrisons(RPB_MCM_02 mcm) global
         if (isPlayerImprisoned)
             RPB_Prisoner playerPrisoner = holdPrison.GetPrisoner(Game.GetForm(0x14) as Actor)
             string cellId = playerPrisoner.JailCell.ID
-            mcm.AddOptionText("", "Currently In " + holdPrison.Name + ", " + cellId, defaultFlags = mcm.OPTION_DISABLED)
+            mcm.AddOptionText("", "Currently Jailed In " + holdPrison.Name, defaultFlags = mcm.OPTION_DISABLED)
         else
             int lastJailedDay       = RPB_Utility.GetPlayerPrisonLastJailedTime("Day", holdCrimeFaction)
             int lastJailedMonth     = RPB_Utility.GetPlayerPrisonLastJailedTime("Month", holdCrimeFaction)
@@ -182,16 +182,14 @@ function Render(RPB_MCM_02 mcm) global
     RenderPrisons(mcm)
 endFunction
 
-function Left(RPB_MCM_02 mcm) global
-endFunction
-
-function Right(RPB_MCM_02 mcm) global
-endFunction
-
 ; =====================================================
 ; Helpers
 ; =====================================================
 
+;/
+    Displays the Header section info with the Hold info.
+    The header's values, as well as their positioning, are controlled through the template on the MCM config file.
+/;
 function DisplayHoldStats(RPB_MCM_02 mcm, Actor akActor, Faction akHoldCrimeFaction) global
     string[] holdPlaceholders   = mcm.HoldStatsPlaceholders
     string[] holdStats = mcm.ConstructHoldStatValues( \

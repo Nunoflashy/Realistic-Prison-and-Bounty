@@ -86,6 +86,41 @@ int aiBountiesPaid \
     return JArray.asStringArray(values)
 endFunction
 
+string property PrisonHeaderTemplate
+    string function get()
+        return RPB_Data.MCM_GetPrisonTemplate()
+    endFunction
+endProperty
+
+string[] property PrisonHeaderPlaceholders
+    string[] function get()
+        int placeholders = JArray.object()
+        JArray.addStr(placeholders, "hold")
+        JArray.addStr(placeholders, "city")
+        JArray.addStr(placeholders, "prison")
+        JArray.addStr(placeholders, "cell")
+        JArray.addStr(placeholders, "prisoner")
+
+        return JArray.asStringArray(placeholders)
+    endFunction
+endProperty
+
+string[] function ConstructPrisonHeaderValues( \ 
+    string asPrisonHold, \
+    string asPrisonCity, \
+    string asPrisonName, \
+    string asPrisonCell, \
+    string asPrisonerName \
+)
+    int values = JArray.object()
+    JArray.addStr(values, asPrisonHold)
+    JArray.addStr(values, asPrisonCity)
+    JArray.addStr(values, asPrisonName)
+    JArray.addStr(values, asPrisonCell)
+    JArray.addStr(values, asPrisonerName)
+    return JArray.asStringArray(values)
+endFunction
+
 bool function IsHoldCurrentPage()
     int i = 0
     while (i < Holds.Length)

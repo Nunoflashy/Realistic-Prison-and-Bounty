@@ -15,24 +15,22 @@ function Render(RPB_MCM_02 mcm, RPB_Prisoner apPrisoner) global
     int emptySpacesLeft     = 0
     int emptySpacesRight    = 0
 
+    RPB_Prison prison       = apPrisoner.Prison
+    RPB_Prisoner prisoner   = apPrisoner
+
     mcm.SetCursorFillMode(mcm.TOP_TO_BOTTOM)
 ; ==========================================================
 ;                           Left
 ; ==========================================================
 
-    RPB_Prison prison       = apPrisoner.Prison
-    RPB_Prisoner prisoner   = apPrisoner
-
     ; Should probably be refactored, a prisoner should always be imprisoned (maybe?)
     if (!prisoner.IsImprisoned)
+        DebugWarn("MCM_02_Prison::Render", "The prisoner " + prisoner.Name + " (Prisoner #"+ prisoner.Number +") " + " is not imprisoned, no stats to show.")
         Warn("The prisoner " + prisoner.Name + " (Prisoner #"+ prisoner.Number +") " + " is not imprisoned, no stats to show.")
+        Debug("MCM_02_Prison::Render", "prison: " + prison + ", prisoner: " + prisoner)
         return
     endif
 
-    Debug("MCM_02_Prison::Render", "prison: " + prison + ", prisoner: " + prisoner)
-
-
-    string currentTimeFormatted                 = RPB_Utility.GetCurrentDateFormatted()
     string arrestTimeFormatted                  = prison.GetTimeOfArrestFormatted(prisoner)
     string imprisonmentTimeFormatted            = prison.GetTimeOfImprisonmentFormatted(prisoner)
     string timeElapsedSinceArrest               = prison.GetTimeElapsedSinceArrest(prisoner)
@@ -40,9 +38,7 @@ function Render(RPB_MCM_02 mcm, RPB_Prisoner apPrisoner) global
     string timeLeftFormatted                    = prison.GetTimeLeftOfSentenceFormatted(prisoner)
     string releaseTimeFormatted                 = prison.GetTimeOfReleaseFormatted(prisoner)
 
-    mcm.AddOptionText("", currentTimeFormatted, defaultFlags = mcm.OPTION_DISABLED)
-    mcm.AddOptionCategory("", flags = mcm.OPTION_DISABLED)
-    mcm.AddEmptyOption()
+    DisplayTimeHeader(mcm)
     emptySpacesLeft += 1
 
     if (prisoner.TimeOfArrest)
@@ -81,54 +77,14 @@ function Render(RPB_MCM_02 mcm, RPB_Prisoner apPrisoner) global
 
     mcm.AddEmptyOption()
     emptySpacesLeft += 1
-    ; RPB_MCM_02_Stats.RenderPrisonLeft(mcm, "Castle Dour Dungeon")
 
     mcm.SetCursorPosition(1)
 ; ==========================================================
 ;                           Right
 ; ==========================================================
 
-    string sentenceFormatted    = prison.GetSentenceFormatted(prisoner)
-    string timeServedFormatted  = prison.GetTimeServedFormatted(prisoner)
+    DisplayPrisonHeader(mcm, prison, prisoner)
 
-    float currentHourWithMinutes = RPB_Utility.GetCurrentHourFloat()
-    string dayOfWeek       = RPB_Utility.GetDayOfWeekName(RPB_Utility.CalculateDayOfWeek(RPB_Utility.GetCurrentDay(), RPB_Utility.GetCurrentMonth(), RPB_Utility.GetCurrentYear()))
-    string currentHour     = RPB_Utility.GetTimeAs12Hour(RPB_Utility.GetCurrentHour(), RPB_Utility.GetMinutesFromHour(currentHourWithMinutes))
-    string currentDay      = RPB_Utility.ToOrdinalNthDay(RPB_Utility.GetCurrentDay())
-    string currentMonth    = RPB_Utility.GetMonthName(RPB_Utility.GetCurrentMonth())
-    string currentYear     = "4E " + RPB_Utility.GetCurrentYear()
-
-    string prisonHold   = prisoner.Prison.Hold
-    string prisonCity   = prisoner.Prison.City
-    string prisonName   = prisoner.Prison.Name
-    string prisonCell   = prisoner.JailCell.ID
-    string prisonerName = prisoner.Name
-
-    string prisonTemplate = RPB_Data.MCM_GetPrisonTemplate()
-
-    int placeholders = JArray.object()
-    int replacements = JArray.object()
-
-    JArray.addStr(placeholders, "hold")
-    JArray.addStr(placeholders, "city")
-    JArray.addStr(placeholders, "prison")
-    JArray.addStr(placeholders, "cell")
-    JArray.addStr(placeholders, "prisoner")
-
-    JArray.addStr(replacements, prisonHold)
-    JArray.addStr(replacements, prisonCity)
-    JArray.addStr(replacements, prisonName)
-    JArray.addStr(replacements, prisonCell)
-    JArray.addStr(replacements, prisonerName)
-
-    string header = RPB_Utility.Replace(prisonTemplate, JArray.asStringArray(placeholders), JArray.asStringArray(replacements))
-
-    mcm.AddOptionText("", header, defaultFlags = mcm.OPTION_DISABLED)
-    ; mcm.AddOptionText("", prisonHold + " | " + prisonCity + " | " + prisonName + " | " + prisonCell, defaultFlags = mcm.OPTION_DISABLED)
-    mcm.AddOptionCategory("", flags = mcm.OPTION_DISABLED)
-    mcm.AddEmptyOption()
-    ; emptySpacesRight += 1
-    
     if (prisoner.Bounty && prisoner.ShowBounty)
         mcm.AddOptionText("Bounty for Arrest", \ 
             string_if (prisoner.BountyNonViolent > 0, prisoner.BountyNonViolent + " Bounty") + \ 
@@ -139,10 +95,12 @@ function Render(RPB_MCM_02 mcm, RPB_Prisoner apPrisoner) global
     endif
 
     if (prisoner.Captor)
-        mcm.AddOptionText("Captured By", prisoner.Captor.GetBaseObject().GetName(), defaultFlags = mcm.OPTION_DISABLED)
+        Actor prisonerCaptor = prisoner.Captor
+        mcm.AddOptionText("Captured By", prisonerCaptor.GetBaseObject().GetName(), defaultFlags = mcm.OPTION_DISABLED)
     endif
 
     if (prisoner.ShowSentence && !prisoner.IsUndeterminedSentence)
+        string sentenceFormatted = prison.GetSentenceFormatted(prisoner)
         mcm.AddOptionText("Sentence", sentenceFormatted, defaultFlags = mcm.OPTION_DISABLED)
     endif
 
@@ -155,6 +113,7 @@ function Render(RPB_MCM_02 mcm, RPB_Prisoner apPrisoner) global
     endif
 
     if (prisoner.ShowTimeServed && prisoner.TimeServed >= 1)
+        string timeServedFormatted  = prison.GetTimeServedFormatted(prisoner)
         mcm.AddOptionText(string_if (!prisoner.IsUndeterminedSentence, "Time Served", "Time in Prison"), timeServedFormatted, defaultFlags = mcm.OPTION_DISABLED)
     endif
 
@@ -165,6 +124,33 @@ function Render(RPB_MCM_02 mcm, RPB_Prisoner apPrisoner) global
         mcm.AddEmptyOption()
         emptySpacesRight += 1
     endWhile
+endFunction
 
-    ; RPB_MCM_02_Stats.RenderPrisonRight(mcm, "Castle Dour Dungeon")
+function DisplayTimeHeader(RPB_MCM_02 mcm) global
+    string currentTimeFormatted = RPB_Utility.GetCurrentDateFormatted()
+    mcm.AddOptionText("", currentTimeFormatted, defaultFlags = mcm.OPTION_DISABLED)
+    mcm.AddOptionCategory("", flags = mcm.OPTION_DISABLED)
+    mcm.AddEmptyOption()
+endFunction
+
+;/
+    Displays the Header section info with the Prison info.
+    The header's values, as well as their position, are controlled through the template on the MCM config file.
+/;
+function DisplayPrisonHeader(RPB_MCM_02 mcm, RPB_Prison apPrison, RPB_Prisoner apPrisoner) global
+    string[] headerPlaceholders = mcm.PrisonHeaderPlaceholders
+    string[] prisonHeader = mcm.ConstructPrisonHeaderValues( \ 
+        asPrisonHold    = apPrison.Hold, \
+        asPrisonCity    = apPrison.City, \
+        asPrisonName    = apPrison.Name, \
+        asPrisonCell    = apPrisoner.JailCell.ID, \
+        asPrisonerName  = apPrisoner.Name \
+    )
+
+    string prisonTemplate = mcm.PrisonHeaderTemplate
+    string header = RPB_Utility.Replace(prisonTemplate, headerPlaceholders, prisonHeader)
+
+    mcm.AddOptionText("", header, defaultFlags = mcm.OPTION_DISABLED)
+    mcm.AddOptionCategory("", flags = mcm.OPTION_DISABLED)
+    mcm.AddEmptyOption()
 endFunction
