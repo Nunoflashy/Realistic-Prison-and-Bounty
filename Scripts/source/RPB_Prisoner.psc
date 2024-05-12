@@ -708,15 +708,15 @@ function Clothe()
 endFunction
 
 function Strip(bool abRemoveUnderwear = true)
-    this.UnequipAll()
-    this.RemoveAllItems(PrisonerBelongingsContainer, false, true)
+    self.UnequipAll()
+    self.RemoveAllItems(PrisonerBelongingsContainer, false, true)
+
     self.IncrementStat("Times Stripped")
     self.IsStrippedNaked = true
     Prison_SetBool("Stripped", true) ; No use for now, might be changed
-    return
 
     Config.NotifyJail("Stripping Thoroughness: " + StrippingThoroughness)
-
+    return
     bool _isStrippedNaked = StrippingThoroughness >= 10
 
     ; Get underwear
@@ -1090,6 +1090,7 @@ state Released
     endEvent
 endState
 
+float _previousUpdateTimeServed
 ; While this Prisoner is imprisoned in their cell
 state Imprisoned
     event OnBeginState()
@@ -1105,11 +1106,8 @@ state Imprisoned
     endEvent
 
     event OnUpdateGameTime()
-        if (Prison.EnableInfamy)
-            self.UpdateInfamy()
-        endif
-
-        self.UpdateDaysImprisoned()
+        self.UpdateInfamy()
+        self.UpdateTimeJailed() ; Must be updated in some other way, otherwise it will reset to 0 on next imprisonment
 
         if (self.IsSentenceServed) ; implementation is not finished
             ; Prison.SendReleaseRequest(self)
@@ -1118,17 +1116,16 @@ state Imprisoned
         endif
 
         Prison.DEBUG_ShowPrisonerSentenceInfo(self, true)
-        
-        ; Must be updated in some other way, otherwise it will reset to 0 on next imprisonment
-        if (!__processTimeJailedOnRest)
-            float currentTimeServedStored = RPB_ActorVars.GetTimeJailed(Prison.PrisonFaction, this)
-            RPB_ActorVars.ModTimeJailed(Prison.PrisonFaction, this, currentTimeServedStored + TimeSinceLastUpdate) 
-        endif
+
         ; RPB_Utility.Debug("Prisoner::OnUpdateGameTime", "currentTimeServedStored: " + currentTimeServedStored)
 
         self.RegisterLastUpdate()
         RegisterForSingleUpdateGameTime(1.0)
     endEvent
+endState
+
+state Awaiting
+    
 endState
 
 ; When this Prisoner gets released
@@ -1137,6 +1134,43 @@ endState
 
 ; When or while this Prisoner is escaping or has escaped
 state Escape
+endState
+
+state ServeOnRest
+    function UpdateTimeJailed()
+        int timeLeft = Math.Ceiling(TimeLeftInSentence)
+        self.ModifyStat("Time Jailed", timeLeft)
+        self.IncrementStat("Days Jailed", timeLeft)
+
+        if (self.IsPlayer())
+            Game.IncrementStat("Days Jailed", timeLeft)
+        endif
+
+        Debug("[state: ServeOnRest] Prisoner::UpdateTimeJailed", "Updating " + self.Name + "'s time jailed: " + timeLeft + ", TimeLeftInSentence: " + TimeLeftInSentence)
+    endFunction
+
+    function UpdateInfamy()
+        if (!Prison.EnableInfamy)
+            return
+        endif
+
+        int timeLeft = Math.Ceiling(TimeLeftInSentence)
+        int infamyGained = (InfamyGainedDaily * timeLeft) as int
+
+        self.IncrementStat("Infamy Gained", infamyGained)
+
+        Config.NotifyInfamy(infamyGained + " infamy gained in " + Prison.Name, self.IsPlayer())
+        Config.NotifyInfamy(self.GetName() + " has gained " + infamyGained + " infamy in " + Prison.Name, !self.IsPlayer())
+    
+        if (IsInfamyKnown)
+            Prison.NotifyInfamyKnownThresholdMet(self.GetHold(), Prison.HasInfamyKnownNotificationFired)
+    
+        elseif (IsInfamyRecognized)
+            Prison.NotifyInfamyRecognizedThresholdMet(self.GetHold(), Prison.HasInfamyRecognizedNotificationFired)
+        endif
+
+        Debug("[state: ServeOnRest] Prisoner::UpdateInfamy", "Updating " + self.Name + "'s infamy in jail: " + infamyGained)
+    endFunction
 endState
 
 ; ==========================================================
@@ -1280,7 +1314,9 @@ endFunction
 ; ==========================================================
 
 function UpdateInfamy()
-    string city = Config.GetCityNameFromHold(self.GetHold())
+    if (!Prison.EnableInfamy)
+        return
+    endif
 
     self.IncrementStat("Infamy Gained", InfamyGainedPerUpdate)
 
@@ -1295,11 +1331,35 @@ function UpdateInfamy()
     endif
 endFunction
 
+function UpdateTimeJailed()
+    float currentTimeJailed = (TimeServed - _previousUpdateTimeServed)
+
+    self.ModifyStat("Time Jailed", currentTimeJailed)
+
+    if (self.HasDayElapsed())
+        if (self.IsPlayer())
+            Game.IncrementStat("Days Jailed", DaysSinceTimeOfImprisonment)
+        endif
+
+        accumulatedTimeServed -= DaysSinceTimeOfImprisonment ; Remove the counted days from accumulated time served (Get the fractional part if there's any - i.e: hours)
+
+        RPB_Utility.Debug("Prisoner::UpdateTimeJailed", "Days Jailed: " + self.QueryStat("Days Jailed"))
+        self.OnDayPassed()
+    endif
+
+    Debug("Prisoner::UpdateTimeJailed", "Updating " + self.Name + "'s time jailed by: " + currentTimeJailed)
+    Debug("Prisoner::UpdateTimeJailed", "TimeServed: " + TimeServed + ", _previousUpdateTimeServed: " + _previousUpdateTimeServed)
+
+    ; Update the previous time served, to take into account for the next calculation
+    _previousUpdateTimeServed = TimeServed
+endFunction
+
 function UpdateLongestSentence()
     int currentLongestSentence = self.QueryStat("Longest Sentence")
     int newLongestSentence = int_if (currentLongestSentence < Sentence, Sentence, currentLongestSentence)
     self.SetStat("Longest Sentence", newLongestSentence)
-    RPB_ActorVars.SetLastSentence(Prison.PrisonFaction, this, Sentence)
+    self.SetStat("Last Sentence", Sentence)
+    ; RPB_ActorVars.SetLastSentence(Prison.PrisonFaction, this, Sentence)
 
     Debug(this, "Prisoner::UpdateLongestSentence", "[\n" + \ 
         "\t Current Longest Sentence: " + currentLongestSentence + "\n" + \
@@ -1358,26 +1418,6 @@ bool function HasDayElapsed()
     return false
 endFunction
 
-function UpdateDaysImprisoned()
-    ; if (self.HasDayElapsed())
-    ;     Game.IncrementStat("Days Jailed", DaysSinceTimeOfImprisonment) ; Pause Stat Menu
-    ;     self.IncrementStat("Days Jailed", DaysSinceTimeOfImprisonment) ; Hold Stat
-        
-    ;     accumulatedTimeServed -= DaysSinceTimeOfImprisonment ; Remove the counted days from accumulated time served (Get the fractional part if there's any - i.e: hours)
-        
-    ;     float accumulatedTimeRemaining = accumulatedTimeServed - DaysSinceTimeOfImprisonment
-    ;     ; RPB_Utility.Debug("Prisoner::UpdateDaysImprisoned", "accumulatedTimeServed remaining: " + accumulatedTimeServed)
-    ;     ; RPB_Utility.Debug("Prisoner::UpdateDaysImprisoned", "TimeOfImprisonment: " + TimeOfImprisonment)
-    ;     RPB_Utility.Debug("Prisoner::UpdateDaysImprisoned", "Days Jailed: " + self.QueryStat("Days Jailed"))
-    ;     self.OnDayPassed()
-    ; endif
-
-    ; Debug("Prisoner::UpdateDaysImprisoned", "TimeServed: " + TimeServed + ", floor(TimeServed): " + floor(TimeServed))
-    ; Debug("Prisoner::UpdateDaysImprisoned", "Updating Days Jailed: " + floor(accumulatedTimeServed))
-    ; Debug("Prisoner::UpdateDaysImprisoned", "LastUpdate: " + LastUpdate)
-    ; Debug("Prisoner::UpdateDaysImprisoned", "TimeSinceLastUpdate: " + TimeSinceLastUpdate)
-endFunction
-
 function SetEscaped()
     Prison_SetBool("Escaped", true)
     self.IncrementStat("Times Escaped")
@@ -1387,7 +1427,7 @@ function SetEscaped()
     endif
 
     Prison.RegisterPrisonerEscapeTimeStats(self)
-    this.SetAttackActorOnSight()
+    self.SetAttackActorOnSight()
 endFunction
 
 bool wasMoved
@@ -1485,36 +1525,38 @@ function MoveToCaptor()
     this.MoveTo(captor)
 endFunction
 
-bool __processTimeJailedOnRest
 bool __hasFastForwardedToRelease
 function FastForwardToRelease()
-    ; if (__hasFastForwardedToRelease)
-    ;     return false
-    ; endif
-    ; Utility.Wait(8.0)
-    ; If the Release must fall in between Minimum and Maximum release hours, set the hour to the minimum before passing the days.
+    if (__hasFastForwardedToRelease)
+        return
+    endif
 
+    ; Utility.Wait(8.0)
+
+    GotoState("ServeOnRest")
     self.UnregisterForUpdates()
 
+    ; If the Release must fall in between Minimum and Maximum release hours, set the hour to the minimum before passing the days.
     if (self.HasReleaseTimeExtraHours())
         RPB_Utility.SetGameHour(Prison.ReleaseTimeMinimumHour)
         RPB_Utility.Debug("Prisoner::FastForwardToRelease", "Setting Game Hour to Release Time Minimum Hour: " + RPB_Utility.GetTimeAs12Hour(Prison.ReleaseTimeMinimumHour))
     endif
 
-    __processTimeJailedOnRest = true
+    ; Pass the time
+    self.UpdateTimeJailed()
+    self.UpdateInfamy()
 
     int timeLeft = Math.Ceiling(TimeLeftInSentence)
     RPB_Utility.PassTimeInDays(timeLeft)
-    Game.IncrementStat("Days Jailed", timeLeft)
-    self.IncrementStat("Days Jailed", timeLeft) ; Hold Stat
-    RPB_ActorVars.ModTimeJailed(Prison.PrisonFaction, this, timeLeft) 
 
-    float currentTimeBeforeChanges = CurrentTime
-    __currentTimeOverride = CurrentTime + timeLeft
+    ; float currentTimeBeforeChanges = CurrentTime
+    ; __currentTimeOverride = CurrentTime + timeLeft
 
-    RPB_Utility.Debug("Prisoner::FastForwardToRelease", "CurrentTime: " + currentTimeBeforeChanges + ", timeLeft: " + timeLeft + ", currentTimeOverride: " + __currentTimeOverride + ", TimeLeftInSentence: " + TimeLeftInSentence)
+    ; RPB_Utility.Debug("Prisoner::FastForwardToRelease", "CurrentTime: " + currentTimeBeforeChanges + ", timeLeft: " + timeLeft + ", currentTimeOverride: " + __currentTimeOverride + ", TimeLeftInSentence: " + TimeLeftInSentence)
 
     __hasFastForwardedToRelease = true
+
+    GotoState("Awaiting")
 
     self.Release()
 endFunction
@@ -1748,13 +1790,13 @@ event OnDayPassed()
     self.PerformDeleveling()
 endEvent
 
-event OnStatChanged(string asStatName, int aiValue)
+event OnStatChanged(string asStatName, float afValue)
     if (asStatName == Prison.Hold + " Bounty") ; If there's bounty gained in the current prison hold
         self.OnBountyGained()
         ; Maybe inform the prisoner of their new sentence and have them escorted out of the cell to be frisked/stripped if they are not
     endif
 
-    ; Debug(this, "Prisoner::OnStatChanged", "Stat " + asStatName + " has been changed to " + aiValue)
+    ; Debug(this, "Prisoner::OnStatChanged", "Stat " + asStatName + " has been changed to " + afValue)
 endEvent
 
 int __serveTimeLastDayRegistered
