@@ -1377,30 +1377,9 @@ string function GetTimeFormatted(float afTime, bool abIncludeMinutes = false, bo
 
         timeDays = ((timeMonths - floor(timeMonths)) * 30)
         timeWeeks = (floor(timeDays) % 30) / 7
-        float timeWeeksNotRounded = ((timeMonths - floor(timeMonths)) * 30) / 7
-
-        ; Round the days to a week to display
-        if (timeWeeksNotRounded >= 0.7)
-            timeWeeks += 1
-            timeWeeksNotRounded = 0.0
-        endif
-
-        if (timeWeeks == 4)
-            timeMonths += 1
-            timeString = floor(timeMonths) + " " + string_if (floor(timeMonths) == 1, "Month", "Months")
-            timeWeeks = 0 ; The weeks were added to a full month, reset them
-            timeDays = 0
-        endif
-
+  
         if (abIncludeWeeks && floor(timeWeeks) >= 1)
             timeString += string_if (timeString != "", ", " + floor(timeWeeks) + " " + string_if (floor(timeWeeks) == 1, "Week", "Weeks"))
-            timeDays = ((timeWeeksNotRounded - floor(timeWeeksNotRounded)) * 7)
-
-            Debug("Utility::GetTimeFormatted", "TimeMonths: " + timeMonths + ", TimeWeeks: " + timeWeeks + ", TimeDays: " + timeDays)
-
-            if (timeDays > 1)
-                timeString += string_if (timeString != "", ", " + floor(timeDays) + " " + string_if (floor(timeDays) == 1, "Day", "Days"))
-            endif
 
         elseif (abIncludeDays && floor(timeDays) >= 1)
             timeString += string_if (timeString != "", ", " + floor(timeDays) + " " + string_if (floor(timeDays) == 1, "Day", "Days"))
