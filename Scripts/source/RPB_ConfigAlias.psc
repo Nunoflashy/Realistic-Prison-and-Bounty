@@ -192,6 +192,12 @@ event OnKeyDown(int keyCode)
         JArray.addStr(actionArrayObj, "Validate Options")
         JArray.addStr(actionArrayObj, "Play Animation on Selected Actor")
         JArray.addStr(actionArrayObj, "Bind All Prisoners")
+        JArray.addStr(actionArrayObj, "Toggle Show Prison Sentence")
+        JArray.addStr(actionArrayObj, "Toggle Show Prison Release Time")
+        JArray.addStr(actionArrayObj, "Toggle Show Prison Time Left")
+        JArray.addStr(actionArrayObj, "Toggle Show Prison Time Served")
+        JArray.addStr(actionArrayObj, "Toggle Show Prison Bounty")
+        JArray.addStr(actionArrayObj, "Toggle All Prison Stats")
 
         string[] actionArray = JArray.asStringArray(actionArrayObj)
 
@@ -210,6 +216,40 @@ event OnKeyDown(int keyCode)
         elseif (actionToPerform == "Bind All Prisoners")
             RPB_Prison castleDourDungeon = API.PrisonManager.GetPrison("Haafingar")
             castleDourDungeon.BindAllPrisonersToCell()
+
+        elseif (actionToPerform == "Toggle Show Prison Sentence")
+            RPB_Prison playerPrison = API.PrisonManager.FindPrisonByPrisoner(Game.GetForm(0x14) as Actor)
+            RPB_Prisoner playerPrisoner = playerPrison.GetPrisoner(Game.GetForm(0x14) as Actor)
+            playerPrisoner.ShowSentence = !playerPrisoner.ShowSentence
+
+        elseif (actionToPerform == "Toggle Show Prison Release Time")
+            RPB_Prison playerPrison = API.PrisonManager.FindPrisonByPrisoner(Game.GetForm(0x14) as Actor)
+            RPB_Prisoner playerPrisoner = playerPrison.GetPrisoner(Game.GetForm(0x14) as Actor)
+            playerPrisoner.ShowReleaseTime = !playerPrisoner.ShowReleaseTime
+
+        elseif (actionToPerform == "Toggle Show Prison Time Left")
+            RPB_Prison playerPrison = API.PrisonManager.FindPrisonByPrisoner(Game.GetForm(0x14) as Actor)
+            RPB_Prisoner playerPrisoner = playerPrison.GetPrisoner(Game.GetForm(0x14) as Actor)
+            playerPrisoner.ShowTimeLeftInSentence = !playerPrisoner.ShowTimeLeftInSentence
+
+        elseif (actionToPerform == "Toggle Show Prison Time Served")
+            RPB_Prison playerPrison = API.PrisonManager.FindPrisonByPrisoner(Game.GetForm(0x14) as Actor)
+            RPB_Prisoner playerPrisoner = playerPrison.GetPrisoner(Game.GetForm(0x14) as Actor)
+            playerPrisoner.ShowTimeServed = !playerPrisoner.ShowTimeServed
+
+        elseif (actionToPerform == "Toggle Show Prison Bounty")
+            RPB_Prison playerPrison = API.PrisonManager.FindPrisonByPrisoner(Game.GetForm(0x14) as Actor)
+            RPB_Prisoner playerPrisoner = playerPrison.GetPrisoner(Game.GetForm(0x14) as Actor)
+            playerPrisoner.ShowBounty = !playerPrisoner.ShowBounty
+
+        elseif (actionToPerform == "Toggle All Prison Stats")
+            RPB_Prison playerPrison = API.PrisonManager.FindPrisonByPrisoner(Game.GetForm(0x14) as Actor)
+            RPB_Prisoner playerPrisoner = playerPrison.GetPrisoner(Game.GetForm(0x14) as Actor)
+            playerPrisoner.ShowSentence = !playerPrisoner.ShowSentence
+            playerPrisoner.ShowReleaseTime = !playerPrisoner.ShowReleaseTime
+            playerPrisoner.ShowTimeLeftInSentence = !playerPrisoner.ShowTimeLeftInSentence
+            playerPrisoner.ShowTimeServed = !playerPrisoner.ShowTimeServed
+            playerPrisoner.ShowBounty = !playerPrisoner.ShowBounty
         endif
     endif
 
