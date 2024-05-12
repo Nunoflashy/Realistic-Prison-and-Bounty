@@ -11,6 +11,10 @@ function SetStat(string asStatName, Faction akFaction, Actor akActor, int aiValu
     SetIntOnForm(akFaction.GetName() + "::" + asStatName, akActor, aiValue, "ActorVars")
 endFunction
 
+function SetStatFloat(string asStatName, Faction akFaction, Actor akActor, float afValue) global
+    SetFloatOnForm(akFaction.GetName() + "::" + asStatName, akActor, afValue, "ActorVars")
+endFunction
+
 function SetCrimeGold(Faction akFaction, Actor akActor, int value) global
     SetIntOnForm(akFaction.GetName() + "::Bounty Non-Violent", akActor, value, "ActorVars")
 endFunction
@@ -63,8 +67,12 @@ function SetTimesStripped(Faction akFaction, Actor akActor, int value) global
     SetIntOnForm(akFaction.GetName() + "::Times Stripped", akActor, value, "ActorVars")
 endFunction
 
+function SetTimesStrippedInPrison(RPB_Prison apPrison, Actor akActor, int value) global
+    SetIntOnForm(apPrison.Name + "::Times Stripped", akActor, value, "ActorVars")
+endFunction
+
 function SetCurrentInfamy(Faction akFaction, Actor akActor, int value) global
-    SetIntOnForm(akFaction.GetName() + "::Current Infamy", akActor, value, "ActorVars")
+    SetIntOnForm(akFaction.GetName() + "::Infamy Gained", akActor, value, "ActorVars")
 endFunction
 
 
@@ -142,18 +150,23 @@ function ModTimesStripped(Faction akFaction, Actor akActor, int value) global
 endFunction
 
 function ModCurrentInfamy(Faction akFaction, Actor akActor, int value) global
-    string statKey = "Current Infamy"
+    string statKey = "Infamy Gained"
     SetIntOnForm(akFaction.GetName() + "::" + statKey, akActor, GetStat(statKey, akFaction, akActor) + value, "ActorVars")
 endFunction
 
-function IncrementStat(string statName, Faction akFaction, Actor akActor, int incrementBy = 1) global
-    int currentValue = GetStat(statName, akFaction, akActor)
-    SetStat(statName, akFaction, akActor, currentValue + incrementBy)
+function IncrementStat(string asStatName, Faction akFaction, Actor akActor, int aiIncrementBy = 1) global
+    int currentValue = GetStat(asStatName, akFaction, akActor)
+    SetStat(asStatName, akFaction, akActor, currentValue + aiIncrementBy)
 endFunction
 
-function DecrementStat(string statName, Faction akFaction, Actor akActor, int decrementBy = 1) global
-    int currentValue = GetStat(statName, akFaction, akActor)
-    SetStat(statName, akFaction, akActor, currentValue - decrementBy)
+function DecrementStat(string asStatName, Faction akFaction, Actor akActor, int aiDecrementBy = 1) global
+    int currentValue = GetStat(asStatName, akFaction, akActor)
+    SetStat(asStatName, akFaction, akActor, currentValue - aiDecrementBy)
+endFunction
+
+function ModifyStat(string asStatName, Faction akFaction, Actor akActor, float modifyBy) global
+    float currentValue = GetStatFloat(asStatName, akFaction, akActor)
+    SetStatFloat(asStatName, akFaction, akActor, currentValue + modifyBy)
 endFunction
 
 
@@ -251,7 +264,7 @@ int function GetTimesStripped(Faction akFaction, Actor akActor) global
 endFunction
 
 int function GetCurrentInfamy(Faction akFaction, Actor akActor) global
-    return GetIntOnForm(akFaction.GetName() + "::Current Infamy", akActor, "ActorVars")
+    return GetIntOnForm(akFaction.GetName() + "::Infamy Gained", akActor, "ActorVars")
 endFunction
 
 ; ==========================================================
