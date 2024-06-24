@@ -7,8 +7,6 @@ bool function ShouldHandleEvent(RPB_MCM mcm) global
     return mcm.IsHoldCurrentPage() ; Only handle if the page rendered if any of the holds
 endFunction
 
-string selectedPage
-
 function Render(RPB_MCM mcm) global
     if (! ShouldHandleEvent(mcm))
         return
@@ -159,11 +157,13 @@ function Right(RPB_MCM mcm) global
     mcm.AddTextOption("", "WHEN ESCAPING", mcm.OPTION_DISABLED)
     mcm.SetRenderedCategory("Escape")
     mcm.AddOptionMenu("Handle Escape On")
-    mcm.AddOptionSliderKey("Escape Bounty", "Escape Bounty (%)", "{1}% of Bounty")
+    mcm.AddOptionSliderKey("Escape Bounty (From Bounty)", "Escape Bounty (%)", "{1}% of Bounty")
     mcm.AddOptionSlider("Escape Bounty", "{0} Bounty")
-    mcm.AddOptionSliderKey("Escape Bounty", "Escape Bounty (Sentence)", "{0}x of Sentence")
-    mcm.AddOptionSlider("Escape Bounty (Bounty Condition)", "{0} of Minimum Bounty")
-    mcm.AddOptionSlider("Escape Bounty (Sentence Condition)", "{0} Minimum Days")
+    mcm.AddOptionSliderKey("Escape Bounty (From Sentence)", "Escape Bounty (Sentence)", "{0}x of Sentence")
+    mcm.AddOptionSliderKey("Escape Bounty (Sentence Days)", "Escape Bounty (Sentence Days)", "{0} Days")
+    mcm.AddOptionSliderKey("Bounty Condition", "Escape Bounty (Bounty Condition)", "{0} of Minimum Bounty")
+    mcm.AddOptionSliderKey("Sentence Condition", "Escape Bounty (Sentence Condition)", "{0} Minimum Days")
+    mcm.AddOptionSlider("Fallback Bounty", "{0} Bounty")
     ; mcm.AddOptionSlider("Escape Attempt Modifier", "{2}x per Escape")
     mcm.AddOptionToggle("Account for Time Served")
     ; mcm.AddOptionToggle("Allow Surrendering")
@@ -335,19 +335,25 @@ function HandleDependencies(RPB_MCM mcm) global
     bool undressUponCaptured     = mcm.GetOptionToggleState("Escape::Strip Search upon Captured")
 
     string handleEscapeOn                                   = mcm.GetOptionMenuValue("Escape::Handle Escape On")
-    bool isEscapeBountyHandled                              = handleEscapeOn  == "Bounty"
-    bool isEscapeSentenceHandled                            = handleEscapeOn  == "Sentence"
+    bool isEscapeBountyHandled                              = handleEscapeOn == "Bounty"
+    bool isEscapeSentenceHandled                            = handleEscapeOn == "Sentence"
     bool isEscapeBountyAndSentenceHandled                   = handleEscapeOn == "Bounty + Sentence"
-    bool isEscapeBountyAndSentenceHandledConditionally      = handleEscapeOn == "Bounty + Sentence (Conditionally)"
+    bool isEscapeBountyHandledConditionally                 = handleEscapeOn == "Bounty (Conditionally)"
+    bool isEscapeSentenceHandledConditionally               = handleEscapeOn == "Sentence (Conditionally)"
+    bool isEscapeBountyAndSentenceHandledConditionallyOR    = handleEscapeOn == "Bounty || Sentence (Conditionally OR)"
+    bool isEscapeBountyAndSentenceHandledConditionallyAND   = handleEscapeOn == "Bounty && Sentence (Conditionally AND)"
 
-    bool onlyBounty     = isEscapeBountyHandled || isEscapeBountyAndSentenceHandled || isEscapeBountyAndSentenceHandledConditionally
-    bool onlySentence   = isEscapeSentenceHandled || isEscapeBountyAndSentenceHandled || isEscapeBountyAndSentenceHandledConditionally
+    bool onlyBounty     = isEscapeBountyHandled || isEscapeBountyAndSentenceHandled || isEscapeBountyHandledConditionally || isEscapeBountyAndSentenceHandledConditionallyOR
+    bool onlySentence   = isEscapeSentenceHandled || isEscapeBountyAndSentenceHandled || isEscapeSentenceHandledConditionally || isEscapeBountyAndSentenceHandledConditionallyOR
+    bool isConditional  = isEscapeBountyHandledConditionally || isEscapeSentenceHandledConditionally || isEscapeBountyAndSentenceHandledConditionallyOR || isEscapeBountyAndSentenceHandledConditionallyAND
 
     mcm.SetOptionDependencyBool("Escape::Escape Bounty",                          onlyBounty)
     mcm.SetOptionDependencyBool("Escape::Escape Bounty (%)",                      onlyBounty)
     mcm.SetOptionDependencyBool("Escape::Escape Bounty (Sentence)",               onlySentence)
-    mcm.SetOptionDependencyBool("Escape::Escape Bounty (Sentence Condition)",     isEscapeBountyAndSentenceHandledConditionally)
-    mcm.SetOptionDependencyBool("Escape::Escape Bounty (Bounty Condition)",       isEscapeBountyAndSentenceHandledConditionally)
+    mcm.SetOptionDependencyBool("Escape::Escape Bounty (Sentence Days)",          onlySentence)
+    mcm.SetOptionDependencyBool("Escape::Escape Bounty (Bounty Condition)",       isEscapeBountyHandledConditionally || isEscapeBountyAndSentenceHandledConditionallyOR || isEscapeBountyAndSentenceHandledConditionallyAND)
+    mcm.SetOptionDependencyBool("Escape::Escape Bounty (Sentence Condition)",     isEscapeSentenceHandledConditionally || isEscapeBountyAndSentenceHandledConditionallyOR || isEscapeBountyAndSentenceHandledConditionallyAND)
+    mcm.SetOptionDependencyBool("Escape::Fallback Bounty",                        isConditional)
 
     mcm.SetOptionDependencyBool("Escape::Frisk Search upon Captured",   (!undressUponCaptured && allowFrisking) || (!allowUndressing && allowFrisking))
     mcm.SetOptionDependencyBool("Escape::Strip Search upon Captured",   allowUndressing)
@@ -535,7 +541,7 @@ function OnOptionHighlight(RPB_MCM mcm, string option) global
         mcm.SetInfoText("The chance of being able to pay the bounty if it exceeds the guaranteed amount but is within the maximum limit.")
 
     elseif (option == "Frisking::Frisk Search Thoroughness")
-        mcm.SetInfoText("The thoroughness of the frisk, higher values mean a more thorough search, more items found by the jailhouse, and possibly less items kept.")
+        mcm.SetInfoText("The thoroughness of the frisk, higher values mean a more thorough search, more items found by the jail, and possibly less items kept.")
 
     elseif (option == "Frisking::Confiscate Stolen Items")
         mcm.SetInfoText("Whether to confiscate any stolen items found during the frisking.")
@@ -1161,22 +1167,34 @@ function OnOptionMenuAccept(RPB_MCM mcm, string option, int menuIndex) global
             bool onlyBounty = \
                 menuIndex == GetOptionIndexFromKey(mcm.EscapeHandlingOptions, "Bounty") || \
                 menuIndex == GetOptionIndexFromKey(mcm.EscapeHandlingOptions, "Bounty + Sentence") || \
-                menuIndex == GetOptionIndexFromKey(mcm.EscapeHandlingOptions, "Bounty + Sentence (Conditionally)")
+                menuIndex == GetOptionIndexFromKey(mcm.EscapeHandlingOptions, "Bounty (Conditionally)") || \
+                menuIndex == GetOptionIndexFromKey(mcm.EscapeHandlingOptions, "Bounty || Sentence (Conditionally OR)") || \
+                menuIndex == GetOptionIndexFromKey(mcm.EscapeHandlingOptions, "Bounty && Sentence (Conditionally AND)")
 
             bool onlySentence = \
                 menuIndex == GetOptionIndexFromKey(mcm.EscapeHandlingOptions, "Sentence") || \
                 menuIndex == GetOptionIndexFromKey(mcm.EscapeHandlingOptions, "Bounty + Sentence") || \
-                menuIndex == GetOptionIndexFromKey(mcm.EscapeHandlingOptions, "Bounty + Sentence (Conditionally)")
+                menuIndex == GetOptionIndexFromKey(mcm.EscapeHandlingOptions, "Sentence (Conditionally)") || \
+                menuIndex == GetOptionIndexFromKey(mcm.EscapeHandlingOptions, "Bounty || Sentence (Conditionally OR)") || \
+                menuIndex == GetOptionIndexFromKey(mcm.EscapeHandlingOptions, "Bounty && Sentence (Conditionally AND)")
 
-            mcm.SetOptionDependencyBool("Escape::Escape Bounty", onlyBounty)
-            mcm.SetOptionDependencyBool("Escape::Escape Bounty (%)", onlyBounty)
-            mcm.SetOptionDependencyBool("Escape::Escape Bounty (Sentence)", onlySentence)
-            mcm.SetOptionDependencyBool("Escape::Escape Bounty (Bounty Condition)", menuIndex == GetOptionIndexFromKey(mcm.EscapeHandlingOptions, "Bounty + Sentence (Conditionally)"))
-            mcm.SetOptionDependencyBool("Escape::Escape Bounty (Sentence Condition)", menuIndex == GetOptionIndexFromKey(mcm.EscapeHandlingOptions, "Bounty + Sentence (Conditionally)"))
+            bool bountyCondition            = menuIndex == GetOptionIndexFromKey(mcm.EscapeHandlingOptions, "Bounty (Conditionally)")
+            bool sentenceCondition          = menuIndex == GetOptionIndexFromKey(mcm.EscapeHandlingOptions, "Sentence (Conditionally)")
+            bool bountyAndSentenceCondition = \
+                menuIndex == GetOptionIndexFromKey(mcm.EscapeHandlingOptions, "Bounty || Sentence (Conditionally OR)") || \
+                menuIndex == GetOptionIndexFromKey(mcm.EscapeHandlingOptions, "Bounty && Sentence (Conditionally AND)")
+
+            mcm.SetOptionDependencyBool("Escape::Escape Bounty",                        onlyBounty)
+            mcm.SetOptionDependencyBool("Escape::Escape Bounty (%)",                    onlyBounty)
+            mcm.SetOptionDependencyBool("Escape::Escape Bounty (Sentence)",             onlySentence)
+            mcm.SetOptionDependencyBool("Escape::Escape Bounty (Sentence Days)",        onlySentence)
+            mcm.SetOptionDependencyBool("Escape::Escape Bounty (Bounty Condition)",     bountyCondition || bountyAndSentenceCondition)
+            mcm.SetOptionDependencyBool("Escape::Escape Bounty (Sentence Condition)",   sentenceCondition || bountyAndSentenceCondition)
+            mcm.SetOptionDependencyBool("Escape::Fallback Bounty",                      bountyCondition || sentenceCondition || bountyAndSentenceCondition)
         endif
     endif
 
-    Debug("OnOptionMenuAccept", "GetMenuOptionValue("+  option +") = " + mcm.GetOptionMenuValue(option, mcm.CurrentPage))
+    ; Debug("OnOptionMenuAccept", "GetMenuOptionValue("+  option +") = " + mcm.GetOptionMenuValue(option, mcm.CurrentPage))
 
 endFunction
 

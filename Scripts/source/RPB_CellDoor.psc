@@ -47,6 +47,12 @@ bool property HasDecayableLock
     endFunction
 endProperty
 
+bool property EscapeTriggerDoor
+    bool function get()
+        return true ; Change later to be a dynamic option in the config file.
+    endFunction
+endProperty
+
 ;/
     Retrieves whether this lock has been broken (decayed to the point of having no lock.)
 /;
@@ -165,8 +171,9 @@ event OnOpen(ObjectReference akActionRef)
     int i = 0
     while (i < cellPrisoners.Length)
         if (akOpener == cellPrisoners[i])
+            ; Get the Prisoner from the cell attached to this door (right now it's retrieving from the Prison, so all prisoners will be retrieved, not ideal)
             RPB_Prisoner prisoner = JailCell.Prison.GetPrisoner(akOpener)
-            prisoner.SetEscaped()
+            JailCell.OnPrisonerOpenCellDoor(self, prisoner)
         endif
         i += 1
     endWhile

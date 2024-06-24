@@ -123,7 +123,7 @@ endProperty
 
 float property TimeOfArrest
     float function get()
-        return Arrest_GetFloat("Time of Arrest")
+        return GetFloat("Time of Arrest")
     endFunction
 endProperty
 
@@ -135,25 +135,25 @@ endProperty
 
 bool property Defeated
     bool function get()
-        return Arrest_GetBool("Defeated")
+        return GetBool("Defeated")
     endFunction
 endProperty
 
 int property DefeatedBounty
     int function get()
-        return Arrest_GetInt("Bounty for Defeat")
+        return GetInt("Bounty for Defeat")
     endFunction
 endProperty
 
 bool property IsArrested
     bool function get()
-        return Arrest_GetBool("Arrested")
+        return GetBool("Arrested")
     endFunction
 endProperty
 
 bool property IsImprisoned
     bool function get()
-        return Arrest_GetBool("Imprisoned", "Jail")
+        return GetBool("Imprisoned", "Jail")
     endFunction
 endProperty
 
@@ -174,11 +174,11 @@ function Frisk()
 endFunction
 
 function AssignCaptor(Actor akCaptor)
-    Arrest_SetReference("Arresting Guard", akCaptor)
+    SetReference("Arresting Guard", akCaptor)
 endFunction
 
 function SetArrestParameters(string asArrestType, Actor akCaptor, Faction akCrimeFaction)
-    RPB_Utility.Debug("Arrestee::SetArrestParameters", "akCaptor: " + akCaptor + ", akCrimeFaction: " + akCrimeFaction)
+    Debug("Arrestee::SetArrestParameters", "akCaptor: " + akCaptor + ", akCrimeFaction: " + akCrimeFaction)
     if (akCaptor)
         akCrimeFaction = akCaptor.GetCrimeFaction()
         self.AssignCaptor(akCaptor)
@@ -190,7 +190,8 @@ function SetArrestParameters(string asArrestType, Actor akCaptor, Faction akCrim
     endif
 
     if (!akCrimeFaction)
-        Error("Arrestee::SetArrestParameters", "Both the captor and faction are none, cannot proceed with the arrest! (returning...)")
+        Error("Both the captor and faction are none, cannot proceed with the arrest! (returning...)")
+        DebugError("Arrestee::SetArrestParameters", "Both the captor and faction are none, cannot proceed with the arrest! (returning...)")
         self.Destroy()
         return
     endif
@@ -201,10 +202,10 @@ function SetArrestParameters(string asArrestType, Actor akCaptor, Faction akCrim
     __hold          = akCrimeFaction.GetName()
     __arrestType    = asArrestType
 
-    Arrest_SetForm("Arrest Faction", ArrestFaction)
-    Arrest_SetForm("Arrestee", this)
-    Arrest_SetString("Arrest Type", ArrestType)
-    Arrest_SetString("Hold", Hold)
+    SetForm("Arrest Faction", ArrestFaction)
+    SetForm("Arrestee", this)
+    SetString("Arrest Type", ArrestType)
+    SetString("Hold", Hold)
 
     ; Trace(none, "Arrestee::SetArrestParameters", "[\n" + \ 
     ;     "\tCaptured: "+ ArrestVars.GetBool("Arrest::Captured") +" \n" + \
@@ -259,11 +260,13 @@ endFunction
 
 function TransferArrestPropertiesToPrisoner(RPB_Prison apPrison)
     self.SetFloat("Time of Arrest", TimeOfArrest, "Jail")
-    self.SetInt("Minute of Arrest", Arrest_GetInt("Minute of Arrest"), "Jail")
-    self.SetInt("Hour of Arrest", Arrest_GetInt("Hour of Arrest"), "Jail")
-    self.SetInt("Day of Arrest", Arrest_GetInt("Day of Arrest"), "Jail")
-    self.SetInt("Month of Arrest", Arrest_GetInt("Month of Arrest"), "Jail")
-    self.SetInt("Year of Arrest", Arrest_GetInt("Year of Arrest"), "Jail")
+    self.SetInt("Minute of Arrest", GetInt("Minute of Arrest"), "Jail")
+    self.SetInt("Hour of Arrest", GetInt("Hour of Arrest"), "Jail")
+    self.SetInt("Day of Arrest", GetInt("Day of Arrest"), "Jail")
+    self.SetInt("Month of Arrest", GetInt("Month of Arrest"), "Jail")
+    self.SetInt("Year of Arrest", GetInt("Year of Arrest"), "Jail")
+    ; self.SetInt("Bounty Non-Violent", GetInt("Bounty Non-Violent"), "Jail")
+    ; self.SetInt("Bounty Violent", GetInt("Bounty Violent"), "Jail")
     self.SetForm("Arrest Captor", Captor, "Jail")
 endFunction
 ; ==========================================================
@@ -295,13 +298,13 @@ endFunction
 ; ==========================================================
 
 function SetArrestTime()
-    Arrest_SetBool("Arrested", true)
-    Arrest_SetBool("Captured", true) ; Used to avoid further arrest resists after being arrested
-    Arrest_SetFloat("Time of Arrest", CurrentTime)
+    SetBool("Arrested", true)
+    SetBool("Captured", true) ; Used to avoid further arrest resists after being arrested
+    SetFloat("Time of Arrest", CurrentTime)
 
     Config.NotifyArrest("You have been arrested in " + Hold, this == Config.Player)
     Config.NotifyArrest(self.GetName() + " has been arrested in " + Hold, this != Config.Player)
-    Info(this.GetBaseObject().GetName() + " has been arrested in " + Hold + " at " + CurrentTime)
+    Info(self.Name + " has been arrested in " + Hold + " at " + CurrentTime)
 endFunction
 
 function SetArrestGoal(string asArrestGoal)
@@ -319,16 +322,16 @@ function RevertArrest()
     self.RestoreBounty()
 
     ; Ideally these vars should be deleted and not set to none/null, but ArrestVars needs a refactor to do so on a per-actor basis if we want to delete all vars belonging to an actor
-    Arrest_Remove("Arrest Faction")
-    Arrest_Remove("Arrestee") ; Might be temp, we already have the Arrestee reference through this instance of RPB_Arrestee
-    Arrest_Remove("Arrest Type")
-    Arrest_Remove("Arrest Scene")
-    Arrest_Remove("Hold")
-    Arrest_Remove("Arrested")
-    Arrest_Remove("Arresting Guard")
-    Arrest_Remove("Captured")
-    Arrest_Remove("Scenario")
-    Arrest_Remove("Time of Arrest")
+    self.Remove("Arrest Faction")
+    self.Remove("Arrestee") ; Might be temp, we already have the Arrestee reference through this instance of RPB_Arrestee
+    self.Remove("Arrest Type")
+    self.Remove("Arrest Scene")
+    self.Remove("Hold")
+    self.Remove("Arrested")
+    self.Remove("Arresting Guard")
+    self.Remove("Captured")
+    self.Remove("Scenario")
+    self.Remove("Time of Arrest")
 
     Utility.Wait(0.5)
     self.Destroy()
@@ -339,21 +342,23 @@ endFunction
 ; ==========================================================
 
 function Arrest()
-    Debug("Arrestee::Arrest", "Arrested " + this)
-
     self.SetArrestGoal(Arrest.ARREST_GOAL_IMPRISONMENT)
     self.UpdateArrestStats()
     self.SetTimeOfArrest()
 
-    Config.NotifyArrest("You have been arrested in " + Hold, this == Config.Player)
-    Info(this.GetBaseObject().GetName() + " has been arrested in " + Hold + " at " + CurrentTime)
-    Debug("Arrestee::Arrest", this.GetBaseObject().GetName() + " has been arrested in " + Hold + " at " + CurrentTime)
-
+    SetBool("Arrested", true)
+    SetBool("Captured", true) ; Used to avoid further arrest resists after being arrested, may change name or implementation
+    self.IncrementStat("Times Arrested")
+    
     ; Arrest.SceneManager.StartArrestScene( \
     ;     akGuard     = Captor, \
     ;     akArrestee  = this, \
     ;     asScene     = Arrest.GetArrestScene(this) \
     ; )
+
+    Config.NotifyArrest("You have been arrested in " + Hold, this == Config.Player)
+    Info(self.Name + " has been arrested in " + Hold + " at " + CurrentTime)
+    Debug("Arrestee::Arrest", self.Name + " has been arrested in " + Hold + " at " + CurrentTime)
 
     Arrest.OnActorArrested(this, Captor)
 endFunction
@@ -386,6 +391,8 @@ function EscortToPrison(bool abEscortDirectlyToCell = false)
             return
         endif
 
+        self.SetStateForScene("OnEscortToJailEnd", "EscortToJail")
+
         Arrest.SceneManager.StartEscortToJail( \
             akEscortLeader      = Captor, \
             akEscortedPrisoner  = this, \
@@ -400,6 +407,7 @@ function EscortToPrison(bool abEscortDirectlyToCell = false)
             return
         endif
 
+        ; return
         Debug("Arrestee::EscortToPrison", "Started escorting " + this + " directly to a cell")
         ; The marker where the escort will stand, waiting for the prisoner to enter the cell.
         ObjectReference outsideJailCellEscortWaitingMarker = prisonerRef.JailCell.GetRandomMarker("Exterior") as ObjectReference
@@ -445,7 +453,7 @@ function MoveToPrison(bool abMoveDirectlyToCell = false)
 endFunction
 
 function ChangeEscort(Actor akNewEscort)
-    ; Arrest_SetReference("Arresting Guard", akNewEscort)
+    ; SetReference("Arresting Guard", akNewEscort)
     ; ; Arrest.RegisterCaptor() || Arrest.MarkActorAsCaptor(akNewEscort)
     ; Arrest.SceneManager.StartEscortToJail( \
     ;     akEscortLeader      = akNewEscort, \
@@ -459,48 +467,117 @@ endFunction
 ; ==========================================================
 
 function SetTimeOfArrest()
-    Arrest_SetBool("Arrested", true)
-    Arrest_SetBool("Captured", true) ; Used to avoid further arrest resists after being arrested, may change name or implementation
-    Arrest_SetFloat("Time of Arrest", CurrentTime)
-
-    Arrest_SetInt("Minute of Arrest", RPB_Utility.GetCurrentMinute())
-    Arrest_SetInt("Hour of Arrest", RPB_Utility.GetCurrentHour())
-    Arrest_SetInt("Day of Arrest", RPB_Utility.GetCurrentDay())
-    Arrest_SetInt("Month of Arrest", RPB_Utility.GetCurrentMonth())
-    Arrest_SetInt("Year of Arrest", RPB_Utility.GetCurrentYear())
-
-    self.IncrementStat("Times Arrested")
+    SetFloat("Time of Arrest", CurrentTime)
+    SetInt("Minute of Arrest", RPB_Utility.GetCurrentMinute())
+    SetInt("Hour of Arrest", RPB_Utility.GetCurrentHour())
+    SetInt("Day of Arrest", RPB_Utility.GetCurrentDay())
+    SetInt("Month of Arrest", RPB_Utility.GetCurrentMonth())
+    SetInt("Year of Arrest", RPB_Utility.GetCurrentYear())
 endFunction
 
 function UpdateCurrentBounty()
     self.SetStat("Current Bounty", Bounty)
-
-    ; Debug("Arrestee::UpdateCurrentBounty", "[\n" + \ 
-    ;     "\t Current Bounty: " + self.QueryStat("Current Bounty") + "\n" + \
-    ;     "\t Bounty: " + Bounty + "\n" + \
-    ; "]")   
+    Debug("Arrestee::UpdateCurrentBounty", "[\n" + \ 
+        "\t Current Bounty: " + self.QueryStat("Current Bounty") + "\n" + \
+        "\t Bounty: " + Bounty + "\n" + \
+    "]")   
 endFunction
 
+
 function UpdateLargestBounty()
-    int currentLargestBounty = self.QueryStat("Largest Bounty")
-    int newLargestBounty = int_if (currentLargestBounty < Bounty, Bounty, currentLargestBounty)
-
-    self.SetStat("Largest Bounty", newLargestBounty)
-
-    ; Debug("Arrestee::UpdateLargestBounty", "[\n" + \ 
-    ;     "\t Current Longest Bounty: " + currentLargestBounty + "\n" + \
-    ;     "\t New Longest Bounty: " + newLargestBounty + "\n" + \
-    ;     "\t Bounty: " + Bounty + "\n" + \
-    ; "]")    
+    parent.SyncLargestBountyForFaction(ArrestFaction)
 endFunction
 
 function UpdateTotalBounty()
-    self.IncrementStat("Total Bounty", Bounty)
+    parent.SyncTotalBountyForFaction(ArrestFaction)
 endFunction
 
 function MoveToCaptor()
     this.MoveTo(Captor)
 endFunction
+
+; ==========================================================
+;                           Bounty
+; ==========================================================
+
+bool function HasActiveBounty()
+    return parent.HasActiveBountyForFaction(ArrestFaction)
+endFunction
+
+bool function HasLatentBounty()
+    return parent.HasLatentBountyForFaction(ArrestFaction)
+endFunction
+
+function SetCrimeGold(int aiGold)
+    parent.SetCrimeGoldForFaction(ArrestFaction, aiGold)
+endFunction
+
+function SetCrimeGoldViolent(int aiGold)
+    parent.SetCrimeGoldViolentForFaction(ArrestFaction, aiGold)
+endFunction
+
+function ModCrimeGold(int aiAmount, bool abViolent = false)
+    parent.ModCrimeGoldForFaction(ArrestFaction, aiAmount, abViolent)
+endFunction
+
+;/
+    Gets the active bounty for this Actor, that is, the bounty that is currently set on a Faction when
+    the Actor is wanted by that Faction.
+
+    bool?   @abNonViolent: Whether to get the non-violent bounty for this Faction.
+    bool?   @abViolent: Whether to get the violent bounty for this Faction.
+/;
+int function GetActiveBounty(bool abNonViolent = true, bool abViolent = true)
+    return parent.GetActiveBountyForFaction(ArrestFaction, abNonViolent, abViolent)
+endFunction
+
+;/
+    Gets the latent bounty for this Actor, that is, the bounty that is stored when Arrested/Jailed.
+
+    bool?   @abNonViolent: Whether to get the non-violent bounty for this Faction.
+    bool?   @abViolent: Whether to get the violent bounty for this Faction.
+/;
+int function GetLatentBounty(bool abNonViolent = true, bool abViolent = true)
+    return parent.GetLatentBountyForFaction(ArrestFaction, abNonViolent, abViolent)
+endFunction
+
+; Transfers the Active Bounty into the Latent Bounty.
+function HideBounty()
+    parent.HideBountyForFaction(ArrestFaction)
+endFunction
+
+; Restores the Active Bounty from the Latent Bounty.
+function RestoreBounty()
+    parent.RestoreBountyForFaction(ArrestFaction)
+endFunction
+
+;/
+    Clears the Latent Bounty for this Actor (The bounty used when Arrested/Jailed).
+
+    bool?   @abNonViolent: Whether to clear non-violent bounty.
+    bool?   @abViolent: Whether to clear violent bounty.
+/;
+function ClearLatentBounty(bool abNonViolent = true, bool abViolent = true)
+    parent.ClearLatentBountyForFaction(ArrestFaction, abNonViolent, abViolent)
+endFunction
+
+; ==========================================================
+;                          Actor Vars
+; ==========================================================
+
+int function QueryStat(string asStatName)
+    return RPB_ActorVars.GetStat(asStatName, ArrestFaction, this)
+endFunction
+
+function SetStat(string asStatName, int aiValue)
+    RPB_ActorVars.SetStat(asStatName, ArrestFaction, this, aiValue)
+
+    if (TrackStats)
+        self.OnStatChanged(asStatName, aiValue)
+    endif
+endFunction
+
+; ==========================================================
 
 ; ==========================================================
 ;                           Events
@@ -518,14 +595,14 @@ event OnDestroy()
     self.UnregisterForTrackedStats()
 
     if (self.IsPlayer())
-        ; If for some reason AI is disabled, re-enable it
+        ; If for some reason AI is enabled, disable it
         ReleaseAI()
     endif
 endEvent
 
 event OnBountyGained()
     self.HideBounty()
-    self.UpdateCurrentBounty()
+    ; self.UpdateCurrentBounty()
     self.UpdateLargestBounty()
     self.UpdateTotalBounty()
 endEvent
@@ -552,80 +629,19 @@ endEvent
 
 function Destroy()
     ; Unset all properties related to this Arrestee
-    Arrest_RemoveAll()
+    self.RemoveAll()
     Utility.Wait(0.5)
     Arrest.UnregisterArrestee(self)
 endFunction
 
-; ==========================================================
-;                      -- Arrest Vars --
-;                           Getters
-bool function Arrest_GetBool(string asVarName, string asVarCategory = "Arrest")
-    return parent.GetBool(asVarName, asVarCategory)
+string function GetScriptVarCategory(string asVarCategory = "Actor")
+    if (asVarCategory == "Actor")
+        return "Arrest"
+    endif
+
+    return asVarCategory
 endFunction
 
-int function Arrest_GetInt(string asVarName, string asVarCategory = "Arrest")
-    return parent.GetInt(asVarName, asVarCategory)
-endFunction
-
-float function Arrest_GetFloat(string asVarName, string asVarCategory = "Arrest")
-    return parent.GetFloat(asVarName, asVarCategory)
-endFunction
-
-string function Arrest_GetString(string asVarName, string asVarCategory = "Arrest")
-    return parent.GetString(asVarName, asVarCategory)
-endFunction
-
-Form function Arrest_GetForm(string asVarName, string asVarCategory = "Arrest")
-    return parent.GetForm(asVarName, asVarCategory)
-endFunction
-
-ObjectReference function Arrest_GetReference(string asVarName, string asVarCategory = "Arrest")
-    return parent.GetReference(asVarName, asVarCategory)
-endFunction
-
-;                          Setters
-function Arrest_SetBool(string asVarName, bool abValue, string asVarCategory = "Arrest")
-    parent.SetBool(asVarName, abValue, asVarCategory)
-endFunction
-
-function Arrest_SetInt(string asVarName, int aiValue, string asVarCategory = "Arrest")
-    parent.SetInt(asVarName, aiValue, asVarCategory)
-endFunction
-
-function Arrest_ModInt(string asVarName, int aiValue, string asVarCategory = "Arrest")
-    parent.ModInt(asVarName, aiValue, asVarCategory)
-endFunction
-
-function Arrest_SetFloat(string asVarName, float afValue, string asVarCategory = "Arrest")
-    parent.SetFloat(asVarName, afValue, asVarCategory)
-endFunction
-
-function Arrest_ModFloat(string asVarName, float afValue, string asVarCategory = "Arrest")
-    parent.ModFloat(asVarName, afValue, asVarCategory)
-endFunction
-
-function Arrest_SetString(string asVarName, string asValue, string asVarCategory = "Arrest")
-    parent.SetString(asVarName, asValue, asVarCategory)
-endFunction
-
-function Arrest_SetForm(string asVarName, Form akValue, string asVarCategory = "Arrest")
-    parent.SetForm(asVarName, akValue, asVarCategory)
-endFunction
-
-function Arrest_SetReference(string asVarName, ObjectReference akValue, string asVarCategory = "Arrest")
-    parent.SetReference(asVarName, akValue, asVarCategory)
-endFunction
-
-function Arrest_Remove(string asVarName, string asVarCategory = "Arrest")
-    ; parent.Remove(asVarName, asVarCategory)
-endFunction
-
-function Arrest_RemoveAll(string asVarCategory = "Arrest")
-    ; parent.RemoveAll(asVarCategory)
-endFunction
-
-; ==========================================================
 
 ; ==========================================================
 ;                            Getters

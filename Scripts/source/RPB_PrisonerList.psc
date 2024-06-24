@@ -43,6 +43,6 @@ function Remove(RPB_Prisoner apPrisoner)
     string elementKey = self.GetPrisonerID(apPrisoner.GetActor())
     protected_remove(elementKey)
 
-    apPrisoner.Prison_RemoveAll()
-    apPrisoner.Prison_RemoveAll("Arrest")
+    apPrisoner.RemoveAll()
+    apPrisoner.RemoveAll("Arrest")
 endFunction

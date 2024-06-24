@@ -84,74 +84,80 @@ function ModStat(string asStatName, Faction akFaction, Actor akActor, int value)
     SetIntOnForm(akFaction.GetName() + "::" + asStatName, akActor, value, "ActorVars")
 endFunction
 
-function ModCrimeGold(Faction akFaction, Actor akActor, int value) global
-    string statKey = akFaction.GetName() + "::Bounty Non-Violent"
-    SetIntOnForm(statKey, akActor, GetStat(statKey, akFaction, akActor) + value, "ActorVars")
+function ModCrimeGold(Faction akFaction, Actor akActor, int value, bool abViolent = false) global
+    string bountyType = "Bounty Non-Violent"
+
+    if (abViolent)
+        bountyType = "Bounty Violent"
+    endif
+
+    string statKey = akFaction.GetName() + "::" + bountyType
+    SetIntOnForm(statKey, akActor, GetIntOnForm(statKey, akActor, "ActorVars") + value, "ActorVars")
 endFunction
 
 function ModCrimeGoldViolent(Faction akFaction, Actor akActor, int value) global
     string statKey = akFaction.GetName() + "::Bounty Violent"
-    SetIntOnForm(statKey, akActor, GetStat(statKey, akFaction, akActor) + value, "ActorVars")
+    SetIntOnForm(statKey, akActor, GetIntOnForm(statKey, akActor, "ActorVars") + value, "ActorVars")
 endFunction
 
 function ModCurrentBounty(Faction akFaction, Actor akActor, int value) global
     string statKey = akFaction.GetName() + "::Current Bounty"
-    SetIntOnForm(statKey, akActor, GetStat(statKey, akFaction, akActor) + value, "ActorVars")
+    SetIntOnForm(statKey, akActor, GetIntOnForm(statKey, akActor, "ActorVars") + value, "ActorVars")
 endFunction
 
 function ModLargestBounty(Faction akFaction, Actor akActor, int value) global
     string statKey = akFaction.GetName() + "::Largest Bounty"
-    SetIntOnForm(statKey, akActor, GetStat(statKey, akFaction, akActor) + value, "ActorVars")
+    SetIntOnForm(statKey, akActor, GetIntOnForm(statKey, akActor, "ActorVars") + value, "ActorVars")
 endFunction
 
 function ModTotalBounty(Faction akFaction, Actor akActor, int value) global
     string statKey = akFaction.GetName() + "::Total Bounty"
-    SetIntOnForm(statKey, akActor, GetStat(statKey, akFaction, akActor) + value, "ActorVars")
+    SetIntOnForm(statKey, akActor, GetIntOnForm(statKey, akActor, "ActorVars") + value, "ActorVars")
 endFunction
 
 function ModTimesArrested(Faction akFaction, Actor akActor, int value) global
     string statKey = akFaction.GetName() + "::Times Arrested"
-    SetIntOnForm(statKey, akActor, GetStat(statKey, akFaction, akActor) + value, "ActorVars")
+    SetIntOnForm(statKey, akActor, GetIntOnForm(statKey, akActor, "ActorVars") + value, "ActorVars")
 endFunction
 
 function ModTimesFrisked(Faction akFaction, Actor akActor, int value) global
-    string statKey = akFaction.GetName() + "Times Frisked"
-    SetIntOnForm(statKey, akActor, GetStat(statKey, akFaction, akActor) + value, "ActorVars")
+    string statKey = akFaction.GetName() + "::Times Frisked"
+    SetIntOnForm(statKey, akActor, GetIntOnForm(statKey, akActor, "ActorVars") + value, "ActorVars")
 endFunction
 
 function ModTimeJailed(Faction akFaction, Actor akActor, float value) global
-    string statKey = "Time Jailed"
-    SetFloatOnForm(akFaction.GetName() + "::" + statKey, akActor, GetStatFloat(statKey, akFaction, akActor) + value, "ActorVars")
+    string statKey = akFaction.GetName() + "::Time Jailed"
+    SetFloatOnForm(statKey, akActor, GetFloatOnForm(statKey, akActor) + value, "ActorVars")
 endFunction
 
 function ModLongestSentence(Faction akFaction, Actor akActor, int value) global
-    string statKey = "Longest Sentence"
-    SetIntOnForm(akFaction.GetName() + "::" + statKey, akActor, GetStat(statKey, akFaction, akActor) + value, "ActorVars")
+    string statKey = akFaction.GetName() + "::Longest Sentence"
+    SetIntOnForm(statKey, akActor, GetIntOnForm(statKey, akActor) + value, "ActorVars")
 endFunction
 
 function ModLastSentence(Faction akFaction, Actor akActor, int value) global
-    string statKey = "Last Sentence"
-    SetIntOnForm(akFaction.GetName() + "::" + statKey, akActor, GetStat(statKey, akFaction, akActor) + value, "ActorVars")
+    string statKey = akFaction.GetName() + "::Last Sentence"
+    SetIntOnForm(statKey, akActor, GetIntOnForm(statKey, akActor) + value, "ActorVars")
 endFunction
 
 function ModTimesJailed(Faction akFaction, Actor akActor, int value) global
-    string statKey = "Times Jailed"
-    SetIntOnForm(akFaction.GetName() + "::" + statKey, akActor, GetStat(statKey, akFaction, akActor) + value, "ActorVars")
+    string statKey = akFaction.GetName() + "::Times Jailed"
+    SetIntOnForm(statKey, akActor, GetIntOnForm(statKey, akActor) + value, "ActorVars")
 endFunction
 
 function ModTimesEscaped(Faction akFaction, Actor akActor, int value) global
-    string statKey = "Times Escaped"
-    SetIntOnForm(akFaction.GetName() + "::" + statKey, akActor, GetStat(statKey, akFaction, akActor) + value, "ActorVars")
+    string statKey = akFaction.GetName() + "::Times Escaped"
+    SetIntOnForm(statKey, akActor, GetIntOnForm(statKey, akActor) + value, "ActorVars")
 endFunction
 
 function ModTimesStripped(Faction akFaction, Actor akActor, int value) global
-    string statKey = "Times Stripped"
-    SetIntOnForm(akFaction.GetName() + "::" + statKey, akActor, GetStat(statKey, akFaction, akActor) + value, "ActorVars")
+    string statKey = akFaction.GetName() + "::Times Stripped"
+    SetIntOnForm(statKey, akActor, GetIntOnForm(statKey, akActor) + value, "ActorVars")
 endFunction
 
 function ModCurrentInfamy(Faction akFaction, Actor akActor, int value) global
-    string statKey = "Infamy Gained"
-    SetIntOnForm(akFaction.GetName() + "::" + statKey, akActor, GetStat(statKey, akFaction, akActor) + value, "ActorVars")
+    string statKey = akFaction.GetName() + "::Infamy Gained"
+    SetIntOnForm(statKey, akActor, GetIntOnForm(statKey, akActor) + value, "ActorVars")
 endFunction
 
 function IncrementStat(string asStatName, Faction akFaction, Actor akActor, int aiIncrementBy = 1) global
@@ -207,6 +213,7 @@ int function GetCrimeGoldViolent(Faction akFaction, Actor akActor) global
     return GetIntOnForm(akFaction.GetName() + "::Bounty Violent", akActor, "ActorVars")
 endFunction
 
+; UNUSED (?)
 int function GetCurrentBounty(Faction akFaction, Actor akActor) global
     return GetIntOnForm(akFaction.GetName() + "::Current Bounty", akActor, "ActorVars")
 endFunction

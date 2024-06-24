@@ -96,6 +96,14 @@ bool function HasSpell(Spell akSpell)
     return this.HasSpell(akSpell)
 endFunction
 
+function UnequipHands()
+    UnequipWeaponForActor(this, false)
+    UnequipWeaponForActor(this, false)
+    UnequipWeaponForActor(this, true)
+    UnequipSpellForActor(this)
+    UnequipShieldForActor(this)
+endFunction
+
 function UnequipAll()
     this.UnequipAll()
 endFunction
@@ -106,6 +114,10 @@ endFunction
 
 function RemoveAllItems(ObjectReference akTransferTo = none, bool abKeepOwnership = false, bool abRemoveQuestItems = true)
     this.RemoveAllItems(akTransferTo, abKeepOwnership, abRemoveQuestItems)
+endFunction
+
+function SheatheWeapon()
+    this.SheatheWeapon()
 endFunction
 
 function StopCombat(bool abStopCombatAlarm = true)
@@ -148,43 +160,91 @@ endFunction
 ; ==========================================================
 ;                           Bounty
 ; ==========================================================
+ 
+function SyncLargestBountyForFaction(Faction akFaction)
+    int currentBountyForFaction = RPB_ActorVars.GetCrimeGold(akFaction, this)
+    int currentLargestBounty    = RPB_ActorVars.GetLargestBounty(akFaction, this)
+    int newLargestBounty        = int_if (currentLargestBounty < currentBountyForFaction, currentBountyForFaction, currentLargestBounty)
 
-bool function HasActiveBounty()
     if (self.IsPlayer())
-        return self.GetFaction().GetCrimeGold() > 0
+        int globalLargestBounty = Game.QueryStat("Largest Bounty")
+        if (globalLargestBounty < newLargestBounty)
+            ; Set the global stat
+            SetGameStat("Largest Bounty", newLargestBounty)
+        endif
+    endif
+ 
+    ; Set the local stat for the Hold
+    RPB_ActorVars.SetLargestBounty(akFaction, this, newLargestBounty)
+
+    DebugWithArgs("Actor::UpdateLargestBountyForFaction", akFaction.GetName(), "[\n" + \ 
+        "\t Current Largest Bounty: " + currentLargestBounty + "\n" + \
+        "\t New Largest Bounty: " + newLargestBounty + "\n" + \
+        "\t Bounty: " + currentBountyForFaction + "\n" + \
+    "]")
+endFunction
+
+function SyncTotalBountyForFaction(Faction akFaction)
+    int currentBountyForFaction = RPB_ActorVars.GetCrimeGold(akFaction, this)
+    RPB_ActorVars.ModTotalBounty(akFaction, this, currentBountyForFaction - self.GetInt("Previous Total Bounty", "Temporary"))
+
+    ; Persist the state to do calculations on previous total
+    self.SetInt("Previous Total Bounty", RPB_ActorVars.GetCrimeGold(akFaction, this), "Temporary")
+endFunction
+
+bool function HasActiveBountyForFaction(Faction akFaction)
+    if (self.IsPlayer())
+        return akFaction.GetCrimeGold() > 0
     else
-        return RPB_ActorVars.GetCrimeGold(self.GetFaction(), this) > 0
+        return RPB_ActorVars.GetCrimeGold(akFaction, this) > 0
     endif
 endFunction
 
-bool function HasLatentBounty()
-    return (GetInt("Bounty Non-Violent", "Arrest") + GetInt("Bounty Violent", "Arrest")) > 0
+bool function HasLatentBountyForFaction(Faction akFaction)
+    return RPB_ActorVars.GetCrimeGold(akFaction, this) > 0
 endFunction
 
-function SetActiveBounty(int aiBounty)
-    self.SetCrimeGold(aiBounty)
+function SetCrimeGoldForFaction(Faction akFaction, int aiGold)
+    if (self.IsPlayer())
+        akFaction.SetCrimeGold(aiGold)
+    else
+        RPB_ActorVars.SetCrimeGold(akFaction, this, aiGold)
+    endif
 endFunction
 
-function SetActiveViolentBounty(int aiBounty)
-    self.SetCrimeGoldViolent(aiBounty)
+function SetCrimeGoldViolentForFaction(Faction akFaction, int aiGold)
+    if (self.IsPlayer())
+        akFaction.SetCrimeGoldViolent(aiGold)
+    else
+        RPB_ActorVars.SetCrimeGoldViolent(akFaction, this, aiGold)
+    endif
+endFunction
+
+function ModCrimeGoldForFaction(Faction akFaction, int aiAmount, bool abViolent = false)
+    if (self.IsPlayer())
+        akFaction.ModCrimeGold(aiAmount, abViolent)
+    else
+        RPB_ActorVars.ModCrimeGold(akFaction, this, aiAmount, abViolent)
+    endif
 endFunction
 
 ;/
     Gets the active bounty for this Actor, that is, the bounty that is currently set on a Faction when
     the Actor is wanted by that Faction.
 
+    Faction @akFaction: The faction to retrieve the bounty from.
     bool?   @abNonViolent: Whether to get the non-violent bounty for this Faction.
     bool?   @abViolent: Whether to get the violent bounty for this Faction.
 /;
-int function GetActiveBounty(bool abNonViolent = true, bool abViolent = true)
+int function GetActiveBountyForFaction(Faction akFaction, bool abNonViolent = true, bool abViolent = true)
     int totalBounty = 0
     
     if (abNonViolent)
-        totalBounty += int_if (self.IsPlayer(), self.GetFaction().GetCrimeGoldNonViolent(), RPB_ActorVars.GetCrimeGoldNonViolent(self.GetFaction(), this))
+        totalBounty += int_if (self.IsPlayer(), akFaction.GetCrimeGoldNonViolent(), RPB_ActorVars.GetCrimeGoldNonViolent(akFaction, this))
     endif
 
     if (abViolent)
-        totalBounty += int_if (self.IsPlayer(), self.GetFaction().GetCrimeGoldViolent(), RPB_ActorVars.GetCrimeGoldViolent(self.GetFaction(), this))
+        totalBounty += int_if (self.IsPlayer(), akFaction.GetCrimeGoldViolent(), RPB_ActorVars.GetCrimeGoldViolent(akFaction, this))
     endif
 
     return totalBounty
@@ -193,95 +253,123 @@ endFunction
 ;/
     Gets the latent bounty for this Actor, that is, the bounty that is stored when Arrested/Jailed.
 
+    Faction @akFaction: The faction to retrieve the bounty from.
     bool?   @abNonViolent: Whether to get the non-violent bounty for this Faction.
     bool?   @abViolent: Whether to get the violent bounty for this Faction.
 /;
-int function GetLatentBounty(bool abNonViolent = true, bool abViolent = true)
+int function GetLatentBountyForFaction(Faction akFaction, bool abNonViolent = true, bool abViolent = true)
     int totalBounty = 0
 
     if (abNonViolent)
-        totalBounty += GetInt("Bounty Non-Violent", "Arrest")
+        totalBounty += RPB_ActorVars.GetCrimeGoldNonViolent(akFaction, this)
     endif
 
     if (abViolent)
-        totalBounty += GetInt("Bounty Violent", "Arrest")
+        totalBounty += RPB_ActorVars.GetCrimeGoldViolent(akFaction, this)
     endif
 
     return totalBounty
 endFunction
 
-; Transfers the Active Bounty into the Latent Bounty.
-function HideBounty()
-    if (self.HasLatentBounty())
-        ModInt("Bounty Non-Violent",   self.GetActiveBounty(abViolent = false), "Arrest")
-        ModInt("Bounty Violent",       self.GetActiveBounty(abNonViolent = false), "Arrest")
+;/
+    Transfers the active bounty into the latent bounty.
+
+    Faction @akFaction: The faction to restore the bounty to.
+/;
+function HideBountyForFaction(Faction akFaction)
+    if (self.HasLatentBountyForFaction(akFaction))
+        RPB_ActorVars.ModCrimeGold(akFaction, this, self.GetActiveBountyForFaction(akFaction, abViolent = false))
+        RPB_ActorVars.ModCrimeGoldViolent(akFaction, this, self.GetActiveBountyForFaction(akFaction, abNonViolent = false))
     else
-        SetInt("Bounty Non-Violent",   self.GetActiveBounty(abViolent = false), "Arrest")
-        SetInt("Bounty Violent",       self.GetActiveBounty(abNonViolent = false), "Arrest")
+        RPB_ActorVars.SetCrimeGold(akFaction, this, self.GetActiveBountyForFaction(akFaction, abViolent = false))
+        RPB_ActorVars.SetCrimeGoldViolent(akFaction, this, self.GetActiveBountyForFaction(akFaction, abNonViolent = false))
     endif
 
     ; if (Defeated && DefeatedBounty > 0)
-    ;     Vars_ModInt("Bounty Non-Violent", ArrestVars.DefeatedBounty, "Arrest")
+    ;     Vars_ModInt("Bounty Non-Violent", ArrestVars.DefeatedBounty, "ActorVars")
     ; endif
 
-    self.ClearActiveBounty()
-endFunction
-
-; Restores the Active Bounty from the Latent Bounty.
-function RestoreBounty()
-    if (!self.HasLatentBounty())
-        return
-    endif
-
-    int nonViolent = self.GetLatentBounty(abViolent = false)
-    int violent    = self.GetLatentBounty(abNonViolent = false)
-
-    if (self.HasActiveBounty())
-        self.ModCrimeGold(nonViolent)
-        self.ModCrimeGold(violent, true)
-    else
-        self.SetCrimeGold(nonViolent)
-        self.SetCrimeGoldViolent(violent)
-    endif
-
-    self.ClearLatentBounty()
+    self.ClearActiveBountyForFaction(akFaction)
 endFunction
 
 ;/
-    Clears the Latent Bounty for this Actor (The bounty used when Arrested/Jailed).
+    Restores the active bounty from the latent bounty.
 
-    bool?   @abNonViolent: Whether to clear non-violent bounty.
-    bool?   @abViolent: Whether to clear violent bounty.
+    Faction @akFaction: The faction to restore the bounty to.
 /;
-function ClearLatentBounty(bool abNonViolent = true, bool abViolent = true)
-    if (abNonViolent)
-        Remove("Bounty Non-Violent", "Arrest")
+function RestoreBountyForFaction(Faction akFaction)
+    if (!self.HasLatentBountyForFaction(akFaction))
+        return
     endif
 
-    if (abViolent)
-        Remove("Bounty Violent", "Arrest")
+    int nonViolent = self.GetLatentBountyForFaction(akFaction, abViolent = false)
+    int violent    = self.GetLatentBountyForFaction(akFaction, abNonViolent = false)
+
+    if (self.HasActiveBountyForFaction(akFaction))
+        self.ModCrimeGoldForFaction(akFaction, nonViolent)
+        self.ModCrimeGoldForFaction(akFaction, violent, true)
+    else
+        self.SetCrimeGoldForFaction(akFaction, nonViolent)
+        self.SetCrimeGoldViolentForFaction(akFaction, violent)
     endif
+
+    if (self.IsPlayer())
+        ; Total Bounty has already been processed, don't let the game add it again
+        Game.IncrementStat("Total Lifetime Bounty", -(nonViolent + violent))
+    endif
+
+    self.ClearLatentBountyForFaction(akFaction)
 endFunction
 
 ;/
     Clears the Active Bounty for this Actor (The bounty when this Actor is wanted by the Faction).
 
+    Faction @akFaction: The faction to clear the bounty of.
     bool?   @abNonViolent: Whether to clear non-violent bounty.
     bool?   @abViolent: Whether to clear violent bounty.
 /;
-function ClearActiveBounty(bool abNonViolent = true, bool abViolent = true)
+function ClearActiveBountyForFaction(Faction akFaction, bool abNonViolent = true, bool abViolent = true)
     if (abNonViolent)
-        self.SetCrimeGold(0)
+        self.SetCrimeGoldForFaction(akFaction, 0)
     endif
 
     if (abViolent)
-        self.SetCrimeGoldViolent(0)
+        self.SetCrimeGoldViolentForFaction(akFaction, 0)
+    endif
+endFunction
+
+;/
+    Clears the Latent Bounty for this Actor (The bounty used when Arrested/Jailed).
+
+    Faction @akFaction: The faction to clear the bounty of.
+    bool?   @abNonViolent: Whether to clear non-violent bounty.
+    bool?   @abViolent: Whether to clear violent bounty.
+/;
+function ClearLatentBountyForFaction(Faction akFaction, bool abNonViolent = true, bool abViolent = true)
+    if (abNonViolent)
+        RPB_ActorVars.Unset(akFaction.GetName() + "::Bounty Non-Violent", this)
+    endif
+
+    if (abViolent)
+        RPB_ActorVars.Unset(akFaction.GetName() + "::Bounty Violent", this)
     endif
 endFunction
 
 ; ==========================================================
 ;                          Actor Vars
 ; ==========================================================
+
+int function QueryFactionStat(string asStatName, Faction akFaction)
+    return RPB_ActorVars.GetStat(asStatName, akFaction, this)
+endFunction
+
+function SetFactionStat(string asStatName, Faction akFaction, int aiValue)
+    RPB_ActorVars.SetStat(asStatName, akFaction, this, aiValue)
+
+    if (TrackStats)
+        self.OnStatChanged(asStatName, aiValue)
+    endif
+endFunction
 
 ;/
     Queries the given stat for this faction and this Actor.
@@ -334,99 +422,164 @@ function ModifyStat(string statName, float modifyBy)
     endif
 endFunction
 
-function SetCrimeGold(int aiGold)
-    if (self.IsPlayer())
-        self.GetFaction().SetCrimeGold(aiGold)
-    else
-        self.SetStat("Bounty Non-Violent", aiGold)
-    endif
+; ==========================================================
+;                         Scene States
+; ==========================================================
+
+function SetStateForScene(string asSceneName, string asSceneState)
+    self.SetString(asSceneName, asSceneState, "SceneState")
 endFunction
 
-function SetCrimeGoldViolent(int aiGold)
-    if (self.IsPlayer())
-        self.GetFaction().SetCrimeGoldViolent(aiGold)
-    else
-        self.SetStat("Bounty Violent", aiGold)
-    endif
-endFunction
-
-function ModCrimeGold(int aiAmount, bool abViolent = false)
-    if (self.IsPlayer())
-        self.GetFaction().ModCrimeGold(aiAmount, abViolent)
-    else
-        self.IncrementStat(string_if (abViolent, "Bounty Violent", "Bounty Non-Violent"), aiAmount)
-    endif
+bool function HasSceneState(string asSceneName, string asSceneState)
+    return self.GetString(asSceneName, "SceneState") == asSceneState
 endFunction
 
 ; ==========================================================
 ;                     State Storage Vars
 ; ==========================================================
 
+;/
+    Gets the variable category through the script that is currently attached.
+
+    If the underlying script is a child of RPB_Actor, and the category passed in
+    is the default, it is set as the category for that specific script.
+
+    If on the other hand, the script is RPB_Actor, the category will be of that script.
+
+    In the case of @asVarCategory being passed in and not being the default value,
+    despite the underlying script, that category will be used instead.
+
+    returns: The variable category of the underlying script attached or @asVarCategory if passed in.
+/;
+string function GetScriptVarCategory(string asVarCategory = "Actor")
+    return asVarCategory
+    if (self as RPB_Prisoner && asVarCategory == "Actor")
+        return "Jail"
+
+    elseif (self as RPB_Arrestee && asVarCategory == "Actor")
+        return "Arrest"
+
+    elseif (self as RPB_Captor && asVarCategory == "Actor")
+        return "Captor"
+
+    elseif (self as RPB_Guard && asVarCategory == "Actor")
+        return "Guard"
+
+    elseif (!(self as RPB_Actor) && asVarCategory == "Actor")
+        DebugError("Actor::GetScriptVarCategory", "Could not find the underlying attached script, no category defined!")
+        return "null"
+    endif
+
+    return asVarCategory
+endFunction
+
 ;                           Getters
 bool function GetBool(string asVarName, string asVarCategory = "Actor")
-    return RPB_StorageVars.GetBoolOnForm(asVarName, this, asVarCategory)
+    string category = self.GetScriptVarCategory(asVarCategory)
+    return RPB_StorageVars.GetBoolOnForm(asVarName, this, category)
+endFunction
+
+; Alias for GetBool() to check a condition
+bool function Is(string asVarName, string asVarCategory = "Actor")
+    return GetBool(asVarName, asVarCategory)
+endFunction
+
+; Alias for GetBool() to check possession
+bool function Has(string asVarName, string asVarCategory = "Actor")
+    return GetBool(asVarName, asVarCategory)
+endFunction
+
+; Alias for GetBool() to check whether an action should be taken
+bool function Should(string asVarName, string asVarCategory = "Actor")
+    return GetBool(asVarName, asVarCategory)
 endFunction
 
 int function GetInt(string asVarName, string asVarCategory = "Actor")
-    return RPB_StorageVars.GetIntOnForm(asVarName, this, asVarCategory)
+    string category = self.GetScriptVarCategory(asVarCategory)
+    Debug("Actor::GetInt", "["+ self +", "+ asVarCategory +"] Getting " + asVarName + " on " + this + ": " + RPB_StorageVars.GetIntOnForm(asVarName, this, category))
+    return RPB_StorageVars.GetIntOnForm(asVarName, this, category)
 endFunction
 
 float function GetFloat(string asVarName, string asVarCategory = "Actor")
-    return RPB_StorageVars.GetFloatOnForm(asVarName, this, asVarCategory)
+    string category = self.GetScriptVarCategory(asVarCategory)
+    return RPB_StorageVars.GetFloatOnForm(asVarName, this, category)
 endFunction
 
 string function GetString(string asVarName, string asVarCategory = "Actor")
-    return RPB_StorageVars.GetStringOnForm(asVarName, this, asVarCategory)
+    string category = self.GetScriptVarCategory(asVarCategory)
+    return RPB_StorageVars.GetStringOnForm(asVarName, this, category)
 endFunction
 
 Form function GetForm(string asVarName, string asVarCategory = "Actor")
-    return RPB_StorageVars.GetFormOnForm(asVarName, this, asVarCategory)
+    string category = self.GetScriptVarCategory(asVarCategory)
+    return RPB_StorageVars.GetFormOnForm(asVarName, this, category)
 endFunction
 
 ObjectReference function GetReference(string asVarName, string asVarCategory = "Actor")
-    return RPB_StorageVars.GetFormOnForm(asVarName, this, asVarCategory) as ObjectReference
+    string category = self.GetScriptVarCategory(asVarCategory)
+    return RPB_StorageVars.GetFormOnForm(asVarName, this, category) as ObjectReference
 endFunction
 
 
 ;                          Setters
 function SetBool(string asVarName, bool abValue, string asVarCategory = "Actor")
-    RPB_StorageVars.SetBoolOnForm(asVarName, this, abValue, asVarCategory)
+    string category = self.GetScriptVarCategory(asVarCategory)
+    RPB_StorageVars.SetBoolOnForm(asVarName, this, abValue, category)
+    ; Debug("Actor::SetBool", "["+ self +"] Setting " + asVarName + " on " + this + " to: " + abValue)
 endFunction
 
-function SetInt(string asVarName, int aiValue, string asVarCategory = "Actor")
-    RPB_StorageVars.SetIntOnForm(asVarName, this, aiValue, asVarCategory)
+function SetInt(string asVarName, int aiValue, string asVarCategory = "Actor", int aiMinValue = 0, int aiMaxValue = 0)
+    string category = self.GetScriptVarCategory(asVarCategory)
+    RPB_StorageVars.SetIntOnForm(asVarName, this, aiValue, category)
+    Debug("Actor::SetInt", "["+ self +", "+ asVarCategory +"] Setting " + asVarName + " on " + this + " to: " + aiValue)
 endFunction
 
 function ModInt(string asVarName, int aiValue, string asVarCategory = "Actor")
-    RPB_StorageVars.ModIntOnForm(asVarName, this, aiValue, asVarCategory)
+    string category = self.GetScriptVarCategory(asVarCategory)
+    RPB_StorageVars.ModIntOnForm(asVarName, this, aiValue, category)
+    ; Debug("Actor::ModInt", "["+ self +"] Modifying " + asVarName + " on " + this + " by: " + aiValue)
 endFunction
 
-function SetFloat(string asVarName, float afValue, string asVarCategory = "Actor")
-    RPB_StorageVars.SetFloatOnForm(asVarName, this, afValue, asVarCategory)
+function SetFloat(string asVarName, float afValue, string asVarCategory = "Actor", float afMinValue = 0.0, float afMaxValue = 0.0)
+    string category = self.GetScriptVarCategory(asVarCategory)
+    RPB_StorageVars.SetFloatOnForm(asVarName, this, afValue, category)
+    ; Debug("Actor::SetFloat", "["+ self +"] Setting " + asVarName + " on " + this + " to: " + afValue)
 endFunction
 
 function ModFloat(string asVarName, float afValue, string asVarCategory = "Actor")
-    RPB_StorageVars.ModFloatOnForm(asVarName, this, afValue, asVarCategory)
+    string category = self.GetScriptVarCategory(asVarCategory)
+    RPB_StorageVars.ModFloatOnForm(asVarName, this, afValue, category)
+    ; Debug("Actor::ModFloat", "["+ self +"] Modifying " + asVarName + " on " + this + " by: " + afValue)
 endFunction
 
 function SetString(string asVarName, string asValue, string asVarCategory = "Actor")
-    RPB_StorageVars.SetStringOnForm(asVarName, this, asValue, asVarCategory)
+    string category = self.GetScriptVarCategory(asVarCategory)
+    RPB_StorageVars.SetStringOnForm(asVarName, this, asValue, category)
+    ; Debug("Actor::SetString", "["+ self +"] Setting " + asVarName + " on " + this + " to: " + asValue)
 endFunction
 
 function SetForm(string asVarName, Form akValue, string asVarCategory = "Actor")
-    RPB_StorageVars.SetFormOnForm(asVarName, this, akValue, asVarCategory)
+    string category = self.GetScriptVarCategory(asVarCategory)
+    RPB_StorageVars.SetFormOnForm(asVarName, this, akValue, category)
+    ; Debug("Actor::SetForm", "["+ self +"] Setting " + asVarName + " on " + this + " to: " + akValue)
 endFunction
 
 function SetReference(string asVarName, ObjectReference akValue, string asVarCategory = "Actor")
-    RPB_StorageVars.SetFormOnForm(asVarName, this, akValue, asVarCategory)
+    string category = self.GetScriptVarCategory(asVarCategory)
+    RPB_StorageVars.SetFormOnForm(asVarName, this, akValue, category)
+    ; Debug("Actor::SetReference", "["+ self +"] Setting " + asVarName + " on " + this + " to: " + akValue)
 endFunction
 
 function Remove(string asVarName, string asVarCategory = "Actor")
-    RPB_StorageVars.DeleteVariableOnForm(asVarName, this, asVarCategory)
+    string category = self.GetScriptVarCategory(asVarCategory)
+    RPB_StorageVars.DeleteVariableOnForm(asVarName, this, category)
+    ; Debug("Actor::Remove", "["+ self +"] Removing " + asVarName + " from " + this)
 endFunction
 
 function RemoveAll(string asVarCategory = "Actor")
-    RPB_StorageVars.DeleteCategoryOnForm(this, asVarCategory)
+    string category = self.GetScriptVarCategory(asVarCategory)
+    RPB_StorageVars.DeleteCategoryOnForm(this, category)
+    ; Debug("Actor::RemoveAll", "["+ self +"] Removing all variables from " + this)
 endFunction
 
 ; ==========================================================

@@ -850,12 +850,36 @@ bool function IsAutoDressingEnabledOnRelease(string hold)
     return MCM.GetOptionToggleState("Release::Auto Re-Dress on Release", hold)
 endFunction
 
+string function GetEscapeHandlingCondition(string hold)
+    return MCM.GetOptionMenuValue("Escape::Handle Escape On", hold)
+endFunction
+
 float function GetEscapedBountyFromCurrentArrest(string hold)
     return MCM.GetOptionSliderValue("Escape::Escape Bounty (%)", hold)
 endFunction
 
 int function GetEscapedBountyFlat(string hold)
     return MCM.GetOptionSliderValue("Escape::Escape Bounty", hold) as int
+endFunction
+
+float function GetEscapedBountySentenceMultiplier(string hold)
+    return MCM.GetOptionSliderValue("Escape::Escape Bounty (Sentence)", hold)
+endFunction
+
+int function GetEscapeBountySentenceDays(string hold)
+    return MCM.GetOptionSliderValue("Escape::Escape Bounty (Sentence Days)", hold) as int
+endFunction
+
+int function GetEscapeBountyCondition(string hold)
+    return MCM.GetOptionSliderValue("Escape::Escape Bounty (Bounty Condition)", hold) as int
+endFunction
+
+int function GetEscapeBountySentenceCondition(string hold)
+    return MCM.GetOptionSliderValue("Escape::Escape Bounty (Sentence Condition)", hold) as int
+endFunction
+
+int function GetEscapeBountyFallbackBounty(string hold)
+    return MCM.GetOptionSliderValue("Escape::Fallback Bounty", hold) as int
 endFunction
 
 bool function IsTimeServedAccountedForOnEscape(string hold)

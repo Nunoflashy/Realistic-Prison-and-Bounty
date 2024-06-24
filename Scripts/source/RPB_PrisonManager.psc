@@ -58,6 +58,15 @@ endProperty
 
 ; ==========================================================
 
+; ==========================================================
+;                  Private Prison Properties
+; ==========================================================
+
+bool property PrisonInfamyRecognizedThresholdNotification auto
+bool property PrisonInfamyKnownThresholdNotification auto
+
+; ==========================================================
+
 int actorToPrison
 
 RPB_Prison function FindPrisonByPrisoner(Actor akPrisonerActor)

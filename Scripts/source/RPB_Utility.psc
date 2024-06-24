@@ -556,6 +556,11 @@ function ReleaseAI(bool condition = true) global
     endif
 endFunction
 
+function SetGameStat(string asStatName, int aiValue) global
+    int statValue = Game.QueryStat(asStatName)
+    Game.IncrementStat(asStatName, (-statValue) + aiValue)
+endFunction
+
 ; ==========================================================
 ;                      External Functions
 ; ==========================================================

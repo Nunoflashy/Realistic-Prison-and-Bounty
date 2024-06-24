@@ -335,11 +335,11 @@ function SetAsMaleOnly()
     Debug("JailCell::SetAsMaleOnly", self + " has been set as a male only cell.")
 endFunction
 
-function SetExclusiveToPrisonerSex(RPB_Prisoner akPrisoner)
-    if (akPrisoner.IsMale)
+function SetExclusiveToPrisonerSex(RPB_Prisoner apPrisoner)
+    if (apPrisoner.IsMale)
         self.SetAsMaleOnly()
 
-    elseif (akPrisoner.IsFemale)
+    elseif (apPrisoner.IsFemale)
         self.SetAsFemaleOnly()
     endif
 endFunction
@@ -519,26 +519,37 @@ endFunction
 ; =========================================================
 
 ; Happens when the prisoner enters this cell (when they are added)
-event OnPrisonerEnter(RPB_Prisoner akPrisoner)
-    self.RegisterPrisoner(akPrisoner)
+event OnPrisonerEnter(RPB_Prisoner apPrisoner)
+    self.RegisterPrisoner(apPrisoner)
     self.DetermineCellParameters()
 
     Debug("JailCell::OnPrisonerEnter", "Cell Properties: " + self.DEBUG_GetCellProperties())
 endEvent
 
 ; Happens when the prisoner leaves this cell (when they are removed)
-event OnPrisonerLeave(RPB_Prisoner akPrisoner)
-    ; self.UnregisterPrisoner(akPrisoner)
+event OnPrisonerLeave(RPB_Prisoner apPrisoner)
+    ; self.UnregisterPrisoner(apPrisoner)
     self.DetermineCellParameters()
 
     Debug("JailCell::OnPrisonerLeave", "Cell Properties: " + self.DEBUG_GetCellProperties())
+endEvent
+
+event OnPrisonerOpenCellDoor(RPB_CellDoor akCellDoor, RPB_Prisoner apPrisoner)
+    if (akCellDoor.EscapeTriggerDoor)
+        apPrisoner.SetEscaped()
+    endif
+
+    Debug("["+ self +"] JailCell::OnPrisonerOpenCellDoor", apPrisoner + " has opened one of their jail cell doors: " + akCellDoor)
+endEvent
+
+event OnGuardOpenCellDoor(RPB_CellDoor akCellDoor, Actor akGuard)
+
 endEvent
 
 ; =========================================================
 ;                         Management
 ; =========================================================
 
-; Probably gonna be unused, we'll see
 int function GetDataObject(string asSubCategory = "null")
     int cellsObj    = Prison.GetDataObject("Cells")     ; JFormMap&
     int thisCellObj = JFormMap.getObj(cellsObj, self)   ; JMap&
@@ -610,11 +621,11 @@ function Initialize(RPB_Prison apPrison)
     self.DetermineMarkers()
 endFunction
 
-function BindPrison(RPB_Prison akPrison)
-    __prison = akPrison
+function BindPrison(RPB_Prison apPrison)
+    __prison = apPrison
 
     if (!self.Prison)
-        Debug("["+ self +"] JailCell::BindPrison", "Could not bind the jail cell " + self + " to the Prison " + akPrison)
+        Debug("["+ self +"] JailCell::BindPrison", "Could not bind the jail cell " + self + " to the Prison " + apPrison)
         return
     endif
 endFunction
@@ -754,8 +765,8 @@ string function GetIdentifier()
     return "Cell["+ self.GetFormID() +"]"
 endFunction
 
-bool function IsBoundToPrisoner(RPB_Prisoner akPrisoner)
-    ; return MiscVars.GetReference("["+ akPrisoner.GetIdentifier() +"]Cell").GetFormID() == self.GetFormID()
+bool function IsBoundToPrisoner(RPB_Prisoner apPrisoner)
+    ; return MiscVars.GetReference("["+ apPrisoner.GetIdentifier() +"]Cell").GetFormID() == self.GetFormID()
 endFunction
 
 ; =========================================================

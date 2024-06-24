@@ -579,6 +579,7 @@ event OnArrestBegin(RPB_Arrestee apArrestee, Actor akCaptor, Faction akCrimeFact
     ; apArrestee.SetArrestParameters(asArrestType, akCaptor, akCrimeFaction)
     ; apArrestee.SetArrestParameters(ARREST_TYPE_TELEPORT_TO_JAIL, akCaptor, akCrimeFaction)
     apArrestee.SetArrestParameters(ARREST_TYPE_TELEPORT_TO_CELL, akCaptor, akCrimeFaction)
+    ; apArrestee.SetArrestParameters(ARREST_TYPE_ESCORT_TO_CELL, akCaptor, akCrimeFaction)
     ; apArrestee.SetActiveBounty(Utility.RandomInt(1200, 7800))
     ; apArrestee.SetActiveBounty(4200)
 
@@ -985,6 +986,8 @@ function BeginArrest(RPB_Arrestee akArresteeRef)
 
     ; Actually consider the actor Arrested
     akArresteeRef.Arrest()
+
+    Utility.Wait(0.2)
 
     ; Next step, escort/move to prison
     if (arrestType == ARREST_TYPE_TELEPORT_TO_CELL)

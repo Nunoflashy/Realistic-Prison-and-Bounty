@@ -229,6 +229,12 @@ endProperty
 ;                           Escape
 ; ==========================================================
 
+string property HandleEscapeOn
+    string function get()
+        return Config.GetEscapeHandlingCondition(Hold)
+    endFunction
+endProperty
+
 float property EscapeBountyOfCurrentBounty
     float function get()
         return Config.GetEscapedBountyFromCurrentArrest(Hold)
@@ -240,6 +246,37 @@ int property EscapeBounty
         return Config.GetEscapedBountyFlat(Hold)
     endFunction
 endProperty
+
+float property EscapeBountySentenceMultiplier
+    float function get()
+        return Config.GetEscapedBountySentenceMultiplier(Hold)
+    endFunction
+endProperty
+
+int property EscapeBountySentenceDays
+    int function get()
+        return Config.GetEscapeBountySentenceDays(Hold)
+    endFunction
+endProperty
+
+int property EscapeBountyCondition
+    int function get()
+        return Config.GetEscapeBountyCondition(Hold)
+    endFunction
+endProperty
+
+int property EscapeBountySentenceCondition
+    int function get()
+        return Config.GetEscapeBountySentenceCondition(Hold)
+    endFunction
+endProperty
+
+int property EscapeBountyFallbackBounty
+    int function get()
+        return Config.GetEscapeBountyFallbackBounty(Hold)
+    endFunction
+endProperty
+
 
 bool property AccountForTimeServedOnEscape
     bool function get()
@@ -526,10 +563,15 @@ Faction property PrisonFaction
 endProperty
 
 string __name
+string __fallbackName
 string property Name
     string function get()
         if (__name)
             return __name
+        endif
+
+        if (__fallbackName)
+            return __fallbackName
         endif
 
         if (!__name)
@@ -537,7 +579,7 @@ string property Name
         endif
 
         if (!__name)
-            __name = PrisonLocation.GetName()
+            __fallbackName = PrisonLocation.GetName()
         endif
 
         ; if (!__name)
@@ -1183,6 +1225,22 @@ event OnPrisonerTimeElapsed(RPB_Prisoner apPrisoner)
 
 endEvent
 
+event OnPrisonerImprisoned(RPB_Prisoner apPrisoner)
+
+endEvent
+
+event OnPrisonerReleased(RPB_Prisoner apPrisoner)
+    self.RegisterPrisonerReleaseTimeStats(apPrisoner)
+endEvent
+
+event OnPrisonerEscaped(RPB_Prisoner apPrisoner)
+    self.RegisterPrisonerEscapeTimeStats(apPrisoner)
+    apPrisoner.SetAttackActorOnSight()
+    apPrisoner.SetEscapePenalty()
+    apPrisoner.RestoreBounty()
+    apPrisoner.DEBUG_ShowHoldStats()
+endEvent
+
 event OnPrisonerDying(RPB_Prisoner apPrisoner, Actor akKiller)
     
 endEvent
@@ -1209,11 +1267,17 @@ event OnEscortPrisonerToJailEnd(RPB_Actor apActor, Actor akEscort)
 endEvent
 
 event OnEscortPrisonerToCellBegin(RPB_Prisoner apPrisoner, Actor akEscort)
+    if (apPrisoner.HasSceneState("OnEscortPrisonerToCellBegin", "Escape"))
+        ; Process escort to cell after escape
+    endif
     Debug("Prison::OnEscortPrisonerToCellBegin", "Event fired but it has no implementation!")
 endEvent
 
 ; TODO: Remove RPB_JailCell from params. since a Prisoner already has a jail cell assigned to them
 event OnEscortPrisonerToCellEnd(RPB_Prisoner apPrisoner, RPB_JailCell akJailCell, Actor akEscort)
+    if (apPrisoner.HasSceneState("OnEscortPrisonerToCellEnd", "Escape"))
+        ; Process escort to cell after escape
+    endif
     if (apPrisoner.IsStrippedNaked || apPrisoner.IsStrippedToUnderwear)
         ; return
     endif
@@ -1225,10 +1289,18 @@ event OnEscortPrisonerToCellEnd(RPB_Prisoner apPrisoner, RPB_JailCell akJailCell
 endEvent
 
 event OnEscortPrisonerFromCellBegin(RPB_Prisoner apPrisoner, Actor akEscort)
+    if (apPrisoner.HasSceneState("OnEscortPrisonerFromCellBegin", "Release"))
+        ; Process Release
+    endif
+
     Debug("Prison::OnEscortPrisonerFromCellBegin", "Event fired but it has no implementation!")
 endEvent
 
 event OnEscortPrisonerFromCellEnd(RPB_Prisoner apPrisoner, Actor akEscort)
+    if (apPrisoner.HasSceneState("OnEscortPrisonerFromCellEnd", "Release"))
+        ; Process Release
+    endif
+
     Debug("Prison::OnEscortPrisonerFromCellEnd", "Event fired but it has no implementation!")
 endEvent
 
@@ -1237,16 +1309,15 @@ event OnPrisonerStripBegin(RPB_Prisoner apPrisoner, Actor akStripper)
 endEvent
 
 event OnPrisonerStripEnd(RPB_Prisoner apPrisoner, Actor akStripper)
+    if (apPrisoner.HasSceneState("OnPrisonerStripEnd", "Escort to Cell"))
+        ; Process Escorting to Cell
+    endif
     if (!apPrisoner.IsInCell)
         ; apPrisoner.StartRestraining(akStripper)
         apPrisoner.EscortToCell(akStripper)
     endif
 
     Debug("Prison::OnPrisonerStripEnd", "event invoked")
-endEvent
-
-event OnPrisonerReleased(RPB_Prisoner apPrisoner)
-    self.RegisterPrisonerReleaseTimeStats(apPrisoner)
 endEvent
 
 event OnGuardDeath(RPB_Guard akGuard, Actor akKiller)
@@ -1261,9 +1332,9 @@ event OnCellDoorClosed(RPB_JailCell akPrisonCell, Actor akCloser)
     
 endEvent
 
-event OnJailCellAssigned(RPB_JailCell akJailCell, RPB_Prisoner akPrisoner)
+event OnJailCellAssigned(RPB_JailCell akJailCell, RPB_Prisoner apPrisoner)
     ; if (akJailCell.IsEmpty)
-    ;     akJailCell.SetExclusiveToPrisonerSex(akPrisoner)
+    ;     akJailCell.SetExclusiveToPrisonerSex(apPrisoner)
     ; endif
 endEvent
 
@@ -1283,11 +1354,11 @@ event OnPrisonerCellAssignFail(RPB_Prisoner apPrisoner, RPB_JailCell akJailCell)
 endEvent
 
 event OnPrisonerEnterCell(RPB_Prisoner apPrisoner, RPB_JailCell akJailCell)
-
+    ; akJailCell.OnPrisonerEnter(apPrisoner)
 endEvent
 
 event OnPrisonerLeaveCell(RPB_Prisoner apPrisoner, RPB_JailCell akJailCell)
-
+    ; akJailCell.OnPrisonerLeave(apPrisoner)
 endEvent
 
 ; ==========================================================
@@ -1751,7 +1822,7 @@ endFunction
 function AssignPrisonerNumber(RPB_Prisoner apPrisoner)
     int prisonerCount   = Prisoners.Count
     int assignedNumber  = prisonerCount + 1
-    apPrisoner.Prison_SetInt("Prisoner Number", assignedNumber)
+    apPrisoner.SetInt("Prisoner Number", assignedNumber)
 endFunction
 
 function RegisterPrisonerLastJailedStats(RPB_Prisoner apPrisoner)
@@ -2060,13 +2131,13 @@ endFunction
 /;
 bool property HasInfamyRecognizedNotificationFired
     bool function get()
-        return RPB_StorageVars.GetBool("Jail::Infamy Recognized Threshold Notification")
+        return PrisonManager.PrisonInfamyRecognizedThresholdNotification
     endFunction
 endProperty
 
 bool property HasInfamyKnownNotificationFired
     bool function get()
-        return RPB_StorageVars.GetBool("Jail::Infamy Known Threshold Notification")
+        return PrisonManager.PrisonInfamyKnownThresholdNotification
     endFunction
 endProperty
 
@@ -2082,36 +2153,57 @@ string property InfamyKnownSentenceAppliedNotification
     endFunction
 endProperty
 
-function NotifyInfamyRecognizedThresholdMet(string hold, bool asNotification = false)
-    if (RPB_StorageVars.GetBool("["+ hold +"]Jail::Infamy Recognized Threshold Message Sent"))
+; State for Infamy Messages
+bool __infamyRecognizedThresholdMsgSent
+bool __infamyKnownThresholdMsgSent
+
+function NotifyInfamyRecognizedThresholdMet(bool asNotification = false)
+    ; if (RPB_StorageVars.GetBool("["+ Hold +"]Jail::Infamy Recognized Threshold Message Sent"))
+    ;     return
+    ; endif
+
+    if (__infamyRecognizedThresholdMsgSent)
         return
     endif
 
-    RPB_StorageVars.SetBool("["+ hold +"]Jail::Infamy Recognized Threshold Message Sent", true)
-    RPB_StorageVars.SetBool("Jail::Infamy Recognized Threshold Notification", true)
+    __infamyRecognizedThresholdMsgSent = true
+
+    PrisonManager.PrisonInfamyRecognizedThresholdNotification = true
+
+    ; RPB_StorageVars.SetBool("["+ Hold +"]Jail::Infamy Recognized Threshold Message Sent", true)
+    ; RPB_StorageVars.SetBool("Jail::Infamy Recognized Threshold Notification", true)
 
     if (config.ShouldDisplayInfamyNotifications && asNotification)
-        debug.notification("You are now recognized as a criminal in " + hold)
+        debug.notification("You are now recognized as a criminal in " + Name)
         return
     endif
 
-    debug.MessageBox("You are now recognized as a criminal in " + hold)
+    debug.MessageBox("You are now recognized as a criminal in " + Name)
 endFunction
 
-function NotifyInfamyKnownThresholdMet(string hold, bool asNotification = false)
-    if (RPB_StorageVars.GetBool("["+ hold +"]Jail::Infamy Known Threshold Message Sent"))
+function NotifyInfamyKnownThresholdMet(bool asNotification = false)
+    ; if (RPB_StorageVars.GetBool("["+ Hold +"]Jail::Infamy Known Threshold Message Sent"))
+    ;     return
+    ; endif
+
+    if (__infamyKnownThresholdMsgSent)
         return
     endif
 
-    RPB_StorageVars.SetBool("["+ hold +"]Jail::Infamy Known Threshold Message Sent", true)
+    __infamyKnownThresholdMsgSent = true
+
+    PrisonManager.PrisonInfamyKnownThresholdNotification = true
+
+
+    ; RPB_StorageVars.SetBool("["+ Hold +"]Jail::Infamy Known Threshold Message Sent", true)
     RPB_StorageVars.SetBool("Jail::Infamy Known Threshold Notification", true)
 
     if (config.ShouldDisplayInfamyNotifications && asNotification)
-        debug.notification("You are now a known criminal in " + hold)
+        debug.notification("You are now a known criminal in " + Name)
         return
     endif
 
-    debug.MessageBox("You are now a known criminal in " + hold)
+    debug.MessageBox("You are now a known criminal in " + Name)
 endFunction
 
 ; ==========================================================

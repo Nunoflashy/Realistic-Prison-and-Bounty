@@ -109,7 +109,8 @@ function RenderPrisons(RPB_MCM_02 mcm) global
         if (isPlayerImprisoned)
             RPB_Prisoner playerPrisoner = holdPrison.GetPrisoner(Game.GetForm(0x14) as Actor)
             string cellId = playerPrisoner.JailCell.ID
-            mcm.AddOptionText("", "Currently Jailed In " + holdPrison.Name, defaultFlags = mcm.OPTION_DISABLED)
+            mcm.AddOptionText("", "Currently Jailed", defaultFlags = mcm.OPTION_DISABLED)
+            mcm.AddOptionText("", "In " + holdPrison.Name, defaultFlags = mcm.OPTION_DISABLED)
         else
             int lastJailedDay       = RPB_Utility.GetPlayerPrisonLastJailedTime("Day", holdCrimeFaction)
             int lastJailedMonth     = RPB_Utility.GetPlayerPrisonLastJailedTime("Month", holdCrimeFaction)

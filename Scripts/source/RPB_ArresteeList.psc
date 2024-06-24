@@ -43,5 +43,5 @@ function Remove(RPB_Arrestee apArrestee)
     string elementKey = self.GetArresteeID(apArrestee.GetActor())
     protected_remove(elementKey)
 
-    apArrestee.Arrest_RemoveAll()
+    apArrestee.RemoveAll()
 endFunction

@@ -85,7 +85,10 @@ string[] property EscapeHandlingOptions
             JArray.addStr(_escapeHandlingOptions, "Bounty")
             JArray.addStr(_escapeHandlingOptions, "Sentence")
             JArray.addStr(_escapeHandlingOptions, "Bounty + Sentence")
-            JArray.addStr(_escapeHandlingOptions, "Bounty + Sentence (Conditionally)")
+            JArray.addStr(_escapeHandlingOptions, "Bounty (Conditionally)")
+            JArray.addStr(_escapeHandlingOptions, "Sentence (Conditionally)")
+            JArray.addStr(_escapeHandlingOptions, "Bounty || Sentence (Conditionally OR)")
+            JArray.addStr(_escapeHandlingOptions, "Bounty && Sentence (Conditionally AND)")
         endif
         return JArray.asStringArray(_escapeHandlingOptions)
     endFunction
