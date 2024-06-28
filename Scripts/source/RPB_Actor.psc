@@ -96,12 +96,20 @@ bool function HasSpell(Spell akSpell)
     return this.HasSpell(akSpell)
 endFunction
 
+function EquipItem(Form akItem, bool abPreventRemoval = false, bool abSilent = true)
+    this.EquipItem(akItem, abPreventRemoval, abSilent)
+endFunction
+
 function UnequipHands()
     UnequipWeaponForActor(this, false)
     UnequipWeaponForActor(this, false)
     UnequipWeaponForActor(this, true)
     UnequipSpellForActor(this)
     UnequipShieldForActor(this)
+endFunction
+
+function UnequipItemSlot(int aiSlot)
+    this.UnequipItemSlot(aiSlot)
 endFunction
 
 function UnequipAll()
@@ -135,6 +143,18 @@ endFunction
 function MoveTo(ObjectReference akTarget, float afXOffset = 0.0, float afYOffset = 0.0, float afZOffset = 0.0, bool abMatchRotation = true)
     this.MoveTo(akTarget, afXOffset, afYOffset, afZOffset, abMatchRotation)
     Debug("Actor::MoveTo", "Moved " + self.Name + " to " + akTarget)
+endFunction
+
+function PlayAnimation(string asAnimationKey)
+    Debug.SendAnimationEvent(this, asAnimationKey)
+endFunction
+
+float function GetDistance(ObjectReference akObject)
+    return this.GetDistance(akObject)
+endFunction
+
+function OrientRelativeTo(ObjectReference akObject, float afRotX = 0.0, float afRotY = 0.0, float afRotZ = 0.0)
+    OrientRelative(this, akObject, afRotX, afRotY, afRotZ)
 endFunction
 
 string function GetSex(bool abShortValue = false)
@@ -277,6 +297,12 @@ endFunction
     Faction @akFaction: The faction to restore the bounty to.
 /;
 function HideBountyForFaction(Faction akFaction)
+    ; For NPC's, the Latent Bounty is the same as the Active Bounty,
+    ; therefore, there's no need to "hide" it.
+    if (self.IsNPC())
+        return
+    endif
+
     if (self.HasLatentBountyForFaction(akFaction))
         RPB_ActorVars.ModCrimeGold(akFaction, this, self.GetActiveBountyForFaction(akFaction, abViolent = false))
         RPB_ActorVars.ModCrimeGoldViolent(akFaction, this, self.GetActiveBountyForFaction(akFaction, abNonViolent = false))
@@ -431,7 +457,8 @@ function SetStateForScene(string asSceneName, string asSceneState)
 endFunction
 
 bool function HasSceneState(string asSceneName, string asSceneState)
-    return self.GetString(asSceneName, "SceneState") == asSceneState
+    bool hasState = self.GetString(asSceneName, "SceneState") == asSceneState
+    return hasState
 endFunction
 
 ; ==========================================================
@@ -452,7 +479,7 @@ endFunction
     returns: The variable category of the underlying script attached or @asVarCategory if passed in.
 /;
 string function GetScriptVarCategory(string asVarCategory = "Actor")
-    return asVarCategory
+    ; return asVarCategory
     if (self as RPB_Prisoner && asVarCategory == "Actor")
         return "Jail"
 
@@ -471,6 +498,10 @@ string function GetScriptVarCategory(string asVarCategory = "Actor")
     endif
 
     return asVarCategory
+endFunction
+
+string function DestroyPropertyOnState(string asStateName)
+    return "Temporary::"+ asStateName
 endFunction
 
 ;                           Getters
@@ -496,7 +527,7 @@ endFunction
 
 int function GetInt(string asVarName, string asVarCategory = "Actor")
     string category = self.GetScriptVarCategory(asVarCategory)
-    Debug("Actor::GetInt", "["+ self +", "+ asVarCategory +"] Getting " + asVarName + " on " + this + ": " + RPB_StorageVars.GetIntOnForm(asVarName, this, category))
+    ; Debug("Actor::GetInt", "["+ self +", "+ asVarCategory +"] Getting " + asVarName + " on " + this + ": " + RPB_StorageVars.GetIntOnForm(asVarName, this, category))
     return RPB_StorageVars.GetIntOnForm(asVarName, this, category)
 endFunction
 
@@ -531,7 +562,7 @@ endFunction
 function SetInt(string asVarName, int aiValue, string asVarCategory = "Actor", int aiMinValue = 0, int aiMaxValue = 0)
     string category = self.GetScriptVarCategory(asVarCategory)
     RPB_StorageVars.SetIntOnForm(asVarName, this, aiValue, category)
-    Debug("Actor::SetInt", "["+ self +", "+ asVarCategory +"] Setting " + asVarName + " on " + this + " to: " + aiValue)
+    ; Debug("Actor::SetInt", "["+ self +", "+ asVarCategory +"] Setting " + asVarName + " on " + this + " to: " + aiValue)
 endFunction
 
 function ModInt(string asVarName, int aiValue, string asVarCategory = "Actor")
@@ -561,6 +592,9 @@ endFunction
 function SetForm(string asVarName, Form akValue, string asVarCategory = "Actor")
     string category = self.GetScriptVarCategory(asVarCategory)
     RPB_StorageVars.SetFormOnForm(asVarName, this, akValue, category)
+    if (asVarName == "StripperGuard")
+        Debug("Actor::SetForm", "["+ self +"] Setting " + asVarName + " on " + this + " to: " + akValue + ", Category: " + category)
+    endif
     ; Debug("Actor::SetForm", "["+ self +"] Setting " + asVarName + " on " + this + " to: " + akValue)
 endFunction
 
