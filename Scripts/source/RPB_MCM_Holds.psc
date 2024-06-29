@@ -4,7 +4,7 @@ import RPB_Utility
 import RPB_MCM
 
 bool function ShouldHandleEvent(RPB_MCM mcm) global
-    return mcm.IsHoldCurrentPage() ; Only handle if the page rendered if any of the holds
+    return mcm.IsHoldCurrentPage() ; Only handle if the page rendered is any of the holds
 endFunction
 
 function Render(RPB_MCM mcm) global
@@ -80,7 +80,6 @@ function Left(RPB_MCM mcm) global
 
     mcm.AddOptionCategory("Frisking")
     mcm.AddOptionToggle("Allow Frisking")
-    ; mcm.AddOptionToggle("Unconditional Frisking")
     mcm.AddOptionSlider("Minimum Bounty for Frisking", "{0} Bounty")
     mcm.AddOptionSlider("Frisk Search Thoroughness", "{0}x")
     mcm.AddEmptyOption()        
@@ -100,8 +99,6 @@ function Left(RPB_MCM mcm) global
     ; mcm.AddOptionToggle("Strip when Defeated")
     mcm.AddOptionSlider("Strip Search Thoroughness", "{0}x")
     mcm.AddOptionSlider("Strip Search Thoroughness Modifier", "{0} Bounty = 1x")
-    mcm.AddOptionToggle("Strip when wearing Heavy Armor")
-    mcm.AddOptionToggle("Strip when wearing Light Armor")
 endFunction
 
 function Right(RPB_MCM mcm) global
@@ -547,10 +544,10 @@ function OnOptionHighlight(RPB_MCM mcm, string option) global
         mcm.SetInfoText("Whether to confiscate any stolen items found during the frisking.")
 
     elseif (option == "Frisking::Strip Search if Stolen Items Found")
-        mcm.SetInfoText("Whether to have the player strip searched if stolen items are found. \n (Note: If the strip search takes place, you will be jailed regardless of the bounty for the arrest)")
+        mcm.SetInfoText("Whether to have the prisoner strip searched if stolen items are found. \n (Note: If the strip search takes place, the prisoner will be jailed regardless of the bounty for the arrest)")
 
     elseif (option == "Frisking::Minimum No. of Stolen Items Required")
-        mcm.SetInfoText("The minimum number of stolen items required to have the player be strip searched.")
+        mcm.SetInfoText("The minimum number of stolen items required to have the prisoner be strip searched.")
 
     ; ==========================================================
     ;                           JAIL
@@ -638,25 +635,25 @@ function OnOptionHighlight(RPB_MCM mcm, string option) global
     ; ==========================================================
 
     elseif (option == "Stripping::Allow Stripping")
-        mcm.SetInfoText("Determines if you can be stripped off in " + city + "'s jail.")
+        mcm.SetInfoText("Determines if prisoners can be stripped off in " + city + "'s jail.")
 
     elseif (option == "Stripping::Handle Stripping On")
         mcm.SetInfoText("Determines which rules to use to know whether stripping should take place in " + city + "'s jail.\n" + \
-            "Minimum Bounty - Stripping will only happen if the minimum bounty for this arrest is met.\n" + \
-            "Minimum Sentence - Stripping will only happen if the sentence given falls within the minimum value.\n" + \
-            "Unconditionally - Stripping will always happen regardless of bounty or sentence.")
+            "Minimum Bounty - Stripping will only happen if the Minimum Bounty for this arrest is met.\n" + \
+            "Minimum Sentence - Stripping will only happen if the Sentence given falls within the minimum value.\n" + \
+            "Unconditionally - Stripping will always happen regardless of Bounty or Sentence.")
 
     elseif (option == "Stripping::Minimum Bounty to Strip")
-        mcm.SetInfoText("The minimum bounty required in order to be stripped off in " + city + "'s jail.")
+        mcm.SetInfoText("The Minimum Bounty required in order to be stripped off in " + city + "'s jail.")
 
     elseif (option == "Stripping::Minimum Violent Bounty to Strip")
-        mcm.SetInfoText("The minimum violent bounty required in order to be stripped off in " + city + "'s jail.")
+        mcm.SetInfoText("The Minimum Violent Bounty required in order to be stripped off in " + city + "'s jail.")
 
     elseif (option == "Stripping::Minimum Sentence to Strip")
-        mcm.SetInfoText("The minimum sentence required in order to be stripped off in " + city + "'s jail.")
+        mcm.SetInfoText("The Minimum Sentence required in order to be stripped off in " + city + "'s jail.")
 
     elseif (option == "Stripping::Strip when Defeated")
-        mcm.SetInfoText("Whether to have you stripped off when defeated in " + city + "'s jail.")
+        mcm.SetInfoText("Whether to have prisoners stripped off when defeated in " + city + "'s jail.")
 
     elseif (option == "Stripping::Strip Search Thoroughness")
         mcm.SetInfoText("The thoroughness of the strip search, higher values mean a more thorough search and therefore possibly less items kept.\n" + \
@@ -671,25 +668,28 @@ function OnOptionHighlight(RPB_MCM mcm, string option) global
     ; ==========================================================
 
     elseif (option == "Clothing::Allow Clothing")
-        mcm.SetInfoText("Determines if you are allowed clothing in " + city + " jail.")
+        mcm.SetInfoText("Determines if prisoners are allowed clothing in " + city + " jail.")
 
     elseif (option == "Clothing::Handle Clothing On")
         mcm.SetInfoText("Determines which rules to use to know whether clothing should be given in " + city + " jail.\n" + \
-            "Maximum Bounty - Allow clothing only if the bounty for this arrest does not exceed the maximum.\n" + \
-            "Maximum Sentence - Allow clothing only if the sentence given does not exceed the maximum set.\n" + \
-            "Unconditionally - Always allow clothing regardless of bounty or sentence.")
+            "Maximum Bounty - Allow clothing only if the Bounty for this arrest does not exceed the maximum.\n" + \
+            "Maximum Sentence - Allow clothing only if the Sentence given does not exceed the maximum set.\n" + \
+            "Unconditionally - Always allow clothing regardless of Bounty or Sentence.")
 
     elseif (option == "Clothing::When Defeated")
-        mcm.SetInfoText("Determines if you are given clothing when defeated in " + city + " jail.")
+        mcm.SetInfoText("Determines if prisoners are given clothing when defeated in " + city + " jail.")
 
     elseif (option == "Clothing::Maximum Bounty")
-        mcm.SetInfoText("The maximum amount of bounty you can have in order to be given clothing in " + city + " jail.")
+        mcm.SetInfoText("The maximum amount of bounty a prisoner can have in order to be given clothing in " + city + " jail.\n" + \
+                        "If a Prisoner exceeds this threshold, they will not be given any clothing.")
 
     elseif (option == "Clothing::Maximum Violent Bounty")
-        mcm.SetInfoText("The maximum amount of violent bounty you can have in order to be given clothing in " + city + " jail.")
+        mcm.SetInfoText("The maximum amount of violent bounty a prisoner can have in order to be given clothing in " + city + " jail.\n" + \
+                        "If a Prisoner exceeds this threshold, they will not be given any clothing.")
 
     elseif (option == "Clothing::Maximum Sentence")
-        mcm.SetInfoText("The maximum sentence you can be given in order to get clothing in " + city + " jail.")
+        mcm.SetInfoText("The maximum sentence a prisoner can be given in order to get clothing in " + city + " jail.\n" + \
+                        "If a Prisoner exceeds this threshold, they will not be given any clothing.")
 
     ; ==========================================================
     ;                      ADDITIONAL CHARGES
