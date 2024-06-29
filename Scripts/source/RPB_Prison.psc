@@ -700,10 +700,13 @@ ReferenceAlias function BindPrisonerToCell(RPB_Prisoner apPrisoner, string asPac
     ; Make sure the prisoner is inside the cell before applying the AI Package (Wander in Cell),
     ; since the package's location is set to be the same point at the time of application 
     ; so the prisoner must be in the cell, in order to remain there.
+    ReferenceAlias cellPackage = PrisonManager.GetCellPackageOfType(asPackageSize)
+
     apPrisoner.MoveTo(apPrisoner.JailCell)
+    Debug("Prison::BindPrisonerToCell", "Cell [X,Y,Z]: " + "[" + apPrisoner.JailCell.X + "," + apPrisoner.JailCell.Y + "," + apPrisoner.JailCell.Z + "]")
+    Debug("Prison::BindPrisonerToCell", "Prisoner [X,Y,Z]: " + "[" + apPrisoner.this.X + "," + apPrisoner.this.Y + "," + apPrisoner.this.Z + "]")
     apPrisoner.DisableAI()
     
-    ReferenceAlias cellPackage = PrisonManager.GetCellPackageOfType(asPackageSize)
     apPrisoner.BindAlias(cellPackage)
     apPrisoner.EnableAI()
 
@@ -1136,6 +1139,9 @@ function AwaitPrisonersRelease()
                 ; Debug("Prison::AwaitPrisonersRelease", currentPrisoner + " " + currentPrisoner.GetActor() + " ("+ currentPrisoner.GetSex(true) +")" + " has not served their sentence yet in "+ Hold +".")
             endif
         endif
+
+        currentPrisoner.PerformSanityChecks()
+
         i += 1
     endWhile
     
@@ -1282,9 +1288,15 @@ event OnEscortPrisonerToCellEnd(RPB_Prisoner apPrisoner, RPB_JailCell akJailCell
         ; return
     endif
 
+    ; akJailCell.Lock()
+
     apPrisoner.Uncuff()
-    
     apPrisoner.Imprison()
+    if (apPrisoner.HasSceneState("OnEscortPrisonerToCellEnd", "Arrest"))
+        if (apPrisoner.ShouldBeStripped)
+            apPrisoner.Strip()
+        endif
+    endif
     ; apPrisoner.StartStripping(akEscort)
 endEvent
 
@@ -1304,10 +1316,42 @@ event OnEscortPrisonerFromCellEnd(RPB_Prisoner apPrisoner, Actor akEscort)
     Debug("Prison::OnEscortPrisonerFromCellEnd", "Event fired but it has no implementation!")
 endEvent
 
+; Happens when a Prisoner is about to be stripped
 event OnPrisonerStripBegin(RPB_Prisoner apPrisoner, Actor akStripper)
-    apPrisoner.Strip()
+    ; TODO: Maybe check whether this Prisoner should be stripped
+    ; apPrisoner.Strip()
 endEvent
 
+; Happens when a Prisoner is being stripped
+event OnPrisonerStripping(RPB_Prisoner apPrisoner, Actor akStripper, string asSceneEvent)
+    if (asSceneEvent == "Lie Down")
+        OrientRelative(apPrisoner.GetActor(), akStripper, afRotZ = 180)
+        apPrisoner.PlayAnimation("ZazAPC011")
+
+    elseif (asSceneEvent == "Sit Down")
+        ; OrientRelative(apPrisoner.GetActor(), stripperGuard, afRotZ = 180)
+        apPrisoner.PlayAnimation("ZazAPC006")
+
+    elseif (asSceneEvent == "Undress Lower Body")
+        apPrisoner.UnequipItemSlot(37)
+        apPrisoner.UnequipItemSlot(49)
+        apPrisoner.UnequipItemSlot(52)
+    elseif (asSceneEvent == "Undress Upper Body")
+        apPrisoner.UnequipItemSlot(33)
+        apPrisoner.UnequipItemSlot(56)
+        apPrisoner.UnequipItemSlot(32)
+
+    elseif (asSceneEvent == "Undress to Underwear")
+        ; Remove all clothing except Underwear
+        apPrisoner.Strip(false)
+
+    elseif (asSceneEvent == "Remove Underwear")
+        ; Remove Underwear, prisoner must be unclothed already
+        apPrisoner.RemoveUnderwear()
+    endif
+endEvent
+
+; Happens when a Prisoner has been stripped
 event OnPrisonerStripEnd(RPB_Prisoner apPrisoner, Actor akStripper)
     if (apPrisoner.HasSceneState("OnPrisonerStripEnd", "Escort to Cell"))
         ; Process Escorting to Cell
@@ -1406,6 +1450,118 @@ int function GetDataObject(string asPrisonObjectCategory = "null")
     endif
     
     return returnedObject
+endFunction
+
+;/
+    Fires a Prisoner based Event on a Scene condition and phase.
+    It also handles sub-events within that Scene that should not fire an Event by themselves.
+
+    string          @asScene: The name of the Scene.
+    string          @asSceneEvent: The event that takes place within the Scene.
+    RPB_Prisoner    @apPrisoner: The prisoner that is taking part in the Scene.
+    string?         @asSceneSubEvent: The event that takes place within the Scene at a certain phase.
+
+    returns: Return value is not used, instead, the sole purpose is to block the execution and prevent further calls that depend on these Events.
+/;
+int function FirePrisonerEventOnScene(string asScene, string asSceneEvent, RPB_Prisoner apPrisoner, string asSceneSubEvent = "null")
+    if (asScene == SceneManager.SCENE_STRIPPING_02 || asScene == SceneManager.SCENE_STRIPPING_01 || asScene == SceneManager.SCENE_FORCED_STRIPPING_02)
+        Actor stripperGuard = apPrisoner.GetForm("StripperGuard", "Temporary::Imprisoned") as Actor
+        Debug("Prison::FirePrisonerEventOnScene", "Stripper Guard: " + stripperGuard)
+
+        if (asSceneEvent == "StripBegin")
+            if (asSceneSubEvent == "Undress to Underwear")
+                apPrisoner.Strip(abRemoveUnderwear = false)
+
+            elseif (asSceneSubEvent == "Lie Down")
+                apPrisoner.PlayAnimation("IdleLayDownEnter")
+
+            elseif (asSceneSubEvent == "")
+            endif
+            self.OnPrisonerStripBegin(apPrisoner, stripperGuard)
+            
+        elseif (asSceneEvent == "StripMiddle")
+            self.OnPrisonerStripping(apPrisoner, stripperGuard, asSceneSubEvent)
+
+        elseif (asSceneEvent == "StripEnd")
+            if (asSceneSubEvent == "Restrain Prisoner")
+                Form cuffs = Game.GetFormEx(0xA081D33)
+                apPrisoner.SheatheWeapon()
+                apPrisoner.EquipItem(cuffs, true, true)
+                return 1
+
+            elseif (asSceneSubEvent == "Stand Up (Lie Down)")
+                apPrisoner.PlayAnimation("IdleLayDownExit")
+                ; Remove Underwear
+                self.OnPrisonerStripEnd(apPrisoner, stripperGuard)
+
+            elseif (asSceneSubEvent == "Stand Up (Kneel)")
+                apPrisoner.PlayAnimation("IdleKneelExit") ; TODO: Not working
+                self.OnPrisonerStripEnd(apPrisoner, stripperGuard)
+                API.Arrest.RestrainArrestee(apPrisoner.GetActor())
+                return 1
+            endif
+
+            self.OnPrisonerStripEnd(apPrisoner, stripperGuard)
+        endif
+
+    elseif (asScene == SceneManager.SCENE_ESCORT_TO_JAIL_01 || asScene == SceneManager.SCENE_ESCORT_TO_JAIL_02)
+        Actor prisonerEscort = apPrisoner.GetForm("EscortGuard", apPrisoner.TEMPORARY_DESTROY_ON_IMPRISONED) as Actor
+
+        if (asSceneEvent == "EscortBegin")
+            self.OnEscortPrisonerToJailBegin(apPrisoner, prisonerEscort)
+
+        elseif (asSceneEvent == "EscortEnd")
+            self.OnEscortPrisonerToJailEnd(apPrisoner, prisonerEscort)
+
+        endif
+
+        Debug("Prison::FirePrisonerEventOnScene", "Prison -> " + asScene + ": " + asSceneEvent)
+
+    elseif (asScene == SceneManager.SCENE_ESCORT_TO_CELL_01 || asScene == SceneManager.SCENE_ESCORT_TO_CELL_02)
+        Actor prisonerEscort        = apPrisoner.GetForm("EscortGuard", apPrisoner.TEMPORARY_DESTROY_ON_IMPRISONED) as Actor
+        RPB_CellDoor cellDoor       = apPrisoner.GetForm("CellDoor", apPrisoner.TEMPORARY_DESTROY_ON_IMPRISONED) as RPB_CellDoor 
+
+        if (asSceneEvent == "EscortBegin")
+            self.OnEscortPrisonerToCellBegin(apPrisoner, prisonerEscort)
+
+        elseif (asSceneEvent == "EscortEnd")
+            if (asSceneSubEvent == "Lock Cell Door")
+                cellDoor.Close()
+                cellDoor.Lock()
+                Debug.SendAnimationEvent(prisonerEscort, "IdleLockpick") ; Lock animation
+
+            elseif (asSceneSubEvent == "Unlock Cell Door")
+                Debug.SendAnimationEvent(prisonerEscort, "IdleLockpick")
+                cellDoor.Unlock()
+                cellDoor.Open()
+                return 1
+            endif
+            self.OnEscortPrisonerToCellEnd(apPrisoner, apPrisoner.JailCell, prisonerEscort)
+        endif
+
+    elseif (asScene == SceneManager.SCENE_ESCORT_FROM_CELL)
+        Actor prisonerEscort = apPrisoner.GetForm("EscortGuard", apPrisoner.TEMPORARY_DESTROY_ON_IMPRISONED) as Actor
+
+        if (asSceneEvent == "EscortBegin")
+            self.OnEscortPrisonerFromCellBegin(apPrisoner, prisonerEscort)
+
+        elseif (asSceneEvent == "EscortEnd")
+            self.OnEscortPrisonerFromCellEnd(apPrisoner, prisonerEscort)
+            
+        endif
+    endif
+endFunction
+
+function FireFallbackActorEventOnScene(string asScene, string asSceneEvent, Actor akActor, string asSceneSubEvent = "null")
+    if (asScene == SceneManager.SCENE_ESCORT_TO_JAIL_01)
+        if (asSceneEvent == "EscortBegin")
+            if (asSceneSubEvent == "Make Prisoner") ; Make the Actor a Prisoner
+                RPB_Prisoner prisoner = self.MakePrisoner(akActor)
+                prisoner.SetSentence()
+                self.RegisterPrisoner(prisoner)
+            endif
+        endif
+    endif
 endFunction
 
 ; Temporary, to hold periodically updates prisoners for now
