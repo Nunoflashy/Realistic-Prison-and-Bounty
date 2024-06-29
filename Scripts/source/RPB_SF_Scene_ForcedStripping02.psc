@@ -5,8 +5,8 @@ Scriptname RPB_SF_Scene_ForcedStripping02 Extends Scene Hidden
 ;BEGIN FRAGMENT Fragment_18
 Function Fragment_18()
 ;BEGIN CODE
-; Phase 5
-self.SendModEvent("RPB_ScenePlayingEnd", "RPB_ForcedStripping02", 5)
+; Phase 7
+self.SendModEvent("RPB_ScenePlayingEnd", "RPB_ForcedStripping02", 7)
 ;END CODE
 EndFunction
 ;END FRAGMENT
@@ -14,8 +14,8 @@ EndFunction
 ;BEGIN FRAGMENT Fragment_22
 Function Fragment_22()
 ;BEGIN CODE
-; Phase 8
-self.SendModEvent("RPB_ScenePlayingStart", "RPB_ForcedStripping02", 8)
+; Phase 10
+self.SendModEvent("RPB_ScenePlayingStart", "RPB_ForcedStripping02", 10)
 ;END CODE
 EndFunction
 ;END FRAGMENT
@@ -41,8 +41,8 @@ EndFunction
 ;BEGIN FRAGMENT Fragment_16
 Function Fragment_16()
 ;BEGIN CODE
-; Phase 5
-self.SendModEvent("RPB_ScenePlayingStart", "RPB_ForcedStripping02", 5)
+; Phase 7
+self.SendModEvent("RPB_ScenePlayingStart", "RPB_ForcedStripping02", 7)
 ;END CODE
 EndFunction
 ;END FRAGMENT
@@ -50,7 +50,7 @@ EndFunction
 ;BEGIN FRAGMENT Fragment_24
 Function Fragment_24()
 ;BEGIN CODE
-self.SendModEvent("RPB_ScenePlayingEnd", "RPB_ForcedStripping02", 4)
+self.SendModEvent("RPB_ScenePlayingEnd", "RPB_ForcedStripping02", 5)
 ;END CODE
 EndFunction
 ;END FRAGMENT
@@ -58,7 +58,7 @@ EndFunction
 ;BEGIN FRAGMENT Fragment_26
 Function Fragment_26()
 ;BEGIN CODE
-self.SendModEvent("RPB_ScenePlayingStart", "RPB_ForcedStripping02", 4)
+self.SendModEvent("RPB_ScenePlayingStart", "RPB_ForcedStripping02", 5)
 ;END CODE
 EndFunction
 ;END FRAGMENT
@@ -84,7 +84,7 @@ EndFunction
 ;BEGIN FRAGMENT Fragment_20
 Function Fragment_20()
 ;BEGIN CODE
-; Phase 8
+; Phase 10
 self.SendModEvent("RPB_SceneEnd", "RPB_ForcedStripping02")
 ;END CODE
 EndFunction
