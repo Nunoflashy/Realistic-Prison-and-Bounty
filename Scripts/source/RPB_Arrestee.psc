@@ -233,8 +233,12 @@ function Restrain()
 endFunction
 
 function Cuff()
-    Form cuffs = Game.GetFormEx(0xA081D33)
+    ; Form cuffs = Game.GetFormEx(0xA081D33) ; Front
+
+    Form cuffs = Game.GetFormEx(0xA081D2F) ; Back
+
     this.SheatheWeapon()
+    UnequipHandsForActor(this)
     this.EquipItem(cuffs, true, true)
 endFunction
 
@@ -621,6 +625,18 @@ endEvent
 
 event OnDeath(Actor akKiller)
     Arrest.OnArresteeDeath(this, Captor, akKiller)
+endEvent
+
+event OnRestrained()
+    
+endEvent
+
+event OnArrestBegin()
+    
+endEvent
+
+event OnArrestEnd()
+    
 endEvent
 
 ; ==========================================================
