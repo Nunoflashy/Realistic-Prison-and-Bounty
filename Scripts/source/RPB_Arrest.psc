@@ -461,6 +461,63 @@ event OnArresting(Actor akCaptor, Actor akArrestee)
     self.RestrainArrestee(akArrestee)
 endEvent
 
+;/
+    Fires an Arrestee based Event on a Scene condition and occurrence.
+
+    string          @asScene: The name of the Scene.
+    string          @asSceneEvent: The event that takes place within the Scene.
+    RPB_Arrestee    @apPrisoner: The arrestee that is taking part in the Scene.
+/;
+function FireArresteeEventOnScene(string asScene, string asSceneEvent, RPB_Arrestee apArrestee, string asSceneSubEvent = "null")
+    if (asScene == SceneManager.SCENE_ARREST_START_01 || \ 
+        asScene == SceneManager.SCENE_ARREST_START_02 || \ 
+        asScene == SceneManager.SCENE_ARREST_START_03 || \ 
+        asScene == SceneManager.SCENE_ARREST_START_04 \
+    )
+        Actor escort = apArrestee.GetForm("Escort", "Temporary::Imprisoned") as Actor
+
+        if (asSceneEvent == "ArrestStart")
+            if (asSceneSubEvent == "Hands Behind Back")
+                apArrestee.OrientRelativeTo(escort)
+                apArrestee.PlayAnimation("ZazAPC001")
+
+            elseif (asSceneSubEvent == "Handcuff")
+                apArrestee.Restrain()
+                self.OnArresteeRestrained(apArrestee)
+
+            elseif (asSceneSubEvent == "Kneel Down")
+                apArrestee.PlayAnimation("ZazAPC018")
+
+            elseif (asSceneSubEvent == "Lie Down")
+                apArrestee.PlayAnimation("ZazAPC011")
+            endif
+
+            apArrestee.OnArrestBegin()
+
+        elseif (asSceneEvent == "ArrestEnd")
+            apArrestee.OnArrestEnd()
+        endif
+
+    elseif (asScene == SceneManager.SCENE_ESCORT_TO_JAIL_01 || asScene == SceneManager.SCENE_ESCORT_TO_JAIL_02)
+        ; TODO: Obtain reference to the Prison where the Arrestee is going OR the reference to walk there
+        ; For now, use Haafingar
+        ; RPB_Prison prison = apArrestee.GetPotentialPrison()
+        RPB_Prison prison = API.PrisonManager.GetPrison("Haafingar")
+
+        Actor prisonerEscort = apArrestee.GetForm("EscortGuard", apArrestee.DestroyPropertyOnState("Imprisoned")) as Actor
+
+        if (asSceneEvent == "EscortBegin")
+            prison.OnEscortPrisonerToJailBegin(apArrestee, prisonerEscort)
+
+        elseif (asSceneEvent == "EscortEnd")
+            prison.OnEscortPrisonerToJailEnd(apArrestee, prisonerEscort)
+
+        endif
+
+        Debug("Arrest::FireArresteeEventOnScene", "Arrestee -> " + asScene + ": " + asSceneEvent)
+    endif
+endFunction
+
 ; ==========================================================
 ;                        Event Handlers
 ; ==========================================================
@@ -583,7 +640,7 @@ event OnArrestBegin(RPB_Arrestee apArrestee, Actor akCaptor, Faction akCrimeFact
     ; apArrestee.SetActiveBounty(Utility.RandomInt(1200, 7800))
     ; apArrestee.SetActiveBounty(4200)
 
-    Trace(self, "Arrest::OnArrestBegin", "ArresteeRef: [\n" + \
+    Trace("Arrest::OnArrestBegin", "ArresteeRef: [\n" + \
         "\t arresteeRef: " + apArrestee + "\n" + \
         "\t apArrestee.HasLatentBounty(): " + apArrestee.HasLatentBounty() + "\n" + \
         "\t apArrestee.HasActiveBounty(): " + apArrestee.HasActiveBounty() + "\n" + \
@@ -816,16 +873,27 @@ event OnArresteeDeath(Actor akArrestee, Actor akArrestGuard, Actor akKiller)
 
 endEvent
 
-event OnArresteeRestrained(Actor akArrestee)
-    RPB_Arrestee arresteeRef = self.GetArresteeReference(akArrestee)
+event OnArresteeRestrained(RPB_Arrestee apArrestee)
+    if (apArrestee.GetArrestType() == ARREST_TYPE_TELEPORT_TO_CELL)
+        apArrestee.MoveToPrison(abMoveDirectlyToCell = true)
 
-    if (arresteeRef.GetArrestType() == ARREST_TYPE_TELEPORT_TO_CELL)
-        arresteeRef.MoveToPrison(abMoveDirectlyToCell = true)
-
-    elseif (arresteeRef.GetArrestType() == ARREST_TYPE_TELEPORT_TO_JAIL)
-        arresteeRef.MoveToPrison()
+    elseif (apArrestee.GetArrestType() == ARREST_TYPE_TELEPORT_TO_JAIL)
+        apArrestee.MoveToPrison()
     endif
+
+    apArrestee.OnRestrained()
 endEvent
+
+; event OnArresteeRestrained(Actor akArrestee)
+;     RPB_Arrestee arresteeRef = self.GetArresteeReference(akArrestee)
+
+;     if (arresteeRef.GetArrestType() == ARREST_TYPE_TELEPORT_TO_CELL)
+;         arresteeRef.MoveToPrison(abMoveDirectlyToCell = true)
+
+;     elseif (arresteeRef.GetArrestType() == ARREST_TYPE_TELEPORT_TO_JAIL)
+;         arresteeRef.MoveToPrison()
+;     endif
+; endEvent
 
 event OnArresteeFreed(Actor akArrestee, Actor akGuard)
 
@@ -1012,6 +1080,7 @@ function BeginArrest(RPB_Arrestee akArresteeRef)
     ; Will most likely be used when the arrestee has no chance to pay their bounty, and therefore will get immediately escorted into the cell
     elseif (arrestType == ARREST_TYPE_ESCORT_TO_CELL)
         akArresteeRef.EscortToPrison(abEscortDirectlyToCell = true)
+        akArresteeRef.SetStateForScene("OnEscortPrisonerToCellEnd", "Arrest")
 
     elseif (arrestType == ARREST_TYPE_ESCORT_TO_JAIL)
         akArresteeRef.EscortToPrison()
@@ -1409,7 +1478,7 @@ function SetupArrestPayableBountyVars(Faction akCrimeFaction)
     RPB_ArrestRollDiceResult.SetValueInt(int_if (random <= maxPayableChance, 1, 0)) ; 1 = able to pay max bounty / 0 = not able
     Debug("Arrest::SetupArrestPayableBountyVars", "Needed: <= " + maxPayableChance + ", Got: " + random)
 
-    Trace(self, "Arrest::SetupArrestPayableBountyVars", "Stack Trace: [\n" + \
+    Trace("Arrest::SetupArrestPayableBountyVars", "Stack Trace: [\n" + \
         "\tRPB_ArrestGuaranteedPayableBounty: " + RPB_ArrestGuaranteedPayableBounty.GetValueInt() + "\n" + \
         "\tRPB_ArrestMaxPayableBounty: " + RPB_ArrestMaxPayableBounty.GetValueInt() + "\n" + \
         "\tRPB_ArrestRollDiceResult: " + RPB_ArrestRollDiceResult.GetValueInt() + "\n" + \
