@@ -531,6 +531,15 @@ function BindToCell()
     Debug("Prisoner::BindToCell", "Bound " + Name + " to "+ self.GetPossessivePronoun() +" Cell.")
 endFunction
 
+function RebindToCell()
+    self.UnbindAlias(boundCellPackage)
+    Utility.Wait(0.2)
+    
+    self.MoveTo(JailCell)
+    self.BindToCell()
+    Debug("[state: Imprisoned] Prisoner::OnUpdateGameTime", "Rebinding " + Name + " to their cell.")
+endFunction
+
 function SetReleaseLocation(bool abIsTeleportLocation = true)
     if (abIsTeleportLocation)
         SetForm("Teleport Release Location", Prison.GetRandomReleaseMarker("Teleport"))
@@ -633,6 +642,14 @@ bool function ShouldBeClothed()
 endFunction
 
 bool function HasStateRequiredForImprisonment()
+    ; Debug("Prisoner::HasStateRequiredForImprisonment", "Status: [\n" + \
+    ;     "\t Prison: " + Prison + "\n" + \
+    ;     "\t JailCell: " + JailCell + "\n" + \
+    ;     "\t Sentence: " + Sentence + "\n" + \
+    ;     "\t Bounty: " + Bounty + "\n" + \
+    ;     "\t IsUndeterminedSentence: " + IsUndeterminedSentence + "\n" + \
+    ;     "\t Result: " + (Prison && JailCell && (Sentence || Bounty || IsUndeterminedSentence))+ "\n" + \
+    ; "]")
     return Prison && JailCell && (Sentence || Bounty || IsUndeterminedSentence)
 endFunction
 
@@ -718,18 +735,6 @@ function Clothe()
 endFunction
 
 function Strip(bool abRemoveUnderwear = true)
-    return
-    self.UnequipAll()
-    self.RemoveAllItems(PrisonerBelongingsContainer, false, true)
-
-    self.IncrementStat("Times Stripped")
-    self.IsStrippedNaked = true
-    SetBool("Stripped", true) ; No use for now, might be changed
-
-    Config.NotifyJail("Stripping Thoroughness: " + StrippingThoroughness)
-    return
-    bool _isStrippedNaked = StrippingThoroughness >= 10
-
     ; Get underwear
     int underwearTopSlotMask    = GetSlotMaskValue(config.UnderwearTopSlot)
     int underwearBottomSlotMask = GetSlotMaskValue(config.UnderwearBottomSlot)
@@ -737,10 +742,25 @@ function Strip(bool abRemoveUnderwear = true)
     Armor underwearTop      = this.GetWornForm(underwearTopSlotMask) as Armor
     Armor underwearBottom   = this.GetWornForm(underwearBottomSlotMask) as Armor
 
-    ; Remove and put all the items in the prisoner's posession in the assigned prisoner container
-    this.RemoveAllItems(PrisonerBelongingsContainer, false, true)
+    self.UnequipAll()
+    self.RemoveAllItems(PrisonerBelongingsContainer, false, true) ; Remove and put all the items in the prisoner's posession in the assigned prisoner container
 
-    ; TODO: Determine what is required to happen to have the Prisoner be in underwear
+    ; Debug("Prisoner::Strip", "Underwear Top: " + underwearTop + " ("+ underwearTopSlotMask +")" + ", Underwear Bottom: " + underwearBottom + " ("+ underwearBottomSlotMask +")")
+    ; Debug("Prisoner::Strip", "Underwear Top Slot: " + config.UnderwearTopSlot + ", Underwear Bottom Slot: " + config.UnderwearBottomSlot)
+
+    Config.NotifyJail("Stripping Thoroughness: " + StrippingThoroughness)
+    bool _isStrippedNaked       = StrippingThoroughness >= 10
+    self.IsStrippedNaked        = _isStrippedNaked
+    self.IsStrippedToUnderwear  = !_isStrippedNaked
+
+    ; TODO: Determine what is required to happen to have the Prisoner be in underwear (e.g: Stripping Thoroughness)
+    if (!abRemoveUnderwear)
+        PrisonerBelongingsContainer.RemoveItem(underwearTop, abSilent = true, akOtherContainer = this)
+        PrisonerBelongingsContainer.RemoveItem(underwearBottom, abSilent = true, akOtherContainer = this)
+
+        self.EquipItem(underwearTop)
+        self.EquipItem(underwearBottom)
+    endif
 
     ; Unequip anything currently held in the hands of this Prisoner
     self.UnequipHands()
@@ -748,10 +768,6 @@ function Strip(bool abRemoveUnderwear = true)
 
     self.IncrementStat("Times Stripped")
     SetBool("Stripped", true) ; No use for now, might be changed
-endFunction
-
-function PutUnderwear()
-    
 endFunction
 
 function RemoveUnderwear()
@@ -776,8 +792,6 @@ endFunction
 ; ==========================================================
 
 function StartRestraining(Actor akRestrainer)
-    Debug("Prisoner::StartRestraining", "StartRestraining called")
-
     SceneManager.StartRestrainPrisoner_02( \
         akGuard     = akRestrainer, \
         akPrisoner  = this \
@@ -785,8 +799,6 @@ function StartRestraining(Actor akRestrainer)
 endFunction
 
 function StartStripping(Actor akStripperGuard)
-    Debug("Prisoner::StartStripping", "Stripping " + this)
-    
     SceneManager.StartStripping_02( \
         akStripperGuard     = akStripperGuard, \
         akStrippedPrisoner  = this \
@@ -794,8 +806,6 @@ function StartStripping(Actor akStripperGuard)
 endFunction
 
 function StartGiveClothing(Actor akClothingGiver)
-    Debug("Prisoner::StartGiveClothing", "StartGiveClothing called")
-
     SceneManager.StartGiveClothing( \
         akGuard     = akClothingGiver, \
         akPrisoner  = this \
@@ -803,9 +813,8 @@ function StartGiveClothing(Actor akClothingGiver)
 endFunction
 
 function EscortToCell(Actor akEscort)
-    Debug("Prisoner::EscortToCell", "EscortToCell called")
-    
     Form outsideCellGuardWaitingMarker = JailCell.GetRandomMarker("Exterior")
+
     SceneManager.StartEscortToCell( \
         akEscortLeader              = akEscort, \
         akEscortedPrisoner          = this, \
@@ -964,7 +973,7 @@ endFunction
 
 function SetSentence(int aiSentenceInDays = 0, bool abShouldAffectBounty = true)
     if (GetBool("Sentence Set"))
-        RPB_Utility.Debug("Prisoner::SetSentence", "A sentence has already been set for this prisoner ("+ self.GetIdentifier() +"). \nConsider using IncreaseSentence() or DecreaseSentence() instead.")
+        Debug("Prisoner::SetSentence", "A sentence has already been set for this prisoner ("+ self.GetIdentifier() +"). \nConsider using IncreaseSentence() or DecreaseSentence() instead.")
         return
     endif
 
@@ -1107,18 +1116,13 @@ state Imprisoned
             Prison.RegisterForPrisonPeriodicUpdate(self)
         ; endif
 
-        Debug("[state: Imprisoned] Prisoner::OnBeginState", "Prison Faction: " + self.GetFaction())
-        Debug("[state: Imprisoned] Prisoner::OnBeginState", self.Name + "'s Bounty: " + Bounty)
-
         ; At this point, we can delete the prisoner's arrest state
         self.DestroyArrestState()
-
-        Debug("Prisoner::OnBeginState", "Bounty: " + Bounty + ", Violent: " + BountyViolent)
-
+        self.RemoveAll(TEMPORARY_DESTROY_ON_IMPRISONED) ; Destroy all Temporary vars on Imprisoned state
     endEvent
 
     event OnUpdateGameTime()
-        Debug("Prisoner::OnUpdateGameTime", "Bounty: " + Bounty + ", Violent: " + BountyViolent)
+        self.PerformSanityChecks()
 
         self.UpdateInfamy()
         self.UpdateTimeJailed() ; Must be updated in some other way, otherwise it will reset to 0 on next imprisonment
@@ -1131,7 +1135,7 @@ state Imprisoned
 
         Prison.DEBUG_ShowPrisonerSentenceInfo(self, true)
 
-        ; RPB_Utility.Debug("Prisoner::OnUpdateGameTime", "currentTimeServedStored: " + currentTimeServedStored)
+        ; Debug("Prisoner::OnUpdateGameTime", "currentTimeServedStored: " + currentTimeServedStored)
 
         self.RegisterLastUpdate()
         RegisterForSingleUpdateGameTime(1.0)
@@ -1270,7 +1274,7 @@ bool function ShouldDelevelSkills()
         return false
     endif
 
-    RPB_Utility.Debug("Prisoner::ShouldDelevelSkills", "randomChance: " + randomChance + ", skillLossChance: " + skillLossChance)
+    Debug("Prisoner::ShouldDelevelSkills", "randomChance: " + randomChance + ", skillLossChance: " + skillLossChance)
 
     return randomChance <= skillLossChance
 endFunction
@@ -1292,12 +1296,12 @@ bool function DelevelSkill(string asSkill)
 
     if (newStatValue <= minimumSkillValue)
         ; Skill reached minimum level, don't delevel
-        RPB_Utility.Debug("Prisoner::PerformDeleveling", "Did not delevel Skill " + asSkill + " as it has reached the minimum level!")
+        Debug("Prisoner::PerformDeleveling", "Did not delevel Skill " + asSkill + " as it has reached the minimum level!")
         return false
     endif
 
     this.SetActorValue(asSkill, newStatValue)
-    RPB_Utility.Debug("Prisoner::PerformDeleveling", "Deleveling Skill " + asSkill + " ("+ "Was: " + statValue + ", Is: " + newStatValue + ")")
+    Debug("Prisoner::PerformDeleveling", "Deleveling Skill " + asSkill + " ("+ "Was: " + statValue + ", Is: " + newStatValue + ")")
 endFunction
 
 function PerformDeleveling()
@@ -1376,7 +1380,7 @@ function UpdateTimeJailed()
 
         accumulatedTimeServed -= DaysSinceTimeOfImprisonment ; Remove the counted days from accumulated time served (Get the fractional part if there's any - i.e: hours)
 
-        RPB_Utility.Debug("Prisoner::UpdateTimeJailed", "Days Jailed: " + self.QueryStat("Days Jailed"))
+        Debug("Prisoner::UpdateTimeJailed", "Days Jailed: " + self.QueryStat("Days Jailed"))
         self.OnDayPassed()
     endif
 
@@ -1577,8 +1581,8 @@ endFunction
 
 function MoveToCell(bool abBeginImprisonment = true)
     if (self.IsInCell)
-        RPB_Utility.Error(self.GetName() + " is already in "+ self.GetPossessivePronoun() +" cell: " + JailCell + "!")
-        RPB_Utility.DebugError("Prisoner::MoveToCell", self.GetName() + " is already in "+ self.GetPossessivePronoun() +" cell: " + JailCell + "!")
+        Error(self.GetName() + " is already in "+ self.GetPossessivePronoun() +" cell: " + JailCell + "!")
+        DebugError("Prisoner::MoveToCell", self.GetName() + " is already in "+ self.GetPossessivePronoun() +" cell: " + JailCell + "!")
         return
     endif
 
@@ -1650,7 +1654,7 @@ function FastForwardToRelease()
     ; If the Release must fall in between Minimum and Maximum release hours, set the hour to the minimum before passing the days.
     if (self.HasReleaseTimeExtraHours())
         RPB_Utility.SetGameHour(Prison.ReleaseTimeMinimumHour)
-        RPB_Utility.Debug("Prisoner::FastForwardToRelease", "Setting Game Hour to Release Time Minimum Hour: " + RPB_Utility.GetTimeAs12Hour(Prison.ReleaseTimeMinimumHour))
+        Debug("Prisoner::FastForwardToRelease", "Setting Game Hour to Release Time Minimum Hour: " + RPB_Utility.GetTimeAs12Hour(Prison.ReleaseTimeMinimumHour))
     endif
 
     self.UpdateTimeJailed()
@@ -1663,7 +1667,7 @@ function FastForwardToRelease()
     ; float currentTimeBeforeChanges = CurrentTime
     ; __currentTimeOverride = CurrentTime + timeLeft
 
-    ; RPB_Utility.Debug("Prisoner::FastForwardToRelease", "CurrentTime: " + currentTimeBeforeChanges + ", timeLeft: " + timeLeft + ", currentTimeOverride: " + __currentTimeOverride + ", TimeLeftInSentence: " + TimeLeftInSentence)
+    ; Debug("Prisoner::FastForwardToRelease", "CurrentTime: " + currentTimeBeforeChanges + ", timeLeft: " + timeLeft + ", currentTimeOverride: " + __currentTimeOverride + ", TimeLeftInSentence: " + TimeLeftInSentence)
 
     GotoState("Awaiting")
 
@@ -1671,25 +1675,25 @@ function FastForwardToRelease()
 endFunction
 
 ; function DetermineReleaseTimeAdditionalHours()
-;     RPB_Utility.Debug("Prisoner::DetermineReleaseTimeAdditionalHours", "ReleaseTime: " + ReleaseTime)
+;     Debug("Prisoner::DetermineReleaseTimeAdditionalHours", "ReleaseTime: " + ReleaseTime)
 ;     float currentGameHour = (Game.GetFormEx(0x38) as GlobalVariable).GetValue() ; 13.50 = 1:30 PM
 ;     float oneGameHour = 0.04166666666666666666666666666667
 
 
-;     RPB_Utility.Debug("Prisoner::DetermineReleaseTimeAdditionalHours", "Prison.ReleaseTimeMinimumHour: " + Prison.ReleaseTimeMinimumHour + ", Prison.ReleaseTimeMaximumHour: " + Prison.ReleaseTimeMaximumHour)
+;     Debug("Prisoner::DetermineReleaseTimeAdditionalHours", "Prison.ReleaseTimeMinimumHour: " + Prison.ReleaseTimeMinimumHour + ", Prison.ReleaseTimeMaximumHour: " + Prison.ReleaseTimeMaximumHour)
 ;     ; If the release time window has already passed
 ;     if (currentGameHour > Prison.ReleaseTimeMaximumHour)
 ;         __additionalReleaseHours += 1 + (Prison.ReleaseTimeMinimumHour * oneGameHour) ; Add a day and the desired hour for release (taken from Minimum Hour)
-;         RPB_Utility.Debug("Prisoner::DetermineReleaseTimeAdditionalHours", "(After Calculation) ReleaseTime: " + ReleaseTime)
+;         Debug("Prisoner::DetermineReleaseTimeAdditionalHours", "(After Calculation) ReleaseTime: " + ReleaseTime)
 ;     endif
 ; endFunction
 
 function DetermineReleaseTimeAdditionalHours()
-    RPB_Utility.Debug("Prisoner::DetermineReleaseTimeAdditionalHours", "ReleaseTime: " + ReleaseTime)
+    Debug("Prisoner::DetermineReleaseTimeAdditionalHours", "ReleaseTime: " + ReleaseTime)
     ; float currentGameHour = (Game.GetFormEx(0x38) as GlobalVariable).GetValue() ; 13.50 = 1:30 PM
     float currentGameHour = RPB_Utility.GetCurrentHourFloat() ; 13.50 = 1:30 PM
 
-    RPB_Utility.Debug("Prisoner::DetermineReleaseTimeAdditionalHours", "Prison.ReleaseTimeMinimumHour: " + Prison.ReleaseTimeMinimumHour + ", Prison.ReleaseTimeMaximumHour: " + Prison.ReleaseTimeMaximumHour)
+    Debug("Prisoner::DetermineReleaseTimeAdditionalHours", "Prison.ReleaseTimeMinimumHour: " + Prison.ReleaseTimeMinimumHour + ", Prison.ReleaseTimeMaximumHour: " + Prison.ReleaseTimeMaximumHour)
     ; If the release time window has already passed
     if (currentGameHour > Prison.ReleaseTimeMaximumHour)
         __hasExtraReleaseTimeHours = true
@@ -1740,7 +1744,7 @@ bool function IsReleaseOnWeekend()
     int releaseYear     = RPB_Utility.GetStructMemberInt(releaseDate, "year")
 
     int dayOfWeek = RPB_Utility.CalculateDayOfWeek(releaseDay, releaseMonth, releaseYear)
-    RPB_Utility.Debug("Prisoner::IsReleaseOnWeekend", "releaseDate: " + releaseDay + "/" + releaseMonth + "/" + releaseYear + ", IsWeekend: " + RPB_Utility.IsWeekend(releaseDay, releaseMonth, releaseYear) + ", Day of Week: " + RPB_Utility.GetDayOfWeekName(dayOfWeek))
+    Debug("Prisoner::IsReleaseOnWeekend", "releaseDate: " + releaseDay + "/" + releaseMonth + "/" + releaseYear + ", IsWeekend: " + RPB_Utility.IsWeekend(releaseDay, releaseMonth, releaseYear) + ", Day of Week: " + RPB_Utility.GetDayOfWeekName(dayOfWeek))
     return RPB_Utility.IsWeekend(releaseDay, releaseMonth, releaseYear)
 endFunction
 
@@ -1936,6 +1940,9 @@ endEvent
 ;                          Management
 ; ==========================================================
 
+string property TEMPORARY_DESTROY_ON_IMPRISONED = "Temporary::Imprisoned" autoreadonly
+
+
 function Destroy()
     ; TODO: Unset all properties related to this Prisoner
     Prison.UnregisterPrisoner(self)
@@ -1962,6 +1969,23 @@ function DestroyArrestState()
         self.SetInt("Bounty Non-Violent", _bounty, "Arrest")
         self.SetInt("Bounty Violent", _bountyViolent, "Arrest")
         Debug("Prisoner::DestroyArrestState", "Bounty: " + Bounty + ", Violent: " + BountyViolent)
+    endif
+endFunction
+
+function PerformSanityChecks()
+    if (self.IsNPC())
+        ; Rebind Cell packages if the NPC is far away enough from the Cell.
+        if (self.GetDistance(JailCell) >= 100)
+            self.RebindToCell()
+        endif
+
+        ; If the stripped flag has been set (Stripping has occurred, but the NPC still has clothes)
+        ; This usually happens when the player is far away from the target NPC at the time of imprisonment
+        ; causing them to recover the clothes somehow, despite being stripped.
+        ; (Only happens for the first prisoner apparently)
+        ; if (apPrisoner.IsStrippedNaked)
+        ;     apPrisoner.RemoveAllItems()
+        ; endif
     endif
 endFunction
 
