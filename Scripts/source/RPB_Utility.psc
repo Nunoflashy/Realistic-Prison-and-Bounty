@@ -710,6 +710,21 @@ function OrientRelative(ObjectReference akObjA, ObjectReference akObjB, Float af
 	akObjA.SetAngle(rotX, rotY, rotZ)
 endFunction
 
+bool function IsFarAwayFromObject(ObjectReference akObjectOne, ObjectReference akObjectTwo) global
+    float infinityDistance = 340282346638528859811 ; Obtained from GetDistance in another cell different from @akObjectOne
+    return akObjectOne.GetDistance(akObjectTwo) >= infinityDistance
+endFunction
+
+bool function IsActorFarAwayFromPlayer(Actor akActor) global
+    if (!akActor)
+        DebugError("Utility::IsActorFarAwayFromPlayer", "Actor is null, cannot measure the distance!")
+        Error("Actor is null, cannot measure the distance!")
+        return false
+    endif
+    
+    return IsFarAwayFromObject(akActor, Game.GetPlayer())
+endFunction
+
 ; ==========================================================
 ;                       Misc Functions
 ; ==========================================================

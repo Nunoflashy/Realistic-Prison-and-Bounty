@@ -157,6 +157,10 @@ function OrientRelativeTo(ObjectReference akObject, float afRotX = 0.0, float af
     OrientRelative(this, akObject, afRotX, afRotY, afRotZ)
 endFunction
 
+bool function IsFarFromPlayer()
+    return RPB_Utility.IsActorFarAwayFromPlayer(this)
+endFunction
+
 string function GetSex(bool abShortValue = false)
     if (self.IsFemale)
         return string_if (abShortValue, "F", "Female")
@@ -459,6 +463,10 @@ endFunction
 bool function HasSceneState(string asSceneName, string asSceneState)
     bool hasState = self.GetString(asSceneName, "SceneState") == asSceneState
     return hasState
+endFunction
+
+function DeleteSceneStates()
+    self.RemoveAll("SceneState")
 endFunction
 
 ; ==========================================================
