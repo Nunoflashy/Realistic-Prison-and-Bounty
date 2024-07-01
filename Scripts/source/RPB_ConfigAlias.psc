@@ -192,6 +192,8 @@ event OnKeyDown(int keyCode)
         JArray.addStr(actionArrayObj, "Validate Options")
         JArray.addStr(actionArrayObj, "Play Animation on Selected Actor")
         JArray.addStr(actionArrayObj, "Bind All Prisoners")
+        JArray.addStr(actionArrayObj, "[Escort] Arrest Selected Actor")
+        JArray.addStr(actionArrayObj, "[Teleport] Arrest Selected Actor")
         JArray.addStr(actionArrayObj, "Toggle Show Prison Sentence")
         JArray.addStr(actionArrayObj, "Toggle Show Prison Release Time")
         JArray.addStr(actionArrayObj, "Toggle Show Prison Time Left")
@@ -216,6 +218,43 @@ event OnKeyDown(int keyCode)
         elseif (actionToPerform == "Bind All Prisoners")
             RPB_Prison castleDourDungeon = API.PrisonManager.GetPrison("Haafingar")
             castleDourDungeon.BindAllPrisonersToCell()
+
+        elseif (actionToPerform == "[Escort] Arrest Selected Actor" || actionToPerform == "[Teleport] Arrest Selected Actor")
+            Actor selectedActor = Game.GetCurrentConsoleRef() as Actor
+            Actor randomGuard   = RPB_Utility.GetNearestGuard(selectedActor, 500, selectedActor)
+            string actorName    = selectedActor.GetBaseObject().GetName()
+            string holdName     = randomGuard.GetCrimeFaction().GetName()
+            bool isPlayer       = selectedActor.GetFormID() == 0x14
+
+            int currentBounty
+            if (!isPlayer)
+                currentBounty = RPB_ActorVars.GetCrimeGold(randomGuard.GetCrimeFaction(), selectedActor)
+            else
+                currentBounty = randomGuard.GetCrimeFaction().GetCrimeGold()
+            endif
+
+            int arrestBounty = int_if (currentBounty == 0, (uilib.ShowInput(holdName + " - Bounty to set for " + actorName) as int), currentBounty)
+
+            if (arrestBounty == 0)
+                return
+            endif
+
+            if (!isPlayer)
+                RPB_ActorVars.SetCrimeGold(randomGuard.GetCrimeFaction(), selectedActor, arrestBounty)
+            else
+                randomGuard.GetCrimeFaction().SetCrimeGold(arrestBounty)
+            endif
+
+            ; Select Cell
+            ; string cellId = uilib.ShowInput("Cell for Imprisonment of " + actorName + " in " + holdName)
+            ; uilib.ShowList_ReturnElement("Cell for Imprisonment of ", cellIds, 0, 0)
+
+            RPB_Arrest arrest = API.Arrest
+            arrest.ArrestActor(randomGuard, selectedActor, \ 
+                string_if (actionToPerform == "[Escort] Arrest Selected Actor", \ 
+                    arrest.ARREST_TYPE_ESCORT_TO_JAIL, \ 
+                    arrest.ARREST_TYPE_TELEPORT_TO_CELL \ 
+                ))
 
         elseif (actionToPerform == "Toggle Show Prison Sentence")
             RPB_Prison playerPrison = API.PrisonManager.FindPrisonByPrisoner(Game.GetForm(0x14) as Actor)
