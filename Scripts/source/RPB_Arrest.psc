@@ -467,6 +467,10 @@ endEvent
     string          @asScene: The name of the Scene.
     string          @asSceneEvent: The event that takes place within the Scene.
     RPB_Arrestee    @apPrisoner: The arrestee that is taking part in the Scene.
+
+    TOOD: For some reason, any Arrestee disappears from the list if the player is not near them, which means
+    that apArrestee will be null and so any properties that depend on it will also be null.
+    This doesn't happen with RPB_Prisoner, so after figuring the problem out, we should be able to do this properly.
 /;
 function FireArresteeEventOnScene(string asScene, string asSceneEvent, RPB_Arrestee apArrestee, string asSceneSubEvent = "null")
     if (asScene == SceneManager.SCENE_ARREST_START_01 || \ 
@@ -492,7 +496,7 @@ function FireArresteeEventOnScene(string asScene, string asSceneEvent, RPB_Arres
                 apArrestee.PlayAnimation("ZazAPC011")
             endif
 
-            apArrestee.OnArrestBegin()
+            ; apArrestee.OnArrestBegin()
 
         elseif (asSceneEvent == "ArrestEnd")
             apArrestee.OnArrestEnd()
@@ -505,6 +509,8 @@ function FireArresteeEventOnScene(string asScene, string asSceneEvent, RPB_Arres
         RPB_Prison prison = API.PrisonManager.GetPrison("Haafingar")
 
         Actor prisonerEscort = apArrestee.GetForm("EscortGuard", apArrestee.DestroyPropertyOnState("Imprisoned")) as Actor
+
+        Debug("Arrest::FireArresteeEventOnScene", "Prison: " + prison + ", Escort: " + prisonerEscort + ", Arrestee: " + apArrestee.GetActor())
 
         if (asSceneEvent == "EscortBegin")
             prison.OnEscortPrisonerToJailBegin(apArrestee, prisonerEscort)
@@ -629,16 +635,7 @@ event OnArrestBegin(RPB_Arrestee apArrestee, Actor akCaptor, Faction akCrimeFact
         return
     endif
 
-
-    ; apArrestee.SetArrestParameters(ARREST_TYPE_ESCORT_TO_CELL, akCaptor, akCrimeFaction)
-    ; apArrestee.SetArrestParameters(ARREST_TYPE_ESCORT_TO_JAIL, akCaptor, akCrimeFaction)
-
-    ; apArrestee.SetArrestParameters(asArrestType, akCaptor, akCrimeFaction)
-    ; apArrestee.SetArrestParameters(ARREST_TYPE_TELEPORT_TO_JAIL, akCaptor, akCrimeFaction)
-    apArrestee.SetArrestParameters(ARREST_TYPE_TELEPORT_TO_CELL, akCaptor, akCrimeFaction)
-    ; apArrestee.SetArrestParameters(ARREST_TYPE_ESCORT_TO_CELL, akCaptor, akCrimeFaction)
-    ; apArrestee.SetActiveBounty(Utility.RandomInt(1200, 7800))
-    ; apArrestee.SetActiveBounty(4200)
+    apArrestee.SetArrestParameters(asArrestType, akCaptor, akCrimeFaction)
 
     Trace("Arrest::OnArrestBegin", "ArresteeRef: [\n" + \
         "\t arresteeRef: " + apArrestee + "\n" + \
