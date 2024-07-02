@@ -95,8 +95,9 @@ function Render(RPB_MCM_02 mcm, RPB_Prisoner apPrisoner) global
     endif
 
     if (prisoner.Captor)
-        Actor prisonerCaptor = prisoner.Captor
-        mcm.AddOptionText("Captured By", prisonerCaptor.GetBaseObject().GetName(), defaultFlags = mcm.OPTION_DISABLED)
+        RPB_Captor prisonerCaptor = prisoner.Captor
+        Debug("["+ prison.Name +"] MCM_02_Prison::Render", prisoner.Name + "'s Captor: " + prisonerCaptor + ", Form: " + prisonerCaptor.GetActor() + ", Test: " + prisonerCaptor.Test)
+        mcm.AddOptionText("Captured By", prisonerCaptor.Name, defaultFlags = mcm.OPTION_DISABLED)
     endif
 
     if (prisoner.ShowSentence && !prisoner.IsUndeterminedSentence)

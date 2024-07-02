@@ -88,6 +88,7 @@ function RenderPrisons(RPB_MCM_02 mcm) global
     RPB_Prison holdPrison       = RPB_API.GetPrisonManager().GetPrison(hold)
 
     if (!holdPrison)
+        Debug("MCM_02_Holds::RenderPrisons", "There was no prison found, cannot render hold!")
         return
     endif
 
