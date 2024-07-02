@@ -79,9 +79,13 @@ RPB_Prison function FindPrisonByPrisoner(Actor akPrisonerActor)
     return none
 endFunction
 
+; Might be deprecated, in the future a hold will have many prisons, 1:N
 RPB_Prison function FindPrisonByHold(string asHold)
 
 endFunction
+
+
+
 
 ;/
     RPB_PrisonList function FindPrisonsInCity(string asCity)
@@ -101,6 +105,7 @@ function RemovePrisonerFromPrisonRegistry(RPB_Prisoner apPrisoner)
     RPB_StorageVars.DeleteVariable(apPrisoner.GetIdentifier(), "PrisonManager")
 endFunction
 
+; TODO: Refactor this and any function that configures prisons, since by adding two more they stop working entirely
 RPB_Prison function GetAvailablePrisonSlot()
     int i = 0
 
@@ -230,17 +235,19 @@ RPB_Prison function GetPrison(string asHold)
     return none
 endFunction
 
+; TODO: Add support for multiple prisons in each Hold,
+; Returns a ReferenceAlias[], each element is castable to RPB_Prison
+ReferenceAlias[] function GetPrisonsByHold(string asHold)
+
+endFunction
+
 RPB_Prison function GetPrisonByID(int aiPrisonID)
     return self.GetNthAlias(aiPrisonID) as RPB_Prison
 endFunction
 
+RPB_Prison function GetPrisonByName(string asPrisonName)
 
-; RPB_Prison function GetPrisonForBoundPrisoner(RPB_Prisoner akPrisoner)
-;     ; int prisonAliasID = JMap.getInt(__global_prisonerList, akPrisoner.GetIdentifier()) ; returns the ID of the Prison alias
-;     ; return self.GetAlias(prisonAliasID) as RPB_Prison
-;     int prisonAliasID = JDB.solveInt(".rpb_hidden_config.prison.prisoner." + akPrisoner.GetIdentifier()) ; returns the ID of the Prison alias
-;     return self.GetAlias(prisonAliasID) as RPB_Prison
-; endFunction
+endFunction
 
 ; ==========================================================
 ;                       AI Cell Packages
