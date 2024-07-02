@@ -95,9 +95,20 @@ event OnArrestBegin(string eventName, string arrestType, float arresteeIdFlt, Fo
     endif
 
     RPB_Arrestee arresteeRef = Arrest.MakeArrestee(arrestee)  ; Mark this Actor as one that is to be arrested (Cast the spell in order to have Arrestee related functions on them through RPB_Arrestee)
-    RPB_Captor captorRef = Arrest.MakeCaptor(captor)
-    
-    Arrest.OnArrestBegin(arresteeRef, captor, crimeFaction, arrestType)
+
+    ; Faction Arrest
+    if (captor == none)
+        Arrest.OnArrestBegin(arresteeRef, none, crimeFaction, arrestType)
+        return
+    endif
+
+    ; For some reason Arrest.MakeOrGetCaptor(captor) doesn't retrieve the RPB_Captor,
+    ; so this is a temporary workaround.
+    Arrest.MakeOrGetCaptor(captor)
+    RPB_Captor captorRef = Arrest.GetCaptorReference(captor)
+
+    ; Captor Arrest
+    Arrest.OnArrestBegin(arresteeRef, captorRef, crimeFaction, arrestType)
 endEvent
 
 event OnArrestResist(string eventName, string unusedStr, float arrestResisterIdFlt, Form sender)
