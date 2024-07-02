@@ -36,8 +36,7 @@ Spell function RPB_PrisonerSpell() global
 endFunction
 
 Spell function RPB_CaptorSpell() global
-    return none ; change form id
-    return GetFormFromMod(0x197D7) as Spell
+    return GetFormFromMod(0x2293E) as Spell
 endFunction
 
 ; ==========================================================
