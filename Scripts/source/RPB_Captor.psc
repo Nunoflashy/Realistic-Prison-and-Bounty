@@ -22,22 +22,59 @@ bool property IsGuard
     endFunction
 endProperty
 
-event OnDeath(Actor akKiller)
-    Debug("Captor::OnDeath", "The captor has died! (Captor: " + self.Name + ") [Killed by: " + akKiller.GetName() +"]")
-    API.Arrest.OnArrestCaptorDeath(this, akKiller)
-endEvent
+; TODO: Add Bounty Hunter support
+bool property IsBountyHunter
+    bool function get()
+        return false
+    endFunction
+endProperty
+
+bool property IsEscorting
+    bool function get()
+        return self.GetString("Current State") == "Escorting"
+    endFunction
+endProperty
+
+; RPB_ArresteeList property Arrestees
+;     RPB_ArresteeList function get()
+        
+;     endFunction
+; endProperty
+
+int __arrestees
+Form[] property Arrestees
+    Form[] function get()
+        if (!__arrestees)
+            __arrestees = JArray.object()
+            JValue.retain(__arrestees)
+        endif
+
+        return JArray.asFormArray(__arrestees)
+    endFunction
+endProperty
+
+; event OnDeath(Actor akKiller)
+;     Debug("Captor::OnDeath", "The captor has died! (Captor: " + self.Name + ") [Killed by: " + akKiller.GetName() +"]")
+;     API.Arrest.OnArrestCaptorDeath(this, akKiller)
+; endEvent
 
 ; Needs to be revised. (Where is the RegisterForSingleUpdate()?)
 event OnUpdate()
-    if (!_arrestee)
+    if (!Arrestee)
         return
     endif
+    ; if (this.GetDistance(_arrestee) >= 200)
+    ;     _arrestee.MoveTo(this)
+    ;     Debug("Captor::OnUpdate", "Moved Arrestee to " + Name)
+
+    ; endif
+    ; RegisterForSingleUpdate(5.0)
 
     ; Keep track of the arrestee's distance to the captor,
     ; only if we are in the Bounty Payment scenario
-    if (API.Arrest.GetActorIsPayingBounty(_arrestee))
-        if (this.GetDistance(_arrestee) >= 800)
-            API.Arrest.PunishPaymentEvader(this, _arrestee)
+    if (API.Arrest.GetActorIsPayingBounty(Arrestee))
+        if (this.GetDistance(Arrestee) >= 800)
+            API.Arrest.PunishPaymentEvader(this, Arrestee)
         endif
     
         RegisterForSingleUpdate(5.0)
@@ -48,10 +85,17 @@ RPB_Arrestee[] function GetArrestees()
     return none
 endFunction
 
-Actor _arrestee = none ; Temp, later this must be an array since a captor can have N arrestees (1:N)
+; Actor _arrestee = none ; Temp, later this must be an array since a captor can have N arrestees (1:N)
+
+Actor property Arrestee
+    Actor function get()
+        return self.GetForm("Arrestee") as Actor
+    endFunction
+endProperty
 
 function AssignArrestee(Actor akArrestee)
-    _arrestee = akArrestee
+    ; _arrestee = akArrestee
+    self.SetForm("Arrestee", akArrestee)
 endFunction
 
 function AddArrestee(RPB_Arrestee akArresteeRef)
@@ -74,5 +118,92 @@ function RestrainActor(Actor akActor)
 
 endFunction
 
+function SetEscorting()
+    Debug("Captor::SetEscorting", "Set escorting from " + Name)
 
+    self.SetString("Current State", "Escorting")
+    RegisterForSingleUpdate(5.0)
+    GotoState("Escorting")
+endFunction
 
+function StopEscorting()
+    UnregisterForUpdates()
+    GotoState("Inactive")
+
+endFunction
+
+; ==========================================================
+;                           States
+; ==========================================================
+
+state Inactive
+    event OnBeginState()
+        Debug("[state: Inactive] Captor::OnBeginState", "Captor is now inactive")
+    endEvent
+
+    event OnUpdate()
+    endEvent
+endState
+
+state Escorting
+    event OnUpdate()
+        return
+        if (this.GetDistance(Arrestee) >= 200)
+            Arrestee.MoveTo(this)
+            Debug("Captor::OnUpdate", "Moved Arrestee to " + Name)
+    
+        endif
+        RegisterForSingleUpdate(5.0)
+    endEvent
+endState
+
+; ==========================================================
+;                           Events
+; ==========================================================
+
+event OnInitialize()
+    API.Arrest.RegisterCaptor(self)
+    Debug("Captor::OnInitialize", "Initialized Captor, this: " + this)
+
+    if (self.IsEscorting)
+        GotoState("Escorting")
+        RegisterForSingleUpdate(5.0)
+        return
+    endif
+
+    RegisterForSingleUpdate(5.0)
+endEvent
+
+event OnDeath(Actor akKiller)
+    Debug("Captor::OnDeath", "Captor died, releasing arrestees")
+    API.Arrest.GetArresteeReference(Arrestee).RevertArrest()
+endEvent
+
+event OnDestroy()
+    if (this.IsDead())
+        OnDeath(none)
+    endif
+endEvent
+
+Actor function GetActor()
+    return this
+endFunction
+
+; ==========================================================
+;                           Management
+; ==========================================================
+
+string _test
+string property Test
+    string function get()
+        return _test
+    endFunction
+endProperty
+
+function Destroy()
+    ; Unset all properties related to this Arrestee
+    _test = "Gata"
+    self.RemoveAll()
+    Utility.Wait(0.5)
+    API.Arrest.UnregisterCaptor(self)
+endFunction
