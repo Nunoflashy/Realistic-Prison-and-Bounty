@@ -39,6 +39,10 @@ Spell function RPB_CaptorSpell() global
     return GetFormFromMod(0x2293E) as Spell
 endFunction
 
+Idle function BoundHandsBehindBack() global
+    return Game.GetFormEx(0xB600A) as Idle
+endFunction
+
 ; ==========================================================
 ;                        Log Functions
 ; ==========================================================
