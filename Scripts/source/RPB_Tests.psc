@@ -2,24 +2,28 @@ scriptname RPB_Tests extends ObjectReference hidden
 
 import RPB_Utility
 
-bool property ENABLE_TRACING    = false autoreadonly
-bool property ENABLE_DEBUGGING  = false autoreadonly
-bool property ENABLE_LOGGING    = false autoreadonly
+bool property ENABLE_TRACING            = false autoreadonly
+bool property ENABLE_DEBUGGING          = false autoreadonly
+bool property ENABLE_LOGGING            = false autoreadonly
+bool property DISPLAY_ASSERT_IN_GAME    = false autoreadonly
+bool property DISPLAY_RESULT_IN_GAME    = false autoreadonly
 
 function SetTests()
-    self.AddTest("0 - No Test", "")
-    self.AddTest("25 Days after 26th Frostfall is 20th of Sun's Dusk", "Test_25Days_After_26th_Frostfall_Is_20th_Suns_Dusk")
-    self.AddTest("Get Prison For Actor Globally", "Test_Can_Get_Prison_For_Actor_Globally")
-    self.AddTest("Imprison Actor without Arresting", "Test_Can_Imprison_Actor_Without_Arresting")
-    self.AddTest("Imprison Multiple Actors", "Test_Imprison_Multiple_Actors")
-    self.AddTest("Arrest and Imprison Multiple Actors with Scene", "Test_Arrest_And_Imprison_Multiple_Actors_With_Scene")
-    self.AddTest("Imprisonment In Cell Should Not Allow Overcrowding", "Test_Imprisonment_In_Cell_Should_Not_Allow_Overcrowding")
-    self.AddTest("Imprison Player Without Arresting - Required Bounty", "Test_Imprison_Player_Without_Arresting_Required_Bounty")
-    self.AddTest("Can Add Prisoners to PrisonerList", "Test_Can_Add_Prisoners_To_PrisonerList")
-    self.AddTest("Unset Prisons", "Test_Unset_Prisons")
-    self.AddTest("Configure Prisons", "Test_Configure_Prisons")
-    self.AddTest("Arrest Selected NPC with Escort Scene", "Test_Arrest_Selected_NPC_Escort_Scene")
-    self.AddTest("Test ActiveMagicEffect List", "Test_ActiveMagicEffectList_Works_Correctly")
+    self.AddTest("00 - No Test", "")
+    self.AddTest("01 - 25 Days after 26th Frostfall is 20th of Sun's Dusk", "Test_25Days_After_26th_Frostfall_Is_20th_Suns_Dusk")
+    self.AddTest("02 - Get Prison For Actor Globally", "Test_Can_Get_Prison_For_Actor_Globally")
+    self.AddTest("03 - Imprison Actor without Arresting", "Test_Can_Imprison_Actor_Without_Arresting")
+    self.AddTest("04 - Imprison Multiple Actors", "Test_Imprison_Multiple_Actors")
+    self.AddTest("05 - Arrest and Imprison Multiple Actors with Scene", "Test_Arrest_And_Imprison_Multiple_Actors_With_Scene")
+    self.AddTest("06 - Imprisonment In Cell Should Not Allow Overcrowding", "Test_Imprisonment_In_Cell_Should_Not_Allow_Overcrowding")
+    self.AddTest("07 - Imprison Player Without Arresting - Required Bounty", "Test_Imprison_Player_Without_Arresting_Required_Bounty")
+    self.AddTest("08 - Can Add Prisoners to PrisonerList", "Test_Can_Add_Prisoners_To_PrisonerList")
+    self.AddTest("09 - Unset Prisons", "Test_Unset_Prisons")
+    self.AddTest("10 - Configure Prisons", "Test_Configure_Prisons")
+    self.AddTest("11 - Arrest Selected NPC with Escort Scene", "Test_Arrest_Selected_NPC_Escort_Scene")
+    self.AddTest("12 - Test ActiveMagicEffect List", "Test_ActiveMagicEffectList_Works_Correctly")
+    self.AddTest("13 - Test Prisoner Has Bounty in Prison", "Test_PrisonerHasBountyInPrison")
+    self.AddTest("14 - Test Prisoner Gets Correct Escape Penalty", "Test_PrisonerEscapeGetsCorrectPenalty")
 endFunction
 
 state Test_25Days_After_26th_Frostfall_Is_20th_Suns_Dusk
@@ -172,9 +176,10 @@ state Test_Arrest_And_Imprison_Multiple_Actors_With_Scene
         ; endWhile
         Actor playerCopy = player.PlaceActorAtMe(playerBase, 1)
         RPB_Arrestee playerCopyRef = arrest.MakeArrestee(playerCopy)
+        RPB_Captor captorRef = arrest.MakeOrGetCaptor(guard)
     
         RPB_Arrestee arresteeRef = arrest.MakeArrestee(player)
-        arrest.OnArrestBegin(arresteeRef, guard, guard.GetCrimeFaction(), arrest.ARREST_TYPE_ESCORT_TO_JAIL)
+        arrest.OnArrestBegin(arresteeRef, captorRef, guard.GetCrimeFaction(), arrest.ARREST_TYPE_ESCORT_TO_JAIL)
         RPB_Utility.BindAliasTo(RPB_API.GetSceneManager().GetEscortee(1), playerCopy)
     endFunction
 endState
@@ -328,6 +333,8 @@ state Test_Arrest_Selected_NPC_Escort_Scene
         Actor selectedNPC = Game.GetCurrentConsoleRef() as Actor
         Actor randomGuard = RPB_Utility.GetNearestGuard(selectedNPC, 500, selectedNPC)
 
+        ; Check if Guard is currently in a Scene, if so, queue the arrest otherwise Scene gets broken
+
         bool hasSelectedNPC = assert_true(selectedNPC != none, "There's no NPC selected for the arrest.")
         bool hasRandomGuard = assert_true(randomGuard != none, "There's no guard to perform the arrest.")
 
@@ -353,6 +360,38 @@ endState
 state Test_ActiveMagicEffectList_Works_Correctly
     function Setup()
         RPB_ActiveMagicEffectContainer ameList = API.Arrest.GetAliasByName("ArresteeList") as RPB_ActiveMagicEffectContainer
+        
+    endFunction
+endState
+
+state Test_PrisonerHasBountyInPrison
+    function Setup()
+        RPB_Prison castleDourDungeon    = API.PrisonManager.GetPrison("Haafingar")
+        RPB_Prisoner playerPrisonerRef  = castleDourDungeon.GetPrisoner(Game.GetForm(0x14) as Actor)
+
+        bool hasBounty = assert_true(playerPrisonerRef.Bounty > 0, "Prisoner does not have a bounty while in prison!")
+        display_result(hasBounty)
+    endFunction
+endState
+
+state Test_PrisonerEscapeGetsCorrectPenalty
+    function Setup()
+        ; Use this Prison
+        RPB_Prison solitudePrison = (RPB_API.GetPrisonManager()).GetPrison("Haafingar")
+
+        ; Use this Actor
+        Actor testPrisoner = Game.GetFormEx(0x14) as Actor
+
+        RPB_Arrestee arrestee = (RPB_API.GetArrest()).MakeArrestee(testPrisoner)
+        arrestee.SetCrimeGold(6000)
+
+        RPB_Prisoner prisoner = arrestee.MakePrisoner()
+        prisoner.AssignCell()
+        prisoner.Imprison()
+        prisoner.SetEscaped()
+    endFunction
+
+    function Teardown()
         
     endFunction
 endState
@@ -393,8 +432,29 @@ function AddTest(string asName, string asTestMethodName)
         testMap = JMap.object()
         JValue.retain(testMap)
     endif
+    
+    ; int testMethods = JMap.allValues(testMap)
+    ; int currentTestIndex = 0
+    
+    ; while (currentTestIndex < JArray.count(testMethods))
+    ;     string testMethod = JArray.getStr(testMethods, currentTestIndex)
+    ;     if (asTestMethodName == testMethod)
+    ;         ; Existing Test
 
-    JMap.setStr(testMap, asName, asTestMethodName)
+    ;     endif
+    ;     currentTestIndex += 1
+    ; endWhile
+    
+    ; if (JValue.count(testMap) == 0)
+        ; int testCount       = JValue.count(testMap)
+        ; string testIndex    = string_if (testCount < 10, "0" + (testCount), (testCount))
+        ; string testName     = testIndex + " - " + asName
+
+        ; log("testCount: " + testCount + ", testIndex: " + testIndex + ", testName: " + testName)
+
+        JMap.setStr(testMap, asName, asTestMethodName)
+        RPB_StorageVars.SetStringOnForm(asName, self, asTestMethodName)
+    ; endif
 endFunction
 
 event OnInit()
@@ -404,6 +464,7 @@ endEvent
 
 string[] function GetTestNames()
     self.SetTests()
+    ; return RPB_StorageVars.GetStringsOnForm()
     return JMap.allKeysPArray(testMap)
 endFunction
 
@@ -412,6 +473,7 @@ string[] function GetTestMethodNames()
 endFunction
 
 string function GetTest(string asTestName)
+    return RPB_StorageVars.GetStringOnForm(asTestName, self)
     return JMap.getStr(testMap, asTestName)
 endFunction
 
@@ -449,13 +511,20 @@ function start_test(string testName = "")
 endFunction
 
 function display_result(bool condition, bool showTimeElapsed = true)
+    string testResult = ""
     if (showTimeElapsed)
         float testEndTime = Utility.GetCurrentRealTime()
         int elapsedTime = ((testEndTime - __testStartTime) * 1000) as int
-
-        base_log("[UNIT RESULT]", string_if (condition, "Test Passed!", "Test Failed!") + " (execution took "+ elapsedTime +" ms)", "Tests::" + self.GetCurrentTest())
+        testResult = string_if (condition, "Test Passed!", "Test Failed!") + " (execution took "+ elapsedTime +" ms)"
+        ; base_log("[UNIT RESULT]", string_if (condition, "Test Passed!", "Test Failed!") + " (execution took "+ elapsedTime +" ms)", "Tests::" + self.GetCurrentTest())
     else
-        base_log("[UNIT RESULT]", string_if (condition, "Test Passed!", "Test Failed!"), "Tests::" + self.GetCurrentTest())
+        testResult = string_if (condition, "Test Passed!", "Test Failed!")
+        ; base_log("[UNIT RESULT]", string_if (condition, "Test Passed!", "Test Failed!"), "Tests::" + self.GetCurrentTest())
+    endif
+        base_log("[UNIT RESULT]", testResult, "Tests::" + self.GetCurrentTest())
+
+    if (DISPLAY_RESULT_IN_GAME)
+        Debug.MessageBox(testResult)
     endif
 
     __testStartTime = 0
@@ -464,6 +533,9 @@ endFunction
 bool function assert_true(bool condition, string failMessage = "")
     if (!condition)
         base_log("ASSERT", "Assertion Failed: " + failMessage, "Tests::" + self.GetCurrentTest())
+        if (DISPLAY_ASSERT_IN_GAME)
+            Debug.MessageBox("Assertion Failed: " + failMessage)
+        endif
     endif
 
     return condition
@@ -476,6 +548,9 @@ endFunction
 bool function assert_equals(string expectedValue, string gottenValue, string failMessage = "")
     if (gottenValue != expectedValue)
         base_log("ASSERT", "Assertion Failed: " + failMessage + " (Expected: " + expectedValue + ", Got: " + gottenValue + ")", "Tests::" + self.GetCurrentTest())
+        if (DISPLAY_ASSERT_IN_GAME)
+            Debug.MessageBox("Assertion Failed: " + failMessage)
+        endif
     endif
 
     return gottenValue == expectedValue
@@ -484,6 +559,9 @@ endFunction
 bool function assert_not_equals(string expectedValue, string gottenValue, string failMessage = "")
     if (gottenValue == expectedValue)
         base_log("ASSERT", "Assertion Failed: " + failMessage + " (Expected: " + expectedValue + ", Got: " + gottenValue + ")", "Tests::" + self.GetCurrentTest())
+        if (DISPLAY_ASSERT_IN_GAME)
+            Debug.MessageBox("Assertion Failed: " + failMessage)
+        endif
     endif
 
     return gottenValue != expectedValue
