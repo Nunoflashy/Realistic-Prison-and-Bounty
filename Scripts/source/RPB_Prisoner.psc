@@ -56,9 +56,15 @@ int property Number
     endFunction
 endProperty
 
-Actor property Captor
-    Actor function get()
-        return GetForm("Arrest Captor") as Actor
+; Actor property Captor
+;     Actor function get()
+;         return GetForm("Arrest Captor") as Actor
+;     endFunction
+; endProperty
+
+RPB_Captor property Captor
+    RPB_Captor function get()
+        return API.Arrest.GetCaptorReference(GetForm("Arrest Captor") as Actor)
     endFunction
 endProperty
 
@@ -498,47 +504,55 @@ bool function AssignCell()
         return true
     endif
 
-    ; Determine if prisoner will be stripped etc
+    ; Determine if prisoner will be stripped etc (Set options that a cell depend on)
     self.WillBeStrippedNaked = true
 
     RPB_JailCell assignedCell = Prison.RequestCellForPrisoner(self)
 
+
     if (assignedCell == none)
-        ; Could not assign a cell to this prisoner, abort imprisonment?
-        DebugError("Prisoner::AssignCell", "A jail cell could not be assigned to prisoner " + self.Name + ", aborting imprisonment and destroying reference...!")
-        Error("A jail cell could not be assigned to " + self.Name + ", aborting imprisonment...!")
-        self.Destroy() ; We might destroy this instance somewhere else, because in the case of failing to assign a cell, we may still want to try other imprisonment options (maybe transfer to another hold?)
+        Prison.OnPrisonerImprisonmentFail(self, "Assign Cell")
         return false
     endif
 
     ; Actually bind this jail cell to the prisoner, it has been assigned.
-    if (Prison.BindCellToPrisoner(assignedCell, self))
-        SetReference("Cell", assignedCell)
-    endif
-
+    Prison.BindCellToPrisoner(assignedCell, self)
     return self.JailCell != none
 endFunction
 
-;/ @boundCellPackage: The ReferenceAlias containing the bound AI Cell Package /;
-ReferenceAlias boundCellPackage
+ReferenceAlias property CellPackage
+    ReferenceAlias function get()
+        ; return JailCell.GetPrisonerCellPackage(self)
+    endFunction
+endProperty
+
+
+; Binds the NPC to their Cell, does not work on the Player.
 function BindToCell()
-    if (boundCellPackage)
-        self.UnbindAlias(boundCellPackage)
-        Debug("Prisoner::BindToCell", "Prisoner " + Name + " already had " + self.GetPossessivePronoun() + " cell package bound, unbinding it before re-application!")
+    if (self.IsPlayer())
+        return
     endif
 
-    boundCellPackage = Prison.BindPrisonerToCell(self, "S")
-    Debug("Prisoner::BindToCell", "Bound " + Name + " to "+ self.GetPossessivePronoun() +" Cell.")
+    ; self.BindAlias(CellPackage)
+    self.BindAlias(JailCell.CellPackage)
+    RegisterForSingleUpdate(1.0)
+    Debug("[Prison: "+ self.Prison.Name +"] Prisoner::BindToCell", "[Package: "+ JailCell.CellPackage.GetName() +"] Bound " + Name + " to "+ self.GetPossessivePronoun() +" Cell.")
 endFunction
 
-function RebindToCell()
-    self.UnbindAlias(boundCellPackage)
-    Utility.Wait(0.2)
-    
-    self.MoveTo(JailCell)
-    self.BindToCell()
-    Debug("[state: Imprisoned] Prisoner::OnUpdateGameTime", "Rebinding " + Name + " to their cell.")
-endFunction
+ReferenceAlias property BoundCellPackage auto
+; function BindToCell()
+;     if (self.IsPlayer())
+;         return
+;     endif
+
+;     if (boundCellPackage)
+;         self.UnbindAlias(boundCellPackage)
+;         Debug("Prisoner::BindToCell", "Prisoner " + Name + " already had " + self.GetPossessivePronoun() + " cell package bound, unbinding it before re-application!")
+;     endif
+
+;     boundCellPackage = Prison.BindPrisonerToCell(self, JailCell.PackageSize)
+;     Debug("Prisoner::BindToCell", "["+ boundCellPackage.GetName() +"] Bound " + Name + " to "+ self.GetPossessivePronoun() +" Cell.")
+; endFunction
 
 function SetReleaseLocation(bool abIsTeleportLocation = true)
     if (abIsTeleportLocation)
@@ -567,12 +581,12 @@ endFunction
 bool __isReleased
 function Release()
     if (!__isReleased)
+        GotoState("Released")
         Prison.ReleasePrisoner(self)
         Debug("Prisoner::Release", "Released " + self.Name + " from " + Prison.Name)
         __isReleased = true
     endif
 
-    GotoState("Released")
 endFunction
 
 ;/
@@ -670,10 +684,7 @@ function Imprison()
     endif
 
     float startBench = StartBenchmark()
-
-    if (!self.IsPlayer())
-        self.BindToCell()
-    endif
+    self.BindToCell()
 
     self.SetBelongingsContainer()
     self.SetReleaseLocation()
@@ -814,7 +825,7 @@ endFunction
 
 function EscortToCell(Actor akEscort)
     Form outsideCellGuardWaitingMarker = JailCell.GetRandomMarker("Exterior")
-
+    
     SceneManager.StartEscortToCell( \
         akEscortLeader              = akEscort, \
         akEscortedPrisoner          = this, \
@@ -1116,17 +1127,44 @@ state Imprisoned
             Prison.RegisterForPrisonPeriodicUpdate(self)
         ; endif
 
+        ; Captor should probably be destroyed in RPB_Captor, because more Prisoners/Arrestees may depend on it
+        ; we could check if that Captor has any prisoners left to escort, if not, destroy the reference.
+        Captor.Destroy()
+
         ; At this point, we can delete the prisoner's arrest state
         self.DestroyArrestState()
         self.RemoveAll(TEMPORARY_DESTROY_ON_IMPRISONED) ; Destroy all Temporary vars on Imprisoned state
     endEvent
 
+    event OnUpdate()
+        if (self.IsNPC())
+            float distanceFromCell          = self.GetDistance(JailCell)
+            float distanceFromCellDoor      = self.GetDistance(JailCell.CellDoor)
+            float distanceFromOutsideCell   = self.GetDistance(JailCell.ExteriorMarkers[0] as ObjectReference)
+            bool isOutOfCell                = distanceFromCellDoor >= distanceFromOutsideCell
+            LogNoType(Name + " in " + Prison.Name + " { "+ "Distance from Cell: " + (distanceFromCell as int) + " | Distance from Cell Door: " + (distanceFromCellDoor as int) + " | Distance from Outside of Cell: " + (distanceFromOutsideCell as int) + " | Is Out of Cell: " + isOutOfCell + " }")
+            LogNoType(Name + " in " + Prison.Name + " { "+ "Cell Package Alias bound on: " + JailCell.CellPackage.GetReference() +" | Cell Package Name: "+ JailCell.CellPackage.GetName() +" }")
+
+            if (self.IsOutOfCell())
+                this.MoveTo(JailCell)
+                ReferenceAlias randomCellPackage = JailCell.GetSuitableCellPackage()
+                self.BindAlias(randomCellPackage)
+                MiscUtil.PrintConsole("["+ Name +"] Bound to Package " + randomCellPackage.GetName())
+                Debug("[state: Imprisoned] Prisoner::OnUpdate", "["+ Name +"] S_0 Reference: " + JailCell.CellPackage.GetReference())
+                ; self.UnbindAlias(JailCell.CellPackage)
+                RegisterForSingleUpdate(1.0)
+            endif
+
+            ; RegisterForSingleUpdate(10.0)
+        endif
+    endEvent
+
     event OnUpdateGameTime()
-        self.PerformSanityChecks()
+        ; self.PerformSanityChecks()
 
         self.UpdateInfamy()
         self.UpdateTimeJailed() ; Must be updated in some other way, otherwise it will reset to 0 on next imprisonment
-
+ 
         if (self.IsSentenceServed) ; implementation is not finished
             ; Prison.SendReleaseRequest(self)
             self.Release()
@@ -1135,12 +1173,22 @@ state Imprisoned
 
         Prison.DEBUG_ShowPrisonerSentenceInfo(self, true)
 
+        if (self.IsNPC())
+            float distanceFromCell          = self.GetDistance(JailCell)
+            float distanceFromCellDoor      = self.GetDistance(JailCell.CellDoor)
+            float distanceFromOutsideCell   = self.GetDistance(JailCell.ExteriorMarkers[0] as ObjectReference)
+            bool isOutOfCell                = distanceFromCellDoor >= distanceFromOutsideCell
+            LogNoType(Name + " in " + Prison.Name + " { "+ "Distance from Cell: " + (distanceFromCell as int) + " | Distance from Cell Door: " + (distanceFromCellDoor as int) + " | Distance from Outside of Cell: " + (distanceFromOutsideCell as int) + " | Is Out of Cell: " + isOutOfCell + " }")
+            LogNoType(Name + " in " + Prison.Name + " { "+ "Cell Package Alias bound on: " + JailCell.CellPackage.GetReference() +" | Cell Package Name: "+ JailCell.CellPackage.GetName() +" }")
+        endif
+
         ; Debug("Prisoner::OnUpdateGameTime", "currentTimeServedStored: " + currentTimeServedStored)
 
         self.RegisterLastUpdate()
         RegisterForSingleUpdateGameTime(1.0)
-        Debug("[state: Imprisoned] Prisoner::OnUpdateGameTime", self.Name + "'s Bounty: " + Bounty)
-        self.DEBUG_ShowHoldStats()
+        RegisterForSingleUpdate(10.0)
+        ; Debug("[state: Imprisoned] Prisoner::OnUpdateGameTime", self.Name + "'s Bounty: " + Bounty)
+        ; self.DEBUG_ShowHoldStats()
 
     endEvent
 endState
@@ -1384,8 +1432,8 @@ function UpdateTimeJailed()
         self.OnDayPassed()
     endif
 
-    Debug("Prisoner::UpdateTimeJailed", "Updating " + self.Name + "'s time jailed by: " + currentTimeJailed)
-    Debug("Prisoner::UpdateTimeJailed", "TimeServed: " + TimeServed + ", _previousUpdateTimeServed: " + _previousUpdateTimeServed)
+    ; Debug("Prisoner::UpdateTimeJailed", "Updating " + self.Name + "'s time jailed by: " + currentTimeJailed)
+    ; Debug("Prisoner::UpdateTimeJailed", "TimeServed: " + TimeServed + ", _previousUpdateTimeServed: " + _previousUpdateTimeServed)
 
     ; Update the previous time served, to take into account for the next calculation
     _previousUpdateTimeServed = TimeServed
@@ -1579,6 +1627,16 @@ function MoveToPrison(Actor akCaptor)
     akCaptor.MoveTo(PrisonerBelongingsContainer)
 endFunction
 
+function MoveToCellTemp()
+    ; Release from Scenes
+    int escorteeId = self.GetInt("Escortee")
+    ReferenceAlias escorteeAlias = SceneManager.GetEscortee(escorteeId)
+    self.UnbindAlias(escorteeAlias)
+    Utility.Wait(0.2)
+    self.MoveToCell()
+    Prison.OnPrisonerMovedToPrison(self, true)
+endFunction
+
 function MoveToCell(bool abBeginImprisonment = true)
     if (self.IsInCell)
         Error(self.GetName() + " is already in "+ self.GetPossessivePronoun() +" cell: " + JailCell + "!")
@@ -1589,11 +1647,7 @@ function MoveToCell(bool abBeginImprisonment = true)
     wasMoved = true
 
     self.MoveTo(JailCell)
-
-    if (!self.IsPlayer())
-        self.BindToCell()
-        ; Prison.BindPrisonerToCell(self)
-    endif
+    self.BindToCell()
 
     if (abBeginImprisonment)
         if (Prison.IsPrisonerQueuedForImprisonment(self))
@@ -1643,9 +1697,9 @@ endFunction
 
 ; ==========================================================
 
-function MoveToCaptor()
-    this.MoveTo(captor)
-endFunction
+; function MoveToCaptor()
+;     this.MoveTo(captor)
+; endFunction
 
 function FastForwardToRelease()
     GotoState("ServeOnRest")
@@ -1803,7 +1857,74 @@ endFunction
 ;                           Events
 ; ==========================================================
 
+event OnPackageChange(Package akOldPackage)
+    Debug("Prisoner::OnPackageChange", "We just switched away from running the " + akOldPackage + " package")
+    RegisterForSingleUpdate(1.0)
+endEvent
+
+
+; event OnPackageChange(Package akOldPackage)
+;     Debug("Prisoner::OnPackageChange", "We just switched away from running the " + akOldPackage + " package")
+;     this.MoveTo(JailCell)
+;     self.UnbindAlias(CellPackage)
+;     ; self.BindAlias(CellPackage)
+; endEvent
+
+; event OnPackageStart(Package akNewPackage)
+;     Debug("Prisoner::OnPackageStart", "We just started the " + akNewPackage + " package")
+    
+; endEvent
+
+; event OnPackageEnd(Package akOldPackage)
+;     Debug("Prisoner::OnPackageEnd", "We just stopped the " + akOldPackage + " package")
+;     self.BindAlias(CellPackage)
+;     ; Package RPB_PrisonStayStillPackage = GetFormFromMod(0x23968) as Package
+;     ; if (akOldPackage == RPB_PrisonStayStillPackage)
+;     ;     this.MoveTo(JailCell)
+;     ;     self.BindAlias(CellPackage)
+;     ;     self.UnbindAlias(Prison.PrisonManager.GetCellPackageByName("S_0"))
+;     ;     Debug("Prisoner::OnPackageEnd", "Package is " + akOldPackage + ", binding " + Name + " to cell.")
+;     ; endif
+; endEvent
+
+; event OnPackageChange(Package akOldPackage)
+;     Debug("Prisoner::OnPackageChange", "We just switched away from running the " + akOldPackage + " package")
+;     this.MoveTo(JailCell)
+;     ; Bind to temporary package
+;     self.BindAlias(Prison.PrisonManager.GetCellPackageByName("S_0"))
+;     ; Utility.Wait(5.0)
+;     ; self.BindAlias(CellPackage)
+;     ; Renew Package
+;     ; BindAliasTo(JailCell.GetCellPackage(self.GetInt("Cell Package Index", "JailCell")), none)
+;     ; self.BindAlias(JailCell.GetSuitableCellPackage())
+;     ; this.EvaluatePackage()
+; endEvent
+
+; event OnPackageStart(Package akNewPackage)
+;     Debug("Prisoner::OnPackageStart", "We just started the " + akNewPackage + " package")
+    
+; endEvent
+
+; event OnPackageEnd(Package akOldPackage)
+;     Debug("Prisoner::OnPackageEnd", "We just stopped the " + akOldPackage + " package")
+;     Package RPB_PrisonStayStillPackage = GetFormFromMod(0x23968) as Package
+;     if (akOldPackage == RPB_PrisonStayStillPackage)
+;         this.MoveTo(JailCell)
+;         self.BindAlias(CellPackage)
+;         self.UnbindAlias(Prison.PrisonManager.GetCellPackageByName("S_0"))
+;         Debug("Prisoner::OnPackageEnd", "Package is " + akOldPackage + ", binding " + Name + " to cell.")
+;     endif
+; endEvent
+
 event OnInitialize()
+    ; if (self.Is("Inactive"))
+    ;     return
+    ; endif
+
+    ; if (self.IsNPC() && self.IsOutOfCell() && self.IsInCell)
+    ;     this.MoveTo(JailCell)
+    ; endif
+
     ; Prison.RegisterForPrisonPeriodicUpdate(self)
     Prison.RegisterPrisoner(self) ; Registers this prisoner into the prisoner list
     Debug("Prisoner::OnInitialize", "self: " + self)
@@ -1933,7 +2054,7 @@ event OnSleepStart(float afSleepStartTime, float afSleepEndTime)
         endif
         __serveTimeLastDayRegistered = RPB_Utility.GetCurrentDay()
     endif
-
+         
 endEvent
 
 ; ==========================================================
@@ -1954,13 +2075,13 @@ endFunction
 function DestroyArrestState()
     RPB_Arrestee arrestState = RPB_Arrestee.GetStateForPrisoner(self)
 
-    Debug("Prisoner::DestroyArrestState", "Prison Hold from Arrest Vars: " + GetString("Hold", "Arrest"))
+    ; Debug("Prisoner::DestroyArrestState", "Prison Hold from Arrest Vars: " + GetString("Hold", "Arrest"))
 
     if (arrestState)
         ; Save the bounty from the Arrest state
         int _bounty          = self.GetInt("Bounty Non-Violent", "Arrest")
         int _bountyViolent   = self.GetInt("Bounty Violent", "Arrest")
-        Debug("Prisoner::DestroyArrestState", "Bounty: " + _bounty + ", Violent: " + _bountyViolent)
+        ; Debug("Prisoner::DestroyArrestState", "Bounty: " + _bounty + ", Violent: " + _bountyViolent)
         
         arrestState.Destroy()
         Utility.Wait(0.2)
@@ -1968,23 +2089,36 @@ function DestroyArrestState()
         ; Save the bounty from the Arrest state
         self.SetInt("Bounty Non-Violent", _bounty, "Arrest")
         self.SetInt("Bounty Violent", _bountyViolent, "Arrest")
-        Debug("Prisoner::DestroyArrestState", "Bounty: " + Bounty + ", Violent: " + BountyViolent)
+        ; Debug("Prisoner::DestroyArrestState", "Bounty: " + Bounty + ", Violent: " + BountyViolent)
     endif
+endFunction
+
+bool function IsOutOfCell()
+    float distanceFromCellDoor      = self.GetDistance(JailCell.CellDoor)
+    float distanceFromOutsideCell   = self.GetDistance(JailCell.ExteriorMarkers[0] as ObjectReference)
+    bool isOutOfCell                = distanceFromCellDoor >= distanceFromOutsideCell
+
+    Debug("Prisoner::IsOutOfCell", Name + "'s distance from Cell Door: " + distanceFromCellDoor)
+    Debug("Prisoner::IsOutOfCell", Name + "'s distance from Exterior of Cell: " + distanceFromOutsideCell)
+    Debug("Prisoner::IsOutOfCell", Name + " is out of cell: " + isOutOfCell)
+
+    return isOutOfCell
 endFunction
 
 function PerformSanityChecks()
     if (self.IsNPC())
-        ; Rebind Cell packages if the NPC is far away enough from the Cell.
-        if (self.GetDistance(JailCell) >= 100)
-            self.RebindToCell()
+        if (self.IsOutOfCell())
+            this.MoveTo(JailCell)
+            ReferenceAlias newCellPackage = JailCell.GetSuitableCellPackage()
+            self.BindAlias(newCellPackage)
+            Debug("[Prison: "+ self.Prison.Name +"] Prisoner::PerformSanityChecks", "["+ CellPackage.GetName() +"] Moving " + Name + " to cell")
         endif
-
         ; If the stripped flag has been set (Stripping has occurred, but the NPC still has clothes)
         ; This usually happens when the player is far away from the target NPC at the time of imprisonment
         ; causing them to recover the clothes somehow, despite being stripped.
         ; (Only happens for the first prisoner apparently)
-        ; if (apPrisoner.IsStrippedNaked)
-        ;     apPrisoner.RemoveAllItems()
+        ; if (self.IsStrippedNaked || self.IsStrippedToUnderwear)
+        ;     self.RemoveAllItems()
         ; endif
     endif
 endFunction
