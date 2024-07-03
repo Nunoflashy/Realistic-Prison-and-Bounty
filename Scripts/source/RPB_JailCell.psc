@@ -299,9 +299,12 @@ endProperty
 ReferenceAlias __cellPackage
 ReferenceAlias property CellPackage
     ReferenceAlias function get()
+        return Prison.PrisonManager.GetCellPackageByName("S_0")
         return __cellPackage
     endFunction
 endProperty
+
+ReferenceAlias[] _cellPackages
 
 ReferenceAlias function GetSuitableCellPackage()
     return Prison.PrisonManager.GetCellPackageOfType(self.PackageSize)
@@ -316,11 +319,68 @@ endFunction
     This package is used to bind NPC prisoners to their cell, so as not run any other AI Packages
     while this one is active.
 /;
+; function ApplyCellPackage(RPB_Prisoner apPrisoner)
+;     if (!_cellPackages)
+;         ;/
+;             Maximum of 20 NPC's per cell, since there's no way to dynamically resize ReferenceAlias[],
+;             this is done here and not on a Prisoner level because the Aliases need a persistent reference, and RPB_Prisoner gets destroyed when the Player
+;             is not in sight of the NPC anymore, and hence the Alias becomes inactive, making the NPC restore their usual activities and not stay in the cell.
+
+;             Since RPB_JailCell is a persistent reference in all jail cells, these ReferenceAliases will never be destroyed, and the NPC will be bound
+;             to their jail cell as long as the reference is active.
+;         /;
+;         _cellPackages = new ReferenceAlias[20]
+;     endif
+
+;     int packageIndex = PrisonerCount - 1
+;     apPrisoner.SetInt("Cell Package Index", packageIndex, "JailCell")
+ 
+;     _cellPackages[packageIndex] = Prison.PrisonManager.GetCellPackageOfType(self.PackageSize)
+;     ; __cellPackage = _cellPackages[packageIndex]
+;     BindAliasTo(_cellPackages[packageIndex], self)
+;     Debug("[Prison: "+ self.Prison.Name +"] JailCell::ApplyCellPackage", "[Prisoner: "+ apPrisoner.Name +"] Package applied on: " +  _cellPackages[packageIndex].GetReference())
+; endFunction
 function ApplyCellPackage()
     __cellPackage = Prison.PrisonManager.GetCellPackageOfType(self.PackageSize)
-    BindAliasTo(__cellPackage, self)
+    return
+    if (!_cellPackages)
+        _cellPackages = new ReferenceAlias[20]
+    endif
+    ; JMap.setForm(__prisonersInCell, apPrisoner.GetIdentifier(), apPrisoner.GetActor())
+
+    string mapKey   = JMap.getNthKey(__prisonersInCell, PrisonerCount - 1) ; Actor Form ID
+    Actor actorForm  = JMap.getForm(__prisonersInCell, mapKey) as Actor
+    int packageIndex = PrisonerCount - 1
+    RPB_Prisoner prisoner = Prison.GetPrisoner(actorForm)
+    prisoner.SetInt("Cell Package Index", packageIndex, "JailCell")
+ 
+    _cellPackages[PrisonerCount - 1] = Prison.PrisonManager.GetCellPackageOfType(self.PackageSize)
+    __cellPackage =  _cellPackages[PrisonerCount - 1]
+    ; __cellPackage = Prison.PrisonManager.GetCellPackageOfType(self.PackageSize)
+    ; BindAliasTo(__cellPackage, self)
+    Debug("[Prison: "+ self.Prison.Name +"] JailCell::ApplyCellPackage", "mapKey: " + mapKey + ", actorForm: " + actorForm + ", packageIndex: " + packageIndex + ", prisoner: " + prisoner)
     Debug("[Prison: "+ self.Prison.Name +"] JailCell::ApplyCellPackage", "Package applied on: " + CellPackage.GetReference())
 endFunction
+
+ReferenceAlias function GetCellPackage(int aiIndex)
+    return _cellPackages[aiIndex]
+endFunction
+
+ReferenceAlias function GetPrisonerCellPackage(RPB_Prisoner apPrisoner)
+    int packageIndex = apPrisoner.GetInt("Cell Package Index", "JailCell")
+    return _cellPackages[packageIndex]
+endFunction
+
+; function ApplyCellPackage()
+;     if (!_cellPackages)
+;         _cellPackages = new ReferenceAlias[20]
+;     endif
+;     _cellPackages[PrisonerCount - 1] = Prison.PrisonManager.GetCellPackageOfType(self.PackageSize)
+;     __cellPackage =  _cellPackages[PrisonerCount - 1]
+;     ; __cellPackage = Prison.PrisonManager.GetCellPackageOfType(self.PackageSize)
+;     BindAliasTo(__cellPackage, self)
+;     Debug("[Prison: "+ self.Prison.Name +"] JailCell::ApplyCellPackage", "Package applied on: " + CellPackage.GetReference())
+; endFunction
 
 ;/
     Randomly generates goodies such as Lockpicks and Keys for this Cell if applicable.
@@ -723,8 +783,10 @@ endFunction
 
 function UnregisterPrisoner(RPB_Prisoner apPrisoner)
     JMap.removeKey(__prisonersInCell, apPrisoner.GetIdentifier())
+
     if (apPrisoner.IsNPC())
-        BindAliasTo(__cellPackage, none)
+        ReferenceAlias prisonerCellPackage = self.GetPrisonerCellPackage(apPrisoner)
+        BindAliasTo(prisonerCellPackage, none)
     endif
 
     self.OnPrisonerUnregister(apPrisoner)
