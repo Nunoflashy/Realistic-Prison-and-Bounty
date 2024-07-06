@@ -58,6 +58,7 @@ endFunction
 /;
 function UnbindAlias(ReferenceAlias apAlias)
     BindAliasTo(apAlias, none)
+    Debug("["+ this +"] Actor::UnbindAlias", "Unbound " + apAlias + " Alias.")
 endFunction
 
 bool function HasAlias(ReferenceAlias apAlias)

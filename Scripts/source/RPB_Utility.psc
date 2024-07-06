@@ -23,6 +23,11 @@ Quest function CellPackages() global
     return GetFormFromMod(0x21916) as Quest
 endFunction
 
+Quest function ArrestPackages() global
+    ; return GetFormFromMod(0x1F8CC) as Quest
+    return GetFormFromMod(0x24441) as Quest
+endFunction
+
 Message function ServeTimeMessage() global
     return GetFormFromMod(0x1EE08) as Message
 endFunction
@@ -41,6 +46,10 @@ endFunction
 
 Idle function BoundHandsBehindBack() global
     return Game.GetFormEx(0xB600A) as Idle
+endFunction
+
+Armor function RPB_PrisonerHandCuffs() global
+    return GetFormFromMod(0x23969) as Armor
 endFunction
 
 ; ==========================================================

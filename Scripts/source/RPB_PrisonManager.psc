@@ -306,3 +306,14 @@ ReferenceAlias function GetCellPackageByName(string asCellPackageName)
 
     return cellPackagesReference.GetAliasByName(asCellPackageName) as ReferenceAlias
 endFunction
+
+
+; Temporary - Arrest Packages
+Quest _arrestPackages
+ReferenceAlias function GetArrestPackageByIndex(int aiIndex)
+    if (!_arrestPackages)
+        _arrestPackages = RPB_Utility.ArrestPackages()
+    endif
+
+    return _arrestPackages.GetNthAlias(aiIndex) as ReferenceAlias
+endFunction

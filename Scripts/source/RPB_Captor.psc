@@ -63,8 +63,9 @@ event OnUpdate()
     if (!Arrestee)
         return
     endif
-    ; if (this.GetDistance(_arrestee) >= 200)
-    ;     _arrestee.MoveTo(this)
+    
+    ; if (this.GetDistance(Arrestee) >= 700)
+    ;     Arrestee.MoveTo(this)
     ;     Debug("Captor::OnUpdate", "Moved Arrestee to " + Name)
 
     ; endif
@@ -148,7 +149,7 @@ endState
 state Escorting
     event OnUpdate()
         return
-        if (this.GetDistance(Arrestee) >= 200)
+        if (this.GetDistance(Arrestee) >= 700)
             Arrestee.MoveTo(this)
             Debug("Captor::OnUpdate", "Moved Arrestee to " + Name)
     
@@ -201,7 +202,7 @@ string property Test
 endProperty
 
 function Destroy()
-    ; Unset all properties related to this Arrestee
+    ; Unset all properties related to this captor
     _test = "Gata"
     self.RemoveAll()
     Utility.Wait(0.5)

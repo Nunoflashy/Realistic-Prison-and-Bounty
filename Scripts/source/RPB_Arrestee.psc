@@ -385,6 +385,10 @@ function EscortToPrison(bool abEscortDirectlyToCell = false)
         asScene     = Arrest.SceneManager.SCENE_ARREST_START_02 \
     )
 
+    ; Bind stay still package
+    ReferenceAlias arrestPackage = API.PrisonManager.GetArrestPackageByIndex(0)
+    self.BindAlias(arrestPackage)
+
     ; Debug("Arrestee::EscortToPrison", "Captor: " + Captor + ", this: " + this + ", Arrest Scene: " + Arrest.GetArrestScene(this))
 
     if (!abEscortDirectlyToCell)

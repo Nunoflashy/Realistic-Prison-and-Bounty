@@ -1253,6 +1253,7 @@ endEvent
 
 event OnPrisonerReleased(RPB_Prisoner apPrisoner)
     self.RegisterPrisonerReleaseTimeStats(apPrisoner)
+    apPrisoner.Destroy()
 endEvent
 
 event OnPrisonerEscaped(RPB_Prisoner apPrisoner)
@@ -1274,6 +1275,9 @@ endEvent
 event OnEscortPrisonerToJailBegin(RPB_Actor apActor, Actor akEscort)
     (apActor as RPB_Arrestee).Cuff()
 
+    ; ReferenceAlias arrestPackage = API.PrisonManager.GetCellPackageOfType("S")
+    ; apActor.BindAlias(arrestPackage)
+    Debug("Prison::OnEscortPrisonerToJailBegin", "Bound arrest package, arrestee should stay still.")
 endEvent
 
 event OnEscortPrisonerToJailEnd(RPB_Actor apActor, Actor akEscort)
@@ -1285,7 +1289,11 @@ event OnEscortPrisonerToJailEnd(RPB_Actor apActor, Actor akEscort)
     prisonerRef.AssignCell()            ; Assign a prison cell to this prisoner
 
     ; if should be stripped
-    prisonerRef.StartStripping(akEscort)
+    ; prisonerRef.StartStripping(akEscort)
+    if (!prisonerRef.IsInCell)
+        ; prisonerRef.StartRestraining(akStripper)
+        prisonerRef.EscortToCell(akEscort)
+    endif
     ; prisonerRef.EscortToCell(akEscort)
 endEvent
 
@@ -1318,6 +1326,15 @@ event OnEscortPrisonerToCellEnd(RPB_Prisoner apPrisoner, RPB_JailCell akJailCell
         ; return
     endif
 
+    if (apPrisoner.IsNPC())
+        apPrisoner.BindToCell()
+
+        if (apPrisoner.IsFarFromPlayer())
+            apPrisoner.MoveTo(apPrisoner.JailCell)
+            self.RegisterForSingleUpdate(1.0) ; Poll request to ensure the prisoner stays in the jail cell, should be terminated right after that
+        endif
+    endif
+
     ; akJailCell.Lock()
 
     ; Since NPC's don't stay in the cell if the player is away with Scenes, we must force the move
@@ -1331,14 +1348,16 @@ event OnEscortPrisonerToCellEnd(RPB_Prisoner apPrisoner, RPB_JailCell akJailCell
     ;     apPrisoner.MoveTo(apPrisoner.JailCell)
     ; endif
 
+    ; apPrisoner.MoveTo(apPrisoner.JailCell)
     apPrisoner.Uncuff()
     apPrisoner.Imprison()
-    if (apPrisoner.HasSceneState("OnEscortPrisonerToCellEnd", "Arrest"))
-        if (apPrisoner.ShouldBeStripped)
-            apPrisoner.Strip()
-        endif
-    endif
+    ; if (apPrisoner.HasSceneState("OnEscortPrisonerToCellEnd", "Arrest"))
+    ;     if (apPrisoner.ShouldBeStripped)
+    ;         apPrisoner.Strip()
+    ;     endif
+    ; endif
     ; apPrisoner.StartStripping(akEscort)
+    apPrisoner.OnEscortedToCell(akEscort)
 endEvent
 
 event OnEscortPrisonerFromCellBegin(RPB_Prisoner apPrisoner, Actor akEscort)
@@ -1388,7 +1407,7 @@ event OnPrisonerStripping(RPB_Prisoner apPrisoner, Actor akStripper, string asSc
 
     elseif (asSceneEvent == "Remove Underwear")
         ; Remove Underwear, prisoner must be unclothed already
-        apPrisoner.RemoveUnderwear()
+        ; apPrisoner.RemoveUnderwear()
     endif
 endEvent
 
@@ -1585,6 +1604,7 @@ int function FirePrisonerEventOnScene(string asScene, string asSceneEvent, RPB_P
                 cellDoor.Open()
                 return 1
             endif
+            
             self.OnEscortPrisonerToCellEnd(apPrisoner, apPrisoner.JailCell, prisonerEscort)
         endif
 
@@ -1648,6 +1668,29 @@ event OnInit()
 
     Debug("Prison::OnInit", "OnInit PRISON")
 endEvent
+
+;/
+    Should only happen the first time the player visits the prisoner
+    and at some points where an AI Package is overridden, such as the Solitude execution scene for the NPC's there
+    if they were to be imprisoned.
+/;
+event OnUpdate()
+    int i = 0
+    while (i < Prisoners.Count)
+        RPB_Prisoner prisoner = Prisoners.AtIndex(i)
+        while (!prisoner.IsInCell)
+            ; prisoner.BindToCell()
+            prisoner.MoveTo(prisoner.JailCell)
+            RegisterForSingleUpdate(1.0)
+        endWhile
+        i += 1
+    endWhile
+    Debug("Prison::OnUpdate", "Updating...")
+endEvent
+
+function ProcessNPC(RPB_Prisoner apPrisoner)
+
+endFunction
 
 event OnUpdateGameTime()
     __isReceivingUpdates = true
@@ -1935,11 +1978,11 @@ RPB_JailCell function GetJailCellBasedOnPriority(string asSex, bool abAllowRando
 
     if (self.PrioritizeEmptyCells)
         returnedCell = self.GetEmptyJailCell()
-        Debug("Prison::GetJailCellBasedOnPriority", "Got empty cell: " + returnedCell + ", Prisoner Gender: " + asSex, returnedCell != none)
+        Trace("Prison::GetJailCellBasedOnPriority", "Got empty cell: " + returnedCell + ", Prisoner Gender: " + asSex, returnedCell != none)
 
     elseif (self.PrioritizeGenderCells)
         returnedCell = self.GetJailCellOfGender(asSex)
-        Debug("Prison::GetJailCellBasedOnPriority", "Got gender exclusive cell: " + returnedCell + ", Prisoner Gender: " + asSex, returnedCell != none)
+        Trace("Prison::GetJailCellBasedOnPriority", "Got gender exclusive cell: " + returnedCell + ", Prisoner Gender: " + asSex, returnedCell != none)
     endif
 
         
@@ -1947,23 +1990,23 @@ RPB_JailCell function GetJailCellBasedOnPriority(string asSex, bool abAllowRando
     ; Get empty cell first, if that fails, get a gender exclusive one, else get a random cell if @abAllowRandomCells is true
     if (returnedCell == none)
         returnedCell = self.GetEmptyJailCell()
-        Debug("Prison::GetJailCellBasedOnPriority", "Got empty cell: " + returnedCell + ", Prisoner Gender: " + asSex, returnedCell != none)
+        Trace("Prison::GetJailCellBasedOnPriority", "Got empty cell: " + returnedCell + ", Prisoner Gender: " + asSex, returnedCell != none)
     endif
 
     if (returnedCell == none)
         returnedCell = self.GetJailCellOfGender(asSex)
-        Debug("Prison::GetJailCellBasedOnPriority", "Got gender exclusive cell: " + returnedCell + ", Prisoner Gender: " + asSex, returnedCell != none)
+        Trace("Prison::GetJailCellBasedOnPriority", "Got gender exclusive cell: " + returnedCell + ", Prisoner Gender: " + asSex, returnedCell != none)
 
     endif
 
     if (returnedCell == none && abAllowRandomCells)
         returnedCell = self.GetRandomJailCell()
-        Debug("Prison::GetJailCellBasedOnPriority", "Got random cell: " + returnedCell + ", Prisoner Gender: " + asSex, returnedCell != none)
+        Trace("Prison::GetJailCellBasedOnPriority", "Got random cell: " + returnedCell + ", Prisoner Gender: " + asSex, returnedCell != none)
 
     endif
 
     ; Could not return any cell, error here
-    Debug("Prison::GetJailCellBasedOnPriority", "Could not retrieve any cell!  Prisoner Gender: " + asSex, returnedCell == none)
+    Trace("Prison::GetJailCellBasedOnPriority", "Could not retrieve any cell!  Prisoner Gender: " + asSex, returnedCell == none)
 
     return returnedCell
 endFunction
@@ -2000,7 +2043,7 @@ bool function RegisterPrisoner(RPB_Prisoner apPrisoner)
     ; Assign a Prisoner number based on the current number of prisoners in the prison
     self.AssignPrisonerNumber(apPrisoner)
 
-    Debug("Prison::RegisterPrisoner", "PrisonerList: " + Prisoners.GetKeys())
+    Trace("Prison::RegisterPrisoner", "PrisonerList: " + Prisoners.GetKeys())
 
     return Prisoners.Exists(apPrisoner)
 endFunction
@@ -2192,11 +2235,6 @@ endFunction
 ; ==========================================================
 ;                            Test
 ; ==========================================================
-
-Form[] function GetBedBaseObjects()
-    Form bedRollHay01 = Game.GetFormEx(0x1899D)
-
-endFunction
 
 bool __isAwaitingUpdateForGameTime
 bool property IsAwaitingUpdateForGameTime

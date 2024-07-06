@@ -178,7 +178,7 @@ event OnOpen(ObjectReference akActionRef)
         i += 1
     endWhile
 
-    Debug("["+ self +"] CellDoor::OnOpen", akActionRef + " opened cell door " + self + ", which belongs to jail cell " + self.JailCell)
+    Debug("["+ self +"] CellDoor::OnOpen", akOpener + " opened cell door " + self + ", which belongs to jail cell " + self.JailCell)
 endEvent
 
 event OnClose(ObjectReference akActionRef)

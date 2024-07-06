@@ -1239,6 +1239,7 @@ event OnSceneEnd(string name, Scene sender)
 
         RPB_Prison prison = PrisonManager.FindPrisonByPrisoner(escortee)
         RPB_Prisoner prisonerReference  = prison.GetPrisoner(escortee)
+
         prisonerReference.SetForm("EscortGuard", escort, prisonerReference.TEMPORARY_DESTROY_ON_IMPRISONED)
         prison.FirePrisonerEventOnScene(name, "EscortEnd", prisonerReference)
 
