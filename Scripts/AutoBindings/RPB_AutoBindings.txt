@@ -3,4 +3,5 @@
 RPB_UIInterface Player
 RPB_Actions Player
 RPB_Tests Player
+RPB_TestList Player
 UILIB_1 Player
