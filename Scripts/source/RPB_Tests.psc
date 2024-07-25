@@ -24,6 +24,8 @@ function SetTests()
     self.AddTest("12 - Test ActiveMagicEffect List", "Test_ActiveMagicEffectList_Works_Correctly")
     self.AddTest("13 - Test Prisoner Has Bounty in Prison", "Test_PrisonerHasBountyInPrison")
     self.AddTest("14 - Test Prisoner Gets Correct Escape Penalty", "Test_PrisonerEscapeGetsCorrectPenalty")
+    self.AddTest("15 - Test List Algorithms", "Test_ListAlgorithms")
+    self.AddTest("16 - Test ActiveMagicEffectList Algorithms", "Test_ActiveMagicEffectListAlgorithms")
 endFunction
 
 state Test_25Days_After_26th_Frostfall_Is_20th_Suns_Dusk
@@ -396,6 +398,190 @@ state Test_PrisonerEscapeGetsCorrectPenalty
     endFunction
 endState
 
+state Test_ListAlgorithms
+    function Setup()
+        SetLoggingEnabled("DEBUG",  true)
+        SetLoggingEnabled("LOG",  true)
+
+        ; Test list instance
+        RPB_TestList testList = (self as ObjectReference) as RPB_TestList
+        testList.__private_initialize()
+
+        begin_step("Add Elements", "Adding elements to the list...")
+            testList.__private_add_at("Taarie", "Prisoner[104611]")
+            testList.__private_add_at("Evette San", "Prisoner[104610]")
+            testList.__private_add_at("Vivienne Onis", "Prisoner[104620]")
+            testList.__private_add_at("Jala", "Prisoner[104623]")
+            testList.__private_add_at("Sorex Vinius", "Prisoner[104627]")
+            testList.__private_add_at("Lisette", "Prisoner[104637]")
+            testList.__private_add_at("Greta", "Prisoner[104659]")
+            testList.__private_add_at("Addvar", "Prisoner[104660]")
+            testList.__private_add_at("Noster Eagle-Eye", "Prisoner[108087]")
+            testList.__private_add_at("Priscilla", "Prisoner[108612]")
+            testList.__private_add_at("Johanne", "Prisoner[109118]")
+        end_step("Add Elements", testList.getListLength() == 11 && !testList.isEmpty())
+
+        int arrayLength = testList.getListLength()
+
+        log("List Length: "     + arrayLength)
+        log("Indices: "         + testList.__private_get_indices())
+        log("Keys: "            + testList.__private_get_keys())
+        log("Elements: "        + testList.__private_get_elements())
+        log("Indices to Keys: " + testList.__private_list_indices_relation_to_keys())
+        ; testList.__private_list_data()
+
+        begin_step("Remove Elements", "Removing Greta & Vivienne Onis from the list...")
+            testList.__private_remove_at("Prisoner[104659]") ; Greta
+            testList.__private_remove_at("Prisoner[104620]") ; Vivienne Onis
+        end_step("Remove Elements", testList.getListLength() == (arrayLength - 2))
+
+        begin_step("Reindex Elements")
+            testList.__private_reindex()
+
+        ; begin_step("Sort Elements")
+        ;     testList.__private_sort()
+
+        ; Print out the results for verification
+        arrayLength = testList.getListLength()
+        ; int i = 0
+        ; while (i < arrayLength)
+        ;     string element1 = testList.__private_get_value_by_index(i)
+        ;     string elementKey = testList.__private_get_key_for_index(i)
+        ;     int indexForKey = testList.__private_get_index_for_key(elementKey)
+        ;     Debug("Test Result", "Element at index " + i + ": " + element1 + " (key: " + elementKey + ", Index for Key: "+ indexForKey +")")
+        ;     i += 1
+        ; endWhile
+
+        ; ; Print out the JMap indices
+        ; i = 0
+        ; while (i < arrayLength)
+        ;     string elementKey = testList.__private_get_key_for_index(i)
+        ;     int index = testList.__private_get_index_for_key(elementKey)
+        ;     Debug("JMap", "Key: " + elementKey + ", Index: " + index)
+        ;     i += 1
+        ; endWhile
+
+        log("[STEP: Reindexing Elements] Indices: "         + testList.__private_get_indices())
+        log("[STEP: Reindexing Elements] Keys: "            + testList.__private_get_keys())
+        log("[STEP: Reindexing Elements] Elements: "        + testList.__private_get_elements())
+        log("[STEP: Reindexing Elements] Indices to Keys: " + testList.__private_list_indices_relation_to_keys())
+
+        begin_step("Check Elements Validity")
+            string taarieKey    = "Prisoner[104611]"
+            string evetteKey    = "Prisoner[104610]"
+            string vivienneKey  = "Prisoner[104620]"
+            string jalaKey      = "Prisoner[104623]"
+            string sorexKey     = "Prisoner[104627]"
+            string lisetteKey   = "Prisoner[104637]"
+            string gretaKey     = "Prisoner[104659]"
+            string addvarKey    = "Prisoner[104660]"
+            string nosterKey    = "Prisoner[108087]"
+            string priscillaKey = "Prisoner[108612]"
+            string johanneKey   = "Prisoner[109118]"
+
+            bool taarieResult       = assert_equals("Taarie",           testList.__private_get_value_by_key(taarieKey), "Does not get the correct result after reindexing! (Index: "+ testList.__private_get_index_for_key(taarieKey) +")")
+            bool evetteResult       = assert_equals("Evette San",       testList.__private_get_value_by_key(evetteKey), "Does not get the correct result after reindexing! (Index: "+ testList.__private_get_index_for_key(evetteKey) +")")
+            ; bool vivienneResult     = assert_equals("Vivienne Onis",    testList.__private_get_value_by_key(vivienneKey), "Does not get the correct result after reindexing! (Index: "+ testList.__private_get_index_for_key(vivienneKey) +")")
+            bool jalaResult         = assert_equals("Jala",             testList.__private_get_value_by_key(jalaKey), "Does not get the correct result after reindexing! (Index: "+ testList.__private_get_index_for_key(jalaKey) +")")
+            bool sorexResult        = assert_equals("Sorex Vinius",     testList.__private_get_value_by_key(sorexKey), "Does not get the correct result after reindexing! (Index: "+ testList.__private_get_index_for_key(sorexKey) +")")
+            bool lisetteResult      = assert_equals("Lisette",          testList.__private_get_value_by_key(lisetteKey), "Does not get the correct result after reindexing! (Index: "+ testList.__private_get_index_for_key(lisetteKey) +")")
+            ; bool gretaResult        = assert_equals("Greta",            testList.__private_get_value_by_key(gretaKey), "Does not get the correct result after reindexing! (Index: "+ testList.__private_get_index_for_key(gretaKey) +")")
+            bool addvarResult       = assert_equals("Addvar",           testList.__private_get_value_by_key(addvarKey), "Does not get the correct result after reindexing! (Index: "+ testList.__private_get_index_for_key(addvarKey) +")")
+            bool nosterResult       = assert_equals("Noster Eagle-Eye", testList.__private_get_value_by_key(nosterKey), "Does not get the correct result after reindexing! (Index: "+ testList.__private_get_index_for_key(nosterKey) +")")
+            bool priscillaResult    = assert_equals("Priscilla",        testList.__private_get_value_by_key(priscillaKey), "Does not get the correct result after reindexing! (Index: "+ testList.__private_get_index_for_key(priscillaKey) +")")
+            bool johanneResult      = assert_equals("Johanne",          testList.__private_get_value_by_key(johanneKey), "Does not get the correct result after reindexing! (Index: "+ testList.__private_get_index_for_key(johanneKey) +")")
+
+            bool stepPassed = taarieResult && evetteResult && jalaResult && sorexResult && lisetteResult && addvarResult && nosterResult && priscillaResult && johanneResult
+        end_step("Check Elements Validity", stepPassed)
+    endFunction
+
+    function Teardown()
+        
+    endFunction
+endState
+
+state Test_ActiveMagicEffectListAlgorithms
+    function Setup()
+        SetLoggingEnabled("DEBUG",  true)
+        SetLoggingEnabled("LOG",  true)
+        ; Test list instance
+        RPB_PrisonerList testList = API.PrisonManager.GetPrison("Haafingar").Prisoners
+        testList.__string_add_at("Taarie", "Prisoner[104611]")
+        testList.__string_add_at("Evette San", "Prisoner[104610]")
+        testList.__string_add_at("Vivienne Onis", "Prisoner[104620]")
+        testList.__string_add_at("Jala", "Prisoner[104623]")
+        testList.__string_add_at("Sorex Vinius", "Prisoner[104627]")
+        testList.__string_add_at("Lisette", "Prisoner[104637]")
+        testList.__string_add_at("Greta", "Prisoner[104659]")
+        testList.__string_add_at("Addvar", "Prisoner[104660]")
+        testList.__string_add_at("Noster Eagle-Eye", "Prisoner[108087]")
+        testList.__string_add_at("Priscilla", "Prisoner[108612]")
+        testList.__string_add_at("Johanne", "Prisoner[109118]")
+
+        int arrayLength = testList.__string_get_length()
+        int[] indexes   = testList.__string_get_indexes()
+
+        log("Array Length: " + arrayLength)
+        log("Indexes: " + indexes)
+        testList.__string_list_data()
+
+        string element = testList.__string_remove_element("Prisoner[104659]") ; Greta
+        log("element: " + element)
+        
+        testList.__string_remove_element("Prisoner[104620]")
+
+        log("\nBefore Reindexing\n")
+        ; int j = 0
+        ; while (j < arrayLength)
+        ;     string storedValue = testList.__string_get_value(j)
+        ;     string elementKey = testList.__string_get_key_for_index(j)
+        ;     log("data["+j+"]: " + storedValue + " (Key: "+ elementKey +")")
+        ;     j += 1
+        ; endWhile
+
+        log("\nAfter Reindexing\n")
+        testList.__string_reindex_data()
+        testList.__string_sort_data()
+
+        ; Print out the results for verification
+        arrayLength = testList.__string_get_length()
+        int i = 0
+        while (i < arrayLength)
+            string element1 = testList.__string_get_value(i)
+            string elementKey = testList.__string_get_key_for_index(i)
+            int indexForKey = testList.__string_get_index_for_key(elementKey)
+            Debug("Test Result", "Element at index " + i + ": " + element1 + " (key: " + elementKey + ", Index for Key: "+ indexForKey +")")
+            i += 1
+        endWhile
+
+        ; Print out the JMap indices
+        i = 0
+        while (i < arrayLength)
+            string elementKey = testList.__string_get_key_for_index(i)
+            int index = testList.__string_get_index_for_key(elementKey)
+            Debug("JMap", "Key: " + elementKey + ", Index: " + index)
+            i += 1
+        endWhile
+
+        string addvarKey = "Prisoner[104660]"
+        int addvarIndex = testList.__string_get_index_for_key(addvarKey)
+        string addvar = testList.__string_get_value_by_key(addvarKey)
+        bool addvarTestResult = assert_equals("Addvar", addvar, "Does not get the correct result after reindexing!")
+        display_step("Addvar Test", addvarTestResult, "Key: "+ addvarKey +", Index: "+ addvarIndex +", Value: "+ addvar)
+
+        log("Array Length: " + arrayLength)
+        log("Indexes: " + testList.__string_get_indexes())
+
+        display_result(addvarTestResult)
+
+    endFunction
+
+    function Teardown()
+        RPB_PrisonerList testList = API.PrisonManager.GetPrison("Haafingar").Prisoners
+        testList.__string_clear()
+    endFunction
+endState
+
 function ImprisonActor(RPB_Prison apPrison)
     Actor player = Game.GetFormEx(0x14) as Actor
     
@@ -510,18 +696,39 @@ function start_test(string testName = "")
     base_log("[UNIT]", "Starting Test: " + testName, "Tests::" + testName)
 endFunction
 
+function begin_step(string stepName, string msg = "")
+    base_log("[UNIT STEP] (START) " + stepName + " @", msg, "Tests::" + self.GetCurrentTest())
+endFunction
+
+function end_step(string stepName, bool condition, string additionalInfoOnFail = "")
+    string testResult = string_if (condition, stepName + " Passed!", stepName + " Failed!" + " ("+ additionalInfoOnFail +")")
+    base_log("[UNIT STEP] " + string_if (condition, "(PASS)", "(FAIL)") + " " + stepName + " @", testResult, "Tests::" + self.GetCurrentTest())
+
+    if (DISPLAY_RESULT_IN_GAME)
+        Debug.MessageBox(testResult)
+    endif
+endFunction
+
+function display_step(string stepName, bool condition, string additionalInfoOnFail = "")
+    string testResult = string_if (condition, stepName + " Passed!", stepName + " Failed!" + " ("+ additionalInfoOnFail +")")
+    base_log("[UNIT STEP] " + string_if (condition, "(PASS)", "(FAIL)"), testResult, "Tests::" + self.GetCurrentTest())
+
+    if (DISPLAY_RESULT_IN_GAME)
+        Debug.MessageBox(testResult)
+    endif
+endFunction
+
 function display_result(bool condition, bool showTimeElapsed = true)
     string testResult = ""
     if (showTimeElapsed)
         float testEndTime = Utility.GetCurrentRealTime()
         int elapsedTime = ((testEndTime - __testStartTime) * 1000) as int
         testResult = string_if (condition, "Test Passed!", "Test Failed!") + " (execution took "+ elapsedTime +" ms)"
-        ; base_log("[UNIT RESULT]", string_if (condition, "Test Passed!", "Test Failed!") + " (execution took "+ elapsedTime +" ms)", "Tests::" + self.GetCurrentTest())
     else
         testResult = string_if (condition, "Test Passed!", "Test Failed!")
-        ; base_log("[UNIT RESULT]", string_if (condition, "Test Passed!", "Test Failed!"), "Tests::" + self.GetCurrentTest())
     endif
-        base_log("[UNIT RESULT]", testResult, "Tests::" + self.GetCurrentTest())
+    
+    base_log("[UNIT RESULT] " + string_if (condition, "(PASS)", "(FAIL)"), testResult, "Tests::" + self.GetCurrentTest())
 
     if (DISPLAY_RESULT_IN_GAME)
         Debug.MessageBox(testResult)
@@ -532,7 +739,7 @@ endFunction
 
 bool function assert_true(bool condition, string failMessage = "")
     if (!condition)
-        base_log("ASSERT", "Assertion Failed: " + failMessage, "Tests::" + self.GetCurrentTest())
+        base_log("[ASSERT]", "Assertion Failed: " + failMessage, "Tests::" + self.GetCurrentTest())
         if (DISPLAY_ASSERT_IN_GAME)
             Debug.MessageBox("Assertion Failed: " + failMessage)
         endif
@@ -545,26 +752,36 @@ bool function assert_false(bool condition, string failMessage = "")
     return assert_true(!condition, failMessage)
 endFunction
 
-bool function assert_equals(string expectedValue, string gottenValue, string failMessage = "")
-    if (gottenValue != expectedValue)
-        base_log("ASSERT", "Assertion Failed: " + failMessage + " (Expected: " + expectedValue + ", Got: " + gottenValue + ")", "Tests::" + self.GetCurrentTest())
+bool function assert_equals(string expectedValue, string gottenValue, string failMessage = "", bool showResult = false)
+    bool passed = gottenValue == expectedValue
+    if (!passed)
+        base_log("[ASSERT]", "Assertion Failed: " + failMessage + " (Expected: " + expectedValue + ", Got: " + gottenValue + ")", "Tests::" + self.GetCurrentTest())
         if (DISPLAY_ASSERT_IN_GAME)
             Debug.MessageBox("Assertion Failed: " + failMessage)
         endif
     endif
+    
+    if (showResult)
+        base_log("[UNIT STEP]", string_if (passed, "[PASS]", "[FAIL]") + " Expected: " + expectedValue + ", Got: " + gottenValue, "Tests::" + self.GetCurrentTest())
+    endif
 
-    return gottenValue == expectedValue
+    return passed
 endFunction
 
-bool function assert_not_equals(string expectedValue, string gottenValue, string failMessage = "")
-    if (gottenValue == expectedValue)
-        base_log("ASSERT", "Assertion Failed: " + failMessage + " (Expected: " + expectedValue + ", Got: " + gottenValue + ")", "Tests::" + self.GetCurrentTest())
+bool function assert_not_equals(string expectedValue, string gottenValue, string failMessage = "", bool showResult = false)
+    bool passed = gottenValue != expectedValue
+    if (!passed)
+        base_log("[ASSERT]", "Assertion Failed: " + failMessage + " (Expected: " + expectedValue + ", Got: " + gottenValue + ")", "Tests::" + self.GetCurrentTest())
         if (DISPLAY_ASSERT_IN_GAME)
             Debug.MessageBox("Assertion Failed: " + failMessage)
         endif
     endif
 
-    return gottenValue != expectedValue
+    if (showResult)
+        base_log("[UNIT STEP]", string_if (passed, "[PASS]", "[FAIL]") + " Expected: " + expectedValue + ", Got: " + gottenValue, "Tests::" + self.GetCurrentTest())
+    endif
+
+    return passed
 endFunction
 
 function log(string msg, bool condition = true)
