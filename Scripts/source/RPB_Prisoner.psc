@@ -175,12 +175,6 @@ bool property IsInCell
     endFunction
 endProperty
 
-; bool property IsInCell
-;     bool function get()
-;         return GetBool("In Cell")
-;     endFunction
-; endProperty
-
 bool property ShouldBeInCell
     bool function get()
         return Has("Should Be In Cell")
@@ -550,7 +544,7 @@ endProperty
 
 bool property HasCellPackage
     bool function get()
-        return Has("Cell Package")
+        return CellPackage.GetActorReference() == this
     endFunction
 endProperty
 
@@ -565,25 +559,9 @@ function BindToCell()
     endif
 
     self.BindAlias(CellPackage)
-    self.SetBool("Cell Package", true)
     MiscUtil.PrintConsole("["+ Name +"] Bound to Package " + CellPackage.GetName())
     Debug("[Prison: "+ self.Prison.Name +"] Prisoner::BindToCell", "[Package: "+ CellPackage.GetName() +"] Bound " + Name + " to "+ self.GetPossessivePronoun() +" Cell.")
 endFunction
-
-ReferenceAlias property BoundCellPackage auto
-; function BindToCell()
-;     if (self.IsPlayer())
-;         return
-;     endif
-
-;     if (boundCellPackage)
-;         self.UnbindAlias(boundCellPackage)
-;         Debug("Prisoner::BindToCell", "Prisoner " + Name + " already had " + self.GetPossessivePronoun() + " cell package bound, unbinding it before re-application!")
-;     endif
-
-;     boundCellPackage = Prison.BindPrisonerToCell(self, JailCell.PackageSize)
-;     Debug("Prisoner::BindToCell", "["+ boundCellPackage.GetName() +"] Bound " + Name + " to "+ self.GetPossessivePronoun() +" Cell.")
-; endFunction
 
 function SetReleaseLocation(bool abIsTeleportLocation = true)
     if (abIsTeleportLocation)
@@ -642,6 +620,7 @@ function ReturnBelongings()
 endFunction
 
 function TeleportToRelease()
+    self.EnableAI(self.IsNPC())
     self.MoveTo(TeleportReleaseLocation)
 endFunction
 
@@ -708,10 +687,6 @@ function Imprison()
         DebugError("Prisoner::Imprison", self.GetName() + " does not have the required state for "+ self.GetPossessivePronoun() +" imprisonment, cannot continue!")
         return
     endif
-
-    ; if (self.IsNPC() && self.IsFarFromPlayer())
-    ;     this.MoveTo(JailCell)
-    ; endif
 
     if (self.IsImprisoned)
         Error(self.GetName() + " is already imprisoned in "+ Prison.Name + "!")
@@ -781,6 +756,7 @@ function Clothe()
 endFunction
 
 function Strip(bool abRemoveUnderwear = true)
+    RPB_Outfit prisonerOutfit = (self as ActiveMagicEffect) as RPB_Outfit
     ; Get underwear
     int underwearTopSlotMask    = GetSlotMaskValue(config.UnderwearTopSlot)
     int underwearBottomSlotMask = GetSlotMaskValue(config.UnderwearBottomSlot)
@@ -1152,6 +1128,11 @@ state Escorting
 endState
 
 state Released
+    event OnBeginState()
+        SetBool("Should Be In Cell", false)
+        SetBool("Imprisoned", false)
+    endEvent
+
     event OnUpdateGameTime()
     endEvent
 endState
@@ -1174,7 +1155,8 @@ state Imprisoned
     endEvent
 
     event OnUpdateGameTime()
-        ; self.PerformSanityChecks()
+        self.PerformSanityChecks()
+        JailCell.PerformPrisonerSanityCheck(self)
 
         self.UpdateInfamy()
         self.UpdateTimeJailed() ; Must be updated in some other way, otherwise it will reset to 0 on next imprisonment
@@ -1192,8 +1174,8 @@ state Imprisoned
             float distanceFromCellDoor      = self.GetDistance(JailCell.CellDoor)
             float distanceFromOutsideCell   = self.GetDistance(JailCell.ExteriorMarkers[0] as ObjectReference)
             bool isOutOfCell                = distanceFromCellDoor >= distanceFromOutsideCell
-            LogNoType(Name + " in " + Prison.Name + " { "+ "Distance from Cell: " + (distanceFromCell as int) + " | Distance from Cell Door: " + (distanceFromCellDoor as int) + " | Distance from Outside of Cell: " + (distanceFromOutsideCell as int) + " | Is Out of Cell: " + isOutOfCell + " }")
-            LogNoType(Name + " in " + Prison.Name + " { "+ "Cell Package Alias bound on: " + JailCell.CellPackage.GetReference() +" | Cell Package Name: "+ JailCell.CellPackage.GetName() +" }")
+            ; LogNoType(Name + " in " + Prison.Name + " { "+ "Distance from Cell: " + (distanceFromCell as int) + " | Distance from Cell Door: " + (distanceFromCellDoor as int) + " | Distance from Outside of Cell: " + (distanceFromOutsideCell as int) + " | Is Out of Cell: " + isOutOfCell + " }")
+            ; LogNoType(Name + " in " + Prison.Name + " { "+ "Cell Package Alias bound on: " + CellPackage.GetReference() +" | Cell Package Name: "+ CellPackage.GetName() +" }")
         endif
 
         ; Debug("Prisoner::OnUpdateGameTime", "currentTimeServedStored: " + currentTimeServedStored)
@@ -1654,29 +1636,40 @@ endFunction
  ; When the player leaves this prisoner
  event OnCellDetach()
     Debug("Prisoner::OnCellDetach", "Fired event")
-    self.PerformSanityChecks()
+    ; self.PerformSanityChecks()
+    JailCell.PerformPrisonerSanityCheck(self)
 endEvent
 
 ; When the player is in the same cell as this prisoner
 event OnCellAttach()
     Debug("Prisoner::OnCellAttach", "Fired event")
-    self.PerformSanityChecks()
+    ; self.PerformSanityChecks()
+    JailCell.PerformPrisonerSanityCheck(self)
 endEvent
 
 ; When this prisoner comes into the same cell as the player
 event OnAttachedToCell()
     Debug("Prisoner::OnAttachedToCell", "Fired event")
-    self.PerformSanityChecks()
+    ; self.PerformSanityChecks()
+    JailCell.PerformPrisonerSanityCheck(self)
 endEvent
 
 ; When this prisoner leaves the cell the player is in
 event OnDetachedFromCell()
     Debug("Prisoner::OnDetachedFromCell", "Fired event")
-    self.PerformSanityChecks()
+    ; self.PerformSanityChecks()
+    JailCell.PerformPrisonerSanityCheck(self)
 endEvent
 
 
 function MoveToCell(bool abBeginImprisonment = true)
+    if (!self.JailCell)
+        Error("The prisoner " + Name + " has not been assigned a jail cell!")
+        DebugError("Prisoner::MoveToCell", "The prisoner " + Name + " has not been assigned a jail cell!")
+        ; TODO: Add event handling for failed imprisonment
+        return
+    endif
+
     if (self.ShouldBeInCell && self.IsInCell)
         Error(self.GetName() + " is already in "+ self.GetPossessivePronoun() +" cell: " + JailCell + "!")
         DebugError("Prisoner::MoveToCell", self.GetName() + " is already in "+ self.GetPossessivePronoun() +" cell: " + JailCell + "!")
@@ -1916,7 +1909,8 @@ event OnInitialize()
     Prison.RegisterPrisoner(self) ; Registers this prisoner into the prisoner list
     Trace("Prisoner::OnInitialize", "self: " + self)
     if (self.IsNPC() && !self.IsInCell)
-        self.PerformSanityChecks()
+        ; self.PerformSanityChecks()
+        JailCell.PerformPrisonerSanityCheck(self)
     endif
     if (NPC_RestorePrisonerState())
         ; Actor was already a prisoner, do not initialize normally and instead proceed to restoring their previous state
@@ -2062,7 +2056,7 @@ string property TEMPORARY_DESTROY_ON_IMPRISONED = "Temporary::Imprisoned" autore
 
 function Destroy()
     ; TODO: Unset all properties related to this Prisoner
-    Prison.UnregisterPrisoner(self)
+    ; Prison.UnregisterPrisoner(self)
 endFunction
 
 ;/
@@ -2089,24 +2083,14 @@ function DestroyArrestState()
     endif
 endFunction
 
-bool function IsOutOfCell()
-    float distanceFromCellDoor      = self.GetDistance(JailCell.CellDoor)
-    float distanceFromOutsideCell   = self.GetDistance(JailCell.ExteriorMarkers[0] as ObjectReference)
-    bool isOutOfCell                = distanceFromCellDoor >= distanceFromOutsideCell
-
-    Debug("Prisoner::IsOutOfCell", Name + "'s distance from Cell Door: " + distanceFromCellDoor)
-    Debug("Prisoner::IsOutOfCell", Name + "'s distance from Exterior of Cell: " + distanceFromOutsideCell)
-    Debug("Prisoner::IsOutOfCell", Name + " is out of cell: " + isOutOfCell)
-
-    return isOutOfCell
-endFunction
-
 function PerformSanityChecks()
     if (self.IsNPC())
         if (self.ShouldBeInCell && !self.IsInCell)
             self.MoveTo(JailCell)
-            ; Prison.RegisterForSingleUpdate(4.0) ; Continue sanity check in Prison::OnUpdate since this ref may be inactive and not listen to events
+            ; JailCell.RegisterForSanityChecking() ; Continue sanity check in since this ref may be inactive and not listen to events
         endif
+
+        self.EnableAI(!self.IsFarFromPlayer())
     endif
 endFunction
 

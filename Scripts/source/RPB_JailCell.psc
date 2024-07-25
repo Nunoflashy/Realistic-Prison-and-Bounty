@@ -71,7 +71,6 @@ bool property HasExteriorMarkers
 endProperty
 
 ; The prisoners living in this cell
-RPB_Prisoner[] __prisoners
 Form[] property Prisoners
     Form[] function get()
         return JArray.asFormArray(JMap.allValues(__prisonersInCell))
@@ -340,47 +339,11 @@ function ApplyCellPackage(RPB_Prisoner apPrisoner)
     ; BindAliasTo(_cellPackages[packageIndex], self)
     Debug("[Prison: "+ self.Prison.Name +"] JailCell::ApplyCellPackage", "[Prisoner: "+ apPrisoner.Name +"] Package applied on: " +  _cellPackages[packageIndex].GetReference())
 endFunction
-; function ApplyCellPackage()
-;     ; __cellPackage = Prison.PrisonManager.GetCellPackageOfType(self.PackageSize)
-;     ; return
-;     if (!_cellPackages)
-;         _cellPackages = new ReferenceAlias[20]
-;     endif
-;     ; JMap.setForm(__prisonersInCell, apPrisoner.GetIdentifier(), apPrisoner.GetActor())
-
-;     string mapKey   = JMap.getNthKey(__prisonersInCell, PrisonerCount - 1) ; Actor Form ID
-;     Actor actorForm  = JMap.getForm(__prisonersInCell, mapKey) as Actor
-;     int packageIndex = PrisonerCount - 1
-;     RPB_Prisoner prisoner = Prison.GetPrisoner(actorForm)
-;     prisoner.SetInt("Cell Package Index", packageIndex, "JailCell")
- 
-;     _cellPackages[PrisonerCount - 1] = Prison.PrisonManager.GetCellPackageOfType(self.PackageSize)
-;     __cellPackage =  _cellPackages[PrisonerCount - 1]
-;     ; __cellPackage = Prison.PrisonManager.GetCellPackageOfType(self.PackageSize)
-;     ; BindAliasTo(__cellPackage, self)
-;     Debug("[Prison: "+ self.Prison.Name +"] JailCell::ApplyCellPackage", "mapKey: " + mapKey + ", actorForm: " + actorForm + ", packageIndex: " + packageIndex + ", prisoner: " + prisoner)
-;     Debug("[Prison: "+ self.Prison.Name +"] JailCell::ApplyCellPackage", "Package applied on: " + CellPackage.GetReference())
-; endFunction
-
-ReferenceAlias function GetCellPackage(int aiIndex)
-    return _cellPackages[aiIndex]
-endFunction
 
 ReferenceAlias function GetPrisonerCellPackage(RPB_Prisoner apPrisoner)
     int packageIndex = apPrisoner.GetInt("Cell Package Index", "JailCell")
     return _cellPackages[packageIndex]
 endFunction
-
-; function ApplyCellPackage()
-;     if (!_cellPackages)
-;         _cellPackages = new ReferenceAlias[20]
-;     endif
-;     _cellPackages[PrisonerCount - 1] = Prison.PrisonManager.GetCellPackageOfType(self.PackageSize)
-;     __cellPackage =  _cellPackages[PrisonerCount - 1]
-;     ; __cellPackage = Prison.PrisonManager.GetCellPackageOfType(self.PackageSize)
-;     BindAliasTo(__cellPackage, self)
-;     Debug("[Prison: "+ self.Prison.Name +"] JailCell::ApplyCellPackage", "Package applied on: " + CellPackage.GetReference())
-; endFunction
 
 ;/
     Randomly generates goodies such as Lockpicks and Keys for this Cell if applicable.
@@ -793,11 +756,6 @@ function UnregisterPrisoner(RPB_Prisoner apPrisoner)
 endFunction
 
 function DetermineCellParameters()
-    ; if (!self.IsEmpty)
-    ;     ; Don't do anything, cell is not empty which means the parameters have already been set most likely
-    ;     return
-    ; endif
-
     if (self.PrisonerCount > 0)
         Form prisonerForm = JMap.getForm(__prisonersInCell, JMap.getNthKey(__prisonersInCell, 0)) ; Get the first prisoner
         RPB_Prisoner prisonerRef = Prison.GetPrisonerReference(prisonerForm as Actor)
@@ -805,7 +763,7 @@ function DetermineCellParameters()
         ; If the first prisoner will be/is stripped naked / to underwear, set this cell as gender exclusive for them if the cell is not yet gender exclusive,
         ; this means that the first prisoner has not been stripped naked or to underwear.
         ; (Not implemented yet): We should probably make the first prisoner strip off (maybe in some condition, such as having more than a day left of sentence for example.)
-        if (!self.IsGenderExclusive && (prisonerRef.WillBeStrippedNaked || prisonerRef.WillBeStrippedToUnderwear) || (prisonerRef.IsStrippedNaked || prisonerRef.IsStrippedToUnderwear))
+        if (!self.IsGenderExclusive && ((prisonerRef.WillBeStrippedNaked || prisonerRef.WillBeStrippedToUnderwear) || (prisonerRef.IsStrippedNaked || prisonerRef.IsStrippedToUnderwear)))
             self.SetExclusiveToPrisonerSex(prisonerRef)
         endif
 
@@ -815,6 +773,158 @@ function DetermineCellParameters()
         self.RemoveGenderExclusiveness()
     endif
 endFunction
+
+; =========================================================
+;                    NPC Sanity Checking                      
+; =========================================================
+;/
+    Should only happen the first time the player visits the NPC prisoner
+    and at some points where an AI Package is overridden, such as the Solitude execution scene for the NPC's there
+    if they were to be imprisoned.
+/;
+
+float __npcSanityCheckPostCheckUpdateTime
+int   __npcSanityCheckUpdateTries
+float __npcSanityCheckElapsedTime
+bool __npcSanityCheckIsCellAttachedOrDetached
+bool __npcSanityCheckAllPrisoners
+RPB_Prisoner __npcSanityCheckSelectedPrisoner
+
+;/
+    Registers this jail cell for NPC sanity checking, ensuring they remain there.
+
+    float?          @afPreCheckUpdateTime: The update window upon registering the event.
+    float?          @afPostCheckUpdateTime: The update window after the event has been registered, until it is unregistered.
+    RPB_Prisoner?   @apPrisoner: The prisoner to register for sanity checking, if none, all prisoners in the jail cell will be registered.
+/;
+function RegisterForSanityChecking(float afPreCheckUpdateTime = 4.0, float afPostCheckUpdateTime = 1.0, int aiUpdateTries = 10, RPB_Prisoner apPrisoner = none)
+    __npcSanityCheckPostCheckUpdateTime = afPostCheckUpdateTime
+    __npcSanityCheckAllPrisoners        = apPrisoner == none
+    __npcSanityCheckSelectedPrisoner    = apPrisoner
+
+    GotoState("NPC_SanityChecking")
+    RegisterForSingleUpdate(afPreCheckUpdateTime)
+endFunction
+
+ ; When the player leaves the location of this jail cell
+ event OnCellDetach()
+    if (__npcSanityCheckIsCellAttachedOrDetached)
+        return
+    endif
+
+    __npcSanityCheckAllPrisoners = true
+    if (self.PerformPrisonersSanityCheck())
+        Debug("{NPC_SanityChecking} "+ self +" JailCell::OnCellDetach", "Fired")
+        __npcSanityCheckIsCellAttachedOrDetached = true
+        Utility.Wait(1.0)
+        __npcSanityCheckIsCellAttachedOrDetached = false
+    endif
+endEvent
+
+; When the player is in the same cell as this jail cell
+event OnCellAttach()
+    if (__npcSanityCheckIsCellAttachedOrDetached)
+        return
+    endif
+    
+    __npcSanityCheckAllPrisoners = true
+    if (self.PerformPrisonersSanityCheck())
+        Debug("{NPC_SanityChecking} "+ self +" JailCell::OnCellAttach", "Fired")
+        __npcSanityCheckIsCellAttachedOrDetached = true
+        Utility.Wait(1.0)
+        __npcSanityCheckIsCellAttachedOrDetached = false
+    endif
+endEvent
+
+; When this jail cell is in the same cell as the player
+event OnAttachedToCell()
+    if (__npcSanityCheckIsCellAttachedOrDetached)
+        return
+    endif
+    
+    __npcSanityCheckAllPrisoners = true
+    if (self.PerformPrisonersSanityCheck())
+        Debug("{NPC_SanityChecking} "+ self +" JailCell::OnAttachedToCell", "Fired")
+        __npcSanityCheckIsCellAttachedOrDetached = true
+        Utility.Wait(1.0)
+        __npcSanityCheckIsCellAttachedOrDetached = false
+    endif
+endEvent
+
+; When this jail cell is not in the cell the player is in
+event OnDetachedFromCell()
+    if (__npcSanityCheckIsCellAttachedOrDetached)
+        return
+    endif
+
+    __npcSanityCheckAllPrisoners = true
+    if (self.PerformPrisonersSanityCheck())
+        Debug("{NPC_SanityChecking} "+ self +" JailCell::OnDetachedFromCell", "Fired")
+        __npcSanityCheckIsCellAttachedOrDetached = true
+        Utility.Wait(1.0)
+        __npcSanityCheckIsCellAttachedOrDetached = false
+    endif
+endEvent
+
+function PerformPrisonerSanityCheck(RPB_Prisoner apPrisoner)
+    if (apPrisoner.IsNPC())
+        if (apPrisoner.ShouldBeInCell)
+            apPrisoner.EnableAI(!apPrisoner.IsFarFromPlayer())
+            RegisterForSingleUpdate(__npcSanityCheckPostCheckUpdateTime)    ; Keep updating until the prisoner is checked
+        endif
+
+        if (apPrisoner.ShouldBeInCell && !apPrisoner.IsInCell)
+            apPrisoner.MoveTo(self)                                           ; Move the prisoner to this jail cell
+            apPrisoner.BindToCell()                                           ; Prisoner should already be bound to cell, but just in case they aren't
+            ; JailCell.RegisterForSanityChecking() ; Continue sanity check in since this ref may be inactive and not listen to events
+            RegisterForSingleUpdate(__npcSanityCheckPostCheckUpdateTime)    ; Keep updating until the prisoner is checked
+        endif
+    endif
+endFunction
+
+bool function PerformPrisonersSanityCheck()
+    ; Dont need to sanity check empty cells
+    if (self.IsEmpty)
+        return false
+    endif
+
+    ; Not registered to check all prisoners
+    if (!__npcSanityCheckAllPrisoners)
+        return false
+    endif
+
+    int i = 0
+
+    while (i < self.PrisonerCount)
+        Actor prisonerRef       = self.Prisoners[i] as Actor
+        RPB_Prisoner prisoner   = prison.GetPrisoner(prisonerRef)
+        if (prisoner)
+            prisoner.EnableAI(!prisoner.IsFarFromPlayer())
+            while (!prisoner.IsInCell)
+                prisoner.MoveTo(self)                                           ; Move the prisoner to this jail cell
+                prisoner.BindToCell()                                           ; Prisoner should already be bound to cell, but just in case they aren't
+                RegisterForSingleUpdate(__npcSanityCheckPostCheckUpdateTime)    ; Keep updating until the prisoner is in the cell
+            endWhile
+        endif
+        i += 1
+
+        Debug("{NPC_SanityChecking} "+ self +" JailCell::PerformPrisonersSanityCheck", "[Prisoner: "+ prisoner.Name +"] Location: " + prisoner.GetCurrentCell())
+    endWhile
+
+    return true
+endFunction
+
+; Problematic - this OnUpdate must be reviewed at some point, it can cause stack dumps (Prisoner being null might have been the issue, now it's checked)
+state NPC_SanityChecking
+    event OnUpdate()
+        if (!self.PerformPrisonersSanityCheck() && __npcSanityCheckSelectedPrisoner)
+            ; Mass prisoner sanity check failed, check only the passed in prisoner
+            self.PerformPrisonerSanityCheck(__npcSanityCheckSelectedPrisoner)
+        endif
+        Debug("{NPC_SanityChecking} "+ self +" JailCell::OnUpdate", "Updating...")
+        GotoState("")
+    endEvent
+endState
 
 ; =========================================================
 ;                         Data Config                      

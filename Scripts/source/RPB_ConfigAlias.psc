@@ -116,6 +116,8 @@ endEvent
 event OnPlayerLoadGame()
     self.PerformMaintenance()
     self.RegisterHotkeys()
+
+    SetLoggingEnabled("TRACE",  IsTracingEnabled() && false)
 endEvent
 
 ; event OnLocationChange(Location akOldLocation, Location akNewLocation)
@@ -190,6 +192,8 @@ event OnKeyDown(int keyCode)
     endif
 
     if (keyCode == 0x41) ; F7
+        RPB_Actions actions = (self.GetReference() as Form) as RPB_Actions
+        actions.Action_ImprisonSelectedActor(none)
         ; configScript.miscVars.CreateStringMap("Options")
         ; configScript.miscVars.CreateStringMap("Options/Value")
         ; ; configScript.miscVars.CreateArray("Whiterun")

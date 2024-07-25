@@ -21,11 +21,18 @@ string[] function GetActions()
     JArray.addStr(actionArrayObj, "Validate Options")
     JArray.addStr(actionArrayObj, "Play Animation on Selected Actor")
     JArray.addStr(actionArrayObj, "Bind All Prisoners")
+    JArray.addStr(actionArrayObj, "[Prison] Reindex PrisonerList")
+    JArray.addStr(actionArrayObj, "[Prison] Verify Selected Prisoner Integrity")
+    JArray.addStr(actionArrayObj, "[Arrest] Show Arrestee / Captor Lists")
+    JArray.addStr(actionArrayObj, "[Prison] Show Prisoner List")
     JArray.addStr(actionArrayObj, "[Captor Arrest] Arrest Selected Actor (Escort Prisoner)")
     JArray.addStr(actionArrayObj, "[Captor Arrest] Arrest Selected Actor (Teleport Prisoner)")
     JArray.addStr(actionArrayObj, "[Faction Arrest] Arrest Selected Actor (Teleport Prisoner)")
+    JArray.addStr(actionArrayObj, "[Imprisonment] Imprison Selected Actor")
+    JArray.addStr(actionArrayObj, "[Imprisonment] Imprison Nearby Actors")
     JArray.addStr(actionArrayObj, "[Arrest] Add Selected Actor to Current Arrest")
     JArray.addStr(actionArrayObj, "[Prison] Imprison Selected Actor")
+    JArray.addStr(actionArrayObj, "[Prison] Check Prisoners AI Status")
     JArray.addStr(actionArrayObj, "Release Prisoner from Prison (Escort)")
     JArray.addStr(actionArrayObj, "Release Prisoner from Prison (Teleport)")
     JArray.addStr(actionArrayObj, "Bind Cell Package to Reference")
@@ -61,6 +68,18 @@ function ShowActionsMenu()
     elseif (actionToPerform == "Bind All Prisoners")
         Action_BindAllPrisoners(uilib)
 
+    elseif (actionToPerform == "[Prison] Reindex PrisonerList")
+        Action_TestReindexing(uilib)
+
+    elseif (actionToPerform == "[Prison] Verify Selected Prisoner Integrity")
+        Action_VerifyPrisonerIntegrity(uilib)
+
+    elseif (actionToPerform == "[Arrest] Show Arrestee / Captor Lists")
+        Action_ShowArresteeCaptorList(uilib)
+
+    elseif (actionToPerform == "[Prison] Show Prisoner List")
+        Action_ShowPrisonerList(uilib)
+
     elseif (actionToPerform == "[Captor Arrest] Arrest Selected Actor (Escort Prisoner)")
         Action_ArrestSelectedActor(uilib, true)
 
@@ -69,6 +88,15 @@ function ShowActionsMenu()
 
     elseif (actionToPerform == "[Faction Arrest] Arrest Selected Actor (Teleport Prisoner)")
         Action_ArrestSelectedActorForFaction(uilib)
+
+    elseif (actionToPerform == "[Imprisonment] Imprison Selected Actor")
+        Action_ImprisonSelectedActor(uilib)
+
+    elseif (actionToPerform == "[Prison] Check Prisoners AI Status")
+        Action_CheckPrisonersAI(uilib)
+
+    elseif(actionToPerform == "[Imprisonment] Imprison Nearby Actors")
+        Action_ImprisonNearbyActors(uilib)
 
     elseif (actionToPerform == "[Arrest] Add Selected Actor to Current Arrest")
         Action_AddSelectedActorToArrest(uilib)
@@ -142,6 +170,25 @@ function Action_BindAllPrisoners(RPB_UIInterface uilib)
     castleDourDungeon.BindAllPrisonersToCell()
 endFunction
 
+function Action_ShowArresteeCaptorList(RPB_UIInterface uilib)
+    RPB_ArresteeList arrestees  = API.Arrest.Arrestees
+    RPB_CaptorList captors      = API.Arrest.Captors
+
+    ; GetKeys() returns the list as an array of string identifiers for the Actor,
+    ; GetAsArray() returns the whole list even if it's empty (ActiveMagicEffect[] as string)
+    LogNoType("Arrestees: " + arrestees.GetKeys() + " (Array: "+ arrestees.GetAsArray() +")")
+    LogNoType("Captors: " + captors.GetKeys() + " (Array: "+ captors.GetAsArray() +")")
+endFunction
+
+function Action_ShowPrisonerList(RPB_UIInterface uilib)
+    RPB_Prison prison           = API.PrisonManager.GetPrison("Haafingar")
+    RPB_PrisonerList prisoners  = prison.Prisoners
+
+    ; GetKeys() returns the list as an array of string identifiers for the Actor,
+    ; GetAsArray() returns the whole list even if it's empty (ActiveMagicEffect[] as string)
+    LogNoType("Prisoners: " + prisoners.GetKeys() + " (Array: "+ prisoners.GetAsArray() +")")
+endFunction
+
 ; TODO: Check what options are desired, or all, and allow to do this for selected NPC's as well as the Player
 function Action_TogglePrisonStats(RPB_UIInterface uilib, bool abSentence = false, bool abReleaseTime = false, bool abTimeLeft = false, bool abTimeServed = false, bool abBounty = false)
     Actor selectedActor = Game.GetCurrentConsoleRef() as Actor
@@ -184,6 +231,24 @@ function Action_ReleasePrisoner(RPB_UIInterface uilib)
 
     RPB_Prisoner prisoner = prison.GetPrisoner(selectedActor)
     prisoner.Release()
+endFunction
+
+function Action_TestReindexing(RPB_UIInterface uilib)
+    RPB_Prison prison           = API.PrisonManager.GetPrison("Haafingar")
+    RPB_PrisonerList prisoners  = prison.Prisoners
+    prisoners.__private_reindex_data()
+endFunction
+
+function Action_VerifyPrisonerIntegrity(RPB_UIInterface uilib)
+    Actor selectedActor = Game.GetCurrentConsoleRef() as Actor
+    RPB_Prison prison   = API.PrisonManager.FindPrisonByPrisoner(selectedActor)
+
+    if (!prison)
+        return
+    endif
+
+    RPB_Prisoner prisoner = prison.GetPrisoner(selectedActor)
+    LogNoType("Prisoner: " + prisoner.Name + " (Identifier: "+ prisoner.GetIdentifier() +")")
 endFunction
 
 function Action_BindCellPackageToReference(RPB_UIInterface uilib)
@@ -348,3 +413,106 @@ function Action_ArrestSelectedActorForFaction(RPB_UIInterface uilib)
 
     API.Arrest.ArrestActorForFaction(crimeFaction, selectedActor, API.Arrest.ARREST_TYPE_TELEPORT_TO_CELL)
 endFunction
+
+function Action_ImprisonSelectedActor(RPB_UIInterface uilib, string asHold = "null")
+    Actor selectedActor = Game.GetCurrentConsoleRef() as Actor
+    if (selectedActor == none)
+        selectedActor == Game.GetPlayer()
+    endif
+
+    ; string prisonName       = string_if (asHold == "null", uilib.ShowInput("Prison Hold", "Haafingar"), asHold) ; To be changed to a List instead
+    string prisonName = "Haafingar"
+    RPB_Prison prison       = API.PrisonManager.GetPrison(prisonName)
+    RPB_Prisoner prisoner   = prison.MakePrisoner(selectedActor)
+
+    ; Set showable options in prisoner info menu
+    prisoner.ShowReleaseTime          = true
+    prisoner.ShowSentence             = true
+    prisoner.ShowTimeServed           = true
+    prisoner.ShowTimeLeftInSentence   = true
+    prisoner.ShowBounty               = true
+
+    prisoner.SetBelongingsContainer()
+    prisoner.UndetermineSentence()
+    ; prisoner.SetSentence(10)
+
+    prisoner.AssignCell()
+    prisoner.MoveToCell()
+endFunction
+
+function Action_CheckPrisonersAI(RPB_UIInterface uilib)
+    string prisonName = uilib.ShowInput("Prison Hold", "Haafingar") ; To be changed to a List instead
+    RPB_Prison prison       = API.PrisonManager.GetPrison(prisonName)
+
+    int i = 0
+    while (i < prison.Prisoners.Count)
+        RPB_Prisoner prisoner = prison.Prisoners.AtIndex(i)
+        int nameLength  = StringUtil.GetLength(prisoner.Name)
+        string tabs     = string_if (nameLength >= 10, "\t", "\t\t")
+        Debug("Actions::Action_CheckPrisonersAI", "["+ prisoner.Name +"] "+ tabs + prisoner.GetActor() +"\t{ AI: " + prisoner.HasAI() + " | In Cell: "+ prisoner.IsInCell +" | Jail Cell: "+ prisoner.JailCell +" Location: "+ prisoner.GetCurrentCell() +"}")
+        i += 1
+    endWhile
+endFunction
+
+function Action_ImprisonNearbyActors(RPB_UIInterface uilib)
+    int i = 0
+    int actorsToImprison = 30
+    RPB_Prison prison       = API.PrisonManager.GetPrison("Haafingar")
+    ObjectReference selectedRef       = Game.GetCurrentConsoleRef()
+
+    while (i < actorsToImprison)
+        Actor scannedActor = Game.FindClosestActorFromRef(selectedRef, 7000)
+
+        RPB_Prisoner prisoner
+        
+        if (scannedActor)
+            prisoner = prison.MakePrisoner(scannedActor)
+            selectedRef = scannedActor
+        endif
+
+        ; Set showable options in prisoner info menu
+        prisoner.ShowReleaseTime          = true
+        prisoner.ShowSentence             = true
+        prisoner.ShowTimeServed           = true
+        prisoner.ShowTimeLeftInSentence   = true
+        prisoner.ShowBounty               = true
+
+        prisoner.SetBelongingsContainer()
+        prisoner.UndetermineSentence()
+        ; prisoner.SetSentence(10)
+
+        prisoner.AssignCell()
+        prisoner.MoveToCell()
+        i += 1
+    endWhile
+endFunction
+
+; function Action_ImprisonNearbyActors(RPB_UIInterface uilib)
+;     int i = 0
+;     int actorsToImprison = 30
+;     RPB_Prison prison       = API.PrisonManager.GetPrison("Haafingar")
+
+;     while (i < actorsToImprison)
+;         Actor scannedActor = Game.FindClosestActor(0, 0, 0, 7000)
+;         RPB_Prisoner prisoner
+        
+;         if (scannedActor)
+;             prisoner = prison.MakePrisoner(scannedActor)
+;         endif
+
+;         ; Set showable options in prisoner info menu
+;         prisoner.ShowReleaseTime          = true
+;         prisoner.ShowSentence             = true
+;         prisoner.ShowTimeServed           = true
+;         prisoner.ShowTimeLeftInSentence   = true
+;         prisoner.ShowBounty               = true
+
+;         prisoner.SetBelongingsContainer()
+;         prisoner.UndetermineSentence()
+;         ; prisoner.SetSentence(10)
+
+;         prisoner.AssignCell()
+;         prisoner.MoveToCell()
+;         i += 1
+;     endWhile
+; endFunction

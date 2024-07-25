@@ -73,8 +73,9 @@ bool function HasAlias(ReferenceAlias apAlias)
     return false
 endFunction
 
-function EnableAI()
-    this.EnableAI()
+function EnableAI(bool abEnable = true)
+    this.EnableAI(abEnable)
+    Debug("Actor::EnableAI", "AI: " + abEnable)
 endFunction
 
 function DisableAI()
@@ -144,6 +145,10 @@ endFunction
 function MoveTo(ObjectReference akTarget, float afXOffset = 0.0, float afYOffset = 0.0, float afZOffset = 0.0, bool abMatchRotation = true)
     this.MoveTo(akTarget, afXOffset, afYOffset, afZOffset, abMatchRotation)
     Debug("Actor::MoveTo", "Moved " + self.Name + " to " + akTarget)
+endFunction
+
+Cell function GetCurrentCell()
+    return this.GetParentCell()
 endFunction
 
 function PlayAnimation(string asAnimationKey)

@@ -41,6 +41,8 @@ endFunction
 
 function Remove(RPB_Prisoner apPrisoner)
     string elementKey = self.GetPrisonerID(apPrisoner.GetActor())
+
+    RPB_Utility.Debug("PrisonerList::Remove", "Removed Prisoner " + apPrisoner + " ["+ apPrisoner.Name +"]")
     protected_remove(elementKey)
 
     apPrisoner.RemoveAll()

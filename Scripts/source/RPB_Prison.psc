@@ -1326,14 +1326,16 @@ event OnEscortPrisonerToCellEnd(RPB_Prisoner apPrisoner, RPB_JailCell akJailCell
         ; return
     endif
 
-    if (apPrisoner.IsNPC())
-        apPrisoner.BindToCell()
+    akJailCell.RegisterForSanityChecking(apPrisoner = apPrisoner)
 
-        if (apPrisoner.IsFarFromPlayer())
-            apPrisoner.MoveTo(apPrisoner.JailCell)
-            self.RegisterForSingleUpdate(1.0) ; Poll request to ensure the prisoner stays in the jail cell, should be terminated right after that
-        endif
-    endif
+    ; if (apPrisoner.IsNPC())
+    ;     apPrisoner.BindToCell()
+
+    ;     if (apPrisoner.IsFarFromPlayer())
+    ;         apPrisoner.MoveTo(apPrisoner.JailCell)
+    ;         self.RegisterForSingleUpdate(1.0) ; Poll request to ensure the prisoner stays in the jail cell, should be terminated right after that
+    ;     endif
+    ; endif
 
     ; akJailCell.Lock()
 
@@ -1668,29 +1670,6 @@ event OnInit()
 
     Debug("Prison::OnInit", "OnInit PRISON")
 endEvent
-
-;/
-    Should only happen the first time the player visits the prisoner
-    and at some points where an AI Package is overridden, such as the Solitude execution scene for the NPC's there
-    if they were to be imprisoned.
-/;
-event OnUpdate()
-    int i = 0
-    while (i < Prisoners.Count)
-        RPB_Prisoner prisoner = Prisoners.AtIndex(i)
-        while (!prisoner.IsInCell)
-            ; prisoner.BindToCell()
-            prisoner.MoveTo(prisoner.JailCell)
-            RegisterForSingleUpdate(1.0)
-        endWhile
-        i += 1
-    endWhile
-    Debug("Prison::OnUpdate", "Updating...")
-endEvent
-
-function ProcessNPC(RPB_Prisoner apPrisoner)
-
-endFunction
 
 event OnUpdateGameTime()
     __isReceivingUpdates = true
