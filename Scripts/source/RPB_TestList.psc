@@ -190,35 +190,35 @@ function __private_reindex()
     endWhile
 endFunction
 
-function __private_sort()
-    int arrayLength = JValue.count(dataIds)
-    int[] indices   = JArray.asIntArray(JMap.allValues(dataIds))
+; function __private_sort()
+;     int arrayLength = JValue.count(dataIds)
+;     int[] indices   = JArray.asIntArray(JMap.allValues(dataIds))
 
-    int i = 0
-    while (i < arrayLength)
-        string elementKey   = __private_get_key_for_index(i)            ; Get the key in the i'th position: [0, 4, 3, 6, 2]; i = 1 then x = 4 
-        int elementIndex    = __private_get_index_for_key(elementKey)   ; Get the index from the key located in the i'th position
+;     int i = 0
+;     while (i < arrayLength)
+;         string elementKey   = __private_get_key_for_index(i)            ; Get the key in the i'th position: [0, 4, 3, 6, 2]; i = 1 then x = 4 
+;         int elementIndex    = __private_get_index_for_key(elementKey)   ; Get the index from the key located in the i'th position
 
-        string tempData     = data[i] ; i = 0 -> dataIds[1]
-        int tempDataIndex   = JArray.findInt(JMap.allValues(dataIds), i) ; find i in dataIds, so dataIds[x] = i
+;         string tempData     = data[i] ; i = 0 -> dataIds[1]
+;         int tempDataIndex   = JArray.findInt(JMap.allValues(dataIds), i) ; find i in dataIds, so dataIds[x] = i
 
-        Debug("TestList::__private_sort", i + ": elementIndex: " + elementIndex + ", tempDataIndex: " + tempDataIndex)
+;         Debug("TestList::__private_sort", i + ": elementIndex: " + elementIndex + ", tempDataIndex: " + tempDataIndex)
 
-        ; Assign the i'th index to this element
-        JMap.setInt(dataIds, elementKey, i)
+;         ; Assign the i'th index to this element
+;         JMap.setInt(dataIds, elementKey, i)
 
-        string oppositeElementKey = __private_get_key_for_index(elementIndex) ; i = 0 -> dataIds[0] because elementIndex was retrieved from dataIds[1]
-        JMap.setInt(dataIds, oppositeElementKey, elementIndex)
+;         string oppositeElementKey = __private_get_key_for_index(elementIndex) ; i = 0 -> dataIds[0] because elementIndex was retrieved from dataIds[1]
+;         JMap.setInt(dataIds, oppositeElementKey, elementIndex)
 
-        Debug("TestList::__private_sort", i + ": Swapping " + elementKey + " (index: "+ elementIndex +") with " + oppositeElementKey + " (index: "+ tempDataIndex +")")
+;         Debug("TestList::__private_sort", i + ": Swapping " + elementKey + " (index: "+ elementIndex +") with " + oppositeElementKey + " (index: "+ tempDataIndex +")")
 
-        i += 1
-    endWhile
+;         i += 1
+;     endWhile
 
-    indices = JArray.asIntArray(JMap.allValues(dataIds))
-    Debug("TestList::__private_sort", "data: " + data)
-    ; Debug("TestList::__private_sort", "indices: " + indices)
-endFunction
+;     indices = JArray.asIntArray(JMap.allValues(dataIds))
+;     Debug("TestList::__private_sort", "data: " + data)
+;     ; Debug("TestList::__private_sort", "indices: " + indices)
+; endFunction
 
 function __private_list_data()
     int arrayLength         = JValue.count(dataIds)
