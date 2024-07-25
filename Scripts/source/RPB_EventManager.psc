@@ -41,7 +41,7 @@ function RegisterEvents()
     RegisterForModEvent("RPB_ArrestDefeated", "OnArrestDefeat")         ; Happens after the player is defeated through DA
     RegisterForModEvent("RPB_CombatYield", "OnCombatYield")             ; Happens when the player is spared after yielding
     RegisterForModEvent("RPB_SetArrestScene", "OnArrestSceneChanged")   ; Happens when there's a request to change the Arrest scene
-    RegisterForModEvent("RPB_SetArrestGoal", "OnArrestGoalChanged")   ; Happens when there's a request to change the Arrest scene
+    RegisterForModEvent("RPB_SetArrestGoal", "OnArrestGoalChanged")     ; Happens when there's a request to change the Arrest goal
 
     ; Jail Event Handlers
     RegisterForModEvent("RPB_JailBegin", "OnJailBegin")
