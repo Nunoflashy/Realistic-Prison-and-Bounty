@@ -6,11 +6,11 @@ UILIB_1 property UILib
     endFunction
 endProperty
 
-int function ShowList(string asTitle = "", string[] asOptions, int aiStartIndex, int aiDefaultIndex)
+int function ShowList(string asTitle = "", string[] asOptions, int aiStartIndex = 0, int aiDefaultIndex = 0)
     return UILib.ShowList(asTitle, asOptions, aiStartIndex, aiDefaultIndex)
 endFunction
 
-string function ShowList_ReturnElement(string asTitle = "", string[] asOptions, int aiStartIndex, int aiDefaultIndex)
+string function ShowList_ReturnElement(string asTitle = "", string[] asOptions, int aiStartIndex = 0, int aiDefaultIndex = 0)
     int selectedIndex = UILib.ShowList(asTitle, asOptions, aiStartIndex, aiDefaultIndex)
     return asOptions[selectedIndex]
 endFunction
