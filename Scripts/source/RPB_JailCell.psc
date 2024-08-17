@@ -548,11 +548,36 @@ function ScanMiscProps()
     Debug("[Prison: "+ self.Prison.Name +"] JailCell::ScanMiscProps", "Props in " + self + ": " + self.OtherProps)
 endFunction
 
+ObjectReference function GetNthMarker(int aiIndex, string asInteriorOrExterior = "Interior")
+    if (asInteriorOrExterior == "Interior")
+        Form[] _interiorMarkers = self.InteriorMarkers
+        if (_interiorMarkers.Length <= aiIndex)
+            return _interiorMarkers[aiIndex] as ObjectReference
+        else
+            Error("Marker falls outside of the bounds of the array!")
+            DebugError("JailCell::GetNthMarker", "Marker falls outside of the bounds of the array!")
+        endif
+
+    elseif (asInteriorOrExterior == "Exterior")
+        Form[] _exteriorMarkers = self.ExteriorMarkers
+        if (_exteriorMarkers.Length <= aiIndex)
+            return _exteriorMarkers[aiIndex] as ObjectReference
+        else
+            Error("Marker falls outside of the bounds of the array!")
+            DebugError("JailCell::GetNthMarker", "Marker falls outside of the bounds of the array!")
+        endif
+    endif
+
+    return none
+endFunction
+
 ObjectReference function GetRandomMarker(string asInteriorOrExterior = "Interior")
     if (asInteriorOrExterior == "Interior")
+        ; return self.GetNthMarker(Utility.RandomInt(0, self.InteriorMarkers.Length - 1), "Interior")
         return self.InteriorMarkers[Utility.RandomInt(0, self.InteriorMarkers.Length - 1)] as ObjectReference
 
     elseif (asInteriorOrExterior == "Exterior")
+        ; return self.GetNthMarker(Utility.RandomInt(0, self.ExteriorMarkers.Length - 1), "Exterior")
         return self.ExteriorMarkers[Utility.RandomInt(0, self.ExteriorMarkers.Length - 1)] as ObjectReference
     endif
 
@@ -564,7 +589,7 @@ endFunction
 ; =========================================================
 
 bool function HasPrisoners()
-
+    return PrisonerCount > 0
 endFunction
 
 bool function HasFemales(bool abStrictlyFemales = false)
