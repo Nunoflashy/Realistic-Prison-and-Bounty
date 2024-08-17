@@ -770,7 +770,11 @@ endFunction
 
 
 bool function HasPrisoners(RPB_JailCell akPrisonCell = none)
+    if (akPrisonCell)
+        return akPrisonCell.HasPrisoners()
+    endif
 
+    return Prisoners.Count > 0
 endFunction
 
 bool function HasFemalePrisoners(RPB_JailCell akPrisonCell = none, bool abOnlyFemales = false)
@@ -806,7 +810,7 @@ bool function ReleasePrisoner(RPB_Prisoner apPrisoner)
 
     ; Unregister the prisoner from prison
     self.UnregisterPrisoner(apPrisoner)
-
+    
     self.OnPrisonerReleased(apPrisoner)
 endFunction
 
@@ -910,7 +914,7 @@ string function GetTimeServedFormatted(RPB_Prisoner apPrisoner)
     return RPB_Utility.GetTimeFormatted(apPrisoner.TimeServed, asNullValue = "None")
 endFunction
 
-
+; ==========================================================
 ;                         Escape
 ; ==========================================================
 
@@ -1216,6 +1220,9 @@ event OnPrisonerRegistered(RPB_Prisoner apPrisoner)
 endEvent
 
 event OnPrisonerUnregistered(RPB_Prisoner apPrisoner)
+    Spell prisonerSpell = RPB_Utility.RPB_PrisonerSpell()
+    apPrisoner.RemoveSpell(prisonerSpell)
+
     PrisonManager.OnPrisonUnregisteredPrisoner(self, apPrisoner)
 endEvent
 
