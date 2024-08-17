@@ -33,6 +33,7 @@ string[] function GetActions()
     JArray.addStr(actionArrayObj, "[Arrest] Add Selected Actor to Current Arrest")
     JArray.addStr(actionArrayObj, "[Prison] Imprison Selected Actor")
     JArray.addStr(actionArrayObj, "[Prison] Check Prisoners AI Status")
+    JArray.addStr(actionArrayObj, "Release Prisoner from Prison")
     JArray.addStr(actionArrayObj, "Release Prisoner from Prison (Escort)")
     JArray.addStr(actionArrayObj, "Release Prisoner from Prison (Teleport)")
     JArray.addStr(actionArrayObj, "Bind Cell Package to Reference")
@@ -101,11 +102,13 @@ function ShowActionsMenu()
     elseif (actionToPerform == "[Arrest] Add Selected Actor to Current Arrest")
         Action_AddSelectedActorToArrest(uilib)
 
+    elseif (actionToPerform == "Release Prisoner from Prison")
+        Action_ReleasePrisoner(uilib)
+
     elseif (actionToPerform == "Release Prisoner from Prison (Escort)")
-        Actor selectedActor = Game.GetCurrentConsoleRef() as Actor
 
     elseif (actionToPerform == "Release Prisoner from Prison (Teleport)")
-        Action_ReleasePrisoner(uilib)
+        Action_ReleaseSelectedPrisoner(uilib)
 
     elseif (actionToPerform == "Bind Cell Package to Reference")
         Action_BindCellPackageToReference(uilib)
@@ -191,13 +194,17 @@ endFunction
 
 ; TODO: Check what options are desired, or all, and allow to do this for selected NPC's as well as the Player
 function Action_TogglePrisonStats(RPB_UIInterface uilib, bool abSentence = false, bool abReleaseTime = false, bool abTimeLeft = false, bool abTimeServed = false, bool abBounty = false)
-    Actor selectedActor = Game.GetCurrentConsoleRef() as Actor
-    if (selectedActor == none)
-        selectedActor == Game.GetPlayer()
+    RPB_Prison prison = self.ShowPrisonList(uilib)
+
+    if (prison == none)
+        return none
     endif
 
-    RPB_Prison prison     = API.PrisonManager.FindPrisonByPrisoner(selectedActor)
-    RPB_Prisoner prisoner = prison.GetPrisoner(selectedActor)
+    RPB_Prisoner prisoner = self.ShowPrisonerList(uilib, prison)
+
+    if (prisoner == none)
+        return none
+    endif
 
     if (abSentence)
         prisoner.ShowSentence = !prisoner.ShowSentence
@@ -220,8 +227,24 @@ function Action_TogglePrisonStats(RPB_UIInterface uilib, bool abSentence = false
     endif
 endFunction
 
-; Releases the selected Prisoner
 function Action_ReleasePrisoner(RPB_UIInterface uilib)
+    RPB_Prison prison = self.ShowPrisonList(uilib)
+
+    if (prison == none)
+        return none
+    endif
+
+    RPB_Prisoner prisoner = self.ShowPrisonerList(uilib, prison)
+
+    if (prisoner == none)
+        return none
+    endif
+    
+    prisoner.Release()
+endFunction
+
+; Releases the selected Prisoner
+function Action_ReleaseSelectedPrisoner(RPB_UIInterface uilib)
     Actor selectedActor = Game.GetCurrentConsoleRef() as Actor
     RPB_Prison prison   = API.PrisonManager.FindPrisonByPrisoner(selectedActor)
 
@@ -516,3 +539,95 @@ endFunction
 ;         i += 1
 ;     endWhile
 ; endFunction
+
+; ==========================================================
+;                          Functions
+; ==========================================================
+
+RPB_Prison function ShowPrisonList(RPB_UIInterface uilib, bool abNotEmpty = true)
+    RPB_PrisonManager prisonManager = API.PrisonManager
+    int prisonNames = JArray.object()
+    int prisonCount = prisonManager.PrisonSlots
+    int activePrisonCount = 0
+
+    int prisonIds = JArray.object()
+
+    JArray.addStr(prisonNames, "<No Prison>")
+
+    int i = 0
+    while (i < prisonCount)
+        RPB_Prison prison = prisonManager.GetPrisonByID(i)
+        int prisonerCount = prison.Prisoners.Count
+        if ((prisonerCount > 0 && abNotEmpty) || !abNotEmpty)
+            string prisonName = prison.Name
+            string prisonHold = prison.Hold
+            string prisonLine = "("+ prisonHold +") " + prisonName + " - " + prisonerCount + " Prisoners"
+            JArray.addStr(prisonNames, prisonLine)
+            JArray.addInt(prisonIds, prison.ID)
+            activePrisonCount += 1
+        endif
+        i += 1
+    endWhile
+    
+    if (activePrisonCount == 0)
+        return none
+    endif
+
+    string[] prisonNamesArray = JArray.asStringArray(prisonNames)
+
+    int index = uilib.ShowList("Select Prison", prisonNamesArray, 0, 0) - 1
+    if (index == -1)
+        return none
+    endif
+
+    int id = JArray.getInt(prisonIds, index)
+    return prisonManager.GetPrisonByID(id)
+endFunction
+
+RPB_Prisoner function ShowPrisonerList(RPB_UIInterface uilib, RPB_Prison apPrison, bool abOnlyImprisoned = false)
+    float startBench = StartBenchmark()
+    RPB_Prison prison = apPrison
+    
+    if (!prison)
+        return none
+    endif
+
+    RPB_PrisonerList prisoners = prison.Prisoners
+    int activePrisonerCount = 0
+
+    int prisonerNames = JArray.object()
+    JArray.addStr(prisonerNames, "<No Prisoner>")
+    Debug("Actions::ShowPrisonerList", "Prisoners: " + prisoners.GetKeys())
+
+    int i = 0
+    while (i < prisoners.GetSize())
+        RPB_Prisoner prisoner = prisoners.AtIndex(i)
+        if ((abOnlyImprisoned && prisoner.IsImprisoned) || !abOnlyImprisoned)
+            string prisonerName = prisoner.Name
+            ; string sentenceFormatted = prison.GetSentenceFormatted(prisoner)
+            ; string prisonerLine = "("+ prisoner.GetSex(true) +") " + prisoner.Name + " - " + prisoner.JailCell.ID + " | Sentence: " + sentenceFormatted
+            string prisonerLine = "("+ prisoner.GetSex(true) +") " + prisonerName + " - " + prisoner.JailCell.ID
+            JArray.addStr(prisonerNames, prisonerLine)
+            activePrisonerCount += 1
+        endif
+        i += 1
+    endWhile
+
+
+    if (activePrisonerCount == 0)
+        return none
+    endif
+ 
+    string[] prisonerNamesAsArray = JArray.asStringArray(prisonerNames)
+    EndBenchmark(startBench, "Actions::ShowPrisonerList")
+
+
+
+    int index = uilib.ShowList("Select Prisoner", prisonerNamesAsArray, 0, 0) - 1
+    if (index == -1)
+        return none
+    endif
+
+    RPB_Prisoner selectedPrisoner = prisoners.AtIndex(index)
+    return selectedPrisoner
+endFunction
