@@ -75,7 +75,9 @@ endFunction
 
 function EnableAI(bool abEnable = true)
     this.EnableAI(abEnable)
-    Debug("Actor::EnableAI", "AI: " + abEnable)
+    if (abEnable)
+        Debug("Actor::EnableAI", "AI: " + abEnable)
+    endif
 endFunction
 
 function DisableAI()
