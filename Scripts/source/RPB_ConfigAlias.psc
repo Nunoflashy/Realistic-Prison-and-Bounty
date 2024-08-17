@@ -116,8 +116,6 @@ endEvent
 event OnPlayerLoadGame()
     self.PerformMaintenance()
     self.RegisterHotkeys()
-
-    SetLoggingEnabled("TRACE",  IsTracingEnabled() && false)
 endEvent
 
 ; event OnLocationChange(Location akOldLocation, Location akNewLocation)
