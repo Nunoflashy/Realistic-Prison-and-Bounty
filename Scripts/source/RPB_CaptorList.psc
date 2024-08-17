@@ -1,22 +1,5 @@
 scriptname RPB_CaptorList extends RPB_ActiveMagicEffectContainer
 
-; How many Captors are in the list
-int property Count
-    int function get()
-        int containerSize = parent.GetSize()
-        int _count = 0
-        int i = 0
-        while (i < containerSize)
-            if (self.AtIndex(i) != none)
-                _count += 1
-            endif
-            i += 1
-        endWhile
-
-        return _count
-    endFunction
-endProperty
-
 string function GetCaptorID(Actor akActor)
     return "Captor["+ akActor.GetFormID() +"]"
 endFunction

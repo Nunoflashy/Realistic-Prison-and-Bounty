@@ -1,22 +1,5 @@
 scriptname RPB_ArresteeList extends RPB_ActiveMagicEffectContainer
 
-; How many arrestees are in the list
-int property Count
-    int function get()
-        int containerSize = parent.GetSize()
-        int _count = 0
-        int i = 0
-        while (i < containerSize)
-            if (self.AtIndex(i) != none)
-                _count += 1
-            endif
-            i += 1
-        endWhile
-
-        return _count
-    endFunction
-endProperty
-
 string function GetArresteeID(Actor akActor)
     return "Arrestee["+ akActor.GetFormID() +"]"
 endFunction

@@ -1,22 +1,5 @@
 scriptname RPB_PrisonerList extends RPB_ActiveMagicEffectContainer
 
-; How many prisoners are in the list
-int property Count
-    int function get()
-        int containerSize = parent.GetSize()
-        int _count = 0
-        int i = 0
-        while (i < containerSize)
-            if (self.AtIndex(i) != none)
-                _count += 1
-            endif
-            i += 1
-        endWhile
-
-        return _count
-    endFunction
-endProperty
-
 string function GetPrisonerID(Actor akActor)
     return "Prisoner["+ akActor.GetFormID() +"]"
 endFunction
@@ -36,14 +19,14 @@ endFunction
 
 bool function Add(RPB_Prisoner apPrisonerRef)
     string elementKey = self.GetPrisonerID(apPrisonerRef.GetActor())
-    parent.AddAt(apPrisonerRef, elementKey)
+    parent.AddElement(apPrisonerRef, elementKey)
 endFunction
 
 function Remove(RPB_Prisoner apPrisoner)
     string elementKey = self.GetPrisonerID(apPrisoner.GetActor())
 
     RPB_Utility.Debug("PrisonerList::Remove", "Removed Prisoner " + apPrisoner + " ["+ apPrisoner.Name +"]")
-    protected_remove(elementKey)
+    parent.RemoveElement(elementKey)
 
     apPrisoner.RemoveAll()
     apPrisoner.RemoveAll("Arrest")
