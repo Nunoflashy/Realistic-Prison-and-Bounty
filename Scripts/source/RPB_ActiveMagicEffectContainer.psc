@@ -336,8 +336,6 @@ function __private_add_at(ActiveMagicEffect element, string elementKey)
     if (hasKey)
         return
     endif
-    ; SetLoggingEnabled("DEBUG", false)
-    ; SetLoggingEnabled("TRACE", false)
 
     int availableIndex = __private_getAvailableIndex()
 endFunction
@@ -358,18 +356,13 @@ function AddAt(ActiveMagicEffect apActiveMagicEffect, string asKey)
 
     ; possible point of slowdown since we iterate over all elements
     int availableIndex = __private_getAvailableIndex()
-    ; SetLoggingEnabled("DEBUG", false)
-    ; SetLoggingEnabled("TRACE", false)
     if (data[availableIndex] == none)
         data[availableIndex] = apActiveMagicEffect ; Assign AME to this index
         JMap.setInt(dataIds, asKey, availableIndex) ; Store the index at this key
-        ; SetLoggingEnabled("DEBUG", true)
-        ; SetLoggingEnabled("TRACE", true)
+
         Debug("ActiveMagicEffectList::Add", "Added ActiveMagicEffect: " + apActiveMagicEffect + " at index: " + availableIndex + " (key: "+ asKey +").")
         nextAvailableIndex = availableIndex
     endif
-    ; SetLoggingEnabled("DEBUG", false)
-    ; SetLoggingEnabled("TRACE", false)
 
     ; RPB_Utility.Debug("ActiveMAgicEffectList::AddAt", "data: " + data + ", self: " + GetOwningQuest())
 endFunction
@@ -431,8 +424,6 @@ function __private_shift_element_left(int index)
 endFunction
 
 function __private_reindex_data()
-    ; SetLoggingEnabled("DEBUG", true)
-    ; SetLoggingEnabled("TRACE", true)
     int arrayLength = JValue.count(dataIds)
     int[] indexes   = JArray.asIntArray(JMap.allValues(dataIds))
 
@@ -456,8 +447,6 @@ function __private_reindex_data()
 
     indexes   = JArray.asIntArray(JMap.allValues(dataIds))
     Debug("ActiveMagicEffectList::__private_reindex_data", "indexes: " + indexes)
-    ; SetLoggingEnabled("DEBUG", false)
-    ; SetLoggingEnabled("TRACE", false)
 endFunction
 
 function reindex_data(string asKeyToRemove)
