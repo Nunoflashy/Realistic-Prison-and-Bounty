@@ -17,7 +17,8 @@ bool function Exists(RPB_Captor apCaptor)
 endFunction
 
 bool function Add(RPB_Captor apCaptorRef)
-    parent.AddAt(apCaptorRef, self.GetCaptorID(apCaptorRef.GetActor()))
+    string elementKey = self.GetCaptorID(apCaptorRef.GetActor())
+    parent.AddElement(apCaptorRef, elementKey)
 endFunction
 
 function Remove(RPB_Captor apCaptor)
