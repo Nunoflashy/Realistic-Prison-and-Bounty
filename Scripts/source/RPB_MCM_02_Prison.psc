@@ -8,9 +8,11 @@ bool function ShouldHandleEvent(RPB_MCM_02 mcm, RPB_Prisoner apPrisoner = none) 
 endFunction
 
 function Render(RPB_MCM_02 mcm, RPB_Prisoner apPrisoner) global
-    if (!ShouldHandleEvent(mcm, apPrisoner))
-        return
-    endif
+    RPB_Utility.Debug("MCM_02_Prison::Render", "Render")
+
+    ; if (!ShouldHandleEvent(mcm, apPrisoner))
+    ;     return
+    ; endif
 
     int emptySpacesLeft     = 0
     int emptySpacesRight    = 0
@@ -95,9 +97,9 @@ function Render(RPB_MCM_02 mcm, RPB_Prisoner apPrisoner) global
     endif
 
     if (prisoner.Captor)
-        RPB_Captor prisonerCaptor = prisoner.Captor
-        Debug("["+ prison.Name +"] MCM_02_Prison::Render", prisoner.Name + "'s Captor: " + prisonerCaptor + ", Form: " + prisonerCaptor.GetActor() + ", Test: " + prisonerCaptor.Test)
-        mcm.AddOptionText("Captured By", prisonerCaptor.Name, defaultFlags = mcm.OPTION_DISABLED)
+        Actor prisonerCaptor = prisoner.Captor
+        Debug("["+ prison.Name +"] MCM_02_Prison::Render", prisoner.Name + "'s Captor: " + prisonerCaptor + ", Form: " + prisonerCaptor)
+        mcm.AddOptionText("Captured By", prisonerCaptor.GetBaseObject().GetName(), defaultFlags = mcm.OPTION_DISABLED)
     endif
 
     if (prisoner.ShowSentence && !prisoner.IsUndeterminedSentence)

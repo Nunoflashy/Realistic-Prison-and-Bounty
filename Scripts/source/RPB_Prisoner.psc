@@ -56,15 +56,9 @@ int property Number
     endFunction
 endProperty
 
-; Actor property Captor
-;     Actor function get()
-;         return GetForm("Arrest Captor") as Actor
-;     endFunction
-; endProperty
-
-RPB_Captor property Captor
-    RPB_Captor function get()
-        return API.Arrest.GetCaptorReference(GetForm("Arrest Captor") as Actor)
+Actor property Captor
+    Actor function get()
+        return self.GetForm("Arrest Captor") as Actor
     endFunction
 endProperty
 
@@ -79,7 +73,6 @@ RPB_JailCell property JailCell
         return self.GetCell()
     endFunction
 endProperty
-
 
 float __currentTimeOverride
 float property CurrentTime
@@ -1147,7 +1140,7 @@ state Imprisoned
 
         ; Captor should probably be destroyed in RPB_Captor, because more Prisoners/Arrestees may depend on it
         ; we could check if that Captor has any prisoners left to escort, if not, destroy the reference.
-        Captor.Destroy()
+        ; Captor.Destroy()
 
         ; At this point, we can delete the prisoner's arrest state
         self.DestroyArrestState()

@@ -785,6 +785,10 @@ bool function HasMalePrisoners(RPB_JailCell akPrisonCell = none, bool abOnlyMale
 
 endFunction
 
+bool function HasPrisonersOfGender(RPB_JailCell akPrisonCell = none, string asGender, bool abOnlySpecifiedGender = false)
+
+endFunction
+
 RPB_Prisoner[] function GetPrisoners(RPB_JailCell akPrisonCell = none)
 
 endFunction
@@ -828,7 +832,7 @@ bool function ProcessPrisoner(RPB_Prisoner apPrisoner)
     endif
 
     if (apPrisoner.ShouldBeStripped)
-        apPrisoner.StartStripping(apPrisoner.Captor.GetActor())
+        apPrisoner.StartStripping(apPrisoner.Captor)
     endif
 endFunction
 
@@ -1220,9 +1224,6 @@ event OnPrisonerRegistered(RPB_Prisoner apPrisoner)
 endEvent
 
 event OnPrisonerUnregistered(RPB_Prisoner apPrisoner)
-    Spell prisonerSpell = RPB_Utility.RPB_PrisonerSpell()
-    apPrisoner.RemoveSpell(prisonerSpell)
-
     PrisonManager.OnPrisonUnregisteredPrisoner(self, apPrisoner)
 endEvent
 
@@ -1247,7 +1248,7 @@ event OnPrisonerProcessed(RPB_Prisoner apPrisoner)
         return
     endif
 
-    apPrisoner.StartStripping(apPrisoner.Captor.GetActor())
+    apPrisoner.StartStripping(apPrisoner.Captor)
 endEvent
 
 event OnPrisonerTimeElapsed(RPB_Prisoner apPrisoner)
