@@ -142,23 +142,7 @@ function InitializePages()
     endWhile
 
     JArray.addStr(_pagesArray, "")
-
-    RPB_Prison actorPrison = RPB_Prison.GetPrisonForHold("Haafingar")
-    string prisonName = actorPrison.Name
-    int n = 0
-    while (n < actorPrison.Prisoners.Count)
-        RPB_Prisoner prisoner = actorPrison.Prisoners.AtIndex(n)
-        int prisonerFormID  = actorPrison.Prisoners.AtIndex(n).GetActor().GetFormID()
-        RPB_Utility.Debug("MCM_02::InitializePages", "Prisoner: " + prisoner)
-        RPB_Utility.Debug("MCM_02::InitializePages", "Prisoner Name: " + prisoner.Name)
-        RPB_Utility.Debug("MCM_02::InitializePages", "Prisoner Number: " + prisoner.Number)
-        RPB_Utility.Debug("MCM_02::InitializePages", "Prisoners: " + actorPrison.Prisoners.GetKeys())
-        RPB_Utility.Debug("MCM_02::InitializePages", "Prisoners ActiveMagicEffect[]: " + actorPrison.Prisoners.GetAsArray())
-        JArray.addStr(_pagesArray, prisonName + " - " + prisoner.Name + " (#"+ prisoner.Number +")")
-        n += 1
-    endWhile
-
-    ; JArray.addStr(_pagesArray, "Prison - Quorya")
+    JArray.addStr(_pagesArray, "Check Prisoner")
 
     Pages = JArray.asStringArray(_pagesArray)
 endFunction
@@ -177,23 +161,39 @@ event OnConfigOpen()
 endEvent
 
 event OnPageReset(string page)
+    if (page == "")
+        Actor player = Game.GetForm(0x14) as Actor
+        RPB_Prison playerPrison = PrisonManager.FindPrisonByPrisoner(player)
+        if (playerPrison == none)
+            return ; No Prison
+        endif
+
+        RPB_Prisoner playerPrisoner = playerPrison.GetPrisonerReference(player)
+        if (playerPrisoner == none)
+            return ; No Prisoner
+        endif
+
+        RPB_MCM_02_Prison.Render(self, playerPrisoner)
+
+    elseif (page == "Check Prisoner")
+        RPB_Utility.Debug("MCM_02::OnPageReset", "Page: " + page + " - Check Prisoner")
+        RPB_UIInterface uilib = (Game.GetForm(0x14) as Form) as RPB_UIInterface
+
+        RPB_Prison selectedPrison = uilib.ShowPrisonList()
+        if (selectedPrison == none)
+            return
+        endif
+
+        RPB_Prisoner selectedPrisoner = uilib.ShowPrisonerList(selectedPrison, true)
+        if (selectedPrisoner == none)
+            return
+        endif
+
+        RPB_MCM_02_Prison.Render(self, selectedPrisoner)
+        return
+    endif
+
     RPB_MCM_02_Holds.Render(self)
-
-    RPB_Prison actorPrison = RPB_Prison.GetPrisonForHold("Haafingar")
-    int n = 0
-    while (n < actorPrison.Prisoners.Count)
-        RPB_Prisoner prisoner = actorPrison.Prisoners.AtIndex(n)
-        string prisonerName = actorPrison.Prisoners.AtIndex(n).Name
-        int prisonerFormID = actorPrison.Prisoners.AtIndex(n).GetActor().GetFormID()
-        ; RPB_Utility.Debug("MCM_02::OnPageReset", "prisoner: " + prisoner)
-        ; RPB_Utility.Debug("MCM_02::OnPageReset", "prisonerName: " + prisoner.Name)
-        ; RPB_Utility.Debug("MCM_02::OnPageReset", "Prisoner Number: " + prisoner.Number)
-        RPB_MCM_02_Prison.Render(self, prisoner)
-        n += 1
-    endWhile
-
-    RPB_Utility.Debug("MCM_02::OnPageReset", "Page: " + page, true)
-    RPB_Utility.Debug("MCM_02::OnPageReset", "self.CurrentPage: " + self.CurrentPage, true)
 endEvent
 
 event OnOptionHighlight(int option)

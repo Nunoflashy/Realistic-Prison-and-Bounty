@@ -28,6 +28,9 @@ function Remove(RPB_Prisoner apPrisoner)
     RPB_Utility.Debug("PrisonerList::Remove", "Removed Prisoner " + apPrisoner + " ["+ apPrisoner.Name +"]")
     parent.RemoveElement(elementKey)
 
+    Spell prisonerSpell = RPB_Utility.RPB_PrisonerSpell()
+    apPrisoner.RemoveSpell(prisonerSpell)
+
     apPrisoner.RemoveAll()
-    apPrisoner.RemoveAll("Arrest")
+    apPrisoner.RemoveAll("Arrest") ; Needs to be reviewed, do we really want to delete Arrest-related category for Prisoners?
 endFunction
