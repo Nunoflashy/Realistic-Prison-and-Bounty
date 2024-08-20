@@ -15,6 +15,17 @@ int property OPTION_ENABLED  = 0x00 autoreadonly
 int property OPTION_DISABLED = 0x01 autoreadonly
 ; ==============================================================================
 
+RPB_API __api
+RPB_API property API
+    RPB_API function get()
+        if (__api)
+            return __api
+        endif
+
+        __api = RPB_API.GetSelf()
+        return __api
+    endFunction
+endProperty
 
 RPB_PrisonManager __prisonManager
 RPB_PrisonManager property PrisonManager
@@ -86,6 +97,38 @@ int aiBountiesPaid \
     return JArray.asStringArray(values)
 endFunction
 
+string property ArrestHeaderTemplate
+    string function get()
+        return RPB_Data.MCM_GetArrestTemplate()
+    endFunction
+endProperty
+
+string[] property ArrestHeaderPlaceholders
+    string[] function get()
+        int placeholders = JArray.object()
+        JArray.addStr(placeholders, "hold")
+        JArray.addStr(placeholders, "city")
+        JArray.addStr(placeholders, "potential prison")
+        JArray.addStr(placeholders, "arrestee")
+
+        return JArray.asStringArray(placeholders)
+    endFunction
+endProperty
+
+string[] function ConstructArrestHeaderValues( \ 
+    string asArrestHold, \
+    string asArrestCity, \
+    string asPotentialPrisonName, \
+    string asArresteeName \
+)
+    int values = JArray.object()
+    JArray.addStr(values, asArrestHold)
+    JArray.addStr(values, asArrestCity)
+    JArray.addStr(values, asPotentialPrisonName)
+    JArray.addStr(values, asArresteeName)
+    return JArray.asStringArray(values)
+endFunction
+
 string property PrisonHeaderTemplate
     string function get()
         return RPB_Data.MCM_GetPrisonTemplate()
@@ -142,6 +185,10 @@ function InitializePages()
     endWhile
 
     JArray.addStr(_pagesArray, "")
+    if (API.Arrest.Arrestees.Count > 0)
+        JArray.addStr(_pagesArray, "Check Arrestee")
+    endif
+
     JArray.addStr(_pagesArray, "Check Prisoner")
 
     Pages = JArray.asStringArray(_pagesArray)
@@ -175,16 +222,32 @@ event OnPageReset(string page)
 
         RPB_MCM_02_Prison.Render(self, playerPrisoner)
 
+    elseif (page == "Check Arrestee")
+        RPB_UIInterface uilib = (Game.GetForm(0x14) as Form) as RPB_UIInterface
+        string selectedHold = uilib.ShowHoldList(abMustHaveArrestees = true, abSkipListOnSingleResult = true, asListTitle = "Select Arrest Hold")
+
+        if (!selectedHold)
+            return
+        endif
+
+        RPB_Arrestee selectedArrestee = uilib.ShowArresteeList(selectedHold, asListTitle = "Select Arrestee for " + selectedHold)
+        if (selectedArrestee == none)
+            return
+        endif
+
+        RPB_MCM_02_Prison.RenderArrest(self, selectedArrestee)
+        return
+
     elseif (page == "Check Prisoner")
         RPB_Utility.Debug("MCM_02::OnPageReset", "Page: " + page + " - Check Prisoner")
         RPB_UIInterface uilib = (Game.GetForm(0x14) as Form) as RPB_UIInterface
 
-        RPB_Prison selectedPrison = uilib.ShowPrisonList()
+        RPB_Prison selectedPrison = uilib.ShowPrisonList(abSkipListOnSingleResult = true)
         if (selectedPrison == none)
             return
         endif
 
-        RPB_Prisoner selectedPrisoner = uilib.ShowPrisonerList(selectedPrison, true)
+        RPB_Prisoner selectedPrisoner = uilib.ShowPrisonerList(selectedPrison, true, "Select Prisoner in " + selectedPrison.Name)
         if (selectedPrisoner == none)
             return
         endif

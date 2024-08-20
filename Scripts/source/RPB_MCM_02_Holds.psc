@@ -143,8 +143,8 @@ function RenderPrisons(RPB_MCM_02 mcm) global
             endif
 
         endif
-    else
-        mcm.AddOptionText("", "You have not been jailed", defaultFlags = mcm.OPTION_DISABLED)
+    else ; TODO: Add case to display "Last Arrested on Xth of Month, 4E 2XX, In Hold"
+        mcm.AddOptionText("", "You have not been arrested", defaultFlags = mcm.OPTION_DISABLED)
         mcm.AddOptionText("", "In " + hold, defaultFlags = mcm.OPTION_DISABLED)
         mcm.AddEmptyOption()
         ; mcm.AddOptionText("", "In any of " + hold + "'s prisons", defaultFlags = mcm.OPTION_DISABLED) ; Saved for future updates when 1:N Hold to Prison

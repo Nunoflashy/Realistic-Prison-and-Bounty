@@ -76,6 +76,18 @@ string function MCM_GetPrisonTemplate() global
     return prisonTemplate
 endFunction
 
+string function MCM_GetArrestTemplate() global
+    int mcmConfig   = JValue.readFromFile(GetModDataDirectory() + "mcm.json") ; JMap&
+    int statsObj    = JMap.getObj(mcmConfig, "Stats") ; JMap&
+    int arrestObj   = JMap.getObj(statsObj, "Arrest")
+
+    string template = JMap.getStr(arrestObj, "Template")
+
+    return template
+endFunction
+
+
+
 ; ==========================================================
 ;                        Serialization
 ; ==========================================================

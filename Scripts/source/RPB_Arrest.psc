@@ -187,6 +187,10 @@ RPB_Arrestee function GetArresteeReference(Actor akArrestee)
     return arresteeRef
 endFunction
 
+RPB_Arrestee function GetArresteeReferenceInHold(Actor akArrestee, string asHold)
+
+endFunction
+
 ; ==========================================================
 ;                  Captor-specific Methods
 ; ==========================================================
@@ -482,6 +486,15 @@ event OnKeyDown(int keyCode)
     endif
 endEvent
 
+string function GetTimeOfArrestFormatted(RPB_Arrestee apArrestee)
+    int day      = apArrestee.DayOfArrest
+    int month    = apArrestee.MonthOfArrest
+    int year     = apArrestee.YearOfArrest
+    int hour     = apArrestee.HourOfArrest
+    int minute   = apArrestee.MinuteOfArrest
+
+    return RPB_Utility.GetFormattedDate(day, month, year, hour, minute)
+endFunction
 
 ; Temporary Event Handlers
 event OnArrestStart(Actor akCaptor, Actor akArrestee)

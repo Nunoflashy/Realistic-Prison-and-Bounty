@@ -127,6 +127,36 @@ float property TimeOfArrest
     endFunction
 endProperty
 
+int property MinuteOfArrest
+    int function get()
+        return GetInt("Minute of Arrest")
+    endFunction
+endProperty
+
+int property HourOfArrest
+    int function get()
+        return GetInt("Hour of Arrest")
+    endFunction
+endProperty
+
+int property DayOfArrest
+    int function get()
+        return GetInt("Day of Arrest")
+    endFunction
+endProperty
+
+int property MonthOfArrest
+    int function get()
+        return GetInt("Month of Arrest")
+    endFunction
+endProperty
+
+int property YearOfArrest
+    int function get()
+        return GetInt("Year of Arrest")
+    endFunction
+endProperty
+
 float property TimeArrested
     float function get()
         return CurrentTime - TimeOfArrest
@@ -179,6 +209,21 @@ endFunction
 RPB_Prison function GetPotentialPrison()
     return API.PrisonManager.GetPrison(Hold)
 endFunction
+
+string function GetTimeOfArrestFormatted()
+    int day      = self.DayOfArrest
+    int month    = self.MonthOfArrest
+    int year     = self.YearOfArrest
+    int hour     = self.HourOfArrest
+    int minute   = self.MinuteOfArrest
+
+    return RPB_Utility.GetFormattedDate(day, month, year, hour, minute)
+endFunction
+
+string function GetTimeElapsedSinceArrest()
+    return RPB_Utility.GetTimeFormatted(self.CurrentTime - self.TimeOfArrest)
+endFunction
+
 
 function Frisk()
     
@@ -267,11 +312,11 @@ endFunction
 
 function TransferArrestPropertiesToPrisoner(RPB_Prison apPrison)
     self.SetFloat("Time of Arrest", TimeOfArrest, "Jail")
-    self.SetInt("Minute of Arrest", GetInt("Minute of Arrest"), "Jail")
-    self.SetInt("Hour of Arrest", GetInt("Hour of Arrest"), "Jail")
-    self.SetInt("Day of Arrest", GetInt("Day of Arrest"), "Jail")
-    self.SetInt("Month of Arrest", GetInt("Month of Arrest"), "Jail")
-    self.SetInt("Year of Arrest", GetInt("Year of Arrest"), "Jail")
+    self.SetInt("Minute of Arrest", MinuteOfArrest, "Jail")
+    self.SetInt("Hour of Arrest", HourOfArrest, "Jail")
+    self.SetInt("Day of Arrest", DayOfArrest, "Jail")
+    self.SetInt("Month of Arrest", MonthOfArrest, "Jail")
+    self.SetInt("Year of Arrest", YearOfArrest, "Jail")
     self.SetForm("Arrest Captor", Captor.GetActor(), "Jail")
 endFunction
 ; ==========================================================

@@ -190,8 +190,9 @@ event OnKeyDown(int keyCode)
     endif
 
     if (keyCode == 0x41) ; F7
-        RPB_Actions actions = (self.GetReference() as Form) as RPB_Actions
-        actions.Action_ImprisonSelectedActor(none)
+        RPB_UIInterface uilib   = (self.GetReference() as Form) as RPB_UIInterface
+        RPB_Actions actions     = (self.GetReference() as Form) as RPB_Actions
+        actions.Action_ImprisonSelectedActor(uilib)
         ; configScript.miscVars.CreateStringMap("Options")
         ; configScript.miscVars.CreateStringMap("Options/Value")
         ; ; configScript.miscVars.CreateArray("Whiterun")

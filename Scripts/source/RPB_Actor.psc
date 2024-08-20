@@ -725,6 +725,10 @@ string function GetIdentifier()
     return this.GetFormID()
 endFunction
 
+int function GetFormID()
+    return this.GetFormID()
+endFunction
+
 string function GetPossessivePronoun()
     if (self.IsFemale)
         return "her"

@@ -7,6 +7,110 @@ bool function ShouldHandleEvent(RPB_MCM_02 mcm, RPB_Prisoner apPrisoner = none) 
     return StringUtil.Find(mcm.CurrentPage, prison.Name + " - " + apPrisoner.Name + " (#"+ apPrisoner.Number +")") != -1
 endFunction
 
+; ==========================================================
+;                           Arrest
+; ==========================================================
+
+function RenderArrest(RPB_MCM_02 mcm, RPB_Arrestee apArrestee) global
+    RPB_Utility.Debug("MCM_02_Prison::RenderArrest", "RenderArrest")
+
+    int emptySpacesLeft     = 0
+    int emptySpacesRight    = 0
+
+    string hold           = apArrestee.Hold
+    RPB_Arrestee arrestee = apArrestee
+
+    mcm.SetCursorFillMode(mcm.TOP_TO_BOTTOM)
+    ; ==========================================================
+    ;                           Left
+    ; ==========================================================
+    if (!arrestee.IsArrested)
+        DebugWarn("MCM_02_Prison::RenderArrest", "The arrestee " + arrestee.Name + " is not arrested, no stats to show.")
+        Warn("The arrestee " + arrestee.Name + " is not arrested, no stats to show.")
+        Debug("MCM_02_Prison::RenderArrest", "arrestee: " + arrestee)
+        return
+    endif
+
+    RPB_Prison potentialPrison = arrestee.GetPotentialPrison()
+
+    string arrestTimeFormatted      = arrestee.GetTimeOfArrestFormatted()
+    string timeElapsedSinceArrest   = arrestee.GetTimeElapsedSinceArrest()
+
+    DisplayTimeHeader(mcm)
+    emptySpacesLeft += 1
+
+    if (arrestee.TimeOfArrest)
+        mcm.AddOptionText("\t\t\t\tTime of Arrest", defaultFlags = mcm.OPTION_DISABLED)
+        mcm.AddOptionText("", arrestTimeFormatted, defaultFlags = mcm.OPTION_DISABLED)
+        if (timeElapsedSinceArrest)
+            mcm.AddOptionText("", timeElapsedSinceArrest + " Ago", defaultFlags = mcm.OPTION_DISABLED)
+        endif
+        mcm.AddEmptyOption()
+        emptySpacesLeft += 1
+    endif
+
+    mcm.AddEmptyOption()
+    emptySpacesLeft += 1
+
+    mcm.SetCursorPosition(1)
+    ; ==========================================================
+    ;                           Right
+    ; ==========================================================
+
+    DisplayArrestHeader(mcm, hold, arrestee)
+
+    if (arrestee.Bounty)
+        mcm.AddOptionText("Bounty for Arrest", \ 
+            string_if (arrestee.BountyNonViolent > 0, arrestee.BountyNonViolent + " Bounty") + \ 
+            string_if (arrestee.BountyNonViolent && arrestee.BountyViolent, " / ") + \
+            string_if (arrestee.BountyViolent > 0, arrestee.BountyViolent + " Violent Bounty"), \ 
+            defaultFlags = mcm.OPTION_DISABLED \
+        )
+    endif
+
+    if (arrestee.Captor)
+        RPB_Captor captor = arrestee.Captor
+        Debug("["+ hold +"] MCM_02_Prison::RenderArrest", arrestee.Name + "'s Captor: " + captor)
+        mcm.AddOptionText("Captured By", captor.Name, defaultFlags = mcm.OPTION_DISABLED)
+    endif
+
+    if (potentialPrison)
+        mcm.AddOptionText("Headed To", potentialPrison.Name + ", " + potentialPrison.City, defaultFlags = mcm.OPTION_DISABLED)
+        ; mcm.AddOptionText("City", potentialPrison.City, defaultFlags = mcm.OPTION_DISABLED)
+    endif
+
+    mcm.AddEmptyOption()
+    ; emptySpacesRight += 1
+
+    while (emptySpacesRight < emptySpacesLeft)
+        mcm.AddEmptyOption()
+        emptySpacesRight += 1
+    endWhile
+endFunction
+
+function DisplayArrestHeader(RPB_MCM_02 mcm, string asArrestHold, RPB_Arrestee apArrestee) global
+    RPB_Prison potentialPrison = apArrestee.GetPotentialPrison()
+
+    string[] headerPlaceholders = mcm.ArrestHeaderPlaceholders
+    string[] arrestHeader = mcm.ConstructArrestHeaderValues( \ 
+        asArrestHold          = apArrestee.Hold, \
+        asArrestCity          = potentialPrison.City, \
+        asPotentialPrisonName = potentialPrison.Name, \
+        asArresteeName        = apArrestee.Name \
+    )
+
+    string template = mcm.ArrestHeaderTemplate
+    string header   = RPB_Utility.Replace(template, headerPlaceholders, arrestHeader)
+
+    mcm.AddOptionText("", header, defaultFlags = mcm.OPTION_DISABLED)
+    mcm.AddOptionCategory("", flags = mcm.OPTION_DISABLED)
+    mcm.AddEmptyOption()
+endFunction
+
+; ==========================================================
+;                           Prison
+; ==========================================================
+
 function Render(RPB_MCM_02 mcm, RPB_Prisoner apPrisoner) global
     RPB_Utility.Debug("MCM_02_Prison::Render", "Render")
 
