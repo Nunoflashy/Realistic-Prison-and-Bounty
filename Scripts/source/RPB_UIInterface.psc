@@ -155,7 +155,7 @@ RPB_Prison function ShowPrisonList(bool abNotEmpty = true, bool abSkipListOnSing
         return none
     endif
 
-    if (activePrisonCount == 1 && abSkipListOnSingleResult) ; Skip List (Only one result and <No Hold>)
+    if (activePrisonCount == 1 && abSkipListOnSingleResult) ; Skip List (Only one result and <No Prison>)
         int id = JArray.getInt(prisonIds, 0)
         return prisonManager.GetPrisonByID(id)
     endif
