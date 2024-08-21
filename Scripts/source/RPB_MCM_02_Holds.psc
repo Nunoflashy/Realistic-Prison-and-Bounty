@@ -7,46 +7,6 @@ bool function ShouldHandleEvent(RPB_MCM_02 mcm) global
     return mcm.IsHoldCurrentPage()
 endFunction
 
-; function RenderPrisonLeft(RPB_MCM_02 mcm, string asPrisonName) global
-;     string prisonCity = "Solitude"
-
-;     string hold = mcm.CurrentPage
-
-;     int holdObject = RPB_Data.GetRootObject(hold)
-;     Faction holdCrimeFaction = RPB_Data.Hold_GetCrimeFaction(holdObject)
-
-;     float timeJailed    = RPB_ActorVars.GetTimeJailed(holdCrimeFaction, Game.GetForm(0x14) as Actor)
-;     int lastSentence    = RPB_ActorVars.GetLastSentence(holdCrimeFaction, Game.GetForm(0x14) as Actor)
-
-;     ; ==========================================================
-;     ;                           Left
-;     ; ==========================================================
-;     mcm.AddOptionCategory(asPrisonName + " ("+ prisonCity +")", flags = mcm.OPTION_DISABLED)
-;     ; mcm.AddOptionText("Time Jailed", RPB_Utility.GetTimeFormatted(100), defaultFlags = mcm.OPTION_DISABLED)
-;     mcm.AddOptionText("Time Served", RPB_Utility.GetTimeFormatted(timeJailed, asNullValue = "N/A"), defaultFlags = mcm.OPTION_DISABLED)
-;     mcm.AddOptionText("Last Sentence", RPB_Utility.GetTimeFormatted(lastSentence, asNullValue = "N/A"), defaultFlags = mcm.OPTION_DISABLED)
-;     mcm.AddOptionText("Longest Sentence", RPB_Utility.GetTimeFormatted(30*4), defaultFlags = mcm.OPTION_DISABLED)
-;     mcm.AddOptionText("Current Infamy", "50", defaultFlags = mcm.OPTION_DISABLED)
-;     mcm.AddOptionCategory("", flags = mcm.OPTION_DISABLED)
-; endFunction
-
-; function RenderPrisonRight(RPB_MCM_02 mcm, string asPrisonName) global
-;     string prisonCity = "Solitude"
-
-;     int timesFrisked = RPB_ActorVars.GetTimesFrisked()
-
-;     ; ==========================================================
-;     ;                           Right
-;     ; ==========================================================
-;     mcm.AddOptionCategory("", flags = mcm.OPTION_DISABLED)
-
-;     mcm.AddOptionText("Times Frisked", "1", defaultFlags = mcm.OPTION_DISABLED)
-;     mcm.AddOptionText("Times Stripped", "0", defaultFlags = mcm.OPTION_DISABLED)
-;     mcm.AddOptionText("Times Jailed", "1", defaultFlags = mcm.OPTION_DISABLED)
-;     mcm.AddOptionText("Times Escaped", "0", defaultFlags = mcm.OPTION_DISABLED)
-;     mcm.AddOptionCategory("", flags = mcm.OPTION_DISABLED)
-; endFunction
-
 function RenderPrisonLeft(RPB_MCM_02 mcm, RPB_Prison apPrison, Actor akActor) global
     Faction prisonFaction = apPrison.PrisonFaction
 
