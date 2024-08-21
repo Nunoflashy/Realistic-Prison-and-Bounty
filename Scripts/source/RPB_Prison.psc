@@ -1207,10 +1207,10 @@ endEvent
     Handles imprisonment failures of any kind.
     
     RPB_Prisoner    @apPrisoner: The prisoner that has failed to be imprisoned.
-    string          @asFailReason: The reason for imprisonment failing.
+    string          @reason: The reason for imprisonment failing.
 /;
-event OnPrisonerImprisonmentFail(RPB_Prisoner apPrisoner, string asFailReason)
-    if (asFailReason == "Assign Cell")
+event OnPrisonerImprisonmentFail(RPB_Prisoner apPrisoner, string reason)
+    if (reason == "Assign Cell")
         ; Could not assign a cell to this prisoner, abort imprisonment?
         DebugError("Prison::OnPrisonerImprisonmentFail", "A jail cell could not be assigned to prisoner " + apPrisoner.Name + ", aborting imprisonment and destroying reference...!")
         Error("A jail cell could not be assigned to " + apPrisoner.Name + ", aborting imprisonment...!")
@@ -2316,6 +2316,21 @@ RPB_Prisoner function MakePrisoner(Actor akActor, bool abDelayExecution = true)
     endif
 
     RPB_Prisoner prisonerReference = self.GetPrisonerReference(akActor)
+    if (prisonerReference == none)
+        RPB_Prison actorPrison = PrisonManager.FindPrisonByPrisoner(akActor)
+
+        if (actorPrison != none)
+            RPB_Prisoner actorPrisonerRef = actorPrison.GetPrisonerReference(akActor)
+            ; Actor is a prisoner in some prison, don't do anything
+            if (actorPrisonerRef != none)
+                return none
+            endif
+        endif
+    
+        ; Remove the RPB_Prisoner spell and consequently, the effect
+        akActor.RemoveSpell(prisonerSpell)
+        return none
+    endif
 
     ; The instance should be available by now, since after the spell is added, the script will register this actor as a Prisoner OnInitialize() through self.RegisterPrisoner()
     return prisonerReference
@@ -2372,10 +2387,6 @@ bool __infamyRecognizedThresholdMsgSent
 bool __infamyKnownThresholdMsgSent
 
 function NotifyInfamyRecognizedThresholdMet(bool asNotification = false)
-    ; if (RPB_StorageVars.GetBool("["+ Hold +"]Jail::Infamy Recognized Threshold Message Sent"))
-    ;     return
-    ; endif
-
     if (__infamyRecognizedThresholdMsgSent)
         return
     endif
@@ -2384,22 +2395,15 @@ function NotifyInfamyRecognizedThresholdMet(bool asNotification = false)
 
     PrisonManager.PrisonInfamyRecognizedThresholdNotification = true
 
-    ; RPB_StorageVars.SetBool("["+ Hold +"]Jail::Infamy Recognized Threshold Message Sent", true)
-    ; RPB_StorageVars.SetBool("Jail::Infamy Recognized Threshold Notification", true)
-
     if (config.ShouldDisplayInfamyNotifications && asNotification)
-        debug.notification("You are now recognized as a criminal in " + Name)
+        Debug.notification("You are now recognized as a criminal in " + Name)
         return
     endif
 
-    debug.MessageBox("You are now recognized as a criminal in " + Name)
+    Debug.MessageBox("You are now recognized as a criminal in " + Name)
 endFunction
 
 function NotifyInfamyKnownThresholdMet(bool asNotification = false)
-    ; if (RPB_StorageVars.GetBool("["+ Hold +"]Jail::Infamy Known Threshold Message Sent"))
-    ;     return
-    ; endif
-
     if (__infamyKnownThresholdMsgSent)
         return
     endif
@@ -2408,16 +2412,12 @@ function NotifyInfamyKnownThresholdMet(bool asNotification = false)
 
     PrisonManager.PrisonInfamyKnownThresholdNotification = true
 
-
-    ; RPB_StorageVars.SetBool("["+ Hold +"]Jail::Infamy Known Threshold Message Sent", true)
-    RPB_StorageVars.SetBool("Jail::Infamy Known Threshold Notification", true)
-
     if (config.ShouldDisplayInfamyNotifications && asNotification)
-        debug.notification("You are now a known criminal in " + Name)
+        Debug.notification("You are now a known criminal in " + Name)
         return
     endif
 
-    debug.MessageBox("You are now a known criminal in " + Name)
+    Debug.MessageBox("You are now a known criminal in " + Name)
 endFunction
 
 ; ==========================================================
