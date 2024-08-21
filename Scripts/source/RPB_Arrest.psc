@@ -279,7 +279,6 @@ endFunction
 
 bool function IsActorArrested(Actor akActor)
     return RPB_StorageVars.GetBoolOnForm("Arrested", akActor, "Arrest")
-    ; return ArrestVars.GetBool(string_if (akActor == Config.Player, "Arrest::Arrested", "["+ akActor.GetFormID() +"]Arrest::Arrested"))
 endFunction
 
 event OnInit()
@@ -486,16 +485,6 @@ event OnKeyDown(int keyCode)
     endif
 endEvent
 
-string function GetTimeOfArrestFormatted(RPB_Arrestee apArrestee)
-    int day      = apArrestee.DayOfArrest
-    int month    = apArrestee.MonthOfArrest
-    int year     = apArrestee.YearOfArrest
-    int hour     = apArrestee.HourOfArrest
-    int minute   = apArrestee.MinuteOfArrest
-
-    return RPB_Utility.GetFormattedDate(day, month, year, hour, minute)
-endFunction
-
 ; Temporary Event Handlers
 event OnArrestStart(Actor akCaptor, Actor akArrestee)
     ; Jail.EscortToJail()
@@ -510,7 +499,7 @@ endEvent
 
     string          @asScene: The name of the Scene.
     string          @asSceneEvent: The event that takes place within the Scene.
-    RPB_Arrestee    @apPrisoner: The arrestee that is taking part in the Scene.
+    RPB_Arrestee    @apArrestee: The arrestee that is taking part in the Scene.
 
     TOOD: For some reason, any Arrestee disappears from the list if the player is not near them, which means
     that apArrestee will be null and so any properties that depend on it will also be null.
