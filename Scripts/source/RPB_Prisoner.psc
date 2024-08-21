@@ -2056,15 +2056,16 @@ endFunction
     Destroys the prisoner's arrest state, as they are now a prisoner and the arrest state is not required anymore.
 /;
 function DestroyArrestState()
-    RPB_Arrestee arrestState = RPB_Arrestee.GetStateForPrisoner(self)
+    if (!API.Arrest.IsActorArrested(this))
+        return
+    endif
 
-    ; Debug("Prisoner::DestroyArrestState", "Prison Hold from Arrest Vars: " + GetString("Hold", "Arrest"))
+    RPB_Arrestee arrestState = RPB_Arrestee.GetStateForPrisoner(self)
 
     if (arrestState)
         ; Save the bounty from the Arrest state
         int _bounty          = self.GetInt("Bounty Non-Violent", "Arrest")
         int _bountyViolent   = self.GetInt("Bounty Violent", "Arrest")
-        ; Debug("Prisoner::DestroyArrestState", "Bounty: " + _bounty + ", Violent: " + _bountyViolent)
         
         arrestState.Destroy()
         Utility.Wait(0.2)
@@ -2072,7 +2073,6 @@ function DestroyArrestState()
         ; Save the bounty from the Arrest state
         self.SetInt("Bounty Non-Violent", _bounty, "Arrest")
         self.SetInt("Bounty Violent", _bountyViolent, "Arrest")
-        ; Debug("Prisoner::DestroyArrestState", "Bounty: " + Bounty + ", Violent: " + BountyViolent)
     endif
 endFunction
 
