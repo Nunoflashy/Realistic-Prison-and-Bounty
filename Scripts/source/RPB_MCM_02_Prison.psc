@@ -2,18 +2,11 @@ Scriptname RPB_MCM_02_Prison hidden
 
 import RPB_Utility
 
-bool function ShouldHandleEvent(RPB_MCM_02 mcm, RPB_Prisoner apPrisoner = none) global
-    RPB_Prison prison = apPrisoner.Prison
-    return StringUtil.Find(mcm.CurrentPage, prison.Name + " - " + apPrisoner.Name + " (#"+ apPrisoner.Number +")") != -1
-endFunction
-
 ; ==========================================================
 ;                           Arrest
 ; ==========================================================
 
 function RenderArrest(RPB_MCM_02 mcm, RPB_Arrestee apArrestee) global
-    RPB_Utility.Debug("MCM_02_Prison::RenderArrest", "RenderArrest")
-
     int emptySpacesLeft     = 0
     int emptySpacesRight    = 0
 
@@ -27,7 +20,6 @@ function RenderArrest(RPB_MCM_02 mcm, RPB_Arrestee apArrestee) global
     if (!arrestee.IsArrested)
         DebugWarn("MCM_02_Prison::RenderArrest", "The arrestee " + arrestee.Name + " is not arrested, no stats to show.")
         Warn("The arrestee " + arrestee.Name + " is not arrested, no stats to show.")
-        Debug("MCM_02_Prison::RenderArrest", "arrestee: " + arrestee)
         return
     endif
 
@@ -70,7 +62,6 @@ function RenderArrest(RPB_MCM_02 mcm, RPB_Arrestee apArrestee) global
 
     if (arrestee.Captor)
         RPB_Captor captor = arrestee.Captor
-        Debug("["+ hold +"] MCM_02_Prison::RenderArrest", arrestee.Name + "'s Captor: " + captor)
         mcm.AddOptionText("Captured By", captor.Name, defaultFlags = mcm.OPTION_DISABLED)
     endif
 
@@ -88,6 +79,10 @@ function RenderArrest(RPB_MCM_02 mcm, RPB_Arrestee apArrestee) global
     endWhile
 endFunction
 
+;/
+    Displays the Header section info with the Arrest info.
+    The header's values, as well as their position, are controlled through the template on the MCM config file.
+/;
 function DisplayArrestHeader(RPB_MCM_02 mcm, string asArrestHold, RPB_Arrestee apArrestee) global
     RPB_Prison potentialPrison = apArrestee.GetPotentialPrison()
 
@@ -112,12 +107,6 @@ endFunction
 ; ==========================================================
 
 function Render(RPB_MCM_02 mcm, RPB_Prisoner apPrisoner) global
-    RPB_Utility.Debug("MCM_02_Prison::Render", "Render")
-
-    ; if (!ShouldHandleEvent(mcm, apPrisoner))
-    ;     return
-    ; endif
-
     int emptySpacesLeft     = 0
     int emptySpacesRight    = 0
 
@@ -133,7 +122,6 @@ function Render(RPB_MCM_02 mcm, RPB_Prisoner apPrisoner) global
     if (!prisoner.IsImprisoned)
         DebugWarn("MCM_02_Prison::Render", "The prisoner " + prisoner.Name + " (Prisoner #"+ prisoner.Number +") " + " is not imprisoned, no stats to show.")
         Warn("The prisoner " + prisoner.Name + " (Prisoner #"+ prisoner.Number +") " + " is not imprisoned, no stats to show.")
-        Debug("MCM_02_Prison::Render", "prison: " + prison + ", prisoner: " + prisoner)
         return
     endif
 
@@ -202,7 +190,6 @@ function Render(RPB_MCM_02 mcm, RPB_Prisoner apPrisoner) global
 
     if (prisoner.Captor)
         Actor prisonerCaptor = prisoner.Captor
-        Debug("["+ prison.Name +"] MCM_02_Prison::Render", prisoner.Name + "'s Captor: " + prisonerCaptor + ", Form: " + prisonerCaptor)
         mcm.AddOptionText("Captured By", prisonerCaptor.GetBaseObject().GetName(), defaultFlags = mcm.OPTION_DISABLED)
     endif
 
