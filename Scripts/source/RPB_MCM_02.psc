@@ -194,6 +194,26 @@ function InitializePages()
     Pages = JArray.asStringArray(_pagesArray)
 endFunction
 
+int property PLAYER_INFO_NONE     = 0 autoreadonly
+int property PLAYER_INFO_ARRESTED = 1 autoreadonly
+int property PLAYER_INFO_PRISONER = 2 autoreadonly
+
+int function GetPlayerArrestStatus()
+    Actor player = Game.GetForm(0x14) as Actor
+
+    bool isImprisoned = RPB_StorageVars.GetBoolOnForm("Imprisoned", player, "Jail")
+    if (isImprisoned)
+        return PLAYER_INFO_PRISONER
+    endif
+
+    bool isArrested = RPB_StorageVars.GetBoolOnForm("Arrested", player, "Arrest")
+    if (isArrested)
+        return PLAYER_INFO_ARRESTED
+    endif
+
+    return PLAYER_INFO_NONE
+endFunction
+
 ; ============================================================================
 ; Event Handling
 ; ============================================================================
@@ -209,18 +229,26 @@ endEvent
 
 event OnPageReset(string page)
     if (page == "")
+        int playerArrestStatus = self.GetPlayerArrestStatus()
         Actor player = Game.GetForm(0x14) as Actor
-        RPB_Prison playerPrison = PrisonManager.FindPrisonByPrisoner(player)
-        if (playerPrison == none)
-            return ; No Prison
-        endif
 
-        RPB_Prisoner playerPrisoner = playerPrison.GetPrisonerReference(player)
-        if (playerPrisoner == none)
-            return ; No Prisoner
-        endif
+        if (playerArrestStatus == PLAYER_INFO_PRISONER)
+            RPB_Prison playerPrison = PrisonManager.FindPrisonByPrisoner(player)
+            if (playerPrison == none)
+                return ; No Prison
+            endif
+    
+            RPB_Prisoner playerPrisoner = playerPrison.GetPrisonerReference(player)
+            if (playerPrisoner == none)
+                return ; No Prisoner
+            endif
 
-        RPB_MCM_02_Prison.Render(self, playerPrisoner)
+            RPB_MCM_02_Prison.Render(self, playerPrisoner)
+
+        elseif (playerArrestStatus == PLAYER_INFO_ARRESTED)
+            RPB_Arrestee playerArresteeRef = API.Arrest.GetArresteeReference(player)
+            RPB_MCM_02_Prison.RenderArrest(self, playerArresteeRef)
+        endif
 
     elseif (page == "Check Arrestee")
         RPB_UIInterface uilib = (Game.GetForm(0x14) as Form) as RPB_UIInterface
