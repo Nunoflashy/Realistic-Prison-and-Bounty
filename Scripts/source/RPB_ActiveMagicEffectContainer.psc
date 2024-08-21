@@ -378,7 +378,7 @@ ActiveMagicEffect function GetAt(string asKey)
 
     int arrayIndex = JMap.getInt(dataIds, asKey)
 
-    Debug("ActiveMagicEffectList::GetAt", "Retrieved ActiveMagicEffect: " + data[arrayIndex] + " at index: " + arrayIndex + ", from key: " + asKey)
+    ; Debug("ActiveMagicEffectList::GetAt", "Retrieved ActiveMagicEffect: " + data[arrayIndex] + " at index: " + arrayIndex + ", from key: " + asKey)
     return data[arrayIndex]
 endFunction
 
