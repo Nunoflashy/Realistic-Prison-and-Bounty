@@ -123,7 +123,8 @@ endProperty
 
 bool property ShouldBeStripped
     bool function get()
-        return true
+        return Sentence >= 10
+        return true && (!IsStrippedNaked && !IsStrippedToUnderwear)
     endFunction
 endProperty
 
@@ -704,9 +705,9 @@ function Imprison()
         self.TriggerInfamyPenalty()
     endif
 
-    if (wasMoved)
-        self.ProcessWhenMoved() ; Only use when moved, not when escorted (Handle all events at once)
-    endif
+    ; if (wasMoved)
+    ;     self.ProcessWhenMoved() ; Only use when moved, not when escorted (Handle all events at once)
+    ; endif
 
     self.RegisterTimeOfImprisonment()
     self.DetermineReleaseTimeAdditionalHours() ; For Release Time (Minimum, Maximum) intervals
@@ -781,7 +782,7 @@ function Strip(bool abRemoveUnderwear = true)
     self.UnequipHands()
     self.SheatheWeapon()
 
-    this.EquipItem(Game.GetForm(0x13105) as Armor)
+    ; this.EquipItem(Game.GetForm(0x13105) as Armor)
 
     self.IncrementStat("Times Stripped")
     SetBool("Stripped", true) ; No use for now, might be changed
@@ -812,6 +813,13 @@ function StartRestraining(Actor akRestrainer)
     SceneManager.StartRestrainPrisoner_02( \
         akGuard     = akRestrainer, \
         akPrisoner  = this \
+    )
+endFunction
+
+function StartFrisking(Actor akSearcherGuard)
+    SceneManager.StartFrisking( \
+        akFriskerGuard     = akSearcherGuard, \
+        akFriskedPrisoner  = this \
     )
 endFunction
 
@@ -1600,7 +1608,7 @@ function ProcessWhenMoved()
     endif
 
     if (self.ShouldBeStripped)
-        ; self.Strip()
+        self.Strip()
     endif
 endFunction
 
@@ -1673,6 +1681,8 @@ function MoveToCell(bool abBeginImprisonment = true)
 
     self.MoveTo(JailCell)
     self.BindToCell()
+
+    self.ProcessWhenMoved()
 
     if (abBeginImprisonment)
         if (Prison.IsPrisonerQueuedForImprisonment(self))
@@ -2046,7 +2056,6 @@ endEvent
 
 string property TEMPORARY_DESTROY_ON_IMPRISONED = "Temporary::Imprisoned" autoreadonly
 
-
 function Destroy()
     ; TODO: Unset all properties related to this Prisoner
     ; Prison.UnregisterPrisoner(self)
@@ -2084,6 +2093,35 @@ function PerformSanityChecks()
         endif
 
         self.EnableAI(!self.IsFarFromPlayer())
+    endif
+endFunction
+
+;/
+    Performs sanity checks for prisoners that should be stripped (NPC's only)
+
+    When the player is far away from the prisoner at the time of imprisonment,
+    despite the prisoner being stripped, they will still be wearing their normal clothes,
+    leaving copies of it in the prisoner chest on strip.
+
+    This function aims to fix that by performing a sanity check to ensure they are stripped when the player
+    is in the same location.
+
+    It can and should only run once, after that, their clothes will not reappear on them.
+    called from JailCell::PerformPrisonersSanityCheck() and JailCell::PerformPrisonerSanityCheck()
+/;
+function PerformStrippingSanityChecks()
+    if (!self.IsNPC())
+        return
+    endif
+
+    ; TODO: Check if the prisoner was stripped to underwear, and give them the underwear back,
+    ; also take into account possible lockpicks or keys the prisoner might have, we don't want to include those, the prisoner should remain with them
+    bool shouldStrip = !self.IsNaked() && self.IsInCell && self.Is("Stripped") ;/&& !self.Has("Stripped by Sanity Check")/;
+
+    if (shouldStrip)
+        self.RemoveAllItems()
+        Debug("Prisoner::PerformStrippingSanityChecks", "Stripped " + self.Name + " - performed sanity check")
+        ; self.SetBool("Stripped by Sanity Check", true) ; Only let it happen once (ideally when the player first visits the prisoner)
     endif
 endFunction
 
@@ -2133,21 +2171,6 @@ endFunction
 
 function NPC_SavePrisonerState()
     SetBool("ShouldRestorePrisonerState", true)
-    return
-    ; SetInt("Sentence",               self.Sentence)
-    ; SetFloat("Time of Arrest",       self.TimeOfArrest)
-    ; SetFloat("Time of Imprisonment", self.TimeOfImprisonment)
-
-    ; ; Set flag to know whether to restore the state or not
-    ; SetBool("ShouldRestorePrisonerState", true)
-
-    ; Debug(this, "Prisoner::NPC_SavePrisonerState", "Saving NPC Prisoner state..." + "\n" + \
-    ;     "\t Sentence: " + self.Sentence + "\n" + \
-    ;     "\t Time of Arrest: " + self.TimeOfArrest + "\n" + \
-    ;     "\t Time Of Imprisonment: " + self.TimeOfImprisonment + "\n" + \
-    ;     "\t Release Time: " + self.ReleaseTime + "\n" \
-    ; )
-
 endFunction
 
 ;/

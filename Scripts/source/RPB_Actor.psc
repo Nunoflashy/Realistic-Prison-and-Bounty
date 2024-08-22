@@ -182,6 +182,8 @@ endFunction
 ; ==========================================================
 
 bool function IsNaked()
+    bool hasBodyClothing = this.GetWornForm(0x00000004) == none
+    return hasBodyClothing
     ; TOOD: Logic to determine when the actor is naked
 endFunction
 

@@ -1296,13 +1296,19 @@ event OnEscortPrisonerToJailEnd(RPB_Actor apActor, Actor akEscort)
     prisonerRef.SetBelongingsContainer()     ; Set the container of where the prisoner's items will be confiscated to
     prisonerRef.AssignCell()            ; Assign a prison cell to this prisoner
 
-    ; if should be stripped
-    ; prisonerRef.StartStripping(akEscort)
-    if (!prisonerRef.IsInCell)
-        ; prisonerRef.StartRestraining(akStripper)
-        prisonerRef.EscortToCell(akEscort)
+    ; TODO: Review if a prisoner should be both frisked and stripped, or only stripped if they were going to be stripped
+    if (prisonerRef.ShouldBeStripped)
+        prisonerRef.StartStripping(akEscort)
+
+    elseif (prisonerRef.ShouldBeFrisked)
+        prisonerRef.StartFrisking(akEscort)
+
+    else
+        if (!prisonerRef.IsInCell)
+            ; prisonerRef.StartRestraining(akStripper)
+            prisonerRef.EscortToCell(akEscort)
+        endif
     endif
-    ; prisonerRef.EscortToCell(akEscort)
 endEvent
 
 event OnEscortPrisonerToCellBegin(RPB_Prisoner apPrisoner, Actor akEscort)
@@ -1478,26 +1484,6 @@ endEvent
 ; ==========================================================
 ;                           Scenes
 ; ==========================================================
-
-function EscortPrisonerToCell(RPB_Prisoner apPrisoner, Actor akEscort)
-    ; The marker where the escort will stand, waiting for the prisoner to enter the cell.
-    ObjectReference outsideJailCellEscortWaitingMarker = apPrisoner.JailCell.GetRandomMarker("Exterior") as ObjectReference
-
-    SceneManager.StartEscortToCell( \
-        akEscortLeader              = akEscort, \
-        akEscortedPrisoner          = apPrisoner.GetActor(), \
-        akJailCellMarker            = apPrisoner.JailCell, \
-        akJailCellDoor              = apPrisoner.JailCell.CellDoor, \ 
-        akEscortWaitingMarker       = outsideJailCellEscortWaitingMarker \ 
-    )
-endFunction
-
-function BeginStrippingPrisoner(RPB_Prisoner apPrisoner, Actor akStripper)
-    SceneManager.StartStripping_02( \
-        akStripperGuard     = akStripper, \
-        akStrippedPrisoner  = apPrisoner.GetActor() \
-    )
-endFunction
 
 ; ==========================================================
 ;                          Management

@@ -19,12 +19,15 @@ endFunction
 
 bool function Add(RPB_Arrestee apArrestee)
     string elementKey = self.GetArresteeID(apArrestee.GetActor())
-    parent.AddAt(apArrestee, elementKey)
+    parent.AddElement(apArrestee, elementKey)
 endFunction
 
 function Remove(RPB_Arrestee apArrestee)
     string elementKey = self.GetArresteeID(apArrestee.GetActor())
-    protected_remove(elementKey)
+    parent.RemoveElement(elementKey)
+
+    Spell arresteeSpell = RPB_Utility.RPB_ArresteeSpell()
+    apArrestee.RemoveSpell(arresteeSpell)
 
     apArrestee.RemoveAll()
 endFunction

@@ -898,6 +898,10 @@ function PerformPrisonerSanityCheck(RPB_Prisoner apPrisoner)
             RegisterForSingleUpdate(__npcSanityCheckPostCheckUpdateTime)    ; Keep updating until the prisoner is checked
         endif
 
+        if (apPrisoner.IsImprisoned)
+            apPrisoner.PerformStrippingSanityChecks()                
+        endif
+
         if (apPrisoner.ShouldBeInCell && !apPrisoner.IsInCell)
             apPrisoner.MoveTo(self)                                           ; Move the prisoner to this jail cell
             apPrisoner.BindToCell()                                           ; Prisoner should already be bound to cell, but just in case they aren't
@@ -925,7 +929,12 @@ bool function PerformPrisonersSanityCheck()
         RPB_Prisoner prisoner   = prison.GetPrisoner(prisonerRef)
         if (prisoner)
             prisoner.EnableAI(!prisoner.IsFarFromPlayer())
-            while (!prisoner.IsInCell)
+            
+            if (prisoner.IsImprisoned)
+                prisoner.PerformStrippingSanityChecks()                
+            endif
+
+            while (!prisoner.IsInCell && prisoner.IsImprisoned)
                 prisoner.MoveTo(self)                                           ; Move the prisoner to this jail cell
                 prisoner.BindToCell()                                           ; Prisoner should already be bound to cell, but just in case they aren't
                 RegisterForSingleUpdate(__npcSanityCheckPostCheckUpdateTime)    ; Keep updating until the prisoner is in the cell

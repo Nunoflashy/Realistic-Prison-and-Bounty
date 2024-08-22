@@ -538,7 +538,6 @@ function FireArresteeEventOnScene(string asScene, string asSceneEvent, RPB_Arres
     elseif (asScene == SceneManager.SCENE_ESCORT_TO_JAIL_01 || asScene == SceneManager.SCENE_ESCORT_TO_JAIL_02)
         ; TODO: Obtain reference to the Prison where the Arrestee is going OR the reference to walk there
         ; For now, use Haafingar
-        ; RPB_Prison prison = apArrestee.GetPotentialPrison()
         RPB_Prison prison = apArrestee.GetPotentialPrison()
 
         Actor prisonerEscort = apArrestee.GetForm("EscortGuard", apArrestee.DestroyPropertyOnState("Imprisoned")) as Actor
