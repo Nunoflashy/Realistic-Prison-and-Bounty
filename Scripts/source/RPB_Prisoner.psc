@@ -1296,14 +1296,14 @@ endFunction
 int function GetMinimumSkillValue(string asSkill)
     ; TODO: Add logic depending on which skill is passed in, maybe process it from JSON
     ; TODO: Possibly chain to other stats to delevel if this one has met the minimum value (e.g: Health reached minimum, delevel Stamina or Magicka)
-    ; return Config.GetSkillLevelCap(asSkill)
-    if (RPB_Utility.IsStatSkill(asSkill))
-        RPB_Utility.Trace("["+ Name +"] Prisoner::GetMinimumSkillValue", "It's a stat skill: " + asSkill)
-        return 50
-    else
-        RPB_Utility.Trace("["+ Name +"] Prisoner::GetMinimumSkillValue", "It's a perk skill: " + asSkill)
-        return 10
-    endif
+    return Config.GetSkillLevelCap(asSkill)
+    ; if (RPB_Utility.IsStatSkill(asSkill))
+    ;     RPB_Utility.Trace("["+ Name +"] Prisoner::GetMinimumSkillValue", "It's a stat skill: " + asSkill)
+    ;     return 50
+    ; else
+    ;     RPB_Utility.Trace("["+ Name +"] Prisoner::GetMinimumSkillValue", "It's a perk skill: " + asSkill)
+    ;     return 10
+    ; endif
 endFunction
 
 bool function ShouldDelevelSkillOfType(string asSkillType)
@@ -1314,9 +1314,9 @@ bool function ShouldDelevelSkillOfType(string asSkillType)
 
     int dayToStartLosingSkills = GetInt("Day to Start Losing Skills ("+ asSkillType +")")
 
-    DebugWithArgs("["+ Name +"] Prisoner::ShouldDelevelSkillOfType", asSkillType, "dayToStartLosingSkills != 1 && dayToStartLosingSkills >= TimeServed: " + (dayToStartLosingSkills != 1 && dayToStartLosingSkills >= self.TimeServed))
-    DebugWithArgs("["+ Name +"] Prisoner::ShouldDelevelSkillOfType", asSkillType, "dayToStartLosingSkills: " + dayToStartLosingSkills)
-    DebugWithArgs("["+ Name +"] Prisoner::ShouldDelevelSkillOfType", asSkillType, "TimeServed: " + self.TimeServed)
+    ; DebugWithArgs("["+ Name +"] Prisoner::ShouldDelevelSkillOfType", asSkillType, "dayToStartLosingSkills != 1 && dayToStartLosingSkills >= TimeServed: " + (dayToStartLosingSkills != 1 && dayToStartLosingSkills >= self.TimeServed))
+    ; DebugWithArgs("["+ Name +"] Prisoner::ShouldDelevelSkillOfType", asSkillType, "dayToStartLosingSkills: " + dayToStartLosingSkills)
+    ; DebugWithArgs("["+ Name +"] Prisoner::ShouldDelevelSkillOfType", asSkillType, "TimeServed: " + self.TimeServed)
 
     if (dayToStartLosingSkills != 1 && dayToStartLosingSkills >= self.TimeServed)
         ; Don't delevel, property is set to a specific day to start and the prisoner hasn't been in prison for that long yet.
@@ -1330,30 +1330,16 @@ bool function ShouldDelevelSkillOfType(string asSkillType)
         return false
     endif
 
-    DebugWithArgs("["+ Name +"] Prisoner::ShouldDelevelSkillOfType", asSkillType, "randomChance: " + randomChance + ", skillLossChance: " + skillLossChance)
+    ; DebugWithArgs("["+ Name +"] Prisoner::ShouldDelevelSkillOfType", asSkillType, "randomChance: " + randomChance + ", skillLossChance: " + skillLossChance)
 
     return randomChance <= skillLossChance
 endFunction
 
 bool function DelevelSkill(string asSkill)
-    if (RPB_Utility.IsPerkSkill(asSkill))
-        asSkill = "Conjuration" ; temporary, for testing
-    endif
-
     int statValue               = this.GetBaseActorValue(asSkill) as int
     int configuredLossAmount    = Config.GetDelevelingSkillValue(asSkill)
     int newStatValue            = statValue - configuredLossAmount
     int minimumSkillValue       = self.GetMinimumSkillValue(asSkill)
-
-    if (RPB_Utility.IsPerkSkill(asSkill))
-        configuredLossAmount = 3 ; temporary
-        newStatValue = statValue - configuredLossAmount
-    endif
-
-    if (RPB_Utility.IsStatSkill(asSkill))
-        configuredLossAmount = 5 ; temporary
-        newStatValue = statValue - configuredLossAmount
-    endif
 
     if (newStatValue < minimumSkillValue)
         ; Skill reached minimum level, don't delevel
