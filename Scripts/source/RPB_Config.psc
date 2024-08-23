@@ -794,12 +794,16 @@ string function GetJailHandleSkillLoss(string hold)
     return MCM.GetOptionMenuValue("Jail::Handle Skill Loss", hold)
 endFunction
 
-int function GetJailDayToStartLosingSkills(string hold)
-    return MCM.GetOptionSliderValue("Jail::Day to Start Losing Skills", hold) as int
+int function GetJailDayToStartLosingSkillsOfType(string hold, string skillType)
+    if (skillType == "Stat" || skillType == "Perk")
+        return MCM.GetOptionSliderValue("Jail::Day to Start Losing Skills ("+ skillType +")", hold) as int
+    endif
 endFunction
 
-int function GetJailChanceToLoseSkillsDaily(string hold)
-    return MCM.GetOptionSliderValue("Jail::Chance to Lose Skills", hold) as int
+int function GetJailChanceToLoseSkillsDailyOfType(string hold, string skillType)
+    if (skillType == "Stat" || skillType == "Perk")
+        return MCM.GetOptionSliderValue("Jail::Chance to Lose Skills ("+ skillType +")", hold) as int
+    endif
 endFunction
 
 float function GetJailRecognizedCriminalPenalty(string hold)

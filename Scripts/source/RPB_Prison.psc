@@ -139,15 +139,27 @@ string property HandleSkillLoss
     endFunction
 endProperty
 
-int property DayToStartLosingSkills
+int property DayToStartLosingSkillsStat
     int function get()
-        return Config.GetJailDayToStartLosingSkills(Hold)
+        return Config.GetJailDayToStartLosingSkillsOfType(Hold, "Stat")
     endFunction
 endProperty
 
-int property ChanceToLoseSkills
+int property DayToStartLosingSkillsPerk
     int function get()
-        return Config.GetJailChanceToLoseSkillsDaily(Hold)
+        return Config.GetJailDayToStartLosingSkillsOfType(Hold, "Perk")
+    endFunction
+endProperty
+
+int property ChanceToLoseSkillsStat
+    int function get()
+        return Config.GetJailChanceToLoseSkillsDailyOfType(Hold, "Stat")
+    endFunction
+endProperty
+
+int property ChanceToLoseSkillsPerk
+    int function get()
+        return Config.GetJailChanceToLoseSkillsDailyOfType(Hold, "Perk")
     endFunction
 endProperty
 
@@ -1285,7 +1297,7 @@ event OnEscortPrisonerToJailBegin(RPB_Actor apActor, Actor akEscort)
 
     ; ReferenceAlias arrestPackage = API.PrisonManager.GetCellPackageOfType("S")
     ; apActor.BindAlias(arrestPackage)
-    Debug("Prison::OnEscortPrisonerToJailBegin", "Bound arrest package, arrestee should stay still.")
+    ; Debug("Prison::OnEscortPrisonerToJailBegin", "Bound arrest package, arrestee should stay still.")
 endEvent
 
 event OnEscortPrisonerToJailEnd(RPB_Actor apActor, Actor akEscort)
