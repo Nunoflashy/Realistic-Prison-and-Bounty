@@ -98,25 +98,13 @@ function OnOptionSelect(RPB_MCM mcm, string option) global
 endFunction
 
 function LoadSliderOptions(RPB_MCM mcm, string option, float currentSliderValue) global
-    float minRange = 0
-    float maxRange = 100000
-    float intervalSteps = 1
-    float defaultValue = mcm.GetOptionDefaultFloat(option)
+    mcm.LoadOptionProperties(option)
+    mcm.ValidateOption(option)
 
-    if (IsDelevelingCategory(option))
-        if (IsStatSkill(option))
-            maxRange = 1000
-        else
-            maxRange = 100 ; For Perk Skills (Max Lv.100)
-        endif
-
-    elseif (IsSkillCapCategory(option))
-        if (IsStatSkill(option))
-            maxRange = 1000
-        else
-            maxRange = 100 ; For Perk Skills (Max Lv.100)
-        endif
-    endif
+    float minRange      = mcm.GetOptionMinimum(option)
+    float maxRange      = mcm.GetOptionMaximum(option)
+    float intervalSteps = mcm.GetOptionSteps(option)
+    float defaultValue  = mcm.GetOptionDefaultFloat(option)
 
     defaultValue = float_if (defaultValue > maxRange, maxRange, defaultValue)
     float startValue = float_if (currentSliderValue > mcm.GENERAL_ERROR, currentSliderValue, defaultValue)

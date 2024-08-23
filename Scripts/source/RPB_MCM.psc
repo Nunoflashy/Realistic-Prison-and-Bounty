@@ -986,6 +986,9 @@ endFunction
 
     As such, any options that should have rules such as having its value less than / greater than
     or equal to another option, or a specific value, should be set here.
+
+    For options not present in the MCM config file, this function is also used to assign default values for them through
+    EnsureOptionValueGreaterThanOrEqualTo()
 /;
 function ValidateOption(string asOption)
     if (asOption == "General::Timescale" || \
@@ -1013,6 +1016,91 @@ function ValidateOption(string asOption)
         EnsureOptionIsNotOfType(asOption, TYPE_STRING)
         EnsureOptionValueGreaterThanOrEqualTo(asOption, 1)
     endif
+
+; ============================================================
+;                            Skills
+; ============================================================
+
+;                             Stats
+; ============================================================
+
+    if (asOption == "Deleveling::Health" || \
+        asOption == "Deleveling::Stamina" || \
+        asOption == "Deleveling::Magicka" \
+        )
+        EnsureOptionIsOfType(asOption, TYPE_INT)
+        EnsureOptionValueGreaterThanOrEqualTo(asOption, 1, asValuePropertyType = "Steps")
+        EnsureOptionValueGreaterThanOrEqualTo(asOption, 0, asValuePropertyType = "Minimum")
+        EnsureOptionValueGreaterThanOrEqualTo(asOption, 10, asValuePropertyType = "Maximum")
+        EnsureOptionValueGreaterThanOrEqualTo(asOption, 0, asValuePropertyType = "Default")
+
+    elseif (asOption == "Level Caps::Health" || \
+            asOption == "Level Caps::Stamina" || \
+            asOption == "Level Caps::Magicka" \
+        )
+        EnsureOptionIsOfType(asOption, TYPE_INT)
+        EnsureOptionValueGreaterThanOrEqualTo(asOption, 1, asValuePropertyType = "Steps")
+        EnsureOptionValueGreaterThanOrEqualTo(asOption, 0, asValuePropertyType = "Minimum")
+        EnsureOptionValueGreaterThanOrEqualTo(asOption, 10, asValuePropertyType = "Maximum")
+        EnsureOptionValueGreaterThanOrEqualTo(asOption, 0, asValuePropertyType = "Default")
+
+;                             Perks
+; ============================================================
+
+    elseif (asOption == "Deleveling::Heavy Armor" || \
+            asOption == "Deleveling::Light Armor" || \
+            asOption == "Deleveling::Sneak" || \
+            asOption == "Deleveling::One-Handed" || \
+            asOption == "Deleveling::Two-Handed" || \
+            asOption == "Deleveling::Archery" || \
+            asOption == "Deleveling::Block" || \
+            asOption == "Deleveling::Smithing" || \
+            asOption == "Deleveling::Speechcraft" || \
+            asOption == "Deleveling::Pickpocketing" || \
+            asOption == "Deleveling::Lockpicking" || \
+            asOption == "Deleveling::Alteration" || \
+            asOption == "Deleveling::Conjuration" || \
+            asOption == "Deleveling::Destruction" || \
+            asOption == "Deleveling::Illusion" || \
+            asOption == "Deleveling::Restoration" || \
+            asOption == "Deleveling::Enchanting" || \
+            asOption == "Deleveling::Alchemy" \
+        )
+        EnsureOptionIsOfType(asOption, TYPE_INT)
+        EnsureOptionValueGreaterThanOrEqualTo(asOption, 1, asValuePropertyType = "Steps")
+        EnsureOptionValueGreaterThanOrEqualTo(asOption, 0, asValuePropertyType = "Minimum")
+        EnsureOptionValueGreaterThanOrEqualTo(asOption, 10, asValuePropertyType = "Maximum")
+        EnsureOptionValueLessThanOrEqualTo(asOption, 100, asValuePropertyType = "Maximum")
+        EnsureOptionValueGreaterThanOrEqualTo(asOption, 0, asValuePropertyType = "Default")
+
+    elseif (asOption == "Level Caps::Heavy Armor" || \
+            asOption == "Level Caps::Light Armor" || \
+            asOption == "Level Caps::Sneak" || \
+            asOption == "Level Caps::One-Handed" || \
+            asOption == "Level Caps::Two-Handed" || \
+            asOption == "Level Caps::Archery" || \
+            asOption == "Level Caps::Block" || \
+            asOption == "Level Caps::Smithing" || \
+            asOption == "Level Caps::Speechcraft" || \
+            asOption == "Level Caps::Pickpocketing" || \
+            asOption == "Level Caps::Lockpicking" || \
+            asOption == "Level Caps::Alteration" || \
+            asOption == "Level Caps::Conjuration" || \
+            asOption == "Level Caps::Destruction" || \
+            asOption == "Level Caps::Illusion" || \
+            asOption == "Level Caps::Restoration" || \
+            asOption == "Level Caps::Enchanting" || \
+            asOption == "Level Caps::Alchemy" \
+        )
+        EnsureOptionIsOfType(asOption, TYPE_INT)
+        EnsureOptionValueGreaterThanOrEqualTo(asOption, 1, asValuePropertyType = "Steps")
+        EnsureOptionValueGreaterThanOrEqualTo(asOption, 0, asValuePropertyType = "Minimum")
+        EnsureOptionValueGreaterThanOrEqualTo(asOption, 10, asValuePropertyType = "Maximum")
+        EnsureOptionValueLessThanOrEqualTo(asOption, 100, asValuePropertyType = "Maximum")
+        EnsureOptionValueGreaterThanOrEqualTo(asOption, 0, asValuePropertyType = "Default")
+    endif
+
+; ============================================================
 
     if (asOption == "Frisking::Frisk Search Thoroughness" || \ 
         asOption == "Stripping::Strip Search Thoroughness" \ 
