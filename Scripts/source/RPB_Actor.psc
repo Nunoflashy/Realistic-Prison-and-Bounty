@@ -35,6 +35,17 @@ bool property IsMale
     endFunction
 endProperty
 
+string property Gender
+    string function get()
+        if (self.IsFemale)
+            return "Female"
+
+        elseif (self.IsMale)
+            return "Male"
+        endif
+    endFunction
+endProperty
+
 ; ==========================================================
 
 ;/
