@@ -213,3 +213,67 @@ RPB_Prisoner function ShowPrisonerList(RPB_Prison apPrison, bool abOnlyImprisone
     RPB_Prisoner selectedPrisoner = prisoners.AtIndex(index)
     return selectedPrisoner
 endFunction
+
+; TODO: Implement logic for @abOnlyEmpty and @abOnlyGenderExclusive
+RPB_JailCell function ShowCellList(RPB_Prison apPrison, bool abOnlyEmpty = false, bool abOnlyGenderExclusive = false, string asListTitle = "Select Cell")
+    RPB_Prison prison = apPrison
+    
+    if (!prison)
+        return none
+    endif
+
+    Form[] prisonCells = prison.JailCells
+    int cellIds = JArray.object()
+    JArray.addStr(cellIds, "<No Cell>")
+
+    int i = 0
+    while (i < prisonCells.Length)
+        RPB_JailCell jailCell = prisonCells[i] as RPB_JailCell
+        string cellLine = ""
+
+        if (jailCell.IsFemaleOnly)
+            cellLine += string_if (jailCell.HasMales(), "[F?]", "[F] ")
+
+        elseif (jailCell.IsMaleOnly)
+            cellLine += string_if (jailCell.HasFemales(), "[M?]", "[M] ")
+        endif
+
+        cellLine += jailCell.ID
+        cellLine += " - " + jailCell.PrisonerCount + "/" + jailCell.MaxPrisoners
+
+        ; if (jailCell.HasPrisoners())
+        ;     ; cellLine += " - " + jailCell.PrisonerCount + "/" + jailCell.MaxPrisoners
+        ;     ; cellLine += " - " + jailCell.PrisonerCount + " Prisoners"
+        ; endif
+
+        if (!jailcell.IsGenderExclusive && jailCell.HasMales(true))
+            cellLine += " (M)"
+        
+        elseif (!jailcell.IsGenderExclusive && jailCell.HasFemales(true))
+            cellLine += " (F)"
+        endif
+
+        if (jailCell.IsOvercrowded)
+            cellLine += " (Overcrowded)"
+
+        elseif (jailCell.IsFull)
+            cellLine += " (Full)"
+
+        elseif (jailCell.IsEmpty)
+            cellLine += " (Empty)"
+        endif
+
+        JArray.addStr(cellIds, cellLine)
+        i += 1
+    endWhile
+
+    string[] cellIdsArray = JArray.asStringArray(cellIds)
+
+    int index = self.ShowList(asListTitle, cellIdsArray) - 1
+    if (index == -1)
+        return none
+    endif
+
+    RPB_JailCell selectedCell = prisonCells[index] as RPB_JailCell
+    return selectedCell
+endFunction
