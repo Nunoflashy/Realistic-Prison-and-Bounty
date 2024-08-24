@@ -404,6 +404,19 @@ function DetermineMarkers()
     Debug("[Prison: "+ self.Prison.Name +"] JailCell::DetermineMarkers", "ExteriorMarkers: " + ExteriorMarkers)
 endFunction
 
+function RefreshOptions()
+    __beds              = none
+    __containers        = none
+    __otherProps        = none
+    __allowOvercrowding = false
+    __cellRadius        = 0.0
+    __scanIterations    = 0
+    __maxPrisoners      = 0
+    __packageSize       = none
+
+    ; TODO: Refresh cell doors options
+endFunction
+
 ; =========================================================
 ;                           Cell                        
 ; =========================================================
@@ -436,6 +449,17 @@ function RemoveGenderExclusiveness()
     __isMaleOnly    = false
 
     Debug("JailCell::RemoveGenderExclusiveness", self + " is no longer a gender exclusive cell.")
+endFunction
+
+string function GetAcceptedGender()
+    if (self.IsFemaleOnly)
+        return "Female"
+    elseif (self.IsMaleOnly)
+        return "Male"
+    else
+        return "All"
+    endif
+
 endFunction
 
 ; RPB_CellDoor function ScanCellDoor()
@@ -593,11 +617,37 @@ bool function HasPrisoners()
 endFunction
 
 bool function HasFemales(bool abStrictlyFemales = false)
-    
+    int i = 0
+    bool foundFemale = false
+
+    while (i < self.PrisonerCount)
+        Actor prisoner = self.Prisoners[i] as Actor
+        if (RPB_Utility.IsActorFemale(prisoner))
+            foundFemale = true
+        elseif (abStrictlyFemales)
+            return false
+        endif
+        i += 1
+    endWhile
+
+    return foundFemale
 endFunction
 
 bool function HasMales(bool abStrictlyMales = false)
-    
+    int i = 0
+    bool foundMale = false
+
+    while (i < self.PrisonerCount)
+        Actor prisoner = self.Prisoners[i] as Actor
+        if (RPB_Utility.IsActorMale(prisoner))
+            foundMale = true
+        elseif (abStrictlyMales)
+            return false
+        endif
+        i += 1
+    endWhile
+
+    return foundMale
 endFunction
 
 ;/
@@ -1071,7 +1121,7 @@ string function DEBUG_GetCellProperties()
         "\t Door: " + self.CellDoor + "\n" + \
         "\t Empty: " + self.IsEmpty + "\n" + \
         "\t Full: " + self.IsFull + "\n" + \
-        "\t Overcrowded: " + self.IsOvercrowded + "\n" + \
+        "\t Overcrowded: " + self.IsOvercrowded + " (Allow Overcrowding: "+ self.AllowOvercrowding +")" + "\n" + \
         "\t Available: " + self.IsAvailable + "\n" + \
         "\t Gender Exclusive: " + self.IsGenderExclusive + string_if (self.IsGenderExclusive, " ("+ getGenderExclusivenessAsString +")") + "\n" + \
         "\t Maximum Prisoners: " + self.MaxPrisoners + "\n" + \
