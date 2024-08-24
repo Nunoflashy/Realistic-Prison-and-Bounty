@@ -688,6 +688,13 @@ bool function ActorHasClothing(Actor akActor) global
     return akActor.GetWornForm(GetSlotMask("Body")) != none
 endFunction
 
+bool function IsActorMale(Actor akActor) global
+    return akActor.GetActorBase().GetSex() == 0
+endFunction
+
+bool function IsActorFemale(Actor akActor) global
+    return akActor.GetActorBase().GetSex() == 1
+endFunction
 ; ==========================================================
 ;                       Alias Functions
 ; ==========================================================
@@ -814,6 +821,14 @@ int function GetSlotMaskValue(int slotMask) global
     endWhile
 
     return -1
+endFunction
+
+string function YesNo(bool abValue) global
+    if (abValue)
+        return "Yes"
+    else
+        return "No"
+    endif
 endFunction
 
 ; ==========================================================
