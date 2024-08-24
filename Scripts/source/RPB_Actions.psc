@@ -25,6 +25,8 @@ string[] function GetActions()
     JArray.addStr(actionArrayObj, "[Faction Arrest] Arrest Selected Actor (Teleport Prisoner)")
     JArray.addStr(actionArrayObj, "[Arrest] Add Selected Actor to Current Arrest")
     JArray.addStr(actionArrayObj, "[Prison] Bind All Prisoners")
+    JArray.addStr(actionArrayObj, "[Prison] Refresh Cell Options")
+    JArray.addStr(actionArrayObj, "[Prison] Pre-Assign Cell to Prisoner")
     JArray.addStr(actionArrayObj, "[Prison] Reindex PrisonerList")
     JArray.addStr(actionArrayObj, "[Prison] Imprison Nearby Actors")
     JArray.addStr(actionArrayObj, "[Prison] Imprison Selected Actor")
@@ -60,6 +62,12 @@ function ShowActionsMenu()
 
     elseif (actionToPerform == "[Prison] Bind All Prisoners")
         Action_BindAllPrisoners(uilib)
+
+    elseif (actionToPerform == "[Prison] Refresh Cell Options")
+        Action_RefreshCellOptions(uilib)
+
+    elseif (actionToPerform == "[Prison] Pre-Assign Cell to Prisoner")
+        Action_PreAssignCellToPrisoner(uilib)
 
     elseif (actionToPerform == "[Prison] Reindex PrisonerList")
         Action_TestReindexing(uilib)
@@ -146,6 +154,35 @@ endFunction
 function Action_BindAllPrisoners(RPB_UIInterface uilib)
     RPB_Prison castleDourDungeon = API.PrisonManager.GetPrison("Haafingar")
     castleDourDungeon.BindAllPrisonersToCell()
+endFunction
+
+function Action_RefreshCellOptions(RPB_UIInterface uilib)
+    RPB_Prison prison = uilib.ShowPrisonList(false, false, true, false, false)
+
+    if (prison == none)
+        return none
+    endif
+
+    RPB_JailCell jailCell = uilib.ShowCellList(prison)
+    jailCell.RefreshOptions()
+endFunction
+
+function Action_PreAssignCellToPrisoner(RPB_UIInterface uilib)
+    Actor selectedActor = Game.GetCurrentConsoleRef() as Actor
+
+    if (selectedActor == none)
+        return
+    endif
+
+    RPB_Prison prison = uilib.ShowPrisonList()
+
+    if (prison == none)
+        return none
+    endif
+
+    RPB_JailCell jailCell = uilib.ShowCellList(prison)
+
+    RPB_StorageVars.SetFormOnForm("Assigned Prison Cell", selectedActor, jailCell, "Jail")
 endFunction
 
 ; TODO: Check what options are desired, or all, and allow to do this for selected NPC's as well as the Player
@@ -315,11 +352,7 @@ function Action_ArrestSelectedActor(RPB_UIInterface uilib, bool abEscortArrestee
         randomGuard.GetCrimeFaction().SetCrimeGold(arrestBounty)
     endif
 
-    ; Select Cell
-    ; string cellId = uilib.ShowInput("Cell for Imprisonment of " + actorName + " in " + holdName)
-    ; uilib.ShowList_ReturnElement("Cell for Imprisonment of ", cellIds, 0, 0)
-
-    API.Arrest.ArrestActor(randomGuard, selectedActor, string_if (abEscortArrestee, API.Arrest.ARREST_TYPE_ESCORT_TO_CELL, API.Arrest.ARREST_TYPE_TELEPORT_TO_CELL))
+    API.Arrest.ArrestActor(randomGuard, selectedActor, string_if (abEscortArrestee, API.Arrest.ARREST_TYPE_ESCORT_TO_JAIL, API.Arrest.ARREST_TYPE_TELEPORT_TO_CELL))
 endFunction
 
 function Action_AddSelectedActorToArrest(RPB_UIInterface uilib)
@@ -397,7 +430,7 @@ function Action_CheckPrisonersAI(RPB_UIInterface uilib)
         RPB_Prisoner prisoner = prison.Prisoners.AtIndex(i)
         int nameLength  = StringUtil.GetLength(prisoner.Name)
         string tabs     = string_if (nameLength >= 10, "\t", "\t\t")
-        Debug("Actions::Action_CheckPrisonersAI", "["+ prisoner.Name +"] "+ tabs + prisoner.GetActor() +"\t{ AI: " + prisoner.HasAI() + " | In Cell: "+ prisoner.IsInCell +" | Jail Cell: "+ prisoner.JailCell +" Location: "+ prisoner.GetCurrentCell() +"}")
+        Debug("Actions::Action_CheckPrisonersAI", "["+ prisoner.Name +"] "+ tabs + prisoner.GetActor() +"\t{ AI: " + YesNo(prisoner.HasAI()) + " | In Cell: "+ YesNo(prisoner.IsInCell) +" | Jail Cell: "+ prisoner.JailCell.ID +" ("+ prisoner.JailCell +" ) " +" Location: "+ prisoner.GetCurrentCell() +"}")
         i += 1
     endWhile
 endFunction
