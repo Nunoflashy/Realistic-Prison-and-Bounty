@@ -158,7 +158,7 @@ Scene function GetScene(string asSceneName)
         return none
     endif
 
-    Debug("SceneManager::GetScene", "Scenes: " + SceneCount)
+    ; Debug("SceneManager::GetScene", "Scenes: " + SceneCount)
     ; return Game.GetFormFromFile(JMap.getInt(sceneContainer, asSceneName), GetPluginasSceneName()) as Scene
     return GetFormFromMod(self.GetSceneFormID(asSceneName)) as Scene
 endFunction
@@ -216,9 +216,77 @@ string property SCENE_ARREST_PAY_BOUNTY_FOLLOW_BY_FORCE     = "RPB_ArrestPayBoun
 ; ==========================================================
 ;                     Scene Control Queue
 ; ==========================================================
-Scene _previousScene
-Scene _currentScene
-Scene _nextScene
+
+int __queuedScenes
+bool __isScenePlaying
+
+bool function HasQueuedScenes()
+    return JArray.count(__queuedScenes) > 0
+endFunction
+
+;/
+    Pushes a Scene into the queue.
+
+    string  @asSceneName: The name of the scene.
+/;
+function PushScene(string asSceneName)
+    if (!__queuedScenes)
+        __queuedScenes = JArray.object()
+        JValue.retain(__queuedScenes, "RPB_SceneManager")
+    endif
+
+    JArray.addStr(__queuedScenes, asSceneName)
+endFunction
+
+;/
+    Removes a Scene from the queue, and returns its name.
+
+    returns (string): The name of the removed Scene
+/;
+string function PopScene()
+    if (!self.HasQueuedScenes())
+        return ""
+    endif
+
+    string sceneName = JArray.getStr(__queuedScenes, 0)
+    JArray.eraseIndex(__queuedScenes, 0)
+    return sceneName
+endFunction
+
+;/
+    Queues a Scene, or plays it if the queue is empty.
+
+    string  @asSceneName: The name of the Scene to queue up or play.
+/;
+function QueueOrPlay(string asSceneName)
+    int queuedSceneCount = JArray.count(__queuedScenes)
+
+    ; Queue Scene
+    self.PushScene(asSceneName)
+
+    if (!__isScenePlaying)
+        self.PlayQueued() ; play the 1st scene if the queue was empty
+    endif
+endFunction
+
+;/
+    Plays the next Scene in the queue if there's any.
+    This is invoked OnSceneEnd() to ensure that the previous Scene finishes.
+/;
+function PlayQueued()
+    if (!self.HasQueuedScenes())
+        return
+    endif
+
+    ; Scene is now playing
+    __isScenePlaying = true
+
+    string nextScene = self.PopScene()
+
+    if (nextScene != "")
+        self.GetScene(nextScene).Start() ; Play the Scene
+    endif
+endFunction
 
 ; ==========================================================
 ;                       Scene Aliases
@@ -558,10 +626,10 @@ string function GetSceneParametersDebugInfo(Scene sender, string sceneName, Obje
     endWhile
     
     if (emptyParams)
-        return "Scene: " + sceneName + " " + sender + " - No Parameters, Scene expected: " + params.Length + " parameters!" ; " - No Parameters, Scene expected: need a way to find scene required params
+        return sceneName + " " + sender + " - No Parameters, Scene expected: " + params.Length + " parameters!" ; " - No Parameters, Scene expected: need a way to find scene required params
     endif
 
-    return "Scene: " + sceneName + " " + sender + "\nParameters: [\n" + debugInfo + "]"
+    return sceneName + " " + sender + "\nParameters: [\n" + debugInfo + "]"
 endFunction
 
 event OnSceneStart(string name, Scene sender)
@@ -806,7 +874,8 @@ endEvent
 event OnScenePlaying(string name, int phaseEvent, int phase, Scene sender)
     ObjectReference[] params = self.GetSceneParameters(name)
 
-    Debug("SceneManager::OnScenePlaying", string_if (phaseEvent == PHASE_START, "(Start) Playing", "(End) Played") + " Phase " + phase + " of " + name)
+    ; Debug("SceneManager::OnScenePlaying", string_if (phaseEvent == PHASE_START, "(Start) Playing", "(End) Played") + " Phase " + phase + " of " + name)
+    Debug("SceneManager::OnScenePlaying", name + " " + sender + ": " + string_if (phaseEvent == PHASE_START, "(Start)", "(End)") + " Phase " + phase)
 
     if (name == SCENE_ARREST_START_01)
         Actor escort   = params[0] as Actor
@@ -1013,7 +1082,6 @@ event OnScenePlaying(string name, int phaseEvent, int phase, Scene sender)
 
         RPB_Prison prison = PrisonManager.FindPrisonByPrisoner(strippedPrisoner)
 
-
         int i = 0
         while (i < params.Length)
             Actor currentPrisoner = params[i] as Actor
@@ -1021,14 +1089,14 @@ event OnScenePlaying(string name, int phaseEvent, int phase, Scene sender)
                 RetainAI(params[i] == Config.Player)
                 RPB_Prisoner prisoner = prison.GetPrisoner(params[i] as Actor)
                 ; prison.OnPrisonerStripBegin(prisoner, stripperGuard)
-                Debug("SceneManager::OnScenePlaying", "SCENE_STRIPPING_02 -> strippedPrisoner: " + currentPrisoner + ", prison: " + prison + ", prisoner: " + prisoner)
+                Debug("SceneManager::OnScenePlaying", "SCENE_STRIPPING_02 -> strippedPrisoner: " + currentPrisoner + ", prison: " + prison.Name + ", prisoner: " + prisoner)
 
                 if (phaseEvent == PHASE_START)
                     if (phase == 2)
         
                     elseif (phase == 6) ; Remove Underwear
-                        prisoner.SetForm("StripperGuard", stripperGuard, prisoner.TEMPORARY_DESTROY_ON_IMPRISONED)
-                        prison.FirePrisonerEventOnScene(name, "StripMiddle", prisoner, "Remove Underwear")
+                        ; prisoner.SetForm("StripperGuard", stripperGuard, prisoner.TEMPORARY_DESTROY_ON_IMPRISONED)
+                        ; prison.FirePrisonerEventOnScene(name, "StripMiddle", prisoner, "Remove Underwear")
                     endif
                     
                 elseif (phaseEvent == PHASE_END)
@@ -1418,8 +1486,12 @@ event OnSceneEnd(string name, Scene sender)
     endif
 
     self.ResetSceneOverride()
+
     Debug("SceneManager::OnSceneEnd", self.GetSceneParametersDebugInfo(sender, name, params))
     Info(self.GetSceneParametersDebugInfo(sender, name, params))
+
+    self.PlayQueued()
+    __isScenePlaying = false ; Scene has finished playing
 endEvent
 
 function StartScene(string asSceneName, int akSceneParameters, int aiStartingPhase = 1, bool abForceStart = false)
@@ -1466,7 +1538,8 @@ function StartEscortToCell(Actor akEscortLeader, Actor akEscortedPrisoner, Objec
     ; Bind the guard waiting marker
     BindAliasTo(self.GetGuardLocation(), akEscortWaitingMarker)
 
-    self.GetScene(SCENE_ESCORT_TO_CELL_01).Start()
+    self.QueueOrPlay(SCENE_ESCORT_TO_CELL_01)
+    ; self.GetScene(SCENE_ESCORT_TO_CELL_01).Start()
     ; EscortToCell.Start()
 endFunction
 
@@ -1483,7 +1556,8 @@ function StartEscortToCell_02(Actor akGuard, Actor akPrisoner, ObjectReference a
     ; Bind the guard's destination point, the jail cell door
     BindAliasTo(self.GetCellDoor(), akJailCellDoor)
 
-    self.GetScene(SCENE_ESCORT_TO_CELL_02).Start()
+    self.QueueOrPlay(SCENE_ESCORT_TO_CELL_02)
+    ; self.GetScene(SCENE_ESCORT_TO_CELL_02).Start()
     ; EscortToCell_02.Start()
 endFunction
 
@@ -1499,7 +1573,8 @@ function StartEscortFromCell(Actor akGuard, Actor akPrisoner, ObjectReference ak
 
     BindAliasTo(self.GetGuardLocation(), akJailCellDoor)
 
-    self.GetScene(SCENE_ESCORT_FROM_CELL).Start()
+    self.QueueOrPlay(SCENE_ESCORT_FROM_CELL)
+    ; self.GetScene(SCENE_ESCORT_FROM_CELL).Start()
     ; EscortFromCell.Start()
 endFunction
 
@@ -1518,7 +1593,8 @@ function StartEscortToJail(Actor akEscortLeader, Actor akEscortedPrisoner, Objec
     ; Bind the guard's destination point, the jail cell door
     BindAliasTo(self.GetGuardLocation(), akPrisonerChest)
 
-    self.GetScene(SCENE_ESCORT_TO_JAIL_01).Start()
+    self.QueueOrPlay(SCENE_ESCORT_TO_JAIL_01)
+    ; self.GetScene(SCENE_ESCORT_TO_JAIL_01).Start()
     ; EscortToJail.Start()
 endFunction
 
@@ -1552,7 +1628,8 @@ function StartStrippingStart(Actor akStripperGuard, Actor akStrippedPrisoner)
     BindAliasTo(self.GetPrisoner(2), self.GetEscortee(2).GetActorReference())
     BindAliasTo(self.GetPrisoner(3), self.GetEscortee(3).GetActorReference())
 
-    self.GetScene(SCENE_STRIPPING_START_01).Start()
+    self.QueueOrPlay(SCENE_STRIPPING_START_01)
+    ; self.GetScene(SCENE_STRIPPING_START_01).Start()
 
     ; StrippingStart.Start()
 endFunction
@@ -1568,7 +1645,8 @@ function StartStripping(Actor akStripperGuard, Actor akStrippedPrisoner)
     BindAliasTo(self.GetPrisoner(1), self.GetEscortee(1).GetActorReference())
     BindAliasTo(self.GetPrisoner(2), self.GetEscortee(2).GetActorReference())
 
-    self.GetScene(SCENE_STRIPPING_01).Start()
+    self.QueueOrPlay(SCENE_STRIPPING_01)
+    ; self.GetScene(SCENE_STRIPPING_01).Start()
     ; Stripping.Start()
 endFunction
 
@@ -1583,7 +1661,8 @@ function StartStripping_02(Actor akStripperGuard, Actor akStrippedPrisoner)
     BindAliasTo(self.GetPrisoner(1), self.GetEscortee(1).GetActorReference())
     BindAliasTo(self.GetPrisoner(2), self.GetEscortee(2).GetActorReference())
 
-    self.GetScene(SCENE_STRIPPING_02).Start()
+    self.QueueOrPlay(SCENE_STRIPPING_02)
+    ; self.GetScene(SCENE_STRIPPING_02).Start()
     ; Stripping_02.Start()
 endFunction
 
@@ -1594,7 +1673,8 @@ function StartFrisking(Actor akFriskerGuard, Actor akFriskedPrisoner)
     ; Bind the Prisoner to be the actor being frisk searched
     BindAliasTo(self.GetPrisoner(), akFriskedPrisoner)
 
-    self.GetScene(SCENE_FRISKING).Start()
+    self.QueueOrPlay(SCENE_FRISKING)
+    ; self.GetScene(SCENE_FRISKING).Start()
     ; Frisking.Start()
 endFunction
 
@@ -1605,7 +1685,8 @@ function StartGiveClothing(Actor akGuard, Actor akPrisoner)
     ; Bind the Prisoner to be the actor being given clothing
     BindAliasTo(self.GetPrisoner(), akPrisoner)
 
-    self.GetScene(SCENE_GIVE_CLOTHING).Start()
+    self.QueueOrPlay(SCENE_GIVE_CLOTHING)
+    ; self.GetScene(SCENE_GIVE_CLOTHING).Start()
     ; GiveClothing.Start()
 endFunction
 
@@ -1630,7 +1711,8 @@ function StartBountyPaymentFail(Actor akGuard, Actor akPrisoner)
     ; Bind the Prisoner, who's trying to pay the bounty
     BindAliasTo(self.GetPrisoner(), akPrisoner)
 
-    self.GetScene(SCENE_PAYMENT_FAIL).Start()
+    self.QueueOrPlay(SCENE_PAYMENT_FAIL)
+    ; self.GetScene(SCENE_PAYMENT_FAIL).Start()
     ; BountyPaymentFail.Start()
 endFunction
 
@@ -1642,7 +1724,9 @@ function StartArrestStart01(Actor akGuard, Actor akPrisoner)
     BindAliasTo(self.GetEscortee(), akPrisoner)
 
     ; ArrestStart01.Start()
-    self.GetScene(SCENE_ARREST_START_01).Start()
+
+    self.QueueOrPlay(SCENE_ARREST_START_01)
+    ; self.GetScene(SCENE_ARREST_START_01).Start()
 endFunction
 
 function StartArrestStart02(Actor akGuard, Actor akPrisoner)
@@ -1652,7 +1736,8 @@ function StartArrestStart02(Actor akGuard, Actor akPrisoner)
     ; Bind the Prisoner, who's getting arrested
     BindAliasTo(self.GetEscortee(), akPrisoner)
 
-    self.GetScene(SCENE_ARREST_START_02).Start()
+    self.QueueOrPlay(SCENE_ARREST_START_02)
+    ; self.GetScene(SCENE_ARREST_START_02).Start()
     ; ArrestStart02.Start()
 endFunction
 
@@ -1663,7 +1748,8 @@ function StartArrestStart03(Actor akGuard, Actor akPrisoner)
     ; Bind the Prisoner, who's getting arrested
     BindAliasTo(self.GetEscortee(), akPrisoner)
 
-    self.GetScene(SCENE_ARREST_START_03).Start()
+    self.QueueOrPlay(SCENE_ARREST_START_03)
+    ; self.GetScene(SCENE_ARREST_START_03).Start()
 endFunction
 
 function StartArrestStart04(Actor akGuard, Actor akPrisoner)
@@ -1673,7 +1759,8 @@ function StartArrestStart04(Actor akGuard, Actor akPrisoner)
     ; Bind the Arrestee, who's getting arrested
     BindAliasTo(self.GetArrestee(), akPrisoner)
 
-    self.GetScene(SCENE_ARREST_START_04).Start()
+    self.QueueOrPlay(SCENE_ARREST_START_04)
+    ; self.GetScene(SCENE_ARREST_START_04).Start()
     ; ArrestStart04.Start()
 endFunction
 
@@ -1683,8 +1770,9 @@ function StartArrestScene(Actor akGuard, Actor akArrestee, string asScene)
 
     ; Bind the Arrestee, who's getting arrested
     BindAliasTo(self.GetEscortee(), akArrestee)
-
-    self.GetScene(asScene).Start()
+    
+    self.QueueOrPlay(asScene)
+    ; self.GetScene(asScene).Start()
 endFunction
 
 function StartEscortToJailScene(Actor akGuard, Actor akArrestee, string asScene)
@@ -1694,7 +1782,8 @@ function StartEscortToJailScene(Actor akGuard, Actor akArrestee, string asScene)
     ; Bind the Arrestee, who's getting arrested
     BindAliasTo(self.GetEscortee(), akArrestee)
 
-    self.GetScene(asScene).Start()
+    self.QueueOrPlay(asScene)
+    ; self.GetScene(asScene).Start()
 endFunction
 
 function StartArrestStartPrison_01(Actor akGuard, Actor akPrisoner, int aiStartingPhase = 1)
@@ -1705,7 +1794,8 @@ function StartArrestStartPrison_01(Actor akGuard, Actor akPrisoner, int aiStarti
     BindAliasTo(self.GetEscortee(), akPrisoner)
 
     self.StartSceneAtPhase(aiStartingPhase)
-    self.GetScene(SCENE_ARREST_START_PRISON_01).Start()
+    ; self.GetScene(SCENE_ARREST_START_PRISON_01).Start()
+    self.QueueOrPlay(SCENE_ARREST_START_PRISON_01)
 endFunction
 
 function StartRestrainPrisoner_01(Actor akGuard, Actor akPrisoner, int aiStartingPhase = 1)
@@ -1713,7 +1803,9 @@ function StartRestrainPrisoner_01(Actor akGuard, Actor akPrisoner, int aiStartin
     BindAliasTo(self.GetPrisoner(), akPrisoner)
 
     self.StartSceneAtPhase(aiStartingPhase)
-    self.GetScene(SCENE_RESTRAIN_PRISONER_01).Start()
+    ; self.GetScene(SCENE_RESTRAIN_PRISONER_01).Start()
+    self.QueueOrPlay(SCENE_RESTRAIN_PRISONER_01)
+
 endFunction
 
 function StartRestrainPrisoner_02(Actor akGuard, Actor akPrisoner, int aiStartingPhase = 1)
@@ -1721,7 +1813,8 @@ function StartRestrainPrisoner_02(Actor akGuard, Actor akPrisoner, int aiStartin
     BindAliasTo(self.GetPrisoner(), akPrisoner)
 
     self.StartSceneAtPhase(aiStartingPhase)
-    self.GetScene(SCENE_RESTRAIN_PRISONER_02).Start()
+    ; self.GetScene(SCENE_RESTRAIN_PRISONER_02).Start()
+    self.QueueOrPlay(SCENE_RESTRAIN_PRISONER_02)
 endFunction
 
 function StartNoClothing(Actor akGuard, Actor akPrisoner)
@@ -1731,7 +1824,8 @@ function StartNoClothing(Actor akGuard, Actor akPrisoner)
     ; Bind the Prisoner, who's undressed and given no clothing
     BindAliasTo(self.GetPrisoner(), akPrisoner)
 
-    self.GetScene(SCENE_NO_CLOTHING).Start()
+    self.QueueOrPlay(SCENE_NO_CLOTHING)
+    ; self.GetScene(SCENE_NO_CLOTHING).Start()
     ; NoClothing.Start()
 endFunction
 
@@ -1742,7 +1836,8 @@ function StartForcedStripping(Actor akGuard, Actor akPrisoner)
     ; Bind the Prisoner, who's about to be stripped
     BindAliasTo(self.GetPrisoner(), akPrisoner)
     
-    self.GetScene(SCENE_FORCED_STRIPPING_01).Start()
+    self.QueueOrPlay(SCENE_FORCED_STRIPPING_01)
+    ; self.GetScene(SCENE_FORCED_STRIPPING_01).Start()
     ; ForcedStripping01.Start()
 endFunction
 
@@ -1753,7 +1848,8 @@ function StartForcedStripping02(Actor akGuard, Actor akPrisoner)
     ; Bind the Prisoner, who's about to be stripped
     BindAliasTo(self.GetPrisoner(), akPrisoner)
 
-    self.GetScene(SCENE_FORCED_STRIPPING_02).Start()
+    self.QueueOrPlay(SCENE_FORCED_STRIPPING_02)
+    ; self.GetScene(SCENE_FORCED_STRIPPING_02).Start()
     ; ForcedStripping02.Start()
 endFunction
 
@@ -1771,7 +1867,8 @@ function StartEludingArrest(Actor akGuard, Actor akEluder)
 
     Debug("SceneManager::StartEludingArrest", "Scene: "+ self.GetScene(SCENE_ELUDING_ARREST_01) +" Params ["+ akGuard + ", " + akEluder + "] | Aliases: ["+ self.GetGuard() + ", " + self.GetEluder() + "]")
 
-    self.GetScene(SCENE_ELUDING_ARREST_01).Start()
+    self.QueueOrPlay(SCENE_ELUDING_ARREST_01)
+    ; self.GetScene(SCENE_ELUDING_ARREST_01).Start()
     ; EludingArrest.Start()
 endFunction
 
@@ -1781,7 +1878,8 @@ function StartArrestBountyPaymentFollowWillingly(Actor akEscort, Actor akEscorte
     BindAliasTo(self.GetGuardLocation(), akEscortLocation)
     BindAliasTo(self.GetPrisonerLocation(), akEscortLocation)
 
-    self.GetScene(SCENE_ARREST_PAY_BOUNTY_FOLLOW_WILLINGLY).Start()
+    self.QueueOrPlay(SCENE_ARREST_PAY_BOUNTY_FOLLOW_WILLINGLY)
+    ; self.GetScene(SCENE_ARREST_PAY_BOUNTY_FOLLOW_WILLINGLY).Start()
 endFunction
 
 function StartArrestPayBountyFollowByForce(Actor akEscort, Actor akEscortee, ObjectReference akEscortLocation)
@@ -1790,5 +1888,6 @@ function StartArrestPayBountyFollowByForce(Actor akEscort, Actor akEscortee, Obj
     BindAliasTo(self.GetGuardLocation(), akEscortLocation)
     BindAliasTo(self.GetPrisonerLocation(), akEscortLocation)
 
-    self.GetScene(SCENE_ARREST_PAY_BOUNTY_FOLLOW_BY_FORCE).Start()
+    self.QueueOrPlay(SCENE_ARREST_PAY_BOUNTY_FOLLOW_BY_FORCE)
+    ; self.GetScene(SCENE_ARREST_PAY_BOUNTY_FOLLOW_BY_FORCE).Start()
 endFunction
