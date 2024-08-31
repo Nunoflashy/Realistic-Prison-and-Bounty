@@ -806,15 +806,11 @@ int function GetSlotMask(string bodyPart) global
 endFunction
 
 int function GetSlotMaskValue(int slotMask) global
-    ; int slotMaskMap = JIntMap.object()
-
     int currentSlotMask = 30
     int slotMaskValue = 0x00000001
     while (currentSlotMask <= 61)
-        ; JIntMap.setInt(slotMaskMap, currentSlotMask, slotMaskValue)
         if (slotMask == currentSlotMask)
             return slotMaskValue
-            ; return JIntMap.getInt(slotMaskMap, slotMask)
         endif
         currentSlotMask += 1
         slotMaskValue *= 2 ; Get next slot mask by doubling the value

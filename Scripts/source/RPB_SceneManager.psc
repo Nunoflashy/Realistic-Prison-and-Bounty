@@ -679,7 +679,7 @@ event OnSceneStart(string name, Scene sender)
                 RetainAI(params[i] == Config.Player)
                 RPB_Prisoner prisoner = prison.GetPrisoner(params[i] as Actor)
                 prisoner.SetForm("EscortGuard", escort, prisoner.TEMPORARY_DESTROY_ON_IMPRISONED)
-                prison.FirePrisonerEventOnScene(name, "EscortBegin", prisoner)
+                prison.FirePrisonerEventOnScene(name, "EscortBegin", prisoner) ; possibly needs to be reviewed, it's being called 4 times for one prisoner
             endif
             i += 1
         endWhile
