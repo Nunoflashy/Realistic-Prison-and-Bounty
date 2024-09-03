@@ -41,6 +41,39 @@ endFunction
 ;                         UI Functions
 ; ==========================================================
 
+string function ShowStringList(string asTitle = "", string asOptions, string asOptionSeparator = ",", int aiStartIndex = 0, int aiDefaultIndex = 0)
+    string[] options = StringUtil.Split(asOptions, asOptionSeparator)
+    
+    int selectedIndex = UILib.ShowList(asTitle, options, aiStartIndex, aiDefaultIndex)
+    return options[selectedIndex]
+endFunction
+
+Form function ShowFormArrayList(string asListTitle = "", Form[] akOptions)
+    if (akOptions == none)
+        return none
+    endif
+
+    int formNames = JArray.object()
+    JArray.addStr(formNames, "<No Form>")
+
+    int arrSize = akOptions.Length
+
+    int i = 0
+    while (i < arrSize)
+        string formLine = akOptions[i] + ": " + akOptions[i].GetName()
+        JArray.addStr(formNames, formLine)
+        i += 1
+    endWhile
+
+    string[] listOptions = JArray.asStringArray(formNames)
+    int index = self.ShowList(asListTitle, listOptions) - 1
+    if (index == -1)
+        return none
+    endif
+
+    return akOptions[index]
+endFunction
+
 string function ShowHoldList(bool abMustHaveArrestees = false, bool abSkipListOnSingleResult = false, string asListTitle = "Select Hold")
     string[] holds = API.Config.Holds
 
@@ -241,11 +274,6 @@ RPB_JailCell function ShowCellList(RPB_Prison apPrison, bool abOnlyEmpty = false
         cellLine += jailCell.ID
         cellLine += " - " + jailCell.PrisonerCount + "/" + jailCell.MaxPrisoners
 
-        ; if (jailCell.HasPrisoners())
-        ;     ; cellLine += " - " + jailCell.PrisonerCount + "/" + jailCell.MaxPrisoners
-        ;     ; cellLine += " - " + jailCell.PrisonerCount + " Prisoners"
-        ; endif
-
         if (!jailcell.IsGenderExclusive && jailCell.HasMales(true))
             cellLine += " (M)"
         
@@ -279,35 +307,31 @@ RPB_JailCell function ShowCellList(RPB_Prison apPrison, bool abOnlyEmpty = false
 endFunction
 
 Form function ShowPrisonContainerList(RPB_Prison apPrison, string asListTitle = "Select Container")
-    RPB_Prison prison = apPrison
-
-    if (prison == none)
+    if (apPrison == none)
         return none
     endif
 
-    Form[] prisonerBelongingsContainers = prison.GetPrisonerContainers()
-    Form[] prisonerEvidenceContainers   = prison.GetPrisonerContainers("Evidence")
+    Form[] prisonerBelongingsContainers = apPrison.GetPrisonerContainers("Belongings")
+    Form[] prisonerEvidenceContainers   = apPrison.GetPrisonerContainers("Evidence")
 
-    int containerNames = JArray.object()
+    int prisonerBelongingsObj   = JArray.objectWithForms(prisonerBelongingsContainers)
+    int prisonerEvidenceObj     = JArray.objectWithForms(prisonerEvidenceContainers)
+    int allContainersArr        = JArray.object()
+    int containerNames          = JArray.object()
+    
+    JArray.addFromArray(allContainersArr, prisonerBelongingsObj)
+    JArray.addFromArray(allContainersArr, prisonerEvidenceObj)
     JArray.addStr(containerNames, "<No Container>")
 
+    int arrSize = JArray.count(allContainersArr)
+
     int i = 0
-    if (prisonerBelongingsContainers.Length > 0)
-        while (i < prisonerBelongingsContainers.Length)
-            ObjectReference prisonContainerRef = prisonerBelongingsContainers[i] as ObjectReference
-            string containerName = prisonContainerRef + ": " + prisonContainerRef.GetBaseObject().GetName() + " - " + prisonContainerRef.GetNumItems() + " Items"
-            JArray.addStr(containerNames, containerName)
-            i += 1
-        endWhile
-    endif
-    
-    ; i = 0
-    ; if (prisonerEvidenceContainers.Length > 0)
-    ;     while (i < prisonerEvidenceContainers.Length)
-    ;         string containerName = prisonerEvidenceContainers[i].GetName()
-    ;         JArray.addStr(containerNames, containerName)
-    ;     endWhile
-    ; endif
+    while (i < arrSize)
+        ObjectReference prisonContainerRef = JArray.getForm(allContainersArr, i) as ObjectReference
+        string containerName = prisonContainerRef + ": " + prisonContainerRef.GetBaseObject().GetName() + " - " + prisonContainerRef.GetNumItems() + " Items"
+        JArray.addStr(containerNames, containerName)
+        i += 1
+    endWhile
 
     string[] listOptions = JArray.asStringArray(containerNames)
     int index = self.ShowList(asListTitle, listOptions) - 1
@@ -315,6 +339,9 @@ Form function ShowPrisonContainerList(RPB_Prison apPrison, string asListTitle = 
         return none
     endif
 
-    Form prisonContainer = prisonerBelongingsContainers[index]
-    return prisonContainer
+    Form selectedContainer = JArray.getForm(allContainersArr, index)
+
+    DebugWithArgs("UI::ShowPrisonContainerList", apPrison.Name, "index: " + index + ", prisonerBelongingsContainers: " + prisonerBelongingsContainers + ", prisonerEvidenceContainers: " + prisonerEvidenceContainers + ", selectedContainer: " + selectedContainer)
+
+    return selectedContainer
 endFunction
