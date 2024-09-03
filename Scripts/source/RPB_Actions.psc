@@ -25,6 +25,7 @@ string[] function GetActions()
     JArray.addStr(actionArrayObj, "[Arrest] Arrest Selected Actor (Escort Prisoner)")
     JArray.addStr(actionArrayObj, "[Arrest] Arrest Selected Actor with Selected Captor (Escort Prisoner)")
     JArray.addStr(actionArrayObj, "[Arrest] Arrest Selected Actor (Teleport Prisoner)")
+    JArray.addStr(actionArrayObj, "[Arrest] Arrest Selected Actor with Selected Captor (Teleport Prisoner)")
     JArray.addStr(actionArrayObj, "[Faction Arrest] Arrest Selected Actor (Teleport Prisoner)")
     JArray.addStr(actionArrayObj, "[Arrest] Add Selected Actor to Current Arrest")
     JArray.addStr(actionArrayObj, "[Prison] Bind All Prisoners")
@@ -36,6 +37,7 @@ string[] function GetActions()
     JArray.addStr(actionArrayObj, "[Prison] Check Prisoners AI Status")
     JArray.addStr(actionArrayObj, "[Prison] Show Prison Container")
     JArray.addStr(actionArrayObj, "[Prison] Show Prisoner Inventory")
+    JArray.addStr(actionArrayObj, "[Prison] Show Prison Markers")
     JArray.addStr(actionArrayObj, "[Prison] Return Prisoner Belongings")
     JArray.addStr(actionArrayObj, "[Prison] Strip Prisoner")
     JArray.addStr(actionArrayObj, "[Prison] Strip Prisoner to Underwear")
@@ -96,6 +98,9 @@ function ShowActionsMenu()
     elseif (actionToPerform == "[Arrest] Arrest Selected Actor (Teleport Prisoner)")
         Action_ArrestSelectedActor(uilib, false)
 
+    elseif (actionToPerform == "[Arrest] Arrest Selected Actor with Selected Captor (Teleport Prisoner)")
+        Action_ArrestSelectedActor(uilib, false, true)
+
     elseif (actionToPerform == "[Faction Arrest] Arrest Selected Actor (Teleport Prisoner)")
         Action_ArrestSelectedActorForFaction(uilib)
 
@@ -110,6 +115,9 @@ function ShowActionsMenu()
 
     elseif (actionToPerform == "[Prison] Show Prisoner Inventory")
         Action_ShowPrisonerInventory(uilib)
+
+    elseif (actionToPerform == "[Prison] Show Prison Markers")
+        Action_ShowPrisonMarkers(uilib)
 
     elseif (actionToPerform == "[Prison] Return Prisoner Belongings")
         Action_ReturnPrisonerBelongings(uilib)
@@ -404,6 +412,7 @@ function Action_TestActorHandcuffing(RPB_UIInterface uilib)
 endFunction
 
 function Action_ArrestSelectedActor(RPB_UIInterface uilib, bool abEscortArrestee = true, bool abShowCaptorInputField = false)
+    float startBench = StartBenchmark()
     Actor selectedActor = Game.GetCurrentConsoleRef() as Actor
 
     Actor guard = none
@@ -439,6 +448,7 @@ function Action_ArrestSelectedActor(RPB_UIInterface uilib, bool abEscortArrestee
     endif
 
     API.Arrest.ArrestActor(guard, selectedActor, string_if (abEscortArrestee, API.Arrest.ARREST_TYPE_ESCORT_TO_JAIL, API.Arrest.ARREST_TYPE_TELEPORT_TO_CELL))
+    EndBenchmark(startBench, "Actions::Action_ArrestSelectedActor")
 endFunction
 
 function Action_AddSelectedActorToArrest(RPB_UIInterface uilib)
@@ -567,6 +577,61 @@ function Action_ShowPrisonerInventory(RPB_UIInterface uilib)
 
     prisoner.GotoState("Imprisoned")
     prisoner.RegisterForSingleUpdateGameTime(1.0)
+endFunction
+
+function Action_ShowPrisonMarkers(RPB_UIInterface uilib)
+    RPB_Prison prison = uilib.ShowPrisonList(false, true, abShowPrisonerCount = false)
+
+    if (prison == none)
+        return none
+    endif
+
+    string selectedMarkerType = uilib.ShowStringList("Select Marker Type", \ 
+        "<No Marker>," + \
+        "Release (Escort)," + \
+        "Release (Teleport)," + \ 
+        "Jail (Escort)," + \ 
+        "Jail (Teleport)," + \
+        "Search (Frisking)," + \
+        "Search (Stripping)" \
+    )
+
+    if (selectedMarkerType == "<No Marker>")
+        return none
+    endif
+
+    int subOptionStartIndex = StringUtil.Find(selectedMarkerType, "(") + 1
+    int subOptionEndIndex   = StringUtil.Find(selectedMarkerType, ")")
+    int spaceBeforeParenthesisOffset = 2
+
+    string mainOption   = StringUtil.Substring(selectedMarkerType, 0, subOptionStartIndex - spaceBeforeParenthesisOffset)
+    string subOption    = StringUtil.Substring(selectedMarkerType, subOptionStartIndex, subOptionEndIndex - subOptionStartIndex)
+
+    string propertyPath = "Markers//" + mainOption + "//" + subOption
+    Form[] availableMarkersOfType = prison.GetRootPropertyOfTypeFormArray(propertyPath)
+
+    Debug("Actions::Action_ShowPrisonMarkers", "mainOption: " + mainOption + ", subOption: " + subOption + ", propertyPath: " + propertyPath + ", availableMarkersOfType: " + availableMarkersOfType + ", subOptionStartIndex: " + subOptionStartIndex)
+
+    ObjectReference selectedMarker = uilib.ShowFormArrayList("Select "+ mainOption + "//" + subOption +" Marker", availableMarkersOfType) as ObjectReference
+    Debug("Actions::Action_ShowPrisonMarkers", "selectedMarker: "+ selectedMarker)
+
+    string selectedActionOnMarker = uilib.ShowStringList("Do What?", \ 
+        "<Nothing>," + \
+        "Teleport to Marker," + \
+        "Teleport Selected NPC to Marker" \ 
+    )
+
+    if (selectedActionOnMarker == "<Nothing>")
+        return none
+
+    elseif (selectedActionOnMarker == "Teleport to Marker")
+        Actor ref = Game.GetForm(0x14) as Actor
+        ref.MoveTo(selectedMarker)
+
+    elseif (selectedActionOnMarker == "Teleport Selected NPC to Marker")
+        Actor ref = Game.GetCurrentConsoleRef() as Actor
+        ref.MoveTo(selectedMarker)
+    endif
 endFunction
 
 function Action_ReturnPrisonerBelongings(RPB_UIInterface uilib)
