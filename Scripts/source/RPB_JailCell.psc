@@ -856,6 +856,15 @@ endFunction
     Should only happen the first time the player visits the NPC prisoner
     and at some points where an AI Package is overridden, such as the Solitude execution scene for the NPC's there
     if they were to be imprisoned.
+
+    NPC Sanity checking is used because Skyrim NPC's have caveats to them which prevents the prison system to work without flaws as it would for the player.
+    For instance, NPC's can execute AI packages at any time if they have scripted events (such as the Solitude opening execution scene), which, in this case,
+    makes them walk to the place, essentially leaving the prison.
+
+    Another problem is with NPC clothing, NPC's have their clothes set up at the Actor level, which means that they will recover them as soon as the Player has unloaded the cell (out of the area).
+    This means that for an NPC that has been stripped off their clothing for example, they will recover it when the Player leaves, which defeats the purpose of stripping.
+    To get around this, these sanity checks essentially remove their clothing again, as well as perform any additional checking that ensures that they keep the state they had at the time of their
+    incarceration.
 /;
 
 float __npcSanityCheckPostCheckUpdateTime
@@ -863,6 +872,7 @@ int   __npcSanityCheckUpdateTries
 float __npcSanityCheckElapsedTime
 bool __npcSanityCheckIsCellAttachedOrDetached
 bool __npcSanityCheckAllPrisoners
+bool __npcSanityCheckReset
 RPB_Prisoner __npcSanityCheckSelectedPrisoner
 
 ;/
@@ -876,92 +886,117 @@ function RegisterForSanityChecking(float afPreCheckUpdateTime = 4.0, float afPos
     __npcSanityCheckPostCheckUpdateTime = afPostCheckUpdateTime
     __npcSanityCheckAllPrisoners        = apPrisoner == none
     __npcSanityCheckSelectedPrisoner    = apPrisoner
+    __npcSanityCheckReset               = false
 
     GotoState("NPC_SanityChecking")
     RegisterForSingleUpdate(afPreCheckUpdateTime)
 endFunction
 
- ; When the player leaves the location of this jail cell
- event OnCellDetach()
+;/
+    Resets this jail cell from NPC sanity checking, ensuring a clean state for next check.
+/;
+function ResetSanityChecking()
+    __npcSanityCheckPostCheckUpdateTime = 0.0
+    __npcSanityCheckAllPrisoners        = false
+    __npcSanityCheckSelectedPrisoner    = none
+    __npcSanityCheckReset               = false
+
+    ; Debug(self +" JailCell::ResetSanityChecking", "Sanity checking state has been reset.")
+    ; Trace(self +" JailCell::ResetSanityChecking", \
+    ;     "\n\t __npcSanityCheckPostCheckUpdateTime: "    + __npcSanityCheckPostCheckUpdateTime + \
+    ;     "\n\t __npcSanityCheckAllPrisoners: "           + __npcSanityCheckAllPrisoners + \
+    ;     "\n\t __npcSanityCheckSelectedPrisoner: "       + __npcSanityCheckSelectedPrisoner + \
+    ;     "\n\t __npcSanityCheckReset: "                  + __npcSanityCheckReset \
+    ; )
+endFunction
+
+;/
+    Performs the actions when OnCellAttach() / OnAttachedToCell() and OnCellDetach() / OnDetachedFromCell() events happen.
+/;
+function __onCellAttachAndDetachEvent()
     if (__npcSanityCheckIsCellAttachedOrDetached)
         return
     endif
 
-    __npcSanityCheckAllPrisoners = true
-    if (self.PerformPrisonersSanityCheck())
-        Debug("{NPC_SanityChecking} "+ self +" JailCell::OnCellDetach", "Fired")
-        __npcSanityCheckIsCellAttachedOrDetached = true
-        Utility.Wait(1.0)
-        __npcSanityCheckIsCellAttachedOrDetached = false
-    endif
+    self.RegisterForSanityChecking(0.1)
+    __lock_onCellAttachAndDetachEvents()
+endFunction
+
+;/
+    Ensures only one of the events is happening at the given time,
+    so as to not overlap checks and actions.
+/;
+function __lock_onCellAttachAndDetachEvents()
+    __npcSanityCheckIsCellAttachedOrDetached = true
+    Utility.Wait(__npcSanityCheckPostCheckUpdateTime) ; Ensure a lock of the time configured for post event delay
+    __npcSanityCheckIsCellAttachedOrDetached = false
+endFunction
+
+; When the player leaves the location of this jail cell
+event OnCellDetach()
+    __onCellAttachAndDetachEvent()
 endEvent
 
 ; When the player is in the same cell as this jail cell
 event OnCellAttach()
-    if (__npcSanityCheckIsCellAttachedOrDetached)
-        return
-    endif
-    
-    __npcSanityCheckAllPrisoners = true
-    if (self.PerformPrisonersSanityCheck())
-        Debug("{NPC_SanityChecking} "+ self +" JailCell::OnCellAttach", "Fired")
-        __npcSanityCheckIsCellAttachedOrDetached = true
-        Utility.Wait(1.0)
-        __npcSanityCheckIsCellAttachedOrDetached = false
-    endif
+    __onCellAttachAndDetachEvent()
 endEvent
 
 ; When this jail cell is in the same cell as the player
 event OnAttachedToCell()
-    if (__npcSanityCheckIsCellAttachedOrDetached)
-        return
-    endif
-    
-    __npcSanityCheckAllPrisoners = true
-    if (self.PerformPrisonersSanityCheck())
-        Debug("{NPC_SanityChecking} "+ self +" JailCell::OnAttachedToCell", "Fired")
-        __npcSanityCheckIsCellAttachedOrDetached = true
-        Utility.Wait(1.0)
-        __npcSanityCheckIsCellAttachedOrDetached = false
-    endif
+    __onCellAttachAndDetachEvent()
 endEvent
 
 ; When this jail cell is not in the cell the player is in
 event OnDetachedFromCell()
-    if (__npcSanityCheckIsCellAttachedOrDetached)
-        return
-    endif
-
-    __npcSanityCheckAllPrisoners = true
-    if (self.PerformPrisonersSanityCheck())
-        Debug("{NPC_SanityChecking} "+ self +" JailCell::OnDetachedFromCell", "Fired")
-        __npcSanityCheckIsCellAttachedOrDetached = true
-        Utility.Wait(1.0)
-        __npcSanityCheckIsCellAttachedOrDetached = false
-    endif
+    __onCellAttachAndDetachEvent()
 endEvent
 
-function PerformPrisonerSanityCheck(RPB_Prisoner apPrisoner)
-    if (apPrisoner.IsNPC())
-        if (apPrisoner.ShouldBeInCell)
-            apPrisoner.EnableAI(!apPrisoner.IsFarFromPlayer())
-            RegisterForSingleUpdate(__npcSanityCheckPostCheckUpdateTime)    ; Keep updating until the prisoner is checked
-        endif
+bool function PerformPrisonerSanityCheck(RPB_Prisoner apPrisoner)
+    return __performPrisonerSanityCheck(apPrisoner)
+endFunction
 
-        if (apPrisoner.IsImprisoned)
-            apPrisoner.PerformStrippingSanityChecks()                
-        endif
+bool function __shouldSanityCheckAllPrisoners()
+    return !self.IsEmpty && __npcSanityCheckAllPrisoners && __npcSanityCheckSelectedPrisoner == none
+endFunction
+
+bool function __shouldSanityCheckSinglePrisoner()
+    return !self.IsEmpty && !__npcSanityCheckAllPrisoners && __npcSanityCheckSelectedPrisoner != none
+endFunction
+
+bool function __performPrisonerSanityCheck(RPB_Prisoner apPrisoner)
+    if (!apPrisoner && !apPrisoner.IsNPC())
+        return false
+    endif
+
+    bool isStateValid = true
+
+    if (apPrisoner.IsImprisoned)
+        apPrisoner.EnableAI(!apPrisoner.IsFarFromPlayer())
+        apPrisoner.PerformStrippingSanityChecks()
 
         if (apPrisoner.ShouldBeInCell && !apPrisoner.IsInCell)
             apPrisoner.MoveTo(self)                                           ; Move the prisoner to this jail cell
             apPrisoner.BindToCell()                                           ; Prisoner should already be bound to cell, but just in case they aren't
-            ; JailCell.RegisterForSanityChecking() ; Continue sanity check in since this ref may be inactive and not listen to events
-            RegisterForSingleUpdate(__npcSanityCheckPostCheckUpdateTime)    ; Keep updating until the prisoner is checked
+            RegisterForSingleUpdate(__npcSanityCheckPostCheckUpdateTime)      ; Keep updating until the prisoner is in the cell
+            isStateValid = false
         endif
     endif
+
+    DebugWithArgs(self + " JailCell::__performPrisonerSanityCheck", apPrisoner.Name , "Sanity check complete for " + apPrisoner.Name + ", state is valid.", isStateValid)
+    ; DebugWithArgs(self +" JailCell::__performPrisonerSanityCheck", apPrisoner.Name, \
+    ;     "\n\t __npcSanityCheckPostCheckUpdateTime: "    + __npcSanityCheckPostCheckUpdateTime + \
+    ;     "\n\t __npcSanityCheckAllPrisoners: "           + __npcSanityCheckAllPrisoners + \
+    ;     "\n\t __npcSanityCheckSelectedPrisoner: "       + __npcSanityCheckSelectedPrisoner + \
+    ;     "\n\t __npcSanityCheckReset: "                  + __npcSanityCheckReset + \
+    ;     "\n\t apPrisoner.IsImprisoned: "                + apPrisoner.IsImprisoned + \
+    ;     "\n\t isStateValid: "                           + isStateValid \
+    ; )
+
+    return isStateValid
 endFunction
 
-bool function PerformPrisonersSanityCheck()
+bool function __performPrisonersSanityCheck()
     ; Dont need to sanity check empty cells
     if (self.IsEmpty)
         return false
@@ -972,41 +1007,50 @@ bool function PerformPrisonersSanityCheck()
         return false
     endif
 
+    bool havePrisonersPassedSanityCheck = true
+
     int i = 0
-
     while (i < self.PrisonerCount)
-        Actor prisonerRef       = self.Prisoners[i] as Actor
-        RPB_Prisoner prisoner   = prison.GetPrisoner(prisonerRef)
-        if (prisoner)
-            prisoner.EnableAI(!prisoner.IsFarFromPlayer())
-            
-            if (prisoner.IsImprisoned)
-                prisoner.PerformStrippingSanityChecks()                
-            endif
+        Actor prisonerRef                   = self.Prisoners[i] as Actor
+        RPB_Prisoner prisoner               = prison.GetPrisoner(prisonerRef)
+        bool hasPrisonerPassedSanityCheck   =  self.__performPrisonerSanityCheck(prisoner)
+        ; Debug("{NPC_SanityChecking} "+ self +" JailCell::__performPrisonersSanityCheck", "[Prisoner: "+ prisoner.Name +"] Location: " + prisoner.GetCurrentCell())
 
-            while (!prisoner.IsInCell && prisoner.IsImprisoned)
-                prisoner.MoveTo(self)                                           ; Move the prisoner to this jail cell
-                prisoner.BindToCell()                                           ; Prisoner should already be bound to cell, but just in case they aren't
-                RegisterForSingleUpdate(__npcSanityCheckPostCheckUpdateTime)    ; Keep updating until the prisoner is in the cell
-            endWhile
+        if (!hasPrisonerPassedSanityCheck)
+            havePrisonersPassedSanityCheck = false
         endif
         i += 1
-
-        Debug("{NPC_SanityChecking} "+ self +" JailCell::PerformPrisonersSanityCheck", "[Prisoner: "+ prisoner.Name +"] Location: " + prisoner.GetCurrentCell())
     endWhile
 
-    return true
+    ; Trace("{NPC_SanityChecking} "+ self +" JailCell::__performPrisonersSanityCheck", \
+    ;     "\n\t __npcSanityCheckPostCheckUpdateTime: "    + __npcSanityCheckPostCheckUpdateTime + \
+    ;     "\n\t __npcSanityCheckAllPrisoners: "           + YesNo(__npcSanityCheckAllPrisoners) + \
+    ;     "\n\t __npcSanityCheckSelectedPrisoner: "       + __npcSanityCheckSelectedPrisoner + \
+    ;     "\n\t __npcSanityCheckReset: "                  + __npcSanityCheckReset + \
+    ;     "\n\t havePrisonersPassedSanityCheck: "         + YesNo(havePrisonersPassedSanityCheck) \
+    ; )
+
+    return havePrisonersPassedSanityCheck
 endFunction
 
 ; Problematic - this OnUpdate must be reviewed at some point, it can cause stack dumps (Prisoner being null might have been the issue, now it's checked)
 state NPC_SanityChecking
     event OnUpdate()
-        if (!self.PerformPrisonersSanityCheck() && __npcSanityCheckSelectedPrisoner)
-            ; Mass prisoner sanity check failed, check only the passed in prisoner
-            self.PerformPrisonerSanityCheck(__npcSanityCheckSelectedPrisoner)
+        bool hasCheckedSuccessfully = \ 
+            (__shouldSanityCheckAllPrisoners() && __performPrisonersSanityCheck()) || \
+            (__shouldSanityCheckSinglePrisoner() && __performPrisonerSanityCheck(__npcSanityCheckSelectedPrisoner))
+
+        if (hasCheckedSuccessfully)
+            __npcSanityCheckReset = true ; Toggle the flag to reset the sanity check variables to ensure a clean state
+            ; Debug("{NPC_SanityChecking} "+ self +" JailCell::OnUpdate", "Updating...")
+            GotoState("")
         endif
-        Debug("{NPC_SanityChecking} "+ self +" JailCell::OnUpdate", "Updating...")
-        GotoState("")
+    endEvent
+
+    event OnEndState()
+        if (__npcSanityCheckReset)
+            self.ResetSanityChecking()
+        endif
     endEvent
 endState
 

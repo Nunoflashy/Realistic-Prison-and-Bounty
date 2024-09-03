@@ -7,6 +7,23 @@ import RPB_Utility
 ;                      Script References
 ; ==========================================================
 
+RPB_API __api
+RPB_API property API
+    RPB_API function get()
+        if (!__api)
+            __api = RPB_API.GetSelf()
+        endif
+
+        return __api
+    endFunction
+endProperty
+
+RPB_Config property Config
+    RPB_Config function get()
+        return API.Config
+    endFunction
+endProperty
+
 ; ==========================================================
 ;                       Actor Related
 ; ==========================================================
@@ -86,9 +103,9 @@ endFunction
 
 function EnableAI(bool abEnable = true)
     this.EnableAI(abEnable)
-    if (abEnable)
-        Debug("Actor::EnableAI", "AI: " + abEnable)
-    endif
+    ; if (abEnable)
+    ;     Debug("Actor::EnableAI", "AI: " + abEnable)
+    ; endif
 endFunction
 
 function DisableAI()
@@ -111,8 +128,10 @@ bool function HasSpell(Spell akSpell)
     return this.HasSpell(akSpell)
 endFunction
 
-function EquipItem(Form akItem, bool abPreventRemoval = false, bool abSilent = true)
-    this.EquipItem(akItem, abPreventRemoval, abSilent)
+function EquipItem(Form akItem, bool abPreventRemoval = false, bool abSilent = true, bool abCondition = true)
+    if (abCondition)
+        this.EquipItem(akItem, abPreventRemoval, abSilent)
+    endif
 endFunction
 
 function UnequipHands()
@@ -199,7 +218,43 @@ bool function IsNaked()
 endFunction
 
 bool function IsInUnderwear()
+    return true
     ; TOOD: Logic to determine when the actor is only wearing underwear
+endFunction
+
+;/
+    For actions that require the reference of the underwear,
+    consider using self.GetUnderwear() and check that value != none instead
+/;
+bool function HasUnderwear()
+    Armor underwearTop      = self.GetUnderwear("Top")
+    Armor underwearBottom   = self.GetUnderwear("Bottom")
+
+    return underwearTop || underwearBottom
+endFunction
+
+Armor function GetUnderwear(string asUnderwearPart)
+    if (asUnderwearPart != "Top" && asUnderwearPart != "Bottom")
+        return none
+    endif
+
+    int underwearClothingSlot
+
+    if (asUnderwearPart == "Top")
+        underwearClothingSlot = Config.UnderwearTopSlot
+
+    elseif (asUnderwearPart == "Bottom")
+        underwearClothingSlot = Config.UnderwearBottomSlot
+    endif
+
+    if (underwearClothingSlot == 0)
+        return none
+    endif
+
+    int underwearSlotMask = RPB_Utility.GetSlotMaskValue(underwearClothingSlot)
+    Armor underwearPart = this.GetWornForm(underwearSlotMask) as Armor
+
+    return underwearPart
 endFunction
 
 ; ==========================================================
@@ -549,8 +604,18 @@ bool function Has(string asVarName, string asVarCategory = "Actor")
     return GetBool(asVarName, asVarCategory)
 endFunction
 
+; Alias for GetBool() to check past events or possession
+bool function Was(string asVarName, string asVarCategory = "Actor")
+    return GetBool(asVarName, asVarCategory)
+endFunction
+
 ; Alias for GetBool() to check whether an action should be taken
 bool function Should(string asVarName, string asVarCategory = "Actor")
+    return GetBool(asVarName, asVarCategory)
+endFunction
+
+; Alias for GetBool() to check whether an action should be taken
+bool function Must(string asVarName, string asVarCategory = "Actor")
     return GetBool(asVarName, asVarCategory)
 endFunction
 

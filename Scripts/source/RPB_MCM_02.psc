@@ -190,6 +190,7 @@ function InitializePages()
     endif
 
     JArray.addStr(_pagesArray, "Check Prisoner")
+    JArray.addStr(_pagesArray, "Check Hold Info for Prisoner")
 
     Pages = JArray.asStringArray(_pagesArray)
 endFunction
@@ -282,6 +283,21 @@ event OnPageReset(string page)
 
         RPB_MCM_02_Prison.Render(self, selectedPrisoner)
         return
+
+    elseif (page == "Check Hold Info for Prisoner")
+        RPB_UIInterface uilib = (Game.GetForm(0x14) as Form) as RPB_UIInterface
+
+        RPB_Prison selectedPrison = uilib.ShowPrisonList(abSkipListOnSingleResult = true)
+        if (selectedPrison == none)
+            return
+        endif
+
+        RPB_Prisoner selectedPrisoner = uilib.ShowPrisonerList(selectedPrison, true, "Select Prisoner in " + selectedPrison.Name)
+        if (selectedPrisoner == none)
+            return
+        endif
+
+        RPB_MCM_02_Holds.NPC_RenderPrisons(self, selectedPrisoner)
     endif
 
     RPB_MCM_02_Holds.Render(self)

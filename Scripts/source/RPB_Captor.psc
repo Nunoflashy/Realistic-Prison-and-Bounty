@@ -3,19 +3,6 @@ Scriptname RPB_Captor extends RPB_Actor
 import RPB_Utility
 import RPB_Arrest
 
-RPB_API __api
-RPB_API property API
-    RPB_API function get()
-        if (__api)
-            return __api
-        endif
-
-        __api = RPB_API.GetSelf()
-        return __api
-    endFunction
-endProperty
-
-
 bool property IsGuard
     bool function get()
         return this.IsGuard()
@@ -149,12 +136,12 @@ endState
 state Escorting
     event OnUpdate()
         return
-        if (this.GetDistance(Arrestee) >= 700)
-            Arrestee.MoveTo(this)
-            Debug("Captor::OnUpdate", "Moved Arrestee to " + Name)
+        ; if (this.GetDistance(Arrestee) >= 700)
+        ;     Arrestee.MoveTo(this)
+        ;     Debug("Captor::OnUpdate", "Moved Arrestee to " + Name)
     
-        endif
-        RegisterForSingleUpdate(5.0)
+        ; endif
+        ; RegisterForSingleUpdate(5.0)
     endEvent
 endState
 

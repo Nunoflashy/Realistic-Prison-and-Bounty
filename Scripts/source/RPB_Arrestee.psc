@@ -7,29 +7,22 @@ import RPB_Config
 ;                      Script References
 ; ==========================================================
 
-RPB_API __api
-RPB_API property API
-    RPB_API function get()
-        if (__api)
-            return __api
-        endif
-
-        __api = RPB_API.GetSelf()
-        return __api
-    endFunction
-endProperty
-
-RPB_Config property Config
-    RPB_Config function get()
-        return API.Config
-    endFunction
-endProperty
-
 RPB_Arrest property Arrest
     RPB_Arrest function get()
         return API.Arrest
     endFunction
 endProperty
+
+RPB_SceneManager property SceneManager
+    RPB_SceneManager function get()
+        return API.SceneManager
+    endFunction
+endProperty
+
+
+; ==========================================================
+;                          Properties
+; ==========================================================
 
 ;/
     The Actor that has arrested this Arrestee.
@@ -93,9 +86,6 @@ string property ArrestType
     endFunction
 endProperty
 
-; ==========================================================
-;                          Properties
-; ==========================================================
 
 float property CurrentTime
     float function get()
@@ -403,12 +393,6 @@ function Arrest()
     SetBool("Arrested", true)
     SetBool("Captured", true) ; Used to avoid further arrest resists after being arrested, may change name or implementation
     self.IncrementStat("Times Arrested")
-    
-    ; Arrest.SceneManager.StartArrestScene( \
-    ;     akGuard     = Captor, \
-    ;     akArrestee  = this, \
-    ;     asScene     = Arrest.GetArrestScene(this) \
-    ; )
 
     Config.NotifyArrest("You have been arrested in " + Hold, this == Config.Player)
     Info(self.Name + " has been arrested in " + Hold + " at " + CurrentTime)
@@ -418,106 +402,54 @@ function Arrest()
 endFunction
 
 function EscortToPrison(bool abEscortDirectlyToCell = false)
-    ; Arrest.SceneManager.StartArrestScene( \
-    ;     akGuard     = Captor, \
-    ;     akArrestee  = this, \
-    ;     asScene     = Arrest.GetArrestScene(this) \
-    ; )
-
-    Arrest.SceneManager.StartArrestScene( \
+    SceneManager.StartArrestScene( \
         akGuard     = Captor.GetActor(), \
         akArrestee  = this, \
         asScene     = Arrest.SceneManager.SCENE_ARREST_START_02 \
     )
 
-    ; Bind stay still package
-    ReferenceAlias arrestPackage = API.PrisonManager.GetArrestPackageByIndex(0)
-    self.BindAlias(arrestPackage)
+    RPB_Prisoner prisoner   = self.MakePrisoner()
+    RPB_Prison prison       = prisoner.Prison
 
-    ; Debug("Arrestee::EscortToPrison", "Captor: " + Captor + ", this: " + this + ", Arrest Scene: " + Arrest.GetArrestScene(this))
+    bool hasAssignedCell = prisoner.AssignCell()
+
+    if (!hasAssignedCell)
+        prison.OnPrisonerImprisonmentFail(prisoner, "Assign Cell")
+        self.RevertArrest()
+        return
+    endif
+
+    ; ; Bind stay still package
+    ; ReferenceAlias arrestPackage = API.PrisonManager.GetArrestPackageByIndex(0)
+    ; self.BindAlias(arrestPackage)
 
     if (!abEscortDirectlyToCell)
-        ; ObjectReference movePoint = Game.GetForm(0x3eeff) as ObjectReference
-        ; self.SetStateForScene("OnEscortToJailEnd", "EscortToJail")
-        ; API.SceneManager.StartEscortToJail( \
-        ;     akEscortLeader      = Captor, \
-        ;     akEscortedPrisoner  = this, \
-        ;     akPrisonerChest     = movePoint \
-        ; )
-        ; return
-        ; Debug("Arrestee::EscortToPrison", "Started escorting " + this + " to prison")
-        ; Make this arrestee a prisoner right away
-        RPB_Prisoner prisonerRef = self.MakePrisoner()
-
-        prisonerRef.SetBelongingsContainer()  ; Temporary, later another location should be used for taking to prison
-
-        if (!prisonerRef.AssignCell())
-            Debug("Arrestee::EscortToPrison", "Could not assign a cell to arrestee " + this)
-            self.RevertArrest()
-            return
-        endif
-        ; RPB_JailCell assignedCell = GetFormFromMod(0x3895) as RPB_JailCell
-        ; prisonerRef.SetForm("Cell", assignedCell)
-
-        self.SetStateForScene("OnEscortToJailEnd", "EscortToJail")
-
-        Arrest.SceneManager.StartEscortToJail( \
-            akEscortLeader      = Captor.GetActor(), \
-            akEscortedPrisoner  = this, \
-            akPrisonerChest     = prisonerRef.PrisonerBelongingsContainer \
-        )
+        prisoner.EscortToJail(Captor.GetActor())
     else
-        ; Make this arrestee a prisoner right away
-        RPB_Prisoner prisonerRef = self.MakePrisoner()
-        if (!prisonerRef.AssignCell())
-            Debug("Arrestee::EscortToPrison", "Could not assign a cell to arrestee " + this)
-            self.RevertArrest()
-            return
-        endif
-
-        ; return
-        ; Debug("Arrestee::EscortToPrison", "Started escorting " + this + " directly to a cell")
-        ; The marker where the escort will stand, waiting for the prisoner to enter the cell.
-        ObjectReference outsideJailCellEscortWaitingMarker = prisonerRef.JailCell.GetRandomMarker("Exterior") as ObjectReference
-
-        Arrest.SceneManager.StartEscortToCell( \
-            akEscortLeader                  = Captor.GetActor(), \
-            akEscortedPrisoner              = prisonerRef.GetActor(), \
-            akJailCellMarker                = prisonerRef.JailCell, \
-            akJailCellDoor                  = prisonerRef.JailCell.CellDoor, \
-            akEscortWaitingMarker           = outsideJailCellEscortWaitingMarker \ 
-        )
+        prisoner.EscortToCell(Captor.GetActor())
     endif
 endFunction
 
 function MoveToPrison(bool abMoveDirectlyToCell = false)
-    ; Arrest.SceneManager.StartArrestScene( \
-    ;     akGuard     = Captor, \
-    ;     akArrestee  = this, \
-    ;     asScene     = Arrest.GetArrestScene(this) \
-    ; )
-    ; Utility.Wait(6.0)
-    RPB_Prisoner prisonerRef = self.MakePrisoner()
-    RPB_Prison prison        = prisonerRef.Prison
-    prisonerRef.IsUndeterminedSentence = false
+    RPB_Prisoner prisoner   = self.MakePrisoner()
+    RPB_Prison prison       = prisoner.Prison
 
-    if (!abMoveDirectlyToCell)
-        prisonerRef.MoveToPrison(Captor.GetActor())
-        ; Later when RPB_Captor is done, we should call it like
-        ; captorRef.MoveToPrison(prison) or captorRef.MoveToPrison() in case a Prison is associated with that Captor already, which probably should be
-        Debug("Arrestee::MoveToPrison", "Moving " + this + " to prison")
-    else
-        if (!prisonerRef.AssignCell())
-            ; Terminate arrest, could not assign cell
-            prisonerRef.Destroy()
-            self.RevertArrest()
+    bool hasAssignedCell = prisoner.AssignCell()
+
+    if (abMoveDirectlyToCell)
+        if (!hasAssignedCell)
+            prisoner.OnImprisonmentFail("Assign Cell")
+            self.OnArrestFailed("Assign Cell")
             return
         endif
 
-        prisonerRef.MoveToCell()
+        prisoner.MoveToCell()
+    else
+        if (!hasAssignedCell)
+            DebugWarn("["+ Name +"] Arrestee::MoveToPrison", "Arrestee hasn't been assigned a cell yet since it failed, the arrest may not work!")
+        endif
+        prisoner.MoveToPrison(Captor.GetActor())
     endif
-
-    prison.OnPrisonerMovedToPrison(prisonerRef, abMoveDirectlyToCell)
 endFunction
 
 function ChangeEscort(Actor akNewEscort)
@@ -550,7 +482,6 @@ function UpdateCurrentBounty()
     ;     "\t Bounty: " + Bounty + "\n" + \
     ; "]")   
 endFunction
-
 
 function UpdateLargestBounty()
     parent.SyncLargestBountyForFaction(ArrestFaction)
@@ -704,6 +635,14 @@ event OnArrestEnd()
 
     Captor.SetEscorting()
     
+endEvent
+
+event OnArrestFailed(string asReason)
+    if (asReason == "Assign Cell")
+        ; Destroy anything related to RPB_Prisoner here (need to find a way to get the reference)
+    endif
+
+    self.RevertArrest()
 endEvent
 
 ; ==========================================================

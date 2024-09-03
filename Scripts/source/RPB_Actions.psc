@@ -665,7 +665,7 @@ function Action_StripPrisoner(RPB_UIInterface uilib, bool abStripToUnderwear = f
         return none
     endif
 
-    prisoner.Test_Strip(abStripToUnderwear)
+    self.Prisoner_Strip(prisoner, abStripToUnderwear)
 endFunction
 
 function Action_SetPrisonerStateProperty(RPB_UIInterface uilib)
@@ -758,4 +758,39 @@ function Action_ImprisonNearbyActors(RPB_UIInterface uilib)
         prisoner.MoveToCell()
         i += 1
     endWhile
+endFunction
+
+
+; ==========================================================
+;                          Functions
+; ==========================================================
+
+function Prisoner_Strip(RPB_Prisoner apPrisoner, bool abKeepUnderwear = false)
+    if (abKeepUnderwear)
+        Armor underwearTop      = apPrisoner.GetUnderwear("Top")
+        Armor underwearBottom   = apPrisoner.GetUnderwear("Bottom")
+        bool hasUnderwear = false
+
+        DebugWithArgs("["+ apPrisoner.Name +"] Prisoner::Test_Strip", "abKeepUnderwear: " + abKeepUnderwear, "Top: " + underwearTop + ", Bottom: " + underwearBottom)
+
+        apPrisoner.UnequipAll()
+        apPrisoner.RemoveAllItems()
+
+        if (underwearTop)
+            apPrisoner.EquipItem(underwearTop)
+            hasUnderwear = true
+        endif
+
+        if (underwearBottom)
+            apPrisoner.EquipItem(underwearBottom)
+            hasUnderwear = true
+        endif
+
+        Debug("["+ apPrisoner.Name +"] Prisoner::Test_Strip", "Stripped " + apPrisoner.Name + " to underwear.", hasUnderwear)
+        Debug("["+ apPrisoner.Name +"] Prisoner::Test_Strip", "Stripped " + apPrisoner.Name + " naked. (does not have underwear)", !hasUnderwear)
+    else
+        apPrisoner.UnequipAll()
+        apPrisoner.RemoveAllItems()
+        Debug("["+ apPrisoner.Name +"] Prisoner::Test_Strip", "Stripped " + apPrisoner.Name + " naked.")
+    endif
 endFunction

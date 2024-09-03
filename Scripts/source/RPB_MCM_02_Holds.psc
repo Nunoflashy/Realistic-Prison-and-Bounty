@@ -144,6 +144,54 @@ function Render(RPB_MCM_02 mcm) global
     RenderPrisons(mcm)
 endFunction
 
+; ==========================================================
+;                           NPC
+; ==========================================================
+
+function NPC_RenderPrisons(RPB_MCM_02 mcm, RPB_Prisoner apPrisoner) global
+    RPB_Prison holdPrison       = apPrisoner.Prison
+    string hold                 = holdPrison.Hold
+    Faction holdCrimeFaction    = RPB_Utility.GetCrimeFactionByHold(hold)
+
+    if (!holdPrison)
+        Debug("MCM_02_Holds::NPC_RenderPrisons", "There was no prison found, cannot render hold!")
+        return
+    endif
+
+     ; Refresh time jailed (only updates when player is nearby since that's when the effect is on)
+    apPrisoner.UpdateTimeJailed()
+    
+    mcm.SetCursorFillMode(mcm.TOP_TO_BOTTOM)
+    ; ==========================================================
+    ;                           Left
+    ; ==========================================================
+
+    mcm.AddOptionText("", hold + " Statistics - " + apPrisoner.Name, defaultFlags = mcm.OPTION_DISABLED)
+    mcm.AddEmptyOption()
+
+    string cellId = apPrisoner.JailCell.ID
+    mcm.AddOptionText("", "Currently Jailed", defaultFlags = mcm.OPTION_DISABLED)
+    mcm.AddOptionText("", "In " + holdPrison.Name + ", " + cellId, defaultFlags = mcm.OPTION_DISABLED)
+    
+    mcm.AddEmptyOption()
+    mcm.AddEmptyOption()
+    mcm.AddEmptyOption()
+
+    RenderPrisonLeft(mcm, holdPrison, apPrisoner.GetActor())
+
+    mcm.SetCursorPosition(1)
+    ; ==========================================================
+    ;                           Right
+    ; ==========================================================
+    
+    DisplayHoldStats(mcm, apPrisoner.GetActor(), holdCrimeFaction)
+
+    mcm.AddEmptyOption()
+    mcm.AddEmptyOption()
+
+    RenderPrisonRight(mcm, holdPrison, apPrisoner.GetActor())
+endFunction
+
 ; =====================================================
 ; Helpers
 ; =====================================================

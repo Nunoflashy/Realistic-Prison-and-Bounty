@@ -8,42 +8,12 @@ import Math
 ;                      Script References
 ; ==========================================================
 
-RPB_API property API
-    RPB_API function get()
-        return Prison.API
-    endFunction
-endProperty
-
-RPB_Config property Config
-    RPB_Config function get()
-        return API.Config
-    endFunction
-endProperty
-
 RPB_SceneManager property SceneManager
     RPB_SceneManager function get()
         return API.SceneManager
     endFunction
 endProperty
 
-;/
-    The Actor that has arrested this Arrestee.
-    This may be null depending on whether the arrest was done through a captor or faction (if the latter, this is null).
-
-    The reason this is not a property with the value of GetCasterActor() is the same as the one for the Arrestee.
-    Once the MagicEffect is removed, this reference will be null and cannot be used in any function or event, this
-    is using the same workaround.
-
-    Additionally, the Caster may not be the Captor in the future, for instance if the Arrest is done through a Faction, there will
-    be no Caster, or it will be the same as the Target, which would result in logic failure, this bypasses that problem too.
-
-    The value is set through Initialize().
-/;
-; Actor captor ; To be changed, a prisoner shouldn't have a captor. The correct relation would be this prisoner to a prison, and multiple guards to a prison, not a prisoner
-; Idea for the future: self.GetPrison().GetGuards() where the return type is RPB_Guard[], then each one could have prison cells assigned to them, or be selected at random to do some action
-; Likewise, prisoners would be retrieved as such: self.GetPrison.GetPrisoners() where the return type is RPB_Prisoner[] and returns every prisoner in this particular prison by iterating through every prison cell.
-; self.GetPrison() could return something like RPB_Prison or RPB_PrisonLocation, something akin to Faction
-; This way, this prisoner script would no longer contain jailFaction or hold, since those would now be part of RPB_Prison
 
 ; ==========================================================
 ;                    Prisoner Properties
@@ -158,6 +128,12 @@ endProperty
     TODO: When cells with multiple doors are supported,
         this property should take into account the distance between the door and the exterior marker of that door,
         since each cell door should have at least one exterior marker.
+
+        Needs to be refactored, because it doesn't exactly check if the prisoner is in the cell,
+        it's only checking if the distance to the cell door is greater than the distance from the outside markers,
+        and it fails on StripEnd because of that, since even when the Actor is outside the cell,
+        the condition is being met because there's no rule checking if the Prisoner is inside the cell,
+        need to think of a way to do that check
 /;
 bool property IsInCell
     bool function get()
@@ -430,6 +406,18 @@ bool property IsSentenceSet
     endFunction
 endProperty
 
+ReferenceAlias property CellPackage
+    ReferenceAlias function get()
+        return JailCell.GetPrisonerCellPackage(self)
+    endFunction
+endProperty
+
+bool property HasCellPackage
+    bool function get()
+        return CellPackage.GetActorReference() == this
+    endFunction
+endProperty
+
 ; Whether this prisoner will be stripped naked (used for determing jail cell type before actually assigning a cell, or any other action in the future that makes use of such property.)
 bool property WillBeStrippedNaked auto
 
@@ -510,37 +498,26 @@ endFunction
 /;
 bool function AssignCell()
     if (self.JailCell)
-        ; Debug(this, "["+ Name +"] Prisoner::AssignCell", "A prison cell has already been assigned to prisoner " + this + ": [" +"Cell: " + self.JailCell + ", Door: " + self.JailCell.CellDoor + "]")
+        Debug("["+ Name +"] Prisoner::AssignCell", "A prison cell has already been assigned to prisoner " + this + ": [" +"Cell: " + self.JailCell + ", Door: " + self.JailCell.CellDoor + "]")
         return true
     endif
 
-    ; Determine if prisoner will be stripped etc (Set options that a cell depend on)
-    self.WillBeStrippedNaked = true
+    ; Needs to be refactored, shouldn't be here
+    if (ShouldBeStripped)
+        ; Determine if prisoner will be stripped etc (Set options that a cell depend on)
+        self.WillBeStrippedNaked = true ; Makes the cell gender exclusive
+    endif
 
-    RPB_JailCell assignedCell = Prison.RequestCellForPrisoner(self)
-
+    RPB_JailCell assignedCell = Prison.RequestCell(self)
 
     if (assignedCell == none)
-        Prison.OnPrisonerImprisonmentFail(self, "Assign Cell")
+        self.OnImprisonmentFail("Assign Cell")
         return false
     endif
 
-    ; Actually bind this jail cell to the prisoner, it has been assigned.
-    Prison.BindCellToPrisoner(assignedCell, self)
+    Prison.BindCellToPrisoner(assignedCell, self) ; Actually bind this jail cell to the prisoner, it has been assigned.
     return self.JailCell != none
 endFunction
-
-ReferenceAlias property CellPackage
-    ReferenceAlias function get()
-        return JailCell.GetPrisonerCellPackage(self)
-    endFunction
-endProperty
-
-bool property HasCellPackage
-    bool function get()
-        return CellPackage.GetActorReference() == this
-    endFunction
-endProperty
 
 ; Binds the NPC to their Cell, does not work on the Player.
 function BindToCell()
@@ -677,8 +654,8 @@ endFunction
 /;
 function Imprison()
     if (!self.HasStateRequiredForImprisonment())
-        Error(self.GetName() + " does not have the required state for "+ self.GetPossessivePronoun() +" imprisonment, cannot continue!")
-        DebugError("["+ Name +"] Prisoner::Imprison", self.GetName() + " does not have the required state for "+ self.GetPossessivePronoun() +" imprisonment, cannot continue!")
+        Error(Name + " does not have the required state for "+ self.GetPossessivePronoun() +" imprisonment, cannot continue!")
+        DebugError("["+ Name +"] Prisoner::Imprison", Name + " does not have the required state for "+ self.GetPossessivePronoun() +" imprisonment, cannot continue!")
         return
     endif
 
@@ -689,28 +666,9 @@ function Imprison()
     endif
 
     float startBench = StartBenchmark()
-    self.BindToCell() ; Probably delete this
-
-    self.SetBelongingsContainer()
-    self.SetReleaseLocation()
-
-    self.RegisterLastUpdate()
-    self.MarkAsJailed()
-
-    if (!Sentence)
-        self.SetSentence(abShouldAffectBounty = false)
-    endif
-    
     if (GetBool("Infamy Enabled"))
         self.TriggerInfamyPenalty()
     endif
-
-    ; if (wasMoved)
-    ;     self.ProcessWhenMoved() ; Only use when moved, not when escorted (Handle all events at once)
-    ; endif
-
-    self.RegisterTimeOfImprisonment()
-    self.DetermineReleaseTimeAdditionalHours() ; For Release Time (Minimum, Maximum) intervals
 
     string sentenceFormatted    = RPB_Utility.GetTimeFormatted(Sentence, abIncludeHours = false)
     string releaseDateFormatted = Prison.GetTimeOfReleaseFormatted(self)
@@ -725,9 +683,8 @@ function Imprison()
         Config.NotifyJail(self.GetName() + "'s release is due on " + releaseDateFormatted, !self.IsPlayer())
     endif
 
-    SetBool("Imprisoned", true)
+    self.OnImprisoned()
     GotoState("Imprisoned") ; State when the prisoner is in the cell, check for updates for sentence, etc...
-    RegisterForUpdateGameTime(1.0)
     EndBenchmark(startBench, "Ended ["+ Name +"] Prisoner::Imprison")
 endFunction
 
@@ -750,35 +707,37 @@ function Clothe()
 endFunction
 
 function Strip(bool abRemoveUnderwear = true)
-    RPB_Outfit prisonerOutfit = (self as ActiveMagicEffect) as RPB_Outfit
-    ; Get underwear
-    int underwearTopSlotMask    = GetSlotMaskValue(config.UnderwearTopSlot)
-    int underwearBottomSlotMask = GetSlotMaskValue(config.UnderwearBottomSlot)
+    if (!self.PrisonerBelongingsContainer)
+        DebugError("["+ Name +"] Prisoner::Strip", "The prisoner hasn't had a belongings container assigned to them, cannot strip!")
+        return
+    endif
 
-    Armor underwearTop      = this.GetWornForm(underwearTopSlotMask) as Armor
-    Armor underwearBottom   = this.GetWornForm(underwearBottomSlotMask) as Armor
+    RPB_Outfit prisonerOutfit = (self as ActiveMagicEffect) as RPB_Outfit ; Should be in Clothe()
 
     self.UnequipAll()
-    self.RemoveAllItems(PrisonerBelongingsContainer, false, true) ; Remove and put all the items in the prisoner's posession in the assigned prisoner container
+    self.RemoveAllItems(PrisonerBelongingsContainer, true, true) ; Remove and put all the items in the prisoner's posession in the assigned prisoner container
 
-    ; Debug("["+ Name +"] Prisoner::Strip", "Underwear Top: " + underwearTop + " ("+ underwearTopSlotMask +")" + ", Underwear Bottom: " + underwearBottom + " ("+ underwearBottomSlotMask +")")
-    ; Debug("["+ Name +"] Prisoner::Strip", "Underwear Top Slot: " + config.UnderwearTopSlot + ", Underwear Bottom Slot: " + config.UnderwearBottomSlot)
+    ObjectReference evidenceChest = Game.GetForm(0x108D37) as ObjectReference ; temp
+    evidenceChest.SetDisplayName("Vivienne Onis' Belongings") ; temp
+    PrisonerBelongingsContainer.AddItem(evidenceChest) ; temp
 
-    Config.NotifyJail("Stripping Thoroughness: " + StrippingThoroughness)
-    bool _isStrippedNaked       = StrippingThoroughness >= 10
-    self.IsStrippedNaked        = _isStrippedNaked
-    self.IsStrippedToUnderwear  = !_isStrippedNaked
+    self.IsStrippedNaked       = StrippingThoroughness >= 10
+    self.IsStrippedToUnderwear = !self.IsStrippedNaked
 
+    DebugWithArgs("["+ Name +"] Prisoner::Strip", "abRemoveUnderwear: " + YesNo(abRemoveUnderwear), "Container: " + PrisonerBelongingsContainer)
     ; TODO: Determine what is required to happen to have the Prisoner be in underwear (e.g: Stripping Thoroughness)
     ; TODO: Find a way to keep the underwear without recovering NPC's body clothing (skyrim bug?), maybe filters?
     ; if (!abRemoveUnderwear)
+    ;     Armor underwearTop      = self.GetUnderwear("Top")
+    ;     Armor underwearBottom   = self.GetUnderwear("Bottom")
+
     ;     PrisonerBelongingsContainer.RemoveItem(underwearTop, abSilent = true, akOtherContainer = this)
     ;     PrisonerBelongingsContainer.RemoveItem(underwearBottom, abSilent = true, akOtherContainer = this)
 
     ;     self.EquipItem(underwearTop)
     ;     self.EquipItem(underwearBottom)
     ; endif
-
+ 
     ; Unequip anything currently held in the hands of this Prisoner
     self.UnequipHands()
     self.SheatheWeapon()
@@ -787,15 +746,13 @@ function Strip(bool abRemoveUnderwear = true)
 
     self.IncrementStat("Times Stripped")
     SetBool("Stripped", true) ; No use for now, might be changed
+    Debug("["+ Name +"] Prisoner::Strip", "Stripped "+ Name + " naked.", self.IsStrippedNaked)
+    Debug("["+ Name +"] Prisoner::Strip", "Stripped "+ Name + " to underwear.", self.IsStrippedToUnderwear)
 endFunction
 
 function RemoveUnderwear()
-    ; Get underwear
-    int underwearTopSlotMask    = GetSlotMaskValue(config.UnderwearTopSlot)
-    int underwearBottomSlotMask = GetSlotMaskValue(config.UnderwearBottomSlot)
-
-    Armor underwearTop      = this.GetWornForm(underwearTopSlotMask) as Armor
-    Armor underwearBottom   = this.GetWornForm(underwearBottomSlotMask) as Armor
+    Armor underwearTop      = self.GetUnderwear("Top")
+    Armor underwearBottom   = self.GetUnderwear("Bottom")
 
     if (underwearTop)
         this.RemoveItem(underwearTop, 1, true, PrisonerBelongingsContainer)
@@ -838,9 +795,27 @@ function StartGiveClothing(Actor akClothingGiver)
     )
 endFunction
 
+function EscortToJail(Actor akEscort)
+    ObjectReference escortLocation = Prison.GetRandomEscortLocation()
+
+    SceneManager.StartEscortToJail( \
+        akEscortLeader      = akEscort, \
+        akEscortedPrisoner  = this, \
+        akPrisonerChest     = escortLocation \
+    )
+    SetBool("Go to Cell", true)
+endFunction
+
 function EscortToCell(Actor akEscort)
     ObjectReference outsideCellGuardWaitingMarker = JailCell.GetRandomMarker("Exterior")
-    
+    ; Debug("["+ Name +"] Prisoner::EscortToCell", "Called EscortToCell()")
+    ; Debug("["+ Name +"] Prisoner::EscortToCell", "Started escort to cell with escort " + akEscort.GetBaseObject().GetName() + "\n" + \ 
+    ;     "\t\t akEscortLeader: " + akEscort + \ 
+    ;     "\t\t akEscortedPrisoner: " + this + \ 
+    ;     "\t\t akJailCellMarker: " + self.JailCell + \ 
+    ;     "\t\t akJailCellDoor: " + self.JailCell.CellDoor + \ 
+    ;     "\t\t akEscortWaitingMarker: " + outsideCellGuardWaitingMarker \ 
+    ; )
     SceneManager.StartEscortToCell( \
         akEscortLeader              = akEscort, \
         akEscortedPrisoner          = this, \
@@ -1143,6 +1118,7 @@ float _previousUpdateTimeServed
 ; While this Prisoner is imprisoned in their cell
 state Imprisoned
     event OnBeginState()
+        Debug("[state: "+ self.GetState() +"] ["+ Name +"] Prisoner::OnBeginState", self.Name + "'s Bounty: " + Bounty)
         ; if (!Prison.IsReceivingUpdates()) ; if we dont destroy the instance in time, this will get called from Prison after processing queued prisoners, and since we didnt register the prisoner, this is a bug since it will report 0 prisoners
             Prison.RegisterForPrisonPeriodicUpdate(self)
         ; endif
@@ -1154,12 +1130,13 @@ state Imprisoned
         ; At this point, we can delete the prisoner's arrest state
         self.DestroyArrestState()
         self.RemoveAll(TEMPORARY_DESTROY_ON_IMPRISONED) ; Destroy all Temporary vars on Imprisoned state
+
+        self.RegisterLastUpdate()
+        RegisterForUpdateGameTime(1.0)
+        SetBool("Imprisoned", true)
     endEvent
 
     event OnUpdateGameTime()
-        self.PerformSanityChecks()
-        JailCell.PerformPrisonerSanityCheck(self)
-
         self.UpdateInfamy()
         self.UpdateTimeJailed() ; Must be updated in some other way, otherwise it will reset to 0 on next imprisonment
  
@@ -1170,15 +1147,6 @@ state Imprisoned
         endif
 
         Prison.DEBUG_ShowPrisonerSentenceInfo(self, true)
-
-        if (self.IsNPC())
-            float distanceFromCell          = self.GetDistance(JailCell)
-            float distanceFromCellDoor      = self.GetDistance(JailCell.CellDoor)
-            float distanceFromOutsideCell   = self.GetDistance(JailCell.ExteriorMarkers[0] as ObjectReference)
-            bool isOutOfCell                = distanceFromCellDoor >= distanceFromOutsideCell
-            ; LogNoType(Name + " in " + Prison.Name + " { "+ "Distance from Cell: " + (distanceFromCell as int) + " | Distance from Cell Door: " + (distanceFromCellDoor as int) + " | Distance from Outside of Cell: " + (distanceFromOutsideCell as int) + " | Is Out of Cell: " + isOutOfCell + " }")
-            ; LogNoType(Name + " in " + Prison.Name + " { "+ "Cell Package Alias bound on: " + CellPackage.GetReference() +" | Cell Package Name: "+ CellPackage.GetName() +" }")
-        endif
 
         ; Debug("["+ Name +"] Prisoner::OnUpdateGameTime", "currentTimeServedStored: " + currentTimeServedStored)
 
@@ -1622,17 +1590,6 @@ function SetEscapePenalty()
     self.ModCrimeGold(bountyPenalty)
 endFunction
 
-bool wasMoved
-function ProcessWhenMoved()
-    if (self.ShouldBeFrisked)
-        self.Frisk()
-    endif
-
-    if (self.ShouldBeStripped)
-        self.Strip()
-    endif
-endFunction
-
 ; Moves this prisoner to Prison (To be processed)
 function MoveToPrison(Actor akCaptor)
     ; Assign a container for this prisoner's belongings (if applicable)
@@ -1655,40 +1612,10 @@ function MoveToCellTemp()
     Prison.OnPrisonerMovedToPrison(self, true)
 endFunction
 
- ; When the player leaves this prisoner
- event OnCellDetach()
-    Debug("["+ Name +"] Prisoner::OnCellDetach", "Fired event")
-    ; self.PerformSanityChecks()
-    JailCell.PerformPrisonerSanityCheck(self)
-endEvent
-
-; When the player is in the same cell as this prisoner
-event OnCellAttach()
-    Debug("["+ Name +"] Prisoner::OnCellAttach", "Fired event")
-    ; self.PerformSanityChecks()
-    JailCell.PerformPrisonerSanityCheck(self)
-endEvent
-
-; When this prisoner comes into the same cell as the player
-event OnAttachedToCell()
-    Debug("["+ Name +"] Prisoner::OnAttachedToCell", "Fired event")
-    ; self.PerformSanityChecks()
-    JailCell.PerformPrisonerSanityCheck(self)
-endEvent
-
-; When this prisoner leaves the cell the player is in
-event OnDetachedFromCell()
-    Debug("["+ Name +"] Prisoner::OnDetachedFromCell", "Fired event")
-    ; self.PerformSanityChecks()
-    JailCell.PerformPrisonerSanityCheck(self)
-endEvent
-
-
 function MoveToCell(bool abBeginImprisonment = true)
-    if (!self.JailCell)
-        Error("The prisoner " + Name + " has not been assigned a jail cell!")
-        DebugError("["+ Name +"] Prisoner::MoveToCell", "The prisoner " + Name + " has not been assigned a jail cell!")
-        ; TODO: Add event handling for failed imprisonment
+    if (self.IsImprisoned)
+        Error(self.GetName() + " is already imprisoned in "+ Prison.Name + "!")
+        DebugError("["+ Name +"] Prisoner::MoveToCell", self.GetName() + " is already imprisoned in "+ Prison.Name + "!")
         return
     endif
 
@@ -1698,40 +1625,19 @@ function MoveToCell(bool abBeginImprisonment = true)
         return
     endif
 
-    wasMoved = true
-
-    self.MoveTo(JailCell)
-    self.BindToCell()
-
-    self.ProcessWhenMoved()
-
-    if (abBeginImprisonment)
-        if (Prison.IsPrisonerQueuedForImprisonment(self))
-            Prison.RegisterForQueuedImprisonment()
-        else
-            self.Imprison()
-        endif
+    if (!self.JailCell)
+        Error("The prisoner " + Name + " has not been assigned a jail cell!")
+        DebugError("["+ Name +"] Prisoner::MoveToCell", "The prisoner " + Name + " has not been assigned a jail cell!")
+        Prison.OnPrisonerImprisonmentFail(self, "Assign Cell")
+        return
     endif
 
-    SetBool("Should Be In Cell", true)
-    Prison.OnPrisonerEnterCell(self, JailCell)
+    self.MoveTo(JailCell)
+    self.OnTeleportedToCell(abBeginImprisonment)
 endFunction
 
 function QueueForImprisonment()
     Prison.QueuePrisonerForImprisonment(self)
-endFunction
-
-function QueueForScene() ; TODO: Implementation, should be used for Scenes where every prisoner may take part of, so a queue system must be created in order for the same Scene to be executed for each prisoner.
-    ; Implementation can be Release scene, Stripping / Frisking scene, etc... Any scene that a prisoner can be a part of when they are inside the cell.
-endFunction
-
-function MarkAsJailed()
-    SetBool("Imprisoned", true)
-    self.IncrementStat("Times Jailed") ; Increment the "Times Jailed" stat for this Hold
-
-    if (self.IsPlayer())
-        Game.IncrementStat("Times Jailed") ; Increment the "Times Jailed" in the regular vanilla stat menu.
-    endif
 endFunction
 
 function UpdateSentence()
@@ -1751,10 +1657,6 @@ function TriggerInfamyPenalty()
 endFunction
 
 ; ==========================================================
-
-; function MoveToCaptor()
-;     this.MoveTo(captor)
-; endFunction
 
 function FastForwardToRelease()
     GotoState("ServeOnRest")
@@ -1912,8 +1814,14 @@ endFunction
 ;                           Events
 ; ==========================================================
 
+event OnTeleportedToCell(bool abBeginImprisonment)
+    SetBool("Should Be In Cell", true)
+    Prison.OnPrisonerTeleportedToCell(self, abBeginImprisonment)
+endEvent
+
 event OnEscortedToCell(Actor akEscort)
     SetBool("Should Be In Cell", true)
+    Prison.OnEscortPrisonerToCellEnd(self, JailCell, akEscort)
 endEvent
 
 event OnEscortedFromCell(Actor akEscort)
@@ -1925,16 +1833,13 @@ event OnInitialize()
     ;     return
     ; endif
 
-    ; if (self.IsNPC() && self.IsOutOfCell() && self.IsInCell)
-    ;     this.MoveTo(JailCell)
-    ; endif
-
     ; Prison.RegisterForPrisonPeriodicUpdate(self)
     Prison.RegisterPrisoner(self) ; Registers this prisoner into the prisoner list
     Trace("["+ Name +"] Prisoner::OnInitialize", "self: " + self)
     if (self.IsNPC() && !self.IsInCell)
         ; self.PerformSanityChecks()
-        JailCell.PerformPrisonerSanityCheck(self)
+        JailCell.RegisterForSanityChecking(1.0, apPrisoner = self)
+        ; JailCell.PerformPrisonerSanityCheck(self)
     endif
     if (NPC_RestorePrisonerState())
         ; Actor was already a prisoner, do not initialize normally and instead proceed to restoring their previous state
@@ -1959,22 +1864,19 @@ bool property IsEnabledForBackgroundUpdates
 endProperty
 
 event OnDestroy()
-    if (!self.IsPlayer())
-        self.NPC_SavePrisonerState()
+    if (self.IsNPC())
+        self.NPC_SavePrisonerState() ; temporarily disabled
 
         if (!Prison.IsReceivingUpdates()) ; if we dont destroy the instance in time, this will get called from Prison after processing queued prisoners, and since we didnt register the prisoner, this is a bug since it will report 0 prisoners
             Prison.RegisterForPrisonPeriodicUpdate(self)
         endif
-    endif
 
-    if (self.IsNPC())
         if (this.GetParentCell() != Config.Player.GetParentCell())
-            Debug("["+ Name +"] ["+ Name +"] Prisoner::OnDestroy", Name + "'s Cell: " + this.GetParentCell() + ", Player's Cell: " + Config.Player.GetParentCell())
+            Debug("["+ Name +"] Prisoner::OnDestroy", Name + "'s Cell: " + this.GetParentCell() + ", Player's Cell: " + Config.Player.GetParentCell())
         endif
     endif
 
     ; We don't unregister the prisoner (remove from the AME list) because OnDestroy will get called as soon as the Player is out of range, meaning it's not a proper way to handle the destruction of the object
-    ; Prison.UnregisterPrisoner(self) ; Remove this Actor from the AME list since they are no longer a prisoner
     self.UnregisterForTrackedStats()
 
     if (self.IsPlayer())
@@ -2071,6 +1973,14 @@ event OnSleepStart(float afSleepStartTime, float afSleepEndTime)
          
 endEvent
 
+event OnImprisoned()
+    Prison.OnPrisonerImprisoned(self)
+endEvent
+
+event OnImprisonmentFail(string asReason)
+    Prison.OnPrisonerImprisonmentFail(self, asReason)
+endEvent
+
 ; ==========================================================
 ;                          Management
 ; ==========================================================
@@ -2106,17 +2016,6 @@ function DestroyArrestState()
     endif
 endFunction
 
-function PerformSanityChecks()
-    if (self.IsNPC())
-        if (self.ShouldBeInCell && !self.IsInCell)
-            self.MoveTo(JailCell)
-            ; JailCell.RegisterForSanityChecking() ; Continue sanity check in since this ref may be inactive and not listen to events
-        endif
-
-        self.EnableAI(!self.IsFarFromPlayer())
-    endif
-endFunction
-
 ;/
     Performs sanity checks for prisoners that should be stripped (NPC's only)
 
@@ -2129,21 +2028,39 @@ endFunction
 
     It can and should only run once, after that, their clothes will not reappear on them.
     called from JailCell::PerformPrisonersSanityCheck() and JailCell::PerformPrisonerSanityCheck()
+
+    May be renamed to PerformClothingSanityChecks
 /;
-function PerformStrippingSanityChecks()
+bool function PerformStrippingSanityChecks()
     if (!self.IsNPC())
-        return
+        return false
     endif
 
     ; TODO: Check if the prisoner was stripped to underwear, and give them the underwear back,
     ; also take into account possible lockpicks or keys the prisoner might have, we don't want to include those, the prisoner should remain with them
-    bool shouldStrip = !self.IsNaked() && self.IsInCell && self.Is("Stripped") ;/&& !self.Has("Stripped by Sanity Check")/;
+    bool shouldStrip = !self.IsNaked() && self.IsInCell && self.Is("Stripped") ;/&& !self.IsWearingPrisonerOutfit/;
 
     if (shouldStrip)
-        self.RemoveAllItems()
-        Debug("["+ Name +"] Prisoner::PerformStrippingSanityChecks", "Stripped " + self.Name + " - performed sanity check")
-        ; self.SetBool("Stripped by Sanity Check", true) ; Only let it happen once (ideally when the player first visits the prisoner)
+        if (self.IsStrippedToUnderwear)
+            Armor underwearTop      = self.GetUnderwear("Top")
+            Armor underwearBottom   = self.GetUnderwear("Bottom")
+
+            self.UnequipAll()
+            self.RemoveAllItems()
+  
+            self.EquipItem(underwearTop, abCondition = underwearTop != none)        
+            self.EquipItem(underwearBottom, abCondition = underwearBottom != none)
+
+            Debug("["+ Name +"] Prisoner::PerformStrippingSanityChecks", "Stripped " + self.Name + " to underwear - performed sanity check", underwearTop != none || underwearBottom != none)
+            Debug("["+ Name +"] Prisoner::PerformStrippingSanityChecks", "Stripped " + self.Name + " naked - performed sanity check", underwearTop == none && underwearBottom == none)
+
+        elseif (self.IsStrippedNaked)
+            self.RemoveAllItems()
+            Debug("["+ Name +"] Prisoner::PerformStrippingSanityChecks", "Stripped " + self.Name + " naked - performed sanity check")
+        endif
     endif
+
+    return (self.IsStrippedNaked && self.IsNaked()) || (self.IsStrippedToUnderwear && self.IsInUnderwear()) ; TODO: Add outfit clothing condition
 endFunction
 
 string function GetScriptVarCategory(string asVarCategory = "Actor")
@@ -2163,11 +2080,17 @@ function RegisterLastUpdate()
 endFunction
 
 function NPC_RestoreImprisonment()
+    if (!self.IsImprisoned)
+        return
+    endif
+    
+    Debug("["+ Name +"] Prisoner::NPC_RestoreImprisonment", "Restoring NPC Imprisonment...")
+
     if (GetBool("Infamy Enabled"))
         self.TriggerInfamyPenalty()
     endif
 
-    self.ProcessWhenMoved() ; Only use when moved, not when escorted (Handle all events at once)
+    ; self.ProcessWhenMoved() ; Only use when moved, not when escorted (Handle all events at once)
     Config.NotifyJail(self.GetName() + " still has "+ self.GetTimeLeftInSentence("Days") +" days left in prison for " + self.GetHold())
 
     ; ArrestVars.List("Jail")
@@ -2182,7 +2105,9 @@ endFunction
     must re-apply the effect and restore the state previous to reference destruction for NPC's.
 /;
 bool function NPC_RestorePrisonerState()
+    return false
     if (GetBool("ShouldRestorePrisonerState"))
+        Debug("["+ Name +"] Prisoner::NPC_RestorePrisonerState", "Restoring NPC state...")
         self.NPC_RestoreImprisonment()
 
         ; Unset the flag so the state can be restored again at re-initialization upon being destroyed
@@ -2191,7 +2116,9 @@ bool function NPC_RestorePrisonerState()
 endFunction
 
 function NPC_SavePrisonerState()
+    return
     SetBool("ShouldRestorePrisonerState", true)
+    Debug("["+ Name +"] Prisoner::NPC_SavePrisonerState", "Saving NPC state...")
 endFunction
 
 ;/
@@ -2210,14 +2137,14 @@ function LockPrisonerSettings()
     SetFloat("Infamy Gain Modifier (Recognized)",            Prison.InfamyGainModifierRecognized)
     SetFloat("Infamy Gain Modifier (Known)",                 Prison.InfamyGainModifierKnown)
     ; Frisking
-    SetBool("Allow Frisking",                                Prison.AllowFrisking) ; Change all to Prison or Jail prefix later
+    SetBool("Allow Frisking",                                Prison.AllowFrisking)
     SetInt("Bounty for Frisking",                            Prison.MinimumBountyForFrisking)
     SetInt("Frisking Thoroughness",                          Prison.FriskingThoroughness)
     SetBool("Confiscate Stolen Items",                       Prison.ConfiscateStolenItemsOnFrisk)
     SetBool("Strip if Stolen Items Found",                   Prison.StripIfStolenItemsFoundOnFrisk)
     SetInt("Minimum No. of Stolen Items Required",           Prison.MinimumNumberOfStolenItemsRequiredToStripOnFrisk)
     ; Stripping
-    SetBool("Allow Stripping",                               Prison.AllowStripping) ; Change all to Prison or Jail prefix later
+    SetBool("Allow Stripping",                               Prison.AllowStripping)
     SetString("Handle Stripping On",                         Prison.HandleStrippingOn)
     SetInt("Bounty to Strip",                                Prison.MinimumBountyToStrip)
     SetInt("Violent Bounty to Strip",                        Prison.MinimumViolentBountyToStrip)
@@ -2225,7 +2152,7 @@ function LockPrisonerSettings()
     SetInt("Stripping Thoroughness",                         Prison.StrippingThoroughness)
     SetInt("Stripping Thoroughness Modifier",                Prison.StrippingThoroughnessModifier)
     ; Clothing
-    SetBool("Allow Clothing",                                Prison.AllowClothing) ; Change all to Prison or Jail prefix later
+    SetBool("Allow Clothing",                                Prison.AllowClothing)
     SetString("Handle Clothing On",                          Prison.HandleClothingOn)
     SetInt("Maximum Bounty to Clothe",                       Prison.MaximumBountyClothing)
     SetInt("Maximum Violent Bounty to Clothe",               Prison.MaximumViolentBountyClothing)
@@ -2338,7 +2265,7 @@ RPB_Prison function GetPrison()
         return none
     endif
 
-    __cachedPrison = (RPB_API.GetPrisonManager()).GetPrisonByID(prisonID)
+    __cachedPrison = API.PrisonManager.GetPrisonByID(prisonID)
     return __cachedPrison
 endFunction
 

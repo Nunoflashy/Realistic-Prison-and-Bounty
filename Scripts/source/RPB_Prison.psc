@@ -692,6 +692,23 @@ function Uninitialize()
     __city              = none
 endFunction
 
+; ==========================================================
+;                           Prison
+; ==========================================================
+
+Form[] function GetEscortLocations()
+    return self.GetRootPropertyOfTypeFormArray("Escort Locations")
+endFunction
+
+ObjectReference function GetRandomEscortLocation()
+    Form[] escortLocations = self.GetEscortLocations()
+    if (escortLocations == none)
+        return none
+    endif
+
+    return escortLocations[Utility.RandomInt(0, escortLocations.Length - 1)] as ObjectReference
+endFunction
+
 ;/
     Binds this Prisoner to their cell (it must already be assigned),
     this is used to make NPC's "stick" to the cell, and not wander around
@@ -1055,84 +1072,143 @@ bool function AssignPrisonerToCell(RPB_Prisoner apPrisoner, RPB_JailCell akJailC
     return true
 endFunction
 
-;/
-    Requests a jail cell for the given prisoner, based on this Prison's config.
-
-    RPB_Prisoner    @akPrisoner: The prisoner that is requesting the jail cell.
-
-    returns (RPB_JaiLCell): The jail cell that was requested for this prisoner, based on their criteria if it exists, otherwise returns none.
-/;
-RPB_JailCell function RequestCellForPrisoner(RPB_Prisoner akPrisoner)
-    RPB_JailCell outputCell = none
-
-    self.PrioritizeGenderCells = true
-
-    ; Determine what type of cell this prisoner should go to
-    akPrisoner.DetermineCellOptions()
-
-    if (self.AllowOnlyEmptyCells && akPrisoner.OnlyAllowImprisonmentInGenderCell)
-        ; Error, conflicting options
-        Debug("Prison::RequestCellForPrisoner", "There are conflicting properties, cannot request a jail cell for this prisoner! [\n"+ \
-            "\t Prison: " + self.Hold + "\n" + \
-            "\t Prisoner: " + akPrisoner + ", identified by: " + akPrisoner.GetIdentifier() + \
-            "\t Prison.AllowOnlyEmptyCells: " + self.AllowOnlyEmptyCells + "\n" + \
-            "\t Prisoner.OnlyAllowImprisonmentInGenderCell: " + akPrisoner.OnlyAllowImprisonmentInGenderCell + "\n" + \
-        "]")
-        return none
-
-    elseif (self.AllowOnlyGenderExclusiveCells && akPrisoner.OnlyAllowImprisonmentInEmptyCell)
-        ; Error, conflicting options
-        Debug("Prison::RequestCellForPrisoner", "There are conflicting properties, cannot request a jail cell for this prisoner! [\n"+ \
-            "\t Prison: " + self.Hold + "\n" + \
-            "\t Prisoner: " + akPrisoner + ", identified by: " + akPrisoner.GetIdentifier() + \
-            "\t Prison.AllowOnlyGenderExclusiveCells: " + self.AllowOnlyGenderExclusiveCells + "\n" + \
-            "\t Prisoner.OnlyAllowImprisonmentInEmptyCell: " + akPrisoner.OnlyAllowImprisonmentInEmptyCell + "\n" + \
-        "]")
+RPB_JailCell function GetGenderExclusiveCell(string asGender, bool abCanBeEmpty = true, bool abCanBeOvercrowded = false)
+    if (asGender != "Male" && asGender != "Female")
         return none
     endif
 
-    ; Determine cell to request through Prisoner related config
-    if (akPrisoner.OnlyAllowImprisonmentInEmptyCell)
-        outputCell = self.GetEmptyJailCell()
-        Debug("Prison::RequestCellForPrisoner", "Tried getting empty cell: " + outputCell, outputCell == none)
-        Debug("Prison::RequestCellForPrisoner", "Got empty cell: " + outputCell, outputCell != none)
-        return outputCell
+    RPB_JailCell returnedCell = self.GetJailCellOfGender(asGender, true, abCanBeOvercrowded)
 
-    elseif (akPrisoner.OnlyAllowImprisonmentInGenderCell)
-        outputCell = self.GetJailCellOfGender(akPrisoner.GetSex())
-        Debug("Prison::RequestCellForPrisoner", "Tried getting gender exclusive cell: " + outputCell, outputCell == none)
-        Debug("Prison::RequestCellForPrisoner", "Got gender exclusive cell: " + outputCell, outputCell != none)
-        return outputCell
-
-    elseif (akPrisoner.OnlyAllowImprisonmentInEmptyOrGenderCell)
-        ; Get the cell based on prison's priorities, and do not allow random cells
-        outputCell = self.GetJailCellBasedOnPriority(akPrisoner.GetSex())
-        Debug("Prison::RequestCellForPrisoner", "Tried getting priority based cell (empty or gender exclusive): " + outputCell + ", Prisoner Gender: " + akPrisoner.GetSex(), outputCell == none)
-        Debug("Prison::RequestCellForPrisoner", "Got priority based cell (empty or gender exclusive): " + outputCell + ", Prisoner Gender: " + akPrisoner.GetSex(), outputCell != none)
-        return outputCell
+    if (abCanBeEmpty && returnedCell == none)
+        returnedCell = self.GetEmptyJailCell()
     endif
 
-    if (outputCell == none)
-        ; Get a jail cell based on this prison's priorities, allow random cells
-        outputCell = self.GetJailCellBasedOnPriority(akPrisoner.GetSex(), true)
-        Debug("Prison::RequestCellForPrisoner", "Tried getting priority based or random cell: " + outputCell + ", Prisoner Gender: " + akPrisoner.GetSex(), outputCell == none)
-        Debug("Prison::RequestCellForPrisoner", "Got priority based or random cell: " + outputCell + ", Prisoner Gender: " + akPrisoner.GetSex(), outputCell != none)
+    return returnedCell
+endFunction
+
+; Test function for requesting cell (WIP)
+RPB_JailCell function RequestCell(RPB_Prisoner apPrisoner)
+    ;/
+        First, attempt to get empty cell for the prisoner, if that fails (there are no empty cells),
+        get a gender exclusive one to the prisoner's gender (even if they are not stripped),
+        if that fails, get a random cell with any gender (as long as the prisoner is not marked to be in a gender exclusive cell),
+        otherwise get any cell that is overcrowdable (again, stripped prisoners cant be with the opposite gender)
+    /;
+
+    RPB_JailCell returnedCell = none
+    bool prisonerMustBeInGenderExclusiveCell = self.ShouldPrisonerBeInGenderExclusiveCell(apPrisoner)
+    
+    if (self.PrioritizeEmptyCells)
+        returnedCell = self.GetEmptyJailCell()
+        DebugWithArgs("["+ Name +"] [Priority: Empty Cell] Prison::RequestCell", apPrisoner.Name, "prisonerMustBeInGenderExclusiveCell: " + prisonerMustBeInGenderExclusiveCell + ", returnedCell: " + returnedCell)
+
+    elseif (self.PrioritizeGenderCells)
+        if (prisonerMustBeInGenderExclusiveCell)
+            returnedCell = self.GetGenderExclusiveCell(apPrisoner.Gender, true)
+
+            if (returnedCell == none) ; could not find a gender exclusive cell that was not overcrowded or an empty one
+                returnedCell = self.GetGenderExclusiveCell(apPrisoner.Gender, false, true) ; attempt to get one that is overcrowded
+            endif
+            DebugWithArgs("["+ Name +"] [Priority: Gender Exclusive Cell] Prison::RequestCell", apPrisoner.Name, "prisonerMustBeInGenderExclusiveCell: " + prisonerMustBeInGenderExclusiveCell + ", returnedCell: " + returnedCell)
+        endif
     endif
 
-    ; Cells must either be empty or gender exclusive, and none was found for this prisoner
-    if ((self.AllowOnlyEmptyCells || self.AllowOnlyGenderExclusiveCells) && outputCell == none)
-        ; Could not assign a cell based on criteria.
+    ; Priority failed, or no priority
+    if (returnedCell == none)
+        returnedCell = self.GetEmptyJailCell()
     endif
 
-    if (outputCell == none)
-        ; If no criteria was passed and a cell was not retrieved yet, get a random cell
-        outputCell = self.GetRandomJailCell() as RPB_JailCell
-        Debug("Prison::RequestCellForPrisoner", "Tried getting random cell: " + outputCell, outputCell == none)
-        Debug("Prison::RequestCellForPrisoner", "Got random cell: " + outputCell, outputCell != none)
+    if (returnedCell == none)
+        DebugWithArgs("["+ Name +"] Prison::RequestCell", apPrisoner.Name, "prisonerMustBeInGenderExclusiveCell: " + prisonerMustBeInGenderExclusiveCell)
+
+        if (prisonerMustBeInGenderExclusiveCell)
+            returnedCell = self.GetGenderExclusiveCell(apPrisoner.Gender, abCanBeEmpty = true)
+
+            if (returnedCell == none) ; could not find a gender exclusive cell that was not overcrowded or an empty one
+                returnedCell = self.GetGenderExclusiveCell(apPrisoner.Gender, abCanBeEmpty = false, abCanBeOvercrowded = true) ; attempt to get one that is overcrowded
+            endif
+            DebugWithArgs("["+ Name +"] Prison::RequestCell", apPrisoner.Name, "prisonerMustBeInGenderExclusiveCell: " + prisonerMustBeInGenderExclusiveCell + ", returnedCell: " + returnedCell)
+        endif
     endif
 
+    if (returnedCell == none)
+        returnedCell = self.GetRandomAvailableJailCell()
 
-    return outputCell
+        if (returnedCell.IsGenderExclusive || (!returnedCell.IsGenderExclusive && prisonerMustBeInGenderExclusiveCell))
+            returnedCell = none
+        endif
+    endif
+
+    return returnedCell
+endFunction
+; RPB_JailCell function RequestCell(RPB_Prisoner apPrisoner)
+;     ;/
+;         First, attempt to get empty cell for the prisoner, if that fails (there are no empty cells),
+;         get a gender exclusive one to the prisoner's gender (even if they are not stripped),
+;         if that fails, get a random cell with any gender (as long as the prisoner is not marked to be in a gender exclusive cell),
+;         otherwise get any cell that is overcrowdable (again, stripped prisoners cant be with the opposite gender)
+;     /;
+
+;     RPB_JailCell returnedCell = none
+;     bool prisonerMustBeInGenderExclusiveCell = self.ShouldPrisonerBeInGenderExclusiveCell(apPrisoner)
+
+;     if (self.PrioritizeEmptyCells)
+;         returnedCell = self.GetEmptyJailCell()
+;         DebugWithArgs("["+ Name +"] [Priority: Empty Cell] Prison::RequestCell", apPrisoner.Name, "prisonerMustBeInGenderExclusiveCell: " + prisonerMustBeInGenderExclusiveCell + ", returnedCell: " + returnedCell)
+
+;     elseif (self.PrioritizeGenderCells)
+;         if (prisonerMustBeInGenderExclusiveCell)
+;             returnedCell = self.GetJailCellOfGender(apPrisoner.Gender, true)
+
+;             if (returnedCell == none)
+;                 returnedCell = self.GetEmptyJailCell() ; Gender exclusive cell that is not overcrowded could not be retrieved, get empty one
+;             endif
+
+;             if (returnedCell == none) ; could not find a gender exclusive cell that was not overcrowded or an empty one
+;                 returnedCell = self.GetJailCellOfGender(apPrisoner.Gender, true, true) ; attempt to get one that is overcrowded
+;             endif
+;             DebugWithArgs("["+ Name +"] [Priority: Gender Exclusive Cell] Prison::RequestCell", apPrisoner.Name, "prisonerMustBeInGenderExclusiveCell: " + prisonerMustBeInGenderExclusiveCell + ", returnedCell: " + returnedCell)
+;         endif
+;     endif
+
+;     ; Priority failed, or no priority
+;     if (returnedCell == none)
+;         returnedCell = self.GetEmptyJailCell()
+;     endif
+
+;     if (returnedCell == none)
+;         DebugWithArgs("["+ Name +"] Prison::RequestCell", apPrisoner.Name, "prisonerMustBeInGenderExclusiveCell: " + prisonerMustBeInGenderExclusiveCell)
+
+;         if (prisonerMustBeInGenderExclusiveCell)
+;             returnedCell = self.GetJailCellOfGender(apPrisoner.Gender, true)
+
+;             if (returnedCell == none)
+;                 returnedCell = self.GetEmptyJailCell() ; Gender exclusive cell that is not overcrowded could not be retrieved, get empty one
+;             endif
+
+;             if (returnedCell == none) ; could not find a gender exclusive cell that was not overcrowded or an empty one
+;                 returnedCell = self.GetJailCellOfGender(apPrisoner.Gender, true, true) ; attempt to get one that is overcrowded
+;             endif
+;             DebugWithArgs("["+ Name +"] Prison::RequestCell", apPrisoner.Name, "prisonerMustBeInGenderExclusiveCell: " + prisonerMustBeInGenderExclusiveCell + ", returnedCell: " + returnedCell)
+;         endif
+;     endif
+
+;     if (returnedCell == none)
+;         returnedCell = self.GetRandomAvailableJailCell()
+
+;         if (returnedCell.IsGenderExclusive || (!returnedCell.IsGenderExclusive && prisonerMustBeInGenderExclusiveCell))
+;             returnedCell = none
+;         endif
+;     endif
+
+;     return returnedCell
+; endFunction
+
+bool function ShouldPrisonerBeInGenderExclusiveCell(RPB_Prisoner apPrisoner)
+    bool strippedNaked      = apPrisoner.WillBeStrippedNaked || apPrisoner.IsStrippedNaked
+    bool strippedUnderwear  = apPrisoner.WillBeStrippedToUnderwear || apPrisoner.IsStrippedToUnderwear
+
+    return strippedNaked || strippedUnderwear
 endFunction
 
 ; ==========================================================
@@ -1224,9 +1300,15 @@ endEvent
 event OnPrisonerImprisonmentFail(RPB_Prisoner apPrisoner, string reason)
     if (reason == "Assign Cell")
         ; Could not assign a cell to this prisoner, abort imprisonment?
-        DebugError("Prison::OnPrisonerImprisonmentFail", "A jail cell could not be assigned to prisoner " + apPrisoner.Name + ", aborting imprisonment and destroying reference...!")
-        Error("A jail cell could not be assigned to " + apPrisoner.Name + ", aborting imprisonment...!")
-        apPrisoner.Destroy()
+        DebugError("["+ Name +"] Prison::OnPrisonerImprisonmentFail", "A jail cell could not be assigned to prisoner " + apPrisoner.Name + ", aborting imprisonment and destroying reference...!")
+        Error("["+ Name +"] A jail cell could not be assigned to " + apPrisoner.Name + ", aborting imprisonment...!")
+
+        RPB_Arrestee prisonerArresteeState = RPB_Arrestee.GetStateForPrisoner(apPrisoner)
+        if (prisonerArresteeState != none)
+            prisonerArresteeState.Destroy()
+        endif
+
+        self.UnregisterPrisoner(apPrisoner)
     endif
 endEvent
 
@@ -1263,12 +1345,19 @@ event OnPrisonerProcessed(RPB_Prisoner apPrisoner)
     apPrisoner.StartStripping(apPrisoner.Captor)
 endEvent
 
-event OnPrisonerTimeElapsed(RPB_Prisoner apPrisoner)
-
-endEvent
-
 event OnPrisonerImprisoned(RPB_Prisoner apPrisoner)
+    apPrisoner.RegisterTimeOfImprisonment()
+    apPrisoner.DetermineReleaseTimeAdditionalHours() ; For Release Time (Minimum, Maximum) intervals
+    apPrisoner.SetReleaseLocation() ; to be refactored (needs to take into account whether to use Escort or Teleport markers)
 
+    if (!apPrisoner.Sentence)
+        apPrisoner.SetSentence(abShouldAffectBounty = false)
+    endif
+
+    apPrisoner.IncrementStat("Times Jailed")
+    if (apPrisoner.IsPlayer())
+        Game.IncrementStat("Times Jailed") ; Increment the "Times Jailed" in the regular vanilla stat menu.
+    endif
 endEvent
 
 event OnPrisonerReleased(RPB_Prisoner apPrisoner)
@@ -1284,6 +1373,41 @@ event OnPrisonerEscaped(RPB_Prisoner apPrisoner)
     apPrisoner.DEBUG_ShowHoldStats()
 endEvent
 
+event OnPrisonerTeleportedToPrison(RPB_Prisoner apPrisoner)
+    if (!apPrisoner.PrisonerBelongingsContainer)
+        apPrisoner.SetBelongingsContainer()
+    endif
+
+
+endEvent
+
+event OnPrisonerTeleportedToCell(RPB_Prisoner apPrisoner, bool abImprisonPrisoner)
+    if (apPrisoner.IsNPC())
+        apPrisoner.EnableAI(!apPrisoner.IsFarFromPlayer()) ; Disable AI if not near Player
+        apPrisoner.BindToCell()
+    endif
+
+    if (!apPrisoner.PrisonerBelongingsContainer)
+        apPrisoner.SetBelongingsContainer()
+    endif
+
+    if (apPrisoner.ShouldBeFrisked)
+        apPrisoner.Frisk()
+    endif
+
+    if (apPrisoner.ShouldBeStripped)
+        apPrisoner.Strip()
+    endif
+
+    if (abImprisonPrisoner)
+        if (self.IsPrisonerQueuedForImprisonment(apPrisoner))
+            self.RegisterForQueuedImprisonment()
+        else
+            apPrisoner.Imprison()
+        endif
+    endif
+endEvent
+
 event OnPrisonerDying(RPB_Prisoner apPrisoner, Actor akKiller)
     
 endEvent
@@ -1294,19 +1418,21 @@ endEvent
 
 event OnEscortPrisonerToJailBegin(RPB_Actor apActor, Actor akEscort)
     (apActor as RPB_Arrestee).Cuff()
-
-    ; ReferenceAlias arrestPackage = API.PrisonManager.GetCellPackageOfType("S")
-    ; apActor.BindAlias(arrestPackage)
-    ; Debug("Prison::OnEscortPrisonerToJailBegin", "Bound arrest package, arrestee should stay still.")
 endEvent
 
 event OnEscortPrisonerToJailEnd(RPB_Actor apActor, Actor akEscort)
     ; Retrieve or make the Actor a Prisoner
     RPB_Prisoner prisonerRef = RPB_Utility.ame_if (apActor as RPB_Prisoner, apActor, (apActor as RPB_Arrestee).MakePrisoner()) as RPB_Prisoner
 
-    prisonerRef.SetReleaseLocation()    ; Set the release location for this prisoner
-    prisonerRef.SetBelongingsContainer()     ; Set the container of where the prisoner's items will be confiscated to
-    prisonerRef.AssignCell()            ; Assign a prison cell to this prisoner
+    prisonerRef.SetReleaseLocation()    ; Set the teleport release location for this prisoner
+
+    if (!prisonerRef.PrisonerBelongingsContainer)
+        prisonerRef.SetBelongingsContainer() ; Set the container of where the prisoner's items will be confiscated to
+    endif
+
+    if (!prisonerRef.JailCell)
+        prisonerRef.AssignCell() ; Assign a prison cell to this prisoner
+    endif
 
     ; TODO: Review if a prisoner should be both frisked and stripped, or only stripped if they were going to be stripped
     if (prisonerRef.ShouldBeStripped)
@@ -1314,12 +1440,11 @@ event OnEscortPrisonerToJailEnd(RPB_Actor apActor, Actor akEscort)
 
     elseif (prisonerRef.ShouldBeFrisked)
         prisonerRef.StartFrisking(akEscort)
+    endif
 
-    else
-        if (!prisonerRef.IsInCell)
-            ; prisonerRef.StartRestraining(akStripper)
-            prisonerRef.EscortToCell(akEscort)
-        endif
+    if (prisonerRef.Should("Go to Cell"))
+        ; Need to check if the prisoner is not in the cell later, IsInCell doesn't work as it should
+        prisonerRef.EscortToCell(akEscort)
     endif
 endEvent
 
@@ -1328,14 +1453,6 @@ event OnEscortPrisonerToCellBegin(RPB_Prisoner apPrisoner, Actor akEscort)
         ; Process escort to cell after escape
     endif
 
-    ; ; Since NPC's don't stay in the cell if the player is away with Scenes, we must force the move
-    ; ; by checking if the player is far away, it will be seamless and it's as if they were escorted
-    ; if (apPrisoner.IsNPC() && apPrisoner.IsFarFromPlayer())
-    ;     apPrisoner.MoveToCellTemp()
-    ;     apPrisoner.Strip()
-    ; endif
-
-    return
     Debug("Prison::OnEscortPrisonerToCellBegin", "Event fired but it has no implementation!")
 endEvent
 
@@ -1348,44 +1465,22 @@ event OnEscortPrisonerToCellEnd(RPB_Prisoner apPrisoner, RPB_JailCell akJailCell
     if (apPrisoner.HasSceneState("OnEscortPrisonerToCellEnd", "Escape"))
         ; Process escort to cell after escape
     endif
-    if (apPrisoner.IsStrippedNaked || apPrisoner.IsStrippedToUnderwear)
-        ; return
+
+    if (!apPrisoner.PrisonerBelongingsContainer)
+        apPrisoner.SetBelongingsContainer()     ; Set the container of where the prisoner's items will be confiscated to
     endif
 
-    akJailCell.RegisterForSanityChecking(apPrisoner = apPrisoner)
-
-    ; if (apPrisoner.IsNPC())
-    ;     apPrisoner.BindToCell()
-
-    ;     if (apPrisoner.IsFarFromPlayer())
-    ;         apPrisoner.MoveTo(apPrisoner.JailCell)
-    ;         self.RegisterForSingleUpdate(1.0) ; Poll request to ensure the prisoner stays in the jail cell, should be terminated right after that
-    ;     endif
-    ; endif
-
-    ; akJailCell.Lock()
-
-    ; Since NPC's don't stay in the cell if the player is away with Scenes, we must force the move
-    ; by checking if the player is far away, it will be seamless and it's as if they were escorted
-    ; if (apPrisoner.IsNPC() && apPrisoner.IsFarFromPlayer())
-    ;     apPrisoner.MoveToCellTemp()
-    ;     ; apPrisoner.Strip()
-    ; endif
-
-    ; if (apPrisoner.IsOutOfCell())
-    ;     apPrisoner.MoveTo(apPrisoner.JailCell)
-    ; endif
-
-    ; apPrisoner.MoveTo(apPrisoner.JailCell)
     apPrisoner.Uncuff()
-    apPrisoner.Imprison()
-    ; if (apPrisoner.HasSceneState("OnEscortPrisonerToCellEnd", "Arrest"))
-    ;     if (apPrisoner.ShouldBeStripped)
-    ;         apPrisoner.Strip()
-    ;     endif
-    ; endif
-    ; apPrisoner.StartStripping(akEscort)
-    apPrisoner.OnEscortedToCell(akEscort)
+
+    if (!apPrisoner.IsImprisoned)
+        apPrisoner.Imprison()
+    endif
+
+    if (apPrisoner.IsNPC())
+        ; Ensures the Prisoner stays in the cell since we update it 10s later,
+        ; delaying it enough for all actions to finish before the check.
+        apPrisoner.JailCell.RegisterForSanityChecking(10.0, apPrisoner = apPrisoner)
+   endif
 endEvent
 
 event OnEscortPrisonerFromCellBegin(RPB_Prisoner apPrisoner, Actor akEscort)
@@ -1446,10 +1541,8 @@ event OnPrisonerStripEnd(RPB_Prisoner apPrisoner, Actor akStripper)
     endif
     if (!apPrisoner.IsInCell)
         ; apPrisoner.StartRestraining(akStripper)
-        apPrisoner.EscortToCell(akStripper)
     endif
-
-    Debug("Prison::OnPrisonerStripEnd", "event invoked")
+    ; apPrisoner.EscortToCell(akStripper)
 endEvent
 
 event OnGuardDeath(RPB_Guard akGuard, Actor akKiller)
@@ -1790,27 +1883,37 @@ endFunction
 
 Form[] function GetReleaseMarkers(string asReleaseMarkerType = "Teleport")
     if (asReleaseMarkerType != "Teleport" && asReleaseMarkerType != "Escort")
-        Error("The release marker type specified ("+ asReleaseMarkerType +") is invalid!")
-        DebugError("Prison::GetReleaseMarkers", "The release marker type specified ("+ asReleaseMarkerType +") is invalid!")
+        Error("["+ Name +"] The release marker type specified ("+ asReleaseMarkerType +") is invalid!")
+        DebugError("["+ Name +"] Prison::GetReleaseMarkers", "The release marker type specified ("+ asReleaseMarkerType +") is invalid!")
         return none
     endif
 
-    return RPB_Data.Jail_GetReleaseMarkers(self.GetDataObject(), asReleaseMarkerType)
+    return self.GetRootPropertyOfTypeFormArray("Markers//Release//" + asReleaseMarkerType)
+endFunction
+
+Form[] function GetSearchMarkers(string asSearchType = "Frisking")
+    if (asSearchType != "Frisking" && asSearchType != "Stripping")
+        Error("["+ Name +"] The search marker type specified ("+ asSearchType +") is invalid!")
+        DebugError("["+ Name +"] Prison::GetSearchMarkers", "The search marker type specified ("+ asSearchType +") is invalid!")
+        return none
+    endif
+
+    return self.GetRootPropertyOfTypeFormArray("Markers//Search//" + asSearchType)
 endFunction
 
 Form function GetRandomReleaseMarker(string asReleaseMarkerType = "Teleport")
-    if (asReleaseMarkerType != "Teleport" && asReleaseMarkerType != "Escort")
-        Error("The release marker type specified ("+ asReleaseMarkerType +") is invalid!")
-        DebugError("Prison::GetRandomReleaseMarker", "The release marker type specified ("+ asReleaseMarkerType +") is invalid!")
-        return none
-    endif
-
     Form[] allReleaseMarkersOfType = self.GetReleaseMarkers(asReleaseMarkerType)
     return allReleaseMarkersOfType[Utility.RandomInt(0, allReleaseMarkersOfType.Length - 1)]
 endFunction
 
 Form[] function GetPrisonerContainers(string asPrisonerContainerType = "Belongings")
-    return RPB_Data.Jail_GetPrisonerContainers(self.GetDataObject(), asPrisonerContainerType)
+    if (asPrisonerContainerType != "Belongings" && asPrisonerContainerType != "Evidence")
+        Error("["+ Name +"] The prisoner container type specified ("+ asPrisonerContainerType +") is invalid!")
+        DebugError("["+ Name +"] Prison::GetPrisonerContainers", "The prisoner container type specified ("+ asPrisonerContainerType +") is invalid!")
+        return none
+    endif
+    
+    return self.GetRootPropertyOfTypeFormArray("Prisoner Containers//" + asPrisonerContainerType)
 endFunction
 
 Form function GetRandomPrisonerContainer(string asPrisonerContainerType = "Belongings")
@@ -1880,24 +1983,36 @@ Form function GetJailCellExterior(RPB_JailCell akJailCell)
 endFunction
 
 ;/
-    Gets all the jail cells in this prison that match the sex passed in.
+    Gets all the jail cells in this prison that match the gender passed in.
 
-    string  @asSex: The desired sex for the exclusivity of the jail cell.
+    string  @asGender: The desired gender for the exclusivity of the jail cell.
+    bool    @abAvailable: Whether to only include available cells.
+    bool    @abCanBeOvercrowded: Whether to include cells that can be overcrowded.
 
     For a jail cell to be of a specific sex, it must have at least one prisoner of that sex,
     which means these jail cells are never empty.
 /;
-Form[] function GetGenderExclusiveCells(string asSex)
-    Form[] cells = self.JailCells
+Form[] function GetGenderExclusiveCells(string asGender, bool abAvailable = true, bool abCanBeOvercrowded = false)
+    Form[] cells
+    
+    if (abAvailable)
+        cells = self.AvailableJailCells
+    else
+        cells = self.JailCells
+    endif
+
     int genderCellsArray = JArray.object()
 
     int i = 0
     while (i < cells.Length)
         RPB_JailCell jailCellRef = cells[i] as RPB_JailCell
+        bool isGenderExclusive = (asGender == "Male" && jailCellRef.IsMaleOnly) || (asGender == "Female" && jailCellRef.IsFemaleOnly)
+        ; Debug("["+ Name +"] ["+ jailCellRef.ID +"] Prison::GetGenderExclusiveCells", "isGenderExclusive: " + isGenderExclusive + ", abCanBeOvercrowded: " + abCanBeOvercrowded + ", jailCellRef.IsOvercrowded: " + jailCellRef.IsOvercrowded + ", (!abCanBeOvercrowded && !jailCellRef.IsOvercrowded) || abCanBeOvercrowded: " + ((!abCanBeOvercrowded && !jailCellRef.IsOvercrowded) || abCanBeOvercrowded))
 
-        if (jailCellRef && (asSex == "Male" && jailCellRef.IsMaleOnly) || (asSex == "Female" && jailCellRef.IsFemaleOnly))
-            ; Debug("Prison::GetGenderExclusiveCells", "Cell: " + jailCellRef + ", IsEmpty: " + jailCellRef.IsEmpty + ", Gender: " + jailCellRef.IsGenderExclusive)
-            JArray.addForm(genderCellsArray, jailCellRef)
+        if ((!abCanBeOvercrowded && !jailCellRef.IsFull) || abCanBeOvercrowded)
+            if (jailCellRef && isGenderExclusive)
+                JArray.addForm(genderCellsArray, jailCellRef)
+            endif
         endif
         i += 1
     endWhile
@@ -1934,8 +2049,12 @@ RPB_JailCell function GetEmptyJailCell()
     return emptyCells[Utility.RandomInt(0, emptyCells.Length - 1)] as RPB_JailCell
 endFunction
 
-RPB_JailCell function GetJailCellOfGender(string asSex)
-    Form[] genderCells = self.GetGenderExclusiveCells(asSex)
+;/
+    bool    @abAvailable: Whether to only include available cells
+    bool    @abCanBeOvercrowded: Whether to include cells that can be overcrowded
+/;
+RPB_JailCell function GetJailCellOfGender(string asSex, bool abAvailable = true, bool abCanBeOvercrowded = false)
+    Form[] genderCells = self.GetGenderExclusiveCells(asSex, abAvailable, abCanBeOvercrowded)
     RPB_JailCell genderCell = genderCells[Utility.RandomInt(0, genderCells.Length - 1)] as RPB_JailCell
 
     return genderCell
@@ -1947,53 +2066,6 @@ endFunction
 
 RPB_JailCell function GetMaleJailCell()
     return self.GetJailCellOfGender("Male")
-endFunction
-
-;/
-    Retrieves a jail cell based on this prison's priorities.
-
-    string  @asSex: The gender of the cell in case a gender exclusive cell is returned
-    bool    @abAllowRandomCells: Whether to allow random jail cells as a fallback in case either empty or gender exclusive cells could not be returned
-
-    returns: A jail cell based on the prison's priorities, random if the priorities could not be met, or none if no jail cells could be returned.
-
-/;
-RPB_JailCell function GetJailCellBasedOnPriority(string asSex, bool abAllowRandomCells = false)
-    RPB_JailCell returnedCell = none
-
-    if (self.PrioritizeEmptyCells)
-        returnedCell = self.GetEmptyJailCell()
-        Trace("Prison::GetJailCellBasedOnPriority", "Got empty cell: " + returnedCell + ", Prisoner Gender: " + asSex, returnedCell != none)
-
-    elseif (self.PrioritizeGenderCells)
-        returnedCell = self.GetJailCellOfGender(asSex)
-        Trace("Prison::GetJailCellBasedOnPriority", "Got gender exclusive cell: " + returnedCell + ", Prisoner Gender: " + asSex, returnedCell != none)
-    endif
-
-        
-    ; No priority
-    ; Get empty cell first, if that fails, get a gender exclusive one, else get a random cell if @abAllowRandomCells is true
-    if (returnedCell == none)
-        returnedCell = self.GetEmptyJailCell()
-        Trace("Prison::GetJailCellBasedOnPriority", "Got empty cell: " + returnedCell + ", Prisoner Gender: " + asSex, returnedCell != none)
-    endif
-
-    if (returnedCell == none)
-        returnedCell = self.GetJailCellOfGender(asSex)
-        Trace("Prison::GetJailCellBasedOnPriority", "Got gender exclusive cell: " + returnedCell + ", Prisoner Gender: " + asSex, returnedCell != none)
-
-    endif
-
-    if (returnedCell == none && abAllowRandomCells)
-        returnedCell = self.GetRandomJailCell()
-        Trace("Prison::GetJailCellBasedOnPriority", "Got random cell: " + returnedCell + ", Prisoner Gender: " + asSex, returnedCell != none)
-
-    endif
-
-    ; Could not return any cell, error here
-    Trace("Prison::GetJailCellBasedOnPriority", "Could not retrieve any cell!  Prisoner Gender: " + asSex, returnedCell == none)
-
-    return returnedCell
 endFunction
 
 function RegisterForPrisonPeriodicUpdate(RPB_Prisoner akPrisoner)
@@ -2172,6 +2244,22 @@ Form function GetRootPropertyOfTypeForm(string asPropertyName)
     return RPB_Data.Jail_GetRootPropertyOfTypeForm(self.GetDataObject(), asPropertyName)
 endFunction
 
+int[] function GetRootPropertyOfTypeIntegerArray(string asPropertyName, string asSubCategoryPath = "")
+    return RPB_Data.Jail_GetRootPropertyOfTypeIntegerArray(self.GetDataObject(), asPropertyName, asSubCategoryPath)
+endFunction
+
+float[] function GetRootPropertyOfTypeFloatArray(string asPropertyName, string asSubCategoryPath = "")
+    return RPB_Data.Jail_GetRootPropertyOfTypeFloatArray(self.GetDataObject(), asPropertyName, asSubCategoryPath)
+endFunction
+
+string[] function GetRootPropertyOfTypeStringArray(string asPropertyName, string asSubCategoryPath = "")
+    return RPB_Data.Jail_GetRootPropertyOfTypeStringArray(self.GetDataObject(), asPropertyName, asSubCategoryPath)
+endFunction
+
+Form[] function GetRootPropertyOfTypeFormArray(string asPropertyName)
+    return RPB_Data.GetPropertyOfTypeFormArray(self.GetDataObject(), asPropertyName)
+endFunction
+
 ;                       Global Root Properties                    
 ; =========================================================
 bool function Global_GetRootPropertyOfTypeBool(int apPrisonDataObject, string asPropertyName) global
@@ -2344,7 +2432,6 @@ function ImprisonActorImmediately(Actor akActor)
 
     prisonerRef.QueueForImprisonment()
     prisonerRef.MoveToCell()
-    prisonerRef.ProcessWhenMoved()
     prisonerRef.SetSentence(self.GetRandomSentence(0, 75))
 endFunction
 

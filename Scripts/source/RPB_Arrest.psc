@@ -925,17 +925,6 @@ event OnArresteeRestrained(RPB_Arrestee apArrestee)
     apArrestee.OnRestrained()
 endEvent
 
-; event OnArresteeRestrained(Actor akArrestee)
-;     RPB_Arrestee arresteeRef = self.GetArresteeReference(akArrestee)
-
-;     if (arresteeRef.GetArrestType() == ARREST_TYPE_TELEPORT_TO_CELL)
-;         arresteeRef.MoveToPrison(abMoveDirectlyToCell = true)
-
-;     elseif (arresteeRef.GetArrestType() == ARREST_TYPE_TELEPORT_TO_JAIL)
-;         arresteeRef.MoveToPrison()
-;     endif
-; endEvent
-
 event OnArresteeFreed(RPB_Arrestee apArrestee, RPB_Captor apCaptor)
 
 endEvent
@@ -1119,7 +1108,7 @@ function BeginArrest(RPB_Arrestee akArresteeRef)
         akArresteeRef.MoveToPrison(abMoveDirectlyToCell = true)
         return
         ; Handled on OnArresteeRestrained()
-        self.SceneManager.StartArrestScene( \
+        SceneManager.StartArrestScene( \
             akGuard     = captor, \
             akArrestee  = akArresteeRef.GetActor(), \
             asScene     = self.GetArrestScene(akArresteeRef.GetActor()) \
@@ -1128,10 +1117,10 @@ function BeginArrest(RPB_Arrestee akArresteeRef)
     ; Could be used when the arrestee still has a chance to pay their bounty, and not go to the cell immediately
     elseif (arrestType == ARREST_TYPE_TELEPORT_TO_JAIL) ; Not implemented yet (Idea: Arrestee will be teleported to some location in jail and then either escorted or teleported to the cell)
         ; Handled on OnArresteeRestrained()
-        self.SceneManager.StartArrestScene( \
+        SceneManager.StartArrestScene( \
             akGuard     = captor, \
-            akArrestee  = akArresteeRef.GetActor(), \
-            asScene     = self.GetArrestScene(akArresteeRef.GetActor()) \
+            akArrestee  = arrestee, \
+            asScene     = SceneManager.SCENE_ARREST_START_02 \
         )
 
     ; Will most likely be used when the arrestee has no chance to pay their bounty, and therefore will get immediately escorted into the cell
