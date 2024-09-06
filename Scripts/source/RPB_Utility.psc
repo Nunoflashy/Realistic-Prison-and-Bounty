@@ -748,6 +748,76 @@ endFunction
 ;                       Misc Functions
 ; ==========================================================
 
+;/
+    INFO: Slow function, execution takes ~25ms, avoid when looping
+
+    Retrieves a Form from a string identifier (the string obtained when implicitly casting a Form to a string),
+    which means a Form can be passed here.
+
+    string  @asFormIdentifier: The Form's identifier when implicitly cast as a string, expressed like this: [Form < (00036897)>]
+    Actor, ObjectReference, or any other Form type will work.
+
+    returns (Form): The Form that matches its identifier.
+/;
+Form function GetFormFromString(string asFormIdentifier) global
+    int formIdLength    = 8 ; FormID always has 8 digits
+    int endOffset       = 3 ; )>]
+    int len             = StringUtil.GetLength(asFormIdentifier)
+    string hexFormID    = StringUtil.Substring(asFormIdentifier, len - endOffset - formIdLength, formIdLength)
+    int formID          = HexStringToInt(hexFormID)
+
+    ; DebugWithArgs("Data::GetFormFromString", asFormIdentifier, \
+    ;     "\n\t formIdLength: " + formIdLength + \
+    ;     "\n\t endOffset: " + endOffset + \
+    ;     "\n\t len: " + len + \
+    ;     "\n\t hexFormID: " + hexFormID + \
+    ;     "\n\t formId: " + formId \
+    ; )
+
+
+    ; string formId2 = PO3_SKSEFunctions.IntToString(formId as int, false)
+
+    ; int[] systemTime = PO3_SKSEFunctions.GetSystemTime()
+    ; DebugWithArgs("Data::GetFormFromString", asFormIdentifier, "systemTime: " + systemTime)
+
+    return Game.GetFormEx(formID)
+endFunction
+
+int function HexStringToInt(string asHexString) global
+    int result = 0
+    int len = StringUtil.GetLength(asHexString)
+
+    int i = 0
+    while (i < len)
+        string currentChar = StringUtil.GetNthChar(asHexString, i)
+        int value
+
+        if (StringUtil.IsDigit(currentChar))
+            value = (currentChar as int)
+        elseif (currentChar == "A")
+                value = 10
+            elseif (currentChar == "B")
+                value = 11
+            elseif (currentChar == "C")
+                value = 12
+            elseif (currentChar == "D")
+                value = 13
+            elseif (currentChar == "E")
+                value = 14
+            elseif (currentChar == "F")
+                value = 15
+        else
+            DebugError("Utility::HexStringToInt", "Invalid HEX character: " + currentChar)
+            return -1
+        endif
+
+        result = result * 16 + value
+        i += 1
+    endWhile
+
+    return result
+endFunction
+
 Form function GetFormOfType(string asFormType) global
     if (asFormType == "Gold")
         return Game.GetFormEx(0xF)

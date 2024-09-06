@@ -36,11 +36,7 @@ bool __hasDecayableLock
 bool property HasDecayableLock
     bool function get()
         if (!__hasDecayableLock)
-            string[] subCategories = new string[2]
-            subCategories[0] = "Decay Options"
-            subCategories[1] = "Wear Thresholds"
-
-            __hasDecayableLock = self.HasOption(self.CurrentLockLevel, "Lock", subCategories)
+            __hasDecayableLock = self.HasProperty("Lock//Decay Options//Wear Thresholds")
         endif
 
         return __hasDecayableLock
@@ -81,9 +77,7 @@ string __minimumLockLevel
 string property MinimumLockLevel
     string function get()
         if (!__minimumLockLevel)
-            string[] subCategories = new string[1]
-            subCategories[0] = "Decay Options"
-            __minimumLockLevel = self.GetOptionOfTypeString("Min. Lock Level", "Lock", subCategories)
+            __minimumLockLevel = self.GetPropertyOfTypeString("Lock//Decay Options//Min. Lock Level")
         endif
 
         return __minimumLockLevel
@@ -193,7 +187,10 @@ endEvent
 ; =========================================================
 
 function Initialize()
-    string lockLevel = self.GetOptionOfTypeString("Level", "Lock")
+    ; string lockLevel = self.GetOptionOfTypeString("Level", "Lock")
+    string lockLevel = self.GetPropertyOfTypeString("Lock//Level")
+    Debug("CellDoor::Initialize", "lockLevel: " + lockLevel)
+
 
     if (lockLevel)
         int lockLevelAsInt  = LockLevelAsInteger(lockLevel)
@@ -263,10 +260,7 @@ endFunction
 function DetermineLockLevel()
     __lockLevelWear += 1
 
-    string[] subCategories = new string[2]
-    subCategories[0] = "Decay Options"
-    subCategories[1] = "Wear Thresholds"
-    int wearThresholdForCurrentLockLevel = self.GetOptionOfTypeInt(self.CurrentLockLevel, "Lock", subCategories)
+    int wearThresholdForCurrentLockLevel = self.GetPropertyOfTypeInt("Lock//Decay Options//Wear Thresholds//" + self.CurrentLockLevel)
 
     if (self.LockLevelWear >= wearThresholdForCurrentLockLevel)
         self.DowngradeLock()
@@ -320,28 +314,38 @@ endFunction
 ;                         Data Config                      
 ; =========================================================
 
-;                           Options                        
-; =========================================================
-bool function HasOption(string asOption, string asOptionCategory, string[] asArrOptionsSubCategories = none)
-    return RPB_Data.CellDoor_HasOption(JailCell.GetDataObject(), self, asOption, asOptionCategory, asArrOptionsSubCategories)
+int function GetRootObject()
+    return RPB_Data.GetPropertyOfTypeObject(JailCell.GetRootObject(), "Cell Doors//" + self)
 endFunction
 
-bool function GetOptionOfTypeBool(string asOption, string asOptionCategory, string[] asArrOptionsSubCategories = none)
-    return RPB_Data.CellDoor_GetOptionOfTypeBool(JailCell.GetDataObject(), self, asOption, asOptionCategory, asArrOptionsSubCategories)
+bool function GetPropertyOfTypeBool(string asPropertyName)
+    return RPB_Data.GetPropertyOfTypeInteger(self.GetRootObject(), asPropertyName) as bool
 endFunction
 
-int function GetOptionOfTypeInt(string asOption, string asOptionCategory, string[] asArrOptionsSubCategories = none)
-    return RPB_Data.CellDoor_GetOptionOfTypeInt(JailCell.GetDataObject(), self, asOption, asOptionCategory, asArrOptionsSubCategories)
+int function GetPropertyOfTypeInt(string asPropertyName)
+    return RPB_Data.GetPropertyOfTypeInteger(self.GetRootObject(), asPropertyName)
 endFunction
 
-float function GetOptionOfTypeFloat(string asOption, string asOptionCategory, string[] asArrOptionsSubCategories = none)
-    return RPB_Data.CellDoor_GetOptionOfTypeFloat(JailCell.GetDataObject(), self, asOption, asOptionCategory, asArrOptionsSubCategories)
+float function GetPropertyOfTypeFloat(string asPropertyName)
+    return RPB_Data.GetPropertyOfTypeFloat(self.GetRootObject(), asPropertyName)
 endFunction
 
-string function GetOptionOfTypeString(string asOption, string asOptionCategory, string[] asArrOptionsSubCategories = none)
-    return RPB_Data.CellDoor_GetOptionOfTypeString(JailCell.GetDataObject(), self, asOption, asOptionCategory, asArrOptionsSubCategories)
+string function GetPropertyOfTypeString(string asPropertyName)
+    return RPB_Data.GetPropertyOfTypeString(self.GetRootObject(), asPropertyName)
 endFunction
 
-Form function GetOptionOfTypeForm(string asOption, string asOptionCategory, string[] asArrOptionsSubCategories = none)
-    return RPB_Data.CellDoor_GetOptionOfTypeForm(JailCell.GetDataObject(), self, asOption, asOptionCategory, asArrOptionsSubCategories)
+Form function GetPropertyOfTypeForm(string asPropertyName)
+    return RPB_Data.GetPropertyOfTypeForm(self.GetRootObject(), asPropertyName)
+endFunction
+
+string[] function GetPropertyOfTypeStringArray(string asPropertyName)
+    return RPB_Data.GetPropertyOfTypeStringArray(self.GetRootObject(), asPropertyName)
+endFunction
+
+Form[] function GetPropertyOfTypeFormArray(string asPropertyName)
+    return RPB_Data.GetPropertyOfTypeFormArray(self.GetRootObject(), asPropertyName)
+endFunction
+
+bool function HasProperty(string asPropertyName)
+    return RPB_Data.HasProperty(self.GetRootObject(), asPropertyName)
 endFunction

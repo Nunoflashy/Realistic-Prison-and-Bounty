@@ -38,12 +38,6 @@ string property ID
     endFunction
 endProperty
 
-RPB_JailCell property ParentInteriorMarker
-    RPB_JailCell function get()
-        return self
-    endFunction
-endProperty
-
 Form[] __interiorMarkers
 Form[] property InteriorMarkers
     Form[] function get()
@@ -213,7 +207,7 @@ float __cellRadius
 float property CellRadius
     float function get()
         if (!__cellRadius)
-            __cellRadius = self.GetOptionOfTypeFloat("Interior Radius", "Scan")
+            __cellRadius = self.GetOptionOfTypeFloat("Scan//Interior Radius")
         endif
 
         return __cellRadius
@@ -225,7 +219,7 @@ int __scanIterations
 int property ScanIterations
     int function get()
         if (!__scanIterations)
-            __scanIterations = self.GetOptionOfTypeInt("Iterations", "Scan")
+            __scanIterations = self.GetOptionOfTypeInt("Scan//Iterations")
         endif
 
         return __scanIterations
@@ -237,8 +231,10 @@ int __maxPrisoners
 int property MaxPrisoners
     int function get()
         if (!__maxPrisoners)
-            __maxPrisoners = self.GetOptionOfTypeInt("Maximum Prisoners")
-
+            if (self.HasOption("Maximum Prisoners"))
+                __maxPrisoners = self.GetOptionOfTypeInt("Maximum Prisoners")
+            endif
+            
             if (!__maxPrisoners)
                 ; Since there's no Max Prisoners property, make the max the same as the number of beds in the cell
                 __maxPrisoners = self.GetConfigObjects("Beds").Length
@@ -369,10 +365,10 @@ ObjectReference function GetCellObject(Keyword akPropType)
 endFunction
 
 function DetermineMarkers()
-    Form[] interiorChildMarkers = RPB_Data.JailCell_GetChildren(Prison.GetDataObject("Cells"), self, "Interior")
-    Form[] exteriorChildMarkers = RPB_Data.JailCell_GetChildren(Prison.GetDataObject("Cells"), self, "Exterior")
+    Form[] interiorChildMarkers = self.GetRootPropertyOfTypeFormArray("Interior")
+    Form[] exteriorChildMarkers = self.GetRootPropertyOfTypeFormArray("Exterior")
 
-    Debug("[Prison: "+ self.Prison.Name +"] JailCell::DetermineMarkers", "Cell: " + self + ", Main Marker: " + RPB_Data.JailCell_GetMainMarker(Prison.GetDataObject("Cells"), self))
+    Debug("[Prison: "+ self.Prison.Name +"] JailCell::DetermineMarkers", "Cell: " + self + ", Main Marker: " + self.GetRootPropertyOfTypeForm("Main Interior"))
     Debug("[Prison: "+ self.Prison.Name +"] JailCell::DetermineMarkers", "Cell: " + self + ", interiorChildMarkers: " + interiorChildMarkers)
     Debug("[Prison: "+ self.Prison.Name +"] JailCell::DetermineMarkers", "Cell: " + self + ", exteriorChildMarkers: " + exteriorChildMarkers)
 
@@ -702,6 +698,7 @@ endEvent
 ;                         Management
 ; =========================================================
 
+
 int function GetDataObject(string asSubCategory = "null")
     int cellsObj    = Prison.GetDataObject("Cells")     ; JFormMap&
     int thisCellObj = JFormMap.getObj(cellsObj, self)   ; JMap&
@@ -712,6 +709,10 @@ int function GetDataObject(string asSubCategory = "null")
     endif
 
     return returnedObj
+endFunction
+
+int function GetRootObject()
+    return RPB_Data.GetPropertyOfTypeObject(Prison.GetDataObject(), "Cells//" + self)
 endFunction
 
 bool function ShouldPerformScan(string asScanTarget)
@@ -750,11 +751,10 @@ bool function IsInitialized()
 endFunction
 
 function Initialize(RPB_Prison apPrison)
+    self.RefreshOptions()
+
     ; Link the actual Prison with this Jail Cell
     self.BindPrison(apPrison)
-
-    ; int cellObj = self.GetDataObject()
-    ; Debug("["+ self +"] JailCell::Initialize", "Jail Cell Config: " + GetContainerList(cellObj))
 
     string[] stringList = self.GetRootPropertyOfTypeStringArray("String List")
     Debug("JailCell::Initialize", "String List: " + stringList)
@@ -1061,53 +1061,57 @@ endState
 ;                       Root Properties                    
 ; =========================================================
 bool function GetRootPropertyOfTypeBool(string asPropertyName)
-    return RPB_Data.JailCell_GetRootPropertyOfTypeBool(Prison.GetDataObject("Cells"), self, asPropertyName)
+    return RPB_Data.GetPropertyOfTypeBool(self.GetRootObject(), asPropertyName)
 endFunction
 
 int function GetRootPropertyOfTypeInt(string asPropertyName)
-    return RPB_Data.JailCell_GetRootPropertyOfTypeInt(Prison.GetDataObject("Cells"), self, asPropertyName)
+    return RPB_Data.GetPropertyOfTypeInteger(self.GetRootObject(), asPropertyName)
 endFunction
 
 float function GetRootPropertyOfTypeFloat(string asPropertyName)
-    return RPB_Data.JailCell_GetRootPropertyOfTypeFloat(Prison.GetDataObject("Cells"), self, asPropertyName)
+    return RPB_Data.GetPropertyOfTypeFloat(self.GetRootObject(), asPropertyName)
 endFunction
 
 string function GetRootPropertyOfTypeString(string asPropertyName)
-    return RPB_Data.JailCell_GetRootPropertyOfTypeString(Prison.GetDataObject("Cells"), self, asPropertyName)
+    return RPB_Data.GetPropertyOfTypeString(self.GetRootObject(), asPropertyName)
 endFunction
 
 Form function GetRootPropertyOfTypeForm(string asPropertyName)
-    return RPB_Data.JailCell_GetRootPropertyOfTypeForm(Prison.GetDataObject("Cells"), self, asPropertyName)
+    return RPB_Data.GetPropertyOfTypeForm(self.GetRootObject(), asPropertyName)
 endFunction
 
 string[] function GetRootPropertyOfTypeStringArray(string asPropertyName)
-    return RPB_Data.JailCell_GetRootPropertyOfTypeStringArray(Prison.GetDataObject("Cells"), self, asPropertyName)
+    return RPB_Data.GetPropertyOfTypeStringArray(self.GetRootObject(), asPropertyName)
 endFunction
 
 Form[] function GetRootPropertyOfTypeFormArray(string asPropertyName)
-    return RPB_Data.JailCell_GetRootPropertyOfTypeFormArray(Prison.GetDataObject("Cells"), self, asPropertyName)
+    return RPB_Data.GetPropertyOfTypeFormArray(self.GetRootObject(), asPropertyName)
+endFunction
+
+Form[] function GetRootPropertyOfTypeFormArrayTest(string asPropertyName)
+    return RPB_Data.GetPropertyOfTypeFormArray(self.GetRootObject(), "//" + asPropertyName)
 endFunction
 
 ;                           Options                        
 ; =========================================================
-bool function GetOptionOfTypeBool(string asOption, string asOptionCategory = "null")
-    return RPB_Data.JailCell_GetOptionOfTypeBool(Prison.GetDataObject("Cells"), self, asOption, asOptionCategory)
+bool function GetOptionOfTypeBool(string asOption, bool abDefaultInvalidValue = false)
+    return self.GetRootPropertyOfTypeBool("Options//" + asOption)
 endFunction
 
-int function GetOptionOfTypeInt(string asOption, string asOptionCategory = "null")
-    return RPB_Data.JailCell_GetOptionOfTypeInt(Prison.GetDataObject("Cells"), self, asOption, asOptionCategory)
+int function GetOptionOfTypeInt(string asOption, int aiDefaultInvalidValue = -1)
+    return self.GetRootPropertyOfTypeInt("Options//" + asOption)
 endFunction
 
-float function GetOptionOfTypeFloat(string asOption, string asOptionCategory = "null")
-    return RPB_Data.JailCell_GetOptionOfTypeFloat(Prison.GetDataObject("Cells"), self, asOption, asOptionCategory)
+float function GetOptionOfTypeFloat(string asOption, float afDefaultInvalidValue = -1.0)
+    return self.GetRootPropertyOfTypeFloat("Options//" + asOption)
 endFunction
 
-string function GetOptionOfTypeString(string asOption, string asOptionCategory = "null")
-    return RPB_Data.JailCell_GetOptionOfTypeString(Prison.GetDataObject("Cells"), self, asOption, asOptionCategory)
+string function GetOptionOfTypeString(string asOption, string asDefaultInvalidValue = "")
+    return self.GetRootPropertyOfTypeString("Options//" + asOption)
 endFunction
 
-Form function GetOptionOfTypeForm(string asOption, string asOptionCategory = "null")
-    return RPB_Data.JailCell_GetOptionOfTypeForm(Prison.GetDataObject("Cells"), self, asOption, asOptionCategory)
+Form function GetOptionOfTypeForm(string asOption, Form akDefaultInvalidValue = none)
+    return self.GetRootPropertyOfTypeForm("Options//" + asOption)
 endFunction
 
 bool function HasOption(string asOption, string asOptionCategory = "null")
@@ -1117,20 +1121,16 @@ endFunction
 ;                         Objects                          
 ; =========================================================
 Form[] function GetConfigObjects(string asObjectCategory)
-    return RPB_Data.JailCell_GetObjects(Prison.GetDataObject("Cells"), self, asObjectCategory)
+    return self.GetRootPropertyOfTypeFormArray("Objects//" + asObjectCategory)
+    ; return RPB_Data.JailCell_GetObjects(Prison.GetDataObject("Cells"), self, asObjectCategory)
 endFunction
 
 bool function HasObjects(string asObjectCategory)
     return RPB_Data.JailCell_HasObjects(Prison.GetDataObject("Cells"), self, asObjectCategory, true)
 endFunction
 
-
 string function GetIdentifier()
     return "Cell["+ self.GetFormID() +"]"
-endFunction
-
-bool function IsBoundToPrisoner(RPB_Prisoner apPrisoner)
-    ; return MiscVars.GetReference("["+ apPrisoner.GetIdentifier() +"]Cell").GetFormID() == self.GetFormID()
 endFunction
 
 ; =========================================================

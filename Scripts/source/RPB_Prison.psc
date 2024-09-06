@@ -289,7 +289,6 @@ int property EscapeBountyFallbackBounty
     endFunction
 endProperty
 
-
 bool property AccountForTimeServedOnEscape
     bool function get()
         return Config.IsTimeServedAccountedForOnEscape(Hold)
@@ -593,10 +592,6 @@ string property Name
         if (!__name)
             __fallbackName = PrisonLocation.GetName()
         endif
-
-        ; if (!__name)
-        ;     return "Prison " + ID
-        ; endif
 
         return __name
     endFunction
@@ -1051,6 +1046,10 @@ RPB_JailCell[] function GetCellsWithMixedPrisoners()
 endFunction
 
 RPB_JailCell function GetCellByID(string asCellIdentifier)
+    ; return self.FindPropertyOfTypeForm("Cells//*", 
+    ;     "[active: true]," + \ 
+    ;     "[id: "+ asCellIdentifier +"]" \ 
+    ; )
     return RPB_Data.Jail_GetJailCellByID(self.GetDataObject(), asCellIdentifier)
 endFunction
 
@@ -1595,25 +1594,6 @@ endEvent
 ; ==========================================================
 
 ;/
-    Retrieves the Prison's data object.
-
-    string? @asPrisonObjectCategory: The category of object to get from the Prison object (e.g: Cells).
-
-    returns (any& <JContainer>): The reference to the Prison data object, or an object inside the Prison object if a category is specified.
-/;
-int function GetDataObject(string asPrisonObjectCategory = "null")
-    int rootObject      = RPB_Data.GetRootObject(self.Hold)             ; JMap&
-    int prisonObject    = RPB_Data.Hold_GetJailObject(rootObject)       ; JMap&
-    int returnedObject  = prisonObject
-
-    if (asPrisonObjectCategory != "null")
-        returnedObject = JMap.getObj(prisonObject, asPrisonObjectCategory) ; any& <JContainer>
-    endif
-    
-    return returnedObject
-endFunction
-
-;/
     Fires a Prisoner based Event on a Scene condition and phase.
     It also handles sub-events within that Scene that should not fire an Event by themselves.
 
@@ -1913,6 +1893,9 @@ Form[] function GetPrisonerContainers(string asPrisonerContainerType = "Belongin
         return none
     endif
     
+    string[] stringArrayTest = self.GetRootPropertyOfTypeStringArray("TestArray")
+    Debug("["+ Name +"] Prison::GetPrisonerContainers", "stringArrayTest: " + stringArrayTest)
+
     return self.GetRootPropertyOfTypeFormArray("Prisoner Containers//" + asPrisonerContainerType)
 endFunction
 
@@ -2222,64 +2205,104 @@ bool __isInitialized
 ;                         Data Config                      
 ; =========================================================
 
+;/
+    Retrieves the Prison's data object.
+
+    string? @asPrisonObjectCategory: The category of object to get from the Prison object (e.g: Cells).
+
+    returns (any& <JContainer>): The reference to the Prison data object, or an object inside the Prison object if a category is specified.
+/;
+int function GetDataObject(string asPrisonObjectCategory = "null")
+    int rootObject      = RPB_Data.GetRootObject(self.Hold)             ; JMap&
+    int prisonObject    = RPB_Data.Hold_GetJailObject(rootObject)       ; JMap&
+    int returnedObject  = prisonObject
+
+    if (asPrisonObjectCategory != "null")
+        returnedObject = JMap.getObj(prisonObject, asPrisonObjectCategory) ; any& <JContainer>
+    endif
+    
+    return returnedObject
+endFunction
+
 ;                       Root Properties                    
 ; =========================================================
 bool function GetRootPropertyOfTypeBool(string asPropertyName)
-    return RPB_Data.Jail_GetRootPropertyOfTypeBool(self.GetDataObject(), asPropertyName)
+    return RPB_Data.GetPropertyOfTypeInteger(self.GetDataObject(), asPropertyName) as bool
 endFunction
 
 int function GetRootPropertyOfTypeInt(string asPropertyName)
-    return RPB_Data.Jail_GetRootPropertyOfTypeInt(self.GetDataObject(), asPropertyName)
+    return RPB_Data.GetPropertyOfTypeInteger(self.GetDataObject(), asPropertyName)
 endFunction
 
 float function GetRootPropertyOfTypeFloat(string asPropertyName)
-    return RPB_Data.Jail_GetRootPropertyOfTypeFloat(self.GetDataObject(), asPropertyName)
+    return RPB_Data.GetPropertyOfTypeFloat(self.GetDataObject(), asPropertyName)
 endFunction
 
 string function GetRootPropertyOfTypeString(string asPropertyName)
-    return RPB_Data.Jail_GetRootPropertyOfTypeString(self.GetDataObject(), asPropertyName)
+    return RPB_Data.GetPropertyOfTypeString(self.GetDataObject(), asPropertyName)
 endFunction
 
 Form function GetRootPropertyOfTypeForm(string asPropertyName)
-    return RPB_Data.Jail_GetRootPropertyOfTypeForm(self.GetDataObject(), asPropertyName)
+    return RPB_Data.GetPropertyOfTypeForm(self.GetDataObject(), asPropertyName)
 endFunction
 
-int[] function GetRootPropertyOfTypeIntegerArray(string asPropertyName, string asSubCategoryPath = "")
-    return RPB_Data.Jail_GetRootPropertyOfTypeIntegerArray(self.GetDataObject(), asPropertyName, asSubCategoryPath)
+int[] function GetRootPropertyOfTypeIntegerArray(string asPropertyName)
+    return RPB_Data.GetPropertyOfTypeIntegerArray(self.GetDataObject(), asPropertyName)
 endFunction
 
-float[] function GetRootPropertyOfTypeFloatArray(string asPropertyName, string asSubCategoryPath = "")
-    return RPB_Data.Jail_GetRootPropertyOfTypeFloatArray(self.GetDataObject(), asPropertyName, asSubCategoryPath)
+float[] function GetRootPropertyOfTypeFloatArray(string asPropertyName)
+    return RPB_Data.GetPropertyOfTypeFloatArray(self.GetDataObject(), asPropertyName)
 endFunction
 
-string[] function GetRootPropertyOfTypeStringArray(string asPropertyName, string asSubCategoryPath = "")
-    return RPB_Data.Jail_GetRootPropertyOfTypeStringArray(self.GetDataObject(), asPropertyName, asSubCategoryPath)
+string[] function GetRootPropertyOfTypeStringArray(string asPropertyName)
+    return RPB_Data.GetPropertyOfTypeStringArray(self.GetDataObject(), asPropertyName)
 endFunction
 
 Form[] function GetRootPropertyOfTypeFormArray(string asPropertyName)
     return RPB_Data.GetPropertyOfTypeFormArray(self.GetDataObject(), asPropertyName)
 endFunction
 
+; TODO: Implement
+Form function FindPropertyOfTypeForm(string asProperty, string apFindConditions)
+    return RPB_Data.FindPropertyOfTypeForm(self.GetDataObject(), asProperty, apFindConditions)
+endFunction
+
 ;                       Global Root Properties                    
 ; =========================================================
-bool function Global_GetRootPropertyOfTypeBool(int apPrisonDataObject, string asPropertyName) global
-    return RPB_Data.Jail_GetRootPropertyOfTypeBool(apPrisonDataObject, asPropertyName)
+bool function Global_GetRootPropertyOfTypeBool(int apRootObject, string asPropertyName) global
+    return RPB_Data.GetPropertyOfTypeInteger(apRootObject, asPropertyName) as bool
 endFunction
 
-int function Global_GetRootPropertyOfTypeInt(int apPrisonDataObject, string asPropertyName) global
-    return RPB_Data.Jail_GetRootPropertyOfTypeInt(apPrisonDataObject, asPropertyName)
+int function Global_GetRootPropertyOfTypeInt(int apRootObject, string asPropertyName) global
+    return RPB_Data.GetPropertyOfTypeInteger(apRootObject, asPropertyName)
 endFunction
 
-float function Global_GetRootPropertyOfTypeFloat(int apPrisonDataObject, string asPropertyName) global
-    return RPB_Data.Jail_GetRootPropertyOfTypeFloat(apPrisonDataObject, asPropertyName)
+float function Global_GetRootPropertyOfTypeFloat(int apRootObject, string asPropertyName) global
+    return RPB_Data.GetPropertyOfTypeFloat(apRootObject, asPropertyName)
 endFunction
 
-string function Global_GetRootPropertyOfTypeString(int apPrisonDataObject, string asPropertyName) global
-    return RPB_Data.Jail_GetRootPropertyOfTypeString(apPrisonDataObject, asPropertyName)
+string function Global_GetRootPropertyOfTypeString(int apRootObject, string asPropertyName) global
+    return RPB_Data.GetPropertyOfTypeString(apRootObject, asPropertyName)
 endFunction
 
-Form function Global_GetRootPropertyOfTypeForm(int apPrisonDataObject, string asPropertyName) global
-    return RPB_Data.Jail_GetRootPropertyOfTypeForm(apPrisonDataObject, asPropertyName)
+Form function Global_GetRootPropertyOfTypeForm(int apRootObject, string asPropertyName) global
+    return RPB_Data.GetPropertyOfTypeForm(apRootObject, asPropertyName)
+endFunction
+
+int[] function Global_GetRootPropertyOfTypeIntegerArray(int apRootObject, string asPropertyName) global
+    return RPB_Data.GetPropertyOfTypeIntegerArray(apRootObject, asPropertyName)
+endFunction
+
+float[] function Global_GetRootPropertyOfTypeFloatArray(int apRootObject, string asPropertyName) global
+    return RPB_Data.GetPropertyOfTypeFloatArray(apRootObject, asPropertyName)
+endFunction
+
+string[] function Global_GetRootPropertyOfTypeStringArray(int apRootObject, string asPropertyName) global
+    return RPB_Data.GetPropertyOfTypeStringArray(apRootObject, asPropertyName)
+endFunction
+
+Form[] function Global_GetRootPropertyOfTypeFormArray(int apRootObject, string asPropertyName) global
+    return RPB_Data.GetPropertyOfTypeFormArray(apRootObject, asPropertyName)
 endFunction
 
 

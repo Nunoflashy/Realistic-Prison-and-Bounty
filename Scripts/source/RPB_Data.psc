@@ -183,54 +183,145 @@ function SaveRoot() global
 endFunction
 
 ; ==========================================================
-;                       Object Getters
-; ==========================================================
-
-;/
-    Returns the object in the data file that holds the jail cell of a specific parent.
-
-    JMap&           @apHoldJailObject: The reference to the jail object of the hold.
-    RPB_JailCell    @akJailCell: The jail cell parent reference.
-
-    returns (JMap&): A reference to the object containing the jail cell parent along with its properties.
-/;
-int function RawObject_GetJailCellParent(int apHoldJailObject, RPB_JailCell akJailCell) global
-    int formMap_cellsDataContent    = JMap.getObj(apHoldJailObject, "Cells")                    ; JFormMap&
-    int map_parentCellObject        = JFormMap.getObj(formMap_cellsDataContent, akJailCell)     ; JMap&
-
-    Debug(none, "Data::RawObject_GetJailCellParent", GetContainerList(map_parentCellObject))
-
-    return map_parentCellObject
-endFunction
-
-;/
-    Checks if the object has the specified property.
-
-    JMap&   @apObject: The reference to the object to check.
-    string  @asPropertyName: The property to check the existence of in the object.
-
-    returns (bool): Whether or not the property exists in this object.
-/;
-bool function RawObject_HasProperty(int apObject, string asPropertyName)
-    return JMap.hasKey(apObject, asPropertyName)
-endFunction
-
-; ==========================================================
 ;                         Data Getters
 ; ==========================================================
 
-int function TraversePathToFinalObject(int apRootObject, string[] explodedPath) global
-    if (explodedPath.Length == 1)
-        return apRootObject
-    else
-        int map_propertyCategory = JMap.getObj(apRootObject, explodedPath[0])
-        int i = 1
-        while (i < explodedPath.Length - 1) ; second to last element, because the last is not an object, and if it is, we do not want it
-            map_propertyCategory = JMap.getObj(map_propertyCategory, explodedPath[i])
-            i += 1
-        endWhile
-        return map_propertyCategory
+;/
+    Retrieves the object at @akExplodedPath[@aiIterations] after traversing the path if it exists.
+    By default, it retrieves the second to last element in the path, which is the parent object.
+
+    any& <JContainer>   @apRootObject: The reference to the root object.
+    string[]            @akExplodedPath: The path to the object, imploded as an array.
+    int?                @aiIterations: How many iterations of the path to traverse. (default n-1)
+
+    returns (any& <JContainer>): The reference to the object that is at the path.
+/;
+int function TraversePathToFinalObject(int apRootObject, string[] akExplodedPath, int aiIterations = 0) global
+    int propertyObject = apRootObject
+
+    if (akExplodedPath.Length == 1)
+        return propertyObject
     endif
+
+    int iterations = aiIterations
+
+    if (aiIterations == 0)
+         ; second to last element, because the last is not an object, and if it is, we do not want it
+        iterations = akExplodedPath.Length - 1
+    elseif (iterations > akExplodedPath.Length)
+        DebugError("Data::TraversePathToFinalObject", "Number of iterations fall outside of the bounds of the array!")
+        return -1
+    endif
+
+    int i = 0
+    while (i < iterations)
+        ; DebugWithArgs("Data::TraversePathToFinalObject", "akExplodedPath: " + akExplodedPath, \
+        ;     "\n\t akExplodedPath[i]: "  + akExplodedPath[i] + \
+        ;     "\n\t isMap: "              + JValue.isMap(propertyObject) + \
+        ;     "\n\t isFormMap: "          + JValue.isFormMap(propertyObject) + \
+        ;     "\n\t isIntMap: "           + JValue.isIntegerMap(propertyObject) + \
+        ;     "\n\t isArray: "            + JValue.isArray(propertyObject) \
+        ; )
+
+        if (JValue.isMap(propertyObject))
+            propertyObject = JMap.getObj(propertyObject, akExplodedPath[i])
+            ; DebugWithArgs("Data::TraversePathToFinalObject", "akExplodedPath: " + akExplodedPath, "Processing a Map...")
+
+            ; int arrayStartBracket   = StringUtil.Find(akExplodedPath[i+1], "[")
+            ; int arrayEndBracket     = StringUtil.Find(akExplodedPath[i+1], "]", arrayStartBracket)
+            ; if (arrayStartBracket != -1)
+            ;     string arrayIndex          = StringUtil.Substring(akExplodedPath[i+1], arrayStartBracket + 1, (arrayEndBracket - arrayStartBracket) - 1)
+            ;     ; propertyObject = JMap.getObj(propertyObject, akExplodedPath[i])
+            ;     string arrayName = StringUtil.Substring(akExplodedPath[i], 0, arrayStartBracket)
+
+            ;     ; DebugWithArgs("Data::TraversePathToFinalObject", "akExplodedPath: " + akExplodedPath, \
+            ;     ;     "\n\t akExplodedPath[i]: " + akExplodedPath[i] + \
+            ;     ;     "\n\t arrayStartBracket: " + arrayStartBracket + \
+            ;     ;     "\n\t arrayEndBracket: "   + arrayEndBracket + \
+            ;     ;     "\n\t arrayIndex: "        + arrayIndex + \
+            ;     ;     "\n\t arrayName: "         + arrayName \
+            ;     ; )
+            ; endif
+            
+        elseif (JValue.isFormMap(propertyObject))
+            Form theForm = GetFormFromString(akExplodedPath[i])
+
+            if (theForm == none)
+                DebugError("Data::TraversePathToFinalObject", "Could not process the Form at ["+ i +"] in the path! (Got: " + akExplodedPath[i] + ")")
+                Error("Could not process the Form at ["+ i +"] in the path! (Got: " + akExplodedPath[i] + ")")
+            endif
+            propertyObject = JFormMap.getObj(propertyObject, theForm)
+            ; DebugWithArgs("Data::TraversePathToFinalObject", "akExplodedPath: " + akExplodedPath, "Processing a Form Map... Form: " + theForm + ", akExplodedPath[i]: " + akExplodedPath[i])
+
+        elseif (JValue.isArray(propertyObject))
+            int index = akExplodedPath[i] as int
+            propertyObject = JArray.getObj(propertyObject, index)
+            DebugWithArgs("Data::TraversePathToFinalObject", "akExplodedPath: " + akExplodedPath, "Processing an Array... akExplodedPath[i]: " + akExplodedPath[i])
+        else
+            ; int arrayStartBracket   = StringUtil.Find(akExplodedPath[i], "[")
+            ; int arrayEndBracket     = StringUtil.Find(akExplodedPath[i], "]", arrayStartBracket)
+            ; string arrayIndex          = StringUtil.Substring(akExplodedPath[i], arrayStartBracket, arrayEndBracket - arrayStartBracket)
+            ; ; propertyObject = JMap.getObj(propertyObject, akExplodedPath[i])
+            ; string arrayName = StringUtil.Substring(akExplodedPath[i], 0, arrayStartBracket)
+
+            ; DebugWithArgs("Data::TraversePathToFinalObject", "akExplodedPath: " + akExplodedPath, \
+            ;     "\n\t akExplodedPath[i]: " + akExplodedPath[i] + \
+            ;     "\n\t arrayStartBracket: " + arrayStartBracket + \
+            ;     "\n\t arrayEndBracket: "   + arrayEndBracket + \
+            ;     "\n\t arrayIndex: "        + arrayIndex + \
+            ;     "\n\t arrayName: "         + arrayName \
+            ; )
+
+            
+
+            ; DebugError("Data::TraversePathToFinalObject", "Invalid object type at ["+ i +"]: "+ akExplodedPath[i] +", cannot proceed!")
+            ; Error("Invalid object type at ["+ i +"]: "+ akExplodedPath[i] +", cannot proceed!")
+        endif
+        i += 1
+    endWhile
+
+    return propertyObject
+endFunction
+
+int function GetObjectFromContainer(int apRootObject, string asElementKey, int apDefaultObjectOnFail = -1) global
+    int TYPE_OBJECT = 5
+    int returnedObject
+
+    if (JValue.isMap(apRootObject)) ; Element is Map
+        if (JMap.valueType(apRootObject, asElementKey) != TYPE_OBJECT)
+            return apDefaultObjectOnFail
+        endif
+
+        returnedObject = JMap.getObj(apRootObject, asElementKey)
+
+    elseif (JValue.isFormMap(apRootObject)) ; Element is FormMap
+        Form keyElement = GetFormFromString(asElementKey)
+        if (JFormMap.valueType(apRootObject, keyElement) != TYPE_OBJECT)
+            return apDefaultObjectOnFail
+        endif
+
+        returnedObject = JFormMap.getObj(apRootObject, keyElement)
+
+    elseif (JValue.isIntegerMap(apRootObject)) ; Element is IntMap (NOT TESTED)
+        int keyElement = asElementKey as int
+
+        if (JIntMap.valueType(apRootObject, keyElement) != TYPE_OBJECT)
+            return apDefaultObjectOnFail
+        endif
+
+        returnedObject = JIntMap.getObj(apRootObject, keyElement)
+
+    elseif (JValue.isArray(apRootObject)) ; Element is Array (NOT TESTED)
+        int arrayIndex = asElementKey as int
+
+        if (JArray.valueType(apRootObject, arrayIndex) != TYPE_OBJECT)
+            return apDefaultObjectOnFail
+        endif
+
+        returnedObject = JArray.getObj(apRootObject, arrayIndex)
+    endif
+
+    return returnedObject
 endFunction
 
 ;/
@@ -245,363 +336,558 @@ int function Hold_GetJailObject(int apHoldRootObject) global
 endFunction
 
 ;/
-    Retrieves the property base object from a root object with the parameters specified.
+    Retrieves whether a property exists given by the path starting at the root.
 
-    JMap&           @apRootObject: The reference to the root object.
-    string          @asPropertyCategory: The root category of the property.
-    string?         @asSubCategoryPath: The path to the nested categories within the root category for this property, if there are any.
-    string?         @asPathDelimiter: The delimiter used to separate the sub categories path.
+    any& <JContainer>   @apRootObject: The reference to the root object.
+    string              @asPropertyPath: The name or the path to the property.
+    string?             @asPathDelimiter: The delimiter when building the path to traverse.
 
-    returns (JMap&): The base object specified through the parameters.
+    returns (bool): true if the property exists, false otherwise.
 /;
-int function Root_GetPropertyBaseObject(int apRootObject, string asPropertyPath, string asPathDelimiter = "//") global
-    string[] subCategories = StringUtil.Split(asPropertyPath, asPathDelimiter)
+bool function HasProperty(int apRootObject, string asPropertyPath, string asPathDelimiter = "//") global
+    string[] subCategories  = StringUtil.Split(asPropertyPath, asPathDelimiter)
+    int parentObject        = TraversePathToFinalObject(apRootObject, subCategories)
+    string pathKey          = subCategories[subCategories.Length - 1]
 
-    int map_propertyCategory    = JMap.getObj(apRootObject, subCategories[0])
-    int map_finalPropertyObject = map_propertyCategory
-
-    bool isNestedPath = StringUtil.Find(asPropertyPath, asPathDelimiter) != -1 ; asPathDelimiter: // (Unused for now)
-    ; Debug("Data::Root_GetPropertyBaseObject", "isNestedPath: " + isNestedPath)
-
-    if (isNestedPath)
-        int map_propertySubCategory = map_propertyCategory
-        ; Debug("Data::Root_GetPropertyBaseObject", "Categories: " + subCategories)
-        int i = 1
-        while (i < subCategories.Length)
-            string currentStoredCategory = subCategories[i]
-            if (currentStoredCategory)
-                ; Iterate through the container recursively until we find the option
-                map_propertySubCategory = JMap.getObj(map_propertySubCategory, currentStoredCategory)
-                ; Debug("Data::Root_GetPropertyBaseObject", "["+ i +"]: currentStoredCategory: " + currentStoredCategory +", map_propertySubCategory: " + GetContainerList(map_propertySubCategory))
-            endif
-            i += 1
-        endWhile
-        map_finalPropertyObject = map_propertySubCategory
-    endif
-
-    return map_finalPropertyObject
+    return JValue.hasPath(parentObject, "." + pathKey)
 endFunction
 
 ;/
-    Retrieves a root property of type int.
+    Retrieves a property of type bool.
 
-    JMap&           @apRootObject: The reference to the root object.
-    string          @asPropertyPath: The name or the path to the property.
-    int?            @aiDefaultInvalidValue: The value to return if the retrieval fails.
-    string?         @asPathDelimiter: The delimiter when building the path to traverse.
+    any& <JContainer>   @apRootObject: The reference to the root object.
+    string              @asPropertyPath: The name or the path to the property.
+    bool?               @abDefaultInvalidValue: The value to return if the retrieval fails.
+    bool?               @abCheckExists: Whether to check if this property exists.
+    string?             @asPathDelimiter: The delimiter when building the path to traverse.
 
-    returns (int): A root property of type int.
+    returns (bool): A property of type bool.
 /;
-int function GetPropertyOfTypeInteger(int apRootObject, string asPropertyPath, int aiDefaultInvalidValue = -1, string asPathDelimiter = "//") global
+bool function GetPropertyOfTypeBool(int apRootObject, string asPropertyPath, bool abDefaultInvalidValue = false, bool abCheckExists = true, string asPathDelimiter = "//") global
+    return GetPropertyOfTypeInteger(apRootObject, asPropertyPath, abDefaultInvalidValue as int, abCheckExists, asPathDelimiter) as bool
+endFunction
+
+;/
+    Retrieves a property of type int.
+
+    any& <JContainer>   @apRootObject: The reference to the root object.
+    string              @asPropertyPath: The name or the path to the property.
+    int?                @aiDefaultInvalidValue: The value to return if the retrieval fails.
+    bool?               @abCheckExists: Whether to check if this property exists.
+    string?             @asPathDelimiter: The delimiter when building the path to traverse.
+
+    returns (int): A property of type int.
+/;
+int function GetPropertyOfTypeInteger(int apRootObject, string asPropertyPath, int aiDefaultInvalidValue = -1, bool abCheckExists = true, string asPathDelimiter = "//") global
     string[] subCategories  = StringUtil.Split(asPropertyPath, asPathDelimiter)
-    int finalObject         = TraversePathToFinalObject(apRootObject, subCategories)
+    int parentObject        = TraversePathToFinalObject(apRootObject, subCategories)
     string pathKey          = subCategories[subCategories.Length - 1]
     int TYPE_INTEGER        = 2
 
-    if (JMap.valueType(finalObject, pathKey) != TYPE_INTEGER)
-        return aiDefaultInvalidValue
-    endif
+    if (JValue.isMap(parentObject))
+        if (JMap.valueType(parentObject, pathKey) != TYPE_INTEGER)
+            return aiDefaultInvalidValue
+        endif
 
-    return JMap.getInt(finalObject, pathKey)
+        if (abCheckExists && !JMap.hasKey(parentObject, pathKey))
+            return aiDefaultInvalidValue
+        endif
+
+        return JMap.getInt(parentObject, pathKey)
+
+    elseif (JValue.isArray(parentObject))
+        int arrayStartBracket   = StringUtil.Find(pathKey, "[")
+        int arrayEndBracket     = StringUtil.Find(pathKey, "]", arrayStartBracket)
+        int arrayIndex          = StringUtil.Substring(pathKey, arrayStartBracket + 1, (arrayEndBracket - arrayStartBracket) - 1) as int
+
+        if (JArray.valueType(parentObject, arrayIndex) != TYPE_INTEGER)
+            return aiDefaultInvalidValue
+        endif
+
+        return JArray.getInt(parentObject, arrayIndex)
+    endif
 endFunction
 
 ;/
-    Retrieves a root property of type float.
+    Retrieves a property of type float.
 
-    JMap&           @apRootObject: The reference to the root object.
-    string          @asPropertyPath: The name or the path to the property.
-    float?          @afDefaultInvalidValue: The value to return if the retrieval fails.
-    string?         @asPathDelimiter: The delimiter when building the path to traverse.
+    any& <JContainer>   @apRootObject: The reference to the root object.
+    string              @asPropertyPath: The name or the path to the property.
+    float?              @afDefaultInvalidValue: The value to return if the retrieval fails.
+    bool?               @abCheckExists: Whether to check if this property exists.
+    string?             @asPathDelimiter: The delimiter when building the path to traverse.
 
-    returns (float): A root property of type float.
+    returns (float): A property of type float.
 /;
-float function GetPropertyOfTypeFloat(int apRootObject, string asPropertyPath, float afDefaultInvalidValue = -1.0, string asPathDelimiter = "//") global
+float function GetPropertyOfTypeFloat(int apRootObject, string asPropertyPath, float afDefaultInvalidValue = -1.0, bool abCheckExists = true, string asPathDelimiter = "//") global
     string[] subCategories  = StringUtil.Split(asPropertyPath, asPathDelimiter)
-    int finalObject         = TraversePathToFinalObject(apRootObject, subCategories)
+    int parentObject        = TraversePathToFinalObject(apRootObject, subCategories)
     string pathKey          = subCategories[subCategories.Length - 1]
     int TYPE_FLOAT          = 3
 
-    if (JMap.valueType(finalObject, pathKey) != TYPE_FLOAT)
-        return afDefaultInvalidValue
-    endif
+    if (JValue.isMap(parentObject))
+        if (JMap.valueType(parentObject, pathKey) != TYPE_FLOAT)
+            return afDefaultInvalidValue
+        endif
 
-    return JMap.getFlt(finalObject, pathKey)
+        if (abCheckExists && !JMap.hasKey(parentObject, pathKey))
+            return afDefaultInvalidValue
+        endif
+
+        return JMap.getFlt(parentObject, pathKey)
+
+    elseif (JValue.isArray(parentObject))
+        int arrayStartBracket   = StringUtil.Find(pathKey, "[")
+        int arrayEndBracket     = StringUtil.Find(pathKey, "]", arrayStartBracket)
+        int arrayIndex          = StringUtil.Substring(pathKey, arrayStartBracket + 1, (arrayEndBracket - arrayStartBracket) - 1) as int
+
+        if (JArray.valueType(parentObject, arrayIndex) != TYPE_FLOAT)
+            return afDefaultInvalidValue
+        endif
+
+        return JArray.getFlt(parentObject, arrayIndex)
+    endif
 endFunction
 
 ;/
-    Retrieves a root property of type string.
+    Retrieves a property of type string.
 
-    JMap&           @apRootObject: The reference to the root object.
-    string          @asPropertyPath: The name or the path to the property.
-    string?         @asDefaultInvalidValue: The value to return if the retrieval fails.
-    string?         @asPathDelimiter: The delimiter when building the path to traverse.
+    any& <JContainer>   @apRootObject: The reference to the root object.
+    string              @asPropertyPath: The name or the path to the property.
+    string?             @asDefaultInvalidValue: The value to return if the retrieval fails.
+    bool?               @abCheckExists: Whether to check if this property exists.
+    string?             @asPathDelimiter: The delimiter when building the path to traverse.
 
-    returns (string): A root property of type string.
+    returns (string): A property of type string.
 /;
-string function GetPropertyOfTypeString(int apRootObject, string asPropertyPath, string asDefaultInvalidValue = "", string asPathDelimiter = "//") global
+string function GetPropertyOfTypeString(int apRootObject, string asPropertyPath, string asDefaultInvalidValue = "", bool abCheckExists = true, string asPathDelimiter = "//") global
     string[] subCategories  = StringUtil.Split(asPropertyPath, asPathDelimiter)
-    int finalObject         = TraversePathToFinalObject(apRootObject, subCategories)
+    int parentObject        = TraversePathToFinalObject(apRootObject, subCategories)
     string pathKey          = subCategories[subCategories.Length - 1]
     int TYPE_STRING         = 6
 
-    if (JMap.valueType(finalObject, pathKey) != TYPE_STRING)
-        return asDefaultInvalidValue
-    endif
+    ; Debug("Data::GetPropertyOfTypeString", "asPropertyPath: " + asPropertyPath)
+    ; DebugWithArgs("Data::GetPropertyOfTypeString", asPropertyPath, \
+    ;     "\n\t pathKey: "            + pathKey + \
+    ;     "\n\t isMap: "              + JValue.isMap(parentObject) + \
+    ;     "\n\t isFormMap: "          + JValue.isFormMap(parentObject) + \
+    ;     "\n\t isIntMap: "           + JValue.isIntegerMap(parentObject) + \
+    ;     "\n\t isArray: "            + JValue.isArray(parentObject) \
+    ; )
 
-    return JMap.getStr(finalObject, pathKey)
+    if (JValue.isMap(parentObject))
+        if (JMap.valueType(parentObject, pathKey) != TYPE_STRING)
+            return asDefaultInvalidValue
+        endif
+
+        return JMap.getStr(parentObject, pathKey)
+
+    elseif (JValue.isArray(parentObject))
+        int arrayStartBracket   = StringUtil.Find(pathKey, "[")
+        int arrayEndBracket     = StringUtil.Find(pathKey, "]", arrayStartBracket)
+        int arrayIndex          = StringUtil.Substring(pathKey, arrayStartBracket + 1, (arrayEndBracket - arrayStartBracket) - 1) as int
+
+        if (JArray.valueType(parentObject, arrayIndex) != TYPE_STRING)
+            return asDefaultInvalidValue
+        endif
+
+        return JArray.getStr(parentObject, arrayIndex)
+    endif
 endFunction
 
 ;/
-    Retrieves a root property of type Form.
+    Retrieves a property of type Form.
 
-    JMap&           @apRootObject: The reference to the root object.
-    string          @asPropertyPath: The name or the path to the property.
-    Form?           @akDefaultInvalidValue: The value to return if the retrieval fails.
-    string?         @asPathDelimiter: The delimiter when building the path to traverse.
+    any& <JContainer>   @apRootObject: The reference to the root object.
+    string              @asPropertyPath: The name or the path to the property.
+    Form?               @akDefaultInvalidValue: The value to return if the retrieval fails.
+    bool?               @abCheckExists: Whether to check if this property exists.
+    string?             @asPathDelimiter: The delimiter when building the path to traverse.
 
-    returns (Form): A root property of type Form.
+    returns (Form): A property of type Form.
 /;
-Form function GetPropertyOfTypeForm(int apRootObject, string asPropertyPath, Form akDefaultInvalidValue = none, string asPathDelimiter = "//") global
+Form function GetPropertyOfTypeForm(int apRootObject, string asPropertyPath, Form akDefaultInvalidValue = none, bool abCheckExists = true, string asPathDelimiter = "//") global
     string[] subCategories  = StringUtil.Split(asPropertyPath, asPathDelimiter)
-    int finalObject         = TraversePathToFinalObject(apRootObject, subCategories)
+    int parentObject        = TraversePathToFinalObject(apRootObject, subCategories)
     string pathKey          = subCategories[subCategories.Length - 1]
     int TYPE_FORM           = 4
 
-    if (JMap.valueType(finalObject, pathKey) != TYPE_FORM)
-        return akDefaultInvalidValue
-    endif
+    if (JValue.isMap(parentObject))
+        if (JMap.valueType(parentObject, pathKey) != TYPE_FORM)
+            return akDefaultInvalidValue
+        endif
 
-    return JMap.getForm(finalObject, pathKey)
+        if (abCheckExists && !JMap.hasKey(parentObject, pathKey))
+            return akDefaultInvalidValue
+        endif
+
+        return JMap.getForm(parentObject, pathKey)
+
+    elseif (JValue.isArray(parentObject))
+        int arrayStartBracket   = StringUtil.Find(pathKey, "[")
+        int arrayEndBracket     = StringUtil.Find(pathKey, "]", arrayStartBracket)
+        int arrayIndex          = StringUtil.Substring(pathKey, arrayStartBracket + 1, (arrayEndBracket - arrayStartBracket) - 1) as int
+
+        if (JArray.valueType(parentObject, arrayIndex) != TYPE_FORM)
+            return akDefaultInvalidValue
+        endif
+
+        return JArray.getForm(parentObject, arrayIndex)
+    endif
 endFunction
 
 ;/
-    Retrieves a root property of type int[].
+    Retrieves a property of type int[].
 
-    JMap&           @apRootObject: The reference to the root object.
-    string          @asPropertyPath: The name or the path to the property.
-    int[]?          @akDefaultInvalidValue: The value to return if the retrieval fails.
-    string?         @asPathDelimiter: The delimiter when building the path to traverse.
-
-    returns (int[]): A root property of type int[].
-/;
-int[] function GetPropertyOfTypeIntegerArray(int apRootObject, string asPropertyPath, int[] akDefaultInvalidValue = none, string asPathDelimiter = "//") global
-    string[] subCategories  = StringUtil.Split(asPropertyPath, asPathDelimiter)
-    int finalObject         = TraversePathToFinalObject(apRootObject, subCategories)
-    string pathKey          = subCategories[subCategories.Length - 1]
-    int TYPE_OBJECT         = 5
-
-    if (JMap.valueType(finalObject, pathKey) != TYPE_OBJECT)
-        return akDefaultInvalidValue
-    endif
-
-    int[] arr = JArray.asIntArray(JMap.getObj(finalObject, pathKey))
-
-    if (!arr)
-        return akDefaultInvalidValue
-    endif
-
-    return arr
-endFunction
-
-;/
-    Retrieves a root property of type float[].
-
-    JMap&           @apRootObject: The reference to the root object.
-    string          @asPropertyPath: The name or the path to the property.
-    float[]?        @akDefaultInvalidValue: The value to return if the retrieval fails.
-    string?         @asPathDelimiter: The delimiter when building the path to traverse.
-
-    returns (float[]): A root property of type float[].
-/;
-float[] function GetPropertyOfTypeFloatArray(int apRootObject, string asPropertyPath, float[] akDefaultInvalidValue = none, string asPathDelimiter = "//") global
-    string[] subCategories  = StringUtil.Split(asPropertyPath, asPathDelimiter)
-    int finalObject         = TraversePathToFinalObject(apRootObject, subCategories)
-    string pathKey          = subCategories[subCategories.Length - 1]
-    int TYPE_OBJECT         = 5
-
-    if (JMap.valueType(finalObject, pathKey) != TYPE_OBJECT)
-        return akDefaultInvalidValue
-    endif
-
-    float[] arr = JArray.asFloatArray(JMap.getObj(finalObject, pathKey))
-
-    if (!arr)
-        return akDefaultInvalidValue
-    endif
-
-    return arr
-endFunction
-
-;/
-    Retrieves a root property of type string[].
-
-    JMap&           @apRootObject: The reference to the root object.
-    string          @asPropertyPath: The name or the path to the property.
-    string[]?       @akDefaultInvalidValue: The value to return if the retrieval fails.
-    string?         @asPathDelimiter: The delimiter when building the path to traverse.
-
-    returns (string[]): A root property of type string[].
-/;
-string[] function GetPropertyOfTypeStringArray(int apRootObject, string asPropertyPath, string[] akDefaultInvalidValue = none, string asPathDelimiter = "//") global
-    string[] subCategories  = StringUtil.Split(asPropertyPath, asPathDelimiter)
-    int finalObject         = TraversePathToFinalObject(apRootObject, subCategories)
-    string pathKey          = subCategories[subCategories.Length - 1]
-    int TYPE_OBJECT         = 5
-
-    if (JMap.valueType(finalObject, pathKey) != TYPE_OBJECT)
-        return akDefaultInvalidValue
-    endif
-
-    string[] arr = JArray.asStringArray(JMap.getObj(finalObject, pathKey))
-
-    if (!arr)
-        return akDefaultInvalidValue
-    endif
-
-    return arr
-endFunction
-
-;/
-    Retrieves a root property of type Form[].
-
-    JMap&           @apRootObject: The reference to the root object.
-    string          @asPropertyPath: The name or the path to the property.
-    Form[]?         @akDefaultInvalidValue: The value to return if the retrieval fails.
-    string?         @asPathDelimiter: The delimiter when building the path to traverse.
-
-    returns (Form[]): A root property of type Form[].
-/;
-Form[] function GetPropertyOfTypeFormArray(int apRootObject, string asPropertyPath, Form[] akDefaultInvalidValue = none, string asPathDelimiter = "//") global
-    string[] subCategories  = StringUtil.Split(asPropertyPath, asPathDelimiter)
-    int finalObject         = TraversePathToFinalObject(apRootObject, subCategories)
-    string pathKey          = subCategories[subCategories.Length - 1]
-    int TYPE_OBJECT         = 5
-
-    if (JMap.valueType(finalObject, pathKey) != TYPE_OBJECT)
-        return akDefaultInvalidValue
-    endif
-
-    Form[] arr = JArray.asFormArray(JMap.getObj(finalObject, pathKey))
-
-    if (!arr)
-        return akDefaultInvalidValue
-    endif
-
-    return arr
-endFunction
-
-;/
-    Retrieves a root property of type any& <JContainer>
-
-    JMap&               @apRootObject: The reference to the root object.
+    any& <JContainer>   @apRootObject: The reference to the root object.
     string              @asPropertyPath: The name or the path to the property.
-    any& <JContainer>?  @apDefaultObject: The value to return if the retrieval fails.
+    int[]?              @akDefaultInvalidValue: The value to return if the retrieval fails.
+    bool?               @abCheckExists: Whether to check if this property exists.
     string?             @asPathDelimiter: The delimiter when building the path to traverse.
 
-    returns (any& <JContainer>): A root property of type object.
+    returns (int[]): A property of type int[].
 /;
-int function GetPropertyOfTypeObject(int apRootObject, string asPropertyPath, int apDefaultObject = -1, string asPathDelimiter = "//") global
+int[] function GetPropertyOfTypeIntegerArray(int apRootObject, string asPropertyPath, int[] akDefaultInvalidValue = none, bool abCheckExists = true, string asPathDelimiter = "//") global
     string[] subCategories  = StringUtil.Split(asPropertyPath, asPathDelimiter)
-    int finalObject         = TraversePathToFinalObject(apRootObject, subCategories)
+    int parentObject        = TraversePathToFinalObject(apRootObject, subCategories)
     string pathKey          = subCategories[subCategories.Length - 1]
     int TYPE_OBJECT         = 5
 
-    if (JMap.valueType(finalObject, pathKey) != TYPE_OBJECT)
+    int returnedObject
+
+    if (JValue.isMap(parentObject))
+        if (JMap.valueType(parentObject, pathKey) != TYPE_OBJECT)
+            return akDefaultInvalidValue
+        endif
+
+        returnedObject = JMap.getObj(parentObject, pathKey)
+
+    elseif (JValue.isArray(parentObject))
+        int arrayStartBracket   = StringUtil.Find(pathKey, "[")
+        int arrayEndBracket     = StringUtil.Find(pathKey, "]", arrayStartBracket)
+        int arrayIndex          = StringUtil.Substring(pathKey, arrayStartBracket + 1, (arrayEndBracket - arrayStartBracket) - 1) as int
+
+        if (JArray.valueType(parentObject, arrayIndex) != TYPE_OBJECT)
+            return akDefaultInvalidValue
+        endif
+
+        returnedObject = JArray.getObj(parentObject, arrayIndex)
+    endif
+
+    if (abCheckExists && JValue.empty(returnedObject))
+        return akDefaultInvalidValue
+    endif
+
+    int[] arr = JArray.asIntArray(returnedObject)
+
+    if (!arr)
+        return akDefaultInvalidValue
+    endif
+
+    return arr
+endFunction
+
+;/
+    Retrieves a property of type float[].
+
+    any& <JContainer>   @apRootObject: The reference to the root object.
+    string              @asPropertyPath: The name or the path to the property.
+    float[]?            @akDefaultInvalidValue: The value to return if the retrieval fails.
+    bool?               @abCheckExists: Whether to check if this property exists.
+    string?             @asPathDelimiter: The delimiter when building the path to traverse.
+
+    returns (float[]): A property of type float[].
+/;
+float[] function GetPropertyOfTypeFloatArray(int apRootObject, string asPropertyPath, float[] akDefaultInvalidValue = none, bool abCheckExists = true, string asPathDelimiter = "//") global
+    string[] subCategories  = StringUtil.Split(asPropertyPath, asPathDelimiter)
+    int parentObject        = TraversePathToFinalObject(apRootObject, subCategories)
+    string pathKey          = subCategories[subCategories.Length - 1]
+    int TYPE_OBJECT         = 5
+
+    int returnedObject
+
+    if (JValue.isMap(parentObject))
+        if (JMap.valueType(parentObject, pathKey) != TYPE_OBJECT)
+            return akDefaultInvalidValue
+        endif
+
+        returnedObject = JMap.getObj(parentObject, pathKey)
+
+    elseif (JValue.isArray(parentObject))
+        int arrayStartBracket   = StringUtil.Find(pathKey, "[")
+        int arrayEndBracket     = StringUtil.Find(pathKey, "]", arrayStartBracket)
+        int arrayIndex          = StringUtil.Substring(pathKey, arrayStartBracket + 1, (arrayEndBracket - arrayStartBracket) - 1) as int
+
+        if (JArray.valueType(parentObject, arrayIndex) != TYPE_OBJECT)
+            return akDefaultInvalidValue
+        endif
+
+        returnedObject = JArray.getObj(parentObject, arrayIndex)
+    endif
+
+    if (abCheckExists && JValue.empty(returnedObject))
+        return akDefaultInvalidValue
+    endif
+
+    float[] arr = JArray.asFloatArray(returnedObject)
+
+    if (!arr)
+        return akDefaultInvalidValue
+    endif
+
+    return arr
+endFunction
+
+;/
+    Retrieves a property of type string[].
+
+    any& <JContainer>   @apRootObject: The reference to the root object.
+    string              @asPropertyPath: The name or the path to the property.
+    string[]?           @akDefaultInvalidValue: The value to return if the retrieval fails.
+    bool?               @abCheckExists: Whether to check if this property exists.
+    string?             @asPathDelimiter: The delimiter when building the path to traverse.
+
+    returns (string[]): A property of type string[].
+/;
+string[] function GetPropertyOfTypeStringArray(int apRootObject, string asPropertyPath, string[] akDefaultInvalidValue = none, bool abCheckExists = true, string asPathDelimiter = "//") global
+    string[] subCategories  = StringUtil.Split(asPropertyPath, asPathDelimiter)
+    int parentObject        = TraversePathToFinalObject(apRootObject, subCategories)
+    string pathKey          = subCategories[subCategories.Length - 1]
+    int TYPE_OBJECT         = 5
+
+    ; DebugWithArgs("Data::GetPropertyOfTypeStringArray", asPropertyPath, \
+    ;     "\n\t pathKey: "            + pathKey + \
+    ;     "\n\t isMap: "              + JValue.isMap(parentObject) + \
+    ;     "\n\t isFormMap: "          + JValue.isFormMap(parentObject) + \
+    ;     "\n\t isIntMap: "           + JValue.isIntegerMap(parentObject) + \
+    ;     "\n\t isArray: "            + JValue.isArray(parentObject) \
+    ; )
+
+    int returnedObject
+
+    if (JValue.isMap(parentObject))
+        if (JMap.valueType(parentObject, pathKey) != TYPE_OBJECT)
+            return akDefaultInvalidValue
+        endif
+
+        returnedObject = JMap.getObj(parentObject, pathKey)
+
+    elseif (JValue.isArray(parentObject))
+        int arrayStartBracket   = StringUtil.Find(pathKey, "[")
+        int arrayEndBracket     = StringUtil.Find(pathKey, "]", arrayStartBracket)
+        int arrayIndex          = StringUtil.Substring(pathKey, arrayStartBracket + 1, (arrayEndBracket - arrayStartBracket) - 1) as int
+
+        ; ; Check for multi-dimensional array
+        ; if (arrayIndex)
+        ;     int nestedArray = JArray.getObj(parentObject, arrayIndex)
+
+        ;     if (JValue.isArray(nestedArray) && pathKey != "["+ arrayIndex +"]")
+        ;         arrayStartBracket   = StringUtil.Find(pathKey, "[", arrayEndBracket)
+        ;         arrayEndBracket     = StringUtil.Find(pathKey, "]", arrayStartBracket)
+        ;         arrayIndex          = StringUtil.Substring(pathKey, arrayStartBracket + 1, (arrayEndBracket - arrayStartBracket) - 1) as int
+
+        ;         parentObject = nestedArray
+
+        ;         DebugWithArgs("Data::GetPropertyOfTypeStringArray", asPropertyPath, \
+        ;             "\n\t nestedArray: "            + GetContainerList(nestedArray) + \
+        ;             "\n\t arrayIndex: "              + arrayIndex + \
+        ;             "\n\t arrayStartBracket: "          + arrayStartBracket + \
+        ;             "\n\t arrayEndBracket: "           + arrayEndBracket \
+        ;         )
+        ;     endif
+        ; endif
+
+        if (JArray.valueType(parentObject, arrayIndex) != TYPE_OBJECT)
+            return akDefaultInvalidValue
+        endif
+
+        returnedObject = JArray.getObj(parentObject, arrayIndex)
+    endif
+
+    ; Element is a Map, get the Keys as array
+    if (JValue.isMap(returnedObject))
+        returnedObject = JMap.allKeys(returnedObject)
+    endif
+
+    if (abCheckExists && JValue.empty(returnedObject))
+        return akDefaultInvalidValue
+    endif
+
+    string[] arr = JArray.asStringArray(returnedObject)
+
+    if (!arr)
+        return akDefaultInvalidValue
+    endif
+
+    return arr
+endFunction
+
+;/
+    Retrieves a property of type Form[].
+
+    any& <JContainer>   @apRootObject: The reference to the root object.
+    string              @asPropertyPath: The name or the path to the property.
+    Form[]?             @akDefaultInvalidValue: The value to return if the retrieval fails.
+    bool?               @abCheckExists: Whether to check if this property exists.
+    string?             @asPathDelimiter: The delimiter when building the path to traverse.
+
+    returns (Form[]): A property of type Form[].
+/;
+Form[] function GetPropertyOfTypeFormArray(int apRootObject, string asPropertyPath, Form[] akDefaultInvalidValue = none, bool abCheckExists = true, string asPathDelimiter = "//") global
+    string[] subCategories  = StringUtil.Split(asPropertyPath, asPathDelimiter)
+    int parentObject        = TraversePathToFinalObject(apRootObject, subCategories)
+    string pathKey          = subCategories[subCategories.Length - 1]
+    int TYPE_OBJECT         = 5
+
+    ; string args = "apRootObject: " + apRootObject + ", asPropertyPath: " + asPropertyPath
+    ; DebugWithArgs("Data::GetPropertyOfTypeFormArray", args, "\n\tsubCategories: " + subCategories + "\n\tpathKey: " + pathKey + "\n\tfinalObject: " + GetContainerList(parentObject))
+
+    if (JValue.empty(parentObject))
+        return akDefaultInvalidValue
+    endif
+    ; Debug("Data::GetPropertyOfTypeFormArray", "asPropertyPath: " + asPropertyPath)
+
+    int returnedObject
+
+    if (JValue.isMap(parentObject))
+        returnedObject = JMap.getObj(parentObject, pathKey)
+        ; Debug("Data::GetPropertyOfTypeFormArray", "This is a Map, pathKey: " + pathKey)
+
+    ; elseif (JValue.isFormMap(parentObject))
+    ;     returnedObject = JMap.getObj(parentObject, pathKey)
+    ;     Debug("Data::GetPropertyOfTypeFormArray", "This is a Form Map, pathKey: " + pathKey)
+    
+    endif
+
+    if (JValue.isFormMap(returnedObject))
+        returnedObject = JFormMap.allKeys(returnedObject)
+    endif
+
+    ; Debug("Data::GetPropertyOfTypeFormArray", "Final Object: " + GetContainerList(parentObject))
+    ; Debug("Data::GetPropertyOfTypeFormArray", "Object Returned: " + GetContainerList(returnedObject))
+
+    ; if (JMap.valueType(parentObject, pathKey) != TYPE_OBJECT)
+    ;     return akDefaultInvalidValue
+    ; endif
+
+    ; int returnedObject
+    ; if (JValue.isMap(parentObject))
+    ;     returnedObject = JMap.getObj(parentObject, pathKey)
+    ;     Debug("Data::GetPropertyOfTypeFormArray", "This is a Map")
+    ; elseif (JValue.isFormMap(parentObject))
+    ;     ; returnedObject = JFormMap.getObj(parentObject, pathKey)
+    ;     Debug("Data::GetPropertyOfTypeFormArray", "This is a Form Map")
+    ; endif
+    ; Debug("Data::GetPropertyOfTypeFormArray", "Object Returned: " + GetContainerList(returnedObject))
+
+    if (abCheckExists && JValue.empty(returnedObject))
+        return akDefaultInvalidValue
+    endif
+
+    Form[] arr = JArray.asFormArray(returnedObject)
+
+    if (!arr)
+        return akDefaultInvalidValue
+    endif
+
+    return arr
+endFunction
+
+;/
+    Retrieves a property of type any& <JContainer>
+
+    any& <JContainer>   @apRootObject: The reference to the root object.
+    string              @asPropertyPath: The name or the path to the property.
+    any& <JContainer>?  @apDefaultObject: The value to return if the retrieval fails.
+    bool?               @abCheckExists: Whether to check if this property exists.
+    string?             @asPathDelimiter: The delimiter when building the path to traverse.
+
+    returns (any& <JContainer>): A property of type object.
+/;
+int function GetPropertyOfTypeObject(int apRootObject, string asPropertyPath, int apDefaultObject = -1, bool abCheckExists = true, string asPathDelimiter = "//") global
+    string[] subCategories  = StringUtil.Split(asPropertyPath, asPathDelimiter)
+    int parentObject        = TraversePathToFinalObject(apRootObject, subCategories)
+    string pathKey          = subCategories[subCategories.Length - 1]
+    int TYPE_OBJECT         = 5
+
+    ; DebugWithArgs("Data::GetPropertyOfTypeObject", asPropertyPath, \
+    ;     "\n\t pathKey: "            + pathKey + \
+    ;     "\n\t subCategories: "      + subCategories + \
+    ;     "\n\t isMap: "              + JValue.isMap(parentObject) + \
+    ;     "\n\t isFormMap: "          + JValue.isFormMap(parentObject) + \
+    ;     "\n\t isIntMap: "           + JValue.isIntegerMap(parentObject) + \
+    ;     "\n\t isArray: "            + JValue.isArray(parentObject) \
+    ; )
+
+    int returnedObject = GetObjectFromContainer(parentObject, pathKey)
+
+    if (abCheckExists && JValue.empty(returnedObject))
         return apDefaultObject
     endif
 
-    int obj = JMap.getObj(finalObject, pathKey)
-    return obj
+    ; if (JValue.isMap(parentObject)) ; Element is Map
+    ;     if (JMap.valueType(parentObject, pathKey) != TYPE_OBJECT)
+    ;         return apDefaultObject
+    ;     endif
+
+    ;     returnedObject = JMap.getObj(parentObject, pathKey)
+
+    ; elseif (JValue.isFormMap(parentObject)) ; Element is FormMap
+    ;     Form keyElement = GetFormFromString(pathKey)
+    ;     if (JFormMap.valueType(parentObject, keyElement) != TYPE_OBJECT)
+    ;         return apDefaultObject
+    ;     endif
+
+    ;     returnedObject = JFormMap.getObj(parentObject, keyElement)
+
+    ; elseif (JValue.isIntegerMap(parentObject)) ; Element is IntMap (NOT TESTED)
+    ;     int keyElement = pathKey as int
+
+    ;     if (JIntMap.valueType(parentObject, keyElement) != TYPE_OBJECT)
+    ;         return apDefaultObject
+    ;     endif
+
+    ;     returnedObject = JIntMap.getObj(parentObject, keyElement)
+
+    ; elseif (JValue.isArray(parentObject)) ; Element is Array (NOT TESTED)
+    ;     int arrayIndex = pathKey as int
+
+    ;     if (JArray.valueType(parentObject, arrayIndex) != TYPE_OBJECT)
+    ;         return apDefaultObject
+    ;     endif
+
+    ;     returnedObject = JArray.getObj(parentObject, arrayIndex)
+    ; endif
+
+    return returnedObject
 endFunction
 
-;/
-    Retrieves the property base object for a particular Jail with the parameters specified.
-
-    JMap&           @apHoldRootObject: The reference to the Jail object for the given Hold.
-    string          @asPropertyCategory: The root category of the property.
-    string?         @asSubCategoryPath: The path to the nested categories within the root category for this property, if there are any.
-    string?         @asPathDelimiter: The delimiter used to separate the sub categories path.
-
-    returns (JMap&): The base object specified through the parameters for this jail.
-/;
-int function Hold_GetPropertyBaseObject(int apHoldRootObject, string asPropertyPath, string asPathDelimiter = "//") global
-    string[] subCategories = StringUtil.Split(asPropertyPath, asPathDelimiter)
-
-    int map_propertyCategory    = JMap.getObj(apHoldRootObject, subCategories[0])
-    int map_finalPropertyObject = map_propertyCategory
-
-    bool isNestedPath = StringUtil.Find(asPropertyPath, asPathDelimiter) != -1 ; asPathDelimiter: // (Unused for now)
-    Debug("Data::Hold_GetPropertyBaseObject", "isNestedPath: " + isNestedPath)
-
-    if (isNestedPath)
-        int map_propertySubCategory = map_propertyCategory
-        Debug("Data::Hold_GetPropertyBaseObject", "Categories: " + subCategories)
-        int i = 1
-        while (i < subCategories.Length)
-            string currentStoredCategory = subCategories[i]
-            if (currentStoredCategory)
-                ; Iterate through the container recursively until we find the option
-                map_propertySubCategory = JMap.getObj(map_propertySubCategory, currentStoredCategory)
-                Debug("Data::Hold_GetPropertyBaseObject", "["+ i +"]: currentStoredCategory: " + currentStoredCategory +", map_propertySubCategory: " + GetContainerList(map_propertySubCategory))
-            endif
-            i += 1
-        endWhile
-        map_finalPropertyObject = map_propertySubCategory
-    endif
-
-    return map_finalPropertyObject
+; TODO: Implement
+bool function FindPropertyOfTypeBool(int apRootObject, string asPropertyPath, string apFindConditions = "[]", bool abDefaultValue = false, bool abCheckExists = true, string asPathDelimiter = "//") global
 endFunction
 
-;/
-    Retrieves a root property of type int[] from a Prison.
-
-    JMap&           @apHoldRootObject: The reference to the jail object.
-    string          @asProperty: The name of the property.
-
-    returns (int[]): A root property of type int[] from the Prison.
-/;
-int[] function Hold_GetRootPropertyOfTypeIntegerArray(int apHoldRootObject, string asProperty) global
-    int propertyArray = Hold_GetPropertyBaseObject(apHoldRootObject, asProperty)
-    return JArray.asIntArray(propertyArray)
+int function FindPropertyOfTypeInteger(int apRootObject, string asPropertyPath, string apFindConditions = "[]", int aiDefaultValue = -1, bool abCheckExists = true, string asPathDelimiter = "//") global
 endFunction
 
-;/
-    Retrieves a root property of type float[] from a Prison.
-
-    JMap&           @apHoldRootObject: The reference to the jail object.
-    string          @asProperty: The name of the property.
-
-    returns (float[]): A root property of type float[] from the Prison.
-/;
-float[] function Hold_GetRootPropertyOfTypeFloatArray(int apHoldRootObject, string asProperty) global
-    int propertyArray = Hold_GetPropertyBaseObject(apHoldRootObject, asProperty)
-    return JArray.asFloatArray(propertyArray)
+float function FindPropertyOfTypeFloat(int apRootObject, string asPropertyPath, string apFindConditions = "[]", float afDefaultValue = -1.0, bool abCheckExists = true, string asPathDelimiter = "//") global
 endFunction
 
-;/
-    Retrieves a root property of type string[] from a Prison.
-
-    JMap&           @apHoldRootObject: The reference to the jail object.
-    string          @asProperty: The name of the property.
-
-    returns (string[]): A root property of type string[] from the Prison.
-/;
-string[] function Hold_GetRootPropertyOfTypeStringArray(int apHoldRootObject, string asProperty) global
-    int propertyArray = Hold_GetPropertyBaseObject(apHoldRootObject, asProperty)
-    return JArray.asStringArray(propertyArray)
+string function FindPropertyOfTypeString(int apRootObject, string asPropertyPath, string apFindConditions = "[]", string asDefaultValue = "", bool abCheckExists = true, string asPathDelimiter = "//") global
 endFunction
 
-;/
-    Retrieves a root property of type Form[] from a Prison.
+Form function FindPropertyOfTypeForm(int apRootObject, string asPropertyPath, string apFindConditions = "[]", Form akDefaultValue = none, bool abCheckExists = true, string asPathDelimiter = "//") global
+endFunction
 
-    JMap&           @apHoldRootObject: The reference to the jail object.
-    string          @asProperty: The name of the property.
+int[] function FindPropertyOfTypeIntegerArray(int apRootObject, string asPropertyPath, string apFindConditions = "[]", int[] akDefaultValue = none, bool abCheckExists = true, string asPathDelimiter = "//") global
+endFunction
 
-    returns (Form[]): A root property of type Form[] from the Prison.
-/;
-Form[] function Hold_GetRootPropertyOfTypeFormArray(int apHoldRootObject, string asProperty) global
-    int propertyArray = Hold_GetPropertyBaseObject(apHoldRootObject, asProperty)
-    return JArray.asFormArray(propertyArray)
+float[] function FindPropertyOfTypeFloatArray(int apRootObject, string asPropertyPath, string apFindConditions = "[]", float[] akDefaultValue = none, bool abCheckExists = true, string asPathDelimiter = "//") global
+endFunction
+
+string[] function FindPropertyOfTypeStringArray(int apRootObject, string asPropertyPath, string apFindConditions = "[]", string[] akDefaultValue = none, bool abCheckExists = true, string asPathDelimiter = "//") global
+endFunction
+
+Form[] function FindPropertyOfTypeFormArray(int apRootObject, string asPropertyPath, string apFindConditions = "[]", Form[] akDefaultValue = none, bool abCheckExists = true, string asPathDelimiter = "//") global
 endFunction
 
 ;/
@@ -653,154 +939,6 @@ int function Jail_GetCellsObject(int apHoldJailObject) global
 endFunction
 
 ;/
-    Retrieves the property base object for a particular Jail with the parameters specified.
-
-    JMap&           @apHoldJailObject: The reference to the Jail object for the given Hold.
-    string          @asPropertyCategory: The root category of the property.
-    string?         @asSubCategoryPath: The path to the nested categories within the root category for this property, if there are any.
-    string?         @asPathDelimiter: The delimiter used to separate the sub categories path.
-
-    returns (JMap&): The base object specified through the parameters for this jail.
-/;
-int function Jail_GetPropertyBaseObject(int apHoldJailObject, string asPropertyCategory, string asSubCategoryPath = "", string asPathDelimiter = "//") global
-    int map_propertyCategory    = JMap.getObj(apHoldJailObject, asPropertyCategory)
-    int map_propertySubCategory = map_propertyCategory
-    int map_finalPropertyObject = map_propertyCategory
-
-
-    ; There are sub-categories to this property
-    if (asSubCategoryPath != "")
-        ; bool hasSubCategories = StringUtil.Find(asPropertyCategory, asPathDelimiter) ; asPathDelimiter: // (Unused for now)
-        string[] subCategories = StringUtil.Split(asSubCategoryPath, asPathDelimiter) ; asPathDelimiter: //
-        Debug("Data::Jail_GetPropertyBaseObject", "Sub Categories: " + subCategories)
-        int i = 0
-        while (i < subCategories.Length)
-            string currentStoredCategory = subCategories[i]
-            if (currentStoredCategory)
-                ; Iterate through the container recursively until we find the option
-                map_propertySubCategory = JMap.getObj(map_propertySubCategory, currentStoredCategory)
-            endif
-            i += 1
-        endWhile
-        map_finalPropertyObject = map_propertySubCategory
-    endif
-
-    return map_finalPropertyObject
-endFunction
-
-;/
-    Retrieves a root property of type bool from a Prison.
-
-    JMap&           @apHoldJailObject: The reference to the jail object.
-    string          @asProperty: The name of the property.
-
-    returns (bool): A root property of type bool from the Prison.
-/;
-bool function Jail_GetRootPropertyOfTypeBool(int apHoldJailObject, string asProperty) global
-    return Jail_GetRootPropertyOfTypeInt(apHoldJailObject, asProperty) as bool
-endFunction
-
-;/
-    Retrieves a root property of type int from a Prison.
-
-    JMap&           @apHoldJailObject: The reference to the jail object.
-    string          @asProperty: The name of the property.
-
-    returns (int): A root property of type int from the Prison.
-/;
-int function Jail_GetRootPropertyOfTypeInt(int apHoldJailObject, string asProperty) global
-    return JMap.getInt(apHoldJailObject, asProperty)
-endFunction
-
-;/
-    Retrieves a root property of type float from a Prison.
-
-    JMap&           @apHoldJailObject: The reference to the jail object.
-    string          @asProperty: The name of the property.
-
-    returns (float): A root property of type float from the Prison.
-/;
-float function Jail_GetRootPropertyOfTypeFloat(int apHoldJailObject, string asProperty) global
-    return JMap.getFlt(apHoldJailObject, asProperty)
-endFunction
-
-;/
-    Retrieves a root property of type string from a Prison.
-
-    JMap&           @apHoldJailObject: The reference to the jail object.
-    string          @asProperty: The name of the property.
-
-    returns (string): A root property of type string from the Prison.
-/;
-string function Jail_GetRootPropertyOfTypeString(int apHoldJailObject, string asProperty) global
-    return JMap.getStr(apHoldJailObject, asProperty)
-endFunction
-
-;/
-    Retrieves a root property of type Form from a Prison.
-
-    JMap&           @apHoldJailObject: The reference to the jail object.
-    string          @asProperty: The name of the property.
-
-    returns (Form): A root property of type Form from the Prison.
-/;
-Form function Jail_GetRootPropertyOfTypeForm(int apHoldJailObject, string asProperty) global
-    return JMap.getForm(apHoldJailObject, asProperty)
-endFunction
-
-;/
-    Retrieves a root property of type int[] from a Prison.
-
-    JMap&           @apHoldJailObject: The reference to the jail object.
-    string          @asProperty: The name of the property.
-
-    returns (int[]): A root property of type int[] from the Prison.
-/;
-int[] function Jail_GetRootPropertyOfTypeIntegerArray(int apHoldJailObject, string asProperty, string asSubCategory = "") global
-    int propertyArray = Jail_GetPropertyBaseObject(apHoldJailObject, asProperty, asSubCategory)
-    return JArray.asIntArray(propertyArray)
-endFunction
-
-;/
-    Retrieves a root property of type float[] from a Prison.
-
-    JMap&           @apHoldJailObject: The reference to the jail object.
-    string          @asProperty: The name of the property.
-
-    returns (float[]): A root property of type float[] from the Prison.
-/;
-float[] function Jail_GetRootPropertyOfTypeFloatArray(int apHoldJailObject, string asProperty, string asSubCategory = "") global
-    int propertyArray = Jail_GetPropertyBaseObject(apHoldJailObject, asProperty, asSubCategory)
-    return JArray.asFloatArray(propertyArray)
-endFunction
-
-;/
-    Retrieves a root property of type string[] from a Prison.
-
-    JMap&           @apHoldJailObject: The reference to the jail object.
-    string          @asProperty: The name of the property.
-
-    returns (string[]): A root property of type string[] from the Prison.
-/;
-string[] function Jail_GetRootPropertyOfTypeStringArray(int apHoldJailObject, string asProperty, string asSubCategory = "") global
-    int propertyArray = Jail_GetPropertyBaseObject(apHoldJailObject, asProperty, asSubCategory)
-    return JArray.asStringArray(propertyArray)
-endFunction
-
-;/
-    Retrieves a root property of type Form[] from a Prison.
-
-    JMap&           @apHoldJailObject: The reference to the jail object.
-    string          @asProperty: The name of the property.
-
-    returns (Form[]): A root property of type Form[] from the Prison.
-/;
-Form[] function Jail_GetRootPropertyOfTypeFormArray(int apHoldJailObject, string asProperty, string asSubCategory = "") global
-    int propertyArray = Jail_GetPropertyBaseObject(apHoldJailObject, asProperty, asSubCategory)
-    return JArray.asFormArray(propertyArray)
-endFunction
-
-;/
     Retrieves a jail cell by its ID from a Prison.
 
     JMap&   @apHoldJailObject: The reference to the prison object.
@@ -828,226 +966,6 @@ RPB_JailCell function Jail_GetJailCellByID(int apHoldJailObject, string asCellID
     return none
 endFunction
 
-;/
-    Retrieves the parent Forms of the jail cells.
-
-    JMap&   @apHoldJailObject: The reference to the jail object.
-
-    returns (Form[]): All the jail cell parents.
-/;
-Form[] function GetJailCellParents(int apHoldJailObject) global
-    int formMap_cellsDataContent    = JMap.getObj(apHoldJailObject, "Cells")        ; JFormMap&
-    int array_cellsKeys             = JFormMap.allKeys(formMap_cellsDataContent)    ; JArray& (Form[])
-
-    Form[] asFormArray = JArray.asFormArray(array_cellsKeys)
-
-    return asFormArray
-endFunction
-
-;/
-    Gets the child markers of this jail cell.
-
-    JMap&   @apHoldJailObject: The reference to the jail object.
-    Form    @akParentForm: The parent form of this jail cell.
-    string  @asInteriorOrExterior: Whether to retrieve the Interior or Exterior child markers.
-
-    returns (Form[]): The child markers of the jail cell.
-/;
-Form[] function GetJailCellChildren(int apHoldJailObject, Form akParentForm, string asInteriorOrExterior = "Interior") global
-    if (asInteriorOrExterior != "Interior" && asInteriorOrExterior != "Exterior")
-        return none
-    endif
-
-    int formMap_cells           = JMap.getObj(apHoldJailObject, "Cells")                    ; JFormMap&
-    int map_cellDataContent     = JFormMap.getObj(formMap_cells, akParentForm)              ; JMap& - Get the cell object with this parent key
-    int array_childrenAsObject  = JMap.getObj(map_cellDataContent, asInteriorOrExterior)    ; JArray& (Form[])
-
-    Debug(none, "Config::GetJailCellChildMarkers", akParentForm + "'s " + asInteriorOrExterior +" Children: " + GetContainerList(array_childrenAsObject))
-
-    Form[] childrenAsForms = JArray.asFormArray(array_childrenAsObject)
-    return childrenAsForms
-endFunction
-
-;/
-    Retrieves the property base object for a particular Jail Cell with the parameters specified.
-
-    JFormMap&       @apPrisonCellsObject: The reference to the Cells object for the given Prison (Cells in the data file).
-    RPB_JailCell    @akJailCell: The jail cell.
-    string          @asPropertyCategory: The root category of the property.
-    string[]?       @asArrPropertySubCategories: The nested categories within the root category for this property, if there are any.
-    int?            @aiSubCategoriesLimitSize: The number of elements to take into account for the sub-categories if the array is bigger than desired.
-
-    returns (JMap&): The base object specified through the parameters for this jail cell.
-/;
-int function JailCell_GetPropertyBaseObject(int apPrisonCellsObject, RPB_JailCell akJailCell, string asPropertyCategory = "null", string[] asArrPropertySubCategories = none, int aiSubCategoriesLimitSize = 0) global
-    int map_cellDataContent     = JFormMap.getObj(apPrisonCellsObject, akJailCell) ; JMap& - Get the cell object with this parent key
-
-    if (asPropertyCategory == "null")
-        return map_cellDataContent ; this is the root object, no categories have been specified
-    endif
-
-    int map_propertyCategory    = JMap.getObj(map_cellDataContent, asPropertyCategory)
-    int map_propertySubCategory = map_propertyCategory
-    int map_finalPropertyObject = map_propertyCategory
-
-    ; There are sub-categories to this property
-    if (asArrPropertySubCategories.Length > 0)
-        int desiredArraySize = int_if (aiSubCategoriesLimitSize > 0, Min(aiSubCategoriesLimitSize, asArrPropertySubCategories.Length) as int, asArrPropertySubCategories.Length)
-        int i = 0
-        while (i < desiredArraySize)
-            string currentStoredCategory = asArrPropertySubCategories[i]
-            if (currentStoredCategory)
-                ; Iterate through the container recursively until we find the option
-                map_propertySubCategory = JMap.getObj(map_propertySubCategory, currentStoredCategory)
-            endif
-            i += 1
-        endWhile
-
-        map_finalPropertyObject = map_propertySubCategory
-    endif
-
-    return map_finalPropertyObject
-endFunction
-
-;/
-    Retrieves a root property of type bool from a Jail Cell.
-
-    JFormMap&       @apPrisonCellsObject: The reference to the Cells object for the given Prison (Cells in the data file).
-    RPB_JailCell    @akJailCell: The jail cell.
-    string          @asProperty: The name of the property.
-
-    returns (bool): A root property of type bool from the Jail Cell.
-/;
-bool function JailCell_GetRootPropertyOfTypeBool(int apPrisonCellsObject, RPB_JailCell akJailCell, string asProperty) global
-    return JailCell_GetRootPropertyOfTypeInt(apPrisonCellsObject, akJailCell, asProperty) as bool
-endFunction
-
-;/
-    Retrieves a root property of type int from a Jail Cell.
-
-    JFormMap&       @apPrisonCellsObject: The reference to the Cells object for the given Prison (Cells in the data file).
-    RPB_JailCell    @akJailCell: The jail cell.
-    string          @asProperty: The name of the property.
-
-    returns (int): A root property of type int from the Jail Cell.
-/;
-int function JailCell_GetRootPropertyOfTypeInt(int apPrisonCellsObject, RPB_JailCell akJailCell, string asProperty) global
-    int map_cellDataContent     = JailCell_GetPropertyBaseObject(apPrisonCellsObject, akJailCell) ; JMap& - Get the cell object with this parent key
-    int intProperty             = JMap.getInt(map_cellDataContent, asProperty)
-    
-    return intProperty
-endFunction
-
-;/
-    Retrieves a root property of type float from a Jail Cell.
-
-    JFormMap&       @apPrisonCellsObject: The reference to the Cells object for the given Prison (Cells in the data file).
-    RPB_JailCell    @akJailCell: The jail cell.
-    string          @asProperty: The name of the property.
-
-    returns (float): A root property of type float from the Jail Cell.
-/;
-float function JailCell_GetRootPropertyOfTypeFloat(int apPrisonCellsObject, RPB_JailCell akJailCell, string asProperty) global
-    int map_cellDataContent     = JailCell_GetPropertyBaseObject(apPrisonCellsObject, akJailCell) ; JMap& - Get the cell object with this parent key
-    float floatProperty         = JMap.getFlt(map_cellDataContent, asProperty)
-    
-    return floatProperty
-endFunction
-
-;/
-    Retrieves a root property of type string from a Jail Cell.
-
-    JFormMap&       @apPrisonCellsObject: The reference to the Cells object for the given Prison (Cells in the data file).
-    RPB_JailCell    @akJailCell: The jail cell.
-    string          @asProperty: The name of the property.
-
-    returns (string): A root property of type string from the Jail Cell.
-/;
-string function JailCell_GetRootPropertyOfTypeString(int apPrisonCellsObject, RPB_JailCell akJailCell, string asProperty) global
-    int map_cellDataContent     = JailCell_GetPropertyBaseObject(apPrisonCellsObject, akJailCell) ; JMap& - Get the cell object with this parent key
-    string stringProperty       = JMap.getStr(map_cellDataContent, asProperty)
-    
-    return stringProperty
-endFunction
-
-;/
-    Retrieves a root property of type Form from a Jail Cell.
-
-    JFormMap&       @apPrisonCellsObject: The reference to the Cells object for the given Prison (Cells in the data file).
-    RPB_JailCell    @akJailCell: The jail cell.
-    string          @asProperty: The name of the property.
-
-    returns (Form): A root property of type Form from the Jail Cell.
-/;
-Form function JailCell_GetRootPropertyOfTypeForm(int apPrisonCellsObject, RPB_JailCell akJailCell, string asProperty) global
-    int map_cellDataContent     = JailCell_GetPropertyBaseObject(apPrisonCellsObject, akJailCell) ; JMap& - Get the cell object with this parent key
-    Form formProperty           = JMap.getForm(map_cellDataContent, asProperty)
-
-    return formProperty
-endFunction
-
-;/
-    Retrieves a root property of type Form[] from a Jail Cell.
-
-    JFormMap&       @apPrisonCellsObject: The reference to the Cells object for the given Prison (Cells in the data file).
-    RPB_JailCell    @akJailCell: The jail cell.
-    string          @asProperty: The name of the property.
-
-    returns (Form[]): A root property of type Form[] from the Jail Cell.
-/;
-Form[] function JailCell_GetRootPropertyOfTypeFormArray(int apPrisonCellsObject, RPB_JailCell akJailCell, string asProperty) global
-    int map_cellDataContent     = JailCell_GetPropertyBaseObject(apPrisonCellsObject, akJailCell) ; JMap& - Get the cell object with this parent key
-    int propertyContainer       = JMap.getObj(map_cellDataContent, asProperty) ; any& <JContainer>
-
-    if (JValue.isArray(propertyContainer))
-        return JArray.asFormArray(propertyContainer)
-
-    elseif (JValue.isFormMap(propertyContainer))
-        return JFormMap.allKeysPArray(propertyContainer)
-    endif
-
-    return none
-endFunction
-
-;/
-    Retrieves a root property of type string[] from a Jail Cell.
-
-    JFormMap&       @apPrisonCellsObject: The reference to the Cells object for the given Prison (Cells in the data file).
-    RPB_JailCell    @akJailCell: The jail cell.
-    string          @asProperty: The name of the property.
-
-    returns (string[]): A root property of type string[] from the Jail Cell.
-/;
-string[] function JailCell_GetRootPropertyOfTypeStringArray(int apPrisonCellsObject, RPB_JailCell akJailCell, string asProperty) global
-    int map_cellDataContent = JailCell_GetPropertyBaseObject(apPrisonCellsObject, akJailCell) ; JMap& - Get the cell object with this parent key
-    int propertyContainer   = JMap.getObj(map_cellDataContent, asProperty) ; any& <JContainer>
-
-    if (JValue.isArray(propertyContainer))
-        return JArray.asStringArray(propertyContainer)
-
-    elseif (JValue.isMap(propertyContainer))
-        return JMap.allKeysPArray(propertyContainer)
-    endif
-
-    return none
-endFunction
-
-;/
-    Gets the main marker of this jail cell.
-
-    JFormMap&       @apPrisonCellsObject: The reference to the Cells object for the given Prison (Cells in the data file).
-    RPB_JailCell    @akJailCell: The parent form of this jail cell.
-    string          @asInteriorOrExterior: Whether to retrieve the Interior or Exterior marker.
-
-    returns (Form): The main marker of this jail cell.
-/;
-Form function JailCell_GetMainMarker(int apPrisonCellsObject, RPB_JailCell akJailCell, string asInteriorOrExterior = "Interior") global
-    if (asInteriorOrExterior != "Interior" && asInteriorOrExterior != "Exterior")
-        return none
-    endif
-
-    return JailCell_GetRootPropertyOfTypeForm(apPrisonCellsObject, akJailCell, "Main " + asInteriorOrExterior)
-endFunction
 
 ;/
     Retrieves the parent Forms of the jail cells. 
@@ -1087,174 +1005,6 @@ Form[] function JailCell_GetParents(int apPrisonCellsObject, bool abOnlyActiveCe
 
     return JArray.asFormArray(array_cellsKeys)
 endFunction
-
-;/
-    Gets the child markers of this jail cell.
-
-    JFormMap&       @apPrisonCellsObject: The reference to the Cells object for the given Prison (Cells in the data file).
-    RPB_JailCell    @akParentForm: The parent form of this jail cell.
-    string          @asInteriorOrExterior: Whether to retrieve the Interior or Exterior child markers.
-
-    returns (Form[]): The child markers of the jail cell.
-/;
-Form[] function JailCell_GetChildren(int apPrisonCellsObject, RPB_JailCell akJailCell, string asInteriorOrExterior = "Interior") global
-    if (asInteriorOrExterior != "Interior" && asInteriorOrExterior != "Exterior")
-        return none
-    endif
-
-    int map_cellDataContent     = JFormMap.getObj(apPrisonCellsObject, akJailCell)              ; JMap& - Get the cell object with this parent key
-    int array_childrenAsObject  = JMap.getObj(map_cellDataContent, asInteriorOrExterior)        ; JArray& (Form[])
-
-    Debug(none, "Data::JailCell_GetChildren", akJailCell + "'s " + asInteriorOrExterior +" Children: " + GetContainerList(array_childrenAsObject))
-
-    Form[] childrenAsForms = JArray.asFormArray(array_childrenAsObject)
-    return childrenAsForms
-endFunction
-
-
-;/
-    Retrieves an option of type bool from a Jail Cell.
-
-    JFormMap&       @apPrisonCellsObject: The reference to the Cells object for the given Prison (Cells in the data file).
-    RPB_JailCell    @akJailCell: The jail cell.
-    string          @asOption: The name of the Option.
-    string          @asOptionCategory: The category of the Option.
-
-    returns (bool): An Option of type bool.
-/;
-bool function JailCell_GetOptionOfTypeBool(int apPrisonCellsObject, RPB_JailCell akJailCell, string asOption, string asOptionCategory = "null") global
-    int map_cellDataContent     = JFormMap.getObj(apPrisonCellsObject, akJailCell)      ; JMap& - Get the cell object with this parent key
-    int map_options             = JMap.getObj(map_cellDataContent, "Options")           ; JMap& - The options for this cell
-    int map_finalOptionObject   = map_options ; Default to main Options category
-
-    if (asOptionCategory != "null")
-        ; We got a sub option object (such as Scan), change the final object to retrieve the option from
-        map_finalOptionObject = JMap.getObj(map_options, asOptionCategory)
-    endif
-
-    bool selectedOption = JMap.getInt(map_finalOptionObject, asOption) as bool ; The bool option
-
-    return selectedOption
-endFunction
-
-;/
-    Retrieves an option of type int from a Jail Cell.
-
-    JFormMap&       @apPrisonCellsObject: The reference to the Cells object for the given Prison (Cells in the data file).
-    RPB_JailCell    @akJailCell: The jail cell.
-    string          @asOption: The name of the Option.
-    string          @asOptionCategory: The category of the Option.
-
-    returns (int): An Option of type int.
-/;
-int function JailCell_GetOptionOfTypeInt(int apPrisonCellsObject, RPB_JailCell akJailCell, string asOption, string asOptionCategory = "null") global
-    int map_cellDataContent     = JFormMap.getObj(apPrisonCellsObject, akJailCell)      ; JMap& - Get the cell object with this parent key
-    int map_options             = JMap.getObj(map_cellDataContent, "Options")           ; JMap& - The options for this cell
-    int map_finalOptionObject   = map_options ; Default to main Options category
-
-    if (asOptionCategory != "null")
-        ; We got a sub option object (such as Scan), change the final object to retrieve the option from
-        map_finalOptionObject = JMap.getObj(map_options, asOptionCategory)
-    endif
-
-    int selectedOption = JMap.getInt(map_finalOptionObject, asOption)
-
-    return selectedOption
-endFunction
-
-;/
-    Retrieves an option of type float from a Jail Cell.
-
-    JFormMap&       @apPrisonCellsObject: The reference to the Cells object for the given Prison (Cells in the data file).
-    RPB_JailCell    @akJailCell: The jail cell.
-    string          @asOption: The name of the Option.
-    string          @asOptionCategory: The category of the Option.
-
-    returns (float): An Option of type float.
-/;
-float function JailCell_GetOptionOfTypeFloat(int apPrisonCellsObject, RPB_JailCell akJailCell, string asOption, string asOptionCategory = "null") global
-    int map_cellDataContent     = JFormMap.getObj(apPrisonCellsObject, akJailCell)      ; JMap& - Get the cell object with this parent key
-    int map_options             = JMap.getObj(map_cellDataContent, "Options")           ; JMap& - The options for this cell
-    int map_finalOptionObject   = map_options ; Default to main Options category
-
-    if (asOptionCategory != "null")
-        ; We got a sub option object (such as Scan), change the final object to retrieve the option from
-        map_finalOptionObject = JMap.getObj(map_options, asOptionCategory)
-    endif
-
-    float selectedOption = JMap.getFlt(map_finalOptionObject, asOption)
-
-    return selectedOption
-endFunction
-
-;/
-    Retrieves an option of type string from a Jail Cell.
-
-    JFormMap&       @apPrisonCellsObject: The reference to the Cells object for the given Prison (Cells in the data file).
-    RPB_JailCell    @akJailCell: The jail cell.
-    string          @asOption: The name of the Option.
-    string          @asOptionCategory: The category of the Option.
-
-    returns (string): An Option of type string.
-/;
-string function JailCell_GetOptionOfTypeString(int apPrisonCellsObject, RPB_JailCell akJailCell, string asOption, string asOptionCategory = "null") global
-    int map_cellDataContent     = JFormMap.getObj(apPrisonCellsObject, akJailCell)      ; JMap& - Get the cell object with this parent key
-    int map_options             = JMap.getObj(map_cellDataContent, "Options")           ; JMap& - The options for this cell
-    int map_finalOptionObject   = map_options ; Default to main Options category
-
-    if (asOptionCategory != "null")
-        ; We got a sub option object (such as Scan), change the final object to retrieve the option from
-        map_finalOptionObject = JMap.getObj(map_options, asOptionCategory)
-    endif
-
-    string selectedOption = JMap.getStr(map_finalOptionObject, asOption)                ; The string option
-
-    return selectedOption
-endFunction
-
-;/
-    Retrieves an option of type Form from a Jail Cell.
-
-    JFormMap&       @apPrisonCellsObject: The reference to the Cells object for the given Prison (Cells in the data file).
-    RPB_JailCell    @akJailCell: The jail cell.
-    string          @asOption: The name of the Option.
-    string          @asOptionCategory: The category of the Option.
-
-    returns (Form): An Option of type Form.
-/;
-Form function JailCell_GetOptionOfTypeForm(int apPrisonCellsObject, RPB_JailCell akJailCell, string asOption, string asOptionCategory = "null") global
-    int map_cellDataContent     = JFormMap.getObj(apPrisonCellsObject, akJailCell)      ; JMap& - Get the cell object with this parent key
-    int map_options             = JMap.getObj(map_cellDataContent, "Options")           ; JMap& - The options for this cell
-    int map_finalOptionObject   = map_options ; Default to main Options category
-
-    if (asOptionCategory != "null")
-        ; We got a sub option object (such as Scan), change the final object to retrieve the option from
-        map_finalOptionObject = JMap.getObj(map_options, asOptionCategory)
-    endif
-
-    Form selectedOption = JMap.getForm(map_finalOptionObject, asOption)               ; The Form option
-
-    return selectedOption
-endFunction
-
-;/
-    Retrieves the Objects of a Jail Cell, object type is specified through @asObjectCategory.
-
-    JFormMap&       @apPrisonCellsObject: The reference to the Cells object for the given Prison (Cells in the data file).
-    RPB_JailCell    @akJailCell: The jail cell.
-    string          @asObjectCategory: The type of objects to check.
-
-    returns (Form[]): The objects of a specific type.
-/;
-Form[] function JailCell_GetObjects(int apPrisonCellsObject, RPB_JailCell akJailCell, string asObjectCategory) global
-    int map_cellDataContent     = JFormMap.getObj(apPrisonCellsObject, akJailCell)      ; JMap& - Get the cell object with this parent key
-    int map_objects             = JMap.getObj(map_cellDataContent, "Objects")           ; JMap& - The Objects for this cell
-    int array_finalObjectRef    = JMap.getObj(map_objects, asObjectCategory)            ; JArray& - The actual objects content
-
-    Form[] selectedObjects = JArray.asFormArray(array_finalObjectRef)
-    return selectedObjects
-endFunction
-
 
 ;/
     Checks if a given jail cell has an option, determined by @asOptionCategory, optionally checking if the contents are empty or not.
@@ -1325,457 +1075,119 @@ bool function JailCell_HasObjects(int apPrisonCellsObject, RPB_JailCell akJailCe
     return map_objects && hasSubObjectsCategory 
 endFunction
 
-;/
-    Retrieves whether the option exists for a particular Cell Door with the parameters specified.
-
-    JMap&           @apJailCellObject: The reference to the jail cell object that owns this cell door.
-    RPB_CellDoor    @akCellDoor: The cell door reference.
-    string          @asOption: The option to retrieve.
-    string          @asOptionCategory: The category of the option.
-    string[]?       @asArrOptionsSubCategories: The nested categories within the main category for this option, if there are any.
-    int?            @aiSubCategoriesLimitSize: The number of elements to take into account for the sub-categories if the array is bigger than desired.
-
-    returns (bool): Whether the specified option exists for this cell door.
-/;
-bool function CellDoor_HasOption(int apJailCellObject, RPB_CellDoor akCellDoor, string asOption, string asOptionCategory, string[] asArrOptionsSubCategories = none, int aiSubCategoriesLimitSize = 0) global
-    int map_cellDoors           = JMap.getObj(apJailCellObject, "Cell Doors")           ; JFormMap& - The cell doors for this jail cell
-    int map_cellDoor            = JFormMap.getObj(map_cellDoors, akCellDoor)            ; JMap&
-    int map_optionCategory      = JMap.getObj(map_cellDoor, asOptionCategory)           ; JMap& - (e.g: Lock)
-    int map_optionSubCategory   = map_optionCategory ; The same category to start off, assign another if it has children
-    int map_finalOptionObject   = map_optionCategory
-
-    ; Invalid category, doesn't exist
-    if (JValue.empty(map_optionCategory))
-        return false
-    endif
-
-    ; There are sub-categories to this option
-    if (asArrOptionsSubCategories.Length > 0)
-        int desiredArraySize = int_if (aiSubCategoriesLimitSize > 0, Min(aiSubCategoriesLimitSize, asArrOptionsSubCategories.Length) as int, asArrOptionsSubCategories.Length)
-
-        int i = 0
-        while (i < desiredArraySize)
-            string currentStoredCategory = asArrOptionsSubCategories[i]
-            if (currentStoredCategory)
-                map_optionSubCategory = JMap.getObj(map_optionSubCategory, currentStoredCategory) ; (e.g: Decay Options for 1st iteration, Decay Thresholds for 2nd)
-            endif
-            i += 1
-        endWhile
-
-        map_finalOptionObject = map_optionSubCategory
-
-        ; Invalid category, doesn't exist
-        if (JValue.empty(map_finalOptionObject))
-            return false
-        endif
-    endif
-
-    return JMap.hasKey(map_finalOptionObject, asOption)
-endFunction
-
-;/
-    Retrieves the options base object for a particular Cell Door with the parameters specified.
-
-    JMap&           @apJailCellObject: The reference to the jail cell object that owns this cell door.
-    RPB_CellDoor    @akCellDoor: The cell door reference.
-    string          @asOptionCategory: The category of the option.
-    string[]?       @asArrOptionsSubCategories: The nested categories within the main category for this option, if there are any.
-    int?            @aiSubCategoriesLimitSize: The number of elements to take into account for the sub-categories if the array is bigger than desired.
-
-    returns (JMap&): The object specified through the parameters for this cell door.
-/;
-int function CellDoor_GetOptionBaseObject(int apJailCellObject, RPB_CellDoor akCellDoor, string asOptionCategory, string[] asArrOptionsSubCategories = none, int aiSubCategoriesLimitSize = 0) global
-    int map_cellDoors           = JMap.getObj(apJailCellObject, "Cell Doors")           ; JFormMap& - The cell doors for this jail cell
-    int map_cellDoor            = JFormMap.getObj(map_cellDoors, akCellDoor)            ; JMap&
-    int map_optionCategory      = JMap.getObj(map_cellDoor, asOptionCategory)           ; JMap& - (e.g: Lock)
-    int map_optionSubCategory   = map_optionCategory ; The same category to start off, assign another if it has children
-    int map_finalOptionObject   = map_optionCategory
-
-    ; There are sub-categories to this option
-    if (asArrOptionsSubCategories.Length > 0)
-        int desiredArraySize = int_if (aiSubCategoriesLimitSize > 0, Min(aiSubCategoriesLimitSize, asArrOptionsSubCategories.Length) as int, asArrOptionsSubCategories.Length)
-
-        int i = 0
-        while (i < desiredArraySize)
-            string currentStoredCategory = asArrOptionsSubCategories[i]
-            if (currentStoredCategory)
-                map_optionSubCategory = JMap.getObj(map_optionSubCategory, currentStoredCategory) ; (e.g: Decay Options for 1st iteration, Decay Thresholds for 2nd)
-            endif
-            i += 1
-        endWhile
-
-        map_finalOptionObject = map_optionSubCategory
-    endif
-
-    ; Debug(none, "Data::CellDoor_GetOptionBaseObject", "Cell Doors: " + GetContainerList(map_cellDoors))
-    ; Debug(none, "Data::CellDoor_GetOptionBaseObject", "Cell Door: " + GetContainerList(map_cellDoor))
-    ; Debug(none, "Data::CellDoor_GetOptionBaseObject", "Option Category: " + GetContainerList(map_optionCategory))
-    ; Debug(none, "Data::CellDoor_GetOptionBaseObject", "Option Sub Category: " + GetContainerList(map_optionSubCategory))
-    ; Debug(none, "Data::CellDoor_GetOptionBaseObject", "Option Final Object: " + GetContainerList(map_finalOptionObject))
-
-    return map_finalOptionObject
-endFunction
-
-;/
-    Retrieves an option of type bool from a Cell Door.
-
-    JMap&           @apJailCellObject: The reference to the jail cell object that owns this cell door.
-    RPB_CellDoor    @akCellDoor: The cell door reference.
-    string          @asOption: The option to retrieve.
-    string          @asOptionCategory: The category of the option.
-    string[]?       @asArrOptionsSubCategories: The nested categories within the main category for this option, if there are any.
-    int?            @aiSubCategoriesLimitSize: The number of elements to take into account for the sub-categories if the array is bigger than desired.
-
-    returns (bool): The specified option of type bool for this cell door.
-/;
-bool function CellDoor_GetOptionOfTypeBool(int apJailCellObject, RPB_CellDoor akCellDoor, string asOption, string asOptionCategory, string[] asArrOptionsSubCategories = none, int aiSubCategoriesLimitSize = 0) global
-    int optionBaseObject = CellDoor_GetOptionBaseObject(apJailCellObject, akCellDoor, asOptionCategory, asArrOptionsSubCategories, aiSubCategoriesLimitSize)
-    return JMap.getInt(optionBaseObject, asOption) as bool
-endFunction
-
-;/
-    Retrieves an option of type int from a Cell Door.
-
-    JMap&           @apJailCellObject: The reference to the jail cell object that owns this cell door.
-    RPB_CellDoor    @akCellDoor: The cell door reference.
-    string          @asOption: The option to retrieve.
-    string          @asOptionCategory: The category of the option.
-    string[]?       @asArrOptionsSubCategories: The nested categories within the main category for this option, if there are any.
-    int?            @aiSubCategoriesLimitSize: The number of elements to take into account for the sub-categories if the array is bigger than desired.
-
-    returns (int): The specified option of type int for this cell door.
-/;
-int function CellDoor_GetOptionOfTypeInt(int apJailCellObject, RPB_CellDoor akCellDoor, string asOption, string asOptionCategory, string[] asArrOptionsSubCategories = none, int aiSubCategoriesLimitSize = 0) global
-    int optionBaseObject = CellDoor_GetOptionBaseObject(apJailCellObject, akCellDoor, asOptionCategory, asArrOptionsSubCategories, aiSubCategoriesLimitSize)
-    return JMap.getInt(optionBaseObject, asOption)
-endFunction
-
-;/
-    Retrieves an option of type float from a Cell Door.
-
-    JMap&           @apJailCellObject: The reference to the jail cell object that owns this cell door.
-    RPB_CellDoor    @akCellDoor: The cell door reference.
-    string          @asOption: The option to retrieve.
-    string          @asOptionCategory: The category of the option.
-    string[]?       @asArrOptionsSubCategories: The nested categories within the main category for this option, if there are any.
-    int?            @aiSubCategoriesLimitSize: The number of elements to take into account for the sub-categories if the array is bigger than desired.
-
-    returns (float): The specified option of type float for this cell door.
-/;
-float function CellDoor_GetOptionOfTypeFloat(int apJailCellObject, RPB_CellDoor akCellDoor, string asOption, string asOptionCategory, string[] asArrOptionsSubCategories = none, int aiSubCategoriesLimitSize = 0) global
-    int optionBaseObject = CellDoor_GetOptionBaseObject(apJailCellObject, akCellDoor, asOptionCategory, asArrOptionsSubCategories, aiSubCategoriesLimitSize)
-    return JMap.getFlt(optionBaseObject, asOption)
-endFunction
-
-;/
-    Retrieves an option of type string from a Cell Door.
-
-    JMap&           @apJailCellObject: The reference to the jail cell object that owns this cell door.
-    RPB_CellDoor    @akCellDoor: The cell door reference.
-    string          @asOption: The option to retrieve.
-    string          @asOptionCategory: The category of the option.
-    string[]?       @asArrOptionsSubCategories: The nested categories within the main category for this option, if there are any.
-    int?            @aiSubCategoriesLimitSize: The number of elements to take into account for the sub-categories if the array is bigger than desired.
-
-    returns (string): The specified option of type string for this cell door.
-/;
-string function CellDoor_GetOptionOfTypeString(int apJailCellObject, RPB_CellDoor akCellDoor, string asOption, string asOptionCategory, string[] asArrOptionsSubCategories = none, int aiSubCategoriesLimitSize = 0) global
-    int optionBaseObject = CellDoor_GetOptionBaseObject(apJailCellObject, akCellDoor, asOptionCategory, asArrOptionsSubCategories, aiSubCategoriesLimitSize)
-    return JMap.getStr(optionBaseObject, asOption)
-endFunction
-
-;/
-    Retrieves an option of type Form from a Cell Door.
-
-    JMap&           @apJailCellObject: The reference to the jail cell object that owns this cell door.
-    RPB_CellDoor    @akCellDoor: The cell door reference.
-    string          @asOption: The option to retrieve.
-    string          @asOptionCategory: The category of the option.
-    string[]?       @asArrOptionsSubCategories: The nested categories within the main category for this option, if there are any.
-    int?            @aiSubCategoriesLimitSize: The number of elements to take into account for the sub-categories if the array is bigger than desired.
-
-    returns (Form): The specified option of type Form for this cell door.
-/;
-Form function CellDoor_GetOptionOfTypeForm(int apJailCellObject, RPB_CellDoor akCellDoor, string asOption, string asOptionCategory, string[] asArrOptionsSubCategories = none, int aiSubCategoriesLimitSize = 0) global
-    int optionBaseObject = CellDoor_GetOptionBaseObject(apJailCellObject, akCellDoor, asOptionCategory, asArrOptionsSubCategories, aiSubCategoriesLimitSize)
-    return JMap.getForm(optionBaseObject, asOption)
-endFunction
-
-;/
-    Retrieves an option of type int[] from a Cell Door.
-
-    JMap&           @apJailCellObject: The reference to the jail cell object that owns this cell door.
-    RPB_CellDoor    @akCellDoor: The cell door reference.
-    string          @asOption: The option to retrieve.
-    string          @asOptionCategory: The category of the option.
-    string[]?       @asArrOptionsSubCategories: The nested categories within the main category for this option, if there are any.
-    int?            @aiSubCategoriesLimitSize: The number of elements to take into account for the sub-categories if the array is bigger than desired.
-
-    returns (int[]): The specified option of type int[] for this cell door.
-/;
-int[] function CellDoor_GetOptionOfTypeIntArray(int apJailCellObject, RPB_CellDoor akCellDoor, string asOption, string asOptionCategory, string[] asArrOptionsSubCategories = none, int aiSubCategoriesLimitSize = 0) global
-    int optionBaseObject    = CellDoor_GetOptionBaseObject(apJailCellObject, akCellDoor, asOptionCategory, asArrOptionsSubCategories, aiSubCategoriesLimitSize)
-    int optionContainer     = JMap.getObj(optionBaseObject, asOption) ; any& <JContainer>
-
-    if (JValue.isArray(optionContainer))
-        return JArray.asIntArray(optionContainer)
-
-    elseif (JValue.isFormMap(optionContainer))
-        return JIntMap.allKeysPArray(optionContainer)
-    endif
-
-    return none
-endFunction
-
-;/
-    Retrieves an option of type float[] from a Cell Door.
-
-    JMap&           @apJailCellObject: The reference to the jail cell object that owns this cell door.
-    RPB_CellDoor    @akCellDoor: The cell door reference.
-    string          @asOption: The option to retrieve.
-    string          @asOptionCategory: The category of the option.
-    string[]?       @asArrOptionsSubCategories: The nested categories within the main category for this option, if there are any.
-    int?            @aiSubCategoriesLimitSize: The number of elements to take into account for the sub-categories if the array is bigger than desired.
-
-    returns (float[]): The specified option of type float[] for this cell door.
-/;
-float[] function CellDoor_GetOptionOfTypeFloatArray(int apJailCellObject, RPB_CellDoor akCellDoor, string asOption, string asOptionCategory, string[] asArrOptionsSubCategories = none, int aiSubCategoriesLimitSize = 0) global
-    int optionBaseObject    = CellDoor_GetOptionBaseObject(apJailCellObject, akCellDoor, asOptionCategory, asArrOptionsSubCategories, aiSubCategoriesLimitSize)
-    int optionContainer     = JMap.getObj(optionBaseObject, asOption) ; any& <JContainer>
-
-    if (JValue.isArray(optionContainer))
-        return JArray.asFloatArray(optionContainer)
-    endif
-
-    return none
-endFunction
-
-;/
-    Retrieves an option of type Form[] from a Cell Door.
-
-    JMap&           @apJailCellObject: The reference to the jail cell object that owns this cell door.
-    RPB_CellDoor    @akCellDoor: The cell door reference.
-    string          @asOption: The option to retrieve.
-    string          @asOptionCategory: The category of the option.
-    string[]?       @asArrOptionsSubCategories: The nested categories within the main category for this option, if there are any.
-    int?            @aiSubCategoriesLimitSize: The number of elements to take into account for the sub-categories if the array is bigger than desired.
-
-    returns (Form[]): The specified option of type Form[] for this cell door.
-/;
-Form[] function CellDoor_GetOptionOfTypeFormArray(int apJailCellObject, RPB_CellDoor akCellDoor, string asOption, string asOptionCategory, string[] asArrOptionsSubCategories = none, int aiSubCategoriesLimitSize = 0) global
-    int optionBaseObject    = CellDoor_GetOptionBaseObject(apJailCellObject, akCellDoor, asOptionCategory, asArrOptionsSubCategories, aiSubCategoriesLimitSize)
-    int optionContainer     = JMap.getObj(optionBaseObject, asOption) ; any& <JContainer>
-
-    if (JValue.isArray(optionContainer))
-        return JArray.asFormArray(optionContainer)
-
-    elseif (JValue.isFormMap(optionContainer))
-        return JFormMap.allKeysPArray(optionContainer)
-    endif
-
-    return none
-endFunction
-
-;/
-    Retrieves an option of type string[] from a Cell Door.
-
-    JMap&           @apJailCellObject: The reference to the jail cell object that owns this cell door.
-    RPB_CellDoor    @akCellDoor: The cell door reference.
-    string          @asOption: The option to retrieve.
-    string          @asOptionCategory: The category of the option.
-    string[]?       @asArrOptionsSubCategories: The nested categories within the main category for this option, if there are any.
-    int?            @aiSubCategoriesLimitSize: The number of elements to take into account for the sub-categories if the array is bigger than desired.
-
-    returns (string[]): The specified option of type string[] for this cell door.
-/;
-string[] function CellDoor_GetOptionOfTypeStringArray(int apJailCellObject, RPB_CellDoor akCellDoor, string asOption, string asOptionCategory, string[] asArrOptionsSubCategories = none, int aiSubCategoriesLimitSize = 0) global
-    int optionBaseObject    = CellDoor_GetOptionBaseObject(apJailCellObject, akCellDoor, asOptionCategory, asArrOptionsSubCategories, aiSubCategoriesLimitSize)
-    int optionContainer     = JMap.getObj(optionBaseObject, asOption) ; any& <JContainer>
-
-    if (JValue.isArray(optionContainer))
-        return JArray.asStringArray(optionContainer)
-
-    elseif (JValue.isFormMap(optionContainer))
-        return JMap.allKeysPArray(optionContainer)
-    endif
-
-    return none
-endFunction
-
-;/
-    Retrieves the hold's jail release markers, whether they're Teleport or Escort markers depends on @asTeleportOrEscort.
-
-    JMap&   @apHoldJailObject: The reference to the jail object.
-    string  @asTeleportOrEscort: Whether to retrieve Teleport or Escort markers.
-
-    returns (Form[]): The jail release markers with the parameters specified.
-/;
-Form[] function Jail_GetReleaseMarkers(int apHoldJailObject, string asTeleportOrEscort) global
-    if (asTeleportOrEscort != "Teleport" && asTeleportOrEscort != "Escort")
-        return none
-    endif
-
-    int map_release             = JMap.getObj(apHoldJailObject, "Release")      ; JMap&
-    int array_releaseMarkers    = JMap.getObj(map_release, asTeleportOrEscort)  ; JArray& (Form[]) - Either Teleport or Escort, retrieve array accordingly
-
-    return JArray.asFormArray(array_releaseMarkers)
-endFunction
-
-;/
-    Retrieves the prisoner containers from the hold's jail through the jail item.
-
-    int     @apHoldJailObject: The reference to the jail item of the hold.
-    string  @asPrisonerContainerType: The type of prisoner container to get, options are: Belongings, Evidence.
-
-    returns (Form[]): The prisoner containers of the specified type for this jail.
-/;
-Form[] function Jail_GetPrisonerContainers(int apHoldJailObject, string asPrisonerContainerType = "Belongings") global
-    if (asPrisonerContainerType != "Belongings" && asPrisonerContainerType != "Evidence")
-        return none
-    endif
-
-    int map_prisonerContainers          = JMap.getObj(apHoldJailObject, "Prisoner Containers")          ; JMap&
-    int array_prisonerContainersOfType  = JMap.getObj(map_prisonerContainers, asPrisonerContainerType)  ; JArray&
-
-    ; Debug(none, "Data::Jail_GetPrisonerContainers", "map_prisonerContainers: " + GetContainerList(map_prisonerContainers) + ", array_prisonerContainersOfType: " + GetContainerList(array_prisonerContainersOfType))
-
-
-    return JArray.asFormArray(array_prisonerContainersOfType)
-endFunction
-
-Form[] function Jail_GetEscortLocations(int apHoldJailObject) global
-    int array = JMap.getObj(apHoldJailObject, "Escort Locations") ; JArray&
-    Debug("Data::Jail_GetEscortLocations", "Escort Locations: " + GetContainerList(array))
-    
-    if (!array)
-        return none
-    endif
-
-    return JArray.asFormArray(array)
-endFunction
-
-
-string[] function Jail_GetScenes(int apHoldJailObject)
-
-endFunction
-
-int function Jail_GetSceneProbability(int apHoldJailObject, string asSceneName)
-    
-endFunction
-
 
 ; ==========================================================
 ;                         Data Setters
 ; ==========================================================
 
-bool function RemoveJailGuard(int apHoldJailObject, Form akGuard) global
-    int guardsArray = JMap.getObj(apHoldJailObject, "Guards") ; JArray&
-    bool hasElement = JArray.findForm(guardsArray, akGuard) != -1
+; bool function RemoveJailGuard(int apHoldJailObject, Form akGuard) global
+;     int guardsArray = JMap.getObj(apHoldJailObject, "Guards") ; JArray&
+;     bool hasElement = JArray.findForm(guardsArray, akGuard) != -1
 
-    if (!hasElement)
-        ; No element found, don't remove anything
-        return false
-    endif
+;     if (!hasElement)
+;         ; No element found, don't remove anything
+;         return false
+;     endif
 
-    JArray.eraseForm(guardsArray, akGuard)
+;     JArray.eraseForm(guardsArray, akGuard)
 
-    return true
-endFunction
+;     return true
+; endFunction
 
-bool function AddJailGuard(int apHoldJailObject, Form akGuard) global
-    int guardsArray = JMap.getObj(apHoldJailObject, "Guards") ; JArray&
-    bool hasElement = JArray.findForm(guardsArray, akGuard) != -1
+; bool function AddJailGuard(int apHoldJailObject, Form akGuard) global
+;     int guardsArray = JMap.getObj(apHoldJailObject, "Guards") ; JArray&
+;     bool hasElement = JArray.findForm(guardsArray, akGuard) != -1
 
-    if (hasElement)
-        ; Guard already exists, don't add anything
-        return false
-    endif
+;     if (hasElement)
+;         ; Guard already exists, don't add anything
+;         return false
+;     endif
 
-    JArray.addForm(guardsArray, akGuard)
+;     JArray.addForm(guardsArray, akGuard)
 
-    return true
-endFunction
+;     return true
+; endFunction
 
-bool function ReplaceJailGuard(int apHoldJailObject, Form akOldGuard, Form akNewGuard) global
-    if (RemoveJailGuard(apHoldJailObject, akOldGuard))
-        return AddJailGuard(apHoldJailObject, akNewGuard)
-    endif
+; bool function ReplaceJailGuard(int apHoldJailObject, Form akOldGuard, Form akNewGuard) global
+;     if (RemoveJailGuard(apHoldJailObject, akOldGuard))
+;         return AddJailGuard(apHoldJailObject, akNewGuard)
+;     endif
 
-    return false
-endFunction
+;     return false
+; endFunction
 
-bool function AddHoldLocation(Form akLocation, int apHoldRootObject) global
-    int locationsArray = JMap.getObj(apHoldRootObject, "Locations")
-    JArray.addForm(locationsArray, akLocation)
+; bool function AddHoldLocation(Form akLocation, int apHoldRootObject) global
+;     int locationsArray = JMap.getObj(apHoldRootObject, "Locations")
+;     JArray.addForm(locationsArray, akLocation)
 
-    return JArray.findForm(locationsArray, akLocation)
-endFunction
+;     return JArray.findForm(locationsArray, akLocation)
+; endFunction
 
-bool function AddJailCellMarker(Form akMarker, int apHoldJailObject, string asInteriorOrExterior, bool abSaveData = true) global
-    if (asInteriorOrExterior != "Interior" && asInteriorOrExterior != "Exterior")
-        return none
-    endif
+; bool function AddJailCellMarker(Form akMarker, int apHoldJailObject, string asInteriorOrExterior, bool abSaveData = true) global
+;     if (asInteriorOrExterior != "Interior" && asInteriorOrExterior != "Exterior")
+;         return none
+;     endif
 
-    int cellsMap    = JMap.getObj(apHoldJailObject, "Cells") ; Map with both Exterior and Interior markers
-    int cellTypeMap = JMap.getObj(cellsMap, asInteriorOrExterior) ; The map holding all of the jail cell arrays, key is the parent FormID and the value is an array containing all of the markers belonging to said parent
+;     int cellsMap    = JMap.getObj(apHoldJailObject, "Cells") ; Map with both Exterior and Interior markers
+;     int cellTypeMap = JMap.getObj(cellsMap, asInteriorOrExterior) ; The map holding all of the jail cell arrays, key is the parent FormID and the value is an array containing all of the markers belonging to said parent
 
-    akMarker = Game.GetForm(0x3C9FE) ; temporary, to test
+;     akMarker = Game.GetForm(0x3C9FE) ; temporary, to test
 
-    int markerId        = akMarker.GetFormID() ; The jail cell identifier
-    int markersArray    = JMap.getObj(cellTypeMap, markerId) ; The array holding all of the jail cells belonging to parent (format is CellID: []) where [] = markersArray
+;     int markerId        = akMarker.GetFormID() ; The jail cell identifier
+;     int markersArray    = JMap.getObj(cellTypeMap, markerId) ; The array holding all of the jail cells belonging to parent (format is CellID: []) where [] = markersArray
 
-    ; Create array if it doesn't exist yet
-    if (!markersArray)
-        markersArray = JArray.object()
-    endif
+;     ; Create array if it doesn't exist yet
+;     if (!markersArray)
+;         markersArray = JArray.object()
+;     endif
 
-    bool itemExists = JArray.findForm(markersArray, akMarker) != -1
+;     bool itemExists = JArray.findForm(markersArray, akMarker) != -1
 
-    if (!itemExists)
-        ; Add the actual form to the array that contains all forms belonging to this parent
-        JArray.addForm(markersArray, akMarker)
-    endif
+;     if (!itemExists)
+;         ; Add the actual form to the array that contains all forms belonging to this parent
+;         JArray.addForm(markersArray, akMarker)
+;     endif
 
-    JMap.setObj(cellTypeMap, markerId, markersArray) ; Add the marker to the jail cell's marker array
+;     JMap.setObj(cellTypeMap, markerId, markersArray) ; Add the marker to the jail cell's marker array
 
-    string debugInfo = GetContainerList(cellsMap)
-    Debug(none, "Config::AddJailCellMarker", debugInfo)
+;     string debugInfo = GetContainerList(cellsMap)
+;     Debug(none, "Config::AddJailCellMarker", debugInfo)
 
-    ; self.AddJailCellToParent(markersArray, Game.GetForm(0x14))
-    int parentArray = RawObject_GetJailCellParent(apHoldJailObject, akMarker as RPB_JailCell) ; To be tested after the refactor to JFormMap
-    AddJailCellToParent(parentArray, Game.GetForm(0x14))
+;     ; self.AddJailCellToParent(markersArray, Game.GetForm(0x14))
+;     int parentArray = RawObject_GetJailCellParent(apHoldJailObject, akMarker as RPB_JailCell) ; To be tested after the refactor to JFormMap
+;     AddJailCellToParent(parentArray, Game.GetForm(0x14))
 
-    if (abSaveData)
-        RPB_Data.SaveRoot()
-    endif
+;     if (abSaveData)
+;         RPB_Data.SaveRoot()
+;     endif
 
-    return JArray.findForm(markersArray, akMarker) != -1
-endFunction
+;     return JArray.findForm(markersArray, akMarker) != -1
+; endFunction
 
-bool function AddJailCellToParent(int apJailCellParentItem, Form akJailCellMarker) global ; Might not be working after the refactor
-    ; apJailCellParentItem = The identifier of the jail cell, for example, for Interior markers: Haafingar.Interior.0x3880 (Array)
+; bool function AddJailCellToParent(int apJailCellParentItem, Form akJailCellMarker) global ; Might not be working after the refactor
+;     ; apJailCellParentItem = The identifier of the jail cell, for example, for Interior markers: Haafingar.Interior.0x3880 (Array)
 
-    bool itemExists = JArray.findForm(apJailCellParentItem, akJailCellMarker) != -1
+;     bool itemExists = JArray.findForm(apJailCellParentItem, akJailCellMarker) != -1
 
-    if (!itemExists && JValue.isArray(apJailCellParentItem))
-        JArray.addForm(apJailCellParentItem, akJailCellMarker)
-    endif
-endFunction
+;     if (!itemExists && JValue.isArray(apJailCellParentItem))
+;         JArray.addForm(apJailCellParentItem, akJailCellMarker)
+;     endif
+; endFunction
 
-bool function AddJailPrisonerContainer(Form akPrisonerContainer, int apHoldJailObject)
-    int prisonerContainersArray = JMap.getObj(apHoldJailObject, "Prisoner Containers")
-    JArray.addForm(prisonerContainersArray, akPrisonerContainer)
+; bool function AddJailPrisonerContainer(Form akPrisonerContainer, int apHoldJailObject)
+;     int prisonerContainersArray = JMap.getObj(apHoldJailObject, "Prisoner Containers")
+;     JArray.addForm(prisonerContainersArray, akPrisonerContainer)
 
-    return JArray.findForm(prisonerContainersArray, akPrisonerContainer)
-endFunction
+;     return JArray.findForm(prisonerContainersArray, akPrisonerContainer)
+; endFunction
 
-bool function Hold_SetCity(int apHoldRootObject, string asCity)
-    JMap.setStr(apHoldRootObject, "City", asCity)
-endFunction
+; bool function Hold_SetCity(int apHoldRootObject, string asCity)
+;     JMap.setStr(apHoldRootObject, "City", asCity)
+; endFunction
 
-bool function Hold_SetCrimeFaction(int apHoldRootObject, Faction akCrimeFaction)
-    JMap.setForm(apHoldRootObject, "Crime Faction", akCrimeFaction)
-endFunction
+; bool function Hold_SetCrimeFaction(int apHoldRootObject, Faction akCrimeFaction)
+;     JMap.setForm(apHoldRootObject, "Crime Faction", akCrimeFaction)
+; endFunction
 
 
 ; ==========================================================
@@ -1884,7 +1296,7 @@ Form[] function GetJailCellParentMarkers(int apHoldJailObject, string asInterior
 
     Form[] parentCells = JFormMap.allKeysPArray(cellArrays)
 
-    Debug(none, "Config::GetJailCellParentMarkers", "Parent Cells: " + parentCells)
+    ; Debug(none, "Config::GetJailCellParentMarkers", "Parent Cells: " + parentCells)
 
     return parentCells
 endFunction
@@ -1906,7 +1318,7 @@ Form[] function GetJailCellChildMarkers(int apHoldJailObject, Form akParentForm,
 
     int children = selectedCellArray
 
-    Debug(none, "Config::GetJailCellChildMarkers", akParentForm + "'s " + asInteriorOrExterior +" Children: " + GetContainerList(children))
+    ; Debug(none, "Config::GetJailCellChildMarkers", akParentForm + "'s " + asInteriorOrExterior +" Children: " + GetContainerList(children))
 
     Form[] childrenAsForms = JArray.asFormArray(children)
 
