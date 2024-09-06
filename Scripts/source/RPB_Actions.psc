@@ -259,7 +259,7 @@ function Action_PreAssignCellToPrisoner(RPB_UIInterface uilib)
         return
     endif
 
-    RPB_Prison prison = uilib.ShowPrisonList()
+    RPB_Prison prison = uilib.ShowPrisonList(false)
 
     if (prison == none)
         return none
@@ -267,8 +267,73 @@ function Action_PreAssignCellToPrisoner(RPB_UIInterface uilib)
 
     RPB_JailCell jailCell = uilib.ShowCellList(prison)
 
-    RPB_StorageVars.SetFormOnForm("Assigned Prison Cell", selectedActor, jailCell, "Jail")
-    Debug("Actions::Action_PreAssignCellToPrisoner", "Assigned " + jailCell.ID + " to " + selectedActor.GetBaseObject().GetName())
+    ; RPB_CellDoor configuredCellDoor = jailCell.GetRootPropertyOfTypeFormArray("Cell Doors")[0] as RPB_CellDoor
+    ; RPB_CellDoor configuredCellDoorTest = jailCell.GetRootPropertyOfTypeFormArrayTest("Cell Doors")[0] as RPB_CellDoor
+    ; RPB_CellDoor configuredCellDoorTest1 = jailCell.GetRootPropertyOfTypeFormArrayTest("Cell Doors")[0] as RPB_CellDoor
+    ; RPB_JailCell cellTest = jailCell
+    RPB_JailCell cellTest = Game.GetFormEx(0x36897) as RPB_JailCell
+    ; RPB_JailCell cellTest2 = Game.GetFormEx(0x36897) as RPB_JailCell
+    Form f2 = GetFormFromMod(0x3879)
+    RPB_CellDoor cellDoor = Game.GetFormEx(0x5e921) as RPB_CellDoor
+
+    bool __hasDecayableLock = cellDoor.GetPropertyOfTypeBool("Lock//Decay Options//Wear Thresholds")
+    ; bool testExists = JValue.hasPath(cellDoor.GetRootObject(), ".Lock.Decay Options.Wear Thresholds")
+    bool testExists = RPB_Data.HasProperty(cellDoor.GetRootObject(), "Lock//Decay Options//Wear Thresholds")
+
+    ; Debug("["+ cellTest.ID +"] Actions::Action_PreAssignCellToPrisoner", "Object: " + GetContainerList(cellTest.GetDataObject()))
+    ; Debug("["+ cellTest.ID +"] Actions::Action_PreAssignCellToPrisoner", "Root Object: " + GetContainerList(cellTest.GetRootObject()))
+    Debug("["+ cellTest.ID +"] ["+ cellDoor.GetFormID() +"] Actions::Action_PreAssignCellToPrisoner", "__hasDecayableLock: " + __hasDecayableLock)
+    Debug("["+ cellTest.ID +"] ["+ cellDoor.GetFormID() +"] Actions::Action_PreAssignCellToPrisoner", "testExists: " + testExists)
+    ; return
+    ; Debug("["+ cellTest.ID +"] Actions::Action_PreAssignCellToPrisoner", "cellTest: " + cellTest)
+
+
+    string[] subCategories = new string[1]
+    subCategories[0] = "Decay Options"
+    ; string stringProperty   = cellDoor.GetOptionOfTypeString("Min. Lock Level", "Lock", subCategories)
+    ; string stringProperty2  = RPB_Data.GetPropertyOfTypeString(cellDoor.JailCell.GetDataObject(), cellDoor + "//Lock//Decay Options//Min. Lock Level") 
+    string stringPropertyCell  = RPB_Data.GetPropertyOfTypeString(prison.GetDataObject(), "Cells//" + cellTest + "//Cell Doors//"+ cellDoor +"//Lock//Decay Options//Min. Lock Level")
+    string stringPropertyCell2  = RPB_Data.GetPropertyOfTypeString(jailCell.GetDataObject(), "//Cell Doors//"+ cellDoor +"//Lock//Decay Options//Min. Lock Level")
+    ; string stringProperty3  = cellDoor.GetOptionOfTypeStringNew("Lock//Decay Options//Min. Lock Level")
+    string[] decayOptions   = RPB_Data.GetPropertyOfTypeStringArray(cellTest.GetDataObject(), "Cell Doors//" + cellDoor + "//Lock//Gata")
+    ; string[] decayOptions   = RPB_Data.GetPropertyOfTypeStringArray(prison.GetDataObject(), "Cells//" + cellTest + "//Cell Doors//"+ cellDoor + "//Lock//Decay Options")
+    ; Debug("Actions::Action_PreAssignCellToPrisoner", "stringProperty: " + stringProperty)
+    ; Debug("Actions::Action_PreAssignCellToPrisoner", "stringProperty2: " + stringProperty2)
+    ; Debug("Actions::Action_PreAssignCellToPrisoner", "stringProperty3: " + stringProperty3)
+    Debug("Actions::Action_PreAssignCellToPrisoner", "stringPropertyCell: " + stringPropertyCell)
+    Debug("Actions::Action_PreAssignCellToPrisoner", "stringPropertyCell2: " + stringPropertyCell2)
+    Debug("Actions::Action_PreAssignCellToPrisoner", "decayOptions: " + decayOptions)
+
+    return
+
+    ; Form cellTestFromString     = GetFormFromString(cellTest)
+    ; Form cellDoorTestFromString = GetFormFromString(cellDoor)
+    ; return
+
+    ; Form f = RPB_Data.GetFormFromString(cellTest)
+    ; Debug("Actions::Action_PreAssignCellToPrisoner", "f: " + f)
+    ; return
+    ; Form[] testForms = RPB_Data.GetPropertyOfTypeFormArray(prison.GetDataObject(), "Cells//" + cellTest + "//Exterior")
+    ; Form[] testForms = RPB_Data.GetPropertyOfTypeFormArray(prison.GetDataObject(), "Cells")
+    ; Form[] testForms = jailCell.GetRootPropertyOfTypeFormArrayTest("Exterior")
+    ; string lockLevel = jailCell.GetRootPropertyOfTypeString("Cell Doors//" + cellDoor + "//Lock//Level")
+
+    ; string lockLevel = RPB_Data.GetPropertyOfTypeString(prison.GetDataObject(), "Cells//" + cellTest + "//Cell Doors//"+ cellDoor +"//TestString")
+    string arrayTestElement = RPB_Data.GetPropertyOfTypeString(prison.GetDataObject(), "Cells//" + cellTest + "//Cell Doors//"+ cellDoor +"//Array//[0]")
+    string[] arrayTest = RPB_Data.GetPropertyOfTypeStringArray(prison.GetDataObject(), "Cells//" + cellTest + "//Cell Doors//"+ cellDoor +"//Array")
+    string[] arrayTest2 = RPB_Data.GetPropertyOfTypeStringArray(prison.GetDataObject(), "Cells//" + cellTest + "//Cell Doors//"+ cellDoor +"//Array//[2]")
+    ; string[] arrayTest3 = RPB_Data.GetPropertyOfTypeStringArray(prison.GetDataObject(), "Cells//" + cellTest + "//Cell Doors//"+ cellDoor +"//Array//[2][0]")
+    ; int[] arrayTest3 = RPB_Data.GetPropertyOfTypeIntegerArray(prison.GetDataObject(), "Cells//" + cellTest + "//Cell Doors//"+ cellDoor +"//Array//[3]")
+
+    ; Debug("Actions::Action_PreAssignCellToPrisoner", "testForms: " + testForms)
+    Debug("Actions::Action_PreAssignCellToPrisoner", "arrayTestElement: " + arrayTestElement)
+    Debug("Actions::Action_PreAssignCellToPrisoner", "arrayTest: " + arrayTest)
+    Debug("Actions::Action_PreAssignCellToPrisoner", "arrayTest2: " + arrayTest2)
+    ; Debug("Actions::Action_PreAssignCellToPrisoner", "arrayTest3: " + arrayTest3)
+    ; Debug("Actions::Action_PreAssignCellToPrisoner", "["+ jailCell.ID +"] configuredCellDoorTest1: " + configuredCellDoorTest1)
+
+    ; RPB_StorageVars.SetFormOnForm("Assigned Prison Cell", selectedActor, jailCell, "Jail")
+    ; Debug("Actions::Action_PreAssignCellToPrisoner", "Assigned " + jailCell.ID + " to " + selectedActor.GetBaseObject().GetName())
 endFunction
 
 ; TODO: Check what options are desired, or all, and allow to do this for selected NPC's as well as the Player
