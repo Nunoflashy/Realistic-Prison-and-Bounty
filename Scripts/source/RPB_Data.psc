@@ -344,12 +344,21 @@ endFunction
 
     returns (bool): true if the property exists, false otherwise.
 /;
-bool function HasProperty(int apRootObject, string asPropertyPath, string asPathDelimiter = "//") global
+bool function HasProperty(int apRootObject, string asPropertyPath, string asPathDelimiter = "//", bool abCheckEmpty = false) global
     string[] subCategories  = StringUtil.Split(asPropertyPath, asPathDelimiter)
     int parentObject        = TraversePathToFinalObject(apRootObject, subCategories)
     string pathKey          = subCategories[subCategories.Length - 1]
+    string elementPath      = "." + pathKey
+    bool isObject           = JValue.solvedValueType(parentObject, elementPath) == 5
 
-    return JValue.hasPath(parentObject, "." + pathKey)
+    if (isObject)
+        int obj = JValue.solveObj(parentObject, elementPath)
+        if (abCheckEmpty && JValue.empty(obj))
+            return false
+        endif
+    endif
+
+    return JValue.hasPath(parentObject, elementPath)
 endFunction
 
 ;/

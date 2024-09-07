@@ -1,4 +1,4 @@
-Scriptname RPB_Prison extends ReferenceAlias  
+Scriptname RPB_Prison extends RPB_SerializableReferenceAlias  
 
 import Math
 import RPB_Config
@@ -553,11 +553,11 @@ bool property Initialized
     endFunction
 endProperty
 
-int property ID
-    int function get()
-        return self.GetID()
-    endFunction
-endProperty
+; int property ID
+;     int function get()
+;         return self.GetID()
+;     endFunction
+; endProperty
 
 Location __prisonLocation
 Location property PrisonLocation
@@ -573,29 +573,29 @@ Faction property PrisonFaction
     endFunction
 endProperty
 
-string __name
-string __fallbackName
-string property Name
-    string function get()
-        if (__name)
-            return __name
-        endif
+; string __name
+; string __fallbackName
+; string property Name
+;     string function get()
+;         if (__name)
+;             return __name
+;         endif
 
-        if (__fallbackName)
-            return __fallbackName
-        endif
+;         if (__fallbackName)
+;             return __fallbackName
+;         endif
 
-        if (!__name)
-            __name = self.GetRootPropertyOfTypeString("Name")
-        endif
+;         if (!__name)
+;             __name = self.GetPropertyOfTypeString("Name")
+;         endif
 
-        if (!__name)
-            __fallbackName = PrisonLocation.GetName()
-        endif
+;         if (!__name)
+;             __fallbackName = PrisonLocation.GetName()
+;         endif
 
-        return __name
-    endFunction
-endProperty
+;         return __name
+;     endFunction
+; endProperty
 
 string __hold
 string property Hold
@@ -682,7 +682,7 @@ function Uninitialize()
 
     __prisonLocation    = none
     __prisonFaction     = none
-    __name              = none
+    ; __name              = none
     __hold              = none
     __city              = none
 endFunction
@@ -692,7 +692,7 @@ endFunction
 ; ==========================================================
 
 Form[] function GetEscortLocations()
-    return self.GetRootPropertyOfTypeFormArray("Escort Locations")
+    return self.GetPropertyOfTypeFormArray("Escort Locations")
 endFunction
 
 ObjectReference function GetRandomEscortLocation()
@@ -1140,68 +1140,6 @@ RPB_JailCell function RequestCell(RPB_Prisoner apPrisoner)
 
     return returnedCell
 endFunction
-; RPB_JailCell function RequestCell(RPB_Prisoner apPrisoner)
-;     ;/
-;         First, attempt to get empty cell for the prisoner, if that fails (there are no empty cells),
-;         get a gender exclusive one to the prisoner's gender (even if they are not stripped),
-;         if that fails, get a random cell with any gender (as long as the prisoner is not marked to be in a gender exclusive cell),
-;         otherwise get any cell that is overcrowdable (again, stripped prisoners cant be with the opposite gender)
-;     /;
-
-;     RPB_JailCell returnedCell = none
-;     bool prisonerMustBeInGenderExclusiveCell = self.ShouldPrisonerBeInGenderExclusiveCell(apPrisoner)
-
-;     if (self.PrioritizeEmptyCells)
-;         returnedCell = self.GetEmptyJailCell()
-;         DebugWithArgs("["+ Name +"] [Priority: Empty Cell] Prison::RequestCell", apPrisoner.Name, "prisonerMustBeInGenderExclusiveCell: " + prisonerMustBeInGenderExclusiveCell + ", returnedCell: " + returnedCell)
-
-;     elseif (self.PrioritizeGenderCells)
-;         if (prisonerMustBeInGenderExclusiveCell)
-;             returnedCell = self.GetJailCellOfGender(apPrisoner.Gender, true)
-
-;             if (returnedCell == none)
-;                 returnedCell = self.GetEmptyJailCell() ; Gender exclusive cell that is not overcrowded could not be retrieved, get empty one
-;             endif
-
-;             if (returnedCell == none) ; could not find a gender exclusive cell that was not overcrowded or an empty one
-;                 returnedCell = self.GetJailCellOfGender(apPrisoner.Gender, true, true) ; attempt to get one that is overcrowded
-;             endif
-;             DebugWithArgs("["+ Name +"] [Priority: Gender Exclusive Cell] Prison::RequestCell", apPrisoner.Name, "prisonerMustBeInGenderExclusiveCell: " + prisonerMustBeInGenderExclusiveCell + ", returnedCell: " + returnedCell)
-;         endif
-;     endif
-
-;     ; Priority failed, or no priority
-;     if (returnedCell == none)
-;         returnedCell = self.GetEmptyJailCell()
-;     endif
-
-;     if (returnedCell == none)
-;         DebugWithArgs("["+ Name +"] Prison::RequestCell", apPrisoner.Name, "prisonerMustBeInGenderExclusiveCell: " + prisonerMustBeInGenderExclusiveCell)
-
-;         if (prisonerMustBeInGenderExclusiveCell)
-;             returnedCell = self.GetJailCellOfGender(apPrisoner.Gender, true)
-
-;             if (returnedCell == none)
-;                 returnedCell = self.GetEmptyJailCell() ; Gender exclusive cell that is not overcrowded could not be retrieved, get empty one
-;             endif
-
-;             if (returnedCell == none) ; could not find a gender exclusive cell that was not overcrowded or an empty one
-;                 returnedCell = self.GetJailCellOfGender(apPrisoner.Gender, true, true) ; attempt to get one that is overcrowded
-;             endif
-;             DebugWithArgs("["+ Name +"] Prison::RequestCell", apPrisoner.Name, "prisonerMustBeInGenderExclusiveCell: " + prisonerMustBeInGenderExclusiveCell + ", returnedCell: " + returnedCell)
-;         endif
-;     endif
-
-;     if (returnedCell == none)
-;         returnedCell = self.GetRandomAvailableJailCell()
-
-;         if (returnedCell.IsGenderExclusive || (!returnedCell.IsGenderExclusive && prisonerMustBeInGenderExclusiveCell))
-;             returnedCell = none
-;         endif
-;     endif
-
-;     return returnedCell
-; endFunction
 
 bool function ShouldPrisonerBeInGenderExclusiveCell(RPB_Prisoner apPrisoner)
     bool strippedNaked      = apPrisoner.WillBeStrippedNaked || apPrisoner.IsStrippedNaked
@@ -1376,8 +1314,6 @@ event OnPrisonerTeleportedToPrison(RPB_Prisoner apPrisoner)
     if (!apPrisoner.PrisonerBelongingsContainer)
         apPrisoner.SetBelongingsContainer()
     endif
-
-
 endEvent
 
 event OnPrisonerTeleportedToCell(RPB_Prisoner apPrisoner, bool abImprisonPrisoner)
@@ -1770,7 +1706,7 @@ function ConfigurePrison( \
 
     __prisonLocation    = akLocation
     __prisonFaction     = akFaction
-    __name              = asName
+    ; __name              = asName
     __hold              = asHold
 
     int rootItem                = RPB_Data.GetRootObject(__hold)
@@ -1778,6 +1714,8 @@ function ConfigurePrison( \
 
     __city              = configuredCity
     __holdObject        = rootItem
+
+    self.SetFallbackName(PrisonLocation.GetName())
 
     ; RPB_Utility.Debug("Prison::ConfigurePrison", "Name: " + self.Name + ", Hold: " + self.Hold + ", Faction: " + self.PrisonFaction + ", City: " + self.City)
 
@@ -1801,6 +1739,10 @@ function ConfigurePrison( \
     self.SetupCells() ; To be changed, this will only work if the Player is present in the scene
 
     ; Debug(self.GetOwningQuest(), "Prison::ConfigurePrison", "Prison Location: " + PrisonLocation + ", Prison Faction: " + PrisonFaction + ", Prison Hold: " + Hold)
+endFunction
+
+string function GetSerializableID() ; overrides
+    return self.GetID() as string
 endFunction
 
 bool function BindCellToPrisoner(ObjectReference akJailCell, RPB_Prisoner apPrisoner)
@@ -1868,7 +1810,7 @@ Form[] function GetReleaseMarkers(string asReleaseMarkerType = "Teleport")
         return none
     endif
 
-    return self.GetRootPropertyOfTypeFormArray("Markers//Release//" + asReleaseMarkerType)
+    return self.GetPropertyOfTypeFormArray("Markers//Release//" + asReleaseMarkerType)
 endFunction
 
 Form[] function GetSearchMarkers(string asSearchType = "Frisking")
@@ -1878,7 +1820,7 @@ Form[] function GetSearchMarkers(string asSearchType = "Frisking")
         return none
     endif
 
-    return self.GetRootPropertyOfTypeFormArray("Markers//Search//" + asSearchType)
+    return self.GetPropertyOfTypeFormArray("Markers//Search//" + asSearchType)
 endFunction
 
 Form function GetRandomReleaseMarker(string asReleaseMarkerType = "Teleport")
@@ -1893,10 +1835,10 @@ Form[] function GetPrisonerContainers(string asPrisonerContainerType = "Belongin
         return none
     endif
     
-    string[] stringArrayTest = self.GetRootPropertyOfTypeStringArray("TestArray")
+    string[] stringArrayTest = self.GetPropertyOfTypeStringArray("TestArray")
     Debug("["+ Name +"] Prison::GetPrisonerContainers", "stringArrayTest: " + stringArrayTest)
 
-    return self.GetRootPropertyOfTypeFormArray("Prisoner Containers//" + asPrisonerContainerType)
+    return self.GetPropertyOfTypeFormArray("Prisoner Containers//" + asPrisonerContainerType)
 endFunction
 
 Form function GetRandomPrisonerContainer(string asPrisonerContainerType = "Belongings")
@@ -1959,10 +1901,6 @@ Form function GetPrisonerContainerLinkedWithOppositeType(Form akOppositeTypePris
     endWhile
 
     return none
-endFunction
-
-Form function GetJailCellExterior(RPB_JailCell akJailCell)
-
 endFunction
 
 ;/
@@ -2079,12 +2017,7 @@ endFunction
 bool function RegisterPrisoner(RPB_Prisoner apPrisoner)
     Prisoners.Add(apPrisoner)
     self.OnPrisonerRegistered(apPrisoner)
-
-    ; Assign a Prisoner number based on the current number of prisoners in the prison
     self.AssignPrisonerNumber(apPrisoner)
-
-    Trace("Prison::RegisterPrisoner", "PrisonerList: " + Prisoners.GetKeys())
-
     return Prisoners.Exists(apPrisoner)
 endFunction
 
@@ -2104,7 +2037,7 @@ function RegisterPrisonerLastJailedStats(RPB_Prisoner apPrisoner)
         RPB_StorageVars.DeleteCategoryOnForm(self.PrisonFaction, "PrisonLastReleased")
         RPB_StorageVars.DeleteCategoryOnForm(self.PrisonFaction, "PrisonLastEscaped")
 
-        RPB_StorageVars.SetIntOnForm("Last Jailed - Prison", self.PrisonFaction, self.ID, "PrisonLastJailed")
+        RPB_StorageVars.SetIntOnForm("Last Jailed - Prison", self.PrisonFaction, self.ID as int, "PrisonLastJailed")
         RPB_StorageVars.SetIntOnForm("Last Jailed - Day", self.PrisonFaction, RPB_Utility.GetCurrentDay(), "PrisonLastJailed")
         RPB_StorageVars.SetIntOnForm("Last Jailed - Month", self.PrisonFaction, RPB_Utility.GetCurrentMonth(), "PrisonLastJailed")
         RPB_StorageVars.SetIntOnForm("Last Jailed - Year", self.PrisonFaction, RPB_Utility.GetCurrentYear(), "PrisonLastJailed")
@@ -2117,7 +2050,7 @@ endFunction
 function RegisterPrisonerReleaseTimeStats(RPB_Prisoner apPrisoner)
     ; Only register for the player, for now
     if (apPrisoner.IsPlayer())
-        RPB_StorageVars.SetIntOnForm("Last Released - Prison", self.PrisonFaction, self.ID, "PrisonLastReleased")
+        RPB_StorageVars.SetIntOnForm("Last Released - Prison", self.PrisonFaction, self.ID as int, "PrisonLastReleased")
         RPB_StorageVars.SetIntOnForm("Last Released - Day", self.PrisonFaction, RPB_Utility.GetCurrentDay(), "PrisonLastReleased")
         RPB_StorageVars.SetIntOnForm("Last Released - Month", self.PrisonFaction, RPB_Utility.GetCurrentMonth(), "PrisonLastReleased")
         RPB_StorageVars.SetIntOnForm("Last Released - Year", self.PrisonFaction, RPB_Utility.GetCurrentYear(), "PrisonLastReleased")
@@ -2131,7 +2064,7 @@ endFunction
 function RegisterPrisonerEscapeTimeStats(RPB_Prisoner apPrisoner)
     ; Only register for the player, for now
     if (apPrisoner.IsPlayer())
-        RPB_StorageVars.SetIntOnForm("Last Escaped - Prison", self.PrisonFaction, self.ID, "PrisonLastEscaped")
+        RPB_StorageVars.SetIntOnForm("Last Escaped - Prison", self.PrisonFaction, self.ID as int, "PrisonLastEscaped")
         RPB_StorageVars.SetIntOnForm("Last Escaped - Day", self.PrisonFaction, RPB_Utility.GetCurrentDay(), "PrisonLastEscaped")
         RPB_StorageVars.SetIntOnForm("Last Escaped - Month", self.PrisonFaction, RPB_Utility.GetCurrentMonth(), "PrisonLastEscaped")
         RPB_StorageVars.SetIntOnForm("Last Escaped - Year", self.PrisonFaction, RPB_Utility.GetCurrentYear(), "PrisonLastEscaped")
@@ -2224,84 +2157,52 @@ int function GetDataObject(string asPrisonObjectCategory = "null")
     return returnedObject
 endFunction
 
-;                       Root Properties                    
-; =========================================================
-bool function GetRootPropertyOfTypeBool(string asPropertyName)
-    return RPB_Data.GetPropertyOfTypeInteger(self.GetDataObject(), asPropertyName) as bool
+int function GetSerializableRootObject()
+    int rootObject = RPB_Data.GetRootObject(self.Hold)
+    return RPB_Data.GetPropertyOfTypeObject(rootObject, "Jail") ; rename to Prison name later
 endFunction
 
-int function GetRootPropertyOfTypeInt(string asPropertyName)
-    return RPB_Data.GetPropertyOfTypeInteger(self.GetDataObject(), asPropertyName)
-endFunction
-
-float function GetRootPropertyOfTypeFloat(string asPropertyName)
-    return RPB_Data.GetPropertyOfTypeFloat(self.GetDataObject(), asPropertyName)
-endFunction
-
-string function GetRootPropertyOfTypeString(string asPropertyName)
-    return RPB_Data.GetPropertyOfTypeString(self.GetDataObject(), asPropertyName)
-endFunction
-
-Form function GetRootPropertyOfTypeForm(string asPropertyName)
-    return RPB_Data.GetPropertyOfTypeForm(self.GetDataObject(), asPropertyName)
-endFunction
-
-int[] function GetRootPropertyOfTypeIntegerArray(string asPropertyName)
-    return RPB_Data.GetPropertyOfTypeIntegerArray(self.GetDataObject(), asPropertyName)
-endFunction
-
-float[] function GetRootPropertyOfTypeFloatArray(string asPropertyName)
-    return RPB_Data.GetPropertyOfTypeFloatArray(self.GetDataObject(), asPropertyName)
-endFunction
-
-string[] function GetRootPropertyOfTypeStringArray(string asPropertyName)
-    return RPB_Data.GetPropertyOfTypeStringArray(self.GetDataObject(), asPropertyName)
-endFunction
-
-Form[] function GetRootPropertyOfTypeFormArray(string asPropertyName)
-    return RPB_Data.GetPropertyOfTypeFormArray(self.GetDataObject(), asPropertyName)
-endFunction
 
 ; TODO: Implement
 Form function FindPropertyOfTypeForm(string asProperty, string apFindConditions)
-    return RPB_Data.FindPropertyOfTypeForm(self.GetDataObject(), asProperty, apFindConditions)
+    return RPB_Data.FindPropertyOfTypeForm(self.GetSerializableRootObject(), asProperty, apFindConditions)
 endFunction
 
 ;                       Global Root Properties                    
 ; =========================================================
-bool function Global_GetRootPropertyOfTypeBool(int apRootObject, string asPropertyName) global
+bool function Global_GetPropertyOfTypeBool(int apRootObject, string asPropertyName) global
     return RPB_Data.GetPropertyOfTypeInteger(apRootObject, asPropertyName) as bool
 endFunction
 
-int function Global_GetRootPropertyOfTypeInt(int apRootObject, string asPropertyName) global
+int function Global_GetPropertyOfTypeInt(int apRootObject, string asPropertyName) global
     return RPB_Data.GetPropertyOfTypeInteger(apRootObject, asPropertyName)
 endFunction
 
-float function Global_GetRootPropertyOfTypeFloat(int apRootObject, string asPropertyName) global
+float function Global_GetPropertyOfTypeFloat(int apRootObject, string asPropertyName) global
     return RPB_Data.GetPropertyOfTypeFloat(apRootObject, asPropertyName)
 endFunction
 
-string function Global_GetRootPropertyOfTypeString(int apRootObject, string asPropertyName) global
+string function Global_GetPropertyOfTypeString(int apRootObject, string asPropertyName) global
     return RPB_Data.GetPropertyOfTypeString(apRootObject, asPropertyName)
 endFunction
 
-Form function Global_GetRootPropertyOfTypeForm(int apRootObject, string asPropertyName) global
+Form function Global_GetPropertyOfTypeForm(int apRootObject, string asPropertyName) global
     return RPB_Data.GetPropertyOfTypeForm(apRootObject, asPropertyName)
 endFunction
 
-int[] function Global_GetRootPropertyOfTypeIntegerArray(int apRootObject, string asPropertyName) global
+int[] function Global_GetPropertyOfTypeIntegerArray(int apRootObject, string asPropertyName) global
     return RPB_Data.GetPropertyOfTypeIntegerArray(apRootObject, asPropertyName)
 endFunction
 
-float[] function Global_GetRootPropertyOfTypeFloatArray(int apRootObject, string asPropertyName) global
+float[] function Global_GetPropertyOfTypeFloatArray(int apRootObject, string asPropertyName) global
     return RPB_Data.GetPropertyOfTypeFloatArray(apRootObject, asPropertyName)
 endFunction
 
-string[] function Global_GetRootPropertyOfTypeStringArray(int apRootObject, string asPropertyName) global
+string[] function Global_GetPropertyOfTypeStringArray(int apRootObject, string asPropertyName) global
     return RPB_Data.GetPropertyOfTypeStringArray(apRootObject, asPropertyName)
 endFunction
 
-Form[] function Global_GetRootPropertyOfTypeFormArray(int apRootObject, string asPropertyName) global
+Form[] function Global_GetPropertyOfTypeFormArray(int apRootObject, string asPropertyName) global
     return RPB_Data.GetPropertyOfTypeFormArray(apRootObject, asPropertyName)
 endFunction
 
@@ -2417,7 +2318,7 @@ RPB_Prisoner function MakePrisoner(Actor akActor, bool abDelayExecution = true)
     akActor.AddSpell(prisonerSpell, false)
 
     ; Bind this Prison to the Prisoner (to retrieve it from RPB_Prisoner)
-    RPB_StorageVars.SetIntOnForm("Prison ID", akActor, self.ID, "Jail")
+    RPB_StorageVars.SetIntOnForm("Prison ID", akActor, self.ID as int, "Jail")
 
     ; Delay execution before returning an instance of the prisoner, since we need to let the RPB_Prisoner script register this Prisoner
     if (abDelayExecution)

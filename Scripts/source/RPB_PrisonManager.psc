@@ -67,8 +67,6 @@ bool property PrisonInfamyKnownThresholdNotification auto
 
 ; ==========================================================
 
-int actorToPrison
-
 RPB_Prison function FindPrisonByPrisoner(Actor akPrisonerActor)
     string prisonHold = RPB_StorageVars.GetString(akPrisonerActor.GetFormID(), "PrisonManager")
 
@@ -83,9 +81,6 @@ endFunction
 RPB_Prison function FindPrisonByHold(string asHold)
 
 endFunction
-
-
-
 
 ;/
     RPB_PrisonList function FindPrisonsInCity(string asCity)
@@ -148,8 +143,8 @@ bool function DeletePrison(RPB_Prison akPrison)
 endFunction
 
 function ReloadPrisonConfig(RPB_Prison apPrison)
-    Location prisonLocation = apPrison.GetRootPropertyOfTypeForm("Location") as Location
-    string prisonName       = apPrison.GetRootPropertyOfTypeString("Name")
+    Location prisonLocation = apPrison.GetPropertyOfTypeForm("Location") as Location
+    string prisonName       = apPrison.GetPropertyOfTypeString("Name")
 
     apPrison.ConfigurePrison( \
         akLocation  = prisonLocation, \
@@ -182,8 +177,8 @@ bool function InitializePrisonConfig(string asHold)
     int rootObject      = RPB_Data.GetRootObject(asHold) ; JMap&
     int prisonObject    = RPB_Data.Hold_GetJailObject(rootObject) ; JMap&
 
-    Location prisonLocation = RPB_Prison.Global_GetRootPropertyOfTypeForm(prisonObject, "Location") as Location
-    string prisonName       = RPB_Prison.Global_GetRootPropertyOfTypeString(prisonObject, "Name")
+    Location prisonLocation = RPB_Prison.Global_GetPropertyOfTypeForm(prisonObject, "Location") as Location
+    string prisonName       = RPB_Prison.Global_GetPropertyOfTypeString(prisonObject, "Name")
     Faction prisonFaction   = RPB_Data.Hold_GetCrimeFaction(rootObject)
 
     RPB_Prison prisonSlot = self.AvailableSlot
