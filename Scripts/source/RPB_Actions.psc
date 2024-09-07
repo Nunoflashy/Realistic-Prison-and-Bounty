@@ -38,6 +38,7 @@ string[] function GetActions()
     JArray.addStr(actionArrayObj, "[Prison] Show Prison Container")
     JArray.addStr(actionArrayObj, "[Prison] Show Prisoner Inventory")
     JArray.addStr(actionArrayObj, "[Prison] Show Prison Markers")
+    JArray.addStr(actionArrayObj, "[Prison] Show Cell Doors")
     JArray.addStr(actionArrayObj, "[Prison] Return Prisoner Belongings")
     JArray.addStr(actionArrayObj, "[Prison] Strip Prisoner")
     JArray.addStr(actionArrayObj, "[Prison] Strip Prisoner to Underwear")
@@ -118,6 +119,9 @@ function ShowActionsMenu()
 
     elseif (actionToPerform == "[Prison] Show Prison Markers")
         Action_ShowPrisonMarkers(uilib)
+
+    elseif (actionToPerform == "[Prison] Show Cell Doors")
+        Action_ShowCellDoors(uilib)
 
     elseif (actionToPerform == "[Prison] Return Prisoner Belongings")
         Action_ReturnPrisonerBelongings(uilib)
@@ -278,7 +282,7 @@ function Action_PreAssignCellToPrisoner(RPB_UIInterface uilib)
 
     bool __hasDecayableLock = cellDoor.GetPropertyOfTypeBool("Lock//Decay Options//Wear Thresholds")
     ; bool testExists = JValue.hasPath(cellDoor.GetRootObject(), ".Lock.Decay Options.Wear Thresholds")
-    bool testExists = RPB_Data.HasProperty(cellDoor.GetRootObject(), "Lock//Decay Options//Wear Thresholds")
+    bool testExists = RPB_Data.HasProperty(cellDoor.GetSerializableRootObject(), "Lock//Decay Options//Wear Thresholds")
 
     ; Debug("["+ cellTest.ID +"] Actions::Action_PreAssignCellToPrisoner", "Object: " + GetContainerList(cellTest.GetDataObject()))
     ; Debug("["+ cellTest.ID +"] Actions::Action_PreAssignCellToPrisoner", "Root Object: " + GetContainerList(cellTest.GetRootObject()))
@@ -293,9 +297,9 @@ function Action_PreAssignCellToPrisoner(RPB_UIInterface uilib)
     ; string stringProperty   = cellDoor.GetOptionOfTypeString("Min. Lock Level", "Lock", subCategories)
     ; string stringProperty2  = RPB_Data.GetPropertyOfTypeString(cellDoor.JailCell.GetDataObject(), cellDoor + "//Lock//Decay Options//Min. Lock Level") 
     string stringPropertyCell  = RPB_Data.GetPropertyOfTypeString(prison.GetDataObject(), "Cells//" + cellTest + "//Cell Doors//"+ cellDoor +"//Lock//Decay Options//Min. Lock Level")
-    string stringPropertyCell2  = RPB_Data.GetPropertyOfTypeString(jailCell.GetDataObject(), "//Cell Doors//"+ cellDoor +"//Lock//Decay Options//Min. Lock Level")
+    string stringPropertyCell2  = RPB_Data.GetPropertyOfTypeString(jailCell.GetSerializableRootObject(), "//Cell Doors//"+ cellDoor +"//Lock//Decay Options//Min. Lock Level")
     ; string stringProperty3  = cellDoor.GetOptionOfTypeStringNew("Lock//Decay Options//Min. Lock Level")
-    string[] decayOptions   = RPB_Data.GetPropertyOfTypeStringArray(cellTest.GetDataObject(), "Cell Doors//" + cellDoor + "//Lock//Gata")
+    string[] decayOptions   = RPB_Data.GetPropertyOfTypeStringArray(cellTest.GetSerializableRootObject(), "Cell Doors//" + cellDoor + "//Lock//Gata")
     ; string[] decayOptions   = RPB_Data.GetPropertyOfTypeStringArray(prison.GetDataObject(), "Cells//" + cellTest + "//Cell Doors//"+ cellDoor + "//Lock//Decay Options")
     ; Debug("Actions::Action_PreAssignCellToPrisoner", "stringProperty: " + stringProperty)
     ; Debug("Actions::Action_PreAssignCellToPrisoner", "stringProperty2: " + stringProperty2)
@@ -673,7 +677,7 @@ function Action_ShowPrisonMarkers(RPB_UIInterface uilib)
     string subOption    = StringUtil.Substring(selectedMarkerType, subOptionStartIndex, subOptionEndIndex - subOptionStartIndex)
 
     string propertyPath = "Markers//" + mainOption + "//" + subOption
-    Form[] availableMarkersOfType = prison.GetRootPropertyOfTypeFormArray(propertyPath)
+    Form[] availableMarkersOfType = prison.GetPropertyOfTypeFormArray(propertyPath)
 
     Debug("Actions::Action_ShowPrisonMarkers", "mainOption: " + mainOption + ", subOption: " + subOption + ", propertyPath: " + propertyPath + ", availableMarkersOfType: " + availableMarkersOfType + ", subOptionStartIndex: " + subOptionStartIndex)
 
@@ -697,6 +701,24 @@ function Action_ShowPrisonMarkers(RPB_UIInterface uilib)
         Actor ref = Game.GetCurrentConsoleRef() as Actor
         ref.MoveTo(selectedMarker)
     endif
+endFunction
+
+function Action_ShowCellDoors(RPB_UIInterface uilib)
+    RPB_Prison prison = uilib.ShowPrisonList(false)
+    Debug("Actions::Action_ShowCellDoor", "prison: " + prison + ", name: " + prison.Name + ", hold: " + prison.Hold)
+    prison.SetupCells()
+
+    if (prison == none)
+        return none
+    endif
+
+    RPB_JailCell jailCell = uilib.ShowCellList(prison)
+
+    if (jailCell == none)
+        return none
+    endif
+
+    RPB_CellDoor cellDoor = uilib.ShowCellDoorList(jailCell, "Cell Doors for " + jailCell.ID)
 endFunction
 
 function Action_ReturnPrisonerBelongings(RPB_UIInterface uilib)

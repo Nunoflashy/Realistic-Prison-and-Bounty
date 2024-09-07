@@ -43,7 +43,7 @@ endFunction
 
 string function ShowStringList(string asTitle = "", string asOptions, string asOptionSeparator = ",", int aiStartIndex = 0, int aiDefaultIndex = 0)
     string[] options = StringUtil.Split(asOptions, asOptionSeparator)
-    
+
     int selectedIndex = UILib.ShowList(asTitle, options, aiStartIndex, aiDefaultIndex)
     return options[selectedIndex]
 endFunction
@@ -178,7 +178,7 @@ RPB_Prison function ShowPrisonList(bool abNotEmpty = true, bool abSkipListOnSing
             endif
 
             JArray.addStr(prisonNames, prisonLine)
-            JArray.addInt(prisonIds, prison.ID)
+            JArray.addInt(prisonIds, prison.ID as int)
             activePrisonCount += 1
         endif
         i += 1
@@ -304,6 +304,34 @@ RPB_JailCell function ShowCellList(RPB_Prison apPrison, bool abOnlyEmpty = false
 
     RPB_JailCell selectedCell = prisonCells[index] as RPB_JailCell
     return selectedCell
+endFunction
+
+RPB_CellDoor function ShowCellDoorList(RPB_JailCell akCell, string asListTitle = "Select Cell Door")
+    if (akCell == none)
+        return none
+    endif
+
+    Form[] cellDoors = akCell.GetPropertyOfTypeFormArray("Cell Doors")
+
+    int cellDoorIds = JArray.object()
+    JArray.addStr(cellDoorIds, "<No Cell Door>")
+
+    int i = 0
+    while (i < cellDoors.Length)
+        RPB_CellDoor cellDoor = cellDoors[i] as RPB_CellDoor
+        string cellDoorLine = (cellDoor as string) + " - " + cellDoor.CurrentLockLevel + " ("+ cellDoor.GetOpenStateAsString() +")"
+        JArray.addStr(cellDoorIds, cellDoorLine)
+        i += 1
+    endWhile
+
+    string[] cellDoorIdsArray = JArray.asStringArray(cellDoorIds)
+
+    int index = self.ShowList(asListTitle, cellDoorIdsArray) - 1
+    if (index == -1)
+        return none
+    endif
+
+    return cellDoors[index] as RPB_CellDoor
 endFunction
 
 Form function ShowPrisonContainerList(RPB_Prison apPrison, string asListTitle = "Select Container")
