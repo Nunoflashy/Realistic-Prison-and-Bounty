@@ -21,42 +21,51 @@ RPB_Config property Config
     endFunction
 endProperty
 
+RPB_PrisonManager property PrisonManager
+    RPB_PrisonManager function get()
+        return API.PrisonManager
+    endFunction
+endProperty
+
 RPB_SceneManager property SceneManager
     RPB_SceneManager function get()
         return API.SceneManager
     endFunction
 endProperty
 
-function PerformSetup()
-    bool registeredEvents               = Config.HandleEvents()
-    bool holdLocations                  = Config.SetHoldLocations()
-    bool jailTeleportReleaseLocations   = Config.SetJailTeleportReleaseLocations()
-    bool jailPrisonerContainers         = Config.SetJailPrisonerContainers()
-    bool prisons                        = Config.SetPrisons()
+RPB_EventManager property EventManager
+    RPB_EventManager function get()
+        return API.EventManager
+    endFunction
+endProperty
 
+function PerformSetup()
+    EventManager.RegisterEvents()
+    PrisonManager.InitializePrisons()
     SceneManager.SetupScenes()
 
-    Info(\
-        "==========================================================\n" + \
-                        "\t\t"+ GetModName() +"\n" + \
-        "==========================================================\n" + \
-        "\n" + \
-        "Performing initial mod setup...\n" + \
-        "Registering Events: " + string_if (registeredEvents, "OK", "Failed") + "\n" + \
-        "Setting Hold Locations up: " + string_if (holdLocations, "OK", "Failed") + "\n" +  \
-        "Setting Jail Release Locations up: " + string_if (jailTeleportReleaseLocations, "OK", "Failed") + "\n" +  \
-        "Setting Jail Containers up: " + string_if (jailPrisonerContainers, "OK", "Failed") + "\n" +  \
-        "Setting Prisons up: " + string_if (prisons, "OK", "Failed") + "\n" \
-    )
+    ; Info(\
+    ;     "==========================================================\n" + \
+    ;                     "\t\t"+ GetModName() +"\n" + \
+    ;     "==========================================================\n" + \
+    ;     "\n" + \
+    ;     "Performing initial mod setup...\n" + \
+    ;     "Registering Events: " + string_if (registeredEvents, "OK", "Failed") + "\n" + \
+    ;     "Setting Hold Locations up: " + string_if (holdLocations, "OK", "Failed") + "\n" +  \
+    ;     "Setting Jail Release Locations up: " + string_if (jailTeleportReleaseLocations, "OK", "Failed") + "\n" +  \
+    ;     "Setting Jail Containers up: " + string_if (jailPrisonerContainers, "OK", "Failed") + "\n" +  \
+    ;     "Setting Prisons up: " + string_if (prisons, "OK", "Failed") + "\n" \
+    ; )
 
-    if (!registeredEvents || !holdLocations || !jailTeleportReleaseLocations || !jailPrisonerContainers || !prisons)
-        Debug.MessageBox("["+ GetModName() +"] One or more components of the mod have failed, some things may not work properly!")
-    endif
+    ; if (!registeredEvents || !holdLocations || !jailTeleportReleaseLocations || !jailPrisonerContainers || !prisons)
+    ;     Debug.MessageBox("["+ GetModName() +"] One or more components of the mod have failed, some things may not work properly!")
+    ; endif
 endFunction
 
 function PerformMaintenance()
-    bool registeredEvents = Config.HandleEvents()
-    bool prisons          = false;Config.SetPrisons()
+    EventManager.RegisterEvents()
+    ; Config.SetPrisons()
+    PrisonManager.VerifyPrisonsIntegrity()
 
 
     Config.MCM.InitializePages()
@@ -67,20 +76,20 @@ function PerformMaintenance()
         miscVars.AddFormToArray("Jail::Cells[New_Hold]", Game.GetForm([New_Hold_Jail_Cell_Ref]))
     /;
 
-    Info(\
-        "==========================================================\n" + \
-                        "\t\t"+ GetModName() +"\n" + \
-        "==========================================================\n" + \
-        "\n" + \
-        "Registering Events: " + string_if (registeredEvents, "OK", "Failed") + "\n" + \
-        "Registering Prisons: " + string_if (prisons, "OK", "Failed") + "\n" \
-    )
+    ; Info(\
+    ;     "==========================================================\n" + \
+    ;                     "\t\t"+ GetModName() +"\n" + \
+    ;     "==========================================================\n" + \
+    ;     "\n" + \
+    ;     "Registering Events: " + string_if (registeredEvents, "OK", "Failed") + "\n" + \
+    ;     "Registering Prisons: " + string_if (prisons, "OK", "Failed") + "\n" \
+    ; )
     
     SceneManager.SetupScenes()
 
-    if (!registeredEvents)
-        Debug.MessageBox("["+ GetModName() +"] Failed to register events, the mod may not work at all!")
-    endif
+    ; if (!registeredEvents)
+    ;     Debug.MessageBox("["+ GetModName() +"] Failed to register events, the mod may not work at all!")
+    ; endif
 
     ; Temporary, RefAliases are lost on Player Load, must find a way to rectify
     ; Config.jail.Prisoner.ForceRefTo(Config.Player)
