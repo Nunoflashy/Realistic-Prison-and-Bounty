@@ -59,9 +59,9 @@ function RenderPrisons(RPB_MCM_02 mcm) global
     ;                           Left
     ; ==========================================================
 
-    int lastJailedPrisonId   = RPB_StorageVars.GetIntOnForm("Last Jailed - Prison", holdCrimeFaction, "PrisonLastJailed")
+    string lastJailedPrisonId   = RPB_StorageVars.GetStringOnForm("Last Jailed - Prison", holdCrimeFaction, "PrisonLastJailed")
     bool hasLastJailedPrison = RPB_Utility.WasPlayerLastJailedInHold(holdCrimeFaction)
-    bool isLastJailedPrison  = hasLastJailedPrison && holdPrison.ID == lastJailedPrisonId
+    bool isLastJailedPrison  = hasLastJailedPrison && holdPrison.UUID == lastJailedPrisonId
 
     mcm.AddOptionText("", hold + " Statistics", defaultFlags = mcm.OPTION_DISABLED)
     mcm.AddEmptyOption()
