@@ -638,14 +638,6 @@ bool function ShouldBeClothed()
 endFunction
 
 bool function HasStateRequiredForImprisonment()
-    ; Debug("["+ Name +"] Prisoner::HasStateRequiredForImprisonment", "Status: [\n" + \
-    ;     "\t Prison: " + Prison + "\n" + \
-    ;     "\t JailCell: " + JailCell + "\n" + \
-    ;     "\t Sentence: " + Sentence + "\n" + \
-    ;     "\t Bounty: " + Bounty + "\n" + \
-    ;     "\t IsUndeterminedSentence: " + IsUndeterminedSentence + "\n" + \
-    ;     "\t Result: " + (Prison && JailCell && (Sentence || Bounty || IsUndeterminedSentence))+ "\n" + \
-    ; "]")
     return Prison && JailCell && (Sentence || Bounty || IsUndeterminedSentence)
 endFunction
 
@@ -670,12 +662,15 @@ function Imprison()
         self.TriggerInfamyPenalty()
     endif
 
+    self.OnImprisoned()
+    GotoState("Imprisoned") ; State when the prisoner is in the cell, check for updates for sentence, etc...
+
     string sentenceFormatted    = RPB_Utility.GetTimeFormatted(Sentence, abIncludeHours = false)
     string releaseDateFormatted = Prison.GetTimeOfReleaseFormatted(self)
 
     if (self.ShowSentence && !self.IsUndeterminedSentence)
         Config.NotifyJail("Your sentence was set at "+ sentenceFormatted +" in " + Prison.Name, self.IsPlayer())
-        Config.NotifyJail(self.GetName() + " has been sentenced to "+ sentenceFormatted +"  in prison for " + self.GetHold(), !self.IsPlayer())
+        Config.NotifyJail(self.GetName() + " has been sentenced to "+ sentenceFormatted +" in " + Prison.Name, self.IsNPC())
     endif
     
     if (self.ShowReleaseTime && !self.IsUndeterminedSentence)
@@ -683,8 +678,6 @@ function Imprison()
         Config.NotifyJail(self.GetName() + "'s release is due on " + releaseDateFormatted, !self.IsPlayer())
     endif
 
-    self.OnImprisoned()
-    GotoState("Imprisoned") ; State when the prisoner is in the cell, check for updates for sentence, etc...
     EndBenchmark(startBench, "Ended ["+ Name +"] Prisoner::Imprison")
 endFunction
 
@@ -702,6 +695,19 @@ endFunction
 ; ==========================================================
 ;                    Clothing / Undressing
 
+function NPC_SaveOriginalOutfit()
+    if (self.IsNPC())
+        Outfit originalOutfit = this.GetActorBase().GetOutfit()
+    endif
+endFunction
+
+function NPC_SetPersistentOutfit(string asOutfit)
+    if (self.IsNPC())
+        Outfit persistentOutfit = RPB_GetOutfit(asOutfit)
+        this.SetOutfit(persistentOutfit)
+    endif
+endFunction
+
 function Clothe()
 
 endFunction
@@ -716,6 +722,8 @@ function Strip(bool abRemoveUnderwear = true)
 
     self.UnequipAll()
     self.RemoveAllItems(PrisonerBelongingsContainer, true, true) ; Remove and put all the items in the prisoner's posession in the assigned prisoner container
+    NPC_SaveOriginalOutfit()
+    NPC_SetPersistentOutfit("Naked")
 
     ObjectReference evidenceChest = Game.GetForm(0x108D37) as ObjectReference ; temp
     evidenceChest.SetDisplayName("Vivienne Onis' Belongings") ; temp
@@ -724,7 +732,6 @@ function Strip(bool abRemoveUnderwear = true)
     self.IsStrippedNaked       = StrippingThoroughness >= 10
     self.IsStrippedToUnderwear = !self.IsStrippedNaked
 
-    DebugWithArgs("["+ Name +"] Prisoner::Strip", "abRemoveUnderwear: " + YesNo(abRemoveUnderwear), "Container: " + PrisonerBelongingsContainer)
     ; TODO: Determine what is required to happen to have the Prisoner be in underwear (e.g: Stripping Thoroughness)
     ; TODO: Find a way to keep the underwear without recovering NPC's body clothing (skyrim bug?), maybe filters?
     ; if (!abRemoveUnderwear)
@@ -746,8 +753,12 @@ function Strip(bool abRemoveUnderwear = true)
 
     self.IncrementStat("Times Stripped")
     SetBool("Stripped", true) ; No use for now, might be changed
-    Debug("["+ Name +"] Prisoner::Strip", "Stripped "+ Name + " naked.", self.IsStrippedNaked)
-    Debug("["+ Name +"] Prisoner::Strip", "Stripped "+ Name + " to underwear.", self.IsStrippedToUnderwear)
+    DebugWithArgs("["+ Name +"] Prisoner::Strip", "abRemoveUnderwear: " + YesNo(abRemoveUnderwear), \ 
+        "\n\t Stripped " + Name + string_if (self.IsStrippedNaked, " naked.", " to underwear.") + \
+        "\n\t Prisoner Container: " + PrisonerBelongingsContainer \
+    )
+    ; Debug("["+ Name +"] Prisoner::Strip", "Stripped "+ Name + " naked.", self.IsStrippedNaked)
+    ; Debug("["+ Name +"] Prisoner::Strip", "Stripped "+ Name + " to underwear.", self.IsStrippedToUnderwear)
 endFunction
 
 function RemoveUnderwear()
@@ -782,9 +793,12 @@ function StartFrisking(Actor akSearcherGuard)
 endFunction
 
 function StartStripping(Actor akStripperGuard)
+    ObjectReference stripMarker = Prison.GetRandomSearchMarker("Stripping") as ObjectReference
+
     SceneManager.StartStripping_02( \
         akStripperGuard     = akStripperGuard, \
-        akStrippedPrisoner  = this \
+        akStrippedPrisoner  = this, \
+        akStripMarker       = none \
     )
 endFunction
 
@@ -797,6 +811,7 @@ endFunction
 
 function EscortToJail(Actor akEscort)
     ObjectReference escortLocation = Prison.GetRandomEscortLocation()
+    self.BindToCell()
 
     SceneManager.StartEscortToJail( \
         akEscortLeader      = akEscort, \
@@ -808,14 +823,8 @@ endFunction
 
 function EscortToCell(Actor akEscort)
     ObjectReference outsideCellGuardWaitingMarker = JailCell.GetRandomMarker("Exterior")
-    ; Debug("["+ Name +"] Prisoner::EscortToCell", "Called EscortToCell()")
-    ; Debug("["+ Name +"] Prisoner::EscortToCell", "Started escort to cell with escort " + akEscort.GetBaseObject().GetName() + "\n" + \ 
-    ;     "\t\t akEscortLeader: " + akEscort + \ 
-    ;     "\t\t akEscortedPrisoner: " + this + \ 
-    ;     "\t\t akJailCellMarker: " + self.JailCell + \ 
-    ;     "\t\t akJailCellDoor: " + self.JailCell.CellDoor + \ 
-    ;     "\t\t akEscortWaitingMarker: " + outsideCellGuardWaitingMarker \ 
-    ; )
+    self.BindToCell()
+
     SceneManager.StartEscortToCell( \
         akEscortLeader              = akEscort, \
         akEscortedPrisoner          = this, \
@@ -1832,7 +1841,7 @@ event OnInitialize()
     ; if (self.Is("Inactive"))
     ;     return
     ; endif
-
+    
     ; Prison.RegisterForPrisonPeriodicUpdate(self)
     Prison.RegisterPrisoner(self) ; Registers this prisoner into the prisoner list
     Trace("["+ Name +"] Prisoner::OnInitialize", "self: " + self)
@@ -2256,16 +2265,16 @@ RPB_Prison function GetPrison()
     endif
 
     ; Used to obtain a reference to the Prison for the first time, not required after caching.
-    int prisonID = GetInt("Prison ID")
+    string prisonUUID = RPB_StorageVars.GetStringOnForm("Prison UUID", this, "Jail")
 
-    if (!prisonID)
+    if (!prisonUUID)
         Fatal("There was an error retrieving the Prison belonging to Prisoner: " + self.Name)
         DebugError("["+ Name +"] Prisoner::GetPrison", "There was an error retrieving the Prison belonging to Prisoner: " + self.Name)
         __prisonFailedInitialization = true
         return none
     endif
 
-    __cachedPrison = API.PrisonManager.GetPrisonByID(prisonID)
+    __cachedPrison = API.PrisonManager.GetPrisonByUUID(prisonUUID)
     return __cachedPrison
 endFunction
 
