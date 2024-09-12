@@ -48,29 +48,6 @@ RPB_Arrest property Arrest
     endFunction
 endProperty
 
-RPB_SceneManager property SceneManager
-    RPB_SceneManager function get()
-        return API.SceneManager
-    endFunction
-endProperty
-
-RPB_EventManager property EventManager
-    RPB_EventManager function get()
-        return API.EventManager
-    endFunction
-endProperty
-
-
-; Called from ConfigAlias
-bool function HandleEvents()
-; ==========================================================
-;                     EventManager Events
-; ==========================================================
-    eventManager.RegisterEvents()
-
-    return true
-endFunction
-
 string[] property Holds
     string[] function get()
         int cellsMap = RPB_Data.Unserialize()
@@ -85,6 +62,7 @@ string[] property Cities
         int i = 0
         while (i < Holds.Length)
             int rootItem = RPB_Data.GetRootObject(Holds[i])
+            ; string city = RPB_Data.GetPropertyOfTypeString(rootItem, Holds[i] + "//City")
             JArray.addStr(citiesArray, RPB_Data.Hold_GetCity(rootItem))
             i += 1
         endWhile
@@ -98,21 +76,6 @@ Actor property Player
         return Game.GetForm(0x00014) as Actor
     endFunction
 endProperty
-
-bool function SetPrisons()
-    RPB_PrisonManager prisonManager = GetFormFromMod(0x1B825) as RPB_PrisonManager
-
-    int i = 0
-    bool break = false
-    while (i < Holds.Length && !break)
-        if (!prisonManager.InitializePrisonConfig(Holds[i]))
-            break = true
-        endif
-        i += 1
-    endWhile
-
-    return true
-endFunction
 
 bool function SetJailTeleportReleaseLocations()
     ; miscVars.SetForm("Jail::Release::Teleport[Whiterun]", Game.GetFormEx(0x3EF19)) ; FormID Invalid
@@ -523,7 +486,7 @@ int function GetArrestAdditionalBountyDefeatedFlat(string hold)
 endFunction
 
 int function GetArrestAdditionalBountyDefeated(string hold)
-    float bountyPercentModifier = GetPercentAsDecimal(getArrestAdditionalBountyDefeatedFromCurrentBounty(hold))
+    float bountyPercentModifier = GetPercentAsDecimal(GetArrestAdditionalBountyDefeatedFromCurrentBounty(hold))
     int bountyFlat              = GetArrestAdditionalBountyDefeatedFlat(hold)
     Faction crimeFaction        = GetFaction(hold)
     int bounty                  = floor(crimeFaction.GetCrimeGold() * bountyPercentModifier) + bountyFlat
