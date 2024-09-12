@@ -8,7 +8,6 @@ import RPB_Config
 ;                     Script References
 ; ==========================================================
 
-
 RPB_JailCell __jailCell
 RPB_JailCell property JailCell
     RPB_JailCell function get()
@@ -23,46 +22,27 @@ bool property EscapeTriggerDoor
 endProperty
 
 
-
-; ==========================================================
-
-; =========================================================
-;                         Functions
-; =========================================================
-
-
-
 ; =========================================================
 ;                          Events
 ; =========================================================
 
-event OnActivate(ObjectReference akActionRef)
-    if (!self.IsRegisteredCellDoor())
-        return
-    endif
-
+; Don't init Cell Doors, let Jail Cells handle them
+event OnInit() ; overrides
 endEvent
 
-event OnLockStateChanged()
-    if (!self.IsRegisteredCellDoor())
+event OnActivate(ObjectReference akActionRef)
+    if (!_shouldProcessLockable())
         return
     endif
 
-    if (self.IsLocked())
-        
-    else
-        
-    endif
-
-    if (self.HasDecayableLock)
-        self.DetermineLockLevel()
-    endif
 endEvent
 
 event OnOpen(ObjectReference akActionRef)
-    if (!self.IsRegisteredCellDoor())
+    if (!_shouldProcessLockable())
         return
     endif
+
+    Debug("["+ self +"] CellDoor::OnOpen", akOpener + " opened cell door " + self + ", which belongs to jail cell " + self.JailCell)
 
     Actor akOpener = akActionRef as Actor
     Form[] cellPrisoners = JailCell.Prisoners
@@ -81,44 +61,29 @@ event OnOpen(ObjectReference akActionRef)
 endEvent
 
 event OnClose(ObjectReference akActionRef)
-    if (!self.IsRegisteredCellDoor())
+    if (!_shouldProcessLockable())
         return
     endif
 
+    Debug("["+ self +"] CellDoor::OnOpen", akActionRef + " closed cell door " + self + ", which belongs to jail cell " + self.JailCell)
 endEvent
 
 ; =========================================================
-;                         Management
+;                           public                      
 ; =========================================================
-
-
-
-;/
-    Determines if this is a registered cell door for a RPB_JailCell in a RPB_Prison.
-
-    This is used to determine if we should process events and functions on this cell door,
-    to avoid execution of this script on other cell doors that were not registered for this Prison/Cell.
-/;
-bool function IsRegisteredCellDoor()
-    return JailCell.IsRegisteredCellDoorInPrison(self.GetFormID())
-    ;/
-        Form[] registeredCellDoors = JailCell.Prison.GetRegisteredCellDoors()
-        int i = 0
-        while (i < registeredCellDoors.Length)
-            if (self.GetFormID() == registeredCellDoors[i].GetFormID())
-                return true
-            endif
-            i += 1
-        endWhile
-
-        return false
-    /;
-endFunction
 
 function BindCell(RPB_JailCell akJailCell)
     __jailCell = akJailCell
 endFunction
 
+; =========================================================
+;                         protected                      
+; =========================================================
+
+; Only process this cell door if it's bound to a jail cell
+bool function _shouldProcessLockable() ; overrides
+    return self.JailCell != none
+endFunction
 
 ; =========================================================
 ;                         Data Config                      

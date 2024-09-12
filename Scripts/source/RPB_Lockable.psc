@@ -3,6 +3,10 @@ scriptname RPB_Lockable extends RPB_SerializableObjectReference
 import Math
 import RPB_Utility
 
+; =========================================================
+;                         Properties
+; =========================================================
+
 bool property IsOpen
     bool function get()
         int openState = self.GetOpenState()
@@ -14,6 +18,25 @@ bool property IsClosed
     bool function get()
         int openState = self.GetOpenState()
         return openState == 3 || openState == 4
+    endFunction
+endProperty
+
+bool property IsUnlocked
+    bool function get()
+        return !self.IsLocked
+    endFunction
+endProperty
+
+bool __isLocked
+bool property IsLocked
+    bool function get()
+        return self.IsLocked()
+        if (!__isLockInitialized)
+            __initializeLockStates()
+            return parent.IsLocked()
+        endif
+
+        return __isLocked
     endFunction
 endProperty
 
@@ -82,6 +105,106 @@ string property CurrentLockLevel
 endProperty
 
 ; =========================================================
+;                          Events
+; =========================================================
+
+int __previousLockState
+bool __wasLocked
+;/
+    STATE_OPEN      = 1
+    STATE_OPENING   = 2
+    STATE_CLOSED    = 3
+    STATE_CLOSING   = 4
+
+    (currentState == 2 && __previousLockState == 4)                      ; Open (not Unlocked)
+    (currentState == 2 && __previousLockState == 3)                      ; Unlocked and Open
+    (currentState == 3 && __previousLockState == 2)                      ; Closed and Locked
+    (currentState == 4 && __previousLockState == 2)                      ; Closed (not Locked)
+    (currentState == 4 && __previousLockState == 3)                      ; Locked
+    (currentState == 3 && __previousLockState == 4)                      ; Locked
+    (currentState == 3 && __previousLockState == 3 && self.IsLocked)     ; Locked
+    (currentState == 3 && __previousLockState == 3 && !self.IsLocked)    ; Unlocked
+    (currentState == 3 && __previousLockState == 1 && self.IsLocked)     ; Locked
+    (currentState == 4 && __previousLockState == 4 && self.IsLocked)     ; Locked
+/;
+event OnLockStateChanged()
+    if (!_shouldProcessLockable())
+        return
+    endif
+
+    int currentState = self.GetOpenState()
+
+    int STATE_OPEN      = 1
+    int STATE_OPENING   = 2
+    int STATE_CLOSED    = 3
+    int STATE_CLOSING   = 4
+
+    if (!__isLockInitialized)
+        __initializeLockStates()
+        return
+    endif
+
+    bool unlockedToLocked = (currentState == STATE_CLOSING && __previousLockState == STATE_CLOSED) || \
+                            (currentState == STATE_CLOSED && __previousLockState == STATE_CLOSING && self.IsLocked) || \
+                            (currentState == STATE_CLOSED && __previousLockState == STATE_CLOSED && !__wasLocked && self.IsLocked) || \
+                            (currentState == STATE_CLOSED && __previousLockState == STATE_OPEN && self.IsLocked)
+
+    bool lockedToUnlocked             = (currentState == STATE_CLOSED && __previousLockState == STATE_CLOSED && __wasLocked && !self.IsLocked)
+    bool openUnlockedToClosedLocked   = (currentState == STATE_CLOSED && __previousLockState == STATE_OPENING)
+    bool closedLockedToOpenUnlocked   = (currentState == STATE_OPENING && __previousLockState == STATE_CLOSED && __wasLocked)
+
+    if (openUnlockedToClosedLocked)
+        self.OnLocked()
+        __isLocked = true
+
+    elseif (closedLockedToOpenUnlocked)
+        self.OnUnlocked()
+        __isLocked = false
+
+    elseif (unlockedToLocked)
+        self.OnLock()
+        __isLocked = true
+
+    elseif (lockedToUnlocked)
+        self.OnUnlock()
+        __isLocked = false
+    endif
+
+    if (self.HasDecayableLock)
+        __determineLockLevel()
+    endif
+
+    ; Debug("["+ self +"] Lockable::OnLockStateChanged", "["+ __previousLockState +" -> "+ currentState +"] (Was Locked: "+ __wasLocked +", Is Locked: "+ self.IsLocked +")")
+
+    __wasLocked = self.IsLocked
+    __previousLockState = currentState
+endEvent
+
+; Happens when this Lockable is locked
+event OnLock()
+    ; Debug("["+ self +"] Lockable::OnLock", "Locked")
+endEvent
+
+; Happens when this Lockable is unlocked
+event OnUnlock()
+    ; Debug("["+ self +"] Lockable::OnUnlock", "Unlocked")
+endEvent
+
+; Happens when this Lockable is closed and locked (Ensuring the Lockable is locked)
+event OnLocked()
+    ; Debug("["+ self +"] Lockable::OnLocked", "Closed and Locked")
+endEvent
+
+; Happens when this Lockable is unlocked and open
+event OnUnlocked()
+    ; Debug("["+ self +"] Lockable::OnUnlocked", "Unlocked and Open")
+endEvent
+
+event OnInit()
+    Initialize()
+endEvent
+
+; =========================================================
 ;                         Functions
 ; =========================================================
 
@@ -99,7 +222,7 @@ function Lock(bool abLock = true, bool abAsOwner = false)
     if (self.IsLockBroken)
         return
     endif
-
+ 
     ; TODO: Implement additional lock logic
     parent.Lock(abLock, abAsOwner)
 endFunction
@@ -116,12 +239,14 @@ function Initialize()
     string lockLevel = self.GetPropertyOfTypeString("Lock//Level")
     Debug("["+ self +"] Lockable::Initialize", "lockLevel: " + lockLevel)
 
-
     if (lockLevel)
         int lockLevelAsInt  = LockLevelAsInteger(lockLevel)
         Debug("["+ self +"] Lockable::Initialize", "Lock Level: " + lockLevel + ", As Integer: " + lockLevelAsInt + ", Object: " + self)
         self.SetLockLevel(lockLevelAsInt)
     endif
+
+    __initializeLockStates()
+    __isInitialized = true
 endFunction
 
 int function LockLevelAsInteger(string asLockLevel) global
@@ -157,7 +282,7 @@ string function LockLevelAsString(int aiLockLevel) global
 endFunction
 
 string function GetOpenStateAsString()
-    if (self.IsLocked())
+    if (self.IsLocked)
         return "Locked"
     endif
 
@@ -168,18 +293,53 @@ string function GetOpenStateAsString()
     endif
 endFunction
 
-function DetermineLockLevel()
-    __lockLevelWear += 1
+; =========================================================
+;                          public
+; =========================================================
 
+
+
+; =========================================================
+;                          protected
+; =========================================================
+
+;/
+    Determines whether this Lockable should have its Events processed.
+
+    Used to handle only Lockables related to the mod, since the script is attached
+    to the base objects.
+/;
+bool function _shouldProcessLockable() ; abstract
+endFunction
+
+; =========================================================
+;                           private
+; =========================================================
+
+bool __isInitialized
+bool __isLockInitialized
+
+function __initializeLockStates()
+    __previousLockState = self.GetOpenState()
+    __wasLocked         = self.IsLocked
+    __isLocked          = self.IsLocked
+    __isLockInitialized = true
+
+    Debug("["+ self +"] (private) Lockable::InitializeLockStates", "Initialized Lockable ("+ "Locked: " + __isLocked +", Lock State: "+ __previousLockState +")")
+endFunction
+
+function __determineLockLevel()
     int wearThresholdForCurrentLockLevel = self.GetPropertyOfTypeInt("Lock//Decay Options//Wear Thresholds//" + self.CurrentLockLevel)
 
+    __lockLevelWear += 1
+
     if (self.LockLevelWear >= wearThresholdForCurrentLockLevel)
-        self.DowngradeLock()
+        __downgradeLock()
     endif
 endFunction
 
 ; Probably temporary, need to find a way to downgrade based on the threshold and not the current lock
-function DowngradeLock()
+function __downgradeLock()
     string nextLockLevel
     string previousLockLevel = self.CurrentLockLevel
 
@@ -217,5 +377,5 @@ function DowngradeLock()
     ; Assign the new lock level
     __currentLockLevel = nextLockLevel
 
-    Debug("Lockable::DowngradeLock", "Lock has been downgraded from " + previousLockLevel + " to " + self.CurrentLockLevel)
+    Debug("["+ self +"] (private) Lockable::DowngradeLock", "Lock has been downgraded from " + previousLockLevel + " to " + self.CurrentLockLevel)
 endFunction
