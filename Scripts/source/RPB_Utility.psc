@@ -52,6 +52,24 @@ Armor function RPB_PrisonerHandCuffs() global
     return GetFormFromMod(0x23969) as Armor
 endFunction
 
+Outfit function RPB_GetOutfit(string asOutfit) global
+    if (asOutfit == "Naked")
+        return GetFormFromMod(0x259D4) as Outfit
+
+    elseif (asOutfit == "Default")
+        return GetFormFromMod(0x259D5) as Outfit
+
+    elseif (asOutfit == "Default 2")
+        return GetFormFromMod(0x259D6) as Outfit
+
+    elseif (asOutfit == "Default no Shoes")
+        return GetFormFromMod(0x259D7) as Outfit
+
+    elseif (asOutfit == "Default 2 no Shoes")
+        return GetFormFromMod(0x259D8) as Outfit
+    endif
+endFunction
+
 ; ==========================================================
 ;                        Log Functions
 ; ==========================================================
@@ -745,6 +763,31 @@ bool function IsActorFarAwayFromPlayer(Actor akActor) global
 endFunction
 
 ; ==========================================================
+;                       UUID Functions
+; ==========================================================
+
+string function GenerateUUIDSection(int aiLength) global
+    string result = ""
+    while (aiLength > 0)
+        result += GetRandomHex()
+        aiLength -= 1
+    endWhile
+
+    return result
+endFunction
+
+string function GenerateUUID() global
+    string section1 = GenerateUUIDSection(8)
+    string section2 = GenerateUUIDSection(4)
+    string section3 = "4" + GenerateUUIDSection(3) ; Force UUIDv4
+    string section4 = IntToHex(Utility.RandomInt(8, 11)) + GenerateUUIDSection(3) ; Set 'N' to be 8, 9, A or B
+    string section5 = GenerateUUIDSection(12)
+
+    string uuid = section1 + "-" + section2 + "-" + section3 + "-" + section4 + "-" + section5
+    return uuid
+endFunction
+
+; ==========================================================
 ;                       Misc Functions
 ; ==========================================================
 
@@ -817,6 +860,33 @@ int function HexStringToInt(string asHexString) global
 
     return result
 endFunction
+
+string function IntToHex(int i) global
+    if (i >= 0 && i <= 9)
+        return i as string
+
+    elseif (i == 10)
+        return "A"
+    elseif (i == 11)
+        return "B"
+    elseif (i == 12)
+        return "C"
+    elseif (i == 13)
+        return "D"
+    elseif (i == 14)
+        return "E"
+    elseif (i == 15)
+        return "F"
+    endif
+
+    return ""
+endFunction
+
+string function GetRandomHex() global
+    int random = Utility.RandomInt(0, 15)
+    return IntToHex(random)
+endFunction
+
 
 Form function GetFormOfType(string asFormType) global
     if (asFormType == "Gold")
