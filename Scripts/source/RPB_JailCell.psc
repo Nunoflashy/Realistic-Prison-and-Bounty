@@ -255,16 +255,23 @@ int property MaxPrisoners
     endFunction
 endProperty
 
+string property DefaultPackageSize
+    string function get()
+        return "S"
+    endFunction
+endProperty
+
 string __packageSize
 string property PackageSize
     string function get()
-        if (!__packageSize)
-            __packageSize = self.GetOptionOfTypeString("Package")
-        endif
-
-        if (!__packageSize) ; Default
-            return "S"
-        endif
+        ; if (__packageSize == "")
+            if (self.HasOption("Package"))
+                __packageSize = self.GetOptionOfTypeString("Package")
+                Debug("["+ ID +"] JailCell:PackageSize", "__packageSize: " + __packageSize)
+            else
+                DebugWarn("["+ ID +"] JailCell:PackageSize", "Returning default package size: S")
+                return self.DefaultPackageSize
+            endif
 
         return __packageSize
     endFunction
@@ -667,6 +674,11 @@ endFunction
 ; =========================================================
 
 event OnPrisonerRegister(RPB_Prisoner apPrisoner)
+    if (!self.CellDoor)
+        RPB_CellDoor configuredCellDoor = self.GetPropertyOfTypeFormArray("Cell Doors")[0] as RPB_CellDoor ; Index is temporary, for now only use 1st cell door
+        self.BindCellDoor(configuredCellDoor)
+        Debug("["+ ID +"] JailCell::OnPrisonerRegister", "Rebinding Cell Door!")
+    endif
     self.DetermineCellParameters()
     Debug("JailCell::OnPrisonerRegister", "Cell Properties: " + self.DEBUG_GetCellProperties())
 endEvent
@@ -723,13 +735,6 @@ string function GetName()
     return "Jail Cell"
 endFunction
 
-;/
-    Determines if this JailCell... this should be in CellDoor
-/;
-bool function IsRegisteredCellDoorInPrison(int aiCellDoorFormID)
-    return true ; temporary
-endFunction
-
 bool function IsInitialized()
     return __prison && __cellDoor
 endFunction
@@ -758,6 +763,14 @@ function Initialize(RPB_Prison apPrison)
 
     ; Determine all markers for this cell
     self.DetermineMarkers()
+endFunction
+
+function Uninitialize()
+    Debug("[Prison: "+ Name +"] Cell::Uninitialize", "Unitializing jail cell: " + self)
+
+    self.RefreshOptions()
+    __prison    = none
+    __cellDoor  = none ; Later needs to handle 1:N
 endFunction
 
 function BindPrison(RPB_Prison apPrison)
@@ -1046,7 +1059,7 @@ endState
 ; =========================================================
 
 int function GetSerializableRootObject()
-    return RPB_Data.GetPropertyOfTypeObject(Prison.GetDataObject(), "Cells//" + self)
+    return RPB_Data.GetPropertyOfTypeObject(Prison.GetSerializableRootObject(), "Cells//" + self)
 endFunction
 
 bool function HasOption(string asOption)
