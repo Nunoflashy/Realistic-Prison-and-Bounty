@@ -59,6 +59,7 @@ endFunction
 
 int function GetInt(string asKey, string asCategory = "null") global
     string path = GetVarPath(asKey, asCategory)
+    Debug("StorageVars::GetInt", "path: " + path + ", value: " + JDB.solveInt(path))
     return JDB.solveInt(path)
 endFunction
 
@@ -223,8 +224,6 @@ endFunction
 
 int function GetIntOnForm(string asKey, Form akForm, string asCategory = "null") global
     string path = GetVarPathOnForm(asKey, akForm, asCategory)
-    ; Debug(none, "StorageVars::GetIntOnForm", "path: " + path + ", value: " + JDB.solveInt(path))
-
     return JDB.solveInt(path)
 endFunction
 
@@ -523,6 +522,183 @@ endFunction
 
 bool function HasVarsOnActiveMagicEffect(ActiveMagicEffect apEffect, string asCategory = "null") global
     string path = GetRootPath() + "." + apEffect as string
+    return JDB.hasPath(path)
+endFunction
+
+; ==========================================================
+;                  Any Reference as Source
+; ==========================================================
+
+;/
+    Getters:
+        Returns a value <T> from the given reference, optionally from a specific category.
+        The reference is taken as a string since all objects can be implicitly cast as one.
+
+        Function Signature: <T> function GetTypeOnReference(string Key, string Reference, string? Category)
+            string  @Key: The key to access the value.
+            string  @Reference: The reference on which this value should be set (References can be anything implicitly castable to a string: Form, ReferenceAlias, ActiveMagicEffect, etc...).
+            string  @Category: The category on which this value will be stored (sub-category of Reference).
+
+            returns (<T>): The value from the given key on the reference.
+
+    Setters:
+        Sets a value <T> on a given reference, optionally setting it on a specific category of that reference.
+        The reference is taken as a string since all objects can be implicitly cast as one.
+
+        Function Signature: <T> function SetTypeOnReference(string Key, string Reference, T Value, string? Category)
+            string  @Key: The key to access the value.
+            string  @Reference: The reference on which this value should be set (References can be anything implicitly castable to a string: Form, ReferenceAlias, ActiveMagicEffect, etc...).
+            T       @Value: The value to set for this key on this reference.
+            string  @Category: The category on which this value will be stored (sub-category of Reference).
+/;
+
+string function GetVarPathOnReference(string asKey, string apReference, string asCategory = "null") global
+    string path = ""
+    
+    if (asCategory != "null" && asCategory != "")
+        path = GetRootPath() + "." + apReference + "." + asCategory + "." + asKey
+    else
+        path = GetRootPath() + "." + apReference + "." + asKey
+    endif
+    ; DebugWithArgs("StorageVars::GetVarPathOnReference", "Key: " + asKey + ", Reference: " + apReference + ", Category: " + asCategory, path)
+
+    return path
+endFunction
+
+;                          Getters
+
+bool function GetBoolOnReference(string asKey, string apReference, string asCategory = "null") global
+    string path = GetVarPathOnReference(asKey, apReference, asCategory)
+    return JDB.solveInt(path) as bool
+endFunction
+
+int function GetIntOnReference(string asKey, string apReference, string asCategory = "null") global
+    string path = GetVarPathOnReference(asKey, apReference, asCategory)
+    return JDB.solveInt(path)
+endFunction
+
+float function GetFloatOnReference(string asKey, string apReference, string asCategory = "null") global
+    string path = GetVarPathOnReference(asKey, apReference, asCategory)
+    return JDB.solveFlt(path)
+endFunction
+
+string function GetStringOnReference(string asKey, string apReference, string asCategory = "null") global
+    string path = GetVarPathOnReference(asKey, apReference, asCategory)
+    return JDB.solveStr(path)
+endFunction
+
+Form function GetFormOnReference(string asKey, string apReference, string asCategory = "null") global
+    string path = GetVarPathOnReference(asKey, apReference, asCategory)
+    return JDB.solveForm(path)
+endFunction
+
+int[] function GetIntsOnReference(string asKey, string apReference, string asCategory = "null") global
+    string path = GetVarPathOnReference(asKey, apReference, asCategory)
+    return JArray.asIntArray(JDB.solveObj(path))
+endFunction
+
+float[] function GetFloatsOnReference(string asKey, string apReference, string asCategory = "null") global
+    string path = GetVarPathOnReference(asKey, apReference, asCategory)
+    return JArray.asFloatArray(JDB.solveObj(path))
+endFunction
+
+string[] function GetStringsOnReference(string asKey, string apReference, string asCategory = "null") global
+    string path = GetVarPathOnReference(asKey, apReference, asCategory)
+    return JArray.asStringArray(JDB.solveObj(path))
+endFunction
+
+Form[] function GetFormsOnReference(string asKey, string apReference, string asCategory = "null") global
+    string path = GetVarPathOnReference(asKey, apReference, asCategory)
+    return JArray.asFormArray(JDB.solveObj(path))
+endFunction
+
+;                          Setters
+
+function SetBoolOnReference(string asKey, string apReference, bool abValue, string asCategory = "null") global
+    string path = GetVarPathOnReference(asKey, apReference, asCategory)
+    JDB.solveIntSetter(path, abValue as int, true)
+endFunction
+
+function SetIntOnReference(string asKey, string apReference, int aiValue, string asCategory = "null") global
+    string path = GetVarPathOnReference(asKey, apReference, asCategory)
+    JDB.solveIntSetter(path, aiValue, true)
+endFunction
+
+function SetFloatOnReference(string asKey, string apReference, float afValue, string asCategory = "null") global
+    string path = GetVarPathOnReference(asKey, apReference, asCategory)
+    JDB.solveFltSetter(path, afValue, true)
+endFunction
+
+function SetStringOnReference(string asKey, string apReference, string asValue, string asCategory = "null") global
+    string path = GetVarPathOnReference(asKey, apReference, asCategory)
+    JDB.solveStrSetter(path, asValue, true)
+endFunction
+
+function SetFormOnReference(string asKey, string apReference, Form akValue, string asCategory = "null") global
+    string path = GetVarPathOnReference(asKey, apReference, asCategory)
+    JDB.solveFormSetter(path, akValue, true)
+endFunction
+
+function SetIntsOnReference(string asKey, string apReference, int[] aiValues, string asCategory = "null") global
+    string path = GetVarPathOnReference(asKey, apReference, asCategory)
+    int formToObject = JArray.objectWithInts(aiValues)
+    JDB.solveObjSetter(path, formToObject, true)
+endFunction
+
+function SetFloatsOnReference(string asKey, string apReference, float[] afValues, string asCategory = "null") global
+    string path = GetVarPathOnReference(asKey, apReference, asCategory)
+    int formToObject = JArray.objectWithFloats(afValues)
+    JDB.solveObjSetter(path, formToObject, true)
+endFunction
+
+function SetStringsOnReference(string asKey, string apReference, string[] asValues, string asCategory = "null") global
+    string path = GetVarPathOnReference(asKey, apReference, asCategory)
+    int formToObject = JArray.objectWithStrings(asValues)
+    JDB.solveObjSetter(path, formToObject, true)
+endFunction
+
+function SetFormsOnReference(string asKey, string apReference, Form[] akValues, string asCategory = "null") global
+    string path = GetVarPathOnReference(asKey, apReference, asCategory)
+    int formToObject = JArray.objectWithForms(akValues)
+    JDB.solveObjSetter(path, formToObject, true)
+endFunction
+
+;                          Modifiers
+function ModIntOnReference(string asKey, string apReference, int aiValue, string asCategory = "null") global
+    int currentValue = GetIntOnReference(asKey, apReference, asCategory)
+    SetIntOnReference(asKey, apReference, currentValue + aiValue, asCategory)
+endFunction
+
+function ModFloatOnReference(string asKey, string apReference, float afValue, string asCategory = "null") global
+    float currentValue = GetFloatOnReference(asKey, apReference, asCategory)
+    SetFloatOnReference(asKey, apReference, currentValue + afValue, asCategory)
+endFunction
+
+;                     Delete Functions
+
+function DeleteVariableOnReference(string asKey, string apReference, string asCategory = "null") global
+    int obj = GetObjectHandleOnKey(apReference, asCategory)
+    JMap.removeKey(obj, asKey)
+endFunction
+
+function DeleteCategoryOnReference(string apReference, string asCategory) global
+    int deletedObj = GetObjectHandleOnKey(apReference)
+    JMap.removeKey(deletedObj, asCategory)
+endFunction
+
+function DeleteAllOnReference(string apReference) global
+    int deletedObj = GetObjectHandleOnKey(apReference)
+    JMap.clear(deletedObj)
+    JMap.removeKey(GetObjectHandle(), apReference as string)
+endFunction
+
+bool function HasVarOnReference(string asKey, string apReference, string asCategory = "null") global
+    string path = GetVarPathOnReference(asKey, apReference, asCategory)
+    return JDB.hasPath(path)
+endFunction
+
+bool function HasVarsOnReference(string apReference, string asCategory = "null") global
+    string path = GetRootPath() + "." + apReference as string
     return JDB.hasPath(path)
 endFunction
 

@@ -6,33 +6,43 @@ import RPB_Utility
 ;                Serializable ReferenceAlias
 ; ==========================================================
 
-string __fallbackId
-string __id
-string property ID
-    string function get()
-        return self.GetSerializableID()
+bool __initialized
+bool _active
+bool property Active
+    bool function get() ; public
+        if (!__initialized)
+            _active = self.ActiveByDefault()
+            __initialized = true
+        endif
+        return _active
+    endFunction
+
+    function set(bool value) ; protected
+        if (!__initialized)
+            return
+        endif
+
+        _active = value
     endFunction
 endProperty
 
-string __fallbackName
-string __name
-string property Name
+string __oldUuid
+string __uuid
+string property UUID
     string function get()
-        return self.GetSerializableName()
+        if (!__uuid)
+            __requestUUID()
+        endif
+
+        __checkAndTriggerIdentityChange()
+        return __uuid
     endFunction
 endProperty
+
 
 int __rootObject
 
 bool property IsDataHotLoadable auto
-
-function SetFallbackID(string asFallbackID)
-    __fallbackId = asFallbackID
-endFunction
-
-function SetFallbackName(string asFallbackName)
-    __fallbackName = asFallbackName
-endFunction
 
 string function Rules(string rule)
     if (rule == "Required Properties")
@@ -41,36 +51,28 @@ string function Rules(string rule)
 endFunction
 
 bool function __verifyDataIntegrity()
+    if (!Active)
+        return false
+    endif
+
     ; Check the data file for this object for errors
     return true
 endFunction
 
-int function __updateRootObject()
-    if (!__rootObject)
-        __rootObject = JValue.deepCopy(self.GetSerializableRootObject())
-        JValue.retain(__rootObject)
-    endif
-
-    __rootObject = JValue.deepCopy(self.GetSerializableRootObject())
-    return __rootObject
-endFunction 
-
 ; Add verification of data integrity
-int function __getCachedSerializedRootObject()
+int function __internalSerializedRootObject()
+    if (!Active)
+        return 0
+    endif
+
     return self.GetSerializableRootObject()
-
-    if (self.IsDataHotLoadable)
-        return __updateRootObject()
-    endif
-
-    if (!__rootObject)
-        __updateRootObject()
-    endif
-
-    return __rootObject
 endFunction
 
 bool function ReloadData()
+    if (!Active)
+        return false
+    endif
+
     bool isValidData = __verifyDataIntegrity()
 
     if (isValidData)
@@ -86,58 +88,55 @@ bool function ReloadData()
     return isValidData
 endFunction
 
+function Delete()
+    ; Release serializable object, in case it was retained in memory
+    JValue.release(self.GetSerializableRootObject())
 
-string function GetSerializableName() ; virtual
-    if (self.IsDataHotLoadable)
-        string value = self.GetPropertyOfTypeString("Name")
-        if (value)
-            return value
-        else
-            return __fallbackName
-        endif
-    endif
+    _active = false
 
-    if (!__name)
-        __name = self.GetPropertyOfTypeString("Name")
-    endif
-    
-    if (!__name)
-        return __fallbackName
-    endif
+    self.DeleteAllLocalProperties()
 
-    return __name
+    ; Assign new UUID to differentiate this Ref from the new one
+    __assignNewIdentity()
+
+    self.OnReferenceDeleted()
 endFunction
 
-string function GetSerializableID() ; virtual
-    if (self.IsDataHotLoadable)
-        string value = self.GetPropertyOfTypeString("ID")
-        if (value)
-            return value
-        else
-            return __fallbackId
-        endif
-    endif
-
-    if (!__id)
-        __id = self.GetPropertyOfTypeString("ID")
-    endif
-    
-    if (!__id)
-        return __fallbackId
-    endif
-
-    return __id
+bool function ActiveByDefault() ; virtual
+    return true
 endFunction
 
 ;/
-    returns (any& <JContainer>): Retrieves the serializable root object that represents this ObjectReference.
+    Attempts to get @asProperty from the Serializable Object and returns it,
+    in case that fails, the fallback property is returned instead.
+/;
+string function TryGetString(string asProperty)
+    if (self.HasProperty(asProperty))
+        return self.GetPropertyOfTypeString(asProperty)
+    endif
+
+    return self.GetLocalPropertyOfTypeString(asProperty, "Fallback")   
+endFunction
+
+string function GetFallbackProperty(string asProperty)
+    if (!self.HasProperty(asProperty))
+        return self.GetLocalPropertyOfTypeString(asProperty, "Fallback")   
+    endif
+endFunction
+
+function SetFallbackProperty(string asProperty, string asValue)
+    self.SetLocalPropertyOfTypeString(asProperty, asValue, "Fallback")   
+endFunction
+
+;/
+    returns (any& <JContainer>): Retrieves the serializable root object that represents this ReferenceAlias.
 /;
 int function GetSerializableRootObject() ; abstract
     DebugWarn("["+ self +"] SerializableReferenceAlias::GetSerializableRootObject", "Root data object has not been implemented!")
 endFunction
 
 bool function HasProperty(string asPropertyName, bool abCheckEmpty = false)
-    return RPB_Data.HasProperty(__getCachedSerializedRootObject(), asPropertyName, abCheckEmpty = abCheckEmpty)
+    return RPB_Data.HasProperty(__internalSerializedRootObject(), asPropertyName, abCheckEmpty = abCheckEmpty)
 endFunction
 
 ; ==========================================================
@@ -145,42 +144,39 @@ endFunction
 ; ==========================================================
 
 bool function GetPropertyOfTypeBool(string asPropertyName)
-    return RPB_Data.GetPropertyOfTypeBool(__getCachedSerializedRootObject(), asPropertyName)
+    return RPB_Data.GetPropertyOfTypeBool(__internalSerializedRootObject(), asPropertyName)
 endFunction
 
 int function GetPropertyOfTypeInt(string asPropertyName)
-    return RPB_Data.GetPropertyOfTypeInteger(__getCachedSerializedRootObject(), asPropertyName)
+    return RPB_Data.GetPropertyOfTypeInteger(__internalSerializedRootObject(), asPropertyName)
 endFunction
 
 float function GetPropertyOfTypeFloat(string asPropertyName)
-    return RPB_Data.GetPropertyOfTypeFloat(__getCachedSerializedRootObject(), asPropertyName)
+    return RPB_Data.GetPropertyOfTypeFloat(__internalSerializedRootObject(), asPropertyName)
 endFunction
 
 string function GetPropertyOfTypeString(string asPropertyName)
-    float s = StartBenchmark()
-    string prop = RPB_Data.GetPropertyOfTypeString(__getCachedSerializedRootObject(), asPropertyName)
-    EndBenchmark(s, "["+ self +"] SerializableReferenceAlias::GetPropertyOfTypeString ("+ asPropertyName +")")
-    return prop
+    return RPB_Data.GetPropertyOfTypeString(__internalSerializedRootObject(), asPropertyName)
 endFunction
 
 Form function GetPropertyOfTypeForm(string asPropertyName)
-    return RPB_Data.GetPropertyOfTypeForm(__getCachedSerializedRootObject(), asPropertyName)
+    return RPB_Data.GetPropertyOfTypeForm(__internalSerializedRootObject(), asPropertyName)
 endFunction
 
 int[] function GetPropertyOfTypeIntegerArray(string asPropertyName)
-    return RPB_Data.GetPropertyOfTypeIntegerArray(__getCachedSerializedRootObject(), asPropertyName)
+    return RPB_Data.GetPropertyOfTypeIntegerArray(__internalSerializedRootObject(), asPropertyName)
 endFunction
 
 float[] function GetPropertyOfTypeFloatArray(string asPropertyName)
-    return RPB_Data.GetPropertyOfTypeFloatArray(__getCachedSerializedRootObject(), asPropertyName)
+    return RPB_Data.GetPropertyOfTypeFloatArray(__internalSerializedRootObject(), asPropertyName)
 endFunction
 
 string[] function GetPropertyOfTypeStringArray(string asPropertyName)
-    return RPB_Data.GetPropertyOfTypeStringArray(__getCachedSerializedRootObject(), asPropertyName)
+    return RPB_Data.GetPropertyOfTypeStringArray(__internalSerializedRootObject(), asPropertyName)
 endFunction
 
 Form[] function GetPropertyOfTypeFormArray(string asPropertyName)
-    return RPB_Data.GetPropertyOfTypeFormArray(__getCachedSerializedRootObject(), asPropertyName)
+    return RPB_Data.GetPropertyOfTypeFormArray(__internalSerializedRootObject(), asPropertyName)
 endFunction
 
 
@@ -189,39 +185,39 @@ endFunction
 ; ==========================================================
 
 function SetPropertyOfTypeBool(string asPropertyName, bool abValue)
-    ; return RPB_Data.SetPropertyOfTypeBool(__getCachedSerializedRootObject(), asPropertyName)
+    ; return RPB_Data.SetPropertyOfTypeBool(__internalSerializedRootObject(), asPropertyName)
 endFunction
 
 function SetPropertyOfTypeInt(string asPropertyName, int aiValue)
-    ; return RPB_Data.SetPropertyOfTypeInteger(__getCachedSerializedRootObject(), asPropertyName)
+    ; return RPB_Data.SetPropertyOfTypeInteger(__internalSerializedRootObject(), asPropertyName)
 endFunction
 
 function SetPropertyOfTypeFloat(string asPropertyName, float afValue)
-    ; return RPB_Data.SetPropertyOfTypeFloat(__getCachedSerializedRootObject(), asPropertyName)
+    ; return RPB_Data.SetPropertyOfTypeFloat(__internalSerializedRootObject(), asPropertyName)
 endFunction
 
 function SetPropertyOfTypeString(string asPropertyName, string asValue)
-    ; return RPB_Data.SetPropertyOfTypeString(__getCachedSerializedRootObject(), asPropertyName)
+    ; return RPB_Data.SetPropertyOfTypeString(__internalSerializedRootObject(), asPropertyName)
 endFunction
 
 function SetPropertyOfTypeForm(string asPropertyName, Form akValue)
-    ; return RPB_Data.SetPropertyOfTypeForm(__getCachedSerializedRootObject(), asPropertyName)
+    ; return RPB_Data.SetPropertyOfTypeForm(__internalSerializedRootObject(), asPropertyName)
 endFunction
 
 function SetPropertyOfTypeIntegerArray(string asPropertyName, int[] akValue)
-    ; return RPB_Data.SetPropertyOfTypeIntegerArray(__getCachedSerializedRootObject(), asPropertyName)
+    ; return RPB_Data.SetPropertyOfTypeIntegerArray(__internalSerializedRootObject(), asPropertyName)
 endFunction
 
 function SetPropertyOfTypeFloatArray(string asPropertyName, float[] akValue)
-    ; return RPB_Data.SetPropertyOfTypeFloatArray(__getCachedSerializedRootObject(), asPropertyName)
+    ; return RPB_Data.SetPropertyOfTypeFloatArray(__internalSerializedRootObject(), asPropertyName)
 endFunction
 
 function SetPropertyOfTypeStringArray(string asPropertyName, string[] akValue)
-    ; return RPB_Data.SetPropertyOfTypeStringArray(__getCachedSerializedRootObject(), asPropertyName)
+    ; return RPB_Data.SetPropertyOfTypeStringArray(__internalSerializedRootObject(), asPropertyName)
 endFunction
 
 function SetPropertyOfTypeFormArray(string asPropertyName, Form[] akValue)
-    ; return RPB_Data.SetPropertyOfTypeFormArray(__getCachedSerializedRootObject(), asPropertyName)
+    ; return RPB_Data.SetPropertyOfTypeFormArray(__internalSerializedRootObject(), asPropertyName)
 endFunction
 
 
@@ -230,37 +226,189 @@ endFunction
 ; ==========================================================
 
 bool function FindPropertyOfTypeBool(string asPropertyName, string apFindConditions)
-    ; return RPB_Data.FindPropertyOfTypeBool(__getCachedSerializedRootObject(), asPropertyName)
+    ; return RPB_Data.FindPropertyOfTypeBool(__internalSerializedRootObject(), asPropertyName)
 endFunction
 
 int function FindPropertyOfTypeInt(string asPropertyName, string apFindConditions)
-    ; return RPB_Data.FindPropertyOfTypeInteger(__getCachedSerializedRootObject(), asPropertyName)
+    ; return RPB_Data.FindPropertyOfTypeInteger(__internalSerializedRootObject(), asPropertyName)
 endFunction
 
 float function FindPropertyOfTypeFloat(string asPropertyName, string apFindConditions)
-    ; return RPB_Data.FindPropertyOfTypeFloat(__getCachedSerializedRootObject(), asPropertyName)
+    ; return RPB_Data.FindPropertyOfTypeFloat(__internalSerializedRootObject(), asPropertyName)
 endFunction
 
 string function FindPropertyOfTypeString(string asPropertyName, string apFindConditions)
-    ; return RPB_Data.FindPropertyOfTypeString(__getCachedSerializedRootObject(), asPropertyName)
+    ; return RPB_Data.FindPropertyOfTypeString(__internalSerializedRootObject(), asPropertyName)
 endFunction
 
 Form function FindPropertyOfTypeForm(string asPropertyName, string apFindConditions)
-    ; return RPB_Data.FindPropertyOfTypeForm(__getCachedSerializedRootObject(), asPropertyName)
+    ; return RPB_Data.FindPropertyOfTypeForm(__internalSerializedRootObject(), asPropertyName)
 endFunction
 
 int[] function FindPropertyOfTypeIntegerArray(string asPropertyName, string apFindConditions)
-    ; return RPB_Data.FindPropertyOfTypeIntegerArray(__getCachedSerializedRootObject(), asPropertyName)
+    ; return RPB_Data.FindPropertyOfTypeIntegerArray(__internalSerializedRootObject(), asPropertyName)
 endFunction
 
 float[] function FindPropertyOfTypeFloatArray(string asPropertyName, string apFindConditions)
-    ; return RPB_Data.FindPropertyOfTypeFloatArray(__getCachedSerializedRootObject(), asPropertyName)
+    ; return RPB_Data.FindPropertyOfTypeFloatArray(__internalSerializedRootObject(), asPropertyName)
 endFunction
 
 string[] function FindPropertyOfTypeStringArray(string asPropertyName, string apFindConditions)
-    ; return RPB_Data.FindPropertyOfTypeStringArray(__getCachedSerializedRootObject(), asPropertyName)
+    ; return RPB_Data.FindPropertyOfTypeStringArray(__internalSerializedRootObject(), asPropertyName)
 endFunction
 
 Form[] function FindPropertyOfTypeFormArray(string asPropertyName, string apFindConditions)
-    ; return RPB_Data.FindPropertyOfTypeFormArray(__getCachedSerializedRootObject(), asPropertyName)
+    ; return RPB_Data.FindPropertyOfTypeFormArray(__internalSerializedRootObject(), asPropertyName)
 endFunction
+
+; ==========================================================
+;             Local Properties bound to Reference
+; ==========================================================
+
+;                          Getters
+; ==========================================================
+
+bool function GetLocalPropertyOfTypeBool(string asPropertyName, string asCategory = "null")
+    return RPB_StorageVars.GetBoolOnReference(asPropertyName, UUID, asCategory)
+endFunction
+
+int function GetLocalPropertyOfTypeInt(string asPropertyName, string asCategory = "null")
+    return RPB_StorageVars.GetIntOnReference(asPropertyName, UUID, asCategory)
+endFunction
+
+float function GetLocalPropertyOfTypeFloat(string asPropertyName, string asCategory = "null")
+    return RPB_StorageVars.GetFloatOnReference(asPropertyName, UUID, asCategory)
+endFunction
+
+string function GetLocalPropertyOfTypeString(string asPropertyName, string asCategory = "null")
+    return RPB_StorageVars.GetStringOnReference(asPropertyName, UUID, asCategory)
+endFunction
+
+Form function GetLocalPropertyOfTypeForm(string asPropertyName, string asCategory = "null")
+    return RPB_StorageVars.GetFormOnReference(asPropertyName, UUID, asCategory)
+endFunction
+
+int[] function GetLocalPropertyOfTypeIntegerArray(string asPropertyName, string asCategory = "null")
+    return RPB_StorageVars.GetIntsOnReference(asPropertyName, UUID, asCategory)
+endFunction
+
+float[] function GetLocalPropertyOfTypeFloatArray(string asPropertyName, string asCategory = "null")
+    return RPB_StorageVars.GetFloatsOnReference(asPropertyName, UUID, asCategory)
+endFunction
+
+string[] function GetLocalPropertyOfTypeStringArray(string asPropertyName, string asCategory = "null")
+    return RPB_StorageVars.GetStringsOnReference(asPropertyName, UUID, asCategory)
+endFunction
+
+Form[] function GetLocalPropertyOfTypeFormArray(string asPropertyName, string asCategory = "null")
+    return RPB_StorageVars.GetFormsOnReference(asPropertyName, UUID, asCategory)
+endFunction
+
+;                          Setters
+; ==========================================================
+
+function SetLocalPropertyOfTypeBool(string asPropertyName, bool abValue, string asCategory = "null")
+    RPB_StorageVars.SetBoolOnReference(asPropertyName, UUID, abValue, asCategory)
+endFunction
+
+function SetLocalPropertyOfTypeInt(string asPropertyName, int aiValue, string asCategory = "null")
+    RPB_StorageVars.SetIntOnReference(asPropertyName, UUID, aiValue, asCategory)
+endFunction
+
+function SetLocalPropertyOfTypeFloat(string asPropertyName, float afValue, string asCategory = "null")
+    RPB_StorageVars.SetFloatOnReference(asPropertyName, UUID, afValue, asCategory)
+endFunction
+
+function SetLocalPropertyOfTypeString(string asPropertyName, string asValue, string asCategory = "null")
+    RPB_StorageVars.SetStringOnReference(asPropertyName, UUID, asValue, asCategory)
+endFunction
+
+function SetLocalPropertyOfTypeForm(string asPropertyName, Form akValue, string asCategory = "null")
+    RPB_StorageVars.SetFormOnReference(asPropertyName, UUID, akValue, asCategory)
+endFunction
+
+function SetLocalPropertyOfTypeIntegerArray(string asPropertyName, int[] akValue, string asCategory = "null")
+    RPB_StorageVars.SetIntsOnReference(asPropertyName, UUID, akValue, asCategory)
+endFunction
+
+function SetLocalPropertyOfTypeFloatArray(string asPropertyName, float[] akValue, string asCategory = "null")
+    RPB_StorageVars.SetFloatsOnReference(asPropertyName, UUID, akValue, asCategory)
+endFunction
+
+function SetLocalPropertyOfTypeStringArray(string asPropertyName, string[] akValue, string asCategory = "null")
+    RPB_StorageVars.SetStringsOnReference(asPropertyName, UUID, akValue, asCategory)
+endFunction
+
+function SetLocalPropertyOfTypeFormArray(string asPropertyName, Form[] akValue, string asCategory = "null")
+    RPB_StorageVars.SetFormsOnReference(asPropertyName, UUID, akValue, asCategory)
+endFunction
+
+;                           Misc.
+; ==========================================================
+
+function DeleteLocalProperty(string asKey, string asCategory = "null")
+    RPB_StorageVars.DeleteVariableOnReference(asKey, UUID, asCategory)
+endFunction
+
+function DeleteLocalCategory(string asCategory)
+    RPB_StorageVars.DeleteCategoryOnReference(UUID, asCategory)
+endFunction
+
+function DeleteAllLocalProperties()
+    RPB_StorageVars.DeleteAllOnReference(UUID)
+endFunction
+
+bool function HasLocalProperty(string asKey, string asCategory = "null")
+    return RPB_StorageVars.HasVarOnReference(asKey, UUID, asCategory)
+endFunction
+
+bool function HasLocalProperties()
+    return RPB_StorageVars.HasVarsOnReference(UUID)
+endFunction
+
+; ==========================================================
+
+function EnsureFunctionalState()
+    ; UUID changed, this is a new RefAlias
+    __checkAndTriggerIdentityChange()
+
+    if (!__uuid)
+        __requestUUID()
+    endif
+endFunction
+
+; Triggers when the UUID for this RefAlias is changed
+event OnIdentityChanged(string asOldUUID, string asNewUUID)
+    Debug("["+ self +"] SerializableReferenceAlias::OnIdentityChanged", "Identity has changed! (Old UUID: "+ asOldUUID +", Current UUID: "+ asNewUUID +")")
+endEvent
+
+event OnReferenceDeleted() ; abstract
+endEvent
+
+event OnInit()
+    self.EnsureFunctionalState()
+endEvent
+
+; ==========================================================
+;                           private
+; ==========================================================
+
+function __requestUUID()
+    __assignNewIdentity()
+    Debug("["+ self +"] (private) SerializableReferenceAlias::RequestUUID", "Requested UUID: " + UUID)
+endFunction
+
+;Generates and assigns a new UUID to this instance.
+function __assignNewIdentity()
+    __oldUuid = __uuid
+    __uuid = RPB_Utility.GenerateUUID()
+endFunction
+
+; Checks whether the UUID has changed and triggers the event if it has.
+function __checkAndTriggerIdentityChange()
+    if (__uuid != __oldUuid && __oldUuid != "")
+        self.OnIdentityChanged(__oldUuid, __uuid)
+        __oldUuid = ""
+    endif
+endFunction
+
