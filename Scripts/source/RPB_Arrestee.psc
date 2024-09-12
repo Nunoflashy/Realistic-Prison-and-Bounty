@@ -419,10 +419,6 @@ function EscortToPrison(bool abEscortDirectlyToCell = false)
         return
     endif
 
-    ; ; Bind stay still package
-    ; ReferenceAlias arrestPackage = API.PrisonManager.GetArrestPackageByIndex(0)
-    ; self.BindAlias(arrestPackage)
-
     if (!abEscortDirectlyToCell)
         prisoner.EscortToJail(Captor.GetActor())
     else
