@@ -148,8 +148,11 @@ endFunction
 
 RPB_Prison function ShowPrisonList(bool abNotEmpty = true, bool abSkipListOnSingleResult = false, bool abShowCity = true, bool abShowHold = false, bool abShowPrisonerCount = true, string asListTitle = "Select Prison")
     RPB_PrisonManager prisonManager = API.PrisonManager
+    Alias[] prisons = prisonManager.GetAllPrisons()
+    Alias[] returnedPrisons = Utility.CreateAliasArray(prisons.Length)
+
     int prisonNames = JArray.object()
-    int prisonCount = prisonManager.PrisonSlots
+    int prisonCount = prisons.Length
     int activePrisonCount = 0
 
     int prisonIds = JArray.object()
@@ -158,39 +161,43 @@ RPB_Prison function ShowPrisonList(bool abNotEmpty = true, bool abSkipListOnSing
 
     int i = 0
     while (i < prisonCount)
-        RPB_Prison prison = prisonManager.GetPrisonByID(i) ; Might be changed later since the ID might not match an index from i = 0, should have a map of indices to ids
+        RPB_Prison prison = prisons[i] as RPB_Prison
+
+        string name = prison.Name
+        string hold = prison.Hold
+        string city = prison.City
+
         int prisonerCount = prison.Prisoners.Count
         if ((prisonerCount > 0 && abNotEmpty) || !abNotEmpty)
             string prisonLine = ""
 
-            if (abShowHold && ((prison.City != prison.Hold) || !abShowCity))
-                prisonLine += "["+ prison.Hold +"]"
+            if (abShowHold && ((city != hold) || !abShowCity))
+                prisonLine += "["+ hold +"]"
             endif
 
             if (abShowCity)
-                prisonLine += string_if (prisonLine != "", " ("+ prison.City +") ", "("+ prison.City +") ")
+                prisonLine += string_if (prisonLine != "", " ("+ city +") ", "("+ city +") ")
             endif
 
-            prisonLine += prison.Name
+            prisonLine += name
 
             if (abShowPrisonerCount)
                 prisonLine += " - " + prisonerCount + " Prisoners"
             endif
 
             JArray.addStr(prisonNames, prisonLine)
-            JArray.addInt(prisonIds, prison.ID as int)
-            activePrisonCount += 1
+            returnedPrisons[i] = prison
+
+            Debug("["+ i +"] [ID: "+ prison.ID +"] [UUID: "+ prison.UUID +"] ["+ name +"] UI::ShowPrisonList", "Name: " + name + ", Hold: " + hold + ", Faction: " + prison.PrisonFaction + ", City: " + city + ", Root Object: " + prison.GetSerializableRootObject())
         endif
+        activePrisonCount += 1
         i += 1
     endWhile
-    
-    if (activePrisonCount == 0)
-        return none
-    endif
 
     if (activePrisonCount == 1 && abSkipListOnSingleResult) ; Skip List (Only one result and <No Prison>)
-        int id = JArray.getInt(prisonIds, 0)
-        return prisonManager.GetPrisonByID(id)
+        RPB_Prison prison = prisons[0] as RPB_Prison
+        return prison
+        ; return prisonManager.GetPrisonByUUID(prison.UUID) ; redundant, can return prison directly, but test to see if UUID works properly
     endif
 
     string[] prisonNamesArray = JArray.asStringArray(prisonNames)
@@ -199,8 +206,9 @@ RPB_Prison function ShowPrisonList(bool abNotEmpty = true, bool abSkipListOnSing
         return none
     endif
 
-    int id = JArray.getInt(prisonIds, index)
-    return prisonManager.GetPrisonByID(id)
+    RPB_Prison returnedPrison = (returnedPrisons[index]) as RPB_Prison
+    return returnedPrison
+    ; return prisonManager.GetPrisonByUUID(returnedPrison.UUID)
 endFunction
 
 RPB_Prisoner function ShowPrisonerList(RPB_Prison apPrison, bool abOnlyImprisoned = false, string asListTitle = "Select Prisoner")
