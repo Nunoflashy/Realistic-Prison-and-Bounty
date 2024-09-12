@@ -28,6 +28,8 @@ string[] function GetActions()
     JArray.addStr(actionArrayObj, "[Arrest] Arrest Selected Actor with Selected Captor (Teleport Prisoner)")
     JArray.addStr(actionArrayObj, "[Faction Arrest] Arrest Selected Actor (Teleport Prisoner)")
     JArray.addStr(actionArrayObj, "[Arrest] Add Selected Actor to Current Arrest")
+    JArray.addStr(actionArrayObj, "[Prison] Initialize Prisons")
+    JArray.addStr(actionArrayObj, "[Prison] Configure Prison in Slot")
     JArray.addStr(actionArrayObj, "[Prison] Bind All Prisoners")
     JArray.addStr(actionArrayObj, "[Prison] Refresh Cell Options")
     JArray.addStr(actionArrayObj, "[Prison] Pre-Assign Cell to Prisoner")
@@ -77,6 +79,9 @@ function ShowActionsMenu()
 
     elseif (actionToPerform == "[Bounty] Set Violent Bounty for Selected Actor")
         Action_SetBountyForActor(uilib, true)
+
+    elseif (actionToPerform == "[Prison] Configure Prison in Slot")
+        Action_ConfigurePrisonInSlot(uilib)
 
     elseif (actionToPerform == "[Prison] Bind All Prisoners")
         Action_BindAllPrisoners(uilib)
@@ -140,6 +145,9 @@ function ShowActionsMenu()
 
     elseif (actionToPerform == "[Arrest] Add Selected Actor to Current Arrest")
         Action_AddSelectedActorToArrest(uilib)
+
+    elseif (actionToPerform == "[Prison] Initialize Prisons")
+        Action_InitializePrisons(uilib)
 
     elseif (actionToPerform == "[Prison] Release Prisoner from Prison")
         Action_ReleasePrisoner(uilib)
@@ -239,6 +247,36 @@ function Action_SetBountyForActor(RPB_UIInterface uilib, bool abViolentBounty = 
     DebugWithArgs("Actions::Action_SetBountyForActor", "abViolentBounty: " + YesNo(abViolentBounty), "Set " + actorName + "'s Bounty to " + bountyToSet)
 endFunction
 
+function Action_ConfigurePrisonInSlot(RPB_UIInterface uilib)
+    Alias[] prisonSlots = API.PrisonManager.GetAliases()
+    string builtSlots = ""
+
+    int i = 0
+    while (i < prisonSlots.Length)
+        Debug("Actions::Action_ConfigurePrisonInSlot", "PrisonSlots["+ i +"] ID: " + (prisonSlots[i] as RPB_Prison).ID)
+        builtSlots += "Slot " + i + " (ID: "+ (prisonSlots[i] as RPB_Prison).ID +")"
+        if (i < prisonSlots.Length)
+            builtSlots += ","
+        endif
+        i += 1
+    endWhile
+
+    string selectedSlot = uilib.ShowStringList("Select Slot", builtSlots)
+    int slotNumber = StringUtil.Substring(selectedSlot, StringUtil.Find(selectedSlot, " ") + 1, StringUtil.GetLength(selectedSlot)) as int
+    Debug("Actions::Action_ConfigurePrisonInSlot", "slotNumber: "+ slotNumber)
+    Debug("Actions::Action_ConfigurePrisonInSlot", "NthAlias(8): "+ API.PrisonManager.GetNthAlias(8))
+
+    ; int rootObject      = RPB_Data.GetRootObject("Bruma") ; JMap&
+    ; int prisonObject    = RPB_Data.Hold_GetJailObject(rootObject) ; JMap&
+
+    ; Location prisonLocation = RPB_Prison.Global_GetPropertyOfTypeForm(prisonObject, "Location") as Location
+    ; string prisonName       = RPB_Prison.Global_GetPropertyOfTypeString(prisonObject, "Name")
+    ; Faction prisonFaction   = RPB_Data.Hold_GetCrimeFaction(rootObject)
+
+    ; RPB_Prison prisonSlot = API.PrisonManager.GetNthAlias(slotNumber) as RPB_Prison
+    API.PrisonManager.InitializePrisonInSlot("The Rift", slotNumber)
+endFunction
+
 ; TODO: Add option to select the Prison
 function Action_BindAllPrisoners(RPB_UIInterface uilib)
     RPB_Prison castleDourDungeon = API.PrisonManager.GetPrison("Haafingar")
@@ -258,6 +296,10 @@ endFunction
 
 function Action_PreAssignCellToPrisoner(RPB_UIInterface uilib)
     Actor selectedActor = Game.GetCurrentConsoleRef() as Actor
+
+    Alias[] brumaPrisons = API.PrisonManager.GetPrisonsForHold("Bruma")
+    Debug("Actions::Action_PreAssignCellToPrisoner", "Bruma Prisons: " + brumaPrisons)
+
 
     if (selectedActor == none)
         return
@@ -527,6 +569,15 @@ function Action_AddSelectedActorToArrest(RPB_UIInterface uilib)
     BindAliasTo(sceneManager.GetEscortee(1), selectedActor)
 endFunction
 
+function Action_InitializePrisons(RPB_UIInterface uilib)
+    string[] holds = API.Config.Holds
+    int i = 0
+    while (i < holds.Length)
+        API.PrisonManager.InitializePrison(holds[i])
+        i += 1
+    endWhile
+endFunction
+
 function Action_ArrestSelectedActorForFaction(RPB_UIInterface uilib)
     string selectedFaction  = uilib.ShowHoldList("Select Faction for Arrest")
 
@@ -570,7 +621,20 @@ function Action_ImprisonSelectedActor(RPB_UIInterface uilib)
     endif
 
     RPB_Prison prison       = uilib.ShowPrisonList(abNotEmpty = false, abShowCity = true, abShowHold = false, abShowPrisonerCount = false, asListTitle = "Send " + selectedActor.GetBaseObject().GetName() + " to Prison")
+    ; RPB_Prison prison = API.PrisonManager.GetNthAlias(8) as RPB_Prison
+    if (!prison)
+        return
+    endif
+
     RPB_Prisoner prisoner   = prison.MakePrisoner(selectedActor)
+
+    ; Debug("Actions::Action_ImprisonSelectedActor", "[Prison ID: "+ prison.ID +"] ["+ prison.UUID +"] Prison: " + prison.Name + ", prisoner: " + prisoner)
+    ; Debug("Actions::Action_ImprisonSelectedActor", "[Prison ID: "+ prison.ID +"] ["+ prison.UUID +"] Prisoners: "+ prison.Prisoners.GetKeys())
+
+    if (!prisoner)
+        Debug("Actions::Action_ImprisonSelectedActor", "[Prison ID: "+ prison.ID +"] ["+ prison.UUID +"] Prisoners: "+ prison.Prisoners.GetKeys())
+        return
+    endif
 
     ; Set showable options in prisoner info menu
     prisoner.ShowReleaseTime          = true
@@ -705,7 +769,7 @@ endFunction
 
 function Action_ShowCellDoors(RPB_UIInterface uilib)
     RPB_Prison prison = uilib.ShowPrisonList(false)
-    Debug("Actions::Action_ShowCellDoor", "prison: " + prison + ", name: " + prison.Name + ", hold: " + prison.Hold)
+    Debug("Actions::Action_ShowCellDoors", "prison: " + prison + ", name: " + prison.Name + ", hold: " + prison.Hold)
     prison.SetupCells()
 
     if (prison == none)
