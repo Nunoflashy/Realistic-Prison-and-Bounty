@@ -1535,26 +1535,39 @@ function StartEscortToCell(Actor akEscortLeader, Actor akEscortedPrisoner, Objec
     ; Bind the the jail cell door
     BindAliasTo(self.GetCellDoor(), akJailCellDoor)
 
+    ObjectReference waitingEscortMarker = akEscortWaitingMarker
+    if (waitingEscortMarker == none)
+        waitingEscortMarker = akJailCellDoor
+    endif
+
     ; Bind the guard waiting marker
-    BindAliasTo(self.GetGuardLocation(), akEscortWaitingMarker)
+    BindAliasTo(self.GetGuardLocation(), waitingEscortMarker)
 
     self.QueueOrPlay(SCENE_ESCORT_TO_CELL_01)
     ; self.GetScene(SCENE_ESCORT_TO_CELL_01).Start()
     ; EscortToCell.Start()
 endFunction
 
-function StartEscortToCell_02(Actor akGuard, Actor akPrisoner, ObjectReference akJailCell, ObjectReference akJailCellDoor)
+function StartEscortToCell_02(Actor akEscortLeader, Actor akEscortedPrisoner, ObjectReference akJailCellMarker, ObjectReference akJailCellDoor, ObjectReference akEscortWaitingMarker)
     ; Bind the captor to its alias to lead the escort scene
-    BindAliasTo(self.GetGuard(), akGuard)
+    BindAliasTo(self.GetGuard(), akEscortLeader)
 
     ; Bind the prisoner to its alias to be escorted
-    BindAliasTo(self.GetPrisoner(), akPrisoner)
+    BindAliasTo(self.GetPrisoner(), akEscortedPrisoner)
 
     ; Bind the prisoner's destination point, the jail cell
-    BindAliasTo(self.GetCell(), akJailCell)
+    BindAliasTo(self.GetCell(), akJailCellMarker)
 
     ; Bind the guard's destination point, the jail cell door
     BindAliasTo(self.GetCellDoor(), akJailCellDoor)
+
+    ObjectReference waitingEscortMarker = akEscortWaitingMarker
+    ; if (waitingEscortMarker == none)
+    ;     waitingEscortMarker = akJailCellDoor
+    ; endif
+    
+    ; Bind the guard waiting marker
+    BindAliasTo(self.GetGuardLocation(), waitingEscortMarker)
 
     self.QueueOrPlay(SCENE_ESCORT_TO_CELL_02)
     ; self.GetScene(SCENE_ESCORT_TO_CELL_02).Start()
@@ -1650,12 +1663,15 @@ function StartStripping(Actor akStripperGuard, Actor akStrippedPrisoner)
     ; Stripping.Start()
 endFunction
 
-function StartStripping_02(Actor akStripperGuard, Actor akStrippedPrisoner)
+function StartStripping_02(Actor akStripperGuard, Actor akStrippedPrisoner, ObjectReference akStripMarker = none)
     ; Bind the guard to be the one performing the strip search / undressing
     BindAliasTo(self.GetGuard(), akStripperGuard)
 
     ; Bind the Prisoner to be the actor being strip searched / undressed
     BindAliasTo(self.GetPrisoner(), akStrippedPrisoner)
+
+    BindAliasTo(self.GetGuardLocation(), akStripMarker)
+    BindAliasTo(self.GetPrisonerLocation(), akStripMarker)
 
     ; Bind the other Prisoners to also be strip searched / undressed
     BindAliasTo(self.GetPrisoner(1), self.GetEscortee(1).GetActorReference())
