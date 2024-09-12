@@ -669,7 +669,10 @@ string[] function GetPropertyOfTypeStringArray(int apRootObject, string asProper
     ;     "\n\t isMap: "              + JValue.isMap(parentObject) + \
     ;     "\n\t isFormMap: "          + JValue.isFormMap(parentObject) + \
     ;     "\n\t isIntMap: "           + JValue.isIntegerMap(parentObject) + \
-    ;     "\n\t isArray: "            + JValue.isArray(parentObject) \
+    ;     "\n\t isArray: "            + JValue.isArray(parentObject) + \
+    ;     "\n\t subCategories: "       + subCategories + \
+    ;     "\n\t apRootObject: "       + GetContainerList(apRootObject) + \
+    ;     "\n\t apRootObject: "       + GetContainerList(parentObject) \
     ; )
 
     int returnedObject
