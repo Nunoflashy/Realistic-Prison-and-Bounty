@@ -88,6 +88,42 @@ endFunction
     endFunction
 /;
 
+function VerifyPrisonsIntegrity()
+    ; return
+    Debug("PrisonManager::VerifyPrisonsIntegrity", "Verifying Prisons integrity...")
+
+    int i = 0
+    while (i < PrisonSlots)
+        RPB_Prison prisonRef = self.GetNthAlias(i) as RPB_Prison
+        if (prisonRef.Active)
+            prisonRef.SetupCells()
+            ; prisonRef.EnsureFunctionalState()
+        endif
+        i += 1
+    endWhile
+
+    self.RemoveDuplicatePrisons()
+endFunction
+
+event OnPrisonConfigured(RPB_Prison apPrison)
+    apPrison.Active = true
+    apPrison.SetFallbackProperty("Name", apPrison.PrisonLocation.GetName())
+    apPrison.SetupCells()
+    Debug("PrisonManager::OnPrisonConfigured", "Initialized " + apPrison.Name + " for Hold " + apPrison.Hold)
+endEvent
+
+event OnPrisonInitializationFailed(RPB_Prison apPrisonSlot, string asHold, int apRootHoldObject, int apRootPrisonObject, string asReason = "")
+    DebugError("PrisonManager::OnPrisonInitializationFailed", "Failed to initialize prison for " + asHold + " (slot: "+ apPrisonSlot.ID +")")
+endEvent
+
+event OnPrisonRemove(RPB_Prison apPrison)
+    ; Check if there are prisoners currently in the Prison, maybe don't allow removal until then, etc (move Prison to a temp object, for example)
+endEvent
+
+event OnPrisonRemoved(RPB_Prison apPrison)
+
+endEvent
+
 event OnPrisonRegisteredPrisoner(RPB_Prison apPrison, RPB_Prisoner apPrisoner)
     RPB_StorageVars.SetString(apPrisoner.GetIdentifier(), apPrison.Hold, "PrisonManager")
 endEvent
@@ -106,8 +142,7 @@ RPB_Prison function GetAvailablePrisonSlot()
 
     while (i < self.PrisonSlots)
         RPB_Prison currentPrisonAlias = self.GetNthAlias(i) as RPB_Prison
-        Trace("PrisonManager::GetAvailablePrisonSlot", "["+ currentPrisonAlias.Name +"] Is Initialized: " + currentPrisonAlias.WasInitialized())
-        if (!currentPrisonAlias.Initialized)
+        if (!currentPrisonAlias.Active)
             return currentPrisonAlias ; Free slot, return this one
         endif
         i += 1
@@ -122,7 +157,7 @@ int function GetNumberOfAvailableSlots()
     int i = 0
     while (i < self.PrisonSlots)
         RPB_Prison currentPrisonAlias = self.GetNthAlias(i) as RPB_Prison
-        if (!currentPrisonAlias.WasInitialized())
+        if (!currentPrisonAlias.Active)
             availableSlots += 1
         endif
         i += 1
@@ -131,38 +166,77 @@ int function GetNumberOfAvailableSlots()
     return availableSlots
 endFunction
 
-bool function WasPrisonConfigChanged(RPB_Prison apPrison)
-    int holdRootObject = RPB_Data.GetRootObject(apPrison.Hold)
-    RPB_Utility.Debug("Prison::WasConfigChanged", "Prison: " + apPrison.City + ", " + "holdRootObject: " + holdRootObject)
-    RPB_Utility.Debug("Prison::WasConfigChanged", "Hold: " + apPrison.Hold + ", Faction: " + apPrison.PrisonFaction + ", City: " + apPrison.City)
+bool function IsValidPrison(RPB_Prison apPrison) global
+    return apPrison && apPrison.Name != "" && apPrison.Hold != "" && apPrison.PrisonFaction != none
+endFunction
+
+; bool function ValidateRootPrisonObject(int apRootObject) global
+;     bool hasCells = \
+;         RPB_Data.HasProperty(apRootObject, "Cells")
+
+
+;     bool isValid = \
+;         RPB_Data.HasProperty(apRootObject, "Location") && \
+;         RPB_Data.HasProperty(apRootObject, "Name") && \
+;         RPB_Data.HasProperty(apRootObject, "Prisoner Containers//Belongings") && \
+;         RPB_Data.HasProperty(apRootObject, "Prisoner Containers//Evidence") && \
+;         RPB_Data.HasProperty(apRootObject, "Markers//Jail//Teleport") && \
+;         RPB_Data.HasProperty(apRootObject, "Markers//Jail//Escort") && \
+;         RPB_Data.HasProperty(apRootObject, "Markers//Release//Teleport") && \
+;         RPB_Data.HasProperty(apRootObject, "Markers//Release//Escort") && \
+; endFunction
+
+bool function DeletePrison(RPB_Prison apPrison)
+    Debug("["+ apPrison.Name +"] PrisonManager::DeletePrison", "Deleted Prison [Name: " + apPrison.Name + ", Hold: " + apPrison.Hold + ", Faction: " + apPrison.PrisonFaction + ", City: " + apPrison.City + "]")
+    
+    ; Deallocate pointer to root prison object
+    int rootObject = apPrison.GetSerializableRootObject()
+    rootObject = JValue.release(rootObject)
+
+    Utility.Wait(0.1)
+    apPrison.Delete()
+endFunction
+
+function AssignPrisonRootObject(RPB_Prison apPrison, int apRootObject) global
+    if (apPrison.GetSerializableRootObject() != 0)
+        DebugError("PrisonManager::AssignPrisonRootObject", "["+ apPrison.UUID +"] " + apPrison.Name + " already has a root object, aborting!")
+        return
+    endif
+
+    apPrison.SetLocalPropertyOfTypeInt("Root Object", apRootObject)
+    JValue.retain(apRootObject, "PrisonManager::PrisonObjects")
+endFunction
+
+bool function AssignPrisonHoldProperties(RPB_Prison apPrison, string asHold, int apHoldRootObject) global
+    Faction crimeFaction = RPB_Data.GetPropertyOfTypeForm(apHoldRootObject, "Crime Faction") as Faction
+
+    if (crimeFaction == none)
+        return false
+    endif
+
+    apPrison.SetLocalPropertyOfTypeString("Hold", asHold)
+    apPrison.SetLocalPropertyOfTypeForm("Crime Faction", crimeFaction)
+
     return true
 endFunction
 
-bool function DeletePrison(RPB_Prison akPrison)
-
-endFunction
-
 function ReloadPrisonConfig(RPB_Prison apPrison)
-    Location prisonLocation = apPrison.GetPropertyOfTypeForm("Location") as Location
-    string prisonName       = apPrison.GetPropertyOfTypeString("Name")
+    int rootObject      = RPB_Data.GetRootObject(apPrison.Hold) ; JMap&
+    int newPrisonObject = RPB_Data.GetPropertyOfTypeObject(rootObject, "Jail") ; JMap& ; Later change to Prison name when 1:N
 
-    apPrison.ConfigurePrison( \
-        akLocation  = prisonLocation, \
-        akFaction   = apPrison.PrisonFaction, \
-        asHold      = apPrison.Hold, \
-        asName      = prisonName \
-    )
+    int oldPrisonObject = RPB_StorageVars.GetIntOnReference("Root Object", apPrison.UUID)
+    oldPrisonObject     = JValue.release(oldPrisonObject)
 
-    Error("Some elements of the prison config could not be determined!", !prisonLocation || !prisonName)
+    apPrison.SetLocalPropertyOfTypeInt("Root Object", newPrisonObject)
+    JValue.retain(newPrisonObject, "PrisonManager::PrisonObjects")
 endFunction
 
 function UninitializePrisons()
     int i = 0
     while (i < self.PrisonSlots)
         RPB_Prison possiblePrison = self.GetNthAlias(i) as RPB_Prison
-        if (possiblePrison && possiblePrison.WasInitialized())
-            possiblePrison.Uninitialize()
-            ; RPB_StorageVars.SetBool("Prison::" + i, false, "PrisonManager")
+        if (IsValidPrison(possiblePrison) && possiblePrison.Active)
+            self.DeletePrison(possiblePrison)
         endif
         i += 1
     endWhile
@@ -170,40 +244,88 @@ endFunction
 
 int function UninitializePrisonByID(int aiPrisonID)
     RPB_Prison possiblePrison = self.GetNthAlias(aiPrisonID) as RPB_Prison
-    possiblePrison.Uninitialize()
+    if (IsValidPrison(possiblePrison))
+        self.DeletePrison(possiblePrison)
+    endif
 endFunction
 
-bool function InitializePrisonConfig(string asHold)
+bool function InitializePrison(string asHold)
     int rootObject      = RPB_Data.GetRootObject(asHold) ; JMap&
     int prisonObject    = RPB_Data.Hold_GetJailObject(rootObject) ; JMap&
 
-    Location prisonLocation = RPB_Prison.Global_GetPropertyOfTypeForm(prisonObject, "Location") as Location
-    string prisonName       = RPB_Prison.Global_GetPropertyOfTypeString(prisonObject, "Name")
-    Faction prisonFaction   = RPB_Data.Hold_GetCrimeFaction(rootObject)
-
     RPB_Prison prisonSlot = self.AvailableSlot
 
-    ; Trace("PrisonManager::InitializePrisonConfig", "{\n"+ \
-    ;     "prisonLocation: " + prisonLocation + "\n" + \
-    ;     "prisonName: " + prisonName + "\n" + \
-    ;     "prisonFaction: " + prisonFaction + "\n" + \
-    ;     "prisonSlot: " + prisonSlot + "\n" + \
-    ;     "Prison Slots: " + self.PrisonSlots + "\n" \
-    ;  +"}")
-
     if (!prisonSlot)
-        Error("There are no Prison Slots available, cannot configure prison for " + asHold + "! (Prison: "+ prisonName +")")
+        Error("There are no Prison Slots available, cannot configure prison for "+ asHold +".")
+        self.OnPrisonInitializationFailed(prisonSlot, asHold, rootObject, prisonObject, "No Slots")
         return false
     endif
 
-    prisonSlot.ConfigurePrison( \
-        akLocation  = prisonLocation, \
-        akFaction   = prisonFaction, \
-        asHold      = asHold, \
-        asName      = prisonName \
-    )
+    ; if (!PrisonExists()) ; TODO: Check if prison exists with given parameters before adding and initialiazing
 
-    return true
+    if (AssignPrisonHoldProperties(prisonSlot, asHold, rootObject))
+        AssignPrisonRootObject(prisonSlot, prisonObject)
+        self.OnPrisonConfigured(prisonSlot)
+
+        return true
+    endif
+
+    return false
+endFunction
+
+bool function InitializePrisonInSlot(string asHold, int aiSlot)
+    int rootObject      = RPB_Data.GetRootObject(asHold) ; JMap&
+    int prisonObject    = RPB_Data.Hold_GetJailObject(rootObject) ; JMap&
+
+    if (aiSlot > self.PrisonSlots)
+        return false; Out of bounds
+    endif
+
+    RPB_Prison slotAlias = self.GetNthAlias(aiSlot) as RPB_Prison
+    self.DeletePrison(slotAlias)
+
+    if (AssignPrisonHoldProperties(slotAlias, asHold, rootObject))
+        AssignPrisonRootObject(slotAlias, prisonObject)
+        self.OnPrisonConfigured(slotAlias)
+
+        return true
+    endif
+
+    return false
+endFunction
+
+function InitializePrisons()
+    int rootObject = RPB_Data.GetRootObject() ; JMap&
+    string[] holds = JMap.allKeysPArray(rootObject)
+
+    int i = 0
+    while (i < holds.Length)
+        self.InitializePrison(holds[i])
+        i += 1
+    endWhile
+endFunction
+
+Alias[] function GetAllPrisons()
+    int i = 0
+    int activePrisons = 0
+    while (i < PrisonSlots)
+        RPB_Prison prison = self.GetNthAlias(i) as RPB_Prison
+        if (prison.Active && IsValidPrison(prison))
+            activePrisons += 1
+        endif
+        i += 1
+    endWhile
+
+    Alias[] prisonArray = Utility.CreateAliasArray(activePrisons)
+
+    i = 0
+    while (i < activePrisons)
+        RPB_Prison prison = self.GetNthAlias(i) as RPB_Prison
+        prisonArray[i] = prison
+        i += 1
+    endWhile
+
+    return prisonArray
 endFunction
 
 ;/
@@ -213,15 +335,31 @@ endFunction
 
     returns [RPB_Prison]: The RPB_Prison reference for this hold, or none if it does not exist.
 /;
+; RPB_Prison function GetPrison(string asHold)
+;     int i = 0
+
+;     while (i < self.PrisonSlots)
+;         RPB_Prison currentPrison = self.GetNthAlias(i) as RPB_Prison
+;         ; Info("Hold: " + currentPrison.Hold + ", Faction: " + currentPrison.PrisonFaction + ", City: " + currentPrison.City)
+;         if (currentPrison.Hold == asHold)
+;             ; RPB_Utility.DebugWithArgs("PrisonManager::GetPrison", asHold, "Hold: " + currentPrison.Hold + ", Faction: " + currentPrison.PrisonFaction + ", City: " + currentPrison.City)
+;             self.ReloadPrisonConfig(currentPrison)
+;             Debug("PrisonManager::GetPrison", "Returned currentPrison.Name: "+ currentPrison.Name +", currentPrison.ID: " + currentPrison.ID + " (Nth Alias: "+ (currentPrison as Alias).GetID() +") ")
+
+;             return currentPrison
+;         endif
+;         i += 1
+;     endWhile
+
+;     return none
+; endFunction
+
 RPB_Prison function GetPrison(string asHold)
     int i = 0
 
     while (i < self.PrisonSlots)
         RPB_Prison currentPrison = self.GetNthAlias(i) as RPB_Prison
-        ; Info("Hold: " + currentPrison.Hold + ", Faction: " + currentPrison.PrisonFaction + ", City: " + currentPrison.City)
         if (currentPrison.Hold == asHold)
-            ; RPB_Utility.DebugWithArgs("PrisonManager::GetPrison", asHold, "Hold: " + currentPrison.Hold + ", Faction: " + currentPrison.PrisonFaction + ", City: " + currentPrison.City)
-            self.ReloadPrisonConfig(currentPrison)
             return currentPrison
         endif
         i += 1
@@ -231,17 +369,156 @@ RPB_Prison function GetPrison(string asHold)
 endFunction
 
 ; TODO: Add support for multiple prisons in each Hold,
-; Returns a ReferenceAlias[], each element is castable to RPB_Prison
-ReferenceAlias[] function GetPrisonsByHold(string asHold)
+; Returns a Alias[], each element is castable to RPB_Prison
+Alias[] function GetPrisonsByHold(string asHold)
 
 endFunction
+
+Alias[] function GetPrisonsForHold(string asHold)
+    Alias[] prisonRefs = Utility.CreateAliasArray(1)
+
+    int prisonsAdded = 0
+    int i = 0
+    while (i < PrisonSlots)
+        RPB_Prison prisonRef = self.GetNthAlias(i) as RPB_Prison
+        ; if (prisonRef.Active && prisonRef.Hold == asHold)
+            prisonRefs[i] = prisonRef
+            prisonsAdded += 1
+        ; endif
+        i += 1
+    endWhile
+    Utility.ResizeAliasArray(prisonRefs, 20)
+
+    ; Utility.ResizeAliasArray(prisonRefs, prisonRefs.Length - prisonsAdded)
+
+    return prisonRefs
+endFunction
+
+; Alias[] function GetPrisonsForHold(string asHold)
+;     int holdObject      = RPB_Data.GetRootObject(asHold)
+;     int prisonsObject   = RPB_Data.GetPropertyOfTypeObject(holdObject, "Prisons")
+;     int prisonCount     = JValue.count(prisonsObject)
+
+;     Alias[] prisonsArray = Utility.CreateAliasArray(prisonCount)
+
+;     int i = 0
+;     while (i < prisonCount)
+;         string hold = asHold
+;         Faction crimeFaction = RPB_Data.GetPropertyOfTypeForm(holdObject, "Crime Faction") as Faction
+;         string city = RPB_Data.GetPropertyOfTypeString(prisonsObject, "Jail//City")
+;         string name = RPB_Data.GetPropertyOfTypeString(prisonsObject, "Jail//Name")
+;         RPB_Prison prisonRef
+;         prisonsArray[i] = new RPB_Prison
+;         i += 1
+;     endWhile
+; endFunction
 
 RPB_Prison function GetPrisonByID(int aiPrisonID)
     return self.GetNthAlias(aiPrisonID) as RPB_Prison
 endFunction
 
-RPB_Prison function GetPrisonByName(string asPrisonName)
+; Later cache the Prisons by UUID
+RPB_Prison function GetPrisonByUUID(string uuid)
+    int i = 0
+    while (i < PrisonSlots)
+        RPB_Prison prison = self.GetNthAlias(i) as RPB_Prison
+        ; Debug("["+ prison.UUID +"] PrisonManager::GetPrisonByUUID", "prison: " + prison.Name)
+        if (prison.UUID == uuid)
+            return prison
+        endif
+        i += 1
+    endWhile
 
+    return none
+endFunction
+
+RPB_Prison function GetPrisonByIndex(int aiPrisonIndex)
+    return self.GetAliasByName("Prison" + aiPrisonIndex) as RPB_Prison
+endFunction
+
+RPB_Prison function GetPrisonByName(string asPrisonName)
+    int i = 0
+    while (i < PrisonSlots)
+        RPB_Prison prison = self.GetNthAlias(i) as RPB_Prison
+        if (prison.Name == asPrisonName)
+            return prison
+        endif
+        i += 1
+    endWhile
+
+    return none
+endFunction
+
+bool function PrisonExists(string asHold, string asName, Faction akCrimeFaction)
+    int i = 0
+    while (i < PrisonSlots)
+        RPB_Prison prisonRef = self.GetNthAlias(i) as RPB_Prison
+        if (prisonRef.Hold == asHold && prisonRef.Name == asName && prisonRef.PrisonFaction == akCrimeFaction)
+            return true
+        endif
+        i += 1
+    endWhile
+
+    return false
+endFunction
+
+bool function IsSamePrison(RPB_Prison apPrisonOne, RPB_Prison apPrisonTwo) global
+    return (apPrisonOne.Name == apPrisonTwo.Name) && (apPrisonOne.Hold == apPrisonTwo.Hold) && (apPrisonOne.PrisonFaction == apPrisonTwo.PrisonFaction)
+endFunction
+
+int function GetActivePrisonCount()
+    int i = 0
+    int activePrisonCount = 0
+
+    while (i < PrisonSlots)
+        RPB_Prison prisonRef = self.GetNthAlias(i) as RPB_Prison
+        if (prisonRef && prisonRef.Active)
+            activePrisonCount = i
+        endif
+        i += 1
+    endWhile
+
+    return activePrisonCount
+endFunction
+
+; int function GetActivePrisonCount()
+;     if (self.HasCachedActivePrisons())
+;         return self.GetCachedActivePrisons()
+;     endif
+;     int i = 0
+;     int startIndex = 0
+;     while (i < PrisonSlots)
+;         RPB_Prison prisonRef = self.GetNthAlias(i) as RPB_Prison
+;         if (prisonRef.Active && startIndex == 0)
+;             startIndex = i
+;         endif
+;         i += 1
+;     endWhile
+
+;     int activePrisonCount = i
+;     self.CacheActivePrisons(startIndex, activePrisonCount)
+; endFunction
+
+
+function RemoveDuplicatePrisons()
+    int i = 0
+    int j = 0
+
+    while (i < PrisonSlots)
+        RPB_Prison currentPrison = self.GetNthAlias(i) as RPB_Prison
+        if (currentPrison)
+            j = (i + 1)
+            while (j < PrisonSlots)
+                RPB_Prison prisonToCheck = self.GetNthAlias(j) as RPB_Prison
+                if (IsValidPrison(prisonToCheck) && IsSamePrison(currentPrison, prisonToCheck))
+                    Debug("PrisonManager::RemoveDuplicatePrisons", "Found duplicate Prison in slot "+ j +": ["+ prisonToCheck.Name +"], already exists in slot: " + i)
+                    self.DeletePrison(prisonToCheck)
+                endif
+                j += 1
+            endWhile
+        endif
+        i += 1
+    endWhile
 endFunction
 
 ; ==========================================================
@@ -254,7 +531,7 @@ ReferenceAlias function GetCellPackageOfType(string asCellPackageType)
     if (!cellPackagesReference)
         cellPackagesReference = RPB_Utility.CellPackages()
     endif
-
+    
     int availablePackages = cellPackagesReference.GetNumAliases()
 
     int i = 0

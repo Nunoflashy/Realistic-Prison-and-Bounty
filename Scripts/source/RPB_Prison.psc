@@ -546,68 +546,39 @@ int property SERVE_TIME_YES = 0 autoreadonly
 ;                       Prison Identity
 ; ==========================================================
 
-bool property Initialized
-    bool function get()
-        return __isInitialized
-        ; return ID && Name && PrisonFaction && PrisonLocation && Hold && City
+int property ID
+    int function get()
+        return self.GetID()
     endFunction
 endProperty
 
-; int property ID
-;     int function get()
-;         return self.GetID()
-;     endFunction
-; endProperty
+string property Name
+    string function get()
+        return self.TryGetString("Name")
+    endFunction
+endProperty
 
-Location __prisonLocation
 Location property PrisonLocation
     Location function get()
-        return __prisonLocation
+        return self.GetPropertyOfTypeForm("Location") as Location
     endFunction
 endProperty
 
-Faction __prisonFaction
 Faction property PrisonFaction
     Faction function get()
-        return __prisonFaction
+        return self.GetLocalPropertyOfTypeForm("Crime Faction") as Faction
     endFunction
 endProperty
 
-; string __name
-; string __fallbackName
-; string property Name
-;     string function get()
-;         if (__name)
-;             return __name
-;         endif
-
-;         if (__fallbackName)
-;             return __fallbackName
-;         endif
-
-;         if (!__name)
-;             __name = self.GetPropertyOfTypeString("Name")
-;         endif
-
-;         if (!__name)
-;             __fallbackName = PrisonLocation.GetName()
-;         endif
-
-;         return __name
-;     endFunction
-; endProperty
-
-string __hold
 string property Hold
     string function get()
-        return __hold
+        return self.GetLocalPropertyOfTypeString("Hold")
     endFunction
 endProperty
 
-string __city
 string property City
     string function get()
-        return __city
+        return self.GetPropertyOfTypeString("City")
     endFunction
 endProperty
 
@@ -640,7 +611,8 @@ RPB_PrisonerList property Prisoners
 
         __prisoners = ((self as ReferenceAlias) as RPB_ActiveMagicEffectContainer) as RPB_PrisonerList
         ; __prisoners = PrisonManager.GetNthAlias(self.GetID()) as RPB_PrisonerList
-        LogProperty("Prison::Prisoners", "Initialized with a value of: " + __prisoners)
+        ; LogProperty("Prison::Prisoners", "Initialized with a value of: " + __prisoners)
+        ; Debug("["+ Name +"] Prison::Prisoners", "Initialized with a value of: " + __prisoners)
         return __prisoners
     endFunction
 endProperty
@@ -677,22 +649,21 @@ endProperty
 
 ; ==========================================================
 
-function Uninitialize()
-    __isInitialized = false
-
-    __prisonLocation    = none
-    __prisonFaction     = none
-    ; __name              = none
-    __hold              = none
-    __city              = none
+bool function ActiveByDefault() ; overrides
+    return false
 endFunction
+
+event OnReferenceDeleted()
+    ; Reset Prisoners list
+    __prisoners = none
+endEvent
 
 ; ==========================================================
 ;                           Prison
 ; ==========================================================
 
 Form[] function GetEscortLocations()
-    return self.GetPropertyOfTypeFormArray("Escort Locations")
+    return self.GetPropertyOfTypeFormArray("Markers//Jail//Escort")
 endFunction
 
 ObjectReference function GetRandomEscortLocation()
@@ -1411,11 +1382,15 @@ event OnEscortPrisonerToCellEnd(RPB_Prisoner apPrisoner, RPB_JailCell akJailCell
         apPrisoner.Imprison()
     endif
 
+    apPrisoner.SetBool("Should Be In Cell", true)
+
     if (apPrisoner.IsNPC())
-        ; Ensures the Prisoner stays in the cell since we update it 10s later,
+        ; Ensures the Prisoner stays in the cell since we update it 10s later after the initial check,
         ; delaying it enough for all actions to finish before the check.
+        apPrisoner.JailCell.RegisterForSanityChecking(1.0, apPrisoner = apPrisoner)
         apPrisoner.JailCell.RegisterForSanityChecking(10.0, apPrisoner = apPrisoner)
    endif
+
 endEvent
 
 event OnEscortPrisonerFromCellBegin(RPB_Prisoner apPrisoner, Actor akEscort)
@@ -1674,18 +1649,6 @@ RPB_Prisoner[] property CheckedPrisonersList
     endFunction
 endProperty
 
-event OnInit()
-    ; ; Temporary, to hold periodically updates prisoners for now
-    ; checkedPrisoners        = new RPB_Prisoner[128]
-    ; checkedPrisonersIndex   = 0
-
-    ; ; __prisoners             = new RPB_Prisoner[128]
-    ; __prisonersIndex        = 0
-
-
-    Debug("Prison::OnInit", "OnInit PRISON")
-endEvent
-
 event OnUpdateGameTime()
     __isReceivingUpdates = true
     __isAwaitingUpdateForGameTime = false
@@ -1694,56 +1657,6 @@ event OnUpdateGameTime()
 
     RegisterForSingleUpdateGameTime(5.0)
 endEvent
-
-int __holdObject
-
-function ConfigurePrison( \
-    Location akLocation, \
-    Faction akFaction, \
-    string asHold, \
-    string asName = "" \
-)
-
-    __prisonLocation    = akLocation
-    __prisonFaction     = akFaction
-    ; __name              = asName
-    __hold              = asHold
-
-    int rootItem                = RPB_Data.GetRootObject(__hold)
-    string configuredCity       = RPB_Data.Hold_GetCity(rootItem)
-
-    __city              = configuredCity
-    __holdObject        = rootItem
-
-    self.SetFallbackName(PrisonLocation.GetName())
-
-    ; RPB_Utility.Debug("Prison::ConfigurePrison", "Name: " + self.Name + ", Hold: " + self.Hold + ", Faction: " + self.PrisonFaction + ", City: " + self.City)
-
-    ; if (PrisonLocation && PrisonFaction && Name && Hold)
-        __isInitialized     = true
-        ; RPB_StorageVars.SetBool("Prison::" + ID, true, "PrisonManager")
-    ; endif
-    ; Trace("Prison::ConfigurePrison", "["+ self.Name +"] Is Initialized: " + __isInitialized)
-
-    ; Form randomPrisonerContainer = self.GetRandomPrisonerContainer()
-
-    ; Form oppositeContainer = self.GetPrisonerContainerLinkedWithOppositeType(randomPrisonerContainer, "Evidence")
-    ; Debug("Prison::ConfigurePrison", "Evidence Link Of Belongings Container " + randomPrisonerContainer + ": " + oppositeContainer)
-    ; Debug("Prison::ConfigurePrison", "Prisoner Containers: " + self.GetPrisonerContainers())
-
-    ; if (randomPrisonerContainer)
-    ;     Config.Player.RemoveAllItems(randomPrisonerContainer as ObjectReference, true, true)
-    ; endif
-
-    ; Initialize all of the jail cells belonging to this prison
-    self.SetupCells() ; To be changed, this will only work if the Player is present in the scene
-
-    ; Debug(self.GetOwningQuest(), "Prison::ConfigurePrison", "Prison Location: " + PrisonLocation + ", Prison Faction: " + PrisonFaction + ", Prison Hold: " + Hold)
-endFunction
-
-string function GetSerializableID() ; overrides
-    return self.GetID() as string
-endFunction
 
 bool function BindCellToPrisoner(ObjectReference akJailCell, RPB_Prisoner apPrisoner)
     RPB_JailCell jailCell = (akJailCell as RPB_JailCell)
@@ -1770,32 +1683,31 @@ function SetupCells()
 
     float startBench = StartBenchmark()
 
+    Debug("["+ Name +"] Prison::SetupCells", "Cells: " + JailCells)
+
     int i = 0
     while (i < JailCells.Length)
         RPB_JailCell jailCell = JailCells[i] as RPB_JailCell
 
-        ; if (jailCell == GetFormFromMod(0x3879) || jailCell == Game.GetFormEx(0x36897))
-            if (!jailCell.IsInitialized())
-                jailCell.Initialize(self)
-    
-                Debug("[Prison: "+ Name +"] Prison::SetupCells", "Jail Cell: " + jailCell + " - " + "HasOption(Maximum Prisoners):" + jailCell.HasOption("Maximum Prisoners") + ", HasObjects(Beds): " + jailCell.HasObjects("Beds"))
-    
-                if (jailCell.ShouldPerformScan("Beds"))
-                    jailCell.ScanBeds()
-                endif
-                
-                if (jailCell.ShouldPerformScan("Containers"))
-                    jailCell.ScanContainers()
-                endif
-    
-                if (jailCell.ShouldPerformScan("Props"))
-                    jailCell.ScanMiscProps()
-                endif
-    
-                Debug("[Prison: "+ Name +"] Prison::SetupCells", jailCell + " Maximum Prisoners: " + jailCell.MaxPrisoners)
-            endif
-        ; endif
+        if (!jailCell.IsInitialized())
+            jailCell.Initialize(self)
 
+            Debug("[Prison: "+ Name +"] Prison::SetupCells", "Jail Cell: " + jailCell + " - " + "HasOption(Maximum Prisoners):" + jailCell.HasOption("Maximum Prisoners") + ", HasObjects(Beds): " + jailCell.HasObjects("Beds"))
+
+            if (jailCell.ShouldPerformScan("Beds"))
+                jailCell.ScanBeds()
+            endif
+            
+            if (jailCell.ShouldPerformScan("Containers"))
+                jailCell.ScanContainers()
+            endif
+
+            if (jailCell.ShouldPerformScan("Props"))
+                jailCell.ScanMiscProps()
+            endif
+
+            Debug("[Prison: "+ Name +"] Prison::SetupCells", jailCell + " Maximum Prisoners: " + jailCell.MaxPrisoners)
+        endif
 
         i += 1
     endWhile
@@ -1821,6 +1733,11 @@ Form[] function GetSearchMarkers(string asSearchType = "Frisking")
     endif
 
     return self.GetPropertyOfTypeFormArray("Markers//Search//" + asSearchType)
+endFunction
+
+Form function GetRandomSearchMarker(string asSearchType = "Frisking")
+    Form[] markers = self.GetSearchMarkers(asSearchType)
+    return markers[Utility.RandomInt(0, markers.Length - 1)]
 endFunction
 
 Form function GetRandomReleaseMarker(string asReleaseMarkerType = "Teleport")
@@ -2037,7 +1954,7 @@ function RegisterPrisonerLastJailedStats(RPB_Prisoner apPrisoner)
         RPB_StorageVars.DeleteCategoryOnForm(self.PrisonFaction, "PrisonLastReleased")
         RPB_StorageVars.DeleteCategoryOnForm(self.PrisonFaction, "PrisonLastEscaped")
 
-        RPB_StorageVars.SetIntOnForm("Last Jailed - Prison", self.PrisonFaction, self.ID as int, "PrisonLastJailed")
+        RPB_StorageVars.SetStringOnForm("Last Jailed - Prison", self.PrisonFaction, self.UUID, "PrisonLastJailed")
         RPB_StorageVars.SetIntOnForm("Last Jailed - Day", self.PrisonFaction, RPB_Utility.GetCurrentDay(), "PrisonLastJailed")
         RPB_StorageVars.SetIntOnForm("Last Jailed - Month", self.PrisonFaction, RPB_Utility.GetCurrentMonth(), "PrisonLastJailed")
         RPB_StorageVars.SetIntOnForm("Last Jailed - Year", self.PrisonFaction, RPB_Utility.GetCurrentYear(), "PrisonLastJailed")
@@ -2050,7 +1967,7 @@ endFunction
 function RegisterPrisonerReleaseTimeStats(RPB_Prisoner apPrisoner)
     ; Only register for the player, for now
     if (apPrisoner.IsPlayer())
-        RPB_StorageVars.SetIntOnForm("Last Released - Prison", self.PrisonFaction, self.ID as int, "PrisonLastReleased")
+        RPB_StorageVars.SetIntOnForm("Last Released - Prison", self.PrisonFaction, self.ID, "PrisonLastReleased")
         RPB_StorageVars.SetIntOnForm("Last Released - Day", self.PrisonFaction, RPB_Utility.GetCurrentDay(), "PrisonLastReleased")
         RPB_StorageVars.SetIntOnForm("Last Released - Month", self.PrisonFaction, RPB_Utility.GetCurrentMonth(), "PrisonLastReleased")
         RPB_StorageVars.SetIntOnForm("Last Released - Year", self.PrisonFaction, RPB_Utility.GetCurrentYear(), "PrisonLastReleased")
@@ -2064,7 +1981,7 @@ endFunction
 function RegisterPrisonerEscapeTimeStats(RPB_Prisoner apPrisoner)
     ; Only register for the player, for now
     if (apPrisoner.IsPlayer())
-        RPB_StorageVars.SetIntOnForm("Last Escaped - Prison", self.PrisonFaction, self.ID as int, "PrisonLastEscaped")
+        RPB_StorageVars.SetIntOnForm("Last Escaped - Prison", self.PrisonFaction, self.ID, "PrisonLastEscaped")
         RPB_StorageVars.SetIntOnForm("Last Escaped - Day", self.PrisonFaction, RPB_Utility.GetCurrentDay(), "PrisonLastEscaped")
         RPB_StorageVars.SetIntOnForm("Last Escaped - Month", self.PrisonFaction, RPB_Utility.GetCurrentMonth(), "PrisonLastEscaped")
         RPB_StorageVars.SetIntOnForm("Last Escaped - Year", self.PrisonFaction, RPB_Utility.GetCurrentYear(), "PrisonLastEscaped")
@@ -2107,21 +2024,8 @@ bool function IsReceivingUpdates()
     return __isReceivingUpdates
 endFunction
 
-bool function WasInitialized()
-    return __isInitialized
-    ; return RPB_StorageVars.GetBool("Prison::" + ID, "PrisonManager")
-    ; return __isInitialized && (PrisonManager.GetNthAlias(ID) as RPB_Prison == self)
-endFunction
-
 bool function IsValid()
     return self.GetReference() != none
-endFunction
-
-bool function WasConfigChanged()
-    int holdRootObject = RPB_Data.GetRootObject(self.Hold)
-    RPB_Utility.Debug("Prison::WasConfigChanged", "Prison: " + self.City + ", " + "holdRootObject: " + holdRootObject + ", holdObject: " + __holdObject)
-    RPB_Utility.Debug("Prison::WasConfigChanged", "Hold: " + self.Hold + ", Faction: " + self.PrisonFaction + ", City: " + self.City)
-    return __holdObject != holdRootObject
 endFunction
 
 ; TODO: Store the prisoners for each prison here, making the AME list futile since we can always retrieve them through here,
@@ -2131,8 +2035,6 @@ int __prisonersIndex
 
 
 RPB_JailCell[] __prisonCells
-
-bool __isInitialized
 
 ; =========================================================
 ;                         Data Config                      
@@ -2158,8 +2060,7 @@ int function GetDataObject(string asPrisonObjectCategory = "null")
 endFunction
 
 int function GetSerializableRootObject()
-    int rootObject = RPB_Data.GetRootObject(self.Hold)
-    return RPB_Data.GetPropertyOfTypeObject(rootObject, "Jail") ; rename to Prison name later
+    return self.GetLocalPropertyOfTypeInt("Root Object")
 endFunction
 
 
@@ -2306,6 +2207,19 @@ function ProcessImprisonmentForQueuedPrisoners()
     isProcessingQueuedPrisonersForImprisonment = false
 endFunction
 
+RPB_Prisoner function AwaitForPrisonerReference(Actor akActor, int aiMaxTries = 50, float afTimeBetweenTries = 0.1)
+    RPB_Prisoner ref = self.GetPrisonerReference(akActor)
+    int tries = 0
+
+    while (!ref && tries < aiMaxTries)
+        ref = self.GetPrisonerReference(akActor)
+        Utility.Wait(afTimeBetweenTries)
+        tries += 1
+    endWhile
+
+    return ref
+endFunction
+
 ;/
     Turns the Actor into an RPB_Prisoner and binds it to this Prison.
 
@@ -2318,14 +2232,15 @@ RPB_Prisoner function MakePrisoner(Actor akActor, bool abDelayExecution = true)
     akActor.AddSpell(prisonerSpell, false)
 
     ; Bind this Prison to the Prisoner (to retrieve it from RPB_Prisoner)
-    RPB_StorageVars.SetIntOnForm("Prison ID", akActor, self.ID as int, "Jail")
+    RPB_StorageVars.SetStringOnForm("Prison UUID", akActor, self.UUID, "Jail")
 
     ; Delay execution before returning an instance of the prisoner, since we need to let the RPB_Prisoner script register this Prisoner
-    if (abDelayExecution)
-        Utility.Wait(0.2)
-    endif
+    ; if (abDelayExecution)
+    ;     Utility.Wait(0.2)
+    ; endif
 
-    RPB_Prisoner prisonerReference = self.GetPrisonerReference(akActor)
+    RPB_Prisoner prisonerReference = self.AwaitForPrisonerReference(akActor)
+
     if (prisonerReference == none)
         RPB_Prison actorPrison = PrisonManager.FindPrisonByPrisoner(akActor)
 
