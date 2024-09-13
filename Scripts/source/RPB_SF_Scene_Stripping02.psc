@@ -18,10 +18,10 @@ self.SendModEvent("RPB_ScenePlayingStart", "RPB_Stripping02", 2)
 EndFunction
 ;END FRAGMENT
 
-;BEGIN FRAGMENT Fragment_6
-Function Fragment_6()
+;BEGIN FRAGMENT Fragment_15
+Function Fragment_15()
 ;BEGIN CODE
-self.SendModEvent("RPB_SceneEnd", "RPB_Stripping02")
+self.SendModEvent("RPB_SceneStart", "RPB_Stripping02")
 ;END CODE
 EndFunction
 ;END FRAGMENT
@@ -34,10 +34,10 @@ self.SendModEvent("RPB_ScenePlayingStart", "RPB_Stripping02", 6)
 EndFunction
 ;END FRAGMENT
 
-;BEGIN FRAGMENT Fragment_15
-Function Fragment_15()
+;BEGIN FRAGMENT Fragment_6
+Function Fragment_6()
 ;BEGIN CODE
-self.SendModEvent("RPB_SceneStart", "RPB_Stripping02")
+self.SendModEvent("RPB_SceneEnd", "RPB_Stripping02")
 ;END CODE
 EndFunction
 ;END FRAGMENT

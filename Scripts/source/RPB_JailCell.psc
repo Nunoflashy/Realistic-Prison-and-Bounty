@@ -5,10 +5,12 @@ import RPB_Config
 import RPB_Utility
 
 ; ==========================================================
-;                     Script References
-; ==========================================================
 
-; ==========================================================
+string property Name
+    string function get()
+        return self.TryGetString("Name")
+    endFunction
+endProperty
 
 RPB_Prison __prison
 RPB_Prison property Prison
@@ -369,16 +371,9 @@ function DetermineMarkers()
     Form[] interiorChildMarkers = self.GetPropertyOfTypeFormArray("Interior")
     Form[] exteriorChildMarkers = self.GetPropertyOfTypeFormArray("Exterior")
 
-    Debug("[Prison: "+ self.Prison.Name +"] JailCell::DetermineMarkers", "Cell: " + self + ", Main Marker: " + self.GetPropertyOfTypeForm("Main Interior"))
-    Debug("[Prison: "+ self.Prison.Name +"] JailCell::DetermineMarkers", "Cell: " + self + ", interiorChildMarkers: " + interiorChildMarkers)
-    Debug("[Prison: "+ self.Prison.Name +"] JailCell::DetermineMarkers", "Cell: " + self + ", exteriorChildMarkers: " + exteriorChildMarkers)
-
     ; Convert to JArray
     int arrayInteriorChildMarkers = JArray.objectWithForms(interiorChildMarkers)
     int arrayExteriorChildMarkers = JArray.objectWithForms(exteriorChildMarkers)
-
-    ; Debug("[Prison: "+ self.Prison.Name +"] JailCell::DetermineMarkers", "arrayInteriorChildMarkers: " + GetContainerList(arrayInteriorChildMarkers))
-    ; Debug("[Prison: "+ self.Prison.Name +"] JailCell::DetermineMarkers", "arrayExteriorChildMarkers: " + GetContainerList(arrayExteriorChildMarkers))
 
     int arrayAllInteriorMarkers = JArray.object()
     int arrayAllExteriorMarkers = JArray.object()
@@ -390,15 +385,9 @@ function DetermineMarkers()
     JArray.addFromArray(arrayAllInteriorMarkers, arrayInteriorChildMarkers)
     JArray.addFromArray(arrayAllExteriorMarkers, arrayExteriorChildMarkers)
 
-    ; Debug("[Prison: "+ self.Prison.Name +"] JailCell::DetermineMarkers", "arrayAllInteriorMarkers: " + GetContainerList(arrayAllInteriorMarkers))
-    ; Debug("[Prison: "+ self.Prison.Name +"] JailCell::DetermineMarkers", "arrayAllExteriorMarkers: " + GetContainerList(arrayAllExteriorMarkers))
-
     ; Set properties
     __interiorMarkers       = JArray.asFormArray(arrayAllInteriorMarkers)
     __exteriorMarkers       = JArray.asFormArray(arrayAllExteriorMarkers)
-    
-    Debug("[Prison: "+ self.Prison.Name +"] JailCell::DetermineMarkers", "InteriorMarkers: " + InteriorMarkers)
-    Debug("[Prison: "+ self.Prison.Name +"] JailCell::DetermineMarkers", "ExteriorMarkers: " + ExteriorMarkers)
 endFunction
 
 function RefreshOptions()
@@ -748,13 +737,7 @@ function Initialize(RPB_Prison apPrison)
     ; Link the actual Prison with this Jail Cell
     self.BindPrison(apPrison)
 
-    string[] stringList = self.GetPropertyOfTypeStringArray("String List")
-    Debug("JailCell::Initialize", "String List: " + stringList)
-
-    ; RPB_CellDoor configuredCellDoor = self.GetPropertyOfTypeForm("Cell Door") as RPB_CellDoor
     RPB_CellDoor configuredCellDoor = self.GetPropertyOfTypeFormArray("Cell Doors")[0] as RPB_CellDoor ; Index is temporary, for now only use 1st cell door
-    Debug("JailCell::Initialize", "configuredCellDoor: " + configuredCellDoor)
-
 
     if (configuredCellDoor)
         ; Bind the cell door to the jail cell
@@ -763,6 +746,14 @@ function Initialize(RPB_Prison apPrison)
 
     ; Determine all markers for this cell
     self.DetermineMarkers()
+
+    Debug("["+ self.Prison.Name +"] ["+ self.ID +": "+ self +"] JailCell::Initialize", \ 
+        "\n\tMain Marker: " + self.GetPropertyOfTypeForm("Main Interior") + \ 
+        "\n\tCell Door: " + self.CellDoor + \
+        "\n\tInterior Markers: " + InteriorMarkers + \ 
+        "\n\tExterior Markers: " + ExteriorMarkers \ 
+    )
+
 endFunction
 
 function Uninitialize()
@@ -939,6 +930,9 @@ endEvent
 
 ; When the player is in the same cell as this jail cell
 event OnCellAttach()
+    ; if (!self.IsInitialized())
+    ;     self.Initialize(Prison)
+    ; endif
     __onCellAttachAndDetachEvent()
 endEvent
 

@@ -23,11 +23,6 @@ Quest function CellPackages() global
     return GetFormFromMod(0x21916) as Quest
 endFunction
 
-Quest function ArrestPackages() global
-    ; return GetFormFromMod(0x1F8CC) as Quest
-    return GetFormFromMod(0x24441) as Quest
-endFunction
-
 Message function ServeTimeMessage() global
     return GetFormFromMod(0x1EE08) as Message
 endFunction
@@ -713,6 +708,39 @@ endFunction
 bool function IsActorFemale(Actor akActor) global
     return akActor.GetActorBase().GetSex() == 1
 endFunction
+
+; ==========================================================
+;                   Prison/Arrest Functions
+; ==========================================================
+
+;/
+    Ensures the Actor @akArrestee is an Arrestee, and binds it to @apHold.
+
+    Actor       @akArrestee: The Actor to be ensured as an Arrestee.
+/;
+function EnsureArresteeSpellAndBinding(Actor akArrestee) global
+    if (!akArrestee.HasSpell(RPB_ArresteeSpell()))
+        ; Cast the Arrestee spell (to bind the RPB_Arrestee instance script)
+        akArrestee.AddSpell(RPB_ArresteeSpell(), false)
+    endif
+endFunction
+
+;/
+    Ensures the Actor @akPrisoner is a Prisoner, and binds it to @apPrison.
+
+    Actor       @akPrisoner: The Actor to be ensured as a Prisoner.
+    RPB_Prison  @apPrison: The Prison to which the Actor should be bound as a Prisoner.
+/;
+function EnsurePrisonerSpellAndBinding(Actor akPrisoner, RPB_Prison apPrison) global
+    if (!akPrisoner.HasSpell(RPB_PrisonerSpell()))
+        ; Cast the Prisoner spell (to bind the RPB_Prisoner instance script)
+        akPrisoner.AddSpell(RPB_PrisonerSpell(), false)
+
+        ; Bind this Prison to the Prisoner (to retrieve it from RPB_Prisoner)
+        RPB_StorageVars.SetStringOnForm("Prison UUID", akPrisoner, apPrison.UUID, "Jail")
+    endif
+endFunction
+
 ; ==========================================================
 ;                       Alias Functions
 ; ==========================================================
@@ -1714,6 +1742,25 @@ endFunction
 ; ==========================================================
 ;                           Struct
 ; ==========================================================
+;/
+    int myStruct = struct( \ 
+        "bool: (isImprisoned = false, isInCell = false) |" + \ 
+        "string: () |" + \ 
+        "Form[]: (prisons) |" \ 
+    )
+
+    GetStructMemberBool(myStruct, "isInCell")
+/;
+
+; int function struct(string apStructMembers, bool abRetain = false) global
+;     int structObj = JMap.object()
+
+;     if (abRetain)
+;         JValue.retain(structObj, "struct")
+;     endif
+
+;     return structObj
+; endFunction
 
 int function new_struct(bool abRetain = false, string asStructType = "") global
     int structObj = JMap.object()

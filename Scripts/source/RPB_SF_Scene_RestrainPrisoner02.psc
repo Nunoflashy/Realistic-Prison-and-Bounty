@@ -15,6 +15,7 @@ EndFunction
 Function Fragment_7()
 ;BEGIN CODE
 self.SendModEvent("RPB_ScenePlayingEnd", "RPB_RestrainPrisoner02", 2)
+self.SendModEvent("RPB_SceneEnd", "RPB_RestrainPrisoner02")
 ;END CODE
 EndFunction
 ;END FRAGMENT

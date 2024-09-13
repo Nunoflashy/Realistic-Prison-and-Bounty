@@ -237,7 +237,6 @@ endFunction
 
 function Initialize()
     string lockLevel = self.GetPropertyOfTypeString("Lock//Level")
-    Debug("["+ self +"] Lockable::Initialize", "lockLevel: " + lockLevel)
 
     if (lockLevel)
         int lockLevelAsInt  = LockLevelAsInteger(lockLevel)

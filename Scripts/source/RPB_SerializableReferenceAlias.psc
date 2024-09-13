@@ -1,4 +1,9 @@
 scriptname RPB_SerializableReferenceAlias extends ReferenceAlias
+{
+    @property int ID
+    @property string UUID
+    @property bool Active
+}
 
 import RPB_Utility
 
@@ -26,6 +31,12 @@ bool property Active
     endFunction
 endProperty
 
+int property ID
+    int function get()
+        return self.GetID()
+    endFunction
+endProperty
+
 string __oldUuid
 string __uuid
 string property UUID
@@ -39,53 +50,10 @@ string property UUID
     endFunction
 endProperty
 
-
-int __rootObject
-
-bool property IsDataHotLoadable auto
-
 string function Rules(string rule)
     if (rule == "Required Properties")
         
     endif
-endFunction
-
-bool function __verifyDataIntegrity()
-    if (!Active)
-        return false
-    endif
-
-    ; Check the data file for this object for errors
-    return true
-endFunction
-
-; Add verification of data integrity
-int function __internalSerializedRootObject()
-    if (!Active)
-        return 0
-    endif
-
-    return self.GetSerializableRootObject()
-endFunction
-
-bool function ReloadData()
-    if (!Active)
-        return false
-    endif
-
-    bool isValidData = __verifyDataIntegrity()
-
-    if (isValidData)
-        __rootObject = self.GetSerializableRootObject()
-
-        Debug("["+ self +"] SerializableReferenceAlias::ReloadData", "Data has been reloaded.", !self.IsDataHotLoadable)
-        DebugWarn("["+ self +"] SerializableReferenceAlias::ReloadData", "Data has been reloaded, but the reference is already hot loadable!", self.IsDataHotLoadable)
-    else
-        DebugError("["+ self +"] SerializableReferenceAlias::ReloadData", "There are errors in the data object, cannot reload data!", !isValidData)
-        Error("There are errors in the data object, cannot reload data!", !isValidData)
-    endif
-
-    return isValidData
 endFunction
 
 function Delete()
@@ -104,28 +72,6 @@ endFunction
 
 bool function ActiveByDefault() ; virtual
     return true
-endFunction
-
-;/
-    Attempts to get @asProperty from the Serializable Object and returns it,
-    in case that fails, the fallback property is returned instead.
-/;
-string function TryGetString(string asProperty)
-    if (self.HasProperty(asProperty))
-        return self.GetPropertyOfTypeString(asProperty)
-    endif
-
-    return self.GetLocalPropertyOfTypeString(asProperty, "Fallback")   
-endFunction
-
-string function GetFallbackProperty(string asProperty)
-    if (!self.HasProperty(asProperty))
-        return self.GetLocalPropertyOfTypeString(asProperty, "Fallback")   
-    endif
-endFunction
-
-function SetFallbackProperty(string asProperty, string asValue)
-    self.SetLocalPropertyOfTypeString(asProperty, asValue, "Fallback")   
 endFunction
 
 ;/
@@ -367,6 +313,90 @@ bool function HasLocalProperties()
 endFunction
 
 ; ==========================================================
+;                          Try Get
+; ==========================================================
+;/
+    Attempts to get @asProperty from the Serializable Object and returns it,
+    in case that fails, the fallback property is returned instead.
+/;
+
+function SetFallbackProperty(string asProperty, string asValue)
+    self.SetLocalPropertyOfTypeString(asProperty, asValue, "Fallback")   
+endFunction
+
+bool function TryGetBool(string asProperty)
+    if (self.HasProperty(asProperty))
+        return self.GetPropertyOfTypeBool(asProperty)
+    endif
+
+    return self.GetLocalPropertyOfTypeBool(asProperty, "Fallback")   
+endFunction
+
+int function TryGetInt(string asProperty)
+    if (self.HasProperty(asProperty))
+        return self.GetPropertyOfTypeInt(asProperty)
+    endif
+
+    return self.GetLocalPropertyOfTypeInt(asProperty, "Fallback")   
+endFunction
+
+float function TryGetFloat(string asProperty)
+    if (self.HasProperty(asProperty))
+        return self.GetPropertyOfTypeFloat(asProperty)
+    endif
+
+    return self.GetLocalPropertyOfTypeFloat(asProperty, "Fallback")   
+endFunction
+
+string function TryGetString(string asProperty)
+    if (self.HasProperty(asProperty))
+        return self.GetPropertyOfTypeString(asProperty)
+    endif
+
+    return self.GetLocalPropertyOfTypeString(asProperty, "Fallback")   
+endFunction
+
+Form function TryGetForm(string asProperty)
+    if (self.HasProperty(asProperty))
+        return self.GetPropertyOfTypeForm(asProperty)
+    endif
+
+    return self.GetLocalPropertyOfTypeForm(asProperty, "Fallback")   
+endFunction
+
+int[] function TryGetIntegerArray(string asProperty)
+    if (self.HasProperty(asProperty))
+        return self.GetPropertyOfTypeIntegerArray(asProperty)
+    endif
+
+    return self.GetLocalPropertyOfTypeIntegerArray(asProperty, "Fallback")   
+endFunction
+
+float[] function TryGetFloatArray(string asProperty)
+    if (self.HasProperty(asProperty))
+        return self.GetPropertyOfTypeFloatArray(asProperty)
+    endif
+
+    return self.GetLocalPropertyOfTypeFloatArray(asProperty, "Fallback")   
+endFunction
+
+string[] function TryGetStringArray(string asProperty)
+    if (self.HasProperty(asProperty))
+        return self.GetPropertyOfTypeStringArray(asProperty)
+    endif
+
+    return self.GetLocalPropertyOfTypeStringArray(asProperty, "Fallback")   
+endFunction
+
+Form[] function TryGetFormArray(string asProperty)
+    if (self.HasProperty(asProperty))
+        return self.GetPropertyOfTypeFormArray(asProperty)
+    endif
+
+    return self.GetLocalPropertyOfTypeFormArray(asProperty, "Fallback")   
+endFunction
+
+; ==========================================================
 
 function EnsureFunctionalState()
     ; UUID changed, this is a new RefAlias
@@ -412,3 +442,20 @@ function __checkAndTriggerIdentityChange()
     endif
 endFunction
 
+bool function __verifyDataIntegrity()
+    if (!Active)
+        return false
+    endif
+
+    ; Check the data file for this object for errors
+    return true
+endFunction
+
+; Add verification of data integrity
+int function __internalSerializedRootObject()
+    if (!Active)
+        return 0
+    endif
+
+    return self.GetSerializableRootObject()
+endFunction
