@@ -42,7 +42,7 @@ endProperty
 function PerformSetup()
     EventManager.RegisterEvents()
     PrisonManager.InitializePrisons()
-    SceneManager.SetupScenes()
+    SceneManager.Initialize()
 
     ; Info(\
     ;     "==========================================================\n" + \
@@ -85,7 +85,7 @@ function PerformMaintenance()
     ;     "Registering Prisons: " + string_if (prisons, "OK", "Failed") + "\n" \
     ; )
     
-    SceneManager.SetupScenes()
+    SceneManager.Initialize()
 
     ; if (!registeredEvents)
     ;     Debug.MessageBox("["+ GetModName() +"] Failed to register events, the mod may not work at all!")

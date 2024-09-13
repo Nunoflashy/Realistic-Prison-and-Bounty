@@ -36,6 +36,155 @@ endProperty
 Idle property LockpickingIdle auto
 
 ; ==========================================================
+;                            Init
+; ==========================================================
+
+int __globalDefaults ; JMap&
+int __globals ; JMap&
+int __sceneContainer ; JMap&
+int __sceneToCategory; JMap&
+function __allocateMemory()
+    if (!__sceneContainer)
+        __sceneContainer = JMap.object()
+        JValue.retain(__sceneContainer, "SceneManager")
+    endif
+
+    if (!__sceneToCategory)
+        __sceneToCategory = JMap.object()
+        JValue.retain(__sceneToCategory, "SceneManager")
+    endif
+
+    if (!__globals)
+        __globals = JMap.object()
+        JValue.retain(__globals, "SceneManager")
+    endif
+
+    if (!__globalDefaults)
+        __globalDefaults = JMap.object()
+        JValue.retain(__globalDefaults, "SceneManager")
+    endif
+endFunction
+
+function __deallocateMemory()
+    JValue.releaseObjectsWithTag("SceneManager")
+endFunction
+
+function Initialize()
+    __allocateMemory()
+    self.SetupGlobals()
+    self.SetupScenes()
+endFunction
+
+; ==========================================================
+;                          Globals
+; ==========================================================
+
+int property GlobalCount
+    int function get()
+        return JValue.count(__globals)
+    endFunction
+endProperty
+
+function AddGlobal(string asGlobalName, int aiGlobalFormID, int aiDefaultValue = 0)
+    JMap.setInt(__globals, asGlobalName, aiGlobalFormID)
+    JMap.setInt(__globalDefaults, asGlobalName, aiDefaultValue)
+endFunction
+
+bool function HasGlobal(string asGlobal)
+    return JMap.hasKey(__globals, asGlobal)
+endFunction
+
+GlobalVariable function GetGlobal(string asGlobal)
+    if (!self.HasGlobal(asGlobal))
+        return none
+    endif
+
+    int globalFormId = JMap.getInt(__globals, asGlobal)
+    return GetFormFromMod(globalFormId) as GlobalVariable
+endFunction
+
+function SetGlobal(string asGlobal, int aiValue)
+    GlobalVariable g = self.GetGlobal(asGlobal)
+
+    if (g)
+        g.SetValueInt(aiValue)
+        Debug("SceneManager::SetGlobal", "Setting Global " + asGlobal + " to " + aiValue)
+    endif
+endFunction
+
+function ResetGlobal(string asGlobal)
+    GlobalVariable g = self.GetGlobal(asGlobal)
+
+    if (g)
+        int defaultValue = JMap.getInt(__globalDefaults, asGlobal)
+        g.SetValueInt(defaultValue)
+    endif
+endFunction
+
+function SetupGlobals()
+    ; Control Flow - Scene Dialogue
+    self.AddGlobal("RPB_Scene_Dialogue_CF01", 0x264B5)
+    self.AddGlobal("RPB_Scene_Dialogue_CF02", 0x264B6)
+    self.AddGlobal("RPB_Scene_Dialogue_CF03", 0x264B7)
+    self.AddGlobal("RPB_Scene_Dialogue_CF04", 0x264B8)
+    self.AddGlobal("RPB_Scene_Dialogue_CF05", 0x264B9)
+    self.AddGlobal("RPB_Scene_Dialogue_CF06", 0x264BA)
+    self.AddGlobal("RPB_Scene_Dialogue_CF07", 0x264BB)
+    self.AddGlobal("RPB_Scene_Dialogue_CF08", 0x264BC)
+    self.AddGlobal("RPB_Scene_Dialogue_CF09", 0x264BD)
+    self.AddGlobal("RPB_Scene_Dialogue_CF10", 0x264BE)
+    self.AddGlobal("RPB_Scene_Dialogue_CF11", 0x264BF)
+
+    ; Control Flow - Scene Actions
+    self.AddGlobal("RPB_Scene_Action_CF01", 0x264C0)
+    self.AddGlobal("RPB_Scene_Action_CF02", 0x264C1)
+    self.AddGlobal("RPB_Scene_Action_CF03", 0x264C2)
+    self.AddGlobal("RPB_Scene_Action_CF04", 0x264C3)
+    self.AddGlobal("RPB_Scene_Action_CF05", 0x264C4)
+    self.AddGlobal("RPB_Scene_Action_CF06", 0x264C5)
+    self.AddGlobal("RPB_Scene_Action_CF07", 0x264C6)
+    self.AddGlobal("RPB_Scene_Action_CF08", 0x264C7)
+    self.AddGlobal("RPB_Scene_Action_CF09", 0x264C8)
+    self.AddGlobal("RPB_Scene_Action_CF10", 0x264C9)
+    self.AddGlobal("RPB_Scene_Action_CF11", 0x264CA)
+endFunction
+
+function ResetGlobals()
+    int i = 0
+    int globalKeys = JMap.allKeys(__globals)
+
+    while (i < GlobalCount)
+        string globalKey = JArray.getStr(globalKeys, i)
+        int defaultValue = JMap.getInt(__globalDefaults, globalKey)
+        self.GetGlobal(globalKey).SetValueInt(defaultValue)
+        i += 1
+    endWhile
+
+    Debug("SceneManager::ResetGlobals", "Scene Globals have been reset to their default values.")
+endFunction
+
+;/
+    Handles customization of a Scene, either Enabling/Disabling dialogue or a particular Action.
+    Scenes have conditions that depend on Scene_{Dialogue|Action}_CF* globals.
+
+    These events set them for a Scene that could customize another Scene, for example.
+
+    string  @asSceneName: The name of the scene to be customized.
+/;
+event OnSceneStartHandleGlobals(string asSceneName, ObjectReference[] params)
+    if (self.IsSceneOfType(asSceneName, CATEGORY_ESCORT_TO_JAIL))
+        self.SetGlobal("RPB_Scene_Action_CF01", 1) ; Enables some actions in escort to cell
+    endif
+endEvent
+
+event OnScenePlayingHandleGlobals(string asSceneName, int aiSceneEventType, int aiScenePhase, ObjectReference[] params)
+endEvent
+
+event OnSceneEndHandleGlobals(string asSceneName, ObjectReference[] params)
+    self.ResetGlobals()
+endEvent
+
+; ==========================================================
 ;                   Scene Phase Overriding
 ; ==========================================================
 
@@ -66,85 +215,82 @@ endFunction
 Scene property UnlockCell auto
 Scene property LockCell auto
 
-int sceneContainer
 
 int property SceneCount
     int function get()
-        return JValue.count(sceneContainer)
+        return JValue.count(__sceneContainer)
     endFunction
 endProperty
 
-function AddScene(string asSceneName, int aiSceneFormID)
-    JMap.setInt(sceneContainer, asSceneName, aiSceneFormID)
+function AddScene(string asSceneName, int aiSceneFormID, string asSceneCategory = "null")
+    JMap.setInt(__sceneContainer, asSceneName, aiSceneFormID)
+
+    if (asSceneCategory != "null")
+        JMap.setStr(__sceneToCategory, asSceneName, asSceneCategory)
+        ; Debug("SceneManager::AddScene", "Setting " + asSceneName + " category: " + asSceneCategory)
+
+    endif
 endFunction
 
 string function GetSceneNameByIndex(int aiIndex)
-    return JMap.getNthKey(sceneContainer, aiIndex)
+    return JMap.getNthKey(__sceneContainer, aiIndex)
 endFunction
 
 int function GetSceneFormID(string asSceneName)
-    return JMap.getInt(sceneContainer, asSceneName)
+    return JMap.getInt(__sceneContainer, asSceneName)
 endFunction
 
 string function GetSceneNameByFormID(int aiSceneFormID)
-    return JMap.getStr(sceneContainer, aiSceneFormID)
+    return JMap.getStr(__sceneContainer, aiSceneFormID)
 endFunction
 
 bool function SceneExists(string asSceneName)
-    return JMap.hasKey(sceneContainer, asSceneName)
+    return JMap.hasKey(__sceneContainer, asSceneName)
 endFunction
 
-bool function IsValidScene(string asSceneCategory, string asSceneName)
-    if (asSceneCategory == CATEGORY_ARREST_START)
-        return  asSceneName == SCENE_ARREST_START_01 || \
-                asSceneName == SCENE_ARREST_START_02 || \ 
-                asSceneName == SCENE_ARREST_START_03 || \
-                asSceneName == SCENE_ARREST_START_04
+;/
+    Checks if a given Scene is of the specified type (category).
 
-    elseif (asSceneCategory == CATEGORY_ESCORT_TO_JAIL)
-        return asSceneName == SCENE_ESCORT_TO_JAIL_01
-
-    endif
+    string  @asSceneName: The name of the Scene.
+    string  @asCategory: The category of which the Scene should be a part of.
+/;
+bool function IsSceneOfType(string asSceneName, string asCategory)
+    return JMap.getStr(__sceneToCategory, asSceneName) == asCategory
 endFunction
 
 function SetupScenes()
     float x = StartBenchmark()
 
-    if (!sceneContainer)
-        sceneContainer = JMap.object()
-        JValue.retain(sceneContainer)
-    endif
-
-    self.AddScene(SCENE_ARREST_START_01,                        0xF569) ; Arrest Start 01
-    self.AddScene(SCENE_ARREST_START_02,                        0xFAF6) ; Arrest Start 02
-    self.AddScene(SCENE_ARREST_START_03,                        0x130DD) ; Arrest Start 03
-    self.AddScene(SCENE_ARREST_START_04,                        0x13663) ; Arrest Start 04
-    self.AddScene(SCENE_ARREST_START_PRISON_01,                 0x14C14)
-    self.AddScene(SCENE_ESCORT_TO_JAIL_01,                      0xF532) ; Escort to Jail
-    self.AddScene(SCENE_ESCORT_TO_JAIL_02,                      0x17CDA) ; Escort to Jail 02
-    self.AddScene(SCENE_ESCORT_TO_CELL_01,                      0xCF58) ; Escort to Cell 01
-    self.AddScene(SCENE_ESCORT_TO_CELL_02,                      0x1367D) ; Escort to Cell 02
-    self.AddScene(SCENE_ESCORT_FROM_CELL,                       0x115E6) ; Escort from Cell
-    ; self.AddScene(SCENE_SEARCH_START,                         0xF55C) ; SearchStart
-    self.AddScene(SCENE_FRISKING,                               0xCF5A) ; Frisking
-    self.AddScene(SCENE_STRIPPING_START_01,                     0xF561) ; Stripping Start
-    self.AddScene(SCENE_STRIPPING_01,                           0xCF59) ; Stripping
-    self.AddScene(SCENE_STRIPPING_02,                           0xEA60) ; Stripping 02
-    self.AddScene(SCENE_FORCED_STRIPPING_01,                    0xF587) ; Forced Stripping 01
-    self.AddScene(SCENE_FORCED_STRIPPING_02,                    0x120A9) ; Forced Stripping 02
-    self.AddScene(SCENE_GIVE_CLOTHING,                          0xF52A) ; Give Clothing
-    self.AddScene(SCENE_NO_CLOTHING,                            0xF571) ; No Clothing
-    self.AddScene(SCENE_PAYMENT_FAIL,                           0xF54E) ; Bounty Payment Fail
-    self.AddScene(SCENE_ELUDING_ARREST_01,                      0x12613) ; Eluding Arrest
-    self.AddScene(SCENE_RESTRAIN_PRISONER_01,                   0x15702) ; Restrain Prisoner 01
-    self.AddScene(SCENE_RESTRAIN_PRISONER_02,                   0x15C66) ; Restrain Prisoner 02
-    self.AddScene(SCENE_ARREST_PAY_BOUNTY_FOLLOW_WILLINGLY,     0x1776B) ; Pay Bounty Follow Willingly
-    self.AddScene(SCENE_ARREST_PAY_BOUNTY_FOLLOW_BY_FORCE,      0x1776E) ; Pay Bounty Follow By Force
+    self.AddScene(SCENE_ARREST_START_01,                        0xF569, CATEGORY_ARREST_START)      ; Arrest Start 01
+    self.AddScene(SCENE_ARREST_START_02,                        0xFAF6, CATEGORY_ARREST_START)      ; Arrest Start 02
+    self.AddScene(SCENE_ARREST_START_03,                        0x130DD, CATEGORY_ARREST_START)     ; Arrest Start 03
+    self.AddScene(SCENE_ARREST_START_04,                        0x13663, CATEGORY_ARREST_START)     ; Arrest Start 04
+    self.AddScene(SCENE_ARREST_START_PRISON_01,                 0x14C14, CATEGORY_ARREST_START)     ; Arrest Start Prison 01
+    self.AddScene(SCENE_ESCORT_TO_JAIL_01,                      0xF532, CATEGORY_ESCORT_TO_JAIL)    ; Escort to Jail
+    self.AddScene(SCENE_ESCORT_TO_JAIL_02,                      0x17CDA, CATEGORY_ESCORT_TO_JAIL)   ; Escort to Jail 02
+    self.AddScene(SCENE_ESCORT_TO_CELL_01,                      0xCF58, CATEGORY_ESCORT_TO_CELL)    ; Escort to Cell 01
+    self.AddScene(SCENE_ESCORT_TO_CELL_02,                      0x1367D, CATEGORY_ESCORT_TO_CELL)   ; Escort to Cell 02
+    self.AddScene(SCENE_ESCORT_FROM_CELL,                       0x115E6, CATEGORY_ESCORT_FROM_CELL) ; Escort from Cell
+    ; self.AddScene(SCENE_SEARCH_START,                         0xF55C)     ; SearchStart
+    self.AddScene(SCENE_FRISKING,                               0xCF5A, CATEGORY_FRISKING)          ; Frisking
+    self.AddScene(SCENE_STRIPPING_START_01,                     0xF561, CATEGORY_STRIPPING)         ; Stripping Start
+    self.AddScene(SCENE_STRIPPING_01,                           0xCF59, CATEGORY_STRIPPING)         ; Stripping
+    self.AddScene(SCENE_STRIPPING_02,                           0xEA60, CATEGORY_STRIPPING)         ; Stripping 02
+    self.AddScene(SCENE_FORCED_STRIPPING_01,                    0xF587, CATEGORY_STRIPPING)         ; Forced Stripping 01
+    self.AddScene(SCENE_FORCED_STRIPPING_02,                    0x120A9, CATEGORY_STRIPPING)        ; Forced Stripping 02
+    self.AddScene(SCENE_GIVE_CLOTHING,                          0xF52A, CATEGORY_CLOTHING)          ; Give Clothing
+    self.AddScene(SCENE_NO_CLOTHING,                            0xF571, CATEGORY_NO_CLOTHING)       ; No Clothing
+    self.AddScene(SCENE_PAYMENT_FAIL,                           0xF54E, CATEGORY_PAYMENT_FAIL)      ; Bounty Payment Fail
+    self.AddScene(SCENE_ELUDING_ARREST_01,                      0x12613, CATEGORY_ELUDING)          ; Eluding Arrest
+    self.AddScene(SCENE_RESTRAIN_PRISONER_01,                   0x15702, CATEGORY_RESTRAIN)         ; Restrain Prisoner 01
+    self.AddScene(SCENE_RESTRAIN_PRISONER_02,                   0x15C66, CATEGORY_RESTRAIN)         ; Restrain Prisoner 02
+    self.AddScene(SCENE_ARREST_PAY_BOUNTY_FOLLOW_WILLINGLY,     0x1776B, CATEGORY_PAY_BOUNTY)       ; Pay Bounty Follow Willingly
+    self.AddScene(SCENE_ARREST_PAY_BOUNTY_FOLLOW_BY_FORCE,      0x1776E, CATEGORY_PAY_BOUNTY)       ; Pay Bounty Follow By Force
 
     string sceneListAsString = ""
     int i = 0
     while (i < SceneCount)
-        ; sceneListAsString += "\t["+i+"]: "+ JMap.getNthKey(sceneContainer, i) +"\n"
+        ; sceneListAsString += "\t["+i+"]: "+ JMap.getNthKey(__sceneContainer, i) +"\n"
         sceneListAsString += "\t["+i+"]: "+ self.GetSceneNameByIndex(i) +"\n"
         i += 1
     endWhile
@@ -159,7 +305,7 @@ Scene function GetScene(string asSceneName)
     endif
 
     ; Debug("SceneManager::GetScene", "Scenes: " + SceneCount)
-    ; return Game.GetFormFromFile(JMap.getInt(sceneContainer, asSceneName), GetPluginasSceneName()) as Scene
+    ; return Game.GetFormFromFile(JMap.getInt(__sceneContainer, asSceneName), GetPluginasSceneName()) as Scene
     return GetFormFromMod(self.GetSceneFormID(asSceneName)) as Scene
 endFunction
 
@@ -176,8 +322,18 @@ int property PHASE_END      = 1 autoreadonly
 ;                       Scene Categories
 ; ==========================================================
 
-string property CATEGORY_ARREST_START   = "ArrestStart" autoreadonly
-string property CATEGORY_ESCORT_TO_JAIL = "EscortToJail" autoreadonly
+string property CATEGORY_ARREST_START       = "RPB_ArrestStart" autoreadonly
+string property CATEGORY_ESCORT_TO_JAIL     = "RPB_EscortToJail" autoreadonly
+string property CATEGORY_ESCORT_TO_CELL     = "RPB_EscortToCell" autoreadonly
+string property CATEGORY_ESCORT_FROM_CELL   = "RPB_EscortFromCell" autoreadonly
+string property CATEGORY_FRISKING           = "RPB_Frisking" autoreadonly
+string property CATEGORY_STRIPPING          = "RPB_Stripping" autoreadonly
+string property CATEGORY_CLOTHING           = "RPB_Clothing" autoreadonly
+string property CATEGORY_NO_CLOTHING        = "RPB_NoClothing" autoreadonly
+string property CATEGORY_PAYMENT_FAIL       = "RPB_PaymentFail" autoreadonly
+string property CATEGORY_ELUDING            = "RPB_Eluding" autoreadonly
+string property CATEGORY_RESTRAIN           = "RPB_Restrain" autoreadonly
+string property CATEGORY_PAY_BOUNTY         = "RPB_ArrestPayBounty" autoreadonly
 
 ; ==========================================================
 ;                         Scene Names
@@ -212,6 +368,16 @@ string property SCENE_RESTRAIN_PRISONER_02                  = "RPB_RestrainPriso
 string property SCENE_ARREST_PAY_BOUNTY_FOLLOW_WILLINGLY    = "RPB_ArrestPayBountyFollowWillingly" autoreadonly
 string property SCENE_ARREST_PAY_BOUNTY_FOLLOW_BY_FORCE     = "RPB_ArrestPayBountyFollowByForce" autoreadonly
 
+; ==========================================================
+;                     Management Events
+; ==========================================================
+
+event OnAllScenesFinished()
+    Debug("SceneManager::OnAllScenesFinished", "Resetting current scene!")
+    currentScene = ""
+
+    self.ResetGlobals()
+endEvent
 
 ; ==========================================================
 ;                     Scene Control Queue
@@ -219,6 +385,7 @@ string property SCENE_ARREST_PAY_BOUNTY_FOLLOW_BY_FORCE     = "RPB_ArrestPayBoun
 
 int __queuedScenes
 bool __isScenePlaying
+string currentScene
 
 bool function HasQueuedScenes()
     return JArray.count(__queuedScenes) > 0
@@ -245,6 +412,7 @@ endFunction
 /;
 string function PopScene()
     if (!self.HasQueuedScenes())
+        self.OnAllScenesFinished()
         return ""
     endif
 
@@ -275,6 +443,7 @@ endFunction
 /;
 function PlayQueued()
     if (!self.HasQueuedScenes())
+        self.OnAllScenesFinished()
         return
     endif
 
@@ -285,6 +454,9 @@ function PlayQueued()
 
     if (nextScene != "")
         self.GetScene(nextScene).Start() ; Play the Scene
+        currentScene = nextScene
+        Debug("SceneManager::PlayQueued", "Setting current scene: " + nextScene)
+
     endif
 endFunction
 
@@ -403,6 +575,22 @@ function ReleaseAliasesFromScene(string sceneName)
         i += 1
     endWhile
 endFunction
+
+; Right now only releases the AI for Scenes that retain it, however in some instances we actually want to release it,
+; so this is here as a workaround. Later it should handle more things related to End of scene blocking.
+bool __resumeSceneBlocked
+function ResumeSceneBlocked()
+    __resumeSceneBlocked = true
+endFunction
+
+event OnResumeSceneBlocked()
+    string lastScene = JArray.getStr(__queuedScenes, -1) ; needs to be revised, returning empty, however it works for now
+    Debug("SceneManager::OnResumeSceneBlocked", "ResumeSceneBlocked: " + __resumeSceneBlocked + ", Current Scene: " + currentScene + ", Last Scene: " + lastScene + ", Condition: " + (currentScene == lastScene))
+    if (__resumeSceneBlocked && currentScene == lastScene)
+        ReleaseAI()
+        __resumeSceneBlocked = false
+    endif
+endEvent
 
 ; Possible Escorts
 ; Possible Escort locations for Escortees / Arrestees / Prisoners
@@ -635,6 +823,8 @@ endFunction
 event OnSceneStart(string name, Scene sender)
     ObjectReference[] params = self.GetSceneParameters(name)
 
+    self.OnSceneStartHandleGlobals(name, params)
+
     if (name == SCENE_ARREST_START_01)
         Actor escort   = params[0] as Actor
         Actor escortee = params[1] as Actor
@@ -726,6 +916,8 @@ event OnSceneStart(string name, Scene sender)
         Actor escortee      = params[1] as Actor
         Actor escortee02    = params[2] as Actor
         Actor escortee03    = params[3] as Actor
+
+        self.SetGlobal("RPB_SceneDialogueEnabled1", 1) ; Used for certain dialogue
 
         RPB_Prison prison = PrisonManager.FindPrisonByPrisoner(escortee) ; TODO: Escortee may not be a prisoner yet (BUG?)
 
@@ -873,6 +1065,7 @@ endEvent
 
 event OnScenePlaying(string name, int phaseEvent, int phase, Scene sender)
     ObjectReference[] params = self.GetSceneParameters(name)
+    self.OnScenePlayingHandleGlobals(name, phaseEvent, phase, params)
 
     ; Debug("SceneManager::OnScenePlaying", string_if (phaseEvent == PHASE_START, "(Start) Playing", "(End) Played") + " Phase " + phase + " of " + name)
     Debug("SceneManager::OnScenePlaying", name + " " + sender + ": " + string_if (phaseEvent == PHASE_START, "(Start)", "(End)") + " Phase " + phase)
@@ -1492,6 +1685,8 @@ event OnSceneEnd(string name, Scene sender)
 
     self.PlayQueued()
     __isScenePlaying = false ; Scene has finished playing
+    self.OnResumeSceneBlocked()
+    self.OnSceneEndHandleGlobals(name, params)
 endEvent
 
 function StartScene(string asSceneName, int akSceneParameters, int aiStartingPhase = 1, bool abForceStart = false)

@@ -246,11 +246,9 @@ event OnArrestSceneChanged(string eventName, string sceneName, float unusedFlt, 
         return
     endif
 
-    string sceneCategoryArrestStart = SceneManager.CATEGORY_ARREST_START
-
-    if (!SceneManager.IsValidScene(sceneCategoryArrestStart, sceneName))
-        Error("The Scene " + sceneName + " is not a valid Scene for the type "+ sceneCategoryArrestStart +", returning...")
-        Debug("EventManager::OnArrestSceneChanged", "The Scene " + sceneName + " is not a valid Scene for the type "+ sceneCategoryArrestStart +", returning...")
+    if (!SceneManager.IsSceneOfType(sceneName, SceneManager.CATEGORY_ARREST_START))
+        Error("The Scene " + sceneName + " is not a valid Scene for the type "+ SceneManager.CATEGORY_ARREST_START +", returning...")
+        Debug("EventManager::OnArrestSceneChanged", "The Scene " + sceneName + " is not a valid Scene for the type "+ SceneManager.CATEGORY_ARREST_START +", returning...")
         return
     endif
 
