@@ -51,7 +51,7 @@ event OnOpen(ObjectReference akActionRef)
     while (i < cellPrisoners.Length)
         if (akOpener == cellPrisoners[i])
             ; Get the Prisoner from the cell attached to this door (right now it's retrieving from the Prison, so all prisoners will be retrieved, not ideal)
-            RPB_Prisoner prisoner = JailCell.Prison.GetPrisoner(akOpener)
+            RPB_Prisoner prisoner = JailCell.Prison.AwaitPrisonerReference(akOpener)
             JailCell.OnPrisonerOpenCellDoor(self, prisoner)
         endif
         i += 1

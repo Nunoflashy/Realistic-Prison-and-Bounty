@@ -717,6 +717,7 @@ endFunction
     Ensures the Actor @akArrestee is an Arrestee, and binds it to @apHold.
 
     Actor       @akArrestee: The Actor to be ensured as an Arrestee.
+    RPB_Hold    @apHold: The Prison to which the Actor should be bound as an Arrestee.
 /;
 function EnsureArresteeSpellAndBinding(Actor akArrestee) global
     if (!akArrestee.HasSpell(RPB_ArresteeSpell()))
@@ -741,6 +742,12 @@ function EnsurePrisonerSpellAndBinding(Actor akPrisoner, RPB_Prison apPrison) gl
     endif
 endFunction
 
+function EnsureCaptorSpellAndBinding(Actor akCaptor) global
+    if (!akCaptor.HasSpell(RPB_CaptorSpell()))
+        akCaptor.AddSpell(RPB_CaptorSpell(), false)
+    endif
+endFunction
+
 ; ==========================================================
 ;                       Alias Functions
 ; ==========================================================
@@ -753,12 +760,20 @@ function BindAliasTo(ReferenceAlias akAlias, ObjectReference akObjectReference) 
     endif
 endFunction
 
+function UnbindAlias(ReferenceAlias akAlias) global
+    akAlias.Clear()
+endFunction
+
 ; ==========================================================
 ;           Distance/Position/Translation Functions
 ; ==========================================================
 
-float function UnitsToCentimeters(int unit)
+float function UnitsToCM(int unit)
     return unit * 1.428
+endFunction
+
+float function UnitsToM(int unit)
+    return (unit * 1.428) / 100
 endFunction
 
 ; Faces akObjA relative to akObjB

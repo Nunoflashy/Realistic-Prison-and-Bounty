@@ -90,12 +90,19 @@ endFunction
 
 function VerifyPrisonsIntegrity()
     ; return
+    ; int root = RPB_Data.GetRootObjectInPath("Holds")
+    int castleDourDungeonCell01 = RPB_Data.GetPrisonObject("Holds/Haafingar/Prisons/Castle Dour Dungeon/Cells/cell01.json")
+    Debug("PrisonManager::VerifyPrisonsIntegrity", "castleDourDungeonCell01: " + GetContainerList(castleDourDungeonCell01))
+    Debug("PrisonManager::VerifyPrisonsIntegrity", "Holds: " + RPB_Data.GetRootObjectInPath("Holds"))
+    ; Debug("PrisonManager::VerifyPrisonsIntegrity", "root: " + GetContainerList(root))
+    return
     Debug("PrisonManager::VerifyPrisonsIntegrity", "Verifying Prisons integrity...")
 
     int i = 0
     while (i < PrisonSlots)
         RPB_Prison prisonRef = self.GetNthAlias(i) as RPB_Prison
         if (prisonRef.Active)
+            BindAliasTo(prisonRef, prisonRef.JailCells[0] as ObjectReference)
             prisonRef.SetupCells()
             ; prisonRef.EnsureFunctionalState()
         endif
@@ -146,6 +153,18 @@ RPB_Prison function GetAvailablePrisonSlot()
             return currentPrisonAlias ; Free slot, return this one
         endif
         i += 1
+    endWhile
+
+    return none
+endFunction
+
+ReferenceAlias function GetEmptySlot()
+    int i = 0
+    while (i < self.PrisonSlots)
+        RPB_Prison slot = self.GetNthAlias(i) as RPB_Prison
+        if (!slot.Active)
+            return slot
+        endif
     endWhile
 
     return none
@@ -236,8 +255,8 @@ function UninitializePrisons()
     endWhile
 endFunction
 
-int function UninitializePrisonByID(int aiPrisonID)
-    RPB_Prison possiblePrison = self.GetNthAlias(aiPrisonID) as RPB_Prison
+int function UninitializeNthPrison(int index)
+    RPB_Prison possiblePrison = self.GetNthPrison(index)
     if (IsValidPrison(possiblePrison))
         self.DeletePrison(possiblePrison)
     endif
@@ -247,7 +266,7 @@ bool function InitializePrison(string asHold)
     int rootObject      = RPB_Data.GetRootObject(asHold) ; JMap&
     int prisonObject    = RPB_Data.Hold_GetJailObject(rootObject) ; JMap&
 
-    RPB_Prison prisonSlot = self.AvailableSlot
+    RPB_Prison prisonSlot = self.GetEmptySlot() as RPB_Prison
 
     if (!prisonSlot)
         Error("There are no Prison Slots available, cannot configure prison for "+ asHold +".")
@@ -299,7 +318,7 @@ function InitializePrisons()
     endWhile
 endFunction
 
-Alias[] function GetAllPrisons()
+Alias[] function GetPrisons()
     int i = 0
     int activePrisons = 0
     while (i < PrisonSlots)
@@ -387,6 +406,15 @@ Alias[] function GetPrisonsForHold(string asHold)
     return prisonRefs
 endFunction
 
+RPB_Prison function GetNthPrison(int index)
+    RPB_Prison currentPrisonSlot = self.GetNthAlias(index) as RPB_Prison
+    if (currentPrisonSlot.Active && IsValidPrison(currentPrisonSlot))
+        return currentPrisonSlot
+    endif
+
+    return none
+endFunction
+
 RPB_Prison function GetPrisonByID(int aiPrisonID)
     return self.GetNthAlias(aiPrisonID) as RPB_Prison
 endFunction
@@ -395,7 +423,7 @@ endFunction
 RPB_Prison function GetPrisonByUUID(string uuid)
     int i = 0
     while (i < PrisonSlots)
-        RPB_Prison prison = self.GetNthAlias(i) as RPB_Prison
+        RPB_Prison prison = self.GetNthPrison(i)
         if (prison.UUID == uuid)
             return prison
         endif
@@ -408,7 +436,7 @@ endFunction
 bool function PrisonExists(string asHold, string asName, Faction akCrimeFaction)
     int i = 0
     while (i < PrisonSlots)
-        RPB_Prison prisonRef = self.GetNthAlias(i) as RPB_Prison
+        RPB_Prison prisonRef = self.GetNthPrison(i)
         if (prisonRef.Hold == asHold && prisonRef.Name == asName && prisonRef.PrisonFaction == akCrimeFaction)
             return true
         endif
@@ -423,13 +451,13 @@ bool function IsSamePrison(RPB_Prison apPrisonOne, RPB_Prison apPrisonTwo) globa
 endFunction
 
 int function GetActivePrisonCount()
-    int i = 0
     int activePrisonCount = 0
 
+    int i = 0
     while (i < PrisonSlots)
-        RPB_Prison prisonRef = self.GetNthAlias(i) as RPB_Prison
-        if (prisonRef && prisonRef.Active)
-            activePrisonCount = i
+        RPB_Prison prisonRef = self.GetNthPrison(i)
+        if (prisonRef)
+            activePrisonCount += 1
         endif
         i += 1
     endWhile
