@@ -746,15 +746,15 @@ endEvent
 
 ; Handles the tracked stats when they are changed.
 ; Tracks both ActorVars for this particular Actor and all stats handled by OnTrackedStatsEvent() for the Player.
-event OnStatChanged(string asStatName, float afValue) ; override
+event OnStatChanged(string asStatName, float afValue) ; virtual
 endEvent
 
 ; Handles the initialization of this Actor
-event OnInitialize() ; override
+event OnInitialize() ; virtual
 endEvent
 
 ; Handles the destruction of this Actor
-event OnDestroy() ; override
+event OnDestroy() ; virtual
 endEvent
 
 ; Registers this Actor to receive events when tracked stats are updated.
@@ -783,11 +783,11 @@ function UnregisterForUpdates()
     self.UnregisterForUpdateGameTime()
 endFunction
 
-Actor function GetActor() ; override
+Actor function GetActor() ; virtual
     Debug("Actor::GetActor", "Actor has not been overridden for " + self.GetExtends() + ", some features may not work properly! [Implement method " + self.GetExtends() + ".GetActor()]")
 endFunction
 
-Faction function GetFaction() ; override
+Faction function GetFaction() ; virtual
     Debug("Actor::GetFaction", "Faction has not been overridden for " + self.GetExtends() + ", some features may not work properly! [Implement method " + self.GetExtends() + ".GetFaction()]")
 endFunction
 
