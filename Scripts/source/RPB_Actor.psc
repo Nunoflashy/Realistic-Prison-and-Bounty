@@ -277,11 +277,11 @@ function SyncLargestBountyForFaction(Faction akFaction)
     ; Set the local stat for the Hold
     RPB_ActorVars.SetLargestBounty(akFaction, this, newLargestBounty)
 
-    DebugWithArgs("Actor::UpdateLargestBountyForFaction", akFaction.GetName(), "[\n" + \ 
-        "\t Current Largest Bounty: " + currentLargestBounty + "\n" + \
-        "\t New Largest Bounty: " + newLargestBounty + "\n" + \
-        "\t Bounty: " + currentBountyForFaction + "\n" + \
-    "]")
+    ; DebugWithArgs("Actor::UpdateLargestBountyForFaction", akFaction.GetName(), "[\n" + \ 
+    ;     "\t Current Largest Bounty: " + currentLargestBounty + "\n" + \
+    ;     "\t New Largest Bounty: " + newLargestBounty + "\n" + \
+    ;     "\t Bounty: " + currentBountyForFaction + "\n" + \
+    ; "]")
 endFunction
 
 function SyncTotalBountyForFaction(Faction akFaction)

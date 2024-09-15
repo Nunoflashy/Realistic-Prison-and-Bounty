@@ -1,4 +1,8 @@
-scriptname RPB_ArresteeList extends RPB_ActiveMagicEffectContainer
+scriptname RPB_ArresteeList extends RPB_ActorList
+
+string function ListIdentifier()
+    return "ArresteeList"
+endFunction
 
 string function GetArresteeID(Actor akActor)
     return "Arrestee["+ akActor.GetFormID() +"]"
@@ -31,3 +35,21 @@ function Remove(RPB_Arrestee apArrestee)
 
     apArrestee.RemoveAll()
 endFunction
+
+
+string function GetActorIdentifier(Actor akActor) ; override
+    return "Arrestee["+ akActor.GetFormID() +"]"
+endFunction
+
+RPB_Actor function AtKeyEx(Actor akActor)
+    string elementKey = self.GetActorIdentifier(akActor)
+    return parent.GetAt(elementKey) as RPB_Actor
+endFunction
+
+; function Remove(RPB_Actor apArrestee)
+;     parent.Remove(apArrestee)
+;     Spell arresteeSpell = RPB_Utility.RPB_ArresteeSpell()
+;     apArrestee.RemoveSpell(arresteeSpell)
+
+;     (apArrestee as RPB_Arrestee).RemoveAll()
+; endFunction

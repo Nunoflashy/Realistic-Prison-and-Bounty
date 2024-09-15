@@ -164,7 +164,7 @@ endEvent
 
 event OnDeath(Actor akKiller)
     Debug("Captor::OnDeath", "Captor died, releasing arrestees")
-    API.Arrest.GetArresteeReference(Arrestee).RevertArrest()
+    API.Arrest.AwaitArresteeReference(Arrestee).RevertArrest()
 endEvent
 
 event OnDestroy()

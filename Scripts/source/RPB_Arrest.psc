@@ -102,6 +102,19 @@ endProperty
 ; ==========================================================
 
 ;/
+    Awaits a reference of RPB_Arrestee for the specified Actor.
+    If the Actor is not an Arrestee yet, they will be made into one. 
+
+    Actor   @akArrestee: The actor to retrieve the Arrestee reference from.
+    int?    @aiMaxTries: How many attempts retrieving the reference, in case it fails initially.
+    float?  @afInitialTimeBetweenTries: The delay on each try
+    float?  @afMaxTimeBetweenTries: The max delay on each try that is possible (Exponential Backoff).
+/;
+RPB_Arrestee function AwaitArresteeReference(Actor akArrestee, int aiMaxTries = 50, float afInitialTimeBetweenTries = 0.1, float afMaxTimeBetweenTries = 3.0)
+    return RPB_Utility.AwaitEntityReference(akArrestee, Arrestees, none, aiMaxTries, afInitialTimeBetweenTries, afMaxTimeBetweenTries) as RPB_Arrestee
+endFunction
+
+;/
     Binds @akArrestee to an instance of RPB_Arrestee,
     giving us the arrest state of the Actor bound to this reference.
 
@@ -113,38 +126,6 @@ bool function RegisterArrestee(RPB_Arrestee apArrestee)
 endFunction
 
 ;/
-    Marks an Actor as an Arrestee.
-    This function should be used whenever an Actor should have an Arrest state (e.g: when beginning an arrest.)
-
-    Actor   @akActor: The Actor to mark as arrestee.
-    bool?   @abDelayExecution: Whether to delay the execution of this function after marking the Actor (In order to obtain the reference for slower systems).
-
-    returns (RPB_Arrestee): A reference to the arrest state of the Actor.
-/;
-RPB_Arrestee function MakeArrestee(Actor akActor, bool abDelayExecution = true)
-    Spell arrestSpell = RPB_Utility.RPB_ArresteeSpell()
-    akActor.AddSpell(arrestSpell, false)
-
-    if (abDelayExecution)
-        Utility.Wait(0.2)
-    endif
-
-    ; Since the spell is cast, a reference of type RPB_Arrestee is now available for akActor
-    return self.GetArresteeReference(akActor)
-endFunction
-
-;/
-    Removes an arrestee from the Arrestee list.
-
-    RPB_Arrestee    @apArrestee: The reference to the arrestee.
-/;
-function RemoveArresteeFromList(RPB_Arrestee apArrestee)
-    if (apArrestee && Arrestees.Exists(apArrestee))
-        Arrestees.Remove(apArrestee)
-    endif
-endFunction
-
-;/
     Removes the Arrestee spell (and consequently, the MagicEffect) from this arrestee.
 /;
 function UnregisterArrestee(RPB_Arrestee apArrestee)
@@ -153,28 +134,29 @@ function UnregisterArrestee(RPB_Arrestee apArrestee)
     if (apArrestee.HasSpell(arrestSpell))
         apArrestee.RemoveSpell(arrestSpell)
     endif
-endFunction
 
-RPB_Arrestee function GetArresteeReference(Actor akArrestee)
-    RPB_Arrestee arresteeRef = Arrestees.AtKey(akArrestee)
-
-    if (!arresteeRef)
-        Warn("The Actor " + akArrestee + " is not arrested or there was a state mismatch!")
-        DebugWarn("Arrest::GetArresteeReference", "The Actor " + akArrestee + " is not arrested or there was a state mismatch!")
-
-        return none
+    if (apArrestee && Arrestees.Exists(apArrestee))
+        Arrestees.Remove(apArrestee)
     endif
-
-    return arresteeRef
 endFunction
-
-RPB_Arrestee function GetArresteeReferenceInHold(Actor akArrestee, string asHold)
-
-endFunction
+; ==========================================================
 
 ; ==========================================================
 ;                  Captor-specific Methods
 ; ==========================================================
+
+;/
+    Awaits a reference of RPB_Captor for the specified Actor.
+    If the Actor is not a Captor yet, they will be made into one. 
+
+    Actor   @akCaptor: The actor to retrieve the Captor reference from.
+    int?    @aiMaxTries: How many attempts retrieving the reference, in case it fails initially.
+    float?  @afInitialTimeBetweenTries: The delay on each try
+    float?  @afMaxTimeBetweenTries: The max delay on each try that is possible (Exponential Backoff).
+/;
+RPB_Captor function AwaitCaptorReference(Actor akCaptor, int aiMaxTries = 50, float afInitialTimeBetweenTries = 0.1, float afMaxTimeBetweenTries = 3.0)
+    return RPB_Utility.AwaitEntityReference(akCaptor, Captors, none, aiMaxTries, afInitialTimeBetweenTries, afMaxTimeBetweenTries) as RPB_Captor
+endFunction
 
 ;/
     Binds @akCaptorRef to an instance of RPB_Captor,
@@ -186,46 +168,6 @@ bool function RegisterCaptor(RPB_Captor apCaptor)
     Captors.Add(apCaptor)
     return Captors.Exists(apCaptor)
 endFunction
-
-RPB_Captor function MakeCaptor(Actor akActor, bool abDelayExecution = true)
-    Spell captorSpell = RPB_Utility.RPB_CaptorSpell()
-    akActor.AddSpell(captorSpell, false)
-
-    if (abDelayExecution)
-        Utility.Wait(0.2)
-    endif
-
-    if (akActor.HasSpell(captorSpell))
-        Debug("Arrest::MakeCaptor", "The Actor does not have the spell attached to them! (This is possibly a bug!)")
-        return none
-    endif
-
-    ; Since the spell is cast, a reference of type RPB_Captor is now available for akActor
-    return self.GetCaptorReference(akActor)
-endFunction
-
-RPB_Captor function MakeOrGetCaptor(Actor akActor, bool abDelayExecution = true)
-    RPB_Captor existingRef = self.GetCaptorReference(akActor)
-    if (existingRef)
-        return existingRef
-    endif
-    
-    Spell captorSpell = RPB_Utility.RPB_CaptorSpell()
-    akActor.AddSpell(captorSpell, false)
-
-    if (abDelayExecution)
-        Utility.Wait(0.2)
-    endif
-
-    if (akActor.HasSpell(captorSpell))
-        Debug("Arrest::MakeCaptor", "The Actor does not have the spell attached to them! (This is possibly a bug!)")
-        return none
-    endif
-
-    ; Since the spell is cast, a reference of type RPB_Captor is now available for akActor
-    return self.GetCaptorReference(akActor)
-endFunction
-
 ;/
     Removes the Captor spell (and consequently, the MagicEffect) from this Captor.
     Optionally removes it from the Captors list.
@@ -244,19 +186,7 @@ function UnregisterCaptor(RPB_Captor apCaptor, bool abRemoveFromList = false)
         Captors.Remove(apCaptor)
     endif
 endFunction
-
-RPB_Captor function GetCaptorReference(Actor akCaptor)
-    RPB_Captor captor = Captors.AtKey(akCaptor)
-
-    if (!captor)
-        Warn("The Actor " + akCaptor + " is not a captor or there was a state mismatch!")
-        DebugWarn("Arrest::GetCaptorReference", "The Actor " + akCaptor + " is not a captor or there was a state mismatch!")
-        return none
-    endif
-
-    return captor
-endFunction
-
+; ==========================================================
 
 bool function IsActorArrested(Actor akActor)
     return RPB_StorageVars.GetBoolOnForm("Arrested", akActor, "Arrest")
@@ -367,7 +297,7 @@ endFunction
             - Stop, in the name of the Jarl!
             - Come quietly or face the Jarl's justice!
             - By order of the Jarl, I command you to halt!
-            - Sheathe your wepaons and come quietly!
+            - Sheathe your weapons and come quietly!
 
         - TOPIC_TYPE_ARREST_CONFRONT
             - By order of the Jarl, stop right there!
@@ -458,6 +388,9 @@ event OnArrestBegin(RPB_Arrestee apArrestee, RPB_Captor apCaptor, Faction akCrim
         return
     endif
 
+    ; asArrestType = ARREST_TYPE_TELEPORT_TO_JAIL
+    ; asArrestType = ARREST_TYPE_ESCORT_TO_CELL
+    ; asArrestType = ARREST_TYPE_ESCORT_TO_CELL
     ; Debug("Arrest::OnArrestBegin", "Captor: " + apCaptor + ", Captors: " + Captors.GetKeys())
     apArrestee.SetArrestParameters(asArrestType, apCaptor, akCrimeFaction)
 
@@ -1166,6 +1099,10 @@ function TriggerForcegreetEluding(Actor akEludedGuard)
 endFunction
 
 function TriggerPursuitEluding(Actor akEludedGuard)
+    if (akEludedGuard.GetCrimeFaction().GetCrimeGold() > 1000)
+        akEludedGuard.StartCombat(Config.Player)
+        return
+    endif
     self.SetEludedGuard(akEludedGuard, "Pursuit")
     RegisterForDelayedEvent("Eluding", config.ArrestEludeWarningTime) ; Register for a delayed event on Eluding::OnUpdate()
 endFunction

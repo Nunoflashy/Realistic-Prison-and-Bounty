@@ -1076,7 +1076,7 @@ event OnScenePlaying(string name, int phaseEvent, int phase, Scene sender)
         Actor escort   = params[0] as Actor
         Actor escortee = params[1] as Actor
 
-        RPB_Arrestee arrestee = Arrest.GetArresteeReference(escortee)
+        RPB_Arrestee arrestee = Arrest.AwaitArresteeReference(escortee)
         arrestee.SetForm("Escort", escort, arrestee.DestroyPropertyOnState("Imprisoned"))
 
         if (phaseEvent == PHASE_START)
@@ -1092,7 +1092,7 @@ event OnScenePlaying(string name, int phaseEvent, int phase, Scene sender)
         Actor escort   = params[0] as Actor
         Actor escortee = params[1] as Actor
 
-        RPB_Arrestee arrestee = Arrest.GetArresteeReference(escortee)
+        RPB_Arrestee arrestee = Arrest.AwaitArresteeReference(escortee)
         arrestee.SetForm("Escort", escort, "Temporary::Imprisoned")
 
         if (phaseEvent == PHASE_START)
@@ -1111,7 +1111,7 @@ event OnScenePlaying(string name, int phaseEvent, int phase, Scene sender)
         Actor escort   = params[0] as Actor
         Actor escortee = params[1] as Actor
 
-        RPB_Arrestee arrestee = Arrest.GetArresteeReference(escortee)
+        RPB_Arrestee arrestee = Arrest.AwaitArresteeReference(escortee)
         arrestee.SetForm("Escort", escort, "Temporary::Imprisoned")
 
         if (phaseEvent == PHASE_START)
@@ -1131,7 +1131,7 @@ event OnScenePlaying(string name, int phaseEvent, int phase, Scene sender)
         Actor escort   = params[0] as Actor
         Actor escortee = params[1] as Actor
 
-        RPB_Arrestee arrestee = Arrest.GetArresteeReference(escortee)
+        RPB_Arrestee arrestee = Arrest.AwaitArresteeReference(escortee)
         arrestee.SetForm("Escort", escort, "Temporary::Imprisoned")
 
         if (phaseEvent == PHASE_START)
@@ -1152,7 +1152,7 @@ event OnScenePlaying(string name, int phaseEvent, int phase, Scene sender)
         Actor escort   = params[0] as Actor
         Actor escortee = params[1] as Actor
 
-        RPB_Arrestee arrestee = Arrest.GetArresteeReference(escortee)
+        RPB_Arrestee arrestee = Arrest.AwaitArresteeReference(escortee)
         arrestee.SetForm("Escort", escort, "Temporary::Imprisoned")
 
         if (phaseEvent == PHASE_START)
@@ -1447,7 +1447,7 @@ event OnSceneEnd(string name, Scene sender)
         Actor escort   = params[0] as Actor
         Actor escortee = params[1] as Actor
 
-        RPB_Arrestee arrestee = Arrest.GetArresteeReference(escortee)
+        RPB_Arrestee arrestee = Arrest.AwaitArresteeReference(escortee)
 
         arrestee.SetForm("Escort", escort, arrestee.DestroyPropertyOnState("Imprisoned"))
         Arrest.FireArresteeEventOnScene(name, "ArrestEnd", arrestee)
@@ -1458,7 +1458,7 @@ event OnSceneEnd(string name, Scene sender)
         Actor escort   = params[0] as Actor
         Actor escortee = params[1] as Actor
 
-        RPB_Arrestee arrestee = Arrest.GetArresteeReference(escortee)
+        RPB_Arrestee arrestee = Arrest.AwaitArresteeReference(escortee)
 
         arrestee.SetForm("Escort", escort, arrestee.DestroyPropertyOnState("Imprisoned"))
         Arrest.FireArresteeEventOnScene(name, "ArrestEnd", arrestee)
@@ -1467,7 +1467,7 @@ event OnSceneEnd(string name, Scene sender)
         Actor escort   = params[0] as Actor
         Actor escortee = params[1] as Actor
 
-        RPB_Arrestee arrestee = Arrest.GetArresteeReference(escortee)
+        RPB_Arrestee arrestee = Arrest.AwaitArresteeReference(escortee)
 
         arrestee.SetForm("Escort", escort, arrestee.DestroyPropertyOnState("Imprisoned"))
         Arrest.FireArresteeEventOnScene(name, "ArrestEnd", arrestee)
@@ -1476,7 +1476,7 @@ event OnSceneEnd(string name, Scene sender)
         Actor escort   = params[0] as Actor
         Actor escortee = params[1] as Actor
 
-        RPB_Arrestee arrestee = Arrest.GetArresteeReference(escortee)
+        RPB_Arrestee arrestee = Arrest.AwaitArresteeReference(escortee)
 
         arrestee.SetForm("Escort", escort, arrestee.DestroyPropertyOnState("Imprisoned"))
         Arrest.FireArresteeEventOnScene(name, "ArrestEnd", arrestee)
@@ -1485,7 +1485,7 @@ event OnSceneEnd(string name, Scene sender)
         Actor escort   = params[0] as Actor
         Actor escortee = params[1] as Actor
 
-        RPB_Arrestee arrestee = Arrest.GetArresteeReference(escortee)
+        RPB_Arrestee arrestee = Arrest.AwaitArresteeReference(escortee)
 
         arrestee.SetForm("Escort", escort, arrestee.DestroyPropertyOnState("Imprisoned"))
         Arrest.FireArresteeEventOnScene(name, "ArrestEnd", arrestee, "Arrest in Prison")
@@ -1542,7 +1542,7 @@ event OnSceneEnd(string name, Scene sender)
             if (params[i] != None && params[i] != escort)
                 RPB_Actor actorReference = prison.AwaitPrisonerReference(escortee)
                 if (actorReference == none)
-                    actorReference = Arrest.GetArresteeReference(params[i] as Actor)
+                    actorReference = Arrest.AwaitArresteeReference(params[i] as Actor)
 
                     RPB_Arrestee arrestee = actorReference as RPB_Arrestee
                     arrestee.SetForm("EscortGuard", escort, "Temporary::Imprisoned")

@@ -1,4 +1,8 @@
-scriptname RPB_CaptorList extends RPB_ActiveMagicEffectContainer
+scriptname RPB_CaptorList extends RPB_ActorList
+
+string function ListIdentifier()
+    return "CaptorList"
+endFunction
 
 string function GetCaptorID(Actor akActor)
     return "Captor["+ akActor.GetFormID() +"]"
@@ -23,4 +27,15 @@ endFunction
 
 function Remove(RPB_Captor apCaptor)
     protected_remove(self.GetCaptorID(apCaptor.GetActor()))
+endFunction
+
+
+
+string function GetActorIdentifier(Actor akActor) ; override
+    return "Captor["+ akActor.GetFormID() +"]"
+endFunction
+
+RPB_Actor function AtKeyEx(Actor akActor)
+    string elementKey = self.GetActorIdentifier(akActor)
+    return parent.GetAt(elementKey) as RPB_Actor
 endFunction

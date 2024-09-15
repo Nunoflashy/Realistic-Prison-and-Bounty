@@ -714,15 +714,73 @@ endFunction
 ; ==========================================================
 
 ;/
+    Awaits a reference of RPB_Actor for the specified Actor.
+    If the Actor is not of the Entity type yet, they will be made into one and bound to it. 
+
+    Actor           @akEntity: The actor to retrieve the Prisoner reference from.
+    RPB_ActorList   @apEntityList: The entity list to get the reference from.
+    int?            @aiMaxTries: How many attempts retrieving the reference, in case it fails initially.
+    float?          @afInitialTimeBetweenTries: The delay on each try
+    float?          @afMaxTimeBetweenTries: The max delay on each try that is possible (Exponential Backoff).
+
+    returns (RPB_Actor): The RPB_Actor reference for this Actor.
+/;
+RPB_Actor function AwaitEntityReference(\
+    Actor akEntity, \
+    RPB_ActorList apEntityList, \
+    ReferenceAlias apAlias = none, \
+    int aiMaxTries = 50, \
+    float afInitialTimeBetweenTries = 0.1, \
+    float afMaxTimeBetweenTries = 3.0 \
+) global
+    if (apEntityList as RPB_PrisonerList)
+        EnsurePrisonerSpellAndBinding(akEntity, apAlias as RPB_Prison)
+
+    elseif (apEntityList as RPB_ArresteeList)
+        EnsureArresteeSpellAndBinding(akEntity, apAlias as RPB_Hold)
+
+     elseif (apEntityList as RPB_CaptorList)
+         EnsureCaptorSpellAndBinding(akEntity)
+    endif
+
+    ; Shared logic for awaiting reference
+    RPB_Actor entityRef = apEntityList.AtKeyEx(akEntity) as RPB_Actor
+    int tries = 0
+    float delay = afInitialTimeBetweenTries
+
+    ; Safeguard
+    while (!entityRef && tries < aiMaxTries)
+        entityRef = apEntityList.AtKeyEx(akEntity) as RPB_Actor
+        Utility.Wait(delay)
+        tries += 1
+        delay *= 1.5
+        if (delay > afMaxTimeBetweenTries)
+            delay = afMaxTimeBetweenTries
+        endif
+    endWhile
+
+    if (!entityRef)
+        DebugError("Utility::AwaitEntityReference ["+ apEntityList.ListIdentifier() +"]", "The Actor " + akEntity + " is not in the provided list or there was a state mismatch!")
+        Error(akEntity.GetBaseObject().GetName() + " is not in the provided list or there was a state mismatch!")
+        return none
+    endif
+
+    return entityRef
+endFunction
+
+;/
     Ensures the Actor @akArrestee is an Arrestee, and binds it to @apHold.
 
     Actor       @akArrestee: The Actor to be ensured as an Arrestee.
     RPB_Hold    @apHold: The Prison to which the Actor should be bound as an Arrestee.
 /;
-function EnsureArresteeSpellAndBinding(Actor akArrestee) global
+function EnsureArresteeSpellAndBinding(Actor akArrestee, RPB_Hold apHold) global
     if (!akArrestee.HasSpell(RPB_ArresteeSpell()))
         ; Cast the Arrestee spell (to bind the RPB_Arrestee instance script)
         akArrestee.AddSpell(RPB_ArresteeSpell(), false)
+
+        ; Bind this Hold to the Arrestee (to retrieve it from RPB_Arrestee)
+        RPB_StorageVars.SetStringOnForm("Hold UUID", akArrestee, apHold.UUID, "Jail")
     endif
 endFunction
 

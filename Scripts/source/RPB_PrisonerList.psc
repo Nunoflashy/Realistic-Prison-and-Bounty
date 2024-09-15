@@ -1,4 +1,8 @@
-scriptname RPB_PrisonerList extends RPB_ActiveMagicEffectContainer
+scriptname RPB_PrisonerList extends RPB_ActorList
+
+string function ListIdentifier()
+    return "PrisonerList"
+endFunction
 
 string function GetPrisonerID(Actor akActor)
     return "Prisoner["+ akActor.GetFormID() +"]"
@@ -34,3 +38,25 @@ function Remove(RPB_Prisoner apPrisoner)
     apPrisoner.RemoveAll()
     apPrisoner.RemoveAll("Arrest") ; Needs to be reviewed, do we really want to delete Arrest-related category for Prisoners?
 endFunction
+
+
+
+string function GetActorIdentifier(Actor akActor) ; override
+    return "Prisoner["+ akActor.GetFormID() +"]"
+endFunction
+
+RPB_Actor function AtKeyEx(Actor akActor)
+    string elementKey = self.GetActorIdentifier(akActor)
+    return parent.GetAt(elementKey) as RPB_Actor
+endFunction
+
+; function Remove(RPB_Actor apPrisoner)
+;     parent.Remove(apPrisoner)
+;     Spell arresteeSpell = RPB_Utility.RPB_ArresteeSpell()
+
+;     Spell prisonerSpell = RPB_Utility.RPB_PrisonerSpell()
+;     (apPrisoner as RPB_Prisoner).RemoveSpell(prisonerSpell)
+
+;     (apPrisoner as RPB_Prisoner).RemoveAll()
+;     (apPrisoner as RPB_Prisoner).RemoveAll("Arrest") ; Needs to be reviewed, do we really want to delete Arrest-related category for Prisoners?
+; endFunction

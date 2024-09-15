@@ -186,7 +186,7 @@ endProperty
     returns (RPB_Arrestee): A reference to the arrest state of the prisoner.
 /;
 RPB_Arrestee function GetStateForPrisoner(RPB_Prisoner apPrisoner) global
-    return (RPB_API.GetArrest()).GetArresteeReference(apPrisoner.GetActor())
+    return (RPB_API.GetArrest()).AwaitArresteeReference(apPrisoner.GetActor())
 endFunction
 
 ;/
@@ -587,7 +587,6 @@ event OnInitialize()
 endEvent
 
 event OnDestroy()
-    Arrest.RemoveArresteeFromList(self) ; Remove this Actor from the AME list since they are no longer arrested
     self.UnregisterForTrackedStats()
 
     if (self.IsPlayer())

@@ -1641,7 +1641,7 @@ int function FirePrisonerEventOnScene(string asScene, string asSceneEvent, RPB_P
 
         elseif (asSceneEvent == "Escorting")
             if (asSceneSubEvent == "Release from Captor")
-                RPB_Captor captor = API.Arrest.GetCaptorReference(prisonerEscort)
+                RPB_Captor captor = API.Arrest.AwaitCaptorReference(prisonerEscort)
                 captor.StopEscorting()
             endif
 
@@ -2249,37 +2249,12 @@ endFunction
     int?    @aiMaxTries: How many attempts retrieving the reference, in case it fails initially.
     float?  @afInitialTimeBetweenTries: The delay on each try
     float?  @afMaxTimeBetweenTries: The max delay on each try that is possible (Exponential Backoff).
+
+    returns (RPB_Prisoner): The Prisoner reference for this Actor.
 /;
-; RPB_Prisoner function AwaitPrisonerReference(Actor akPrisoner, int aiMaxTries = 50, float afInitialTimeBetweenTries = 0.1, float afMaxTimeBetweenTries = 3.0)
-;     return RPB_Utility.AwaitEntityReference(akPrisoner, Prisoners, self, aiMaxTries, afInitialTimeBetweenTries, afMaxTimeBetweenTries) as RPB_Prisoner
-; endFunction
 RPB_Prisoner function AwaitPrisonerReference(Actor akPrisoner, int aiMaxTries = 50, float afInitialTimeBetweenTries = 0.1, float afMaxTimeBetweenTries = 3.0)
-    RPB_Utility.EnsurePrisonerSpellAndBinding(akPrisoner, self)
-
-    RPB_Prisoner prisonerRef = Prisoners.AtKey(akPrisoner)
-    int tries = 0
-    float delay = afInitialTimeBetweenTries
-
-    ; Safeguard
-    while (!prisonerRef && tries < aiMaxTries)
-        prisonerRef = Prisoners.AtKey(akPrisoner)
-        Utility.Wait(delay)
-        tries += 1
-        delay *= 1.5
-        if (delay > afMaxTimeBetweenTries)
-            delay = afMaxTimeBetweenTries
-        endif
-    endWhile
-
-    if (!prisonerRef)
-        DebugError("Prison::AwaitPrisonerReference", "The Actor " + akPrisoner + " is not a prisoner or there was a state mismatch!")
-        Error(akPrisoner.GetBaseObject().GetName() + " is not a prisoner or there was a state mismatch!")
-        return none
-    endif
-
-    return prisonerRef
+    return RPB_Utility.AwaitEntityReference(akPrisoner, Prisoners, self, aiMaxTries, afInitialTimeBetweenTries, afMaxTimeBetweenTries) as RPB_Prisoner
 endFunction
-
 
 ;/
     Turns the Actor into an RPB_Prisoner and binds it to this Prison.

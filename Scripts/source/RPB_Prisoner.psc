@@ -1873,7 +1873,7 @@ endFunction
     This could also be an event that happens by chance (configured in the MCM, to make it more dynamic and random)
 /;
 RPB_Arrestee function MakeArrestee()
-    RPB_Arrestee arresteeRef = API.Arrest.MakeArrestee(this)
+    RPB_Arrestee arresteeRef = API.Arrest.AwaitArresteeReference(this)
     ;/ arresteeRef.SetArrestParameters( \
         asArrestHold        = newArrestHold, \
         akArrestCaptor      = newArrestCaptor \
