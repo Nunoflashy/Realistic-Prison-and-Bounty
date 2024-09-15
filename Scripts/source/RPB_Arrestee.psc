@@ -297,7 +297,7 @@ RPB_Prisoner function MakePrisoner()
     RPB_Prison prison  = self.GetPotentialPrison()
     self.TransferArrestPropertiesToPrisoner(prison)
 
-    return prison.MakePrisoner(this)
+    return prison.AwaitPrisonerReference(this)
 endFunction
 
 function TransferArrestPropertiesToPrisoner(RPB_Prison apPrison)
@@ -309,6 +309,7 @@ function TransferArrestPropertiesToPrisoner(RPB_Prison apPrison)
     self.SetInt("Year of Arrest", YearOfArrest, "Jail")
     self.SetForm("Arrest Captor", Captor.GetActor(), "Jail")
 endFunction
+
 ; ==========================================================
 ;                           Bounty
 ; ==========================================================
