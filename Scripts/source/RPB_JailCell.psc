@@ -60,11 +60,21 @@ bool property HasExteriorMarkers
     endFunction
 endProperty
 
-; The prisoners living in this cell
 Form[] property Prisoners
     Form[] function get()
-        return JArray.asFormArray(JMap.allValues(__prisonersInCell))
-        ; return self.GetPrisoners()
+        return self.GetPrisoners()
+    endFunction
+endProperty
+
+Form[] property FemalePrisoners
+    Form[] function get()
+        return self.GetFemalePrisoners()
+    endFunction
+endProperty
+
+Form[] property MalePrisoners
+    Form[] function get()
+        return self.GetMalePrisoners()
     endFunction
 endProperty
 
@@ -98,6 +108,12 @@ Form[] property OtherProps
             __otherProps = self.GetConfigObjects("Props")
         endif
         return __otherProps
+    endFunction
+endProperty
+
+bool property HasPrisoners
+    bool function get()
+        return self.Prisoners.Length > 0
     endFunction
 endProperty
 
@@ -185,19 +201,6 @@ bool __scannedOtherProps
 
 ; ==========================================================
 
-; Not yet used, since the caller needs a reference to Prisoner to pass to SetExclusiveToPrisonerSex
-; Workaround might be to store the first prisoner reference just for this purpose, so we don't retrieve it twice and waste cycles/performance
-bool property ShouldBeGenderExclusive
-    bool function get()
-        Form prisonerForm = JMap.getForm(__prisonersInCell, JMap.getNthKey(__prisonersInCell, 0)) ; Get the first prisoner
-        RPB_Prisoner prisonerRef = Prison.GetPrisonerReference(prisonerForm as Actor)
-
-        ; If the first prisoner will be/is stripped naked / to underwear, set this cell as gender exclusive for them if the cell is not yet gender exclusive
-        return !self.IsGenderExclusive && (prisonerRef.WillBeStrippedNaked || prisonerRef.WillBeStrippedToUnderwear) || (prisonerRef.IsStrippedNaked || prisonerRef.IsStrippedToUnderwear)
-    endFunction
-endProperty
-
-
 ; The approximate size of this cell from the center point (this reference) as a radius
 float __cellRadius
 float property CellRadius
@@ -245,16 +248,6 @@ int property MaxPrisoners
 
         return __maxPrisoners
     endFunction
-
-    function set(int value)
-        int configOption = self.GetOptionOfTypeInt("Maximum Prisoners")
-
-        if (configOption)
-            LogProperty("JailCell::MaxPrisoners", "Property is retrieved from data file, make sure the value is supposed to be changing!")
-        endif
-
-        __maxPrisoners = value
-    endFunction
 endProperty
 
 string property DefaultPackageSize
@@ -294,54 +287,8 @@ endProperty
 
 ; ==========================================================
 
-ReferenceAlias __cellPackage
-ReferenceAlias property CellPackage
-    ReferenceAlias function get()
-        return Prison.PrisonManager.GetCellPackageByName("S_0")
-        return __cellPackage
-    endFunction
-endProperty
-
-ReferenceAlias[] _cellPackages
-
 ReferenceAlias function GetSuitableCellPackage()
     return Prison.PrisonManager.GetCellPackageOfType(self.PackageSize)
-endFunction
-
-;/
-    Applies an AI Package that is bound to this Jail Cell.
-
-    The package is retrieved through PrisonManager and depends on the PackageSize attribute
-    for the jail cell to determine the size required.
-
-    This package is used to bind NPC prisoners to their cell, so as not to run any other AI Packages
-    while this one is active.
-/;
-function ApplyCellPackage(RPB_Prisoner apPrisoner)
-    if (!_cellPackages)
-        ;/
-            Maximum of 20 NPC's per cell, since there's no way to dynamically resize ReferenceAlias[],
-            this is done here and not on a Prisoner level because the Aliases need a persistent reference, and RPB_Prisoner gets destroyed when the Player
-            is not in sight of the NPC anymore, and hence the Alias becomes inactive, making the NPC restore their usual activities and not stay in the cell.
-
-            Since RPB_JailCell is a persistent reference in all jail cells, these ReferenceAliases will never be destroyed, and the NPC will be bound
-            to their jail cell as long as the reference is active.
-        /;
-        _cellPackages = new ReferenceAlias[20]
-    endif
-
-    int packageIndex = PrisonerCount - 1
-    apPrisoner.SetInt("Cell Package Index", packageIndex, "JailCell")
- 
-    _cellPackages[packageIndex] = Prison.PrisonManager.GetCellPackageOfType(self.PackageSize)
-    ; __cellPackage = _cellPackages[packageIndex]
-    ; BindAliasTo(_cellPackages[packageIndex], self)
-    Debug("[Prison: "+ self.Prison.Name +"] JailCell::ApplyCellPackage", "[Prisoner: "+ apPrisoner.Name +"] Package applied on: " +  _cellPackages[packageIndex].GetReference())
-endFunction
-
-ReferenceAlias function GetPrisonerCellPackage(RPB_Prisoner apPrisoner)
-    int packageIndex = apPrisoner.GetInt("Cell Package Index", "JailCell")
-    return _cellPackages[packageIndex]
 endFunction
 
 ;/
@@ -448,21 +395,18 @@ string function GetAcceptedGender()
 
 endFunction
 
-; RPB_CellDoor function ScanCellDoor()
-;     int jailBaseDoorIdForPrison = GetJailBaseDoorID(self.Prison.Hold) ; Base ID of any Door from this Prison
-;     RPB_CellDoor _cellDoor      = GetNearestJailDoorOfType(jailBaseDoorIdForPrison, self, 4000) as RPB_CellDoor
-;     return _cellDoor
-; endFunction
-
 function ScanCellDoor(bool abForceAssignment = false)
     if (CellDoor && !abForceAssignment)
         return
     endif
 
-    Form baseCellDoor = Prison.GetPropertyOfTypeForm("Base Cell Door")
+    ObjectReference baseCellDoor = Prison.GetPropertyOfTypeForm("Base Cell Door") as ObjectReference
+    RPB_CellDoor _cellDoor       = GetNearestJailDoorOfTypeEx(baseCellDoor, self, 4000) as RPB_CellDoor
 
-    int jailBaseDoorIdForPrison = GetJailBaseDoorID(self.Prison.Hold) ; Base ID of any Door from this Prison
-    RPB_CellDoor _cellDoor      = GetNearestJailDoorOfTypeEx(baseCellDoor, self, 4000) as RPB_CellDoor
+    ; Not in the same cell (location), would happen when teleporting from a jail to another, for example.
+    if (self.GetParentCell() != _cellDoor.GetParentCell())
+        return
+    endif
 
     if (_cellDoor)
         ; Bind the cell door to the jail cell
@@ -479,18 +423,15 @@ function ScanBeds()
     int bedExclusions   = JMap.object()
     int bedsScanned     = JArray.object()
 
-    Form bedRollHay01 = Game.GetFormEx(0x1899D)
     FormList RPB_BedFormList = GetFormFromMod(0x1CDAA) as FormList
 
     Debug("[Prison: "+ self.Prison.Name +"] JailCell::ScanBeds", "Scan Iterations: " + self.ScanIterations + ", Cell Radius: " + self.CellRadius)
-
 
     int i = 0
     while (i < self.ScanIterations)
         ObjectReference scannedBed = Game.FindRandomReferenceOfAnyTypeInListFromRef(RPB_BedFormList, self, self.CellRadius)
 
         if (scannedBed && !JMap.hasKey(bedExclusions, scannedBed.GetFormID()))
-            ; self.MaxPrisoners += 1
             JMap.setForm(bedExclusions, scannedBed.GetFormID(), scannedBed)
             JArray.addForm(bedsScanned, scannedBed) ; Add the bed to this local array
             Debug("[Prison: "+ self.Prison.Name +"] JailCell::ScanBeds", "Scanned " + scannedBed + " (Name: "+ scannedBed.GetBaseObject().GetName() +") Bed in " + self + ", Max Prisoners for this Cell: " + self.MaxPrisoners)
@@ -502,7 +443,7 @@ function ScanBeds()
     if (JValue.count(bedsScanned) > 0)
         __beds = JArray.asFormArray(bedsScanned)
         __scannedBeds = true
-        self.MaxPrisoners = JValue.count(bedsScanned)
+        __maxPrisoners = JValue.count(bedsScanned)
     endif
 
     Debug("[Prison: "+ self.Prison.Name +"] JailCell::ScanBeds", "Beds in " + self + ": " + self.Beds)
@@ -598,10 +539,6 @@ endFunction
 ;                         Prisoners                        
 ; =========================================================
 
-bool function HasPrisoners()
-    return PrisonerCount > 0
-endFunction
-
 bool function HasFemales(bool abStrictlyFemales = false)
     int i = 0
     bool foundFemale = false
@@ -636,25 +573,46 @@ bool function HasMales(bool abStrictlyMales = false)
     return foundMale
 endFunction
 
-;/
-    Retrieves the prisoner(s) living in this jail cell.
-/;
-RPB_Prisoner[] function GetPrisoners()
-
+; Retrieves the prisoner(s) living in this jail cell.
+Form[] function GetPrisoners()
+    return JArray.asFormArray(JMap.allValues(__prisonersInCell))
 endFunction
 
-RPB_Prisoner[] function GetFemalePrisoners()
+; Retrieves the females prisoner(s) living in this jail cell.
+Form[] function GetFemalePrisoners()
+    int arr = JArray.object()
 
+    int i = 0
+    while (i < Prisoners.Length)
+        Actor ref = Prisoners[i] as Actor
+        if (RPB_Utility.IsActorFemale(ref))
+            JArray.addForm(arr, ref)
+        endif
+        i += 1
+    endWhile
+
+    return JArray.asFormArray(arr)
 endFunction
 
-RPB_Prisoner[] function GetMalePrisoners()
-    
+; Retrieves the male prisoner(s) living in this jail cell.
+Form[] function GetMalePrisoners()
+    int arr = JArray.object()
+
+    int i = 0
+    while (i < Prisoners.Length)
+        Actor ref = Prisoners[i] as Actor
+        if (RPB_Utility.IsActorMale(ref))
+            JArray.addForm(arr, ref)
+        endif
+        i += 1
+    endWhile
+
+    return JArray.asFormArray(arr)
 endFunction
 
 function RemovePrisoner(RPB_Prisoner apPrisoner)
     if (apPrisoner)
         self.UnregisterPrisoner(apPrisoner)
-        ; self.OnPrisonerLeave(apPrisoner)
     endif
 endFunction
 
@@ -802,22 +760,11 @@ function RegisterPrisoner(RPB_Prisoner apPrisoner)
     ; Pass the reference to the Prisoner
     apPrisoner.SetForm("Cell", self, "Jail")
 
-    if (apPrisoner.IsNPC())
-        ; Bind the Package to this Cell
-        self.ApplyCellPackage(apPrisoner)
-    endif
-
     self.OnPrisonerRegister(apPrisoner)
 endFunction
 
 function UnregisterPrisoner(RPB_Prisoner apPrisoner)
     JMap.removeKey(__prisonersInCell, apPrisoner.GetIdentifier())
-
-    if (apPrisoner.IsNPC())
-        ReferenceAlias prisonerCellPackage = self.GetPrisonerCellPackage(apPrisoner)
-        BindAliasTo(prisonerCellPackage, none)
-    endif
-
     self.OnPrisonerUnregister(apPrisoner)
 endFunction
 
@@ -840,9 +787,70 @@ function DetermineCellParameters()
     endif
 endFunction
 
+event OnInit()
+    Debug("["+ self +"] JailCell::OnInit", "Initialized " + self)
+endEvent
+
 ; =========================================================
 ;                    NPC Sanity Checking                      
 ; =========================================================
+
+int __queuedChecks
+bool __hasQueuedCheckCurrently
+RPB_Prisoner __npcQueuedCheckPrisoner
+
+bool function __hasQueuedChecks()
+    return JArray.count(__queuedChecks) > 0
+endFunction
+
+function __pushCheck(float aiCheckTime)
+    if (!__queuedChecks)
+        __queuedChecks = JArray.object()
+        JValue.retain(__queuedChecks)
+    endif
+
+    JArray.addFlt(__queuedChecks, aiCheckTime)
+endFunction
+
+float function __popCheck()
+    if (!__hasQueuedChecks())
+        return 0
+    endif
+
+    float checkTime = JArray.getFlt(__queuedChecks, 0)
+    JArray.eraseIndex(__queuedChecks, 0)
+    return checkTime
+endFunction
+
+function __executeQueuedCheck(RPB_Prisoner apPrisoner = none)
+    if (!__hasQueuedChecks())
+        return
+    endif
+
+    __hasQueuedCheckCurrently = true
+    float nextCheck = __popCheck()
+
+    if (nextCheck != 0)
+        self.RegisterForSanityChecking(nextCheck, apPrisoner = apPrisoner)
+        
+    endif
+endFunction
+
+;/
+    Queues this Prisoner for a sanity check, ensuring they are in a valid state.
+
+    float?          @afPreCheckUpdateTime: The update window upon registering the event.
+    RPB_Prisoner?   @apPrisoner: The prisoner to register for sanity checking, if none, all prisoners in the jail cell will be registered.
+/;
+function QueueForSanityCheck(float afPreCheckUpdateTime = 4.0, RPB_Prisoner apPrisoner = none)
+    int queuedCheckCount = JArray.count(__queuedChecks)
+    __pushCheck(afPreCheckUpdateTime)
+
+    if (!__hasQueuedCheckCurrently)
+        __executeQueuedCheck(apPrisoner)
+    endif
+endFunction
+
 ;/
     Should only happen the first time the player visits the NPC prisoner
     and at some points where an AI Package is overridden, such as the Solitude execution scene for the NPC's there
@@ -858,6 +866,7 @@ endFunction
     incarceration.
 /;
 
+float __npcSanityCheckPreCheckUpdateTime
 float __npcSanityCheckPostCheckUpdateTime
 int   __npcSanityCheckUpdateTries
 float __npcSanityCheckElapsedTime
@@ -878,6 +887,7 @@ function RegisterForSanityChecking(float afPreCheckUpdateTime = 4.0, float afPos
     __npcSanityCheckAllPrisoners        = apPrisoner == none
     __npcSanityCheckSelectedPrisoner    = apPrisoner
     __npcSanityCheckReset               = false
+    __npcSanityCheckPreCheckUpdateTime  = afPreCheckUpdateTime
 
     GotoState("NPC_SanityChecking")
     RegisterForSingleUpdate(afPreCheckUpdateTime)
@@ -930,9 +940,6 @@ endEvent
 
 ; When the player is in the same cell as this jail cell
 event OnCellAttach()
-    ; if (!self.IsInitialized())
-    ;     self.Initialize(Prison)
-    ; endif
     __onCellAttachAndDetachEvent()
 endEvent
 
@@ -1006,7 +1013,7 @@ bool function __performPrisonersSanityCheck()
     int i = 0
     while (i < self.PrisonerCount)
         Actor prisonerRef                   = self.Prisoners[i] as Actor
-        RPB_Prisoner prisoner               = prison.GetPrisoner(prisonerRef)
+        RPB_Prisoner prisoner               = prison.AwaitPrisonerReference(prisonerRef)
         bool hasPrisonerPassedSanityCheck   =  self.__performPrisonerSanityCheck(prisoner)
         ; Debug("{NPC_SanityChecking} "+ self +" JailCell::__performPrisonersSanityCheck", "[Prisoner: "+ prisoner.Name +"] Location: " + prisoner.GetCurrentCell())
 
@@ -1027,9 +1034,9 @@ bool function __performPrisonersSanityCheck()
     return havePrisonersPassedSanityCheck
 endFunction
 
-; Problematic - this OnUpdate must be reviewed at some point, it can cause stack dumps (Prisoner being null might have been the issue, now it's checked)
 state NPC_SanityChecking
     event OnUpdate()
+        ; Debug("["+ ID +"] {NPC_SanityChecking} JailCell::OnUpdate", "Updating... Time for update: " + __npcSanityCheckPreCheckUpdateTime)
         bool hasCheckedSuccessfully = \ 
             (__shouldSanityCheckAllPrisoners() && __performPrisonersSanityCheck()) || \
             (__shouldSanityCheckSinglePrisoner() && __performPrisonerSanityCheck(__npcSanityCheckSelectedPrisoner))
@@ -1100,28 +1107,46 @@ endFunction
 ;                          Debug                      
 ; =========================================================
 
+string function DEBUG_ShowPrisonerSentenceInfo(RPB_Prisoner apPrisoner)
+    string sentenceFormatted    = Prison.GetSentenceFormatted(apPrisoner)
+    string sentence = string_if (!apPrisoner.IsUndeterminedSentence, sentenceFormatted, "N/A")
+
+    return sentence
+endFunction
+
 string function DEBUG_GetPrisoners()
     string outputPrisoners = ""
     int i = 0
-    while (i < JValue.count(__prisonersInCell))
-        Form prisonerForm = JMap.getForm(__prisonersInCell, JMap.getNthKey(__prisonersInCell, i))
-        RPB_Prisoner prisonerRef = Prison.GetPrisonerReference(prisonerForm as Actor)
-
+    while (i < Prisoners.Length)
+        Form ref = Prisoners[i]
+        RPB_Prisoner prisonerRef = Prison.GetPrisonerReference(ref as Actor)
+        ; string sentence = DEBUG_ShowPrisonerSentenceInfo(prisonerRef)
+        ; Debug("["+ ID +"] JailCell::DEBUG_GetPrisoners", "Sentence: " + sentence)
         if (prisonerRef)
             ; string sentenceInfo = Prison.DEBUG_GetPrisonerSentenceInfo(prisonerRef, true)
             ; outputPrisoners += "\t\t"+ prisonerRef.GetActor() + " " + prisonerRef.GetName() + " " + "(" + prisonerRef.GetSex(true) + ")" + string_if (prisonerRef.IsSentenceSet, ": " + sentenceInfo) + "\n"
+            ; outputPrisoners += "\t\t"+ prisonerRef.GetActor() + " " + prisonerRef.GetName() + " " + "(" + prisonerRef.GetSex(true) + ")" + string_if (prisonerRef.IsSentenceSet, ": " + sentence) + "\n"
             outputPrisoners += "\t\t"+ prisonerRef.GetActor() + " " + prisonerRef.GetName() + " " + "(" + prisonerRef.GetSex(true) + ")" + "\n"
             endif
         i += 1
     endWhile
+    ; while (i < JValue.count(__prisonersInCell))
+    ;     Form prisonerForm = JMap.getForm(__prisonersInCell, JMap.getNthKey(__prisonersInCell, i))
+    ;     RPB_Prisoner prisonerRef = Prison.GetPrisonerReference(prisonerForm as Actor)
+
+    ;     if (prisonerRef)
+    ;         ; string sentenceInfo = Prison.DEBUG_GetPrisonerSentenceInfo(prisonerRef, true)
+    ;         ; outputPrisoners += "\t\t"+ prisonerRef.GetActor() + " " + prisonerRef.GetName() + " " + "(" + prisonerRef.GetSex(true) + ")" + string_if (prisonerRef.IsSentenceSet, ": " + sentenceInfo) + "\n"
+    ;         outputPrisoners += "\t\t"+ prisonerRef.GetActor() + " " + prisonerRef.GetName() + " " + "(" + prisonerRef.GetSex(true) + ")" + "\n"
+    ;         endif
+    ;     i += 1
+    ; endWhile
 
     return outputPrisoners
 endFunction
 
 string function DEBUG_GetCellProperties()
     string getGenderExclusivenessAsString = string_if (self.IsFemaleOnly, "Female Only", string_if(self.IsMaleOnly, "Male Only"))
-
-    bool _hasPrisoners = self.PrisonerCount > 0
 
     return "[\n" + \
         "\t Cell: " + self.ID + " (" + self + ")" + "\n" + \
@@ -1132,6 +1157,6 @@ string function DEBUG_GetCellProperties()
         "\t Available: " + self.IsAvailable + "\n" + \
         "\t Gender Exclusive: " + self.IsGenderExclusive + string_if (self.IsGenderExclusive, " ("+ getGenderExclusivenessAsString +")") + "\n" + \
         "\t Maximum Prisoners: " + self.MaxPrisoners + "\n" + \
-        "\t Prisoners: " + self.PrisonerCount + string_if (_hasPrisoners, " -> [\n"+ self.DEBUG_GetPrisoners() +"\t]") + "\n" + \
+        "\t Prisoners: " + self.PrisonerCount + string_if (self.HasPrisoners, " -> [\n"+ self.DEBUG_GetPrisoners() +"\t]") + "\n" + \
     "]"
 endFunction
