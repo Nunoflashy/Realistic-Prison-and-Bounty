@@ -60,6 +60,9 @@ function Delete()
     ; Release serializable object, in case it was retained in memory
     JValue.release(self.GetSerializableRootObject())
 
+    ; Release the object that is bound to this ReferenceAlias
+    UnbindAlias(self)
+
     _active = false
 
     self.DeleteAllLocalProperties()

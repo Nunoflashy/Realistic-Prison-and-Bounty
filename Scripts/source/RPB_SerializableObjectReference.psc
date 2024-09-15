@@ -90,7 +90,7 @@ endFunction
 string function GetPropertyOfTypeString(string asPropertyName)
     float s = StartBenchmark()
     string prop = RPB_Data.GetPropertyOfTypeString(__internalSerializedRootObject(), asPropertyName)
-    EndBenchmark(s, "["+ self +"] SerializableObjectReference::GetPropertyOfTypeString")
+    ; EndBenchmark(s, "["+ self +"] SerializableObjectReference::GetPropertyOfTypeString")
     return prop
 endFunction
 
