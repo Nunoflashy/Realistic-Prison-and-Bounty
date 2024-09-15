@@ -68,7 +68,7 @@ function RenderPrisons(RPB_MCM_02 mcm) global
 
     if (isLastJailedPrison)
         if (isPlayerImprisoned)
-            RPB_Prisoner playerPrisoner = holdPrison.GetPrisoner(Game.GetForm(0x14) as Actor)
+            RPB_Prisoner playerPrisoner = holdPrison.AwaitPrisonerReference(Game.GetForm(0x14) as Actor)
             string cellId = playerPrisoner.JailCell.ID
             mcm.AddOptionText("", "Currently Jailed", defaultFlags = mcm.OPTION_DISABLED)
             mcm.AddOptionText("", "In " + holdPrison.Name, defaultFlags = mcm.OPTION_DISABLED)

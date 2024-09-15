@@ -719,6 +719,7 @@ endFunction
 
     Actor           @akEntity: The actor to retrieve the Prisoner reference from.
     RPB_ActorList   @apEntityList: The entity list to get the reference from.
+    RPB_Entity      @apEntity: The entity to bind this Actor to.
     int?            @aiMaxTries: How many attempts retrieving the reference, in case it fails initially.
     float?          @afInitialTimeBetweenTries: The delay on each try
     float?          @afMaxTimeBetweenTries: The max delay on each try that is possible (Exponential Backoff).
@@ -728,16 +729,16 @@ endFunction
 RPB_Actor function AwaitEntityReference(\
     Actor akEntity, \
     RPB_ActorList apEntityList, \
-    ReferenceAlias apAlias = none, \
+    RPB_Entity apEntity = none, \
     int aiMaxTries = 50, \
     float afInitialTimeBetweenTries = 0.1, \
     float afMaxTimeBetweenTries = 3.0 \
 ) global
     if (apEntityList as RPB_PrisonerList)
-        EnsurePrisonerSpellAndBinding(akEntity, apAlias as RPB_Prison)
+        EnsurePrisonerSpellAndBinding(akEntity, apEntity as RPB_Prison)
 
     elseif (apEntityList as RPB_ArresteeList)
-        EnsureArresteeSpellAndBinding(akEntity, apAlias as RPB_Hold)
+        EnsureArresteeSpellAndBinding(akEntity, apEntity as RPB_Hold)
 
      elseif (apEntityList as RPB_CaptorList)
          EnsureCaptorSpellAndBinding(akEntity)

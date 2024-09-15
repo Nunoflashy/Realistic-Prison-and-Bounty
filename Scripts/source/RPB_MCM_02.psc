@@ -247,7 +247,7 @@ event OnPageReset(string page)
             RPB_MCM_02_Prison.Render(self, playerPrisoner)
 
         elseif (playerArrestStatus == PLAYER_INFO_ARRESTED)
-            RPB_Arrestee playerArresteeRef = API.Arrest.GetArresteeReference(player)
+            RPB_Arrestee playerArresteeRef = API.Arrest.AwaitArresteeReference(player)
             RPB_MCM_02_Prison.RenderArrest(self, playerArresteeRef)
         endif
 

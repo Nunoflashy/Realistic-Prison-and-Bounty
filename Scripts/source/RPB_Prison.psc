@@ -1,4 +1,4 @@
-Scriptname RPB_Prison extends RPB_SerializableReferenceAlias  
+scriptname RPB_Prison extends RPB_Entity  
 {
     @property int ID
     @property string UUID
@@ -2098,10 +2098,6 @@ int function GetDataObject(string asPrisonObjectCategory = "null")
     return returnedObject
 endFunction
 
-int function GetSerializableRootObject()
-    return self.GetLocalPropertyOfTypeInt("Root Object")
-endFunction
-
 
 ;                       Global Root Properties                    
 ; =========================================================
@@ -2246,8 +2242,8 @@ endFunction
     If the Actor is not a Prisoner yet, they will be made into one and bound to this Prison. 
 
     Actor   @akPrisoner: The actor to retrieve the Prisoner reference from.
-    int?    @aiMaxTries: How many attempts retrieving the reference, in case it fails initially.
     float?  @afInitialTimeBetweenTries: The delay on each try
+    int?    @aiMaxTries: How many attempts retrieving the reference, in case it fails initially.
     float?  @afMaxTimeBetweenTries: The max delay on each try that is possible (Exponential Backoff).
 
     returns (RPB_Prisoner): The Prisoner reference for this Actor.
