@@ -19,6 +19,8 @@ string[] function GetActions()
     JArray.addStr(actionArrayObj, "<No Action>")
     JArray.addStr(actionArrayObj, "Quit to Main Menu")
     JArray.addStr(actionArrayObj, "[MCM] Validate Options")
+    JArray.addStr(actionArrayObj, "Check Item Stolen")
+    JArray.addStr(actionArrayObj, "Distance between two Objects")
     JArray.addStr(actionArrayObj, "Play Animation on Selected Actor")
     JArray.addStr(actionArrayObj, "[Bounty] Set Bounty for Selected Actor")
     JArray.addStr(actionArrayObj, "[Bounty] Set Violent Bounty for Selected Actor")
@@ -70,6 +72,12 @@ function ShowActionsMenu()
 
     elseif (actionToPerform == "[MCM] Validate Options")
         API.MCM.ValidateOptions()
+
+    elseif (actionToPerform == "Check Item Stolen")
+        Action_CheckItemStolen(uilib)
+
+    elseif (actionToPerform == "Distance between two Objects")
+        Action_DistanceBetweenTwoObjects(uilib)
 
     elseif (actionToPerform == "Play Animation on Selected Actor")
         Action_PlayAnimationOnActor(uilib)
@@ -196,6 +204,32 @@ endFunction
 ; ==========================================================
 ;                           Actions
 ; ==========================================================
+
+function Action_CheckItemStolen(RPB_UIInterface uilib)
+    ObjectReference selectedReference = Game.GetCurrentConsoleRef()
+    Debug("Actions::Action_CheckItemStolen", "Is item stolen: " + selectedReference.IsOffLimits())
+endFunction
+
+function Action_DistanceBetweenTwoObjects(RPB_UIInterface uilib)
+    ObjectReference obj1 = Game.GetCurrentConsoleRef()
+    ObjectReference obj2 = none
+
+    string inputFormID = uilib.ShowInput("Input FormID for 2nd Object")
+    int formIdHex = RPB_Utility.HexStringToInt(inputFormID)
+    obj2 = Game.GetFormEx(formIdHex) as ObjectReference
+
+    string obj1Name = obj1.GetBaseObject().GetName()
+    string obj2Name = obj2.GetBaseObject().GetName()
+    float distanceBetweenObjects = obj1.GetDistance(obj2)
+    string msg = "Distance between " + obj1Name + " and " + obj2Name + " is " + distanceBetweenObjects
+    Debug.MessageBox(msg)
+    Debug("Actions::Action_DistanceBetweenObjects", \ 
+        msg + \
+        "obj1: " + obj1 + \ 
+        "obj2: " + obj2 + \ 
+        "inputFormID: " + inputFormID \ 
+    )
+endFunction
 
 function Action_PlayAnimationOnActor(RPB_UIInterface uilib)
     Actor selectedActor     = Game.GetCurrentConsoleRef() as Actor
@@ -425,7 +459,7 @@ function Action_ReleasePrisoner(RPB_UIInterface uilib)
         if (prisonBySelectedPrisoner != none)
             ; No need to check for selectedPrisoner result because FindPrisonByPrisoner(Actor) already implies that the Actor must be a prisoner,
             ; if selectedPrisoner is none, there's something wrong in the assignment of prisoners
-            RPB_Prisoner selectedPrisoner = prisonBySelectedPrisoner.GetPrisoner(selectedActor)
+            RPB_Prisoner selectedPrisoner = prisonBySelectedPrisoner.AwaitPrisonerReference(selectedActor)
             selectedPrisoner.Release()
             return
         endif
@@ -434,6 +468,8 @@ function Action_ReleasePrisoner(RPB_UIInterface uilib)
     ; Otherwise, proceed as normal and show the dropdown for the Prison & Prisoners
 
     RPB_Prison prison = uilib.ShowPrisonList()
+
+    Debug("Actions::Action_ReleasePrisoner", "prison: " + prison)
 
     if (prison == none)
         return none
@@ -477,7 +513,7 @@ function Action_TogglePrisonerEffectOnSelectedActor(RPB_UIInterface uilib)
     endif
 
     ; if prisoner fails, and prison doesn't, something is wrong with Prison.GetPrisoner()
-    RPB_Prisoner prisoner   = prison.GetPrisoner(selectedActor)
+    RPB_Prisoner prisoner   = prison.AwaitPrisonerReference(selectedActor)
 
     if (prisoner.GetState() == "Imprisoned")
         prisoner.GotoState("")
@@ -659,7 +695,7 @@ function Action_CheckPrisonersAI(RPB_UIInterface uilib)
         RPB_Prisoner prisoner = prison.Prisoners.AtIndex(i)
         int nameLength  = StringUtil.GetLength(prisoner.Name)
         string tabs     = string_if (nameLength >= 10, "\t", "\t\t")
-        LogNoType("["+ prisoner.Name +"] "+ tabs + prisoner.GetActor() +"\t{ AI: " + YesNo(prisoner.HasAI()) + " | In Cell: "+ YesNo(prisoner.IsInCell) +" | " + prisoner.JailCell.ID +" ("+ prisoner.JailCell +" ) | " + "Location: "+ prisoner.GetCurrentCell() +"}")
+        LogNoType("["+ prisoner.Name +"] "+ tabs + prisoner.GetActor() +"\t{ AI: " + YesNo(prisoner.HasAI()) + " | In Cell: "+ YesNo(prisoner.IsInCell) +" | " + prisoner.JailCell.ID +" ("+ prisoner.JailCell + " [Package: "+ prisoner.CellPackage.GetName() +"]) | " + "Location: "+ prisoner.GetCurrentCell() +"}")
         i += 1
     endWhile
 endFunction
