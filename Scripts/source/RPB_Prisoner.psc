@@ -93,8 +93,12 @@ endProperty
 
 bool property ShouldBeStripped
     bool function get()
-        return Bounty >= 1000
-        return true && (!IsStrippedNaked && !IsStrippedToUnderwear)
+        return Prison.ShouldStripPrisoner(self)
+        ; Debug("Prisoner::ShouldBeStripped", "CALLED HERE, Meets Sentence condition: " + (Sentence >= 12) + ", Sentence: " + Sentence)
+        ; return Sentence >= 12
+        ; return Prison.ShouldStripPrisoner(self)
+        ; return Bounty >= 1000
+        ; return true && (!IsStrippedNaked && !IsStrippedToUnderwear)
     endFunction
 endProperty
 
@@ -102,6 +106,12 @@ int property StrippingThoroughness
     int function get()
         int modifier = Prison.StrippingThoroughnessModifier
         return GetInt("Stripping Thoroughness", "Stripping") + int_if (modifier > 0, Round(Bounty / modifier))
+    endFunction
+endProperty
+
+bool property ShouldBeClothed
+    bool function get()
+        return Prison.ShouldClothePrisoner(self)
     endFunction
 endProperty
 
@@ -406,9 +416,13 @@ bool property IsSentenceSet
     endFunction
 endProperty
 
+ReferenceAlias __cellPackage
 ReferenceAlias property CellPackage
     ReferenceAlias function get()
-        return JailCell.GetPrisonerCellPackage(self)
+        if (!__cellPackage)
+            __cellPackage = JailCell.GetSuitableCellPackage()
+        endif
+        return __cellPackage
     endFunction
 endProperty
 
@@ -429,6 +443,12 @@ bool property IsStrippedNaked auto
 
 ; Whether this prisoner was stripped to their underwear
 bool property IsStrippedToUnderwear auto
+
+bool property IsStripped
+    bool function get()
+        return IsStrippedNaked || IsStrippedToUnderwear
+    endFunction
+endProperty
 
 ; Whether this prisoner should only be imprisoned in an empty cell
 bool __onlyAllowImprisonmentInEmptyCell
@@ -564,6 +584,11 @@ function Release()
         GotoState("Released")
         self.UnbindAlias(CellPackage)
         Prison.ReleasePrisoner(self)
+
+        if (self.IsNPC())
+            self.NPC_RestoreOriginalOutfit()
+        endif
+
         Debug("["+ Name +"] Prisoner::Release", "Released " + self.Name + " from " + Prison.Name)
         __isReleased = true
     endif
@@ -633,10 +658,6 @@ function Uncuff()
     Debug("["+ Name +"] Prisoner::Uncuff", "Uncuffed " + this)
 endFunction
 
-bool function ShouldBeClothed()
-    return false
-endFunction
-
 bool function HasStateRequiredForImprisonment()
     return Prison && JailCell && (Sentence || Bounty || IsUndeterminedSentence)
 endFunction
@@ -694,10 +715,22 @@ endFunction
 
 ; ==========================================================
 ;                    Clothing / Undressing
+Outfit __npcOriginalOutfit
+Outfit property NPC_OriginalOutfit
+    Outfit function get()
+        return __npcOriginalOutfit
+    endFunction
+endProperty
 
 function NPC_SaveOriginalOutfit()
     if (self.IsNPC())
-        Outfit originalOutfit = this.GetActorBase().GetOutfit()
+        __npcOriginalOutfit = this.GetActorBase().GetOutfit()
+    endif
+endFunction
+
+function NPC_RestoreOriginalOutfit()
+    if (self.IsNPC())
+        this.SetOutfit(NPC_OriginalOutfit)
     endif
 endFunction
 
@@ -717,6 +750,23 @@ function Strip(bool abRemoveUnderwear = true)
         DebugError("["+ Name +"] Prisoner::Strip", "The prisoner hasn't had a belongings container assigned to them, cannot strip!")
         return
     endif
+
+    ; int itemCount = this.GetNumItems()
+    ; Form[] items = this.GetContainerForms()
+
+    ; int i = 0
+    ; while (i < items.Length)
+    ;     Form item = items[i]
+    ;     int thisItemCount = this.GetItemCount(item)
+
+    ;     ObjectReference droppedItem = this.DropObject(item, thisItemCount)
+    ;     ; if (droppedItem.IsOffLimits())
+    ;         ; Debug("["+ Name +"] Prisoner::OnUpdate", droppedItem + "("+ droppedItem.GetName() +") is stolen!")
+    ;         ObjectReference evidenceChest = Prison.GetRandomPrisonerContainer("Evidence") as ObjectReference
+    ;         evidenceChest.AddItem(droppedItem)
+    ;     ; endif
+    ;     i += 1
+    ; endWhile
 
     RPB_Outfit prisonerOutfit = (self as ActiveMagicEffect) as RPB_Outfit ; Should be in Clothe()
 
@@ -759,7 +809,29 @@ function Strip(bool abRemoveUnderwear = true)
     )
     ; Debug("["+ Name +"] Prisoner::Strip", "Stripped "+ Name + " naked.", self.IsStrippedNaked)
     ; Debug("["+ Name +"] Prisoner::Strip", "Stripped "+ Name + " to underwear.", self.IsStrippedToUnderwear)
+
+
+    RegisterForSingleUpdate(1.0)
 endFunction
+
+event OnUpdate()
+    ; int itemCount = PrisonerBelongingsContainer.GetNumItems()
+    ; Form[] items = PrisonerBelongingsContainer.GetContainerForms()
+
+    ; int i = 0
+    ; while (i < items.Length)
+    ;     Form item = items[i]
+    ;     int thisItemCount = PrisonerBelongingsContainer.GetItemCount(item)
+
+    ;     ObjectReference droppedItem = PrisonerBelongingsContainer.DropObject(item, thisItemCount)
+    ;     if (droppedItem.IsOffLimits())
+    ;         Debug("["+ Name +"] Prisoner::OnUpdate", droppedItem + "("+ droppedItem.GetName() +") is stolen!")
+    ;         ObjectReference evidenceChest = Prison.GetRandomPrisonerContainer("Evidence") as ObjectReference
+    ;         evidenceChest.AddItem(droppedItem)
+    ;     endif
+    ;     i += 1
+    ; endWhile
+endEvent
 
 function RemoveUnderwear()
     Armor underwearTop      = self.GetUnderwear("Top")
@@ -823,6 +895,7 @@ endFunction
 
 function EscortToCell(Actor akEscort)
     ObjectReference outsideCellGuardWaitingMarker = JailCell.GetRandomMarker("Exterior")
+    Debug("["+ Name +"] Prisoner::EscortToCell", "Waiting Marker: " + outsideCellGuardWaitingMarker)
     self.BindToCell()
 
     SceneManager.StartEscortToCell( \
@@ -1601,24 +1674,19 @@ endFunction
 
 ; Moves this prisoner to Prison (To be processed)
 function MoveToPrison(Actor akCaptor)
+    ObjectReference escortLocation = Prison.GetRandomEscortLocation()
+
     ; Assign a container for this prisoner's belongings (if applicable)
     self.SetBelongingsContainer()
-
-    self.MoveTo(PrisonerBelongingsContainer)
+    self.MoveTo(escortLocation)
 
      ; Later maybe the captor shouldn't go, and instead there should be guards waiting in the prison
      ; They shouldn't go especially if they are not a guard (e.g: Bounty Hunter or other NPC)
-    akCaptor.MoveTo(PrisonerBelongingsContainer)
-endFunction
+    akCaptor.MoveTo(escortLocation)
 
-function MoveToCellTemp()
-    ; Release from Scenes
-    int escorteeId = self.GetInt("Escortee")
-    ReferenceAlias escorteeAlias = SceneManager.GetEscortee(escorteeId)
-    self.UnbindAlias(escorteeAlias)
-    Utility.Wait(0.2)
-    self.MoveToCell()
-    Prison.OnPrisonerMovedToPrison(self, true)
+    Prison.OnPrisonerTeleportedToPrison(self)
+
+    SetBool("Go to Cell", true)
 endFunction
 
 function MoveToCell(bool abBeginImprisonment = true)
@@ -1838,18 +1906,14 @@ event OnEscortedFromCell(Actor akEscort)
 endEvent
 
 event OnInitialize()
-    ; if (self.Is("Inactive"))
-    ;     return
-    ; endif
-    
-    ; Prison.RegisterForPrisonPeriodicUpdate(self)
-    Prison.RegisterPrisoner(self) ; Registers this prisoner into the prisoner list
-    Trace("["+ Name +"] Prisoner::OnInitialize", "self: " + self)
-    if (self.IsNPC() && !self.IsInCell)
-        ; self.PerformSanityChecks()
-        JailCell.RegisterForSanityChecking(1.0, apPrisoner = self)
-        ; JailCell.PerformPrisonerSanityCheck(self)
+    if (!Prison.IsPrisoner(self))
+        Prison.RegisterPrisoner(self)
     endif
+
+    if (!self.Sentence)
+        self.SetSentence()
+    endif
+
     if (NPC_RestorePrisonerState())
         ; Actor was already a prisoner, do not initialize normally and instead proceed to restoring their previous state
         ; Prison.RegisterPrisoner(self) ; Registers this prisoner into the prisoner list since they were unregistered OnDestroy()
@@ -1857,9 +1921,24 @@ event OnInitialize()
         return
     endif
 
+    if (self.IsNPC() && self.IsImprisoned)
+        self.OnResumeImprisonment()
+        return
+    endif
+
+    self.SetReleaseLocation() ; to be refactored (needs to take into account whether to use Escort or Teleport markers)
+
     self.RegisterSleepEvents = true
     self.RegisterForTrackedStats()
     self.LockPrisonerSettings()
+endEvent
+
+;/
+    Handles actions when an NPC's imprisonment state is resumed (usually when the player is in the same location as the NPC).
+/;
+event OnResumeImprisonment()
+    self.NPC_ResumeImprisonment() ;  Re-register this Prisoner into the imprisoned state for updates
+    JailCell.RegisterForSanityChecking(1.0, apPrisoner = self)
 endEvent
 
 bool property IsEnabledForBackgroundUpdates
@@ -2023,6 +2102,17 @@ function DestroyArrestState()
         self.SetInt("Bounty Non-Violent", _bounty, "Arrest")
         self.SetInt("Bounty Violent", _bountyViolent, "Arrest")
     endif
+endFunction
+
+function NPC_ResumeImprisonment()
+    if (!self.IsImprisoned)
+        DebugError("["+ Name +"] Prisoner::NPC_ResumeImprisonment", "Prisoner " + Name + " is not imprisoned, cannot resume imprisonment!")
+        Error("Prisoner " + Name + " is not imprisoned, cannot resume imprisonment!")
+        return
+    endif
+
+    GotoState("Imprisoned")
+    RegisterForSingleUpdateGameTime(0.1)
 endFunction
 
 ;/
