@@ -1,4 +1,21 @@
 Scriptname RPB_Prison extends RPB_SerializableReferenceAlias  
+{
+    @property int ID
+    @property string UUID
+    @property string Name
+    @property bool Active
+
+    @property Location PrisonLocation
+    @property Faction PrisonFaction
+    @property string Hold
+    @property string City
+    @property RPB_PrisonerList Prisoners
+    @property Form[] JailCells
+    @property Form[] EmptyJailCells
+    @property Form[] AvailableJailCells
+    @property Form[] FemaleJailCells
+    @property Form[] MaleJailCells
+}
 
 import Math
 import RPB_Config
@@ -35,6 +52,40 @@ endProperty
 RPB_SceneManager property SceneManager
     RPB_SceneManager function get()
         return API.SceneManager
+    endFunction
+endProperty
+
+; ==========================================================
+;                       Prison Identity
+; ==========================================================
+
+string property Name
+    string function get()
+        return self.TryGetString("Name")
+    endFunction
+endProperty
+
+Location property PrisonLocation
+    Location function get()
+        return self.GetPropertyOfTypeForm("Location") as Location
+    endFunction
+endProperty
+
+Faction property PrisonFaction
+    Faction function get()
+        return self.GetLocalPropertyOfTypeForm("Crime Faction") as Faction
+    endFunction
+endProperty
+
+string property Hold
+    string function get()
+        return self.GetLocalPropertyOfTypeString("Hold")
+    endFunction
+endProperty
+
+string property City
+    string function get()
+        return self.GetPropertyOfTypeString("City")
     endFunction
 endProperty
 
@@ -542,46 +593,6 @@ endProperty
 
 int property SERVE_TIME_YES = 0 autoreadonly
 
-; ==========================================================
-;                       Prison Identity
-; ==========================================================
-
-int property ID
-    int function get()
-        return self.GetID()
-    endFunction
-endProperty
-
-string property Name
-    string function get()
-        return self.TryGetString("Name")
-    endFunction
-endProperty
-
-Location property PrisonLocation
-    Location function get()
-        return self.GetPropertyOfTypeForm("Location") as Location
-    endFunction
-endProperty
-
-Faction property PrisonFaction
-    Faction function get()
-        return self.GetLocalPropertyOfTypeForm("Crime Faction") as Faction
-    endFunction
-endProperty
-
-string property Hold
-    string function get()
-        return self.GetLocalPropertyOfTypeString("Hold")
-    endFunction
-endProperty
-
-string property City
-    string function get()
-        return self.GetPropertyOfTypeString("City")
-    endFunction
-endProperty
-
 
 ; ==========================================================
 ;                     Prison Properties
@@ -726,13 +737,80 @@ RPB_Prison function GetPrisonForHold(string asHold) global
     return prison
 endFunction
 
-RPB_Prisoner function GetPrisoner(Actor akPrisonerActor)
-    return self.Prisoners.AtKey(akPrisonerActor)
-endFunction
-
 ; ==========================================================
 ;                         Prisoners
 ; ==========================================================
+
+bool function ShouldStripPrisoner(RPB_Prisoner apPrisoner)
+    DebugWithArgs("["+ Name +"] Prison::ShouldStripPrisoner", apPrisoner.Name, "Allow Stripping: " + apPrisoner.GetBool("Allow Stripping"))
+
+    if (!apPrisoner.GetBool("Allow Stripping"))
+        return false
+    endif
+
+    ; TODO: Need to do a silent strip in case the prisoner still has items (but no clothes on, this would be used as an exploit)
+    if (apPrisoner.IsNaked())
+        return false
+    endif
+
+    string strippingHandler = apPrisoner.GetString("Handle Stripping On")
+
+    if (strippingHandler == "Minimum Sentence")
+        int sentenceToStrip = apPrisoner.GetInt("Sentence to Strip")
+        if (apPrisoner.Sentence >= sentenceToStrip)
+            return true
+        endif
+
+    elseif (strippingHandler == "Minimum Bounty")
+        int minBountyToStrip        = apPrisoner.GetInt("Bounty to Strip")
+        int minViolentBountyToStrip = apPrisoner.GetInt("Violent Bounty to Strip")
+
+        if (apPrisoner.Bounty >= minBountyToStrip || apPrisoner.BountyViolent >= minViolentBountyToStrip)
+            return true
+        endif
+
+    elseif (strippingHandler == "Unconditionally")
+        return true
+    endif
+
+    return false
+endFunction
+
+bool function ShouldClothePrisoner(RPB_Prisoner apPrisoner)
+    if (!apPrisoner.GetBool("Allow Clothing"))
+        return false
+    endif
+
+    ; If the prisoner is neither naked nor in underwear, do not clothe
+    if ((!apPrisoner.IsNaked() && !apPrisoner.IsInUnderwear()))
+        return false
+    endif
+    
+    string clothingHandler  = apPrisoner.GetString("Handle Clothing On")
+
+    if (clothingHandler == "Maximum Sentence")
+        int maxSentence = apPrisoner.GetInt("Maximum Sentence to Clothe")
+        if (apPrisoner.Sentence > maxSentence)
+            return false
+        endif
+        
+    elseif (clothingHandler == "Maximum Bounty")
+        int maxBounty           = apPrisoner.GetInt("Maximum Bounty to Clothe")
+        int maxViolentBounty    = apPrisoner.GetInt("Maximum Violent Bounty to Clothe")
+        if (apPrisoner.BountyViolent > maxViolentBounty || apPrisoner.Bounty > maxBounty)
+            return false
+        endif
+
+    elseif (clothingHandler == "Unconditionally")
+        return true
+    endif
+
+    return true
+endFunction
+
+bool function IsPrisoner(RPB_Prisoner apPrisoner)
+    return Prisoners.Exists(apPrisoner)
+endFunction
 
 function SetSentence(RPB_Prisoner apPrisoner, int aiSentence = 0)
     apPrisoner.SetSentence(aiSentence)
@@ -766,7 +844,7 @@ endFunction
 
 bool function HasPrisoners(RPB_JailCell akPrisonCell = none)
     if (akPrisonCell)
-        return akPrisonCell.HasPrisoners()
+        return akPrisonCell.HasPrisoners
     endif
 
     return Prisoners.Count > 0
@@ -811,24 +889,6 @@ bool function ReleasePrisoner(RPB_Prisoner apPrisoner)
     self.UnregisterPrisoner(apPrisoner)
     
     self.OnPrisonerReleased(apPrisoner)
-endFunction
-
-bool function ProcessPrisoner(RPB_Prisoner apPrisoner)
-    apPrisoner.SetReleaseLocation()
-    apPrisoner.SetBelongingsContainer()
-
-    if (!apPrisoner.AssignCell())
-        return false
-    endif
-
-    if (apPrisoner.ShouldBeFrisked)
-        ; Prison.EnqueueScene("RPB_Stripping02")
-        ; SceneManager.EnqueueNextScene()
-    endif
-
-    if (apPrisoner.ShouldBeStripped)
-        apPrisoner.StartStripping(apPrisoner.Captor)
-    endif
 endFunction
 
 string function GetTimeOfArrestFormatted(RPB_Prisoner apPrisoner)
@@ -1229,20 +1289,6 @@ event OnPrisonerUnregistered(RPB_Prisoner apPrisoner)
     PrisonManager.OnPrisonUnregisteredPrisoner(self, apPrisoner)
 endEvent
 
-event OnPrisonerMovedToPrison(RPB_Prisoner apPrisoner, bool abWasMovedDirectlyToCell)
-    if (abWasMovedDirectlyToCell)
-        if (apPrisoner.IsRestrained())
-            apPrisoner.Uncuff()
-        endif
-
-        return
-    endif
-
-    ; Moved to Prison
-    self.ProcessPrisoner(apPrisoner)
-    ; self.OnPrisonerProcessed(apPrisoner)
-endEvent
-
 event OnPrisonerProcessed(RPB_Prisoner apPrisoner)
     apPrisoner.SetReleaseLocation()
     apPrisoner.SetBelongingsContainer()
@@ -1256,11 +1302,11 @@ endEvent
 event OnPrisonerImprisoned(RPB_Prisoner apPrisoner)
     apPrisoner.RegisterTimeOfImprisonment()
     apPrisoner.DetermineReleaseTimeAdditionalHours() ; For Release Time (Minimum, Maximum) intervals
-    apPrisoner.SetReleaseLocation() ; to be refactored (needs to take into account whether to use Escort or Teleport markers)
+    ; apPrisoner.SetReleaseLocation() ; to be refactored (needs to take into account whether to use Escort or Teleport markers)
 
-    if (!apPrisoner.Sentence)
-        apPrisoner.SetSentence(abShouldAffectBounty = false)
-    endif
+    ; if (!apPrisoner.Sentence)
+    ;     apPrisoner.SetSentence(abShouldAffectBounty = false)
+    ; endif
 
     apPrisoner.IncrementStat("Times Jailed")
     if (apPrisoner.IsPlayer())
@@ -1285,6 +1331,17 @@ event OnPrisonerTeleportedToPrison(RPB_Prisoner apPrisoner)
     if (!apPrisoner.PrisonerBelongingsContainer)
         apPrisoner.SetBelongingsContainer()
     endif
+
+    if (apPrisoner.ShouldBeFrisked)
+        apPrisoner.Frisk()
+    endif
+
+    if (apPrisoner.ShouldBeStripped)
+        apPrisoner.StartStripping(apPrisoner.Captor)
+    endif
+
+    apPrisoner.StartRestraining(apPrisoner.Captor)
+    apPrisoner.EscortToCell(apPrisoner.Captor)
 endEvent
 
 event OnPrisonerTeleportedToCell(RPB_Prisoner apPrisoner, bool abImprisonPrisoner)
@@ -1372,6 +1429,13 @@ event OnEscortPrisonerToCellEnd(RPB_Prisoner apPrisoner, RPB_JailCell akJailCell
         ; Process escort to cell after escape
     endif
 
+    ; TODO: Fix NPC not staying in cell if they are stripped OnEscortToCellEnd
+    if (!apPrisoner.IsStripped && apPrisoner.ShouldBeStripped)
+        apPrisoner.Strip()
+        ; apPrisoner.StartStripping(akEscort)
+        ; SceneManager.ResumeSceneBlocked()
+    endif
+
     if (!apPrisoner.PrisonerBelongingsContainer)
         apPrisoner.SetBelongingsContainer()     ; Set the container of where the prisoner's items will be confiscated to
     endif
@@ -1387,7 +1451,6 @@ event OnEscortPrisonerToCellEnd(RPB_Prisoner apPrisoner, RPB_JailCell akJailCell
     if (apPrisoner.IsNPC())
         ; Ensures the Prisoner stays in the cell since we update it 10s later after the initial check,
         ; delaying it enough for all actions to finish before the check.
-        apPrisoner.JailCell.RegisterForSanityChecking(1.0, apPrisoner = apPrisoner)
         apPrisoner.JailCell.RegisterForSanityChecking(10.0, apPrisoner = apPrisoner)
    endif
 
@@ -1628,7 +1691,7 @@ int function FireFallbackActorEventOnScene(string asScene, string asSceneEvent, 
         if (asSceneEvent == "StripBegin")
             if (asSceneSubEvent == "Make Prisoner")
                 self.MakePrisoner(akActor)
-                RPB_Prisoner newPrisoner = self.GetPrisoner(akActor)
+                RPB_Prisoner newPrisoner = self.AwaitPrisonerReference(akActor)
                 int copiedSentence       = newPrisoner.GetInt("Sentence", newPrisoner.TEMPORARY_DESTROY_ON_IMPRISONED)
                 newPrisoner.SetSentence(copiedSentence)  ; Copy the sentence
                 return 1
@@ -1675,15 +1738,17 @@ bool function BindCellToPrisoner(ObjectReference akJailCell, RPB_Prisoner apPris
     return true
 endFunction
 
+event OnCellAttach()
+    self.SetupCells()
+    Debug("["+ Name +"] Prison::OnCellAttach", "On Cell Attach Prison")
+endEvent
 
 function SetupCells()
-    if (self.Hold != "Haafingar")
-        return
-    endif
+    ; if (self.Hold != "Whiterun")
+    ;     return
+    ; endif
 
     float startBench = StartBenchmark()
-
-    Debug("["+ Name +"] Prison::SetupCells", "Cells: " + JailCells)
 
     int i = 0
     while (i < JailCells.Length)
@@ -1692,21 +1757,17 @@ function SetupCells()
         if (!jailCell.IsInitialized())
             jailCell.Initialize(self)
 
-            Debug("[Prison: "+ Name +"] Prison::SetupCells", "Jail Cell: " + jailCell + " - " + "HasOption(Maximum Prisoners):" + jailCell.HasOption("Maximum Prisoners") + ", HasObjects(Beds): " + jailCell.HasObjects("Beds"))
-
-            if (jailCell.ShouldPerformScan("Beds"))
-                jailCell.ScanBeds()
-            endif
+            ; if (jailCell.ShouldPerformScan("Beds"))
+            ;     jailCell.ScanBeds()
+            ; endif
             
-            if (jailCell.ShouldPerformScan("Containers"))
-                jailCell.ScanContainers()
-            endif
+            ; if (jailCell.ShouldPerformScan("Containers"))
+            ;     jailCell.ScanContainers()
+            ; endif
 
-            if (jailCell.ShouldPerformScan("Props"))
-                jailCell.ScanMiscProps()
-            endif
-
-            Debug("[Prison: "+ Name +"] Prison::SetupCells", jailCell + " Maximum Prisoners: " + jailCell.MaxPrisoners)
+            ; if (jailCell.ShouldPerformScan("Props"))
+            ;     jailCell.ScanMiscProps()
+            ; endif
         endif
 
         i += 1
@@ -1751,9 +1812,6 @@ Form[] function GetPrisonerContainers(string asPrisonerContainerType = "Belongin
         DebugError("["+ Name +"] Prison::GetPrisonerContainers", "The prisoner container type specified ("+ asPrisonerContainerType +") is invalid!")
         return none
     endif
-    
-    string[] stringArrayTest = self.GetPropertyOfTypeStringArray("TestArray")
-    Debug("["+ Name +"] Prison::GetPrisonerContainers", "stringArrayTest: " + stringArrayTest)
 
     return self.GetPropertyOfTypeFormArray("Prisoner Containers//" + asPrisonerContainerType)
 endFunction
@@ -2006,16 +2064,9 @@ function UnregisterPrisoner(RPB_Prisoner apPrisoner)
     endif
 endFunction
 
+; TODO: Delete this after replacing calls
 RPB_Prisoner function GetPrisonerReference(Actor akPrisoner)
-    RPB_Prisoner prisonerRef = Prisoners.AtKey(akPrisoner)
-
-    if (!prisonerRef)
-        DebugError("Prison::GetPrisonerReference", "The Actor " + akPrisoner + " is not a prisoner or there was a state mismatch!")
-        Error(akPrisoner.GetBaseObject().GetName() + " is not a prisoner or there was a state mismatch!")
-        return none
-    endif
-
-    return prisonerRef
+    return self.AwaitPrisonerReference(akPrisoner)
 endFunction
 
 
@@ -2023,18 +2074,6 @@ bool __isReceivingUpdates
 bool function IsReceivingUpdates()
     return __isReceivingUpdates
 endFunction
-
-bool function IsValid()
-    return self.GetReference() != none
-endFunction
-
-; TODO: Store the prisoners for each prison here, making the AME list futile since we can always retrieve them through here,
-; maybe map the index to a key for easier access like it's done in the AME list.
-
-int __prisonersIndex
-
-
-RPB_JailCell[] __prisonCells
 
 ; =========================================================
 ;                         Data Config                      
@@ -2063,11 +2102,6 @@ int function GetSerializableRootObject()
     return self.GetLocalPropertyOfTypeInt("Root Object")
 endFunction
 
-
-; TODO: Implement
-Form function FindPropertyOfTypeForm(string asProperty, string apFindConditions)
-    return RPB_Data.FindPropertyOfTypeForm(self.GetSerializableRootObject(), asProperty, apFindConditions)
-endFunction
 
 ;                       Global Root Properties                    
 ; =========================================================
@@ -2207,18 +2241,45 @@ function ProcessImprisonmentForQueuedPrisoners()
     isProcessingQueuedPrisonersForImprisonment = false
 endFunction
 
-RPB_Prisoner function AwaitForPrisonerReference(Actor akActor, int aiMaxTries = 50, float afTimeBetweenTries = 0.1)
-    RPB_Prisoner ref = self.GetPrisonerReference(akActor)
-    int tries = 0
+;/
+    Awaits a reference of RPB_Prisoner for the specified Actor.
+    If the Actor is not a Prisoner yet, they will be made into one and bound to this Prison. 
 
-    while (!ref && tries < aiMaxTries)
-        ref = self.GetPrisonerReference(akActor)
-        Utility.Wait(afTimeBetweenTries)
+    Actor   @akPrisoner: The actor to retrieve the Prisoner reference from.
+    int?    @aiMaxTries: How many attempts retrieving the reference, in case it fails initially.
+    float?  @afInitialTimeBetweenTries: The delay on each try
+    float?  @afMaxTimeBetweenTries: The max delay on each try that is possible (Exponential Backoff).
+/;
+; RPB_Prisoner function AwaitPrisonerReference(Actor akPrisoner, int aiMaxTries = 50, float afInitialTimeBetweenTries = 0.1, float afMaxTimeBetweenTries = 3.0)
+;     return RPB_Utility.AwaitEntityReference(akPrisoner, Prisoners, self, aiMaxTries, afInitialTimeBetweenTries, afMaxTimeBetweenTries) as RPB_Prisoner
+; endFunction
+RPB_Prisoner function AwaitPrisonerReference(Actor akPrisoner, int aiMaxTries = 50, float afInitialTimeBetweenTries = 0.1, float afMaxTimeBetweenTries = 3.0)
+    RPB_Utility.EnsurePrisonerSpellAndBinding(akPrisoner, self)
+
+    RPB_Prisoner prisonerRef = Prisoners.AtKey(akPrisoner)
+    int tries = 0
+    float delay = afInitialTimeBetweenTries
+
+    ; Safeguard
+    while (!prisonerRef && tries < aiMaxTries)
+        prisonerRef = Prisoners.AtKey(akPrisoner)
+        Utility.Wait(delay)
         tries += 1
+        delay *= 1.5
+        if (delay > afMaxTimeBetweenTries)
+            delay = afMaxTimeBetweenTries
+        endif
     endWhile
 
-    return ref
+    if (!prisonerRef)
+        DebugError("Prison::AwaitPrisonerReference", "The Actor " + akPrisoner + " is not a prisoner or there was a state mismatch!")
+        Error(akPrisoner.GetBaseObject().GetName() + " is not a prisoner or there was a state mismatch!")
+        return none
+    endif
+
+    return prisonerRef
 endFunction
+
 
 ;/
     Turns the Actor into an RPB_Prisoner and binds it to this Prison.
@@ -2226,39 +2287,9 @@ endFunction
     Actor   @akActor: The actor to turn into a Prisoner
     bool?   @abDelayExecution: Whether to delay before obtaining a reference to the prisoner.
 /;
+; TODO: Delete this after replacing calls
 RPB_Prisoner function MakePrisoner(Actor akActor, bool abDelayExecution = true)
-    ; Cast the Prisoner spell (to bind the RPB_Prisoner instance script)
-    Spell prisonerSpell = RPB_Utility.RPB_PrisonerSpell()
-    akActor.AddSpell(prisonerSpell, false)
-
-    ; Bind this Prison to the Prisoner (to retrieve it from RPB_Prisoner)
-    RPB_StorageVars.SetStringOnForm("Prison UUID", akActor, self.UUID, "Jail")
-
-    ; Delay execution before returning an instance of the prisoner, since we need to let the RPB_Prisoner script register this Prisoner
-    ; if (abDelayExecution)
-    ;     Utility.Wait(0.2)
-    ; endif
-
-    RPB_Prisoner prisonerReference = self.AwaitForPrisonerReference(akActor)
-
-    if (prisonerReference == none)
-        RPB_Prison actorPrison = PrisonManager.FindPrisonByPrisoner(akActor)
-
-        if (actorPrison != none)
-            RPB_Prisoner actorPrisonerRef = actorPrison.GetPrisonerReference(akActor)
-            ; Actor is a prisoner in some prison, don't do anything
-            if (actorPrisonerRef != none)
-                return none
-            endif
-        endif
-    
-        ; Remove the RPB_Prisoner spell and consequently, the effect
-        akActor.RemoveSpell(prisonerSpell)
-        return none
-    endif
-
-    ; The instance should be available by now, since after the spell is added, the script will register this actor as a Prisoner OnInitialize() through self.RegisterPrisoner()
-    return prisonerReference
+    return self.AwaitPrisonerReference(akActor)
 endFunction
 
 function ImprisonActorImmediately(Actor akActor)
