@@ -26,6 +26,9 @@ function SetTests()
     self.AddTest("14 - Test Prisoner Gets Correct Escape Penalty", "Test_PrisonerEscapeGetsCorrectPenalty")
     self.AddTest("15 - Test List Algorithms", "Test_ListAlgorithms")
     self.AddTest("16 - Test ActiveMagicEffectList Algorithms", "Test_ActiveMagicEffectListAlgorithms")
+    self.AddTest("17 - Test New Serialization - Compare with Old", "Test_NewSerializationCompareWithOld")
+    self.AddTest("18 - Test Prison Root Objects", "Test_PrisonRootObjects")
+    self.AddTest("18 - Test JSON Conditions", "Test_JSONConditions")
 endFunction
 
 state Test_25Days_After_26th_Frostfall_Is_20th_Suns_Dusk
@@ -52,7 +55,7 @@ state Test_Can_Get_Prison_For_Actor_Globally
         ; Use this Actor
         Actor testPrisoner = Game.GetFormEx(0x14) as Actor
 
-        RPB_Arrestee arrestee = (RPB_API.GetArrest()).MakeArrestee(testPrisoner)
+        RPB_Arrestee arrestee = (RPB_API.GetArrest()).AwaitArresteeReference(testPrisoner)
         arrestee.SetArrestParameters((RPB_API.GetArrest()).ARREST_TYPE_TELEPORT_TO_CELL, none, solitudePrison.PrisonFaction)
 
         ; Add the actor to Prison
@@ -171,16 +174,16 @@ state Test_Arrest_And_Imprison_Multiple_Actors_With_Scene
         ; while (i < npcCount)
         ;     ; Actor vivienne = player.PlaceActorAtMe(vivienneOnisBase, 1)
         ;     Actor playerCopy = player.PlaceActorAtMe(playerBase, 1)
-        ;     RPB_Arrestee arresteeRef = arrest.MakeArrestee(playerCopy)
+        ;     RPB_Arrestee arresteeRef = arrest.AwaitArresteeReference(playerCopy)
         ;     ; arrest.OnArrestBegin(arresteeRef, guard, guard.GetCrimeFaction(), arrest.ARREST_TYPE_ESCORT_TO_JAIL)
         ;     ; arrest.ArrestActor(guard, vivienne, arrest.ARREST_TYPE_ESCORT_TO_JAIL)
         ;     i += 1
         ; endWhile
         Actor playerCopy = player.PlaceActorAtMe(playerBase, 1)
-        RPB_Arrestee playerCopyRef = arrest.MakeArrestee(playerCopy)
-        RPB_Captor captorRef = arrest.MakeOrGetCaptor(guard)
+        RPB_Arrestee playerCopyRef = arrest.AwaitArresteeReference(playerCopy)
+        RPB_Captor captorRef = arrest.AwaitCaptorReference(guard)
     
-        RPB_Arrestee arresteeRef = arrest.MakeArrestee(player)
+        RPB_Arrestee arresteeRef = arrest.AwaitArresteeReference(player)
         arrest.OnArrestBegin(arresteeRef, captorRef, guard.GetCrimeFaction(), arrest.ARREST_TYPE_ESCORT_TO_JAIL)
         RPB_Utility.BindAliasTo(RPB_API.GetSceneManager().GetEscortee(1), playerCopy)
     endFunction
@@ -273,7 +276,7 @@ state Test_Configure_Prisons
         RPB_PrisonManager prisonManager         = RPB_API.GetPrisonManager()
         RPB_Config config  = API.Config
 
-        API.Config.SetPrisons()
+        ; API.Config.SetPrisons()
 
         bool validPrisons = true
         int i = 0
@@ -290,7 +293,7 @@ state Test_Configure_Prisons
         RPB_Prison solitudePrison = prisonManager.GetPrison("Haafingar")
         bool isSolitudePrison = assert_true( \
             solitudePrison.Name == "Castle Dour Dungeon" && \
-            solitudePrison.ID == prisonManager.GetPrisonByID(solitudePrison.ID).ID && \
+            solitudePrison.ID == prisonManager.GetPrisonByID(solitudePrison.ID as int).ID && \
             solitudePrison.Hold == "Haafingar", \ 
             "This is not Solitude Prison" \
         )
@@ -301,6 +304,7 @@ endState
 
 state Test_Unset_Prisons
     function Setup()
+        EnableDebugging()
         RPB_PrisonManager prisonManager = RPB_API.GetPrisonManager()
         ; prisonManager.UninitializePrisons()
 
@@ -312,11 +316,11 @@ state Test_Unset_Prisons
         int i = 0
         while (i < prisonManager.PrisonSlots)
             RPB_Prison prison = prisonManager.GetPrisonByID(i)
-            bool wasPrisonInitialized = prison.Initialized
+            bool wasPrisonInitialized = prison.Active
             string prisonName = prison.Name
-            prisonManager.UninitializePrisonByID(i)
-            log("Unsetting Prison (ID "+ i +" ["+ prisonName +"]) | Unset: " + (!prison.Initialized), wasPrisonInitialized)
-            bool prisonNotInitialized = assert_false(prison.Initialized, "The prison is initialized ("+ prisonName +")")
+            prisonManager.UninitializeNthPrison(i)
+            log("Unsetting Prison (ID "+ i +" ["+ prisonName +"]) | Unset: " + (!prison.Active), wasPrisonInitialized)
+            bool prisonNotInitialized = assert_false(prison.Active, "The prison is initialized ("+ prisonName +")")
             if (!prisonNotInitialized)
                 noPrisonsInitialized = false
             endif
@@ -369,7 +373,7 @@ endState
 state Test_PrisonerHasBountyInPrison
     function Setup()
         RPB_Prison castleDourDungeon    = API.PrisonManager.GetPrison("Haafingar")
-        RPB_Prisoner playerPrisonerRef  = castleDourDungeon.GetPrisoner(Game.GetForm(0x14) as Actor)
+        RPB_Prisoner playerPrisonerRef  = castleDourDungeon.AwaitPrisonerReference(Game.GetForm(0x14) as Actor)
 
         bool hasBounty = assert_true(playerPrisonerRef.Bounty > 0, "Prisoner does not have a bounty while in prison!")
         display_result(hasBounty)
@@ -384,7 +388,7 @@ state Test_PrisonerEscapeGetsCorrectPenalty
         ; Use this Actor
         Actor testPrisoner = Game.GetFormEx(0x14) as Actor
 
-        RPB_Arrestee arrestee = (RPB_API.GetArrest()).MakeArrestee(testPrisoner)
+        RPB_Arrestee arrestee = (RPB_API.GetArrest()).AwaitArresteeReference(testPrisoner)
         arrestee.SetCrimeGold(6000)
 
         RPB_Prisoner prisoner = arrestee.MakePrisoner()
@@ -579,6 +583,71 @@ state Test_ActiveMagicEffectListAlgorithms
     function Teardown()
         RPB_PrisonerList testList = API.PrisonManager.GetPrison("Haafingar").Prisoners
         testList.__string_clear()
+    endFunction
+endState
+
+state Test_NewSerializationCompareWithOld
+    function Setup()
+        RPB_Prison prison = API.PrisonManager.GetPrison("Haafingar")
+        RPB_JailCell jailCell = Game.GetFormEx(0x36897) as RPB_JailCell ; 1st Jail Cell for this prison
+        int cellsDataObject = prison.GetDataObject("Cells")
+
+        bool oldBool = jailCell.GetOptionOfTypeBool("Bool")
+        bool newBool = RPB_Data.GetPropertyOfTypeInteger(cellsDataObject, jailCell + "//Bool") as bool
+
+        begin_step("Bool Operations")
+        bool passBool = assert_true(oldBool == newBool, "Functions value mismatch!")
+
+        int oldInteger = jailCell.GetPropertyOfTypeInt("Integer")
+        int newInteger = RPB_Data.GetPropertyOfTypeInteger(cellsDataObject, jailCell + "//Integer")
+
+        begin_step("Integer Operations")
+        bool passInt = assert_true(oldInteger == newInteger, "Functions value mismatch!")
+
+        string oldString = jailCell.GetPropertyOfTypeString("String")
+        string newString = RPB_Data.GetPropertyOfTypeString(cellsDataObject, jailCell + "//String")
+
+        begin_step("String Operations")
+        bool passString = assert_equals(oldString, newString, "Functions value mismatch!")
+
+        log( \
+            "\n\t jailCell.GetPropertyOfTypeBool(Bool): " + jailCell.GetPropertyOfTypeBool("Bool") + \
+            "\n\t RPB_Data.GetPropertyOfTypeInteger(cellsDataObject, " + jailCell + "//Bool): " + RPB_Data.GetPropertyOfTypeInteger(cellsDataObject, jailCell + "//Bool") + \
+            "\n\t jailCell.GetPropertyOfTypeInt(Integer): " + jailCell.GetPropertyOfTypeInt("Integer") + \
+            "\n\t RPB_Data.GetPropertyOfTypeInt(cellsDataObject, " + jailCell + "//Integer): " + RPB_Data.GetPropertyOfTypeInteger(cellsDataObject, jailCell + "//Integer") + \
+            "\n\t jailCell.GetPropertyOfTypeString(String): " + jailCell.GetPropertyOfTypeString("String") + \
+            "\n\t RPB_Data.GetPropertyOfTypeString(cellsDataObject, " + jailCell + "//String): " + RPB_Data.GetPropertyOfTypeString(cellsDataObject, jailCell + "//String") \
+        )
+
+        display_result(passBool && passInt && passString)
+    endFunction
+endState
+
+state Test_PrisonRootObjects
+    function Setup()
+        EnableDebugging()
+        ; Castle Dour Dungeon
+        RPB_Prison prison = API.PrisonManager.GetPrison("Haafingar")
+        int holdRootObject      = RPB_Data.GetRootObject("Haafingar")
+        ; Only one prison object for now, later when 1:N, this must be iterated through to get all prison objects
+        int prisonRootObject    = RPB_Data.GetPropertyOfTypeObject(holdRootObject, "Jail")
+        ; RPB_StorageVars.SetIntOnReference("Hold Root Object", prison.UUID, holdRootObject)
+        ; RPB_StorageVars.SetIntOnReference("Root Object", prison.UUID, prisonRootObject)
+        
+        ; log("Root Object 1: " + prison.GetSerializableRootObject())
+        ; log("Root Object 2: " + prison.GetSerializableRootObject1())
+
+        ; log("Root Object 1 Content: " + GetContainerList(prison.GetSerializableRootObject()))
+        ; log("Root Object 2 Content: " + GetContainerList(prison.GetSerializableRootObject1()))
+    endFunction
+endState
+
+state Test_JSONConditions
+    function Setup()
+        int testObject      = RPB_Data.GetObjectInPath("tests/jsonConditions.json")
+        Form[] testForms    = RPB_Data.QueryFormArray(testObject, "*", "{ 'active': true }")
+        begin_step("Test JSON Condition", "Displaying result of testForms")
+        log(testForms)
     endFunction
 endState
 

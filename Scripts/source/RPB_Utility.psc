@@ -314,6 +314,49 @@ endFunction
 ;                      String Functions
 ; ==========================================================
 
+string function ReplaceString(string str, string toFind, string replacement) global
+int len = StringUtil.GetLength(str)
+    string result = ""
+
+    int i = 0
+    while (i < len)
+        int index = StringUtil.Find(str, toFind, i)
+        if (index != -1)
+            result += StringUtil.Substring(str, i, index - i)
+            result += replacement
+
+            i = index + StringUtil.GetLength(toFind)
+        else
+            result += StringUtil.Substring(str, i, len - i)
+            return result
+        endif
+    endWhile
+
+    return result
+endFunction
+
+; string function ReplaceChar(string str, string toFind, string replacement) global
+;     int len = StringUtil.GetLength(str)
+;     string result = ""
+;     DebugWithArgs("Data::ReplaceChar", "toFind Length: " + StringUtil.GetLength(toFind) + ", replacement Length: " + StringUtil.GetLength(replacement), "")
+;     int i = 0
+;     while (i < len)
+;         string currentChar = StringUtil.GetNthChar(str, i)
+;         DebugWithArgs("", "Data::ReplaceChar", "Index: " + i + ", Current Char: " + currentChar + ", ToFind: " + toFind)
+
+;         if (currentChar == toFind)
+;             result += replacement
+;             DebugWithArgs("Data::ReplaceChar", "str: " + str + ", toFind: " + toFind + ", replacement: " + replacement, "Found "+ currentChar +", appending " + replacement)
+;         else
+;             result += currentChar
+;         endif
+;         i += 1
+;     endWhile
+;     DebugWithArgs("Data::ReplaceChar", "str: " + str + ", toFind: " + toFind + ", replacement: " + replacement, "Returning " + result)
+
+;     return result
+; endFunction
+
 string[] function StringArray_Merge(string[] asArrayOne, string[] asArrayTwo) global
     int newStringArray = JArray.object()
     int arrayOneObj = JArray.objectWithStrings(asArrayOne)

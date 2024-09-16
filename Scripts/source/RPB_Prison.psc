@@ -991,8 +991,9 @@ endFunction
 
     returns (Form[]); The jail cells for this Prison.
 /;
+
 Form[] function GetJailCells()
-    return RPB_Data.JailCell_GetParents(self.GetDataObject("Cells"))
+    return RPB_Data.QueryFormArray(self.Children("Cells"), "*", "{ 'active': true }")
 endFunction
 
 ;/

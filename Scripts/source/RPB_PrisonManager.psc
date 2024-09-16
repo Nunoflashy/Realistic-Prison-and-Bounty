@@ -91,19 +91,20 @@ endFunction
 function VerifyPrisonsIntegrity()
     ; return
     ; int root = RPB_Data.GetRootObjectInPath("Holds")
-    int castleDourDungeonCell01 = RPB_Data.GetPrisonObject("Holds/Haafingar/Prisons/Castle Dour Dungeon/Cells/cell01.json")
-    Debug("PrisonManager::VerifyPrisonsIntegrity", "castleDourDungeonCell01: " + GetContainerList(castleDourDungeonCell01))
-    Debug("PrisonManager::VerifyPrisonsIntegrity", "Holds: " + RPB_Data.GetRootObjectInPath("Holds"))
-    ; Debug("PrisonManager::VerifyPrisonsIntegrity", "root: " + GetContainerList(root))
-    return
+    ; int castleDourDungeonCell01 = RPB_Data.GetPrisonObject("Holds/Haafingar/Prisons/Castle Dour Dungeon/Cells/cell01.json")
+    ; Debug("PrisonManager::VerifyPrisonsIntegrity", "castleDourDungeonCell01: " + GetContainerList(castleDourDungeonCell01))
+    ; Debug("PrisonManager::VerifyPrisonsIntegrity", "Holds: " + RPB_Data.GetRootObjectInPath("Holds"))
+    ; ; Debug("PrisonManager::VerifyPrisonsIntegrity", "root: " + GetContainerList(root))
+    ; return
     Debug("PrisonManager::VerifyPrisonsIntegrity", "Verifying Prisons integrity...")
 
     int i = 0
     while (i < PrisonSlots)
         RPB_Prison prisonRef = self.GetNthAlias(i) as RPB_Prison
         if (prisonRef.Active)
+            ReloadPrisonConfig(prisonRef)
             BindAliasTo(prisonRef, prisonRef.JailCells[0] as ObjectReference)
-            prisonRef.SetupCells()
+            ; prisonRef.SetupCells()
             ; prisonRef.EnsureFunctionalState()
         endif
         i += 1

@@ -1,5 +1,7 @@
 Scriptname RPB_MCM_Holds hidden
 
+; Add color to text (RGB values): <font color='#ff0000'>
+
 import RPB_Utility
 import RPB_MCM
 
