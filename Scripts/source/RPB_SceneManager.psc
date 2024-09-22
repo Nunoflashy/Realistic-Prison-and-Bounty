@@ -1088,15 +1088,12 @@ event OnScenePlaying(string name, int phaseEvent, int phase, Scene sender)
         Actor escort   = params[0] as Actor
         Actor escortee = params[1] as Actor
 
-        RPB_Arrestee arrestee = Arrest.AwaitArresteeReference(escortee)
-        arrestee.SetForm("Escort", escort, arrestee.DestroyPropertyOnState("Imprisoned"))
-
         if (phaseEvent == PHASE_START)
         elseif (phaseEvent == PHASE_END)
             if (phase == 1)
                 ; Make arrestee put hands behind their back
-                Arrest.HandleArresteeEventOnScene(name, "ArrestStart", arrestee, "Hands Behind Back")
-                Arrest.HandleArresteeEventOnScene(name, "ArrestStart", arrestee, "Handcuff")
+                EventManager.SendArrestSceneEvent(name, "ArrestStart", escortee, escort, "Hands Behind Back")
+                EventManager.SendArrestSceneEvent(name, "ArrestStart", escortee, escort, "Handcuff")
             endif
         endif
 
@@ -1104,18 +1101,15 @@ event OnScenePlaying(string name, int phaseEvent, int phase, Scene sender)
         Actor escort   = params[0] as Actor
         Actor escortee = params[1] as Actor
 
-        RPB_Arrestee arrestee = Arrest.AwaitArresteeReference(escortee)
-        arrestee.SetForm("Escort", escort, "Temporary::Imprisoned")
-
         if (phaseEvent == PHASE_START)
             if (phase == 3)
-                Arrest.HandleArresteeEventOnScene(name, "ArrestStart", arrestee, "Handcuff")
+                EventManager.SendArrestSceneEvent(name, "ArrestStart", escortee, escort, "Handcuff")
             endif
 
         elseif (phaseEvent == PHASE_END)
             if (phase == 1)
                 ; Make Arrestee turn around and put hands behind the back
-                Arrest.HandleArresteeEventOnScene(name, "ArrestStart", arrestee, "Hands Behind Back")
+                EventManager.SendArrestSceneEvent(name, "ArrestStart", escortee, escort, "Hands Behind Back")
             endif
         endif
 
@@ -1123,40 +1117,35 @@ event OnScenePlaying(string name, int phaseEvent, int phase, Scene sender)
         Actor escort   = params[0] as Actor
         Actor escortee = params[1] as Actor
 
-        RPB_Arrestee arrestee = Arrest.AwaitArresteeReference(escortee)
-        arrestee.SetForm("Escort", escort, "Temporary::Imprisoned")
+        ; RPB_Arrestee arrestee = Arrest.AwaitArresteeReference(escortee)
+        ; arrestee.SetForm("Escort", escort, "Temporary::Imprisoned")
 
         if (phaseEvent == PHASE_START)
             if (phase == 4)
-                Arrest.HandleArresteeEventOnScene(name, "ArrestStart", arrestee, "Handcuff") ; TODO: Change this to ArrestMiddle
+                EventManager.SendArrestSceneEvent(name, "ArrestStart", escortee, escort, "Handcuff")
             endif
 
         elseif (phaseEvent == PHASE_END)
             if (phase == 1)
                 ; OrientRelative(escortee, escort)
                 ; Debug.SendAnimationEvent(escortee, "ZazAPC018")
-                Arrest.HandleArresteeEventOnScene(name, "ArrestStart", arrestee, "Kneel Down")
+                EventManager.SendArrestSceneEvent(name, "ArrestStart", escortee, escort, "Kneel Down")
             endif
         endif
 
     elseif (name == SCENE_ARREST_START_04)
         Actor escort   = params[0] as Actor
         Actor escortee = params[1] as Actor
-
-        RPB_Arrestee arrestee = Arrest.AwaitArresteeReference(escortee)
-        arrestee.SetForm("Escort", escort, "Temporary::Imprisoned")
-
         if (phaseEvent == PHASE_START)
 
         elseif (phaseEvent == PHASE_END)
             if (phase == 1)
                 ; Make arrestee lie down
                 ; Debug.SendAnimationEvent(arrestee, "ZazAPC011")
-                Arrest.HandleArresteeEventOnScene(name, "ArrestStart", arrestee, "Lie Down")
+                EventManager.SendArrestSceneEvent(name, "ArrestStart", escortee, escort, "Lie Down")
             elseif (phase == 6)
                 ; Make arrestee get up (by restraining the animation is canceled)
-                Arrest.HandleArresteeEventOnScene(name, "ArrestStart", arrestee, "Handcuff") ; TODO: Change this to ArrestEnd
-                ; Arrest.OnArresting(captor, arrestee)
+                EventManager.SendArrestSceneEvent(name, "ArrestStart", escortee, escort, "Handcuff") ; TODO: Change this to ArrestEnd
             endif
         endif
 
@@ -1192,21 +1181,14 @@ event OnScenePlaying(string name, int phaseEvent, int phase, Scene sender)
         Actor escort   = params[0] as Actor
         Actor escortee = params[1] as Actor
 
-        RPB_Arrestee arrestee = Arrest.AwaitArresteeReference(escortee)
-        arrestee.SetForm("Escort", escort, "Temporary::Imprisoned")
-
         if (phaseEvent == PHASE_START)
 
         elseif (phaseEvent == PHASE_END)
             if (phase == 1)
                 ; Make arrestee put their hands behind the back
-                Arrest.HandleArresteeEventOnScene(name, "ArrestStart", arrestee, "Hands Behind Back")
-                ; OrientRelative(arrestee, captor)
-                ; Debug.SendAnimationEvent(arrestee, "ZazAPC001")
+                EventManager.SendArrestSceneEvent(name, "ArrestStart", escortee, escort, "Hands Behind Back")
             elseif (phase == 2)
-                ; Restrain
-                ; Arrest.OnArresting(captor, arrestee)
-                Arrest.HandleArresteeEventOnScene(name, "ArrestStart", arrestee, "Handcuff")
+                EventManager.SendArrestSceneEvent(name, "ArrestStart", escortee, escort, "Handcuff")
             endif
         endif
 
@@ -1487,37 +1469,25 @@ event OnSceneEnd(string name, Scene sender)
         Actor escort   = params[0] as Actor
         Actor escortee = params[1] as Actor
 
-        RPB_Arrestee arrestee = Arrest.AwaitArresteeReference(escortee)
-
-        arrestee.SetForm("Escort", escort, arrestee.DestroyPropertyOnState("Imprisoned"))
-        Arrest.HandleArresteeEventOnScene(name, "ArrestEnd", arrestee)
+        EventManager.SendArrestSceneEvent(name, "ArrestEnd", escortee, escort)
 
     elseif (name == SCENE_ARREST_START_02)
         Actor escort   = params[0] as Actor
         Actor escortee = params[1] as Actor
 
-        RPB_Arrestee arrestee = Arrest.AwaitArresteeReference(escortee)
-
-        arrestee.SetForm("Escort", escort, arrestee.DestroyPropertyOnState("Imprisoned"))
-        Arrest.HandleArresteeEventOnScene(name, "ArrestEnd", arrestee)
+        EventManager.SendArrestSceneEvent(name, "ArrestEnd", escortee, escort)
 
     elseif (name == SCENE_ARREST_START_03)
         Actor escort   = params[0] as Actor
         Actor escortee = params[1] as Actor
 
-        RPB_Arrestee arrestee = Arrest.AwaitArresteeReference(escortee)
-
-        arrestee.SetForm("Escort", escort, arrestee.DestroyPropertyOnState("Imprisoned"))
-        Arrest.HandleArresteeEventOnScene(name, "ArrestEnd", arrestee)
+        EventManager.SendArrestSceneEvent(name, "ArrestEnd", escortee, escort)
 
     elseif (name == SCENE_ARREST_START_04)
         Actor escort   = params[0] as Actor
         Actor escortee = params[1] as Actor
 
-        RPB_Arrestee arrestee = Arrest.AwaitArresteeReference(escortee)
-
-        arrestee.SetForm("Escort", escort, arrestee.DestroyPropertyOnState("Imprisoned"))
-        Arrest.HandleArresteeEventOnScene(name, "ArrestEnd", arrestee)
+        EventManager.SendArrestSceneEvent(name, "ArrestEnd", escortee, escort)
 
     elseif (name == SCENE_SURRENDER_01)
         Actor surrenderer        = params[0] as Actor
@@ -1536,10 +1506,7 @@ event OnSceneEnd(string name, Scene sender)
         Actor escort   = params[0] as Actor
         Actor escortee = params[1] as Actor
 
-        RPB_Arrestee arrestee = Arrest.AwaitArresteeReference(escortee)
-
-        arrestee.SetForm("Escort", escort, arrestee.DestroyPropertyOnState("Imprisoned"))
-        Arrest.HandleArresteeEventOnScene(name, "ArrestEnd", arrestee, "Arrest in Prison")
+        EventManager.SendArrestSceneEvent(name, "ArrestEnd", escortee, escort, "Arrest in Prison")
 
     elseif (name == SCENE_ESCORT_TO_CELL_01)
         Actor escort   = params[0] as Actor
@@ -1593,15 +1560,7 @@ event OnSceneEnd(string name, Scene sender)
             if (params[i] != None && params[i] != escort)
                 RPB_Actor actorReference = prison.AwaitPrisonerReference(escortee)
                 if (actorReference == none)
-                    actorReference = Arrest.AwaitArresteeReference(params[i] as Actor)
-
-                    RPB_Arrestee arrestee = actorReference as RPB_Arrestee
-                    arrestee.SetForm("EscortGuard", escort, "Temporary::Imprisoned")
-                    Arrest.HandleArresteeEventOnScene(name, "EscortEnd", arrestee)
-                    
-                    Debug("["+ SCENE_ESCORT_TO_JAIL_01 +"] SceneManager::OnSceneEnd", "params["+i+"] = " + params[i])
-                    Debug("["+ SCENE_ESCORT_TO_JAIL_01 +"] SceneManager::OnSceneEnd", "Arrestee: " + arrestee + ", Actor: " + actorReference + ", Escort: " + arrestee.GetForm("EscortGuard", "Temporary::Imprisoned"))
-                
+                    EventManager.SendArrestSceneEvent(name, "EscortEnd", escortee, escort)
                 else
                     RPB_Prisoner prisonerReference = actorReference as RPB_Prisoner
 

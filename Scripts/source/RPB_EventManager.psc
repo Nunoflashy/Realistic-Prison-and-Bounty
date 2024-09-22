@@ -69,6 +69,18 @@ function RegisterEvents()
 endFunction
 
 ; ==========================================================
+;                      Event Dispatchers
+; ==========================================================
+
+function SendSurrenderSceneEvent(string asScene, string asSceneEvent, Actor akSurrenderer, Actor akSurrendererCaptor, string asSceneSecondaryEvent = "null")
+    self.OnSurrenderScene(asScene, asSceneEvent, akSurrenderer, akSurrendererCaptor, asSceneSecondaryEvent)
+endFunction
+
+function SendArrestSceneEvent(string asScene, string asSceneEvent, Actor akArrestee, Actor akAuthority, string asSceneSecondaryEvent = "null")
+    self.OnArresteeScene(asScene, asSceneEvent, akArrestee, akAuthority, asSceneSecondaryEvent)
+endFunction
+
+; ==========================================================
 ;                       Logging Events
 ; ==========================================================
 
@@ -376,13 +388,52 @@ event OnPayBounty(string eventName, string categoryPayBounty, float arresteeForm
     Arrest.OnArrestPayBounty(guard, arrestee, crimeFaction, categoryPayBounty)
 endEvent
 
+event OnArresteeScene(string asScene, string asSceneEvent, Actor akArrestee, Actor akAuthority, string asSceneSecondaryEvent)
+    string sceneType        = SceneManager.GetSceneType(asScene)
+    RPB_Arrestee arrestee   = Arrest.AwaitArresteeReference(akArrestee)
+
+    if (sceneType == SceneManager.CATEGORY_ARREST_START)
+        Actor escort = akAuthority
+        
+        if (asSceneEvent == "ArrestStart")
+            if (asSceneSecondaryEvent == "Hands Behind Back")
+                arrestee.OrientRelativeTo(escort)
+                arrestee.PlayAnimation("IdleHandsBehindBack")
+            
+            elseif (asSceneSecondaryEvent == "Handcuff")
+                arrestee.Restrain()
+                Arrest.OnArresteeRestrained(arrestee)
+
+            elseif (asSceneSecondaryEvent == "Kneel Down")
+                arrestee.PlayAnimation("ZazAPC018")
+
+            elseif (asSceneSecondaryEvent == "Lie Down")
+                arrestee.PlayAnimation("ZazAPC011")
+            endif
+
+        elseif (asSceneEvent == "ArrestEnd")
+            arrestee.OnArrestEnd()
+        endif
+
+    elseif (sceneType == SceneManager.CATEGORY_ESCORT_TO_JAIL)
+        RPB_Prison prison = arrestee.GetPotentialPrison()
+        Actor escort = akAuthority
+        self.SendInfo("Prison: " + prison + ", Escort: " + escort + ", Arrestee: " + arrestee.GetActor(), "EventManager::OnArresteeScene")
+
+        if (asSceneEvent == "EscortBegin")
+            prison.OnEscortPrisonerToJailBegin(arrestee, escort)
+
+        elseif (asSceneEvent == "EscortEnd")
+            prison.OnEscortPrisonerToJailEnd(arrestee, escort)
+        endif
+
+        self.SendInfo("Arrestee -> " + asScene + ": " + asSceneEvent, "EventManager::OnArresteeScene")
+    endif
+endEvent
+
 ; ==========================================================
 ;                        Surrender Events
 ; ==========================================================
-
-function SendSurrenderSceneEvent(string asScene, string asSceneEvent, Actor akSurrenderer, Actor akSurrendererCaptor, string asSceneSecondaryEvent = "null")
-    self.OnSurrenderScene(asScene, asSceneEvent, akSurrenderer, akSurrendererCaptor, asSceneSecondaryEvent)
-endFunction
 
 event OnSurrenderPreparing(Form akSurrenderer)
     Actor surrenderer = akSurrenderer as Actor
@@ -415,7 +466,6 @@ event OnSurrenderScene(string asScene, string asSceneEvent, Actor akSurrenderer,
         endif
     endif
 endEvent
-
 
 ; ==========================================================
 ;                        Scene Events
