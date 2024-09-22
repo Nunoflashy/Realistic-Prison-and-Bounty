@@ -206,7 +206,7 @@ string[] function FindPropertyOfTypeStringArray(string asPropertyName, string ap
     ; return RPB_Data.FindPropertyOfTypeStringArray(__internalSerializedRootObject(), asPropertyName)
 endFunction
 
-Form[] function FindPropertyOfTypeFormArray(string asPropertyName, string apFindConditions)
+Form[] function QueryFormArray(string asPropertyName, string apFindConditions)
     return RPB_Data.QueryFormArray(__internalSerializedRootObject(), asPropertyName, apFindConditions)
 endFunction
 

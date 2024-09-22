@@ -562,13 +562,16 @@ function Action_ArrestSelectedActor(RPB_UIInterface uilib, bool abEscortArrestee
     float startBench = StartBenchmark()
     Actor selectedActor = Game.GetCurrentConsoleRef() as Actor
 
+    GlobalVariable RPB_Surrender = RPB_Utility.RPB_ArrestGlobal("No Dialogue")
+    RPB_Surrender.SetValueInt(1)
+
     Actor guard = none
 
     if (abShowCaptorInputField)
         int formId = PO3_SKSEFunctions.StringToInt(uilib.ShowInput("Captor Form ID", "0x10C06D"))
         guard = Game.GetFormEx(formId) as Actor
     else
-        guard = RPB_Utility.GetNearestGuard(selectedActor, 500, selectedActor)
+        guard = RPB_Utility.GetNearbyGuardForFactionFromRef(selectedActor)
     endif
 
     string actorName    = selectedActor.GetBaseObject().GetName()

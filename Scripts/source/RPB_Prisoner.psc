@@ -14,6 +14,11 @@ RPB_SceneManager property SceneManager
     endFunction
 endProperty
 
+RPB_EventManager property EventManager
+    RPB_EventManager function get()
+        return API.EventManager
+    endFunction
+endProperty
 
 ; ==========================================================
 ;                    Prisoner Properties
@@ -600,7 +605,7 @@ endFunction
 /;
 function RemoveFromCell()
     if (!self.JailCell)
-        DebugWarn("["+ Name +"] Prisoner::RemoveFromCell", "The prisoner " + self.Name + " is not bound to any jail cell!")
+        EventManager.SendWarning("The prisoner " + self.Name + " is not bound to any jail cell!", "["+ Name +"] Prisoner::RemoveFromCell")
         return
     endif
     
@@ -667,14 +672,12 @@ endFunction
 /;
 function Imprison()
     if (!self.HasStateRequiredForImprisonment())
-        Error(Name + " does not have the required state for "+ self.GetPossessivePronoun() +" imprisonment, cannot continue!")
-        DebugError("["+ Name +"] Prisoner::Imprison", Name + " does not have the required state for "+ self.GetPossessivePronoun() +" imprisonment, cannot continue!")
+        EventManager.SendError(Name + " does not have the required state for "+ self.GetPossessivePronoun() +" imprisonment, cannot continue!", "["+ Name +"] Prisoner::Imprison")
         return
     endif
 
     if (self.IsImprisoned)
-        Error(self.GetName() + " is already imprisoned in "+ Prison.Name + "!")
-        DebugError("["+ Name +"] Prisoner::Imprison", self.GetName() + " is already imprisoned in "+ Prison.Name + "!")
+        EventManager.SendError(self.GetName() + " is already imprisoned in "+ Prison.Name + "!", "["+ Name +"] Prisoner::Imprison")
         return
     endif
 
@@ -742,12 +745,28 @@ function NPC_SetPersistentOutfit(string asOutfit)
 endFunction
 
 function Clothe()
+    Outfit[] prisonerDefaultOutfits = new Outfit[4]
+    prisonerDefaultOutfits[0] = RPB_GetOutfit("Default")
+    prisonerDefaultOutfits[1] = RPB_GetOutfit("Default 2")
+    prisonerDefaultOutfits[2] = RPB_GetOutfit("Default no Shoes")
+    prisonerDefaultOutfits[3] = RPB_GetOutfit("Default 2 no Shoes")
 
+    Outfit randomPrisonerOutfit = prisonerDefaultOutfits[Utility.RandomInt(0, 3)]
+
+    ; this.SetOutfit(randomPrisonerOutfit)
+
+    if (self.IsPlayer())
+        int i = 0
+        while (i < randomPrisonerOutfit.GetNumParts())
+            self.EquipItem(randomPrisonerOutfit.GetNthPart(i))
+            i += 1
+        endWhile
+    endif
 endFunction
 
 function Strip(bool abRemoveUnderwear = true)
     if (!self.PrisonerBelongingsContainer)
-        DebugError("["+ Name +"] Prisoner::Strip", "The prisoner hasn't had a belongings container assigned to them, cannot strip!")
+        EventManager.SendError("The prisoner hasn't had a belongings container assigned to them, cannot strip!", "["+ Name +"] Prisoner::Strip")
         return
     endif
 
@@ -767,8 +786,6 @@ function Strip(bool abRemoveUnderwear = true)
     ;     ; endif
     ;     i += 1
     ; endWhile
-
-    RPB_Outfit prisonerOutfit = (self as ActiveMagicEffect) as RPB_Outfit ; Should be in Clothe()
 
     self.UnequipAll()
     self.RemoveAllItems(PrisonerBelongingsContainer, true, true) ; Remove and put all the items in the prisoner's posession in the assigned prisoner container
@@ -809,29 +826,7 @@ function Strip(bool abRemoveUnderwear = true)
     )
     ; Debug("["+ Name +"] Prisoner::Strip", "Stripped "+ Name + " naked.", self.IsStrippedNaked)
     ; Debug("["+ Name +"] Prisoner::Strip", "Stripped "+ Name + " to underwear.", self.IsStrippedToUnderwear)
-
-
-    RegisterForSingleUpdate(1.0)
 endFunction
-
-event OnUpdate()
-    ; int itemCount = PrisonerBelongingsContainer.GetNumItems()
-    ; Form[] items = PrisonerBelongingsContainer.GetContainerForms()
-
-    ; int i = 0
-    ; while (i < items.Length)
-    ;     Form item = items[i]
-    ;     int thisItemCount = PrisonerBelongingsContainer.GetItemCount(item)
-
-    ;     ObjectReference droppedItem = PrisonerBelongingsContainer.DropObject(item, thisItemCount)
-    ;     if (droppedItem.IsOffLimits())
-    ;         Debug("["+ Name +"] Prisoner::OnUpdate", droppedItem + "("+ droppedItem.GetName() +") is stolen!")
-    ;         ObjectReference evidenceChest = Prison.GetRandomPrisonerContainer("Evidence") as ObjectReference
-    ;         evidenceChest.AddItem(droppedItem)
-    ;     endif
-    ;     i += 1
-    ; endWhile
-endEvent
 
 function RemoveUnderwear()
     Armor underwearTop      = self.GetUnderwear("Top")
@@ -1243,7 +1238,7 @@ endState
 
 state Awaiting
     event OnUpdateGameTime()
-        DebugError("[state: Awaiting] ["+ Name +"] Prisoner::OnUpdateGameTime", "Updating in the Awaiting state, should not happen!")
+        EventManager.SendError("Updating in the Awaiting state, should not happen!", "{Awaiting} ["+ Name +"] Prisoner::OnUpdateGameTime")
     endEvent
 endState
 
@@ -1691,20 +1686,17 @@ endFunction
 
 function MoveToCell(bool abBeginImprisonment = true)
     if (self.IsImprisoned)
-        Error(self.GetName() + " is already imprisoned in "+ Prison.Name + "!")
-        DebugError("["+ Name +"] Prisoner::MoveToCell", self.GetName() + " is already imprisoned in "+ Prison.Name + "!")
+        EventManager.SendError(self.GetName() + " is already imprisoned in "+ Prison.Name + "!", "["+ Name +"] Prisoner::MoveToCell")
         return
     endif
 
     if (self.ShouldBeInCell && self.IsInCell)
-        Error(self.GetName() + " is already in "+ self.GetPossessivePronoun() +" cell: " + JailCell + "!")
-        DebugError("["+ Name +"] Prisoner::MoveToCell", self.GetName() + " is already in "+ self.GetPossessivePronoun() +" cell: " + JailCell + "!")
+        EventManager.SendError(self.GetName() + " is already in "+ self.GetPossessivePronoun() +" cell: " + JailCell + "!", "["+ Name +"] Prisoner::MoveToCell")
         return
     endif
 
     if (!self.JailCell)
-        Error("The prisoner " + Name + " has not been assigned a jail cell!")
-        DebugError("["+ Name +"] Prisoner::MoveToCell", "The prisoner " + Name + " has not been assigned a jail cell!")
+        EventManager.SendError("The prisoner " + Name + " has not been assigned a jail cell!", "["+ Name +"] Prisoner::MoveToCell")
         Prison.OnPrisonerImprisonmentFail(self, "Assign Cell")
         return
     endif
@@ -2084,7 +2076,7 @@ endFunction
     Destroys the prisoner's arrest state, as they are now a prisoner and the arrest state is not required anymore.
 /;
 function DestroyArrestState()
-    if (!API.Arrest.IsActorArrested(this))
+    if (!RPB_Utility.IsActorArrested(this))
         return
     endif
 
@@ -2176,6 +2168,9 @@ endFunction
 /;
 function RegisterLastUpdate()
     LastUpdate = Utility.GetCurrentGameTime()
+
+    int objectHandle = RPB_StorageVars.GetObjectHandleOnForm(this)
+    Debug("Prisoner::RegisterLastUpdate", "object: " + GetContainerList(objectHandle))
 endFunction
 
 function NPC_RestoreImprisonment()
@@ -2355,11 +2350,10 @@ RPB_Prison function GetPrison()
     endif
 
     ; Used to obtain a reference to the Prison for the first time, not required after caching.
-    string prisonUUID = RPB_StorageVars.GetStringOnForm("Prison UUID", this, "Jail")
+    string prisonUUID = self.GetString("Prison UUID")
 
     if (!prisonUUID)
-        Fatal("There was an error retrieving the Prison belonging to Prisoner: " + self.Name)
-        DebugError("["+ Name +"] Prisoner::GetPrison", "There was an error retrieving the Prison belonging to Prisoner: " + self.Name)
+        EventManager.SendError("There was an error retrieving the Prison belonging to Prisoner: " + self.Name, "["+ Name +"] Prisoner::GetPrison")
         __prisonFailedInitialization = true
         return none
     endif

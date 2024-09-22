@@ -43,6 +43,9 @@ function RegisterEvents()
     RegisterForModEvent("RPB_SetArrestScene", "OnArrestSceneChanged")   ; Happens when there's a request to change the Arrest scene
     RegisterForModEvent("RPB_SetArrestGoal", "OnArrestGoalChanged")     ; Happens when there's a request to change the Arrest goal
 
+    ; Surrender Event Handlers
+    RegisterForModEvent("RPB_Surrender", "OnSurrenderPreparing")
+
     ; Jail Event Handlers
     RegisterForModEvent("RPB_JailBegin", "OnJailBegin")
     RegisterForModEvent("RPB_JailEnd", "OnJailEnd")
@@ -66,6 +69,60 @@ function RegisterEvents()
 endFunction
 
 ; ==========================================================
+;                       Logging Events
+; ==========================================================
+
+event OnTrace(string msg, string caller)
+    Trace(caller, msg)
+endEvent
+
+event OnInfo(string msg, string caller)
+    Debug(caller, msg)
+    Info(msg)
+endEvent
+
+event OnWarn(string msg, string caller)
+    DebugWarn(caller, msg)
+    Warn(msg)
+endEvent
+
+event OnError(string msg, string caller)
+    DebugError(caller, msg)
+    Error(msg)
+endEvent
+
+function SendError(string msg, string caller = "")
+    self.OnError(msg, caller)
+endFunction
+
+function SendWarning(string msg, string caller = "")
+    self.OnWarn(msg, caller)
+endFunction
+
+function SendInfo(string msg, string caller = "")
+    self.OnInfo(msg, caller)
+endFunction
+
+function TraceParams(string params, string paramNames = "", string caller = "")
+    string[] splitParams    = StringUtil.Split(params, ",")
+    string[] splitNames     = StringUtil.Split(paramNames, ", ")
+
+    string traceMsg = "[\n"
+    int i = 0
+    while (i < splitParams.Length)
+        string paramName = string_if (splitNames[i], splitNames[i], i)
+        traceMsg = "\t" + paramName + ": " + splitParams[i] + "\n"
+        ; if (i < splitParams.Length - 1)
+        ;     traceMsg += "\n"
+        ; endif
+        i += 1
+    endWhile
+    traceMsg += "\n]"
+    
+    self.OnTrace(traceMsg, caller)
+endFunction
+
+; ==========================================================
 ;                        Arrest Events
 ; ==========================================================
 
@@ -74,25 +131,39 @@ event OnArrestBegin(string eventName, string arrestType, float arresteeIdFlt, Fo
     Faction crimeFaction = form_if ((sender as Faction), (sender as Faction), captor.GetCrimeFaction()) as Faction
 
     if (captor == none && crimeFaction == none)
-        Error("Either there's no Captor, or no Crime Faction! (["+ "Captor: "+ captor + ", Faction: " + crimeFaction +"])")
-        DebugError("EventManager::OnArrestBegin", "Either there's no Captor, or no Crime Faction! (["+ "Captor: "+ captor + ", Faction: " + crimeFaction +"])")
+        self.SendError("Either there's no Captor, or no Crime Faction! (["+ "Captor: "+ captor + ", Faction: " + crimeFaction +"])", "EventManager::OnArrestBegin")
         return
     endif
 
     int actorPlayerId = 0x14
-    Actor arrestee = Game.GetFormEx(int_if (!arresteeIdFlt, actorPlayerId, arresteeIdFlt as int)) as Actor
+    bool isPlayer = (arresteeIdFlt as int) == actorPlayerId
+    Actor arrestee = Game.GetFormEx(int_if (isPlayer, actorPlayerId, arresteeIdFlt as int)) as Actor
 
     if (!arrestee)
-        Error("There's no one to be arrested! (Arrestee is "+ arrestee +")")
-        DebugError("EventManager::OnArrestBegin", "There's no one to be arrested! (Arrestee is "+ arrestee +")")
+        self.SendError("There's no one to be arrested! (Arrestee is "+ arrestee +")", "EventManager::OnArrestBegin")
         return
     endif
 
     if (!Arrest.ValidateArrestType(arrestType))
-        Error("Arrest Type is invalid, got: " + arrestType + ". (valid options: "+ Arrest.GetValidArrestTypes() +") ")
-        DebugError("EventManager::OnArrestBegin", "Arrest Type is invalid, got: " + arrestType + ". (valid options: "+ Arrest.GetValidArrestTypes() +") ")
+        self.SendError("Arrest Type is invalid, got: " + arrestType + ". (valid options: "+ Arrest.GetValidArrestTypes() +") ", "EventManager::OnArrestBegin")
         return
     endif
+
+    int arrestStatus = Arrest.GetActorArrestStatus(arrestee)
+
+    if (arrestStatus == Arrest.ALREADY_ARRESTED)
+        Config.NotifyArrest("You are already under arrest.", isPlayer) ; Might be removed
+        self.SendError(arrestee.GetBaseObject().GetName() + " has already been arrested, cannot arrest for "+ crimeFaction.GetName() +", aborting!", "EventManager::OnArrestBegin")
+        return
+
+    elseif (arrestStatus == Arrest.ALREADY_IMPRISONED)
+        Config.NotifyArrest("You are already in prison.", isPlayer) ; Might be removed
+        self.SendError(arrestee.GetBaseObject().GetName() + " has already been arrested, and is currently in prison. Cannot arrest for "+ crimeFaction.GetName() +", aborting!", "EventManager::OnArrestBegin")
+        return
+    endif
+
+    ; Handle Before Arrest event
+    Arrest.OnArrestPreparing(arrestee, captor, crimeFaction, arrestType)
 
     RPB_Arrestee arresteeRef = Arrest.AwaitArresteeReference(arrestee)  ; Mark this Actor as one that is to be arrested (Cast the spell in order to have Arrestee related functions on them through RPB_Arrestee)
 
@@ -113,16 +184,14 @@ event OnArrestResist(string eventName, string unusedStr, float arrestResisterIdF
     Faction crimeFaction = form_if ((sender as Faction), (sender as Faction), guard.GetCrimeFaction()) as Faction
 
     if (guard == none && crimeFaction == none)
-        Error("Either there's no Guard, or no Crime Faction! (["+ "Lead Captor: "+ guard + ", Faction: " + crimeFaction +"])")
-        Debug("EventManager::OnArrestResist", "Either there's no Guard, or no Crime Faction! (["+ "Lead Captor: "+ guard + ", Faction: " + crimeFaction +"])")
+        self.SendError("Either there's no Guard, or no Crime Faction! (["+ "Lead Captor: "+ guard + ", Faction: " + crimeFaction +"])", "EventManager::OnArrestResist")
         return
     endif
 
     ; Not the player
     Actor arrestResister = Game.GetFormEx(arrestResisterIdFlt as int) as Actor
     if (arrestResister.GetFormID() != 0x14)
-        Error("Someone other than the player ("+ arrestResister +") has resisted arrest (how?), returning...")
-        Debug("EventManager::OnArrestResist", "Someone other than the player ("+ arrestResister +") has resisted arrest (how?), returning...")
+        self.SendError("Someone other than the player ("+ arrestResister +") has resisted arrest (how?), returning...", "EventManager::OnArrestResist")
         return
     endif
 
@@ -134,8 +203,7 @@ event OnArrestDefeat(string eventName, string unusedStr, float unusedFlt, Form s
     Faction crimeFaction = attacker.GetCrimeFaction()
 
     if (!attacker)
-        Error("sender is not an Actor, failed check! [sender: "+ sender +"]")
-        Debug("EventManager::OnArrestDefeat", "sender is not an Actor, failed check! [sender: "+ sender +"]")
+        self.SendError("sender is not an Actor, failed check! [sender: "+ sender +"]", "EventManager::OnArrestDefeat")
         return
     endif
 
@@ -162,14 +230,12 @@ event OnArrestEludeStart(string eventName, string eludeType, float unusedFlt, Fo
     Actor eludedGuard = (sender as Actor)
 
     if (!eludeType)
-        Error("There is no Elude Type, failed check!")
-        Debug("EventManager::OnArrestEludeStart", "There is no Elude Type, failed check!")
+        self.SendError("There is no Elude Type, failed check!", "EventManager::OnArrestEludeStart")
         return
     endif
 
     if (!eludedGuard)
-        Error("sender is not an Actor, failed check! [sender: "+ sender +"]")
-        Debug("EventManager::OnArrestEludeStart", "sender is not an Actor, failed check! [sender: "+ sender +"]")
+        self.SendError("sender is not an Actor, failed check! [sender: "+ sender +"]", "EventManager::OnArrestEludeStart")
         return
     endif
 
@@ -187,14 +253,12 @@ event OnCombatYield(string eventName, string unusedStr, float unusedFlt, Form se
     Actor guard = (sender as Actor)
 
     if (!guard)
-        Error("sender is not an Actor, failed check! [sender: "+ sender +"]")
-        Debug("EventManager::OnCombatYield", "sender is not an Actor, failed check! [sender: "+ sender +"]")
+        self.SendError("sender is not an Actor, failed check! [sender: "+ sender +"]", "EventManager::OnCombatYield")
         return
     endif
 
     if (!guard.IsGuard())
-        Info("Actor is not a guard, the event will not proceed!")
-        Debug("EventManager::OnCombatYield", "Actor is not a guard, the event will not proceed!")
+        self.SendError("Actor is not a guard, the event will not proceed!", "EventManager::OnCombatYield")
         return
     endif
 
@@ -202,14 +266,12 @@ event OnCombatYield(string eventName, string unusedStr, float unusedFlt, Form se
 
     ; Fallback to Player if nearby, since GetDialogueTarget() fails if there are many guards talking at once, yieldedArrestee will be none
     if (!yieldedArrestee && guard.GetDistance(Config.Player) <= 1000)
-        yieldedArrestee = Config.Player
-        Debug("EventManager::OnCombatYield", "Could not get the dialogue target of " + guard + ", falling back to Player since they are nearby.")
+        self.SendError("Could not get the dialogue target of " + guard + ", falling back to Player since they are nearby.", "EventManager::OnCombatYield")
     endif
 
     ; Failed to get dialogue target even with fallback, player must not be near
     if (!yieldedArrestee)
-        Error("Could not get the dialogue target of " + guard + ", returning...")
-        Debug("EventManager::OnCombatYield", "Could not get the dialogue target of " + guard + ", returning...")
+        self.SendError("Could not get the dialogue target of " + guard + ", returning...", "EventManager::OnCombatYield")
         Trace("EventManager::OnCombatYield", "Stack Trace: [\n" + \
             "\teventName: " + eventName + "\n" + \
             "\tsender: " + sender + "\n" + \
@@ -226,26 +288,22 @@ event OnArrestSceneChanged(string eventName, string sceneName, float unusedFlt, 
     Actor arrestee = (sender as Actor)
 
     if (sceneName == "")
-        Error("There was no Scene passed in to the request.")
-        Debug("EventManager::OnArrestSceneChanged", "There was no Scene passed in to the request.")
+        self.SendError("There was no Scene passed in to the request.", "EventManager::OnArrestSceneChanged")
         return
     endif
 
     if (!arrestee)
-        Error("sender is not an Actor, failed check! [sender: "+ sender +"]")
-        Debug("EventManager::OnArrestSceneChanged", "sender is not an Actor, failed check! [sender: "+ sender +"]")
+        self.SendError("sender is not an Actor, failed check! [sender: "+ sender +"]", "EventManager::OnArrestSceneChanged")
         return
     endif
 
     if (!SceneManager.SceneExists(sceneName))
-        Error("The Scene " + sceneName + " does not exist, returning...")
-        Debug("EventManager::OnArrestSceneChanged", "The Scene " + sceneName + " does not exist, returning...")
+        self.SendError("The Scene " + sceneName + " does not exist, returning...", "EventManager::OnArrestSceneChanged")
         return
     endif
 
     if (!SceneManager.IsSceneOfType(sceneName, SceneManager.CATEGORY_ARREST_START))
-        Error("The Scene " + sceneName + " is not a valid Scene for the type "+ SceneManager.CATEGORY_ARREST_START +", returning...")
-        Debug("EventManager::OnArrestSceneChanged", "The Scene " + sceneName + " is not a valid Scene for the type "+ SceneManager.CATEGORY_ARREST_START +", returning...")
+        self.SendError("The Scene " + sceneName + " is not a valid Scene for the type "+ SceneManager.CATEGORY_ARREST_START +", returning...", "EventManager::OnArrestSceneChanged")
         return
     endif
 
@@ -256,27 +314,24 @@ event OnArrestGoalChanged(string eventName, string newArrestGoal, float unusedFl
     Actor arrestee = (sender as Actor)
     
     if (newArrestGoal == "")
-        Error("There was no Arrest Goal passed in to the request.")
-        Debug("EventManager::OnArrestGoalChanged", "There was no Arrest Goal passed in to the request.")
+        self.SendError("There was no Arrest Goal passed in to the request.", "EventManager::OnArrestGoalChanged")
         return
     endif
 
     string currentArrestGoal = Arrest.GetArrestGoal(arrestee)
 
     if (newArrestGoal == currentArrestGoal)
-        Debug("EventManager::OnArrestGoalChanged", "The requested arrest goal is the same as the current one set, returning...")
+        self.SendError("The requested arrest goal is the same as the current one set, returning...", "EventManager::OnArrestGoalChanged")
         return
     endif
 
     if (!arrestee)
-        Error("sender is not an Actor, failed check! [sender: "+ sender +"]")
-        Debug("EventManager::OnArrestGoalChanged", "sender is not an Actor, failed check! [sender: "+ sender +"]")
+        self.SendError("sender is not an Actor, failed check! [sender: "+ sender +"]", "EventManager::OnArrestGoalChanged")
         return
     endif
 
     if (!Arrest.IsValidArrestGoal(newArrestGoal))
-        Error("The Arrest Goal Type " + newArrestGoal + " is not a valid goal, returning...")
-        Debug("EventManager::OnArrestGoalChanged", "The Arrest Goal Type " + newArrestGoal + " is not a valid goal, returning...")
+        self.SendError("The Arrest Goal Type " + newArrestGoal + " is not a valid goal, returning...", "EventManager::OnArrestGoalChanged")
         return
     endif
 
@@ -287,14 +342,12 @@ event OnPayBounty(string eventName, string categoryPayBounty, float arresteeForm
     Actor guard = (sender as Actor)
 
     if (!guard)
-        Error("sender is not an Actor, failed check! [sender: "+ sender +"]")
-        Debug("EventManager::OnPayBounty", "sender is not an Actor, failed check! [sender: "+ sender +"]")
+        self.SendError("sender is not an Actor, failed check! [sender: "+ sender +"]", "EventManager::OnPayBounty")
         return
     endif
 
     if (!guard.IsGuard())
-        Info("Actor is not a Guard, the event will not proceed!")
-        Debug("EventManager::OnPayBounty", "Actor is not a Guard, the event will not proceed!")
+        self.SendError("Actor is not a Guard, the event will not proceed!", "EventManager::OnPayBounty")
         return
     endif
 
@@ -303,13 +356,12 @@ event OnPayBounty(string eventName, string categoryPayBounty, float arresteeForm
     ; Fallback to Player if nearby, since GetDialogueTarget() fails if there are many guards talking at once, arrestee will be none
     if (!arrestee && guard.GetDistance(Config.Player) <= 1000)
         arrestee = Config.Player
-        Debug("EventManager::OnPayBounty", "Could not get the dialogue target of " + guard + ", falling back to Player since they are nearby.")
+        self.SendError("Could not get the dialogue target of " + guard + ", falling back to Player since they are nearby.", "EventManager::OnPayBounty")
     endif
 
     ; Failed to get dialogue target even with fallback, player must not be near
     if (!arrestee)
-        Error("Could not get the dialogue target of " + guard + ", returning...")
-        Debug("EventManager::OnPayBounty", "Could not get the dialogue target of " + guard + ", returning...")
+        self.SendError("Could not get the dialogue target of " + guard + ", returning...", "EventManager::OnPayBounty")
         Trace("EventManager::OnPayBounty", "Stack Trace: [\n" + \
             "\teventName: " + eventName + "\n" + \
             "\tsender: " + sender + "\n" + \
@@ -322,52 +374,47 @@ event OnPayBounty(string eventName, string categoryPayBounty, float arresteeForm
     Faction crimeFaction = guard.GetCrimeFaction()
 
     Arrest.OnArrestPayBounty(guard, arrestee, crimeFaction, categoryPayBounty)
-
 endEvent
 
 ; ==========================================================
-;                         Jail Events
+;                        Surrender Events
 ; ==========================================================
 
-; event OnJailBegin(string eventName, string strArg, float numArg, Form sender)
-;     Actor prisoner = (sender as Actor)
+function SendSurrenderSceneEvent(string asScene, string asSceneEvent, Actor akSurrenderer, Actor akSurrendererCaptor, string asSceneSecondaryEvent = "null")
+    self.OnSurrenderScene(asScene, asSceneEvent, akSurrenderer, akSurrendererCaptor, asSceneSecondaryEvent)
+endFunction
 
-;     if (!prisoner)
-;         Error("sender is not an Actor, failed check! [sender: "+ sender +"]")
-;         Debug("EventManager::OnJailBegin", "sender is not an Actor, failed check! [sender: "+ sender +"]")
-;         return
-;     endif
+event OnSurrenderPreparing(Form akSurrenderer)
+    Actor surrenderer = akSurrenderer as Actor
+    if (!surrenderer)
+        return
+    endif
 
-;     RPB_Prisoner prisonerRef = Jail.GetPrisonerReference(prisoner)
+    ; The captors that will surround the surrenderer
+    Actor[] surrendererCaptors = PO3_SKSEFunctions.GetCombatTargets(surrenderer)
 
-;     if (!prisonerRef)
-;         Error("Actor " + prisoner + " is not registered as a prisoner, there is no reference. Returning...")
-;         Debug("EventManager::OnJailBegin", "Actor " + prisoner + " is not registered as a prisoner, there is no reference. Returning...")
-;         return
-;     endif
+    if (!Arrest.CanActorSurrender(surrenderer, surrendererCaptors))
+        return
+    endif
 
-;     Jail.OnJailBegin(prisonerRef)
-; endEvent
+    ; Should only be for player (to avoid forced dialogue during surrender)
+    RPB_Arrest.DisableForcedArrestDialogue()
 
-; event OnPrisonActionRequest(string eventName, string actionName, float numArg, Form sender)
-;     Actor prisoner = (sender as Actor)
+    Arrest.OnSurrenderBegin(surrenderer, surrendererCaptors)
+endEvent
 
-;     if (!prisoner)
-;         Error("sender is not an Actor, failed check! [sender: "+ sender +"]")
-;         Debug("EventManager::OnPrisonActionRequest", "sender is not an Actor, failed check! [sender: "+ sender +"]")
-;         return
-;     endif
+event OnSurrenderScene(string asScene, string asSceneEvent, Actor akSurrenderer, Actor akCaptor, string asSceneSecondaryEvent)
+    string sceneType = SceneManager.GetSceneType(asScene)
 
-;     RPB_Prisoner prisonerRef = Jail.GetPrisonerReference(prisoner)
-
-;     if (!prisonerRef)
-;         Error("Actor " + prisoner + " is not registered as a prisoner, there is no reference. Returning...")
-;         Debug("EventManager::OnPrisonActionRequest", "Actor " + prisoner + " is not registered as a prisoner, there is no reference. Returning...")
-;         return
-;     endif
-
-;     Jail.OnPrisonActionRequest(actionName, prisonerRef)
-; endEvent
+    if (sceneType == SceneManager.CATEGORY_SURRENDER)
+        if (asSceneEvent == "SurrenderEnd")
+            Arrest.OnSurrenderEnd(akSurrenderer, akCaptor)
+            
+            ; Re-enable forced arrest dialogue for next times (Actor has surrendered)
+            RPB_Arrest.EnableForcedArrestDialogue()
+        endif
+    endif
+endEvent
 
 
 ; ==========================================================
@@ -376,8 +423,7 @@ endEvent
 
 event OnSceneStart(string eventName, string sceneName, float unusedFlt, Form sender)
     if (sceneName == "" || !(sender as Scene))
-        Error("There's either no Scene Name, or the event sender is not a Scene, returning!")
-        Debug("EventManager::OnSceneStart", "There's either no Scene Name, or the event sender is not a Scene, returning!")
+        self.SendError("There's either no Scene Name, or the event sender is not a Scene, returning!", "EventManager::OnSceneStart")
         return
     endif
 
@@ -386,14 +432,12 @@ endEvent
 
 event OnScenePlayingStart(string eventName, string sceneName, float scenePhaseFlt, Form sender)
     if (sceneName == "" || !(sender as Scene))
-        Error("[" + sceneName + ": PHASE_START] There's either no Scene Name, or the event sender is not a Scene, returning!")
-        Debug("EventManager::OnScenePlayingStart", "[" + sceneName + ": PHASE_START] There's either no Scene Name, or the event sender is not a Scene, returning!")
+        self.SendError("[" + sceneName + ": PHASE_START] There's either no Scene Name, or the event sender is not a Scene, returning!", "EventManager::OnScenePlayingStart")
         return
     endif
 
     if ((scenePhaseFlt as int) < 1 || !scenePhaseFlt)
-        Error("[" + sceneName + ": PHASE_START] There's no passed in Scene Phase as a parameter, returning!");
-        Debug("EventManager::OnScenePlayingStart", "[" + sceneName + ": PHASE_START] There's no passed in Scene Phase as a parameter, returning!");
+        self.SendError("[" + sceneName + ": PHASE_START] There's no passed in Scene Phase as a parameter, returning!", "EventManager::OnScenePlayingStart")
         return
     endif
     
@@ -402,14 +446,12 @@ endEvent
 
 event OnScenePlayingEnd(string eventName, string sceneName, float scenePhaseFlt, Form sender)
     if (sceneName == "" || !(sender as Scene))
-        Error("[" + sceneName + ": PHASE_END] There's either no Scene Name, or the event sender is not a Scene, returning!")
-        Debug("EventManager::OnScenePlayingEnd", "[" + sceneName + ": PHASE_END] There's either no Scene Name, or the event sender is not a Scene, returning!")
+        self.SendError("[" + sceneName + ": PHASE_END] There's either no Scene Name, or the event sender is not a Scene, returning!", "EventManager::OnScenePlayingEnd")
         return
     endif
 
     if ((scenePhaseFlt as int) < 1 || !scenePhaseFlt)
-        Error("[" + sceneName + ": PHASE_END] There's no passed in Scene Phase as a parameter, returning!");
-        Debug("EventManager::OnScenePlayingEnd", "[" + sceneName + ": PHASE_END] There's no passed in Scene Phase as a parameter, returning!");
+        self.SendError("[" + sceneName + ": PHASE_END] There's no passed in Scene Phase as a parameter, returning!", "EventManager::OnScenePlayingEnd")
         return
     endif
     
@@ -418,8 +460,7 @@ endEvent
 
 event OnSceneEnd(string eventName, string sceneName, float unusedFlt, Form sender)
     if (sceneName == "" || !(sender as Scene))
-        Error("There's either no Scene Name, or the event sender is not a Scene, returning!")
-        Debug("EventManager::OnSceneEnd", "There's either no Scene Name, or the event sender is not a Scene, returning!")
+        self.SendError("There's either no Scene Name, or the event sender is not a Scene, returning!", "EventManager::OnSceneEnd")
         return
     endif
 
@@ -435,14 +476,12 @@ event OnDialogueTopicStart(string eventName, string topicInfoDialogue, float top
     Actor akSpeaker = (sender as Actor)
 
     if (!topicInfoType)
-        Error("Topic Info Type is none or invalid, returning...")
-        Debug("EventManager::OnDialogueTopicStart", "Topic Info Type is none or invalid, returning...")
+        self.SendError("Topic Info Type is none or invalid, returning...", "EventManager::OnDialogueTopicStart")
         return
     endif
 
     if (!akSpeaker)
-        Error("sender is not an Actor, failed check! [sender: "+ sender +"]")
-        Debug("EventManager::OnDialogueTopicStart", "sender is not an Actor, failed check! [sender: "+ sender +"]")
+        self.SendError("sender is not an Actor, failed check! [sender: "+ sender +"]", "EventManager::OnDialogueTopicStart")
         return
     endif
 
@@ -451,13 +490,12 @@ event OnDialogueTopicStart(string eventName, string topicInfoDialogue, float top
     ; Fallback to Player if nearby, since GetDialogueTarget() fails if there are many guards talking at once, akSpokenTo will be none
     if (!akSpokenTo && akSpeaker.GetDistance(Config.Player) <= 1000)
         akSpokenTo = Config.Player
-        Debug("EventManager::OnDialogueTopicStart", "Could not get the dialogue target of " + akSpeaker + ", falling back to Player since they are nearby.")
+        self.SendError("Could not get the dialogue target of " + akSpeaker + ", falling back to Player since they are nearby.", "EventManager::OnDialogueTopicStart")
     endif
 
     ; Failed to get dialogue target even with fallback, player must not be near
     if (!akSpokenTo)
-        Error("Could not get the dialogue target of " + akSpeaker + ", returning...")
-        Debug("EventManager::OnDialogueTopicStart", "Could not get the dialogue target of " + akSpeaker + ", returning...")
+        self.SendError("Could not get the dialogue target of " + akSpeaker + ", returning...", "EventManager::OnDialogueTopicStart")
         Trace("EventManager::OnDialogueTopicStart", "Stack Trace: [\n" + \
             "\teventName: " + eventName + "\n" + \
             "\ttopicInfoDialogue: " + topicInfoDialogue + "\n" + \
@@ -480,14 +518,12 @@ event OnDialogueTopicEnd(string eventName, string topicInfoDialogue, float topic
     Actor akSpeaker     = (sender as Actor)
 
     if (!topicInfoType)
-        Error("Topic Info Type is none or invalid, returning...")
-        Debug("EventManager::OnDialogueTopicEnd", "Topic Info Type is none or invalid, returning...")
+        self.SendError("Topic Info Type is none or invalid, returning...", "EventManager::OnDialogueTopicEnd")
         return
     endif
 
     if (!akSpeaker)
-        Error("sender is not an Actor, failed check! [sender: "+ sender +"]")
-        Debug("EventManager::OnDialogueTopicEnd", "sender is not an Actor, failed check! [sender: "+ sender +"]")
+        self.SendError("sender is not an Actor, failed check! [sender: "+ sender +"]", "EventManager::OnDialogueTopicEnd")
         return
     endif
 
@@ -496,13 +532,13 @@ event OnDialogueTopicEnd(string eventName, string topicInfoDialogue, float topic
     ; Fallback to Player if nearby, since GetDialogueTarget() fails if there are many guards talking at once, akSpokenTo will be none
     if (!akSpokenTo && akSpeaker.GetDistance(Config.Player) <= 1000)
         akSpokenTo = Config.Player
-        Debug("EventManager::OnDialogueTopicStart", "Could not get the dialogue target of " + akSpeaker + ", falling back to Player since they are nearby.")
+        self.SendError("Could not get the dialogue target of " + akSpeaker + ", falling back to Player since they are nearby.", "EventManager::OnDialogueTopicStart")
     endif
 
     ; Failed to get dialogue target even with fallback, player must not be near
     if (!akSpokenTo)
-        Error("Could not get the dialogue target of " + akSpeaker + ", returning...")
-        Debug("EventManager::OnDialogueTopicEnd", "Could not get the dialogue target of " + akSpeaker + ", returning...")
+        self.SendError("Could not get the dialogue target of " + akSpeaker + ", returning...", "EventManager::OnDialogueTopicEnd")
+        TraceParams(eventName + "," + topicInfoDialogue +","+topicInfoType, "eventName, topicInfoDialogue, topicInfoType")
         Trace("EventManager::OnDialogueTopicEnd", "Stack Trace: [\n" + \
             "\teventName: " + eventName + "\n" + \
             "\ttopicInfoDialogue: " + topicInfoDialogue + "\n" + \

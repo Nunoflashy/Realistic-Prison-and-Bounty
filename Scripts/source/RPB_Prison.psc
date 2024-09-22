@@ -742,8 +742,6 @@ endFunction
 ; ==========================================================
 
 bool function ShouldStripPrisoner(RPB_Prisoner apPrisoner)
-    DebugWithArgs("["+ Name +"] Prison::ShouldStripPrisoner", apPrisoner.Name, "Allow Stripping: " + apPrisoner.GetBool("Allow Stripping"))
-
     if (!apPrisoner.GetBool("Allow Stripping"))
         return false
     endif
@@ -806,6 +804,39 @@ bool function ShouldClothePrisoner(RPB_Prisoner apPrisoner)
     endif
 
     return true
+endFunction
+
+; Used to strip the prisoner of some items when they are already naked or in underwear, should not be noticeable
+bool function ShouldSilentlyStripPrisoner(RPB_Prisoner apPrisoner)
+    if (!apPrisoner.GetBool("Allow Stripping"))
+        return false
+    endif
+
+    if (!apPrisoner.IsNaked() && !apPrisoner.IsInUnderwear())
+        return false
+    endif
+
+    string strippingHandler = apPrisoner.GetString("Handle Stripping On")
+
+    if (strippingHandler == "Minimum Sentence")
+        int sentenceToStrip = apPrisoner.GetInt("Sentence to Strip")
+        if (apPrisoner.Sentence >= sentenceToStrip)
+            return true
+        endif
+
+    elseif (strippingHandler == "Minimum Bounty")
+        int minBountyToStrip        = apPrisoner.GetInt("Bounty to Strip")
+        int minViolentBountyToStrip = apPrisoner.GetInt("Violent Bounty to Strip")
+
+        if (apPrisoner.Bounty >= minBountyToStrip || apPrisoner.BountyViolent >= minViolentBountyToStrip)
+            return true
+        endif
+
+    elseif (strippingHandler == "Unconditionally")
+        return true
+    endif
+
+    return false
 endFunction
 
 bool function IsPrisoner(RPB_Prisoner apPrisoner)
@@ -1363,6 +1394,10 @@ event OnPrisonerTeleportedToCell(RPB_Prisoner apPrisoner, bool abImprisonPrisone
         apPrisoner.Strip()
     endif
 
+    if (apPrisoner.ShouldBeClothed)
+        apPrisoner.Clothe()
+    endif
+
     if (abImprisonPrisoner)
         if (self.IsPrisonerQueuedForImprisonment(apPrisoner))
             self.RegisterForQueuedImprisonment()
@@ -1579,10 +1614,10 @@ endEvent
 
     returns: Return value is not used, instead, the sole purpose is to block the execution and prevent further calls that depend on these Events.
 /;
-int function FirePrisonerEventOnScene(string asScene, string asSceneEvent, RPB_Prisoner apPrisoner, string asSceneSubEvent = "null")
+int function HandlePrisonerEventOnScene(string asScene, string asSceneEvent, RPB_Prisoner apPrisoner, string asSceneSubEvent = "null")
     if (asScene == SceneManager.SCENE_STRIPPING_02 || asScene == SceneManager.SCENE_STRIPPING_01 || asScene == SceneManager.SCENE_FORCED_STRIPPING_02)
         Actor stripperGuard = apPrisoner.GetForm("StripperGuard", "Temporary::Imprisoned") as Actor
-        Debug("Prison::FirePrisonerEventOnScene", "Stripper Guard: " + stripperGuard)
+        Debug("Prison::HandlePrisonerEventOnScene", "Stripper Guard: " + stripperGuard)
 
         if (asSceneEvent == "StripBegin")
             if (asSceneSubEvent == "Undress to Underwear")
@@ -1631,7 +1666,7 @@ int function FirePrisonerEventOnScene(string asScene, string asSceneEvent, RPB_P
 
         endif
 
-        Debug("Prison::FirePrisonerEventOnScene", "Prison -> " + asScene + ": " + asSceneEvent)
+        Debug("Prison::HandlePrisonerEventOnScene", "Prison -> " + asScene + ": " + asSceneEvent)
 
     elseif (asScene == SceneManager.SCENE_ESCORT_TO_CELL_01 || asScene == SceneManager.SCENE_ESCORT_TO_CELL_02)
         Actor prisonerEscort        = apPrisoner.GetForm("EscortGuard", apPrisoner.TEMPORARY_DESTROY_ON_IMPRISONED) as Actor

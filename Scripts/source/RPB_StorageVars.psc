@@ -364,166 +364,6 @@ bool function HasVarsOnForm(Form akForm, string asCategory = "null") global
     return JDB.hasPath(path)
 endFunction
 
-; ==========================================================
-;                      ActiveMagicEffect
-; ==========================================================
-
-string function GetVarPathOnActiveMagicEffect(string asKey, ActiveMagicEffect apEffect, string asCategory = "null") global
-    string path = none
-    
-    if (asCategory != "null" && asCategory != "")
-        path = GetRootPath() + "." + apEffect + "." + asCategory + "." + asKey
-    else
-        path = GetRootPath() + "." + apEffect + "." + asKey
-    endif
-
-    return path
-endFunction
-
-string function GetCategoryPathOnActiveMagicEffect(ActiveMagicEffect apEffect, string asCategory) global
-    return GetRootPath() + "." + apEffect as string + "." + asCategory
-endFunction
-
-string function GetActiveMagicEffectPath(ActiveMagicEffect apEffect) global
-    return GetRootPath() + "." + apEffect as string
-endFunction
-
-;                          Getters
-
-bool function GetBoolOnActiveMagicEffect(string asKey, ActiveMagicEffect apEffect, string asCategory = "null") global
-    string path = GetVarPathOnActiveMagicEffect(asKey, apEffect, asCategory)
-    return JDB.solveInt(path) as bool
-endFunction
-
-int function GetIntOnActiveMagicEffect(string asKey, ActiveMagicEffect apEffect, string asCategory = "null") global
-    string path = GetVarPathOnActiveMagicEffect(asKey, apEffect, asCategory)
-    return JDB.solveInt(path)
-endFunction
-
-float function GetFloatOnActiveMagicEffect(string asKey, ActiveMagicEffect apEffect, string asCategory = "null") global
-    string path = GetVarPathOnActiveMagicEffect(asKey, apEffect, asCategory)
-    return JDB.solveFlt(path)
-endFunction
-
-string function GetStringOnActiveMagicEffect(string asKey, ActiveMagicEffect apEffect, string asCategory = "null") global
-    string path = GetVarPathOnActiveMagicEffect(asKey, apEffect, asCategory)
-    return JDB.solveStr(path)
-endFunction
-
-Form function GetFormOnActiveMagicEffect(string asKey, ActiveMagicEffect apEffect, string asCategory = "null") global
-    string path = GetVarPathOnActiveMagicEffect(asKey, apEffect, asCategory)
-    return JDB.solveForm(path)
-endFunction
-
-int[] function GetIntsOnActiveMagicEffect(string asKey, ActiveMagicEffect apEffect, string asCategory = "null") global
-    string path = GetVarPathOnActiveMagicEffect(asKey, apEffect, asCategory)
-    return JArray.asIntArray(JDB.solveObj(path))
-endFunction
-
-float[] function GetFloatsOnActiveMagicEffect(string asKey, ActiveMagicEffect apEffect, string asCategory = "null") global
-    string path = GetVarPathOnActiveMagicEffect(asKey, apEffect, asCategory)
-    return JArray.asFloatArray(JDB.solveObj(path))
-endFunction
-
-string[] function GetStringsOnActiveMagicEffect(string asKey, ActiveMagicEffect apEffect, string asCategory = "null") global
-    string path = GetVarPathOnActiveMagicEffect(asKey, apEffect, asCategory)
-    return JArray.asStringArray(JDB.solveObj(path))
-endFunction
-
-Form[] function GetFormsOnActiveMagicEffect(string asKey, ActiveMagicEffect apEffect, string asCategory = "null") global
-    string path = GetVarPathOnActiveMagicEffect(asKey, apEffect, asCategory)
-    return JArray.asFormArray(JDB.solveObj(path))
-endFunction
-
-;                          Setters
-
-function SetBoolOnActiveMagicEffect(string asKey, ActiveMagicEffect apEffect, bool abValue, string asCategory = "null") global
-    string path = GetVarPathOnActiveMagicEffect(asKey, apEffect, asCategory)
-    JDB.solveIntSetter(path, abValue as int, true)
-endFunction
-
-function SetIntOnActiveMagicEffect(string asKey, ActiveMagicEffect apEffect, int aiValue, string asCategory = "null") global
-    string path = GetVarPathOnActiveMagicEffect(asKey, apEffect, asCategory)
-    JDB.solveIntSetter(path, aiValue, true)
-endFunction
-
-function SetFloatOnActiveMagicEffect(string asKey, ActiveMagicEffect apEffect, float afValue, string asCategory = "null") global
-    string path = GetVarPathOnActiveMagicEffect(asKey, apEffect, asCategory)
-    JDB.solveFltSetter(path, afValue, true)
-endFunction
-
-function SetStringOnActiveMagicEffect(string asKey, ActiveMagicEffect apEffect, string asValue, string asCategory = "null") global
-    string path = GetVarPathOnActiveMagicEffect(asKey, apEffect, asCategory)
-    JDB.solveStrSetter(path, asValue, true)
-endFunction
-
-function SetFormOnActiveMagicEffect(string asKey, ActiveMagicEffect apEffect, Form akValue, string asCategory = "null") global
-    string path = GetVarPathOnActiveMagicEffect(asKey, apEffect, asCategory)
-    JDB.solveFormSetter(path, akValue, true)
-endFunction
-
-function SetIntsOnActiveMagicEffect(string asKey, ActiveMagicEffect apEffect, int[] aiValues, string asCategory = "null") global
-    string path = GetVarPathOnActiveMagicEffect(asKey, apEffect, asCategory)
-    int formToObject = JArray.objectWithInts(aiValues)
-    JDB.solveObjSetter(path, formToObject, true)
-endFunction
-
-function SetFloatsOnActiveMagicEffect(string asKey, ActiveMagicEffect apEffect, float[] afValues, string asCategory = "null") global
-    string path = GetVarPathOnActiveMagicEffect(asKey, apEffect, asCategory)
-    int formToObject = JArray.objectWithFloats(afValues)
-    JDB.solveObjSetter(path, formToObject, true)
-endFunction
-
-function SetStringsOnActiveMagicEffect(string asKey, ActiveMagicEffect apEffect, string[] asValues, string asCategory = "null") global
-    string path = GetVarPathOnActiveMagicEffect(asKey, apEffect, asCategory)
-    int formToObject = JArray.objectWithStrings(asValues)
-    JDB.solveObjSetter(path, formToObject, true)
-endFunction
-
-function SetFormsOnActiveMagicEffect(string asKey, ActiveMagicEffect apEffect, Form[] akValues, string asCategory = "null") global
-    string path = GetVarPathOnActiveMagicEffect(asKey, apEffect, asCategory)
-    int formToObject = JArray.objectWithForms(akValues)
-    JDB.solveObjSetter(path, formToObject, true)
-endFunction
-
-;                          Modifiers
-function ModIntOnActiveMagicEffect(string asKey, ActiveMagicEffect apEffect, int aiValue, string asCategory = "null") global
-    int currentValue = GetIntOnActiveMagicEffect(asKey, apEffect, asCategory)
-    SetIntOnActiveMagicEffect(asKey, apEffect, currentValue + aiValue, asCategory)
-endFunction
-
-function ModFloatOnActiveMagicEffect(string asKey, ActiveMagicEffect apEffect, float afValue, string asCategory = "null") global
-    float currentValue = GetFloatOnActiveMagicEffect(asKey, apEffect, asCategory)
-    SetFloatOnActiveMagicEffect(asKey, apEffect, currentValue + afValue, asCategory)
-endFunction
-
-;                     Delete Functions
-
-function DeleteVariableOnActiveMagicEffect(string asKey, ActiveMagicEffect apEffect, string asCategory = "null") global
-    int obj = GetObjectHandleOnKey(apEffect, asCategory)
-    JMap.removeKey(obj, asKey)
-endFunction
-
-function DeleteCategoryOnActiveMagicEffect(ActiveMagicEffect apEffect, string asCategory) global
-    int deletedObj = GetObjectHandleOnKey(apEffect)
-    JMap.removeKey(deletedObj, asCategory)
-endFunction
-
-function DeleteAllOnActiveMagicEffect(ActiveMagicEffect apEffect) global
-    int deletedObj = GetObjectHandleOnKey(apEffect)
-    JMap.clear(deletedObj)
-    JMap.removeKey(GetObjectHandle(), apEffect as string)
-endFunction
-
-bool function HasVarOnActiveMagicEffect(string asKey, ActiveMagicEffect apEffect, string asCategory = "null") global
-    string path = GetVarPathOnActiveMagicEffect(asKey, apEffect, asCategory)
-    return JDB.hasPath(path)
-endFunction
-
-bool function HasVarsOnActiveMagicEffect(ActiveMagicEffect apEffect, string asCategory = "null") global
-    string path = GetRootPath() + "." + apEffect as string
-    return JDB.hasPath(path)
-endFunction
 
 ; ==========================================================
 ;                  Any Reference as Source
@@ -534,10 +374,10 @@ endFunction
         Returns a value <T> from the given reference, optionally from a specific category.
         The reference is taken as a string since all objects can be implicitly cast as one.
 
-        Function Signature: <T> function GetTypeOnReference(string Key, string Reference, string? Category)
+        Signature: <T> function GetTypeOnReference(string Key, string Reference, string? Category)
             string  @Key: The key to access the value.
             string  @Reference: The reference on which this value should be set (References can be anything implicitly castable to a string: Form, ReferenceAlias, ActiveMagicEffect, etc...).
-            string  @Category: The category on which this value will be stored (sub-category of Reference).
+            string  @Category: The category on which this value will be under (sub-category of Reference).
 
             returns (<T>): The value from the given key on the reference.
 
@@ -545,16 +385,20 @@ endFunction
         Sets a value <T> on a given reference, optionally setting it on a specific category of that reference.
         The reference is taken as a string since all objects can be implicitly cast as one.
 
-        Function Signature: <T> function SetTypeOnReference(string Key, string Reference, T Value, string? Category)
+        Signature: function SetTypeOnReference(string Key, string Reference, T Value, string? Category)
             string  @Key: The key to access the value.
             string  @Reference: The reference on which this value should be set (References can be anything implicitly castable to a string: Form, ReferenceAlias, ActiveMagicEffect, etc...).
             T       @Value: The value to set for this key on this reference.
-            string  @Category: The category on which this value will be stored (sub-category of Reference).
+            string  @Category: The category on which this value will be under (sub-category of Reference).
+
+    Known Caveats:
+        Forms cannot be passed as a Reference, their [] Signature conflicts with the pathing.
+        A custom identifier must be made to pass a Form as a reference, or a prefix added.
 /;
 
 string function GetVarPathOnReference(string asKey, string apReference, string asCategory = "null") global
     string path = ""
-    
+
     if (asCategory != "null" && asCategory != "")
         path = GetRootPath() + "." + apReference + "." + asCategory + "." + asKey
     else
@@ -569,6 +413,7 @@ endFunction
 
 bool function GetBoolOnReference(string asKey, string apReference, string asCategory = "null") global
     string path = GetVarPathOnReference(asKey, apReference, asCategory)
+    ; Debug("StorageVars::GetBoolOnReference", "Retrieving " + asKey + " on "+ apReference +": " + JDB.solveInt(path))
     return JDB.solveInt(path) as bool
 endFunction
 

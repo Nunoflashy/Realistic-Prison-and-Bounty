@@ -15,6 +15,21 @@ Form function GetFormFromMod(int formId) global
 endFunction
 
 ; ==========================================================
+;                           Globals
+; ==========================================================
+
+GlobalVariable function RPB_ArrestGlobal(string asGlobal) global
+    if (asGlobal == "Surrender")
+        return GetFormFromMod(0x26A2D) as GlobalVariable
+
+    elseif (asGlobal == "No Dialogue")
+        return GetFormFromMod(0x26A2E) as GlobalVariable
+    endif
+
+    return none
+endFunction
+
+; ==========================================================
 ;                       Form References
 ; ==========================================================
 
@@ -302,20 +317,12 @@ ActiveMagicEffect function ame_if (bool condition, ActiveMagicEffect apTrue, Act
     endif
 endFunction
 
-RPB_Actor function rpb_actor_if(bool condition, RPB_Actor apTrue, RPB_Actor apFalse) global
-    if (condition)
-        return apTrue
-    else
-        return apFalse
-    endif
-endFunction
-
 ; ==========================================================
 ;                      String Functions
 ; ==========================================================
 
 string function ReplaceString(string str, string toFind, string replacement) global
-int len = StringUtil.GetLength(str)
+    int len = StringUtil.GetLength(str)
     string result = ""
 
     int i = 0
@@ -634,15 +641,15 @@ endFunction
 ; ==========================================================
 
 bool function IsActorArrested(Actor akActor) global
-    return RPB_StorageVars.GetBoolOnForm("Arrested", akActor)
+    return RPB_StorageVars.GetBoolOnForm("Arrested", akActor, "Arrest")
+endFunction
+
+bool function IsActorImprisoned(Actor akActor) global
+    return RPB_StorageVars.GetBoolOnForm("Imprisoned", akActor, "Jail")
 endFunction
 
 bool function IsPlayerArrested() global
     return RPB_StorageVars.GetBoolOnForm("Arrested", Game.GetForm(0x14))
-endFunction
-
-bool function IsActorImprisoned(Actor akActor) global
-    return RPB_StorageVars.GetBoolOnForm("Imprisoned", akActor)
 endFunction
 
 bool function IsPlayerImprisoned() global
@@ -824,7 +831,7 @@ function EnsureArresteeSpellAndBinding(Actor akArrestee, RPB_Hold apHold) global
         akArrestee.AddSpell(RPB_ArresteeSpell(), false)
 
         ; Bind this Hold to the Arrestee (to retrieve it from RPB_Arrestee)
-        RPB_StorageVars.SetStringOnForm("Hold UUID", akArrestee, apHold.UUID, "Jail")
+        RPB_StorageVars.SetStringOnForm("Hold UUID", akArrestee, apHold.UUID)
     endif
 endFunction
 
@@ -856,6 +863,7 @@ endFunction
 
 function BindAliasTo(ReferenceAlias akAlias, ObjectReference akObjectReference) global
     if (akObjectReference != None)
+        ; DebugWithArgs("Utility::BindAliasTo", "akAlias: " + akAlias + ", akObjectReference: " + akObjectReference, "Bound Alias to "+ akObjectReference)
         akAlias.ForceRefTo(akObjectReference)
     else
         akAlias.Clear()
@@ -869,6 +877,10 @@ endFunction
 ; ==========================================================
 ;           Distance/Position/Translation Functions
 ; ==========================================================
+
+float function GetInfinityDistance() global
+    return 340282346638528859811
+endFunction
 
 float function UnitsToCM(int unit)
     return unit * 1.428
@@ -2061,6 +2073,84 @@ Actor function GetNearestActor(ObjectReference centerRef, float radius) global
             radius *= 2
         endif
         i -= 1
+    endWhile
+
+    return none
+endFunction
+
+Actor function GetNearestActorFromList(Actor akRef, Actor[] akRefs) global
+    float nearestRefDistance = GetInfinityDistance()
+    int nearestRefIndex = -1
+    int i = 0
+    while (i < akRefs.Length)
+        if (akRefs[i] != none)
+            float distanceToRef = akRefs[i].GetDistance(akRef)
+            if (distanceToRef < nearestRefDistance)
+                nearestRefDistance = distanceToRef
+                nearestRefindex = i
+            endif
+        endif
+        i += 1
+    endWhile
+
+    if (nearestRefIndex != -1)
+        return akRefs[nearestRefIndex]
+    endif
+
+    return none
+endFunction
+
+Actor function GetNearbyActorFromRefWithPrototype(ObjectReference akCenterRef, ActorBase akPrototype, float afMaxRadius = 1000.0) global
+    int tries       = 0
+    int maxTries    = 30
+    float radius    = 50
+
+    while (tries < maxTries)
+        Actor scannedActor = Game.FindRandomActorFromRef(akCenterRef, radius)
+        bool conditions = scannedActor.GetActorBase() == akPrototype
+
+        if (conditions)
+            return scannedActor
+        endif
+
+        if (radius < afMaxRadius)
+            radius += 100
+        endif
+
+        tries += 1
+    endWhile
+
+    return none
+endFunction
+
+Actor function GetNearbyGuardForFactionFromRef( \
+    ObjectReference akCenterRef, \ 
+    Faction akCrimeFaction = none, \ 
+    float afMinRadius = 50.0, \ 
+    float afMaxRadius = 1000.0, \ 
+    float afIncreaseRadiusBy = 100.0, \
+    int aiMaxScans = 30 \ 
+) global
+    int scans    = 0
+    float radius = afMinRadius
+
+    while (scans < aiMaxScans)
+        Actor scannedActor = Game.FindRandomActorFromRef(akCenterRef, radius)
+
+        bool conditions = \ 
+            scannedActor.GetFormID() != 0x14 && \
+            !scannedActor.IsChild() && \
+            scannedActor.IsGuard()
+
+        if (conditions)
+            return scannedActor
+        endif
+
+        if (radius < afMaxRadius)
+            radius += afIncreaseRadiusBy
+        endif
+
+        scans += 1
     endWhile
 
     return none

@@ -403,10 +403,11 @@ function Arrest()
 endFunction
 
 function EscortToPrison(bool abEscortDirectlyToCell = false)
+    string sceneSet = string_if (self.GetString("Scene"), self.GetString("Scene"), Arrest.SceneManager.SCENE_ARREST_START_02)
     SceneManager.StartArrestScene( \
         akGuard     = Captor.GetActor(), \
         akArrestee  = this, \
-        asScene     = Arrest.SceneManager.SCENE_ARREST_START_02 \
+        asScene     = sceneSet \
     )
 
     RPB_Prisoner prisoner   = self.MakePrisoner()
