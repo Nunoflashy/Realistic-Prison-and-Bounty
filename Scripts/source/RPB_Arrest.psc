@@ -234,66 +234,6 @@ event OnArresting(Actor akCaptor, Actor akArrestee)
     self.RestrainArrestee(akArrestee)
 endEvent
 
-;/
-    Fires an Arrestee based Event on a Scene condition and occurrence.
-
-    string          @asScene: The name of the Scene.
-    string          @asSceneEvent: The event that takes place within the Scene.
-    RPB_Arrestee    @apArrestee: The arrestee that is taking part in the Scene.
-
-    TODO: For some reason, any Arrestee disappears from the list if the player is not near them, which means
-    that apArrestee will be null and so any properties that depend on it will also be null.
-    This doesn't happen with RPB_Prisoner, so after figuring the problem out, we should be able to do this properly.
-/;
-function HandleArresteeEventOnScene(string asScene, string asSceneEvent, RPB_Arrestee apArrestee, string asSceneSubEvent = "null")
-    string sceneType = SceneManager.GetSceneType(asScene)
-
-    if (sceneType == SceneManager.CATEGORY_ARREST_START)
-        Actor escort = apArrestee.GetForm("Escort", "Temporary::Imprisoned") as Actor
-
-        if (asSceneEvent == "ArrestStart")
-            if (asSceneSubEvent == "Hands Behind Back")
-                apArrestee.OrientRelativeTo(escort)
-                ; apArrestee.PlayAnimation("ZazAPC001")
-                apArrestee.PlayAnimation("IdleHandsBehindBack")
-
-            elseif (asSceneSubEvent == "Handcuff")
-                apArrestee.Restrain()
-                self.OnArresteeRestrained(apArrestee)
-
-            elseif (asSceneSubEvent == "Kneel Down")
-                apArrestee.PlayAnimation("ZazAPC018")
-
-            elseif (asSceneSubEvent == "Lie Down")
-                apArrestee.PlayAnimation("ZazAPC011")
-            endif
-
-            ; apArrestee.OnArrestBegin()
-
-        elseif (asSceneEvent == "ArrestEnd")
-            apArrestee.OnArrestEnd()
-        endif
-
-    elseif (sceneType == SceneManager.CATEGORY_ESCORT_TO_JAIL)
-        ; TODO: Obtain reference to the Prison where the Arrestee is going OR the reference to walk there
-        RPB_Prison prison = apArrestee.GetPotentialPrison()
-
-        Actor prisonerEscort = apArrestee.GetForm("EscortGuard", apArrestee.DestroyPropertyOnState("Imprisoned")) as Actor
-
-        Debug("Arrest::HandleArresteeEventOnScene", "Prison: " + prison + ", Escort: " + prisonerEscort + ", Arrestee: " + apArrestee.GetActor())
-
-        if (asSceneEvent == "EscortBegin")
-            prison.OnEscortPrisonerToJailBegin(apArrestee, prisonerEscort)
-
-        elseif (asSceneEvent == "EscortEnd")
-            prison.OnEscortPrisonerToJailEnd(apArrestee, prisonerEscort)
-
-        endif
-
-        Debug("Arrest::HandleArresteeEventOnScene", "Arrestee -> " + asScene + ": " + asSceneEvent)
-    endif
-endFunction
-
 ; ==========================================================
 ;                        Event Handlers
 ; ==========================================================
