@@ -948,6 +948,14 @@ endFunction
 ;                       Misc Functions
 ; ==========================================================
 
+int[] function Pair(int n1, int n2) global
+    int[] pair = new int[2]
+    pair[0] = n1
+    pair[1] = n2
+
+    return pair
+endFunction
+
 ;/
     INFO: Slow function, execution takes ~25ms, avoid when looping
 
@@ -1201,6 +1209,10 @@ endFunction
 ; ==========================================================
 
 string[] function GetLockLevels() global
+    ;/
+        int lockLevels = Array("<string>", "[Novice, Apprentice, Adept, Expert, Master, Requires Key]")
+        return Array_AsStringArray(lockLevels)
+    /;
    int _lockLevels = JArray.object()
 
     JArray.addStr(_lockLevels, "Novice")
@@ -1212,6 +1224,24 @@ string[] function GetLockLevels() global
 
     return JArray.asStringArray(_lockLevels)
 endFunction
+
+; ==========================================================
+;                System Time Related Functions
+; ==========================================================
+
+; Retrieves the system time in the format Y-m-d H:i:s
+string function GetDateTimeNow() global
+    int[] systemTime = PO3_SKSEFunctions.GetSystemTime()
+    int year    = systemTime[0]
+    int month   = systemTime[1]
+    int day     = systemTime[3]
+    int hour    = systemTime[4]
+    int minute  = systemTime[5]
+    int second  = systemTime[6]
+
+    return year + "-" + month + "-" + day + " " + hour + ":" + minute + ":" + second
+endFunction
+
 
 ; ==========================================================
 ;                 Game-Time Related Functions
@@ -2078,13 +2108,14 @@ Actor function GetNearestActor(ObjectReference centerRef, float radius) global
     return none
 endFunction
 
-Actor function GetNearestActorFromList(Actor akRef, Actor[] akRefs) global
+Actor function GetNearestActorFromList(Actor akRef, Form[] akRefs) global
     float nearestRefDistance = GetInfinityDistance()
     int nearestRefIndex = -1
     int i = 0
     while (i < akRefs.Length)
         if (akRefs[i] != none)
-            float distanceToRef = akRefs[i].GetDistance(akRef)
+            Actor akRefFromList = akRefs[i] as Actor
+            float distanceToRef = akRefFromList.GetDistance(akRef)
             if (distanceToRef < nearestRefDistance)
                 nearestRefDistance = distanceToRef
                 nearestRefindex = i
@@ -2094,7 +2125,7 @@ Actor function GetNearestActorFromList(Actor akRef, Actor[] akRefs) global
     endWhile
 
     if (nearestRefIndex != -1)
-        return akRefs[nearestRefIndex]
+        return akRefs[nearestRefIndex] as Actor
     endif
 
     return none

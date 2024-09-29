@@ -72,8 +72,8 @@ endFunction
 ;                      Event Dispatchers
 ; ==========================================================
 
-function SendSurrenderSceneEvent(string asScene, string asSceneEvent, Actor akSurrenderer, Actor akSurrendererCaptor, string asSceneSecondaryEvent = "null")
-    self.OnSurrenderScene(asScene, asSceneEvent, akSurrenderer, akSurrendererCaptor, asSceneSecondaryEvent)
+function SendSurrenderSceneEvent(string asScene, string asSceneEvent, Actor akSurrenderer, Actor akSurrendererCaptor, string asSceneSecondaryEvent = "null", Form[] akParams = none, Form[] akParams2 = none)
+    self.OnSurrenderScene(asScene, asSceneEvent, akSurrenderer, akSurrendererCaptor, asSceneSecondaryEvent, akParams, akParams2)
 endFunction
 
 function SendArrestSceneEvent(string asScene, string asSceneEvent, Actor akArrestee, Actor akAuthority, string asSceneSecondaryEvent = "null")
@@ -85,6 +85,27 @@ function SendArrestSceneEvent(string asScene, string asSceneEvent, Actor akArres
     endif
 
     self.OnArrestScene(asScene, asSceneEvent, arrestee, akAuthority, asSceneSecondaryEvent)
+endFunction
+
+function SendArrestSceneBulkEvent(string asScene, string asSceneEvent, Form[] akArrestees, Actor akAuthority, string asSceneSecondaryEvent = "null")
+    if (akArrestees == none || akArrestees.Length == 0)
+        self.SendError("No Arrestees provided for bulk scene event!")
+        return
+    endif
+
+    int i = 0
+    while (i < akArrestees.Length)
+        RPB_Arrestee arrestee = Arrest.AwaitArresteeReference(akArrestees[i] as Actor)
+
+        if (arrestee == none)
+            self.SendError("Could not retrieve the Arrestee reference from the actor, cannot proceed with the scene!")
+            return
+        endif
+
+        Debug("EventManager::SendArrestSceneBulkEvent", "Entering OnArrestScene (Arrestee: "+ arrestee +") (Event: "+ asSceneEvent +", "+ asSceneSecondaryEvent +")")
+        self.OnArrestScene(asScene, asSceneEvent, arrestee, akAuthority, asSceneSecondaryEvent)
+        i += 1
+    endWhile
 endFunction
 
 function SendPrisonSceneEvent(string asScene, string asSceneEvent, Actor akPrisoner, Actor akAuthority, string asSceneSecondaryEvent = "null")
@@ -105,13 +126,13 @@ function SendPrisonSceneEvent(string asScene, string asSceneEvent, Actor akPriso
     self.OnPrisonScene(asScene, asSceneEvent, prison, prisoner, akAuthority, asSceneSecondaryEvent)
 endFunction
 
-function SendPrisonSceneBulkEvent(string asScene, string asSceneEvent, Actor[] akPrisoners, Actor akAuthority, string asSceneSecondaryEvent = "null")
+function SendPrisonSceneBulkEvent(string asScene, string asSceneEvent, Form[] akPrisoners, Actor akAuthority, string asSceneSecondaryEvent = "null")
     if (akPrisoners == none || akPrisoners.Length == 0)
         self.SendError("No prisoners provided for bulk scene event!")
         return
     endif
 
-    RPB_Prison prison = API.PrisonManager.FindPrisonByPrisoner(akPrisoners[0])
+    RPB_Prison prison = API.PrisonManager.FindPrisonByPrisoner(akPrisoners[0] as Actor)
 
     if (prison == none)
         self.SendError("Could not retrieve the prison from " + akPrisoners[0] + ", cannot proceed with the scene!")
@@ -120,7 +141,7 @@ function SendPrisonSceneBulkEvent(string asScene, string asSceneEvent, Actor[] a
 
     int i = 0
     while (i < akPrisoners.Length)
-        RPB_Prisoner prisoner = prison.AwaitPrisonerReference(akPrisoners[i]) 
+        RPB_Prisoner prisoner = prison.AwaitPrisonerReference(akPrisoners[i] as Actor) 
 
         if (prisoner == none)
             self.SendError("Could not retrieve the prisoner from the scene event, cannot proceed with the scene!")
@@ -140,31 +161,31 @@ event OnTrace(string msg, string caller)
     Trace(caller, msg)
 endEvent
 
-event OnInfo(string msg, string caller)
-    Debug(caller, msg)
-    Info(msg)
+event OnInfo(string msg, string caller, bool condition)
+    Debug(caller, msg, condition)
+    Info(msg, condition)
 endEvent
 
-event OnWarn(string msg, string caller)
-    DebugWarn(caller, msg)
-    Warn(msg)
+event OnWarn(string msg, string caller, bool condition)
+    DebugWarn(caller, msg, condition)
+    Warn(msg, condition)
 endEvent
 
-event OnError(string msg, string caller)
-    DebugError(caller, msg)
-    Error(msg)
+event OnError(string msg, string caller, bool condition)
+    DebugError(caller, msg, condition)
+    Error(msg, condition)
 endEvent
 
-function SendError(string msg, string caller = "")
-    self.OnError(msg, caller)
+function SendError(string msg, string caller = "", bool condition = true)
+    self.OnError(msg, caller, condition)
 endFunction
 
-function SendWarning(string msg, string caller = "")
-    self.OnWarn(msg, caller)
+function SendWarning(string msg, string caller = "", bool condition = true)
+    self.OnWarn(msg, caller, condition)
 endFunction
 
-function SendInfo(string msg, string caller = "")
-    self.OnInfo(msg, caller)
+function SendInfo(string msg, string caller = "", bool condition = true)
+    self.OnInfo(msg, caller, condition)
 endFunction
 
 function TraceParams(string params, string paramNames = "", string caller = "")
@@ -455,8 +476,11 @@ event OnArrestScene(string asScene, string asSceneEvent, RPB_Arrestee apArrestee
     if (sceneType == SceneManager.CATEGORY_ARREST_START)
         Actor escort = akAuthority
         
-        if (asSceneEvent == "ArrestStart")
+        if (asSceneEvent == SceneManager.EVENT_ARREST_BEGIN)
+            RetainAI(apArrestee.IsPlayer())
+
             if (asSceneSecondaryEvent == "Hands Behind Back")
+                Debug("EventManager::OnArrestScene", "Arrestee: " + apArrestee + ", Secondary Event: " + asSceneSecondaryEvent)
                 apArrestee.OrientRelativeTo(escort)
                 apArrestee.PlayAnimation("IdleHandsBehindBack")
             
@@ -471,7 +495,9 @@ event OnArrestScene(string asScene, string asSceneEvent, RPB_Arrestee apArrestee
                 apArrestee.PlayAnimation("ZazAPC011")
             endif
 
-        elseif (asSceneEvent == "ArrestEnd")
+            apArrestee.OnArrestBegin()
+
+        elseif (asSceneEvent == SceneManager.EVENT_ARREST_END)
             apArrestee.OnArrestEnd()
         endif
 
@@ -480,10 +506,10 @@ event OnArrestScene(string asScene, string asSceneEvent, RPB_Arrestee apArrestee
         Actor escort = akAuthority
         self.SendInfo("Prison: " + prison + ", Escort: " + escort + ", Arrestee: " + apArrestee.GetActor(), "EventManager::OnArrestScene")
 
-        if (asSceneEvent == "EscortBegin")
+        if (asSceneEvent == SceneManager.EVENT_ESCORT_BEGIN)
             prison.OnEscortPrisonerToJailBegin(apArrestee, escort)
 
-        elseif (asSceneEvent == "EscortEnd")
+        elseif (asSceneEvent == SceneManager.EVENT_ESCORT_END)
             prison.OnEscortPrisonerToJailEnd(apArrestee, escort)
         endif
 
@@ -492,7 +518,7 @@ event OnArrestScene(string asScene, string asSceneEvent, RPB_Arrestee apArrestee
     elseif (sceneType == SceneManager.CATEGORY_ELUDING)
         Actor guard = akAuthority
 
-        if (asSceneEvent == "EludeTrigger")
+        if (asSceneEvent == SceneManager.EVENT_ELUDE_BEGIN)
             if (asSceneSecondaryEvent == "Dialogue")
                 Arrest.OnArrestEludeTriggered(guard, asSceneSecondaryEvent)
             endif
@@ -502,14 +528,22 @@ event OnArrestScene(string asScene, string asSceneEvent, RPB_Arrestee apArrestee
         Actor escort    = akAuthority
         Actor escortee  = apArrestee.GetActor()
 
-        if (asSceneEvent == "ArrestPayBounty")
+        if (asSceneEvent == SceneManager.EVENT_ARREST_PAYING_BOUNTY)
+            if (asSceneSecondaryEvent == "Hands Behind Back")
+                RetainAI(apArrestee.IsPlayer())
+                apArrestee.OrientRelativeTo(escort, afRotZ = 180)
+                apArrestee.PlayAnimation("ZazAPC001") ; Make arrestee put their hands behind the back
+            endif
+
+        elseif (asSceneEvent == SceneManager.EVENT_ARREST_PAY_BOUNTY_END)
             if (asSceneSecondaryEvent == "Follow Willingly")
                 Arrest.OnArrestPayBountyEnd(escort, escortee, escort.GetCrimeFaction(), false)
 
             elseif (asSceneSecondaryEvent == "Escort by Force")
                 Arrest.OnArrestPayBountyEnd(escort, escortee, escort.GetCrimeFaction(), true)
-
             endif
+
+            ReleaseAI(apArrestee.IsPlayer()) ; Need to check if this makes sense in this Scene
         endif
     endif
 endEvent
@@ -537,10 +571,11 @@ event OnPrisonScene(string asScene, string asSceneEvent, RPB_Prison apPrison, RP
     if (sceneType == SceneManager.CATEGORY_ESCORT_TO_JAIL)
         Actor escort = akAuthority
 
-        if (asSceneEvent == "EscortBegin")
+        if (asSceneEvent == SceneManager.EVENT_ESCORT_BEGIN)
+            RetainAI(apPrisoner.IsPlayer())
             apPrison.OnEscortPrisonerToJailBegin(apPrisoner, escort)
 
-        elseif (asSceneEvent == "EscortEnd")
+        elseif (asSceneEvent == SceneManager.EVENT_ESCORT_END)
             apPrison.OnEscortPrisonerToJailEnd(apPrisoner, escort)
         endif
 
@@ -548,10 +583,11 @@ event OnPrisonScene(string asScene, string asSceneEvent, RPB_Prison apPrison, RP
         Actor escort = akAuthority
         RPB_JailCell jailCell = apPrisoner.JailCell
 
-        if (asSceneEvent == "EscortBegin")
+        if (asSceneEvent == SceneManager.EVENT_ESCORT_BEGIN)
+            RetainAI(apPrisoner.IsPlayer())
             apPrison.OnEscortPrisonerToCellBegin(apPrisoner, escort)
 
-        elseif (asSceneEvent == "Escorting")
+        elseif (asSceneEvent == SceneManager.EVENT_ESCORTING)
             if (asSceneSecondaryEvent == "Release from Captor") ; May be refactored into OnArrestScene
                 RPB_Captor captor = Arrest.AwaitCaptorReference(escort)
                 captor.StopEscorting()
@@ -565,7 +601,7 @@ event OnPrisonScene(string asScene, string asSceneEvent, RPB_Prison apPrison, RP
 
             apPrison.OnEscortingPrisonerToCell(apPrisoner, escort)
 
-        elseif (asSceneEvent == "EscortEnd")
+        elseif (asSceneEvent == SceneManager.EVENT_ESCORT_END)
             if (asSceneSecondaryEvent == "Lock Cell")
                 jailCell.CellDoor.Close()
                 jailCell.CellDoor.Lock()
@@ -584,23 +620,31 @@ event OnPrisonScene(string asScene, string asSceneEvent, RPB_Prison apPrison, RP
                 return
             endif
 
+            ReleaseAI(apPrisoner.IsPlayer())
             apPrison.OnEscortPrisonerToCellEnd(apPrisoner, jailCell, escort)
         endif
 
     elseif (sceneType == SceneManager.CATEGORY_ESCORT_FROM_CELL)
         Actor escort = akAuthority
 
-        if (asSceneEvent == "EscortBegin")
+        if (asSceneEvent == SceneManager.EVENT_ESCORT_BEGIN)
+            RetainAI(apPrisoner.IsPlayer())
             apPrison.OnEscortPrisonerFromCellBegin(apPrisoner, escort)
 
-        elseif (asSceneEvent == "EscortEnd")
+        elseif (asSceneEvent == SceneManager.EVENT_ESCORTING)
+            RetainAI(apPrisoner.IsPlayer())
+
+        elseif (asSceneEvent == SceneManager.EVENT_ESCORT_END)
+            ReleaseAI(apPrisoner.IsPlayer())
             apPrison.OnEscortPrisonerFromCellEnd(apPrisoner, escort)
         endif
 
     elseif (sceneType == SceneManager.CATEGORY_STRIPPING)
         Actor stripper = akAuthority
 
-        if (asSceneEvent == "StripBegin")
+        if (asSceneEvent == SceneManager.EVENT_STRIP_BEGIN)
+            RetainAI(apPrisoner.IsPlayer())
+
             if (asSceneSecondaryEvent == "Undress to Underwear")
                 apPrisoner.Strip(abRemoveUnderwear = false)
 
@@ -614,10 +658,11 @@ event OnPrisonScene(string asScene, string asSceneEvent, RPB_Prison apPrison, RP
 
             apPrison.OnPrisonerStripBegin(apPrisoner, stripper)
 
-        elseif (asSceneEvent == "StripMiddle")
+        elseif (asSceneEvent == SceneManager.EVENT_STRIPPING)
+            RetainAI(apPrisoner.IsPlayer())
             apPrison.OnPrisonerStripping(apPrisoner, stripper, asSceneSecondaryEvent)
 
-        elseif (asSceneEvent == "StripEnd")
+        elseif (asSceneEvent == SceneManager.EVENT_STRIP_END)
             if (asSceneSecondaryEvent == "Restrain Prisoner")
                 Form cuffs = Game.GetFormEx(0xA081D33)
                 apPrisoner.SheatheWeapon()
@@ -634,20 +679,32 @@ event OnPrisonScene(string asScene, string asSceneEvent, RPB_Prison apPrison, RP
 
             apPrison.OnPrisonerStripEnd(apPrisoner, stripper)
 
-        elseif (asSceneEvent == "ForcedStripBegin")
-        
+        elseif (asSceneEvent == SceneManager.EVENT_FORCED_STRIP_BEGIN)
+            apPrison.OnPrisonerStripBegin(apPrisoner, stripper)
 
-        elseif (asSceneEvent == "ForcedStripMiddle")
+        elseif (asSceneEvent == SceneManager.EVENT_FORCED_STRIPPING)
             apPrison.OnPrisonerStripping(apPrisoner, stripper, asSceneSecondaryEvent)
 
-        elseif (asSceneEvent == "ForcedStripEnd")
+        elseif (asSceneEvent == SceneManager.EVENT_FORCED_STRIP_END)
+            apPrison.OnPrisonerStripEnd(apPrisoner, stripper)
+        endif
+
+    elseif (sceneType == SceneManager.CATEGORY_CLOTHING)
+        if (asSceneEvent == SceneManager.EVENT_CLOTHING_BEGIN)
+
+        elseif (asSceneEvent == SceneManager.EVENT_CLOTHING)
+
+        elseif (asSceneEvent == SceneManager.EVENT_CLOTHING_END)
+            ReleaseAI(apPrisoner.IsPlayer())
 
         endif
+
+    elseif (sceneType == SceneManager.CATEGORY_NO_CLOTHING)
 
     elseif (sceneType == SceneManager.CATEGORY_RESTRAIN)
         Actor guard = akAuthority
 
-        if (asSceneEvent == "RestrainBegin")
+        if (asSceneEvent == SceneManager.EVENT_RESTRAIN_BEGIN)
             if (asSceneSecondaryEvent == "Hands in Front")
                 apPrisoner.PlayAnimation("IdleWarmHands")
 
@@ -656,7 +713,7 @@ event OnPrisonScene(string asScene, string asSceneEvent, RPB_Prison apPrison, RP
                 apPrisoner.PlayAnimation("IdleHandsBehindBack")
             endif
 
-        elseif (asSceneEvent == "RestrainEnd")
+        elseif (asSceneEvent == SceneManager.EVENT_RESTRAIN_END)
             apPrison.RestrainPrisoner(apPrisoner, true)
         endif
     endif
@@ -685,12 +742,20 @@ event OnSurrenderPreparing(Form akSurrenderer)
     Arrest.OnSurrenderBegin(surrenderer, surrendererCaptors)
 endEvent
 
-event OnSurrenderScene(string asScene, string asSceneEvent, Actor akSurrenderer, Actor akCaptor, string asSceneSecondaryEvent)
+event OnSurrenderScene(string asScene, string asSceneEvent, Actor akSurrenderer, Actor akSurrendererCaptor, string asSceneSecondaryEvent, Form[] akParams, Form[] akParams2)
     string sceneType = SceneManager.GetSceneType(asScene)
 
     if (sceneType == SceneManager.CATEGORY_SURRENDER)
-        if (asSceneEvent == "SurrenderEnd")
-            Arrest.OnSurrenderEnd(akSurrenderer, akCaptor)
+        if (asSceneEvent == SceneManager.EVENT_SURRENDER_BEGIN)
+            ; TODO: Refactor this
+            Form[] captors = akParams
+            Actor mainCaptor = RPB_Utility.GetNearestActorFromList(akSurrenderer, captors)
+            BindAliasTo(SceneManager.GetSurrendererCaptor(), mainCaptor)
+
+        elseif (asSceneEvent == SceneManager.EVENT_SURRENDER_END)
+            RetainAI(akSurrenderer.GetFormID() == 0x14)
+
+            Arrest.OnSurrenderEnd(akSurrenderer, akSurrendererCaptor)
             
             ; Re-enable forced arrest dialogue for next times (Actor has surrendered)
             RPB_Arrest.EnableForcedArrestDialogue()
