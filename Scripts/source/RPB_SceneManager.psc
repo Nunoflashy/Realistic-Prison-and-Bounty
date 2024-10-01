@@ -184,37 +184,6 @@ function ResetGlobals()
     Debug("SceneManager::ResetGlobals", "Scene Globals have been reset to their default values.")
 endFunction
 
-;/
-    Handles customization of a Scene, either Enabling/Disabling dialogue or a particular Action.
-    Scenes have conditions that depend on Scene_{Dialogue|Action}_CF* globals.
-
-    These events set them for a Scene that could customize another Scene, for example.
-
-    string  @asSceneName: The name of the scene to be customized.
-/;
-event OnSceneStartHandleGlobals(string asSceneName, Form[] params)
-    ; if (self.IsSceneOfType(asSceneName, CATEGORY_ESCORT_TO_JAIL))
-    ;     self.SetGlobal("RPB_Scene_Action_CF01", 1) ; Enables some actions in escort to cell
-    ; endif
-
-    float sceneRefTypesBench = StartBenchmark()
-    int i = 0
-    string[] sceneRefTypes = self.GetSceneRefTypes(asSceneName)
-    while (i < sceneRefTypes.Length)
-        Form[] paramsOfType = self.GetSceneRefsOfType(asSceneName, sceneRefTypes[i])
-        Debug("SceneManager::OnSceneStartHandleGlobals", "["+ sceneRefTypes[i] +"] "+ asSceneName +" Params: " + paramsOfType)
-        i += 1
-    endWhile
-    EndBenchmark(sceneRefTypesBench, "SceneManager::GetSceneRefTypes")
-
-    ; float sceneRefTypesBench = StartBenchmark()
-    ; Form[] sceneRefs        = self.GetSceneRefs(asSceneName)
-    ; Alias[] sceneAliases    = self.GetSceneAliases(asSceneName)
-    ; Debug("SceneManager::OnSceneStartHandleGlobals", asSceneName +" Params: " + sceneRefs)
-    ; Debug("SceneManager::OnSceneStartHandleGlobals", asSceneName +" Aliases: " + sceneAliases)
-    ; EndBenchmark(sceneRefTypesBench, "SceneManager::GetSceneRefs")
-endEvent
-
 ; ==========================================================
 ;                   Scene Phase Overriding
 ; ==========================================================
@@ -242,11 +211,28 @@ function ResetSceneOverride()
 endFunction
 
 ; ==========================================================
+;                    Scene Block Handling
+; ==========================================================
+
+; Right now only releases the AI for Scenes that retain it, however in some instances we actually want to release it,
+; so this is here as a workaround. Later it should handle more things related to End of scene blocking.
+bool __resumeSceneBlocked
+function ResumeSceneBlocked()
+    __resumeSceneBlocked = true
+endFunction
+
+event OnResumeSceneBlocked()
+    string lastScene = JArray.getStr(__queuedScenes, -1) ; needs to be revised, returning empty, however it works for now
+    Debug("SceneManager::OnResumeSceneBlocked", "ResumeSceneBlocked: " + __resumeSceneBlocked + ", Current Scene: " + currentScene + ", Last Scene: " + lastScene + ", Condition: " + (currentScene == lastScene))
+    if (__resumeSceneBlocked && currentScene == lastScene)
+        ReleaseAI()
+        __resumeSceneBlocked = false
+    endif
+endEvent
+
+; ==========================================================
 ;                           Scenes
 ; ==========================================================
-Scene property UnlockCell auto
-Scene property LockCell auto
-
 
 int property SceneCount
     int function get()
@@ -295,8 +281,6 @@ string function GetSceneType(string asSceneName)
 endFunction
 
 function SetupScenes()
-    float x = StartBenchmark()
-
     self.AddScene(SCENE_ARREST_START_01,                        0xF569, CATEGORY_ARREST_START)      ; Arrest Start 01
     self.AddScene(SCENE_ARREST_START_02,                        0xFAF6, CATEGORY_ARREST_START)      ; Arrest Start 02
     self.AddScene(SCENE_ARREST_START_03,                        0x130DD, CATEGORY_ARREST_START)     ; Arrest Start 03
@@ -331,10 +315,14 @@ function SetupScenes()
         sceneListAsString += "\t["+i+"]: "+ self.GetSceneNameByIndex(i) +"\n"
         i += 1
     endWhile
-    EndBenchmark(x, "SetupScenes")
+
     Debug("SceneManager::SetupScenes", "Loaded "+ SceneCount +" Scenes: [\n" + sceneListAsString + "]")
 endFunction
 
+;/
+    Creates a nested structure that contains a Scene's configuration related to
+    their ReferenceAliases information.
+/;
 function CreateSceneRefTypeConfig(string asScene, string asRefType, int[] akSceneAliasCount)
     bool sceneExists = JMap.hasKey(__sceneConfig, asScene)
 
@@ -439,25 +427,37 @@ int function GetSceneRefsOfTypeObject(string asScene, string asRefType)
 endFunction
 
 Alias[] function GetSceneAliasesOfType(string asScene, string asRefType, bool abOnlyIncludeAliasesInUse = false)
-    int refsOfType = self.GetSceneRefsOfTypeObject(asScene, asRefType)
-
-    int refTypeCount    = JArray.getInt(refsOfType, 0)
-    int refStartIndex   = JArray.getInt(refsOfType, 1)
-
-    Alias[] aliasArr = Utility.CreateAliasArray(refTypeCount)
-
+    int refsOfType  = self.GetSceneRefsOfTypeObject(asScene, asRefType) ; JArray&
+    int arrLen      = JValue.count(refsOfType)
+    
+    Alias[] aliasArr = Utility.CreateAliasArray(arrLen)
+ 
     int i = 0
-    int aliasIndex = refStartIndex
-    while (i < (refTypeCount - refStartIndex))
-        Alias currentAlias = self.GetAliasByName(asRefType + aliasIndex)
-        if (!abOnlyIncludeAliasesInUse || (abOnlyIncludeAliasesInUse && (currentAlias as ReferenceAlias).GetReference() != none))
+    while (i < arrLen)
+        int id = JArray.getInt(refsOfType, i)
+        Alias currentAlias = self.GetAliasByID(id)
+        if (!abOnlyIncludeAliasesInUse || (currentAlias as ReferenceAlias).GetReference() != none)
             aliasArr[i] = currentAlias
         endif
-        aliasIndex += 1
         i += 1
     endWhile
 
     return aliasArr
+endFunction
+
+;/
+    Retrieves the Scene's nth Alias of a specific type.
+
+    string  @asScene: The name of the Scene.
+    string  @asRefType: The type of the scene reference (Escort, Escortee, Guard, Prisoner, etc...)
+
+    returns (ReferenceAlias): The Scene's Alias of a specific reference type.
+/;
+ReferenceAlias function GetSceneNthAliasOfType(string asScene, string asRefType, int aiIndex = 0)
+    int refsOfType  = self.GetSceneRefsOfTypeObject(asScene, asRefType) ; JArray&
+    int id = JArray.getInt(refsOfType, aiIndex)
+
+    return self.GetAliasByID(id) as ReferenceAlias
 endFunction
 
 ;/
@@ -470,12 +470,23 @@ string[] function GetSceneRefTypes(string asScene)
     return JMap.allKeysPArray(specifiedSceneConfig)
 endFunction
 
-Alias[] function GetSceneAliases(string asScene)
+;/
+    Retrieves all of a Scene's aliases.
+
+    string  @asScene: The name of the Scene.
+    bool?   @abOnlyIncludeAliasesInUse: Whether to only include aliases that are currently bound.
+
+    returns (Alias[]): All of a Scene's aliases.
+/;
+Alias[] function GetSceneAliases(string asScene, bool abOnlyIncludeAliasesInUse = false)
+    float s = StartBenchmark()
     int specifiedSceneConfig = self.GetSceneRefTypesConfig(asScene) ; JMap&
     int allRefTypeIds = JMap.allValues(specifiedSceneConfig) ; JArray&
-    int explodedIds = JArray.object()
-    int arrayLength = 0
 
+    Alias[] buffer = Utility.CreateAliasArray(128)
+    int aliasIndex = 0
+
+    ; I hate this nesting, but I can't extract this due to performance...
     int i = 0
     while (i < JValue.count(allRefTypeIds))
         int typeArray = JArray.getObj(allRefTypeIds, i)
@@ -483,36 +494,44 @@ Alias[] function GetSceneAliases(string asScene)
             int k = 0
             while (k < JValue.count(typeArray))
                 int id = JArray.getInt(typeArray, k)
-                JArray.addInt(explodedIds, id)
+                ReferenceAlias refAlias = self.GetAliasByID(id) as ReferenceAlias 
+                if (!abOnlyIncludeAliasesInUse || refAlias.GetReference() != none)
+                    if (aliasIndex < buffer.Length) ; prevent buffer overflow
+                        buffer[aliasIndex] = refAlias
+                        aliasIndex += 1
+                    endif
+                endif
                 k += 1
             endWhile
-            arrayLength += JValue.count(typeArray)
         endif
         i += 1
     endWhile
 
-    if (arrayLength <= 0)
+    if (aliasIndex <= 0)
         EventManager.SendError("Could not retrieve any scene aliases for Scene " + asScene + " (no aliases found!)", "SceneManager::GetSceneAliases")
         return none
     endif
 
-    Alias[] mergedAliases = Utility.CreateAliasArray(arrayLength)
+    Alias[] mergedAliases = Utility.CreateAliasArray(aliasIndex)
+
     i = 0
     while (i < mergedAliases.Length)
-        int id = JArray.getInt(explodedIds, i)
-        mergedAliases[i] = self.GetAliasByID(id)
+        mergedAliases[i] = buffer[i]
         i += 1
     endWhile
 
-    ; DebugWithArgs("SceneManager::GetSceneAliases", asScene, \ 
-    ;     "All Ref Types: " + GetContainerList(allRefTypeIds) + "," + \ 
-    ;     "Merged Types: " + mergedAliases \
-    ; )
-
+    EndBenchmark(s, "SceneManager::GetSceneAliases("+ asScene +")")
     return mergedAliases
 endFunction
 
-Form[] function GetSceneRefs(string asScene)
+;/
+    Retrieves all of a Scene's references that are currently bound to a ReferenceAlias.
+
+    string  @asScene: The name of the Scene.
+
+    returns (Form[]): All of a Scene's references.
+/;
+Form[] function GetSceneReferences(string asScene)
     int specifiedSceneConfig = self.GetSceneRefTypesConfig(asScene) ; JMap&
     ;/
         "Guards": [],
@@ -540,15 +559,20 @@ Form[] function GetSceneRefs(string asScene)
         i += 1
     endWhile
 
-    ; DebugWithArgs("SceneManager::GetSceneRefs", asScene, \ 
-    ;     "All Ref Types: " + GetContainerList(allRefTypeIds) + "," + \ 
-    ;     "Merged Types: " + GetContainerList(mergedTypes) \
-    ; )
-
     return JArray.asFormArray(mergedTypes)
 endFunction
 
-Form[] function GetSceneRefsOfType(string asScene, string asRefType)
+
+
+;/
+    Retrieves the Scene references of a specific type that are currently bound to a ReferenceAlias.
+
+    string  @asScene: The name of the Scene.
+    string  @asRefType: The type of the scene reference (Escort, Escortee, Guard, Prisoner, etc...)
+
+    returns (Form[]): The Scene's references of a specific reference type.
+/;
+Form[] function GetSceneReferencesOfType(string asScene, string asRefType)
     int refsOfType  = self.GetSceneRefsOfTypeObject(asScene, asRefType) ; JArray&
     int arrLen      = JValue.count(refsOfType)
     
@@ -564,56 +588,35 @@ Form[] function GetSceneRefsOfType(string asScene, string asRefType)
         endif
         i += 1
     endWhile
-
-    ; int refTypeCount    = JArray.getInt(refsOfType, 0)
-    ; int refStartIndex   = JArray.getInt(refsOfType, 1)
-
-    ; int boundReferences = JArray.object()
-
-    ; int i = 0
-    ; int aliasIndex = refStartIndex
-    ; while (i < (refTypeCount - refStartIndex))
-    ;     ReferenceAlias currentAlias = self.GetRefAlias(asRefType, aliasIndex) as ReferenceAlias
-    ;     ObjectReference aliasRef = currentAlias.GetReference()
-    ;     ; DebugWithArgs( \ 
-    ;     ;     "SceneManager::GetSceneRefsOfType", "asScene: " + asScene + ", asRefType: " + asRefType, \ 
-    ;     ;     "Alias: " + currentAlias + "\n" + \
-    ;     ;     "Reference: " + aliasRef + "\n" \
-    ;     ; )
-    ;     if (aliasRef != none)
-    ;         JArray.addForm(boundReferences, aliasRef)
-    ;     endif
-    ;     aliasIndex += 1
-    ;     i += 1
-    ; endWhile
-
-    ; DebugWithArgs("SceneManager::GetSceneRefsOfType", "asScene: " + asScene + ", asRefType: " + asRefType, \ 
-    ;     GetContainerList(refsOfType) + "\n," + \ 
-    ;     GetContainerList(boundReferences) + "\n," + \ 
-    ;     "refTypeCount: " + refTypeCount + "\n" + \
-    ;     "refStartIndex: " + refStartIndex \
-    ; )
     
     return JArray.asFormArray(boundReferences)
 endFunction
 
-Form[] function BuildParams( \
-    ObjectReference akRef1, \
-    ObjectReference akRef2 = none, \
-    ObjectReference akRef3 = none, \
-    ObjectReference akRef4 = none, \
-    ObjectReference akRef5 = none, \
-    ObjectReference akRef6 = none, \
-    ObjectReference akRef7 = none, \
-    ObjectReference akRef8 = none, \
-    ObjectReference akRef9 = none, \
-    ObjectReference akRef10 = none \
-)
+;/
+    Retrieves the Scene's nth reference of a specific type that is currently bound to a ReferenceAlias.
 
+    string  @asScene: The name of the Scene.
+    string  @asRefType: The type of the scene reference (Escort, Escortee, Guard, Prisoner, etc...)
 
+    returns (ObjectReference): The Scene's reference of a specific reference type.
+/;
+ObjectReference function GetSceneNthReferenceOfType(string asScene, string asRefType, int aiIndex = 0)
+    int refsOfType  = self.GetSceneRefsOfTypeObject(asScene, asRefType) ; JArray&
 
+    int id = JArray.getInt(refsOfType, aiIndex)
+    ReferenceAlias r = self.GetAliasByID(id) as ReferenceAlias
+    ObjectReference ref = r.GetReference()
+    if (ref != none)
+        return ref
+    endif
+
+    return none
 endFunction
 
+;/
+    Handles the Scenes' configuration related to the ReferenceAlias they have,
+    where each one starts (index) and how many there are for every Scene.
+/;
 function CreateSceneConfig()
     ; Arrest Start
     self.CreateSceneRefTypeConfig(SCENE_ARREST_START_01, "Escort",      Pair(1, 0))
@@ -648,6 +651,8 @@ function CreateSceneConfig()
     ; Escort to Jail
     self.CreateSceneRefTypeConfig(SCENE_ESCORT_TO_JAIL_01, "Escort",    Pair(3, 0))
     self.CreateSceneRefTypeConfig(SCENE_ESCORT_TO_JAIL_01, "Escortee",  Pair(10, 0))
+    self.CreateSceneRefTypeConfig(SCENE_ESCORT_TO_JAIL_01, "Player_EscortLocation",  Pair(1, 0))
+    self.CreateSceneRefTypeConfig(SCENE_ESCORT_TO_JAIL_01, "Guard_EscortLocation",  Pair(1, 0))
     self.CreateSceneRefTypeConfig(SCENE_ESCORT_TO_JAIL_02, "Escort",    Pair(3, 0))
     self.CreateSceneRefTypeConfig(SCENE_ESCORT_TO_JAIL_02, "Escortee",  Pair(1, 0))
 
@@ -694,6 +699,13 @@ function CreateSceneConfig()
     self.CreateSceneRefTypeConfig(SCENE_SURRENDER_01, "SurrendererCaptor",  Pair(6, 0))
 endFunction
 
+;/
+    Retrieves a Scene by its configured name.
+
+    string  @asSceneName: The name of the Scene
+
+    returns (Scene): The actual Scene object for this scene.
+/;
 Scene function GetScene(string asSceneName)
     if (!self.SceneExists(asSceneName))
         Error("SceneManager::GetScene", "Scene " + asSceneName + " does not exist!")
@@ -702,7 +714,6 @@ Scene function GetScene(string asSceneName)
 
     return GetFormFromMod(self.GetSceneFormID(asSceneName)) as Scene
 endFunction
-
 
 ; ==========================================================
 ;                      Scene Event Types
@@ -797,17 +808,6 @@ string property SCENE_ARREST_PAY_BOUNTY_FOLLOW_WILLINGLY    = "RPB_ArrestPayBoun
 string property SCENE_ARREST_PAY_BOUNTY_FOLLOW_BY_FORCE     = "RPB_ArrestPayBountyFollowByForce" autoreadonly
 
 ; ==========================================================
-;                     Management Events
-; ==========================================================
-
-event OnAllScenesFinished()
-    Debug("SceneManager::OnAllScenesFinished", "Resetting current scene!")
-    currentScene = ""
-
-    self.ResetGlobals()
-endEvent
-
-; ==========================================================
 ;                     Scene Control Queue
 ; ==========================================================
 
@@ -830,6 +830,7 @@ function PushScene(string asSceneName)
         JValue.retain(__queuedScenes, "RPB_SceneManager")
     endif
 
+    ; Stack_PushString(__queuedScenes, asScenName)
     JArray.addStr(__queuedScenes, asSceneName)
 endFunction
 
@@ -844,6 +845,7 @@ string function PopScene()
         return ""
     endif
 
+    ; return Stack_PopString(__queuedScenes)
     string sceneName = JArray.getStr(__queuedScenes, 0)
     JArray.eraseIndex(__queuedScenes, 0)
     return sceneName
@@ -903,70 +905,6 @@ ReferenceAlias function GetRefAlias(string aliasGroup, int index = 0)
     return self.GetAliasByName(refAliasGroup) as ReferenceAlias
 endFunction
 
-ReferenceAlias function GetEscort(int index = 0)
-    return self.GetAliasByName(string_if (index == 0, "Escort", "Escort" + index)) as ReferenceAlias
-endFunction
-
-ReferenceAlias function GetEscortee(int index = 0)
-    return self.GetAliasByName(string_if (index == 0, "Escortee", "Escortee" + index)) as ReferenceAlias
-endFunction
-
-ReferenceAlias function GetSurrenderer(int index = 0)
-    return self.GetAliasByName("Surrenderer_" + index) as ReferenceAlias
-endFunction
-
-ReferenceAlias function GetSurrendererCaptor(int index = 0)
-    return self.GetAliasByName("SurrendererCaptor_" + index) as ReferenceAlias
-endFunction
-
-ReferenceAlias function GetEluder(int index = 0)
-    return self.GetAliasByName(string_if (index == 0, "Eluder", "Eluder" + index)) as ReferenceAlias
-endFunction
-
-ReferenceAlias function GetDetainee(int index = 0)
-    return self.GetAliasByName(string_if (index == 0, "Detainee", "Detainee" + index)) as ReferenceAlias
-endFunction
-
-ReferenceAlias function GetArrestee(int index = 0)
-    return self.GetAliasByName(string_if (index == 0, "Arrestee", "Arrestee" + index)) as ReferenceAlias
-endFunction
-
-ReferenceAlias function GetGuard(int index = 0)
-    return self.GetAliasByName(string_if (index == 0, "Guard", "Guard" + index)) as ReferenceAlias
-endFunction
-
-ReferenceAlias function GetCaptor(int index = 0)
-    return self.GetAliasByName(string_if (index == 0, "Captor", "Captor" + index)) as ReferenceAlias
-endFunction
-
-ReferenceAlias function GetPrisoner(int index = 0)
-    return self.GetAliasByName(string_if (index == 0, "Prisoner", "Prisoner" + index)) as ReferenceAlias
-endFunction
-
-ReferenceAlias function GetCell(int index = 0)
-    return self.GetAliasByName(string_if (index == 0, "Cell", "Cell" + index)) as ReferenceAlias
-endFunction
-
-ReferenceAlias function GetCellDoor(int index = 0)
-    return self.GetAliasByName(string_if (index == 0, "CellDoor", "CellDoor" + index)) as ReferenceAlias
-endFunction
-
-ReferenceAlias function GetGuardLocation(int index = 0)
-    return self.GetAliasByName(string_if (index == 0, "Guard_EscortLocation", "Guard_EscortLocation" + index)) as ReferenceAlias
-endFunction
-
-ReferenceAlias function GetPrisonerLocation(int index = 0)
-    return self.GetAliasByName(string_if (index == 0, "Player_EscortLocation", "Player_EscortLocation" + index)) as ReferenceAlias
-endFunction
-
-ReferenceAlias function GetEscorteeLocation(int index = 0)
-    return self.GetAliasByName(string_if (index == 0, "Player_EscortLocation", "Player_EscortLocation" + index)) as ReferenceAlias
-endFunction
-
-ReferenceAlias function GetGuardWaitingSpot(int index = 0)
-    return self.GetAliasByName(string_if (index == 0, "GuardWaitingSpot", "GuardWaitingSpot" + index)) as ReferenceAlias
-endFunction
-
 string function GetAliasName(string aliasName, int aliasIndex, bool checkForExistence = false)
     string finalName
     if (aliasIndex == 0)
@@ -983,7 +921,6 @@ string function GetAliasName(string aliasName, int aliasIndex, bool checkForExis
     return finalName
 endFunction
 
-
 function ReleaseAlias(string aliasName, int aliasIndex = 0)
     string finalName = self.GetAliasName(aliasName, aliasIndex , true)
     ReferenceAlias refAlias = self.GetAliasByName(finalName) as ReferenceAlias
@@ -993,6 +930,9 @@ function ReleaseAlias(string aliasName, int aliasIndex = 0)
     endif
 endFunction
 
+;/
+    Unbinds all aliases of a particular Scene.
+/;
 function UnbindAliases(string asScene)
     Alias[] sceneAliases = self.GetSceneAliases(asScene)
 
@@ -1009,23 +949,102 @@ function UnbindAliases(string asScene)
 endFunction
 
 int __queuedAliases
-function BindAlias(ReferenceAlias apRefAlias, ObjectReference akRef)
-    ; Queue the alias
+
+;/                                                                                       
+    Queues an Alias for binding, optionally directly binding it if @abBindAlias is true.
+
+    ReferenceAlias  @apRefAlias: The Alias to use as binder.
+    ObjectReference @akRef: The reference to bind to the Alias.
+    bool?           @abBindAlias: Whether to directly bind the reference to the Alias.
+/;
+function QueueAlias(ReferenceAlias apRefAlias, ObjectReference akRef, bool abBindAlias = true)
+    if (!akRef)
+        EventManager.SendError("The reference received is none! (cannot queue Alias)", "SceneManager::QueueAlias")
+        return
+    endif
+
     if (!__queuedAliases)
         __queuedAliases = JIntMap.object()
         JValue.retain(__queuedAliases)
     endif
 
-    if (akRef)
-        RPB_Utility.BindAliasTo(apRefAlias, akRef) ; in case there arent any scenes, bind directly
-        int id = apRefAlias.GetID()
-        JIntMap.setForm(__queuedAliases, id, akRef)
-        Debug("SceneManager::BindAlias", "Bound " + apRefAlias.GetName() + " (id: "+ apRefAlias.GetID() +") with reference: " + akRef)
+    int id = apRefAlias.GetID()
+    JIntMap.setForm(__queuedAliases, id, akRef)
+    Debug("SceneManager::QueueAlias", "Bound " + apRefAlias.GetName() + " (id: "+ apRefAlias.GetID() +") with reference: " + akRef)
+
+    if (abBindAlias)
+        RPB_Utility.BindAliasTo(apRefAlias, akRef)
     endif
 
-    EventManager.SendWarning("Alias " + apRefAlias.GetName() + " (id: "+ apRefAlias.GetID() +") has not been assigned to any reference!", "SceneManager::BindAlias", akRef == none)
+    EventManager.SendWarning("Alias " + apRefAlias.GetName() + " (id: "+ apRefAlias.GetID() +") has not been assigned to any reference!", "SceneManager::QueueAlias", akRef == none)
 endFunction
 
+;/
+    Binds the received References to a specific type of Alias for the Scene.
+
+    string  @asScene: The scene of which to bind the references to.
+    string  @asAliasRefType: The group name of the Aliases (Escort, Escortee, Prisoner...)
+    Form[]  @akRefs: The references to bind to their respective alias group.
+/;
+function BindSceneAliasGroup(string asScene, string asAliasRefType, Form[] akRefs)
+    Alias[] aliasesInGroup = self.GetSceneAliasesOfType(asScene, asAliasRefType)
+
+    if (!aliasesInGroup)
+        EventManager.SendError("Could not retrieve the Scene's Aliases of type " + asAliasRefType + ", cannot bind!", "SceneManager::BindSceneAliasGroup")
+        return
+    endif
+
+    int refCount    = akRefs.Length 
+    int aliasCount  = aliasesInGroup.Length
+    int iterations  = min(refCount, aliasCount) as int
+
+    int i = 0
+    while (i < iterations)
+        if (akRefs[i])
+            self.QueueAlias(aliasesInGroup[i] as ReferenceAlias, akRefs[i] as ObjectReference)
+        endif
+        i += 1
+    endWhile
+
+    EventManager.SendWarning("Received references are more than the available Aliases in the Scene! (Scene: "+ asScene +") (Received: "+ refCount +", Available Aliases: "+ aliasCount +")", "SceneManager::BindSceneAliasGroup", refCount > aliasCount)
+    EventManager.SendInfo("Received less references than the available Aliases in the Scene. (Scene: "+ asScene +") (Received: "+ refCount +", Available Aliases: "+ aliasCount +")", "SceneManager::BindSceneAliasGroup", aliasCount > refCount)
+endFunction
+
+;/
+    Binds the received Reference to a specific type of Alias for the Scene.
+
+    string           @asScene: The scene of which to bind the references to.
+    string           @asAliasRefType: The group name of the Aliases (Escort, Escortee, Prisoner...)
+    ObjectReference  @akRef: The reference to bind to its respective alias group.
+/;
+function BindSceneAlias(string asScene, string asAliasRefType, ObjectReference akRef)
+    Alias[] aliasesInGroup = self.GetSceneAliasesOfType(asScene, asAliasRefType)
+
+    if (!aliasesInGroup)
+        EventManager.SendError("Could not retrieve the Scene's Aliases of type " + asAliasRefType + ", cannot bind!", "SceneManager::BindSceneAlias")
+        return
+    endif
+
+    int aliasCount  = aliasesInGroup.Length
+    int iterations  = 1
+
+    int i = 0
+    while (i < iterations)
+        if (akRef)
+            self.QueueAlias(aliasesInGroup[i] as ReferenceAlias, akRef)
+        endif
+        i += 1
+    endWhile
+endFunction
+
+;/
+    Restores all of the currently queued Aliases.
+    This means that every Alias (along with its Reference), will be re-bound.
+
+    Possible ISSUE: Might clear the Aliases of the Scene after the queued scene (3rd Scene in the queue, 
+        since the 2nd scene will have the Aliases queued from the first call, but then cleared for the 3rd (which were already queued)), needs to be tested
+    Confirmed ISSUE: It is indeed the case, the 3rd scene doesn't get the Aliases (if they were the same as the 2nd scene), and therefore fails to run.
+/;
 function RestoreAliases()
     int aliasIds    = JIntMap.allKeys(__queuedAliases)
     int aliasRefs   = JIntMap.allValues(__queuedAliases)
@@ -1046,117 +1065,106 @@ function RestoreAliases()
     JIntMap.clear(__queuedAliases)
 endFunction
 
-; Right now only releases the AI for Scenes that retain it, however in some instances we actually want to release it,
-; so this is here as a workaround. Later it should handle more things related to End of scene blocking.
-bool __resumeSceneBlocked
-function ResumeSceneBlocked()
-    __resumeSceneBlocked = true
-endFunction
-
-event OnResumeSceneBlocked()
-    string lastScene = JArray.getStr(__queuedScenes, -1) ; needs to be revised, returning empty, however it works for now
-    Debug("SceneManager::OnResumeSceneBlocked", "ResumeSceneBlocked: " + __resumeSceneBlocked + ", Current Scene: " + currentScene + ", Last Scene: " + lastScene + ", Condition: " + (currentScene == lastScene))
-    if (__resumeSceneBlocked && currentScene == lastScene)
-        ReleaseAI()
-        __resumeSceneBlocked = false
-    endif
-endEvent
+; ==========================================================
+;                    Scene Event Handlers
+; ==========================================================
 
 ;/
-    Returns all of the scene passed parameters as a Form[].
+    Handles customization of a Scene, either Enabling/Disabling Dialogue or a particular Action.
+    Scenes that have conditions that depend on Scene_{Dialogue|Action}_CF* Globals.
+
+    These global events set them for a scene that could customize another scene, for example.
+
+    If a control flow global variable must be set on a particular Scene,
+    the @asScene parameter can be used to specify the exact scene, instead of relying on just the type.
+
+    string  @asSceneType: The type this Scene falls under.
+    string  @asScene: The name of the Scene.
 /;
-Form[] function GetSceneParameters(string asScene)
-    return self.GetSceneRefs(asScene)
-endFunction
-
-string function GetSceneParametersDebugInfo(Scene sender, string sceneName, Form[] params)
-    string debugInfo = ""
-    bool emptyParams = true
-
-    int i = 0
-    while (i < params.Length)
-        ObjectReference param = params[i] as ObjectReference
-        if (param != none)
-            string baseId     = "[BaseID: " + param.GetBaseObject().GetFormID() + "] "
-            string formId     = "[FormID: " + param.GetFormID() + "] "
-            
-            string objectBaseName   = param.GetBaseObject().GetName()
-            string objectClassName  = param.GetName()
-            string whichNameProperty = string_if (objectClassName != "", objectClassName, objectBaseName)
-            string objectName = "[Name: " + whichNameProperty + "] "
-            emptyParams = false
-
-            debugInfo += "\t["+i+"]: " + param + " " + formId + baseId + string_if (objectName != "[Name: ] ", objectName) + "\n"
-        endif
-        i += 1
-    endWhile
-    
-    if (emptyParams)
-        return sceneName + " " + sender + " - No Parameters, Scene expected: " + params.Length + " parameters!" ; " - No Parameters, Scene expected: need a way to find scene required params
+function HandleSceneGlobalControlFlow(string asSceneType, string asScene)
+    if (asSceneType == CATEGORY_ARREST_START)
+    elseif (asSceneType == CATEGORY_ESCORT_TO_JAIL)
+        self.SetGlobal("RPB_Scene_Action_CF01", 1) ; Enables some actions in EscortToCell
+    elseif (asSceneType == CATEGORY_ESCORT_TO_CELL)
+    elseif (asSceneType == CATEGORY_ESCORT_FROM_CELL)
+    elseif (asSceneType == CATEGORY_FRISKING)
+    elseif (asSceneType == CATEGORY_STRIPPING)
+    elseif (asSceneType == CATEGORY_ELUDING)
     endif
-
-    return sceneName + " " + sender + "\nParameters: [\n" + debugInfo + "]"
 endFunction
 
 event OnSceneStart(string name, Scene sender)
-    Form[] params   = self.GetSceneParameters(name)
+    float paramsBenchmark = StartBenchmark()
+    Form[] params   = self.GetSceneReferences(name)
+    EndBenchmark(paramsBenchmark, "SceneManager::OnSceneStart::GetSceneReferences() NEW")
+    Alias[] aliases = self.GetSceneAliases(name, true)
     string type     = self.GetSceneType(name)
 
-    self.OnSceneStartHandleGlobals(name, params)
+    float sceneRefTypesBench = StartBenchmark()
+    int i = 0
+    string[] sceneRefTypes = self.GetSceneRefTypes(name)
+    while (i < sceneRefTypes.Length)
+        Form[] paramsOfType = self.GetSceneReferencesOfType(name, sceneRefTypes[i])
+        DebugWithArgs("SceneManager::OnSceneStart", name, "["+ sceneRefTypes[i] +"] "+ name +" Params: " + paramsOfType)
+        i += 1
+    endWhile
+    EndBenchmark(sceneRefTypesBench, "SceneManager::OnSceneStart")
+
+    self.HandleSceneGlobalControlFlow(type, name)
 
     if (type == CATEGORY_ARREST_START)
-        Actor escort     = self.GetSceneRefsOfType(name, "Escort")[0] as Actor
-        Form[] arrestees = self.GetSceneRefsOfType(name, "Escortee")
+        Actor escort     = self.GetSceneNthReferenceOfType(name, "Escort") as Actor
+        Form[] arrestees = self.GetSceneReferencesOfType(name, "Escortee")
 
         EventManager.SendArrestSceneBulkEvent(name, EVENT_ARREST_BEGIN, arrestees, escort)
 
     elseif (type == CATEGORY_ESCORT_TO_JAIL)
-        Actor escort     = self.GetSceneRefsOfType(name, "Escort")[0] as Actor
-        Form[] arrestees = self.GetSceneRefsOfType(name, "Escortee")
-
-        self.SetGlobal("RPB_Scene_Action_CF01", 1) ; Enables some actions in escort to cell
+        Actor escort     = self.GetSceneNthReferenceOfType(name, "Escort") as Actor
+        Form[] arrestees = self.GetSceneReferencesOfType(name, "Escortee")
         
         EventManager.SendPrisonSceneBulkEvent(name, EVENT_ESCORT_BEGIN, arrestees, escort)
 
     elseif (type == CATEGORY_ESCORT_TO_CELL)
-        Actor escort     = self.GetSceneRefsOfType(name, "Escort")[0] as Actor
-        Form[] prisoners = self.GetSceneRefsOfType(name, "Escortee")
+        Actor escort     = self.GetSceneNthReferenceOfType(name, "Escort") as Actor
+        Form[] prisoners = self.GetSceneReferencesOfType(name, "Escortee")
 
         if (name == SCENE_ESCORT_TO_CELL_02) ; override
-            escort      = self.GetSceneRefsOfType(name, "Guard")[0] as Actor
-            prisoners   = self.GetSceneRefsOfType(name, "Prisoner")
+            escort      = self.GetSceneNthReferenceOfType(name, "Guard") as Actor
+            prisoners   = self.GetSceneReferencesOfType(name, "Prisoner")
         endif
+
+        DebugWithArgs("SceneManager::OnSceneStart", name, "escort: " + escort + ", prisoners: " + prisoners)
         
         EventManager.SendPrisonSceneBulkEvent(name, EVENT_ESCORT_BEGIN, prisoners, escort)
 
     elseif (type == CATEGORY_ESCORT_FROM_CELL)
-        Actor guard      = self.GetSceneRefsOfType(name, "Guard")[0] as Actor
-        Form[] prisoners = self.GetSceneRefsOfType(name, "Prisoner")
+        Actor guard      = self.GetSceneNthReferenceOfType(name, "Guard") as Actor
+        Form[] prisoners = self.GetSceneReferencesOfType(name, "Prisoner")
         
         EventManager.SendPrisonSceneBulkEvent(name, EVENT_ESCORT_BEGIN, prisoners, guard)
 
     elseif (type == CATEGORY_FRISKING)
-        Actor guard      = self.GetSceneRefsOfType(name, "Guard")[0] as Actor
-        Form[] prisoners = self.GetSceneRefsOfType(name, "Prisoner")
+        Actor guard      = self.GetSceneNthReferenceOfType(name, "Guard") as Actor
+        Form[] prisoners = self.GetSceneReferencesOfType(name, "Prisoner")
         
         EventManager.SendPrisonSceneBulkEvent(name, EVENT_FRISK_BEGIN, prisoners, guard)
 
     elseif (type == CATEGORY_STRIPPING)
-        Actor guard      = self.GetSceneRefsOfType(name, "Guard")[0] as Actor
-        Form[] prisoners = self.GetSceneRefsOfType(name, "Prisoner")
+        Actor guard      = self.GetSceneNthReferenceOfType(name, "Guard") as Actor
+        Form[] prisoners = self.GetSceneReferencesOfType(name, "Prisoner")
 
         string secondaryEvent = string_if (name == SCENE_STRIPPING_02, "Undress to Underwear", "null")
 
         EventManager.SendPrisonSceneBulkEvent(name, EVENT_STRIP_BEGIN, prisoners, guard, secondaryEvent)
 
     elseif (type == CATEGORY_ELUDING)
-        Actor guard      = self.GetSceneRefsOfType(name, "Guard")[0] as Actor
-        Actor eluder     = self.GetSceneRefsOfType(name, "Eluder")[0] as Actor
+        Actor guard      = self.GetSceneNthReferenceOfType(name, "Guard") as Actor
+        Actor eluder     = self.GetSceneNthReferenceOfType(name, "Eluder") as Actor
 
         EventManager.SendArrestSceneEvent(name, EVENT_ELUDE_BEGIN, eluder, guard, "Dialogue")
     endif
 
-    Debug("SceneManager::OnSceneStart", self.GetSceneParametersDebugInfo(sender, name, params))
+    Debug("SceneManager::OnSceneStart", self.GetSceneParametersDebugInfo(sender, name, params, aliases))
     ; Info(self.GetSceneParametersDebugInfo(sender, name, params))
 endEvent
 
@@ -1166,8 +1174,8 @@ event OnScenePlaying(string name, int phaseEvent, int phase, Scene sender)
     Debug("SceneManager::OnScenePlaying", name + " " + sender + ": " + string_if (phaseEvent == PHASE_START, "(Start)", "(End)") + " Phase " + phase)
 
     if (type == CATEGORY_ARREST_START)
-        Actor escort        = self.GetSceneRefsOfType(name, "Escort")[0] as Actor
-        Form[] arrestees    = self.GetSceneRefsOfType(name, "Escortee")
+        Actor escort        = self.GetSceneNthReferenceOfType(name, "Escort") as Actor
+        Form[] arrestees    = self.GetSceneReferencesOfType(name, "Escortee")
 
         if (name == SCENE_ARREST_START_01)
             if (phase == 1 && phaseEvent == PHASE_END)
@@ -1212,8 +1220,8 @@ event OnScenePlaying(string name, int phaseEvent, int phase, Scene sender)
         ; No Events
 
     elseif (type == CATEGORY_ESCORT_TO_CELL)
-        Actor escort     = self.GetSceneRefsOfType(name, "Escort")[0] as Actor
-        Form[] prisoners = self.GetSceneRefsOfType(name, "Escortee")
+        Actor escort     = self.GetSceneNthReferenceOfType(name, "Escort") as Actor
+        Form[] prisoners = self.GetSceneReferencesOfType(name, "Escortee")
 
         if (name == SCENE_ESCORT_TO_CELL_01)
             if (phase == 7 && phaseEvent == PHASE_START)
@@ -1227,8 +1235,8 @@ event OnScenePlaying(string name, int phaseEvent, int phase, Scene sender)
             endif
 
         elseif (name == SCENE_ESCORT_TO_CELL_02)
-            escort      = self.GetSceneRefsOfType(name, "Guard")[0] as Actor
-            prisoners   = self.GetSceneRefsOfType(name, "Prisoner")
+            escort      = self.GetSceneNthReferenceOfType(name, "Guard") as Actor
+            prisoners   = self.GetSceneReferencesOfType(name, "Prisoner")
 
             if (phase == 1 && phaseEvent == PHASE_END)
                 ; Make prisoner put their hands behind their back
@@ -1244,8 +1252,8 @@ event OnScenePlaying(string name, int phaseEvent, int phase, Scene sender)
         endif
 
     elseif (type == CATEGORY_ESCORT_FROM_CELL)
-        Actor guard      = self.GetSceneRefsOfType(name, "Guard")[0] as Actor
-        Form[] prisoners = self.GetSceneRefsOfType(name, "Prisoner")
+        Actor guard      = self.GetSceneNthReferenceOfType(name, "Guard") as Actor
+        Form[] prisoners = self.GetSceneReferencesOfType(name, "Prisoner")
 
         if (name == SCENE_ESCORT_FROM_CELL)
             if (phase == 1 && phaseEvent == PHASE_END)
@@ -1254,8 +1262,8 @@ event OnScenePlaying(string name, int phaseEvent, int phase, Scene sender)
         endif
 
     elseif (type == CATEGORY_STRIPPING)
-        Actor guard      = self.GetSceneRefsOfType(name, "Guard")[0] as Actor
-        Form[] prisoners = self.GetSceneRefsOfType(name, "Prisoner")
+        Actor guard      = self.GetSceneNthReferenceOfType(name, "Guard") as Actor
+        Form[] prisoners = self.GetSceneReferencesOfType(name, "Prisoner")
 
         if (name == SCENE_STRIPPING_01)
             EventManager.SendPrisonSceneBulkEvent(name, EVENT_STRIPPING, prisoners, guard)
@@ -1294,8 +1302,8 @@ event OnScenePlaying(string name, int phaseEvent, int phase, Scene sender)
         endif
 
     elseif (type == CATEGORY_SURRENDER)
-        Form[] surrendererCaptors   = self.GetSceneRefsOfType(name, "SurrendererCaptor")
-        Actor surrenderer           = self.GetSceneRefsOfType(name, "Surrenderer")[0] as Actor
+        Form[] surrendererCaptors   = self.GetSceneReferencesOfType(name, "SurrendererCaptor")
+        Actor surrenderer           = self.GetSceneNthReferenceOfType(name, "Surrenderer") as Actor
 
         if (name == SCENE_SURRENDER_01)
             if (phase == 2 && phaseEvent == PHASE_START)
@@ -1304,8 +1312,8 @@ event OnScenePlaying(string name, int phaseEvent, int phase, Scene sender)
         endif
 
     elseif (type == CATEGORY_PAY_BOUNTY)
-        Actor escort        = self.GetSceneRefsOfType(name, "Escort")[0] as Actor
-        Form[] arrestees    = self.GetSceneRefsOfType(name, "Escortee")
+        Actor escort        = self.GetSceneNthReferenceOfType(name, "Escort") as Actor
+        Form[] arrestees    = self.GetSceneReferencesOfType(name, "Escortee")
 
         if (name == SCENE_ARREST_PAY_BOUNTY_FOLLOW_BY_FORCE)
             if (phase == 3 && phaseEvent == PHASE_END)
@@ -1314,8 +1322,8 @@ event OnScenePlaying(string name, int phaseEvent, int phase, Scene sender)
         endif
 
     elseif (type == CATEGORY_RESTRAIN)
-        Actor guard     = self.GetSceneRefsOfType(name, "Guard")[0] as Actor
-        Form[] prisoners = self.GetSceneRefsOfType(name, "Prisoner")
+        Actor guard     = self.GetSceneNthReferenceOfType(name, "Guard") as Actor
+        Form[] prisoners = self.GetSceneReferencesOfType(name, "Prisoner")
 
         if (name == SCENE_RESTRAIN_PRISONER_01)
             if (phase == 1 && phaseEvent == PHASE_END)
@@ -1342,39 +1350,39 @@ event OnSceneEnd(string name, Scene sender)
     string type = self.GetSceneType(name)
 
     if (type == CATEGORY_ARREST_START)
-        Actor escort     = self.GetSceneRefsOfType(name, "Escort")[0] as Actor
-        Form[] arrestees = self.GetSceneRefsOfType(name, "Escortee")
+        Actor escort     = self.GetSceneNthReferenceOfType(name, "Escort") as Actor
+        Form[] arrestees = self.GetSceneReferencesOfType(name, "Escortee")
 
         string secondaryEvent = string_if (name == SCENE_ARREST_START_PRISON_01, "Arrest in Prison", "null")
 
         EventManager.SendArrestSceneBulkEvent(name, EVENT_ARREST_END, arrestees, escort, secondaryEvent)
 
     elseif (type == CATEGORY_ESCORT_TO_JAIL)
-        Actor escort     = self.GetSceneRefsOfType(name, "Escort")[0] as Actor
-        Form[] arrestees = self.GetSceneRefsOfType(name, "Escortee")
+        Actor escort     = self.GetSceneNthReferenceOfType(name, "Escort") as Actor
+        Form[] arrestees = self.GetSceneReferencesOfType(name, "Escortee")
         
         EventManager.SendPrisonSceneBulkEvent(name, EVENT_ESCORT_END, arrestees, escort)
 
     elseif (type == CATEGORY_ESCORT_TO_CELL)
-        Actor escort     = self.GetSceneRefsOfType(name, "Escort")[0] as Actor
-        Form[] prisoners = self.GetSceneRefsOfType(name, "Escortee")
+        Actor escort     = self.GetSceneNthReferenceOfType(name, "Escort") as Actor
+        Form[] prisoners = self.GetSceneReferencesOfType(name, "Escortee")
 
         if (name == SCENE_ESCORT_TO_CELL_02) ; override
-            escort      = self.GetSceneRefsOfType(name, "Guard")[0] as Actor
-            prisoners   = self.GetSceneRefsOfType(name, "Prisoner")
+            escort      = self.GetSceneNthReferenceOfType(name, "Guard") as Actor
+            prisoners   = self.GetSceneReferencesOfType(name, "Prisoner")
         endif
         
         EventManager.SendPrisonSceneBulkEvent(name, EVENT_ESCORT_END, prisoners, escort)
 
     elseif (type == CATEGORY_ESCORT_FROM_CELL)
-        Actor guard      = self.GetSceneRefsOfType(name, "Guard")[0] as Actor
-        Form[] prisoners = self.GetSceneRefsOfType(name, "Prisoner")
+        Actor guard      = self.GetSceneNthReferenceOfType(name, "Guard") as Actor
+        Form[] prisoners = self.GetSceneReferencesOfType(name, "Prisoner")
         
         EventManager.SendPrisonSceneBulkEvent(name, EVENT_ESCORT_END, prisoners, guard)
 
     elseif (type == CATEGORY_STRIPPING)
-        Actor guard      = self.GetSceneRefsOfType(name, "Guard")[0] as Actor
-        Form[] prisoners = self.GetSceneRefsOfType(name, "Prisoner")
+        Actor guard      = self.GetSceneNthReferenceOfType(name, "Guard") as Actor
+        Form[] prisoners = self.GetSceneReferencesOfType(name, "Prisoner")
 
         string secondaryEvent = "null"
 
@@ -1391,14 +1399,15 @@ event OnSceneEnd(string name, Scene sender)
         EventManager.SendPrisonSceneBulkEvent(name, EVENT_STRIP_END, prisoners, guard, secondaryEvent)
 
     elseif (type == CATEGORY_SURRENDER)
-        Actor surrendererCaptor = self.GetSceneRefsOfType(name, "SurrendererCaptor")[0] as Actor
-        Actor surrenderer       = self.GetSceneRefsOfType(name, "Surrenderer")[0] as Actor
+        Actor surrendererCaptor = self.GetSceneNthReferenceOfType(name, "SurrendererCaptor") as Actor
+        Actor surrenderer       = self.GetSceneNthReferenceOfType(name, "Surrenderer") as Actor
+        Debug("SceneManager::OnSceneEnd", "surrendererCaptor: " + surrendererCaptor + ", surrenderer: " + surrenderer)
 
         EventManager.SendSurrenderSceneEvent(name, EVENT_SURRENDER_END, surrenderer, surrendererCaptor)
 
     elseif (type == CATEGORY_PAY_BOUNTY)
-        Actor escort   = self.GetSceneRefsOfType(name, "Escort")[0] as Actor
-        Actor escortee = self.GetSceneRefsOfType(name, "Escortee")[0] as Actor
+        Actor escort   = self.GetSceneNthReferenceOfType(name, "Escort") as Actor
+        Actor escortee = self.GetSceneNthReferenceOfType(name, "Escortee") as Actor
 
         string secondaryEvent = "null"
 
@@ -1413,10 +1422,13 @@ event OnSceneEnd(string name, Scene sender)
     endif
 
     self.ResetSceneOverride()
-
-    Form[] params = self.GetSceneParameters(name)
-    Debug("SceneManager::OnSceneEnd", self.GetSceneParametersDebugInfo(sender, name, params))
+    float paramsBenchmark = StartBenchmark()
+    Form[] params = self.GetSceneReferences(name)
+    EndBenchmark(paramsBenchmark, "SceneManager::OnSceneEnd::GetSceneReferences() NEW")
+    Alias[] aliases = self.GetSceneAliases(name, true)
+    Debug("SceneManager::OnSceneEnd", self.GetSceneParametersDebugInfo(sender, name, params, aliases))
     ; Info(self.GetSceneParametersDebugInfo(sender, name, params))
+    Debug("SceneManager::OnSceneEnd", "Ended Scene: " + name)
 
     self.UnbindAliases(name)
     self.PlayQueued()
@@ -1424,6 +1436,17 @@ event OnSceneEnd(string name, Scene sender)
     self.ResetGlobals()
     self.OnResumeSceneBlocked()
 endEvent
+
+event OnAllScenesFinished()
+    Debug("SceneManager::OnAllScenesFinished", "Resetting current scene!")
+    currentScene = ""
+
+    self.ResetGlobals()
+endEvent
+
+; ==========================================================
+;                       Scene Starters
+; ==========================================================
 
 function StartScene(string asSceneName, int akSceneParameters, int aiStartingPhase = 1, bool abForceStart = false)
     if (!self.SceneExists(asSceneName))
@@ -1451,366 +1474,210 @@ function StartScene(string asSceneName, int akSceneParameters, int aiStartingPha
     endif
 endFunction
 
+
 function StartEscortToCell(Actor akEscortLeader, Actor akEscortedPrisoner, ObjectReference akJailCellMarker, RPB_CellDoor akJailCellDoor, ObjectReference akEscortWaitingMarker)
-    ; Bind the captor to its alias to lead the escort scene
-    BindAlias(self.GetEscort(), akEscortLeader)
-
-    ; Bind the prisoner to its alias to be escorted
-    BindAlias(self.GetEscortee(), akEscortedPrisoner)
-
-    ; BindAlias(self.GetEscortee(1), self.GetPrisoner(1).GetReference()) ; TODO: Support for multiple Actor arrest/escorting
-
-    ; Bind the prisoner's destination point, the jail cell
-    BindAlias(self.GetPrisonerLocation(), akJailCellMarker)
-
-    ; Bind the the jail cell door
-    BindAlias(self.GetCellDoor(), akJailCellDoor)
-
     ObjectReference waitingEscortMarker = akEscortWaitingMarker
     if (waitingEscortMarker == none)
         waitingEscortMarker = akJailCellDoor
     endif
 
-    ; Bind the guard waiting marker
-    BindAlias(self.GetGuardLocation(), waitingEscortMarker)
+    Debug("SceneManager::StartEscortToCell", "akEscortLeader: " + akEscortLeader + ", akEscortedPrisoner: " + akEscortedPrisoner)
 
-    self.QueueOrPlay(SCENE_ESCORT_TO_CELL_01)
-    ; self.GetScene(SCENE_ESCORT_TO_CELL_01).Start()
-    ; EscortToCell.Start()
+    string name = SCENE_ESCORT_TO_CELL_01
+    self.BindSceneAlias(name, "Escort", akEscortLeader)
+    self.BindSceneAlias(name, "Escortee", akEscortedPrisoner)
+    self.BindSceneAlias(name, "CellDoor", akJailCellDoor)
+    self.BindSceneAlias(name, "Player_EscortLocation", akJailCellMarker)
+    self.BindSceneAlias(name, "Guard_EscortLocation", waitingEscortMarker)
+    self.QueueOrPlay(name)
 endFunction
 
 function StartEscortToCell_02(Actor akEscortLeader, Actor akEscortedPrisoner, ObjectReference akJailCellMarker, ObjectReference akJailCellDoor, ObjectReference akEscortWaitingMarker)
-    ; Bind the captor to its alias to lead the escort scene
-    BindAlias(self.GetGuard(), akEscortLeader)
-
-    ; Bind the prisoner to its alias to be escorted
-    BindAlias(self.GetPrisoner(), akEscortedPrisoner)
-
-    ; Bind the prisoner's destination point, the jail cell
-    BindAlias(self.GetCell(), akJailCellMarker)
-
-    ; Bind the guard's destination point, the jail cell door
-    BindAlias(self.GetCellDoor(), akJailCellDoor)
-
     ObjectReference waitingEscortMarker = akEscortWaitingMarker
-    ; if (waitingEscortMarker == none)
-    ;     waitingEscortMarker = akJailCellDoor
-    ; endif
-    
-    ; Bind the guard waiting marker
-    BindAlias(self.GetGuardLocation(), waitingEscortMarker)
+    if (waitingEscortMarker == none)
+        waitingEscortMarker = akJailCellDoor
+    endif
 
-    self.QueueOrPlay(SCENE_ESCORT_TO_CELL_02)
-    ; self.GetScene(SCENE_ESCORT_TO_CELL_02).Start()
-    ; EscortToCell_02.Start()
+    string name = SCENE_ESCORT_TO_CELL_02
+    self.BindSceneAlias(name, "Guard", akEscortLeader)
+    self.BindSceneAlias(name, "Prisoner", akEscortedPrisoner)
+    self.BindSceneAlias(name, "CellDoor", akJailCellDoor)
+    self.BindSceneAlias(name, "Cell", akJailCellMarker)
+    self.BindSceneAlias(name, "Guard_EscortLocation", waitingEscortMarker)
+    self.QueueOrPlay(name)
 endFunction
 
 function StartEscortFromCell(Actor akGuard, Actor akPrisoner, ObjectReference akJailCellDoor, ObjectReference akJailChest)
     Debug("SceneManager::StartEscortFromCell", "Starting Scene " + self.GetScene(SCENE_ESCORT_FROM_CELL) +", params: ["+ akGuard + "," + akPrisoner + "," + akJailCellDoor + "," + akJailChest + "]")
-    ; Bind the captor to its alias to lead the escort scene
-    BindAlias(self.GetGuard(), akGuard)
-
-    ; Bind the prisoner to its alias to be escorted
-    BindAlias(self.GetPrisoner(), akPrisoner)
-
-    BindAlias(self.GetPrisonerLocation(), akJailChest)
-
-    BindAlias(self.GetGuardLocation(), akJailCellDoor)
-
-    self.QueueOrPlay(SCENE_ESCORT_FROM_CELL)
-    ; self.GetScene(SCENE_ESCORT_FROM_CELL).Start()
-    ; EscortFromCell.Start()
+    string name = SCENE_ESCORT_FROM_CELL
+    self.BindSceneAlias(name, "Guard", akGuard)
+    self.BindSceneAlias(name, "Prisoner", akPrisoner)
+    self.BindSceneAlias(name, "Player_EscortLocation", akJailChest)
+    self.BindSceneAlias(name, "Guard_EscortLocation", akJailCellDoor)
+    self.QueueOrPlay(name)
 endFunction
 
 function StartEscortToJail(Actor akEscortLeader, Actor akEscortedPrisoner, ObjectReference akPrisonerChest)
-    ; Bind the captor to its alias to lead the escort scene
-    BindAlias(self.GetEscort(), akEscortLeader)
-    ; BindAlias(self.GetEscortee(1), GetNearestActor(akEscortedPrisoner, 9000))
-    ; BindAlias(self.GetEscortee(2), GetNearestActor(akEscortedPrisoner, 9000))
-
-    ; Bind the prisoner to its alias to be escorted
-    BindAlias(self.GetEscortee(), akEscortedPrisoner)
-
-    ; Bind the destination point, the chest
-    BindAlias(self.GetPrisonerLocation(), akPrisonerChest)
-
-    ; Bind the guard's destination point, the jail cell door
-    BindAlias(self.GetGuardLocation(), akPrisonerChest)
-
-    self.QueueOrPlay(SCENE_ESCORT_TO_JAIL_01)
-    ; self.GetScene(SCENE_ESCORT_TO_JAIL_01).Start()
-    ; EscortToJail.Start()
+    string name = SCENE_ESCORT_TO_JAIL_01
+    self.BindSceneAlias(name, "Escort", akEscortLeader)
+    self.BindSceneAlias(name, "Escortee", akEscortedPrisoner)
+    self.BindSceneAlias(name, "Player_EscortLocation", akPrisonerChest)
+    self.BindSceneAlias(name, "Guard_EscortLocation", akPrisonerChest)
+    self.QueueOrPlay(name)
 endFunction
 
-function StartMultipleEscortsToJail(Actor akEscortLeader, Actor[] akEscortedPrisoners, ObjectReference akPrisonerChest)
-    ; Bind the leader to its alias to lead the escort scene
-    BindAlias(self.GetEscort(), akEscortLeader)
+function EscortToJail(Actor akEscort, Form[] akEscortees, Form[] akDestinations)
+    string name = SCENE_ESCORT_TO_JAIL_01
 
-    ; Bind the prisoners to their aliases to be escorted
-    int i = 0
-    while (i < akEscortedPrisoners.Length)
-        BindAlias(self.GetAliasByName("Escortee" + i) as ReferenceAlias, akEscortedPrisoners[i])
-        i += 1
-    endWhile
+    self.BindSceneAlias(name, "Escort", akEscort)
+    self.BindSceneAliasGroup(name, "Escortee", akEscortees)
+    self.BindSceneAliasGroup(name, "Player_EscortLocation", akDestinations)
+    self.BindSceneAliasGroup(name, "Guard_EscortLocation", akDestinations)
 
-    ; Bind the destination point, the chest
-    BindAlias(self.GetPrisonerLocation(), akPrisonerChest)
-
-    ; Bind the destination point, the chest
-    BindAlias(self.GetGuardLocation(), akPrisonerChest)
+    self.QueueOrPlay(name)
 endFunction
 
 function StartStrippingStart(Actor akStripperGuard, Actor akStrippedPrisoner)
-    ; Bind the guard to be the one performing the strip search / undressing
-    BindAlias(self.GetGuard(), akStripperGuard)
-
-    ; Bind the Prisoner to be the actor being strip searched / undressed
-    BindAlias(self.GetPrisoner(), akStrippedPrisoner)
-
-    ; Bind the other Prisoners to also be strip searched / undressed
-    BindAlias(self.GetPrisoner(1), self.GetEscortee(1).GetActorReference())
-    BindAlias(self.GetPrisoner(2), self.GetEscortee(2).GetActorReference())
-    BindAlias(self.GetPrisoner(3), self.GetEscortee(3).GetActorReference())
-
-    self.QueueOrPlay(SCENE_STRIPPING_START_01)
-    ; self.GetScene(SCENE_STRIPPING_START_01).Start()
-
-    ; StrippingStart.Start()
+    ; TODO: add the remaining prisoners
+    string name = SCENE_STRIPPING_START_01
+    self.BindSceneAlias(name, "Guard", akStripperGuard)
+    self.BindSceneAlias(name, "Prisoner", akStrippedPrisoner)
+    self.QueueOrPlay(name)
 endFunction
 
 function StartStripping(Actor akStripperGuard, Actor akStrippedPrisoner)
-    ; Bind the guard to be the one performing the strip search / undressing
-    BindAlias(self.GetGuard(), akStripperGuard)
-
-    ; Bind the Prisoner to be the actor being strip searched / undressed
-    BindAlias(self.GetPrisoner(), akStrippedPrisoner)
-
-    ; Bind the other Prisoners to also be strip searched / undressed
-    BindAlias(self.GetPrisoner(1), self.GetEscortee(1).GetActorReference())
-    BindAlias(self.GetPrisoner(2), self.GetEscortee(2).GetActorReference())
-
-    self.QueueOrPlay(SCENE_STRIPPING_01)
-    ; self.GetScene(SCENE_STRIPPING_01).Start()
-    ; Stripping.Start()
+    string name = SCENE_STRIPPING_01
+    self.BindSceneAlias(name, "Guard", akStripperGuard)
+    self.BindSceneAlias(name, "Prisoner", akStrippedPrisoner)
+    ; self.BindSceneAlias(name, "Guard_EscortLocation", akStripMarker) ; Needs to be added
+    ; self.BindSceneAlias(name, "Player_EscortLocation", akStripMarker) ; Needs to be added
+    self.QueueOrPlay(name)
 endFunction
 
 function StartStripping_02(Actor akStripperGuard, Actor akStrippedPrisoner, ObjectReference akStripMarker = none)
-    ; Bind the guard to be the one performing the strip search / undressing
-    BindAlias(self.GetGuard(), akStripperGuard)
-
-    ; Bind the Prisoner to be the actor being strip searched / undressed
-    BindAlias(self.GetPrisoner(), akStrippedPrisoner)
-
-    BindAlias(self.GetGuardLocation(), akStripMarker)
-    BindAlias(self.GetPrisonerLocation(), akStripMarker)
-
-    ; Bind the other Prisoners to also be strip searched / undressed
-    BindAlias(self.GetPrisoner(1), self.GetEscortee(1).GetActorReference())
-    BindAlias(self.GetPrisoner(2), self.GetEscortee(2).GetActorReference())
-
-    self.QueueOrPlay(SCENE_STRIPPING_02)
-    ; self.GetScene(SCENE_STRIPPING_02).Start()
-    ; Stripping_02.Start()
+    string name = SCENE_STRIPPING_02
+    self.BindSceneAlias(name, "Guard", akStripperGuard)
+    self.BindSceneAlias(name, "Prisoner", akStrippedPrisoner)
+    self.BindSceneAlias(name, "Guard_EscortLocation", akStripMarker)
+    self.BindSceneAlias(name, "Player_EscortLocation", akStripMarker)
+    self.QueueOrPlay(name)
 endFunction
 
 function StartFrisking(Actor akFriskerGuard, Actor akFriskedPrisoner)
-    ; Bind the guard to be the one performing the frisk search
-    BindAlias(self.GetGuard(), akFriskerGuard)
-
-    ; Bind the Prisoner to be the actor being frisk searched
-    BindAlias(self.GetPrisoner(), akFriskedPrisoner)
-
-    self.QueueOrPlay(SCENE_FRISKING)
-    ; self.GetScene(SCENE_FRISKING).Start()
-    ; Frisking.Start()
+    string name = SCENE_FRISKING
+    self.BindSceneAlias(name, "Guard", akFriskerGuard)
+    self.BindSceneAlias(name, "Prisoner", akFriskedPrisoner)
+    ; self.BindSceneAlias(name, "Guard_EscortLocation", akFriskMarker) ; Needs to be added
+    ; self.BindSceneAlias(name, "Player_EscortLocation", akFriskMarker) ; Needs to be added
+    self.QueueOrPlay(name)
 endFunction
 
 function StartGiveClothing(Actor akGuard, Actor akPrisoner)
-    ; Bind the guard to be the one giving clothing
-    BindAlias(self.GetGuard(), akGuard)
-
-    ; Bind the Prisoner to be the actor being given clothing
-    BindAlias(self.GetPrisoner(), akPrisoner)
-
-    self.QueueOrPlay(SCENE_GIVE_CLOTHING)
-    ; self.GetScene(SCENE_GIVE_CLOTHING).Start()
-    ; GiveClothing.Start()
-endFunction
-
-function StartUnlockDoor(Actor akGuard, ObjectReference akJailCellDoor)
-    BindAlias(self.GetEscort(), akGuard)
-    BindAlias(self.GetGuardLocation(), akJailCellDoor)
-
-    ; UnlockCell.Start()
-endFunction
-
-function StartLockDoor(Actor akGuard, ObjectReference akJailCellDoor)
-    BindAlias(self.GetEscort(), akGuard)
-    BindAlias(self.GetGuardLocation(), akJailCellDoor)
-
-    ; LockCell.Start()
+    string name = SCENE_GIVE_CLOTHING
+    self.BindSceneAlias(name, "Guard", akGuard)
+    self.BindSceneAlias(name, "Prisoner", akPrisoner)
+    self.QueueOrPlay(name)
 endFunction
 
 function StartBountyPaymentFail(Actor akGuard, Actor akPrisoner)
-    ; Bind the guard
-    BindAlias(self.GetGuard(), akGuard)
-
-    ; Bind the Prisoner, who's trying to pay the bounty
-    BindAlias(self.GetPrisoner(), akPrisoner)
-
-    self.QueueOrPlay(SCENE_PAYMENT_FAIL)
-    ; self.GetScene(SCENE_PAYMENT_FAIL).Start()
-    ; BountyPaymentFail.Start()
+    string name = SCENE_PAYMENT_FAIL
+    self.BindSceneAlias(name, "Guard", akGuard)
+    self.BindSceneAlias(name, "Prisoner", akPrisoner)
+    self.QueueOrPlay(name)
 endFunction
 
 function StartArrestStart01(Actor akGuard, Actor akPrisoner)
-    ; Bind the guard
-    BindAlias(self.GetEscort(), akGuard)
-
-    ; Bind the Prisoner, who's getting arrested
-    BindAlias(self.GetEscortee(), akPrisoner)
-
-    ; ArrestStart01.Start()
-
-    self.QueueOrPlay(SCENE_ARREST_START_01)
-    ; self.GetScene(SCENE_ARREST_START_01).Start()
+    string name = SCENE_ARREST_START_01
+    self.BindSceneAlias(name, "Escort", akGuard)
+    self.BindSceneAlias(name, "Escortee", akPrisoner)
+    self.QueueOrPlay(name)
 endFunction
 
 function StartArrestStart02(Actor akGuard, Actor akPrisoner)
-    ; Bind the guard
-    BindAlias(self.GetEscort(), akGuard)
-
-    ; Bind the Prisoner, who's getting arrested
-    BindAlias(self.GetEscortee(), akPrisoner)
-
-    self.QueueOrPlay(SCENE_ARREST_START_02)
-    ; self.GetScene(SCENE_ARREST_START_02).Start()
-    ; ArrestStart02.Start()
+    string name = SCENE_ARREST_START_02
+    self.BindSceneAlias(name, "Escort", akGuard)
+    self.BindSceneAlias(name, "Escortee", akPrisoner)
+    self.QueueOrPlay(name)
 endFunction
 
 function StartArrestStart03(Actor akGuard, Actor akPrisoner)
-    ; Bind the guard
-    BindAlias(self.GetEscort(), akGuard)
-
-    ; Bind the Prisoner, who's getting arrested
-    BindAlias(self.GetEscortee(), akPrisoner)
-
-    self.QueueOrPlay(SCENE_ARREST_START_03)
-    ; self.GetScene(SCENE_ARREST_START_03).Start()
+    string name = SCENE_ARREST_START_03
+    self.BindSceneAlias(name, "Escort", akGuard)
+    self.BindSceneAlias(name, "Escortee", akPrisoner)
+    self.QueueOrPlay(name)
 endFunction
 
 function StartArrestStart04(Actor akGuard, Actor akPrisoner)
-    ; Bind the captor
-    BindAlias(self.GetCaptor(), akGuard)
-
-    ; Bind the Arrestee, who's getting arrested
-    BindAlias(self.GetArrestee(), akPrisoner)
-
-    self.QueueOrPlay(SCENE_ARREST_START_04)
-    ; self.GetScene(SCENE_ARREST_START_04).Start()
-    ; ArrestStart04.Start()
+    string name = SCENE_ARREST_START_04
+    self.BindSceneAlias(name, "Captor", akGuard) ; needs to be changed to Escort
+    self.BindSceneAlias(name, "Escortee", akPrisoner)
+    self.QueueOrPlay(name)
 endFunction
 
 function StartSurrenderScene(Actor akSurrenderer, Actor[] akSurrendererCaptors, string asScene)
-    BindAlias(self.GetSurrenderer(), akSurrenderer)
-
-    int i = 0
-    while (i < akSurrendererCaptors.Length)
-        BindAlias(self.GetSurrendererCaptor(i), akSurrendererCaptors[i])
-        i += 1
-    endWhile
-    
-    ; self.StartScene(asScene, 0)
-    self.QueueOrPlay(asScene)
+    string name = SCENE_SURRENDER_01
+    self.BindSceneAliasGroup(name, "SurrendererCaptor", RPB_Utility.ActorToFormArray(akSurrendererCaptors))
+    self.BindSceneAlias(name, "Surrenderer", akSurrenderer)
+    self.QueueOrPlay(name)
 endFunction
 
 function StartArrestScene(Actor akGuard, Actor akArrestee, string asScene)
-    ; Bind the captor
-    BindAlias(self.GetEscort(), akGuard)
-
-    ; Bind the Arrestee, who's getting arrested
-    BindAlias(self.GetEscortee(), akArrestee)
-    
-    self.QueueOrPlay(asScene)
-    ; self.GetScene(asScene).Start()
+    string name = asScene
+    self.BindSceneAlias(name, "Escort", akGuard)
+    self.BindSceneAlias(name, "Escortee", akArrestee)
+    self.QueueOrPlay(name)
 endFunction
 
 function StartEscortToJailScene(Actor akGuard, Actor akArrestee, string asScene)
-    ; Bind the captor
-    BindAlias(self.GetEscort(), akGuard)
-
-    ; Bind the Arrestee, who's getting arrested
-    BindAlias(self.GetEscortee(), akArrestee)
-
-    self.QueueOrPlay(asScene)
-    ; self.GetScene(asScene).Start()
+    string name = asScene
+    self.BindSceneAlias(name, "Escort", akGuard)
+    self.BindSceneAlias(name, "Escortee", akArrestee)
+    self.QueueOrPlay(name)
 endFunction
 
 function StartArrestStartPrison_01(Actor akGuard, Actor akPrisoner, int aiStartingPhase = 1)
-    ; Bind the captor
-    BindAlias(self.GetEscort(), akGuard)
-
-    ; Bind the Arrestee, who's getting arrested
-    BindAlias(self.GetEscortee(), akPrisoner)
-
+    string name = SCENE_ARREST_START_PRISON_01
+    self.BindSceneAlias(name, "Escort", akGuard)
+    self.BindSceneAlias(name, "Escortee", akPrisoner)
     self.StartSceneAtPhase(aiStartingPhase)
-    ; self.GetScene(SCENE_ARREST_START_PRISON_01).Start()
-    self.QueueOrPlay(SCENE_ARREST_START_PRISON_01)
+    self.QueueOrPlay(name)
 endFunction
 
 function StartRestrainPrisoner_01(Actor akGuard, Actor akPrisoner, int aiStartingPhase = 1)
-    BindAlias(self.GetGuard(), akGuard)
-    BindAlias(self.GetPrisoner(), akPrisoner)
-
+    string name = SCENE_RESTRAIN_PRISONER_01
+    self.BindSceneAlias(name, "Guard", akGuard)
+    self.BindSceneAlias(name, "Prisoner", akPrisoner)
     self.StartSceneAtPhase(aiStartingPhase)
-    ; self.GetScene(SCENE_RESTRAIN_PRISONER_01).Start()
-    self.QueueOrPlay(SCENE_RESTRAIN_PRISONER_01)
-
+    self.QueueOrPlay(name)
 endFunction
 
 function StartRestrainPrisoner_02(Actor akGuard, Actor akPrisoner, int aiStartingPhase = 1)
-    BindAlias(self.GetGuard(), akGuard)
-    BindAlias(self.GetPrisoner(), akPrisoner)
-
+    string name = SCENE_RESTRAIN_PRISONER_02
+    self.BindSceneAlias(name, "Guard", akGuard)
+    self.BindSceneAlias(name, "Prisoner", akPrisoner)
     self.StartSceneAtPhase(aiStartingPhase)
-    ; self.GetScene(SCENE_RESTRAIN_PRISONER_02).Start()
-    self.QueueOrPlay(SCENE_RESTRAIN_PRISONER_02)
+    self.QueueOrPlay(name)
 endFunction
 
 function StartNoClothing(Actor akGuard, Actor akPrisoner)
-    ; Bind the guard
-    BindAlias(self.GetGuard(), akGuard)
-
-    ; Bind the Prisoner, who's undressed and given no clothing
-    BindAlias(self.GetPrisoner(), akPrisoner)
-
-    self.QueueOrPlay(SCENE_NO_CLOTHING)
-    ; self.GetScene(SCENE_NO_CLOTHING).Start()
-    ; NoClothing.Start()
+    string name = SCENE_NO_CLOTHING
+    self.BindSceneAlias(name, "Guard", akGuard)
+    self.BindSceneAlias(name, "Prisoner", akPrisoner)
+    self.QueueOrPlay(name)
 endFunction
 
 function StartForcedStripping(Actor akGuard, Actor akPrisoner)
-    ; Bind the guard
-    BindAlias(self.GetGuard(), akGuard)
-
-    ; Bind the Prisoner, who's about to be stripped
-    BindAlias(self.GetPrisoner(), akPrisoner)
-    
-    self.QueueOrPlay(SCENE_FORCED_STRIPPING_01)
-    ; self.GetScene(SCENE_FORCED_STRIPPING_01).Start()
-    ; ForcedStripping01.Start()
+    string name = SCENE_FORCED_STRIPPING_01
+    self.BindSceneAlias(name, "Guard", akGuard)
+    self.BindSceneAlias(name, "Prisoner", akPrisoner)
+    self.QueueOrPlay(name)
 endFunction
 
 function StartForcedStripping02(Actor akGuard, Actor akPrisoner)
-    ; Bind the guard
-    BindAlias(self.GetGuard(), akGuard)
-
-    ; Bind the Prisoner, who's about to be stripped
-    BindAlias(self.GetPrisoner(), akPrisoner)
-
-    self.QueueOrPlay(SCENE_FORCED_STRIPPING_02)
-    ; self.GetScene(SCENE_FORCED_STRIPPING_02).Start()
-    ; ForcedStripping02.Start()
+    string name = SCENE_FORCED_STRIPPING_02
+    self.BindSceneAlias(name, "Guard", akGuard)
+    self.BindSceneAlias(name, "Prisoner", akPrisoner)
+    self.QueueOrPlay(name)
 endFunction
 
 function StartEludingArrest(Actor akGuard, Actor akEluder)
@@ -1819,35 +1686,62 @@ function StartEludingArrest(Actor akGuard, Actor akEluder)
         return
     endif
 
-    ; Bind the guard
-    BindAlias(self.GetGuard(), akGuard)
-
-    ; Bind the Eluder, who is eluding arrest
-    BindAlias(self.GetEluder(), akEluder)
-
-    Debug("SceneManager::StartEludingArrest", "Scene: "+ self.GetScene(SCENE_ELUDING_ARREST_01) +" Params ["+ akGuard + ", " + akEluder + "] | Aliases: ["+ self.GetGuard() + ", " + self.GetEluder() + "]")
-
-    self.QueueOrPlay(SCENE_ELUDING_ARREST_01)
-    ; self.GetScene(SCENE_ELUDING_ARREST_01).Start()
-    ; EludingArrest.Start()
+    string name = SCENE_ELUDING_ARREST_01
+    self.BindSceneAlias(name, "Guard", akGuard)
+    self.BindSceneAlias(name, "Eluder", akEluder)
+    self.QueueOrPlay(name)
 endFunction
 
 function StartArrestBountyPaymentFollowWillingly(Actor akEscort, Actor akEscortee, ObjectReference akEscortLocation)
-    BindAlias(self.GetEscort(), akEscort)
-    BindAlias(self.GetEscortee(), akEscortee)
-    BindAlias(self.GetGuardLocation(), akEscortLocation)
-    BindAlias(self.GetPrisonerLocation(), akEscortLocation)
-
-    self.QueueOrPlay(SCENE_ARREST_PAY_BOUNTY_FOLLOW_WILLINGLY)
-    ; self.GetScene(SCENE_ARREST_PAY_BOUNTY_FOLLOW_WILLINGLY).Start()
+    string name = SCENE_ARREST_PAY_BOUNTY_FOLLOW_WILLINGLY
+    self.BindSceneAlias(name, "Escort", akEscort)
+    self.BindSceneAlias(name, "Escortee", akEscortee)
+    self.BindSceneAlias(name, "Guard_EscortLocation", akEscortLocation)
+    self.BindSceneAlias(name, "Player_EscortLocation", akEscortLocation)
+    self.QueueOrPlay(name)
 endFunction
 
 function StartArrestPayBountyFollowByForce(Actor akEscort, Actor akEscortee, ObjectReference akEscortLocation)
-    BindAlias(self.GetEscort(), akEscort)
-    BindAlias(self.GetEscortee(), akEscortee)
-    BindAlias(self.GetGuardLocation(), akEscortLocation)
-    BindAlias(self.GetPrisonerLocation(), akEscortLocation)
+    string name = SCENE_ARREST_PAY_BOUNTY_FOLLOW_BY_FORCE
+    self.BindSceneAlias(name, "Escort", akEscort)
+    self.BindSceneAlias(name, "Escortee", akEscortee)
+    self.BindSceneAlias(name, "Guard_EscortLocation", akEscortLocation)
+    self.BindSceneAlias(name, "Player_EscortLocation", akEscortLocation)
+    self.QueueOrPlay(name)
+endFunction
 
-    self.QueueOrPlay(SCENE_ARREST_PAY_BOUNTY_FOLLOW_BY_FORCE)
-    ; self.GetScene(SCENE_ARREST_PAY_BOUNTY_FOLLOW_BY_FORCE).Start()
+
+; ==========================================================
+;                           Debug
+; ==========================================================
+
+string function GetSceneParametersDebugInfo(Scene sender, string sceneName, Form[] params, Alias[] aliases)
+    string debugInfo = ""
+    bool emptyParams = true
+
+    int i = 0
+    while (i < params.Length)
+        ObjectReference param = params[i] as ObjectReference
+        if (param != none)
+            ReferenceAlias paramBinder = aliases[i] as ReferenceAlias
+            string paramBinderSignature = "["+ paramBinder.GetName() +" < ("+ paramBinder.GetID() +")>]"
+            string baseId     = "[BaseID: " + param.GetBaseObject().GetFormID() + "] "
+            string formId     = "[FormID: " + param.GetFormID() + "] "
+            
+            string objectBaseName   = param.GetBaseObject().GetName()
+            string objectClassName  = param.GetName()
+            string whichNameProperty = string_if (objectClassName != "", objectClassName, objectBaseName)
+            string objectName = "[Name: " + whichNameProperty + "] "
+            emptyParams = false
+
+            debugInfo += "\t["+i+"]: " + paramBinderSignature + " " + param + " " + formId + baseId + string_if (objectName != "[Name: ] ", objectName) + "\n"
+        endif
+        i += 1
+    endWhile
+    
+    if (emptyParams)
+        return sceneName + " " + sender + " - No Parameters, Scene expected: " + params.Length + " parameters!" ; " - No Parameters, Scene expected: need a way to find scene required params
+    endif
+
+    return sceneName + " " + sender + "\nParameters: [\n" + debugInfo + "]"
 endFunction

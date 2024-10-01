@@ -128,14 +128,14 @@ endFunction
 
 function SendPrisonSceneBulkEvent(string asScene, string asSceneEvent, Form[] akPrisoners, Actor akAuthority, string asSceneSecondaryEvent = "null")
     if (akPrisoners == none || akPrisoners.Length == 0)
-        self.SendError("No prisoners provided for bulk scene event!")
+        self.SendError("No prisoners provided for bulk scene event!", "EventManager::SendPrisonSceneBulkEvent")
         return
     endif
 
     RPB_Prison prison = API.PrisonManager.FindPrisonByPrisoner(akPrisoners[0] as Actor)
 
     if (prison == none)
-        self.SendError("Could not retrieve the prison from " + akPrisoners[0] + ", cannot proceed with the scene!")
+        self.SendError("Could not retrieve the prison from " + akPrisoners[0] + ", cannot proceed with the scene!", "EventManager::SendPrisonSceneBulkEvent")
         return
     endif
 
@@ -144,7 +144,7 @@ function SendPrisonSceneBulkEvent(string asScene, string asSceneEvent, Form[] ak
         RPB_Prisoner prisoner = prison.AwaitPrisonerReference(akPrisoners[i] as Actor) 
 
         if (prisoner == none)
-            self.SendError("Could not retrieve the prisoner from the scene event, cannot proceed with the scene!")
+            self.SendError("Could not retrieve the prisoner from the scene event, cannot proceed with the scene!", "EventManager::SendPrisonSceneBulkEvent")
             return
         endif
 
@@ -750,7 +750,9 @@ event OnSurrenderScene(string asScene, string asSceneEvent, Actor akSurrenderer,
             ; TODO: Refactor this
             Form[] captors = akParams
             Actor mainCaptor = RPB_Utility.GetNearestActorFromList(akSurrenderer, captors)
-            BindAliasTo(SceneManager.GetSurrendererCaptor(), mainCaptor)
+            ReferenceAlias paramBinder = SceneManager.GetSceneNthAliasOfType(asScene, "SurrendererCaptor")
+            BindAliasTo(paramBinder, mainCaptor)
+            Debug("EventManager::OnSurrenderScene", "akParams: " + akParams + ", akSurrenderer: " + akSurrenderer)
 
         elseif (asSceneEvent == SceneManager.EVENT_SURRENDER_END)
             RetainAI(akSurrenderer.GetFormID() == 0x14)
