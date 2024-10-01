@@ -858,6 +858,131 @@ function EnsureCaptorSpellAndBinding(Actor akCaptor) global
 endFunction
 
 ; ==========================================================
+;                     Type Cast Functions
+; ==========================================================
+
+Form[] function ActorToFormArray(Actor[] akActors) global
+    int arr = JArray.object()
+
+    int i = 0
+    while (i < akActors.Length)
+        JArray.addForm(arr, akActors[i])
+        i += 1
+    endWhile
+
+    return JArray.asFormArray(arr)
+endFunction
+
+; ==========================================================
+;                       Param Functions
+; ==========================================================
+
+function AddFormIfNotNone(Form akForm, int arr) global
+    if (akForm)
+        JArray.addForm(arr, akForm)
+    endif
+endFunction
+
+Form[] function BuildParamsObjectReference(\
+    ObjectReference akRef1, \
+    ObjectReference akRef2 = none, \
+    ObjectReference akRef3 = none, \
+    ObjectReference akRef4 = none, \
+    ObjectReference akRef5 = none, \
+    ObjectReference akRef6 = none, \
+    ObjectReference akRef7 = none, \
+    ObjectReference akRef8 = none, \
+    ObjectReference akRef9 = none, \
+    ObjectReference akRef10 = none, \
+    ObjectReference akRef11 = none, \
+    ObjectReference akRef12 = none, \
+    ObjectReference akRef13 = none, \
+    ObjectReference akRef14 = none, \
+    ObjectReference akRef15 = none, \
+    ObjectReference akRef16 = none, \
+    ObjectReference akRef17 = none, \
+    ObjectReference akRef18 = none, \
+    ObjectReference akRef19 = none, \
+    ObjectReference akRef20 = none \
+) global
+
+    int arr = JArray.object()
+
+    AddFormIfNotNone(akRef1, arr)
+    AddFormIfNotNone(akRef2, arr)
+    AddFormIfNotNone(akRef3, arr)
+    AddFormIfNotNone(akRef4, arr)
+    AddFormIfNotNone(akRef5, arr)
+    AddFormIfNotNone(akRef6, arr)
+    AddFormIfNotNone(akRef7, arr)
+    AddFormIfNotNone(akRef8, arr)
+    AddFormIfNotNone(akRef9, arr)
+    AddFormIfNotNone(akRef10, arr)
+    AddFormIfNotNone(akRef11, arr)
+    AddFormIfNotNone(akRef12, arr)
+    AddFormIfNotNone(akRef13, arr)
+    AddFormIfNotNone(akRef14, arr)
+    AddFormIfNotNone(akRef15, arr)
+    AddFormIfNotNone(akRef16, arr)
+    AddFormIfNotNone(akRef17, arr)
+    AddFormIfNotNone(akRef18, arr)
+    AddFormIfNotNone(akRef19, arr)
+    AddFormIfNotNone(akRef20, arr)
+
+    return JArray.asFormArray(arr)
+endFunction
+
+Form[] function BuildParamsActor(\
+    Actor akRef1, \
+    Actor akRef2 = none, \
+    Actor akRef3 = none, \
+    Actor akRef4 = none, \
+    Actor akRef5 = none, \
+    Actor akRef6 = none, \
+    Actor akRef7 = none, \
+    Actor akRef8 = none, \
+    Actor akRef9 = none, \
+    Actor akRef10 = none, \
+    Actor akRef11 = none, \
+    Actor akRef12 = none, \
+    Actor akRef13 = none, \
+    Actor akRef14 = none, \
+    Actor akRef15 = none, \
+    Actor akRef16 = none, \
+    Actor akRef17 = none, \
+    Actor akRef18 = none, \
+    Actor akRef19 = none, \
+    Actor akRef20 = none \
+) global
+
+    int arr = JArray.object()
+
+    AddFormIfNotNone(akRef1, arr)
+    AddFormIfNotNone(akRef2, arr)
+    AddFormIfNotNone(akRef3, arr)
+    AddFormIfNotNone(akRef4, arr)
+    AddFormIfNotNone(akRef5, arr)
+    AddFormIfNotNone(akRef6, arr)
+    AddFormIfNotNone(akRef7, arr)
+    AddFormIfNotNone(akRef8, arr)
+    AddFormIfNotNone(akRef9, arr)
+    AddFormIfNotNone(akRef10, arr)
+    AddFormIfNotNone(akRef11, arr)
+    AddFormIfNotNone(akRef12, arr)
+    AddFormIfNotNone(akRef13, arr)
+    AddFormIfNotNone(akRef14, arr)
+    AddFormIfNotNone(akRef15, arr)
+    AddFormIfNotNone(akRef16, arr)
+    AddFormIfNotNone(akRef17, arr)
+    AddFormIfNotNone(akRef18, arr)
+    AddFormIfNotNone(akRef19, arr)
+    AddFormIfNotNone(akRef20, arr)
+
+    return JArray.asFormArray(arr)
+
+endFunction
+
+; ==========================================================
 ;                       Alias Functions
 ; ==========================================================
 
