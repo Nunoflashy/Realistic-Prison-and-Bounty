@@ -141,6 +141,14 @@ function Debug(string asCaller, string asLogInfo, bool abCondition = true) globa
     base_log("DEBUG:", asLogInfo, asCaller)
 endFunction
 
+function DebugInfo(string asCaller, string asLogInfo, bool abCondition = true) global
+    if (!abCondition || !IsDebuggingEnabled())
+        return
+    endif
+
+    base_log("INFO:", asLogInfo, asCaller)
+endFunction
+
 function DebugWarn(string asCaller, string asLogInfo, bool abCondition = true) global
     if (!abCondition || !IsDebuggingEnabled())
         return
@@ -163,6 +171,27 @@ function DebugWithArgs(string asCaller, string asArgs, string asLogInfo, bool ab
     endif
 
     base_log("DEBUG:", asLogInfo, asCaller, asArgs)
+endFunction
+
+function DebugParams(string params, string paramNames = "", string caller = "", bool condition = true) global
+    string[] splitParams    = StringUtil.Split(params, ",")
+    string[] splitNames     = StringUtil.Split(paramNames, ", ")
+
+    string msg = "[\n"
+    int i = 0
+    while (i < splitParams.Length)
+        string paramName = string_if (splitNames[i], splitNames[i], i)
+        msg += "\t" + paramName + ": " + splitParams[i]
+
+        if (i < splitParams.Length - 1)
+            msg += "\n"
+        endif
+
+        i += 1
+    endWhile
+    msg += "\n]"
+
+    Debug(caller, msg, condition)
 endFunction
 
 function LogNoType(string asLogInfo, string asCaller = "", bool abCondition = true) global
@@ -320,6 +349,52 @@ endFunction
 ; ==========================================================
 ;                      String Functions
 ; ==========================================================
+
+string function GetFormattedAsParams(string values, string keys = "", string keyPrefixes = "", string keySuffixes = "", string valuePrefixes = "", string valueSuffixes = "") global
+    string[] splitValues        = StringUtil.Split(values, ",")
+    string[] splitKeys          = StringUtil.Split(keys, ", ")
+    string[] splitKeyPrefixes   = StringUtil.Split(keyPrefixes, ", ")
+    string[] splitKeySuffixes   = StringUtil.Split(keySuffixes, ", ")
+    string[] splitValuePrefixes = StringUtil.Split(valuePrefixes, ", ")
+    string[] splitValueSuffixes = StringUtil.Split(valueSuffixes, ", ")
+
+    string msg = "[\n"
+    int i = 0
+    while (i < splitValues.Length)
+        string paramName = string_if (splitKeys[i], splitKeys[i], i)
+        string keyPrefix = ""
+        string keySuffix = ""
+        string valuePrefix = ""
+        string valueSuffix = ""
+
+        if (splitKeyPrefixes != none)
+            keyPrefix = splitKeyPrefixes[i]
+        endif
+
+        if (splitValuePrefixes != none)
+            valuePrefix = splitValuePrefixes[i]
+        endif
+
+        if (splitKeySuffixes != none)
+            keySuffix = splitKeySuffixes[i]
+        endif
+
+        if (splitValueSuffixes != none)
+            valueSuffix = splitValueSuffixes[i]
+        endif
+
+        msg += "\t" + keyPrefix + paramName + keySuffix + ": " + valuePrefix + splitValues[i] + valueSuffix
+
+        if (i < splitValues.Length - 1)
+            msg += "\n"
+        endif
+
+        i += 1
+    endWhile
+    msg += "\n]"
+
+    return msg
+endFunction
 
 string function ReplaceString(string str, string toFind, string replacement) global
     int len = StringUtil.GetLength(str)
@@ -2023,6 +2098,26 @@ bool function PassTimeInDays(int aiPassByDays) global
 endFunction
 
 
+string function FormatFloat(float number) global
+    string numberAsString       = number as string
+    int decimalPlacePosition    = StringUtil.Find(numberAsString, ".")
+
+    if (decimalPlacePosition == -1) 
+        return numberAsString
+    endif
+
+    string wholePart            = StringUtil.Substring(numberAsString, 0, decimalPlacePosition)
+    string decimalPart          = StringUtil.Substring(numberAsString, decimalPlacePosition + 1)
+
+    int decimalLength = StringUtil.GetLength(decimalPart)
+    int decimalsToUse = Min(2, decimalLength) as int
+
+    string formattedNumber = wholePart + "." + StringUtil.Substring(decimalPart, 0, decimalsToUse)
+
+    ; DebugParams(number + "," + numberAsString + ",", "number, numberAsString")
+    return formattedNumber
+endFunction
+
 ; ==========================================================
 ;                           Struct
 ; ==========================================================
@@ -2123,8 +2218,6 @@ int function EndBenchmark(float startTime, string _message = "", bool condition 
         float endTime = Utility.GetCurrentRealTime()
         int elapsedTime = ((endTime - startTime) * 1000) as int
         base_log("BENCHMARK:", string_if (_message != "", _message + " ") + "execution took " + elapsedTime + " ms")
-        ; debug.trace("[Realistic Prison and Bounty] DEBUG: " + _message + " execution took " + elapsedTime + " ms")
-        ; local_log(none, string_if(_message != "", _message + " ", "") + "execution took " + ((elapsedTime * 1000)) + " ms", LOG_DEBUG(), hideCall = true)
         return elapsedTime
     endif
 endFunction
