@@ -28,7 +28,8 @@ function SetTests()
     self.AddTest("16 - Test ActiveMagicEffectList Algorithms", "Test_ActiveMagicEffectListAlgorithms")
     self.AddTest("17 - Test New Serialization - Compare with Old", "Test_NewSerializationCompareWithOld")
     self.AddTest("18 - Test Prison Root Objects", "Test_PrisonRootObjects")
-    self.AddTest("18 - Test JSON Conditions", "Test_JSONConditions")
+    self.AddTest("19 - Test JSON Conditions", "Test_JSONConditions")
+    self.AddTest("20 - Test Data Structures", "Test_DataStructures")
 endFunction
 
 state Test_25Days_After_26th_Frostfall_Is_20th_Suns_Dusk
@@ -185,7 +186,7 @@ state Test_Arrest_And_Imprison_Multiple_Actors_With_Scene
     
         RPB_Arrestee arresteeRef = arrest.AwaitArresteeReference(player)
         arrest.OnArrestBegin(arresteeRef, captorRef, guard.GetCrimeFaction(), arrest.ARREST_TYPE_ESCORT_TO_JAIL)
-        RPB_Utility.BindAliasTo(RPB_API.GetSceneManager().GetEscortee(1), playerCopy)
+        ; RPB_Utility.BindAliasTo(RPB_API.GetSceneManager().GetEscortee(1), playerCopy)
     endFunction
 endState
 
@@ -651,6 +652,865 @@ state Test_JSONConditions
     endFunction
 endState
 
+state Test_DataStructures
+    function Setup()
+        int parentContainer
+        int totalObjects = 100
+
+        start_test("Data Structures - Execution Times")
+
+        ; JC
+        parentContainer                     = JMap.object()
+        int jcMemoryTimes                   = JC_Flat(parentContainer, JArray.object(), totalObjects)
+        float jcObjectCreationTime          = JMap.getFlt(jcMemoryTimes, "Object Creation")
+        float jcObjectReadTime              = JMap.getFlt(jcMemoryTimes, "Object Read")
+        float jcObjectWriteTime             = JMap.getFlt(jcMemoryTimes, "Object Write")
+        float jcObjectDeleteTime            = JMap.getFlt(jcMemoryTimes, "Object Delete")
+        float jcObjectVerifyRead            = JMap.getInt(jcMemoryTimes, "Object Verify Read")
+        float jcObjectVerifyCreate          = JMap.getInt(jcMemoryTimes, "Object Verify Create")
+        int jcObject                        = JMap.getObj(jcMemoryTimes, "Object")
+        bool jcHasValidCreateIntegrity      = JMap.getInt(jcMemoryTimes, "Object Verify Create: Integrity") as bool
+        bool jcHasValidReadIntegrity        = JMap.getInt(jcMemoryTimes, "Object Verify Read: Integrity") as bool
+        bool jcHasValidDeleteIntegrity      = JMap.getInt(jcMemoryTimes, "Object Verify Delete: Integrity") as bool
+
+        ; RPB_Memory
+        parentContainer                     = RPB_Memory.Map("<string>")
+        int rpbMemoryTimes                  = RPB_Flat(parentContainer, RPB_Memory.Array("<int>"), totalObjects)
+        ; int rpbMemoryTimes                  = RPB_Flat(parentContainer, RPB_Memory.Object("int[]", "{ 'length': 3 }"), totalObjects)
+        float rpbObjectCreationTime         = RPB_Memory.Map_GetFloat(rpbMemoryTimes, "Object Creation")
+        float rpbObjectReadTime             = RPB_Memory.Map_GetFloat(rpbMemoryTimes, "Object Read")
+        float rpbObjectWriteTime            = RPB_Memory.Map_GetFloat(rpbMemoryTimes, "Object Write")
+        float rpbObjectDeleteTime           = RPB_Memory.Map_GetFloat(rpbMemoryTimes, "Object Delete")
+        float rpbObjectVerifyRead           = RPB_Memory.Map_GetInt(rpbMemoryTimes, "Object Verify Read")
+        float rpbObjectVerifyCreate         = RPB_Memory.Map_GetInt(rpbMemoryTimes, "Object Verify Create")
+        int rpbObject                       = RPB_Memory.Map_GetObject(rpbMemoryTimes, "Object")
+        bool rpbHasValidCreateIntegrity     = RPB_Memory.Map_GetInt(rpbMemoryTimes, "Object Verify Create: Integrity") as bool
+        bool rpbHasValidReadIntegrity       = RPB_Memory.Map_GetInt(rpbMemoryTimes, "Object Verify Read: Integrity") as bool
+        bool rpbHasValidDeleteIntegrity     = RPB_Memory.Map_GetInt(rpbMemoryTimes, "Object Verify Delete: Integrity") as bool
+
+        ; RPB_Memory Fast
+        parentContainer                           = RPB_Memory.FastMap("<string>")
+        int unsafeRpbMemoryTimes                  = RPB_Fast_Flat(parentContainer, RPB_Memory.FastArray("<int>"), totalObjects)
+        float unsafeRpbObjectCreationTime         = RPB_Memory.FastMap_GetFloat(unsafeRpbMemoryTimes, "Object Creation")
+        float unsafeRpbObjectReadTime             = RPB_Memory.FastMap_GetFloat(unsafeRpbMemoryTimes, "Object Read")
+        float unsafeRpbObjectWriteTime            = RPB_Memory.FastMap_GetFloat(unsafeRpbMemoryTimes, "Object Write")
+        float unsafeRpbObjectDeleteTime           = RPB_Memory.FastMap_GetFloat(unsafeRpbMemoryTimes, "Object Delete")
+        float unsafeRpbObjectVerifyRead           = RPB_Memory.FastMap_GetInt(unsafeRpbMemoryTimes, "Object Verify Read")
+        float unsafeRpbObjectVerifyCreate         = RPB_Memory.FastMap_GetInt(unsafeRpbMemoryTimes, "Object Verify Create")
+        int unsafeRpbObject                       = RPB_Memory.FastMap_GetObject(unsafeRpbMemoryTimes, "Object")
+        bool unsafeRpbHasValidCreateIntegrity     = RPB_Memory.FastMap_GetInt(unsafeRpbMemoryTimes, "Object Verify Create: Integrity") as bool
+        bool unsafeRpbHasValidReadIntegrity       = RPB_Memory.FastMap_GetInt(unsafeRpbMemoryTimes, "Object Verify Read: Integrity") as bool
+        bool unsafeRpbHasValidDeleteIntegrity     = RPB_Memory.FastMap_GetInt(unsafeRpbMemoryTimes, "Object Verify Delete: Integrity") as bool
+
+
+        log("Object Performance (objects: "+ totalObjects +") \n"+ \ 
+            "[UNIT LOG] \tJContainers: \n" + \ 
+                "[UNIT LOG] \t - Creation: "+ (jcObjectCreationTime as int) +" ms ("+ FormatFloat(jcObjectCreationTime as float / totalObjects) +" ms per object)\n" + \ 
+                "[UNIT LOG] \t - Read: "+ (jcObjectReadTime as int) +" ms ("+ FormatFloat(jcObjectReadTime as float / totalObjects) +" ms per object)\n" + \ 
+                "[UNIT LOG] \t - Write: "+ (jcObjectWriteTime as int) +" ms ("+ FormatFloat(jcObjectWriteTime as float / totalObjects) +" ms per object)\n" + \
+                "[UNIT LOG] \t - Delete: "+ (jcObjectDeleteTime as int) +" ms ("+ FormatFloat(jcObjectDeleteTime as float / totalObjects) +" ms per object)\n" + \
+                "[UNIT LOG] \t - Verify Create: "+ (jcObjectVerifyCreate as int) +" ms ("+ FormatFloat(jcObjectVerifyCreate as float / totalObjects) +" ms per object)\n" + \
+                "[UNIT LOG] \t - Verify Read: "+ (jcObjectVerifyRead as int) +" ms ("+ FormatFloat(jcObjectVerifyRead as float / totalObjects) +" ms per object)\n\n" + \
+            "[UNIT LOG] \tRPB_Memory: \n" + \ 
+                "[UNIT LOG] \t - Creation: "+ (rpbObjectCreationTime as int) +" ms ("+ FormatFloat(rpbObjectCreationTime as float / totalObjects) +" ms per object)\n" + \ 
+                "[UNIT LOG] \t - Read: "+ (rpbObjectReadTime as int) +" ms ("+ FormatFloat(rpbObjectReadTime as float / totalObjects) +" ms per object)\n" + \ 
+                "[UNIT LOG] \t - Write: "+ (rpbObjectWriteTime as int) +" ms ("+ FormatFloat(rpbObjectWriteTime as float / totalObjects) +" ms per object)\n" + \
+                "[UNIT LOG] \t - Delete: "+ (rpbObjectDeleteTime as int) +" ms ("+ FormatFloat(rpbObjectDeleteTime as float / totalObjects) +" ms per object)\n" + \
+                "[UNIT LOG] \t - Verify Create: "+ (rpbObjectVerifyCreate as int) +" ms ("+ FormatFloat(rpbObjectVerifyCreate as float / totalObjects) +" ms per object)\n" + \
+                "[UNIT LOG] \t - Verify Read: "+ (rpbObjectVerifyRead as int) +" ms ("+ FormatFloat(rpbObjectVerifyRead as float / totalObjects) +" ms per object)\n\n" + \
+            "[UNIT LOG] \tRPB_Memory (Fast): \n" + \ 
+                "[UNIT LOG] \t - Creation: "+ (unsafeRpbObjectCreationTime as int) +" ms ("+ FormatFloat(unsafeRpbObjectCreationTime as float / totalObjects) +" ms per object)\n" + \ 
+                "[UNIT LOG] \t - Read: "+ (unsafeRpbObjectReadTime as int) +" ms ("+ FormatFloat(unsafeRpbObjectReadTime as float / totalObjects) +" ms per object)\n" + \ 
+                "[UNIT LOG] \t - Write: "+ (unsafeRpbObjectWriteTime as int) +" ms ("+ FormatFloat(unsafeRpbObjectWriteTime as float / totalObjects) +" ms per object)\n" + \
+                "[UNIT LOG] \t - Delete: "+ (unsafeRpbObjectDeleteTime as int) +" ms ("+ FormatFloat(unsafeRpbObjectDeleteTime as float / totalObjects) +" ms per object)\n" + \
+                "[UNIT LOG] \t - Verify Create: "+ (unsafeRpbObjectVerifyCreate as int) +" ms ("+ FormatFloat(unsafeRpbObjectVerifyCreate as float / totalObjects) +" ms per object)\n" + \
+                "[UNIT LOG] \t - Verify Read: "+ (unsafeRpbObjectVerifyRead as int) +" ms ("+ FormatFloat(unsafeRpbObjectVerifyRead as float / totalObjects) +" ms per object)\n\n" \
+        )
+ 
+        display_step("JContainers -> Create Integrity", jcHasValidCreateIntegrity)
+        display_step("JContainers -> Read Integrity", jcHasValidReadIntegrity)
+        display_step("JContainers -> Delete Integrity", jcHasValidDeleteIntegrity)
+
+        display_step("RPB_Memory -> Create Integrity", rpbHasValidCreateIntegrity)
+        display_step("RPB_Memory -> Read Integrity", rpbHasValidReadIntegrity)
+        display_step("RPB_Memory -> Delete Integrity", rpbHasValidDeleteIntegrity)
+
+        display_step("RPB_Memory (Fast) -> Create Integrity", unsafeRpbHasValidCreateIntegrity)
+        display_step("RPB_Memory (Fast) -> Read Integrity", unsafeRpbHasValidReadIntegrity)
+        display_step("RPB_Memory (Fast) -> Delete Integrity", unsafeRpbHasValidDeleteIntegrity)
+
+        debug.trace("\n")
+
+        int nestingDepth = 30
+        ; JC
+        jcMemoryTimes                   = JC_Nested(nestingDepth)
+        jcObjectCreationTime            = JMap.getInt(jcMemoryTimes, "Object Creation")
+        jcObjectReadTime                = JMap.getInt(jcMemoryTimes, "Object Read")
+        jcObjectWriteTime               = JMap.getInt(jcMemoryTimes, "Object Write")
+        jcObjectDeleteTime              = JMap.getFlt(jcMemoryTimes, "Object Delete")
+        jcObjectVerifyRead              = JMap.getInt(jcMemoryTimes, "Object Verify Read")
+        jcObjectVerifyCreate            = JMap.getInt(jcMemoryTimes, "Object Verify Create")
+        jcObject                        = JMap.getObj(jcMemoryTimes, "Object")
+        jcHasValidCreateIntegrity       = JMap.getInt(jcMemoryTimes, "Object Verify Create: Integrity") as bool
+        jcHasValidReadIntegrity         = JMap.getInt(jcMemoryTimes, "Object Verify Read: Integrity") as bool
+        jcHasValidDeleteIntegrity       = JMap.getInt(jcMemoryTimes, "Object Verify Delete: Integrity") as bool
+
+        ; RPB_Memory
+        rpbMemoryTimes                  = RPB_Nested(nestingDepth)
+        rpbObjectCreationTime           = RPB_Memory.Map_GetFloat(rpbMemoryTimes, "Object Creation")
+        rpbObjectReadTime               = RPB_Memory.Map_GetFloat(rpbMemoryTimes, "Object Read")
+        rpbObjectWriteTime              = RPB_Memory.Map_GetFloat(rpbMemoryTimes, "Object Write")
+        rpbObjectDeleteTime             = RPB_Memory.Map_GetFloat(rpbMemoryTimes, "Object Delete")
+        rpbObjectVerifyRead             = RPB_Memory.Map_GetInt(rpbMemoryTimes, "Object Verify Read")
+        rpbObjectVerifyCreate           = RPB_Memory.Map_GetInt(rpbMemoryTimes, "Object Verify Create")
+        rpbObject                       = RPB_Memory.Map_GetObject(rpbMemoryTimes, "Object")
+        rpbHasValidCreateIntegrity      = RPB_Memory.Map_GetInt(rpbMemoryTimes, "Object Verify Create: Integrity") as bool
+        rpbHasValidReadIntegrity        = RPB_Memory.Map_GetInt(rpbMemoryTimes, "Object Verify Read: Integrity") as bool
+        rpbHasValidDeleteIntegrity      = RPB_Memory.Map_GetInt(rpbMemoryTimes, "Object Verify Delete: Integrity") as bool
+
+        ; RPB_Memory Fast
+        unsafeRpbMemoryTimes                = RPB_Fast_Nested(nestingDepth)
+        unsafeRpbObjectCreationTime         = RPB_Memory.FastMap_GetFloat(unsafeRpbMemoryTimes, "Object Creation")
+        unsafeRpbObjectReadTime             = RPB_Memory.FastMap_GetFloat(unsafeRpbMemoryTimes, "Object Read")
+        unsafeRpbObjectWriteTime            = RPB_Memory.FastMap_GetFloat(unsafeRpbMemoryTimes, "Object Write")
+        unsafeRpbObjectDeleteTime           = RPB_Memory.FastMap_GetFloat(unsafeRpbMemoryTimes, "Object Delete")
+        unsafeRpbObjectVerifyRead           = RPB_Memory.FastMap_GetInt(unsafeRpbMemoryTimes, "Object Verify Read")
+        unsafeRpbObjectVerifyCreate         = RPB_Memory.FastMap_GetInt(unsafeRpbMemoryTimes, "Object Verify Create")
+        unsafeRpbObject                     = RPB_Memory.FastMap_GetObject(unsafeRpbMemoryTimes, "Object")
+        unsafeRpbHasValidCreateIntegrity    = RPB_Memory.FastMap_GetInt(unsafeRpbMemoryTimes, "Object Verify Create: Integrity") as bool
+        unsafeRpbHasValidReadIntegrity      = RPB_Memory.FastMap_GetInt(unsafeRpbMemoryTimes, "Object Verify Read: Integrity") as bool
+        unsafeRpbHasValidDeleteIntegrity    = RPB_Memory.FastMap_GetInt(unsafeRpbMemoryTimes, "Object Verify Delete: Integrity") as bool
+
+        log("Object Nested Performance (Nesting Depth: "+ nestingDepth +") \n"+ \ 
+            "[UNIT LOG] \tJContainers: \n" + \ 
+                "[UNIT LOG] \t - Creation: "+ (jcObjectCreationTime as int) +" ms ("+ FormatFloat(jcObjectCreationTime as float / nestingDepth) +" ms per object)\n" + \ 
+                "[UNIT LOG] \t - Read: "+ (jcObjectReadTime as int) +" ms ("+ FormatFloat(jcObjectReadTime as float / nestingDepth) +" ms per object)\n" + \ 
+                "[UNIT LOG] \t - Write: "+ (jcObjectWriteTime as int) +" ms ("+ FormatFloat(jcObjectWriteTime as float / nestingDepth) +" ms per object)\n" + \
+                "[UNIT LOG] \t - Delete: "+ (jcObjectDeleteTime as int) +" ms ("+ FormatFloat(jcObjectDeleteTime as float / totalObjects) +" ms per object)\n" + \
+                "[UNIT LOG] \t - Verify Create: "+ (jcObjectVerifyCreate as int) +" ms ("+ FormatFloat(jcObjectVerifyCreate as float / nestingDepth) +" ms per object)\n" + \
+                "[UNIT LOG] \t - Verify Read: "+ (jcObjectVerifyRead as int) +" ms ("+ FormatFloat(jcObjectVerifyRead as float / nestingDepth) +" ms per object)\n\n" + \
+            "[UNIT LOG] \tRPB_Memory: \n" + \ 
+                "[UNIT LOG] \t - Creation: "+ (rpbObjectCreationTime as int) +" ms ("+ FormatFloat(rpbObjectCreationTime as float / nestingDepth) +" ms per object)\n" + \ 
+                "[UNIT LOG] \t - Read: "+ (rpbObjectReadTime as int) +" ms ("+ FormatFloat(rpbObjectReadTime as float / nestingDepth) +" ms per object)\n" + \ 
+                "[UNIT LOG] \t - Write: "+ (rpbObjectWriteTime as int) +" ms ("+ FormatFloat(rpbObjectWriteTime as float / nestingDepth) +" ms per object)\n" + \
+                "[UNIT LOG] \t - Delete: "+ (rpbObjectDeleteTime as int) +" ms ("+ FormatFloat(rpbObjectDeleteTime as float / totalObjects) +" ms per object)\n" + \
+                "[UNIT LOG] \t - Verify Create: "+ (rpbObjectVerifyCreate as int) +" ms ("+ FormatFloat(rpbObjectVerifyCreate as float / nestingDepth) +" ms per object)\n" + \
+                "[UNIT LOG] \t - Verify Read: "+ (rpbObjectVerifyRead as int) +" ms ("+ FormatFloat(rpbObjectVerifyRead as float / nestingDepth) +" ms per object)\n\n" + \
+            "[UNIT LOG] \tRPB_Memory (Fast): \n" + \ 
+                "[UNIT LOG] \t - Creation: "+ (unsafeRpbObjectCreationTime as int) +" ms ("+ FormatFloat(unsafeRpbObjectCreationTime as float / nestingDepth) +" ms per object)\n" + \ 
+                "[UNIT LOG] \t - Read: "+ (unsafeRpbObjectReadTime as int) +" ms ("+ FormatFloat(unsafeRpbObjectReadTime as float / nestingDepth) +" ms per object)\n" + \ 
+                "[UNIT LOG] \t - Write: "+ (unsafeRpbObjectWriteTime as int) +" ms ("+ FormatFloat(unsafeRpbObjectWriteTime as float / nestingDepth) +" ms per object)\n" + \
+                "[UNIT LOG] \t - Delete: "+ (unsafeRpbObjectDeleteTime as int) +" ms ("+ FormatFloat(unsafeRpbObjectDeleteTime as float / totalObjects) +" ms per object)\n" + \
+                "[UNIT LOG] \t - Verify Create: "+ (unsafeRpbObjectVerifyCreate as int) +" ms ("+ FormatFloat(unsafeRpbObjectVerifyCreate as float / nestingDepth) +" ms per object)\n" + \
+                "[UNIT LOG] \t - Verify Read: "+ (unsafeRpbObjectVerifyRead as int) +" ms ("+ FormatFloat(unsafeRpbObjectVerifyRead as float / nestingDepth) +" ms per object)\n\n" \
+        )
+
+        display_step("JContainers -> Create Integrity", jcHasValidCreateIntegrity)
+        display_step("JContainers -> Read Integrity", jcHasValidReadIntegrity)
+        display_step("JContainers -> Delete Integrity", jcHasValidDeleteIntegrity)
+
+        display_step("RPB_Memory -> Create Integrity", rpbHasValidCreateIntegrity)
+        display_step("RPB_Memory -> Read Integrity", rpbHasValidReadIntegrity)
+        display_step("RPB_Memory -> Delete Integrity", rpbHasValidDeleteIntegrity)
+
+        display_step("RPB_Memory (Fast) -> Create Integrity", unsafeRpbHasValidCreateIntegrity)
+        display_step("RPB_Memory (Fast) -> Read Integrity", unsafeRpbHasValidReadIntegrity)
+        display_step("RPB_Memory (Fast) -> Delete Integrity", unsafeRpbHasValidDeleteIntegrity)
+        debug.trace("\n")
+
+        ; log("(Object) RPB_Memory -> " + GetContainerList(rpbObject))
+    endFunction
+endState
+
+int function JC_Flat(int parentContainer, int object, int objectCount)
+    float startTime
+    float endTime
+    bool hasIntegrity = true
+    int benchmarks = JMap.object()
+    int totalObjects = objectCount
+
+    startTime = Utility.GetCurrentRealTime()
+    ; Object Creation
+    while (objectCount > 0)
+        int obj = object
+        JMap.setObj(parentContainer, "obj:" + objectCount, obj)
+        objectCount -= 1
+    endWhile
+    endTime = Utility.GetCurrentRealTime()
+    JMap.setFlt(benchmarks, "Object Creation", ((endTime - startTime) * 1000))
+
+
+    objectCount = totalObjects
+    hasIntegrity = true
+    startTime = Utility.GetCurrentRealTime()
+    ; Object Write
+    while (objectCount > 0)
+        JMap.setStr(parentContainer, "Key:" + objectCount, "Gatinha Cheia de Metropolitanas")
+        objectCount -= 1
+    endWhile
+    endTime = Utility.GetCurrentRealTime()
+    JMap.setFlt(benchmarks, "Object Write", ((endTime - startTime) * 1000))
+
+
+    objectCount = totalObjects
+    startTime = Utility.GetCurrentRealTime()
+    ; Object Read
+    while (objectCount > 0)
+        JMap.getStr(parentContainer, "Key:" + objectCount)
+        objectCount -= 1
+    endWhile
+    endTime = Utility.GetCurrentRealTime()
+    JMap.setFlt(benchmarks, "Object Read", ((endTime - startTime) * 1000))
+
+    ; Object Verify Create
+    objectCount = totalObjects
+    hasIntegrity = true
+    startTime = Utility.GetCurrentRealTime()
+    while (objectCount > 0)
+        bool hasKey = JMap.hasKey(parentContainer, "obj:" + objectCount)
+        if (!hasKey)
+            hasIntegrity = false
+        endif
+        objectCount -= 1
+    endWhile
+    endTime = Utility.GetCurrentRealTime()
+    JMap.setFlt(benchmarks, "Object Verify Create", ((endTime - startTime) * 1000))
+    JMap.setInt(benchmarks, "Object Verify Create: Integrity", hasIntegrity as int)
+
+    ; Object Verify Read
+    objectCount = totalObjects
+    hasIntegrity = true
+    startTime = Utility.GetCurrentRealTime()
+    while (objectCount > 0)
+        bool contentsMatch = JMap.getStr(parentContainer, "Key:" + objectCount) == "Gatinha Cheia de Metropolitanas"
+        if (!contentsMatch)
+            hasIntegrity = false
+        endif
+        objectCount -= 1
+    endWhile
+    endTime = Utility.GetCurrentRealTime()
+    JMap.setFlt(benchmarks, "Object Verify Read", ((endTime - startTime) * 1000))
+    JMap.setInt(benchmarks, "Object Verify Read: Integrity", hasIntegrity as int)
+
+    ; Object Delete
+    objectCount = totalObjects
+    startTime = Utility.GetCurrentRealTime()
+    hasIntegrity = true
+    while (objectCount > 0)
+        hasIntegrity = JMap.removeKey(parentContainer, "Key:" + objectCount)
+        if (!hasIntegrity)
+            hasIntegrity = false
+        endif
+        objectCount -= 1
+    endWhile
+    endTime = Utility.GetCurrentRealTime()
+    JMap.setFlt(benchmarks, "Object Delete", ((endTime - startTime) * 1000))
+    JMap.setInt(benchmarks, "Object Verify Delete: Integrity", hasIntegrity as int)
+
+
+    return benchmarks
+endFunction
+
+int function RPB_Flat(int parentContainer, int object, int objectCount)
+    float startTime
+    float endTime
+    bool hasIntegrity = true
+    int benchmarks = RPB_Memory.Map("<string>")
+    int totalObjects = objectCount
+
+    startTime = Utility.GetCurrentRealTime()
+    ; Object Creation
+    while (objectCount > 0)
+        int obj = object
+        RPB_Memory.Map_SetObject(parentContainer, "obj:" + objectCount, obj)
+        objectCount -= 1
+    endWhile
+    endTime = Utility.GetCurrentRealTime()
+    RPB_Memory.Map_SetFloat(benchmarks, "Object Creation", ((endTime - startTime) * 1000))
+
+    objectCount = totalObjects
+    hasIntegrity = true
+    startTime = Utility.GetCurrentRealTime()
+    ; Object Write
+    while (objectCount > 0)
+        RPB_Memory.Map_SetString(parentContainer, "Key:" + objectCount, "Gatinha Cheia de Metropolitanas")
+        objectCount -= 1
+    endWhile
+    endTime = Utility.GetCurrentRealTime()
+    RPB_Memory.Map_SetFloat(benchmarks, "Object Write", ((endTime - startTime) * 1000))
+
+    objectCount = totalObjects
+    startTime = Utility.GetCurrentRealTime()
+    ; Object Read
+    while (objectCount > 0)
+        RPB_Memory.Map_GetString(parentContainer, "Key:" + objectCount)
+        objectCount -= 1
+    endWhile
+    endTime = Utility.GetCurrentRealTime()
+    RPB_Memory.Map_SetFloat(benchmarks, "Object Read", ((endTime - startTime) * 1000))
+
+    ; Object Verify Create
+    objectCount = totalObjects
+    hasIntegrity = true
+    startTime = Utility.GetCurrentRealTime()
+    while (objectCount > 0)
+        bool hasKey = RPB_Memory.Map_HasKey(parentContainer, "obj:" + objectCount)
+        if (!hasKey)
+            hasIntegrity = false
+        endif
+        objectCount -= 1
+    endWhile
+    endTime = Utility.GetCurrentRealTime()
+    RPB_Memory.Map_SetFloat(benchmarks, "Object Verify Create", ((endTime - startTime) * 1000))
+    RPB_Memory.Map_SetInt(benchmarks, "Object Verify Create: Integrity", hasIntegrity as int)
+
+    ; Object Verify Read
+    objectCount = totalObjects
+    hasIntegrity = true
+    startTime = Utility.GetCurrentRealTime()
+    while (objectCount > 0)
+        bool contentsMatch = RPB_Memory.Map_GetString(parentContainer, "Key:" + objectCount) == "Gatinha Cheia de Metropolitanas"
+        if (!contentsMatch)
+            hasIntegrity = false
+        endif
+        objectCount -= 1
+    endWhile
+    endTime = Utility.GetCurrentRealTime()
+    RPB_Memory.Map_SetFloat(benchmarks, "Object Verify Read", ((endTime - startTime) * 1000))
+    RPB_Memory.Map_SetInt(benchmarks, "Object Verify Read: Integrity", hasIntegrity as int)
+
+    ; Object Delete
+    objectCount = totalObjects
+    startTime = Utility.GetCurrentRealTime()
+    hasIntegrity = true
+    while (objectCount > 0)
+        hasIntegrity = RPB_Memory.Map_RemoveKey(parentContainer, "Key:" + objectCount)
+        if (!hasIntegrity)
+            hasIntegrity = false
+        endif
+        objectCount -= 1
+    endWhile
+    endTime = Utility.GetCurrentRealTime()
+    RPB_Memory.Map_SetFloat(benchmarks, "Object Delete", ((endTime - startTime) * 1000))
+    RPB_Memory.Map_SetInt(benchmarks, "Object Verify Delete: Integrity", hasIntegrity as int)
+
+    return benchmarks
+endFunction
+
+int function JC_Nested(int nestingDepth)
+    int rootContainer = JMap.object()
+    int benchmarks = JMap.object()
+    bool hasIntegrity = true
+
+    ; Object Creation
+    float startTime = Utility.GetCurrentRealTime()
+    int currentContainer = rootContainer
+
+    int i = 1
+    while (i < nestingDepth)
+        int newContainer = JMap.object()
+        JMap.setObj(currentContainer, "Child:" + i, newContainer)
+        currentContainer = newContainer
+        i += 1
+    endWhile
+    float endTime = Utility.GetCurrentRealTime()
+    JMap.setFlt(benchmarks, "Object Creation", ((endTime - startTime) * 1000))
+
+    ; Object Read
+    startTime = Utility.GetCurrentRealTime()
+    currentContainer = rootContainer
+    i = 1
+    while (i < nestingDepth)
+        currentContainer = JMap.getObj(currentContainer, "Child:" + i)
+        i += 1
+    endWhile
+    endTime = Utility.GetCurrentRealTime()
+    JMap.setFlt(benchmarks, "Object Read", ((endTime - startTime) * 1000))
+
+    ; Object Write
+    startTime = Utility.GetCurrentRealTime()
+    currentContainer = rootContainer
+    i = 1
+    while (i < nestingDepth)
+        currentContainer = JMap.getObj(currentContainer, "Child:"+ i)
+        JMap.setInt(currentContainer, "TestKey", 100)
+        i += 1
+    endWhile
+
+    JMap.setInt(currentContainer, "TestKey", 100)
+    self.AddTestElementsToContainer(currentContainer, "JC")
+    endTime = Utility.GetCurrentRealTime()
+    JMap.setFlt(benchmarks, "Object Write", ((endTime - startTime) * 1000))
+    JMap.setObj(benchmarks, "Object", rootContainer)
+
+    ; Object Verify Create
+    hasIntegrity = true
+    startTime = Utility.GetCurrentRealTime()
+    currentContainer = rootContainer
+    i = 1
+    while (i < nestingDepth)
+        bool hasKey         = JMap.hasKey(currentContainer, "Child:" + i)
+        currentContainer    = JMap.getObj(currentContainer, "Child:"+ i)
+
+        if (!hasKey)
+            hasIntegrity = false
+        endif
+        i += 1
+    endWhile
+    endTime = Utility.GetCurrentRealTime()
+    JMap.setFlt(benchmarks, "Object Verify Create", ((endTime - startTime) * 1000))
+    JMap.setInt(benchmarks, "Object Verify Create: Integrity", hasIntegrity as int)
+
+    ; Object Verify Read
+    hasIntegrity = true
+    startTime = Utility.GetCurrentRealTime()
+    currentContainer = rootContainer
+    i = 1
+    while (i < nestingDepth)
+        currentContainer   = JMap.getObj(currentContainer, "Child:"+ i)
+        bool contentsMatch = JMap.getInt(currentContainer, "TestKey") == 100
+
+        if (!contentsMatch)
+            hasIntegrity = false
+        endif
+        i += 1
+    endWhile
+    endTime = Utility.GetCurrentRealTime()
+    JMap.setFlt(benchmarks, "Object Verify Read", ((endTime - startTime) * 1000))
+    JMap.setInt(benchmarks, "Object Verify Read: Integrity", hasIntegrity as int)
+
+    ; Object Delete
+    startTime = Utility.GetCurrentRealTime()
+    currentContainer = rootContainer
+    hasIntegrity = true
+    i = 1
+    while (i < nestingDepth)
+        currentContainer = JMap.getObj(currentContainer, "Child:"+ i)
+        hasIntegrity = JMap.removeKey(currentContainer, "TestKey")
+        if (!hasIntegrity)
+            hasIntegrity = false
+        endif
+        i += 1
+    endWhile
+
+    endTime = Utility.GetCurrentRealTime()
+    JMap.setFlt(benchmarks, "Object Delete", ((endTime - startTime) * 1000))
+    JMap.setInt(benchmarks, "Object Verify Delete: Integrity", hasIntegrity as int)
+
+    return benchmarks
+endFunction
+
+int function RPB_Nested(int nestingDepth)
+    int rootContainer = RPB_Memory.Map("<string>")
+    int benchmarks = RPB_Memory.Map("<string>")
+    bool hasIntegrity = true
+
+    ; Object Creation
+    float startTime = Utility.GetCurrentRealTime()
+    int currentContainer = rootContainer
+
+    int i = 1
+    while (i < nestingDepth)
+        int newContainer = RPB_Memory.Map("<string>")
+        RPB_Memory.Map_SetObject(currentContainer, "Child:" + i, newContainer)
+        currentContainer = newContainer
+        i += 1
+    endWhile
+    float endTime = Utility.GetCurrentRealTime()
+    RPB_Memory.Map_SetFloat(benchmarks, "Object Creation", ((endTime - startTime) * 1000))
+
+    ; Object Read
+    startTime = Utility.GetCurrentRealTime()
+    currentContainer = rootContainer
+    i = 1
+    while (i < nestingDepth)
+        currentContainer = RPB_Memory.Map_GetObject(currentContainer, "Child:" + i)
+        i += 1
+    endWhile
+    endTime = Utility.GetCurrentRealTime()
+    RPB_Memory.Map_SetFloat(benchmarks, "Object Read", ((endTime - startTime) * 1000))
+
+    ; Object Write
+    startTime = Utility.GetCurrentRealTime()
+    currentContainer = rootContainer
+    i = 1
+    while (i < nestingDepth)
+        currentContainer = RPB_Memory.Map_GetObject(currentContainer, "Child:"+ i)
+        RPB_Memory.Map_SetInt(currentContainer, "TestKey", 100)
+        i += 1
+    endWhile
+
+    RPB_Memory.Map_SetInt(currentContainer, "TestKey", 100)
+    self.AddTestElementsToContainer(currentContainer, "RPB")
+    endTime = Utility.GetCurrentRealTime()
+    RPB_Memory.Map_SetFloat(benchmarks, "Object Write", ((endTime - startTime) * 1000))
+
+    RPB_Memory.Map_SetObject(benchmarks, "Object", rootContainer)
+
+    ; Object Verify Create
+    hasIntegrity = true
+    startTime = Utility.GetCurrentRealTime()
+    currentContainer = rootContainer
+    i = 1
+    while (i < nestingDepth)
+        bool hasKey         = RPB_Memory.Map_HasKey(currentContainer, "Child:" + i)
+        currentContainer    = RPB_Memory.Map_GetObject(currentContainer, "Child:"+ i)
+
+        if (!hasKey)
+            hasIntegrity = false
+        endif
+        i += 1
+    endWhile
+    endTime = Utility.GetCurrentRealTime()
+    RPB_Memory.Map_SetFloat(benchmarks, "Object Verify Create", ((endTime - startTime) * 1000))
+    RPB_Memory.Map_SetInt(benchmarks, "Object Verify Create: Integrity", hasIntegrity as int)
+
+    ; Object Verify Read
+    hasIntegrity = true
+    startTime = Utility.GetCurrentRealTime()
+    currentContainer = rootContainer
+    i = 1
+    while (i < nestingDepth)
+        currentContainer   = RPB_Memory.Map_GetObject(currentContainer, "Child:"+ i)
+        bool contentsMatch = RPB_Memory.Map_GetInt(currentContainer, "TestKey") == 100
+
+        if (!contentsMatch)
+            hasIntegrity = false
+        endif
+        i += 1
+    endWhile
+    endTime = Utility.GetCurrentRealTime()
+    RPB_Memory.Map_SetFloat(benchmarks, "Object Verify Read", ((endTime - startTime) * 1000))
+    RPB_Memory.Map_SetInt(benchmarks, "Object Verify Read: Integrity", hasIntegrity as int)
+
+    ; Object Delete
+    startTime = Utility.GetCurrentRealTime()
+    currentContainer = rootContainer
+    hasIntegrity = true
+    i = 1
+    while (i < nestingDepth)
+        currentContainer = RPB_Memory.Map_GetObject(currentContainer, "Child:" + i)
+        hasIntegrity = RPB_Memory.Map_RemoveKey(currentContainer, "TestKey")
+        if (!hasIntegrity)
+            hasIntegrity = false
+        endif
+        i += 1
+    endWhile
+
+    endTime = Utility.GetCurrentRealTime()
+    RPB_Memory.Map_SetFloat(benchmarks, "Object Delete", ((endTime - startTime) * 1000))
+    RPB_Memory.Map_SetInt(benchmarks, "Object Verify Delete: Integrity", hasIntegrity as int)
+
+    return benchmarks
+endFunction
+
+int function RPB_Fast_Flat(int parentContainer, int object, int objectCount)
+    float startTime
+    float endTime
+    bool hasIntegrity = true
+    int benchmarks = RPB_Memory.FastMap("<string>")
+    int totalObjects = objectCount
+
+    startTime = Utility.GetCurrentRealTime()
+    ; Object Creation
+    while (objectCount > 0)
+        int obj = object
+        RPB_Memory.FastMap_SetObject(parentContainer, "obj:" + objectCount, obj)
+        objectCount -= 1
+    endWhile
+    endTime = Utility.GetCurrentRealTime()
+    RPB_Memory.FastMap_SetFloat(benchmarks, "Object Creation", ((endTime - startTime) * 1000))
+
+    objectCount = totalObjects
+    hasIntegrity = true
+    startTime = Utility.GetCurrentRealTime()
+    ; Object Write
+    while (objectCount > 0)
+        RPB_Memory.FastMap_SetString(parentContainer, "Key:" + objectCount, "Gatinha Cheia de Metropolitanas")
+        objectCount -= 1
+    endWhile
+    endTime = Utility.GetCurrentRealTime()
+    RPB_Memory.FastMap_SetFloat(benchmarks, "Object Write", ((endTime - startTime) * 1000))
+
+    objectCount = totalObjects
+    startTime = Utility.GetCurrentRealTime()
+    ; Object Read
+    while (objectCount > 0)
+        RPB_Memory.FastMap_GetString(parentContainer, "Key:" + objectCount)
+        objectCount -= 1
+    endWhile
+    endTime = Utility.GetCurrentRealTime()
+    RPB_Memory.FastMap_SetFloat(benchmarks, "Object Read", ((endTime - startTime) * 1000))
+
+    ; Object Verify Create
+    objectCount = totalObjects
+    hasIntegrity = true
+    startTime = Utility.GetCurrentRealTime()
+    while (objectCount > 0)
+        bool hasKey = RPB_Memory.FastMap_HasKey(parentContainer, "obj:" + objectCount)
+        if (!hasKey)
+            hasIntegrity = false
+        endif
+        objectCount -= 1
+    endWhile
+    endTime = Utility.GetCurrentRealTime()
+    RPB_Memory.FastMap_SetFloat(benchmarks, "Object Verify Create", ((endTime - startTime) * 1000))
+    RPB_Memory.FastMap_SetInt(benchmarks, "Object Verify Create: Integrity", hasIntegrity as int)
+
+    ; Object Verify Read
+    objectCount = totalObjects
+    hasIntegrity = true
+    startTime = Utility.GetCurrentRealTime()
+    while (objectCount > 0)
+        bool contentsMatch = RPB_Memory.FastMap_GetString(parentContainer, "Key:" + objectCount) == "Gatinha Cheia de Metropolitanas"
+        if (!contentsMatch)
+            hasIntegrity = false
+        endif
+        objectCount -= 1
+    endWhile
+    endTime = Utility.GetCurrentRealTime()
+    RPB_Memory.FastMap_SetFloat(benchmarks, "Object Verify Read", ((endTime - startTime) * 1000))
+    RPB_Memory.FastMap_SetInt(benchmarks, "Object Verify Read: Integrity", hasIntegrity as int)
+
+    ; Object Delete
+    objectCount = totalObjects
+    startTime = Utility.GetCurrentRealTime()
+    hasIntegrity = true
+    while (objectCount > 0)
+        hasIntegrity = RPB_Memory.FastMap_RemoveKey(parentContainer, "Key:" + objectCount)
+        if (!hasIntegrity)
+            hasIntegrity = false
+        endif
+        objectCount -= 1
+    endWhile
+    endTime = Utility.GetCurrentRealTime()
+    RPB_Memory.FastMap_SetFloat(benchmarks, "Object Delete", ((endTime - startTime) * 1000))
+    RPB_Memory.FastMap_SetInt(benchmarks, "Object Verify Delete: Integrity", hasIntegrity as int)
+
+    return benchmarks
+endFunction
+
+int function RPB_Fast_Nested(int nestingDepth)
+    int rootContainer = RPB_Memory.FastMap("<string>")
+    int benchmarks = RPB_Memory.FastMap("<string>")
+    bool hasIntegrity = true
+
+    ; Object Creation
+    float startTime = Utility.GetCurrentRealTime()
+    int currentContainer = rootContainer
+
+    int i = 1
+    while (i < nestingDepth)
+        int newContainer = RPB_Memory.FastMap("<string>")
+        RPB_Memory.FastMap_SetObject(currentContainer, "Child:" + i, newContainer)
+        currentContainer = newContainer
+        i += 1
+    endWhile
+    float endTime = Utility.GetCurrentRealTime()
+    RPB_Memory.FastMap_SetFloat(benchmarks, "Object Creation", ((endTime - startTime) * 1000))
+
+    ; Object Read
+    startTime = Utility.GetCurrentRealTime()
+    currentContainer = rootContainer
+    i = 1
+    while (i < nestingDepth)
+        currentContainer = RPB_Memory.FastMap_GetObject(currentContainer, "Child:" + i)
+        i += 1
+    endWhile
+    endTime = Utility.GetCurrentRealTime()
+    RPB_Memory.FastMap_SetFloat(benchmarks, "Object Read", ((endTime - startTime) * 1000))
+
+    ; Object Write
+    startTime = Utility.GetCurrentRealTime()
+    currentContainer = rootContainer
+    i = 1
+    while (i < nestingDepth)
+        currentContainer = RPB_Memory.FastMap_GetObject(currentContainer, "Child:"+ i)
+        RPB_Memory.FastMap_SetInt(currentContainer, "TestKey", 100)
+        i += 1
+    endWhile
+
+    RPB_Memory.FastMap_SetInt(currentContainer, "TestKey", 100)
+    self.AddTestElementsToContainer(currentContainer, "RPB_Fast")
+    endTime = Utility.GetCurrentRealTime()
+    RPB_Memory.FastMap_SetFloat(benchmarks, "Object Write", ((endTime - startTime) * 1000))
+
+    RPB_Memory.FastMap_SetObject(benchmarks, "Object", rootContainer)
+
+    ; Object Verify Create
+    hasIntegrity = true
+    startTime = Utility.GetCurrentRealTime()
+    currentContainer = rootContainer
+    i = 1
+    while (i < nestingDepth)
+        bool hasKey         = RPB_Memory.FastMap_HasKey(currentContainer, "Child:" + i)
+        currentContainer    = RPB_Memory.FastMap_GetObject(currentContainer, "Child:"+ i)
+
+        if (!hasKey)
+            hasIntegrity = false
+        endif
+        i += 1
+    endWhile
+    endTime = Utility.GetCurrentRealTime()
+    RPB_Memory.FastMap_SetFloat(benchmarks, "Object Verify Create", ((endTime - startTime) * 1000))
+    RPB_Memory.FastMap_SetInt(benchmarks, "Object Verify Create: Integrity", hasIntegrity as int)
+
+    ; Object Verify Read
+    hasIntegrity = true
+    startTime = Utility.GetCurrentRealTime()
+    currentContainer = rootContainer
+    i = 1
+    while (i < nestingDepth)
+        currentContainer   = RPB_Memory.FastMap_GetObject(currentContainer, "Child:"+ i)
+        bool contentsMatch = RPB_Memory.FastMap_GetInt(currentContainer, "TestKey") == 100
+
+        if (!contentsMatch)
+            hasIntegrity = false
+        endif
+        i += 1
+    endWhile
+    endTime = Utility.GetCurrentRealTime()
+    RPB_Memory.FastMap_SetFloat(benchmarks, "Object Verify Read", ((endTime - startTime) * 1000))
+    RPB_Memory.FastMap_SetInt(benchmarks, "Object Verify Read: Integrity", hasIntegrity as int)
+
+    ; Object Delete
+    startTime = Utility.GetCurrentRealTime()
+    currentContainer = rootContainer
+    hasIntegrity = true
+    i = 1
+    while (i < nestingDepth)
+        currentContainer = RPB_Memory.FastMap_GetObject(currentContainer, "Child:" + i)
+        hasIntegrity = RPB_Memory.FastMap_RemoveKey(currentContainer, "TestKey")
+        if (!hasIntegrity)
+            hasIntegrity = false
+        endif
+        i += 1
+    endWhile
+
+    endTime = Utility.GetCurrentRealTime()
+    RPB_Memory.FastMap_SetFloat(benchmarks, "Object Delete", ((endTime - startTime) * 1000))
+    RPB_Memory.FastMap_SetInt(benchmarks, "Object Verify Delete: Integrity", hasIntegrity as int)
+
+    return benchmarks
+endFunction
+
+function AddTestElementsToContainer(int parentObject, string library = "RPB")
+    if (library == "JC")
+        JMap.setStr(parentObject, "Deleveling::Heavy Armor", "Deleveling::Heavy Armor")
+        JMap.setStr(parentObject, "Deleveling::Light Armor", "Deleveling::Light Armor")
+        JMap.setStr(parentObject, "Deleveling::Sneak", "Deleveling::Sneak")
+        JMap.setStr(parentObject, "Deleveling::One-Handed", "Deleveling::One-Handed")
+        JMap.setStr(parentObject, "Deleveling::Two-Handed", "Deleveling::Two-Handed")
+        JMap.setStr(parentObject, "Deleveling::Archery", "Deleveling::Archery")
+        JMap.setStr(parentObject, "Deleveling::Block", "Deleveling::Block")
+        JMap.setStr(parentObject, "Deleveling::Smithing", "Deleveling::Smithing")
+        JMap.setStr(parentObject, "Deleveling::Speechcraft", "Deleveling::Speechcraft")
+        JMap.setStr(parentObject, "Deleveling::Pickpocketing", "Deleveling::Pickpocketing")
+        JMap.setStr(parentObject, "Deleveling::Lockpicking", "Deleveling::Lockpicking")
+        JMap.setStr(parentObject, "Deleveling::Alteration", "Deleveling::Alteration")
+        JMap.setStr(parentObject, "Deleveling::Conjuration", "Deleveling::Conjuration")
+        JMap.setStr(parentObject, "Deleveling::Destruction", "Deleveling::Destruction")
+        JMap.setStr(parentObject, "Deleveling::Illusion", "Deleveling::Illusion")
+        JMap.setStr(parentObject, "Deleveling::Restoration", "Deleveling::Restoration")
+        JMap.setStr(parentObject, "Deleveling::Enchanting", "Deleveling::Enchanting")
+        JMap.setStr(parentObject, "Deleveling::Alchemy", "Deleveling::Alchemy")
+        JMap.setStr(parentObject, "Level Caps::Heavy Armor", "Level Caps::Heavy Armor")
+        JMap.setStr(parentObject, "Level Caps::Light Armor", "Level Caps::Light Armor")
+        JMap.setStr(parentObject, "Level Caps::Sneak", "Level Caps::Sneak")
+        JMap.setStr(parentObject, "Level Caps::One-Handed", "Level Caps::One-Handed")
+        JMap.setStr(parentObject, "Level Caps::Two-Handed", "Level Caps::Two-Handed")
+        JMap.setStr(parentObject, "Level Caps::Archery", "Level Caps::Archery")
+        JMap.setStr(parentObject, "Level Caps::Block", "Level Caps::Block")
+        JMap.setStr(parentObject, "Level Caps::Smithing", "Level Caps::Smithing")
+        JMap.setStr(parentObject, "Level Caps::Speechcraft", "Level Caps::Speechcraft")
+        JMap.setStr(parentObject, "Level Caps::Pickpocketing", "Level Caps::Pickpocketing")
+        JMap.setStr(parentObject, "Level Caps::Lockpicking", "Level Caps::Lockpicking")
+        JMap.setStr(parentObject, "Level Caps::Alteration", "Level Caps::Alteration")
+        JMap.setStr(parentObject, "Level Caps::Conjuration", "Level Caps::Conjuration")
+        JMap.setStr(parentObject, "Level Caps::Destruction", "Level Caps::Destruction")
+        JMap.setStr(parentObject, "Level Caps::Illusion", "Level Caps::Illusion")
+        JMap.setStr(parentObject, "Level Caps::Restoration", "Level Caps::Restoration")
+        JMap.setStr(parentObject, "Level Caps::Enchanting", "Level Caps::Enchanting")
+        JMap.setStr(parentObject, "Level Caps::Alchemy", "Level Caps::Alchemy")
+
+    elseif (library == "RPB")
+        RPB_Memory.Map_SetString(parentObject, "Deleveling::Heavy Armor", "Deleveling::Heavy Armor")
+        RPB_Memory.Map_SetString(parentObject, "Deleveling::Light Armor", "Deleveling::Light Armor")
+        RPB_Memory.Map_SetString(parentObject, "Deleveling::Sneak", "Deleveling::Sneak")
+        RPB_Memory.Map_SetString(parentObject, "Deleveling::One-Handed", "Deleveling::One-Handed")
+        RPB_Memory.Map_SetString(parentObject, "Deleveling::Two-Handed", "Deleveling::Two-Handed")
+        RPB_Memory.Map_SetString(parentObject, "Deleveling::Archery", "Deleveling::Archery")
+        RPB_Memory.Map_SetString(parentObject, "Deleveling::Block", "Deleveling::Block")
+        RPB_Memory.Map_SetString(parentObject, "Deleveling::Smithing", "Deleveling::Smithing")
+        RPB_Memory.Map_SetString(parentObject, "Deleveling::Speechcraft", "Deleveling::Speechcraft")
+        RPB_Memory.Map_SetString(parentObject, "Deleveling::Pickpocketing", "Deleveling::Pickpocketing")
+        RPB_Memory.Map_SetString(parentObject, "Deleveling::Lockpicking", "Deleveling::Lockpicking")
+        RPB_Memory.Map_SetString(parentObject, "Deleveling::Alteration", "Deleveling::Alteration")
+        RPB_Memory.Map_SetString(parentObject, "Deleveling::Conjuration", "Deleveling::Conjuration")
+        RPB_Memory.Map_SetString(parentObject, "Deleveling::Destruction", "Deleveling::Destruction")
+        RPB_Memory.Map_SetString(parentObject, "Deleveling::Illusion", "Deleveling::Illusion")
+        RPB_Memory.Map_SetString(parentObject, "Deleveling::Restoration", "Deleveling::Restoration")
+        RPB_Memory.Map_SetString(parentObject, "Deleveling::Enchanting", "Deleveling::Enchanting")
+        RPB_Memory.Map_SetString(parentObject, "Deleveling::Alchemy", "Deleveling::Alchemy")
+        RPB_Memory.Map_SetString(parentObject, "Level Caps::Heavy Armor", "Level Caps::Heavy Armor")
+        RPB_Memory.Map_SetString(parentObject, "Level Caps::Light Armor", "Level Caps::Light Armor")
+        RPB_Memory.Map_SetString(parentObject, "Level Caps::Sneak", "Level Caps::Sneak")
+        RPB_Memory.Map_SetString(parentObject, "Level Caps::One-Handed", "Level Caps::One-Handed")
+        RPB_Memory.Map_SetString(parentObject, "Level Caps::Two-Handed", "Level Caps::Two-Handed")
+        RPB_Memory.Map_SetString(parentObject, "Level Caps::Archery", "Level Caps::Archery")
+        RPB_Memory.Map_SetString(parentObject, "Level Caps::Block", "Level Caps::Block")
+        RPB_Memory.Map_SetString(parentObject, "Level Caps::Smithing", "Level Caps::Smithing")
+        RPB_Memory.Map_SetString(parentObject, "Level Caps::Speechcraft", "Level Caps::Speechcraft")
+        RPB_Memory.Map_SetString(parentObject, "Level Caps::Pickpocketing", "Level Caps::Pickpocketing")
+        RPB_Memory.Map_SetString(parentObject, "Level Caps::Lockpicking", "Level Caps::Lockpicking")
+        RPB_Memory.Map_SetString(parentObject, "Level Caps::Alteration", "Level Caps::Alteration")
+        RPB_Memory.Map_SetString(parentObject, "Level Caps::Conjuration", "Level Caps::Conjuration")
+        RPB_Memory.Map_SetString(parentObject, "Level Caps::Destruction", "Level Caps::Destruction")
+        RPB_Memory.Map_SetString(parentObject, "Level Caps::Illusion", "Level Caps::Illusion")
+        RPB_Memory.Map_SetString(parentObject, "Level Caps::Restoration", "Level Caps::Restoration")
+        RPB_Memory.Map_SetString(parentObject, "Level Caps::Enchanting", "Level Caps::Enchanting")
+        RPB_Memory.Map_SetString(parentObject, "Level Caps::Alchemy", "Level Caps::Alchemy")
+
+    elseif (library == "RPB_Fast")
+        RPB_Memory.FastMap_SetString(parentObject, "Deleveling::Heavy Armor", "Deleveling::Heavy Armor")
+        RPB_Memory.FastMap_SetString(parentObject, "Deleveling::Light Armor", "Deleveling::Light Armor")
+        RPB_Memory.FastMap_SetString(parentObject, "Deleveling::Sneak", "Deleveling::Sneak")
+        RPB_Memory.FastMap_SetString(parentObject, "Deleveling::One-Handed", "Deleveling::One-Handed")
+        RPB_Memory.FastMap_SetString(parentObject, "Deleveling::Two-Handed", "Deleveling::Two-Handed")
+        RPB_Memory.FastMap_SetString(parentObject, "Deleveling::Archery", "Deleveling::Archery")
+        RPB_Memory.FastMap_SetString(parentObject, "Deleveling::Block", "Deleveling::Block")
+        RPB_Memory.FastMap_SetString(parentObject, "Deleveling::Smithing", "Deleveling::Smithing")
+        RPB_Memory.FastMap_SetString(parentObject, "Deleveling::Speechcraft", "Deleveling::Speechcraft")
+        RPB_Memory.FastMap_SetString(parentObject, "Deleveling::Pickpocketing", "Deleveling::Pickpocketing")
+        RPB_Memory.FastMap_SetString(parentObject, "Deleveling::Lockpicking", "Deleveling::Lockpicking")
+        RPB_Memory.FastMap_SetString(parentObject, "Deleveling::Alteration", "Deleveling::Alteration")
+        RPB_Memory.FastMap_SetString(parentObject, "Deleveling::Conjuration", "Deleveling::Conjuration")
+        RPB_Memory.FastMap_SetString(parentObject, "Deleveling::Destruction", "Deleveling::Destruction")
+        RPB_Memory.FastMap_SetString(parentObject, "Deleveling::Illusion", "Deleveling::Illusion")
+        RPB_Memory.FastMap_SetString(parentObject, "Deleveling::Restoration", "Deleveling::Restoration")
+        RPB_Memory.FastMap_SetString(parentObject, "Deleveling::Enchanting", "Deleveling::Enchanting")
+        RPB_Memory.FastMap_SetString(parentObject, "Deleveling::Alchemy", "Deleveling::Alchemy")
+        RPB_Memory.FastMap_SetString(parentObject, "Level Caps::Heavy Armor", "Level Caps::Heavy Armor")
+        RPB_Memory.FastMap_SetString(parentObject, "Level Caps::Light Armor", "Level Caps::Light Armor")
+        RPB_Memory.FastMap_SetString(parentObject, "Level Caps::Sneak", "Level Caps::Sneak")
+        RPB_Memory.FastMap_SetString(parentObject, "Level Caps::One-Handed", "Level Caps::One-Handed")
+        RPB_Memory.FastMap_SetString(parentObject, "Level Caps::Two-Handed", "Level Caps::Two-Handed")
+        RPB_Memory.FastMap_SetString(parentObject, "Level Caps::Archery", "Level Caps::Archery")
+        RPB_Memory.FastMap_SetString(parentObject, "Level Caps::Block", "Level Caps::Block")
+        RPB_Memory.FastMap_SetString(parentObject, "Level Caps::Smithing", "Level Caps::Smithing")
+        RPB_Memory.FastMap_SetString(parentObject, "Level Caps::Speechcraft", "Level Caps::Speechcraft")
+        RPB_Memory.FastMap_SetString(parentObject, "Level Caps::Pickpocketing", "Level Caps::Pickpocketing")
+        RPB_Memory.FastMap_SetString(parentObject, "Level Caps::Lockpicking", "Level Caps::Lockpicking")
+        RPB_Memory.FastMap_SetString(parentObject, "Level Caps::Alteration", "Level Caps::Alteration")
+        RPB_Memory.FastMap_SetString(parentObject, "Level Caps::Conjuration", "Level Caps::Conjuration")
+        RPB_Memory.FastMap_SetString(parentObject, "Level Caps::Destruction", "Level Caps::Destruction")
+        RPB_Memory.FastMap_SetString(parentObject, "Level Caps::Illusion", "Level Caps::Illusion")
+        RPB_Memory.FastMap_SetString(parentObject, "Level Caps::Restoration", "Level Caps::Restoration")
+        RPB_Memory.FastMap_SetString(parentObject, "Level Caps::Enchanting", "Level Caps::Enchanting")
+        RPB_Memory.FastMap_SetString(parentObject, "Level Caps::Alchemy", "Level Caps::Alchemy")
+    endif
+endFunction
+
 function ImprisonActor(RPB_Prison apPrison)
     Actor player = Game.GetFormEx(0x14) as Actor
     
@@ -742,7 +1602,7 @@ function ExecuteTest(string asTestKeyName)
     if (testToExecute != "")
         ; Silence logs
         SetLoggingEnabled("TRACE",  IsTracingEnabled()   && ENABLE_TRACING)
-        SetLoggingEnabled("DEBUG",  IsDebuggingEnabled() && ENABLE_DEBUGGING)
+        ; SetLoggingEnabled("DEBUG",  IsDebuggingEnabled() && ENABLE_DEBUGGING)
         SetLoggingEnabled("LOG",    IsLoggingEnabled()   && ENABLE_LOGGING)
 
         start_test(testToExecute)   ; Log test start
