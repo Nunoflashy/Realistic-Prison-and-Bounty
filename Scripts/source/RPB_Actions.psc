@@ -574,6 +574,15 @@ function Action_ArrestSelectedActor(RPB_UIInterface uilib, bool abEscortArrestee
         guard = RPB_Utility.GetNearbyGuardForFactionFromRef(selectedActor)
     endif
 
+    string arrestType = API.Arrest.ARREST_TYPE_TELEPORT_TO_CELL
+
+    if (abEscortArrestee)
+        arrestType = uilib.ShowStringList("Select Escort Location", \ 
+            API.Arrest.ARREST_TYPE_ESCORT_TO_JAIL + "," + \
+            API.Arrest.ARREST_TYPE_ESCORT_TO_CELL \
+        )
+    endif
+
     string actorName    = selectedActor.GetBaseObject().GetName()
     string holdName     = guard.GetCrimeFaction().GetName()
     bool isPlayer       = selectedActor.GetFormID() == 0x14
@@ -596,8 +605,8 @@ function Action_ArrestSelectedActor(RPB_UIInterface uilib, bool abEscortArrestee
     else
         guard.GetCrimeFaction().SetCrimeGold(arrestBounty)
     endif
-
-    API.Arrest.ArrestActor(guard, selectedActor, string_if (abEscortArrestee, API.Arrest.ARREST_TYPE_ESCORT_TO_JAIL, API.Arrest.ARREST_TYPE_TELEPORT_TO_CELL))
+    
+    API.Arrest.ArrestActor(guard, selectedActor, arrestType)
     EndBenchmark(startBench, "Actions::Action_ArrestSelectedActor")
 endFunction
 
@@ -605,7 +614,7 @@ function Action_AddSelectedActorToArrest(RPB_UIInterface uilib)
     Actor selectedActor = Game.GetCurrentConsoleRef() as Actor
     RPB_SceneManager sceneManager = API.SceneManager
 
-    BindAliasTo(sceneManager.GetEscortee(1), selectedActor)
+    ; BindAliasTo(sceneManager.GetEscortee(1), selectedActor)
 endFunction
 
 function Action_InitializePrisons(RPB_UIInterface uilib)
