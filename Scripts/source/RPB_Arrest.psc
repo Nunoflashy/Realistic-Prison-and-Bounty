@@ -330,7 +330,7 @@ event OnSurrenderBegin(Actor akSurrenderer, Actor[] akSurrendererCaptors)
 endEvent
 
 event OnSurrenderEnd(Actor akSurrenderer, Actor akCaptor)
-    self.ArrestActor(akCaptor, akSurrenderer, ARREST_TYPE_ESCORT_TO_CELL)
+    self.ArrestActor(akCaptor, akSurrenderer, ARREST_TYPE_ESCORT_TO_JAIL)
 endEvent
 
 ;/
