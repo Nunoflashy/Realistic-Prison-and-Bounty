@@ -162,7 +162,7 @@ event OnTrace(string msg, string caller)
 endEvent
 
 event OnInfo(string msg, string caller, bool condition)
-    Debug(caller, msg, condition)
+    DebugInfo(caller, msg, condition)
     Info(msg, condition)
 endEvent
 
@@ -611,6 +611,10 @@ event OnPrisonScene(string asScene, string asSceneEvent, RPB_Prison apPrison, RP
                 Debug.SendAnimationEvent(escort, "IdleLockpick")
                 jailCell.CellDoor.Unlock()
                 jailCell.CellDoor.Open()
+
+            elseif (asSceneSecondaryEvent == "Hands Behind Back")
+                apPrisoner.OrientRelativeTo(escort, afRotZ = 180)
+                apPrisoner.PlayAnimation("ZazAPC001")
 
             elseif (asSceneSecondaryEvent == "Restrain Prisoner")
                 apPrison.RestrainPrisoner(apPrisoner)
