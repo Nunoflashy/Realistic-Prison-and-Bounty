@@ -102,9 +102,9 @@ function VerifyPrisonsIntegrity()
     while (i < PrisonSlots)
         RPB_Prison prisonRef = self.GetNthAlias(i) as RPB_Prison
         if (prisonRef.Active)
-            ReloadPrisonConfig(prisonRef)
+            ; ReloadPrisonConfig(prisonRef)
+            prisonRef.SetupCells()
             BindAliasTo(prisonRef, prisonRef.JailCells[0] as ObjectReference)
-            ; prisonRef.SetupCells()
             ; prisonRef.EnsureFunctionalState()
         endif
         i += 1
@@ -115,7 +115,10 @@ endFunction
 
 event OnPrisonConfigured(RPB_Prison apPrison)
     apPrison.Active = true
+    Debug("PrisonManager::OnPrisonConfigured", "things (prison: " + apPrison.Name + "): " + apPrison)
+    ; return
     apPrison.SetFallbackProperty("Name", apPrison.PrisonLocation.GetName())
+
     apPrison.SetupCells()
     Debug("PrisonManager::OnPrisonConfigured", "Initialized " + apPrison.Name + " for Hold " + apPrison.Hold)
 endEvent
@@ -166,6 +169,7 @@ ReferenceAlias function GetEmptySlot()
         if (!slot.Active)
             return slot
         endif
+        i += 1
     endWhile
 
     return none
@@ -280,7 +284,6 @@ bool function InitializePrison(string asHold)
     if (AssignPrisonHoldProperties(prisonSlot, asHold, rootObject))
         AssignPrisonRootObject(prisonSlot, prisonObject)
         self.OnPrisonConfigured(prisonSlot)
-
         return true
     endif
 
