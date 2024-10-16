@@ -42,7 +42,7 @@ endProperty
 function PerformSetup()
     EventManager.RegisterEvents()
     PrisonManager.InitializePrisons()
-    SceneManager.Initialize()
+    SceneManager.SceneManager()
 
     ; Info(\
     ;     "==========================================================\n" + \
@@ -64,45 +64,11 @@ endFunction
 
 function PerformMaintenance()
     EventManager.RegisterEvents()
-    ; Config.SetPrisons()
+    SceneManager.SceneManager()
     PrisonManager.VerifyPrisonsIntegrity()
+    API.Arrest.RegisterForKey(0x42)
 
-
-    Config.MCM.InitializePages()
-    ;/
-        TODO: If at any point a new hold, city, jail cell, jail location etc gets added,
-        we should refresh the lists and add the new content, like:
-        
-        miscVars.AddFormToArray("Jail::Cells[New_Hold]", Game.GetForm([New_Hold_Jail_Cell_Ref]))
-    /;
-
-    ; Info(\
-    ;     "==========================================================\n" + \
-    ;                     "\t\t"+ GetModName() +"\n" + \
-    ;     "==========================================================\n" + \
-    ;     "\n" + \
-    ;     "Registering Events: " + string_if (registeredEvents, "OK", "Failed") + "\n" + \
-    ;     "Registering Prisons: " + string_if (prisons, "OK", "Failed") + "\n" \
-    ; )
-    
-    SceneManager.Initialize()
-
-    ; if (!registeredEvents)
-    ;     Debug.MessageBox("["+ GetModName() +"] Failed to register events, the mod may not work at all!")
-    ; endif
-
-    ; Temporary, RefAliases are lost on Player Load, must find a way to rectify
-    ; Config.jail.Prisoner.ForceRefTo(Config.Player)
-    ; Config.NotifyJail("Prisoner: " + Config.Player + ", Ref: " + Config.jail.Prisoner)
-
-    ; Config.miscVars.CreateStringMap("Options")
-    ; Config.miscVars.CreateStringMap("Options/Flags")
-    ; Config.miscVars.AddToContainer("Jail::Cells", "Jail::Cells[Teste]")
-    ; Config.miscVars.AddToContainer("Options", "Jail::Cells")
-    ; Config.miscVars.Serialize("Options", "OptionsContainer.txt")
-    ; Config.miscVars.Serialize("root", "newRootContainer.txt")
-
-    ; Config.miscVars.Serialize("root", "rootTest.txt")
+    API.MCM.InitializePages()
 endFunction
 
 state Initialization
@@ -145,6 +111,9 @@ event OnKeyDown(int keyCode)
     RPB_MCM mcm = Config.MCM
 
     if (keyCode == 0x3B)    ; F1
+        PrisonManager.VerifyPrisonsIntegrity()
+
+        return
         RPB_UIInterface uilib   = (self.GetReference() as Form) as RPB_UIInterface
         RPB_Tests unitTest      = (self.GetReference() as Form) as RPB_Tests
         
@@ -152,6 +121,12 @@ event OnKeyDown(int keyCode)
         unitTest.ExecuteTest(testName)
 
     elseif (keyCode == 0x3C)    ; F2
+        ; Config.SetPrisons()
+
+        ; return
+        PrisonManager.InitializePrisons()
+
+        return
         RPB_UIInterface uilib   = (self.GetReference() as Form) as RPB_UIInterface
         RPB_Tests unitTest      = (self.GetReference() as Form) as RPB_Tests
         RPB_MCM_02 mcm2         = RPB_Utility.GetFormFromMod(0x1F36A) as RPB_MCM_02
