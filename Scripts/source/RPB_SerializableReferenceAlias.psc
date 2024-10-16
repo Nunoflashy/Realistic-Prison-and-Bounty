@@ -418,10 +418,6 @@ endEvent
 event OnReferenceDeleted() ; abstract
 endEvent
 
-event OnInit()
-    self.EnsureFunctionalState()
-endEvent
-
 ; ==========================================================
 ;                           private
 ; ==========================================================
