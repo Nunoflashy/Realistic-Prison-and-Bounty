@@ -1394,6 +1394,7 @@ event OnSceneEnd(string name, Scene sender)
         Actor escort     = self.GetSceneNthReferenceOfType(name, "Escort") as Actor
         Form[] arrestees = self.GetSceneReferencesOfType(name, "Escortee")
         
+        self.SetPackageLockOnActor(escort) ; When do we unset it? Is this Escort the one that takes to cell? Or should we unbind it in some other way? OnUpdate?
         EventManager.SendPrisonSceneBulkEvent(name, EVENT_ESCORT_END, arrestees, escort)
 
     elseif (type == CATEGORY_ESCORT_TO_CELL)
@@ -1405,6 +1406,7 @@ event OnSceneEnd(string name, Scene sender)
             prisoners   = self.GetSceneReferencesOfType(name, "Prisoner")
         endif
         
+        self.UnsetPackageLockOnActor(escort) ; Needs to be reviewed, since the Escort may not be the one from the "Escort to Jail" scene, where the package is set
         EventManager.SendPrisonSceneBulkEvent(name, EVENT_ESCORT_END, prisoners, escort)
 
     elseif (type == CATEGORY_ESCORT_FROM_CELL)

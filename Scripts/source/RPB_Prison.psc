@@ -1488,8 +1488,7 @@ event OnEscortPrisonerToCellEnd(RPB_Prisoner apPrisoner, RPB_JailCell akJailCell
         ; Ensures the Prisoner stays in the cell since we update it 10s later after the initial check,
         ; delaying it enough for all actions to finish before the check.
         apPrisoner.JailCell.RegisterForSanityChecking(10.0, apPrisoner = apPrisoner)
-   endif
-
+   endif 
 endEvent
 
 event OnEscortPrisonerFromCellBegin(RPB_Prisoner apPrisoner, Actor akEscort)
