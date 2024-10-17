@@ -200,6 +200,7 @@ endEvent
 ; ==========================================================
 ;                           Scenes
 ; ==========================================================
+
 Scene property UnlockCell auto
 Scene property LockCell auto
 
@@ -894,6 +895,65 @@ string function GetAliasName(string aliasName, int aliasIndex, bool checkForExis
     return finalName
 endFunction
 
+;/
+    Sets a package lock on the specified Actor.
+    This is used for specific escort scenes where the behavior is overridden by the vanilla AI,
+    resulting in weirdness sometimes when escorting an Arrestee to the jail, for example.
+
+    After both the Arrestee and the Escort reach the jail, the Arrestee will have its behavior bound by the "Cell Package",
+    whereas the Escort will not, so they will revert to their default AI behavior and try to exit the Scene, which then makes it so
+    that the Arrestee will follow (should not happen).
+
+    The point of this package lock is to make sure that the Escort does not leave the Scene until it is unset 
+    (works exactly the same as a Cell Package, they use the same package under the hood).
+
+    This makes it possible for the Escort to lead a Scene without any weird behaviors until the package lock is unset.
+    The package must be unset, otherwise the Escort will be stuck in place forever.
+
+    Actor   @akActor: The actor to set the package lock on.
+/;
+function SetPackageLockOnActor(Actor akActor)
+    string packageAliasGroup = "PKG_Lock_0"
+    int packageIndex = 1
+    ReferenceAlias packageLock = self.GetRefAlias(packageAliasGroup, packageIndex)
+
+    while (packageLock.GetReference() != none && packageIndex <= 5)
+        Debug("SceneManager::SetPackageLockOnActor", "Shouldn't even enter here")
+        packageLock = self.GetRefAlias(packageAliasGroup, packageIndex)
+        packageIndex += 1
+    endWhile
+
+    if (packageLock.GetReference()) ; Package already in use
+        ; Error
+        EventManager.SendWarning("There was a problem assigning a package lock to the Actor " + akActor + "!", "SceneManager::SetPackageLockOnActor")
+        return
+    endif
+
+    ; Debug("SceneManager::SetPackageLockOnActor", "Alias: " + packageLock + ", ID: " + packageLock.GetID())
+
+    BindAliasTo(packageLock, akActor)
+    RPB_StorageVars.SetIntOnForm("Package Lock", akActor, packageLock.GetID())
+    EventManager.SendInfo("Bound package lock to Actor " + akActor + " successfully!", "SceneManager::SetPackageLockOnActor")
+endFunction
+
+;/
+    Unsets the package lock on the specified Actor if they have one.
+    Actor   @akActor: The actor to unset the package lock from.
+/;
+function UnsetPackageLockOnActor(Actor akActor)
+    int packageId = RPB_StorageVars.GetIntOnForm("Package Lock", akActor)
+    ReferenceAlias packageLock = self.GetAliasByID(packageId) as ReferenceAlias
+
+    if (packageId && !packageLock)
+        EventManager.SendError("There was an error unsetting the package lock for Actor " + akActor + ", the package does not exist!", "SceneManager::UnsetPackageLockOnActor")
+        return
+    endif
+
+    UnbindAlias(packageLock)
+    RPB_StorageVars.DeleteVariableOnForm("Package Lock", akActor)
+    EventManager.SendInfo("Unbound package lock from Actor " + akActor + " successfully!", "SceneManager::UnsetPackageLockOnActor")
+endFunction
+
 
 function ReleaseAlias(string aliasName, int aliasIndex = 0)
     string finalName = self.GetAliasName(aliasName, aliasIndex , true)
@@ -1402,7 +1462,7 @@ event OnSceneEnd(string name, Scene sender)
     Debug("SceneManager::OnSceneEnd", self.GetSceneParametersDebugInfo(sender, name))
     Debug("SceneManager::OnSceneEnd", "Ended Scene: " + name)
 
-    self.UnbindAliases(name) ; (Need to fix this, since they get unbound after they should, for now, uncommented) ERROR: EventManager::SendPrisonSceneBulkEvent() -> No prisoners provided for bulk scene event!
+    ; self.UnbindAliases(name) ; (Need to fix this, since they get unbound after they should, for now, uncommented) ERROR: EventManager::SendPrisonSceneBulkEvent() -> No prisoners provided for bulk scene event!
     self.PlayQueued()
     __isScenePlaying = false ; Scene has finished playing
     self.ResetGlobals()
