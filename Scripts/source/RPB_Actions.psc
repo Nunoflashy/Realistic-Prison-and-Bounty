@@ -46,6 +46,7 @@ string[] function GetActions()
     JArray.addStr(actionArrayObj, "[Prison] Return Prisoner Belongings")
     JArray.addStr(actionArrayObj, "[Prison] Strip Prisoner")
     JArray.addStr(actionArrayObj, "[Prison] Strip Prisoner to Underwear")
+    JArray.addStr(actionArrayObj, "[Prison] Clothe Prisoner")
     JArray.addStr(actionArrayObj, "[Prison] Set Prisoner State Property")
     JArray.addStr(actionArrayObj, "[Prison] Release Prisoner from Prison")
     JArray.addStr(actionArrayObj, "[Prison] Bind Cell Package to Reference")
@@ -144,6 +145,9 @@ function ShowActionsMenu()
 
     elseif (actionToPerform == "[Prison] Strip Prisoner to Underwear")
         Action_StripPrisoner(uilib, true)
+
+    elseif (actionToPerform == "[Prison] Clothe Prisoner")
+        Action_ClothePrisoner(uilib)
 
     elseif (actionToPerform == "[Prison] Set Prisoner State Property")
         Action_SetPrisonerStateProperty(uilib)
@@ -865,6 +869,22 @@ function Action_StripPrisoner(RPB_UIInterface uilib, bool abStripToUnderwear = f
     endif
 
     self.Prisoner_Strip(prisoner, abStripToUnderwear)
+endFunction
+
+function Action_ClothePrisoner(RPB_UIInterface uilib)
+    RPB_Prison prison = uilib.ShowPrisonList()
+
+    if (prison == none)
+        return none
+    endif
+
+    RPB_Prisoner prisoner = uilib.ShowPrisonerList(prison, asListTitle = "Clothe Prisoner")
+
+    if (prisoner == none)
+        return none
+    endif
+
+    prisoner.Clothe()
 endFunction
 
 function Action_SetPrisonerStateProperty(RPB_UIInterface uilib)
