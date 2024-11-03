@@ -45,7 +45,6 @@ endFunction
 
 function Right(RPB_MCM mcm) global
     mcm.AddOptionCategoryKey("", "Deleveling")
-    ; mcm.SetRenderedCategory("Skills")
 
     int i = 0
     while (i < 11)
