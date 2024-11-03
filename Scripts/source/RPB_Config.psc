@@ -4,12 +4,16 @@ import RPB_Utility
 import PO3_SKSEFunctions
 import Math
 
-; ==============================================================================
-; Constants
-; ==============================================================================
+; ==========================================================
+;                          Constants
+; ==========================================================
 
 bool property IS_DEBUG = false autoreadonly
 bool property ENABLE_BENCHMARK = true autoreadonly
+
+; ==========================================================
+;                         API Related
+; ==========================================================
 
 float function GetVersion() global
     return 1.00
@@ -23,6 +27,9 @@ string function GetModName() global
     return "Realistic Prison and Bounty"
 endFunction
 
+; ==========================================================
+;                     Script References
+; ==========================================================
 
 RPB_API __api
 RPB_API property API
@@ -47,6 +54,10 @@ RPB_Arrest property Arrest
         return API.Arrest
     endFunction
 endProperty
+
+; ==========================================================
+;                         Properties
+; ==========================================================
 
 string[] property Holds
     string[] function get()
@@ -76,77 +87,6 @@ Actor property Player
         return Game.GetForm(0x00014) as Actor
     endFunction
 endProperty
-
-bool function SetJailTeleportReleaseLocations()
-    ; miscVars.SetForm("Jail::Release::Teleport[Whiterun]", Game.GetFormEx(0x3EF19)) ; FormID Invalid
-    ; miscVars.SetForm("Jail::Release::Teleport[Eastmarch]", Game.GetFormEx(0x3EF19)) ; FormID Invalid
-    ; miscVars.SetForm("Jail::Release::Teleport[Falkreath]", Game.GetFormEx(0x3EF19)) ; FormID Invalid
-    ; miscVars.SetForm("Jail::Release::Teleport[Haafingar]", Game.GetFormEx(0x3EF19))
-    ; miscVars.SetForm("Jail::Release::Teleport[Hjaalmarch]", Game.GetFormEx(0x3EF19)) ; FormID Invalid
-    ; miscVars.SetForm("Jail::Release::Teleport[The Rift]", Game.GetFormEx(0x3EF19)) ; FormID Invalid
-    ; miscVars.SetForm("Jail::Release::Teleport[The Pale]", Game.GetFormEx(0x3EF19)) ; FormID Invalid
-
-    return true
-endFunction
-
-bool function SetJailPrisonerContainers()
-    ; miscVars.SetForm("Jail::Containers[Whiterun]", Game.GetFormEx(0x3EEFF)) ; FormID Invalid
-    ; miscVars.SetForm("Jail::Containers[Eastmarch]", Game.GetFormEx(0x3EEFF)) ; FormID Invalid
-    ; miscVars.SetForm("Jail::Containers[Falkreath]", Game.GetFormEx(0x3EEFF)) ; FormID Invalid
-    ; miscVars.SetForm("Jail::Containers[Haafingar]", Game.GetFormEx(0x3EEFF))
-    ; miscVars.SetForm("Jail::Containers[Hjaalmarch]", Game.GetFormEx(0x3EEFF)) ; FormID Invalid
-    ; miscVars.SetForm("Jail::Containers[The Rift]", Game.GetFormEx(0x3EEFF)) ; FormID Invalid
-    ; miscVars.SetForm("Jail::Containers[The Pale]", Game.GetFormEx(0x3EEFF)) ; FormID Invalid
-
-    return true
-endFunction
-
-bool function SetHoldLocations()
-    ; if (miscVars.Exists("Locations"))
-    ;     return true
-    ; endif
-
-    ; miscVars.AddFormToArray("Locations[Whiterun]", Game.GetForm(0x00018A56))
-    ; miscVars.AddFormToArray("Locations[Whiterun]", Game.GetForm(0x00016772))
-
-    ; miscVars.AddFormToArray("Locations[Winterhold]", Game.GetForm(0x00018A51))
-    ; miscVars.AddFormToArray("Locations[Winterhold]", Game.GetForm(0x0001676B))
-
-    ; miscVars.AddFormToArray("Locations[Eastmarch]", Game.GetForm(0x00018A57))
-    ; miscVars.AddFormToArray("Locations[Eastmarch]", Game.GetForm(0x0001676A))
-
-    ; miscVars.AddFormToArray("Locations[Falkreath]", Game.GetForm(0x00018A49))
-    ; miscVars.AddFormToArray("Locations[Falkreath]", Game.GetForm(0x0001676F))
-
-    ; miscVars.AddFormToArray("Locations[Haafingar]", Game.GetForm(0x00018A5A))
-    ; miscVars.AddFormToArray("Locations[Haafingar]", Game.GetForm(0x00016770))
-
-    ; miscVars.AddFormToArray("Locations[Hjaalmarch]", Game.GetForm(0x00018A53))
-    ; miscVars.AddFormToArray("Locations[Hjaalmarch]", Game.GetForm(0x0001676E))
-
-    ; miscVars.AddFormToArray("Locations[The Rift]", Game.GetForm(0x00018A58))
-    ; miscVars.AddFormToArray("Locations[The Rift]", Game.GetForm(0x0001676C))
-
-    ; miscVars.AddFormToArray("Locations[The Reach]", Game.GetForm(0x00018A59))
-    ; miscVars.AddFormToArray("Locations[The Reach]", Game.GetForm(0x00016769))
-
-    ; miscVars.AddFormToArray("Locations[The Pale]", Game.GetForm(0x00018A50))
-    ; miscVars.AddFormToArray("Locations[The Pale]", Game.GetForm(0x0001676D))
-
-    ; miscVars.CreateStringMap("Locations")
-    ; int i = 0
-    ; while (i < Holds.Length)
-    ;     string hold = Holds[i]
-    ;     if (miscVars.Exists("Locations["+ hold +"]"))
-    ;         miscVars.AddToContainer("Locations", "Locations["+ hold +"]")
-    ;     endif
-    ;     i += 1
-    ; endWhile
-
-    ; Debug("Config::SetHoldLocations", "Length: " + miscVars.GetLengthOf("Locations"))
-
-    return true
-endFunction
 
 bool function IsInLocationFromHold(string hold)
 ; ; float x = StartBenchmark()
@@ -329,6 +269,10 @@ int property FactionCount
     endFunction
 endProperty
 
+; ==========================================================
+;                          General
+; ==========================================================
+
 int property FreeTimescale
     int function get()
         return MCM.GetOptionSliderValue("General::Timescale", "General") as int
@@ -383,6 +327,10 @@ bool property ShouldDisplayInfamyNotifications
     endFunction
 endProperty
 
+; ==========================================================
+;                          Clothing
+; ==========================================================
+
 bool property HasNudeBodyModInstalled
     bool function get()
         return MCM.GetOptionToggleState("Configuration::NudeBodyModInstalled", "Clothing")
@@ -406,27 +354,6 @@ int property UnderwearBottomSlot
         return MCM.GetOptionSliderValue("Item Slots::Underwear (Bottom)", "Clothing") as int
     endFunction
 endProperty
-
-bool function ShouldDisplaySentencePage()
-    RPB_Prison playerPrison = RPB_Prison.GetPrisonForHold("Haafingar")
-    RPB_Prisoner playerPrisoner = playerPrison.GetPrisonerReference(self.Player)
-
-    if (!playerPrisoner)
-        return false
-    endif
-
-    return true
-endFunction
-
-; Temporary functions
-function PrepareActorForJail(Actor akActor)
-    ; Undress actor
-    akActor.UnequipAll()
-
-    AddOutfit("Outfit 1", none, Game.GetFormEx(0x3C9FE) as Armor, none, none)
-    AddOutfit("Outfit 2", none, Game.GetFormEx(0x3C9FE) as Armor, none, Game.GetFormEx(0x3CA00) as Armor)
-    WearOutfitOnActor(akActor, "Outfit 1")
-endFunction
 
 int function GetDelevelingSkillValue(string skillName)
     return MCM.GetOptionSliderValue("Deleveling::" + skillName, "Skills") as int
@@ -609,12 +536,21 @@ bool function IsClothedOnDefeat(string hold)
     return MCM.GetOptionToggleState("Clothing::When Defeated", hold)
 endFunction
 
-string function GetClothingOutfit(string hold)
-    return MCM.GetOutfitIdentifier(MCM.GetOptionMenuValue("Clothing::Outfit", hold)) ; Get mapped Outfit ID
+string function GetClothingOutfitIdentifier(string hold)
+    string outfitName = self.GetClothingOutfitName(hold)
+    return MCM.GetOutfitIdentifier(outfitName) ; Get mapped Outfit Name -> Outfit ID
+endFunction
+
+string function GetClothingOutfitName(string hold)
+    return MCM.GetOptionMenuValue("Clothing::Outfit", hold)
+endFunction
+
+bool function UseDefaultOutfitAsFallback(string hold)
+    return MCM.GetOptionToggleState("Clothing::Use Default Outfit as Fallback", hold)
 endFunction
 
 bool function IsClothingOutfitConditional(string hold)
-    string holdOutfit = GetClothingOutfit(hold)
+    string holdOutfit = GetClothingOutfitIdentifier(hold)
     return MCM.GetOptionToggleState(holdOutfit + "::Conditional Outfit", "Clothing")
 endFunction
 
@@ -631,12 +567,12 @@ int function GetClothingOutfitMaximumBountyFromID(string outfitId)
 endFunction
 
 int function GetClothingOutfitMinimumBounty(string hold)
-    string holdOutfit = GetClothingOutfit(hold)
+    string holdOutfit = GetClothingOutfitIdentifier(hold)
     return MCM.GetOptionSliderValue(holdOutfit + "::Minimum Bounty", "Clothing") as int
 endFunction
 
 int function GetClothingOutfitMaximumBounty(string hold)
-    string holdOutfit = GetClothingOutfit(hold)
+    string holdOutfit = GetClothingOutfitIdentifier(hold)
     return MCM.GetOptionSliderValue(holdOutfit + "::Maximum Bounty", "Clothing") as int
 endFunction
 
@@ -926,23 +862,6 @@ bool function HasBountyInHold(string hold)
     return crimeFaction.GetCrimeGold() > 0
 endFunction
 
-bool function CanBeArrested(string hold)
-    Faction crimeFaction = getFaction(hold)
-    int holdBounty = crimeFaction.GetCrimeGold()
-
-    if (!crimeFaction)
-        return false
-    endif
-
-    int minBountyRequired = getArrestRequiredBounty(hold)
-
-    if (holdBounty <= minBountyRequired)
-        return false
-    endif
-
-    return true
-endFunction
-
 function NotifyArrest(string msg, bool condition = true)
     if (ShouldDisplayArrestNotifications && condition)
         debug.notification(msg)
@@ -979,170 +898,13 @@ bool function IsBountyDecayable(string hold)
     return isDecayable
 endFunction
 
-Armor function GetActorEquippedClothingForBodyPart(Actor actorTarget, string bodyPart)
-    int validSlotMasks = JArray.object()
-
-    if (bodyPart == "Head")
-        JArray.addInt(validSlotMasks, 0x00000001)
-        JArray.addInt(validSlotMasks, 0x00000002)
-        JArray.addInt(validSlotMasks, 0x00001000)
-        JArray.addInt(validSlotMasks, 0x00002000)
-    elseif (bodyPart == "Body")
-        JArray.addInt(validSlotMasks, 0x00000004)
-        JArray.addInt(validSlotMasks, 0x00000002)
-        JArray.addInt(validSlotMasks, 0x00001000)
-    elseif (bodyPart == "Hands")
-        JArray.addInt(validSlotMasks, 0x00000008)
-    elseif (bodyPart == "Feet")
-        JArray.addInt(validSlotMasks, 0x00000080)
-    endif
-
-    int combinedSlotMask
-    int i = 0
-    while (i < JArray.count(validSlotMasks))
-        int currentSlotMask = JArray.getInt(validSlotMasks, i)
-        combinedSlotMask += currentSlotMask
-        Armor armorPieceSingleSlot = actorTarget.GetWornForm(currentSlotMask) as Armor
-        if (armorPieceSingleSlot)
-            return armorPieceSingleSlot
-        endif
-
-        Armor armorPieceMultipleSlots = actorTarget.GetWornForm(combinedSlotMask) as Armor
-        if (armorPieceMultipleSlots)
-            return armorPieceMultipleSlots
-        endif
-        
-        i += 1
-    endWhile
-
-    return none
-endFunction
-
-function WearOutfitOnActor(Actor actorTarget, string outfitId, bool unequipAllItems = true)
-    Armor bodyPartHead = MCM.GetOutfitPart(outfitId, "Head")
-    Armor bodyPartBody = MCM.GetOutfitPart(outfitId, "Body")
-    Armor bodyPartHands = MCM.GetOutfitPart(outfitId, "Hands")
-    Armor bodyPartFeet = MCM.GetOutfitPart(outfitId, "Feet")
-
-    string actorName = actorTarget.GetActorBase().GetName()
-
-    if (unequipAllItems)
-        actorTarget.UnequipAll()
-    endif
-
-    Debug("WearOutfit", "Test call for this outfit for " + actorName + ", body parts: ["+ bodyPartHead + ", " + bodyPartBody + ", " + bodyPartHands + ", " + bodyPartFeet +"]")
-
-    if (bodyPartHead != none)
-        actorTarget.EquipItem(bodyPartHead, false, abSilent = true)
-        Debug("WearOutfit", "Equipped " + bodyPartHead.GetName() + " from " + outfitId + "::Head" + " on " + actorName)
-    endif
-
-    if (bodyPartBody != none)
-        actorTarget.EquipItem(bodyPartBody, false, abSilent = true)
-        Debug("WearOutfit", "Equipped " + bodyPartBody.GetName() + " from " + outfitId + "::Body" + " on " + actorName)
-    endif
-    
-    if (bodyPartHands != none)
-        actorTarget.EquipItem(bodyPartHands, false, abSilent = true)
-        Debug("WearOutfit", "Equipped " + bodyPartHands.GetName() + " from " + outfitId + "::Hands" + " on " + actorName)
-    endif
-
-    if (bodyPartFeet != none)
-        actorTarget.EquipItem(bodyPartFeet, false, abSilent = true)
-        Debug("WearOutfit", "Equipped " + bodyPartFeet.GetName() + " from " + outfitId + "::Feet" + " on " + actorName)
-    endif
-
-endFunction
-
-function AddOutfit(string outfitId, Armor headClothing, Armor bodyClothing, Armor handsClothing, Armor feetClothing)
-    ; if body overrides head (shares slots, remove head, since body will take up its slot)
-    if (bodyClothing == headClothing)
-        headClothing = none
-    endif
-
-    ; Set each outfit part's name in the input fields for the outfit
-    MCM.SetOptionInputValue(outfitId + "::Head", headClothing.GetName())
-    MCM.SetOptionInputValue(outfitId + "::Body", bodyClothing.GetName())
-    MCM.SetOptionInputValue(outfitId + "::Hands", handsClothing.GetName())
-    MCM.SetOptionInputValue(outfitId + "::Feet", feetClothing.GetName())
-
-    ; Add each clothing piece to this outfit (store persistently into the outfit list)
-    MCM.AddOutfitPiece(outfitId, "Head", headClothing)
-    MCM.AddOutfitPiece(outfitId, "Body", bodyClothing)
-    MCM.AddOutfitPiece(outfitId, "Hands", handsClothing)
-    MCM.AddOutfitPiece(outfitId, "Feet", feetClothing)
-
-    Trace("AddOutfit", "headClothing: " + headClothing + ", bodyClothing: " + bodyClothing + ", handsClothing: " + handsClothing + ", feetClothing: " + feetClothing)
-    Trace("AddOutfit", "Slot Masks [headClothing: " + headClothing.GetSlotMask() + ", bodyClothing: " + bodyClothing.GetSlotMask() + ", handsClothing: " + handsClothing.GetSlotMask() + ", feetClothing: " + feetClothing.GetSlotMask() + "]")
-endFunction
-
 Armor function GetOutfitPart(string hold, string bodyPart)
-    string holdOutfit = GetClothingOutfit(hold)
-    return MCM.GetOutfitPart("Outfit 6", bodyPart)
+    string holdOutfitIdentifier = GetClothingOutfitIdentifier(hold)
+
+    DebugWithArgs("Config::GetOutfitPart", "hold: " + hold + ", bodyPart: " + bodyPart, "outfitIdentifier: " + holdOutfitIdentifier + ", outfitPart: " + MCM.GetOutfitPart(holdOutfitIdentifier, bodyPart))
+
+    return MCM.GetOutfitPart(holdOutfitIdentifier, bodyPart)
 endFunction
 
-; Player function aliases for param Actor
 
-Armor function GetEquippedClothingForBodyPart(string bodyPart)
-    return GetActorEquippedClothingForBodyPart(Player, bodyPart)
-endFunction
-
-function WearOutfit(string outfitName, bool unequipAllItems = true)
-    WearOutfitOnActor(Player, outfitName, unequipAllItems)
-endFunction
-
-bool function Debug_OutfitMeetsCondition(Faction crimeFaction, string outfitId)
-    int bounty = crimeFaction.GetCrimeGold()
-    int outfitMinimumBounty = MCM.GetOptionSliderValue("Clothing", outfitId + "::Minimum Bounty") as int
-    int outfitMaximumBounty = MCM.GetOptionSliderValue("Clothing", outfitId + "::Maximum Bounty") as int
-
-    bool onlyMinBountyRequired = outfitMinimumBounty == outfitMaximumBounty && bounty >= outfitMinimumBounty
-    bool isBountyWithinRange = IsWithin(bounty, outfitMinimumBounty, outfitMaximumBounty)
-    bool hasCondition = MCM.GetOptionToggleState("Clothing", outfitId + "::Conditional Outfit") as bool
-    bool meetsCondition = !hasCondition || isBountyWithinRange && !onlyMinBountyRequired || onlyMinBountyRequired
-
-    Debug("Debug_OutfitMeetsCondition", "Bounty for " + crimeFaction.GetName() + ": " + bounty)
-    Debug("Debug_OutfitMeetsCondition", outfitId + " [Minimum Bounty: " + outfitMinimumBounty + ", Maximum Bounty: " + outfitMaximumBounty + "] ("+ "isBountyWithinRange: " + isBountyWithinRange + ", hasCondition: "+ hasCondition +") (meets condition: " + meetsCondition + ")")
-
-    return meetsCondition
-endFunction
-
-; bool function Debug_OutfitMeetsCondition(Faction crimeFaction, string outfitId)
-;     int bounty = crimeFaction.GetCrimeGold()
-;     int outfitMinimumBounty = GetOutfitMinimumBounty(outfitId)
-;     int outfitMaximumBounty = GetOutfitMaximumBounty(outfitId)
-
-;     bool hasMinBounty = outfitMinimumBounty > 0
-;     bool hasMaxBounty = outfitMaximumBounty > 0
-
-;     bool isBountyRange = hasMinBounty && hasMaxBounty
-;     bool isSingleBounty = hasMinBounty && !hasMaxBounty
-
-;     bool isBountyWithinRange = !isSingleBounty && isBountyRange && IsWithin(bounty, outfitMinimumBounty, outfitMaximumBounty)
-
-;     bool hasCondition = MCM.GetOptionToggleState("Clothing", outfitId + "::Conditional Outfit") as bool
-;     bool meetsCondition = !hasCondition || (isSingleBounty && bounty >= outfitMinimumBounty) || isBountyWithinRange
-
-;     Debug("Debug_OutfitMeetsCondition", "Bounty for " + crimeFaction.GetName() + ": " + bounty)
-;     Debug("Debug_OutfitMeetsCondition", outfitId + " [Minimum Bounty: " + outfitMinimumBounty + ", Maximum Bounty: " + outfitMaximumBounty + "] ("+ "isBountyWithinRange: " + isBountyWithinRange + ", hasCondition: "+ hasCondition +") (meets condition: " + meetsCondition + ")")
-
-;     return meetsCondition
-; endFunction
-
-bool function OutfitMeetsCondition(Faction crimeFaction, string outfitId)
-    bool hasCondition = MCM.GetOptionToggleState("Clothing", outfitId + "::Conditional Outfit") as bool
-
-    if (!hasCondition)
-        return true
-    endif
-
-    int bounty = crimeFaction.GetCrimeGold()
-    int outfitMinimumBounty = MCM.GetOptionSliderValue("Clothing", outfitId + "::Minimum Bounty") as int
-    int outfitMaximumBounty = MCM.GetOptionSliderValue("Clothing", outfitId + "::Maximum Bounty") as int
-
-    bool isBountyWithinRange = IsWithin(bounty, outfitMinimumBounty, outfitMaximumBounty)
-    bool meetsCondition = !hasCondition || isBountyWithinRange
-
-    return meetsCondition
-endFunction
 
