@@ -396,6 +396,36 @@ string function GetFormattedAsParams(string values, string keys = "", string key
     return msg
 endFunction
 
+bool function String_StartsWith(string str, string needle) global
+    if (StringUtil.GetLength(str) < StringUtil.GetLength(needle))
+        return false
+    endif
+
+    string substring = StringUtil.Substring(str, 0, StringUtil.GetLength(needle))
+    return substring == needle
+endFunction
+
+string function String_Implode(string[] akStrArray, string asDelimiter = ",") global
+    string result = ""
+
+    int i = 0
+    while (i < akStrArray.Length)
+        result += akStrArray[i]
+
+        if (i < (akStrArray.Length - 1))
+            result += asDelimiter
+        endif
+
+        i += 1
+    endWhile
+
+    return result
+endFunction
+
+string[] function String_Explode(string asStr, string asDelimiter = ",") global
+    return StringUtil.Split(asStr, asDelimiter)
+endFunction
+
 string function ReplaceString(string str, string toFind, string replacement) global
     int len = StringUtil.GetLength(str)
     string result = ""
@@ -518,165 +548,117 @@ string function Replace(string asTemplate, string[] akPlaceholders, string[] akR
     return result
 endFunction
 
-; string function Replace(string asTemplate, string[] akPlaceholders, string[] akReplacements) global
-;     int numberOfPlaceholders = akPlaceholders.Length
-;     int numberOfReplacements = akReplacements.Length
+; ==========================================================
+;                      Bitwise Functions
+; ==========================================================
 
-;     if (numberOfPlaceholders != numberOfReplacements)
-;         return "Error: Number of placeholders does not match the number of replacements!"
-;     endif
+string function OR(int[] elements) global
+    string orBitwiseExpr = ""
 
-;     int startIndex = 0
-;     int templateLength = StringUtil.GetLength(asTemplate)
+    int i = 0
+    while (i < elements.Length)
+        orBitwiseExpr += elements[i]
+        if (i < (elements.Length - 1))
+            orBitwiseExpr +=  " | "
+        endif
+        i += 1
+    endWhile
 
-;     string result = ""
+    return orBitwiseExpr
+endFunction
 
-;     bool breakOuter = false
-;     while (startIndex < templateLength && !breakOuter)
-;         int placeholderIndex = StringUtil.Find(asTemplate, "{", startIndex)
-;         if (placeholderIndex == -1)
-;             ; If no more placeholders found, append the remaining part of the template
-;             ; result += StringUtil.Substring(asTemplate, startIndex, templateLength - startIndex)
-;             breakOuter = true
-;         else
-;             ; Append the part of the template before the placeholder
-;             result += StringUtil.Substring(asTemplate, startIndex, placeholderIndex - startIndex)
-;             startIndex = endPlaceholderIndex + 1
-            
-;             int endPlaceholderIndex = StringUtil.Find(asTemplate, "}", placeholderIndex)
-;             if (endPlaceholderIndex == -1)
-;                 return "Error: Unclosed placeholder."
-;             endif
+string function XOR(int[] elements) global
+    string xorBitwiseExpr = ""
 
-;             string placeholder = StringUtil.Substring(asTemplate, placeholderIndex + 1, endPlaceholderIndex - placeholderIndex - 1)
+    int i = 0
+    while (i < elements.Length)
+        xorBitwiseExpr += elements[i]
+        if (i < (elements.Length - 1))
+            xorBitwiseExpr +=  " ^ "
+        endif
+        i += 1
+    endWhile
 
-;             int replacementIndex = -1
-;             int n = 0
-;             bool breakInner = false
-;             while (n < numberOfPlaceholders && !breakInner)
-;                 if (placeholder == akPlaceholders[n])
-;                     replacementIndex = n
-;                     breakInner = true
-;                 endif
-;                 n += 1
-;             endWhile
+    return xorBitwiseExpr
+endFunction
 
-;             if (replacementIndex != -1)
-;                 ; Append the replacement string
-;                 result += akReplacements[replacementIndex]
-;             endif
+string function AND(int[] elements) global
+    string andBitwiseExpr = ""
 
-;             ; Update the start index to the character after the end of the placeholder
-;             startIndex = endPlaceholderIndex + 1
-;         endif
-;     endWhile
+    int i = 0
+    while (i < elements.Length)
+        andBitwiseExpr += elements[i]
+        if (i < (elements.Length - 1))
+            andBitwiseExpr +=  " & "
+        endif
+        i += 1
+    endWhile
 
-;     return result
-; endFunction
+    return andBitwiseExpr
+endFunction
 
-; string function Replace(string asTemplate, string[] akPlaceholders, string[] akReplacements) global
-;     int numberOfPlaceholders = akPlaceholders.Length
-;     int numberOfReplacements = akReplacements.Length
+; Temporary
+int function BitwiseExpr(string bitfield) global
+    ; Debug("BitwiseExpr", "["+i+"] " + "Bitfield: " + bitfield)
 
-;     if (numberOfPlaceholders != numberOfReplacements)
-;         return "Error: Number of placeholders does not match the number of replacements!"
-;     endif
+    int result = 0
+    string currentOperator = ""
+    string[] tokens = StringUtil.Split(bitfield, " ")
 
-;     int startIndex = 0
-;     int templateLength = StringUtil.GetLength(asTemplate)
+    ; Iterate over tokens to process the bitwise expression
+    int i = 0
+    while (i < tokens.length)
+        string token = tokens[i]
 
-;     string result = ""
+        if (token == "|")
+            currentOperator = "OR"
+        elseif (token == "&")
+            currentOperator = "AND"
+        elseif (token == "<<")
+            currentOperator = "LSHIFT"
+        elseif (token == ">>")
+            currentOperator = "RSHIFT"
+        else
+            bool isHexadecimal  = String_StartsWith(token, "0x")
+            bool isBinary       = !isHexadecimal && String_StartsWith(token, "0b")
+            bool isDecimal      = !isHexadecimal && !isBinary
 
-;     bool breakOuter = false
-;     while (startIndex < templateLength && !breakOuter)
-;         int placeholderIndex = StringUtil.Find(asTemplate, "{", startIndex)
-;         if (placeholderIndex == -1)
-;             result += StringUtil.Substring(asTemplate, startIndex, templateLength - startIndex)
-;             breakOuter = true
-;         else
-;             result += StringUtil.Substring(asTemplate, startIndex, placeholderIndex - startIndex)
-;             int endPlaceholderIndex = StringUtil.Find(asTemplate, "}", placeholderIndex)
-;             if (endPlaceholderIndex == -1)
-;                 return "Error: Unclosed placeholder."
-;             endif
+            int currentValue = 0
 
-;             string placeholder = StringUtil.Substring(asTemplate, placeholderIndex + 1, endPlaceholderIndex - placeholderIndex - 1)
+            if (isHexadecimal)
+                currentValue = HexStringToInt(token)
+ 
+            elseif (isBinary)
+                currentValue = BinStringToInt(token)
 
-;             int replacementIndex = -1
-;             int n = 0
-;             bool breakInner = false
-;             while (n < numberOfPlaceholders && !breakInner)
-;                 if (placeholder == akPlaceholders[n])
-;                     replacementIndex = n
-;                     breakInner = true
-;                 endif
-;                 n += 1
-;             endWhile
+            elseif (isDecimal)
+                currentValue = token as int
+            endif
 
-;             if (replacementIndex != -1)
-;                 result += akReplacements[replacementIndex]
-;             else
-;                 result += "{" + placeholder + "}"
-;             endif
+            ; Debug("BitwiseExpr", "["+i+"] " + currentValue)
 
-;             startIndex = endPlaceholderIndex + 1
-;         endif
-;     endWhile
+            ; Apply the current operator
+            if (currentOperator == "")
+                result = currentValue
+            elseif (currentOperator == "OR")
+                result = Math.LogicalOr(result, currentValue)
+            elseif (currentOperator == "AND")
+                result = Math.LogicalAnd(result, currentValue)
+            elseif (currentOperator == "LSHIFT")
+                result = Math.LeftShift(result, currentValue)
+            elseif (currentOperator == "RSHIFT")
+                result = Math.RightShift(result, currentValue)
+            endif
 
-;     return result
-; endFunction
+            ; Reset current operator after use
+            currentOperator = ""
+        endif
 
-; string function Replace(string asTemplate, string[] akPlaceholders, string[] akReplacements) global
-;     int numberOfPlaceholders = akPlaceholders.Length
-;     int numberOfReplacements = akReplacements.Length
+        i += 1
+    endWhile
 
-;     if (numberOfPlaceholders != numberOfReplacements)
-;         return "Error: Number of placeholders does not match the number of replacements!"
-;     endif
-
-;     int startIndex = 0
-;     int templateLength = StringUtil.GetLength(asTemplate)
-
-;     string result = ""
-
-;     bool break = false
-;     while (startIndex < templateLength && !break)
-;         int placeholderIndex = StringUtil.Find(asTemplate, "{", startIndex)
-;         if (placeholderIndex == -1)
-;             result += StringUtil.Substring(asTemplate, startIndex, templateLength - startIndex)
-;             break = true
-;         else
-;             result += StringUtil.Substring(asTemplate, startIndex, placeholderIndex - startIndex)
-;             int endPlaceholderIndex = StringUtil.Find(asTemplate, "}", placeholderIndex)
-;             if (endPlaceholderIndex == -1)
-;                 return "Error: Unclosed placeholder."
-;             endif
-
-;             string placeholder = StringUtil.Substring(asTemplate, placeholderIndex + 1, endPlaceholderIndex - placeholderIndex - 1)
-
-;             int replacementIndex = -1
-;             int n = 0
-;             bool break2 = false
-;             while (n < akReplacements.Length && !break2)
-;                 if (placeholder == akReplacements[n])
-;                     replacementIndex = n
-;                     break = true
-;                 endif
-;                 n += 1
-;             endWhile
-
-;             if (replacementIndex == -1)
-;                 result += akReplacements[n]
-;             else
-;                 result += "{" + placeholder + "}"
-;             endif
-
-;             startIndex = endPlaceholderIndex + 1
-;         endif
-;     endWhile
-
-;     return result
-; endFunction
+    return result
+endFunction
 
 ; ==========================================================
 ;                        AI Functions
@@ -952,10 +934,65 @@ endFunction
 ;                       Param Functions
 ; ==========================================================
 
+function AddIntIfNotNone(int aiElement, int arr) global
+    if (aiElement)
+        JArray.addInt(arr, aiElement)
+    endif
+endFunction
+
 function AddFormIfNotNone(Form akForm, int arr) global
     if (akForm)
         JArray.addForm(arr, akForm)
     endif
+endFunction
+
+int[] function IntList( \
+int aiElement1, \
+int aiElement2 = 0, \
+int aiElement3 = 0, \
+int aiElement4 = 0, \
+int aiElement5 = 0, \
+int aiElement6 = 0, \
+int aiElement7 = 0, \
+int aiElement8 = 0, \
+int aiElement9 = 0, \
+int aiElement10 = 0, \
+int aiElement11 = 0, \
+int aiElement12 = 0, \
+int aiElement13 = 0, \
+int aiElement14 = 0, \
+int aiElement15 = 0, \
+int aiElement16 = 0, \
+int aiElement17 = 0, \
+int aiElement18 = 0, \
+int aiElement19 = 0, \
+int aiElement20 = 0 \
+) global
+
+    int arr = JArray.object()
+
+    AddIntIfNotNone(aiElement1, arr)
+    AddIntIfNotNone(aiElement2, arr)
+    AddIntIfNotNone(aiElement3, arr)
+    AddIntIfNotNone(aiElement4, arr)
+    AddIntIfNotNone(aiElement5, arr)
+    AddIntIfNotNone(aiElement6, arr)
+    AddIntIfNotNone(aiElement7, arr)
+    AddIntIfNotNone(aiElement8, arr)
+    AddIntIfNotNone(aiElement9, arr)
+    AddIntIfNotNone(aiElement10, arr)
+    AddIntIfNotNone(aiElement11, arr)
+    AddIntIfNotNone(aiElement12, arr)
+    AddIntIfNotNone(aiElement13, arr)
+    AddIntIfNotNone(aiElement14, arr)
+    AddIntIfNotNone(aiElement15, arr)
+    AddIntIfNotNone(aiElement16, arr)
+    AddIntIfNotNone(aiElement17, arr)
+    AddIntIfNotNone(aiElement18, arr)
+    AddIntIfNotNone(aiElement19, arr)
+    AddIntIfNotNone(aiElement20, arr)
+
+    return JArray.asIntArray(arr)
 endFunction
 
 Form[] function BuildParamsObjectReference(\
@@ -1174,28 +1211,68 @@ Form function GetFormFromString(string asFormIdentifier) global
     string hexFormID    = StringUtil.Substring(asFormIdentifier, len - endOffset - formIdLength, formIdLength)
     int formID          = HexStringToInt(hexFormID)
 
-    ; DebugWithArgs("Data::GetFormFromString", asFormIdentifier, \
-    ;     "\n\t formIdLength: " + formIdLength + \
-    ;     "\n\t endOffset: " + endOffset + \
-    ;     "\n\t len: " + len + \
-    ;     "\n\t hexFormID: " + hexFormID + \
-    ;     "\n\t formId: " + formId \
-    ; )
-
-
-    ; string formId2 = PO3_SKSEFunctions.IntToString(formId as int, false)
-
-    ; int[] systemTime = PO3_SKSEFunctions.GetSystemTime()
-    ; DebugWithArgs("Data::GetFormFromString", asFormIdentifier, "systemTime: " + systemTime)
-
     return Game.GetFormEx(formID)
+endFunction
+
+;/
+    Parses the given number string as an integer in various formats.
+
+    For Decimal numbers, @asNumber should simply be passed the number.
+    For Hexadecimal numbers, prefix the number with '0x'.
+    For Binary numbers, prefix the number with '0b'.
+
+    returns (int): The given number as an integer in decimal format.
+/;
+int function ParseInt(string asNumber) global
+    bool isHexadecimal  = String_StartsWith(asNumber, "0x")
+    bool isBinary       = !isHexadecimal && String_StartsWith(asNumber, "0b")
+    bool isDecimal      = !isHexadecimal && !isBinary
+
+    if (isHexadecimal)
+        return HexStringToInt(asNumber)
+
+    elseif (isBinary)
+        return BinStringToInt(asNumber)
+
+    elseif (isDecimal)
+        return asNumber as int
+    endif
+
+    return -1
+endFunction
+
+int function ParseBinary(string asBin) global
+    int BIT_OFF = 0
+    int BIT_ON  = 1
+    int PREFIX_LEN = 2
+    int result = 0
+    int len = StringUtil.GetLength(asBin)
+
+    bool hasBinPrefix = String_StartsWith(asBin, "0b")
+    int i = int_if (hasBinPrefix, PREFIX_LEN, 0)
+    
+    while (i < len)
+        string currentBit = StringUtil.GetNthChar(asBin, i)
+        if (currentBit < BIT_OFF || currentBit > BIT_ON)
+            return -1
+        endif
+
+        result += Math.Pow(2, (len - 1 - i)) as int
+        i += 1
+    endWhile
+
+    return result
 endFunction
 
 int function HexStringToInt(string asHexString) global
     int result = 0
     int len = StringUtil.GetLength(asHexString)
 
-    int i = 0
+    bool hasHexPrefix = \ 
+        StringUtil.GetNthChar(asHexString, 0) == "0" && \
+        StringUtil.GetNthChar(asHexString, 1) == "x"
+
+    int i = int_if (hasHexPrefix, 2, 0)
     while (i < len)
         string currentChar = StringUtil.GetNthChar(asHexString, i)
         int value
@@ -1220,6 +1297,26 @@ int function HexStringToInt(string asHexString) global
         endif
 
         result = result * 16 + value
+        ; Debug("Utility::HexStringToInt", "["+ currentChar +"] result: " + result + " (value: "+ value +")")
+        i += 1
+    endWhile
+
+    return result
+endFunction
+
+int function BinStringToInt(string asBinString) global
+    int BIT_OFF = 0
+    int BIT_ON  = 1
+    int PREFIX_LEN = 2
+    int result = 0
+    int len = StringUtil.GetLength(asBinString)
+
+    bool hasBinPrefix = String_StartsWith(asBinString, "0b")
+
+    int i = int_if (hasBinPrefix, PREFIX_LEN, 0)
+    while (i < len)
+        string currentChar = StringUtil.GetNthChar(asBinString, i)
+        result += Math.Pow(2, (len - 1 - i)) as int
         i += 1
     endWhile
 
@@ -1337,36 +1434,28 @@ endFunction
 ; ==========================================================
 
 string[] function GetAllSkills(bool abIncludeStatSkills = true, bool abIncludePerkSkills = true) global
-    int arr = JArray.object()
+    if (!abIncludeStatSkills && !abIncludePerkSkills)
+        return none
+    endif
+
+    string skillList = ""
 
     if (abIncludeStatSkills)
-        JArray.addStr(arr, "Health")
-        JArray.addStr(arr, "Stamina")
-        JArray.addStr(arr, "Magicka")
+        skillList += "Health,Stamina,Magicka,"
     endif
 
     if (abIncludePerkSkills)
-        JArray.addStr(arr, "Heavy Armor")
-        JArray.addStr(arr, "Light Armor")
-        JArray.addStr(arr, "Sneak")
-        JArray.addStr(arr, "One-Handed")
-        JArray.addStr(arr, "Two-Handed")
-        JArray.addStr(arr, "Archery")
-        JArray.addStr(arr, "Block")
-        JArray.addStr(arr, "Smithing")
-        JArray.addStr(arr, "Speechcraft")
-        JArray.addStr(arr, "Pickpocketing")
-        JArray.addStr(arr, "Lockpicking")
-        JArray.addStr(arr, "Alteration")
-        JArray.addStr(arr, "Conjuration")
-        JArray.addStr(arr, "Destruction")
-        JArray.addStr(arr, "Illusion")
-        JArray.addStr(arr, "Restoration")
-        JArray.addStr(arr, "Enchanting")
-        JArray.addStr(arr, "Alchemy")
+        skillList += "Heavy Armor,Light Armor,Sneak,One-Handed,Two-Handed,Archery,Block," + \
+                     "Smithing,Speechcraft,Pickpocketing,Lockpicking,Alteration,Conjuration," + \
+                     "Destruction,Illusion,Restoration,Enchanting,Alchemy,"
     endif
 
-    return JArray.asStringArray(arr)
+    if (skillList != "")
+        ; Remove trailing comma
+        skillList = StringUtil.Substring(skillList, 0, StringUtil.GetLength(skillList) - 1)
+    endif
+
+    return StringUtil.Split(skillList, delim = ",")
 endFunction
 
 string[] function GetStatSkills() global
@@ -1409,20 +1498,7 @@ endFunction
 ; ==========================================================
 
 string[] function GetLockLevels() global
-    ;/
-        int lockLevels = Array("<string>", "[Novice, Apprentice, Adept, Expert, Master, Requires Key]")
-        return Array_AsStringArray(lockLevels)
-    /;
-   int _lockLevels = JArray.object()
-
-    JArray.addStr(_lockLevels, "Novice")
-    JArray.addStr(_lockLevels, "Apprentice")
-    JArray.addStr(_lockLevels, "Adept")
-    JArray.addStr(_lockLevels, "Expert")
-    JArray.addStr(_lockLevels, "Master")
-    JArray.addStr(_lockLevels, "Requires Key")
-
-    return JArray.asStringArray(_lockLevels)
+    return StringUtil.Split("Novice,Apprentice,Adept,Expert,Master,Requires Key", delim = ",")
 endFunction
 
 ; ==========================================================
