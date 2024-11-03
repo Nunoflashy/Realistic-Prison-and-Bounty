@@ -528,7 +528,13 @@ endProperty
 
 string property ClothingOutfit
     string function get()
-        return Config.GetClothingOutfit(Hold)
+        return Config.GetClothingOutfitIdentifier(Hold)
+    endFunction
+endProperty
+
+bool property UseDefaultOutfitAsFallback
+    bool function get()
+        return Config.UseDefaultOutfitAsFallback(Hold)
     endFunction
 endProperty
 
@@ -537,30 +543,30 @@ endProperty
 
 string property OutfitName
     string function get()
-        return Config.GetClothingOutfit(Hold)
+        return Config.GetClothingOutfitName(Hold)
     endFunction
 endProperty
 
-Form property OutfitPartHead
-    Form function get()
+Armor property OutfitPartHead
+    Armor function get()
         return Config.GetOutfitPart(Hold, "Head")
     endFunction
 endProperty
 
-Form property OutfitPartBody
-    Form function get()
+Armor property OutfitPartBody
+    Armor function get()
         return Config.GetOutfitPart(Hold, "Body")
     endFunction
 endProperty
 
-Form property OutfitPartHands
-    Form function get()
+Armor property OutfitPartHands
+    Armor function get()
         return Config.GetOutfitPart(Hold, "Hands")
     endFunction
 endProperty
 
-Form property OutfitPartFeet
-    Form function get()
+Armor property OutfitPartFeet
+    Armor function get()
         return Config.GetOutfitPart(Hold, "Feet")
     endFunction
 endProperty
@@ -839,6 +845,29 @@ bool function ShouldSilentlyStripPrisoner(RPB_Prisoner apPrisoner)
     return false
 endFunction
 
+Armor[] function GetDefaultOutfit()
+    Armor[] outfitPieces = new Armor[4]
+    Outfit[] prisonerDefaultOutfits = new Outfit[4]
+    prisonerDefaultOutfits[0] = RPB_GetOutfit("Default")
+    prisonerDefaultOutfits[1] = RPB_GetOutfit("Default 2")
+    prisonerDefaultOutfits[2] = RPB_GetOutfit("Default no Shoes")
+    prisonerDefaultOutfits[3] = RPB_GetOutfit("Default 2 no Shoes")
+
+    Outfit randomPrisonerOutfit = prisonerDefaultOutfits[Utility.RandomInt(0, 3)]
+    int outfitPartCount = randomPrisonerOutfit.GetNumParts()
+
+    int i = 0
+    while (i < outfitPieces.Length)
+        Armor outfitPiece = randomPrisonerOutfit.GetNthPart(i) as Armor
+        if (outfitPiece)
+            outfitPieces[i] = outfitPiece
+        endif
+        i += 1
+    endWhile
+
+    return outfitPieces
+endFunction
+
 bool function IsPrisoner(RPB_Prisoner apPrisoner)
     return Prisoners.Exists(apPrisoner)
 endFunction
@@ -1008,7 +1037,7 @@ endFunction
 ;                         Escape
 ; ==========================================================
 
-function TriggerEscape(RPB_Prisoner akPrisoner)
+function TriggerEscape(RPB_Prisoner apPrisoner)
 
 endFunction
 

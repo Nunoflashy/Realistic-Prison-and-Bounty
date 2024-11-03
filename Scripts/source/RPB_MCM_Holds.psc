@@ -21,6 +21,8 @@ function Render(RPB_MCM mcm) global
     mcm.SetCursorPosition(1)
     Right(mcm)
 
+    HandleDependencies(mcm)
+
     EndBenchmark(bench, mcm.CurrentPage + " page loaded -")
 endFunction
 
@@ -244,6 +246,7 @@ function HandleDependencies(RPB_MCM mcm) global
     mcm.SetOptionDependencyBool("Clothing::Maximum Violent Bounty",           allowUndressing && allowWearingClothes && isClothingBountyHandling)
     mcm.SetOptionDependencyBool("Clothing::Maximum Sentence",                 allowUndressing && allowWearingClothes && isClothingSentenceHandling)
     mcm.SetOptionDependencyBool("Clothing::Outfit",                           allowUndressing && allowWearingClothes)
+    mcm.SetOptionDependencyBool("Clothing::Use Default Outfit as Fallback",   allowUndressing && allowWearingClothes)
 
     ; ==========================================================
     ;                      FRISKING:UNDRESSING

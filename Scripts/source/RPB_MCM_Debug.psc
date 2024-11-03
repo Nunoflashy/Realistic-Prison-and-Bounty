@@ -64,6 +64,26 @@ function LoadSliderOptions(RPB_MCM mcm, string option, float currentSliderValue)
 endFunction
 
 ; =====================================================
+; Helpers
+; =====================================================
+
+bool function OutfitMeetsCondition(RPB_MCM mcm, Faction crimeFaction, string outfitId) global
+    int bounty = crimeFaction.GetCrimeGold()
+    int outfitMinimumBounty = mcm.GetOptionSliderValue(outfitId + "::Minimum Bounty", "Clothing") as int
+    int outfitMaximumBounty = mcm.GetOptionSliderValue(outfitId + "::Maximum Bounty", "Clothing") as int
+
+    bool onlyMinBountyRequired = outfitMinimumBounty == outfitMaximumBounty && bounty >= outfitMinimumBounty
+    bool isBountyWithinRange = IsWithin(bounty, outfitMinimumBounty, outfitMaximumBounty)
+    bool hasCondition = mcm.GetOptionToggleState(outfitId + "::Conditional Outfit", "Clothing") as bool
+    bool meetsCondition = !hasCondition || isBountyWithinRange && !onlyMinBountyRequired || onlyMinBountyRequired
+
+    Debug("MCM::Debug::OutfitMeetsCondition", "Bounty for " + crimeFaction.GetName() + ": " + bounty)
+    Debug("MCM::Debug::OutfitMeetsCondition", outfitId + " [Minimum Bounty: " + outfitMinimumBounty + ", Maximum Bounty: " + outfitMaximumBounty + "] ("+ "isBountyWithinRange: " + isBountyWithinRange + ", hasCondition: "+ hasCondition +") (meets condition: " + meetsCondition + ")")
+
+    return meetsCondition
+endFunction
+
+; =====================================================
 ; Events
 ; =====================================================
 
@@ -78,7 +98,7 @@ endFunction
 function OnOptionSelect(RPB_MCM mcm, string option) global
     string optionKey = mcm.CurrentPage + "::" + option
 
-    if (IsSelectedOption(option, "Outfit"))
+    if (IsOptionInCategory(option, "Outfit"))
         string outfitId = GetOptionNameNoCategory(option) ; Outfit 1, Outfit 2 ...
         string testHold = mcm.GetOptionMenuValue("Outfits::OutfitCondition")
         ; int outfitMinBounty = mcm.config.GetOutfitMinimumBounty(outfitId)
@@ -86,17 +106,18 @@ function OnOptionSelect(RPB_MCM mcm, string option) global
 
         ; mcm.Debug("OnOptionSelect", "outfitMinBounty: " + outfitMinBounty + ", outfitMaxBounty: " + outfitMaxBounty)
 
-        if (!mcm.config.Debug_OutfitMeetsCondition(mcm.config.GetFaction(testHold), outfitId))
+        if (!OutfitMeetsCondition(mcm, mcm.config.GetFaction(testHold), outfitId))
             string outfitName = mcm.GetOptionInputValue(outfitId + "::Name", "Clothing")
             Debug.MessageBox(outfitId + " (" + outfitName + ") does not meet the condition to be worn in " + testHold)
             return
         endif
 
         ; Call wear method for the specified outfit
-        mcm.config.WearOutfit(outfitId)
+        Actor player = Game.GetFormEx(0x14) as Actor
+        RPB_MCM_Clothing.EquipOutfitOnActor(mcm, player, outfitId)
         return
     
-    elseif (IsSelectedOption(option, "TeleportJailCell"))
+    elseif (IsOptionInCategory(option, "TeleportJailCell"))
         string hold = StringUtil.Substring(option, StringUtil.Find(option, "TeleportJailCell") + 16)
         ObjectReference jailCellRef = mcm.config.GetRandomJailMarker(hold)
         mcm.config.Player.MoveTo(jailCellRef)
@@ -122,14 +143,14 @@ function OnOptionSliderAccept(RPB_MCM mcm, string option, float value) global
 endFunction
 
 function OnOptionMenuOpen(RPB_MCM mcm, string option) global
-    if (IsSelectedOption(option, "OutfitCondition"))
+    if (IsOptionInCategory(option, "OutfitCondition"))
         mcm.SetMenuDialogOptions(mcm.config.Holds)
         mcm.SetMenuDialogDefaultIndex(GetOptionIndexFromKey(mcm.config.Holds, "Whiterun"))
     endif
 endFunction
 
 function OnOptionMenuAccept(RPB_MCM mcm, string option, int menuIndex) global
-    if (IsSelectedOption(option, "OutfitCondition"))
+    if (IsOptionInCategory(option, "OutfitCondition"))
         if (menuIndex != -1)
             mcm.SetOptionMenuValue(option, mcm.config.Holds[menuIndex])
         endif
