@@ -134,6 +134,25 @@ function EquipItem(Form akItem, bool abPreventRemoval = false, bool abSilent = t
     endif
 endFunction
 
+;/
+    Equips the specified Outfit through its Armor pieces.
+
+    Armor[] @akOutfit: The outfit pieces of this Outfit.
+    bool?   @abPreventRemoval: Whether to prevent this Outfit's removal by the Actor.
+/;
+function EquipOutfit(Armor[] akOutfit, bool abPreventRemoval = false)
+    if (akOutfit.Length == 0)
+        ; Error
+        return none
+    endif
+
+    int i = 0
+    while (i < akOutfit.Length)
+        self.EquipItem(akOutfit[i], abPreventRemoval)
+        i += 1
+    endWhile
+endFunction
+
 function UnequipHands()
     UnequipWeaponForActor(this, false)
     UnequipWeaponForActor(this, false)
