@@ -2,6 +2,29 @@ Scriptname RPB_MCM extends SKI_ConfigBase
 
 import RPB_Utility
 import RPB_Config
+import RPB_Memory
+
+; ==========================================================
+;                     Script References
+; ==========================================================
+
+RPB_API __api
+RPB_API property API
+    RPB_API function get()
+        if (__api)
+            return __api
+        endif
+
+        __api = RPB_API.GetSelf()
+        return __api
+    endFunction
+endProperty
+
+RPB_Config property Config
+    RPB_Config function get()
+        return API.Config
+    endFunction
+endProperty
 
 ; ==============================================================================
 ; Constants
@@ -41,111 +64,75 @@ int property TYPE_STRING    = 6 autoreadonly
 
 int property OUTFIT_COUNT = 10 autoreadonly
 
-RPB_API __api
-RPB_API property API
-    RPB_API function get()
-        if (__api)
-            return __api
-        endif
+; ==========================================================
+;                        Properties
+; ==========================================================
 
-        __api = RPB_API.GetSelf()
-        return __api
-    endFunction
-endProperty
-
-RPB_Config property Config
-    RPB_Config function get()
-        return API.Config
-    endFunction
-endProperty
-
-int _prisonSkillHandlingOptions
 string[] property PrisonSkillHandlingOptions
     string[] function get()
-        if (JArray.count(_prisonSkillHandlingOptions) == 0)
-            _prisonSkillHandlingOptions = JArray.object()
-
-            JArray.addStr(_prisonSkillHandlingOptions, "All Skills")
-            JArray.addStr(_prisonSkillHandlingOptions, "All Stat Skills (Health, Stamina, Magicka)")
-            JArray.addStr(_prisonSkillHandlingOptions, "All Perk Skills")
-            JArray.addStr(_prisonSkillHandlingOptions, "1x Random Stat Skill")
-            JArray.addStr(_prisonSkillHandlingOptions, "1x Random Perk Skill")
-            JArray.addStr(_prisonSkillHandlingOptions, "Random")
-        endif
-        return JArray.asStringArray(_prisonSkillHandlingOptions)
+        return String_Explode( \
+            "All Skills," + \
+            "All Stat Skills (Health, Stamina, Magicka)," + \
+            "All Perk Skills," + \
+            "1x Random Stat Skill," + \
+            "1x Random Perk Skill," + \
+            "Random" \
+        )
     endFunction
 endProperty
 
-int _escapeHandlingOptions
 string[] property EscapeHandlingOptions
     string[] function get()
-        if (JArray.count(_escapeHandlingOptions) == 0)
-            _escapeHandlingOptions = JArray.object()
-
-            JArray.addStr(_escapeHandlingOptions, "Bounty")
-            JArray.addStr(_escapeHandlingOptions, "Sentence")
-            JArray.addStr(_escapeHandlingOptions, "Bounty + Sentence")
-            JArray.addStr(_escapeHandlingOptions, "Bounty (Conditionally)")
-            JArray.addStr(_escapeHandlingOptions, "Sentence (Conditionally)")
-            JArray.addStr(_escapeHandlingOptions, "Bounty || Sentence (Conditionally OR)")
-            JArray.addStr(_escapeHandlingOptions, "Bounty && Sentence (Conditionally AND)")
-        endif
-        return JArray.asStringArray(_escapeHandlingOptions)
+        return String_Explode( \
+            "Bounty," + \
+            "Sentence," + \
+            "Bounty + Sentence," + \
+            "Bounty (Conditionally)," + \
+            "Sentence (Conditionally)," + \
+            "Bounty || Sentence (Conditionally OR)," + \
+            "Bounty && Sentence (Conditionally AND)" \
+        )
     endFunction
 endProperty
 
-int _undressingHandlingOptions
 string[] property UndressingHandlingOptions
     string[] function get()
-        if (JArray.count(_undressingHandlingOptions) == 0)
-            _undressingHandlingOptions = JArray.object()
-
-            JArray.addStr(_undressingHandlingOptions, "Minimum Bounty")
-            JArray.addStr(_undressingHandlingOptions, "Minimum Sentence")
-            JArray.addStr(_undressingHandlingOptions, "Unconditionally")
-        endif
-        return JArray.asStringArray(_undressingHandlingOptions)
+        return String_Explode( \
+            "Minimum Bounty," + \
+            "Minimum Sentence," + \
+            "Unconditionally" \
+        )
     endFunction
 endProperty
 
-int _clothingHandlingOptions
 string[] property ClothingHandlingOptions
     string[] function get()
-        if (JArray.count(_clothingHandlingOptions) == 0)
-            _clothingHandlingOptions = JArray.object()
-
-            JArray.addStr(_clothingHandlingOptions, "Maximum Bounty")
-            JArray.addStr(_clothingHandlingOptions, "Maximum Sentence")
-            JArray.addStr(_clothingHandlingOptions, "Unconditionally")
-        endif
-        return JArray.asStringArray(_clothingHandlingOptions)
+        return String_Explode( \
+            "Maximum Bounty," + \
+            "Maximum Sentence," + \
+            "Unconditionally" \
+        )
     endFunction
 endProperty
 
-int _clothingOutfits
 string[] property ClothingOutfits
     string[] function get()
-        if (JArray.count(_clothingOutfits) == 0)
-            _clothingOutfits = JArray.object()
-            
-            JArray.addStr(_clothingOutfits, "Default")
-            int i = 0
-            while (i < 10)
-                string currentOutfitCategory = "Outfit " + (i + 1)
-                string outfitName = GetOptionInputValue(currentOutfitCategory + "::Name", "Clothing")
-                LogProperty(self, "MCM::ClothingOutfits", "Outfit Name: " + outfitName)
-                JArray.addStr(_clothingOutfits, outfitName)
-                i += 1
-            endWhile
-        endif
-        return JArray.asStringArray(_clothingOutfits)
+        int _clothingOutfits = FastArray("<string>")
+
+        int i = 0
+        while (i < OUTFIT_COUNT)
+            int id = (i + 1) ; The outfit's id
+            string outfitName           = self.GetOptionValueString("Outfit "+ id +"::Name", "Clothing")
+            string outfitDefaultName    = self.GetOptionDefaultString("Outfit "+ id +"::Name")
+            ; Debug("MCM::ClothingOutfits", "Outfit["+i+"].Name: " + outfitName + " < Default: "+ outfitDefaultName +" >")
+
+            FastArray_AddString(_clothingOutfits, string_if (outfitName != "", outfitName, outfitDefaultName))
+            i += 1
+        endWhile
+        
+        return FastArray_ToStringArray(_clothingOutfits)
     endFunction
 endProperty
-
-int function GetOptionIndexFromKey(string[] _array, string _key) global
-    int internalContainer = JArray.objectWithStrings(_array)
-    return JArray.findStr(internalContainer, _key)
-endFunction
 
 string[] property LockLevels
     string[] function get()
@@ -159,64 +146,134 @@ string[] property Skills
     endFunction
 endProperty
 
-bool function IsSelectedOption(string optionParam, string optionName) global
-    return StringUtil.Find(optionParam, optionName) != -1
+;/
+    Retrieves the index in the array where the value matches @_key.
+
+    string[]    @_array: The array to check the index of.
+    string      @_key: The value to search in the array.
+
+    returns (int): The index of @_key in the array.
+/;
+int function GetOptionIndexFromKey(string[] _array, string _key) global
+    ; return FastArray_FindString( \ 
+    ;     FastArray_FromStringArray(_array), \
+    ;     _key \
+    ; )
+
+    int internalContainer = JArray.objectWithStrings(_array)
+    return JArray.findStr(internalContainer, _key)
 endFunction
 
-bool function IsValidClothingForBodyPart(string bodyPart, int slotMask) global
-    int validSlotMasks = JArray.object()
+;/
+    Checks if @asCategory is part of @asOptionName.
+    
+    string  @asOptionName: The name of the option to check.
+    string  @asOptionCategory: The category of the option.
 
-    if (bodyPart == "Head")
-        JArray.addInt(validSlotMasks, 0x00000001)
-        JArray.addInt(validSlotMasks, 0x00000002)
-        JArray.addInt(validSlotMasks, 0x00001000)
-        JArray.addInt(validSlotMasks, 0x00002000)
-    elseif (bodyPart == "Body")
-        JArray.addInt(validSlotMasks, 0x00000004)
-        JArray.addInt(validSlotMasks, 0x00000002)
-        JArray.addInt(validSlotMasks, 0x00001000)
-    elseif (bodyPart == "Hands")
-        JArray.addInt(validSlotMasks, 0x00000008)
-    elseif (bodyPart == "Feet")
-        JArray.addInt(validSlotMasks, 0x00000080)
-    endif
-
-    int combinedSlotMask
-    int i = 0
-    while (i < JArray.count(validSlotMasks))
-        int currentSlotMask = JArray.getInt(validSlotMasks, i)
-        combinedSlotMask += currentSlotMask
-        if (currentSlotMask == slotMask || combinedSlotMask == slotMask)
-            return true
-        endif
-        i += 1
-    endWhile
-
-    return false
+    returns (bool): true if the option is part of the category, false otherwise.
+/;
+bool function IsOptionInCategory(string asOptionName, string asCategory) global
+    return StringUtil.Find(asOptionName, asCategory) != -1
 endFunction
 
+;/
+    Checks if the option is of specificity @optionSpecificity.
+
+    string  @option: The option to check
+    string  @optionSpecificity: The option's specificity (e.g: option's property name)
+
+    returns (bool): Whether @option is of the specified specificity.
+/;
+bool function IsOptionOfSpecificity(string option, string optionSpecificity) global
+    return StringUtil.Find(option, optionSpecificity) != -1
+endFunction
+
+int __clothingOutfitsMap ; FastMap<string, Map<string>>
 function AddOutfitPiece(string outfitId, string outfitBodyPart, Armor outfitObject)
     if (!outfitObject)
         return
     endif
 
+    ; Outfit Map
+    __clothingOutfitsMap = Object_CreateIfNotExists(__clothingOutfitsMap, FastMap("<string>", retain = true))
+
+    ; Outfit - Identifiers
+    FastMap_SetObject(__clothingOutfitsMap, "Identifiers", FastMap("<string>"), condition = !FastMap_HasKey(__clothingOutfitsMap, "Identifiers"))
+
+    ; Outfit - Body Parts
+    FastMap_SetObject(__clothingOutfitsMap, "Body Parts", FastMap("<string>"), condition = !FastMap_HasKey(__clothingOutfitsMap, "Body Parts"))
+
     string outfitPieceKey = outfitId + "::" + outfitBodyPart
     self.SetOptionInputValue(outfitPieceKey, outfitObject.GetName())
+    
+    int outfitIdentifiers   = FastMap_GetObject(__clothingOutfitsMap, "Identifiers")
+    int outfitBodyParts     = FastMap_GetObject(__clothingOutfitsMap, "Body Parts")
 
-    ; miscVars.SetForm(outfitPieceKey, outfitObject, "clothing/outfits")
+    int outfitIndex = RPB_MCM_Clothing.GetOutfitIndex(outfitId)
+    string outfitName = self.ClothingOutfits[outfitIndex]
+    Debug("MCM::AddOutfitPiece", "self.ClothingOutfits: " + self.ClothingOutfits)
+
+    FastMap_SetString(outfitIdentifiers, outfitName, outfitId)
+    FastMap_SetForm(outfitBodyParts, outfitPieceKey, outfitObject)
+
+    Debug("MCM::AddOutfitPiece", "outfitId: " + outfitId + ", outfitIndex: " + outfitIndex + ", outfitObject: " + outfitObject + ", outfitName: " + outfitName)
+    Debug("MCM::AddOutfitPiece", "Outfit Container: "+ GetContainerList(__clothingOutfitsMap))
     ; Debug("AddOutfitPiece", "Added Outfit Piece: " + outfitObject.GetName() + " (FormID: " + outfitObject.GetFormID() + ") to Body Part: " + outfitBodyPart)
 endFunction
 
+bool function OutfitHasBodyParts(string outfitId)
+    string[] bodyParts  = String_Explode("Head,Body,Hands,Feet")
+    int bodyPartsObject = FastMap_GetObject(__clothingOutfitsMap, "Body Parts")
+
+    bool hasBodyPart = false
+
+    int i = 0
+    while (i < bodyParts.Length)
+        if (FastMap_HasKey(bodyPartsObject, outfitId + "::" + bodyParts[i]))
+            hasBodyPart = true
+        endif
+        i += 1
+    endWhile
+
+    return hasBodyPart
+endFunction
+
+;/
+    Removes an outfit body part from the Outfit specified by its id.
+
+    string  @outfitId: The id of the Outfit.
+    string  @outfitBodyPart: The body part of this outfit (Head, Body, Hands, Feet).
+/;
 function RemoveOutfitPiece(string outfitId, string outfitBodyPart)
     string outfitPieceKey = outfitId + "::" + outfitBodyPart
     self.SetOptionInputValue(outfitPieceKey, "")
-    ; Armor outfitObject = miscVars.GetForm(outfitPieceKey) as Armor
-    ; miscVars.SetForm(outfitPieceKey, none, "clothing/outfits")
+
+    int bodyPartsObject   = FastMap_GetObject(__clothingOutfitsMap, "Body Parts")
+    int identifiersObject = FastMap_GetObject(__clothingOutfitsMap, "Identifiers")
+
+    FastMap_RemoveKey(bodyPartsObject, outfitPieceKey)
+
+    if (!OutfitHasBodyParts(outfitId))
+        string outfitIdentifier = FastMap_KeyFromValueString(identifiersObject, outfitPieceKey)
+        FastMap_RemoveKey(identifiersObject,  outfitIdentifier)
+    endif
+    ; Armor outfitObject = FastMap_GetForm(__clothingOutfitsMap, outfitPieceKey) as Armor
     ; Debug("RemoveOutfitPiece", "Removed Outfit Piece: " + outfitObject.GetName() + " (FormID: " + outfitObject.GetFormID() +") from Body Part: " + outfitBodyPart)
 endFunction
 
+;/
+    Returns the Outfit body part for this Outfit through its id.
+
+    string  @outfitId: The id of the Outfit.
+    string  @outfitBodyPart: The body part of this outfit (Head, Body, Hands, Feet).
+
+    returns (Armor): The outfit body part for this Outfit.
+/;
 Armor function GetOutfitPart(string outfitId, string outfitBodyPart)
-    ; return miscVars.GetForm(outfitId + "::" + outfitBodyPart, "clothing/outfits") as Armor
+    return FastMap_GetForm( \ 
+        FastMap_GetObject(__clothingOutfitsMap, "Body Parts"), \ 
+        (outfitId + "::" + outfitBodyPart) \ 
+    ) as Armor
 endFunction
 
 ;/
@@ -226,7 +283,27 @@ endFunction
     returns: The outfit's id.
 /;
 string function GetOutfitIdentifier(string outfitName)
-    ; return miscVars.GetString(outfitName, "clothing/outfits")
+    return FastMap_GetString( \ 
+        FastMap_GetObject(__clothingOutfitsMap, "Identifiers"), \ 
+        outfitName \
+    )
+endFunction
+
+function SetOutfitName(string outfitId, string outfitName)
+    int identifiersObject    = FastMap_GetObject(__clothingOutfitsMap, "Identifiers")
+    string currentOutfitName = FastMap_KeyFromValueString(identifiersObject, outfitId)
+
+    bool keyExists = FastMap_HasKey(identifiersObject, currentOutfitName)
+
+    Debug("MCM::SetOutfitName", "keyExists: "+ keyExists)
+    Debug("MCM::SetOutfitName", "[Before] Outfit Identifiers: "+ GetContainerList(identifiersObject))
+
+    if (keyExists)
+        FastMap_RemoveKey(identifiersObject, currentOutfitName)
+    endif
+
+    FastMap_SetString(identifiersObject, outfitName, outfitId)
+    Debug("MCM::SetOutfitName", "[After] Outfit Identifiers: "+ GetContainerList(identifiersObject))
 endFunction
 
 string _currentRenderedCategory
@@ -272,29 +349,20 @@ bool function IsHoldCurrentPage()
 endFunction
 
 function InitializePages()
-    int _pagesArray = JArray.object()
-
-    JArray.addStr(_pagesArray, "Stats")
-
-    JArray.addStr(_pagesArray, "")
-    JArray.addStr(_pagesArray, "General")
-    JArray.addStr(_pagesArray, "Skills")
-    JArray.addStr(_pagesArray, "Clothing")
-    JArray.addStr(_pagesArray, "")
-
-    int i = 0
-    while (i < Config.Holds.Length)
-        JArray.addStr(_pagesArray, Config.Holds[i])
-        i += 1
-    endWhile
-
-    JArray.addStr(_pagesArray, "")
-    JArray.addStr(_pagesArray, "Maintenance")
-    JArray.addStr(_pagesArray, "Debug")
-
-    Debug("Pages::get", "Initialized array with a size of: " + JArray.count(_pagesArray))
-
-    Pages = JArray.asStringArray(_pagesArray)
+    string PAGE_SEPARATOR = " ,"
+    string[] pagesBuilt = String_Explode( \ 
+        "Stats," + \
+        PAGE_SEPARATOR + \
+        "General," + \
+        "Skills," + \
+        "Clothing," + \
+        PAGE_SEPARATOR + \
+        String_Implode(Config.Holds) + "," + \
+        PAGE_SEPARATOR + \
+        "Maintenance," + \
+        "Debug" \
+    )
+    Pages = pagesBuilt
 endFunction
 
 ;/
@@ -306,7 +374,7 @@ endFunction
 /;
 function SetOptionDependencyBool(string option, bool dependency, bool storePersistently = true)
     string optionKey = self.GetOptionAsStored(option)
-    int optionId     = self.GetOption(optionKey)
+    int optionId     = self.GetOptionID(optionKey)
     int flag         = int_if (dependency, OPTION_FLAG_NONE, OPTION_FLAG_DISABLED)
 
     parent.SetOptionFlags(optionId, flag)
@@ -328,10 +396,6 @@ endFunction
 
     returns [bool]:    The option's state.
 /;
-; bool function GetToggleOptionState(string page, string optionName)
-
-; endFunction
-
 bool function GetOptionToggleState(string option, string page = "")
     if (self.OptionHasValue(option, page))
         return self.GetOptionValueBool(option, page)
@@ -366,6 +430,7 @@ endFunction
 /;
 string function GetOptionMenuValue(string option, string page = "")
     if (self.OptionHasValue(option, page))
+        Debug("MCM::GetOptionMenuValue", "option: " + option + ", value: " + self.GetOptionValueString(option, page))
         return self.GetOptionValueString(option, page)
     else
         return self.GetOptionDefaultString(option)
@@ -428,7 +493,7 @@ endFunction
 /;
 function ToggleOption(string _key, bool storePersistently = true)
     string optionKey = self.GetOptionAsStored(_key)
-    int optionId     = self.GetOption(optionKey)
+    int optionId     = self.GetOptionID(optionKey)
     bool option      = bool_if (self.OptionHasValue(_key), self.GetOptionValueBool(_key), self.GetOptionDefaultBool(_key))
 
     parent.SetToggleOptionValue(optionId, !option)
@@ -747,15 +812,15 @@ endFunction
     float       @value: The new value for the option.
     string      @formatString: The format string used when displaying the option.
 /;
-function SetOptionSliderValue(string option, float value, string formatString = "{0}")
-    string optionKey = self.GetOptionAsStored(option)
-    int optionId     = self.GetOption(optionKey)
+function SetOptionSliderValue(string option, float value, string formatString = "{0}", string page = "")
+    string optionKey = self.GetOptionAsStored(option, page)
+    int optionId     = self.GetOptionID(optionKey)
 
     ; Change the value of the slider option
     parent.SetSliderOptionValue(optionId, value, formatString)
     
     ; Store the value
-    self.SetOptionValueFloat(option, value)
+    self.SetOptionValueFloat(option, value, page)
 
     Trace("SetOptionSliderValue", "Set new value of " + self.GetOptionValueFloat(option) + " for " + option + " (option_id: " + optionId + ")", true)
 endFunction
@@ -765,18 +830,19 @@ endFunction
 
     string      @option: The name of the option to be changed.
     string      @value: The new value for the option.
+    string?     @page: The page where this Option is located, if null, the current page will be used.
 /;
-function SetOptionMenuValue(string option, string value)
-    string optionKey = self.GetOptionAsStored(option)
-    int optionId     = self.GetOption(optionKey)
+function SetOptionMenuValue(string option, string value, string page = "")
+    string optionKey = self.GetOptionAsStored(option, page)
+    int optionId     = self.GetOptionID(optionKey)
     
     ; Change the value of the menu option
     parent.SetMenuOptionValue(optionId, value)
 
     ; Store the value
-    self.SetOptionValueString(option, value)
+    self.SetOptionValueString(option, value, page)
 
-    Trace("SetOptionMenuValue", "Set new value of " + value + " for " + option + " (option_id: " + optionId + ")")
+    Debug("MCM::SetOptionMenuValue", "Set new value of " + value + " for " + string_if (page != "", page + "/") + option + " (option_id: " + optionId + ")")
 endFunction
 
 ;/
@@ -785,15 +851,15 @@ endFunction
     string      @option: The name of the option to be changed.
     string      @value: The new value for the option.
 /;
-function SetOptionInputValue(string option, string value)
-    string optionKey = self.GetOptionAsStored(option)
-    int optionId     = self.GetOption(optionKey)
+function SetOptionInputValue(string option, string value, string page = "")
+    string optionKey = self.GetOptionAsStored(option, page)
+    int optionId     = self.GetOptionID(optionKey)
 
     ; Change the value of the input option
     parent.SetInputOptionValue(optionId, value)
 
     ; Store the value
-    self.SetOptionValueString(option, value)
+    self.SetOptionValueString(option, value, page)
 
     Trace("SetOptionInputValue", "Set new value of " + value + " for " + option + " (option_id: " + optionId + ")")
 endFunction
@@ -812,6 +878,7 @@ endEvent
 
 event OnConfigOpen()
     self.InitializePages()
+    self.SetHardcodedDefaults()
 endEvent
 
 string property RPB_CurrentPage auto
@@ -1158,13 +1225,7 @@ bool function IsValidPropertyType(string asPropertyType)
 endFunction
 
 string[] function GetPropertyTypes()
-    int types = JArray.object()
-    JArray.addStr(types, "Minimum")
-    JArray.addStr(types, "Maximum")
-    JArray.addStr(types, "Default")
-    JArray.addStr(types, "Steps")
-
-    return JArray.asStringArray(types)
+    return String_Explode("Minimum,Maximum,Default,Steps")
 endFunction
 
 ;/
@@ -1930,7 +1991,7 @@ function InitializeOptions()
     ; Persist the Options and assign them to a general container (this will persist the child objects)
     generalContainer = JMap.object()
     JValue.retain(generalContainer, "RPB_MCM01")
-
+    
     JMap.setObj(generalContainer, "options/value", optionsValueMap)
     JMap.setObj(generalContainer, "options/state", optionsStateMap)
     JMap.setObj(generalContainer, "options/default", optionsDefaultValueMap)
@@ -1952,6 +2013,33 @@ int optionsFromKeyToIdMap   ; Holds the identifier to identify an option from Ke
 int optionsFromIdToKeyMap   ; Holds the identifier to identify an option from ID to Key
 int generalContainer        ; Holds every option container and persists them
 
+function MCM()
+    optionsValueMap         = Object_CreateIfNotExists(optionsValueMap,         FastMap("<string>",   retain = true))
+    optionsStateMap         = Object_CreateIfNotExists(optionsStateMap,         FastMap("<string>",   retain = true))
+    optionsDefaultValueMap  = Object_CreateIfNotExists(optionsDefaultValueMap,  FastMap("<string>",   retain = true))
+    optionsMinimumValueMap  = Object_CreateIfNotExists(optionsMinimumValueMap,  FastMap("<string>",   retain = true))
+    optionsMaximumValueMap  = Object_CreateIfNotExists(optionsMaximumValueMap,  FastMap("<string>",   retain = true))
+    optionsStepsValueMap    = Object_CreateIfNotExists(optionsStepsValueMap,    FastMap("<string>",   retain = true))
+    optionsFromKeyToIdMap   = Object_CreateIfNotExists(optionsFromKeyToIdMap,   FastMap("<string>",   retain = true))
+    optionsFromIdToKeyMap   = Object_CreateIfNotExists(optionsFromIdToKeyMap,   FastMap("<int>",      retain = true))
+    __clothingOutfitsMap    = Object_CreateIfNotExists(__clothingOutfitsMap,    FastMap("<string>",   retain = true))
+endFunction
+
+;/
+    Sets predefined default values for options that should not be user configurable.
+/;
+function SetHardcodedDefaults()
+    self.SetOptionDefaultString("Outfit 1::Name", "Outfit 1")
+    self.SetOptionDefaultString("Outfit 2::Name", "Outfit 2")
+    self.SetOptionDefaultString("Outfit 3::Name", "Outfit 3")
+    self.SetOptionDefaultString("Outfit 4::Name", "Outfit 4")
+    self.SetOptionDefaultString("Outfit 5::Name", "Outfit 5")
+    self.SetOptionDefaultString("Outfit 6::Name", "Outfit 6")
+    self.SetOptionDefaultString("Outfit 7::Name", "Outfit 7")
+    self.SetOptionDefaultString("Outfit 8::Name", "Outfit 8")
+    self.SetOptionDefaultString("Outfit 9::Name", "Outfit 9")
+    self.SetOptionDefaultString("Outfit 10::Name", "Outfit 10")
+endFunction
 
 ; ============================================================================
 ;                             Option Setters/Getters
@@ -1979,11 +2067,12 @@ endFunction
 ;/
     Retrieves the option specified by the key.
 
-    string  @_key: The key to retrieve the option from.
+    string  @optionKey: The key to retrieve the option from.
     returns: The option's id.
  /;
-int function GetOption(string optionKey)
-    return JMap.getInt(optionsFromKeyToIdMap, optionKey)
+int function GetOptionID(string optionKey)
+    return FastMap_GetInt(optionsFromKeyToIdMap, optionKey)
+    ; return JMap.getInt(optionsFromKeyToIdMap, optionKey)
 endFunction
 
 ;/
@@ -2033,6 +2122,7 @@ endFunction
 function SetOptionValueString(string optionKey, string value, string page = "")
     string optionAsStored = self.GetOptionAsStored(optionKey, page)
     JMap.setStr(optionsValueMap, optionAsStored, value)
+    Debug("MCM::SetOptionValueString", "Setting " + optionAsStored + ": " + value)
 endFunction
 
 ;/
@@ -2104,7 +2194,8 @@ endFunction
 /;
 bool function GetOptionValueBool(string optionKey, string page = "")
     string optionAsStored = self.GetOptionAsStored(optionKey, page)
-    return JMap.getInt(optionsValueMap, optionAsStored) as bool
+    return FastMap_GetInt(optionsValueMap, optionAsStored) as bool
+    ; return JMap.getInt(optionsValueMap, optionAsStored) as bool
 endFunction
 
 ;/
@@ -2115,7 +2206,8 @@ endFunction
 /;
 int function GetOptionValueInt(string optionKey, string page = "")
     string optionAsStored = self.GetOptionAsStored(optionKey, page)
-    return JMap.getInt(optionsValueMap, optionAsStored)
+    return FastMap_GetInt(optionsValueMap, optionAsStored)
+    ; return JMap.getInt(optionsValueMap, optionAsStored)
 endFunction
 
 ;/
@@ -2126,7 +2218,8 @@ endFunction
 /;
 float function GetOptionValueFloat(string optionKey, string page = "")
     string optionAsStored = self.GetOptionAsStored(optionKey, page)
-    return JMap.getFlt(optionsValueMap, optionAsStored)
+    return FastMap_GetFloat(optionsValueMap, optionAsStored)
+    ; return JMap.getFlt(optionsValueMap, optionAsStored)
 endFunction
 
 ;/
@@ -2137,7 +2230,8 @@ endFunction
 /;
 string function GetOptionValueString(string optionKey, string page = "")
     string optionAsStored = self.GetOptionAsStored(optionKey, page)
-    return JMap.getStr(optionsValueMap, optionAsStored)
+    return FastMap_GetString(optionsValueMap, optionAsStored)
+    ; return JMap.getStr(optionsValueMap, optionAsStored)
 endFunction
 
 ;/
@@ -2148,7 +2242,8 @@ endFunction
 /;
 int function GetOptionState(string optionKey, string page = "")
     string optionAsStored = self.GetOptionAsStored(optionKey, page)
-    return JMap.getInt(optionsStateMap, optionAsStored)
+    return FastMap_GetInt(optionsStateMap, optionAsStored)
+    ; return JMap.getInt(optionsStateMap, optionAsStored)
 endFunction
 
 ;/
@@ -2196,7 +2291,8 @@ endFunction
     string  @asOptionKey: The key of the option.
 /;
 bool function GetOptionDefaultBool(string optionKey)
-    return JMap.getInt(optionsDefaultValueMap, optionKey) as bool
+    return FastMap_GetInt(optionsDefaultValueMap, optionKey) as bool
+    ; return JMap.getInt(optionsDefaultValueMap, optionKey) as bool
 endFunction
 
 ;/
@@ -2205,7 +2301,8 @@ endFunction
     string  @asOptionKey: The key of the option.
 /;
 int function GetOptionDefaultInt(string optionKey)
-    return JMap.getInt(optionsDefaultValueMap, optionKey)
+    return FastMap_GetInt(optionsDefaultValueMap, optionKey)
+    ; return JMap.getInt(optionsDefaultValueMap, optionKey)
 endFunction
 
 ;/
@@ -2214,7 +2311,8 @@ endFunction
     string  @asOptionKey: The key of the option.
 /;
 float function GetOptionDefaultFloat(string optionKey)
-    return JMap.getFlt(optionsDefaultValueMap, optionKey)
+    return FastMap_GetFloat(optionsDefaultValueMap, optionKey)
+    ; return JMap.getFlt(optionsDefaultValueMap, optionKey)
 endFunction
 
 ;/
@@ -2223,7 +2321,8 @@ endFunction
     string  @asOptionKey: The key of the option.
 /;
 string function GetOptionDefaultString(string optionKey)
-    return JMap.getStr(optionsDefaultValueMap, optionKey)
+    return FastMap_GetString(optionsDefaultValueMap, optionKey)
+    ; return JMap.getStr(optionsDefaultValueMap, optionKey)
 endFunction
 
 ;/
@@ -2262,7 +2361,8 @@ endFunction
     string  @asOptionKey: The key of the option.
 /;
 float function GetOptionMinimum(string optionKey)
-    return JMap.getFlt(optionsMinimumValueMap, optionKey)
+    return FastMap_GetFloat(optionsMinimumValueMap, optionKey)
+    ; return JMap.getFlt(optionsMinimumValueMap, optionKey)
 endFunction
 
 ;/
@@ -2271,7 +2371,8 @@ endFunction
     string  @asOptionKey: The key of the option.
 /;
 float function GetOptionMaximum(string optionKey)
-    return JMap.getFlt(optionsMaximumValueMap, optionKey)
+    return FastMap_GetFloat(optionsMaximumValueMap, optionKey)
+    ; return JMap.getFlt(optionsMaximumValueMap, optionKey)
 endFunction
 
 ;/
@@ -2280,5 +2381,6 @@ endFunction
     string  @asOptionKey: The key of the option.
 /;
 float function GetOptionSteps(string optionKey)
-    return JMap.getFlt(optionsStepsValueMap, optionKey)
+    return FastMap_GetFloat(optionsStepsValueMap, optionKey)
+    ; return JMap.getFlt(optionsStepsValueMap, optionKey)
 endFunction
