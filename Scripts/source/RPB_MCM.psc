@@ -117,20 +117,25 @@ endProperty
 
 string[] property ClothingOutfits
     string[] function get()
-        int _clothingOutfits = FastArray("<string>")
+        string buildString = ""
 
         int i = 0
         while (i < OUTFIT_COUNT)
             int id = (i + 1) ; The outfit's id
-            string outfitName           = self.GetOptionValueString("Outfit "+ id +"::Name", "Clothing")
-            string outfitDefaultName    = self.GetOptionDefaultString("Outfit "+ id +"::Name")
-            ; Debug("MCM::ClothingOutfits", "Outfit["+i+"].Name: " + outfitName + " < Default: "+ outfitDefaultName +" >")
 
-            FastArray_AddString(_clothingOutfits, string_if (outfitName != "", outfitName, outfitDefaultName))
+            string outfitName = string_if ( \ 
+                self.OptionHasValue("Outfit " + id + "::Name", "Clothing"), \ 
+                self.GetOptionValueString("Outfit "+ id +"::Name", "Clothing"), \
+                self.GetOptionDefaultString("Outfit "+ id +"::Name") \
+            )
+
+            buildString += outfitName
+            buildString += string_if (i < (OUTFIT_COUNT - 1), ",")
+
             i += 1
         endWhile
         
-        return FastArray_ToStringArray(_clothingOutfits)
+        return String_Explode(buildString)
     endFunction
 endProperty
 
@@ -145,7 +150,7 @@ string[] property Skills
         return RPB_Utility.GetAllSkills()
     endFunction
 endProperty
-
+              
 ;/
     Retrieves the index in the array where the value matches @_key.
 
@@ -2072,7 +2077,6 @@ endFunction
  /;
 int function GetOptionID(string optionKey)
     return FastMap_GetInt(optionsFromKeyToIdMap, optionKey)
-    ; return JMap.getInt(optionsFromKeyToIdMap, optionKey)
 endFunction
 
 ;/
@@ -2195,7 +2199,6 @@ endFunction
 bool function GetOptionValueBool(string optionKey, string page = "")
     string optionAsStored = self.GetOptionAsStored(optionKey, page)
     return FastMap_GetInt(optionsValueMap, optionAsStored) as bool
-    ; return JMap.getInt(optionsValueMap, optionAsStored) as bool
 endFunction
 
 ;/
@@ -2207,7 +2210,6 @@ endFunction
 int function GetOptionValueInt(string optionKey, string page = "")
     string optionAsStored = self.GetOptionAsStored(optionKey, page)
     return FastMap_GetInt(optionsValueMap, optionAsStored)
-    ; return JMap.getInt(optionsValueMap, optionAsStored)
 endFunction
 
 ;/
@@ -2219,7 +2221,6 @@ endFunction
 float function GetOptionValueFloat(string optionKey, string page = "")
     string optionAsStored = self.GetOptionAsStored(optionKey, page)
     return FastMap_GetFloat(optionsValueMap, optionAsStored)
-    ; return JMap.getFlt(optionsValueMap, optionAsStored)
 endFunction
 
 ;/
@@ -2231,7 +2232,6 @@ endFunction
 string function GetOptionValueString(string optionKey, string page = "")
     string optionAsStored = self.GetOptionAsStored(optionKey, page)
     return FastMap_GetString(optionsValueMap, optionAsStored)
-    ; return JMap.getStr(optionsValueMap, optionAsStored)
 endFunction
 
 ;/
@@ -2243,7 +2243,6 @@ endFunction
 int function GetOptionState(string optionKey, string page = "")
     string optionAsStored = self.GetOptionAsStored(optionKey, page)
     return FastMap_GetInt(optionsStateMap, optionAsStored)
-    ; return JMap.getInt(optionsStateMap, optionAsStored)
 endFunction
 
 ;/
@@ -2292,7 +2291,6 @@ endFunction
 /;
 bool function GetOptionDefaultBool(string optionKey)
     return FastMap_GetInt(optionsDefaultValueMap, optionKey) as bool
-    ; return JMap.getInt(optionsDefaultValueMap, optionKey) as bool
 endFunction
 
 ;/
@@ -2302,7 +2300,6 @@ endFunction
 /;
 int function GetOptionDefaultInt(string optionKey)
     return FastMap_GetInt(optionsDefaultValueMap, optionKey)
-    ; return JMap.getInt(optionsDefaultValueMap, optionKey)
 endFunction
 
 ;/
@@ -2312,7 +2309,6 @@ endFunction
 /;
 float function GetOptionDefaultFloat(string optionKey)
     return FastMap_GetFloat(optionsDefaultValueMap, optionKey)
-    ; return JMap.getFlt(optionsDefaultValueMap, optionKey)
 endFunction
 
 ;/
@@ -2322,7 +2318,6 @@ endFunction
 /;
 string function GetOptionDefaultString(string optionKey)
     return FastMap_GetString(optionsDefaultValueMap, optionKey)
-    ; return JMap.getStr(optionsDefaultValueMap, optionKey)
 endFunction
 
 ;/
@@ -2362,7 +2357,6 @@ endFunction
 /;
 float function GetOptionMinimum(string optionKey)
     return FastMap_GetFloat(optionsMinimumValueMap, optionKey)
-    ; return JMap.getFlt(optionsMinimumValueMap, optionKey)
 endFunction
 
 ;/
@@ -2372,7 +2366,6 @@ endFunction
 /;
 float function GetOptionMaximum(string optionKey)
     return FastMap_GetFloat(optionsMaximumValueMap, optionKey)
-    ; return JMap.getFlt(optionsMaximumValueMap, optionKey)
 endFunction
 
 ;/
@@ -2382,5 +2375,4 @@ endFunction
 /;
 float function GetOptionSteps(string optionKey)
     return FastMap_GetFloat(optionsStepsValueMap, optionKey)
-    ; return JMap.getFlt(optionsStepsValueMap, optionKey)
 endFunction
