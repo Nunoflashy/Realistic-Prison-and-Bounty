@@ -205,9 +205,6 @@ endFunction
     returns (bool): true if the slot masks overlap, false otherwise.
 /;
 bool function HasSlotMaskOverlap(int aiSlotMaskOne, int aiSlotMaskTwo) global
-    ; Perform a bitwise AND to identify overlapping slots
-    ; Check if there’s any overlap by comparing to 0
-    ; Debug("MCM::Clothing::HasSlotMaskOverlap", aiSlotMaskOne + " & " + aiSlotMaskTwo + " = " + BitwiseExpr(aiSlotMaskOne + " & " + aiSlotMaskTwo))
     return BitwiseExpr(aiSlotMaskOne + " & " + aiSlotMaskTwo) != 0
 endFunction
 
