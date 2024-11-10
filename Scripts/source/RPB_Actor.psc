@@ -230,6 +230,7 @@ endFunction
 ;                          Clothing
 ; ==========================================================
 
+; TODO: Check if Actor is in underwear, if so, it's not naked, return false
 bool function IsNaked()
     bool hasBodyClothing = this.GetWornForm(0x00000004) == none
     return hasBodyClothing
@@ -274,6 +275,26 @@ Armor function GetUnderwear(string asUnderwearPart)
     Armor underwearPart = this.GetWornForm(underwearSlotMask) as Armor
 
     return underwearPart
+endFunction
+
+bool function IsWearingOutfit(Armor[] akOutfit)
+    if (!akOutfit)
+        return false
+    endif
+
+    ; bool pieceMismatch = false
+
+    int i = 0
+    while (i < akOutfit.Length)
+        int slotMask = akOutfit[i].GetSlotMask()
+        Armor wornPiece = this.GetWornForm(slotMask) as Armor
+        if (wornPiece != akOutfit[i])
+            return false
+        endif
+        i += 1
+    endWhile
+
+    return true
 endFunction
 
 ; ==========================================================
@@ -826,6 +847,7 @@ int function GetFormID()
     return this.GetFormID()
 endFunction
 
+; Returns 'her' for Females, 'his' for Males
 string function GetPossessivePronoun()
     if (self.IsFemale)
         return "her"
@@ -834,11 +856,21 @@ string function GetPossessivePronoun()
     endif
 endFunction
 
+; Returns 'her' for Females, 'him' for Males
 string function GetPronoun()
     if (self.IsFemale)
         return "her"
     elseif (self.IsMale)
         return "him"
+    endif
+endFunction
+
+; Returns 'she' for Females, 'he' for Males
+string function GetGenderPronoun()
+    if (self.IsFemale)
+        return "she"
+    elseif (self.IsMale)
+        return "he"
     endif
 endFunction
 
