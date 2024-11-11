@@ -1305,7 +1305,7 @@ event OnScenePlaying(string name, int phaseEvent, int phase, Scene sender)
             EventManager.SendPrisonSceneBulkEvent(name, EVENT_STRIPPING, prisoners, guard)
 
             if (phase == 6 && phaseEvent == PHASE_START) ; Remove Underwear
-                
+                EventManager.SendPrisonSceneBulkEvent(name, EVENT_STRIPPING, prisoners, guard, "Remove Underwear")
             endif
 
         elseif (name == SCENE_FORCED_STRIPPING_01)

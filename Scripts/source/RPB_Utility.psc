@@ -141,6 +141,30 @@ function Debug(string asCaller, string asLogInfo, bool abCondition = true) globa
     base_log("DEBUG:", asLogInfo, asCaller)
 endFunction
 
+function NotImplemented(string asCaller, bool abCondition = true) global
+    if (!abCondition || !IsDebuggingEnabled())
+        return
+    endif
+
+    base_log("IMPLEMENT:", asCaller + " has not been implemented!", asCaller)
+endFunction
+
+function FunctionNotImplemented(string asCaller, bool abCondition = true) global
+    if (!abCondition || !IsDebuggingEnabled())
+        return
+    endif
+
+    base_log("IMPLEMENT:", "Function " + asCaller + "() has not been implemented!", asCaller)
+endFunction
+
+function EventNotImplemented(string asCaller, bool abCondition = true) global
+    if (!abCondition || !IsDebuggingEnabled())
+        return
+    endif
+
+    base_log("IMPLEMENT:", "Event " + asCaller + "() has not been implemented!", asCaller)
+endFunction
+
 function DebugInfo(string asCaller, string asLogInfo, bool abCondition = true) global
     if (!abCondition || !IsDebuggingEnabled())
         return

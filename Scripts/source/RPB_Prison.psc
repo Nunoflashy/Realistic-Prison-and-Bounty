@@ -55,6 +55,12 @@ RPB_SceneManager property SceneManager
     endFunction
 endProperty
 
+RPB_EventManager property EventManager
+    RPB_EventManager function get()
+        return API.EventManager
+    endFunction
+endProperty
+
 ; ==========================================================
 ;                       Prison Identity
 ; ==========================================================
@@ -1234,8 +1240,8 @@ RPB_JailCell function RequestCell(RPB_Prisoner apPrisoner)
 endFunction
 
 bool function ShouldPrisonerBeInGenderExclusiveCell(RPB_Prisoner apPrisoner)
-    bool strippedNaked      = apPrisoner.WillBeStrippedNaked || apPrisoner.IsStrippedNaked
-    bool strippedUnderwear  = apPrisoner.WillBeStrippedToUnderwear || apPrisoner.IsStrippedToUnderwear
+    bool strippedNaked      = apPrisoner.WillBeStrippedNaked        || apPrisoner.IsStrippedNaked
+    bool strippedUnderwear  = apPrisoner.WillBeStrippedToUnderwear  || apPrisoner.IsStrippedToUnderwear
 
     return strippedNaked || strippedUnderwear
 endFunction
@@ -1292,7 +1298,36 @@ function AwaitPrisonersQueuedImprisonment()
     endWhile
 endFunction
 
+; ==========================================================
+;                       Escort Actions
+; ==========================================================
 
+function EscortPrisonerToJail(RPB_Prisoner apPrisoner, Actor akEscort)
+    FunctionNotImplemented("Prison::EscortPrisonerToJail")
+endFunction
+
+function EscortPrisonerToCell(RPB_Prisoner apPrisoner, Actor akEscort)
+    RPB_JailCell jailCell = apPrisoner.JailCell
+
+    ObjectReference outsideCellGuardWaitingMarker = jailCell.GetRandomMarker("Exterior")
+    apPrisoner.BindToCell()
+
+    SceneManager.StartEscortToCell( \
+        akEscortLeader              = akEscort, \
+        akEscortedPrisoner          = apPrisoner.GetActor(), \
+        akJailCellMarker            = jailCell, \
+        akJailCellDoor              = jailCell.CellDoor, \
+        akEscortWaitingMarker       = outsideCellGuardWaitingMarker \ 
+    )
+endFunction
+
+function EscortPrisonerFromJail(RPB_Prisoner apPrisoner, Actor akEscort)
+    FunctionNotImplemented("Prison::EscortPrisonerFromJail")
+endFunction
+
+function EscortPrisonerFromCell(RPB_Prisoner apPrisoner, Actor akEscort)
+    FunctionNotImplemented("Prison::EscortPrisonerFromCell")
+endFunction
 
 ; ==========================================================
 ;                          Events
@@ -1350,16 +1385,6 @@ event OnPrisonerUnregistered(RPB_Prisoner apPrisoner)
     PrisonManager.OnPrisonUnregisteredPrisoner(self, apPrisoner)
 endEvent
 
-event OnPrisonerProcessed(RPB_Prisoner apPrisoner)
-    apPrisoner.SetReleaseLocation()
-    apPrisoner.SetBelongingsContainer()
-    if (!apPrisoner.AssignCell())
-        return
-    endif
-
-    apPrisoner.StartStripping(apPrisoner.Captor)
-endEvent
-
 event OnPrisonerImprisoned(RPB_Prisoner apPrisoner)
     apPrisoner.RegisterTimeOfImprisonment()
     apPrisoner.DetermineReleaseTimeAdditionalHours() ; For Release Time (Minimum, Maximum) intervals
@@ -1403,6 +1428,7 @@ event OnPrisonerTeleportedToPrison(RPB_Prisoner apPrisoner)
 
     apPrisoner.StartRestraining(apPrisoner.Captor)
     apPrisoner.EscortToCell(apPrisoner.Captor)
+    ; apPrisoner.EscortPrisonerToCell(apPrisoner, apPrisoner.Captor)
 endEvent
 
 event OnPrisonerTeleportedToCell(RPB_Prisoner apPrisoner, bool abImprisonPrisoner)
@@ -1420,8 +1446,10 @@ event OnPrisonerTeleportedToCell(RPB_Prisoner apPrisoner, bool abImprisonPrisone
     endif
 
     if (apPrisoner.ShouldBeStripped)
-        apPrisoner.Strip()
+        apPrisoner.Strip(abRemoveUnderwear = apPrisoner.WillBeStrippedNaked)
     endif
+
+    Debug("("+ Name +") Prison::OnPrisonerTeleportedToCell", "apPrisoner.ShouldBeClothed: " + apPrisoner.ShouldBeClothed)
 
     if (apPrisoner.ShouldBeClothed)
         apPrisoner.Clothe()
@@ -1490,34 +1518,7 @@ endEvent
 
 ; TODO: Remove RPB_JailCell from params. since a Prisoner already has a jail cell assigned to them
 event OnEscortPrisonerToCellEnd(RPB_Prisoner apPrisoner, RPB_JailCell akJailCell, Actor akEscort)
-    if (apPrisoner.HasSceneState("OnEscortPrisonerToCellEnd", "Escape"))
-        ; Process escort to cell after escape
-    endif
-
-    ; TODO: Fix NPC not staying in cell if they are stripped OnEscortToCellEnd
-    if (!apPrisoner.IsStripped && apPrisoner.ShouldBeStripped)
-        apPrisoner.Strip()
-        ; apPrisoner.StartStripping(akEscort)
-        ; SceneManager.ResumeSceneBlocked()
-    endif
-
-    if (!apPrisoner.PrisonerBelongingsContainer)
-        apPrisoner.SetBelongingsContainer()     ; Set the container of where the prisoner's items will be confiscated to
-    endif
-
-    apPrisoner.Uncuff()
-
-    if (!apPrisoner.IsImprisoned)
-        apPrisoner.Imprison()
-    endif
-
-    apPrisoner.SetBool("Should Be In Cell", true)
-
-    if (apPrisoner.IsNPC())
-        ; Ensures the Prisoner stays in the cell since we update it 10s later after the initial check,
-        ; delaying it enough for all actions to finish before the check.
-        apPrisoner.JailCell.RegisterForSanityChecking(10.0, apPrisoner = apPrisoner)
-   endif 
+   apPrisoner.OnEscortedToCell(akEscort)
 endEvent
 
 event OnEscortPrisonerFromCellBegin(RPB_Prisoner apPrisoner, Actor akEscort)
@@ -1553,13 +1554,9 @@ event OnPrisonerStripping(RPB_Prisoner apPrisoner, Actor akStripper, string asSc
         apPrisoner.PlayAnimation("ZazAPC006")
 
     elseif (asSceneEvent == "Undress Lower Body")
-        apPrisoner.UnequipItemSlot(37)
-        apPrisoner.UnequipItemSlot(49)
-        apPrisoner.UnequipItemSlot(52)
+        apPrisoner.UndressLowerBody()
     elseif (asSceneEvent == "Undress Upper Body")
-        apPrisoner.UnequipItemSlot(33)
-        apPrisoner.UnequipItemSlot(56)
-        apPrisoner.UnequipItemSlot(32)
+        apPrisoner.UndressUpperBody()
 
     elseif (asSceneEvent == "Undress to Underwear")
         ; Remove all clothing except Underwear
@@ -1567,7 +1564,7 @@ event OnPrisonerStripping(RPB_Prisoner apPrisoner, Actor akStripper, string asSc
 
     elseif (asSceneEvent == "Remove Underwear")
         ; Remove Underwear, prisoner must be unclothed already
-        ; apPrisoner.RemoveUnderwear()
+        apPrisoner.RemoveUnderwear()
     endif
 endEvent
 
