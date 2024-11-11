@@ -99,11 +99,6 @@ endProperty
 bool property ShouldBeStripped
     bool function get()
         return Prison.ShouldStripPrisoner(self)
-        ; Debug("Prisoner::ShouldBeStripped", "CALLED HERE, Meets Sentence condition: " + (Sentence >= 12) + ", Sentence: " + Sentence)
-        ; return Sentence >= 12
-        ; return Prison.ShouldStripPrisoner(self)
-        ; return Bounty >= 1000
-        ; return true && (!IsStrippedNaked && !IsStrippedToUnderwear)
     endFunction
 endProperty
 
@@ -117,6 +112,12 @@ endProperty
 bool property ShouldBeClothed
     bool function get()
         return Prison.ShouldClothePrisoner(self)
+    endFunction
+endProperty
+
+bool property UseDefaultOutfitAsFallback
+    bool function get()
+        return self.Should("Use Default Outfit as Fallback")
     endFunction
 endProperty
 
@@ -455,68 +456,19 @@ bool property IsStripped
     endFunction
 endProperty
 
-; Whether this prisoner should only be imprisoned in an empty cell
-bool __onlyAllowImprisonmentInEmptyCell
-bool property OnlyAllowImprisonmentInEmptyCell
+bool property IsClothed
     bool function get()
-        return __onlyAllowImprisonmentInEmptyCell
-    endFunction
-
-    function set(bool value)
-        if (value && (self.OnlyAllowImprisonmentInGenderCell || self.OnlyAllowImprisonmentInEmptyOrGenderCell))
-            self.OnlyAllowImprisonmentInGenderCell          = false
-            self.OnlyAllowImprisonmentInEmptyOrGenderCell   = false
-        endif
-
-        __onlyAllowImprisonmentInEmptyCell = value
+        return self.Is("Clothed")
     endFunction
 endProperty
 
-; Whether this prisoner should only be imprisoned in a gender exclusive cell
-bool __onlyAllowImprisonmentInGenderCell
-bool property OnlyAllowImprisonmentInGenderCell
-    bool function get()
-        return __onlyAllowImprisonmentInGenderCell
-    endFunction
-
-    function set(bool value)
-        if (value && (self.OnlyAllowImprisonmentInEmptyCell || self.OnlyAllowImprisonmentInEmptyOrGenderCell))
-            self.OnlyAllowImprisonmentInEmptyCell           = false
-            self.OnlyAllowImprisonmentInEmptyOrGenderCell   = false
-        endif
-
-        __onlyAllowImprisonmentInGenderCell = value
+Armor[] __prisonOutfit
+Armor[] property PrisonOutfit
+    Armor[] function get()
+        return __prisonOutfit
     endFunction
 endProperty
 
-; Whether this prisoner should only be imprisoned in either an empty or gender exclusive cell
-bool __onlyAllowImprisonmentInEmptyOrGenderCell
-bool property OnlyAllowImprisonmentInEmptyOrGenderCell
-    bool function get()
-        return __onlyAllowImprisonmentInEmptyOrGenderCell
-    endFunction
-
-    function set(bool value)
-        if (value && (self.OnlyAllowImprisonmentInEmptyCell || self.OnlyAllowImprisonmentInGenderCell))
-            self.OnlyAllowImprisonmentInEmptyCell       = false
-            self.OnlyAllowImprisonmentInGenderCell      = false
-        endif
-
-        __onlyAllowImprisonmentInEmptyOrGenderCell = value
-    endFunction
-endProperty
-
-; Determines what type of jail cell should be assigned to this prisoner - called from RPB_Prison
-function DetermineCellOptions()
-    if (self.WillBeStrippedNaked || self.IsStrippedNaked)
-        ; Only allow imprisonment in either empty cells or cells of the same gender where the prisoners are also stripped naked / possibly to underwear
-        self.OnlyAllowImprisonmentInEmptyOrGenderCell = true
-
-    elseif (self.WillBeStrippedToUnderwear || self.IsStrippedToUnderwear)
-        ; Only allow imprisonment in either empty cells or cells of the same gender where the prisoners are also stripped to underwear / possibly naked
-        self.OnlyAllowImprisonmentInEmptyOrGenderCell = true
-    endif
-endFunction
 
 ;/
     Assigns a jail cell to this prisoner
@@ -718,51 +670,150 @@ endFunction
 
 ; ==========================================================
 ;                    Clothing / Undressing
-Outfit __npcOriginalOutfit
-Outfit property NPC_OriginalOutfit
-    Outfit function get()
-        return __npcOriginalOutfit
-    endFunction
-endProperty
 
-function NPC_SaveOriginalOutfit()
-    if (self.IsNPC())
-        __npcOriginalOutfit = this.GetActorBase().GetOutfit()
-    endif
+;/
+    Determines whether this Prisoner will be stripped naked or to underwear
+    based on several factors.
+
+    If stripping naked is not possible, then it will fallback to stripping to underwear.
+    Likewise, if stripping to underwear is not possible, it will default to stripping naked.
+/;
+function DetermineStrippingType()
+    bool hasUnderwearWorn           = self.HasUnderwear()
+    bool isAbleToStripNaked         = Config.HasNudeBodyModInstalled
+    bool isAbleToStripToUnderwear   = (isAbleToStripNaked && Config.HasUnderwearBodyModInstalled && hasUnderwearWorn) || !isAbleToStripNaked
+
+    self.WillBeStrippedNaked        = (isAbleToStripNaked       && (StrippingThoroughness >= 10 || !isAbleToStripToUnderwear))
+    self.WillBeStrippedToUnderwear  = (isAbleToStripToUnderwear && (StrippingThoroughness < 10  || !isAbleToStripNaked))
+
+    DebugParams( \ 
+        hasUnderwearWorn + "," + isAbleToStripNaked + "," + isAbleToStripToUnderwear + "," + self.WillBeStrippedNaked + "," + self.WillBeStrippedToUnderwear, \
+        "hasUnderwearWorn, isAbleToStripNaked, isAbleToStripToUnderwear, WillBeStrippedNaked, WillBeStrippedToUnderwear", \
+        "("+ Name +") Prisoner::DetermineStrippingType" \ 
+    )
+
+    ; Assert (WIP)
+    EventManager.SendError( \ 
+        "An error has occurred, cannot strip prisoner both naked and to underwear, logic error!", \ 
+        "("+ Name +") Prisoner::DetermineStrippingType", \ 
+        self.WillBeStrippedNaked == self.WillBeStrippedToUnderwear \
+    )
 endFunction
 
-function NPC_RestoreOriginalOutfit()
-    if (self.IsNPC())
-        this.SetOutfit(NPC_OriginalOutfit)
+function DetermineClothingOutfit()
+    bool prisonerMeetsOutfitCondition   = Outfit_MeetsConditions()
+    Armor[] configuredOutfit            = self.GetConfiguredOutfit()
+
+    ;/ const /; int OUTFIT_NONE         = 0
+    ;/ const /; int OUTFIT_CONFIGURED   = 1
+    ;/ const /; int OUTFIT_FALLBACK     = 2
+
+    int outfitType = OUTFIT_NONE
+
+    if (configuredOutfit && prisonerMeetsOutfitCondition)
+        __prisonOutfit = configuredOutfit
+        outfitType = OUTFIT_CONFIGURED
+
+    elseif (UseDefaultOutfitAsFallback)
+        ; Apply fallback outfit
+        __prisonOutfit = Prison.GetDefaultOutfit()
+        outfitType = OUTFIT_FALLBACK
     endif
+ 
+    EventManager.SendInfo("Applied Configured Outfit: " + self.PrisonOutfit, "("+ Name +") Prisoner::DetermineClothingOutfit",  outfitType == OUTFIT_CONFIGURED)
+    EventManager.SendInfo("Applied Fallback Outfit: " + self.PrisonOutfit, "("+ Name +") Prisoner::DetermineClothingOutfit",    outfitType == OUTFIT_FALLBACK)
+    EventManager.SendInfo("No outfit is currently configured, and no fallback option!", "("+ Name +") Prisoner::DetermineClothingOutfit", outfitType == OUTFIT_NONE)
 endFunction
 
-function NPC_SetPersistentOutfit(string asOutfit)
-    if (self.IsNPC())
-        Outfit persistentOutfit = RPB_GetOutfit(asOutfit)
-        this.SetOutfit(persistentOutfit)
+bool function Outfit_MeetsConditions()
+    if (!self.Is("Outfit::Conditional"))
+        return true
     endif
+
+    int outfitMinimumBounty = self.GetInt("Outfit::Minimum Bounty")
+    int outfitMaximumBounty = self.GetInt("Outfit::Maximum Bounty")
+
+    bool hasStrictlyMinimumBounty = (outfitMinimumBounty == outfitMaximumBounty)
+
+    return  (hasStrictlyMinimumBounty   && Bounty >= outfitMinimumBounty) || \
+            (!hasStrictlyMinimumBounty  && Bounty >= outfitMinimumBounty && Bounty <= outfitMaximumBounty)
+endFunction
+
+Armor[] function GetConfiguredOutfit()
+    Armor[] outfitPieces = new Armor[4]
+
+    outfitPieces[0] = self.GetForm("Outfit::Head") as Armor
+    outfitPieces[1] = self.GetForm("Outfit::Body") as Armor
+    outfitPieces[2] = self.GetForm("Outfit::Hands") as Armor
+    outfitPieces[3] = self.GetForm("Outfit::Feet") as Armor
+
+    return outfitPieces
+endFunction
+
+Armor[] function GetOutfit()
+    Armor[] outfitPieces = new Armor[4]
+
+    outfitPieces[0] = self.GetForm("Outfit::Head") as Armor
+    outfitPieces[1] = self.GetForm("Outfit::Body") as Armor
+    outfitPieces[2] = self.GetForm("Outfit::Hands") as Armor
+    outfitPieces[3] = self.GetForm("Outfit::Feet") as Armor
+
+    ; Debug("["+ Name +"] Prisoner::GetOutfit", "Configured Outfit: " + outfitPieces)
+
+    return outfitPieces
+endFunction
+
+bool function Outfit_IsValid(int aiPieceCountToCheck = 4)
+    Armor[] outfitToVerify = self.GetOutfit()
+
+    int piecesVerified = 0
+    int i = 0
+    while (i < min(outfitToVerify.Length, aiPieceCountToCheck))
+        if (outfitToVerify[i])
+            piecesVerified += 1
+        endif
+        i += 1
+    endWhile
+
+    return piecesVerified >= 1
 endFunction
 
 function Clothe()
-    Outfit[] prisonerDefaultOutfits = new Outfit[4]
-    prisonerDefaultOutfits[0] = RPB_GetOutfit("Default")
-    prisonerDefaultOutfits[1] = RPB_GetOutfit("Default 2")
-    prisonerDefaultOutfits[2] = RPB_GetOutfit("Default no Shoes")
-    prisonerDefaultOutfits[3] = RPB_GetOutfit("Default 2 no Shoes")
-
-    Outfit randomPrisonerOutfit = prisonerDefaultOutfits[Utility.RandomInt(0, 3)]
-
-    ; this.SetOutfit(randomPrisonerOutfit)
-
-    if (self.IsPlayer())
-        int i = 0
-        while (i < randomPrisonerOutfit.GetNumParts())
-            self.EquipItem(randomPrisonerOutfit.GetNthPart(i))
-            i += 1
-        endWhile
+    if (!self.PrisonOutfit)
+        EventManager.SendWarning("Tried to clothe prisoner " + Name + ", but there's no outfit configured!", "("+ Name +") Prisoner::Clothe")
+        return
     endif
+
+    EquipOutfit(self.PrisonOutfit)
+    Debug("["+ Name +"] Prisoner::Clothe", "Outfit to Wear: " + self.PrisonOutfit)
+
+    self.OnClothed()
 endFunction
+
+; function Clothe()
+;     bool clothed = false
+
+;     Armor[] outfitToWear
+
+;     if (Outfit_IsValid() && Outfit_MeetsConditions())
+;         outfitToWear = self.GetOutfit()
+;         Debug("["+ Name +"] Prisoner::Clothe", "(Configured Outfit) Outfit to Wear: " + outfitToWear)
+;         EquipOutfit(outfitToWear)
+;         clothed = true
+
+;     elseif (self.UseDefaultOutfitAsFallback)
+;         outfitToWear = Prison.GetDefaultOutfit()
+;         Debug("["+ Name +"] Prisoner::Clothe", "(Default Outfit) Outfit to Wear: " + outfitToWear)
+;         EquipOutfit(outfitToWear)
+;         clothed = true
+;     endif
+
+;     Debug("["+ Name +"] Prisoner::Clothe", "self.UseDefaultOutfitAsFallback: " + self.UseDefaultOutfitAsFallback + ", self.Outfit_MeetsConditions()): " + self.Outfit_MeetsConditions())
+
+;     if (clothed)
+;         self.OnClothed()
+;     endif
+; endFunction
 
 function Strip(bool abRemoveUnderwear = true)
     if (!self.PrisonerBelongingsContainer)
@@ -787,39 +838,37 @@ function Strip(bool abRemoveUnderwear = true)
     ;     i += 1
     ; endWhile
 
+    Armor underwearTop      = none 
+    Armor underwearBottom   = none 
+
+    if (!abRemoveUnderwear)
+        underwearTop    = self.GetUnderwear("Top")
+        underwearBottom = self.GetUnderwear("Bottom")
+
+        NPC_SaveUnderwear(underwearTop, underwearBottom)
+    endif
+
     self.UnequipAll()
-    self.RemoveAllItems(PrisonerBelongingsContainer, true, true) ; Remove and put all the items in the prisoner's posession in the assigned prisoner container
-    NPC_SaveOriginalOutfit()
-    NPC_SetPersistentOutfit("Naked")
+    self.RemoveAllItems(PrisonerBelongingsContainer, true, true) ; Remove and put all the items in the prisoner's possession in the assigned prisoner container
+    self.UnequipHands()
+    self.SheatheWeapon()
+
+    self.OnStripped()
 
     ObjectReference evidenceChest = Game.GetForm(0x108D37) as ObjectReference ; temp
     evidenceChest.SetDisplayName("Vivienne Onis' Belongings") ; temp
     PrisonerBelongingsContainer.AddItem(evidenceChest) ; temp
 
-    self.IsStrippedNaked       = StrippingThoroughness >= 10
-    self.IsStrippedToUnderwear = !self.IsStrippedNaked
+    ; TODO: Find a way to keep the underwear without recovering NPC's body clothing (skyrim bug?), maybe filters? (FIXED: Change Actor Outfit)
+    if (!abRemoveUnderwear)
+        ; Equip Underwear
+        PrisonerBelongingsContainer.RemoveItem(underwearTop, abSilent = true, akOtherContainer = this)
+        PrisonerBelongingsContainer.RemoveItem(underwearBottom, abSilent = true, akOtherContainer = this)
 
-    ; TODO: Determine what is required to happen to have the Prisoner be in underwear (e.g: Stripping Thoroughness)
-    ; TODO: Find a way to keep the underwear without recovering NPC's body clothing (skyrim bug?), maybe filters?
-    ; if (!abRemoveUnderwear)
-    ;     Armor underwearTop      = self.GetUnderwear("Top")
-    ;     Armor underwearBottom   = self.GetUnderwear("Bottom")
+        self.EquipItem(underwearTop)
+        self.EquipItem(underwearBottom)
+    endif
 
-    ;     PrisonerBelongingsContainer.RemoveItem(underwearTop, abSilent = true, akOtherContainer = this)
-    ;     PrisonerBelongingsContainer.RemoveItem(underwearBottom, abSilent = true, akOtherContainer = this)
-
-    ;     self.EquipItem(underwearTop)
-    ;     self.EquipItem(underwearBottom)
-    ; endif
- 
-    ; Unequip anything currently held in the hands of this Prisoner
-    self.UnequipHands()
-    self.SheatheWeapon()
-
-    ; this.EquipItem(Game.GetForm(0x13105) as Armor)
-
-    self.IncrementStat("Times Stripped")
-    SetBool("Stripped", true) ; No use for now, might be changed
     DebugWithArgs("["+ Name +"] Prisoner::Strip", "abRemoveUnderwear: " + YesNo(abRemoveUnderwear), \ 
         "\n\t Stripped " + Name + string_if (self.IsStrippedNaked, " naked.", " to underwear.") + \
         "\n\t Prisoner Container: " + PrisonerBelongingsContainer \
@@ -839,8 +888,21 @@ function RemoveUnderwear()
     if (underwearBottom)
         this.RemoveItem(underwearBottom, 1, true, PrisonerBelongingsContainer)
     endif
+
+    self.OnUnderwearRemoved(underwearTop, underwearBottom)
 endFunction
 
+function UndressUpperBody()
+    self.UnequipItemSlot(33)
+    self.UnequipItemSlot(56)
+    self.UnequipItemSlot(32)
+endFunction
+
+function UndressLowerBody()
+    self.UnequipItemSlot(37)
+    self.UnequipItemSlot(49)
+    self.UnequipItemSlot(52)
+endFunction
 ; ==========================================================
 ;                           Scenes
 ; ==========================================================
@@ -1889,12 +1951,70 @@ event OnTeleportedToCell(bool abBeginImprisonment)
 endEvent
 
 event OnEscortedToCell(Actor akEscort)
+    ; TODO: Fix NPC not staying in cell if they are stripped OnEscortToCellEnd
+    if (!self.IsStripped && self.ShouldBeStripped)
+        self.Strip()
+        ; self.StartStripping(akEscort)
+        ; SceneManager.ResumeSceneBlocked()
+    endif
+
+    if (!self.PrisonerBelongingsContainer)
+        self.SetBelongingsContainer()     ; Set the container of where the prisoner's items will be confiscated to
+    endif
+
+    self.Uncuff()
+
+    if (!self.IsImprisoned)
+        self.Imprison()
+    endif
+
+    if (self.IsNPC())
+        ; Ensures the Prisoner stays in the cell since we update it 10s later after the initial check,
+        ; delaying it enough for all actions to finish before the check.
+        if (self.IsFarFromPlayer())
+            self.JailCell.RegisterForSanityChecking(10.0, apPrisoner = self)
+        endif
+   endif
+
     SetBool("Should Be In Cell", true)
-    Prison.OnEscortPrisonerToCellEnd(self, JailCell, akEscort)
+    ; Prison.OnEscortPrisonerToCellEnd(self, JailCell, akEscort)
 endEvent
 
 event OnEscortedFromCell(Actor akEscort)
     SetBool("Should Be In Cell", false)
+endEvent
+
+event OnClothed()
+    SetBool("Clothed", true)
+endEvent
+
+event OnStripped()
+    ;/
+        Saves the NPC's original Outfit (inherited from ActorBase), and sets them
+        to be naked before possibly equipping a Prison issued outfit (or no clothing).
+
+        This doesn't mean they will be naked if an outfit should be equipped, it simply means
+        that their base outfit is now naked, their state handles the outfitting afterwards.
+
+        This is due to a FormList limitation, since we cannot have dynamic FormLists, they must be set
+        statically in the CK, so the outfitting must happen on an Armor[].
+    /;
+    NPC_SaveOriginalOutfit()
+    NPC_SetPersistentOutfit("Naked")
+
+    self.IsStrippedNaked        = self.WillBeStrippedNaked
+    self.IsStrippedToUnderwear  = self.WillBeStrippedToUnderwear
+
+    IncrementStat("Times Stripped")
+    SetBool("Stripped", true)
+endEvent
+
+event OnUnderwearRemoved(Armor akUnderwearTop, Armor akUnderwearBottom)
+    DebugParams( \ 
+        akUnderwearTop + "," + akUnderwearBottom, \
+        "akUnderwearTop, akUnderwearBottom", \
+        "("+ Name +") Prisoner::OnUnderwearRemoved" \ 
+    )
 endEvent
 
 event OnInitialize()
@@ -1914,24 +2034,21 @@ event OnInitialize()
     endif
 
     if (self.IsNPC() && self.IsImprisoned)
-        self.OnResumeImprisonment()
+        self.NPC_ResumeImprisonment()
         return
     endif
 
+    self.DetermineStrippingType()
     self.SetReleaseLocation() ; to be refactored (needs to take into account whether to use Escort or Teleport markers)
 
     self.RegisterSleepEvents = true
     self.RegisterForTrackedStats()
     self.LockPrisonerSettings()
+
+    self.DetermineClothingOutfit()
 endEvent
 
-;/
-    Handles actions when an NPC's imprisonment state is resumed (usually when the player is in the same location as the NPC).
-/;
-event OnResumeImprisonment()
-    self.NPC_ResumeImprisonment() ;  Re-register this Prisoner into the imprisoned state for updates
-    JailCell.RegisterForSanityChecking(1.0, apPrisoner = self)
-endEvent
+
 
 bool property IsEnabledForBackgroundUpdates
     bool function get()
@@ -2096,17 +2213,6 @@ function DestroyArrestState()
     endif
 endFunction
 
-function NPC_ResumeImprisonment()
-    if (!self.IsImprisoned)
-        DebugError("["+ Name +"] Prisoner::NPC_ResumeImprisonment", "Prisoner " + Name + " is not imprisoned, cannot resume imprisonment!")
-        Error("Prisoner " + Name + " is not imprisoned, cannot resume imprisonment!")
-        return
-    endif
-
-    GotoState("Imprisoned")
-    RegisterForSingleUpdateGameTime(0.1)
-endFunction
-
 ;/
     Performs sanity checks for prisoners that should be stripped (NPC's only)
 
@@ -2154,6 +2260,7 @@ bool function PerformStrippingSanityChecks()
     return (self.IsStrippedNaked && self.IsNaked()) || (self.IsStrippedToUnderwear && self.IsInUnderwear()) ; TODO: Add outfit clothing condition
 endFunction
 
+
 string function GetScriptVarCategory(string asVarCategory = "Actor")
     if (asVarCategory == "Actor")
         return "Jail"
@@ -2169,50 +2276,8 @@ endFunction
 function RegisterLastUpdate()
     LastUpdate = Utility.GetCurrentGameTime()
 
-    int objectHandle = RPB_StorageVars.GetObjectHandleOnForm(this)
-    Debug("Prisoner::RegisterLastUpdate", "object: " + GetContainerList(objectHandle))
-endFunction
-
-function NPC_RestoreImprisonment()
-    if (!self.IsImprisoned)
-        return
-    endif
-    
-    Debug("["+ Name +"] Prisoner::NPC_RestoreImprisonment", "Restoring NPC Imprisonment...")
-
-    if (GetBool("Infamy Enabled"))
-        self.TriggerInfamyPenalty()
-    endif
-
-    ; self.ProcessWhenMoved() ; Only use when moved, not when escorted (Handle all events at once)
-    Config.NotifyJail(self.GetName() + " still has "+ self.GetTimeLeftInSentence("Days") +" days left in prison for " + self.GetHold())
-
-    ; ArrestVars.List("Jail")
-    GotoState("Imprisoned") ; State when the prisoner is in the cell, check for updates for sentence, etc...
-    RegisterForUpdateGameTime(1.0)
-endFunction
-
-;/
-    Restores this ActiveMagicEffect on the imprisoned NPC, if they exist and are imprisoned.
-
-    Since ActiveMagicEffects dispel after the Player is far away enough from the target Actor, we
-    must re-apply the effect and restore the state previous to reference destruction for NPC's.
-/;
-bool function NPC_RestorePrisonerState()
-    return false
-    if (GetBool("ShouldRestorePrisonerState"))
-        Debug("["+ Name +"] Prisoner::NPC_RestorePrisonerState", "Restoring NPC state...")
-        self.NPC_RestoreImprisonment()
-
-        ; Unset the flag so the state can be restored again at re-initialization upon being destroyed
-        SetBool("ShouldRestorePrisonerState", false)
-    endif
-endFunction
-
-function NPC_SavePrisonerState()
-    return
-    SetBool("ShouldRestorePrisonerState", true)
-    Debug("["+ Name +"] Prisoner::NPC_SavePrisonerState", "Saving NPC state...")
+    ; int objectHandle = RPB_StorageVars.GetObjectHandleOnForm(this)
+    ; Debug("Prisoner::RegisterLastUpdate", "object: " + GetContainerList(objectHandle))
 endFunction
 
 ;/
@@ -2250,9 +2315,10 @@ function LockPrisonerSettings()
     SetString("Handle Clothing On",                          Prison.HandleClothingOn)
     SetInt("Maximum Bounty to Clothe",                       Prison.MaximumBountyClothing)
     SetInt("Maximum Violent Bounty to Clothe",               Prison.MaximumViolentBountyClothing)
-    SetInt("Maximum Sentence to Clothe",                     Prison.MaximumSentence)
+    SetInt("Maximum Sentence to Clothe",                     Prison.MaximumSentenceClothing)
     SetBool("Clothe when Defeated",                          Prison.ClotheWhenDefeated)
     SetString("Outfit",                                      Prison.ClothingOutfit)
+    SetBool("Use Default Outfit as Fallback",                Prison.UseDefaultOutfitAsFallback)
     ; Prison
     SetInt("Bounty Exchange",                                Prison.BountyExchange)
     SetInt("Bounty to Sentence",                             Prison.BountyToSentence)
@@ -2299,8 +2365,17 @@ function LockPrisonerSettings()
     SetForm("Outfit::Hands",                                 Prison.OutfitPartHands)
     SetForm("Outfit::Feet",                                  Prison.OutfitPartFeet)
     SetBool("Outfit::Conditional",                           Prison.IsOutfitConditional)
-    SetFloat("Outfit::Minimum Bounty",                       Prison.OutfitMinimumBounty)
-    SetFloat("Outfit::Maximum Bounty",                       Prison.OutfitMaximumBounty)
+    SetInt("Outfit::Minimum Bounty",                         Prison.OutfitMinimumBounty)
+    SetInt("Outfit::Maximum Bounty",                         Prison.OutfitMaximumBounty)
+
+    ; Debug("["+ Name +"] Prisoner::LockPrisonerSettings", "\n" + \ 
+    ;     "\t Prison.OutfitName: " + Prison.OutfitName + "\n" + \
+    ;     "\t Prison.OutfitPartHead: " + Prison.OutfitPartHead + "\n" + \
+    ;     "\t Prison.OutfitPartBody: " + Prison.OutfitPartBody + "\n" + \
+    ;     "\t Prison.OutfitPartHands: " + Prison.OutfitPartHands + "\n" + \
+    ;     "\t Prison.OutfitPartFeet: " + Prison.OutfitPartFeet + "\n" \
+    ; )
+
 
     ; ArrestVars.Serialize("Prisoner#" + self.GetIdentifier())
 endFunction
@@ -2365,6 +2440,280 @@ endFunction
 RPB_JailCell function GetCell()
     return GetReference("Cell") as RPB_JailCell
 endFunction
+
+
+; ==========================================================
+;                          NPC Only
+; ==========================================================
+
+; ==========================================================
+;                          Management
+
+;/
+    Handles actions when an NPC's imprisonment state is resumed (usually when the player is in the same location as the NPC).
+/;
+event NPC_OnResumeImprisonment()
+    GotoState("Imprisoned")
+    RegisterForSingleUpdateGameTime(0.1)
+    ; self.NPC_ResumeImprisonment() ;  Re-register this Prisoner into the imprisoned state for updates
+    JailCell.RegisterForSanityChecking(1.0, apPrisoner = self)
+endEvent
+
+function NPC_ResumeImprisonment()
+    if (!self.IsImprisoned)
+        DebugError("["+ Name +"] Prisoner::NPC_ResumeImprisonment", "Prisoner " + Name + " is not imprisoned, cannot resume imprisonment!")
+        Error("Prisoner " + Name + " is not imprisoned, cannot resume imprisonment!")
+        return
+    endif
+
+    NPC_OnResumeImprisonment()
+
+    ; GotoState("Imprisoned")
+    ; RegisterForSingleUpdateGameTime(0.1)
+endFunction
+
+function NPC_RestoreImprisonment()
+    if (!self.IsImprisoned)
+        return
+    endif
+    
+    Debug("["+ Name +"] Prisoner::NPC_RestoreImprisonment", "Restoring NPC Imprisonment...")
+
+    if (GetBool("Infamy Enabled"))
+        self.TriggerInfamyPenalty()
+    endif
+
+    ; self.ProcessWhenMoved() ; Only use when moved, not when escorted (Handle all events at once)
+    Config.NotifyJail(self.GetName() + " still has "+ self.GetTimeLeftInSentence("Days") +" days left in prison for " + self.GetHold())
+
+    ; ArrestVars.List("Jail")
+    GotoState("Imprisoned") ; State when the prisoner is in the cell, check for updates for sentence, etc...
+    RegisterForUpdateGameTime(1.0)
+endFunction
+
+;/
+    Restores this ActiveMagicEffect on the imprisoned NPC, if they exist and are imprisoned.
+
+    Since ActiveMagicEffects dispel after the Player is far away enough from the target Actor, we
+    must re-apply the effect and restore the state previous to reference destruction for NPC's.
+/;
+bool function NPC_RestorePrisonerState()
+    return false
+    if (GetBool("ShouldRestorePrisonerState"))
+        Debug("["+ Name +"] Prisoner::NPC_RestorePrisonerState", "Restoring NPC state...")
+        self.NPC_RestoreImprisonment()
+
+        ; Unset the flag so the state can be restored again at re-initialization upon being destroyed
+        SetBool("ShouldRestorePrisonerState", false)
+    endif
+endFunction
+
+function NPC_SavePrisonerState()
+    return
+    SetBool("ShouldRestorePrisonerState", true)
+    Debug("["+ Name +"] Prisoner::NPC_SavePrisonerState", "Saving NPC state...")
+endFunction
+
+; ==========================================================
+;                    Clothing / Undressing
+
+Outfit __npcOriginalOutfit
+Outfit property NPC_OriginalOutfit
+    Outfit function get()
+        return __npcOriginalOutfit
+    endFunction
+endProperty
+
+Armor[] __npcUnderwear
+Armor[] property NPC_Underwear
+    Armor[] function get()
+        return __npcUnderwear
+    endFunction
+endProperty
+
+int property NPC_UNDERWEAR_TOP_INDEX    = 0 autoreadonly
+int property NPC_UNDERWEAR_BOTTOM_INDEX = 1 autoreadonly
+
+function NPC_SaveUnderwear(Armor akUnderwearTop, Armor akUnderwearBottom)
+    __npcUnderwear = new Armor[2]
+    __npcUnderwear[NPC_UNDERWEAR_TOP_INDEX]     = akUnderwearTop
+    __npcUnderwear[NPC_UNDERWEAR_BOTTOM_INDEX]  = akUnderwearBottom
+endFunction
+
+function NPC_SaveOriginalOutfit()
+    if (self.IsNPC())
+        __npcOriginalOutfit = this.GetActorBase().GetOutfit()
+    endif
+endFunction
+
+function NPC_RestoreOriginalOutfit()
+    if (self.IsNPC())
+        this.SetOutfit(NPC_OriginalOutfit)
+    endif
+endFunction
+
+function NPC_SetPersistentOutfit(string asOutfit)
+    if (self.IsNPC())
+        Outfit persistentOutfit = RPB_GetOutfit(asOutfit)
+        this.SetOutfit(persistentOutfit)
+
+        ; NPCs will recover their ActorBase inventory when the Outfit is changed, remove them.
+        NPC_RemovePresetItems()
+    endif
+endFunction
+
+function NPC_RemovePresetItems()
+    if (self.IsNPC())
+        self.RemoveAllItems()
+    endif
+endFunction
+
+; function NPC_UpdateStripping()
+;     if (!self.IsNPC())
+;         return
+;     endif
+
+;     ; TODO: Check if the prisoner was stripped to underwear, and give them the underwear back,
+;     ; also take into account possible lockpicks or keys the prisoner might have, we don't want to include those, the prisoner should remain with them
+;     ; bool shouldStrip = !self.IsNaked() && self.IsInCell && self.Is("Stripped") ;/&& !self.IsWearingPrisonerOutfit/;
+
+;     ; Needs to take into account default outfit as well, we should store it in the prisoner state
+;     Armor[] pOutfit = self.GetOutfit()
+
+;     bool shouldStrip = \
+;         self.Was("Stripped") && \ 
+;         ( \
+;             (!self.HasUnderwear()   && self.IsStrippedToUnderwear) || \ 
+;             (!self.IsNaked()        && self.IsStrippedNaked) \
+;         ) && \
+;         ( \
+;             (self.ShouldBeClothed && !self.IsWearingOutfit(pOutfit)) || \
+;             !self.ShouldBeClothed \
+;         )
+
+;     if (!shouldStrip)
+;         DebugParams( \ 
+;             shouldStrip + "," + self.Was("Stripped") + "," + self.IsNaked() + "," + self.HasUnderwear() + "," + self.IsStrippedNaked + "," + self.IsStrippedToUnderwear, \
+;             "shouldStrip, WasStripped, IsNaked,  HasUnderwear, IsStrippedNaked, IsStrippedToUnderwear", \
+;             "("+ Name +") Prisoner::NPC_UpdateStripping" \
+;         )
+;         return
+;     endif
+
+;     if (IsStrippedToUnderwear)
+;         ; Armor underwearTop    = self.GetUnderwear("Top") ; TODO: Get the underwear from the prison container perhaps, since it is impossible for the prisoner to be wearing it at this stage
+;         ; Armor underwearBottom = self.GetUnderwear("Bottom") ; TODO: Get the underwear from the prison container perhaps, since it is impossible for the prisoner to be wearing it at this stage
+
+;         Armor underwearTop      = NPC_Underwear[NPC_UNDERWEAR_TOP_INDEX]
+;         Armor underwearBottom   = NPC_Underwear[NPC_UNDERWEAR_BOTTOM_INDEX]
+
+;         self.UnequipAll() ; Probably not needed, since their base state will be naked (although we can check for items, but it probably shouldn't be done at this point)
+;         self.RemoveAllItems() ; Probably not needed, since their base state will be naked (although we can check for items, but it probably shouldn't be done at this point)
+
+;         self.EquipItem(underwearTop,    abCondition = underwearTop != none)
+;         self.EquipItem(underwearBottom, abCondition = underwearBottom != none)
+        
+;         Debug("["+ Name +"] Prisoner::NPC_UpdateStripping", "Stripped " + self.Name + " to underwear - performed sanity check", underwearTop != none || underwearBottom != none)
+;         Debug("["+ Name +"] Prisoner::NPC_UpdateStripping", "Stripped " + self.Name + " naked - performed sanity check", underwearTop == none && underwearBottom == none)
+
+;     elseif (IsStrippedNaked)
+;         self.RemoveAllItems()
+;         Debug("["+ Name +"] Prisoner::PerformStrippingSanityChecks", "Stripped " + self.Name + " naked - performed sanity check")
+;     endif
+
+;     DebugParams( \ 
+;         shouldStrip + "," + self.Was("Stripped") + "," + self.IsNaked() + "," + self.HasUnderwear() + "," + self.IsStrippedNaked + "," + self.IsStrippedToUnderwear, \
+;         "shouldStrip, WasStripped, IsNaked,  HasUnderwear, IsStrippedNaked, IsStrippedToUnderwear", \
+;         "("+ Name +") (END) Prisoner::NPC_UpdateStripping" \
+;     )
+
+; endFunction
+
+function NPC_UpdateStripping()
+    if (!self.IsNPC())
+        return
+    endif
+
+    return ; Unused for now
+
+    Armor[] pOutfit = self.GetOutfit()
+
+    bool shouldStrip = \
+        self.Was("Stripped") && \ 
+        ( \
+            (!self.HasUnderwear()   && self.IsStrippedToUnderwear) || \ 
+            (!self.IsNaked()        && self.IsStrippedNaked) \
+        ) && \
+        ( \
+            (self.ShouldBeClothed && !self.IsWearingOutfit(pOutfit)) || \
+            !self.ShouldBeClothed \
+        )
+
+    if (!shouldStrip)
+        DebugParams( \ 
+            shouldStrip + "," + self.Was("Stripped") + "," + self.IsNaked() + "," + self.HasUnderwear() + "," + self.IsStrippedNaked + "," + self.IsStrippedToUnderwear, \
+            "shouldStrip, WasStripped, IsNaked,  HasUnderwear, IsStrippedNaked, IsStrippedToUnderwear", \
+            "("+ Name +") (Should not Strip) Prisoner::NPC_UpdateStripping" \
+        )
+        return
+    endif
+
+    self.UnequipAll() ; Probably not needed, since their base state will be naked (although we can check for items, but it probably shouldn't be done at this point)
+    self.RemoveAllItems() ; Probably not needed, since their base state will be naked (although we can check for items, but it probably shouldn't be done at this point)
+
+    DebugParams( \ 
+        shouldStrip + "," + self.Was("Stripped") + "," + self.IsNaked() + "," + self.HasUnderwear() + "," + self.IsStrippedNaked + "," + self.IsStrippedToUnderwear, \
+        "shouldStrip, WasStripped, IsNaked,  HasUnderwear, IsStrippedNaked, IsStrippedToUnderwear", \
+        "("+ Name +") (END) Prisoner::NPC_UpdateStripping" \
+    )
+endFunction
+
+function NPC_UpdateUnderwear()
+    if (!self.IsNPC())
+        return
+    endif
+
+    Armor underwearTop      = NPC_Underwear[NPC_UNDERWEAR_TOP_INDEX]
+    Armor underwearBottom   = NPC_Underwear[NPC_UNDERWEAR_BOTTOM_INDEX]
+
+    bool hasUnderwearInInventory    = this.GetItemCount(underwearTop) >= 1 || this.GetItemCount(underwearBottom) >= 1
+    bool wasStrippedToUnderwear     = self.Was("Stripped") && self.IsStrippedToUnderwear
+    bool shouldBeInUnderwear        = self.IsNaked() && wasStrippedToUnderwear && hasUnderwearInInventory
+
+    if (shouldBeInUnderwear)
+        self.EquipItem(underwearTop,    abCondition = underwearTop != none)
+        self.EquipItem(underwearBottom, abCondition = underwearBottom != none)
+    endif
+
+    EventManager.SendInfo("Equipped underwear on " + self.Name, "["+ Name +"] Prisoner::NPC_UpdateUnderwear", shouldBeInUnderwear)
+    EventManager.SendInfo("Tried to equip underwear on " + self.Name + ", but " + self.GetGenderPronoun() + " does not have any!", "["+ Name +"] Prisoner::NPC_UpdateUnderwear", wasStrippedToUnderwear && !hasUnderwearInInventory)
+endFunction
+
+function NPC_UpdateClothing()
+    if (!self.IsNPC())
+        return
+    endif
+
+    Armor[] pOutfit = self.GetOutfit()
+
+    ; TODO: Fix this condition, keeps being true when NPC is not stripped (when NPC_UpdateStripping does nothing)
+    bool isWearingOutfit        = self.IsWearingOutfit(pOutfit)
+    bool isNakedOrInUnderwear   = self.IsNaked() || self.HasUnderwear()
+
+    bool shouldClothe = self.Was("Stripped") && self.ShouldBeClothed \ 
+        && isNakedOrInUnderwear && !isWearingOutfit
+
+        DebugParams( \ 
+            shouldClothe + "," + ShouldBeClothed + "," + self.IsNaked() + "," + self.HasUnderwear() + "," + self.IsStrippedNaked + "," + self.IsStrippedToUnderwear, \
+            "shouldClothe, ShouldBeClothed, IsNaked,  HasUnderwear, IsStrippedNaked, IsStrippedToUnderwear", \
+            "("+ Name +") Prisoner::NPC_UpdateClothing" \
+        )
+
+    if (shouldClothe)
+        self.Clothe()
+    endif
+endFunction
+
 
 ; ==========================================================
 ;                          Debug

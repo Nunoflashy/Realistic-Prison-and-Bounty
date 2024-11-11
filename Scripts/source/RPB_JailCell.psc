@@ -287,6 +287,10 @@ endProperty
 
 ; ==========================================================
 
+function JailCell()
+    
+endFunction
+
 ReferenceAlias function GetSuitableCellPackage()
     return Prison.PrisonManager.GetCellPackageOfType(self.PackageSize)
 endFunction
@@ -788,7 +792,7 @@ function DetermineCellParameters()
 endFunction
 
 event OnInit()
-    Debug("["+ self +"] JailCell::OnInit", "Initialized " + self)
+    ; Debug("["+ self +"] JailCell::OnInit", "Initialized " + self)
 endEvent
 
 ; =========================================================
@@ -974,7 +978,10 @@ bool function __performPrisonerSanityCheck(RPB_Prisoner apPrisoner)
 
     if (apPrisoner.IsImprisoned)
         apPrisoner.EnableAI(!apPrisoner.IsFarFromPlayer())
-        apPrisoner.PerformStrippingSanityChecks()
+        
+        apPrisoner.NPC_UpdateStripping()
+        apPrisoner.NPC_UpdateClothing()
+        apPrisoner.NPC_UpdateUnderwear()
 
         if (apPrisoner.ShouldBeInCell && !apPrisoner.IsInCell)
             apPrisoner.MoveTo(self)                                           ; Move the prisoner to this jail cell
