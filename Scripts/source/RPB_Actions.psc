@@ -578,6 +578,11 @@ function Action_ArrestSelectedActor(RPB_UIInterface uilib, bool abEscortArrestee
         guard = RPB_Utility.GetNearbyGuardForFactionFromRef(selectedActor)
     endif
 
+    if (!guard)
+        API.Config.NotifyArrest("There isn't any nearby guard to perform the Arrest!")
+        return
+    endif
+
     string arrestType = API.Arrest.ARREST_TYPE_TELEPORT_TO_CELL
 
     if (abEscortArrestee)
