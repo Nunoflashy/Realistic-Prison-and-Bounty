@@ -709,12 +709,12 @@ function Initialize(RPB_Prison apPrison)
     ; Determine all markers for this cell
     self.DetermineMarkers()
 
-    Debug("["+ self.Prison.Name +"] ["+ self.ID +": "+ self +"] JailCell::Initialize", \ 
-        "\n\tMain Marker: " + self.GetPropertyOfTypeForm("Main Interior") + \ 
-        "\n\tCell Door: " + self.CellDoor + \
-        "\n\tInterior Markers: " + InteriorMarkers + \ 
-        "\n\tExterior Markers: " + ExteriorMarkers \ 
-    )
+    ; Debug("["+ self.Prison.Name +"] ["+ self.ID +": "+ self +"] JailCell::Initialize", \ 
+    ;     "\n\tMain Marker: " + self.GetPropertyOfTypeForm("Main Interior") + \ 
+    ;     "\n\tCell Door: " + self.CellDoor + \
+    ;     "\n\tInterior Markers: " + InteriorMarkers + \ 
+    ;     "\n\tExterior Markers: " + ExteriorMarkers \ 
+    ; )
 
 endFunction
 
@@ -970,7 +970,7 @@ bool function __shouldSanityCheckSinglePrisoner()
 endFunction
 
 bool function __performPrisonerSanityCheck(RPB_Prisoner apPrisoner)
-    if (!apPrisoner && !apPrisoner.IsNPC())
+    if (!apPrisoner || (apPrisoner && !apPrisoner.IsNPC()))
         return false
     endif
 
