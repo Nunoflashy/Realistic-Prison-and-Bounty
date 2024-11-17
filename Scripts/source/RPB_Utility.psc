@@ -1,6 +1,7 @@
 scriptname RPB_Utility hidden
 
 import Math
+import RPB_Memory
 
 string function ModName() global
     return "Realistic Prison and Bounty"
@@ -33,10 +34,48 @@ endFunction
 ;                       Form References
 ; ==========================================================
 
-Quest function CellPackages() global
+Quest function GetCellPackageGroup(string questPackageID) global
     ; return GetFormFromMod(0x1F8CC) as Quest
-    return GetFormFromMod(0x21916) as Quest
+    string packageID = "RPB_" + questPackageID
+
+    int packages = FastMap("<string>")
+    FastMap_SetForm(packages, "RPB_CellPackages_02",        GetFormFromMod(0x21916))
+    FastMap_SetForm(packages, "RPB_CellPackages_M_01",      GetFormFromMod(0x27A60))
+    FastMap_SetForm(packages, "RPB_CellPackages_L_01",      GetFormFromMod(0x27A61))
+    FastMap_SetForm(packages, "RPB_CellPackages_XL_01",     GetFormFromMod(0x27A62))
+    FastMap_SetForm(packages, "RPB_CellPackages_XXL_01",    GetFormFromMod(0x27A63))
+
+    if (!FastMap_HasKey(packages, packageID))
+        ; Error, package quest does not exist
+        return none
+    endif
+
+    return FastMap_GetForm(packages, packageID) as Quest
 endFunction
+
+RPB_PackageGroup function GetCellPackageGroupEx(string questPackageID) global
+    ; return GetFormFromMod(0x1F8CC) as Quest
+    string packageID = "RPB_" + questPackageID
+
+    int packages = FastMap("<string>")
+    FastMap_SetForm(packages, "RPB_CellPackages_02",        GetFormFromMod(0x21916))
+    FastMap_SetForm(packages, "RPB_CellPackages_M_01",      GetFormFromMod(0x27A60))
+    FastMap_SetForm(packages, "RPB_CellPackages_L_01",      GetFormFromMod(0x27A61))
+    FastMap_SetForm(packages, "RPB_CellPackages_XL_01",     GetFormFromMod(0x27A62))
+    FastMap_SetForm(packages, "RPB_CellPackages_XXL_01",    GetFormFromMod(0x27A63))
+
+    if (!FastMap_HasKey(packages, packageID))
+        ; Error, package quest does not exist
+        return none
+    endif
+
+    return FastMap_GetForm(packages, packageID) as RPB_PackageGroup
+endFunction
+
+; Quest function GetCellPackageGroup() global
+;     ; return GetFormFromMod(0x1F8CC) as Quest
+;     return GetFormFromMod(0x21916) as Quest
+; endFunction
 
 Message function ServeTimeMessage() global
     return GetFormFromMod(0x1EE08) as Message
@@ -1453,11 +1492,37 @@ string function YesNo(bool abValue) global
     endif
 endFunction
 
+int function EnsureTrue(bool condition, string messageWhenFalse, int failedConditionList = 0) global
+    if (!condition && failedConditionList)
+        RPB_Memory.FastArray_AddString(failedConditionList, messageWhenFalse)
+
+    elseif (!condition)
+        failedConditionList = RPB_Memory.FastArray("<string>")
+        RPB_Memory.FastArray_AddString(failedConditionList, messageWhenFalse)
+        DebugWarn("Utility::EnsureTrue", messageWhenFalse)
+    endif
+
+    return failedConditionList
+endFunction
+
+int function EnsureFalse(bool condition, string messageWhenTrue, int failedConditionList = 0) global
+    if (condition && failedConditionList)
+        RPB_Memory.FastArray_AddString(failedConditionList, messageWhenTrue)
+
+    elseif (condition)
+        failedConditionList = RPB_Memory.FastArray("<string>")
+        RPB_Memory.FastArray_AddString(failedConditionList, messageWhenTrue)
+        DebugWarn("Utility::EnsureFalse", messageWhenTrue)
+    endif
+
+    return failedConditionList
+endFunction
+
 ; ==========================================================
 ;                 Skill Stats/Perks Functions
 ; ==========================================================
 
-string[] function GetAllSkills(bool abIncludeStatSkills = true, bool abIncludePerkSkills = true) global
+string[] function GetAllSkillNames(bool abIncludeStatSkills = true, bool abIncludePerkSkills = true) global
     if (!abIncludeStatSkills && !abIncludePerkSkills)
         return none
     endif
@@ -1471,6 +1536,44 @@ string[] function GetAllSkills(bool abIncludeStatSkills = true, bool abIncludePe
     if (abIncludePerkSkills)
         skillList += "Heavy Armor,Light Armor,Sneak,One-Handed,Two-Handed,Archery,Block," + \
                      "Smithing,Speechcraft,Pickpocketing,Lockpicking,Alteration,Conjuration," + \
+                     "Destruction,Illusion,Restoration,Enchanting,Alchemy,"
+    endif
+
+    if (skillList != "")
+        ; Remove trailing comma
+        skillList = StringUtil.Substring(skillList, 0, StringUtil.GetLength(skillList) - 1)
+    endif
+
+    return StringUtil.Split(skillList, delim = ",")
+endFunction
+
+string function GetSkillName(string asSkillInternalReference) global
+    string[] skillNames = GetAllSkillNames()
+    string[] skillInternalReferences = GetAllSkills()
+
+    int i = 0
+    while (i < skillNames.Length)
+        if (asSkillInternalReference == skillInternalReferences[i])
+            return skillNames[i]
+        endif
+        i += 1
+    endWhile
+endFunction
+
+string[] function GetAllSkills(bool abIncludeStatSkills = true, bool abIncludePerkSkills = true) global
+    if (!abIncludeStatSkills && !abIncludePerkSkills)
+        return none
+    endif
+
+    string skillList = ""
+
+    if (abIncludeStatSkills)
+        skillList += "Health,Stamina,Magicka,"
+    endif
+
+    if (abIncludePerkSkills)
+        skillList += "HeavyArmor,LightArmor,Sneak,OneHanded,TwoHanded,Marksman,Block," + \
+                     "Smithing,Speechcraft,Pickpocket,Lockpicking,Alteration,Conjuration," + \
                      "Destruction,Illusion,Restoration,Enchanting,Alchemy,"
     endif
 
@@ -2191,7 +2294,7 @@ bool function PassTimeInDays(int aiPassByDays) global
         GameHour.Mod(24)
         Utility.Wait(0.01)
         string currentDate = GetCurrentDay() + "/" + GetCurrentMonth() + "/" + GetCurrentYear()
-        DebugWithArgs("Utility::PassTimeInDays", aiPassByDays, "Date: " + currentDate +  " at " + GetTimeAs12Hour(GetCurrentHour()) + " ("+ GetTimeAs12Hour(GetCurrentHour()) +", "+  GetCurrentDay() +" of " + GetMonthName(GetCurrentMonth()) +")" + ", " + "GameDaysPassed: " + GameDaysPassed.GetValue())
+        DebugWithArgs("Utility::PassTimeInDays", aiPassByDays, "Date: " + currentDate +  " at " + GetTimeAs12Hour(GetCurrentHour()) + " ("+ GetTimeAs12Hour(GetCurrentHour()) +", "+  ToOrdinalNthDay(GetCurrentDay()) +" of " + GetMonthName(GetCurrentMonth()) +")" + ", " + "GameDaysPassed: " + GameDaysPassed.GetValue())
         daysPassed += 1
     endWhile
     ; GameHour.Mod(-1) ; Take off one hour, for some reason, after passing the days, the time is incremented by 1h

@@ -901,7 +901,7 @@ endFunction
 Armor function GetOutfitPart(string hold, string bodyPart)
     string holdOutfitIdentifier = GetClothingOutfitIdentifier(hold)
 
-    DebugWithArgs("Config::GetOutfitPart", "hold: " + hold + ", bodyPart: " + bodyPart, "outfitIdentifier: " + holdOutfitIdentifier + ", outfitPart: " + MCM.GetOutfitPart(holdOutfitIdentifier, bodyPart))
+    ; DebugWithArgs("Config::GetOutfitPart", "hold: " + hold + ", bodyPart: " + bodyPart, "outfitIdentifier: " + holdOutfitIdentifier + ", outfitPart: " + MCM.GetOutfitPart(holdOutfitIdentifier, bodyPart))
 
     return MCM.GetOutfitPart(holdOutfitIdentifier, bodyPart)
 endFunction

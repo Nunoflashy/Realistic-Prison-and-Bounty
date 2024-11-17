@@ -145,6 +145,12 @@ string[] property LockLevels
     endFunction
 endProperty
 
+string[] property SkillNames
+    string[] function get()
+        return RPB_Utility.GetAllSkillNames()
+    endFunction
+endProperty
+
 string[] property Skills
     string[] function get()
         return RPB_Utility.GetAllSkills()
@@ -355,7 +361,7 @@ endFunction
 
 function InitializePages()
     string PAGE_SEPARATOR = " ,"
-    string[] pagesBuilt = String_Explode( \ 
+    Pages = String_Explode( \ 
         "Stats," + \
         PAGE_SEPARATOR + \
         "General," + \
@@ -367,7 +373,6 @@ function InitializePages()
         "Maintenance," + \
         "Debug" \
     )
-    Pages = pagesBuilt
 endFunction
 
 ;/
@@ -435,7 +440,7 @@ endFunction
 /;
 string function GetOptionMenuValue(string option, string page = "")
     if (self.OptionHasValue(option, page))
-        Debug("MCM::GetOptionMenuValue", "option: " + option + ", value: " + self.GetOptionValueString(option, page))
+        ; Debug("MCM::GetOptionMenuValue", "option: " + option + ", value: " + self.GetOptionValueString(option, page))
         return self.GetOptionValueString(option, page)
     else
         return self.GetOptionDefaultString(option)
@@ -1103,7 +1108,7 @@ function ValidateOption(string asOption)
         EnsureOptionIsOfType(asOption, TYPE_INT)
         EnsureOptionValueGreaterThanOrEqualTo(asOption, 1, asValuePropertyType = "Steps")
         EnsureOptionValueGreaterThanOrEqualTo(asOption, 0, asValuePropertyType = "Minimum")
-        EnsureOptionValueGreaterThanOrEqualTo(asOption, 10, asValuePropertyType = "Maximum")
+        EnsureOptionValueGreaterThanOrEqualTo(asOption, 15, asValuePropertyType = "Maximum")
         EnsureOptionValueGreaterThanOrEqualTo(asOption, 0, asValuePropertyType = "Default")
 
     elseif (asOption == "Level Caps::Health" || \
@@ -1113,31 +1118,18 @@ function ValidateOption(string asOption)
         EnsureOptionIsOfType(asOption, TYPE_INT)
         EnsureOptionValueGreaterThanOrEqualTo(asOption, 1, asValuePropertyType = "Steps")
         EnsureOptionValueGreaterThanOrEqualTo(asOption, 0, asValuePropertyType = "Minimum")
-        EnsureOptionValueGreaterThanOrEqualTo(asOption, 10, asValuePropertyType = "Maximum")
+        EnsureOptionValueGreaterThanOrEqualTo(asOption, 15, asValuePropertyType = "Maximum")
         EnsureOptionValueGreaterThanOrEqualTo(asOption, 0, asValuePropertyType = "Default")
 
 ;                             Perks
 ; ============================================================
-
-    elseif (asOption == "Deleveling::Heavy Armor" || \
-            asOption == "Deleveling::Light Armor" || \
-            asOption == "Deleveling::Sneak" || \
-            asOption == "Deleveling::One-Handed" || \
-            asOption == "Deleveling::Two-Handed" || \
-            asOption == "Deleveling::Archery" || \
-            asOption == "Deleveling::Block" || \
-            asOption == "Deleveling::Smithing" || \
-            asOption == "Deleveling::Speechcraft" || \
-            asOption == "Deleveling::Pickpocketing" || \
-            asOption == "Deleveling::Lockpicking" || \
-            asOption == "Deleveling::Alteration" || \
-            asOption == "Deleveling::Conjuration" || \
-            asOption == "Deleveling::Destruction" || \
-            asOption == "Deleveling::Illusion" || \
-            asOption == "Deleveling::Restoration" || \
-            asOption == "Deleveling::Enchanting" || \
-            asOption == "Deleveling::Alchemy" \
-        )
+    
+    elseif ( \ 
+        String_StartsWith(asOption, "Deleveling::") && \
+        !String_StartsWith(asOption, "Deleveling::Health") && \
+        !String_StartsWith(asOption, "Deleveling::Stamina") && \
+        !String_StartsWith(asOption, "Deleveling::Magicka") \
+    )
         EnsureOptionIsOfType(asOption, TYPE_INT)
         EnsureOptionValueGreaterThanOrEqualTo(asOption, 1, asValuePropertyType = "Steps")
         EnsureOptionValueGreaterThanOrEqualTo(asOption, 0, asValuePropertyType = "Minimum")
@@ -1145,25 +1137,12 @@ function ValidateOption(string asOption)
         EnsureOptionValueLessThanOrEqualTo(asOption, 100, asValuePropertyType = "Maximum")
         EnsureOptionValueGreaterThanOrEqualTo(asOption, 0, asValuePropertyType = "Default")
 
-    elseif (asOption == "Level Caps::Heavy Armor" || \
-            asOption == "Level Caps::Light Armor" || \
-            asOption == "Level Caps::Sneak" || \
-            asOption == "Level Caps::One-Handed" || \
-            asOption == "Level Caps::Two-Handed" || \
-            asOption == "Level Caps::Archery" || \
-            asOption == "Level Caps::Block" || \
-            asOption == "Level Caps::Smithing" || \
-            asOption == "Level Caps::Speechcraft" || \
-            asOption == "Level Caps::Pickpocketing" || \
-            asOption == "Level Caps::Lockpicking" || \
-            asOption == "Level Caps::Alteration" || \
-            asOption == "Level Caps::Conjuration" || \
-            asOption == "Level Caps::Destruction" || \
-            asOption == "Level Caps::Illusion" || \
-            asOption == "Level Caps::Restoration" || \
-            asOption == "Level Caps::Enchanting" || \
-            asOption == "Level Caps::Alchemy" \
-        )
+    elseif ( \ 
+        String_StartsWith(asOption, "Level Caps::") && \ 
+        !String_StartsWith(asOption, "Level Caps::Health") && \
+        !String_StartsWith(asOption, "Level Caps::Stamina") && \
+        !String_StartsWith(asOption, "Level Caps::Magicka") \
+    )
         EnsureOptionIsOfType(asOption, TYPE_INT)
         EnsureOptionValueGreaterThanOrEqualTo(asOption, 1, asValuePropertyType = "Steps")
         EnsureOptionValueGreaterThanOrEqualTo(asOption, 0, asValuePropertyType = "Minimum")

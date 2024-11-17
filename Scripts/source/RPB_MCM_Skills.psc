@@ -28,7 +28,8 @@ function Left(RPB_MCM mcm) global
     int i = 0
     while (i < 10)
         string skill = mcm.Skills[i]
-        mcm.AddOptionSlider(skill, string_if (IsStatSkill(skill), "{0} Points", "{0} Levels"), 0)
+        string skillNames = mcm.SkillNames[i]
+        mcm.AddOptionSliderKey(skillNames, skill, string_if (IsStatSkill(skill), "{0} Points", "{0} Levels"), 0)
         i += 1
     endWhile
 
@@ -38,7 +39,8 @@ function Left(RPB_MCM mcm) global
     int j = 0
     while (j < 10)
         string skill = mcm.Skills[j]
-        mcm.AddOptionSlider(skill, string_if (IsStatSkill(skill), "{0} Points", "Level {0}"), 0)
+        string skillNames = mcm.SkillNames[j]
+        mcm.AddOptionSliderKey(skillNames, skill, string_if (IsStatSkill(skill), "{0} Points", "Level {0}"), 0)
         j += 1
     endWhile
 endFunction
@@ -49,7 +51,8 @@ function Right(RPB_MCM mcm) global
     int i = 0
     while (i < 11)
         string skill = mcm.Skills[i+10]
-        mcm.AddOptionSlider(skill, string_if (IsStatSkill(skill), "{0} Points", "{0} Levels"), 0)
+        string skillNames = mcm.SkillNames[i+10]
+        mcm.AddOptionSliderKey(skillNames, skill, string_if (IsStatSkill(skill), "{0} Points", "{0} Levels"), 0)
         i += 1
     endWhile
 
@@ -57,7 +60,8 @@ function Right(RPB_MCM mcm) global
     int j = 0
     while (j < 11)
         string skill = mcm.Skills[j+10]
-        mcm.AddOptionSlider(skill, string_if (IsStatSkill(skill), "{0} Points", "Level {0}"), 0)
+        string skillNames = mcm.SkillNames[j+10]
+        mcm.AddOptionSliderKey(skillNames, skill, string_if (IsStatSkill(skill), "{0} Points", "Level {0}"), 0)
         j += 1
     endWhile
 endFunction
@@ -75,7 +79,9 @@ endFunction
 ; =====================================================
 
 function OnOptionHighlight(RPB_MCM mcm, string option) global
-    string optionName = GetOptionNameNoCategory(option)
+    ; string optionName = GetOptionNameNoCategory(option)
+    string skillInternalReference = GetOptionNameNoCategory(option)
+    string optionName = RPB_Utility.GetSkillName(skillInternalReference)
 
     ; Deleveling Stats
     if (IsDelevelingCategory(option))
