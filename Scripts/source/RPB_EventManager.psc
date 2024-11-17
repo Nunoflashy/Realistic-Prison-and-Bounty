@@ -252,6 +252,12 @@ event OnArrestBegin(string eventName, string arrestType, float arresteeIdFlt, Fo
 
     RPB_Arrestee arresteeRef = Arrest.AwaitArresteeReference(arrestee)  ; Mark this Actor as one that is to be arrested (Cast the spell in order to have Arrestee related functions on them through RPB_Arrestee)
 
+    if (!arresteeRef.InitializeState())
+        Config.NotifyArrest("Could not arrest " + arresteeRef.Name)
+        self.SendError("Could not arrest " + arresteeRef.Name + " for "+ crimeFaction.GetName() +", the state was invalid! (aborting)", "EventManager::OnArrestBegin")
+        return
+    endif
+
     ; Faction Arrest
     if (captor == none)
         Arrest.OnArrestBegin(arresteeRef, none, crimeFaction, arrestType)

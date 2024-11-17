@@ -539,7 +539,11 @@ bool __isReleased
 function Release()
     if (!__isReleased)
         GotoState("Released")
-        self.UnbindAlias(CellPackage)
+        
+        if (self.IsNPC() && CellPackage)
+            self.UnbindAlias(CellPackage)
+        endif
+
         Prison.ReleasePrisoner(self)
 
         if (self.IsNPC())
@@ -573,8 +577,10 @@ function ReturnBelongings()
 endFunction
 
 function TeleportToRelease()
-    self.EnableAI(self.IsNPC())
-    self.MoveTo(TeleportReleaseLocation)
+    if (TeleportReleaseLocation)
+        self.EnableAI(self.IsNPC())
+        self.MoveTo(TeleportReleaseLocation)
+    endif
 endFunction
 
 ;/
@@ -634,10 +640,6 @@ function Imprison()
     endif
 
     float startBench = StartBenchmark()
-    if (GetBool("Infamy Enabled"))
-        self.TriggerInfamyPenalty()
-    endif
-
     self.OnImprisoned()
     GotoState("Imprisoned") ; State when the prisoner is in the cell, check for updates for sentence, etc...
 
@@ -715,13 +717,17 @@ function DetermineClothingOutfit()
         outfitType = OUTFIT_CONFIGURED
 
     elseif (UseDefaultOutfitAsFallback)
-        ; Apply fallback outfit
         __prisonOutfit = Prison.GetDefaultOutfit()
         outfitType = OUTFIT_FALLBACK
     endif
+
+    Debug( \ 
+        "("+ Name +") Prisoner::DetermineClothingOutfit", \ 
+        "\n\tprisonerMeetsOutfitCondition: "+ prisonerMeetsOutfitCondition +" \n\tconfiguredOutfit: "+ configuredOutfit +" \n\toutfitType: "+ outfitType +" \n\tUseDefaultOutfitAsFallback: "+ UseDefaultOutfitAsFallback +" \n\tSentence: "+ Sentence + "\n" \
+    )
  
-    EventManager.SendInfo("Applied Configured Outfit: " + self.PrisonOutfit, "("+ Name +") Prisoner::DetermineClothingOutfit",  outfitType == OUTFIT_CONFIGURED)
-    EventManager.SendInfo("Applied Fallback Outfit: " + self.PrisonOutfit, "("+ Name +") Prisoner::DetermineClothingOutfit",    outfitType == OUTFIT_FALLBACK)
+    EventManager.SendInfo("Determined Configured Outfit: " + self.PrisonOutfit, "("+ Name +") Prisoner::DetermineClothingOutfit",  outfitType == OUTFIT_CONFIGURED)
+    EventManager.SendInfo("Determined Fallback Outfit: " + self.PrisonOutfit, "("+ Name +") Prisoner::DetermineClothingOutfit",    outfitType == OUTFIT_FALLBACK)
     EventManager.SendInfo("No outfit is currently configured, and no fallback option!", "("+ Name +") Prisoner::DetermineClothingOutfit", outfitType == OUTFIT_NONE)
 endFunction
 
@@ -747,6 +753,10 @@ Armor[] function GetConfiguredOutfit()
     outfitPieces[2] = self.GetForm("Outfit::Hands") as Armor
     outfitPieces[3] = self.GetForm("Outfit::Feet") as Armor
 
+    if (!Outfit_IsValid(akOutfit = outfitPieces))
+        return none
+    endif
+
     return outfitPieces
 endFunction
 
@@ -763,8 +773,14 @@ Armor[] function GetOutfit()
     return outfitPieces
 endFunction
 
-bool function Outfit_IsValid(int aiPieceCountToCheck = 4)
-    Armor[] outfitToVerify = self.GetOutfit()
+bool function Outfit_IsValid(int aiPieceCountToCheck = 4, Armor[] akOutfit = none)
+    Armor[] outfitToVerify
+
+    if (akOutfit != none)
+        outfitToVerify = akOutfit
+    else
+        outfitToVerify = self.GetOutfit()
+    endif
 
     int piecesVerified = 0
     int i = 0
@@ -785,7 +801,7 @@ function Clothe()
     endif
 
     EquipOutfit(self.PrisonOutfit)
-    Debug("["+ Name +"] Prisoner::Clothe", "Outfit to Wear: " + self.PrisonOutfit)
+    Debug("["+ Name +"] Prisoner::Clothe", "Applied Outfit: " + self.PrisonOutfit)
 
     self.OnClothed()
 endFunction
@@ -1246,11 +1262,14 @@ endState
 state Released
     event OnBeginState()
         SetBool("Should Be In Cell", false)
-        SetBool("Imprisoned", false)
+        SetBool("Imprisoned", false) ; TODO: This shouldn't be set here, since at this point, the Prisoner may still be in the cell, not escorted out yet
     endEvent
 
     event OnUpdateGameTime()
     endEvent
+
+    function Release()
+    endFunction
 endState
 
 float _previousUpdateTimeServed
@@ -1542,7 +1561,7 @@ endFunction
 
 function UpdateTimeJailed()
     float currentTimeJailed = (TimeServed - _previousUpdateTimeServed) ; Subtract previous time served so we only add the new time after the last update
-    Debug("["+ Name +"] Prisoner::UpdateTimeJailed", "currentTimeJailed: " + currentTimeJailed + ", TimeServed: " + TimeServed + ", _previousUpdateTimeServed: " + _previousUpdateTimeServed)
+    ; Debug("["+ Name +"] Prisoner::UpdateTimeJailed", "currentTimeJailed: " + currentTimeJailed + ", TimeServed: " + TimeServed + ", _previousUpdateTimeServed: " + _previousUpdateTimeServed)
 
     self.ModifyStat("Time Jailed", currentTimeJailed)
 
@@ -1552,8 +1571,8 @@ function UpdateTimeJailed()
         endif
 
         accumulatedTimeServed -= DaysSinceTimeOfImprisonment ; Remove the counted days from accumulated time served (Get the fractional part if there's any - i.e: hours)
-        Debug("["+ Name +"] Prisoner::UpdateTimeJailed", "DaysSinceTimeOfImprisonment: " + DaysSinceTimeOfImprisonment + ", accumulatedTimeServed: " + accumulatedTimeServed)
-        Debug("["+ Name +"] Prisoner::UpdateTimeJailed", "Days Jailed: " + self.QueryStat("Days Jailed"))
+        ; Debug("["+ Name +"] Prisoner::UpdateTimeJailed", "DaysSinceTimeOfImprisonment: " + DaysSinceTimeOfImprisonment + ", accumulatedTimeServed: " + accumulatedTimeServed)
+        ; Debug("["+ Name +"] Prisoner::UpdateTimeJailed", "Days Jailed: " + self.QueryStat("Days Jailed"))
         self.OnDayPassed()
     endif
 
@@ -1741,7 +1760,8 @@ function MoveToPrison(Actor akCaptor)
      ; They shouldn't go especially if they are not a guard (e.g: Bounty Hunter or other NPC)
     akCaptor.MoveTo(escortLocation)
 
-    Prison.OnPrisonerTeleportedToPrison(self)
+    ; Prison.OnPrisonerTeleportedToPrison(self)
+    self.OnTeleportedToJail()
 
     SetBool("Go to Cell", true)
 endFunction
@@ -1783,8 +1803,58 @@ function UpdateSentence()
     self.IncreaseSentence(activeBounty / Prison.BountyToSentence, false)
 endFunction
 
-function TriggerInfamyPenalty()
+bool property HasCriminalPenalty
+    bool function get()
+        return Was("Infamy Penalty Applied")
+    endFunction
+endProperty
 
+
+
+int __criminalPenaltySentence
+int property CriminalPenaltySentence
+    int function get()
+        return __criminalPenaltySentence
+    endFunction
+endProperty
+
+function TriggerInfamyPenalty()
+    if (!IsInfamyEnabled || CurrentInfamy <= 0 || Was("Infamy Penalty Applied") || (Bounty <= self.GetInt("Bounty to Trigger Infamy")))
+        return
+    endif
+
+    ;/ const /; int INFAMY_RECOGNIZED_THRESHOLD     = self.GetInt("Infamy Recognized Threshold")
+    ;/ const /; int INFAMY_KNOWN_THRESHOLD          = self.GetInt("Infamy Known Threshold")
+    ;/ const /; float INFAMY_RECOGNIZED_PENALTY     = self.GetFloat("Recognized Criminal Penalty")
+    ;/ const /; float INFAMY_KNOWN_PENALTY          = self.GetFloat("Known Criminal Penalty")
+
+    ;/ const /; int INFAMY_NEUTRAL      = 0
+    ;/ const /; int INFAMY_RECOGNIZED   = 1
+    ;/ const /; int INFAMY_KNOWN        = 2
+
+    int currentInfamyType
+    float penaltyAsBounty = 0
+
+    if (Bounty >= INFAMY_KNOWN_THRESHOLD)
+        penaltyAsBounty = CurrentInfamy * (INFAMY_KNOWN_PENALTY * 0.01)
+        currentInfamyType = INFAMY_KNOWN
+
+    elseif (Bounty >= INFAMY_RECOGNIZED_THRESHOLD)
+        penaltyAsBounty = CurrentInfamy * (INFAMY_RECOGNIZED_PENALTY * 0.01)
+        currentInfamyType = INFAMY_RECOGNIZED
+
+    else
+        currentInfamyType = INFAMY_NEUTRAL
+    endif
+
+    ; Infamy shouldn't touch the Bounty, add to the Sentence instead
+    int penaltyAsSentence = Round(penaltyAsBounty / Prison.BountyToSentence)
+    __criminalPenaltySentence = penaltyAsSentence
+
+    Debug("("+ Name +") Prisoner::TriggerInfamyPenalty", "currentInfamyType: " + currentInfamyType + ", penaltyAsBounty: " + penaltyAsBounty + ", penaltyAsSentence: " + penaltyAsSentence)
+
+    self.IncreaseSentence(penaltyAsSentence, abShouldAffectBounty = false)
+    self.SetBool("Infamy Penalty Applied", true)
 endFunction
 
 ; ==========================================================
@@ -1945,9 +2015,92 @@ endFunction
 ;                           Events
 ; ==========================================================
 
+event OnTeleportedToJail()
+    self.SetBelongingsContainer()
+
+    if (self.ShouldBeFrisked)
+        self.Frisk()
+    endif
+
+    if (self.ShouldBeStripped)
+        self.StartStripping(self.Captor) ; Maybe there's some instances where a Captor is not available? TODO: Refactor and take this into account
+    endif
+
+    ; Same thing here regarding the Captor, and maybe there should be instances where the prisoner is not taken to the cell.
+    self.StartRestraining(self.Captor)
+    self.EscortToCell(self.Captor)
+endEvent
+
+event OnEscortedToJail(Actor akEscort)
+    self.SetReleaseLocation()    ; Set the teleport release location for this prisoner
+
+    if (!self.PrisonerBelongingsContainer)
+        self.SetBelongingsContainer() ; Set the container of where the prisoner's items will be confiscated to
+    endif
+
+    if (!self.JailCell)
+        self.AssignCell() ; Assign a prison cell to this prisoner
+    endif
+
+    ; TODO: Review if a prisoner should be both frisked and stripped, or only stripped if they were going to be stripped
+    if (self.ShouldBeStripped)
+        self.StartStripping(akEscort)
+
+    elseif (self.ShouldBeFrisked)
+        self.StartFrisking(akEscort)
+    endif
+
+    if (self.Should("Go to Cell"))
+        ; Need to check if the prisoner is not in the cell later, IsInCell doesn't work as it should
+        self.EscortToCell(akEscort)
+    endif
+endEvent
+
 event OnTeleportedToCell(bool abBeginImprisonment)
+    ; Await state initialization
+    ; int tries = 10
+    ; int currentTry = 1
+    ; while (!Is("Initialized") || (currentTry > tries))
+    ;     Utility.Wait(0.1)
+    ;     currentTry += 1
+    ; endWhile
+
+    if (self.IsNPC())
+        self.EnableAI(!self.IsFarFromPlayer()) ; Disable AI if not near Player
+        self.BindToCell()
+    endif
+
+    if (!self.PrisonerBelongingsContainer)
+        self.SetBelongingsContainer()
+    endif
+
+    if (self.ShouldBeFrisked)
+        self.Frisk()
+    endif
+
+    if (self.ShouldBeStripped)
+        self.Strip(abRemoveUnderwear = self.WillBeStrippedNaked)
+    endif
+
+
+    ; Debug("("+ Name +") Prisoner::OnTeleportedToCell", "ShouldBeStripped: " + ShouldBeStripped)
+    ; Debug("("+ Name +") Prisoner::OnTeleportedToCell", "ShouldBeClothed: " + ShouldBeClothed)
+
+    if (self.ShouldBeClothed)
+        self.DetermineClothingOutfit()
+        self.Clothe()
+    endif
+
+    if (abBeginImprisonment)
+        ; To be removed, this monitoring should be done automatically by Prison (maybe PrisonMonitor which has the Prison as a member)
+        if (Prison.IsPrisonerQueuedForImprisonment(self))
+            Prison.RegisterForQueuedImprisonment()
+        else
+            self.Imprison()
+        endif
+    endif
+
     SetBool("Should Be In Cell", true)
-    Prison.OnPrisonerTeleportedToCell(self, abBeginImprisonment)
 endEvent
 
 event OnEscortedToCell(Actor akEscort)
@@ -1977,7 +2130,10 @@ event OnEscortedToCell(Actor akEscort)
    endif
 
     SetBool("Should Be In Cell", true)
-    ; Prison.OnEscortPrisonerToCellEnd(self, JailCell, akEscort)
+endEvent
+
+; When should this happen?
+event OnEscortedFromJail(Actor akEscort)
 endEvent
 
 event OnEscortedFromCell(Actor akEscort)
@@ -2026,29 +2182,17 @@ event OnInitialize()
         self.SetSentence()
     endif
 
-    if (NPC_RestorePrisonerState())
-        ; Actor was already a prisoner, do not initialize normally and instead proceed to restoring their previous state
-        ; Prison.RegisterPrisoner(self) ; Registers this prisoner into the prisoner list since they were unregistered OnDestroy()
-        self.RegisterForTrackedStats()
-        return
-    endif
-
     if (self.IsNPC() && self.IsImprisoned)
         self.NPC_ResumeImprisonment()
         return
     endif
 
-    self.DetermineStrippingType()
-    self.SetReleaseLocation() ; to be refactored (needs to take into account whether to use Escort or Teleport markers)
-
     self.RegisterSleepEvents = true
     self.RegisterForTrackedStats()
     self.LockPrisonerSettings()
 
-    self.DetermineClothingOutfit()
+    self.InitializeState()
 endEvent
-
-
 
 bool property IsEnabledForBackgroundUpdates
     bool function get()
@@ -2171,7 +2315,18 @@ event OnSleepStart(float afSleepStartTime, float afSleepEndTime)
 endEvent
 
 event OnImprisoned()
-    Prison.OnPrisonerImprisoned(self)
+    self.RegisterTimeOfImprisonment()
+    self.DetermineReleaseTimeAdditionalHours() ; For Release Time (Minimum, Maximum) intervals
+    ; self.SetReleaseLocation() ; to be refactored (needs to take into account whether to use Escort or Teleport markers)
+
+    ; if (!self.Sentence)
+    ;     self.SetSentence(abShouldAffectBounty = false)
+    ; endif
+
+    self.IncrementStat("Times Jailed")
+    if (self.IsPlayer())
+        Game.IncrementStat("Times Jailed") ; Increment the "Times Jailed" in the regular vanilla stat menu.
+    endif
 endEvent
 
 event OnImprisonmentFail(string asReason)
@@ -2278,6 +2433,60 @@ function RegisterLastUpdate()
 
     ; int objectHandle = RPB_StorageVars.GetObjectHandleOnForm(this)
     ; Debug("Prisoner::RegisterLastUpdate", "object: " + GetContainerList(objectHandle))
+endFunction
+
+;/
+    Handles the Prisoner's initialization state,
+    ensuring the logic goes through before actually making the arrest.
+
+    If anything should fail here that is crucial, 
+    the arrest should be terminated and everything reverted.
+/;
+function InitializeState()
+    if (self.Was("Initialized"))
+        return
+    endif
+
+    ShowSentence = true
+    ShowReleaseTime = true
+    ShowTimeLeftInSentence = true
+    ShowTimeServed = true
+    ShowBounty = true
+
+    self.DetermineStrippingType()
+    self.DetermineClothingOutfit()
+    self.SetReleaseLocation() ; to be refactored (needs to take into account whether to use Escort or Teleport markers)
+
+    ; if (Is("Infamy Enabled"))
+        self.TriggerInfamyPenalty()
+    ; endif
+
+    int errors = RPB_Memory.FastArray("<string>")
+
+    errors = EnsureTrue((WillBeStrippedNaked || WillBeStrippedToUnderwear), "Could not determine the stripping type for Prisoner " + Name, errors)
+    errors = EnsureTrue(TeleportReleaseLocation, "Could not determine the release location for Prisoner " + Name, errors)
+
+    bool hasErrors = RPB_Memory.FastArray_Size(errors) > 0
+
+    if (hasErrors)
+        ; Log error, revert state, etc... like a transaction in a database
+        self.RevertState()
+    endif
+
+    self.SetBool("Initialized", true) ; Prevent further initializations
+endFunction
+
+; NOT WORKING: We shouldn't process anything if this fails, the execution should stop here for this script
+function RevertState()
+    RPB_Arrestee arresteeRef = RPB_Arrestee.GetStateForPrisoner(self)
+
+    if (arresteeRef)
+        arresteeRef.RevertState()
+    endif
+
+    ; Refactor into Destroy()
+    self.RemoveFromCell()
+    Prison.UnregisterPrisoner(self)
 endFunction
 
 ;/
@@ -2479,10 +2688,6 @@ function NPC_RestoreImprisonment()
     
     Debug("["+ Name +"] Prisoner::NPC_RestoreImprisonment", "Restoring NPC Imprisonment...")
 
-    if (GetBool("Infamy Enabled"))
-        self.TriggerInfamyPenalty()
-    endif
-
     ; self.ProcessWhenMoved() ; Only use when moved, not when escorted (Handle all events at once)
     Config.NotifyJail(self.GetName() + " still has "+ self.GetTimeLeftInSentence("Days") +" days left in prison for " + self.GetHold())
 
@@ -2636,8 +2841,6 @@ function NPC_UpdateStripping()
 
     return ; Unused for now
 
-    Armor[] pOutfit = self.GetOutfit()
-
     bool shouldStrip = \
         self.Was("Stripped") && \ 
         ( \
@@ -2645,7 +2848,7 @@ function NPC_UpdateStripping()
             (!self.IsNaked()        && self.IsStrippedNaked) \
         ) && \
         ( \
-            (self.ShouldBeClothed && !self.IsWearingOutfit(pOutfit)) || \
+            (self.ShouldBeClothed && !self.IsWearingOutfit(PrisonOutfit)) || \
             !self.ShouldBeClothed \
         )
 
@@ -2694,10 +2897,8 @@ function NPC_UpdateClothing()
         return
     endif
 
-    Armor[] pOutfit = self.GetOutfit()
-
     ; TODO: Fix this condition, keeps being true when NPC is not stripped (when NPC_UpdateStripping does nothing)
-    bool isWearingOutfit        = self.IsWearingOutfit(pOutfit)
+    bool isWearingOutfit        = self.IsWearingOutfit(PrisonOutfit)
     bool isNakedOrInUnderwear   = self.IsNaked() || self.HasUnderwear()
 
     bool shouldClothe = self.Was("Stripped") && self.ShouldBeClothed \ 

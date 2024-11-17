@@ -2,6 +2,7 @@ Scriptname RPB_Arrestee extends RPB_Actor
 
 import RPB_Utility
 import RPB_Config
+import RPB_Memory
 
 ; ==========================================================
 ;                      Script References
@@ -271,6 +272,14 @@ function Restrain()
 endFunction
 
 function Cuff()
+    ; this.SheatheWeapon()
+    ; UnequipHandsForActor(this)
+
+    ; self.EquipItem(RPB_Utility.RPB_PrisonerHandCuffs(), true)
+    ; self.PlayAnimation("OffsetBoundStandingPlayerInstant")
+    ; Utility.Wait(5.0)
+    ; self.PlayAnimation("OffsetBoundStandingPlayerInstant")
+    ; return
     ; Form cuffs = Game.GetFormEx(0xA081D33) ; Front
 
     Form cuffs = Game.GetFormEx(0xA081D2F) ; Back
@@ -360,8 +369,7 @@ endFunction
 
 function RevertArrest()
     ; Unbind from Cuffs
-    Form cuffs = this.GetWornForm(GetSlotMaskValue(59))
-    this.RemoveItem(cuffs)
+    self.Uncuff()
 
     self.UnregisterForTrackedStats()
     self.RestoreBounty()
@@ -395,7 +403,7 @@ function Arrest()
     SetBool("Captured", true) ; Used to avoid further arrest resists after being arrested, may change name or implementation
     self.IncrementStat("Times Arrested")
 
-    Config.NotifyArrest("You have been arrested in " + Hold, this == Config.Player)
+    Config.NotifyArrest("You have been arrested in " + Hold, self.IsPlayer())
     Info(self.Name + " has been arrested in " + Hold + " at " + CurrentTime)
     ; Debug("Arrestee::Arrest", self.Name + " has been arrested in " + Hold + " at " + CurrentTime)
 
@@ -585,6 +593,7 @@ event OnInitialize()
     Debug("Arrestee::OnInitialize", "Initialized Arrestee, this: " + this)
 
     self.RegisterForTrackedStats()
+    self.InitializeState()
 endEvent
 
 event OnDestroy()
@@ -661,6 +670,41 @@ string function GetScriptVarCategory(string asVarCategory = "Actor")
     return asVarCategory
 endFunction
 
+bool function InitializeState()
+    ; Determine what Prison to go to (or another location, needs to be handled accordingly)
+    ; Check if the Prison exists and every crucial property is okay, if not abort the arrest.
+    if (self.Was("Initialized"))
+        return true
+    endif
+
+    ; self.DeterminePrison() or Location
+
+    int errors = FastArray("<string>")
+    ; errors = EnsureTrue(HasPrisonToGoTo || HasLocationToGoTo, "Could not determine the Location to escort the Arrestee " + Name, errors)
+
+    bool hasErrors = FastArray_Size(errors) > 0
+
+    if (hasErrors)
+        self.RevertState()
+    endif
+
+    self.SetBool("Initialized", true) ; Prevent further initializations
+endFunction
+
+function RevertState()
+    ; Decouple the Captor from this Arrestee, if it exists.
+    if (Captor)
+        Captor.RemoveArrestee(self)
+    endif
+
+    ; Revert the Arrestee's state
+    self.UnregisterForTrackedStats()
+    self.RestoreBounty()
+    self.RemoveAll()
+
+    ; Destroy the effect
+    self.Destroy()
+endFunction
 
 ; ==========================================================
 ;                            Getters

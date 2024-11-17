@@ -754,6 +754,15 @@ endFunction
 ; ==========================================================
 
 bool function ShouldStripPrisoner(RPB_Prisoner apPrisoner)
+    ; DebugParams( \
+    ;     apPrisoner.GetBool("Allow Stripping") + "," + \
+    ;     apPrisoner.IsNaked() + "," + \
+    ;     apPrisoner.Sentence + "," + \
+    ;     apPrisoner.GetInt("Sentence to Strip"), \
+    ;     "AllowStripping, IsNaked, Sentence, Sentence_to_Strip", \
+    ;     "("+ Name +") Prison::ShouldStripPrisoner" \
+    ; )
+
     if (!apPrisoner.GetBool("Allow Stripping"))
         return false
     endif
@@ -872,6 +881,42 @@ Armor[] function GetDefaultOutfit()
     endWhile
 
     return outfitPieces
+endFunction
+
+function ClearPrisonerBounty(RPB_Actor apActor)
+    apActor.ClearLatentBountyForFaction(PrisonFaction)
+endFunction
+
+function SendEscortPrisonerToCellRequest(RPB_Prisoner apPrisoner)
+    ;/
+        TODO: Implementation.
+
+        This function will send a request to the Prison letting it know that a prisoner
+        is awaiting escort to their cell.
+
+        This would be most useful when there are multiple prisoners escorted to the prison,
+        awaiting to be frisked/stripped or just processed.
+
+        It would then add the prisoner to a queue in the prison, and they would be led 1 by 1
+        to their cell as the queue empties.
+    /;
+    FunctionNotImplemented("Prison::SendEscortPrisonerToCellRequest")
+endFunction
+
+function SendEscortPrisonerFromCellRequest(RPB_Prisoner apPrisoner, ObjectReference akDestination)
+    ;/
+        TODO: Implementation.
+
+        This function will send a request to the Prison letting it know that a prisoner
+        is awaiting escort from their cell.
+
+        The main scenario of this is when multiple prisoners are to be released,
+        usually they are released 1 by 1, so we would need to implement a queue system.
+
+        It would then add the prisoner to a queue in the prison, and they would be led 1 by 1
+        from their cell to the destination as the queue empties.
+    /;
+    FunctionNotImplemented("Prison::SendEscortPrisonerFromCellRequest")
 endFunction
 
 bool function IsPrisoner(RPB_Prisoner apPrisoner)
@@ -1033,6 +1078,10 @@ endFunction
 
 string function GetSentenceFormatted(RPB_Prisoner apPrisoner)
     return RPB_Utility.GetTimeFormatted(apPrisoner.Sentence, asNullValue = "None")
+endFunction
+
+string function GetCriminalPenaltySentenceFormatted(RPB_Prisoner apPrisoner)
+    return RPB_Utility.GetTimeFormatted(apPrisoner.CriminalPenaltySentence, asNullValue = "None")
 endFunction
 
 string function GetTimeServedFormatted(RPB_Prisoner apPrisoner)
@@ -1303,7 +1352,14 @@ endFunction
 ; ==========================================================
 
 function EscortPrisonerToJail(RPB_Prisoner apPrisoner, Actor akEscort)
-    FunctionNotImplemented("Prison::EscortPrisonerToJail")
+    ObjectReference escortLocation = self.GetRandomEscortLocation()
+    apPrisoner.BindToCell()
+
+    SceneManager.StartEscortToJail( \
+        akEscortLeader      = akEscort, \
+        akEscortedPrisoner  = apPrisoner.GetActor(), \
+        akPrisonerChest     = escortLocation \
+    )
 endFunction
 
 function EscortPrisonerToCell(RPB_Prisoner apPrisoner, Actor akEscort)
@@ -1386,22 +1442,13 @@ event OnPrisonerUnregistered(RPB_Prisoner apPrisoner)
 endEvent
 
 event OnPrisonerImprisoned(RPB_Prisoner apPrisoner)
-    apPrisoner.RegisterTimeOfImprisonment()
-    apPrisoner.DetermineReleaseTimeAdditionalHours() ; For Release Time (Minimum, Maximum) intervals
-    ; apPrisoner.SetReleaseLocation() ; to be refactored (needs to take into account whether to use Escort or Teleport markers)
-
-    ; if (!apPrisoner.Sentence)
-    ;     apPrisoner.SetSentence(abShouldAffectBounty = false)
-    ; endif
-
-    apPrisoner.IncrementStat("Times Jailed")
-    if (apPrisoner.IsPlayer())
-        Game.IncrementStat("Times Jailed") ; Increment the "Times Jailed" in the regular vanilla stat menu.
-    endif
+    apPrisoner.OnImprisoned()
 endEvent
 
 event OnPrisonerReleased(RPB_Prisoner apPrisoner)
     self.RegisterPrisonerReleaseTimeStats(apPrisoner)
+    self.ClearPrisonerBounty(apPrisoner)
+
     apPrisoner.Destroy()
 endEvent
 
@@ -1414,54 +1461,11 @@ event OnPrisonerEscaped(RPB_Prisoner apPrisoner)
 endEvent
 
 event OnPrisonerTeleportedToPrison(RPB_Prisoner apPrisoner)
-    if (!apPrisoner.PrisonerBelongingsContainer)
-        apPrisoner.SetBelongingsContainer()
-    endif
-
-    if (apPrisoner.ShouldBeFrisked)
-        apPrisoner.Frisk()
-    endif
-
-    if (apPrisoner.ShouldBeStripped)
-        apPrisoner.StartStripping(apPrisoner.Captor)
-    endif
-
-    apPrisoner.StartRestraining(apPrisoner.Captor)
-    apPrisoner.EscortToCell(apPrisoner.Captor)
-    ; apPrisoner.EscortPrisonerToCell(apPrisoner, apPrisoner.Captor)
+    apPrisoner.OnTeleportedToJail()
 endEvent
 
 event OnPrisonerTeleportedToCell(RPB_Prisoner apPrisoner, bool abImprisonPrisoner)
-    if (apPrisoner.IsNPC())
-        apPrisoner.EnableAI(!apPrisoner.IsFarFromPlayer()) ; Disable AI if not near Player
-        apPrisoner.BindToCell()
-    endif
-
-    if (!apPrisoner.PrisonerBelongingsContainer)
-        apPrisoner.SetBelongingsContainer()
-    endif
-
-    if (apPrisoner.ShouldBeFrisked)
-        apPrisoner.Frisk()
-    endif
-
-    if (apPrisoner.ShouldBeStripped)
-        apPrisoner.Strip(abRemoveUnderwear = apPrisoner.WillBeStrippedNaked)
-    endif
-
-    Debug("("+ Name +") Prison::OnPrisonerTeleportedToCell", "apPrisoner.ShouldBeClothed: " + apPrisoner.ShouldBeClothed)
-
-    if (apPrisoner.ShouldBeClothed)
-        apPrisoner.Clothe()
-    endif
-
-    if (abImprisonPrisoner)
-        if (self.IsPrisonerQueuedForImprisonment(apPrisoner))
-            self.RegisterForQueuedImprisonment()
-        else
-            apPrisoner.Imprison()
-        endif
-    endif
+   apPrisoner.OnTeleportedToCell(abImprisonPrisoner)
 endEvent
 
 event OnPrisonerDying(RPB_Prisoner apPrisoner, Actor akKiller)
@@ -1479,29 +1483,7 @@ endEvent
 event OnEscortPrisonerToJailEnd(RPB_Actor apActor, Actor akEscort)
     ; Retrieve or make the Actor a Prisoner
     RPB_Prisoner prisonerRef = RPB_Utility.ame_if (apActor as RPB_Prisoner, apActor, (apActor as RPB_Arrestee).MakePrisoner()) as RPB_Prisoner
-
-    prisonerRef.SetReleaseLocation()    ; Set the teleport release location for this prisoner
-
-    if (!prisonerRef.PrisonerBelongingsContainer)
-        prisonerRef.SetBelongingsContainer() ; Set the container of where the prisoner's items will be confiscated to
-    endif
-
-    if (!prisonerRef.JailCell)
-        prisonerRef.AssignCell() ; Assign a prison cell to this prisoner
-    endif
-
-    ; TODO: Review if a prisoner should be both frisked and stripped, or only stripped if they were going to be stripped
-    if (prisonerRef.ShouldBeStripped)
-        prisonerRef.StartStripping(akEscort)
-
-    elseif (prisonerRef.ShouldBeFrisked)
-        prisonerRef.StartFrisking(akEscort)
-    endif
-
-    if (prisonerRef.Should("Go to Cell"))
-        ; Need to check if the prisoner is not in the cell later, IsInCell doesn't work as it should
-        prisonerRef.EscortToCell(akEscort)
-    endif
+    prisonerRef.OnEscortedToJail(akEscort)
 endEvent
 
 event OnEscortPrisonerToCellBegin(RPB_Prisoner apPrisoner, Actor akEscort)
