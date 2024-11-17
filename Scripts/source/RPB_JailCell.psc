@@ -970,7 +970,7 @@ bool function __shouldSanityCheckSinglePrisoner()
 endFunction
 
 bool function __performPrisonerSanityCheck(RPB_Prisoner apPrisoner)
-    if (!apPrisoner || (apPrisoner && !apPrisoner.IsNPC()))
+    if (!apPrisoner || !apPrisoner.IsNPC())
         return false
     endif
 
