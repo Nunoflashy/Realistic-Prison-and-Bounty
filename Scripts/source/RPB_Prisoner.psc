@@ -550,6 +550,13 @@ function Release()
             self.NPC_RestoreOriginalOutfit()
         endif
 
+        RPB_Arrestee arresteeState = RPB_Arrestee.GetStateForPrisoner(self)
+        if (arresteeState)
+            arresteeState.Destroy()
+        endif
+
+        self.Destroy()
+
         Debug("["+ Name +"] Prisoner::Release", "Released " + self.Name + " from " + Prison.Name)
         __isReleased = true
     endif
@@ -638,6 +645,8 @@ function Imprison()
         EventManager.SendError(self.GetName() + " is already imprisoned in "+ Prison.Name + "!", "["+ Name +"] Prisoner::Imprison")
         return
     endif
+
+    ; return
 
     float startBench = StartBenchmark()
     self.OnImprisoned()
@@ -2340,6 +2349,7 @@ endEvent
 string property TEMPORARY_DESTROY_ON_IMPRISONED = "Temporary::Imprisoned" autoreadonly
 
 function Destroy()
+    self.RemoveAll()
     ; TODO: Unset all properties related to this Prisoner
     ; Prison.UnregisterPrisoner(self)
 endFunction

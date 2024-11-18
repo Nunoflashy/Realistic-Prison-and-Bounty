@@ -1448,8 +1448,6 @@ endEvent
 event OnPrisonerReleased(RPB_Prisoner apPrisoner)
     self.RegisterPrisonerReleaseTimeStats(apPrisoner)
     self.ClearPrisonerBounty(apPrisoner)
-
-    apPrisoner.Destroy()
 endEvent
 
 event OnPrisonerEscaped(RPB_Prisoner apPrisoner)
@@ -1477,7 +1475,6 @@ event OnPrisonerDeath(RPB_Prisoner apPrisoner, Actor akKiller)
 endEvent
 
 event OnEscortPrisonerToJailBegin(RPB_Actor apActor, Actor akEscort)
-    (apActor as RPB_Arrestee).Cuff()
 endEvent
 
 event OnEscortPrisonerToJailEnd(RPB_Actor apActor, Actor akEscort)

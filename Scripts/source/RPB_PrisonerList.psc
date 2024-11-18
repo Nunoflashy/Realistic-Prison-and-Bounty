@@ -30,13 +30,14 @@ function Remove(RPB_Prisoner apPrisoner)
     string elementKey = self.GetPrisonerID(apPrisoner.GetActor())
 
     RPB_Utility.Debug("PrisonerList::Remove", "Removed Prisoner " + apPrisoner + " ["+ apPrisoner.Name +"]")
-    parent.RemoveElement(elementKey)
 
     Spell prisonerSpell = RPB_Utility.RPB_PrisonerSpell()
     apPrisoner.RemoveSpell(prisonerSpell)
 
-    apPrisoner.RemoveAll()
-    apPrisoner.RemoveAll("Arrest") ; Needs to be reviewed, do we really want to delete Arrest-related category for Prisoners?
+    ; apPrisoner.RemoveAll()
+    ; apPrisoner.RemoveAll("Arrest") ; Needs to be reviewed, do we really want to delete Arrest-related category for Prisoners?
+
+    parent.RemoveElement(elementKey)
 endFunction
 
 

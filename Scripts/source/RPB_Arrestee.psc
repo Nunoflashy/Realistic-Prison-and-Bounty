@@ -613,7 +613,9 @@ event OnBountyGained()
 endEvent
 
 event OnStatChanged(string asStatName, float afValue)
-    if (asStatName == Hold + " Bounty") ; If there's bounty gained in the current arrest hold
+    ;/ const /; string HOLD_BOUNTY = Hold + " Bounty"
+
+    if (asStatName == HOLD_BOUNTY) ; If there's bounty gained in the current arrest hold
         self.OnBountyGained()
     endif
 

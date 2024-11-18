@@ -19,6 +19,8 @@ string[] function GetActions()
     JArray.addStr(actionArrayObj, "<No Action>")
     JArray.addStr(actionArrayObj, "Quit to Main Menu")
     JArray.addStr(actionArrayObj, "[MCM] Validate Options")
+    JArray.addStr(actionArrayObj, "[Actor] Log Selected Actor State Variables")
+    JArray.addStr(actionArrayObj, "[Actor] Delete Selected Actor State")
     JArray.addStr(actionArrayObj, "Check Item Stolen")
     JArray.addStr(actionArrayObj, "Distance between two Objects")
     JArray.addStr(actionArrayObj, "Play Animation on Selected Actor")
@@ -73,6 +75,12 @@ function ShowActionsMenu()
 
     elseif (actionToPerform == "[MCM] Validate Options")
         API.MCM.ValidateOptions()
+
+    elseif (actionToPerform == "[Actor] Log Selected Actor State Variables")
+        Action_LogActorStateVariables(uilib)
+
+    elseif (actionToPerform == "[Actor] Delete Selected Actor State")
+        Action_DeleteActorState(uilib)
 
     elseif (actionToPerform == "Check Item Stolen")
         Action_CheckItemStolen(uilib)
@@ -208,6 +216,43 @@ endFunction
 ; ==========================================================
 ;                           Actions
 ; ==========================================================
+
+function Action_LogActorStateVariables(RPB_UIInterface uilib)
+    Actor selectedActor = Game.GetCurrentConsoleRef() as Actor
+
+    string category = uilib.ShowInput("State Category")
+
+    int actorObject = RPB_StorageVars.GetObjectHandleOnForm(selectedActor, category)
+
+    Debug("Actions::Action_LogActorStateVariables", "Object Handle ("+ category +"): " + GetContainerList(actorObject))
+endFunction
+
+function Action_DeleteActorState(RPB_UIInterface uilib)
+    Actor selectedActor = Game.GetCurrentConsoleRef() as Actor
+
+    RPB_Prison prison = uilib.ShowPrisonList()
+
+    if (prison == none)
+        return none
+    endif
+
+    RPB_Prisoner prisoner = uilib.ShowPrisonerList(prison)
+
+    if (prisoner == none)
+        return none
+    endif
+
+    selectedActor = prisoner.GetActor()
+
+    string category = uilib.ShowInput("State Category")
+
+    int actorObject = RPB_StorageVars.GetObjectHandleOnForm(selectedActor, category)
+    Debug("Actions::Action_DeleteActorState", "(Before) Object Handle ("+ category +"): " + GetContainerList(actorObject))
+
+    RPB_StorageVars.DeleteCategoryOnForm(selectedActor, category)
+    actorObject = RPB_StorageVars.GetObjectHandleOnForm(selectedActor, category)
+    Debug("Actions::Action_DeleteActorState", "(After) Object Handle ("+ category +"): " + GetContainerList(actorObject))
+endFunction
 
 function Action_CheckItemStolen(RPB_UIInterface uilib)
     ObjectReference selectedReference = Game.GetCurrentConsoleRef()
@@ -704,8 +749,12 @@ function Action_ImprisonSelectedActor(RPB_UIInterface uilib)
     prisoner.UndetermineSentence()
     ; prisoner.SetSentence(10)
 
+
     prisoner.AssignCell()
     prisoner.MoveToCell()
+    
+    prisoner.Release()
+    return
 endFunction
 
 function Action_CheckPrisonersAI(RPB_UIInterface uilib)
