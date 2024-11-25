@@ -976,6 +976,10 @@ bool function __performPrisonerSanityCheck(RPB_Prisoner apPrisoner)
 
     bool isStateValid = true
 
+    Debug("("+ ID +") (-) JailCell::PerformPrisonerSanityCheck", "("+ apPrisoner.GetActor() +") Cell Package: " + apPrisoner.CellPackage)
+    Debug("("+ ID +") (-) JailCell::PerformPrisonerSanityCheck", "("+ apPrisoner.GetActor() +") NPC_Underwear: " + apPrisoner.NPC_Underwear)
+    Debug("("+ ID +") (-) JailCell::PerformPrisonerSanityCheck", "("+ apPrisoner.GetActor() +") Outfit: " + apPrisoner.PrisonOutfit)
+
     if (apPrisoner.IsImprisoned)
         apPrisoner.EnableAI(!apPrisoner.IsFarFromPlayer())
         
