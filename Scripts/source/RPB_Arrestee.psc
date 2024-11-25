@@ -362,7 +362,6 @@ function SetArrestGoal(string asArrestGoal)
 endFunction
 
 function UpdateArrestStats()
-    self.UpdateCurrentBounty()
     self.UpdateLargestBounty()
     self.UpdateTotalBounty()
 endFunction
@@ -479,14 +478,6 @@ function SetTimeOfArrest()
     SetInt("Day of Arrest", RPB_Utility.GetCurrentDay())
     SetInt("Month of Arrest", RPB_Utility.GetCurrentMonth())
     SetInt("Year of Arrest", RPB_Utility.GetCurrentYear())
-endFunction
-
-function UpdateCurrentBounty()
-    self.SetStat("Current Bounty", Bounty)
-    ; Debug("Arrestee::UpdateCurrentBounty", "[\n" + \ 
-    ;     "\t Current Bounty: " + self.QueryStat("Current Bounty") + "\n" + \
-    ;     "\t Bounty: " + Bounty + "\n" + \
-    ; "]")   
 endFunction
 
 function UpdateLargestBounty()
@@ -607,7 +598,6 @@ endEvent
 
 event OnBountyGained()
     self.HideBounty()
-    ; self.UpdateCurrentBounty()
     self.UpdateLargestBounty()
     self.UpdateTotalBounty()
 endEvent
