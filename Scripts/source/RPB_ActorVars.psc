@@ -23,10 +23,6 @@ function SetCrimeGoldViolent(Faction akFaction, Actor akActor, int value) global
     SetIntOnForm(akFaction.GetName() + "::Bounty Violent", akActor, value, "ActorVars")
 endFunction
 
-function SetCurrentBounty(Faction akFaction, Actor akActor, int value) global
-    SetIntOnForm(akFaction.GetName() + "::Current Bounty", akActor, value, "ActorVars")
-endFunction
-
 function SetLargestBounty(Faction akFaction, Actor akActor, int value) global
     SetIntOnForm(akFaction.GetName() + "::Largest Bounty", akActor, value, "ActorVars")
 endFunction
@@ -97,11 +93,6 @@ endFunction
 
 function ModCrimeGoldViolent(Faction akFaction, Actor akActor, int value) global
     string statKey = akFaction.GetName() + "::Bounty Violent"
-    SetIntOnForm(statKey, akActor, GetIntOnForm(statKey, akActor, "ActorVars") + value, "ActorVars")
-endFunction
-
-function ModCurrentBounty(Faction akFaction, Actor akActor, int value) global
-    string statKey = akFaction.GetName() + "::Current Bounty"
     SetIntOnForm(statKey, akActor, GetIntOnForm(statKey, akActor, "ActorVars") + value, "ActorVars")
 endFunction
 
@@ -211,11 +202,6 @@ endFunction
 
 int function GetCrimeGoldViolent(Faction akFaction, Actor akActor) global
     return GetIntOnForm(akFaction.GetName() + "::Bounty Violent", akActor, "ActorVars")
-endFunction
-
-; UNUSED (?)
-int function GetCurrentBounty(Faction akFaction, Actor akActor) global
-    return GetIntOnForm(akFaction.GetName() + "::Current Bounty", akActor, "ActorVars")
 endFunction
 
 int function GetLargestBounty(Faction akFaction, Actor akActor) global
