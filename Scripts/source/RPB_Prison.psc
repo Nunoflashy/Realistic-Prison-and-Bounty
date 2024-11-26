@@ -20,6 +20,7 @@ scriptname RPB_Prison extends RPB_Entity
 import Math
 import RPB_Config
 import RPB_Utility
+import RPB_Memory
 
 ; ==========================================================
 ;                     Script References
@@ -952,7 +953,6 @@ function RestrainPrisoner(RPB_Prisoner apPrisoner, bool abRestrainInFront = fals
     apPrisoner.GetActor().EquipItem(cuffs, true, true)
 endFunction
 
-
 bool function HasPrisoners(RPB_JailCell akPrisonCell = none)
     if (akPrisonCell)
         return akPrisonCell.HasPrisoners
@@ -985,22 +985,80 @@ RPB_Prisoner[] function GetMalePrisoners(RPB_JailCell akPrisonCell = none)
     
 endFunction
 
-bool function ReleasePrisoner(RPB_Prisoner apPrisoner)
-    ; Temporarily give the prisoner their items back
+Form[] function GetCellMates(RPB_Prisoner apPrisoner)
+    RPB_JailCell jailCell   = apPrisoner.JailCell
+    Form[] prisonersInCell  = jailCell.Prisoners
+    int cellMates           = FastArray("<Form>")
+
+    int i = 0
+    while (i < prisonersInCell.Length)
+        if (prisonersInCell[i] != apPrisoner.GetActor())
+            FastArray_AddForm(cellMates, prisonersInCell[i])
+        endif
+        i += 1
+    endWhile
+
+    return FastArray_ToFormArray(cellMates)
+endFunction
+
+bool function HasCellMates(RPB_Prisoner apPrisoner)
+    RPB_JailCell jailCell = apPrisoner.JailCell
+
+    if (jailCell == none)
+        return false
+    endif
+
+    return jailCell.PrisonerCount > 1
+endFunction
+
+
+function TeleportPrisonerToRelease(RPB_Prisoner apPrisoner)
+    apPrisoner.GotoState("Released")
+    Debug("["+ Name +"] Prison::TeleportPrisonerToRelease", "Released " + apPrisoner.Name + ".")
+
+    apPrisoner.Remove("Imprisoned")
+
     apPrisoner.ReturnBelongings()
-
-    ; Teleport to release
-    apPrisoner.TeleportToRelease()
-
-    ; Let the cell know the prisoner is leaving
     apPrisoner.RemoveFromCell()
-    ; apPrisoner.JailCell.RemovePrisoner(apPrisoner)
 
-    ; Unregister the prisoner from prison
+    if (apPrisoner.TeleportReleaseLocation)
+        apPrisoner.EnableAI(apPrisoner.IsNPC())
+        apPrisoner.MoveTo(apPrisoner.TeleportReleaseLocation)
+    endif
+
     self.UnregisterPrisoner(apPrisoner)
-    
     self.OnPrisonerReleased(apPrisoner)
 endFunction
+
+function EscortPrisonerToRelease(RPB_Prisoner apPrisoner)
+    apPrisoner.GotoState("Releasing")
+
+    ObjectReference releaseLocation = self.GetRandomReleaseMarker("Escort") as ObjectReference
+    self.SendEscortPrisonerFromCellRequest(apPrisoner, releaseLocation)
+endFunction
+
+bool function SendReleaseRequest(RPB_Prisoner apPrisoner)
+    Debug("["+ Name +"] Prison::SendReleaseRequest", "Cell Package Applied: " + apPrisoner.CellPackage)
+
+    ; Determine type of release
+    if (apPrisoner.IsNPC() && apPrisoner.IsFarFromPlayer())
+        apPrisoner.SetBool("Teleport to Release", true)
+
+    else
+        apPrisoner.SetBool("Teleport to Release", true)
+        ; apPrisoner.SetBool("Escort to Release", true)
+    endif
+
+    ; TODO: Maybe add some conditions for instances where the Release request should be denied.
+
+    if (apPrisoner.Should("Teleport to Release"))
+        self.TeleportPrisonerToRelease(apPrisoner)
+
+    elseif (apPrisoner.Should("Escort to Release"))
+        self.EscortPrisonerToRelease(apPrisoner)
+    endif
+endFunction
+
 
 string function GetTimeOfArrestFormatted(RPB_Prisoner apPrisoner)
     int day      = apPrisoner.DayOfArrest
@@ -1348,44 +1406,6 @@ function AwaitPrisonersQueuedImprisonment()
 endFunction
 
 ; ==========================================================
-;                       Escort Actions
-; ==========================================================
-
-function EscortPrisonerToJail(RPB_Prisoner apPrisoner, Actor akEscort)
-    ObjectReference escortLocation = self.GetRandomEscortLocation()
-    apPrisoner.BindToCell()
-
-    SceneManager.StartEscortToJail( \
-        akEscortLeader      = akEscort, \
-        akEscortedPrisoner  = apPrisoner.GetActor(), \
-        akPrisonerChest     = escortLocation \
-    )
-endFunction
-
-function EscortPrisonerToCell(RPB_Prisoner apPrisoner, Actor akEscort)
-    RPB_JailCell jailCell = apPrisoner.JailCell
-
-    ObjectReference outsideCellGuardWaitingMarker = jailCell.GetRandomMarker("Exterior")
-    apPrisoner.BindToCell()
-
-    SceneManager.StartEscortToCell( \
-        akEscortLeader              = akEscort, \
-        akEscortedPrisoner          = apPrisoner.GetActor(), \
-        akJailCellMarker            = jailCell, \
-        akJailCellDoor              = jailCell.CellDoor, \
-        akEscortWaitingMarker       = outsideCellGuardWaitingMarker \ 
-    )
-endFunction
-
-function EscortPrisonerFromJail(RPB_Prisoner apPrisoner, Actor akEscort)
-    FunctionNotImplemented("Prison::EscortPrisonerFromJail")
-endFunction
-
-function EscortPrisonerFromCell(RPB_Prisoner apPrisoner, Actor akEscort)
-    FunctionNotImplemented("Prison::EscortPrisonerFromCell")
-endFunction
-
-; ==========================================================
 ;                          Events
 ; ==========================================================
 
@@ -1448,6 +1468,8 @@ endEvent
 event OnPrisonerReleased(RPB_Prisoner apPrisoner)
     self.RegisterPrisonerReleaseTimeStats(apPrisoner)
     self.ClearPrisonerBounty(apPrisoner)
+
+    apPrisoner.Destroy()
 endEvent
 
 event OnPrisonerEscaped(RPB_Prisoner apPrisoner)
@@ -1558,10 +1580,6 @@ event OnPrisonerStripEnd(RPB_Prisoner apPrisoner, Actor akStripper)
     ; apPrisoner.EscortToCell(akStripper)
 endEvent
 
-event OnGuardDeath(RPB_Guard akGuard, Actor akKiller)
-
-endEvent
-
 event OnCellDoorOpen(RPB_JailCell akPrisonCell, Actor akOpener)
 
 endEvent
@@ -1602,6 +1620,80 @@ endEvent
 ; ==========================================================
 ;                           Scenes
 ; ==========================================================
+
+;                       Escort Actions
+; ==========================================================
+
+function EscortPrisonerToJail(RPB_Prisoner apPrisoner, Actor akEscort)
+    ObjectReference escortLocation = self.GetRandomEscortLocation()
+    apPrisoner.BindToCell()
+
+    SceneManager.StartEscortToJail( \
+        akEscortLeader      = akEscort, \
+        akEscortedPrisoner  = apPrisoner.GetActor(), \
+        akPrisonerChest     = escortLocation \
+    )
+
+    ; Set state
+    apPrisoner.SetBool("Go to Cell", true)
+endFunction
+
+function EscortPrisonerToCell(RPB_Prisoner apPrisoner, Actor akEscort)
+    RPB_JailCell jailCell = apPrisoner.JailCell
+
+    ObjectReference outsideCellGuardWaitingMarker = jailCell.GetRandomMarker("Exterior")
+    apPrisoner.BindToCell()
+
+    SceneManager.StartEscortToCell( \
+        akEscortLeader              = akEscort, \
+        akEscortedPrisoner          = apPrisoner.GetActor(), \
+        akJailCellMarker            = jailCell, \
+        akJailCellDoor              = jailCell.CellDoor, \
+        akEscortWaitingMarker       = outsideCellGuardWaitingMarker \ 
+    )
+endFunction
+
+function EscortPrisonerFromJail(RPB_Prisoner apPrisoner, Actor akEscort)
+    FunctionNotImplemented("Prison::EscortPrisonerFromJail")
+endFunction
+
+function EscortPrisonerFromCell(RPB_Prisoner apPrisoner, Actor akEscort)
+    FunctionNotImplemented("Prison::EscortPrisonerFromCell")
+endFunction
+
+;                        Misc Actions
+; ==========================================================
+
+function StartRestrainingPrisoner(RPB_Prisoner apPrisoner, Actor akRestrainer)
+    SceneManager.StartRestrainPrisoner_02( \
+        akGuard       = akRestrainer, \
+        akPrisoner    = apPrisoner.GetActor() \
+    )
+endFunction
+
+function StartFriskingPrisoner(RPB_Prisoner apPrisoner, Actor akSearcherGuard)
+    SceneManager.StartFrisking( \
+        akFriskerGuard     = akSearcherGuard, \
+        akFriskedPrisoner  = apPrisoner.GetActor() \
+    )
+endFunction
+
+function StartStrippingPrisoner(RPB_Prisoner apPrisoner, Actor akSearcherGuard)
+    ObjectReference stripMarker = self.GetRandomSearchMarker("Stripping") as ObjectReference
+
+    SceneManager.StartStripping_02( \
+        akStripperGuard     = akSearcherGuard, \
+        akStrippedPrisoner  = apPrisoner.GetActor(), \
+        akStripMarker       = none \
+    )
+endFunction
+
+function StartGivingPrisonerClothing(RPB_Prisoner apPrisoner, Actor akSearcherGuard)
+    SceneManager.StartGiveClothing( \
+        akGuard     = akSearcherGuard, \
+        akPrisoner  = apPrisoner.GetActor() \
+    )
+endFunction
 
 ; ==========================================================
 ;                          Management
@@ -1888,7 +1980,8 @@ endFunction
     Binds the actor to an instance of RPB_Prisoner,
     giving us the prisoner state of the Actor bound to this reference.
 
-    Used when this Actor is a Prisoner, lasts until Release or Escape.
+    Used when this Actor is a Prisoner, lasts until Release, Escape,
+    or until Prisoner::Destroy() is called.
 
     This function is used inside RPB_Prisoner, since there is no other way to obtain
     a reference to the script as of now.
@@ -1896,6 +1989,10 @@ endFunction
     RPB_Prisoner    @akPrisonerRef: The Prisoner reference to bind to the Actor.
 /;
 bool function RegisterPrisoner(RPB_Prisoner apPrisoner)
+    if (self.IsPrisoner(apPrisoner))
+        return false
+    endif
+    
     Prisoners.Add(apPrisoner)
     self.OnPrisonerRegistered(apPrisoner)
     self.AssignPrisonerNumber(apPrisoner)
@@ -1938,7 +2035,6 @@ function RegisterPrisonerReleaseTimeStats(RPB_Prisoner apPrisoner)
         RPB_StorageVars.SetIntOnForm("Last Released - Hour", self.PrisonFaction, RPB_Utility.GetCurrentHour(), "PrisonLastReleased")
         RPB_StorageVars.SetIntOnForm("Last Released - Minute", self.PrisonFaction, RPB_Utility.GetCurrentMinute(), "PrisonLastReleased")
         RPB_StorageVars.SetStringOnForm("Last Released - Cell", self.PrisonFaction, apPrisoner.JailCell.ID, "PrisonLastReleased")
-        RPB_StorageVars.SetBoolOnForm("Imprisoned", apPrisoner.GetActor(), false)
     endif
 endFunction
 
@@ -1952,7 +2048,6 @@ function RegisterPrisonerEscapeTimeStats(RPB_Prisoner apPrisoner)
         RPB_StorageVars.SetIntOnForm("Last Escaped - Hour", self.PrisonFaction, RPB_Utility.GetCurrentHour(), "PrisonLastEscaped")
         RPB_StorageVars.SetIntOnForm("Last Escaped - Minute", self.PrisonFaction, RPB_Utility.GetCurrentMinute(), "PrisonLastEscaped")
         RPB_StorageVars.SetStringOnForm("Last Escaped - Cell", self.PrisonFaction, apPrisoner.JailCell.ID, "PrisonLastEscaped")
-        RPB_StorageVars.SetBoolOnForm("Imprisoned", apPrisoner.GetActor(), false)
     endif
 endFunction
 
@@ -2155,7 +2250,12 @@ endFunction
     returns (RPB_Prisoner): The Prisoner reference for this Actor.
 /;
 RPB_Prisoner function AwaitPrisonerReference(Actor akPrisoner, int aiMaxTries = 50, float afInitialTimeBetweenTries = 0.1, float afMaxTimeBetweenTries = 3.0)
-    return RPB_Utility.AwaitEntityReference(akPrisoner, Prisoners, self, aiMaxTries, afInitialTimeBetweenTries, afMaxTimeBetweenTries) as RPB_Prisoner
+    ; RPB_StorageVars.SetBoolOnForm("Is Initialized", akPrisoner, true, "Actor")
+    return (RPB_Utility.AwaitEntityReference(akPrisoner, Prisoners, self, aiMaxTries, afInitialTimeBetweenTries, afMaxTimeBetweenTries) as RPB_Prisoner).Initialize()
+endFunction
+
+RPB_Prisoner function GetPrisoner(Actor akPrisoner, int aiMaxTries = 50, float afInitialTimeBetweenTries = 0.1, float afMaxTimeBetweenTries = 3.0)
+    return RPB_Utility.AwaitExistingEntityReference(akPrisoner, Prisoners, self, aiMaxTries, afInitialTimeBetweenTries, afMaxTimeBetweenTries) as RPB_Prisoner
 endFunction
 
 ;/

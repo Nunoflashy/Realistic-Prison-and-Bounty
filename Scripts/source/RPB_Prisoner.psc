@@ -21,6 +21,104 @@ RPB_EventManager property EventManager
 endProperty
 
 ; ==========================================================
+;                   Management Properties
+; ==========================================================
+
+bool property HasStateRequiredForImprisonment
+    bool function get()
+        return Prison && JailCell && (Sentence || Bounty || IsUndeterminedSentence)
+    endFunction
+endProperty
+
+; ==========================================================
+;                 Arrest / Imprisonment Time
+; ==========================================================
+
+int property MinuteOfArrest
+    int function get()
+        return GetInt("Minute of Arrest")
+    endFunction
+endProperty
+
+int property HourOfArrest
+    int function get()
+        return GetInt("Hour of Arrest")
+    endFunction
+endProperty
+
+int property DayOfArrest
+    int function get()
+        return GetInt("Day of Arrest")
+    endFunction
+endProperty
+
+int property MonthOfArrest
+    int function get()
+        return GetInt("Month of Arrest")
+    endFunction
+endProperty
+
+int property YearOfArrest
+    int function get()
+        return GetInt("Year of Arrest")
+    endFunction
+endProperty
+
+int property MinuteOfImprisonment
+    int function get()
+        return GetInt("Minute of Imprisonment")
+    endFunction
+endProperty
+
+int property HourOfImprisonment
+    int function get()
+        return GetInt("Hour of Imprisonment")
+    endFunction
+endProperty
+
+int property DayOfImprisonment
+    int function get()
+        return GetInt("Day of Imprisonment")
+    endFunction
+endProperty
+
+int property MonthOfImprisonment
+    int function get()
+        return GetInt("Month of Imprisonment")
+    endFunction
+endProperty
+
+int property YearOfImprisonment
+    int function get()
+        return GetInt("Year of Imprisonment")
+    endFunction
+endProperty
+
+int property ReleaseHour
+    int function get()
+        float releaseTimeHour = ReleaseTime - math.floor(ReleaseTime)
+
+        ; Get the release hour and minutes
+        float releaseHourAndMinutes = releaseTimeHour / 0.0416
+
+        return Round(releaseHourAndMinutes)
+    endFunction
+endProperty
+
+int property ReleaseMinute
+    int function get()
+        float releaseTimeHour = ReleaseTime - math.floor(ReleaseTime)
+
+        ; Get the release hour and minutes
+        float releaseHourAndMinutes = releaseTimeHour / 0.0416
+    
+        int releaseMinutes = Round((releaseHourAndMinutes - math.floor(releaseHourAndMinutes)) * 60)
+    
+        return releaseMinutes
+    endFunction
+endProperty
+
+; ==========================================================
 ;                    Prisoner Properties
 ; ==========================================================
 
@@ -167,7 +265,12 @@ bool property ShouldBeInCell
     endFunction
 endProperty
 
-float property LastUpdate auto
+float __lastUpdate
+float property LastUpdate
+    float function get()
+        return __lastUpdate
+    endFunction
+endProperty
 
 ;/
     Gets the time since the last update.
@@ -409,26 +512,21 @@ int property InfamyGainedPerUpdate
     endFunction
 endProperty
 
-int property InfamyBountyPenalty
-    int function get()
-        ; float infamyTypePenalty = float_if (IsInfamyKnown, arrestVars.InfamyKnownPenalty, float_if (IsInfamyRecognized, arrestVars.InfamyRecognizedPenalty))
-        ; return round(CurrentInfamy * infamyTypePenalty)
-    endFunction
-endProperty
-
 bool property IsSentenceSet
     bool function get()
         return self.Sentence != 0
     endFunction
 endProperty
 
-ReferenceAlias __cellPackage
 ReferenceAlias property CellPackage
     ReferenceAlias function get()
-        if (!__cellPackage)
-            __cellPackage = JailCell.GetSuitableCellPackage()
+        string packageId = self.GetString("Cell Package ID")
+
+        if (!packageId)
+             self.SetString("Cell Package ID", JailCell.GetSuitableCellPackage().GetName())
         endif
-        return __cellPackage
+
+        return Prison.PrisonManager.GetCellPackageByName(packageId)
     endFunction
 endProperty
 
@@ -532,36 +630,6 @@ function SetBelongingsContainer()
     Debug("Prison::SetBelongingsContainer", "Prisoner Belongings Container:  " + PrisonerBelongingsContainer)
 endFunction
 
-;/
-    Releases this prisoner from jail
-/;
-bool __isReleased
-function Release()
-    if (!__isReleased)
-        GotoState("Released")
-        
-        if (self.IsNPC() && CellPackage)
-            self.UnbindAlias(CellPackage)
-        endif
-
-        Prison.ReleasePrisoner(self)
-
-        if (self.IsNPC())
-            self.NPC_RestoreOriginalOutfit()
-        endif
-
-        RPB_Arrestee arresteeState = RPB_Arrestee.GetStateForPrisoner(self)
-        if (arresteeState)
-            arresteeState.Destroy()
-        endif
-
-        self.Destroy()
-
-        Debug("["+ Name +"] Prisoner::Release", "Released " + self.Name + " from " + Prison.Name)
-        __isReleased = true
-    endif
-
-endFunction
 
 ;/
     Removes this Prisoner reference from the assigned jail cell.
@@ -628,15 +696,11 @@ function Uncuff()
     Debug("["+ Name +"] Prisoner::Uncuff", "Uncuffed " + this)
 endFunction
 
-bool function HasStateRequiredForImprisonment()
-    return Prison && JailCell && (Sentence || Bounty || IsUndeterminedSentence)
-endFunction
-
 ;/
     Main function that handles the imprisonment of this Prisoner.
 /;
 function Imprison()
-    if (!self.HasStateRequiredForImprisonment())
+    if (!self.HasStateRequiredForImprisonment)
         EventManager.SendError(Name + " does not have the required state for "+ self.GetPossessivePronoun() +" imprisonment, cannot continue!", "["+ Name +"] Prisoner::Imprison")
         return
     endif
@@ -933,60 +997,27 @@ endFunction
 ; ==========================================================
 
 function StartRestraining(Actor akRestrainer)
-    SceneManager.StartRestrainPrisoner_02( \
-        akGuard     = akRestrainer, \
-        akPrisoner  = this \
-    )
+    Prison.StartRestrainingPrisoner(self, akRestrainer)
 endFunction
 
 function StartFrisking(Actor akSearcherGuard)
-    SceneManager.StartFrisking( \
-        akFriskerGuard     = akSearcherGuard, \
-        akFriskedPrisoner  = this \
-    )
+    Prison.StartFriskingPrisoner(self, akSearcherGuard)
 endFunction
 
 function StartStripping(Actor akStripperGuard)
-    ObjectReference stripMarker = Prison.GetRandomSearchMarker("Stripping") as ObjectReference
-
-    SceneManager.StartStripping_02( \
-        akStripperGuard     = akStripperGuard, \
-        akStrippedPrisoner  = this, \
-        akStripMarker       = none \
-    )
+    Prison.StartStrippingPrisoner(self, akStripperGuard)
 endFunction
 
 function StartGiveClothing(Actor akClothingGiver)
-    SceneManager.StartGiveClothing( \
-        akGuard     = akClothingGiver, \
-        akPrisoner  = this \
-    )
+    Prison.StartGivingPrisonerClothing(self, akClothingGiver)
 endFunction
 
 function EscortToJail(Actor akEscort)
-    ObjectReference escortLocation = Prison.GetRandomEscortLocation()
-    self.BindToCell()
-
-    SceneManager.StartEscortToJail( \
-        akEscortLeader      = akEscort, \
-        akEscortedPrisoner  = this, \
-        akPrisonerChest     = escortLocation \
-    )
-    SetBool("Go to Cell", true)
+    Prison.EscortPrisonerToJail(self, akEscort)
 endFunction
 
 function EscortToCell(Actor akEscort)
-    ObjectReference outsideCellGuardWaitingMarker = JailCell.GetRandomMarker("Exterior")
-    Debug("["+ Name +"] Prisoner::EscortToCell", "Waiting Marker: " + outsideCellGuardWaitingMarker)
-    self.BindToCell()
-
-    SceneManager.StartEscortToCell( \
-        akEscortLeader              = akEscort, \
-        akEscortedPrisoner          = this, \
-        akJailCellMarker            = self.JailCell, \
-        akJailCellDoor              = self.JailCell.CellDoor, \
-        akEscortWaitingMarker       = outsideCellGuardWaitingMarker \ 
-    )
+    Prison.EscortPrisonerToCell(self, akEscort)
 endFunction
 
 ; ==========================================================
@@ -994,90 +1025,6 @@ endFunction
 ; ==========================================================
 ;                          Sentence
 ; ==========================================================
-
-int property MinuteOfArrest
-    int function get()
-        return GetInt("Minute of Arrest")
-    endFunction
-endProperty
-
-int property HourOfArrest
-    int function get()
-        return GetInt("Hour of Arrest")
-    endFunction
-endProperty
-
-int property DayOfArrest
-    int function get()
-        return GetInt("Day of Arrest")
-    endFunction
-endProperty
-
-int property MonthOfArrest
-    int function get()
-        return GetInt("Month of Arrest")
-    endFunction
-endProperty
-
-int property YearOfArrest
-    int function get()
-        return GetInt("Year of Arrest")
-    endFunction
-endProperty
-
-int property MinuteOfImprisonment
-    int function get()
-        return GetInt("Minute of Imprisonment")
-    endFunction
-endProperty
-
-int property HourOfImprisonment
-    int function get()
-        return GetInt("Hour of Imprisonment")
-    endFunction
-endProperty
-
-int property DayOfImprisonment
-    int function get()
-        return GetInt("Day of Imprisonment")
-    endFunction
-endProperty
-
-int property MonthOfImprisonment
-    int function get()
-        return GetInt("Month of Imprisonment")
-    endFunction
-endProperty
-
-int property YearOfImprisonment
-    int function get()
-        return GetInt("Year of Imprisonment")
-    endFunction
-endProperty
-
-int property ReleaseHour
-    int function get()
-        float releaseTimeHour = ReleaseTime - math.floor(ReleaseTime)
-
-        ; Get the release hour and minutes
-        float releaseHourAndMinutes = releaseTimeHour / 0.0416
-
-        return Round(releaseHourAndMinutes)
-    endFunction
-endProperty
-
-int property ReleaseMinute
-    int function get()
-        float releaseTimeHour = ReleaseTime - math.floor(ReleaseTime)
-
-        ; Get the release hour and minutes
-        float releaseHourAndMinutes = releaseTimeHour / 0.0416
-    
-        int releaseMinutes = Round((releaseHourAndMinutes - math.floor(releaseHourAndMinutes)) * 60)
-    
-        return releaseMinutes
-    endFunction
-endProperty
 
 
 function RegisterTimeOfImprisonment()
@@ -1264,21 +1211,37 @@ endFunction
 ;                            States
 ; ==========================================================
 
+state Processing
+endState
+
 ; While this Prisoner is being escorted
 state Escorting
 endState
 
-state Released
+state Releasing
     event OnBeginState()
-        SetBool("Should Be In Cell", false)
-        SetBool("Imprisoned", false) ; TODO: This shouldn't be set here, since at this point, the Prisoner may still be in the cell, not escorted out yet
     endEvent
 
     event OnUpdateGameTime()
     endEvent
+endState
 
-    function Release()
-    endFunction
+state Released
+    event OnBeginState()
+        Debug("{Released} ("+ Name +") Prisoner::OnBeginState", "this: " + this + ", HasCellPackage: " + self.HasCellPackage + ", Cell Package: " + self.CellPackage + ", Cell Package Actor Reference: " + CellPackage.GetActorReference())
+
+        if (self.IsNPC())
+            self.NPC_RestoreOriginalOutfit()
+        endif
+
+        if (self.IsNPC() && self.HasCellPackage)
+            self.UnbindAlias(self.CellPackage)
+        endif
+    endEvent
+
+    event OnUpdateGameTime()
+        EventManager.SendError("Updating in the Released state, should not happen!", "{Released} ["+ Name +"] Prisoner::OnUpdateGameTime")
+    endEvent
 endState
 
 float _previousUpdateTimeServed
@@ -1307,13 +1270,16 @@ state Imprisoned
         self.UpdateInfamy()
         self.UpdateTimeJailed() ; Must be updated in some other way, otherwise it will reset to 0 on next imprisonment
  
-        if (self.IsSentenceServed) ; implementation is not finished
-            ; Prison.SendReleaseRequest(self)
-            self.Release()
+        if (self.IsSentenceServed)
+            Prison.SendReleaseRequest(self)
             return
         endif
 
         Prison.DEBUG_ShowPrisonerSentenceInfo(self, true)
+        Debug("["+ Name +"] Prisoner::OnUpdateGameTime", "("+ self.GetActor() +") Cell Package: " + self.CellPackage)
+        Debug("["+ Name +"] Prisoner::OnUpdateGameTime", "Outfit: " + self.PrisonOutfit)
+        Debug("["+ Name +"] Prisoner::OnUpdateGameTime", "this: " + this)
+
 
         ; Debug("["+ Name +"] Prisoner::OnUpdateGameTime", "currentTimeServedStored: " + currentTimeServedStored)
 
@@ -1330,10 +1296,6 @@ state Awaiting
     event OnUpdateGameTime()
         EventManager.SendError("Updating in the Awaiting state, should not happen!", "{Awaiting} ["+ Name +"] Prisoner::OnUpdateGameTime")
     endEvent
-endState
-
-; When this Prisoner gets released
-state Released
 endState
 
 ; When or while this Prisoner is escaping or has escaped
@@ -1547,7 +1509,7 @@ function PerformDeleveling()
 endFunction
 
 ; ==========================================================
-;                            Utility
+;                           Utility
 ; ==========================================================
 
 function UpdateInfamy()
@@ -1892,7 +1854,7 @@ function FastForwardToRelease()
 
     GotoState("Awaiting")
 
-    self.Release()
+    Prison.SendReleaseRequest(self)
 endFunction
 
 ; function DetermineReleaseTimeAdditionalHours()
@@ -2182,7 +2144,14 @@ event OnUnderwearRemoved(Armor akUnderwearTop, Armor akUnderwearBottom)
     )
 endEvent
 
-event OnInitialize()
+RPB_Prisoner function Initialize()
+    if (self.Was("Initialized"))
+        return self
+    endif
+
+    DebugInfo("("+ Name +") Prisoner::Initialize", "Was Initialized: " + self.Was("Initialized"))
+
+
     if (!Prison.IsPrisoner(self))
         Prison.RegisterPrisoner(self)
     endif
@@ -2191,16 +2160,41 @@ event OnInitialize()
         self.SetSentence()
     endif
 
-    if (self.IsNPC() && self.IsImprisoned)
-        self.NPC_ResumeImprisonment()
-        return
-    endif
-
     self.RegisterSleepEvents = true
     self.RegisterForTrackedStats()
     self.LockPrisonerSettings()
 
     self.InitializeState()
+
+    return self
+endFunction
+
+event OnInitialize()
+    DebugInfo("("+ Name +") Prisoner::OnInitialize", "State: " + self.GetState())
+    DebugInfo("("+ Name +") Prisoner::OnInitialize", "IsInitialized: " + self.IsInitialized)
+
+    if (self.IsNPC() && self.IsImprisoned)
+        self.NPC_ResumeImprisonment()
+    endif
+
+    if (self.Was("Initialized"))
+        return
+    endif
+
+    Prison.RegisterPrisoner(self)
+    DebugInfo("("+ Name +") Prisoner::OnInitialize", "Initialized: " + self.Was("Initialized"))
+endEvent
+
+event OnRestore()
+    ; if (self.IsNPC() && self.IsImprisoned)
+    ;     self.NPC_ResumeImprisonment()
+    ; endif
+
+    DebugInfo("("+ Name +") Prisoner::OnRestore", "Restoring Prisoner: " + Name)
+endEvent
+
+event OnReleased()
+    self.Destroy()
 endEvent
 
 bool property IsEnabledForBackgroundUpdates
@@ -2215,8 +2209,6 @@ endProperty
 
 event OnDestroy()
     if (self.IsNPC())
-        self.NPC_SavePrisonerState() ; temporarily disabled
-
         if (!Prison.IsReceivingUpdates()) ; if we dont destroy the instance in time, this will get called from Prison after processing queued prisoners, and since we didnt register the prisoner, this is a bug since it will report 0 prisoners
             Prison.RegisterForPrisonPeriodicUpdate(self)
         endif
@@ -2320,7 +2312,6 @@ event OnSleepStart(float afSleepStartTime, float afSleepEndTime)
         endif
         __serveTimeLastDayRegistered = RPB_Utility.GetCurrentDay()
     endif
-         
 endEvent
 
 event OnImprisoned()
@@ -2350,6 +2341,11 @@ string property TEMPORARY_DESTROY_ON_IMPRISONED = "Temporary::Imprisoned" autore
 
 function Destroy()
     self.RemoveAll()
+    parent.Destroy()
+    ; self.Remove("Is Initialized", "Actor")
+    ; RPB_StorageVars.SetBoolOnForm("Is Initialized", this, false, "Actor")
+
+    Debug("("+ Name +") Prisoner::Destroy", "Object: " + GetContainerList(RPB_StorageVars.GetObjectHandleOnForm(this)))
     ; TODO: Unset all properties related to this Prisoner
     ; Prison.UnregisterPrisoner(self)
 endFunction
@@ -2363,68 +2359,8 @@ function DestroyArrestState()
     endif
 
     RPB_Arrestee arrestState = RPB_Arrestee.GetStateForPrisoner(self)
-
-    if (arrestState)
-        ; Save the bounty from the Arrest state
-        int _bounty          = self.GetInt("Bounty Non-Violent", "Arrest")
-        int _bountyViolent   = self.GetInt("Bounty Violent", "Arrest")
-        
-        arrestState.Destroy()
-        Utility.Wait(0.2)
-        
-        ; Save the bounty from the Arrest state
-        self.SetInt("Bounty Non-Violent", _bounty, "Arrest")
-        self.SetInt("Bounty Violent", _bountyViolent, "Arrest")
-    endif
+    arrestState.Destroy()
 endFunction
-
-;/
-    Performs sanity checks for prisoners that should be stripped (NPC's only)
-
-    When the player is far away from the prisoner at the time of imprisonment,
-    despite the prisoner being stripped, they will still be wearing their normal clothes,
-    leaving copies of it in the prisoner chest on strip.
-
-    This function aims to fix that by performing a sanity check to ensure they are stripped when the player
-    is in the same location.
-
-    It can and should only run once, after that, their clothes will not reappear on them.
-    called from JailCell::PerformPrisonersSanityCheck() and JailCell::PerformPrisonerSanityCheck()
-
-    May be renamed to PerformClothingSanityChecks
-/;
-bool function PerformStrippingSanityChecks()
-    if (!self.IsNPC())
-        return false
-    endif
-
-    ; TODO: Check if the prisoner was stripped to underwear, and give them the underwear back,
-    ; also take into account possible lockpicks or keys the prisoner might have, we don't want to include those, the prisoner should remain with them
-    bool shouldStrip = !self.IsNaked() && self.IsInCell && self.Is("Stripped") ;/&& !self.IsWearingPrisonerOutfit/;
-
-    if (shouldStrip)
-        if (self.IsStrippedToUnderwear)
-            Armor underwearTop      = self.GetUnderwear("Top")
-            Armor underwearBottom   = self.GetUnderwear("Bottom")
-
-            self.UnequipAll()
-            self.RemoveAllItems()
-  
-            self.EquipItem(underwearTop, abCondition = underwearTop != none)        
-            self.EquipItem(underwearBottom, abCondition = underwearBottom != none)
-
-            Debug("["+ Name +"] Prisoner::PerformStrippingSanityChecks", "Stripped " + self.Name + " to underwear - performed sanity check", underwearTop != none || underwearBottom != none)
-            Debug("["+ Name +"] Prisoner::PerformStrippingSanityChecks", "Stripped " + self.Name + " naked - performed sanity check", underwearTop == none && underwearBottom == none)
-
-        elseif (self.IsStrippedNaked)
-            self.RemoveAllItems()
-            Debug("["+ Name +"] Prisoner::PerformStrippingSanityChecks", "Stripped " + self.Name + " naked - performed sanity check")
-        endif
-    endif
-
-    return (self.IsStrippedNaked && self.IsNaked()) || (self.IsStrippedToUnderwear && self.IsInUnderwear()) ; TODO: Add outfit clothing condition
-endFunction
-
 
 string function GetScriptVarCategory(string asVarCategory = "Actor")
     if (asVarCategory == "Actor")
@@ -2439,10 +2375,7 @@ endFunction
     this is a crucial variable used to determine updated sentences, infamy gained, and so on...
 /;
 function RegisterLastUpdate()
-    LastUpdate = Utility.GetCurrentGameTime()
-
-    ; int objectHandle = RPB_StorageVars.GetObjectHandleOnForm(this)
-    ; Debug("Prisoner::RegisterLastUpdate", "object: " + GetContainerList(objectHandle))
+    __lastUpdate = Utility.GetCurrentGameTime()
 endFunction
 
 ;/
@@ -2466,10 +2399,7 @@ function InitializeState()
     self.DetermineStrippingType()
     self.DetermineClothingOutfit()
     self.SetReleaseLocation() ; to be refactored (needs to take into account whether to use Escort or Teleport markers)
-
-    ; if (Is("Infamy Enabled"))
-        self.TriggerInfamyPenalty()
-    ; endif
+    self.TriggerInfamyPenalty()
 
     int errors = RPB_Memory.FastArray("<string>")
 
@@ -2672,61 +2602,24 @@ endFunction
     Handles actions when an NPC's imprisonment state is resumed (usually when the player is in the same location as the NPC).
 /;
 event NPC_OnResumeImprisonment()
-    GotoState("Imprisoned")
-    RegisterForSingleUpdateGameTime(0.1)
-    ; self.NPC_ResumeImprisonment() ;  Re-register this Prisoner into the imprisoned state for updates
     JailCell.RegisterForSanityChecking(1.0, apPrisoner = self)
 endEvent
 
 function NPC_ResumeImprisonment()
+    if (!self.IsNPC())
+        return
+    endif
+
     if (!self.IsImprisoned)
         DebugError("["+ Name +"] Prisoner::NPC_ResumeImprisonment", "Prisoner " + Name + " is not imprisoned, cannot resume imprisonment!")
         Error("Prisoner " + Name + " is not imprisoned, cannot resume imprisonment!")
         return
     endif
 
+    GotoState("Imprisoned")
+    RegisterForSingleUpdateGameTime(0.1)
+
     NPC_OnResumeImprisonment()
-
-    ; GotoState("Imprisoned")
-    ; RegisterForSingleUpdateGameTime(0.1)
-endFunction
-
-function NPC_RestoreImprisonment()
-    if (!self.IsImprisoned)
-        return
-    endif
-    
-    Debug("["+ Name +"] Prisoner::NPC_RestoreImprisonment", "Restoring NPC Imprisonment...")
-
-    ; self.ProcessWhenMoved() ; Only use when moved, not when escorted (Handle all events at once)
-    Config.NotifyJail(self.GetName() + " still has "+ self.GetTimeLeftInSentence("Days") +" days left in prison for " + self.GetHold())
-
-    ; ArrestVars.List("Jail")
-    GotoState("Imprisoned") ; State when the prisoner is in the cell, check for updates for sentence, etc...
-    RegisterForUpdateGameTime(1.0)
-endFunction
-
-;/
-    Restores this ActiveMagicEffect on the imprisoned NPC, if they exist and are imprisoned.
-
-    Since ActiveMagicEffects dispel after the Player is far away enough from the target Actor, we
-    must re-apply the effect and restore the state previous to reference destruction for NPC's.
-/;
-bool function NPC_RestorePrisonerState()
-    return false
-    if (GetBool("ShouldRestorePrisonerState"))
-        Debug("["+ Name +"] Prisoner::NPC_RestorePrisonerState", "Restoring NPC state...")
-        self.NPC_RestoreImprisonment()
-
-        ; Unset the flag so the state can be restored again at re-initialization upon being destroyed
-        SetBool("ShouldRestorePrisonerState", false)
-    endif
-endFunction
-
-function NPC_SavePrisonerState()
-    return
-    SetBool("ShouldRestorePrisonerState", true)
-    Debug("["+ Name +"] Prisoner::NPC_SavePrisonerState", "Saving NPC state...")
 endFunction
 
 ; ==========================================================
@@ -2939,7 +2832,6 @@ function DEBUG_ShowHoldStats()
         "Bounty Violent: "      + violent  + ", \n\t" + \
         "Bounty: "              + self.QueryStat("Bounty Non-Violent")  + ", \n\t" + \
         "Bounty Violent: "      + self.QueryStat("Bounty Violent")      + ", \n\t" + \
-        "Current Bounty: "      + self.QueryStat("Current Bounty")      + ", \n\t" + \
         "Largest Bounty: "      + self.QueryStat("Largest Bounty")      + ", \n\t" + \
         "Total Bounty: "        + self.QueryStat("Total Bounty")        + ", \n\t" + \
         "Times Arrested: "      + self.QueryStat("Times Arrested")      + ", \n\t" + \
