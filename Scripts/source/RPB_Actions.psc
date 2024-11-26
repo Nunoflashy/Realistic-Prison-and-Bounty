@@ -508,8 +508,11 @@ function Action_ReleasePrisoner(RPB_UIInterface uilib)
         if (prisonBySelectedPrisoner != none)
             ; No need to check for selectedPrisoner result because FindPrisonByPrisoner(Actor) already implies that the Actor must be a prisoner,
             ; if selectedPrisoner is none, there's something wrong in the assignment of prisoners
-            RPB_Prisoner selectedPrisoner = prisonBySelectedPrisoner.AwaitPrisonerReference(selectedActor)
-            selectedPrisoner.Release()
+            RPB_Prisoner selectedPrisoner = prisonBySelectedPrisoner.GetPrisoner(selectedActor)
+            prisonBySelectedPrisoner.SendReleaseRequest(selectedPrisoner)
+
+            ; DebugParams(selectedPrisoner + "," + selectedPrisoner2, "selectedPrisoner, selectedPrisoner2", "Actions::Action_ReleasePrisoner")
+            Debug("Actions::Action_ReleasePrisoner", "selectedPrisoner: " + selectedPrisoner + ", Actor: " + selectedPrisoner.GetActor())
             return
         endif
     endif
@@ -530,7 +533,7 @@ function Action_ReleasePrisoner(RPB_UIInterface uilib)
         return none
     endif
     
-    prisoner.Release()
+    prison.SendReleaseRequest(prisoner)
 endFunction
 
 function Action_TestReindexing(RPB_UIInterface uilib)
@@ -722,13 +725,13 @@ function Action_ImprisonSelectedActor(RPB_UIInterface uilib)
         selectedActor == Game.GetPlayer()
     endif
 
-    RPB_Prison prison       = uilib.ShowPrisonList(abNotEmpty = false, abShowCity = true, abShowHold = false, abShowPrisonerCount = false, asListTitle = "Send " + selectedActor.GetBaseObject().GetName() + " to Prison")
-    ; RPB_Prison prison = API.PrisonManager.GetNthAlias(8) as RPB_Prison
+    RPB_Prison prison = uilib.ShowPrisonList(abNotEmpty = false, abShowCity = true, abShowHold = false, abShowPrisonerCount = false, asListTitle = "Send " + selectedActor.GetBaseObject().GetName() + " to Prison")
+
     if (!prison)
         return
     endif
 
-    RPB_Prisoner prisoner   = prison.MakePrisoner(selectedActor)
+    RPB_Prisoner prisoner = prison.MakePrisoner(selectedActor)
 
     ; Debug("Actions::Action_ImprisonSelectedActor", "[Prison ID: "+ prison.ID +"] ["+ prison.UUID +"] Prison: " + prison.Name + ", prisoner: " + prisoner)
     ; Debug("Actions::Action_ImprisonSelectedActor", "[Prison ID: "+ prison.ID +"] ["+ prison.UUID +"] Prisoners: "+ prison.Prisoners.GetKeys())
@@ -749,12 +752,8 @@ function Action_ImprisonSelectedActor(RPB_UIInterface uilib)
     prisoner.UndetermineSentence()
     ; prisoner.SetSentence(10)
 
-
     prisoner.AssignCell()
     prisoner.MoveToCell()
-    
-    prisoner.Release()
-    return
 endFunction
 
 function Action_CheckPrisonersAI(RPB_UIInterface uilib)
