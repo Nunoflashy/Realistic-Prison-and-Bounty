@@ -30,6 +30,12 @@ bool property HasStateRequiredForImprisonment
     endFunction
 endProperty
 
+bool property ShouldProcessImprisonmentEvents
+    bool function get()
+        return self.IsImprisoned
+    endFunction
+endProperty
+
 ; ==========================================================
 ;                 Arrest / Imprisonment Time
 ; ==========================================================
@@ -1977,10 +1983,6 @@ RPB_Arrestee function MakeArrestee()
     return arresteeRef
 endFunction
 
-bool function ShouldProcessImprisonmentEvents()
-    return self.IsImprisoned
-endFunction
-
 ; ==========================================================
 ;                           Events
 ; ==========================================================
@@ -2242,7 +2244,7 @@ endEvent
     Handles what happens when this Prisoner receives additional active bounty.
 /;
 event OnBountyGained()
-    if (!self.ShouldProcessImprisonmentEvents())
+    if (!self.ShouldProcessImprisonmentEvents)
         return
     endif
 
@@ -2252,7 +2254,7 @@ event OnBountyGained()
 endEvent
 
 event OnSentenceSet(int aiSentence, float afAtWhatTime)
-    if (!self.ShouldProcessImprisonmentEvents())
+    if (!self.ShouldProcessImprisonmentEvents)
         return
     endif
 
@@ -2260,7 +2262,7 @@ event OnSentenceSet(int aiSentence, float afAtWhatTime)
 endEvent
 
 event OnSentenceChanged(int aiOldSentence, int aiNewSentence, bool abHasSentenceIncreased, bool abSentenceAffectsBounty)
-    if (!self.ShouldProcessImprisonmentEvents())
+    if (!self.ShouldProcessImprisonmentEvents)
         return
     endif
 
@@ -2273,7 +2275,7 @@ endEvent
 
 ; Triggered whenever a full day has passed
 event OnDayPassed()
-    if (!self.ShouldProcessImprisonmentEvents())
+    if (!self.ShouldProcessImprisonmentEvents)
         return
     endif
 
@@ -2291,7 +2293,7 @@ endEvent
 
 int __serveTimeLastDayRegistered
 event OnSleepStart(float afSleepStartTime, float afSleepEndTime)
-    if (!self.ShouldProcessImprisonmentEvents())
+    if (!self.ShouldProcessImprisonmentEvents)
         return
     endif
 
