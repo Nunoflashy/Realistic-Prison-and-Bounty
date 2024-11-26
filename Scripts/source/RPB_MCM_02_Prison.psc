@@ -211,6 +211,18 @@ function Render(RPB_MCM_02 mcm, RPB_Prisoner apPrisoner) global
         mcm.AddOptionText(string_if (!prisoner.IsUndeterminedSentence, "Time Served", "Time in Prison"), timeServedFormatted, defaultFlags = mcm.OPTION_DISABLED)
     endif
 
+    if (prisoner.HasCriminalPenalty)
+        mcm.AddEmptyOption()
+        mcm.AddEmptyOption()
+
+        string infamyKnownText = "Due to being a known criminal, " + prisoner.Name + "'s sentence has been extended"
+        string infamyRecognizedText = "Due to having been recognized, " + prisoner.Name + "'s sentence has been extended"
+        
+        mcm.AddOptionText("Prison Observations:", defaultFlags = mcm.OPTION_DISABLED)
+        mcm.AddOptionText(string_if (prisoner.IsInfamyKnown, infamyKnownText, infamyRecognizedText), defaultFlags = mcm.OPTION_DISABLED)
+        mcm.AddOptionText("by " + prison.GetCriminalPenaltySentenceFormatted(prisoner) + ".", defaultFlags = mcm.OPTION_DISABLED)
+    endif
+
     mcm.AddEmptyOption()
     ; emptySpacesRight += 1
 
