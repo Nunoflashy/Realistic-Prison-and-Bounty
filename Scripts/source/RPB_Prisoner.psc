@@ -1259,7 +1259,6 @@ state Imprisoned
 
         ; At this point, we can delete the prisoner's arrest state
         self.DestroyArrestState()
-        self.RemoveAll(TEMPORARY_DESTROY_ON_IMPRISONED) ; Destroy all Temporary vars on Imprisoned state
 
         self.RegisterLastUpdate()
         RegisterForUpdateGameTime(1.0)
@@ -2337,8 +2336,6 @@ endEvent
 ;                          Management
 ; ==========================================================
 
-string property TEMPORARY_DESTROY_ON_IMPRISONED = "Temporary::Imprisoned" autoreadonly
-
 function Destroy()
     self.RemoveAll()
     parent.Destroy()
@@ -2516,17 +2513,6 @@ function LockPrisonerSettings()
     SetBool("Outfit::Conditional",                           Prison.IsOutfitConditional)
     SetInt("Outfit::Minimum Bounty",                         Prison.OutfitMinimumBounty)
     SetInt("Outfit::Maximum Bounty",                         Prison.OutfitMaximumBounty)
-
-    ; Debug("["+ Name +"] Prisoner::LockPrisonerSettings", "\n" + \ 
-    ;     "\t Prison.OutfitName: " + Prison.OutfitName + "\n" + \
-    ;     "\t Prison.OutfitPartHead: " + Prison.OutfitPartHead + "\n" + \
-    ;     "\t Prison.OutfitPartBody: " + Prison.OutfitPartBody + "\n" + \
-    ;     "\t Prison.OutfitPartHands: " + Prison.OutfitPartHands + "\n" + \
-    ;     "\t Prison.OutfitPartFeet: " + Prison.OutfitPartFeet + "\n" \
-    ; )
-
-
-    ; ArrestVars.Serialize("Prisoner#" + self.GetIdentifier())
 endFunction
 
 ; ==========================================================
