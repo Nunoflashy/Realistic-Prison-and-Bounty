@@ -906,14 +906,64 @@ RPB_Actor function AwaitEntityReference(\
 ) global
     if (apEntityList as RPB_PrisonerList)
         EnsurePrisonerSpellAndBinding(akEntity, apEntity as RPB_Prison)
+        ; Debug("Utility::AwaitEntityReference", "("+ akEntity +") apEntityList: " + apEntityList)
+        ; Debug("Utility::AwaitEntityReference", "(RPB_PrisonerList) ("+ akEntity +") apEntityList Keys: " + apEntityList.GetKeys())
 
     elseif (apEntityList as RPB_ArresteeList)
         EnsureArresteeSpellAndBinding(akEntity, apEntity as RPB_Hold)
+        ; Debug("Utility::AwaitEntityReference", "(RPB_ArresteeList) ("+ akEntity +") apEntityList Keys: " + apEntityList.GetKeys())
 
      elseif (apEntityList as RPB_CaptorList)
          EnsureCaptorSpellAndBinding(akEntity)
     endif
 
+    ; Shared logic for awaiting reference
+    RPB_Actor entityRef = apEntityList.AtKeyEx(akEntity) as RPB_Actor
+    int tries = 0
+    float delay = afInitialTimeBetweenTries
+
+    ; Safeguard
+    while (!entityRef && tries < aiMaxTries)
+        entityRef = apEntityList.AtKeyEx(akEntity) as RPB_Actor
+        Utility.Wait(delay)
+        ; Debug("Utility::AwaitEntityReference", "("+ tries +") ("+ akEntity +") entityRef: " + entityRef)
+        tries += 1
+        delay *= 1.5
+        if (delay > afMaxTimeBetweenTries)
+            delay = afMaxTimeBetweenTries
+        endif
+    endWhile
+
+    if (!entityRef)
+        DebugError("Utility::AwaitEntityReference ["+ apEntityList.ListIdentifier() +"]", "The Actor " + akEntity + " is not in the provided list or there was a state mismatch!")
+        Error(akEntity.GetBaseObject().GetName() + " is not in the provided list or there was a state mismatch!")
+        return none
+    endif
+    ; Debug("Utility::AwaitEntityReference", "("+ akEntity +") Returned: " + entityRef)
+
+    return entityRef
+endFunction
+
+;/
+    Awaits a reference of RPB_Actor for the specified Actor.
+
+    Actor           @akEntity: The actor to retrieve the Prisoner reference from.
+    RPB_ActorList   @apEntityList: The entity list to get the reference from.
+    RPB_Entity      @apEntity: The entity to bind this Actor to.
+    int?            @aiMaxTries: How many attempts retrieving the reference, in case it fails initially.
+    float?          @afInitialTimeBetweenTries: The delay on each try
+    float?          @afMaxTimeBetweenTries: The max delay on each try that is possible (Exponential Backoff).
+
+    returns (RPB_Actor): The RPB_Actor reference for this Actor.
+/;
+RPB_Actor function AwaitExistingEntityReference(\
+    Actor akEntity, \
+    RPB_ActorList apEntityList, \
+    RPB_Entity apEntity = none, \
+    int aiMaxTries = 50, \
+    float afInitialTimeBetweenTries = 0.1, \
+    float afMaxTimeBetweenTries = 3.0 \
+) global
     ; Shared logic for awaiting reference
     RPB_Actor entityRef = apEntityList.AtKeyEx(akEntity) as RPB_Actor
     int tries = 0
@@ -931,7 +981,7 @@ RPB_Actor function AwaitEntityReference(\
     endWhile
 
     if (!entityRef)
-        DebugError("Utility::AwaitEntityReference ["+ apEntityList.ListIdentifier() +"]", "The Actor " + akEntity + " is not in the provided list or there was a state mismatch!")
+        DebugError("Utility::AwaitExistingEntityReference ["+ apEntityList.ListIdentifier() +"]", "The Actor " + akEntity + " is not in the provided list or there was a state mismatch!")
         Error(akEntity.GetBaseObject().GetName() + " is not in the provided list or there was a state mismatch!")
         return none
     endif
@@ -950,8 +1000,10 @@ function EnsureArresteeSpellAndBinding(Actor akArrestee, RPB_Hold apHold) global
         ; Cast the Arrestee spell (to bind the RPB_Arrestee instance script)
         akArrestee.AddSpell(RPB_ArresteeSpell(), false)
 
-        ; Bind this Hold to the Arrestee (to retrieve it from RPB_Arrestee)
-        RPB_StorageVars.SetStringOnForm("Hold UUID", akArrestee, apHold.UUID)
+        if (apHold)
+            ; Bind this Hold to the Arrestee (to retrieve it from RPB_Arrestee)
+            RPB_StorageVars.SetStringOnForm("Hold UUID", akArrestee, apHold.UUID, "Arrest")
+        endif
     endif
 endFunction
 
@@ -966,8 +1018,10 @@ function EnsurePrisonerSpellAndBinding(Actor akPrisoner, RPB_Prison apPrison) gl
         ; Cast the Prisoner spell (to bind the RPB_Prisoner instance script)
         akPrisoner.AddSpell(RPB_PrisonerSpell(), false)
 
-        ; Bind this Prison to the Prisoner (to retrieve it from RPB_Prisoner)
-        RPB_StorageVars.SetStringOnForm("Prison UUID", akPrisoner, apPrison.UUID, "Jail")
+        if (apPrison)
+            ; Bind this Prison to the Prisoner (to retrieve it from RPB_Prisoner)
+            RPB_StorageVars.SetStringOnForm("Prison UUID", akPrisoner, apPrison.UUID, "Jail")        
+        endif
     endif
 endFunction
 
