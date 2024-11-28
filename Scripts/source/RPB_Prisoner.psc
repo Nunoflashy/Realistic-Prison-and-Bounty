@@ -213,13 +213,13 @@ endProperty
 
 bool property ShouldBeFrisked
     bool function get()
-        return true
+        return self.ShouldFrisk()
     endFunction
 endProperty
 
 bool property ShouldBeStripped
     bool function get()
-        return Prison.ShouldStripPrisoner(self)
+        return self.ShouldStrip()
     endFunction
 endProperty
 
@@ -232,7 +232,7 @@ endProperty
 
 bool property ShouldBeClothed
     bool function get()
-        return Prison.ShouldClothePrisoner(self)
+        return self.ShouldClothe()
     endFunction
 endProperty
 
@@ -1001,6 +1001,11 @@ endFunction
 
 ;                      Frisking - Checkers
 ; ==========================================================
+
+bool function ShouldFrisk()
+    return true
+endFunction
+
 ;                      Frisking - Getters
 ; ==========================================================
 ;                      Frisking - Setters
@@ -1016,8 +1021,77 @@ endFunction
 
 ;               Stripping / Undressing - Checkers
 ; ==========================================================
+
+bool function ShouldStrip()
+    if (!self.GetBool("Allow Stripping"))
+        return false
+    endif
+
+    ; TODO: Need to do a silent strip in case the prisoner still has items (but no clothes on, this would be used as an exploit)
+    if (self.IsNaked())
+        return false
+    endif
+
+    string strippingHandler = self.GetString("Handle Stripping On")
+
+    if (strippingHandler == "Minimum Sentence")
+        int sentenceToStrip = self.GetInt("Sentence to Strip")
+        if (self.Sentence >= sentenceToStrip)
+            return true
+        endif
+
+    elseif (strippingHandler == "Minimum Bounty")
+        int minBountyToStrip        = self.GetInt("Bounty to Strip")
+        int minViolentBountyToStrip = self.GetInt("Violent Bounty to Strip")
+
+        if (self.Bounty >= minBountyToStrip || self.BountyViolent >= minViolentBountyToStrip)
+            return true
+        endif
+
+    elseif (strippingHandler == "Unconditionally")
+        return true
+    endif
+
+    return false
+endFunction
+
+bool function ShouldSilentlyStrip()
+    if (!self.GetBool("Allow Stripping"))
+        return false
+    endif
+
+    if (!self.IsNaked() && !self.IsInUnderwear())
+        return false
+    endif
+
+    string strippingHandler = self.GetString("Handle Stripping On")
+
+    if (strippingHandler == "Minimum Sentence")
+        int sentenceToStrip = self.GetInt("Sentence to Strip")
+        if (self.Sentence >= sentenceToStrip)
+            return true
+        endif
+
+    elseif (strippingHandler == "Minimum Bounty")
+        int minBountyToStrip        = self.GetInt("Bounty to Strip")
+        int minViolentBountyToStrip = self.GetInt("Violent Bounty to Strip")
+
+        if (self.Bounty >= minBountyToStrip || self.BountyViolent >= minViolentBountyToStrip)
+            return true
+        endif
+
+    elseif (strippingHandler == "Unconditionally")
+        return true
+    endif
+
+    return false
+endFunction
+
 ;               Stripping / Undressing - Getters
 ; ==========================================================
+
+
+
 ;               Stripping / Undressing - Setters
 ; ==========================================================
 
@@ -1153,6 +1227,38 @@ endFunction
 
 ;                      Clothing - Checkers
 ; ==========================================================
+
+bool function ShouldClothe()
+    if (!self.GetBool("Allow Clothing"))
+        return false
+    endif
+
+    ; If the prisoner is neither naked nor in underwear, do not clothe
+    if ((!self.IsNaked() && !self.IsInUnderwear()))
+        return false
+    endif
+    
+    string clothingHandler  = self.GetString("Handle Clothing On")
+
+    if (clothingHandler == "Maximum Sentence")
+        int maxSentence = self.GetInt("Maximum Sentence to Clothe")
+        if (self.Sentence > maxSentence)
+            return false
+        endif
+        
+    elseif (clothingHandler == "Maximum Bounty")
+        int maxBounty           = self.GetInt("Maximum Bounty to Clothe")
+        int maxViolentBounty    = self.GetInt("Maximum Violent Bounty to Clothe")
+        if (self.BountyViolent > maxViolentBounty || self.Bounty > maxBounty)
+            return false
+        endif
+
+    elseif (clothingHandler == "Unconditionally")
+        return true
+    endif
+
+    return true
+endFunction
 
 bool function Outfit_MeetsConditions()
     if (!self.Is("Outfit::Conditional"))
@@ -1560,13 +1666,6 @@ function FastForwardToRelease()
     GotoState("Awaiting")
 
     Prison.SendReleaseRequest(self)
-endFunction
-
-function TeleportToRelease()
-    if (TeleportReleaseLocation)
-        self.EnableAI(self.IsNPC())
-        self.MoveTo(TeleportReleaseLocation)
-    endif
 endFunction
 
 function DetermineReleaseTimeAdditionalHours()
@@ -2036,12 +2135,7 @@ endFunction
     Removes this Prisoner reference from the assigned jail cell.
 /;
 function RemoveFromCell()
-    if (!self.JailCell)
-        EventManager.SendWarning("The prisoner " + self.Name + " is not bound to any jail cell!", "["+ Name +"] Prisoner::RemoveFromCell")
-        return
-    endif
-    
-    JailCell.RemovePrisoner(self)
+    Prison.RemoveFromCell(self)
 endFunction
 
 ;/
@@ -2049,53 +2143,14 @@ endFunction
     while they are in prison.
 /;
 function SetBelongingsContainer()
-    if (self.PrisonerBelongingsContainer)
-        return
-    endif
-
-    SetForm("Prisoner Belongings Container", Prison.GetRandomPrisonerContainer("Belongings"))
-    Debug("Prison::SetBelongingsContainer", "Prisoner Belongings Container:  " + PrisonerBelongingsContainer)
+    Prison.AssignBelongingsContainer(self)
 endFunction
 
 ;/
     Assigns a jail cell to this prisoner
 /;
 bool function AssignCell()
-    if (self.JailCell)
-        Debug("["+ Name +"] Prisoner::AssignCell", "A prison cell has already been assigned to prisoner " + this + ": [" +"Cell: " + self.JailCell + ", Door: " + self.JailCell.CellDoor + "]")
-        return true
-    endif
-
-    ; Needs to be refactored, shouldn't be here
-    if (ShouldBeStripped)
-        ; Determine if prisoner will be stripped etc (Set options that a cell depend on)
-        self.WillBeStrippedNaked = true ; Makes the cell gender exclusive
-    endif
-
-    RPB_JailCell assignedCell = Prison.RequestCell(self)
-
-    if (assignedCell == none)
-        self.OnImprisonmentFail("Assign Cell")
-        return false
-    endif
-
-    Prison.BindCellToPrisoner(assignedCell, self) ; Actually bind this jail cell to the prisoner, it has been assigned.
-    return self.JailCell != none
-endFunction
-
-; Binds the NPC to their Cell, does not work on the Player.
-function BindToCell()
-    if (self.IsPlayer())
-        return
-    endif
-
-    if (self.HasCellPackage)
-        return
-    endif
-
-    self.BindAlias(CellPackage)
-    MiscUtil.PrintConsole("["+ Name +"] Bound to Package " + CellPackage.GetName())
-    Debug("[Prison: "+ self.Prison.Name +"] ["+ Name +"] Prisoner::BindToCell", "[Package: "+ CellPackage.GetName() +"] Bound " + Name + " to "+ self.GetPossessivePronoun() +" Cell.")
+    return Prison.AssignCell(self)
 endFunction
 
 function SetReleaseLocation(bool abIsTeleportLocation = true)
@@ -2557,6 +2612,20 @@ endFunction
 
 ; ==========================================================
 ;                          Management
+
+function NPC_BindToCell()
+    if (!self.IsNPC())
+        return
+    endif
+
+    if (self.HasCellPackage)
+        return
+    endif
+
+    self.BindAlias(CellPackage)
+    MiscUtil.PrintConsole("["+ Name +"] Bound to Package " + CellPackage.GetName())
+    Debug("[Prison: "+ self.Prison.Name +"] ["+ Name +"] Prisoner::NPC_BindToCell", "[Package: "+ CellPackage.GetName() +"] Bound " + Name + " to "+ self.GetPossessivePronoun() +" Cell.")
+endFunction
 
 ;/
     Handles actions when an NPC's imprisonment state is resumed (usually when the player is in the same location as the NPC).

@@ -989,7 +989,7 @@ bool function __performPrisonerSanityCheck(RPB_Prisoner apPrisoner)
 
         if (apPrisoner.ShouldBeInCell && !apPrisoner.IsInCell)
             apPrisoner.MoveTo(self)                                           ; Move the prisoner to this jail cell
-            apPrisoner.BindToCell()                                           ; Prisoner should already be bound to cell, but just in case they aren't
+            apPrisoner.NPC_BindToCell()                                       ; Prisoner should already be bound to cell, but just in case they aren't
             RegisterForSingleUpdate(__npcSanityCheckPostCheckUpdateTime)      ; Keep updating until the prisoner is in the cell
             isStateValid = false
         endif
