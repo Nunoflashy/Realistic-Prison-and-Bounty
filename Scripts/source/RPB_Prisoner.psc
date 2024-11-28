@@ -5,14 +5,19 @@ import RPB_Utility
 import Math
 
 ; ==========================================================
-;                      Script References
+;                          Constants
 ; ==========================================================
 
-RPB_SceneManager property SceneManager
-    RPB_SceneManager function get()
-        return API.SceneManager
-    endFunction
-endProperty
+int property SKILL_LOSS_HANDLING_ALL_SKILLS             = 0 autoreadonly
+int property SKILL_LOSS_HANDLING_ALL_STAT_SKILLS        = 1 autoreadonly
+int property SKILL_LOSS_HANDLING_ALL_PERK_SKILLS        = 2 autoreadonly
+int property SKILL_LOSS_HANDLING_RANDOM_STAT_SKILL      = 3 autoreadonly
+int property SKILL_LOSS_HANDLING_RANDOM_PERK_SKILL      = 4 autoreadonly
+int property SKILL_LOSS_HANDLING_RANDOM                 = 5 autoreadonly
+
+; ==========================================================
+;                      Script References
+; ==========================================================
 
 RPB_EventManager property EventManager
     RPB_EventManager function get()
@@ -35,6 +40,18 @@ bool property ShouldProcessImprisonmentEvents
         return self.IsImprisoned
     endFunction
 endProperty
+
+bool property IsEnabledForBackgroundUpdates
+    bool function get()
+        return GetBool("IsEnabledForBackgroundUpdates")
+    endFunction
+
+    function set(bool value)
+        SetBool("IsEnabledForBackgroundUpdates", value)
+    endFunction
+endProperty
+
+bool property IsQueuedForImprisonment auto
 
 ; ==========================================================
 ;                 Arrest / Imprisonment Time
@@ -542,6 +559,19 @@ bool property HasCellPackage
     endFunction
 endProperty
 
+bool property HasCriminalPenalty
+    bool function get()
+        return Was("Infamy Penalty Applied")
+    endFunction
+endProperty
+
+int __criminalPenaltySentence
+int property CriminalPenaltySentence
+    int function get()
+        return __criminalPenaltySentence
+    endFunction
+endProperty
+
 ; Whether this prisoner will be stripped naked (used for determing jail cell type before actually assigning a cell, or any other action in the future that makes use of such property.)
 bool property WillBeStrippedNaked auto
 
@@ -573,109 +603,369 @@ Armor[] property PrisonOutfit
     endFunction
 endProperty
 
+; ==========================================================
+;                            States
+; ==========================================================
 
-;/
-    Assigns a jail cell to this prisoner
-/;
-bool function AssignCell()
-    if (self.JailCell)
-        Debug("["+ Name +"] Prisoner::AssignCell", "A prison cell has already been assigned to prisoner " + this + ": [" +"Cell: " + self.JailCell + ", Door: " + self.JailCell.CellDoor + "]")
+state Processing
+endState
+
+state Awaiting
+    event OnUpdateGameTime()
+        EventManager.SendError("Updating in the Awaiting state, should not happen!", "{Awaiting} ["+ Name +"] Prisoner::OnUpdateGameTime")
+    endEvent
+endState
+
+; While this Prisoner is being escorted
+state Escorting
+endState
+
+state Releasing
+    event OnBeginState()
+    endEvent
+
+    event OnUpdateGameTime()
+    endEvent
+endState
+
+state Released
+    event OnBeginState()
+        Debug("{Released} ("+ Name +") Prisoner::OnBeginState", "this: " + this + ", HasCellPackage: " + self.HasCellPackage + ", Cell Package: " + self.CellPackage + ", Cell Package Actor Reference: " + CellPackage.GetActorReference())
+
+        if (self.IsNPC())
+            self.NPC_RestoreOriginalOutfit()
+        endif
+
+        if (self.IsNPC() && self.HasCellPackage)
+            self.UnbindAlias(self.CellPackage)
+        endif
+    endEvent
+
+    event OnUpdateGameTime()
+        EventManager.SendError("Updating in the Released state, should not happen!", "{Released} ["+ Name +"] Prisoner::OnUpdateGameTime")
+    endEvent
+endState
+
+float _previousUpdateTimeServed
+
+; While this Prisoner is imprisoned in their cell
+state Imprisoned
+    event OnBeginState()
+        Debug("[state: "+ self.GetState() +"] ["+ Name +"] Prisoner::OnBeginState", self.Name + "'s Bounty: " + Bounty)
+        ; if (!Prison.IsReceivingUpdates()) ; if we dont destroy the instance in time, this will get called from Prison after processing queued prisoners, and since we didnt register the prisoner, this is a bug since it will report 0 prisoners
+            Prison.RegisterForPrisonPeriodicUpdate(self)
+        ; endif
+
+        ; Captor should probably be destroyed in RPB_Captor, because more Prisoners/Arrestees may depend on it
+        ; we could check if that Captor has any prisoners left to escort, if not, destroy the reference.
+        ; Captor.Destroy()
+
+        ; At this point, we can delete the prisoner's arrest state
+        self.DestroyArrestState()
+
+        self.RegisterLastUpdate()
+        RegisterForUpdateGameTime(1.0)
+        SetBool("Imprisoned", true)
+    endEvent
+
+    event OnUpdateGameTime()
+        self.UpdateInfamy()
+        self.UpdateTimeJailed() ; Must be updated in some other way, otherwise it will reset to 0 on next imprisonment
+ 
+        if (self.IsSentenceServed)
+            Prison.SendReleaseRequest(self)
+            return
+        endif
+
+        Prison.DEBUG_ShowPrisonerSentenceInfo(self, true)
+        Debug("["+ Name +"] Prisoner::OnUpdateGameTime", "("+ self.GetActor() +") Cell Package: " + self.CellPackage)
+        Debug("["+ Name +"] Prisoner::OnUpdateGameTime", "Outfit: " + self.PrisonOutfit)
+        Debug("["+ Name +"] Prisoner::OnUpdateGameTime", "this: " + this)
+
+
+        ; Debug("["+ Name +"] Prisoner::OnUpdateGameTime", "currentTimeServedStored: " + currentTimeServedStored)
+
+        self.RegisterLastUpdate()
+        RegisterForSingleUpdateGameTime(1.0)
+        RegisterForSingleUpdate(10.0)
+        ; Debug("[state: Imprisoned] ["+ Name +"] Prisoner::OnUpdateGameTime", self.Name + "'s Bounty: " + Bounty)
+        ; self.DEBUG_ShowHoldStats()
+
+    endEvent
+endState
+
+; When or while this Prisoner is escaping or has escaped
+state Escape
+    event OnBountyGained()
+        Debug("[state: Escape] ["+ Name +"] Prisoner::OnBountyGained", "Currently escaping, not storing bounty!")
+    endEvent
+
+    function RestoreBounty()
+        parent.RestoreBountyForFaction(Prison.PrisonFaction) ; Restore the Bounty
+        
+        if (Should("Account for Time Served"))
+            ; Take away the bounty from the time already served
+            int timeServedAsBounty = DaysSinceTimeOfImprisonment * GetInt("Bounty to Sentence")
+            self.ModCrimeGold(-timeServedAsBounty)
+        endif
+    endFunction
+endState
+
+; When resting at a bed to serve the time
+state ServeOnRest
+    function UpdateTimeJailed()
+        int timeLeft = Math.Ceiling(TimeLeftInSentence)
+        self.ModifyStat("Time Jailed", timeLeft)
+        self.IncrementStat("Days Jailed", timeLeft)
+
+        if (self.IsPlayer())
+            Game.IncrementStat("Days Jailed", timeLeft)
+        endif
+
+        Debug("[state: ServeOnRest] ["+ Name +"] Prisoner::UpdateTimeJailed", "Updating " + self.Name + "'s time jailed: " + timeLeft + ", TimeLeftInSentence: " + TimeLeftInSentence)
+    endFunction
+
+    function UpdateInfamy()
+        if (!Prison.EnableInfamy)
+            return
+        endif
+
+        int timeLeft = Math.Ceiling(TimeLeftInSentence)
+        int infamyGained = (InfamyGainedDaily * timeLeft) as int
+
+        self.IncrementStat("Infamy Gained", infamyGained)
+
+        Config.NotifyInfamy(infamyGained + " infamy gained in " + Prison.Name, self.IsPlayer())
+        Config.NotifyInfamy(self.GetName() + " has gained " + infamyGained + " infamy in " + Prison.Name, !self.IsPlayer())
+    
+        if (IsInfamyKnown)
+            Prison.NotifyInfamyKnownThresholdMet(Prison.HasInfamyKnownNotificationFired)
+    
+        elseif (IsInfamyRecognized)
+            Prison.NotifyInfamyRecognizedThresholdMet(Prison.HasInfamyRecognizedNotificationFired)
+        endif
+
+        Debug("[state: ServeOnRest] ["+ Name +"] Prisoner::UpdateInfamy", "Updating " + self.Name + "'s infamy in jail: " + infamyGained)
+    endFunction
+endState
+
+; ==========================================================
+;                           Scenes
+; ==========================================================
+
+function StartRestraining(Actor akRestrainer)
+    Prison.StartRestrainingPrisoner(self, akRestrainer)
+endFunction
+
+function StartFrisking(Actor akSearcherGuard)
+    Prison.StartFriskingPrisoner(self, akSearcherGuard)
+endFunction
+
+function StartStripping(Actor akStripperGuard)
+    Prison.StartStrippingPrisoner(self, akStripperGuard)
+endFunction
+
+function StartGiveClothing(Actor akClothingGiver)
+    Prison.StartGivingPrisonerClothing(self, akClothingGiver)
+endFunction
+
+function EscortToJail(Actor akEscort)
+    Prison.EscortPrisonerToJail(self, akEscort)
+endFunction
+
+function EscortToCell(Actor akEscort)
+    Prison.EscortPrisonerToCell(self, akEscort)
+endFunction
+
+; ==========================================================
+
+
+; function DetermineReleaseTimeAdditionalHours()
+;     Debug("["+ Name +"] Prisoner::DetermineReleaseTimeAdditionalHours", "ReleaseTime: " + ReleaseTime)
+;     float currentGameHour = (Game.GetFormEx(0x38) as GlobalVariable).GetValue() ; 13.50 = 1:30 PM
+;     float oneGameHour = 0.04166666666666666666666666666667
+
+
+;     Debug("["+ Name +"] Prisoner::DetermineReleaseTimeAdditionalHours", "Prison.ReleaseTimeMinimumHour: " + Prison.ReleaseTimeMinimumHour + ", Prison.ReleaseTimeMaximumHour: " + Prison.ReleaseTimeMaximumHour)
+;     ; If the release time window has already passed
+;     if (currentGameHour > Prison.ReleaseTimeMaximumHour)
+;         __additionalReleaseHours += 1 + (Prison.ReleaseTimeMinimumHour * oneGameHour) ; Add a day and the desired hour for release (taken from Minimum Hour)
+;         Debug("["+ Name +"] Prisoner::DetermineReleaseTimeAdditionalHours", "(After Calculation) ReleaseTime: " + ReleaseTime)
+;     endif
+; endFunction
+
+; ==========================================================
+;                         Functions
+; ==========================================================
+
+;                Misc (TODO: Categorize these)
+; ==========================================================
+
+; Determines if at least a day has elapsed in prison
+bool function HasDayElapsed()
+    ; Add the time served from each update this runs
+    accumulatedTimeServed += TimeSinceLastUpdate
+
+    if (accumulatedTimeServed >= 1)
         return true
     endif
 
-    ; Needs to be refactored, shouldn't be here
-    if (ShouldBeStripped)
-        ; Determine if prisoner will be stripped etc (Set options that a cell depend on)
-        self.WillBeStrippedNaked = true ; Makes the cell gender exclusive
-    endif
-
-    RPB_JailCell assignedCell = Prison.RequestCell(self)
-
-    if (assignedCell == none)
-        self.OnImprisonmentFail("Assign Cell")
-        return false
-    endif
-
-    Prison.BindCellToPrisoner(assignedCell, self) ; Actually bind this jail cell to the prisoner, it has been assigned.
-    return self.JailCell != none
+    return false
 endFunction
 
-; Binds the NPC to their Cell, does not work on the Player.
-function BindToCell()
-    if (self.IsPlayer())
-        return
-    endif
-
-    if (self.HasCellPackage)
-        return
-    endif
-
-    self.BindAlias(CellPackage)
-    MiscUtil.PrintConsole("["+ Name +"] Bound to Package " + CellPackage.GetName())
-    Debug("[Prison: "+ self.Prison.Name +"] ["+ Name +"] Prisoner::BindToCell", "[Package: "+ CellPackage.GetName() +"] Bound " + Name + " to "+ self.GetPossessivePronoun() +" Cell.")
-endFunction
-
-function SetReleaseLocation(bool abIsTeleportLocation = true)
-    if (abIsTeleportLocation)
-        SetForm("Teleport Release Location", Prison.GetRandomReleaseMarker("Teleport"))
-    else
-        SetForm("Teleport Release Location", Prison.GetRandomReleaseMarker("Escort"))
-    endif
-endFunction
-
-;/
-    Sets the Prisoner's belongings container where their items will be stored
-    while they are in prison.
-/;
-function SetBelongingsContainer()
-    if (self.PrisonerBelongingsContainer)
-        return
-    endif
-
-    SetForm("Prisoner Belongings Container", Prison.GetRandomPrisonerContainer("Belongings"))
-    Debug("Prison::SetBelongingsContainer", "Prisoner Belongings Container:  " + PrisonerBelongingsContainer)
-endFunction
-
-
-;/
-    Removes this Prisoner reference from the assigned jail cell.
-/;
-function RemoveFromCell()
-    if (!self.JailCell)
-        EventManager.SendWarning("The prisoner " + self.Name + " is not bound to any jail cell!", "["+ Name +"] Prisoner::RemoveFromCell")
-        return
-    endif
+function SetEscaped()
+    SetBool("Escaped", true, "PrisonerEscape")
+    self.IncrementStat("Times Escaped")
     
-    JailCell.RemovePrisoner(self)
-endFunction
-
-function Restrain()
-    self.Cuff()
-endFunction
-
-function ReturnBelongings()
-    PrisonerBelongingsContainer.RemoveAllItems(this, false, true)
-endFunction
-
-function TeleportToRelease()
-    if (TeleportReleaseLocation)
-        self.EnableAI(self.IsNPC())
-        self.MoveTo(TeleportReleaseLocation)
+    if (self.IsPlayer())
+        Game.IncrementStat("Jail Escapes")
     endif
+
+    GotoState("Escape")
+    Prison.OnPrisonerEscaped(self)
+    self.Destroy()
 endFunction
 
-;/
-    Retrieves the Sentence for this Prisoner based on their current bounty at the time of the call.
-    The bounty that is taken into consideration is the latent bounty (Bounty upon being arrested).
+function SetEscapePenalty()
+    string handleEscapeOn = GetString("Handle Escape On")
 
-    The sentence formula is as follows: (Bounty + (BountyViolent * BountyExchange)) / BountyToSentence
-    Example: (2500 + (500 * 2)) / 170 = 20.5 <=> 21 Days Sentence
-/;
-int function GetSentenceFromBounty()
-    int nonViolent  = self.GetLatentBounty(abViolent = false)
-    int violent     = self.GetLatentBounty(abNonViolent = false)
+    int escapeBountyOfCurrentBounty     = (GetFloat("Escape Bounty of Current Bounty") * Bounty * 0.01) as int
+    int escapeBountyFlat                = GetInt("Escape Bounty")
+    int escapeBountySentenceMultiplier  = GetInt("Escape Bounty (Sentence)") * Sentence
+    int escapeBountyCondition           = GetInt("Escape Bounty (Bounty Condition)")
+    int escapeBountySentenceCondition   = GetInt("Escape Bounty (Sentence Condition)")
 
-    return (nonViolent + Round(violent * (100 / Prison.BountyExchange))) / Prison.BountyToSentence
+    ; Bounty penalty to apply
+    int bountyPenalty = 0
+
+    ; Whether the handling of the escape penalty is conditional
+    bool isConditional = false
+
+    if (handleEscapeOn == "Bounty")
+        bountyPenalty += escapeBountyFlat + escapeBountyOfCurrentBounty
+
+    elseif (handleEscapeOn == "Sentence")
+        bountyPenalty += floor(escapeBountySentenceMultiplier * GetInt("Bounty to Sentence"))
+
+    elseif (handleEscapeOn == "Bounty + Sentence")
+        bountyPenalty += escapeBountyFlat + escapeBountyOfCurrentBounty
+        bountyPenalty += floor(escapeBountySentenceMultiplier * GetInt("Bounty to Sentence"))
+
+    elseif (handleEscapeOn == "Bounty (Conditionally)")
+        bool meetsBountyCondition = Bounty >= escapeBountyCondition
+        isConditional = true
+
+        if (meetsBountyCondition)
+            bountyPenalty += escapeBountyFlat + escapeBountyOfCurrentBounty
+        endif
+
+    elseif (handleEscapeOn == "Sentence (Conditionally)")
+        bool meetsSentenceCondition = Sentence >= escapeBountySentenceCondition
+        isConditional = true
+
+        if (meetsSentenceCondition)
+            bountyPenalty += floor(escapeBountySentenceMultiplier * GetInt("Bounty to Sentence"))    
+        endif
+
+    elseif (handleEscapeOn == "Bounty || Sentence (Conditionally OR)" || handleEscapeOn == "Bounty && Sentence (Conditionally AND)")
+        bool meetsBountyCondition   = Bounty >= escapeBountyCondition
+        bool meetsSentenceCondition = Sentence >= escapeBountySentenceCondition
+        bool condition = bool_if (handleEscapeOn == "Bounty || Sentence (Conditionally OR)", meetsBountyCondition || meetsSentenceCondition, meetsBountyCondition && meetsSentenceCondition)
+        isConditional = true
+
+        if (condition)
+            bountyPenalty += escapeBountyFlat + escapeBountyOfCurrentBounty
+            bountyPenalty += floor(escapeBountySentenceMultiplier * GetInt("Bounty to Sentence"))    
+        endif
+    endif
+
+    ; Handle fallback if conditions fail
+    if (isConditional && !bountyPenalty && GetInt("Fallback Bounty") > 0)
+        bountyPenalty = GetInt("Fallback Bounty")
+    endif
+
+    self.ModCrimeGold(bountyPenalty)
+endFunction
+
+; Moves this prisoner to Prison (To be processed)
+function MoveToPrison(Actor akCaptor)
+    ObjectReference escortLocation = Prison.GetRandomEscortLocation()
+
+    ; Assign a container for this prisoner's belongings (if applicable)
+    self.SetBelongingsContainer()
+    self.MoveTo(escortLocation)
+
+     ; Later maybe the captor shouldn't go, and instead there should be guards waiting in the prison
+     ; They shouldn't go especially if they are not a guard (e.g: Bounty Hunter or other NPC)
+    akCaptor.MoveTo(escortLocation)
+
+    Prison.OnPrisonerTeleportedToPrison(self)
+
+    SetBool("Go to Cell", true)
+endFunction
+
+function MoveToCell(bool abBeginImprisonment = true)
+    if (self.IsImprisoned)
+        EventManager.SendError(self.GetName() + " is already imprisoned in "+ Prison.Name + "!", "["+ Name +"] Prisoner::MoveToCell")
+        return
+    endif
+
+    if (self.ShouldBeInCell && self.IsInCell)
+        EventManager.SendError(self.GetName() + " is already in "+ self.GetPossessivePronoun() +" cell: " + JailCell + "!", "["+ Name +"] Prisoner::MoveToCell")
+        return
+    endif
+
+    if (!self.JailCell)
+        EventManager.SendError("The prisoner " + Name + " has not been assigned a jail cell!", "["+ Name +"] Prisoner::MoveToCell")
+        Prison.OnPrisonerImprisonmentFail(self, "Assign Cell")
+        return
+    endif
+
+    self.MoveTo(JailCell)
+    Prison.OnPrisonerTeleportedToCell(self, abBeginImprisonment)
+endFunction
+
+function QueueForImprisonment()
+    Prison.QueuePrisonerForImprisonment(self)
+endFunction
+
+function TriggerInfamyPenalty()
+    if (!IsInfamyEnabled || CurrentInfamy <= 0 || Was("Infamy Penalty Applied") || (Bounty <= self.GetInt("Bounty to Trigger Infamy")))
+        return
+    endif
+
+    ;/ const /; int INFAMY_RECOGNIZED_THRESHOLD     = self.GetInt("Infamy Recognized Threshold")
+    ;/ const /; int INFAMY_KNOWN_THRESHOLD          = self.GetInt("Infamy Known Threshold")
+    ;/ const /; float INFAMY_RECOGNIZED_PENALTY     = self.GetFloat("Recognized Criminal Penalty")
+    ;/ const /; float INFAMY_KNOWN_PENALTY          = self.GetFloat("Known Criminal Penalty")
+
+    ;/ const /; int INFAMY_NEUTRAL      = 0
+    ;/ const /; int INFAMY_RECOGNIZED   = 1
+    ;/ const /; int INFAMY_KNOWN        = 2
+
+    int currentInfamyType
+    float penaltyAsBounty = 0
+
+    if (Bounty >= INFAMY_KNOWN_THRESHOLD)
+        penaltyAsBounty = CurrentInfamy * (INFAMY_KNOWN_PENALTY * 0.01)
+        currentInfamyType = INFAMY_KNOWN
+
+    elseif (Bounty >= INFAMY_RECOGNIZED_THRESHOLD)
+        penaltyAsBounty = CurrentInfamy * (INFAMY_RECOGNIZED_PENALTY * 0.01)
+        currentInfamyType = INFAMY_RECOGNIZED
+
+    else
+        currentInfamyType = INFAMY_NEUTRAL
+    endif
+
+    ; Infamy shouldn't touch the Bounty, add to the Sentence instead
+    int penaltyAsSentence = Round(penaltyAsBounty / Prison.BountyToSentence)
+    __criminalPenaltySentence = penaltyAsSentence
+
+    Debug("("+ Name +") Prisoner::TriggerInfamyPenalty", "currentInfamyType: " + currentInfamyType + ", penaltyAsBounty: " + penaltyAsBounty + ", penaltyAsSentence: " + penaltyAsSentence)
+
+    self.IncreaseSentence(penaltyAsSentence, abShouldAffectBounty = false)
+    self.SetBool("Infamy Penalty Applied", true)
 endFunction
 
 bool function IsRestrained()
@@ -702,55 +992,38 @@ function Uncuff()
     Debug("["+ Name +"] Prisoner::Uncuff", "Uncuffed " + this)
 endFunction
 
-;/
-    Main function that handles the imprisonment of this Prisoner.
-/;
-function Imprison()
-    if (!self.HasStateRequiredForImprisonment)
-        EventManager.SendError(Name + " does not have the required state for "+ self.GetPossessivePronoun() +" imprisonment, cannot continue!", "["+ Name +"] Prisoner::Imprison")
-        return
-    endif
-
-    if (self.IsImprisoned)
-        EventManager.SendError(self.GetName() + " is already imprisoned in "+ Prison.Name + "!", "["+ Name +"] Prisoner::Imprison")
-        return
-    endif
-
-    ; return
-
-    float startBench = StartBenchmark()
-    self.OnImprisoned()
-    GotoState("Imprisoned") ; State when the prisoner is in the cell, check for updates for sentence, etc...
-
-    string sentenceFormatted    = RPB_Utility.GetTimeFormatted(Sentence, abIncludeHours = false)
-    string releaseDateFormatted = Prison.GetTimeOfReleaseFormatted(self)
-
-    if (self.ShowSentence && !self.IsUndeterminedSentence)
-        Config.NotifyJail("Your sentence was set at "+ sentenceFormatted +" in " + Prison.Name, self.IsPlayer())
-        Config.NotifyJail(self.GetName() + " has been sentenced to "+ sentenceFormatted +" in " + Prison.Name, self.IsNPC())
-    endif
-    
-    if (self.ShowReleaseTime && !self.IsUndeterminedSentence)
-        Config.NotifyJail("Your release is due on " + releaseDateFormatted, self.IsPlayer())
-        Config.NotifyJail(self.GetName() + "'s release is due on " + releaseDateFormatted, !self.IsPlayer())
-    endif
-
-    EndBenchmark(startBench, "Ended ["+ Name +"] Prisoner::Imprison")
+function Restrain()
+    self.Cuff()
 endFunction
 
-; ==========================================================
-;                       Body Searching
+;                  Body Searching & Clothing
 ; ==========================================================
 
+;                      Frisking - Checkers
 ; ==========================================================
-;                    Frisking / Pat Down
+;                      Frisking - Getters
+; ==========================================================
+;                      Frisking - Setters
+; ==========================================================
+;                  Frisking - Configurators
+; ==========================================================
+;                      Frisking - Mutators
+; ==========================================================
 
 function Frisk()
 
 endFunction
 
+;               Stripping / Undressing - Checkers
 ; ==========================================================
-;                    Clothing / Undressing
+;               Stripping / Undressing - Getters
+; ==========================================================
+;               Stripping / Undressing - Setters
+; ==========================================================
+
+
+;           Stripping / Undressing - Configurators
+; ==========================================================
 
 ;/
     Determines whether this Prisoner will be stripped naked or to underwear
@@ -781,134 +1054,8 @@ function DetermineStrippingType()
     )
 endFunction
 
-function DetermineClothingOutfit()
-    bool prisonerMeetsOutfitCondition   = Outfit_MeetsConditions()
-    Armor[] configuredOutfit            = self.GetConfiguredOutfit()
-
-    ;/ const /; int OUTFIT_NONE         = 0
-    ;/ const /; int OUTFIT_CONFIGURED   = 1
-    ;/ const /; int OUTFIT_FALLBACK     = 2
-
-    int outfitType = OUTFIT_NONE
-
-    if (configuredOutfit && prisonerMeetsOutfitCondition)
-        __prisonOutfit = configuredOutfit
-        outfitType = OUTFIT_CONFIGURED
-
-    elseif (UseDefaultOutfitAsFallback)
-        __prisonOutfit = Prison.GetDefaultOutfit()
-        outfitType = OUTFIT_FALLBACK
-    endif
-
-    Debug( \ 
-        "("+ Name +") Prisoner::DetermineClothingOutfit", \ 
-        "\n\tprisonerMeetsOutfitCondition: "+ prisonerMeetsOutfitCondition +" \n\tconfiguredOutfit: "+ configuredOutfit +" \n\toutfitType: "+ outfitType +" \n\tUseDefaultOutfitAsFallback: "+ UseDefaultOutfitAsFallback +" \n\tSentence: "+ Sentence + "\n" \
-    )
- 
-    EventManager.SendInfo("Determined Configured Outfit: " + self.PrisonOutfit, "("+ Name +") Prisoner::DetermineClothingOutfit",  outfitType == OUTFIT_CONFIGURED)
-    EventManager.SendInfo("Determined Fallback Outfit: " + self.PrisonOutfit, "("+ Name +") Prisoner::DetermineClothingOutfit",    outfitType == OUTFIT_FALLBACK)
-    EventManager.SendInfo("No outfit is currently configured, and no fallback option!", "("+ Name +") Prisoner::DetermineClothingOutfit", outfitType == OUTFIT_NONE)
-endFunction
-
-bool function Outfit_MeetsConditions()
-    if (!self.Is("Outfit::Conditional"))
-        return true
-    endif
-
-    int outfitMinimumBounty = self.GetInt("Outfit::Minimum Bounty")
-    int outfitMaximumBounty = self.GetInt("Outfit::Maximum Bounty")
-
-    bool hasStrictlyMinimumBounty = (outfitMinimumBounty == outfitMaximumBounty)
-
-    return  (hasStrictlyMinimumBounty   && Bounty >= outfitMinimumBounty) || \
-            (!hasStrictlyMinimumBounty  && Bounty >= outfitMinimumBounty && Bounty <= outfitMaximumBounty)
-endFunction
-
-Armor[] function GetConfiguredOutfit()
-    Armor[] outfitPieces = new Armor[4]
-
-    outfitPieces[0] = self.GetForm("Outfit::Head") as Armor
-    outfitPieces[1] = self.GetForm("Outfit::Body") as Armor
-    outfitPieces[2] = self.GetForm("Outfit::Hands") as Armor
-    outfitPieces[3] = self.GetForm("Outfit::Feet") as Armor
-
-    if (!Outfit_IsValid(akOutfit = outfitPieces))
-        return none
-    endif
-
-    return outfitPieces
-endFunction
-
-Armor[] function GetOutfit()
-    Armor[] outfitPieces = new Armor[4]
-
-    outfitPieces[0] = self.GetForm("Outfit::Head") as Armor
-    outfitPieces[1] = self.GetForm("Outfit::Body") as Armor
-    outfitPieces[2] = self.GetForm("Outfit::Hands") as Armor
-    outfitPieces[3] = self.GetForm("Outfit::Feet") as Armor
-
-    ; Debug("["+ Name +"] Prisoner::GetOutfit", "Configured Outfit: " + outfitPieces)
-
-    return outfitPieces
-endFunction
-
-bool function Outfit_IsValid(int aiPieceCountToCheck = 4, Armor[] akOutfit = none)
-    Armor[] outfitToVerify
-
-    if (akOutfit != none)
-        outfitToVerify = akOutfit
-    else
-        outfitToVerify = self.GetOutfit()
-    endif
-
-    int piecesVerified = 0
-    int i = 0
-    while (i < min(outfitToVerify.Length, aiPieceCountToCheck))
-        if (outfitToVerify[i])
-            piecesVerified += 1
-        endif
-        i += 1
-    endWhile
-
-    return piecesVerified >= 1
-endFunction
-
-function Clothe()
-    if (!self.PrisonOutfit)
-        EventManager.SendWarning("Tried to clothe prisoner " + Name + ", but there's no outfit configured!", "("+ Name +") Prisoner::Clothe")
-        return
-    endif
-
-    EquipOutfit(self.PrisonOutfit)
-    Debug("["+ Name +"] Prisoner::Clothe", "Applied Outfit: " + self.PrisonOutfit)
-
-    self.OnClothed()
-endFunction
-
-; function Clothe()
-;     bool clothed = false
-
-;     Armor[] outfitToWear
-
-;     if (Outfit_IsValid() && Outfit_MeetsConditions())
-;         outfitToWear = self.GetOutfit()
-;         Debug("["+ Name +"] Prisoner::Clothe", "(Configured Outfit) Outfit to Wear: " + outfitToWear)
-;         EquipOutfit(outfitToWear)
-;         clothed = true
-
-;     elseif (self.UseDefaultOutfitAsFallback)
-;         outfitToWear = Prison.GetDefaultOutfit()
-;         Debug("["+ Name +"] Prisoner::Clothe", "(Default Outfit) Outfit to Wear: " + outfitToWear)
-;         EquipOutfit(outfitToWear)
-;         clothed = true
-;     endif
-
-;     Debug("["+ Name +"] Prisoner::Clothe", "self.UseDefaultOutfitAsFallback: " + self.UseDefaultOutfitAsFallback + ", self.Outfit_MeetsConditions()): " + self.Outfit_MeetsConditions())
-
-;     if (clothed)
-;         self.OnClothed()
-;     endif
-; endFunction
+;                      Stripping - Mutators
+; ==========================================================
 
 function Strip(bool abRemoveUnderwear = true)
     if (!self.PrisonerBelongingsContainer)
@@ -973,6 +1120,11 @@ function Strip(bool abRemoveUnderwear = true)
 endFunction
 
 function RemoveUnderwear()
+    if (!self.PrisonerBelongingsContainer)
+        EventManager.SendError("The prisoner hasn't had a belongings container assigned to them, cannot remove underwear!", "["+ Name +"] Prisoner::RemoveUnderwear")
+        return
+    endif
+
     Armor underwearTop      = self.GetUnderwear("Top")
     Armor underwearBottom   = self.GetUnderwear("Bottom")
 
@@ -998,40 +1150,207 @@ function UndressLowerBody()
     self.UnequipItemSlot(49)
     self.UnequipItemSlot(52)
 endFunction
-; ==========================================================
-;                           Scenes
-; ==========================================================
 
-function StartRestraining(Actor akRestrainer)
-    Prison.StartRestrainingPrisoner(self, akRestrainer)
-endFunction
-
-function StartFrisking(Actor akSearcherGuard)
-    Prison.StartFriskingPrisoner(self, akSearcherGuard)
-endFunction
-
-function StartStripping(Actor akStripperGuard)
-    Prison.StartStrippingPrisoner(self, akStripperGuard)
-endFunction
-
-function StartGiveClothing(Actor akClothingGiver)
-    Prison.StartGivingPrisonerClothing(self, akClothingGiver)
-endFunction
-
-function EscortToJail(Actor akEscort)
-    Prison.EscortPrisonerToJail(self, akEscort)
-endFunction
-
-function EscortToCell(Actor akEscort)
-    Prison.EscortPrisonerToCell(self, akEscort)
-endFunction
-
+;                      Clothing - Checkers
 ; ==========================================================
 
-; ==========================================================
-;                          Sentence
+bool function Outfit_MeetsConditions()
+    if (!self.Is("Outfit::Conditional"))
+        return true
+    endif
+
+    int outfitMinimumBounty = self.GetInt("Outfit::Minimum Bounty")
+    int outfitMaximumBounty = self.GetInt("Outfit::Maximum Bounty")
+
+    bool hasStrictlyMinimumBounty = (outfitMinimumBounty == outfitMaximumBounty)
+
+    return  (hasStrictlyMinimumBounty   && Bounty >= outfitMinimumBounty) || \
+            (!hasStrictlyMinimumBounty  && Bounty >= outfitMinimumBounty && Bounty <= outfitMaximumBounty)
+endFunction
+
+bool function Outfit_IsValid(int aiPieceCountToCheck = 4, Armor[] akOutfit = none)
+    Armor[] outfitToVerify
+
+    if (akOutfit != none)
+        outfitToVerify = akOutfit
+    else
+        outfitToVerify = self.GetOutfit()
+    endif
+
+    int piecesVerified = 0
+    int i = 0
+    while (i < min(outfitToVerify.Length, aiPieceCountToCheck))
+        if (outfitToVerify[i])
+            piecesVerified += 1
+        endif
+        i += 1
+    endWhile
+
+    return piecesVerified >= 1
+endFunction
+
+
+;                      Clothing - Getters
 ; ==========================================================
 
+Armor[] function GetConfiguredOutfit()
+    Armor[] outfitPieces = new Armor[4]
+
+    outfitPieces[0] = self.GetForm("Outfit::Head") as Armor
+    outfitPieces[1] = self.GetForm("Outfit::Body") as Armor
+    outfitPieces[2] = self.GetForm("Outfit::Hands") as Armor
+    outfitPieces[3] = self.GetForm("Outfit::Feet") as Armor
+
+    if (!Outfit_IsValid(akOutfit = outfitPieces))
+        return none
+    endif
+
+    return outfitPieces
+endFunction
+
+Armor[] function GetOutfit()
+    Armor[] outfitPieces = new Armor[4]
+
+    outfitPieces[0] = self.GetForm("Outfit::Head") as Armor
+    outfitPieces[1] = self.GetForm("Outfit::Body") as Armor
+    outfitPieces[2] = self.GetForm("Outfit::Hands") as Armor
+    outfitPieces[3] = self.GetForm("Outfit::Feet") as Armor
+
+    ; Debug("["+ Name +"] Prisoner::GetOutfit", "Configured Outfit: " + outfitPieces)
+
+    return outfitPieces
+endFunction
+
+;                      Clothing - Setters
+; ==========================================================
+
+
+
+;                      Clothing - Mutators
+; ==========================================================
+
+function DetermineClothingOutfit()
+    bool prisonerMeetsOutfitCondition   = Outfit_MeetsConditions()
+    Armor[] configuredOutfit            = self.GetConfiguredOutfit()
+
+    ;/ const /; int OUTFIT_NONE         = 0
+    ;/ const /; int OUTFIT_CONFIGURED   = 1
+    ;/ const /; int OUTFIT_FALLBACK     = 2
+
+    int outfitType = OUTFIT_NONE
+
+    if (configuredOutfit && prisonerMeetsOutfitCondition)
+        __prisonOutfit = configuredOutfit
+        outfitType = OUTFIT_CONFIGURED
+
+    elseif (UseDefaultOutfitAsFallback)
+        __prisonOutfit = Prison.GetDefaultOutfit()
+        outfitType = OUTFIT_FALLBACK
+    endif
+
+    Debug( \ 
+        "("+ Name +") Prisoner::DetermineClothingOutfit", \ 
+        "\n\tprisonerMeetsOutfitCondition: "+ prisonerMeetsOutfitCondition +" \n\tconfiguredOutfit: "+ configuredOutfit +" \n\toutfitType: "+ outfitType +" \n\tUseDefaultOutfitAsFallback: "+ UseDefaultOutfitAsFallback +" \n\tSentence: "+ Sentence + "\n" \
+    )
+ 
+    EventManager.SendInfo("Determined Configured Outfit: " + self.PrisonOutfit, "("+ Name +") Prisoner::DetermineClothingOutfit",  outfitType == OUTFIT_CONFIGURED)
+    EventManager.SendInfo("Determined Fallback Outfit: " + self.PrisonOutfit, "("+ Name +") Prisoner::DetermineClothingOutfit",    outfitType == OUTFIT_FALLBACK)
+    EventManager.SendInfo("No outfit is currently configured, and no fallback option!", "("+ Name +") Prisoner::DetermineClothingOutfit", outfitType == OUTFIT_NONE)
+endFunction
+
+function Clothe()
+    if (!self.PrisonOutfit)
+        EventManager.SendWarning("Tried to clothe prisoner " + Name + ", but there's no outfit configured!", "("+ Name +") Prisoner::Clothe")
+        return
+    endif
+
+    EquipOutfit(self.PrisonOutfit)
+    Debug("["+ Name +"] Prisoner::Clothe", "Applied Outfit: " + self.PrisonOutfit)
+
+    self.OnClothed()
+endFunction
+
+;                      Sentence - Checkers
+; ==========================================================
+
+;                      Sentence - Getters
+; ==========================================================
+
+int function GetTimeServed(string timeUnit)
+    int _timeServedDays = floor(TimeServed)
+
+    if (timeUnit == "Days")
+        return _timeServedDays
+    endif
+
+    float timeLeftOverOfDay     = (TimeServed - _timeServedDays) * 24 ; Hours and Minutes
+    int _timeServedHoursOfDay   = floor(timeLeftOverOfDay)
+
+    if (timeUnit == "Hours of Day")
+        return _timeServedHoursOfDay
+    endif
+
+    float timeLeftOverOfHour        = (timeLeftOverOfDay - floor(timeLeftOverOfDay)) * 60 ; Minutes
+    int _timeServedMinutesOfHour    = floor(timeLeftOverOfHour)
+
+    if (timeUnit == "Minutes of Hour")
+        return _timeServedMinutesOfHour
+    endif
+
+    float timeLeftOverOfMinute      = (timeLeftOverOfHour - floor(timeLeftOverOfHour)) * 60 ; Seconds
+    int _timeServedSecondsOfMinute  = floor(timeLeftOverOfMinute)
+
+    if (timeUnit == "Seconds of Minute")
+        return _timeServedSecondsOfMinute
+    endif
+endFunction
+
+int function GetTimeLeftInSentence(string timeUnit)
+    int _timeLeftDays = floor(TimeLeftInSentence)
+
+    if (timeUnit == "Days")
+        return _timeLeftDays
+    endif
+
+    float _timeLeftOverOfDay    = (TimeLeftInSentence - _timeLeftDays) * 24 ; Hours and Minutes
+    int _timeLeftHoursOfDay     = floor(_timeLeftOverOfDay)
+
+    if (timeUnit == "Hours of Day")
+        return _timeLeftHoursOfDay
+    endif
+
+    float _timeLeftOverOfHour   = (_timeLeftOverOfDay - floor(_timeLeftOverOfDay)) * 60 ; Minutes
+    int _timeLeftMinutesOfHour  = floor(_timeLeftOverOfHour)
+
+    if (timeUnit == "Minutes of Hour")
+        return _timeLeftMinutesOfHour
+    endif
+
+    float _timeLeftOverOfMinute   =  (_timeLeftOverOfHour - floor(_timeLeftOverOfHour)) * 60 ; Seconds
+    int _timeLeftSecondsOfMinute  =  floor(_timeLeftOverOfMinute)
+
+    if (timeUnit == "Seconds of Minute")
+        return _timeLeftSecondsOfMinute
+    endif
+endFunction
+
+;/
+    Retrieves the Sentence for this Prisoner based on their current bounty at the time of the call.
+    The bounty that is taken into consideration is the latent bounty (Bounty upon being arrested).
+
+    The sentence formula is as follows: (Bounty + (BountyViolent * BountyExchange)) / BountyToSentence
+    Example: (2500 + (500 * 2)) / 170 = 20.5 <=> 21 Days Sentence
+/;
+int function GetSentenceFromBounty()
+    int nonViolent  = self.GetLatentBounty(abViolent = false)
+    int violent     = self.GetLatentBounty(abNonViolent = false)
+
+    return (nonViolent + Round(violent * (100 / Prison.BountyExchange))) / Prison.BountyToSentence
+endFunction
+
+
+;                      Sentence - Mutators
+; ==========================================================
 
 function RegisterTimeOfImprisonment()
     SetFloat("Time of Imprisonment", CurrentTime)
@@ -1040,17 +1359,6 @@ function RegisterTimeOfImprisonment()
     SetInt("Day of Imprisonment", RPB_Utility.GetCurrentDay())
     SetInt("Month of Imprisonment", RPB_Utility.GetCurrentMonth())
     SetInt("Year of Imprisonment", RPB_Utility.GetCurrentYear())
-endFunction
-
-int function GetReleaseTimeHour()
-    int releaseTimeHour = (ReleaseTime - math.floor(ReleaseTime)) as int
-
-    ; Get the release hour and minutes
-    float releaseHourAndMinutes = releaseTimeHour / 0.0416
-
-    int releaseMinutes = Round((releaseHourAndMinutes - math.floor(releaseHourAndMinutes)) * 60)
-
-    return releaseMinutes
 endFunction
 
 function UndetermineSentence()
@@ -1154,220 +1462,268 @@ function DecreaseSentence(int aiDaysToDecreaseBy, bool abShouldAffectBounty = tr
     self.OnSentenceChanged(previousSentence, newSentence, newSentence > previousSentence, abShouldAffectBounty)
 endFunction
 
+;                      Release - Checkers
+; ==========================================================
 
-int function GetTimeServed(string timeUnit)
-    int _timeServedDays = floor(TimeServed)
+bool function IsReleaseOnWeekend()
+    int releaseDate     = RPB_Utility.GetDateFromDaysPassed(DayOfImprisonment, MonthOfImprisonment, YearOfImprisonment, Sentence)
+    int releaseDay      = RPB_Utility.GetStructMemberInt(releaseDate, "day")
+    int releaseMonth    = RPB_Utility.GetStructMemberInt(releaseDate, "month")
+    int releaseYear     = RPB_Utility.GetStructMemberInt(releaseDate, "year")
 
-    if (timeUnit == "Days")
-        return _timeServedDays
+    int dayOfWeek = RPB_Utility.CalculateDayOfWeek(releaseDay, releaseMonth, releaseYear)
+    Debug("["+ Name +"] Prisoner::IsReleaseOnWeekend", "releaseDate: " + releaseDay + "/" + releaseMonth + "/" + releaseYear + ", IsWeekend: " + RPB_Utility.IsWeekend(releaseDay, releaseMonth, releaseYear) + ", Day of Week: " + RPB_Utility.GetDayOfWeekName(dayOfWeek))
+    return RPB_Utility.IsWeekend(releaseDay, releaseMonth, releaseYear)
+endFunction
+
+bool function IsReleaseOnLoredas()
+    int releaseDate     = RPB_Utility.GetDateFromDaysPassed(DayOfImprisonment, MonthOfImprisonment, YearOfImprisonment, Sentence)
+    int releaseDay      = RPB_Utility.GetStructMemberInt(releaseDate, "day")
+    int releaseMonth    = RPB_Utility.GetStructMemberInt(releaseDate, "month")
+    int releaseYear     = RPB_Utility.GetStructMemberInt(releaseDate, "year")
+
+    return RPB_Utility.IsLoredas(releaseDay, releaseMonth, releaseYear)
+endFunction
+
+bool function IsReleaseOnSundas()
+    int releaseDate     = RPB_Utility.GetDateFromDaysPassed(DayOfImprisonment, MonthOfImprisonment, YearOfImprisonment, Sentence)
+    int releaseDay      = RPB_Utility.GetStructMemberInt(releaseDate, "day")
+    int releaseMonth    = RPB_Utility.GetStructMemberInt(releaseDate, "month")
+    int releaseYear     = RPB_Utility.GetStructMemberInt(releaseDate, "year")
+
+    return RPB_Utility.IsSundas(releaseDay, releaseMonth, releaseYear)
+endFunction
+
+bool __hasExtraReleaseTimeHours
+bool function HasReleaseTimeExtraHours()
+    return __hasExtraReleaseTimeHours
+endFunction
+
+;                      Release - Getters
+; ==========================================================
+
+float function GetReleaseTime(bool abIncludeMinutes = true)
+    float oneGameHour = 0.04166666666666666666666666666667
+
+    if (abIncludeMinutes)
+        return TimeOfImprisonment + (oneGameHour * 24 * Sentence)
     endif
 
-    float timeLeftOverOfDay     = (TimeServed - _timeServedDays) * 24 ; Hours and Minutes
-    int _timeServedHoursOfDay   = floor(timeLeftOverOfDay)
+    return floor(TimeOfImprisonment) + (oneGameHour * 24 * Sentence)
+endFunction
 
-    if (timeUnit == "Hours of Day")
-        return _timeServedHoursOfDay
+int function GetReleaseTimeHour()
+    int releaseTimeHour = (ReleaseTime - math.floor(ReleaseTime)) as int
+
+    ; Get the release hour and minutes
+    float releaseHourAndMinutes = releaseTimeHour / 0.0416
+
+    int releaseMinutes = Round((releaseHourAndMinutes - math.floor(releaseHourAndMinutes)) * 60)
+
+    return releaseMinutes
+endFunction
+
+float function GetIndefiniteReleaseTime()
+    return self.GetReleaseTime() + RPB_Utility.GetDaysPassed() + 1
+endFunction
+
+float function GetReleaseTimeExtraHours()
+    float gameHour = 0.04166666666666666666666666666667
+    return 1 + (Prison.ReleaseTimeMinimumHour * gameHour) ; Add 1 day and round to the time configured by Prison.ReleaseTimeMinimumHour
+endFunction
+
+;                      Release - Mutators
+; ==========================================================
+
+function FastForwardToRelease()
+    GotoState("ServeOnRest")
+    self.UnregisterForUpdates()
+
+    ; If the Release must fall in between Minimum and Maximum release hours, set the hour to the minimum before passing the days.
+    if (self.HasReleaseTimeExtraHours())
+        RPB_Utility.SetGameHour(Prison.ReleaseTimeMinimumHour)
+        Debug("["+ Name +"] Prisoner::FastForwardToRelease", "Setting Game Hour to Release Time Minimum Hour: " + RPB_Utility.GetTimeAs12Hour(Prison.ReleaseTimeMinimumHour))
     endif
 
-    float timeLeftOverOfHour        = (timeLeftOverOfDay - floor(timeLeftOverOfDay)) * 60 ; Minutes
-    int _timeServedMinutesOfHour    = floor(timeLeftOverOfHour)
+    self.UpdateTimeJailed()
+    self.UpdateInfamy()
 
-    if (timeUnit == "Minutes of Hour")
-        return _timeServedMinutesOfHour
-    endif
+    ; Pass the time
+    int timeLeft = Math.Ceiling(TimeLeftInSentence)
+    RPB_Utility.PassTimeInDays(timeLeft)
 
-    float timeLeftOverOfMinute      = (timeLeftOverOfHour - floor(timeLeftOverOfHour)) * 60 ; Seconds
-    int _timeServedSecondsOfMinute  = floor(timeLeftOverOfMinute)
+    ; float currentTimeBeforeChanges = CurrentTime
+    ; __currentTimeOverride = CurrentTime + timeLeft
 
-    if (timeUnit == "Seconds of Minute")
-        return _timeServedSecondsOfMinute
+    ; Debug("["+ Name +"] Prisoner::FastForwardToRelease", "CurrentTime: " + currentTimeBeforeChanges + ", timeLeft: " + timeLeft + ", currentTimeOverride: " + __currentTimeOverride + ", TimeLeftInSentence: " + TimeLeftInSentence)
+
+    GotoState("Awaiting")
+
+    Prison.SendReleaseRequest(self)
+endFunction
+
+function TeleportToRelease()
+    if (TeleportReleaseLocation)
+        self.EnableAI(self.IsNPC())
+        self.MoveTo(TeleportReleaseLocation)
     endif
 endFunction
 
-int function GetTimeLeftInSentence(string timeUnit)
-    int _timeLeftDays = floor(TimeLeftInSentence)
+function DetermineReleaseTimeAdditionalHours()
+    Debug("["+ Name +"] Prisoner::DetermineReleaseTimeAdditionalHours", "ReleaseTime: " + ReleaseTime)
+    ; float currentGameHour = (Game.GetFormEx(0x38) as GlobalVariable).GetValue() ; 13.50 = 1:30 PM
+    float currentGameHour = RPB_Utility.GetCurrentHourFloat() ; 13.50 = 1:30 PM
 
-    if (timeUnit == "Days")
-        return _timeLeftDays
-    endif
-
-    float _timeLeftOverOfDay    = (TimeLeftInSentence - _timeLeftDays) * 24 ; Hours and Minutes
-    int _timeLeftHoursOfDay     = floor(_timeLeftOverOfDay)
-
-    if (timeUnit == "Hours of Day")
-        return _timeLeftHoursOfDay
-    endif
-
-    float _timeLeftOverOfHour   = (_timeLeftOverOfDay - floor(_timeLeftOverOfDay)) * 60 ; Minutes
-    int _timeLeftMinutesOfHour  = floor(_timeLeftOverOfHour)
-
-    if (timeUnit == "Minutes of Hour")
-        return _timeLeftMinutesOfHour
-    endif
-
-    float _timeLeftOverOfMinute   =  (_timeLeftOverOfHour - floor(_timeLeftOverOfHour)) * 60 ; Seconds
-    int _timeLeftSecondsOfMinute  =  floor(_timeLeftOverOfMinute)
-
-    if (timeUnit == "Seconds of Minute")
-        return _timeLeftSecondsOfMinute
+    Debug("["+ Name +"] Prisoner::DetermineReleaseTimeAdditionalHours", "Prison.ReleaseTimeMinimumHour: " + Prison.ReleaseTimeMinimumHour + ", Prison.ReleaseTimeMaximumHour: " + Prison.ReleaseTimeMaximumHour)
+    ; If the release time window has already passed
+    if (currentGameHour > Prison.ReleaseTimeMaximumHour)
+        __hasExtraReleaseTimeHours = true
     endif
 endFunction
 
+function ReturnBelongings()
+    PrisonerBelongingsContainer.RemoveAllItems(this, false, true)
+endFunction
+
+;                        Imprisonment
 ; ==========================================================
-;                            States
-; ==========================================================
 
-state Processing
-endState
+;/
+    Main function that handles the imprisonment of this Prisoner.
+/;
+function Imprison()
+    if (!self.HasStateRequiredForImprisonment)
+        EventManager.SendError(Name + " does not have the required state for "+ self.GetPossessivePronoun() +" imprisonment, cannot continue!", "["+ Name +"] Prisoner::Imprison")
+        return
+    endif
 
-; While this Prisoner is being escorted
-state Escorting
-endState
+    if (self.IsImprisoned)
+        EventManager.SendError(self.GetName() + " is already imprisoned in "+ Prison.Name + "!", "["+ Name +"] Prisoner::Imprison")
+        return
+    endif
 
-state Releasing
-    event OnBeginState()
-    endEvent
+    ; return
 
-    event OnUpdateGameTime()
-    endEvent
-endState
+    float startBench = StartBenchmark()
+    self.OnImprisoned()
+    GotoState("Imprisoned") ; State when the prisoner is in the cell, check for updates for sentence, etc...
 
-state Released
-    event OnBeginState()
-        Debug("{Released} ("+ Name +") Prisoner::OnBeginState", "this: " + this + ", HasCellPackage: " + self.HasCellPackage + ", Cell Package: " + self.CellPackage + ", Cell Package Actor Reference: " + CellPackage.GetActorReference())
+    string sentenceFormatted    = RPB_Utility.GetTimeFormatted(Sentence, abIncludeHours = false)
+    string releaseDateFormatted = Prison.GetTimeOfReleaseFormatted(self)
 
-        if (self.IsNPC())
-            self.NPC_RestoreOriginalOutfit()
-        endif
-
-        if (self.IsNPC() && self.HasCellPackage)
-            self.UnbindAlias(self.CellPackage)
-        endif
-    endEvent
-
-    event OnUpdateGameTime()
-        EventManager.SendError("Updating in the Released state, should not happen!", "{Released} ["+ Name +"] Prisoner::OnUpdateGameTime")
-    endEvent
-endState
-
-float _previousUpdateTimeServed
-; While this Prisoner is imprisoned in their cell
-state Imprisoned
-    event OnBeginState()
-        Debug("[state: "+ self.GetState() +"] ["+ Name +"] Prisoner::OnBeginState", self.Name + "'s Bounty: " + Bounty)
-        ; if (!Prison.IsReceivingUpdates()) ; if we dont destroy the instance in time, this will get called from Prison after processing queued prisoners, and since we didnt register the prisoner, this is a bug since it will report 0 prisoners
-            Prison.RegisterForPrisonPeriodicUpdate(self)
-        ; endif
-
-        ; Captor should probably be destroyed in RPB_Captor, because more Prisoners/Arrestees may depend on it
-        ; we could check if that Captor has any prisoners left to escort, if not, destroy the reference.
-        ; Captor.Destroy()
-
-        ; At this point, we can delete the prisoner's arrest state
-        self.DestroyArrestState()
-
-        self.RegisterLastUpdate()
-        RegisterForUpdateGameTime(1.0)
-        SetBool("Imprisoned", true)
-    endEvent
-
-    event OnUpdateGameTime()
-        self.UpdateInfamy()
-        self.UpdateTimeJailed() ; Must be updated in some other way, otherwise it will reset to 0 on next imprisonment
- 
-        if (self.IsSentenceServed)
-            Prison.SendReleaseRequest(self)
-            return
-        endif
-
-        Prison.DEBUG_ShowPrisonerSentenceInfo(self, true)
-        Debug("["+ Name +"] Prisoner::OnUpdateGameTime", "("+ self.GetActor() +") Cell Package: " + self.CellPackage)
-        Debug("["+ Name +"] Prisoner::OnUpdateGameTime", "Outfit: " + self.PrisonOutfit)
-        Debug("["+ Name +"] Prisoner::OnUpdateGameTime", "this: " + this)
-
-
-        ; Debug("["+ Name +"] Prisoner::OnUpdateGameTime", "currentTimeServedStored: " + currentTimeServedStored)
-
-        self.RegisterLastUpdate()
-        RegisterForSingleUpdateGameTime(1.0)
-        RegisterForSingleUpdate(10.0)
-        ; Debug("[state: Imprisoned] ["+ Name +"] Prisoner::OnUpdateGameTime", self.Name + "'s Bounty: " + Bounty)
-        ; self.DEBUG_ShowHoldStats()
-
-    endEvent
-endState
-
-state Awaiting
-    event OnUpdateGameTime()
-        EventManager.SendError("Updating in the Awaiting state, should not happen!", "{Awaiting} ["+ Name +"] Prisoner::OnUpdateGameTime")
-    endEvent
-endState
-
-; When or while this Prisoner is escaping or has escaped
-state Escape
-    event OnBountyGained()
-        Debug("[state: Escape] ["+ Name +"] Prisoner::OnBountyGained", "Currently escaping, not storing bounty!")
-    endEvent
-
-    function RestoreBounty()
-        parent.RestoreBountyForFaction(Prison.PrisonFaction) ; Restore the Bounty
-        
-        if (Should("Account for Time Served"))
-            ; Take away the bounty from the time already served
-            int timeServedAsBounty = DaysSinceTimeOfImprisonment * GetInt("Bounty to Sentence")
-            self.ModCrimeGold(-timeServedAsBounty)
-        endif
-    endFunction
-endState
-
-; When resting at a bed to serve the time
-state ServeOnRest
-    function UpdateTimeJailed()
-        int timeLeft = Math.Ceiling(TimeLeftInSentence)
-        self.ModifyStat("Time Jailed", timeLeft)
-        self.IncrementStat("Days Jailed", timeLeft)
-
-        if (self.IsPlayer())
-            Game.IncrementStat("Days Jailed", timeLeft)
-        endif
-
-        Debug("[state: ServeOnRest] ["+ Name +"] Prisoner::UpdateTimeJailed", "Updating " + self.Name + "'s time jailed: " + timeLeft + ", TimeLeftInSentence: " + TimeLeftInSentence)
-    endFunction
-
-    function UpdateInfamy()
-        if (!Prison.EnableInfamy)
-            return
-        endif
-
-        int timeLeft = Math.Ceiling(TimeLeftInSentence)
-        int infamyGained = (InfamyGainedDaily * timeLeft) as int
-
-        self.IncrementStat("Infamy Gained", infamyGained)
-
-        Config.NotifyInfamy(infamyGained + " infamy gained in " + Prison.Name, self.IsPlayer())
-        Config.NotifyInfamy(self.GetName() + " has gained " + infamyGained + " infamy in " + Prison.Name, !self.IsPlayer())
+    if (self.ShowSentence && !self.IsUndeterminedSentence)
+        Config.NotifyJail("Your sentence was set at "+ sentenceFormatted +" in " + Prison.Name, self.IsPlayer())
+        Config.NotifyJail(self.GetName() + " has been sentenced to "+ sentenceFormatted +" in " + Prison.Name, self.IsNPC())
+    endif
     
-        if (IsInfamyKnown)
-            Prison.NotifyInfamyKnownThresholdMet(Prison.HasInfamyKnownNotificationFired)
-    
-        elseif (IsInfamyRecognized)
-            Prison.NotifyInfamyRecognizedThresholdMet(Prison.HasInfamyRecognizedNotificationFired)
-        endif
+    if (self.ShowReleaseTime && !self.IsUndeterminedSentence)
+        Config.NotifyJail("Your release is due on " + releaseDateFormatted, self.IsPlayer())
+        Config.NotifyJail(self.GetName() + "'s release is due on " + releaseDateFormatted, !self.IsPlayer())
+    endif
 
-        Debug("[state: ServeOnRest] ["+ Name +"] Prisoner::UpdateInfamy", "Updating " + self.Name + "'s infamy in jail: " + infamyGained)
-    endFunction
-endState
+    EndBenchmark(startBench, "Ended ["+ Name +"] Prisoner::Imprison")
+endFunction
 
-; ==========================================================
-;                     Stats / Deleveling
+
+;                       Stats - Checkers
 ; ==========================================================
 
-int property SKILL_LOSS_HANDLING_ALL_SKILLS             = 0 autoreadonly
-int property SKILL_LOSS_HANDLING_ALL_STAT_SKILLS        = 1 autoreadonly
-int property SKILL_LOSS_HANDLING_ALL_PERK_SKILLS        = 2 autoreadonly
-int property SKILL_LOSS_HANDLING_RANDOM_STAT_SKILL      = 3 autoreadonly
-int property SKILL_LOSS_HANDLING_RANDOM_PERK_SKILL      = 4 autoreadonly
-int property SKILL_LOSS_HANDLING_RANDOM                 = 5 autoreadonly
+bool function HasActiveBounty()
+    return parent.HasActiveBountyForFaction(Prison.PrisonFaction)
+endFunction
+
+bool function HasLatentBounty()
+    return parent.HasLatentBountyForFaction(Prison.PrisonFaction)
+endFunction
+
+;/
+    Gets the active bounty for this Actor, that is, the bounty that is currently set on a Faction when
+    the Actor is wanted by that Faction.
+
+    bool?   @abNonViolent: Whether to get the non-violent bounty for this Faction.
+    bool?   @abViolent: Whether to get the violent bounty for this Faction.
+
+    If no parameters are specified, both the non-violent and violent bounties are returned.
+/;
+int function GetActiveBounty(bool abNonViolent = true, bool abViolent = true)
+    return parent.GetActiveBountyForFaction(Prison.PrisonFaction, abNonViolent, abViolent)
+endFunction
+
+;/
+    Gets the latent bounty for this Actor, that is, the bounty that is stored when Arrested/Jailed.
+
+    bool?   @abNonViolent: Whether to get the non-violent bounty for this Faction.
+    bool?   @abViolent: Whether to get the violent bounty for this Faction.
+
+    If no parameters are specified, both the non-violent and violent bounties are returned.
+/;
+int function GetLatentBounty(bool abNonViolent = true, bool abViolent = true)
+    return parent.GetLatentBountyForFaction(Prison.PrisonFaction, abNonViolent, abViolent)
+endFunction
+
+;                Stats - Setters / Modifiers
+; ==========================================================
+
+function SetCrimeGold(int aiGold)
+    parent.SetCrimeGoldForFaction(Prison.PrisonFaction, aiGold)
+endFunction
+
+function SetCrimeGoldViolent(int aiGold)
+    parent.SetCrimeGoldViolentForFaction(Prison.PrisonFaction, aiGold)
+endFunction
+
+function ModCrimeGold(int aiAmount, bool abViolent = false)
+    parent.ModCrimeGoldForFaction(Prison.PrisonFaction, aiAmount, abViolent)
+endFunction
+
+;                      Stats - Mutators
+; ==========================================================
+
+; Transfers the Active Bounty into the Latent Bounty.
+function HideBounty()
+    parent.HideBountyForFaction(Prison.PrisonFaction)
+endFunction
+
+; Restores the Active Bounty from the Latent Bounty.
+function RestoreBounty()
+    parent.RestoreBountyForFaction(Prison.PrisonFaction)
+endFunction
+
+;                    Deleveling - Checkers
+; ==========================================================
+
+bool function ShouldDelevelSkillOfType(string asSkillType)
+    if (asSkillType != "Stat" && asSkillType != "Perk")
+        DebugError("Prisoner::ShouldDelevelSkillOfType", "Invalid skill type, valid options are: Stat, Perk | Got: " + asSkillType)
+        return false
+    endif
+
+    int dayToStartLosingSkills = GetInt("Day to Start Losing Skills ("+ asSkillType +")")
+
+    ; DebugWithArgs("["+ Name +"] Prisoner::ShouldDelevelSkillOfType", asSkillType, "dayToStartLosingSkills != 1 && dayToStartLosingSkills >= TimeServed: " + (dayToStartLosingSkills != 1 && dayToStartLosingSkills >= self.TimeServed))
+    ; DebugWithArgs("["+ Name +"] Prisoner::ShouldDelevelSkillOfType", asSkillType, "dayToStartLosingSkills: " + dayToStartLosingSkills)
+    ; DebugWithArgs("["+ Name +"] Prisoner::ShouldDelevelSkillOfType", asSkillType, "TimeServed: " + self.TimeServed)
+
+    if (dayToStartLosingSkills != 1 && dayToStartLosingSkills >= self.TimeServed)
+        ; Don't delevel, property is set to a specific day to start and the prisoner hasn't been in prison for that long yet.
+        return false
+    endif
+
+    int randomChance    = Utility.RandomInt(0, 100)
+    int skillLossChance = GetInt("Chance to Lose Skills ("+ asSkillType +")")
+
+    if (skillLossChance == 0)
+        return false
+    endif
+
+    ; DebugWithArgs("["+ Name +"] Prisoner::ShouldDelevelSkillOfType", asSkillType, "randomChance: " + randomChance + ", skillLossChance: " + skillLossChance)
+
+    return randomChance <= skillLossChance
+endFunction
+
+
+;                    Deleveling - Getters
+; ==========================================================
 
 int function GetSkillLossHandlingType()
     string handleSkillLossOn = GetString("Handle Skill Loss")
@@ -1408,34 +1764,14 @@ int function GetMinimumSkillValue(string asSkill)
     ; endif
 endFunction
 
-bool function ShouldDelevelSkillOfType(string asSkillType)
-    if (asSkillType != "Stat" && asSkillType != "Perk")
-        DebugError("Prisoner::ShouldDelevelSkillOfType", "Invalid skill type, valid options are: Stat, Perk | Got: " + asSkillType)
-        return false
-    endif
 
-    int dayToStartLosingSkills = GetInt("Day to Start Losing Skills ("+ asSkillType +")")
+;              Deleveling - Setters / Modifiers
+; ==========================================================
 
-    ; DebugWithArgs("["+ Name +"] Prisoner::ShouldDelevelSkillOfType", asSkillType, "dayToStartLosingSkills != 1 && dayToStartLosingSkills >= TimeServed: " + (dayToStartLosingSkills != 1 && dayToStartLosingSkills >= self.TimeServed))
-    ; DebugWithArgs("["+ Name +"] Prisoner::ShouldDelevelSkillOfType", asSkillType, "dayToStartLosingSkills: " + dayToStartLosingSkills)
-    ; DebugWithArgs("["+ Name +"] Prisoner::ShouldDelevelSkillOfType", asSkillType, "TimeServed: " + self.TimeServed)
 
-    if (dayToStartLosingSkills != 1 && dayToStartLosingSkills >= self.TimeServed)
-        ; Don't delevel, property is set to a specific day to start and the prisoner hasn't been in prison for that long yet.
-        return false
-    endif
 
-    int randomChance    = Utility.RandomInt(0, 100)
-    int skillLossChance = GetInt("Chance to Lose Skills ("+ asSkillType +")")
-
-    if (skillLossChance == 0)
-        return false
-    endif
-
-    ; DebugWithArgs("["+ Name +"] Prisoner::ShouldDelevelSkillOfType", asSkillType, "randomChance: " + randomChance + ", skillLossChance: " + skillLossChance)
-
-    return randomChance <= skillLossChance
-endFunction
+;                    Deleveling - Mutators
+; ==========================================================
 
 bool function DelevelSkill(string asSkill)
     int statValue               = this.GetBaseActorValue(asSkill) as int
@@ -1513,8 +1849,7 @@ function PerformDeleveling()
     endif
 endFunction
 
-; ==========================================================
-;                           Utility
+;                       Update Stats
 ; ==========================================================
 
 function UpdateInfamy()
@@ -1581,192 +1916,6 @@ function UpdateTotalBounty()
     parent.SyncTotalBountyForFaction(Prison.PrisonFaction)
 endFunction
 
-bool function HasActiveBounty()
-    return parent.HasActiveBountyForFaction(Prison.PrisonFaction)
-endFunction
-
-bool function HasLatentBounty()
-    return parent.HasLatentBountyForFaction(Prison.PrisonFaction)
-endFunction
-
-function SetCrimeGold(int aiGold)
-    parent.SetCrimeGoldForFaction(Prison.PrisonFaction, aiGold)
-endFunction
-
-function SetCrimeGoldViolent(int aiGold)
-    parent.SetCrimeGoldViolentForFaction(Prison.PrisonFaction, aiGold)
-endFunction
-
-function ModCrimeGold(int aiAmount, bool abViolent = false)
-    parent.ModCrimeGoldForFaction(Prison.PrisonFaction, aiAmount, abViolent)
-endFunction
-
-;/
-    Gets the active bounty for this Actor, that is, the bounty that is currently set on a Faction when
-    the Actor is wanted by that Faction.
-
-    bool?   @abNonViolent: Whether to get the non-violent bounty for this Faction.
-    bool?   @abViolent: Whether to get the violent bounty for this Faction.
-/;
-int function GetActiveBounty(bool abNonViolent = true, bool abViolent = true)
-    return parent.GetActiveBountyForFaction(Prison.PrisonFaction, abNonViolent, abViolent)
-endFunction
-
-;/
-    Gets the latent bounty for this Actor, that is, the bounty that is stored when Arrested/Jailed.
-
-    bool?   @abNonViolent: Whether to get the non-violent bounty for this Faction.
-    bool?   @abViolent: Whether to get the violent bounty for this Faction.
-/;
-int function GetLatentBounty(bool abNonViolent = true, bool abViolent = true)
-    return parent.GetLatentBountyForFaction(Prison.PrisonFaction, abNonViolent, abViolent)
-endFunction
-
-; Transfers the Active Bounty into the Latent Bounty.
-function HideBounty()
-    parent.HideBountyForFaction(Prison.PrisonFaction)
-endFunction
-
-; Restores the Active Bounty from the Latent Bounty.
-function RestoreBounty()
-    parent.RestoreBountyForFaction(Prison.PrisonFaction)
-endFunction
-
-; ==========================================================
-;                       Temporary - Maybe
-; ==========================================================
-
-bool property IsQueuedForImprisonment auto
-
-; Determines if at least a day has elapsed in prison
-bool function HasDayElapsed()
-    ; Add the time served from each update this runs
-    accumulatedTimeServed += TimeSinceLastUpdate
-
-    if (accumulatedTimeServed >= 1)
-        return true
-    endif
-
-    return false
-endFunction
-
-function SetEscaped()
-    SetBool("Escaped", true, "PrisonerEscape")
-    self.IncrementStat("Times Escaped")
-    
-    if (self.IsPlayer())
-        Game.IncrementStat("Jail Escapes")
-    endif
-
-    GotoState("Escape")
-    Prison.OnPrisonerEscaped(self)
-    self.Destroy()
-endFunction
-
-function SetEscapePenalty()
-    string handleEscapeOn = GetString("Handle Escape On")
-
-    int escapeBountyOfCurrentBounty     = (GetFloat("Escape Bounty of Current Bounty") * Bounty * 0.01) as int
-    int escapeBountyFlat                = GetInt("Escape Bounty")
-    int escapeBountySentenceMultiplier  = GetInt("Escape Bounty (Sentence)") * Sentence
-    int escapeBountyCondition           = GetInt("Escape Bounty (Bounty Condition)")
-    int escapeBountySentenceCondition   = GetInt("Escape Bounty (Sentence Condition)")
-
-    ; Bounty penalty to apply
-    int bountyPenalty = 0
-
-    ; Whether the handling of the escape penalty is conditional
-    bool isConditional = false
-
-    if (handleEscapeOn == "Bounty")
-        bountyPenalty += escapeBountyFlat + escapeBountyOfCurrentBounty
-
-    elseif (handleEscapeOn == "Sentence")
-        bountyPenalty += floor(escapeBountySentenceMultiplier * GetInt("Bounty to Sentence"))
-
-    elseif (handleEscapeOn == "Bounty + Sentence")
-        bountyPenalty += escapeBountyFlat + escapeBountyOfCurrentBounty
-        bountyPenalty += floor(escapeBountySentenceMultiplier * GetInt("Bounty to Sentence"))
-
-    elseif (handleEscapeOn == "Bounty (Conditionally)")
-        bool meetsBountyCondition = Bounty >= escapeBountyCondition
-        isConditional = true
-
-        if (meetsBountyCondition)
-            bountyPenalty += escapeBountyFlat + escapeBountyOfCurrentBounty
-        endif
-
-    elseif (handleEscapeOn == "Sentence (Conditionally)")
-        bool meetsSentenceCondition = Sentence >= escapeBountySentenceCondition
-        isConditional = true
-
-        if (meetsSentenceCondition)
-            bountyPenalty += floor(escapeBountySentenceMultiplier * GetInt("Bounty to Sentence"))    
-        endif
-
-    elseif (handleEscapeOn == "Bounty || Sentence (Conditionally OR)" || handleEscapeOn == "Bounty && Sentence (Conditionally AND)")
-        bool meetsBountyCondition   = Bounty >= escapeBountyCondition
-        bool meetsSentenceCondition = Sentence >= escapeBountySentenceCondition
-        bool condition = bool_if (handleEscapeOn == "Bounty || Sentence (Conditionally OR)", meetsBountyCondition || meetsSentenceCondition, meetsBountyCondition && meetsSentenceCondition)
-        isConditional = true
-
-        if (condition)
-            bountyPenalty += escapeBountyFlat + escapeBountyOfCurrentBounty
-            bountyPenalty += floor(escapeBountySentenceMultiplier * GetInt("Bounty to Sentence"))    
-        endif
-    endif
-
-    ; Handle fallback if conditions fail
-    if (isConditional && !bountyPenalty && GetInt("Fallback Bounty") > 0)
-        bountyPenalty = GetInt("Fallback Bounty")
-    endif
-
-    self.ModCrimeGold(bountyPenalty)
-endFunction
-
-; Moves this prisoner to Prison (To be processed)
-function MoveToPrison(Actor akCaptor)
-    ObjectReference escortLocation = Prison.GetRandomEscortLocation()
-
-    ; Assign a container for this prisoner's belongings (if applicable)
-    self.SetBelongingsContainer()
-    self.MoveTo(escortLocation)
-
-     ; Later maybe the captor shouldn't go, and instead there should be guards waiting in the prison
-     ; They shouldn't go especially if they are not a guard (e.g: Bounty Hunter or other NPC)
-    akCaptor.MoveTo(escortLocation)
-
-    ; Prison.OnPrisonerTeleportedToPrison(self)
-    self.OnTeleportedToJail()
-
-    SetBool("Go to Cell", true)
-endFunction
-
-function MoveToCell(bool abBeginImprisonment = true)
-    if (self.IsImprisoned)
-        EventManager.SendError(self.GetName() + " is already imprisoned in "+ Prison.Name + "!", "["+ Name +"] Prisoner::MoveToCell")
-        return
-    endif
-
-    if (self.ShouldBeInCell && self.IsInCell)
-        EventManager.SendError(self.GetName() + " is already in "+ self.GetPossessivePronoun() +" cell: " + JailCell + "!", "["+ Name +"] Prisoner::MoveToCell")
-        return
-    endif
-
-    if (!self.JailCell)
-        EventManager.SendError("The prisoner " + Name + " has not been assigned a jail cell!", "["+ Name +"] Prisoner::MoveToCell")
-        Prison.OnPrisonerImprisonmentFail(self, "Assign Cell")
-        return
-    endif
-
-    self.MoveTo(JailCell)
-    self.OnTeleportedToCell(abBeginImprisonment)
-endFunction
-
-function QueueForImprisonment()
-    Prison.QueuePrisonerForImprisonment(self)
-endFunction
-
 function UpdateSentence()
     int nonViolent      = self.GetActiveBounty(abViolent = false)
     int violent         = self.GetActiveBounty(abNonViolent = false)
@@ -1779,371 +1928,8 @@ function UpdateSentence()
     self.IncreaseSentence(activeBounty / Prison.BountyToSentence, false)
 endFunction
 
-bool property HasCriminalPenalty
-    bool function get()
-        return Was("Infamy Penalty Applied")
-    endFunction
-endProperty
-
-
-
-int __criminalPenaltySentence
-int property CriminalPenaltySentence
-    int function get()
-        return __criminalPenaltySentence
-    endFunction
-endProperty
-
-function TriggerInfamyPenalty()
-    if (!IsInfamyEnabled || CurrentInfamy <= 0 || Was("Infamy Penalty Applied") || (Bounty <= self.GetInt("Bounty to Trigger Infamy")))
-        return
-    endif
-
-    ;/ const /; int INFAMY_RECOGNIZED_THRESHOLD     = self.GetInt("Infamy Recognized Threshold")
-    ;/ const /; int INFAMY_KNOWN_THRESHOLD          = self.GetInt("Infamy Known Threshold")
-    ;/ const /; float INFAMY_RECOGNIZED_PENALTY     = self.GetFloat("Recognized Criminal Penalty")
-    ;/ const /; float INFAMY_KNOWN_PENALTY          = self.GetFloat("Known Criminal Penalty")
-
-    ;/ const /; int INFAMY_NEUTRAL      = 0
-    ;/ const /; int INFAMY_RECOGNIZED   = 1
-    ;/ const /; int INFAMY_KNOWN        = 2
-
-    int currentInfamyType
-    float penaltyAsBounty = 0
-
-    if (Bounty >= INFAMY_KNOWN_THRESHOLD)
-        penaltyAsBounty = CurrentInfamy * (INFAMY_KNOWN_PENALTY * 0.01)
-        currentInfamyType = INFAMY_KNOWN
-
-    elseif (Bounty >= INFAMY_RECOGNIZED_THRESHOLD)
-        penaltyAsBounty = CurrentInfamy * (INFAMY_RECOGNIZED_PENALTY * 0.01)
-        currentInfamyType = INFAMY_RECOGNIZED
-
-    else
-        currentInfamyType = INFAMY_NEUTRAL
-    endif
-
-    ; Infamy shouldn't touch the Bounty, add to the Sentence instead
-    int penaltyAsSentence = Round(penaltyAsBounty / Prison.BountyToSentence)
-    __criminalPenaltySentence = penaltyAsSentence
-
-    Debug("("+ Name +") Prisoner::TriggerInfamyPenalty", "currentInfamyType: " + currentInfamyType + ", penaltyAsBounty: " + penaltyAsBounty + ", penaltyAsSentence: " + penaltyAsSentence)
-
-    self.IncreaseSentence(penaltyAsSentence, abShouldAffectBounty = false)
-    self.SetBool("Infamy Penalty Applied", true)
-endFunction
-
+;                     De/(Initialization)
 ; ==========================================================
-
-function FastForwardToRelease()
-    GotoState("ServeOnRest")
-    self.UnregisterForUpdates()
-
-    ; If the Release must fall in between Minimum and Maximum release hours, set the hour to the minimum before passing the days.
-    if (self.HasReleaseTimeExtraHours())
-        RPB_Utility.SetGameHour(Prison.ReleaseTimeMinimumHour)
-        Debug("["+ Name +"] Prisoner::FastForwardToRelease", "Setting Game Hour to Release Time Minimum Hour: " + RPB_Utility.GetTimeAs12Hour(Prison.ReleaseTimeMinimumHour))
-    endif
-
-    self.UpdateTimeJailed()
-    self.UpdateInfamy()
-
-    ; Pass the time
-    int timeLeft = Math.Ceiling(TimeLeftInSentence)
-    RPB_Utility.PassTimeInDays(timeLeft)
-
-    ; float currentTimeBeforeChanges = CurrentTime
-    ; __currentTimeOverride = CurrentTime + timeLeft
-
-    ; Debug("["+ Name +"] Prisoner::FastForwardToRelease", "CurrentTime: " + currentTimeBeforeChanges + ", timeLeft: " + timeLeft + ", currentTimeOverride: " + __currentTimeOverride + ", TimeLeftInSentence: " + TimeLeftInSentence)
-
-    GotoState("Awaiting")
-
-    Prison.SendReleaseRequest(self)
-endFunction
-
-; function DetermineReleaseTimeAdditionalHours()
-;     Debug("["+ Name +"] Prisoner::DetermineReleaseTimeAdditionalHours", "ReleaseTime: " + ReleaseTime)
-;     float currentGameHour = (Game.GetFormEx(0x38) as GlobalVariable).GetValue() ; 13.50 = 1:30 PM
-;     float oneGameHour = 0.04166666666666666666666666666667
-
-
-;     Debug("["+ Name +"] Prisoner::DetermineReleaseTimeAdditionalHours", "Prison.ReleaseTimeMinimumHour: " + Prison.ReleaseTimeMinimumHour + ", Prison.ReleaseTimeMaximumHour: " + Prison.ReleaseTimeMaximumHour)
-;     ; If the release time window has already passed
-;     if (currentGameHour > Prison.ReleaseTimeMaximumHour)
-;         __additionalReleaseHours += 1 + (Prison.ReleaseTimeMinimumHour * oneGameHour) ; Add a day and the desired hour for release (taken from Minimum Hour)
-;         Debug("["+ Name +"] Prisoner::DetermineReleaseTimeAdditionalHours", "(After Calculation) ReleaseTime: " + ReleaseTime)
-;     endif
-; endFunction
-
-function DetermineReleaseTimeAdditionalHours()
-    Debug("["+ Name +"] Prisoner::DetermineReleaseTimeAdditionalHours", "ReleaseTime: " + ReleaseTime)
-    ; float currentGameHour = (Game.GetFormEx(0x38) as GlobalVariable).GetValue() ; 13.50 = 1:30 PM
-    float currentGameHour = RPB_Utility.GetCurrentHourFloat() ; 13.50 = 1:30 PM
-
-    Debug("["+ Name +"] Prisoner::DetermineReleaseTimeAdditionalHours", "Prison.ReleaseTimeMinimumHour: " + Prison.ReleaseTimeMinimumHour + ", Prison.ReleaseTimeMaximumHour: " + Prison.ReleaseTimeMaximumHour)
-    ; If the release time window has already passed
-    if (currentGameHour > Prison.ReleaseTimeMaximumHour)
-        __hasExtraReleaseTimeHours = true
-    endif
-endFunction
-
-float function GetReleaseTime(bool abIncludeMinutes = true)
-    float oneGameHour = 0.04166666666666666666666666666667
-
-    if (abIncludeMinutes)
-        return TimeOfImprisonment + (oneGameHour * 24 * Sentence)
-    endif
-
-    return floor(TimeOfImprisonment) + (oneGameHour * 24 * Sentence)
-endFunction
-
-float function GetIndefiniteReleaseTime()
-    return self.GetReleaseTime() + RPB_Utility.GetDaysPassed() + 1
-endFunction
-
-float function GetReleaseTimeExtraHours()
-    float gameHour = 0.04166666666666666666666666666667
-    return 1 + (Prison.ReleaseTimeMinimumHour * gameHour) ; Add 1 day and round to the time configured by Prison.ReleaseTimeMinimumHour
-endFunction
-
-bool __hasExtraReleaseTimeHours
-bool function HasReleaseTimeExtraHours()
-    return __hasExtraReleaseTimeHours
-endFunction
-
-function DetermineReleaseTime(bool abNotify = false)
-    SetBool("ReleaseTime::Show", true)
-
-    if (abNotify)
-        string releaseDateFormatted = Prison.GetTimeOfReleaseFormatted(self)
-        Config.NotifyJail("Your release is due on " + releaseDateFormatted, self.IsPlayer())
-    endif
-endFunction
-
-function SetAsShowable(string asPropertyName, bool abValue = true)
-    SetBool(asPropertyName + "::Show", abValue)
-endFunction
-
-bool function IsReleaseOnWeekend()
-    int releaseDate     = RPB_Utility.GetDateFromDaysPassed(DayOfImprisonment, MonthOfImprisonment, YearOfImprisonment, Sentence)
-    int releaseDay      = RPB_Utility.GetStructMemberInt(releaseDate, "day")
-    int releaseMonth    = RPB_Utility.GetStructMemberInt(releaseDate, "month")
-    int releaseYear     = RPB_Utility.GetStructMemberInt(releaseDate, "year")
-
-    int dayOfWeek = RPB_Utility.CalculateDayOfWeek(releaseDay, releaseMonth, releaseYear)
-    Debug("["+ Name +"] Prisoner::IsReleaseOnWeekend", "releaseDate: " + releaseDay + "/" + releaseMonth + "/" + releaseYear + ", IsWeekend: " + RPB_Utility.IsWeekend(releaseDay, releaseMonth, releaseYear) + ", Day of Week: " + RPB_Utility.GetDayOfWeekName(dayOfWeek))
-    return RPB_Utility.IsWeekend(releaseDay, releaseMonth, releaseYear)
-endFunction
-
-bool function IsReleaseOnLoredas()
-    int releaseDate     = RPB_Utility.GetDateFromDaysPassed(DayOfImprisonment, MonthOfImprisonment, YearOfImprisonment, Sentence)
-    int releaseDay      = RPB_Utility.GetStructMemberInt(releaseDate, "day")
-    int releaseMonth    = RPB_Utility.GetStructMemberInt(releaseDate, "month")
-    int releaseYear     = RPB_Utility.GetStructMemberInt(releaseDate, "year")
-
-    return RPB_Utility.IsLoredas(releaseDay, releaseMonth, releaseYear)
-endFunction
-
-bool function IsReleaseOnSundas()
-    int releaseDate     = RPB_Utility.GetDateFromDaysPassed(DayOfImprisonment, MonthOfImprisonment, YearOfImprisonment, Sentence)
-    int releaseDay      = RPB_Utility.GetStructMemberInt(releaseDate, "day")
-    int releaseMonth    = RPB_Utility.GetStructMemberInt(releaseDate, "month")
-    int releaseYear     = RPB_Utility.GetStructMemberInt(releaseDate, "year")
-
-    return RPB_Utility.IsSundas(releaseDay, releaseMonth, releaseYear)
-endFunction
-
-; bool function HasAdditionalReleaseTimeHours()
-;     return __additionalReleaseHours > 0
-; endFunction
-
-;/
-    Reverts this Prisoner to an Arrestee.
-
-    This function should be used whenever this Prisoner must be escorted out of the prison and possibly into another prison location,
-    for example, escorting from Solitude prison to Whiterun prison with their bounties.
-
-    This can be useful if we imagine the Holds helping each other catching crime, and while one of the holds is holding the criminal,
-    they can easily transfer them into another prison.
-
-    This means that the Prisoner can potentially hop into several prisons before all their sentences are served.
-    To avoid infinite sentencing, a variable should be put in place to limit how many prisons they can be transfered to.
-
-    This could also be an event that happens by chance (configured in the MCM, to make it more dynamic and random)
-/;
-RPB_Arrestee function MakeArrestee()
-    RPB_Arrestee arresteeRef = API.Arrest.AwaitArresteeReference(this)
-    ;/ arresteeRef.SetArrestParameters( \
-        asArrestHold        = newArrestHold, \
-        akArrestCaptor      = newArrestCaptor \
-        akArrestFaction     = newArrestFaction, \
-    )/;
-
-    return arresteeRef
-endFunction
-
-; ==========================================================
-;                           Events
-; ==========================================================
-
-event OnTeleportedToJail()
-    self.SetBelongingsContainer()
-
-    if (self.ShouldBeFrisked)
-        self.Frisk()
-    endif
-
-    if (self.ShouldBeStripped)
-        self.StartStripping(self.Captor) ; Maybe there's some instances where a Captor is not available? TODO: Refactor and take this into account
-    endif
-
-    ; Same thing here regarding the Captor, and maybe there should be instances where the prisoner is not taken to the cell.
-    self.StartRestraining(self.Captor)
-    self.EscortToCell(self.Captor)
-endEvent
-
-event OnEscortedToJail(Actor akEscort)
-    self.SetReleaseLocation()    ; Set the teleport release location for this prisoner
-
-    if (!self.PrisonerBelongingsContainer)
-        self.SetBelongingsContainer() ; Set the container of where the prisoner's items will be confiscated to
-    endif
-
-    if (!self.JailCell)
-        self.AssignCell() ; Assign a prison cell to this prisoner
-    endif
-
-    ; TODO: Review if a prisoner should be both frisked and stripped, or only stripped if they were going to be stripped
-    if (self.ShouldBeStripped)
-        self.StartStripping(akEscort)
-
-    elseif (self.ShouldBeFrisked)
-        self.StartFrisking(akEscort)
-    endif
-
-    if (self.Should("Go to Cell"))
-        ; Need to check if the prisoner is not in the cell later, IsInCell doesn't work as it should
-        self.EscortToCell(akEscort)
-    endif
-endEvent
-
-event OnTeleportedToCell(bool abBeginImprisonment)
-    ; Await state initialization
-    ; int tries = 10
-    ; int currentTry = 1
-    ; while (!Is("Initialized") || (currentTry > tries))
-    ;     Utility.Wait(0.1)
-    ;     currentTry += 1
-    ; endWhile
-
-    if (self.IsNPC())
-        self.EnableAI(!self.IsFarFromPlayer()) ; Disable AI if not near Player
-        self.BindToCell()
-    endif
-
-    if (!self.PrisonerBelongingsContainer)
-        self.SetBelongingsContainer()
-    endif
-
-    if (self.ShouldBeFrisked)
-        self.Frisk()
-    endif
-
-    if (self.ShouldBeStripped)
-        self.Strip(abRemoveUnderwear = self.WillBeStrippedNaked)
-    endif
-
-
-    ; Debug("("+ Name +") Prisoner::OnTeleportedToCell", "ShouldBeStripped: " + ShouldBeStripped)
-    ; Debug("("+ Name +") Prisoner::OnTeleportedToCell", "ShouldBeClothed: " + ShouldBeClothed)
-
-    if (self.ShouldBeClothed)
-        self.DetermineClothingOutfit()
-        self.Clothe()
-    endif
-
-    if (abBeginImprisonment)
-        ; To be removed, this monitoring should be done automatically by Prison (maybe PrisonMonitor which has the Prison as a member)
-        if (Prison.IsPrisonerQueuedForImprisonment(self))
-            Prison.RegisterForQueuedImprisonment()
-        else
-            self.Imprison()
-        endif
-    endif
-
-    SetBool("Should Be In Cell", true)
-endEvent
-
-event OnEscortedToCell(Actor akEscort)
-    ; TODO: Fix NPC not staying in cell if they are stripped OnEscortToCellEnd
-    if (!self.IsStripped && self.ShouldBeStripped)
-        self.Strip()
-        ; self.StartStripping(akEscort)
-        ; SceneManager.ResumeSceneBlocked()
-    endif
-
-    if (!self.PrisonerBelongingsContainer)
-        self.SetBelongingsContainer()     ; Set the container of where the prisoner's items will be confiscated to
-    endif
-
-    self.Uncuff()
-
-    if (!self.IsImprisoned)
-        self.Imprison()
-    endif
-
-    if (self.IsNPC())
-        ; Ensures the Prisoner stays in the cell since we update it 10s later after the initial check,
-        ; delaying it enough for all actions to finish before the check.
-        if (self.IsFarFromPlayer())
-            self.JailCell.RegisterForSanityChecking(10.0, apPrisoner = self)
-        endif
-   endif
-
-    SetBool("Should Be In Cell", true)
-endEvent
-
-; When should this happen?
-event OnEscortedFromJail(Actor akEscort)
-endEvent
-
-event OnEscortedFromCell(Actor akEscort)
-    SetBool("Should Be In Cell", false)
-endEvent
-
-event OnClothed()
-    SetBool("Clothed", true)
-endEvent
-
-event OnStripped()
-    ;/
-        Saves the NPC's original Outfit (inherited from ActorBase), and sets them
-        to be naked before possibly equipping a Prison issued outfit (or no clothing).
-
-        This doesn't mean they will be naked if an outfit should be equipped, it simply means
-        that their base outfit is now naked, their state handles the outfitting afterwards.
-
-        This is due to a FormList limitation, since we cannot have dynamic FormLists, they must be set
-        statically in the CK, so the outfitting must happen on an Armor[].
-    /;
-    NPC_SaveOriginalOutfit()
-    NPC_SetPersistentOutfit("Naked")
-
-    self.IsStrippedNaked        = self.WillBeStrippedNaked
-    self.IsStrippedToUnderwear  = self.WillBeStrippedToUnderwear
-
-    IncrementStat("Times Stripped")
-    SetBool("Stripped", true)
-endEvent
-
-event OnUnderwearRemoved(Armor akUnderwearTop, Armor akUnderwearBottom)
-    DebugParams( \ 
-        akUnderwearTop + "," + akUnderwearBottom, \
-        "akUnderwearTop, akUnderwearBottom", \
-        "("+ Name +") Prisoner::OnUnderwearRemoved" \ 
-    )
-endEvent
 
 RPB_Prisoner function Initialize()
     if (self.Was("Initialized"))
@@ -2151,7 +1937,6 @@ RPB_Prisoner function Initialize()
     endif
 
     DebugInfo("("+ Name +") Prisoner::Initialize", "Was Initialized: " + self.Was("Initialized"))
-
 
     if (!Prison.IsPrisoner(self))
         Prison.RegisterPrisoner(self)
@@ -2170,174 +1955,6 @@ RPB_Prisoner function Initialize()
     return self
 endFunction
 
-event OnInitialize()
-    DebugInfo("("+ Name +") Prisoner::OnInitialize", "State: " + self.GetState())
-    DebugInfo("("+ Name +") Prisoner::OnInitialize", "IsInitialized: " + self.IsInitialized)
-
-    if (self.IsNPC() && self.IsImprisoned)
-        self.NPC_ResumeImprisonment()
-    endif
-
-    if (self.Was("Initialized"))
-        return
-    endif
-
-    Prison.RegisterPrisoner(self)
-    DebugInfo("("+ Name +") Prisoner::OnInitialize", "Initialized: " + self.Was("Initialized"))
-endEvent
-
-event OnRestore()
-    ; if (self.IsNPC() && self.IsImprisoned)
-    ;     self.NPC_ResumeImprisonment()
-    ; endif
-
-    DebugInfo("("+ Name +") Prisoner::OnRestore", "Restoring Prisoner: " + Name)
-endEvent
-
-event OnReleased()
-    self.Destroy()
-endEvent
-
-bool property IsEnabledForBackgroundUpdates
-    bool function get()
-        return GetBool("IsEnabledForBackgroundUpdates")
-    endFunction
-
-    function set(bool value)
-        SetBool("IsEnabledForBackgroundUpdates", value)
-    endFunction
-endProperty
-
-event OnDestroy()
-    if (self.IsNPC())
-        if (!Prison.IsReceivingUpdates()) ; if we dont destroy the instance in time, this will get called from Prison after processing queued prisoners, and since we didnt register the prisoner, this is a bug since it will report 0 prisoners
-            Prison.RegisterForPrisonPeriodicUpdate(self)
-        endif
-
-        if (this.GetParentCell() != Config.Player.GetParentCell())
-            Debug("["+ Name +"] Prisoner::OnDestroy", Name + "'s Cell: " + this.GetParentCell() + ", Player's Cell: " + Config.Player.GetParentCell())
-        endif
-    endif
-
-    ; We don't unregister the prisoner (remove from the AME list) because OnDestroy will get called as soon as the Player is out of range, meaning it's not a proper way to handle the destruction of the object
-    self.UnregisterForTrackedStats()
-
-    if (self.IsPlayer())
-        ; If for some reason AI is disabled, re-enable it
-        ReleaseAI()
-    endif
-endEvent
-
-event OnObjectUnequipped(Form akBaseObject, ObjectReference akReference)
-    
-endEvent
-
-event OnDying(Actor akKiller)
-    Prison.OnPrisonerDying(self, akKiller)
-endEvent
-
-event OnDeath(Actor akKiller)
-    Prison.OnPrisonerDeath(self, akKiller)
-endEvent
-
-;/
-    Handles what happens when this Prisoner receives additional active bounty.
-/;
-event OnBountyGained()
-    if (!self.ShouldProcessImprisonmentEvents)
-        return
-    endif
-
-    self.UpdateSentence()
-    self.UpdateLargestBounty()
-    self.UpdateTotalBounty()
-endEvent
-
-event OnSentenceSet(int aiSentence, float afAtWhatTime)
-    if (!self.ShouldProcessImprisonmentEvents)
-        return
-    endif
-
-    self.UpdateLongestSentence()
-endEvent
-
-event OnSentenceChanged(int aiOldSentence, int aiNewSentence, bool abHasSentenceIncreased, bool abSentenceAffectsBounty)
-    if (!self.ShouldProcessImprisonmentEvents)
-        return
-    endif
-
-    if (abHasSentenceIncreased)
-        int daysIncreasedBy = aiNewSentence - aiOldSentence
-        Config.NotifyJail("Your sentence was increased by " + daysIncreasedBy + " days.")
-        self.UpdateLongestSentence()
-    endif
-endEvent
-
-; Triggered whenever a full day has passed
-event OnDayPassed()
-    if (!self.ShouldProcessImprisonmentEvents)
-        return
-    endif
-
-    self.PerformDeleveling()
-endEvent
-
-event OnStatChanged(string asStatName, float afValue)
-    if (asStatName == Prison.Hold + " Bounty") ; If there's bounty gained in the current prison hold
-        self.OnBountyGained()
-        ; Maybe inform the prisoner of their new sentence and have them escorted out of the cell to be frisked/stripped if they are not
-    endif
-
-    ; Debug(this, "["+ Name +"] Prisoner::OnStatChanged", "Stat " + asStatName + " has been changed to " + afValue)
-endEvent
-
-int __serveTimeLastDayRegistered
-event OnSleepStart(float afSleepStartTime, float afSleepEndTime)
-    if (!self.ShouldProcessImprisonmentEvents)
-        return
-    endif
-
-    if (self.IsUndeterminedSentence)
-        Debug("["+ Name +"] Prisoner::OnSleepStart", self.Name + " currently has an undetermined sentence, cannot serve time.")
-        return
-    endif
-
-    if (__serveTimeLastDayRegistered != RPB_Utility.GetCurrentDay() || !__serveTimeLastDayRegistered)
-        int msgResult = Prison.ServeTimeMessage.Show()
-        if (msgResult == Prison.SERVE_TIME_YES)
-            ; if (self.ShouldFastForwardToRelease)
-                self.FastForwardToRelease()
-                Prison.Notify("Sleep Start is: " + afSleepStartTime + ", Sleep End is: " + afSleepEndTime)
-            ; endif
-            return
-        endif
-        __serveTimeLastDayRegistered = RPB_Utility.GetCurrentDay()
-    endif
-endEvent
-
-event OnImprisoned()
-    self.RegisterTimeOfImprisonment()
-    self.DetermineReleaseTimeAdditionalHours() ; For Release Time (Minimum, Maximum) intervals
-    ; self.SetReleaseLocation() ; to be refactored (needs to take into account whether to use Escort or Teleport markers)
-
-    ; if (!self.Sentence)
-    ;     self.SetSentence(abShouldAffectBounty = false)
-    ; endif
-
-    self.IncrementStat("Times Jailed")
-    if (self.IsPlayer())
-        Game.IncrementStat("Times Jailed") ; Increment the "Times Jailed" in the regular vanilla stat menu.
-    endif
-endEvent
-
-event OnImprisonmentFail(string asReason)
-    Prison.OnPrisonerImprisonmentFail(self, asReason)
-endEvent
-
-; ==========================================================
-;                          Management
-; ==========================================================
-
 function Destroy()
     self.RemoveAll()
     parent.Destroy()
@@ -2347,34 +1964,6 @@ function Destroy()
     Debug("("+ Name +") Prisoner::Destroy", "Object: " + GetContainerList(RPB_StorageVars.GetObjectHandleOnForm(this)))
     ; TODO: Unset all properties related to this Prisoner
     ; Prison.UnregisterPrisoner(self)
-endFunction
-
-;/
-    Destroys the prisoner's arrest state, as they are now a prisoner and the arrest state is not required anymore.
-/;
-function DestroyArrestState()
-    if (!RPB_Utility.IsActorArrested(this))
-        return
-    endif
-
-    RPB_Arrestee arrestState = RPB_Arrestee.GetStateForPrisoner(self)
-    arrestState.Destroy()
-endFunction
-
-string function GetScriptVarCategory(string asVarCategory = "Actor")
-    if (asVarCategory == "Actor")
-        return "Jail"
-    endif
-
-    return asVarCategory
-endFunction
-
-;/
-    Registers the last update for the prisoner, 
-    this is a crucial variable used to determine updated sentences, infamy gained, and so on...
-/;
-function RegisterLastUpdate()
-    __lastUpdate = Utility.GetCurrentGameTime()
 endFunction
 
 ;/
@@ -2427,6 +2016,142 @@ function RevertState()
     self.RemoveFromCell()
     Prison.UnregisterPrisoner(self)
 endFunction
+
+;/
+    Destroys the prisoner's arrest state, as they are now a prisoner and the arrest state is not required anymore.
+/;
+function DestroyArrestState()
+    if (!RPB_Utility.IsActorArrested(this))
+        return
+    endif
+
+    RPB_Arrestee arrestState = RPB_Arrestee.GetStateForPrisoner(self)
+    arrestState.Destroy()
+endFunction
+
+;                         Management
+; ==========================================================
+
+;/
+    Removes this Prisoner reference from the assigned jail cell.
+/;
+function RemoveFromCell()
+    if (!self.JailCell)
+        EventManager.SendWarning("The prisoner " + self.Name + " is not bound to any jail cell!", "["+ Name +"] Prisoner::RemoveFromCell")
+        return
+    endif
+    
+    JailCell.RemovePrisoner(self)
+endFunction
+
+;/
+    Sets the Prisoner's belongings container where their items will be stored
+    while they are in prison.
+/;
+function SetBelongingsContainer()
+    if (self.PrisonerBelongingsContainer)
+        return
+    endif
+
+    SetForm("Prisoner Belongings Container", Prison.GetRandomPrisonerContainer("Belongings"))
+    Debug("Prison::SetBelongingsContainer", "Prisoner Belongings Container:  " + PrisonerBelongingsContainer)
+endFunction
+
+;/
+    Assigns a jail cell to this prisoner
+/;
+bool function AssignCell()
+    if (self.JailCell)
+        Debug("["+ Name +"] Prisoner::AssignCell", "A prison cell has already been assigned to prisoner " + this + ": [" +"Cell: " + self.JailCell + ", Door: " + self.JailCell.CellDoor + "]")
+        return true
+    endif
+
+    ; Needs to be refactored, shouldn't be here
+    if (ShouldBeStripped)
+        ; Determine if prisoner will be stripped etc (Set options that a cell depend on)
+        self.WillBeStrippedNaked = true ; Makes the cell gender exclusive
+    endif
+
+    RPB_JailCell assignedCell = Prison.RequestCell(self)
+
+    if (assignedCell == none)
+        self.OnImprisonmentFail("Assign Cell")
+        return false
+    endif
+
+    Prison.BindCellToPrisoner(assignedCell, self) ; Actually bind this jail cell to the prisoner, it has been assigned.
+    return self.JailCell != none
+endFunction
+
+; Binds the NPC to their Cell, does not work on the Player.
+function BindToCell()
+    if (self.IsPlayer())
+        return
+    endif
+
+    if (self.HasCellPackage)
+        return
+    endif
+
+    self.BindAlias(CellPackage)
+    MiscUtil.PrintConsole("["+ Name +"] Bound to Package " + CellPackage.GetName())
+    Debug("[Prison: "+ self.Prison.Name +"] ["+ Name +"] Prisoner::BindToCell", "[Package: "+ CellPackage.GetName() +"] Bound " + Name + " to "+ self.GetPossessivePronoun() +" Cell.")
+endFunction
+
+function SetReleaseLocation(bool abIsTeleportLocation = true)
+    if (abIsTeleportLocation)
+        SetForm("Teleport Release Location", Prison.GetRandomReleaseMarker("Teleport"))
+    else
+        SetForm("Teleport Release Location", Prison.GetRandomReleaseMarker("Escort"))
+    endif
+endFunction
+
+function SetAsShowable(string asPropertyName, bool abValue = true)
+    SetBool(asPropertyName + "::Show", abValue)
+endFunction
+
+;/
+    Reverts this Prisoner to an Arrestee.
+
+    This function should be used whenever this Prisoner must be escorted out of the prison and possibly into another prison location,
+    for example, escorting from Solitude prison to Whiterun prison with their bounties.
+
+    This can be useful if we imagine the Holds helping each other catching crime, and while one of the holds is holding the criminal,
+    they can easily transfer them into another prison.
+
+    This means that the Prisoner can potentially hop into several prisons before all their sentences are served.
+    To avoid infinite sentencing, a variable should be put in place to limit how many prisons they can be transfered to.
+
+    This could also be an event that happens by chance (configured in the MCM, to make it more dynamic and random)
+/;
+RPB_Arrestee function MakeArrestee()
+    RPB_Arrestee arresteeRef = API.Arrest.AwaitArresteeReference(this)
+    ;/ arresteeRef.SetArrestParameters( \
+        asArrestHold        = newArrestHold, \
+        akArrestCaptor      = newArrestCaptor \
+        akArrestFaction     = newArrestFaction, \
+    )/;
+
+    return arresteeRef
+endFunction
+
+
+string function GetScriptVarCategory(string asVarCategory = "Actor")
+    if (asVarCategory == "Actor")
+        return "Jail"
+    endif
+
+    return asVarCategory
+endFunction
+
+;/
+    Registers the last update for the prisoner, 
+    this is a crucial variable used to determine updated sentences, infamy gained, and so on...
+/;
+function RegisterLastUpdate()
+    __lastUpdate = Utility.GetCurrentGameTime()
+endFunction
+
 
 ;/
     Locks the prisoner's settings configured in the MCM for the Prison they are housed in.
@@ -2517,7 +2242,254 @@ function LockPrisonerSettings()
     SetInt("Outfit::Maximum Bounty",                         Prison.OutfitMaximumBounty)
 endFunction
 
+
 ; ==========================================================
+;                           Events
+; ==========================================================
+
+;             Escort / Teleport -> Prison / Cell
+; ==========================================================
+
+event OnTeleportedToPrison()
+endEvent
+
+event OnTeleportedToCell(bool abBeginImprisonment)
+endEvent
+
+event OnEscortToPrison(Actor akEscort)
+endEvent
+
+event OnEscortedToPrison(Actor akEscort)
+endEvent
+
+event OnEscortToCell(Actor akEscort)
+endEvent
+
+event OnEscortedToCell(Actor akEscort)
+endEvent
+
+; When should this happen?
+event OnEscortFromJail(Actor akEscort)
+endEvent
+
+; When should this happen?
+event OnEscortedFromJail(Actor akEscort)
+endEvent
+
+event OnEscortFromCell(Actor akEscort)
+endEvent
+
+event OnEscortedFromCell(Actor akEscort)
+endEvent
+
+;               Stripping / Clothing / Removal
+; ==========================================================
+
+event OnClothed()
+    SetBool("Clothed", true)
+endEvent
+
+event OnStripped()
+    ;/
+        Saves the NPC's original Outfit (inherited from ActorBase), and sets them
+        to be naked before possibly equipping a Prison issued outfit (or no clothing).
+
+        This doesn't mean they will be naked if an outfit should be equipped, it simply means
+        that their base outfit is now naked, their state handles the outfitting afterwards.
+
+        This is due to a FormList limitation, since we cannot have dynamic FormLists, they must be set
+        statically in the CK, so the outfitting must happen on an Armor[].
+    /;
+    NPC_SaveOriginalOutfit()
+    NPC_SetPersistentOutfit("Naked")
+
+    self.IsStrippedNaked        = self.WillBeStrippedNaked
+    self.IsStrippedToUnderwear  = self.WillBeStrippedToUnderwear
+
+    IncrementStat("Times Stripped")
+    SetBool("Stripped", true)
+endEvent
+
+event OnUnderwearRemoved(Armor akUnderwearTop, Armor akUnderwearBottom)
+    DebugParams( \ 
+        akUnderwearTop + "," + akUnderwearBottom, \
+        "akUnderwearTop, akUnderwearBottom", \
+        "("+ Name +") Prisoner::OnUnderwearRemoved" \ 
+    )
+endEvent
+
+event OnObjectUnequipped(Form akBaseObject, ObjectReference akReference)
+    
+endEvent
+
+;                            Death
+; ==========================================================
+
+event OnDying(Actor akKiller)
+    Prison.OnPrisonerDying(self, akKiller)
+endEvent
+
+event OnDeath(Actor akKiller)
+    Prison.OnPrisonerDeath(self, akKiller)
+endEvent
+
+;                  Bounty / Sentence / Stats
+; ==========================================================
+
+;/
+    Handles what happens when this Prisoner receives additional active bounty.
+/;
+event OnBountyGained()
+    if (!self.ShouldProcessImprisonmentEvents)
+        return
+    endif
+
+    self.UpdateSentence()
+    self.UpdateLargestBounty()
+    self.UpdateTotalBounty()
+endEvent
+
+event OnSentenceSet(int aiSentence, float afAtWhatTime)
+    if (!self.ShouldProcessImprisonmentEvents)
+        return
+    endif
+
+    self.UpdateLongestSentence()
+endEvent
+
+event OnSentenceChanged(int aiOldSentence, int aiNewSentence, bool abHasSentenceIncreased, bool abSentenceAffectsBounty)
+    if (!self.ShouldProcessImprisonmentEvents)
+        return
+    endif
+
+    if (abHasSentenceIncreased)
+        int daysIncreasedBy = aiNewSentence - aiOldSentence
+        Config.NotifyJail("Your sentence was increased by " + daysIncreasedBy + " days.")
+        self.UpdateLongestSentence()
+    endif
+endEvent
+
+event OnStatChanged(string asStatName, float afValue)
+    if (asStatName == Prison.Hold + " Bounty") ; If there's bounty gained in the current prison hold
+        self.OnBountyGained()
+        ; Maybe inform the prisoner of their new sentence and have them escorted out of the cell to be frisked/stripped if they are not
+    endif
+
+    ; Debug(this, "["+ Name +"] Prisoner::OnStatChanged", "Stat " + asStatName + " has been changed to " + afValue)
+endEvent
+
+;                Imprisonment / Sleep / Time
+; ==========================================================
+
+; Triggered whenever a full day has passed
+event OnDayPassed()
+    if (!self.ShouldProcessImprisonmentEvents)
+        return
+    endif
+
+    self.PerformDeleveling()
+endEvent
+
+int __serveTimeLastDayRegistered
+event OnSleepStart(float afSleepStartTime, float afSleepEndTime)
+    if (!self.ShouldProcessImprisonmentEvents)
+        return
+    endif
+
+    if (self.IsUndeterminedSentence)
+        Debug("["+ Name +"] Prisoner::OnSleepStart", self.Name + " currently has an undetermined sentence, cannot serve time.")
+        return
+    endif
+
+    if (__serveTimeLastDayRegistered != RPB_Utility.GetCurrentDay() || !__serveTimeLastDayRegistered)
+        int msgResult = Prison.ServeTimeMessage.Show()
+        if (msgResult == Prison.SERVE_TIME_YES)
+            ; if (self.ShouldFastForwardToRelease)
+                self.FastForwardToRelease()
+                Prison.Notify("Sleep Start is: " + afSleepStartTime + ", Sleep End is: " + afSleepEndTime)
+            ; endif
+            return
+        endif
+        __serveTimeLastDayRegistered = RPB_Utility.GetCurrentDay()
+    endif
+endEvent
+
+event OnImprisoned()
+    self.RegisterTimeOfImprisonment()
+    self.DetermineReleaseTimeAdditionalHours() ; For Release Time (Minimum, Maximum) intervals
+    ; self.SetReleaseLocation() ; to be refactored (needs to take into account whether to use Escort or Teleport markers)
+
+    ; if (!self.Sentence)
+    ;     self.SetSentence(abShouldAffectBounty = false)
+    ; endif
+
+    self.IncrementStat("Times Jailed")
+    if (self.IsPlayer())
+        Game.IncrementStat("Times Jailed") ; Increment the "Times Jailed" in the regular vanilla stat menu.
+    endif
+endEvent
+
+;                      Release / Escape
+; ==========================================================
+
+event OnReleased()
+    self.Destroy()
+endEvent
+
+event OnEscaped()
+
+endEvent
+
+;                         Management
+; ==========================================================
+
+event OnInitialize()
+    DebugInfo("("+ Name +") Prisoner::OnInitialize", "State: " + self.GetState())
+    DebugInfo("("+ Name +") Prisoner::OnInitialize", "IsInitialized: " + self.IsInitialized)
+
+    if (self.IsNPC() && self.IsImprisoned)
+        self.NPC_ResumeImprisonment()
+    endif
+
+    if (self.Was("Initialized"))
+        return
+    endif
+
+    Prison.RegisterPrisoner(self)
+    DebugInfo("("+ Name +") Prisoner::OnInitialize", "Initialized: " + self.Was("Initialized"))
+endEvent
+
+event OnRestore()
+    ; if (self.IsNPC() && self.IsImprisoned)
+    ;     self.NPC_ResumeImprisonment()
+    ; endif
+
+    DebugInfo("("+ Name +") Prisoner::OnRestore", "Restoring Prisoner: " + Name)
+endEvent
+
+event OnDestroy()
+    if (self.IsNPC())
+        if (!Prison.IsReceivingUpdates()) ; if we dont destroy the instance in time, this will get called from Prison after processing queued prisoners, and since we didnt register the prisoner, this is a bug since it will report 0 prisoners
+            Prison.RegisterForPrisonPeriodicUpdate(self)
+        endif
+
+        if (this.GetParentCell() != Config.Player.GetParentCell())
+            Debug("["+ Name +"] Prisoner::OnDestroy", Name + "'s Cell: " + this.GetParentCell() + ", Player's Cell: " + Config.Player.GetParentCell())
+        endif
+    endif
+
+    ; We don't unregister the prisoner (remove from the AME list) because OnDestroy will get called as soon as the Player is out of range, meaning it's not a proper way to handle the destruction of the object
+    self.UnregisterForTrackedStats()
+
+    if (self.IsPlayer())
+        ; If for some reason AI is disabled, re-enable it
+        ReleaseAI()
+    endif
+endEvent
+
+event OnImprisonmentFail(string asReason)
+    Prison.OnPrisonerImprisonmentFail(self, asReason)
+endEvent
 
 ; ==========================================================
 ;                            Getters

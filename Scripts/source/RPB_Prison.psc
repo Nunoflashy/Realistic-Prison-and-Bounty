@@ -754,6 +754,52 @@ endFunction
 ;                         Prisoners
 ; ==========================================================
 
+;/
+    Sets the Prisoner's belongings container where their items will be stored
+    while they are in prison.
+
+    RPB_Prisoner    @apPrisoner: The prisoner to set the belongings container for.
+/;
+function AssignBelongingsContainer(RPB_Prisoner apPrisoner)
+    if (apPrisoner.PrisonerBelongingsContainer)
+        return
+    endif
+
+    apPrisoner.SetForm("Prisoner Belongings Container", self.GetRandomPrisonerContainer("Belongings"))
+    Debug("Prison::SetBelongingsContainer", "Prisoner Belongings Container:  " + apPrisoner.PrisonerBelongingsContainer)
+endFunction
+
+function AssignReleaseLocation(RPB_Prisoner apPrisoner, bool abIsTeleportLocation = true)
+    if (abIsTeleportLocation)
+        apPrisoner.SetForm("Teleport Release Location", self.GetRandomReleaseMarker("Teleport"))
+    else
+        apPrisoner.SetForm("Teleport Release Location", self.GetRandomReleaseMarker("Escort")) ; Change Form Map ID to Escort
+    endif
+endFunction
+
+bool function AssignCell(RPB_Prisoner apPrisoner)
+    if (apPrisoner.JailCell)
+        Debug("["+ Name +"] Prison::AssignCell", "A prison cell has already been assigned to prisoner " + apPrisoner.Name + ": [" +"Cell: " + apPrisoner.JailCell + ", Door: " + apPrisoner.JailCell.CellDoor + "]")
+        return true
+    endif
+
+    ; Needs to be refactored, shouldn't be here
+    if (apPrisoner.ShouldBeStripped)
+        ; Determine if prisoner will be stripped etc (Set options that a cell depend on)
+        apPrisoner.WillBeStrippedNaked = true ; Makes the cell gender exclusive
+    endif
+
+    RPB_JailCell assignedCell = self.RequestCell(apPrisoner)
+
+    if (assignedCell == none)
+        EventManager.SendError("("+ Name +") Prison::AssignCell", "Could not assign a cell for prisoner " + apPrisoner.Name)
+        return false
+    endif
+
+    self.BindCellToPrisoner(assignedCell, apPrisoner) ; Actually bind this jail cell to the prisoner, it has been assigned.
+    return apPrisoner.JailCell != none
+endFunction
+
 bool function ShouldStripPrisoner(RPB_Prisoner apPrisoner)
     ; DebugParams( \
     ;     apPrisoner.GetBool("Allow Stripping") + "," + \
@@ -1461,10 +1507,6 @@ event OnPrisonerUnregistered(RPB_Prisoner apPrisoner)
     PrisonManager.OnPrisonUnregisteredPrisoner(self, apPrisoner)
 endEvent
 
-event OnPrisonerImprisoned(RPB_Prisoner apPrisoner)
-    apPrisoner.OnImprisoned()
-endEvent
-
 event OnPrisonerReleased(RPB_Prisoner apPrisoner)
     self.RegisterPrisonerReleaseTimeStats(apPrisoner)
     self.ClearPrisonerBounty(apPrisoner)
@@ -1478,14 +1520,67 @@ event OnPrisonerEscaped(RPB_Prisoner apPrisoner)
     apPrisoner.SetEscapePenalty()
     apPrisoner.RestoreBounty()
     apPrisoner.DEBUG_ShowHoldStats()
+
+    apPrisoner.OnEscaped()
 endEvent
 
 event OnPrisonerTeleportedToPrison(RPB_Prisoner apPrisoner)
-    apPrisoner.OnTeleportedToJail()
+    apPrisoner.SetBelongingsContainer()
+
+    if (apPrisoner.ShouldBeFrisked)
+        self.StartFriskingPrisoner(apPrisoner, apPrisoner.Captor)
+        ; apPrisoner.Frisk()
+    endif
+
+    if (apPrisoner.ShouldBeStripped)
+        self.StartStrippingPrisoner(apPrisoner, apPrisoner.Captor) ; Maybe there's some instances where a Captor is not available? TODO: Refactor and take this into account
+    endif
+
+    ; Same thing here regarding the Captor, and maybe there should be instances where the prisoner is not taken to the cell.
+    self.StartRestrainingPrisoner(apPrisoner, apPrisoner.Captor)
+    self.EscortPrisonerToCell(apPrisoner, apPrisoner.Captor)
+
+    apPrisoner.OnTeleportedToPrison()
 endEvent
 
 event OnPrisonerTeleportedToCell(RPB_Prisoner apPrisoner, bool abImprisonPrisoner)
-   apPrisoner.OnTeleportedToCell(abImprisonPrisoner)
+    if (apPrisoner.IsNPC())
+        apPrisoner.EnableAI(!apPrisoner.IsFarFromPlayer()) ; Disable AI if not near Player
+        apPrisoner.BindToCell()
+    endif
+
+    if (!apPrisoner.PrisonerBelongingsContainer)
+        self.AssignBelongingsContainer(apPrisoner)
+    endif
+
+    if (apPrisoner.ShouldBeFrisked)
+        apPrisoner.Frisk()
+    endif
+
+    if (apPrisoner.ShouldBeStripped)
+        apPrisoner.Strip(abRemoveUnderwear = apPrisoner.WillBeStrippedNaked)
+    endif
+
+
+    ; Debug("("+ Name +") Prisoner::OnTeleportedToCell", "ShouldBeStripped: " + ShouldBeStripped)
+    ; Debug("("+ Name +") Prisoner::OnTeleportedToCell", "ShouldBeClothed: " + ShouldBeClothed)
+
+    if (apPrisoner.ShouldBeClothed)
+        apPrisoner.DetermineClothingOutfit()
+        apPrisoner.Clothe()
+    endif
+
+    if (abImprisonPrisoner)
+        ; To be removed, this monitoring should be done automatically by Prison (maybe PrisonMonitor which has the Prison as a member)
+        if (self.IsPrisonerQueuedForImprisonment(apPrisoner))
+            self.RegisterForQueuedImprisonment()
+        else
+            apPrisoner.Imprison()
+        endif
+    endif
+
+    apPrisoner.SetBool("Should Be In Cell", true)
+    apPrisoner.OnTeleportedToCell(abImprisonPrisoner)
 endEvent
 
 event OnPrisonerDying(RPB_Prisoner apPrisoner, Actor akKiller)
@@ -1497,20 +1592,51 @@ event OnPrisonerDeath(RPB_Prisoner apPrisoner, Actor akKiller)
 endEvent
 
 event OnEscortPrisonerToJailBegin(RPB_Actor apActor, Actor akEscort)
+    RPB_Prisoner prisonerRef = RPB_Utility.ame_if (apActor as RPB_Prisoner, apActor, (apActor as RPB_Arrestee).MakePrisoner()) as RPB_Prisoner
+
+    EventNotImplemented("Prison::OnEscortPrisonerToJailBegin")
+    prisonerRef.OnEscortToPrison(akEscort)
 endEvent
 
+; TODO: Possibly rename this to OnEscortedPrisonerToPrison
 event OnEscortPrisonerToJailEnd(RPB_Actor apActor, Actor akEscort)
     ; Retrieve or make the Actor a Prisoner
     RPB_Prisoner prisonerRef = RPB_Utility.ame_if (apActor as RPB_Prisoner, apActor, (apActor as RPB_Arrestee).MakePrisoner()) as RPB_Prisoner
-    prisonerRef.OnEscortedToJail(akEscort)
+
+    self.AssignReleaseLocation(prisonerRef)    ; Set the teleport release location for this prisoner
+
+    if (!prisonerRef.PrisonerBelongingsContainer)
+        self.AssignBelongingsContainer(prisonerRef) ; Set the container of where the prisoner's items will be confiscated to
+    endif
+
+    if (!prisonerRef.JailCell)
+        self.AssignCell(prisonerRef) ; Assign a prison cell to this prisoner
+    endif
+
+    ; TODO: Review if a prisoner should be both frisked and stripped, or only stripped if they were going to be stripped
+    if (prisonerRef.ShouldBeStripped)
+        self.StartStrippingPrisoner(prisonerRef, akEscort)
+
+    elseif (prisonerRef.ShouldBeFrisked)
+        self.StartFriskingPrisoner(prisonerRef, akEscort)
+    endif
+
+    if (prisonerRef.Should("Go to Cell"))
+        ; Need to check if the prisoner is not in the cell later, IsInCell doesn't work as it should
+        self.EscortPrisonerToCell(prisonerRef, akEscort)
+    endif
+
+    prisonerRef.OnEscortedToPrison(akEscort)
 endEvent
 
+; TODO: Possibly rename this to OnEscortPrisonerToPrison
 event OnEscortPrisonerToCellBegin(RPB_Prisoner apPrisoner, Actor akEscort)
     if (apPrisoner.HasSceneState("OnEscortPrisonerToCellBegin", "Escape"))
         ; Process escort to cell after escape
     endif
 
-    Debug("Prison::OnEscortPrisonerToCellBegin", "Event fired but it has no implementation!")
+    EventNotImplemented("Prison::OnEscortPrisonerToCellBegin")
+    apPrisoner.OnEscortToCell(akEscort)
 endEvent
 
 event OnEscortingPrisonerToCell(RPB_Prisoner apPrisoner, Actor akEscort)
@@ -1519,7 +1645,33 @@ endEvent
 
 ; TODO: Remove RPB_JailCell from params. since a Prisoner already has a jail cell assigned to them
 event OnEscortPrisonerToCellEnd(RPB_Prisoner apPrisoner, RPB_JailCell akJailCell, Actor akEscort)
-   apPrisoner.OnEscortedToCell(akEscort)
+    ; TODO: Fix NPC not staying in cell if they are stripped OnEscortToCellEnd
+    if (!apPrisoner.IsStripped && apPrisoner.ShouldBeStripped)
+        apPrisoner.Strip()
+        ; apPrisoner.StartStripping(akEscort)
+        ; SceneManager.ResumeSceneBlocked()
+    endif
+
+    if (!apPrisoner.PrisonerBelongingsContainer)
+        self.AssignBelongingsContainer(apPrisoner)     ; Set the container of where the prisoner's items will be confiscated to
+    endif
+
+    apPrisoner.Uncuff()
+
+    if (!apPrisoner.IsImprisoned)
+        apPrisoner.Imprison()
+    endif
+
+    if (apPrisoner.IsNPC())
+        ; Ensures the Prisoner stays in the cell since we update it 10s later after the initial check,
+        ; delaying it enough for all actions to finish before the check.
+        if (apPrisoner.IsFarFromPlayer())
+            apPrisoner.JailCell.RegisterForSanityChecking(10.0, apPrisoner = apPrisoner)
+        endif
+    endif
+
+    apPrisoner.SetBool("Should Be In Cell", true)
+    apPrisoner.OnEscortedToCell(akEscort)
 endEvent
 
 event OnEscortPrisonerFromCellBegin(RPB_Prisoner apPrisoner, Actor akEscort)
@@ -1527,7 +1679,8 @@ event OnEscortPrisonerFromCellBegin(RPB_Prisoner apPrisoner, Actor akEscort)
         ; Process Release
     endif
 
-    Debug("Prison::OnEscortPrisonerFromCellBegin", "Event fired but it has no implementation!")
+    EventNotImplemented("Prison::OnEscortPrisonerFromCellBegin")
+    apPrisoner.OnEscortFromCell(akEscort)
 endEvent
 
 event OnEscortPrisonerFromCellEnd(RPB_Prisoner apPrisoner, Actor akEscort)
@@ -1535,7 +1688,10 @@ event OnEscortPrisonerFromCellEnd(RPB_Prisoner apPrisoner, Actor akEscort)
         ; Process Release
     endif
 
-    Debug("Prison::OnEscortPrisonerFromCellEnd", "Event fired but it has no implementation!")
+    EventNotImplemented("Prison::OnEscortPrisonerFromCellEnd")
+
+    apPrisoner.SetBool("Should Be In Cell", false)
+    apPrisoner.OnEscortedFromCell(akEscort)
 endEvent
 
 ; Happens when a Prisoner is about to be stripped
