@@ -15,118 +15,119 @@ scriptname RPB_Prison extends RPB_Entity
     @property Form[] AvailableJailCells
     @property Form[] FemaleJailCells
     @property Form[] MaleJailCells
-
-    @functions:
-        bool function HasFemaleOnlyCells()
-        bool function HasMaleOnlyCells()
-        int function GetRandomSentence(int aiMinSentence, int aiMaxSentence)
-        int function GetCurrentLowestSentence()
-        int function GetCurrentHighestSentence()
-        Form[] function GetJailCells()
-        Form[] function GetEmptyJailCells()
-        Form[] function GetAvailableJailCells()
-        RPB_JailCell[] function GetCellsWithFemalePrisoners()
-        RPB_JailCell[] function GetCellsWithMalePrisoners()
-        RPB_JailCell[] function GetCellsWithMixedPrisoners()
-        RPB_JailCell function GetCellByID(string asCellIdentifier)
-        RPB_JailCell function GetGenderExclusiveCell(string asGender, bool abCanBeEmpty = true, bool abCanBeOvercrowded = false)
-        RPB_JailCell function RequestCell(RPB_Prisoner apPrisoner)
-        Form[] function GetEscortLocations()
-        ObjectReference function GetRandomEscortLocation()
-        bool function ShouldPrisonerBeInGenderExclusiveCell(RPB_Prisoner apPrisoner)
-        bool function IsPrisoner(RPB_Prisoner apPrisoner)
-        bool function HasPrisoners(RPB_JailCell akPrisonCell = none)
-        bool function HasFemalePrisoners(RPB_JailCell akPrisonCell = none, bool abOnlyFemales = false)
-        bool function HasMalePrisoners(RPB_JailCell akPrisonCell = none, bool abOnlyMales = false)
-        bool function HasPrisonersOfGender(RPB_JailCell akPrisonCell = none, string asGender, bool abOnlySpecifiedGender = false)
-        bool function HasCellMates(RPB_Prisoner apPrisoner)
-        RPB_Prisoner[] function GetPrisoners(RPB_JailCell akPrisonCell = none)
-        RPB_Prisoner[] function GetFemalePrisoners(RPB_JailCell akPrisonCell = none)
-        RPB_Prisoner[] function GetMalePrisoners(RPB_JailCell akPrisonCell = none)
-        Form[] function GetCellMates(RPB_Prisoner apPrisoner)
-        string function GetTimeOfArrestFormatted(RPB_Prisoner apPrisoner)
-        string function GetTimeOfImprisonmentFormatted(RPB_Prisoner apPrisoner)
-        string function GetTimeOfReleaseFormatted(RPB_Prisoner apPrisoner)
-        string function GetTimeElapsedSinceArrest(RPB_Prisoner apPrisoner)
-        string function GetTimeElapsedSinceImprisonment(RPB_Prisoner apPrisoner)
-        string function GetTimeLeftOfSentenceFormatted(RPB_Prisoner apPrisoner)
-        string function GetSentenceFormatted(RPB_Prisoner apPrisoner)
-        string function GetCriminalPenaltySentenceFormatted(RPB_Prisoner apPrisoner)
-        string function GetTimeServedFormatted(RPB_Prisoner apPrisoner)
-        function SetSentence(RPB_Prisoner apPrisoner, int aiSentence = 0)
-        function RestrainPrisoner(RPB_Prisoner apPrisoner, bool abRestrainInFront = false)
-        function TeleportPrisonerToRelease(RPB_Prisoner apPrisoner)
-        function EscortPrisonerToRelease(RPB_Prisoner apPrisoner)
-        bool function SendReleaseRequest(RPB_Prisoner apPrisoner)
-        function TriggerEscape(RPB_Prisoner apPrisoner)
-        function SendEscortPrisonerToCellRequest(RPB_Prisoner apPrisoner)
-        function SendEscortPrisonerFromCellRequest(RPB_Prisoner apPrisoner, ObjectReference akDestination)
-        function AssignBelongingsContainer(RPB_Prisoner apPrisoner)
-        function AssignReleaseLocation(RPB_Prisoner apPrisoner, bool abIsTeleportLocation = true)
-        bool function AssignCell(RPB_Prisoner apPrisoner)
-        function RemoveFromCell(RPB_Prisoner apPrisoner)
-        function ClearPrisonerBounty(RPB_Actor apActor)
-        bool function AssignPrisonerToCell(RPB_Prisoner apPrisoner, RPB_JailCell akJailCell)
-        function EscortPrisonerToJail(RPB_Prisoner apPrisoner, Actor akEscort)
-        function EscortPrisonerToCell(RPB_Prisoner apPrisoner, Actor akEscort)
-        function EscortPrisonerFromJail(RPB_Prisoner apPrisoner, Actor akEscort)
-        function EscortPrisonerFromCell(RPB_Prisoner apPrisoner, Actor akEscort)
-        function StartRestrainingPrisoner(RPB_Prisoner apPrisoner, Actor akRestrainer)
-        function StartFriskingPrisoner(RPB_Prisoner apPrisoner, Actor akSearcherGuard)
-        function StartStrippingPrisoner(RPB_Prisoner apPrisoner, Actor akSearcherGuard)
-        function StartGivingPrisonerClothing(RPB_Prisoner apPrisoner, Actor akSearcherGuard)
-        Form[] function GetReleaseMarkers(string asReleaseMarkerType = "Teleport")
-        Form[] function GetSearchMarkers(string asSearchType = "Frisking")
-        Form function GetRandomSearchMarker(string asSearchType = "Frisking")
-        Form function GetRandomReleaseMarker(string asReleaseMarkerType = "Teleport")
-        Form[] function GetPrisonerContainers(string asPrisonerContainerType = "Belongings")
-        Form function GetRandomPrisonerContainer(string asPrisonerContainerType = "Belongings")
-        Form function GetPrisonerContainerLinkedWithOppositeType(Form akOppositeTypePrisonerContainer, string asPrisonerContainerType)
-        Form[] function GetGenderExclusiveCells(string asGender, bool abAvailable = true, bool abCanBeOvercrowded = false)
-        RPB_JailCell function GetRandomJailCell(bool abPrioritizeEmptyCells = true)
-        RPB_JailCell function GetRandomAvailableJailCell(bool abPrioritizeEmptyCells = true)
-        RPB_JailCell function GetEmptyJailCell()
-        RPB_JailCell function GetJailCellOfGender(string asSex, bool abAvailable = true, bool abCanBeOvercrowded = false)
-        RPB_JailCell function GetFemaleJailCell()
-        RPB_JailCell function GetMaleJailCell()
-        bool function RegisterPrisoner(RPB_Prisoner apPrisoner)
-        function AssignPrisonerNumber(RPB_Prisoner apPrisoner)
-        function RegisterPrisonerLastJailedStats(RPB_Prisoner apPrisoner)
-        function RegisterPrisonerReleaseTimeStats(RPB_Prisoner apPrisoner)
-        function RegisterPrisonerEscapeTimeStats(RPB_Prisoner apPrisoner)
-        function UnregisterPrisoner(RPB_Prisoner apPrisoner)
-        RPB_Prisoner function GetPrisonerReference(Actor akPrisoner)
-
-
-
-    @events:
-        event OnPrisonerImprisonmentFail(RPB_Prisoner apPrisoner, string reason)
-        event OnPrisonerRegistered(RPB_Prisoner apPrisoner)
-        event OnPrisonerUnregistered(RPB_Prisoner apPrisoner)
-        event OnPrisonerReleased(RPB_Prisoner apPrisoner)
-        event OnPrisonerEscaped(RPB_Prisoner apPrisoner)
-        event OnPrisonerTeleportedToPrison(RPB_Prisoner apPrisoner)
-        event OnPrisonerTeleportedToCell(RPB_Prisoner apPrisoner, bool abImprisonPrisoner)
-        event OnPrisonerDying(RPB_Prisoner apPrisoner, Actor akKiller)
-        event OnPrisonerDeath(RPB_Prisoner apPrisoner, Actor akKiller)
-        event OnEscortPrisonerToJailBegin(RPB_Actor apActor, Actor akEscort)
-        event OnEscortPrisonerToJailEnd(RPB_Actor apActor, Actor akEscort)
-        event OnEscortPrisonerToCellBegin(RPB_Prisoner apPrisoner, Actor akEscort)
-        event OnEscortingPrisonerToCell(RPB_Prisoner apPrisoner, Actor akEscort)
-        event OnEscortPrisonerToCellEnd(RPB_Prisoner apPrisoner, RPB_JailCell akJailCell, Actor akEscort)
-        event OnEscortPrisonerFromCellBegin(RPB_Prisoner apPrisoner, Actor akEscort)
-        event OnEscortPrisonerFromCellEnd(RPB_Prisoner apPrisoner, Actor akEscort)
-        event OnPrisonerStripBegin(RPB_Prisoner apPrisoner, Actor akStripper)
-        event OnPrisonerStripping(RPB_Prisoner apPrisoner, Actor akStripper, string asSceneEvent)
-        event OnPrisonerStripEnd(RPB_Prisoner apPrisoner, Actor akStripper)
-        event OnCellDoorOpen(RPB_JailCell akPrisonCell, Actor akOpener)
-        event OnCellDoorClosed(RPB_JailCell akPrisonCell, Actor akCloser)
-        event OnJailCellAssigned(RPB_JailCell akJailCell, RPB_Prisoner apPrisoner)
-        event OnPrisonerCellAssigned(RPB_Prisoner apPrisoner, RPB_JailCell akJailCell)
-        event OnPrisonerCellAssignFail(RPB_Prisoner apPrisoner, RPB_JailCell akJailCell)
-        event OnPrisonerEnterCell(RPB_Prisoner apPrisoner, RPB_JailCell akJailCell)
-        event OnPrisonerLeaveCell(RPB_Prisoner apPrisoner, RPB_JailCell akJailCell)
 }
+
+;/
+@functions:
+    bool function HasFemaleOnlyCells()
+    bool function HasMaleOnlyCells()
+    int function GetRandomSentence(int aiMinSentence, int aiMaxSentence)
+    int function GetCurrentLowestSentence()
+    int function GetCurrentHighestSentence()
+    Form[] function GetJailCells()
+    Form[] function GetEmptyJailCells()
+    Form[] function GetOccupiedJailCells()
+    Form[] function GetAvailableJailCells()
+    RPB_JailCell[] function GetCellsWithFemalePrisoners()
+    RPB_JailCell[] function GetCellsWithMalePrisoners()
+    RPB_JailCell[] function GetCellsWithMixedPrisoners()
+    RPB_JailCell function GetCellByID(string asCellIdentifier)
+    RPB_JailCell function GetGenderExclusiveCell(string asGender, bool abCanBeEmpty = true, bool abCanBeOvercrowded = false)
+    RPB_JailCell function RequestCell(RPB_Prisoner apPrisoner)
+    Form[] function GetEscortLocations()
+    ObjectReference function GetRandomEscortLocation()
+    bool function ShouldPrisonerBeInGenderExclusiveCell(RPB_Prisoner apPrisoner)
+    bool function IsPrisoner(RPB_Prisoner apPrisoner)
+    bool function HasPrisoners(RPB_JailCell akPrisonCell = none)
+    bool function HasFemalePrisoners(RPB_JailCell akPrisonCell = none, bool abOnlyFemales = false)
+    bool function HasMalePrisoners(RPB_JailCell akPrisonCell = none, bool abOnlyMales = false)
+    bool function HasPrisonersOfGender(RPB_JailCell akPrisonCell = none, string asGender, bool abOnlySpecifiedGender = false)
+    bool function HasCellMates(RPB_Prisoner apPrisoner)
+    RPB_Prisoner[] function GetPrisoners(RPB_JailCell akPrisonCell = none)
+    RPB_Prisoner[] function GetFemalePrisoners(RPB_JailCell akPrisonCell = none)
+    RPB_Prisoner[] function GetMalePrisoners(RPB_JailCell akPrisonCell = none)
+    Form[] function GetCellMates(RPB_Prisoner apPrisoner)
+    string function GetTimeOfArrestFormatted(RPB_Prisoner apPrisoner)
+    string function GetTimeOfImprisonmentFormatted(RPB_Prisoner apPrisoner)
+    string function GetTimeOfReleaseFormatted(RPB_Prisoner apPrisoner)
+    string function GetTimeElapsedSinceArrest(RPB_Prisoner apPrisoner)
+    string function GetTimeElapsedSinceImprisonment(RPB_Prisoner apPrisoner)
+    string function GetTimeLeftOfSentenceFormatted(RPB_Prisoner apPrisoner)
+    string function GetSentenceFormatted(RPB_Prisoner apPrisoner)
+    string function GetCriminalPenaltySentenceFormatted(RPB_Prisoner apPrisoner)
+    string function GetTimeServedFormatted(RPB_Prisoner apPrisoner)
+    function SetSentence(RPB_Prisoner apPrisoner, int aiSentence = 0)
+    function RestrainPrisoner(RPB_Prisoner apPrisoner, bool abRestrainInFront = false)
+    function TeleportPrisonerToRelease(RPB_Prisoner apPrisoner)
+    function EscortPrisonerToRelease(RPB_Prisoner apPrisoner)
+    bool function SendReleaseRequest(RPB_Prisoner apPrisoner)
+    function TriggerEscape(RPB_Prisoner apPrisoner)
+    function SendEscortPrisonerToCellRequest(RPB_Prisoner apPrisoner)
+    function SendEscortPrisonerFromCellRequest(RPB_Prisoner apPrisoner, ObjectReference akDestination)
+    function AssignBelongingsContainer(RPB_Prisoner apPrisoner)
+    function AssignReleaseLocation(RPB_Prisoner apPrisoner, bool abIsTeleportLocation = true)
+    bool function AssignCell(RPB_Prisoner apPrisoner)
+    function RemoveFromCell(RPB_Prisoner apPrisoner)
+    function ClearPrisonerBounty(RPB_Actor apActor)
+    bool function AssignPrisonerToCell(RPB_Prisoner apPrisoner, RPB_JailCell akJailCell)
+    function EscortPrisonerToJail(RPB_Prisoner apPrisoner, Actor akEscort)
+    function EscortPrisonerToCell(RPB_Prisoner apPrisoner, Actor akEscort)
+    function EscortPrisonerFromJail(RPB_Prisoner apPrisoner, Actor akEscort)
+    function EscortPrisonerFromCell(RPB_Prisoner apPrisoner, Actor akEscort)
+    function StartRestrainingPrisoner(RPB_Prisoner apPrisoner, Actor akRestrainer)
+    function StartFriskingPrisoner(RPB_Prisoner apPrisoner, Actor akSearcherGuard)
+    function StartStrippingPrisoner(RPB_Prisoner apPrisoner, Actor akSearcherGuard)
+    function StartGivingPrisonerClothing(RPB_Prisoner apPrisoner, Actor akSearcherGuard)
+    Form[] function GetReleaseMarkers(string asReleaseMarkerType = "Teleport")
+    Form[] function GetSearchMarkers(string asSearchType = "Frisking")
+    Form function GetRandomSearchMarker(string asSearchType = "Frisking")
+    Form function GetRandomReleaseMarker(string asReleaseMarkerType = "Teleport")
+    Form[] function GetPrisonerContainers(string asPrisonerContainerType = "Belongings")
+    Form function GetRandomPrisonerContainer(string asPrisonerContainerType = "Belongings")
+    Form function GetPrisonerContainerLinkedWithOppositeType(Form akOppositeTypePrisonerContainer, string asPrisonerContainerType)
+    Form[] function GetGenderExclusiveCells(string asGender, bool abAvailable = true, bool abCanBeOvercrowded = false)
+    RPB_JailCell function GetRandomJailCell(bool abPrioritizeEmptyCells = true)
+    RPB_JailCell function GetRandomAvailableJailCell(bool abPrioritizeEmptyCells = true)
+    RPB_JailCell function GetEmptyJailCell()
+    RPB_JailCell function GetJailCellOfGender(string asSex, bool abAvailable = true, bool abCanBeOvercrowded = false)
+    RPB_JailCell function GetFemaleJailCell()
+    RPB_JailCell function GetMaleJailCell()
+    bool function RegisterPrisoner(RPB_Prisoner apPrisoner)
+    function AssignPrisonerNumber(RPB_Prisoner apPrisoner)
+    function RegisterPrisonerLastJailedStats(RPB_Prisoner apPrisoner)
+    function RegisterPrisonerReleaseTimeStats(RPB_Prisoner apPrisoner)
+    function RegisterPrisonerEscapeTimeStats(RPB_Prisoner apPrisoner)
+    function UnregisterPrisoner(RPB_Prisoner apPrisoner)
+    RPB_Prisoner function GetPrisonerReference(Actor akPrisoner)
+
+@events:
+    event OnPrisonerImprisonmentFail(RPB_Prisoner apPrisoner, string reason)
+    event OnPrisonerRegistered(RPB_Prisoner apPrisoner)
+    event OnPrisonerUnregistered(RPB_Prisoner apPrisoner)
+    event OnPrisonerReleased(RPB_Prisoner apPrisoner)
+    event OnPrisonerEscaped(RPB_Prisoner apPrisoner)
+    event OnPrisonerTeleportedToPrison(RPB_Prisoner apPrisoner)
+    event OnPrisonerTeleportedToCell(RPB_Prisoner apPrisoner, bool abImprisonPrisoner)
+    event OnPrisonerDying(RPB_Prisoner apPrisoner, Actor akKiller)
+    event OnPrisonerDeath(RPB_Prisoner apPrisoner, Actor akKiller)
+    event OnEscortPrisonerToJailBegin(RPB_Actor apActor, Actor akEscort)
+    event OnEscortPrisonerToJailEnd(RPB_Actor apActor, Actor akEscort)
+    event OnEscortPrisonerToCellBegin(RPB_Prisoner apPrisoner, Actor akEscort)
+    event OnEscortingPrisonerToCell(RPB_Prisoner apPrisoner, Actor akEscort)
+    event OnEscortPrisonerToCellEnd(RPB_Prisoner apPrisoner, RPB_JailCell akJailCell, Actor akEscort)
+    event OnEscortPrisonerFromCellBegin(RPB_Prisoner apPrisoner, Actor akEscort)
+    event OnEscortPrisonerFromCellEnd(RPB_Prisoner apPrisoner, Actor akEscort)
+    event OnPrisonerStripBegin(RPB_Prisoner apPrisoner, Actor akStripper)
+    event OnPrisonerStripping(RPB_Prisoner apPrisoner, Actor akStripper, string asSceneEvent)
+    event OnPrisonerStripEnd(RPB_Prisoner apPrisoner, Actor akStripper)
+    event OnCellDoorOpen(RPB_JailCell akPrisonCell, Actor akOpener)
+    event OnCellDoorClosed(RPB_JailCell akPrisonCell, Actor akCloser)
+    event OnJailCellAssigned(RPB_JailCell akJailCell, RPB_Prisoner apPrisoner)
+    event OnPrisonerCellAssigned(RPB_Prisoner apPrisoner, RPB_JailCell akJailCell)
+    event OnPrisonerCellAssignFail(RPB_Prisoner apPrisoner, RPB_JailCell akJailCell)
+    event OnPrisonerEnterCell(RPB_Prisoner apPrisoner, RPB_JailCell akJailCell)
+    event OnPrisonerLeaveCell(RPB_Prisoner apPrisoner, RPB_JailCell akJailCell)    
+/;
 
 import Math
 import RPB_Config
@@ -764,6 +765,12 @@ Form[] property EmptyJailCells
     endFunction
 endProperty
 
+Form[] property OccupiedJailCells
+    Form[] function get()
+        return self.GetOccupiedJailCells()
+    endFunction
+endProperty
+
 Form[] property AvailableJailCells
     Form[] function get()
         return self.GetAvailableJailCells()
@@ -888,7 +895,7 @@ function SetupCells()
         i += 1
     endWhile
 
-    EndBenchmark(startBench, "Prison::SetupCells")
+    EndBenchmark(startBench, "("+ Name +") Prison::SetupCells")
 endFunction
 
 ;                   Prison - Notifications
@@ -986,12 +993,15 @@ int function GetRandomSentence(int aiMinSentence, int aiMaxSentence)
 endFunction
 
 int function GetPrisonCapacity()
+    FunctionNotImplemented("Prison::GetPrisonCapacity")
 endFunction
 
 int function GetCurrentLowestSentence()
+    FunctionNotImplemented("Prison::GetCurrentLowestSentence")
 endFunction
 
 int function GetCurrentHighestSentence()
+    FunctionNotImplemented("Prison::GetCurrentHighestSentence")
 endFunction
 
 Armor[] function GetDefaultOutfit()
@@ -1021,11 +1031,24 @@ endFunction
     Retrieves the jail cells configured for this Prison.
     Each element is able to be cast to a RPB_JailCell.
 
-    returns (Form[]); The jail cells for this Prison.
+    returns (Form[]): The jail cells for this Prison.
 /;
+Form[] __jailCells
 Form[] function GetJailCells()
-    return RPB_Data.QueryFormArray(self.Children("Cells"), "*", "{ 'active': true }")
+    if (__jailCells)
+        ; Debug("("+ Name +") Prison::GetJailCells", __jailCells)
+        return __jailCells
+    endif
+
+    Form[] objectData = RPB_Data.QueryFormArray(self.Children("Cells"), "*", "{ 'active': true }")
+    __jailCells = objectData
+
+    ; Debug("("+ Name +") Prison::GetJailCells", __jailCells)
+    return __jailCells
 endFunction
+; Form[] function GetJailCells()
+;     return RPB_Data.QueryFormArray(self.Children("Cells"), "*", "{ 'active': true }")
+; endFunction
 
 ;/
     Retrieves the jail cells that are currently empty.
@@ -1053,6 +1076,28 @@ Form[] function GetEmptyJailCells()
     endif
 
     return JArray.asFormArray(emptyCellsArray)
+endFunction
+
+Form[] function GetOccupiedJailCells()
+    Form[] cells = self.GetJailCells()
+
+    int cellsArray = FastArray("<Form>")
+    
+    int i = 0
+    while (i < cells.Length)
+        RPB_JailCell jailCellRef = cells[i] as RPB_JailCell
+
+        if (jailCellRef && !jailCellRef.IsEmpty)
+            FastArray_AddForm(cellsArray, jailCellRef)
+        endif
+        i += 1
+    endWhile
+
+    if (FastArray_Size(cellsArray) <= 0)
+        return none
+    endif
+
+    return FastArray_ToFormArray(cellsArray)
 endFunction
 
 ;/
@@ -2104,6 +2149,9 @@ event OnPrisonerTeleportedToCell(RPB_Prisoner apPrisoner, bool abImprisonPrisone
 
     if (apPrisoner.ShouldBeStripped)
         apPrisoner.Strip(abRemoveUnderwear = apPrisoner.WillBeStrippedNaked)
+
+    elseif (apPrisoner.ShouldBeStrippedSilently)
+        apPrisoner.StripSilently()
     endif
 
 
@@ -2309,10 +2357,12 @@ event OnPrisonerCellAssignFail(RPB_Prisoner apPrisoner, RPB_JailCell akJailCell)
     self.UnregisterPrisoner(apPrisoner)
 endEvent
 
+; Refactor to use CK Triggers, this should be fired on enter/leave trigger
 event OnPrisonerEnterCell(RPB_Prisoner apPrisoner, RPB_JailCell akJailCell)
     ; akJailCell.OnPrisonerEnter(apPrisoner)
 endEvent
 
+; Refactor to use CK Triggers, this should be fired on enter/leave trigger
 event OnPrisonerLeaveCell(RPB_Prisoner apPrisoner, RPB_JailCell akJailCell)
     ; akJailCell.OnPrisonerLeave(apPrisoner)
 endEvent
@@ -2320,6 +2370,37 @@ endEvent
 ; ==========================================================
 ;                          Management
 ; ==========================================================
+
+;/
+    Updates the prisoners stripping and clothing states after they have been imprisoned,
+    used in case the initial check fails and the prisoners are not stripped and/or clothed if applicable.
+/;
+function UpdatePrisonersStrippingAndClothingStates()
+    int i = 0
+    while (i < Prisoners.Count)
+        RPB_Prisoner apPrisoner = Prisoners.AtIndex(i)
+        self.UpdatePrisonerStrippingAndClothingStates(apPrisoner)
+        i += 1
+    endWhile
+endFunction
+
+;/
+    Updates a prisoner's stripping and clothing states after they have been imprisoned,
+    used in case the initial check fails and the prisoner is not stripped and/or clothed if applicable.
+/;
+function UpdatePrisonerStrippingAndClothingStates(RPB_Prisoner apPrisoner)
+    if (apPrisoner.ShouldBeStripped)
+        apPrisoner.Strip(abRemoveUnderwear = apPrisoner.WillBeStrippedNaked)
+
+    elseif (apPrisoner.ShouldBeStrippedSilently)
+        apPrisoner.StripSilently()
+    endif
+
+    if (apPrisoner.ShouldBeClothed)
+        apPrisoner.DetermineClothingOutfit()
+        apPrisoner.Clothe()
+    endif
+endFunction
 
 
 ; Temporary, to hold periodically updates prisoners for now
@@ -2358,15 +2439,71 @@ bool function BindCellToPrisoner(ObjectReference akJailCell, RPB_Prisoner apPris
     return true
 endFunction
 
+;/
+    Workaround for references getting deleted in Skyrim after a certain
+    amount of time (10 days tested).
+
+    The reference (JailCell) will reset all its member properties, so they
+    will become null, this includes the Prisoners residing in the cell.
+    
+    So every time a jail cell does not contain prisoners, and considering its reference
+    is stored in RPB_Prisoner, that implies that the Jail Cell was reset but the Prisoner
+    should still be there, in which case we re-bind the Prisoner to the Jail Cell.
+
+    This is a workaround for that issue.
+
+    TODO: Test if this works when many prisoners are in the same cell,
+    because !JailCell.Prisoners will only be true when there are no prisoners,
+    which means that after one of these updates, it may not happen to the other ones
+    from the other RPB_Prisoner instances, since this will be false by then.
+/;
+function NPC_UpdateCellIntegrity(RPB_Prisoner apPrisoner)
+    if (!apPrisoner || !apPrisoner.IsNPC())
+        return
+    endif
+
+    ; The reference to the prisoner's jail cell, it was reset, but the Prisoner retains its reference
+    RPB_JailCell jailCell = apPrisoner.JailCell
+    
+    ; If the prisoner holds the jail cell reference, but is not registered, the integrity was broken
+    bool isCellIntegrityBroken = !jailCell.HasPrisoner(apPrisoner)
+
+    if (!isCellIntegrityBroken)
+        return
+    endif
+
+    ; Since the jail cell's properties were reset, re-register this prisoner
+    jailCell.RegisterPrisoner(apPrisoner)
+    jailCell.PerformPrisonerSanityCheck(apPrisoner)
+endFunction
+
 ; To be refactored into RPB_PrisonMonitor perhaps, along with OnUpdateGameTime() to check for Prisoner releases/escapes
 event OnCellAttach()
     self.SetupCells()
     Debug("["+ Name +"] Prison::OnCellAttach", "On Cell Attach Prison")
+
+    float startBench = StartBenchmark()
+    int i = 0
+    while (i < Prisoners.Count)
+        RPB_Prisoner prisoner = Prisoners.AtIndex(i)
+        
+        if (prisoner && prisoner.IsNPC())
+            self.NPC_UpdateCellIntegrity(prisoner)
+            ; self.UpdatePrisonerStrippingAndClothingStates(prisoner) ; temporary
+        endif
+
+        ; Debug("["+ Name +"] Prison::OnCellAttach", prisoner.Name + "'s Cell: " + prisoner.JailCell.ID)
+        ; Debug("["+ Name +"] Prison::OnCellAttach", prisoner.JailCell.ID + " Prisoners: " + prisoner.JailCell.Prisoners)
+
+        i += 1
+    endWhile
+
+    EndBenchmark(startBench, "NPC Cell Integrity Checks")
 endEvent
 
 
 function RegisterForPrisonPeriodicUpdate(RPB_Prisoner akPrisoner)
-    Debug("Prison::RegisterForPrisonPeriodicUpdate", "Called RegisterForPrisonPeriodicUpdate()")
+    ; Debug("Prison::RegisterForPrisonPeriodicUpdate", "Called RegisterForPrisonPeriodicUpdate()")
     ; Add this prisoner to the list of prisoners to check periodically
     if (!akPrisoner.IsEnabledForBackgroundUpdates)
         checkedPrisoners[checkedPrisonersIndex] = akPrisoner
