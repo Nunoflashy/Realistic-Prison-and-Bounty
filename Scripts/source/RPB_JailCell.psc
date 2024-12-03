@@ -3,6 +3,7 @@ scriptname RPB_JailCell extends RPB_SerializableObjectReference
 import Math
 import RPB_Config
 import RPB_Utility
+import RPB_Memory
 
 ; ==========================================================
 
@@ -12,25 +13,58 @@ string property Name
     endFunction
 endProperty
 
-RPB_Prison __prison
+; RPB_Prison __prison
+; RPB_Prison property Prison
+;     RPB_Prison function get()
+;         if (!__prison)
+;             ; ErrorProperty("["+ self +"] JailCell::Prison", "Prison is null, this may result in undefined behavior!")
+;             ; DebugError("["+ self +"] JailCell::Prison", "Prison is null, this may result in undefined behavior!")
+
+;             ; Refetch the weak ref from the persistent UUID in storage
+;             string prisonUUID = self.GetLocalPropertyOfTypeString("Prison UUID")
+;             __prison = RPB_API.GetPrisonManager().GetPrisonByUUID(prisonUUID)
+
+;             if (!__prison)
+;                 DebugError("["+ self +"] JailCell::Prison", "Prison is null, this may result in undefined behavior!")
+;             endif
+
+;             ; if (__prison)
+;             ;     DebugInfo("["+ self +"] JailCell::Prison", "Successfully loaded prison from storage variable: " + __prison.Name)
+;             ; endif
+;         endif
+
+;         return __prison
+;     endFunction
+; endProperty
+
 RPB_Prison property Prison
     RPB_Prison function get()
-        if (!__prison)
-            ErrorProperty("["+ self +"] JailCell::Prison", "Prison is null, this may result in undefined behavior!")
-        endif
-
-        return __prison
+        return __getPrison()
     endFunction
 endProperty
 
-RPB_CellDoor __cellDoor
+; RPB_CellDoor __cellDoor
+; RPB_CellDoor property CellDoor
+;     RPB_CellDoor function get()
+;         if (!__cellDoor)
+;             ; ErrorProperty("["+ self +"] JailCell::CellDoor", "Cell Door for Cell "+ self +" is null, this may result in undefined behavior!")
+;             ; DebugError("["+ self +"] JailCell::CellDoor", "Cell Door for Cell "+ self +" is null, this may result in undefined behavior!")
+
+;             __cellDoor = self.GetPropertyOfTypeFormArray("Cell Doors")[0] as RPB_CellDoor
+;             self.BindCellDoor(__cellDoor)
+
+;             if (!__cellDoor)
+;                 DebugError("["+ self +"] JailCell::CellDoor", "Cell Door for Cell "+ self +" is null, this may result in undefined behavior!")
+;             endif
+;         endif
+
+;         return __cellDoor
+;     endFunction
+; endProperty
+
 RPB_CellDoor property CellDoor
     RPB_CellDoor function get()
-        if (!__cellDoor)
-            ErrorProperty("["+ self +"] JailCell::CellDoor", "Cell Door for Cell "+ self +" is null, this may result in undefined behavior!")
-        endif
-
-        return __cellDoor
+        return __getCellDoor()
     endFunction
 endProperty
 
@@ -273,11 +307,6 @@ string property PackageSize
 endProperty
 
 int __prisonersInCell
-Form[] property PrisonersInCell
-    Form[] function get()
-        
-    endFunction
-endProperty
 
 int property PrisonerCount
     int function get()
@@ -543,6 +572,10 @@ endFunction
 ;                         Prisoners                        
 ; =========================================================
 
+bool function HasPrisoner(RPB_Prisoner apPrisoner)
+    return FastMap_HasKey(__prisonersInCell, apPrisoner.GetIdentifier())
+endFunction
+
 bool function HasFemales(bool abStrictlyFemales = false)
     int i = 0
     bool foundFemale = false
@@ -631,7 +664,7 @@ event OnPrisonerRegister(RPB_Prisoner apPrisoner)
         Debug("["+ ID +"] JailCell::OnPrisonerRegister", "Rebinding Cell Door!")
     endif
     self.DetermineCellParameters()
-    Debug("JailCell::OnPrisonerRegister", "Cell Properties: " + self.DEBUG_GetCellProperties())
+    ; Debug("JailCell::OnPrisonerRegister", "Cell Properties: " + self.DEBUG_GetCellProperties())
 endEvent
 
 event OnPrisonerUnregister(RPB_Prisoner apPrisoner)
@@ -694,6 +727,9 @@ function Initialize(RPB_Prison apPrison)
     ; self.SetFallbackID(self)
     ; self.SetFallbackName(self)
 
+    ; Set the persistent Prison UUID
+    ; RPB_StorageVars.SetStringOnForm("Prison UUID", self, apPrison.UUID)
+
     self.RefreshOptions()
 
     ; Link the actual Prison with this Jail Cell
@@ -733,6 +769,9 @@ function BindPrison(RPB_Prison apPrison)
         Debug("["+ self +"] JailCell::BindPrison", "Could not bind the jail cell " + self + " to the Prison " + apPrison)
         return
     endif
+
+    ; Bind the UUID persistently, __prison is a weak ref, it will be reset by Skyrim after 10 days
+    self.SetLocalPropertyOfTypeString("Prison UUID", apPrison.UUID)
 endFunction
 
 function BindCellDoor(RPB_CellDoor akCellDoor)
@@ -756,7 +795,7 @@ endFunction
 function RegisterPrisoner(RPB_Prisoner apPrisoner)
     if (!__prisonersInCell)
         __prisonersInCell = JMap.object()
-        JValue.retain(__prisonersInCell)
+        JValue.retain(__prisonersInCell) ; May be a problem, after this Reference is lost (10d+ passes), it will not be released and the handle will be lost.
     endif
 
     JMap.setForm(__prisonersInCell, apPrisoner.GetIdentifier(), apPrisoner.GetActor())
@@ -793,7 +832,12 @@ endFunction
 
 event OnInit()
     ; Debug("["+ self +"] JailCell::OnInit", "Initialized " + self)
+    ; Debug("["+ self +"] JailCell::OnInit", "Initialized Cell: (ID: " + self.ID + ") (Name: "+ self.Name +") (" + self + ") (Markers: "+ self.InteriorMarkers +") (Prison: "+ self.Prison +") (Prisoners: "+ self.Prisoners +") (CellDoor: "+ self.CellDoor +")")
+    ; Debug("["+ self +"] JailCell::OnInit", "Initialized Cell: (Prison: " + self.Prison + ")")
+    ; Debug("["+ self +"] JailCell::OnInit", "Initialized Cell: (CellDoor: " + self.CellDoor + ")")
+
 endEvent
+
 
 ; =========================================================
 ;                    NPC Sanity Checking                      
@@ -923,7 +967,34 @@ function __onCellAttachAndDetachEvent()
         return
     endif
 
-    self.RegisterForSanityChecking(0.1)
+    int i = 0
+    while (i < Prisoners.Length)
+        apPrisoner.EnableAI(!apPrisoner.IsFarFromPlayer())
+
+        RPB_Prisoner apPrisoner = Prison.AwaitPrisonerReference(Prisoners[i] as Actor)
+        if (apPrisoner.IsImprisoned)
+            apPrisoner.EnableAI(!apPrisoner.IsFarFromPlayer())
+            
+            apPrisoner.NPC_UpdateStripping()
+            apPrisoner.NPC_UpdateClothing()
+            apPrisoner.NPC_UpdateUnderwear()
+
+            ; Debug("("+ ID +") (-) JailCell::OnCellAttachAndDetachEvent", "("+ apPrisoner.GetActor() +")")
+
+            if (apPrisoner.ShouldBeInCell && !apPrisoner.IsInCell)
+                apPrisoner.MoveTo(self)                                           ; Move the prisoner to this jail cell
+                apPrisoner.NPC_BindToCell()                                       ; Prisoner should already be bound to cell, but just in case they aren't
+                RegisterForSingleUpdate(__npcSanityCheckPostCheckUpdateTime)      ; Keep updating until the prisoner is in the cell
+                ; isStateValid = false
+            endif
+        endif
+        i += 1
+    endWhile
+
+    ; Debug("("+ ID +") (-) JailCell::OnCellAttachAndDetachEvent", "Prisoners: " + Prisoners)
+
+    ; self.RegisterForSanityChecking(0.1)
+    ; self.PerformPrisonersSanityCheck()
     __lock_onCellAttachAndDetachEvents()
 endFunction
 
@@ -944,6 +1015,7 @@ endEvent
 
 ; When the player is in the same cell as this jail cell
 event OnCellAttach()
+    ; Debug("["+ self +"] JailCell::OnCellAttach", "Cell: (ID: " + self.ID + ") (" + self + ") (Markers: "+ self.InteriorMarkers +") (Prison: "+ self.Prison.Name +") (Prisoners: "+ self.Prisoners +") (CellDoor: "+ self.CellDoor +")")
     __onCellAttachAndDetachEvent()
 endEvent
 
@@ -961,6 +1033,11 @@ bool function PerformPrisonerSanityCheck(RPB_Prisoner apPrisoner)
     return __performPrisonerSanityCheck(apPrisoner)
 endFunction
 
+bool function PerformPrisonersSanityCheck()
+    __npcSanityCheckAllPrisoners = true
+    return __performPrisonersSanityCheck()
+endFunction
+
 bool function __shouldSanityCheckAllPrisoners()
     return !self.IsEmpty && __npcSanityCheckAllPrisoners && __npcSanityCheckSelectedPrisoner == none
 endFunction
@@ -976,9 +1053,9 @@ bool function __performPrisonerSanityCheck(RPB_Prisoner apPrisoner)
 
     bool isStateValid = true
 
-    Debug("("+ ID +") (-) JailCell::PerformPrisonerSanityCheck", "("+ apPrisoner.GetActor() +") Cell Package: " + apPrisoner.CellPackage)
-    Debug("("+ ID +") (-) JailCell::PerformPrisonerSanityCheck", "("+ apPrisoner.GetActor() +") NPC_Underwear: " + apPrisoner.NPC_Underwear)
-    Debug("("+ ID +") (-) JailCell::PerformPrisonerSanityCheck", "("+ apPrisoner.GetActor() +") Outfit: " + apPrisoner.PrisonOutfit)
+    ; Debug("("+ ID +") (-) JailCell::PerformPrisonerSanityCheck", "("+ apPrisoner.GetActor() +") Cell Package: " + apPrisoner.CellPackage)
+    ; Debug("("+ ID +") (-) JailCell::PerformPrisonerSanityCheck", "("+ apPrisoner.GetActor() +") NPC_Underwear: " + apPrisoner.NPC_Underwear)
+    ; Debug("("+ ID +") (-) JailCell::PerformPrisonerSanityCheck", "("+ apPrisoner.GetActor() +") Outfit: " + apPrisoner.PrisonOutfit)
 
     if (apPrisoner.IsImprisoned)
         apPrisoner.EnableAI(!apPrisoner.IsFarFromPlayer())
@@ -995,7 +1072,7 @@ bool function __performPrisonerSanityCheck(RPB_Prisoner apPrisoner)
         endif
     endif
 
-    DebugWithArgs(self + " JailCell::__performPrisonerSanityCheck", apPrisoner.Name , "Sanity check complete for " + apPrisoner.Name + ", state is valid.", isStateValid)
+    DebugWithArgs("(-) " + self + " JailCell::PerformPrisonerSanityCheck", apPrisoner.Name , "Sanity check complete for " + apPrisoner.Name + ", state is valid.", isStateValid)
     ; DebugWithArgs(self +" JailCell::__performPrisonerSanityCheck", apPrisoner.Name, \
     ;     "\n\t __npcSanityCheckPostCheckUpdateTime: "    + __npcSanityCheckPostCheckUpdateTime + \
     ;     "\n\t __npcSanityCheckAllPrisoners: "           + __npcSanityCheckAllPrisoners + \
@@ -1112,6 +1189,62 @@ endFunction
 
 string function GetIdentifier()
     return "Cell["+ self.GetFormID() +"]"
+endFunction
+
+; =========================================================
+;                          private                      
+; =========================================================
+
+;/
+    Fetches the Prison weak reference from the Prison UUID in storage.
+
+    This reference (and any reference that is a member of this script), will be reset to null
+    after 10+ in-game days have passed due to the way Skyrim deletes them.
+
+    By setting it from the persistent storage, it is always able to be retrieved.
+/;
+RPB_Prison function __fetchPrisonWeakReference()
+    string prisonUUID = self.GetLocalPropertyOfTypeString("Prison UUID")
+
+    if (!prisonUUID)
+        DebugError("(-) ["+ self +"] JailCell::FetchPrisonWeakReference", "Prison UUID is null, this may result in undefined behavior!")
+        return none
+    endif
+
+    return RPB_API.GetPrisonManager().GetPrisonByUUID(prisonUUID)
+endFunction
+
+RPB_Prison __prison
+RPB_Prison function __getPrison()
+    if (__prison)
+        return __prison
+    endif
+
+    __prison = __fetchPrisonWeakReference()
+
+    if (__prison)
+        return __prison
+    endif
+
+    DebugError("["+ self +"] JailCell::Prison", "Prison is null, this may result in undefined behavior!")
+    return none
+endFunction
+
+RPB_CellDoor __cellDoor
+RPB_CellDoor function __getCellDoor()
+    if (__cellDoor)
+        return __cellDoor
+    endif
+
+    __cellDoor = self.GetPropertyOfTypeFormArray("Cell Doors")[0] as RPB_CellDoor
+    self.BindCellDoor(__cellDoor)
+
+    if (__cellDoor)
+        return __cellDoor
+    endif
+
+    DebugError("["+ self +"] JailCell::CellDoor", "Cell Door for Cell "+ self +" is null, this may result in undefined behavior!")
+    return none
 endFunction
 
 ; =========================================================
