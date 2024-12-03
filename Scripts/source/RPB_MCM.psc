@@ -71,12 +71,13 @@ int property OUTFIT_COUNT = 10 autoreadonly
 string[] property PrisonSkillHandlingOptions
     string[] function get()
         return String_Explode( \
-            "All Skills," + \
-            "All Stat Skills (Health, Stamina, Magicka)," + \
-            "All Perk Skills," + \
-            "1x Random Stat Skill," + \
-            "1x Random Perk Skill," + \
+            "All Skills|" + \
+            "All Stat Skills (Health, Stamina, Magicka)|" + \
+            "All Perk Skills|" + \
+            "1x Random Stat Skill|" + \
+            "1x Random Perk Skill|" + \
             "Random" \
+            , asDelimiter = "|" \
         )
     endFunction
 endProperty
