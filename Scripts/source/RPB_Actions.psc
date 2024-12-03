@@ -22,6 +22,7 @@ string[] function GetActions()
     JArray.addStr(actionArrayObj, "[Actor] Log Selected Actor State Variables")
     JArray.addStr(actionArrayObj, "[Actor] Delete Selected Actor State")
     JArray.addStr(actionArrayObj, "Check Item Stolen")
+    JArray.addStr(actionArrayObj, "[Prison] Verify Jail Cells Integrity")
     JArray.addStr(actionArrayObj, "Distance between two Objects")
     JArray.addStr(actionArrayObj, "Play Animation on Selected Actor")
     JArray.addStr(actionArrayObj, "[Bounty] Set Bounty for Selected Actor")
@@ -44,6 +45,7 @@ string[] function GetActions()
     JArray.addStr(actionArrayObj, "[Prison] Show Prison Container")
     JArray.addStr(actionArrayObj, "[Prison] Show Prisoner Inventory")
     JArray.addStr(actionArrayObj, "[Prison] Show Prison Markers")
+    JArray.addStr(actionArrayObj, "[Prison] Show Cells")
     JArray.addStr(actionArrayObj, "[Prison] Show Cell Doors")
     JArray.addStr(actionArrayObj, "[Prison] Return Prisoner Belongings")
     JArray.addStr(actionArrayObj, "[Prison] Strip Prisoner")
@@ -84,6 +86,9 @@ function ShowActionsMenu()
 
     elseif (actionToPerform == "Check Item Stolen")
         Action_CheckItemStolen(uilib)
+
+    elseif (actionToPerform == "[Prison] Verify Jail Cells Integrity")
+        Action_VerifyJailCellsIntegrity(uilib)
 
     elseif (actionToPerform == "Distance between two Objects")
         Action_DistanceBetweenTwoObjects(uilib)
@@ -141,6 +146,9 @@ function ShowActionsMenu()
 
     elseif (actionToPerform == "[Prison] Show Prison Markers")
         Action_ShowPrisonMarkers(uilib)
+
+    elseif (actionToPerform == "[Prison] Show Cells")
+        Action_ShowCells(uilib)
 
     elseif (actionToPerform == "[Prison] Show Cell Doors")
         Action_ShowCellDoors(uilib)
@@ -257,6 +265,31 @@ endFunction
 function Action_CheckItemStolen(RPB_UIInterface uilib)
     ObjectReference selectedReference = Game.GetCurrentConsoleRef()
     Debug("Actions::Action_CheckItemStolen", "Is item stolen: " + selectedReference.IsOffLimits())
+endFunction
+
+function Action_VerifyJailCellsIntegrity(RPB_UIInterface uilib)
+    RPB_Prison prison = uilib.ShowPrisonList( \ 
+        abNotEmpty = false, \
+        abShowPrisonerCount = false \
+    )
+
+    if (prison == none)
+        return none
+    endif
+
+    Form[] cells = prison.JailCells
+
+    if (cells == none)
+        return none
+    endif
+
+    int i = 0
+    while (i < cells.Length)
+        RPB_JailCell jailCell = cells[i] as RPB_JailCell
+        ; Fire the test event to verify the integrity of the cell
+        Debug("["+ jailCell +"] JailCell::OnCellAttach", "Cell: (ID: " + jailCell.ID + ") (" + jailCell + ") (Markers: "+ jailCell.InteriorMarkers +") (Prison: "+ jailCell.Prison.Name +") (Prisoners: "+ jailCell.Prisoners +") (CellDoor: "+ jailCell.CellDoor +")")
+        i += 1
+    endWhile
 endFunction
 
 function Action_DistanceBetweenTwoObjects(RPB_UIInterface uilib)
@@ -870,6 +903,17 @@ function Action_ShowPrisonMarkers(RPB_UIInterface uilib)
         Actor ref = Game.GetCurrentConsoleRef() as Actor
         ref.MoveTo(selectedMarker)
     endif
+endFunction
+
+function Action_ShowCells(RPB_UIInterface uilib)
+    RPB_Prison prison = uilib.ShowPrisonList(false)
+
+    if (prison == none)
+        return none
+    endif
+
+    Debug("Actions::Action_ShowCells", "Cells: " + prison.GetJailCells())
+    Debug("Actions::Action_ShowCells", "Cells Children: " + prison.Children("Cells"))
 endFunction
 
 function Action_ShowCellDoors(RPB_UIInterface uilib)
