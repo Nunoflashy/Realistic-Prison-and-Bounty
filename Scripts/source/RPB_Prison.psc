@@ -5,6 +5,7 @@ scriptname RPB_Prison extends RPB_Entity
     @property string Name
     @property bool Active
 
+    @property RPB_PrisonMonitor Monitor
     @property Location PrisonLocation
     @property Faction PrisonFaction
     @property string Hold
@@ -21,6 +22,7 @@ scriptname RPB_Prison extends RPB_Entity
 @functions:
     bool function HasFemaleOnlyCells()
     bool function HasMaleOnlyCells()
+    bool function ShouldActivelyMonitorPrisoner(RPB_Prisoner apPrisoner)
     int function GetRandomSentence(int aiMinSentence, int aiMaxSentence)
     int function GetCurrentLowestSentence()
     int function GetCurrentHighestSentence()
@@ -61,6 +63,7 @@ scriptname RPB_Prison extends RPB_Entity
     function TeleportPrisonerToRelease(RPB_Prisoner apPrisoner)
     function EscortPrisonerToRelease(RPB_Prisoner apPrisoner)
     bool function SendReleaseRequest(RPB_Prisoner apPrisoner)
+    bool function SendMonitoringRequest()
     function TriggerEscape(RPB_Prisoner apPrisoner)
     function SendEscortPrisonerToCellRequest(RPB_Prisoner apPrisoner)
     function SendEscortPrisonerFromCellRequest(RPB_Prisoner apPrisoner, ObjectReference akDestination)
@@ -722,7 +725,17 @@ int property SERVE_TIME_YES = 0 autoreadonly
 ; ==========================================================
 ;                     Prison Properties
 ; ==========================================================
- 
+
+; This may have to be a property global to all Prisons in PrisonManager,
+; because issues may arise if the player is fast forwarding days/months,
+; and the normal update system is retained for the NPC's in the other Prisons.
+bool __isPlayerFastForwardingToRelease
+bool property IsPlayerFastForwardingToRelease
+    bool function get()
+        return __isPlayerFastForwardingToRelease
+    endFunction
+endProperty
+
 ; Give priority to empty jail cells when placing a prisoner
 bool property PrioritizeEmptyCells auto
 
@@ -738,6 +751,12 @@ bool property AllowOnlyGenderExclusiveCells auto
 ; When assigning a cell to a prisoner, it must either be empty or a gender exclusive cell
 bool property AllowOnlyEmptyOrGenderCells auto
 
+RPB_PrisonMonitor property Monitor
+    RPB_PrisonMonitor function get()
+        return (self as ReferenceAlias) as RPB_PrisonMonitor
+    endFunction
+endProperty
+
 RPB_PrisonerList __prisoners
 RPB_PrisonerList property Prisoners
     RPB_PrisonerList function get()
@@ -746,9 +765,6 @@ RPB_PrisonerList property Prisoners
         endif
 
         __prisoners = ((self as ReferenceAlias) as RPB_ActiveMagicEffectContainer) as RPB_PrisonerList
-        ; __prisoners = PrisonManager.GetNthAlias(self.GetID()) as RPB_PrisonerList
-        ; LogProperty("Prison::Prisoners", "Initialized with a value of: " + __prisoners)
-        ; Debug("["+ Name +"] Prison::Prisoners", "Initialized with a value of: " + __prisoners)
         return __prisoners
     endFunction
 endProperty
@@ -946,6 +962,11 @@ bool function HasMaleOnlyCells()
 
 endFunction
 
+bool function ShouldActivelyMonitorPrisoner(RPB_Prisoner apPrisoner)
+    ; Always actively monitor the Player, for now. (RPB_PrisonMonitor is only used for NPC's background monitoring)
+    return apPrisoner.IsPlayer() || (apPrisoner.IsNPC() && !self.IsPlayerFastForwardingToRelease && !apPrisoner.IsFarFromPlayer())
+endFunction
+
 ;                      Prison - Getters
 ; ==========================================================
 
@@ -996,11 +1017,23 @@ int function GetPrisonCapacity()
     FunctionNotImplemented("Prison::GetPrisonCapacity")
 endFunction
 
-int function GetCurrentLowestSentence()
-    FunctionNotImplemented("Prison::GetCurrentLowestSentence")
+float function GetCurrentLowestSentence()
+    float currentLowestSentence = -1
+
+    int i = 0
+    while (i < Prisoners.Count)
+        float prisonerCurrentTimeLeftInSentence = Prisoners.AtIndex(i).TimeLeftInSentence
+        if (currentLowestSentence == -1 || currentLowestSentence > prisonerCurrentTimeLeftInSentence)
+            currentLowestSentence = prisonerCurrentTimeLeftInSentence
+        endif
+        i += 1
+    endWhile
+
+    EventManager.SendError("The current lowest sentence could not be determined!", "Prison::GetCurrentLowestSentence", currentLowestSentence == -1)
+    return currentLowestSentence
 endFunction
 
-int function GetCurrentHighestSentence()
+float function GetCurrentHighestSentence()
     FunctionNotImplemented("Prison::GetCurrentHighestSentence")
 endFunction
 
@@ -1433,6 +1466,11 @@ endFunction
 
 ;                      Prison - Setters
 ; ==========================================================
+
+function SetPlayerFastForwardingToRelease(bool abFastForward)
+    __isPlayerFastForwardingToRelease = abFastForward
+endFunction
+
 ;                      Prison - Mutators
 ; ==========================================================
 
@@ -1473,40 +1511,6 @@ function UnregisterPrisoner(RPB_Prisoner apPrisoner)
     endif
 endFunction
 
-
-;/
-    Binds this Prisoner to their cell (it must already be assigned),
-    this is used to make NPC's "stick" to the cell, and not wander around
-    or execute their usual AI packages.
-
-    Several AI Packages are available to bind the prisoners, their use
-    should depend on the size of the cell, as to not allow them to get out
-    and not constrain them to a very small area either.
-
-    Packages should be: XS, S, M, L, and XL.
-
-    RPB_Prisoner    @apPrisoner: The prisoner to bind to the cell.
-    string          @asPackageSize: The size of the AI cell package to apply.
-
-    returns (ReferenceAlias): The reference alias that binds this AI Package.
-/;
-ReferenceAlias function BindPrisonerToCell(RPB_Prisoner apPrisoner, string asPackageSize)
-    ; Make sure the prisoner is inside the cell before applying the AI Package (Wander in Cell),
-    ; since the package's location is set to be the same point at the time of application 
-    ; so the prisoner must be in the cell, in order to remain there.
-    ReferenceAlias cellPackage = PrisonManager.GetCellPackageOfType(asPackageSize)
-
-    apPrisoner.MoveTo(apPrisoner.JailCell)
-    Debug("Prison::BindPrisonerToCell", "Cell [X,Y,Z]: " + "[" + apPrisoner.JailCell.X + "," + apPrisoner.JailCell.Y + "," + apPrisoner.JailCell.Z + "]")
-    Debug("Prison::BindPrisonerToCell", "Prisoner [X,Y,Z]: " + "[" + apPrisoner.this.X + "," + apPrisoner.this.Y + "," + apPrisoner.this.Z + "]")
-    apPrisoner.DisableAI()
-    
-    apPrisoner.BindAlias(cellPackage)
-    apPrisoner.EnableAI()
-
-    return cellPackage
-endFunction
-
 function BindAllPrisonersToCell()
     int i = 0
     while (i < Prisoners.Count)
@@ -1518,6 +1522,10 @@ endFunction
 
 function Notify(string asMessage, bool abCondition = true)
     Config.NotifyJail(asMessage, abCondition)
+endFunction
+
+bool function SendMonitoringRequest()
+    Monitor.SendRequest()
 endFunction
 
 
@@ -1739,7 +1747,7 @@ function EscortPrisonerToRelease(RPB_Prisoner apPrisoner)
 endFunction
 
 bool function SendReleaseRequest(RPB_Prisoner apPrisoner)
-    Debug("["+ Name +"] Prison::SendReleaseRequest", "Cell Package Applied: " + apPrisoner.CellPackage)
+    ; Debug("["+ Name +"] Prison::SendReleaseRequest", "Cell Package Applied: " + apPrisoner.CellPackage)
 
     ; Determine type of release
     if (apPrisoner.IsNPC() && apPrisoner.IsFarFromPlayer())
@@ -1988,84 +1996,8 @@ function StartGivingPrisonerClothing(RPB_Prisoner apPrisoner, Actor akSearcherGu
 endFunction
 
 ; ==========================================================
-; Temp
-function AwaitPrisonersRelease()
-    ; int prisonersAwaitingRelease = 0
-
-    ; int i = 0
-    ; while (i < Prisoners.Count)
-    ;     RPB_Prisoner currentPrisoner = Prisoners.AtIndex(i)
-
-    ;     if (currentPrisoner && !currentPrisoner.IsEffectActive)
-    ;         prisonersAwaitingRelease += 1
-    ;         ; Maybe take into account possible bounty gain and infamy updates
-
-    ;         if (currentPrisoner.IsSentenceServed)
-    ;             ; Release Prisoner
-    ;             Debug("Prison::AwaitPrisonersRelease", "Released Prisoner:  " + currentPrisoner + currentPrisoner.GetPrisoner())
-    ;             currentPrisoner.Release()
-    ;             ; checkedPrisoners[i] = none
-    ;         else
-    ;             int timeServedDays  = currentPrisoner.GetTimeServed("Days")
-    ;             int timeLeftDays    = currentPrisoner.GetTimeLeftInSentence("Days")
-    ;             ; Debug("Prison::AwaitPrisonersRelease", "Prisoner:  " + currentPrisoner.GetActor() + " has not served their sentence yet ("+ timeServedDays + " days served, " +  timeLeftDays +" days left).")
-    ;             ; Debug("Prison::AwaitPrisonersRelease", currentPrisoner + " " + currentPrisoner.GetActor() + " ("+ currentPrisoner.GetSex(true) +")" + " has not served their sentence yet in "+ Hold +".")
-    ;         endif
-    ;     endif
-
-    ;     currentPrisoner.PerformSanityChecks()
-
-    ;     i += 1
-    ; endWhile
-    
-    ; if (prisonersAwaitingRelease > 0)
-    ;     Debug("Prison::AwaitPrisonersRelease", "Awaiting release for " + prisonersAwaitingRelease + " prisoners in " + Hold)
-    ; endif
-endFunction
-
-function AwaitPrisonersQueuedImprisonment()
-    if (isProcessingQueuedPrisonersForImprisonment)
-        return
-    endif
-
-    int i = 0
-    while (i < queuedPrisonersForImprisonment.Length)
-        if (queuedPrisonersForImprisonment[i] != none)
-            queuedPrisonersForImprisonment[i].Imprison()    ; Imprison this Prisoner
-            queuedPrisonersForImprisonment[i] = none        ; Remove from Queue
-        endif
-        Utility.Wait(0.2)
-        i += 1
-    endWhile
-endFunction
-
-; ==========================================================
-
-; ==========================================================
 ;                          Events
 ; ==========================================================
-
-event OnPrisonPeriodicUpdate()
-    self.AwaitPrisonersQueuedImprisonment() ; Delayed Imprisonment for registered Prisoners
-    self.AwaitPrisonersRelease()            ; Keep checking for Prisoners to Release
-
-    ; Get all jail cells
-    ; Show relevant info from each
-    int i = 0
-    Form[] cells = self.GetJailCells()
-    while (i < cells.Length)
-        RPB_JailCell theCell = cells[i] as RPB_JailCell
-        string debugInfo = theCell.DEBUG_GetCellProperties()
-        ; Debug("Prison::OnPrisonPeriodicUpdate", "Cell " + theCell + ": " + debugInfo)
-        i += 1
-    endWhile
-
-    Debug("Prison::OnPrisonPeriodicUpdate", "Prisoners in " + Hold + ": " + Prisoners.Count)
-
-    ; ; TODO: If all the prisoners do not require processing anymore, unregister the update here
-
-    ; Debug("Prison::OnPrisonPeriodicUpdate", "Prisoners in " + Hold + ": " + prisonerCount)
-endEvent
 
 ;/
     Handles imprisonment failures of any kind.
@@ -2090,6 +2022,8 @@ endEvent
 
 event OnPrisonerRegistered(RPB_Prisoner apPrisoner)
     self.RegisterPrisonerLastJailedStats(apPrisoner)
+
+    Monitor.RegisterPrisoner(apPrisoner)
     PrisonManager.OnPrisonRegisteredPrisoner(self, apPrisoner)
 endEvent
 
@@ -2164,12 +2098,7 @@ event OnPrisonerTeleportedToCell(RPB_Prisoner apPrisoner, bool abImprisonPrisone
     endif
 
     if (abImprisonPrisoner)
-        ; To be removed, this monitoring should be done automatically by Prison (maybe PrisonMonitor which has the Prison as a member)
-        if (self.IsPrisonerQueuedForImprisonment(apPrisoner))
-            self.RegisterForQueuedImprisonment()
-        else
-            apPrisoner.Imprison()
-        endif
+        apPrisoner.Imprison()
     endif
 
     apPrisoner.SetBool("Should Be In Cell", true)
@@ -2371,57 +2300,6 @@ endEvent
 ;                          Management
 ; ==========================================================
 
-;/
-    Updates the prisoners stripping and clothing states after they have been imprisoned,
-    used in case the initial check fails and the prisoners are not stripped and/or clothed if applicable.
-/;
-function UpdatePrisonersStrippingAndClothingStates()
-    int i = 0
-    while (i < Prisoners.Count)
-        RPB_Prisoner apPrisoner = Prisoners.AtIndex(i)
-        self.UpdatePrisonerStrippingAndClothingStates(apPrisoner)
-        i += 1
-    endWhile
-endFunction
-
-;/
-    Updates a prisoner's stripping and clothing states after they have been imprisoned,
-    used in case the initial check fails and the prisoner is not stripped and/or clothed if applicable.
-/;
-function UpdatePrisonerStrippingAndClothingStates(RPB_Prisoner apPrisoner)
-    if (apPrisoner.ShouldBeStripped)
-        apPrisoner.Strip(abRemoveUnderwear = apPrisoner.WillBeStrippedNaked)
-
-    elseif (apPrisoner.ShouldBeStrippedSilently)
-        apPrisoner.StripSilently()
-    endif
-
-    if (apPrisoner.ShouldBeClothed)
-        apPrisoner.DetermineClothingOutfit()
-        apPrisoner.Clothe()
-    endif
-endFunction
-
-
-; Temporary, to hold periodically updates prisoners for now
-RPB_Prisoner[] checkedPrisoners
-int checkedPrisonersIndex
-
-RPB_Prisoner[] property CheckedPrisonersList
-    RPB_Prisoner[] function get()
-        return checkedPrisoners
-    endFunction
-endProperty
-
-event OnUpdateGameTime()
-    __isReceivingUpdates = true
-    __isAwaitingUpdateForGameTime = false
-    
-    self.OnPrisonPeriodicUpdate()
-
-    RegisterForSingleUpdateGameTime(5.0)
-endEvent
-
 bool function BindCellToPrisoner(ObjectReference akJailCell, RPB_Prisoner apPrisoner)
     RPB_JailCell jailCell = (akJailCell as RPB_JailCell)
 
@@ -2440,83 +2318,6 @@ bool function BindCellToPrisoner(ObjectReference akJailCell, RPB_Prisoner apPris
 endFunction
 
 ;/
-    Workaround for references getting deleted in Skyrim after a certain
-    amount of time (10 days tested).
-
-    The reference (JailCell) will reset all its member properties, so they
-    will become null, this includes the Prisoners residing in the cell.
-    
-    So every time a jail cell does not contain prisoners, and considering its reference
-    is stored in RPB_Prisoner, that implies that the Jail Cell was reset but the Prisoner
-    should still be there, in which case we re-bind the Prisoner to the Jail Cell.
-
-    This is a workaround for that issue.
-
-    TODO: Test if this works when many prisoners are in the same cell,
-    because !JailCell.Prisoners will only be true when there are no prisoners,
-    which means that after one of these updates, it may not happen to the other ones
-    from the other RPB_Prisoner instances, since this will be false by then.
-/;
-function NPC_UpdateCellIntegrity(RPB_Prisoner apPrisoner)
-    if (!apPrisoner || !apPrisoner.IsNPC())
-        return
-    endif
-
-    ; The reference to the prisoner's jail cell, it was reset, but the Prisoner retains its reference
-    RPB_JailCell jailCell = apPrisoner.JailCell
-    
-    ; If the prisoner holds the jail cell reference, but is not registered, the integrity was broken
-    bool isCellIntegrityBroken = !jailCell.HasPrisoner(apPrisoner)
-
-    if (!isCellIntegrityBroken)
-        return
-    endif
-
-    ; Since the jail cell's properties were reset, re-register this prisoner
-    jailCell.RegisterPrisoner(apPrisoner)
-    jailCell.PerformPrisonerSanityCheck(apPrisoner)
-endFunction
-
-; To be refactored into RPB_PrisonMonitor perhaps, along with OnUpdateGameTime() to check for Prisoner releases/escapes
-event OnCellAttach()
-    self.SetupCells()
-    Debug("["+ Name +"] Prison::OnCellAttach", "On Cell Attach Prison")
-
-    float startBench = StartBenchmark()
-    int i = 0
-    while (i < Prisoners.Count)
-        RPB_Prisoner prisoner = Prisoners.AtIndex(i)
-        
-        if (prisoner && prisoner.IsNPC())
-            self.NPC_UpdateCellIntegrity(prisoner)
-            ; self.UpdatePrisonerStrippingAndClothingStates(prisoner) ; temporary
-        endif
-
-        ; Debug("["+ Name +"] Prison::OnCellAttach", prisoner.Name + "'s Cell: " + prisoner.JailCell.ID)
-        ; Debug("["+ Name +"] Prison::OnCellAttach", prisoner.JailCell.ID + " Prisoners: " + prisoner.JailCell.Prisoners)
-
-        i += 1
-    endWhile
-
-    EndBenchmark(startBench, "NPC Cell Integrity Checks")
-endEvent
-
-
-function RegisterForPrisonPeriodicUpdate(RPB_Prisoner akPrisoner)
-    ; Debug("Prison::RegisterForPrisonPeriodicUpdate", "Called RegisterForPrisonPeriodicUpdate()")
-    ; Add this prisoner to the list of prisoners to check periodically
-    if (!akPrisoner.IsEnabledForBackgroundUpdates)
-        checkedPrisoners[checkedPrisonersIndex] = akPrisoner
-        Debug("Prison::RegisterForPrisonPeriodicUpdate", "Added Prisoner to check for updates: " + checkedPrisoners[checkedPrisonersIndex] + ", index: " + checkedPrisonersIndex)
-        checkedPrisonersIndex += 1
-        akPrisoner.IsEnabledForBackgroundUpdates = true
-    endif
-
-    __isReceivingUpdates = true
-    self.RegisterForSingleUpdateGameTime(5.0)
-endFunction
-
-;/
     Assigns a number to this Prisoner for this Prison.
 /;
 function AssignPrisonerNumber(RPB_Prisoner apPrisoner)
@@ -2525,11 +2326,6 @@ function AssignPrisonerNumber(RPB_Prisoner apPrisoner)
     apPrisoner.SetInt("Prisoner Number", assignedNumber)
 endFunction
 
-
-bool __isReceivingUpdates
-bool function IsReceivingUpdates()
-    return __isReceivingUpdates
-endFunction
 
 ; =========================================================
 ;                         Data Config                      
@@ -2617,73 +2413,8 @@ RPB_Prisoner[] queuedPrisonersForImprisonment
 bool isProcessingQueuedPrisonersForImprisonment
 int queuedPrisonerAvailableIndex
 
-bool function IsPrisonerQueuedForImprisonment(RPB_Prisoner akPrisoner)
-    ; float startBench = StartBenchmark()
-    int i = 0
-    while (i < queuedPrisonersForImprisonment.Length)
-        if (queuedPrisonersForImprisonment[i] == akPrisoner)
-            ; EndBenchmark(startBench, "IsPrisonerQueuedForImprisonment -> returned true")
-            return true
-        endif
-        i += 1
-    endWhile
-    
-    ; EndBenchmark(startBench, "IsPrisonerQueuedForImprisonment -> returned false")
-    return false
-endFunction
-
-function RegisterForQueuedImprisonment()
-    ; Don't process, we are already processing
-    if (isProcessingQueuedPrisonersForImprisonment)
-        return
-    endif
-
-    ; GotoState("ProcessQueuedPrisonersForImprisonment")
-    RegisterForSingleUpdateGameTime(0.1)
-endFunction
-
-function QueuePrisonerForImprisonment(RPB_Prisoner akPrisoner)
-    if (self.IsPrisonerQueuedForImprisonment(akPrisoner))
-        return
-    endif
-
-    if (!queuedPrisonersForImprisonment)
-        queuedPrisonersForImprisonment = new RPB_Prisoner[128]
-        queuedPrisonerAvailableIndex = 0
-    endif
-    ; Debug("Prison::QueuePrisonerForImprisonment", "queuedPrisonersForImprisonment.Length: " + queuedPrisonersForImprisonment.Length)
-
-    queuedPrisonersForImprisonment[queuedPrisonerAvailableIndex] = akPrisoner
-    Debug("Prison::QueuePrisonerForImprisonment", "Queued " + queuedPrisonersForImprisonment[queuedPrisonerAvailableIndex] + " for imprisonment.")
-    queuedPrisonerAvailableIndex += 1
-endFunction
-
-function ProcessImprisonmentForQueuedPrisoners()
-    int i = 0
-    while (i < queuedPrisonersForImprisonment.Length)
-        if (queuedPrisonersForImprisonment[i] != none)
-            queuedPrisonersForImprisonment[i].Imprison()    ; Imprison this Prisoner
-            queuedPrisonersForImprisonment[i] = none        ; Remove from Queue
-        endif
-        Utility.Wait(0.2)
-        i += 1
-    endWhile
-
-    ; Finished processing prisoners
-    isProcessingQueuedPrisonersForImprisonment = false
-endFunction
-
 function ImprisonActorImmediately(Actor akActor)
-    RPB_Prisoner prisonerRef = self.MakePrisoner(akActor)
-
-    if (!prisonerRef.AssignCell())
-        Debug(akActor, "Prison::ImprisonActorImmediately", "Could not assign a cell to actor " + akActor)
-        return
-    endif
-
-    prisonerRef.QueueForImprisonment()
-    prisonerRef.MoveToCell()
-    prisonerRef.SetSentence(self.GetRandomSentence(0, 75))
+    FunctionNotImplemented("Prisoner::ImprisonActorImmediately")
 endFunction
 
 ; ==========================================================

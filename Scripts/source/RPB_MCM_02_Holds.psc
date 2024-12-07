@@ -158,8 +158,7 @@ function NPC_RenderPrisons(RPB_MCM_02 mcm, RPB_Prisoner apPrisoner) global
         return
     endif
 
-     ; Refresh time jailed (only updates when player is nearby since that's when the effect is on)
-    apPrisoner.UpdateTimeJailed()
+     RefreshPrisonerUI(apPrisoner)
     
     mcm.SetCursorFillMode(mcm.TOP_TO_BOTTOM)
     ; ==========================================================
@@ -192,9 +191,9 @@ function NPC_RenderPrisons(RPB_MCM_02 mcm, RPB_Prisoner apPrisoner) global
     RenderPrisonRight(mcm, holdPrison, apPrisoner.GetActor())
 endFunction
 
-; =====================================================
-; Helpers
-; =====================================================
+; ==========================================================
+;                           Helpers
+; ==========================================================
 
 ;/
     Displays the Header section info with the Hold info.
@@ -222,4 +221,13 @@ function DisplayHoldStats(RPB_MCM_02 mcm, Actor akActor, Faction akHoldCrimeFact
         mcm.AddOptionText("", statLine, defaultFlags = mcm.OPTION_DISABLED)
         optionIndex += 1
     endWhile
+endFunction
+
+; ==========================================================
+;                         UI Refresh
+; ==========================================================
+
+function RefreshPrisonerUI(RPB_Prisoner apPrisoner) global
+    apPrisoner.UpdateTimeJailed()
+    apPrisoner.UpdateInfamy()
 endFunction

@@ -2728,33 +2728,37 @@ string function __internal_GetMapElement( \
         return ""
     endif
 
-    bool paramValueBool = JMap.getInt(map, paramKey) as bool
-    int paramValueInt = JMap.getInt(map, paramKey)
-    float paramValueFlt = JMap.getFlt(map, paramKey)
-    string paramValueStr = JMap.getStr(map, paramKey)
-    int paramValueObj = JMap.getObj(map, paramKey)
-    Form paramValueForm = JMap.getForm(map, paramKey)
+    ;/ const /; int VALUE_TYPE_NO_VALUE = 0
+    ;/ const /; int VALUE_TYPE_NONE     = 1
+    ;/ const /; int VALUE_TYPE_INT      = 2
+    ;/ const /; int VALUE_TYPE_FLOAT    = 3
+    ;/ const /; int VALUE_TYPE_FORM     = 4
+    ;/ const /; int VALUE_TYPE_OBJECT   = 5
+    ;/ const /; int VALUE_TYPE_STRING   = 6
 
-    bool isBoolValue = paramValueBool == false || paramValueBool == true
-    bool isIntValue = paramValueInt != 0
-    bool isFloatValue = paramValueFlt != 0
-    bool isStringValue = paramValueStr != ""
-    bool isFormValue = paramValueForm != none
-    bool isObjValue = paramValueObj != 0
+    bool isIntValue     = JMap.valueType(map, paramKey) == VALUE_TYPE_INT
+    bool isFloatValue   = JMap.valueType(map, paramKey) == VALUE_TYPE_FLOAT
+    bool isStringValue  = JMap.valueType(map, paramKey) == VALUE_TYPE_STRING
+    bool isFormValue    = JMap.valueType(map, paramKey) == VALUE_TYPE_FORM
+    bool isObjValue     = JMap.valueType(map, paramKey) == VALUE_TYPE_OBJECT
 
     if (isStringValue)
+        string paramValueStr = JMap.getStr(map, paramKey)
         string paramValue = paramValueStr
         return paramKey + ": " + paramValue
 
-    elseif (isIntValue)
-        int paramValue = paramValueInt
-        return paramKey + ": " + paramValue
-
     elseif (isFloatValue)
+        float paramValueFlt = JMap.getFlt(map, paramKey)
         float paramValue = paramValueFlt
         return paramKey + ": " + paramValue
 
+    elseif (isIntValue)
+        int paramValueInt = JMap.getInt(map, paramKey)
+        int paramValue = paramValueInt
+        return paramKey + ": " + paramValue
+
     elseif (isObjValue)
+        int paramValueObj = JMap.getObj(map, paramKey)
         int paramValue = paramValueObj
         string objListFunction = GetContainerList( \
             paramValue, \
@@ -2769,10 +2773,12 @@ string function __internal_GetMapElement( \
         return paramKey + ": " + objListFunction
 
     elseif (isFormValue)
+        Form paramValueForm = JMap.getForm(map, paramKey)
         Form paramValue = paramValueForm
         return paramKey + ": " + paramValue
 
-    elseif (isBoolValue)
+    else ; Might never reach here because it gets evaluated as int
+        bool paramValueBool = JMap.getInt(map, paramKey)
         bool paramValue = paramValueBool
         return paramKey + ": " + paramValue
     endif

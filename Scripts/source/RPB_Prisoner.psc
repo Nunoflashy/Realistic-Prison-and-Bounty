@@ -636,14 +636,14 @@ endState
 
 state Released
     event OnBeginState()
-        Debug("{Released} ("+ Name +") Prisoner::OnBeginState", "this: " + this + ", HasCellPackage: " + self.HasCellPackage + ", Cell Package: " + self.CellPackage + ", Cell Package Actor Reference: " + CellPackage.GetActorReference())
+        ; Debug("{Released} ("+ Name +") Prisoner::OnBeginState", "this: " + this + ", HasCellPackage: " + self.HasCellPackage + ", Cell Package: " + self.CellPackage + ", Cell Package Actor Reference: " + CellPackage.GetActorReference())
 
         if (self.IsNPC())
             self.NPC_RestoreOriginalOutfit()
         endif
 
         if (self.IsNPC() && self.HasCellPackage)
-            self.UnbindAlias(self.CellPackage)
+            self.NPC_UnbindFromCell()
         endif
     endEvent
 
@@ -658,10 +658,6 @@ float _previousUpdateTimeServed
 state Imprisoned
     event OnBeginState()
         ; Debug("[state: "+ self.GetState() +"] ["+ Name +"] Prisoner::OnBeginState", self.Name + "'s Bounty: " + Bounty)
-        
-        ; if (!Prison.IsReceivingUpdates()) ; if we dont destroy the instance in time, this will get called from Prison after processing queued prisoners, and since we didnt register the prisoner, this is a bug since it will report 0 prisoners
-            Prison.RegisterForPrisonPeriodicUpdate(self)
-        ; endif
 
         ; Captor should probably be destroyed in RPB_Captor, because more Prisoners/Arrestees may depend on it
         ; we could check if that Captor has any prisoners left to escort, if not, destroy the reference.
@@ -676,6 +672,16 @@ state Imprisoned
     endEvent
 
     event OnUpdateGameTime()
+        ; ; Test - Don't let NPC update
+        ; if (self.IsNPC())
+        ;     return
+        ; endif
+        ; Dont update if the player is not nearby, let Prison Monitor handle it
+        if (!Prison.ShouldActivelyMonitorPrisoner(self))
+            Prison.SendMonitoringRequest()
+            return
+        endif
+
         self.UpdateInfamy()
         self.UpdateTimeJailed() ; Must be updated in some other way, otherwise it will reset to 0 on next imprisonment
  
@@ -683,6 +689,10 @@ state Imprisoned
             Prison.SendReleaseRequest(self)
             return
         endif
+
+        ; Debug("("+ Name +") Prisoner::OnUpdateGameTime", "this: " + this)
+        ; Debug("("+ Name +") Prisoner::OnUpdateGameTime", "ActorVars: " + GetContainerList(RPB_StorageVars.GetObjectHandleOnForm(this, "ActorVars")))
+        Debug("("+ Name +") Prisoner::OnUpdateGameTime", "Time Jailed: " + RPB_StorageVars.GetFloatOnForm(Prison.Hold + "::Time Jailed", this, "ActorVars"))
 
         Prison.DEBUG_ShowPrisonerSentenceInfo(self, true)
         ; Debug("["+ Name +"] Prisoner::OnUpdateGameTime", "("+ self.GetActor() +") Cell Package: " + self.CellPackage)
@@ -719,41 +729,19 @@ state Escape
 endState
 
 ; When resting at a bed to serve the time
+;/
+    To avoid any problems with possible imprisoned NPC's,
+    process all of the NPC's that are imprisoned with less
+    time left on their sentence compared to the Player.
+
+    This includes deleveling and any stat updates.
+    After that, the Player can be released,
+    this way we avoid invalid NPC stats.
+
+    The NPC's that have more time on their sentence compared to the player should also be processed,
+    but will not be released yet.
+/;
 state ServeOnRest
-    function UpdateTimeJailed()
-        int timeLeft = Math.Ceiling(TimeLeftInSentence)
-        self.ModifyStat("Time Jailed", timeLeft)
-        self.IncrementStat("Days Jailed", timeLeft)
-
-        if (self.IsPlayer())
-            Game.IncrementStat("Days Jailed", timeLeft)
-        endif
-
-        Debug("[state: ServeOnRest] ["+ Name +"] Prisoner::UpdateTimeJailed", "Updating " + self.Name + "'s time jailed: " + timeLeft + ", TimeLeftInSentence: " + TimeLeftInSentence)
-    endFunction
-
-    function UpdateInfamy()
-        if (!Prison.EnableInfamy)
-            return
-        endif
-
-        int timeLeft = Math.Ceiling(TimeLeftInSentence)
-        int infamyGained = (InfamyGainedDaily * timeLeft) as int
-
-        self.IncrementStat("Infamy Gained", infamyGained)
-
-        Config.NotifyInfamy(infamyGained + " infamy gained in " + Prison.Name, self.IsPlayer())
-        Config.NotifyInfamy(self.GetName() + " has gained " + infamyGained + " infamy in " + Prison.Name, !self.IsPlayer())
-    
-        if (IsInfamyKnown)
-            Prison.NotifyInfamyKnownThresholdMet(Prison.HasInfamyKnownNotificationFired)
-    
-        elseif (IsInfamyRecognized)
-            Prison.NotifyInfamyRecognizedThresholdMet(Prison.HasInfamyRecognizedNotificationFired)
-        endif
-
-        Debug("[state: ServeOnRest] ["+ Name +"] Prisoner::UpdateInfamy", "Updating " + self.Name + "'s infamy in jail: " + infamyGained)
-    endFunction
 endState
 
 ; ==========================================================
@@ -812,12 +800,9 @@ endFunction
 bool function HasDayElapsed()
     ; Add the time served from each update this runs
     accumulatedTimeServed += TimeSinceLastUpdate
+    Debug("["+ Name +"] Prisoner::HasDayElapsed", "accumulatedTimeServed: " + accumulatedTimeServed + ", Has Day Elapsed: " + (accumulatedTimeServed >= 1))
 
-    if (accumulatedTimeServed >= 1)
-        return true
-    endif
-
-    return false
+    return accumulatedTimeServed >= 1
 endFunction
 
 function SetEscaped()
@@ -933,7 +918,8 @@ function MoveToCell(bool abBeginImprisonment = true)
 endFunction
 
 function QueueForImprisonment()
-    Prison.QueuePrisonerForImprisonment(self)
+    ; Prison.QueuePrisonerForImprisonment(self)
+     FunctionNotImplemented("Prisoner::QueueForImprisonment")
 endFunction
 
 function TriggerInfamyPenalty()
@@ -1654,6 +1640,8 @@ endFunction
 ; ==========================================================
 
 function FastForwardToRelease()
+    Prison.SetPlayerFastForwardingToRelease(true)
+
     GotoState("ServeOnRest")
     self.UnregisterForUpdates()
 
@@ -1663,12 +1651,12 @@ function FastForwardToRelease()
         Debug("["+ Name +"] Prisoner::FastForwardToRelease", "Setting Game Hour to Release Time Minimum Hour: " + RPB_Utility.GetTimeAs12Hour(Prison.ReleaseTimeMinimumHour))
     endif
 
-    self.UpdateTimeJailed()
-    self.UpdateInfamy()
-
     ; Pass the time
     int timeLeft = Math.Ceiling(TimeLeftInSentence)
     RPB_Utility.PassTimeInDays(timeLeft)
+
+    self.UpdateTimeJailed()
+    self.UpdateInfamy()
 
     ; float currentTimeBeforeChanges = CurrentTime
     ; __currentTimeOverride = CurrentTime + timeLeft
@@ -1678,6 +1666,7 @@ function FastForwardToRelease()
     GotoState("Awaiting")
 
     Prison.SendReleaseRequest(self)
+    Prison.SetPlayerFastForwardingToRelease(false)
 endFunction
 
 function DetermineReleaseTimeAdditionalHours()
@@ -1968,10 +1957,12 @@ function UpdateInfamy()
         return
     endif
 
-    self.IncrementStat("Infamy Gained", InfamyGainedPerUpdate)
+    float infamyGained = InfamyGainedPerUpdate
+    self.IncrementStat("Infamy Gained", infamyGained as int)
 
-    Config.NotifyInfamy(InfamyGainedPerUpdate + " infamy gained in " + Prison.Name, self.IsPlayer())
-    Info(self.GetName() + " has gained " + InfamyGainedPerUpdate + " infamy in " + Prison.Name, self.IsNPC())
+    Config.NotifyInfamy(infamyGained + " infamy gained in " + Prison.Name, self.IsPlayer())
+    Info(self.GetName() + " has gained " + infamyGained + " infamy in " + Prison.Name, self.IsNPC())
+    Debug("("+ Name +") Prisoner::UpdateInfamy", self.GetName() + " has gained " + infamyGained + " infamy in " + Prison.Name)
 
     if (IsInfamyKnown && self.IsPlayer())
         Prison.NotifyInfamyKnownThresholdMet(Prison.HasInfamyKnownNotificationFired)
@@ -1979,31 +1970,52 @@ function UpdateInfamy()
     elseif (IsInfamyRecognized && self.IsPlayer())
         Prison.NotifyInfamyRecognizedThresholdMet(Prison.HasInfamyRecognizedNotificationFired)
     endif
+    
+    self.RegisterLastUpdate()
 endFunction
+
+float property PreviousUpdateTimeServed
+    float function get()
+        return RPB_StorageVars.GetFloatOnForm("Previous Update Time Served", this, "Temporary")
+    endFunction
+
+    function set(float value)
+        RPB_StorageVars.SetFloatOnForm("Previous Update Time Served", this, value, "Temporary")
+    endFunction
+endProperty
 
 function UpdateTimeJailed()
-    float currentTimeJailed = (TimeServed - _previousUpdateTimeServed) ; Subtract previous time served so we only add the new time after the last update
-    ; Debug("["+ Name +"] Prisoner::UpdateTimeJailed", "currentTimeJailed: " + currentTimeJailed + ", TimeServed: " + TimeServed + ", _previousUpdateTimeServed: " + _previousUpdateTimeServed)
+    float timeJailedSinceLastUpdate = TimeServed - PreviousUpdateTimeServed
+    Debug("["+ Name +"] Prisoner::UpdateTimeJailed", "TimeServed: " + TimeServed + ", PreviousUpdateTimeServed: " + PreviousUpdateTimeServed + ", timeJailedSinceLastUpdate: " + timeJailedSinceLastUpdate)
 
-    self.ModifyStat("Time Jailed", currentTimeJailed)
 
-    if (self.HasDayElapsed())
-        if (self.IsPlayer())
-            Game.IncrementStat("Days Jailed", DaysSinceTimeOfImprisonment)
-        endif
+    int daysElapsed = floor(TimeServed) - floor(PreviousUpdateTimeServed)
 
-        accumulatedTimeServed -= DaysSinceTimeOfImprisonment ; Remove the counted days from accumulated time served (Get the fractional part if there's any - i.e: hours)
-        ; Debug("["+ Name +"] Prisoner::UpdateTimeJailed", "DaysSinceTimeOfImprisonment: " + DaysSinceTimeOfImprisonment + ", accumulatedTimeServed: " + accumulatedTimeServed)
-        ; Debug("["+ Name +"] Prisoner::UpdateTimeJailed", "Days Jailed: " + self.QueryStat("Days Jailed"))
-        self.OnDayPassed()
+    Debug("["+ Name +"] Prisoner::UpdateTimeJailed()", "Before UpdateDayEvents: PreviousUpdateTimeServed = " + PreviousUpdateTimeServed)
+    self.UpdateDayEvents()
+    Debug("["+ Name +"] Prisoner::UpdateTimeJailed()", "After UpdateDayEvents: PreviousUpdateTimeServed = " + PreviousUpdateTimeServed)
+
+    self.ModifyStat("Time Jailed", timeJailedSinceLastUpdate)
+
+    if (self.IsPlayer() && daysElapsed > 0)
+        Game.IncrementStat("Days Jailed", daysElapsed)
     endif
 
-    ; Debug("["+ Name +"] Prisoner::UpdateTimeJailed", "Updating " + self.Name + "'s time jailed by: " + currentTimeJailed)
-    ; Debug("["+ Name +"] Prisoner::UpdateTimeJailed", "TimeServed: " + TimeServed + ", _previousUpdateTimeServed: " + _previousUpdateTimeServed)
-
-    ; Update the previous time served, to take into account for the next calculation
-    _previousUpdateTimeServed = TimeServed
+    PreviousUpdateTimeServed = TimeServed
 endFunction
+
+function UpdateDayEvents()
+    int daysElapsed = floor(TimeServed) - floor(PreviousUpdateTimeServed)
+    Debug("["+ Name +"] Prisoner::UpdateDayEvents", "PreviousUpdateTimeServed: " + PreviousUpdateTimeServed + ", TimeServed: " + TimeServed + ", daysElapsed: " + daysElapsed)
+
+    while (daysElapsed > 0)
+        self.OnDayPassed()
+        daysElapsed -= 1
+    endwhile
+
+    PreviousUpdateTimeServed = TimeServed
+endFunction
+
 
 function UpdateLongestSentence()
     int currentLongestSentence = self.QueryStat("Longest Sentence")
@@ -2072,7 +2084,7 @@ function Destroy()
     ; self.Remove("Is Initialized", "Actor")
     ; RPB_StorageVars.SetBoolOnForm("Is Initialized", this, false, "Actor")
 
-    Debug("("+ Name +") Prisoner::Destroy", "Object: " + GetContainerList(RPB_StorageVars.GetObjectHandleOnForm(this)))
+    ; Debug("("+ Name +") Prisoner::Destroy", "Object: " + GetContainerList(RPB_StorageVars.GetObjectHandleOnForm(this)))
     ; TODO: Unset all properties related to this Prisoner
     ; Prison.UnregisterPrisoner(self)
 endFunction
@@ -2458,6 +2470,7 @@ event OnDayPassed()
         return
     endif
 
+    Debug("["+ Name +"] Prisoner::OnDayPassed", "A day has passed.")
     self.PerformDeleveling()
 endEvent
 
@@ -2540,10 +2553,6 @@ endEvent
 
 event OnDestroy()
     if (self.IsNPC())
-        if (!Prison.IsReceivingUpdates()) ; if we dont destroy the instance in time, this will get called from Prison after processing queued prisoners, and since we didnt register the prisoner, this is a bug since it will report 0 prisoners
-            Prison.RegisterForPrisonPeriodicUpdate(self)
-        endif
-
         if (this.GetParentCell() != Config.Player.GetParentCell())
             Debug("["+ Name +"] Prisoner::OnDestroy", Name + "'s Cell: " + this.GetParentCell() + ", Player's Cell: " + Config.Player.GetParentCell())
         endif
@@ -2629,6 +2638,14 @@ endFunction
 ; ==========================================================
 ;                          Management
 
+bool function NPC_ShouldMonitorActively()
+    return self.IsNPC() && !self.IsFarFromPlayer()
+endFunction
+
+function NPC_KeepMonitoring()
+    Prison.SendMonitoringRequest()
+endFunction
+
 function NPC_BindToCell()
     if (!self.IsNPC())
         return
@@ -2641,6 +2658,20 @@ function NPC_BindToCell()
     self.BindAlias(CellPackage)
     MiscUtil.PrintConsole("["+ Name +"] Bound to Package " + CellPackage.GetName())
     Debug("[Prison: "+ self.Prison.Name +"] ["+ Name +"] Prisoner::NPC_BindToCell", "[Package: "+ CellPackage.GetName() +"] Bound " + Name + " to "+ self.GetPossessivePronoun() +" Cell.")
+endFunction
+
+function NPC_UnbindFromCell()
+    if (!self.IsNPC())
+        return
+    endif
+
+    if (!self.HasCellPackage)
+        return
+    endif
+
+    self.UnbindAlias(CellPackage)
+    MiscUtil.PrintConsole("["+ Name +"] Unbound from Package " + CellPackage.GetName())
+    Debug("[Prison: "+ self.Prison.Name +"] ["+ Name +"] Prisoner::NPC_UnbindFromCell", "[Package: "+ CellPackage.GetName() +"] Unbound " + Name + " from "+ self.GetPossessivePronoun() +" Cell.")
 endFunction
 
 ;/
