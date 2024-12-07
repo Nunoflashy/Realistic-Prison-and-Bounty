@@ -522,7 +522,7 @@ int property InfamyGainedDaily
     endFunction
 endProperty
 
-int property InfamyGainedPerUpdate
+float property InfamyGainedPerUpdate
     ;/
         InfamyGainedDaily: 83
         TimeSinceLastUpdate: 0.16666666666666666666666666666667 (4 / 24) [4 Hours passed since last update]
@@ -536,8 +536,8 @@ int property InfamyGainedPerUpdate
         <=> ceil (3.4583333333333333333333333333334)
         <=> 4
     /;
-    int function get()
-        return round(InfamyGainedDaily * TimeSinceLastUpdate)
+    float function get()
+        return InfamyGainedDaily * TimeSinceLastUpdate
     endFunction
 endProperty
 
@@ -903,7 +903,7 @@ function MoveToCell(bool abBeginImprisonment = true)
     endif
 
     if (self.ShouldBeInCell && self.IsInCell)
-        EventManager.SendError(self.GetName() + " is already in "+ self.GetPossessivePronoun() +" cell: " + JailCell + "!", "["+ Name +"] Prisoner::MoveToCell")
+        EventManager.SendError(self.GetName() + " is already in "+ self.PronounPossessive +" cell: " + JailCell + "!", "["+ Name +"] Prisoner::MoveToCell")
         return
     endif
 
@@ -1693,7 +1693,7 @@ endFunction
 /;
 function Imprison()
     if (!self.HasStateRequiredForImprisonment)
-        EventManager.SendError(Name + " does not have the required state for "+ self.GetPossessivePronoun() +" imprisonment, cannot continue!", "["+ Name +"] Prisoner::Imprison")
+        EventManager.SendError(Name + " does not have the required state for "+ self.PronounPossessive +" imprisonment, cannot continue!", "["+ Name +"] Prisoner::Imprison")
         return
     endif
 
@@ -1958,7 +1958,7 @@ function UpdateInfamy()
     endif
 
     float infamyGained = InfamyGainedPerUpdate
-    self.IncrementStat("Infamy Gained", infamyGained as int)
+    self.ModifyStat("Infamy Gained", infamyGained)
 
     Config.NotifyInfamy(infamyGained + " infamy gained in " + Prison.Name, self.IsPlayer())
     Info(self.GetName() + " has gained " + infamyGained + " infamy in " + Prison.Name, self.IsNPC())
@@ -1986,13 +1986,13 @@ endProperty
 
 function UpdateTimeJailed()
     float timeJailedSinceLastUpdate = TimeServed - PreviousUpdateTimeServed
-    Debug("["+ Name +"] Prisoner::UpdateTimeJailed", "TimeServed: " + TimeServed + ", PreviousUpdateTimeServed: " + PreviousUpdateTimeServed + ", timeJailedSinceLastUpdate: " + timeJailedSinceLastUpdate)
-
-
     int daysElapsed = floor(TimeServed) - floor(PreviousUpdateTimeServed)
 
+    Debug("["+ Name +"] Prisoner::UpdateTimeJailed", "TimeServed: " + TimeServed + ", PreviousUpdateTimeServed: " + PreviousUpdateTimeServed + ", timeJailedSinceLastUpdate: " + timeJailedSinceLastUpdate)
     Debug("["+ Name +"] Prisoner::UpdateTimeJailed()", "Before UpdateDayEvents: PreviousUpdateTimeServed = " + PreviousUpdateTimeServed)
+
     self.UpdateDayEvents()
+    
     Debug("["+ Name +"] Prisoner::UpdateTimeJailed()", "After UpdateDayEvents: PreviousUpdateTimeServed = " + PreviousUpdateTimeServed)
 
     self.ModifyStat("Time Jailed", timeJailedSinceLastUpdate)
@@ -2657,7 +2657,7 @@ function NPC_BindToCell()
 
     self.BindAlias(CellPackage)
     MiscUtil.PrintConsole("["+ Name +"] Bound to Package " + CellPackage.GetName())
-    Debug("[Prison: "+ self.Prison.Name +"] ["+ Name +"] Prisoner::NPC_BindToCell", "[Package: "+ CellPackage.GetName() +"] Bound " + Name + " to "+ self.GetPossessivePronoun() +" Cell.")
+    Debug("[Prison: "+ self.Prison.Name +"] ["+ Name +"] Prisoner::NPC_BindToCell", "[Package: "+ CellPackage.GetName() +"] Bound " + Name + " to "+ self.PronounPossessive +" Cell.")
 endFunction
 
 function NPC_UnbindFromCell()
@@ -2671,7 +2671,7 @@ function NPC_UnbindFromCell()
 
     self.UnbindAlias(CellPackage)
     MiscUtil.PrintConsole("["+ Name +"] Unbound from Package " + CellPackage.GetName())
-    Debug("[Prison: "+ self.Prison.Name +"] ["+ Name +"] Prisoner::NPC_UnbindFromCell", "[Package: "+ CellPackage.GetName() +"] Unbound " + Name + " from "+ self.GetPossessivePronoun() +" Cell.")
+    Debug("[Prison: "+ self.Prison.Name +"] ["+ Name +"] Prisoner::NPC_UnbindFromCell", "[Package: "+ CellPackage.GetName() +"] Unbound " + Name + " from "+ self.PronounPossessive +" Cell.")
 endFunction
 
 ;/
@@ -2870,7 +2870,7 @@ function NPC_UpdateUnderwear()
     endif
 
     EventManager.SendInfo("Equipped underwear on " + self.Name, "["+ Name +"] Prisoner::NPC_UpdateUnderwear", shouldBeInUnderwear)
-    EventManager.SendInfo("Tried to equip underwear on " + self.Name + ", but " + self.GetGenderPronoun() + " does not have any!", "["+ Name +"] Prisoner::NPC_UpdateUnderwear", wasStrippedToUnderwear && !hasUnderwearInInventory)
+    EventManager.SendInfo("Tried to equip underwear on " + self.Name + ", but " + self.Pronoun + " does not have any!", "["+ Name +"] Prisoner::NPC_UpdateUnderwear", wasStrippedToUnderwear && !hasUnderwearInInventory)
 endFunction
 
 function NPC_UpdateClothing()

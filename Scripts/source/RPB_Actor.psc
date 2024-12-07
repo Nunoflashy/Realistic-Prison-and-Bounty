@@ -63,6 +63,79 @@ string property Gender
     endFunction
 endProperty
 
+
+; Returns 'she' for Females, 'he' for Males
+string property Pronoun
+    string function get()
+        if (self.IsFemale)
+            return "she"
+        elseif (self.IsMale)
+            return "he"
+        else
+            return "they" ; Let's hope we never get here
+        endif
+    endFunction
+endProperty
+
+; Returns 'her' for Females, 'him' for Males
+string property PronounObject
+    string function get()
+        if (self.IsFemale)
+            return "her"
+        elseif (self.IsMale)
+            return "him"
+        else
+            return "they" ; Let's hope we never get here
+        endif
+    endFunction
+endProperty
+
+string property PronounPossessive
+    string function get()
+        if (self.IsFemale)
+            return "hers"
+        elseif (self.IsMale)
+            return "his"
+        else
+            return "theirs" ; Let's hope we never get here
+        endif
+    endFunction
+endProperty
+
+; Returns 'her' for Females, 'his' for Males
+string property PronounPossessiveObject
+    string function get()
+        if (self.IsFemale)
+            return "her"
+        elseif (self.IsMale)
+            return "his"
+        else
+            return "their" ; Let's hope we never get here
+        endif
+    endFunction
+endProperty
+
+; Returns 'herself' for Females, 'himself' for Males
+string property PronounReflexive
+    string function get()
+        if (self.IsFemale)
+            return "herself"
+        elseif (self.IsMale)
+            return "himself"
+        else
+            return "themself" ; Let's hope we never get here
+        endif
+    endFunction
+endProperty
+
+; Returns 'herself' for Females, 'himself' for Males
+string property PronounIntensive
+    string function get()
+        return self.PronounReflexive
+    endFunction
+endProperty
+
+
 ; ==========================================================
 
 ;/
@@ -529,7 +602,6 @@ endFunction
 /;
 function SetStat(string statName, int value)
     RPB_ActorVars.SetStat(statName, self.GetFaction(), this, value)
-    ; RPB_Actor.SetStat(statName, self.Faction, this, value)
 
     if (TrackStats)
         self.OnStatChanged(statName, value)
@@ -541,8 +613,6 @@ endFunction
 /;
 function IncrementStat(string statName, int incrementBy = 1)
     RPB_ActorVars.IncrementStat(statName, self.GetFaction(), this, incrementBy)
-
-    ; RPB_Utility.DebugWithArgs("Actor::IncrementStat", "statName: " + statName + ", incrementBy: " + incrementBy, "Incrementing stat")
 
     if (TrackStats)
         self.OnStatChanged(statName, self.QueryStat(statName))
@@ -613,9 +683,6 @@ string function GetScriptVarCategory(string asVarCategory = "Actor")
     elseif (self as RPB_Captor && asVarCategory == "Actor")
         return "Captor"
 
-    elseif (self as RPB_Guard && asVarCategory == "Actor")
-        return "Guard"
-
     elseif (!(self as RPB_Actor) && asVarCategory == "Actor")
         DebugError("Actor::GetScriptVarCategory", "Could not find the underlying attached script, no category defined!")
         return "null"
@@ -661,7 +728,6 @@ endFunction
 
 int function GetInt(string asVarName, string asVarCategory = "Actor")
     string category = self.GetScriptVarCategory(asVarCategory)
-    ; Debug("Actor::GetInt", "["+ self +", "+ asVarCategory +"] Getting " + asVarName + " on " + this + ": " + RPB_StorageVars.GetIntOnForm(asVarName, this, category))
     return RPB_StorageVars.GetIntOnForm(asVarName, this, category)
 endFunction
 
@@ -757,6 +823,13 @@ endFunction
 ; ==========================================================
 
 event OnEffectStart(Actor akTarget, Actor akCaster)
+    ; Debug("("+ self as string +") RPB_Actor::OnEffectStart", this + ": IsInitialized: " + self.IsInitialized)
+
+    if (self.IsInitialized)
+        OnRestore()
+        return
+    endif
+
     __this = akTarget
     __isEffectActive = true
 
@@ -764,7 +837,10 @@ event OnEffectStart(Actor akTarget, Actor akCaster)
     self.__assignActor()
 
     ; Initialization to overriden children
+    ; TODO: Only initialize this based on a flag perhaps, so Prisoners don't get the effect initialized when they shouldn't (because it happens when the player is nearby)
     self.OnInitialize()
+
+    IsInitialized = true
 endEvent
 
 event OnEffectFinish(Actor akTarget, Actor akCaster)
@@ -793,9 +869,25 @@ endEvent
 event OnInitialize() ; virtual
 endEvent
 
+event OnRestore() ; virtual
+endEvent
+
 ; Handles the destruction of this Actor
 event OnDestroy() ; virtual
 endEvent
+
+;                     Virtual Functions
+; ==========================================================
+
+function Destroy() ; virtual
+    ; Debug("("+ Name +") Actor::Destroy", "this " + this + " from script " + self as string)
+
+    ; RPB_StorageVars.DeleteVariableOnForm("Is Initialized", this, "Actor")
+    RPB_StorageVars.DeleteCategoryOnForm(this, "Actor")
+    RPB_StorageVars.DeleteCategoryOnForm(this, "Temporary")
+endFunction
+
+; ==========================================================
 
 ; Registers this Actor to receive events when tracked stats are updated.
 function RegisterForTrackedStats()
@@ -847,32 +939,6 @@ int function GetFormID()
     return this.GetFormID()
 endFunction
 
-; Returns 'her' for Females, 'his' for Males
-string function GetPossessivePronoun()
-    if (self.IsFemale)
-        return "her"
-    elseif (self.IsMale)
-        return "his"
-    endif
-endFunction
-
-; Returns 'her' for Females, 'him' for Males
-string function GetPronoun()
-    if (self.IsFemale)
-        return "her"
-    elseif (self.IsMale)
-        return "him"
-    endif
-endFunction
-
-; Returns 'she' for Females, 'he' for Males
-string function GetGenderPronoun()
-    if (self.IsFemale)
-        return "she"
-    elseif (self.IsMale)
-        return "he"
-    endif
-endFunction
 
 ;/
     The Actor that is currently attached to this script.
@@ -916,6 +982,17 @@ bool property IsEffectActive
     endFunction
 endProperty
 
+bool property IsInitialized
+    bool function get()
+        return RPB_StorageVars.GetBoolOnForm("Is Initialized", this, "Actor")
+        ; return self.GetBool("Is Initialized")
+    endFunction
+
+    function set(bool value)
+        return RPB_StorageVars.SetBoolOnForm("Is Initialized", this, value, "Actor")
+        ; self.SetBool("Is Initialized", value)
+    endFunction
+endProperty
 
 ; State vars to control whether this Actor is the Player or an NPC
 bool __isPlayer

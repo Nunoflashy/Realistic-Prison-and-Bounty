@@ -119,7 +119,7 @@ bool function AwaitPrisonerForRelease(RPB_Prisoner apPrisoner)
 
     string timeServed = RPB_Utility.GetTimeFormatted(apPrisoner.TimeServed, abIncludeMinutes = true, asNullValue = "seconds")
     string timeLeft   = RPB_Utility.GetTimeFormatted(apPrisoner.TimeLeftInSentence, abIncludeMinutes = true, asNullValue = "seconds")
-    Debug("PrisonMonitor::AwaitPrisoners", apPrisoner.Name + " has not yet served "+ apPrisoner.GetPossessivePronoun() +" sentence in " + Prison.Name + " (" + timeServed + " served, " +  timeLeft +" left).")
+    Debug("PrisonMonitor::AwaitPrisoners", apPrisoner.Name + " has not yet served "+ apPrisoner.PronounPossessive +" sentence in " + Prison.Name + " (" + timeServed + " served, " +  timeLeft +" left).")
 
     return true
 endFunction
