@@ -361,11 +361,6 @@ function SetArrestGoal(string asArrestGoal)
     Arrest.SetArrestGoal(this, asArrestGoal)
 endFunction
 
-function UpdateArrestStats()
-    self.UpdateLargestBounty()
-    self.UpdateTotalBounty()
-endFunction
-
 function RevertArrest()
     ; Unbind from Cuffs
     self.Uncuff()
@@ -395,7 +390,6 @@ endFunction
 
 function Arrest()
     self.SetArrestGoal(Arrest.ARREST_GOAL_IMPRISONMENT)
-    self.UpdateArrestStats()
     self.SetTimeOfArrest()
 
     SetBool("Arrested", true)
@@ -478,14 +472,6 @@ function SetTimeOfArrest()
     SetInt("Day of Arrest", RPB_Utility.GetCurrentDay())
     SetInt("Month of Arrest", RPB_Utility.GetCurrentMonth())
     SetInt("Year of Arrest", RPB_Utility.GetCurrentYear())
-endFunction
-
-function UpdateLargestBounty()
-    parent.SyncLargestBountyForFaction(ArrestFaction)
-endFunction
-
-function UpdateTotalBounty()
-    parent.SyncTotalBountyForFaction(ArrestFaction)
 endFunction
 
 function MoveToCaptor()

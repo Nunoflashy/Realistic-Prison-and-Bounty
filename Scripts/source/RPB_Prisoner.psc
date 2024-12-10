@@ -2033,14 +2033,6 @@ function UpdateLongestSentence()
     "]")
 endFunction
 
-function UpdateLargestBounty()
-    parent.SyncLargestBountyForFaction(Prison.PrisonFaction)
-endFunction
-
-function UpdateTotalBounty()
-    parent.SyncTotalBountyForFaction(Prison.PrisonFaction)
-endFunction
-
 function UpdateSentence()
     int nonViolent      = self.GetActiveBounty(abViolent = false)
     int violent         = self.GetActiveBounty(abNonViolent = false)
