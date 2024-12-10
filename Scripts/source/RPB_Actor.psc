@@ -90,6 +90,7 @@ string property PronounObject
     endFunction
 endProperty
 
+; Returns 'hers' for Females, 'his' for Males
 string property PronounPossessive
     string function get()
         if (self.IsFemale)
@@ -137,6 +138,32 @@ endProperty
 
 
 ; ==========================================================
+
+; ==========================================================
+;                      Static Functions
+; ==========================================================
+
+int function GetCurrentActiveAndLatentBountyForFaction(Actor akActor, Faction akFaction, bool abNonViolent = true, bool abViolent = true) global
+    int totalBounty = 0
+    bool isPlayer = akActor.GetFormID() == 0x14
+
+    if (abNonViolent)
+        int activeNonViolentBounty = int_if (isPlayer, akFaction.GetCrimeGoldNonViolent(), RPB_ActorVars.GetCrimeGoldNonViolent(akFaction, akActor))
+        int latentNonViolentBounty = RPB_ActorVars.GetLatentCrimeGoldNonViolent(akFaction, akActor)
+        totalBounty += activeNonViolentBounty + latentNonViolentBounty
+    endif
+
+    if (abViolent)
+        int activeViolentBounty = int_if (isPlayer, akFaction.GetCrimeGoldViolent(), RPB_ActorVars.GetCrimeGoldViolent(akFaction, akActor))
+        int latentViolentBounty = RPB_ActorVars.GetLatentCrimeGoldViolent(akFaction, akActor)
+        totalBounty += activeViolentBounty + latentViolentBounty
+    endif
+
+    return totalBounty
+endFunction
+
+; ==========================================================
+
 
 ;/
     Binds an Alias to this Actor.
@@ -375,7 +402,7 @@ endFunction
 ; ==========================================================
  
 function SyncLargestBountyForFaction(Faction akFaction)
-    int currentBountyForFaction = RPB_ActorVars.GetCrimeGold(akFaction, this)
+    int currentBountyForFaction = self.GetActiveBountyForFaction(akFaction, abNonViolent = true, abViolent = true)
     int currentLargestBounty    = RPB_ActorVars.GetLargestBounty(akFaction, this)
     int newLargestBounty        = int_if (currentLargestBounty < currentBountyForFaction, currentBountyForFaction, currentLargestBounty)
 
@@ -390,19 +417,28 @@ function SyncLargestBountyForFaction(Faction akFaction)
     ; Set the local stat for the Hold
     RPB_ActorVars.SetLargestBounty(akFaction, this, newLargestBounty)
 
-    ; DebugWithArgs("Actor::UpdateLargestBountyForFaction", akFaction.GetName(), "[\n" + \ 
-    ;     "\t Current Largest Bounty: " + currentLargestBounty + "\n" + \
-    ;     "\t New Largest Bounty: " + newLargestBounty + "\n" + \
-    ;     "\t Bounty: " + currentBountyForFaction + "\n" + \
-    ; "]")
+    DebugWithArgs("Actor::SyncLargestBountyForFaction", akFaction.GetName(), "[\n" + \ 
+        "\t Current Largest Bounty: " + currentLargestBounty + "\n" + \
+        "\t New Largest Bounty: " + newLargestBounty + "\n" + \
+        "\t Bounty: " + currentBountyForFaction + "\n" + \
+    "]")
 endFunction
 
 function SyncTotalBountyForFaction(Faction akFaction)
-    int currentBountyForFaction = RPB_ActorVars.GetCrimeGold(akFaction, this)
-    RPB_ActorVars.ModTotalBounty(akFaction, this, currentBountyForFaction - self.GetInt("Previous Total Bounty", "Temporary"))
+    int currentBountyForFaction = self.GetActiveBountyForFaction(akFaction, abNonViolent = true, abViolent = true)
+    int previousTotalBounty     = self.GetInt("Previous Total Bounty", "Temporary")
+    int newTotalBounty          = currentBountyForFaction - previousTotalBounty
+
+    RPB_ActorVars.ModTotalBounty(akFaction, this, currentBountyForFaction)
 
     ; Persist the state to do calculations on previous total
-    self.SetInt("Previous Total Bounty", RPB_ActorVars.GetCrimeGold(akFaction, this), "Temporary")
+    self.SetInt("Previous Total Bounty", currentBountyForFaction, "Temporary")
+
+    DebugWithArgs("Actor::SyncTotalBountyForFaction", akFaction.GetName(), "[\n" + \ 
+        "\t Previous Total Bounty: " + previousTotalBounty + "\n" + \
+        "\t New Total Bounty: " + newTotalBounty + "\n" + \
+        "\t Bounty: " + currentBountyForFaction + "\n" + \
+    "]")
 endFunction
 
 bool function HasActiveBountyForFaction(Faction akFaction)
@@ -414,24 +450,49 @@ bool function HasActiveBountyForFaction(Faction akFaction)
 endFunction
 
 bool function HasLatentBountyForFaction(Faction akFaction)
-    return RPB_ActorVars.GetCrimeGold(akFaction, this) > 0
+    return RPB_ActorVars.GetLatentCrimeGold(akFaction, this) > 0
 endFunction
 
 function SetCrimeGoldForFaction(Faction akFaction, int aiGold)
+    ; Handling for the Player, done by base Faction
     if (self.IsPlayer())
         akFaction.SetCrimeGold(aiGold)
-    else
-        RPB_ActorVars.SetCrimeGold(akFaction, this, aiGold)
+        return
     endif
+
+    ; Handling for NPC's below
+    ; Unset the var if bounty is 0
+    if (aiGold == 0)
+        RPB_ActorVars.Unset(akFaction.GetName() + "::Bounty Non-Violent", this)
+        return
+    endif
+    
+    ; Set the bounty according to the value
+    RPB_ActorVars.SetCrimeGold(akFaction, this, aiGold)
+
+    self.OnBountyGained()
 endFunction
 
 function SetCrimeGoldViolentForFaction(Faction akFaction, int aiGold)
+    ; Handling for the Player, done by base Faction
     if (self.IsPlayer())
         akFaction.SetCrimeGoldViolent(aiGold)
-    else
-        RPB_ActorVars.SetCrimeGoldViolent(akFaction, this, aiGold)
+        return
     endif
+
+    ; Handling for NPC's below
+    ; Unset the var if bounty is 0
+    if (aiGold == 0)
+        RPB_ActorVars.Unset(akFaction.GetName() + "::Bounty Violent", this)
+        return
+    endif
+    
+    ; Set the bounty according to the value
+    RPB_ActorVars.SetCrimeGoldViolent(akFaction, this, aiGold)
+
+    self.OnBountyGained()
 endFunction
+
 
 function ModCrimeGoldForFaction(Faction akFaction, int aiAmount, bool abViolent = false)
     if (self.IsPlayer())
@@ -474,11 +535,11 @@ int function GetLatentBountyForFaction(Faction akFaction, bool abNonViolent = tr
     int totalBounty = 0
 
     if (abNonViolent)
-        totalBounty += RPB_ActorVars.GetCrimeGoldNonViolent(akFaction, this)
+        totalBounty += RPB_ActorVars.GetLatentCrimeGoldNonViolent(akFaction, this)
     endif
 
     if (abViolent)
-        totalBounty += RPB_ActorVars.GetCrimeGoldViolent(akFaction, this)
+        totalBounty += RPB_ActorVars.GetLatentCrimeGoldViolent(akFaction, this)
     endif
 
     return totalBounty
@@ -490,24 +551,15 @@ endFunction
     Faction @akFaction: The faction to restore the bounty to.
 /;
 function HideBountyForFaction(Faction akFaction)
-    ; For NPC's, the Latent Bounty is the same as the Active Bounty,
-    ; therefore, there's no need to "hide" it.
-    if (self.IsNPC())
-        return
-    endif
-
-    if (self.HasLatentBountyForFaction(akFaction))
-        RPB_ActorVars.ModCrimeGold(akFaction, this, self.GetActiveBountyForFaction(akFaction, abViolent = false))
-        RPB_ActorVars.ModCrimeGoldViolent(akFaction, this, self.GetActiveBountyForFaction(akFaction, abNonViolent = false))
-    else
-        RPB_ActorVars.SetCrimeGold(akFaction, this, self.GetActiveBountyForFaction(akFaction, abViolent = false))
-        RPB_ActorVars.SetCrimeGoldViolent(akFaction, this, self.GetActiveBountyForFaction(akFaction, abNonViolent = false))
-    endif
+    RPB_ActorVars.ModLatentCrimeGold(akFaction, this, self.GetActiveBountyForFaction(akFaction, abViolent = false), abViolent = false)
+    RPB_ActorVars.ModLatentCrimeGold(akFaction, this, self.GetActiveBountyForFaction(akFaction, abNonViolent = false), abViolent = true)
 
     ; if (Defeated && DefeatedBounty > 0)
     ;     Vars_ModInt("Bounty Non-Violent", ArrestVars.DefeatedBounty, "ActorVars")
     ; endif
 
+    self.SyncLargestBountyForFaction(akFaction)
+    self.SyncTotalBountyForFaction(akFaction)
     self.ClearActiveBountyForFaction(akFaction)
 endFunction
 
@@ -566,11 +618,11 @@ endFunction
 /;
 function ClearLatentBountyForFaction(Faction akFaction, bool abNonViolent = true, bool abViolent = true)
     if (abNonViolent)
-        RPB_ActorVars.Unset(akFaction.GetName() + "::Bounty Non-Violent", this)
+        RPB_ActorVars.Unset(akFaction.GetName() + "::Latent Bounty Non-Violent", this)
     endif
 
     if (abViolent)
-        RPB_ActorVars.Unset(akFaction.GetName() + "::Bounty Violent", this)
+        RPB_ActorVars.Unset(akFaction.GetName() + "::Latent Bounty Violent", this)
     endif
 endFunction
 
@@ -863,6 +915,9 @@ endEvent
 ; Handles the tracked stats when they are changed.
 ; Tracks both ActorVars for this particular Actor and all stats handled by OnTrackedStatsEvent() for the Player.
 event OnStatChanged(string asStatName, float afValue) ; virtual
+endEvent
+
+event OnBountyGained() ; virtual
 endEvent
 
 ; Handles the initialization of this Actor

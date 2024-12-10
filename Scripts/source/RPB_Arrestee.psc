@@ -598,8 +598,6 @@ endEvent
 
 event OnBountyGained()
     self.HideBounty()
-    self.UpdateLargestBounty()
-    self.UpdateTotalBounty()
 endEvent
 
 event OnStatChanged(string asStatName, float afValue)

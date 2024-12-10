@@ -652,8 +652,6 @@ state Released
     endEvent
 endState
 
-float _previousUpdateTimeServed
-
 ; While this Prisoner is imprisoned in their cell
 state Imprisoned
     event OnBeginState()
@@ -903,7 +901,7 @@ function MoveToCell(bool abBeginImprisonment = true)
     endif
 
     if (self.ShouldBeInCell && self.IsInCell)
-        EventManager.SendError(self.GetName() + " is already in "+ self.PronounPossessive +" cell: " + JailCell + "!", "["+ Name +"] Prisoner::MoveToCell")
+        EventManager.SendError(self.GetName() + " is already in "+ self.PronounPossessiveObject +" cell: " + JailCell + "!", "["+ Name +"] Prisoner::MoveToCell")
         return
     endif
 
@@ -1667,6 +1665,8 @@ function FastForwardToRelease()
 
     Prison.SendReleaseRequest(self)
     Prison.SetPlayerFastForwardingToRelease(false)
+
+    ; Maybe process NPC states now, shouldn't be in this function though. (maybe OnDestroy()?)
 endFunction
 
 function DetermineReleaseTimeAdditionalHours()
@@ -1693,7 +1693,7 @@ endFunction
 /;
 function Imprison()
     if (!self.HasStateRequiredForImprisonment)
-        EventManager.SendError(Name + " does not have the required state for "+ self.PronounPossessive +" imprisonment, cannot continue!", "["+ Name +"] Prisoner::Imprison")
+        EventManager.SendError(Name + " does not have the required state for "+ self.PronounPossessiveObject +" imprisonment, cannot continue!", "["+ Name +"] Prisoner::Imprison")
         return
     endif
 
@@ -2002,6 +2002,8 @@ function UpdateTimeJailed()
     endif
 
     PreviousUpdateTimeServed = TimeServed
+    Debug("["+ Name +"] Prisoner::UpdateTimeJailed()", "(Function End) PreviousUpdateTimeServed = " + PreviousUpdateTimeServed + ", TimeServed = " + TimeServed + ", LastUpdate: " + LastUpdate)
+
 endFunction
 
 function UpdateDayEvents()
@@ -2418,7 +2420,7 @@ endEvent
 
 ;                  Bounty / Sentence / Stats
 ; ==========================================================
-
+ 
 ;/
     Handles what happens when this Prisoner receives additional active bounty.
 /;
@@ -2428,8 +2430,6 @@ event OnBountyGained()
     endif
 
     self.UpdateSentence()
-    self.UpdateLargestBounty()
-    self.UpdateTotalBounty()
 endEvent
 
 event OnSentenceSet(int aiSentence, float afAtWhatTime)
@@ -2447,18 +2447,25 @@ event OnSentenceChanged(int aiOldSentence, int aiNewSentence, bool abHasSentence
 
     if (abHasSentenceIncreased)
         int daysIncreasedBy = aiNewSentence - aiOldSentence
-        Config.NotifyJail("Your sentence was increased by " + daysIncreasedBy + " days.")
+        Config.NotifyJail("Your sentence was increased by " + daysIncreasedBy + " days.", self.IsPlayer())
         self.UpdateLongestSentence()
     endif
 endEvent
 
 event OnStatChanged(string asStatName, float afValue)
-    if (asStatName == Prison.Hold + " Bounty") ; If there's bounty gained in the current prison hold
+    ;/ const /; string HOLD_BOUNTY                  = Prison.Hold + " Bounty"
+    ;/ const /; string HOLD_LATENT_BOUNTY           = "Bounty Non-Violent"
+    ;/ const /; string HOLD_LATENT_VIOLENT_BOUNTY   = "Bounty Violent"
+
+    if (asStatName == HOLD_BOUNTY) ; If there's bounty gained in the current prison hold
         self.OnBountyGained()
         ; Maybe inform the prisoner of their new sentence and have them escorted out of the cell to be frisked/stripped if they are not
+
+    elseif (asStatName == HOLD_LATENT_BOUNTY || asStatName == HOLD_LATENT_VIOLENT_BOUNTY)
+        self.OnBountyGained()
     endif
 
-    ; Debug(this, "["+ Name +"] Prisoner::OnStatChanged", "Stat " + asStatName + " has been changed to " + afValue)
+    Debug("["+ Name +"] Prisoner::OnStatChanged", "Stat " + asStatName + " has been changed to " + afValue)
 endEvent
 
 ;                Imprisonment / Sleep / Time
@@ -2657,7 +2664,7 @@ function NPC_BindToCell()
 
     self.BindAlias(CellPackage)
     MiscUtil.PrintConsole("["+ Name +"] Bound to Package " + CellPackage.GetName())
-    Debug("[Prison: "+ self.Prison.Name +"] ["+ Name +"] Prisoner::NPC_BindToCell", "[Package: "+ CellPackage.GetName() +"] Bound " + Name + " to "+ self.PronounPossessive +" Cell.")
+    Debug("[Prison: "+ self.Prison.Name +"] ["+ Name +"] Prisoner::NPC_BindToCell", "[Package: "+ CellPackage.GetName() +"] Bound " + Name + " to "+ self.PronounPossessiveObject +" Cell.")
 endFunction
 
 function NPC_UnbindFromCell()
@@ -2671,7 +2678,7 @@ function NPC_UnbindFromCell()
 
     self.UnbindAlias(CellPackage)
     MiscUtil.PrintConsole("["+ Name +"] Unbound from Package " + CellPackage.GetName())
-    Debug("[Prison: "+ self.Prison.Name +"] ["+ Name +"] Prisoner::NPC_UnbindFromCell", "[Package: "+ CellPackage.GetName() +"] Unbound " + Name + " from "+ self.PronounPossessive +" Cell.")
+    Debug("[Prison: "+ self.Prison.Name +"] ["+ Name +"] Prisoner::NPC_UnbindFromCell", "[Package: "+ CellPackage.GetName() +"] Unbound " + Name + " from "+ self.PronounPossessiveObject +" Cell.")
 endFunction
 
 ;/

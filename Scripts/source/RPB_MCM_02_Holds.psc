@@ -197,13 +197,13 @@ endFunction
 
 ;/
     Displays the Header section info with the Hold info.
-    The header's values, as well as their positioning, are controlled through the template on the MCM config file.
+    The header's values, as well as their positioning, are controlled through the template in the MCM config file.
 /;
 function DisplayHoldStats(RPB_MCM_02 mcm, Actor akActor, Faction akHoldCrimeFaction) global
     string[] holdPlaceholders   = mcm.HoldStatsPlaceholders
     string[] holdStats = mcm.ConstructHoldStatValues( \
-        aiBounty            = RPB_ActorVars.GetCrimeGoldNonViolent(akHoldCrimeFaction, akActor), \ 
-        aiViolentBounty     = RPB_ActorVars.GetCrimeGoldViolent(akHoldCrimeFaction, akActor), \ 
+        aiBounty            = RPB_Actor.GetCurrentActiveAndLatentBountyForFaction(akActor, akHoldCrimeFaction), \
+        aiViolentBounty     = RPB_Actor.GetCurrentActiveAndLatentBountyForFaction(akActor, akHoldCrimeFaction, abNonViolent = false), \ 
         aiLargestBounty     = RPB_ActorVars.GetLargestBounty(akHoldCrimeFaction, akActor), \ 
         aiTotalBounty       = RPB_ActorVars.GetTotalBounty(akHoldCrimeFaction, akActor), \ 
         aiTimesArrested     = RPB_ActorVars.GetTimesArrested(akHoldCrimeFaction, akActor), \
