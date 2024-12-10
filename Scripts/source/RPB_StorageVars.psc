@@ -271,7 +271,12 @@ function SetBoolOnForm(string asKey, Form akForm, bool abValue, string asCategor
     JDB.solveIntSetter(path, abValue as int, true)
 endFunction
 
-function SetIntOnForm(string asKey, Form akForm, int aiValue, string asCategory = "null") global
+function SetIntOnForm(string asKey, Form akForm, int aiValue, string asCategory = "null", bool abDeleteOnNull = true) global
+    if (abDeleteOnNull && aiValue == 0)
+        DeleteVariableOnForm(asKey, akForm, asCategory)
+        return
+    endif
+    
     string path = GetVarPathOnForm(asKey, akForm, asCategory)
     JDB.solveIntSetter(path, aiValue, true)
 endFunction

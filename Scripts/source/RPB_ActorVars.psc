@@ -23,6 +23,14 @@ function SetCrimeGoldViolent(Faction akFaction, Actor akActor, int value) global
     SetIntOnForm(akFaction.GetName() + "::Bounty Violent", akActor, value, "ActorVars")
 endFunction
 
+function SetLatentCrimeGold(Faction akFaction, Actor akActor, int value) global
+    SetIntOnForm(akFaction.GetName() + "::Latent Bounty Non-Violent", akActor, value, "ActorVars", abDeleteOnNull = true)
+endFunction
+
+function SetLatentCrimeGoldViolent(Faction akFaction, Actor akActor, int value) global
+    SetIntOnForm(akFaction.GetName() + "::Latent Bounty Violent", akActor, value, "ActorVars")
+endFunction
+
 function SetLargestBounty(Faction akFaction, Actor akActor, int value) global
     SetIntOnForm(akFaction.GetName() + "::Largest Bounty", akActor, value, "ActorVars")
 endFunction
@@ -96,6 +104,19 @@ function ModCrimeGoldViolent(Faction akFaction, Actor akActor, int value) global
     SetIntOnForm(statKey, akActor, GetIntOnForm(statKey, akActor, "ActorVars") + value, "ActorVars")
 endFunction
 
+function ModLatentCrimeGold(Faction akFaction, Actor akActor, int value, bool abViolent = false) global
+    string bountyType = "Latent Bounty Non-Violent"
+
+    if (abViolent)
+        bountyType = "Latent Bounty Violent"
+    endif
+
+    string statKey = akFaction.GetName() + "::" + bountyType
+    SetIntOnForm(statKey, akActor, GetIntOnForm(statKey, akActor, "ActorVars") + value, "ActorVars")
+
+    Debug("ActorVars::ModLatentCrimeGold", "Stat Key: " + statKey + ", New Value: " + GetIntOnForm(statKey, akActor, "ActorVars"))
+endFunction
+
 function ModLargestBounty(Faction akFaction, Actor akActor, int value) global
     string statKey = akFaction.GetName() + "::Largest Bounty"
     SetIntOnForm(statKey, akActor, GetIntOnForm(statKey, akActor, "ActorVars") + value, "ActorVars")
@@ -164,6 +185,10 @@ endFunction
 function ModifyStat(string asStatName, Faction akFaction, Actor akActor, float modifyBy) global
     float currentValue = GetStatFloat(asStatName, akFaction, akActor)
     SetStatFloat(asStatName, akFaction, akActor, currentValue + modifyBy)
+
+    if (asStatName == "Time Jailed")
+        Debug("ActorVars::ModifyStat", "Time Jailed: " + currentValue + ", Adding: " + modifyBy + ", New Value: " + GetStatFloat(asStatName, akFaction, akActor))
+    endif
 endFunction
 
 
@@ -202,6 +227,19 @@ endFunction
 
 int function GetCrimeGoldViolent(Faction akFaction, Actor akActor) global
     return GetIntOnForm(akFaction.GetName() + "::Bounty Violent", akActor, "ActorVars")
+endFunction
+
+int function GetLatentCrimeGold(Faction akFaction, Actor akActor) global
+    return  GetIntOnForm(akFaction.GetName() + "::Latent Bounty Non-Violent", akActor, "ActorVars") + \
+            GetIntOnForm(akFaction.GetName() + "::Latent Bounty Violent", akActor, "ActorVars")
+endFunction
+
+int function GetLatentCrimeGoldNonViolent(Faction akFaction, Actor akActor) global
+    return GetIntOnForm(akFaction.GetName() + "::Latent Bounty Non-Violent", akActor, "ActorVars")
+endFunction
+
+int function GetLatentCrimeGoldViolent(Faction akFaction, Actor akActor) global
+    return GetIntOnForm(akFaction.GetName() + "::Latent Bounty Violent", akActor, "ActorVars")
 endFunction
 
 int function GetLargestBounty(Faction akFaction, Actor akActor) global
