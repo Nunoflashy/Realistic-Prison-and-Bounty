@@ -425,20 +425,8 @@ function SyncLargestBountyForFaction(Faction akFaction)
 endFunction
 
 function SyncTotalBountyForFaction(Faction akFaction)
-    int currentBountyForFaction = self.GetActiveBountyForFaction(akFaction, abNonViolent = true, abViolent = true)
-    int previousTotalBounty     = self.GetInt("Previous Total Bounty", "Temporary")
-    int newTotalBounty          = currentBountyForFaction - previousTotalBounty
-
-    RPB_ActorVars.ModTotalBounty(akFaction, this, currentBountyForFaction)
-
-    ; Persist the state to do calculations on previous total
-    self.SetInt("Previous Total Bounty", currentBountyForFaction, "Temporary")
-
-    DebugWithArgs("Actor::SyncTotalBountyForFaction", akFaction.GetName(), "[\n" + \ 
-        "\t Previous Total Bounty: " + previousTotalBounty + "\n" + \
-        "\t New Total Bounty: " + newTotalBounty + "\n" + \
-        "\t Bounty: " + currentBountyForFaction + "\n" + \
-    "]")
+    int activeBounty = self.GetActiveBountyForFaction(akFaction)
+    RPB_ActorVars.ModTotalBounty(akFaction, this, activeBounty)
 endFunction
 
 bool function HasActiveBountyForFaction(Faction akFaction)
