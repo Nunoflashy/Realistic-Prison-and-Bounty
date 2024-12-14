@@ -645,6 +645,9 @@ state Released
         if (self.IsNPC() && self.HasCellPackage)
             self.NPC_UnbindFromCell()
         endif
+
+        self.UpdateTimeJailed()
+        self.UpdateInfamy()    
     endEvent
 
     event OnUpdateGameTime()
@@ -1648,6 +1651,10 @@ function FastForwardToRelease()
         RPB_Utility.SetGameHour(Prison.ReleaseTimeMinimumHour)
         Debug("["+ Name +"] Prisoner::FastForwardToRelease", "Setting Game Hour to Release Time Minimum Hour: " + RPB_Utility.GetTimeAs12Hour(Prison.ReleaseTimeMinimumHour))
     endif
+
+    ; Process all NPC Prisoners that have a Sentence less than the Player's
+    ; This should probably be processed globally for all Prisons, but just for testing it's done with the same one the Player is in.
+    Prison.ReleasePrisonersWithSentenceLessThan(TimeLeftInSentence)
 
     ; Pass the time
     int timeLeft = Math.Ceiling(TimeLeftInSentence)
@@ -2727,12 +2734,17 @@ endFunction
 
 function NPC_SaveOriginalOutfit()
     if (self.IsNPC())
-        __npcOriginalOutfit = this.GetActorBase().GetOutfit()
+        Outfit npcBaseOutfit = this.GetActorBase().GetOutfit()
+
+        ; Ensure we don't save a 'naked' outfit.
+        if (npcBaseOutfit != RPB_GetOutfit("Naked"))
+            __npcOriginalOutfit = npcBaseOutfit
+        endif
     endif
 endFunction
 
 function NPC_RestoreOriginalOutfit()
-    if (self.IsNPC())
+    if (self.IsNPC() && NPC_OriginalOutfit)
         this.SetOutfit(NPC_OriginalOutfit)
     endif
 endFunction

@@ -48,6 +48,9 @@ scriptname RPB_Prison extends RPB_Entity
     RPB_Prisoner[] function GetPrisoners(RPB_JailCell akPrisonCell = none)
     RPB_Prisoner[] function GetFemalePrisoners(RPB_JailCell akPrisonCell = none)
     RPB_Prisoner[] function GetMalePrisoners(RPB_JailCell akPrisonCell = none)
+    Form[] function GetPrisonersWithSentenceLessThan(float afSentence, float afPadding = 0.0)
+    Form[] function GetPrisonersWithCurrentSentenceLessThan(float afSentence, float afPadding = 0.0)
+    function ReleasePrisonersWithSentenceLessThan(float afTimeLeftInSentence, bool abPassTime = true)
     Form[] function GetCellMates(RPB_Prisoner apPrisoner)
     string function GetTimeOfArrestFormatted(RPB_Prisoner apPrisoner)
     string function GetTimeOfImprisonmentFormatted(RPB_Prisoner apPrisoner)
@@ -1577,6 +1580,56 @@ endFunction
 ;                     Prisoner - Getters
 ; ==========================================================
 
+;/
+    Returns a list of all prisoners with a base Sentence less than @afSentence, with a padding of @afPadding.
+
+    float  @afSentence: The sentence to compare against.
+    float  @afPadding: The padding to remove from the sentence.
+
+    returns (Form[]): A list of all prisoners with a base Sentence less than the specified sentence.
+/;
+Form[] function GetPrisonersWithSentenceLessThan(float afSentence, float afPadding = 0.0)
+    int prisonersArray = FastArray("<Form>")
+
+    int i = 0
+    while (i < Prisoners.Count)
+        RPB_Prisoner prisoner = Prisoners.AtIndex(i)
+
+        if (prisoner.Sentence < (afSentence - afPadding))
+            FastArray_AddForm(prisonersArray, prisoner.GetActor())
+        endif
+
+        i += 1
+    endWhile
+
+    return FastArray_ToFormArray(prisonersArray)
+endFunction
+
+;/
+    Returns a list of all prisoners with a Current Sentence less than @afSentence, with a padding of @afPadding.
+
+    float  @afSentence: The sentence to compare against.
+    float  @afPadding: The padding to remove from the sentence.
+
+    returns (Form[]): A list of all prisoners with a Current Sentence less than the specified sentence.
+/;
+Form[] function GetPrisonersWithCurrentSentenceLessThan(float afSentence, float afPadding = 0.0)
+    int prisonersArray = FastArray("<Form>")
+
+    int i = 0
+    while (i < Prisoners.Count)
+        RPB_Prisoner prisoner = Prisoners.AtIndex(i)
+
+        if (prisoner.TimeLeftInSentence < (afSentence - afPadding))
+            FastArray_AddForm(prisonersArray, prisoner.GetActor())
+        endif
+
+        i += 1
+    endWhile
+
+    return FastArray_ToFormArray(prisonersArray)
+endFunction
+
 RPB_Prisoner[] function GetPrisoners(RPB_JailCell akPrisonCell = none)
 
 endFunction
@@ -1676,19 +1729,19 @@ string function GetTimeElapsedSinceImprisonment(RPB_Prisoner apPrisoner)
 endFunction
 
 string function GetTimeLeftOfSentenceFormatted(RPB_Prisoner apPrisoner)
-    return RPB_Utility.GetTimeFormatted(apPrisoner.TimeLeftInSentence, asNullValue = "None")
+    return RPB_Utility.GetTimeFormatted(apPrisoner.TimeLeftInSentence)
 endFunction
 
 string function GetSentenceFormatted(RPB_Prisoner apPrisoner)
-    return RPB_Utility.GetTimeFormatted(apPrisoner.Sentence, asNullValue = "None")
+    return RPB_Utility.GetTimeFormatted(apPrisoner.Sentence)
 endFunction
 
 string function GetCriminalPenaltySentenceFormatted(RPB_Prisoner apPrisoner)
-    return RPB_Utility.GetTimeFormatted(apPrisoner.CriminalPenaltySentence, asNullValue = "None")
+    return RPB_Utility.GetTimeFormatted(apPrisoner.CriminalPenaltySentence)
 endFunction
 
 string function GetTimeServedFormatted(RPB_Prisoner apPrisoner)
-    return RPB_Utility.GetTimeFormatted(apPrisoner.TimeServed, asNullValue = "None")
+    return RPB_Utility.GetTimeFormatted(apPrisoner.TimeServed)
 endFunction
 
 
@@ -1766,6 +1819,31 @@ bool function SendReleaseRequest(RPB_Prisoner apPrisoner)
     elseif (apPrisoner.Should("Escort to Release"))
         self.EscortPrisonerToRelease(apPrisoner)
     endif
+endFunction
+
+function ReleasePrisonersWithSentenceLessThan(float afTimeLeftInSentence, bool abPassTime = true)
+    ;/ const /; int PADDING_ONE_DAY = 1
+
+    Form[] prisonersWithSentenceLessThan = self.GetPrisonersWithCurrentSentenceLessThan(afTimeLeftInSentence, PADDING_ONE_DAY)
+    int prisonersWithSentenceLessThanCount = prisonersWithSentenceLessThan.Length
+
+    Debug("["+ Name +"] Prison::ReleasePrisonersWithSentenceLessThan", "Prisoners With Sentence Less Than: " + prisonersWithSentenceLessThan)
+
+    int i = 0
+    while (i < prisonersWithSentenceLessThanCount)
+        RPB_Prisoner prisoner = Prisoners.AtKey(prisonersWithSentenceLessThan[i] as Actor)
+        float timeLeftInSentenceForPrisoner = prisoner.TimeLeftInSentence
+        Debug("["+ Name +"] Prison::ReleasePrisonersWithSentenceLessThan", "["+ i +"] ["+ prisoner.GetActor() +"] Prisoner: " + prisoner.Name + " (Cell: "+ prisoner.JailCell.ID +") (Package: "+ prisoner.CellPackage.GetName() +") (Prison: "+ prisoner.Prison.Name +")" + ", Sentence Left: " + timeLeftInSentenceForPrisoner + ", Less Than: " + afTimeLeftInSentence)
+
+        if (abPassTime)
+            RPB_Utility.PassTimeInDays(Ceiling(timeLeftInSentenceForPrisoner))
+        endif
+
+        self.SendReleaseRequest(prisoner)
+        Debug("["+ Name +"] Prison::ReleasePrisonersWithSentenceLessThan", "["+ i +"] ["+ prisoner.GetActor() +"] Base Outfit: " + prisoner.GetActor().GetActorBase().GetOutfit())
+
+        i += 1
+    endWhile
 endFunction
 
 function TriggerEscape(RPB_Prisoner apPrisoner)
