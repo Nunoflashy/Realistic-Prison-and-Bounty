@@ -382,8 +382,6 @@ bool function IsWearingOutfit(Armor[] akOutfit)
         return false
     endif
 
-    ; bool pieceMismatch = false
-
     int i = 0
     while (i < akOutfit.Length)
         int slotMask = akOutfit[i].GetSlotMask()
@@ -480,7 +478,6 @@ function SetCrimeGoldViolentForFaction(Faction akFaction, int aiGold)
 
     self.OnBountyGained()
 endFunction
-
 
 function ModCrimeGoldForFaction(Faction akFaction, int aiAmount, bool abViolent = false)
     if (self.IsPlayer())
