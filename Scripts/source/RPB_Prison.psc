@@ -30,9 +30,9 @@ scriptname RPB_Prison extends RPB_Entity
     Form[] function GetEmptyJailCells()
     Form[] function GetOccupiedJailCells()
     Form[] function GetAvailableJailCells()
-    RPB_JailCell[] function GetCellsWithFemalePrisoners()
-    RPB_JailCell[] function GetCellsWithMalePrisoners()
-    RPB_JailCell[] function GetCellsWithMixedPrisoners()
+    Form[] function GetCellsWithFemalePrisoners(bool abOnlyFemales = false)
+    Form[] function GetCellsWithMalePrisoners(bool abOnlyMales = false)
+    Form[] function GetCellsWithMixedPrisoners()
     RPB_JailCell function GetCellByID(string asCellIdentifier)
     RPB_JailCell function GetGenderExclusiveCell(string asGender, bool abCanBeEmpty = true, bool abCanBeOvercrowded = false)
     RPB_JailCell function RequestCell(RPB_Prisoner apPrisoner)
@@ -45,9 +45,9 @@ scriptname RPB_Prison extends RPB_Entity
     bool function HasMalePrisoners(RPB_JailCell akPrisonCell = none, bool abOnlyMales = false)
     bool function HasPrisonersOfGender(RPB_JailCell akPrisonCell = none, string asGender, bool abOnlySpecifiedGender = false)
     bool function HasCellMates(RPB_Prisoner apPrisoner)
-    RPB_Prisoner[] function GetPrisoners(RPB_JailCell akPrisonCell = none)
-    RPB_Prisoner[] function GetFemalePrisoners(RPB_JailCell akPrisonCell = none)
-    RPB_Prisoner[] function GetMalePrisoners(RPB_JailCell akPrisonCell = none)
+    Form[] function GetPrisoners(RPB_JailCell akPrisonCell = none)
+    Form[] function GetFemalePrisoners(RPB_JailCell akPrisonCell = none)
+    Form[] function GetMalePrisoners(RPB_JailCell akPrisonCell = none)
     Form[] function GetPrisonersWithSentenceLessThan(float afSentence, float afPadding = 0.0)
     Form[] function GetPrisonersWithCurrentSentenceLessThan(float afSentence, float afPadding = 0.0)
     function ReleasePrisonersWithSentenceLessThan(float afTimeLeftInSentence, bool abPassTime = true)
@@ -1140,11 +1140,11 @@ endFunction
     Retrieves the jail cells that are currently available (haven't reached the maximum amount of prisoners).
     Each element is able to be cast to a RPB_JailCell.
 
-    returns (Form[]); The jail cells that are currently available to take more prisoners.
+    returns (Form[]): The jail cells that are currently available to take more prisoners.
 /;
 Form[] function GetAvailableJailCells()
     Form[] cells = self.GetJailCells()
-    int availableCellsArray = JArray.object()
+    int availableCellsArray = FastArray("<Form>")
 
     int i = 0
     while (i < cells.Length)
@@ -1152,40 +1152,119 @@ Form[] function GetAvailableJailCells()
 
         if (jailCellRef && jailCellRef.IsAvailable)
             ; Debug("Prison::GetAvailableJailCells", "Cell: " + jailCellRef + ", IsAvailable: " + jailCellRef.IsAvailable + ", Gender: " + jailCellRef.IsGenderExclusive)
-            JArray.addForm(availableCellsArray, jailCellRef)
+            FastArray_AddForm(availableCellsArray, jailCellRef)
         endif
         i += 1
     endWhile
 
-    if (JValue.count(availableCellsArray) <= 0)
+    if (FastArray_Size(availableCellsArray) <= 0)
         return none
     endif
 
-    return JArray.asFormArray(availableCellsArray)
+    return FastArray_ToFormArray(availableCellsArray)
 endFunction
 
-RPB_JailCell[] function GetCellsWithFemalePrisoners()
-    ; Iterate through all the cells in the prison
-    ; Get each prisoner from each cell
-    ; Determine the sex of the prisoner
-    ; Store the prisoner's gender, or just a bool determining if it's female or male and set to true
-    ; If all the prisoners are the same sex, this cell only has female prisoners
+;/
+    Retrieves the jail cells that have female prisoners.
+    Each element is able to be cast to a RPB_JailCell.
+
+    bool? @abOnlyFemales: Only return cells strictly with female prisoners.
+
+    returns (Form[]): The jail cells that have female prisoners.
+/;
+Form[] function GetCellsWithFemalePrisoners(bool abOnlyFemales = false)
+    Form[] cells = self.OccupiedJailCells
+
+    if (!cells)
+        return none
+    endif
+
+    int returnedCells = FastArray("<Form>")
+
+    int i = 0
+    while (i < cells.Length)
+        RPB_JailCell jailCell = cells[i] as RPB_JailCell
+
+        if (jailCell.HasFemales(abOnlyFemales))
+            FastArray_AddForm(returnedCells, jailCell)
+        endif
+
+        i += 1
+    endWhile
+
+    if (FastArray_Size(returnedCells) <= 0)
+        return none
+    endif
+
+    return FastArray_ToFormArray(returnedCells)
 endFunction
 
-RPB_JailCell[] function GetCellsWithMalePrisoners()
-    ; Iterate through all the cells in the prison
-    ; Get each prisoner from each cell
-    ; Determine the sex of the prisoner
-    ; Store the prisoner's gender, or just a bool determining if it's female or male and set to true
-    ; If all the prisoners are the same sex, this cell only has male prisoners
+;/
+    Retrieves the jail cells that have male prisoners.
+    Each element is able to be cast to a RPB_JailCell.
+
+    bool? @abOnlyMales: Only return cells strictly with male prisoners.
+
+    returns (Form[]): The jail cells that have male prisoners.
+/;
+Form[] function GetCellsWithMalePrisoners(bool abOnlyMales = false)
+    Form[] cells = self.OccupiedJailCells
+
+    if (!cells)
+        return none
+    endif
+
+    int returnedCells = FastArray("<Form>")
+
+    int i = 0
+    while (i < cells.Length)
+        RPB_JailCell jailCell = cells[i] as RPB_JailCell
+
+        if (jailCell.HasMales(abOnlyMales))
+            FastArray_AddForm(returnedCells, jailCell)
+        endif
+
+        i += 1
+    endWhile
+
+    if (FastArray_Size(returnedCells) <= 0)
+        return none
+    endif
+
+    return FastArray_ToFormArray(returnedCells)
 endFunction
 
-RPB_JailCell[] function GetCellsWithMixedPrisoners()
-    ; Iterate through all the cells in the prison
-    ; Get each prisoner from each cell
-    ; Determine the sex of the prisoner
-    ; Store the prisoner's gender, or just a bool determining if it's female or male and set to true
-    ; If all the prisoners are not the same sex, this cell has both male and female prisoners
+;/
+    Retrieves the jail cells that have both male and female prisoners.
+    Each element is able to be cast to a RPB_JailCell.
+
+    returns (Form[]): The jail cells that have both male and female prisoners.
+/;
+Form[] function GetCellsWithMixedPrisoners()
+    Form[] cells = self.OccupiedJailCells
+
+    if (!cells)
+        return none
+    endif
+
+    int returnedCells = FastArray("<Form>")
+
+    int i = 0
+    while (i < cells.Length)
+        RPB_JailCell jailCell = cells[i] as RPB_JailCell
+
+        if (jailCell.HasMales() && jailCell.HasFemales())
+            FastArray_AddForm(returnedCells, jailCell)
+        endif
+
+        i += 1
+    endWhile
+
+    if (FastArray_Size(returnedCells) <= 0)
+        return none
+    endif
+
+    return FastArray_ToFormArray(returnedCells)
 endFunction
 
 RPB_JailCell function GetCellByID(string asCellIdentifier)
@@ -1196,6 +1275,17 @@ RPB_JailCell function GetCellByID(string asCellIdentifier)
     return RPB_Data.Jail_GetJailCellByID(self.GetDataObject(), asCellIdentifier)
 endFunction
 
+;/
+    Returns the gender exclusive cell for the specified gender.
+    Optionally, if @abCanBeEmpty is true, returns an empty cell if there is no gender exclusive cell for the specified gender.
+    Optionally, if @abCanBeOvercrowded is true, returns a cell that is overcrowdable if there is no available cell.
+
+    string @asGender: The gender to get the gender exclusive cell for.
+    bool? @abCanBeEmpty: If true, returns an empty cell if there is no gender exclusive cell for the specified gender.
+    bool? @abCanBeOvercrowded: If true, returns a cell that is overcrowdable if there is no gender exclusive cell for the specified gender.
+
+    returns (RPB_JailCell): The gender exclusive cell for the specified gender.
+/;
 RPB_JailCell function GetGenderExclusiveCell(string asGender, bool abCanBeEmpty = true, bool abCanBeOvercrowded = false)
     if (asGender != "Male" && asGender != "Female")
         return none
@@ -1210,7 +1300,13 @@ RPB_JailCell function GetGenderExclusiveCell(string asGender, bool abCanBeEmpty 
     return returnedCell
 endFunction
 
-; Test function for requesting cell (WIP)
+;/
+    Requests a cell for the specified prisoner.
+
+    RPB_Prisoner @apPrisoner: The prisoner requesting a cell.
+
+    returns (RPB_JailCell): The cell that the prisoner was assigned to.
+/;
 RPB_JailCell function RequestCell(RPB_Prisoner apPrisoner)
     ;/
         First, attempt to get empty cell for the prisoner, if that fails (there are no empty cells),
@@ -1265,6 +1361,7 @@ RPB_JailCell function RequestCell(RPB_Prisoner apPrisoner)
 
     return returnedCell
 endFunction
+
 
 Form[] function GetEscortLocations()
     return self.GetPropertyOfTypeFormArray("Markers//Jail//Escort")
@@ -1554,18 +1651,42 @@ bool function HasPrisoners(RPB_JailCell akPrisonCell = none)
     return Prisoners.Count > 0
 endFunction
 
-bool function HasFemalePrisoners(RPB_JailCell akPrisonCell = none, bool abOnlyFemales = false)
+;/
+    Checks if there are any Prisoners in the Prison who are female.
+    If a jail cell is passed in, then only check that cell for females.
+    In case that @abStrictlyFemales is true, checks if all of the Prisoners are Females.
 
+    RPB_JailCell?    @akPrisonCell: The Jail Cell to check for female prisoners.
+    bool             @abStrictlyFemales: Checks if all of the Prisoners are Female.
+    
+    returns (bool): True if there are prisoners in the Prison who are female,
+        further checking from their cell if one is passed in.
+/;
+bool function HasFemalePrisoners(RPB_JailCell akPrisonCell = none, bool abStrictlyFemales = false)
+    if (akPrisonCell)
+        return akPrisonCell.HasFemales(abStrictlyFemales)
+    endif
+
+    return RPB_Utility.HasFemalesInList(Prisoners.GetActors(), abStrictlyFemales)
 endFunction
 
 bool function HasMalePrisoners(RPB_JailCell akPrisonCell = none, bool abOnlyMales = false)
+    if (akPrisonCell)
+        return akPrisonCell.HasMales(abOnlyMales)
+    endif
 
+    return RPB_Utility.HasMalesInList(Prisoners.GetActors(), abOnlyMales)
 endFunction
 
 bool function HasPrisonersOfGender(RPB_JailCell akPrisonCell = none, string asGender, bool abOnlySpecifiedGender = false)
+    if (akPrisonCell)
+        return akPrisonCell.HasPrisonersOfGender(asGender, abOnlySpecifiedGender)
+    endif
 
+    return RPB_Utility.HasActorsOfGenderInList(Prisoners.GetActors(), asGender, abOnlySpecifiedGender)
 endFunction
 
+; Should probably be in RPB_Prisoner
 bool function HasCellMates(RPB_Prisoner apPrisoner)
     RPB_JailCell jailCell = apPrisoner.JailCell
 
@@ -1574,6 +1695,27 @@ bool function HasCellMates(RPB_Prisoner apPrisoner)
     endif
 
     return jailCell.PrisonerCount > 1
+endFunction
+
+; Should probably be in RPB_Prisoner
+bool function HasCellMatesOfGender(RPB_Prisoner apPrisoner, string asGender)
+    RPB_JailCell jailCell = apPrisoner.JailCell
+
+    if (jailCell == none)
+        return false
+    endif
+
+    ; TODO: Implementation
+endFunction
+
+; Should probably be in RPB_Prisoner
+bool function HasFemaleCellMates(RPB_Prisoner apPrisoner)
+    return HasCellMatesOfGender(apPrisoner, "Female")
+endFunction
+
+; Should probably be in RPB_Prisoner
+bool function HasMaleCellMates(RPB_Prisoner apPrisoner)
+    return HasCellMatesOfGender(apPrisoner, "Male")
 endFunction
 
 
@@ -1630,16 +1772,28 @@ Form[] function GetPrisonersWithCurrentSentenceLessThan(float afSentence, float 
     return FastArray_ToFormArray(prisonersArray)
 endFunction
 
-RPB_Prisoner[] function GetPrisoners(RPB_JailCell akPrisonCell = none)
+Form[] function GetPrisoners(RPB_JailCell akPrisonCell = none)
+    if (akPrisonCell)
+        return akPrisonCell.Prisoners
+    endif
 
+    return Prisoners.GetActors()
 endFunction
 
-RPB_Prisoner[] function GetFemalePrisoners(RPB_JailCell akPrisonCell = none)
+Form[] function GetFemalePrisoners(RPB_JailCell akPrisonCell = none)
+    if (akPrisonCell)
+        return akPrisonCell.GetFemalePrisoners()
+    endif
 
+    return RPB_Utility.GetFemalesInList(Prisoners.GetActors())
 endFunction
 
-RPB_Prisoner[] function GetMalePrisoners(RPB_JailCell akPrisonCell = none)
-    
+Form[] function GetMalePrisoners(RPB_JailCell akPrisonCell = none)
+    if (akPrisonCell)
+        return akPrisonCell.GetMalePrisoners()
+    endif
+
+    return RPB_Utility.GetMalesInList(Prisoners.GetActors())
 endFunction
 
 Form[] function GetCellMates(RPB_Prisoner apPrisoner)
