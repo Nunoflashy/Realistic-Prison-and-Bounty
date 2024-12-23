@@ -871,13 +871,157 @@ bool function ActorHasClothing(Actor akActor) global
     return akActor.GetWornForm(GetSlotMask("Body")) != none
 endFunction
 
+;/
+    Checks if the specified Actor is male.
+    Actor @akActor: The Actor to check.
+/;
 bool function IsActorMale(Actor akActor) global
     return akActor.GetActorBase().GetSex() == 0
 endFunction
 
+;/
+    Checks if the specified Actor is female.
+    Actor @akActor: The Actor to check.
+/;
 bool function IsActorFemale(Actor akActor) global
     return akActor.GetActorBase().GetSex() == 1
 endFunction
+
+;/
+    Checks if the specified Actor is of the specified gender.
+
+    Actor @akActor: The Actor to check.
+    string @asGender: The gender to check for.
+
+    Returns true if the Actor is of the specified gender, false otherwise.
+/;
+bool function IsActorOfGender(Actor akActor, string asGender) global
+    if (asGender == "Female" || asGender == "F")
+        return IsActorFemale(akActor)
+        
+    elseif (asGender == "Male" || asGender == "M")
+        return IsActorMale(akActor)
+    endif
+
+    return false
+endFunction
+
+;/
+    Checks if there are any Actors in the list that are of the specified gender.
+    Optionally, if @abStrictlyMatchGender is true, checks if all of the Actors are of the specified gender.
+
+    Form[] @akActors: The list of Actors to check.
+    string @asGender: The gender to check for.
+    bool?  @abStrictlyMatchGender: Checks if all of the Actors are of the specified gender.
+
+    Returns true if there are any Actors in the list that are of the specified gender,
+    or if they are all of the specified gender when @abStrictlyMatchGender is true, false otherwise.
+/;
+bool function HasActorsOfGenderInList(Form[] akActors, string asGender, bool abStrictlyMatchGender = false) global
+    if (!akActors)
+        return false
+    endif
+
+    if (asGender != "Male" && asGender != "Female" && asGender != "M" && asGender != "F")
+        return false
+    endif
+
+    int i = 0
+    while (i < akActors.Length)
+        Actor actorRef = akActors[i] as Actor
+        if (actorRef && IsActorOfGender(actorRef, asGender))
+            return true
+
+        elseif (abStrictlyMatchGender)
+            return false
+        endif
+        i += 1
+    endWhile
+
+    return false
+endFunction
+
+;/
+    Checks if there are any Actors in the list that are Males.
+    Optionally, if @abStrictlyMales is true, checks if all of the Actors are Males.
+
+    Form[] @akActors: The list of Actors to check.
+    bool?  @abStrictlyMales: Checks if all of the Actors are Males.
+
+    Returns true if there are any Actors in the list that are Males,
+    or if they are all Males when @abStrictlyMales is true, false otherwise.
+/;
+bool function HasMalesInList(Form[] akActors, bool abStrictlyMales = false) global
+    return HasActorsOfGenderInList(akActors, "Male", abStrictlyMales)
+endFunction
+
+;/
+    Checks if there are any Actors in the list that are Females.
+    Optionally, if @abStrictlyFemales is true, checks if all of the Actors are Females.
+
+    Form[] @akActors: The list of Actors to check.  
+    bool?  @abStrictlyFemales: Checks if all of the Actors are Females.
+
+    Returns true if there are any Actors in the list that are Females,
+    or if they are all Females when @abStrictlyFemales is true, false otherwise.
+/;
+bool function HasFemalesInList(Form[] akActors, bool abStrictlyFemales = false) global
+    return HasActorsOfGenderInList(akActors, "Female", abStrictlyFemales)
+endFunction
+
+;/
+    Retrieves all Actors in the list that are of the specified gender.
+
+    Form[] @akActors: The source list of Actors.
+    string @asGender: The gender to check for.
+
+    returns (Form[]): The Actors in the list that are of the specified gender.
+/;
+Form[] function GetActorsOfGenderInList(Form[] akActors, string asGender) global
+    if (!akActors)
+        return none
+    endif
+
+    if (asGender != "Male" && asGender != "Female" && asGender != "M" && asGender != "F")
+        return none
+    endif
+
+    int actors = FastArray("<Form>")
+
+    int i = 0
+    while (i < akActors.Length)
+        Actor actorRef = akActors[i] as Actor
+        if (actorRef && IsActorOfGender(actorRef, asGender))
+            FastArray_AddForm(actors, actorRef)
+        endif
+        i += 1
+    endWhile
+
+    return FastArray_ToFormArray(actors)
+endFunction
+
+;/
+    Retrieves all Actors in the list that are Males.
+
+    Form[] @akActors: The source list of Actors.
+
+    returns (Form[]): The Actors in the list that are Males.
+/;
+Form[] function GetMalesInList(Form[] akActors) global
+    return GetActorsOfGenderInList(akActors, "Male")
+endFunction
+
+;/
+    Retrieves all Actors in the list that are Females.
+
+    Form[] @akActors: The source list of Actors.
+
+    returns (Form[]): The Actors in the list that are Females.
+/;
+Form[] function GetFemalesInList(Form[] akActors) global
+    return GetActorsOfGenderInList(akActors, "Female")
+endFunction
+
 
 ; ==========================================================
 ;                   Prison/Arrest Functions
