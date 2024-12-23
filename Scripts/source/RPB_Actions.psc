@@ -27,6 +27,7 @@ string[] function GetActions()
     JArray.addStr(actionArrayObj, "Play Animation on Selected Actor")
     JArray.addStr(actionArrayObj, "[Bounty] Set Bounty for Selected Actor")
     JArray.addStr(actionArrayObj, "[Bounty] Set Violent Bounty for Selected Actor")
+    JArray.addStr(actionArrayObj, "[Bounty] Set Bounty for Prisoner")
     JArray.addStr(actionArrayObj, "[Arrest] Arrest Selected Actor (Escort Prisoner)")
     JArray.addStr(actionArrayObj, "[Arrest] Arrest Selected Actor with Selected Captor (Escort Prisoner)")
     JArray.addStr(actionArrayObj, "[Arrest] Arrest Selected Actor (Teleport Prisoner)")
@@ -101,6 +102,9 @@ function ShowActionsMenu()
 
     elseif (actionToPerform == "[Bounty] Set Violent Bounty for Selected Actor")
         Action_SetBountyForActor(uilib, true)
+
+    elseif (actionToPerform == "[Bounty] Set Bounty for Prisoner")
+        Action_SetBountyForPrisoner(uilib)
 
     elseif (actionToPerform == "[Prison] Configure Prison in Slot")
         Action_ConfigurePrisonInSlot(uilib)
@@ -361,6 +365,26 @@ function Action_SetBountyForActor(RPB_UIInterface uilib, bool abViolentBounty = 
     endif
 
     DebugWithArgs("Actions::Action_SetBountyForActor", "abViolentBounty: " + YesNo(abViolentBounty), "Set " + actorName + "'s Bounty to " + bountyToSet)
+endFunction
+
+function Action_SetBountyForPrisoner(RPB_UIInterface uilib, bool abViolentBounty = false)
+    RPB_Prison prison = uilib.ShowPrisonList()
+
+    if (prison == none)
+        return none
+    endif
+
+    RPB_Prisoner prisoner = uilib.ShowPrisonerList(prison)
+
+    if (prisoner == none)
+        return none
+    endif
+
+    int bountyToSet = uilib.ShowInput("Setting Bounty for " + prisoner.GetActor()) as int
+    prisoner.RegisterForTrackedStats()
+    prisoner.SetCrimeGold(bountyToSet)
+
+    DebugWithArgs("Actions::Action_SetBountyForActor", "abViolentBounty: " + YesNo(abViolentBounty), "Set " + prisoner.GetActor() + "'s Bounty to " + bountyToSet)
 endFunction
 
 function Action_ConfigurePrisonInSlot(RPB_UIInterface uilib)
@@ -914,6 +938,9 @@ function Action_ShowCells(RPB_UIInterface uilib)
 
     Debug("Actions::Action_ShowCells", "Cells: " + prison.GetJailCells())
     Debug("Actions::Action_ShowCells", "Cells Children: " + prison.Children("Cells"))
+
+    RPB_JailCell selectedJailCell = uilib.ShowCellList(prison)
+
 endFunction
 
 function Action_ShowCellDoors(RPB_UIInterface uilib)
