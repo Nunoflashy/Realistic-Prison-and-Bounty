@@ -16,11 +16,11 @@ function SetStatFloat(string asStatName, Faction akFaction, Actor akActor, float
 endFunction
 
 function SetCrimeGold(Faction akFaction, Actor akActor, int value) global
-    SetIntOnForm(akFaction.GetName() + "::Bounty Non-Violent", akActor, value, "ActorVars")
+    SetIntOnForm(akFaction.GetName() + "::Bounty Non-Violent", akActor, value, "ActorVars", abDeleteOnNull = true)
 endFunction
 
 function SetCrimeGoldViolent(Faction akFaction, Actor akActor, int value) global
-    SetIntOnForm(akFaction.GetName() + "::Bounty Violent", akActor, value, "ActorVars")
+    SetIntOnForm(akFaction.GetName() + "::Bounty Violent", akActor, value, "ActorVars", abDeleteOnNull = true)
 endFunction
 
 function SetLatentCrimeGold(Faction akFaction, Actor akActor, int value) global
@@ -28,7 +28,7 @@ function SetLatentCrimeGold(Faction akFaction, Actor akActor, int value) global
 endFunction
 
 function SetLatentCrimeGoldViolent(Faction akFaction, Actor akActor, int value) global
-    SetIntOnForm(akFaction.GetName() + "::Latent Bounty Violent", akActor, value, "ActorVars")
+    SetIntOnForm(akFaction.GetName() + "::Latent Bounty Violent", akActor, value, "ActorVars", abDeleteOnNull = true)
 endFunction
 
 function SetLargestBounty(Faction akFaction, Actor akActor, int value) global
@@ -96,12 +96,12 @@ function ModCrimeGold(Faction akFaction, Actor akActor, int value, bool abViolen
     endif
 
     string statKey = akFaction.GetName() + "::" + bountyType
-    SetIntOnForm(statKey, akActor, GetIntOnForm(statKey, akActor, "ActorVars") + value, "ActorVars")
+    SetIntOnForm(statKey, akActor, GetIntOnForm(statKey, akActor, "ActorVars") + value, "ActorVars", abDeleteOnNull = true)
 endFunction
 
 function ModCrimeGoldViolent(Faction akFaction, Actor akActor, int value) global
     string statKey = akFaction.GetName() + "::Bounty Violent"
-    SetIntOnForm(statKey, akActor, GetIntOnForm(statKey, akActor, "ActorVars") + value, "ActorVars")
+    SetIntOnForm(statKey, akActor, GetIntOnForm(statKey, akActor, "ActorVars") + value, "ActorVars", abDeleteOnNull = true)
 endFunction
 
 function ModLatentCrimeGold(Faction akFaction, Actor akActor, int value, bool abViolent = false) global
@@ -112,7 +112,7 @@ function ModLatentCrimeGold(Faction akFaction, Actor akActor, int value, bool ab
     endif
 
     string statKey = akFaction.GetName() + "::" + bountyType
-    SetIntOnForm(statKey, akActor, GetIntOnForm(statKey, akActor, "ActorVars") + value, "ActorVars")
+    SetIntOnForm(statKey, akActor, GetIntOnForm(statKey, akActor, "ActorVars") + value, "ActorVars", abDeleteOnNull = true)
 
     Debug("ActorVars::ModLatentCrimeGold", "Stat Key: " + statKey + ", New Value: " + GetIntOnForm(statKey, akActor, "ActorVars"))
 endFunction
