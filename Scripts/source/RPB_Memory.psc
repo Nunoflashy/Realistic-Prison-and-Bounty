@@ -64,6 +64,14 @@ int function Object_FromJSON(string json) global
     return JValue.objectFromPrototype(json)
 endFunction
 
+; ==========================================================
+;                       Static Storage
+; ==========================================================
+
+int function StaticStorage() global
+    string rootPath = ".rpb_root"
+    return JDB.solveObj(rootPath)
+endFunction
 
 ; ==========================================================
 ;                         Generic
@@ -77,6 +85,10 @@ int function Object_Size(int object) global
     endif
 
     return JValue.count(data)
+endFunction
+
+int function Size(int object) global
+    return Object_Size(object)
 endFunction
 
 ; Clears the object's data (does not clear metadata)
@@ -110,7 +122,7 @@ endFunction
     Data structures that are not type safe, do not contain additional checks,
     do not throw exceptions and dont have any additional functionality.
 
-    Essentially a wrapper for the JMap classes, for now, to avoid tight coupling.
+    Essentially a wrapper for the JContainer classes, for now, to avoid tight coupling.
 
     - FastArray
     - FastMap
@@ -158,8 +170,24 @@ function FastArray_Clear(int array) global
     Object_Clear(array)
 endFunction
 
-int function FastArray_FromObject(int object) global
+function FastArray_SetInt(int array, int index, int element) global
+    JArray.setInt(array, index, element)
+endFunction
 
+function FastArray_SetFloat(int array, int index, float element) global
+    JArray.setFlt(array, index, element)
+endFunction
+
+function FastArray_SetString(int array, int index, string element) global
+    JArray.setStr(array, index, element)
+endFunction
+
+function FastArray_SetObject(int array, int index, int element) global
+    JArray.setObj(array, index, element)
+endFunction
+
+function FastArray_SetForm(int array, int index, Form element) global
+    JArray.setForm(array, index, element)
 endFunction
 
 function FastArray_AddInt(int array, int element) global
@@ -180,6 +208,10 @@ endFunction
 
 function FastArray_AddForm(int array, Form element) global
     JArray.addForm(array, element)
+endFunction
+
+function FastArray_AddFromArray(int array, int otherArray) global
+    JArray.addFromArray(array, otherArray)
 endFunction
 
 int function FastArray_GetInt(int array, int index) global
@@ -222,8 +254,40 @@ function FastArray_Remove(int array, int index) global
     JArray.eraseIndex(array, index)
 endFunction
 
-Form[] function FastArray_ToPapyrusFormArray(int array) global
+int[] function FastArray_ToIntArray(int array) global
+    return JArray.asIntArray(array)
+endFunction
+
+float[] function FastArray_ToFloatArray(int array) global
+    return JArray.asFloatArray(array)
+endFunction
+
+string[] function FastArray_ToStringArray(int array) global
+    return JArray.asStringArray(array)
+endFunction
+
+Form[] function FastArray_ToFormArray(int array) global
     return JArray.asFormArray(array)
+endFunction
+
+int function FastArray_FromBoolArray(bool[] array) global
+    return JArray.objectWithBooleans(array)
+endFunction
+
+int function FastArray_FromIntArray(int[] array) global
+    return JArray.objectWithInts(array)
+endFunction
+
+int function FastArray_FromFloatArray(float[] array) global
+    return JArray.objectWithFloats(array)
+endFunction
+
+string function FastArray_FromStringArray(string[] array) global
+    return JArray.objectWithStrings(array)
+endFunction
+
+int function FastArray_FromFormArray(Form[] array) global
+    return JArray.objectWithForms(array)
 endFunction
 
 ; ==========================================================
@@ -239,8 +303,7 @@ bool function FastMap_Empty(int map) global
 endFunction
 
 function FastMap_Clear(int map) global
-    int data = __getDataObject(map)
-    JValue.clear(data)
+    JValue.clear(map)
 endFunction
 
 string function FastMap_GetNthKey(int map, int index) global
@@ -265,6 +328,20 @@ endFunction
 
 string[] function FastMap_KeysAsPapyrusArray(int map) global
     return JMap.allKeysPArray(map)
+endFunction
+
+string function FastMap_KeyFromValueString(int map, string value) global
+    int _values = FastMap_Values(map)
+
+    int i = 0
+    while (i < FastArray_Size(_values))
+        if (FastArray_GetString(_values, i) == value)
+            return FastMap_GetNthKey(map, i)
+        endif
+        i += 1
+    endWhile
+
+    return ""
 endFunction
 
 string function FastMap_GetString(int map, string _key) global
@@ -491,11 +568,32 @@ int function Stack(string signature, bool retain = false) global
     return obj
 endFunction
 
-int function Delete(int object) global
-    return JValue.release(object)
+int function Pair(string signature = "", bool retain = false) global
+    if (!__parseSignature(signature, "pair"))
+        return throwAndReturn(__invalidObject(), InvalidObjectException("Invalid signature for a pair data structure! (" + signature + ")"))
+    endif
+
+    int obj = __makeParent()
+    __writeData(obj, FastArray())
+    __writeMetadata(obj, "pair")
+    __retainObjectInMemory(obj, retain)
+    return obj
 endFunction
 
-function Destroy(int object) global
+int function Vector(string signature, bool retain = false) global
+    if (!__parseSignature(signature, "vector"))
+        return throwAndReturn(__invalidObject(), InvalidObjectException("Invalid signature for a vector data structure! (" + signature + ")"))
+    endif
+
+    int obj = __makeParent()
+    __writeData(obj, FastArray())
+    __writeMetadata(obj, "vector")
+    __retainObjectInMemory(obj, retain)
+    return obj
+endFunction
+
+int function Delete(int object) global
+    return JValue.release(object)
 endFunction
 
 
@@ -1241,17 +1339,223 @@ int function Stack_Count(int stack) global
 endFunction
 
 ; ==========================================================
+;                           Pair
+; ==========================================================
+
+int function Pair_First() global
+    return 0
+endFunction
+
+int function Pair_Second() global
+    return 1
+endFunction
+
+int function Pair_Size(int pair) global
+    int data = __getDataObject(pair)
+    return FastArray_Size(data)
+endFunction
+
+int function Pair_MakeIntPair(int value1, int value2) global
+    int pair = Pair()
+    Pair_SetInt(Pair_First(), value1, pair)
+    Pair_SetInt(Pair_Second(), value2, pair)
+    return pair
+endFunction
+
+int function Pair_MakeFloatPair(float value1, float value2) global
+    int pair = Pair()
+    Pair_SetFloat(Pair_First(), value1, pair)
+    Pair_SetFloat(Pair_Second(), value2, pair)
+    return pair
+endFunction
+
+int function Pair_MakeStringPair(string value1, string value2) global
+    int pair = Pair()
+    Pair_SetString(Pair_First(), value1, pair)
+    Pair_SetString(Pair_Second(), value2, pair)
+    return pair
+endFunction
+
+int function Pair_MakeFormPair(Form value1, Form value2) global
+    int pair = Pair()
+    Pair_SetForm(Pair_First(), value1, pair)
+    Pair_SetForm(Pair_Second(), value2, pair)
+    return pair
+endFunction
+
+int function Pair_MakeObjectPair(int value1, int value2) global
+    int pair = Pair()
+    Pair_SetObject(Pair_First(), value1, pair)
+    Pair_SetObject(Pair_Second(), value2, pair)
+    return pair
+endFunction
+
+int function __pairSetBase(int pairElement, int pair) global
+    int data = __getDataObject(pair)
+
+    if (pairElement < 0 || pairElement > 1)
+        ; Error, throw exception
+        return -1
+    endif
+
+    return data
+endFunction
+
+function Pair_SetInt(int pairElement, int value, int pair) global
+    int data = __pairSetBase(pairElement, pair)
+    
+    if (!data)
+        return
+    endif
+
+    FastArray_SetInt(data, pairElement, value)
+endFunction
+
+function Pair_SetFloat(int pairElement, float value, int pair) global
+    int data = __pairSetBase(pairElement, pair)
+    
+    if (!data)
+        return
+    endif
+
+    FastArray_SetFloat(data, pairElement, value)
+endFunction
+
+function Pair_SetString(int pairElement, string value, int pair) global
+    int data = __pairSetBase(pairElement, pair)
+    
+    if (!data)
+        return
+    endif
+
+    FastArray_SetString(data, pairElement, value)
+endFunction
+
+function Pair_SetForm(int pairElement, Form value, int pair) global
+    int data = __pairSetBase(pairElement, pair)
+    
+    if (!data)
+        return
+    endif
+
+    FastArray_SetForm(data, pairElement, value)
+endFunction
+
+function Pair_SetObject(int pairElement, int value, int pair) global
+    int data = __pairSetBase(pairElement, pair)
+    
+    if (!data)
+        return
+    endif
+
+    FastArray_SetObject(data, pairElement, value)
+endFunction
+
+int function Pair_Int(int pairElement, int pair) global
+    int data = __getDataObject(pair)
+    
+    if (!data)
+        return -1
+    endif
+
+    return FastArray_GetInt(data, pairElement)
+endFunction
+
+float function Pair_Float(int pairElement, int pair) global
+    int data = __getDataObject(pair)
+    
+    if (!data)
+        return -1.0
+    endif
+
+    return FastArray_GetFloat(data, pairElement)
+endFunction
+
+string function Pair_String(int pairElement, int pair) global
+    int data = __getDataObject(pair)
+    
+    if (!data)
+        return ""
+    endif
+
+    return FastArray_GetString(data, pairElement)
+endFunction
+
+Form function Pair_Form(int pairElement, int pair) global
+    int data = __getDataObject(pair)
+    
+    if (!data)
+        return none
+    endif
+
+    return FastArray_GetForm(data, pairElement)
+endFunction
+
+int function Pair_Object(int pairElement, int pair) global
+    int data = __getDataObject(pair)
+    
+    if (!data)
+        return -1
+    endif
+
+    return FastArray_GetObject(data, pairElement)
+endFunction
+
+; ==========================================================
+;                           Vector
+; ==========================================================
+
+int function Vector_Size(int vector) global
+    int data = __getDataObject(vector)
+    return FastArray_Size(data)
+endFunction
+
+function Vector_SetX(int vector, float value) global
+    int data = __getDataObject(vector)
+    FastArray_SetFloat(data, 0, value)
+endFunction
+
+function Vector_SetY(int vector, float value) global
+    int data = __getDataObject(vector)
+    FastArray_SetFloat(data, 1, value)
+endFunction
+
+function Vector_SetZ(int vector, float value) global
+    int data = __getDataObject(vector)
+    FastArray_SetFloat(data, 2, value)
+endFunction
+
+function Vector_SetW(int vector, float value) global
+    int data = __getDataObject(vector)
+    FastArray_SetFloat(data, 3, value)
+endFunction
+
+float function Vector_X(int vector) global
+    int data = __getDataObject(vector)
+    return FastArray_GetFloat(data, 0)
+endFunction
+
+float function Vector_Y(int vector) global
+    int data = __getDataObject(vector)
+    return FastArray_GetFloat(data, 1)
+endFunction
+
+float function Vector_Z(int vector) global
+    int data = __getDataObject(vector)
+    return FastArray_GetFloat(data, 2)
+endFunction
+
+float function Vector_W(int vector) global
+    int data = __getDataObject(vector)
+    return FastArray_GetFloat(data, 3)
+endFunction
+
+; ==========================================================
 ;                           Helpers
 ; ==========================================================
 
 string function DebugObject(int object) global
 
-endFunction
-
-int function objectNotExists(int oldObj, int newObj) global
-    if (!oldObj)
-        return newObj
-    endif
 endFunction
 
 bool function __isValidObject(int object) global
@@ -1283,7 +1587,7 @@ endFunction
     Copies an object and returns a new object.
 
     Object  @object: The object to copy.
-    bool?   @deepCopy: Whether to make a deep copy of the object.
+    bool?   @deepCopy: Whether to make a deep copy of the object (copies child objects).
     string? @params: The parameters to pass to the resulting object.
 
     returns (Object): The copied object.
@@ -1306,7 +1610,7 @@ endFunction
 /;
 int function Move(int sourceObject, string params = "") global
     int newObj = Copy(sourceObject, true, params)
-    Destroy(sourceObject)
+    delete(sourceObject)
 endFunction
 
 ;/
