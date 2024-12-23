@@ -96,7 +96,9 @@ endProperty
 
 Form[] property Prisoners
     Form[] function get()
-        return self.GetPrisoners()
+        return FastArray_ToFormArray( \ 
+            FastMap_Values(__prisonersInCell) \
+        )
     endFunction
 endProperty
 
@@ -310,7 +312,7 @@ int __prisonersInCell
 
 int property PrisonerCount
     int function get()
-        return JValue.count(__prisonersInCell)
+        return Object_Size(__prisonersInCell)
     endFunction
 endProperty
 
@@ -343,31 +345,26 @@ function DetermineGoodies()
     endif
 endFunction
 
-ObjectReference function GetCellObject(Keyword akPropType)
-
-endFunction
-
 function DetermineMarkers()
     Form[] interiorChildMarkers = self.GetPropertyOfTypeFormArray("Interior")
     Form[] exteriorChildMarkers = self.GetPropertyOfTypeFormArray("Exterior")
 
-    ; Convert to JArray
-    int arrayInteriorChildMarkers = JArray.objectWithForms(interiorChildMarkers)
-    int arrayExteriorChildMarkers = JArray.objectWithForms(exteriorChildMarkers)
+    int arrayInteriorChildMarkers = FastArray_FromFormArray(interiorChildMarkers)
+    int arrayExteriorChildMarkers = FastArray_FromFormArray(exteriorChildMarkers)
 
-    int arrayAllInteriorMarkers = JArray.object()
-    int arrayAllExteriorMarkers = JArray.object()
+    int arrayAllInteriorMarkers = FastArray("<Form>")
+    int arrayAllExteriorMarkers = FastArray("<Form>")
     
     ; Add parent
-    JArray.addForm(arrayAllInteriorMarkers, self)
+    FastArray_AddForm(arrayAllInteriorMarkers, self)
 
     ; Merge the arrays
-    JArray.addFromArray(arrayAllInteriorMarkers, arrayInteriorChildMarkers)
-    JArray.addFromArray(arrayAllExteriorMarkers, arrayExteriorChildMarkers)
+    FastArray_AddFromArray(arrayAllInteriorMarkers, arrayInteriorChildMarkers)
+    FastArray_AddFromArray(arrayAllExteriorMarkers, arrayExteriorChildMarkers)
 
     ; Set properties
-    __interiorMarkers       = JArray.asFormArray(arrayAllInteriorMarkers)
-    __exteriorMarkers       = JArray.asFormArray(arrayAllExteriorMarkers)
+    __interiorMarkers       = FastArray_ToFormArray(arrayAllInteriorMarkers)
+    __exteriorMarkers       = FastArray_ToFormArray(arrayAllExteriorMarkers)
 endFunction
 
 function RefreshOptions()
@@ -414,7 +411,7 @@ function RemoveGenderExclusiveness()
     __isFemaleOnly  = false
     __isMaleOnly    = false
 
-    Debug("JailCell::RemoveGenderExclusiveness", self + " is no longer a gender exclusive cell.")
+    ; Debug("JailCell::RemoveGenderExclusiveness", self + " is no longer a gender exclusive cell.")
 endFunction
 
 string function GetAcceptedGender()
@@ -453,8 +450,8 @@ endFunction
 
 ; Unreliable, since it can scan beds from other cells that are near one of the scanned beds in this cell. (this is because beds are not in the same place on all the cells, and the radius of the scan will get other beds from other cells.)
 function ScanBeds()
-    int bedExclusions   = JMap.object()
-    int bedsScanned     = JArray.object()
+    int bedExclusions   = FastMap("<string>")
+    int bedsScanned     = FastArray("<Form>")
 
     FormList RPB_BedFormList = GetFormFromMod(0x1CDAA) as FormList
 
@@ -464,19 +461,19 @@ function ScanBeds()
     while (i < self.ScanIterations)
         ObjectReference scannedBed = Game.FindRandomReferenceOfAnyTypeInListFromRef(RPB_BedFormList, self, self.CellRadius)
 
-        if (scannedBed && !JMap.hasKey(bedExclusions, scannedBed.GetFormID()))
-            JMap.setForm(bedExclusions, scannedBed.GetFormID(), scannedBed)
-            JArray.addForm(bedsScanned, scannedBed) ; Add the bed to this local array
+        if (scannedBed && !FastMap_HasKey(bedExclusions, scannedBed.GetFormID()))
+            FastMap_SetForm(bedExclusions, scannedBed.GetFormID(), scannedBed)
+            FastArray_AddForm(bedsScanned, scannedBed) ; Add the bed to this local array
             Debug("[Prison: "+ self.Prison.Name +"] JailCell::ScanBeds", "Scanned " + scannedBed + " (Name: "+ scannedBed.GetBaseObject().GetName() +") Bed in " + self + ", Max Prisoners for this Cell: " + self.MaxPrisoners)
         endif
         i += 1
     endWhile
     
     ; If there were beds caught in the scan, add it to the cell beds array
-    if (JValue.count(bedsScanned) > 0)
-        __beds = JArray.asFormArray(bedsScanned)
+    if (Object_Size(bedsScanned) > 0)
+        __beds = FastArray_ToFormArray(bedsScanned)
         __scannedBeds = true
-        __maxPrisoners = JValue.count(bedsScanned)
+        __maxPrisoners = Object_Size(bedsScanned)
     endif
 
     Debug("[Prison: "+ self.Prison.Name +"] JailCell::ScanBeds", "Beds in " + self + ": " + self.Beds)
@@ -484,23 +481,23 @@ endFunction
 
 function ScanContainers()
     FormList RPB_ContainerFormList = GetFormFromMod(0x1CDAB) as FormList
-    int containersAlreadyAdded  = JMap.object()
-    int containersScanned       = JArray.object()
+    int containersAlreadyAdded  = FastMap("<string>")
+    int containersScanned       = FastArray("<Form>")
 
     int i = 0
     while (i < self.ScanIterations)
         ObjectReference scannedContainer = Game.FindRandomReferenceOfAnyTypeInListFromRef(RPB_ContainerFormList, self, self.CellRadius)
-        bool containerExistsInList = JMap.hasKey(containersAlreadyAdded, scannedContainer.GetFormID())
+        bool containerExistsInList = FastMap_HasKey(containersAlreadyAdded, scannedContainer.GetFormID())
         if (scannedContainer && !containerExistsInList)
-            JMap.setForm(containersAlreadyAdded, scannedContainer.GetFormID(), scannedContainer)
-            JArray.addForm(containersScanned, scannedContainer)
+            FastMap_SetForm(containersAlreadyAdded, scannedContainer.GetFormID(), scannedContainer)
+            FastArray_AddForm(containersScanned, scannedContainer)
             Debug("[Prison: "+ self.Prison.Name +"] JailCell::ScanContainers", "Scanned " + scannedContainer + " (Name: "+ scannedContainer.GetBaseObject().GetName() +") container in " + self)
         endif
         i += 1
     endWhile
 
-    if (JValue.count(containersScanned) > 0)
-        __containers = JArray.asFormArray(containersScanned)
+    if (Object_Size(containersScanned) > 0)
+        __containers = FastArray_ToFormArray(containersScanned)
         __scannedContainers = true
     endif
 
@@ -509,23 +506,23 @@ endFunction
 
 function ScanMiscProps()
     FormList RPB_MiscPropsFormList = GetFormFromMod(0x1CDAC) as FormList
-    int propsAlreadyAdded  = JMap.object()
-    int propsScanned       = JArray.object()
+    int propsAlreadyAdded  = FastMap("<string>")
+    int propsScanned       = FastArray("<Form>")
 
     int i = 0
     while (i < self.ScanIterations)
         ObjectReference scannedProp = Game.FindRandomReferenceOfAnyTypeInListFromRef(RPB_MiscPropsFormList, self, self.CellRadius)
-        bool propExistsInList = JMap.hasKey(propsAlreadyAdded, scannedProp.GetFormID())
+        bool propExistsInList = FastMap_HasKey(propsAlreadyAdded, scannedProp.GetFormID())
         if (scannedProp && !propExistsInList)
-            JMap.setForm(propsAlreadyAdded, scannedProp.GetFormID(), scannedProp)
-            JArray.addForm(propsScanned, scannedProp)
+            FastMap_SetForm(propsAlreadyAdded, scannedProp.GetFormID(), scannedProp)
+            FastArray_AddForm(propsScanned, scannedProp)
             Debug("[Prison: "+ self.Prison.Name +"] JailCell::ScanMiscProps", "Scanned " + scannedProp + " (Name: "+ scannedProp.GetBaseObject().GetName() +") prop in " + self)
         endif
         i += 1
     endWhile
 
-    if (JValue.count(propsScanned) > 0)
-        __otherProps = JArray.asFormArray(propsScanned)
+    if (Object_Size(propsScanned) > 0)
+        __otherProps = FastArray_ToFormArray(propsScanned)
         __scannedOtherProps = true
     endif
 
@@ -572,79 +569,59 @@ endFunction
 ;                         Prisoners                        
 ; =========================================================
 
+;/
+    Checks whether this cell has a specific prisoner in it.
+
+    RPB_Prisoner @apPrisoner: The prisoner to check for.
+
+    returns (bool): true if the prisoner is in this cell, false otherwise.
+/;
 bool function HasPrisoner(RPB_Prisoner apPrisoner)
     return FastMap_HasKey(__prisonersInCell, apPrisoner.GetIdentifier())
 endFunction
 
+;/
+    Checks whether this cell has prisoners of the specified gender.
+
+    string  @asGender: The gender to check for.
+    bool?   @abOnlySpecifiedGender: If true, only checks if all prisoners are of the specified gender.
+
+    returns (bool): true if there are prisoners of the specified gender in this cell, false otherwise.
+/;
+bool function HasPrisonersOfGender(string asGender, bool abOnlySpecifiedGender = false)
+    return RPB_Utility.HasActorsOfGenderInList(self.Prisoners, asGender, abOnlySpecifiedGender)
+endFunction
+
+;/
+    Checks whether this cell has female prisoners.
+
+    bool?   @abStrictlyFemales: If true, only checks if all prisoners are females.
+
+    returns (bool): true if there are female prisoners in this cell, false otherwise.
+/;
 bool function HasFemales(bool abStrictlyFemales = false)
-    int i = 0
-    bool foundFemale = false
-
-    while (i < self.PrisonerCount)
-        Actor prisoner = self.Prisoners[i] as Actor
-        if (RPB_Utility.IsActorFemale(prisoner))
-            foundFemale = true
-        elseif (abStrictlyFemales)
-            return false
-        endif
-        i += 1
-    endWhile
-
-    return foundFemale
+    return RPB_Utility.HasFemalesInList(self.Prisoners, abStrictlyFemales)
 endFunction
 
+;/
+    Checks whether this cell has male prisoners.
+
+    bool?   @abStrictlyMales: If true, only checks if all prisoners are males.
+
+    returns (bool): true if there are male prisoners in this cell, false otherwise.
+/;
 bool function HasMales(bool abStrictlyMales = false)
-    int i = 0
-    bool foundMale = false
-
-    while (i < self.PrisonerCount)
-        Actor prisoner = self.Prisoners[i] as Actor
-        if (RPB_Utility.IsActorMale(prisoner))
-            foundMale = true
-        elseif (abStrictlyMales)
-            return false
-        endif
-        i += 1
-    endWhile
-
-    return foundMale
+    return RPB_Utility.HasMalesInList(self.Prisoners, abStrictlyMales)
 endFunction
 
-; Retrieves the prisoner(s) living in this jail cell.
-Form[] function GetPrisoners()
-    return JArray.asFormArray(JMap.allValues(__prisonersInCell))
-endFunction
-
-; Retrieves the females prisoner(s) living in this jail cell.
+; Retrieves the female prisoners living in this jail cell.
 Form[] function GetFemalePrisoners()
-    int arr = JArray.object()
-
-    int i = 0
-    while (i < Prisoners.Length)
-        Actor ref = Prisoners[i] as Actor
-        if (RPB_Utility.IsActorFemale(ref))
-            JArray.addForm(arr, ref)
-        endif
-        i += 1
-    endWhile
-
-    return JArray.asFormArray(arr)
+    return RPB_Utility.GetFemalesInList(self.Prisoners)
 endFunction
 
-; Retrieves the male prisoner(s) living in this jail cell.
+; Retrieves the male prisoners living in this jail cell.
 Form[] function GetMalePrisoners()
-    int arr = JArray.object()
-
-    int i = 0
-    while (i < Prisoners.Length)
-        Actor ref = Prisoners[i] as Actor
-        if (RPB_Utility.IsActorMale(ref))
-            JArray.addForm(arr, ref)
-        endif
-        i += 1
-    endWhile
-
-    return JArray.asFormArray(arr)
+    return RPB_Utility.GetMalesInList(self.Prisoners)
 endFunction
 
 function RemovePrisoner(RPB_Prisoner apPrisoner)
@@ -669,7 +646,8 @@ endEvent
 
 event OnPrisonerUnregister(RPB_Prisoner apPrisoner)
     self.DetermineCellParameters()
-    Debug("JailCell::OnPrisonerUnregister", "Cell Properties: " + self.DEBUG_GetCellProperties())
+    ; Debug("JailCell::OnPrisonerUnregister", "Cell Properties: " + self.DEBUG_GetCellProperties())
+    Debug("("+ ID +") JailCell::OnPrisonerUnregister", "Unregistered Prisoner: " + apPrisoner.Name)
 endEvent
 
 event OnPrisonerOpenCellDoor(RPB_CellDoor akCellDoor, RPB_Prisoner apPrisoner)
@@ -793,12 +771,10 @@ endFunction
     Cell[FormID] = 0x14
 /;
 function RegisterPrisoner(RPB_Prisoner apPrisoner)
-    if (!__prisonersInCell)
-        __prisonersInCell = JMap.object()
-        JValue.retain(__prisonersInCell) ; May be a problem, after this Reference is lost (10d+ passes), it will not be released and the handle will be lost.
-    endif
+     ; Retaining in memory may be a problem, after this Reference is lost (10d+ passes), it will not be released and the handle will be lost.
+    __prisonersInCell = Object_CreateIfNotExists(__prisonersInCell, FastMap("<string>", retain = true))
 
-    JMap.setForm(__prisonersInCell, apPrisoner.GetIdentifier(), apPrisoner.GetActor())
+    FastMap_SetForm(__prisonersInCell, apPrisoner.GetIdentifier(), apPrisoner.GetActor())
 
     ; Pass the reference to the Prisoner
     apPrisoner.SetForm("Cell", self, "Jail")
@@ -807,13 +783,13 @@ function RegisterPrisoner(RPB_Prisoner apPrisoner)
 endFunction
 
 function UnregisterPrisoner(RPB_Prisoner apPrisoner)
-    JMap.removeKey(__prisonersInCell, apPrisoner.GetIdentifier())
+    FastMap_RemoveKey(__prisonersInCell, apPrisoner.GetIdentifier())
     self.OnPrisonerUnregister(apPrisoner)
 endFunction
 
 function DetermineCellParameters()
     if (self.PrisonerCount > 0)
-        Form prisonerForm = JMap.getForm(__prisonersInCell, JMap.getNthKey(__prisonersInCell, 0)) ; Get the first prisoner
+        Form prisonerForm = FastMap_GetForm(__prisonersInCell, FastMap_GetNthKey(__prisonersInCell, 0)) ; Get the first prisoner reference
         RPB_Prisoner prisonerRef = Prison.GetPrisonerReference(prisonerForm as Actor)
 
         ; If the first prisoner will be/is stripped naked / to underwear, set this cell as gender exclusive for them if the cell is not yet gender exclusive,
@@ -842,63 +818,6 @@ endEvent
 ; =========================================================
 ;                    NPC Sanity Checking                      
 ; =========================================================
-
-int __queuedChecks
-bool __hasQueuedCheckCurrently
-RPB_Prisoner __npcQueuedCheckPrisoner
-
-bool function __hasQueuedChecks()
-    return JArray.count(__queuedChecks) > 0
-endFunction
-
-function __pushCheck(float aiCheckTime)
-    if (!__queuedChecks)
-        __queuedChecks = JArray.object()
-        JValue.retain(__queuedChecks)
-    endif
-
-    JArray.addFlt(__queuedChecks, aiCheckTime)
-endFunction
-
-float function __popCheck()
-    if (!__hasQueuedChecks())
-        return 0
-    endif
-
-    float checkTime = JArray.getFlt(__queuedChecks, 0)
-    JArray.eraseIndex(__queuedChecks, 0)
-    return checkTime
-endFunction
-
-function __executeQueuedCheck(RPB_Prisoner apPrisoner = none)
-    if (!__hasQueuedChecks())
-        return
-    endif
-
-    __hasQueuedCheckCurrently = true
-    float nextCheck = __popCheck()
-
-    if (nextCheck != 0)
-        self.RegisterForSanityChecking(nextCheck, apPrisoner = apPrisoner)
-        
-    endif
-endFunction
-
-;/
-    Queues this Prisoner for a sanity check, ensuring they are in a valid state.
-
-    float?          @afPreCheckUpdateTime: The update window upon registering the event.
-    RPB_Prisoner?   @apPrisoner: The prisoner to register for sanity checking, if none, all prisoners in the jail cell will be registered.
-/;
-function QueueForSanityCheck(float afPreCheckUpdateTime = 4.0, RPB_Prisoner apPrisoner = none)
-    int queuedCheckCount = JArray.count(__queuedChecks)
-    __pushCheck(afPreCheckUpdateTime)
-
-    if (!__hasQueuedCheckCurrently)
-        __executeQueuedCheck(apPrisoner)
-    endif
-endFunction
-
 ;/
     Should only happen the first time the player visits the NPC prisoner
     and at some points where an AI Package is overridden, such as the Solitude execution scene for the NPC's there
@@ -1274,8 +1193,8 @@ string function DEBUG_GetPrisoners()
             endif
         i += 1
     endWhile
-    ; while (i < JValue.count(__prisonersInCell))
-    ;     Form prisonerForm = JMap.getForm(__prisonersInCell, JMap.getNthKey(__prisonersInCell, i))
+    ; while (i < Object_Size(__prisonersInCell))
+    ;     Form prisonerForm = FastMap_GetForm(__prisonersInCell, FastMap_GetNthKey(__prisonersInCell, i))
     ;     RPB_Prisoner prisonerRef = Prison.GetPrisonerReference(prisonerForm as Actor)
 
     ;     if (prisonerRef)
