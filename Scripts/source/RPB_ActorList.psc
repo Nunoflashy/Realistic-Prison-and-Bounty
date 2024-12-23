@@ -1,5 +1,7 @@
 scriptname RPB_ActorList extends RPB_ActiveMagicEffectContainer
 
+import RPB_Memory
+
 string function ListIdentifier() ; abstract
     return "ActorList"
 endFunction
@@ -8,6 +10,21 @@ RPB_Actor function AtKeyEx(Actor akActor) ; virtual
 endFunction
 
 string function GetActorIdentifier(Actor akActor) ; virtual
+endFunction
+
+Form[] function GetActors()
+    int actorArray = FastArray("<Form>")
+
+    int i = 0
+    while (i < Count)
+        RPB_Actor actorRef = FromIndex(i) as RPB_Actor
+        if (actorRef)
+            FastArray_AddForm(actorArray, actorRef.GetActor())
+        endif
+        i += 1
+    endWhile
+
+    return FastArray_ToFormArray(actorArray)
 endFunction
 
 ; RPB_Actor function AtIndex(int aiIndex)
