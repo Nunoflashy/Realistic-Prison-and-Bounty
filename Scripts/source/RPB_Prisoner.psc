@@ -1,4 +1,4 @@
-Scriptname RPB_Prisoner extends RPB_Actor
+Scriptname RPB_Prisoner extends RPB_ActorBase
 
 import RPB_Config
 import RPB_Utility

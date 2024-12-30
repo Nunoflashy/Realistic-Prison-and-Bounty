@@ -6,7 +6,7 @@ string function ListIdentifier() ; abstract
     return "ActorList"
 endFunction
 
-RPB_Actor function AtKeyEx(Actor akActor) ; virtual
+RPB_ActorBase function AtKeyEx(Actor akActor) ; virtual
 endFunction
 
 string function GetActorIdentifier(Actor akActor) ; virtual
@@ -17,7 +17,7 @@ Form[] function GetActors()
 
     int i = 0
     while (i < Count)
-        RPB_Actor actorRef = FromIndex(i) as RPB_Actor
+        RPB_ActorBase actorRef = FromIndex(i) as RPB_ActorBase
         if (actorRef)
             FastArray_AddForm(actorArray, actorRef.GetActor())
         endif
@@ -27,20 +27,20 @@ Form[] function GetActors()
     return FastArray_ToFormArray(actorArray)
 endFunction
 
-; RPB_Actor function AtIndex(int aiIndex)
-;     return parent.FromIndex(aiIndex) as RPB_Actor
+; RPB_ActorBase function AtIndex(int aiIndex)
+;     return parent.FromIndex(aiIndex) as RPB_ActorBase
 ; endFunction
 
-; bool function Exists(RPB_Actor apActor)
+; bool function Exists(RPB_ActorBase apActor)
 ;     return self.AtKey(apActor.GetActor()) == apActor
 ; endFunction
 
-; bool function Add(RPB_Actor apActor)
+; bool function Add(RPB_ActorBase apActor)
 ;     string elementKey = self.GetActorIdentifier(apActor.GetActor())
 ;     parent.AddElement(apActor, elementKey)
 ; endFunction
 
-; function Remove(RPB_Actor apActor)
+; function Remove(RPB_ActorBase apActor)
 ;     string elementKey = self.GetActorIdentifier(apActor.GetActor())
 ;     parent.RemoveElement(elementKey)
 ; endFunction

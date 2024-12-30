@@ -1028,7 +1028,7 @@ endFunction
 ; ==========================================================
 
 ;/
-    Awaits a reference of RPB_Actor for the specified Actor.
+    Awaits a reference of RPB_ActorBase for the specified Actor.
     If the Actor is not of the Entity type yet, they will be made into one and bound to it. 
 
     Actor           @akEntity: The actor to retrieve the Prisoner reference from.
@@ -1038,9 +1038,9 @@ endFunction
     float?          @afInitialTimeBetweenTries: The delay on each try
     float?          @afMaxTimeBetweenTries: The max delay on each try that is possible (Exponential Backoff).
 
-    returns (RPB_Actor): The RPB_Actor reference for this Actor.
+    returns (RPB_ActorBase): The RPB_ActorBase reference for this Actor.
 /;
-RPB_Actor function AwaitEntityReference(\
+RPB_ActorBase function AwaitEntityReference(\
     Actor akEntity, \
     RPB_ActorList apEntityList, \
     RPB_Entity apEntity = none, \
@@ -1062,13 +1062,13 @@ RPB_Actor function AwaitEntityReference(\
     endif
 
     ; Shared logic for awaiting reference
-    RPB_Actor entityRef = apEntityList.AtKeyEx(akEntity) as RPB_Actor
+    RPB_ActorBase entityRef = apEntityList.AtKeyEx(akEntity) as RPB_ActorBase
     int tries = 0
     float delay = afInitialTimeBetweenTries
 
     ; Safeguard
     while (!entityRef && tries < aiMaxTries)
-        entityRef = apEntityList.AtKeyEx(akEntity) as RPB_Actor
+        entityRef = apEntityList.AtKeyEx(akEntity) as RPB_ActorBase
         Utility.Wait(delay)
         ; Debug("Utility::AwaitEntityReference", "("+ tries +") ("+ akEntity +") entityRef: " + entityRef)
         tries += 1
@@ -1089,7 +1089,7 @@ RPB_Actor function AwaitEntityReference(\
 endFunction
 
 ;/
-    Awaits a reference of RPB_Actor for the specified Actor.
+    Awaits a reference of RPB_ActorBase for the specified Actor.
 
     Actor           @akEntity: The actor to retrieve the Prisoner reference from.
     RPB_ActorList   @apEntityList: The entity list to get the reference from.
@@ -1098,9 +1098,9 @@ endFunction
     float?          @afInitialTimeBetweenTries: The delay on each try
     float?          @afMaxTimeBetweenTries: The max delay on each try that is possible (Exponential Backoff).
 
-    returns (RPB_Actor): The RPB_Actor reference for this Actor.
+    returns (RPB_ActorBase): The RPB_ActorBase reference for this Actor.
 /;
-RPB_Actor function AwaitExistingEntityReference(\
+RPB_ActorBase function AwaitExistingEntityReference(\
     Actor akEntity, \
     RPB_ActorList apEntityList, \
     RPB_Entity apEntity = none, \
@@ -1109,13 +1109,13 @@ RPB_Actor function AwaitExistingEntityReference(\
     float afMaxTimeBetweenTries = 3.0 \
 ) global
     ; Shared logic for awaiting reference
-    RPB_Actor entityRef = apEntityList.AtKeyEx(akEntity) as RPB_Actor
+    RPB_ActorBase entityRef = apEntityList.AtKeyEx(akEntity) as RPB_ActorBase
     int tries = 0
     float delay = afInitialTimeBetweenTries
 
     ; Safeguard
     while (!entityRef && tries < aiMaxTries)
-        entityRef = apEntityList.AtKeyEx(akEntity) as RPB_Actor
+        entityRef = apEntityList.AtKeyEx(akEntity) as RPB_ActorBase
         Utility.Wait(delay)
         tries += 1
         delay *= 1.5

@@ -23,15 +23,21 @@ event OnInit()
 
     ; Register bounty decaying
     RegisterForBountyDecayingUpdate()
+
+    Debug("BountyDecay::OnInit", "Initialized Bounty Decay System")
 endEvent
 
 event OnPlayerLoadGame()
+    OnInit()
 endEvent
 
 event OnUpdateGameTime()
     int i = 0
-    while (i < config.FactionCount)
-        string hold = config.Holds[i]
+    
+    string[] holds = Config.Holds
+
+    while (i < holds.Length)
+        string hold = holds[i]
 
         ; Infamy conditions
         bool isDecayable  = (config.isBountyDecayableAsCriminal(hold) && !config.isInfamyKnown(hold)) || config.isBountyDecayEnabled(hold)

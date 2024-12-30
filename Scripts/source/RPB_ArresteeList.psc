@@ -41,12 +41,12 @@ string function GetActorIdentifier(Actor akActor) ; override
     return "Arrestee["+ akActor.GetFormID() +"]"
 endFunction
 
-RPB_Actor function AtKeyEx(Actor akActor)
+RPB_ActorBase function AtKeyEx(Actor akActor)
     string elementKey = self.GetActorIdentifier(akActor)
-    return parent.GetAt(elementKey) as RPB_Actor
+    return parent.GetAt(elementKey) as RPB_ActorBase
 endFunction
 
-; function Remove(RPB_Actor apArrestee)
+; function Remove(RPB_ActorBase apArrestee)
 ;     parent.Remove(apArrestee)
 ;     Spell arresteeSpell = RPB_Utility.RPB_ArresteeSpell()
 ;     apArrestee.RemoveSpell(arresteeSpell)

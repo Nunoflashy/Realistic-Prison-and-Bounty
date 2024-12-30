@@ -2,9 +2,9 @@ scriptname RPB_Outfit extends ActiveMagicEffect
 
 import RPB_Utility
 
-RPB_Actor property Owner
-    RPB_Actor function get()
-        return parent as RPB_Actor
+RPB_ActorBase property Owner
+    RPB_ActorBase function get()
+        return parent as RPB_ActorBase
     endFunction
 endProperty
 

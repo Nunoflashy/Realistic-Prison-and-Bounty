@@ -74,7 +74,7 @@ scriptname RPB_Prison extends RPB_Entity
     function AssignReleaseLocation(RPB_Prisoner apPrisoner, bool abIsTeleportLocation = true)
     bool function AssignCell(RPB_Prisoner apPrisoner)
     function RemoveFromCell(RPB_Prisoner apPrisoner)
-    function ClearPrisonerBounty(RPB_Actor apActor)
+    function ClearPrisonerBounty(RPB_ActorBase apActor)
     bool function AssignPrisonerToCell(RPB_Prisoner apPrisoner, RPB_JailCell akJailCell)
     function EscortPrisonerToJail(RPB_Prisoner apPrisoner, Actor akEscort)
     function EscortPrisonerToCell(RPB_Prisoner apPrisoner, Actor akEscort)
@@ -116,8 +116,8 @@ scriptname RPB_Prison extends RPB_Entity
     event OnPrisonerTeleportedToCell(RPB_Prisoner apPrisoner, bool abImprisonPrisoner)
     event OnPrisonerDying(RPB_Prisoner apPrisoner, Actor akKiller)
     event OnPrisonerDeath(RPB_Prisoner apPrisoner, Actor akKiller)
-    event OnEscortPrisonerToJailBegin(RPB_Actor apActor, Actor akEscort)
-    event OnEscortPrisonerToJailEnd(RPB_Actor apActor, Actor akEscort)
+    event OnEscortPrisonerToJailBegin(RPB_ActorBase apActor, Actor akEscort)
+    event OnEscortPrisonerToJailEnd(RPB_ActorBase apActor, Actor akEscort)
     event OnEscortPrisonerToCellBegin(RPB_Prisoner apPrisoner, Actor akEscort)
     event OnEscortingPrisonerToCell(RPB_Prisoner apPrisoner, Actor akEscort)
     event OnEscortPrisonerToCellEnd(RPB_Prisoner apPrisoner, RPB_JailCell akJailCell, Actor akEscort)
@@ -2092,7 +2092,7 @@ function RemoveFromCell(RPB_Prisoner apPrisoner)
     jailCell.RemovePrisoner(apPrisoner)
 endFunction
 
-function ClearPrisonerBounty(RPB_Actor apActor)
+function ClearPrisonerBounty(RPB_ActorBase apActor)
     apActor.ClearLatentBountyForFaction(PrisonFaction)
 endFunction
 
@@ -2345,7 +2345,7 @@ event OnPrisonerDeath(RPB_Prisoner apPrisoner, Actor akKiller)
 
 endEvent
 
-event OnEscortPrisonerToJailBegin(RPB_Actor apActor, Actor akEscort)
+event OnEscortPrisonerToJailBegin(RPB_ActorBase apActor, Actor akEscort)
     RPB_Prisoner prisonerRef = RPB_Utility.ame_if (apActor as RPB_Prisoner, apActor, (apActor as RPB_Arrestee).MakePrisoner()) as RPB_Prisoner
 
     EventNotImplemented("Prison::OnEscortPrisonerToJailBegin")
@@ -2353,7 +2353,7 @@ event OnEscortPrisonerToJailBegin(RPB_Actor apActor, Actor akEscort)
 endEvent
 
 ; TODO: Possibly rename this to OnEscortedPrisonerToPrison
-event OnEscortPrisonerToJailEnd(RPB_Actor apActor, Actor akEscort)
+event OnEscortPrisonerToJailEnd(RPB_ActorBase apActor, Actor akEscort)
     ; Retrieve or make the Actor a Prisoner
     RPB_Prisoner prisonerRef = RPB_Utility.ame_if (apActor as RPB_Prisoner, apActor, (apActor as RPB_Arrestee).MakePrisoner()) as RPB_Prisoner
 

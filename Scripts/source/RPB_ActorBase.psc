@@ -1,5 +1,5 @@
-scriptname RPB_Actor extends ActiveMagicEffect
-{Base Actor script for RPB_Actor, must be inherited from to be used}
+scriptname RPB_ActorBase extends ActiveMagicEffect
+{Base Actor script for RPB_ActorBase, must be inherited from to be used}
 
 import RPB_Utility
 
@@ -699,10 +699,10 @@ endFunction
 ;/
     Gets the variable category through the script that is currently attached.
 
-    If the underlying script is a child of RPB_Actor, and the category passed in
+    If the underlying script is a child of RPB_ActorBase, and the category passed in
     is the default, it is set as the category for that specific script.
 
-    If on the other hand, the script is RPB_Actor, the category will be of that script.
+    If on the other hand, the script is RPB_ActorBase, the category will be of that script.
 
     In the case of @asVarCategory being passed in and not being the default value,
     despite the underlying script, that category will be used instead.
@@ -720,7 +720,7 @@ string function GetScriptVarCategory(string asVarCategory = "Actor")
     elseif (self as RPB_Captor && asVarCategory == "Actor")
         return "Captor"
 
-    elseif (!(self as RPB_Actor) && asVarCategory == "Actor")
+    elseif (!(self as RPB_ActorBase) && asVarCategory == "Actor")
         DebugError("Actor::GetScriptVarCategory", "Could not find the underlying attached script, no category defined!")
         return "null"
     endif
@@ -860,7 +860,7 @@ endFunction
 ; ==========================================================
 
 event OnEffectStart(Actor akTarget, Actor akCaster)
-    ; Debug("("+ self as string +") RPB_Actor::OnEffectStart", this + ": IsInitialized: " + self.IsInitialized)
+    ; Debug("("+ self as string +") RPB_ActorBase::OnEffectStart", this + ": IsInitialized: " + self.IsInitialized)
 
     if (self.IsInitialized)
         OnRestore()
@@ -881,7 +881,7 @@ event OnEffectStart(Actor akTarget, Actor akCaster)
 endEvent
 
 event OnEffectFinish(Actor akTarget, Actor akCaster)
-    Debug("RPB_Actor::OnEffectFinish", this + " is no longer bound to " + self as string + ", detaching script!")
+    Debug("RPB_ActorBase::OnEffectFinish", this + " is no longer bound to " + self as string + ", detaching script!")
 
     __isEffectActive = false
     self.OnDestroy()
@@ -1038,7 +1038,7 @@ endProperty
 bool __isPlayer
 bool __wasActorAssigned
 
-; Internal function for RPB_Actor, assigns the Actor for this script
+; Internal function for RPB_ActorBase, assigns the Actor for this script
 function __assignActor()
     if (this.GetFormID() == 0x14) ; Player FormID
         __isPlayer = true

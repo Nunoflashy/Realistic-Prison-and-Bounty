@@ -1,4 +1,4 @@
-Scriptname RPB_Arrestee extends RPB_Actor
+Scriptname RPB_Arrestee extends RPB_ActorBase
 
 import RPB_Utility
 import RPB_Config

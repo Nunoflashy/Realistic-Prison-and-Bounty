@@ -202,8 +202,8 @@ endFunction
 function DisplayHoldStats(RPB_MCM_02 mcm, Actor akActor, Faction akHoldCrimeFaction) global
     string[] holdPlaceholders   = mcm.HoldStatsPlaceholders
     string[] holdStats = mcm.ConstructHoldStatValues( \
-        aiBounty            = RPB_Actor.GetCurrentActiveAndLatentBountyForFaction(akActor, akHoldCrimeFaction), \
-        aiViolentBounty     = RPB_Actor.GetCurrentActiveAndLatentBountyForFaction(akActor, akHoldCrimeFaction, abNonViolent = false), \ 
+        aiBounty            = RPB_ActorBase.GetCurrentActiveAndLatentBountyForFaction(akActor, akHoldCrimeFaction), \
+        aiViolentBounty     = RPB_ActorBase.GetCurrentActiveAndLatentBountyForFaction(akActor, akHoldCrimeFaction, abNonViolent = false), \ 
         aiLargestBounty     = RPB_ActorVars.GetLargestBounty(akHoldCrimeFaction, akActor), \ 
         aiTotalBounty       = RPB_ActorVars.GetTotalBounty(akHoldCrimeFaction, akActor), \ 
         aiTimesArrested     = RPB_ActorVars.GetTimesArrested(akHoldCrimeFaction, akActor), \
