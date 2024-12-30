@@ -158,7 +158,17 @@ function Render(RPB_MCM_02 mcm, RPB_Prisoner apPrisoner) global
     if (prisoner.ShowReleaseTime && !prisoner.IsUndeterminedSentence)
         mcm.AddOptionText("\t\t\t\tTime of Release", defaultFlags = mcm.OPTION_DISABLED)
         mcm.AddOptionText("", releaseTimeFormatted, defaultFlags = mcm.OPTION_DISABLED)
-        mcm.AddOptionText("", timeLeftFormatted + " from Now", defaultFlags = mcm.OPTION_DISABLED)
+
+        bool isPastReleaseDate = prisoner.TimeLeftInSentence < 0
+
+        if (isPastReleaseDate)
+            string timeLeftFormattedReleasePast = RPB_Utility.GetTimeFormatted(Math.Abs(apPrisoner.TimeLeftInSentence))
+            mcm.AddOptionText("", timeLeftFormattedReleasePast + " Ago", defaultFlags = mcm.OPTION_DISABLED)
+        else
+            mcm.AddOptionText("", timeLeftFormatted + " From Now", defaultFlags = mcm.OPTION_DISABLED)
+        endif
+
+        ; mcm.AddOptionText("", string_if (timeLeftFormatted != "", timeLeftFormatted + " from Now", "Today"), defaultFlags = mcm.OPTION_DISABLED)
         ; mcm.AddOptionText("", "Execution Time: " + xBenchmark + " ms", defaultFlags = mcm.OPTION_DISABLED)
     endif
 
@@ -198,12 +208,8 @@ function Render(RPB_MCM_02 mcm, RPB_Prisoner apPrisoner) global
         mcm.AddOptionText("Sentence", sentenceFormatted, defaultFlags = mcm.OPTION_DISABLED)
     endif
 
-    if (prisoner.ShowTimeLeftInSentence)
-        if (!prisoner.IsUndeterminedSentence)
-            mcm.AddOptionText("Time Remaining", timeLeftFormatted, defaultFlags = mcm.OPTION_DISABLED)
-        else
-            mcm.AddOptionText("Time Remaining", "Undetermined", defaultFlags = mcm.OPTION_DISABLED)
-        endif
+    if (prisoner.ShowTimeLeftInSentence && timeLeftFormatted != "")
+        mcm.AddOptionText("Time Remaining", string_if (!prisoner.IsUndeterminedSentence, timeLeftFormatted, "Undetermined"), defaultFlags = mcm.OPTION_DISABLED)
     endif
 
     if (prisoner.ShowTimeServed && prisoner.TimeServed >= 1)
