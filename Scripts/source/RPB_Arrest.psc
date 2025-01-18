@@ -127,6 +127,12 @@ RPB_CaptorList property Captors
 endProperty
 
 ; ==========================================================
+;                   Actor-specific Methods
+; ==========================================================
+
+
+
+; ==========================================================
 ;                  Arrestee-specific Methods
 ; ==========================================================
 
@@ -362,14 +368,14 @@ event OnArrestBegin(RPB_Arrestee apArrestee, RPB_Captor apCaptor, Faction akCrim
     ; Debug("Arrest::OnArrestBegin", "Captor: " + apCaptor + ", Captors: " + Captors.GetKeys())
     apArrestee.SetArrestParameters(asArrestType, apCaptor, akCrimeFaction)
 
-    ; Trace("Arrest::OnArrestBegin", "ArresteeRef: [\n" + \
-    ;     "\t arresteeRef: " + apArrestee + "\n" + \
-    ;     "\t apArrestee.HasLatentBounty(): " + apArrestee.HasLatentBounty() + "\n" + \
-    ;     "\t apArrestee.HasActiveBounty(): " + apArrestee.HasActiveBounty() + "\n" + \
-    ;     "\t apArrestee.GetActiveBounty(): " + apArrestee.GetActiveBounty() + "\n" + \
-    ;     "\t apArrestee.GetLatentBounty(): " + apArrestee.GetLatentBounty() + "\n" + \
-    ;     "\t apArrestee.GetFaction(): " + apArrestee.GetFaction() + "\n" + \
-    ; "]")
+    Debug("Arrest::OnArrestBegin", "ArresteeRef: [\n" + \
+        "\t arresteeRef: " + apArrestee + "\n" + \
+        "\t apArrestee.HasLatentBounty(): " + apArrestee.HasLatentBounty() + "\n" + \
+        "\t apArrestee.HasActiveBounty(): " + apArrestee.HasActiveBounty() + "\n" + \
+        "\t apArrestee.GetActiveBounty(): " + apArrestee.GetActiveBounty() + "\n" + \
+        "\t apArrestee.GetLatentBounty(): " + apArrestee.GetLatentBounty() + "\n" + \
+        "\t apArrestee.GetFaction(): " + apArrestee.GetFaction() + "\n" + \
+    "]")
 
     if (!apArrestee.HasLatentBounty() && !apArrestee.HasActiveBounty())
         Config.NotifyArrest("You can't be arrested in " + akCrimeFaction.GetName() + " since you do not have a bounty in the hold", apArrestee.IsPlayer())
@@ -380,7 +386,9 @@ event OnArrestBegin(RPB_Arrestee apArrestee, RPB_Captor apCaptor, Faction akCrim
 
     ; Bind this Captor to the Arrestee
     ; apCaptor.AddArrestee(apArrestee)
-    apCaptor.AssignArrestee(apArrestee.GetActor())
+    if (apCaptor)
+        apCaptor.AssignArrestee(apArrestee.GetActor())
+    endif
     ; Captors.AtKey(apCaptor).GotoState("Escorting")
 
     if (apArrestee.IsPlayer())
@@ -938,7 +946,7 @@ function ApplyArrestResistedPenalty(Faction akArrestFaction)
     string hold = akArrestFaction.GetName()
 
     int resistBountyFlat                    = config.GetArrestAdditionalBountyResistingFlat(hold)
-    float resistBountyFromCurrentBounty     = GetPercentAsDecimal(config.GetArrestAdditionalBountyResistingFromCurrentBounty(hold))
+    float resistBountyFromCurrentBounty     = PercentToDecimal(config.GetArrestAdditionalBountyResistingFromCurrentBounty(hold))
     int resistArrestPenalty                 = int_if (resistBountyFromCurrentBounty > 0, floor(akArrestFaction.GetCrimeGold() * resistBountyFromCurrentBounty)) + resistBountyFlat
 
     if (resistArrestPenalty > 0)
@@ -962,7 +970,7 @@ function SetAsDefeated(Faction akCrimeFaction)
 
     ; int defeatBountyFlat                = config.GetArrestAdditionalBountyDefeatedFlat(hold)
     ; float defeatBountyFromCurrentBounty = config.GetArrestAdditionalBountyDefeatedFromCurrentBounty(hold)
-    ; float defeatBountyPercentModifier   = GetPercentAsDecimal(defeatBountyFromCurrentBounty)
+    ; float defeatBountyPercentModifier   = PercentToDecimal(defeatBountyFromCurrentBounty)
     ; int defeatArrestPenalty             = floor(akCrimeFaction.GetCrimeGold() * defeatBountyPercentModifier) + defeatBountyFlat
 
     ; Debug("Arrest::SetAsDefeated", "\n" +  \
@@ -1044,7 +1052,7 @@ function ApplyArrestEludedPenalty(Faction akArrestFaction)
     string hold = akArrestFaction.GetName()
 
     int eludeBountyFlat = config.GetArrestAdditionalBountyEludingFlat(akArrestFaction.GetName())
-    float eludeBountyPercent = GetPercentAsDecimal(config.GetArrestAdditionalBountyEludingFromCurrentBounty(akArrestFaction.GetName()))
+    float eludeBountyPercent = PercentToDecimal(config.GetArrestAdditionalBountyEludingFromCurrentBounty(akArrestFaction.GetName()))
     int totalEludeBounty = int_if (eludeBountyPercent > 0, round(akArrestFaction.GetCrimeGold() * eludeBountyPercent)) + eludeBountyFlat
 
     if (totalEludeBounty > 0)
@@ -1070,7 +1078,7 @@ function ApplyArrestDefeatedPenalty(Faction akArrestFaction)
     ; ArrestVars.SetInt("Arrest::Bounty for Defeat", Helper.GetArrestAdditionalBountyOnDefeat(hold))
 
     ; ArrestVars.SetInt("Arrest::Additional Bounty when Defeated", config.GetArrestAdditionalBountyDefeatedFlat(hold))
-    ; ArrestVars.SetFloat("Arrest::Additional Bounty when Defeated from Current Bounty", GetPercentAsDecimal(config.GetArrestAdditionalBountyDefeatedFromCurrentBounty(hold)))
+    ; ArrestVars.SetFloat("Arrest::Additional Bounty when Defeated from Current Bounty", PercentToDecimal(config.GetArrestAdditionalBountyDefeatedFromCurrentBounty(hold)))
     ; ArrestVars.SetInt("Arrest::Bounty for Defeat", int_if (ArrestVars.DefeatedAdditionalBountyPercentage > 0, round(akArrestFaction.GetCrimeGold() * ArrestVars.DefeatedAdditionalBountyPercentage)) + ArrestVars.DefeatedAdditionalBounty)
     ; ArrestVars.SetBool("Arrest::Defeated", true)
 
