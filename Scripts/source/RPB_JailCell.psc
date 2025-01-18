@@ -13,54 +13,11 @@ string property Name
     endFunction
 endProperty
 
-; RPB_Prison __prison
-; RPB_Prison property Prison
-;     RPB_Prison function get()
-;         if (!__prison)
-;             ; ErrorProperty("["+ self +"] JailCell::Prison", "Prison is null, this may result in undefined behavior!")
-;             ; DebugError("["+ self +"] JailCell::Prison", "Prison is null, this may result in undefined behavior!")
-
-;             ; Refetch the weak ref from the persistent UUID in storage
-;             string prisonUUID = self.GetLocalPropertyOfTypeString("Prison UUID")
-;             __prison = RPB_API.GetPrisonManager().GetPrisonByUUID(prisonUUID)
-
-;             if (!__prison)
-;                 DebugError("["+ self +"] JailCell::Prison", "Prison is null, this may result in undefined behavior!")
-;             endif
-
-;             ; if (__prison)
-;             ;     DebugInfo("["+ self +"] JailCell::Prison", "Successfully loaded prison from storage variable: " + __prison.Name)
-;             ; endif
-;         endif
-
-;         return __prison
-;     endFunction
-; endProperty
-
 RPB_Prison property Prison
     RPB_Prison function get()
         return __getPrison()
     endFunction
 endProperty
-
-; RPB_CellDoor __cellDoor
-; RPB_CellDoor property CellDoor
-;     RPB_CellDoor function get()
-;         if (!__cellDoor)
-;             ; ErrorProperty("["+ self +"] JailCell::CellDoor", "Cell Door for Cell "+ self +" is null, this may result in undefined behavior!")
-;             ; DebugError("["+ self +"] JailCell::CellDoor", "Cell Door for Cell "+ self +" is null, this may result in undefined behavior!")
-
-;             __cellDoor = self.GetPropertyOfTypeFormArray("Cell Doors")[0] as RPB_CellDoor
-;             self.BindCellDoor(__cellDoor)
-
-;             if (!__cellDoor)
-;                 DebugError("["+ self +"] JailCell::CellDoor", "Cell Door for Cell "+ self +" is null, this may result in undefined behavior!")
-;             endif
-;         endif
-
-;         return __cellDoor
-;     endFunction
-; endProperty
 
 RPB_CellDoor property CellDoor
     RPB_CellDoor function get()
@@ -1166,7 +1123,7 @@ RPB_CellDoor function __getCellDoor()
         return __cellDoor
     endif
 
-    DebugError("["+ self +"] JailCell::CellDoor", "Cell Door for Cell "+ self +" is null, this may result in undefined behavior!")
+    DebugError("["+ Prison.Name +"] ["+ self +"] JailCell::CellDoor", "Cell Door for " + self.ID + " (" + self + ") is null, this may result in undefined behavior!")
     return none
 endFunction
 
