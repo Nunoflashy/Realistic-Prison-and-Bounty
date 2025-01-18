@@ -88,6 +88,59 @@ Actor property Player
     endFunction
 endProperty
 
+
+; TODO: Move this to RPB_Data or RPB_Utility, and maybe optimize it further for performance
+bool function IsActorInLocationFromHold(Actor akActor, string asHold = "", int apHoldObject = 0)
+    if (asHold == "" && apHoldObject == 0)
+        Error("Config::IsActorInLocationFromHold", "Must specify either a hold or a hold object.")
+        return false
+    endif
+
+    if (asHold != "")
+        int holdRootItem = RPB_Data.GetRootObject(asHold)
+        apHoldObject = holdRootItem
+    endif
+
+    Form[] holdLocations = RPB_Data.Hold_GetLocations(apHoldObject)
+
+    int i = 0
+    while (i < holdLocations.Length)
+        Location holdLocation = holdLocations[i] as Location
+        if (akActor.IsInLocation(holdLocation))
+            return true
+        endif
+        i += 1
+    endWhile
+
+    return false
+endFunction
+
+; TODO: Move this to RPB_Data or RPB_Utility, and maybe optimize it further for performance
+bool function IsLocationFromHold(Location akLocation, string asHold = "", int apHoldObject = 0)
+    if (asHold == "" && apHoldObject == 0)
+        Error("Config::IsLocationFromHold", "Must specify either a hold or a hold object.")
+        return false
+    endif
+
+    if (asHold != "")
+        int holdRootItem = RPB_Data.GetRootObject(asHold)
+        apHoldObject = holdRootItem
+    endif
+
+    Form[] holdLocations = RPB_Data.Hold_GetLocations(apHoldObject)
+
+    int i = 0
+    while (i < holdLocations.Length)
+        Location holdLocation = holdLocations[i] as Location
+        if (akLocation == holdLocation)
+            return true
+        endif
+        i += 1
+    endWhile
+
+    return false
+endFunction
+
 bool function IsInLocationFromHold(string hold)
 ; ; float x = StartBenchmark()
 
@@ -113,23 +166,23 @@ bool function IsInLocationFromHold(string hold)
     return false
 endFunction
 
-bool function IsLocationFromHold(string hold, Location akLocation)
-; float x = StartBenchmark()
+; bool function IsLocationFromHold(string hold, Location akLocation)
+; ; float x = StartBenchmark()
 
-;     int i = 0
-;     while (i < miscVars.Exists("Locations["+ hold +"]"))
-;         Location currentIteration = miscVars.GetFormFromArray("Locations["+ hold +"]", i) as Location
-;         if (currentIteration == akLocation)
-; ; EndBenchmark(x, i + " iterations (IsLocationFromHold): returned true")
+; ;     int i = 0
+; ;     while (i < miscVars.Exists("Locations["+ hold +"]"))
+; ;         Location currentIteration = miscVars.GetFormFromArray("Locations["+ hold +"]", i) as Location
+; ;         if (currentIteration == akLocation)
+; ; ; EndBenchmark(x, i + " iterations (IsLocationFromHold): returned true")
 
-;             return true
-;         endif
-;         i += 1
-;     endWhile
-; ; EndBenchmark(x, i + " iterations (IsInLocationFromHold): returned false")
+; ;             return true
+; ;         endif
+; ;         i += 1
+; ;     endWhile
+; ; ; EndBenchmark(x, i + " iterations (IsInLocationFromHold): returned false")
 
-    return false
-endFunction
+;     return false
+; endFunction
 
 string function GetCurrentPlayerHoldLocationEx()
     int holdIndex = 0
@@ -251,23 +304,12 @@ endFunction
 Faction function GetFaction(string hold)
     int rootObject = RPB_Data.GetRootObject(hold)
     return RPB_Data.Hold_GetCrimeFaction(rootObject)
-    ; if (miscVars.Exists("Faction::Crime["+ hold +"]"))
-    ;     return miscVars.GetForm("Faction::Crime["+ hold +"]") as Faction
-    ; endif
-
-    ; return none
 endFunction
 
 ; Temporary, to be implemented here later
 Faction function GetCrimeFaction(string hold)
     return self.GetFaction(hold)
 endFunction
-
-int property FactionCount
-    int function get()
-        ; return miscVars.GetLengthOf("Factions")
-    endFunction
-endProperty
 
 ; ==========================================================
 ;                          General
@@ -279,7 +321,7 @@ int property FreeTimescale
     endFunction
 endProperty
 
-int property JailedTimescale
+int property PrisonTimescale
     int function get()
         return MCM.GetOptionSliderValue("General::TimescalePrison", "General") as int
     endFunction
@@ -396,7 +438,7 @@ int function GetArrestAdditionalBountyResistingFlat(string hold)
 endFunction
 
 int function GetArrestAdditionalBountyResisting(string hold)
-    float bountyPercentModifier = GetPercentAsDecimal(GetArrestAdditionalBountyResistingFromCurrentBounty(hold))
+    float bountyPercentModifier = PercentToDecimal(GetArrestAdditionalBountyResistingFromCurrentBounty(hold))
     int bountyFlat              = GetArrestAdditionalBountyResistingFlat(hold)
     Faction crimeFaction        = GetFaction(hold)
     int bounty                  = floor(crimeFaction.GetCrimeGold() * bountyPercentModifier) + bountyFlat
@@ -413,7 +455,7 @@ int function GetArrestAdditionalBountyDefeatedFlat(string hold)
 endFunction
 
 int function GetArrestAdditionalBountyDefeated(string hold)
-    float bountyPercentModifier = GetPercentAsDecimal(GetArrestAdditionalBountyDefeatedFromCurrentBounty(hold))
+    float bountyPercentModifier = PercentToDecimal(GetArrestAdditionalBountyDefeatedFromCurrentBounty(hold))
     int bountyFlat              = GetArrestAdditionalBountyDefeatedFlat(hold)
     Faction crimeFaction        = GetFaction(hold)
     int bounty                  = floor(crimeFaction.GetCrimeGold() * bountyPercentModifier) + bountyFlat
