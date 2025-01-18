@@ -815,7 +815,7 @@ bool function HasDayElapsed()
 endFunction
 
 function SetEscaped()
-    SetBool("Escaped", true, "PrisonerEscape")
+    SetBool("Escaped", true, "PrisonerEscape") ; refactor to EscapedAt perhaps, then calculate time since escaping, till re-caught
     self.IncrementStat("Times Escaped")
     
     if (self.IsPlayer())
