@@ -2073,7 +2073,7 @@ bool function AssignCell(RPB_Prisoner apPrisoner)
     RPB_JailCell assignedCell = self.RequestCell(apPrisoner)
 
     if (assignedCell == none)
-        EventManager.SendError("("+ Name +") Prison::AssignCell", "Could not assign a cell for prisoner " + apPrisoner.Name)
+        EventManager.SendError("Could not assign a cell for prisoner " + apPrisoner.Name, "("+ Name +") Prison::AssignCell")
         return false
     endif
 
@@ -2275,7 +2275,7 @@ event OnPrisonerEscaped(RPB_Prisoner apPrisoner)
     apPrisoner.SetAttackActorOnSight()
     apPrisoner.SetEscapePenalty()
     apPrisoner.RestoreBounty()
-    apPrisoner.DEBUG_ShowHoldStats()
+    ; apPrisoner.DEBUG_ShowHoldStats()
 
     apPrisoner.OnEscaped()
 endEvent
