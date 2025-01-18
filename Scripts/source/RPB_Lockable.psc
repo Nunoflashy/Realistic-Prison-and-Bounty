@@ -236,16 +236,20 @@ endFunction
 ; =========================================================
 
 function Initialize()
+    ; Debug("["+ self +"] Lockable::Initialize", self)
     string lockLevel = self.GetPropertyOfTypeString("Lock//Level")
+    int lockLevelAsInt
 
     if (lockLevel)
-        int lockLevelAsInt  = LockLevelAsInteger(lockLevel)
-        Debug("["+ self +"] Lockable::Initialize", "Lock Level: " + lockLevel + ", As Integer: " + lockLevelAsInt + ", Object: " + self)
+        lockLevelAsInt  = LockLevelAsInteger(lockLevel)
+        ; Debug("["+ self +"] Lockable::Initialize", "Lock Level: " + lockLevel + ", As Integer: " + lockLevelAsInt + ", Object: " + self)
         self.SetLockLevel(lockLevelAsInt)
     endif
 
     __initializeLockStates()
     __isInitialized = true
+
+    Debug("["+ self +"] Lockable::Initialize", "Initialized Lockable ("+ "Locked: " + __isLocked +", Lock State: "+ __previousLockState +") Lock Level: " + lockLevel + ", As Integer: " + lockLevelAsInt + ", Object: " + self)
 endFunction
 
 int function LockLevelAsInteger(string asLockLevel) global
@@ -324,7 +328,7 @@ function __initializeLockStates()
     __isLocked          = self.IsLocked
     __isLockInitialized = true
 
-    Debug("["+ self +"] (private) Lockable::InitializeLockStates", "Initialized Lockable ("+ "Locked: " + __isLocked +", Lock State: "+ __previousLockState +")")
+    ; Debug("["+ self +"] (private) Lockable::InitializeLockStates", "Initialized Lockable ("+ "Locked: " + __isLocked +", Lock State: "+ __previousLockState +")")
 endFunction
 
 function __determineLockLevel()
