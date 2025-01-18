@@ -81,6 +81,10 @@ Message function ServeTimeMessage() global
     return GetFormFromMod(0x1EE08) as Message
 endFunction
 
+Spell function RPB_ActorSpell() global
+    return GetFormFromMod(0x28523) as Spell
+endFunction
+
 Spell function RPB_ArresteeSpell() global
     return GetFormFromMod(0x187B3) as Spell
 endFunction
@@ -346,7 +350,7 @@ endFunction
 
 ; Converts the passed in percent number to its equivalent decimal percentage to do calculations.
 ; e.g: 5 becomes 0.05
-float function GetPercentAsDecimal(float percentToConvert) global
+float function PercentToDecimal(float percentToConvert) global
     if (percentToConvert <= 0)
         return 0.0
     endif
