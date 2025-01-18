@@ -24,6 +24,12 @@ RPB_Config property Config
     endFunction
 endProperty
 
+RPB_Logger property Logger
+    RPB_Logger function get()
+        return self.GetAliasByName("Logger") as RPB_Logger
+    endFunction
+endProperty
+
 RPB_Arrest __arrest
 RPB_Arrest property Arrest
     RPB_Arrest function get()
@@ -33,6 +39,18 @@ RPB_Arrest property Arrest
 
         __arrest = GetArrest()
         return __arrest
+    endFunction
+endProperty
+
+RPB_ActorList __actorListTrackedActors
+RPB_ActorList property ActorListForTrackedActors
+    RPB_ActorList function get()
+        if (__actorListTrackedActors)
+            return __actorListTrackedActors
+        endif
+
+        __actorListTrackedActors = GetActorListForTrackedActors()
+        return __actorListTrackedActors
     endFunction
 endProperty
 
@@ -84,8 +102,16 @@ RPB_Config function GetConfig() global
     return GetFormFromMod(0x3317) as RPB_Config
 endFunction
 
+RPB_Logger function GetLogger() global
+    return (RPB_API.GetSelf()).GetAliasByName("Logger") as RPB_Logger
+endFunction
+
 RPB_Arrest function GetArrest() global
     return GetFormFromMod(0x3DF8) as RPB_Arrest
+endFunction
+
+RPB_ActorList function GetActorListForTrackedActors() global
+    return (GetFormFromMod(0x3DF8) as Quest).GetAliasByName("ActorList") as RPB_ActorList
 endFunction
 
 RPB_PrisonManager function GetPrisonManager() global
