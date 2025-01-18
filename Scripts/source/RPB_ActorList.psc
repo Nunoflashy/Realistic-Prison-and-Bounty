@@ -7,6 +7,8 @@ string function ListIdentifier() ; abstract
 endFunction
 
 RPB_ActorBase function AtKeyEx(Actor akActor) ; virtual
+    ; string elementKey = self.GetActorIdentifier(akActor)
+    return parent.GetAt(akActor) as RPB_ActorBase
 endFunction
 
 string function GetActorIdentifier(Actor akActor) ; virtual
