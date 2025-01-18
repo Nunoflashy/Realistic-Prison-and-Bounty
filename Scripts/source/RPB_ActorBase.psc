@@ -464,7 +464,7 @@ function SetCrimeGoldForFaction(Faction akFaction, int aiGold)
     ; Handling for the Player, done by base Faction
     if (self.IsPlayer())
         akFaction.SetCrimeGold(aiGold)
-        self.OnBountyGained()
+        ; self.OnBountyGained() ; Problems with arrest, need to find a workaround (maybe states for RPB_Arrestee?)
         return
     endif
 
