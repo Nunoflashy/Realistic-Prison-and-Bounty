@@ -31,6 +31,14 @@ endProperty
 
 bool property HasStateRequiredForImprisonment
     bool function get()
+        ; Debug("("+ Name +") Prisoner::HasStateRequiredForImprisonment", \
+        ;     "\nPrison: " + Prison.Name + "\n" + \
+        ;     "JailCell: " + JailCell + "\n" + \
+        ;     "Sentence: " + Sentence + "\n" + \
+        ;     "Bounty: " + Bounty + "\n" + \
+        ;     "IsUndeterminedSentence: " + IsUndeterminedSentence + "\n" + \
+        ;     "All: " + (Prison && JailCell && (Sentence || Bounty || IsUndeterminedSentence)) \
+        ; )
         return Prison && JailCell && (Sentence || Bounty || IsUndeterminedSentence)
     endFunction
 endProperty
@@ -1503,18 +1511,22 @@ function SetSentenceFromTimeServed(int aiSentenceInDays, bool abShouldAffectBoun
 endFunction
 
 function SetSentence(int aiSentenceInDays = 0, bool abShouldAffectBounty = true)
-    if (GetBool("Sentence Set"))
-        Debug("["+ Name +"] Prisoner::SetSentence", "A sentence has already been set for this prisoner ("+ self.GetIdentifier() +"). \nConsider using IncreaseSentence() or DecreaseSentence() instead.")
+    if (Has("Sentence Set"))
+        EventManager.SendWarning("A sentence has already been set for this prisoner ("+ self.GetIdentifier() +"). \nConsider using IncreaseSentence() or DecreaseSentence() instead.", "["+ Name +"] Prisoner::SetSentence")
         return
     endif
 
     if (self.IsUndeterminedSentence && aiSentenceInDays == 0)
-        Debug("["+ Name +"] Prisoner::SetSentence", "Setting an undetermined sentence for prisoner " + self.GetActor())
+        EventManager.SendInfo("Setting an undetermined sentence for prisoner " + self.GetActor(), "["+ Name +"] Prisoner::SetSentence")
         return
     endif
 
-    ; Set a sentence based on params
-    SetInt("Sentence", \ 
+    if (aiSentenceInDays <= 0 && !self.Bounty)
+        EventManager.SendWarning("Sentence must be greater than 0 days. (Sentence not set)", "["+ Name +"] Prisoner::SetSentence")
+        return
+    endif
+
+    self.SetInt("Sentence", \ 
         aiValue     = int_if (aiSentenceInDays > 0, aiSentenceInDays, self.GetSentenceFromBounty()), \
         aiMinValue  = Prison.MinimumSentence, \
         aiMaxValue  = Prison.MaximumSentence \
@@ -2025,7 +2037,6 @@ function UpdateDayEvents()
     PreviousUpdateTimeServed = TimeServed
 endFunction
 
-
 function UpdateLongestSentence()
     int currentLongestSentence = self.QueryStat("Longest Sentence")
     int newLongestSentence = int_if (currentLongestSentence < Sentence, Sentence, currentLongestSentence)
@@ -2051,6 +2062,7 @@ function UpdateSentence()
 
     self.IncreaseSentence(activeBounty / Prison.BountyToSentence, false)
 endFunction
+
 
 ;                     De/(Initialization)
 ; ==========================================================
@@ -2087,7 +2099,7 @@ function Destroy()
 
     ; Debug("("+ Name +") Prisoner::Destroy", "Object: " + GetContainerList(RPB_StorageVars.GetObjectHandleOnForm(this)))
     ; TODO: Unset all properties related to this Prisoner
-    ; Prison.UnregisterPrisoner(self)
+    Prison.UnregisterPrisoner(self)
 endFunction
 
 ;/
