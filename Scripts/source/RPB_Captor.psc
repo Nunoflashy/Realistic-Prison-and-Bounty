@@ -1,7 +1,27 @@
-Scriptname RPB_Captor extends RPB_Actor
+Scriptname RPB_Captor extends RPB_ActorBase
 
 import RPB_Utility
 import RPB_Arrest
+
+; ==========================================================
+;                      Script References
+; ==========================================================
+
+RPB_Arrest property Arrest
+    RPB_Arrest function get()
+        return API.Arrest
+    endFunction
+endProperty
+
+RPB_SceneManager property SceneManager
+    RPB_SceneManager function get()
+        return API.SceneManager
+    endFunction
+endProperty
+
+; ==========================================================
+;                          Properties
+; ==========================================================
 
 bool property IsGuard
     bool function get()
@@ -22,11 +42,11 @@ bool property IsEscorting
     endFunction
 endProperty
 
-; RPB_ArresteeList property Arrestees
-;     RPB_ArresteeList function get()
-        
-;     endFunction
-; endProperty
+RPB_ArresteeList property ArresteesList
+    RPB_ArresteeList function get()
+        return Arrest.Arrestees
+    endFunction
+endProperty
 
 int __arrestees
 Form[] property Arrestees
@@ -84,6 +104,10 @@ endProperty
 function AssignArrestee(Actor akArrestee)
     ; _arrestee = akArrestee
     self.SetForm("Arrestee", akArrestee)
+endFunction
+
+function RemoveArrestee(RPB_Arrestee apArrestee)
+    ArresteesList.Remove(apArrestee)
 endFunction
 
 function AddArrestee(RPB_Arrestee akArresteeRef)
