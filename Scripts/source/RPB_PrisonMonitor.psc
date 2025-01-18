@@ -57,6 +57,14 @@ function SendRequest()
     endif
 endFunction
 
+function EnableMonitoring()
+    self.GotoState("Active")
+endFunction
+
+function DisableMonitoring()
+    self.GotoState("Inactive")
+endFunction
+
 ; ==========================================================
 ;                          Prisoners
 ; ==========================================================
@@ -227,7 +235,16 @@ endEvent
 
 event OnCellAttach()
     Debug("["+ Prison.Name +"] PrisonMonitor::OnCellAttach", "Prison Monitor - On Cell Attach")
-    self.GotoState("Inactive")
+    self.DisableMonitoring()
+
+    int i = 0
+    while (i < Prison.JailCells.Length)
+        RPB_JailCell jailCell = Prison.JailCells[i] as RPB_JailCell
+        if (jailCell && !jailCell.IsInitialized())
+            jailCell.Initialize(Prison)
+        endif
+        i += 1
+    endWhile
 endEvent
 
 event OnCellDetach()

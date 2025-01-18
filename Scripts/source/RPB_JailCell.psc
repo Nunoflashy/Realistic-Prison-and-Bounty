@@ -641,7 +641,7 @@ event OnPrisonerRegister(RPB_Prisoner apPrisoner)
         Debug("["+ ID +"] JailCell::OnPrisonerRegister", "Rebinding Cell Door!")
     endif
     self.DetermineCellParameters()
-    ; Debug("JailCell::OnPrisonerRegister", "Cell Properties: " + self.DEBUG_GetCellProperties())
+    Debug("JailCell::OnPrisonerRegister", "Cell Properties: " + self.DEBUG_GetCellProperties())
 endEvent
 
 event OnPrisonerUnregister(RPB_Prisoner apPrisoner)
@@ -698,7 +698,7 @@ string function GetName()
 endFunction
 
 bool function IsInitialized()
-    return __prison && __cellDoor
+    return Prison && CellDoor
 endFunction
 
 function Initialize(RPB_Prison apPrison)
@@ -753,6 +753,10 @@ function BindPrison(RPB_Prison apPrison)
 endFunction
 
 function BindCellDoor(RPB_CellDoor akCellDoor)
+    if (!akCellDoor)
+        return
+    endif
+
     ; Bind the cell door to this jail cell
     __cellDoor = akCellDoor
 
