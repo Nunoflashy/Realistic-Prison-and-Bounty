@@ -28,6 +28,28 @@ endProperty
 
 ; Don't init Cell Doors, let Jail Cells handle them
 event OnInit() ; overrides
+    if (!_shouldProcessLockable())
+        return
+    endif
+
+    ; Debug("["+ self +"] CellDoor::OnInit", "Initialized Cell Door: (ID: " + self.ID + ") (Prison: "+ self.JailCell.Prison +") (Cell: "+ self.JailCell +")")
+    ; Debug("["+ self +"] CellDoor::OnInit", "Initialized Cell Door: (Prison: "+ self.JailCell.Prison +") (Cell: "+ self.JailCell +")")
+endEvent
+
+event OnAttachedToCell()
+    if (!_shouldProcessLockable())
+        return
+    endif
+
+    ; Debug("["+ self +"] CellDoor::OnAttachedToCell", "Cell Door: (" + self + ") (Prison: "+ JailCell.Prison.Name +") (Cell: "+ self.JailCell +")")
+endEvent
+
+event OnCellAttach()
+    if (!_shouldProcessLockable())
+        return
+    endif
+
+    ; Debug("["+ self +"] CellDoor::OnCellAttach", "Cell Door: (" + self + ") (Prison: "+ JailCell.Prison.Name +") (Cell: "+ self.JailCell +")")
 endEvent
 
 event OnActivate(ObjectReference akActionRef)
@@ -46,7 +68,7 @@ event OnOpen(ObjectReference akActionRef)
     Actor akOpener = akActionRef as Actor
     Form[] cellPrisoners = JailCell.Prisoners
     
-    Debug("["+ self +"] CellDoor::OnOpen", akOpener + " opened cell door " + self + ", which belongs to jail cell " + self.JailCell)
+    ; Debug("["+ self +"] CellDoor::OnOpen", akOpener + " opened cell door " + self + ", which belongs to jail cell " + self.JailCell)
     int i = 0
     while (i < cellPrisoners.Length)
         if (akOpener == cellPrisoners[i])
