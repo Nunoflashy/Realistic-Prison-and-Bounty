@@ -427,6 +427,27 @@ function SyncTotalBountyForFaction(Faction akFaction)
     RPB_ActorVars.ModTotalBounty(akFaction, this, activeBounty)
 endFunction
 
+
+function ModTotalBountyForFaction(Faction akFaction, int aiAmountBy)
+    int activeBounty = self.GetActiveBountyForFaction(akFaction)
+
+    if (activeBounty == 0)
+        RPB_StorageVars.SetIntOnForm("Previous Active Bounty", this, 0, "Temporary")
+    endif
+
+    int previousActiveBounty = RPB_StorageVars.GetIntOnForm("Previous Active Bounty", this, "Temporary")
+
+    if (previousActiveBounty > 0)
+        RPB_ActorVars.ModTotalBounty(akFaction, this, (Max(previousActiveBounty, aiAmountBy) - Min(previousActiveBounty, aiAmountBy)) as int)
+    else
+        RPB_ActorVars.ModTotalBounty(akFaction, this, aiAmountBy)
+    endif
+
+    ; Store the previous bounty
+    RPB_StorageVars.SetIntOnForm("Previous Active Bounty", this, activeBounty, "Temporary")
+endFunction
+
+
 bool function HasActiveBountyForFaction(Faction akFaction)
     if (self.IsPlayer())
         return akFaction.GetCrimeGold() > 0
@@ -443,6 +464,7 @@ function SetCrimeGoldForFaction(Faction akFaction, int aiGold)
     ; Handling for the Player, done by base Faction
     if (self.IsPlayer())
         akFaction.SetCrimeGold(aiGold)
+        self.OnBountyGained()
         return
     endif
 
@@ -799,7 +821,6 @@ endFunction
 function SetInt(string asVarName, int aiValue, string asVarCategory = "Actor", int aiMinValue = 0, int aiMaxValue = 0)
     string category = self.GetScriptVarCategory(asVarCategory)
     RPB_StorageVars.SetIntOnForm(asVarName, this, aiValue, category)
-    ; Debug("Actor::SetInt", "["+ self +", "+ asVarCategory +"] Setting " + asVarName + " on " + this + " to: " + aiValue)
 endFunction
 
 function ModInt(string asVarName, int aiValue, string asVarCategory = "Actor")
@@ -829,9 +850,6 @@ endFunction
 function SetForm(string asVarName, Form akValue, string asVarCategory = "Actor")
     string category = self.GetScriptVarCategory(asVarCategory)
     RPB_StorageVars.SetFormOnForm(asVarName, this, akValue, category)
-    if (asVarName == "StripperGuard")
-        Debug("Actor::SetForm", "["+ self +"] Setting " + asVarName + " on " + this + " to: " + akValue + ", Category: " + category)
-    endif
     ; Debug("Actor::SetForm", "["+ self +"] Setting " + asVarName + " on " + this + " to: " + akValue)
 endFunction
 
