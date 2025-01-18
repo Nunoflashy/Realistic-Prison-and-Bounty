@@ -25,6 +25,10 @@ string[] function GetActions()
     JArray.addStr(actionArrayObj, "[Prison] Verify Jail Cells Integrity")
     JArray.addStr(actionArrayObj, "Distance between two Objects")
     JArray.addStr(actionArrayObj, "Play Animation on Selected Actor")
+    JArray.addStr(actionArrayObj, "[Monitoring] Apply RPB_Actor on Actor")
+    JArray.addStr(actionArrayObj, "[Monitoring] Remove RPB_Actor from Actor")
+    JArray.addStr(actionArrayObj, "[Monitoring] Attach RPB_BountyDecayable on Actor")
+    JArray.addStr(actionArrayObj, "[Monitoring] Detach RPB_BountyDecayable from Actor")
     JArray.addStr(actionArrayObj, "[Bounty] Set Bounty for Selected Actor")
     JArray.addStr(actionArrayObj, "[Bounty] Set Violent Bounty for Selected Actor")
     JArray.addStr(actionArrayObj, "[Bounty] Set Bounty for Prisoner")
@@ -96,6 +100,18 @@ function ShowActionsMenu()
 
     elseif (actionToPerform == "Play Animation on Selected Actor")
         Action_PlayAnimationOnActor(uilib)
+
+    elseif (actionToPerform == "[Monitoring] Apply RPB_Actor on Actor")
+        Action_MonitoringApplyActorScript(uilib)
+
+    elseif (actionToPerform == "[Monitoring] Remove RPB_Actor from Actor")
+        Action_MonitoringRemoveActorScript(uilib)
+
+    elseif (actionToPerform == "[Monitoring] Attach RPB_BountyDecayable on Actor")
+        Action_MonitoringApplyBountyScript(uilib)
+
+    elseif (actionToPerform == "[Monitoring] Detach RPB_BountyDecayable from Actor")
+        Action_MonitoringRemoveBountyScript(uilib)
 
     elseif (actionToPerform == "[Bounty] Set Bounty for Selected Actor")
         Action_SetBountyForActor(uilib)
@@ -325,6 +341,47 @@ function Action_PlayAnimationOnActor(RPB_UIInterface uilib)
     Debug.SendAnimationEvent(selectedActor, animationToPlay)
     Debug("Actions::Action_PlayAnimationOnActor", "Playing " + animationToPlay + " on Actor " + actorName)
 endFunction
+
+function Action_MonitoringApplyActorScript(RPB_UIInterface uilib)
+    Actor selectedActor = Game.GetCurrentConsoleRef() as Actor
+
+    if (selectedActor == none)
+        return
+    endif
+
+    RPB_Actor.ApplyEffect(selectedActor)
+endFunction
+
+function Action_MonitoringRemoveActorScript(RPB_UIInterface uilib)
+    Actor selectedActor = Game.GetCurrentConsoleRef() as Actor
+
+    if (selectedActor == none)
+        return
+    endif
+
+    RPB_Actor.RemoveEffect(selectedActor)
+endFunction
+
+function Action_MonitoringApplyBountyScript(RPB_UIInterface uilib)
+    Actor selectedActor = Game.GetCurrentConsoleRef() as Actor
+
+    if (selectedActor == none)
+        return
+    endif
+
+    RPB_BountyDecayable.Attach(selectedActor)
+endFunction
+
+function Action_MonitoringRemoveBountyScript(RPB_UIInterface uilib)
+    Actor selectedActor = Game.GetCurrentConsoleRef() as Actor
+
+    if (selectedActor == none)
+        return
+    endif
+
+    RPB_BountyDecayable.Detach(selectedActor)
+endFunction
+
 
 function Action_SetBountyForActor(RPB_UIInterface uilib, bool abViolentBounty = false)
     Actor selectedActor = Game.GetCurrentConsoleRef() as Actor
@@ -770,7 +827,6 @@ function Action_ArrestSelectedActorForFaction(RPB_UIInterface uilib)
         RPB_ActorVars.SetCrimeGold(crimeFaction, selectedActor, arrestBounty)
     else
         RPB_ActorVars.SetCrimeGold(crimeFaction, selectedActor, arrestBounty)
-        ; crimeFaction.SetCrimeGold(arrestBounty)
     endif
 
     API.Arrest.ArrestActorForFaction(crimeFaction, selectedActor, API.Arrest.ARREST_TYPE_TELEPORT_TO_CELL)
@@ -790,9 +846,6 @@ function Action_ImprisonSelectedActor(RPB_UIInterface uilib)
 
     RPB_Prisoner prisoner = prison.MakePrisoner(selectedActor)
 
-    ; Debug("Actions::Action_ImprisonSelectedActor", "[Prison ID: "+ prison.ID +"] ["+ prison.UUID +"] Prison: " + prison.Name + ", prisoner: " + prisoner)
-    ; Debug("Actions::Action_ImprisonSelectedActor", "[Prison ID: "+ prison.ID +"] ["+ prison.UUID +"] Prisoners: "+ prison.Prisoners.GetKeys())
-
     if (!prisoner)
         Debug("Actions::Action_ImprisonSelectedActor", "[Prison ID: "+ prison.ID +"] ["+ prison.UUID +"] Prisoners: "+ prison.Prisoners.GetKeys())
         return
@@ -806,8 +859,8 @@ function Action_ImprisonSelectedActor(RPB_UIInterface uilib)
     prisoner.ShowBounty               = true
 
     prisoner.SetBelongingsContainer()
-    prisoner.UndetermineSentence()
-    ; prisoner.SetSentence(10)
+    ; prisoner.UndetermineSentence()
+    prisoner.SetSentence(10)
 
     prisoner.AssignCell()
     prisoner.MoveToCell()
