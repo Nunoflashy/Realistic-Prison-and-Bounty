@@ -1,6 +1,7 @@
 Scriptname RPB_MCM_02 extends SKI_ConfigBase  
 
 import RPB_Utility
+import RPB_Memory
 
 ; ==============================================================================
 ; Constants
@@ -176,23 +177,14 @@ bool function IsHoldCurrentPage()
 endFunction
 
 function InitializePages()
-    int _pagesArray = JArray.object()
-
-    int i = 0
-    while (i < Holds.Length)
-        JArray.addStr(_pagesArray, Holds[i])
-        i += 1
-    endWhile
-
-    JArray.addStr(_pagesArray, "")
-    if (API.Arrest.Arrestees.Count > 0)
-        JArray.addStr(_pagesArray, "Check Arrestee")
-    endif
-
-    JArray.addStr(_pagesArray, "Check Prisoner")
-    JArray.addStr(_pagesArray, "Check Hold Info for Prisoner")
-
-    Pages = JArray.asStringArray(_pagesArray)
+    string PAGE_SEPARATOR = " ,"
+    Pages = String_Explode( \ 
+        String_Implode(Holds) + "," + \
+        string_if (API.Arrest.Arrestees.Count > 0 || API.PrisonManager.HasPrisonsWithPrisoners, PAGE_SEPARATOR) + \
+        string_if (API.Arrest.Arrestees.Count > 0, "Check Arrestee" + ",")+ \
+        string_if (API.PrisonManager.HasPrisonsWithPrisoners, "Check Prisoner" + ",")+ \
+        string_if (API.PrisonManager.HasPrisonsWithPrisoners, "Check Hold Info for Prisoner") \
+    )
 endFunction
 
 int property PLAYER_INFO_NONE     = 0 autoreadonly
