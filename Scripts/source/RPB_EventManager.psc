@@ -135,7 +135,6 @@ function SendPrisonSceneBulkEvent(string asScene, string asSceneEvent, Form[] ak
     RPB_Prison prison = API.PrisonManager.FindPrisonByPrisoner(akPrisoners[0] as Actor)
 
     if (prison == none)
-    if (!prison)
         self.SendError("Could not retrieve the prison from " + akPrisoners[0] + ", cannot proceed with the scene!", "EventManager::SendPrisonSceneBulkEvent")
         return
     endif
@@ -145,7 +144,6 @@ function SendPrisonSceneBulkEvent(string asScene, string asSceneEvent, Form[] ak
         RPB_Prisoner prisoner = prison.AwaitPrisonerReference(akPrisoners[i] as Actor) 
 
         if (prisoner == none)
-        if (!prisoner)
             self.SendError("Could not retrieve the prisoner from the scene event, cannot proceed with the scene!", "EventManager::SendPrisonSceneBulkEvent")
             return
         endif
