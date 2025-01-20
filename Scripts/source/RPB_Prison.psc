@@ -1967,7 +1967,6 @@ function TeleportPrisonerToRelease(RPB_Prisoner apPrisoner)
         apPrisoner.MoveTo(apPrisoner.TeleportReleaseLocation)
     endif
 
-    self.UnregisterPrisoner(apPrisoner)
     self.OnPrisonerReleased(apPrisoner)
 endFunction
 
