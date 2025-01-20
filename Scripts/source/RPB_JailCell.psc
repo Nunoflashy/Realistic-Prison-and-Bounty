@@ -112,19 +112,19 @@ endProperty
 
 bool property HasBeds
     bool function get()
-        return self.Beds.Length > 0
+        return __beds.Length > 0
     endFunction
 endProperty
 
 bool property HasContainers
     bool function get()
-        return self.Containers.Length > 0
+        return __containers.Length > 0
     endFunction
 endProperty
 
 bool property HasOtherProps
     bool function get()
-        return self.OtherProps.Length > 0
+        return __otherProps.Length > 0
     endFunction
 endProperty
 
@@ -655,7 +655,7 @@ string function GetName()
 endFunction
 
 bool function IsInitialized()
-    return Prison && CellDoor
+    return __prison && __cellDoor
 endFunction
 
 function Initialize(RPB_Prison apPrison)

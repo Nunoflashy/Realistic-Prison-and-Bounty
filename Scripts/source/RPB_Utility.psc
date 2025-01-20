@@ -734,6 +734,7 @@ endFunction
 function RetainAI(bool condition = true) global
     if (condition)
         Game.SetPlayerAIDriven(true)
+        Game.GetPlayer().EnableAI(true)
         Game.DisablePlayerControls( \
             abMovement = true, \
             abFighting = true, \
@@ -1909,6 +1910,14 @@ endFunction
 
 int function GetLastDayOfMonth(int aiMonth) global
     return GetDaysOfMonth(aiMonth)
+endFunction
+
+float function GetElapsedTimeBetweenTimes(float afStartTime, float afEndTime) global
+    return afEndTime - afStartTime
+endFunction
+
+float function GetElapsedTimeSincePointInTime(float afPointInTime) global
+    return now() - afPointInTime
 endFunction
 
 bool function IsLastDayOfMonth() global

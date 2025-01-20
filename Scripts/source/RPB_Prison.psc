@@ -1441,7 +1441,7 @@ endFunction
 
 ObjectReference function GetRandomEscortLocation()
     Form[] escortLocations = self.GetEscortLocations()
-    if (escortLocations == none)
+    if (!escortLocations)
         return none
     endif
 
@@ -1450,16 +1450,31 @@ endFunction
 
 Form function GetRandomSearchMarker(string asSearchType = "Frisking")
     Form[] markers = self.GetSearchMarkers(asSearchType)
+
+    if (!markers)
+        return none
+    endif
+
     return markers[Utility.RandomInt(0, markers.Length - 1)]
 endFunction
 
 Form function GetRandomReleaseMarker(string asReleaseMarkerType = "Teleport")
     Form[] allReleaseMarkersOfType = self.GetReleaseMarkers(asReleaseMarkerType)
+
+    if (!allReleaseMarkersOfType)
+        return none
+    endif
+
     return allReleaseMarkersOfType[Utility.RandomInt(0, allReleaseMarkersOfType.Length - 1)]
 endFunction
 
 Form function GetRandomPrisonerContainer(string asPrisonerContainerType = "Belongings")
     Form[] allPrisonerContainers = self.GetPrisonerContainers(asPrisonerContainerType)
+
+    if (!allPrisonerContainers)
+        return none
+    endif
+
     return allPrisonerContainers[Utility.RandomInt(0, allPrisonerContainers.Length - 1)]
 endFunction
 
@@ -1542,6 +1557,11 @@ endFunction
 
 RPB_JailCell function GetEmptyJailCell()
     Form[] emptyCells = self.EmptyJailCells
+
+    if (!emptyCells)
+        return none
+    endif
+
     return emptyCells[Utility.RandomInt(0, emptyCells.Length - 1)] as RPB_JailCell
 endFunction
 
@@ -1551,6 +1571,11 @@ endFunction
 /;
 RPB_JailCell function GetJailCellOfGender(string asSex, bool abAvailable = true, bool abCanBeOvercrowded = false)
     Form[] genderCells = self.GetGenderExclusiveCells(asSex, abAvailable, abCanBeOvercrowded)
+
+    if (!genderCells)
+        return none
+    endif
+
     RPB_JailCell genderCell = genderCells[Utility.RandomInt(0, genderCells.Length - 1)] as RPB_JailCell
 
     return genderCell
@@ -1938,7 +1963,7 @@ function TeleportPrisonerToRelease(RPB_Prisoner apPrisoner)
     apPrisoner.RemoveFromCell()
 
     if (apPrisoner.TeleportReleaseLocation)
-        apPrisoner.EnableAI(apPrisoner.IsNPC())
+        apPrisoner.EnableAI(apPrisoner.IsNPC()) ; TODO: FIX THIS!!!!!!!!!! Only EnableAI if it's an NPC, this is not doing that!!!! BIG BUG
         apPrisoner.MoveTo(apPrisoner.TeleportReleaseLocation)
     endif
 
@@ -2346,10 +2371,7 @@ event OnPrisonerDeath(RPB_Prisoner apPrisoner, Actor akKiller)
 endEvent
 
 event OnEscortPrisonerToJailBegin(RPB_ActorBase apActor, Actor akEscort)
-    RPB_Prisoner prisonerRef = RPB_Utility.ame_if (apActor as RPB_Prisoner, apActor, (apActor as RPB_Arrestee).MakePrisoner()) as RPB_Prisoner
-
     EventNotImplemented("Prison::OnEscortPrisonerToJailBegin")
-    prisonerRef.OnEscortToPrison(akEscort)
 endEvent
 
 ; TODO: Possibly rename this to OnEscortedPrisonerToPrison

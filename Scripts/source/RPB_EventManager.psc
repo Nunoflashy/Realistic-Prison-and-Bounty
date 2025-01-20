@@ -127,7 +127,7 @@ function SendPrisonSceneEvent(string asScene, string asSceneEvent, Actor akPriso
 endFunction
 
 function SendPrisonSceneBulkEvent(string asScene, string asSceneEvent, Form[] akPrisoners, Actor akAuthority, string asSceneSecondaryEvent = "null")
-    if (akPrisoners == none || akPrisoners.Length == 0)
+    if (!akPrisoners || akPrisoners.Length == 0)
         self.SendError("No prisoners provided for bulk scene event!", "EventManager::SendPrisonSceneBulkEvent")
         return
     endif
@@ -135,6 +135,7 @@ function SendPrisonSceneBulkEvent(string asScene, string asSceneEvent, Form[] ak
     RPB_Prison prison = API.PrisonManager.FindPrisonByPrisoner(akPrisoners[0] as Actor)
 
     if (prison == none)
+    if (!prison)
         self.SendError("Could not retrieve the prison from " + akPrisoners[0] + ", cannot proceed with the scene!", "EventManager::SendPrisonSceneBulkEvent")
         return
     endif
@@ -144,6 +145,7 @@ function SendPrisonSceneBulkEvent(string asScene, string asSceneEvent, Form[] ak
         RPB_Prisoner prisoner = prison.AwaitPrisonerReference(akPrisoners[i] as Actor) 
 
         if (prisoner == none)
+        if (!prisoner)
             self.SendError("Could not retrieve the prisoner from the scene event, cannot proceed with the scene!", "EventManager::SendPrisonSceneBulkEvent")
             return
         endif
@@ -890,7 +892,7 @@ event OnDialogueTopicEnd(string eventName, string topicInfoDialogue, float topic
     ; Fallback to Player if nearby, since GetDialogueTarget() fails if there are many guards talking at once, akSpokenTo will be none
     if (!akSpokenTo && akSpeaker.GetDistance(Config.Player) <= 1000)
         akSpokenTo = Config.Player
-        self.SendError("Could not get the dialogue target of " + akSpeaker + ", falling back to Player since they are nearby.", "EventManager::OnDialogueTopicStart")
+        self.SendInfo("Could not get the dialogue target of " + akSpeaker + ", falling back to Player since they are nearby.", "EventManager::OnDialogueTopicStart")
     endif
 
     ; Failed to get dialogue target even with fallback, player must not be near
