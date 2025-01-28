@@ -1,6 +1,7 @@
 Scriptname RPB_Config extends Quest
 
 import RPB_Utility
+import RPB_Memory
 import PO3_SKSEFunctions
 import Math
 
@@ -61,9 +62,10 @@ endProperty
 
 string[] property Holds
     string[] function get()
-        int cellsMap = RPB_Data.Unserialize()
-        string[] _holds = JMap.allKeysPArray(cellsMap)
-        return _holds
+        int rootObject = RPB_Data.Unserialize()
+        return FastArray_ToStringArray( \ 
+            FastMap_Keys(rootObject) \
+        )
     endFunction
 endProperty
 
@@ -82,9 +84,14 @@ string[] property Cities
     endFunction
 endProperty
 
+Actor __player
 Actor property Player
     Actor function get()
-        return Game.GetForm(0x00014) as Actor
+        if (__player)
+            return __player
+        endif
+
+        __player = Game.GetPlayer()
     endFunction
 endProperty
 
