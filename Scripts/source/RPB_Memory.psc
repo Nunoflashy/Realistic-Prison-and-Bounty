@@ -282,7 +282,7 @@ int function FastArray_FromFloatArray(float[] array) global
     return JArray.objectWithFloats(array)
 endFunction
 
-string function FastArray_FromStringArray(string[] array) global
+int function FastArray_FromStringArray(string[] array) global
     return JArray.objectWithStrings(array)
 endFunction
 

@@ -88,7 +88,7 @@ function SendArrestSceneEvent(string asScene, string asSceneEvent, Actor akArres
 endFunction
 
 function SendArrestSceneBulkEvent(string asScene, string asSceneEvent, Form[] akArrestees, Actor akAuthority, string asSceneSecondaryEvent = "null")
-    if (akArrestees == none || akArrestees.Length == 0)
+    if (!akArrestees || akArrestees.Length == 0)
         self.SendError("No Arrestees provided for bulk scene event!")
         return
     endif

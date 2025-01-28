@@ -1,6 +1,7 @@
 scriptname RPB_UIInterface extends ObjectReference
 
 import RPB_Utility
+import RPB_Memory
 
 UILIB_1 property UILib
     UILIB_1 function get()
@@ -53,19 +54,19 @@ Form function ShowFormArrayList(string asListTitle = "", Form[] akOptions)
         return none
     endif
 
-    int formNames = JArray.object()
-    JArray.addStr(formNames, "<No Form>")
+    int formNames = FastArray("<string>")
+    FastArray_AddString(formNames, "<No Form>")
 
     int arrSize = akOptions.Length
 
     int i = 0
     while (i < arrSize)
         string formLine = akOptions[i] + ": " + akOptions[i].GetName()
-        JArray.addStr(formNames, formLine)
+        FastArray_AddString(formNames, formLine)
         i += 1
     endWhile
 
-    string[] listOptions = JArray.asStringArray(formNames)
+    string[] listOptions = FastArray_ToStringArray(formNames)
     int index = self.ShowList(asListTitle, listOptions) - 1
     if (index == -1)
         return none
@@ -77,8 +78,8 @@ endFunction
 string function ShowHoldList(bool abMustHaveArrestees = false, bool abSkipListOnSingleResult = false, string asListTitle = "Select Hold")
     string[] holds = API.Config.Holds
 
-    int holdsArr = JArray.object()
-    JArray.addStr(holdsArr, "<No Hold>")
+    int holdsArr = FastArray("<string>")
+    FastArray_AddString(holdsArr, "<No Hold>")
 
     if (abMustHaveArrestees)
         RPB_ArresteeList arrestees  = API.Arrest.Arrestees
@@ -87,22 +88,22 @@ string function ShowHoldList(bool abMustHaveArrestees = false, bool abSkipListOn
         while (i < arrestees.Count)
             RPB_Arrestee arrestee = arrestees.AtIndex(i)
             string hold = arrestee.Hold
-            bool holdHasArrestee = JArray.findStr(holdsArr, hold) != -1
+            bool holdHasArrestee = FastArray_FindString(holdsArr, hold) != -1
             if (!holdHasArrestee)
-                JArray.addStr(holdsArr, hold)
+                FastArray_AddString(holdsArr, hold)
             endif
     
             i += 1
         endWhile
     else
-        JArray.addFromArray(holdsArr, JArray.objectWithStrings(holds))
+        FastArray_AddFromArray(holdsArr, FastArray_FromStringArray(holds))
     endif
 
-    if (JArray.count(holdsArr) == 2 && abSkipListOnSingleResult) ; Skip List (Only one result and <No Hold>)
+    if (FastArray_Size(holdsArr) == 2 && abSkipListOnSingleResult) ; Skip List (Only one result and <No Hold>)
         return holdsOutput[1]
     endif
 
-    string[] holdsOutput = JArray.asStringArray(holdsArr)
+    string[] holdsOutput = FastArray_ToStringArray(holdsArr)
     string selectedHold  = self.ShowList_ReturnElement(asListTitle, holdsOutput)
 
     if (selectedHold == "<No Hold>")
@@ -114,10 +115,10 @@ endFunction
 
 RPB_Arrestee function ShowArresteeList(string asArrestHold, string asListTitle = "Select Arrestee")
     RPB_Arrest arrest = API.Arrest
-    int arresteesArr = JArray.object()
-    int arresteesIds = JArray.object()
+    int arresteesArr = FastArray("<string>")
+    int arresteesIds = FastArray("<int>")
 
-    JArray.addStr(arresteesArr, "<No Arrestee>")
+    FastArray_AddString(arresteesArr, "<No Arrestee>")
 
     RPB_ArresteeList arrestees = arrest.Arrestees
     int i = 0
@@ -126,19 +127,19 @@ RPB_Arrestee function ShowArresteeList(string asArrestHold, string asListTitle =
 
         if (arrestee.Hold == asArrestHold)
             string arresteeLine = arrestee.Name
-            JArray.addStr(arresteesArr, arresteeLine)
-            JArray.addInt(arresteesIds, arrestee.GetFormID())
+            FastArray_AddString(arresteesArr, arresteeLine)
+            FastArray_AddInt(arresteesIds, arrestee.GetFormID())
         endif
         i += 1
     endWhile
 
-    string[] arresteesNamesArray = JArray.asStringArray(arresteesArr)
+    string[] arresteesNamesArray = FastArray_ToStringArray(arresteesArr)
     int index = self.ShowList(asListTitle, arresteesNamesArray, 0, 0) - 1
     if (index == -1)
         return none
     endif
 
-    int formId = JArray.getInt(arresteesIds, index)
+    int formId = FastArray_GetInt(arresteesIds, index)
     return arrestees.AtKey(Game.GetForm(formId) as Actor)
 endFunction
 
@@ -148,13 +149,13 @@ endFunction
 
 RPB_Prison function ShowPrisonList(bool abNotEmpty = true, bool abSkipListOnSingleResult = false, bool abShowCity = true, bool abShowHold = false, bool abShowPrisonerCount = true, string asListTitle = "Select Prison")
     RPB_PrisonManager prisonManager = API.PrisonManager
-    int prisonNames = JArray.object()
     int prisonCount = prisonManager.PrisonSlots
     int activePrisonCount = 0
 
-    int prisonIds = JArray.object()
+    int prisonNames = FastArray("<string>")
+    int prisonIds   = FastArray("<string>")
 
-    JArray.addStr(prisonNames, "<No Prison>")
+    FastArray_AddString(prisonNames, "<No Prison>")
 
     int i = 0
     while (i < prisonCount)
@@ -178,10 +179,11 @@ RPB_Prison function ShowPrisonList(bool abNotEmpty = true, bool abSkipListOnSing
                     prisonLine += " - " + prisonerCount + " Prisoners"
                 endif
 
-                JArray.addStr(prisonNames, prisonLine)
-                JArray.addStr(prisonIds, prison.UUID)
+                FastArray_AddString(prisonNames, prisonLine)
+                FastArray_AddString(prisonIds, prison.UUID)
                 activePrisonCount += 1
             endif
+            Debug("UI::ShowPrisonList", "[Alias Name: "+ prison.GetName() +"] [ID: "+ prison.ID +"] [UUID: "+ prison.UUID +"] [Name: "+ prison.Name +"]")
         endif
         i += 1
     endWhile
@@ -191,17 +193,17 @@ RPB_Prison function ShowPrisonList(bool abNotEmpty = true, bool abSkipListOnSing
     endif
 
     if (activePrisonCount == 1 && abSkipListOnSingleResult) ; Skip List (Only one result and <No Prison>)
-        string uuid = JArray.getStr(prisonIds, 0)
+        string uuid = FastArray_GetString(prisonIds, 0)
         return prisonManager.GetPrisonByUUID(uuid)
     endif
 
-    string[] prisonNamesArray = JArray.asStringArray(prisonNames)
+    string[] prisonNamesArray = FastArray_ToStringArray(prisonNames)
     int index = self.ShowList(asListTitle, prisonNamesArray, 0, 0) - 1
     if (index == -1)
         return none
     endif
 
-    string uuid = JArray.getStr(prisonIds, index)
+    string uuid = FastArray_GetString(prisonIds, index)
     return prisonManager.GetPrisonByUUID(uuid)
 endFunction
 
@@ -215,8 +217,8 @@ RPB_Prisoner function ShowPrisonerList(RPB_Prison apPrison, bool abOnlyImprisone
     RPB_PrisonerList prisoners = prison.Prisoners
     int activePrisonerCount = 0
 
-    int prisonerNames = JArray.object()
-    JArray.addStr(prisonerNames, "<No Prisoner>")
+    int prisonerNames = FastArray("<string>")
+    FastArray_AddString(prisonerNames, "<No Prisoner>")
     Debug("Actions::ShowPrisonerList", "Prisoners: " + prisoners.GetKeys())
 
     int i = 0
@@ -227,7 +229,7 @@ RPB_Prisoner function ShowPrisonerList(RPB_Prison apPrison, bool abOnlyImprisone
             ; string sentenceFormatted = prison.GetSentenceFormatted(prisoner)
             ; string prisonerLine = "("+ prisoner.GetSex(true) +") " + prisoner.Name + " - " + prisoner.JailCell.ID + " | Sentence: " + sentenceFormatted
             string prisonerLine = "("+ prisoner.GetSex(true) +") " + prisonerName + " - " + prisoner.JailCell.ID
-            JArray.addStr(prisonerNames, prisonerLine)
+            FastArray_AddString(prisonerNames, prisonerLine)
             activePrisonerCount += 1
         endif
         i += 1
@@ -238,7 +240,7 @@ RPB_Prisoner function ShowPrisonerList(RPB_Prison apPrison, bool abOnlyImprisone
         return none
     endif
  
-    string[] prisonerNamesAsArray = JArray.asStringArray(prisonerNames)
+    string[] prisonerNamesAsArray = FastArray_ToStringArray(prisonerNames)
 
     int index = self.ShowList(asListTitle, prisonerNamesAsArray, 0, 0) - 1
     if (index == -1)
@@ -258,8 +260,8 @@ RPB_JailCell function ShowCellList(RPB_Prison apPrison, bool abOnlyEmpty = false
     endif
 
     Form[] prisonCells = prison.JailCells
-    int cellIds = JArray.object()
-    JArray.addStr(cellIds, "<No Cell>")
+    int cellIds = FastArray("<string>")
+    FastArray_AddString(cellIds, "<No Cell>")
 
     int i = 0
     while (i < prisonCells.Length)
@@ -293,11 +295,11 @@ RPB_JailCell function ShowCellList(RPB_Prison apPrison, bool abOnlyEmpty = false
             cellLine += " (Empty)"
         endif
 
-        JArray.addStr(cellIds, cellLine)
+        FastArray_AddString(cellIds, cellLine)
         i += 1
     endWhile
 
-    string[] cellIdsArray = JArray.asStringArray(cellIds)
+    string[] cellIdsArray = FastArray_ToStringArray(cellIds)
 
     int index = self.ShowList(asListTitle, cellIdsArray) - 1
     if (index == -1)
@@ -315,18 +317,18 @@ RPB_CellDoor function ShowCellDoorList(RPB_JailCell akCell, string asListTitle =
 
     Form[] cellDoors = akCell.GetPropertyOfTypeFormArray("Cell Doors")
 
-    int cellDoorIds = JArray.object()
-    JArray.addStr(cellDoorIds, "<No Cell Door>")
+    int cellDoorIds = FastArray("<string>")
+    FastArray_AddString(cellDoorIds, "<No Cell Door>")
 
     int i = 0
     while (i < cellDoors.Length)
         RPB_CellDoor cellDoor = cellDoors[i] as RPB_CellDoor
         string cellDoorLine = (cellDoor as string) + " - " + cellDoor.CurrentLockLevel + " ("+ cellDoor.GetOpenStateAsString() +")"
-        JArray.addStr(cellDoorIds, cellDoorLine)
+        FastArray_AddString(cellDoorIds, cellDoorLine)
         i += 1
     endWhile
 
-    string[] cellDoorIdsArray = JArray.asStringArray(cellDoorIds)
+    string[] cellDoorIdsArray = FastArray_ToStringArray(cellDoorIds)
 
     int index = self.ShowList(asListTitle, cellDoorIdsArray) - 1
     if (index == -1)
@@ -344,32 +346,32 @@ Form function ShowPrisonContainerList(RPB_Prison apPrison, string asListTitle = 
     Form[] prisonerBelongingsContainers = apPrison.GetPrisonerContainers("Belongings")
     Form[] prisonerEvidenceContainers   = apPrison.GetPrisonerContainers("Evidence")
 
-    int prisonerBelongingsObj   = JArray.objectWithForms(prisonerBelongingsContainers)
-    int prisonerEvidenceObj     = JArray.objectWithForms(prisonerEvidenceContainers)
-    int allContainersArr        = JArray.object()
-    int containerNames          = JArray.object()
+    int prisonerBelongingsObj   = FastArray_FromFormArray(prisonerBelongingsContainers)
+    int prisonerEvidenceObj     = FastArray_FromFormArray(prisonerEvidenceContainers)
+    int allContainersArr        = FastArray("<object>")
+    int containerNames          = FastArray("<string>")
     
-    JArray.addFromArray(allContainersArr, prisonerBelongingsObj)
-    JArray.addFromArray(allContainersArr, prisonerEvidenceObj)
-    JArray.addStr(containerNames, "<No Container>")
+    FastArray_AddFromArray(allContainersArr, prisonerBelongingsObj)
+    FastArray_AddFromArray(allContainersArr, prisonerEvidenceObj)
+    FastArray_AddString(containerNames, "<No Container>")
 
-    int arrSize = JArray.count(allContainersArr)
+    int arrSize = FastArray_Size(allContainersArr)
 
     int i = 0
     while (i < arrSize)
-        ObjectReference prisonContainerRef = JArray.getForm(allContainersArr, i) as ObjectReference
+        ObjectReference prisonContainerRef = FastArray_GetForm(allContainersArr, i) as ObjectReference
         string containerName = prisonContainerRef + ": " + prisonContainerRef.GetBaseObject().GetName() + " - " + prisonContainerRef.GetNumItems() + " Items"
-        JArray.addStr(containerNames, containerName)
+        FastArray_AddString(containerNames, containerName)
         i += 1
     endWhile
 
-    string[] listOptions = JArray.asStringArray(containerNames)
+    string[] listOptions = FastArray_ToStringArray(containerNames)
     int index = self.ShowList(asListTitle, listOptions) - 1
     if (index == -1)
         return none
     endif
 
-    Form selectedContainer = JArray.getForm(allContainersArr, index)
+    Form selectedContainer = FastArray_GetForm(allContainersArr, index)
 
     DebugWithArgs("UI::ShowPrisonContainerList", apPrison.Name, "index: " + index + ", prisonerBelongingsContainers: " + prisonerBelongingsContainers + ", prisonerEvidenceContainers: " + prisonerEvidenceContainers + ", selectedContainer: " + selectedContainer)
 

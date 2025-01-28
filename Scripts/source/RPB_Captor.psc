@@ -1,6 +1,7 @@
 Scriptname RPB_Captor extends RPB_ActorBase
 
 import RPB_Utility
+import RPB_Memory
 import RPB_Arrest
 
 ; ==========================================================
@@ -51,12 +52,8 @@ endProperty
 int __arrestees
 Form[] property Arrestees
     Form[] function get()
-        if (!__arrestees)
-            __arrestees = JArray.object()
-            JValue.retain(__arrestees)
-        endif
-
-        return JArray.asFormArray(__arrestees)
+        __arrestees = Object_CreateIfNotExists(__arrestees, FastArray("<Form>", retain = true))
+        return FastArray_ToFormArray(__arrestees)
     endFunction
 endProperty
 
@@ -134,7 +131,6 @@ function SetEscorting()
     Debug("Captor::SetEscorting", "Set escorting from " + Name)
 
     self.SetString("Current State", "Escorting")
-    RegisterForSingleUpdate(5.0)
     GotoState("Escorting")
 endFunction
 
@@ -152,21 +148,9 @@ state Inactive
     event OnBeginState()
         Debug("[state: Inactive] Captor::OnBeginState", "Captor is now inactive")
     endEvent
-
-    event OnUpdate()
-    endEvent
 endState
 
 state Escorting
-    event OnUpdate()
-        return
-        ; if (this.GetDistance(Arrestee) >= 700)
-        ;     Arrestee.MoveTo(this)
-        ;     Debug("Captor::OnUpdate", "Moved Arrestee to " + Name)
-    
-        ; endif
-        ; RegisterForSingleUpdate(5.0)
-    endEvent
 endState
 
 ; ==========================================================

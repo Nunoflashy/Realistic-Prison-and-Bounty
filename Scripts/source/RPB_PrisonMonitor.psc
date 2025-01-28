@@ -45,7 +45,11 @@ endProperty
 ;                    Monitoring Properties
 ; ==========================================================
 
-
+ObjectReference property MonitorOn
+    ObjectReference function get()
+        return Prison.GetPropertyOfTypeForm("Monitoring//On") as ObjectReference
+    endFunction
+endProperty
 
 ; ==========================================================
 ;                       Prison Monitoring
@@ -127,7 +131,7 @@ bool function AwaitPrisonerForRelease(RPB_Prisoner apPrisoner)
 
     string timeServed = RPB_Utility.GetTimeFormatted(apPrisoner.TimeServed, abIncludeMinutes = true, asNullValue = "seconds")
     string timeLeft   = RPB_Utility.GetTimeFormatted(apPrisoner.TimeLeftInSentence, abIncludeMinutes = true, asNullValue = "seconds")
-    Debug("PrisonMonitor::AwaitPrisoners", apPrisoner.Name + " has not yet served "+ apPrisoner.PronounPossessiveObject +" sentence in " + Prison.Name + " (" + timeServed + " served, " +  timeLeft +" left).")
+    Debug("["+ Prison.Name +"] PrisonMonitor::AwaitPrisoners", apPrisoner.Name + " has not yet served "+ apPrisoner.PronounPossessiveObject +" sentence in " + Prison.Name + " (" + timeServed + " served, " +  timeLeft +" left).")
 
     return true
 endFunction
