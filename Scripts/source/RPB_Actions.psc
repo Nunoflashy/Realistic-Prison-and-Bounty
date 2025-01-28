@@ -1,6 +1,11 @@
 scriptname RPB_Actions extends ObjectReference
 
 import RPB_Utility
+import RPB_Memory
+
+; ==========================================================
+;                      Script References
+; ==========================================================
 
 RPB_API __api
 RPB_API property API
@@ -14,63 +19,65 @@ RPB_API property API
     endFunction
 endProperty
 
+; ==========================================================
+
 string[] function GetActions()
-    int actionArrayObj = JArray.object()
-    JArray.addStr(actionArrayObj, "<No Action>")
-    JArray.addStr(actionArrayObj, "Quit to Main Menu")
-    JArray.addStr(actionArrayObj, "[MCM] Validate Options")
-    JArray.addStr(actionArrayObj, "[Actor] Log Selected Actor State Variables")
-    JArray.addStr(actionArrayObj, "[Actor] Delete Selected Actor State")
-    JArray.addStr(actionArrayObj, "Check Item Stolen")
-    JArray.addStr(actionArrayObj, "[Prison] Verify Jail Cells Integrity")
-    JArray.addStr(actionArrayObj, "Distance between two Objects")
-    JArray.addStr(actionArrayObj, "Play Animation on Selected Actor")
-    JArray.addStr(actionArrayObj, "[Monitoring] Apply RPB_Actor on Actor")
-    JArray.addStr(actionArrayObj, "[Monitoring] Remove RPB_Actor from Actor")
-    JArray.addStr(actionArrayObj, "[Monitoring] Attach RPB_BountyDecayable on Actor")
-    JArray.addStr(actionArrayObj, "[Monitoring] Detach RPB_BountyDecayable from Actor")
-    JArray.addStr(actionArrayObj, "[Bounty] Set Bounty for Selected Actor")
-    JArray.addStr(actionArrayObj, "[Bounty] Set Violent Bounty for Selected Actor")
-    JArray.addStr(actionArrayObj, "[Bounty] Set Bounty for Prisoner")
-    JArray.addStr(actionArrayObj, "[Arrest] Arrest Selected Actor (Escort Prisoner)")
-    JArray.addStr(actionArrayObj, "[Arrest] Arrest Selected Actor with Selected Captor (Escort Prisoner)")
-    JArray.addStr(actionArrayObj, "[Arrest] Arrest Selected Actor (Teleport Prisoner)")
-    JArray.addStr(actionArrayObj, "[Arrest] Arrest Selected Actor with Selected Captor (Teleport Prisoner)")
-    JArray.addStr(actionArrayObj, "[Faction Arrest] Arrest Selected Actor (Teleport Prisoner)")
-    JArray.addStr(actionArrayObj, "[Arrest] Add Selected Actor to Current Arrest")
-    JArray.addStr(actionArrayObj, "[Prison] Initialize Prisons")
-    JArray.addStr(actionArrayObj, "[Prison] Configure Prison in Slot")
-    JArray.addStr(actionArrayObj, "[Prison] Bind All Prisoners")
-    JArray.addStr(actionArrayObj, "[Prison] Refresh Cell Options")
-    JArray.addStr(actionArrayObj, "[Prison] Pre-Assign Cell to Prisoner")
-    JArray.addStr(actionArrayObj, "[Prison] Reindex PrisonerList")
-    JArray.addStr(actionArrayObj, "[Prison] Imprison Nearby Actors")
-    JArray.addStr(actionArrayObj, "[Prison] Imprison Selected Actor")
-    JArray.addStr(actionArrayObj, "[Prison] Check Prisoners AI Status")
-    JArray.addStr(actionArrayObj, "[Prison] Show Prison Container")
-    JArray.addStr(actionArrayObj, "[Prison] Show Prisoner Inventory")
-    JArray.addStr(actionArrayObj, "[Prison] Show Prison Markers")
-    JArray.addStr(actionArrayObj, "[Prison] Show Cells")
-    JArray.addStr(actionArrayObj, "[Prison] Show Cell Doors")
-    JArray.addStr(actionArrayObj, "[Prison] Return Prisoner Belongings")
-    JArray.addStr(actionArrayObj, "[Prison] Strip Prisoner")
-    JArray.addStr(actionArrayObj, "[Prison] Strip Prisoner to Underwear")
-    JArray.addStr(actionArrayObj, "[Prison] Clothe Prisoner")
-    JArray.addStr(actionArrayObj, "[Prison] Set Prisoner State Property")
-    JArray.addStr(actionArrayObj, "[Prison] Release Prisoner from Prison")
-    JArray.addStr(actionArrayObj, "[Prison] Bind Cell Package to Reference")
-    JArray.addStr(actionArrayObj, "[Prison] Bind Actor to Cell Package")
-    JArray.addStr(actionArrayObj, "[Prison] Toggle Show Prison Sentence")
-    JArray.addStr(actionArrayObj, "[Prison] Toggle Show Prison Release Time")
-    JArray.addStr(actionArrayObj, "[Prison] Toggle Show Prison Time Left")
-    JArray.addStr(actionArrayObj, "[Prison] Toggle Show Prison Time Served")
-    JArray.addStr(actionArrayObj, "[Prison] Toggle Show Prison Bounty")
-    JArray.addStr(actionArrayObj, "[Prison] Toggle All Prison Stats")
-    JArray.addStr(actionArrayObj, "Move Selected NPC to ObjectReference")
-    JArray.addStr(actionArrayObj, "Test Actor Handcuffing")
-    JArray.addStr(actionArrayObj, "Toggle Prisoner Effect on Selected Actor")
-    string[] actionArray = JArray.asStringArray(actionArrayObj)
-    return actionArray
+    return String_Explode( \
+        "<No Action>," + \
+        "Quit to Main Menu," + \
+        "[MCM] Validate Options," + \
+        "[Actor] Log Selected Actor State Variables," + \
+        "[Actor] Delete Selected Actor State," + \
+        "Check Item Stolen," + \
+        "[Prison] Verify Jail Cells Integrity," + \
+        "Distance between two Objects," + \
+        "Play Animation on Selected Actor," + \
+        "[Object] Clear Ownership," + \
+        "[Monitoring] Apply RPB_Actor on Actor," + \
+        "[Monitoring] Remove RPB_Actor from Actor," + \
+        "[Monitoring] Attach RPB_BountyDecayable on Actor," + \
+        "[Monitoring] Detach RPB_BountyDecayable from Actor," + \
+        "[Bounty] Set Bounty for Selected Actor," + \
+        "[Bounty] Set Violent Bounty for Selected Actor," + \
+        "[Bounty] Set Bounty for Prisoner," + \
+        "[Arrest] Arrest Selected Actor (Escort Prisoner)," + \
+        "[Arrest] Arrest Selected Actor with Selected Captor (Escort Prisoner)," + \
+        "[Arrest] Arrest Selected Actor (Teleport Prisoner)," + \
+        "[Arrest] Arrest Selected Actor with Selected Captor (Teleport Prisoner)," + \
+        "[Faction Arrest] Arrest Selected Actor (Teleport Prisoner)," + \
+        "[Arrest] Add Selected Actor to Current Arrest," + \
+        "[Prison] Initialize Prisons," + \
+        "[Prison] Configure Prison in Slot," + \
+        "[Prison] Bind All Prisoners," + \
+        "[Prison] Refresh Cell Options," + \
+        "[Prison] Pre-Assign Cell to Prisoner," + \
+        "[Prison] Reindex PrisonerList," + \
+        "[Prison] Imprison Nearby Actors," + \
+        "[Prison] Imprison Selected Actor," + \
+        "[Prison] Check Prisoners AI Status," + \
+        "[Prison] Show Prison Container," + \
+        "[Prison] Show Prisoner Inventory," + \
+        "[Prison] Show Prison Markers," + \
+        "[Prison] Show Cells," + \
+        "[Prison] Show Cell Doors," + \
+        "[Prison] Return Prisoner Belongings," + \
+        "[Prison] Strip Prisoner," + \
+        "[Prison] Strip Prisoner to Underwear," + \
+        "[Prison] Clothe Prisoner," + \
+        "[Prison] Set Prisoner State Property," + \
+        "[Prison] Release Prisoner from Prison," + \
+        "[Prison] Bind Cell Package to Reference," + \
+        "[Prison] Bind Actor to Cell Package," + \
+        "[Prison] Toggle Show Prison Sentence," + \
+        "[Prison] Toggle Show Prison Release Time," + \
+        "[Prison] Toggle Show Prison Time Left," + \
+        "[Prison] Toggle Show Prison Time Served," + \
+        "[Prison] Toggle Show Prison Bounty," + \
+        "[Prison] Toggle All Prison Stats," + \
+        "Move Selected NPC to ObjectReference," + \
+        "Test Actor Handcuffing," + \
+        "Toggle Prisoner Effect on Selected Actor," \
+    )
 endFunction
 
 function ShowActionsMenu()
@@ -78,7 +85,9 @@ function ShowActionsMenu()
     string actionToPerform  = uilib.ShowList_ReturnElement("Execute Action", self.GetActions(), 0, 0)
 
     if (actionToPerform == "Quit to Main Menu")
-        Game.QuitToMainMenu()
+        RPB_Arrest.AllowArrestForcegreets()
+        RPB_Arrest.EnableForcedArrestDialogue()
+        ; Game.QuitToMainMenu()
 
     elseif (actionToPerform == "[MCM] Validate Options")
         API.MCM.ValidateOptions()
@@ -100,6 +109,9 @@ function ShowActionsMenu()
 
     elseif (actionToPerform == "Play Animation on Selected Actor")
         Action_PlayAnimationOnActor(uilib)
+
+    elseif (actionToPerform == "[Object] Clear Ownership")
+        Action_ClearOwnership(uilib)
 
     elseif (actionToPerform == "[Monitoring] Apply RPB_Actor on Actor")
         Action_MonitoringApplyActorScript(uilib)
@@ -340,6 +352,16 @@ function Action_PlayAnimationOnActor(RPB_UIInterface uilib)
 
     Debug.SendAnimationEvent(selectedActor, animationToPlay)
     Debug("Actions::Action_PlayAnimationOnActor", "Playing " + animationToPlay + " on Actor " + actorName)
+endFunction
+
+function Action_ClearOwnership(RPB_UIInterface uilib)
+    ObjectReference selectedRef = Game.GetCurrentConsoleRef() as ObjectReference
+
+    if (selectedRef == none)
+        return
+    endif
+
+    selectedRef.SetActorOwner(none)
 endFunction
 
 function Action_MonitoringApplyActorScript(RPB_UIInterface uilib)
@@ -1077,14 +1099,14 @@ function Action_SetPrisonerStateProperty(RPB_UIInterface uilib)
         return none
     endif
 
-    int propertyTypes = JArray.object()
-    JArray.addStr(propertyTypes, "<No Type>")
-    JArray.addStr(propertyTypes, "Bool")
-    JArray.addStr(propertyTypes, "Integer")
-    JArray.addStr(propertyTypes, "Float")
-    JArray.addStr(propertyTypes, "String")
+    int propertyTypes = FastArray("<string>")
+    FastArray_AddString(propertyTypes, "<No Type>")
+    FastArray_AddString(propertyTypes, "Bool")
+    FastArray_AddString(propertyTypes, "Integer")
+    FastArray_AddString(propertyTypes, "Float")
+    FastArray_AddString(propertyTypes, "String")
 
-    string propertyType = uilib.ShowList_ReturnElement("Select Property Type", JArray.asStringArray(propertyTypes))
+    string propertyType = uilib.ShowList_ReturnElement("Select Property Type", FastArray_ToStringArray(propertyTypes))
     
     if (propertyType == "<No Type>")
         return
@@ -1097,12 +1119,12 @@ function Action_SetPrisonerStateProperty(RPB_UIInterface uilib)
     endif
 
     if (propertyType == "Bool")
-        int propertyValues = JArray.object()
-        JArray.addStr(propertyValues, "False")
-        JArray.addStr(propertyValues, "True")
+        int propertyValues = FastArray("<string>")
+        FastArray_AddString(propertyValues, "False")
+        FastArray_AddString(propertyValues, "True")
 
         ; Can cast since indices are 0 and 1, can be implicitly cast to bool
-        bool propertyValueToSet = uilib.ShowList("Set " + propertyName + " To", JArray.asStringArray(propertyValues)) as bool
+        bool propertyValueToSet = uilib.ShowList("Set " + propertyName + " To", FastArray_ToStringArray(propertyValues)) as bool
         prisoner.SetBool(propertyName, propertyValueToSet)
         Debug("Actions::Actions_SetPrisonerStateProperty", "Set " + propertyName + " to: " + propertyValueToSet)
 
