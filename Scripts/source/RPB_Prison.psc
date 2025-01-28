@@ -99,7 +99,6 @@ scriptname RPB_Prison extends RPB_Entity
     RPB_JailCell function GetFemaleJailCell()
     RPB_JailCell function GetMaleJailCell()
     bool function RegisterPrisoner(RPB_Prisoner apPrisoner)
-    function AssignPrisonerNumber(RPB_Prisoner apPrisoner)
     function RegisterPrisonerLastJailedStats(RPB_Prisoner apPrisoner)
     function RegisterPrisonerReleaseTimeStats(RPB_Prisoner apPrisoner)
     function RegisterPrisonerEscapeTimeStats(RPB_Prisoner apPrisoner)
@@ -195,6 +194,7 @@ Location property PrisonLocation
         return self.GetPropertyOfTypeForm("Location") as Location
     endFunction
 endProperty
+
 
 Faction property PrisonFaction
     Faction function get()
@@ -1618,7 +1618,6 @@ bool function RegisterPrisoner(RPB_Prisoner apPrisoner)
     
     Prisoners.Add(apPrisoner)
     self.OnPrisonerRegistered(apPrisoner)
-    self.AssignPrisonerNumber(apPrisoner)
     return Prisoners.Exists(apPrisoner)
 endFunction
 
@@ -1943,9 +1942,13 @@ function RestrainPrisoner(RPB_Prisoner apPrisoner, bool abRestrainInFront = fals
     ; Hand Cuffs Crossed Front 01 - 0xA033D9D
     ; Hands Crossed Front in Scarfs - 0xA073A14
     ; Hands in Irons Front Black - 0xA033D9E
-    Form cuffs = Game.GetFormEx(0xA081D2F)
+
+    Form cuffs = Game.GetFormFromFile(0x81D2F, "ZaZAnimationPack.esm")
+
+    ; Form cuffs = Game.GetFormEx(0xA081D2F)
     if (abRestrainInFront)
-        cuffs = Game.GetFormEx(0xA081D33)
+        ; cuffs = Game.GetFormEx(0xA081D33)
+        cuffs = Game.GetFormFromFile(0x81D33, "ZaZAnimationPack.esm")
     endif
 
     apPrisoner.GetActor().SheatheWeapon()
@@ -1963,8 +1966,11 @@ function TeleportPrisonerToRelease(RPB_Prisoner apPrisoner)
     apPrisoner.RemoveFromCell()
 
     if (apPrisoner.TeleportReleaseLocation)
-        apPrisoner.EnableAI(apPrisoner.IsNPC()) ; TODO: FIX THIS!!!!!!!!!! Only EnableAI if it's an NPC, this is not doing that!!!! BIG BUG
         apPrisoner.MoveTo(apPrisoner.TeleportReleaseLocation)
+    endif
+
+    if (apPrisoner.IsNPC())
+        apPrisoner.EnableAI()
     endif
 
     self.OnPrisonerReleased(apPrisoner)
@@ -1978,9 +1984,6 @@ function EscortPrisonerToRelease(RPB_Prisoner apPrisoner)
 endFunction
 
 bool function SendReleaseRequest(RPB_Prisoner apPrisoner)
-    ; Debug("["+ Name +"] Prison::SendReleaseRequest", "Cell Package Applied: " + apPrisoner.CellPackage)
-
-    ; Determine type of release
     if (apPrisoner.IsNPC() && apPrisoner.IsFarFromPlayer())
         apPrisoner.SetBool("Teleport to Release", true)
 
@@ -2071,7 +2074,7 @@ function AssignBelongingsContainer(RPB_Prisoner apPrisoner)
     endif
 
     apPrisoner.SetForm("Prisoner Belongings Container", self.GetRandomPrisonerContainer("Belongings"))
-    Debug("Prison::SetBelongingsContainer", "Prisoner Belongings Container:  " + apPrisoner.PrisonerBelongingsContainer)
+    ; Debug("Prison::SetBelongingsContainer", "Prisoner Belongings Container:  " + apPrisoner.PrisonerBelongingsContainer)
 endFunction
 
 function AssignReleaseLocation(RPB_Prisoner apPrisoner, bool abIsTeleportLocation = true)
@@ -2088,13 +2091,9 @@ bool function AssignCell(RPB_Prisoner apPrisoner)
         return true
     endif
 
-    ; Needs to be refactored, shouldn't be here
-    if (apPrisoner.ShouldBeStripped)
-        ; Determine if prisoner will be stripped etc (Set options that a cell depend on)
-        apPrisoner.WillBeStrippedNaked = true ; Makes the cell gender exclusive
-    endif
-
     RPB_JailCell assignedCell = self.RequestCell(apPrisoner)
+    ; RPB_JailCell assignedCell = GetFormFromMod(0x388D) as RPB_JaiLCell
+
 
     if (assignedCell == none)
         EventManager.SendError("Could not assign a cell for prisoner " + apPrisoner.Name, "("+ Name +") Prison::AssignCell")
@@ -2344,10 +2343,6 @@ event OnPrisonerTeleportedToCell(RPB_Prisoner apPrisoner, bool abImprisonPrisone
         apPrisoner.StripSilently()
     endif
 
-
-    ; Debug("("+ Name +") Prisoner::OnTeleportedToCell", "ShouldBeStripped: " + ShouldBeStripped)
-    ; Debug("("+ Name +") Prisoner::OnTeleportedToCell", "ShouldBeClothed: " + ShouldBeClothed)
-
     if (apPrisoner.ShouldBeClothed)
         apPrisoner.DetermineClothingOutfit()
         apPrisoner.Clothe()
@@ -2570,16 +2565,6 @@ bool function BindCellToPrisoner(ObjectReference akJailCell, RPB_Prisoner apPris
     return true
 endFunction
 
-;/
-    Assigns a number to this Prisoner for this Prison.
-/;
-function AssignPrisonerNumber(RPB_Prisoner apPrisoner)
-    int prisonerCount   = Prisoners.Count
-    int assignedNumber  = prisonerCount + 1
-    apPrisoner.SetInt("Prisoner Number", assignedNumber)
-endFunction
-
-
 ; =========================================================
 ;                         Data Config                      
 ; =========================================================
@@ -2642,29 +2627,7 @@ Form[] function Global_GetPropertyOfTypeFormArray(int apRootObject, string asPro
     return RPB_Data.GetPropertyOfTypeFormArray(apRootObject, asPropertyName)
 endFunction
 
-
 ; ==========================================================
-
-; ==========================================================
-;                            Test
-; ==========================================================
-
-bool __isAwaitingUpdateForGameTime
-bool property IsAwaitingUpdateForGameTime
-    bool function get()
-        return __isAwaitingUpdateForGameTime
-    endFunction
-endProperty
-
-
-function RegisterForSingleUpdateGameTime(float afInterval)
-    parent.RegisterForSingleUpdateGameTime(afInterval)
-    __isAwaitingUpdateForGameTime = true
-endFunction
-
-RPB_Prisoner[] queuedPrisonersForImprisonment
-bool isProcessingQueuedPrisonersForImprisonment
-int queuedPrisonerAvailableIndex
 
 function ImprisonActorImmediately(Actor akActor)
     FunctionNotImplemented("Prisoner::ImprisonActorImmediately")
