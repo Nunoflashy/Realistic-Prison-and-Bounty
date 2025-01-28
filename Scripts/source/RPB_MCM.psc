@@ -157,7 +157,13 @@ string[] property Skills
         return RPB_Utility.GetAllSkills()
     endFunction
 endProperty
-              
+
+string[] property Holds
+    string[] function get()
+        return API.Config.Holds
+    endFunction
+endProperty
+
 ;/
     Retrieves the index in the array where the value matches @_key.
 
@@ -307,15 +313,15 @@ function SetOutfitName(string outfitId, string outfitName)
 
     bool keyExists = FastMap_HasKey(identifiersObject, currentOutfitName)
 
-    Debug("MCM::SetOutfitName", "keyExists: "+ keyExists)
-    Debug("MCM::SetOutfitName", "[Before] Outfit Identifiers: "+ GetContainerList(identifiersObject))
+    ; Debug("MCM::SetOutfitName", "keyExists: "+ keyExists)
+    ; Debug("MCM::SetOutfitName", "[Before] Outfit Identifiers: "+ GetContainerList(identifiersObject))
 
     if (keyExists)
         FastMap_RemoveKey(identifiersObject, currentOutfitName)
     endif
 
     FastMap_SetString(identifiersObject, outfitName, outfitId)
-    Debug("MCM::SetOutfitName", "[After] Outfit Identifiers: "+ GetContainerList(identifiersObject))
+    ; Debug("MCM::SetOutfitName", "[After] Outfit Identifiers: "+ GetContainerList(identifiersObject))
 endFunction
 
 string _currentRenderedCategory
@@ -369,7 +375,7 @@ function InitializePages()
         "Skills," + \
         "Clothing," + \
         PAGE_SEPARATOR + \
-        String_Implode(Config.Holds) + "," + \
+        String_Implode(Holds) + "," + \
         PAGE_SEPARATOR + \
         "Maintenance," + \
         "Debug" \
@@ -513,7 +519,7 @@ function ToggleOption(string _key, bool storePersistently = true)
         self.SetOptionValueBool(_key, !option)
     endif
 
-    Trace("MCM::ToggleOption", "Set new value of " + !option + " for " + _key + "(OptionKey: "+ optionKey +")" + "(option_id: "+ optionId +")", true)
+    ; Trace("MCM::ToggleOption", "Set new value of " + !option + " for " + _key + "(OptionKey: "+ optionKey +")" + "(option_id: "+ optionId +")", true)
 endFunction
 
 ; Option Rendering Functions
@@ -833,7 +839,7 @@ function SetOptionSliderValue(string option, float value, string formatString = 
     ; Store the value
     self.SetOptionValueFloat(option, value, page)
 
-    Trace("SetOptionSliderValue", "Set new value of " + self.GetOptionValueFloat(option) + " for " + option + " (option_id: " + optionId + ")", true)
+    ; Trace("SetOptionSliderValue", "Set new value of " + self.GetOptionValueFloat(option) + " for " + option + " (option_id: " + optionId + ")", true)
 endFunction
 
 ;/
@@ -853,7 +859,7 @@ function SetOptionMenuValue(string option, string value, string page = "")
     ; Store the value
     self.SetOptionValueString(option, value, page)
 
-    Debug("MCM::SetOptionMenuValue", "Set new value of " + value + " for " + string_if (page != "", page + "/") + option + " (option_id: " + optionId + ")")
+    ; Debug("MCM::SetOptionMenuValue", "Set new value of " + value + " for " + string_if (page != "", page + "/") + option + " (option_id: " + optionId + ")")
 endFunction
 
 ;/
@@ -872,7 +878,7 @@ function SetOptionInputValue(string option, string value, string page = "")
     ; Store the value
     self.SetOptionValueString(option, value, page)
 
-    Trace("SetOptionInputValue", "Set new value of " + value + " for " + option + " (option_id: " + optionId + ")")
+    ; Trace("SetOptionInputValue", "Set new value of " + value + " for " + option + " (option_id: " + optionId + ")")
 endFunction
 
 ; ============================================================================
@@ -1198,7 +1204,7 @@ function ValidateOptions()
         optionIndex += 1
     endWhile
 
-    Debug("MCM::ValidateOptions", "Validated " + validatedOptions + " options.")
+    ; Debug("MCM::ValidateOptions", "Validated " + validatedOptions + " options.")
 endFunction
 
 bool function IsValidPropertyType(string asPropertyType)

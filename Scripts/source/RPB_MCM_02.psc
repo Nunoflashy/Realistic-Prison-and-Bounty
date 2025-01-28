@@ -3,18 +3,20 @@ Scriptname RPB_MCM_02 extends SKI_ConfigBase
 import RPB_Utility
 import RPB_Memory
 
-; ==============================================================================
-; Constants
-; ==============================================================================
+; ==========================================================
+;                         Constants
+; ==========================================================
 
 bool property IS_DEBUG      = false autoreadonly
 bool property ENABLE_TRACE  = false autoreadonly
 
-; ==============================================================================
 ; MCM Option Flags
 int property OPTION_ENABLED  = 0x00 autoreadonly
 int property OPTION_DISABLED = 0x01 autoreadonly
-; ==============================================================================
+
+; ==========================================================
+;                     Script References
+; ==========================================================
 
 RPB_API __api
 RPB_API property API
@@ -40,11 +42,11 @@ RPB_PrisonManager property PrisonManager
     endFunction
 endProperty
 
+; ==========================================================
+
 string[] property Holds
     string[] function get()
-        int cellsMap = RPB_Data.Unserialize()
-        string[] _holds = JMap.allKeysPArray(cellsMap)
-        return _holds
+        return API.Config.Holds
     endFunction
 endProperty
 
@@ -56,19 +58,18 @@ endProperty
 
 string[] property HoldStatsPlaceholders
     string[] function get()
-        int placeholders = JArray.object()
-        JArray.addStr(placeholders, "bounty")
-        JArray.addStr(placeholders, "violent bounty")
-        JArray.addStr(placeholders, "[bounty+violent bounty]")
-        JArray.addStr(placeholders, "largest bounty")
-        JArray.addStr(placeholders, "total bounty")
-        JArray.addStr(placeholders, "times arrested")
-        JArray.addStr(placeholders, "times frisked")
-        JArray.addStr(placeholders, "arrests eluded")
-        JArray.addStr(placeholders, "arrests resisted")
-        JArray.addStr(placeholders, "bounties paid")
-
-        return JArray.asStringArray(placeholders)
+        return String_Explode( \ 
+            "bounty," + \
+            "violent bounty," + \
+            "[bounty+violent bounty]," + \
+            "largest bounty," + \
+            "total bounty," + \
+            "times arrested," + \
+            "times frisked," + \
+            "arrests eluded," + \
+            "arrests resisted," + \
+            "bounties paid" \
+        )
     endFunction
 endProperty
 
@@ -83,19 +84,18 @@ int aiArrestsEluded,  \
 int aiArrestsResisted, \ 
 int aiBountiesPaid \
 )
-    int values = JArray.object()
-    JArray.addStr(values, aiBounty as string)
-    JArray.addStr(values, aiViolentBounty as string)
-    JArray.addStr(values, (aiBounty + aiViolentBounty) as string)
-    JArray.addStr(values, aiLargestBounty as string)
-    JArray.addStr(values, aiTotalBounty as string)
-    JArray.addStr(values, aiTimesArrested as string)
-    JArray.addStr(values, aiTimesFrisked as string)
-    JArray.addStr(values, aiArrestsEluded as string)
-    JArray.addStr(values, aiArrestsResisted as string)
-    JArray.addStr(values, aiBountiesPaid as string)
-
-    return JArray.asStringArray(values)
+    return String_Explode( \ 
+        aiBounty + "," + \
+        aiViolentBounty + "," + \
+        (aiBounty + aiViolentBounty) + "," + \
+        aiLargestBounty + "," + \
+        aiTotalBounty + "," + \
+        aiTimesArrested + "," + \
+        aiTimesFrisked + "," + \
+        aiArrestsEluded + "," + \
+        aiArrestsResisted + "," + \
+        aiBountiesPaid \
+    )
 endFunction
 
 string property ArrestHeaderTemplate
@@ -106,13 +106,12 @@ endProperty
 
 string[] property ArrestHeaderPlaceholders
     string[] function get()
-        int placeholders = JArray.object()
-        JArray.addStr(placeholders, "hold")
-        JArray.addStr(placeholders, "city")
-        JArray.addStr(placeholders, "potential prison")
-        JArray.addStr(placeholders, "arrestee")
-
-        return JArray.asStringArray(placeholders)
+        return String_Explode( \ 
+            "hold," + \
+            "city," + \
+            "potential prison," + \
+            "arrestee" \
+        )
     endFunction
 endProperty
 
@@ -122,12 +121,12 @@ string[] function ConstructArrestHeaderValues( \
     string asPotentialPrisonName, \
     string asArresteeName \
 )
-    int values = JArray.object()
-    JArray.addStr(values, asArrestHold)
-    JArray.addStr(values, asArrestCity)
-    JArray.addStr(values, asPotentialPrisonName)
-    JArray.addStr(values, asArresteeName)
-    return JArray.asStringArray(values)
+    return String_Explode( \ 
+        asArrestHold + "," + \
+        asArrestCity + "," + \
+        asPotentialPrisonName + "," + \
+        asArresteeName \
+    )
 endFunction
 
 string property PrisonHeaderTemplate
@@ -138,14 +137,13 @@ endProperty
 
 string[] property PrisonHeaderPlaceholders
     string[] function get()
-        int placeholders = JArray.object()
-        JArray.addStr(placeholders, "hold")
-        JArray.addStr(placeholders, "city")
-        JArray.addStr(placeholders, "prison")
-        JArray.addStr(placeholders, "cell")
-        JArray.addStr(placeholders, "prisoner")
-
-        return JArray.asStringArray(placeholders)
+        return String_Explode( \ 
+            "hold," + \
+            "city," + \
+            "prison," + \
+            "cell," + \
+            "prisoner" \
+        )
     endFunction
 endProperty
 
@@ -156,13 +154,13 @@ string[] function ConstructPrisonHeaderValues( \
     string asPrisonCell, \
     string asPrisonerName \
 )
-    int values = JArray.object()
-    JArray.addStr(values, asPrisonHold)
-    JArray.addStr(values, asPrisonCity)
-    JArray.addStr(values, asPrisonName)
-    JArray.addStr(values, asPrisonCell)
-    JArray.addStr(values, asPrisonerName)
-    return JArray.asStringArray(values)
+    return String_Explode( \ 
+        asPrisonHold + "," + \
+        asPrisonCity + "," + \
+        asPrisonName + "," + \
+        asPrisonCell + "," + \
+        asPrisonerName \
+    )
 endFunction
 
 bool function IsHoldCurrentPage()
@@ -463,5 +461,9 @@ endFunction
 /;
 function SetOptionInputValue(string option, string value)
 endFunction
+
+; ==========================================================
+;                         private
+; ==========================================================
 
 string _currentRenderedCategory

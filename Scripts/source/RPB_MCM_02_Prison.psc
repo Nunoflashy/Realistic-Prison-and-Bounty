@@ -17,6 +17,7 @@ function RenderArrest(RPB_MCM_02 mcm, RPB_Arrestee apArrestee) global
     ; ==========================================================
     ;                           Left
     ; ==========================================================
+    
     if (!arrestee.IsArrested)
         DebugWarn("MCM_02_Prison::RenderArrest", "The arrestee " + arrestee.Name + " is not arrested, no stats to show.")
         Warn("The arrestee " + arrestee.Name + " is not arrested, no stats to show.")
@@ -113,6 +114,16 @@ function Render(RPB_MCM_02 mcm, RPB_Prisoner apPrisoner) global
     RPB_Prison prison       = apPrisoner.Prison
     RPB_Prisoner prisoner   = apPrisoner
 
+    ; Debug( \ 
+    ;     "MCM_02_Prison::Render",  \ 
+    ;     "TimeServed: " + prisoner.TimeServed + "\n" + \ 
+    ;     "TimeOfImprisonment: " + prisoner.TimeOfImprisonment + "\n" + \
+    ;     "ReleaseTime: " + prisoner.ReleaseTime + "\n" + \
+    ;     "TimeLeftInSentence: " + prisoner.TimeLeftInSentence + "\n" + \
+    ;     "TimeOfImprisonment: " + prisoner.TimeOfImprisonment + "\n" + \ 
+    ;     "CurrentTime: " + prisoner.CurrentTime \ 
+    ; )
+
     mcm.SetCursorFillMode(mcm.TOP_TO_BOTTOM)
 ; ==========================================================
 ;                           Left
@@ -120,8 +131,8 @@ function Render(RPB_MCM_02 mcm, RPB_Prisoner apPrisoner) global
 
     ; Should probably be refactored, a prisoner should always be imprisoned (maybe?)
     if (!prisoner.IsImprisoned)
-        DebugWarn("MCM_02_Prison::Render", "The prisoner " + prisoner.Name + " (Prisoner #"+ prisoner.Number +") " + " is not imprisoned, no stats to show.")
-        Warn("The prisoner " + prisoner.Name + " (Prisoner #"+ prisoner.Number +") " + " is not imprisoned, no stats to show.")
+        DebugWarn("MCM_02_Prison::Render", "The prisoner " + prisoner.Name + " is not imprisoned, no stats to show.")
+        Warn("The prisoner " + prisoner.Name + " is not imprisoned, no stats to show.")
         return
     endif
 
