@@ -249,7 +249,7 @@ function Initialize()
     __initializeLockStates()
     __isInitialized = true
 
-    Debug("["+ self +"] Lockable::Initialize", "Initialized Lockable ("+ "Locked: " + __isLocked +", Lock State: "+ __previousLockState +") Lock Level: " + lockLevel + ", As Integer: " + lockLevelAsInt + ", Object: " + self)
+    Debug("["+ self +"] Lockable::Initialize", "Initialized Lockable ("+ "Locked: " + __isLocked +", Lock State: "+ __previousLockState + ", Lock Level: " + lockLevel + ")")
 endFunction
 
 int function LockLevelAsInteger(string asLockLevel) global

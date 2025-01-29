@@ -39,11 +39,11 @@ Quest function GetCellPackageGroup(string questPackageID) global
     string packageID = "RPB_" + questPackageID
 
     int packages = FastMap("<string>")
-    FastMap_SetForm(packages, "RPB_CellPackages_02",        GetFormFromMod(0x21916))
+    FastMap_SetForm(packages, "RPB_CellPackages_S_01",      GetFormFromMod(0x21916))
     FastMap_SetForm(packages, "RPB_CellPackages_M_01",      GetFormFromMod(0x27A60))
-    FastMap_SetForm(packages, "RPB_CellPackages_L_01",      GetFormFromMod(0x27A61))
-    FastMap_SetForm(packages, "RPB_CellPackages_XL_01",     GetFormFromMod(0x27A62))
-    FastMap_SetForm(packages, "RPB_CellPackages_XXL_01",    GetFormFromMod(0x27A63))
+    FastMap_SetForm(packages, "RPB_CellPackages_L_01",      GetFormFromMod(0x2A012))
+    FastMap_SetForm(packages, "RPB_CellPackages_XL_01",     GetFormFromMod(0x1F8CC))
+    FastMap_SetForm(packages, "RPB_CellPackages_2XL_01",    GetFormFromMod(0x2A013))
 
     if (!FastMap_HasKey(packages, packageID))
         ; Error, package quest does not exist
@@ -58,11 +58,11 @@ RPB_PackageGroup function GetCellPackageGroupEx(string questPackageID) global
     string packageID = "RPB_" + questPackageID
 
     int packages = FastMap("<string>")
-    FastMap_SetForm(packages, "RPB_CellPackages_02",        GetFormFromMod(0x21916))
+    FastMap_SetForm(packages, "RPB_CellPackages_S_01",      GetFormFromMod(0x21916))
     FastMap_SetForm(packages, "RPB_CellPackages_M_01",      GetFormFromMod(0x27A60))
-    FastMap_SetForm(packages, "RPB_CellPackages_L_01",      GetFormFromMod(0x27A61))
-    FastMap_SetForm(packages, "RPB_CellPackages_XL_01",     GetFormFromMod(0x27A62))
-    FastMap_SetForm(packages, "RPB_CellPackages_XXL_01",    GetFormFromMod(0x27A63))
+    FastMap_SetForm(packages, "RPB_CellPackages_L_01",      GetFormFromMod(0x2A012))
+    FastMap_SetForm(packages, "RPB_CellPackages_XL_01",     GetFormFromMod(0x1F8CC))
+    FastMap_SetForm(packages, "RPB_CellPackages_2XL_01",    GetFormFromMod(0x2A013))
 
     if (!FastMap_HasKey(packages, packageID))
         ; Error, package quest does not exist
@@ -616,6 +616,18 @@ string function Replace(string asTemplate, string[] akPlaceholders, string[] akR
 endFunction
 
 ; ==========================================================
+;                       Array Functions
+; ==========================================================
+
+function Array_ClearForms(Form[] akArray) global
+    int i = 0
+    while (i < akArray.Length)
+        akArray[i] = none
+        i += 1
+    endWhile
+endFunction
+
+; ==========================================================
 ;                      Bitwise Functions
 ; ==========================================================
 
@@ -734,7 +746,7 @@ endFunction
 function RetainAI(bool condition = true) global
     if (condition)
         Game.SetPlayerAIDriven(true)
-        Game.GetPlayer().EnableAI(true)
+        ; Game.GetPlayer().EnableAI(true)
         Game.DisablePlayerControls( \
             abMovement = true, \
             abFighting = true, \

@@ -362,20 +362,16 @@ endEvent
     string          @asArrestType: The type of the arrest, whether to escort or to move to jail, etc... (for more info, see ARREST_TYPES)
 /;
 event OnArrestBegin(RPB_Arrestee apArrestee, RPB_Captor apCaptor, Faction akCrimeFaction, string asArrestType)
-    ; asArrestType = ARREST_TYPE_TELEPORT_TO_JAIL
-    ; asArrestType = ARREST_TYPE_ESCORT_TO_CELL
-    ; asArrestType = ARREST_TYPE_ESCORT_TO_CELL
-    ; Debug("Arrest::OnArrestBegin", "Captor: " + apCaptor + ", Captors: " + Captors.GetKeys())
     apArrestee.SetArrestParameters(asArrestType, apCaptor, akCrimeFaction)
 
-    Debug("Arrest::OnArrestBegin", "ArresteeRef: [\n" + \
-        "\t arresteeRef: " + apArrestee + "\n" + \
-        "\t apArrestee.HasLatentBounty(): " + apArrestee.HasLatentBounty() + "\n" + \
-        "\t apArrestee.HasActiveBounty(): " + apArrestee.HasActiveBounty() + "\n" + \
-        "\t apArrestee.GetActiveBounty(): " + apArrestee.GetActiveBounty() + "\n" + \
-        "\t apArrestee.GetLatentBounty(): " + apArrestee.GetLatentBounty() + "\n" + \
-        "\t apArrestee.GetFaction(): " + apArrestee.GetFaction() + "\n" + \
-    "]")
+    ; Debug("Arrest::OnArrestBegin", "ArresteeRef: [\n" + \
+    ;     "\t arresteeRef: " + apArrestee + "\n" + \
+    ;     "\t apArrestee.HasLatentBounty(): " + apArrestee.HasLatentBounty() + "\n" + \
+    ;     "\t apArrestee.HasActiveBounty(): " + apArrestee.HasActiveBounty() + "\n" + \
+    ;     "\t apArrestee.GetActiveBounty(): " + apArrestee.GetActiveBounty() + "\n" + \
+    ;     "\t apArrestee.GetLatentBounty(): " + apArrestee.GetLatentBounty() + "\n" + \
+    ;     "\t apArrestee.GetFaction(): " + apArrestee.GetFaction() + "\n" + \
+    ; "]")
 
     if (!apArrestee.HasLatentBounty() && !apArrestee.HasActiveBounty())
         Config.NotifyArrest("You can't be arrested in " + akCrimeFaction.GetName() + " since you do not have a bounty in the hold", apArrestee.IsPlayer())
@@ -580,8 +576,8 @@ endEvent
 event OnArrestGoalChanged(Actor akArrestee, string asOldArrestGoal, string asNewArrestGoal)
     ; ArrestVars.SetString("Arrest::Arrest Goal", asNewArrestGoal)
     RPB_StorageVars.SetStringOnForm("Arrest Goal", akArrestee, asNewArrestGoal, "Arrest")
-    Debug("Arrest::OnArrestGoalChanged", "Arrest Goal for Actor " + akArrestee + " was set to " + asNewArrestGoal, asOldArrestGoal == "")
-    Debug("Arrest::OnArrestGoalChanged", "Arrest Goal for Actor " + akArrestee + " was changed from " + asOldArrestGoal + " to " + asNewArrestGoal, asOldArrestGoal != "")
+    ; Debug("Arrest::OnArrestGoalChanged", "Arrest Goal for Actor " + akArrestee + " was set to " + asNewArrestGoal, asOldArrestGoal == "")
+    ; Debug("Arrest::OnArrestGoalChanged", "Arrest Goal for Actor " + akArrestee + " was changed from " + asOldArrestGoal + " to " + asNewArrestGoal, asOldArrestGoal != "")
 endEvent
 
 ; Prototype may be different later, like this:
@@ -1220,7 +1216,9 @@ function RestrainArrestee(Actor akArrestee)
     ; Hand Cuffs Crossed Front 01 - 0xA033D9D
     ; Hands Crossed Front in Scarfs - 0xA073A14
     ; Hands in Irons Front Black - 0xA033D9E
-    Form cuffs = Game.GetFormEx(0xA081D2F)
+    ; Form cuffs = Game.GetFormEx(0xA081D2F)
+    Form cuffs = Game.GetFormFromFile(0x81D2F, "ZaZAnimationPack.esm")
+
     akArrestee.SheatheWeapon()
     UnequipHandsForActor(akArrestee)
     akArrestee.EquipItem(cuffs, true, true)

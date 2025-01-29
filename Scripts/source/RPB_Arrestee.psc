@@ -282,7 +282,8 @@ function Cuff()
     ; return
     ; Form cuffs = Game.GetFormEx(0xA081D33) ; Front
 
-    Form cuffs = Game.GetFormEx(0xA081D2F) ; Back
+    ; Form cuffs = Game.GetFormEx(0xA081D2F) ; Back
+    Form cuffs = Game.GetFormFromFile(0x81D2F, "ZaZAnimationPack.esm")
 
     this.SheatheWeapon()
     UnequipHandsForActor(this)
@@ -567,7 +568,7 @@ endFunction
 
 event OnInitialize()
     Arrest.RegisterArrestee(self)
-    Debug("Arrestee::OnInitialize", "Initialized Arrestee, this: " + this)
+    ; Debug("Arrestee::OnInitialize", "Initialized Arrestee, this: " + this)
 
     self.RegisterForTrackedStats()
     self.InitializeState()
@@ -615,8 +616,9 @@ endEvent
 event OnArrestEnd()
     Debug("Arrest::OnArrestEnd", "Arrest, captor should be escorting now")
 
-    Captor.SetEscorting()
+    ; Captor.SetEscorting()
     
+    RegisterForSingleUpdate(1.0)
 endEvent
 
 event OnArrestFailed(string asReason)
@@ -625,6 +627,15 @@ event OnArrestFailed(string asReason)
     endif
 
     self.RevertArrest()
+endEvent
+
+event OnUpdate()
+    if (this.GetDistance(Captor.GetActor()) >= 700)
+        this.MoveTo(Captor.GetActor())
+        Debug("["+ Name +"] Arrestee::OnUpdate", "Moved Arrestee to " + Captor.Name)
+    endif
+
+    RegisterForSingleUpdate(5.0)
 endEvent
 
 ; ==========================================================

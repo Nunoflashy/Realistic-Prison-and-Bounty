@@ -65,7 +65,7 @@ endFunction
 function PerformMaintenance()
     EventManager.RegisterEvents()
     SceneManager.SceneManager()
-    PrisonManager.VerifyPrisonsIntegrity()
+    PrisonManager.VerifyIntegrity()
     API.Arrest.RegisterForKey(0x42)
 
     API.MCM.InitializePages()
@@ -111,9 +111,9 @@ event OnKeyDown(int keyCode)
     RPB_MCM mcm = Config.MCM
 
     if (keyCode == 0x3B)    ; F1
-        PrisonManager.VerifyPrisonsIntegrity()
+        ; PrisonManager.VerifyIntegrity()
 
-        return
+        ; return
         RPB_UIInterface uilib   = (self.GetReference() as Form) as RPB_UIInterface
         RPB_Tests unitTest      = (self.GetReference() as Form) as RPB_Tests
         

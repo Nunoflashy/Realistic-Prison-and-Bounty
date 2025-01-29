@@ -6,6 +6,22 @@ import RPB_Utility
 import RPB_Memory
 
 ; ==========================================================
+;                     Script References
+; ==========================================================
+
+RPB_API property API
+    RPB_API function get()
+        return Prison.API
+    endFunction
+endProperty
+
+RPB_EventManager property EventManager
+    RPB_EventManager function get()
+        return API.EventManager
+    endFunction
+endProperty
+
+; ==========================================================
 
 string property Name
     string function get()
@@ -252,14 +268,13 @@ endProperty
 string __packageSize
 string property PackageSize
     string function get()
-        ; if (__packageSize == "")
-            if (self.HasOption("Package"))
-                __packageSize = self.GetOptionOfTypeString("Package")
-                Debug("["+ ID +"] JailCell:PackageSize", "__packageSize: " + __packageSize)
-            else
-                DebugWarn("["+ ID +"] JailCell:PackageSize", "Returning default package size: S")
-                return self.DefaultPackageSize
-            endif
+        if (self.HasOption("Package"))
+            __packageSize = self.GetOptionOfTypeString("Package")
+            ; Debug("["+ ID +"] JailCell:PackageSize", "__packageSize: " + __packageSize)
+        else
+            DebugWarn("["+ ID +"] JailCell:PackageSize", "Returning default package size: S")
+            return self.DefaultPackageSize
+        endif
 
         return __packageSize
     endFunction
@@ -280,7 +295,7 @@ function JailCell()
 endFunction
 
 ReferenceAlias function GetSuitableCellPackage()
-    return Prison.PrisonManager.GetCellPackageOfType(self.PackageSize)
+    return Prison.PrisonManager.GetCellPackageOfTypeEx(self.PackageSize)
 endFunction
 
 ;/
@@ -306,6 +321,17 @@ function DetermineMarkers()
     Form[] interiorChildMarkers = self.GetPropertyOfTypeFormArray("Interior")
     Form[] exteriorChildMarkers = self.GetPropertyOfTypeFormArray("Exterior")
 
+    if (!exteriorChildMarkers)
+        ; Important, these markers are used in Scenes, where the guard will be standing
+        EventManager.SendError("Failed to determine exterior markers for " + ID, "["+ Prison.Name +"] ["+ ID +"] JailCell::DetermineMarkers")
+        return
+    endif
+
+    if (!interiorChildMarkers)
+        ; Not as important as Exterior, Main Interior is used most of the time, this is unused for now
+        ; EventManager.SendWarning("Failed to determine interior markers for " + ID, "["+ Prison.Name +"] ["+ ID +"] JailCell::DetermineMarkers")
+    endif
+
     int arrayInteriorChildMarkers = FastArray_FromFormArray(interiorChildMarkers)
     int arrayExteriorChildMarkers = FastArray_FromFormArray(exteriorChildMarkers)
 
@@ -325,14 +351,15 @@ function DetermineMarkers()
 endFunction
 
 function RefreshOptions()
-    __beds              = none
-    __containers        = none
-    __otherProps        = none
     __allowOvercrowding = false
     __cellRadius        = 0.0
     __scanIterations    = 0
     __maxPrisoners      = 0
     __packageSize       = none
+
+    Array_ClearForms(__beds)
+    Array_ClearForms(__containers)
+    Array_ClearForms(__otherProps)
 
     ; TODO: Refresh cell doors options
 endFunction
@@ -620,6 +647,18 @@ event OnGuardOpenCellDoor(RPB_CellDoor akCellDoor, Actor akGuard)
 endEvent
 
 ; =========================================================
+;                       Trigger Events
+; =========================================================
+
+event OnTriggerEnter(ObjectReference akObjectRef)
+    Debug("["+ self +"] JailCell::OnTriggerEnter", "Prisoner entered the trigger")
+endEvent
+
+event OnTriggerLeave(ObjectReference akObjectRef)
+    Debug("["+ self +"] JailCell::OnTriggerLeave", "Prisoner left the trigger")
+endEvent
+
+; =========================================================
 ;                         Management
 ; =========================================================
 
@@ -661,12 +700,16 @@ endFunction
 function Initialize(RPB_Prison apPrison)
     ; self.SetFallbackID(self)
     ; self.SetFallbackName(self)
-
     ; Set the persistent Prison UUID
     ; RPB_StorageVars.SetStringOnForm("Prison UUID", self, apPrison.UUID)
 
-    self.RefreshOptions()
+    ; if (self.GetFormID() == GetFormFromMod(0x25F49).GetFormID())
+    ;     Debug("["+ apPrison.Name +"] ["+ self +"] JailCell::Initialize", "Contents: " + GetContainerList(self.GetSerializableRootObject()))
 
+    ;     return
+    ; endif
+
+    self.RefreshOptions()
     ; Link the actual Prison with this Jail Cell
     self.BindPrison(apPrison)
 
@@ -677,16 +720,10 @@ function Initialize(RPB_Prison apPrison)
         self.BindCellDoor(configuredCellDoor)
     endif
 
+    self.DisableOwnership()
+
     ; Determine all markers for this cell
     self.DetermineMarkers()
-
-    ; Debug("["+ self.Prison.Name +"] ["+ self.ID +": "+ self +"] JailCell::Initialize", \ 
-    ;     "\n\tMain Marker: " + self.GetPropertyOfTypeForm("Main Interior") + \ 
-    ;     "\n\tCell Door: " + self.CellDoor + \
-    ;     "\n\tInterior Markers: " + InteriorMarkers + \ 
-    ;     "\n\tExterior Markers: " + ExteriorMarkers \ 
-    ; )
-
 endFunction
 
 function Uninitialize()
@@ -724,6 +761,21 @@ function BindCellDoor(RPB_CellDoor akCellDoor)
     akCellDoor.Initialize()
 
     Error("Could not bind cell door to the jail cell " + self, (!self.CellDoor && self.CellDoor != akCellDoor))
+endFunction
+
+function DisableOwnership()
+    Form[] _beds = self.Beds
+
+    int i = 0
+    while (i < _beds.Length)
+        ObjectReference bed = _beds[i] as ObjectReference
+        if (bed && bed.GetActorOwner() != none)
+            bed.SetActorOwner(none)
+            string bedName = bed.GetBaseObject().GetName()
+            Debug("["+ Prison.Name +"] ["+ ID +"] JailCell::DisableOwnership", bed + " (" + bedName + ") is now unoccupied.")
+        endif
+        i += 1
+    endWhile
 endFunction
 
 ;/
@@ -1028,6 +1080,11 @@ endState
 ; =========================================================
 
 int function GetSerializableRootObject()
+    ; TODO: Commented, but we need to find a way to hot-reload the object, so changes can be made
+    ; int rootObject      = RPB_Data.GetRootObject(Prison.Hold) ; JMap&
+    ; int prisonObject    = RPB_Data.Hold_GetJailObject(rootObject) ; JMap&
+    ; return RPB_Data.GetPropertyOfTypeObject(prisonObject, "Cells//" + self)
+
     return RPB_Data.GetPropertyOfTypeObject(Prison.GetSerializableRootObject(), "Cells//" + self)
 endFunction
 

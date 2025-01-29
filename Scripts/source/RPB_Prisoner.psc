@@ -49,18 +49,6 @@ bool property ShouldProcessImprisonmentEvents
     endFunction
 endProperty
 
-bool property IsEnabledForBackgroundUpdates
-    bool function get()
-        return GetBool("IsEnabledForBackgroundUpdates")
-    endFunction
-
-    function set(bool value)
-        SetBool("IsEnabledForBackgroundUpdates", value)
-    endFunction
-endProperty
-
-bool property IsQueuedForImprisonment auto
-
 ; ==========================================================
 ;                 Arrest / Imprisonment Time
 ; ==========================================================
@@ -153,13 +141,6 @@ endProperty
 ;                    Prisoner Properties
 ; ==========================================================
 
-; The number associated with this Prisoner
-int property Number
-    int function get()
-        return GetInt("Prisoner Number")
-    endFunction
-endProperty
-
 Actor property Captor
     Actor function get()
         return self.GetForm("Arrest Captor") as Actor
@@ -204,6 +185,14 @@ endProperty
 int property Bounty
     int function get()
         return self.GetLatentBounty()
+    endFunction
+endProperty
+
+; TODO: Refactor into a Prison specific property when Hold to Prison is 1:N
+int property Infamy
+    int function get()
+        string factionName = Prison.PrisonFaction.GetName()
+        return GetInt(factionName + "::Infamy Gained", "ActorVars")
     endFunction
 endProperty
 
@@ -526,7 +515,7 @@ int property InfamyGainedDaily
                     float_if (Prison.InfamyGainModifierRecognized < 0, (1 / abs(Prison.InfamyGainModifierRecognized) as int), Prison.InfamyGainModifierRecognized)) as int
         endif
 
-        return round(Bounty * Prison.InfamyGainedDailyOfCurrentBounty) + Prison.InfamyGainedDaily
+        return Round(Bounty * Prison.InfamyGainedDailyOfCurrentBounty) + Prison.InfamyGainedDaily
     endFunction
 endProperty
 
@@ -557,13 +546,19 @@ endProperty
 
 ReferenceAlias property CellPackage
     ReferenceAlias function get()
-        string packageId = self.GetString("Cell Package ID")
+        string packageId    = self.GetString("Cell Package ID")
+        Quest packageGroup  = self.GetForm("Cell Package Group") as Quest
 
         if (!packageId)
-             self.SetString("Cell Package ID", JailCell.GetSuitableCellPackage().GetName())
+            ReferenceAlias cellPackageRef = JailCell.GetSuitableCellPackage()
+            self.SetString("Cell Package ID", cellPackageRef.GetName())
+            self.SetForm("Cell Package Group", cellPackageRef.GetOwningQuest())
+
+            packageId    = self.GetString("Cell Package ID")
+            packageGroup = self.GetForm("Cell Package Group") as Quest
         endif
 
-        return Prison.PrisonManager.GetCellPackageByName(packageId)
+        return Prison.PrisonManager.GetCellPackageByNameEx(packageGroup, packageId)
     endFunction
 endProperty
 
@@ -681,10 +676,6 @@ state Imprisoned
     endEvent
 
     event OnUpdateGameTime()
-        ; ; Test - Don't let NPC update
-        ; if (self.IsNPC())
-        ;     return
-        ; endif
         ; Dont update if the player is not nearby, let Prison Monitor handle it
         if (!Prison.ShouldActivelyMonitorPrisoner(self))
             Prison.SendMonitoringRequest()
@@ -936,10 +927,10 @@ function TriggerInfamyPenalty()
         return
     endif
 
-    ;/ const /; int INFAMY_RECOGNIZED_THRESHOLD     = self.GetInt("Infamy Recognized Threshold")
-    ;/ const /; int INFAMY_KNOWN_THRESHOLD          = self.GetInt("Infamy Known Threshold")
-    ;/ const /; float INFAMY_RECOGNIZED_PENALTY     = self.GetFloat("Recognized Criminal Penalty")
-    ;/ const /; float INFAMY_KNOWN_PENALTY          = self.GetFloat("Known Criminal Penalty")
+    ;/ constexpr /; int INFAMY_RECOGNIZED_THRESHOLD     = self.GetInt("Infamy Recognized Threshold")
+    ;/ constexpr /; int INFAMY_KNOWN_THRESHOLD          = self.GetInt("Infamy Known Threshold")
+    ;/ constexpr /; float INFAMY_RECOGNIZED_PENALTY     = self.GetFloat("Recognized Criminal Penalty")
+    ;/ constexpr /; float INFAMY_KNOWN_PENALTY          = self.GetFloat("Known Criminal Penalty")
 
     ;/ const /; int INFAMY_NEUTRAL      = 0
     ;/ const /; int INFAMY_RECOGNIZED   = 1
@@ -948,11 +939,11 @@ function TriggerInfamyPenalty()
     int currentInfamyType
     float penaltyAsBounty = 0
 
-    if (Bounty >= INFAMY_KNOWN_THRESHOLD)
+    if (Infamy >= INFAMY_KNOWN_THRESHOLD)
         penaltyAsBounty = CurrentInfamy * (INFAMY_KNOWN_PENALTY * 0.01)
         currentInfamyType = INFAMY_KNOWN
 
-    elseif (Bounty >= INFAMY_RECOGNIZED_THRESHOLD)
+    elseif (Infamy >= INFAMY_RECOGNIZED_THRESHOLD)
         penaltyAsBounty = CurrentInfamy * (INFAMY_RECOGNIZED_PENALTY * 0.01)
         currentInfamyType = INFAMY_RECOGNIZED
 
@@ -975,10 +966,12 @@ bool function IsRestrained()
 endFunction
 
 function Cuff(bool abCuffInFront = false)
-    Form cuffs = Game.GetFormEx(0xA081D2F)
+    ; Form cuffs = Game.GetFormEx(0xA081D2F)
+    Form cuffs = Game.GetFormFromFile(0x81D2F, "ZaZAnimationPack.esm")
 
     if (abCuffInFront)
-        cuffs = Game.GetFormEx(0xA081D33)
+        ; cuffs = Game.GetFormEx(0xA081D33)
+        cuffs = Game.GetFormFromFile(0x81D33, "ZaZAnimationPack.esm")
     endif
 
     this.SheatheWeapon()
@@ -1097,11 +1090,11 @@ function DetermineStrippingType()
     self.WillBeStrippedNaked        = (isAbleToStripNaked       && (StrippingThoroughness >= 10 || !isAbleToStripToUnderwear))
     self.WillBeStrippedToUnderwear  = (isAbleToStripToUnderwear && (StrippingThoroughness < 10  || !isAbleToStripNaked))
 
-    DebugParams( \ 
-        hasUnderwearWorn + "," + isAbleToStripNaked + "," + isAbleToStripToUnderwear + "," + self.WillBeStrippedNaked + "," + self.WillBeStrippedToUnderwear, \
-        "hasUnderwearWorn, isAbleToStripNaked, isAbleToStripToUnderwear, WillBeStrippedNaked, WillBeStrippedToUnderwear", \
-        "("+ Name +") Prisoner::DetermineStrippingType" \ 
-    )
+    ; DebugParams( \ 
+    ;     hasUnderwearWorn + "," + isAbleToStripNaked + "," + isAbleToStripToUnderwear + "," + self.WillBeStrippedNaked + "," + self.WillBeStrippedToUnderwear, \
+    ;     "hasUnderwearWorn, isAbleToStripNaked, isAbleToStripToUnderwear, WillBeStrippedNaked, WillBeStrippedToUnderwear", \
+    ;     "("+ Name +") Prisoner::DetermineStrippingType" \ 
+    ; )
 
     ; Assert (WIP)
     EventManager.SendError( \ 
@@ -1116,7 +1109,7 @@ endFunction
 
 function Strip(bool abRemoveUnderwear = true)
     if (!self.PrisonerBelongingsContainer)
-        EventManager.SendError("The prisoner hasn't had a belongings container assigned to them, cannot strip!", "["+ Name +"] Prisoner::Strip")
+        EventManager.SendError("The prisoner hasn't had a belongings container assigned to "+ PronounObject +", therefore cannot strip!", "["+ Name +"] Prisoner::Strip")
         return
     endif
 
@@ -1178,7 +1171,7 @@ endFunction
 
 function StripSilently()
     if (!self.PrisonerBelongingsContainer)
-        EventManager.SendError("The prisoner hasn't had a belongings container assigned to them, cannot strip silently!", "["+ Name +"] Prisoner::StripSilently")
+        EventManager.SendError("The prisoner hasn't had a belongings container assigned to "+ PronounObject +", therefore cannot strip silently!", "["+ Name +"] Prisoner::StripSilently")
         return
     endif
 
@@ -1202,7 +1195,7 @@ endFunction
 
 function RemoveUnderwear()
     if (!self.PrisonerBelongingsContainer)
-        EventManager.SendError("The prisoner hasn't had a belongings container assigned to them, cannot remove underwear!", "["+ Name +"] Prisoner::RemoveUnderwear")
+        EventManager.SendError("The prisoner hasn't had a belongings container assigned to "+ PronounObject +", therefore cannot remove underwear!", "["+ Name +"] Prisoner::RemoveUnderwear")
         return
     endif
 
@@ -1218,18 +1211,6 @@ function RemoveUnderwear()
     endif
 
     self.OnUnderwearRemoved(underwearTop, underwearBottom)
-endFunction
-
-function UndressUpperBody()
-    self.UnequipItemSlot(33)
-    self.UnequipItemSlot(56)
-    self.UnequipItemSlot(32)
-endFunction
-
-function UndressLowerBody()
-    self.UnequipItemSlot(37)
-    self.UnequipItemSlot(49)
-    self.UnequipItemSlot(52)
 endFunction
 
 ;                      Clothing - Checkers
@@ -1284,7 +1265,7 @@ endFunction
 bool function Outfit_IsValid(int aiPieceCountToCheck = 4, Armor[] akOutfit = none)
     Armor[] outfitToVerify
 
-    if (akOutfit != none)
+    if (akOutfit)
         outfitToVerify = akOutfit
     else
         outfitToVerify = self.GetOutfit()
@@ -1328,8 +1309,6 @@ Armor[] function GetOutfit()
     outfitPieces[1] = self.GetForm("Outfit::Body") as Armor
     outfitPieces[2] = self.GetForm("Outfit::Hands") as Armor
     outfitPieces[3] = self.GetForm("Outfit::Feet") as Armor
-
-    ; Debug("["+ Name +"] Prisoner::GetOutfit", "Configured Outfit: " + outfitPieces)
 
     return outfitPieces
 endFunction
@@ -1707,6 +1686,22 @@ endFunction
 ;                        Imprisonment
 ; ==========================================================
 
+function NotifySentence()
+    if (self.ShowSentence && !self.IsUndeterminedSentence)
+        string sentenceFormatted = RPB_Utility.GetTimeFormatted(Sentence, abIncludeHours = false)
+        Config.NotifyJail("Your sentence was set at "+ sentenceFormatted +" in " + Prison.Name, self.IsPlayer())
+        Config.NotifyJail(Name + " has been sentenced to "+ sentenceFormatted +" in " + Prison.Name, self.IsNPC())
+    endif
+endFunction
+
+function NotifyReleaseDate()
+    if (self.ShowReleaseTime && !self.IsUndeterminedSentence)
+        string releaseDateFormatted = Prison.GetTimeOfReleaseFormatted(self)
+        Config.NotifyJail("Your release is due on " + releaseDateFormatted, self.IsPlayer())
+        Config.NotifyJail(Name + "'s release is due on " + releaseDateFormatted, self.IsNPC())
+    endif
+endFunction
+
 ;/
     Main function that handles the imprisonment of this Prisoner.
 /;
@@ -1721,25 +1716,9 @@ function Imprison()
         return
     endif
 
-    ; return
-
     float startBench = StartBenchmark()
     self.OnImprisoned()
     GotoState("Imprisoned") ; State when the prisoner is in the cell, check for updates for sentence, etc...
-
-    string sentenceFormatted    = RPB_Utility.GetTimeFormatted(Sentence, abIncludeHours = false)
-    string releaseDateFormatted = Prison.GetTimeOfReleaseFormatted(self)
-
-    if (self.ShowSentence && !self.IsUndeterminedSentence)
-        Config.NotifyJail("Your sentence was set at "+ sentenceFormatted +" in " + Prison.Name, self.IsPlayer())
-        Config.NotifyJail(self.GetName() + " has been sentenced to "+ sentenceFormatted +" in " + Prison.Name, self.IsNPC())
-    endif
-    
-    if (self.ShowReleaseTime && !self.IsUndeterminedSentence)
-        Config.NotifyJail("Your release is due on " + releaseDateFormatted, self.IsPlayer())
-        Config.NotifyJail(self.GetName() + "'s release is due on " + releaseDateFormatted, !self.IsPlayer())
-    endif
-
     EndBenchmark(startBench, "Ended ["+ Name +"] Prisoner::Imprison")
 endFunction
 
@@ -1913,7 +1892,7 @@ endFunction
 function PerformDeleveling()
     int handlingType = self.GetSkillLossHandlingType()
 
-    Debug("["+ Name +"] Prisoner::PerformDeleveling", "Handling Type: " + handlingType)
+    ; Debug("["+ Name +"] Prisoner::PerformDeleveling", "Handling Type: " + handlingType)
 
     if  (handlingType == SKILL_LOSS_HANDLING_RANDOM_STAT_SKILL || \
          handlingType == SKILL_LOSS_HANDLING_RANDOM_PERK_SKILL || \
@@ -2004,15 +1983,15 @@ float property PreviousUpdateTimeServed
 endProperty
 
 function UpdateTimeJailed()
-    float timeJailedSinceLastUpdate = TimeServed - PreviousUpdateTimeServed
-    int daysElapsed = floor(TimeServed) - floor(PreviousUpdateTimeServed)
+    float timeJailedSinceLastUpdate = GetElapsedTimeBetweenTimes(PreviousUpdateTimeServed, TimeServed)
+    int daysElapsed = timeJailedSinceLastUpdate as int
 
-    Debug("["+ Name +"] Prisoner::UpdateTimeJailed", "TimeServed: " + TimeServed + ", PreviousUpdateTimeServed: " + PreviousUpdateTimeServed + ", timeJailedSinceLastUpdate: " + timeJailedSinceLastUpdate)
-    Debug("["+ Name +"] Prisoner::UpdateTimeJailed()", "Before UpdateDayEvents: PreviousUpdateTimeServed = " + PreviousUpdateTimeServed)
+    ; Debug("["+ Name +"] Prisoner::UpdateTimeJailed", "TimeServed: " + TimeServed + ", PreviousUpdateTimeServed: " + PreviousUpdateTimeServed + ", timeJailedSinceLastUpdate: " + timeJailedSinceLastUpdate)
+    ; Debug("["+ Name +"] Prisoner::UpdateTimeJailed()", "Before UpdateDayEvents: PreviousUpdateTimeServed = " + PreviousUpdateTimeServed)
 
     self.UpdateDayEvents()
     
-    Debug("["+ Name +"] Prisoner::UpdateTimeJailed()", "After UpdateDayEvents: PreviousUpdateTimeServed = " + PreviousUpdateTimeServed)
+    ; Debug("["+ Name +"] Prisoner::UpdateTimeJailed()", "After UpdateDayEvents: PreviousUpdateTimeServed = " + PreviousUpdateTimeServed)
 
     self.ModifyStat("Time Jailed", timeJailedSinceLastUpdate)
 
@@ -2021,13 +2000,12 @@ function UpdateTimeJailed()
     endif
 
     PreviousUpdateTimeServed = TimeServed
-    Debug("["+ Name +"] Prisoner::UpdateTimeJailed()", "(Function End) PreviousUpdateTimeServed = " + PreviousUpdateTimeServed + ", TimeServed = " + TimeServed + ", LastUpdate: " + LastUpdate)
-
+    ; Debug("["+ Name +"] Prisoner::UpdateTimeJailed()", "(Function End) PreviousUpdateTimeServed = " + PreviousUpdateTimeServed + ", TimeServed = " + TimeServed + ", LastUpdate: " + LastUpdate)
 endFunction
 
 function UpdateDayEvents()
-    int daysElapsed = floor(TimeServed) - floor(PreviousUpdateTimeServed)
-    Debug("["+ Name +"] Prisoner::UpdateDayEvents", "PreviousUpdateTimeServed: " + PreviousUpdateTimeServed + ", TimeServed: " + TimeServed + ", daysElapsed: " + daysElapsed)
+    int daysElapsed = GetElapsedTimeBetweenTimes(PreviousUpdateTimeServed, TimeServed) as int
+    ; Debug("["+ Name +"] Prisoner::UpdateDayEvents", "PreviousUpdateTimeServed: " + PreviousUpdateTimeServed + ", TimeServed: " + TimeServed + ", daysElapsed: " + daysElapsed)
 
     while (daysElapsed > 0)
         self.OnDayPassed()
@@ -2044,11 +2022,11 @@ function UpdateLongestSentence()
     self.SetStat("Last Sentence", Sentence)
     ; RPB_ActorVars.SetLastSentence(Prison.PrisonFaction, this, Sentence)
 
-    Debug("["+ Name +"] Prisoner::UpdateLongestSentence", "[\n" + \ 
-        "\t Current Longest Sentence: " + currentLongestSentence + "\n" + \
-        "\t New Longest Sentence: " + newLongestSentence + "\n" + \
-        "\t Sentence: " + Sentence + "\n" + \
-    "]")
+    ; Debug("["+ Name +"] Prisoner::UpdateLongestSentence", "[\n" + \ 
+    ;     "\t Current Longest Sentence: " + currentLongestSentence + "\n" + \
+    ;     "\t New Longest Sentence: " + newLongestSentence + "\n" + \
+    ;     "\t Sentence: " + Sentence + "\n" + \
+    ; "]")
 endFunction
 
 function UpdateSentence()
@@ -2476,7 +2454,7 @@ event OnStatChanged(string asStatName, float afValue)
         self.OnBountyGained()
     endif
 
-    Debug("["+ Name +"] Prisoner::OnStatChanged", "Stat " + asStatName + " has been changed to " + afValue)
+    ; Debug("["+ Name +"] Prisoner::OnStatChanged", "Stat " + asStatName + " has been changed to " + afValue)
 endEvent
 
 ;                Imprisonment / Sleep / Time
@@ -2488,7 +2466,7 @@ event OnDayPassed()
         return
     endif
 
-    Debug("["+ Name +"] Prisoner::OnDayPassed", "A day has passed.")
+    ; Debug("["+ Name +"] Prisoner::OnDayPassed", "A day has passed.")
     self.PerformDeleveling()
 endEvent
 
@@ -2499,7 +2477,7 @@ event OnSleepStart(float afSleepStartTime, float afSleepEndTime)
     endif
 
     if (self.IsUndeterminedSentence)
-        Debug("["+ Name +"] Prisoner::OnSleepStart", self.Name + " currently has an undetermined sentence, cannot serve time.")
+        EventManager.SendInfo(Name + " currently has an undetermined sentence, cannot serve time.", "["+ Name +"] Prisoner::OnSleepStart")
         return
     endif
 
@@ -2519,6 +2497,9 @@ endEvent
 event OnImprisoned()
     self.RegisterTimeOfImprisonment()
     self.DetermineReleaseTimeAdditionalHours() ; For Release Time (Minimum, Maximum) intervals
+    self.NotifySentence()
+    self.NotifyReleaseDate()
+
     ; self.SetReleaseLocation() ; to be refactored (needs to take into account whether to use Escort or Teleport markers)
 
     ; if (!self.Sentence)
@@ -2535,11 +2516,9 @@ endEvent
 ; ==========================================================
 
 event OnReleased()
-    self.Destroy()
 endEvent
 
 event OnEscaped()
-
 endEvent
 
 ;                         Management
@@ -2673,6 +2652,11 @@ function NPC_BindToCell()
         return
     endif
 
+    if (!self.CellPackage)
+        EventManager.SendError("There was an error retrieving the Cell Package belonging to Prisoner: " + self.Name, "["+ Name +"] Prisoner::NPC_BindToCell")
+        return
+    endif
+
     self.BindAlias(CellPackage)
     MiscUtil.PrintConsole("["+ Name +"] Bound to Package " + CellPackage.GetName())
     Debug("[Prison: "+ self.Prison.Name +"] ["+ Name +"] Prisoner::NPC_BindToCell", "[Package: "+ CellPackage.GetName() +"] Bound " + Name + " to "+ self.PronounPossessiveObject +" Cell.")
@@ -2684,6 +2668,11 @@ function NPC_UnbindFromCell()
     endif
 
     if (!self.HasCellPackage)
+        return
+    endif
+
+    if (!self.CellPackage)
+        EventManager.SendError("There was an error retrieving the Cell Package belonging to Prisoner: " + self.Name, "["+ Name +"] Prisoner::NPC_UnbindFromCell")
         return
     endif
 

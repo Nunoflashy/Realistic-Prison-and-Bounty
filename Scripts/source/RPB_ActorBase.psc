@@ -265,6 +265,18 @@ function UnequipItemSlot(int aiSlot)
     this.UnequipItemSlot(aiSlot)
 endFunction
 
+function UndressUpperBody()
+    self.UnequipItemSlot(33)
+    self.UnequipItemSlot(56)
+    self.UnequipItemSlot(32)
+endFunction
+
+function UndressLowerBody()
+    self.UnequipItemSlot(37)
+    self.UnequipItemSlot(49)
+    self.UnequipItemSlot(52)
+endFunction
+
 function UnequipAll()
     this.UnequipAll()
 endFunction
@@ -415,11 +427,11 @@ function SyncLargestBountyForFaction(Faction akFaction)
     ; Set the local stat for the Hold
     RPB_ActorVars.SetLargestBounty(akFaction, this, newLargestBounty)
 
-    DebugWithArgs("Actor::SyncLargestBountyForFaction", akFaction.GetName(), "[\n" + \ 
-        "\t Current Largest Bounty: " + currentLargestBounty + "\n" + \
-        "\t New Largest Bounty: " + newLargestBounty + "\n" + \
-        "\t Bounty: " + currentBountyForFaction + "\n" + \
-    "]")
+    ; DebugWithArgs("Actor::SyncLargestBountyForFaction", akFaction.GetName(), "[\n" + \ 
+    ;     "\t Current Largest Bounty: " + currentLargestBounty + "\n" + \
+    ;     "\t New Largest Bounty: " + newLargestBounty + "\n" + \
+    ;     "\t Bounty: " + currentBountyForFaction + "\n" + \
+    ; "]")
 endFunction
 
 function SyncTotalBountyForFaction(Faction akFaction)
