@@ -114,7 +114,7 @@ function ModLatentCrimeGold(Faction akFaction, Actor akActor, int value, bool ab
     string statKey = akFaction.GetName() + "::" + bountyType
     SetIntOnForm(statKey, akActor, GetIntOnForm(statKey, akActor, "ActorVars") + value, "ActorVars", abDeleteOnNull = true)
 
-    Debug("ActorVars::ModLatentCrimeGold", "Stat Key: " + statKey + ", New Value: " + GetIntOnForm(statKey, akActor, "ActorVars"))
+    ; Debug("ActorVars::ModLatentCrimeGold", "Stat Key: " + statKey + ", New Value: " + GetIntOnForm(statKey, akActor, "ActorVars"))
 endFunction
 
 function ModLargestBounty(Faction akFaction, Actor akActor, int value) global
@@ -186,9 +186,9 @@ function ModifyStat(string asStatName, Faction akFaction, Actor akActor, float m
     float currentValue = GetStatFloat(asStatName, akFaction, akActor)
     SetStatFloat(asStatName, akFaction, akActor, currentValue + modifyBy)
 
-    if (asStatName == "Time Jailed")
-        Debug("ActorVars::ModifyStat", "Time Jailed: " + currentValue + ", Adding: " + modifyBy + ", New Value: " + GetStatFloat(asStatName, akFaction, akActor))
-    endif
+    ; if (asStatName == "Time Jailed")
+        ; Debug("ActorVars::ModifyStat", "Time Jailed: " + currentValue + ", Adding: " + modifyBy + ", New Value: " + GetStatFloat(asStatName, akFaction, akActor))
+    ; endif
 endFunction
 
 
