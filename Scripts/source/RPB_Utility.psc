@@ -472,6 +472,28 @@ bool function String_StartsWith(string str, string needle) global
     return substring == needle
 endFunction
 
+; TODO: Test
+bool function String_EndsWith(string str, string needle) global
+    if (StringUtil.GetLength(str) < StringUtil.GetLength(needle))
+        return false
+    endif
+
+    string substring = StringUtil.Substring(str, StringUtil.GetLength(str) - StringUtil.GetLength(needle), StringUtil.GetLength(needle))
+    return substring == needle
+endFunction
+
+bool function String_StartsEndsWith(string str, string startChar, string endChar) global
+    if (StringUtil.GetLength(str) == 0)
+        return false
+    endif
+
+    return StringUtil.GetNthChar(str, 0) == startChar && StringUtil.GetNthChar(str, StringUtil.GetLength(str) - 1) == endChar
+endFunction
+
+bool function String_Contains(string str, string needle) global
+    return StringUtil.Find(str, needle) != -1
+endFunction
+
 string function String_Implode(string[] akStrArray, string asDelimiter = ",") global
     string result = ""
 
@@ -1490,6 +1512,32 @@ Form function GetFormFromString(string asFormIdentifier) global
     int formID          = HexStringToInt(hexFormID)
 
     return Game.GetFormEx(formID)
+endFunction
+
+;/
+    Extracts the reference type (Actor, ObjectReference, etc.) from a Papyrus reference, implicitly castable to a string.
+
+    string  @asReference: The Papyrus reference, implicitly castable to a string, expressed like this: [Actor < (00036897)>]
+
+    returns (string): The reference type (Actor, ObjectReference, etc).
+/;
+string function ExtractReferenceType(string asReference) global
+    int beginningIdGroupIndex = StringUtil.Find(asReference, " <", 1)
+    return StringUtil.Substring(asReference, 1, beginningIdGroupIndex - 1)
+endFunction
+
+;/
+    Extracts the reference ID from a Papyrus reference, implicitly castable to a string.
+
+    string  @asReference: The Papyrus reference, implicitly castable to a string, expressed like this: [Actor < (00036897)>]
+
+    returns (string): The reference ID (00036897).
+/;
+string function ExtractReferenceID(string asReference) global
+    int idLength        = 8 ; Papyrus reference ID's always have 8 digits
+    int endOffset       = 3 ; )>]
+    int len             = StringUtil.GetLength(asReference)
+    return StringUtil.Substring(asReference, len - endOffset - idLength, idLength)
 endFunction
 
 ;/
