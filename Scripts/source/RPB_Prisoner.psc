@@ -2,6 +2,7 @@ Scriptname RPB_Prisoner extends RPB_ActorBase
 
 import RPB_Config
 import RPB_Utility
+import RPB_Memory
 import Math
 
 ; ==========================================================
@@ -917,11 +918,6 @@ function MoveToCell(bool abBeginImprisonment = true)
     Prison.OnPrisonerTeleportedToCell(self, abBeginImprisonment)
 endFunction
 
-function QueueForImprisonment()
-    ; Prison.QueuePrisonerForImprisonment(self)
-     FunctionNotImplemented("Prisoner::QueueForImprisonment")
-endFunction
-
 function TriggerInfamyPenalty()
     if (!IsInfamyEnabled || CurrentInfamy <= 0 || Was("Infamy Penalty Applied") || (Bounty <= self.GetInt("Bounty to Trigger Infamy")))
         return
@@ -1722,6 +1718,20 @@ function Imprison()
     EndBenchmark(startBench, "Ended ["+ Name +"] Prisoner::Imprison")
 endFunction
 
+Form[] function GetCellMates()
+    Form[] prisonersInCell  = self.JailCell.Prisoners
+    int cellMates           = FastArray("<Form>")
+
+    int i = 0
+    while (i < prisonersInCell.Length)
+        if (prisonersInCell[i] != self.GetActor())
+            FastArray_AddForm(cellMates, prisonersInCell[i])
+        endif
+        i += 1
+    endWhile
+
+    return FastArray_ToFormArray(cellMates)
+endFunction
 
 ;                       Stats - Checkers
 ; ==========================================================
@@ -1785,6 +1795,11 @@ endFunction
 ; Restores the Active Bounty from the Latent Bounty.
 function RestoreBounty()
     parent.RestoreBountyForFaction(Prison.PrisonFaction)
+endFunction
+
+function UpdateInfamyLost()
+    Prison.UpdateInfamyLost(this)
+    Prison.ClearActorInfamyState(this)
 endFunction
 
 ;                    Deleveling - Checkers
@@ -2091,7 +2106,7 @@ function InitializeState()
     if (self.Was("Initialized"))
         return
     endif
-
+ 
     ShowSentence = true
     ShowReleaseTime = true
     ShowTimeLeftInSentence = true
@@ -2101,6 +2116,7 @@ function InitializeState()
     self.DetermineStrippingType()
     self.DetermineClothingOutfit()
     self.SetReleaseLocation() ; to be refactored (needs to take into account whether to use Escort or Teleport markers)
+    self.UpdateInfamyLost()
     self.TriggerInfamyPenalty()
 
     int errors = RPB_Memory.FastArray("<string>")

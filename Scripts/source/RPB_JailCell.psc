@@ -742,7 +742,7 @@ function BindPrison(RPB_Prison apPrison)
         return
     endif
 
-    ; Bind the UUID persistently, __prison is a weak ref, it will be reset by Skyrim after 10 days
+    ; Bind the UUID persistently, __prison is a weak ref, it will be reset by Skyrim after 10 days (maybe not anymore with the Respawn flag unchecked for the cells in CK)
     self.SetLocalPropertyOfTypeString("Prison UUID", apPrison.UUID)
 endFunction
 
@@ -1085,7 +1085,7 @@ int function GetSerializableRootObject()
     ; int prisonObject    = RPB_Data.Hold_GetJailObject(rootObject) ; JMap&
     ; return RPB_Data.GetPropertyOfTypeObject(prisonObject, "Cells//" + self)
 
-    return RPB_Data.GetPropertyOfTypeObject(Prison.GetSerializableRootObject(), "Cells//" + self)
+    return Prison.GetCellRootObject(self)
 endFunction
 
 bool function HasOption(string asOption)

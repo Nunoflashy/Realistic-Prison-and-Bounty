@@ -59,7 +59,7 @@ endFunction
 
 int function GetInt(string asKey, string asCategory = "null") global
     string path = GetVarPath(asKey, asCategory)
-    Debug("StorageVars::GetInt", "path: " + path + ", value: " + JDB.solveInt(path))
+    ; Debug("StorageVars::GetInt", "path: " + path + ", value: " + JDB.solveInt(path))
     return JDB.solveInt(path)
 endFunction
 
@@ -195,6 +195,11 @@ endFunction
 string function GetVarPathOnForm(string asKey, Form akForm, string asCategory = "null") global
     string path = none
     
+    if (!akForm)
+        Debug("StorageVars::GetVarPathOnForm", "The provided Form is invalid! asKey: " + asKey + ", asCategory: " + asCategory)
+        return ""
+    endif
+
     if (asCategory != "null" && asCategory != "")
         path = GetRootPath() + "." + akForm.GetFormID() + "." + asCategory + "." + asKey
     else
@@ -271,7 +276,8 @@ function SetBoolOnForm(string asKey, Form akForm, bool abValue, string asCategor
     JDB.solveIntSetter(path, abValue as int, true)
 endFunction
 
-function SetIntOnForm(string asKey, Form akForm, int aiValue, string asCategory = "null", bool abDeleteOnNull = true) global
+function SetIntOnForm(string asKey, Form akForm, int aiValue, string asCategory = "null", bool abDeleteOnNull = false) global
+    ; Debug("StorageVars::SetIntOnForm", "Key: " + asKey + ", Value: " + aiValue + ", Category: " + asCategory + ", DeleteOnNull: " + abDeleteOnNull)
     if (abDeleteOnNull && aiValue == 0)
         DeleteVariableOnForm(asKey, akForm, asCategory)
         return
@@ -396,22 +402,37 @@ endFunction
             T       @Value: The value to set for this key on this reference.
             string  @Category: The category on which this value will be under (sub-category of Reference).
 
-    Known Caveats:
+    Known Caveats (Fixed):
         Forms cannot be passed as a Reference, their [] Signature conflicts with the pathing.
         A custom identifier must be made to pass a Form as a reference, or a prefix added.
 /;
-
 string function GetVarPathOnReference(string asKey, string apReference, string asCategory = "null") global
-    string path = ""
+    if (apReference == "null" || apReference == "")
+        return "null"
+    endif
+
+    bool isPapyrusReference = String_StartsEndsWith(apReference, "[", "]")
+
+    if (apReference && isPapyrusReference)
+        ;/
+             Possible problem:
+             referenceType can be different for GET and SET, because only the active script is
+             taken into account when passing the reference, and it can happen that for SET
+             we get something like WIDeadBodyScript, while for GET we get Actor or Form,
+             in which case this will fail to be retrieved.
+        /;
+        string referenceType    = ExtractReferenceType(apReference)
+        string referenceId      = ExtractReferenceID(apReference)
+        apReference = "(" + referenceType + " <" + referenceId + ">" + ")"
+        ; apReference = "Form <" + GetFormFromString(apReference).GetFormID() + ">"
+    endif
 
     if (asCategory != "null" && asCategory != "")
-        path = GetRootPath() + "." + apReference + "." + asCategory + "." + asKey
+        return GetRootPath() + "." + apReference + "." + asCategory + "." + asKey
     else
-        path = GetRootPath() + "." + apReference + "." + asKey
+        return GetRootPath() + "." + apReference + "." + asKey
     endif
     ; DebugWithArgs("StorageVars::GetVarPathOnReference", "Key: " + asKey + ", Reference: " + apReference + ", Category: " + asCategory, path)
-
-    return path
 endFunction
 
 ;                          Getters
@@ -477,7 +498,9 @@ endFunction
 function SetFloatOnReference(string asKey, string apReference, float afValue, string asCategory = "null") global
     string path = GetVarPathOnReference(asKey, apReference, asCategory)
     JDB.solveFltSetter(path, afValue, true)
-endFunction
+    Debug("StorageVars::SetFloatOnReference", "Setting " + asKey + " on "+ apReference +" with category " + asCategory + " to " + afValue + ": " + JDB.solveFltSetter(path, afValue, true))
+    Debug("StorageVars::SetFloatOnReference", "PATH: " + path)
+endFunction 
 
 function SetStringOnReference(string asKey, string apReference, string asValue, string asCategory = "null") global
     string path = GetVarPathOnReference(asKey, apReference, asCategory)

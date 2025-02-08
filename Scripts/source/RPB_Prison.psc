@@ -528,6 +528,18 @@ float property InfamyGainModifierKnown
     endFunction
 endProperty
 
+float property InfamyLostDailyOfCurrentInfamy
+    float function get()
+        return Config.GetInfamyLostFromCurrentInfamy(Hold)
+    endFunction
+endProperty
+
+int property InfamyLostDaily
+    int function get()
+        return Config.GetInfamyLost(Hold)
+    endFunction
+endProperty
+
 ;                          Frisking
 ; ==========================================================
 
@@ -1082,9 +1094,6 @@ Form[] function GetJailCells()
     ; Debug("("+ Name +") Prison::GetJailCells", __jailCells)
     return __jailCells
 endFunction
-; Form[] function GetJailCells()
-;     return RPB_Data.QueryFormArray(self.Children("Cells"), "*", "{ 'active': true }")
-; endFunction
 
 ;/
     Retrieves the jail cells that are currently empty.
@@ -2290,7 +2299,13 @@ event OnPrisonerReleased(RPB_Prisoner apPrisoner)
     self.RegisterPrisonerReleaseTimeStats(apPrisoner)
     self.ClearPrisonerBounty(apPrisoner)
 
+    self.OnPrisonerLeave(apPrisoner)
     apPrisoner.Destroy()
+endEvent
+
+event OnPrisonerLeave(RPB_Prisoner apPrisoner)
+    self.RegisterInfamyLost(apPrisoner.GetActor())
+    Debug("("+ Name +") Prison::OnPrisonerLeave", apPrisoner.Name + " has left the prison! (registering infamy time for state)")
 endEvent
 
 event OnPrisonerEscaped(RPB_Prisoner apPrisoner)
@@ -2299,8 +2314,8 @@ event OnPrisonerEscaped(RPB_Prisoner apPrisoner)
     apPrisoner.SetEscapePenalty()
     apPrisoner.RestoreBounty()
     ; apPrisoner.DEBUG_ShowHoldStats()
-
     apPrisoner.OnEscaped()
+    self.OnPrisonerLeave(apPrisoner)
 endEvent
 
 event OnPrisonerTeleportedToPrison(RPB_Prisoner apPrisoner)
@@ -2545,6 +2560,48 @@ event OnPrisonerLeaveCell(RPB_Prisoner apPrisoner, RPB_JailCell akJailCell)
 endEvent
 
 ; ==========================================================
+;                        Actor Specific
+; ==========================================================
+
+;/
+    Registers the infamy lost at this time for the specified Actor in the Prison.
+
+    Actor   @akActor: The Actor to register the lost infamy for.
+/;
+function RegisterInfamyLost(Actor akActor)
+    self.SetReferenceStateFloat(akActor, "infamy::lost_at", now())
+endFunction
+
+;/
+    Updates the infamy lost for the specified Actor in the Prison.
+
+    Actor   @akActor: The Actor to update the lost infamy for.
+/;
+function UpdateInfamyLost(Actor akActor)
+    float infamyLostAt = self.GetReferenceStateFloat(akActor, "infamy::lost_at")
+    
+    if (!infamyLostAt)
+        return
+    endif
+
+    int currentInfamy = RPB_ActorVars.GetCurrentInfamy(self.PrisonFaction, akActor)
+    float infamyLostFromCurrentInfamy = PercentToDecimal(self.InfamyLostDailyOfCurrentInfamy)
+    float timePassed = (now() - infamyLostAt)
+    float reduceBy = (timePassed * self.InfamyLostDaily) + (timePassed * infamyLostFromCurrentInfamy)
+    RPB_ActorVars.ModifyStat("Infamy Gained", self.PrisonFaction, akActor, -reduceBy)
+
+    ; Update with new time for next infamy reduction
+    self.RegisterInfamyLost(akActor)
+
+    Debug("("+ Name +") Prison::UpdateInfamyLost", "InfamyLostDaily: " + self.InfamyLostDaily + ", InfamyLostFromCurrentInfamy: " + infamyLostFromCurrentInfamy + ", TimePassed: " + timePassed + ", ReduceBy: " + reduceBy)
+    Debug("("+ Name +") Prison::UpdateInfamyLost", "InfamyLostAt: " + infamyLostAt + ", Now: " + now())
+endFunction
+
+function ClearActorInfamyState(Actor akActor)
+    self.RemoveReferenceState(akActor, "infamy::lost_at")
+endFunction
+
+; ==========================================================
 ;                          Management
 ; ==========================================================
 
@@ -2588,6 +2645,9 @@ int function GetDataObject(string asPrisonObjectCategory = "null")
     return returnedObject
 endFunction
 
+int function GetCellRootObject(RPB_JailCell akJailCell)
+    return self.Children("Cells//" + akJailCell)
+endFunction
 
 ;                       Global Root Properties                    
 ; =========================================================

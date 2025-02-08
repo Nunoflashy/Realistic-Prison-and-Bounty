@@ -128,6 +128,10 @@ Form[] function GetPropertyOfTypeFormArray(string asPropertyName)
     return RPB_Data.GetPropertyOfTypeFormArray(__internalSerializedRootObject(), asPropertyName)
 endFunction
 
+int function GetPropertyOfTypeObject(string asPropertyName)
+    return RPB_Data.GetPropertyOfTypeObject(__internalSerializedRootObject(), asPropertyName)
+endFunction
+
 
 ; ==========================================================
 ;                          Setters
@@ -397,6 +401,44 @@ Form[] function TryGetFormArray(string asProperty)
     endif
 
     return self.GetLocalPropertyOfTypeFormArray(asProperty, "Fallback")   
+endFunction
+
+; =========================================================
+;                       State Registry                      
+; =========================================================
+
+function SetReferenceStateInt(string asReference, string asStateProperty, int aiValue)
+    RPB_StorageVars.SetIntOnReference(asStateProperty, asReference, aiValue, UUID + "::State")
+endFunction
+
+function SetReferenceStateFloat(string asReference, string asStateProperty, float afValue)
+    RPB_StorageVars.SetFloatOnReference(asStateProperty, asReference, afValue, UUID + "::State")
+endFunction
+
+function SetReferenceStateString(string asReference, string asStateProperty, string asValue)
+    RPB_StorageVars.SetStringOnReference(asStateProperty, asReference, asValue, UUID + "::State")
+endFunction
+
+int function GetReferenceStateInt(string asReference, string asStateProperty)
+    return RPB_StorageVars.GetIntOnReference(asStateProperty, asReference, UUID + "::State")
+endFunction
+
+float function GetReferenceStateFloat(string asReference, string asStateProperty)
+    return RPB_StorageVars.GetFloatOnReference(asStateProperty, asReference, UUID + "::State")
+endFunction
+
+string function GetReferenceStateString(string asReference, string asStateProperty)
+    return RPB_StorageVars.GetStringOnReference(asStateProperty, asReference, UUID + "::State")
+endFunction
+
+function RemoveReferenceState(string asReference, string asStateProperty)
+    RPB_StorageVars.DeleteVariableOnReference(asStateProperty, asReference, UUID + "::State")
+
+    bool hasStates = RPB_StorageVars.HasVarsOnReference(asReference, UUID + "::State")
+
+    if (!hasStates)
+        RPB_StorageVars.DeleteCategoryOnReference(asReference, UUID + "::State")
+    endif
 endFunction
 
 ; ==========================================================
