@@ -1085,7 +1085,7 @@ int function GetSerializableRootObject()
     ; int prisonObject    = RPB_Data.Hold_GetJailObject(rootObject) ; JMap&
     ; return RPB_Data.GetPropertyOfTypeObject(prisonObject, "Cells//" + self)
 
-    return Prison.GetCellRootObject(self)
+    return Prison.Children("Cells//" + self)
 endFunction
 
 bool function HasOption(string asOption)

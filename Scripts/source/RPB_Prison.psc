@@ -1281,7 +1281,7 @@ RPB_JailCell function GetCellByID(string asCellIdentifier)
     ;     "[active: true]," + \ 
     ;     "[id: "+ asCellIdentifier +"]" \ 
     ; )
-    return RPB_Data.Jail_GetJailCellByID(self.GetDataObject(), asCellIdentifier)
+    return RPB_Data.Jail_GetJailCellByID(self.Root, asCellIdentifier)
 endFunction
 
 ;/
@@ -1506,7 +1506,8 @@ Form function GetPrisonerContainerLinkedWithOppositeType(Form akOppositeTypePris
         return none
     endif
 
-    int prisonerContainersObj = self.GetDataObject("Prisoner Containers") ; JMap&
+    ; int prisonerContainersObj = self.GetDataObject("Prisoner Containers") ; JMap&
+    int prisonerContainersObj = self.Children("Prisoner Containers") ; JMap&
 
     ; Get the opposite type of prisoner container
     string oppositeContainerType = string_if (asPrisonerContainerType == "Belongings", "Evidence", "Belongings")
@@ -1676,6 +1677,14 @@ bool function IsPrisoner(RPB_Prisoner apPrisoner)
     return Prisoners.Exists(apPrisoner)
 endFunction
 
+;/
+    Checks if there are any Prisoners in the Prison.
+    If a jail cell is passed in, then only check that cell for Prisoners.
+    
+    RPB_JailCell?    @akPrisonCell: The Jail Cell to check for Prisoners.
+    
+    returns (bool): True if there are prisoners in the Prison, further checking from their cell if one is passed in.
+/;
 bool function HasPrisoners(RPB_JailCell akPrisonCell = none)
     if (akPrisonCell)
         return akPrisonCell.HasPrisoners
@@ -1703,6 +1712,17 @@ bool function HasFemalePrisoners(RPB_JailCell akPrisonCell = none, bool abStrict
     return RPB_Utility.HasFemalesInList(Prisoners.GetActors(), abStrictlyFemales)
 endFunction
 
+;/
+    Checks if there are any Prisoners in the Prison who are male.
+    If a jail cell is passed in, then only check that cell for Males.
+    In case that @abStrictlyMales is true, checks if all of the Prisoners are Males.
+
+    RPB_JailCell?    @akPrisonCell: The Jail Cell to check for male prisoners.
+    bool             @abStrictlyMales: Checks if all of the Prisoners are Male.
+    
+    returns (bool): True if there are prisoners in the Prison who are male,
+        further checking from their cell if one is passed in.
+/;
 bool function HasMalePrisoners(RPB_JailCell akPrisonCell = none, bool abOnlyMales = false)
     if (akPrisonCell)
         return akPrisonCell.HasMales(abOnlyMales)
@@ -1711,6 +1731,18 @@ bool function HasMalePrisoners(RPB_JailCell akPrisonCell = none, bool abOnlyMale
     return RPB_Utility.HasMalesInList(Prisoners.GetActors(), abOnlyMales)
 endFunction
 
+;/
+    Checks if there are any Prisoners in the Prison who are of the specified gender.
+    If a jail cell is passed in, then only check that cell for Prisoners.
+    In case that @abOnlySpecifiedGender is true, checks if all of the Prisoners are of the specified gender.
+
+    RPB_JailCell?    @akPrisonCell: The Jail Cell to check for Prisoners.
+    string           @asGender: The gender to check for.
+    bool?            @abOnlySpecifiedGender: Checks if all of the Prisoners are of the specified gender.
+    
+    returns (bool): True if there are prisoners in the Prison who are of the specified gender,
+        further checking from their cell if one is passed in.
+/;
 bool function HasPrisonersOfGender(RPB_JailCell akPrisonCell = none, string asGender, bool abOnlySpecifiedGender = false)
     if (akPrisonCell)
         return akPrisonCell.HasPrisonersOfGender(asGender, abOnlySpecifiedGender)
@@ -1762,6 +1794,7 @@ endFunction
     float  @afPadding: The padding to remove from the sentence.
 
     returns (Form[]): A list of all prisoners with a base Sentence less than the specified sentence.
+        Each element is able to be cast to a RPB_Prisoner.
 /;
 Form[] function GetPrisonersWithSentenceLessThan(float afSentence, float afPadding = 0.0)
     int prisonersArray = FastArray("<Form>")
@@ -1805,6 +1838,14 @@ Form[] function GetPrisonersWithCurrentSentenceLessThan(float afSentence, float 
     return FastArray_ToFormArray(prisonersArray)
 endFunction
 
+;/
+    Returns a list of all prisoners.
+    If a jail cell is passed in, then only return the prisoners from that cell.
+
+    RPB_JailCell?    @akPrisonCell: The Jail Cell to check for Prisoners.
+
+    returns (Form[]): A list of all prisoners in the Prison.
+/;
 Form[] function GetPrisoners(RPB_JailCell akPrisonCell = none)
     if (akPrisonCell)
         return akPrisonCell.Prisoners
@@ -1813,6 +1854,14 @@ Form[] function GetPrisoners(RPB_JailCell akPrisonCell = none)
     return Prisoners.GetActors()
 endFunction
 
+;/
+    Returns a list of all female prisoners.
+    If a jail cell is passed in, then only return the female prisoners from that cell.
+
+    RPB_JailCell?    @akPrisonCell: The Jail Cell to check for Prisoners.
+
+    returns (Form[]): A list of all female prisoners in the Prison.
+/;
 Form[] function GetFemalePrisoners(RPB_JailCell akPrisonCell = none)
     if (akPrisonCell)
         return akPrisonCell.GetFemalePrisoners()
@@ -1821,6 +1870,14 @@ Form[] function GetFemalePrisoners(RPB_JailCell akPrisonCell = none)
     return RPB_Utility.GetFemalesInList(Prisoners.GetActors())
 endFunction
 
+;/
+    Returns a list of all male prisoners.
+    If a jail cell is passed in, then only return the male prisoners from that cell.
+
+    RPB_JailCell?    @akPrisonCell: The Jail Cell to check for Prisoners.
+
+    returns (Form[]): A list of all male prisoners in the Prison.
+/;
 Form[] function GetMalePrisoners(RPB_JailCell akPrisonCell = none)
     if (akPrisonCell)
         return akPrisonCell.GetMalePrisoners()
@@ -1829,6 +1886,13 @@ Form[] function GetMalePrisoners(RPB_JailCell akPrisonCell = none)
     return RPB_Utility.GetMalesInList(Prisoners.GetActors())
 endFunction
 
+;/
+    Returns a list of all cell mates of the specified prisoner.
+
+    RPB_Prisoner @apPrisoner: The prisoner to check for cell mates.
+
+    returns (Form[]): A list of all cell mates of the specified prisoner.
+/;
 Form[] function GetCellMates(RPB_Prisoner apPrisoner)
     RPB_JailCell jailCell   = apPrisoner.JailCell
     Form[] prisonersInCell  = jailCell.Prisoners
@@ -2620,33 +2684,6 @@ bool function BindCellToPrisoner(ObjectReference akJailCell, RPB_Prisoner apPris
     jailCell.DetermineGoodies()
 
     return true
-endFunction
-
-; =========================================================
-;                         Data Config                      
-; =========================================================
-
-;/
-    Retrieves the Prison's data object.
-
-    string? @asPrisonObjectCategory: The category of object to get from the Prison object (e.g: Cells).
-
-    returns (any& <JContainer>): The reference to the Prison data object, or an object inside the Prison object if a category is specified.
-/;
-int function GetDataObject(string asPrisonObjectCategory = "null")
-    int rootObject      = RPB_Data.GetRootObject(self.Hold)             ; JMap&
-    int prisonObject    = RPB_Data.Hold_GetJailObject(rootObject)       ; JMap&
-    int returnedObject  = prisonObject
-
-    if (asPrisonObjectCategory != "null")
-        returnedObject = JMap.getObj(prisonObject, asPrisonObjectCategory) ; any& <JContainer>
-    endif
-    
-    return returnedObject
-endFunction
-
-int function GetCellRootObject(RPB_JailCell akJailCell)
-    return self.Children("Cells//" + akJailCell)
 endFunction
 
 ;                       Global Root Properties                    

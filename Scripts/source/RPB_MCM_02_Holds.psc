@@ -54,6 +54,8 @@ function RenderPrisons(RPB_MCM_02 mcm) global
 
     Actor player = Game.GetForm(0x14) as Actor
 
+    RefreshActorUI(holdPrison, player)
+
     mcm.SetCursorFillMode(mcm.TOP_TO_BOTTOM)
     ; ==========================================================
     ;                           Left
@@ -230,4 +232,8 @@ endFunction
 function RefreshPrisonerUI(RPB_Prisoner apPrisoner) global
     apPrisoner.UpdateTimeJailed()
     apPrisoner.UpdateInfamy()
+endFunction
+
+function RefreshActorUI(RPB_Prison apPrison, Actor akActor) global
+    apPrison.UpdateInfamyLost(akActor)
 endFunction
