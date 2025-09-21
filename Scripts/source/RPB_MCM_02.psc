@@ -14,6 +14,11 @@ bool property ENABLE_TRACE  = false autoreadonly
 int property OPTION_ENABLED  = 0x00 autoreadonly
 int property OPTION_DISABLED = 0x01 autoreadonly
 
+; MCM Page Names
+string property MCM_PAGE_CHECK_ARRESTEE_INFO = "Check Arrestee" autoreadonly
+string property MCM_PAGE_CHECK_PRISONER_INFO = "Check Prisoner" autoreadonly
+string property MCM_PAGE_CHECK_HOLD_INFO_FOR_ACTOR = "Check Hold Info for Actor" autoreadonly
+
 ; ==========================================================
 ;                     Script References
 ; ==========================================================
@@ -179,9 +184,9 @@ function InitializePages()
     Pages = String_Explode( \ 
         String_Implode(Holds) + "," + \
         string_if (API.Arrest.Arrestees.Count > 0 || API.PrisonManager.HasPrisonsWithPrisoners, PAGE_SEPARATOR) + \
-        string_if (API.Arrest.Arrestees.Count > 0, "Check Arrestee" + ",")+ \
-        string_if (API.PrisonManager.HasPrisonsWithPrisoners, "Check Prisoner" + ",")+ \
-        string_if (API.PrisonManager.HasPrisonsWithPrisoners, "Check Hold Info for Prisoner") \
+        string_if (API.Arrest.Arrestees.Count > 0, MCM_PAGE_CHECK_ARRESTEE_INFO + ",")+ \
+        string_if (API.PrisonManager.HasPrisonsWithPrisoners, MCM_PAGE_CHECK_PRISONER_INFO + ",")+ \
+        string_if (API.PrisonManager.HasPrisonsWithPrisoners, MCM_PAGE_CHECK_HOLD_INFO_FOR_ACTOR) \
     )
 endFunction
 
@@ -192,18 +197,91 @@ int property PLAYER_INFO_PRISONER = 2 autoreadonly
 int function GetPlayerArrestStatus()
     Actor player = Game.GetForm(0x14) as Actor
 
-    bool isImprisoned = RPB_StorageVars.GetBoolOnForm("Imprisoned", player, "Jail")
+    bool isImprisoned = RPB_StorageVars.GetBoolOnReference("Imprisoned", player, "Jail")
     if (isImprisoned)
         return PLAYER_INFO_PRISONER
     endif
 
-    bool isArrested = RPB_StorageVars.GetBoolOnForm("Arrested", player, "Arrest")
+    bool isArrested = RPB_StorageVars.GetBoolOnReference("Arrested", player, "Arrest")
     if (isArrested)
         return PLAYER_INFO_ARRESTED
     endif
 
     return PLAYER_INFO_NONE
 endFunction
+
+function RenderDefaultPage()
+    int playerArrestStatus = self.GetPlayerArrestStatus()
+    Actor player = Game.GetForm(0x14) as Actor
+
+    if (playerArrestStatus == PLAYER_INFO_PRISONER)
+        RPB_Prison playerPrison = PrisonManager.FindPrisonByPrisoner(player)
+        if (playerPrison == none)
+            return ; No Prison
+        endif
+
+        RPB_Prisoner playerPrisoner = playerPrison.GetPrisonerReference(player)
+        if (playerPrisoner == none)
+            return ; No Prisoner
+        endif
+
+        RPB_MCM_02_Prison.Render(self, playerPrisoner)
+
+    elseif (playerArrestStatus == PLAYER_INFO_ARRESTED)
+        RPB_Arrestee playerArresteeRef = API.Arrest.AwaitArresteeReference(player)
+        RPB_MCM_02_Prison.RenderArrest(self, playerArresteeRef)
+    endif
+endFunction
+
+function RenderSelectedActorHoldInfo()
+    RPB_UIInterface uilib = (Game.GetForm(0x14) as Form) as RPB_UIInterface
+
+    RPB_Prison selectedPrison = uilib.ShowPrisonList(abSkipListOnSingleResult = true)
+    if (selectedPrison == none)
+        return
+    endif
+
+    RPB_Prisoner selectedPrisoner = uilib.ShowPrisonerList(selectedPrison, true, "Select Prisoner in " + selectedPrison.Name)
+    if (selectedPrisoner == none)
+        return
+    endif
+
+    RPB_MCM_02_Holds.NPC_RenderPrisons(self, selectedPrisoner)
+endFunction
+
+function RenderSelectedArresteeInfo()
+    RPB_UIInterface uilib = (Game.GetForm(0x14) as Form) as RPB_UIInterface
+    string selectedHold = uilib.ShowHoldList(abMustHaveArrestees = true, abSkipListOnSingleResult = true, asListTitle = "Select Arrest Hold")
+
+    if (!selectedHold)
+        return
+    endif
+
+    RPB_Arrestee selectedArrestee = uilib.ShowArresteeList(selectedHold, asListTitle = "Select Arrestee for " + selectedHold)
+    if (selectedArrestee == none)
+        return
+    endif
+
+    RPB_MCM_02_Prison.RenderArrest(self, selectedArrestee)
+endFunction
+
+function RenderSelectedPrisonerInfo()
+    RPB_UIInterface uilib = (Game.GetForm(0x14) as Form) as RPB_UIInterface
+
+    RPB_Prison selectedPrison = uilib.ShowPrisonList(abSkipListOnSingleResult = true)
+    if (selectedPrison == none)
+        return
+    endif
+
+    RPB_Prisoner selectedPrisoner = uilib.ShowPrisonerList(selectedPrison, true, "Select Prisoner in " + selectedPrison.Name)
+    if (selectedPrisoner == none)
+        return
+    endif
+
+    RPB_MCM_02_Prison.Render(self, selectedPrisoner)
+endFunction
+
+
 
 ; ============================================================================
 ; Event Handling
@@ -215,79 +293,28 @@ event OnConfigInit()
 endEvent
 
 event OnConfigOpen()
+    Debug("PrisonManager::InitializePages", "Holds: " + Holds)
+
     self.InitializePages()
 endEvent
 
 event OnPageReset(string page)
     if (page == "")
-        int playerArrestStatus = self.GetPlayerArrestStatus()
-        Actor player = Game.GetForm(0x14) as Actor
-
-        if (playerArrestStatus == PLAYER_INFO_PRISONER)
-            RPB_Prison playerPrison = PrisonManager.FindPrisonByPrisoner(player)
-            if (playerPrison == none)
-                return ; No Prison
-            endif
-    
-            RPB_Prisoner playerPrisoner = playerPrison.GetPrisonerReference(player)
-            if (playerPrisoner == none)
-                return ; No Prisoner
-            endif
-
-            RPB_MCM_02_Prison.Render(self, playerPrisoner)
-
-        elseif (playerArrestStatus == PLAYER_INFO_ARRESTED)
-            RPB_Arrestee playerArresteeRef = API.Arrest.AwaitArresteeReference(player)
-            RPB_MCM_02_Prison.RenderArrest(self, playerArresteeRef)
-        endif
-
-    elseif (page == "Check Arrestee")
-        RPB_UIInterface uilib = (Game.GetForm(0x14) as Form) as RPB_UIInterface
-        string selectedHold = uilib.ShowHoldList(abMustHaveArrestees = true, abSkipListOnSingleResult = true, asListTitle = "Select Arrest Hold")
-
-        if (!selectedHold)
-            return
-        endif
-
-        RPB_Arrestee selectedArrestee = uilib.ShowArresteeList(selectedHold, asListTitle = "Select Arrestee for " + selectedHold)
-        if (selectedArrestee == none)
-            return
-        endif
-
-        RPB_MCM_02_Prison.RenderArrest(self, selectedArrestee)
+        self.RenderDefaultPage()
         return
 
-    elseif (page == "Check Prisoner")
+    elseif (page == MCM_PAGE_CHECK_ARRESTEE_INFO)
+        self.RenderSelectedArresteeInfo()
+        return
+
+    elseif (page == MCM_PAGE_CHECK_PRISONER_INFO)
         RPB_Utility.Debug("MCM_02::OnPageReset", "Page: " + page + " - Check Prisoner")
-        RPB_UIInterface uilib = (Game.GetForm(0x14) as Form) as RPB_UIInterface
-
-        RPB_Prison selectedPrison = uilib.ShowPrisonList(abSkipListOnSingleResult = true)
-        if (selectedPrison == none)
-            return
-        endif
-
-        RPB_Prisoner selectedPrisoner = uilib.ShowPrisonerList(selectedPrison, true, "Select Prisoner in " + selectedPrison.Name)
-        if (selectedPrisoner == none)
-            return
-        endif
-
-        RPB_MCM_02_Prison.Render(self, selectedPrisoner)
+        self.RenderSelectedPrisonerInfo()
         return
 
-    elseif (page == "Check Hold Info for Prisoner")
-        RPB_UIInterface uilib = (Game.GetForm(0x14) as Form) as RPB_UIInterface
-
-        RPB_Prison selectedPrison = uilib.ShowPrisonList(abSkipListOnSingleResult = true)
-        if (selectedPrison == none)
-            return
-        endif
-
-        RPB_Prisoner selectedPrisoner = uilib.ShowPrisonerList(selectedPrison, true, "Select Prisoner in " + selectedPrison.Name)
-        if (selectedPrisoner == none)
-            return
-        endif
-
-        RPB_MCM_02_Holds.NPC_RenderPrisons(self, selectedPrisoner)
+    elseif (page == MCM_PAGE_CHECK_HOLD_INFO_FOR_ACTOR)
+        self.RenderSelectedActorHoldInfo()
+        return
     endif
 
     RPB_MCM_02_Holds.Render(self)

@@ -700,13 +700,17 @@ event OnPrisonScene(string asScene, string asSceneEvent, RPB_Prison apPrison, RP
         endif
 
     elseif (sceneType == SceneManager.CATEGORY_CLOTHING)
+        Actor clothingGiver = akAuthority
+
         if (asSceneEvent == SceneManager.EVENT_CLOTHING_BEGIN)
+            apPrison.OnPrisonerClothingBegin(apPrisoner, clothingGiver)
 
         elseif (asSceneEvent == SceneManager.EVENT_CLOTHING)
+            apPrison.OnPrisonerClothingOngoing(apPrisoner, clothingGiver)
 
         elseif (asSceneEvent == SceneManager.EVENT_CLOTHING_END)
-            ReleaseAI(apPrisoner.IsPlayer())
-
+            ; ReleaseAI(apPrisoner.IsPlayer())
+            apPrison.OnPrisonerClothingEnd(apPrisoner, clothingGiver)
         endif
 
     elseif (sceneType == SceneManager.CATEGORY_NO_CLOTHING)

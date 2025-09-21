@@ -72,6 +72,10 @@ RPB_PackageGroup function GetCellPackageGroupEx(string questPackageID) global
     return FastMap_GetForm(packages, packageID) as RPB_PackageGroup
 endFunction
 
+WICourierScript function GetCourierQuest() global
+    return Game.GetFormEx(0x39F82) as WICourierScript
+endFunction
+
 ; Quest function GetCellPackageGroup() global
 ;     ; return GetFormFromMod(0x1F8CC) as Quest
 ;     return GetFormFromMod(0x21916) as Quest
@@ -267,6 +271,17 @@ function LogNoType(string asLogInfo, string asCaller = "", bool abCondition = tr
     endif
 
     debug.trace("["+ ModName() +"] " + asLogInfo)
+endFunction
+
+function LogException(string asExceptionType, string asExceptionMessage, string asCaller = "", bool abCondition = true) global
+    if (!abCondition)
+        return
+    endif
+
+    string caller = string_if (asCaller, asCaller + "() -> ", "")
+    ; debug.trace("["+ ModName() +"] " + caller + asExceptionMessage)
+    debug.trace("["+ ModName() +"] [" + asExceptionType + "]: " + caller + asExceptionMessage)
+
 endFunction
 
 function Info(string asLogInfo, bool abCondition = true) global
@@ -800,19 +815,19 @@ endFunction
 ; ==========================================================
 
 bool function IsActorArrested(Actor akActor) global
-    return RPB_StorageVars.GetBoolOnForm("Arrested", akActor, "Arrest")
+    return RPB_StorageVars.GetBoolOnReference("Arrested", akActor, "Arrest")
 endFunction
 
 bool function IsActorImprisoned(Actor akActor) global
-    return RPB_StorageVars.GetBoolOnForm("Imprisoned", akActor, "Jail")
+    return RPB_StorageVars.GetBoolOnReference("Imprisoned", akActor, "Jail")
 endFunction
 
 bool function IsPlayerArrested() global
-    return RPB_StorageVars.GetBoolOnForm("Arrested", Game.GetForm(0x14))
+    return RPB_StorageVars.GetBoolOnReference("Arrested", Game.GetForm(0x14))
 endFunction
 
 bool function IsPlayerImprisoned() global
-    return RPB_StorageVars.GetBoolOnForm("Imprisoned", Game.GetForm(0x14))
+    return RPB_StorageVars.GetBoolOnReference("Imprisoned", Game.GetForm(0x14))
 endFunction
 
 ;/
@@ -828,7 +843,7 @@ Faction function GetCrimeFactionByHold(string asHold) global
 endFunction
 
 bool function WasPlayerLastJailedInHold(Faction akCrimeFaction) global
-    return RPB_StorageVars.HasVarOnForm("Last Jailed - Prison", akCrimeFaction, "PrisonLastJailed")
+    return RPB_StorageVars.HasVarOnReference("Last Jailed - Prison", akCrimeFaction, "PrisonLastJailed")
 endFunction
 
 int function GetPlayerPrisonLastJailedTime(string asTimeType, Faction akCrimeFaction) global
@@ -836,7 +851,7 @@ int function GetPlayerPrisonLastJailedTime(string asTimeType, Faction akCrimeFac
         return -1
     endif
 
-    return RPB_StorageVars.GetIntOnForm("Last Jailed - " + asTimeType, akCrimeFaction, "PrisonLastJailed")
+    return RPB_StorageVars.GetIntOnReference("Last Jailed - " + asTimeType, akCrimeFaction, "PrisonLastJailed")
 endFunction
 
 int function GetPlayerPrisonLastReleasedTime(string asTimeType, Faction akCrimeFaction) global
@@ -844,7 +859,7 @@ int function GetPlayerPrisonLastReleasedTime(string asTimeType, Faction akCrimeF
         return -1
     endif
 
-    return RPB_StorageVars.GetIntOnForm("Last Released - " + asTimeType, akCrimeFaction, "PrisonLastReleased")
+    return RPB_StorageVars.GetIntOnReference("Last Released - " + asTimeType, akCrimeFaction, "PrisonLastReleased")
 endFunction
 
 int function GetPlayerPrisonLastEscapedTime(string asTimeType, Faction akCrimeFaction) global
@@ -852,7 +867,7 @@ int function GetPlayerPrisonLastEscapedTime(string asTimeType, Faction akCrimeFa
         return -1
     endif
 
-    return RPB_StorageVars.GetIntOnForm("Last Escaped - " + asTimeType, akCrimeFaction, "PrisonLastEscaped")
+    return RPB_StorageVars.GetIntOnReference("Last Escaped - " + asTimeType, akCrimeFaction, "PrisonLastEscaped")
 endFunction
 
 ; ==========================================================
@@ -1185,7 +1200,7 @@ function EnsureArresteeSpellAndBinding(Actor akArrestee, RPB_Hold apHold) global
 
         if (apHold)
             ; Bind this Hold to the Arrestee (to retrieve it from RPB_Arrestee)
-            RPB_StorageVars.SetStringOnForm("Hold UUID", akArrestee, apHold.UUID, "Arrest")
+            RPB_StorageVars.SetStringOnReference("Hold UUID", akArrestee, apHold.UUID, "Arrest")
         endif
     endif
 endFunction
@@ -1203,7 +1218,7 @@ function EnsurePrisonerSpellAndBinding(Actor akPrisoner, RPB_Prison apPrison) gl
 
         if (apPrison)
             ; Bind this Prison to the Prisoner (to retrieve it from RPB_Prisoner)
-            RPB_StorageVars.SetStringOnForm("Prison UUID", akPrisoner, apPrison.UUID, "Jail")        
+            RPB_StorageVars.SetStringOnReference("Prison UUID", akPrisoner, apPrison.UUID, "Jail")        
         endif
     endif
 endFunction

@@ -115,7 +115,7 @@ bool function AwaitPrisonerImprisonment(RPB_Prisoner apPrisoner)
 
     ; self.PassDaysForPrisoner(apPrisoner, daysElapsedSinceLastUpdate)
 
-    ; Debug("PrisonMonitor::AwaitPrisonerImprisonment", "("+ apPrisoner.Name +") Time Jailed: " + RPB_StorageVars.GetFloatOnForm(Prison.Hold + "::Time Jailed", apPrisoner.GetActor(), "ActorVars") + " | Current Time Served: " + currentTimeServed + " | Previous Time Served: " + apPrisoner.PreviousUpdateTimeServed + " | Days Elapsed: " + daysElapsedSinceLastUpdate)
+    ; Debug("PrisonMonitor::AwaitPrisonerImprisonment", "("+ apPrisoner.Name +") Time Jailed: " + RPB_StorageVars.GetFloatOnReference(Prison.Hold + "::Time Jailed", apPrisoner.GetActor(), "ActorVars") + " | Current Time Served: " + currentTimeServed + " | Previous Time Served: " + apPrisoner.PreviousUpdateTimeServed + " | Days Elapsed: " + daysElapsedSinceLastUpdate)
     ; apPrisoner.PreviousUpdateTimeServed = apPrisoner.TimeServed
 
     self.UpdatePrisonersStats()
@@ -151,12 +151,12 @@ function AwaitPrisoners()
         else
             ; prisoner.UpdateTimeJailed()
             ; Debug("PrisonMonitor::AwaitPrisoners", "("+ prisoner.Name +") Time Jailed: " + prisoner.QueryStat("Time Jailed"))
-            ; Debug("PrisonMonitor::AwaitPrisoners", "("+ prisoner.Name +") Time Jailed: " + RPB_StorageVars.GetFloatOnForm(Prison.Hold + "::Time Jailed", prisoner.GetActor(), "ActorVars"))
+            ; Debug("PrisonMonitor::AwaitPrisoners", "("+ prisoner.Name +") Time Jailed: " + RPB_StorageVars.GetFloatOnReference(Prison.Hold + "::Time Jailed", prisoner.GetActor(), "ActorVars"))
         endif
 
         ; Debug("PrisonMonitor::AwaitPrisoners", "("+ prisoner.Name +") [Before Update Time Jailed] Sentence - Time Left: " + (prisoner.Sentence - prisoner.TimeLeftInSentence))
         ; prisoner.UpdateTimeJailed()
-        ; Debug("PrisonMonitor::AwaitPrisoners", "("+ prisoner.Name +") Time Jailed: " + RPB_StorageVars.GetFloatOnForm(Prison.Hold + "::Time Jailed", prisoner.GetActor(), "ActorVars"))
+        ; Debug("PrisonMonitor::AwaitPrisoners", "("+ prisoner.Name +") Time Jailed: " + RPB_StorageVars.GetFloatOnReference(Prison.Hold + "::Time Jailed", prisoner.GetActor(), "ActorVars"))
         ; Debug("PrisonMonitor::AwaitPrisoners", "("+ prisoner.Name +") Sentence - Time Left: " + (prisoner.Sentence - prisoner.TimeLeftInSentence))
         i += 1
     endWhile

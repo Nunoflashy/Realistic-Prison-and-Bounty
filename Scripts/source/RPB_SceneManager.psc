@@ -932,7 +932,7 @@ function SetPackageLockOnActor(Actor akActor)
     ; Debug("SceneManager::SetPackageLockOnActor", "Alias: " + packageLock + ", ID: " + packageLock.GetID())
 
     BindAliasTo(packageLock, akActor)
-    RPB_StorageVars.SetIntOnForm("Package Lock", akActor, packageLock.GetID())
+    RPB_StorageVars.SetIntOnReference("Package Lock", akActor, packageLock.GetID())
     EventManager.SendInfo("Bound package lock to Actor " + akActor + " successfully!", "SceneManager::SetPackageLockOnActor")
 endFunction
 
@@ -941,7 +941,7 @@ endFunction
     Actor   @akActor: The actor to unset the package lock from.
 /;
 function UnsetPackageLockOnActor(Actor akActor)
-    int packageId = RPB_StorageVars.GetIntOnForm("Package Lock", akActor)
+    int packageId = RPB_StorageVars.GetIntOnReference("Package Lock", akActor)
     ReferenceAlias packageLock = self.GetAliasByID(packageId) as ReferenceAlias
 
     if (packageId && !packageLock)
@@ -950,7 +950,7 @@ function UnsetPackageLockOnActor(Actor akActor)
     endif
 
     UnbindAlias(packageLock)
-    RPB_StorageVars.DeleteVariableOnForm("Package Lock", akActor)
+    RPB_StorageVars.DeleteVariableOnReference("Package Lock", akActor)
     EventManager.SendInfo("Unbound package lock from Actor " + akActor + " successfully!", "SceneManager::UnsetPackageLockOnActor")
 endFunction
 
@@ -1432,6 +1432,16 @@ event OnSceneEnd(string name, Scene sender)
         endif
 
         EventManager.SendPrisonSceneBulkEvent(name, EVENT_STRIP_END, prisoners, guard, secondaryEvent)
+
+    elseif (type == CATEGORY_CLOTHING)
+        Actor guard      = self.GetSceneNthReferenceOfType(name, "Guard") as Actor
+        Actor prisoner = self.GetSceneNthReferenceOfType(name, "Prisoner") as Actor
+
+        if (name == SCENE_GIVE_CLOTHING)
+            
+        endif
+
+        EventManager.SendPrisonSceneEvent(name, EVENT_CLOTHING_END, prisoner, guard)
 
     elseif (type == CATEGORY_SURRENDER)
         Actor surrendererCaptor = self.GetSceneNthReferenceOfType(name, "SurrendererCaptor") as Actor

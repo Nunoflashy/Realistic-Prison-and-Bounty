@@ -701,7 +701,7 @@ function Initialize(RPB_Prison apPrison)
     ; self.SetFallbackID(self)
     ; self.SetFallbackName(self)
     ; Set the persistent Prison UUID
-    ; RPB_StorageVars.SetStringOnForm("Prison UUID", self, apPrison.UUID)
+    ; RPB_StorageVars.SetStringOnReference("Prison UUID", self, apPrison.UUID)
 
     ; if (self.GetFormID() == GetFormFromMod(0x25F49).GetFormID())
     ;     Debug("["+ apPrison.Name +"] ["+ self +"] JailCell::Initialize", "Contents: " + GetContainerList(self.GetSerializableRootObject()))

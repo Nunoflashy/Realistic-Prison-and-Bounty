@@ -692,8 +692,8 @@ state Imprisoned
         endif
 
         ; Debug("("+ Name +") Prisoner::OnUpdateGameTime", "this: " + this)
-        ; Debug("("+ Name +") Prisoner::OnUpdateGameTime", "ActorVars: " + GetContainerList(RPB_StorageVars.GetObjectHandleOnForm(this, "ActorVars")))
-        Debug("("+ Name +") Prisoner::OnUpdateGameTime", "Time Jailed: " + RPB_StorageVars.GetFloatOnForm(Prison.Hold + "::Time Jailed", this, "ActorVars"))
+        ; Debug("("+ Name +") Prisoner::OnUpdateGameTime", "ActorVars: " + GetContainerList(RPB_StorageVars.GetObjectHandleOnReference(this, "ActorVars")))
+        Debug("("+ Name +") Prisoner::OnUpdateGameTime", "Time Jailed: " + RPB_StorageVars.GetFloatOnReference(Prison.Hold + "::Time Jailed", this, "ActorVars"))
 
         Prison.DEBUG_ShowPrisonerSentenceInfo(self, true)
         ; Debug("["+ Name +"] Prisoner::OnUpdateGameTime", "("+ self.GetActor() +") Cell Package: " + self.CellPackage)
@@ -1335,6 +1335,10 @@ function DetermineClothingOutfit()
         __prisonOutfit = Prison.GetDefaultOutfit()
         outfitType = OUTFIT_FALLBACK
     endif
+
+    ; EventManager.SendInfo("Determining Clothing Outfit" "("+ Name +") Prisoner::DetermineClothingOutfit")
+    Config.NotifyJail("Determining Clothing Outfit")
+
 
     ; Debug( \ 
     ;     "("+ Name +") Prisoner::DetermineClothingOutfit", \ 
@@ -1989,11 +1993,11 @@ endFunction
 
 float property PreviousUpdateTimeServed
     float function get()
-        return RPB_StorageVars.GetFloatOnForm("Previous Update Time Served", this, "Temporary")
+        return RPB_StorageVars.GetFloatOnReference("Previous Update Time Served", this, "Temporary")
     endFunction
 
     function set(float value)
-        RPB_StorageVars.SetFloatOnForm("Previous Update Time Served", this, value, "Temporary")
+        RPB_StorageVars.SetFloatOnReference("Previous Update Time Served", this, value, "Temporary")
     endFunction
 endProperty
 
@@ -2088,9 +2092,9 @@ function Destroy()
     self.RemoveAll()
     parent.Destroy()
     ; self.Remove("Is Initialized", "Actor")
-    ; RPB_StorageVars.SetBoolOnForm("Is Initialized", this, false, "Actor")
+    ; RPB_StorageVars.SetBoolOnReference("Is Initialized", this, false, "Actor")
 
-    ; Debug("("+ Name +") Prisoner::Destroy", "Object: " + GetContainerList(RPB_StorageVars.GetObjectHandleOnForm(this)))
+    ; Debug("("+ Name +") Prisoner::Destroy", "Object: " + GetContainerList(RPB_StorageVars.GetObjectHandleOnReference(this)))
     ; TODO: Unset all properties related to this Prisoner
     Prison.UnregisterPrisoner(self)
 endFunction
