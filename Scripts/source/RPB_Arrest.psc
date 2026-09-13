@@ -126,11 +126,51 @@ RPB_CaptorList property Captors
     endFunction
 endProperty
 
+; =========================================================
+;                       State Registry                      
+; =========================================================
+
+function SetReferenceStateInt(string asReference, string asStateProperty, int aiValue)
+    RPB_StorageVars.SetIntOnReference(asStateProperty, asReference, aiValue, "Arrest::State")
+endFunction
+
+function SetReferenceStateFloat(string asReference, string asStateProperty, float afValue)
+    RPB_StorageVars.SetFloatOnReference(asStateProperty, asReference, afValue, "Arrest::State")
+endFunction
+
+function SetReferenceStateString(string asReference, string asStateProperty, string asValue)
+    RPB_StorageVars.SetStringOnReference(asStateProperty, asReference, asValue, "Arrest::State")
+endFunction
+
+int function GetReferenceStateInt(string asReference, string asStateProperty)
+    return RPB_StorageVars.GetIntOnReference(asStateProperty, asReference, "Arrest::State")
+endFunction
+
+float function GetReferenceStateFloat(string asReference, string asStateProperty)
+    return RPB_StorageVars.GetFloatOnReference(asStateProperty, asReference, "Arrest::State")
+endFunction
+
+string function GetReferenceStateString(string asReference, string asStateProperty)
+    return RPB_StorageVars.GetStringOnReference(asStateProperty, asReference, "Arrest::State")
+endFunction
+
+function RemoveReferenceState(string asReference, string asStateProperty)
+    RPB_StorageVars.DeleteVariableOnReference(asStateProperty, asReference, "Arrest::State")
+
+    bool hasStates = RPB_StorageVars.HasVarsOnReference(asReference, "Arrest::State")
+
+    if (!hasStates)
+        RPB_StorageVars.DeleteCategoryOnReference(asReference, "Arrest::State")
+    endif
+endFunction
+
+; ==========================================================
+;                   Config-specific Methods
+; ==========================================================
+
 ; ==========================================================
 ;                   Actor-specific Methods
 ; ==========================================================
-
-
 
 ; ==========================================================
 ;                  Arrestee-specific Methods
@@ -442,7 +482,7 @@ event OnArrestEludeTriggered(Actor akEludedGuard, string asEludeType)
 endEvent
 
 event OnArrestResist(Actor akArrestResister, Actor akGuard, Faction akCrimeFaction)
-    bool isCaptured = RPB_StorageVars.GetBoolOnForm("Captured", akArrestResister, "Arrest")
+    bool isCaptured = RPB_StorageVars.GetBoolOnReference("Captured", akArrestResister, "Arrest")
     if (isCaptured)
         EventManager.SendWarning(akArrestResister.GetBaseObject().GetName() + " was arrested, no arrest was resisted (maybe multiple guards talked at once and triggered resist arrest?) [BUG]", "Arrest::OnArrestResist")
         return
@@ -535,7 +575,7 @@ event OnCombatYield(Actor akGuard, Actor akYieldedArrestee)
     ; this is to avoid Guards triggering their dialogue while the player has already ran away.
     if (akYieldedArrestee.GetDistance(akGuard) <= 1200)
         ; ArrestVars.SetString("Arrest::Arrest Scene", "ArrestStartFree01")
-        RPB_StorageVars.SetStringOnForm("Arrest Scene", akYieldedArrestee, "ArrestStartFree01", "Arrest")
+        RPB_StorageVars.SetStringOnReference("Arrest Scene", akYieldedArrestee, "ArrestStartFree01", "Arrest")
         akGuard.SendModEvent("RPB_ArrestBegin", ARREST_TYPE_ESCORT_TO_JAIL, akYieldedArrestee.GetFormID())
     endif
 endEvent
@@ -562,7 +602,7 @@ endEvent
 event OnArrestSceneChanged(Actor akArrestee, string asSceneName)
     if (akArrestee == Config.Player)
         ; ArrestVars.SetString("Arrest::Scene", asSceneName)
-        RPB_StorageVars.SetStringOnForm("Scene", akArrestee, asSceneName, "Arrest")
+        RPB_StorageVars.SetStringOnReference("Scene", akArrestee, asSceneName, "Arrest")
     endif
 endEvent
 
@@ -575,7 +615,7 @@ endEvent
 /;
 event OnArrestGoalChanged(Actor akArrestee, string asOldArrestGoal, string asNewArrestGoal)
     ; ArrestVars.SetString("Arrest::Arrest Goal", asNewArrestGoal)
-    RPB_StorageVars.SetStringOnForm("Arrest Goal", akArrestee, asNewArrestGoal, "Arrest")
+    RPB_StorageVars.SetStringOnReference("Arrest Goal", akArrestee, asNewArrestGoal, "Arrest")
     ; Debug("Arrest::OnArrestGoalChanged", "Arrest Goal for Actor " + akArrestee + " was set to " + asNewArrestGoal, asOldArrestGoal == "")
     ; Debug("Arrest::OnArrestGoalChanged", "Arrest Goal for Actor " + akArrestee + " was changed from " + asOldArrestGoal + " to " + asNewArrestGoal, asOldArrestGoal != "")
 endEvent
@@ -1035,7 +1075,7 @@ function ResetEludedFlag()
     Debug("Arrest::ResetEludedFlag", "This is called")
     RPB_StorageVars.DeleteCategoryOnReference(referenceKey, "Pre-Arrest")
     EventManager.SendInfo("The eluding arrest flags have been reset.")
-    EventManager.SendInfo("Elude Arrest: " + GetContainerList(RPB_StorageVars.GetObjectHandleOnKey(Config.Player, "Pre-Arrest")))
+    EventManager.SendInfo("Elude Arrest: " + GetContainerList(RPB_StorageVars.GetObjectHandleOnReference(Config.Player, "Pre-Arrest")))
 
 endFunction
 
@@ -1079,10 +1119,10 @@ function ApplyArrestDefeatedPenalty(Faction akArrestFaction)
     ; ArrestVars.SetBool("Arrest::Defeated", true)
 
     ; TODO: Fix this
-    ; RPB_StorageVars.SetIntOnForm("Additional Bounty when Defeated", Config.Player, Config.GetArrestAdditionalBountyDefeatedFlat(hold), "Arrest")
-    ; RPB_StorageVars.SetFloatOnForm("Additional Bounty when Defeated from Current Bounty", Config.Player, Config.GetArrestAdditionalBountyDefeatedFromCurrentBounty(hold), "Arrest")
-    ; RPB_StorageVars.SetIntOnForm("Bounty for Defeat", Config.Player, int_if (ArrestVars.DefeatedAdditionalBountyPercentage > 0, round(akArrestFaction.GetCrimeGold() * ArrestVars.DefeatedAdditionalBountyPercentage)) + ArrestVars.DefeatedAdditionalBounty, "Arrest")
-    ; RPB_StorageVars.SetBoolOnForm("Defeated", Config.Player, true, "Arrest")
+    ; RPB_StorageVars.SetIntOnReference("Additional Bounty when Defeated", Config.Player, Config.GetArrestAdditionalBountyDefeatedFlat(hold), "Arrest")
+    ; RPB_StorageVars.SetFloatOnReference("Additional Bounty when Defeated from Current Bounty", Config.Player, Config.GetArrestAdditionalBountyDefeatedFromCurrentBounty(hold), "Arrest")
+    ; RPB_StorageVars.SetIntOnReference("Bounty for Defeat", Config.Player, int_if (ArrestVars.DefeatedAdditionalBountyPercentage > 0, round(akArrestFaction.GetCrimeGold() * ArrestVars.DefeatedAdditionalBountyPercentage)) + ArrestVars.DefeatedAdditionalBounty, "Arrest")
+    ; RPB_StorageVars.SetBoolOnReference("Defeated", Config.Player, true, "Arrest")
 
     ; Bounty is applied later at the Arrest stage.
 endFunction
@@ -1139,7 +1179,7 @@ endFunction
 string function GetArrestScene(Actor akArrestee, string asFallbackScene = "RPB_ArrestStart02")
     ; if (akArrestee == Config.Player)
 
-    ;     ; return RPB_StorageVars.GetStringOnForm("Scene", akArrestee, "Arrest")
+    ;     ; return RPB_StorageVars.GetStringOnReference("Scene", akArrestee, "Arrest")
 
     ;     if (ArrestVars.Exists("Arrest::Scene"))
     ;         return ArrestVars.GetString("Arrest::Scene")
@@ -1150,7 +1190,7 @@ string function GetArrestScene(Actor akArrestee, string asFallbackScene = "RPB_A
 endFunction
 
 string function GetArrestGoal(Actor akArrestee)
-    return RPB_StorageVars.GetStringOnForm("Arrest Goal", akArrestee, "Arrest")
+    return RPB_StorageVars.GetStringOnReference("Arrest Goal", akArrestee, "Arrest")
     ; return ArrestVars.GetString("Arrest::Arrest Goal")
 endFunction
 
