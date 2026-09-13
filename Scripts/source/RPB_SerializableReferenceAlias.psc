@@ -23,11 +23,8 @@ bool property Active
     endFunction
 
     function set(bool value) ; protected
-        if (!__initialized)
-            return
-        endif
-
         _active = value
+        __initialized = true
     endFunction
 endProperty
 
