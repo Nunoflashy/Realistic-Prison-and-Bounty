@@ -363,6 +363,76 @@ int function Round(float value) global
 endFunction
 
 
+; ==========================================================
+;                       Clamp Functions
+; ==========================================================
+
+int function ClampInt(int value, int min, int max) global
+    if (value < min)
+        return min
+    elseif (value > max)
+        return max
+    else
+        return value
+    endif
+endFunction
+
+float function ClampFloat(float value, float min, float max) global
+    if (value < min)
+        return min
+    elseif (value > max)
+        return max
+    else
+        return value
+    endif
+endFunction
+
+; int function ClampInt(int value, int min = 2147483647, int max = -2147483648) global
+;     int NO_MIN = -2147483648
+;     int NO_MAX = 2147483647
+
+;     ; If user didn’t pass min, Papyrus fills in with default (2147483647)
+;     if (min == 2147483647)
+;         min = NO_MIN
+;     endif
+
+;     ; If user didn’t pass max, Papyrus fills in with default (-2147483648)
+;     if (max == -2147483648)
+;         max = NO_MAX
+;     endif
+
+;     Debug("ClampInt", "Min: " + min + ", Max: " + max + ", Value: " + value)
+
+;     if (value < min)
+;         return min
+;     elseif (value > max)
+;         return max
+;     else
+;         return value
+;     endif
+; endFunction
+
+; float function ClampFloat(float value, float min = -99999999.0, float max = 99999999.0) global
+;     float NO_MIN = -99999999.0
+;     float NO_MAX =  99999999.0
+
+;     ; Replace default sentinels with real unbounded values
+;     if (min == -99999999.0)
+;         min = NO_MIN
+;     endif
+;     if (max == 99999999.0)
+;         max = NO_MAX
+;     endif
+
+;     if (value < min)
+;         return min
+;     elseif (value > max)
+;         return max
+;     else
+;         return value
+;     endif
+; endFunction
+
 ; Converts the passed in percent number to its equivalent decimal percentage to do calculations.
 ; e.g: 5 becomes 0.05
 float function PercentToDecimal(float percentToConvert) global
@@ -2605,6 +2675,20 @@ string function FormatFloat(float number) global
 
     ; DebugParams(number + "," + numberAsString + ",", "number, numberAsString")
     return formattedNumber
+endFunction
+
+; ==========================================================
+;                           Actions
+; ==========================================================
+
+function SendCourierDelivery(ReferenceAlias apItemAlias, Form akItem) global
+    WICourierScript courierScript = RPB_Utility.GetCourierQuest()
+    apItemAlias.ForceRefTo(Game.GetPlayer().PlaceAtMe(akItem))
+    courierScript.AddAliasToContainer(apItemAlias)
+endFunction
+
+function ScheduleCourierDeliveryInGameTime(ReferenceAlias apItemAlias, Form akItem, float afTimeFromNow) global
+
 endFunction
 
 ; ==========================================================
