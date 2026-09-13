@@ -12,6 +12,14 @@ int function __retainObjectInMemory(int object, bool retain = true) global
     return object
 endFunction
 
+int function PersistObjectInMemory(int object, string identifier = "") global
+    return JValue.retain(object, "RPB_MEMORY-" + identifier)
+endFunction
+
+int function Object_Retain(int object, string tag) global
+    return JValue.retain(object, tag)
+endFunction
+
 function __releaseAll() global
     JValue.releaseObjectsWithTag("RPB_MEMORY")
 endFunction
@@ -68,9 +76,58 @@ endFunction
 ;                       Static Storage
 ; ==========================================================
 
-int function StaticStorage() global
-    string rootPath = ".rpb_root"
-    return JDB.solveObj(rootPath)
+int function StaticStorage(string path = "") global
+    if (!StaticStorage_HasPath(path))
+        StaticStorage_SetObjectInPath(path, FastMap("<string>"), createMissingKeys = true)
+    endif
+
+    RPB_Utility.Debug("MCM::StaticStorage", "path: " + path + ", OBJ: " + StaticStorage_GetObjectInPath(path))
+
+    return StaticStorage_GetObjectInPath(path)
+endFunction
+
+bool function StaticStorage_HasPath(string path) global
+    return JDB.hasPath(".rpb_root.static_storage" + path)
+endFunction
+
+float function StaticStorage_GetFloatInPath(string path, float default = 0.0) global
+    return JDB.solveFlt(".rpb_root.static_storage" + path, default)
+endFunction
+
+int function StaticStorage_GetIntInPath(string path, int default = 0) global
+    return JDB.solveInt(".rpb_root.static_storage" + path, default)
+endFunction
+
+string function StaticStorage_GetStringInPath(string path, string default = "") global
+    return JDB.solveStr(".rpb_root.static_storage" + path, default)
+endFunction
+
+int function StaticStorage_GetObjectInPath(string path, int default = 0) global
+    return JDB.solveObj(".rpb_root.static_storage" + path, default)
+endFunction
+
+Form function StaticStorage_GetFormInPath(string path, Form default = none) global
+    return JDB.solveForm(".rpb_root.static_storage" + path, default)
+endFunction
+
+bool function StaticStorage_SetFloatInPath(string path, float value, bool createMissingKeys = false) global
+    return JDB.solveFltSetter(".rpb_root.static_storage" + path, value, createMissingKeys)
+endFunction
+
+bool function StaticStorage_SetIntInPath(string path, int value, bool createMissingKeys = false) global
+    return JDB.solveIntSetter(".rpb_root.static_storage" + path, value, createMissingKeys)
+endFunction
+
+bool function StaticStorage_SetStringInPath(string path, string value, bool createMissingKeys = false) global
+    return JDB.solveStrSetter(".rpb_root.static_storage" + path, value, createMissingKeys)
+endFunction
+
+bool function StaticStorage_SetObjectInPath(string path, int value, bool createMissingKeys = false) global
+    return JDB.solveObjSetter(".rpb_root.static_storage" + path, value, createMissingKeys)
+endFunction
+
+bool function StaticStorage_SetFormInPath(string path, Form value, bool createMissingKeys = false) global
+    return JDB.solveFormSetter(".rpb_root.static_storage" + path, value, createMissingKeys)
 endFunction
 
 ; ==========================================================
@@ -170,48 +227,70 @@ function FastArray_Clear(int array) global
     Object_Clear(array)
 endFunction
 
-function FastArray_SetInt(int array, int index, int element) global
-    JArray.setInt(array, index, element)
+function FastArray_SetInt(int array, int index, int element, bool condition = true) global
+    if (condition)
+        JArray.setInt(array, index, element)
+    endif
 endFunction
 
-function FastArray_SetFloat(int array, int index, float element) global
-    JArray.setFlt(array, index, element)
+function FastArray_SetFloat(int array, int index, float element, bool condition = true) global
+    if (condition)
+        JArray.setFlt(array, index, element)
+    endif
 endFunction
 
-function FastArray_SetString(int array, int index, string element) global
-    JArray.setStr(array, index, element)
+function FastArray_SetString(int array, int index, string element, bool condition = true) global
+    if (condition)
+        JArray.setStr(array, index, element)
+    endif
 endFunction
 
-function FastArray_SetObject(int array, int index, int element) global
-    JArray.setObj(array, index, element)
+function FastArray_SetObject(int array, int index, int element, bool condition = true) global
+    if (condition)
+        JArray.setObj(array, index, element)
+    endif
 endFunction
 
-function FastArray_SetForm(int array, int index, Form element) global
-    JArray.setForm(array, index, element)
+function FastArray_SetForm(int array, int index, Form element, bool condition = true) global
+    if (condition)
+        JArray.setForm(array, index, element)
+    endif
 endFunction
 
-function FastArray_AddInt(int array, int element) global
-    JArray.addInt(array, element)
+function FastArray_AddInt(int array, int element, bool condition = true) global
+    if (condition)
+        JArray.addInt(array, element)
+    endif
 endFunction
 
-function FastArray_AddFloat(int array, float element) global
-    JArray.addFlt(array, element)
+function FastArray_AddFloat(int array, float element, bool condition = true) global
+    if (condition)
+        JArray.addFlt(array, element)
+    endif
 endFunction
 
-function FastArray_AddString(int array, string element) global
-    JArray.addStr(array, element)
+function FastArray_AddString(int array, string element, bool condition = true) global
+    if (condition)
+        JArray.addStr(array, element)
+    endif
 endFunction
 
-function FastArray_AddObject(int array, int element) global
-    JArray.addObj(array, element)
+function FastArray_AddObject(int array, int element, bool condition = true) global
+    if (condition)
+        JArray.addObj(array, element)
+    endif
 endFunction
 
-function FastArray_AddForm(int array, Form element) global
-    JArray.addForm(array, element)
+function FastArray_AddForm(int array, Form element, bool condition = true) global
+    if (condition)
+        JArray.addForm(array, element)
+    endif
 endFunction
 
-function FastArray_AddFromArray(int array, int otherArray) global
-    JArray.addFromArray(array, otherArray)
+function FastArray_AddFromArray(int array, int otherArray, bool condition = true) global
+    if (condition)
+        JArray.addFromArray(array, otherArray)
+    endif
 endFunction
 
 int function FastArray_GetInt(int array, int index) global
@@ -314,6 +393,10 @@ bool function FastMap_HasKey(int map, string _key) global
     return JMap.hasKey(map, _key)
 endFunction
 
+int function FastMap_ValueType(int map, string _key) global
+    return JMap.valueType(map, _key)
+endFunction
+
 bool function FastMap_RemoveKey(int map, string _key) global
     return JMap.removeKey(map, _key)
 endFunction
@@ -406,6 +489,14 @@ int function FastMap_SetObject(int map, string _key, int value, bool condition =
     endif
     
     return JMap.getObj(map, _key)
+endFunction
+
+int function FastMap_FromFile(string path) global
+    return JValue.readFromFile(path)
+endFunction
+
+int function FastMap_FromDirectory(string path, string extension = "") global
+    return JValue.readFromDirectory(path, extension)
 endFunction
 
 ; Integer Map (Temporary, maybe)
@@ -596,6 +687,10 @@ int function Delete(int object) global
     return JValue.release(object)
 endFunction
 
+function DeleteWithIdentifier(string identifier) global
+    JValue.releaseObjectsWithTag("RPB_MEMORY-" + identifier)
+endFunction
+
 
 ; ==========================================================
 ;                          Array
@@ -679,6 +774,11 @@ endFunction
 function Array_Remove(int array, int index) global
     int data = __getDataObject(array)
     JArray.eraseIndex(data, index)
+endFunction
+
+string[] function Array_ToPapyrusStringArray(int array) global
+    int data = __getDataObject(array)
+    return JArray.asStringArray(array)
 endFunction
 
 Form[] function Array_ToPapyrusFormArray(int array) global
@@ -1560,7 +1660,8 @@ endFunction
 
 bool function __isValidObject(int object) global
     ; TODO: Implement
-    return object != 0
+    return JValue.isExists(object)
+    ; return object != 0
 endFunction
 
 ;/
@@ -1712,8 +1813,16 @@ int function __exceptionStorage() global
     ; return Map("<string>", "{ 'memory': { 'retain': true } }")
 endFunction
 
-function throw(int object, int exception) global
-    Map_SetObject(__exceptionStorage(), "exception:" + object, exception)
+function throw(int exception, string caller = "") global
+    if (!exception)
+        RPB_Utility.LogException("UnknownException", "Tried to throw a none exception!", caller)
+        return
+    endif
+
+    string exceptionType    = Map_GetString(exception, "type")
+    string exceptionMessage = Map_GetString(exception, "message")
+
+    RPB_Utility.LogException(exceptionType, exceptionMessage, caller)
 endFunction
 
 int function throwAndReturn(int object, int exception) global
@@ -1757,6 +1866,26 @@ endFunction
 
 int function InvalidObjectParamsException(string msg) global
     return Exception("InvalidObjectParamsException", msg, 104)
+endFunction
+
+int function InvalidParamException(string msg) global
+    return Exception("InvalidParamException", msg, 106)
+endFunction
+
+int function ResourceNotFoundException(string msg) global
+    return Exception("ResourceNotFoundException", msg, 107)
+endFunction
+
+int function NullReferenceException(string msg) global
+    return Exception("NullReferenceException", msg, 108)
+endFunction
+
+int function InvalidStateException(string msg) global
+    return Exception("InvalidStateException", msg, 110)
+endFunction
+
+int function MemoryException(string msg) global
+    return Exception("MemoryException", msg, 108)
 endFunction
 
 int function PathNotFoundException(string msg) global

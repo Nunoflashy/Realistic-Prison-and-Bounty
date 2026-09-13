@@ -201,8 +201,8 @@ string[] function GetPagesNoSpaces()
 endFunction
 
 string[] function GetExistingPresets()
-    int fileListObj = JValue.readFromDirectory("Data/RPB_Data/Presets", ".rpbp")
-    int fileList    = JMap.allKeys(fileListObj)
+    int fileListObj = FastMap_FromDirectory("Data/RPB_Data/Presets", ".rpbp")
+    int fileList    = FastMap_Keys(fileListObj)
 
 
     ; JValue.writeToFile(fileListObj, "Data/RPB_Data/Presets/preset2.rpbp")
@@ -327,8 +327,8 @@ function RegisterPages()
 endFunction
 
 function LoadPageFromPreset(string asPresetFile, string asPage)
-    int fileContents = JValue.readFromFile("Data/RPB_Data/Presets/" + asPresetFile)
-    int pageContents = JMap.getObj(fileContents, asPage)
+    int fileContents = FastMap_FromFile("Data/RPB_Data/Presets/" + asPresetFile)
+    int pageContents = FastMap_GetObject(fileContents, asPage)
 endFunction
 
 function SavePreset(string asPresetFile, string asContent)
@@ -342,10 +342,10 @@ function SavePreset(string asPresetFile, string asContent)
     endif
 
     if (contentMode == ALL_CONTENT)
-        JValue.writeToFile(optionsValueMap, "Data/RPB_Data/Presets/" + asPresetFile)
+        Object_WriteData(optionsValueMap, "Data/RPB_Data/Presets/" + asPresetFile)
     else
         int partialContent = FastMap_GetObject(optionsValueMap, asContent)
-        JValue.writeToFile(partialContent, "Data/RPB_Data/Presets/" + asPresetFile)
+        Object_WriteData(partialContent, "Data/RPB_Data/Presets/" + asPresetFile)
     endif
 
     ; Debug("RPB_MCM::SavePreset", "optionsValueMap: " + GetContainerList(optionsValueMap) + "\n" + "optionValuesInPage: " + GetContainerList(optionValuesInPage))
@@ -391,13 +391,8 @@ endFunction
     returns (int): The index of @_key in the array.
 /;
 int function GetOptionIndexFromKey(string[] _array, string _key) global
-    ; return FastArray_FindString( \ 
-    ;     FastArray_FromStringArray(_array), \
-    ;     _key \
-    ; )
-
-    int internalContainer = JArray.objectWithStrings(_array)
-    return JArray.findStr(internalContainer, _key)
+    int internalContainer = FastArray_FromStringArray(_array)
+    return FastArray_FindString(internalContainer, _key)
 endFunction
 
 ;/
@@ -733,7 +728,7 @@ int function GetPageObjectFromIDToKey(int parentContainer, string page = "")
     int pageObject = FastMap_GetObject(parentContainer, page)
 
     if (!pageObject)
-        pageObject = FastMap_SetObject(parentContainer, page, JIntMap.object())
+        pageObject = FastMap_SetObject(parentContainer, page, FastMap("<int>"))
     endif
 
 
@@ -1146,7 +1141,7 @@ event OnConfigInit()
 endEvent
 
 event OnConfigOpen()
-    if (JValue.isIntegerMap(optionsFromIdToKeyMap))
+    if (Object_IsIntMap(optionsFromIdToKeyMap))
         ; Repair a save whose optionsFromIdToKeyMap was persisted as a JIntMap by old code (should be a JMap - see InitializeOptions()).
         ; OnConfigInit only fires once ever per save, so fixing InitializeOptions() alone can't retroactively repair a save that already ran it under the old, wrong type.
         Debug("MCM::OnConfigOpen", "Repairing optionsFromIdToKeyMap - was created as a JIntMap by old code, recreating as a JMap")
@@ -1317,7 +1312,7 @@ event OnOptionInputAccept(int option, string inputValue)
 endEvent
 
 function SerializeOptions()
-    JValue.writeToFile(generalContainer, "generalContainer.txt")
+    Object_WriteData(generalContainer, "generalContainer.txt")
     ; miscVars.serialize("root", "miscVars_all.txt")
 endFunction
 
@@ -1507,14 +1502,14 @@ function ValidateOption(string asOption)
 endFunction
 
 function ValidateOptions()
-    int obj         = JMap.allKeys(optionsDefaultValueMap) ; JArray& (string[])
-    int optionCount = JValue.count(obj)
+    int obj         = FastMap_Keys(optionsDefaultValueMap) ; JArray& (string[])
+    int optionCount = FastArray_Size(obj)
 
     int validatedOptions = 0
 
     int optionIndex = 0
     while (optionIndex < optionCount)
-        string optionKey = JArray.getStr(obj, optionIndex)
+        string optionKey = FastArray_GetString(obj, optionIndex)
 
         self.ValidateOption(optionKey)
         validatedOptions += 1
@@ -1543,17 +1538,17 @@ endFunction
     returns (int): The value type of the specified property.
 /;
 int function DeterminePropertyValueType(int apOptionMap, string asPropertyType)
-    int valueType = JMap.valueType(apOptionMap, asPropertyType)
+    int valueType = FastMap_ValueType(apOptionMap, asPropertyType)
 
     if (valueType == TYPE_OBJECT)
         ; Property specified is a dependency property, process it accordingly.
-        int dependencyObject            = JMap.getObj(apOptionMap, asPropertyType)
-        string dependencyOptionKey      = JArray.getStr(dependencyObject, 0)
-        int dependencyOptionValueType   = JMap.valueType(optionsDefaultValueMap, dependencyOptionKey) ; Might change, since default option may not be defined yet
-        
+        int dependencyObject            = FastMap_GetObject(apOptionMap, asPropertyType)
+        string dependencyOptionKey      = FastArray_GetString(dependencyObject, 0)
+        int dependencyOptionValueType   = FastMap_ValueType(optionsDefaultValueMap, dependencyOptionKey) ; Might change, since default option may not be defined yet
+
         ; Since all default number options are stored as float, determine here if it's float or int
         if (dependencyOptionValueType == TYPE_FLOAT)
-            float originalValue     = JMap.getFlt(optionsDefaultValueMap, dependencyOptionKey)
+            float originalValue     = FastMap_GetFloat(optionsDefaultValueMap, dependencyOptionKey)
             float fractionalPart    = originalValue - math.floor(originalValue)
 
             if (fractionalPart == 0.0)
@@ -1579,7 +1574,7 @@ endFunction
 int function GetOptionValueTypeFromConfig(string asOptionKey, bool abVerifyEveryProperty = true, string asReturnedPropertyTypeIfNotAllEqual = "")
     int optionsObj  = RPB_Data.MCM_GetOptionObject()
     int pageObj     = FastMap_GetObject(optionsObj, CurrentPageConfig)
-    int optionMap   = JMap.getObj(pageObj, asOptionKey) ; JMap&
+    int optionMap   = FastMap_GetObject(pageObj, asOptionKey) ; JMap&
 
     ;/ 
         Check what properties it has,
@@ -1588,7 +1583,7 @@ int function GetOptionValueTypeFromConfig(string asOptionKey, bool abVerifyEvery
 
         If there's only one property (Default), check whether it is of type string or bool.
     /;
-    int propertyCount = JMap.count(optionMap)
+    int propertyCount = FastMap_Size(optionMap)
 
     if (asOptionKey == "Infamy::Infamy Recognized Threshold")
         Debug("MCM::GetOptionValueTypeFromConfig", "Property Count: " + propertyCount)
@@ -1624,7 +1619,7 @@ int function GetOptionValueTypeFromConfig(string asOptionKey, bool abVerifyEvery
                     asReturnedPropertyTypeIfNotAllEqual, "Minimum" \
                 )
 
-                int returnedValueType = JMap.valueType(optionMap, propertyType)
+                int returnedValueType = FastMap_ValueType(optionMap, propertyType)
 
                 ; if (returnedValueType == TYPE_OBJECT)
                 ;     ; Selected property is a dependency, not a value, get its value.
@@ -1659,8 +1654,8 @@ int function GetOptionValueTypeFromConfig(string asOptionKey, bool abVerifyEvery
         return minimumPropertyValueType
 
     elseif (propertyCount == 1) ; String or Bool option
-        string propertyType     = JMap.getNthKey(optionMap, 0)
-        int propertyValueType   = JMap.valueType(optionMap, propertyType)
+        string propertyType     = FastMap_GetNthKey(optionMap, 0)
+        int propertyValueType   = FastMap_ValueType(optionMap, propertyType)
 
         return propertyValueType
     endif
@@ -1675,22 +1670,22 @@ endFunction
 function LoadOptionValues(string asPropertyType)
     int optionsObj  = RPB_Data.MCM_GetOptionObject()
     int pageObj     = FastMap_GetObject(optionsObj, CurrentPageConfig)
-    int optionCount = JValue.count(pageObj)
+    int optionCount = FastMap_Size(pageObj)
 
     int optionIndex = 0
     bool continue   = false
 
     while (optionIndex < optionCount)
-        string optionKey                = JMap.getNthKey(pageObj, optionIndex) ; Current Option Key
-        int optionMap                   = JMap.getObj(pageObj, optionKey) ; JMap&
-        bool hasPropertySpecified       = JMap.hasKey(optionMap, asPropertyType)
+        string optionKey                = FastMap_GetNthKey(pageObj, optionIndex) ; Current Option Key
+        int optionMap                   = FastMap_GetObject(pageObj, optionKey) ; JMap&
+        bool hasPropertySpecified       = FastMap_HasKey(optionMap, asPropertyType)
 
         if (!hasPropertySpecified)
             ; Determine if it's a string or bool option, if so, we shouldn't error, otherwise we should.
-            bool hasMinimum = JMap.hasKey(optionMap, "Minimum")
-            bool hasMaximum = JMap.hasKey(optionMap, "Maximum")
-            bool hasSteps   = JMap.hasKey(optionMap, "Steps")
-            bool hasDefault = JMap.hasKey(optionMap, "Default")
+            bool hasMinimum = FastMap_HasKey(optionMap, "Minimum")
+            bool hasMaximum = FastMap_HasKey(optionMap, "Maximum")
+            bool hasSteps   = FastMap_HasKey(optionMap, "Steps")
+            bool hasDefault = FastMap_HasKey(optionMap, "Default")
             bool hasNumberOptionProperties = hasMinimum && hasMaximum && hasSteps
             
             if (!hasNumberOptionProperties)
@@ -1708,16 +1703,16 @@ function LoadOptionValues(string asPropertyType)
         endif
 
         if (!continue)
-            bool hasDependency = JMap.valueType(optionMap, asPropertyType) == TYPE_OBJECT
+            bool hasDependency = FastMap_ValueType(optionMap, asPropertyType) == TYPE_OBJECT
 
             if (hasDependency)
-                int propertyObject              = JMap.getObj(optionMap, asPropertyType)
-                string dependencyOptionKey      = JArray.getStr(propertyObject, 0) ; [0] = Dependency Option
+                int propertyObject              = FastMap_GetObject(optionMap, asPropertyType)
+                string dependencyOptionKey      = FastArray_GetString(propertyObject, 0) ; [0] = Dependency Option
                 int dependencyOptionValueType   = self.GetOptionValueTypeFromConfig(dependencyOptionKey)
 
                 if (dependencyOptionValueType == TYPE_FLOAT || dependencyOptionValueType == TYPE_INT)
                     ; If of type int, cast it to float
-                    float offset                = JArray.getFlt(propertyObject, 1) ; [1] = Option Offset
+                    float offset                = FastArray_GetFloat(propertyObject, 1) ; [1] = Option Offset
                     bool hasOffset              = (offset as bool)
                     float dependencyOptionValue = self.GetOptionSliderValue(dependencyOptionKey)
                     float updatedValue          = float_if (hasOffset, (dependencyOptionValue + offset), dependencyOptionValue)
@@ -1726,27 +1721,27 @@ function LoadOptionValues(string asPropertyType)
 
             else
                 bool isBool     = self.IsPropertyValueOfTypeBool(optionMap, asPropertyType)
-                bool isFloat    = JMap.valueType(optionMap, asPropertyType) == TYPE_FLOAT
-                bool isInteger  = JMap.valueType(optionMap, asPropertyType) == TYPE_INT 
-                bool isString   = JMap.valueType(optionMap, asPropertyType) == TYPE_STRING
+                bool isFloat    = FastMap_ValueType(optionMap, asPropertyType) == TYPE_FLOAT
+                bool isInteger  = FastMap_ValueType(optionMap, asPropertyType) == TYPE_INT
+                bool isString   = FastMap_ValueType(optionMap, asPropertyType) == TYPE_STRING
 
                 if (isBool)
-                    bool optionValue = JMap.getInt(optionMap, asPropertyType) as bool
+                    bool optionValue = FastMap_GetInt(optionMap, asPropertyType) as bool
                     self.SetBoolOptionPropertyValue(optionKey, asPropertyType, optionValue)
                     DebugWithArgs("MCM::LoadOptionValues", asPropertyType, "[bool] Setting ["+ optionKey + "] " + asPropertyType +" Value to: " + optionValue)
 
                 elseif (isInteger)
-                    int optionValue = JMap.getInt(optionMap, asPropertyType) ; int|bool
+                    int optionValue = FastMap_GetInt(optionMap, asPropertyType) ; int|bool
                     self.SetNumberOptionPropertyValue(optionKey, asPropertyType, optionValue)
                     DebugWithArgs("MCM::LoadOptionValues", asPropertyType, "[int] Setting ["+ optionKey + "] " + asPropertyType +" Value to: " + optionValue)
-    
+
                 elseif (isFloat)
-                    float optionValue = JMap.getFlt(optionMap, asPropertyType) ; int|float
+                    float optionValue = FastMap_GetFloat(optionMap, asPropertyType) ; int|float
                     self.SetNumberOptionPropertyValue(optionKey, asPropertyType, optionValue)
                     DebugWithArgs("MCM::LoadOptionValues", asPropertyType, "[float] Setting ["+ optionKey + "] " + asPropertyType +" Value to: " + optionValue)
-                
+
                 elseif (isString)
-                    string optionValue = JMap.getStr(optionMap, asPropertyType) ; string
+                    string optionValue = FastMap_GetString(optionMap, asPropertyType) ; string
                     self.SetStringOptionPropertyValue(optionKey, asPropertyType, optionValue)
                     DebugWithArgs("MCM::LoadOptionValues", asPropertyType, "[string] Setting ["+ optionKey + "] " + asPropertyType +" Value to: " + optionValue)
                 endif
@@ -1858,11 +1853,11 @@ endFunction
     returns (bool): Whether this option is of type bool or not.
 /;
 bool function IsPropertyValueOfTypeBool(int apOptionMap, string asPropertyType)
-    bool isInteger = JMap.valueType(apOptionMap, asPropertyType) == TYPE_INT 
+    bool isInteger = FastMap_ValueType(apOptionMap, asPropertyType) == TYPE_INT
 
     if (isInteger)
-        int propertyCount   = JValue.count(apOptionMap)
-        int optionValue     = JMap.getInt(apOptionMap, asPropertyType) ; int|bool
+        int propertyCount   = FastMap_Size(apOptionMap)
+        int optionValue     = FastMap_GetInt(apOptionMap, asPropertyType) ; int|bool
 
         ; Since int options usually have 4 properties, and bools only have one (Default),
         ; it's safe to assume that if it only has that one property, it is a bool option.
@@ -1891,30 +1886,30 @@ function __internal_loadPropertyForOption( \
     int apOptionObject \
 )
     int optionMap           = apOptionObject; JMap&
-    int propertyValueType   = JMap.valueType(optionMap, asPropertyType)
+    int propertyValueType   = FastMap_ValueType(optionMap, asPropertyType)
 
     if (propertyValueType == TYPE_INT)
-        int optionValue = JMap.getInt(optionMap, asPropertyType)
+        int optionValue = FastMap_GetInt(optionMap, asPropertyType)
         self.SetNumberOptionPropertyValue(asOptionKey, asPropertyType, optionValue)
         DebugWithArgs("MCM::LoadPropertyForOption", "asOptionKey: " + asOptionKey + ", asPropertyType: " + asPropertyType, "[int] Setting "+ asPropertyType +" Value to: " + optionValue)
 
     elseif (propertyValueType == TYPE_FLOAT)
-        float optionValue = JMap.getFlt(optionMap, asPropertyType)
+        float optionValue = FastMap_GetFloat(optionMap, asPropertyType)
         self.SetNumberOptionPropertyValue(asOptionKey, asPropertyType, optionValue)
         DebugWithArgs("MCM::LoadPropertyForOption", "asOptionKey: " + asOptionKey + ", asPropertyType: " + asPropertyType, "[float] Setting "+ asPropertyType +" Value to: " + optionValue)
 
     elseif (propertyValueType == TYPE_STRING)
-        string optionValue = JMap.getStr(optionMap, asPropertyType)
+        string optionValue = FastMap_GetString(optionMap, asPropertyType)
         self.SetStringOptionPropertyValue(asOptionKey, asPropertyType, optionValue)
         DebugWithArgs("MCM::LoadPropertyForOption", "asOptionKey: " + asOptionKey + ", asPropertyType: " + asPropertyType, "[string] Setting "+ asPropertyType +" Value to: " + optionValue)
 
     elseif (propertyValueType == TYPE_FORM)
-        Form optionValue = JMap.getForm(optionMap, asPropertyType)
+        Form optionValue = FastMap_GetForm(optionMap, asPropertyType)
 
 
     elseif (propertyValueType == TYPE_OBJECT)
         ; Handle children object nesting
-        int optionValue = JMap.getObj(optionMap, asPropertyType)
+        int optionValue = FastMap_GetObject(optionMap, asPropertyType)
 
     else
         Error("There was an error determining the value type of the option " + "[" + asOptionKey + "].")
@@ -1938,18 +1933,18 @@ function __internal_loadPropertyForOptionWithDependency( \
     int apDependencyObject \
 )
     int dependencyObject            = apDependencyObject; JArray& (Dependency Array)
-    string dependencyOptionKey      = JArray.getStr(dependencyObject, 0) ; [0] = Dependency Option
+    string dependencyOptionKey      = FastArray_GetString(dependencyObject, 0) ; [0] = Dependency Option
 
     Debug("MCM::LoadPropertyForOption", "asOptionKey: " + asOptionKey + ", asPropertyType: " + asPropertyType + ", dependencyObject: " + GetContainerList(dependencyObject))
 
     ; Get the dependency value type from the default value of the dependency option.
     ; The default option must first be initialized for this to work.
-    int dependencyOptionValueType   = JMap.valueType(optionsDefaultValueMap, dependencyOptionKey)
+    int dependencyOptionValueType   = FastMap_ValueType(optionsDefaultValueMap, dependencyOptionKey)
 
     ; Assume the Option is of the same type as the Dependency Option
     if (dependencyOptionValueType == TYPE_INT)
         int dependencyOptionValue = self.GetOptionSliderValue(dependencyOptionKey) as int
-        int offset      = JArray.getInt(dependencyObject, 1) ; [1] = Option Offset
+        int offset      = FastArray_GetInt(dependencyObject, 1) ; [1] = Option Offset
         bool hasOffset  = (offset as bool)
 
         int finalOptionValue = int_if (hasOffset, (dependencyOptionValue + offset), dependencyOptionValue)
@@ -1962,7 +1957,7 @@ function __internal_loadPropertyForOptionWithDependency( \
 
     elseif (dependencyOptionValueType == TYPE_FLOAT)
         float dependencyOptionValue = self.GetOptionSliderValue(dependencyOptionKey)
-        float offset    = JArray.getFlt(dependencyObject, 1) ; [1] = Option Offset
+        float offset    = FastArray_GetFloat(dependencyObject, 1) ; [1] = Option Offset
         bool hasOffset  = (offset as bool)
 
         float finalOptionValue = float_if (hasOffset, (dependencyOptionValue + offset), dependencyOptionValue)
@@ -1999,7 +1994,7 @@ endFunction
 function LoadPropertyForOption(string asOptionKey, string asPropertyType)
     int optionsObj      = RPB_Data.MCM_GetOptionObject()
     int pageObj         = self.GetPageObject(optionsObj, CurrentPageConfig) ; TODO: Add asPage parameter
-    bool isObject       = JMap.valueType(pageObj, asOptionKey) == TYPE_OBJECT ; object type (All options are comprised of an object)
+    bool isObject       = FastMap_ValueType(pageObj, asOptionKey) == TYPE_OBJECT ; object type (All options are comprised of an object)
     bool isValidOption  = isObject
 
     ; Debug("MCM::LoadPropertyForOption", "asOptionKey: " + asOptionKey + ", asPropertyType: " + asPropertyType + ", PageObject: " + GetContainerList(pageObj))
@@ -2012,8 +2007,8 @@ function LoadPropertyForOption(string asOptionKey, string asPropertyType)
         return
     endif
 
-    int optionMap           = JMap.getObj(pageObj, asOptionKey) ; JMap&
-    bool propertyExists     = JMap.hasKey(optionMap, asPropertyType)
+    int optionMap           = FastMap_GetObject(pageObj, asOptionKey) ; JMap&
+    bool propertyExists     = FastMap_HasKey(optionMap, asPropertyType)
 
     Debug("MCM::LoadPropertyForOption", "optionMap: " + GetContainerList(optionMap) + ", asPropertyType: " + asPropertyType + ", propertyExists: " + propertyExists)
 
@@ -2023,13 +2018,13 @@ function LoadPropertyForOption(string asOptionKey, string asPropertyType)
         return
     endif
 
-    int propertyValueType   = JMap.valueType(optionMap, asPropertyType)
+    int propertyValueType   = FastMap_ValueType(optionMap, asPropertyType)
     bool hasDependency      = (propertyValueType == TYPE_OBJECT)
 
     Debug("MCM::LoadPropertyForOption", "asOptionKey: " + asOptionKey + ", asPropertyType: " + asPropertyType + ", propertyValueType: " + propertyValueType + ", hasDependency: " + hasDependency)
 
     if (hasDependency)
-        int dependencyObject = JMap.getObj(optionMap, asPropertyType) ; JArray& (Dependency Array)
+        int dependencyObject = FastMap_GetObject(optionMap, asPropertyType) ; JArray& (Dependency Array)
         __internal_loadPropertyForOptionWithDependency(asOptionKey, asPropertyType, dependencyObject)
         return
     else
@@ -2284,43 +2279,43 @@ function InitializeOptions()
 ; ============================================================================
 ;                                   Values
 ; ============================================================================
-    optionsValueMap         = JMap.object() ; To hold each option's value
+    optionsValueMap         = FastMap("<string>") ; To hold each option's value
 
 ; ============================================================================
 ;                                   ID's
 ; ============================================================================
-    optionsFromKeyToIdMap   = JMap.object()     ; Identify options from key to id
-    optionsFromIdToKeyMap   = JMap.object()     ; Identify options from id to key (page name -> per-page IntMap, built on demand via GetPageObject; the top-level container itself must be a string-keyed JMap like its sibling above, not a JIntMap)
+    optionsFromKeyToIdMap   = FastMap("<string>")     ; Identify options from key to id
+    optionsFromIdToKeyMap   = FastMap("<string>")     ; Identify options from id to key (page name -> per-page IntMap, built on demand via GetPageObject; the top-level container itself must be a string-keyed JMap like its sibling above, not a JIntMap)
 
 ; ============================================================================
 ;                                State (Flags)
 ; ============================================================================
-    optionsStateMap         = JMap.object() ; To hold each option's state (Enabled, Disabled)
+    optionsStateMap         = FastMap("<string>") ; To hold each option's state (Enabled, Disabled)
 
 ; ============================================================================
 ;                               Default Values
 ; ============================================================================
-    optionsDefaultValueMap  = JMap.object() ; Default values for options
+    optionsDefaultValueMap  = FastMap("<string>") ; Default values for options
 
 ; ============================================================================
 ;                              Min/Max/Step Values
 ; ============================================================================
-    optionsMinimumValueMap  = JMap.object() ; Minimum values for options
-    optionsMaximumValueMap  = JMap.object() ; Maximum values for options
-    optionsStepsValueMap    = JMap.object() ; Interval Steps values for options
+    optionsMinimumValueMap  = FastMap("<string>") ; Minimum values for options
+    optionsMaximumValueMap  = FastMap("<string>") ; Maximum values for options
+    optionsStepsValueMap    = FastMap("<string>") ; Interval Steps values for options
 
     ; Persist the Options and assign them to a general container (this will persist the child objects)
-    generalContainer = JMap.object()
-    JValue.retain(generalContainer, "RPB_MCM01")
-    
-    JMap.setObj(generalContainer, "options/value", optionsValueMap)
-    JMap.setObj(generalContainer, "options/state", optionsStateMap)
-    JMap.setObj(generalContainer, "options/default", optionsDefaultValueMap)
-    JMap.setObj(generalContainer, "options/minimum", optionsMinimumValueMap)
-    JMap.setObj(generalContainer, "options/maximum", optionsMaximumValueMap)
-    JMap.setObj(generalContainer, "options/steps", optionsStepsValueMap)
-    JMap.setObj(generalContainer, "options/id/from-key-to-id", optionsFromKeyToIdMap)
-    JMap.setObj(generalContainer, "options/id/from-id-to-key", optionsFromIdToKeyMap)
+    generalContainer = FastMap("<string>")
+    Object_Retain(generalContainer, "RPB_MCM01")
+
+    FastMap_SetObject(generalContainer, "options/value", optionsValueMap)
+    FastMap_SetObject(generalContainer, "options/state", optionsStateMap)
+    FastMap_SetObject(generalContainer, "options/default", optionsDefaultValueMap)
+    FastMap_SetObject(generalContainer, "options/minimum", optionsMinimumValueMap)
+    FastMap_SetObject(generalContainer, "options/maximum", optionsMaximumValueMap)
+    FastMap_SetObject(generalContainer, "options/steps", optionsStepsValueMap)
+    FastMap_SetObject(generalContainer, "options/id/from-key-to-id", optionsFromKeyToIdMap)
+    FastMap_SetObject(generalContainer, "options/id/from-id-to-key", optionsFromIdToKeyMap)
 endFunction
 
 
@@ -2376,7 +2371,7 @@ endFunction
  /;
  string function GetKeyFromOption(int optionId, bool includePageInKey = true)
     int pageObject = self.GetPageObject(optionsFromIdToKeyMap, CurrentPage)
-    string optionKey = JIntMap.getStr(pageObject, optionId)
+    string optionKey = FastIntMap_GetString(pageObject, optionId)
 
 
     if (!includePageInKey)
@@ -2506,8 +2501,8 @@ endFunction
 /;
 function RegisterOption(string optionKey, int optionId, string page = "")
     ; For bi-directional identification (option-key to option-id and option-id to option-key)
-    JMap.setInt(self.GetPageObject(optionsFromKeyToIdMap, page), optionKey, optionId)
-    JIntMap.setStr(self.GetPageObject(optionsFromIdToKeyMap, page, "<int>"), optionId, optionKey)
+    FastMap_SetInt(self.GetPageObject(optionsFromKeyToIdMap, page), optionKey, optionId)
+    FastIntMap_SetString(self.GetPageObject(optionsFromIdToKeyMap, page, "<int>"), optionId, optionKey)
 endFunction
 
 ;/
@@ -2604,7 +2599,7 @@ endFunction
     bool    @value: The value to set.
 /;
 function SetOptionDefaultBool(string optionKey, bool value)
-    JMap.setInt(optionsDefaultValueMap, optionKey, value as int)
+    FastMap_SetInt(optionsDefaultValueMap, optionKey, value as int)
 endFunction
 
 ;/
@@ -2614,7 +2609,7 @@ endFunction
     int     @value: The value to set.
 /;
 function SetOptionDefaultInt(string optionKey, int value)
-    JMap.setInt(optionsDefaultValueMap, optionKey, value)
+    FastMap_SetInt(optionsDefaultValueMap, optionKey, value)
 endFunction
 
 ;/
@@ -2624,7 +2619,7 @@ endFunction
     float   @value: The value to set.
 /;
 function SetOptionDefaultFloat(string optionKey, float value)
-    JMap.setFlt(optionsDefaultValueMap, optionKey, value)
+    FastMap_SetFloat(optionsDefaultValueMap, optionKey, value)
 endFunction
 ;/
     Sets the default value of a string option.
@@ -2633,7 +2628,7 @@ endFunction
     string  @value: The value to set.
 /;
 function SetOptionDefaultString(string optionKey, string value)
-    JMap.setStr(optionsDefaultValueMap, optionKey, value)
+    FastMap_SetString(optionsDefaultValueMap, optionKey, value)
 endFunction
 
 ;/
@@ -2679,7 +2674,7 @@ endFunction
     float   @value: The value to set
 /;
 function SetOptionMinimum(string optionKey, float value)
-    JMap.setFlt(optionsMinimumValueMap, optionKey, value)
+    FastMap_SetFloat(optionsMinimumValueMap, optionKey, value)
 endFunction
 
 ;/
@@ -2689,7 +2684,7 @@ endFunction
     float   @value: The value to set
 /;
 function SetOptionMaximum(string optionKey, float value)
-    JMap.setFlt(optionsMaximumValueMap, optionKey, value)
+    FastMap_SetFloat(optionsMaximumValueMap, optionKey, value)
 endFunction
 
 ;/
@@ -2699,7 +2694,7 @@ endFunction
     float   @value: The value to set
 /;
 function SetOptionSteps(string optionKey, float value)
-    JMap.setFlt(optionsStepsValueMap, optionKey, value)
+    FastMap_SetFloat(optionsStepsValueMap, optionKey, value)
 endFunction
 
 ;/
