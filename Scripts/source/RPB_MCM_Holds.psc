@@ -808,7 +808,7 @@ function OnOptionHighlight(RPB_MCM mcm, string option) global
 endFunction
 
 function OnOptionDefault(RPB_MCM mcm, string option) global
-
+    
 endFunction
 
 function OnOptionSelect(RPB_MCM mcm, string option) global
@@ -817,6 +817,7 @@ function OnOptionSelect(RPB_MCM mcm, string option) global
 endFunction
 
 function LoadSliderOptions(RPB_MCM mcm, string option, float currentSliderValue) global
+    Debug("LoadSliderOptions", "Option: " + option)
     mcm.LoadOptionProperties(option)
     mcm.ValidateOption(option)
 
@@ -832,6 +833,7 @@ endFunction
 
 function OnOptionSliderOpen(RPB_MCM mcm, string option) global
     float sliderOptionValue = mcm.GetOptionSliderValue(option)
+    Debug("OnOptionSliderOpen", "Option: " + option + ", Value: " + sliderOptionValue)
     LoadSliderOptions(mcm, option, sliderOptionValue)
 endFunction
 
@@ -1257,6 +1259,7 @@ function OnSliderOpen(RPB_MCM mcm, int oid) global
         return
     endif
 
+    Debug("MCM::Holds::OnSliderOpen", "oid = " + oid)
     OnOptionSliderOpen(mcm, mcm.GetKeyFromOption(oid, false))
 endFunction
 
