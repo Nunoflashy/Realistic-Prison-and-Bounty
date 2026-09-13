@@ -29,7 +29,7 @@ function Left(RPB_MCM mcm) global
     while (i < 10)
         string skill = mcm.Skills[i]
         string skillNames = mcm.SkillNames[i]
-        mcm.AddOptionSliderKey(skillNames, skill, string_if (IsStatSkill(skill), "{0} Points", "{0} Levels"), 0)
+        mcm.AddOptionSliderKey(skillNames, skill, string_if (IsStatSkill(skill), "{0} Points", "{0} Levels"))
         i += 1
     endWhile
 
@@ -40,7 +40,7 @@ function Left(RPB_MCM mcm) global
     while (j < 10)
         string skill = mcm.Skills[j]
         string skillNames = mcm.SkillNames[j]
-        mcm.AddOptionSliderKey(skillNames, skill, string_if (IsStatSkill(skill), "{0} Points", "Level {0}"), 0)
+        mcm.AddOptionSliderKey(skillNames, skill, string_if (IsStatSkill(skill), "{0} Points", "Level {0}"))
         j += 1
     endWhile
 endFunction
@@ -52,7 +52,7 @@ function Right(RPB_MCM mcm) global
     while (i < 11)
         string skill = mcm.Skills[i+10]
         string skillNames = mcm.SkillNames[i+10]
-        mcm.AddOptionSliderKey(skillNames, skill, string_if (IsStatSkill(skill), "{0} Points", "{0} Levels"), 0)
+        mcm.AddOptionSliderKey(skillNames, skill, string_if (IsStatSkill(skill), "{0} Points", "{0} Levels"))
         i += 1
     endWhile
 
@@ -61,7 +61,7 @@ function Right(RPB_MCM mcm) global
     while (j < 11)
         string skill = mcm.Skills[j+10]
         string skillNames = mcm.SkillNames[j+10]
-        mcm.AddOptionSliderKey(skillNames, skill, string_if (IsStatSkill(skill), "{0} Points", "Level {0}"), 0)
+        mcm.AddOptionSliderKey(skillNames, skill, string_if (IsStatSkill(skill), "{0} Points", "Level {0}"))
         j += 1
     endWhile
 endFunction

@@ -3,6 +3,7 @@ Scriptname RPB_MCM extends SKI_ConfigBase
 import RPB_Utility
 import RPB_Config
 import RPB_Memory
+import RPB_Data
 
 ; ==========================================================
 ;                     Script References
@@ -163,6 +164,223 @@ string[] property Holds
         return API.Config.Holds
     endFunction
 endProperty
+
+; ==========================================================
+;                           Presets
+; ==========================================================
+
+; function GetExistingPresets() global
+;     int presetObj = JValue.readFromDirectory("Data/RPB_Data/Presets/Preset 1")
+;     int fileObj = JValue.readFromFile("Data/RPB_Data/Presets/Preset 1/holds.json")
+;     int configObj   = JValue.readFromFile("Data/RPB_Data/Presets/root.json") ; JMap&
+
+;     int obj = JValue.objectFromPrototype("{'Gata: 4'}")
+;     JValue.writeToFile(obj, "Data/RPB_Data/gata.json")
+
+
+;     Debug("RPB_MCM::GetExistingPresets", "Presets: " + GetContainerList(configObj))
+; endFunction
+
+string[] function GetPresetPages()
+    return String_Explode( \ 
+        "All," + \
+        "General," + \
+        "Skills," + \
+        "Clothing," + \
+        String_Implode(Holds) + "," \
+    )
+endFunction
+
+string[] function GetPagesNoSpaces()
+    return String_Explode( \ 
+        "General," + \
+        "Skills," + \
+        "Clothing," + \
+        String_Implode(Holds) + "," \
+    )
+endFunction
+
+string[] function GetExistingPresets()
+    int fileListObj = JValue.readFromDirectory("Data/RPB_Data/Presets", ".rpbp")
+    int fileList    = JMap.allKeys(fileListObj)
+
+
+    ; JValue.writeToFile(fileListObj, "Data/RPB_Data/Presets/preset2.rpbp")
+
+    ; Debug("RPB_MCM::GetExistingPresets", "Presets: " + GetContainerList(fileList))
+
+    return RPB_Memory.FastArray_ToStringArray(fileList)
+endFunction
+
+function LoadPreset(string asPresetFile, string asContent = "All")
+    int ALL_CONTENT     = 0
+    int PARTIAL_CONTENT = 1
+
+    int contentMode = ALL_CONTENT
+
+    if (asContent != "All")
+        contentMode = PARTIAL_CONTENT
+    endif
+
+    int presetData = Preset_Load(asPresetFile)
+
+    if (presetData == PRESET_INVALID_FILE())
+        return
+    endif
+
+    if (presetData == PRESET_NOT_FOUND())
+        return
+    endif
+
+    Debug("RPB_MCM::LoadPreset", "Loading preset (with content: " + asContent + "): " + asPresetFile + ", data: " + GetContainerList(presetData))
+
+    Preset_Apply(presetData, optionsValueMap)
+endFunction
+
+; function LoadPresetX(string asPresetFile, string asContent = "All")
+;     int ALL_CONTENT     = 0
+;     int PARTIAL_CONTENT = 1
+
+;     int fileContents = JValue.readFromFile("Data/RPB_Data/Presets/" + asPresetFile)
+;     int contentMode = ALL_CONTENT
+
+;     if (asContent != "All")
+;         contentMode = PARTIAL_CONTENT
+;     endif
+
+;     if (!fileContents)
+;         Debug("RPB_MCM::LoadPreset", "Failed to load preset: " + asPresetFile)
+;         return
+;     endif
+
+;     if (contentMode == ALL_CONTENT)
+;         string[] allPages = self.GetPagesNoSpaces()
+;         string[] srcKeys = FastMap_KeysAsPapyrusArray(fileContents)
+
+;         ; int i = 0
+;         ; while (i < srcKeys.Length)
+;         ;     string pageFromPreset = srcKeys[i]
+;         ;     if (self.IsValidPage(pageFromPreset))
+;         ;         int src = FastMap_GetObject(fileContents, pageFromPreset)
+;         ;         FastMap_SetObject(optionsValueMap, pageFromPreset, src)
+;         ;     endif
+;         ;     i += 1
+;         ; endWhile
+
+;         int i = 0
+;         while (i < allPages.Length)
+;             string currentPage = allPages[i]
+;             if (self.IsValidPage(currentPage))
+;                 int src = FastMap_GetObject(fileContents, pageFromPreset)
+;                 FastMap_SetObject(optionsValueMap, pageFromPreset, src)
+;             endif
+;             i += 1
+;         endWhile
+
+;         ; Verify Pages that might not exist in the save (but are in the preset)
+;         i = 0
+;         while (i < srcKeys.Length)
+;             string pageFromPreset = srcKeys[i]
+;             if (!self.IsValidPage(pageFromPreset))
+;                 Debug.MessageBox("Preset contains page that does not exist in the save: " + pageFromPreset)
+;             endif
+;             i += 1
+;         endWhile
+
+;         ; int i = 0
+;         ; while (i < Holds.Length)
+;         ;     int src = FastMap_GetObject(fileContents, Holds[i])
+;         ;     FastMap_SetObject(optionsValueMap, Holds[i], src)
+;         ;     i += 1
+;         ; endWhile
+;         ; optionsValueMap = JValue.deepCopy(fileContents)
+;         Debug("RPB_MCM::LoadPreset", "optionsValueMap: " + GetContainerList(optionsValueMap))
+;     else
+;         int partialContent = FastMap_GetObject(fileContents, asContent)
+;         FastMap_SetObject(optionsValueMap, asContent, partialContent)
+;         Debug("RPB_MCM::LoadPreset", "optionsValueMap: " + GetContainerList(optionsValueMap))
+;     endif
+
+; endFunction
+
+bool function IsValidPage(string asPage)
+    string[] allPages = self.GetPagesNoSpaces()
+
+    int i = 0
+    while (i < allPages.Length)
+        if (allPages[i] == asPage)
+            return true
+        endif
+        i += 1
+    endWhile
+endFunction
+
+function RegisterPages()
+    RPB_Registry.RegisterContent("PRESET.MCM", \
+        FastArray_FromStringArray(String_Explode( \ 
+            "General," + \
+            "Skills," + \
+            "Clothing," + \
+            String_Implode(Holds) + "," \
+        )) \
+    )
+endFunction
+
+function LoadPageFromPreset(string asPresetFile, string asPage)
+    int fileContents = JValue.readFromFile("Data/RPB_Data/Presets/" + asPresetFile)
+    int pageContents = JMap.getObj(fileContents, asPage)
+endFunction
+
+function SavePreset(string asPresetFile, string asContent)
+    int ALL_CONTENT     = 0
+    int PARTIAL_CONTENT = 1
+
+    int contentMode = ALL_CONTENT
+
+    if (asContent != "All")
+        contentMode = PARTIAL_CONTENT
+    endif
+
+    if (contentMode == ALL_CONTENT)
+        JValue.writeToFile(optionsValueMap, "Data/RPB_Data/Presets/" + asPresetFile)
+    else
+        int partialContent = FastMap_GetObject(optionsValueMap, asContent)
+        JValue.writeToFile(partialContent, "Data/RPB_Data/Presets/" + asPresetFile)
+    endif
+
+    ; Debug("RPB_MCM::SavePreset", "optionsValueMap: " + GetContainerList(optionsValueMap) + "\n" + "optionValuesInPage: " + GetContainerList(optionValuesInPage))
+
+    ; string testOptionRead = self.GetOptionValueString("Outfit 1::Name", "Clothing")
+    ; Debug("RPB_MCM::SavePreset", "testOptionRead: " + testOptionRead)
+endFunction
+
+;/
+    Retrieves the page object from the parent container (containing all page objects).
+
+    FastMap     @parentContainer: The parent container.
+    string?     @page: The page name, null for the current page.
+    string?     @objectFnType: The data type of the page object.
+
+    returns (FastMap): The page object for the specified page.
+
+/;
+int function GetPageObject(int parentContainer, string page = "", string objectFnType = "<string>")
+    if (page == "")
+        page = CurrentPage
+    endif
+
+    int pageObject = FastMap_GetObject(parentContainer, page)
+
+    if (!pageObject)
+        pageObject = FastMap_SetObject(parentContainer, page, FastMap(objectFnType))
+        ; Debug("MCM::GetPageObject", "object: " + pageObject + ", page: " + page + ", type: " + objectFnType + ", Is IntMap: " + JValue.isIntegerMap(pageObject))
+    endif
+
+    return pageObject
+endFunction
+
+; ==========================================================
+
 
 ;/
     Retrieves the index in the array where the value matches @_key.
@@ -377,6 +595,8 @@ function InitializePages()
         PAGE_SEPARATOR + \
         String_Implode(Holds) + "," + \
         PAGE_SEPARATOR + \
+        "Presets," + \
+        PAGE_SEPARATOR + \
         "Maintenance," + \
         "Debug" \
     )
@@ -433,6 +653,7 @@ float function GetOptionSliderValue(string option, string page = "")
     if (self.OptionHasValue(option, page))
         return self.GetOptionValueFloat(option, page)
     else
+        ; Debug("MCM::GetOptionSliderValue", "option: " + option + ", default content: " + GetContainerList(optionsDefaultValueMap))
         return self.GetOptionDefaultFloat(option)
     endif
 endFunction
@@ -495,11 +716,29 @@ endFunction
     returns (string): The constructed string of how the option is stored.
 /;
 string function GetOptionAsStored(string optionKey, string page = "")
+    return optionKey
+
     if (page == "")
         return CurrentPage + "/" + optionKey
     else
         return page + "/" + optionKey
     endif
+endFunction
+
+int function GetPageObjectFromIDToKey(int parentContainer, string page = "")
+    if (page == "")
+        page = CurrentPage
+    endif
+
+    int pageObject = FastMap_GetObject(parentContainer, page)
+
+    if (!pageObject)
+        pageObject = FastMap_SetObject(parentContainer, page, JIntMap.object())
+    endif
+
+
+    Debug("MCM::GetPageObjectFromIDToKey", "object: " + pageObject)
+    return pageObject
 endFunction
 
 ;/
@@ -519,6 +758,7 @@ function ToggleOption(string _key, bool storePersistently = true)
         self.SetOptionValueBool(_key, !option)
     endif
 
+    Debug("MCM::ToggleOption", "Set new value of " + !option + " for " + _key + "(OptionKey: "+ optionKey +")" + "(option_id: "+ optionId +")", true)
     ; Trace("MCM::ToggleOption", "Set new value of " + !option + " for " + _key + "(OptionKey: "+ optionKey +")" + "(option_id: "+ optionId +")", true)
 endFunction
 
@@ -711,9 +951,19 @@ int function AddOptionSliderKey(string displayedText, string _key, string format
     optionId = AddSliderOption(displayedText, value, formatString, flags)
 
     if (!self.OptionExists(optionKey))
-        DebugWithArgs("MCM::AddOptionSliderKey", "displayedText: " + displayedText + ", key: " + _key, "Option does not exist!")
+        ; DebugWithArgs("MCM::AddOptionSliderKey", "displayedText: " + displayedText + ", key: " + _key, "Option does not exist!")
         self.RegisterOption(optionKey, optionId)
     endif
+
+    ; Debug("MCM::AddOptionSliderKey", "Option Key: " + optionKey + ", Value: " + value + ", Option ID: " + optionId + ", Has State: " + optionHasState + ", Has Value: " + optionHasValue)
+
+    ; if (optionKey == "General::Infamy Decay (Update Interval)" || optionKey == "General::InfamyNotifications")
+    ;     Debug("MCM::AddOptionSliderKey", "Option Key: " + optionKey + ", Default: " + self.GetOptionDefaultFloat(optionKey) + ", Value: " + self.GetOptionValueFloat(optionKey))
+    ;     Debug("MCM::AddOptionSliderKey", "Defaults Content: " + GetContainerList(optionsDefaultValueMap))
+    ;     Debug("MCM::AddOptionSliderKey", "Value Content: " + GetContainerList(optionsValueMap))
+    ;     Debug("MCM::AddOptionSliderKey", "Key to ID: " + GetContainerList(optionsFromKeyToIdMap))
+    ;     Debug("MCM::AddOptionSliderKey", "ID To Key: " + GetContainerList(optionsFromIdToKeyMap))
+    ; endif
 
     return optionId
 endFunction
@@ -885,6 +1135,8 @@ endFunction
 ; Event Handling
 ; ============================================================================
 event OnConfigInit()
+    Debug("MCM::OnConfigInit", "Firing")
+
     ModName = RPB_Data.MCM_GetRootPropertyOfTypeString("Config", "Name")
 
     self.InitializePages()
@@ -894,11 +1146,40 @@ event OnConfigInit()
 endEvent
 
 event OnConfigOpen()
+    if (JValue.isIntegerMap(optionsFromIdToKeyMap))
+        ; Repair a save whose optionsFromIdToKeyMap was persisted as a JIntMap by old code (should be a JMap - see InitializeOptions()).
+        ; OnConfigInit only fires once ever per save, so fixing InitializeOptions() alone can't retroactively repair a save that already ran it under the old, wrong type.
+        Debug("MCM::OnConfigOpen", "Repairing optionsFromIdToKeyMap - was created as a JIntMap by old code, recreating as a JMap")
+        optionsFromIdToKeyMap = FastMap("<string>")
+        FastMap_SetObject(generalContainer, "options/id/from-id-to-key", optionsFromIdToKeyMap)
+    endif
+
+    self.MCM() ; Idempotently ensure the option-storage maps are valid every time the menu opens
+
     self.InitializePages()
     self.SetHardcodedDefaults()
+
+    self.RegisterPages()
+
+    Debug("MCM::LoadPreset", "Registry (MCM): " + RPB_Registry.ListContent("PRESET.MCM"))
+
+    ; Debug("MCM::LoadPreset", "Static Storage: " + StaticStorage(".mcm.pages"))
+    ; Debug("MCM::LoadPreset", "Static Storage (MCM Pages): " + GetContainerList(FastMap_GetObject(StaticStorage(".mcm.pages"), "data")))
+
 endEvent
 
 string property RPB_CurrentPage auto
+
+string property CurrentPageConfig
+    string function get()
+        if (self.IsHoldCurrentPage())
+            ; Debug("MCM::CurrentPageConfig", CurrentPage + " ->Hold")
+            return "Hold"
+        endif
+
+        return CurrentPage
+    endFunction
+endProperty
 
 event OnPageReset(string page)
     RPB_MCM_Skills.Render(self)
@@ -907,6 +1188,33 @@ event OnPageReset(string page)
     RPB_MCM_Clothing.Render(self)
     RPB_MCM_Debug.Render(self)
     RPB_MCM_Stats.Render(self)
+    RPB_MCM_Presets.Render(self)
+
+    ; Debug("MCM::OnPageReset", "Content: " + GetContainerList(optionsValueMap))
+
+    ; int jintTest = JMap.object()
+    ; JValue.retain(jintTest, "RPB_MEMORY")
+
+    ; int jintTestInPage = self.GetPageObjectFromIDToKey(jintTest, page)
+    ; Debug("("+ page +") MCM::OnPageReset", "jintTestInPage: " + jintTestInPage + ", content: " + GetContainerList(jintTestInPage))
+
+    ; JMap.setInt(self.GetPageObject(optionsFromKeyToIdMap, page), "Arrest::Guaranteed Payable Bounty", 1798)
+    ; JIntMap.setStr(jintTestInPage, 1798, "Arrest::Guaranteed Payable Bounty")
+
+    ; Debug("("+ page +") MCM::OnPageReset", "Object (From ID to Key): " + self.GetPageObjectFromIDToKey(jintTest, page))
+    ; Debug("("+ page +") MCM::OnPageReset", "Object (From Key to ID): " + self.GetPageObject(optionsFromKeyToIdMap, page))
+
+    ; Debug("("+ page +") MCM::OnPageReset", "Option Map (From ID to Key): " + GetContainerList(self.GetPageObjectFromIDToKey(jintTest, page)))
+    ; Debug("("+ page +") MCM::OnPageReset", "Option Map (From Key to ID): " + GetContainerList(self.GetPageObject(optionsFromKeyToIdMap, page)))
+
+    ; Debug("MCM::OnPageReset", "Option Map (From ID to Key): " + GetContainerList(optionsFromIdToKeyMap))
+    ; Debug("MCM::OnPageReset", "Option Map (From Key to ID): " + GetContainerList(optionsFromKeyToIdMap))
+    if (page == "Debug")
+        MCM()
+
+    elseif (page == "Presets")
+        Debug("RPB_MCM::OnPageReset", "optionsValueMap: " + GetContainerList(optionsValueMap) + "\n" + "optionsDefaultValueMap: " + GetContainerList(optionsDefaultValueMap))
+    endif
 endEvent
 
 event OnOptionHighlight(int option)
@@ -917,6 +1225,7 @@ event OnOptionHighlight(int option)
     RPB_MCM_Debug.OnHighlight(self, option)
     RPB_MCM_Stats.OnHighlight(self, option)
     RPB_MCM_Sentence.OnHighlight(self, option)
+    RPB_MCM_Presets.OnHighlight(self, option)
 endEvent
 
 event OnOptionDefault(int option)
@@ -927,6 +1236,7 @@ event OnOptionDefault(int option)
     RPB_MCM_Debug.OnDefault(self, option)
     RPB_MCM_Stats.OnDefault(self, option)
     RPB_MCM_Sentence.OnDefault(self, option)
+    RPB_MCM_Presets.OnDefault(self, option)
 endEvent
 
 event OnOptionSelect(int option)
@@ -937,6 +1247,7 @@ event OnOptionSelect(int option)
     RPB_MCM_Debug.OnSelect(self, option)
     RPB_MCM_Stats.OnSelect(self, option)
     RPB_MCM_Sentence.OnSelect(self, option)
+    RPB_MCM_Presets.OnSelect(self, option)
 endEvent
 
 event OnOptionSliderOpen(int option)
@@ -947,6 +1258,7 @@ event OnOptionSliderOpen(int option)
     RPB_MCM_Debug.OnSliderOpen(self, option)
     RPB_MCM_Stats.OnSliderOpen(self, option)
     RPB_MCM_Sentence.OnSliderOpen(self, option)
+    RPB_MCM_Presets.OnSliderOpen(self, option)
 endEvent
 
 event OnOptionSliderAccept(int option, float value)
@@ -957,6 +1269,7 @@ event OnOptionSliderAccept(int option, float value)
     RPB_MCM_Debug.OnSliderAccept(self, option, value)
     RPB_MCM_Stats.OnSliderAccept(self, option, value)
     RPB_MCM_Sentence.OnSliderAccept(self, option, value)
+    RPB_MCM_Presets.OnSliderAccept(self, option, value)
 endEvent
 
 event OnOptionMenuOpen(int option)
@@ -967,6 +1280,7 @@ event OnOptionMenuOpen(int option)
     RPB_MCM_Debug.OnMenuOpen(self, option)
     RPB_MCM_Stats.OnMenuOpen(self, option)
     RPB_MCM_Sentence.OnMenuOpen(self, option)
+    RPB_MCM_Presets.OnMenuOpen(self, option)
 endEvent
 
 event OnOptionMenuAccept(int option, int index)
@@ -977,6 +1291,7 @@ event OnOptionMenuAccept(int option, int index)
     RPB_MCM_Debug.OnMenuAccept(self, option, index)
     RPB_MCM_Stats.OnMenuAccept(self, option, index)
     RPB_MCM_Sentence.OnMenuAccept(self, option, index)
+    RPB_MCM_Presets.OnMenuAccept(self, option, index)
 endEvent
 
 event OnOptionInputOpen(int option)
@@ -987,6 +1302,7 @@ event OnOptionInputOpen(int option)
     RPB_MCM_Debug.OnInputOpen(self, option)
     RPB_MCM_Stats.OnInputOpen(self, option)
     RPB_MCM_Sentence.OnInputOpen(self, option)
+    RPB_MCM_Presets.OnInputOpen(self, option)
 endEvent
 
 event OnOptionInputAccept(int option, string inputValue)
@@ -997,6 +1313,7 @@ event OnOptionInputAccept(int option, string inputValue)
     RPB_MCM_Debug.OnInputAccept(self, option, inputValue)
     RPB_MCM_Stats.OnInputAccept(self, option, inputValue)
     RPB_MCM_Sentence.OnInputAccept(self, option, inputValue)
+    RPB_MCM_Presets.OnInputAccept(self, option, inputValue)
 endEvent
 
 function SerializeOptions()
@@ -1261,7 +1578,8 @@ endFunction
 ; TODO: Fix error, number dependency options are always considered float, even if they should be int (should be fixed with DeterminePropertyValueType())
 int function GetOptionValueTypeFromConfig(string asOptionKey, bool abVerifyEveryProperty = true, string asReturnedPropertyTypeIfNotAllEqual = "")
     int optionsObj  = RPB_Data.MCM_GetOptionObject()
-    int optionMap   = JMap.getObj(optionsObj, asOptionKey) ; JMap&
+    int pageObj     = FastMap_GetObject(optionsObj, CurrentPageConfig)
+    int optionMap   = JMap.getObj(pageObj, asOptionKey) ; JMap&
 
     ;/ 
         Check what properties it has,
@@ -1356,14 +1674,15 @@ endFunction
 /;
 function LoadOptionValues(string asPropertyType)
     int optionsObj  = RPB_Data.MCM_GetOptionObject()
-    int optionCount = JValue.count(optionsObj)
+    int pageObj     = FastMap_GetObject(optionsObj, CurrentPageConfig)
+    int optionCount = JValue.count(pageObj)
 
     int optionIndex = 0
     bool continue   = false
 
     while (optionIndex < optionCount)
-        string optionKey                = JMap.getNthKey(optionsObj, optionIndex) ; Current Option Key
-        int optionMap                   = JMap.getObj(optionsObj, optionKey) ; JMap&
+        string optionKey                = JMap.getNthKey(pageObj, optionIndex) ; Current Option Key
+        int optionMap                   = JMap.getObj(pageObj, optionKey) ; JMap&
         bool hasPropertySpecified       = JMap.hasKey(optionMap, asPropertyType)
 
         if (!hasPropertySpecified)
@@ -1621,6 +1940,8 @@ function __internal_loadPropertyForOptionWithDependency( \
     int dependencyObject            = apDependencyObject; JArray& (Dependency Array)
     string dependencyOptionKey      = JArray.getStr(dependencyObject, 0) ; [0] = Dependency Option
 
+    Debug("MCM::LoadPropertyForOption", "asOptionKey: " + asOptionKey + ", asPropertyType: " + asPropertyType + ", dependencyObject: " + GetContainerList(dependencyObject))
+
     ; Get the dependency value type from the default value of the dependency option.
     ; The default option must first be initialized for this to work.
     int dependencyOptionValueType   = JMap.valueType(optionsDefaultValueMap, dependencyOptionKey)
@@ -1677,8 +1998,13 @@ endFunction
 /;
 function LoadPropertyForOption(string asOptionKey, string asPropertyType)
     int optionsObj      = RPB_Data.MCM_GetOptionObject()
-    bool isObject       = JMap.valueType(optionsObj, asOptionKey) == TYPE_OBJECT ; object type (All options are comprised of an object)
+    int pageObj         = self.GetPageObject(optionsObj, CurrentPageConfig) ; TODO: Add asPage parameter
+    bool isObject       = JMap.valueType(pageObj, asOptionKey) == TYPE_OBJECT ; object type (All options are comprised of an object)
     bool isValidOption  = isObject
+
+    ; Debug("MCM::LoadPropertyForOption", "asOptionKey: " + asOptionKey + ", asPropertyType: " + asPropertyType + ", PageObject: " + GetContainerList(pageObj))
+
+    ; Debug("MCM::LoadPropertyForOption", "optionsObj: " + GetContainerList(optionsObj) + ", pageObj: " + GetContainerList(pageObj))
 
     if (!isValidOption)
         DebugError("MCM::LoadPropertyForOption", "The option " + asOptionKey + " does not exist!")
@@ -1686,8 +2012,10 @@ function LoadPropertyForOption(string asOptionKey, string asPropertyType)
         return
     endif
 
-    int optionMap           = JMap.getObj(optionsObj, asOptionKey) ; JMap&
+    int optionMap           = JMap.getObj(pageObj, asOptionKey) ; JMap&
     bool propertyExists     = JMap.hasKey(optionMap, asPropertyType)
+
+    Debug("MCM::LoadPropertyForOption", "optionMap: " + GetContainerList(optionMap) + ", asPropertyType: " + asPropertyType + ", propertyExists: " + propertyExists)
 
     if (!propertyExists)
         DebugError("MCM::LoadPropertyForOption", "There was an error loading the property " + asPropertyType + " for the option " + asOptionKey)
@@ -1697,6 +2025,8 @@ function LoadPropertyForOption(string asOptionKey, string asPropertyType)
 
     int propertyValueType   = JMap.valueType(optionMap, asPropertyType)
     bool hasDependency      = (propertyValueType == TYPE_OBJECT)
+
+    Debug("MCM::LoadPropertyForOption", "asOptionKey: " + asOptionKey + ", asPropertyType: " + asPropertyType + ", propertyValueType: " + propertyValueType + ", hasDependency: " + hasDependency)
 
     if (hasDependency)
         int dependencyObject = JMap.getObj(optionMap, asPropertyType) ; JArray& (Dependency Array)
@@ -1960,7 +2290,7 @@ function InitializeOptions()
 ;                                   ID's
 ; ============================================================================
     optionsFromKeyToIdMap   = JMap.object()     ; Identify options from key to id
-    optionsFromIdToKeyMap   = JIntMap.object()  ; Identify options from id to key
+    optionsFromIdToKeyMap   = JMap.object()     ; Identify options from id to key (page name -> per-page IntMap, built on demand via GetPageObject; the top-level container itself must be a string-keyed JMap like its sibling above, not a JIntMap)
 
 ; ============================================================================
 ;                                State (Flags)
@@ -2012,7 +2342,7 @@ function MCM()
     optionsMaximumValueMap  = Object_CreateIfNotExists(optionsMaximumValueMap,  FastMap("<string>",   retain = true))
     optionsStepsValueMap    = Object_CreateIfNotExists(optionsStepsValueMap,    FastMap("<string>",   retain = true))
     optionsFromKeyToIdMap   = Object_CreateIfNotExists(optionsFromKeyToIdMap,   FastMap("<string>",   retain = true))
-    optionsFromIdToKeyMap   = Object_CreateIfNotExists(optionsFromIdToKeyMap,   FastMap("<int>",      retain = true))
+    optionsFromIdToKeyMap   = Object_CreateIfNotExists(optionsFromIdToKeyMap,   FastMap("<string>",   retain = true))
     __clothingOutfitsMap    = Object_CreateIfNotExists(__clothingOutfitsMap,    FastMap("<string>",   retain = true))
 endFunction
 
@@ -2045,7 +2375,9 @@ endFunction
     returns: The option's key.
  /;
  string function GetKeyFromOption(int optionId, bool includePageInKey = true)
-    string optionKey = JIntMap.getStr(optionsFromIdToKeyMap, optionId)
+    int pageObject = self.GetPageObject(optionsFromIdToKeyMap, CurrentPage)
+    string optionKey = JIntMap.getStr(pageObject, optionId)
+
 
     if (!includePageInKey)
         int indexOfDelimiter = StringUtil.Find(optionKey, "/")
@@ -2062,7 +2394,9 @@ endFunction
     returns: The option's id.
  /;
 int function GetOptionID(string optionKey)
-    return FastMap_GetInt(optionsFromKeyToIdMap, optionKey)
+    int pageObject = self.GetPageObject(optionsFromKeyToIdMap, CurrentPage)
+    ; Debug("GetOptionID", "optionKey: " + optionKey + ", content: " + GetContainerList(pageObject))
+    return FastMap_GetInt(pageObject, optionKey)
 endFunction
 
 ;/
@@ -2074,8 +2408,10 @@ endFunction
 /;
 function SetOptionValueBool(string optionKey, bool value, string page = "")
     ; options/value/Whiterun/Stripping::Allow Stripping
-    string optionAsStored = self.GetOptionAsStored(optionKey, page)
-    JMap.setInt(optionsValueMap, optionAsStored, value as int)
+    FastMap_SetInt(self.GetPageObject(optionsValueMap, page), optionKey, value as int)
+
+    ; string optionAsStored = self.GetOptionAsStored(optionKey, page)
+    ; JMap.setInt(optionsValueMap, optionAsStored, value as int)
 endFunction
 
 ;/
@@ -2086,8 +2422,10 @@ endFunction
     string? @page: The page where the option is rendered (will be CurrentPage if null).
 /;
 function SetOptionValueInt(string optionKey, int value, string page = "")
-    string optionAsStored = self.GetOptionAsStored(optionKey, page)
-    JMap.setInt(optionsValueMap, optionAsStored, value)
+    FastMap_SetInt(self.GetPageObject(optionsValueMap, page), optionKey, value)
+
+    ; string optionAsStored = self.GetOptionAsStored(optionKey, page)
+    ; JMap.setInt(optionsValueMap, optionAsStored, value)
 endFunction
 
 ;/
@@ -2098,8 +2436,10 @@ endFunction
     string? @page: The page where the option is rendered (will be CurrentPage if null).
 /;
 function SetOptionValueFloat(string optionKey, float value, string page = "")
-    string optionAsStored = self.GetOptionAsStored(optionKey, page)
-    JMap.setFlt(optionsValueMap, optionAsStored, value)
+    FastMap_SetFloat(self.GetPageObject(optionsValueMap, page), optionKey, value)
+
+    ; string optionAsStored = self.GetOptionAsStored(optionKey, page)
+    ; JMap.setFlt(optionsValueMap, optionAsStored, value)
 endFunction
 
 ;/
@@ -2110,9 +2450,11 @@ endFunction
     string? @page: The page where the option is rendered (will be CurrentPage if null).
 /;
 function SetOptionValueString(string optionKey, string value, string page = "")
-    string optionAsStored = self.GetOptionAsStored(optionKey, page)
-    JMap.setStr(optionsValueMap, optionAsStored, value)
-    Debug("MCM::SetOptionValueString", "Setting " + optionAsStored + ": " + value)
+    FastMap_SetString(self.GetPageObject(optionsValueMap, page), optionKey, value)
+
+    ; string optionAsStored = self.GetOptionAsStored(optionKey, page)
+    ; JMap.setStr(optionsValueMap, optionAsStored, value)
+    ; Debug("MCM::SetOptionValueString", "Setting " + optionAsStored + ": " + value)
 endFunction
 
 ;/
@@ -2122,8 +2464,9 @@ endFunction
     string? @page: The page where the option is rendered (will be CurrentPage if null).
 /;
 bool function OptionExists(string optionKey, string page = "")
-    string optionAsStored = self.GetOptionAsStored(optionKey, page)
-    return JMap.hasKey(optionsFromKeyToIdMap, optionAsStored)
+    return FastMap_HasKey(self.GetPageObject(optionsFromKeyToIdMap, page), optionKey)
+    ; string optionAsStored = self.GetOptionAsStored(optionKey, page)
+    ; return JMap.hasKey(optionsFromKeyToIdMap, optionAsStored)
 endFunction
 
 ;/
@@ -2133,8 +2476,10 @@ endFunction
     string? @page: The page where the option is rendered (will be CurrentPage if null).
 /;
 bool function OptionHasValue(string optionKey, string page = "")
-    string optionAsStored = self.GetOptionAsStored(optionKey, page)
-    return JMap.hasKey(optionsValueMap, optionAsStored)
+    return FastMap_HasKey(self.GetPageObject(optionsValueMap, page), optionKey)
+
+    ; string optionAsStored = self.GetOptionAsStored(optionKey, page)
+    ; return JMap.hasKey(optionsValueMap, optionAsStored)
 endFunction
 
 ;/
@@ -2144,8 +2489,10 @@ endFunction
     string? @page: The page where the option is rendered (will be CurrentPage if null).
 /;
 bool function OptionHasState(string optionKey, string page = "")
-    string optionAsStored = self.GetOptionAsStored(optionKey, page)
-    return JMap.hasKey(optionsStateMap, optionAsStored)
+    return FastMap_HasKey(self.GetPageObject(optionsStateMap, page), optionKey)
+    
+    ; string optionAsStored = self.GetOptionAsStored(optionKey, page)
+    ; return JMap.hasKey(optionsStateMap, optionAsStored)
 endFunction
 
 ;/
@@ -2159,10 +2506,8 @@ endFunction
 /;
 function RegisterOption(string optionKey, int optionId, string page = "")
     ; For bi-directional identification (option-key to option-id and option-id to option-key)
-    string optionAsStored = self.GetOptionAsStored(optionKey, page)
-
-    JMap.setInt(optionsFromKeyToIdMap, optionAsStored, optionId)
-    JIntMap.setStr(optionsFromIdToKeyMap, optionId, optionAsStored)
+    JMap.setInt(self.GetPageObject(optionsFromKeyToIdMap, page), optionKey, optionId)
+    JIntMap.setStr(self.GetPageObject(optionsFromIdToKeyMap, page, "<int>"), optionId, optionKey)
 endFunction
 
 ;/
@@ -2173,7 +2518,9 @@ endFunction
     string? @page: The page where the option is rendered (will be CurrentPage if null).
 /;
 function SetOptionState(string optionKey, int optionState, string page = "")
-    JMap.setInt(optionsStateMap, optionKey, optionState)
+    FastMap_SetFloat(self.GetPageObject(optionsStateMap, page), optionKey, optionState)
+
+    ; JMap.setInt(optionsStateMap, optionKey, optionState)
 endFunction
 
 ;/
@@ -2183,8 +2530,10 @@ endFunction
     string? @page: The page where the option is rendered (will be CurrentPage if null).
 /;
 bool function GetOptionValueBool(string optionKey, string page = "")
-    string optionAsStored = self.GetOptionAsStored(optionKey, page)
-    return FastMap_GetInt(optionsValueMap, optionAsStored) as bool
+    return FastMap_GetInt(self.GetPageObject(optionsValueMap, page), optionKey) as bool
+
+    ; string optionAsStored = self.GetOptionAsStored(optionKey, page)
+    ; return FastMap_GetInt(optionsValueMap, optionAsStored) as bool
 endFunction
 
 ;/
@@ -2194,8 +2543,11 @@ endFunction
     string? @page: The page where the option is rendered (will be CurrentPage if null).
 /;
 int function GetOptionValueInt(string optionKey, string page = "")
-    string optionAsStored = self.GetOptionAsStored(optionKey, page)
-    return FastMap_GetInt(optionsValueMap, optionAsStored)
+    Debug("MCM::GetOptionValueInt", "Getting " + optionKey + " from page " + page + " = " + FastMap_GetInt(self.GetPageObject(optionsValueMap, page), optionKey))
+    return FastMap_GetInt(self.GetPageObject(optionsValueMap, page), optionKey)
+    
+    ; string optionAsStored = self.GetOptionAsStored(optionKey, page)
+    ; return FastMap_GetInt(optionsValueMap, optionAsStored)
 endFunction
 
 ;/
@@ -2205,8 +2557,11 @@ endFunction
     string? @page: The page where the option is rendered (will be CurrentPage if null).
 /;
 float function GetOptionValueFloat(string optionKey, string page = "")
-    string optionAsStored = self.GetOptionAsStored(optionKey, page)
-    return FastMap_GetFloat(optionsValueMap, optionAsStored)
+    Debug("MCM::GetOptionValueFloat", "Getting " + optionKey + " from page " + page + " = " + FastMap_GetFloat(self.GetPageObject(optionsValueMap, page), optionKey))
+    return FastMap_GetFloat(self.GetPageObject(optionsValueMap, page), optionKey)
+
+    ; string optionAsStored = self.GetOptionAsStored(optionKey, page)
+    ; return FastMap_GetFloat(optionsValueMap, optionAsStored)
 endFunction
 
 ;/
@@ -2216,8 +2571,17 @@ endFunction
     string? @page: The page where the option is rendered (will be CurrentPage if null).
 /;
 string function GetOptionValueString(string optionKey, string page = "")
-    string optionAsStored = self.GetOptionAsStored(optionKey, page)
-    return FastMap_GetString(optionsValueMap, optionAsStored)
+    return FastMap_GetString(self.GetPageObject(optionsValueMap, page), optionKey)
+
+    int pageObject = self.GetPageObject(optionsValueMap, page)
+    ; string value = FastMap_GetString(pageObject, optionKey)
+
+    ; Debug("MCM::SetOptionValueString", "Getting " + optionKey + " from page " + page + " = " + value)
+
+    return FastMap_GetString(pageObject, optionKey)
+
+    ; string optionAsStored = self.GetOptionAsStored(optionKey, page)
+    ; return FastMap_GetString(optionsValueMap, optionAsStored)
 endFunction
 
 ;/
@@ -2227,8 +2591,10 @@ endFunction
     string? @page: The page where the option is rendered (will be CurrentPage if null).
 /;
 int function GetOptionState(string optionKey, string page = "")
-    string optionAsStored = self.GetOptionAsStored(optionKey, page)
-    return FastMap_GetInt(optionsStateMap, optionAsStored)
+    return FastMap_GetInt(self.GetPageObject(optionsStateMap, page), optionKey)
+
+    ; string optionAsStored = self.GetOptionAsStored(optionKey, page)
+    ; return FastMap_GetInt(optionsStateMap, optionAsStored)
 endFunction
 
 ;/
