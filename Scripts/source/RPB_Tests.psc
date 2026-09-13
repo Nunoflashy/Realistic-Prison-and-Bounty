@@ -30,6 +30,7 @@ function SetTests()
     self.AddTest("18 - Test Prison Root Objects", "Test_PrisonRootObjects")
     self.AddTest("19 - Test JSON Conditions", "Test_JSONConditions")
     self.AddTest("20 - Test Data Structures", "Test_DataStructures")
+    self.AddTest("21 - Benchmark StorageVars", "Benchmark_StorageVars")
 endFunction
 
 state Test_25Days_After_26th_Frostfall_Is_20th_Suns_Dusk
@@ -591,7 +592,7 @@ state Test_NewSerializationCompareWithOld
     function Setup()
         RPB_Prison prison = API.PrisonManager.GetPrison("Haafingar")
         RPB_JailCell jailCell = Game.GetFormEx(0x36897) as RPB_JailCell ; 1st Jail Cell for this prison
-        int cellsDataObject = prison.GetDataObject("Cells")
+        int cellsDataObject = prison.Children("Cells")
 
         bool oldBool = jailCell.GetOptionOfTypeBool("Bool")
         bool newBool = RPB_Data.GetPropertyOfTypeInteger(cellsDataObject, jailCell + "//Bool") as bool
@@ -621,6 +622,51 @@ state Test_NewSerializationCompareWithOld
         )
 
         display_result(passBool && passInt && passString)
+    endFunction
+endState
+
+state Benchmark_StorageVars
+    function Setup()
+        ;/ const /; int ITERATIONS = 400
+
+        Actor testReference = Game.GetFormEx(0x14) as Actor
+
+        ; Setters
+        float bench = StartBenchmark()
+        int i = 1
+        while (i <= ITERATIONS)
+            RPB_StorageVars.SetStringOnReference("Test" + i, testReference, "(" + i + ") Test String To Add To Benchmark These Reference Functions")
+            i += 1
+        endWhile
+        EndBenchmark(bench, "StorageVars Reference Setter Functions Benchmark ("+ ITERATIONS +" iterations)")
+
+        ; Setters
+        bench = StartBenchmark()
+        i = 1
+        while (i <= ITERATIONS)
+            RPB_StorageVars.SetStringOnReference("Test" + i, testReference, "(" + i + ") Test String To Add To Benchmark These Form Functions")
+            i += 1
+        endWhile
+        EndBenchmark(bench, "StorageVars Form Setter Functions Benchmark ("+ ITERATIONS +" iterations)")
+
+        ; Getters
+        bench = StartBenchmark()
+        i = 1
+        while (i <= ITERATIONS)
+            RPB_StorageVars.GetStringOnReference("Test" + i, testReference)
+            i += 1
+        endWhile
+        EndBenchmark(bench, "StorageVars Reference Getter Functions Benchmark ("+ ITERATIONS +" iterations)")
+
+        ; Getters
+        bench = StartBenchmark()
+
+        i = 1
+        while (i <= ITERATIONS)
+            RPB_StorageVars.GetStringOnReference("Test" + i, testReference)
+            i += 1
+        endWhile
+        EndBenchmark(bench, "StorageVars Form Getter Functions Benchmark ("+ ITERATIONS +" iterations)")
     endFunction
 endState
 
@@ -1568,7 +1614,7 @@ function AddTest(string asName, string asTestMethodName)
         ; log("testCount: " + testCount + ", testIndex: " + testIndex + ", testName: " + testName)
 
         JMap.setStr(testMap, asName, asTestMethodName)
-        RPB_StorageVars.SetStringOnForm(asName, self, asTestMethodName)
+        RPB_StorageVars.SetStringOnReference(asName, self, asTestMethodName)
     ; endif
 endFunction
 
@@ -1588,7 +1634,7 @@ string[] function GetTestMethodNames()
 endFunction
 
 string function GetTest(string asTestName)
-    return RPB_StorageVars.GetStringOnForm(asTestName, self)
+    return RPB_StorageVars.GetStringOnReference(asTestName, self)
     return JMap.getStr(testMap, asTestName)
 endFunction
 

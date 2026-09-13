@@ -14,20 +14,15 @@ int function GetObjectHandle(string asCategory = "null") global
     return JDB.solveObj(GetRootPath())
 endFunction
 
-int function GetObjectHandleOnForm(Form akForm, string asCategory = "null") global
+int function GetObjectHandleOnReference(string asReference, string asCategory = "null") global
+    string referenceId          = ExtractReferenceID(asReference)
+    string referenceSignature   = "(" + "Reference" + " <" + referenceId + ">" + ")"
+
     if (asCategory != "null" && asCategory != "")
-        return JDB.solveObj(GetRootPath() + "." + akForm.GetFormID() + "." + asCategory)
+        return JDB.solveObj(GetRootPath() + "." + referenceSignature + "." + asCategory)
     endif
 
-    return JDB.solveObj(GetRootPath() + "." + akForm.GetFormID())
-endFunction
-
-int function GetObjectHandleOnKey(string asKey, string asCategory = "null") global
-    if (asCategory != "null" && asCategory != "")
-        return JDB.solveObj(GetRootPath() + "." + asKey + "." + asCategory)
-    endif
-
-    return JDB.solveObj(GetRootPath() + "." + asKey)
+    return JDB.solveObj(GetRootPath() + "." + referenceSignature)
 endFunction
 
 ; ==========================================================
@@ -189,194 +184,6 @@ function DeleteAll() global
 endFunction
 
 ; ==========================================================
-;                       Form Specific
-; ==========================================================
-
-string function GetVarPathOnForm(string asKey, Form akForm, string asCategory = "null") global
-    string path = none
-    
-    if (!akForm)
-        Debug("StorageVars::GetVarPathOnForm", "The provided Form is invalid! asKey: " + asKey + ", asCategory: " + asCategory)
-        return ""
-    endif
-
-    if (asCategory != "null" && asCategory != "")
-        path = GetRootPath() + "." + akForm.GetFormID() + "." + asCategory + "." + asKey
-    else
-        path = GetRootPath() + "." + akForm.GetFormID() + "." + asKey
-    endif
-
-    return path
-endFunction
-
-string function GetCategoryPathOnForm(Form akForm, string asCategory) global
-    return GetRootPath() + "." + akForm.GetFormID() + "." + asCategory
-endFunction
-
-string function GetFormPath(Form akForm) global
-    return GetRootPath() + "." + akForm.GetFormID()
-endFunction
-
-;                          Getters
-
-bool function GetBoolOnForm(string asKey, Form akForm, string asCategory = "null") global
-    string path = GetVarPathOnForm(asKey, akForm, asCategory)
-
-    ; Debug(none, "StorageVars::GetBoolOnForm", "path: " + path + ", value: " + JDB.solveInt(path))
-
-    return JDB.solveInt(path) as bool
-endFunction
-
-int function GetIntOnForm(string asKey, Form akForm, string asCategory = "null") global
-    string path = GetVarPathOnForm(asKey, akForm, asCategory)
-    return JDB.solveInt(path)
-endFunction
-
-float function GetFloatOnForm(string asKey, Form akForm, string asCategory = "null") global
-    string path = GetVarPathOnForm(asKey, akForm, asCategory)
-    return JDB.solveFlt(path)
-endFunction
-
-string function GetStringOnForm(string asKey, Form akForm, string asCategory = "null") global
-    string path = GetVarPathOnForm(asKey, akForm, asCategory)
-    return JDB.solveStr(path)
-endFunction
-
-Form function GetFormOnForm(string asKey, Form akForm, string asCategory = "null") global
-    string path = GetVarPathOnForm(asKey, akForm, asCategory)
-    ; Debug(none, "StorageVars::GetFormOnForm", "path: " + path + ", value: " + JDB.solveForm(path))
-
-    return JDB.solveForm(path)
-endFunction
-
-int[] function GetIntsOnForm(string asKey, Form akForm, string asCategory = "null") global
-    string path = GetVarPathOnForm(asKey, akForm, asCategory)
-    return JArray.asIntArray(JDB.solveObj(path))
-endFunction
-
-float[] function GetFloatsOnForm(string asKey, Form akForm, string asCategory = "null") global
-    string path = GetVarPathOnForm(asKey, akForm, asCategory)
-    return JArray.asFloatArray(JDB.solveObj(path))
-endFunction
-
-string[] function GetStringsOnForm(string asKey, Form akForm, string asCategory = "null") global
-    string path = GetVarPathOnForm(asKey, akForm, asCategory)
-    return JArray.asStringArray(JDB.solveObj(path))
-endFunction
-
-Form[] function GetFormsOnForm(string asKey, Form akForm, string asCategory = "null") global
-    string path = GetVarPathOnForm(asKey, akForm, asCategory)
-    return JArray.asFormArray(JDB.solveObj(path))
-endFunction
-
-;                          Setters
-
-function SetBoolOnForm(string asKey, Form akForm, bool abValue, string asCategory = "null") global
-    string path = GetVarPathOnForm(asKey, akForm, asCategory)
-    JDB.solveIntSetter(path, abValue as int, true)
-endFunction
-
-function SetIntOnForm(string asKey, Form akForm, int aiValue, string asCategory = "null", bool abDeleteOnNull = false) global
-    ; Debug("StorageVars::SetIntOnForm", "Key: " + asKey + ", Value: " + aiValue + ", Category: " + asCategory + ", DeleteOnNull: " + abDeleteOnNull)
-    if (abDeleteOnNull && aiValue == 0)
-        DeleteVariableOnForm(asKey, akForm, asCategory)
-        return
-    endif
-    
-    string path = GetVarPathOnForm(asKey, akForm, asCategory)
-    JDB.solveIntSetter(path, aiValue, true)
-endFunction
-
-function SetFloatOnForm(string asKey, Form akForm, float afValue, string asCategory = "null") global
-    string path = GetVarPathOnForm(asKey, akForm, asCategory)
-    JDB.solveFltSetter(path, afValue, true)
-endFunction
-
-function SetStringOnForm(string asKey, Form akForm, string asValue, string asCategory = "null") global
-    string path = GetVarPathOnForm(asKey, akForm, asCategory)
-    JDB.solveStrSetter(path, asValue, true)
-endFunction
-
-function SetFormOnForm(string asKey, Form akForm, Form akValue, string asCategory = "null") global
-    string path = GetVarPathOnForm(asKey, akForm, asCategory)
-    
-    JDB.solveFormSetter(path, akValue, true)
-    ; Debug(none, "StorageVars::SetFormOnForm", "path: " + path + ", value: " + JDB.solveForm(path))
-endFunction
-
-function SetIntsOnForm(string asKey, Form akForm, int[] aiValues, string asCategory = "null") global
-    string path = GetVarPathOnForm(asKey, akForm, asCategory)
-    int formToObject = JArray.objectWithInts(aiValues)
-    JDB.solveObjSetter(path, formToObject, true)
-endFunction
-
-function SetFloatsOnForm(string asKey, Form akForm, float[] afValues, string asCategory = "null") global
-    string path = GetVarPathOnForm(asKey, akForm, asCategory)
-    int formToObject = JArray.objectWithFloats(afValues)
-    JDB.solveObjSetter(path, formToObject, true)
-endFunction
-
-function SetStringsOnForm(string asKey, Form akForm, string[] asValues, string asCategory = "null") global
-    string path = GetVarPathOnForm(asKey, akForm, asCategory)
-    int formToObject = JArray.objectWithStrings(asValues)
-    JDB.solveObjSetter(path, formToObject, true)
-endFunction
-
-function SetFormsOnForm(string asKey, Form akForm, Form[] akValues, string asCategory = "null") global
-    string path = GetVarPathOnForm(asKey, akForm, asCategory)
-    int formToObject = JArray.objectWithForms(akValues)
-    JDB.solveObjSetter(path, formToObject, true)
-endFunction
-
-;                          Modifiers
-function ModIntOnForm(string asKey, Form akForm, int aiValue, string asCategory = "null") global
-    int currentValue = GetIntOnForm(asKey, akForm, asCategory)
-    SetIntOnForm(asKey, akForm, currentValue + aiValue, asCategory)
-endFunction
-
-function ModFloatOnForm(string asKey, Form akForm, float afValue, string asCategory = "null") global
-    float currentValue = GetFloatOnForm(asKey, akForm, asCategory)
-    SetFloatOnForm(asKey, akForm, currentValue + afValue, asCategory)
-endFunction
-
-;                     Delete Functions
-
-function DeleteVariableOnForm(string asKey, Form akForm, string asCategory = "null") global
-    ; string path = GetVarPathOnForm(asKey, akForm, asCategory)
-    ; JDB.solveObjSetter(path, 0)
-    int obj = GetObjectHandleOnForm(akForm, asCategory)
-    JMap.removeKey(obj, asKey)
-endFunction
-
-function DeleteCategoryOnForm(Form akForm, string asCategory) global
-    ; string path = GetCategoryPathOnForm(akForm, asCategory)
-    ; JDB.solveObjSetter(path, 0)
-    int deletedObj = GetObjectHandleOnForm(akForm)
-    JMap.removeKey(deletedObj, asCategory)
-endFunction
-
-function DeleteAllOnForm(Form akForm) global
-    ; string path = GetFormPath(akForm)
-    ; JDB.solveObjSetter(path, 0, true)
-    int deletedObj = GetObjectHandleOnForm(akForm)
-    JMap.clear(deletedObj)
-    JMap.removeKey(GetObjectHandle(), akForm.GetFormID())
-endFunction
-
-bool function HasVarOnForm(string asKey, Form akForm, string asCategory = "null") global
-    string path = GetVarPathOnForm(asKey, akForm, asCategory)
-    return JDB.hasPath(path)
-endFunction
-
-bool function HasVarsOnForm(Form akForm, string asCategory = "null") global
-    int formId  = akForm.GetFormID()
-    string path = GetRootPath() + "."+ formId
-
-    return JDB.hasPath(path)
-endFunction
-
-
-; ==========================================================
 ;                  Any Reference as Source
 ; ==========================================================
 
@@ -420,11 +227,25 @@ string function GetVarPathOnReference(string asKey, string apReference, string a
              taken into account when passing the reference, and it can happen that for SET
              we get something like WIDeadBodyScript, while for GET we get Actor or Form,
              in which case this will fail to be retrieved.
+
+             Possible use: Storage the data for each Reference Type on the same reference,
+             so if it is cast when being passed, it will retrieve the correct data.
         /;
-        string referenceType    = ExtractReferenceType(apReference)
+        ; string referenceType    = ExtractReferenceType(apReference)
         string referenceId      = ExtractReferenceID(apReference)
-        apReference = "(" + referenceType + " <" + referenceId + ">" + ")"
+        ; apReference = "(" + referenceType + " <" + referenceId + ">" + ")"
         ; apReference = "Form <" + GetFormFromString(apReference).GetFormID() + ">"
+
+        ;/
+            Alternative method to fix this issue:
+                Only extract the reference ID, and append that to a name that
+                is known to be unique, such as Reference.
+                
+                In this case, it could look like this: (Reference <00000014>).
+                Now, no matter which type of reference is passed, the ID will always be valid
+                and the type Reference.
+        /;
+        apReference = "(" + "Reference" + " <" + referenceId + ">" + ")"
     endif
 
     if (asCategory != "null" && asCategory != "")
@@ -490,7 +311,12 @@ function SetBoolOnReference(string asKey, string apReference, bool abValue, stri
     JDB.solveIntSetter(path, abValue as int, true)
 endFunction
 
-function SetIntOnReference(string asKey, string apReference, int aiValue, string asCategory = "null") global
+function SetIntOnReference(string asKey, string apReference, int aiValue, string asCategory = "null", bool abDeleteOnNull = false) global
+    if (abDeleteOnNull && aiValue == 0)
+        DeleteVariableOnReference(asKey, apReference, asCategory)
+        return
+    endif
+
     string path = GetVarPathOnReference(asKey, apReference, asCategory)
     JDB.solveIntSetter(path, aiValue, true)
 endFunction
@@ -498,12 +324,13 @@ endFunction
 function SetFloatOnReference(string asKey, string apReference, float afValue, string asCategory = "null") global
     string path = GetVarPathOnReference(asKey, apReference, asCategory)
     JDB.solveFltSetter(path, afValue, true)
-    Debug("StorageVars::SetFloatOnReference", "Setting " + asKey + " on "+ apReference +" with category " + asCategory + " to " + afValue + ": " + JDB.solveFltSetter(path, afValue, true))
-    Debug("StorageVars::SetFloatOnReference", "PATH: " + path)
+    ; Debug("StorageVars::SetFloatOnReference", "Setting " + asKey + " on "+ apReference +" with category " + asCategory + " to " + afValue + ": " + JDB.solveFltSetter(path, afValue, true))
+    ; Debug("StorageVars::SetFloatOnReference", "PATH: " + path)
 endFunction 
 
 function SetStringOnReference(string asKey, string apReference, string asValue, string asCategory = "null") global
     string path = GetVarPathOnReference(asKey, apReference, asCategory)
+    Debug("StorageVars::SetStringOnReference", "Setting " + asKey + " on "+ apReference +" with category " + asCategory + " to " + asValue)
     JDB.solveStrSetter(path, asValue, true)
 endFunction
 
@@ -550,17 +377,17 @@ endFunction
 ;                     Delete Functions
 
 function DeleteVariableOnReference(string asKey, string apReference, string asCategory = "null") global
-    int obj = GetObjectHandleOnKey(apReference, asCategory)
+    int obj = GetObjectHandleOnReference(apReference, asCategory)
     JMap.removeKey(obj, asKey)
 endFunction
 
 function DeleteCategoryOnReference(string apReference, string asCategory) global
-    int deletedObj = GetObjectHandleOnKey(apReference)
+    int deletedObj = GetObjectHandleOnReference(apReference)
     JMap.removeKey(deletedObj, asCategory)
 endFunction
 
 function DeleteAllOnReference(string apReference) global
-    int deletedObj = GetObjectHandleOnKey(apReference)
+    int deletedObj = GetObjectHandleOnReference(apReference)
     JMap.clear(deletedObj)
     JMap.removeKey(GetObjectHandle(), apReference as string)
 endFunction
@@ -584,7 +411,7 @@ string function GetList(string asCategory = "null") global
 endFunction
 
 string function GetListOnForm(Form akForm, string asCategory = "null") global
-    return GetContainerList(GetObjectHandleOnForm(akForm, asCategory))
+    return GetContainerList(GetObjectHandleOnReference(akForm, asCategory))
 endFunction
 
 ; ==========================================================
@@ -597,7 +424,7 @@ function Serialize(string asFilePath, string asCategory = "null") global
 endFunction
 
 function SerializeForm(string asFilePath, Form akForm, string asCategory = "null") global
-    int obj = GetObjectHandleOnForm(akForm, asCategory)
+    int obj = GetObjectHandleOnReference(akForm, asCategory)
     JValue.writeToFile(obj, asFilePath)
 endFunction
 
