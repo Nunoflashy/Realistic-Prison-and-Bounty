@@ -830,8 +830,11 @@ function SetBool(string asVarName, bool abValue, string asVarCategory = "Actor")
     ; Debug("Actor::SetBool", "["+ self +"] Setting " + asVarName + " on " + this + " to: " + abValue)
 endFunction
 
-function SetInt(string asVarName, int aiValue, string asVarCategory = "Actor", int aiMinValue = 0, int aiMaxValue = 0)
+function SetInt(string asVarName, int aiValue, string asVarCategory = "Actor", int aiMinValue = -99999999, int aiMaxValue = 99999999)
     string category = self.GetScriptVarCategory(asVarCategory)
+
+    ; Clamp the value
+    aiValue = ClampInt(aiValue, aiMinValue, aiMaxValue)
     RPB_StorageVars.SetIntOnReference(asVarName, this, aiValue, category)
 endFunction
 
@@ -841,8 +844,11 @@ function ModInt(string asVarName, int aiValue, string asVarCategory = "Actor")
     ; Debug("Actor::ModInt", "["+ self +"] Modifying " + asVarName + " on " + this + " by: " + aiValue)
 endFunction
 
-function SetFloat(string asVarName, float afValue, string asVarCategory = "Actor", float afMinValue = 0.0, float afMaxValue = 0.0)
+function SetFloat(string asVarName, float afValue, string asVarCategory = "Actor", float afMinValue = -99999999.0, float afMaxValue = 99999999.0)
     string category = self.GetScriptVarCategory(asVarCategory)
+
+    ; Clamp the value
+    afValue = ClampFloat(afValue, afMinValue, afMaxValue)
     RPB_StorageVars.SetFloatOnReference(asVarName, this, afValue, category)
     ; Debug("Actor::SetFloat", "["+ self +"] Setting " + asVarName + " on " + this + " to: " + afValue)
 endFunction
