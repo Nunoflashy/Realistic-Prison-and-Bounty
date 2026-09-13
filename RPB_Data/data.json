@@ -1,20 +1,20 @@
 {
   "Eastmarch": {
+    "City": "Windhelm",
     "Crime Faction": "__formData|Skyrim.esm|0x267e3",
     "Jail": {
-      "City": "Windhelm",
-      "Base Cell Door": "__formData|Skyrim.esm|0x40BB2",
+      "Base Cell Door": "__formData|Skyrim.esm|0x40bb2",
       "Cells": {
         "__metaInfo": {
           "typeName": "JFormMap"
         },
-        "__formData|RealisticPrisonAndBounty.esp|0x24F06": {
+        "__formData|RealisticPrisonAndBounty.esp|0x24f06": {
           "Active": 1,
           "Cell Doors": {
             "__metaInfo": {
               "typeName": "JFormMap"
             },
-            "__formData|Skyrim.esm|0x8D449": {
+            "__formData|Skyrim.esm|0x8d449": {
               "Lock": {
                 "Decay Options": {
                   "Min. Lock Level": "Adept",
@@ -30,10 +30,12 @@
               }
             }
           },
-          "Exterior": ["__formData|RealisticPrisonAndBounty.esp|0x24F0C"],
+          "Exterior": [
+            "__formData|RealisticPrisonAndBounty.esp|0x24f0c"
+          ],
           "ID": "Cell 01",
           "Interior": [],
-          "Main Interior": "__formData|RealisticPrisonAndBounty.esp|0x24F06",
+          "Main Interior": "__formData|RealisticPrisonAndBounty.esp|0x24f06",
           "Objects": {
             "Beds": [],
             "Containers": [],
@@ -50,188 +52,13 @@
             }
           }
         },
-        "__formData|RealisticPrisonAndBounty.esp|0x24F07": {
+        "__formData|RealisticPrisonAndBounty.esp|0x24f07": {
           "Active": 1,
           "Cell Doors": {
             "__metaInfo": {
               "typeName": "JFormMap"
             },
-            "__formData|Skyrim.esm|0x105FBC": {
-              "Lock": {
-                "Decay Options": {
-                  "Min. Lock Level": "Adept",
-                  "Wear Thresholds": {
-                    "Adept": 60,
-                    "Apprentice": 150,
-                    "Expert": 200,
-                    "Master": 100,
-                    "Novice": 700,
-                    "Requires Key": 2
-                  }
-                },
-                "Level": "Requires Key"
-              }
-            }
-          },
-          "Exterior": ["__formData|RealisticPrisonAndBounty.esp|0x24F0D"],
-          "ID": "Cell 02",
-          "Interior": [],
-          "Main Exterior": null,
-          "Main Interior": "__formData|RealisticPrisonAndBounty.esp|0x24F07",
-          "Objects": {
-            "Beds": [],
-            "Containers": [],
-            "Props": []
-          },
-          "Options": {
-            "Allow Overcrowding": 0,
-            "Lock Level": "Master",
-            "Maximum Prisoners": 1,
-            "Scan": {
-              "Exterior Radius": 200,
-              "Interior Radius": 500,
-              "Iterations": 5
-            }
-          }
-        },
-        "__formData|RealisticPrisonAndBounty.esp|0x24F08": {
-          "Active": 1,
-          "Cell Doors": {
-            "__metaInfo": {
-              "typeName": "JFormMap"
-            },
-            "__formData|Skyrim.esm|0x105FBB": {
-              "Lock": {
-                "Decay Options": {
-                  "Min. Lock Level": "Adept",
-                  "Wear Thresholds": {
-                    "Adept": 60,
-                    "Apprentice": 150,
-                    "Expert": 200,
-                    "Master": 100,
-                    "Novice": 700,
-                    "Requires Key": 2
-                  }
-                },
-                "Level": "Requires Key"
-              }
-            }
-          },
-          "Exterior": ["__formData|RealisticPrisonAndBounty.esp|0x24F0E"],
-          "ID": "Cell 03",
-          "Interior": [],
-          "Main Exterior": null,
-          "Main Interior": "__formData|RealisticPrisonAndBounty.esp|0x24F08",
-          "Objects": {
-            "Beds": [],
-            "Containers": [],
-            "Props": []
-          },
-          "Options": {
-            "Maximum Prisoners": 1,
-            "Lock Level": "Requires Key",
-            "Scan": {
-              "Exterior Radius": 200,
-              "Interior Radius": 300,
-              "Iterations": 5
-            }
-          }
-        },
-        "__formData|RealisticPrisonAndBounty.esp|0x24F09": {
-          "Active": 1,
-          "Cell Doors": {
-            "__metaInfo": {
-              "typeName": "JFormMap"
-            },
-            "__formData|Skyrim.esm|0xD3141": {
-              "Lock": {
-                "Decay Options": {
-                  "Min. Lock Level": "Adept",
-                  "Wear Thresholds": {
-                    "Adept": 60,
-                    "Apprentice": 150,
-                    "Expert": 200,
-                    "Master": 100,
-                    "Novice": 700,
-                    "Requires Key": 2
-                  }
-                },
-                "Level": "Requires Key"
-              }
-            }
-          },
-          "Exterior": ["__formData|RealisticPrisonAndBounty.esp|0x24F0F"],
-          "ID": "Cell 04",
-          "Interior": [],
-          "Main Exterior": null,
-          "Main Interior": "__formData|RealisticPrisonAndBounty.esp|0x24F09",
-          "Options": {
-            "Allow Overcrowding": 1,
-            "Maximum Prisoners": 2,
-            "Scan": {
-              "Exterior Radius": 200,
-              "Interior Radius": 500,
-              "Iterations": 5
-            }
-          }
-        }
-      },
-      "Location": "__formData|Skyrim.esm|0x209E7",
-      "Name": "Windhelm Barracks",
-      "Prisoner Containers": {
-        "Belongings": [
-          "__formData|Skyrim.esm|0x3EF10"
-        ],
-        "Evidence": [
-          "__formData|Skyrim.esm|0x108D38"
-        ]
-      },
-      "Markers": {
-        "Jail": {
-          "Teleport": [
-            "__formData|Skyrim.esm|0x3EF10"
-          ],
-          "Escort": [
-            "__formData|Skyrim.esm|0x3EF10"
-          ]
-        },
-        "Release": {
-          "Teleport": [
-            "__formData|Skyrim.esm|0x3EF10"
-          ],
-          "Escort": [
-            "__formData|Skyrim.esm|0x3EF10"
-          ]
-        },
-        "Search": {
-          "Frisking": [],
-          "Stripping": [
-            "__formData|RealisticPrisonAndBounty.esp|0x24F11"
-          ]
-        }
-      }
-    },
-    "Locations": [
-      "__formData|Skyrim.esm|0x18a57",
-      "__formData|Skyrim.esm|0x1676a"
-    ]
-  },
-  "Falkreath": {
-    "Crime Faction": "__formData|Skyrim.esm|0x28170",
-    "Jail": {
-      "City": "Falkreath",
-      "Base Cell Door": "__formData|Skyrim.esm|0xEC563",
-      "Cells": {
-        "__metaInfo": {
-          "typeName": "JFormMap"
-        },
-        "__formData|RealisticPrisonAndBounty.esp|0x25F3A": {
-          "Active": 1,
-          "Cell Doors": {
-            "__metaInfo": {
-              "typeName": "JFormMap"
-            },
-            "__formData|Skyrim.esm|0xEF434": {
+            "__formData|Skyrim.esm|0x105fbc": {
               "Lock": {
                 "Decay Options": {
                   "Min. Lock Level": "Adept",
@@ -249,21 +76,203 @@
             }
           },
           "Exterior": [
-            "__formData|RealisticPrisonAndBounty.esp|0x25F3D",
-            "__formData|RealisticPrisonAndBounty.esp|0x25F3C",
-            "__formData|RealisticPrisonAndBounty.esp|0x25F3B"
+            "__formData|RealisticPrisonAndBounty.esp|0x24f0d"
           ],
-          "ID": "Holding Cell",
+          "ID": "Cell 02",
           "Interior": [],
-          "Main Interior": "__formData|RealisticPrisonAndBounty.esp|0x25F3A",
+          "Main Exterior": null,
+          "Main Interior": "__formData|RealisticPrisonAndBounty.esp|0x24f07",
           "Objects": {
             "Beds": [],
             "Containers": [],
             "Props": []
           },
           "Options": {
-            "Cell Type": "Holding Cell",
+            "Allow Overcrowding": 0,
+            "Lock Level": "Master",
+            "Maximum Prisoners": 1,
+            "Scan": {
+              "Exterior Radius": 200,
+              "Interior Radius": 500,
+              "Iterations": 5
+            }
+          }
+        },
+        "__formData|RealisticPrisonAndBounty.esp|0x24f08": {
+          "Active": 1,
+          "Cell Doors": {
+            "__metaInfo": {
+              "typeName": "JFormMap"
+            },
+            "__formData|Skyrim.esm|0x105fbb": {
+              "Lock": {
+                "Decay Options": {
+                  "Min. Lock Level": "Adept",
+                  "Wear Thresholds": {
+                    "Adept": 60,
+                    "Apprentice": 150,
+                    "Expert": 200,
+                    "Master": 100,
+                    "Novice": 700,
+                    "Requires Key": 2
+                  }
+                },
+                "Level": "Requires Key"
+              }
+            }
+          },
+          "Exterior": [
+            "__formData|RealisticPrisonAndBounty.esp|0x24f0e"
+          ],
+          "ID": "Cell 03",
+          "Interior": [],
+          "Main Exterior": null,
+          "Main Interior": "__formData|RealisticPrisonAndBounty.esp|0x24f08",
+          "Objects": {
+            "Beds": [],
+            "Containers": [],
+            "Props": []
+          },
+          "Options": {
+            "Lock Level": "Requires Key",
+            "Maximum Prisoners": 1,
+            "Scan": {
+              "Exterior Radius": 200,
+              "Interior Radius": 300,
+              "Iterations": 5
+            }
+          }
+        },
+        "__formData|RealisticPrisonAndBounty.esp|0x24f09": {
+          "Active": 1,
+          "Cell Doors": {
+            "__metaInfo": {
+              "typeName": "JFormMap"
+            },
+            "__formData|Skyrim.esm|0xd3141": {
+              "Lock": {
+                "Decay Options": {
+                  "Min. Lock Level": "Adept",
+                  "Wear Thresholds": {
+                    "Adept": 60,
+                    "Apprentice": 150,
+                    "Expert": 200,
+                    "Master": 100,
+                    "Novice": 700,
+                    "Requires Key": 2
+                  }
+                },
+                "Level": "Requires Key"
+              }
+            }
+          },
+          "Exterior": [
+            "__formData|RealisticPrisonAndBounty.esp|0x24f0f"
+          ],
+          "ID": "Cell 04",
+          "Interior": [],
+          "Main Exterior": null,
+          "Main Interior": "__formData|RealisticPrisonAndBounty.esp|0x24f09",
+          "Options": {
             "Allow Overcrowding": 1,
+            "Maximum Prisoners": 2,
+            "Scan": {
+              "Exterior Radius": 200,
+              "Interior Radius": 500,
+              "Iterations": 5
+            }
+          }
+        }
+      },
+      "City": "Windhelm",
+      "Location": "__formData|Skyrim.esm|0x209e7",
+      "Markers": {
+        "Jail": {
+          "Escort": [
+            "__formData|Skyrim.esm|0x3ef10"
+          ],
+          "Teleport": [
+            "__formData|Skyrim.esm|0x3ef10"
+          ]
+        },
+        "Release": {
+          "Escort": [
+            "__formData|Skyrim.esm|0x3ef10"
+          ],
+          "Teleport": [
+            "__formData|Skyrim.esm|0x3ef10"
+          ]
+        },
+        "Search": {
+          "Frisking": [],
+          "Stripping": [
+            "__formData|RealisticPrisonAndBounty.esp|0x24f11"
+          ]
+        }
+      },
+      "Name": "Windhelm Barracks",
+      "Prisoner Containers": {
+        "Belongings": [
+          "__formData|Skyrim.esm|0x3ef10"
+        ],
+        "Evidence": [
+          "__formData|Skyrim.esm|0x108d38"
+        ]
+      }
+    },
+    "Locations": [
+      "__formData|Skyrim.esm|0x18a57",
+      "__formData|Skyrim.esm|0x1676a"
+    ]
+  },
+  "Falkreath": {
+    "City": "Falkreath",
+    "Crime Faction": "__formData|Skyrim.esm|0x28170",
+    "Jail": {
+      "Base Cell Door": "__formData|Skyrim.esm|0xec563",
+      "Cells": {
+        "__metaInfo": {
+          "typeName": "JFormMap"
+        },
+        "__formData|RealisticPrisonAndBounty.esp|0x25f3a": {
+          "Active": 1,
+          "Cell Doors": {
+            "__metaInfo": {
+              "typeName": "JFormMap"
+            },
+            "__formData|Skyrim.esm|0xef434": {
+              "Lock": {
+                "Decay Options": {
+                  "Min. Lock Level": "Adept",
+                  "Wear Thresholds": {
+                    "Adept": 60,
+                    "Apprentice": 150,
+                    "Expert": 200,
+                    "Master": 100,
+                    "Novice": 700,
+                    "Requires Key": 2
+                  }
+                },
+                "Level": "Requires Key"
+              }
+            }
+          },
+          "Exterior": [
+            "__formData|RealisticPrisonAndBounty.esp|0x25f3d",
+            "__formData|RealisticPrisonAndBounty.esp|0x25f3c",
+            "__formData|RealisticPrisonAndBounty.esp|0x25f3b"
+          ],
+          "ID": "Holding Cell",
+          "Interior": [],
+          "Main Interior": "__formData|RealisticPrisonAndBounty.esp|0x25f3a",
+          "Objects": {
+            "Beds": [],
+            "Containers": [],
+            "Props": []
+          },
+          "Options": {
+            "Allow Overcrowding": 1,
+            "Cell Type": "Holding Cell",
             "Maximum Prisoners": 2,
             "Maximum Prisoners when Overcrowded": 15,
             "Package": "M",
@@ -275,33 +284,34 @@
           }
         }
       },
-      "Location":  "__formData|Skyrim.esm|0x1033AF",
-      "Name": "Falkreath Jail",
-      "Prisoner Containers": {
-        "Belongings": [
-          "__formData|Skyrim.esm|0xEF436"
-        ],
-        "Evidence": [
-          "__formData|Skyrim.esm|0xEF437"
-        ]
-      },
+      "City": "Falkreath",
+      "Location": "__formData|Skyrim.esm|0x1033af",
       "Markers": {
         "Jail": {
-          "Teleport": [
-            "__formData|Skyrim.esm|0xEF436"
-          ],
           "Escort": [
-            "__formData|Skyrim.esm|0xEF436"
+            "__formData|Skyrim.esm|0xef436"
+          ],
+          "Teleport": [
+            "__formData|Skyrim.esm|0xef436"
           ]
         },
         "Release": {
-          "Teleport": [
-            "__formData|Skyrim.esm|0xEF436"
-          ],
           "Escort": [
-            "__formData|Skyrim.esm|0xEF436"
+            "__formData|Skyrim.esm|0xef436"
+          ],
+          "Teleport": [
+            "__formData|Skyrim.esm|0xef436"
           ]
         }
+      },
+      "Name": "Falkreath Jail",
+      "Prisoner Containers": {
+        "Belongings": [
+          "__formData|Skyrim.esm|0xef436"
+        ],
+        "Evidence": [
+          "__formData|Skyrim.esm|0xef437"
+        ]
       }
     },
     "Locations": [
@@ -320,9 +330,9 @@
         }
       }
     },
+    "City": "Solitude",
     "Crime Faction": "__formData|Skyrim.esm|0x29db0",
     "Jail": {
-      "City": "Solitude",
       "Base Cell Door": "__formData|Skyrim.esm|0x5e91d",
       "Cells": {
         "__metaInfo": {
@@ -383,6 +393,58 @@
             "Second Item"
           ]
         },
+        "__formData|RealisticPrisonAndBounty.esp|0x3879": {
+          "Active": 1,
+          "Cell Doors": {
+            "__metaInfo": {
+              "typeName": "JFormMap"
+            },
+            "__formData|Skyrim.esm|0x5e91f": {
+              "Lock": {
+                "Decay Options": {
+                  "Min. Lock Level": "Adept",
+                  "Wear Thresholds": {
+                    "Adept": 60,
+                    "Apprentice": 150,
+                    "Expert": 200,
+                    "Master": 100,
+                    "Novice": 700,
+                    "Requires Key": 2
+                  }
+                },
+                "Level": "Requires Key"
+              }
+            }
+          },
+          "Exterior": [
+            "__formData|RealisticPrisonAndBounty.esp|0x1ddd6",
+            "__formData|RealisticPrisonAndBounty.esp|0x1ddd7",
+            "__formData|RealisticPrisonAndBounty.esp|0x1ddd8"
+          ],
+          "ID": "Cell 03",
+          "Interior": [],
+          "Main Exterior": null,
+          "Main Interior": "__formData|RealisticPrisonAndBounty.esp|0x3879",
+          "Objects": {
+            "Beds": [
+              "__formData|Skyrim.esm|0xce7eb"
+            ],
+            "Containers": [
+              "__formData|RealisticPrisonAndBounty.esp|0x1ddd6"
+            ],
+            "Props": []
+          },
+          "Options": {
+            "Lock Level": "Requires Key",
+            "Maximum Prisoners": 1,
+            "Package": "S",
+            "Scan": {
+              "Exterior Radius": 200.0,
+              "Interior Radius": 300.0,
+              "Iterations": 5
+            }
+          }
+        },
         "__formData|RealisticPrisonAndBounty.esp|0x3880": {
           "Active": 1,
           "Cell Doors": {
@@ -431,58 +493,6 @@
             }
           }
         },
-        "__formData|RealisticPrisonAndBounty.esp|0x3879": {
-          "Active": 1,
-          "Cell Doors": {
-            "__metaInfo": {
-              "typeName": "JFormMap"
-            },
-            "__formData|Skyrim.esm|0x5e91f": {
-              "Lock": {
-                "Decay Options": {
-                  "Min. Lock Level": "Adept",
-                  "Wear Thresholds": {
-                    "Adept": 60,
-                    "Apprentice": 150,
-                    "Expert": 200,
-                    "Master": 100,
-                    "Novice": 700,
-                    "Requires Key": 2
-                  }
-                },
-                "Level": "Requires Key"
-              }
-            }
-          },
-          "Exterior": [
-            "__formData|RealisticPrisonAndBounty.esp|0x1ddd6",
-            "__formData|RealisticPrisonAndBounty.esp|0x1ddd7",
-            "__formData|RealisticPrisonAndBounty.esp|0x1ddd8"
-          ],
-          "ID": "Cell 03",
-          "Interior": [],
-          "Main Exterior": null,
-          "Main Interior": "__formData|RealisticPrisonAndBounty.esp|0x3879",
-          "Objects": {
-            "Beds": [
-              "__formData|Skyrim.esm|0xce7eb"
-            ],
-            "Containers": [
-              "__formData|RealisticPrisonAndBounty.esp|0x1ddd6"
-            ],
-            "Props": []
-          },
-          "Options": {
-            "Package": "S",
-            "Maximum Prisoners": 1,
-            "Lock Level": "Requires Key",
-            "Scan": {
-              "Exterior Radius": 200.0,
-              "Interior Radius": 300.0,
-              "Iterations": 5
-            }
-          }
-        },
         "__formData|RealisticPrisonAndBounty.esp|0x3881": {
           "Active": 1,
           "Cell Doors": {
@@ -526,167 +536,193 @@
           }
         },
         "__formData|RealisticPrisonAndBounty.esp|0x3882": {
+          "Active": 1,
+          "Cell Doors": {
+            "__metaInfo": {
+              "typeName": "JFormMap"
+            },
+            "__formData|Skyrim.esm|0x5e923": {
+              "Lock": {
+                "Decay Options": {
+                  "Min. Lock Level": "Adept",
+                  "Wear Thresholds": {
+                    "Adept": 60,
+                    "Apprentice": 150,
+                    "Expert": 200,
+                    "Master": 100,
+                    "Novice": 700,
+                    "Requires Key": 2
+                  }
+                },
+                "Level": "Requires Key"
+              }
+            }
+          },
           "Exterior": [
             "__formData|RealisticPrisonAndBounty.esp|0x1dddc",
             "__formData|RealisticPrisonAndBounty.esp|0x1dddd",
             "__formData|RealisticPrisonAndBounty.esp|0x1ddde"
           ],
+          "ID": "Cell 05",
           "Interior": [],
           "Main Exterior": null,
           "Main Interior": "__formData|RealisticPrisonAndBounty.esp|0x3882",
-          "Active": 1,
-          "ID": "Cell 05",
           "Objects": {
-              "Beds": [
-                "__formData|Skyrim.esm|0xce7eb"
-              ],
-              "Containers": [
-                "__formData|RealisticPrisonAndBounty.esp|0x1ddd6"
-              ],
-              "Props": []
-            },
-            "Options": {
-              "Allow Overcrowding": 0,
-              "Maximum Prisoners": 1,
-              "Package": "S",
-              "Scan": {
-                "Exterior Radius": 200.0,
-                "Interior Radius": 300.0,
-                "Iterations": 5
-              }
-            },
-            "Cell Doors": {
-              "__metaInfo": {
-                "typeName": "JFormMap"
-              },
-              "__formData|Skyrim.esm|0x5e923": {
-                "Lock": {
-                  "Decay Options": {
-                    "Min. Lock Level": "Adept",
-                    "Wear Thresholds": {
-                      "Adept": 60,
-                      "Apprentice": 150,
-                      "Expert": 200,
-                      "Master": 100,
-                      "Novice": 700,
-                      "Requires Key": 2
-                    }
-                  },
-                  "Level": "Requires Key"
-                }
-              }
+            "Beds": [
+              "__formData|Skyrim.esm|0xce7eb"
+            ],
+            "Containers": [
+              "__formData|RealisticPrisonAndBounty.esp|0x1ddd6"
+            ],
+            "Props": []
+          },
+          "Options": {
+            "Allow Overcrowding": 0,
+            "Maximum Prisoners": 1,
+            "Package": "S",
+            "Scan": {
+              "Exterior Radius": 200.0,
+              "Interior Radius": 300.0,
+              "Iterations": 5
             }
+          }
         },
         "__formData|RealisticPrisonAndBounty.esp|0x3883": {
+          "Active": 1,
+          "Cell Doors": {
+            "__metaInfo": {
+              "typeName": "JFormMap"
+            },
+            "__formData|Skyrim.esm|0x5e924": {
+              "Lock": {
+                "Decay Options": {
+                  "Min. Lock Level": "Adept",
+                  "Wear Thresholds": {
+                    "Adept": 60,
+                    "Apprentice": 150,
+                    "Expert": 200,
+                    "Master": 100,
+                    "Novice": 700,
+                    "Requires Key": 2
+                  }
+                },
+                "Level": "Requires Key"
+              }
+            }
+          },
           "Exterior": [
             "__formData|RealisticPrisonAndBounty.esp|0x1dddf",
             "__formData|RealisticPrisonAndBounty.esp|0x1dde0",
             "__formData|RealisticPrisonAndBounty.esp|0x1dde1"
           ],
+          "ID": "Cell 06",
           "Interior": [],
           "Main Exterior": null,
           "Main Interior": "__formData|RealisticPrisonAndBounty.esp|0x3883",
-          "Active": 1,
-          "ID": "Cell 06",
           "Objects": {
-              "Beds": [
-                "__formData|Skyrim.esm|0xce7eb"
-              ],
-              "Containers": [
-                "__formData|RealisticPrisonAndBounty.esp|0x1ddd6"
-              ],
-              "Props": []
-            },
-            "Options": {
-              "Allow Overcrowding": 0,
-              "Maximum Prisoners": 1,
-              "Package": "S",
-              "Scan": {
-                "Exterior Radius": 200.0,
-                "Interior Radius": 300.0,
-                "Iterations": 5
-              }
-            },
-            "Cell Doors": {
-              "__metaInfo": {
-                "typeName": "JFormMap"
-              },
-              "__formData|Skyrim.esm|0x5e924": {
-                "Lock": {
-                  "Decay Options": {
-                    "Min. Lock Level": "Adept",
-                    "Wear Thresholds": {
-                      "Adept": 60,
-                      "Apprentice": 150,
-                      "Expert": 200,
-                      "Master": 100,
-                      "Novice": 700,
-                      "Requires Key": 2
-                    }
-                  },
-                  "Level": "Requires Key"
-                }
-              }
+            "Beds": [
+              "__formData|Skyrim.esm|0xce7eb"
+            ],
+            "Containers": [
+              "__formData|RealisticPrisonAndBounty.esp|0x1ddd6"
+            ],
+            "Props": []
+          },
+          "Options": {
+            "Allow Overcrowding": 0,
+            "Maximum Prisoners": 1,
+            "Package": "S",
+            "Scan": {
+              "Exterior Radius": 200.0,
+              "Interior Radius": 300.0,
+              "Iterations": 5
             }
+          }
         },
         "__formData|RealisticPrisonAndBounty.esp|0x3884": {
+          "Active": 1,
+          "Cell Doors": {
+            "__metaInfo": {
+              "typeName": "JFormMap"
+            },
+            "__formData|Skyrim.esm|0x5e922": {
+              "Lock": {
+                "Decay Options": {
+                  "Min. Lock Level": "Adept",
+                  "Wear Thresholds": {
+                    "Adept": 60,
+                    "Apprentice": 150,
+                    "Expert": 200,
+                    "Master": 100,
+                    "Novice": 700,
+                    "Requires Key": 2
+                  }
+                },
+                "Level": "Requires Key"
+              }
+            }
+          },
           "Exterior": [
             "__formData|RealisticPrisonAndBounty.esp|0x1dde2",
             "__formData|RealisticPrisonAndBounty.esp|0x1dde3",
             "__formData|RealisticPrisonAndBounty.esp|0x1dde4"
           ],
+          "ID": "Cell 07",
           "Interior": [],
           "Main Exterior": null,
           "Main Interior": "__formData|RealisticPrisonAndBounty.esp|0x3884",
-          "Active": 1,
-          "ID": "Cell 07",
           "Objects": {
-              "Beds": [
-                "__formData|Skyrim.esm|0xce7eb"
-              ],
-              "Containers": [
-                "__formData|RealisticPrisonAndBounty.esp|0x1ddd6"
-              ],
-              "Props": []
-            },
-            "Options": {
-              "Allow Overcrowding": 0,
-              "Maximum Prisoners": 1,
-              "Package": "S",
-              "Scan": {
-                "Exterior Radius": 200.0,
-                "Interior Radius": 300.0,
-                "Iterations": 5
-              }
-            },
-            "Cell Doors": {
-              "__metaInfo": {
-                "typeName": "JFormMap"
-              },
-              "__formData|Skyrim.esm|0x5e922": {
-                "Lock": {
-                  "Decay Options": {
-                    "Min. Lock Level": "Adept",
-                    "Wear Thresholds": {
-                      "Adept": 60,
-                      "Apprentice": 150,
-                      "Expert": 200,
-                      "Master": 100,
-                      "Novice": 700,
-                      "Requires Key": 2
-                    }
-                  },
-                  "Level": "Requires Key"
-                }
-              }
+            "Beds": [
+              "__formData|Skyrim.esm|0xce7eb"
+            ],
+            "Containers": [
+              "__formData|RealisticPrisonAndBounty.esp|0x1ddd6"
+            ],
+            "Props": []
+          },
+          "Options": {
+            "Allow Overcrowding": 0,
+            "Maximum Prisoners": 1,
+            "Package": "S",
+            "Scan": {
+              "Exterior Radius": 200.0,
+              "Interior Radius": 300.0,
+              "Iterations": 5
             }
+          }
         }
       },
+      "City": "Solitude",
+      "Escort Locations": [
+        "__formData|RealisticPrisonAndBounty.esp|0x249a3"
+      ],
       "Guards": [
         "__formData|Skyrim.esm|0x7df2",
         "__formData|Skyrim.esm|0x7df4"
       ],
       "Location": "__formData|Skyrim.esm|0xbed97",
+      "Markers": {
+        "Jail": {
+          "Escort": [
+            "__formData|RealisticPrisonAndBounty.esp|0x249a3"
+          ],
+          "Teleport": [
+            "__formData|RealisticPrisonAndBounty.esp|0x249a3"
+          ]
+        },
+        "Release": {
+          "Escort": [
+            "__formData|RealisticPrisonAndBounty.esp|0x249a3"
+          ],
+          "Teleport": [
+            "__formData|Skyrim.esm|0x3ef19"
+          ]
+        },
+        "Search": {
+          "Frisking": [],
+          "Stripping": []
+        }
+      },
       "Name": "Castle Dour Dungeon",
       "Options": {
         "Stripping": {
@@ -715,54 +751,30 @@
       "Search Locations": {
         "Frisk": [],
         "Strip": []
-      },
-      "Escort Locations": [
-        "__formData|RealisticPrisonAndBounty.esp|0x249A3"
-      ],
-      "Markers": {
-        "Jail": {
-          "Teleport": [
-            "__formData|RealisticPrisonAndBounty.esp|0x249A3"
-          ],
-          "Escort": [
-            "__formData|RealisticPrisonAndBounty.esp|0x249A3"
-          ]
-        },
-        "Release": {
-          "Teleport": [
-            "__formData|Skyrim.esm|0x3ef19"
-          ],
-          "Escort": [
-            "__formData|RealisticPrisonAndBounty.esp|0x249A3"
-          ]
-        },
-        "Search": {
-          "Frisking": [],
-          "Stripping": []
-        }
       }
     },
     "Locations": [
       "__formData|Skyrim.esm|0x18a57",
+      "__formData|Skyrim.esm|0x18a5a",
       "__formData|Skyrim.esm|0x1676a"
     ]
   },
   "Hjaalmarch": {
-    "Crime Faction": "__formData|Skyrim.esm|0x2816D",
+    "City": "Morthal",
+    "Crime Faction": "__formData|Skyrim.esm|0x2816d",
     "Jail": {
-      "City": "Morthal",
-      "Base Cell Door": "__formData|Skyrim.esm|0xEC563",
+      "Base Cell Door": "__formData|Skyrim.esm|0xec563",
       "Cells": {
         "__metaInfo": {
           "typeName": "JFormMap"
         },
-        "__formData|RealisticPrisonAndBounty.esp|0x25F45": {
+        "__formData|RealisticPrisonAndBounty.esp|0x25f45": {
           "Active": 1,
           "Cell Doors": {
             "__metaInfo": {
               "typeName": "JFormMap"
             },
-            "__formData|Skyrim.esm|0xEC565": {
+            "__formData|Skyrim.esm|0xec565": {
               "Lock": {
                 "Decay Options": {
                   "Min. Lock Level": "Adept",
@@ -780,21 +792,21 @@
             }
           },
           "Exterior": [
-            "__formData|RealisticPrisonAndBounty.esp|0x25F42",
-            "__formData|RealisticPrisonAndBounty.esp|0x25F44",
-            "__formData|RealisticPrisonAndBounty.esp|0x25F43"
+            "__formData|RealisticPrisonAndBounty.esp|0x25f42",
+            "__formData|RealisticPrisonAndBounty.esp|0x25f44",
+            "__formData|RealisticPrisonAndBounty.esp|0x25f43"
           ],
           "ID": "Holding Cell",
           "Interior": [],
-          "Main Interior": "__formData|RealisticPrisonAndBounty.esp|0x25F45",
+          "Main Interior": "__formData|RealisticPrisonAndBounty.esp|0x25f45",
           "Objects": {
             "Beds": [],
             "Containers": [],
             "Props": []
           },
           "Options": {
-            "Cell Type": "Holding Cell",
             "Allow Overcrowding": 1,
+            "Cell Type": "Holding Cell",
             "Maximum Prisoners": 3,
             "Maximum Prisoners when Overcrowded": 15,
             "Package": "M",
@@ -806,55 +818,56 @@
           }
         }
       },
-      "Location":  "__formData|Skyrim.esm|0x1EB98",
+      "City": "Morthal",
+      "Location": "__formData|Skyrim.esm|0x1eb98",
+      "Markers": {
+        "Jail": {
+          "Escort": [
+            "__formData|Skyrim.esm|0x3ef09"
+          ],
+          "Teleport": [
+            "__formData|Skyrim.esm|0x3ef09"
+          ]
+        },
+        "Release": {
+          "Escort": [
+            "__formData|Skyrim.esm|0x3ef09"
+          ],
+          "Teleport": [
+            "__formData|Skyrim.esm|0x3ef09"
+          ]
+        }
+      },
       "Name": "Morthal Jail",
       "Prisoner Containers": {
         "Belongings": [
-          "__formData|Skyrim.esm|0x3EF09"
+          "__formData|Skyrim.esm|0x3ef09"
         ],
         "Evidence": [
-          "__formData|Skyrim.esm|0x3EF0A"
+          "__formData|Skyrim.esm|0x3ef0a"
         ]
-      },
-      "Markers": {
-        "Jail": {
-          "Teleport": [
-            "__formData|Skyrim.esm|0x3EF09"
-          ],
-          "Escort": [
-            "__formData|Skyrim.esm|0x3EF09"
-          ]
-        },
-        "Release": {
-          "Teleport": [
-            "__formData|Skyrim.esm|0x3EF09"
-          ],
-          "Escort": [
-            "__formData|Skyrim.esm|0x3EF09"
-          ]
-        }
       }
     },
     "Locations": [
-      "__formData|Skyrim.esm|0x1676E"
+      "__formData|Skyrim.esm|0x1676e"
     ]
   },
   "The Pale": {
-    "Crime Faction": "__formData|Skyrim.esm|0x2816E",
+    "City": "Dawnstar",
+    "Crime Faction": "__formData|Skyrim.esm|0x2816e",
     "Jail": {
-      "City": "Dawnstar",
-      "Base Cell Door": "__formData|Skyrim.esm|0xEC563",
+      "Base Cell Door": "__formData|Skyrim.esm|0xec563",
       "Cells": {
         "__metaInfo": {
           "typeName": "JFormMap"
         },
-        "__formData|RealisticPrisonAndBounty.esp|0x25F41": {
+        "__formData|RealisticPrisonAndBounty.esp|0x25f41": {
           "Active": 1,
           "Cell Doors": {
             "__metaInfo": {
               "typeName": "JFormMap"
             },
-            "__formData|Skyrim.esm|0xEC564": {
+            "__formData|Skyrim.esm|0xec564": {
               "Lock": {
                 "Decay Options": {
                   "Min. Lock Level": "Adept",
@@ -872,21 +885,21 @@
             }
           },
           "Exterior": [
-            "__formData|RealisticPrisonAndBounty.esp|0x25F3F",
-            "__formData|RealisticPrisonAndBounty.esp|0x25F40",
-            "__formData|RealisticPrisonAndBounty.esp|0x25F3E"
+            "__formData|RealisticPrisonAndBounty.esp|0x25f3f",
+            "__formData|RealisticPrisonAndBounty.esp|0x25f40",
+            "__formData|RealisticPrisonAndBounty.esp|0x25f3e"
           ],
           "ID": "Holding Cell",
           "Interior": [],
-          "Main Interior": "__formData|RealisticPrisonAndBounty.esp|0x25F41",
+          "Main Interior": "__formData|RealisticPrisonAndBounty.esp|0x25f41",
           "Objects": {
             "Beds": [],
             "Containers": [],
             "Props": []
           },
           "Options": {
-            "Cell Type": "Holding Cell",
             "Allow Overcrowding": 1,
+            "Cell Type": "Holding Cell",
             "Maximum Prisoners": 3,
             "Maximum Prisoners when Overcrowded": 15,
             "Package": "M",
@@ -898,33 +911,34 @@
           }
         }
       },
-      "Location":  "__formData|Skyrim.esm|0x2005C",
-      "Name": "Dawnstar Jail",
-      "Prisoner Containers": {
-        "Belongings": [
-          "__formData|Skyrim.esm|0x3EF12"
-        ],
-        "Evidence": [
-          "__formData|Skyrim.esm|0x3EF13"
-        ]
-      },
+      "City": "Dawnstar",
+      "Location": "__formData|Skyrim.esm|0x2005c",
       "Markers": {
         "Jail": {
-          "Teleport": [
-            "__formData|Skyrim.esm|0x3EF12"
-          ],
           "Escort": [
-            "__formData|Skyrim.esm|0x3EF12"
+            "__formData|Skyrim.esm|0x3ef12"
+          ],
+          "Teleport": [
+            "__formData|Skyrim.esm|0x3ef12"
           ]
         },
         "Release": {
-          "Teleport": [
-            "__formData|Skyrim.esm|0x3EF12"
-          ],
           "Escort": [
-            "__formData|Skyrim.esm|0x3EF12"
+            "__formData|Skyrim.esm|0x3ef12"
+          ],
+          "Teleport": [
+            "__formData|Skyrim.esm|0x3ef12"
           ]
         }
+      },
+      "Name": "Dawnstar Jail",
+      "Prisoner Containers": {
+        "Belongings": [
+          "__formData|Skyrim.esm|0x3ef12"
+        ],
+        "Evidence": [
+          "__formData|Skyrim.esm|0x3ef13"
+        ]
       }
     },
     "Locations": [
@@ -942,9 +956,9 @@
         }
       }
     },
-    "Crime Faction": "__formData|Skyrim.esm|0x2816B",
+    "City": "Riften",
+    "Crime Faction": "__formData|Skyrim.esm|0x2816b",
     "Jail": {
-      "City": "Riften",
       "Base Cell Door": "__formData|Skyrim.esm|0x5e91d",
       "Cells": {
         "__metaInfo": {
@@ -981,7 +995,7 @@
           "Main Interior": "__formData|Skyrim.esm|0x6128d",
           "Objects": {
             "Beds": [
-              "__formData|Skyrim.esm|0xce7eb"
+              "__formData|Skyrim.esm|0xa8bb5"
             ],
             "Containers": [
               "__formData|RealisticPrisonAndBounty.esp|0x1ddd6"
@@ -1034,7 +1048,10 @@
           "Main Exterior": null,
           "Main Interior": "__formData|RealisticPrisonAndBounty.esp|0x388d",
           "Objects": {
-            "Beds": [],
+            "Beds": [
+              "__formData|Skyrim.esm|0xa8bb6",
+              "__formData|Skyrim.esm|0xa8bb7"
+            ],
             "Containers": [],
             "Props": []
           },
@@ -1080,7 +1097,10 @@
           "Main Exterior": null,
           "Main Interior": "__formData|RealisticPrisonAndBounty.esp|0x388e",
           "Objects": {
-            "Beds": [],
+            "Beds": [
+              "__formData|Skyrim.esm|0xa8bba",
+              "__formData|Skyrim.esm|0xa8bb9"
+            ],
             "Containers": [],
             "Props": []
           },
@@ -1126,7 +1146,9 @@
           "Main Exterior": null,
           "Main Interior": "__formData|RealisticPrisonAndBounty.esp|0x388f",
           "Objects": {
-            "Beds": [],
+            "Beds": [
+              "__formData|Skyrim.esm|0xe82ea"
+            ],
             "Containers": [],
             "Props": []
           },
@@ -1172,7 +1194,10 @@
           "Main Exterior": null,
           "Main Interior": "__formData|RealisticPrisonAndBounty.esp|0x3890",
           "Objects": {
-            "Beds": [],
+            "Beds": [
+              "__formData|Skyrim.esm|0xa8bbe",
+              "__formData|Skyrim.esm|0xa8bbd"
+            ],
             "Containers": [],
             "Props": []
           },
@@ -1218,7 +1243,10 @@
           "Main Exterior": null,
           "Main Interior": "__formData|RealisticPrisonAndBounty.esp|0x3893",
           "Objects": {
-            "Beds": [],
+            "Beds": [
+              "__formData|Skyrim.esm|0xa8bc0",
+              "__formData|Skyrim.esm|0xa8bc1"
+            ],
             "Containers": [],
             "Props": []
           },
@@ -1264,7 +1292,9 @@
           "Main Exterior": null,
           "Main Interior": "__formData|RealisticPrisonAndBounty.esp|0x3894",
           "Objects": {
-            "Beds": [],
+            "Beds": [
+              "__formData|Skyrim.esm|0xa8bbf"
+            ],
             "Containers": [],
             "Props": []
           },
@@ -1310,7 +1340,10 @@
           "Main Exterior": null,
           "Main Interior": "__formData|RealisticPrisonAndBounty.esp|0x3895",
           "Objects": {
-            "Beds": [],
+            "Beds": [
+              "__formData|Skyrim.esm|0xa8bbb",
+              "__formData|Skyrim.esm|0xa8bbc"
+            ],
             "Containers": [],
             "Props": []
           },
@@ -1326,26 +1359,18 @@
           }
         }
       },
+      "City": "Riften",
       "Guards": [
         "__formData|Skyrim.esm|0x7df2",
         "__formData|Skyrim.esm|0x7df4"
       ],
-      "Location": "__formData|Skyrim.esm|0xbed97",
-      "Name": "Riften Jail",
-      "Options": {
-        "Stripping": {
-          "Location": [
-            "Cell",
-            "Jail"
-          ]
-        }
-      },
+      "Location": "__formData|Skyrim.esm|0xa8c86",
       "Markers": {
         "Jail": {
-          "Teleport": [
+          "Escort": [
             "__formData|Skyrim.esm|0xa8f33"
           ],
-          "Escort": [
+          "Teleport": [
             "__formData|Skyrim.esm|0xa8f33"
           ]
         },
@@ -1360,6 +1385,15 @@
         "Search": {
           "Frisking": [],
           "Stripping": []
+        }
+      },
+      "Name": "Riften Jail",
+      "Options": {
+        "Stripping": {
+          "Location": [
+            "Cell",
+            "Jail"
+          ]
         }
       },
       "Prisoner Containers": {
@@ -1377,23 +1411,21 @@
     ]
   },
   "Whiterun": {
-    "Crime Faction": "__formData|Skyrim.esm|0x267EA",
+    "City": "Whiterun",
+    "Crime Faction": "__formData|Skyrim.esm|0x267ea",
     "Jail": {
-      "City": "Whiterun",
-      "Name": "Dragonsreach Dungeon",
-      "Location":  "__formData|Skyrim.esm|0x7312F",
-      "Base Cell Door": "__formData|Skyrim.esm|0xEC563",
+      "Base Cell Door": "__formData|Skyrim.esm|0xec563",
       "Cells": {
         "__metaInfo": {
           "typeName": "JFormMap"
         },
-        "__formData|RealisticPrisonAndBounty.esp|0x25F46": {
+        "__formData|RealisticPrisonAndBounty.esp|0x25f46": {
           "Active": 1,
           "Cell Doors": {
             "__metaInfo": {
               "typeName": "JFormMap"
             },
-            "__formData|Skyrim.esm|0xA7618": {
+            "__formData|Skyrim.esm|0xa7618": {
               "Lock": {
                 "Decay Options": {
                   "Min. Lock Level": "Adept",
@@ -1411,19 +1443,19 @@
             }
           },
           "Exterior": [
-            "__formData|RealisticPrisonAndBounty.esp|0x25F4A"
+            "__formData|RealisticPrisonAndBounty.esp|0x25f4a"
           ],
           "ID": "Cell 01",
           "Interior": [],
-          "Main Interior": "__formData|RealisticPrisonAndBounty.esp|0x25F46",
+          "Main Interior": "__formData|RealisticPrisonAndBounty.esp|0x25f46",
           "Objects": {
             "Beds": [],
             "Containers": [],
             "Props": []
           },
           "Options": {
-            "Cell Type": "Cell",
             "Allow Overcrowding": 0,
+            "Cell Type": "Cell",
             "Maximum Prisoners": 1,
             "Package": "S",
             "Scan": {
@@ -1433,13 +1465,13 @@
             }
           }
         },
-        "__formData|RealisticPrisonAndBounty.esp|0x25F47": {
+        "__formData|RealisticPrisonAndBounty.esp|0x25f47": {
           "Active": 1,
           "Cell Doors": {
             "__metaInfo": {
               "typeName": "JFormMap"
             },
-            "__formData|Skyrim.esm|0xA7617": {
+            "__formData|Skyrim.esm|0xa7617": {
               "Lock": {
                 "Decay Options": {
                   "Min. Lock Level": "Adept",
@@ -1457,19 +1489,19 @@
             }
           },
           "Exterior": [
-            "__formData|RealisticPrisonAndBounty.esp|0x25F4B"
+            "__formData|RealisticPrisonAndBounty.esp|0x25f4b"
           ],
           "ID": "Cell 02",
           "Interior": [],
-          "Main Interior": "__formData|RealisticPrisonAndBounty.esp|0x25F46",
+          "Main Interior": "__formData|RealisticPrisonAndBounty.esp|0x25f46",
           "Objects": {
             "Beds": [],
             "Containers": [],
             "Props": []
           },
           "Options": {
-            "Cell Type": "Cell",
             "Allow Overcrowding": 0,
+            "Cell Type": "Cell",
             "Maximum Prisoners": 1,
             "Package": "S",
             "Scan": {
@@ -1479,13 +1511,13 @@
             }
           }
         },
-        "__formData|RealisticPrisonAndBounty.esp|0x25F48": {
+        "__formData|RealisticPrisonAndBounty.esp|0x25f48": {
           "Active": 1,
           "Cell Doors": {
             "__metaInfo": {
               "typeName": "JFormMap"
             },
-            "__formData|Skyrim.esm|0xA7614": {
+            "__formData|Skyrim.esm|0xa7614": {
               "Lock": {
                 "Decay Options": {
                   "Min. Lock Level": "Adept",
@@ -1503,19 +1535,19 @@
             }
           },
           "Exterior": [
-            "__formData|RealisticPrisonAndBounty.esp|0x25F4C"
+            "__formData|RealisticPrisonAndBounty.esp|0x25f4c"
           ],
           "ID": "Cell 03",
           "Interior": [],
-          "Main Interior": "__formData|RealisticPrisonAndBounty.esp|0x25F48",
+          "Main Interior": "__formData|RealisticPrisonAndBounty.esp|0x25f48",
           "Objects": {
             "Beds": [],
             "Containers": [],
             "Props": []
           },
           "Options": {
-            "Cell Type": "Cell",
             "Allow Overcrowding": 0,
+            "Cell Type": "Cell",
             "Maximum Prisoners": 1,
             "Package": "S",
             "Scan": {
@@ -1525,13 +1557,13 @@
             }
           }
         },
-        "__formData|RealisticPrisonAndBounty.esp|0x25F49": {
+        "__formData|RealisticPrisonAndBounty.esp|0x25f49": {
           "Active": 1,
           "Cell Doors": {
             "__metaInfo": {
               "typeName": "JFormMap"
             },
-            "__formData|Skyrim.esm|0xA7615": {
+            "__formData|Skyrim.esm|0xa7615": {
               "Lock": {
                 "Decay Options": {
                   "Min. Lock Level": "Adept",
@@ -1549,19 +1581,19 @@
             }
           },
           "Exterior": [
-            "__formData|RealisticPrisonAndBounty.esp|0x25F4D"
+            "__formData|RealisticPrisonAndBounty.esp|0x25f4d"
           ],
           "ID": "Cell 04",
           "Interior": [],
-          "Main Interior": "__formData|RealisticPrisonAndBounty.esp|0x25F49",
+          "Main Interior": "__formData|RealisticPrisonAndBounty.esp|0x25f49",
           "Objects": {
             "Beds": [],
             "Containers": [],
             "Props": []
           },
           "Options": {
-            "Cell Type": "Cell",
             "Allow Overcrowding": 0,
+            "Cell Type": "Cell",
             "Maximum Prisoners": 1,
             "Package": "S",
             "Scan": {
@@ -1572,31 +1604,37 @@
           }
         }
       },
-      "Prisoner Containers": {
-        "Belongings": [
-          "__formData|Skyrim.esm|0x267E8"
-        ],
-        "Evidence": [
-          "__formData|Skyrim.esm|0x9DC64"
-        ]
-      },
+      "City": "Whiterun",
+      "Location": "__formData|Skyrim.esm|0x25f49",
       "Markers": {
         "Jail": {
-          "Teleport": [
-            "__formData|Skyrim.esm|0x267E8"
-          ],
           "Escort": [
-            "__formData|Skyrim.esm|0x267E8"
+            "__formData|Skyrim.esm|0x267e8"
+          ],
+          "Teleport": [
+            "__formData|Skyrim.esm|0x267e8"
           ]
         },
         "Release": {
-          "Teleport": [
-            "__formData|Skyrim.esm|0x267E8"
-          ],
           "Escort": [
-            "__formData|Skyrim.esm|0x267E8"
+            "__formData|Skyrim.esm|0x267e8"
+          ],
+          "Teleport": [
+            "__formData|Skyrim.esm|0x267e8"
           ]
         }
+      },
+      "Monitoring": {
+        "On": "__formData|RealisticPrisonAndBounty.esp|0x25f49"
+      },
+      "Name": "Dragonsreach Dungeon",
+      "Prisoner Containers": {
+        "Belongings": [
+          "__formData|Skyrim.esm|0x267e8"
+        ],
+        "Evidence": [
+          "__formData|Skyrim.esm|0x9dc64"
+        ]
       }
     },
     "Locations": [
@@ -1604,23 +1642,21 @@
     ]
   },
   "Winterhold": {
-    "Crime Faction": "__formData|Skyrim.esm|0x2816F",
+    "City": "Winterhold",
+    "Crime Faction": "__formData|Skyrim.esm|0x2816f",
     "Jail": {
-      "City": "Winterhold",
-      "Name": "The Chill",
-      "Location":  "__formData|Skyrim.esm|0x7312F",
-      "Base Cell Door": "__formData|Skyrim.esm|0xCE0AB",
+      "Base Cell Door": "__formData|Skyrim.esm|0xce0ab",
       "Cells": {
         "__metaInfo": {
           "typeName": "JFormMap"
         },
-        "__formData|RealisticPrisonAndBounty.esp|0x25F4E": {
+        "__formData|RealisticPrisonAndBounty.esp|0x25f4e": {
           "Active": 1,
           "Cell Doors": {
             "__metaInfo": {
               "typeName": "JFormMap"
             },
-            "__formData|Skyrim.esm|0x10CFF3": {
+            "__formData|Skyrim.esm|0x10cff3": {
               "Lock": {
                 "Decay Options": {
                   "Min. Lock Level": "Adept",
@@ -1638,19 +1674,19 @@
             }
           },
           "Exterior": [
-            "__formData|RealisticPrisonAndBounty.esp|0x25F51"
+            "__formData|RealisticPrisonAndBounty.esp|0x25f51"
           ],
           "ID": "Cell 01",
           "Interior": [],
-          "Main Interior": "__formData|RealisticPrisonAndBounty.esp|0x25F4E",
+          "Main Interior": "__formData|RealisticPrisonAndBounty.esp|0x25f4e",
           "Objects": {
             "Beds": [],
             "Containers": [],
             "Props": []
           },
           "Options": {
-            "Cell Type": "Cell",
             "Allow Overcrowding": 0,
+            "Cell Type": "Cell",
             "Maximum Prisoners": 1,
             "Package": "S",
             "Scan": {
@@ -1660,13 +1696,13 @@
             }
           }
         },
-        "__formData|RealisticPrisonAndBounty.esp|0x25F4F": {
+        "__formData|RealisticPrisonAndBounty.esp|0x25f4f": {
           "Active": 1,
           "Cell Doors": {
             "__metaInfo": {
               "typeName": "JFormMap"
             },
-            "__formData|Skyrim.esm|0x10CFF7": {
+            "__formData|Skyrim.esm|0x10cff7": {
               "Lock": {
                 "Decay Options": {
                   "Min. Lock Level": "Adept",
@@ -1684,19 +1720,19 @@
             }
           },
           "Exterior": [
-            "__formData|RealisticPrisonAndBounty.esp|0x25F52"
+            "__formData|RealisticPrisonAndBounty.esp|0x25f52"
           ],
           "ID": "Cell 02",
           "Interior": [],
-          "Main Interior": "__formData|RealisticPrisonAndBounty.esp|0x25F4F",
+          "Main Interior": "__formData|RealisticPrisonAndBounty.esp|0x25f4f",
           "Objects": {
             "Beds": [],
             "Containers": [],
             "Props": []
           },
           "Options": {
-            "Cell Type": "Cell",
             "Allow Overcrowding": 0,
+            "Cell Type": "Cell",
             "Maximum Prisoners": 1,
             "Package": "S",
             "Scan": {
@@ -1706,13 +1742,13 @@
             }
           }
         },
-        "__formData|RealisticPrisonAndBounty.esp|0x25F50": {
+        "__formData|RealisticPrisonAndBounty.esp|0x25f50": {
           "Active": 1,
           "Cell Doors": {
             "__metaInfo": {
               "typeName": "JFormMap"
             },
-            "__formData|Skyrim.esm|0x10CFFC": {
+            "__formData|Skyrim.esm|0x10cffc": {
               "Lock": {
                 "Decay Options": {
                   "Min. Lock Level": "Adept",
@@ -1730,65 +1766,19 @@
             }
           },
           "Exterior": [
-            "__formData|RealisticPrisonAndBounty.esp|0x25F53"
+            "__formData|RealisticPrisonAndBounty.esp|0x25f53"
           ],
           "ID": "Cell 03",
           "Interior": [],
-          "Main Interior": "__formData|RealisticPrisonAndBounty.esp|0x25F50",
+          "Main Interior": "__formData|RealisticPrisonAndBounty.esp|0x25f50",
           "Objects": {
             "Beds": [],
             "Containers": [],
             "Props": []
           },
           "Options": {
-            "Cell Type": "Cell",
             "Allow Overcrowding": 0,
-            "Maximum Prisoners": 1,
-            "Package": "S",
-            "Scan": {
-              "Exterior Radius": 200,
-              "Interior Radius": 300,
-              "Iterations": 5
-            }
-          }
-        },
-        "__formData|RealisticPrisonAndBounty.esp|0x25F49": {
-          "Active": 1,
-          "Cell Doors": {
-            "__metaInfo": {
-              "typeName": "JFormMap"
-            },
-            "__formData|Skyrim.esm|0xA7615": {
-              "Lock": {
-                "Decay Options": {
-                  "Min. Lock Level": "Adept",
-                  "Wear Thresholds": {
-                    "Adept": 60,
-                    "Apprentice": 150,
-                    "Expert": 200,
-                    "Master": 100,
-                    "Novice": 700,
-                    "Requires Key": 2
-                  }
-                },
-                "Level": "Requires Key"
-              }
-            }
-          },
-          "Exterior": [
-            "__formData|RealisticPrisonAndBounty.esp|0x25F4D"
-          ],
-          "ID": "Cell 04",
-          "Interior": [],
-          "Main Interior": "__formData|RealisticPrisonAndBounty.esp|0x25F49",
-          "Objects": {
-            "Beds": [],
-            "Containers": [],
-            "Props": []
-          },
-          "Options": {
             "Cell Type": "Cell",
-            "Allow Overcrowding": 0,
             "Maximum Prisoners": 1,
             "Package": "S",
             "Scan": {
@@ -1799,33 +1789,34 @@
           }
         }
       },
-      "Prisoner Containers": {
-        "Belongings": [
-        ],
-        "Evidence": [
-        ]
-      },
+      "City": "Winterhold",
+      "Location": "__formData|Skyrim.esm|0x1676b",
       "Markers": {
         "Jail": {
-          "Teleport": [
-            "__formData|Skyrim.esm|0xEAB"
-          ],
           "Escort": [
-            "__formData|Skyrim.esm|0xEAB"
+            "__formData|Skyrim.esm|0xeab"
+          ],
+          "Teleport": [
+            "__formData|Skyrim.esm|0xeab"
           ]
         },
         "Release": {
-          "Teleport": [
-            "__formData|Skyrim.esm|0x3EF59"
-          ],
           "Escort": [
-            "__formData|Skyrim.esm|0x3EF59"
+            "__formData|Skyrim.esm|0x3ef59"
+          ],
+          "Teleport": [
+            "__formData|Skyrim.esm|0x3ef59"
           ]
         }
+      },
+      "Name": "The Chill",
+      "Prisoner Containers": {
+        "Belongings": [],
+        "Evidence": []
       }
     },
     "Locations": [
-      "__formData|Skyrim.esm|0x18A51"
+      "__formData|Skyrim.esm|0x18a51"
     ]
   }
 }
