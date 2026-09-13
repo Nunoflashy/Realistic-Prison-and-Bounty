@@ -195,7 +195,7 @@ endFunction
     it's not guaranteed, hence "potential".
 
     For now, it retrieves the Hold's Prison, but when 1:N (Hold to Prison) gets added
-    this must be refactored to decide which one to choose.
+    this must be refactored to decide which one to choose (based on distance from the capture point to the Prison, maybe?).
 /;
 RPB_Prison function GetPotentialPrison()
     return API.PrisonManager.GetPrison(Hold)
@@ -271,24 +271,37 @@ function Restrain()
     self.Cuff()
 endFunction
 
+; this.SheatheWeapon()
+; UnequipHandsForActor(this)
+
+; self.EquipItem(RPB_Utility.RPB_PrisonerHandCuffs(), true)
+; self.PlayAnimation("OffsetBoundStandingPlayerInstant")
+; Utility.Wait(5.0)
+; self.PlayAnimation("OffsetBoundStandingPlayerInstant")
+; return
+; Form cuffs = Game.GetFormEx(0xA081D33) ; Front
+
+; Form cuffs = Game.GetFormEx(0xA081D2F) ; Back
+
 function Cuff()
-    ; this.SheatheWeapon()
-    ; UnequipHandsForActor(this)
-
-    ; self.EquipItem(RPB_Utility.RPB_PrisonerHandCuffs(), true)
-    ; self.PlayAnimation("OffsetBoundStandingPlayerInstant")
-    ; Utility.Wait(5.0)
-    ; self.PlayAnimation("OffsetBoundStandingPlayerInstant")
-    ; return
-    ; Form cuffs = Game.GetFormEx(0xA081D33) ; Front
-
-    ; Form cuffs = Game.GetFormEx(0xA081D2F) ; Back
     Form cuffs = Game.GetFormFromFile(0x81D2F, "ZaZAnimationPack.esm")
 
-    this.SheatheWeapon()
+    self.SheatheWeapon()
     UnequipHandsForActor(this)
-    this.EquipItem(cuffs, true, true)
+    self.EquipItem(cuffs, true, true)
 endFunction
+
+; Dependency-free attempt (no ZaZAnimationPack) - currently broken, animation doesn't play
+; correctly since there's no cuff model/animation of our own yet. Revisit once those assets
+; exist, maybe by studying how ZazAnimationPack itself implements cuffing.
+; function Cuff()
+;     self.EquipItem(RPB_Utility.RPB_PrisonerHandCuffs(), true)
+;     Utility.Wait(2.0)
+;     self.PlayAnimation("OffsetBoundStandingPlayerInstant")
+;
+;     this.SheatheWeapon()
+;     UnequipHandsForActor(this)
+; endFunction
 
 function Uncuff()
     int cuffsItemSlot = 59
