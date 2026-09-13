@@ -29,9 +29,12 @@ docs/**
 file-history
 Killmove**
 projects/**
+.claude**
 .credentials.json
 .last-cleanup
 cache/**
+changelog/**
+CLAUDE.md
 history.jsonl
 plans/**
 RPB_Bruma.esp
@@ -41,3 +44,4 @@ Textures/Books/**
 SKSE/Plugins**
 shell-snapshots/**
 settings.json
+ROADMAP.md
