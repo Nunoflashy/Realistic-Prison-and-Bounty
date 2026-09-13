@@ -26,6 +26,7 @@ string[] function GetActions()
         "<No Action>," + \
         "Quit to Main Menu," + \
         "[MCM] Validate Options," + \
+        "[State] Delete All States," + \
         "[Actor] Log Selected Actor State Variables," + \
         "[Actor] Delete Selected Actor State," + \
         "Check Item Stolen," + \
@@ -47,6 +48,7 @@ string[] function GetActions()
         "[Faction Arrest] Arrest Selected Actor (Teleport Prisoner)," + \
         "[Arrest] Add Selected Actor to Current Arrest," + \
         "[Prison] Initialize Prisons," + \
+        "[Prison] Uninitialize Prisons," + \
         "[Prison] Configure Prison in Slot," + \
         "[Prison] Bind All Prisoners," + \
         "[Prison] Refresh Cell Options," + \
@@ -91,6 +93,9 @@ function ShowActionsMenu()
 
     elseif (actionToPerform == "[MCM] Validate Options")
         API.MCM.ValidateOptions()
+
+    elseif (actionToPerform == "[State] Delete All States")
+        Action_DeleteAllStates(uilib)
 
     elseif (actionToPerform == "[Actor] Log Selected Actor State Variables")
         Action_LogActorStateVariables(uilib)
@@ -209,6 +214,9 @@ function ShowActionsMenu()
     elseif (actionToPerform == "[Prison] Initialize Prisons")
         Action_InitializePrisons(uilib)
 
+    elseif (actionToPerform == "[Prison] Uninitialize Prisons")
+        Action_UninitializePrisons(uilib)
+
     elseif (actionToPerform == "[Prison] Release Prisoner from Prison")
         Action_ReleasePrisoner(uilib)
 
@@ -257,12 +265,16 @@ endFunction
 ;                           Actions
 ; ==========================================================
 
+function Action_DeleteAllStates(RPB_UIInterface uilib)
+    RPB_StorageVars.DeleteAll()
+endFunction
+
 function Action_LogActorStateVariables(RPB_UIInterface uilib)
     Actor selectedActor = Game.GetCurrentConsoleRef() as Actor
 
     string category = uilib.ShowInput("State Category")
 
-    int actorObject = RPB_StorageVars.GetObjectHandleOnForm(selectedActor, category)
+    int actorObject = RPB_StorageVars.GetObjectHandleOnReference(selectedActor, category)
 
     Debug("Actions::Action_LogActorStateVariables", "Object Handle ("+ category +"): " + GetContainerList(actorObject))
 endFunction
@@ -286,11 +298,11 @@ function Action_DeleteActorState(RPB_UIInterface uilib)
 
     string category = uilib.ShowInput("State Category")
 
-    int actorObject = RPB_StorageVars.GetObjectHandleOnForm(selectedActor, category)
+    int actorObject = RPB_StorageVars.GetObjectHandleOnReference(selectedActor, category)
     Debug("Actions::Action_DeleteActorState", "(Before) Object Handle ("+ category +"): " + GetContainerList(actorObject))
 
-    RPB_StorageVars.DeleteCategoryOnForm(selectedActor, category)
-    actorObject = RPB_StorageVars.GetObjectHandleOnForm(selectedActor, category)
+    RPB_StorageVars.DeleteCategoryOnReference(selectedActor, category)
+    actorObject = RPB_StorageVars.GetObjectHandleOnReference(selectedActor, category)
     Debug("Actions::Action_DeleteActorState", "(After) Object Handle ("+ category +"): " + GetContainerList(actorObject))
 endFunction
 
@@ -392,6 +404,7 @@ function Action_MonitoringApplyBountyScript(RPB_UIInterface uilib)
     endif
 
     RPB_BountyDecayable.Attach(selectedActor)
+    ; RPB_ActorScript.AttachOfType(selectedActor, RPB_BountyDecayable.className())
 endFunction
 
 function Action_MonitoringRemoveBountyScript(RPB_UIInterface uilib)
@@ -402,6 +415,7 @@ function Action_MonitoringRemoveBountyScript(RPB_UIInterface uilib)
     endif
 
     RPB_BountyDecayable.Detach(selectedActor)
+    ; RPB_ActorScript.DetachOfType(selectedActor, RPB_BountyDecayable.className())
 endFunction
 
 
@@ -557,7 +571,7 @@ function Action_PreAssignCellToPrisoner(RPB_UIInterface uilib)
     subCategories[0] = "Decay Options"
     ; string stringProperty   = cellDoor.GetOptionOfTypeString("Min. Lock Level", "Lock", subCategories)
     ; string stringProperty2  = RPB_Data.GetPropertyOfTypeString(cellDoor.JailCell.GetDataObject(), cellDoor + "//Lock//Decay Options//Min. Lock Level") 
-    string stringPropertyCell  = RPB_Data.GetPropertyOfTypeString(prison.GetDataObject(), "Cells//" + cellTest + "//Cell Doors//"+ cellDoor +"//Lock//Decay Options//Min. Lock Level")
+    string stringPropertyCell  = RPB_Data.GetPropertyOfTypeString(prison.Root, "Cells//" + cellTest + "//Cell Doors//"+ cellDoor +"//Lock//Decay Options//Min. Lock Level")
     string stringPropertyCell2  = RPB_Data.GetPropertyOfTypeString(jailCell.GetSerializableRootObject(), "//Cell Doors//"+ cellDoor +"//Lock//Decay Options//Min. Lock Level")
     ; string stringProperty3  = cellDoor.GetOptionOfTypeStringNew("Lock//Decay Options//Min. Lock Level")
     string[] decayOptions   = RPB_Data.GetPropertyOfTypeStringArray(cellTest.GetSerializableRootObject(), "Cell Doors//" + cellDoor + "//Lock//Gata")
@@ -584,9 +598,9 @@ function Action_PreAssignCellToPrisoner(RPB_UIInterface uilib)
     ; string lockLevel = jailCell.GetRootPropertyOfTypeString("Cell Doors//" + cellDoor + "//Lock//Level")
 
     ; string lockLevel = RPB_Data.GetPropertyOfTypeString(prison.GetDataObject(), "Cells//" + cellTest + "//Cell Doors//"+ cellDoor +"//TestString")
-    string arrayTestElement = RPB_Data.GetPropertyOfTypeString(prison.GetDataObject(), "Cells//" + cellTest + "//Cell Doors//"+ cellDoor +"//Array//[0]")
-    string[] arrayTest = RPB_Data.GetPropertyOfTypeStringArray(prison.GetDataObject(), "Cells//" + cellTest + "//Cell Doors//"+ cellDoor +"//Array")
-    string[] arrayTest2 = RPB_Data.GetPropertyOfTypeStringArray(prison.GetDataObject(), "Cells//" + cellTest + "//Cell Doors//"+ cellDoor +"//Array//[2]")
+    string arrayTestElement = RPB_Data.GetPropertyOfTypeString(prison.Root, "Cells//" + cellTest + "//Cell Doors//"+ cellDoor +"//Array//[0]")
+    string[] arrayTest = RPB_Data.GetPropertyOfTypeStringArray(prison.Root, "Cells//" + cellTest + "//Cell Doors//"+ cellDoor +"//Array")
+    string[] arrayTest2 = RPB_Data.GetPropertyOfTypeStringArray(prison.Root, "Cells//" + cellTest + "//Cell Doors//"+ cellDoor +"//Array//[2]")
     ; string[] arrayTest3 = RPB_Data.GetPropertyOfTypeStringArray(prison.GetDataObject(), "Cells//" + cellTest + "//Cell Doors//"+ cellDoor +"//Array//[2][0]")
     ; int[] arrayTest3 = RPB_Data.GetPropertyOfTypeIntegerArray(prison.GetDataObject(), "Cells//" + cellTest + "//Cell Doors//"+ cellDoor +"//Array//[3]")
 
@@ -597,7 +611,7 @@ function Action_PreAssignCellToPrisoner(RPB_UIInterface uilib)
     ; Debug("Actions::Action_PreAssignCellToPrisoner", "arrayTest3: " + arrayTest3)
     ; Debug("Actions::Action_PreAssignCellToPrisoner", "["+ jailCell.ID +"] configuredCellDoorTest1: " + configuredCellDoorTest1)
 
-    ; RPB_StorageVars.SetFormOnForm("Assigned Prison Cell", selectedActor, jailCell, "Jail")
+    ; RPB_StorageVars.SetFormOnReference("Assigned Prison Cell", selectedActor, jailCell, "Jail")
     ; Debug("Actions::Action_PreAssignCellToPrisoner", "Assigned " + jailCell.ID + " to " + selectedActor.GetBaseObject().GetName())
 endFunction
 
@@ -679,12 +693,12 @@ function Action_TestReindexing(RPB_UIInterface uilib)
 endFunction
 
 function Action_BindCellPackageToReference(RPB_UIInterface uilib)
-    int packageIndex = uilib.ShowInput("Cell Package ID") as int
-    ReferenceAlias cellPackage  = API.Prisonmanager.GetCellPackageByName("S_000" + packageIndex)
-    ObjectReference selectedRef = Game.GetCurrentConsoleRef()
+    ; int packageIndex = uilib.ShowInput("Cell Package ID") as int
+    ; ReferenceAlias cellPackage  = API.Prisonmanager.GetCellPackageByName("S_000" + packageIndex)
+    ; ObjectReference selectedRef = Game.GetCurrentConsoleRef()
 
-    BindAliasTo(cellPackage, selectedRef)
-    Debug("Actions::Action_BindCellPackageToReference", "Bound Cell Package " + cellPackage.GetName() + " to " + selectedRef)
+    ; BindAliasTo(cellPackage, selectedRef)
+    ; Debug("Actions::Action_BindCellPackageToReference", "Bound Cell Package " + cellPackage.GetName() + " to " + selectedRef)
 endFunction
 
 function Action_TogglePrisonerEffectOnSelectedActor(RPB_UIInterface uilib)
@@ -714,22 +728,22 @@ function Action_TogglePrisonerEffectOnSelectedActor(RPB_UIInterface uilib)
 endFunction
 
 function Action_BindActorToCellPackage(RPB_UIInterface uilib, bool abByName = false)
-    if (abByName)
-        string packageName = uilib.ShowInput("Cell Package Name")
-        ReferenceAlias cellPackage  = API.Prisonmanager.GetCellPackageByName(packageName)
-        Actor selectedActor = Game.GetCurrentConsoleRef() as Actor
+    ; if (abByName)
+    ;     string packageName = uilib.ShowInput("Cell Package Name")
+    ;     ReferenceAlias cellPackage  = API.Prisonmanager.GetCellPackageByName(packageName)
+    ;     Actor selectedActor = Game.GetCurrentConsoleRef() as Actor
     
-        BindAliasTo(cellPackage, selectedActor)
-        Debug("Actions::Action_BindActorToCellPackage", "Bound Cell Package " + cellPackage.GetName() + " to " + selectedActor)
-        return
-    endif
+    ;     BindAliasTo(cellPackage, selectedActor)
+    ;     Debug("Actions::Action_BindActorToCellPackage", "Bound Cell Package " + cellPackage.GetName() + " to " + selectedActor)
+    ;     return
+    ; endif
 
-    int packageIndex = uilib.ShowInput("Cell Package ID") as int
-    ReferenceAlias cellPackage  = API.Prisonmanager.GetCellPackageByName("S_000" + packageIndex)
-    Actor selectedActor = Game.GetCurrentConsoleRef() as Actor
+    ; int packageIndex = uilib.ShowInput("Cell Package ID") as int
+    ; ReferenceAlias cellPackage  = API.Prisonmanager.GetCellPackageByName("S_000" + packageIndex)
+    ; Actor selectedActor = Game.GetCurrentConsoleRef() as Actor
 
-    BindAliasTo(cellPackage, selectedActor)
-    Debug("Actions::Action_BindActorToCellPackage", "Bound Cell Package " + cellPackage.GetName() + " to " + selectedActor)
+    ; BindAliasTo(cellPackage, selectedActor)
+    ; Debug("Actions::Action_BindActorToCellPackage", "Bound Cell Package " + cellPackage.GetName() + " to " + selectedActor)
 endFunction
 
 function Action_TestActorHandcuffing(RPB_UIInterface uilib)
@@ -819,6 +833,11 @@ function Action_InitializePrisons(RPB_UIInterface uilib)
     endWhile
 endFunction
 
+function Action_UninitializePrisons(RPB_UIInterface uilib)
+    RPB_PrisonManager prisonManager = API.PrisonManager
+    prisonManager.UninitializePrisons()
+endFunction
+
 function Action_ArrestSelectedActorForFaction(RPB_UIInterface uilib)
     string selectedFaction  = uilib.ShowHoldList("Select Faction for Arrest")
 
@@ -857,14 +876,14 @@ endFunction
 function Action_ImprisonSelectedActor(RPB_UIInterface uilib)
     Actor selectedActor = Game.GetCurrentConsoleRef() as Actor
     if (selectedActor == none)
-        selectedActor == Game.GetPlayer()
+        selectedActor = Game.GetPlayer()
     endif
 
     RPB_Prison prison = uilib.ShowPrisonList(abNotEmpty = false, abShowCity = true, abShowHold = false, abShowPrisonerCount = false, asListTitle = "Send " + selectedActor.GetBaseObject().GetName() + " to Prison")
-
     if (!prison)
         return
     endif
+    Debug("Actions::Action_ImprisonSelectedActor", "Prison ID: "+ prison.ID +"] ["+ prison.UUID +"] Prisoners: "+ prison.Prisoners.GetKeys())
 
     RPB_Prisoner prisoner = prison.MakePrisoner(selectedActor)
 

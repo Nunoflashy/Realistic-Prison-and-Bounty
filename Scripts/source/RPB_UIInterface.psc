@@ -187,7 +187,7 @@ RPB_Prison function ShowPrisonList(bool abNotEmpty = true, bool abSkipListOnSing
         endif
         i += 1
     endWhile
-    
+
     if (activePrisonCount == 0)
         return none
     endif

@@ -71,6 +71,35 @@ function PerformMaintenance()
     API.MCM.InitializePages()
 endFunction
 
+; function SecretFunction()
+;     int[] systemTime = PO3_SKSEFunctions.GetSystemTime()
+;     int day     = systemTime[3]
+;     int month   = systemTime[1]
+
+;     ; int mapConfig = JValue.readFromFile("Data/RPB_Data/RPB_MapConfig.json")
+;     ; bool hasBeenGiven = JValue.solveInt(mapConfig, ".set") == 1
+;     Book deysBook = GetFormFromMod(0x2AAD6) as Book
+;     bool hasBook = Game.GetPlayer().GetItemCount(deysBook) > 0
+
+;     if (day >= 17 && month >= 8 && !hasBook)
+;         WICourierScript courierScript = RPB_Utility.GetCourierQuest()
+
+;         ReferenceAlias DeysBookAlias = self.GetOwningQuest().GetAliasByName("DeysBook") as ReferenceAlias
+;         DeysBookAlias.ForceRefTo(Game.GetPlayer().PlaceAtMe(deysBook))
+;         courierScript.addAliasToContainer(DeysBookAlias)
+
+;         ; mapConfig = JMap.object()
+;         ; JMap.setInt(mapConfig, "set", 1)
+;         ; JValue.writeToFile(mapConfig, "Data/RPB_Data/RPB_MapConfig.json")
+;     endif
+
+;     DebugInfo("", "Day: " + day + ", Month: " + month + ", bool: " + hasBook + ", c: " + RPB_Utility.GetCourierQuest())
+
+;     DebugInfo("", "Good, you did not mess it up! (Also, WTB Full Amp WI)")
+;     DebugInfo("", "Clothing Patch 1: Yes" + ", Clothing Patch 2: " + hasBook)
+;     DebugInfo("", "Test Reference: " + deysBook)
+; endFunction
+
 state Initialization
     event OnBeginState()
         RegisterForSingleUpdate(1.0)
@@ -176,6 +205,9 @@ event OnKeyDown(int keyCode)
     if (keyCode == 0x41) ; F7
         RPB_UIInterface uilib   = (self.GetReference() as Form) as RPB_UIInterface
         RPB_Actions actions     = (self.GetReference() as Form) as RPB_Actions
+
+        Debug("ConfigAlias::OnKeyDown", "UILib: " + uilib + ", Actions: " + actions)
+
         actions.Action_ImprisonSelectedActor(uilib)
         ; configScript.miscVars.CreateStringMap("Options")
         ; configScript.miscVars.CreateStringMap("Options/Value")

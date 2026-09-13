@@ -373,20 +373,21 @@ bool function PrisonExists_FromObject(int apRootPrisonObject, int apRootHoldObje
     int i = 0
     while (i < PrisonSlots)
         RPB_Prison prisonRef = self.GetNthPrison(i)
-        bool condition = prisonRef.Name == name
 
-        if (apRootHoldObject)
-            Faction crimeFaction = RPB_Data.GetPropertyOfTypeForm(apRootHoldObject, "Crime Faction") as Faction
-            string hold = crimeFaction.GetName()
-        
-            if (prisonRef.Hold == hold && prisonRef.Name == name && prisonRef.PrisonFaction == crimeFaction)
+        if (prisonRef) ; GetNthPrison legitimately returns none for still-inactive slots
+            if (apRootHoldObject)
+                Faction crimeFaction = RPB_Data.GetPropertyOfTypeForm(apRootHoldObject, "Crime Faction") as Faction
+                string hold = crimeFaction.GetName()
+
+                if (prisonRef.Hold == hold && prisonRef.Name == name && prisonRef.PrisonFaction == crimeFaction)
+                    return true
+                endif
+
+            elseif (prisonRef.Name == name)
                 return true
             endif
-
-        elseif (prisonRef.Name == name)
-            return true
         endif
-        
+
         i += 1
     endWhile
 
@@ -464,8 +465,8 @@ bool function InitializePrisonInSlot(string asHold, int aiSlot)
         return false
     endif
 
-    slotAlias.SetFallbackProperty("Name", slotAlias.PrisonLocation.GetName())
     slotAlias.Active = true
+    slotAlias.SetFallbackProperty("Name", slotAlias.PrisonLocation.GetName())
 
     self.AssignPrisonRootObject(slotAlias, prisonObject)
     self.AttachMonitoringObject(slotAlias, slotAlias.Monitor.MonitorOn)
@@ -540,6 +541,7 @@ bool function AssignPrisonHoldProperties(RPB_Prison apPrison, string asHold, int
     Faction crimeFaction = RPB_Data.GetPropertyOfTypeForm(apHoldRootObject, "Crime Faction") as Faction
 
     if (crimeFaction == none)
+        DebugError("PrisonManager::AssignPrisonHoldProperties", "["+ asHold +"] Crime Faction could not be resolved, aborting prison initialization for this hold.")
         return false
     endif
 
@@ -556,7 +558,7 @@ endFunction
 ; ==========================================================
 
 bool function DeletePrison(RPB_Prison apPrison)
-    Debug("["+ apPrison.Name +"] PrisonManager::DeletePrison", "Deleted Prison [Name: " + apPrison.Name + ", Hold: " + apPrison.Hold + ", Faction: " + apPrison.PrisonFaction + ", City: " + apPrison.City + "]")
+    Debug("["+ apPrison.GetName() +"] ["+ apPrison.Name +"] PrisonManager::DeletePrison", "Deleted Prison [Name: " + apPrison.Name + ", Hold: " + apPrison.Hold + ", Faction: " + apPrison.PrisonFaction + ", City: " + apPrison.City + "]")
 
     Utility.Wait(0.1)
     apPrison.Delete()
@@ -566,7 +568,7 @@ function UninitializePrisons()
     int i = 0
     while (i < self.PrisonSlots)
         RPB_Prison possiblePrison = self.GetNthAlias(i) as RPB_Prison
-        if (IsValidPrison(possiblePrison) && possiblePrison.Active)
+        if (;/IsValidPrison(possiblePrison) &&/; possiblePrison.Active)
             self.DeletePrison(possiblePrison)
         endif
         i += 1
@@ -775,21 +777,27 @@ endFunction
 ; ==========================================================
 
 bool function __initializePrisonInternal(RPB_Entity apEntity, string asHold, int apHoldRootObject, int apPrisonRootObject)
-    if (self.PrisonExists_FromObject(apPrisonRootObject))
-        return false
-    endif
+    Debug("PrisonManager::__initializePrisonInternal", "("+ asHold +") apEntity: " + apEntity)
 
-    if (!AssignPrisonHoldProperties(apEntity as RPB_Prison, asHold, apHoldRootObject))
+    if (self.PrisonExists_FromObject(apPrisonRootObject))
+        Debug("PrisonManager::__initializePrisonInternal", "("+ asHold +") Prison already exists, skipping.")
         return false
     endif
 
     RPB_Prison prison = apEntity as RPB_Prison
 
-    prison.SetFallbackProperty("Name", prison.PrisonLocation.GetName())
-    prison.Active = true
+    if (!AssignPrisonHoldProperties(prison, asHold, apHoldRootObject))
+        return false
+    endif
+
 
     self.AssignPrisonRootObject(prison, apPrisonRootObject)
     self.AttachMonitoringObject(prison, prison.Monitor.MonitorOn)
+
+    prison.Active = true
+    prison.SetFallbackProperty("Name", prison.PrisonLocation.GetName())
+
+    ; Debug("PrisonManager::__initializePrisonInternal", "Initializing Prison: " + prison.Name + ", Object: " + GetContainerList(prison.Root))
 
     return true
 endFunction
