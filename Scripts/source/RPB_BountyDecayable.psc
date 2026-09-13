@@ -1,15 +1,39 @@
-scriptname RPB_BountyDecayable extends RPB_ActorBase
+scriptname RPB_BountyDecayable extends RPB_ActorScript
 {
     Bounty Decay script: An Actor that has this script attached to them
     has the bounty decay functionality enabled to them and is considered a BountyDecayable.
 
     Additionally, if the Actor is registered as a RPB_Actor, this script's state
-    can be retrieved by calling GetScriptState("BountyDecayable") on the Actor.
+    can be retrieved by calling GetScriptState(RPB_BountyDecayable.className()) on the Actor.
 }
 
 import Math
 import RPB_Memory
 import RPB_Utility
+
+; ==========================================================
+;                           Class
+; ==========================================================
+
+string function className() global
+    return "RPB_BountyDecayable"
+endFunction
+
+string function typeName()
+    return className()
+endFunction
+
+; ==========================================================
+;                      Script Management
+; ==========================================================
+
+function Attach(Actor akActor) global
+    RPB_ActorScript.AttachOfType(akActor, className())
+endFunction
+
+function Detach(Actor akActor) global
+    RPB_ActorScript.DetachOfType(akActor, className())
+endFunction
 
 ; ==========================================================
 ;                           Fields
@@ -34,28 +58,18 @@ float property CurrentTime
     endFunction
 endProperty
 
-RPB_Actor __actorState
-RPB_Actor property ActorState
-    RPB_Actor function get()
-        if (__actorState)
-            return __actorState
-        endif
-
-        __actorState = RPB_Actor.GetActorStateReference(this)
-
-        if (!__actorState)
-            API.EventManager.SendError("Could not find ActorState for Actor " + this + " (RPB_Actor was not bound!)", "BountyDecayable::ActorState")
-            return none
-        endif
-
-        __actorState.ApplyScriptState(self)
-        return __actorState
-    endFunction
-endProperty
-
 ; ==========================================================
 
-event OnInitialize()
+function __construct()
+    holdLastUpdates         = self.CreateScriptProperty(holdLastUpdates, FastMap("<string>"))
+    holdBountyDecayTimers   = self.CreateScriptProperty(holdBountyDecayTimers, FastMap("<string>"))
+endFunction
+
+; ==========================================================
+;                        Event Handlers
+; ==========================================================
+
+event OnAttachScript()
     self.StartDecayUpdates()
 
     string[] holds = Config.Holds
@@ -66,13 +80,9 @@ event OnInitialize()
         self.RegisterLastUpdateInHold(hold)
         i += 1
     endWhile
-
-    ActorState.ApplyScriptState(self)
 endEvent
 
-event OnDestroy()
-    ActorState.RemoveScriptState(self)
-    self.CleanMemory()
+event OnDetachScript()
 endEvent
 
 event OnBountyLost(Faction akFaction, int aiBountyLost)
@@ -81,7 +91,7 @@ endEvent
 event OnUpdateGameTime()
     self.UpdateBountyDecaying()
 
-    RPB_BountyDecayable actorBountyDecayEffectRef = ActorState.GetScriptState("BountyDecayable") as RPB_BountyDecayable
+    RPB_BountyDecayable actorBountyDecayEffectRef = ActorState.GetScriptState(className()) as RPB_BountyDecayable
 
     Debug("BountyDecayable::OnUpdateGameTime", "Updating bounty decay for Actor " + this + " (Actor Effect Ref: " + ActorState + ", Actor Bounty Decay Ref: " + actorBountyDecayEffectRef + ")")
 endEvent
@@ -91,35 +101,55 @@ event OnLocationChange(Location akOldLocation, Location akNewLocation)
 endEvent
 
 ; ==========================================================
-;                          Management
+
+; ==========================================================
+;                          Functions
 ; ==========================================================
 
-; Attaches this script to the specified Actor.
-function Attach(Actor akActor) global
-    if (!akActor.HasSpell(RPB_BountyDecayableSpell()))
-        akActor.AddSpell(RPB_BountyDecayableSpell(), false)
-        Debug("BountyDecayable::Attach", "Attached script RPB_BountyDecayable to Actor " + akActor)
+function UpdateBountyLost(Faction akCrimeFaction)
+    string hold = akCrimeFaction.GetName()
+
+    int currentBountyNonViolent = parent.GetActiveBountyForFaction(akCrimeFaction, abViolent = false)
+    int currentBountyViolent    = parent.GetActiveBountyForFaction(akCrimeFaction, abNonViolent = false)
+
+    bool hasBounty = currentBountyNonViolent > 0 || currentBountyViolent > 0
+
+    float bountyUpdatedAt = self.GetFloat("bounty::updated_at", hold + "::State")
+
+    if (!bountyUpdatedAt && hasBounty)
+        self.RegisterBountyLost(akCrimeFaction)
+        return
     endif
+
+    if (!hasBounty)
+        return
+    endif
+
+    float bountyLost                    = Config.GetBountyDecayLostBounty(hold)
+    float bountyLostFromCurrentBounty   = \
+        Round((currentBountyNonViolent + currentBountyViolent) * \
+        PercentToDecimal(Config.GetBountyDecayLostFromCurrentBounty(hold)))
+
+    float timePassed    = now() - bountyUpdatedAt
+    int reduceBy        = floor((timePassed * bountyLost) + (timePassed * bountyLostFromCurrentBounty))
+
+    self.ModCrimeGoldForFaction(akCrimeFaction, -reduceBy)
+
+    ; Update with new time for next bounty reduction
+    self.RegisterBountyLost(akCrimeFaction)
+
+    Debug("("+ hold +") ("+ Name +") BountyDecayable::UpdateBountyLost", "Bounty Lost Daily: " + bountyLost + ", Bounty Lost From Current Bounty: " + bountyLostFromCurrentBounty + ", TimePassed: " + timePassed + ", ReduceBy: " + reduceBy)
+    Debug("("+ hold +") ("+ Name +") BountyDecayable::UpdateBountyLost", "Bounty Updated At: " + bountyUpdatedAt + ", Now: " + now())
 endFunction
 
-; Detaches this script from the specified Actor.
-function Detach(Actor akActor) global
-    akActor.RemoveSpell(RPB_BountyDecayableSpell())
-    Debug("BountyDecayable::Detach", "Detached script RPB_BountyDecayable from Actor " + akActor)
+function RegisterBountyLost(Faction akCrimeFaction)
+    string hold = akCrimeFaction.GetName()
+    self.SetFloat("bounty::updated_at", now(), hold + "::State")
 endFunction
 
 function StartDecayUpdates()
     RegisterForSingleUpdateGameTime(UpdateInterval)
 endFunction
-
-function CleanMemory()
-    delete(holdBountyDecayTimers)
-    delete(holdLastUpdates)
-endFunction
-
-; ==========================================================
-;                          Functions
-; ==========================================================
 
 int function GetBountyLostDaily(string asHold)
     Faction crimeFaction = Config.GetFaction(asHold)
@@ -147,7 +177,9 @@ float function GetLastBountyUpdateTime(string asHold)
 endFunction
 
 function RegisterLastUpdateInHold(string asHold)
-    holdLastUpdates = Object_CreateIfNotExists(holdLastUpdates, FastMap("<string>", retain = true))
+    ; holdLastUpdates = Object_CreateIfNotExists(holdLastUpdates, FastMap("<string>", retain = true))
+    ; holdLastUpdates = self.CreateScriptProperty(holdLastUpdates, FastMap("<string>"))
+
     FastMap_SetFloat(holdLastUpdates, asHold, CurrentTime)
 endFunction
 
@@ -228,7 +260,9 @@ function UpdateBountyDecayTimers(Location akOldLocation, Location akNewLocation)
 endFunction
 
 function InitializeTimers()
-    holdBountyDecayTimers = Object_CreateIfNotExists(holdBountyDecayTimers, FastMap("<string>", retain = true))
+    ; holdBountyDecayTimers = Object_CreateIfNotExists(holdBountyDecayTimers, FastMap("<string>", retain = true))
+    ; holdBountyDecayTimers = self.CreateScriptProperty(holdBountyDecayTimers, FastMap("<string>"))
+
     string[] holds = Config.Holds
 
     int i = 0
@@ -278,7 +312,6 @@ bool function HasTimerElapsed(string asHold)
 endFunction
 
 
-
-Spell function RPB_BountyDecayableSpell() global
+Spell function ScriptSpell() global
     return RPB_Utility.GetFormFromMod(0x28525) as Spell
 endFunction

@@ -9,17 +9,15 @@ import RPB_Utility
 import RPB_Memory
 
 ; ==========================================================
-;                        Script States
+;                        Attached Scripts
 ; ==========================================================
 ;/
-    Script States are scripts that are bound to this Actor,
-    which must be of type RPB_ActorBase.
+    Attached Scripts are scripts that are bound to this Actor,
+    which must be of type RPB_ActorScript.
 
     This allows the system to have multiple scripts for different functionality
     for a particular RPB_Actor.
 /;
-
-string property SCRIPT_STATE_BOUNTY_DECAYABLE = "BountyDecayable" autoreadonly
 
 RPB_BountyDecayable __bountyDecayable
 
@@ -87,32 +85,32 @@ endEvent
 ; ==========================================================
 
 ;/
-    Applies a script state to this Actor, that is of type RPB_ActorBase.
+    Applies a script state to this Actor, that is of type RPB_ActorScript.
 
     A script state allows for multiple scripts to be bound to the same Actor,
     and their state referenced and managed.
 
-    RPB_ActorBase @apScriptState: The script state to apply.
+    RPB_ActorScript @apScriptState: The script state to apply.
 /;
-function ApplyScriptState(RPB_ActorBase apScriptState)
+function ApplyScriptState(RPB_ActorScript apScriptState)
     if (apScriptState as RPB_BountyDecayable)
         __bountyDecayable = apScriptState as RPB_BountyDecayable
     endif
 endFunction
 
 ;/
-    Removes a script state from this Actor, that is of type RPB_ActorBase.
+    Removes a script state from this Actor, that is of type RPB_ActorScript.
 
-    RPB_ActorBase @apScriptState: The script state to remove.
+    RPB_ActorScript @apScriptState: The script state to remove.
 /;
-function RemoveScriptState(RPB_ActorBase apScriptState)
+function RemoveScriptState(RPB_ActorScript apScriptState)
     if (apScriptState as RPB_BountyDecayable)
         __bountyDecayable = none
     endif
 endFunction
 
 function RemoveScriptStateFromTag(string asScriptStateTag)
-    RPB_ActorBase scriptState = self.GetScriptState(asScriptStateTag)
+    RPB_ActorScript scriptState = self.GetScriptState(asScriptStateTag)
 
     if (!scriptState)
         API.EventManager.SendError("Could not find script state with tag " + asScriptStateTag, "["+ self +"] Actor::RemoveScriptStateFromTag")
@@ -123,14 +121,14 @@ function RemoveScriptStateFromTag(string asScriptStateTag)
 endFunction
 
 ;/
-    Returns a script state from this Actor, that is of type RPB_ActorBase.
+    Returns a script state from this Actor, that is of type RPB_ActorScript.
 
     string @asScriptStateTag: The script state tag of type to return.
 
-    returns (RPB_ActorBase): The script state of the specified type from this Actor.
+    returns (RPB_ActorScript): The script state of the specified type from this Actor.
 /;
-RPB_ActorBase function GetScriptState(string asScriptStateTag)
-    if (asScriptStateTag == SCRIPT_STATE_BOUNTY_DECAYABLE)
+RPB_ActorScript function GetScriptState(string asScriptStateTag)
+    if (asScriptStateTag == RPB_BountyDecayable.className())
         return __bountyDecayable
     endif
 
@@ -158,7 +156,14 @@ function RegisterActorForTracking()
     TrackedActors.AddElement(self, this)
     ; Debug("Actor::RegisterActorForTracking", "["+ self +"] Contents: " + TrackedActors.GetKeys())
 endFunction
- 
+
+;/
+    Returns the RPB_Actor reference for the specified Actor.
+
+    Actor @akActor: The Actor to get the RPB_Actor reference for.
+
+    returns (RPB_Actor): The RPB_Actor reference for the specified Actor.
+/;
 RPB_Actor function GetActorStateReference(Actor akActor) global
     return RPB_API.GetActorListForTrackedActors().AtKeyEx(akActor) as RPB_Actor
 endFunction
