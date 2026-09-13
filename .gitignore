@@ -2,6 +2,7 @@ meta.ini
 temp/
 Ideas
 *.pex
+*.pas
 *.jslot
 *Copy*.esp
 Ideas
