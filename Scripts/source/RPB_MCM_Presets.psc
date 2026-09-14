@@ -5,6 +5,10 @@ import RPB_MCM
 import RPB_Memory
 import RPB_Data
 
+string function SAVE_AS() global
+    return "Save As..."
+endFunction
+
 bool function ShouldHandleEvent(RPB_MCM mcm) global
     return mcm.CurrentPage == "Presets"
 endFunction
@@ -21,20 +25,94 @@ function Render(RPB_MCM mcm) global
     Right(mcm)
 endFunction
 
+;/
+    Renders one group of Scope toggles under its own category header. Kept as a shared helper since
+    Left() renders two such groups (Pages, Holds) today and will likely render a third (Prisons)
+    once the Hold/Prison MCM decoupling lands - see ROADMAP.md.
+/;
+function RenderScopeGroup(RPB_MCM mcm, string asCategory, string[] akBuckets) global
+    mcm.AddOptionCategory(asCategory)
+
+    int i = 0
+    while (i < akBuckets.Length)
+        string bucket = akBuckets[i]
+        int optionId = mcm.AddToggleOption(bucket, false) ; native SKI_ConfigBase toggle, no RPB wrapper/persistence
+        mcm.RegisterOption("Scope::" + bucket, optionId) ; id<->key bookkeeping only, needed for dispatch
+        i += 1
+    endWhile
+endFunction
+
 function Left(RPB_MCM mcm) global
-    mcm.AddOptionCategory("Presets")
-    mcm.SetRenderedCategory("SaveLoad")
-    mcm.AddOptionMenuKey("Content", "menuContent", "All")
+    mcm.ResetPresetScopeChecked() ; always start unchecked - ephemeral, not real MCM option storage
 
-    mcm.SetRenderedCategory("Save")
-    mcm.AddOptionMenuKey("Save Preset", "menuSavePreset")
-
-    mcm.SetRenderedCategory("Load")
-    mcm.AddOptionMenuKey("Load Preset", "menuLoadPreset")
+    RenderScopeGroup(mcm, "Pages", mcm.GetPresetPageBuckets())
+    RenderScopeGroup(mcm, "Holds", mcm.Holds)
 endFunction
 
 function Right(RPB_MCM mcm) global
+    mcm.AddOptionCategory("Scope Controls")
+    mcm.AddOptionTextKey("Select All", "btnSelectAll", "Click to Apply")
+    mcm.AddOptionTextKey("Clear All", "btnClearAll", "Click to Apply")
 
+    ; No "/" in this name - GetKeyFromOption(oid, includePageInKey=false) (what this page's whole
+    ; dispatch chain uses) strips everything up to the FIRST "/" in the stored key, which would
+    ; silently corrupt "Save / Load::menuSavePreset" into " Load::menuSavePreset".
+    mcm.AddOptionCategory("Save & Load")
+    mcm.AddOptionMenuKey("Save Preset", "menuSavePreset")
+
+    ; Show which preset is currently tracked (most recent Save or Load) as this option's own
+    ; displayed value, computed fresh every render so "(Changed)" reflects live state.
+    string trackedDisplayName = mcm.GetTrackedPresetDisplayName()
+
+    if (trackedDisplayName != "")
+        mcm.SetOptionMenuValue("Save & Load::menuLoadPreset", trackedDisplayName)
+    endif
+
+    mcm.AddOptionMenuKey("Load Preset", "menuLoadPreset")
+
+    mcm.AddOptionCategory("Copy")
+    mcm.AddOptionMenuKey("Copy From", "menuCopyFrom")
+    mcm.AddOptionMenuKey("Copy To", "menuCopyTo")
+    mcm.AddOptionTextKey("Copy", "btnCopy", "Click to Apply")
+endFunction
+
+;/
+    Retrieves the buckets currently checked in the Scope category.
+/;
+string[] function GetCheckedBuckets(RPB_MCM mcm) global
+    string[] buckets = mcm.GetPresetBuckets()
+    int checked = FastArray("<string>")
+
+    int i = 0
+    while (i < buckets.Length)
+        if (mcm.IsPresetBucketChecked(buckets[i]))
+            FastArray_AddString(checked, buckets[i])
+        endif
+        i += 1
+    endWhile
+
+    return FastArray_ToStringArray(checked)
+endFunction
+
+function SetAllBucketsChecked(RPB_MCM mcm, bool abChecked) global
+    string[] buckets = mcm.GetPresetBuckets()
+
+    int i = 0
+    while (i < buckets.Length)
+        string bucket = buckets[i]
+        mcm.SetPresetBucketChecked(bucket, mcm.GetOptionID("Scope::" + bucket), abChecked)
+        i += 1
+    endWhile
+endFunction
+
+string[] function GetSaveMenuOptions(RPB_MCM mcm) global
+    string[] existingPresets = mcm.GetExistingPresets()
+
+    if (existingPresets.Length == 0)
+        return String_Explode(SAVE_AS())
+    endif
+
+    return String_Explode(SAVE_AS() + "," + String_Implode(existingPresets))
 endFunction
 
 ; =====================================================
@@ -48,15 +126,52 @@ function OnOptionDefault(RPB_MCM mcm, string option) global
 endFunction
 
 function OnOptionSelect(RPB_MCM mcm, string option) global
-    if (RPB_Utility.String_Contains(option, "btn"))
-        bool msgResult = mcm.ShowMessage("Gata", true, "Yes", "No")
-        Debug("MCM_Presets::OnOptionSelect", "Option: " + option + ", Result: " + msgResult)
+    if (option == "Scope Controls::btnSelectAll")
+        SetAllBucketsChecked(mcm, true)
 
-    elseif (RPB_Utility.String_Contains(option, "toggle"))
-        mcm.ToggleOption(option)
+    elseif (option == "Scope Controls::btnClearAll")
+        SetAllBucketsChecked(mcm, false)
+
+    elseif (option == "Copy::btnCopy")
+        RunCopy(mcm)
+
+    elseif (StringUtil.Find(option, "Scope::") == 0)
+        string bucket = StringUtil.Substring(option, 7) ; strip the "Scope::" prefix (7 chars)
+        mcm.SetPresetBucketChecked(bucket, mcm.GetOptionID(option), !mcm.IsPresetBucketChecked(bucket))
+    endif
+endFunction
+
+;/
+    Runs the Copy From -> Copy To action, with the same confirm-then-notify pattern as Save/Load.
+/;
+function RunCopy(RPB_MCM mcm) global
+    string copyFrom = mcm.GetOptionMenuValue("Copy::menuCopyFrom")
+    string copyTo   = mcm.GetOptionMenuValue("Copy::menuCopyTo")
+
+    if (copyFrom == "" || copyTo == "")
+        mcm.ShowMessage("Pick both a Copy From and Copy To Hold first.", false, "OK", "")
+        return
     endif
 
-    mcm.GetExistingPresets()
+    if (copyFrom == copyTo)
+        mcm.ShowMessage("Copy From and Copy To must be different Holds.", false, "OK", "")
+        return
+    endif
+
+    bool msgResult = mcm.ShowMessage("Are you sure you want to copy " + copyFrom + "'s options into " + copyTo + "?\n\nWarning: This will overwrite " + copyTo + "'s current settings!", true, "Yes", "No")
+
+    if (!msgResult)
+        return
+    endif
+
+    bool copied = mcm.CopyBucketOptions(copyFrom, copyTo)
+
+    if (copied)
+        Debug("MCM_Presets::RunCopy", "Copied " + copyFrom + "'s options into " + copyTo)
+        mcm.ShowMessage("Copied " + copyFrom + "'s options into " + copyTo + " successfully!", false, "OK", "")
+    else
+        mcm.ShowMessage("Could not copy " + copyFrom + " into " + copyTo + " - they don't share the same shape.", false, "OK", "")
+    endif
 endFunction
 
 
@@ -67,202 +182,125 @@ function OnOptionSliderAccept(RPB_MCM mcm, string option, float value) global
 endFunction
 
 function OnOptionMenuOpen(RPB_MCM mcm, string option) global
-    int optionToContents = FastMap("<string>");Object_CreateIfNotExists(optionToContents, FastMap("<string>"))
+    if (option == "Save & Load::menuSavePreset")
+        string[] menuOptions = GetSaveMenuOptions(mcm)
+        mcm.SetPresetMenuOptionsCache(option, menuOptions) ; captured now so Accept can't drift from what's shown
+        mcm.SetMenuDialogOptions(menuOptions)
+        mcm.SetMenuDialogDefaultIndex(0)
 
-    string[] presetPages = mcm.GetPresetPages()
-    string[] existingPresets = mcm.GetExistingPresets()
+    elseif (option == "Save & Load::menuLoadPreset")
+        string[] existingPresets = mcm.GetExistingPresets()
+        mcm.SetPresetMenuOptionsCache(option, existingPresets)
+        mcm.SetMenuDialogOptions(existingPresets)
+        mcm.SetMenuDialogDefaultIndex(0)
 
-    string SAVE_AS = "Save As..."
-
-    string implodedPresets = String_Implode(existingPresets)
-    string[] menuOptions = String_Explode( \
-        SAVE_AS + "," + \
-        implodedPresets \
-    )
-
-    FastMap_SetObject(optionToContents, "SaveLoad::menuContent", FastArray_FromStringArray(presetPages))
-    FastMap_SetObject(optionToContents, "Save::menuSavePreset",    FastArray_FromStringArray(menuOptions))
-    FastMap_SetObject(optionToContents, "SaveLoad::menuContent", FastArray_FromStringArray(presetPages))
-    FastMap_SetObject(optionToContents, "Load::menuLoadPreset",    FastArray_FromStringArray(existingPresets))
-
-    if (FastMap_HasKey(optionToContents, option))
-        string[] menuItems = FastArray_ToStringArray(FastMap_GetObject(optionToContents, option))
-        mcm.SetMenuDialogOptions(menuItems)
+    elseif (option == "Copy::menuCopyFrom" || option == "Copy::menuCopyTo")
+        ; mcm.Holds is a stable property (not a fresh directory listing), no drift risk here -
+        ; no need for the same open/accept caching Save/Load use.
+        mcm.SetMenuDialogOptions(mcm.Holds)
         mcm.SetMenuDialogDefaultIndex(0)
     endif
-
-
-    ; if (option == "SaveLoad::menuContent" || \ 
-    ;     option == "SaveLoad::menuContent")
-    ;     mcm.SetMenuDialogOptions(mcm.GetPresetPages())
-    ;     mcm.SetMenuDialogDefaultIndex(0)
-
-    ; elseif (option == "Load::menuLoadPreset")
-    ;     mcm.SetMenuDialogOptions(mcm.GetExistingPresets())
-    ;     mcm.SetMenuDialogDefaultIndex(0)
-    ; endif
 endFunction
 
-; function OnOptionMenuOpen(RPB_MCM mcm, string option) global
-;     ; string[] presetPages = mcm.GetPresetPages()
-;     ; string[] existingPresets = mcm.GetExistingPresets()
-
-;     ; string SAVE_AS = "Save As..."
-;     ; string CANCEL = "Cancel"
-
-;     ; string implodedPresets = String_Implode(existingPresets)
-;     ; string[] menuOptions = String_Explode( \
-;     ;     SAVE_AS + "," + \
-;     ;     implodedPresets + "," + \
-;     ;     CANCEL + "," \
-;     ; )
-;     Debug("", "menuOptions: " + menuOptions)
-
-;     if (option == "SaveLoad::menuContent" || "SaveLoad::menuContent")
-;         mcm.SetMenuDialogOptions(mcm.GetPresetPages())
-
-;     elseif (option == "Save::menuSavePreset" || option == "Load::menuLoadPreset")
-;         string[] presetPages = mcm.GetPresetPages()
-;         string[] existingPresets = mcm.GetExistingPresets()
-    
-;         string SAVE_AS = "Save As..."
-;         string CANCEL = "Cancel"
-    
-;         string implodedPresets = String_Implode(existingPresets)
-;         string[] menuOptions = String_Explode( \
-;             SAVE_AS + "," + \
-;             implodedPresets + "," + \
-;             CANCEL + "," \
-;         )
-
-;         Debug("", "menuOptions: " + menuOptions)
-
-;         mcm.SetMenuDialogOptions(menuOptions)
-;     endif
-
-;     mcm.SetMenuDialogDefaultIndex(0)
-
-;     ; int optionToContents = Object_CreateIfNotExists(optionToContents, FastMap("<string>"))
-
-;     ; string[] presetPages = mcm.GetPresetPages()
-;     ; string[] existingPresets = mcm.GetExistingPresets()
-
-;     ; string SAVE_AS = "Save As..."
-;     ; string CANCEL = "Cancel"
-
-;     ; string implodedPresets = String_Implode(existingPresets)
-;     ; string[] menuOptions = String_Explode( \
-;     ;     SAVE_AS + "," + \
-;     ;     implodedPresets + "," + \
-;     ;     CANCEL + "," \
-;     ; )
-
-;     ; FastMap_SetObject(optionToContents, "SaveLoad::menuContent", FastArray_FromStringArray(presetPages))
-;     ; FastMap_SetObject(optionToContents, "Save::menuSavePreset",    FastArray_FromStringArray(menuOptions))
-;     ; FastMap_SetObject(optionToContents, "SaveLoad::menuContent", FastArray_FromStringArray(presetPages))
-;     ; FastMap_SetObject(optionToContents, "Load::menuLoadPreset",    FastArray_FromStringArray(existingPresets))
-
-;     ; if (FastMap_HasKey(optionToContents, option))
-;     ;     string[] menuItems = FastArray_ToStringArray(FastMap_GetObject(optionToContents, option))
-;     ;     mcm.SetMenuDialogOptions(menuItems)
-;     ;     mcm.SetMenuDialogDefaultIndex(0)
-;     ; endif
-
-
-;     ; if (option == "SaveLoad::menuContent" || \ 
-;     ;     option == "SaveLoad::menuContent")
-;     ;     mcm.SetMenuDialogOptions(mcm.GetPresetPages())
-;     ;     mcm.SetMenuDialogDefaultIndex(0)
-
-;     ; elseif (option == "Load::menuLoadPreset")
-;     ;     mcm.SetMenuDialogOptions(mcm.GetExistingPresets())
-;     ;     mcm.SetMenuDialogDefaultIndex(0)
-;     ; endif
-; endFunction
-
 function OnOptionMenuAccept(RPB_MCM mcm, string option, int menuIndex) global
-    RPB_UIInterface uilib   = (Game.GetPlayer() as Form) as RPB_UIInterface
-
-    int optionToContents = FastMap("<string>")
-
-    string[] presetPages = mcm.GetPresetPages()
-    string[] existingPresets = mcm.GetExistingPresets()
-
-    string SAVE_AS = "Save As..."
-
-    string implodedPresets = String_Implode(existingPresets)
-    string[] menuOptions = String_Explode( \
-        SAVE_AS + "," + \
-        implodedPresets \
-    )
-
-    FastMap_SetObject(optionToContents, "SaveLoad::menuContent", FastArray_FromStringArray(presetPages))
-    FastMap_SetObject(optionToContents, "Save::menuSavePreset",    FastArray_FromStringArray(menuOptions))
-    FastMap_SetObject(optionToContents, "SaveLoad::menuContent", FastArray_FromStringArray(presetPages))
-    FastMap_SetObject(optionToContents, "Load::menuLoadPreset",    FastArray_FromStringArray(existingPresets))
-
-    if (!FastMap_HasKey(optionToContents, option) || menuIndex == -1)
+    if (menuIndex == -1)
         return
     endif
 
-    string[] menuItems = FastArray_ToStringArray(FastMap_GetObject(optionToContents, option))
-    string selectedItem = menuItems[menuIndex]
+    if (option == "Copy::menuCopyFrom" || option == "Copy::menuCopyTo")
+        if (menuIndex >= mcm.Holds.Length)
+            return
+        endif
 
-    if (option == "SaveLoad::menuContent")
-        mcm.SetOptionMenuValue(option, selectedItem)
+        mcm.SetOptionMenuValue(option, mcm.Holds[menuIndex])
+        return
+    endif
 
-    elseif (option == "Save::menuSavePreset" || option == "Load::menuLoadPreset")
-        string selectedPreset = selectedItem
-        string selectedContent = mcm.GetOptionMenuValue("SaveLoad::menuContent")
+    ; Everything past this point (Save/Load) acts on the Scope checklist.
+    string[] checkedBuckets = GetCheckedBuckets(mcm)
 
-        if (option == "Save::menuSavePreset")
-            if (selectedItem == SAVE_AS)
-                string presetName = uilib.ShowInput("Save Preset As")
-                mcm.SavePreset(presetName, selectedContent)
-                Debug("MCM_Presets::OnOptionMenuAccept", "Saved Preset As: " + presetName)
-                mcm.ShowMessage("Saved preset " + presetName + " successfully!", false, "OK", "")
-                return
-            endif
+    if (checkedBuckets.Length == 0)
+        mcm.ShowMessage("Check at least one item under Scope first.", false, "OK", "")
+        return
+    endif
 
-            ; A preset is selected to be overwritten
-            ; bool msgResult = mcm.ShowMessage("Are you sure you want to overwrite your current options (" + selectedContent + ") to preset " + selectedPreset + "?", true, "Yes", "No")
-            bool msgResult = mcm.ShowMessage("Are you sure you want to overwrite the preset " + selectedPreset + " with your current options (" + selectedContent + ")?", true, "Yes", "No")
+    ; Reuse the exact list captured at OnOptionMenuOpen-time - recomputing here (e.g. a fresh
+    ; directory listing) risks it drifting from what the player actually saw and clicked on,
+    ; silently mismatching menuIndex to the wrong item. Fall back to a fresh list only if nothing
+    ; was cached (accept firing without a matching open shouldn't normally happen).
+    string[] menuOptions = mcm.GetPresetMenuOptionsCache(option)
 
-            if (msgResult)
-                mcm.SavePreset(selectedPreset, selectedContent)
-                Debug("MCM_Presets::OnOptionMenuAccept", "Overwrote Preset: " + selectedPreset + " with options: " + "{CONTENT_TO_SAVE}")
-            endif
-
-        elseif (option == "Load::menuLoadPreset")
-            bool msgResult = mcm.ShowMessage("Are you sure you want to load the preset " + selectedPreset + " with the options (" + selectedContent + ")?\n\nWarning: This will overwrite your current options for "+ selectedContent +"!", true, "Yes", "No")
-
-            if (msgResult)
-                mcm.LoadPreset(selectedPreset, selectedContent)
-                Debug("MCM_Presets::OnOptionMenuAccept", "Loaded Preset: " + selectedPreset + " with options: " + "{CONTENT_TO_LOAD}")
-            endif
+    if (!menuOptions)
+        if (option == "Save & Load::menuSavePreset")
+            menuOptions = GetSaveMenuOptions(mcm)
+        else
+            menuOptions = mcm.GetExistingPresets()
         endif
     endif
 
+    if (menuIndex >= menuOptions.Length)
+        return
+    endif
+
+    string selectedItem = menuOptions[menuIndex]
+
+    if (option == "Save & Load::menuSavePreset")
+        RPB_UIInterface uilib = (Game.GetPlayer() as Form) as RPB_UIInterface
+
+        if (selectedItem == SAVE_AS())
+            string presetName = uilib.ShowInput("Save Preset As")
+
+            if (presetName == "")
+                return
+            endif
+
+            mcm.SavePreset(presetName, checkedBuckets)
+            Debug("MCM_Presets::OnOptionMenuAccept", "Saved Preset As: " + presetName + " (" + String_Implode(checkedBuckets) + ")")
+            mcm.SetOptionMenuValue("Save & Load::menuLoadPreset", mcm.GetTrackedPresetDisplayName()) ; refresh now, don't wait for the next page reset
+            mcm.ShowMessage("Saved preset " + presetName + " successfully!", false, "OK", "")
+            return
+        endif
+
+        bool msgResult = mcm.ShowMessage("Are you sure you want to overwrite the preset " + selectedItem + " with your currently checked options (" + String_Implode(checkedBuckets) + ")?", true, "Yes", "No")
+
+        if (msgResult)
+            mcm.SavePreset(selectedItem, checkedBuckets)
+            Debug("MCM_Presets::OnOptionMenuAccept", "Overwrote Preset: " + selectedItem + " with buckets: " + String_Implode(checkedBuckets))
+            mcm.SetOptionMenuValue("Save & Load::menuLoadPreset", mcm.GetTrackedPresetDisplayName())
+        endif
+
+    elseif (option == "Save & Load::menuLoadPreset")
+        string selectedPreset = selectedItem
+
+        bool msgResult = mcm.ShowMessage("Are you sure you want to load the preset " + selectedPreset + " for your currently checked options (" + String_Implode(checkedBuckets) + ")?\n\nWarning: This will overwrite your current settings for those!", true, "Yes", "No")
+
+        if (msgResult)
+            mcm.LoadPreset(selectedPreset, checkedBuckets)
+            Debug("MCM_Presets::OnOptionMenuAccept", "Loaded Preset: " + selectedPreset + " for buckets: " + String_Implode(checkedBuckets))
+            mcm.SetOptionMenuValue("Save & Load::menuLoadPreset", mcm.GetTrackedPresetDisplayName())
+            mcm.ShowMessage("Loaded preset " + selectedPreset + " successfully!", false, "OK", "")
+        endif
+    endif
 endFunction
 
 function OnOptionColorOpen(RPB_MCM mcm, string option) global
-    
+
 endFunction
 
 function OnOptionColorAccept(RPB_MCM mcm, string option, int color) global
-    
+
 endFunction
 
 function OnOptionInputOpen(RPB_MCM mcm, string option) global
-    
+
 endFunction
 
 function OnOptionInputAccept(RPB_MCM mcm, string option, string input) global
-    
+
 endFunction
 
 function OnOptionKeymapChange(RPB_MCM mcm, string option, int keyCode, string conflictControl, string conflictName) global
-    
+
 endFunction
 
 ; =====================================================
@@ -273,7 +311,7 @@ function OnHighlight(RPB_MCM mcm, int oid) global
     if (! ShouldHandleEvent(mcm))
         return
     endif
-    
+
     OnOptionHighlight(mcm, mcm.GetKeyFromOption(oid, false))
 endFunction
 
@@ -362,395 +400,6 @@ function OnInputAccept(RPB_MCM mcm, int oid, string inputValue) global
     if (! ShouldHandleEvent(mcm))
         return
     endif
-    
+
     OnOptionInputAccept(mcm, mcm.GetKeyFromOption(oid, false), inputValue)
 endFunction
-
-; Scriptname RPB_MCM_Presets hidden
-
-; import RPB_Utility
-; import RPB_MCM
-; import RPB_Memory
-
-; bool function ShouldHandleEvent(RPB_MCM mcm) global
-;     return mcm.CurrentPage == "Presets"
-; endFunction
-
-; function Render(RPB_MCM mcm) global
-;     if (! ShouldHandleEvent(mcm))
-;         return
-;     endif
-
-;     mcm.SetCursorFillMode(mcm.TOP_TO_BOTTOM)
-;     Left(mcm)
-
-;     mcm.SetCursorPosition(1)
-;     Right(mcm)
-; endFunction
-
-; function Left(RPB_MCM mcm) global
-;     mcm.AddOptionCategory("Save")
-;     mcm.AddOptionMenuKey("Content to Save", "menuContentToSave", "All Pages")
-;     mcm.AddOptionMenuKey("Save Preset", "menuSavePreset")
-    
-;     mcm.AddEmptyOption()
-
-;     mcm.AddOptionCategory("Load")
-;     mcm.AddOptionMenuKey("Content to Load", "menuContentToLoad", "All Pages")
-;     mcm.AddOptionMenuKey("Load Preset", "menuLoadPreset")
-; endFunction
-
-; function Right(RPB_MCM mcm) global
-
-; endFunction
-
-; ; =====================================================
-; ; Events
-; ; =====================================================
-
-; function OnOptionHighlight(RPB_MCM mcm, string option) global
-;     string optionName = GetOptionNameNoCategory(option)
-
-;     ; Deleveling Stats
-;     if (StringUtil.Find(option, "Deleveling") != -1)
-;         mcm.SetInfoText("Sets how much progress you will lose in " + optionName + " for each day in jail.")
-
-;     elseif (option == "General::Timescale")
-;         int timescaleValue = mcm.GetOptionSliderValue(option) as int
-;         mcm.SetInfoText("Sets the timescale when free.\nThis is how fast the time passes relative to Real Life.\n1:" + timescaleValue + " means that, for each hour in real life, " + timescaleValue + " hour(s) will pass in-game.")
-
-;     elseif (option == "General::TimescalePrison")
-;         int timescaleValue = mcm.GetOptionSliderValue(option) as int
-;         mcm.SetInfoText("Sets the timescale when in jail.\nThis is how fast the time passes relative to Real Life.\n1:" + timescaleValue + " means that, for each hour in real life, " + timescaleValue + " hour(s) will pass in-game.")
-    
-;     elseif (option == "General::TimescalePrisonOutsideGame")
-;         int timescaleValue = mcm.GetOptionSliderValue(option) as int
-;         mcm.SetInfoText("Sets the timescale when in jail and not playing.\nThis is how fast the time passes relative to Real Life.\n1:" + timescaleValue + " means that, for each hour in real life, " + timescaleValue + " hour(s) will pass in-game.")
-
-;     elseif (option == "General::Bounty Decay (Update Interval)")
-;         mcm.SetInfoText("Sets the time between updates in in-game hours for when the bounty should decay for all holds.")
-
-;     elseif (option == "General::Infamy Decay (Update Interval)")
-;         mcm.SetInfoText("Sets the time between updates in in-game days for when infamy should be lost over time for all holds that have it enabled.")
-
-;     elseif (option == "General::Arrest Elude Warning Time")
-;         mcm.SetInfoText("Determines the time after pursuit that guards will wait for you to stop and surrender before they consider you as being eluding arrest and start attacking.")
-;     endif
- 
-;     Debug("OnOptionHighlight", option + ", find: " + StringUtil.Find(option, "Deleveling") + ", optionName: " + optionName)
-
-; endFunction
-
-; function OnOptionDefault(RPB_MCM mcm, string option) global
-    
-; endFunction
-
-; function OnOptionSelect(RPB_MCM mcm, string option) global
-;     if (RPB_Utility.String_Contains(option, "btn"))
-;         bool msgResult = mcm.ShowMessage("Gata", true, "Yes", "No")
-;         Debug("MCM_Presets::OnOptionSelect", "Option: " + option + ", Result: " + msgResult)
-
-;     elseif (RPB_Utility.String_Contains(option, "toggle"))
-;         mcm.ToggleOption(option)
-;     endif
-
-;     mcm.GetExistingPresets()
-; endFunction
-
-
-; function OnOptionSliderOpen(RPB_MCM mcm, string option) global
-; endFunction
-
-; function OnOptionSliderAccept(RPB_MCM mcm, string option, float value) global
-; endFunction
-
-; function OnOptionMenuOpen(RPB_MCM mcm, string option) global
-;     int optionToContents = Object_CreateIfNotExists(optionToContents, FastMap("<string>"))
-
-;     string[] presetPages = mcm.GetPresetPages()
-;     string[] existingPresets = mcm.GetExistingPresets()
-
-;     string SAVE_AS = "Save As..."
-;     string CANCEL = "Cancel"
-
-;     string implodedPresets = String_Implode(existingPresets)
-;     string[] menuOptions = String_Explode( \
-;         SAVE_AS + "," + \
-;         implodedPresets + "," + \
-;         CANCEL + "," \
-;     )
-
-;     FastMap_SetObject(optionToContents, "Save::menuContentToSave", FastArray_FromStringArray(presetPages))
-;     FastMap_SetObject(optionToContents, "Save::menuSavePreset",    FastArray_FromStringArray(menuOptions))
-;     FastMap_SetObject(optionToContents, "Load::menuContentToLoad", FastArray_FromStringArray(presetPages))
-;     FastMap_SetObject(optionToContents, "Load::menuLoadPreset",    FastArray_FromStringArray(existingPresets))
-
-;     if (FastMap_HasKey(optionToContents, option))
-;         string[] menuItems = FastArray_ToStringArray(FastMap_GetObject(optionToContents, option))
-;         mcm.SetMenuDialogOptions(menuItems)
-;         mcm.SetMenuDialogDefaultIndex(0)
-;     endif
-
-
-;     ; if (option == "Save::menuContentToSave" || \ 
-;     ;     option == "Load::menuContentToLoad")
-;     ;     mcm.SetMenuDialogOptions(mcm.GetPresetPages())
-;     ;     mcm.SetMenuDialogDefaultIndex(0)
-
-;     ; elseif (option == "Load::menuLoadPreset")
-;     ;     mcm.SetMenuDialogOptions(mcm.GetExistingPresets())
-;     ;     mcm.SetMenuDialogDefaultIndex(0)
-;     ; endif
-; endFunction
-
-; ; function OnOptionMenuOpen(RPB_MCM mcm, string option) global
-; ;     ; string[] presetPages = mcm.GetPresetPages()
-; ;     ; string[] existingPresets = mcm.GetExistingPresets()
-
-; ;     ; string SAVE_AS = "Save As..."
-; ;     ; string CANCEL = "Cancel"
-
-; ;     ; string implodedPresets = String_Implode(existingPresets)
-; ;     ; string[] menuOptions = String_Explode( \
-; ;     ;     SAVE_AS + "," + \
-; ;     ;     implodedPresets + "," + \
-; ;     ;     CANCEL + "," \
-; ;     ; )
-; ;     Debug("", "menuOptions: " + menuOptions)
-
-; ;     if (option == "Save::menuContentToSave" || "Load::menuContentToLoad")
-; ;         mcm.SetMenuDialogOptions(mcm.GetPresetPages())
-
-; ;     elseif (option == "Save::menuSavePreset" || option == "Load::menuLoadPreset")
-; ;         string[] presetPages = mcm.GetPresetPages()
-; ;         string[] existingPresets = mcm.GetExistingPresets()
-    
-; ;         string SAVE_AS = "Save As..."
-; ;         string CANCEL = "Cancel"
-    
-; ;         string implodedPresets = String_Implode(existingPresets)
-; ;         string[] menuOptions = String_Explode( \
-; ;             SAVE_AS + "," + \
-; ;             implodedPresets + "," + \
-; ;             CANCEL + "," \
-; ;         )
-
-; ;         Debug("", "menuOptions: " + menuOptions)
-
-; ;         mcm.SetMenuDialogOptions(menuOptions)
-; ;     endif
-
-; ;     mcm.SetMenuDialogDefaultIndex(0)
-
-; ;     ; int optionToContents = Object_CreateIfNotExists(optionToContents, FastMap("<string>"))
-
-; ;     ; string[] presetPages = mcm.GetPresetPages()
-; ;     ; string[] existingPresets = mcm.GetExistingPresets()
-
-; ;     ; string SAVE_AS = "Save As..."
-; ;     ; string CANCEL = "Cancel"
-
-; ;     ; string implodedPresets = String_Implode(existingPresets)
-; ;     ; string[] menuOptions = String_Explode( \
-; ;     ;     SAVE_AS + "," + \
-; ;     ;     implodedPresets + "," + \
-; ;     ;     CANCEL + "," \
-; ;     ; )
-
-; ;     ; FastMap_SetObject(optionToContents, "Save::menuContentToSave", FastArray_FromStringArray(presetPages))
-; ;     ; FastMap_SetObject(optionToContents, "Save::menuSavePreset",    FastArray_FromStringArray(menuOptions))
-; ;     ; FastMap_SetObject(optionToContents, "Load::menuContentToLoad", FastArray_FromStringArray(presetPages))
-; ;     ; FastMap_SetObject(optionToContents, "Load::menuLoadPreset",    FastArray_FromStringArray(existingPresets))
-
-; ;     ; if (FastMap_HasKey(optionToContents, option))
-; ;     ;     string[] menuItems = FastArray_ToStringArray(FastMap_GetObject(optionToContents, option))
-; ;     ;     mcm.SetMenuDialogOptions(menuItems)
-; ;     ;     mcm.SetMenuDialogDefaultIndex(0)
-; ;     ; endif
-
-
-; ;     ; if (option == "Save::menuContentToSave" || \ 
-; ;     ;     option == "Load::menuContentToLoad")
-; ;     ;     mcm.SetMenuDialogOptions(mcm.GetPresetPages())
-; ;     ;     mcm.SetMenuDialogDefaultIndex(0)
-
-; ;     ; elseif (option == "Load::menuLoadPreset")
-; ;     ;     mcm.SetMenuDialogOptions(mcm.GetExistingPresets())
-; ;     ;     mcm.SetMenuDialogDefaultIndex(0)
-; ;     ; endif
-; ; endFunction
-
-; function OnOptionMenuAccept(RPB_MCM mcm, string option, int menuIndex) global
-;     RPB_UIInterface uilib   = (Game.GetPlayer() as Form) as RPB_UIInterface
-
-;     int optionToContents = Object_CreateIfNotExists(optionToContents, FastMap("<string>"))
-
-;     string[] presetPages = mcm.GetPresetPages()
-;     string[] existingPresets = mcm.GetExistingPresets()
-
-;     string SAVE_AS = "Save As..."
-;     string CANCEL = "Cancel"
-
-;     string implodedPresets = String_Implode(existingPresets)
-;     string[] menuOptions = String_Explode( \
-;         SAVE_AS + "," + \
-;         implodedPresets + "," + \
-;         CANCEL + "," \
-;     )
-
-;     FastMap_SetObject(optionToContents, "Save::menuContentToSave", FastArray_FromStringArray(presetPages))
-;     FastMap_SetObject(optionToContents, "Save::menuSavePreset",    FastArray_FromStringArray(menuOptions))
-;     FastMap_SetObject(optionToContents, "Load::menuContentToLoad", FastArray_FromStringArray(presetPages))
-;     FastMap_SetObject(optionToContents, "Load::menuLoadPreset",    FastArray_FromStringArray(existingPresets))
-
-;     if (FastMap_HasKey(optionToContents, option) && menuIndex != -1)
-;         string[] menuItems = FastArray_ToStringArray(FastMap_GetObject(optionToContents, option))
-;         string selectedItem = menuItems[menuIndex]
-
-;         if (selectedItem == CANCEL)
-;             return
-;         endif
-
-;         if (selectedItem == SAVE_AS)
-;             string presetName = uilib.ShowInput("Save Preset As")
-;             Debug("MCM_Presets::OnOptionMenuAccept", "Saved Preset As: " + presetName)
-;             return
-;         endif
-
-;         if (String_Contains(selectedItem, implodedPresets))
-;             bool msgResult = mcm.ShowMessage("Are you sure you want to save your current option to preset " + selectedItem + "?", true, "Yes", "No")
-;             if (!msgResult)
-;                 return
-;             endif     
-
-;             if (msgResult)
-;                 Debug("MCM_Presets::OnOptionMenuAccept", "Overwrote Preset: " + selectedItem + " with options: " + "{CONTENT_TO_SAVE}")
-;                 return
-;             endif
-;         endif
-
-;         mcm.SetOptionMenuValue(option, selectedItem)
-;     endif
-
-; endFunction
-
-; function OnOptionColorOpen(RPB_MCM mcm, string option) global
-    
-; endFunction
-
-; function OnOptionColorAccept(RPB_MCM mcm, string option, int color) global
-    
-; endFunction
-
-; function OnOptionInputOpen(RPB_MCM mcm, string option) global
-    
-; endFunction
-
-; function OnOptionInputAccept(RPB_MCM mcm, string option, string input) global
-    
-; endFunction
-
-; function OnOptionKeymapChange(RPB_MCM mcm, string option, int keyCode, string conflictControl, string conflictName) global
-    
-; endFunction
-
-; ; =====================================================
-; ; Event Handlers
-; ; =====================================================
-
-; function OnHighlight(RPB_MCM mcm, int oid) global
-;     if (! ShouldHandleEvent(mcm))
-;         return
-;     endif
-    
-;     OnOptionHighlight(mcm, mcm.GetKeyFromOption(oid, false))
-; endFunction
-
-; function OnDefault(RPB_MCM mcm, int oid) global
-
-;     if (! ShouldHandleEvent(mcm))
-;         return
-;     endif
-
-;     OnOptionDefault(mcm, mcm.GetKeyFromOption(oid, false))
-; endFunction
-
-; function OnSelect(RPB_MCM mcm, int oid) global
-;     if (! ShouldHandleEvent(mcm))
-;         return
-;     endif
-
-;     OnOptionSelect(mcm, mcm.GetKeyFromOption(oid, false))
-; endFunction
-
-; function OnSliderOpen(RPB_MCM mcm, int oid) global
-;     if (! ShouldHandleEvent(mcm))
-;         return
-;     endif
-
-;     OnOptionSliderOpen(mcm, mcm.GetKeyFromOption(oid, false))
-; endFunction
-
-; function OnSliderAccept(RPB_MCM mcm, int oid, float value) global
-;     if (! ShouldHandleEvent(mcm))
-;         return
-;     endif
-
-;     OnOptionSliderAccept(mcm, mcm.GetKeyFromOption(oid, false), value)
-; endFunction
-
-; function OnMenuOpen(RPB_MCM mcm, int oid) global
-;     if (! ShouldHandleEvent(mcm))
-;         return
-;     endif
-
-;     OnOptionMenuOpen(mcm, mcm.GetKeyFromOption(oid, false))
-; endFunction
-
-; function OnMenuAccept(RPB_MCM mcm, int oid, int menuIndex) global
-;     if (! ShouldHandleEvent(mcm))
-;         return
-;     endif
-
-;     OnOptionMenuAccept(mcm, mcm.GetKeyFromOption(oid, false), menuIndex)
-; endFunction
-
-; function OnColorOpen(RPB_MCM mcm, int oid) global
-;     if (! ShouldHandleEvent(mcm))
-;         return
-;     endif
-
-;     OnOptionColorOpen(mcm, mcm.GetKeyFromOption(oid, false))
-; endFunction
-
-; function OnColorAccept(RPB_MCM mcm, int oid, int color) global
-;     if (! ShouldHandleEvent(mcm))
-;         return
-;     endif
-
-;     OnOptionColorAccept(mcm, mcm.GetKeyFromOption(oid, false), color)
-; endFunction
-
-; function OnKeymapChange(RPB_MCM mcm, int oid, int keycode, string conflictControl, string conflictName) global
-;     if (! ShouldHandleEvent(mcm))
-;         return
-;     endif
-
-;     OnOptionKeymapChange(mcm, mcm.GetKeyFromOption(oid, false), keycode, conflictControl, conflictName)
-; endFunction
-
-; function OnInputOpen(RPB_MCM mcm, int oid) global
-;     if (! ShouldHandleEvent(mcm))
-;         return
-;     endif
-
-;     OnOptionInputOpen(mcm, mcm.GetKeyFromOption(oid, false))
-; endFunction
-
-; function OnInputAccept(RPB_MCM mcm, int oid, string inputValue) global
-;     if (! ShouldHandleEvent(mcm))
-;         return
-;     endif
-    
-;     OnOptionInputAccept(mcm, mcm.GetKeyFromOption(oid, false), inputValue)
-; endFunction

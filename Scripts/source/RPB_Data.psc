@@ -51,99 +51,15 @@ string[] function Preset_List() global
 endFunction
 
 ;/
-    Checks if the given data in the specified registrant exists in the preset.
+    Reads a preset file, returning its raw bucket-keyed contents (FastMap<string, object>,
+    keyed by bucket name - e.g. "General", a Hold name).
+
+    Returns PRESET_INVALID_FILE()/PRESET_NOT_FOUND() (both negative, never a real object id) on
+    failure - check the result against those before treating it as a real FastMap.
+
+    string  @asPresetFile: The name of the preset file to load (relative to Preset_GetDirectory()).
 /;
-bool function Preset_DataExists(int apPresetData, string asDataToCheck, string asRegistrant) global
-    ;/ FastArray @registrantStorage /;
-    int registrantStorage = StaticStorage("." + asRegistrant)
-
-    if (!registrantStorage)
-        return false
-    endif
-
-    int registrantDataInPreset = FastMap_GetObject(apPresetData, asRegistrant)
-
-    if (!registrantDataInPreset)
-        return false
-    endif
-
-    int i = 0
-    while (i < FastMap_Size(registrantDataInPreset))
-        ; TODO
-        i += 1
-    endWhile
-
-    i = 0
-    while (i < FastArray_Size(registrantStorage))
-        if (FastArray_GetString(registrantStorage, i) == asDataToCheck)
-            return true
-        endif
-        i += 1
-    endWhile
-
-    return false
-endFunction
-
-; ;/
-;     Loads a preset file into memory.
-
-;     string  @asPresetFile: The name of the preset file to load
-;     string[] @akRegistrants: The registrants of the preset file to load
-;     string[] @akContent: The contents of the preset file to load
-;     bool     @abVerbose: Whether to print verbose output
-; /;
-; int function Preset_Load(string asPresetFile, string[] akRegistrants = none, string[] akContent = none, bool abVerbose = true) global
-;     if (asPresetFile == "" || !asPresetFile)
-;         Debug("Data::Preset_Load", "Failed to load preset: Invalid preset filename.")
-;         return PRESET_INVALID_FILE()
-;     endif
-
-;     int fileContents = FastMap_FromFile(Preset_GetDirectory() + "/" + asPresetFile)
-
-;     if (!Object_Exists(fileContents))
-;         Debug("Data::Preset_Load", "Failed to load preset: " + asPresetFile + " (file not found)")
-;         return PRESET_NOT_FOUND()
-;     endif
-
-;     int ALL_CONTENT     = 0
-;     int PARTIAL_CONTENT = 1
-
-;     int contentMode = ALL_CONTENT
-
-;     if (akContent.Length > 0)
-;         contentMode = PARTIAL_CONTENT
-;     endif
-
-;     if (contentMode == ALL_CONTENT)
-;         return fileContents
-;     else
-;         int partialContent = FastMap("<string>")
-
-;         int i = 0
-;         while (i < akContent.Length)
-;             int srcContent = FastMap_GetObject(fileContents, akContent[i])
-;             if (srcContent && FastMap_HasKey(fileContents, akContent[i]))
-;                 FastMap_SetObject(partialContent, akContent[i], srcContent)
-;             else
-;                 Debug("Data::Preset_Load", "Requested content not found in preset: " + akContent[i])
-;             endif
-;             i += 1
-;         endWhile
-
-;         Debug("Data::Preset_Load", "Loaded filtered preset: " + asPresetFile + " ("+ akContent.Length +" row(s))")
-;         return partialContent
-;     endif
-; endFunction
-
-;/
-    Loads a preset file into memory.
-
-    string  @asPresetFile: The name of the preset file to load
-    string[] @akRegistrants: The registrants of the preset file to load
-    string[] @akContent: The contents of the preset file to load
-    bool     @abVerbose: Whether to print verbose output
-/;
-int function Preset_Load(string asPresetFile, string[] akRegistrants = none, string[] akContent = none, bool abVerbose = true) global
+int function Preset_Load(string asPresetFile) global
     if (asPresetFile == "" || !asPresetFile)
         Debug("Data::Preset_Load", "Failed to load preset: Invalid preset filename.")
         return PRESET_INVALID_FILE()
@@ -156,252 +72,95 @@ int function Preset_Load(string asPresetFile, string[] akRegistrants = none, str
         return PRESET_NOT_FOUND()
     endif
 
-    int ALL_REGISTRANTS     = 0
-    int PARTIAL_REGISTRANTS = 1
-
-    int registrantMode = ALL_REGISTRANTS
-
-    if (akRegistrants.Length > 0)
-        registrantMode = PARTIAL_REGISTRANTS
-    endif
-
-    string[] presetRegistrants = FastMap_KeysAsPapyrusArray(fileContents)
-
-    if (!presetRegistrants)
-        Debug("Data::Preset_Load", "Failed to load preset: " + asPresetFile + " (no registrants found)")
-        return PRESET_NO_REGISTRANTS()
-    endif
-
-    int validRegistrants = FastArray("<string>")
-
-    int i = 0
-    while (i < presetRegistrants.Length)
-        bool isValidRegistrant = RPB_Registry.HasPresetRegistrant(presetRegistrants[i])
-        if (isValidRegistrant)
-            FastArray_AddString(validRegistrants, presetRegistrants[i])
-        endif
-        
-        Debug("Data::Preset_Load", "Tried to load "+ presetRegistrants[i] +" from preset: " + asPresetFile + " (registrant not found in registry)", abCondition = !isValidRegistrant)
-        i += 1
-    endWhile
-
-    int ALL_CONTENT     = 0
-    int PARTIAL_CONTENT = 1
-
-    int contentMode = ALL_CONTENT
-
-    if (akContent.Length > 0)
-        contentMode = PARTIAL_CONTENT
-    endif
-
-    if (registrantMode == ALL_REGISTRANTS)
-        if (contentMode == ALL_CONTENT)
-            return fileContents
-        elseif (contentMode == PARTIAL_CONTENT)
-            int partialContent = FastMap("<string>")
-
-            i = 0
-            while (i < FastArray_Size(validRegistrants))
-                string srcRegistrant        = FastArray_GetString(validRegistrants, i)
-                int srcRegistrantContent    = FastMap_GetObject(fileContents, srcRegistrant)
-                
-                
-                i += 1
-            endWhile
-        endif
-    endif
-
-    if (registrantMode == PARTIAL_REGISTRANTS && contentMode == ALL_CONTENT)
-        int partialRegistrants = FastMap("<string>")
-    endif
-
-    if (contentMode == ALL_CONTENT)
-        return fileContents
-    else
-        int partialContent = FastMap("<string>")
-
-        i = 0
-        while (i < akContent.Length)
-            int srcContent = FastMap_GetObject(fileContents, akContent[i])
-            if (srcContent && FastMap_HasKey(fileContents, akContent[i]))
-                FastMap_SetObject(partialContent, akContent[i], srcContent)
-            else
-                Debug("Data::Preset_Load", "Requested content not found in preset: " + akContent[i])
-            endif
-            i += 1
-        endWhile
-
-        Debug("Data::Preset_Load", "Loaded filtered preset: " + asPresetFile + " ("+ akContent.Length +" row(s))")
-        return partialContent
-    endif
-endFunction
-
-int function Preset_Transform(int apDataContent, string[] akContent = none, bool abVerbose = true) global
-    if (!apDataContent)
-        return PRESET_NOT_FOUND()
-    endif
-
-    int ALL_CONTENT     = 0
-    int PARTIAL_CONTENT = 1
-
-    int contentMode = ALL_CONTENT
-
-    if (akContent.Length > 0)
-        contentMode = PARTIAL_CONTENT
-    endif
-
-    if (contentMode == ALL_CONTENT)
-        return apDataContent
-    else
-        int partialContent = FastMap("<string>")
-
-        int i = 0
-        while (i < akContent.Length)
-            int srcContent = FastMap_GetObject(apDataContent, akContent[i])
-            if (FastMap_HasKey(apDataContent, akContent[i]))
-                FastMap_SetObject(partialContent, akContent[i], srcContent)
-            endif
-            i += 1
-        endWhile
-
-        return partialContent
-    endif
-endFunction
-
-function Preset_Save(int apDataContent, string asPresetFile, string[] akContent = none, bool abVerbose = true) global
-
+    return fileContents
 endFunction
 
 ;/
+    Writes a bucket-keyed data blob to a preset file (to build one, put each bucket's own data
+    object into a FastMap<string> keyed by bucket name - see RPB_MCM.SavePreset).
 
-    Applies a preset object to the specifiec data content object (to obtain the preset, use Preset_Load).
-
-    FastMap<string, object> @apSrcDataContent: The source data contents of the preset.
-    FastMap<string, object> @apDstDataContent: The destination data content (where the changes will be applied).
-    bool                    @abVerbose: Whether to print verbose output.
-    bool                    @abDryRun: Whether to perform a dry run (i.e. no changes, preview only).
+    int     @apBucketsData: FastMap<string, object> keyed by bucket name.
+    string  @asPresetFile: The preset file name to write (relative to Preset_GetDirectory()).
 /;
-function Preset_Apply(int apSrcDataContent, int apDstDataContent, bool abVerbose = true, bool abDryRun = false) global
-    if (!apSrcDataContent)
-        Debug("Data::Preset_Apply", "Failed to apply preset: Invalid source data content.")
+function Preset_Save(int apBucketsData, string asPresetFile) global
+    if (!apBucketsData)
+        Debug("Data::Preset_Save", "Failed to save preset: Invalid data content.")
+        return
+    endif
+
+    Object_WriteData(apBucketsData, Preset_GetDirectory() + "/" + asPresetFile)
+    Debug("Data::Preset_Save", "Saved preset: " + asPresetFile)
+endFunction
+
+;/
+    Validates and applies exactly one bucket's preset data into the destination content object.
+    Each key is checked against that bucket's registrant (registered by RPB_MCM.RegisterPages())
+    before being applied - a key that's no longer a real, live option for this bucket is skipped
+    and logged, not blindly written.
+
+    string  @asBucket: The bucket name (e.g. "General", a Hold name) this data belongs to.
+    int     @apSrcBucketData: FastMap<string, object> - this bucket's own data, as read from the preset.
+    int     @apDstDataContent: FastMap<string, object> - the destination bucket map to write into.
+    bool    @abVerbose: Whether to print verbose output.
+    bool    @abDryRun: Whether to perform a dry run (i.e. no changes, preview only).
+/;
+function Preset_ApplyBucket(string asBucket, int apSrcBucketData, int apDstDataContent, bool abVerbose = true, bool abDryRun = false) global
+    if (!apSrcBucketData)
+        Debug("Data::Preset_ApplyBucket", "Failed to apply preset bucket " + asBucket + ": Invalid source data content.")
         return
     endif
 
     if (!apDstDataContent)
-        Debug("Data::Preset_Apply", "Failed to apply preset: Invalid destination data content.")
+        Debug("Data::Preset_ApplyBucket", "Failed to apply preset bucket " + asBucket + ": Invalid destination data content.")
         return
     endif
 
-    string[] registrants = FastMap_KeysAsPapyrusArray(apSrcDataContent)
+    ; Mirrors RPB_MCM.psc's TYPE_INT/TYPE_FLOAT/TYPE_STRING properties (2/3/6) - not accessible here
+    ; (they're properties on an RPB_MCM instance, and this function has no such reference).
+    int TYPE_INT    = 2
+    int TYPE_FLOAT  = 3
+    int TYPE_STRING = 6
 
-    if (registrants.Length == 0)
-        Debug("Data::Preset_Apply", "Failed to apply preset: No registrants found in source data content.")
-        return
-    endif
+    string registrant  = RPB_Registry.AsPresetRegistrantKey(asBucket)
+    string[] srcKeys    = FastMap_KeysAsPapyrusArray(apSrcBucketData)
 
     int appliedCount = 0
     int skippedCount = 0
 
     int i = 0
-    while (i < registrants.Length)
-        string registrant   = registrants[i]
-        int registrantData  = FastMap_GetObject(apSrcDataContent, registrant)
-        Debug("Data::Preset_Apply", "Empty or invalid content for Registrant: " + registrant, abCondition = !registrantData && abVerbose)
-        
-        if (registrantData)
-            string[] srcKeys = FastMap_KeysAsPapyrusArray(registrantData)
+    while (i < srcKeys.Length)
+        string presetContentKey = srcKeys[i]
 
-            if (srcKeys.Length == 0)
-                Debug("Data::Preset_Apply", "Failed to apply preset: No keys found in source data content.")
-                return
-            endif
-        
-            int j = 0
-            while (j < srcKeys.Length)
-                string presetContentKey = srcKeys[j]
-        
-                if (!RPB_Registry.HasContent(presetContentKey, registrant))
-                    Debug("Data::Preset_Apply", "Skipped invalid content: " + presetContentKey, abCondition = abVerbose)
-                    skippedCount += 1
-                else
-                    int srcObject = FastMap_GetObject(apSrcDataContent, presetContentKey)
-        
-                    if (!abDryRun)
-                        ; Apply the preset data to the destination map
-                        FastMap_SetObject(apDstDataContent, presetContentKey, srcObject)
-                        appliedCount += 1
-                    endif
-            
-                    Debug("Data::Preset_Apply", "Applied content: " + presetContentKey, abCondition = !abDryRun && abVerbose)
-                    Debug("Data::Preset_Apply", "(Dry Run) Would apply content: " + presetContentKey, abCondition = abDryRun && abVerbose)
+        if (!RPB_Registry.HasContent(presetContentKey, registrant))
+            ; Debug("Data::Preset_ApplyBucket", "Skipped invalid content for bucket " + asBucket + ": " + presetContentKey, abCondition = abVerbose)
+            skippedCount += 1
+        else
+            ; Every real option value is a primitive (bools stored as int 0/1) - never an object -
+            ; so this must copy with the matching typed getter/setter, not FastMap_GetObject/SetObject
+            ; (the wrong accessor for a primitive value; it silently returns/writes 0).
+            int valueType = FastMap_ValueType(apSrcBucketData, presetContentKey)
+
+            if (!abDryRun)
+                if (valueType == TYPE_INT)
+                    FastMap_SetInt(apDstDataContent, presetContentKey, FastMap_GetInt(apSrcBucketData, presetContentKey))
+                elseif (valueType == TYPE_FLOAT)
+                    FastMap_SetFloat(apDstDataContent, presetContentKey, FastMap_GetFloat(apSrcBucketData, presetContentKey))
+                elseif (valueType == TYPE_STRING)
+                    FastMap_SetString(apDstDataContent, presetContentKey, FastMap_GetString(apSrcBucketData, presetContentKey))
                 endif
 
-                j += 1
-            endWhile
+                appliedCount += 1
+            endif
+
+            ; Debug("Data::Preset_ApplyBucket", "Applied content for bucket " + asBucket + ": " + presetContentKey, abCondition = !abDryRun && abVerbose)
+            ; Debug("Data::Preset_ApplyBucket", "(Dry Run) Would apply content for bucket " + asBucket + ": " + presetContentKey, abCondition = abDryRun && abVerbose)
         endif
+
         i += 1
     endWhile
 
-    Debug("Data::Preset_Apply","Completed: " + appliedCount + " applied, " + skippedCount + " skipped.", abCondition = !abDryRun && abVerbose)
+    Debug("Data::Preset_ApplyBucket", "Bucket " + asBucket + " completed: " + appliedCount + " applied, " + skippedCount + " skipped.", abCondition = !abDryRun && abVerbose)
 endFunction
-
-; ;/
-
-;     Applies a preset object to the specifiec data content object (to obtain the preset, use Preset_Load).
-
-;     FastMap<string, object> @apSrcDataContent: The source data contents of the preset.
-;     FastMap<string, object> @apDstDataContent: The destination data content (where the changes will be applied).
-;     bool                    @abVerbose: Whether to print verbose output.
-;     bool                    @abDryRun: Whether to perform a dry run (i.e. no changes, preview only).
-;     string                  @asRegistrant: The name of the registrant to perform validation on each element of the preset (queries RPB_Registry).
-; /;
-; function Preset_Apply(int apSrcDataContent, int apDstDataContent, bool abVerbose = true, bool abDryRun = false, string asRegistrant = "") global
-;     if (!apSrcDataContent)
-;         Debug("Data::Preset_Apply", "Failed to apply preset: Invalid source data content.")
-;         return
-;     endif
-
-;     if (!apDstDataContent)
-;         Debug("Data::Preset_Apply", "Failed to apply preset: Invalid destination data content.")
-;         return
-;     endif
-
-;     string[] srcKeys = FastMap_KeysAsPapyrusArray(apSrcDataContent)
-
-;     if (srcKeys.Length == 0)
-;         Debug("Data::Preset_Apply", "Failed to apply preset: No keys found in source data content.")
-;         return
-;     endif
-
-;     int appliedCount = 0
-;     int skippedCount = 0
-
-;     int i = 0
-;     while (i < srcKeys.Length)
-;         string presetContentKey = srcKeys[i]
-
-;         if (!RPB_Registry.HasContent(presetContentKey, asRegistrant))
-;             Debug("Data::Preset_Apply", "Skipped invalid content: " + presetContentKey, abCondition = abVerbose)
-;             skippedCount += 1
-;         else
-;             int srcObject = FastMap_GetObject(apSrcDataContent, presetContentKey)
-
-;             if (!abDryRun)
-;                 ; Apply the preset data to the destination map
-;                 FastMap_SetObject(apDstDataContent, presetContentKey, srcObject)
-;                 appliedCount += 1
-;             endif
-    
-;             Debug("Data::Preset_Apply", "Applied content: " + presetContentKey, abCondition = !abDryRun && abVerbose)
-;             Debug("Data::Preset_Apply", "(Dry Run) Would apply content: " + presetContentKey, abCondition = abDryRun && abVerbose)
-;         endif
-
-        
-;         i += 1
-;     endWhile
-
-;     Debug("Data::Preset_Apply","Completed: " + appliedCount + " applied, " + skippedCount + " skipped.", abCondition = !abDryRun && abVerbose)
-; endFunction
 
 ; ==========================================================
 ;                           MCM

@@ -169,21 +169,12 @@ endProperty
 ;                           Presets
 ; ==========================================================
 
-; function GetExistingPresets() global
-;     int presetObj = JValue.readFromDirectory("Data/RPB_Data/Presets/Preset 1")
-;     int fileObj = JValue.readFromFile("Data/RPB_Data/Presets/Preset 1/holds.json")
-;     int configObj   = JValue.readFromFile("Data/RPB_Data/Presets/root.json") ; JMap&
-
-;     int obj = JValue.objectFromPrototype("{'Gata: 4'}")
-;     JValue.writeToFile(obj, "Data/RPB_Data/gata.json")
-
-
-;     Debug("RPB_MCM::GetExistingPresets", "Presets: " + GetContainerList(configObj))
-; endFunction
-
-string[] function GetPresetPages()
-    return String_Explode( \ 
-        "All," + \
+;/
+    Every bucket a preset can target: the fixed pages (General/Skills/Clothing) plus every Hold.
+    Single source of truth for the Presets page's Scope checklist, RegisterPages(), and SavePreset/LoadPreset.
+/;
+string[] function GetPresetBuckets()
+    return String_Explode( \
         "General," + \
         "Skills," + \
         "Clothing," + \
@@ -191,167 +182,427 @@ string[] function GetPresetPages()
     )
 endFunction
 
-string[] function GetPagesNoSpaces()
-    return String_Explode( \ 
-        "General," + \
-        "Skills," + \
-        "Clothing," + \
-        String_Implode(Holds) + "," \
-    )
+;/ The non-Hold subset of GetPresetBuckets() - used to render the Presets page's "Pages" group separately from "Holds". /;
+string[] function GetPresetPageBuckets()
+    return String_Explode("General,Skills,Clothing,")
 endFunction
 
 string[] function GetExistingPresets()
-    int fileListObj = FastMap_FromDirectory("Data/RPB_Data/Presets", ".rpbp")
+    int fileListObj = FastMap_FromDirectory(Preset_GetDirectory(), Preset_Extension())
     int fileList    = FastMap_Keys(fileListObj)
-
-
-    ; JValue.writeToFile(fileListObj, "Data/RPB_Data/Presets/preset2.rpbp")
-
-    ; Debug("RPB_MCM::GetExistingPresets", "Presets: " + GetContainerList(fileList))
 
     return RPB_Memory.FastArray_ToStringArray(fileList)
 endFunction
 
-function LoadPreset(string asPresetFile, string asContent = "All")
-    int ALL_CONTENT     = 0
-    int PARTIAL_CONTENT = 1
+;/
+    Resolves the bucket's config key in mcm.json - Hold pages share one config template, keyed
+    "Hold", not each Hold's own name.
+/;
+string function GetBucketConfigKey(string asBucket)
+    int i = 0
+    while (i < Holds.Length)
+        if (Holds[i] == asBucket)
+            return "Hold"
+        endif
+        i += 1
+    endWhile
 
-    int contentMode = ALL_CONTENT
-
-    if (asContent != "All")
-        contentMode = PARTIAL_CONTENT
-    endif
-
-    int presetData = Preset_Load(asPresetFile)
-
-    if (presetData == PRESET_INVALID_FILE())
-        return
-    endif
-
-    if (presetData == PRESET_NOT_FOUND())
-        return
-    endif
-
-    Debug("RPB_MCM::LoadPreset", "Loading preset (with content: " + asContent + "): " + asPresetFile + ", data: " + GetContainerList(presetData))
-
-    Preset_Apply(presetData, optionsValueMap)
+    return asBucket
 endFunction
 
-; function LoadPresetX(string asPresetFile, string asContent = "All")
-;     int ALL_CONTENT     = 0
-;     int PARTIAL_CONTENT = 1
+;/
+    Retrieves every real, declared option key for @asBucket straight from mcm.json - independent
+    of render/touch state (unlike optionsFromKeyToIdMap, which only ever contains keys from options
+    that have actually been rendered this session).
 
-;     int fileContents = JValue.readFromFile("Data/RPB_Data/Presets/" + asPresetFile)
-;     int contentMode = ALL_CONTENT
+    int?    @aiOptionsObj: An already-loaded RPB_Data.MCM_GetOptionObject() result, to avoid a fresh
+        full-file read+parse of mcm.json when resolving several buckets in a row (see RegisterPages/
+        SavePreset). Loaded fresh if not given, so this stays usable standalone.
 
-;     if (asContent != "All")
-;         contentMode = PARTIAL_CONTENT
-;     endif
+    returns (string[]): The bucket's option keys, or none if the bucket has no config.
+/;
+string[] function GetBucketOptionKeys(string asBucket, int aiOptionsObj = 0)
+    int optionsObj = aiOptionsObj
 
-;     if (!fileContents)
-;         Debug("RPB_MCM::LoadPreset", "Failed to load preset: " + asPresetFile)
-;         return
-;     endif
+    if (!optionsObj)
+        optionsObj = RPB_Data.MCM_GetOptionObject()
+    endif
 
-;     if (contentMode == ALL_CONTENT)
-;         string[] allPages = self.GetPagesNoSpaces()
-;         string[] srcKeys = FastMap_KeysAsPapyrusArray(fileContents)
+    int pageObj = FastMap_GetObject(optionsObj, self.GetBucketConfigKey(asBucket))
 
-;         ; int i = 0
-;         ; while (i < srcKeys.Length)
-;         ;     string pageFromPreset = srcKeys[i]
-;         ;     if (self.IsValidPage(pageFromPreset))
-;         ;         int src = FastMap_GetObject(fileContents, pageFromPreset)
-;         ;         FastMap_SetObject(optionsValueMap, pageFromPreset, src)
-;         ;     endif
-;         ;     i += 1
-;         ; endWhile
+    if (!pageObj)
+        return none
+    endif
 
-;         int i = 0
-;         while (i < allPages.Length)
-;             string currentPage = allPages[i]
-;             if (self.IsValidPage(currentPage))
-;                 int src = FastMap_GetObject(fileContents, pageFromPreset)
-;                 FastMap_SetObject(optionsValueMap, pageFromPreset, src)
-;             endif
-;             i += 1
-;         endWhile
+    return FastMap_KeysAsPapyrusArray(pageObj)
+endFunction
 
-;         ; Verify Pages that might not exist in the save (but are in the preset)
-;         i = 0
-;         while (i < srcKeys.Length)
-;             string pageFromPreset = srcKeys[i]
-;             if (!self.IsValidPage(pageFromPreset))
-;                 Debug.MessageBox("Preset contains page that does not exist in the save: " + pageFromPreset)
-;             endif
-;             i += 1
-;         endWhile
-
-;         ; int i = 0
-;         ; while (i < Holds.Length)
-;         ;     int src = FastMap_GetObject(fileContents, Holds[i])
-;         ;     FastMap_SetObject(optionsValueMap, Holds[i], src)
-;         ;     i += 1
-;         ; endWhile
-;         ; optionsValueMap = JValue.deepCopy(fileContents)
-;         Debug("RPB_MCM::LoadPreset", "optionsValueMap: " + GetContainerList(optionsValueMap))
-;     else
-;         int partialContent = FastMap_GetObject(fileContents, asContent)
-;         FastMap_SetObject(optionsValueMap, asContent, partialContent)
-;         Debug("RPB_MCM::LoadPreset", "optionsValueMap: " + GetContainerList(optionsValueMap))
-;     endif
-
-; endFunction
-
-bool function IsValidPage(string asPage)
-    string[] allPages = self.GetPagesNoSpaces()
+;/
+    Registers every preset bucket's real, declared option keys (per mcm.json, via
+    GetBucketOptionKeys - not just whatever's been touched this session) with RPB_Registry, so a
+    loaded preset's keys can be validated against what's actually live right now - a key that's no
+    longer a real option for that bucket (renamed/removed since the preset was saved) gets skipped,
+    not blindly applied. Called every OnConfigOpen, so the registered content is always current.
+/;
+function RegisterPages()
+    string[] buckets = self.GetPresetBuckets()
+    int optionsObj   = RPB_Data.MCM_GetOptionObject() ; loaded once, not once per bucket
 
     int i = 0
-    while (i < allPages.Length)
-        if (allPages[i] == asPage)
-            return true
+    while (i < buckets.Length)
+        string bucket       = buckets[i]
+        string[] bucketKeys = self.GetBucketOptionKeys(bucket, optionsObj)
+
+        ; RPB_Registry.HasContent() checks membership via FastMap_HasKey(), so the registered
+        ; content must be a FastMap (JMap), not a plain FastArray of key names.
+        int registrantContent = FastMap("<string>")
+
+        if (bucketKeys)
+            int j = 0
+            while (j < bucketKeys.Length)
+                FastMap_SetInt(registrantContent, bucketKeys[j], 1)
+                j += 1
+            endWhile
         endif
+
+        RPB_Registry.RegisterContent(RPB_Registry.AsPresetRegistrantKey(bucket), registrantContent)
         i += 1
     endWhile
 endFunction
 
-function RegisterPages()
-    RPB_Registry.RegisterContent("PRESET.MCM", \
-        FastArray_FromStringArray(String_Explode( \ 
-            "General," + \
-            "Skills," + \
-            "Clothing," + \
-            String_Implode(Holds) + "," \
-        )) \
-    )
-endFunction
+;/
+    Resolves the *effective* current value (the touched value if present, else this bucket's
+    declared default from mcm.json) for every real option key in @asBucket, independent of whether
+    that page has actually been rendered/visited this session - optionsValueMap only ever contains
+    explicitly-touched keys (see SavePreset), so reading it alone would silently skip anything left
+    at its default.
 
-function LoadPageFromPreset(string asPresetFile, string asPage)
-    int fileContents = FastMap_FromFile("Data/RPB_Data/Presets/" + asPresetFile)
-    int pageContents = FastMap_GetObject(fileContents, asPage)
-endFunction
+    Deliberately does NOT go through GetOptionDefaultBool/Int/Float/String or
+    GetOptionValueTypeFromConfig - both are hard-coupled to CurrentPage (unusable for a bucket that
+    isn't the page currently open) and/or independently flagged as buggy elsewhere in this file.
+    Reuses OptionHasValue/GetOptionValue{Bool,Int,Float,String}(key, page) instead, which already
+    accept an explicit page, and the existing IsPropertyValueOfTypeBool(optionMap, "Default")
+    int-vs-bool heuristic (also page-independent, since it only inspects the passed-in option map).
 
-function SavePreset(string asPresetFile, string asContent)
-    int ALL_CONTENT     = 0
-    int PARTIAL_CONTENT = 1
+    string  @asBucket: The bucket (page or Hold name) to resolve.
+    int?    @aiOptionsObj: An already-loaded RPB_Data.MCM_GetOptionObject() result - see
+        GetBucketOptionKeys. Loaded fresh (once, not twice) if not given.
 
-    int contentMode = ALL_CONTENT
+    returns (int): FastMap<string> - "Category::Option" -> effective value, one entry per real option key.
+/;
+int function GetBucketEffectiveValues(string asBucket, int aiOptionsObj = 0)
+    int optionsObj = aiOptionsObj
 
-    if (asContent != "All")
-        contentMode = PARTIAL_CONTENT
+    if (!optionsObj)
+        optionsObj = RPB_Data.MCM_GetOptionObject()
     endif
 
-    if (contentMode == ALL_CONTENT)
-        Object_WriteData(optionsValueMap, "Data/RPB_Data/Presets/" + asPresetFile)
-    else
-        int partialContent = FastMap_GetObject(optionsValueMap, asContent)
-        Object_WriteData(partialContent, "Data/RPB_Data/Presets/" + asPresetFile)
+    string[] optionKeys = self.GetBucketOptionKeys(asBucket, optionsObj)
+    int snapshot         = FastMap("<string>")
+
+    if (!optionKeys)
+        return snapshot
     endif
 
-    ; Debug("RPB_MCM::SavePreset", "optionsValueMap: " + GetContainerList(optionsValueMap) + "\n" + "optionValuesInPage: " + GetContainerList(optionValuesInPage))
+    int pageObj = FastMap_GetObject(optionsObj, self.GetBucketConfigKey(asBucket))
 
-    ; string testOptionRead = self.GetOptionValueString("Outfit 1::Name", "Clothing")
-    ; Debug("RPB_MCM::SavePreset", "testOptionRead: " + testOptionRead)
+    int i = 0
+    while (i < optionKeys.Length)
+        string optionKey = optionKeys[i]
+        int optionMap    = FastMap_GetObject(pageObj, optionKey)
+
+        if (FastMap_HasKey(optionMap, "Default"))
+            int defaultType = FastMap_ValueType(optionMap, "Default")
+            bool hasValue   = self.OptionHasValue(optionKey, asBucket)
+
+            if (defaultType == TYPE_INT && self.IsPropertyValueOfTypeBool(optionMap, "Default"))
+                FastMap_SetInt(snapshot, optionKey, bool_if(hasValue, self.GetOptionValueBool(optionKey, asBucket), FastMap_GetInt(optionMap, "Default") as bool) as int)
+
+            elseif (defaultType == TYPE_INT || defaultType == TYPE_FLOAT)
+                FastMap_SetFloat(snapshot, optionKey, float_if(hasValue, self.GetOptionValueFloat(optionKey, asBucket), FastMap_GetFloat(optionMap, "Default")))
+
+            elseif (defaultType == TYPE_STRING)
+                FastMap_SetString(snapshot, optionKey, string_if(hasValue, self.GetOptionValueString(optionKey, asBucket), FastMap_GetString(optionMap, "Default")))
+            endif
+        endif
+
+        i += 1
+    endWhile
+
+    return snapshot
+endFunction
+
+;/
+    Copies one bucket's current effective values into another, same-shaped bucket (e.g. Hold to
+    Hold - Eastmarch into Haafingar). Refuses to copy between buckets of different shape (e.g. a
+    Hold into General) - GetBucketConfigKey() resolves each bucket to its mcm.json config template,
+    and this stays forward-compatible with the future Hold/Prison MCM decoupling for free, since a
+    new Prison shape would just be another distinct config template.
+
+    Reuses GetBucketEffectiveValues() (the same resolver presets use) as the source and
+    Preset_ApplyBucket() (already registrant-validated and type-correct) to write it - no new
+    validation logic needed.
+
+    string  @asSrcBucket: The bucket to copy from.
+    string  @asDstBucket: The bucket to copy into.
+
+    returns (bool): false if the copy was refused (different shape), true otherwise.
+/;
+bool function CopyBucketOptions(string asSrcBucket, string asDstBucket)
+    if (self.GetBucketConfigKey(asSrcBucket) != self.GetBucketConfigKey(asDstBucket))
+        Debug("RPB_MCM::CopyBucketOptions", "Cannot copy " + asSrcBucket + " into " + asDstBucket + " - different shape.")
+        return false
+    endif
+
+    int srcValues = self.GetBucketEffectiveValues(asSrcBucket)
+    Preset_ApplyBucket(asDstBucket, srcValues, self.GetPageObject(optionsValueMap, asDstBucket))
+
+    return true
+endFunction
+
+;/
+    Saves every given bucket's current effective values (touched-or-default, via
+    GetBucketEffectiveValues) into one preset file. Appends the preset extension automatically if
+    @asPresetFile doesn't already have it.
+
+    string      @asPresetFile: The preset file name (with or without the .rpbp extension).
+    string[]    @akBuckets: The buckets to save (e.g. "General", a Hold name, ...).
+/;
+function SavePreset(string asPresetFile, string[] akBuckets)
+    string presetFile = asPresetFile
+
+    if (!String_EndsWith(presetFile, Preset_Extension()))
+        presetFile += Preset_Extension()
+    endif
+
+    int bucketsData = FastMap("<string>")
+    int optionsObj  = RPB_Data.MCM_GetOptionObject() ; loaded once, not once per bucket
+
+    int i = 0
+    while (i < akBuckets.Length)
+        string bucket = akBuckets[i]
+        FastMap_SetObject(bucketsData, bucket, self.GetBucketEffectiveValues(bucket, optionsObj))
+        i += 1
+    endWhile
+
+    Preset_Save(bucketsData, presetFile)
+    self.SetTrackedPreset(presetFile, akBuckets)
+endFunction
+
+;/
+    Loads a preset file and applies every given bucket that's actually present in the file.
+    A given bucket missing from the file is skipped and logged, not treated as an error.
+
+    string      @asPresetFile: The preset file to load.
+    string[]    @akBuckets: The buckets to apply from the loaded file, if present.
+/;
+function LoadPreset(string asPresetFile, string[] akBuckets)
+    int presetData = Preset_Load(asPresetFile)
+
+    if (presetData == PRESET_INVALID_FILE() || presetData == PRESET_NOT_FOUND())
+        return
+    endif
+
+    int appliedBuckets = FastArray("<string>")
+
+    int i = 0
+    while (i < akBuckets.Length)
+        string bucket = akBuckets[i]
+
+        if (FastMap_HasKey(presetData, bucket))
+            Preset_ApplyBucket(bucket, FastMap_GetObject(presetData, bucket), self.GetPageObject(optionsValueMap, bucket))
+            FastArray_AddString(appliedBuckets, bucket)
+        else
+            Debug("RPB_MCM::LoadPreset", "Checked bucket not found in preset " + asPresetFile + ": " + bucket)
+        endif
+
+        i += 1
+    endWhile
+
+    self.SetTrackedPreset(asPresetFile, FastArray_ToStringArray(appliedBuckets))
+endFunction
+
+; ==========================================================
+;              Presets - tracked (last saved/loaded)
+; ==========================================================
+
+;/
+    Persisted (survives MCM close and game save/reload, same as optionsValueMap's own backing
+    container) record of the most recently saved-to or loaded-from preset, and a snapshot of the
+    buckets involved at that moment - lets the Presets page show which preset is "active" and
+    whether anything's changed since.
+/;
+;/ FastMap<string> - "name" -> string, "buckets" -> FastMap<bucket, snapshot> /; int __trackedPreset
+
+;/
+    Which tracked buckets have had any option set since the current baseline was captured -
+    HasTrackedPresetChanged() only needs to resolve/compare buckets that show up here, instead of
+    every tracked bucket on every check. See MarkBucketPossiblyDirty().
+/;
+;/ FastMap<bool> /; int __trackedPresetDirtyBuckets
+
+;/
+    Records @asPresetFile and @akBuckets as the tracked preset/baseline - called after a
+    successful Save (every checked bucket) or Load (only the buckets actually found-and-applied).
+    Re-derives the snapshot fresh from live state via GetBucketEffectiveValues rather than reusing
+    whatever was written/read, so it always matches what's actually live right now.
+/;
+function SetTrackedPreset(string asPresetFile, string[] akBuckets)
+    __trackedPreset = delete(__trackedPreset)
+    __trackedPreset = FastMap("<string>", retain = true)
+
+    FastMap_SetString(__trackedPreset, "name", asPresetFile)
+
+    int bucketsSnapshot = FastMap("<string>")
+    int optionsObj      = RPB_Data.MCM_GetOptionObject() ; loaded once, not once per bucket
+
+    int i = 0
+    while (i < akBuckets.Length)
+        string bucket = akBuckets[i]
+        FastMap_SetObject(bucketsSnapshot, bucket, self.GetBucketEffectiveValues(bucket, optionsObj))
+        i += 1
+    endWhile
+
+    FastMap_SetObject(__trackedPreset, "buckets", bucketsSnapshot)
+
+    ; Fresh baseline - nothing's dirty relative to it yet.
+    __trackedPresetDirtyBuckets = delete(__trackedPresetDirtyBuckets)
+    __trackedPresetDirtyBuckets = FastMap("<string>", retain = true)
+endFunction
+
+;/
+    Marks @asPage dirty relative to the tracked preset's baseline, if it's actually one of the
+    tracked buckets - called from every SetOptionValue{Bool,Int,Float,String} so
+    HasTrackedPresetChanged() knows which tracked buckets might need re-checking, without having to
+    blindly re-resolve all of them. No-ops immediately if nothing's tracked or @asPage isn't a
+    tracked bucket - cheap even for MCM interactions completely unrelated to Presets.
+
+    string  @asPage: The page an option was just set on ("" resolves to CurrentPage, same as
+        GetPageObject).
+/;
+function MarkBucketPossiblyDirty(string asPage)
+    if (!__trackedPreset)
+        return
+    endif
+
+    string page = asPage
+
+    if (page == "")
+        page = CurrentPage
+    endif
+
+    int trackedBuckets = FastMap_GetObject(__trackedPreset, "buckets")
+
+    if (!FastMap_HasKey(trackedBuckets, page))
+        return
+    endif
+
+    if (!__trackedPresetDirtyBuckets)
+        __trackedPresetDirtyBuckets = FastMap("<string>", retain = true)
+    endif
+
+    FastMap_SetInt(__trackedPresetDirtyBuckets, page, 1)
+endFunction
+
+;/
+    Key-by-key, type-by-type equality check between two GetBucketEffectiveValues()-shaped
+    FastMap<string> objects. JContainers has no built-in deep-equality call.
+/;
+bool function BucketValuesEqual(int apA, int apB)
+    if (FastMap_Size(apA) != FastMap_Size(apB))
+        return false
+    endif
+
+    string[] keys = FastMap_KeysAsPapyrusArray(apA)
+
+    int i = 0
+    while (i < keys.Length)
+        string _key = keys[i]
+
+        if (!FastMap_HasKey(apB, _key))
+            return false
+        endif
+
+        int valueType = FastMap_ValueType(apA, _key)
+
+        if (valueType != FastMap_ValueType(apB, _key))
+            return false
+        endif
+
+        if (valueType == TYPE_INT && FastMap_GetInt(apA, _key) != FastMap_GetInt(apB, _key))
+            return false
+        elseif (valueType == TYPE_FLOAT && FastMap_GetFloat(apA, _key) != FastMap_GetFloat(apB, _key))
+            return false
+        elseif (valueType == TYPE_STRING && FastMap_GetString(apA, _key) != FastMap_GetString(apB, _key))
+            return false
+        endif
+
+        i += 1
+    endWhile
+
+    return true
+endFunction
+
+;/
+    Whether anything's changed in any tracked bucket since the last Save/Load. Only resolves/
+    compares buckets MarkBucketPossiblyDirty() actually flagged - if nothing's been touched since
+    the baseline was captured, this returns immediately with no resolving at all (confirmed the
+    actual cost driver of a 6-10s Presets-page load: fully re-resolving every tracked bucket on
+    every single visit, even when nothing had changed).
+/;
+bool function HasTrackedPresetChanged()
+    if (!__trackedPreset)
+        return false
+    endif
+
+    if (!__trackedPresetDirtyBuckets || FastMap_Size(__trackedPresetDirtyBuckets) == 0)
+        return false
+    endif
+
+    int bucketsSnapshot  = FastMap_GetObject(__trackedPreset, "buckets")
+    string[] dirtyBuckets = FastMap_KeysAsPapyrusArray(__trackedPresetDirtyBuckets)
+    int optionsObj        = RPB_Data.MCM_GetOptionObject() ; loaded once, not once per bucket
+
+    int i = 0
+    while (i < dirtyBuckets.Length)
+        string bucket = dirtyBuckets[i]
+
+        if (FastMap_HasKey(bucketsSnapshot, bucket))
+            int snapshotValues = FastMap_GetObject(bucketsSnapshot, bucket)
+            int currentValues  = self.GetBucketEffectiveValues(bucket, optionsObj)
+
+            if (!self.BucketValuesEqual(snapshotValues, currentValues))
+                return true
+            endif
+        endif
+
+        i += 1
+    endWhile
+
+    return false
+endFunction
+
+;/
+    "" if nothing is tracked yet; otherwise the tracked preset's name (extension stripped) plus
+    " (Changed)" if HasTrackedPresetChanged().
+/;
+string function GetTrackedPresetDisplayName()
+    if (!__trackedPreset)
+        return ""
+    endif
+
+    string fileName = FastMap_GetString(__trackedPreset, "name")
+    string extension = Preset_Extension()
+
+    if (String_EndsWith(fileName, extension))
+        fileName = StringUtil.Substring(fileName, 0, StringUtil.GetLength(fileName) - StringUtil.GetLength(extension))
+    endif
+
+    if (self.HasTrackedPresetChanged())
+        return fileName + " (Changed)"
+    endif
+
+    return fileName
 endFunction
 
 ;/
@@ -757,6 +1008,79 @@ function ToggleOption(string _key, bool storePersistently = true)
     ; Trace("MCM::ToggleOption", "Set new value of " + !option + " for " + _key + "(OptionKey: "+ optionKey +")" + "(option_id: "+ optionId +")", true)
 endFunction
 
+; ==========================================================
+;                 Presets - Scope checklist (ephemeral)
+; ==========================================================
+
+;/
+    Ephemeral scratch storage for the Presets page's Scope checklist - deliberately NOT part of
+    optionsValueMap (not real, persisted MCM option storage). Reset every time the Presets page
+    renders, so leaving and returning to the page always starts from a blank, all-unchecked slate.
+/;
+;/ FastMap<bool> /; int __presetScopeChecked
+
+function ResetPresetScopeChecked()
+    __presetScopeChecked = delete(__presetScopeChecked)
+    __presetScopeChecked = FastMap("<string>", retain = true)
+endFunction
+
+bool function IsPresetBucketChecked(string asBucket)
+    if (!__presetScopeChecked)
+        return false
+    endif
+
+    return FastMap_GetInt(__presetScopeChecked, asBucket) as bool
+endFunction
+
+;/
+    Sets a Scope checklist bucket's checked state and updates the toggle widget to match.
+    Ephemeral only - never touches optionsValueMap.
+
+    string  @asBucket: The bucket name (matches GetPresetBuckets()).
+    int     @aiOptionId: The toggle option's native id, to update its displayed state.
+    bool    @abChecked: The value to set.
+/;
+function SetPresetBucketChecked(string asBucket, int aiOptionId, bool abChecked)
+    if (!__presetScopeChecked)
+        self.ResetPresetScopeChecked()
+    endif
+
+    FastMap_SetInt(__presetScopeChecked, asBucket, abChecked as int)
+    parent.SetToggleOptionValue(aiOptionId, abChecked)
+endFunction
+
+;/
+    Ephemeral cache of the exact item list shown in a Menu-type dialog (keyed by option, e.g.
+    "Save::menuSavePreset"), captured at OnOptionMenuOpen-time and read back at
+    OnOptionMenuAccept-time instead of recomputing it (which risks the accept-time list - e.g. a
+    fresh directory listing - drifting from what the player actually saw and clicked on, silently
+    mismatching menuIndex to the wrong item).
+/;
+;/ FastMap<string[]> /; int __presetMenuOptionsCache
+
+function SetPresetMenuOptionsCache(string asOption, string[] akOptions)
+    if (!__presetMenuOptionsCache)
+        __presetMenuOptionsCache = FastMap("<string>", retain = true)
+    endif
+
+    FastMap_SetObject(__presetMenuOptionsCache, asOption, FastArray_FromStringArray(akOptions))
+endFunction
+
+;/ Returns none if nothing was cached for @asOption (e.g. accept fired without a matching open). /;
+string[] function GetPresetMenuOptionsCache(string asOption)
+    if (!__presetMenuOptionsCache)
+        return none
+    endif
+
+    int cached = FastMap_GetObject(__presetMenuOptionsCache, asOption)
+
+    if (!cached)
+        return none
+    endif
+
+    return FastArray_ToStringArray(cached)
+endFunction
+
 ; Option Rendering Functions
 ; ============================================================
 
@@ -785,6 +1109,72 @@ function AddOptionCategory(string text, int flags = 0)
     AddHeaderOption(text, flags)
 endFunction
 
+; ============================================================
+; Option Rendering Support - collapsed exists-then-get resolvers
+; ============================================================
+
+;/
+    Every AddOption*Key function below used to call OptionHasState()+GetOptionState() and
+    OptionHasValue()+GetOptionValue{Bool,Float,String}() - two Papyrus-level calls each, both pairs
+    resolving the SAME (map, page) page-object twice in a row for data nothing could have changed
+    in between. These Resolve* functions do the same net resolution (stored value if present, else
+    the caller's own fallback) in one call and one page-object lookup instead of two of each -
+    collapsing redundant work at the source, not adding a caching layer on top of it (that was
+    already tried elsewhere in this file and measured worse - see TROUBLESHOOTING_NOTES.md). Every
+    real page in this MCM renders through these, so this is deliberately a hot path.
+/;
+int function ResolveOptionFlags(string optionKey, int defaultFlags)
+    int pageObject = self.GetPageObject(optionsStateMap, "")
+
+    if (FastMap_HasKey(pageObject, optionKey))
+        return FastMap_GetInt(pageObject, optionKey)
+    endif
+
+    return defaultFlags
+endFunction
+
+bool function ResolveOptionValueBool(string optionKey, int defaultValueOverride)
+    int pageObject = self.GetPageObject(optionsValueMap, "")
+
+    if (FastMap_HasKey(pageObject, optionKey))
+        return FastMap_GetInt(pageObject, optionKey) as bool
+    endif
+
+    if (defaultValueOverride > -1)
+        return defaultValueOverride as bool
+    endif
+
+    return self.GetOptionDefaultBool(optionKey)
+endFunction
+
+float function ResolveOptionValueFloat(string optionKey, float defaultValueOverride)
+    int pageObject = self.GetPageObject(optionsValueMap, "")
+
+    if (FastMap_HasKey(pageObject, optionKey))
+        return FastMap_GetFloat(pageObject, optionKey)
+    endif
+
+    if (defaultValueOverride > -1.0)
+        return defaultValueOverride
+    endif
+
+    return self.GetOptionDefaultFloat(optionKey)
+endFunction
+
+string function ResolveOptionValueString(string optionKey, string defaultValueOverride)
+    int pageObject = self.GetPageObject(optionsValueMap, "")
+
+    if (FastMap_HasKey(pageObject, optionKey))
+        return FastMap_GetString(pageObject, optionKey)
+    endif
+
+    if (defaultValueOverride != "")
+        return defaultValueOverride
+    endif
+
+    return self.GetOptionDefaultString(optionKey)
+endFunction
+
 ;/
     Adds and renders a Toggle Option with the possibility of specifying a Key for its storage.
 
@@ -796,29 +1186,11 @@ endFunction
 /;
 int function AddOptionToggleKey(string displayedText, string _key, int defaultValueOverride = -1, int defaultFlags = 0)
     int optionId
-    int flags
-    bool value
 
     string optionKey = CurrentRenderedCategory + "::" + _key
 
-    bool optionHasState = self.OptionHasState(optionKey)
-    bool optionHasValue = self.OptionHasValue(optionKey)
-
-    if (optionHasState)
-        flags = self.GetOptionState(optionKey)
-    else
-        flags = defaultFlags
-    endif
-
-    if (optionHasValue)
-        value = self.GetOptionValueBool(optionKey)
-    else
-        if (defaultValueOverride > -1)
-            value = defaultValueOverride
-        else
-            value = self.GetOptionDefaultBool(optionKey)
-        endif
-    endif
+    int flags   = self.ResolveOptionFlags(optionKey, defaultFlags)
+    bool value  = self.ResolveOptionValueBool(optionKey, defaultValueOverride)
 
     optionId = AddToggleOption(displayedText, value, flags)
 
@@ -844,29 +1216,11 @@ endFunction
 /;
 int function AddOptionTextKey(string displayedText, string _key, string defaultValueOverride = "", int defaultFlags = 0)
     int optionId
-    int flags
-    string value
 
     string optionKey = CurrentRenderedCategory + "::" + _key
 
-    bool optionHasState = self.OptionHasState(optionKey)
-    bool optionHasValue = self.OptionHasValue(optionKey)
-
-    if (optionHasState)
-        flags = self.GetOptionState(optionKey)
-    else
-        flags = defaultFlags
-    endif
-
-    if (optionHasValue)
-        value = self.GetOptionValueString(optionKey)
-    else
-        if (defaultValueOverride != "")
-            value = defaultValueOverride
-        else
-            value = self.GetOptionDefaultString(optionKey)
-        endif
-    endif
+    int flags      = self.ResolveOptionFlags(optionKey, defaultFlags)
+    string value   = self.ResolveOptionValueString(optionKey, defaultValueOverride)
 
     optionId = AddTextOption(displayedText, value, flags)
 
@@ -919,29 +1273,11 @@ endFunction
 /;
 int function AddOptionSliderKey(string displayedText, string _key, string formatString = "{0}", float defaultValueOverride = -1.0, int defaultFlags = 0)
     int optionId
-    int flags
-    float value
 
     string optionKey = CurrentRenderedCategory + "::" + _key
 
-    bool optionHasState = self.OptionHasState(optionKey)
-    bool optionHasValue = self.OptionHasValue(optionKey)
-
-    if (optionHasState)
-        flags = self.GetOptionState(optionKey)
-    else
-        flags = defaultFlags
-    endif
-
-    if (optionHasValue)
-        value = self.GetOptionValueFloat(optionKey)
-    else
-        if (defaultValueOverride > -1.0)
-            value = defaultValueOverride
-        else
-            value = self.GetOptionDefaultFloat(optionKey)
-        endif
-    endif
+    int flags    = self.ResolveOptionFlags(optionKey, defaultFlags)
+    float value  = self.ResolveOptionValueFloat(optionKey, defaultValueOverride)
 
     optionId = AddSliderOption(displayedText, value, formatString, flags)
 
@@ -977,30 +1313,12 @@ endFunction
     returns:    The Option's ID.
 /;
 int function AddOptionMenuKey(string displayedText, string _key, string defaultValueOverride = "", int defaultFlags = 0)
-    int optionId;           = AddSliderOption(displayedText, float_if (self.OptionHasValue(optionKey), value, defaultValue), formatString, int_if (self.OptionHasState(optionKey), flags, defaultFlags))
-    int flags
-    string value
+    int optionId
 
     string optionKey = CurrentRenderedCategory + "::" + _key
 
-    bool optionHasState = self.OptionHasState(optionKey)
-    bool optionHasValue = self.OptionHasValue(optionKey)
-
-    if (optionHasState)
-        flags = self.GetOptionState(optionKey)
-    else
-        flags = defaultFlags
-    endif
-
-    if (optionHasValue)
-        value = self.GetOptionValueString(optionKey)
-    else
-        if (defaultValueOverride != "")
-            value = defaultValueOverride
-        else
-            value = self.GetOptionDefaultString(optionKey)
-        endif
-    endif
+    int flags      = self.ResolveOptionFlags(optionKey, defaultFlags)
+    string value   = self.ResolveOptionValueString(optionKey, defaultValueOverride)
 
     optionId = AddMenuOption(displayedText, value, flags)
 
@@ -1026,29 +1344,11 @@ endFunction
 /;
 int function AddOptionInputKey(string displayedText, string _key, string defaultValueOverride = "-", int defaultFlags = 0)
     int optionId
-    int flags
-    string value
 
     string optionKey = CurrentRenderedCategory + "::" + _key
 
-    bool optionHasState = self.OptionHasState(optionKey)
-    bool optionHasValue = self.OptionHasValue(optionKey)
-
-    if (optionHasState)
-        flags = self.GetOptionState(optionKey)
-    else
-        flags = defaultFlags
-    endif
-
-    if (optionHasValue)
-        value = self.GetOptionValueString(optionKey)
-    else
-        if (defaultValueOverride != "")
-            value = defaultValueOverride
-        else
-            value = self.GetOptionDefaultString(optionKey)
-        endif
-    endif
+    int flags      = self.ResolveOptionFlags(optionKey, defaultFlags)
+    string value   = self.ResolveOptionValueString(optionKey, defaultValueOverride)
 
     optionId = AddInputOption(displayedText, value, flags)
 
@@ -1156,11 +1456,6 @@ event OnConfigOpen()
 
     self.RegisterPages()
 
-    Debug("MCM::LoadPreset", "Registry (MCM): " + RPB_Registry.ListContent("PRESET.MCM"))
-
-    ; Debug("MCM::LoadPreset", "Static Storage: " + StaticStorage(".mcm.pages"))
-    ; Debug("MCM::LoadPreset", "Static Storage (MCM Pages): " + GetContainerList(FastMap_GetObject(StaticStorage(".mcm.pages"), "data")))
-
 endEvent
 
 string property RPB_CurrentPage auto
@@ -1208,7 +1503,11 @@ event OnPageReset(string page)
         MCM()
 
     elseif (page == "Presets")
-        Debug("RPB_MCM::OnPageReset", "optionsValueMap: " + GetContainerList(optionsValueMap) + "\n" + "optionsDefaultValueMap: " + GetContainerList(optionsDefaultValueMap))
+        ; Was dumping the entire optionsValueMap/optionsDefaultValueMap trees as strings on every
+        ; Presets page reset - the actual cause of the Presets page feeling slow to open (this was
+        ; gated specifically to page == "Presets", not a hook every page shares), and it only got
+        ; worse as the preset redesign's full-snapshot Loads grew optionsValueMap larger.
+        ; Debug("RPB_MCM::OnPageReset", "optionsValueMap: " + GetContainerList(optionsValueMap) + "\n" + "optionsDefaultValueMap: " + GetContainerList(optionsDefaultValueMap))
     endif
 endEvent
 
@@ -2404,6 +2703,7 @@ endFunction
 function SetOptionValueBool(string optionKey, bool value, string page = "")
     ; options/value/Whiterun/Stripping::Allow Stripping
     FastMap_SetInt(self.GetPageObject(optionsValueMap, page), optionKey, value as int)
+    self.MarkBucketPossiblyDirty(page)
 
     ; string optionAsStored = self.GetOptionAsStored(optionKey, page)
     ; JMap.setInt(optionsValueMap, optionAsStored, value as int)
@@ -2418,6 +2718,7 @@ endFunction
 /;
 function SetOptionValueInt(string optionKey, int value, string page = "")
     FastMap_SetInt(self.GetPageObject(optionsValueMap, page), optionKey, value)
+    self.MarkBucketPossiblyDirty(page)
 
     ; string optionAsStored = self.GetOptionAsStored(optionKey, page)
     ; JMap.setInt(optionsValueMap, optionAsStored, value)
@@ -2432,6 +2733,7 @@ endFunction
 /;
 function SetOptionValueFloat(string optionKey, float value, string page = "")
     FastMap_SetFloat(self.GetPageObject(optionsValueMap, page), optionKey, value)
+    self.MarkBucketPossiblyDirty(page)
 
     ; string optionAsStored = self.GetOptionAsStored(optionKey, page)
     ; JMap.setFlt(optionsValueMap, optionAsStored, value)
@@ -2538,7 +2840,7 @@ endFunction
     string? @page: The page where the option is rendered (will be CurrentPage if null).
 /;
 int function GetOptionValueInt(string optionKey, string page = "")
-    Debug("MCM::GetOptionValueInt", "Getting " + optionKey + " from page " + page + " = " + FastMap_GetInt(self.GetPageObject(optionsValueMap, page), optionKey))
+    ; Debug("MCM::GetOptionValueInt", "Getting " + optionKey + " from page " + page + " = " + FastMap_GetInt(self.GetPageObject(optionsValueMap, page), optionKey))
     return FastMap_GetInt(self.GetPageObject(optionsValueMap, page), optionKey)
     
     ; string optionAsStored = self.GetOptionAsStored(optionKey, page)
@@ -2552,7 +2854,7 @@ endFunction
     string? @page: The page where the option is rendered (will be CurrentPage if null).
 /;
 float function GetOptionValueFloat(string optionKey, string page = "")
-    Debug("MCM::GetOptionValueFloat", "Getting " + optionKey + " from page " + page + " = " + FastMap_GetFloat(self.GetPageObject(optionsValueMap, page), optionKey))
+    ; Debug("MCM::GetOptionValueFloat", "Getting " + optionKey + " from page " + page + " = " + FastMap_GetFloat(self.GetPageObject(optionsValueMap, page), optionKey))
     return FastMap_GetFloat(self.GetPageObject(optionsValueMap, page), optionKey)
 
     ; string optionAsStored = self.GetOptionAsStored(optionKey, page)
