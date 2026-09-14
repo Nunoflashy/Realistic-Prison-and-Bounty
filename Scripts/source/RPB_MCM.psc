@@ -333,6 +333,70 @@ int function GetBucketEffectiveValues(string asBucket, int aiOptionsObj = 0)
 endFunction
 
 ;/
+    Populates optionsDefaultValueMap for every real option key on CurrentPage, in one pass (one
+    RPB_Data.MCM_GetOptionObject() read, one loop) - fixes GetOptionToggleState/GetOptionMenuValue/
+    GetOptionDefaultBool&co. returning a wrong false/0/"" for any option nobody's touched yet.
+
+    optionsDefaultValueMap was previously only ever populated by LoadDefaults(), called exactly
+    once from OnConfigInit() (which itself fires once ever per save) for whatever page happened to
+    be CurrentPage at that single moment - never comprehensively populated for every page. This is
+    called once per page visit (see OnPageReset) instead, using the same single-mcm.json-read
+    discipline already proven for the preset resolver (GetBucketEffectiveValues) rather than the
+    old, per-key-chatty LoadOptionValues an earlier round tried and reverted for cost reasons.
+
+    Since every Hold page shares one "Hold" config template (GetBucketConfigKey), populating
+    defaults once for any Hold page already covers every other Hold page's identical keys too -
+    tracked in __warmedDefaultShapes so a repeat visit to an already-warmed shape (any Hold, once
+    any Hold has been visited) skips the mcm.json read entirely instead of redoing it every visit.
+/;
+;/ FastMap<bool> - which GetBucketConfigKey() shapes have already been refreshed this session /; int __warmedDefaultShapes
+
+function RefreshOptionDefaultsForCurrentPage()
+    string configKey = self.GetBucketConfigKey(CurrentPage)
+
+    if (!__warmedDefaultShapes)
+        __warmedDefaultShapes = FastMap("<string>", retain = true)
+    endif
+
+    if (FastMap_HasKey(__warmedDefaultShapes, configKey))
+        return
+    endif
+
+    int optionsObj       = RPB_Data.MCM_GetOptionObject() ; loaded once, not once per bucket
+    string[] optionKeys  = self.GetBucketOptionKeys(CurrentPage, optionsObj)
+
+    if (!optionKeys)
+        return
+    endif
+
+    int pageObj = FastMap_GetObject(optionsObj, configKey)
+
+    int i = 0
+    while (i < optionKeys.Length)
+        string optionKey = optionKeys[i]
+        int optionMap    = FastMap_GetObject(pageObj, optionKey)
+
+        if (FastMap_HasKey(optionMap, "Default"))
+            int defaultType = FastMap_ValueType(optionMap, "Default")
+
+            if (defaultType == TYPE_INT && self.IsPropertyValueOfTypeBool(optionMap, "Default"))
+                self.SetOptionDefaultBool(optionKey, FastMap_GetInt(optionMap, "Default") as bool)
+
+            elseif (defaultType == TYPE_INT || defaultType == TYPE_FLOAT)
+                self.SetOptionDefaultFloat(optionKey, FastMap_GetFloat(optionMap, "Default"))
+
+            elseif (defaultType == TYPE_STRING)
+                self.SetOptionDefaultString(optionKey, FastMap_GetString(optionMap, "Default"))
+            endif
+        endif
+
+        i += 1
+    endWhile
+
+    FastMap_SetInt(__warmedDefaultShapes, configKey, 1)
+endFunction
+
+;/
     Copies one bucket's current effective values into another, same-shaped bucket (e.g. Hold to
     Hold - Eastmarch into Haafingar). Refuses to copy between buckets of different shape (e.g. a
     Hold into General) - GetBucketConfigKey() resolves each bucket to its mcm.json config template,
@@ -1472,6 +1536,8 @@ string property CurrentPageConfig
 endProperty
 
 event OnPageReset(string page)
+    self.RefreshOptionDefaultsForCurrentPage() ; before any page's Render() - HandleDependencies() etc. need real defaults, not a cache that's only ever been warmed for whatever page was current at OnConfigInit
+
     RPB_MCM_Skills.Render(self)
     RPB_MCM_Holds.Render(self)
     RPB_MCM_General.Render(self)
@@ -1509,6 +1575,18 @@ event OnPageReset(string page)
         ; worse as the preset redesign's full-snapshot Loads grew optionsValueMap larger.
         ; Debug("RPB_MCM::OnPageReset", "optionsValueMap: " + GetContainerList(optionsValueMap) + "\n" + "optionsDefaultValueMap: " + GetContainerList(optionsDefaultValueMap))
     endif
+endEvent
+
+;/
+    Fires from a RegisterForSingleUpdate() scheduled by a page's Render() - see
+    RPB_MCM_Holds.Render()/OnDeferredDependencyUpdate() for why: SkyUI doesn't reliably apply
+    SetOptionFlags visually when called in the same pass as the options it targets were just
+    created in - works fine as a later, separate call (e.g. on click), not immediately after
+    Render(). Each page module guards its own deferred handler against having navigated away by
+    the time this fires.
+/;
+event OnUpdate()
+    RPB_MCM_Holds.OnDeferredDependencyUpdate(self)
 endEvent
 
 event OnOptionHighlight(int option)

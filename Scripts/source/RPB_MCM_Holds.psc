@@ -23,7 +23,28 @@ function Render(RPB_MCM mcm) global
 
     HandleDependencies(mcm)
 
+    ; SkyUI doesn't reliably apply SetOptionFlags visually when called in the same pass as the
+    ; options it targets were just created in (this call, right above) - confirmed working when the
+    ; identical HandleDependencies() call runs from a later, separate event instead (e.g.
+    ; OnOptionSelect after a click). Schedule a second pass on its own tick via OnUpdate() to match -
+    ; see RPB_MCM.OnUpdate()/OnDeferredDependencyUpdate() below. Keeping the synchronous call above
+    ; too (harmless - it still updates the persisted option-state map correctly either way).
+    mcm.RegisterForSingleUpdate(0.05)
+
     EndBenchmark(bench, mcm.CurrentPage + " page loaded -")
+endFunction
+
+;/
+    Re-runs HandleDependencies() on a deferred tick after Render() - see the comment on the
+    RegisterForSingleUpdate() call in Render(). Guards against having navigated away from a Hold
+    page by the time this fires (the deferred call is scheduled per Render(), not cancellable).
+/;
+function OnDeferredDependencyUpdate(RPB_MCM mcm) global
+    if (! ShouldHandleEvent(mcm))
+        return
+    endif
+
+    HandleDependencies(mcm)
 endFunction
 
 function Left(RPB_MCM mcm) global
