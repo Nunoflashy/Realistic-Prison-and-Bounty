@@ -1,990 +1,579 @@
 scriptname RPB_ActiveMagicEffectContainer extends ReferenceAlias
 
 ;/
-    TODO: Sort list after removing an element, or adding it.
+    Dynamic map of ActiveMagicEffect -> string key, built on fixed-size native Papyrus arrays
+    ("pages") since Papyrus has no dynamic collection type, and ActiveMagicEffect cannot be
+    stored in JContainers - it does NOT extend Form (confirmed against Skyrim's native Papyrus
+    script headers: Form.psc and ActiveMagicEffect.psc are both separate `Hidden` scripts with
+    no Extends clause, i.e. siblings under ScriptObject, not parent/child). That's a
+    compile-time type constraint, not a soft limitation - JMap/JArray's Form-storage functions
+    (wrapped by RPB_Memory.psc's FastMap_SetForm and used successfully elsewhere in this
+    codebase for real Form types) simply reject anything that isn't a Form.
+
+    Design: elements stay densely packed at global indices [0, Count) at all times - no gaps,
+    ever. AddElement() always appends at Count; RemoveElement() moves whatever is currently the
+    last live element into the freed slot (the same technique the old
+    __private_moveLastElementToIndex used within a single array - this just extends it across
+    page boundaries). A later page can therefore never hold a live element while an earlier
+    page has a hole: removing an element always backfills from the true end of the list, so a
+    trailing page that empties out just sits unallocated again - no fragmentation is possible
+    by construction, nothing to "reindex" as a separate pass.
+
+    Pages that fall entirely outside [0, Count) get freed (set to None) as soon as
+    RemoveElement() makes that true, not left allocated forever - confirmed real Papyrus
+    technique (an array field set to None drops to length 0 and is eligible for garbage
+    collection like any other reference). This matters because this container isn't a
+    singleton: every Hold's ArresteeList, every Prison's PrisonerList, every Captor list, etc.
+    each get their own independent set of page fields, so an idle instance's pages shouldn't
+    just sit allocated for the life of the save. See KNOWN_ISSUES.md/TROUBLESHOOTING_NOTES.md
+    for the real numbers and reasoning behind PAGE_SIZE/PAGE_COUNT below.
+
+    Iteration order is NOT stable across removals (a swap can reorder two elements) - a
+    deliberate non-goal, confirmed safe against every real caller in this codebase, none of
+    which depend on order, only on visiting every live element once (GetActors(), the MCM/UI
+    list-pickers, BindAllPrisonersToCell(), the monitor loops).
+
+    JContainers is only ever used for key -> global-index bookkeeping (__keyToIndex); the
+    ActiveMagicEffect payload itself always lives in one of the page arrays below.
 /;
 
 import RPB_Utility
+import RPB_Memory
 
 ; =========================================================
-;                    string implementation                          
+;                          Paged storage
 ; =========================================================
-
-int __dataIds
-int __dataKeys  ; To store the keys, JMap sorts them alphabetically which makes it a pain to reindex, since it doesn't support the order of insertion
-string[] __data
-
-int function __string_get_available_index()
-    int i = 0
-    while (i < __data.Length)
-        if (!__data[i])
-            ; nextAvailableIndex = i
-            return i
-        endif
-        i += 1
-    endWhile
-endFunction
-
-function __string_clear()
-    int arrayLength = JValue.count(__dataIds)
-
-    int i = 0
-    while (i < arrayLength)
-        __data[i] = none
-        i += 1
-    endWhile
-
-    JMap.clear(__dataIds)
-endFunction
-
-int[] function __string_get_indexes()
-    return JArray.asIntArray(JMap.allValues(__dataIds))
-endFunction
-
-int function __string_get_length()
-    return JValue.count(__dataIds)
-endFunction
-
-string function __string_get_key_for_index(int index)
-    return JArray.getStr(__dataKeys, index)
-    ; return JMap.getNthKey(__dataIds, index)
-endFunction
-
-int function __string_get_index_for_key(string elementKey)
-    int index = JMap.getInt(__dataIds, elementKey)
-    return index
-endFunction
-
-string function __string_get_value(int index)
-    ; string elementKey = JMap.getNthKey(__dataIds, index)
-    if (index < 0 || index >= JArray.count(__dataKeys))
-        return none
-    endif
-
-    string elementKey   = JArray.getStr(__dataKeys, index)
-    ; string elementKey   = JMap.getNthKey(__dataIds, index)
-    int elementIndex    = JMap.getInt(__dataIds, elementKey)
-    return __data[elementIndex]
-endFunction
-
-string function __string_get_value_by_key(string elementKey)
-    int elementIndex = JMap.getInt(__dataIds, elementKey)
-    return __data[elementIndex]
-endFunction
-
-string function __string_remove_element(string elementKey)
-    int index = JMap.getInt(__dataIds, elementKey)
-    string element = __data[index]
-
-    DebugWithArgs("ActiveMagicEffectList::__string_remove_element", elementKey, "Removing " + __data[index])
-
-    __data[index] = none                        ; Delete the Data
-    JMap.removeKey(__dataIds, elementKey)       ; Delete the Index
-    JArray.eraseString(__dataKeys, elementKey)  ; Delete the Key
-
-    return element
-endFunction
-
-
-function __string_add_at(string element, string elementKey)
-    if (!__dataIds || !__data)
-        __dataIds   = JMap.object()
-        __dataKeys  = JArray.object()
-        JValue.retain(__dataIds)
-        JValue.retain(__dataKeys)
-        __data = new string[20]
-    endif
-    bool hasKey = JMap.hasKey(__dataIds, elementKey)
-
-    if (!hasKey)
-        int availableIndex = __string_get_available_index()
-        if (!__data[availableIndex])
-            __data[availableIndex] = element                    ; Assign the Data
-            JMap.setInt(__dataIds, elementKey, availableIndex)  ; Assign the Index
-            JArray.addStr(__dataKeys, elementKey)               ; Assign the Key
-        endif
-    endif
-endFunction
-
-function __string_shift_element_left(int index)
-    if (index == 0)
-        return
-    endif
-
-    __data[index - 1] = __data[index]
-    __data[index] = none
-
-    string elementKey = JMap.getNthKey(__dataIds, index)
-    JMap.setInt(__dataIds, elementKey, (index - 1))
-endFunction
-
-function __string_list_data()
-    int arrayLength = JValue.count(__dataIds)
-    int[] mapIndices    = JArray.asIntArray(JMap.allValues(__dataIds))
-    string[] mapKeys    = JArray.asStringArray(JMap.allKeys(__dataIds))
-    string[] arrayKeys  = JArray.asStringArray(__dataKeys)
-    
-    LogNoType("Map Keys: " + mapKeys)
-    LogNoType("Array Keys: " + arrayKeys)
-
-    int i = 0
-    while (i < arrayLength)
-        string tabs = string_if (StringUtil.GetLength(__data[i]) >= 10, "\t\t", "\t\t\t")
-        string keyFromArray = JArray.getStr(__dataKeys, i)
-        string keyFromMap   = JMap.getNthKey(__dataIds, i)
-        LogNoType(i + ": data["+i+"] = " + __data[i] + tabs + "(Key from Array: "+ keyFromArray +", Key from Map: "+ keyFromMap +")")
-        i += 1
-    endWhile
-endFunction
 
 ;/
-    Sorts the array in ascending order
+    32 pages x 32 elements = 1024 total capacity. Real documented scale (cell capacity data,
+    the "Maximum Prisoners when Overcrowded" ceiling of 15) fits inside one 32-slot page with
+    2x headroom, so the common case (an active container) only ever pays for page 0. Pages
+    allocate lazily (only when Count first grows into them) and free themselves (see
+    __FreePageIfNowUnused()) once Count shrinks back out of them - so an idle container costs
+    nothing at all, and an active one costs one 32-slot page, not the 128-slot page this class
+    used before this size was revisited.
+
+    Raising the ceiling later is a mechanical change: add more __pageN fields, add the matching
+    branches to __EnsurePageAllocated()/__GetSlot()/__SetSlot()/__FreePageIfNowUnused() below,
+    bump PAGE_COUNT to match - nothing else in this file needs to change. Papyrus has no
+    array-of-arrays/jagged-array type and no dynamic field list, so a fixed, hand-declared set
+    of page fields plus an if/elseif dispatch is the only way to do this at all.
 /;
-function __string_sort_data()
-    int arrayLength = JArray.count(__dataKeys)
-    string[] elements = __data
-    int[] indices = JArray.asIntArray(JMap.allValues(__dataIds))
+ActiveMagicEffect[] __page0
+ActiveMagicEffect[] __page1
+ActiveMagicEffect[] __page2
+ActiveMagicEffect[] __page3
+ActiveMagicEffect[] __page4
+ActiveMagicEffect[] __page5
+ActiveMagicEffect[] __page6
+ActiveMagicEffect[] __page7
+ActiveMagicEffect[] __page8
+ActiveMagicEffect[] __page9
+ActiveMagicEffect[] __page10
+ActiveMagicEffect[] __page11
+ActiveMagicEffect[] __page12
+ActiveMagicEffect[] __page13
+ActiveMagicEffect[] __page14
+ActiveMagicEffect[] __page15
+ActiveMagicEffect[] __page16
+ActiveMagicEffect[] __page17
+ActiveMagicEffect[] __page18
+ActiveMagicEffect[] __page19
+ActiveMagicEffect[] __page20
+ActiveMagicEffect[] __page21
+ActiveMagicEffect[] __page22
+ActiveMagicEffect[] __page23
+ActiveMagicEffect[] __page24
+ActiveMagicEffect[] __page25
+ActiveMagicEffect[] __page26
+ActiveMagicEffect[] __page27
+ActiveMagicEffect[] __page28
+ActiveMagicEffect[] __page29
+ActiveMagicEffect[] __page30
+ActiveMagicEffect[] __page31
 
-    int i = 0
+;/ const /; int PAGE_SIZE = 32
+;/ const /; int PAGE_COUNT = 32
 
+;/ FastMap<int> - key -> global index (pageIndex * PAGE_SIZE + slotIndex) /;
+int __keyToIndex
 
-    while (i < arrayLength)
-        string elementKey       = self.__string_get_key_for_index(i)    
-        int elementIndexInMap   = self.__string_get_index_for_key(elementKey) ; The actual index where the element is stored in elements[], not i
-
-        string temporaryData    = elements[i] ; i = 0 -> __dataIds[1]
-        int temporaryDataIndex  = JArray.findInt(JMap.allValues(__dataIds), i) ; Find i in __dataIds, so __dataIds[x] = i
-
-        ; elements[i] = elements[elementIndexInMap]
-        JMap.setInt(__dataIds, elementKey, i) ; Assign the i'th index to this element
-
-        string keyForOppositeElement = self.__string_get_key_for_index(elementIndexInMap) ; i = 0 -> __dataIds[0] because elementIndexInMap was retrieved from __dataIds[1]
-        JMap.setInt(__dataIds, keyForOppositeElement, elementIndexInMap)
-
-        ; JArray.swapItems(JMap.allValues(__dataIds), temporaryDataIndex, i)
-        ; indices = JArray.asIntArray(JMap.allValues(__dataIds))
-        ; TODO: Get the element at the i'th index (not position in the map), so __dataIds index 0 for example (could be any position in the map), 
-        ; assign that index to the i index (0), and swap the i 
-        ; index (0) with the __dataIds index that was assigned. 
-        ;/
-            Example: __dataIds indices: [1, 0, 3, 2, 5, 4, 8, 6, 7]
-            __dataIds[0] is i = 1
-            __dataIds[1] is i = 0
-            __dataIds[2] is i = 3
-            __dataIds[3] is i = 2
-
-            So, for i = 0, get __dataIds[1] index which is 0, assign it to __dataIds[0] which is 1, now assign __dataIds[0] to __dataIds[1] (essentially swap them)
-            Keep doing this until the array looks like this: [0, 1, 2, 3, 4, 5, 6, 7], because the actual data is mapped to the index inside this array, the position
-            does not really matter.
-            This might imply using a find() function in the array searching for i, to get that element position in order to replace it.
-            Then, to swap with the __dataIds index that was replaced, we may create a temporary int variable to hold the index that is to be swapped.
-        /;
-        i += 1
-    endWhile
-    elements = __data
-    indices = JArray.asIntArray(JMap.allValues(__dataIds))
-    Debug("ActiveMagicEffectList::__string_sort_data", "elements: " + elements)
-    Debug("ActiveMagicEffectList::__string_sort_data", "indices: " + indices)
-
-endFunction
-
-function __string_reindex_data()
-    int arrayLength = JArray.count(__dataKeys)
-    string[] elements = __data
-
-    Debug("ActiveMagicEffectList::__string_reindex_data", "elements: " + elements)
-    int i = 0
-    while (i < arrayLength)
-        bool isEmptyElement = !elements[i] || elements[i] == "None" || elements[i] == ""
-        string elementKey = self.__string_get_key_for_index(i)
-        int indexInMap = self.__string_get_index_for_key(elementKey)
-
-        if (isEmptyElement)
-            string nextElementKey   = self.__string_get_key_for_index(i + 1)
-            int nextElementIndex    = self.__string_get_index_for_key(nextElementKey)
-            elements[i] = elements[nextElementIndex]
-            elements[nextElementIndex] = none
-            ; Assign new index to this key
-            JMap.setInt(__dataIds, nextElementKey, i) ; No need to delete the index because it's mapped to the key, only change it
-            Debug("ActiveMagicEffectList::__string_reindex_data", "elements: " + elements)
-        endif
-
-        ; ; Test Case
-        ; if (indexInMap == 8)
-        ;     elements[6] = elements[indexInMap] ; Shifts the actual data
-        ;     elements[indexInMap] = none
-        ;     ; Assign new index to this key
-        ;     JMap.setInt(__dataIds, elementKey, 6) ; No need to delete the index because it's mapped to the key, only change it
-        ;     int newIndexInMap = self.__string_get_index_for_key(elementKey)
-        ;     Debug("ActiveMagicEffectList::__string_reindex_data", "elements["+6+"]: " + elements[6] + ", Element Key: " + elementKey + ", New Index in Map: " + newIndexInMap)
-        ;     Debug("ActiveMagicEffectList::__string_reindex_data", "elements: " + elements)
-        ; endif
-
-        ; if (isEmptyElement)
-        ;     Debug("ActiveMagicEffectList::__string_reindex_data", "elements["+indexInMap+"]: " + elements[indexInMap] + ", Element Key: " + elementKey + ", Index in Map: " + indexInMap)
-        ; endif
-        i += 1
-    endWhile
-
-endFunction
-
-; function __string_reindex_data()
-;     int arrayLength = JValue.count(__dataIds)
-;     string[] elements = __data
-
-;     ; int i = 0
-;     ; while (i < arrayLength)
-;     ;     ; Only shift if the element is none
-;     ;     if (elements[i] == "None")
-;     ;         ; Shift element left and assign new index to the key
-;     ;         int shiftIndex = i + 1
-;     ;         elements[i] = elements[shiftIndex]
-;     ;         string elementKey = JArray.getStr(__dataKeys, shiftIndex)
-;     ;         JMap.setInt(__dataIds, elementKey, i)
-
-;     ;         Debug("ActiveMagicEffectList::__string_reindex_data", "Setting data["+ shiftIndex +"] ("+ elements[shiftIndex] +") to null (moved to data["+i+"])")
-;     ;         elements[shiftIndex] = "None"
-;     ;     endif
-;     ;     i += 1
-;     ; endWhile
-;     int i = 0
-;     int nextIndex = 0
-;     while (i < arrayLength)
-;         ; Only shift if the element is none
-;         if (elements[i] != "None")
-;             if (i != nextIndex)
-;                 ; Shift element left and assign new index to the key
-;                 int shiftIndex = i + 1
-;                 elements[nextIndex] = elements[i]
-;                 ; Debug("ActiveMagicEffectList::__string_reindex_data", "Setting data["+ shiftIndex +"] ("+ elements[shiftIndex] +") to null (moved to data["+i+"])")
-;                 elements[i] = "None"
-
-;                 ; Move the corresponding key to the nextIndex position
-;                 string elementKey = JArray.getStr(__dataKeys, i)
-;                 JMap.setInt(__dataIds, elementKey, nextIndex)
-;                 JArray.setStr(__dataKeys, nextIndex, elementKey)
-;                 JArray.setStr(__dataKeys, i, "None")
-;             endif
-;             nextIndex += 1
-;         endif
-;         i += 1
-;     endWhile
-; endFunction
-
-; function __string_reindex_data()
-;     int arrayLength = JValue.count(__dataIds)
-;     int[] indexes   = JArray.asIntArray(JMap.allValues(__dataIds))
-
-;     ; string firstElementKey = JMap.getNthKey(__dataIds, 0)
-;     Debug("ActiveMagicEffectList::__private_reindex_data", "arrayLength: " + arrayLength)
-;     Debug("ActiveMagicEffectList::__private_reindex_data", "indexes: " + indexes)
-
-;     int i = 0
-;     while (i < JValue.count(__dataIds))
-;         ; string castElement = __data[i]
-;         ; string elementKey = JMap.getNthKey(__dataIds, i)
-;         ; int elementIndex  = JMap.getInt(__dataIds, elementKey)
-;         ; Debug("ActiveMagicEffectList::__private_reindex_data", "["+i+"]: \t (Key: "+ elementKey +", Index: "+ elementIndex +")")
-;         if (__data[i] == "None")
-;             ; Shift element left and assign new index to the key
-;             Debug("ActiveMagicEffectList::__private_reindex_data", "["+i+"]: "+__data[i]+" = "+(__data[i + 1]))
-;             __data[i] = __data[i + 1]
-;             __data[i + 1] = "None"
-;             ; string nextElementKey = JMap.getNthKey(__dataIds, i) ; this doesn't make any sense, it works but it should be i + 1
-;             string nextElementKey = JArray.getStr(__dataKeys, i) ; this doesn't make any sense, it works but it should be i + 1
-;             JMap.removeKey(__dataIds, nextElementKey)
-;             JMap.setInt(__dataIds, nextElementKey, i)
-;             ; JArray.swapItems(__dataKeys, i + 1, i)
-;             Debug("ActiveMagicEffectList::__private_reindex_data", "["+i+"]: \t Moving " + nextElementKey + " (index: "+ (i + 1) +") to index: " + i)
-;             string keyWithNewIndex = JMap.getNthKey(__dataIds, i)
-;             Debug("ActiveMagicEffectList::__private_reindex_data", "["+i+"]: \t New Key for "+ __data[i] +": "+ keyWithNewIndex + " - index: " + __string_get_index_for_key(keyWithNewIndex))
-;         endif
-;         i += 1
-;     endWhile
-
-
-;     indexes   = JArray.asIntArray(JMap.allValues(__dataIds))
-; endFunction
-
-; =========================================================
-
-;/ @data ActiveMagicEffect[]: The actual data of the list /;
-ActiveMagicEffect[] data
-
-;/ @dataIds JMap&: A map of keys to the real indices used to access data[] /;
-int dataIds
-
-;/ @dataKeys JArray&: An array of the keys in order of insertion. /;
-int dataKeys
-
-;/ @cachedAvailableIndex int: The next available index that was cached previously. /;
-int cachedAvailableIndex
-
-
-int nextAvailableIndex
-
+int __count
 
 int property Count
     int function get()
-        return self.GetSize()
+        return __count
     endFunction
 endProperty
 
+event OnInit()
+    __keyToIndex = FastMap("<string>", true)
+    __count = 0
+endEvent
 
-function __private_add_at(ActiveMagicEffect element, string elementKey)
-    bool hasKey = JMap.hasKey(dataIds, elementKey)
-    if (hasKey)
+;/
+    Defensive lazy-init, called first thing by every method that touches __keyToIndex.
+    OnInit() alone isn't reliable for this: it's a ReferenceAlias lifecycle event that fires
+    when an alias is FIRST bound - for an alias that already existed in a save from before a
+    change to this script's fields, there's no guarantee it fires again, so __keyToIndex can
+    still be an invalid/unset handle (0) on a real, already-populated alias. FastMap_SetInt/
+    HasKey against an invalid handle are silent no-ops (no crash), which is exactly what let
+    __count drift out of sync with reality before this guard existed: AddElement() kept
+    incrementing __count on every call while the underlying map writes silently went nowhere.
+
+    If __keyToIndex needed (re)allocating here, __count is reset to 0 in the same moment - not
+    just for tidiness. If the handle was invalid, every prior "successful" AddElement for this
+    alias was itself a no-op (nothing was ever really stored or retrievable), so a non-zero
+    __count at this point is corrupted state from that same cause. Resetting both together
+    heals the alias back to a genuinely empty, consistent state instead of leaving __count
+    pointing past where AddElement would actually start writing once __keyToIndex works again.
+/;
+function __EnsureInitialized()
+    if (!__keyToIndex)
+        __keyToIndex = FastMap("<string>", true)
+        __count = 0
+    endif
+endFunction
+
+; =========================================================
+;                      Page dispatch helpers
+; =========================================================
+
+;/
+    Allocates @aiPageIndex's backing array if it isn't already allocated. No-op if it already
+    is - a fresh list only ever touches page 0; later pages allocate on demand as Count grows
+    into them.
+/;
+function __EnsurePageAllocated(int aiPageIndex)
+    if (aiPageIndex == 0 && !__page0)
+        __page0 = new ActiveMagicEffect[32]
+    elseif (aiPageIndex == 1 && !__page1)
+        __page1 = new ActiveMagicEffect[32]
+    elseif (aiPageIndex == 2 && !__page2)
+        __page2 = new ActiveMagicEffect[32]
+    elseif (aiPageIndex == 3 && !__page3)
+        __page3 = new ActiveMagicEffect[32]
+    elseif (aiPageIndex == 4 && !__page4)
+        __page4 = new ActiveMagicEffect[32]
+    elseif (aiPageIndex == 5 && !__page5)
+        __page5 = new ActiveMagicEffect[32]
+    elseif (aiPageIndex == 6 && !__page6)
+        __page6 = new ActiveMagicEffect[32]
+    elseif (aiPageIndex == 7 && !__page7)
+        __page7 = new ActiveMagicEffect[32]
+    elseif (aiPageIndex == 8 && !__page8)
+        __page8 = new ActiveMagicEffect[32]
+    elseif (aiPageIndex == 9 && !__page9)
+        __page9 = new ActiveMagicEffect[32]
+    elseif (aiPageIndex == 10 && !__page10)
+        __page10 = new ActiveMagicEffect[32]
+    elseif (aiPageIndex == 11 && !__page11)
+        __page11 = new ActiveMagicEffect[32]
+    elseif (aiPageIndex == 12 && !__page12)
+        __page12 = new ActiveMagicEffect[32]
+    elseif (aiPageIndex == 13 && !__page13)
+        __page13 = new ActiveMagicEffect[32]
+    elseif (aiPageIndex == 14 && !__page14)
+        __page14 = new ActiveMagicEffect[32]
+    elseif (aiPageIndex == 15 && !__page15)
+        __page15 = new ActiveMagicEffect[32]
+    elseif (aiPageIndex == 16 && !__page16)
+        __page16 = new ActiveMagicEffect[32]
+    elseif (aiPageIndex == 17 && !__page17)
+        __page17 = new ActiveMagicEffect[32]
+    elseif (aiPageIndex == 18 && !__page18)
+        __page18 = new ActiveMagicEffect[32]
+    elseif (aiPageIndex == 19 && !__page19)
+        __page19 = new ActiveMagicEffect[32]
+    elseif (aiPageIndex == 20 && !__page20)
+        __page20 = new ActiveMagicEffect[32]
+    elseif (aiPageIndex == 21 && !__page21)
+        __page21 = new ActiveMagicEffect[32]
+    elseif (aiPageIndex == 22 && !__page22)
+        __page22 = new ActiveMagicEffect[32]
+    elseif (aiPageIndex == 23 && !__page23)
+        __page23 = new ActiveMagicEffect[32]
+    elseif (aiPageIndex == 24 && !__page24)
+        __page24 = new ActiveMagicEffect[32]
+    elseif (aiPageIndex == 25 && !__page25)
+        __page25 = new ActiveMagicEffect[32]
+    elseif (aiPageIndex == 26 && !__page26)
+        __page26 = new ActiveMagicEffect[32]
+    elseif (aiPageIndex == 27 && !__page27)
+        __page27 = new ActiveMagicEffect[32]
+    elseif (aiPageIndex == 28 && !__page28)
+        __page28 = new ActiveMagicEffect[32]
+    elseif (aiPageIndex == 29 && !__page29)
+        __page29 = new ActiveMagicEffect[32]
+    elseif (aiPageIndex == 30 && !__page30)
+        __page30 = new ActiveMagicEffect[32]
+    elseif (aiPageIndex == 31 && !__page31)
+        __page31 = new ActiveMagicEffect[32]
+    endif
+endFunction
+
+;/ Reads the element at @aiGlobalIndex. Returns None if its page was never allocated. /;
+ActiveMagicEffect function __GetSlot(int aiGlobalIndex)
+    int pageIndex = aiGlobalIndex / PAGE_SIZE
+    int slotIndex = aiGlobalIndex % PAGE_SIZE
+
+    if (pageIndex == 0)
+        return __page0[slotIndex]
+    elseif (pageIndex == 1)
+        return __page1[slotIndex]
+    elseif (pageIndex == 2)
+        return __page2[slotIndex]
+    elseif (pageIndex == 3)
+        return __page3[slotIndex]
+    elseif (pageIndex == 4)
+        return __page4[slotIndex]
+    elseif (pageIndex == 5)
+        return __page5[slotIndex]
+    elseif (pageIndex == 6)
+        return __page6[slotIndex]
+    elseif (pageIndex == 7)
+        return __page7[slotIndex]
+    elseif (pageIndex == 8)
+        return __page8[slotIndex]
+    elseif (pageIndex == 9)
+        return __page9[slotIndex]
+    elseif (pageIndex == 10)
+        return __page10[slotIndex]
+    elseif (pageIndex == 11)
+        return __page11[slotIndex]
+    elseif (pageIndex == 12)
+        return __page12[slotIndex]
+    elseif (pageIndex == 13)
+        return __page13[slotIndex]
+    elseif (pageIndex == 14)
+        return __page14[slotIndex]
+    elseif (pageIndex == 15)
+        return __page15[slotIndex]
+    elseif (pageIndex == 16)
+        return __page16[slotIndex]
+    elseif (pageIndex == 17)
+        return __page17[slotIndex]
+    elseif (pageIndex == 18)
+        return __page18[slotIndex]
+    elseif (pageIndex == 19)
+        return __page19[slotIndex]
+    elseif (pageIndex == 20)
+        return __page20[slotIndex]
+    elseif (pageIndex == 21)
+        return __page21[slotIndex]
+    elseif (pageIndex == 22)
+        return __page22[slotIndex]
+    elseif (pageIndex == 23)
+        return __page23[slotIndex]
+    elseif (pageIndex == 24)
+        return __page24[slotIndex]
+    elseif (pageIndex == 25)
+        return __page25[slotIndex]
+    elseif (pageIndex == 26)
+        return __page26[slotIndex]
+    elseif (pageIndex == 27)
+        return __page27[slotIndex]
+    elseif (pageIndex == 28)
+        return __page28[slotIndex]
+    elseif (pageIndex == 29)
+        return __page29[slotIndex]
+    elseif (pageIndex == 30)
+        return __page30[slotIndex]
+    elseif (pageIndex == 31)
+        return __page31[slotIndex]
+    endif
+
+    return none
+endFunction
+
+;/ Writes @apElement at @aiGlobalIndex, allocating its page first if it isn't already. /;
+function __SetSlot(int aiGlobalIndex, ActiveMagicEffect apElement)
+    int pageIndex = aiGlobalIndex / PAGE_SIZE
+    int slotIndex = aiGlobalIndex % PAGE_SIZE
+
+    __EnsurePageAllocated(pageIndex)
+
+    if (pageIndex == 0)
+        __page0[slotIndex] = apElement
+    elseif (pageIndex == 1)
+        __page1[slotIndex] = apElement
+    elseif (pageIndex == 2)
+        __page2[slotIndex] = apElement
+    elseif (pageIndex == 3)
+        __page3[slotIndex] = apElement
+    elseif (pageIndex == 4)
+        __page4[slotIndex] = apElement
+    elseif (pageIndex == 5)
+        __page5[slotIndex] = apElement
+    elseif (pageIndex == 6)
+        __page6[slotIndex] = apElement
+    elseif (pageIndex == 7)
+        __page7[slotIndex] = apElement
+    elseif (pageIndex == 8)
+        __page8[slotIndex] = apElement
+    elseif (pageIndex == 9)
+        __page9[slotIndex] = apElement
+    elseif (pageIndex == 10)
+        __page10[slotIndex] = apElement
+    elseif (pageIndex == 11)
+        __page11[slotIndex] = apElement
+    elseif (pageIndex == 12)
+        __page12[slotIndex] = apElement
+    elseif (pageIndex == 13)
+        __page13[slotIndex] = apElement
+    elseif (pageIndex == 14)
+        __page14[slotIndex] = apElement
+    elseif (pageIndex == 15)
+        __page15[slotIndex] = apElement
+    elseif (pageIndex == 16)
+        __page16[slotIndex] = apElement
+    elseif (pageIndex == 17)
+        __page17[slotIndex] = apElement
+    elseif (pageIndex == 18)
+        __page18[slotIndex] = apElement
+    elseif (pageIndex == 19)
+        __page19[slotIndex] = apElement
+    elseif (pageIndex == 20)
+        __page20[slotIndex] = apElement
+    elseif (pageIndex == 21)
+        __page21[slotIndex] = apElement
+    elseif (pageIndex == 22)
+        __page22[slotIndex] = apElement
+    elseif (pageIndex == 23)
+        __page23[slotIndex] = apElement
+    elseif (pageIndex == 24)
+        __page24[slotIndex] = apElement
+    elseif (pageIndex == 25)
+        __page25[slotIndex] = apElement
+    elseif (pageIndex == 26)
+        __page26[slotIndex] = apElement
+    elseif (pageIndex == 27)
+        __page27[slotIndex] = apElement
+    elseif (pageIndex == 28)
+        __page28[slotIndex] = apElement
+    elseif (pageIndex == 29)
+        __page29[slotIndex] = apElement
+    elseif (pageIndex == 30)
+        __page30[slotIndex] = apElement
+    elseif (pageIndex == 31)
+        __page31[slotIndex] = apElement
+    endif
+endFunction
+
+;/
+    Frees @aiPageIndex's backing array (sets it to None, letting Papyrus reclaim it like any
+    other reference - see the top-of-file doc comment) if dense-packing no longer needs it,
+    i.e. no live index [0, Count) falls inside it anymore. Only ever called by RemoveElement()
+    with the one page that could have just become unused (Count changes by at most 1 per
+    call), so no loop over every page is needed here.
+/;
+function __FreePageIfNowUnused(int aiPageIndex)
+    int pagesStillNeeded = 0
+    if (__count > 0)
+        pagesStillNeeded = ((__count - 1) / PAGE_SIZE) + 1
+    endif
+
+    if (aiPageIndex < pagesStillNeeded)
         return
     endif
 
-    int availableIndex = __private_getAvailableIndex()
+    if (aiPageIndex == 0)
+        __page0 = none
+    elseif (aiPageIndex == 1)
+        __page1 = none
+    elseif (aiPageIndex == 2)
+        __page2 = none
+    elseif (aiPageIndex == 3)
+        __page3 = none
+    elseif (aiPageIndex == 4)
+        __page4 = none
+    elseif (aiPageIndex == 5)
+        __page5 = none
+    elseif (aiPageIndex == 6)
+        __page6 = none
+    elseif (aiPageIndex == 7)
+        __page7 = none
+    elseif (aiPageIndex == 8)
+        __page8 = none
+    elseif (aiPageIndex == 9)
+        __page9 = none
+    elseif (aiPageIndex == 10)
+        __page10 = none
+    elseif (aiPageIndex == 11)
+        __page11 = none
+    elseif (aiPageIndex == 12)
+        __page12 = none
+    elseif (aiPageIndex == 13)
+        __page13 = none
+    elseif (aiPageIndex == 14)
+        __page14 = none
+    elseif (aiPageIndex == 15)
+        __page15 = none
+    elseif (aiPageIndex == 16)
+        __page16 = none
+    elseif (aiPageIndex == 17)
+        __page17 = none
+    elseif (aiPageIndex == 18)
+        __page18 = none
+    elseif (aiPageIndex == 19)
+        __page19 = none
+    elseif (aiPageIndex == 20)
+        __page20 = none
+    elseif (aiPageIndex == 21)
+        __page21 = none
+    elseif (aiPageIndex == 22)
+        __page22 = none
+    elseif (aiPageIndex == 23)
+        __page23 = none
+    elseif (aiPageIndex == 24)
+        __page24 = none
+    elseif (aiPageIndex == 25)
+        __page25 = none
+    elseif (aiPageIndex == 26)
+        __page26 = none
+    elseif (aiPageIndex == 27)
+        __page27 = none
+    elseif (aiPageIndex == 28)
+        __page28 = none
+    elseif (aiPageIndex == 29)
+        __page29 = none
+    elseif (aiPageIndex == 30)
+        __page30 = none
+    elseif (aiPageIndex == 31)
+        __page31 = none
+    endif
 endFunction
 
-function AddAt(ActiveMagicEffect apActiveMagicEffect, string asKey)
-    ; __private_add_at(apActiveMagicEffect, asKey)
-    ; return
-    ; Initialize array
-    ; if (!dataIds || !data)
-    ;     dataIds = JMap.object()
-    ;     JValue.retain(dataIds)
-    ;     data = new ActiveMagicEffect[128]
-    ; endif
-
-    if (self.HasKey(asKey))
-        return
-    endif
-
-    ; possible point of slowdown since we iterate over all elements
-    int availableIndex = __private_getAvailableIndex()
-    if (data[availableIndex] == none)
-        data[availableIndex] = apActiveMagicEffect ; Assign AME to this index
-        JMap.setInt(dataIds, asKey, availableIndex) ; Store the index at this key
-
-        Debug("ActiveMagicEffectList::Add", "Added ActiveMagicEffect: " + apActiveMagicEffect + " at index: " + availableIndex + " (key: "+ asKey +").")
-        nextAvailableIndex = availableIndex
-    endif
-
-    ; RPB_Utility.Debug("ActiveMAgicEffectList::AddAt", "data: " + data + ", self: " + GetOwningQuest())
+int function __TotalCapacity()
+    return PAGE_SIZE * PAGE_COUNT
 endFunction
+
+;/
+    Reverse lookup: finds the key currently mapped to @aiIndex. Only ever called by
+    RemoveElement(), for the one element being moved during a swap - an O(n) map scan here is
+    fine, n is realistically single digits (see this class's design notes / KNOWN_ISSUES.md
+    for the real-scale numbers this was sized against).
+/;
+string function __FindKeyForIndex(int aiIndex)
+    string[] keys = FastMap_KeysAsPapyrusArray(__keyToIndex)
+
+    int i = 0
+    while (i < keys.Length)
+        if (FastMap_GetInt(__keyToIndex, keys[i]) == aiIndex)
+            return keys[i]
+        endif
+        i += 1
+    endWhile
+
+    return ""
+endFunction
+
+; =========================================================
+;                            Public
+; =========================================================
 
 bool function HasKey(string asKey)
-    return JMap.hasKey(dataIds, asKey)
+    self.__EnsureInitialized()
+    return FastMap_HasKey(__keyToIndex, asKey)
 endFunction
 
 ActiveMagicEffect function GetAt(string asKey)
-    if (!JMap.hasKey(dataIds, asKey))
+    if (!self.HasKey(asKey))
         return none
     endif
 
-    int arrayIndex = JMap.getInt(dataIds, asKey)
-
-    ; Debug("ActiveMagicEffectList::GetAt", "Retrieved ActiveMagicEffect: " + data[arrayIndex] + " at index: " + arrayIndex + ", from key: " + asKey)
-    return data[arrayIndex]
+    return self.__GetSlot(FastMap_GetInt(__keyToIndex, asKey))
 endFunction
 
+;/
+    Returns the element at logical index @aiIndex, where 0 <= aiIndex < Count. Elements are
+    always densely packed, so this is a direct, safe 0..Count-1 walk - no gaps to skip, no
+    out-of-bounds risk beyond the explicit check below.
+/;
 ActiveMagicEffect function FromIndex(int aiIndex)
-    ; TODO: Check for out of bounds
-    return data[aiIndex]
-endFunction
-
-
-ActiveMagicEffect[] function GetAsArray()
-    return data
-endFunction
-
-bool function __private_is_out_of_bounds(int index)
-    int dataLength = JValue.count(dataIds)
-    return (index < 0 || index > dataLength)
-endFunction
-
-int function __private_remove_element(string keyToRemove)
-    int index = JMap.getInt(dataIds, keyToRemove)
-
-    ; Remove the actual data from the array
-    data[index] = none
-
-    ; Remove the value of this Key from JMap
-    JMap.removeKey(dataIds, keyToRemove)
-
-    return index
-endFunction
-
-function __private_shift_element_left(int index)
-    if (index == 0) ; can't shift [0] to the left
-        return
+    if (aiIndex < 0 || aiIndex >= __count)
+        return none
     endif
 
-    bool indexExists = JMap.getNthKey(dataIds, index) != ""
-    if (indexExists && data[index] != none)
-        data[index - 1] = data[index]
-
-        string elementKey = JMap.getNthKey(dataIds, index)
-        JMap.setInt(dataIds, elementKey, index - 1)
-    endif
+    return self.__GetSlot(aiIndex)
 endFunction
-
-function __private_reindex_data()
-    int arrayLength = JValue.count(dataIds)
-    int[] indexes   = JArray.asIntArray(JMap.allValues(dataIds))
-
-    ; string firstElementKey = JMap.getNthKey(dataIds, 0)
-    Debug("ActiveMagicEffectList::__private_reindex_data", "arrayLength: " + arrayLength)
-    Debug("ActiveMagicEffectList::__private_reindex_data", "indexes: " + indexes)
-
-    RPB_Prisoner firstElement = data[0] as RPB_Prisoner
-    Debug("ActiveMagicEffectList::__private_reindex_data", "0th index: " + firstElement.Name)
-
-    int i = 0
-    while (i < arrayLength)
-        RPB_Prisoner castElement = data[i] as RPB_Prisoner
-        string elementKey = JMap.getNthKey(dataIds, i)
-        int elementIndex  = JMap.getInt(dataIds, elementKey)
-        string tabs = string_if (StringUtil.GetLength(castElement.Name) >= 10, "\t", "\t\t")
-        Debug("ActiveMagicEffectList::__private_reindex_data", "["+i+"]: " + castElement.Name + tabs + " (Key: "+ elementKey +", Index: "+ elementIndex +")")
-        i += 1
-    endWhile
-
-
-    indexes   = JArray.asIntArray(JMap.allValues(dataIds))
-    Debug("ActiveMagicEffectList::__private_reindex_data", "indexes: " + indexes)
-endFunction
-
-function reindex_data(string asKeyToRemove)
-    int index       = JMap.getInt(dataIds, asKeyToRemove) ; index for this key to be used on data[]
-    int[] indexes   = JArray.asIntArray(JMap.allValues(dataIds))
-    int arrayLength = JValue.count(dataIds)
-
-    Debug("ActiveMagicEffectList::reindex_data", "Removed Key: " + asKeyToRemove + " | Index: "+ index +" | data["+ index +"]: " + data[index])
-    Debug("ActiveMagicEffectList::reindex_data", "\ndata: " + data + " | \nkeys: " + GetKeys() + " | \nindexes: " + indexes)
-
-    int removedIndex = __private_remove_element(asKeyToRemove)
-
-    int mapKeyCount = JValue.count(dataIds)
-    
-    int i = index
-    while (i < mapKeyCount)
-        if (i + 1 < mapKeyCount)
-            data[i] = data[i + 1] ; shift left
-            string elementKey = JMap.getNthKey(dataIds, i + 1)
-            if (elementKey != "")
-                JMap.setInt(dataIds, elementKey, i)
-            endif
-        else
-            data[i] = none
-        endif
-        i += 1
-    endWhile
-
-    data[mapKeyCount - 1] = none
-
-    ; int n = 0
-    ; while (n < mapKeyCount - 1)
-    ;     string elementKey = JMap.getNthKey(dataIds, n)
-    ;     if (elementKey != "")
-    ;         JMap.setInt(dataIds, elementKey, n)
-    ;     endif
-    ;     n += 1
-    ; endWhile
-
-    if (mapKeyCount > 1)
-        string lastKey = JMap.getNthKey(dataIds, (mapKeyCount))
-        if (lastKey != "")
-            JMap.removeKey(dataIds, lastKey)
-        endif
-    endif
-
-    ; int i = 1
-    ; while (i < (data.Length - 1))
-    ;     data[i] = data[i + 1] ; Shift element to the left
-
-    ;     string nextElementKey = JMap.getNthKey(dataIds, (i + 1))
-    ;     ; JMap.removeKey(dataIds, nextElementKey)
-    ;     if (nextElementKey != "")
-    ;         JMap.setInt(dataIds, nextElementKey, i)
-    ;     endif
-
-    ;     i += 1
-    ; endWhile
-
-    ; data[data.Length - 1] = none
-
-    ; int n = 0
-    ; while (n < data.Length)
-    ;     string elementKey = JMap.getNthKey(dataIds, n)
-    ;     if (JMap.getInt(dataIds, elementKey) == data.Length - 1)
-    ;         JMap.removeKey(dataIds, elementKey)
-    ;     endif
-    ;     n += 1
-    ; endWhile
-
-    ; string lastKey = JMap.getNthKey(dataIds, (data.Length - 1))
-    ; if (lastKey != "")
-    ;     JMap.removeKey(dataIds, lastKey)
-    ; endif
-
-    ; ; B: [2, 3, 6, 5, 0, 8, 4, 7, 1]
-    ; ; A: [2, 3, 6, 5, 0, 8, 7, 1]
-    ; int i = 0
-    ; while (i < arrayLength)
-    ;     string elementKey       = JMap.getNthKey(dataIds, i)
-    ;     int currentElement      = JMap.getInt(dataIds, elementKey) ; 2
-    ;     bool hasCurrentElement  = JMap.valueType(dataIds, elementKey) != 0 ; true
-    ;     if (hasCurrentElement && data[currentElement] == none) ;
-    ;         data[currentElement] = data[currentElement + 1]
-    ;         string nextKey = JMap.getNthKey(dataIds, currentElement + 1)
-    ;         JMap.setInt(dataIds, nextKey, i)
-    ;         JMap.removeKey(dataIds, nextKey)
-    ;     endif
-    ;     i += 1
-    ; endWhile
-
-    indexes   = JArray.asIntArray(JMap.allValues(dataIds))
-    Debug("ActiveMagicEffectList::reindex_data", "\ndata: " + data + " | \nkeys: " + GetKeys() + " | \nindexes: " + indexes)
-
-endFunction
-
-function protected_remove(string asKey, bool dispel = true)
-    int index = JMap.getInt(dataIds, asKey)
-    int[] indexes = JArray.asIntArray(JMap.allValues(dataIds))
-
-    ; Debug("ActiveMagicEffectList::protected_remove", "Removed Key: " + asKey + " | Index: "+ index +" | data["+ index +"]: " + data[index])
-    ; Debug("ActiveMagicEffectList::protected_remove", "\ndata: " + data + " | \nkeys: " + GetKeys() + " | \nindexes: " + indexes)
-    ; Debug("ActiveMagicEffectList::protected_remove", "___________________________________________________________________________________")
-    if (dispel)
-        data[index].Dispel()
-    endif
-    
-    reindex_data(asKey)
-    return
-
-    ; data[index] = none
-    ; JMap.removeKey(dataIds, asKey)
-
-    ; Re-index data structure
-    string prisonerKey  = JMap.getNthKey(dataIds, (index + 1)) ; Taarie
-    int nextIndex       = JMap.getInt(dataIds, prisonerKey) ; 0
-    bool indexExists    = JMap.valueType(dataIds, prisonerKey) != 0
-
-    data[index]                 = none                              ; Remove current Element
-    string removedPrisonerKey   = JMap.getNthKey(dataIds, index)    ; Key for the Element
-    JMap.removeKey(dataIds, removedPrisonerKey)                     ; Remove key for element
-
-    int i = index
-    while (i < data.Length - 1)
-        bool isInBounds = (i + 1) < data.Length
-        data[i] = data[i + 1]
-        if (isInBounds)
-            string nextElementKey   = JMap.getNthKey(dataIds, i + 1)
-            int removedValue        = JMap.getInt(dataIds, nextElementKey)
-            JMap.removeKey(dataIds, nextElementKey)
-            JMap.setInt(dataIds, nextElementKey, i)
-            Debug("ActiveMagicEffectList::protected_remove", "Moved data["+ (i+1) +"] to data["+ i +"] ("+ nextElementKey +")")
-            Debug("ActiveMagicEffectList::protected_remove", "Removed value: " + removedValue)
-        endif
-        i += 1
-    endWhile
-
-    data[data.Length - 1] = none
-    Debug("ActiveMagicEffectList::protected_remove", "Deleted data["+(data.Length - 1)+"]")
-    ; int n = index
-    ; while (n < data.Length - 1)
-    ;     string nextElementKey = JMap.getNthKey(dataIds, n + 1)
-    ;     JMap.setInt(dataIds, nextElementKey, n)
-    ;     n += 1
-    ; endWhile
-
-    string lastKey = JMap.getNthKey(dataIds, data.Length - 1)
-    if (JMap.hasKey(dataIds, lastKey))
-        JMap.removeKey(dataIds, lastKey)
-        Debug("ActiveMagicEffectList::protected_remove", "Removed Key from data["+ (data.Length - 1) +"]: " + lastKey)
-    endif
-
-    ; if (data[index + 1] != none)
-    ;     data[index] = data[index + 1]
-    ;     string prisonerKey = JMap.getNthKey(dataIds, (index + 1))
-    ;     JMap.setInt(dataIds, prisonerKey, index)
-    ; else
-    ;     data[index] = none
-    ;     JMap.removeKey(dataIds, asKey)
-    ; endif
-
-    indexes = JArray.asIntArray(JMap.allValues(dataIds))
-    Debug("ActiveMagicEffectList::protected_remove", "Removed Key: " + asKey + " | Index: "+ index +" | data["+ index +"]: " + data[index])
-    Debug("ActiveMagicEffectList::protected_remove", "\ndata: " + data + " | \nkeys: " + GetKeys() + " | \nindexes: " + indexes)
-endFunction
-
-; function Remove(string asKey, bool dispel = true)
-;     int index = JMap.getInt(dataIds, asKey)
-
-;     if (dispel)
-;         data[index].Dispel()
-;     endif
-    
-;     data[index] = none
-;     JMap.removeKey(dataIds, asKey)
-; endFunction
-
-; function AddAt(ActiveMagicEffect ame, int id)
-;     self.Initialize()
-;     if (data[nextAvailableIndex] == none)
-;         JIntMap.setInt(dataIds, id, nextAvailableIndex)
-;         data[nextAvailableIndex] = ame
-;         nextAvailableIndex += 1
-;         Debug(self, "ActiveMagicEffectList::Add", "Added ActiveMagicEffect: " + ame + " at index: " + nextAvailableIndex + " through nextAvailableIndex")
-
-;     ; else
-;     ;     int i = 0
-;     ;     while (i < data.Length)
-;     ;         if (data[i] == none)
-;     ;             JIntMap.setInt(dataIds, id, i)
-;     ;             data[i] = ame
-;     ;             nextAvailableIndex = i + 1
-;     ;             Debug(self, "ActiveMagicEffectList::AddAt", "Added ActiveMagicEffect: " + ame + " at index: " + i)
-;     ;         endif
-;     ;         i += 1
-;     ;     endWhile
-;     endif
-; endFunction
-
-; ActiveMagicEffect function GetAt(int id)
-;     int arrayIndex = JIntMap.getInt(dataIds, id)
-;     Debug(self, "ActiveMagicEffectList::Get", "Retrieved ActiveMagicEffect: " + data[arrayIndex] + " at index: " + arrayIndex)
-;     return data[arrayIndex]
-; endFunction
-
-; int function GetArrayIndex(int id)
-;     return JIntMap.getInt(dataIds, id)
-; endFunction
-
-; function Remove(int id, bool dispel = true)
-;     int index = self.GetArrayIndex(id)
-
-;     if (dispel)
-;         data[index].Dispel()
-;     endif
-    
-;     data[index] = none
-;     JIntMap.removeKey(dataIds, id)
-; endFunction
-
-function Initialize()
-    if (!dataIds || !data)
-        dataIds = JIntMap.object()
-        data = new ActiveMagicEffect[100]
-    endif
-    Debug("ActiveMagicEffectList::Initialize", "Initialized list")
-endFunction
-
-event OnInit()
-    Debug("ActiveMagicEffectList::OnInit", "OnInit")
-    dataIds = JMap.object()
-    JValue.retain(dataIds)
-    data = new ActiveMagicEffect[128]
-endEvent
-
-
-; =========================================================
-;                          public                          
-; =========================================================
 
 int function GetSize()
-    return JValue.count(dataIds)
+    return __count
 endFunction
 
 bool function IsEmpty()
-    return JValue.count(dataIds) <= 0
+    return __count <= 0
 endFunction
 
 string[] function GetKeys()
-    return JMap.allKeysPArray(dataIds)
+    self.__EnsureInitialized()
+    return FastMap_KeysAsPapyrusArray(__keyToIndex)
 endFunction
 
-string function GetValuesAsString()
-    int valueCount = JMap.count(dataIds)
-    string values = ""
-
-    int i = 0
-    while (i < valueCount)
-        bool hasNextElement = data[i + 1] != none
-        values += (data[i] as string) + string_if (hasNextElement, ", ")
-        i += 1
-    endWhile
-
-    return "["+ values +"]"
-endFunction
-
+;/
+    Adds @element under @elementKey. No-ops (logs an error, doesn't corrupt anything) if the
+    key already exists, or if every configured page is already full.
+/;
 function AddElement(ActiveMagicEffect element, string elementKey)
-    bool keyExists = JMap.hasKey(dataIds, elementKey)
-
-    if (keyExists)
+    if (self.HasKey(elementKey))
         Error("Element "+ elementKey +" already exists, cannot add it again!")
         return
     endif
 
-    int availableIndex = __private_getAvailableIndex()
-    
-    if (!data[availableIndex])
-        data[availableIndex] = element                      ; Assign the Data
-        JMap.setInt(dataIds, elementKey, availableIndex)    ; Assign the index to the key
-        JArray.addStr(dataKeys, elementKey)                 ; Assign the Key
-    endif
-endFunction
-
-function RemoveElement(string elementKey, bool dispel = true)
-    int index = JMap.getInt(dataIds, elementKey)
-
-    if (dispel)
-        data[index].Dispel()
+    if (__count >= self.__TotalCapacity())
+        Error("ActiveMagicEffectContainer is full ("+ self.__TotalCapacity() +" entries) - cannot add "+ elementKey +"!")
+        return
     endif
 
-    bool isLastElement = __private_moveLastElementToIndex(index)
-
-    if (isLastElement)
-        data[index] = none
-    endif
-
-    JMap.removeKey(dataIds, elementKey)         ; Delete the Index
-    JArray.eraseString(dataKeys, elementKey)    ; Delete the Key
-
-    ; ; Only if the current element is not the last
-    ; if (index < (size - 1))
-    ;     ; Reorder the last element to this index
-    ;     data[index] = data[size - 1]
-    ;     data[size - 1] = none
-    ;     int oldElementIndex = __private_getIndexFromPosition(size - 1)
-    ;     string newElementKey = __private_getKeyForIndex(oldElementIndex)
-    ;     __private_changeElementIndex(newElementKey, index)
-    ; else
-    ;     data[index] = none ; Delete the Data, this is the last element
-    ; endif
-
-    ; JMap.removeKey(dataIds, elementKey)         ; Delete the Index
-    ; JArray.eraseString(dataKeys, elementKey)    ; Delete the Key
-
-
-    ; __private_reindex()
-endFunction
-
-; =========================================================
-;                         protected                        
-; =========================================================
-
-function __protected_addAtKey(ActiveMagicEffect element, string elementKey)
-endFunction
-
-function __protected_addAtIndex(ActiveMagicEffect element, int elementIndex)
-endFunction
-
-function __protected_removeElement(string keyToRemove)
-endFunction
-
-ActiveMagicEffect function __protected_fromIndex(int index)
-endFunction
-
-ActiveMagicEffect function __protected_fromKey(string keyElement)
-endFunction
-
-function __protected_listData()
-    int arrayLength         = JValue.count(dataIds)
-    int[] mapIndices        = JArray.asIntArray(JMap.allValues(dataIds))
-    string[] elementKeys    = JArray.asStringArray(JMap.allKeys(dataIds))
-
-    LogNoType("Element Keys: " + elementKeys)
-
-    int i = 0
-    while (i < arrayLength)
-        string tabs = string_if (StringUtil.GetLength(data[i]) >= 10, "\t\t", "\t\t\t")
-        string keyFromMap   = JMap.getNthKey(dataIds, i)
-        int indexFromMap    = __private_getIndexFromPosition(i)
-        LogNoType(i + ": data["+indexFromMap+"] = " + data[indexFromMap] + tabs + "(Key: "+ keyFromMap +")")
-        i += 1
-    endWhile
-endFunction
-
-; =========================================================
-;                          private                         
-; =========================================================
-
-int[] function __private_getIndices()
-    return JArray.asIntArray(JMap.allValues(dataIds))
-endFunction
-
-ActiveMagicEffect[] function __private_getElements()
-    return data
-endFunction
-
-string[] function __private_getKeys()
-    return JArray.asStringArray(JMap.allKeys(dataIds))
-endFunction
-
-string function __private_getKeyForIndex(int index)
-    return JMap.getNthKey(dataIds, index)
-    ; return JArray.getStr(dataKeys, index)
-endFunction
-
-int function __private_get_indexForKey(string elementKey)
-    int index = JMap.getInt(dataIds, elementKey)
-    return index
-endFunction
-
-int function __private_getIndexFromPosition(int indexPosition)
-    int index = JArray.findInt(JMap.allValues(dataIds), indexPosition)
-    return index
-endFunction
-
-ActiveMagicEffect function __private_getValueByIndex(int index)
-    if (index < 0 || index >= JArray.count(dataKeys))
-        return none
-    endif
-
-    string elementKey   = JMap.getNthKey(dataIds, index)
-    ; string elementKey   = JArray.getStr(dataKeys, index)
-    int elementIndex    = JMap.getInt(dataIds, elementKey)
-
-    return data[elementIndex]
-endFunction
-
-ActiveMagicEffect function __private_getValueByKey(string elementKey)
-    int elementIndex = JMap.getInt(dataIds, elementKey)
-    return data[elementIndex]
-endFunction
-
-; Returns the element's old index
-int function __private_changeElementIndex(string elementKey, int newIndex)
-    int oldIndex = JMap.getInt(dataIds, elementKey)
-    JMap.setInt(dataIds, elementKey, newIndex)
-
-    return oldIndex
+    self.__SetSlot(__count, element)
+    FastMap_SetInt(__keyToIndex, elementKey, __count)
+    __count += 1
 endFunction
 
 ;/
-    Moves the last element in the list to the position specified by @index.
-
-    int @index: The index in the list to move the last element to.
-
-    returns (bool): true if @index is the last element, false otherwise. 
+    Removes the element stored under @elementKey. If it isn't the last live element, the
+    current last element is moved into its slot first (keeping storage dense, no gaps), then
+    the vacated last slot is cleared. If that leaves the page it was in entirely unused, that
+    page gets freed too (see __FreePageIfNowUnused()).
 /;
-bool function __private_moveLastElementToIndex(int index)
-    int size  = self.GetSize()
-    bool isLastElement = index >= size - 1
-
-    if (isLastElement)
-        return true
+function RemoveElement(string elementKey, bool dispel = true)
+    if (!self.HasKey(elementKey))
+        return
     endif
 
-    data[index] = data[size - 1]
-    data[size - 1] = none
+    int removedIndex = FastMap_GetInt(__keyToIndex, elementKey)
+    ActiveMagicEffect removedElement = self.__GetSlot(removedIndex)
 
-    ; Get the last element index
-    int oldElementIndex = __private_getIndexFromPosition(size - 1)
-
-    ; Get the key for last element
-    string elementKey   = __private_getKeyForIndex(oldElementIndex)
-
-    ; Refresh the index mapping used to access data[] (changes last element index to @index)
-    __private_changeElementIndex(elementKey, index)
-
-    return false
-endFunction
-
-string function __private_listIndicesRelationToKeys()
-    ; Example element relation: 1: Prisoner[104610]
-    int arrayLength         = self.GetSize()
-    int[] elementsIndices   = __private_getIndices()
-
-    string retval = "["
-
-    int i = 0
-    while (i < arrayLength)
-        int elementIndex        = __private_getIndexFromPosition(i)
-        string elementKey       = __private_getKeyForIndex(elementIndex)
-        string elementRelation  = elementsIndices[i] + ": " + elementKey
-        if (i < (arrayLength - 1))
-            elementRelation += ", "
-        endif
-        retval += elementRelation
-        i += 1
-    endWhile
-
-    return retval + "]"
-endFunction
-
-int function __private_getAvailableIndex()
-    int i = 0
-    while (i < data.Length)
-        if (!data[i])
-            return i
-        endif
-        i += 1
-    endWhile
-endFunction
-
-function __private_clear()
-    int arrayLength = JValue.count(dataIds)
-
-    int i = 0
-    while (i < arrayLength)
-        data[i] = none
-        i += 1
-    endWhile
-
-    JMap.clear(dataIds)
-endFunction
-
-function __private_reindex()
-    int arrayLength = JValue.count(dataIds)
-
-    int i = 0
-    while (i < arrayLength)
-        bool isEmptyElement = !data[i] || data[i] == "None" || data[i] == ""
-        string elementKey   = __private_getKeyForIndex(i)
-        int indexInMap      = __private_get_indexForKey(elementKey)
-
-        if (isEmptyElement)
-            string nextElementKey   = __private_getKeyForIndex(i + 1)
-            int nextElementIndex    = __private_get_indexForKey(nextElementKey)
-
-            data[i] = data[nextElementIndex]        ; Assign the next element to this
-            JMap.setInt(dataIds, nextElementKey, i) ; Assign new index to this key, no need to delete the index because it's mapped to the key, only change it
-            data[nextElementIndex] = none
-
-            ; Debug("TestList::__private_reindex", "Shifted "+ data[i] + " from index " + nextElementIndex + " to index " + i + " | " + data)
-        endif
-        i += 1
-    endWhile
-endFunction
-
-function __private_sort(string fnSortCallback)
-    ; Implement the function callback on a state's OnBeginState and then return
-endFunction
-
-function __private_alloc()
-endFunction
-
-function __private_dealloc()
-endFunction
-
-function __private_initialize()
-    if (!data || !dataIds)
-        dataIds     = JMap.object()
-        dataKeys    = JArray.object()
-
-        JValue.retain(dataIds)
-        JValue.retain(dataKeys)
-
-        data = new ActiveMagicEffect[20]
+    if (dispel && removedElement)
+        removedElement.Dispel()
     endif
+
+    int lastIndex = __count - 1
+
+    if (removedIndex != lastIndex)
+        ActiveMagicEffect lastElement = self.__GetSlot(lastIndex)
+        self.__SetSlot(removedIndex, lastElement)
+
+        string lastElementKey = self.__FindKeyForIndex(lastIndex)
+        if (lastElementKey != "")
+            FastMap_SetInt(__keyToIndex, lastElementKey, removedIndex)
+        endif
+    endif
+
+    self.__SetSlot(lastIndex, none)
+    FastMap_RemoveKey(__keyToIndex, elementKey)
+    __count -= 1
+
+    self.__FreePageIfNowUnused(lastIndex / PAGE_SIZE)
 endFunction
 
-bool __isInitialized
-
-; =========================================================
-;                           Events                         
-; =========================================================
-
-event OnElementAdded(ActiveMagicEffect element, string elementKey, int elementIndex)
-endEvent
-
-event OnElementRemoved(ActiveMagicEffect element, string elementKey, int elementIndex)
-endEvent
-
+;/
+    Alias for RemoveElement() - kept for RPB_CaptorList.Remove(), the one real caller still
+    using this name. Both removal paths are now the exact same dense-packing operation,
+    resolving a previously-documented "two different removal code paths for the same
+    operation" design smell as a side effect of this refactor.
+/;
+function protected_remove(string asKey, bool dispel = true)
+    self.RemoveElement(asKey, dispel)
+endFunction

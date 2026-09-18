@@ -274,8 +274,29 @@ RPB_Prison function GetNthPrison(int index)
     return none
 endFunction
 
+;/
+    Bug fix: this used to be `return self.GetNthAlias(aiPrisonID) as RPB_Prison` - but
+    GetNthAlias() indexes aliases by their POSITION in the quest's alias list (0..PrisonSlots-1),
+    while @aiPrisonID (an alias's .ID, i.e. the native Alias.GetID()) is its CK-assigned ID
+    number, which isn't guaranteed to equal its position if any alias in this quest was ever
+    deleted and re-added in the Creation Kit (the CK's ID counter doesn't reuse freed IDs).
+    Confirmed in-game: Solitude's alias has ID 43 despite only 41 total aliases existing, so
+    GetNthAlias(43) was out of range, silently returned None, and every caller (including
+    RPB_Prison.GetLastJailedPrison()) got None back instead of the real prison. Fixed to
+    search by the real ID instead of assuming it matches alias position - same pattern
+    GetPrisonByUUID() below already uses.
+/;
 RPB_Prison function GetPrisonByID(int aiPrisonID)
-    return self.GetNthAlias(aiPrisonID) as RPB_Prison
+    int i = 0
+    while (i < PrisonSlots)
+        RPB_Prison prison = self.GetNthPrison(i)
+        if (prison && prison.ID == aiPrisonID)
+            return prison
+        endif
+        i += 1
+    endWhile
+
+    return none
 endFunction
 
 ; Later cache the Prisons by UUID

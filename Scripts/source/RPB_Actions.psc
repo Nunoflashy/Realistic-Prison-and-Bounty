@@ -686,10 +686,24 @@ function Action_ReleasePrisoner(RPB_UIInterface uilib)
     prison.SendReleaseRequest(prisoner)
 endFunction
 
+;/
+    Debug dump of the PrisonerList's current state, through the public API only -
+    __private_reindex_data() (a container-internal debug helper) was removed as part of the
+    RPB_ActiveMagicEffectContainer refactor; dense packing means there's nothing left to
+    "reindex" as a separate action, so this now just logs what's actually there.
+/;
 function Action_TestReindexing(RPB_UIInterface uilib)
     RPB_Prison prison           = API.PrisonManager.GetPrison("Haafingar")
     RPB_PrisonerList prisoners  = prison.Prisoners
-    prisoners.__private_reindex_data()
+
+    Debug("Actions::Action_TestReindexing", "Count: " + prisoners.Count + ", Keys: " + prisoners.GetKeys())
+
+    int i = 0
+    while (i < prisoners.Count)
+        RPB_Prisoner prisoner = prisoners.AtIndex(i)
+        Debug("Actions::Action_TestReindexing", "["+ i +"]: " + prisoner.Name)
+        i += 1
+    endWhile
 endFunction
 
 function Action_BindCellPackageToReference(RPB_UIInterface uilib)

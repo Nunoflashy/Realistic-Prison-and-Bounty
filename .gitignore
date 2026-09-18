@@ -46,3 +46,6 @@ SKSE/Plugins**
 shell-snapshots/**
 settings.json
 ROADMAP.md
+*.bak
+*.code-workspace
+skills/**

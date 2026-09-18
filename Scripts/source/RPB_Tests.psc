@@ -1,36 +1,62 @@
 scriptname RPB_Tests extends ObjectReference hidden
 
 import RPB_Utility
+import RPB_Memory
 
 bool property ENABLE_TRACING            = false autoreadonly
 bool property ENABLE_DEBUGGING          = false autoreadonly
 bool property ENABLE_LOGGING            = false autoreadonly
 bool property DISPLAY_ASSERT_IN_GAME    = false autoreadonly
-bool property DISPLAY_RESULT_IN_GAME    = false autoreadonly
+; Was false - a test run produced nothing on-screen unless this had already been flipped
+; and the script recompiled first. Defaulting it on makes "press F1, run a test" show a
+; result immediately with no source-editing step beforehand; the noisier per-step tracing
+; flags above stay opt-in/log-only.
+bool property DISPLAY_RESULT_IN_GAME    = true autoreadonly
 
 function SetTests()
+    self.AddTest("00 - Run All Tests", "__RUN_ALL__")
     self.AddTest("00 - No Test", "")
     self.AddTest("01 - 25 Days after 26th Frostfall is 20th of Sun's Dusk", "Test_25Days_After_26th_Frostfall_Is_20th_Suns_Dusk")
     self.AddTest("02 - Get Prison For Actor Globally", "Test_Can_Get_Prison_For_Actor_Globally")
     self.AddTest("03 - Imprison Actor without Arresting", "Test_Can_Imprison_Actor_Without_Arresting")
-    self.AddTest("04 - Imprison Multiple Actors", "Test_Imprison_Multiple_Actors")
-    self.AddTest("05 - Arrest and Imprison Multiple Actors with Scene", "Test_Arrest_And_Imprison_Multiple_Actors_With_Scene")
-    self.AddTest("06 - Imprisonment In Cell Should Not Allow Overcrowding", "Test_Imprisonment_In_Cell_Should_Not_Allow_Overcrowding")
+    ; Not chainable: spawns 4 permanent NPCs with no cleanup - see KNOWN_ISSUES.md
+    self.AddTest("04 - Imprison Multiple Actors", "Test_Imprison_Multiple_Actors", abChainable = false)
+    ; Not chainable: a real arrest/escort Scene, not something to fire unattended in a chain
+    self.AddTest("05 - Arrest and Imprison Multiple Actors with Scene", "Test_Arrest_And_Imprison_Multiple_Actors_With_Scene", abChainable = false)
+    ; Not chainable: hangs when run as part of "00 - Run All Tests" - root cause not yet
+    ; diagnosed (unlike 09's), mitigated here until there's evidence to chase further
+    self.AddTest("06 - Imprisonment In Cell Should Not Allow Overcrowding", "Test_Imprisonment_In_Cell_Should_Not_Allow_Overcrowding", abChainable = false)
     self.AddTest("07 - Imprison Player Without Arresting - Required Bounty", "Test_Imprison_Player_Without_Arresting_Required_Bounty")
     self.AddTest("08 - Can Add Prisoners to PrisonerList", "Test_Can_Add_Prisoners_To_PrisonerList")
-    self.AddTest("09 - Unset Prisons", "Test_Unset_Prisons")
+    ; Not chainable: unsets all prison slots with nothing in this suite to reconfigure them
+    ; afterward (Test_Configure_Prisons' own reconfiguration call is dead) - see KNOWN_ISSUES.md
+    self.AddTest("09 - Unset Prisons", "Test_Unset_Prisons", abChainable = false)
     self.AddTest("10 - Configure Prisons", "Test_Configure_Prisons")
-    self.AddTest("11 - Arrest Selected NPC with Escort Scene", "Test_Arrest_Selected_NPC_Escort_Scene")
-    self.AddTest("12 - Test ActiveMagicEffect List", "Test_ActiveMagicEffectList_Works_Correctly")
-    self.AddTest("13 - Test Prisoner Has Bounty in Prison", "Test_PrisonerHasBountyInPrison")
+    ; Not chainable: a real arrest/escort Scene, not something to fire unattended in a chain
+    self.AddTest("11 - Arrest Selected NPC with Escort Scene", "Test_Arrest_Selected_NPC_Escort_Scene", abChainable = false)
+    self.AddTest("12 - ActiveMagicEffectContainer: Page-Boundary Crossing", "Test_ActiveMagicEffectContainer_PageBoundary")
+    ; Not chainable: stalls "00 - Run All Tests" with no log detail captured yet - root cause
+    ; not diagnosed, mitigated here until there's evidence to chase further (same pattern as 06)
+    self.AddTest("13 - Test Prisoner Has Bounty in Prison", "Test_PrisonerHasBountyInPrison", abChainable = false)
     self.AddTest("14 - Test Prisoner Gets Correct Escape Penalty", "Test_PrisonerEscapeGetsCorrectPenalty")
     self.AddTest("15 - Test List Algorithms", "Test_ListAlgorithms")
-    self.AddTest("16 - Test ActiveMagicEffectList Algorithms", "Test_ActiveMagicEffectListAlgorithms")
     self.AddTest("17 - Test New Serialization - Compare with Old", "Test_NewSerializationCompareWithOld")
     self.AddTest("18 - Test Prison Root Objects", "Test_PrisonRootObjects")
     self.AddTest("19 - Test JSON Conditions", "Test_JSONConditions")
     self.AddTest("20 - Test Data Structures", "Test_DataStructures")
-    self.AddTest("21 - Benchmark StorageVars", "Benchmark_StorageVars")
+    ; Not chainable: 1600 iterations, a benchmark not a correctness test - heavy for a routine chain
+    self.AddTest("21 - Benchmark StorageVars", "Benchmark_StorageVars", abChainable = false)
+    self.AddTest("22 - ActorList: Add and Retrieve (Prisoner/Arrestee/Captor)", "Test_ActorList_Add_And_Retrieve")
+    self.AddTest("23 - ActorList: Multiple Adds and GetKeys()", "Test_ActorList_Multiple_And_GetKeys")
+    self.AddTest("24 - ActorList: Remove and Reindex", "Test_ActorList_Remove_And_Reindex")
+    self.AddTest("25 - ActiveMagicEffectContainer: Dense Packing After Interleaved Add/Remove", "Test_ActiveMagicEffectContainer_DensePacking")
+    self.AddTest("26 - CaptorList: Remove Path (protected_remove)", "Test_CaptorList_Remove_Path")
+    ; Not chainable: a benchmark, not a correctness test - same treatment as 21
+    self.AddTest("27 - Benchmark: Raw JMap vs RPB_Memory FastMap", "Benchmark_RawJMap_vs_FastMap", abChainable = false)
+    ; Not chainable: a benchmark, not a correctness test - same treatment as 21/27
+    self.AddTest("28 - Benchmark: 32x32 vs 128x8 Page Dispatch at ~1000 Entries", "Benchmark_PageDispatch_32x32_vs_128x8", abChainable = false)
+    ; Not chainable: a benchmark, not a correctness test - same treatment as 21/27/28
+    self.AddTest("29 - Benchmark: FindKeyForIndex Scan Cost at 150 Entries", "Benchmark_FindKeyForIndexScanCost", abChainable = false)
 endFunction
 
 state Test_25Days_After_26th_Frostfall_Is_20th_Suns_Dusk
@@ -280,11 +306,23 @@ state Test_Configure_Prisons
 
         ; API.Config.SetPrisons()
 
+        ; Bug fix: this loop used to bound on prisonManager.PrisonSlots (41 - a fixed,
+        ; CK-authored quest alias count, over-provisioned for future 1-hold-to-many-prisons
+        ; expansion), not config.Holds.Length (8 real configured holds right now - "The
+        ; Reach"/Markarth content isn't finished yet). That read config.Holds out of bounds
+        ; for i = 8..40 every single run (Papyrus silently returns "" past a string[]'s
+        ; length), producing a blank-hold assertion flood, AND read config.Holds 2-3x per
+        ; iteration - its getter is uncached, re-parsing data.json from disk on every access
+        ; (RPB_Config.psc) - so this was ~120+ synchronous disk reads in one tight loop with
+        ; no Utility.Wait, a real risk of stalling the whole Papyrus VM for a moment. Reading
+        ; it once into a local fixes both problems at once. See KNOWN_ISSUES.md.
+        string[] holds = config.Holds
+
         bool validPrisons = true
         int i = 0
-        while (i < prisonManager.PrisonSlots)
-            RPB_Prison holdPrison = prisonManager.GetPrison(config.Holds[i])
-            bool validPrison = assert_true(holdPrison != none && holdPrison.Hold == config.Holds[i], holdPrison.Name + " from hold "+ config.Holds[i] +" is null")
+        while (i < holds.Length)
+            RPB_Prison holdPrison = prisonManager.GetPrison(holds[i])
+            bool validPrison = assert_true(holdPrison != none && holdPrison.Hold == holds[i], holdPrison.Name + " from hold "+ holds[i] +" is null")
             if (!validPrison)
                 validPrisons = false
             endif
@@ -293,10 +331,18 @@ state Test_Configure_Prisons
 
         ; Assert that this is Solitude Prison
         RPB_Prison solitudePrison = prisonManager.GetPrison("Haafingar")
+
+        ; Diagnostic logging - the combined assertion below doesn't say which of its three
+        ; clauses is false, and it's been failing with no detail to go on. Log the real
+        ; values so the next run pinpoints the actual cause instead of guessing.
+        log("solitudePrison.Name=" + solitudePrison.Name + " (expected: Castle Dour Dungeon)")
+        log("solitudePrison.ID=" + solitudePrison.ID + ", GetPrisonByID(ID).ID=" + prisonManager.GetPrisonByID(solitudePrison.ID as int).ID)
+        log("solitudePrison.Hold=" + solitudePrison.Hold + " (expected: Haafingar)")
+
         bool isSolitudePrison = assert_true( \
             solitudePrison.Name == "Castle Dour Dungeon" && \
             solitudePrison.ID == prisonManager.GetPrisonByID(solitudePrison.ID as int).ID && \
-            solitudePrison.Hold == "Haafingar", \ 
+            solitudePrison.Hold == "Haafingar", \
             "This is not Solitude Prison" \
         )
 
@@ -365,10 +411,51 @@ state Test_Arrest_Selected_NPC_Escort_Scene
     endFunction
 endState
 
-state Test_ActiveMagicEffectList_Works_Correctly
+;/
+    Exercises the container's page-dispatch/dense-packing directly via cheap synthetic keys
+    and a None payload - no real Actors, no AddSpell, no Utility.Wait needed, this is pure
+    Papyrus/JContainers bookkeeping, so it's fast. Uses the real, live ArresteeList container
+    instance (the same alias this test used to just cast and do nothing with) - every synthetic
+    entry it adds gets removed again before the test ends, so nothing is left behind.
+/;
+state Test_ActiveMagicEffectContainer_PageBoundary
     function Setup()
-        RPB_ActiveMagicEffectContainer ameList = API.Arrest.GetAliasByName("ArresteeList") as RPB_ActiveMagicEffectContainer
-        
+        RPB_ActiveMagicEffectContainer _container = API.Arrest.GetAliasByName("ArresteeList") as RPB_ActiveMagicEffectContainer
+
+        int startCount = _container.Count
+        int entriesToAdd = 150 ; PAGE_SIZE is 32, so this spans pages 0-4 - a more thorough
+                                ; crossing test than a single boundary
+
+        int i = 0
+        while (i < entriesToAdd)
+            _container.AddElement(none, "PageBoundaryTest_" + i)
+            i += 1
+        endWhile
+
+        bool countCorrect = assert_true(_container.Count == startCount + entriesToAdd, "Expected Count == " + (startCount + entriesToAdd) + ", got " + _container.Count)
+
+        ; Index 33 falls inside page 1 (33 / 32 == 1) - confirms the page0/page1 boundary was
+        ; actually crossed, not just that 150 items were stored somehow
+        bool crossedPage = assert_true(_container.HasKey("PageBoundaryTest_33"), "Entry that should be in page 1 (index 33) is missing")
+
+        ; Remove an early (page 0) entry and confirm dense-packing backfilled it correctly
+        _container.RemoveElement("PageBoundaryTest_5")
+        bool removedCorrectly = assert_true(_container.Count == startCount + entriesToAdd - 1, "Expected Count to drop by 1 after removal, got " + _container.Count)
+        bool goneKeyGone      = assert_true(!_container.HasKey("PageBoundaryTest_5"), "Removed key is still reported as present")
+
+        ; Clean up every synthetic entry this test added (including the one already removed)
+        i = 0
+        while (i < entriesToAdd)
+            string _key = "PageBoundaryTest_" + i
+            if (_container.HasKey(_key))
+                _container.RemoveElement(_key, dispel = false)
+            endif
+            i += 1
+        endWhile
+
+        bool cleanedUp = assert_true(_container.Count == startCount, "Container did not return to its original Count after cleanup, got " + _container.Count)
+
+        display_result(countCorrect && crossedPage && removedCorrectly && goneKeyGone && cleanedUp)
     endFunction
 endState
 
@@ -506,87 +593,12 @@ state Test_ListAlgorithms
     endFunction
 endState
 
-state Test_ActiveMagicEffectListAlgorithms
-    function Setup()
-        SetLoggingEnabled("DEBUG",  true)
-        SetLoggingEnabled("LOG",  true)
-        ; Test list instance
-        RPB_PrisonerList testList = API.PrisonManager.GetPrison("Haafingar").Prisoners
-        testList.__string_add_at("Taarie", "Prisoner[104611]")
-        testList.__string_add_at("Evette San", "Prisoner[104610]")
-        testList.__string_add_at("Vivienne Onis", "Prisoner[104620]")
-        testList.__string_add_at("Jala", "Prisoner[104623]")
-        testList.__string_add_at("Sorex Vinius", "Prisoner[104627]")
-        testList.__string_add_at("Lisette", "Prisoner[104637]")
-        testList.__string_add_at("Greta", "Prisoner[104659]")
-        testList.__string_add_at("Addvar", "Prisoner[104660]")
-        testList.__string_add_at("Noster Eagle-Eye", "Prisoner[108087]")
-        testList.__string_add_at("Priscilla", "Prisoner[108612]")
-        testList.__string_add_at("Johanne", "Prisoner[109118]")
-
-        int arrayLength = testList.__string_get_length()
-        int[] indexes   = testList.__string_get_indexes()
-
-        log("Array Length: " + arrayLength)
-        log("Indexes: " + indexes)
-        testList.__string_list_data()
-
-        string element = testList.__string_remove_element("Prisoner[104659]") ; Greta
-        log("element: " + element)
-        
-        testList.__string_remove_element("Prisoner[104620]")
-
-        log("\nBefore Reindexing\n")
-        ; int j = 0
-        ; while (j < arrayLength)
-        ;     string storedValue = testList.__string_get_value(j)
-        ;     string elementKey = testList.__string_get_key_for_index(j)
-        ;     log("data["+j+"]: " + storedValue + " (Key: "+ elementKey +")")
-        ;     j += 1
-        ; endWhile
-
-        log("\nAfter Reindexing\n")
-        testList.__string_reindex_data()
-        testList.__string_sort_data()
-
-        ; Print out the results for verification
-        arrayLength = testList.__string_get_length()
-        int i = 0
-        while (i < arrayLength)
-            string element1 = testList.__string_get_value(i)
-            string elementKey = testList.__string_get_key_for_index(i)
-            int indexForKey = testList.__string_get_index_for_key(elementKey)
-            Debug("Test Result", "Element at index " + i + ": " + element1 + " (key: " + elementKey + ", Index for Key: "+ indexForKey +")")
-            i += 1
-        endWhile
-
-        ; Print out the JMap indices
-        i = 0
-        while (i < arrayLength)
-            string elementKey = testList.__string_get_key_for_index(i)
-            int index = testList.__string_get_index_for_key(elementKey)
-            Debug("JMap", "Key: " + elementKey + ", Index: " + index)
-            i += 1
-        endWhile
-
-        string addvarKey = "Prisoner[104660]"
-        int addvarIndex = testList.__string_get_index_for_key(addvarKey)
-        string addvar = testList.__string_get_value_by_key(addvarKey)
-        bool addvarTestResult = assert_equals("Addvar", addvar, "Does not get the correct result after reindexing!")
-        display_step("Addvar Test", addvarTestResult, "Key: "+ addvarKey +", Index: "+ addvarIndex +", Value: "+ addvar)
-
-        log("Array Length: " + arrayLength)
-        log("Indexes: " + testList.__string_get_indexes())
-
-        display_result(addvarTestResult)
-
-    endFunction
-
-    function Teardown()
-        RPB_PrisonerList testList = API.PrisonManager.GetPrison("Haafingar").Prisoners
-        testList.__string_clear()
-    endFunction
-endState
+; Test_ActiveMagicEffectListAlgorithms removed - it directly called the container's dead
+; __string_* prototype methods (a parallel, unused shadow store) on the real, live Haafingar
+; PrisonerList, mutating production data's container to exercise abandoned scratch code. That
+; whole __string_* implementation was deleted as part of the RPB_ActiveMagicEffectContainer
+; refactor - see Test_ActiveMagicEffectContainer_PageBoundary (test 12) and
+; Test_ActiveMagicEffectContainer_DensePacking (test 25) for its real replacement coverage.
 
 state Test_NewSerializationCompareWithOld
     function Setup()
@@ -627,7 +639,11 @@ endState
 
 state Benchmark_StorageVars
     function Setup()
-        ;/ const /; int ITERATIONS = 400
+        ; NOTE: this was previously wrapped in a ";/ const /;" block comment (Papyrus has no
+        ; const keyword - see CODE_PRACTICES.md), which meant ITERATIONS was never actually
+        ; declared. That's a compile error waiting to happen the next time this file gets a
+        ; real recompile - fixed here as a prerequisite for adding anything else to this file.
+        int ITERATIONS = 400
 
         Actor testReference = Game.GetFormEx(0x14) as Actor
 
@@ -667,6 +683,538 @@ state Benchmark_StorageVars
             i += 1
         endWhile
         EndBenchmark(bench, "StorageVars Form Getter Functions Benchmark ("+ ITERATIONS +" iterations)")
+    endFunction
+endState
+
+;/
+    Compares raw JMap calls against RPB_Memory's FastMap_* wrappers doing the identical
+    operations RPB_ActiveMagicEffectContainer needs (Set+HasKey+Get+Remove per iteration,
+    mirroring one Add+Remove cycle through the container) - real evidence for whether the
+    planned RPB_Memory refactor of that container has any measurable call-overhead cost,
+    before doing it. See RPB_MCM.psc's own FastMap conversion (TROUBLESHOOTING_NOTES.md) for
+    the precedent this follows: measure first, then convert.
+/;
+state Benchmark_RawJMap_vs_FastMap
+    function Setup()
+        int ITERATIONS = 500
+
+        ; Raw JMap - matches RPB_ActiveMagicEffectContainer's current implementation
+        int rawMap = JMap.object()
+        JValue.retain(rawMap)
+
+        float rawBench = StartBenchmark()
+        int i = 0
+        while (i < ITERATIONS)
+            string rawKey = "Key_" + i
+            JMap.setInt(rawMap, rawKey, i)
+            bool rawExists = JMap.hasKey(rawMap, rawKey)
+            int rawValue = JMap.getInt(rawMap, rawKey)
+            JMap.removeKey(rawMap, rawKey)
+            i += 1
+        endWhile
+        int rawElapsed = EndBenchmark(rawBench, "Raw JMap: " + ITERATIONS + " Set+HasKey+Get+Remove cycles")
+
+        ; RPB_Memory FastMap - matches the proposed refactor
+        int fastMap = FastMap("<string>", true)
+
+        float fastBench = StartBenchmark()
+        i = 0
+        while (i < ITERATIONS)
+            string fastKey = "Key_" + i
+            FastMap_SetInt(fastMap, fastKey, i)
+            bool fastExists = FastMap_HasKey(fastMap, fastKey)
+            int fastValue = FastMap_GetInt(fastMap, fastKey)
+            FastMap_RemoveKey(fastMap, fastKey)
+            i += 1
+        endWhile
+        int fastElapsed = EndBenchmark(fastBench, "FastMap: " + ITERATIONS + " Set+HasKey+Get+Remove cycles")
+
+        log("Raw JMap: " + rawElapsed + " ms, FastMap: " + fastElapsed + " ms, difference: " + (fastElapsed - rawElapsed) + " ms")
+        Debug.Notification("Raw: " + rawElapsed + "ms, FastMap: " + fastElapsed + "ms")
+
+        display_result(true, showTimeElapsed = false)
+    endFunction
+endState
+
+;/
+    Isolates exactly the one variable in question - page-dispatch branch count - rather than
+    re-testing the whole container. Two local, self-contained page layouts (32x32, matching
+    the current RPB_ActiveMagicEffectContainer; 128x8, matching its original design), each
+    with its own FastMap key index (identical on both sides, so it cancels out of the
+    comparison), pushed to ~1000 entries - just under the shared 1024 ceiling, so EVERY page
+    in both layouts actually gets used, not just the first few like test 12's 150 entries do.
+/;
+state Benchmark_PageDispatch_32x32_vs_128x8
+    function Setup()
+        int ENTRIES = 1000
+
+        ; --- Layout A: 32-size pages x 32 (matches the current real container) ---
+        ActiveMagicEffect[] a0 = new ActiveMagicEffect[32]
+        ActiveMagicEffect[] a1 = new ActiveMagicEffect[32]
+        ActiveMagicEffect[] a2 = new ActiveMagicEffect[32]
+        ActiveMagicEffect[] a3 = new ActiveMagicEffect[32]
+        ActiveMagicEffect[] a4 = new ActiveMagicEffect[32]
+        ActiveMagicEffect[] a5 = new ActiveMagicEffect[32]
+        ActiveMagicEffect[] a6 = new ActiveMagicEffect[32]
+        ActiveMagicEffect[] a7 = new ActiveMagicEffect[32]
+        ActiveMagicEffect[] a8 = new ActiveMagicEffect[32]
+        ActiveMagicEffect[] a9 = new ActiveMagicEffect[32]
+        ActiveMagicEffect[] a10 = new ActiveMagicEffect[32]
+        ActiveMagicEffect[] a11 = new ActiveMagicEffect[32]
+        ActiveMagicEffect[] a12 = new ActiveMagicEffect[32]
+        ActiveMagicEffect[] a13 = new ActiveMagicEffect[32]
+        ActiveMagicEffect[] a14 = new ActiveMagicEffect[32]
+        ActiveMagicEffect[] a15 = new ActiveMagicEffect[32]
+        ActiveMagicEffect[] a16 = new ActiveMagicEffect[32]
+        ActiveMagicEffect[] a17 = new ActiveMagicEffect[32]
+        ActiveMagicEffect[] a18 = new ActiveMagicEffect[32]
+        ActiveMagicEffect[] a19 = new ActiveMagicEffect[32]
+        ActiveMagicEffect[] a20 = new ActiveMagicEffect[32]
+        ActiveMagicEffect[] a21 = new ActiveMagicEffect[32]
+        ActiveMagicEffect[] a22 = new ActiveMagicEffect[32]
+        ActiveMagicEffect[] a23 = new ActiveMagicEffect[32]
+        ActiveMagicEffect[] a24 = new ActiveMagicEffect[32]
+        ActiveMagicEffect[] a25 = new ActiveMagicEffect[32]
+        ActiveMagicEffect[] a26 = new ActiveMagicEffect[32]
+        ActiveMagicEffect[] a27 = new ActiveMagicEffect[32]
+        ActiveMagicEffect[] a28 = new ActiveMagicEffect[32]
+        ActiveMagicEffect[] a29 = new ActiveMagicEffect[32]
+        ActiveMagicEffect[] a30 = new ActiveMagicEffect[32]
+        ActiveMagicEffect[] a31 = new ActiveMagicEffect[32]
+
+        int aKeyToIndex = FastMap("<string>", true)
+
+        float aBench = StartBenchmark()
+        int i = 0
+        while (i < ENTRIES)
+            int aPage = i / 32
+            int aSlot = i % 32
+
+            if (aPage == 0)
+                a0[aSlot] = none
+            elseif (aPage == 1)
+                a1[aSlot] = none
+            elseif (aPage == 2)
+                a2[aSlot] = none
+            elseif (aPage == 3)
+                a3[aSlot] = none
+            elseif (aPage == 4)
+                a4[aSlot] = none
+            elseif (aPage == 5)
+                a5[aSlot] = none
+            elseif (aPage == 6)
+                a6[aSlot] = none
+            elseif (aPage == 7)
+                a7[aSlot] = none
+            elseif (aPage == 8)
+                a8[aSlot] = none
+            elseif (aPage == 9)
+                a9[aSlot] = none
+            elseif (aPage == 10)
+                a10[aSlot] = none
+            elseif (aPage == 11)
+                a11[aSlot] = none
+            elseif (aPage == 12)
+                a12[aSlot] = none
+            elseif (aPage == 13)
+                a13[aSlot] = none
+            elseif (aPage == 14)
+                a14[aSlot] = none
+            elseif (aPage == 15)
+                a15[aSlot] = none
+            elseif (aPage == 16)
+                a16[aSlot] = none
+            elseif (aPage == 17)
+                a17[aSlot] = none
+            elseif (aPage == 18)
+                a18[aSlot] = none
+            elseif (aPage == 19)
+                a19[aSlot] = none
+            elseif (aPage == 20)
+                a20[aSlot] = none
+            elseif (aPage == 21)
+                a21[aSlot] = none
+            elseif (aPage == 22)
+                a22[aSlot] = none
+            elseif (aPage == 23)
+                a23[aSlot] = none
+            elseif (aPage == 24)
+                a24[aSlot] = none
+            elseif (aPage == 25)
+                a25[aSlot] = none
+            elseif (aPage == 26)
+                a26[aSlot] = none
+            elseif (aPage == 27)
+                a27[aSlot] = none
+            elseif (aPage == 28)
+                a28[aSlot] = none
+            elseif (aPage == 29)
+                a29[aSlot] = none
+            elseif (aPage == 30)
+                a30[aSlot] = none
+            elseif (aPage == 31)
+                a31[aSlot] = none
+            endif
+
+            FastMap_SetInt(aKeyToIndex, "Key_" + i, i)
+            i += 1
+        endWhile
+        int aElapsed = EndBenchmark(aBench, "32-size pages (32 pages): " + ENTRIES + " adds")
+
+        ; --- Layout B: 128-size pages x 8 (matches the container's original design) ---
+        ActiveMagicEffect[] b0 = new ActiveMagicEffect[128]
+        ActiveMagicEffect[] b1 = new ActiveMagicEffect[128]
+        ActiveMagicEffect[] b2 = new ActiveMagicEffect[128]
+        ActiveMagicEffect[] b3 = new ActiveMagicEffect[128]
+        ActiveMagicEffect[] b4 = new ActiveMagicEffect[128]
+        ActiveMagicEffect[] b5 = new ActiveMagicEffect[128]
+        ActiveMagicEffect[] b6 = new ActiveMagicEffect[128]
+        ActiveMagicEffect[] b7 = new ActiveMagicEffect[128]
+
+        int bKeyToIndex = FastMap("<string>", true)
+
+        float bBench = StartBenchmark()
+        i = 0
+        while (i < ENTRIES)
+            int bPage = i / 128
+            int bSlot = i % 128
+
+            if (bPage == 0)
+                b0[bSlot] = none
+            elseif (bPage == 1)
+                b1[bSlot] = none
+            elseif (bPage == 2)
+                b2[bSlot] = none
+            elseif (bPage == 3)
+                b3[bSlot] = none
+            elseif (bPage == 4)
+                b4[bSlot] = none
+            elseif (bPage == 5)
+                b5[bSlot] = none
+            elseif (bPage == 6)
+                b6[bSlot] = none
+            elseif (bPage == 7)
+                b7[bSlot] = none
+            endif
+
+            FastMap_SetInt(bKeyToIndex, "Key_" + i, i)
+            i += 1
+        endWhile
+        int bElapsed = EndBenchmark(bBench, "128-size pages (8 pages): " + ENTRIES + " adds")
+
+        log("32x32: " + aElapsed + " ms, 128x8: " + bElapsed + " ms, delta: " + (aElapsed - bElapsed) + " ms")
+        Debug.Notification("32x32: " + aElapsed + "ms, 128x8: " + bElapsed + "ms, delta: " + (aElapsed - bElapsed) + "ms")
+
+        display_result(true, showTimeElapsed = false)
+    endFunction
+endState
+
+;/
+    Mirrors RPB_ActiveMagicEffectContainer.__FindKeyForIndex() exactly, but taking the map as
+    a parameter so it can be reused against the ad-hoc FastMap built for
+    Benchmark_FindKeyForIndexScanCost below, without needing a real container instance.
+/;
+string function __ScanForKeyAtIndex(int aiMap, int aiIndex)
+    string[] keys = FastMap_KeysAsPapyrusArray(aiMap)
+
+    int i = 0
+    while (i < keys.Length)
+        if (FastMap_GetInt(aiMap, keys[i]) == aiIndex)
+            return keys[i]
+        endif
+        i += 1
+    endWhile
+
+    return ""
+endFunction
+
+;/
+    Isolates RemoveElement()'s O(n) __FindKeyForIndex() reverse-lookup scan as its own cost,
+    independent of page size entirely (the scan only ever touches the FastMap key index, never
+    the page arrays) - built to answer a real question raised by comparing test 12 (150
+    entries, full Add+Remove-drain, ~6250ms) against Benchmark_PageDispatch's isolated
+    Add-only numbers (1000 entries, ~2900ms/~1700ms): those aren't the same workload, so the
+    isolated benchmark's delta can't be extrapolated to test 12's. Two removal passes over
+    identical 150-entry data: one mirroring RemoveElement's real scan-based swap-reindex
+    pattern, one a bare-minimum direct removal by already-known key. The delta between them is
+    the scan's real cost at test-12 scale - if it accounts for most of the gap, page size
+    isn't the main driver of test 12's slowness; the scan is, and it's a separate concern from
+    the 32x32-vs-128x8 decision.
+/;
+state Benchmark_FindKeyForIndexScanCost
+    function Setup()
+        int ENTRIES = 150
+
+        ; --- Pass A: scan-based removal, mirrors RemoveElement()'s real pattern ---
+        int mapA = FastMap("<string>", true)
+        int i = 0
+        while (i < ENTRIES)
+            FastMap_SetInt(mapA, "Key_" + i, i)
+            i += 1
+        endWhile
+
+        float scanBench = StartBenchmark()
+        int countA = ENTRIES
+        i = 0
+        while (i < ENTRIES)
+            string removeKeyA = "Key_" + i
+            int removedIndexA = FastMap_GetInt(mapA, removeKeyA)
+            int lastIndexA = countA - 1
+
+            if (removedIndexA != lastIndexA)
+                string lastKeyA = self.__ScanForKeyAtIndex(mapA, lastIndexA)
+                if (lastKeyA != "")
+                    FastMap_SetInt(mapA, lastKeyA, removedIndexA)
+                endif
+            endif
+
+            FastMap_RemoveKey(mapA, removeKeyA)
+            countA -= 1
+            i += 1
+        endWhile
+        int scanElapsed = EndBenchmark(scanBench, "Scan-based removal: " + ENTRIES + " removes with O(n) reverse lookup")
+
+        ; --- Pass B: direct removal by already-known key, no scan - the bare-minimum baseline ---
+        int mapB = FastMap("<string>", true)
+        i = 0
+        while (i < ENTRIES)
+            FastMap_SetInt(mapB, "Key_" + i, i)
+            i += 1
+        endWhile
+
+        float directBench = StartBenchmark()
+        i = 0
+        while (i < ENTRIES)
+            FastMap_RemoveKey(mapB, "Key_" + i)
+            i += 1
+        endWhile
+        int directElapsed = EndBenchmark(directBench, "Direct removal: " + ENTRIES + " removes, no scan")
+
+        log("Scan-based: " + scanElapsed + " ms, Direct: " + directElapsed + " ms, scan cost: " + (scanElapsed - directElapsed) + " ms")
+        Debug.Notification("Scan-based: " + scanElapsed + "ms, Direct: " + directElapsed + "ms, scan cost: " + (scanElapsed - directElapsed) + "ms")
+
+        display_result(true, showTimeElapsed = false)
+    endFunction
+endState
+
+; ==========================================================
+;   ActiveMagicEffectContainer / ActorList hierarchy tests
+;
+;   These exercise RPB_ActorList/RPB_PrisonerList/RPB_ArresteeList/RPB_CaptorList
+;   (and, through them, the shared RPB_ActiveMagicEffectContainer they all extend)
+;   through their real public API only - Add/Remove via the production
+;   AwaitPrisonerReference()/AwaitArresteeReference()/AwaitCaptorReference()/
+;   UnregisterPrisoner()/UnregisterArrestee()/UnregisterCaptor() helpers, same as
+;   real gameplay uses. Written ahead of a planned refactor of the container (see
+;   KNOWN_ISSUES.md) specifically to get real in-game evidence instead of relying
+;   on static reading alone.
+;
+;   Deliberately reuses the real Haafingar/Solitude prison and the real RPB_Arrest
+;   singleton (same fixture the original tests 02/08 already use) rather than a
+;   dedicated isolated test list - a genuinely isolated fixture would need a new
+;   ReferenceAlias added to a quest in the Creation Kit, which isn't something this
+;   pass can do from source alone. Isolation instead comes from every test's
+;   Teardown() fully unregistering (and disabling/deleting) every temp actor it
+;   placed via __SpawnTempActor()/__TeardownAllTempActors(), so re-running the suite
+;   leaves the prison/arrest state exactly as it found it.
+; ==========================================================
+
+state Test_ActorList_Add_And_Retrieve
+    function Setup()
+        RPB_Prison solitudePrison = (RPB_API.GetPrisonManager()).GetPrison("Haafingar")
+        RPB_Arrest arrest = RPB_API.GetArrest()
+
+        Actor tempArrestee = __SpawnTempActor()
+        Actor tempCaptor   = __SpawnTempActor()
+        Actor tempPrisoner = __SpawnTempActor()
+
+        bool allPassed = true
+
+        RPB_Arrestee arresteeRef = arrest.AwaitArresteeReference(tempArrestee)
+        if (!assert_true(arresteeRef != none, "AwaitArresteeReference returned None"))
+            allPassed = false
+        else
+            allPassed = assert_true(arrest.Arrestees.Exists(arresteeRef), "Arrestee not found via Exists() after Add") && allPassed
+            allPassed = assert_true(arrest.Arrestees.AtKey(tempArrestee) == arresteeRef, "AtKey() did not return the same Arrestee instance") && allPassed
+        endif
+
+        RPB_Captor captorRef = arrest.AwaitCaptorReference(tempCaptor)
+        if (!assert_true(captorRef != none, "AwaitCaptorReference returned None"))
+            allPassed = false
+        else
+            allPassed = assert_true(arrest.Captors.Exists(captorRef), "Captor not found via Exists() after Add") && allPassed
+            allPassed = assert_true(arrest.Captors.AtKey(tempCaptor) == captorRef, "AtKey() did not return the same Captor instance") && allPassed
+        endif
+
+        RPB_Prisoner prisonerRef = solitudePrison.AwaitPrisonerReference(tempPrisoner)
+        if (!assert_true(prisonerRef != none, "AwaitPrisonerReference returned None"))
+            allPassed = false
+        else
+            allPassed = assert_true(solitudePrison.Prisoners.Exists(prisonerRef), "Prisoner not found via Exists() after Add") && allPassed
+            allPassed = assert_true(solitudePrison.Prisoners.AtKey(tempPrisoner) == prisonerRef, "AtKey() did not return the same Prisoner instance") && allPassed
+        endif
+
+        display_result(allPassed)
+    endFunction
+
+    function Teardown()
+        __TeardownAllTempActors()
+    endFunction
+endState
+
+state Test_ActorList_Multiple_And_GetKeys
+    function Setup()
+        RPB_Prison solitudePrison = (RPB_API.GetPrisonManager()).GetPrison("Haafingar")
+
+        ; Utility.Wait() between each spawn+register - back-to-back AddSpell/registration
+        ; calls with no breathing room can back up the engine's own script/magic-effect
+        ; queue (real in-game evidence: RPB_Utility.AwaitEntityReference's default timeout
+        ; is left untouched deliberately, see CODE_PRACTICES.md/KNOWN_ISSUES.md - the fix is
+        ; giving the engine time, not cutting the wait short).
+        Actor tempA = __SpawnTempActor()
+        solitudePrison.AwaitPrisonerReference(tempA)
+        Utility.Wait(1.0)
+
+        Actor tempB = __SpawnTempActor()
+        solitudePrison.AwaitPrisonerReference(tempB)
+        Utility.Wait(1.0)
+
+        Actor tempC = __SpawnTempActor()
+        solitudePrison.AwaitPrisonerReference(tempC)
+
+        bool countCorrect = assert_true(solitudePrison.Prisoners.Count == 3, "Expected Prisoners.Count == 3, got " + solitudePrison.Prisoners.Count)
+
+        string[] keys = solitudePrison.Prisoners.GetKeys()
+        bool hasA = __KeysContain(keys, "Prisoner["+ tempA.GetFormID() +"]")
+        bool hasB = __KeysContain(keys, "Prisoner["+ tempB.GetFormID() +"]")
+        bool hasC = __KeysContain(keys, "Prisoner["+ tempC.GetFormID() +"]")
+
+        bool allKeysFound = assert_true(hasA && hasB && hasC, "GetKeys() is missing one or more expected keys. Got: " + keys)
+
+        display_result(countCorrect && allKeysFound)
+    endFunction
+
+    function Teardown()
+        __TeardownAllTempActors()
+    endFunction
+endState
+
+state Test_ActorList_Remove_And_Reindex
+    function Setup()
+        RPB_Prison solitudePrison = (RPB_API.GetPrisonManager()).GetPrison("Haafingar")
+
+        Actor tempA = __SpawnTempActor()
+        RPB_Prisoner prisonerA = solitudePrison.AwaitPrisonerReference(tempA)
+        log("After adding A: Count=" + solitudePrison.Prisoners.Count + ", Keys=" + solitudePrison.Prisoners.GetKeys())
+        Utility.Wait(1.0)
+
+        Actor tempB = __SpawnTempActor()
+        RPB_Prisoner prisonerB = solitudePrison.AwaitPrisonerReference(tempB)
+        log("After adding B: Count=" + solitudePrison.Prisoners.Count + ", Keys=" + solitudePrison.Prisoners.GetKeys())
+        Utility.Wait(1.0)
+
+        Actor tempC = __SpawnTempActor()
+        RPB_Prisoner prisonerC = solitudePrison.AwaitPrisonerReference(tempC)
+        log("After adding C: Count=" + solitudePrison.Prisoners.Count + ", Keys=" + solitudePrison.Prisoners.GetKeys())
+        ; Same breathing-room fix as between Adds - RemoveSpell()/OnEffectFinish()/OnDestroy()
+        ; is its own engine-queued operation, no different from an Add in that respect, and
+        ; firing it immediately after the 3rd rapid Add hit the same congestion tests 23 hit
+        ; before its fix.
+        Utility.Wait(1.0)
+
+        ; Remove the middle one - this is the case that actually exercises reindexing
+        solitudePrison.UnregisterPrisoner(prisonerB)
+        log("After removing B: Count=" + solitudePrison.Prisoners.Count + ", Keys=" + solitudePrison.Prisoners.GetKeys())
+
+        bool countCorrect  = assert_true(solitudePrison.Prisoners.Count == 2, "Expected Prisoners.Count == 2 after removing the middle Prisoner, got " + solitudePrison.Prisoners.Count)
+        bool aStillThere   = assert_true(solitudePrison.Prisoners.Exists(prisonerA), "Prisoner A missing after an unrelated removal")
+        bool cStillThere   = assert_true(solitudePrison.Prisoners.Exists(prisonerC), "Prisoner C missing after an unrelated removal")
+        bool bIsGone       = assert_true(!solitudePrison.Prisoners.Exists(prisonerB), "Removed Prisoner B is still reported as Exists()")
+
+        display_result(countCorrect && aStillThere && cStillThere && bIsGone)
+    endFunction
+
+    function Teardown()
+        __TeardownAllTempActors()
+    endFunction
+endState
+
+;/
+    Replaces the old dataKeys probe - dataKeys (and DebugGetDataKeysCount(), built specifically
+    to inspect it) no longer exist; the RPB_ActiveMagicEffectContainer refactor's dense-packing
+    design has no separate order-tracking structure left to probe. This instead confirms the
+    property that actually matters now: Count and key presence stay correct and gap-free
+    through a mix of interleaved adds and removes. Cheap synthetic keys on the real, live
+    ArresteeList container (same pattern as test 12) - no real Actors needed, nothing left
+    behind afterward.
+/;
+state Test_ActiveMagicEffectContainer_DensePacking
+    function Setup()
+        RPB_ActiveMagicEffectContainer _container = API.Arrest.GetAliasByName("ArresteeList") as RPB_ActiveMagicEffectContainer
+        int startCount = _container.Count
+
+        ; Add 5, remove 2 from the middle, add 3 more (net +6) - exercises the swap-to-fill
+        ; compaction from both directions, not just a straight append or a straight drain
+        _container.AddElement(none, "DensePackTest_A")
+        _container.AddElement(none, "DensePackTest_B")
+        _container.AddElement(none, "DensePackTest_C")
+        _container.AddElement(none, "DensePackTest_D")
+        _container.AddElement(none, "DensePackTest_E")
+
+        _container.RemoveElement("DensePackTest_B", dispel = false)
+        _container.RemoveElement("DensePackTest_D", dispel = false)
+
+        _container.AddElement(none, "DensePackTest_F")
+        _container.AddElement(none, "DensePackTest_G")
+        _container.AddElement(none, "DensePackTest_H")
+
+        bool countCorrect = assert_true(_container.Count == startCount + 6, "Expected Count == " + (startCount + 6) + ", got " + _container.Count)
+
+        bool allSurvivorsPresent = \
+            _container.HasKey("DensePackTest_A") && \
+            _container.HasKey("DensePackTest_C") && \
+            _container.HasKey("DensePackTest_E") && \
+            _container.HasKey("DensePackTest_F") && \
+            _container.HasKey("DensePackTest_G") && \
+            _container.HasKey("DensePackTest_H")
+        allSurvivorsPresent = assert_true(allSurvivorsPresent, "One or more surviving entries went missing after interleaved add/remove")
+
+        bool removedStaysGone = assert_true(!_container.HasKey("DensePackTest_B") && !_container.HasKey("DensePackTest_D"), "A removed entry is still reported as present")
+
+        ; Clean up
+        _container.RemoveElement("DensePackTest_A", dispel = false)
+        _container.RemoveElement("DensePackTest_C", dispel = false)
+        _container.RemoveElement("DensePackTest_E", dispel = false)
+        _container.RemoveElement("DensePackTest_F", dispel = false)
+        _container.RemoveElement("DensePackTest_G", dispel = false)
+        _container.RemoveElement("DensePackTest_H", dispel = false)
+
+        bool cleanedUp = assert_true(_container.Count == startCount, "Container did not return to its original Count after cleanup, got " + _container.Count)
+
+        display_result(countCorrect && allSurvivorsPresent && removedStaysGone && cleanedUp)
+    endFunction
+endState
+
+state Test_CaptorList_Remove_Path
+    function Setup()
+        RPB_Arrest arrest = RPB_API.GetArrest()
+        Actor tempCaptor = __SpawnTempActor()
+
+        RPB_Captor captorRef = arrest.AwaitCaptorReference(tempCaptor)
+        bool wasAdded = assert_true(captorRef != none && arrest.Captors.Exists(captorRef), "Captor was not added correctly")
+
+        ; CaptorList.Remove() goes through protected_remove(), a different removal path
+        ; than PrisonerList/ArresteeList's RemoveElement() - worth checking on its own.
+        arrest.UnregisterCaptor(captorRef, true)
+
+        bool countIsZero    = assert_true(arrest.Captors.Count == 0, "Expected Captors.Count == 0 after removal, got " + arrest.Captors.Count)
+        bool noLongerExists = assert_true(!arrest.Captors.Exists(captorRef), "Removed Captor still reported as Exists() (protected_remove path)")
+
+        display_result(wasAdded && countIsZero && noLongerExists)
+    endFunction
+
+    function Teardown()
+        __TeardownAllTempActors()
     endFunction
 endState
 
@@ -1587,13 +2135,125 @@ endFunction
 function Teardown()
 endFunction
 
+; ----------------------------------------------------------
+;   Shared temp-actor helpers for tests 22-26 (ActorList/ActiveMagicEffectContainer)
+; ----------------------------------------------------------
+
+Actor[] __testTempActors
+int __testTempActorCount = 0
+
+;/
+    Spawns a disposable NPC (cloned from the same base the original tests already use -
+    see e.g. Test_Imprison_Multiple_Actors) and tracks it so __TeardownAllTempActors()
+    can clean it up afterward. Up to 10 per test - plenty for these.
+/;
+Actor function __SpawnTempActor()
+    if (!__testTempActors)
+        __testTempActors = new Actor[10]
+    endif
+
+    ActorBase npcBase = Game.GetFormEx(0x132A1) as ActorBase
+    Actor player = Game.GetFormEx(0x14) as Actor
+    ; Signature: ObjectReference.PlaceActorAtMe(ActorBase akActorToPlace, int aiLevelMod = 4,
+    ; EncounterZone akZone = None) - only 3 params, no abForcePersist (that's PlaceAtMe, a
+    ; different native, not this one). The "1" below is aiLevelMod (a level modifier), not an
+    ; actor count - this call always places exactly one actor. An earlier attempt here to
+    ; force reference persistence (as a guard against temporary-reference FormID recycling)
+    ; assumed a param that doesn't exist on this native and was removed; turned out
+    ; unnecessary anyway - the real fix for the 23/24/25 stalls was spacing successive
+    ; registrations out with Utility.Wait(), not reference persistence.
+    Actor temp = player.PlaceActorAtMe(npcBase, 1)
+
+    __testTempActors[__testTempActorCount] = temp
+    __testTempActorCount += 1
+
+    return temp
+endFunction
+
+;/
+    Fully unregisters every temp actor spawned this test from all three lists
+    (Prisoner/Arrestee/Captor - a temp actor may only be in one, this just checks all
+    three so a single helper works for every test above) and disables+deletes it, then
+    resets tracking. Call from every test's Teardown() that used __SpawnTempActor().
+/;
+function __TeardownAllTempActors()
+    RPB_Prison solitudePrison = (RPB_API.GetPrisonManager()).GetPrison("Haafingar")
+    RPB_Arrest arrest = RPB_API.GetArrest()
+
+    int i = 0
+    while (i < __testTempActorCount)
+        Actor tempActor = __testTempActors[i]
+
+        if (tempActor)
+            RPB_Prisoner prisonerRef = solitudePrison.Prisoners.AtKey(tempActor)
+            if (prisonerRef)
+                solitudePrison.UnregisterPrisoner(prisonerRef)
+            endif
+
+            RPB_Arrestee arresteeRef = arrest.Arrestees.AtKey(tempActor)
+            if (arresteeRef)
+                arrest.UnregisterArrestee(arresteeRef)
+            endif
+
+            RPB_Captor captorRef = arrest.Captors.AtKey(tempActor)
+            if (captorRef)
+                arrest.UnregisterCaptor(captorRef, true)
+            endif
+
+            tempActor.Disable()
+            tempActor.Delete()
+        endif
+
+        i += 1
+    endWhile
+
+    __testTempActors = none
+    __testTempActorCount = 0
+endFunction
+
+bool function __KeysContain(string[] asKeys, string asTarget)
+    int i = 0
+    while (i < asKeys.Length)
+        if (asKeys[i] == asTarget)
+            return true
+        endif
+        i += 1
+    endWhile
+
+    return false
+endFunction
+
 int testMap
-function AddTest(string asName, string asTestMethodName)
+
+;/ FastMap<int> - test display name -> 1, only present for tests NOT safe to auto-chain /;
+int nonChainableMap
+
+;/
+    Registers a test under @asName (shown in the F1 list), running @asTestMethodName's state
+    when selected.
+
+    string  @asName: The display name shown in the F1 list.
+    string  @asTestMethodName: The state to GotoState() into when this test runs.
+    bool?   @abChainable: Whether RunAllTests() ("00 - Run All Tests") is allowed to run this
+        test as part of a chained run. Defaults true; set false for tests confirmed unsafe to
+        run back-to-back with others (destructive with no self-restore, a real Scene, or just
+        too heavy for a routine chained run) - see KNOWN_ISSUES.md for why each one is marked.
+/;
+function AddTest(string asName, string asTestMethodName, bool abChainable = true)
     if (JValue.empty(testMap))
         testMap = JMap.object()
         JValue.retain(testMap)
     endif
-    
+
+    if (JValue.empty(nonChainableMap))
+        nonChainableMap = JMap.object()
+        JValue.retain(nonChainableMap)
+    endif
+
+    if (!abChainable)
+        JMap.setInt(nonChainableMap, asName, 1)
+    endif
+
     ; int testMethods = JMap.allValues(testMap)
     ; int currentTestIndex = 0
     
@@ -1621,12 +2281,19 @@ endFunction
 event OnInit()
     testMap = JMap.object()
     JValue.retain(testMap)
+
+    nonChainableMap = JMap.object()
+    JValue.retain(nonChainableMap)
 endEvent
 
 string[] function GetTestNames()
     self.SetTests()
     ; return RPB_StorageVars.GetStringsOnForm()
     return JMap.allKeysPArray(testMap)
+endFunction
+
+bool function IsTestChainable(string asTestName)
+    return !JMap.hasKey(nonChainableMap, asTestName)
 endFunction
 
 string[] function GetTestMethodNames()
@@ -1645,10 +2312,17 @@ endFunction
 function ExecuteTest(string asTestKeyName)
     string testToExecute = self.GetTest(asTestKeyName)
 
+    if (testToExecute == "__RUN_ALL__")
+        self.RunAllTests()
+        return
+    endif
+
     if (testToExecute != "")
-        ; Silence logs
+        ; Silence logs - DEBUG was previously commented out here (its restore line below
+        ; wasn't), so production DEBUG:-prefixed logging was never actually silenced during
+        ; a test run. Mirrors the already-working TRACE/LOG pattern now.
         SetLoggingEnabled("TRACE",  IsTracingEnabled()   && ENABLE_TRACING)
-        ; SetLoggingEnabled("DEBUG",  IsDebuggingEnabled() && ENABLE_DEBUGGING)
+        SetLoggingEnabled("DEBUG",  IsDebuggingEnabled() && ENABLE_DEBUGGING)
         SetLoggingEnabled("LOG",    IsLoggingEnabled()   && ENABLE_LOGGING)
 
         start_test(testToExecute)   ; Log test start
@@ -1664,10 +2338,85 @@ function ExecuteTest(string asTestKeyName)
     endif
 endFunction
 
+;/
+    Runs every registered CHAINABLE test back-to-back (skipping "00 - No Test", this entry
+    itself, and anything registered non-chainable via AddTest's abChainable param - see
+    KNOWN_ISSUES.md for why each one is marked) and reports one aggregated
+    pass/fail/no-result/skipped summary, instead of having to read Papyrus.0.log one test
+    at a time. Relies on __lastResultState, which display_result() sets and start_test()
+    resets to "not recorded" before each test - so a test that never calls display_result()
+    (several of the original 21 don't) is counted separately as "no result", not silently
+    miscounted as a pass or fail.
+/;
+function RunAllTests()
+    string[] testNames = self.GetTestNames()
+
+    int passed = 0
+    int failed = 0
+    int noResult = 0
+    int skipped = 0
+    string failedNames = ""
+    string noResultNames = ""
+    string skippedNames = ""
+
+    int i = 0
+    while (i < testNames.Length)
+        string testName = testNames[i]
+        string stateName = self.GetTest(testName)
+
+        if (stateName != "" && stateName != "__RUN_ALL__")
+            if (!self.IsTestChainable(testName))
+                skipped += 1
+                skippedNames += testName + "; "
+            else
+                SetLoggingEnabled("TRACE",  IsTracingEnabled()   && ENABLE_TRACING)
+                SetLoggingEnabled("DEBUG",  IsDebuggingEnabled() && ENABLE_DEBUGGING)
+                SetLoggingEnabled("LOG",    IsLoggingEnabled()   && ENABLE_LOGGING)
+
+                start_test(stateName)
+                GotoState(stateName)
+                Setup()
+                Teardown()
+                GotoState("")
+
+                SetLoggingEnabled("TRACE",  IsTracingEnabled()   || !ENABLE_TRACING)
+                SetLoggingEnabled("DEBUG",  IsDebuggingEnabled() || !ENABLE_DEBUGGING)
+                SetLoggingEnabled("LOG",    IsLoggingEnabled()   || !ENABLE_LOGGING)
+
+                if (__lastResultState == 1)
+                    passed += 1
+                elseif (__lastResultState == 0)
+                    failed += 1
+                    failedNames += testName + "; "
+                else
+                    noResult += 1
+                    noResultNames += testName + "; "
+                endif
+            endif
+        endif
+
+        i += 1
+    endWhile
+
+    string summary = "Tests: " + passed + " passed, " + failed + " failed, " + noResult + " no-result, " + skipped + " skipped (of " + (passed + failed + noResult + skipped) + ")"
+    if (failed > 0)
+        summary += "\nFailed: " + failedNames
+    endif
+    summary += "\nSkipped (not chainable, run individually): " + skippedNames
+
+    base_log("[UNIT SUMMARY]", summary + "\nNo result: " + noResultNames, "Tests::RunAll")
+    ; Notification, not MessageBox - a modal popup at the end of a chained run (on top of the
+    ; one that would've fired per-test below) is exactly the kind of thing DISPLAY_RESULT_IN_GAME
+    ; was originally turned off to avoid. The full summary is always in the log either way.
+    Debug.Notification("Tests: " + passed + " passed, " + failed + " failed, " + noResult + " no-result, " + skipped + " skipped")
+endFunction
+
 
 float __testStartTime
+int __lastResultState = -1 ; -1 = not recorded yet, 0 = last display_result() was a fail, 1 = pass
 function start_test(string testName = "")
     __testStartTime = Utility.GetCurrentRealTime()
+    __lastResultState = -1
     base_log("[UNIT]", "Starting Test: " + testName, "Tests::" + testName)
 endFunction
 
@@ -1679,8 +2428,10 @@ function end_step(string stepName, bool condition, string additionalInfoOnFail =
     string testResult = string_if (condition, stepName + " Passed!", stepName + " Failed!" + " ("+ additionalInfoOnFail +")")
     base_log("[UNIT STEP] " + string_if (condition, "(PASS)", "(FAIL)") + " " + stepName + " @", testResult, "Tests::" + self.GetCurrentTest())
 
+    ; Notification, not MessageBox - a modal popup per step is exactly what
+    ; DISPLAY_RESULT_IN_GAME was originally turned off to avoid.
     if (DISPLAY_RESULT_IN_GAME)
-        Debug.MessageBox(testResult)
+        Debug.Notification(self.GetCurrentTest() + ": " + testResult)
     endif
 endFunction
 
@@ -1689,7 +2440,7 @@ function display_step(string stepName, bool condition, string additionalInfoOnFa
     base_log("[UNIT STEP] " + string_if (condition, "(PASS)", "(FAIL)"), testResult, "Tests::" + self.GetCurrentTest())
 
     if (DISPLAY_RESULT_IN_GAME)
-        Debug.MessageBox(testResult)
+        Debug.Notification(self.GetCurrentTest() + ": " + testResult)
     endif
 endFunction
 
@@ -1705,13 +2456,33 @@ function display_result(bool condition, bool showTimeElapsed = true)
     
     base_log("[UNIT RESULT] " + string_if (condition, "(PASS)", "(FAIL)"), testResult, "Tests::" + self.GetCurrentTest())
 
+    ; Notification (auto-fading, no dismissal needed), not MessageBox (modal) - one popup per
+    ; test in a chained "00 - Run All Tests" run is exactly what DISPLAY_RESULT_IN_GAME was
+    ; originally turned off to avoid. Prefixed with the test name so it's identifiable on its
+    ; own when several fire in sequence; the full detail is always in the log either way.
     if (DISPLAY_RESULT_IN_GAME)
-        Debug.MessageBox(testResult)
+        Debug.Notification(self.GetCurrentTest() + ": " + testResult)
     endif
 
+    __lastResultState = int_if(condition, 1, 0)
     __testStartTime = 0
 endFunction
 
+;/
+    Guard-assertion convention: assert_true()/assert_equals()/etc. only log and return a
+    bool - they can't unwind Setup() on their own (Papyrus has no exceptions). For a
+    precondition a later line depends on (e.g. "this reference isn't None"), guard it
+    explicitly instead of letting a bad assumption become a raw None-dereference crash
+    a few lines later:
+
+        if (!assert_true(prisonerRef != none, "AwaitPrisonerReference returned None"))
+            display_result(false)
+            return
+        endif
+
+    Not retrofitted onto the original 21 tests - applied going forward, see tests 22-26
+    below for worked examples.
+/;
 bool function assert_true(bool condition, string failMessage = "")
     if (!condition)
         base_log("[ASSERT]", "Assertion Failed: " + failMessage, "Tests::" + self.GetCurrentTest())
