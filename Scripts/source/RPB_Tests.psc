@@ -85,6 +85,8 @@ function SetTests()
     self.AddTest("53 - Await: A Stale 'Initialized' Flag Blocks Prisoner Registration", "Test_Await_StaleInitializedFlag", abChainable = false)
     self.AddTest("54 - Prisoner.Initialize(): Per-Step Profile", "Test_Prisoner_InitializeProfile", abChainable = false)
     self.AddTest("55 - Prison: A Failed Imprisonment Cleans the Prisoner's State Up", "Test_Prison_ImprisonmentFailCleansUp", abChainable = false)
+    self.AddTest("56 - LockPrisonerSettings: Per-Operation Cost Split (Reads vs Writes)", "Test_LockPrisonerSettings_CostSplit", abChainable = false)
+    self.AddTest("57 - StorageVars: Cached Reference Key and Cached Hold Give Identical Data", "Test_StorageVars_CachedKeyEquivalence", abChainable = false)
     self.AddTest("41 - ActiveMagicEffectContainer: Stuck Lock Self-Heals", "Test_ActiveMagicEffectContainer_StuckLockSelfHeals")
     self.AddTest("42 - ThreadLock: JAtomic Primitive Semantics and Registry", "Test_ThreadLock_PrimitiveSemantics")
     ; Not chainable: fires concurrent worker threads
@@ -3835,6 +3837,230 @@ state Test_Prisoner_InitializeProfile
         endWhile
 
         log("INITIALIZE PROFILE total: replay " + (grand / N) + "ms avg per prisoner vs the real Initialize() " + (controlTotal / N) + "ms avg")
+        display_result(ok)
+    endFunction
+
+    function Teardown()
+        __TeardownAllTempActors()
+    endFunction
+endState
+
+string function __PerOp(int aiTotalMs, int aiCount)
+    float perOp = (aiTotalMs as float) / (aiCount as float)
+    int hundredths = (perOp * 100.0) as int
+    return (hundredths / 100) + "." + self.__StringIf((hundredths % 100) < 10, "0") + (hundredths % 100) + "ms"
+endFunction
+
+;/
+    LockPrisonerSettings() is 64% of Prisoner.Initialize() (~813ms for ~68 settings, ~12ms each) and the
+    profile can't say whether that is the Prison.X reads (each one is Config.IsXEnabled(hold) ->
+    MCM.GetOption...(name, hold)), the path building in RPB_StorageVars.GetVarPathOnReference, or the
+    JDB write itself. This times each part on its own, over batches (the timer is coarse), and prints
+    the cost per operation and what that means for 68 settings. Nothing in production is changed.
+      READ      : prison.AllowStripping / MinimumSentenceToStrip / InfamyGainedDaily / HandleStrippingOn
+      WRITE     : the full abstraction (p.SetBool -> ActorBase -> StorageVars.SetBoolOnReference)
+      PATH      : GetVarPathOnReference alone
+      JC WRITE  : JDB.solveIntSetter on a prebuilt path (the JC part of a write)
+      HANDLE    : RPB_Memory.FastMap_SetInt and JMap.setInt on the actor's category map (path resolved once)
+/;
+state Test_LockPrisonerSettings_CostSplit
+    function Setup()
+        RPB_Prison prison = (RPB_API.GetPrisonManager()).GetPrison("Haafingar")
+        bool ok = true
+
+        Actor a = __SpawnTempActor()
+        self.__EnsureKind("prisoner", a, prison)
+        RPB_ActorBase reg = none
+        float t0 = Utility.GetCurrentRealTime()
+        while (!reg && (Utility.GetCurrentRealTime() - t0) < 30.0)
+            reg = self.__LookupKind("prisoner", a, prison)
+            if (!reg)
+                Utility.Wait(0.025)
+            endif
+        endWhile
+        RPB_Prisoner p = reg as RPB_Prisoner
+        if (!p)
+            display_result(assert_true(false, "Prisoner never registered, cannot measure"))
+            return
+        endif
+
+        int B = 40
+        int C = 400
+        int i = 0
+        float t = 0.0
+        int msRead = 0
+        int msWrite = 0
+        int msPath = 0
+        int msJC = 0
+        int msFast = 0
+        int msJMap = 0
+        bool sinkB = false
+        int sinkI = 0
+        float sinkF = 0.0
+        string sinkS = ""
+
+        ; --- READ: four different Prison.X properties (bool, int, float, string), B rounds each ---
+        t = Utility.GetCurrentRealTime()
+        i = 0
+        while (i < B)
+            sinkB = prison.AllowStripping
+            i += 1
+        endWhile
+        int msReadBool = self.__Ms(Utility.GetCurrentRealTime() - t)
+
+        t = Utility.GetCurrentRealTime()
+        i = 0
+        while (i < B)
+            sinkI = prison.MinimumSentenceToStrip
+            i += 1
+        endWhile
+        int msReadInt = self.__Ms(Utility.GetCurrentRealTime() - t)
+
+        t = Utility.GetCurrentRealTime()
+        i = 0
+        while (i < B)
+            sinkF = prison.InfamyGainedDaily
+            i += 1
+        endWhile
+        int msReadFloat = self.__Ms(Utility.GetCurrentRealTime() - t)
+
+        t = Utility.GetCurrentRealTime()
+        i = 0
+        while (i < B)
+            sinkS = prison.HandleStrippingOn
+            i += 1
+        endWhile
+        int msReadString = self.__Ms(Utility.GetCurrentRealTime() - t)
+        msRead = msReadBool + msReadInt + msReadFloat + msReadString
+
+        ; --- WRITE: the full abstraction, as LockPrisonerSettings does it ---
+        t = Utility.GetCurrentRealTime()
+        i = 0
+        while (i < B)
+            p.SetBool("Bench Bool", true)
+            i += 1
+        endWhile
+        msWrite = self.__Ms(Utility.GetCurrentRealTime() - t)
+
+        ; --- PATH: only the string building ---
+        string path = ""
+        t = Utility.GetCurrentRealTime()
+        i = 0
+        while (i < B)
+            path = RPB_StorageVars.GetVarPathOnReference("Bench Bool", a, "Jail")
+            i += 1
+        endWhile
+        msPath = self.__Ms(Utility.GetCurrentRealTime() - t)
+
+        ; --- JC WRITE: only the JDB setter on a prebuilt path ---
+        t = Utility.GetCurrentRealTime()
+        i = 0
+        while (i < C)
+            JDB.solveIntSetter(path, 1, true)
+            i += 1
+        endWhile
+        msJC = self.__Ms(Utility.GetCurrentRealTime() - t)
+
+        ; --- HANDLE: resolve the category map once, then write by key ---
+        string mapPath = StringUtil.Substring(path, 0, StringUtil.GetLength(path) - StringUtil.GetLength(".Bench Bool"))
+        int map = JDB.solveObj(mapPath)
+        log("category map handle " + map + " at " + mapPath)
+        if (map == 0)
+            ok = assert_true(false, "The actor's category map does not exist at " + mapPath) && ok
+        else
+            t = Utility.GetCurrentRealTime()
+            i = 0
+            while (i < C)
+                RPB_Memory.FastMap_SetInt(map, "Bench Int", i)
+                i += 1
+            endWhile
+            msFast = self.__Ms(Utility.GetCurrentRealTime() - t)
+
+            t = Utility.GetCurrentRealTime()
+            i = 0
+            while (i < C)
+                JMap.setInt(map, "Bench Int", i)
+                i += 1
+            endWhile
+            msJMap = self.__Ms(Utility.GetCurrentRealTime() - t)
+
+            ok = assert_true(JDB.solveInt(mapPath + ".Bench Int") == C - 1, "A handle write did not land at the path the abstraction reads") && ok
+        endif
+
+        log("COST SPLIT read  bool " + self.__PerOp(msReadBool, B) + " | int " + self.__PerOp(msReadInt, B) + " | float " + self.__PerOp(msReadFloat, B) + " | string " + self.__PerOp(msReadString, B) + "  (Prison.X property)")
+        log("COST SPLIT write (p.SetBool, full abstraction) " + self.__PerOp(msWrite, B) + " per write")
+        log("COST SPLIT   of which GetVarPathOnReference " + self.__PerOp(msPath, B) + " | JDB.solveIntSetter on a prebuilt path " + self.__PerOp(msJC, C))
+        log("COST SPLIT handle write: FastMap_SetInt " + self.__PerOp(msFast, C) + " | JMap.setInt " + self.__PerOp(msJMap, C))
+        log("COST SPLIT for 68 settings: reads ~" + ((msRead * 68) / (B * 4)) + "ms, full-abstraction writes ~" + ((msWrite * 68) / B) + "ms, handle writes via FastMap ~" + ((msFast * 68) / C) + "ms (Initialize() has 813ms in LockPrisonerSettings)")
+
+        RPB_StorageVars.DeleteVariableOnReference("Bench Bool", a, "Jail")
+        RPB_StorageVars.DeleteVariableOnReference("Bench Int", a, "Jail")
+        display_result(ok)
+    endFunction
+
+    function Teardown()
+        __TeardownAllTempActors()
+    endFunction
+endState
+
+;/
+    Correctness of the speed-ups in RPB_ActorBase (cached "(Reference <id>)" key) and RPB_Prison (cached Hold):
+      1. the key derived from the Actor gives exactly the path StorageVars derives itself, and passing the
+         already-normalized key gives the same path again;
+      2. after LockPrisonerSettings(), values written through the cached key read back identically through the
+         plain Actor path (an independent route), for a bool, int, float and string setting, and equal the
+         Prison's live property value (nothing changed in the MCM in between);
+      3. Prison.Hold is non-empty and equals what StorageVars holds.
+/;
+state Test_StorageVars_CachedKeyEquivalence
+    function Setup()
+        RPB_Prison prison = (RPB_API.GetPrisonManager()).GetPrison("Haafingar")
+        bool ok = true
+        bool step = false
+
+        Actor a = __SpawnTempActor()
+        self.__EnsureKind("prisoner", a, prison)
+        RPB_ActorBase reg = none
+        float t0 = Utility.GetCurrentRealTime()
+        while (!reg && (Utility.GetCurrentRealTime() - t0) < 30.0)
+            reg = self.__LookupKind("prisoner", a, prison)
+            if (!reg)
+                Utility.Wait(0.025)
+            endif
+        endWhile
+        RPB_Prisoner p = reg as RPB_Prisoner
+        if (!p)
+            display_result(assert_true(false, "Prisoner never registered"))
+            return
+        endif
+
+        string refKey = RPB_StorageVars.GetReferenceKey(a)
+        string viaActor = RPB_StorageVars.GetVarPathOnReference("Some Key", a, "Jail")
+        string viaKey = RPB_StorageVars.GetVarPathOnReference("Some Key", refKey, "Jail")
+        log("KEY " + refKey + " | path via Actor " + viaActor + " | path via key " + viaKey)
+        step = assert_true(viaActor == viaKey, "The cached-key path differs from the Actor path: " + viaKey + " vs " + viaActor)
+        ok = ok && step
+
+        p.LockPrisonerSettings()
+
+        step = assert_true(p.GetBool("Allow Stripping") == prison.AllowStripping, "Allow Stripping differs from the Prison value")
+        ok = ok && step
+        step = assert_true(RPB_StorageVars.GetBoolOnReference("Allow Stripping", a, "Jail") == prison.AllowStripping, "Allow Stripping differs when read through the plain Actor path")
+        ok = ok && step
+        step = assert_true(p.GetInt("Minimum Sentence") == prison.MinimumSentence && RPB_StorageVars.GetIntOnReference("Minimum Sentence", a, "Jail") == prison.MinimumSentence, "Minimum Sentence differs")
+        ok = ok && step
+        step = assert_true(p.GetFloat("Infamy Gained Daily") == prison.InfamyGainedDaily && RPB_StorageVars.GetFloatOnReference("Infamy Gained Daily", a, "Jail") == prison.InfamyGainedDaily, "Infamy Gained Daily differs")
+        ok = ok && step
+        step = assert_true(p.GetString("Handle Stripping On") == prison.HandleStrippingOn && RPB_StorageVars.GetStringOnReference("Handle Stripping On", a, "Jail") == prison.HandleStrippingOn, "Handle Stripping On differs")
+        ok = ok && step
+
+        string hold = prison.Hold
+        step = assert_true(hold != "", "Prison.Hold is empty")
+        ok = ok && step
+        step = assert_true(hold == prison.GetLocalPropertyOfTypeString("Hold"), "Cached Hold '" + hold + "' differs from the stored one")
+        ok = ok && step
+        log("HOLD '" + hold + "'")
+
         display_result(ok)
     endFunction
 

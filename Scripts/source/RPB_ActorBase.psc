@@ -444,10 +444,10 @@ function ModTotalBountyForFaction(Faction akFaction, int aiAmountBy)
     int activeBounty = self.GetActiveBountyForFaction(akFaction)
 
     if (activeBounty == 0)
-        RPB_StorageVars.SetIntOnReference("Previous Active Bounty", this, 0, "Temporary")
+        RPB_StorageVars.SetIntOnReference("Previous Active Bounty", self.__GetRefKey(), 0, "Temporary")
     endif
 
-    int previousActiveBounty = RPB_StorageVars.GetIntOnReference("Previous Active Bounty", this, "Temporary")
+    int previousActiveBounty = RPB_StorageVars.GetIntOnReference("Previous Active Bounty", self.__GetRefKey(), "Temporary")
 
     if (previousActiveBounty > 0)
         RPB_ActorVars.ModTotalBounty(akFaction, this, (Max(previousActiveBounty, aiAmountBy) - Min(previousActiveBounty, aiAmountBy)) as int)
@@ -456,7 +456,7 @@ function ModTotalBountyForFaction(Faction akFaction, int aiAmountBy)
     endif
 
     ; Store the previous bounty
-    RPB_StorageVars.SetIntOnReference("Previous Active Bounty", this, activeBounty, "Temporary")
+    RPB_StorageVars.SetIntOnReference("Previous Active Bounty", self.__GetRefKey(), activeBounty, "Temporary")
 endFunction
 
 
@@ -769,7 +769,7 @@ endFunction
 ;                           Getters
 bool function GetBool(string asVarName, string asVarCategory = "Actor")
     string category = self.GetScriptVarCategory(asVarCategory)
-    return RPB_StorageVars.GetBoolOnReference(asVarName, this, category)
+    return RPB_StorageVars.GetBoolOnReference(asVarName, self.__GetRefKey(), category)
 endFunction
 
 ; Alias for GetBool() to check a condition
@@ -799,34 +799,34 @@ endFunction
 
 int function GetInt(string asVarName, string asVarCategory = "Actor")
     string category = self.GetScriptVarCategory(asVarCategory)
-    return RPB_StorageVars.GetIntOnReference(asVarName, this, category)
+    return RPB_StorageVars.GetIntOnReference(asVarName, self.__GetRefKey(), category)
 endFunction
 
 float function GetFloat(string asVarName, string asVarCategory = "Actor")
     string category = self.GetScriptVarCategory(asVarCategory)
-    return RPB_StorageVars.GetFloatOnReference(asVarName, this, category)
+    return RPB_StorageVars.GetFloatOnReference(asVarName, self.__GetRefKey(), category)
 endFunction
 
 string function GetString(string asVarName, string asVarCategory = "Actor")
     string category = self.GetScriptVarCategory(asVarCategory)
-    return RPB_StorageVars.GetStringOnReference(asVarName, this, category)
+    return RPB_StorageVars.GetStringOnReference(asVarName, self.__GetRefKey(), category)
 endFunction
 
 Form function GetForm(string asVarName, string asVarCategory = "Actor")
     string category = self.GetScriptVarCategory(asVarCategory)
-    return RPB_StorageVars.GetFormOnReference(asVarName, this, category)
+    return RPB_StorageVars.GetFormOnReference(asVarName, self.__GetRefKey(), category)
 endFunction
 
 ObjectReference function GetReference(string asVarName, string asVarCategory = "Actor")
     string category = self.GetScriptVarCategory(asVarCategory)
-    return RPB_StorageVars.GetFormOnReference(asVarName, this, category) as ObjectReference
+    return RPB_StorageVars.GetFormOnReference(asVarName, self.__GetRefKey(), category) as ObjectReference
 endFunction
 
 
 ;                          Setters
 function SetBool(string asVarName, bool abValue, string asVarCategory = "Actor")
     string category = self.GetScriptVarCategory(asVarCategory)
-    RPB_StorageVars.SetBoolOnReference(asVarName, this, abValue, category)
+    RPB_StorageVars.SetBoolOnReference(asVarName, self.__GetRefKey(), abValue, category)
     ; Debug("Actor::SetBool", "["+ self +"] Setting " + asVarName + " on " + this + " to: " + abValue)
 endFunction
 
@@ -835,12 +835,12 @@ function SetInt(string asVarName, int aiValue, string asVarCategory = "Actor", i
 
     ; Clamp the value
     aiValue = ClampInt(aiValue, aiMinValue, aiMaxValue)
-    RPB_StorageVars.SetIntOnReference(asVarName, this, aiValue, category)
+    RPB_StorageVars.SetIntOnReference(asVarName, self.__GetRefKey(), aiValue, category)
 endFunction
 
 function ModInt(string asVarName, int aiValue, string asVarCategory = "Actor")
     string category = self.GetScriptVarCategory(asVarCategory)
-    RPB_StorageVars.ModIntOnReference(asVarName, this, aiValue, category)
+    RPB_StorageVars.ModIntOnReference(asVarName, self.__GetRefKey(), aiValue, category)
     ; Debug("Actor::ModInt", "["+ self +"] Modifying " + asVarName + " on " + this + " by: " + aiValue)
 endFunction
 
@@ -849,43 +849,43 @@ function SetFloat(string asVarName, float afValue, string asVarCategory = "Actor
 
     ; Clamp the value
     afValue = ClampFloat(afValue, afMinValue, afMaxValue)
-    RPB_StorageVars.SetFloatOnReference(asVarName, this, afValue, category)
+    RPB_StorageVars.SetFloatOnReference(asVarName, self.__GetRefKey(), afValue, category)
     ; Debug("Actor::SetFloat", "["+ self +"] Setting " + asVarName + " on " + this + " to: " + afValue)
 endFunction
 
 function ModFloat(string asVarName, float afValue, string asVarCategory = "Actor")
     string category = self.GetScriptVarCategory(asVarCategory)
-    RPB_StorageVars.ModFloatOnReference(asVarName, this, afValue, category)
+    RPB_StorageVars.ModFloatOnReference(asVarName, self.__GetRefKey(), afValue, category)
     ; Debug("Actor::ModFloat", "["+ self +"] Modifying " + asVarName + " on " + this + " by: " + afValue)
 endFunction
 
 function SetString(string asVarName, string asValue, string asVarCategory = "Actor")
     string category = self.GetScriptVarCategory(asVarCategory)
-    RPB_StorageVars.SetStringOnReference(asVarName, this, asValue, category)
+    RPB_StorageVars.SetStringOnReference(asVarName, self.__GetRefKey(), asValue, category)
     ; Debug("Actor::SetString", "["+ self +"] Setting " + asVarName + " on " + this + " to: " + asValue)
 endFunction
 
 function SetForm(string asVarName, Form akValue, string asVarCategory = "Actor")
     string category = self.GetScriptVarCategory(asVarCategory)
-    RPB_StorageVars.SetFormOnReference(asVarName, this, akValue, category)
+    RPB_StorageVars.SetFormOnReference(asVarName, self.__GetRefKey(), akValue, category)
     ; Debug("Actor::SetForm", "["+ self +"] Setting " + asVarName + " on " + this + " to: " + akValue)
 endFunction
 
 function SetReference(string asVarName, ObjectReference akValue, string asVarCategory = "Actor")
     string category = self.GetScriptVarCategory(asVarCategory)
-    RPB_StorageVars.SetFormOnReference(asVarName, this, akValue, category)
+    RPB_StorageVars.SetFormOnReference(asVarName, self.__GetRefKey(), akValue, category)
     ; Debug("Actor::SetReference", "["+ self +"] Setting " + asVarName + " on " + this + " to: " + akValue)
 endFunction
 
 function Remove(string asVarName, string asVarCategory = "Actor")
     string category = self.GetScriptVarCategory(asVarCategory)
-    RPB_StorageVars.DeleteVariableOnReference(asVarName, this, category)
+    RPB_StorageVars.DeleteVariableOnReference(asVarName, self.__GetRefKey(), category)
     ; Debug("Actor::Remove", "["+ self +"] Removing " + asVarName + " from " + this)
 endFunction
 
 function RemoveAll(string asVarCategory = "Actor")
     string category = self.GetScriptVarCategory(asVarCategory)
-    RPB_StorageVars.DeleteCategoryOnReference(this, category)
+    RPB_StorageVars.DeleteCategoryOnReference(self.__GetRefKey(), category)
     ; Debug("Actor::RemoveAll", "["+ self +"] Removing all variables from " + this)
 endFunction
 
@@ -904,6 +904,7 @@ event OnEffectStart(Actor akTarget, Actor akCaster)
     endif
 
     __this = akTarget
+    __refKey = ""
     __isEffectActive = true
 
     ; Assigns the actor for this script, differentiating between Player and NPC to avoid retrieving properties, instead caching it in a local variable to this script
@@ -958,9 +959,9 @@ endEvent
 function Destroy() ; virtual
     ; Debug("("+ Name +") Actor::Destroy", "this " + this + " from script " + self as string)
 
-    ; RPB_StorageVars.DeleteVariableOnReference("Is Initialized", this, "Actor")
-    RPB_StorageVars.DeleteCategoryOnReference(this, "Actor")
-    RPB_StorageVars.DeleteCategoryOnReference(this, "Temporary")
+    ; RPB_StorageVars.DeleteVariableOnReference("Is Initialized", self.__GetRefKey(), "Actor")
+    RPB_StorageVars.DeleteCategoryOnReference(self.__GetRefKey(), "Actor")
+    RPB_StorageVars.DeleteCategoryOnReference(self.__GetRefKey(), "Temporary")
 endFunction
 
 ; ==========================================================
@@ -1043,6 +1044,22 @@ bool property TrackStats
     endFunction
 endProperty
 
+;/
+    The StorageVars reference key of this Actor ("(Reference <id>)"), computed once. Building it from the Actor
+    (cast to a string, checked, sliced, re-concatenated) was most of the cost of every StorageVars read/write
+    (~3.9ms of ~5ms per write). The key is identical to the one StorageVars derives itself, so stored data is unchanged.
+    Reset in OnEffectStart, where the Actor is (re)assigned.
+/;
+string __refKey
+
+string function __GetRefKey()
+    if (__refKey == "")
+        __refKey = RPB_StorageVars.GetReferenceKey(this)
+    endif
+
+    return __refKey
+endFunction
+
 bool property RegisterSleepEvents auto
 
 string property CurrentState
@@ -1060,12 +1077,12 @@ endProperty
 
 bool property IsInitialized
     bool function get()
-        return RPB_StorageVars.GetBoolOnReference("Is Initialized", this, "Actor")
+        return RPB_StorageVars.GetBoolOnReference("Is Initialized", self.__GetRefKey(), "Actor")
         ; return self.GetBool("Is Initialized")
     endFunction
 
     function set(bool value)
-        return RPB_StorageVars.SetBoolOnReference("Is Initialized", this, value, "Actor")
+        return RPB_StorageVars.SetBoolOnReference("Is Initialized", self.__GetRefKey(), value, "Actor")
         ; self.SetBool("Is Initialized", value)
     endFunction
 endProperty

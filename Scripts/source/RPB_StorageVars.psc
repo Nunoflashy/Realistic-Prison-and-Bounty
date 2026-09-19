@@ -218,9 +218,13 @@ string function GetVarPathOnReference(string asKey, string apReference, string a
         return "null"
     endif
 
-    bool isPapyrusReference = String_StartsEndsWith(apReference, "[", "]")
+    ; Cheap first-character check before the full one, so an already-normalized key ("(Reference <id>)") skips it
+    bool isPapyrusReference = false
+    if (StringUtil.GetNthChar(apReference, 0) == "[")
+        isPapyrusReference = String_StartsEndsWith(apReference, "[", "]")
+    endif
 
-    if (apReference && isPapyrusReference)
+    if (isPapyrusReference)
         ;/
              Possible problem:
              referenceType can be different for GET and SET, because only the active script is
@@ -254,6 +258,25 @@ string function GetVarPathOnReference(string asKey, string apReference, string a
         return GetRootPath() + "." + apReference + "." + asKey
     endif
     ; DebugWithArgs("StorageVars::GetVarPathOnReference", "Key: " + asKey + ", Reference: " + apReference + ", Category: " + asCategory, path)
+endFunction
+
+;/
+    Normalizes a reference (as a string) to the key GetVarPathOnReference() stores it under: "(Reference <id>)" for
+    a Papyrus reference string like "[Script < (FF000E02)>]", anything else is returned unchanged. Callers that use
+    the same reference many times can compute this once and pass it as @apReference: the resulting paths are identical.
+/;
+string function GetReferenceKey(string apReference) global
+    if (apReference == "null" || apReference == "")
+        return apReference
+    endif
+
+    if (StringUtil.GetNthChar(apReference, 0) == "[")
+        if (String_StartsEndsWith(apReference, "[", "]"))
+            return "(" + "Reference" + " <" + ExtractReferenceID(apReference) + ">" + ")"
+        endif
+    endif
+
+    return apReference
 endFunction
 
 ;                          Getters

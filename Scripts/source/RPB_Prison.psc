@@ -161,9 +161,15 @@ RPB_API property API
     endFunction
 endProperty
 
+RPB_Config __cachedConfig
+
 RPB_Config property Config
     RPB_Config function get()
-        return API.Config
+        if (!__cachedConfig)
+            __cachedConfig = API.Config
+        endif
+
+        return __cachedConfig
     endFunction
 endProperty
 
@@ -202,11 +208,26 @@ Faction property PrisonFaction
     endFunction
 endProperty
 
+; Every Prison.X setting getter is Config.Is/Get...(Hold), so this getter runs on every MCM-backed read. Reading it
+; from StorageVars builds a full path each time (~4ms), which was ~60% of a setting read; it never changes once set.
+string __cachedHold
+
 string property Hold
     string function get()
-        return self.GetLocalPropertyOfTypeString("Hold")
+        if (__cachedHold == "")
+            __cachedHold = self.GetLocalPropertyOfTypeString("Hold")
+        endif
+
+        return __cachedHold
     endFunction
 endProperty
+
+;/
+    Forgets the cached Hold, to be called after the "Hold" local property is (re)written.
+/;
+function ResetCachedHold()
+    __cachedHold = ""
+endFunction
 
 string property City
     string function get()
