@@ -82,6 +82,7 @@ function SetTests()
     self.AddTest("50 - Await: What the Effect Start Needs (settle / disabled)", "Test_Await_EffectStartPrerequisites", abChainable = false)
     self.AddTest("51 - Await: Group Flow, Sequential API vs Burst (N=5)", "Test_Await_GroupFlow", abChainable = false)
     self.AddTest("52 - Await: After the Fast-Polling / Unloaded-Actor / None-Safety Fixes", "Test_Await_AfterFixes", abChainable = false)
+    self.AddTest("53 - Await: A Stale 'Initialized' Flag Blocks Prisoner Registration", "Test_Await_StaleInitializedFlag", abChainable = false)
     self.AddTest("41 - ActiveMagicEffectContainer: Stuck Lock Self-Heals", "Test_ActiveMagicEffectContainer_StuckLockSelfHeals")
     self.AddTest("42 - ThreadLock: JAtomic Primitive Semantics and Registry", "Test_ThreadLock_PrimitiveSemantics")
     ; Not chainable: fires concurrent worker threads
@@ -3597,6 +3598,68 @@ state Test_Await_AfterFixes
     endFunction
 endState
 
+;/
+    Deterministic proof of what was making tests 22/23/24/47/48 stall after other tests had run.
+    RPB_Prisoner.OnInitialize() returns before registering when the "Initialized" StorageVars flag
+    (category "Jail") is already true. That flag is keyed by the actor's reference string and was left
+    behind by an earlier, deleted temp actor with the same recycled FormID. Here the same stale flag is
+    planted by hand on a fresh, loaded actor:
+      1. with the flag set, adding the prisoner spell must NOT register the actor (4s watch);
+      2. remove the spell, wipe the actor's state, add the spell again: it must register promptly.
+    If (1) registers anyway, the theory is wrong and the failure message says so.
+/;
+state Test_Await_StaleInitializedFlag
+    function Setup()
+        RPB_Prison prison = (RPB_API.GetPrisonManager()).GetPrison("Haafingar")
+        bool ok = true
+        bool step = false
+
+        Actor a = __SpawnTempActor()
+        RPB_StorageVars.SetBoolOnReference("Initialized", a, true, "Jail")
+        step = assert_true(RPB_StorageVars.GetBoolOnReference("Initialized", a, "Jail"), "Could not plant the stale 'Initialized' flag")
+        ok = ok && step
+
+        self.__EnsureKind("prisoner", a, prison)
+        float t0 = Utility.GetCurrentRealTime()
+        RPB_ActorBase reg = none
+        while (!reg && (Utility.GetCurrentRealTime() - t0) < 4.0)
+            reg = self.__LookupKind("prisoner", a, prison)
+            if (!reg)
+                Utility.Wait(0.05)
+            endif
+        endWhile
+        log("STALE FLAG: with 'Initialized' already true, registration after 4s watch -> " + reg + " (expected: not registered)")
+        step = assert_true(reg == none, "The actor registered even though 'Initialized' was already true - the stale-flag theory does not hold")
+        ok = ok && step
+
+        ; Cure: take the spell off, wipe the actor's state, add the spell again
+        a.RemoveSpell(RPB_Utility.RPB_PrisonerSpell())
+        Utility.Wait(0.5)
+        RPB_StorageVars.DeleteAllOnReference(a)
+        step = assert_false(RPB_StorageVars.GetBoolOnReference("Initialized", a, "Jail"), "Wiping the actor's state did not clear the flag")
+        ok = ok && step
+
+        self.__EnsureKind("prisoner", a, prison)
+        t0 = Utility.GetCurrentRealTime()
+        reg = none
+        while (!reg && (Utility.GetCurrentRealTime() - t0) < 8.0)
+            reg = self.__LookupKind("prisoner", a, prison)
+            if (!reg)
+                Utility.Wait(0.05)
+            endif
+        endWhile
+        log("STALE FLAG: after wiping the state and re-adding the spell, registered after " + self.__Ms(Utility.GetCurrentRealTime() - t0) + "ms -> " + reg)
+        step = assert_true(reg != none, "The actor still did not register after the stale state was wiped")
+        ok = ok && step
+
+        display_result(ok)
+    endFunction
+
+    function Teardown()
+        __TeardownAllTempActors()
+    endFunction
+endState
+
 ; ==========================================================
 ;   ActiveMagicEffectContainer / ActorList hierarchy tests
 ;
@@ -4809,6 +4872,10 @@ Actor function __SpawnTempActor()
     __testTempActors[__testTempActorCount] = temp
     __testTempActorCount += 1
 
+    ; This base has an AI package that walks the NPC off to Castle Dour, where its 3D unloads (and an
+    ; unloaded actor can't get its spell effect started). Freeze it in place: it is only a test dummy.
+    temp.EnableAI(false)
+
     ; A temp actor whose 3D never loads can't get its spell effect started, so nothing registers and the
     ; test would sit in an await (this was the 23/24/48 "hang"). Give it a bounded time to load and say so
     ; loudly at the START of the test, together with where the player is, instead of stalling later.
@@ -4861,9 +4928,26 @@ function __LogTempActorProbe(Actor akTemp)
     RPB_Prison solitudePrison = (RPB_API.GetPrisonManager()).GetPrison("Haafingar")
     RPB_Arrest arrest = RPB_API.GetArrest()
 
-    log("PROBE " + akTemp + " | 3D loaded " + akTemp.Is3DLoaded() + ", cell " + akTemp.GetParentCell() + " | StorageVars 'Is Initialized' " + RPB_StorageVars.GetBoolOnReference("Is Initialized", akTemp, "Actor") + \
-        " | has spells: prisoner " + akTemp.HasSpell(RPB_Utility.RPB_PrisonerSpell()) + ", arrestee " + akTemp.HasSpell(RPB_Utility.RPB_ArresteeSpell()) + ", captor " + akTemp.HasSpell(RPB_Utility.RPB_CaptorSpell()) + \
-        " | already in a list: prisoners " + (solitudePrison.Prisoners.AtKey(akTemp) != none) + ", arrestees " + (arrest.Arrestees.AtKey(akTemp) != none) + ", captors " + (arrest.Captors.AtKey(akTemp) != none) + ", tracked " + (RPB_API.GetActorListForTrackedActors().AtKeyEx(akTemp) != none))
+    ; The flags that matter for registration: RPB_Prisoner.OnInitialize() returns BEFORE registering when
+    ; Was("Initialized") is true (category "Jail" for prisoners, "Arrest" for arrestees, "Captor" for captors),
+    ; and it is keyed by the reference string, so it survives a deleted temp actor and hits the next one that
+    ; gets the same FormID. ("Is Initialized" in category "Actor" is a different flag, set at the end of OnEffectStart.)
+    bool initJail = RPB_StorageVars.GetBoolOnReference("Initialized", akTemp, "Jail")
+    bool initArrest = RPB_StorageVars.GetBoolOnReference("Initialized", akTemp, "Arrest")
+    bool initCaptor = RPB_StorageVars.GetBoolOnReference("Initialized", akTemp, "Captor")
+    bool isInitActor = RPB_StorageVars.GetBoolOnReference("Is Initialized", akTemp, "Actor")
+    bool hasSpell = akTemp.HasSpell(RPB_Utility.RPB_PrisonerSpell()) || akTemp.HasSpell(RPB_Utility.RPB_ArresteeSpell()) || akTemp.HasSpell(RPB_Utility.RPB_CaptorSpell())
+    bool inList = solitudePrison.Prisoners.AtKey(akTemp) != none || arrest.Arrestees.AtKey(akTemp) != none || arrest.Captors.AtKey(akTemp) != none || RPB_API.GetActorListForTrackedActors().AtKeyEx(akTemp) != none
+
+    bool clean = akTemp.Is3DLoaded() && !initJail && !initArrest && !initCaptor && !hasSpell && !inList
+    if (clean)
+        log("PROBE clean " + akTemp + " (3D loaded, no leftover state" + self.__StringIf(isInitActor, ", 'Is Initialized' TRUE (harmless)") + ")")
+    else
+        log("PROBE UNUSUAL " + akTemp + " | 3D loaded " + akTemp.Is3DLoaded() + ", cell " + akTemp.GetParentCell() + \
+            " | STALE 'Initialized': Jail " + initJail + ", Arrest " + initArrest + ", Captor " + initCaptor + " ('Is Initialized' " + isInitActor + ")" + \
+            " | spells: prisoner " + akTemp.HasSpell(RPB_Utility.RPB_PrisonerSpell()) + ", arrestee " + akTemp.HasSpell(RPB_Utility.RPB_ArresteeSpell()) + ", captor " + akTemp.HasSpell(RPB_Utility.RPB_CaptorSpell()) + \
+            " | already in a list: prisoners " + (solitudePrison.Prisoners.AtKey(akTemp) != none) + ", arrestees " + (arrest.Arrestees.AtKey(akTemp) != none) + ", captors " + (arrest.Captors.AtKey(akTemp) != none) + ", tracked " + (RPB_API.GetActorListForTrackedActors().AtKeyEx(akTemp) != none))
+    endif
 endFunction
 
 ;/
@@ -4876,6 +4960,7 @@ function __TeardownAllTempActors()
     RPB_Prison solitudePrison = (RPB_API.GetPrisonManager()).GetPrison("Haafingar")
     RPB_Arrest arrest = RPB_API.GetArrest()
 
+    ; Pass 1: unregister, and take the spells off so the effects finish
     int i = 0
     while (i < __testTempActorCount)
         Actor tempActor = __testTempActors[i]
@@ -4896,8 +4981,30 @@ function __TeardownAllTempActors()
                 arrest.UnregisterCaptor(captorRef, true)
             endif
 
-            tempActor.Disable()
-            tempActor.Delete()
+            tempActor.RemoveSpell(RPB_Utility.RPB_PrisonerSpell())
+            tempActor.RemoveSpell(RPB_Utility.RPB_ArresteeSpell())
+            tempActor.RemoveSpell(RPB_Utility.RPB_CaptorSpell())
+        endif
+
+        i += 1
+    endWhile
+
+    if (__testTempActorCount > 0)
+        ; Let the effects' finish/destroy handlers run before wiping (they can write state themselves)
+        Utility.Wait(0.5)
+    endif
+
+    ; Pass 2: wipe every StorageVars category for the temp actor and delete it. UnregisterPrisoner() alone
+    ; never called Destroy(), so an initialized prisoner's "Initialized" flag survived the deleted actor and
+    ; blocked registration of the next temp actor with the same (recycled) FormID - the 23/24/47/48 "hangs".
+    i = 0
+    while (i < __testTempActorCount)
+        Actor tempActor2 = __testTempActors[i]
+
+        if (tempActor2)
+            RPB_StorageVars.DeleteAllOnReference(tempActor2)
+            tempActor2.Disable()
+            tempActor2.Delete()
         endif
 
         i += 1
