@@ -3089,6 +3089,8 @@ state Test_ActorList_Add_And_Retrieve
         RPB_Prison solitudePrison = (RPB_API.GetPrisonManager()).GetPrison("Haafingar")
         RPB_Arrest arrest = RPB_API.GetArrest()
 
+        __LogRuntimeState("test 22 start")
+
         Actor tempArrestee = __SpawnTempActor()
         Actor tempCaptor   = __SpawnTempActor()
         Actor tempPrisoner = __SpawnTempActor()
@@ -3141,6 +3143,7 @@ state Test_ActorList_Multiple_And_GetKeys
         ; log shows exactly where it stopped. A None result from an await is checked before use
         ; instead of letting a later call on it raise a runtime error that aborts the test.
         log("T23 start, Prisoners.Count at start = " + solitudePrison.Prisoners.Count)
+        __LogRuntimeState("test 23 start")
 
         Actor tempA = __SpawnTempActor()
         log("T23 spawned A " + tempA)
@@ -3190,18 +3193,32 @@ state Test_ActorList_Remove_And_Reindex
     function Setup()
         RPB_Prison solitudePrison = (RPB_API.GetPrisonManager()).GetPrison("Haafingar")
 
+        ; BREADCRUMBS: this test has been seen to stop silently inside the first await after other
+        ; tests ran; the last "T24" line shows where, and the STATE/PROBE lines show what was around
+        log("T24 start")
+        __LogRuntimeState("test 24 start")
+
         Actor tempA = __SpawnTempActor()
+        log("T24 spawned A " + tempA + ", awaiting")
+        float benchA = StartBenchmark()
         RPB_Prisoner prisonerA = solitudePrison.AwaitPrisonerReference(tempA)
+        log("T24 await A returned " + prisonerA + " after " + EndBenchmark(benchA, "T24 await A") + "ms")
         log("After adding A: Count=" + solitudePrison.Prisoners.Count + ", Keys=" + solitudePrison.Prisoners.GetKeys())
         Utility.Wait(1.0)
 
         Actor tempB = __SpawnTempActor()
+        log("T24 spawned B " + tempB + ", awaiting")
+        float benchB = StartBenchmark()
         RPB_Prisoner prisonerB = solitudePrison.AwaitPrisonerReference(tempB)
+        log("T24 await B returned " + prisonerB + " after " + EndBenchmark(benchB, "T24 await B") + "ms")
         log("After adding B: Count=" + solitudePrison.Prisoners.Count + ", Keys=" + solitudePrison.Prisoners.GetKeys())
         Utility.Wait(1.0)
 
         Actor tempC = __SpawnTempActor()
+        log("T24 spawned C " + tempC + ", awaiting")
+        float benchC = StartBenchmark()
         RPB_Prisoner prisonerC = solitudePrison.AwaitPrisonerReference(tempC)
+        log("T24 await C returned " + prisonerC + " after " + EndBenchmark(benchC, "T24 await C") + "ms")
         log("After adding C: Count=" + solitudePrison.Prisoners.Count + ", Keys=" + solitudePrison.Prisoners.GetKeys())
         ; Same breathing-room fix as between Adds - RemoveSpell()/OnEffectFinish()/OnDestroy()
         ; is its own engine-queued operation, no different from an Add in that respect, and
@@ -4257,7 +4274,49 @@ Actor function __SpawnTempActor()
     __testTempActors[__testTempActorCount] = temp
     __testTempActorCount += 1
 
+    __LogTempActorProbe(temp)
+
     return temp
+endFunction
+
+; ----------------------------------------------------------
+;   Diagnostics for the 23/24 hangs (tests that stop somewhere in AwaitPrisonerReference after
+;   other tests have run, and pass again after reloading an earlier save). They only LOG: what
+;   the lists and their thread locks look like, and whether a freshly spawned temp actor - whose
+;   FormID is recycled from an earlier, deleted one - arrives with leftovers. The last STATE/PROBE
+;   lines before a hang say which of "a list isn't empty", "a lock was left held" or "the actor
+;   already had state" applies, or that none do (then it's the engine's spell/effect queue).
+; ----------------------------------------------------------
+
+;/ "name count N lock free|HELD" for one container. The lock word is read without taking the lock. /;
+string function __ContainerStateString(string asName, RPB_ActiveMagicEffectContainer apContainer)
+    string lockState = "free"
+    if (JMap.getInt(apContainer.DebugGetThreadLockHandle(), "locked") != 0)
+        lockState = "HELD"
+    endif
+
+    return asName + " " + apContainer.Count + " (lock " + lockState + ")"
+endFunction
+
+function __LogRuntimeState(string asLabel)
+    RPB_Prison solitudePrison = (RPB_API.GetPrisonManager()).GetPrison("Haafingar")
+    RPB_Arrest arrest = RPB_API.GetArrest()
+
+    log("STATE [" + asLabel + "] t=" + (Utility.GetCurrentRealTime() as int) + "s | " + \
+        __ContainerStateString("tracked", RPB_API.GetActorListForTrackedActors() as RPB_ActiveMagicEffectContainer) + " | " + \
+        __ContainerStateString("arrestees", arrest.Arrestees as RPB_ActiveMagicEffectContainer) + " | " + \
+        __ContainerStateString("captors", arrest.Captors as RPB_ActiveMagicEffectContainer) + " | " + \
+        __ContainerStateString("haafingar prisoners", solitudePrison.Prisoners as RPB_ActiveMagicEffectContainer))
+endFunction
+
+;/ Does this freshly spawned temp actor already carry state from an earlier, deleted actor with the same FormID? /;
+function __LogTempActorProbe(Actor akTemp)
+    RPB_Prison solitudePrison = (RPB_API.GetPrisonManager()).GetPrison("Haafingar")
+    RPB_Arrest arrest = RPB_API.GetArrest()
+
+    log("PROBE " + akTemp + " | StorageVars 'Is Initialized' " + RPB_StorageVars.GetBoolOnReference("Is Initialized", akTemp, "Actor") + \
+        " | has spells: prisoner " + akTemp.HasSpell(RPB_Utility.RPB_PrisonerSpell()) + ", arrestee " + akTemp.HasSpell(RPB_Utility.RPB_ArresteeSpell()) + ", captor " + akTemp.HasSpell(RPB_Utility.RPB_CaptorSpell()) + \
+        " | already in a list: prisoners " + (solitudePrison.Prisoners.AtKey(akTemp) != none) + ", arrestees " + (arrest.Arrestees.AtKey(akTemp) != none) + ", captors " + (arrest.Captors.AtKey(akTemp) != none) + ", tracked " + (RPB_API.GetActorListForTrackedActors().AtKeyEx(akTemp) != none))
 endFunction
 
 ;/

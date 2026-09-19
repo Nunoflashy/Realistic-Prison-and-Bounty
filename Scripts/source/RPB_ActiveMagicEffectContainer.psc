@@ -800,6 +800,14 @@ function DebugSimulateStuckLock()
 endFunction
 
 ;/
+    TEST HOOK ONLY. This container's thread lock handle, so a test can look at the lock word
+    (0 = free, 1 = held) without taking it - e.g. to see whether an earlier test left it held.
+/;
+int function DebugGetThreadLockHandle()
+    return self.__GetThreadLock()
+endFunction
+
+;/
     TEST HOOK ONLY. Puts this alias into the exact state an alias saved before __indexToKey
     existed loads into (valid __keyToIndex and __count, __indexToKey unset) so the migration
     path in __EnsureInitialized() can be exercised in-game without needing an old save. The
