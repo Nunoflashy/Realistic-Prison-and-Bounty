@@ -385,6 +385,15 @@ function FastMap_Clear(int map) global
     JValue.clear(map)
 endFunction
 
+;/
+    Releases one object created with FastMap(retain = true), undoing that retain. Not the same
+    as __releaseAll(), which drops EVERY object retained under the RPB_MEMORY tag (including
+    live container bookkeeping) and must never be used to clean up a single map.
+/;
+function FastMap_Release(int map) global
+    JValue.release(map)
+endFunction
+
 string function FastMap_GetNthKey(int map, int index) global
     return JMap.getNthKey(map, index)
 endFunction
