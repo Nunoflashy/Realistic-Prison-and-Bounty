@@ -69,6 +69,12 @@ function SetTests()
     self.AddTest("35 - Benchmark: Function Size vs Call Cost", "Benchmark_FunctionSizeCallCost", abChainable = false)
     ; Not chainable: fills the container to its full 1024-entry capacity, takes a while
     self.AddTest("36 - ActiveMagicEffectContainer: Full Capacity (All 32 Pages)", "Test_ActiveMagicEffectContainer_FullCapacity", abChainable = false)
+    self.AddTest("37 - ActiveMagicEffectContainer: Real Payload Identity Through Swaps", "Test_ActiveMagicEffectContainer_PayloadIdentity")
+    self.AddTest("38 - ActiveMagicEffectContainer: Duplicate and Missing Keys", "Test_ActiveMagicEffectContainer_DuplicateAndMissingKeys")
+    ; Not chainable: fires concurrent worker threads at the live ArresteeList, must start empty
+    self.AddTest("39 - ActiveMagicEffectContainer: Concurrent Access (8 Worker Threads)", "Test_ActiveMagicEffectContainer_ConcurrentAccess", abChainable = false)
+    self.AddTest("40 - ActiveMagicEffectContainer: No Per-Operation JContainers Allocation", "Test_ActiveMagicEffectContainer_HandleStability")
+    self.AddTest("41 - ActiveMagicEffectContainer: Stuck Lock Self-Heals", "Test_ActiveMagicEffectContainer_StuckLockSelfHeals")
 endFunction
 
 state Test_25Days_After_26th_Frostfall_Is_20th_Suns_Dusk
@@ -743,6 +749,11 @@ state Benchmark_RawJMap_vs_FastMap
         endWhile
         int fastElapsed = EndBenchmark(fastBench, "FastMap: " + ITERATIONS + " Set+HasKey+Get+Remove cycles")
 
+        ; Retained above for the timing loops only - release so repeated runs don't leave
+        ; permanent objects behind in the save
+        JValue.release(rawMap)
+        FastMap_Release(fastMap)
+
         log("Raw JMap: " + rawElapsed + " ms, FastMap: " + fastElapsed + " ms, difference: " + (fastElapsed - rawElapsed) + " ms")
         Debug.Notification("Raw: " + rawElapsed + "ms, FastMap: " + fastElapsed + "ms")
 
@@ -916,6 +927,9 @@ state Benchmark_PageDispatch_32x32_vs_128x8
         endWhile
         int bElapsed = EndBenchmark(bBench, "128-size pages (8 pages): " + ENTRIES + " adds")
 
+        FastMap_Release(aKeyToIndex)
+        FastMap_Release(bKeyToIndex)
+
         log("32x32: " + aElapsed + " ms, 128x8: " + bElapsed + " ms, delta: " + (aElapsed - bElapsed) + " ms")
         Debug.Notification("32x32: " + aElapsed + "ms, 128x8: " + bElapsed + "ms, delta: " + (aElapsed - bElapsed) + "ms")
 
@@ -1003,6 +1017,9 @@ state Benchmark_FindKeyForIndexScanCost
             i += 1
         endWhile
         int directElapsed = EndBenchmark(directBench, "Direct removal: " + ENTRIES + " removes, no scan")
+
+        FastMap_Release(mapA)
+        FastMap_Release(mapB)
 
         log("Scan-based: " + scanElapsed + " ms, Direct: " + directElapsed + " ms, scan cost: " + (scanElapsed - directElapsed) + " ms")
         Debug.Notification("Scan-based: " + scanElapsed + "ms, Direct: " + directElapsed + "ms, scan cost: " + (scanElapsed - directElapsed) + "ms")
@@ -2130,6 +2147,577 @@ state Test_ActiveMagicEffectContainer_FullCapacity
 endState
 
 ; ==========================================================
+;   ActiveMagicEffectContainer: state-integrity tests (payload identity, duplicate/missing
+;   keys, concurrent access, JContainers handle stability)
+;
+;   Tests 30-36 use a None payload, so they prove keys/indices/Count but not that the actual
+;   ActiveMagicEffect follows its key. These close that gap and the "no overwrite, no lost
+;   entry" questions, on the live ArresteeList with synthetic keys.
+; ==========================================================
+
+;/
+    Asserts that for every key marked present in @abPresent, the container returns exactly the
+    payload the shadow model expects: key i must carry @apPayloads[i % apPayloads.Length]. A swap
+    that moved the wrong payload, or an Add that overwrote another key's payload, fails here
+    even when Count, keys and both index maps all look fine.
+/;
+bool function __ContainerPayloadsMatch(RPB_ActiveMagicEffectContainer apContainer, bool[] abPresent, string asKeyPrefix, ActiveMagicEffect[] apPayloads, string asStage)
+    int mismatches = 0
+    string firstMismatch = ""
+    ActiveMagicEffect found = none
+
+    int i = 0
+    while (i < abPresent.Length)
+        if (abPresent[i])
+            found = apContainer.GetAt(asKeyPrefix + i)
+            if (found != apPayloads[i % apPayloads.Length])
+                mismatches += 1
+                if (firstMismatch == "")
+                    firstMismatch = asKeyPrefix + i
+                endif
+            endif
+        endif
+        i += 1
+    endWhile
+
+    return assert_true(mismatches == 0, "Payload mismatch " + asStage + ": " + mismatches + " key(s) returned the wrong ActiveMagicEffect, first: " + firstMismatch)
+endFunction
+
+;/
+    Same churn as test 30 (deterministic, shadow-modelled, crossing page boundaries), but every
+    entry carries one of three REAL ActiveMagicEffects (RPB_Arrestee instances from three
+    disposable actors), assigned cyclically. After each checkpoint every present key must
+    return exactly its own effect.
+/;
+state Test_ActiveMagicEffectContainer_PayloadIdentity
+    function Setup()
+        RPB_Arrest arrest = RPB_API.GetArrest()
+        RPB_ActiveMagicEffectContainer _container = API.Arrest.GetAliasByName("ArresteeList") as RPB_ActiveMagicEffectContainer
+
+        ; Spacing between registrations: same engine-queue courtesy as tests 23/24
+        Actor tempA = __SpawnTempActor()
+        RPB_Arrestee arresteeA = arrest.AwaitArresteeReference(tempA)
+        Utility.Wait(1.0)
+        Actor tempB = __SpawnTempActor()
+        RPB_Arrestee arresteeB = arrest.AwaitArresteeReference(tempB)
+        Utility.Wait(1.0)
+        Actor tempC = __SpawnTempActor()
+        RPB_Arrestee arresteeC = arrest.AwaitArresteeReference(tempC)
+
+        if (!assert_true(arresteeA != none && arresteeB != none && arresteeC != none, "Could not obtain three real Arrestee effects to use as payloads"))
+            display_result(false)
+            return
+        endif
+
+        ActiveMagicEffect[] payloads = new ActiveMagicEffect[3]
+        payloads[0] = arresteeA
+        payloads[1] = arresteeB
+        payloads[2] = arresteeC
+
+        int startCount = _container.Count
+        int ENTRIES = 70
+        string PREFIX = "PayloadTest_"
+        bool ok = true
+        bool step = false
+        bool[] present = new bool[70]
+
+        int i = 0
+        while (i < ENTRIES)
+            _container.AddElement(payloads[i % 3], PREFIX + i)
+            present[i] = true
+            i += 1
+        endWhile
+        step = self.__ContainerPayloadsMatch(_container, present, PREFIX, payloads, "after " + ENTRIES + " appends")
+        ok = ok && step
+
+        ; Front removal (swap from the end), current-last removal (no swap), middle removal
+        _container.RemoveElement(PREFIX + 0, dispel = false)
+        present[0] = false
+        _container.RemoveElement(PREFIX + 68, dispel = false)
+        present[68] = false
+        _container.RemoveElement(PREFIX + 33, dispel = false)
+        present[33] = false
+        step = self.__ContainerPayloadsMatch(_container, present, PREFIX, payloads, "after the three targeted removals")
+        ok = ok && step
+
+        int seed = 24680
+        int slot = 0
+        int op = 0
+        while (op < 150)
+            seed = (seed * 75 + 74) % 65537
+            slot = seed % ENTRIES
+
+            if (present[slot])
+                _container.RemoveElement(PREFIX + slot, dispel = false)
+                present[slot] = false
+            else
+                _container.AddElement(payloads[slot % 3], PREFIX + slot)
+                present[slot] = true
+            endif
+
+            op += 1
+            if ((op % 15) == 0)
+                step = self.__ContainerPayloadsMatch(_container, present, PREFIX, payloads, "during churn, after op " + op)
+                ok = ok && step
+                step = self.__AssertContainerInSync(_container, "during churn, after op " + op)
+                ok = ok && step
+            endif
+        endWhile
+
+        ; Drain - every removal must leave the remaining keys' payloads intact
+        i = 0
+        while (i < ENTRIES)
+            if (present[i])
+                _container.RemoveElement(PREFIX + i, dispel = false)
+                present[i] = false
+                if ((i % 10) == 0)
+                    step = self.__ContainerPayloadsMatch(_container, present, PREFIX, payloads, "during drain, after removing " + i)
+                    ok = ok && step
+                endif
+            endif
+            i += 1
+        endWhile
+
+        step = assert_true(_container.Count == startCount, "Container did not return to its original Count after cleanup, got " + _container.Count)
+        ok = ok && step
+        step = self.__AssertContainerInSync(_container, "after draining")
+        ok = ok && step
+
+        display_result(ok)
+    endFunction
+
+    function Teardown()
+        __TeardownAllTempActors()
+    endFunction
+endState
+
+;/
+    "No overwrites": adding a key that already exists must leave the container, the existing
+    payload and Count exactly as they were (the container logs an "already exists" error for
+    each rejected Add, on purpose); removing a key that doesn't exist must be a no-op; and
+    Add/Remove of the same key over and over must never leave stale state behind (a re-added key
+    returns its NEW payload, not the previous one).
+/;
+state Test_ActiveMagicEffectContainer_DuplicateAndMissingKeys
+    function Setup()
+        RPB_Arrest arrest = RPB_API.GetArrest()
+        RPB_ActiveMagicEffectContainer _container = API.Arrest.GetAliasByName("ArresteeList") as RPB_ActiveMagicEffectContainer
+
+        Actor tempA = __SpawnTempActor()
+        RPB_Arrestee arresteeA = arrest.AwaitArresteeReference(tempA)
+        Utility.Wait(1.0)
+        Actor tempB = __SpawnTempActor()
+        RPB_Arrestee arresteeB = arrest.AwaitArresteeReference(tempB)
+
+        if (!assert_true(arresteeA != none && arresteeB != none, "Could not obtain two real Arrestee effects to use as payloads"))
+            display_result(false)
+            return
+        endif
+
+        int startCount = _container.Count
+        bool ok = true
+        bool step = false
+
+        ; --- duplicate Add must not overwrite ---
+        _container.AddElement(arresteeA, "DupTest")
+        step = assert_true(_container.Count == startCount + 1, "Count should be startCount + 1 after the first Add, got " + _container.Count)
+        ok = ok && step
+        step = assert_true(_container.GetAt("DupTest") == arresteeA, "First Add did not store the expected payload")
+        ok = ok && step
+
+        _container.AddElement(arresteeB, "DupTest")
+        step = assert_true(_container.Count == startCount + 1, "A duplicate Add changed Count to " + _container.Count)
+        ok = ok && step
+        step = assert_true(_container.GetAt("DupTest") == arresteeA, "A duplicate Add OVERWROTE the existing payload")
+        ok = ok && step
+        step = self.__AssertContainerInSync(_container, "after a rejected duplicate Add")
+        ok = ok && step
+
+        ; --- removing a key that isn't there is a no-op ---
+        _container.RemoveElement("DupTest_DoesNotExist", dispel = false)
+        step = assert_true(_container.Count == startCount + 1, "Removing a missing key changed Count to " + _container.Count)
+        ok = ok && step
+        step = assert_true(_container.GetAt("DupTest") == arresteeA, "Removing a missing key disturbed an existing entry")
+        ok = ok && step
+
+        ; --- remove, then a second remove of the same key is a no-op ---
+        _container.RemoveElement("DupTest", dispel = false)
+        step = assert_true(_container.Count == startCount, "Count should be back to startCount after Remove, got " + _container.Count)
+        ok = ok && step
+        step = assert_true(!_container.HasKey("DupTest") && _container.GetAt("DupTest") == none, "Removed key is still retrievable")
+        ok = ok && step
+        _container.RemoveElement("DupTest", dispel = false)
+        step = assert_true(_container.Count == startCount, "A second Remove of the same key changed Count to " + _container.Count)
+        ok = ok && step
+
+        ; --- same key, 50 add/remove cycles with alternating payloads: no stale state ---
+        int i = 0
+        ActiveMagicEffect expected = none
+        while (i < 50)
+            if ((i % 2) == 0)
+                expected = arresteeA
+            else
+                expected = arresteeB
+            endif
+
+            _container.AddElement(expected, "DupTestCycle")
+            if (_container.GetAt("DupTestCycle") != expected || _container.Count != startCount + 1)
+                step = assert_true(false, "Cycle " + i + ": re-added key returned the wrong payload or Count is off (Count " + _container.Count + ")")
+                ok = false
+                i = 50 ; stop early, the state is already known bad
+            else
+                _container.RemoveElement("DupTestCycle", dispel = false)
+                i += 1
+            endif
+        endWhile
+
+        step = assert_true(_container.Count == startCount, "Container did not return to its original Count, got " + _container.Count)
+        ok = ok && step
+        step = self.__AssertContainerInSync(_container, "after the add/remove cycles")
+        ok = ok && step
+
+        display_result(ok)
+    endFunction
+
+    function Teardown()
+        __TeardownAllTempActors()
+    endFunction
+endState
+
+; ----------------------------------------------------------
+;   Concurrency: several worker threads hit one container at once
+;
+;   Papyrus can switch between threads whenever a script makes a call, and AddElement/
+;   RemoveElement are multi-step (read Count, write a slot, write two maps, bump Count). Two
+;   actors registering in the same window could read the same Count and overwrite each other.
+;   Worker threads here are separate stacks: the test fires the same SKSE mod event once per
+;   worker, and each delivery runs OnConcurrencyWorker on its own stack, all against the same
+;   container.
+; ----------------------------------------------------------
+
+RPB_ActiveMagicEffectContainer __concurrencyContainer
+bool[] __concurrencyDone
+int __concurrencyOpsPerWorker = 20
+
+event OnConcurrencyWorker(string asEventName, string asMode, float afWorkerIndex, Form akSender)
+    int worker = afWorkerIndex as int
+    int ops = __concurrencyOpsPerWorker
+    int i = 0
+
+    while (i < ops)
+        if (asMode == "add")
+            __concurrencyContainer.AddElement(none, "Concurrent_" + worker + "_" + i)
+        elseif (asMode == "remove")
+            __concurrencyContainer.RemoveElement("Concurrent_" + worker + "_" + i, dispel = false)
+        else ; "mixed": add key i, then remove this worker's key from 5 iterations ago
+            __concurrencyContainer.AddElement(none, "Concurrent_" + worker + "_" + i)
+            if (i >= 5)
+                __concurrencyContainer.RemoveElement("Concurrent_" + worker + "_" + (i - 5), dispel = false)
+            endif
+        endif
+        i += 1
+    endWhile
+
+    ; Each worker only ever writes its own slot - no shared counter to race on
+    __concurrencyDone[worker] = true
+endEvent
+
+;/
+    Starts @aiWorkers workers in @asMode and waits (up to ~3 minutes) until every one reports
+    done. Returns false if any never finished - which itself means a worker died mid-operation.
+/;
+bool function __RunConcurrencyWave(string asMode, int aiWorkers)
+    __concurrencyDone = new bool[16]
+
+    int i = 0
+    while (i < aiWorkers)
+        self.SendModEvent("RPB_ConcurrencyWorker", asMode, i)
+        i += 1
+    endWhile
+
+    float waited = 0.0
+    bool allDone = false
+    while (!allDone && waited < 180.0)
+        Utility.Wait(0.5)
+        waited += 0.5
+
+        allDone = true
+        i = 0
+        while (i < aiWorkers)
+            if (!__concurrencyDone[i])
+                allDone = false
+            endif
+            i += 1
+        endWhile
+    endWhile
+
+    return allDone
+endFunction
+
+;/
+    Checks which of the workers' keys are present. @asMode "add": all of them; "remove": none;
+    "mixed": only each worker's last 5 keys. Returns the number of wrong answers.
+/;
+int function __CountConcurrentKeyMismatches(RPB_ActiveMagicEffectContainer apContainer, string asMode, int aiWorkers, int aiOps)
+    int mismatches = 0
+    bool shouldExist = false
+    int w = 0
+    int k = 0
+
+    while (w < aiWorkers)
+        k = 0
+        while (k < aiOps)
+            if (asMode == "add")
+                shouldExist = true
+            elseif (asMode == "remove")
+                shouldExist = false
+            else
+                shouldExist = k >= aiOps - 5
+            endif
+
+            if (apContainer.HasKey("Concurrent_" + w + "_" + k) != shouldExist)
+                mismatches += 1
+            endif
+            k += 1
+        endWhile
+        w += 1
+    endWhile
+
+    return mismatches
+endFunction
+
+;/
+    Three waves against the live ArresteeList (which must start empty - a corrupted run is
+    cleaned up with DebugForceReset(), which is only safe on an empty list): 8 workers adding 20
+    keys each; the same 8 removing them; then 8 workers each doing add-then-remove-5-back for 20
+    iterations, leaving 5 keys per worker. After every wave: expected Count, both maps in sync,
+    and every key present or absent exactly as expected. Any lost or overwritten entry, or a
+    hole left behind by two workers reading the same Count, fails one of those.
+/;
+state Test_ActiveMagicEffectContainer_ConcurrentAccess
+    function Setup()
+        RPB_ActiveMagicEffectContainer _container = API.Arrest.GetAliasByName("ArresteeList") as RPB_ActiveMagicEffectContainer
+        int WORKERS = 8
+        int OPS = 20
+
+        if (_container.Count != 0)
+            log("ArresteeList already holds " + _container.Count + " entries - this test needs it empty (a corrupted run is repaired with a full reset)")
+            display_result(false)
+            return
+        endif
+
+        __concurrencyContainer = _container
+        __concurrencyOpsPerWorker = OPS
+        self.RegisterForModEvent("RPB_ConcurrencyWorker", "OnConcurrencyWorker")
+
+        bool ok = true
+        bool step = false
+        int mismatches = 0
+        string problem = ""
+        int w = 0
+        int k = 0
+
+        ; --- wave 1: concurrent adds ---
+        step = self.__RunConcurrencyWave("add", WORKERS)
+        step = assert_true(step, "Wave 1 (concurrent adds): a worker never finished")
+        ok = ok && step
+        mismatches = self.__CountConcurrentKeyMismatches(_container, "add", WORKERS, OPS)
+        step = assert_true(mismatches == 0, "Wave 1: " + mismatches + " key(s) missing after concurrent adds (lost or overwritten entries)")
+        ok = ok && step
+        step = assert_true(_container.Count == WORKERS * OPS, "Wave 1: Count is " + _container.Count + ", expected " + (WORKERS * OPS))
+        ok = ok && step
+        problem = _container.ValidateIndexConsistency()
+        step = assert_true(problem == "", "Wave 1: index maps inconsistent: " + problem)
+        ok = ok && step
+
+        ; --- wave 2: concurrent removes ---
+        step = self.__RunConcurrencyWave("remove", WORKERS)
+        step = assert_true(step, "Wave 2 (concurrent removes): a worker never finished")
+        ok = ok && step
+        mismatches = self.__CountConcurrentKeyMismatches(_container, "remove", WORKERS, OPS)
+        step = assert_true(mismatches == 0, "Wave 2: " + mismatches + " key(s) still present after concurrent removes")
+        ok = ok && step
+        step = assert_true(_container.Count == 0, "Wave 2: Count is " + _container.Count + ", expected 0")
+        ok = ok && step
+        problem = _container.ValidateIndexConsistency()
+        step = assert_true(problem == "", "Wave 2: index maps inconsistent: " + problem)
+        ok = ok && step
+
+        ; --- wave 3: concurrent adds and removes interleaved ---
+        step = self.__RunConcurrencyWave("mixed", WORKERS)
+        step = assert_true(step, "Wave 3 (concurrent mixed): a worker never finished")
+        ok = ok && step
+        mismatches = self.__CountConcurrentKeyMismatches(_container, "mixed", WORKERS, OPS)
+        step = assert_true(mismatches == 0, "Wave 3: " + mismatches + " wrong key state(s) after mixed concurrent add/remove")
+        ok = ok && step
+        step = assert_true(_container.Count == WORKERS * 5, "Wave 3: Count is " + _container.Count + ", expected " + (WORKERS * 5))
+        ok = ok && step
+        problem = _container.ValidateIndexConsistency()
+        step = assert_true(problem == "", "Wave 3: index maps inconsistent: " + problem)
+        ok = ok && step
+
+        ; --- wave 4: twice the contention, 16 workers interleaving adds and removes. Wave 3's
+        ; survivors use the same key names for workers 0-7, so clear them out sequentially first ---
+        if (ok)
+            w = 0
+            while (w < WORKERS)
+                k = 0
+                while (k < OPS)
+                    if (_container.HasKey("Concurrent_" + w + "_" + k))
+                        _container.RemoveElement("Concurrent_" + w + "_" + k, dispel = false)
+                    endif
+                    k += 1
+                endWhile
+                w += 1
+            endWhile
+
+            step = self.__RunConcurrencyWave("mixed", 16)
+            step = assert_true(step, "Wave 4 (16 concurrent workers): a worker never finished")
+            ok = ok && step
+            mismatches = self.__CountConcurrentKeyMismatches(_container, "mixed", 16, OPS)
+            step = assert_true(mismatches == 0, "Wave 4: " + mismatches + " wrong key state(s) with 16 concurrent workers")
+            ok = ok && step
+            step = assert_true(_container.Count == 16 * 5, "Wave 4: Count is " + _container.Count + ", expected " + (16 * 5))
+            ok = ok && step
+            problem = _container.ValidateIndexConsistency()
+            step = assert_true(problem == "", "Wave 4: index maps inconsistent: " + problem)
+            ok = ok && step
+        endif
+
+        ; --- cleanup, sequentially. If anything above went wrong the state may be corrupt, so
+        ; fall back to a full reset (safe: the list started empty) rather than leave it broken ---
+        self.UnregisterForModEvent("RPB_ConcurrencyWorker")
+        if (ok)
+            w = 0
+            while (w < 16)
+                k = 0
+                while (k < OPS)
+                    if (_container.HasKey("Concurrent_" + w + "_" + k))
+                        _container.RemoveElement("Concurrent_" + w + "_" + k, dispel = false)
+                    endif
+                    k += 1
+                endWhile
+                w += 1
+            endWhile
+        endif
+
+        if (!ok || _container.Count != 0 || _container.ValidateIndexConsistency() != "")
+            log("Concurrency test left the container unclean - forcing a full reset of the (previously empty) ArresteeList")
+            _container.DebugForceReset()
+        endif
+
+        log("CONCURRENCY: " + WORKERS + " workers x " + OPS + " ops per wave (16 in the last), final Count " + _container.Count)
+        display_result(ok)
+    endFunction
+endState
+
+;/
+    A thread that dies mid-Add/Remove (a runtime error skips the release) would leave the
+    container stuck in its Busy guard state. The bounded wait must force-release it rather than
+    deadlock the list. Simulates exactly that stuck state, then does a normal Add: it must
+    complete after the timeout (~5s, the container logs an error line for that on purpose), the
+    entry must exist, the maps stay in sync, and ordinary calls work again afterwards.
+/;
+state Test_ActiveMagicEffectContainer_StuckLockSelfHeals
+    function Setup()
+        RPB_ActiveMagicEffectContainer _container = API.Arrest.GetAliasByName("ArresteeList") as RPB_ActiveMagicEffectContainer
+        int startCount = _container.Count
+        bool ok = true
+        bool step = false
+
+        _container.DebugSimulateStuckLock()
+
+        float bench = StartBenchmark()
+        _container.AddElement(none, "StuckLockTest")
+        int waitedMs = EndBenchmark(bench, "Add against a stuck lock (self-heal)")
+
+        step = assert_true(_container.HasKey("StuckLockTest"), "The Add never completed after the stuck lock should have been force-released")
+        ok = ok && step
+        step = assert_true(_container.Count == startCount + 1, "Count should be " + (startCount + 1) + " after the healed Add, got " + _container.Count)
+        ok = ok && step
+        ; It should have waited for a real timeout, not sailed straight through
+        step = assert_true(waitedMs >= 2000, "The Add returned after only " + waitedMs + "ms - it did not actually wait on the stuck lock")
+        ok = ok && step
+
+        ; The lock must be genuinely released again: a second Add/Remove must be fast
+        bench = StartBenchmark()
+        _container.RemoveElement("StuckLockTest", dispel = false)
+        int normalMs = EndBenchmark(bench, "Remove after the lock healed")
+        step = assert_true(normalMs < 2000, "Remove took " + normalMs + "ms - the container is still treating itself as Busy")
+        ok = ok && step
+
+        step = assert_true(_container.Count == startCount, "Container did not return to its original Count, got " + _container.Count)
+        ok = ok && step
+        step = self.__AssertContainerInSync(_container, "after the stuck-lock self-heal")
+        ok = ok && step
+
+        display_result(ok)
+    endFunction
+endState
+
+;/
+    Add and Remove must never allocate JContainers objects: the container's two maps are created
+    once, and everything after is reads and writes into them. A leak would show as a map handle
+    that changes across many operations, or one that stops existing. There is no global
+    object-count API in this JContainers version, so this checks the handles directly. Also
+    exercises the reverse-map rebuild (which must release the old map and create exactly one new
+    one) five times and checks the forward map's handle never moves.
+/;
+state Test_ActiveMagicEffectContainer_HandleStability
+    function Setup()
+        RPB_ActiveMagicEffectContainer _container = API.Arrest.GetAliasByName("ArresteeList") as RPB_ActiveMagicEffectContainer
+        int startCount = _container.Count
+        bool ok = true
+        bool step = false
+
+        ; Touch the container first so any lazy init has already happened
+        step = _container.HasKey("HandleTest")
+
+        int keyHandle = _container.DebugGetKeyToIndexHandle()
+        int indexHandle = _container.DebugGetIndexToKeyHandle()
+
+        step = assert_true(keyHandle != 0 && JValue.isExists(keyHandle), "key -> index map handle " + keyHandle + " is unset or doesn't exist")
+        ok = ok && step
+        step = assert_true(indexHandle != 0 && JValue.isExists(indexHandle), "index -> key map handle " + indexHandle + " is unset or doesn't exist")
+        ok = ok && step
+
+        int i = 0
+        while (i < 200)
+            _container.AddElement(none, "HandleTest")
+            _container.RemoveElement("HandleTest", dispel = false)
+            i += 1
+        endWhile
+
+        step = assert_true(_container.DebugGetKeyToIndexHandle() == keyHandle, "key -> index handle changed during 200 add/remove cycles: " + keyHandle + " -> " + _container.DebugGetKeyToIndexHandle())
+        ok = ok && step
+        step = assert_true(_container.DebugGetIndexToKeyHandle() == indexHandle, "index -> key handle changed during 200 add/remove cycles: " + indexHandle + " -> " + _container.DebugGetIndexToKeyHandle())
+        ok = ok && step
+
+        ; Rebuild path: each cycle drops the reverse map and lets the next call recreate it
+        int rebuilt = 0
+        i = 0
+        while (i < 5)
+            _container.DebugSimulateMissingReverseIndex()
+            step = _container.HasKey("HandleTest")
+
+            rebuilt = _container.DebugGetIndexToKeyHandle()
+            step = assert_true(rebuilt != 0 && JValue.isExists(rebuilt), "Rebuild " + i + ": reverse map handle " + rebuilt + " is unset or doesn't exist")
+            ok = ok && step
+            step = assert_true(_container.DebugGetKeyToIndexHandle() == keyHandle, "Rebuild " + i + ": the forward map handle changed")
+            ok = ok && step
+            i += 1
+        endWhile
+
+        step = assert_true(_container.Count == startCount, "Container did not return to its original Count, got " + _container.Count)
+        ok = ok && step
+        step = self.__AssertContainerInSync(_container, "after the handle stability run")
+        ok = ok && step
+
+        display_result(ok)
+    endFunction
+endState
+
+; ==========================================================
 ;   ActiveMagicEffectContainer / ActorList hierarchy tests
 ;
 ;   These exercise RPB_ActorList/RPB_PrisonerList/RPB_ArresteeList/RPB_CaptorList
@@ -2203,31 +2791,53 @@ state Test_ActorList_Multiple_And_GetKeys
         ; queue (real in-game evidence: RPB_Utility.AwaitEntityReference's default timeout
         ; is left untouched deliberately, see CODE_PRACTICES.md/KNOWN_ISSUES.md - the fix is
         ; giving the engine time, not cutting the wait short).
+        ; BREADCRUMBS: this test has been seen to neither pass nor fail (silently stops). Each
+        ; step logs where it is and how long the await took, so the last "T23" line in the
+        ; log shows exactly where it stopped. A None result from an await is checked before use
+        ; instead of letting a later call on it raise a runtime error that aborts the test.
+        log("T23 start, Prisoners.Count at start = " + solitudePrison.Prisoners.Count)
+
         Actor tempA = __SpawnTempActor()
-        solitudePrison.AwaitPrisonerReference(tempA)
+        log("T23 spawned A " + tempA)
+        float benchA = StartBenchmark()
+        RPB_Prisoner prisonerA = solitudePrison.AwaitPrisonerReference(tempA)
+        log("T23 await A returned " + prisonerA + " after " + EndBenchmark(benchA, "T23 await A") + "ms")
         Utility.Wait(1.0)
 
         Actor tempB = __SpawnTempActor()
-        solitudePrison.AwaitPrisonerReference(tempB)
+        log("T23 spawned B " + tempB)
+        float benchB = StartBenchmark()
+        RPB_Prisoner prisonerB = solitudePrison.AwaitPrisonerReference(tempB)
+        log("T23 await B returned " + prisonerB + " after " + EndBenchmark(benchB, "T23 await B") + "ms")
         Utility.Wait(1.0)
 
         Actor tempC = __SpawnTempActor()
-        solitudePrison.AwaitPrisonerReference(tempC)
+        log("T23 spawned C " + tempC)
+        float benchC = StartBenchmark()
+        RPB_Prisoner prisonerC = solitudePrison.AwaitPrisonerReference(tempC)
+        log("T23 await C returned " + prisonerC + " after " + EndBenchmark(benchC, "T23 await C") + "ms")
 
+        log("T23 all awaits done, Prisoners.Count = " + solitudePrison.Prisoners.Count)
         bool countCorrect = assert_true(solitudePrison.Prisoners.Count == 3, "Expected Prisoners.Count == 3, got " + solitudePrison.Prisoners.Count)
 
         string[] keys = solitudePrison.Prisoners.GetKeys()
+        log("T23 GetKeys() returned " + keys.Length + " key(s)")
         bool hasA = __KeysContain(keys, "Prisoner["+ tempA.GetFormID() +"]")
         bool hasB = __KeysContain(keys, "Prisoner["+ tempB.GetFormID() +"]")
         bool hasC = __KeysContain(keys, "Prisoner["+ tempC.GetFormID() +"]")
+        log("T23 key checks: A=" + hasA + " B=" + hasB + " C=" + hasC)
 
         bool allKeysFound = assert_true(hasA && hasB && hasC, "GetKeys() is missing one or more expected keys. Got: " + keys)
 
+        log("T23 about to report result")
         display_result(countCorrect && allKeysFound)
+        log("T23 result reported, Teardown follows")
     endFunction
 
     function Teardown()
+        log("T23 Teardown start")
         __TeardownAllTempActors()
+        log("T23 Teardown done")
     endFunction
 endState
 
