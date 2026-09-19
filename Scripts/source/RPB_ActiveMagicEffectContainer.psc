@@ -33,8 +33,12 @@ scriptname RPB_ActiveMagicEffectContainer extends ReferenceAlias
     which depend on order, only on visiting every live element once (GetActors(), the MCM/UI
     list-pickers, BindAllPrisonersToCell(), the monitor loops).
 
-    JContainers is only ever used for key -> global-index bookkeeping (__keyToIndex); the
-    ActiveMagicEffect payload itself always lives in one of the page arrays below.
+    JContainers is only ever used for bookkeeping - a key -> global-index map (__keyToIndex) and
+    its mirror, a global-index -> key map (__indexToKey); the ActiveMagicEffect payload itself
+    always lives in one of the page arrays below. The mirror exists so RemoveElement()'s swap
+    step can ask "which key owns the last slot?" in O(1) instead of scanning every key
+    (measured at ~2.4s of pure scanning to drain 150 entries - see KNOWN_ISSUES.md). Both maps
+    must always describe the same set of entries; ValidateIndexConsistency() checks exactly that.
 /;
 
 import RPB_Utility
@@ -54,7 +58,7 @@ import RPB_Memory
     used before this size was revisited.
 
     Raising the ceiling later is a mechanical change: add more __pageN fields, add the matching
-    branches to __EnsurePageAllocated()/__GetSlot()/__SetSlot()/__FreePageIfNowUnused() below,
+    branches to __GetSlot()/__SetSlot()/__FreePageIfNowUnused() below,
     bump PAGE_COUNT to match - nothing else in this file needs to change. Papyrus has no
     array-of-arrays/jagged-array type and no dynamic field list, so a fixed, hand-declared set
     of page fields plus an if/elseif dispatch is the only way to do this at all.
@@ -98,6 +102,9 @@ ActiveMagicEffect[] __page31
 ;/ FastMap<int> - key -> global index (pageIndex * PAGE_SIZE + slotIndex) /;
 int __keyToIndex
 
+;/ FastIntMap<string> - global index -> key, the exact mirror of __keyToIndex /;
+int __indexToKey
+
 int __count
 
 int property Count
@@ -108,6 +115,7 @@ endProperty
 
 event OnInit()
     __keyToIndex = FastMap("<string>", true)
+    __indexToKey = FastMap("<int>", true)
     __count = 0
 endEvent
 
@@ -131,86 +139,35 @@ endEvent
 function __EnsureInitialized()
     if (!__keyToIndex)
         __keyToIndex = FastMap("<string>", true)
+        __indexToKey = FastMap("<int>", true)
         __count = 0
+    elseif (!__indexToKey)
+        self.__RebuildIndexToKey()
     endif
+endFunction
+
+;/
+    Second, distinct case from the one above: __keyToIndex is valid (and may hold real, live
+    entries) but __indexToKey is unset. That's exactly what an alias saved before __indexToKey
+    was added looks like once it loads under the new script - a new field defaults to 0 on
+    existing aliases, and OnInit() doesn't re-fire. Unlike the case above, nothing here is
+    corrupt: __keyToIndex and __count are trustworthy, so they're left alone and the mirror is
+    simply derived from __keyToIndex in one O(n) pass. Runs at most once per alias.
+/;
+function __RebuildIndexToKey()
+    __indexToKey = FastMap("<int>", true)
+
+    string[] keys = FastMap_KeysAsPapyrusArray(__keyToIndex)
+    int i = 0
+    while (i < keys.Length)
+        FastIntMap_SetString(__indexToKey, FastMap_GetInt(__keyToIndex, keys[i]), keys[i])
+        i += 1
+    endWhile
 endFunction
 
 ; =========================================================
 ;                      Page dispatch helpers
 ; =========================================================
-
-;/
-    Allocates @aiPageIndex's backing array if it isn't already allocated. No-op if it already
-    is - a fresh list only ever touches page 0; later pages allocate on demand as Count grows
-    into them.
-/;
-function __EnsurePageAllocated(int aiPageIndex)
-    if (aiPageIndex == 0 && !__page0)
-        __page0 = new ActiveMagicEffect[32]
-    elseif (aiPageIndex == 1 && !__page1)
-        __page1 = new ActiveMagicEffect[32]
-    elseif (aiPageIndex == 2 && !__page2)
-        __page2 = new ActiveMagicEffect[32]
-    elseif (aiPageIndex == 3 && !__page3)
-        __page3 = new ActiveMagicEffect[32]
-    elseif (aiPageIndex == 4 && !__page4)
-        __page4 = new ActiveMagicEffect[32]
-    elseif (aiPageIndex == 5 && !__page5)
-        __page5 = new ActiveMagicEffect[32]
-    elseif (aiPageIndex == 6 && !__page6)
-        __page6 = new ActiveMagicEffect[32]
-    elseif (aiPageIndex == 7 && !__page7)
-        __page7 = new ActiveMagicEffect[32]
-    elseif (aiPageIndex == 8 && !__page8)
-        __page8 = new ActiveMagicEffect[32]
-    elseif (aiPageIndex == 9 && !__page9)
-        __page9 = new ActiveMagicEffect[32]
-    elseif (aiPageIndex == 10 && !__page10)
-        __page10 = new ActiveMagicEffect[32]
-    elseif (aiPageIndex == 11 && !__page11)
-        __page11 = new ActiveMagicEffect[32]
-    elseif (aiPageIndex == 12 && !__page12)
-        __page12 = new ActiveMagicEffect[32]
-    elseif (aiPageIndex == 13 && !__page13)
-        __page13 = new ActiveMagicEffect[32]
-    elseif (aiPageIndex == 14 && !__page14)
-        __page14 = new ActiveMagicEffect[32]
-    elseif (aiPageIndex == 15 && !__page15)
-        __page15 = new ActiveMagicEffect[32]
-    elseif (aiPageIndex == 16 && !__page16)
-        __page16 = new ActiveMagicEffect[32]
-    elseif (aiPageIndex == 17 && !__page17)
-        __page17 = new ActiveMagicEffect[32]
-    elseif (aiPageIndex == 18 && !__page18)
-        __page18 = new ActiveMagicEffect[32]
-    elseif (aiPageIndex == 19 && !__page19)
-        __page19 = new ActiveMagicEffect[32]
-    elseif (aiPageIndex == 20 && !__page20)
-        __page20 = new ActiveMagicEffect[32]
-    elseif (aiPageIndex == 21 && !__page21)
-        __page21 = new ActiveMagicEffect[32]
-    elseif (aiPageIndex == 22 && !__page22)
-        __page22 = new ActiveMagicEffect[32]
-    elseif (aiPageIndex == 23 && !__page23)
-        __page23 = new ActiveMagicEffect[32]
-    elseif (aiPageIndex == 24 && !__page24)
-        __page24 = new ActiveMagicEffect[32]
-    elseif (aiPageIndex == 25 && !__page25)
-        __page25 = new ActiveMagicEffect[32]
-    elseif (aiPageIndex == 26 && !__page26)
-        __page26 = new ActiveMagicEffect[32]
-    elseif (aiPageIndex == 27 && !__page27)
-        __page27 = new ActiveMagicEffect[32]
-    elseif (aiPageIndex == 28 && !__page28)
-        __page28 = new ActiveMagicEffect[32]
-    elseif (aiPageIndex == 29 && !__page29)
-        __page29 = new ActiveMagicEffect[32]
-    elseif (aiPageIndex == 30 && !__page30)
-        __page30 = new ActiveMagicEffect[32]
-    elseif (aiPageIndex == 31 && !__page31)
-        __page31 = new ActiveMagicEffect[32]
-    endif
-endFunction
 
 ;/ Reads the element at @aiGlobalIndex. Returns None if its page was never allocated. /;
 ActiveMagicEffect function __GetSlot(int aiGlobalIndex)
@@ -286,76 +243,180 @@ ActiveMagicEffect function __GetSlot(int aiGlobalIndex)
     return none
 endFunction
 
-;/ Writes @apElement at @aiGlobalIndex, allocating its page first if it isn't already. /;
+;/
+    Writes @apElement at @aiGlobalIndex, allocating that slot's page first if it doesn't exist.
+
+    The allocation check is NESTED inside the branch that matched the page, on purpose. An
+    earlier version did it as a separate __EnsurePageAllocated() helper whose branches read
+    `if (aiPageIndex == N && !__pageN)`: once a page exists (nearly every call) that second
+    condition is false, so the chain didn't stop at the matching branch - it fell through and
+    evaluated every remaining branch too, ~32 comparisons at ~0.11ms each in-game (measured,
+    see TROUBLESHOOTING_NOTES.md), on almost every write. Matching on the index alone lets the
+    chain stop at the right page, and "already allocated" becomes a single check.
+/;
 function __SetSlot(int aiGlobalIndex, ActiveMagicEffect apElement)
     int pageIndex = aiGlobalIndex / PAGE_SIZE
     int slotIndex = aiGlobalIndex % PAGE_SIZE
 
-    __EnsurePageAllocated(pageIndex)
-
     if (pageIndex == 0)
+        if (!__page0)
+            __page0 = new ActiveMagicEffect[32]
+        endif
         __page0[slotIndex] = apElement
     elseif (pageIndex == 1)
+        if (!__page1)
+            __page1 = new ActiveMagicEffect[32]
+        endif
         __page1[slotIndex] = apElement
     elseif (pageIndex == 2)
+        if (!__page2)
+            __page2 = new ActiveMagicEffect[32]
+        endif
         __page2[slotIndex] = apElement
     elseif (pageIndex == 3)
+        if (!__page3)
+            __page3 = new ActiveMagicEffect[32]
+        endif
         __page3[slotIndex] = apElement
     elseif (pageIndex == 4)
+        if (!__page4)
+            __page4 = new ActiveMagicEffect[32]
+        endif
         __page4[slotIndex] = apElement
     elseif (pageIndex == 5)
+        if (!__page5)
+            __page5 = new ActiveMagicEffect[32]
+        endif
         __page5[slotIndex] = apElement
     elseif (pageIndex == 6)
+        if (!__page6)
+            __page6 = new ActiveMagicEffect[32]
+        endif
         __page6[slotIndex] = apElement
     elseif (pageIndex == 7)
+        if (!__page7)
+            __page7 = new ActiveMagicEffect[32]
+        endif
         __page7[slotIndex] = apElement
     elseif (pageIndex == 8)
+        if (!__page8)
+            __page8 = new ActiveMagicEffect[32]
+        endif
         __page8[slotIndex] = apElement
     elseif (pageIndex == 9)
+        if (!__page9)
+            __page9 = new ActiveMagicEffect[32]
+        endif
         __page9[slotIndex] = apElement
     elseif (pageIndex == 10)
+        if (!__page10)
+            __page10 = new ActiveMagicEffect[32]
+        endif
         __page10[slotIndex] = apElement
     elseif (pageIndex == 11)
+        if (!__page11)
+            __page11 = new ActiveMagicEffect[32]
+        endif
         __page11[slotIndex] = apElement
     elseif (pageIndex == 12)
+        if (!__page12)
+            __page12 = new ActiveMagicEffect[32]
+        endif
         __page12[slotIndex] = apElement
     elseif (pageIndex == 13)
+        if (!__page13)
+            __page13 = new ActiveMagicEffect[32]
+        endif
         __page13[slotIndex] = apElement
     elseif (pageIndex == 14)
+        if (!__page14)
+            __page14 = new ActiveMagicEffect[32]
+        endif
         __page14[slotIndex] = apElement
     elseif (pageIndex == 15)
+        if (!__page15)
+            __page15 = new ActiveMagicEffect[32]
+        endif
         __page15[slotIndex] = apElement
     elseif (pageIndex == 16)
+        if (!__page16)
+            __page16 = new ActiveMagicEffect[32]
+        endif
         __page16[slotIndex] = apElement
     elseif (pageIndex == 17)
+        if (!__page17)
+            __page17 = new ActiveMagicEffect[32]
+        endif
         __page17[slotIndex] = apElement
     elseif (pageIndex == 18)
+        if (!__page18)
+            __page18 = new ActiveMagicEffect[32]
+        endif
         __page18[slotIndex] = apElement
     elseif (pageIndex == 19)
+        if (!__page19)
+            __page19 = new ActiveMagicEffect[32]
+        endif
         __page19[slotIndex] = apElement
     elseif (pageIndex == 20)
+        if (!__page20)
+            __page20 = new ActiveMagicEffect[32]
+        endif
         __page20[slotIndex] = apElement
     elseif (pageIndex == 21)
+        if (!__page21)
+            __page21 = new ActiveMagicEffect[32]
+        endif
         __page21[slotIndex] = apElement
     elseif (pageIndex == 22)
+        if (!__page22)
+            __page22 = new ActiveMagicEffect[32]
+        endif
         __page22[slotIndex] = apElement
     elseif (pageIndex == 23)
+        if (!__page23)
+            __page23 = new ActiveMagicEffect[32]
+        endif
         __page23[slotIndex] = apElement
     elseif (pageIndex == 24)
+        if (!__page24)
+            __page24 = new ActiveMagicEffect[32]
+        endif
         __page24[slotIndex] = apElement
     elseif (pageIndex == 25)
+        if (!__page25)
+            __page25 = new ActiveMagicEffect[32]
+        endif
         __page25[slotIndex] = apElement
     elseif (pageIndex == 26)
+        if (!__page26)
+            __page26 = new ActiveMagicEffect[32]
+        endif
         __page26[slotIndex] = apElement
     elseif (pageIndex == 27)
+        if (!__page27)
+            __page27 = new ActiveMagicEffect[32]
+        endif
         __page27[slotIndex] = apElement
     elseif (pageIndex == 28)
+        if (!__page28)
+            __page28 = new ActiveMagicEffect[32]
+        endif
         __page28[slotIndex] = apElement
     elseif (pageIndex == 29)
+        if (!__page29)
+            __page29 = new ActiveMagicEffect[32]
+        endif
         __page29[slotIndex] = apElement
     elseif (pageIndex == 30)
+        if (!__page30)
+            __page30 = new ActiveMagicEffect[32]
+        endif
         __page30[slotIndex] = apElement
     elseif (pageIndex == 31)
+        if (!__page31)
+            __page31 = new ActiveMagicEffect[32]
+        endif
         __page31[slotIndex] = apElement
     endif
 endFunction
@@ -444,28 +505,14 @@ function __FreePageIfNowUnused(int aiPageIndex)
     endif
 endFunction
 
-int function __TotalCapacity()
-    return PAGE_SIZE * PAGE_COUNT
-endFunction
-
 ;/
-    Reverse lookup: finds the key currently mapped to @aiIndex. Only ever called by
-    RemoveElement(), for the one element being moved during a swap - an O(n) map scan here is
-    fine, n is realistically single digits (see this class's design notes / KNOWN_ISSUES.md
-    for the real-scale numbers this was sized against).
+    Reverse lookup: the key currently mapped to @aiIndex, straight from __indexToKey (O(1)).
+    Only ever called by RemoveElement(), for the one element being moved during a swap. This
+    used to be an O(n) scan over every key in __keyToIndex, which dominated removal cost at
+    scale (see KNOWN_ISSUES.md). Callers must have run __EnsureInitialized() first.
 /;
 string function __FindKeyForIndex(int aiIndex)
-    string[] keys = FastMap_KeysAsPapyrusArray(__keyToIndex)
-
-    int i = 0
-    while (i < keys.Length)
-        if (FastMap_GetInt(__keyToIndex, keys[i]) == aiIndex)
-            return keys[i]
-        endif
-        i += 1
-    endWhile
-
-    return ""
+    return FastIntMap_GetString(__indexToKey, aiIndex)
 endFunction
 
 ; =========================================================
@@ -521,13 +568,14 @@ function AddElement(ActiveMagicEffect element, string elementKey)
         return
     endif
 
-    if (__count >= self.__TotalCapacity())
-        Error("ActiveMagicEffectContainer is full ("+ self.__TotalCapacity() +" entries) - cannot add "+ elementKey +"!")
+    if (__count >= PAGE_SIZE * PAGE_COUNT)
+        Error("ActiveMagicEffectContainer is full ("+ (PAGE_SIZE * PAGE_COUNT) +" entries) - cannot add "+ elementKey +"!")
         return
     endif
 
     self.__SetSlot(__count, element)
     FastMap_SetInt(__keyToIndex, elementKey, __count)
+    FastIntMap_SetString(__indexToKey, __count, elementKey)
     __count += 1
 endFunction
 
@@ -558,11 +606,13 @@ function RemoveElement(string elementKey, bool dispel = true)
         string lastElementKey = self.__FindKeyForIndex(lastIndex)
         if (lastElementKey != "")
             FastMap_SetInt(__keyToIndex, lastElementKey, removedIndex)
+            FastIntMap_SetString(__indexToKey, removedIndex, lastElementKey)
         endif
     endif
 
     self.__SetSlot(lastIndex, none)
     FastMap_RemoveKey(__keyToIndex, elementKey)
+    FastIntMap_RemoveKey(__indexToKey, lastIndex)
     __count -= 1
 
     self.__FreePageIfNowUnused(lastIndex / PAGE_SIZE)
@@ -576,4 +626,94 @@ endFunction
 /;
 function protected_remove(string asKey, bool dispel = true)
     self.RemoveElement(asKey, dispel)
+endFunction
+
+; =========================================================
+;                  Inspection / self-check
+; =========================================================
+
+;/
+    The key stored at logical index @aiIndex (0 <= aiIndex < Count), or "" if out of range.
+    Reads the reverse map directly, so it doubles as a cheap public probe of it.
+/;
+string function GetKeyAtIndex(int aiIndex)
+    self.__EnsureInitialized()
+
+    if (aiIndex < 0 || aiIndex >= __count)
+        return ""
+    endif
+
+    return FastIntMap_GetString(__indexToKey, aiIndex)
+endFunction
+
+;/
+    Verifies the forward (key -> index) and reverse (index -> key) maps agree with each other
+    and with Count. Returns "" if everything is consistent, otherwise a description of the
+    first inconsistency found. O(n) - meant for tests/debugging, never for hot paths.
+
+    Checks: both maps hold exactly Count entries; every key maps to an in-range index whose
+    reverse entry is that same key; every index in [0, Count) has a reverse entry whose key
+    maps straight back to that index. (Count entries each way + every forward entry
+    round-tripping already makes the maps exact inverses; the second walk is kept anyway
+    because it fails with a more specific message when the reverse map has a stray/missing
+    entry.)
+/;
+string function ValidateIndexConsistency()
+    self.__EnsureInitialized()
+
+    int forwardSize = FastMap_Size(__keyToIndex)
+    int reverseSize = FastMap_Size(__indexToKey)
+    if (forwardSize != __count)
+        return "key->index map holds " + forwardSize + " entries but Count is " + __count
+    endif
+    if (reverseSize != __count)
+        return "index->key map holds " + reverseSize + " entries but Count is " + __count
+    endif
+
+    string[] keys = FastMap_KeysAsPapyrusArray(__keyToIndex)
+    int mappedIndex = 0
+    string reverseKey = ""
+
+    int i = 0
+    while (i < keys.Length)
+        mappedIndex = FastMap_GetInt(__keyToIndex, keys[i])
+        if (mappedIndex < 0 || mappedIndex >= __count)
+            return "key '" + keys[i] + "' maps to out-of-range index " + mappedIndex + " (Count " + __count + ")"
+        endif
+
+        reverseKey = FastIntMap_GetString(__indexToKey, mappedIndex)
+        if (reverseKey != keys[i])
+            return "key '" + keys[i] + "' -> index " + mappedIndex + ", but index " + mappedIndex + " -> '" + reverseKey + "'"
+        endif
+        i += 1
+    endWhile
+
+    string keyAtIndex = ""
+    i = 0
+    while (i < __count)
+        keyAtIndex = FastIntMap_GetString(__indexToKey, i)
+        if (keyAtIndex == "")
+            return "index " + i + " has no key in the index->key map (Count " + __count + ")"
+        endif
+        if (!FastMap_HasKey(__keyToIndex, keyAtIndex) || FastMap_GetInt(__keyToIndex, keyAtIndex) != i)
+            return "index " + i + " -> '" + keyAtIndex + "', but that key doesn't map back to index " + i
+        endif
+        i += 1
+    endWhile
+
+    return ""
+endFunction
+
+;/
+    TEST HOOK ONLY. Puts this alias into the exact state an alias saved before __indexToKey
+    existed loads into (valid __keyToIndex and __count, __indexToKey unset) so the migration
+    path in __EnsureInitialized() can be exercised in-game without needing an old save. The
+    next call to any container method must silently rebuild the mirror.
+/;
+function DebugSimulateMissingReverseIndex()
+    if (__indexToKey)
+        FastMap_Release(__indexToKey)
+    endif
+
+    __indexToKey = 0
 endFunction
