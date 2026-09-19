@@ -87,6 +87,7 @@ function SetTests()
     self.AddTest("55 - Prison: A Failed Imprisonment Cleans the Prisoner's State Up", "Test_Prison_ImprisonmentFailCleansUp", abChainable = false)
     self.AddTest("56 - LockPrisonerSettings: Per-Operation Cost Split (Reads vs Writes)", "Test_LockPrisonerSettings_CostSplit", abChainable = false)
     self.AddTest("57 - StorageVars: Cached Reference Key and Cached Hold Give Identical Data", "Test_StorageVars_CachedKeyEquivalence", abChainable = false)
+    self.AddTest("58 - StorageVars: Deletes Work With the Cached Reference Key (Second Arrest Regression)", "Test_StorageVars_DeletesWithCachedKey", abChainable = false)
     self.AddTest("41 - ActiveMagicEffectContainer: Stuck Lock Self-Heals", "Test_ActiveMagicEffectContainer_StuckLockSelfHeals")
     self.AddTest("42 - ThreadLock: JAtomic Primitive Semantics and Registry", "Test_ThreadLock_PrimitiveSemantics")
     ; Not chainable: fires concurrent worker threads
@@ -4041,6 +4042,21 @@ state Test_StorageVars_CachedKeyEquivalence
         step = assert_true(viaActor == viaKey, "The cached-key path differs from the Actor path: " + viaKey + " vs " + viaActor)
         ok = ok && step
 
+        string prefix = RPB_StorageVars.GetPathPrefixOnReference(refKey, "Jail")
+        step = assert_true(prefix + "Some Key" == viaActor, "The path prefix + key differs from the Actor path: " + prefix + "Some Key vs " + viaActor)
+        ok = ok && step
+        step = assert_true(RPB_StorageVars.GetPathPrefixOnReference("", "Jail") == "null", "An empty reference should give the 'null' prefix")
+        ok = ok && step
+
+        ; A write through the cached prefix (p.SetInt) must be readable through the plain Actor path, and back
+        p.SetInt("Prefix Probe", 1234)
+        step = assert_true(RPB_StorageVars.GetIntOnReference("Prefix Probe", a, "Jail") == 1234, "A write through the cached prefix is not readable through the plain Actor path")
+        ok = ok && step
+        RPB_StorageVars.SetIntOnReference("Prefix Probe", a, 4321, "Jail")
+        step = assert_true(p.GetInt("Prefix Probe") == 4321, "A write through the plain Actor path is not readable through the cached prefix")
+        ok = ok && step
+        RPB_StorageVars.DeleteVariableOnReference("Prefix Probe", a, "Jail")
+
         p.LockPrisonerSettings()
 
         step = assert_true(p.GetBool("Allow Stripping") == prison.AllowStripping, "Allow Stripping differs from the Prison value")
@@ -4060,6 +4076,92 @@ state Test_StorageVars_CachedKeyEquivalence
         step = assert_true(hold == prison.GetLocalPropertyOfTypeString("Hold"), "Cached Hold '" + hold + "' differs from the stored one")
         ok = ok && step
         log("HOLD '" + hold + "'")
+
+        display_result(ok)
+    endFunction
+
+    function Teardown()
+        __TeardownAllTempActors()
+    endFunction
+endState
+
+;/
+    Regression test for the "second arrest fails after a release" bug. ActorBase passes its cached
+    "(Reference <id>)" key to StorageVars, and GetObjectHandleOnReference() (behind every delete) only understood the
+    "[Script < (ID)>]" form, so Remove()/RemoveAll()/OnDestroy()/Destroy() silently cleared nothing: "Arrested" and
+    "Is Initialized" survived a release. Checks every delete route on a registered temp prisoner, reading back through
+    the plain Actor path (an independent route):
+      a) Remove(); b) RemoveAll() (Jail category); c) DeleteCategoryOnReference() with the normalized key ("Actor"
+      category, what OnDestroy does); d) Destroy() clears "Initialized"; e) DeleteAllOnReference() removes the actor's
+      entry from the storage root.
+/;
+state Test_StorageVars_DeletesWithCachedKey
+    function Setup()
+        RPB_Prison prison = (RPB_API.GetPrisonManager()).GetPrison("Haafingar")
+        bool ok = true
+        bool step = false
+
+        Actor a = __SpawnTempActor()
+        self.__EnsureKind("prisoner", a, prison)
+        RPB_ActorBase reg = none
+        float t0 = Utility.GetCurrentRealTime()
+        while (!reg && (Utility.GetCurrentRealTime() - t0) < 30.0)
+            reg = self.__LookupKind("prisoner", a, prison)
+            if (!reg)
+                Utility.Wait(0.025)
+            endif
+        endWhile
+        RPB_Prisoner p = reg as RPB_Prisoner
+        if (!p)
+            display_result(assert_true(false, "Prisoner never registered"))
+            return
+        endif
+
+        string refKey = RPB_StorageVars.GetReferenceKey(a)
+
+        ; a) Remove()
+        p.SetBool("Probe A", true)
+        step = assert_true(RPB_StorageVars.GetBoolOnReference("Probe A", a, "Jail"), "Probe A was not written")
+        ok = ok && step
+        p.Remove("Probe A")
+        step = assert_false(RPB_StorageVars.GetBoolOnReference("Probe A", a, "Jail"), "Remove() did not delete the variable")
+        ok = ok && step
+
+        ; b) RemoveAll() of the prisoner's own category
+        p.SetBool("Probe B", true)
+        p.SetInt("Probe C", 5)
+        p.RemoveAll()
+        step = assert_false(RPB_StorageVars.GetBoolOnReference("Probe B", a, "Jail"), "RemoveAll() did not delete Probe B")
+        ok = ok && step
+        step = assert_true(RPB_StorageVars.GetIntOnReference("Probe C", a, "Jail") == 0, "RemoveAll() did not delete Probe C")
+        ok = ok && step
+
+        ; c) DeleteCategoryOnReference() with the normalized key, the way OnDestroy() wipes "Actor" and "Temporary"
+        RPB_StorageVars.SetBoolOnReference("Probe D", a, true, "Actor")
+        RPB_StorageVars.SetBoolOnReference("Probe E", a, true, "Temporary")
+        RPB_StorageVars.DeleteCategoryOnReference(refKey, "Actor")
+        RPB_StorageVars.DeleteCategoryOnReference(refKey, "Temporary")
+        step = assert_false(RPB_StorageVars.GetBoolOnReference("Probe D", a, "Actor"), "DeleteCategoryOnReference(normalized key) did not clear the Actor category")
+        ok = ok && step
+        step = assert_false(RPB_StorageVars.GetBoolOnReference("Probe E", a, "Temporary"), "DeleteCategoryOnReference(normalized key) did not clear the Temporary category")
+        ok = ok && step
+
+        ; d) Destroy() clears the flag that gates re-registration
+        p.SetBool("Initialized", true)
+        step = assert_true(RPB_StorageVars.GetBoolOnReference("Initialized", a, "Jail"), "Could not set Initialized")
+        ok = ok && step
+        p.Destroy()
+        step = assert_false(RPB_StorageVars.GetBoolOnReference("Initialized", a, "Jail"), "Destroy() left 'Initialized' behind")
+        ok = ok && step
+
+        ; e) DeleteAllOnReference() removes the actor's entry from the storage root
+        RPB_StorageVars.SetBoolOnReference("Probe F", a, true, "Jail")
+        int root = RPB_StorageVars.GetObjectHandle()
+        step = assert_true(JMap.hasKey(root, refKey), "The actor has no entry in the storage root, cannot test DeleteAllOnReference")
+        ok = ok && step
+        RPB_StorageVars.DeleteAllOnReference(a)
+        step = assert_false(JMap.hasKey(root, refKey), "DeleteAllOnReference() left the actor's entry in the storage root")
+        ok = ok && step
 
         display_result(ok)
     endFunction

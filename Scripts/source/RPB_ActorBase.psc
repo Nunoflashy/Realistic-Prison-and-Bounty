@@ -769,7 +769,7 @@ endFunction
 ;                           Getters
 bool function GetBool(string asVarName, string asVarCategory = "Actor")
     string category = self.GetScriptVarCategory(asVarCategory)
-    return RPB_StorageVars.GetBoolOnReference(asVarName, self.__GetRefKey(), category)
+    return RPB_StorageVars.GetBoolAtPath(self.__GetVarPath(asVarName, category))
 endFunction
 
 ; Alias for GetBool() to check a condition
@@ -799,34 +799,34 @@ endFunction
 
 int function GetInt(string asVarName, string asVarCategory = "Actor")
     string category = self.GetScriptVarCategory(asVarCategory)
-    return RPB_StorageVars.GetIntOnReference(asVarName, self.__GetRefKey(), category)
+    return RPB_StorageVars.GetIntAtPath(self.__GetVarPath(asVarName, category))
 endFunction
 
 float function GetFloat(string asVarName, string asVarCategory = "Actor")
     string category = self.GetScriptVarCategory(asVarCategory)
-    return RPB_StorageVars.GetFloatOnReference(asVarName, self.__GetRefKey(), category)
+    return RPB_StorageVars.GetFloatAtPath(self.__GetVarPath(asVarName, category))
 endFunction
 
 string function GetString(string asVarName, string asVarCategory = "Actor")
     string category = self.GetScriptVarCategory(asVarCategory)
-    return RPB_StorageVars.GetStringOnReference(asVarName, self.__GetRefKey(), category)
+    return RPB_StorageVars.GetStringAtPath(self.__GetVarPath(asVarName, category))
 endFunction
 
 Form function GetForm(string asVarName, string asVarCategory = "Actor")
     string category = self.GetScriptVarCategory(asVarCategory)
-    return RPB_StorageVars.GetFormOnReference(asVarName, self.__GetRefKey(), category)
+    return RPB_StorageVars.GetFormAtPath(self.__GetVarPath(asVarName, category))
 endFunction
 
 ObjectReference function GetReference(string asVarName, string asVarCategory = "Actor")
     string category = self.GetScriptVarCategory(asVarCategory)
-    return RPB_StorageVars.GetFormOnReference(asVarName, self.__GetRefKey(), category) as ObjectReference
+    return RPB_StorageVars.GetFormAtPath(self.__GetVarPath(asVarName, category)) as ObjectReference
 endFunction
 
 
 ;                          Setters
 function SetBool(string asVarName, bool abValue, string asVarCategory = "Actor")
     string category = self.GetScriptVarCategory(asVarCategory)
-    RPB_StorageVars.SetBoolOnReference(asVarName, self.__GetRefKey(), abValue, category)
+    RPB_StorageVars.SetBoolAtPath(self.__GetVarPath(asVarName, category), abValue)
     ; Debug("Actor::SetBool", "["+ self +"] Setting " + asVarName + " on " + this + " to: " + abValue)
 endFunction
 
@@ -835,7 +835,7 @@ function SetInt(string asVarName, int aiValue, string asVarCategory = "Actor", i
 
     ; Clamp the value
     aiValue = ClampInt(aiValue, aiMinValue, aiMaxValue)
-    RPB_StorageVars.SetIntOnReference(asVarName, self.__GetRefKey(), aiValue, category)
+    RPB_StorageVars.SetIntAtPath(self.__GetVarPath(asVarName, category), aiValue)
 endFunction
 
 function ModInt(string asVarName, int aiValue, string asVarCategory = "Actor")
@@ -849,7 +849,7 @@ function SetFloat(string asVarName, float afValue, string asVarCategory = "Actor
 
     ; Clamp the value
     afValue = ClampFloat(afValue, afMinValue, afMaxValue)
-    RPB_StorageVars.SetFloatOnReference(asVarName, self.__GetRefKey(), afValue, category)
+    RPB_StorageVars.SetFloatAtPath(self.__GetVarPath(asVarName, category), afValue)
     ; Debug("Actor::SetFloat", "["+ self +"] Setting " + asVarName + " on " + this + " to: " + afValue)
 endFunction
 
@@ -861,19 +861,19 @@ endFunction
 
 function SetString(string asVarName, string asValue, string asVarCategory = "Actor")
     string category = self.GetScriptVarCategory(asVarCategory)
-    RPB_StorageVars.SetStringOnReference(asVarName, self.__GetRefKey(), asValue, category)
+    RPB_StorageVars.SetStringAtPath(self.__GetVarPath(asVarName, category), asValue)
     ; Debug("Actor::SetString", "["+ self +"] Setting " + asVarName + " on " + this + " to: " + asValue)
 endFunction
 
 function SetForm(string asVarName, Form akValue, string asVarCategory = "Actor")
     string category = self.GetScriptVarCategory(asVarCategory)
-    RPB_StorageVars.SetFormOnReference(asVarName, self.__GetRefKey(), akValue, category)
+    RPB_StorageVars.SetFormAtPath(self.__GetVarPath(asVarName, category), akValue)
     ; Debug("Actor::SetForm", "["+ self +"] Setting " + asVarName + " on " + this + " to: " + akValue)
 endFunction
 
 function SetReference(string asVarName, ObjectReference akValue, string asVarCategory = "Actor")
     string category = self.GetScriptVarCategory(asVarCategory)
-    RPB_StorageVars.SetFormOnReference(asVarName, self.__GetRefKey(), akValue, category)
+    RPB_StorageVars.SetFormAtPath(self.__GetVarPath(asVarName, category), akValue)
     ; Debug("Actor::SetReference", "["+ self +"] Setting " + asVarName + " on " + this + " to: " + akValue)
 endFunction
 
@@ -905,6 +905,7 @@ event OnEffectStart(Actor akTarget, Actor akCaster)
 
     __this = akTarget
     __refKey = ""
+    __pathPrefix = ""
     __isEffectActive = true
 
     ; Assigns the actor for this script, differentiating between Player and NPC to avoid retrieving properties, instead caching it in a local variable to this script
@@ -1058,6 +1059,27 @@ string function __GetRefKey()
     endif
 
     return __refKey
+endFunction
+
+;/
+    "<root>.<reference>.<category>." for the given category, cached (one category at a time: a script uses one, or
+    falls back to rebuilding it when another is asked for), so a variable's path is a single concat of its name.
+    Identical to the path StorageVars builds itself; reset with __refKey in OnEffectStart.
+/;
+string __pathPrefix
+string __pathPrefixCategory
+
+string function __GetVarPath(string asVarName, string asCategory)
+    if (__pathPrefix == "" || __pathPrefixCategory != asCategory)
+        __pathPrefix = RPB_StorageVars.GetPathPrefixOnReference(self.__GetRefKey(), asCategory)
+        __pathPrefixCategory = asCategory
+    endif
+
+    if (__pathPrefix == "null")
+        return "null"
+    endif
+
+    return __pathPrefix + asVarName
 endFunction
 
 bool property RegisterSleepEvents auto

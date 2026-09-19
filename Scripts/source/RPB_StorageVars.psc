@@ -15,8 +15,10 @@ int function GetObjectHandle(string asCategory = "null") global
 endFunction
 
 int function GetObjectHandleOnReference(string asReference, string asCategory = "null") global
-    string referenceId          = ExtractReferenceID(asReference)
-    string referenceSignature   = "(" + "Reference" + " <" + referenceId + ">" + ")"
+    ; Same normalization as GetVarPathOnReference(): a reference string like "[Script < (ID)>]" becomes "(Reference <ID>)",
+    ; an already-normalized key is used as is. (This used to slice the last 11 characters blindly, which only works for
+    ; the first form: passing a normalized key made every delete resolve a garbage path and silently do nothing.)
+    string referenceSignature   = GetReferenceKey(asReference)
 
     if (asCategory != "null" && asCategory != "")
         return JDB.solveObj(GetRootPath() + "." + referenceSignature + "." + asCategory)
@@ -279,6 +281,61 @@ string function GetReferenceKey(string apReference) global
     return apReference
 endFunction
 
+;/
+    The part of GetVarPathOnReference()'s result that does not depend on the key: "<root>.<reference>.<category>."
+    (or "<root>.<reference>." without a category). A path is then just @prefix + key, which one string concat
+    instead of the six GetVarPathOnReference() does (~0.5ms each). Returns "null" when the reference is empty, like
+    GetVarPathOnReference() does. Use with the ...AtPath accessors; the resulting paths are identical.
+/;
+string function GetPathPrefixOnReference(string apReference, string asCategory = "null") global
+    ; With an empty key the path ends with the "." separator that precedes the key
+    return GetVarPathOnReference("", apReference, asCategory)
+endFunction
+
+;/
+    Accessors that take the full path (from GetPathPrefixOnReference() + key) instead of building it.
+    Same JDB calls as the ...OnReference() ones.
+/;
+bool function GetBoolAtPath(string asPath) global
+    return JDB.solveInt(asPath) as bool
+endFunction
+
+int function GetIntAtPath(string asPath) global
+    return JDB.solveInt(asPath)
+endFunction
+
+float function GetFloatAtPath(string asPath) global
+    return JDB.solveFlt(asPath)
+endFunction
+
+string function GetStringAtPath(string asPath) global
+    return JDB.solveStr(asPath)
+endFunction
+
+Form function GetFormAtPath(string asPath) global
+    return JDB.solveForm(asPath)
+endFunction
+
+function SetBoolAtPath(string asPath, bool abValue) global
+    JDB.solveIntSetter(asPath, abValue as int, true)
+endFunction
+
+function SetIntAtPath(string asPath, int aiValue) global
+    JDB.solveIntSetter(asPath, aiValue, true)
+endFunction
+
+function SetFloatAtPath(string asPath, float afValue) global
+    JDB.solveFltSetter(asPath, afValue, true)
+endFunction
+
+function SetStringAtPath(string asPath, string asValue) global
+    JDB.solveStrSetter(asPath, asValue, true)
+endFunction
+
+function SetFormAtPath(string asPath, Form akValue) global
+    JDB.solveFormSetter(asPath, akValue, true)
+endFunction
+
 ;                          Getters
 
 bool function GetBoolOnReference(string asKey, string apReference, string asCategory = "null") global
@@ -412,7 +469,8 @@ endFunction
 function DeleteAllOnReference(string apReference) global
     int deletedObj = GetObjectHandleOnReference(apReference)
     JMap.clear(deletedObj)
-    JMap.removeKey(GetObjectHandle(), apReference as string)
+    ; The root entry is stored under the normalized key, the raw string never matched it (empty maps were left behind)
+    JMap.removeKey(GetObjectHandle(), GetReferenceKey(apReference))
 endFunction
 
 bool function HasVarOnReference(string asKey, string apReference, string asCategory = "null") global
