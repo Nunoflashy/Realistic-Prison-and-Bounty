@@ -2356,7 +2356,12 @@ event OnPrisonerImprisonmentFail(RPB_Prisoner apPrisoner, string reason)
             prisonerArresteeState.Destroy()
         endif
 
-        self.UnregisterPrisoner(apPrisoner)
+        ; Destroy() (not just UnregisterPrisoner()) so the prisoner's state is wiped too: its "Initialized"
+        ; flag survived an unregister-only, and a later re-arrest of this same NPC then skipped registering
+        ; (RPB_Prisoner.OnInitialize returns early when "Initialized" is already true) or would have kept
+        ; the previous sentence and release location. Destroy() clears the state, then unregisters (which
+        ; also removes the spell), exactly like the release path.
+        apPrisoner.Destroy()
     endif
 endEvent
 
@@ -2645,7 +2650,8 @@ event OnPrisonerCellAssignFail(RPB_Prisoner apPrisoner, RPB_JailCell akJailCell)
         return
     endif
 
-    self.UnregisterPrisoner(apPrisoner)
+    ; Destroy() clears the prisoner's state as well as unregistering it (see OnPrisonerImprisonmentFail)
+    apPrisoner.Destroy()
 endEvent
 
 ; Refactor to use CK Triggers, this should be fired on enter/leave trigger

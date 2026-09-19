@@ -83,6 +83,8 @@ function SetTests()
     self.AddTest("51 - Await: Group Flow, Sequential API vs Burst (N=5)", "Test_Await_GroupFlow", abChainable = false)
     self.AddTest("52 - Await: After the Fast-Polling / Unloaded-Actor / None-Safety Fixes", "Test_Await_AfterFixes", abChainable = false)
     self.AddTest("53 - Await: A Stale 'Initialized' Flag Blocks Prisoner Registration", "Test_Await_StaleInitializedFlag", abChainable = false)
+    self.AddTest("54 - Prisoner.Initialize(): Per-Step Profile", "Test_Prisoner_InitializeProfile", abChainable = false)
+    self.AddTest("55 - Prison: A Failed Imprisonment Cleans the Prisoner's State Up", "Test_Prison_ImprisonmentFailCleansUp", abChainable = false)
     self.AddTest("41 - ActiveMagicEffectContainer: Stuck Lock Self-Heals", "Test_ActiveMagicEffectContainer_StuckLockSelfHeals")
     self.AddTest("42 - ThreadLock: JAtomic Primitive Semantics and Registry", "Test_ThreadLock_PrimitiveSemantics")
     ; Not chainable: fires concurrent worker threads
@@ -3650,6 +3652,234 @@ state Test_Await_StaleInitializedFlag
         endWhile
         log("STALE FLAG: after wiping the state and re-adding the spell, registered after " + self.__Ms(Utility.GetCurrentRealTime() - t0) + "ms -> " + reg)
         step = assert_true(reg != none, "The actor still did not register after the stale state was wiped")
+        ok = ok && step
+
+        display_result(ok)
+    endFunction
+
+    function Teardown()
+        __TeardownAllTempActors()
+    endFunction
+endState
+
+; ----------------------------------------------------------
+;   Prisoner.Initialize() profile (test 54): a stopwatch that adds each step's elapsed time to a slot
+; ----------------------------------------------------------
+
+float __lapStart
+int[] __lapTotals
+
+function __LapBegin()
+    __lapStart = Utility.GetCurrentRealTime()
+endFunction
+
+;/ Adds the time since the last LapBegin/LapEnd to slot @aiSlot and starts the next lap. /;
+function __LapEnd(int aiSlot)
+    float now = Utility.GetCurrentRealTime()
+    __lapTotals[aiSlot] = __lapTotals[aiSlot] + self.__Ms(now - __lapStart)
+    __lapStart = now
+endFunction
+
+;/
+    Where do the ~1127ms of RPB_Prisoner.Initialize() go (81% of a prisoner await)? Initialize() is a
+    fixed sequence of public calls, so this registers 3 prisoners the normal way, then replays
+    Initialize()'s body on each one step by step with its own stopwatch, and prints the steps ranked by
+    time. A control run of the real Initialize() on 3 more prisoners shows the replay matches it.
+    Nothing in production is changed. Timer resolution is coarse (~10-16ms), so treat steps of a few
+    ms as noise; the big ones stand out.
+/;
+state Test_Prisoner_InitializeProfile
+    function Setup()
+        RPB_Prison prison = (RPB_API.GetPrisonManager()).GetPrison("Haafingar")
+        int N = 3
+        bool ok = true
+
+        string[] names = new string[12]
+        names[0] = "Prison.IsPrisoner check"
+        names[1] = "SetSentence"
+        names[2] = "RegisterSleepEvents = true"
+        names[3] = "RegisterForTrackedStats"
+        names[4] = "LockPrisonerSettings"
+        names[5] = "Show* property writes (5)"
+        names[6] = "DetermineStrippingType"
+        names[7] = "DetermineClothingOutfit"
+        names[8] = "SetReleaseLocation"
+        names[9] = "UpdateInfamyLost"
+        names[10] = "TriggerInfamyPenalty"
+        names[11] = "error check + SetBool Initialized"
+
+        __lapTotals = new int[16]
+
+        ; --- replay of Initialize()'s body, step by step ---
+        int i = 0
+        while (i < N)
+            Actor a = __SpawnTempActor()
+            self.__EnsureKind("prisoner", a, prison)
+            RPB_ActorBase reg = none
+            float t0 = Utility.GetCurrentRealTime()
+            while (!reg && (Utility.GetCurrentRealTime() - t0) < 30.0)
+                reg = self.__LookupKind("prisoner", a, prison)
+                if (!reg)
+                    Utility.Wait(0.025)
+                endif
+            endWhile
+
+            RPB_Prisoner p = reg as RPB_Prisoner
+            if (!p)
+                ok = assert_true(false, "Prisoner #" + i + " never registered, cannot profile") && ok
+            else
+                self.__LapBegin()
+
+                bool isPrisoner = prison.IsPrisoner(p)
+                self.__LapEnd(0)
+
+                if (!p.Sentence)
+                    p.SetSentence()
+                endif
+                self.__LapEnd(1)
+
+                p.RegisterSleepEvents = true
+                self.__LapEnd(2)
+
+                p.RegisterForTrackedStats()
+                self.__LapEnd(3)
+
+                p.LockPrisonerSettings()
+                self.__LapEnd(4)
+
+                p.ShowSentence = true
+                p.ShowReleaseTime = true
+                p.ShowTimeLeftInSentence = true
+                p.ShowTimeServed = true
+                p.ShowBounty = true
+                self.__LapEnd(5)
+
+                p.DetermineStrippingType()
+                self.__LapEnd(6)
+
+                p.DetermineClothingOutfit()
+                self.__LapEnd(7)
+
+                p.SetReleaseLocation()
+                self.__LapEnd(8)
+
+                p.UpdateInfamyLost()
+                self.__LapEnd(9)
+
+                p.TriggerInfamyPenalty()
+                self.__LapEnd(10)
+
+                int errors = RPB_Memory.FastArray("<string>")
+                errors = EnsureTrue((p.WillBeStrippedNaked || p.WillBeStrippedToUnderwear), "Could not determine the stripping type for Prisoner " + p.Name, errors)
+                errors = EnsureTrue(p.TeleportReleaseLocation, "Could not determine the release location for Prisoner " + p.Name, errors)
+                bool hasErrors = RPB_Memory.FastArray_Size(errors) > 0
+                p.SetBool("Initialized", true)
+                self.__LapEnd(11)
+            endif
+
+            Utility.Wait(1.0)
+            i += 1
+        endWhile
+
+        ; --- control: the real Initialize() on fresh prisoners ---
+        int controlTotal = 0
+        i = 0
+        while (i < N)
+            Actor c = __SpawnTempActor()
+            self.__EnsureKind("prisoner", c, prison)
+            RPB_ActorBase creg = none
+            float tc = Utility.GetCurrentRealTime()
+            while (!creg && (Utility.GetCurrentRealTime() - tc) < 30.0)
+                creg = self.__LookupKind("prisoner", c, prison)
+                if (!creg)
+                    Utility.Wait(0.025)
+                endif
+            endWhile
+            if (creg)
+                float ti = Utility.GetCurrentRealTime()
+                (creg as RPB_Prisoner).Initialize()
+                controlTotal += self.__Ms(Utility.GetCurrentRealTime() - ti)
+            endif
+            Utility.Wait(1.0)
+            i += 1
+        endWhile
+
+        ; --- report, ranked by time ---
+        int grand = 0
+        int k = 0
+        while (k < 12)
+            grand += __lapTotals[k]
+            k += 1
+        endWhile
+
+        bool[] printed = new bool[12]
+        int rank = 0
+        while (rank < 12)
+            int best = -1
+            k = 0
+            while (k < 12)
+                if (!printed[k] && (best < 0 || __lapTotals[k] > __lapTotals[best]))
+                    best = k
+                endif
+                k += 1
+            endWhile
+            printed[best] = true
+
+            int avg = __lapTotals[best] / N
+            int share = 0
+            if (grand > 0)
+                share = (__lapTotals[best] * 100) / grand
+            endif
+            log("INITIALIZE PROFILE #" + (rank + 1) + ": " + names[best] + " - " + avg + "ms avg (" + share + "%)")
+            rank += 1
+        endWhile
+
+        log("INITIALIZE PROFILE total: replay " + (grand / N) + "ms avg per prisoner vs the real Initialize() " + (controlTotal / N) + "ms avg")
+        display_result(ok)
+    endFunction
+
+    function Teardown()
+        __TeardownAllTempActors()
+    endFunction
+endState
+
+;/
+    A failed imprisonment ("Assign Cell") used to unregister the prisoner without Destroy(), leaving its
+    "Initialized" state behind: a later re-arrest of the same NPC then could not register (OnInitialize
+    returns early on a stale flag) or would have kept the previous sentence and release location. Calls the
+    fail event directly on a registered, initialized temp prisoner and checks the cleanup, including that the
+    same actor can be registered again straight afterwards.
+/;
+state Test_Prison_ImprisonmentFailCleansUp
+    function Setup()
+        RPB_Prison prison = (RPB_API.GetPrisonManager()).GetPrison("Haafingar")
+        bool ok = true
+        bool step = false
+
+        Actor a = __SpawnTempActor()
+        RPB_Prisoner p = prison.AwaitPrisonerReference(a)
+        step = assert_true(p != none, "Could not register the prisoner used for this test")
+        ok = ok && step
+        if (!p)
+            display_result(false)
+            return
+        endif
+        step = assert_true(RPB_StorageVars.GetBoolOnReference("Initialized", a, "Jail"), "Precondition: the prisoner should be initialized (flag set)")
+        ok = ok && step
+
+        prison.OnPrisonerImprisonmentFail(p, "Assign Cell")
+        Utility.Wait(1.5)
+
+        step = assert_true(prison.Prisoners.AtKey(a) == none, "The prisoner is still in the list after a failed imprisonment")
+        ok = ok && step
+        step = assert_false(RPB_StorageVars.GetBoolOnReference("Initialized", a, "Jail"), "The 'Initialized' flag survived a failed imprisonment (stale state)")
+        ok = ok && step
+        step = assert_false(a.HasSpell(RPB_Utility.RPB_PrisonerSpell()), "The prisoner spell is still on the actor")
+        ok = ok && step
+
+        ; The same actor must be able to become a prisoner again
+        RPB_Prisoner again = prison.AwaitPrisonerReference(a)
+        step = assert_true(again != none, "The same actor could not be registered again after the failed imprisonment")
         ok = ok && step
 
         display_result(ok)
