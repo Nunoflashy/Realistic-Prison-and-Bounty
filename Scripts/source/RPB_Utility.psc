@@ -1196,10 +1196,9 @@ RPB_ActorBase function AwaitEntityReference(\
         ; only turns "can't happen" into a long stall, so give it a short grace period to load and
         ; then say why.
         ;/ const /; float LOAD_GRACE_SECONDS = 5.0
-        float loadWaited = 0.0
-        while (!akEntity.Is3DLoaded() && loadWaited < LOAD_GRACE_SECONDS)
+        float loadWaitStart = Utility.GetCurrentRealTime()
+        while (!akEntity.Is3DLoaded() && (Utility.GetCurrentRealTime() - loadWaitStart) < LOAD_GRACE_SECONDS)
             Utility.Wait(0.1)
-            loadWaited += 0.1
         endWhile
 
         if (!akEntity.Is3DLoaded())
