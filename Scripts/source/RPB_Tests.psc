@@ -57,6 +57,18 @@ function SetTests()
     self.AddTest("28 - Benchmark: 32x32 vs 128x8 Page Dispatch at ~1000 Entries", "Benchmark_PageDispatch_32x32_vs_128x8", abChainable = false)
     ; Not chainable: a benchmark, not a correctness test - same treatment as 21/27/28
     self.AddTest("29 - Benchmark: FindKeyForIndex Scan Cost at 150 Entries", "Benchmark_FindKeyForIndexScanCost", abChainable = false)
+    self.AddTest("30 - ActiveMagicEffectContainer: Forward/Reverse Index Maps Stay In Sync", "Test_ActiveMagicEffectContainer_IndexMapsInSync")
+    self.AddTest("31 - ActiveMagicEffectContainer: Reverse Map Rebuilds After Missing (Old-Save Migration)", "Test_ActiveMagicEffectContainer_ReverseMapMigration")
+    ; Not chainable: a benchmark, not a correctness test - same treatment as 21/27/28/29
+    self.AddTest("32 - Benchmark: Scan-Based vs Reverse-Index Removal", "Benchmark_ScanVsReverseIndexRemoval", abChainable = false)
+    ; Not chainable: a benchmark, not a correctness test - same treatment as 21/27/28/29/32
+    self.AddTest("33 - Benchmark: Container Per-Operation Overhead Breakdown", "Benchmark_ContainerOverheadBreakdown", abChainable = false)
+    ; Not chainable: a benchmark, not a correctness test - same treatment as 21/27/28/29/32/33
+    self.AddTest("34 - Benchmark: Page Allocation/Free Cost", "Benchmark_PageAllocationCost", abChainable = false)
+    ; Not chainable: a benchmark, not a correctness test - same treatment as 21/27/28/29/32/33/34
+    self.AddTest("35 - Benchmark: Function Size vs Call Cost", "Benchmark_FunctionSizeCallCost", abChainable = false)
+    ; Not chainable: fills the container to its full 1024-entry capacity, takes a while
+    self.AddTest("36 - ActiveMagicEffectContainer: Full Capacity (All 32 Pages)", "Test_ActiveMagicEffectContainer_FullCapacity", abChainable = false)
 endFunction
 
 state Test_25Days_After_26th_Frostfall_Is_20th_Suns_Dusk
@@ -433,6 +445,7 @@ state Test_ActiveMagicEffectContainer_PageBoundary
         endWhile
 
         bool countCorrect = assert_true(_container.Count == startCount + entriesToAdd, "Expected Count == " + (startCount + entriesToAdd) + ", got " + _container.Count)
+        bool syncedAfterAdds = self.__AssertContainerInSync(_container, "after " + entriesToAdd + " adds across pages 0-4")
 
         ; Index 33 falls inside page 1 (33 / 32 == 1) - confirms the page0/page1 boundary was
         ; actually crossed, not just that 150 items were stored somehow
@@ -454,8 +467,9 @@ state Test_ActiveMagicEffectContainer_PageBoundary
         endWhile
 
         bool cleanedUp = assert_true(_container.Count == startCount, "Container did not return to its original Count after cleanup, got " + _container.Count)
+        bool syncedAfterCleanup = self.__AssertContainerInSync(_container, "after draining every page-boundary entry")
 
-        display_result(countCorrect && crossedPage && removedCorrectly && goneKeyGone && cleanedUp)
+        display_result(countCorrect && syncedAfterAdds && crossedPage && removedCorrectly && goneKeyGone && cleanedUp && syncedAfterCleanup)
     endFunction
 endState
 
@@ -998,6 +1012,1124 @@ state Benchmark_FindKeyForIndexScanCost
 endState
 
 ; ==========================================================
+;   ActiveMagicEffectContainer: forward/reverse index map tests
+;
+;   RPB_ActiveMagicEffectContainer keeps a key -> index map and its mirror, index -> key, so
+;   RemoveElement()'s swap step is O(1). These tests prove the two never drift apart, using
+;   the container's own ValidateIndexConsistency() (Count vs both map sizes, every key round-
+;   tripping through both maps, every index in [0, Count) owned by exactly one key) plus
+;   independent checks through the public API. All of them use cheap synthetic keys and a None
+;   payload on the real, live ArresteeList container and remove everything they add.
+; ==========================================================
+
+;/
+    Asserts the container's forward and reverse maps are consistent right now. @asStage only
+    labels the failure message so a failing run says WHERE the maps first diverged.
+/;
+bool function __AssertContainerInSync(RPB_ActiveMagicEffectContainer apContainer, string asStage)
+    string problem = apContainer.ValidateIndexConsistency()
+    return assert_true(problem == "", "Index maps out of sync " + asStage + ": " + problem)
+endFunction
+
+;/
+    Compares the container against a shadow model of what should be present: @abPresent[i] says
+    whether key (@asKeyPrefix + i) should currently exist. Checks every key's HasKey() result
+    and that Count equals the baseline plus the number expected present.
+/;
+bool function __ContainerMatchesShadow(RPB_ActiveMagicEffectContainer apContainer, bool[] abPresent, string asKeyPrefix, int aiStartCount, string asStage)
+    int expectedPresent = 0
+    int mismatches = 0
+    bool isPresent = false
+    string firstMismatch = ""
+
+    int i = 0
+    while (i < abPresent.Length)
+        isPresent = apContainer.HasKey(asKeyPrefix + i)
+        if (abPresent[i])
+            expectedPresent += 1
+        endif
+        if (isPresent != abPresent[i])
+            mismatches += 1
+            if (firstMismatch == "")
+                firstMismatch = asKeyPrefix + i + " (expected " + abPresent[i] + ", HasKey said " + isPresent + ")"
+            endif
+        endif
+        i += 1
+    endWhile
+
+    bool keysMatch = assert_true(mismatches == 0, "HasKey disagrees with shadow model " + asStage + ": " + mismatches + " mismatch(es), first: " + firstMismatch)
+    bool countMatches = assert_true(apContainer.Count == aiStartCount + expectedPresent, "Count " + apContainer.Count + " != expected " + (aiStartCount + expectedPresent) + " " + asStage)
+    return keysMatch && countMatches
+endFunction
+
+state Test_ActiveMagicEffectContainer_IndexMapsInSync
+    function Setup()
+        RPB_ActiveMagicEffectContainer _container = API.Arrest.GetAliasByName("ArresteeList") as RPB_ActiveMagicEffectContainer
+        int startCount = _container.Count
+        int ENTRIES = 70 ; pages 0, 1 and 2 (32 + 32 + 6) - crosses two page boundaries
+        string PREFIX = "SyncTest_"
+
+        bool ok = true
+        bool step = false
+
+        step = self.__AssertContainerInSync(_container, "at baseline, before this test touched anything")
+        ok = ok && step
+
+        ; --- Phase 1: straight appends. Dense packing means the entry added i-th lands at
+        ; index startCount + i, so the reverse map can be checked directly through the public API
+        bool[] present = new bool[70]
+        int i = 0
+        while (i < ENTRIES)
+            _container.AddElement(none, PREFIX + i)
+            present[i] = true
+            i += 1
+        endWhile
+
+        step = self.__AssertContainerInSync(_container, "after " + ENTRIES + " appends")
+        ok = ok && step
+        step = assert_equals(PREFIX + 0, _container.GetKeyAtIndex(startCount + 0), "Reverse map: wrong key at first appended index")
+        ok = ok && step
+        step = assert_equals(PREFIX + 33, _container.GetKeyAtIndex(startCount + 33), "Reverse map: wrong key at an index inside page 1")
+        ok = ok && step
+        step = assert_equals(PREFIX + 69, _container.GetKeyAtIndex(startCount + 69), "Reverse map: wrong key at the last appended index")
+        ok = ok && step
+        step = assert_equals("", _container.GetKeyAtIndex(startCount + ENTRIES), "GetKeyAtIndex should return \"\" one past the last live index")
+        ok = ok && step
+
+        ; --- Phase 2: the three distinct removal shapes, each verified individually ---
+        ; (a) remove the FIRST entry: the last one (69) must be swapped into its slot, and the
+        ; reverse map must now say so
+        _container.RemoveElement(PREFIX + 0, dispel = false)
+        present[0] = false
+        step = assert_equals(PREFIX + 69, _container.GetKeyAtIndex(startCount + 0), "Swap: last entry should now occupy the freed first slot")
+        ok = ok && step
+        step = self.__AssertContainerInSync(_container, "after removing the first entry (swap from the end)")
+        ok = ok && step
+
+        ; (b) remove whatever is CURRENTLY last - the removedIndex == lastIndex path, where no
+        ; swap happens and only the reverse map's trailing entry has to go
+        step = assert_equals(PREFIX + 68, _container.GetKeyAtIndex(_container.Count - 1), "Expected entry 68 to be last after entry 69 was swapped forward")
+        ok = ok && step
+        _container.RemoveElement(PREFIX + 68, dispel = false)
+        present[68] = false
+        step = self.__AssertContainerInSync(_container, "after removing the current last entry (no-swap path)")
+        ok = ok && step
+
+        ; (c) remove a middle entry that sits in a different page from the last one
+        _container.RemoveElement(PREFIX + 33, dispel = false)
+        present[33] = false
+        step = self.__AssertContainerInSync(_container, "after removing a middle entry across a page boundary")
+        ok = ok && step
+        step = self.__ContainerMatchesShadow(_container, present, PREFIX, startCount, "after the three targeted removals")
+        ok = ok && step
+
+        ; --- Phase 3: deterministic pseudo-random churn against a shadow model. Each op toggles
+        ; one slot (present -> remove, absent -> add). The generator is a small full-period LCG so
+        ; every run replays the exact same sequence; a failure is reproducible, not flaky.
+        int seed = 12345
+        int slot = 0
+        int op = 0
+        while (op < 150)
+            seed = (seed * 75 + 74) % 65537
+            slot = seed % ENTRIES
+
+            if (present[slot])
+                _container.RemoveElement(PREFIX + slot, dispel = false)
+                present[slot] = false
+            else
+                _container.AddElement(none, PREFIX + slot)
+                present[slot] = true
+            endif
+
+            op += 1
+            if ((op % 15) == 0)
+                step = self.__AssertContainerInSync(_container, "during churn, after op " + op)
+                ok = ok && step
+                step = self.__ContainerMatchesShadow(_container, present, PREFIX, startCount, "during churn, after op " + op)
+                ok = ok && step
+            endif
+        endWhile
+
+        ; --- Phase 4: drain everything left, then confirm the container is back where it began
+        i = 0
+        while (i < ENTRIES)
+            if (present[i])
+                _container.RemoveElement(PREFIX + i, dispel = false)
+                present[i] = false
+            endif
+            i += 1
+        endWhile
+
+        step = self.__AssertContainerInSync(_container, "after draining every synthetic entry")
+        ok = ok && step
+        step = assert_true(_container.Count == startCount, "Container did not return to its original Count after cleanup, got " + _container.Count)
+        ok = ok && step
+
+        display_result(ok)
+    endFunction
+endState
+
+;/
+    The old-save migration path. An alias saved before __indexToKey existed loads with a valid
+    __keyToIndex and Count but an unset (0) reverse map, and OnInit() doesn't re-fire. That's
+    exactly what DebugSimulateMissingReverseIndex() recreates, so this proves - without needing
+    an old save - that (1) the next ordinary call rebuilds the mirror, (2) it does so WITHOUT
+    touching Count or losing entries (unlike the invalid-__keyToIndex recovery, which
+    deliberately resets both), and (3) removal, which depends on the rebuilt mirror to swap
+    correctly, works straight afterwards. Any real entries already in ArresteeList are part of
+    the rebuild too, so this also covers real state, not just synthetic keys.
+/;
+state Test_ActiveMagicEffectContainer_ReverseMapMigration
+    function Setup()
+        RPB_ActiveMagicEffectContainer _container = API.Arrest.GetAliasByName("ArresteeList") as RPB_ActiveMagicEffectContainer
+        int startCount = _container.Count
+        int ENTRIES = 40 ; spans page 0 and page 1
+        string PREFIX = "MigrationTest_"
+
+        bool ok = true
+        bool step = false
+
+        int i = 0
+        while (i < ENTRIES)
+            _container.AddElement(none, PREFIX + i)
+            i += 1
+        endWhile
+
+        step = self.__AssertContainerInSync(_container, "before simulating the missing reverse map")
+        ok = ok && step
+
+        ; --- Round 1: healed by an ordinary read (HasKey), not by the validator itself ---
+        _container.DebugSimulateMissingReverseIndex()
+
+        step = assert_true(_container.HasKey(PREFIX + 17), "Entry lost after the reverse map went missing")
+        ok = ok && step
+        step = assert_true(_container.Count == startCount + ENTRIES, "Count must survive the rebuild untouched, expected " + (startCount + ENTRIES) + ", got " + _container.Count)
+        ok = ok && step
+        step = assert_equals(PREFIX + 17, _container.GetKeyAtIndex(startCount + 17), "Rebuilt reverse map returned the wrong key")
+        ok = ok && step
+        step = self.__AssertContainerInSync(_container, "after the rebuild triggered by HasKey")
+        ok = ok && step
+
+        ; --- Round 2: healed by RemoveElement itself, the operation that depends on it most ---
+        _container.DebugSimulateMissingReverseIndex()
+        _container.RemoveElement(PREFIX + 3, dispel = false)
+
+        step = assert_false(_container.HasKey(PREFIX + 3), "Removed key still present after rebuild-then-remove")
+        ok = ok && step
+        step = assert_equals(PREFIX + 39, _container.GetKeyAtIndex(startCount + 3), "Removal straight after a rebuild swapped the wrong entry into the freed slot")
+        ok = ok && step
+        step = self.__AssertContainerInSync(_container, "after removing straight after a rebuild")
+        ok = ok && step
+
+        ; --- Round 3: healed by AddElement, then confirm the new entry is reverse-mapped too ---
+        _container.DebugSimulateMissingReverseIndex()
+        _container.AddElement(none, PREFIX + "Late")
+
+        step = assert_equals(PREFIX + "Late", _container.GetKeyAtIndex(_container.Count - 1), "Entry added straight after a rebuild is missing from the reverse map")
+        ok = ok && step
+        step = self.__AssertContainerInSync(_container, "after adding straight after a rebuild")
+        ok = ok && step
+
+        ; Cleanup
+        _container.RemoveElement(PREFIX + "Late", dispel = false)
+        i = 0
+        while (i < ENTRIES)
+            if (_container.HasKey(PREFIX + i))
+                _container.RemoveElement(PREFIX + i, dispel = false)
+            endif
+            i += 1
+        endWhile
+
+        step = self.__AssertContainerInSync(_container, "after cleanup")
+        ok = ok && step
+        step = assert_true(_container.Count == startCount, "Container did not return to its original Count after cleanup, got " + _container.Count)
+        ok = ok && step
+
+        display_result(ok)
+    endFunction
+endState
+
+;/
+    Times the bookkeeping half of RemoveElement() with and without the reverse map. Both modes
+    do the identical add-then-drain over a fresh FastMap; the only difference is how the swap
+    step finds "which key owns the last index": an O(n) scan (the pre-reverse-map behavior,
+    via __ScanForKeyAtIndex, which mirrors the old __FindKeyForIndex exactly) or an O(1) lookup
+    in a second map that Add/Remove keep up to date (the current behavior). Returns
+    [add milliseconds, remove milliseconds], totalled across @aiRepeats runs - repeats exist so
+    the small, real-scale sizes accumulate a measurable time instead of rounding to zero.
+/;
+float[] function __RunBookkeepingBench(int aiEntries, int aiRepeats, bool abUseReverseIndex)
+    float addSeconds = 0.0
+    float removeSeconds = 0.0
+    float startTime = 0.0
+    int keyToIndex = 0
+    int indexToKey = 0
+    int liveCount = 0
+    int removedIndex = 0
+    int lastIndex = 0
+    string removeKey = ""
+    string lastKey = ""
+
+    int rep = 0
+    while (rep < aiRepeats)
+        keyToIndex = FastMap("<string>", true)
+        if (abUseReverseIndex)
+            indexToKey = FastMap("<int>", true)
+        endif
+
+        startTime = Utility.GetCurrentRealTime()
+        int i = 0
+        while (i < aiEntries)
+            FastMap_SetInt(keyToIndex, "Key_" + i, i)
+            if (abUseReverseIndex)
+                FastIntMap_SetString(indexToKey, i, "Key_" + i)
+            endif
+            i += 1
+        endWhile
+        addSeconds += Utility.GetCurrentRealTime() - startTime
+
+        startTime = Utility.GetCurrentRealTime()
+        liveCount = aiEntries
+        i = 0
+        while (i < aiEntries)
+            removeKey = "Key_" + i
+            removedIndex = FastMap_GetInt(keyToIndex, removeKey)
+            lastIndex = liveCount - 1
+
+            if (removedIndex != lastIndex)
+                if (abUseReverseIndex)
+                    lastKey = FastIntMap_GetString(indexToKey, lastIndex)
+                else
+                    lastKey = self.__ScanForKeyAtIndex(keyToIndex, lastIndex)
+                endif
+
+                if (lastKey != "")
+                    FastMap_SetInt(keyToIndex, lastKey, removedIndex)
+                    if (abUseReverseIndex)
+                        FastIntMap_SetString(indexToKey, removedIndex, lastKey)
+                    endif
+                endif
+            endif
+
+            FastMap_RemoveKey(keyToIndex, removeKey)
+            if (abUseReverseIndex)
+                FastIntMap_RemoveKey(indexToKey, lastIndex)
+            endif
+            liveCount -= 1
+            i += 1
+        endWhile
+        removeSeconds += Utility.GetCurrentRealTime() - startTime
+
+        FastMap_Release(keyToIndex)
+        if (abUseReverseIndex)
+            FastMap_Release(indexToKey)
+        endif
+        rep += 1
+    endWhile
+
+    float[] result = new float[2]
+    result[0] = addSeconds * 1000.0
+    result[1] = removeSeconds * 1000.0
+    return result
+endFunction
+
+;/
+    Answers "what did the reverse map actually buy, and what did it cost": the same add+drain
+    workload with and without it, at the container's real scale (15 entries, the documented
+    ceiling, repeated 20x) and at the 150-entry stress size test 12/29 use, then the real
+    container's own end-to-end Add+drain at 150 entries (test 12's exact workload, whose
+    pre-reverse-map figure was ~6250ms, ~2361ms of it the scan).
+/;
+state Benchmark_ScanVsReverseIndexRemoval
+    function Setup()
+        float[] scanSmall = self.__RunBookkeepingBench(15, 20, false)
+        float[] indexSmall = self.__RunBookkeepingBench(15, 20, true)
+        float[] scanLarge = self.__RunBookkeepingBench(150, 1, false)
+        float[] indexLarge = self.__RunBookkeepingBench(150, 1, true)
+
+        log("BENCH real scale (15 entries x20 runs) - scan: add " + (scanSmall[0] as int) + "ms, remove " + (scanSmall[1] as int) + "ms | reverse map: add " + (indexSmall[0] as int) + "ms, remove " + (indexSmall[1] as int) + "ms")
+        log("BENCH stress (150 entries x1 run) - scan: add " + (scanLarge[0] as int) + "ms, remove " + (scanLarge[1] as int) + "ms | reverse map: add " + (indexLarge[0] as int) + "ms, remove " + (indexLarge[1] as int) + "ms")
+        Debug.Notification("15x20 remove: scan " + (scanSmall[1] as int) + "ms vs map " + (indexSmall[1] as int) + "ms")
+        Debug.Notification("150 remove: scan " + (scanLarge[1] as int) + "ms vs map " + (indexLarge[1] as int) + "ms")
+
+        ; --- The real container, test 12's exact workload ---
+        RPB_ActiveMagicEffectContainer _container = API.Arrest.GetAliasByName("ArresteeList") as RPB_ActiveMagicEffectContainer
+        int startCount = _container.Count
+        int ENTRIES = 150
+
+        float realBench = StartBenchmark()
+        int i = 0
+        while (i < ENTRIES)
+            _container.AddElement(none, "BenchReverseIdx_" + i)
+            i += 1
+        endWhile
+        i = 0
+        while (i < ENTRIES)
+            _container.RemoveElement("BenchReverseIdx_" + i, dispel = false)
+            i += 1
+        endWhile
+        int realElapsed = EndBenchmark(realBench, "Real container: " + ENTRIES + " adds + full drain (reverse map; test 12 measured ~6250ms before it)")
+
+        log("BENCH real container 150 add+drain: " + realElapsed + "ms (was ~6250ms scan-based, test 12)")
+        Debug.Notification("Real container 150 add+drain: " + realElapsed + "ms (was ~6250)")
+
+        bool inSync = self.__AssertContainerInSync(_container, "after the real-container benchmark drain")
+        bool backToStart = assert_true(_container.Count == startCount, "Container did not return to its original Count, got " + _container.Count)
+
+        display_result(inSync && backToStart, showTimeElapsed = false)
+    endFunction
+endState
+
+;/
+    Breaks the real container's per-operation cost into its parts, to find where the ~3.5s of
+    overhead in test 12's workload (150 adds + full drain = 4003ms, versus ~484ms of bare map
+    bookkeeping in benchmark 32) actually goes. Everything runs against the live ArresteeList
+    with cheap synthetic keys and a None payload, and only READS the container's public API -
+    nothing about the container is changed by this test. Each phase is timed on its own:
+
+      - string concat floor: building the same "prefix + i" key strings, no container involved
+      - call floor:          a trivial cross-script call (GetSize) - the price of just reaching
+                             the container from here, before it does any work
+      - AddElement only:     150 adds (compare: ~165ms of bare map writes in benchmark 32)
+      - HasKey:              150 hits + 150 misses
+      - remove from FRONT:   ascending keys, so every removal takes the swap path
+      - remove from BACK:    descending keys, so every removal is the last element (no swap)
+
+    Per-call microseconds are logged next to each total so phases with different call counts
+    compare directly.
+/;
+state Benchmark_ContainerOverheadBreakdown
+    function Setup()
+        RPB_ActiveMagicEffectContainer _container = API.Arrest.GetAliasByName("ArresteeList") as RPB_ActiveMagicEffectContainer
+        int startCount = _container.Count
+        int ENTRIES = 150
+        string PREFIX = "OverheadBench_"
+
+        int i = 0
+        int sinkInt = 0
+        bool sinkBool = false
+        string sinkString = ""
+        float bench = 0.0
+
+        ; --- string concat floor ---
+        bench = StartBenchmark()
+        i = 0
+        while (i < ENTRIES * 2)
+            sinkString = PREFIX + i
+            i += 1
+        endWhile
+        int concatMs = EndBenchmark(bench, "String concat floor: " + (ENTRIES * 2) + " x (prefix + i)")
+
+        ; --- cross-script call floor ---
+        bench = StartBenchmark()
+        i = 0
+        while (i < ENTRIES * 2)
+            sinkInt = _container.GetSize()
+            i += 1
+        endWhile
+        int callFloorMs = EndBenchmark(bench, "Cross-script call floor: " + (ENTRIES * 2) + " x GetSize()")
+
+        ; --- AddElement only ---
+        bench = StartBenchmark()
+        i = 0
+        while (i < ENTRIES)
+            _container.AddElement(none, PREFIX + i)
+            i += 1
+        endWhile
+        int addMs = EndBenchmark(bench, "AddElement: " + ENTRIES + " adds")
+
+        ; --- HasKey: 150 hits + 150 misses ---
+        bench = StartBenchmark()
+        i = 0
+        while (i < ENTRIES)
+            sinkBool = _container.HasKey(PREFIX + i)
+            sinkBool = _container.HasKey(PREFIX + "miss_" + i)
+            i += 1
+        endWhile
+        int hasKeyMs = EndBenchmark(bench, "HasKey: " + ENTRIES + " hits + " + ENTRIES + " misses")
+
+        ; --- remove from the FRONT: ascending keys, swap path every time ---
+        bench = StartBenchmark()
+        i = 0
+        while (i < ENTRIES)
+            _container.RemoveElement(PREFIX + i, dispel = false)
+            i += 1
+        endWhile
+        int frontMs = EndBenchmark(bench, "RemoveElement from the front (swap path): " + ENTRIES + " removes")
+
+        ; --- re-add (untimed), then remove from the BACK: descending keys, never a swap ---
+        i = 0
+        while (i < ENTRIES)
+            _container.AddElement(none, PREFIX + i)
+            i += 1
+        endWhile
+
+        bench = StartBenchmark()
+        i = ENTRIES - 1
+        while (i >= 0)
+            _container.RemoveElement(PREFIX + i, dispel = false)
+            i -= 1
+        endWhile
+        int backMs = EndBenchmark(bench, "RemoveElement from the back (no-swap path): " + ENTRIES + " removes")
+
+        log("OVERHEAD (ms total | us per call) - concat floor " + concatMs + " | " + ((concatMs * 1000.0 / (ENTRIES * 2)) as int) + ", call floor " + callFloorMs + " | " + ((callFloorMs * 1000.0 / (ENTRIES * 2)) as int) + ", add " + addMs + " | " + ((addMs * 1000.0 / ENTRIES) as int) + ", hasKey " + hasKeyMs + " | " + ((hasKeyMs * 1000.0 / (ENTRIES * 2)) as int) + ", remove front " + frontMs + " | " + ((frontMs * 1000.0 / ENTRIES) as int) + ", remove back " + backMs + " | " + ((backMs * 1000.0 / ENTRIES) as int))
+        Debug.Notification("Add " + addMs + "ms, HasKey " + hasKeyMs + "ms, remove front " + frontMs + "ms, back " + backMs + "ms")
+        Debug.Notification("Floors: concat " + concatMs + "ms, call " + callFloorMs + "ms")
+
+        bool inSync = self.__AssertContainerInSync(_container, "after the overhead benchmark")
+        bool backToStart = assert_true(_container.Count == startCount, "Container did not return to its original Count, got " + _container.Count)
+
+        display_result(inSync && backToStart, showTimeElapsed = false)
+    endFunction
+endState
+
+;/
+    Tests a specific suspicion raised by benchmark 33: that allocating and freeing a page
+    (new ActiveMagicEffect[32] / = none) is the expensive part of the container's cost, not the
+    call count - 150 adds took ~1496ms (~10ms each) versus ~1.1ms for the same map writes in
+    benchmark 32, and 150 entries cross exactly 5 pages. If so, free-on-empty means an
+    arrestee/prisoner list that flips between 0 and 1 entries pays that cost on every Add and
+    every Remove.
+
+    Four measurements, 20 cycles each:
+      - raw [32] alloc + free into a local (no container)
+      - raw [128] alloc + free into a local (does array size matter?)
+      - real container, cycle Add+Remove one key with the container sitting exactly on a page
+        boundary (Count % 32 == 0), so every Add opens a new page and every Remove frees it
+      - the same cycle with the page kept occupied by one extra entry, so no page event happens
+    The last two differ only by the page alloc+free, so their delta / 20 is what one alloc+free
+    really costs through the container. Filling to a boundary works whatever real entries the
+    live ArresteeList already holds. Everything synthetic is removed afterwards.
+/;
+state Benchmark_PageAllocationCost
+    function Setup()
+        RPB_ActiveMagicEffectContainer _container = API.Arrest.GetAliasByName("ArresteeList") as RPB_ActiveMagicEffectContainer
+        int startCount = _container.Count
+        int CYCLES = 20
+        int PAGE_SIZE_ASSUMED = 32 ; matches RPB_ActiveMagicEffectContainer.PAGE_SIZE
+
+        int i = 0
+        float bench = 0.0
+
+        ; --- raw array allocation, no container ---
+        ActiveMagicEffect[] rawPage = none
+        bench = StartBenchmark()
+        i = 0
+        while (i < CYCLES)
+            rawPage = new ActiveMagicEffect[32]
+            rawPage = none
+            i += 1
+        endWhile
+        int raw32Ms = EndBenchmark(bench, "Raw new ActiveMagicEffect[32] + free: " + CYCLES + " cycles")
+
+        bench = StartBenchmark()
+        i = 0
+        while (i < CYCLES)
+            rawPage = new ActiveMagicEffect[128]
+            rawPage = none
+            i += 1
+        endWhile
+        int raw128Ms = EndBenchmark(bench, "Raw new ActiveMagicEffect[128] + free: " + CYCLES + " cycles")
+
+        ; --- fill to exactly a page boundary ---
+        int fillCount = 0
+        while ((_container.Count % PAGE_SIZE_ASSUMED) != 0)
+            _container.AddElement(none, "AllocBenchFill_" + fillCount)
+            fillCount += 1
+        endWhile
+
+        ; --- churn: every Add opens a page, every Remove frees it ---
+        bench = StartBenchmark()
+        i = 0
+        while (i < CYCLES)
+            _container.AddElement(none, "AllocBenchCycle")
+            _container.RemoveElement("AllocBenchCycle", dispel = false)
+            i += 1
+        endWhile
+        int churnMs = EndBenchmark(bench, "Container Add+Remove ON a page boundary: " + CYCLES + " cycles")
+
+        ; --- same cycle, page kept occupied by one extra entry, so no page event ---
+        _container.AddElement(none, "AllocBenchFill_" + fillCount)
+        fillCount += 1
+
+        bench = StartBenchmark()
+        i = 0
+        while (i < CYCLES)
+            _container.AddElement(none, "AllocBenchCycle")
+            _container.RemoveElement("AllocBenchCycle", dispel = false)
+            i += 1
+        endWhile
+        int steadyMs = EndBenchmark(bench, "Container Add+Remove WITHIN a page: " + CYCLES + " cycles")
+
+        ; --- cleanup ---
+        i = 0
+        while (i < fillCount)
+            _container.RemoveElement("AllocBenchFill_" + i, dispel = false)
+            i += 1
+        endWhile
+
+        int deltaMs = churnMs - steadyMs
+        log("PAGE ALLOC (ms total | ms per cycle) - raw[32] " + raw32Ms + " | " + (raw32Ms * 1.0 / CYCLES) + ", raw[128] " + raw128Ms + " | " + (raw128Ms * 1.0 / CYCLES) + ", container on-boundary " + churnMs + " | " + (churnMs * 1.0 / CYCLES) + ", within-page " + steadyMs + " | " + (steadyMs * 1.0 / CYCLES) + ", delta " + deltaMs + " => " + (deltaMs * 1.0 / CYCLES) + "ms per page alloc+free")
+        Debug.Notification("Raw[32] " + raw32Ms + "ms, raw[128] " + raw128Ms + "ms per " + CYCLES + " cycles")
+        Debug.Notification("Container: boundary " + churnMs + "ms vs within-page " + steadyMs + "ms")
+
+        bool inSync = self.__AssertContainerInSync(_container, "after the page-allocation benchmark")
+        bool backToStart = assert_true(_container.Count == startCount, "Container did not return to its original Count, got " + _container.Count)
+
+        display_result(inSync && backToStart, showTimeElapsed = false)
+    endFunction
+endState
+
+;/
+    Helpers for Benchmark_FunctionSizeCallCost: identical behavior (return a constant chosen by
+    an if/elseif chain), differing only in how many branches - i.e. how large - the function is.
+/;
+int function __BenchSmallFn(int aiValue)
+    return aiValue
+endFunction
+
+int function __BenchBig8Fn(int aiValue)
+    if (aiValue == 0)
+        return 100
+    elseif (aiValue == 1)
+        return 101
+    elseif (aiValue == 2)
+        return 102
+    elseif (aiValue == 3)
+        return 103
+    elseif (aiValue == 4)
+        return 104
+    elseif (aiValue == 5)
+        return 105
+    elseif (aiValue == 6)
+        return 106
+    elseif (aiValue == 7)
+        return 107
+    endif
+    return -1
+endFunction
+
+int function __BenchBig32Fn(int aiValue)
+    if (aiValue == 0)
+        return 100
+    elseif (aiValue == 1)
+        return 101
+    elseif (aiValue == 2)
+        return 102
+    elseif (aiValue == 3)
+        return 103
+    elseif (aiValue == 4)
+        return 104
+    elseif (aiValue == 5)
+        return 105
+    elseif (aiValue == 6)
+        return 106
+    elseif (aiValue == 7)
+        return 107
+    elseif (aiValue == 8)
+        return 108
+    elseif (aiValue == 9)
+        return 109
+    elseif (aiValue == 10)
+        return 110
+    elseif (aiValue == 11)
+        return 111
+    elseif (aiValue == 12)
+        return 112
+    elseif (aiValue == 13)
+        return 113
+    elseif (aiValue == 14)
+        return 114
+    elseif (aiValue == 15)
+        return 115
+    elseif (aiValue == 16)
+        return 116
+    elseif (aiValue == 17)
+        return 117
+    elseif (aiValue == 18)
+        return 118
+    elseif (aiValue == 19)
+        return 119
+    elseif (aiValue == 20)
+        return 120
+    elseif (aiValue == 21)
+        return 121
+    elseif (aiValue == 22)
+        return 122
+    elseif (aiValue == 23)
+        return 123
+    elseif (aiValue == 24)
+        return 124
+    elseif (aiValue == 25)
+        return 125
+    elseif (aiValue == 26)
+        return 126
+    elseif (aiValue == 27)
+        return 127
+    elseif (aiValue == 28)
+        return 128
+    elseif (aiValue == 29)
+        return 129
+    elseif (aiValue == 30)
+        return 130
+    elseif (aiValue == 31)
+        return 131
+    endif
+    return -1
+endFunction
+
+int function __BenchBig128Fn(int aiValue)
+    if (aiValue == 0)
+        return 100
+    elseif (aiValue == 1)
+        return 101
+    elseif (aiValue == 2)
+        return 102
+    elseif (aiValue == 3)
+        return 103
+    elseif (aiValue == 4)
+        return 104
+    elseif (aiValue == 5)
+        return 105
+    elseif (aiValue == 6)
+        return 106
+    elseif (aiValue == 7)
+        return 107
+    elseif (aiValue == 8)
+        return 108
+    elseif (aiValue == 9)
+        return 109
+    elseif (aiValue == 10)
+        return 110
+    elseif (aiValue == 11)
+        return 111
+    elseif (aiValue == 12)
+        return 112
+    elseif (aiValue == 13)
+        return 113
+    elseif (aiValue == 14)
+        return 114
+    elseif (aiValue == 15)
+        return 115
+    elseif (aiValue == 16)
+        return 116
+    elseif (aiValue == 17)
+        return 117
+    elseif (aiValue == 18)
+        return 118
+    elseif (aiValue == 19)
+        return 119
+    elseif (aiValue == 20)
+        return 120
+    elseif (aiValue == 21)
+        return 121
+    elseif (aiValue == 22)
+        return 122
+    elseif (aiValue == 23)
+        return 123
+    elseif (aiValue == 24)
+        return 124
+    elseif (aiValue == 25)
+        return 125
+    elseif (aiValue == 26)
+        return 126
+    elseif (aiValue == 27)
+        return 127
+    elseif (aiValue == 28)
+        return 128
+    elseif (aiValue == 29)
+        return 129
+    elseif (aiValue == 30)
+        return 130
+    elseif (aiValue == 31)
+        return 131
+    elseif (aiValue == 32)
+        return 132
+    elseif (aiValue == 33)
+        return 133
+    elseif (aiValue == 34)
+        return 134
+    elseif (aiValue == 35)
+        return 135
+    elseif (aiValue == 36)
+        return 136
+    elseif (aiValue == 37)
+        return 137
+    elseif (aiValue == 38)
+        return 138
+    elseif (aiValue == 39)
+        return 139
+    elseif (aiValue == 40)
+        return 140
+    elseif (aiValue == 41)
+        return 141
+    elseif (aiValue == 42)
+        return 142
+    elseif (aiValue == 43)
+        return 143
+    elseif (aiValue == 44)
+        return 144
+    elseif (aiValue == 45)
+        return 145
+    elseif (aiValue == 46)
+        return 146
+    elseif (aiValue == 47)
+        return 147
+    elseif (aiValue == 48)
+        return 148
+    elseif (aiValue == 49)
+        return 149
+    elseif (aiValue == 50)
+        return 150
+    elseif (aiValue == 51)
+        return 151
+    elseif (aiValue == 52)
+        return 152
+    elseif (aiValue == 53)
+        return 153
+    elseif (aiValue == 54)
+        return 154
+    elseif (aiValue == 55)
+        return 155
+    elseif (aiValue == 56)
+        return 156
+    elseif (aiValue == 57)
+        return 157
+    elseif (aiValue == 58)
+        return 158
+    elseif (aiValue == 59)
+        return 159
+    elseif (aiValue == 60)
+        return 160
+    elseif (aiValue == 61)
+        return 161
+    elseif (aiValue == 62)
+        return 162
+    elseif (aiValue == 63)
+        return 163
+    elseif (aiValue == 64)
+        return 164
+    elseif (aiValue == 65)
+        return 165
+    elseif (aiValue == 66)
+        return 166
+    elseif (aiValue == 67)
+        return 167
+    elseif (aiValue == 68)
+        return 168
+    elseif (aiValue == 69)
+        return 169
+    elseif (aiValue == 70)
+        return 170
+    elseif (aiValue == 71)
+        return 171
+    elseif (aiValue == 72)
+        return 172
+    elseif (aiValue == 73)
+        return 173
+    elseif (aiValue == 74)
+        return 174
+    elseif (aiValue == 75)
+        return 175
+    elseif (aiValue == 76)
+        return 176
+    elseif (aiValue == 77)
+        return 177
+    elseif (aiValue == 78)
+        return 178
+    elseif (aiValue == 79)
+        return 179
+    elseif (aiValue == 80)
+        return 180
+    elseif (aiValue == 81)
+        return 181
+    elseif (aiValue == 82)
+        return 182
+    elseif (aiValue == 83)
+        return 183
+    elseif (aiValue == 84)
+        return 184
+    elseif (aiValue == 85)
+        return 185
+    elseif (aiValue == 86)
+        return 186
+    elseif (aiValue == 87)
+        return 187
+    elseif (aiValue == 88)
+        return 188
+    elseif (aiValue == 89)
+        return 189
+    elseif (aiValue == 90)
+        return 190
+    elseif (aiValue == 91)
+        return 191
+    elseif (aiValue == 92)
+        return 192
+    elseif (aiValue == 93)
+        return 193
+    elseif (aiValue == 94)
+        return 194
+    elseif (aiValue == 95)
+        return 195
+    elseif (aiValue == 96)
+        return 196
+    elseif (aiValue == 97)
+        return 197
+    elseif (aiValue == 98)
+        return 198
+    elseif (aiValue == 99)
+        return 199
+    elseif (aiValue == 100)
+        return 200
+    elseif (aiValue == 101)
+        return 201
+    elseif (aiValue == 102)
+        return 202
+    elseif (aiValue == 103)
+        return 203
+    elseif (aiValue == 104)
+        return 204
+    elseif (aiValue == 105)
+        return 205
+    elseif (aiValue == 106)
+        return 206
+    elseif (aiValue == 107)
+        return 207
+    elseif (aiValue == 108)
+        return 208
+    elseif (aiValue == 109)
+        return 209
+    elseif (aiValue == 110)
+        return 210
+    elseif (aiValue == 111)
+        return 211
+    elseif (aiValue == 112)
+        return 212
+    elseif (aiValue == 113)
+        return 213
+    elseif (aiValue == 114)
+        return 214
+    elseif (aiValue == 115)
+        return 215
+    elseif (aiValue == 116)
+        return 216
+    elseif (aiValue == 117)
+        return 217
+    elseif (aiValue == 118)
+        return 218
+    elseif (aiValue == 119)
+        return 219
+    elseif (aiValue == 120)
+        return 220
+    elseif (aiValue == 121)
+        return 221
+    elseif (aiValue == 122)
+        return 222
+    elseif (aiValue == 123)
+        return 223
+    elseif (aiValue == 124)
+        return 224
+    elseif (aiValue == 125)
+        return 225
+    elseif (aiValue == 126)
+        return 226
+    elseif (aiValue == 127)
+        return 227
+    endif
+    return -1
+endFunction
+
+;/
+    Tests whether the cost of calling a function depends on the function's SIZE rather than on
+    the work it does. Benchmark 33/34 showed every container operation costing ~7-12ms while its
+    JContainers writes are ~1-2ms, and the container's page helpers are each a 32-branch
+    if/elseif function called several times per operation. If a call's price grows with the
+    function's size (frame/temporaries set-up), that would explain it.
+
+    Same-script member calls, like the container's own internal calls. Every function returns
+    a constant from an if/elseif chain; only the branch count differs (1, 8, 32, 128). Argument
+    0 hits the FIRST branch, so all the "first branch" runs execute one comparison and differ
+    only in function size; the "last branch" runs additionally execute every comparison. Two
+    rounds each, summed, to damp run-to-run noise. Empty-loop floor included.
+      - times track function size, first-branch runs:  size matters (hypothesis confirmed)
+      - last-branch runs far above first-branch ones:  executed comparisons matter
+      - everything about equal:                        neither; the hypothesis is refuted
+/;
+state Benchmark_FunctionSizeCallCost
+    function Setup()
+        int CALLS = 500
+        int ROUNDS = 2
+
+        int sinkInt = 0
+        int i = 0
+        float bench = 0.0
+        int round = 0
+
+        int tFloor = 0
+        int tSmall = 0
+        int t8First = 0
+        int t32First = 0
+        int t128First = 0
+        int t32Last = 0
+        int t128Last = 0
+
+        while (round < ROUNDS)
+            bench = StartBenchmark()
+            i = 0
+            while (i < CALLS)
+                i += 1
+            endWhile
+            tFloor = tFloor + EndBenchmark(bench, "Empty loop floor: " + CALLS + " iterations")
+
+        bench = StartBenchmark()
+        i = 0
+        while (i < CALLS)
+            sinkInt = self.__BenchSmallFn(0)
+            i += 1
+        endWhile
+        tSmall = tSmall + EndBenchmark(bench, "small: " + CALLS + " calls")
+
+        bench = StartBenchmark()
+        i = 0
+        while (i < CALLS)
+            sinkInt = self.__BenchBig8Fn(0)
+            i += 1
+        endWhile
+        t8First = t8First + EndBenchmark(bench, "big8, first branch: " + CALLS + " calls")
+
+        bench = StartBenchmark()
+        i = 0
+        while (i < CALLS)
+            sinkInt = self.__BenchBig32Fn(0)
+            i += 1
+        endWhile
+        t32First = t32First + EndBenchmark(bench, "big32, first branch: " + CALLS + " calls")
+
+        bench = StartBenchmark()
+        i = 0
+        while (i < CALLS)
+            sinkInt = self.__BenchBig128Fn(0)
+            i += 1
+        endWhile
+        t128First = t128First + EndBenchmark(bench, "big128, first branch: " + CALLS + " calls")
+
+        bench = StartBenchmark()
+        i = 0
+        while (i < CALLS)
+            sinkInt = self.__BenchBig32Fn(31)
+            i += 1
+        endWhile
+        t32Last = t32Last + EndBenchmark(bench, "big32, last branch: " + CALLS + " calls")
+
+        bench = StartBenchmark()
+        i = 0
+        while (i < CALLS)
+            sinkInt = self.__BenchBig128Fn(127)
+            i += 1
+        endWhile
+        t128Last = t128Last + EndBenchmark(bench, "big128, last branch: " + CALLS + " calls")
+
+            round += 1
+        endWhile
+
+        int totalCalls = CALLS * ROUNDS
+        log("FUNCTION SIZE (us per call, " + totalCalls + " calls each) - loop floor " + ((tFloor * 1000.0 / totalCalls) as int) + ", small " + ((tSmall * 1000.0 / totalCalls) as int) + ", big8 first " + ((t8First * 1000.0 / totalCalls) as int) + ", big32 first " + ((t32First * 1000.0 / totalCalls) as int) + ", big128 first " + ((t128First * 1000.0 / totalCalls) as int) + ", big32 last " + ((t32Last * 1000.0 / totalCalls) as int) + ", big128 last " + ((t128Last * 1000.0 / totalCalls) as int))
+        Debug.Notification("us/call: small " + ((tSmall * 1000.0 / totalCalls) as int) + ", big8 " + ((t8First * 1000.0 / totalCalls) as int) + ", big32 " + ((t32First * 1000.0 / totalCalls) as int) + ", big128 " + ((t128First * 1000.0 / totalCalls) as int))
+
+        display_result(true, showTimeElapsed = false)
+    endFunction
+endState
+
+;/
+    Fills the live ArresteeList container to its full 1024-entry capacity (32 pages x 32 slots,
+    counting whatever real entries it already holds), so every one of the 32 page branches in
+    __GetSlot/__SetSlot/__FreePageIfNowUnused actually runs - tests 12/25/30 only reach pages
+    0-4. Verifies Count, the forward/reverse maps, and the key stored at an index inside a
+    spread of pages; that one Add past capacity is rejected without changing anything (the
+    container logs an "is full" error line for that on purpose); then drains everything by
+    ascending key, which takes the swap path across every page boundary on the way down, and
+    confirms the container is back where it started. Slow by design (~2000 container
+    operations), so not chainable. Fill and drain times are logged as a bonus.
+/;
+state Test_ActiveMagicEffectContainer_FullCapacity
+    function Setup()
+        RPB_ActiveMagicEffectContainer _container = API.Arrest.GetAliasByName("ArresteeList") as RPB_ActiveMagicEffectContainer
+        int startCount = _container.Count
+        int CAPACITY = 1024
+        string PREFIX = "CapacityTest_"
+
+        bool ok = true
+        bool step = false
+
+        int syntheticCount = CAPACITY - startCount
+        if (syntheticCount <= 0)
+            log("ArresteeList already holds " + startCount + " entries - cannot fill it to capacity for this test")
+            display_result(false)
+            return
+        endif
+
+        ; --- fill to capacity ---
+        float bench = StartBenchmark()
+        int i = 0
+        while (i < syntheticCount)
+            _container.AddElement(none, PREFIX + i)
+            i += 1
+        endWhile
+        int fillMs = EndBenchmark(bench, "Fill to capacity: " + syntheticCount + " adds")
+
+        step = assert_true(_container.Count == CAPACITY, "Expected Count == " + CAPACITY + " after filling, got " + _container.Count)
+        ok = ok && step
+        step = self.__AssertContainerInSync(_container, "at full capacity")
+        ok = ok && step
+
+        ; Spot-check the key at an index inside pages 0, 4, 8, ... 28 and the very last slot of page 31
+        int page = 0
+        int globalIndex = 0
+        while (page < 32)
+            globalIndex = page * 32 + 5
+            if (globalIndex < startCount)
+                globalIndex = startCount
+            endif
+            step = assert_equals(PREFIX + (globalIndex - startCount), _container.GetKeyAtIndex(globalIndex), "Wrong key at global index " + globalIndex + " (page " + (globalIndex / 32) + ")")
+            ok = ok && step
+            page += 4
+        endWhile
+        step = assert_equals(PREFIX + (syntheticCount - 1), _container.GetKeyAtIndex(CAPACITY - 1), "Wrong key in the last slot of page 31")
+        ok = ok && step
+
+        ; --- one past capacity must be rejected, changing nothing ---
+        _container.AddElement(none, PREFIX + "Overflow")
+        step = assert_true(_container.Count == CAPACITY, "Count changed after an Add at full capacity: " + _container.Count)
+        ok = ok && step
+        step = assert_false(_container.HasKey(PREFIX + "Overflow"), "An Add past capacity was accepted")
+        ok = ok && step
+
+        ; --- drain ascending: swap path across every page boundary ---
+        bench = StartBenchmark()
+        i = 0
+        while (i < syntheticCount)
+            _container.RemoveElement(PREFIX + i, dispel = false)
+            i += 1
+            if (i == syntheticCount / 2)
+                step = self.__AssertContainerInSync(_container, "halfway through the drain")
+                ok = ok && step
+            endif
+        endWhile
+        int drainMs = EndBenchmark(bench, "Drain from capacity: " + syntheticCount + " removes")
+
+        step = assert_true(_container.Count == startCount, "Container did not return to its original Count after draining, got " + _container.Count)
+        ok = ok && step
+        step = self.__AssertContainerInSync(_container, "after draining from capacity")
+        ok = ok && step
+
+        log("FULL CAPACITY: fill " + fillMs + "ms, drain " + drainMs + "ms for " + syntheticCount + " entries each way")
+        Debug.Notification("Full capacity: fill " + fillMs + "ms, drain " + drainMs + "ms")
+
+        display_result(ok)
+    endFunction
+endState
+
+; ==========================================================
 ;   ActiveMagicEffectContainer / ActorList hierarchy tests
 ;
 ;   These exercise RPB_ActorList/RPB_PrisonerList/RPB_ArresteeList/RPB_CaptorList
@@ -1180,6 +2312,7 @@ state Test_ActiveMagicEffectContainer_DensePacking
         allSurvivorsPresent = assert_true(allSurvivorsPresent, "One or more surviving entries went missing after interleaved add/remove")
 
         bool removedStaysGone = assert_true(!_container.HasKey("DensePackTest_B") && !_container.HasKey("DensePackTest_D"), "A removed entry is still reported as present")
+        bool syncedAfterChurn = self.__AssertContainerInSync(_container, "after interleaved add/remove")
 
         ; Clean up
         _container.RemoveElement("DensePackTest_A", dispel = false)
@@ -1191,7 +2324,9 @@ state Test_ActiveMagicEffectContainer_DensePacking
 
         bool cleanedUp = assert_true(_container.Count == startCount, "Container did not return to its original Count after cleanup, got " + _container.Count)
 
-        display_result(countCorrect && allSurvivorsPresent && removedStaysGone && cleanedUp)
+        bool syncedAfterCleanup = self.__AssertContainerInSync(_container, "after cleanup")
+
+        display_result(countCorrect && allSurvivorsPresent && removedStaysGone && syncedAfterChurn && cleanedUp && syncedAfterCleanup)
     endFunction
 endState
 
