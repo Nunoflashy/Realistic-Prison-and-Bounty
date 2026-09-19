@@ -74,6 +74,14 @@ function SetTests()
     ; Not chainable: fires concurrent worker threads at the live ArresteeList, must start empty
     self.AddTest("39 - ActiveMagicEffectContainer: Concurrent Access (8 Worker Threads)", "Test_ActiveMagicEffectContainer_ConcurrentAccess", abChainable = false)
     self.AddTest("40 - ActiveMagicEffectContainer: No Per-Operation JContainers Allocation", "Test_ActiveMagicEffectContainer_HandleStability")
+    ; Await<T>Reference investigation (47-51): measure where the ~1.7s per await goes, how registration behaves with several
+    ; actors at once, and what the effect start needs. All spawn real temp actors and can take a while, so not chainable.
+    self.AddTest("47 - Await: Latency Breakdown (prisoner/arrestee/captor)", "Test_Await_LatencyBreakdown", abChainable = false)
+    self.AddTest("48 - Await: Burst Registration Stress (prisoners, K=3/6/10)", "Test_Await_BurstPrisoners", abChainable = false)
+    self.AddTest("49 - Await: Burst Arrestees/Captors and Spaced Prisoners (K=6)", "Test_Await_BurstOtherKinds", abChainable = false)
+    self.AddTest("50 - Await: What the Effect Start Needs (settle / disabled)", "Test_Await_EffectStartPrerequisites", abChainable = false)
+    self.AddTest("51 - Await: Group Flow, Sequential API vs Burst (N=5)", "Test_Await_GroupFlow", abChainable = false)
+    self.AddTest("52 - Await: After the Fast-Polling / Unloaded-Actor / None-Safety Fixes", "Test_Await_AfterFixes", abChainable = false)
     self.AddTest("41 - ActiveMagicEffectContainer: Stuck Lock Self-Heals", "Test_ActiveMagicEffectContainer_StuckLockSelfHeals")
     self.AddTest("42 - ThreadLock: JAtomic Primitive Semantics and Registry", "Test_ThreadLock_PrimitiveSemantics")
     ; Not chainable: fires concurrent worker threads
@@ -3063,6 +3071,533 @@ state Test_ThreadLock_RegistryAndStuckLock
 endState
 
 ; ==========================================================
+;   Await<T>Reference investigation (tests 47-51)
+;
+;   AwaitPrisonerReference/AwaitArresteeReference/AwaitCaptorReference add a spell to an actor
+;   (its magic effect starts LATER, on its own thread, and registers the actor in the list from
+;   OnEffectStart) and poll the list with exponential backoff until the registration shows up.
+;   These tests measure that mechanism from the outside using the same public pieces
+;   (RPB_Utility.Ensure...SpellAndBinding + the lists), so nothing in production is changed:
+;   how long each phase takes, what happens with several actors at once, and what the effect
+;   start needs. Every wait has a hard timeout, so a stall is reported as data instead of
+;   freezing the test.
+; ==========================================================
+
+int __burstRegistered
+int __burstMaxMs
+int __burstAvgMs
+int __burstTotalMs
+
+int function __Ms(float afSeconds)
+    return (afSeconds * 1000.0) as int
+endFunction
+
+;/ Adds the spell (and, for prisoners, the prison binding) for @asKind: "prisoner", "arrestee" or "captor". /;
+function __EnsureKind(string asKind, Actor akActor, RPB_Prison apPrison)
+    if (asKind == "prisoner")
+        RPB_Utility.EnsurePrisonerSpellAndBinding(akActor, apPrison)
+    elseif (asKind == "arrestee")
+        RPB_Utility.EnsureArresteeSpellAndBinding(akActor, none)
+    else
+        RPB_Utility.EnsureCaptorSpellAndBinding(akActor)
+    endif
+endFunction
+
+;/ Has @akActor been registered in the list for @asKind yet? Returns the registered reference or None. /;
+RPB_ActorBase function __LookupKind(string asKind, Actor akActor, RPB_Prison apPrison)
+    if (asKind == "prisoner")
+        return apPrison.Prisoners.AtKeyEx(akActor) as RPB_ActorBase
+    elseif (asKind == "arrestee")
+        return (RPB_API.GetArrest()).Arrestees.AtKeyEx(akActor) as RPB_ActorBase
+    endif
+
+    return (RPB_API.GetArrest()).Captors.AtKeyEx(akActor) as RPB_ActorBase
+endFunction
+
+;/ Why hasn't this actor registered? Everything that could plausibly matter, at the moment of giving up. /;
+function __LogNotRegistered(Actor akActor, string asKind, float afWaitedSeconds)
+    log("NOT REGISTERED after " + (afWaitedSeconds as int) + "s: " + akActor + " (" + asKind + ") | has prisoner spell " + akActor.HasSpell(RPB_Utility.RPB_PrisonerSpell()) + ", arrestee spell " + akActor.HasSpell(RPB_Utility.RPB_ArresteeSpell()) + ", captor spell " + akActor.HasSpell(RPB_Utility.RPB_CaptorSpell()) + " | disabled " + akActor.IsDisabled() + ", 3D loaded " + akActor.Is3DLoaded() + ", cell " + akActor.GetParentCell() + ", dead " + akActor.IsDead())
+endFunction
+
+;/
+    Registers @aiCount freshly spawned actors as @asKind with NO waiting between the spell
+    adds (or @afSpacing seconds apart), then polls (every ~25ms) until every one shows up in
+    its list or 45s pass. Time-to-registered is measured per actor from its own spell add.
+    Results are left in __burst* (registered count, max/average ms, total ms incl. optional
+    Initialize()) and logged. Up to 16 actors.
+/;
+function __RunBurst(string asKind, int aiCount, float afSpacing, bool abInitialize)
+    RPB_Prison prison = (RPB_API.GetPrisonManager()).GetPrison("Haafingar")
+    Actor[] actors = new Actor[16]
+    float[] spellAt = new float[16]
+    int[] regMs = new int[16]
+
+    int i = 0
+    while (i < aiCount)
+        actors[i] = __SpawnTempActor()
+        regMs[i] = -1
+        i += 1
+    endWhile
+
+    float tStart = Utility.GetCurrentRealTime()
+    i = 0
+    while (i < aiCount)
+        self.__EnsureKind(asKind, actors[i], prison)
+        spellAt[i] = Utility.GetCurrentRealTime()
+        if (afSpacing > 0.0 && i < aiCount - 1)
+            Utility.Wait(afSpacing)
+        endif
+        i += 1
+    endWhile
+
+    int pending = aiCount
+    float now = 0.0
+    while (pending > 0 && (Utility.GetCurrentRealTime() - tStart) < 45.0)
+        i = 0
+        while (i < aiCount)
+            if (regMs[i] < 0)
+                if (self.__LookupKind(asKind, actors[i], prison))
+                    now = Utility.GetCurrentRealTime()
+                    regMs[i] = self.__Ms(now - spellAt[i])
+                    pending -= 1
+                endif
+            endif
+            i += 1
+        endWhile
+
+        if (pending > 0)
+            Utility.Wait(0.025)
+        endif
+    endWhile
+
+    if (abInitialize && asKind == "prisoner")
+        i = 0
+        while (i < aiCount)
+            if (regMs[i] >= 0)
+                (self.__LookupKind(asKind, actors[i], prison) as RPB_Prisoner).Initialize()
+            endif
+            i += 1
+        endWhile
+    endif
+    __burstTotalMs = self.__Ms(Utility.GetCurrentRealTime() - tStart)
+
+    __burstRegistered = 0
+    __burstMaxMs = 0
+    int sumMs = 0
+    string perActor = ""
+    i = 0
+    while (i < aiCount)
+        if (regMs[i] >= 0)
+            __burstRegistered += 1
+            sumMs += regMs[i]
+            if (regMs[i] > __burstMaxMs)
+                __burstMaxMs = regMs[i]
+            endif
+        else
+            self.__LogNotRegistered(actors[i], asKind, Utility.GetCurrentRealTime() - spellAt[i])
+        endif
+        perActor += regMs[i] + " "
+        i += 1
+    endWhile
+
+    __burstAvgMs = 0
+    if (__burstRegistered > 0)
+        __burstAvgMs = sumMs / __burstRegistered
+    endif
+
+    log("BURST " + asKind + " K=" + aiCount + " spacing " + afSpacing + "s: registered " + __burstRegistered + "/" + aiCount + " | ms from own spell add to registered: [" + perActor + "] avg " + __burstAvgMs + ", max " + __burstMaxMs + " | total " + __burstTotalMs + "ms" + self.__StringIf(abInitialize, " (incl. Initialize)"))
+endFunction
+
+string function __StringIf(bool abCondition, string asText)
+    if (abCondition)
+        return asText
+    endif
+
+    return ""
+endFunction
+
+;/
+    Where does one await's ~1.7s go? For each kind, N actors one after another (1s apart, like
+    the existing tests): the spell add, the wait until the effect registers the actor (polled
+    every ~25ms, so overshoot is negligible), and Initialize() (prisoners), timed separately.
+    Then the SAME number of fresh actors through the plain public await, to compare: the
+    difference is what the exponential-backoff polling costs on top.
+/;
+state Test_Await_LatencyBreakdown
+    function Setup()
+        RPB_Prison prison = (RPB_API.GetPrisonManager()).GetPrison("Haafingar")
+        RPB_Arrest arrest = RPB_API.GetArrest()
+        int N = 3
+        bool ok = true
+
+        string[] kinds = new string[3]
+        kinds[0] = "prisoner"
+        kinds[1] = "arrestee"
+        kinds[2] = "captor"
+
+        int k = 0
+        while (k < 3)
+            string kind = kinds[k]
+            int sumSpell = 0
+            int sumReg = 0
+            int sumInit = 0
+            int sumPlain = 0
+            int missing = 0
+
+            int i = 0
+            while (i < N)
+                Actor a = __SpawnTempActor()
+                float t0 = Utility.GetCurrentRealTime()
+                self.__EnsureKind(kind, a, prison)
+                float tSpell = Utility.GetCurrentRealTime()
+
+                RPB_ActorBase reg = none
+                int polls = 0
+                while (!reg && (Utility.GetCurrentRealTime() - t0) < 30.0)
+                    reg = self.__LookupKind(kind, a, prison)
+                    if (!reg)
+                        Utility.Wait(0.025)
+                        polls += 1
+                    endif
+                endWhile
+                float tReg = Utility.GetCurrentRealTime()
+
+                float tInit = tReg
+                if (reg && kind == "prisoner")
+                    (reg as RPB_Prisoner).Initialize()
+                    tInit = Utility.GetCurrentRealTime()
+                endif
+
+                if (reg)
+                    sumSpell += self.__Ms(tSpell - t0)
+                    sumReg += self.__Ms(tReg - t0)
+                    sumInit += self.__Ms(tInit - tReg)
+                else
+                    missing += 1
+                    self.__LogNotRegistered(a, kind, tReg - t0)
+                endif
+                log("BREAKDOWN " + kind + " #" + i + ": spell add call " + self.__Ms(tSpell - t0) + "ms, registered after " + self.__Ms(tReg - t0) + "ms (" + polls + " polls), Initialize " + self.__Ms(tInit - tReg) + "ms, total " + self.__Ms(tInit - t0) + "ms")
+                Utility.Wait(1.0)
+                i += 1
+            endWhile
+
+            ; The same number of fresh actors through the plain public await
+            i = 0
+            while (i < N)
+                Actor b = __SpawnTempActor()
+                float tp = Utility.GetCurrentRealTime()
+                if (kind == "prisoner")
+                    prison.AwaitPrisonerReference(b)
+                elseif (kind == "arrestee")
+                    arrest.AwaitArresteeReference(b)
+                else
+                    arrest.AwaitCaptorReference(b)
+                endif
+                sumPlain += self.__Ms(Utility.GetCurrentRealTime() - tp)
+                Utility.Wait(1.0)
+                i += 1
+            endWhile
+
+            int done = N - missing
+            if (done > 0)
+                log("LATENCY " + kind + " (avg of " + done + "): spell add call " + (sumSpell / done) + "ms, registered after " + (sumReg / done) + "ms, Initialize " + (sumInit / done) + "ms, manual total " + ((sumReg + sumInit) / done) + "ms | plain AwaitReference avg " + (sumPlain / N) + "ms | polling overhead vs manual " + ((sumPlain / N) - ((sumReg + sumInit) / done)) + "ms")
+            endif
+            ok = assert_true(missing == 0, kind + ": " + missing + " actor(s) never registered within 30s") && ok
+            k += 1
+        endWhile
+
+        display_result(ok)
+    endFunction
+
+    function Teardown()
+        __TeardownAllTempActors()
+    endFunction
+endState
+
+;/
+    The multi-actor case: K prisoners get their spell at the same instant, nothing spaced.
+    Runs K=3, 6 and 10 (cleaning up between runs). The interesting numbers: does time-to-
+    registered grow with K (a serialized effect queue) or stay flat (parallel)? Does anyone
+    fail to register? A stalled actor is reported with its state, this being the closest
+    thing we have to a reproducer for the intermittent 23/24 hangs.
+/;
+state Test_Await_BurstPrisoners
+    function Setup()
+        bool ok = true
+
+        __LogRuntimeState("burst prisoners start")
+        self.__RunBurst("prisoner", 3, 0.0, false)
+        ok = assert_true(__burstRegistered == 3, "K=3 burst: only " + __burstRegistered + "/3 registered") && ok
+        __TeardownAllTempActors()
+        Utility.Wait(3.0)
+
+        self.__RunBurst("prisoner", 6, 0.0, false)
+        ok = assert_true(__burstRegistered == 6, "K=6 burst: only " + __burstRegistered + "/6 registered") && ok
+        __TeardownAllTempActors()
+        Utility.Wait(3.0)
+
+        self.__RunBurst("prisoner", 10, 0.0, false)
+        ok = assert_true(__burstRegistered == 10, "K=10 burst: only " + __burstRegistered + "/10 registered") && ok
+
+        display_result(ok)
+    endFunction
+
+    function Teardown()
+        __TeardownAllTempActors()
+    endFunction
+endState
+
+;/
+    Same burst for arrestees and captors (K=6 each), then prisoners spaced 1s apart (the
+    workaround the tests currently use), to see whether spacing changes anything.
+/;
+state Test_Await_BurstOtherKinds
+    function Setup()
+        bool ok = true
+
+        self.__RunBurst("arrestee", 6, 0.0, false)
+        ok = assert_true(__burstRegistered == 6, "arrestees burst: only " + __burstRegistered + "/6 registered") && ok
+        __TeardownAllTempActors()
+        Utility.Wait(3.0)
+
+        self.__RunBurst("captor", 6, 0.0, false)
+        ok = assert_true(__burstRegistered == 6, "captors burst: only " + __burstRegistered + "/6 registered") && ok
+        __TeardownAllTempActors()
+        Utility.Wait(3.0)
+
+        self.__RunBurst("prisoner", 6, 1.0, false)
+        ok = assert_true(__burstRegistered == 6, "prisoners spaced 1s: only " + __burstRegistered + "/6 registered") && ok
+
+        display_result(ok)
+    endFunction
+
+    function Teardown()
+        __TeardownAllTempActors()
+    endFunction
+endState
+
+;/
+    What does the effect start depend on? One prisoner at a time under three conditions, each
+    timed from the spell add to registration (30s cap): (a) spell added the instant the actor
+    is spawned, (b) after letting the actor settle for 1s, (c) added to an actor that was
+    disabled right after spawning. Logs Is3DLoaded / IsDisabled / cell at both ends.
+/;
+state Test_Await_EffectStartPrerequisites
+    function Setup()
+        RPB_Prison prison = (RPB_API.GetPrisonManager()).GetPrison("Haafingar")
+        bool ok = true
+        int repeat = 0
+
+        while (repeat < 2)
+            int cond = 0
+            while (cond < 3)
+                Actor a = __SpawnTempActor()
+                string label = "immediate"
+                if (cond == 1)
+                    Utility.Wait(1.0)
+                    label = "after 1s settle"
+                elseif (cond == 2)
+                    a.Disable()
+                    label = "disabled first"
+                endif
+
+                bool loadedBefore = a.Is3DLoaded()
+                bool disabledBefore = a.IsDisabled()
+                float t0 = Utility.GetCurrentRealTime()
+                self.__EnsureKind("prisoner", a, prison)
+
+                RPB_ActorBase reg = none
+                while (!reg && (Utility.GetCurrentRealTime() - t0) < 30.0)
+                    reg = self.__LookupKind("prisoner", a, prison)
+                    if (!reg)
+                        Utility.Wait(0.025)
+                    endif
+                endWhile
+                float elapsed = Utility.GetCurrentRealTime() - t0
+
+                if (reg)
+                    log("PREREQ [" + label + "] round " + repeat + ": registered after " + self.__Ms(elapsed) + "ms | 3D loaded " + loadedBefore + " -> " + a.Is3DLoaded() + ", disabled " + disabledBefore + " -> " + a.IsDisabled() + ", cell " + a.GetParentCell())
+                else
+                    self.__LogNotRegistered(a, "prisoner", elapsed)
+                    log("PREREQ [" + label + "] round " + repeat + ": DID NOT REGISTER in 30s")
+                endif
+                ; A disabled actor failing to register would itself be the finding, not a test failure;
+                ; only the two ordinary conditions must register
+                if (cond < 2)
+                    ok = assert_true(reg != none, "[" + label + "] never registered within 30s") && ok
+                endif
+
+                Utility.Wait(1.0)
+                cond += 1
+            endWhile
+            repeat += 1
+        endWhile
+
+        display_result(ok)
+    endFunction
+
+    function Teardown()
+        __TeardownAllTempActors()
+    endFunction
+endState
+
+;/
+    What a group costs today versus what batching could do, N=5 prisoners: (1) one after
+    another through the public AwaitPrisonerReference, exactly what EventManager's loops do;
+    (2) all five spells first, then wait for all of them (and Initialize each).
+/;
+state Test_Await_GroupFlow
+    function Setup()
+        RPB_Prison prison = (RPB_API.GetPrisonManager()).GetPrison("Haafingar")
+        int N = 5
+        bool ok = true
+
+        Actor[] actors = new Actor[16]
+        int i = 0
+        while (i < N)
+            actors[i] = __SpawnTempActor()
+            i += 1
+        endWhile
+
+        float t0 = Utility.GetCurrentRealTime()
+        i = 0
+        while (i < N)
+            prison.AwaitPrisonerReference(actors[i])
+            i += 1
+        endWhile
+        int sequentialMs = self.__Ms(Utility.GetCurrentRealTime() - t0)
+        log("GROUP sequential AwaitPrisonerReference x" + N + ": " + sequentialMs + "ms (" + (sequentialMs / N) + "ms each)")
+        ok = assert_true(prison.Prisoners.Count >= N, "Sequential run registered fewer than " + N + " prisoners: " + prison.Prisoners.Count) && ok
+
+        __TeardownAllTempActors()
+        Utility.Wait(3.0)
+
+        self.__RunBurst("prisoner", N, 0.0, true)
+        log("GROUP burst x" + N + ": " + __burstTotalMs + "ms total (spells at once, wait for all, Initialize each) vs sequential " + sequentialMs + "ms")
+        ok = assert_true(__burstRegistered == N, "Burst run registered only " + __burstRegistered + "/" + N) && ok
+
+        display_result(ok)
+    endFunction
+
+    function Teardown()
+        __TeardownAllTempActors()
+    endFunction
+endState
+
+;/
+    Behavior after the Await changes (RPB_Utility.AwaitEntityReference): short capped polling
+    that returns the moment the registration is seen, a bounded wait for the actor's 3D to load,
+    and AwaitPrisonerReference no longer calling Initialize() on None.
+      1. Polling overhead per kind: the same measurement as test 47 (manual poll at ~25ms vs the
+         plain public await). Before the change the overhead was 417ms (prisoner), 204ms
+         (arrestee) and 209ms (captor); now it should be well under those.
+      2. An actor that never loads (disabled right after spawn): AwaitPrisonerReference must come
+         back with None in roughly the load grace period (5s) instead of polling for minutes, log why,
+         and not raise a runtime error (which would abort this test with no result).
+      3. An actor that is ALREADY registered must come back immediately even if it is unloaded:
+         load state must not delay a lookup that has nothing to wait for.
+/;
+state Test_Await_AfterFixes
+    function Setup()
+        RPB_Prison prison = (RPB_API.GetPrisonManager()).GetPrison("Haafingar")
+        RPB_Arrest arrest = RPB_API.GetArrest()
+        int N = 3
+        bool ok = true
+        bool step = false
+
+        string[] kinds = new string[3]
+        kinds[0] = "prisoner"
+        kinds[1] = "arrestee"
+        kinds[2] = "captor"
+
+        ; --- 1. polling overhead ---
+        int k = 0
+        while (k < 3)
+            string kind = kinds[k]
+            int sumManual = 0
+            int sumPlain = 0
+            int i = 0
+            while (i < N)
+                Actor a = __SpawnTempActor()
+                float t0 = Utility.GetCurrentRealTime()
+                self.__EnsureKind(kind, a, prison)
+                RPB_ActorBase reg = none
+                while (!reg && (Utility.GetCurrentRealTime() - t0) < 30.0)
+                    reg = self.__LookupKind(kind, a, prison)
+                    if (!reg)
+                        Utility.Wait(0.025)
+                    endif
+                endWhile
+                if (reg && kind == "prisoner")
+                    (reg as RPB_Prisoner).Initialize()
+                endif
+                sumManual += self.__Ms(Utility.GetCurrentRealTime() - t0)
+                Utility.Wait(1.0)
+
+                Actor b = __SpawnTempActor()
+                float tp = Utility.GetCurrentRealTime()
+                RPB_ActorBase plainRef = none
+                if (kind == "prisoner")
+                    plainRef = prison.AwaitPrisonerReference(b)
+                elseif (kind == "arrestee")
+                    plainRef = arrest.AwaitArresteeReference(b)
+                else
+                    plainRef = arrest.AwaitCaptorReference(b)
+                endif
+                sumPlain += self.__Ms(Utility.GetCurrentRealTime() - tp)
+                step = assert_true(reg != none && plainRef != none, kind + " #" + i + ": did not register (manual " + reg + ", plain " + plainRef + ")")
+                ok = ok && step
+                Utility.Wait(1.0)
+                i += 1
+            endWhile
+
+            int overhead = (sumPlain / N) - (sumManual / N)
+            int limit = 175
+            if (kind == "prisoner")
+                limit = 250
+            endif
+            log("AFTER FIX " + kind + ": manual avg " + (sumManual / N) + "ms, plain AwaitReference avg " + (sumPlain / N) + "ms, polling overhead " + overhead + "ms (was " + self.__StringIf(kind == "prisoner", "417") + self.__StringIf(kind == "arrestee", "204") + self.__StringIf(kind == "captor", "209") + "ms; limit " + limit + "ms)")
+            step = assert_true(overhead < limit, kind + ": polling overhead " + overhead + "ms is not below " + limit + "ms")
+            ok = ok && step
+            k += 1
+        endWhile
+
+        ; --- 2. an actor that never loads: must return None promptly, without a runtime error ---
+        Actor unloaded = __SpawnTempActor()
+        unloaded.Disable()
+        Utility.Wait(0.5)
+        float tu = Utility.GetCurrentRealTime()
+        RPB_Prisoner unloadedRef = prison.AwaitPrisonerReference(unloaded)
+        int unloadedMs = self.__Ms(Utility.GetCurrentRealTime() - tu)
+        log("AFTER FIX unloaded actor: AwaitPrisonerReference returned " + unloadedRef + " after " + unloadedMs + "ms (grace period is 5000ms; before the change: ~2 minutes of polling, then Initialize() on None)")
+        step = assert_true(unloadedRef == none, "AwaitPrisonerReference on an unloaded actor should return None, got " + unloadedRef)
+        ok = ok && step
+        step = assert_true(unloadedMs < 9000, "Await on an unloaded actor took " + unloadedMs + "ms - it should give up within about the 5s load grace")
+        ok = ok && step
+
+        ; --- 3. already registered: must not wait, whatever the load state ---
+        Actor loaded = __SpawnTempActor()
+        RPB_Prisoner loadedRef = prison.AwaitPrisonerReference(loaded)
+        step = assert_true(loadedRef != none, "Setup for the already-registered check failed: nothing registered")
+        ok = ok && step
+        loaded.Disable()
+        Utility.Wait(0.5)
+        float tl = Utility.GetCurrentRealTime()
+        RPB_Prisoner againRef = prison.AwaitPrisonerReference(loaded)
+        int againMs = self.__Ms(Utility.GetCurrentRealTime() - tl)
+        log("AFTER FIX already registered (now disabled/unloaded): AwaitPrisonerReference returned " + againRef + " in " + againMs + "ms")
+        step = assert_true(againRef == loadedRef && againMs < 3000, "An already-registered actor should be returned at once, got " + againRef + " after " + againMs + "ms")
+        ok = ok && step
+
+        display_result(ok)
+    endFunction
+
+    function Teardown()
+        __TeardownAllTempActors()
+    endFunction
+endState
+
+; ==========================================================
 ;   ActiveMagicEffectContainer / ActorList hierarchy tests
 ;
 ;   These exercise RPB_ActorList/RPB_PrisonerList/RPB_ArresteeList/RPB_CaptorList
@@ -4252,11 +4787,11 @@ int __testTempActorCount = 0
 ;/
     Spawns a disposable NPC (cloned from the same base the original tests already use -
     see e.g. Test_Imprison_Multiple_Actors) and tracks it so __TeardownAllTempActors()
-    can clean it up afterward. Up to 10 per test - plenty for these.
+    can clean it up afterward. Up to 32 per test (between teardowns).
 /;
 Actor function __SpawnTempActor()
     if (!__testTempActors)
-        __testTempActors = new Actor[10]
+        __testTempActors = new Actor[32]
     endif
 
     ActorBase npcBase = Game.GetFormEx(0x132A1) as ActorBase
@@ -4273,6 +4808,18 @@ Actor function __SpawnTempActor()
 
     __testTempActors[__testTempActorCount] = temp
     __testTempActorCount += 1
+
+    ; A temp actor whose 3D never loads can't get its spell effect started, so nothing registers and the
+    ; test would sit in an await (this was the 23/24/48 "hang"). Give it a bounded time to load and say so
+    ; loudly at the START of the test, together with where the player is, instead of stalling later.
+    float loadWaited = 0.0
+    while (!temp.Is3DLoaded() && loadWaited < 5.0)
+        Utility.Wait(0.1)
+        loadWaited += 0.1
+    endWhile
+    if (!temp.Is3DLoaded())
+        log("TEMP ACTOR NOT LOADED after 5s: " + temp + " | its cell " + temp.GetParentCell() + " | player's cell " + (Game.GetFormEx(0x14) as Actor).GetParentCell() + " - registrations in this test will not work here; reload a save / move somewhere the cell loads")
+    endif
 
     __LogTempActorProbe(temp)
 
@@ -4314,7 +4861,7 @@ function __LogTempActorProbe(Actor akTemp)
     RPB_Prison solitudePrison = (RPB_API.GetPrisonManager()).GetPrison("Haafingar")
     RPB_Arrest arrest = RPB_API.GetArrest()
 
-    log("PROBE " + akTemp + " | StorageVars 'Is Initialized' " + RPB_StorageVars.GetBoolOnReference("Is Initialized", akTemp, "Actor") + \
+    log("PROBE " + akTemp + " | 3D loaded " + akTemp.Is3DLoaded() + ", cell " + akTemp.GetParentCell() + " | StorageVars 'Is Initialized' " + RPB_StorageVars.GetBoolOnReference("Is Initialized", akTemp, "Actor") + \
         " | has spells: prisoner " + akTemp.HasSpell(RPB_Utility.RPB_PrisonerSpell()) + ", arrestee " + akTemp.HasSpell(RPB_Utility.RPB_ArresteeSpell()) + ", captor " + akTemp.HasSpell(RPB_Utility.RPB_CaptorSpell()) + \
         " | already in a list: prisoners " + (solitudePrison.Prisoners.AtKey(akTemp) != none) + ", arrestees " + (arrest.Arrestees.AtKey(akTemp) != none) + ", captors " + (arrest.Captors.AtKey(akTemp) != none) + ", tracked " + (RPB_API.GetActorListForTrackedActors().AtKeyEx(akTemp) != none))
 endFunction
