@@ -563,6 +563,13 @@ endFunction
     key already exists, or if every configured page is already full.
 /;
 function AddElement(ActiveMagicEffect element, string elementKey)
+    ; MUST stay the very first statement - see the concurrency notes above the Busy state
+    GoToState("Busy")
+    self.__AddElementImpl(element, elementKey)
+    GoToState("")
+endFunction
+
+function __AddElementImpl(ActiveMagicEffect element, string elementKey)
     if (self.HasKey(elementKey))
         Error("Element "+ elementKey +" already exists, cannot add it again!")
         return
@@ -586,16 +593,29 @@ endFunction
     page gets freed too (see __FreePageIfNowUnused()).
 /;
 function RemoveElement(string elementKey, bool dispel = true)
+    ; MUST stay the very first statement - see the concurrency notes above the Busy state
+    GoToState("Busy")
+    ActiveMagicEffect removedElement = self.__RemoveElementImpl(elementKey)
+    GoToState("")
+
+    ; Dispelled only after the guard is released: the effect's own callbacks (OnEffectFinish /
+    ; OnDestroy) run on other threads and must never end up waiting on a lock still held here
+    if (dispel && removedElement)
+        removedElement.Dispel()
+    endif
+endFunction
+
+;/
+    The real removal, run inside the Busy guard. Returns the element that was removed (None if
+    the key wasn't present, or its payload was None) so RemoveElement() can dispel it afterwards.
+/;
+ActiveMagicEffect function __RemoveElementImpl(string elementKey)
     if (!self.HasKey(elementKey))
-        return
+        return none
     endif
 
     int removedIndex = FastMap_GetInt(__keyToIndex, elementKey)
     ActiveMagicEffect removedElement = self.__GetSlot(removedIndex)
-
-    if (dispel && removedElement)
-        removedElement.Dispel()
-    endif
 
     int lastIndex = __count - 1
 
@@ -616,7 +636,68 @@ function RemoveElement(string elementKey, bool dispel = true)
     __count -= 1
 
     self.__FreePageIfNowUnused(lastIndex / PAGE_SIZE)
+    return removedElement
 endFunction
+
+; =========================================================
+;                  Concurrency guard (Busy state)
+; =========================================================
+
+;/
+    AddElement/RemoveElement are multi-step (read Count, write a slot, write two maps, bump
+    Count) with function calls in between, and Papyrus can switch to another thread at those
+    calls. Two simultaneous callers (two actors registering in the same window) used to read
+    the same Count and overwrite each other, leaving Count out of step with both maps -
+    reproduced in-game by test 39 (8 worker threads: 155 reverse-map entries vs Count 160, keys
+    left behind after concurrent removes, Count 29 vs 40 expected).
+
+    The guard is a state: the public functions switch to "Busy" as their FIRST statement, and
+    in that state the same functions just wait until it's released and then call themselves
+    again. (A bool flag doesn't work: two threads can both read it as false before either sets
+    it. Switching state is the closest thing to a lock Papyrus offers.)
+
+    Deliberate details:
+      - Waiters sleep a RANDOM 0.02-0.06s so several waiters released at once don't all
+        resume in the same instant and re-create the race they were queued to avoid.
+      - The wait is bounded (LOCK_WAIT_TRIES). A thread that dies mid-operation (a runtime error
+        skips the release) can't deadlock the list: the first waiter to time out logs an error,
+        forces the state back to normal and carries on.
+      - Dispel() runs after the guard is released, so effect callbacks never wait on a lock
+        still held by their own caller.
+      - Reads (HasKey, GetAt, FromIndex, GetKeys, Count) are NOT guarded: Count is bumped last on
+        an Add, so a reader never sees an unwritten slot; overlapping a swap, a reader can at
+        worst see the moved element in two slots for a moment.
+
+    Known limit: there is still a one-instruction window between a call resolving to the normal
+    body and that body's GoToState executing. The short critical section and the jittered
+    waiters make it very unlikely; test 39 exists to check.
+/;
+;/ const /; int LOCK_WAIT_TRIES = 120 ; ~0.04s average per try, so a stuck lock is force-released after ~5s
+
+function __WaitUntilIdle()
+    int tries = 0
+    while (self.GetState() == "Busy" && tries < LOCK_WAIT_TRIES)
+        Utility.WaitMenuMode(Utility.RandomFloat(0.02, 0.06))
+        tries += 1
+    endWhile
+
+    if (self.GetState() == "Busy")
+        Error("ActiveMagicEffectContainer stayed Busy for " + tries + " waits - a previous Add/Remove never released it. Force-releasing.")
+        self.GoToState("")
+    endif
+endFunction
+
+state Busy
+    function AddElement(ActiveMagicEffect element, string elementKey)
+        self.__WaitUntilIdle()
+        self.AddElement(element, elementKey)
+    endFunction
+
+    function RemoveElement(string elementKey, bool dispel = true)
+        self.__WaitUntilIdle()
+        self.RemoveElement(elementKey, dispel)
+    endFunction
+endState
 
 ;/
     Alias for RemoveElement() - kept for RPB_CaptorList.Remove(), the one real caller still
@@ -705,6 +786,14 @@ string function ValidateIndexConsistency()
 endFunction
 
 ;/
+    TEST HOOK ONLY. Puts the container in the state a thread that died mid-Add/Remove would
+    leave it in (stuck Busy), so the bounded, self-healing wait can be exercised in-game.
+/;
+function DebugSimulateStuckLock()
+    self.GoToState("Busy")
+endFunction
+
+;/
     TEST HOOK ONLY. Puts this alias into the exact state an alias saved before __indexToKey
     existed loads into (valid __keyToIndex and __count, __indexToKey unset) so the migration
     path in __EnsureInitialized() can be exercised in-game without needing an old save. The
@@ -716,4 +805,42 @@ function DebugSimulateMissingReverseIndex()
     endif
 
     __indexToKey = 0
+endFunction
+
+;/
+    TEST HOOKS ONLY. The raw JContainers handles behind the two maps, so a test can prove Add and
+    Remove never allocate JContainers objects per operation (a leak would show up as a handle
+    changing, or no longer existing, across many cycles).
+/;
+int function DebugGetKeyToIndexHandle()
+    return __keyToIndex
+endFunction
+
+int function DebugGetIndexToKeyHandle()
+    return __indexToKey
+endFunction
+
+;/
+    TEST HOOK ONLY. Drops every entry without dispelling anything and returns the container to
+    a genuinely empty state: fresh empty maps (old ones released), Count 0, every page freed.
+    Exists so a concurrency stress test that finds the container corrupted can leave the live
+    list clean instead of broken. NEVER call this on a container that holds real entries.
+/;
+function DebugForceReset()
+    if (__keyToIndex)
+        FastMap_Release(__keyToIndex)
+    endif
+    if (__indexToKey)
+        FastMap_Release(__indexToKey)
+    endif
+
+    __keyToIndex = FastMap("<string>", true)
+    __indexToKey = FastMap("<int>", true)
+    __count = 0
+
+    int page = 0
+    while (page < PAGE_COUNT)
+        self.__FreePageIfNowUnused(page)
+        page += 1
+    endWhile
 endFunction
