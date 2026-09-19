@@ -185,7 +185,7 @@ endFunction
     float?  @afInitialTimeBetweenTries: The delay on each try
     float?  @afMaxTimeBetweenTries: The max delay on each try that is possible (Exponential Backoff).
 /;
-RPB_Arrestee function AwaitArresteeReference(Actor akArrestee, int aiMaxTries = 50, float afInitialTimeBetweenTries = 0.1, float afMaxTimeBetweenTries = 3.0)
+RPB_Arrestee function AwaitArresteeReference(Actor akArrestee, int aiMaxTries = 120, float afInitialTimeBetweenTries = 0.05, float afMaxTimeBetweenTries = 0.1)
     return RPB_Utility.AwaitEntityReference(akArrestee, Arrestees, none, aiMaxTries, afInitialTimeBetweenTries, afMaxTimeBetweenTries) as RPB_Arrestee
 endFunction
 
@@ -230,7 +230,7 @@ endFunction
     float?  @afInitialTimeBetweenTries: The delay on each try
     float?  @afMaxTimeBetweenTries: The max delay on each try that is possible (Exponential Backoff).
 /;
-RPB_Captor function AwaitCaptorReference(Actor akCaptor, int aiMaxTries = 50, float afInitialTimeBetweenTries = 0.1, float afMaxTimeBetweenTries = 3.0)
+RPB_Captor function AwaitCaptorReference(Actor akCaptor, int aiMaxTries = 120, float afInitialTimeBetweenTries = 0.05, float afMaxTimeBetweenTries = 0.1)
     return RPB_Utility.AwaitEntityReference(akCaptor, Captors, none, aiMaxTries, afInitialTimeBetweenTries, afMaxTimeBetweenTries) as RPB_Captor
 endFunction
 

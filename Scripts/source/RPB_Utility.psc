@@ -1158,9 +1158,9 @@ endFunction
     Actor           @akEntity: The actor to retrieve the Prisoner reference from.
     RPB_ActorList   @apEntityList: The entity list to get the reference from.
     RPB_Entity      @apEntity: The entity to bind this Actor to.
-    int?            @aiMaxTries: How many attempts retrieving the reference, in case it fails initially.
-    float?          @afInitialTimeBetweenTries: The delay on each try
-    float?          @afMaxTimeBetweenTries: The max delay on each try that is possible (Exponential Backoff).
+    int?            @aiMaxTries: Ignored (kept so existing calls compile) - the wait policy is fixed inside: ~0.05-0.1s polling, ~12s budget.
+    float?          @afInitialTimeBetweenTries: Ignored, see above.
+    float?          @afMaxTimeBetweenTries: Ignored, see above.
 
     returns (RPB_ActorBase): The RPB_ActorBase reference for this Actor.
 /;
@@ -1168,9 +1168,9 @@ RPB_ActorBase function AwaitEntityReference(\
     Actor akEntity, \
     RPB_ActorList apEntityList, \
     RPB_Entity apEntity = none, \
-    int aiMaxTries = 50, \
-    float afInitialTimeBetweenTries = 0.1, \
-    float afMaxTimeBetweenTries = 3.0 \
+    int aiMaxTries = 120, \
+    float afInitialTimeBetweenTries = 0.05, \
+    float afMaxTimeBetweenTries = 0.1 \
 ) global
     if (apEntityList as RPB_PrisonerList)
         EnsurePrisonerSpellAndBinding(akEntity, apEntity as RPB_Prison)
@@ -1185,22 +1185,53 @@ RPB_ActorBase function AwaitEntityReference(\
          EnsureCaptorSpellAndBinding(akEntity)
     endif
 
-    ; Shared logic for awaiting reference
+    ; Already registered (the common case for an actor that was set up earlier, loaded or not)?
+    ; Then there is nothing to wait for.
     RPB_ActorBase entityRef = apEntityList.AtKeyEx(akEntity) as RPB_ActorBase
-    int tries = 0
-    float delay = afInitialTimeBetweenTries
 
-    ; Safeguard
-    while (!entityRef && tries < aiMaxTries)
-        entityRef = apEntityList.AtKeyEx(akEntity) as RPB_ActorBase
-        Utility.Wait(delay)
-        ; Debug("Utility::AwaitEntityReference", "("+ tries +") ("+ akEntity +") entityRef: " + entityRef)
-        tries += 1
-        delay *= 1.5
-        if (delay > afMaxTimeBetweenTries)
-            delay = afMaxTimeBetweenTries
+    if (!entityRef)
+        ; The spell's magic effect only starts once the actor's 3D is loaded (measured: registered
+        ; ~260ms after AddSpell on a loaded actor, never on an unloaded/disabled one), and it is the
+        ; effect that registers the actor. Waiting the whole budget for an actor that isn't loaded
+        ; only turns "can't happen" into a long stall, so give it a short grace period to load and
+        ; then say why.
+        ;/ const /; float LOAD_GRACE_SECONDS = 5.0
+        float loadWaited = 0.0
+        while (!akEntity.Is3DLoaded() && loadWaited < LOAD_GRACE_SECONDS)
+            Utility.Wait(0.1)
+            loadWaited += 0.1
+        endWhile
+
+        if (!akEntity.Is3DLoaded())
+            DebugError("Utility::AwaitEntityReference ["+ apEntityList.ListIdentifier() +"]", "The Actor " + akEntity + " is not loaded (3D not loaded, disabled: " + akEntity.IsDisabled() + ", cell " + akEntity.GetParentCell() + ") after " + LOAD_GRACE_SECONDS + "s - its spell effect can't start until it is, so it can't be registered now.")
+            Error(akEntity.GetBaseObject().GetName() + " is not loaded, cannot be registered right now!")
+            return none
         endif
-    endWhile
+
+        ; Shared logic for awaiting reference. Wait first, then check, so the loop returns as soon as
+        ; the registration is seen (it used to check, then wait one more full delay before leaving),
+        ; and keep the delay short and capped: registration lands within ~0.2-1.5s, and a long
+        ; backoff only adds up to ~50% overshoot to every await.
+        ; The wait policy is fixed HERE on purpose, not taken from the parameters: Papyrus bakes a
+        ; function's default argument values into every call site when THAT caller is compiled, so
+        ; changing the defaults on the wrappers alone would leave every caller that isn't recompiled
+        ; on the old slow exponential backoff. The parameters remain only so existing calls compile.
+        ;/ const /; float POLL_FIRST_SECONDS = 0.05
+        ;/ const /; float POLL_MAX_SECONDS = 0.1
+        ;/ const /; float MAX_WAIT_SECONDS = 12.0
+        float delay = POLL_FIRST_SECONDS
+        float startTime = Utility.GetCurrentRealTime()
+
+        ; Safeguard
+        while (!entityRef && (Utility.GetCurrentRealTime() - startTime) < MAX_WAIT_SECONDS)
+            Utility.Wait(delay)
+            entityRef = apEntityList.AtKeyEx(akEntity) as RPB_ActorBase
+            delay *= 1.5
+            if (delay > POLL_MAX_SECONDS)
+                delay = POLL_MAX_SECONDS
+            endif
+        endWhile
+    endif
 
     if (!entityRef)
         DebugError("Utility::AwaitEntityReference ["+ apEntityList.ListIdentifier() +"]", "The Actor " + akEntity + " is not in the provided list or there was a state mismatch!")
@@ -1218,9 +1249,9 @@ endFunction
     Actor           @akEntity: The actor to retrieve the Prisoner reference from.
     RPB_ActorList   @apEntityList: The entity list to get the reference from.
     RPB_Entity      @apEntity: The entity to bind this Actor to.
-    int?            @aiMaxTries: How many attempts retrieving the reference, in case it fails initially.
-    float?          @afInitialTimeBetweenTries: The delay on each try
-    float?          @afMaxTimeBetweenTries: The max delay on each try that is possible (Exponential Backoff).
+    int?            @aiMaxTries: Ignored (kept so existing calls compile) - the wait policy is fixed inside: ~0.05-0.1s polling, ~12s budget.
+    float?          @afInitialTimeBetweenTries: Ignored, see above.
+    float?          @afMaxTimeBetweenTries: Ignored, see above.
 
     returns (RPB_ActorBase): The RPB_ActorBase reference for this Actor.
 /;
@@ -1228,23 +1259,26 @@ RPB_ActorBase function AwaitExistingEntityReference(\
     Actor akEntity, \
     RPB_ActorList apEntityList, \
     RPB_Entity apEntity = none, \
-    int aiMaxTries = 50, \
-    float afInitialTimeBetweenTries = 0.1, \
-    float afMaxTimeBetweenTries = 3.0 \
+    int aiMaxTries = 120, \
+    float afInitialTimeBetweenTries = 0.05, \
+    float afMaxTimeBetweenTries = 0.1 \
 ) global
     ; Shared logic for awaiting reference
     RPB_ActorBase entityRef = apEntityList.AtKeyEx(akEntity) as RPB_ActorBase
-    int tries = 0
-    float delay = afInitialTimeBetweenTries
+    ; Same fixed wait policy as AwaitEntityReference (see the note there): the parameters are ignored
+    ;/ const /; float POLL_FIRST_SECONDS = 0.05
+    ;/ const /; float POLL_MAX_SECONDS = 0.1
+    ;/ const /; float MAX_WAIT_SECONDS = 12.0
+    float delay = POLL_FIRST_SECONDS
+    float startTime = Utility.GetCurrentRealTime()
 
     ; Safeguard
-    while (!entityRef && tries < aiMaxTries)
-        entityRef = apEntityList.AtKeyEx(akEntity) as RPB_ActorBase
+    while (!entityRef && (Utility.GetCurrentRealTime() - startTime) < MAX_WAIT_SECONDS)
         Utility.Wait(delay)
-        tries += 1
+        entityRef = apEntityList.AtKeyEx(akEntity) as RPB_ActorBase
         delay *= 1.5
-        if (delay > afMaxTimeBetweenTries)
-            delay = afMaxTimeBetweenTries
+        if (delay > POLL_MAX_SECONDS)
+            delay = POLL_MAX_SECONDS
         endif
     endWhile
 

@@ -996,12 +996,18 @@ endFunction
 
     returns (RPB_Prisoner): The Prisoner reference for this Actor.
 /;
-RPB_Prisoner function AwaitPrisonerReference(Actor akPrisoner, int aiMaxTries = 50, float afInitialTimeBetweenTries = 0.1, float afMaxTimeBetweenTries = 3.0)
+RPB_Prisoner function AwaitPrisonerReference(Actor akPrisoner, int aiMaxTries = 120, float afInitialTimeBetweenTries = 0.05, float afMaxTimeBetweenTries = 0.1)
     ; RPB_StorageVars.SetBoolOnReference("Is Initialized", akPrisoner, true, "Actor")
-    return (RPB_Utility.AwaitEntityReference(akPrisoner, Prisoners, self, aiMaxTries, afInitialTimeBetweenTries, afMaxTimeBetweenTries) as RPB_Prisoner).Initialize()
+    RPB_Prisoner prisonerRef = RPB_Utility.AwaitEntityReference(akPrisoner, Prisoners, self, aiMaxTries, afInitialTimeBetweenTries, afMaxTimeBetweenTries) as RPB_Prisoner
+    if (!prisonerRef)
+        ; AwaitEntityReference has already logged why (not loaded / never registered); never call Initialize() on None
+        return none
+    endif
+
+    return prisonerRef.Initialize()
 endFunction
 
-RPB_Prisoner function GetPrisoner(Actor akPrisoner, int aiMaxTries = 50, float afInitialTimeBetweenTries = 0.1, float afMaxTimeBetweenTries = 3.0)
+RPB_Prisoner function GetPrisoner(Actor akPrisoner, int aiMaxTries = 120, float afInitialTimeBetweenTries = 0.05, float afMaxTimeBetweenTries = 0.1)
     return RPB_Utility.AwaitExistingEntityReference(akPrisoner, Prisoners, self, aiMaxTries, afInitialTimeBetweenTries, afMaxTimeBetweenTries) as RPB_Prisoner
 endFunction
 

@@ -154,31 +154,9 @@ string property ARREST_GOAL_TEMPORARY_HOLD      = "TemporaryHold" autoreadonly ;
     float?  @afMaxTimeBetweenTries: The max delay on each try that is possible (Exponential Backoff).
     bool?   @abDelayExecution: Whether to delay before obtaining a reference to the Arrestee.
 /;
-RPB_Arrestee function AwaitArresteeReference(Actor akArrestee, int aiMaxTries = 50, float afInitialTimeBetweenTries = 0.1, float afMaxTimeBetweenTries = 3.0)
-    RPB_Utility.EnsureArresteeSpellAndBinding(akArrestee, self)
-
-    RPB_Arrestee arresteeRef = Arrestees.AtKey(akArrestee)
-    int tries = 0
-    float delay = afInitialTimeBetweenTries
-
-    ; Safeguard
-    while (!arresteeRef && tries < aiMaxTries)
-        arresteeRef = Arrestees.AtKey(akArrestee)
-        Utility.Wait(delay)
-        tries += 1
-        delay *= 1.5
-        if (delay > afMaxTimeBetweenTries)
-            delay = afMaxTimeBetweenTries
-        endif
-    endWhile
-
-    if (!arresteeRef)
-        DebugError("Hold::AwaitArresteeReference", "The Actor " + akArrestee + " is not an arrestee or there was a state mismatch!")
-        Error(akArrestee.GetBaseObject().GetName() + " is not an arrestee or there was a state mismatch!")
-        return none
-    endif
-
-    return arresteeRef
+RPB_Arrestee function AwaitArresteeReference(Actor akArrestee, int aiMaxTries = 120, float afInitialTimeBetweenTries = 0.05, float afMaxTimeBetweenTries = 0.1)
+    ; Same wait as everything else (this used to be a private copy of the polling loop): binds this Hold, adds the spell, waits for the registration
+    return RPB_Utility.AwaitEntityReference(akArrestee, Arrestees, self, aiMaxTries, afInitialTimeBetweenTries, afMaxTimeBetweenTries) as RPB_Arrestee
 endFunction
 
 ; ==========================================================
