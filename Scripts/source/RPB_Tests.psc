@@ -75,6 +75,10 @@ function SetTests()
     self.AddTest("39 - ActiveMagicEffectContainer: Concurrent Access (8 Worker Threads)", "Test_ActiveMagicEffectContainer_ConcurrentAccess", abChainable = false)
     self.AddTest("40 - ActiveMagicEffectContainer: No Per-Operation JContainers Allocation", "Test_ActiveMagicEffectContainer_HandleStability")
     self.AddTest("41 - ActiveMagicEffectContainer: Stuck Lock Self-Heals", "Test_ActiveMagicEffectContainer_StuckLockSelfHeals")
+    self.AddTest("42 - ThreadLock: JAtomic Primitive Semantics and Registry", "Test_ThreadLock_PrimitiveSemantics")
+    ; Not chainable: fires concurrent worker threads
+    self.AddTest("43 - ThreadLock: Mutual Exclusion Proof (control vs locked)", "Test_ThreadLock_MutualExclusion", abChainable = false)
+    self.AddTest("44 - ThreadLock: Concurrent Registry Creation and Stuck-Lock Recovery", "Test_ThreadLock_RegistryAndStuckLock", abChainable = false)
 endFunction
 
 state Test_25Days_After_26th_Frostfall_Is_20th_Suns_Dusk
@@ -2613,7 +2617,7 @@ endState
 
 ;/
     A thread that dies mid-Add/Remove (a runtime error skips the release) would leave the
-    container stuck in its Busy guard state. The bounded wait must force-release it rather than
+    container's thread lock held forever. The bounded wait must force-take it rather than
     deadlock the list. Simulates exactly that stuck state, then does a normal Add: it must
     complete after the timeout (~5s, the container logs an error line for that on purpose), the
     entry must exist, the maps stay in sync, and ordinary calls work again afterwards.
@@ -2643,7 +2647,7 @@ state Test_ActiveMagicEffectContainer_StuckLockSelfHeals
         bench = StartBenchmark()
         _container.RemoveElement("StuckLockTest", dispel = false)
         int normalMs = EndBenchmark(bench, "Remove after the lock healed")
-        step = assert_true(normalMs < 2000, "Remove took " + normalMs + "ms - the container is still treating itself as Busy")
+        step = assert_true(normalMs < 2000, "Remove took " + normalMs + "ms - the container is still stuck on its thread lock")
         ok = ok && step
 
         step = assert_true(_container.Count == startCount, "Container did not return to its original Count, got " + _container.Count)
@@ -2712,6 +2716,347 @@ state Test_ActiveMagicEffectContainer_HandleStability
         ok = ok && step
         step = self.__AssertContainerInSync(_container, "after the handle stability run")
         ok = ok && step
+
+        display_result(ok)
+    endFunction
+endState
+
+; ==========================================================
+;   RPB_ThreadLock (JAtomic-based mutual exclusion between Papyrus threads)
+;
+;   42 checks the JAtomic primitives really behave as a lock needs, 43 is the "is it a true
+;   lock" proof (worker threads against a deliberately racy critical section, with an unlocked
+;   control to show the probe can actually see a race), 44 checks atomic creation of registered
+;   locks under contention and stuck-lock recovery. (Tests 45/46, a one-time head-to-head
+;   against the container's earlier Busy-state guard, were retired once the container switched
+;   to the thread lock; the numbers are in TROUBLESHOOTING_NOTES.md.)
+; ==========================================================
+
+; Shared state for the probe workers. Everything here is deliberately plain script variables,
+; the kind of state a real lock has to protect.
+int __probeLock
+int __probeCounter
+int __probeInside
+int __probeViolations
+int __probeIterations = 10
+bool[] __probeDone
+int[] __probeHandles
+string __probeName
+
+;/ The yield point inside the critical section. A plain call, or, when harsh, a latent wait, which suspends the thread while it still holds the lock - the hardest case for a lock. /;
+function __ProbeYield(bool abHarsh)
+    if (abHarsh)
+        Utility.WaitMenuMode(0.005)
+    endif
+endFunction
+
+event OnThreadLockProbeWorker(string asEventName, string asMode, float afWorkerIndex, Form akSender)
+    int worker = afWorkerIndex as int
+
+    if (asMode == "registry")
+        __probeHandles[worker] = RPB_ThreadLock.Get(__probeName)
+        __probeDone[worker] = true
+        return
+    endif
+
+    bool useLock = asMode == "lock" || asMode == "lock_wait"
+    bool harsh = asMode == "control_wait" || asMode == "lock_wait"
+    int value = 0
+    int i = 0
+
+    while (i < __probeIterations)
+        if (useLock)
+            RPB_ThreadLock.Acquire(__probeLock)
+        endif
+
+        ; Critical section: read-modify-write of shared state with a yield point in the middle.
+        ; If two threads are ever inside at once, the second sees __probeInside already set.
+        if (__probeInside != 0)
+            __probeViolations += 1
+        endif
+        __probeInside = 1
+        value = __probeCounter
+        self.__ProbeYield(harsh)
+        __probeCounter = value + 1
+        __probeInside = 0
+
+        if (useLock)
+            RPB_ThreadLock.Release(__probeLock)
+        endif
+
+        i += 1
+    endWhile
+
+    __probeDone[worker] = true
+endEvent
+
+;/ Runs @aiWorkers probe workers in @asMode and waits for all of them. False if one never finished. /;
+bool function __RunProbeWave(string asMode, int aiWorkers)
+    __probeCounter = 0
+    __probeInside = 0
+    __probeViolations = 0
+    __probeDone = new bool[16]
+    __probeHandles = new int[16]
+
+    int i = 0
+    while (i < aiWorkers)
+        self.SendModEvent("RPB_ThreadLockProbe", asMode, i)
+        i += 1
+    endWhile
+
+    float waited = 0.0
+    bool allDone = false
+    while (!allDone && waited < 180.0)
+        Utility.Wait(0.25)
+        waited += 0.25
+
+        allDone = true
+        i = 0
+        while (i < aiWorkers)
+            if (!__probeDone[i])
+                allDone = false
+            endif
+            i += 1
+        endWhile
+    endWhile
+
+    return allDone
+endFunction
+
+;/
+    Single-threaded: does JAtomic behave the way a lock needs? Logs the raw values it returns.
+    A missing native would return 0 for everything (a fake lock that always "acquires"), so the
+    second acquire failing is the key assertion.
+/;
+state Test_ThreadLock_PrimitiveSemantics
+    function Setup()
+        bool ok = true
+        bool step = false
+
+        step = assert_true(RPB_ThreadLock.IsWorking(), "RPB_ThreadLock.IsWorking() is false - the JAtomic natives don't behave like a lock here")
+        ok = ok && step
+
+        ; --- raw primitives, on a private lock object ---
+        int lockObj = RPB_ThreadLock.CreatePrivate()
+
+        int cas1 = JAtomic.compareExchangeInt(lockObj, ".locked", 1, 0)
+        int cas2 = JAtomic.compareExchangeInt(lockObj, ".locked", 1, 0)
+        int exch = JAtomic.exchangeInt(lockObj, ".locked", 0)
+        int add1 = JAtomic.fetchAddInt(lockObj, ".counter", 5, 0, true)
+        int add2 = JAtomic.fetchAddInt(lockObj, ".counter", 5, 0, true)
+        int counterNow = JMap.getInt(lockObj, "counter")
+        log("JATOMIC raw: compareExchange #1 -> " + cas1 + " (want 0), #2 -> " + cas2 + " (want 1), exchange -> " + exch + " (want 1), fetchAdd #1 -> " + add1 + " (want 0), #2 -> " + add2 + " (want 5), counter now " + counterNow + " (want 10)")
+
+        ; --- informational: what does compareExchangeObj actually do? (An earlier RPB_ThreadLock.Get()
+        ; relied on it to register locks under a nested JDB path and got private, unshared locks
+        ; back; this records the real behavior. Nothing here is asserted.) ---
+        int diagMap = JMap.object()
+        JValue.retain(diagMap)
+        int diagChild = JMap.object()
+        JValue.retain(diagChild)
+        int objSingle = JAtomic.compareExchangeObj(diagMap, ".slot", diagChild, 0, true)
+        int storedSingle = JMap.getObj(diagMap, "slot")
+        int objNested = JAtomic.compareExchangeObj(diagMap, ".a.b", diagChild, 0, true)
+        int storedNested = JValue.solveObj(diagMap, ".a.b")
+        int objRoot = JAtomic.compareExchangeObj(JDB.root(), ".RPB_T42_Diag", diagChild, 0, true)
+        int storedRoot = JDB.solveObj(".RPB_T42_Diag")
+        log("JATOMIC compareExchangeObj (child handle " + diagChild + "): single-level on a private map returned " + objSingle + ", stored " + storedSingle + " | two-level (.a.b) returned " + objNested + ", stored " + storedNested + " | single-level on JDB.root() returned " + objRoot + ", stored " + storedRoot)
+        JMap.removeKey(JDB.root(), "RPB_T42_Diag")
+        JValue.release(diagChild)
+        JValue.release(diagMap)
+
+        step = assert_true(cas1 == 0, "First compareExchange should return the previous value 0, got " + cas1)
+        ok = ok && step
+        step = assert_true(cas2 == 1, "Second compareExchange should fail and return 1, got " + cas2)
+        ok = ok && step
+        step = assert_true(exch == 1, "exchange should return the previous value 1, got " + exch)
+        ok = ok && step
+        step = assert_true(add1 == 0 && add2 == 5 && counterNow == 10, "fetchAdd should return the previous value each time (0 then 5) and leave 10, got " + add1 + ", " + add2 + ", " + counterNow)
+        ok = ok && step
+
+        ; --- TryAcquire / Release ---
+        step = assert_true(RPB_ThreadLock.TryAcquire(lockObj), "TryAcquire on a free lock should succeed")
+        ok = ok && step
+        step = assert_true(!RPB_ThreadLock.TryAcquire(lockObj), "TryAcquire on a held lock should fail")
+        ok = ok && step
+        RPB_ThreadLock.Release(lockObj)
+        step = assert_true(RPB_ThreadLock.TryAcquire(lockObj), "TryAcquire after Release should succeed")
+        ok = ok && step
+        RPB_ThreadLock.Release(lockObj)
+        FastMap_Release(lockObj)
+
+        ; --- registry: same name -> same lock, different names -> different locks ---
+        string suffix = ((Utility.GetCurrentRealTime() * 1000.0) as int) as string
+        string nameA = "T42_A_" + suffix
+        string nameB = "T42_B_" + suffix
+        string nameNeg = "T42_n5_3_" + suffix
+        string nameHyphen = "T42_-5_3_" + suffix
+
+        int handleA = RPB_ThreadLock.Get(nameA)
+        int handleA2 = RPB_ThreadLock.Get(nameA)
+        int handleB = RPB_ThreadLock.Get(nameB)
+        step = assert_true(handleA != 0 && JValue.isExists(handleA), "Get() returned an invalid handle: " + handleA)
+        ok = ok && step
+        step = assert_true(handleA == handleA2, "Get() with the same name returned different handles: " + handleA + " vs " + handleA2)
+        ok = ok && step
+        step = assert_true(handleB != 0 && handleB != handleA, "Get() with a different name should return a different lock: " + handleA + " vs " + handleB)
+        ok = ok && step
+        step = assert_true(RPB_ThreadLock.TryAcquire(handleA) && RPB_ThreadLock.TryAcquire(handleB), "Registered locks should be independent and free at creation")
+        ok = ok && step
+        step = assert_true(!RPB_ThreadLock.TryAcquire(handleA), "A registered lock that is held should refuse a second acquire")
+        ok = ok && step
+        RPB_ThreadLock.Release(handleA)
+        RPB_ThreadLock.Release(handleB)
+
+        int handleNeg = RPB_ThreadLock.Get(nameNeg)
+        step = assert_true(handleNeg != 0 && RPB_ThreadLock.Get(nameNeg) == handleNeg, "A name built from a negative id segment (n5) didn't round-trip")
+        ok = ok && step
+
+        ; Informational: does a literal '-' in a name survive the JContainers path syntax?
+        int handleHyphen = RPB_ThreadLock.Get(nameHyphen)
+        bool hyphenOk = handleHyphen != 0 && RPB_ThreadLock.Get(nameHyphen) == handleHyphen
+        log("THREADLOCK names: a '-' in a lock name " + hyphenOk + " (the container avoids it by writing negative ids as n<id> anyway)")
+
+        RPB_ThreadLock.Forget(nameA)
+        RPB_ThreadLock.Forget(nameB)
+        RPB_ThreadLock.Forget(nameNeg)
+        RPB_ThreadLock.Forget(nameHyphen)
+
+        display_result(ok)
+    endFunction
+endState
+
+;/
+    The "is it a true lock" proof. N worker threads run a critical section that is deliberately
+    unsafe on its own: read a shared counter, yield, write counter + 1, with a flag that any
+    second thread entering at the same time trips. Four runs:
+      control        no lock, the yield is just a function call
+      lock           locked,  the yield is just a function call
+      control_wait   no lock, the yield is a latent wait (the thread is suspended mid-section)
+      lock_wait      locked,  same latent wait: the lock must hold across a suspension
+    Locked runs must show ZERO violations and the exact counter. The harsh control must show
+    races (violations or lost updates) - if it doesn't, the probe can't see a race and a clean
+    locked run would prove nothing, so that fails as "inconclusive" instead of passing.
+/;
+state Test_ThreadLock_MutualExclusion
+    function Setup()
+        int WORKERS = 8
+        int expected = WORKERS * __probeIterations
+
+        if (!RPB_ThreadLock.IsWorking())
+            log("RPB_ThreadLock.IsWorking() is false - the JAtomic natives don't behave like a lock here, aborting")
+            display_result(false)
+            return
+        endif
+
+        __probeLock = RPB_ThreadLock.CreatePrivate()
+        self.RegisterForModEvent("RPB_ThreadLockProbe", "OnThreadLockProbeWorker")
+
+        bool ok = true
+        bool step = false
+        bool finished = false
+
+        finished = self.__RunProbeWave("control", WORKERS)
+        int controlCounter = __probeCounter
+        int controlViolations = __probeViolations
+        step = assert_true(finished, "control run: a worker never finished")
+        ok = ok && step
+
+        finished = self.__RunProbeWave("lock", WORKERS)
+        int lockCounter = __probeCounter
+        int lockViolations = __probeViolations
+        step = assert_true(finished, "lock run: a worker never finished")
+        ok = ok && step
+        step = assert_true(lockViolations == 0 && lockCounter == expected, "LOCKED run (function-call yield) broke mutual exclusion: " + lockViolations + " violation(s), counter " + lockCounter + " of " + expected)
+        ok = ok && step
+
+        finished = self.__RunProbeWave("control_wait", WORKERS)
+        int controlWaitCounter = __probeCounter
+        int controlWaitViolations = __probeViolations
+        step = assert_true(finished, "control_wait run: a worker never finished")
+        ok = ok && step
+        step = assert_true(controlWaitViolations > 0 || controlWaitCounter != expected, "Inconclusive: the UNLOCKED control with a latent wait showed no race (0 violations, counter " + controlWaitCounter + " of " + expected + "), so a clean locked run would prove nothing")
+        ok = ok && step
+
+        finished = self.__RunProbeWave("lock_wait", WORKERS)
+        int lockWaitCounter = __probeCounter
+        int lockWaitViolations = __probeViolations
+        step = assert_true(finished, "lock_wait run: a worker never finished")
+        ok = ok && step
+        step = assert_true(lockWaitViolations == 0 && lockWaitCounter == expected, "LOCKED run (latent wait inside) broke mutual exclusion: " + lockWaitViolations + " violation(s), counter " + lockWaitCounter + " of " + expected)
+        ok = ok && step
+
+        self.UnregisterForModEvent("RPB_ThreadLockProbe")
+        FastMap_Release(__probeLock)
+
+        log("MUTUAL EXCLUSION (" + WORKERS + " workers x " + __probeIterations + ", expected counter " + expected + ") - control: counter " + controlCounter + ", " + controlViolations + " violation(s) | lock: counter " + lockCounter + ", " + lockViolations + " | control+wait: counter " + controlWaitCounter + ", " + controlWaitViolations + " | lock+wait: counter " + lockWaitCounter + ", " + lockWaitViolations)
+        Debug.Notification("Lock+wait: counter " + lockWaitCounter + "/" + expected + ", violations " + lockWaitViolations + " (control " + controlWaitCounter + ", " + controlWaitViolations + ")")
+
+        display_result(ok)
+    endFunction
+endState
+
+;/
+    16 workers ask for the SAME brand-new lock name at the same moment: the registry's atomic
+    compare-exchange must install exactly one object and hand every caller that same handle.
+    Then a lock is left held on purpose and Acquire() must give up waiting and force-take it
+    after a real wait (the error line it logs is expected), after which normal use is fast again.
+/;
+state Test_ThreadLock_RegistryAndStuckLock
+    function Setup()
+        bool ok = true
+        bool step = false
+
+        string suffix = ((Utility.GetCurrentRealTime() * 1000.0) as int) as string
+        __probeName = "T44_Reg_" + suffix
+        self.RegisterForModEvent("RPB_ThreadLockProbe", "OnThreadLockProbeWorker")
+
+        step = self.__RunProbeWave("registry", 16)
+        step = assert_true(step, "registry run: a worker never finished")
+        ok = ok && step
+
+        int first = __probeHandles[0]
+        int mismatches = 0
+        int i = 0
+        while (i < 16)
+            if (__probeHandles[i] != first)
+                mismatches += 1
+            endif
+            i += 1
+        endWhile
+        step = assert_true(first != 0 && JValue.isExists(first), "Registry handle is invalid: " + first)
+        ok = ok && step
+        step = assert_true(mismatches == 0, mismatches + " of 16 concurrent Get() calls returned a DIFFERENT lock than worker 0 - creation isn't atomic")
+        ok = ok && step
+        step = assert_true(RPB_ThreadLock.Get(__probeName) == first, "A later Get() for the same name returned a different lock")
+        ok = ok && step
+        log("THREADLOCK registry: 16 concurrent Get() -> " + mismatches + " mismatch(es), handle " + first)
+
+        self.UnregisterForModEvent("RPB_ThreadLockProbe")
+
+        ; --- stuck lock: hold it, then try to acquire it again with a short wait budget ---
+        int stuck = RPB_ThreadLock.Get("T44_Stuck_" + suffix)
+        step = assert_true(RPB_ThreadLock.Acquire(stuck), "First Acquire on a free lock should succeed normally")
+        ok = ok && step
+
+        float bench = StartBenchmark()
+        bool normal = RPB_ThreadLock.Acquire(stuck, 25)
+        int waitedMs = EndBenchmark(bench, "Acquire against a held lock (25 tries, then force-take)")
+        step = assert_true(!normal, "Acquire against a held lock should report it had to force-take it")
+        ok = ok && step
+        step = assert_true(waitedMs >= 500, "Acquire returned after only " + waitedMs + "ms - it did not actually wait on the held lock")
+        ok = ok && step
+
+        RPB_ThreadLock.Release(stuck)
+        bench = StartBenchmark()
+        bool afterRelease = RPB_ThreadLock.Acquire(stuck)
+        int quickMs = EndBenchmark(bench, "Acquire after Release")
+        RPB_ThreadLock.Release(stuck)
+        step = assert_true(afterRelease && quickMs < 300, "Acquire after Release should be immediate and normal, got " + afterRelease + " in " + quickMs + "ms")
+        ok = ok && step
+
+        RPB_ThreadLock.Forget(__probeName)
+        RPB_ThreadLock.Forget("T44_Stuck_" + suffix)
 
         display_result(ok)
     endFunction

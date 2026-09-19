@@ -563,10 +563,10 @@ endFunction
     key already exists, or if every configured page is already full.
 /;
 function AddElement(ActiveMagicEffect element, string elementKey)
-    ; MUST stay the very first statement - see the concurrency notes above the Busy state
-    GoToState("Busy")
+    int threadLock = self.__GetThreadLock()
+    self.__AcquireThreadLock(threadLock)
     self.__AddElementImpl(element, elementKey)
-    GoToState("")
+    RPB_ThreadLock.Release(threadLock)
 endFunction
 
 function __AddElementImpl(ActiveMagicEffect element, string elementKey)
@@ -593,12 +593,12 @@ endFunction
     page gets freed too (see __FreePageIfNowUnused()).
 /;
 function RemoveElement(string elementKey, bool dispel = true)
-    ; MUST stay the very first statement - see the concurrency notes above the Busy state
-    GoToState("Busy")
+    int threadLock = self.__GetThreadLock()
+    self.__AcquireThreadLock(threadLock)
     ActiveMagicEffect removedElement = self.__RemoveElementImpl(elementKey)
-    GoToState("")
+    RPB_ThreadLock.Release(threadLock)
 
-    ; Dispelled only after the guard is released: the effect's own callbacks (OnEffectFinish /
+    ; Dispelled only after the lock is released: the effect's own callbacks (OnEffectFinish /
     ; OnDestroy) run on other threads and must never end up waiting on a lock still held here
     if (dispel && removedElement)
         removedElement.Dispel()
@@ -606,7 +606,7 @@ function RemoveElement(string elementKey, bool dispel = true)
 endFunction
 
 ;/
-    The real removal, run inside the Busy guard. Returns the element that was removed (None if
+    The real removal, run while holding the thread lock. Returns the element that was removed (None if
     the key wasn't present, or its payload was None) so RemoveElement() can dispel it afterwards.
 /;
 ActiveMagicEffect function __RemoveElementImpl(string elementKey)
@@ -640,64 +640,69 @@ ActiveMagicEffect function __RemoveElementImpl(string elementKey)
 endFunction
 
 ; =========================================================
-;                  Concurrency guard (Busy state)
+;                  Concurrency guard (RPB_ThreadLock)
 ; =========================================================
 
 ;/
     AddElement/RemoveElement are multi-step (read Count, write a slot, write two maps, bump
-    Count) with function calls in between, and Papyrus can switch to another thread at those
-    calls. Two simultaneous callers (two actors registering in the same window) used to read
-    the same Count and overwrite each other, leaving Count out of step with both maps -
-    reproduced in-game by test 39 (8 worker threads: 155 reverse-map entries vs Count 160, keys
-    left behind after concurrent removes, Count 29 vs 40 expected).
+    Count), and Papyrus can switch to another thread in the middle (JContainers natives and
+    latent calls are suspension points). Two simultaneous callers - two actors registering in the
+    same window - used to read the same Count and overwrite each other, leaving Count out of
+    step with both maps: reproduced in-game by test 39 (8 worker threads: 155 reverse-map
+    entries vs Count 160, keys left behind after concurrent removes, Count 29 vs 40 expected).
 
-    The guard is a state: the public functions switch to "Busy" as their FIRST statement, and
-    in that state the same functions just wait until it's released and then call themselves
-    again. (A bool flag doesn't work: two threads can both read it as false before either sets
-    it. Switching state is the closest thing to a lock Papyrus offers.)
+    Both mutators now hold an RPB_ThreadLock (JContainers JAtomic compare-exchange, a genuinely
+    atomic test-and-set) around the real work. It replaced an earlier guard built on a "Busy"
+    script state, which worked but had a documented one-instruction window and couldn't be
+    reused by other scripts; measured head to head (tests 45/46, since retired) the thread lock
+    was within ~5% of it per operation uncontended and at least as fast under contention, and
+    test 43 proved it mutually exclusive even with threads suspended inside the section.
 
     Deliberate details:
-      - Waiters sleep a RANDOM 0.02-0.06s so several waiters released at once don't all
-        resume in the same instant and re-create the race they were queued to avoid.
-      - The wait is bounded (LOCK_WAIT_TRIES). A thread that dies mid-operation (a runtime error
-        skips the release) can't deadlock the list: the first waiter to time out logs an error,
-        forces the state back to normal and carries on.
-      - Dispel() runs after the guard is released, so effect callbacks never wait on a lock
-        still held by their own caller.
-      - Reads (HasKey, GetAt, FromIndex, GetKeys, Count) are NOT guarded: Count is bumped last on
+      - The lock is per container instance, named AME_<quest id>_<alias id>, and fetched lazily
+        into __threadLock (a new field defaults to 0 on aliases saved before it existed).
+        RPB_ThreadLock.Get() is atomic, so simultaneous first callers all get the same lock.
+      - Waiters sleep a random 0.02-0.06s, bounded (~5s); a thread that dies while holding the
+        lock can't deadlock the list - the next caller logs an error and force-takes it. When that
+        happens the cached handle is dropped so the next call re-fetches a known-good lock
+        instead of stalling on a stale one.
+      - Dispel() runs after the lock is released, so effect callbacks never wait on a lock still
+        held by their own caller.
+      - Reads (HasKey, GetAt, FromIndex, GetKeys, Count) are NOT locked: Count is bumped last on
         an Add, so a reader never sees an unwritten slot; overlapping a swap, a reader can at
         worst see the moved element in two slots for a moment.
-
-    Known limit: there is still a one-instruction window between a call resolving to the normal
-    body and that body's GoToState executing. The short critical section and the jittered
-    waiters make it very unlikely; test 39 exists to check.
+      - Requires a JContainers build that includes JAtomic. If its natives are missing, every
+        call would silently "succeed" and the lock would protect nothing, so the first fetch
+        checks RPB_ThreadLock.IsWorking() and logs an error if it doesn't.
 /;
-;/ const /; int LOCK_WAIT_TRIES = 120 ; ~0.04s average per try, so a stuck lock is force-released after ~5s
+int __threadLock
 
-function __WaitUntilIdle()
-    int tries = 0
-    while (self.GetState() == "Busy" && tries < LOCK_WAIT_TRIES)
-        Utility.WaitMenuMode(Utility.RandomFloat(0.02, 0.06))
-        tries += 1
-    endWhile
+int function __GetThreadLock()
+    if (!__threadLock)
+        int formId = self.GetOwningQuest().GetFormID()
+        string idPart = formId
+        if (formId < 0)
+            idPart = "n" + (0 - formId)
+        endif
 
-    if (self.GetState() == "Busy")
-        Error("ActiveMagicEffectContainer stayed Busy for " + tries + " waits - a previous Add/Remove never released it. Force-releasing.")
-        self.GoToState("")
+        int found = RPB_ThreadLock.Get("AME_" + idPart + "_" + self.GetID())
+        if (!RPB_ThreadLock.IsWorking())
+            Error("RPB_ThreadLock is not working on this install (JContainers without JAtomic?) - ActiveMagicEffectContainer's Add/Remove are NOT protected against simultaneous callers!")
+        endif
+
+        __threadLock = found
     endif
+
+    return __threadLock
 endFunction
 
-state Busy
-    function AddElement(ActiveMagicEffect element, string elementKey)
-        self.__WaitUntilIdle()
-        self.AddElement(element, elementKey)
-    endFunction
-
-    function RemoveElement(string elementKey, bool dispel = true)
-        self.__WaitUntilIdle()
-        self.RemoveElement(elementKey, dispel)
-    endFunction
-endState
+function __AcquireThreadLock(int aiThreadLock)
+    if (!RPB_ThreadLock.Acquire(aiThreadLock))
+        ; Had to force-take it: the previous holder never released it (or this handle is stale).
+        ; Re-fetch a known-good lock next time rather than keep stalling on this one.
+        __threadLock = 0
+    endif
+endFunction
 
 ;/
     Alias for RemoveElement() - kept for RPB_CaptorList.Remove(), the one real caller still
@@ -786,11 +791,12 @@ string function ValidateIndexConsistency()
 endFunction
 
 ;/
-    TEST HOOK ONLY. Puts the container in the state a thread that died mid-Add/Remove would
-    leave it in (stuck Busy), so the bounded, self-healing wait can be exercised in-game.
+    TEST HOOK ONLY. Takes this container's thread lock and never releases it - the state a
+    thread that died mid-Add/Remove would leave behind - so the bounded, self-healing wait can
+    be exercised in-game.
 /;
 function DebugSimulateStuckLock()
-    self.GoToState("Busy")
+    RPB_ThreadLock.Acquire(self.__GetThreadLock())
 endFunction
 
 ;/
