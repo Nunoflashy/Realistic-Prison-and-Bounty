@@ -354,9 +354,7 @@ endFunction
 function RefreshOptionDefaultsForCurrentPage()
     string configKey = self.GetBucketConfigKey(CurrentPage)
 
-    if (!__warmedDefaultShapes)
-        __warmedDefaultShapes = FastMap("<string>", retain = true)
-    endif
+    self.__ValidateWarmedDefaults()
 
     if (FastMap_HasKey(__warmedDefaultShapes, configKey))
         return
@@ -375,10 +373,7 @@ endFunction
 /;
 function EnsureAllOptionDefaults()
     self.MCM() ; the option maps must exist
-
-    if (!__warmedDefaultShapes)
-        __warmedDefaultShapes = FastMap("<string>", retain = true)
-    endif
+    self.__ValidateWarmedDefaults()
 
     int optionsObj = RPB_Data.MCM_GetOptionObject() ; one read of mcm.json for every shape
 
@@ -402,6 +397,24 @@ function EnsureAllOptionDefaults()
     ; The hardcoded defaults are bumping the settings version on every write: only register them when missing
     if (!FastMap_HasKey(optionsDefaultValueMap, "Outfit 1::Name"))
         self.SetHardcodedDefaults()
+    endif
+endFunction
+
+;/
+    The warmed-shapes marker only means something for the default map it was written for. OnConfigInit ->
+    InitializeOptions() REPLACES optionsDefaultValueMap with a new empty map, and the marker (persisted) would
+    still say every shape is warmed, so EnsureAllOptionDefaults() would skip them and the defaults would stay
+    empty (the new-save bug again, depending on whether PerformSetup or OnConfigInit ran first). The marker
+    therefore remembers the map handle it belongs to and is cleared when that changes.
+/;
+function __ValidateWarmedDefaults()
+    if (!__warmedDefaultShapes)
+        __warmedDefaultShapes = FastMap("<string>", retain = true)
+    endif
+
+    if (FastMap_GetInt(__warmedDefaultShapes, "__default map") != optionsDefaultValueMap)
+        FastMap_Clear(__warmedDefaultShapes)
+        FastMap_SetInt(__warmedDefaultShapes, "__default map", optionsDefaultValueMap)
     endif
 endFunction
 
@@ -445,6 +458,16 @@ function __RegisterDefaultsForShape(string asConfigKey, int aiOptionsObj)
     endWhile
 
     FastMap_SetInt(__warmedDefaultShapes, asConfigKey, FastMap_Size(pageObj))
+endFunction
+
+;/
+    Test hook: does to the default map exactly what InitializeOptions() does (replaces it with a new empty one)
+    WITHOUT touching the warmed-shapes marker, to prove EnsureAllOptionDefaults() notices a replaced map.
+/;
+function DebugReplaceOptionDefaultsMap()
+    optionsDefaultValueMap = FastMap("<string>", retain = true)
+    generalContainer = Object_CreateIfNotExists(generalContainer, FastMap("<string>", retain = true))
+    FastMap_SetObject(generalContainer, "options/default", optionsDefaultValueMap)
 endFunction
 
 ;/
@@ -2744,6 +2767,10 @@ function InitializeOptions()
 ;                               Default Values
 ; ============================================================================
     optionsDefaultValueMap  = FastMap("<string>") ; Default values for options
+
+    if (__warmedDefaultShapes)
+        FastMap_Clear(__warmedDefaultShapes) ; the default map is a new, empty one: no shape is warmed anymore
+    endif
 
 ; ============================================================================
 ;                              Min/Max/Step Values

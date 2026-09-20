@@ -103,6 +103,7 @@ function SetTests()
     self.AddTest("71 - Utility.GetFormNameCached(): Equals Faction.GetName() and Makes Bounty Reads Cheap", "Test_Utility_FormNameCache", abChainable = false)
     self.AddTest("72 - Native Cost Probe: Distribution, Back-to-Back, and Parallel Stacks", "Test_Natives_Probe", abChainable = false)
     self.AddTest("73 - MCM: Every Option Default Exists Without Visiting an MCM Page (New Save)", "Test_MCM_DefaultsWithoutPageVisit", abChainable = false)
+    self.AddTest("74 - MCM: Defaults Are Rebuilt After the Default Map Is Replaced (OnConfigInit Order)", "Test_MCM_DefaultsAfterMapReplaced", abChainable = false)
     self.AddTest("41 - ActiveMagicEffectContainer: Stuck Lock Self-Heals", "Test_ActiveMagicEffectContainer_StuckLockSelfHeals")
     self.AddTest("42 - ThreadLock: JAtomic Primitive Semantics and Registry", "Test_ThreadLock_PrimitiveSemantics")
     ; Not chainable: fires concurrent worker threads
@@ -5831,6 +5832,85 @@ state Test_MCM_DefaultsWithoutPageVisit
         ok = ok && step
 
         log("MCM DEFAULTS " + checked + " defaults checked across " + shapes.Length + " shapes, " + wrong + " wrong | first Ensure " + msEnsure + "ms, second (nothing to do) " + msSecond + "ms | Jail::Minimum Sentence " + mcm.GetOptionDefaultFloat("Jail::Minimum Sentence") + ", Jail::Bounty to Sentence " + mcm.GetOptionDefaultFloat("Jail::Bounty to Sentence"))
+        display_result(ok)
+    endFunction
+endState
+
+
+int __mcmDefaultsChecked
+
+; How many of mcm.json's options that declare a "Default" do not have exactly that default registered right now
+int function __CountWrongMcmDefaults(RPB_MCM akMcm)
+    int optionsObj = RPB_Data.MCM_GetOptionObject()
+    string[] shapes = JMap.allKeysPArray(optionsObj)
+    __mcmDefaultsChecked = 0
+    int wrong = 0
+
+    int s = 0
+    while (s < shapes.Length)
+        int pageObj = JMap.getObj(optionsObj, shapes[s])
+        string[] optionKeys = JMap.allKeysPArray(pageObj)
+        int o = 0
+        while (o < optionKeys.Length)
+            int optionMap = JMap.getObj(pageObj, optionKeys[o])
+
+            if (JMap.hasKey(optionMap, "Default"))
+                int defaultType = JMap.valueType(optionMap, "Default")
+                bool matches = true
+
+                if (defaultType == 2 && akMcm.IsPropertyValueOfTypeBool(optionMap, "Default"))
+                    matches = akMcm.GetOptionDefaultBool(optionKeys[o]) == (JMap.getInt(optionMap, "Default") as bool)
+                elseif (defaultType == 2 || defaultType == 3)
+                    matches = akMcm.GetOptionDefaultFloat(optionKeys[o]) == JMap.getFlt(optionMap, "Default")
+                elseif (defaultType == 6)
+                    matches = akMcm.GetOptionDefaultString(optionKeys[o]) == JMap.getStr(optionMap, "Default")
+                endif
+
+                __mcmDefaultsChecked += 1
+                if (!matches)
+                    wrong += 1
+                endif
+            endif
+            o += 1
+        endWhile
+        s += 1
+    endWhile
+
+    return wrong
+endFunction
+
+;/
+    OnConfigInit -> InitializeOptions() replaces optionsDefaultValueMap with a new empty map, and the persisted
+    "warmed shapes" marker used to survive that, so EnsureAllOptionDefaults() (from PerformSetup or the next game load)
+    skipped every shape and the defaults stayed empty: the new-save bug again, depending on which of PerformSetup and
+    OnConfigInit ran first. The test warms everything, replaces the default map exactly as InitializeOptions() does
+    (test hook, marker untouched), checks the defaults are gone, calls EnsureAllOptionDefaults() and checks that every
+    default is back.
+/;
+state Test_MCM_DefaultsAfterMapReplaced
+    function Setup()
+        RPB_Prison prison = (RPB_API.GetPrisonManager()).GetPrison("Haafingar")
+        RPB_MCM mcm = prison.Config.MCM
+        bool ok = true
+        bool step = false
+
+        mcm.EnsureAllOptionDefaults()
+        int wrongBefore = self.__CountWrongMcmDefaults(mcm)
+        step = assert_true(wrongBefore == 0 && __mcmDefaultsChecked >= 50, "Precondition failed: " + wrongBefore + " of " + __mcmDefaultsChecked + " defaults wrong before the map was replaced")
+        ok = ok && step
+
+        ; What OnConfigInit -> InitializeOptions() does to the default map, marker untouched
+        mcm.DebugReplaceOptionDefaultsMap()
+        int wrongAfterReplace = self.__CountWrongMcmDefaults(mcm)
+        step = assert_true(wrongAfterReplace > 0, "The replaced default map still holds the defaults, cannot prove anything")
+        ok = ok && step
+
+        mcm.EnsureAllOptionDefaults()
+        int wrongAfterEnsure = self.__CountWrongMcmDefaults(mcm)
+        step = assert_true(wrongAfterEnsure == 0, wrongAfterEnsure + " of " + __mcmDefaultsChecked + " defaults are still missing after EnsureAllOptionDefaults() on a replaced default map (the warmed marker was trusted)")
+        ok = ok && step
+        log("MCM DEFAULTS after map replaced: " + wrongAfterReplace + " missing right after the replacement, " + wrongAfterEnsure + " after EnsureAllOptionDefaults() (of " + __mcmDefaultsChecked + ")")
+
         display_result(ok)
     endFunction
 endState
