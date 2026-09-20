@@ -1852,6 +1852,101 @@ int function GetSlotMask(string bodyPart) global
 endFunction
 
 ;/
+    Flow phase profiler (opt-in). Marks a few named points along a flow (arrest -> imprison) and, at FlowEnd(), logs
+    the time each phase took: `FLOW: #3 Arrestee.InitializeState done | +48ms (net ~39ms) | total 412ms`.
+    Vanilla natives cost about one frame each (~11ms at 90 FPS), so a phase's milliseconds ~ its number of natives.
+
+    - Off by default. EnableFlowProfiling() / DisableFlowProfiling() (in game: F4 Actions menu -> "[Debug] Toggle Flow Profiling").
+    - Off, a mark is a single JDB read (~0.4ms, no native). On, a mark reads Utility.GetCurrentRealTime() (one frame)
+      and stores it; NOTHING is logged until FlowEnd(), so the logging itself does not distort the phases.
+    - FlowBegin() also measures the cost of one timer read (two consecutive reads): every phase includes it, and the
+      report prints each phase net of it.
+    - One flow at a time (state lives under the "Profile" storage category). Marks after FlowEnd() are ignored.
+/;
+bool function IsFlowProfilingEnabled() global
+    return JDB.solveInt(".rpb_root.storage.Profile.FLOW") != 0
+endFunction
+
+function EnableFlowProfiling() global
+    RPB_StorageVars.SetBool("FLOW", true, "Profile")
+endFunction
+
+function DisableFlowProfiling() global
+    RPB_StorageVars.SetBool("FLOW", false, "Profile")
+    RPB_StorageVars.SetInt("Active", 0, "Profile")
+endFunction
+
+function FlowBegin(string asFlow) global
+    if (!IsFlowProfilingEnabled())
+        return
+    endif
+
+    float t0 = Utility.GetCurrentRealTime()
+    float t1 = Utility.GetCurrentRealTime() ; two consecutive reads: the cost of one mark's timer
+
+    RPB_StorageVars.SetString("Name", asFlow, "Profile")
+    RPB_StorageVars.SetInt("Count", 0, "Profile")
+    RPB_StorageVars.SetFloat("Overhead", t1 - t0, "Profile")
+    RPB_StorageVars.SetFloat("Start", t1, "Profile")
+    RPB_StorageVars.SetInt("Active", 1, "Profile")
+endFunction
+
+; Starts the flow only when none is running (for entry points that can be reached from several places)
+function FlowEnsure(string asFlow) global
+    if (IsFlowProfilingEnabled() && JDB.solveInt(".rpb_root.storage.Profile.Active") == 0)
+        FlowBegin(asFlow)
+    endif
+endFunction
+
+function FlowMark(string asPhase) global
+    if (JDB.solveInt(".rpb_root.storage.Profile.Active") == 0)
+        return
+    endif
+
+    float now = Utility.GetCurrentRealTime()
+    int count = RPB_StorageVars.GetInt("Count", "Profile")
+
+    RPB_StorageVars.SetFloat("t" + count, now, "Profile")
+    RPB_StorageVars.SetString("p" + count, asPhase, "Profile")
+    RPB_StorageVars.SetInt("Count", count + 1, "Profile")
+endFunction
+
+; Marks the last phase and logs the whole flow
+function FlowEnd(string asPhase = "end") global
+    if (JDB.solveInt(".rpb_root.storage.Profile.Active") == 0)
+        return
+    endif
+
+    FlowMark(asPhase)
+    RPB_StorageVars.SetInt("Active", 0, "Profile")
+
+    int count = RPB_StorageVars.GetInt("Count", "Profile")
+    float previous = RPB_StorageVars.GetFloat("Start", "Profile")
+    float start = previous
+    int overhead = (RPB_StorageVars.GetFloat("Overhead", "Profile") * 1000.0) as int
+    string flowName = RPB_StorageVars.GetString("Name", "Profile")
+    int netTotal = 0
+
+    base_log("FLOW:", "==== " + flowName + ": " + count + " phases, one timer read costs ~" + overhead + "ms and is inside every phase ====")
+
+    int i = 0
+    while (i < count)
+        float t = RPB_StorageVars.GetFloat("t" + i, "Profile")
+        int delta = ((t - previous) * 1000.0) as int
+        int net = delta - overhead
+        if (net < 0)
+            net = 0
+        endif
+        netTotal += net
+        base_log("FLOW:", "#" + (i + 1) + " " + RPB_StorageVars.GetString("p" + i, "Profile") + " | +" + delta + "ms (net ~" + net + "ms) | total " + (((t - start) * 1000.0) as int) + "ms")
+        previous = t
+        i += 1
+    endWhile
+
+    base_log("FLOW:", "==== " + flowName + " total " + (((previous - start) * 1000.0) as int) + "ms, ~" + netTotal + "ms net of the timer ====")
+endFunction
+
+;/
     A Form's name, read from the engine only the first time (per Form, for the whole save): Form.GetName() is an engine
     native that costs about a frame (~11ms at 90 FPS, test 69) and faction names are used to build every ActorVars key.
     Kept in a persisted JFormMap under the RPB root. Names of these Forms do not change at runtime. Returns "" for None.

@@ -319,6 +319,7 @@ endFunction
 RPB_Prisoner function MakePrisoner()
     RPB_Prison prison  = self.GetPotentialPrison()
     self.TransferArrestPropertiesToPrisoner(prison)
+    RPB_Utility.FlowMark("MakePrisoner: GetPotentialPrison + TransferArrestPropertiesToPrisoner")
 
     return prison.AwaitPrisonerReference(this)
 endFunction
@@ -445,9 +446,11 @@ endFunction
 
 function MoveToPrison(bool abMoveDirectlyToCell = false)
     RPB_Prisoner prisoner   = self.MakePrisoner()
+    RPB_Utility.FlowMark("MoveToPrison: MakePrisoner done (await prisoner incl. Initialize)")
     RPB_Prison prison       = prisoner.Prison
 
     bool hasAssignedCell = prisoner.AssignCell()
+    RPB_Utility.FlowMark("MoveToPrison: AssignCell done")
 
     if (abMoveDirectlyToCell)
         if (!hasAssignedCell)
@@ -457,6 +460,7 @@ function MoveToPrison(bool abMoveDirectlyToCell = false)
         endif
 
         prisoner.MoveToCell()
+        RPB_Utility.FlowMark("MoveToPrison: prisoner.MoveToCell returned")
     else
         if (!hasAssignedCell)
             DebugWarn("["+ Name +"] Arrestee::MoveToPrison", "Arrestee hasn't been assigned a cell yet since it failed, the arrest may not work!")

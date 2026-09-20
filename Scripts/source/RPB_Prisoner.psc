@@ -924,7 +924,9 @@ function MoveToCell(bool abBeginImprisonment = true)
     endif
 
     self.MoveTo(JailCell)
+    RPB_Utility.FlowMark("Prisoner.MoveToCell: MoveTo(JailCell) done")
     Prison.OnPrisonerTeleportedToCell(self, abBeginImprisonment)
+    RPB_Utility.FlowMark("Prisoner.MoveToCell: Prison.OnPrisonerTeleportedToCell returned")
 endFunction
 
 function TriggerInfamyPenalty()
@@ -1777,7 +1779,9 @@ function Imprison()
 
     float startBench = StartBenchmark()
     self.OnImprisoned()
+    RPB_Utility.FlowMark("Imprison: OnImprisoned done")
     GotoState("Imprisoned") ; State when the prisoner is in the cell, check for updates for sentence, etc...
+    RPB_Utility.FlowEnd("Imprison: GotoState(Imprisoned) done")
     EndBenchmark(startBench, "Ended ["+ Name +"] Prisoner::Imprison")
 endFunction
 
@@ -2592,9 +2596,13 @@ endEvent
 
 event OnImprisoned()
     self.RegisterTimeOfImprisonment()
+    RPB_Utility.FlowMark("OnImprisoned: RegisterTimeOfImprisonment")
     self.DetermineReleaseTimeAdditionalHours() ; For Release Time (Minimum, Maximum) intervals
+    RPB_Utility.FlowMark("OnImprisoned: DetermineReleaseTimeAdditionalHours")
     self.NotifySentence()
+    RPB_Utility.FlowMark("OnImprisoned: NotifySentence")
     self.NotifyReleaseDate()
+    RPB_Utility.FlowMark("OnImprisoned: NotifyReleaseDate")
 
     ; self.SetReleaseLocation() ; to be refactored (needs to take into account whether to use Escort or Teleport markers)
 

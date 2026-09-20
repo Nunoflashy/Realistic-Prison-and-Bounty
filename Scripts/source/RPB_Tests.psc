@@ -104,6 +104,7 @@ function SetTests()
     self.AddTest("72 - Native Cost Probe: Distribution, Back-to-Back, and Parallel Stacks", "Test_Natives_Probe", abChainable = false)
     self.AddTest("73 - MCM: Every Option Default Exists Without Visiting an MCM Page (New Save)", "Test_MCM_DefaultsWithoutPageVisit", abChainable = false)
     self.AddTest("74 - MCM: Defaults Are Rebuilt After the Default Map Is Replaced (OnConfigInit Order)", "Test_MCM_DefaultsAfterMapReplaced", abChainable = false)
+    self.AddTest("75 - Flow Profiler: Off Records Nothing, On Records and Reports", "Test_FlowProfiler", abChainable = false)
     self.AddTest("41 - ActiveMagicEffectContainer: Stuck Lock Self-Heals", "Test_ActiveMagicEffectContainer_StuckLockSelfHeals")
     self.AddTest("42 - ThreadLock: JAtomic Primitive Semantics and Registry", "Test_ThreadLock_PrimitiveSemantics")
     ; Not chainable: fires concurrent worker threads
@@ -5911,6 +5912,67 @@ state Test_MCM_DefaultsAfterMapReplaced
         ok = ok && step
         log("MCM DEFAULTS after map replaced: " + wrongAfterReplace + " missing right after the replacement, " + wrongAfterEnsure + " after EnsureAllOptionDefaults() (of " + __mcmDefaultsChecked + ")")
 
+        display_result(ok)
+    endFunction
+endState
+
+
+;/
+    The flow profiler must cost (almost) nothing and record nothing when off, and when on it records marks and
+    reports them at FlowEnd(): FlowBegin/FlowMark are no-ops with profiling off (Count stays 0); with it on, three marks
+    give Count 3 and FlowEnd() closes the flow (later marks are ignored); a run through Utility.Wait shows a phase of
+    roughly the waited time in the log ("FLOW:" lines). The setting is restored afterwards.
+/;
+state Test_FlowProfiler
+    function Setup()
+        bool ok = true
+        bool step = false
+        bool wasEnabled = RPB_Utility.IsFlowProfilingEnabled()
+
+        ; Off: nothing is recorded, and a mark is cheap
+        RPB_Utility.DisableFlowProfiling()
+        RPB_Utility.FlowBegin("test off")
+        RPB_Utility.FlowMark("ignored")
+        step = assert_true(RPB_StorageVars.GetInt("Count", "Profile") == 0, "Marks were recorded with profiling off")
+        ok = ok && step
+
+        float t = Utility.GetCurrentRealTime()
+        int i = 0
+        while (i < 20)
+            RPB_Utility.FlowMark("ignored")
+            i += 1
+        endWhile
+        log("FLOW PROFILER 20 marks with profiling off: " + self.__Ms(Utility.GetCurrentRealTime() - t) + "ms (includes two timer frames)")
+
+        ; On: marks are recorded, FlowEnd reports and closes the flow
+        RPB_Utility.EnableFlowProfiling()
+        RPB_Utility.FlowBegin("test flow")
+        RPB_Utility.FlowMark("phase A (no work)")
+        Utility.Wait(0.5)
+        RPB_Utility.FlowMark("phase B (waited 0.5s)")
+        RPB_Utility.FlowEnd("phase C (end)")
+        step = assert_true(RPB_StorageVars.GetInt("Count", "Profile") == 3, "Expected 3 recorded marks, got " + RPB_StorageVars.GetInt("Count", "Profile"))
+        ok = ok && step
+        step = assert_true(RPB_StorageVars.GetInt("Active", "Profile") == 0, "The flow is still active after FlowEnd()")
+        ok = ok && step
+
+        RPB_Utility.FlowMark("after the end (ignored)")
+        step = assert_true(RPB_StorageVars.GetInt("Count", "Profile") == 3, "A mark after FlowEnd() was recorded")
+        ok = ok && step
+
+        ; FlowEnsure starts a flow only when none is running
+        RPB_Utility.FlowEnsure("ensured")
+        RPB_Utility.FlowMark("one")
+        RPB_Utility.FlowEnsure("ensured again (must not reset)")
+        RPB_Utility.FlowMark("two")
+        step = assert_true(RPB_StorageVars.GetInt("Count", "Profile") == 2, "FlowEnsure restarted a running flow (Count " + RPB_StorageVars.GetInt("Count", "Profile") + ")")
+        ok = ok && step
+        RPB_Utility.FlowEnd()
+
+        if (!wasEnabled)
+            RPB_Utility.DisableFlowProfiling()
+        endif
+        log("FLOW PROFILER look for the 'FLOW:' lines above: phase B should be about 500ms")
         display_result(ok)
     endFunction
 endState

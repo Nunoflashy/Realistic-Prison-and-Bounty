@@ -25,6 +25,8 @@ string[] function GetActions()
     return String_Explode( \
         "<No Action>," + \
         "Quit to Main Menu," + \
+        "[Debug] Toggle Flow Profiling," + \
+        "[Debug] Toggle Debug Logging," + \
         "[MCM] Validate Options," + \
         "[State] Delete All States," + \
         "[Actor] Log Selected Actor State Variables," + \
@@ -90,6 +92,12 @@ function ShowActionsMenu()
         RPB_Arrest.AllowArrestForcegreets()
         RPB_Arrest.EnableForcedArrestDialogue()
         ; Game.QuitToMainMenu()
+
+    elseif (actionToPerform == "[Debug] Toggle Flow Profiling")
+        Action_ToggleFlowProfiling()
+
+    elseif (actionToPerform == "[Debug] Toggle Debug Logging")
+        Action_ToggleDebugLogging()
 
     elseif (actionToPerform == "[MCM] Validate Options")
         API.MCM.ValidateOptions()
@@ -257,6 +265,34 @@ function ShowActionsMenu()
  
     elseif (actionToPerform == "[Prison] Toggle All Prison Stats")
         Action_TogglePrisonStats(uilib, true, true, true, true, true)
+    endif
+endFunction
+
+;/
+    Flips the flow profiler (RPB_Utility.FlowBegin/FlowMark/FlowEnd): when on, arrest -> imprison logs its phases
+    ("FLOW:" lines in the Papyrus log) at the end of the imprisonment.
+/;
+function Action_ToggleFlowProfiling()
+    if (RPB_Utility.IsFlowProfilingEnabled())
+        RPB_Utility.DisableFlowProfiling()
+        debug.notification("RPB flow profiling: OFF")
+    else
+        RPB_Utility.EnableFlowProfiling()
+        debug.notification("RPB flow profiling: ON")
+    endif
+endFunction
+
+;/
+    Flips the mod's debug logging (RPB_Utility.IsDebuggingEnabled(), ON by default). Every logged Debug() line costs a
+    frame (debug.trace is a vanilla native), so this is also a way to measure what the logging costs a flow.
+/;
+function Action_ToggleDebugLogging()
+    if (RPB_Utility.IsDebuggingEnabled())
+        RPB_Utility.DisableDebugging()
+        debug.notification("RPB debug logging: OFF")
+    else
+        RPB_Utility.EnableDebugging()
+        debug.notification("RPB debug logging: ON")
     endif
 endFunction
 

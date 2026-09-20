@@ -431,6 +431,7 @@ event OnArrestBegin(RPB_Arrestee apArrestee, RPB_Captor apCaptor, Faction akCrim
         RPB_Arrest.AllowArrestForcegreets(false)
     endif
 
+    RPB_Utility.FlowMark("Arrest.OnArrestBegin: parameters, bounty check, captor assigned")
     self.BeginArrest(apArrestee)
 endEvent
 
@@ -708,6 +709,7 @@ endFunction
     string  @asArrestType: The type of the arrest, whether to escort to jail, cell, or teleport to jail or cell.
 /;
 function ArrestActor(Actor akArrester, Actor akArrestee, string asArrestType)
+    RPB_Utility.FlowBegin("Arrest -> Imprison")
     akArrester.SendModEvent("RPB_ArrestBegin", asArrestType, akArrestee.GetFormID())
 endFunction
 
@@ -723,6 +725,7 @@ endFunction
     string  @asArrestType: The type of the arrest, whether to escort to jail, cell, or teleport to jail or cell.
 /;
 function ArrestActorForFaction(Faction akCrimeFaction, Actor akArrestee, string asArrestType)
+    RPB_Utility.FlowBegin("Arrest -> Imprison")
     akCrimeFaction.SendModEvent("RPB_ArrestBegin", asArrestType, akArrestee.GetFormID())
 endFunction
 
@@ -902,15 +905,18 @@ function BeginArrest(RPB_Arrestee apArresteeRef)
 
     apArresteeRef.HideBounty()
     apArresteeRef.StopCombat()
+    RPB_Utility.FlowMark("BeginArrest: HideBounty + StopCombat")
     ; apArresteeRef.SheatheWeapon()
     ; apArresteeRef.UnequipHands()
 
     ; Actually consider the actor Arrested
     apArresteeRef.Arrest()
+    RPB_Utility.FlowMark("BeginArrest: Arrestee.Arrest() done")
 
     ; Next step, escort/move to prison
     if (arrestType == ARREST_TYPE_TELEPORT_TO_CELL)
         apArresteeRef.MoveToPrison(abMoveDirectlyToCell = true)
+        RPB_Utility.FlowMark("BeginArrest: MoveToPrison returned")
         return
         ; Handled on OnArresteeRestrained()
         SceneManager.StartArrestScene( \

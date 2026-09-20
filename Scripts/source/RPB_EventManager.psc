@@ -227,6 +227,9 @@ endFunction
 ; ==========================================================
 
 event OnArrestBegin(string eventName, string arrestType, float arresteeIdFlt, Form sender)
+    RPB_Utility.FlowEnsure("Arrest -> Imprison")
+    RPB_Utility.FlowMark("EventManager.OnArrestBegin: mod event delivered")
+
     Actor captor = (sender as Actor)
     Faction crimeFaction = form_if ((sender as Faction), (sender as Faction), captor.GetCrimeFaction()) as Faction
 
@@ -262,16 +265,23 @@ event OnArrestBegin(string eventName, string arrestType, float arresteeIdFlt, Fo
         return
     endif
 
+    RPB_Utility.FlowMark("OnArrestBegin: validated (type, arrest status)")
+
     ; Handle Before Arrest event
     Arrest.OnArrestPreparing(arrestee, captor, crimeFaction, arrestType)
+    RPB_Utility.FlowMark("Arrest.OnArrestPreparing done")
 
     RPB_Arrestee arresteeRef = Arrest.AwaitArresteeReference(arrestee)  ; Mark this Actor as one that is to be arrested (Cast the spell in order to have Arrestee related functions on them through RPB_Arrestee)
+
+    RPB_Utility.FlowMark("AwaitArresteeReference done (spell, effect start, register)")
 
     if (!arresteeRef.InitializeState())
         Config.NotifyArrest("Could not arrest " + arresteeRef.Name)
         self.SendError("Could not arrest " + arresteeRef.Name + " for "+ RPB_Utility.GetFormNameCached(crimeFaction) +", the state was invalid! (aborting)", "EventManager::OnArrestBegin")
         return
     endif
+
+    RPB_Utility.FlowMark("Arrestee.InitializeState done")
 
     ; Faction Arrest
     if (captor == none)
@@ -280,6 +290,7 @@ event OnArrestBegin(string eventName, string arrestType, float arresteeIdFlt, Fo
     endif
 
     RPB_Captor captorRef = Arrest.AwaitCaptorReference(captor)
+    RPB_Utility.FlowMark("AwaitCaptorReference done")
 
     ; Captor Arrest
     Arrest.OnArrestBegin(arresteeRef, captorRef, crimeFaction, arrestType)
