@@ -8,67 +8,67 @@ import RPB_Utility
 ; ==========================================================
 
 function SetStat(string asStatName, Faction akFaction, Actor akActor, int aiValue) global
-    SetIntOnReference(akFaction.GetName() + "::" + asStatName, akActor, aiValue, "ActorVars")
+    SetIntOnReference(RPB_Utility.GetFormNameCached(akFaction) + "::" + asStatName, akActor, aiValue, "ActorVars")
 endFunction
 
 function SetStatFloat(string asStatName, Faction akFaction, Actor akActor, float afValue) global
-    SetFloatOnReference(akFaction.GetName() + "::" + asStatName, akActor, afValue, "ActorVars")
+    SetFloatOnReference(RPB_Utility.GetFormNameCached(akFaction) + "::" + asStatName, akActor, afValue, "ActorVars")
 endFunction
 
 function SetCrimeGold(Faction akFaction, Actor akActor, int value) global
-    SetIntOnReference(akFaction.GetName() + "::Bounty Non-Violent", akActor, value, "ActorVars", abDeleteOnNull = true)
+    SetIntOnReference(RPB_Utility.GetFormNameCached(akFaction) + "::Bounty Non-Violent", akActor, value, "ActorVars", abDeleteOnNull = true)
 endFunction
 
 function SetCrimeGoldViolent(Faction akFaction, Actor akActor, int value) global
-    SetIntOnReference(akFaction.GetName() + "::Bounty Violent", akActor, value, "ActorVars", abDeleteOnNull = true)
+    SetIntOnReference(RPB_Utility.GetFormNameCached(akFaction) + "::Bounty Violent", akActor, value, "ActorVars", abDeleteOnNull = true)
 endFunction
 
 function SetLatentCrimeGold(Faction akFaction, Actor akActor, int value) global
-    SetIntOnReference(akFaction.GetName() + "::Latent Bounty Non-Violent", akActor, value, "ActorVars", abDeleteOnNull = true)
+    SetIntOnReference(RPB_Utility.GetFormNameCached(akFaction) + "::Latent Bounty Non-Violent", akActor, value, "ActorVars", abDeleteOnNull = true)
 endFunction
 
 function SetLatentCrimeGoldViolent(Faction akFaction, Actor akActor, int value) global
-    SetIntOnReference(akFaction.GetName() + "::Latent Bounty Violent", akActor, value, "ActorVars", abDeleteOnNull = true)
+    SetIntOnReference(RPB_Utility.GetFormNameCached(akFaction) + "::Latent Bounty Violent", akActor, value, "ActorVars", abDeleteOnNull = true)
 endFunction
 
 function SetLargestBounty(Faction akFaction, Actor akActor, int value) global
-    SetIntOnReference(akFaction.GetName() + "::Largest Bounty", akActor, value, "ActorVars")
+    SetIntOnReference(RPB_Utility.GetFormNameCached(akFaction) + "::Largest Bounty", akActor, value, "ActorVars")
 endFunction
 
 function SetTotalBounty(Faction akFaction, Actor akActor, int value) global
-    SetIntOnReference(akFaction.GetName() + "::Total Bounty", akActor, value, "ActorVars")
+    SetIntOnReference(RPB_Utility.GetFormNameCached(akFaction) + "::Total Bounty", akActor, value, "ActorVars")
 endFunction
 
 function SetTimesArrested(Faction akFaction, Actor akActor, int value) global
-    SetIntOnReference(akFaction.GetName() + "::Times Arrested", akActor, value, "ActorVars")
+    SetIntOnReference(RPB_Utility.GetFormNameCached(akFaction) + "::Times Arrested", akActor, value, "ActorVars")
 endFunction
 
 function SetTimesFrisked(Faction akFaction, Actor akActor, int value) global
-    SetIntOnReference(akFaction.GetName() + "::Times Frisked", akActor, value, "ActorVars")
+    SetIntOnReference(RPB_Utility.GetFormNameCached(akFaction) + "::Times Frisked", akActor, value, "ActorVars")
 endFunction
 
 function SetTimeJailed(Faction akFaction, Actor akActor, float value) global
-    SetFloatOnReference(akFaction.GetName() + "::Time Jailed", akActor, value, "ActorVars")
+    SetFloatOnReference(RPB_Utility.GetFormNameCached(akFaction) + "::Time Jailed", akActor, value, "ActorVars")
 endFunction
 
 function SetLongestSentence(Faction akFaction, Actor akActor, int value) global
-    SetIntOnReference(akFaction.GetName() + "::Longest Sentence", akActor, value, "ActorVars")
+    SetIntOnReference(RPB_Utility.GetFormNameCached(akFaction) + "::Longest Sentence", akActor, value, "ActorVars")
 endFunction
 
 function SetLastSentence(Faction akFaction, Actor akActor, int value) global
-    SetIntOnReference(akFaction.GetName() + "::Last Sentence", akActor, value, "ActorVars")
+    SetIntOnReference(RPB_Utility.GetFormNameCached(akFaction) + "::Last Sentence", akActor, value, "ActorVars")
 endFunction
 
 function SetTimesJailed(Faction akFaction, Actor akActor, int value) global
-    SetIntOnReference(akFaction.GetName() + "::Times Jailed", akActor, value, "ActorVars")
+    SetIntOnReference(RPB_Utility.GetFormNameCached(akFaction) + "::Times Jailed", akActor, value, "ActorVars")
 endFunction
 
 function SetTimesEscaped(Faction akFaction, Actor akActor, int value) global
-    SetIntOnReference(akFaction.GetName() + "::Times Escaped", akActor, value, "ActorVars")
+    SetIntOnReference(RPB_Utility.GetFormNameCached(akFaction) + "::Times Escaped", akActor, value, "ActorVars")
 endFunction
 
 function SetTimesStripped(Faction akFaction, Actor akActor, int value) global
-    SetIntOnReference(akFaction.GetName() + "::Times Stripped", akActor, value, "ActorVars")
+    SetIntOnReference(RPB_Utility.GetFormNameCached(akFaction) + "::Times Stripped", akActor, value, "ActorVars")
 endFunction
 
 function SetTimesStrippedInPrison(RPB_Prison apPrison, Actor akActor, int value) global
@@ -76,7 +76,7 @@ function SetTimesStrippedInPrison(RPB_Prison apPrison, Actor akActor, int value)
 endFunction
 
 function SetCurrentInfamy(Faction akFaction, Actor akActor, int value) global
-    SetIntOnReference(akFaction.GetName() + "::Infamy Gained", akActor, value, "ActorVars")
+    SetIntOnReference(RPB_Utility.GetFormNameCached(akFaction) + "::Infamy Gained", akActor, value, "ActorVars")
 endFunction
 
 
@@ -85,7 +85,7 @@ endFunction
 ; ==========================================================
 
 function ModStat(string asStatName, Faction akFaction, Actor akActor, int value) global
-    SetIntOnReference(akFaction.GetName() + "::" + asStatName, akActor, value, "ActorVars")
+    SetIntOnReference(RPB_Utility.GetFormNameCached(akFaction) + "::" + asStatName, akActor, value, "ActorVars")
 endFunction
 
 function ModCrimeGold(Faction akFaction, Actor akActor, int value, bool abViolent = false) global
@@ -95,12 +95,12 @@ function ModCrimeGold(Faction akFaction, Actor akActor, int value, bool abViolen
         bountyType = "Bounty Violent"
     endif
 
-    string statKey = akFaction.GetName() + "::" + bountyType
+    string statKey = RPB_Utility.GetFormNameCached(akFaction) + "::" + bountyType
     SetIntOnReference(statKey, akActor, GetIntOnReference(statKey, akActor, "ActorVars") + value, "ActorVars", abDeleteOnNull = true)
 endFunction
 
 function ModCrimeGoldViolent(Faction akFaction, Actor akActor, int value) global
-    string statKey = akFaction.GetName() + "::Bounty Violent"
+    string statKey = RPB_Utility.GetFormNameCached(akFaction) + "::Bounty Violent"
     SetIntOnReference(statKey, akActor, GetIntOnReference(statKey, akActor, "ActorVars") + value, "ActorVars", abDeleteOnNull = true)
 endFunction
 
@@ -111,64 +111,64 @@ function ModLatentCrimeGold(Faction akFaction, Actor akActor, int value, bool ab
         bountyType = "Latent Bounty Violent"
     endif
 
-    string statKey = akFaction.GetName() + "::" + bountyType
+    string statKey = RPB_Utility.GetFormNameCached(akFaction) + "::" + bountyType
     SetIntOnReference(statKey, akActor, GetIntOnReference(statKey, akActor, "ActorVars") + value, "ActorVars", abDeleteOnNull = true)
 
     ; Debug("ActorVars::ModLatentCrimeGold", "Stat Key: " + statKey + ", New Value: " + GetIntOnReference(statKey, akActor, "ActorVars"))
 endFunction
 
 function ModLargestBounty(Faction akFaction, Actor akActor, int value) global
-    string statKey = akFaction.GetName() + "::Largest Bounty"
+    string statKey = RPB_Utility.GetFormNameCached(akFaction) + "::Largest Bounty"
     SetIntOnReference(statKey, akActor, GetIntOnReference(statKey, akActor, "ActorVars") + value, "ActorVars")
 endFunction
 
 function ModTotalBounty(Faction akFaction, Actor akActor, int value) global
-    string statKey = akFaction.GetName() + "::Total Bounty"
+    string statKey = RPB_Utility.GetFormNameCached(akFaction) + "::Total Bounty"
     SetIntOnReference(statKey, akActor, GetIntOnReference(statKey, akActor, "ActorVars") + value, "ActorVars")
 endFunction
 
 function ModTimesArrested(Faction akFaction, Actor akActor, int value) global
-    string statKey = akFaction.GetName() + "::Times Arrested"
+    string statKey = RPB_Utility.GetFormNameCached(akFaction) + "::Times Arrested"
     SetIntOnReference(statKey, akActor, GetIntOnReference(statKey, akActor, "ActorVars") + value, "ActorVars")
 endFunction
 
 function ModTimesFrisked(Faction akFaction, Actor akActor, int value) global
-    string statKey = akFaction.GetName() + "::Times Frisked"
+    string statKey = RPB_Utility.GetFormNameCached(akFaction) + "::Times Frisked"
     SetIntOnReference(statKey, akActor, GetIntOnReference(statKey, akActor, "ActorVars") + value, "ActorVars")
 endFunction
 
 function ModTimeJailed(Faction akFaction, Actor akActor, float value) global
-    string statKey = akFaction.GetName() + "::Time Jailed"
+    string statKey = RPB_Utility.GetFormNameCached(akFaction) + "::Time Jailed"
     SetFloatOnReference(statKey, akActor, GetFloatOnReference(statKey, akActor) + value, "ActorVars")
 endFunction
 
 function ModLongestSentence(Faction akFaction, Actor akActor, int value) global
-    string statKey = akFaction.GetName() + "::Longest Sentence"
+    string statKey = RPB_Utility.GetFormNameCached(akFaction) + "::Longest Sentence"
     SetIntOnReference(statKey, akActor, GetIntOnReference(statKey, akActor) + value, "ActorVars")
 endFunction
 
 function ModLastSentence(Faction akFaction, Actor akActor, int value) global
-    string statKey = akFaction.GetName() + "::Last Sentence"
+    string statKey = RPB_Utility.GetFormNameCached(akFaction) + "::Last Sentence"
     SetIntOnReference(statKey, akActor, GetIntOnReference(statKey, akActor) + value, "ActorVars")
 endFunction
 
 function ModTimesJailed(Faction akFaction, Actor akActor, int value) global
-    string statKey = akFaction.GetName() + "::Times Jailed"
+    string statKey = RPB_Utility.GetFormNameCached(akFaction) + "::Times Jailed"
     SetIntOnReference(statKey, akActor, GetIntOnReference(statKey, akActor) + value, "ActorVars")
 endFunction
 
 function ModTimesEscaped(Faction akFaction, Actor akActor, int value) global
-    string statKey = akFaction.GetName() + "::Times Escaped"
+    string statKey = RPB_Utility.GetFormNameCached(akFaction) + "::Times Escaped"
     SetIntOnReference(statKey, akActor, GetIntOnReference(statKey, akActor) + value, "ActorVars")
 endFunction
 
 function ModTimesStripped(Faction akFaction, Actor akActor, int value) global
-    string statKey = akFaction.GetName() + "::Times Stripped"
+    string statKey = RPB_Utility.GetFormNameCached(akFaction) + "::Times Stripped"
     SetIntOnReference(statKey, akActor, GetIntOnReference(statKey, akActor) + value, "ActorVars")
 endFunction
 
 function ModCurrentInfamy(Faction akFaction, Actor akActor, int value) global
-    string statKey = akFaction.GetName() + "::Infamy Gained"
+    string statKey = RPB_Utility.GetFormNameCached(akFaction) + "::Infamy Gained"
     SetIntOnReference(statKey, akActor, GetIntOnReference(statKey, akActor) + value, "ActorVars")
 endFunction
 
@@ -209,93 +209,93 @@ endFunction
 ; ==========================================================
 
 int function GetStat(string asStatName, Faction akFaction, Actor akActor) global
-    return GetIntOnReference(akFaction.GetName() + "::" + asStatName, akActor, "ActorVars")
+    return GetIntOnReference(RPB_Utility.GetFormNameCached(akFaction) + "::" + asStatName, akActor, "ActorVars")
 endFunction
 
 float function GetStatFloat(string asStatName, Faction akFaction, Actor akActor) global
-    return GetFloatOnReference(akFaction.GetName() + "::" + asStatName, akActor, "ActorVars")
+    return GetFloatOnReference(RPB_Utility.GetFormNameCached(akFaction) + "::" + asStatName, akActor, "ActorVars")
 endFunction
 
 int function GetCrimeGold(Faction akFaction, Actor akActor) global
-    return  GetIntOnReference(akFaction.GetName() + "::Bounty Non-Violent", akActor, "ActorVars") + \
-            GetIntOnReference(akFaction.GetName() + "::Bounty Violent", akActor, "ActorVars")
+    return  GetIntOnReference(RPB_Utility.GetFormNameCached(akFaction) + "::Bounty Non-Violent", akActor, "ActorVars") + \
+            GetIntOnReference(RPB_Utility.GetFormNameCached(akFaction) + "::Bounty Violent", akActor, "ActorVars")
 endFunction
 
 int function GetCrimeGoldNonViolent(Faction akFaction, Actor akActor) global
-    return GetIntOnReference(akFaction.GetName() + "::Bounty Non-Violent", akActor, "ActorVars")
+    return GetIntOnReference(RPB_Utility.GetFormNameCached(akFaction) + "::Bounty Non-Violent", akActor, "ActorVars")
 endFunction
 
 int function GetCrimeGoldViolent(Faction akFaction, Actor akActor) global
-    return GetIntOnReference(akFaction.GetName() + "::Bounty Violent", akActor, "ActorVars")
+    return GetIntOnReference(RPB_Utility.GetFormNameCached(akFaction) + "::Bounty Violent", akActor, "ActorVars")
 endFunction
 
 int function GetLatentCrimeGold(Faction akFaction, Actor akActor) global
-    return  GetIntOnReference(akFaction.GetName() + "::Latent Bounty Non-Violent", akActor, "ActorVars") + \
-            GetIntOnReference(akFaction.GetName() + "::Latent Bounty Violent", akActor, "ActorVars")
+    return  GetIntOnReference(RPB_Utility.GetFormNameCached(akFaction) + "::Latent Bounty Non-Violent", akActor, "ActorVars") + \
+            GetIntOnReference(RPB_Utility.GetFormNameCached(akFaction) + "::Latent Bounty Violent", akActor, "ActorVars")
 endFunction
 
 int function GetLatentCrimeGoldNonViolent(Faction akFaction, Actor akActor) global
-    return GetIntOnReference(akFaction.GetName() + "::Latent Bounty Non-Violent", akActor, "ActorVars")
+    return GetIntOnReference(RPB_Utility.GetFormNameCached(akFaction) + "::Latent Bounty Non-Violent", akActor, "ActorVars")
 endFunction
 
 int function GetLatentCrimeGoldViolent(Faction akFaction, Actor akActor) global
-    return GetIntOnReference(akFaction.GetName() + "::Latent Bounty Violent", akActor, "ActorVars")
+    return GetIntOnReference(RPB_Utility.GetFormNameCached(akFaction) + "::Latent Bounty Violent", akActor, "ActorVars")
 endFunction
 
 int function GetLargestBounty(Faction akFaction, Actor akActor) global
-    return GetIntOnReference(akFaction.GetName() + "::Largest Bounty", akActor, "ActorVars")
+    return GetIntOnReference(RPB_Utility.GetFormNameCached(akFaction) + "::Largest Bounty", akActor, "ActorVars")
 endFunction
 
 int function GetTotalBounty(Faction akFaction, Actor akActor) global
-    return GetIntOnReference(akFaction.GetName() + "::Total Bounty", akActor, "ActorVars")
+    return GetIntOnReference(RPB_Utility.GetFormNameCached(akFaction) + "::Total Bounty", akActor, "ActorVars")
 endFunction
 
 int function GetTimesArrested(Faction akFaction, Actor akActor) global
-    return GetIntOnReference(akFaction.GetName() + "::Times Arrested", akActor, "ActorVars")
+    return GetIntOnReference(RPB_Utility.GetFormNameCached(akFaction) + "::Times Arrested", akActor, "ActorVars")
 endFunction
 
 int function GetTimesFrisked(Faction akFaction, Actor akActor) global
-    return GetIntOnReference(akFaction.GetName() + "::Times Frisked", akActor, "ActorVars")
+    return GetIntOnReference(RPB_Utility.GetFormNameCached(akFaction) + "::Times Frisked", akActor, "ActorVars")
 endFunction
 
 int function GetArrestsEluded(Faction akFaction, Actor akActor) global
-    return GetIntOnReference(akFaction.GetName() + "::Arrests Eluded", akActor, "ActorVars")
+    return GetIntOnReference(RPB_Utility.GetFormNameCached(akFaction) + "::Arrests Eluded", akActor, "ActorVars")
 endFunction
 
 int function GetArrestsResisted(Faction akFaction, Actor akActor) global
-    return GetIntOnReference(akFaction.GetName() + "::Arrests Resisted", akActor, "ActorVars")
+    return GetIntOnReference(RPB_Utility.GetFormNameCached(akFaction) + "::Arrests Resisted", akActor, "ActorVars")
 endFunction
 
 int function GetBountiesPaid(Faction akFaction, Actor akActor) global
-    return GetIntOnReference(akFaction.GetName() + "::Bounties Paid", akActor, "ActorVars")
+    return GetIntOnReference(RPB_Utility.GetFormNameCached(akFaction) + "::Bounties Paid", akActor, "ActorVars")
 endFunction
 
 float function GetTimeJailed(Faction akFaction, Actor akActor) global
-    return GetFloatOnReference(akFaction.GetName() + "::Time Jailed", akActor, "ActorVars")
+    return GetFloatOnReference(RPB_Utility.GetFormNameCached(akFaction) + "::Time Jailed", akActor, "ActorVars")
 endFunction
 
 int function GetLongestSentence(Faction akFaction, Actor akActor) global
-    return GetIntOnReference(akFaction.GetName() + "::Longest Sentence", akActor, "ActorVars")
+    return GetIntOnReference(RPB_Utility.GetFormNameCached(akFaction) + "::Longest Sentence", akActor, "ActorVars")
 endFunction
 
 int function GetLastSentence(Faction akFaction, Actor akActor) global
-    return GetIntOnReference(akFaction.GetName() + "::Last Sentence", akActor, "ActorVars")
+    return GetIntOnReference(RPB_Utility.GetFormNameCached(akFaction) + "::Last Sentence", akActor, "ActorVars")
 endFunction
 
 int function GetTimesJailed(Faction akFaction, Actor akActor) global
-    return GetIntOnReference(akFaction.GetName() + "::Times Jailed", akActor, "ActorVars")
+    return GetIntOnReference(RPB_Utility.GetFormNameCached(akFaction) + "::Times Jailed", akActor, "ActorVars")
 endFunction
 
 int function GetTimesEscaped(Faction akFaction, Actor akActor) global
-    return GetIntOnReference(akFaction.GetName() + "::Times Escaped", akActor, "ActorVars")
+    return GetIntOnReference(RPB_Utility.GetFormNameCached(akFaction) + "::Times Escaped", akActor, "ActorVars")
 endFunction
 
 int function GetTimesStripped(Faction akFaction, Actor akActor) global
-    return GetIntOnReference(akFaction.GetName() + "::Times Stripped", akActor, "ActorVars")
+    return GetIntOnReference(RPB_Utility.GetFormNameCached(akFaction) + "::Times Stripped", akActor, "ActorVars")
 endFunction
 
 int function GetCurrentInfamy(Faction akFaction, Actor akActor) global
-    return GetIntOnReference(akFaction.GetName() + "::Infamy Gained", akActor, "ActorVars")
+    return GetIntOnReference(RPB_Utility.GetFormNameCached(akFaction) + "::Infamy Gained", akActor, "ActorVars")
 endFunction
 
 ; ==========================================================

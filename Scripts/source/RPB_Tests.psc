@@ -100,6 +100,7 @@ function SetTests()
     self.AddTest("68 - Prisoner.Name and Message Building: Cost Breakdown", "Test_Prisoner_NameCostBreakdown", abChainable = false)
     self.AddTest("69 - Native Call Census: Which Natives Cost a Frame", "Test_Natives_Census", abChainable = false)
     self.AddTest("70 - ActorBase.Name: Cached Name Equals the Native One", "Test_ActorBase_CachedName", abChainable = false)
+    self.AddTest("71 - Utility.GetFormNameCached(): Equals Faction.GetName() and Makes Bounty Reads Cheap", "Test_Utility_FormNameCache", abChainable = false)
     self.AddTest("41 - ActiveMagicEffectContainer: Stuck Lock Self-Heals", "Test_ActiveMagicEffectContainer_StuckLockSelfHeals")
     self.AddTest("42 - ThreadLock: JAtomic Primitive Semantics and Registry", "Test_ThreadLock_PrimitiveSemantics")
     ; Not chainable: fires concurrent worker threads
@@ -3794,6 +3795,10 @@ state Test_Prisoner_InitializeProfile
                 bool hasErrors = RPB_Memory.FastArray_Size(errors) > 0
                 p.SetBool("Initialized", true)
                 self.__LapEnd(11)
+
+                ; Calibration: an empty lap costs what the lap timer itself costs (Utility.GetCurrentRealTime() is an engine
+                ; native, about one frame at ~90 FPS), and that cost is inside every step's number above
+                self.__LapEnd(12)
             endif
 
             Utility.Wait(1.0)
@@ -3831,6 +3836,8 @@ state Test_Prisoner_InitializeProfile
             k += 1
         endWhile
 
+        int timerOverhead = __lapTotals[12] / N
+        log("INITIALIZE PROFILE timer: one lap costs ~" + timerOverhead + "ms by itself (an empty lap); every step below includes it")
         bool[] printed = new bool[12]
         int rank = 0
         while (rank < 12)
@@ -3849,7 +3856,11 @@ state Test_Prisoner_InitializeProfile
             if (grand > 0)
                 share = (__lapTotals[best] * 100) / grand
             endif
-            log("INITIALIZE PROFILE #" + (rank + 1) + ": " + names[best] + " - " + avg + "ms avg (" + share + "%)")
+            int net = avg - timerOverhead
+            if (net < 0)
+                net = 0
+            endif
+            log("INITIALIZE PROFILE #" + (rank + 1) + ": " + names[best] + " - " + avg + "ms avg (" + share + "%), net of the timer ~" + net + "ms")
             rank += 1
         endWhile
 
@@ -5455,6 +5466,87 @@ state Test_ActorBase_CachedName
         step = assert_true(nativeName != "", "The dummy has no name, cannot prove anything")
         ok = ok && step
         log("CACHED NAME '" + nativeName + "' | first read (may already be cached by registration) " + msFirst + "ms | 20 cached reads " + msCached + "ms")
+
+        display_result(ok)
+    endFunction
+
+    function Teardown()
+        __TeardownAllTempActors()
+    endFunction
+endState
+
+
+;/
+    GetFormNameCached() must give exactly Faction.GetName() (first call, which reads the engine, and repeated calls),
+    for two different factions and for None (""), and it makes Prisoner.Bounty (two faction-name reads per call) cheap
+    while the value stays the same (bounty 3000 set through the same ActorVars key as test 67).
+/;
+state Test_Utility_FormNameCache
+    function Setup()
+        RPB_Prison prison = (RPB_API.GetPrisonManager()).GetPrison("Haafingar")
+        bool ok = true
+        bool step = false
+
+        Faction crimeFaction = prison.PrisonFaction
+        string otherHold = ""
+        string[] holds = prison.Config.Holds
+        int i = 0
+        while (i < holds.Length && otherHold == "")
+            if (holds[i] != prison.Hold)
+                otherHold = holds[i]
+            endif
+            i += 1
+        endWhile
+        Faction otherFaction = RPB_Utility.GetCrimeFactionByHold(otherHold)
+
+        ; Forget the cached entries so the first call really reads the engine
+        int names = JDB.solveObj(".rpb_root.form_names")
+        if (names)
+            JFormMap.removeKey(names, crimeFaction)
+            JFormMap.removeKey(names, otherFaction)
+        endif
+
+        float t = Utility.GetCurrentRealTime()
+        string first = RPB_Utility.GetFormNameCached(crimeFaction)
+        int msFirst = self.__Ms(Utility.GetCurrentRealTime() - t)
+        t = Utility.GetCurrentRealTime()
+        string second = ""
+        i = 0
+        while (i < 20)
+            second = RPB_Utility.GetFormNameCached(crimeFaction)
+            i += 1
+        endWhile
+        int msCached = self.__Ms(Utility.GetCurrentRealTime() - t)
+
+        step = assert_true(first == crimeFaction.GetName() && first != "", "First read '" + first + "' differs from Faction.GetName() '" + crimeFaction.GetName() + "'")
+        ok = ok && step
+        step = assert_true(second == first, "Cached read '" + second + "' differs from the first read '" + first + "'")
+        ok = ok && step
+        step = assert_true(otherFaction != none && RPB_Utility.GetFormNameCached(otherFaction) == otherFaction.GetName(), "The second faction (" + otherHold + ") name differs from Faction.GetName()")
+        ok = ok && step
+        step = assert_true(RPB_Utility.GetFormNameCached(none) == "", "None should give an empty name")
+        ok = ok && step
+        log("FORM NAME CACHE '" + first + "' | first (engine) read " + msFirst + "ms | 20 cached reads " + msCached + "ms")
+
+        ; Bounty: same value, cheaper
+        Actor a = __SpawnTempActor()
+        RPB_Prisoner p = self.__RegisterPrisonerAndWait(a, prison)
+        if (!p)
+            display_result(assert_true(false, "Prisoner never registered"))
+            return
+        endif
+        RPB_StorageVars.SetIntOnReference(RPB_Utility.GetFormNameCached(crimeFaction) + "::Latent Bounty Non-Violent", a, 3000, "ActorVars")
+        step = assert_true(p.Bounty == 3000, "Bounty is " + p.Bounty + ", expected 3000")
+        ok = ok && step
+
+        t = Utility.GetCurrentRealTime()
+        int sink = 0
+        i = 0
+        while (i < 10)
+            sink = p.Bounty
+            i += 1
+        endWhile
+        log("FORM NAME CACHE 10 Bounty reads " + self.__Ms(Utility.GetCurrentRealTime() - t) + "ms (about 22ms each before the cache)")
 
         display_result(ok)
     endFunction

@@ -862,7 +862,7 @@ function Action_ArrestSelectedActorForFaction(RPB_UIInterface uilib)
 
     Actor selectedActor = Game.GetCurrentConsoleRef() as Actor
     string actorName    = selectedActor.GetBaseObject().GetName()
-    string holdName     = crimeFaction.GetName()
+    string holdName     = RPB_Utility.GetFormNameCached(crimeFaction)
     bool isPlayer       = selectedActor.GetFormID() == 0x14
 
     int currentBounty

@@ -398,7 +398,7 @@ bool function PrisonExists_FromObject(int apRootPrisonObject, int apRootHoldObje
         if (prisonRef) ; GetNthPrison legitimately returns none for still-inactive slots
             if (apRootHoldObject)
                 Faction crimeFaction = RPB_Data.GetPropertyOfTypeForm(apRootHoldObject, "Crime Faction") as Faction
-                string hold = crimeFaction.GetName()
+                string hold = RPB_Utility.GetFormNameCached(crimeFaction)
 
                 if (prisonRef.Hold == hold && prisonRef.Name == name && prisonRef.PrisonFaction == crimeFaction)
                     return true

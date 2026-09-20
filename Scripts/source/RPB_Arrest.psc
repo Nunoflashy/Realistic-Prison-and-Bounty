@@ -414,8 +414,8 @@ event OnArrestBegin(RPB_Arrestee apArrestee, RPB_Captor apCaptor, Faction akCrim
     ; "]")
 
     if (!apArrestee.HasLatentBounty() && !apArrestee.HasActiveBounty())
-        Config.NotifyArrest("You can't be arrested in " + akCrimeFaction.GetName() + " since you do not have a bounty in the hold", apArrestee.IsPlayer())
-        EventManager.SendError(apArrestee.Name + " has no bounty, cannot arrest for "+ akCrimeFaction.GetName() +", aborting!", "Arrest::OnArrestBegin")
+        Config.NotifyArrest("You can't be arrested in " + RPB_Utility.GetFormNameCached(akCrimeFaction) + " since you do not have a bounty in the hold", apArrestee.IsPlayer())
+        EventManager.SendError(apArrestee.Name + " has no bounty, cannot arrest for "+ RPB_Utility.GetFormNameCached(akCrimeFaction) +", aborting!", "Arrest::OnArrestBegin")
         apArrestee.Destroy()
         return
     endif
@@ -520,7 +520,7 @@ event OnArrestPayBounty(Actor akArresterGuard, Actor akPayerArrestee, Faction ak
         ; Get current bounty and hide it
         ; self.HideBounty(akCrimeFaction)
 
-        SceneManager.StartArrestBountyPaymentFollowWillingly(akArresterGuard, akPayerArrestee, Config.GetJailPrisonerItemsContainer(akCrimeFaction.GetName()) as ObjectReference)
+        SceneManager.StartArrestBountyPaymentFollowWillingly(akArresterGuard, akPayerArrestee, Config.GetJailPrisonerItemsContainer(RPB_Utility.GetFormNameCached(akCrimeFaction)) as ObjectReference)
     elseif (asPayBountyScenario == ARREST_PAY_BOUNTY_ESCORT_BY_FORCE)
         ; Start escort Scene, where guard will detain the person paying the bounty to jail and take them there by force, to be frisked and pay it.
         ; temporary escort location:
@@ -954,7 +954,7 @@ function PunishPaymentEvader(Actor akGuard, Actor akPayerArrestee)
 
     int evadingPenalty = 2000
     Faction crimeFaction = akGuard.GetCrimeFaction()
-    string hold = crimeFaction.GetName()
+    string hold = RPB_Utility.GetFormNameCached(crimeFaction)
 
     ; Revert Bounty
     ; self.RevertBounty(akGuard.GetCrimeFaction())
@@ -979,7 +979,7 @@ function ChangeArrestEscort(Actor akNewEscort, Actor akDetainee)
 endFunction
 
 function ApplyArrestResistedPenalty(Faction akArrestFaction)
-    string hold = akArrestFaction.GetName()
+    string hold = RPB_Utility.GetFormNameCached(akArrestFaction)
 
     int resistBountyFlat                    = config.GetArrestAdditionalBountyResistingFlat(hold)
     float resistBountyFromCurrentBounty     = PercentToDecimal(config.GetArrestAdditionalBountyResistingFromCurrentBounty(hold))
@@ -1002,7 +1002,7 @@ function SetAsDefeated(Faction akCrimeFaction)
     ;     return
     ; endif
 
-    ; string hold = akCrimeFaction.GetName()
+    ; string hold = RPB_Utility.GetFormNameCached(akCrimeFaction)
 
     ; int defeatBountyFlat                = config.GetArrestAdditionalBountyDefeatedFlat(hold)
     ; float defeatBountyFromCurrentBounty = config.GetArrestAdditionalBountyDefeatedFromCurrentBounty(hold)
@@ -1034,8 +1034,8 @@ endFunction
 /;
 function SetResistedFlag(Faction akFaction)
     string referenceKey = "Actor FormID(" + Config.Player.GetFormID() + ")"
-    RPB_StorageVars.SetBoolOnReference(akFaction.GetName() + "::Arrest Resisted", referenceKey, true, "Pre-Arrest") ; Set arrest resisted flag
-    EventManager.SendInfo("Set resisted flag for " + akFaction.GetName(), "Arrest::SetResistedFlag")
+    RPB_StorageVars.SetBoolOnReference(RPB_Utility.GetFormNameCached(akFaction) + "::Arrest Resisted", referenceKey, true, "Pre-Arrest") ; Set arrest resisted flag
+    EventManager.SendInfo("Set resisted flag for " + RPB_Utility.GetFormNameCached(akFaction), "Arrest::SetResistedFlag")
 endFunction
 
 ;/
@@ -1051,7 +1051,7 @@ endFunction
 /;
 function SetEludedFlag(Faction akFaction)
     string referenceKey = "Actor FormID(" + Config.Player.GetFormID() + ")"
-    RPB_StorageVars.SetBoolOnReference(akFaction.GetName() + "::Arrest Eluded", referenceKey, true, "Pre-Arrest") ; Set arrest eluded flag
+    RPB_StorageVars.SetBoolOnReference(RPB_Utility.GetFormNameCached(akFaction) + "::Arrest Eluded", referenceKey, true, "Pre-Arrest") ; Set arrest eluded flag
     RegisterForDelayedEventGameTime("Eluding", 1.0)
 endFunction
 
@@ -1085,10 +1085,10 @@ function ApplyArrestEludedPenalty(Faction akArrestFaction)
         return
     endif
 
-    string hold = akArrestFaction.GetName()
+    string hold = RPB_Utility.GetFormNameCached(akArrestFaction)
 
-    int eludeBountyFlat = config.GetArrestAdditionalBountyEludingFlat(akArrestFaction.GetName())
-    float eludeBountyPercent = PercentToDecimal(config.GetArrestAdditionalBountyEludingFromCurrentBounty(akArrestFaction.GetName()))
+    int eludeBountyFlat = config.GetArrestAdditionalBountyEludingFlat(RPB_Utility.GetFormNameCached(akArrestFaction))
+    float eludeBountyPercent = PercentToDecimal(config.GetArrestAdditionalBountyEludingFromCurrentBounty(RPB_Utility.GetFormNameCached(akArrestFaction)))
     int totalEludeBounty = int_if (eludeBountyPercent > 0, round(akArrestFaction.GetCrimeGold() * eludeBountyPercent)) + eludeBountyFlat
 
     if (totalEludeBounty > 0)
@@ -1107,7 +1107,7 @@ endFunction
     Since the state is known, the hold, bounty and everything will be handled internally by the function without any need for params
 /;
 function ApplyArrestDefeatedPenalty(Faction akArrestFaction)
-    string hold = akArrestFaction.GetName()
+    string hold = RPB_Utility.GetFormNameCached(akArrestFaction)
 
     ; Setup Defeated penalties
     ; Helper.GetArrestAdditionalBountyOnDefeat(hold)
@@ -1135,14 +1135,14 @@ endFunction
 
 bool function HasResistedArrestRecently(Faction akArrestFaction)
     string referenceKey = "Actor FormID(" + Config.Player.GetFormID() + ")"
-    return RPB_StorageVars.GetBoolOnReference(akArrestFaction.GetName() + "::Arrest Resisted", referenceKey, "Pre-Arrest")
-    ; return RPB_StorageVars.GetBool("Arrest::" + akArrestFaction.GetName() + "::Arrest Resisted")
+    return RPB_StorageVars.GetBoolOnReference(RPB_Utility.GetFormNameCached(akArrestFaction) + "::Arrest Resisted", referenceKey, "Pre-Arrest")
+    ; return RPB_StorageVars.GetBool("Arrest::" + RPB_Utility.GetFormNameCached(akArrestFaction) + "::Arrest Resisted")
 endFunction
 
 bool function HasEludedArrestRecently(Faction akArrestFaction)
     string referenceKey = "Actor FormID(" + Config.Player.GetFormID() + ")"
-    return RPB_StorageVars.GetBoolOnReference(akArrestFaction.GetName() + "::Arrest Eluded", referenceKey, "Pre-Arrest")
-    ; return RPB_StorageVars.GetBool("Arrest::" + akArrestFaction.GetName() + "::Arrest Eluded")
+    return RPB_StorageVars.GetBoolOnReference(RPB_Utility.GetFormNameCached(akArrestFaction) + "::Arrest Eluded", referenceKey, "Pre-Arrest")
+    ; return RPB_StorageVars.GetBool("Arrest::" + RPB_Utility.GetFormNameCached(akArrestFaction) + "::Arrest Eluded")
 endFunction
 
 function SetEludedGuard(Actor akEludedGuard, string asEludeType)
@@ -1215,7 +1215,7 @@ function PayCrimeGold(Actor akPayer, Faction akCrimeFaction)
     ;     ArrestVars.Remove("Arrest::Bounty Violent")
     ;     akCrimeFaction.PlayerPayCrimeGold(false, false)
 
-    ;     Config.NotifyArrest("Your bounty in " + akCrimeFaction.GetName() + " has been paid")
+    ;     Config.NotifyArrest("Your bounty in " + RPB_Utility.GetFormNameCached(akCrimeFaction) + " has been paid")
     ; endif
 endFunction
 
@@ -1305,7 +1305,7 @@ function SetupArrestPayableBountyVars(Faction akCrimeFaction)
     GlobalVariable RPB_ArrestRollDiceResult          = GetFormFromMod(0x16737) as GlobalVariable
     GlobalVariable RPB_ArrestAllowFrisk              = GetFormFromMod(0x1776A) as GlobalVariable
     
-    string hold = akCrimeFaction.GetName()
+    string hold = RPB_Utility.GetFormNameCached(akCrimeFaction)
 
     ; Update Globals (Determines if the arrest will be payable for sure, or if it falls within the maximum payable, which needs a roll of the dice)
     RPB_ArrestGuaranteedPayableBounty.SetValueInt(Config.GetArrestGuaranteedPayableBounty(hold))

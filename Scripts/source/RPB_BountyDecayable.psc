@@ -107,7 +107,7 @@ endEvent
 ; ==========================================================
 
 function UpdateBountyLost(Faction akCrimeFaction)
-    string hold = akCrimeFaction.GetName()
+    string hold = RPB_Utility.GetFormNameCached(akCrimeFaction)
 
     int currentBountyNonViolent = parent.GetActiveBountyForFaction(akCrimeFaction, abViolent = false)
     int currentBountyViolent    = parent.GetActiveBountyForFaction(akCrimeFaction, abNonViolent = false)
@@ -143,7 +143,7 @@ function UpdateBountyLost(Faction akCrimeFaction)
 endFunction
 
 function RegisterBountyLost(Faction akCrimeFaction)
-    string hold = akCrimeFaction.GetName()
+    string hold = RPB_Utility.GetFormNameCached(akCrimeFaction)
     self.SetFloat("bounty::updated_at", now(), hold + "::State")
 endFunction
 

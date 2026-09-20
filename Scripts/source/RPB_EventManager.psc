@@ -253,12 +253,12 @@ event OnArrestBegin(string eventName, string arrestType, float arresteeIdFlt, Fo
 
     if (arrestStatus == Arrest.ALREADY_ARRESTED)
         Config.NotifyArrest("You are already under arrest.", isPlayer) ; Might be removed
-        self.SendError(arrestee.GetBaseObject().GetName() + " has already been arrested, cannot arrest for "+ crimeFaction.GetName() +", aborting!", "EventManager::OnArrestBegin")
+        self.SendError(arrestee.GetBaseObject().GetName() + " has already been arrested, cannot arrest for "+ RPB_Utility.GetFormNameCached(crimeFaction) +", aborting!", "EventManager::OnArrestBegin")
         return
 
     elseif (arrestStatus == Arrest.ALREADY_IMPRISONED)
         Config.NotifyArrest("You are already in prison.", isPlayer) ; Might be removed
-        self.SendError(arrestee.GetBaseObject().GetName() + " has already been arrested, and is currently in prison. Cannot arrest for "+ crimeFaction.GetName() +", aborting!", "EventManager::OnArrestBegin")
+        self.SendError(arrestee.GetBaseObject().GetName() + " has already been arrested, and is currently in prison. Cannot arrest for "+ RPB_Utility.GetFormNameCached(crimeFaction) +", aborting!", "EventManager::OnArrestBegin")
         return
     endif
 
@@ -269,7 +269,7 @@ event OnArrestBegin(string eventName, string arrestType, float arresteeIdFlt, Fo
 
     if (!arresteeRef.InitializeState())
         Config.NotifyArrest("Could not arrest " + arresteeRef.Name)
-        self.SendError("Could not arrest " + arresteeRef.Name + " for "+ crimeFaction.GetName() +", the state was invalid! (aborting)", "EventManager::OnArrestBegin")
+        self.SendError("Could not arrest " + arresteeRef.Name + " for "+ RPB_Utility.GetFormNameCached(crimeFaction) +", the state was invalid! (aborting)", "EventManager::OnArrestBegin")
         return
     endif
 

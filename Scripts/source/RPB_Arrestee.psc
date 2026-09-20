@@ -246,7 +246,7 @@ function SetArrestParameters(string asArrestType, RPB_Captor apCaptor, Faction a
     ; Set arrest related vars to this Arrestee's state
     __captor        = apCaptor
     __arrestFaction = akCrimeFaction
-    __hold          = akCrimeFaction.GetName()
+    __hold          = RPB_Utility.GetFormNameCached(akCrimeFaction)
     __arrestType    = asArrestType
 
     SetForm("Arrest Faction", ArrestFaction)

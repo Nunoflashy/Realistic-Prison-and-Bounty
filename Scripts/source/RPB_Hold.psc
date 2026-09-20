@@ -166,13 +166,13 @@ endFunction
 event OnArrestBegin(RPB_Arrestee apArrestee, RPB_Captor apCaptor, string asArrestType)
     if (apArrestee.IsArrested)
         Config.NotifyArrest("You are already under arrest.", apArrestee.IsPlayer())
-        Error(apArrestee.GetName() + " has already been arrested, cannot arrest for "+ CrimeFaction.GetName() +", aborting!")
+        Error(apArrestee.GetName() + " has already been arrested, cannot arrest for "+ RPB_Utility.GetFormNameCached(CrimeFaction) +", aborting!")
         return
     endif
 
     if (apArrestee.IsImprisoned)
         Config.NotifyArrest("You are already in prison.", apArrestee.IsPlayer())
-        Error(apArrestee.GetName() + " has already been arrested, and is currently in prison. Cannot arrest for "+ CrimeFaction.GetName() +", aborting!")
+        Error(apArrestee.GetName() + " has already been arrested, and is currently in prison. Cannot arrest for "+ RPB_Utility.GetFormNameCached(CrimeFaction) +", aborting!")
         return
     endif
 

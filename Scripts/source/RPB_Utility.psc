@@ -1851,6 +1851,33 @@ int function GetSlotMask(string bodyPart) global
 
 endFunction
 
+;/
+    A Form's name, read from the engine only the first time (per Form, for the whole save): Form.GetName() is an engine
+    native that costs about a frame (~11ms at 90 FPS, test 69) and faction names are used to build every ActorVars key.
+    Kept in a persisted JFormMap under the RPB root. Names of these Forms do not change at runtime. Returns "" for None.
+/;
+string function GetFormNameCached(Form akForm) global
+    if (!akForm)
+        return ""
+    endif
+
+    int names = JDB.solveObj(".rpb_root.form_names")
+
+    if (!names)
+        JDB.solveObjSetter(".rpb_root.form_names", JFormMap.object(), true)
+        names = JDB.solveObj(".rpb_root.form_names")
+    endif
+
+    if (JFormMap.hasKey(names, akForm))
+        return JFormMap.getStr(names, akForm)
+    endif
+
+    string formName = akForm.GetName()
+    JFormMap.setStr(names, akForm, formName)
+
+    return formName
+endFunction
+
 int function GetSlotMaskValue(int slotMask) global
     ; 2^(slot - 30): slot 30 -> 0x1 ... slot 61 -> 0x80000000 (wraps to a negative int, as repeated doubling did).
     ; This used to loop up to 32 times (~0.35ms per iteration); -1 for slots outside 30..61 as before.

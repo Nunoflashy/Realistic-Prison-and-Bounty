@@ -192,7 +192,7 @@ endProperty
 ; TODO: Refactor into a Prison specific property when Hold to Prison is 1:N
 int property Infamy
     int function get()
-        string factionName = Prison.PrisonFaction.GetName()
+        string factionName = RPB_Utility.GetFormNameCached(Prison.PrisonFaction)
         return GetInt(factionName + "::Infamy Gained", "ActorVars")
     endFunction
 endProperty
