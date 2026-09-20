@@ -107,6 +107,7 @@ function SetTests()
     self.AddTest("75 - Flow Profiler: Off Records Nothing, On Records and Reports", "Test_FlowProfiler", abChainable = false)
     self.AddTest("76 - Arrest Flow Stress: One Actor, Three Full Cycles (Arrest -> Imprison -> Release)", "Test_ArrestStress_SingleCycles", abChainable = false)
     self.AddTest("77 - Arrest Flow Stress: Concurrent Burst (N = 3, then 6) Arrested, Imprisoned and Released Together", "Test_ArrestStress_Burst", abChainable = false)
+    self.AddTest("78 - Arrest Flow Stress: Staggered Arrests (N = 6, 0.3s apart, like ArrestActors) and Repeated Bursts", "Test_ArrestStress_Staggered", abChainable = false)
     self.AddTest("41 - ActiveMagicEffectContainer: Stuck Lock Self-Heals", "Test_ActiveMagicEffectContainer_StuckLockSelfHeals")
     self.AddTest("42 - ThreadLock: JAtomic Primitive Semantics and Registry", "Test_ThreadLock_PrimitiveSemantics")
     ; Not chainable: fires concurrent worker threads
@@ -6096,7 +6097,43 @@ endState
     A burst of N NPCs arrested in the same frame with no spacing (what the removed waits used to hide), all imprisoned,
     then all released together, then all re-arrested. Reports per-phase counts and timings.
 /;
-int function __StressRunBurst(RPB_Prison akPrison, Actor akGuard, int aiCount)
+;/
+    What a stuck actor looks like: which registrations and flags exist, i.e. how far the arrest got.
+/;
+string function __StressDiagnose(Actor akActor, RPB_Prison akPrison, Actor akGuard)
+    RPB_Arrest arrest = RPB_API.GetArrest()
+    string d = "arrestee=" + (arrest.Arrestees.AtKey(akActor) != none)
+    d += " prisoner=" + (akPrison.Prisoners.AtKey(akActor) != none)
+    d += " guardIsCaptor=" + (arrest.Captors.AtKey(akGuard) != none)
+    d += " Arrest{Arrested=" + RPB_StorageVars.GetBoolOnReference("Arrested", akActor, "Arrest")
+    d += " Captured=" + RPB_StorageVars.GetBoolOnReference("Captured", akActor, "Arrest")
+    d += " Initialized=" + RPB_StorageVars.GetBoolOnReference("Initialized", akActor, "Arrest") + "}"
+    d += " Jail{Initialized=" + RPB_StorageVars.GetBoolOnReference("Initialized", akActor, "Jail")
+    d += " Imprisoned=" + RPB_StorageVars.GetBoolOnReference("Imprisoned", akActor, "Jail") + "}"
+    d += " hasArresteeSpell=" + akActor.HasSpell(RPB_Utility.RPB_ArresteeSpell())
+    d += " hasPrisonerSpell=" + akActor.HasSpell(RPB_Utility.RPB_PrisonerSpell())
+    d += " 3DLoaded=" + akActor.Is3DLoaded()
+    return d
+endFunction
+
+bool __stressProfilerWasOn
+
+; The flow profiler is a single global flow: concurrent arrests would interleave its marks, so it is off for the stress bursts
+function __StressProfilerOff()
+    __stressProfilerWasOn = RPB_Utility.IsFlowProfilingEnabled()
+    if (__stressProfilerWasOn)
+        RPB_Utility.DisableFlowProfiling()
+    endif
+endFunction
+
+function __StressProfilerRestore()
+    if (__stressProfilerWasOn)
+        RPB_Utility.EnableFlowProfiling()
+        __stressProfilerWasOn = false
+    endif
+endFunction
+
+int function __StressRunBurst(RPB_Prison akPrison, Actor akGuard, int aiCount, float afStagger = 0.0)
     Actor[] burst = new Actor[10]
     int i = 0
     while (i < aiCount)
@@ -6111,6 +6148,9 @@ int function __StressRunBurst(RPB_Prison akPrison, Actor akGuard, int aiCount)
         i = 0
         while (i < aiCount)
             self.__StressArrest(akGuard, burst[i])
+            if (afStagger > 0.0)
+                Utility.Wait(afStagger)
+            endif
             i += 1
         endWhile
 
@@ -6123,6 +6163,7 @@ int function __StressRunBurst(RPB_Prison akPrison, Actor akGuard, int aiCount)
             else
                 failures += 1
                 log("STRESS burst N=" + aiCount + " round " + round + ": actor " + i + " never reached Imprisoned" + self.__StressLeftovers(burst[i], akPrison))
+                log("STRESS   stuck actor " + i + " (" + burst[i] + "): " + self.__StressDiagnose(burst[i], akPrison, akGuard))
             endif
             i += 1
         endWhile
@@ -6172,6 +6213,7 @@ state Test_ArrestStress_Burst
             return
         endif
 
+        self.__StressProfilerOff()
         int failures3 = self.__StressRunBurst(prison, guard, 3)
         step = assert_true(failures3 == 0, failures3 + " failures in the N=3 burst (arrest, imprison, release, re-arrest)")
         ok = ok && step
@@ -6182,10 +6224,54 @@ state Test_ArrestStress_Burst
         step = assert_true(failures6 == 0, failures6 + " failures in the N=6 burst (arrest, imprison, release, re-arrest)")
         ok = ok && step
 
+        self.__StressProfilerRestore()
         display_result(ok)
     endFunction
 
     function Teardown()
+        self.__StressProfilerRestore()
+        __TeardownAllTempActors()
+    endFunction
+endState
+
+;/
+    Control for the burst: the same N=6 arrests but 0.3 s apart (what Arrest.ArrestActors does), run three times. If the
+    same-frame burst fails and this passes, the trigger is concurrent handling of arrests that start in the same frame.
+/;
+state Test_ArrestStress_Staggered
+    function Setup()
+        RPB_Prison prison = (RPB_API.GetPrisonManager()).GetPrison("Haafingar")
+        Actor player = Game.GetFormEx(0x14) as Actor
+        Actor guard = RPB_Utility.GetNearestGuard(player, 3000.0, player)
+        bool ok = true
+        bool step = false
+
+        step = assert_true(guard != none, "No guard near the player to perform the arrests (stand near a guard in Solitude)")
+        ok = ok && step
+        if (!guard)
+            display_result(false)
+            return
+        endif
+
+        self.__StressProfilerOff()
+        int total = 0
+        int run = 1
+        while (run <= 3)
+            int failures = self.__StressRunBurst(prison, guard, 6, 0.3)
+            log("STRESS staggered run " + run + ": " + failures + " failures")
+            total += failures
+            __TeardownAllTempActors()
+            run += 1
+        endWhile
+        step = assert_true(total == 0, total + " failures over 3 staggered N=6 runs (arrest, imprison, release, re-arrest)")
+        ok = ok && step
+
+        self.__StressProfilerRestore()
+        display_result(ok)
+    endFunction
+
+    function Teardown()
+        self.__StressProfilerRestore()
         __TeardownAllTempActors()
     endFunction
 endState
