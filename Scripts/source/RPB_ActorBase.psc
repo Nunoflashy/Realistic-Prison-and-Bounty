@@ -877,6 +877,15 @@ function SetReference(string asVarName, ObjectReference akValue, string asVarCat
     ; Debug("Actor::SetReference", "["+ self +"] Setting " + asVarName + " on " + this + " to: " + akValue)
 endFunction
 
+;/
+    Copies every key/value pair of @aiSourceMap (a FastMap) into this Actor's variables of the given category,
+    in one call. Equivalent to calling SetX for each key.
+/;
+function SetPairs(int aiSourceMap, string asVarCategory = "Actor")
+    string category = self.GetScriptVarCategory(asVarCategory)
+    RPB_StorageVars.AddPairsOnReference(aiSourceMap, self.__GetRefKey(), category)
+endFunction
+
 function Remove(string asVarName, string asVarCategory = "Actor")
     string category = self.GetScriptVarCategory(asVarCategory)
     RPB_StorageVars.DeleteVariableOnReference(asVarName, self.__GetRefKey(), category)

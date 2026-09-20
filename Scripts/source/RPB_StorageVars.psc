@@ -473,6 +473,27 @@ function DeleteAllOnReference(string apReference) global
     JMap.removeKey(GetObjectHandle(), GetReferenceKey(apReference))
 endFunction
 
+;/
+    Copies every key/value pair of @aiSourceMap into the reference's @asCategory map in one call (creating the
+    category map if the reference has none yet). Same layout as writing each key with Set...OnReference().
+/;
+function AddPairsOnReference(int aiSourceMap, string apReference, string asCategory = "null") global
+    int target = GetObjectHandleOnReference(apReference, asCategory)
+
+    if (!target)
+        string path = GetRootPath() + "." + GetReferenceKey(apReference)
+
+        if (asCategory != "null" && asCategory != "")
+            path += "." + asCategory
+        endif
+
+        JDB.solveObjSetter(path, JMap.object(), true)
+        target = GetObjectHandleOnReference(apReference, asCategory)
+    endif
+
+    RPB_Memory.FastMap_AddPairs(target, aiSourceMap, true)
+endFunction
+
 bool function HasVarOnReference(string asKey, string apReference, string asCategory = "null") global
     string path = GetVarPathOnReference(asKey, apReference, asCategory)
     return JDB.hasPath(path)

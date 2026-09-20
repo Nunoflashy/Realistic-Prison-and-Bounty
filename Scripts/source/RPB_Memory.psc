@@ -500,6 +500,14 @@ int function FastMap_SetObject(int map, string _key, int value, bool condition =
     return JMap.getObj(map, _key)
 endFunction
 
+;/
+    Copies every key/value pair of @sourceMap into @map (same value types; existing keys are overwritten
+    when @overwrite is true). One native call, instead of one write per key.
+/;
+function FastMap_AddPairs(int map, int sourceMap, bool overwrite = true) global
+    JMap.addPairs(map, sourceMap, overwrite)
+endFunction
+
 int function FastMap_FromFile(string path) global
     return JValue.readFromFile(path)
 endFunction

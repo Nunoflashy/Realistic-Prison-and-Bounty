@@ -420,6 +420,7 @@ bool function CopyBucketOptions(string asSrcBucket, string asDstBucket)
 
     int srcValues = self.GetBucketEffectiveValues(asSrcBucket)
     Preset_ApplyBucket(asDstBucket, srcValues, self.GetPageObject(optionsValueMap, asDstBucket))
+    self.__BumpSettingsVersion(asDstBucket)
 
     return true
 endFunction
@@ -475,6 +476,7 @@ function LoadPreset(string asPresetFile, string[] akBuckets)
 
         if (FastMap_HasKey(presetData, bucket))
             Preset_ApplyBucket(bucket, FastMap_GetObject(presetData, bucket), self.GetPageObject(optionsValueMap, bucket))
+            self.__BumpSettingsVersion(bucket)
             FastArray_AddString(appliedBuckets, bucket)
         else
             Debug("RPB_MCM::LoadPreset", "Checked bucket not found in preset " + asPresetFile + ": " + bucket)
@@ -736,6 +738,7 @@ endFunction
 
 int __clothingOutfitsMap ; FastMap<string, Map<string>>
 function AddOutfitPiece(string outfitId, string outfitBodyPart, Armor outfitObject)
+    __globalSettingsVersion += 1
     if (!outfitObject)
         return
     endif
@@ -791,6 +794,7 @@ endFunction
     string  @outfitBodyPart: The body part of this outfit (Head, Body, Hands, Feet).
 /;
 function RemoveOutfitPiece(string outfitId, string outfitBodyPart)
+    __globalSettingsVersion += 1
     string outfitPieceKey = outfitId + "::" + outfitBodyPart
     self.SetOptionInputValue(outfitPieceKey, "")
 
@@ -836,6 +840,7 @@ string function GetOutfitIdentifier(string outfitName)
 endFunction
 
 function SetOutfitName(string outfitId, string outfitName)
+    __globalSettingsVersion += 1
     int identifiersObject    = FastMap_GetObject(__clothingOutfitsMap, "Identifiers")
     string currentOutfitName = FastMap_KeyFromValueString(identifiersObject, outfitId)
 
@@ -2772,6 +2777,48 @@ int function GetOptionID(string optionKey)
 endFunction
 
 ;/
+    Settings versions: counters that change whenever what the settings currently ARE changes, so anything that
+    snapshots settings (RPB_Prison's settings snapshot) can tell whether its snapshot is stale.
+
+    Per page: a Hold's page has its own counter, so editing Whiterun's options does not invalidate Haafingar's
+    snapshot. Every other page (General, Clothing, ...) and the outfit edits bump one global counter that counts for
+    every page (some Prison settings can depend on them). Bumped by the four value setters, by the preset paths that
+    write the value pages directly and by outfit edits: new code that writes optionsValueMap or the outfit map
+    directly has to call __BumpSettingsVersion() too.
+/;
+int __settingsPageVersions ; FastMap<int>: hold page -> version (persisted)
+int __globalSettingsVersion
+
+;/
+    @asPage: The page whose settings are snapshotted (a Hold name, or a bucket in general).
+    returns (int): A number that changes (only ever increases) whenever a setting of that page, a global one or an outfit changes.
+/;
+int function GetSettingsVersion(string asPage)
+    int pageVersion = 0
+
+    if (__settingsPageVersions)
+        pageVersion = FastMap_GetInt(__settingsPageVersions, asPage)
+    endif
+
+    return pageVersion + __globalSettingsVersion
+endFunction
+
+function __BumpSettingsVersion(string asPage)
+    string page = asPage
+
+    if (page == "")
+        page = CurrentPage
+    endif
+
+    if (Holds.Find(page) >= 0)
+        __settingsPageVersions = Object_CreateIfNotExists(__settingsPageVersions, FastMap("<string>", retain = true))
+        FastMap_SetInt(__settingsPageVersions, page, FastMap_GetInt(__settingsPageVersions, page) + 1)
+    else
+        __globalSettingsVersion += 1
+    endif
+endFunction
+
+;/
     Sets the value of a bool-type option.
 
     string  @asOptionKey: The key of the option.
@@ -2781,6 +2828,7 @@ endFunction
 function SetOptionValueBool(string optionKey, bool value, string page = "")
     ; options/value/Whiterun/Stripping::Allow Stripping
     FastMap_SetInt(self.GetPageObject(optionsValueMap, page), optionKey, value as int)
+    self.__BumpSettingsVersion(page)
     self.MarkBucketPossiblyDirty(page)
 
     ; string optionAsStored = self.GetOptionAsStored(optionKey, page)
@@ -2796,6 +2844,7 @@ endFunction
 /;
 function SetOptionValueInt(string optionKey, int value, string page = "")
     FastMap_SetInt(self.GetPageObject(optionsValueMap, page), optionKey, value)
+    self.__BumpSettingsVersion(page)
     self.MarkBucketPossiblyDirty(page)
 
     ; string optionAsStored = self.GetOptionAsStored(optionKey, page)
@@ -2811,6 +2860,7 @@ endFunction
 /;
 function SetOptionValueFloat(string optionKey, float value, string page = "")
     FastMap_SetFloat(self.GetPageObject(optionsValueMap, page), optionKey, value)
+    self.__BumpSettingsVersion(page)
     self.MarkBucketPossiblyDirty(page)
 
     ; string optionAsStored = self.GetOptionAsStored(optionKey, page)
@@ -2826,6 +2876,7 @@ endFunction
 /;
 function SetOptionValueString(string optionKey, string value, string page = "")
     FastMap_SetString(self.GetPageObject(optionsValueMap, page), optionKey, value)
+    self.__BumpSettingsVersion(page)
 
     ; string optionAsStored = self.GetOptionAsStored(optionKey, page)
     ; JMap.setStr(optionsValueMap, optionAsStored, value)

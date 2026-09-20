@@ -88,6 +88,10 @@ function SetTests()
     self.AddTest("56 - LockPrisonerSettings: Per-Operation Cost Split (Reads vs Writes)", "Test_LockPrisonerSettings_CostSplit", abChainable = false)
     self.AddTest("57 - StorageVars: Cached Reference Key and Cached Hold Give Identical Data", "Test_StorageVars_CachedKeyEquivalence", abChainable = false)
     self.AddTest("58 - StorageVars: Deletes Work With the Cached Reference Key (Second Arrest Regression)", "Test_StorageVars_DeletesWithCachedKey", abChainable = false)
+    self.AddTest("59 - Prison Settings Snapshot: Locking From the Snapshot Equals the Direct Way", "Test_SettingsSnapshot_EqualsDirect", abChainable = false)
+    self.AddTest("60 - Prison Settings Snapshot: An MCM Change Invalidates It, Earlier Prisoners Keep Their Values", "Test_SettingsSnapshot_McmChange", abChainable = false)
+    self.AddTest("61 - Prison Settings Snapshot: A Prisoner Gets the Snapshot's Data, Not a Recomputation", "Test_SettingsSnapshot_ComesFromSnapshot", abChainable = false)
+    self.AddTest("62 - Prison Settings Snapshot: Per-Hold Versions (Another Hold Does Not Invalidate It)", "Test_SettingsSnapshot_PerHoldVersion", abChainable = false)
     self.AddTest("41 - ActiveMagicEffectContainer: Stuck Lock Self-Heals", "Test_ActiveMagicEffectContainer_StuckLockSelfHeals")
     self.AddTest("42 - ThreadLock: JAtomic Primitive Semantics and Registry", "Test_ThreadLock_PrimitiveSemantics")
     ; Not chainable: fires concurrent worker threads
@@ -4163,6 +4167,358 @@ state Test_StorageVars_DeletesWithCachedKey
         step = assert_false(JMap.hasKey(root, refKey), "DeleteAllOnReference() left the actor's entry in the storage root")
         ok = ok && step
 
+        display_result(ok)
+    endFunction
+
+    function Teardown()
+        __TeardownAllTempActors()
+    endFunction
+endState
+
+; Registers a prisoner through the normal spell route and waits for it (up to 30s). None if it never registers.
+RPB_Prisoner function __RegisterPrisonerAndWait(Actor akActor, RPB_Prison akPrison)
+    self.__EnsureKind("prisoner", akActor, akPrison)
+    RPB_ActorBase reg = none
+    float t0 = Utility.GetCurrentRealTime()
+    while (!reg && (Utility.GetCurrentRealTime() - t0) < 30.0)
+        reg = self.__LookupKind("prisoner", akActor, akPrison)
+        if (!reg)
+            Utility.Wait(0.025)
+        endif
+    endWhile
+    return reg as RPB_Prisoner
+endFunction
+
+; True when the two JMaps hold the same type and value under @asKey
+bool function __JMapValueMatches(int aiMapA, int aiMapB, string asKey)
+    int typeA = JMap.valueType(aiMapA, asKey)
+    int typeB = JMap.valueType(aiMapB, asKey)
+
+    if (typeA != typeB || typeA == 0)
+        return false
+    endif
+
+    if (typeA == 2)
+        return JMap.getInt(aiMapA, asKey) == JMap.getInt(aiMapB, asKey)
+    elseif (typeA == 3)
+        return JMap.getFlt(aiMapA, asKey) == JMap.getFlt(aiMapB, asKey)
+    elseif (typeA == 4)
+        return JMap.getForm(aiMapA, asKey) == JMap.getForm(aiMapB, asKey)
+    elseif (typeA == 6)
+        return JMap.getStr(aiMapA, asKey) == JMap.getStr(aiMapB, asKey)
+    endif
+
+    return false
+endFunction
+
+;/
+    The Prison settings snapshot must lock exactly what the direct way locks (72 settings, one read and write each).
+    P1 is locked the direct way, P2 from the snapshot; every snapshot key must exist in both prisoners' "Jail"
+    maps with the same type and value, and every key the direct way wrote must be in the snapshot.
+    Also times both, to show what the snapshot buys.
+/;
+state Test_SettingsSnapshot_EqualsDirect
+    function Setup()
+        RPB_Prison prison = (RPB_API.GetPrisonManager()).GetPrison("Haafingar")
+        bool ok = true
+        bool step = false
+
+        Actor a1 = __SpawnTempActor()
+        Actor a2 = __SpawnTempActor()
+        RPB_Prisoner p1 = self.__RegisterPrisonerAndWait(a1, prison)
+        RPB_Prisoner p2 = self.__RegisterPrisonerAndWait(a2, prison)
+        if (!p1 || !p2)
+            display_result(assert_true(false, "A prisoner never registered"))
+            return
+        endif
+
+        int map1 = RPB_StorageVars.GetObjectHandleOnReference(a1, "Jail")
+        string[] keysBefore = JMap.allKeysPArray(map1)
+
+        float t = Utility.GetCurrentRealTime()
+        p1.__LockPrisonerSettingsDirect()
+        int msDirect = self.__Ms(Utility.GetCurrentRealTime() - t)
+
+        ; First call builds the snapshot (reads every setting once), the lock afterwards only copies it
+        t = Utility.GetCurrentRealTime()
+        int snapshot = prison.GetSettingsSnapshot()
+        int msBuild = self.__Ms(Utility.GetCurrentRealTime() - t)
+        t = Utility.GetCurrentRealTime()
+        p2.LockPrisonerSettings()
+        int msCopy = self.__Ms(Utility.GetCurrentRealTime() - t)
+
+        map1 = RPB_StorageVars.GetObjectHandleOnReference(a1, "Jail")
+        int map2 = RPB_StorageVars.GetObjectHandleOnReference(a2, "Jail")
+        string[] snapKeys = JMap.allKeysPArray(snapshot)
+        string[] keysAfter = JMap.allKeysPArray(map1)
+        log("SNAPSHOT keys " + snapKeys.Length + " | direct " + msDirect + "ms | snapshot build (first prisoner after a change) " + msBuild + "ms | copy into a prisoner " + msCopy + "ms")
+
+        step = assert_true(snapKeys.Length >= 60, "The snapshot has only " + snapKeys.Length + " keys")
+        ok = ok && step
+
+        int missing = 0
+        int mismatched = 0
+        int dotted = 0
+        int i = 0
+        while (i < snapKeys.Length)
+            ; StorageVars keys go into a JContainers path where '.' is the separator: a dotted key silently nests
+            if (StringUtil.Find(snapKeys[i], ".") >= 0)
+                dotted += 1
+                log("SNAPSHOT key contains a '.', which StorageVars paths cannot address: '" + snapKeys[i] + "'")
+            endif
+
+            ; The provenance keys are not settings, the direct way does not write them (the prisoner still gets them)
+            if (StringUtil.Find(snapKeys[i], "Settings Snapshot") != 0)
+                if (!self.__JMapValueMatches(snapshot, map1, snapKeys[i]))
+                    mismatched += 1
+                    log("SNAPSHOT differs from the direct way for '" + snapKeys[i] + "'")
+                endif
+            endif
+            if (!self.__JMapValueMatches(snapshot, map2, snapKeys[i]))
+                missing += 1
+                log("SNAPSHOT copy is missing or different in the second prisoner for '" + snapKeys[i] + "'")
+            endif
+            i += 1
+        endWhile
+        step = assert_true(dotted == 0, dotted + " snapshot key(s) contain a '.'")
+        ok = ok && step
+        step = assert_true(mismatched == 0, mismatched + " snapshot value(s) differ from the direct way")
+        ok = ok && step
+        step = assert_true(missing == 0, missing + " snapshot value(s) missing or different in the prisoner locked from the snapshot")
+        ok = ok && step
+
+        ; Every key the direct way added must be in the snapshot (keys that already existed cannot be told apart)
+        int extra = 0
+        i = 0
+        while (i < keysAfter.Length)
+            if (keysBefore.Find(keysAfter[i]) < 0 && snapKeys.Find(keysAfter[i]) < 0)
+                extra += 1
+                log("The direct way wrote '" + keysAfter[i] + "' which the snapshot does not have")
+            endif
+            i += 1
+        endWhile
+        step = assert_true(extra == 0, extra + " key(s) written by the direct way are not in the snapshot")
+        ok = ok && step
+
+        display_result(ok)
+    endFunction
+
+    function Teardown()
+        __TeardownAllTempActors()
+    endFunction
+endState
+
+;/
+    An MCM change must invalidate the snapshot, and earlier prisoners must keep the values they were locked with:
+      P1 locked; a second lock with no change does not rebuild the snapshot;
+      an option is changed through the MCM; P2 locked -> new value, exactly one rebuild, P1 still has the old value;
+      the option is restored; P3 locked -> old value again (another rebuild).
+    Uses "Stripping::Minimum Sentence to Strip" on the Haafingar page, which Prisoner stores as "Sentence to Strip".
+/;
+state Test_SettingsSnapshot_McmChange
+    function Setup()
+        RPB_Prison prison = (RPB_API.GetPrisonManager()).GetPrison("Haafingar")
+        RPB_MCM mcm = prison.Config.MCM
+        bool ok = true
+        bool step = false
+        string optionKey = "Stripping::Minimum Sentence to Strip"
+        string page = prison.Hold
+
+        Actor a1 = __SpawnTempActor()
+        Actor a2 = __SpawnTempActor()
+        Actor a3 = __SpawnTempActor()
+        RPB_Prisoner p1 = self.__RegisterPrisonerAndWait(a1, prison)
+        RPB_Prisoner p2 = self.__RegisterPrisonerAndWait(a2, prison)
+        RPB_Prisoner p3 = self.__RegisterPrisonerAndWait(a3, prison)
+        if (!p1 || !p2 || !p3)
+            display_result(assert_true(false, "A prisoner never registered"))
+            return
+        endif
+
+        float original = mcm.GetOptionSliderValue(optionKey, page)
+        int originalInt = original as int
+
+        p1.LockPrisonerSettings()
+        int builds = prison.SettingsSnapshotBuilds
+        step = assert_true(p1.GetInt("Sentence to Strip") == originalInt, "P1 did not lock the current value " + originalInt)
+        ok = ok && step
+
+        ; Locking again with no MCM change must not rebuild the snapshot
+        p1.LockPrisonerSettings()
+        step = assert_true(prison.SettingsSnapshotBuilds == builds, "The snapshot was rebuilt although nothing changed (" + builds + " -> " + prison.SettingsSnapshotBuilds + ")")
+        ok = ok && step
+
+        ; Change the option through the MCM
+        mcm.SetOptionValueFloat(optionKey, original + 7.0, page)
+        p2.LockPrisonerSettings()
+        step = assert_true(p2.GetInt("Sentence to Strip") == originalInt + 7, "P2 did not get the changed value: " + p2.GetInt("Sentence to Strip") + " (expected " + (originalInt + 7) + ")")
+        ok = ok && step
+        step = assert_true(prison.SettingsSnapshotBuilds == builds + 1, "Expected exactly one rebuild after the change (" + builds + " -> " + prison.SettingsSnapshotBuilds + ")")
+        ok = ok && step
+        step = assert_true(p1.GetInt("Sentence to Strip") == originalInt, "P1's locked value changed with the MCM: " + p1.GetInt("Sentence to Strip"))
+        ok = ok && step
+
+        ; Restore the option: the next prisoner gets the old value again
+        mcm.SetOptionValueFloat(optionKey, original, page)
+        p3.LockPrisonerSettings()
+        step = assert_true(p3.GetInt("Sentence to Strip") == originalInt, "P3 did not get the restored value: " + p3.GetInt("Sentence to Strip"))
+        ok = ok && step
+        step = assert_true(p2.GetInt("Sentence to Strip") == originalInt + 7, "P2's locked value changed after the restore: " + p2.GetInt("Sentence to Strip"))
+        ok = ok && step
+        log("MCM CHANGE original " + originalInt + ", changed " + (originalInt + 7) + ", rebuilds " + builds + " -> " + prison.SettingsSnapshotBuilds)
+
+        display_result(ok)
+    endFunction
+
+    function Teardown()
+        __TeardownAllTempActors()
+    endFunction
+endState
+
+
+;/
+    Deterministic proof that LockPrisonerSettings() COPIES the snapshot instead of recomputing the settings:
+    an impossible sentinel is written into the snapshot map only (no MCM change, no version bump); the prisoner
+    locked next must carry the sentinel. Then the snapshot is invalidated and the next prisoner must carry the real
+    MCM value. The provenance keys ("Settings Snapshot Build" / "Version", copied into every prisoner) must say
+    which build each prisoner came from, and a third prisoner locked with no change must be identical to the second.
+/;
+state Test_SettingsSnapshot_ComesFromSnapshot
+    function Setup()
+        RPB_Prison prison = (RPB_API.GetPrisonManager()).GetPrison("Haafingar")
+        RPB_MCM mcm = prison.Config.MCM
+        bool ok = true
+        bool step = false
+        int SENTINEL = 987654
+
+        Actor a1 = __SpawnTempActor()
+        Actor a2 = __SpawnTempActor()
+        Actor a3 = __SpawnTempActor()
+        RPB_Prisoner p1 = self.__RegisterPrisonerAndWait(a1, prison)
+        RPB_Prisoner p2 = self.__RegisterPrisonerAndWait(a2, prison)
+        RPB_Prisoner p3 = self.__RegisterPrisonerAndWait(a3, prison)
+        if (!p1 || !p2 || !p3)
+            display_result(assert_true(false, "A prisoner never registered"))
+            return
+        endif
+
+        int snapshot = prison.GetSettingsSnapshot()
+        int builds = prison.SettingsSnapshotBuilds
+
+        ; 1. Poison the snapshot only: a prisoner that copies it carries the sentinel, one that recomputes would not
+        RPB_Memory.FastMap_SetInt(snapshot, "Bounty to Strip", SENTINEL)
+        p1.LockPrisonerSettings()
+        step = assert_true(p1.GetInt("Bounty to Strip") == SENTINEL, "P1 did not carry the sentinel (" + p1.GetInt("Bounty to Strip") + "): it did not copy the snapshot")
+        ok = ok && step
+        step = assert_true(prison.SettingsSnapshotBuilds == builds, "The snapshot was rebuilt for P1 (" + builds + " -> " + prison.SettingsSnapshotBuilds + ")")
+        ok = ok && step
+        step = assert_true(p1.GetInt("Settings Snapshot Build") == builds, "P1's snapshot build is " + p1.GetInt("Settings Snapshot Build") + ", expected " + builds)
+        ok = ok && step
+
+        ; 2. Invalidate: the next prisoner gets the real MCM value from a fresh build
+        prison.InvalidateSettingsSnapshot()
+        p2.LockPrisonerSettings()
+        int real = prison.MinimumBountyToStrip
+        step = assert_true(real != SENTINEL, "The real setting equals the sentinel, pick another sentinel")
+        ok = ok && step
+        step = assert_true(p2.GetInt("Bounty to Strip") == real, "P2 did not get the real value " + real + ": " + p2.GetInt("Bounty to Strip"))
+        ok = ok && step
+        step = assert_true(prison.SettingsSnapshotBuilds == builds + 1, "Expected one rebuild after Invalidate (" + builds + " -> " + prison.SettingsSnapshotBuilds + ")")
+        ok = ok && step
+        step = assert_true(p2.GetInt("Settings Snapshot Build") == builds + 1, "P2's snapshot build is " + p2.GetInt("Settings Snapshot Build") + ", expected " + (builds + 1))
+        ok = ok && step
+        step = assert_true(p2.GetInt("Settings Snapshot Version") == mcm.GetSettingsVersion(prison.Hold), "P2's snapshot version does not match the MCM's for " + prison.Hold)
+        ok = ok && step
+        step = assert_true(p1.GetInt("Bounty to Strip") == SENTINEL, "P1's locked value changed with the rebuild")
+        ok = ok && step
+
+        ; 3. A third prisoner with no change in between: same build, every value equal to the second one's
+        p3.LockPrisonerSettings()
+        step = assert_true(p3.GetInt("Settings Snapshot Build") == p2.GetInt("Settings Snapshot Build"), "P3 came from another build than P2")
+        ok = ok && step
+        step = assert_true(prison.SettingsSnapshotBuilds == builds + 1, "P3 caused a rebuild")
+        ok = ok && step
+
+        int map2 = RPB_StorageVars.GetObjectHandleOnReference(a2, "Jail")
+        int map3 = RPB_StorageVars.GetObjectHandleOnReference(a3, "Jail")
+        string[] keys = JMap.allKeysPArray(prison.GetSettingsSnapshot())
+        int different = 0
+        int i = 0
+        while (i < keys.Length)
+            if (!self.__JMapValueMatches(map2, map3, keys[i]))
+                different += 1
+                log("P3 differs from P2 for '" + keys[i] + "'")
+            endif
+            i += 1
+        endWhile
+        step = assert_true(different == 0, different + " of " + keys.Length + " settings differ between P2 and P3 (same snapshot build)")
+        ok = ok && step
+        log("SNAPSHOT PROOF sentinel carried by P1 (build " + p1.GetInt("Settings Snapshot Build") + "), P2 real value " + real + " (build " + p2.GetInt("Settings Snapshot Build") + "), P3 identical to P2 over " + keys.Length + " keys")
+
+        display_result(ok)
+    endFunction
+
+    function Teardown()
+        ; Never leave the sentinel in the shared snapshot if the test stopped early
+        ((RPB_API.GetPrisonManager()).GetPrison("Haafingar")).InvalidateSettingsSnapshot()
+        __TeardownAllTempActors()
+    endFunction
+endState
+
+;/
+    Per-Hold versions: another Hold's page must not invalidate this Prison's snapshot, its own page must, and a
+    non-Hold page (General) must (it counts for every Hold). Each option is re-set to its current value: the version
+    bumps on every write, so nothing actually changes.
+/;
+state Test_SettingsSnapshot_PerHoldVersion
+    function Setup()
+        RPB_Prison prison = (RPB_API.GetPrisonManager()).GetPrison("Haafingar")
+        RPB_MCM mcm = prison.Config.MCM
+        bool ok = true
+        bool step = false
+        string hold = prison.Hold
+        string optionKey = "Stripping::Minimum Sentence to Strip"
+
+        string otherHold = ""
+        string[] holds = prison.Config.Holds
+        int i = 0
+        while (i < holds.Length && otherHold == "")
+            if (holds[i] != hold)
+                otherHold = holds[i]
+            endif
+            i += 1
+        endWhile
+        step = assert_true(otherHold != "", "No other Hold found to test with")
+        ok = ok && step
+
+        prison.GetSettingsSnapshot()
+        int builds = prison.SettingsSnapshotBuilds
+        int versionBefore = mcm.GetSettingsVersion(hold)
+        int otherVersionBefore = mcm.GetSettingsVersion(otherHold)
+
+        ; 1. Another Hold's page: this Prison's snapshot and version stay
+        mcm.SetOptionValueFloat(optionKey, mcm.GetOptionSliderValue(optionKey, otherHold), otherHold)
+        prison.GetSettingsSnapshot()
+        step = assert_true(prison.SettingsSnapshotBuilds == builds, "Changing " + otherHold + " rebuilt " + hold + "'s snapshot (" + builds + " -> " + prison.SettingsSnapshotBuilds + ")")
+        ok = ok && step
+        step = assert_true(mcm.GetSettingsVersion(hold) == versionBefore, hold + "'s settings version changed when only " + otherHold + " was edited")
+        ok = ok && step
+        step = assert_true(mcm.GetSettingsVersion(otherHold) > otherVersionBefore, otherHold + "'s settings version did not increase")
+        ok = ok && step
+
+        ; 2. This Hold's own page: exactly one rebuild
+        mcm.SetOptionValueFloat(optionKey, mcm.GetOptionSliderValue(optionKey, hold), hold)
+        prison.GetSettingsSnapshot()
+        step = assert_true(prison.SettingsSnapshotBuilds == builds + 1, "Changing " + hold + " did not rebuild its snapshot once (" + builds + " -> " + prison.SettingsSnapshotBuilds + ")")
+        ok = ok && step
+
+        ; 3. A non-Hold page counts for every Hold
+        mcm.SetOptionValueFloat("General::Bounty Decay (Update Interval)", mcm.GetOptionSliderValue("General::Bounty Decay (Update Interval)", "General"), "General")
+        prison.GetSettingsSnapshot()
+        step = assert_true(prison.SettingsSnapshotBuilds == builds + 2, "Changing the General page did not rebuild the snapshot (" + builds + " -> " + prison.SettingsSnapshotBuilds + ")")
+        ok = ok && step
+
+        log("PER-HOLD VERSION " + hold + " " + versionBefore + " -> " + mcm.GetSettingsVersion(hold) + " | " + otherHold + " " + otherVersionBefore + " -> " + mcm.GetSettingsVersion(otherHold) + " | rebuilds " + builds + " -> " + prison.SettingsSnapshotBuilds)
         display_result(ok)
     endFunction
 

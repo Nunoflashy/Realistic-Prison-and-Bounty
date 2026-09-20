@@ -2250,6 +2250,17 @@ endFunction
     because they were already set for this Prisoner, guaranteeing that this Prisoner's state will not change while they are in prison.
 /;
 function LockPrisonerSettings()
+    ; The MCM settings of this Prison are the same for every prisoner until an option changes, so they are read once
+    ; into a per-Prison snapshot (rebuilt only when stale) and COPIED into this prisoner: it keeps the values it was
+    ; jailed under even when the MCM (and the snapshot) change later.
+    self.SetPairs(Prison.GetSettingsSnapshot())
+endFunction
+
+;/
+    The original way of locking the settings: one Prison property read and one write per setting (~68 of each).
+    Kept as the reference the snapshot is tested against.
+/;
+function __LockPrisonerSettingsDirect()
     ; Infamy
     SetBool("Infamy Enabled",                                Prison.EnableInfamy)
     SetFloat("Infamy Recognized Threshold",                  Prison.InfamyRecognizedThreshold)
@@ -2264,7 +2275,7 @@ function LockPrisonerSettings()
     SetInt("Frisking Thoroughness",                          Prison.FriskingThoroughness)
     SetBool("Confiscate Stolen Items",                       Prison.ConfiscateStolenItemsOnFrisk)
     SetBool("Strip if Stolen Items Found",                   Prison.StripIfStolenItemsFoundOnFrisk)
-    SetInt("Minimum No. of Stolen Items Required",           Prison.MinimumNumberOfStolenItemsRequiredToStripOnFrisk)
+    SetInt("Minimum Number of Stolen Items Required",           Prison.MinimumNumberOfStolenItemsRequiredToStripOnFrisk)
     ; Stripping
     SetBool("Allow Stripping",                               Prison.AllowStripping)
     SetString("Handle Stripping On",                         Prison.HandleStrippingOn)

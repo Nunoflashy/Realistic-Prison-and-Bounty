@@ -2828,3 +2828,140 @@ function DEBUG_ShowPrisonerSentenceInfo(RPB_Prisoner apPrisoner, bool abShort = 
         " }")
     endif
 endFunction
+
+;/
+    Settings snapshot: this Prison's MCM settings as they are right now, read once and reused for every prisoner
+    (each prisoner gets a COPY, so already-imprisoned actors keep the values they were locked with). Stale when the
+    MCM's settings version changed since it was built (see RPB_MCM.GetSettingsVersion()).
+/;
+int __settingsSnapshot
+int __settingsSnapshotVersion = -1
+int __settingsSnapshotBuilds
+
+; How many times the snapshot was (re)built, for tests and diagnostics
+int property SettingsSnapshotBuilds
+    int function get()
+        return __settingsSnapshotBuilds
+    endFunction
+endProperty
+
+;/
+    returns (int): A FastMap with the Prison's current settings, built or rebuilt when stale.
+                   Read only for callers: copy it (ActorBase.SetPairs), never edit it.
+/;
+int function GetSettingsSnapshot()
+    int version = Config.MCM.GetSettingsVersion(Hold)
+
+    if (__settingsSnapshot && __settingsSnapshotVersion == version)
+        return __settingsSnapshot
+    endif
+
+    if (!__settingsSnapshot)
+        __settingsSnapshot = FastMap("<string>", retain = true)
+    else
+        FastMap_Clear(__settingsSnapshot)
+    endif
+
+    self.__BuildSettingsSnapshot(__settingsSnapshot)
+    __settingsSnapshotVersion = version
+    __settingsSnapshotBuilds += 1
+
+    ; Provenance, copied into every prisoner locked from this snapshot (not settings; tests and debugging read them)
+    FastMap_SetInt(__settingsSnapshot, "Settings Snapshot Build", __settingsSnapshotBuilds)
+    FastMap_SetInt(__settingsSnapshot, "Settings Snapshot Version", version)
+
+    return __settingsSnapshot
+endFunction
+
+;/
+    Marks the settings snapshot stale, so the next GetSettingsSnapshot() rebuilds it.
+/;
+function InvalidateSettingsSnapshot()
+    __settingsSnapshotVersion = -1
+endFunction
+
+;/
+    Writes every setting a prisoner locks into @apMap (same keys and value types RPB_Prisoner writes).
+/;
+function __BuildSettingsSnapshot(int apMap)
+    ; Infamy
+    FastMap_SetInt(apMap, "Infamy Enabled", EnableInfamy as int)
+    FastMap_SetFloat(apMap, "Infamy Recognized Threshold", InfamyRecognizedThreshold)
+    FastMap_SetFloat(apMap, "Infamy Known Threshold", InfamyKnownThreshold)
+    FastMap_SetFloat(apMap, "Infamy Gained Daily from Current Bounty", InfamyGainedDailyOfCurrentBounty)
+    FastMap_SetFloat(apMap, "Infamy Gained Daily", InfamyGainedDaily)
+    FastMap_SetFloat(apMap, "Infamy Gain Modifier (Recognized)", InfamyGainModifierRecognized)
+    FastMap_SetFloat(apMap, "Infamy Gain Modifier (Known)", InfamyGainModifierKnown)
+    ; Frisking
+    FastMap_SetInt(apMap, "Allow Frisking", AllowFrisking as int)
+    FastMap_SetInt(apMap, "Bounty for Frisking", MinimumBountyForFrisking)
+    FastMap_SetInt(apMap, "Frisking Thoroughness", FriskingThoroughness)
+    FastMap_SetInt(apMap, "Confiscate Stolen Items", ConfiscateStolenItemsOnFrisk as int)
+    FastMap_SetInt(apMap, "Strip if Stolen Items Found", StripIfStolenItemsFoundOnFrisk as int)
+    FastMap_SetInt(apMap, "Minimum Number of Stolen Items Required", MinimumNumberOfStolenItemsRequiredToStripOnFrisk)
+    ; Stripping
+    FastMap_SetInt(apMap, "Allow Stripping", AllowStripping as int)
+    FastMap_SetString(apMap, "Handle Stripping On", HandleStrippingOn)
+    FastMap_SetInt(apMap, "Bounty to Strip", MinimumBountyToStrip)
+    FastMap_SetInt(apMap, "Violent Bounty to Strip", MinimumViolentBountyToStrip)
+    FastMap_SetInt(apMap, "Sentence to Strip", MinimumSentenceToStrip)
+    FastMap_SetInt(apMap, "Stripping Thoroughness", StrippingThoroughness)
+    FastMap_SetInt(apMap, "Stripping Thoroughness Modifier", StrippingThoroughnessModifier)
+    ; Clothing
+    FastMap_SetInt(apMap, "Allow Clothing", AllowClothing as int)
+    FastMap_SetString(apMap, "Handle Clothing On", HandleClothingOn)
+    FastMap_SetInt(apMap, "Maximum Bounty to Clothe", MaximumBountyClothing)
+    FastMap_SetInt(apMap, "Maximum Violent Bounty to Clothe", MaximumViolentBountyClothing)
+    FastMap_SetInt(apMap, "Maximum Sentence to Clothe", MaximumSentenceClothing)
+    FastMap_SetInt(apMap, "Clothe when Defeated", ClotheWhenDefeated as int)
+    FastMap_SetString(apMap, "Outfit", ClothingOutfit)
+    FastMap_SetInt(apMap, "Use Default Outfit as Fallback", UseDefaultOutfitAsFallback as int)
+    ; Prison
+    FastMap_SetInt(apMap, "Bounty Exchange", BountyExchange)
+    FastMap_SetInt(apMap, "Bounty to Sentence", BountyToSentence)
+    FastMap_SetInt(apMap, "Minimum Sentence", MinimumSentence)
+    FastMap_SetInt(apMap, "Maximum Sentence", MaximumSentence)
+    FastMap_SetFloat(apMap, "Cell Search Thoroughness", CellSearchThoroughness)
+    FastMap_SetString(apMap, "Cell Lock Level", CellLockLevel)
+    FastMap_SetInt(apMap, "Fast Forward", FastForward as int)
+    FastMap_SetFloat(apMap, "Day to Fast Forward From", DayToFastForwardFrom)
+    FastMap_SetString(apMap, "Handle Skill Loss", HandleSkillLoss)
+    FastMap_SetInt(apMap, "Day to Start Losing Skills (Stat)", DayToStartLosingSkillsStat)
+    FastMap_SetInt(apMap, "Day to Start Losing Skills (Perk)", DayToStartLosingSkillsPerk)
+    FastMap_SetInt(apMap, "Chance to Lose Skills (Stat)", ChanceToLoseSkillsStat)
+    FastMap_SetInt(apMap, "Chance to Lose Skills (Perk)", ChanceToLoseSkillsPerk)
+    FastMap_SetFloat(apMap, "Recognized Criminal Penalty", RecognizedCriminalPenalty)
+    FastMap_SetFloat(apMap, "Known Criminal Penalty", KnownCriminalPenalty)
+    FastMap_SetFloat(apMap, "Bounty to Trigger Infamy", MinimumBountyToTriggerCriminalPenalty)
+    ; Release
+    FastMap_SetInt(apMap, "Release Fees Enabled", EnableReleaseFees as int)
+    FastMap_SetFloat(apMap, "Chance for Release Fees Event", ReleaseFeesChanceForEvent)
+    FastMap_SetFloat(apMap, "Bounty to Owe Fees", MinimumBountyToOweReleaseFees)
+    FastMap_SetFloat(apMap, "Release Fees from Arrest Bounty", ReleaseFeesOfCurrentBounty)
+    FastMap_SetFloat(apMap, "Release Fees Flat", ReleaseFees)
+    FastMap_SetFloat(apMap, "Days Given to Pay Release Fees", DaysGivenToPayReleaseFees)
+    FastMap_SetInt(apMap, "Enable Item Retention", EnableItemRetention as int)
+    FastMap_SetInt(apMap, "Minimum Bounty to Retain Items", MinimumBountyToRetainItems)
+    FastMap_SetInt(apMap, "Auto Redress on Release", AutoRedressOnRelease as int)
+    ; Escape
+    FastMap_SetString(apMap, "Handle Escape On", HandleEscapeOn)
+    FastMap_SetInt(apMap, "Escape Bounty", EscapeBounty)
+    FastMap_SetFloat(apMap, "Escape Bounty of Current Bounty", EscapeBountyOfCurrentBounty)
+    FastMap_SetFloat(apMap, "Escape Bounty (Sentence)", EscapeBountySentenceMultiplier)
+    FastMap_SetFloat(apMap, "Escape Bounty (Sentence Days)", EscapeBountySentenceDays)
+    FastMap_SetInt(apMap, "Escape Bounty (Bounty Condition)", EscapeBountyCondition)
+    FastMap_SetInt(apMap, "Escape Bounty (Sentence Condition)", EscapeBountySentenceCondition)
+    FastMap_SetInt(apMap, "Fallback Bounty", EscapeBountyFallbackBounty)
+    FastMap_SetInt(apMap, "Account for Time Served", AccountForTimeServedOnEscape as int)
+    FastMap_SetInt(apMap, "Frisk upon Captured", FriskUponCapturedOnEscape as int)
+    FastMap_SetInt(apMap, "Strip upon Captured", StripUponCapturedOnEscape as int)
+    ; Outfit
+    FastMap_SetString(apMap, "Outfit::Name", OutfitName)
+    FastMap_SetForm(apMap, "Outfit::Head", OutfitPartHead)
+    FastMap_SetForm(apMap, "Outfit::Body", OutfitPartBody)
+    FastMap_SetForm(apMap, "Outfit::Hands", OutfitPartHands)
+    FastMap_SetForm(apMap, "Outfit::Feet", OutfitPartFeet)
+    FastMap_SetInt(apMap, "Outfit::Conditional", IsOutfitConditional as int)
+    FastMap_SetInt(apMap, "Outfit::Minimum Bounty", OutfitMinimumBounty)
+    FastMap_SetInt(apMap, "Outfit::Maximum Bounty", OutfitMaximumBounty)
+endFunction
