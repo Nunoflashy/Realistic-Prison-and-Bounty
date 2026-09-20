@@ -790,7 +790,9 @@ function RegisterPrisoner(RPB_Prisoner apPrisoner)
     FastMap_SetForm(__prisonersInCell, apPrisoner.GetIdentifier(), apPrisoner.GetActor())
 
     ; Pass the reference to the Prisoner
+    RPB_Utility.FlowMark("RegisterPrisoner: map + identifier")
     apPrisoner.SetForm("Cell", self, "Jail")
+    RPB_Utility.FlowMark("RegisterPrisoner: SetForm Cell")
 
     self.OnPrisonerRegister(apPrisoner)
 endFunction

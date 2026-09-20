@@ -105,6 +105,8 @@ function SetTests()
     self.AddTest("73 - MCM: Every Option Default Exists Without Visiting an MCM Page (New Save)", "Test_MCM_DefaultsWithoutPageVisit", abChainable = false)
     self.AddTest("74 - MCM: Defaults Are Rebuilt After the Default Map Is Replaced (OnConfigInit Order)", "Test_MCM_DefaultsAfterMapReplaced", abChainable = false)
     self.AddTest("75 - Flow Profiler: Off Records Nothing, On Records and Reports", "Test_FlowProfiler", abChainable = false)
+    self.AddTest("76 - Arrest Flow Stress: One Actor, Three Full Cycles (Arrest -> Imprison -> Release)", "Test_ArrestStress_SingleCycles", abChainable = false)
+    self.AddTest("77 - Arrest Flow Stress: Concurrent Burst (N = 3, then 6) Arrested, Imprisoned and Released Together", "Test_ArrestStress_Burst", abChainable = false)
     self.AddTest("41 - ActiveMagicEffectContainer: Stuck Lock Self-Heals", "Test_ActiveMagicEffectContainer_StuckLockSelfHeals")
     self.AddTest("42 - ThreadLock: JAtomic Primitive Semantics and Registry", "Test_ThreadLock_PrimitiveSemantics")
     ; Not chainable: fires concurrent worker threads
@@ -5974,6 +5976,217 @@ state Test_FlowProfiler
         endif
         log("FLOW PROFILER look for the 'FLOW:' lines above: phase B should be about 500ms")
         display_result(ok)
+    endFunction
+endState
+
+
+; ==========================================================
+;   Arrest -> Imprison -> Release stress tests (no blind delays)
+;
+;   The fixed Utility.Wait()s in Arrestee.Destroy()/RevertArrest() were removed. Papyrus is timing sensitive (modlist
+;   weight, number of actors in flight), so these run the REAL flow (Arrest.ArrestActor -> mod event -> arrestee ->
+;   prisoner -> cell -> Imprisoned -> release) on temp NPCs, alone and in bursts, and poll the actual state with a
+;   bounded timeout instead of sleeping. A failure names the actor and the state it got stuck in.
+;   Needs the player to be near Haafingar with a guard around (same as the F1 "arrest selected NPC" test).
+; ==========================================================
+
+; Waits (bounded, polling) until the actor is imprisoned; returns the ms it took, or -1 on timeout
+int function __StressWaitImprisoned(Actor akActor, float afTimeout)
+    float t0 = Utility.GetCurrentRealTime()
+    while ((Utility.GetCurrentRealTime() - t0) < afTimeout)
+        if (RPB_Utility.IsActorImprisoned(akActor))
+            return self.__Ms(Utility.GetCurrentRealTime() - t0)
+        endif
+        Utility.Wait(0.1)
+    endWhile
+    return -1
+endFunction
+
+; Waits (bounded, polling) until the actor is no longer a registered prisoner of the prison; returns ms, or -1
+int function __StressWaitReleased(Actor akActor, RPB_Prison akPrison, float afTimeout)
+    float t0 = Utility.GetCurrentRealTime()
+    while ((Utility.GetCurrentRealTime() - t0) < afTimeout)
+        if (!RPB_Utility.IsActorImprisoned(akActor) && akPrison.Prisoners.AtKey(akActor) == none)
+            return self.__Ms(Utility.GetCurrentRealTime() - t0)
+        endif
+        Utility.Wait(0.1)
+    endWhile
+    return -1
+endFunction
+
+; Gives the actor a bounty and starts a teleport-to-cell arrest through the real event flow
+function __StressArrest(Actor akGuard, Actor akActor)
+    RPB_ActorVars.SetCrimeGold(akGuard.GetCrimeFaction(), akActor, 2000)
+    RPB_API.GetArrest().ArrestActor(akGuard, akActor, RPB_API.GetArrest().ARREST_TYPE_TELEPORT_TO_CELL)
+endFunction
+
+; The state an actor is left in: everything the arrest/prison flow stores must be gone after a release
+string function __StressLeftovers(Actor akActor, RPB_Prison akPrison)
+    string left = ""
+    if (RPB_Utility.IsActorArrested(akActor))
+        left += " [Arrested still set]"
+    endif
+    if (RPB_Utility.IsActorImprisoned(akActor))
+        left += " [Imprisoned still set]"
+    endif
+    if (RPB_API.GetArrest().Arrestees.AtKey(akActor) != none)
+        left += " [still a registered arrestee]"
+    endif
+    if (akActor.HasSpell(RPB_Utility.RPB_ArresteeSpell()))
+        left += " [arrestee spell still on the actor]"
+    endif
+    if (akPrison.Prisoners.AtKey(akActor) != none)
+        left += " [still a registered prisoner]"
+    endif
+    return left
+endFunction
+
+;/
+    One NPC, three full cycles back to back: arrest -> imprisoned -> release. The second and third cycles catch stale
+    state (the delete-path regression showed up exactly there) and anything the removed waits used to hide.
+/;
+state Test_ArrestStress_SingleCycles
+    function Setup()
+        RPB_Prison prison = (RPB_API.GetPrisonManager()).GetPrison("Haafingar")
+        Actor player = Game.GetFormEx(0x14) as Actor
+        Actor guard = RPB_Utility.GetNearestGuard(player, 3000.0, player)
+        bool ok = true
+        bool step = false
+
+        step = assert_true(guard != none, "No guard near the player to perform the arrests (stand near a guard in Solitude)")
+        ok = ok && step
+        if (!guard)
+            display_result(false)
+            return
+        endif
+
+        Actor a = __SpawnTempActor()
+        int cycle = 1
+        while (cycle <= 3 && ok)
+            self.__StressArrest(guard, a)
+            int msImprison = self.__StressWaitImprisoned(a, 60.0)
+            step = assert_true(msImprison >= 0, "Cycle " + cycle + ": the actor never reached Imprisoned (60 s)" + self.__StressLeftovers(a, prison))
+            ok = ok && step
+            if (!step)
+                log("STRESS cycle " + cycle + ": stuck, arrested=" + RPB_Utility.IsActorArrested(a) + " arrestee=" + (RPB_API.GetArrest().Arrestees.AtKey(a) != none) + " prisoner=" + (prison.Prisoners.AtKey(a) != none))
+            else
+                RPB_Prisoner prisoner = prison.Prisoners.AtKey(a)
+                step = assert_true(prisoner != none && prisoner.JailCell != none, "Cycle " + cycle + ": imprisoned but no prisoner reference / cell")
+                ok = ok && step
+                if (prisoner)
+                    prison.SendReleaseRequest(prisoner)
+                endif
+                int msRelease = self.__StressWaitReleased(a, prison, 30.0)
+                step = assert_true(msRelease >= 0, "Cycle " + cycle + ": the actor was not released cleanly (30 s)" + self.__StressLeftovers(a, prison))
+                ok = ok && step
+                log("STRESS cycle " + cycle + ": imprisoned after " + msImprison + " ms, released after " + msRelease + " ms")
+            endif
+            cycle += 1
+        endWhile
+
+        display_result(ok)
+    endFunction
+
+    function Teardown()
+        __TeardownAllTempActors()
+    endFunction
+endState
+
+;/
+    A burst of N NPCs arrested in the same frame with no spacing (what the removed waits used to hide), all imprisoned,
+    then all released together, then all re-arrested. Reports per-phase counts and timings.
+/;
+int function __StressRunBurst(RPB_Prison akPrison, Actor akGuard, int aiCount)
+    Actor[] burst = new Actor[10]
+    int i = 0
+    while (i < aiCount)
+        burst[i] = __SpawnTempActor()
+        i += 1
+    endWhile
+
+    int failures = 0
+    int round = 1
+    while (round <= 2) ; round 2 = re-arrest the same actors after the burst release
+        float t0 = Utility.GetCurrentRealTime()
+        i = 0
+        while (i < aiCount)
+            self.__StressArrest(akGuard, burst[i])
+            i += 1
+        endWhile
+
+        int imprisoned = 0
+        i = 0
+        while (i < aiCount)
+            int ms = self.__StressWaitImprisoned(burst[i], 90.0)
+            if (ms >= 0)
+                imprisoned += 1
+            else
+                failures += 1
+                log("STRESS burst N=" + aiCount + " round " + round + ": actor " + i + " never reached Imprisoned" + self.__StressLeftovers(burst[i], akPrison))
+            endif
+            i += 1
+        endWhile
+        int msAllImprisoned = self.__Ms(Utility.GetCurrentRealTime() - t0)
+
+        ; Release everyone at once
+        i = 0
+        while (i < aiCount)
+            RPB_Prisoner prisoner = akPrison.Prisoners.AtKey(burst[i])
+            if (prisoner)
+                akPrison.SendReleaseRequest(prisoner)
+            endif
+            i += 1
+        endWhile
+
+        int released = 0
+        i = 0
+        while (i < aiCount)
+            if (self.__StressWaitReleased(burst[i], akPrison, 60.0) >= 0)
+                released += 1
+            else
+                failures += 1
+                log("STRESS burst N=" + aiCount + " round " + round + ": actor " + i + " was not released cleanly" + self.__StressLeftovers(burst[i], akPrison))
+            endif
+            i += 1
+        endWhile
+
+        log("STRESS burst N=" + aiCount + " round " + round + ": " + imprisoned + "/" + aiCount + " imprisoned (all after " + msAllImprisoned + " ms), " + released + "/" + aiCount + " released")
+        round += 1
+    endWhile
+
+    return failures
+endFunction
+
+state Test_ArrestStress_Burst
+    function Setup()
+        RPB_Prison prison = (RPB_API.GetPrisonManager()).GetPrison("Haafingar")
+        Actor player = Game.GetFormEx(0x14) as Actor
+        Actor guard = RPB_Utility.GetNearestGuard(player, 3000.0, player)
+        bool ok = true
+        bool step = false
+
+        step = assert_true(guard != none, "No guard near the player to perform the arrests (stand near a guard in Solitude)")
+        ok = ok && step
+        if (!guard)
+            display_result(false)
+            return
+        endif
+
+        int failures3 = self.__StressRunBurst(prison, guard, 3)
+        step = assert_true(failures3 == 0, failures3 + " failures in the N=3 burst (arrest, imprison, release, re-arrest)")
+        ok = ok && step
+
+        __TeardownAllTempActors()
+
+        int failures6 = self.__StressRunBurst(prison, guard, 6)
+        step = assert_true(failures6 == 0, failures6 + " failures in the N=6 burst (arrest, imprison, release, re-arrest)")
+        ok = ok && step
+
+        display_result(ok)
+    endFunction
+
+    function Teardown()
+        __TeardownAllTempActors()
     endFunction
 endState
 

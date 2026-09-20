@@ -395,8 +395,7 @@ function RevertArrest()
     self.Remove("Scenario")
     self.Remove("Time of Arrest")
 
-    Utility.Wait(0.5)
-    self.Destroy()
+    self.Destroy() ; no fixed wait: Destroy() stops the escort loop before deleting the state
 endFunction
 
 ; ==========================================================

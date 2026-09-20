@@ -2455,14 +2455,17 @@ event OnPrisonerTeleportedToCell(RPB_Prisoner apPrisoner, bool abImprisonPrisone
         apPrisoner.NPC_BindToCell()
     endif
 
+    RPB_Utility.FlowMark("Teleported: AI + NPC_BindToCell")
     if (!apPrisoner.PrisonerBelongingsContainer)
         self.AssignBelongingsContainer(apPrisoner)
     endif
 
+    RPB_Utility.FlowMark("Teleported: belongings container")
     if (apPrisoner.ShouldBeFrisked)
         apPrisoner.Frisk()
     endif
 
+    RPB_Utility.FlowMark("Teleported: frisk")
     if (apPrisoner.ShouldBeStripped)
         apPrisoner.Strip(abRemoveUnderwear = apPrisoner.WillBeStrippedNaked)
 
@@ -2470,11 +2473,13 @@ event OnPrisonerTeleportedToCell(RPB_Prisoner apPrisoner, bool abImprisonPrisone
         apPrisoner.StripSilently()
     endif
 
+    RPB_Utility.FlowMark("Teleported: strip")
     if (apPrisoner.ShouldBeClothed)
         apPrisoner.DetermineClothingOutfit()
         apPrisoner.Clothe()
     endif
 
+    RPB_Utility.FlowMark("Teleported: clothe")
     if (abImprisonPrisoner)
         apPrisoner.Imprison()
     endif
