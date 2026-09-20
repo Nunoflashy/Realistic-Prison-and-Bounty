@@ -101,6 +101,7 @@ function SetTests()
     self.AddTest("69 - Native Call Census: Which Natives Cost a Frame", "Test_Natives_Census", abChainable = false)
     self.AddTest("70 - ActorBase.Name: Cached Name Equals the Native One", "Test_ActorBase_CachedName", abChainable = false)
     self.AddTest("71 - Utility.GetFormNameCached(): Equals Faction.GetName() and Makes Bounty Reads Cheap", "Test_Utility_FormNameCache", abChainable = false)
+    self.AddTest("72 - Native Cost Probe: Distribution, Back-to-Back, and Parallel Stacks", "Test_Natives_Probe", abChainable = false)
     self.AddTest("41 - ActiveMagicEffectContainer: Stuck Lock Self-Heals", "Test_ActiveMagicEffectContainer_StuckLockSelfHeals")
     self.AddTest("42 - ThreadLock: JAtomic Primitive Semantics and Registry", "Test_ThreadLock_PrimitiveSemantics")
     ; Not chainable: fires concurrent worker threads
@@ -5552,6 +5553,187 @@ state Test_Utility_FormNameCache
     endFunction
 
     function Teardown()
+        __TeardownAllTempActors()
+    endFunction
+endState
+
+
+; ----------------------------------------------------------
+;   Native cost probe (test 72)
+;
+;   Test 69 found every vanilla engine native costs ~one frame (10.5-12.9ms at 90 FPS) while SKSE / JContainers /
+;   Math natives and plain Papyrus do not, but not WHY. This probe answers the questions the census cannot:
+;     1. distribution: is the cost a constant ~1/FPS (structural frame-locking) or variable (contention)?
+;     2. is it per native or per stack resume: do 3 natives back to back cost 3 frames or 1?
+;     3. do parallel stacks pay in parallel (K stacks x M natives ~ M frames) or serialized (K x M frames)?
+;   Every sample is the difference between two consecutive Utility.GetCurrentRealTime() reads (that read is itself
+;   one engine native, so "timer only" is the baseline and the other sequences are read against it).
+; ----------------------------------------------------------
+
+Actor __probeActor
+Actor __probeSinkA
+int __probeSinkI
+bool __probeSinkB
+int __probeMap
+int __probeParallelIterations
+bool[] __probeWorkerDone
+int[] __probeWorkerMs
+
+; ~0.75ms of plain Papyrus per unit
+function __ProbeBusy(int aiUnits)
+    int i = 0
+    while (i < aiUnits)
+        __probeSinkI = self.__Ms(0.0)
+        i += 1
+    endWhile
+endFunction
+
+function __ProbeNatives(int aiMode)
+    if (aiMode == 1)
+        __probeSinkA = Game.GetPlayer()
+    elseif (aiMode == 2)
+        __probeSinkA = Game.GetPlayer()
+        __probeSinkI = __probeActor.GetFormID()
+        __probeSinkB = __probeActor.IsDead()
+    elseif (aiMode == 3)
+        __probeSinkI = StringUtil.GetLength("probe")
+        __probeSinkI = JMap.getInt(__probeMap, "k")
+    elseif (aiMode == 4)
+        self.__ProbeBusy(5)
+    elseif (aiMode == 5)
+        __probeSinkA = Game.GetPlayer()
+        self.__ProbeBusy(5)
+        __probeSinkI = __probeActor.GetFormID()
+        self.__ProbeBusy(5)
+    endif
+endFunction
+
+; One sample per iteration: the time from the previous timer read to this one
+float[] function __ProbeRun(int aiMode, int aiIterations)
+    float[] samples = new float[64]
+    float last = Utility.GetCurrentRealTime()
+    int i = 0
+    while (i < aiIterations && i < 64)
+        self.__ProbeNatives(aiMode)
+        float now = Utility.GetCurrentRealTime()
+        samples[i] = now - last
+        last = now
+        i += 1
+    endWhile
+    return samples
+endFunction
+
+; Insertion sort of the first @aiCount entries
+float[] function __ProbeSorted(float[] akSamples, int aiCount)
+    float[] sorted = new float[64]
+    int i = 0
+    while (i < aiCount)
+        float value = akSamples[i]
+        int j = i - 1
+        while (j >= 0 && sorted[j] > value)
+            sorted[j + 1] = sorted[j]
+            j -= 1
+        endWhile
+        sorted[j + 1] = value
+        i += 1
+    endWhile
+    return sorted
+endFunction
+
+event OnNativeProbeWorker(string asEventName, string asMode, float afWorker, Form akSender)
+    int worker = afWorker as int
+    float t0 = Utility.GetCurrentRealTime()
+    float[] samples = self.__ProbeRun(1, __probeParallelIterations)
+    __probeWorkerMs[worker] = self.__Ms(Utility.GetCurrentRealTime() - t0)
+    __probeWorkerDone[worker] = true
+endEvent
+
+;/
+    See the header above. Logs, per sequence, min / median / max of N consecutive samples in ms:
+      timer only            baseline (one engine native per sample)
+      GetPlayer             + 1 engine native
+      3 engine natives      GetPlayer + GetFormID + IsDead back to back
+      SKSE natives          StringUtil.GetLength + JMap.getInt
+      plain Papyrus ~3.7ms  5 own function calls
+      natives with Papyrus  GetPlayer, ~3.7ms of Papyrus, GetFormID, ~3.7ms of Papyrus
+    then the parallel probe: 1 stack vs 4 stacks each doing M "GetPlayer" samples, wall clock each.
+    Note the FPS overlay when running it; run again at another frame cap / with XPMSE and Nemesis off to compare.
+/;
+state Test_Natives_Probe
+    function Setup()
+        Actor a = __SpawnTempActor()
+        __probeActor = a
+        __probeMap = JMap.object()
+        int N = 40
+
+        string[] labels = new string[6]
+        labels[0] = "timer only (1 engine native per sample)"
+        labels[1] = "timer + Game.GetPlayer()"
+        labels[2] = "timer + 3 engine natives back to back (GetPlayer, GetFormID, IsDead)"
+        labels[3] = "timer + 2 SKSE natives (StringUtil.GetLength, JMap.getInt)"
+        labels[4] = "timer + ~3.7ms of plain Papyrus"
+        labels[5] = "timer + GetPlayer, Papyrus, GetFormID, Papyrus (natives separated by work)"
+
+        float baselineMedian = 0.0
+        int mode = 0
+        while (mode < 6)
+            float[] samples = self.__ProbeRun(mode, N)
+            float[] sorted = self.__ProbeSorted(samples, N)
+            float minMs = sorted[0] * 1000.0
+            float medianMs = sorted[N / 2] * 1000.0
+            float maxMs = sorted[N - 1] * 1000.0
+            if (mode == 0)
+                baselineMedian = medianMs
+            endif
+            log("NATIVE PROBE " + labels[mode] + ": min " + (minMs as int) + " | median " + (medianMs as int) + " | max " + (maxMs as int) + " ms, +" + ((medianMs - baselineMedian) as int) + "ms over timer only (N=" + N + ")")
+            mode += 1
+        endWhile
+
+        ; --- parallel stacks: 1 worker vs 4, each M GetPlayer samples ---
+        __probeParallelIterations = 20
+        self.RegisterForModEvent("RPB_NativeProbe", "OnNativeProbeWorker")
+
+        int[] wall = new int[2]
+        int run = 0
+        while (run < 2)
+            int workers = 1
+            if (run == 1)
+                workers = 4
+            endif
+            __probeWorkerDone = new bool[8]
+            __probeWorkerMs = new int[8]
+
+            float tStart = Utility.GetCurrentRealTime()
+            int w = 0
+            while (w < workers)
+                self.SendModEvent("RPB_NativeProbe", "go", w)
+                w += 1
+            endWhile
+
+            bool allDone = false
+            while (!allDone && (Utility.GetCurrentRealTime() - tStart) < 60.0)
+                Utility.Wait(0.05)
+                allDone = true
+                w = 0
+                while (w < workers)
+                    if (!__probeWorkerDone[w])
+                        allDone = false
+                    endif
+                    w += 1
+                endWhile
+            endWhile
+            wall[run] = self.__Ms(Utility.GetCurrentRealTime() - tStart)
+            log("NATIVE PROBE parallel: " + workers + " stack(s) x " + __probeParallelIterations + " samples of timer + GetPlayer: wall " + wall[run] + "ms | each stack's own time " + __probeWorkerMs[0] + "/" + __probeWorkerMs[1] + "/" + __probeWorkerMs[2] + "/" + __probeWorkerMs[3] + " ms" + self.__StringIf(!allDone, " (NOT all finished)"))
+            run += 1
+        endWhile
+        log("NATIVE PROBE parallel verdict: 1 stack " + wall[0] + "ms vs 4 stacks " + wall[1] + "ms (overlapped ~equal, serialized ~4x)")
+
+        JValue.release(__probeMap)
+        display_result(true)
+    endFunction
+
+    function Teardown()
+        self.UnregisterForModEvent("RPB_NativeProbe")
         __TeardownAllTempActors()
     endFunction
 endState
