@@ -2184,8 +2184,14 @@ function InitializeState()
 
     int errors = RPB_Memory.FastArray("<string>")
 
-    errors = EnsureTrue((WillBeStrippedNaked || WillBeStrippedToUnderwear), "Could not determine the stripping type for Prisoner " + Name, errors)
-    errors = EnsureTrue(TeleportReleaseLocation, "Could not determine the release location for Prisoner " + Name, errors)
+    ; The messages contain the prisoner's name (an engine native), so they are only built when a condition fails
+    if (!(WillBeStrippedNaked || WillBeStrippedToUnderwear))
+        errors = EnsureTrue(false, "Could not determine the stripping type for Prisoner " + Name, errors)
+    endif
+
+    if (!TeleportReleaseLocation)
+        errors = EnsureTrue(false, "Could not determine the release location for Prisoner " + Name, errors)
+    endif
 
     bool hasErrors = RPB_Memory.FastArray_Size(errors) > 0
 

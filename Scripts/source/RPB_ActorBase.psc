@@ -915,6 +915,7 @@ event OnEffectStart(Actor akTarget, Actor akCaster)
     __this = akTarget
     __refKey = ""
     __pathPrefix = ""
+    __cachedName = ""
     __isEffectActive = true
 
     ; Assigns the actor for this script, differentiating between Player and NPC to avoid retrieving properties, instead caching it in a local variable to this script
@@ -1014,8 +1015,19 @@ string function GetExtends()
     return self.GetBaseObject().GetName()
 endFunction
 
+;/
+    The Actor's name, read once. GetBaseObject() and Form.GetName() are engine natives that cost about a frame each
+    (~25ms together at ~90 FPS, test 68) and the name is used in log/error messages all over the mod. An empty name
+    is not cached (it is looked up again), and the cache is reset in OnEffectStart where the Actor is (re)assigned.
+/;
+string __cachedName
+
 string function GetName()
-    return this.GetBaseObject().GetName()
+    if (__cachedName == "")
+        __cachedName = this.GetBaseObject().GetName()
+    endif
+
+    return __cachedName
 endFunction
 
 string function GetIdentifier()

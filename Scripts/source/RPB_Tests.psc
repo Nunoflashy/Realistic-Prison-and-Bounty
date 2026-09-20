@@ -97,6 +97,9 @@ function SetTests()
     self.AddTest("65 - Utility.GetSlotMaskValue(): Closed Form Equals the Original Loop", "Test_Utility_SlotMaskEquivalence", abChainable = false)
     self.AddTest("66 - StorageVars: Cheaper Path/Key Building Equals the Original Byte for Byte", "Test_StorageVars_PathEquivalence", abChainable = false)
     self.AddTest("67 - Prisoner.StrippingThoroughness: Uses the Locked Setting (Bug Fix)", "Test_Prisoner_ThoroughnessUsesLockedSetting", abChainable = false)
+    self.AddTest("68 - Prisoner.Name and Message Building: Cost Breakdown", "Test_Prisoner_NameCostBreakdown", abChainable = false)
+    self.AddTest("69 - Native Call Census: Which Natives Cost a Frame", "Test_Natives_Census", abChainable = false)
+    self.AddTest("70 - ActorBase.Name: Cached Name Equals the Native One", "Test_ActorBase_CachedName", abChainable = false)
     self.AddTest("41 - ActiveMagicEffectContainer: Stuck Lock Self-Heals", "Test_ActiveMagicEffectContainer_StuckLockSelfHeals")
     self.AddTest("42 - ThreadLock: JAtomic Primitive Semantics and Registry", "Test_ThreadLock_PrimitiveSemantics")
     ; Not chainable: fires concurrent worker threads
@@ -3782,8 +3785,12 @@ state Test_Prisoner_InitializeProfile
                 self.__LapEnd(10)
 
                 int errors = RPB_Memory.FastArray("<string>")
-                errors = EnsureTrue((p.WillBeStrippedNaked || p.WillBeStrippedToUnderwear), "Could not determine the stripping type for Prisoner " + p.Name, errors)
-                errors = EnsureTrue(p.TeleportReleaseLocation, "Could not determine the release location for Prisoner " + p.Name, errors)
+                if (!(p.WillBeStrippedNaked || p.WillBeStrippedToUnderwear))
+                    errors = EnsureTrue(false, "Could not determine the stripping type for Prisoner " + p.Name, errors)
+                endif
+                if (!p.TeleportReleaseLocation)
+                    errors = EnsureTrue(false, "Could not determine the release location for Prisoner " + p.Name, errors)
+                endif
                 bool hasErrors = RPB_Memory.FastArray_Size(errors) > 0
                 p.SetBool("Initialized", true)
                 self.__LapEnd(11)
@@ -4981,6 +4988,481 @@ int function __BountyPart(RPB_Prisoner apPrisoner)
     endif
     return 0
 endFunction
+
+
+;/
+    Test 63 left SendError(msg built, condition false) at ~22ms although SendError now returns at once, so the cost
+    is at the call site. "(" + Name + ")" style messages are built all over the mod, and Prisoner.Initialize()'s
+    "error check + SetBool" step (59ms) has two of them. Times, R rounds each, what such a call is made of:
+      p.Name                              property -> GetName() -> this.GetBaseObject().GetName()
+      p.GetName()                         the same without the property call
+      GetBaseObject() alone               one native on the Actor
+      GetBaseObject().GetName()           two natives
+      p.EventManager                      property chain to the EventManager
+      message built from a read name      two concatenations only
+      SendError(prebuilt, caller, false)  the (now early-returning) call itself
+      EnsureTrue(true, msg)               with the message already built
+      the whole thing as production writes it: SendError("..." + p.Name + "...", caller, false)
+    Tests only, nothing in production is changed.
+/;
+state Test_Prisoner_NameCostBreakdown
+    function Setup()
+        RPB_Prison prison = (RPB_API.GetPrisonManager()).GetPrison("Haafingar")
+        Actor a = __SpawnTempActor()
+        RPB_Prisoner p = self.__RegisterPrisonerAndWait(a, prison)
+        if (!p)
+            display_result(assert_true(false, "Prisoner never registered"))
+            return
+        endif
+
+        int R = 20
+        int N = 9
+        string[] names = new string[9]
+        int[] totals = new int[9]
+        names[0] = "p.Name"
+        names[1] = "p.GetName()"
+        names[2] = "Actor.GetBaseObject() alone"
+        names[3] = "Actor.GetBaseObject().GetName()"
+        names[4] = "p.EventManager"
+        names[5] = "message built from an already read name (2 concats)"
+        names[6] = "SendError(prebuilt msg, caller, false)"
+        names[7] = "EnsureTrue(true, prebuilt msg)"
+        names[8] = "production style: SendError(msg + p.Name + ..., caller, false)"
+
+        string sinkS = ""
+        Form sinkF = none
+        RPB_EventManager em = p.EventManager
+        string nm = p.Name
+        string msg = ""
+        int failed = 0
+        int i = 0
+        float t = 0.0
+
+        t = Utility.GetCurrentRealTime()
+        i = 0
+        while (i < R)
+            sinkS = p.Name
+            i += 1
+        endWhile
+        totals[0] = self.__Ms(Utility.GetCurrentRealTime() - t)
+
+        t = Utility.GetCurrentRealTime()
+        i = 0
+        while (i < R)
+            sinkS = p.GetName()
+            i += 1
+        endWhile
+        totals[1] = self.__Ms(Utility.GetCurrentRealTime() - t)
+
+        t = Utility.GetCurrentRealTime()
+        i = 0
+        while (i < R)
+            sinkF = a.GetBaseObject()
+            i += 1
+        endWhile
+        totals[2] = self.__Ms(Utility.GetCurrentRealTime() - t)
+
+        t = Utility.GetCurrentRealTime()
+        i = 0
+        while (i < R)
+            sinkS = a.GetBaseObject().GetName()
+            i += 1
+        endWhile
+        totals[3] = self.__Ms(Utility.GetCurrentRealTime() - t)
+
+        t = Utility.GetCurrentRealTime()
+        i = 0
+        while (i < R)
+            em = p.EventManager
+            i += 1
+        endWhile
+        totals[4] = self.__Ms(Utility.GetCurrentRealTime() - t)
+
+        t = Utility.GetCurrentRealTime()
+        i = 0
+        while (i < R)
+            msg = "Could not determine the release location for Prisoner " + nm
+            i += 1
+        endWhile
+        totals[5] = self.__Ms(Utility.GetCurrentRealTime() - t)
+
+        t = Utility.GetCurrentRealTime()
+        i = 0
+        while (i < R)
+            em.SendError(msg, "(x) Prisoner::DetermineStrippingType", false)
+            i += 1
+        endWhile
+        totals[6] = self.__Ms(Utility.GetCurrentRealTime() - t)
+
+        t = Utility.GetCurrentRealTime()
+        i = 0
+        while (i < R)
+            failed = EnsureTrue(true, msg, failed)
+            i += 1
+        endWhile
+        totals[7] = self.__Ms(Utility.GetCurrentRealTime() - t)
+
+        t = Utility.GetCurrentRealTime()
+        i = 0
+        while (i < R)
+            p.EventManager.SendError("An error has occurred, cannot strip prisoner both naked and to underwear, logic error!", "("+ p.Name +") Prisoner::DetermineStrippingType", false)
+            i += 1
+        endWhile
+        totals[8] = self.__Ms(Utility.GetCurrentRealTime() - t)
+
+        ; --- ranked report ---
+        bool[] printed = new bool[9]
+        int rank = 0
+        while (rank < N)
+            int best = -1
+            int k = 0
+            while (k < N)
+                if (!printed[k] && (best < 0 || totals[k] > totals[best]))
+                    best = k
+                endif
+                k += 1
+            endWhile
+            printed[best] = true
+            log("NAME BREAKDOWN #" + (rank + 1) + ": " + names[best] + " - " + self.__PerOp(totals[best], R) + " per call")
+            rank += 1
+        endWhile
+
+        display_result(true)
+    endFunction
+
+    function Teardown()
+        __TeardownAllTempActors()
+    endFunction
+endState
+
+;/
+    Which natives cost a frame? Test 68 found Actor.GetBaseObject() ~12ms and Form.GetName() ~13ms (about one frame
+    at ~90 FPS) while StringUtil / JContainers / plain Papyrus are sub-millisecond. This times 24 representative
+    calls, R rounds each, ranked, so the "engine natives on game objects cost a frame each" rule rests on a census
+    and not on one pair of natives. The numbers scale with the frame time: note the FPS overlay when running it.
+    Tests only, nothing in production is changed.
+/;
+state Test_Natives_Census
+    function Setup()
+        RPB_Prison prison = (RPB_API.GetPrisonManager()).GetPrison("Haafingar")
+        Actor a = __SpawnTempActor()
+        Actor player = Game.GetPlayer()
+        Form baseObject = a.GetBaseObject()
+        Faction crimeFaction = prison.PrisonFaction
+        Spell prisonerSpell = RPB_Utility.RPB_PrisonerSpell()
+        string sample = "[WIDeadBodyCleanupScript < (FF000E02)>]"
+        int map = JMap.object()
+
+        int R = 20
+        int N = 24
+        string[] names = new string[24]
+        int[] totals = new int[24]
+
+        int sinkI = 0
+        float sinkF = 0.0
+        bool sinkB = false
+        string sinkS = ""
+        Form sinkO = none
+        ActorBase sinkAB = none
+        Cell sinkC = none
+        Actor sinkA = none
+        int i = 0
+        float t = 0.0
+
+        names[0] = "[engine] Actor.GetFormID()"
+        t = Utility.GetCurrentRealTime()
+        i = 0
+        while (i < R)
+            sinkI = a.GetFormID()
+            i += 1
+        endWhile
+        totals[0] = self.__Ms(Utility.GetCurrentRealTime() - t)
+
+        names[1] = "[engine] Actor.GetBaseObject()"
+        t = Utility.GetCurrentRealTime()
+        i = 0
+        while (i < R)
+            sinkO = a.GetBaseObject()
+            i += 1
+        endWhile
+        totals[1] = self.__Ms(Utility.GetCurrentRealTime() - t)
+
+        names[2] = "[engine] Actor.GetActorBase()"
+        t = Utility.GetCurrentRealTime()
+        i = 0
+        while (i < R)
+            sinkAB = a.GetActorBase()
+            i += 1
+        endWhile
+        totals[2] = self.__Ms(Utility.GetCurrentRealTime() - t)
+
+        names[3] = "[engine] Form.GetName() on a read base object"
+        t = Utility.GetCurrentRealTime()
+        i = 0
+        while (i < R)
+            sinkS = baseObject.GetName()
+            i += 1
+        endWhile
+        totals[3] = self.__Ms(Utility.GetCurrentRealTime() - t)
+
+        names[4] = "[engine] Faction.GetName()"
+        t = Utility.GetCurrentRealTime()
+        i = 0
+        while (i < R)
+            sinkS = crimeFaction.GetName()
+            i += 1
+        endWhile
+        totals[4] = self.__Ms(Utility.GetCurrentRealTime() - t)
+
+        names[5] = "[engine] Actor.GetWornForm(slot)"
+        t = Utility.GetCurrentRealTime()
+        i = 0
+        while (i < R)
+            sinkO = a.GetWornForm(0x00000004)
+            i += 1
+        endWhile
+        totals[5] = self.__Ms(Utility.GetCurrentRealTime() - t)
+
+        names[6] = "[engine] Actor.HasSpell(spell)"
+        t = Utility.GetCurrentRealTime()
+        i = 0
+        while (i < R)
+            sinkB = a.HasSpell(prisonerSpell)
+            i += 1
+        endWhile
+        totals[6] = self.__Ms(Utility.GetCurrentRealTime() - t)
+
+        names[7] = "[engine] Actor.IsDead()"
+        t = Utility.GetCurrentRealTime()
+        i = 0
+        while (i < R)
+            sinkB = a.IsDead()
+            i += 1
+        endWhile
+        totals[7] = self.__Ms(Utility.GetCurrentRealTime() - t)
+
+        names[8] = "[engine] Actor.Is3DLoaded()"
+        t = Utility.GetCurrentRealTime()
+        i = 0
+        while (i < R)
+            sinkB = a.Is3DLoaded()
+            i += 1
+        endWhile
+        totals[8] = self.__Ms(Utility.GetCurrentRealTime() - t)
+
+        names[9] = "[engine] Actor.IsEnabled()"
+        t = Utility.GetCurrentRealTime()
+        i = 0
+        while (i < R)
+            sinkB = a.IsEnabled()
+            i += 1
+        endWhile
+        totals[9] = self.__Ms(Utility.GetCurrentRealTime() - t)
+
+        names[10] = "[engine] Actor.GetLevel()"
+        t = Utility.GetCurrentRealTime()
+        i = 0
+        while (i < R)
+            sinkI = a.GetLevel()
+            i += 1
+        endWhile
+        totals[10] = self.__Ms(Utility.GetCurrentRealTime() - t)
+
+        names[11] = "[engine] Actor.GetParentCell()"
+        t = Utility.GetCurrentRealTime()
+        i = 0
+        while (i < R)
+            sinkC = a.GetParentCell()
+            i += 1
+        endWhile
+        totals[11] = self.__Ms(Utility.GetCurrentRealTime() - t)
+
+        names[12] = "[engine] ObjectReference.GetPositionX()"
+        t = Utility.GetCurrentRealTime()
+        i = 0
+        while (i < R)
+            sinkF = a.GetPositionX()
+            i += 1
+        endWhile
+        totals[12] = self.__Ms(Utility.GetCurrentRealTime() - t)
+
+        names[13] = "[engine] Actor.GetDistance(player)"
+        t = Utility.GetCurrentRealTime()
+        i = 0
+        while (i < R)
+            sinkF = a.GetDistance(player)
+            i += 1
+        endWhile
+        totals[13] = self.__Ms(Utility.GetCurrentRealTime() - t)
+
+        names[14] = "[engine] Game.GetPlayer()"
+        t = Utility.GetCurrentRealTime()
+        i = 0
+        while (i < R)
+            sinkA = Game.GetPlayer()
+            i += 1
+        endWhile
+        totals[14] = self.__Ms(Utility.GetCurrentRealTime() - t)
+
+        names[15] = "[engine] Utility.GetCurrentGameTime()"
+        t = Utility.GetCurrentRealTime()
+        i = 0
+        while (i < R)
+            sinkF = Utility.GetCurrentGameTime()
+            i += 1
+        endWhile
+        totals[15] = self.__Ms(Utility.GetCurrentRealTime() - t)
+
+        names[16] = "[engine] Utility.GetCurrentRealTime()"
+        t = Utility.GetCurrentRealTime()
+        i = 0
+        while (i < R)
+            sinkF = Utility.GetCurrentRealTime()
+            i += 1
+        endWhile
+        totals[16] = self.__Ms(Utility.GetCurrentRealTime() - t)
+
+        names[17] = "[SKSE] StringUtil.GetLength()"
+        t = Utility.GetCurrentRealTime()
+        i = 0
+        while (i < R)
+            sinkI = StringUtil.GetLength(sample)
+            i += 1
+        endWhile
+        totals[17] = self.__Ms(Utility.GetCurrentRealTime() - t)
+
+        names[18] = "[SKSE] StringUtil.Substring()"
+        t = Utility.GetCurrentRealTime()
+        i = 0
+        while (i < R)
+            sinkS = StringUtil.Substring(sample, 2, 5)
+            i += 1
+        endWhile
+        totals[18] = self.__Ms(Utility.GetCurrentRealTime() - t)
+
+        names[19] = "[Papyrus] Math.LeftShift()"
+        t = Utility.GetCurrentRealTime()
+        i = 0
+        while (i < R)
+            sinkI = Math.LeftShift(1, 5)
+            i += 1
+        endWhile
+        totals[19] = self.__Ms(Utility.GetCurrentRealTime() - t)
+
+        names[20] = "[JC] JMap.getInt()"
+        t = Utility.GetCurrentRealTime()
+        i = 0
+        while (i < R)
+            sinkI = JMap.getInt(map, "k")
+            i += 1
+        endWhile
+        totals[20] = self.__Ms(Utility.GetCurrentRealTime() - t)
+
+        names[21] = "[JC] JMap.setInt()"
+        t = Utility.GetCurrentRealTime()
+        i = 0
+        while (i < R)
+            JMap.setInt(map, "k", 1)
+            i += 1
+        endWhile
+        totals[21] = self.__Ms(Utility.GetCurrentRealTime() - t)
+
+        names[22] = "[JC] JDB.solveInt(path)"
+        t = Utility.GetCurrentRealTime()
+        i = 0
+        while (i < R)
+            sinkI = JDB.solveInt(".rpb_root.storage.census")
+            i += 1
+        endWhile
+        totals[22] = self.__Ms(Utility.GetCurrentRealTime() - t)
+
+        names[23] = "[Papyrus] trivial own function call (baseline)"
+        t = Utility.GetCurrentRealTime()
+        i = 0
+        while (i < R)
+            sinkI = self.__Ms(0.0)
+            i += 1
+        endWhile
+        totals[23] = self.__Ms(Utility.GetCurrentRealTime() - t)
+
+        JValue.release(map)
+
+        ; --- ranked report ---
+        bool[] printed = new bool[24]
+        int rank = 0
+        while (rank < N)
+            int best = -1
+            int k = 0
+            while (k < N)
+                if (!printed[k] && (best < 0 || totals[k] > totals[best]))
+                    best = k
+                endif
+                k += 1
+            endWhile
+            printed[best] = true
+            log("NATIVE CENSUS #" + (rank + 1) + ": " + names[best] + " - " + self.__PerOp(totals[best], R) + " per call")
+            rank += 1
+        endWhile
+
+        display_result(true)
+    endFunction
+
+    function Teardown()
+        __TeardownAllTempActors()
+    endFunction
+endState
+
+
+;/
+    ActorBase.GetName() now caches the name (GetBaseObject() + GetName() are ~25ms of engine natives). The cached
+    value must equal the native one, the second read must be much cheaper than the first, and every registered kind
+    (prisoner, arrestee, captor) must return the same name for the same actor.
+/;
+state Test_ActorBase_CachedName
+    function Setup()
+        RPB_Prison prison = (RPB_API.GetPrisonManager()).GetPrison("Haafingar")
+        bool ok = true
+        bool step = false
+
+        Actor a = __SpawnTempActor()
+        RPB_Prisoner p = self.__RegisterPrisonerAndWait(a, prison)
+        if (!p)
+            display_result(assert_true(false, "Prisoner never registered"))
+            return
+        endif
+
+        string nativeName = a.GetBaseObject().GetName()
+
+        float t = Utility.GetCurrentRealTime()
+        string first = p.Name
+        int msFirst = self.__Ms(Utility.GetCurrentRealTime() - t)
+
+        t = Utility.GetCurrentRealTime()
+        string second = ""
+        int i = 0
+        while (i < 20)
+            second = p.Name
+            i += 1
+        endWhile
+        int msCached = self.__Ms(Utility.GetCurrentRealTime() - t)
+
+        step = assert_true(first == nativeName, "First read '" + first + "' differs from the nativeName name '" + nativeName + "'")
+        ok = ok && step
+        step = assert_true(second == nativeName, "Cached read '" + second + "' differs from the nativeName name '" + nativeName + "'")
+        ok = ok && step
+        step = assert_true(p.GetName() == nativeName, "GetName() differs from the nativeName name")
+        ok = ok && step
+        step = assert_true(nativeName != "", "The dummy has no name, cannot prove anything")
+        ok = ok && step
+        log("CACHED NAME '" + nativeName + "' | first read (may already be cached by registration) " + msFirst + "ms | 20 cached reads " + msCached + "ms")
+
+        display_result(ok)
+    endFunction
+
+    function Teardown()
+        __TeardownAllTempActors()
+    endFunction
+endState
 
 ;/
     A failed imprisonment ("Assign Cell") used to unregister the prisoner without Destroy(), leaving its
