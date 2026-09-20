@@ -102,6 +102,7 @@ function SetTests()
     self.AddTest("70 - ActorBase.Name: Cached Name Equals the Native One", "Test_ActorBase_CachedName", abChainable = false)
     self.AddTest("71 - Utility.GetFormNameCached(): Equals Faction.GetName() and Makes Bounty Reads Cheap", "Test_Utility_FormNameCache", abChainable = false)
     self.AddTest("72 - Native Cost Probe: Distribution, Back-to-Back, and Parallel Stacks", "Test_Natives_Probe", abChainable = false)
+    self.AddTest("73 - MCM: Every Option Default Exists Without Visiting an MCM Page (New Save)", "Test_MCM_DefaultsWithoutPageVisit", abChainable = false)
     self.AddTest("41 - ActiveMagicEffectContainer: Stuck Lock Self-Heals", "Test_ActiveMagicEffectContainer_StuckLockSelfHeals")
     self.AddTest("42 - ThreadLock: JAtomic Primitive Semantics and Registry", "Test_ThreadLock_PrimitiveSemantics")
     ; Not chainable: fires concurrent worker threads
@@ -5735,6 +5736,102 @@ state Test_Natives_Probe
     function Teardown()
         self.UnregisterForModEvent("RPB_NativeProbe")
         __TeardownAllTempActors()
+    endFunction
+endState
+
+
+;/
+    New-save bug: option defaults were only registered when an MCM page rendered, so on a new game every setting
+    read 0 / false / "" (a prisoner got no sentence) until the Haafingar page had been opened. EnsureAllOptionDefaults()
+    registers the mcm.json defaults of every config shape at setup / game load / OnConfigInit. Proof:
+      1. every registered default is forgotten (DebugClearOptionDefaults): "Jail::Minimum Sentence" and
+         "Jail::Bounty to Sentence" read 0, like on a new game before any page is opened;
+      2. EnsureAllOptionDefaults() with no page visited: every option in mcm.json that has a "Default" (bool, number
+         or string) has exactly that default again, the two sentence options read their JSON value, and the outfit
+         names (hardcoded defaults) are back;
+      3. a second call changes nothing (same settings version, and much cheaper).
+    The defaults are deterministic (they come from mcm.json), so the live save ends in the same state as before.
+/;
+state Test_MCM_DefaultsWithoutPageVisit
+    function Setup()
+        RPB_Prison prison = (RPB_API.GetPrisonManager()).GetPrison("Haafingar")
+        RPB_MCM mcm = prison.Config.MCM
+        bool ok = true
+        bool step = false
+
+        int optionsObj = RPB_Data.MCM_GetOptionObject()
+        string[] shapes = JMap.allKeysPArray(optionsObj)
+        log("MCM DEFAULTS config shapes in mcm.json: " + shapes.Length)
+
+        ; 1. Forget every default: a new game before any page is opened
+        mcm.DebugClearOptionDefaults()
+        step = assert_true(mcm.GetOptionDefaultFloat("Jail::Minimum Sentence") == 0.0 && mcm.GetOptionDefaultFloat("Jail::Bounty to Sentence") == 0.0, "The defaults were not cleared")
+        ok = ok && step
+
+        ; 2. Register them without visiting any page
+        float t = Utility.GetCurrentRealTime()
+        mcm.EnsureAllOptionDefaults()
+        int msEnsure = self.__Ms(Utility.GetCurrentRealTime() - t)
+
+        int checked = 0
+        int wrong = 0
+        int s = 0
+        while (s < shapes.Length)
+            int pageObj = JMap.getObj(optionsObj, shapes[s])
+            string[] optionKeys = JMap.allKeysPArray(pageObj)
+            int o = 0
+            while (o < optionKeys.Length)
+                int optionMap = JMap.getObj(pageObj, optionKeys[o])
+
+                if (JMap.hasKey(optionMap, "Default"))
+                    int defaultType = JMap.valueType(optionMap, "Default")
+                    bool matches = true
+
+                    if (defaultType == 2 && mcm.IsPropertyValueOfTypeBool(optionMap, "Default"))
+                        matches = mcm.GetOptionDefaultBool(optionKeys[o]) == (JMap.getInt(optionMap, "Default") as bool)
+                    elseif (defaultType == 2 || defaultType == 3)
+                        matches = mcm.GetOptionDefaultFloat(optionKeys[o]) == JMap.getFlt(optionMap, "Default")
+                    elseif (defaultType == 6)
+                        matches = mcm.GetOptionDefaultString(optionKeys[o]) == JMap.getStr(optionMap, "Default")
+                    endif
+
+                    checked += 1
+                    if (!matches)
+                        wrong += 1
+                        if (wrong <= 5)
+                            log("MCM DEFAULTS missing or different: " + shapes[s] + " / " + optionKeys[o])
+                        endif
+                    endif
+                endif
+                o += 1
+            endWhile
+            s += 1
+        endWhile
+
+        step = assert_true(checked >= 50, "Only " + checked + " defaults were found in mcm.json, expected many more")
+        ok = ok && step
+        step = assert_true(wrong == 0, wrong + " of " + checked + " defaults are missing or different after EnsureAllOptionDefaults() without visiting a page")
+        ok = ok && step
+
+        float jsonMinimumSentence = JMap.getFlt(JMap.getObj(JMap.getObj(optionsObj, "Hold"), "Jail::Minimum Sentence"), "Default")
+        float jsonBountyToSentence = JMap.getFlt(JMap.getObj(JMap.getObj(optionsObj, "Hold"), "Jail::Bounty to Sentence"), "Default")
+        step = assert_true(mcm.GetOptionDefaultFloat("Jail::Minimum Sentence") == jsonMinimumSentence && jsonMinimumSentence > 0.0, "Jail::Minimum Sentence default is " + mcm.GetOptionDefaultFloat("Jail::Minimum Sentence") + ", expected " + jsonMinimumSentence)
+        ok = ok && step
+        step = assert_true(mcm.GetOptionDefaultFloat("Jail::Bounty to Sentence") == jsonBountyToSentence && jsonBountyToSentence > 0.0, "Jail::Bounty to Sentence default is " + mcm.GetOptionDefaultFloat("Jail::Bounty to Sentence") + ", expected " + jsonBountyToSentence)
+        ok = ok && step
+        step = assert_true(mcm.GetOptionDefaultString("Outfit 1::Name") == "Outfit 1", "The hardcoded outfit name defaults were not restored")
+        ok = ok && step
+
+        ; 3. A second call changes nothing and is much cheaper
+        int versionBefore = mcm.GetSettingsVersion(prison.Hold)
+        t = Utility.GetCurrentRealTime()
+        mcm.EnsureAllOptionDefaults()
+        int msSecond = self.__Ms(Utility.GetCurrentRealTime() - t)
+        step = assert_true(mcm.GetSettingsVersion(prison.Hold) == versionBefore, "A second EnsureAllOptionDefaults() changed the settings version")
+        ok = ok && step
+
+        log("MCM DEFAULTS " + checked + " defaults checked across " + shapes.Length + " shapes, " + wrong + " wrong | first Ensure " + msEnsure + "ms, second (nothing to do) " + msSecond + "ms | Jail::Minimum Sentence " + mcm.GetOptionDefaultFloat("Jail::Minimum Sentence") + ", Jail::Bounty to Sentence " + mcm.GetOptionDefaultFloat("Jail::Bounty to Sentence"))
+        display_result(ok)
     endFunction
 endState
 

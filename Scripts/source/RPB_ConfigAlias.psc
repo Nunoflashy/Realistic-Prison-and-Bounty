@@ -40,6 +40,7 @@ RPB_EventManager property EventManager
 endProperty
 
 function PerformSetup()
+    API.MCM.EnsureAllOptionDefaults() ; settings must not depend on an MCM page having been visited
     EventManager.RegisterEvents()
     PrisonManager.InitializePrisons()
     SceneManager.SceneManager()
@@ -63,6 +64,7 @@ function PerformSetup()
 endFunction
 
 function PerformMaintenance()
+    API.MCM.EnsureAllOptionDefaults() ; repairs saves that never visited every page
     EventManager.RegisterEvents()
     SceneManager.SceneManager()
     PrisonManager.VerifyIntegrity()

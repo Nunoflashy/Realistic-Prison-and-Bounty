@@ -362,14 +362,65 @@ function RefreshOptionDefaultsForCurrentPage()
         return
     endif
 
-    int optionsObj       = RPB_Data.MCM_GetOptionObject() ; loaded once, not once per bucket
-    string[] optionKeys  = self.GetBucketOptionKeys(CurrentPage, optionsObj)
+    self.__RegisterDefaultsForShape(configKey, RPB_Data.MCM_GetOptionObject()) ; loaded once, not once per bucket
+endFunction
+
+;/
+    Registers the mcm.json defaults of EVERY config shape (General, Hold, Clothing, Skills, ...), not only the current
+    page's. Defaults used to exist only for pages that had been rendered, so on a new game (or an old save that never
+    opened a page) every setting read as 0 / false / "" until the matching MCM page was visited: a prisoner got no
+    sentence, for one. Called from OnConfigInit, the mod's first-time setup and every game load (RPB_ConfigAlias). It is
+    idempotent and cheap when nothing changed: a shape is skipped when it was already registered with the same number
+    of options (so options added by a mod update are picked up on the next load).
+/;
+function EnsureAllOptionDefaults()
+    self.MCM() ; the option maps must exist
+
+    if (!__warmedDefaultShapes)
+        __warmedDefaultShapes = FastMap("<string>", retain = true)
+    endif
+
+    int optionsObj = RPB_Data.MCM_GetOptionObject() ; one read of mcm.json for every shape
+
+    if (!optionsObj)
+        return
+    endif
+
+    string[] configKeys = FastMap_KeysAsPapyrusArray(optionsObj)
+
+    int i = 0
+    while (i < configKeys.Length)
+        int pageObj = FastMap_GetObject(optionsObj, configKeys[i])
+
+        if (pageObj && FastMap_GetInt(__warmedDefaultShapes, configKeys[i]) != FastMap_Size(pageObj))
+            self.__RegisterDefaultsForShape(configKeys[i], optionsObj)
+        endif
+
+        i += 1
+    endWhile
+
+    ; The hardcoded defaults are bumping the settings version on every write: only register them when missing
+    if (!FastMap_HasKey(optionsDefaultValueMap, "Outfit 1::Name"))
+        self.SetHardcodedDefaults()
+    endif
+endFunction
+
+;/
+    Registers every option default of one mcm.json config shape (@asConfigKey) and records the shape as warmed
+    (with its option count).
+/;
+function __RegisterDefaultsForShape(string asConfigKey, int aiOptionsObj)
+    int pageObj = FastMap_GetObject(aiOptionsObj, asConfigKey)
+
+    if (!pageObj)
+        return
+    endif
+
+    string[] optionKeys = FastMap_KeysAsPapyrusArray(pageObj)
 
     if (!optionKeys)
         return
     endif
-
-    int pageObj = FastMap_GetObject(optionsObj, configKey)
 
     int i = 0
     while (i < optionKeys.Length)
@@ -393,7 +444,21 @@ function RefreshOptionDefaultsForCurrentPage()
         i += 1
     endWhile
 
-    FastMap_SetInt(__warmedDefaultShapes, configKey, 1)
+    FastMap_SetInt(__warmedDefaultShapes, asConfigKey, FastMap_Size(pageObj))
+endFunction
+
+;/
+    Test hook: forgets every registered default and which shapes were warmed, so a test can prove
+    EnsureAllOptionDefaults() rebuilds them without any page being visited.
+/;
+function DebugClearOptionDefaults()
+    FastMap_Clear(optionsDefaultValueMap)
+
+    if (__warmedDefaultShapes)
+        FastMap_Clear(__warmedDefaultShapes)
+    endif
+
+    __globalSettingsVersion += 1
 endFunction
 
 ;/
@@ -1507,6 +1572,7 @@ event OnConfigInit()
     self.InitializeOptions()
     self.RegisterEvents()
     self.LoadDefaults()
+    self.EnsureAllOptionDefaults()
 endEvent
 
 event OnConfigOpen()
@@ -3031,6 +3097,7 @@ endFunction
 /;
 function SetOptionDefaultBool(string optionKey, bool value)
     FastMap_SetInt(optionsDefaultValueMap, optionKey, value as int)
+    __globalSettingsVersion += 1
 endFunction
 
 ;/
@@ -3041,6 +3108,7 @@ endFunction
 /;
 function SetOptionDefaultInt(string optionKey, int value)
     FastMap_SetInt(optionsDefaultValueMap, optionKey, value)
+    __globalSettingsVersion += 1
 endFunction
 
 ;/
@@ -3051,6 +3119,7 @@ endFunction
 /;
 function SetOptionDefaultFloat(string optionKey, float value)
     FastMap_SetFloat(optionsDefaultValueMap, optionKey, value)
+    __globalSettingsVersion += 1
 endFunction
 ;/
     Sets the default value of a string option.
@@ -3060,6 +3129,7 @@ endFunction
 /;
 function SetOptionDefaultString(string optionKey, string value)
     FastMap_SetString(optionsDefaultValueMap, optionKey, value)
+    __globalSettingsVersion += 1
 endFunction
 
 ;/
