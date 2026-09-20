@@ -2203,7 +2203,9 @@ bool function AssignCell(RPB_Prisoner apPrisoner)
         return true
     endif
 
+    RPB_Utility.FlowMark("AssignCell: start")
     RPB_JailCell assignedCell = self.RequestCell(apPrisoner)
+    RPB_Utility.FlowMark("AssignCell: RequestCell")
     ; RPB_JailCell assignedCell = GetFormFromMod(0x388D) as RPB_JaiLCell
 
 
@@ -2750,8 +2752,11 @@ bool function BindCellToPrisoner(ObjectReference akJailCell, RPB_Prisoner apPris
     endif
 
     ; Register the prisoner into the cell
+    RPB_Utility.FlowMark("Bind: init/ScanCellDoor")
     jailCell.RegisterPrisoner(apPrisoner)
+    RPB_Utility.FlowMark("Bind: RegisterPrisoner")
     jailCell.DetermineGoodies()
+    RPB_Utility.FlowMark("Bind: DetermineGoodies")
 
     return true
 endFunction

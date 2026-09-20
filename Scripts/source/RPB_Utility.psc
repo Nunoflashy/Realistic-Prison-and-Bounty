@@ -137,7 +137,7 @@ bool function IsTracingEnabled() global
 endFunction
 
 bool function IsDebuggingEnabled() global
-    return RPB_StorageVars.GetBool("DEBUG", "Log", true)
+    return RPB_StorageVars.GetBool("DEBUG", "Log", false) ; OFF by default: every passing Debug() line costs a frame (~370 ms per imprisonment)
 endFunction
 
 bool function IsLoggingEnabled() global

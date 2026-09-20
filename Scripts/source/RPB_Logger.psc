@@ -32,7 +32,7 @@ endProperty
 
 bool property Debugging
     bool function get()
-        return RPB_StorageVars.GetBool("DEBUG", "Log", true)
+        return RPB_StorageVars.GetBool("DEBUG", "Log", false) ; must match RPB_Utility.IsDebuggingEnabled()
     endFunction
 
     function set(bool value)

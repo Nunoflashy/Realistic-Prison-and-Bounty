@@ -661,8 +661,10 @@ endEvent
 
 function Destroy()
     ; Unset all properties related to this Arrestee
+    ; Stop the escort loop first (OnUpdate reads the Captor, which RemoveAll deletes). This used to be a blind
+    ; Utility.Wait(0.5) between RemoveAll and UnregisterArrestee, which blocked every imprisonment for half a second.
+    UnregisterForUpdate()
     self.RemoveAll()
-    Utility.Wait(0.5)
     Arrest.UnregisterArrestee(self)
 endFunction
 

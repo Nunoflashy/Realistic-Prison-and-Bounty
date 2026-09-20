@@ -679,9 +679,12 @@ state Imprisoned
 
         ; At this point, we can delete the prisoner's arrest state
         self.DestroyArrestState()
+        RPB_Utility.FlowMark("Imprisoned: DestroyArrestState")
 
         self.RegisterLastUpdate()
+        RPB_Utility.FlowMark("Imprisoned: RegisterLastUpdate")
         RegisterForUpdateGameTime(1.0)
+        RPB_Utility.FlowMark("Imprisoned: RegisterForUpdateGameTime")
         SetBool("Imprisoned", true)
     endEvent
 
@@ -1506,12 +1509,20 @@ endFunction
 ; ==========================================================
 
 function RegisterTimeOfImprisonment()
-    SetFloat("Time of Imprisonment", CurrentTime)
-    SetInt("Minute of Imprisonment", RPB_Utility.GetCurrentMinute())
+    RPB_Utility.FlowMark("RTI: start")
+    float rtiNow = CurrentTime
+    RPB_Utility.FlowMark("RTI: CurrentTime read")
+    SetFloat("Time of Imprisonment", rtiNow)
+    RPB_Utility.FlowMark("RTI: SetFloat")
+    int rtiMinute = RPB_Utility.GetCurrentMinute()
+    RPB_Utility.FlowMark("RTI: GetCurrentMinute")
+    SetInt("Minute of Imprisonment", rtiMinute)
+    RPB_Utility.FlowMark("RTI: SetInt minute")
     SetInt("Hour of Imprisonment", RPB_Utility.GetCurrentHour())
     SetInt("Day of Imprisonment", RPB_Utility.GetCurrentDay())
     SetInt("Month of Imprisonment", RPB_Utility.GetCurrentMonth())
     SetInt("Year of Imprisonment", RPB_Utility.GetCurrentYear())
+    RPB_Utility.FlowMark("RTI: hour+day+month+year done")
 endFunction
 
 function UndetermineSentence()
@@ -2228,8 +2239,11 @@ function DestroyArrestState()
         return
     endif
 
+    RPB_Utility.FlowMark("DestroyArrestState: IsActorArrested")
     RPB_Arrestee arrestState = RPB_Arrestee.GetStateForPrisoner(self)
+    RPB_Utility.FlowMark("DestroyArrestState: GetStateForPrisoner")
     arrestState.Destroy()
+    RPB_Utility.FlowMark("DestroyArrestState: Arrestee.Destroy")
 endFunction
 
 ;                         Management
