@@ -567,8 +567,8 @@ bool function AssignPrisonHoldProperties(RPB_Prison apPrison, string asHold, int
     endif
 
     apPrison.SetLocalPropertyOfTypeString("Hold", asHold)
-    apPrison.ResetCachedHold()
     apPrison.SetLocalPropertyOfTypeForm("Crime Faction", crimeFaction)
+    apPrison.ResetCachedHold()
 
     return true
 endFunction

@@ -1852,17 +1852,13 @@ int function GetSlotMask(string bodyPart) global
 endFunction
 
 int function GetSlotMaskValue(int slotMask) global
-    int currentSlotMask = 30
-    int slotMaskValue = 0x00000001
-    while (currentSlotMask <= 61)
-        if (slotMask == currentSlotMask)
-            return slotMaskValue
-        endif
-        currentSlotMask += 1
-        slotMaskValue *= 2 ; Get next slot mask by doubling the value
-    endWhile
+    ; 2^(slot - 30): slot 30 -> 0x1 ... slot 61 -> 0x80000000 (wraps to a negative int, as repeated doubling did).
+    ; This used to loop up to 32 times (~0.35ms per iteration); -1 for slots outside 30..61 as before.
+    if (slotMask < 30 || slotMask > 61)
+        return -1
+    endif
 
-    return -1
+    return Math.LeftShift(1, slotMask - 30)
 endFunction
 
 string function YesNo(bool abValue) global

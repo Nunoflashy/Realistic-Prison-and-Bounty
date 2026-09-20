@@ -202,9 +202,16 @@ Location property PrisonLocation
 endProperty
 
 
+; Constant per Prison, and read by every Bounty/Infamy access: the StorageVars read (~4ms) is cached like Hold
+Faction __cachedPrisonFaction
+
 Faction property PrisonFaction
     Faction function get()
-        return self.GetLocalPropertyOfTypeForm("Crime Faction") as Faction
+        if (!__cachedPrisonFaction)
+            __cachedPrisonFaction = self.GetLocalPropertyOfTypeForm("Crime Faction") as Faction
+        endif
+
+        return __cachedPrisonFaction
     endFunction
 endProperty
 
@@ -223,10 +230,11 @@ string property Hold
 endProperty
 
 ;/
-    Forgets the cached Hold, to be called after the "Hold" local property is (re)written.
+    Forgets the cached Hold and Crime Faction, to be called after those local properties are (re)written.
 /;
 function ResetCachedHold()
     __cachedHold = ""
+    __cachedPrisonFaction = none
 endFunction
 
 string property City

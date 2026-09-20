@@ -220,10 +220,15 @@ string function GetVarPathOnReference(string asKey, string apReference, string a
         return "null"
     endif
 
-    ; Cheap first-character check before the full one, so an already-normalized key ("(Reference <id>)") skips it
+    ; A Papyrus reference string ("[Script < (ID)>]", first and last characters) is normalized to "(Reference <ID>)";
+    ; an already-normalized key or any other string is used as is. Inlined (instead of String_StartsEndsWith +
+    ; ExtractReferenceID): the same checks with half the native calls and no helper calls; the ID is the 8 characters
+    ; before the trailing ")>]".
     bool isPapyrusReference = false
+    int referenceLength = 0
     if (StringUtil.GetNthChar(apReference, 0) == "[")
-        isPapyrusReference = String_StartsEndsWith(apReference, "[", "]")
+        referenceLength = StringUtil.GetLength(apReference)
+        isPapyrusReference = StringUtil.GetNthChar(apReference, referenceLength - 1) == "]"
     endif
 
     if (isPapyrusReference)
@@ -238,7 +243,7 @@ string function GetVarPathOnReference(string asKey, string apReference, string a
              so if it is cast when being passed, it will retrieve the correct data.
         /;
         ; string referenceType    = ExtractReferenceType(apReference)
-        string referenceId      = ExtractReferenceID(apReference)
+        string referenceId      = StringUtil.Substring(apReference, referenceLength - 11, 8)
         ; apReference = "(" + referenceType + " <" + referenceId + ">" + ")"
         ; apReference = "Form <" + GetFormFromString(apReference).GetFormID() + ">"
 
@@ -251,7 +256,7 @@ string function GetVarPathOnReference(string asKey, string apReference, string a
                 Now, no matter which type of reference is passed, the ID will always be valid
                 and the type Reference.
         /;
-        apReference = "(" + "Reference" + " <" + referenceId + ">" + ")"
+        apReference = "(Reference <" + referenceId + ">)"
     endif
 
     if (asCategory != "null" && asCategory != "")
@@ -273,8 +278,9 @@ string function GetReferenceKey(string apReference) global
     endif
 
     if (StringUtil.GetNthChar(apReference, 0) == "[")
-        if (String_StartsEndsWith(apReference, "[", "]"))
-            return "(" + "Reference" + " <" + ExtractReferenceID(apReference) + ">" + ")"
+        int referenceLength = StringUtil.GetLength(apReference)
+        if (StringUtil.GetNthChar(apReference, referenceLength - 1) == "]")
+            return "(Reference <" + StringUtil.Substring(apReference, referenceLength - 11, 8) + ">)"
         endif
     endif
 

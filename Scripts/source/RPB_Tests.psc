@@ -92,6 +92,11 @@ function SetTests()
     self.AddTest("60 - Prison Settings Snapshot: An MCM Change Invalidates It, Earlier Prisoners Keep Their Values", "Test_SettingsSnapshot_McmChange", abChainable = false)
     self.AddTest("61 - Prison Settings Snapshot: A Prisoner Gets the Snapshot's Data, Not a Recomputation", "Test_SettingsSnapshot_ComesFromSnapshot", abChainable = false)
     self.AddTest("62 - Prison Settings Snapshot: Per-Hold Versions (Another Hold Does Not Invalidate It)", "Test_SettingsSnapshot_PerHoldVersion", abChainable = false)
+    self.AddTest("63 - Prisoner.DetermineStrippingType(): Cost Breakdown", "Test_Prisoner_StrippingTypeBreakdown", abChainable = false)
+    self.AddTest("64 - Prisoner.DetermineStrippingType(): Decision Table and New Equals the Original", "Test_Prisoner_StrippingTypeEquivalence", abChainable = false)
+    self.AddTest("65 - Utility.GetSlotMaskValue(): Closed Form Equals the Original Loop", "Test_Utility_SlotMaskEquivalence", abChainable = false)
+    self.AddTest("66 - StorageVars: Cheaper Path/Key Building Equals the Original Byte for Byte", "Test_StorageVars_PathEquivalence", abChainable = false)
+    self.AddTest("67 - Prisoner.StrippingThoroughness: Uses the Locked Setting (Bug Fix)", "Test_Prisoner_ThoroughnessUsesLockedSetting", abChainable = false)
     self.AddTest("41 - ActiveMagicEffectContainer: Stuck Lock Self-Heals", "Test_ActiveMagicEffectContainer_StuckLockSelfHeals")
     self.AddTest("42 - ThreadLock: JAtomic Primitive Semantics and Registry", "Test_ThreadLock_PrimitiveSemantics")
     ; Not chainable: fires concurrent worker threads
@@ -4526,6 +4531,456 @@ state Test_SettingsSnapshot_PerHoldVersion
         __TeardownAllTempActors()
     endFunction
 endState
+
+
+;/
+    DetermineStrippingType() is ~119ms of Prisoner.Initialize(). Times each thing it does on its own (R rounds each,
+    the timer is coarse) and the whole function, and prints them ranked:
+      HasUnderwear()                          two GetUnderwear calls, each reads a Config slot from the MCM
+      Config.HasNudeBodyModInstalled          MCM read (always evaluated: Papyrus && / || do not short-circuit)
+      Config.HasUnderwearBodyModInstalled     MCM read (same)
+      StrippingThoroughness                   read TWICE by the function (Prison modifier + StorageVars + Bounty)
+      Bounty                                  Prisoner.Bounty -> GetLatentBounty()
+      Prison.StrippingThoroughnessModifier    MCM read chain
+      SendError(..., false)                   the message string is built even when the condition is false
+      DetermineStrippingType() (whole)
+    Tests only, nothing in production is changed.
+/;
+state Test_Prisoner_StrippingTypeBreakdown
+    function Setup()
+        RPB_Prison prison = (RPB_API.GetPrisonManager()).GetPrison("Haafingar")
+        Actor a = __SpawnTempActor()
+        RPB_Prisoner p = self.__RegisterPrisonerAndWait(a, prison)
+        if (!p)
+            display_result(assert_true(false, "Prisoner never registered"))
+            return
+        endif
+
+        ; Same state Initialize() has when it gets here
+        p.LockPrisonerSettings()
+
+        int R = 15
+        string[] names = new string[8]
+        int[] totals = new int[8]
+        names[0] = "HasUnderwear()"
+        names[1] = "Config.HasNudeBodyModInstalled"
+        names[2] = "Config.HasUnderwearBodyModInstalled"
+        names[3] = "StrippingThoroughness (read once; the function reads it twice)"
+        names[4] = "Bounty"
+        names[5] = "Prison.StrippingThoroughnessModifier"
+        names[6] = "SendError(msg built, condition false)"
+        names[7] = "DetermineStrippingType() whole"
+
+        bool sinkB = false
+        int sinkI = 0
+        int i = 0
+        float t = 0.0
+
+        t = Utility.GetCurrentRealTime()
+        i = 0
+        while (i < R)
+            sinkB = p.HasUnderwear()
+            i += 1
+        endWhile
+        totals[0] = self.__Ms(Utility.GetCurrentRealTime() - t)
+
+        t = Utility.GetCurrentRealTime()
+        i = 0
+        while (i < R)
+            sinkB = p.Config.HasNudeBodyModInstalled
+            i += 1
+        endWhile
+        totals[1] = self.__Ms(Utility.GetCurrentRealTime() - t)
+
+        t = Utility.GetCurrentRealTime()
+        i = 0
+        while (i < R)
+            sinkB = p.Config.HasUnderwearBodyModInstalled
+            i += 1
+        endWhile
+        totals[2] = self.__Ms(Utility.GetCurrentRealTime() - t)
+
+        t = Utility.GetCurrentRealTime()
+        i = 0
+        while (i < R)
+            sinkI = p.StrippingThoroughness
+            i += 1
+        endWhile
+        totals[3] = self.__Ms(Utility.GetCurrentRealTime() - t)
+
+        t = Utility.GetCurrentRealTime()
+        i = 0
+        while (i < R)
+            sinkI = p.Bounty
+            i += 1
+        endWhile
+        totals[4] = self.__Ms(Utility.GetCurrentRealTime() - t)
+
+        t = Utility.GetCurrentRealTime()
+        i = 0
+        while (i < R)
+            sinkI = prison.StrippingThoroughnessModifier
+            i += 1
+        endWhile
+        totals[5] = self.__Ms(Utility.GetCurrentRealTime() - t)
+
+        t = Utility.GetCurrentRealTime()
+        i = 0
+        while (i < R)
+            p.EventManager.SendError("An error has occurred, cannot strip prisoner both naked and to underwear, logic error!", "("+ p.Name +") Prisoner::DetermineStrippingType", false)
+            i += 1
+        endWhile
+        totals[6] = self.__Ms(Utility.GetCurrentRealTime() - t)
+
+        t = Utility.GetCurrentRealTime()
+        i = 0
+        while (i < R)
+            p.DetermineStrippingType()
+            i += 1
+        endWhile
+        totals[7] = self.__Ms(Utility.GetCurrentRealTime() - t)
+
+        ; --- ranked report ---
+        bool[] printed = new bool[8]
+        int rank = 0
+        while (rank < 8)
+            int best = -1
+            int k = 0
+            while (k < 8)
+                if (!printed[k] && (best < 0 || totals[k] > totals[best]))
+                    best = k
+                endif
+                k += 1
+            endWhile
+            printed[best] = true
+            log("STRIPPING BREAKDOWN #" + (rank + 1) + ": " + names[best] + " - " + self.__PerOp(totals[best], R) + " per call")
+            rank += 1
+        endWhile
+        log("STRIPPING BREAKDOWN state: bounty " + p.Bounty + ", thoroughness " + p.StrippingThoroughness + ", modifier " + prison.StrippingThoroughnessModifier + ", naked " + p.WillBeStrippedNaked + ", underwear " + p.WillBeStrippedToUnderwear)
+
+        display_result(true)
+    endFunction
+
+    function Teardown()
+        __TeardownAllTempActors()
+    endFunction
+endState
+
+
+; ---- originals kept as references for the equivalence tests 64-66 ----
+
+; The original stripping-type decision, literally (Papyrus && / || evaluate both sides, so this is the old formula)
+int function __StrippingTypeReference(bool abNudeBodyMod, bool abUnderwearBodyMod, bool abHasUnderwearWorn, int aiThoroughness)
+    bool isAbleToStripNaked         = abNudeBodyMod
+    bool isAbleToStripToUnderwear   = (isAbleToStripNaked && abUnderwearBodyMod && abHasUnderwearWorn) || !isAbleToStripNaked
+    bool naked      = (isAbleToStripNaked       && (aiThoroughness >= 10 || !isAbleToStripToUnderwear))
+    bool underwear  = (isAbleToStripToUnderwear && (aiThoroughness < 10  || !isAbleToStripNaked))
+    int result = 0
+    if (naked)
+        result += 1
+    endif
+    if (underwear)
+        result += 2
+    endif
+    return result
+endFunction
+
+; The original slot mask loop
+int function __SlotMaskReference(int slotMask)
+    int currentSlotMask = 30
+    int slotMaskValue = 0x00000001
+    while (currentSlotMask <= 61)
+        if (slotMask == currentSlotMask)
+            return slotMaskValue
+        endif
+        currentSlotMask += 1
+        slotMaskValue *= 2
+    endWhile
+
+    return -1
+endFunction
+
+; The original GetVarPathOnReference / GetReferenceKey, before the cheaper key building
+string function __PathReference(string asKey, string apReference, string asCategory)
+    if (apReference == "null" || apReference == "")
+        return "null"
+    endif
+
+    bool isPapyrusReference = RPB_Utility.String_StartsEndsWith(apReference, "[", "]")
+
+    if (apReference && isPapyrusReference)
+        string referenceId = RPB_Utility.ExtractReferenceID(apReference)
+        apReference = "(" + "Reference" + " <" + referenceId + ">" + ")"
+    endif
+
+    if (asCategory != "null" && asCategory != "")
+        return RPB_StorageVars.GetRootPath() + "." + apReference + "." + asCategory + "." + asKey
+    else
+        return RPB_StorageVars.GetRootPath() + "." + apReference + "." + asKey
+    endif
+endFunction
+
+string function __KeyReference(string apReference)
+    if (apReference == "null" || apReference == "")
+        return apReference
+    endif
+
+    if (RPB_Utility.String_StartsEndsWith(apReference, "[", "]"))
+        return "(" + "Reference" + " <" + RPB_Utility.ExtractReferenceID(apReference) + ">" + ")"
+    endif
+
+    return apReference
+endFunction
+
+;/
+    The decision itself is pure, so it is checked exhaustively (nude mod x underwear mod x underwear worn x
+    thoroughness 5 / 15) against the original formula, and it must always pick exactly one of naked / underwear.
+    Then the instance function (lazy inputs, one thoroughness read, guarded error) must equal the original body
+    (__DetermineStrippingTypeReference) for every nude-mod / underwear-mod setting, with a locked thoroughness of 5
+    and 15 (bounty modifier off so the bounty does not interfere). The dummy NPC wears no underwear, so the
+    "underwear worn" input is covered by the table only. The MCM toggles are restored afterwards.
+/;
+state Test_Prisoner_StrippingTypeEquivalence
+    function Setup()
+        RPB_Prison prison = (RPB_API.GetPrisonManager()).GetPrison("Haafingar")
+        RPB_MCM mcm = prison.Config.MCM
+        bool ok = true
+        bool step = false
+
+        ; ---- 1. exhaustive table of the pure decision ----
+        int wrong = 0
+        int notExactlyOne = 0
+        int combo = 0
+        while (combo < 16)
+            bool nude = (combo % 2) == 1
+            bool underwearMod = ((combo / 2) % 2) == 1
+            bool hasUnderwear = ((combo / 4) % 2) == 1
+            int thoroughness = 5
+            if (combo >= 8)
+                thoroughness = 15
+            endif
+
+            int expected = self.__StrippingTypeReference(nude, underwearMod, hasUnderwear, thoroughness)
+            int actual = RPB_Prisoner.ResolveStrippingType(nude, underwearMod, hasUnderwear, thoroughness)
+            if (actual != expected)
+                wrong += 1
+                log("DECISION differs for nude " + nude + ", underwear mod " + underwearMod + ", underwear worn " + hasUnderwear + ", thoroughness " + thoroughness + ": expected " + expected + ", got " + actual)
+            endif
+            if (actual != 1 && actual != 2)
+                notExactlyOne += 1
+            endif
+            combo += 1
+        endWhile
+        step = assert_true(wrong == 0, wrong + " of 16 decisions differ from the original formula")
+        ok = ok && step
+        step = assert_true(notExactlyOne == 0, notExactlyOne + " decisions were not exactly one of naked / underwear")
+        ok = ok && step
+
+        ; ---- 2. instance function against the original body ----
+        Actor a = __SpawnTempActor()
+        RPB_Prisoner p = self.__RegisterPrisonerAndWait(a, prison)
+        if (!p)
+            display_result(assert_true(false, "Prisoner never registered"))
+            return
+        endif
+
+        string nudeKey = "Configuration::NudeBodyModInstalled"
+        string underwearKey = "Configuration::UnderwearModInstalled"
+        bool originalNude = mcm.GetOptionToggleState(nudeKey, "Clothing")
+        bool originalUnderwear = mcm.GetOptionToggleState(underwearKey, "Clothing")
+
+        p.LockPrisonerSettings()
+        p.SetInt("Stripping Thoroughness Modifier", 0)
+
+        int differing = 0
+        int c = 0
+        while (c < 8)
+            bool nudeSetting = (c % 2) == 1
+            bool underwearSetting = ((c / 2) % 2) == 1
+            int locked = 5
+            if (c >= 4)
+                locked = 15
+            endif
+
+            mcm.SetOptionValueBool(nudeKey, nudeSetting, "Clothing")
+            mcm.SetOptionValueBool(underwearKey, underwearSetting, "Clothing")
+            p.SetInt("Stripping Thoroughness", locked)
+
+            p.__DetermineStrippingTypeReference()
+            bool refNaked = p.WillBeStrippedNaked
+            bool refUnderwear = p.WillBeStrippedToUnderwear
+
+            p.DetermineStrippingType()
+            if (p.WillBeStrippedNaked != refNaked || p.WillBeStrippedToUnderwear != refUnderwear)
+                differing += 1
+                log("INSTANCE differs for nude mod " + nudeSetting + ", underwear mod " + underwearSetting + ", thoroughness " + locked + ": original naked " + refNaked + "/underwear " + refUnderwear + ", new naked " + p.WillBeStrippedNaked + "/underwear " + p.WillBeStrippedToUnderwear)
+            endif
+            c += 1
+        endWhile
+
+        mcm.SetOptionValueBool(nudeKey, originalNude, "Clothing")
+        mcm.SetOptionValueBool(underwearKey, originalUnderwear, "Clothing")
+
+        step = assert_true(differing == 0, differing + " of 8 instance runs differ from the original body")
+        ok = ok && step
+        log("STRIPPING EQUIVALENCE decision table 16/16 checked, instance runs 8 checked, MCM toggles restored (nude " + originalNude + ", underwear " + originalUnderwear + ")")
+
+        display_result(ok)
+    endFunction
+
+    function Teardown()
+        __TeardownAllTempActors()
+    endFunction
+endState
+
+;/
+    GetSlotMaskValue() is now 2^(slot - 30) by shifting instead of a loop of up to 32 iterations: every slot from
+    29 to 62 (both sides of the valid 30..61 range) must give exactly what the original loop gives.
+/;
+state Test_Utility_SlotMaskEquivalence
+    function Setup()
+        bool ok = true
+        int differing = 0
+        int slot = 29
+        while (slot <= 62)
+            int expected = self.__SlotMaskReference(slot)
+            int actual = RPB_Utility.GetSlotMaskValue(slot)
+            if (actual != expected)
+                differing += 1
+                log("SLOT MASK differs for slot " + slot + ": original " + expected + ", new " + actual)
+            endif
+            slot += 1
+        endWhile
+        ok = assert_true(differing == 0, differing + " of 34 slots differ from the original loop")
+        log("SLOT MASK slots 29..62 checked; 30 -> " + RPB_Utility.GetSlotMaskValue(30) + ", 52 -> " + RPB_Utility.GetSlotMaskValue(52) + ", 61 -> " + RPB_Utility.GetSlotMaskValue(61))
+        display_result(ok)
+    endFunction
+endState
+
+;/
+    GetVarPathOnReference() and GetReferenceKey() build the "(Reference <id>)" key with fewer concatenations and
+    inlined checks. This function once broke every delete when its input contract was misunderstood, so the new
+    versions are compared byte for byte with the originals over Actor and Form strings, an already-normalized key,
+    "null", "", plain strings, an unterminated "[..." and an odd bracketed string, with and without categories.
+/;
+state Test_StorageVars_PathEquivalence
+    function Setup()
+        bool ok = true
+        Actor a = __SpawnTempActor()
+
+        string[] refs = new string[10]
+        refs[0] = a as string
+        refs[1] = (Game.GetForm(0x14)) as string
+        refs[2] = "[Actor < (00000014)>]"
+        refs[3] = "[WIDeadBodyCleanupScript < (FF000E02)>]"
+        refs[4] = "(Reference <00000014>)"
+        refs[5] = "null"
+        refs[6] = ""
+        refs[7] = "plain.custom.id"
+        refs[8] = "[unterminated"
+        refs[9] = "[Something odd here]"
+
+        string[] cats = new string[4]
+        cats[0] = "Jail"
+        cats[1] = "ActorVars"
+        cats[2] = "null"
+        cats[3] = ""
+
+        int differing = 0
+        int checked = 0
+        int r = 0
+        while (r < refs.Length)
+            string expectedKey = self.__KeyReference(refs[r])
+            string actualKey = RPB_StorageVars.GetReferenceKey(refs[r])
+            checked += 1
+            if (actualKey != expectedKey)
+                differing += 1
+                log("KEY differs for '" + refs[r] + "': original '" + expectedKey + "', new '" + actualKey + "'")
+            endif
+
+            int c = 0
+            while (c < cats.Length)
+                string expectedPath = self.__PathReference("Some Key", refs[r], cats[c])
+                string actualPath = RPB_StorageVars.GetVarPathOnReference("Some Key", refs[r], cats[c])
+                checked += 1
+                if (actualPath != expectedPath)
+                    differing += 1
+                    log("PATH differs for '" + refs[r] + "' / '" + cats[c] + "': original '" + expectedPath + "', new '" + actualPath + "'")
+                endif
+                c += 1
+            endWhile
+            r += 1
+        endWhile
+
+        ok = assert_true(differing == 0, differing + " of " + checked + " keys/paths differ from the original")
+        log("PATH EQUIVALENCE " + checked + " keys/paths compared, first Actor path: " + RPB_StorageVars.GetVarPathOnReference("K", refs[0], "Jail"))
+        display_result(ok)
+    endFunction
+
+    function Teardown()
+        __TeardownAllTempActors()
+    endFunction
+endState
+
+;/
+    The thoroughness bug: the property read its base from category "Stripping", which nothing writes, so the MCM's
+    thoroughness was ignored (always 0 + bounty part). It now reads the locked value (and the locked modifier):
+      a prisoner locked from the snapshot carries the MCM's current thoroughness;
+      a locked thoroughness of 15 with the modifier off gives 15 (it gave 0);
+      with modifier 1000 and a latent bounty of 3000 it gives 15 + Round(3000 / 1000) = 18.
+/;
+state Test_Prisoner_ThoroughnessUsesLockedSetting
+    function Setup()
+        RPB_Prison prison = (RPB_API.GetPrisonManager()).GetPrison("Haafingar")
+        bool ok = true
+        bool step = false
+
+        Actor a = __SpawnTempActor()
+        RPB_Prisoner p = self.__RegisterPrisonerAndWait(a, prison)
+        if (!p)
+            display_result(assert_true(false, "Prisoner never registered"))
+            return
+        endif
+
+        ; 1. Locked from the snapshot: the MCM's own value (bounty is 0 for a fresh dummy)
+        p.LockPrisonerSettings()
+        int mcmThoroughness = prison.StrippingThoroughness
+        step = assert_true(p.GetInt("Stripping Thoroughness") == mcmThoroughness, "The locked thoroughness " + p.GetInt("Stripping Thoroughness") + " is not the MCM's " + mcmThoroughness)
+        ok = ok && step
+        step = assert_true(p.StrippingThoroughness == mcmThoroughness + self.__BountyPart(p), "StrippingThoroughness " + p.StrippingThoroughness + " is not the MCM value " + mcmThoroughness + " plus the bounty part")
+        ok = ok && step
+
+        ; 2. A locked 15 with the modifier off is 15 (it was 0: the base came from an unwritten category)
+        p.SetInt("Stripping Thoroughness", 15)
+        p.SetInt("Stripping Thoroughness Modifier", 0)
+        step = assert_true(p.StrippingThoroughness == 15, "Locked 15, modifier off: got " + p.StrippingThoroughness)
+        ok = ok && step
+
+        ; 3. Modifier on: adds Round(bounty / modifier)
+        RPB_StorageVars.SetIntOnReference(prison.PrisonFaction.GetName() + "::Latent Bounty Non-Violent", a, 3000, "ActorVars")
+        p.SetInt("Stripping Thoroughness Modifier", 1000)
+        step = assert_true(p.Bounty == 3000, "The test bounty was not applied: " + p.Bounty)
+        ok = ok && step
+        step = assert_true(p.StrippingThoroughness == 18, "Locked 15, modifier 1000, bounty 3000: expected 18, got " + p.StrippingThoroughness)
+        ok = ok && step
+        log("THOROUGHNESS MCM value " + mcmThoroughness + " | locked 15, modifier off -> 15 | modifier 1000 with bounty 3000 -> " + p.StrippingThoroughness)
+
+        display_result(ok)
+    endFunction
+
+    function Teardown()
+        __TeardownAllTempActors()
+    endFunction
+endState
+
+; The bounty part of the thoroughness for the prisoner's current bounty and locked modifier
+int function __BountyPart(RPB_Prisoner apPrisoner)
+    int modifier = apPrisoner.GetInt("Stripping Thoroughness Modifier")
+    if (modifier > 0)
+        return Math.Floor((apPrisoner.Bounty / modifier) as float)
+    endif
+    return 0
+endFunction
 
 ;/
     A failed imprisonment ("Assign Cell") used to unregister the prisoner without Destroy(), leaving its

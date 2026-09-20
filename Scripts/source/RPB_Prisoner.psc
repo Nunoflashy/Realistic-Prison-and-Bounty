@@ -229,8 +229,17 @@ endProperty
 
 int property StrippingThoroughness
     int function get()
-        int modifier = Prison.StrippingThoroughnessModifier
-        return GetInt("Stripping Thoroughness", "Stripping") + int_if (modifier > 0, Round(Bounty / modifier))
+        ; Both come from the settings locked into this prisoner (LockPrisonerSettings). The base used to be read from a
+        ; category nothing writes ("Stripping"), so the MCM's thoroughness was ignored; the modifier from the live MCM.
+        int thoroughness = GetInt("Stripping Thoroughness")
+        int modifier = GetInt("Stripping Thoroughness Modifier")
+
+        ; The bounty (~22ms to read) only matters when the modifier is enabled
+        if (modifier > 0)
+            thoroughness += Round(Bounty / modifier)
+        endif
+
+        return thoroughness
     endFunction
 endProperty
 
@@ -1078,7 +1087,57 @@ endFunction
     If stripping naked is not possible, then it will fallback to stripping to underwear.
     Likewise, if stripping to underwear is not possible, it will default to stripping naked.
 /;
+int function ResolveStrippingType(bool abNudeBodyMod, bool abUnderwearBodyMod, bool abHasUnderwearWorn, int aiThoroughness) global
+    ; Pure decision, no game state. Returns flags: 1 = stripped naked, 2 = stripped to underwear (exactly one of them).
+    bool isAbleToStripNaked         = abNudeBodyMod
+    bool isAbleToStripToUnderwear   = (isAbleToStripNaked && abUnderwearBodyMod && abHasUnderwearWorn) || !isAbleToStripNaked
+
+    int result = 0
+
+    if (isAbleToStripNaked && (aiThoroughness >= 10 || !isAbleToStripToUnderwear))
+        result += 1
+    endif
+
+    if (isAbleToStripToUnderwear && (aiThoroughness < 10 || !isAbleToStripNaked))
+        result += 2
+    endif
+
+    return result
+endFunction
+
 function DetermineStrippingType()
+    ; Papyrus && / || do not short-circuit, so gather the inputs lazily: without a nude body mod the result is "to
+    ; underwear" whatever the underwear or the thoroughness are (both cost tens of ms), and the thoroughness is read once.
+    bool nudeBodyMod        = Config.HasNudeBodyModInstalled
+    bool underwearBodyMod   = false
+    bool hasUnderwearWorn   = false
+    int thoroughness        = 0
+
+    if (nudeBodyMod)
+        underwearBodyMod = Config.HasUnderwearBodyModInstalled
+
+        if (underwearBodyMod)
+            hasUnderwearWorn = self.HasUnderwear()
+        endif
+
+        thoroughness = self.StrippingThoroughness
+    endif
+
+    int strippingType = RPB_Prisoner.ResolveStrippingType(nudeBodyMod, underwearBodyMod, hasUnderwearWorn, thoroughness)
+
+    self.WillBeStrippedNaked        = Math.LogicalAnd(strippingType, 1) == 1
+    self.WillBeStrippedToUnderwear  = Math.LogicalAnd(strippingType, 2) == 2
+
+    ; Assert (WIP): the message is only built when something is wrong
+    if (self.WillBeStrippedNaked == self.WillBeStrippedToUnderwear)
+        EventManager.SendError("An error has occurred, cannot strip prisoner both naked and to underwear, logic error!", "("+ Name +") Prisoner::DetermineStrippingType")
+    endif
+endFunction
+
+;/
+    The original implementation, kept as the reference the new one is tested against (test 64).
+/;
+function __DetermineStrippingTypeReference()
     bool hasUnderwearWorn           = self.HasUnderwear()
     bool isAbleToStripNaked         = Config.HasNudeBodyModInstalled
     bool isAbleToStripToUnderwear   = (isAbleToStripNaked && Config.HasUnderwearBodyModInstalled && hasUnderwearWorn) || !isAbleToStripNaked

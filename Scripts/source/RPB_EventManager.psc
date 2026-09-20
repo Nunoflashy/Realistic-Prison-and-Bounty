@@ -177,14 +177,29 @@ event OnError(string msg, string caller, bool condition)
 endEvent
 
 function SendError(string msg, string caller = "", bool condition = true)
+    ; The handlers log/notify only when the condition is true, so skip them (and their string work) otherwise
+    if (!condition)
+        return
+    endif
+
     self.OnError(msg, caller, condition)
 endFunction
 
 function SendWarning(string msg, string caller = "", bool condition = true)
+    ; The handlers log/notify only when the condition is true, so skip them (and their string work) otherwise
+    if (!condition)
+        return
+    endif
+
     self.OnWarn(msg, caller, condition)
 endFunction
 
 function SendInfo(string msg, string caller = "", bool condition = true)
+    ; The handlers log/notify only when the condition is true, so skip them (and their string work) otherwise
+    if (!condition)
+        return
+    endif
+
     self.OnInfo(msg, caller, condition)
 endFunction
 
