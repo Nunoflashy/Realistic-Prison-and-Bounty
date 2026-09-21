@@ -2285,6 +2285,7 @@ function TeleportPrisonerToRelease(RPB_Prisoner apPrisoner)
 
     if (apPrisoner.IsNPC())
         apPrisoner.EnableAI()
+        apPrisoner.NPC_EnsureDressed()
     endif
 
     self.OnPrisonerReleased(apPrisoner)

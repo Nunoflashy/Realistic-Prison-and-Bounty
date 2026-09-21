@@ -7305,6 +7305,23 @@ int function __MassCellsAllowingOvercrowding(RPB_Prison akPrison)
     return n
 endFunction
 
+;/ Wears something of its outfit (or a body armor): what "dressed" means for the report after the release /;
+bool function __MassIsDressed(Actor akActor)
+    Outfit worn = akActor.GetActorBase().GetOutfit()
+    if (worn)
+        int n = worn.GetNumParts()
+        int k = 0
+        while (k < n)
+            Armor part = worn.GetNthPart(k) as Armor
+            if (part && akActor.IsEquipped(part))
+                return true
+            endif
+            k += 1
+        endWhile
+    endif
+    return akActor.GetWornForm(0x4) != none
+endFunction
+
 int function __MassCountImprisoned(Actor[] akActors, int aiCount)
     int n = 0
     int i = 0
@@ -7416,6 +7433,7 @@ state Test_MassImprisonment
         float tStart = Utility.GetCurrentRealTime()
 
         Actor[] all = new Actor[64]
+        bool[] everImprisoned = new bool[64]
         int spawned = 0
         int spawnFailures = 0
         int waveNumber = 1
@@ -7460,6 +7478,7 @@ state Test_MassImprisonment
                 placed += 1
                 if (RPB_Utility.IsActorImprisoned(all[i]))
                     imprisoned += 1
+                    everImprisoned[i] = true
                 elseIf (self.__StressLeftovers(all[i], prison) == "")
                     reverted += 1
                 else
@@ -7537,6 +7556,7 @@ state Test_MassImprisonment
             while (i < TOTAL)
                 if (all[i] && RPB_Utility.IsActorImprisoned(all[i]))
                     retriedImprisoned += 1
+                    everImprisoned[i] = true
                 endif
                 i += 1
             endWhile
@@ -7607,10 +7627,10 @@ state Test_MassImprisonment
         int unloaded = 0
         i = 0
         while (i < TOTAL)
-            if (all[i])
+            if (all[i] && everImprisoned[i])
                 if (!all[i].Is3DLoaded())
                     unloaded += 1
-                elseIf (all[i].GetWornForm(0x4))
+                elseIf (self.__MassIsDressed(all[i]))
                     dressed += 1
                 else
                     underwearOnly += 1
@@ -7619,7 +7639,7 @@ state Test_MassImprisonment
             endif
             i += 1
         endWhile
-        log("MASS DRESSED after the release: body armor worn " + dressed + ", nothing on the body " + underwearOnly + ", 3D unloaded (unknown) " + unloaded + " (see the 'Re-equipped' INFO lines for the per NPC counts)")
+        log("MASS DRESSED after the release (NPCs that were imprisoned): dressed " + dressed + ", bare " + underwearOnly + ", 3D unloaded (unknown) " + unloaded + " (see the 'Re-equipped' INFO lines for the per NPC counts)")
 
         __TeardownAllTempActors()
         RPB_Utility.SetOvercrowdingDisabled(false)

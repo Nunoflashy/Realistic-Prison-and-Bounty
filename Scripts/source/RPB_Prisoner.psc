@@ -201,6 +201,7 @@ Scriptname RPB_Prisoner extends RPB_ActorBase
     function NPC_SaveOriginalOutfit()
     function NPC_RestoreOriginalOutfit()
     function NPC_ReequipAfterRelease()
+    function NPC_EnsureDressed()
     function NPC_SaveWornArmor()
     int function NPC_ReequipSavedWornArmor()
     function NPC_SetPersistentOutfit(string asOutfit)
@@ -3442,6 +3443,37 @@ endFunction
     come from their own default Outfit (guards use templates: GetOutfit() is none), so the outfit alone cannot dress them again.
     Must be called BEFORE the NPC is unequipped and emptied.
 /;
+;/
+    Called once the NPC has been moved to its release location and has its AI back: one release in the mass test (1 of 9) left
+    the NPC with all its clothes in the inventory and nothing on (the first equip runs while the NPC is still in its cell).
+    Equips what is carried but not worn, of the original outfit and the saved worn armor. Silent when nothing was off.
+/;
+function NPC_EnsureDressed()
+    if (!self.IsNPC())
+        return
+    endif
+
+    int fixed = 0
+    Outfit original = NPC_OriginalOutfit
+    if (original)
+        int parts = original.GetNumParts()
+        int i = 0
+        while (i < parts)
+            Armor part = original.GetNthPart(i) as Armor
+            if (part && this.GetItemCount(part) > 0 && !this.IsEquipped(part))
+                this.EquipItem(part)
+                fixed += 1
+            endif
+            i += 1
+        endWhile
+    endif
+    fixed += self.NPC_ReequipSavedWornArmor()
+
+    if (fixed > 0)
+        EventManager.SendInfo("Equipped " + fixed + " items that were still off after the release on " + self.Name, "["+ Name +"] Prisoner::NPC_EnsureDressed")
+    endif
+endFunction
+
 int[] function __NPC_WornArmorSlots()
     ; Every armor occupies at least one of the 32 body slots (30..61), so scanning all of them is complete for any NPC or mod list
     int[] slots = new int[32]
