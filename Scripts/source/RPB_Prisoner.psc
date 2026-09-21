@@ -3249,16 +3249,32 @@ function NPC_BindToCell()
         return
     endif
 
+    ; Choosing a free package alias and binding to it must be one step for the whole game: an alias only holds one actor, and two
+    ; prisoners choosing the same free one meant the second bind took the package away from the first.
+    int packageLock = RPB_ThreadLock.Get("CellPackages")
+    RPB_ThreadLock.Acquire(packageLock)
+
     if (self.HasCellPackage)
+        RPB_ThreadLock.Release(packageLock)
         return
     endif
 
-    if (!self.CellPackage)
+    ReferenceAlias cellPackageAlias = self.CellPackage
+    if (cellPackageAlias && cellPackageAlias.GetReference() != none && cellPackageAlias.GetActorReference() != this)
+        ; the alias chosen earlier (and remembered) has been taken by someone else since: choose again
+        Remove("Cell Package ID")
+        Remove("Cell Package Group")
+        cellPackageAlias = self.CellPackage
+    endif
+
+    if (!cellPackageAlias)
+        RPB_ThreadLock.Release(packageLock)
         EventManager.SendError("There was an error retrieving the Cell Package belonging to Prisoner: " + self.Name, "["+ Name +"] Prisoner::NPC_BindToCell")
         return
     endif
 
-    self.BindAlias(CellPackage)
+    self.BindAlias(cellPackageAlias)
+    RPB_ThreadLock.Release(packageLock)
     MiscUtil.PrintConsole("["+ Name +"] Bound to Package " + CellPackage.GetName())
     Debug("[Prison: "+ self.Prison.Name +"] ["+ Name +"] Prisoner::NPC_BindToCell", "[Package: "+ CellPackage.GetName() +"] Bound " + Name + " to "+ self.PronounPossessiveObject +" Cell.")
 endFunction
@@ -3392,6 +3408,7 @@ function NPC_ReequipAfterRelease()
     int parts = 0
     int equipped = 0
     int skipped = 0
+    int reissued = 0
     if (original)
         if (this.GetActorBase().GetOutfit() != original)
             this.SetOutfit(original)
@@ -3403,7 +3420,12 @@ function NPC_ReequipAfterRelease()
             Armor part = original.GetNthPart(i) as Armor
             if (!part)
                 skipped += 1
-            elseIf (this.GetItemCount(part) > 0)
+            else
+                if (this.GetItemCount(part) == 0)
+                    ; The belongings did not bring this part back: outfit items are generic, issue it again instead of leaving the NPC bare
+                    this.AddItem(part, 1, true)
+                    reissued += 1
+                endif
                 this.EquipItem(part)
                 equipped += 1
             endif
@@ -3412,7 +3434,7 @@ function NPC_ReequipAfterRelease()
     endif
 
     int wornEquipped = self.NPC_ReequipSavedWornArmor()
-    EventManager.SendInfo("Re-equipped " + equipped + " of " + parts + " outfit parts (" + skipped + " not plain armors, saved outfit " + original + ") and " + wornEquipped + " saved worn armors on " + self.Name + ", worn body: " + this.GetWornForm(0x4), "["+ Name +"] Prisoner::NPC_ReequipAfterRelease")
+    EventManager.SendInfo("Re-equipped " + equipped + " of " + parts + " outfit parts (" + skipped + " not plain armors, " + reissued + " issued again because the belongings did not have them, saved outfit " + original + ") and " + wornEquipped + " saved worn armors on " + self.Name + ", worn body: " + this.GetWornForm(0x4), "["+ Name +"] Prisoner::NPC_ReequipAfterRelease")
 endFunction
 
 ;/

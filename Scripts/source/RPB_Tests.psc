@@ -7404,6 +7404,8 @@ state Test_MassImprisonment
         RPB_PrisonManager massManager = RPB_API.GetPrisonManager()
         int baseCount = prison.Prisoners.Count
         int basePrisons = massManager.PrisonsWithPrisonersCount
+        ; A cell that allows overcrowding never fills up, so the prison would never overflow: switch overcrowding off for this test
+        RPB_Utility.SetOvercrowdingDisabled(true)
         int capacity = self.__MassCapacity(prison)
         int occupiedBefore = self.__MassOccupied(prison)
         int free = capacity - occupiedBefore
@@ -7545,6 +7547,25 @@ state Test_MassImprisonment
             log("MASS RECOVERY skipped (imprisoned " + imprisoned + ", reverted " + reverted + "): the prison did not overflow, raise TOTAL")
         endif
 
+        ; What the belongings manifests hold, before everybody is released
+        int manifestsWithItems = 0
+        int manifestsEmpty = 0
+        int manifestsMissing = 0
+        i = 0
+        while (i < TOTAL)
+            if (all[i] && RPB_Utility.IsActorImprisoned(all[i]))
+                if (RPB_StorageVars.GetIntOnReference("Belongings Manifest", all[i], "Jail") == 0)
+                    manifestsMissing += 1
+                elseIf (RPB_StorageVars.GetFormsOnReference("Belongings Forms", all[i], "Jail").Length > 0)
+                    manifestsWithItems += 1
+                else
+                    manifestsEmpty += 1
+                endif
+            endif
+            i += 1
+        endWhile
+        log("MASS manifests before the release: with items " + manifestsWithItems + ", empty " + manifestsEmpty + ", missing " + manifestsMissing)
+
         ; Mass release: everybody at once
         float tRelease = Utility.GetCurrentRealTime()
         int toRelease = 0
@@ -7593,6 +7614,7 @@ state Test_MassImprisonment
                     dressed += 1
                 else
                     underwearOnly += 1
+                    log("MASS bare actor " + i + " (" + all[i] + "): items " + all[i].GetNumItems() + ", base outfit " + all[i].GetActorBase().GetOutfit())
                 endif
             endif
             i += 1
@@ -7600,6 +7622,7 @@ state Test_MassImprisonment
         log("MASS DRESSED after the release: body armor worn " + dressed + ", nothing on the body " + underwearOnly + ", 3D unloaded (unknown) " + unloaded + " (see the 'Re-equipped' INFO lines for the per NPC counts)")
 
         __TeardownAllTempActors()
+        RPB_Utility.SetOvercrowdingDisabled(false)
         ok = ok && self.__StressAssertNoLeaks(prison, massManager, baseCount, basePrisons)
         step = assert_true(self.__MassOccupied(prison) == occupiedBefore, "The cells hold " + self.__MassOccupied(prison) + " prisoners after the test, expected " + occupiedBefore)
         ok = ok && step
@@ -7609,6 +7632,7 @@ state Test_MassImprisonment
     endFunction
 
     function Teardown()
+        RPB_Utility.SetOvercrowdingDisabled(false)
         self.__StressProfilerRestore()
         __TeardownAllTempActors()
     endFunction

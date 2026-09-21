@@ -142,6 +142,8 @@ scriptname RPB_Utility hidden
     string function DumpCrumbs(Actor akActor) global
     int function GetMaxDayEventsPerUpdate() global
     function SetMaxDayEventsPerUpdate(int aiDays) global
+    bool function IsOvercrowdingDisabled() global
+    function SetOvercrowdingDisabled(bool abDisabled) global
     float function GetMonitorOverrideHours() global
     function SetMonitorOverrideHours(float afHours) global
     function FlowBegin(string asFlow) global
@@ -2189,6 +2191,18 @@ endFunction
 
 function SetMaxDayEventsPerUpdate(int aiDays) global
     RPB_StorageVars.SetInt("MAX_DAY_EVENTS", aiDays, "Profile")
+endFunction
+
+;/
+    Dev override (Profile.NO_OVERCROWDING): when set, no jail cell allows overcrowding whatever its data says, so a test can
+    fill a prison to its real capacity. Off (0) by default = the cells' own data.
+/;
+bool function IsOvercrowdingDisabled() global
+    return JDB.solveInt(".rpb_root.storage.Profile.NO_OVERCROWDING") != 0
+endFunction
+
+function SetOvercrowdingDisabled(bool abDisabled) global
+    RPB_StorageVars.SetInt("NO_OVERCROWDING", abDisabled as int, "Profile")
 endFunction
 
 ;/

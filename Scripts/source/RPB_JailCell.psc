@@ -269,6 +269,10 @@ endProperty
 bool __allowOvercrowding
 bool property AllowOvercrowding
     bool function get()
+        if (RPB_Utility.IsOvercrowdingDisabled())
+            return false
+        endif
+
         if (!__allowOvercrowding)
             __allowOvercrowding = self.GetOptionOfTypeBool("Allow Overcrowding")
         endif
