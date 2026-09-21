@@ -172,6 +172,10 @@ endProperty
 
 Form[] property Prisoners
     Form[] function get()
+        if (!self.__HasPrisonersMap())
+            return Utility.CreateFormArray(0)
+        endif
+
         return FastArray_ToFormArray( \ 
             FastMap_Values(__prisonersInCell) \
         )
@@ -389,8 +393,31 @@ endProperty
 
 int __prisonersInCell
 
+; The prisoners map is a retained JContainers object held in a script variable: the handle can be 0 (no prisoner yet) or stale (the
+; object is gone), and reading a stale one makes JContainers print "access to non-existing object" in the console. A stale map is
+; an empty cell: forget the handle (and say which cell had it).
+bool function __HasPrisonersMap()
+    if (!__prisonersInCell)
+        return false
+    endif
+
+    if (!Object_Exists(__prisonersInCell))
+        string staleMsg = "[" + ID + "] The prisoners map of this cell (handle " + __prisonersInCell + ") no longer exists, treating the cell as empty"
+        DebugWarn("[" + ID + "] JailCell::__HasPrisonersMap", staleMsg)
+        Warn(staleMsg)
+        __prisonersInCell = 0
+        return false
+    endif
+
+    return true
+endFunction
+
 int property PrisonerCount
     int function get()
+        if (!self.__HasPrisonersMap())
+            return 0
+        endif
+
         return Object_Size(__prisonersInCell)
     endFunction
 endProperty
@@ -668,6 +695,10 @@ endFunction
     returns (bool): true if the prisoner is in this cell, false otherwise.
 /;
 bool function HasPrisoner(RPB_Prisoner apPrisoner)
+    if (!self.__HasPrisonersMap())
+        return false
+    endif
+
     return FastMap_HasKey(__prisonersInCell, apPrisoner.GetIdentifier())
 endFunction
 
@@ -906,7 +937,9 @@ function RegisterPrisoner(RPB_Prisoner apPrisoner)
 endFunction
 
 function UnregisterPrisoner(RPB_Prisoner apPrisoner)
-    FastMap_RemoveKey(__prisonersInCell, apPrisoner.GetIdentifier())
+    if (self.__HasPrisonersMap())
+        FastMap_RemoveKey(__prisonersInCell, apPrisoner.GetIdentifier())
+    endif
     self.OnPrisonerUnregister(apPrisoner)
 endFunction
 

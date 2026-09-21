@@ -202,7 +202,7 @@ endProperty
 ; Builds the package mapping only when it does not exist (yet, or any more): the handle is a script variable and can be 0 after a
 ; script reload or stale (the JContainers object is gone), which made every read of it warn "non-existing object".
 function __EnsureCellPackageMapping()
-    if (__cellPackageMapping && Object_Exists(__cellPackageMapping))
+    if (__cellPackageMapping && Object_Exists(__cellPackageMapping) && Object_Exists(FastMap_GetObject(__cellPackageMapping, "S")))
         return
     endif
 

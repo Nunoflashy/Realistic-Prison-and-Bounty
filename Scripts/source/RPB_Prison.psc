@@ -2337,6 +2337,7 @@ function TeleportPrisonerToRelease(RPB_Prisoner apPrisoner)
             k += 1
         endWhile
         if (equippedNow > 0)
+            releasedActor.QueueNiNodeUpdate() ; make the 3D show the new equipment
             ; Verify: how many are still not worn after the equip
             Utility.Wait(0.3)
             int stillOff = 0

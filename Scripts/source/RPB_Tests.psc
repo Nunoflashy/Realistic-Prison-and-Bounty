@@ -7332,7 +7332,8 @@ string function __MassOutfitParts(Actor akActor)
 endFunction
 
 bool function __MassIsDressed(Actor akActor)
-    ; Fully dressed = every outfit part the actor carries is worn (one worn boot is not "dressed": the dress is what you see)
+    ; Fully dressed = every outfit part the actor carries is worn, except the underwear (it shares the body slot with the tunic, they
+    ; cannot both be worn): one worn boot is not "dressed", the tunic is what you see
     Outfit worn = akActor.GetActorBase().GetOutfit()
     int carried = 0
     int equippedParts = 0
@@ -7341,7 +7342,7 @@ bool function __MassIsDressed(Actor akActor)
         int k = 0
         while (k < n)
             Armor part = worn.GetNthPart(k) as Armor
-            if (part && akActor.GetItemCount(part) > 0)
+            if (part && StringUtil.Find(part.GetName(), "Underwear") < 0 && akActor.GetItemCount(part) > 0)
                 carried += 1
                 if (akActor.IsEquipped(part))
                     equippedParts += 1
@@ -7354,7 +7355,7 @@ bool function __MassIsDressed(Actor akActor)
     if (carried > 0)
         return equippedParts == carried
     endif
-    ; The underwear occupies the body slot too: a body armor only counts for an NPC whose outfit has no carried armor parts
+    ; No carried outer part to check: a body armor counts
     return akActor.GetWornForm(0x4) != none
 endFunction
 
@@ -7368,7 +7369,7 @@ string function __MassPartsDump(Actor akActor)
         while (k < n)
             Armor part = worn.GetNthPart(k) as Armor
             if (part)
-                dump += " [" + part + " carried " + akActor.GetItemCount(part) + " worn " + akActor.IsEquipped(part) + "]"
+                dump += " [" + part.GetName() + " " + part + " carried " + akActor.GetItemCount(part) + " worn " + akActor.IsEquipped(part) + "]"
             endif
             k += 1
         endWhile
