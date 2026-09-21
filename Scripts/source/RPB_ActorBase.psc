@@ -905,6 +905,10 @@ endFunction
 ; ==========================================================
 
 event OnEffectStart(Actor akTarget, Actor akCaster)
+    if (RPB_Utility.IsCrumbsEnabled())
+        RPB_Utility.Crumb(akTarget, "OnEffectStart enter " + (self as string) + " (IsInitialized: " + self.IsInitialized + ")")
+    endif
+
     ; Debug("("+ self as string +") RPB_ActorBase::OnEffectStart", this + ": IsInitialized: " + self.IsInitialized)
 
     if (self.IsInitialized)

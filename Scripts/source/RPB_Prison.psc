@@ -1658,10 +1658,12 @@ endFunction
 /;
 bool function RegisterPrisoner(RPB_Prisoner apPrisoner)
     if (self.IsPrisoner(apPrisoner))
+        RPB_Utility.Crumb(apPrisoner.GetActor(), "Prison.RegisterPrisoner: already a prisoner, returned false")
         return false
     endif
     
     Prisoners.Add(apPrisoner)
+    RPB_Utility.Crumb(apPrisoner.GetActor(), "Prison.RegisterPrisoner: Prisoners.Add done")
     self.OnPrisonerRegistered(apPrisoner)
     return Prisoners.Exists(apPrisoner)
 endFunction

@@ -1233,6 +1233,7 @@ RPB_ActorBase function AwaitEntityReference(\
     endif
 
     if (!entityRef)
+        Crumb(akEntity, "AwaitEntityReference TIMEOUT [" + apEntityList.ListIdentifier() + "] (hasPrisonerSpell: " + akEntity.HasSpell(RPB_PrisonerSpell()) + ", hasArresteeSpell: " + akEntity.HasSpell(RPB_ArresteeSpell()) + ")")
         DebugError("Utility::AwaitEntityReference ["+ apEntityList.ListIdentifier() +"]", "The Actor " + akEntity + " is not in the provided list or there was a state mismatch!")
         Error(akEntity.GetBaseObject().GetName() + " is not in the provided list or there was a state mismatch!")
         return none
@@ -1317,6 +1318,7 @@ endFunction
 function EnsurePrisonerSpellAndBinding(Actor akPrisoner, RPB_Prison apPrison) global
     if (!akPrisoner.HasSpell(RPB_PrisonerSpell()))
         ; Cast the Prisoner spell (to bind the RPB_Prisoner instance script)
+        Crumb(akPrisoner, "EnsurePrisonerSpellAndBinding: AddSpell prisoner")
         akPrisoner.AddSpell(RPB_PrisonerSpell(), false)
 
         if (apPrison)

@@ -446,6 +446,17 @@ endFunction
 
 function MoveToPrison(bool abMoveDirectlyToCell = false)
     RPB_Prisoner prisoner   = self.MakePrisoner()
+
+    if (!prisoner)
+        ; The prisoner never registered (AwaitEntityReference timed out): stop here instead of dereferencing None, and undo
+        ; the half-made arrest (dangling prisoner spell, arrest state) so the actor can be arrested again.
+        RPB_Utility.Crumb(this, "MoveToPrison: ABORT no prisoner registered")
+        DebugError("[" + Name + "] Arrestee::MoveToPrison", "Could not turn " + Name + " into a prisoner (registration timed out), aborting the arrest!")
+        this.RemoveSpell(RPB_Utility.RPB_PrisonerSpell())
+        self.OnArrestFailed("Prisoner Registration")
+        return
+    endif
+
     RPB_Utility.FlowMark("MoveToPrison: MakePrisoner done (await prisoner incl. Initialize)")
     RPB_Utility.Crumb(this, "MoveToPrison: MakePrisoner done (await prisoner incl. Initialize)")
     RPB_Prison prison       = prisoner.Prison

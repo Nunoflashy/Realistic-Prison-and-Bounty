@@ -6149,6 +6149,20 @@ int function __StressRunBurst(RPB_Prison akPrison, Actor akGuard, int aiCount, f
     int failures = 0
     int round = 1
     while (round <= 2) ; round 2 = re-arrest the same actors after the burst release
+        ; A released NPC gets its AI back and walks off (this dummy has a package that leads into Castle Dour, where its 3D
+        ; unloads and no effect can start): put every actor back where __SpawnTempActor had it before each round
+        Actor stressPlayer = Game.GetFormEx(0x14) as Actor
+        i = 0
+        while (i < aiCount)
+            burst[i].EnableAI(false)
+            burst[i].MoveTo(stressPlayer)
+            float loadWait = Utility.GetCurrentRealTime()
+            while (!burst[i].Is3DLoaded() && (Utility.GetCurrentRealTime() - loadWait) < 5.0)
+                Utility.Wait(0.1)
+            endWhile
+            i += 1
+        endWhile
+
         float t0 = Utility.GetCurrentRealTime()
         i = 0
         while (i < aiCount)

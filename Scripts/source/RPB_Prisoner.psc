@@ -2651,15 +2651,21 @@ event OnInitialize()
     ; DebugInfo("("+ Name +") Prisoner::OnInitialize", "State: " + self.GetState())
     ; DebugInfo("("+ Name +") Prisoner::OnInitialize", "IsInitialized: " + self.IsInitialized)
 
+    if (RPB_Utility.IsCrumbsEnabled())
+        RPB_Utility.Crumb(this, "Prisoner.OnInitialize: enter (Was Initialized: " + self.Was("Initialized") + ", IsImprisoned: " + self.IsImprisoned + ", Prison: " + Prison + ")")
+    endif
+
     if (self.IsNPC() && self.IsImprisoned)
         self.NPC_ResumeImprisonment()
     endif
 
     if (self.Was("Initialized"))
+        RPB_Utility.Crumb(this, "Prisoner.OnInitialize: SKIPPED RegisterPrisoner (stale Initialized flag)")
         return
     endif
 
     Prison.RegisterPrisoner(self)
+    RPB_Utility.Crumb(this, "Prisoner.OnInitialize: RegisterPrisoner returned")
     ; DebugInfo("("+ Name +") Prisoner::OnInitialize", "Initialized: " + self.Was("Initialized"))
 endEvent
 
