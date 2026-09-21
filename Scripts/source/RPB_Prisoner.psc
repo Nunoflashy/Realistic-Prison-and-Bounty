@@ -2679,7 +2679,8 @@ event OnInitialize()
     endif
 
     if (self.Was("Initialized"))
-        RPB_Utility.Crumb(this, "Prisoner.OnInitialize: SKIPPED RegisterPrisoner (stale Initialized flag)")
+        RPB_Utility.Crumb(this, "Prisoner.OnInitialize: already initialized, rebinding the prison list to this instance")
+        Prison.RebindPrisoner(self)
         return
     endif
 

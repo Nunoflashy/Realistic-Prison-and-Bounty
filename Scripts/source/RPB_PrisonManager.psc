@@ -86,18 +86,50 @@ bool property PrisonInfamyRecognizedThresholdNotification auto
 bool property PrisonInfamyKnownThresholdNotification auto
 
 ;/
-    How many prisons currently hold at least one prisoner. Derived on every read: it used to be a counter that the
-    register/unregister events incremented and decremented by looking at the list size at that moment, which drifts under
-    concurrency (two threads both see the "0 prisoners" boundary), leaving the MCM's "Check Prisoner" page visible with no
-    prisoners left.
+    How many prisons currently hold at least one prisoner. Derived on every read from the prisons' own lists: it used to be
+    a counter that the register/unregister events incremented and decremented by looking at the list size at that moment,
+    which drifts under concurrency (two threads both see the "0 prisoners" boundary), leaving the MCM's "Check Prisoner"
+    page visible with no prisoners left. The active prisons are cached in an array (looping every quest alias slot costs a
+    vanilla native per slot, ~0.45 s a read, and the MCM reads this several times), so a read is a few script property reads.
 /;
+RPB_Prison[] __activePrisonCache
+int __activePrisonCacheCount
+bool __activePrisonCacheValid
+
+function __InvalidateActivePrisonCache()
+    __activePrisonCacheValid = false
+endFunction
+
+function __BuildActivePrisonCache()
+    if (!__activePrisonCache)
+        __activePrisonCache = new RPB_Prison[128]
+    endif
+
+    int found = 0
+    int i = 0
+    while (i < PrisonSlots && found < 128)
+        RPB_Prison prison = self.GetNthAlias(i) as RPB_Prison
+        if (prison && prison.Active)
+            __activePrisonCache[found] = prison
+            found += 1
+        endif
+        i += 1
+    endWhile
+
+    __activePrisonCacheCount = found
+    __activePrisonCacheValid = true
+endFunction
+
 int property PrisonsWithPrisonersCount
     int function get()
+        if (!__activePrisonCacheValid)
+            self.__BuildActivePrisonCache()
+        endif
+
         int withPrisoners = 0
         int i = 0
-        while (i < PrisonSlots)
-            RPB_Prison prison = self.GetNthAlias(i) as RPB_Prison
-            if (prison && prison.Active && prison.Prisoners.Count > 0)
+        while (i < __activePrisonCacheCount)
+            if (__activePrisonCache[i].Prisoners.Count > 0)
                 withPrisoners += 1
             endif
             i += 1
@@ -160,6 +192,19 @@ endEvent
 
 event OnPrisonRegisteredPrisoner(RPB_Prison apPrison, RPB_Prisoner apPrisoner)
     self.AddPrisonerToPrisonRegistry(apPrisoner)
+
+    ; A prison that is not in the active-prison cache (activated some other way) would never be counted
+    bool cached = false
+    int i = 0
+    while (__activePrisonCacheValid && i < __activePrisonCacheCount)
+        if (__activePrisonCache[i] == apPrison)
+            cached = true
+        endif
+        i += 1
+    endWhile
+    if (!cached)
+        self.__InvalidateActivePrisonCache()
+    endif
 endEvent
 
 event OnPrisonUnregisteredPrisoner(RPB_Prison apPrison, RPB_Prisoner apPrisoner)
@@ -489,6 +534,7 @@ bool function InitializePrisonInSlot(string asHold, int aiSlot)
     endif
 
     slotAlias.Active = true
+    self.__InvalidateActivePrisonCache()
     slotAlias.SetFallbackProperty("Name", slotAlias.PrisonLocation.GetName())
 
     self.AssignPrisonRootObject(slotAlias, prisonObject)
@@ -582,6 +628,7 @@ endFunction
 ; ==========================================================
 
 bool function DeletePrison(RPB_Prison apPrison)
+    self.__InvalidateActivePrisonCache()
     Debug("["+ apPrison.GetName() +"] ["+ apPrison.Name +"] PrisonManager::DeletePrison", "Deleted Prison [Name: " + apPrison.Name + ", Hold: " + apPrison.Hold + ", Faction: " + apPrison.PrisonFaction + ", City: " + apPrison.City + "]")
 
     Utility.Wait(0.1)
@@ -600,6 +647,7 @@ function UninitializePrisons()
 endFunction
 
 int function UninitializeNthPrison(int index)
+    self.__InvalidateActivePrisonCache()
     RPB_Prison possiblePrison = self.GetNthPrison(index)
     if (IsValidPrison(possiblePrison))
         self.DeletePrison(possiblePrison)
@@ -819,6 +867,7 @@ bool function __initializePrisonInternal(RPB_Entity apEntity, string asHold, int
     self.AttachMonitoringObject(prison, prison.Monitor.MonitorOn)
 
     prison.Active = true
+    self.__InvalidateActivePrisonCache()
     prison.SetFallbackProperty("Name", prison.PrisonLocation.GetName())
 
     ; Debug("PrisonManager::__initializePrisonInternal", "Initializing Prison: " + prison.Name + ", Object: " + GetContainerList(prison.Root))

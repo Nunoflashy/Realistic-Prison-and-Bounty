@@ -23,7 +23,14 @@ endFunction
 
 bool function Add(RPB_Prisoner apPrisonerRef)
     string elementKey = self.GetPrisonerID(apPrisonerRef.GetActor())
-    parent.AddElement(apPrisonerRef, elementKey)
+
+    ; A key that already exists holds the instance of an effect that ended (the actor unloaded and loaded again, which starts
+    ; a new instance): point it at this live one instead of refusing the duplicate.
+    if (parent.HasKey(elementKey))
+        parent.ReplaceElement(apPrisonerRef, elementKey)
+    else
+        parent.AddElement(apPrisonerRef, elementKey)
+    endif
 endFunction
 
 function Remove(RPB_Prisoner apPrisoner)

@@ -569,6 +569,24 @@ function AddElement(ActiveMagicEffect element, string elementKey)
     RPB_ThreadLock.Release(threadLock)
 endFunction
 
+;/
+    Puts @element under @elementKey, in the slot the key already has (the count and the index maps do not change), or adds
+    it when the key is new. Never dispels the previous element: it is typically the stale instance of an effect that ended
+    when its actor unloaded (a reload starts a NEW instance, and Add refuses a duplicate key).
+/;
+function ReplaceElement(ActiveMagicEffect element, string elementKey)
+    int threadLock = self.__GetThreadLock()
+    self.__AcquireThreadLock(threadLock)
+
+    if (self.HasKey(elementKey))
+        self.__SetSlot(FastMap_GetInt(__keyToIndex, elementKey), element)
+    else
+        self.__AddElementImpl(element, elementKey)
+    endif
+
+    RPB_ThreadLock.Release(threadLock)
+endFunction
+
 function __AddElementImpl(ActiveMagicEffect element, string elementKey)
     if (self.HasKey(elementKey))
         Error("Element "+ elementKey +" already exists, cannot add it again!")
@@ -601,7 +619,11 @@ function RemoveElement(string elementKey, bool dispel = true)
     ; Dispelled only after the lock is released: the effect's own callbacks (OnEffectFinish /
     ; OnDestroy) run on other threads and must never end up waiting on a lock still held here
     if (dispel && removedElement)
-        removedElement.Dispel()
+        ; A stale instance (its effect already ended, e.g. the actor unloaded) has no native object left: Dispel would only error
+        RPB_ActorBase removedActorBase = removedElement as RPB_ActorBase
+        if (!removedActorBase || removedActorBase.IsEffectActive)
+            removedElement.Dispel()
+        endif
     endif
 endFunction
 

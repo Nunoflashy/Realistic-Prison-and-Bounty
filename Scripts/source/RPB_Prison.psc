@@ -1660,6 +1660,15 @@ endFunction
 
     RPB_Prisoner    @akPrisonerRef: The Prisoner reference to bind to the Actor.
 /;
+;/
+    A prisoner that is already registered got a NEW effect instance (its actor unloaded and loaded again): make the list
+    point at the live one, without firing the registration events again.
+/;
+function RebindPrisoner(RPB_Prisoner apPrisoner)
+    Prisoners.Add(apPrisoner)
+    RPB_Utility.Crumb(apPrisoner.GetActor(), "Prison.RebindPrisoner: list holds this instance: " + (Prisoners.AtKey(apPrisoner.GetActor()) == apPrisoner))
+endFunction
+
 bool function RegisterPrisoner(RPB_Prisoner apPrisoner)
     if (self.IsPrisoner(apPrisoner))
         RPB_Utility.Crumb(apPrisoner.GetActor(), "Prison.RegisterPrisoner: already a prisoner, returned false")
@@ -1667,7 +1676,7 @@ bool function RegisterPrisoner(RPB_Prisoner apPrisoner)
     endif
     
     Prisoners.Add(apPrisoner)
-    RPB_Utility.Crumb(apPrisoner.GetActor(), "Prison.RegisterPrisoner: Prisoners.Add done")
+    RPB_Utility.Crumb(apPrisoner.GetActor(), "Prison.RegisterPrisoner: Prisoners.Add done (list holds this instance: " + (Prisoners.AtKey(apPrisoner.GetActor()) == apPrisoner) + ")")
     self.OnPrisonerRegistered(apPrisoner)
     return Prisoners.Exists(apPrisoner)
 endFunction

@@ -112,6 +112,8 @@ function SetTests()
     self.AddTest("80 - PrisonMonitor: Next Wake Schedule Maths (Lowest Sentence, Empty, Away, Served)", "Test_PrisonMonitor_ScheduleMaths", abChainable = false)
     self.AddTest("81 - PrisonMonitor: What an Away Prisoner Looks Like (Effect Gone, List Entry, Restore)", "Test_PrisonMonitor_AwayPrisoner", abChainable = false)
     self.AddTest("82 - PrisonMonitor: Foreground / Background Handoff State", "Test_PrisonMonitor_Handoff", abChainable = false)
+    self.AddTest("83 - PrisonManager: Prisons-With-Prisoners Count Is Cheap and Matches a Slow Recount", "Test_PrisonManager_CountIsCheap", abChainable = false)
+    self.AddTest("84 - PrisonMonitor: Releases an Away Prisoner Whose Sentence Is Served (Headless)", "Test_PrisonMonitor_HeadlessRelease", abChainable = false)
     self.AddTest("41 - ActiveMagicEffectContainer: Stuck Lock Self-Heals", "Test_ActiveMagicEffectContainer_StuckLockSelfHeals")
     self.AddTest("42 - ThreadLock: JAtomic Primitive Semantics and Registry", "Test_ThreadLock_PrimitiveSemantics")
     ; Not chainable: fires concurrent worker threads
@@ -6532,6 +6534,10 @@ state Test_PrisonMonitor_AwayPrisoner
             stateBack = again.GetState()
         endif
         log("AWAY 6s after coming back: entry present=" + (again != none) + ", list Count=" + prison.Prisoners.Count + ", state='" + stateBack + "', 3D loaded=" + a.Is3DLoaded())
+        step = assert_true(again != none && again.IsEffectActive, "After the actor came back the prisoner list still holds a stale (ended) effect instance")
+        ok = ok && step
+        step = assert_true(prison.Prisoners.Count == 1 && prison.Prisoners.ValidateIndexConsistency() == "", "The prisoner list is inconsistent after the away/back cycle (Count " + prison.Prisoners.Count + ")")
+        ok = ok && step
         log("AWAY " + RPB_Utility.DumpCrumbs(a))
         RPB_Utility.DisableCrumbs()
 
@@ -6613,6 +6619,130 @@ state Test_PrisonMonitor_Handoff
         if (prison.Monitor.GetState() != "Inactive")
             prison.Monitor.Reschedule()
         endif
+    endFunction
+endState
+
+
+;/
+    PrisonsWithPrisonersCount is read several times while the MCM builds its pages. It loops the prisons' own lists (drift
+    free) but must be cheap: the active prisons are cached, so a read is a handful of script property reads instead of a vanilla
+    native per quest alias slot (~0.45 s a read). Compares against a slow recount too.
+/;
+state Test_PrisonManager_CountIsCheap
+    function Setup()
+        RPB_PrisonManager mgr = RPB_API.GetPrisonManager()
+        bool ok = true
+        bool step = false
+
+        int first = mgr.PrisonsWithPrisonersCount ; may build the cache
+
+        float t0 = Utility.GetCurrentRealTime()
+        int last = 0
+        int i = 0
+        while (i < 10)
+            last = mgr.PrisonsWithPrisonersCount
+            i += 1
+        endWhile
+        int ms = self.__Ms(Utility.GetCurrentRealTime() - t0)
+
+        ; Slow recount straight from the alias slots
+        int slow = 0
+        int slot = 0
+        while (slot < mgr.PrisonSlots)
+            RPB_Prison prison = mgr.GetNthAlias(slot) as RPB_Prison
+            if (prison && prison.Active && prison.Prisoners.Count > 0)
+                slow += 1
+            endif
+            slot += 1
+        endWhile
+
+        step = assert_true(last == slow && first == slow, "PrisonsWithPrisonersCount (" + last + ") differs from a slow recount (" + slow + ")")
+        ok = ok && step
+        step = assert_true(ms < 100, "10 reads of PrisonsWithPrisonersCount took " + ms + " ms (cached reads should be a few ms)")
+        ok = ok && step
+        log("COUNT 10 reads took " + ms + " ms, value " + last + " (slow recount " + slow + ")")
+
+        display_result(ok)
+    endFunction
+endState
+
+;/
+    The monitor's core promise: a prisoner whose sentence ends while they are away (3D unloaded, their effect ended) is
+    released in the background. Imprisons a temp NPC through the real flow, makes the sentence served (stored time of
+    imprisonment far in the past), waits until the actor is away, then runs one monitor pass and checks that the prisoner was
+    released and removed from the list, and that nothing leaked.
+/;
+state Test_PrisonMonitor_HeadlessRelease
+    function Setup()
+        RPB_Prison prison = (RPB_API.GetPrisonManager()).GetPrison("Haafingar")
+        Actor player = Game.GetFormEx(0x14) as Actor
+        Actor guard = RPB_Utility.GetNearestGuard(player, 3000.0, player)
+        bool ok = true
+        bool step = false
+
+        step = assert_true(guard != none, "No guard near the player to perform the arrest (stand near a guard in Solitude)")
+        ok = ok && step
+        if (!guard)
+            display_result(false)
+            return
+        endif
+
+        RPB_PrisonManager mgr = RPB_API.GetPrisonManager()
+        int baseCount = prison.Prisoners.Count
+        int basePrisons = mgr.PrisonsWithPrisonersCount
+
+        Actor a = __SpawnTempActor()
+        self.__StressArrest(guard, a)
+        int msImprison = self.__StressWaitImprisoned(a, 30.0)
+        step = assert_true(msImprison >= 0, "The temp NPC was never imprisoned (30 s)" + self.__StressLeftovers(a, prison))
+        ok = ok && step
+        if (msImprison < 0)
+            display_result(false)
+            return
+        endif
+
+        RPB_Prisoner p = prison.Prisoners.AtKey(a)
+        step = assert_true(p != none, "Imprisoned but no prisoner reference")
+        ok = ok && step
+        if (!p)
+            display_result(false)
+            return
+        endif
+
+        ; Sentence served: imprisoned 100000 game days ago
+        p.SetFloat("Time of Imprisonment", Utility.GetCurrentGameTime() - 100000.0)
+        step = assert_true(p.IsSentenceServed, "Precondition: the sentence should count as served")
+        ok = ok && step
+
+        ; Make sure it is away (the flow put it in a jail cell; the player is elsewhere)
+        Utility.Wait(20.0)
+        RPB_Prisoner whileAway = prison.Prisoners.AtKey(a)
+        bool activeWhileAway = false
+        if (whileAway)
+            activeWhileAway = whileAway.IsEffectActive
+        endif
+        log("HEADLESS before the monitor pass: 3D loaded=" + a.Is3DLoaded() + ", entry present=" + (whileAway != none) + ", effect active=" + activeWhileAway + ", cell=" + a.GetParentCell() + ", imprisoned=" + RPB_Utility.IsActorImprisoned(a))
+
+        prison.Monitor.AwaitPrisoners()
+
+        float t0 = Utility.GetCurrentRealTime()
+        while (prison.Prisoners.AtKey(a) != none && (Utility.GetCurrentRealTime() - t0) < 20.0)
+            Utility.Wait(0.5)
+        endWhile
+        step = assert_true(prison.Prisoners.AtKey(a) == none, "The away prisoner (sentence served) was not released by the monitor pass" + self.__StressLeftovers(a, prison))
+        ok = ok && step
+        step = assert_false(RPB_Utility.IsActorImprisoned(a), "The actor is still flagged as imprisoned after the monitor pass")
+        ok = ok && step
+        log("HEADLESS after the monitor pass: released=" + (prison.Prisoners.AtKey(a) == none) + ", imprisoned=" + RPB_Utility.IsActorImprisoned(a) + ", list Count=" + prison.Prisoners.Count)
+
+        __TeardownAllTempActors()
+        ok = ok && self.__StressAssertNoLeaks(prison, mgr, baseCount, basePrisons)
+
+        display_result(ok)
+    endFunction
+
+    function Teardown()
+        __TeardownAllTempActors()
     endFunction
 endState
 

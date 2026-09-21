@@ -936,7 +936,7 @@ endEvent
 event OnEffectFinish(Actor akTarget, Actor akCaster)
     Debug("RPB_ActorBase::OnEffectFinish", this + " is no longer bound to " + self as string + ", detaching script!")
 
-    RPB_Utility.Crumb(akTarget, "OnEffectFinish " + (self as string))
+    RPB_Utility.Crumb(this, "OnEffectFinish " + (self as string) + " (akTarget is none: " + (akTarget == none) + ")")
     __isEffectActive = false
     self.OnDestroy()
 endEvent
