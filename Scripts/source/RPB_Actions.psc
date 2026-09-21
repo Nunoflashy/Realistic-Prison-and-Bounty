@@ -28,6 +28,7 @@ string[] function GetActions()
         "[Debug] Toggle Flow Profiling," + \
         "[Debug] Toggle Debug Logging," + \
         "[Debug] Toggle Fast Monitor (3h)," + \
+        "[Debug] Reset Stuck Prison State," + \
         "[MCM] Validate Options," + \
         "[State] Delete All States," + \
         "[Actor] Log Selected Actor State Variables," + \
@@ -102,6 +103,9 @@ function ShowActionsMenu()
 
     elseif (actionToPerform == "[Debug] Toggle Fast Monitor (3h)")
         Action_ToggleFastMonitor()
+
+    elseif (actionToPerform == "[Debug] Reset Stuck Prison State")
+        Action_ResetStuckPrisonState()
 
     elseif (actionToPerform == "[MCM] Validate Options")
         API.MCM.ValidateOptions()
@@ -294,6 +298,46 @@ endFunction
     Flips the prison monitor's dev override: wake every 3 game hours instead of at the earliest release (test aid).
     Applies from the next reschedule (imprison an NPC, or leave the prison cell).
 /;
+;/
+    Recovery for a stuck prison flow: clears every prison's "player is fast forwarding to release" flag, puts a prisoner (the
+    Player included) that is stuck in ServeOnRest / Awaiting / Releasing back in the Imprisoned state, and re-syncs every
+    prison monitor's background wake. The container thread locks already heal themselves (bounded wait).
+/;
+function Action_ResetStuckPrisonState()
+    RPB_PrisonManager prisonManager = API.PrisonManager
+    int reset = 0
+
+    int i = 0
+    while (i < prisonManager.PrisonSlots)
+        RPB_Prison prison = prisonManager.GetNthAlias(i) as RPB_Prison
+        if (prison && prison.Active)
+            prison.SetPlayerFastForwardingToRelease(false)
+
+            int p = 0
+            while (p < prison.Prisoners.Count)
+                RPB_Prisoner prisoner = prison.Prisoners.AtIndex(p)
+                if (prisoner)
+                    string prisonerState = prisoner.GetState()
+                    if (prisonerState == "ServeOnRest" || prisonerState == "Awaiting" || prisonerState == "Releasing")
+                        if (prisoner.IsImprisoned)
+                            prisoner.GotoState("Imprisoned")
+                            reset += 1
+                        endif
+                    endif
+                endif
+                p += 1
+            endWhile
+
+            if (prison.Monitor.GetState() != "Inactive")
+                prison.Monitor.Reschedule()
+            endif
+        endif
+        i += 1
+    endWhile
+
+    debug.notification("RPB: stuck prison state reset (" + reset + " prisoner(s) put back to Imprisoned)")
+endFunction
+
 function Action_ToggleFastMonitor()
     if (RPB_Utility.GetMonitorOverrideHours() > 0.0)
         RPB_Utility.SetMonitorOverrideHours(0.0)

@@ -1711,6 +1711,7 @@ function FastForwardToRelease()
     Prison.SetPlayerFastForwardingToRelease(true)
 
     GotoState("ServeOnRest")
+    self.NoteStateEntered()
     self.UnregisterForUpdates()
 
     ; If the Release must fall in between Minimum and Maximum release hours, set the hour to the minimum before passing the days.
@@ -1736,6 +1737,7 @@ function FastForwardToRelease()
     ; Debug("["+ Name +"] Prisoner::FastForwardToRelease", "CurrentTime: " + currentTimeBeforeChanges + ", timeLeft: " + timeLeft + ", currentTimeOverride: " + __currentTimeOverride + ", TimeLeftInSentence: " + TimeLeftInSentence)
 
     GotoState("Awaiting")
+    self.NoteStateEntered()
 
     Prison.SendReleaseRequest(self)
     Prison.SetPlayerFastForwardingToRelease(false)
@@ -2082,6 +2084,13 @@ endProperty
 
 function UpdateTimeJailed()
     float timeJailedSinceLastUpdate = GetElapsedTimeBetweenTimes(PreviousUpdateTimeServed, TimeServed)
+
+    int maxDays = RPB_Utility.GetMaxDayEventsPerUpdate()
+    if (timeJailedSinceLastUpdate > maxDays)
+        DebugError("["+ Name +"] Prisoner::UpdateTimeJailed", "Elapsed time of " + timeJailedSinceLastUpdate + " days is over the " + maxDays + " day bound, clamping it.")
+        timeJailedSinceLastUpdate = maxDays
+    endif
+
     int daysElapsed = timeJailedSinceLastUpdate as int
 
     ; Debug("["+ Name +"] Prisoner::UpdateTimeJailed", "TimeServed: " + TimeServed + ", PreviousUpdateTimeServed: " + PreviousUpdateTimeServed + ", timeJailedSinceLastUpdate: " + timeJailedSinceLastUpdate)
@@ -2104,6 +2113,13 @@ endFunction
 function UpdateDayEvents()
     int daysElapsed = GetElapsedTimeBetweenTimes(PreviousUpdateTimeServed, TimeServed) as int
     ; Debug("["+ Name +"] Prisoner::UpdateDayEvents", "PreviousUpdateTimeServed: " + PreviousUpdateTimeServed + ", TimeServed: " + TimeServed + ", daysElapsed: " + daysElapsed)
+
+    ; One day event per elapsed day with no bound made a 100000 day gap run for 7 minutes in a single stack (~4 ms each)
+    int maxDays = RPB_Utility.GetMaxDayEventsPerUpdate()
+    if (daysElapsed > maxDays)
+        DebugError("["+ Name +"] Prisoner::UpdateDayEvents", daysElapsed + " day events are pending, more than the " + maxDays + " day bound: running " + maxDays + ".")
+        daysElapsed = maxDays
+    endif
 
     while (daysElapsed > 0)
         self.OnDayPassed()
@@ -2601,7 +2617,34 @@ event OnDayPassed()
 endEvent
 
 int __serveTimeLastDayRegistered
+; Real time (seconds) at which this prisoner entered a transient serve/release state (ServeOnRest, Awaiting, Releasing)
+float __serveStateEnteredAt
+
+function NoteStateEntered()
+    __serveStateEnteredAt = Utility.GetCurrentRealTime()
+endFunction
+
+;/
+    Self-healing: a prisoner that has been in a transient serve/release state for over a minute got stuck there (the flow
+    that should have moved it on never finished), which used to leave "serve your sentence" doing nothing. Back to Imprisoned.
+/;
+function __RecoverStuckServeState()
+    string currentState = self.GetState()
+    if (currentState != "ServeOnRest" && currentState != "Awaiting" && currentState != "Releasing")
+        return
+    endif
+
+    if (!self.IsImprisoned || __serveStateEnteredAt <= 0.0 || (Utility.GetCurrentRealTime() - __serveStateEnteredAt) < 60.0)
+        return
+    endif
+
+    DebugError("["+ Name +"] Prisoner::__RecoverStuckServeState", "Stuck in the '" + currentState + "' state for over a minute, back to Imprisoned.")
+    Prison.SetPlayerFastForwardingToRelease(false)
+    self.GotoState("Imprisoned")
+endFunction
+
 event OnSleepStart(float afSleepStartTime, float afSleepEndTime)
+    self.__RecoverStuckServeState()
     if (!self.ShouldProcessImprisonmentEvents)
         return
     endif

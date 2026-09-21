@@ -1927,6 +1927,25 @@ string function DumpCrumbs(Actor akActor) global
 endFunction
 
 ;/
+    The most game days a single update processes per-day events for (and the most days PassTimeInDays passes): 40 years.
+    A prisoner's day events used to run once per elapsed day with no bound, so a huge elapsed time (a very long wait, a
+    stale reference time) monopolized one script stack for minutes (~4 ms per day event) and delayed everything else,
+    the player's release included. Long sentences are legitimate (NPCs that are only ever free by escaping), but one
+    update must stay bounded. A dev value (Profile.MAX_DAY_EVENTS, 0 = default) lets a test lower it.
+/;
+int function GetMaxDayEventsPerUpdate() global
+    int configured = JDB.solveInt(".rpb_root.storage.Profile.MAX_DAY_EVENTS")
+    if (configured > 0)
+        return configured
+    endif
+    return 14610
+endFunction
+
+function SetMaxDayEventsPerUpdate(int aiDays) global
+    RPB_StorageVars.SetInt("MAX_DAY_EVENTS", aiDays, "Profile")
+endFunction
+
+;/
     Dev override for the prison monitor's wake: when > 0 the monitor wakes every that many game hours instead of at the
     earliest release, so its behavior can be tested without waiting out a sentence. 0 (default) = the real schedule.
 /;
@@ -2854,16 +2873,23 @@ bool function PassTimeInDays(int aiPassByDays) global
     GlobalVariable GameDaysPassed = Game.GetFormEx(0x39) as GlobalVariable
     GlobalVariable GameHour = Game.GetFormEx(0x38) as GlobalVariable
 
+    int maxDays = GetMaxDayEventsPerUpdate()
+    if (aiPassByDays > maxDays)
+        DebugError("Utility::PassTimeInDays", "Asked to pass " + aiPassByDays + " days, more than the " + maxDays + " day bound: passing " + maxDays + ".")
+        aiPassByDays = maxDays
+    endif
+
+    bool logging = IsDebuggingEnabled() ; the message below costs about ten natives a day: only build it when it will be logged
+
     int daysPassed = 0
     while (daysPassed < aiPassByDays)
-        int currentDay      = GetCurrentDay()
-        int currentMonth    = GetCurrentMonth()
-        int daysInMonth     = GetDaysOfMonth(currentMonth)
-
         GameHour.Mod(24)
         Utility.Wait(0.01)
-        string currentDate = GetCurrentDay() + "/" + GetCurrentMonth() + "/" + GetCurrentYear()
-        DebugWithArgs("Utility::PassTimeInDays", aiPassByDays, "Date: " + currentDate +  " at " + GetTimeAs12Hour(GetCurrentHour()) + " ("+ GetTimeAs12Hour(GetCurrentHour()) +", "+  ToOrdinalNthDay(GetCurrentDay()) +" of " + GetMonthName(GetCurrentMonth()) +")" + ", " + "GameDaysPassed: " + GameDaysPassed.GetValue())
+
+        if (logging)
+            string currentDate = GetCurrentDay() + "/" + GetCurrentMonth() + "/" + GetCurrentYear()
+            DebugWithArgs("Utility::PassTimeInDays", aiPassByDays, "Date: " + currentDate +  " at " + GetTimeAs12Hour(GetCurrentHour()) + " ("+ GetTimeAs12Hour(GetCurrentHour()) +", "+  ToOrdinalNthDay(GetCurrentDay()) +" of " + GetMonthName(GetCurrentMonth()) +")" + ", " + "GameDaysPassed: " + GameDaysPassed.GetValue())
+        endif
         daysPassed += 1
     endWhile
     ; GameHour.Mod(-1) ; Take off one hour, for some reason, after passing the days, the time is incremented by 1h

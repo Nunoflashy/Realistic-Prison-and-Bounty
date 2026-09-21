@@ -114,6 +114,8 @@ function SetTests()
     self.AddTest("82 - PrisonMonitor: Foreground / Background Handoff State", "Test_PrisonMonitor_Handoff", abChainable = false)
     self.AddTest("83 - PrisonManager: Prisons-With-Prisoners Count Is Cheap and Matches a Slow Recount", "Test_PrisonManager_CountIsCheap", abChainable = false)
     self.AddTest("84 - PrisonMonitor: Releases an Away Prisoner Whose Sentence Is Served (Headless)", "Test_PrisonMonitor_HeadlessRelease", abChainable = false)
+    self.AddTest("85 - Prisoner: Day Events Per Update Are Bounded (Extreme Elapsed Time)", "Test_Prisoner_DayEventBound", abChainable = false)
+    self.AddTest("86 - PrisonMonitor: Release Queue Order, No Duplicates, One Per Wake (Dry Run)", "Test_PrisonMonitor_ReleaseQueue", abChainable = false)
     self.AddTest("41 - ActiveMagicEffectContainer: Stuck Lock Self-Heals", "Test_ActiveMagicEffectContainer_StuckLockSelfHeals")
     self.AddTest("42 - ThreadLock: JAtomic Primitive Semantics and Registry", "Test_ThreadLock_PrimitiveSemantics")
     ; Not chainable: fires concurrent worker threads
@@ -6709,8 +6711,8 @@ state Test_PrisonMonitor_HeadlessRelease
             return
         endif
 
-        ; Sentence served: imprisoned 100000 game days ago
-        p.SetFloat("Time of Imprisonment", Utility.GetCurrentGameTime() - 100000.0)
+        ; Sentence served: imprisoned two days more than the sentence ago (a huge value ran one stack for ~7 minutes, see test 85)
+        p.SetFloat("Time of Imprisonment", Utility.GetCurrentGameTime() - (p.Sentence + 2))
         step = assert_true(p.IsSentenceServed, "Precondition: the sentence should count as served")
         ok = ok && step
 
@@ -6742,6 +6744,120 @@ state Test_PrisonMonitor_HeadlessRelease
     endFunction
 
     function Teardown()
+        __TeardownAllTempActors()
+    endFunction
+endState
+
+
+;/
+    A prisoner's day events ran once per elapsed day with no bound: a 100000 day gap (an unrealistic served time in test 84)
+    kept one script stack busy for ~7 minutes (about 4 ms per event) and delayed everything else, the player's release included.
+    UpdateTimeJailed() now clamps the number of day events (and the Time Jailed stat) to GetMaxDayEventsPerUpdate() (40 years
+    by default). The test lowers the bound to 50 and lets 500 days elapse: it must finish quickly and count at most 50 days.
+/;
+state Test_Prisoner_DayEventBound
+    function Setup()
+        RPB_Prison prison = (RPB_API.GetPrisonManager()).GetPrison("Haafingar")
+        bool ok = true
+        bool step = false
+
+        Actor a = __SpawnTempActor()
+        RPB_Prisoner p = __RegisterPrisonerAndWait(a, prison)
+        step = assert_true(p != none, "Could not register the prisoner used for this test")
+        ok = ok && step
+        if (!p)
+            display_result(false)
+            return
+        endif
+
+        RPB_Utility.SetMaxDayEventsPerUpdate(50)
+        p.SetFloat("Time of Imprisonment", Utility.GetCurrentGameTime() - 500.0)
+
+        float statBefore = p.QueryStat("Time Jailed")
+        float t0 = Utility.GetCurrentRealTime()
+        p.UpdateTimeJailed()
+        int ms = self.__Ms(Utility.GetCurrentRealTime() - t0)
+        float counted = p.QueryStat("Time Jailed") - statBefore
+
+        RPB_Utility.SetMaxDayEventsPerUpdate(0) ; back to the default bound
+
+        step = assert_true(ms < 30000, "UpdateTimeJailed() took " + ms + " ms for a 500 day gap with a 50 day bound")
+        ok = ok && step
+        step = assert_true(counted <= 50.5 && counted > 0.0, "The Time Jailed stat grew by " + counted + " days, expected at most the 50 day bound")
+        ok = ok && step
+        log("DAYBOUND 500 elapsed days, bound 50: took " + ms + " ms, Time Jailed grew by " + counted)
+
+        display_result(ok)
+    endFunction
+
+    function Teardown()
+        RPB_Utility.SetMaxDayEventsPerUpdate(0)
+        __TeardownAllTempActors()
+    endFunction
+endState
+
+;/
+    The monitor's release queue: due NPC prisoners are released one per wake, ordered by release time, with no duplicates,
+    on the monitor's own stack (never inline in the caller). Runs as a dry run (the monitor only records the order it
+    would release in), with two bare registered prisoners whose sentences differ.
+/;
+state Test_PrisonMonitor_ReleaseQueue
+    function Setup()
+        RPB_Prison prison = (RPB_API.GetPrisonManager()).GetPrison("Haafingar")
+        RPB_PrisonMonitor mon = prison.Monitor
+        bool ok = true
+        bool step = false
+
+        Actor a1 = __SpawnTempActor()
+        RPB_Prisoner p1 = __RegisterPrisonerAndWait(a1, prison)
+        Actor a2 = __SpawnTempActor()
+        RPB_Prisoner p2 = __RegisterPrisonerAndWait(a2, prison)
+        step = assert_true(p1 != none && p2 != none, "Could not register the two prisoners used for this test")
+        ok = ok && step
+        if (!p1 || !p2)
+            display_result(false)
+            return
+        endif
+
+        float now = Utility.GetCurrentGameTime()
+        p1.SetInt("Sentence", 10)
+        p1.SetFloat("Time of Imprisonment", now)
+        p2.SetInt("Sentence", 3)
+        p2.SetFloat("Time of Imprisonment", now)
+
+        mon.DebugDryRunReleases = true
+        mon.ClearDryRunReleaseOrder()
+
+        mon.QueueRelease(p1) ; the later release is queued first
+        mon.QueueRelease(p1) ; duplicate: ignored
+        mon.QueueRelease(p2)
+        step = assert_true(mon.ReleaseQueueLength >= 1 && mon.ReleaseQueueLength <= 2, "Expected the queue to hold the 2 prisoners (or already be processing them), it holds " + mon.ReleaseQueueLength)
+        ok = ok && step
+
+        float t0 = Utility.GetCurrentRealTime()
+        while ((mon.ReleaseQueueLength > 0 || mon.GetDryRunReleaseOrder().Length < 2) && (Utility.GetCurrentRealTime() - t0) < 15.0)
+            Utility.Wait(0.2)
+        endWhile
+
+        Form[] order = mon.GetDryRunReleaseOrder()
+        mon.DebugDryRunReleases = false
+
+        step = assert_true(order.Length == 2, "Expected exactly 2 releases (no duplicates), saw " + order.Length)
+        ok = ok && step
+        if (order.Length == 2)
+            step = assert_true(order[0] == a2 as Form && order[1] == a1 as Form, "Expected the 3 day sentence (a2) released before the 10 day sentence (a1)")
+            ok = ok && step
+        endif
+        step = assert_true(mon.ReleaseQueueLength == 0, "The queue should be empty afterwards, holds " + mon.ReleaseQueueLength)
+        ok = ok && step
+        log("RELEASEQUEUE order: " + order.Length + " releases, queue length now " + mon.ReleaseQueueLength)
+
+        display_result(ok)
+    endFunction
+
+    function Teardown()
+        RPB_Prison prison = (RPB_API.GetPrisonManager()).GetPrison("Haafingar")
+        prison.Monitor.DebugDryRunReleases = false
         __TeardownAllTempActors()
     endFunction
 endState

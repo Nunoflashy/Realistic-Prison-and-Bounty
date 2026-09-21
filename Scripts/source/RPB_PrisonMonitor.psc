@@ -258,7 +258,7 @@ endFunction
 bool function AwaitPrisonerForRelease(RPB_Prisoner apPrisoner)
     if (apPrisoner.IsSentenceServed)
         Debug("PrisonMonitor::AwaitPrisonerForRelease", "Released Prisoner:  " + apPrisoner + apPrisoner.GetPrisoner())
-        Prison.SendReleaseRequest(apPrisoner)
+        self.QueueRelease(apPrisoner) ; asynchronous, ordered: never blocks this pass on a release
         return false
     endif
 
@@ -268,6 +268,126 @@ bool function AwaitPrisonerForRelease(RPB_Prisoner apPrisoner)
 
     return true
 endFunction
+
+;/
+    Ordered release queue. Due NPC prisoners are queued (ordered by their release time, no duplicates) and released ONE
+    per wake on the monitor's own stack, so a slow or failing release only delays the queue, never the caller (the
+    player's fast forward, the background wake). ReleaseQueued() is the plug-in point for the release strategy: today
+    SendReleaseRequest (teleport / headless, what an away prisoner needs); later an escort scene when the prisoner is
+    near the player (see ROADMAP: the SceneManager must play several scenes first).
+/;
+int __releaseQueue ; JArray of actor Forms, retained
+int __releaseAt    ; JFormMap actor -> game time of release, retained
+bool __releaseQueueRunning
+
+; Test hook: when true ReleaseQueued() only records the order instead of releasing
+bool property DebugDryRunReleases auto
+int __releasedLog ; JArray of actor Forms in the order ReleaseQueued() saw them (dry run only)
+
+function __EnsureReleaseQueue()
+    if (!__releaseQueue || !JValue.isExists(__releaseQueue))
+        __releaseQueue = JValue.retain(JArray.object())
+    endif
+    if (!__releaseAt || !JValue.isExists(__releaseAt))
+        __releaseAt = JValue.retain(JFormMap.object())
+    endif
+    if (!__releasedLog || !JValue.isExists(__releasedLog))
+        __releasedLog = JValue.retain(JArray.object())
+    endif
+endFunction
+
+int property ReleaseQueueLength
+    int function get()
+        if (!__releaseQueue || !JValue.isExists(__releaseQueue))
+            return 0
+        endif
+        return JArray.count(__releaseQueue)
+    endFunction
+endProperty
+
+Form[] function GetDryRunReleaseOrder()
+    self.__EnsureReleaseQueue()
+    int count = JArray.count(__releasedLog)
+    Form[] order = Utility.CreateFormArray(count)
+    int i = 0
+    while (i < count)
+        order[i] = JArray.getForm(__releasedLog, i)
+        i += 1
+    endWhile
+    return order
+endFunction
+
+function ClearDryRunReleaseOrder()
+    self.__EnsureReleaseQueue()
+    JArray.clear(__releasedLog)
+endFunction
+
+function QueueRelease(RPB_Prisoner apPrisoner)
+    Actor queued = apPrisoner.GetActor()
+    if (!queued)
+        return
+    endif
+
+    self.__EnsureReleaseQueue()
+    if (JFormMap.hasKey(__releaseAt, queued))
+        return
+    endif
+
+    float releaseAt = Utility.GetCurrentGameTime() + apPrisoner.TimeLeftInSentence
+    JFormMap.setFlt(__releaseAt, queued, releaseAt)
+
+    int position = 0
+    int count = JArray.count(__releaseQueue)
+    while (position < count && JFormMap.getFlt(__releaseAt, JArray.getForm(__releaseQueue, position)) <= releaseAt)
+        position += 1
+    endWhile
+    JArray.addForm(__releaseQueue, queued, position)
+
+    if (!__releaseQueueRunning)
+        __releaseQueueRunning = true
+        RegisterForSingleUpdate(0.1)
+    endif
+endFunction
+
+; The release strategy for one queued prisoner (see the comment on the queue)
+function ReleaseQueued(RPB_Prisoner apPrisoner)
+    if (self.DebugDryRunReleases)
+        JArray.addForm(__releasedLog, apPrisoner.GetActor())
+        return
+    endif
+
+    Prison.SendReleaseRequest(apPrisoner)
+endFunction
+
+function ProcessReleaseQueue()
+    self.__EnsureReleaseQueue()
+
+    if (JArray.count(__releaseQueue) == 0)
+        __releaseQueueRunning = false
+        return
+    endif
+
+    Form next = JArray.getForm(__releaseQueue, 0)
+    JArray.eraseIndex(__releaseQueue, 0)
+    JFormMap.removeKey(__releaseAt, next)
+
+    RPB_Prisoner prisoner = Prisoners.AtKey(next as Actor)
+    if (prisoner)
+        self.ReleaseQueued(prisoner)
+    else
+        Debug("["+ Prison.Name +"] PrisonMonitor::ProcessReleaseQueue", "Queued prisoner " + next + " is not in the prison anymore, skipping.")
+    endif
+
+    if (JArray.count(__releaseQueue) > 0)
+        RegisterForSingleUpdate(0.5)
+    else
+        __releaseQueueRunning = false
+    endif
+endFunction
+
+event OnUpdate()
+    self.ProcessReleaseQueue()
+endEvent
 
 function AwaitPrisoners()
     int prisonersAwaitingRelease = 0

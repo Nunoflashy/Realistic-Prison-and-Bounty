@@ -774,8 +774,14 @@ int property SERVE_TIME_YES = 0 autoreadonly
 ; because issues may arise if the player is fast forwarding days/months,
 ; and the normal update system is retained for the NPC's in the other Prisons.
 bool __isPlayerFastForwardingToRelease
+float __fastForwardSetAt
 bool property IsPlayerFastForwardingToRelease
     bool function get()
+        ; Self-healing: a fast-forward that never finished must not keep NPCs unmonitored forever
+        if (__isPlayerFastForwardingToRelease && (Utility.GetCurrentRealTime() - __fastForwardSetAt) > 60.0)
+            DebugError("["+ Name +"] Prison::IsPlayerFastForwardingToRelease", "The fast forward to release has been running for over a minute, treating it as stuck and clearing it.")
+            __isPlayerFastForwardingToRelease = false
+        endif
         return __isPlayerFastForwardingToRelease
     endFunction
 endProperty
@@ -1643,6 +1649,12 @@ endFunction
 
 function SetPlayerFastForwardingToRelease(bool abFastForward)
     __isPlayerFastForwardingToRelease = abFastForward
+    __fastForwardSetAt = Utility.GetCurrentRealTime()
+endFunction
+
+; Hands a due NPC prisoner to the monitor's ordered release queue (asynchronous: never blocks the caller)
+function QueueRelease(RPB_Prisoner apPrisoner)
+    Monitor.QueueRelease(apPrisoner)
 endFunction
 
 ;                      Prison - Mutators
@@ -2111,6 +2123,7 @@ endFunction
 
 function EscortPrisonerToRelease(RPB_Prisoner apPrisoner)
     apPrisoner.GotoState("Releasing")
+    apPrisoner.NoteStateEntered()
 
     ObjectReference releaseLocation = self.GetRandomReleaseMarker("Escort") as ObjectReference
     self.SendEscortPrisonerFromCellRequest(apPrisoner, releaseLocation)
@@ -2135,27 +2148,23 @@ bool function SendReleaseRequest(RPB_Prisoner apPrisoner)
     endif
 endFunction
 
+;/
+    Queues the release of every NPC prisoner with less time left than @afTimeLeftInSentence (+ one day of padding) in the
+    monitor's ordered release queue and returns immediately. It used to release each one inline (passing game time between
+    them and calling into every prisoner), so a slow release delayed the player's own fast-forward. @abPassTime is kept
+    for existing callers and ignored: the caller (the player's fast forward) passes the time itself.
+/;
 function ReleasePrisonersWithSentenceLessThan(float afTimeLeftInSentence, bool abPassTime = true)
     ;/ const /; int PADDING_ONE_DAY = 1
 
-    Form[] prisonersWithSentenceLessThan = self.GetPrisonersWithCurrentSentenceLessThan(afTimeLeftInSentence, PADDING_ONE_DAY)
-    int prisonersWithSentenceLessThanCount = prisonersWithSentenceLessThan.Length
-
-    Debug("["+ Name +"] Prison::ReleasePrisonersWithSentenceLessThan", "Prisoners With Sentence Less Than: " + prisonersWithSentenceLessThan)
+    Form[] due = self.GetPrisonersWithCurrentSentenceLessThan(afTimeLeftInSentence, PADDING_ONE_DAY)
 
     int i = 0
-    while (i < prisonersWithSentenceLessThanCount)
-        RPB_Prisoner prisoner = Prisoners.AtKey(prisonersWithSentenceLessThan[i] as Actor)
-        float timeLeftInSentenceForPrisoner = prisoner.TimeLeftInSentence
-        Debug("["+ Name +"] Prison::ReleasePrisonersWithSentenceLessThan", "["+ i +"] ["+ prisoner.GetActor() +"] Prisoner: " + prisoner.Name + " (Cell: "+ prisoner.JailCell.ID +") (Package: "+ prisoner.CellPackage.GetName() +") (Prison: "+ prisoner.Prison.Name +")" + ", Sentence Left: " + timeLeftInSentenceForPrisoner + ", Less Than: " + afTimeLeftInSentence)
-
-        if (abPassTime)
-            RPB_Utility.PassTimeInDays(Ceiling(timeLeftInSentenceForPrisoner))
+    while (i < due.Length)
+        RPB_Prisoner prisoner = Prisoners.AtKey(due[i] as Actor)
+        if (prisoner && !prisoner.IsPlayer())
+            self.QueueRelease(prisoner)
         endif
-
-        self.SendReleaseRequest(prisoner)
-        Debug("["+ Name +"] Prison::ReleasePrisonersWithSentenceLessThan", "["+ i +"] ["+ prisoner.GetActor() +"] Base Outfit: " + prisoner.GetActor().GetActorBase().GetOutfit())
-
         i += 1
     endWhile
 endFunction
