@@ -7647,6 +7647,22 @@ bool function __MassRun(bool abNoOvercrowding)
         i += 1
     endWhile
     log("MASS manifests before the release: with items " + manifestsWithItems + ", empty " + manifestsEmpty + ", missing " + manifestsMissing)
+    ; What the dress-up will have to work with: saved original outfit and saved body armor (read from the storage before the release)
+    int outfitSaved = 0
+    int bodySaved = 0
+    i = 0
+    while (i < TOTAL)
+        if (all[i] && RPB_Utility.IsActorImprisoned(all[i]))
+            if (RPB_StorageVars.GetFormOnReference("NPC Original Outfit", all[i], "Jail"))
+                outfitSaved += 1
+            endif
+            if (RPB_StorageVars.GetFormOnReference("NPC Worn Armor 32", all[i], "Jail"))
+                bodySaved += 1
+            endif
+        endif
+        i += 1
+    endWhile
+    log("MASS restore data before the release: original outfit saved for " + outfitSaved + " actors, body armor saved for " + bodySaved + " actors")
 
     ; Mass release: everybody at once
     float tRelease = Utility.GetCurrentRealTime()

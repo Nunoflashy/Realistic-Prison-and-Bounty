@@ -2276,7 +2276,7 @@ function TeleportPrisonerToRelease(RPB_Prisoner apPrisoner)
     bool releasedIsNPC = apPrisoner.IsNPC()
     Outfit dressOutfit = none
     if (releasedIsNPC && RPB_Utility.IsCrumbsEnabled())
-        dressOutfit = apPrisoner.NPC_OriginalOutfit
+        dressOutfit = RPB_StorageVars.GetFormOnReference("NPC Original Outfit", releasedActor, "Jail") as Outfit
     endif
     RPB_Utility.Crumb(releasedActor, "Release: start, " + self.__PartsTrace(releasedActor, dressOutfit))
 
@@ -2307,7 +2307,7 @@ function TeleportPrisonerToRelease(RPB_Prisoner apPrisoner)
     ; What the NPC is dressed with again: read before the release destroys the storage it comes from
     Form[] restoreItems = none
     if (releasedIsNPC)
-        restoreItems = apPrisoner.NPC_GetRestoreItems()
+        restoreItems = self.__ReadRestoreItems(releasedActor)
     endif
 
     RPB_Utility.Crumb(releasedActor, "Release: restore list, " + self.__DressTrace(releasedActor, restoreItems))
@@ -2390,6 +2390,45 @@ function TeleportPrisonerToRelease(RPB_Prisoner apPrisoner)
         endif
         RPB_Utility.Crumb(releasedActor, "Release: T2 after the equip (equipped " + equippedNow + "), " + self.__DressTrace(releasedActor, restoreItems))
     endif
+endFunction
+
+;/
+    What this NPC is dressed with again on release, and nothing else it carries (it may carry several armors): the plain armor parts
+    of its saved original outfit and the armor it wore before it was stripped. Read from the storage on the actor directly: a
+    value returned from the prisoner effect instance never reached this script (the instance of an NPC whose cell is unloaded has
+    ended). Read it before the release destroys the storage. A fixed size array whose empty entries the caller skips (an empty
+    array is None in Papyrus).
+/;
+Form[] function __ReadRestoreItems(Actor akActor)
+    Form[] items = new Form[64]
+    int count = 0
+
+    Outfit original = RPB_StorageVars.GetFormOnReference("NPC Original Outfit", akActor, "Jail") as Outfit
+    if (original)
+        int parts = original.GetNumParts()
+        int i = 0
+        while (i < parts && count < 64)
+            Armor part = original.GetNthPart(i) as Armor
+            if (part && items.Find(part) < 0)
+                items[count] = part
+                count += 1
+            endif
+            i += 1
+        endWhile
+    endif
+
+    int slot = 30
+    while (slot <= 61 && count < 64)
+        Armor wornBefore = RPB_StorageVars.GetFormOnReference("NPC Worn Armor " + slot, akActor, "Jail") as Armor
+        if (wornBefore && items.Find(wornBefore) < 0)
+            items[count] = wornBefore
+            count += 1
+        endif
+        slot += 1
+    endWhile
+
+    RPB_Utility.Crumb(akActor, "ReadRestoreItems: outfit " + original + ", " + count + " items listed")
+    return items
 endFunction
 
 ; The NPC's outfit parts: how many it carries and whether each is worn, to see where a part is doubled or lost during the release.
