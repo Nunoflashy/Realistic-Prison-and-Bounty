@@ -1068,18 +1068,22 @@ int function GetPrisonCapacity()
 endFunction
 
 float function GetCurrentLowestSentence()
-    float currentLowestSentence = -1
+    ; Days left of the NPC prisoner closest to release (running effects only), -1 when there is none.
+    ; The Player, undetermined sentences and away prisoners (no effect) do not count, and none of that is an error.
+    float currentLowestSentence = -1.0
 
     int i = 0
     while (i < Prisoners.Count)
-        float prisonerCurrentTimeLeftInSentence = Prisoners.AtIndex(i).TimeLeftInSentence
-        if (currentLowestSentence == -1 || currentLowestSentence > prisonerCurrentTimeLeftInSentence)
-            currentLowestSentence = prisonerCurrentTimeLeftInSentence
+        RPB_Prisoner prisoner = Prisoners.AtIndex(i)
+        if (prisoner && !prisoner.IsPlayer() && !prisoner.IsUndeterminedSentence)
+            float prisonerCurrentTimeLeftInSentence = prisoner.TimeLeftInSentence
+            if (currentLowestSentence == -1.0 || currentLowestSentence > prisonerCurrentTimeLeftInSentence)
+                currentLowestSentence = prisonerCurrentTimeLeftInSentence
+            endif
         endif
         i += 1
     endWhile
 
-    EventManager.SendError("The current lowest sentence could not be determined!", "Prison::GetCurrentLowestSentence", currentLowestSentence == -1)
     return currentLowestSentence
 endFunction
 
@@ -1693,6 +1697,12 @@ endFunction
 
 function Notify(string asMessage, bool abCondition = true)
     Config.NotifyJail(asMessage, abCondition)
+endFunction
+
+function SendMonitoringReschedule()
+    if (Monitor.GetState() != "Inactive")
+        Monitor.Reschedule()
+    endif
 endFunction
 
 bool function SendMonitoringRequest()

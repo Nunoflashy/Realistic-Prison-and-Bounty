@@ -2540,7 +2540,17 @@ event OnBountyGained()
     self.UpdateSentence()
 endEvent
 
+;/
+    The earliest release may have moved: let the prison's background monitor recompute its single wake.
+/;
+function __RescheduleMonitor()
+    if (self.IsNPC())
+        Prison.SendMonitoringReschedule()
+    endif
+endFunction
+
 event OnSentenceSet(int aiSentence, float afAtWhatTime)
+    self.__RescheduleMonitor()
     if (!self.ShouldProcessImprisonmentEvents)
         return
     endif
@@ -2549,6 +2559,7 @@ event OnSentenceSet(int aiSentence, float afAtWhatTime)
 endEvent
 
 event OnSentenceChanged(int aiOldSentence, int aiNewSentence, bool abHasSentenceIncreased, bool abSentenceAffectsBounty)
+    self.__RescheduleMonitor()
     if (!self.ShouldProcessImprisonmentEvents)
         return
     endif
@@ -2675,6 +2686,12 @@ event OnRestore()
     ; endif
 
     DebugInfo("("+ Name +") Prisoner::OnRestore", "Restoring Prisoner: " + Name)
+
+    ; The effect starts again when the actor's 3D loads (after being away): IsInitialized is persistent, so OnInitialize does
+    ; not run and nothing resumed the imprisonment (Imprisoned state, hourly update, cell sanity check). Do it here.
+    if (self.IsNPC() && self.IsImprisoned)
+        self.NPC_ResumeImprisonment()
+    endif
 endEvent
 
 event OnDestroy()

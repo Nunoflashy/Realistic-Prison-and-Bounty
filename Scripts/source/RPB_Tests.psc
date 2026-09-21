@@ -109,6 +109,9 @@ function SetTests()
     self.AddTest("77 - Arrest Flow Stress: Concurrent Burst (N = 3, then 6) Arrested, Imprisoned and Released Together", "Test_ArrestStress_Burst", abChainable = false)
     self.AddTest("78 - Arrest Flow Stress: Staggered Arrests (N = 6, 0.3s apart, like ArrestActors) and Repeated Bursts", "Test_ArrestStress_Staggered", abChainable = false)
     self.AddTest("79 - Arrestee: InitializeState() Returns true for Every Caller (First-Caller Race)", "Test_Arrestee_InitializeStateReturnsTrue", abChainable = false)
+    self.AddTest("80 - PrisonMonitor: Next Wake Schedule Maths (Lowest Sentence, Empty, Away, Served)", "Test_PrisonMonitor_ScheduleMaths", abChainable = false)
+    self.AddTest("81 - PrisonMonitor: What an Away Prisoner Looks Like (Effect Gone, List Entry, Restore)", "Test_PrisonMonitor_AwayPrisoner", abChainable = false)
+    self.AddTest("82 - PrisonMonitor: Foreground / Background Handoff State", "Test_PrisonMonitor_Handoff", abChainable = false)
     self.AddTest("41 - ActiveMagicEffectContainer: Stuck Lock Self-Heals", "Test_ActiveMagicEffectContainer_StuckLockSelfHeals")
     self.AddTest("42 - ThreadLock: JAtomic Primitive Semantics and Registry", "Test_ThreadLock_PrimitiveSemantics")
     ; Not chainable: fires concurrent worker threads
@@ -6359,6 +6362,207 @@ state Test_Arrestee_InitializeStateReturnsTrue
 
     function Teardown()
         __TeardownAllTempActors()
+    endFunction
+endState
+
+
+bool function __Near(float afA, float afB, float afTolerance = 0.01)
+    float d = afA - afB
+    if (d < 0.0)
+        d = -d
+    endif
+    return d <= afTolerance
+endFunction
+
+;/
+    The monitor used to compute "lowest sentence * 24 + buffer" and then ignore it (a hardcoded 3 hour poll). The pure
+    function ComputeNextWakeHours() is the schedule: earliest release + buffer among the prisoners that need a wake, never
+    below the minimum, nothing (-1, no error) when there is nothing to monitor, and a bounded re-check while a prisoner is
+    away and cannot be read.
+/;
+state Test_PrisonMonitor_ScheduleMaths
+    function Setup()
+        bool ok = true
+        bool step = false
+
+        ; The example from the design: ten prisoners with two months or more, one with 20 days left -> 20 days + buffer
+        float[] left = Utility.CreateFloatArray(11)
+        bool[] excluded = Utility.CreateBoolArray(11)
+        int i = 0
+        while (i < 10)
+            left[i] = 60.0 + i
+            i += 1
+        endWhile
+        left[10] = 20.0
+        float hours = RPB_PrisonMonitor.ComputeNextWakeHours(left, excluded)
+        step = assert_true(self.__Near(hours, 480.1), "ten long sentences and one with 20 days left: expected 480.1 hours (20 days + 0.1 buffer), got " + hours)
+        ok = ok && step
+
+        ; Nothing eligible: only the Player / an undetermined sentence -> nothing to monitor
+        float[] one = Utility.CreateFloatArray(1)
+        bool[] oneExcluded = Utility.CreateBoolArray(1)
+        one[0] = 5.0
+        oneExcluded[0] = true
+        hours = RPB_PrisonMonitor.ComputeNextWakeHours(one, oneExcluded)
+        step = assert_true(self.__Near(hours, -1.0), "only excluded prisoners: expected -1, got " + hours)
+        ok = ok && step
+
+        ; Only an away prisoner (unreadable): bounded re-check, default 24 hours
+        hours = RPB_PrisonMonitor.ComputeNextWakeHours(one, oneExcluded, true)
+        step = assert_true(self.__Near(hours, 24.0), "only an away prisoner: expected the 24 hour re-check, got " + hours)
+        ok = ok && step
+
+        ; A readable long sentence plus an away prisoner: the sooner of the two (the re-check)
+        left[10] = 20.0
+        hours = RPB_PrisonMonitor.ComputeNextWakeHours(left, excluded, true)
+        step = assert_true(self.__Near(hours, 24.0), "20 days left plus an away prisoner: expected the 24 hour re-check, got " + hours)
+        ok = ok && step
+
+        ; A readable short sentence plus an away prisoner: the short sentence wins (0.5 day = 12 h + 0.1)
+        one[0] = 0.5
+        oneExcluded[0] = false
+        hours = RPB_PrisonMonitor.ComputeNextWakeHours(one, oneExcluded, true)
+        step = assert_true(self.__Near(hours, 12.1), "half a day left plus an away prisoner: expected 12.1, got " + hours)
+        ok = ok && step
+
+        ; Already served (negative days left): wake at the minimum so the monitor cannot spin
+        one[0] = -2.0
+        hours = RPB_PrisonMonitor.ComputeNextWakeHours(one, oneExcluded)
+        step = assert_true(self.__Near(hours, 1.0), "an already served prisoner: expected the 1 hour minimum, got " + hours)
+        ok = ok && step
+
+        ; A huge sentence is scheduled exactly (no cap): 3650 days + buffer
+        one[0] = 3650.0
+        hours = RPB_PrisonMonitor.ComputeNextWakeHours(one, oneExcluded)
+        step = assert_true(self.__Near(hours, 87600.1, 0.5), "a 3650 day sentence: expected 87600.1 hours, got " + hours)
+        ok = ok && step
+
+        ; The lowest one wins wherever it is, and an excluded lower one is ignored
+        left[0] = 1.0
+        excluded[0] = true
+        hours = RPB_PrisonMonitor.ComputeNextWakeHours(left, excluded)
+        step = assert_true(self.__Near(hours, 480.1), "an excluded 1 day prisoner must be ignored: expected 480.1 hours, got " + hours)
+        ok = ok && step
+
+        display_result(ok)
+    endFunction
+endState
+
+;/
+    Characterization (no assumption asserted beyond registration): what does the prison's prisoner list hold for an NPC
+    prisoner whose actor unloads (its effect ends) and then loads again. The monitor's background processing has no
+    RPB_Prisoner object to work with for an away prisoner if the entry goes None. Results are logged.
+/;
+state Test_PrisonMonitor_AwayPrisoner
+    function Setup()
+        RPB_Prison prison = (RPB_API.GetPrisonManager()).GetPrison("Haafingar")
+        bool ok = true
+        bool step = false
+
+        Actor a = __SpawnTempActor()
+        RPB_Prisoner p = __RegisterPrisonerAndWait(a, prison)
+        step = assert_true(p != none, "Could not register the prisoner used for this test")
+        ok = ok && step
+        if (!p)
+            display_result(false)
+            return
+        endif
+
+        log("AWAY before: list Count=" + prison.Prisoners.Count + ", entry for the actor=" + (prison.Prisoners.AtKey(a) != none) + ", effect active=" + p.IsEffectActive + ", GetActors().Length=" + prison.Prisoners.GetActors().Length)
+
+        a.Disable()
+        float t0 = Utility.GetCurrentRealTime()
+        while (prison.Prisoners.AtKey(a) != none && (Utility.GetCurrentRealTime() - t0) < 10.0)
+            Utility.Wait(0.2)
+        endWhile
+        bool entryGone = (prison.Prisoners.AtKey(a) == none)
+        log("AWAY after Disable(): waited " + ((Utility.GetCurrentRealTime() - t0) as int) + "s, entry for the actor gone=" + entryGone + ", list Count=" + prison.Prisoners.Count + ", GetActors().Length=" + prison.Prisoners.GetActors().Length + ", stored Initialized flag=" + RPB_StorageVars.GetBoolOnReference("Initialized", a, "Jail"))
+
+        a.Enable()
+        t0 = Utility.GetCurrentRealTime()
+        while (prison.Prisoners.AtKey(a) == none && (Utility.GetCurrentRealTime() - t0) < 10.0)
+            Utility.Wait(0.2)
+        endWhile
+        log("AWAY after Enable(): waited " + ((Utility.GetCurrentRealTime() - t0) as int) + "s, entry for the actor back=" + (prison.Prisoners.AtKey(a) != none) + ", list Count=" + prison.Prisoners.Count)
+
+        display_result(ok)
+    endFunction
+
+    function Teardown()
+        __TeardownAllTempActors()
+    endFunction
+endState
+
+;/
+    The foreground/background handoff of the prison's monitor without depending on where the player stands: the
+    handlers' logic (EnterForeground / EnterBackground) is called directly. Checks the state, IsMonitoring and the pending
+    wake, that repeated calls are harmless, and that a request while in the foreground registers nothing. The monitor is
+    put back in the state it was found in.
+/;
+state Test_PrisonMonitor_Handoff
+    function Setup()
+        RPB_Prison prison = (RPB_API.GetPrisonManager()).GetPrison("Haafingar")
+        RPB_PrisonMonitor mon = prison.Monitor
+        bool ok = true
+        bool step = false
+
+        string originalState = mon.GetState()
+
+        Actor a = __SpawnTempActor()
+        RPB_Prisoner p = __RegisterPrisonerAndWait(a, prison)
+        step = assert_true(p != none, "Could not register the NPC prisoner used for this test")
+        ok = ok && step
+
+        float now = Utility.GetCurrentGameTime()
+
+        mon.EnterBackground()
+        step = assert_true(mon.IsMonitoring, "EnterBackground() with an NPC prisoner registered should be monitoring")
+        ok = ok && step
+        step = assert_true(mon.GetState() == "", "EnterBackground() should leave the default state, is '" + mon.GetState() + "'")
+        ok = ok && step
+        step = assert_true(mon.NextWakeAt >= now + (1.0 / 24.0) - 0.001, "the pending wake should be at least one game hour away (NextWakeAt " + mon.NextWakeAt + ", now " + now + ")")
+        ok = ok && step
+
+        mon.EnterBackground()
+        step = assert_true(mon.IsMonitoring && mon.NextWakeAt > 0.0, "EnterBackground() twice should stay monitoring with a wake")
+        ok = ok && step
+
+        mon.EnterForeground()
+        step = assert_false(mon.IsMonitoring, "EnterForeground() should stop monitoring")
+        ok = ok && step
+        step = assert_true(mon.GetState() == "Inactive", "EnterForeground() should set the Inactive state, is '" + mon.GetState() + "'")
+        ok = ok && step
+        step = assert_true(mon.NextWakeAt < 0.0, "EnterForeground() should clear the background wake (NextWakeAt " + mon.NextWakeAt + ")")
+        ok = ok && step
+
+        mon.SendRequest()
+        step = assert_false(mon.IsMonitoring, "a monitoring request while the player is in the cell (Inactive) must not schedule a background wake")
+        ok = ok && step
+
+        mon.EnterForeground()
+        step = assert_true(mon.GetState() == "Inactive" && !mon.IsMonitoring, "EnterForeground() twice should stay inactive")
+        ok = ok && step
+
+        mon.EnterBackground()
+        step = assert_true(mon.IsMonitoring && mon.GetState() == "", "EnterBackground() after the foreground should monitor again")
+        ok = ok && step
+
+        ; Put the monitor back the way it was found
+        if (originalState == "Inactive")
+            mon.EnterForeground()
+        else
+            mon.EnterBackground()
+        endif
+
+        display_result(ok)
+    endFunction
+
+    function Teardown()
+        __TeardownAllTempActors()
+        RPB_Prison prison = (RPB_API.GetPrisonManager()).GetPrison("Haafingar")
+        if (prison.Monitor.GetState() != "Inactive")
+            prison.Monitor.Reschedule()
+        endif
     endFunction
 endState
 

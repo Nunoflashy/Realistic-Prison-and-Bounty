@@ -40,6 +40,14 @@ bool property IsMonitoring
     endFunction
 endProperty
 
+; Absolute game time (days) of the pending background wake, -1 when none is registered
+float __nextWakeAt = -1.0
+float property NextWakeAt
+    float function get()
+        return __nextWakeAt
+    endFunction
+endProperty
+
 
 ; ==========================================================
 ;                    Monitoring Properties
@@ -55,18 +63,137 @@ endProperty
 ;                       Prison Monitoring
 ; ==========================================================
 
+;/
+    A foreground prisoner (or a newly registered one) asks for background monitoring. Ignored while the player is in the
+    cell (state Inactive): the prisoners run in the foreground then, and EnterBackground() reschedules when the player leaves.
+/;
 function SendRequest()
-    if (!self.IsMonitoring)
-        self.RegisterForMonitoring()
+    if (!self.IsMonitoring && self.GetState() != "Inactive")
+        self.Reschedule()
     endif
 endFunction
 
+;/
+    The player is in the prison's cell: prisoners are processed in the foreground, so the background wake is cancelled.
+    A slow heartbeat only checks that the monitoring object is still attached, to recover from a missed detach event.
+/;
+function EnterForeground()
+    UnregisterForUpdateGameTime()
+    __isMonitoring = false
+    __nextWakeAt = -1.0
+    self.GotoState("Inactive")
+    RegisterForSingleUpdateGameTime(12.0)
+endFunction
+
+;/
+    The player left (or was never in) the cell: prisoners without a running effect are processed in the background,
+    with one wake scheduled at the earliest release.
+/;
+function EnterBackground()
+    self.GotoState("")
+    self.Reschedule()
+endFunction
+
 function EnableMonitoring()
-    self.GotoState("Active")
+    self.EnterBackground()
 endFunction
 
 function DisableMonitoring()
-    self.GotoState("Inactive")
+    self.EnterForeground()
+endFunction
+
+;/
+    Computes when the next background wake is needed, in game HOURS from now.
+
+    afDaysLeft[i]   Days left in prisoner i's sentence (may be <= 0: already served).
+    abExcluded[i]   Prisoner i needs no background wake (the Player, an undetermined sentence, ...).
+    abHasUnknown    At least one prisoner is away and its time left cannot be read (no effect script); re-check
+                    at least every afUnknownPollHours until that state can be read without the effect.
+
+    returns (float): the hours until the wake, or -1 when there is nothing to monitor. Never below afMinHours so a
+    served-but-not-yet-released prisoner cannot make the monitor spin.
+/;
+float function ComputeNextWakeHours(float[] afDaysLeft, bool[] abExcluded, bool abHasUnknown = false, float afBufferHours = 0.1, float afMinHours = 1.0, float afUnknownPollHours = 24.0) global
+    bool found = false
+    float lowest = 0.0
+
+    int i = 0
+    while (i < afDaysLeft.Length)
+        if (!abExcluded[i])
+            if (!found || afDaysLeft[i] < lowest)
+                lowest = afDaysLeft[i]
+                found = true
+            endif
+        endif
+        i += 1
+    endWhile
+
+    if (!found && !abHasUnknown)
+        return -1.0
+    endif
+
+    float hours = 0.0
+    bool hoursSet = false
+
+    if (found)
+        hours = (lowest * 24.0) + afBufferHours
+        hoursSet = true
+    endif
+
+    if (abHasUnknown && (!hoursSet || hours > afUnknownPollHours))
+        hours = afUnknownPollHours
+    endif
+
+    if (hours < afMinHours)
+        hours = afMinHours
+    endif
+
+    return hours
+endFunction
+
+;/
+    (Re)schedules the single background wake at the earliest release (+ buffer) of the prisoners that need it.
+    Cancels any pending wake first; registers nothing (and logs no error) when there is nothing to monitor.
+/;
+function Reschedule()
+    UnregisterForUpdateGameTime()
+    __nextWakeAt = -1.0
+    __isMonitoring = false
+
+    int count = Prisoners.Count
+    if (count == 0)
+        return
+    endif
+
+    float[] daysLeft = Utility.CreateFloatArray(count)
+    bool[] excluded = Utility.CreateBoolArray(count)
+    bool hasUnknown = false
+
+    int i = 0
+    while (i < count)
+        RPB_Prisoner prisoner = Prisoners.AtIndex(i)
+
+        if (!prisoner)
+            ; Away: no effect script, its stored state cannot be read through RPB_Prisoner (see ROADMAP: persistent roster)
+            excluded[i] = true
+            hasUnknown = true
+        elseif (prisoner.IsPlayer() || prisoner.IsUndeterminedSentence)
+            excluded[i] = true
+        else
+            daysLeft[i] = prisoner.TimeLeftInSentence
+        endif
+        i += 1
+    endWhile
+
+    float hours = ComputeNextWakeHours(daysLeft, excluded, hasUnknown)
+    if (hours < 0.0)
+        return
+    endif
+
+    RegisterForSingleUpdateGameTime(hours)
+    __nextWakeAt = Utility.GetCurrentGameTime() + (hours / 24.0)
+    __isMonitoring = true
+    Debug("["+ Prison.Name +"] PrisonMonitor::Reschedule", "Prison Monitor - next wake in " + hours + " game hours (" + RPB_Utility.GetTimeFormatted(hours / 24.0, abIncludeMinutes = true) + ")")
 endFunction
 
 ; ==========================================================
@@ -78,9 +205,9 @@ function RegisterPrisoner(RPB_Prisoner apPrisoner)
         return
     endif
 
-    if (!self.IsMonitoring)
-        self.RegisterForMonitoring()
-        Debug("PrisonMonitor::RegisterPrisoner", "Prisoner Sentence: " + apPrisoner.Sentence + " | Prisoner Sentence Left:  " + apPrisoner.TimeLeftInSentence)
+    ; A new prisoner may have the earliest release: always recompute (unless the player is in the cell)
+    if (self.GetState() != "Inactive")
+        self.Reschedule()
     endif
 
     ; TODO: Get the prisoner's current time left (current sentence left), and add it to a queue,
@@ -125,7 +252,6 @@ bool function AwaitPrisonerForRelease(RPB_Prisoner apPrisoner)
     if (apPrisoner.IsSentenceServed)
         Debug("PrisonMonitor::AwaitPrisonerForRelease", "Released Prisoner:  " + apPrisoner + apPrisoner.GetPrisoner())
         Prison.SendReleaseRequest(apPrisoner)
-        Utility.Wait(0.2)
         return false
     endif
 
@@ -138,28 +264,31 @@ endFunction
 
 function AwaitPrisoners()
     int prisonersAwaitingRelease = 0
+    int prisonersAway = 0
+
+    ; Snapshot of the actors first: a release removes the prisoner from the list, which used to shift the indexes under this loop
+    Form[] actors = Prisoners.GetActors()
+    prisonersAway = Prisoners.Count - actors.Length ; entries whose effect is not running (away)
+
     int i = 0
-    while (i < Prisoners.Count)
-        RPB_Prisoner prisoner = Prisoners.AtIndex(i)
+    while (i < actors.Length)
+        RPB_Prisoner prisoner = Prisoners.AtKey(actors[i] as Actor)
 
-        self.AwaitPrisonerImprisonment(prisoner)
+        ; Foreground prisoners and the Player run themselves; only NPCs that are not actively monitored are processed here
+        if (prisoner && prisoner.IsNPC() && !Prison.ShouldActivelyMonitorPrisoner(prisoner))
+            self.AwaitPrisonerImprisonment(prisoner)
 
-        bool isAwaitingRelease = self.AwaitPrisonerForRelease(prisoner)
-        if (isAwaitingRelease)
-            prisonersAwaitingRelease += 1
-
-        else
-            ; prisoner.UpdateTimeJailed()
-            ; Debug("PrisonMonitor::AwaitPrisoners", "("+ prisoner.Name +") Time Jailed: " + prisoner.QueryStat("Time Jailed"))
-            ; Debug("PrisonMonitor::AwaitPrisoners", "("+ prisoner.Name +") Time Jailed: " + RPB_StorageVars.GetFloatOnReference(Prison.Hold + "::Time Jailed", prisoner.GetActor(), "ActorVars"))
+            if (self.AwaitPrisonerForRelease(prisoner))
+                prisonersAwaitingRelease += 1
+            endif
         endif
 
-        ; Debug("PrisonMonitor::AwaitPrisoners", "("+ prisoner.Name +") [Before Update Time Jailed] Sentence - Time Left: " + (prisoner.Sentence - prisoner.TimeLeftInSentence))
-        ; prisoner.UpdateTimeJailed()
-        ; Debug("PrisonMonitor::AwaitPrisoners", "("+ prisoner.Name +") Time Jailed: " + RPB_StorageVars.GetFloatOnReference(Prison.Hold + "::Time Jailed", prisoner.GetActor(), "ActorVars"))
-        ; Debug("PrisonMonitor::AwaitPrisoners", "("+ prisoner.Name +") Sentence - Time Left: " + (prisoner.Sentence - prisoner.TimeLeftInSentence))
         i += 1
     endWhile
+
+    if (prisonersAway > 0)
+        Debug("PrisonMonitor::AwaitPrisoners", prisonersAway + " prisoner(s) in " + Prison.Name + " are away (no effect running): their release cannot be evaluated in the background yet")
+    endif
 
     if (prisonersAwaitingRelease > 0)
         Debug("PrisonMonitor::AwaitPrisoners", "Awaiting release for " + prisonersAwaitingRelease + " prisoners in " + Prison.Name + " ("+ Prison.Hold +")")
@@ -170,76 +299,52 @@ endFunction
 ; TODO: Update Prisoner TimeJailed, Infamy Gained, Largest Sentence, Longest Sentence
 
 state Active
-    ; event OnUpdateGameTime()
-    ; endEvent
 endState
 
+;/
+    The player is (was last seen) in the prison's cell. Nothing is scheduled here except a slow heartbeat that recovers from
+    a missed OnCellDetach: if the monitoring object's cell is no longer attached, the player is gone and we go back to the
+    background.
+/;
 state Inactive
     event OnUpdateGameTime()
+        ObjectReference monitored = self.GetReference()
+        Cell monitoredCell = none
+        if (monitored)
+            monitoredCell = monitored.GetParentCell()
+        endif
+
+        if (!monitoredCell || !monitoredCell.IsAttached())
+            Debug("["+ Prison.Name +"] PrisonMonitor::Inactive.OnUpdateGameTime", "The monitoring object is not attached anymore (missed detach), going back to the background")
+            self.EnterBackground()
+        else
+            RegisterForSingleUpdateGameTime(12.0)
+        endif
     endEvent
 endState
 
-
-
+; Kept for existing callers: asks for a background schedule (see SendRequest / Reschedule)
 function RegisterForMonitoring()
-    float buffer        = 0.1 ; 6 minutes in game time
-    float updateIn      = (Prison.GetCurrentLowestSentence() * 24) + buffer
-    float timeInDays    = updateIn / 24
-
-    Debug("["+ Prison.Name +"] PrisonMonitor::RegisterForMonitoring", "updateIn: "+ updateIn +", timeInDays: "+ timeInDays)
-
-    ; if (updateIn < 0)
-    if (Prisoners.Count == 0)
-        Debug("["+ Prison.Name +"] PrisonMonitor::RegisterForMonitoring", "Prison Monitor - No prisoners to monitor (updateIn: "+ updateIn +")")
-        __isMonitoring = false
-        return
-    endif
-
-    RegisterForSingleUpdateGameTime(3.0)
-    __isMonitoring = true
-    Debug("["+ Prison.Name +"] PrisonMonitor::RegisterForMonitoring", "Prison Monitor - Updating in " + RPB_Utility.GetTimeFormatted(timeInDays, abIncludeMinutes = true) + " (" + timeInDays+ " days)")
+    self.SendRequest()
 endFunction
 
+; Kept for existing callers
 function UpdateMonitorTime()
-    float updateIn      = Prison.GetCurrentLowestSentence() * 24
-    float timeInDays    = updateIn / 24
-    Debug("["+ Prison.Name +"] PrisonMonitor::UpdateMonitorTime", "Prison Monitor - Updating in " + RPB_Utility.GetTimeFormatted(timeInDays) + " (" + timeInDays+ " days)")
-    RegisterForSingleUpdateGameTime(updateIn)
+    self.Reschedule()
 endFunction
 
+; The single background wake: the earliest release has (probably) arrived
 event OnUpdateGameTime()
-    ; return
     Debug("["+ Prison.Name +"] PrisonMonitor::OnUpdateGameTime", "Prison Monitor - Updating")
-    RegisterForMonitoring()
+    __isMonitoring = false
+    __nextWakeAt = -1.0
     self.AwaitPrisoners()
+    self.Reschedule()
 endEvent
-
-; event OnCellAttach()
-;     Debug("["+ Prison.Name +"] PrisonMonitor::OnCellAttach", "Prison Monitor - On Cell Attach")
-;     Prison.SetupCells()
-
-;     float startBench = StartBenchmark()
-;     int i = 0
-;     while (i < Prisoners.Count)
-;         RPB_Prisoner prisoner = Prisoners.AtIndex(i)
-        
-;         if (prisoner && prisoner.IsNPC())
-;             self.NPC_UpdateCellIntegrity(prisoner)
-;         endif
-
-;         ; prisoner.UpdateTimeJailed()
-
-;         i += 1
-;     endWhile
-
-;     RegisterForMonitoring()
-
-;     EndBenchmark(startBench, "NPC Cell Integrity Checks")
-; endEvent
 
 event OnCellAttach()
     Debug("["+ Prison.Name +"] PrisonMonitor::OnCellAttach", "Prison Monitor - On Cell Attach")
-    self.DisableMonitoring()
+    self.EnterForeground()
 
     int i = 0
     while (i < Prison.JailCells.Length)
@@ -253,9 +358,7 @@ endEvent
 
 event OnCellDetach()
     Debug("["+ Prison.Name +"] PrisonMonitor::OnCellDetach", "Prison Monitor - On Cell Detach")
-    self.GotoState("")
-    RegisterForSingleUpdateGameTime(3.0)
-    ; self.GotoState("Active")
+    self.EnterBackground()
 endEvent
 
 ; ==========================================================

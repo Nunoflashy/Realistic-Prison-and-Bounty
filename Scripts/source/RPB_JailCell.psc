@@ -898,16 +898,16 @@ endFunction
     Performs the actions when OnCellAttach() / OnAttachedToCell() and OnCellDetach() / OnDetachedFromCell() events happen.
 /;
 function __onCellAttachAndDetachEvent()
-    if (__npcSanityCheckIsCellAttachedOrDetached)
+    if (__npcSanityCheckIsCellAttachedOrDetached || Utility.GetCurrentRealTime() < __attachEventLockedUntil)
         return
     endif
 
     int i = 0
     while (i < Prisoners.Length)
-        apPrisoner.EnableAI(!apPrisoner.IsFarFromPlayer())
-
-        RPB_Prisoner apPrisoner = Prison.AwaitPrisonerReference(Prisoners[i] as Actor)
-        if (apPrisoner.IsImprisoned)
+        ; A lookup, not AwaitPrisonerReference: that blocks up to 12 s per prisoner, and a prisoner whose effect is not running
+        ; (away) resumes by itself when the effect starts again (Prisoner.OnRestore). It also used the variable below before assigning it.
+        RPB_Prisoner apPrisoner = Prison.Prisoners.AtKey(Prisoners[i] as Actor)
+        if (apPrisoner && apPrisoner.IsImprisoned)
             apPrisoner.EnableAI(!apPrisoner.IsFarFromPlayer())
             
             apPrisoner.NPC_UpdateStripping()
@@ -937,10 +937,11 @@ endFunction
     Ensures only one of the events is happening at the given time,
     so as to not overlap checks and actions.
 /;
+float __attachEventLockedUntil
+
 function __lock_onCellAttachAndDetachEvents()
-    __npcSanityCheckIsCellAttachedOrDetached = true
-    Utility.Wait(__npcSanityCheckPostCheckUpdateTime) ; Ensure a lock of the time configured for post event delay
-    __npcSanityCheckIsCellAttachedOrDetached = false
+    ; Ensure only one attach/detach pass per post-event delay, without blocking the event thread with a Utility.Wait
+    __attachEventLockedUntil = Utility.GetCurrentRealTime() + __npcSanityCheckPostCheckUpdateTime
 endFunction
 
 ; When the player leaves the location of this jail cell
