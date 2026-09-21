@@ -1622,8 +1622,9 @@ Form[] function GetGenderExclusiveCells(string asGender, bool abAvailable = true
         bool isGenderExclusive = (asGender == "Male" && jailCellRef.IsMaleOnly) || (asGender == "Female" && jailCellRef.IsFemaleOnly)
         ; Debug("["+ Name +"] ["+ jailCellRef.ID +"] Prison::GetGenderExclusiveCells", "isGenderExclusive: " + isGenderExclusive + ", abCanBeOvercrowded: " + abCanBeOvercrowded + ", jailCellRef.IsOvercrowded: " + jailCellRef.IsOvercrowded + ", (!abCanBeOvercrowded && !jailCellRef.IsOvercrowded) || abCanBeOvercrowded: " + ((!abCanBeOvercrowded && !jailCellRef.IsOvercrowded) || abCanBeOvercrowded))
 
-        if ((!abCanBeOvercrowded && !jailCellRef.IsFull) || abCanBeOvercrowded)
-            if (jailCellRef && isGenderExclusive)
+        ; abCanBeOvercrowded includes the cells that ALLOW overcrowding, it used to include every cell (full ones too)
+        if (jailCellRef && (!jailCellRef.IsFull || (abCanBeOvercrowded && jailCellRef.AllowOvercrowding)))
+            if (isGenderExclusive)
                 JArray.addForm(genderCellsArray, jailCellRef)
             endif
         endif
@@ -2472,18 +2473,25 @@ bool function AssignCell(RPB_Prisoner apPrisoner)
 
     RPB_Utility.FlowMark("AssignCell: start")
     RPB_Utility.Crumb(apPrisoner.GetActor(), "AssignCell: start")
+
+    ; Picking a cell and registering the prisoner in it must be one step: arrests that start together used to all see the same
+    ; cell as free (nobody was registered in it yet) and filled cells past their maximum. The lock is per prison and short.
+    int cellLock = RPB_ThreadLock.Get("AssignCell_" + Name)
+    RPB_ThreadLock.Acquire(cellLock)
+
     RPB_JailCell assignedCell = self.RequestCell(apPrisoner)
     RPB_Utility.FlowMark("AssignCell: RequestCell")
     RPB_Utility.Crumb(apPrisoner.GetActor(), "AssignCell: RequestCell")
     ; RPB_JailCell assignedCell = GetFormFromMod(0x388D) as RPB_JaiLCell
 
-
     if (assignedCell == none)
+        RPB_ThreadLock.Release(cellLock)
         EventManager.SendError("Could not assign a cell for prisoner " + apPrisoner.Name, "("+ Name +") Prison::AssignCell")
         return false
     endif
 
     self.BindCellToPrisoner(assignedCell, apPrisoner) ; Actually bind this jail cell to the prisoner, it has been assigned.
+    RPB_ThreadLock.Release(cellLock)
     return apPrisoner.JailCell != none
 endFunction
 

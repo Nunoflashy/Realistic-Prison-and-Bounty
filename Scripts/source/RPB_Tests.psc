@@ -7269,6 +7269,42 @@ string function __MassOvercrowded(RPB_Prison akPrison)
     return bad
 endFunction
 
+; One line per cell: what it holds against what it may hold
+function __MassDumpCells(RPB_Prison akPrison, string asLabel)
+    Form[] cells = akPrison.JailCells
+    string dump = "MASS cells " + asLabel + ":"
+    int i = 0
+    while (cells && i < cells.Length)
+        RPB_JailCell jailCell = cells[i] as RPB_JailCell
+        if (jailCell)
+            dump += " [" + jailCell.ID + " " + jailCell.PrisonerCount + "/" + jailCell.MaxPrisoners
+            if (jailCell.AllowOvercrowding)
+                dump += " overcrowding allowed"
+            endif
+            if (jailCell.IsGenderExclusive)
+                dump += string_if (jailCell.IsFemaleOnly, " F", " M")
+            endif
+            dump += "]"
+        endif
+        i += 1
+    endWhile
+    log(dump)
+endFunction
+
+int function __MassCellsAllowingOvercrowding(RPB_Prison akPrison)
+    Form[] cells = akPrison.JailCells
+    int n = 0
+    int i = 0
+    while (cells && i < cells.Length)
+        RPB_JailCell jailCell = cells[i] as RPB_JailCell
+        if (jailCell && jailCell.AllowOvercrowding)
+            n += 1
+        endif
+        i += 1
+    endWhile
+    return n
+endFunction
+
 int function __MassCountImprisoned(Actor[] akActors, int aiCount)
     int n = 0
     int i = 0
@@ -7371,7 +7407,8 @@ state Test_MassImprisonment
         int capacity = self.__MassCapacity(prison)
         int occupiedBefore = self.__MassOccupied(prison)
         int free = capacity - occupiedBefore
-        log("MASS capacity " + capacity + " (occupied before " + occupiedBefore + ", free " + free + "), arresting " + TOTAL + " in waves of " + WAVE + ", overcrowding allowed on none of the cells: " + (self.__MassOvercrowded(prison) == ""))
+        log("MASS capacity " + capacity + " (occupied before " + occupiedBefore + ", free " + free + "), arresting " + TOTAL + " in waves of " + WAVE + ", " + self.__MassCellsAllowingOvercrowding(prison) + " cells allow overcrowding")
+        self.__MassDumpCells(prison, "before")
 
         self.__StressProfilerOff()
         float tStart = Utility.GetCurrentRealTime()
@@ -7433,6 +7470,21 @@ state Test_MassImprisonment
             i += 1
         endWhile
         int totalMs = self.__Ms(Utility.GetCurrentRealTime() - tStart)
+        self.__MassDumpCells(prison, "after the arrests")
+
+        ; Every imprisoned NPC needs an AI package that keeps it in its cell; the package groups are finite
+        int withPackage = 0
+        i = 0
+        while (i < TOTAL)
+            if (all[i] && RPB_Utility.IsActorImprisoned(all[i]))
+                RPB_Prisoner pkgPrisoner = prison.Prisoners.AtKey(all[i])
+                if (pkgPrisoner && pkgPrisoner.HasCellPackage)
+                    withPackage += 1
+                endif
+            endif
+            i += 1
+        endWhile
+        log("MASS packages: " + withPackage + " of " + imprisoned + " imprisoned NPCs hold a cell package")
         log("MASS RESULT placed " + placed + " (spawn failures " + spawnFailures + "): imprisoned " + imprisoned + ", cleanly reverted " + reverted + ", stuck " + stuck + "; free capacity was " + free + "; cells now hold " + self.__MassOccupied(prison) + "; " + totalMs + " ms")
 
         step = assert_true(spawnFailures == 0, spawnFailures + " NPCs could not be placed, the scenario is incomplete")
@@ -7443,6 +7495,8 @@ state Test_MassImprisonment
         ok = ok && step
         string overcrowded = self.__MassOvercrowded(prison)
         step = assert_true(overcrowded == "", "Cells over their maximum:" + overcrowded)
+        ok = ok && step
+        step = assert_true(withPackage >= imprisoned, (imprisoned - withPackage) + " imprisoned NPCs have no cell package (nothing keeps them in their cell)")
         ok = ok && step
         if (imprisoned < free && imprisoned < placed)
             log("MASS NOTE: " + imprisoned + " imprisoned although " + free + " places were free and " + (placed - imprisoned) + " NPCs were left out (gender exclusive cell rules?)")
@@ -7524,6 +7578,26 @@ state Test_MassImprisonment
         log("MASS RELEASE " + releasedAll + " of " + toRelease + " released in " + self.__Ms(Utility.GetCurrentRealTime() - tRelease) + " ms")
         step = assert_true(releasedAll >= toRelease, "Only " + releasedAll + " of " + toRelease + " prisoners were released in 120 s")
         ok = ok && step
+
+        ; How many left dressed: body armor worn, or (when the engine has unloaded them) unknown. Reported, not asserted.
+        Utility.Wait(3.0)
+        int dressed = 0
+        int underwearOnly = 0
+        int unloaded = 0
+        i = 0
+        while (i < TOTAL)
+            if (all[i])
+                if (!all[i].Is3DLoaded())
+                    unloaded += 1
+                elseIf (all[i].GetWornForm(0x4))
+                    dressed += 1
+                else
+                    underwearOnly += 1
+                endif
+            endif
+            i += 1
+        endWhile
+        log("MASS DRESSED after the release: body armor worn " + dressed + ", nothing on the body " + underwearOnly + ", 3D unloaded (unknown) " + unloaded + " (see the 'Re-equipped' INFO lines for the per NPC counts)")
 
         __TeardownAllTempActors()
         ok = ok && self.__StressAssertNoLeaks(prison, massManager, baseCount, basePrisons)
