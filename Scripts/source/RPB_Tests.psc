@@ -6988,7 +6988,7 @@ state Test_Prisoner_OutfitSurvivesInstanceReplacement
 
         p.NPC_SaveUnderwear(top, bottom)
         if (haveStandIn)
-            step = assert_true(p.NPC_Underwear != none && p.NPC_Underwear[p.NPC_UNDERWEAR_TOP_INDEX] == top, "The underwear was not saved")
+            step = assert_true(p.NPC_GetUnderwearTop() == top, "The underwear was not saved (top " + p.NPC_GetUnderwearTop() + ", raw " + p.GetForm("NPC Underwear Top") + ", expected " + top + ")")
             ok = ok && step
         endif
 
@@ -7006,19 +7006,17 @@ state Test_Prisoner_OutfitSurvivesInstanceReplacement
             step = assert_true(again.NPC_OriginalOutfit == saved, "The original outfit did not survive the effect being replaced")
             ok = ok && step
             if (haveStandIn)
-                step = assert_true(again.NPC_Underwear != none && again.NPC_Underwear[again.NPC_UNDERWEAR_TOP_INDEX] == top && again.NPC_Underwear[again.NPC_UNDERWEAR_BOTTOM_INDEX] == bottom, "The underwear did not survive the effect being replaced")
+                step = assert_true(again.NPC_GetUnderwearTop() == top && again.NPC_GetUnderwearBottom() == bottom, "The underwear did not survive the effect being replaced")
                 ok = ok && step
             endif
 
             ; An NPC without underwear: two empty entries. The property must still return an array (its consumers index it)
             again.NPC_SaveUnderwear(none, none)
-            Armor[] none_underwear = again.NPC_Underwear
-            if (none_underwear)
-                log("NOUNDERWEAR length=" + none_underwear.Length + " top=" + none_underwear[0] + " bottom=" + none_underwear[1])
-            else
-                log("NOUNDERWEAR array is none")
-            endif
-            step = assert_true(none_underwear != none && none_underwear.Length == 2 && none_underwear[0] == none && none_underwear[1] == none, "An NPC without underwear should read back a two element array of empty entries")
+            Armor[] none_underwear = again.NPC_GetUnderwear()
+            log("NOUNDERWEAR top=" + again.NPC_GetUnderwearTop() + " bottom=" + again.NPC_GetUnderwearBottom() + " array=" + none_underwear)
+            step = assert_true(again.NPC_GetUnderwearTop() == none && again.NPC_GetUnderwearBottom() == none, "An NPC without underwear should read back no top and no bottom")
+            ok = ok && step
+            step = assert_true(none_underwear != none && none_underwear.Length == 2, "NPC_GetUnderwear() should always return a two element array")
             ok = ok && step
         endif
 

@@ -2,6 +2,7 @@ Scriptname RPB_Prisoner extends RPB_ActorBase
 
 ;/
 @properties:
+    Armor[] NPC_Underwear
     int SKILL_LOSS_HANDLING_ALL_SKILLS
     int SKILL_LOSS_HANDLING_ALL_STAT_SKILLS
     int SKILL_LOSS_HANDLING_ALL_PERK_SKILLS
@@ -82,7 +83,6 @@ Scriptname RPB_Prisoner extends RPB_ActorBase
     Armor[] PrisonOutfit
     float PreviousUpdateTimeServed
     Outfit NPC_OriginalOutfit
-    Armor[] NPC_Underwear
     int NPC_UNDERWEAR_TOP_INDEX
     int NPC_UNDERWEAR_BOTTOM_INDEX
 @functions:
@@ -191,9 +191,13 @@ Scriptname RPB_Prisoner extends RPB_ActorBase
     function NPC_BindToCell()
     function NPC_UnbindFromCell()
     function NPC_ResumeImprisonment()
+    Armor function NPC_GetUnderwearTop()
+    Armor function NPC_GetUnderwearBottom()
+    Armor[] function NPC_GetUnderwear()
     function NPC_SaveUnderwear(Armor akUnderwearTop, Armor akUnderwearBottom)
     function NPC_SaveOriginalOutfit()
     function NPC_RestoreOriginalOutfit()
+    function NPC_ReequipAfterRelease()
     function NPC_SetPersistentOutfit(string asOutfit)
     function NPC_RemovePresetItems()
     function NPC_UpdateStripping()
@@ -3157,18 +3161,22 @@ Outfit property NPC_OriginalOutfit
     endFunction
 endProperty
 
-Armor[] property NPC_Underwear
-    Armor[] function get()
-        ; Not every NPC has underwear: always a two element array (entries may be none), the consumers index it
-        Armor top = GetForm("NPC Underwear Top") as Armor
-        Armor bottom = GetForm("NPC Underwear Bottom") as Armor
+; Not every NPC has underwear: the entries may be none
+Armor function NPC_GetUnderwearTop()
+    return GetForm("NPC Underwear Top") as Armor
+endFunction
 
-        Armor[] underwear = new Armor[2]
-        underwear[NPC_UNDERWEAR_TOP_INDEX] = top
-        underwear[NPC_UNDERWEAR_BOTTOM_INDEX] = bottom
-        return underwear
-    endFunction
-endProperty
+Armor function NPC_GetUnderwearBottom()
+    return GetForm("NPC Underwear Bottom") as Armor
+endFunction
+
+; Always a two element array (entries may be none); prefer the two functions above
+Armor[] function NPC_GetUnderwear()
+    Armor[] underwear = new Armor[2]
+    underwear[0] = self.NPC_GetUnderwearTop()
+    underwear[1] = self.NPC_GetUnderwearBottom()
+    return underwear
+endFunction
 
 int property NPC_UNDERWEAR_TOP_INDEX    = 0 autoreadonly
 int property NPC_UNDERWEAR_BOTTOM_INDEX = 1 autoreadonly
@@ -3201,9 +3209,52 @@ function NPC_SaveOriginalOutfit()
 endFunction
 
 function NPC_RestoreOriginalOutfit()
-    if (self.IsNPC() && NPC_OriginalOutfit)
-        this.SetOutfit(NPC_OriginalOutfit)
+    if (!self.IsNPC())
+        return
     endif
+
+    Outfit original = NPC_OriginalOutfit
+    EventManager.SendInfo("Restoring outfit of " + self.Name + ": saved " + original + ", base outfit now " + this.GetActorBase().GetOutfit(), "["+ Name +"] Prisoner::NPC_RestoreOriginalOutfit")
+    if (original)
+        this.SetOutfit(original)
+    endif
+endFunction
+
+;/
+    SetOutfit() only changes the default outfit, it does not equip what the actor already carries, and the belongings are
+    returned after the Released state starts. Called once they are back: sets the outfit again if needed and equips every
+    armor part of the original outfit the actor carries (leveled list parts cannot be resolved here and are skipped).
+/;
+function NPC_ReequipAfterRelease()
+    if (!self.IsNPC())
+        return
+    endif
+
+    Outfit original = NPC_OriginalOutfit
+    if (!original)
+        EventManager.SendInfo("No original outfit saved for " + self.Name + ", nothing to re-equip", "["+ Name +"] Prisoner::NPC_ReequipAfterRelease")
+        return
+    endif
+
+    if (this.GetActorBase().GetOutfit() != original)
+        this.SetOutfit(original)
+    endif
+
+    int parts = original.GetNumParts()
+    int equipped = 0
+    int skipped = 0
+    int i = 0
+    while (i < parts)
+        Armor part = original.GetNthPart(i) as Armor
+        if (!part)
+            skipped += 1
+        elseIf (this.GetItemCount(part) > 0)
+            this.EquipItem(part)
+            equipped += 1
+        endif
+        i += 1
+    endWhile
+    EventManager.SendInfo("Re-equipped " + equipped + " of " + parts + " outfit parts on " + self.Name + " (" + skipped + " not plain armors), worn body: " + this.GetWornForm(0x4), "["+ Name +"] Prisoner::NPC_ReequipAfterRelease")
 endFunction
 
 function NPC_SetPersistentOutfit(string asOutfit)
@@ -3325,8 +3376,8 @@ function NPC_UpdateUnderwear()
         return
     endif
 
-    Armor underwearTop      = NPC_Underwear[NPC_UNDERWEAR_TOP_INDEX]
-    Armor underwearBottom   = NPC_Underwear[NPC_UNDERWEAR_BOTTOM_INDEX]
+    Armor underwearTop      = self.NPC_GetUnderwearTop()
+    Armor underwearBottom   = self.NPC_GetUnderwearBottom()
 
     bool hasUnderwearInInventory    = this.GetItemCount(underwearTop) >= 1 || this.GetItemCount(underwearBottom) >= 1
     bool wasStrippedToUnderwear     = self.Was("Stripped") && self.IsStrippedToUnderwear

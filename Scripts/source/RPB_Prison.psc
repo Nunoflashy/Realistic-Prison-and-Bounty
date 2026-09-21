@@ -2250,6 +2250,7 @@ function TeleportPrisonerToRelease(RPB_Prisoner apPrisoner)
     apPrisoner.Remove("Imprisoned")
 
     apPrisoner.ReturnBelongings()
+    apPrisoner.NPC_ReequipAfterRelease()
     apPrisoner.RemoveFromCell()
 
     if (apPrisoner.TeleportReleaseLocation)
@@ -2653,7 +2654,10 @@ endEvent
 
 event OnPrisonerReleased(RPB_Prisoner apPrisoner)
     ; INFO level (visible with debug logging off): the MCM cannot show a released NPC's Time Jailed, the log can
-    Info("["+ Name +"] Released " + apPrisoner.Name + ": sentence " + apPrisoner.Sentence + " days, time jailed " + apPrisoner.QueryStat("Time Jailed") + " days, time served " + apPrisoner.TimeServed + " days, released at game time " + Utility.GetCurrentGameTime())
+    ; Info() is silent while debug logging is on (only the Debug* variants print then): call both, exactly one prints
+    string releasedMsg = "["+ Name +"] Released " + apPrisoner.Name + ": sentence " + apPrisoner.Sentence + " days, time jailed " + apPrisoner.QueryStat("Time Jailed") + " days, time served " + apPrisoner.TimeServed + " days, released at game time " + Utility.GetCurrentGameTime()
+    DebugInfo("["+ Name +"] Prison::OnPrisonerReleased", releasedMsg)
+    Info(releasedMsg)
 
     self.RegisterPrisonerReleaseTimeStats(apPrisoner)
     self.ClearPrisonerBounty(apPrisoner)
