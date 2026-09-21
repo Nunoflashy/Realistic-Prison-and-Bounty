@@ -2272,7 +2272,14 @@ endFunction
 function TeleportPrisonerToRelease(RPB_Prisoner apPrisoner)
     ; Crumbs (only recorded while the dev flag is on): a release that stalls shows the last step it completed
     Actor releasedActor = apPrisoner.GetActor()
+    ObjectReference releaseLocation = apPrisoner.TeleportReleaseLocation
+    bool releasedIsNPC = apPrisoner.IsNPC()
     RPB_Utility.Crumb(releasedActor, "Release: start")
+
+    ; A prisoner effect instance that starts while the release runs (the actor's 3D loads when it is moved) must not register
+    ; it again: see Prisoner.OnInitialize. Destroy() wipes this flag together with the rest of the state.
+    apPrisoner.SetBool("Releasing", true)
+
     apPrisoner.GotoState("Released")
     RPB_Utility.Crumb(releasedActor, "Release: Released state entered")
     Debug("["+ Name +"] Prison::TeleportPrisonerToRelease", "Released " + apPrisoner.Name + ".")
@@ -2286,18 +2293,24 @@ function TeleportPrisonerToRelease(RPB_Prisoner apPrisoner)
     apPrisoner.RemoveFromCell()
     RPB_Utility.Crumb(releasedActor, "Release: removed from cell")
 
-    if (apPrisoner.TeleportReleaseLocation)
-        apPrisoner.MoveTo(apPrisoner.TeleportReleaseLocation)
+    if (!releasedIsNPC && releaseLocation)
+        apPrisoner.MoveTo(releaseLocation)
     endif
-    RPB_Utility.Crumb(releasedActor, "Release: moved")
 
-    if (apPrisoner.IsNPC())
-        apPrisoner.EnableAI()
-    endif
-    RPB_Utility.Crumb(releasedActor, "Release: AI enabled")
-
+    ; An NPC is moved only AFTER its prisoner state is destroyed and its spell removed: moving it loads its 3D, which starts a new
+    ; prisoner effect instance while the spell is still on it, and that instance registered the released NPC in the prison
+    ; again (a "ghost" prisoner the monitor then stripped and clothed as if it were still imprisoned).
     self.OnPrisonerReleased(apPrisoner)
     RPB_Utility.Crumb(releasedActor, "Release: OnPrisonerReleased done")
+
+    if (releasedIsNPC)
+        if (releaseLocation)
+            releasedActor.MoveTo(releaseLocation)
+        endif
+        RPB_Utility.Crumb(releasedActor, "Release: moved")
+        releasedActor.EnableAI(true)
+        RPB_Utility.Crumb(releasedActor, "Release: AI enabled")
+    endif
 endFunction
 
 function EscortPrisonerToRelease(RPB_Prisoner apPrisoner)

@@ -3103,6 +3103,13 @@ endEvent
 ; ==========================================================
 
 event OnInitialize()
+    ; An instance that starts while this actor is being released (its 3D loads when it is moved out) must do nothing: it used to
+    ; rebind/register the released actor in the prison again.
+    if (self.GetBool("Releasing"))
+        RPB_Utility.Crumb(this, "Prisoner.OnInitialize: the actor is being released, nothing to initialize")
+        return
+    endif
+
     ; DebugInfo("("+ Name +") Prisoner::OnInitialize", "State: " + self.GetState())
     ; DebugInfo("("+ Name +") Prisoner::OnInitialize", "IsInitialized: " + self.IsInitialized)
 

@@ -7657,6 +7657,20 @@ bool function __MassRun(bool abNoOvercrowding)
     log("MASS RELEASE " + releasedAll + " of " + toRelease + " released in " + self.__Ms(Utility.GetCurrentRealTime() - tRelease) + " ms")
     step = assert_true(releasedAll >= toRelease, "Only " + releasedAll + " of " + toRelease + " prisoners were released in 120 s")
     ok = ok && step
+
+    ; A released NPC must not be registered as a prisoner again (a new effect instance did that after the move)
+    Utility.Wait(3.0)
+    int ghosts = 0
+    i = 0
+    while (i < TOTAL)
+        if (releasing[i] && prison.Prisoners.AtKey(all[i]) != none)
+            ghosts += 1
+        endif
+        i += 1
+    endWhile
+    log("MASS ghosts: " + ghosts + " released actors are registered as prisoners again")
+    step = assert_true(ghosts == 0, ghosts + " released NPCs were registered as prisoners again")
+    ok = ok && step
     if (releasedAll < toRelease)
         int shown = 0
         i = 0
