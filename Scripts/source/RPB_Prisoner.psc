@@ -3175,8 +3175,17 @@ int property NPC_UNDERWEAR_BOTTOM_INDEX = 1 autoreadonly
 
 function NPC_SaveUnderwear(Armor akUnderwearTop, Armor akUnderwearBottom)
     if (self.IsNPC())
-        SetForm("NPC Underwear Top", akUnderwearTop)
-        SetForm("NPC Underwear Bottom", akUnderwearBottom)
+        ; SetForm(key, none) is unreliable with the storage: a none part deletes the variable instead
+        if (akUnderwearTop)
+            SetForm("NPC Underwear Top", akUnderwearTop)
+        else
+            Remove("NPC Underwear Top")
+        endif
+        if (akUnderwearBottom)
+            SetForm("NPC Underwear Bottom", akUnderwearBottom)
+        else
+            Remove("NPC Underwear Bottom")
+        endif
     endif
 endFunction
 
