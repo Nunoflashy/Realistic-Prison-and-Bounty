@@ -3423,16 +3423,11 @@ function NPC_ReequipAfterRelease()
             this.SetOutfit(original)
         endif
 
-        ; The underwear is a part of the outfit too and shares the body slot with the tunic/dress: equipping it after them takes
-        ; them off again. It is only worn while the NPC is stripped to underwear, so it is not put back on at release.
-        Armor underwearTop = self.NPC_GetUnderwearTop()
-        Armor underwearBottom = self.NPC_GetUnderwearBottom()
-
         parts = original.GetNumParts()
         int i = 0
         while (i < parts)
             Armor part = original.GetNthPart(i) as Armor
-            if (!part || part == underwearTop || part == underwearBottom)
+            if (!part)
                 skipped += 1
             else
                 if (this.GetItemCount(part) == 0)
@@ -3496,16 +3491,13 @@ Form[] function NPC_GetRestoreItems()
     Form[] items = new Form[64]
     int count = 0
 
-    Armor restoreUnderwearTop = self.NPC_GetUnderwearTop()
-    Armor restoreUnderwearBottom = self.NPC_GetUnderwearBottom()
-
     Outfit original = NPC_OriginalOutfit
     if (original)
         int parts = original.GetNumParts()
         int i = 0
         while (i < parts && count < 64)
             Armor part = original.GetNthPart(i) as Armor
-            if (part && part != restoreUnderwearTop && part != restoreUnderwearBottom && items.Find(part) < 0)
+            if (part && items.Find(part) < 0)
                 items[count] = part
                 count += 1
             endif
@@ -3517,7 +3509,7 @@ Form[] function NPC_GetRestoreItems()
     int j = 0
     while (j < slots.Length && count < 64)
         Armor wornBefore = GetForm("NPC Worn Armor " + slots[j]) as Armor
-        if (wornBefore && wornBefore != restoreUnderwearTop && wornBefore != restoreUnderwearBottom && items.Find(wornBefore) < 0)
+        if (wornBefore && items.Find(wornBefore) < 0)
             items[count] = wornBefore
             count += 1
         endif

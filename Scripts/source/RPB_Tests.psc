@@ -124,6 +124,7 @@ function SetTests()
     self.AddTest("92 - Mass Imprisonment: 45 NPCs In Waves Into a Full Prison (No Overcrowding), Overflow, Recovery, Mass Release", "Test_MassImprisonment", abChainable = false)
     self.AddTest("93 - Mass Time Skip: 40 Prisoners, Release Order and Cost (Dry Run, Passes ~10 Game Days)", "Test_TimeSkipManyPrisoners", abChainable = false)
     self.AddTest("94 - Mass Imprisonment With the Real Cell Data (Overcrowding As Configured): Package Pool Limit", "Test_MassImprisonmentRealData", abChainable = false)
+    self.AddTest("95 - Console Probe: A Marker Before Each Read the Mass Tests Do at Their Start (Find the JContainers Warning)", "Test_ConsoleProbe", abChainable = false)
     self.AddTest("41 - ActiveMagicEffectContainer: Stuck Lock Self-Heals", "Test_ActiveMagicEffectContainer_StuckLockSelfHeals")
     self.AddTest("42 - ThreadLock: JAtomic Primitive Semantics and Registry", "Test_ThreadLock_PrimitiveSemantics")
     ; Not chainable: fires concurrent worker threads
@@ -7332,8 +7333,7 @@ string function __MassOutfitParts(Actor akActor)
 endFunction
 
 bool function __MassIsDressed(Actor akActor)
-    ; Fully dressed = every outfit part the actor carries is worn, except the underwear (it shares the body slot with the tunic, they
-    ; cannot both be worn): one worn boot is not "dressed", the tunic is what you see
+    ; Fully dressed = every outfit part the actor carries is worn (underwear and clothes are worn together): one worn boot is not "dressed"
     Outfit worn = akActor.GetActorBase().GetOutfit()
     int carried = 0
     int equippedParts = 0
@@ -7342,7 +7342,7 @@ bool function __MassIsDressed(Actor akActor)
         int k = 0
         while (k < n)
             Armor part = worn.GetNthPart(k) as Armor
-            if (part && StringUtil.Find(part.GetName(), "Underwear") < 0 && akActor.GetItemCount(part) > 0)
+            if (part && akActor.GetItemCount(part) > 0)
                 carried += 1
                 if (akActor.IsEquipped(part))
                     equippedParts += 1
@@ -7648,6 +7648,7 @@ bool function __MassRun(bool abNoOvercrowding)
     bool[] releasing = new bool[64]
     float sendTotalMs = 0.0
     float sendSlowestMs = 0.0
+    bool[] dressedRightAfter = new bool[64]
     i = 0
     while (i < TOTAL)
         if (all[i])
@@ -7658,6 +7659,7 @@ bool function __MassRun(bool abNoOvercrowding)
                 prison.SendReleaseRequest(leaving)
                 float sendMs = (Utility.GetCurrentRealTime() - sendT0) * 1000.0
                 sendTotalMs += sendMs
+            dressedRightAfter[i] = self.__MassIsDressed(all[i]) ; the release equips synchronously and verifies: is it dressed now?
                 if (sendMs > sendSlowestMs)
                     sendSlowestMs = sendMs
                 endif
@@ -7735,6 +7737,24 @@ bool function __MassRun(bool abNoOvercrowding)
     endWhile
     log("MASS DRESSED after the release (NPCs that were imprisoned): dressed " + dressed + ", bare " + underwearOnly + ", 3D unloaded (unknown) " + unloaded + " (see the 'Re-equipped' INFO lines for the per NPC counts)")
 
+    ; Was it dressed right after its release, and lost the clothes later? (separates "the equip never took" from "undone afterwards")
+    int rightAfterCount = 0
+    int undoneLater = 0
+    i = 0
+    while (i < TOTAL)
+        if (releasing[i] && everImprisoned[i])
+            if (dressedRightAfter[i])
+                rightAfterCount += 1
+                if (all[i].Is3DLoaded() && !self.__MassIsDressed(all[i]))
+                    undoneLater += 1
+                    log("MASS undone later: actor " + i + " (" + all[i] + ") was dressed right after its release and is not at the end, " + self.__MassPartsDump(all[i]))
+                endif
+            endif
+        endif
+        i += 1
+    endWhile
+    log("MASS dressed right after the release: " + rightAfterCount + " of " + toRelease + "; dressed right after but not at the end: " + undoneLater + "; not dressed even right after: " + (toRelease - rightAfterCount))
+
     __TeardownAllTempActors()
     RPB_Utility.SetOvercrowdingDisabled(false)
     ok = ok && self.__StressAssertNoLeaks(prison, massManager, baseCount, basePrisons)
@@ -7781,6 +7801,64 @@ state Test_MassImprisonmentRealData
         RPB_Utility.SetOvercrowdingDisabled(false)
         self.__StressProfilerRestore()
         __TeardownAllTempActors()
+    endFunction
+endState
+
+;/
+    Finds the source of the console warning "access to non-existing object with id 0x64": it prints a marker to the in-game console
+    before each read the mass tests do at their start, so the warning shows right after the marker of the read that causes it.
+    Open the console before running it and note which PROBE line the warning follows.
+/;
+state Test_ConsoleProbe
+    function Setup()
+        RPB_Prison prison = (RPB_API.GetPrisonManager()).GetPrison("Haafingar")
+        RPB_PrisonManager probeManager = RPB_API.GetPrisonManager()
+        Actor player = Game.GetFormEx(0x14) as Actor
+        int n = 0
+
+        MiscUtil.PrintConsole("PROBE 1: prison.Prisoners.Count")
+        n = prison.Prisoners.Count
+        MiscUtil.PrintConsole("PROBE 2: PrisonManager.PrisonsWithPrisonersCount")
+        n = probeManager.PrisonsWithPrisonersCount
+        MiscUtil.PrintConsole("PROBE 3: prison.JailCells")
+        Form[] cells = prison.JailCells
+
+        int i = 0
+        while (cells && i < cells.Length)
+            RPB_JailCell jailCell = cells[i] as RPB_JailCell
+            if (jailCell)
+                MiscUtil.PrintConsole("PROBE 4: " + jailCell.ID + " MaxPrisoners")
+                n = jailCell.MaxPrisoners
+                MiscUtil.PrintConsole("PROBE 5: " + jailCell.ID + " PrisonerCount")
+                n = jailCell.PrisonerCount
+                MiscUtil.PrintConsole("PROBE 6: " + jailCell.ID + " AllowOvercrowding")
+                bool allow = jailCell.AllowOvercrowding
+                MiscUtil.PrintConsole("PROBE 7: " + jailCell.ID + " IsGenderExclusive / IsFull")
+                allow = jailCell.IsGenderExclusive || jailCell.IsFull
+            endif
+            i += 1
+        endWhile
+
+        MiscUtil.PrintConsole("PROBE 8: PrisonManager.GetCellPackageCapacity(S)")
+        n = probeManager.GetCellPackageCapacity("S")
+        MiscUtil.PrintConsole("PROBE 9: RPB_Utility.IsOvercrowdingDisabled")
+        bool disabled = RPB_Utility.IsOvercrowdingDisabled()
+        MiscUtil.PrintConsole("PROBE 10: RPB_Utility.SetOvercrowdingDisabled true then false")
+        RPB_Utility.SetOvercrowdingDisabled(true)
+        RPB_Utility.SetOvercrowdingDisabled(false)
+        MiscUtil.PrintConsole("PROBE 11: RPB_Utility.GetNearestGuard")
+        Actor guard = RPB_Utility.GetNearestGuard(player, 3000.0, player)
+        MiscUtil.PrintConsole("PROBE 12: crumbs on/off (StressProfilerOff / Restore)")
+        self.__StressProfilerOff()
+        self.__StressProfilerRestore()
+        MiscUtil.PrintConsole("PROBE END")
+
+        log("PROBE done: see the console for the marker the warning follows")
+        display_result(true)
+    endFunction
+
+    function Teardown()
+        RPB_Utility.SetOvercrowdingDisabled(false)
     endFunction
 endState
 

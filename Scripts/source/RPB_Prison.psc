@@ -2349,7 +2349,7 @@ function TeleportPrisonerToRelease(RPB_Prisoner apPrisoner)
                 endif
                 k += 1
             endWhile
-            string equipMsg = "Equipped " + equippedNow + " of the pre-strip items on " + releasedActor.GetDisplayName() + " after the move (3D loaded: " + releasedActor.Is3DLoaded() + "), " + stillOff + " still not worn"
+            string equipMsg = "Equipped " + equippedNow + " of the pre-strip items on " + releasedActor.GetDisplayName() + " " + releasedActor + " after the move (3D loaded: " + releasedActor.Is3DLoaded() + "), " + stillOff + " still not worn"
             DebugInfo("["+ Name +"] Prison::TeleportPrisonerToRelease", equipMsg)
             Info(equipMsg)
         endif
