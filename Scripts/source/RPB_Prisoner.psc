@@ -1423,7 +1423,7 @@ endFunction
 
 function Strip(bool abRemoveUnderwear = true)
     if (!self.PrisonerBelongingsContainer)
-        EventManager.SendError("The prisoner hasn't had a belongings container assigned to "+ PronounObject +", therefore cannot strip!", "["+ Name +"] Prisoner::Strip")
+        EventManager.SendError("The prisoner " + Name + " hasn't had a belongings container assigned to "+ PronounObject +", therefore cannot strip!", "["+ Name +"] Prisoner::Strip")
         return
     endif
 
@@ -1489,7 +1489,7 @@ endFunction
 
 function StripSilently()
     if (!self.PrisonerBelongingsContainer)
-        EventManager.SendError("The prisoner hasn't had a belongings container assigned to "+ PronounObject +", therefore cannot strip silently!", "["+ Name +"] Prisoner::StripSilently")
+        EventManager.SendError("The prisoner " + Name + " hasn't had a belongings container assigned to "+ PronounObject +", therefore cannot strip silently!", "["+ Name +"] Prisoner::StripSilently")
         return
     endif
 
@@ -1517,7 +1517,7 @@ endFunction
 
 function RemoveUnderwear()
     if (!self.PrisonerBelongingsContainer)
-        EventManager.SendError("The prisoner hasn't had a belongings container assigned to "+ PronounObject +", therefore cannot remove underwear!", "["+ Name +"] Prisoner::RemoveUnderwear")
+        EventManager.SendError("The prisoner " + Name + " hasn't had a belongings container assigned to "+ PronounObject +", therefore cannot remove underwear!", "["+ Name +"] Prisoner::RemoveUnderwear")
         return
     endif
 
@@ -2132,7 +2132,14 @@ function ReturnBelongings()
     endif
 
     if (GetInt("Belongings Manifest") != 1)
-        ; No (or an incomplete) manifest: return everything in the container, as before
+        if (self.IsNPC())
+            ; The container is shared: RemoveAllItems() here handed one NPC the belongings of everybody else (55 tunics for one NPC in the
+            ; mass test) and left the next ones with nothing. An NPC without a manifest gets nothing back, its outfit is issued again.
+            EventManager.SendInfo("No belongings manifest for " + self.Name + ", nothing is returned from the shared container (the outfit is issued again)", "["+ Name +"] Prisoner::ReturnBelongings")
+            return
+        endif
+
+        ; The player: no better source for irreplaceable items, everything in the container, as before
         PrisonerBelongingsContainer.RemoveAllItems(this, false, true)
         return
     endif

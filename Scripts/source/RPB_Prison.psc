@@ -2332,6 +2332,9 @@ function TeleportPrisonerToRelease(RPB_Prisoner apPrisoner)
             loadWaited += 0.1
         endWhile
 
+        ; An NPC released while its cell was unloaded shows the equipment it had before: refresh the 3D (its equipment can be right and
+        ; still not be drawn)
+        releasedActor.QueueNiNodeUpdate()
         RPB_Utility.Crumb(releasedActor, "Release: T1 before the equip, 3D loaded " + releasedActor.Is3DLoaded() + ", " + self.__DressTrace(releasedActor, restoreItems))
 
         int equippedNow = 0

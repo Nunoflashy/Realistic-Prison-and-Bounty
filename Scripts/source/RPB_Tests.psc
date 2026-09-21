@@ -7632,6 +7632,12 @@ bool function __MassRun(bool abNoOvercrowding)
         if (all[i] && RPB_Utility.IsActorImprisoned(all[i]))
             if (RPB_StorageVars.GetIntOnReference("Belongings Manifest", all[i], "Jail") == 0)
                 manifestsMissing += 1
+                string missingDump = RPB_Utility.DumpCrumbs(all[i])
+                int strippedAt = StringUtil.Find(missingDump, "Teleported:")
+                if (strippedAt >= 0)
+                    missingDump = StringUtil.Substring(missingDump, strippedAt)
+                endif
+                log("MASS manifest missing: actor " + i + " (" + all[i] + "), belongings container " + RPB_StorageVars.GetFormOnReference("Prisoner Belongings Container", all[i], "Jail") + ", Stripped " + RPB_StorageVars.GetBoolOnReference("Stripped", all[i], "Jail") + ", crumbs from the teleport: " + missingDump)
             elseIf (RPB_StorageVars.GetFormsOnReference("Belongings Forms", all[i], "Jail").Length > 0)
                 manifestsWithItems += 1
             else
