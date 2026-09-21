@@ -7726,6 +7726,13 @@ bool function __MassRun(bool abNoOvercrowding)
     log("MASS ghosts: " + ghosts + " released actors are registered as prisoners again")
     step = assert_true(ghosts == 0, ghosts + " released NPCs were registered as prisoners again")
     ok = ok && step
+
+    ; The delayed re-dress pass (Prison) looks at every released NPC again a few seconds after its release: wait for it before judging
+    float passWaitStart = Utility.GetCurrentRealTime()
+    while (prison.PendingDressCount() > 0 && (Utility.GetCurrentRealTime() - passWaitStart) < 60.0)
+        Utility.Wait(0.5)
+    endWhile
+    log("MASS re-dress pass finished after " + self.__Ms(Utility.GetCurrentRealTime() - passWaitStart) + " ms, still queued " + prison.PendingDressCount())
     if (releasedAll < toRelease)
         int shown = 0
         i = 0

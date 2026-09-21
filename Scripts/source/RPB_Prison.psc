@@ -201,6 +201,7 @@ scriptname RPB_Prison extends RPB_Entity
     function SetSentence(RPB_Prisoner apPrisoner, int aiSentence = 0)
     function RestrainPrisoner(RPB_Prisoner apPrisoner, bool abRestrainInFront = false)
     function TeleportPrisonerToRelease(RPB_Prisoner apPrisoner)
+    int function PendingDressCount()
     function EscortPrisonerToRelease(RPB_Prisoner apPrisoner)
     bool function SendReleaseRequest(RPB_Prisoner apPrisoner)
     int function ReleaseDueNPCsInOrder(float afPlayerTimeLeft)
@@ -244,6 +245,7 @@ scriptname RPB_Prison extends RPB_Entity
     function InvalidateSettingsSnapshot()
 @events:
     event OnReferenceDeleted()
+    event OnUpdate()
     event OnPrisonerImprisonmentFail(RPB_Prisoner apPrisoner, string reason)
     event OnPrisonerRegistered(RPB_Prisoner apPrisoner)
     event OnPrisonerUnregistered(RPB_Prisoner apPrisoner)
@@ -2304,16 +2306,13 @@ function TeleportPrisonerToRelease(RPB_Prisoner apPrisoner)
     ; An NPC is moved only AFTER its prisoner state is destroyed and its spell removed: moving it loads its 3D, which starts a new
     ; prisoner effect instance while the spell is still on it, and that instance registered the released NPC in the prison
     ; again (a "ghost" prisoner the monitor then stripped and clothed as if it were still imprisoned).
-    ; What the NPC is dressed with again: read before the release destroys the storage it comes from
-    Form[] restoreItems = none
+    ; What the NPC is dressed with again is queued before the release destroys the storage it comes from (see __QueueDress).
     if (releasedIsNPC)
-        restoreItems = self.__ReadRestoreItems(releasedActor)
+        self.__QueueDress(releasedActor)
     endif
 
-    RPB_Utility.Crumb(releasedActor, "Release: restore list, " + self.__DressTrace(releasedActor, restoreItems))
-
     self.OnPrisonerReleased(apPrisoner)
-    RPB_Utility.Crumb(releasedActor, "Release: OnPrisonerReleased done")
+    RPB_Utility.Crumb(releasedActor, "Release: OnPrisonerReleased done, " + self.__PartsTrace(releasedActor, dressOutfit))
 
     if (releasedIsNPC)
         if (releaseLocation)
@@ -2323,8 +2322,6 @@ function TeleportPrisonerToRelease(RPB_Prisoner apPrisoner)
         releasedActor.EnableAI(true)
         RPB_Utility.Crumb(releasedActor, "Release: AI enabled")
 
-        ; The equip before the move runs while the NPC is still in its cell with its 3D unloaded and does not always take: equip
-        ; again now that it is out, only what it was dressed with (its outfit and the armor it wore before being stripped)
         ; An equip on an actor whose 3D is not loaded yet can be dropped: give it a moment (bounded)
         float loadWaited = 0.0
         while (!releasedActor.Is3DLoaded() && loadWaited < 1.5)
@@ -2332,103 +2329,155 @@ function TeleportPrisonerToRelease(RPB_Prisoner apPrisoner)
             loadWaited += 0.1
         endWhile
 
-        ; An NPC released while its cell was unloaded shows the equipment it had before: refresh the 3D (its equipment can be right and
-        ; still not be drawn)
+        ; The equipment of an NPC released while its cell was unloaded can be right and still not be drawn: refresh the 3D
         releasedActor.QueueNiNodeUpdate()
-        RPB_Utility.Crumb(releasedActor, "Release: T1 before the equip, 3D loaded " + releasedActor.Is3DLoaded() + ", " + self.__DressTrace(releasedActor, restoreItems))
+        int equippedNow = self.__DressActor(releasedActor)
+        RPB_Utility.Crumb(releasedActor, "Release: after the dress-up (equipped " + equippedNow + "), 3D loaded " + releasedActor.Is3DLoaded() + ", " + self.__PartsTrace(releasedActor, dressOutfit))
 
-        int equippedNow = 0
-        int k = 0
-        while (restoreItems && k < restoreItems.Length)
-            Form restoreItem = restoreItems[k]
-            if (restoreItem && releasedActor.GetItemCount(restoreItem) > 0 && !releasedActor.IsEquipped(restoreItem))
-                releasedActor.EquipItem(restoreItem)
-                equippedNow += 1
-            endif
-            k += 1
-        endWhile
-        ; Diagnostic (one line per NPC release): did the dress-up loop run, and what did it find
-        int listLength = 0
-        if (restoreItems)
-            listLength = restoreItems.Length
-        endif
-        string checkMsg = "Dress check on " + releasedActor.GetDisplayName() + " " + releasedActor + ": restore list " + listLength + ", carried and not worn (equipped now) " + equippedNow + ", 3D loaded " + releasedActor.Is3DLoaded()
+        ; Diagnostic (one line per NPC release)
+        string checkMsg = "Dress check on " + releasedActor.GetDisplayName() + " " + releasedActor + ": equipped now " + equippedNow + ", 3D loaded " + releasedActor.Is3DLoaded()
         DebugInfo("["+ Name +"] Prison::TeleportPrisonerToRelease", checkMsg)
         Info(checkMsg)
-
-        if (equippedNow > 0)
-            releasedActor.QueueNiNodeUpdate() ; make the 3D show the new equipment
-            ; Verify: how many are still not worn after the equip
-            Utility.Wait(0.3)
-            int stillOff = 0
-            k = 0
-            while (restoreItems && k < restoreItems.Length)
-                Form checkedItem = restoreItems[k]
-                if (checkedItem && releasedActor.GetItemCount(checkedItem) > 0 && !releasedActor.IsEquipped(checkedItem))
-                    ; Not worn although carried: an NPC that carries the item more than once did not take the equip. Remove the extra
-                    ; copies (duplicates of an outfit item) and equip it again.
-                    int carriedCount = releasedActor.GetItemCount(checkedItem)
-                    if (carriedCount > 1)
-                        releasedActor.RemoveItem(checkedItem, carriedCount - 1, true)
-                    endif
-                    releasedActor.EquipItem(checkedItem)
-                    Utility.Wait(0.2)
-                    bool retryWorn = releasedActor.IsEquipped(checkedItem)
-                    string retryMsg = "Still off after the equip: " + checkedItem.GetName() + " " + checkedItem + " (carried " + carriedCount + ") on " + releasedActor.GetDisplayName() + " " + releasedActor + ", retry worn: " + retryWorn
-                    DebugInfo("["+ Name +"] Prison::TeleportPrisonerToRelease", retryMsg)
-                    Info(retryMsg)
-                    if (!retryWorn)
-                        stillOff += 1
-                    endif
-                    releasedActor.QueueNiNodeUpdate()
-                endif
-                k += 1
-            endWhile
-            string equipMsg = "Equipped " + equippedNow + " of the pre-strip items on " + releasedActor.GetDisplayName() + " " + releasedActor + " after the move (3D loaded: " + releasedActor.Is3DLoaded() + "), " + stillOff + " still not worn"
-            DebugInfo("["+ Name +"] Prison::TeleportPrisonerToRelease", equipMsg)
-            Info(equipMsg)
-        endif
-        RPB_Utility.Crumb(releasedActor, "Release: T2 after the equip (equipped " + equippedNow + "), " + self.__DressTrace(releasedActor, restoreItems))
     endif
 endFunction
 
-;/
-    What this NPC is dressed with again on release, and nothing else it carries (it may carry several armors): the plain armor parts
-    of its saved original outfit and the armor it wore before it was stripped. Read from the storage on the actor directly: a
-    value returned from the prisoner effect instance never reached this script (the instance of an NPC whose cell is unloaded has
-    ended). Read it before the release destroys the storage. A fixed size array whose empty entries the caller skips (an empty
-    array is None in Papyrus).
-/;
-Form[] function __ReadRestoreItems(Actor akActor)
-    Form[] items = new Form[64]
-    int count = 0
+; ==========================================================
+;                  Dressing released NPCs
+; ==========================================================
+; What a released NPC is dressed with again, and nothing else it carries (it may carry several armors): the plain armor parts of its
+; saved original outfit and the armor it wore before it was stripped. The list is read from the storage BEFORE the release destroys
+; it and kept in JContainers (actor -> { items, since, tries }), because the engine handles the outfit of a released NPC on its own
+; schedule (a tunic equipped in the cell was found unequipped after the move): a delayed pass looks again once things settled.
+; No Papyrus array is passed around here: the one built for this used to arrive as None.
 
+int __pendingDress ; JFormMap actor -> JMap { items: JArray of forms, since: real time, tries: int }, retained
+
+function __EnsurePendingDress()
+    if (!__pendingDress || !JValue.isExists(__pendingDress))
+        __pendingDress = JValue.retain(JFormMap.object())
+    endif
+endFunction
+
+int function PendingDressCount()
+    if (!__pendingDress || !JValue.isExists(__pendingDress))
+        return 0
+    endif
+
+    return JFormMap.count(__pendingDress)
+endFunction
+
+function __QueueDress(Actor akActor)
+    self.__EnsurePendingDress()
+
+    int items = JArray.object()
     Outfit original = RPB_StorageVars.GetFormOnReference("NPC Original Outfit", akActor, "Jail") as Outfit
     if (original)
         int parts = original.GetNumParts()
         int i = 0
-        while (i < parts && count < 64)
+        while (i < parts)
             Armor part = original.GetNthPart(i) as Armor
-            if (part && items.Find(part) < 0)
-                items[count] = part
-                count += 1
+            if (part && JArray.findForm(items, part) < 0)
+                JArray.addForm(items, part)
             endif
             i += 1
         endWhile
     endif
 
     int slot = 30
-    while (slot <= 61 && count < 64)
+    while (slot <= 61)
         Armor wornBefore = RPB_StorageVars.GetFormOnReference("NPC Worn Armor " + slot, akActor, "Jail") as Armor
-        if (wornBefore && items.Find(wornBefore) < 0)
-            items[count] = wornBefore
-            count += 1
+        if (wornBefore && JArray.findForm(items, wornBefore) < 0)
+            JArray.addForm(items, wornBefore)
         endif
         slot += 1
     endWhile
 
-    RPB_Utility.Crumb(akActor, "ReadRestoreItems: outfit " + original + ", " + count + " items listed")
-    return items
+    int entry = JMap.object()
+    JMap.setObj(entry, "items", items)
+    JMap.setFlt(entry, "since", Utility.GetCurrentRealTime())
+    JMap.setInt(entry, "tries", 0)
+    JFormMap.setObj(__pendingDress, akActor, entry)
+    RPB_Utility.Crumb(akActor, "Dress queued: outfit " + original + ", " + JArray.count(items) + " items")
+
+    self.RegisterForSingleUpdate(3.0)
+endFunction
+
+; Equips what the actor carries and does not wear from its queued list. returns (int): how many items it equipped.
+int function __DressActor(Actor akActor)
+    if (!__pendingDress || !JValue.isExists(__pendingDress))
+        return 0
+    endif
+
+    int entry = JFormMap.getObj(__pendingDress, akActor)
+    if (!entry)
+        return 0
+    endif
+
+    int items = JMap.getObj(entry, "items")
+    int equipped = 0
+    int k = 0
+    int n = JArray.count(items)
+    while (k < n)
+        Form item = JArray.getForm(items, k)
+        if (item && akActor.GetItemCount(item) > 0 && !akActor.IsEquipped(item))
+            akActor.EquipItem(item)
+            equipped += 1
+        endif
+        k += 1
+    endWhile
+    return equipped
+endFunction
+
+event OnUpdate()
+    self.__ProcessPendingDress()
+endEvent
+
+; The delayed pass: every queued NPC is looked at again 3 s (or more) after its release; it stays queued until two passes in a row
+; found nothing left to equip, or after 5 passes.
+function __ProcessPendingDress()
+    if (!__pendingDress || !JValue.isExists(__pendingDress))
+        return
+    endif
+
+    int keys = JFormMap.allKeys(__pendingDress)
+    int n = JArray.count(keys)
+    float now = Utility.GetCurrentRealTime()
+    int i = 0
+    while (i < n)
+        Actor passActor = JArray.getForm(keys, i) as Actor
+        int entry = 0
+        if (passActor)
+            entry = JFormMap.getObj(__pendingDress, passActor)
+        endif
+
+        if (!passActor || !entry)
+            JFormMap.removeKey(__pendingDress, passActor)
+        elseIf ((now - JMap.getFlt(entry, "since")) >= 3.0)
+            int tries = JMap.getInt(entry, "tries") + 1
+            JMap.setInt(entry, "tries", tries)
+            JMap.setFlt(entry, "since", now)
+
+            bool finished = false
+            if (passActor.Is3DLoaded())
+                passActor.QueueNiNodeUpdate()
+                int equippedNow = self.__DressActor(passActor)
+                string passMsg = "Re-dress pass on " + passActor.GetDisplayName() + " " + passActor + ": equipped " + equippedNow + " (pass " + tries + ")"
+                DebugInfo("["+ Name +"] Prison::__ProcessPendingDress", passMsg)
+                Info(passMsg)
+                RPB_Utility.Crumb(passActor, "Release: pass " + tries + ", equipped " + equippedNow)
+                finished = (equippedNow == 0 && tries >= 2)
+            endif
+
+            if (finished || tries >= 5)
+                JFormMap.removeKey(__pendingDress, passActor)
+            endif
+        endif
+        i += 1
+    endWhile
+
+    if (JFormMap.count(__pendingDress) > 0)
+        self.RegisterForSingleUpdate(3.0)
+    endif
 endFunction
 
 ; The NPC's outfit parts: how many it carries and whether each is worn, to see where a part is doubled or lost during the release.
@@ -2444,29 +2493,6 @@ string function __PartsTrace(Actor akActor, Outfit akOutfit)
         Armor part = akOutfit.GetNthPart(i) as Armor
         if (part)
             trace += " [" + part.GetName() + " c" + akActor.GetItemCount(part) + " w" + akActor.IsEquipped(part) + "]"
-        endif
-        i += 1
-    endWhile
-    return trace
-endFunction
-
-; What the dress-up looks at, per listed item: name, how many the actor carries and whether it is worn. Only while crumbs are enabled
-; (the stress tests), it costs natives.
-string function __DressTrace(Actor akActor, Form[] akItems)
-    if (!RPB_Utility.IsCrumbsEnabled())
-        return ""
-    endif
-
-    if (!akItems)
-        return "list none"
-    endif
-
-    string trace = "list " + akItems.Length + ":"
-    int i = 0
-    while (i < akItems.Length && i < 8)
-        Form item = akItems[i]
-        if (item)
-            trace += " [" + item.GetName() + " c" + akActor.GetItemCount(item) + " w" + akActor.IsEquipped(item) + "]"
         endif
         i += 1
     endWhile
