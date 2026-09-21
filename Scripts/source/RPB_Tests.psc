@@ -7665,6 +7665,7 @@ bool function __MassRun(bool abNoOvercrowding)
     log("MASS restore data before the release: original outfit saved for " + outfitSaved + " actors, body armor saved for " + bodySaved + " actors")
 
     ; Mass release: everybody at once
+    prison.ResetDressCost()
     float tRelease = Utility.GetCurrentRealTime()
     int toRelease = 0
     bool[] releasing = new bool[64]
@@ -7732,6 +7733,7 @@ bool function __MassRun(bool abNoOvercrowding)
     while (prison.PendingDressCount() > 0 && (Utility.GetCurrentRealTime() - passWaitStart) < 60.0)
         Utility.Wait(0.5)
     endWhile
+    log("MASS dress-up cost (natives only, without waits): " + prison.DressCostSummary())
     log("MASS re-dress pass finished after " + self.__Ms(Utility.GetCurrentRealTime() - passWaitStart) + " ms, still queued " + prison.PendingDressCount())
     if (releasedAll < toRelease)
         int shown = 0

@@ -202,6 +202,8 @@ scriptname RPB_Prison extends RPB_Entity
     function RestrainPrisoner(RPB_Prisoner apPrisoner, bool abRestrainInFront = false)
     function TeleportPrisonerToRelease(RPB_Prisoner apPrisoner)
     int function PendingDressCount()
+    function ResetDressCost()
+    string function DressCostSummary()
     function EscortPrisonerToRelease(RPB_Prisoner apPrisoner)
     bool function SendReleaseRequest(RPB_Prisoner apPrisoner)
     int function ReleaseDueNPCsInOrder(float afPlayerTimeLeft)
@@ -2330,8 +2332,11 @@ function TeleportPrisonerToRelease(RPB_Prisoner apPrisoner)
         endWhile
 
         ; The equipment of an NPC released while its cell was unloaded can be right and still not be drawn: refresh the 3D
+        float dressStart = Utility.GetCurrentRealTime()
         releasedActor.QueueNiNodeUpdate()
         int equippedNow = self.__DressActor(releasedActor)
+        __dressCostMs += (Utility.GetCurrentRealTime() - dressStart) * 1000.0
+        __dressCostCount += 1
         RPB_Utility.Crumb(releasedActor, "Release: after the dress-up (equipped " + equippedNow + "), 3D loaded " + releasedActor.Is3DLoaded() + ", " + self.__PartsTrace(releasedActor, dressOutfit))
 
         ; Diagnostic (one line per NPC release)
@@ -2350,7 +2355,10 @@ endFunction
 ; schedule (a tunic equipped in the cell was found unequipped after the move): a delayed pass looks again once things settled.
 ; No Papyrus array is passed around here: the one built for this used to arrive as None.
 
-int __pendingDress ; JFormMap actor -> JMap { items: JArray of forms, since: real time, tries: int }, retained
+int __pendingDress ; JFormMap actor -> JMap { items: JArray of forms, tries: int }, retained
+int __pendingPasses ; consecutive OnUpdate calls that found the queue not empty (safety net: a queue that never empties is cleared)
+float __dressCostMs ; diagnostics: time spent in the immediate dress-up of released NPCs, and how many
+int __dressCostCount
 
 function __EnsurePendingDress()
     if (!__pendingDress || !JValue.isExists(__pendingDress))
@@ -2394,7 +2402,6 @@ function __QueueDress(Actor akActor)
 
     int entry = JMap.object()
     JMap.setObj(entry, "items", items)
-    JMap.setFlt(entry, "since", Utility.GetCurrentRealTime())
     JMap.setInt(entry, "tries", 0)
     JFormMap.setObj(__pendingDress, akActor, entry)
     RPB_Utility.Crumb(akActor, "Dress queued: outfit " + original + ", " + JArray.count(items) + " items")
@@ -2441,21 +2448,48 @@ function __ProcessPendingDress()
 
     int keys = JFormMap.allKeys(__pendingDress)
     int n = JArray.count(keys)
-    float now = Utility.GetCurrentRealTime()
+
+    ; A key of a form that no longer exists reads as None and cannot be removed by a None form: rebuild the map from the live entries
+    bool dead = false
     int i = 0
     while (i < n)
-        Actor passActor = JArray.getForm(keys, i) as Actor
-        int entry = 0
-        if (passActor)
-            entry = JFormMap.getObj(__pendingDress, passActor)
+        if (!(JArray.getForm(keys, i) as Actor))
+            dead = true
         endif
+        i += 1
+    endWhile
 
-        if (!passActor || !entry)
-            JFormMap.removeKey(__pendingDress, passActor)
-        elseIf ((now - JMap.getFlt(entry, "since")) >= 3.0)
+    if (dead)
+        int fresh = JValue.retain(JFormMap.object())
+        int kept = 0
+        i = 0
+        while (i < n)
+            Actor liveActor = JArray.getForm(keys, i) as Actor
+            if (liveActor)
+                int liveEntry = JFormMap.getObj(__pendingDress, liveActor)
+                if (liveEntry)
+                    JFormMap.setObj(fresh, liveActor, liveEntry)
+                    kept += 1
+                endif
+            endif
+            i += 1
+        endWhile
+        JValue.release(__pendingDress)
+        __pendingDress = fresh
+        EventManager.SendWarning("Dropped " + (n - kept) + " re-dress entries of NPCs that no longer exist", "["+ Name +"] Prison::__ProcessPendingDress")
+        keys = JFormMap.allKeys(__pendingDress)
+        n = JArray.count(keys)
+    endif
+
+    ; Every queued NPC is looked at on each update (it fires 3 s after the last release was queued, so each entry is at least that old):
+    ; it leaves the queue after two clean passes in a row or after 5 passes. Nothing depends on a clock (real time restarts every session).
+    i = 0
+    while (i < n)
+        Actor passActor = JArray.getForm(keys, i) as Actor
+        int entry = JFormMap.getObj(__pendingDress, passActor)
+        if (entry)
             int tries = JMap.getInt(entry, "tries") + 1
             JMap.setInt(entry, "tries", tries)
-            JMap.setFlt(entry, "since", now)
 
             bool finished = false
             if (passActor.Is3DLoaded())
@@ -2476,8 +2510,32 @@ function __ProcessPendingDress()
     endWhile
 
     if (JFormMap.count(__pendingDress) > 0)
-        self.RegisterForSingleUpdate(3.0)
+        __pendingPasses += 1
+        if (__pendingPasses > 40)
+            ; more than two minutes of updates and the queue is still not empty: something is wrong, do not loop for ever
+            EventManager.SendWarning("The re-dress queue did not empty after " + __pendingPasses + " updates, clearing it", "["+ Name +"] Prison::__ProcessPendingDress")
+            JFormMap.clear(__pendingDress)
+            __pendingPasses = 0
+        else
+            self.RegisterForSingleUpdate(3.0)
+        endif
+    else
+        __pendingPasses = 0
     endif
+endFunction
+
+; Diagnostics for the stress tests: what the immediate dress-up of released NPCs cost
+function ResetDressCost()
+    __dressCostMs = 0.0
+    __dressCostCount = 0
+endFunction
+
+string function DressCostSummary()
+    float average = 0.0
+    if (__dressCostCount > 0)
+        average = __dressCostMs / __dressCostCount
+    endif
+    return (__dressCostMs as int) + " ms over " + __dressCostCount + " NPCs (" + (average as int) + " ms each)"
 endFunction
 
 ; The NPC's outfit parts: how many it carries and whether each is worn, to see where a part is doubled or lost during the release.
