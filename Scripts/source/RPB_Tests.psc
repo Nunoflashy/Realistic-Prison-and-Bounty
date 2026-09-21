@@ -7307,6 +7307,30 @@ int function __MassCellsAllowingOvercrowding(RPB_Prison akPrison)
 endFunction
 
 ;/ Wears something of its outfit (or a body armor): what "dressed" means for the report after the release /;
+string function __MassOutfitParts(Actor akActor)
+    Outfit worn = akActor.GetActorBase().GetOutfit()
+    int total = 0
+    int carried = 0
+    int equippedParts = 0
+    if (worn)
+        total = worn.GetNumParts()
+        int k = 0
+        while (k < total)
+            Armor part = worn.GetNthPart(k) as Armor
+            if (part)
+                if (akActor.GetItemCount(part) > 0)
+                    carried += 1
+                endif
+                if (akActor.IsEquipped(part))
+                    equippedParts += 1
+                endif
+            endif
+            k += 1
+        endWhile
+    endif
+    return "carried " + carried + ", worn " + equippedParts + " of " + total
+endFunction
+
 bool function __MassIsDressed(Actor akActor)
     Outfit worn = akActor.GetActorBase().GetOutfit()
     if (worn)
@@ -7529,8 +7553,12 @@ bool function __MassRun(bool abNoOvercrowding)
                 RPB_Prisoner freeing = prison.Prisoners.AtKey(all[i])
                 if (freeing)
                     prison.SendReleaseRequest(freeing)
-                    step = assert_true(self.__StressWaitReleased(all[i], prison, 30.0) >= 0, "Prisoner " + i + " was not released while making room")
+                    int freedMs = self.__StressWaitReleased(all[i], prison, 30.0)
+                    step = assert_true(freedMs >= 0, "Prisoner " + i + " was not released while making room")
                     ok = ok && step
+                    if (freedMs < 0)
+                        log("MASS release stuck while making room, actor " + i + " (" + all[i] + "): " + self.__StressDiagnose(all[i], prison, guard))
+                    endif
                     released2 += 1
                 endif
             endif
@@ -7587,18 +7615,28 @@ bool function __MassRun(bool abNoOvercrowding)
     float tRelease = Utility.GetCurrentRealTime()
     int toRelease = 0
     bool[] releasing = new bool[64]
+    float sendTotalMs = 0.0
+    float sendSlowestMs = 0.0
     i = 0
     while (i < TOTAL)
         if (all[i])
             RPB_Prisoner leaving = prison.Prisoners.AtKey(all[i])
             if (leaving)
                 releasing[i] = true
+                float sendT0 = Utility.GetCurrentRealTime()
                 prison.SendReleaseRequest(leaving)
+                float sendMs = (Utility.GetCurrentRealTime() - sendT0) * 1000.0
+                sendTotalMs += sendMs
+                if (sendMs > sendSlowestMs)
+                    sendSlowestMs = sendMs
+                endif
                 toRelease += 1
             endif
         endif
         i += 1
     endWhile
+
+    log("MASS release requests: " + toRelease + " sent, " + (sendTotalMs as int) + " ms in total, slowest " + (sendSlowestMs as int) + " ms")
 
     ; Only the actors that were sent for release count (the reverted ones are not prisoners either, and used to be counted)
     int releasedAll = 0
@@ -7619,6 +7657,17 @@ bool function __MassRun(bool abNoOvercrowding)
     log("MASS RELEASE " + releasedAll + " of " + toRelease + " released in " + self.__Ms(Utility.GetCurrentRealTime() - tRelease) + " ms")
     step = assert_true(releasedAll >= toRelease, "Only " + releasedAll + " of " + toRelease + " prisoners were released in 120 s")
     ok = ok && step
+    if (releasedAll < toRelease)
+        int shown = 0
+        i = 0
+        while (i < TOTAL && shown < 5)
+            if (releasing[i] && (RPB_Utility.IsActorImprisoned(all[i]) || prison.Prisoners.AtKey(all[i]) != none))
+                log("MASS release stuck, actor " + i + " (" + all[i] + "): " + self.__StressDiagnose(all[i], prison, guard))
+                shown += 1
+            endif
+            i += 1
+        endWhile
+    endif
 
     ; How many left dressed: body armor worn, or (when the engine has unloaded them) unknown. Reported, not asserted.
     Utility.Wait(3.0)
@@ -7634,7 +7683,7 @@ bool function __MassRun(bool abNoOvercrowding)
                 dressed += 1
             else
                 underwearOnly += 1
-                log("MASS bare actor " + i + " (" + all[i] + "): items " + all[i].GetNumItems() + ", base outfit " + all[i].GetActorBase().GetOutfit())
+                log("MASS bare actor " + i + " (" + all[i] + "): items " + all[i].GetNumItems() + ", base outfit " + all[i].GetActorBase().GetOutfit() + ", outfit parts " + self.__MassOutfitParts(all[i]))
             endif
         endif
         i += 1
@@ -9064,7 +9113,7 @@ Actor function __SpawnTempActorOf(int aiBaseFormId)
         log("TEMP ACTOR NOT LOADED after 5s: " + temp + " | its cell " + temp.GetParentCell() + " | player's cell " + (Game.GetFormEx(0x14) as Actor).GetParentCell() + " - registrations in this test will not work here; reload a save / move somewhere the cell loads")
     endif
 
-    __LogTempActorProbe(temp)
+    ; __LogTempActorProbe(temp)
 
     return temp
 endFunction

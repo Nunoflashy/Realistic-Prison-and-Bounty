@@ -2270,25 +2270,34 @@ function RestrainPrisoner(RPB_Prisoner apPrisoner, bool abRestrainInFront = fals
 endFunction
 
 function TeleportPrisonerToRelease(RPB_Prisoner apPrisoner)
+    ; Crumbs (only recorded while the dev flag is on): a release that stalls shows the last step it completed
+    Actor releasedActor = apPrisoner.GetActor()
+    RPB_Utility.Crumb(releasedActor, "Release: start")
     apPrisoner.GotoState("Released")
+    RPB_Utility.Crumb(releasedActor, "Release: Released state entered")
     Debug("["+ Name +"] Prison::TeleportPrisonerToRelease", "Released " + apPrisoner.Name + ".")
 
     apPrisoner.Remove("Imprisoned")
 
     apPrisoner.ReturnBelongings()
+    RPB_Utility.Crumb(releasedActor, "Release: belongings returned")
     apPrisoner.NPC_ReequipAfterRelease()
+    RPB_Utility.Crumb(releasedActor, "Release: outfit re-equipped")
     apPrisoner.RemoveFromCell()
+    RPB_Utility.Crumb(releasedActor, "Release: removed from cell")
 
     if (apPrisoner.TeleportReleaseLocation)
         apPrisoner.MoveTo(apPrisoner.TeleportReleaseLocation)
     endif
+    RPB_Utility.Crumb(releasedActor, "Release: moved")
 
     if (apPrisoner.IsNPC())
         apPrisoner.EnableAI()
-        apPrisoner.NPC_EnsureDressed()
     endif
+    RPB_Utility.Crumb(releasedActor, "Release: AI enabled")
 
     self.OnPrisonerReleased(apPrisoner)
+    RPB_Utility.Crumb(releasedActor, "Release: OnPrisonerReleased done")
 endFunction
 
 function EscortPrisonerToRelease(RPB_Prisoner apPrisoner)
