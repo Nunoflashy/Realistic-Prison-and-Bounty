@@ -81,6 +81,7 @@ Scriptname RPB_Prisoner extends RPB_ActorBase
     bool IsStripped
     bool IsClothed
     Armor[] PrisonOutfit
+    int BELONGINGS_MANIFEST_MAX
     float PreviousUpdateTimeServed
     Outfit NPC_OriginalOutfit
     int NPC_UNDERWEAR_TOP_INDEX
@@ -139,6 +140,8 @@ Scriptname RPB_Prisoner extends RPB_ActorBase
     float function GetReleaseTimeExtraHours()
     function FastForwardToRelease()
     function DetermineReleaseTimeAdditionalHours()
+    function SaveBelongingsManifest()
+    function ModBelongingsManifest(Form akItem, int aiDelta)
     function ReturnBelongings()
     function NotifySentence()
     function NotifyReleaseDate()
@@ -1450,6 +1453,7 @@ function Strip(bool abRemoveUnderwear = true)
     endif
 
     self.NPC_SaveWornArmor()
+    self.SaveBelongingsManifest()
     self.UnequipAll()
     self.RemoveAllItems(PrisonerBelongingsContainer, true, true) ; Remove and put all the items in the prisoner's possession in the assigned prisoner container
     self.UnequipHands()
@@ -1466,6 +1470,8 @@ function Strip(bool abRemoveUnderwear = true)
         ; Equip Underwear
         PrisonerBelongingsContainer.RemoveItem(underwearTop, abSilent = true, akOtherContainer = this)
         PrisonerBelongingsContainer.RemoveItem(underwearBottom, abSilent = true, akOtherContainer = this)
+        self.ModBelongingsManifest(underwearTop, -1)
+        self.ModBelongingsManifest(underwearBottom, -1)
 
         self.EquipItem(underwearTop)
         self.EquipItem(underwearBottom)
@@ -1491,6 +1497,7 @@ function StripSilently()
     NPC_SaveUnderwear(underwearTop, underwearBottom)
 
     self.NPC_SaveWornArmor()
+    self.SaveBelongingsManifest()
     self.UnequipAll()
     self.RemoveAllItems(PrisonerBelongingsContainer, true, true) ; Remove and put all the items in the prisoner's possession in the assigned prisoner container
     self.UnequipHands()
@@ -1499,6 +1506,8 @@ function StripSilently()
 
     PrisonerBelongingsContainer.RemoveItem(underwearTop, abSilent = true, akOtherContainer = this)
     PrisonerBelongingsContainer.RemoveItem(underwearBottom, abSilent = true, akOtherContainer = this)
+    self.ModBelongingsManifest(underwearTop, -1)
+    self.ModBelongingsManifest(underwearBottom, -1)
 
     self.EquipItem(underwearTop)
     self.EquipItem(underwearBottom)
@@ -1515,10 +1524,12 @@ function RemoveUnderwear()
 
     if (underwearTop)
         this.RemoveItem(underwearTop, 1, true, PrisonerBelongingsContainer)
+        self.ModBelongingsManifest(underwearTop, 1)
     endif
 
     if (underwearBottom)
         this.RemoveItem(underwearBottom, 1, true, PrisonerBelongingsContainer)
+        self.ModBelongingsManifest(underwearBottom, 1)
     endif
 
     self.OnUnderwearRemoved(underwearTop, underwearBottom)
@@ -2004,8 +2015,148 @@ function DetermineReleaseTimeAdditionalHours()
     endif
 endFunction
 
+;/
+    The belongings containers are shared between prisoners (one is picked at random for each), so what this prisoner put
+    there is recorded when it is stripped (item forms and counts, in the storage on the actor) and exactly that is
+    returned on release: RemoveAllItems() would hand another prisoner's things over to whoever is released first.
+    Kept up to BELONGINGS_MANIFEST_MAX entries (Papyrus array limit); a longer inventory marks the manifest incomplete and
+    the release falls back to returning the whole container.
+/;
+int property BELONGINGS_MANIFEST_MAX = 120 autoreadonly
+
+function SaveBelongingsManifest()
+    int total = this.GetNumItems()
+    int count = total
+    int manifestState = 1 ; 1 = complete, 2 = incomplete
+    if (count > BELONGINGS_MANIFEST_MAX)
+        count = BELONGINGS_MANIFEST_MAX
+        manifestState = 2
+    endif
+
+    Form[] forms = new Form[120]
+    int[] counts = new int[120]
+    int i = 0
+    while (i < count)
+        Form item = this.GetNthForm(i)
+        forms[i] = item
+        counts[i] = this.GetItemCount(item)
+        i += 1
+    endWhile
+
+    string refKey = self.__GetRefKey()
+    string category = self.GetScriptVarCategory("Actor")
+    RPB_StorageVars.SetFormsOnReference("Belongings Forms", refKey, self.__TrimForms(forms, count), category)
+    RPB_StorageVars.SetIntsOnReference("Belongings Counts", refKey, self.__TrimInts(counts, count), category)
+    SetInt("Belongings Manifest", manifestState)
+    EventManager.SendInfo("Recorded " + count + " of " + total + " belongings of " + self.Name + " (manifest " + string_if (manifestState == 1, "complete", "incomplete") + ")", "["+ Name +"] Prisoner::SaveBelongingsManifest")
+endFunction
+
+Form[] function __TrimForms(Form[] akForms, int aiCount)
+    if (aiCount <= 0)
+        return Utility.CreateFormArray(0)
+    endif
+
+    Form[] trimmed = Utility.CreateFormArray(aiCount)
+    int i = 0
+    while (i < aiCount)
+        trimmed[i] = akForms[i]
+        i += 1
+    endWhile
+    return trimmed
+endFunction
+
+int[] function __TrimInts(int[] aiInts, int aiCount)
+    if (aiCount <= 0)
+        return Utility.CreateIntArray(0)
+    endif
+
+    int[] trimmed = Utility.CreateIntArray(aiCount)
+    int i = 0
+    while (i < aiCount)
+        trimmed[i] = aiInts[i]
+        i += 1
+    endWhile
+    return trimmed
+endFunction
+
+;/
+    Adjusts one item of the manifest by @aiDelta (underwear moved between the container and the actor after the strip).
+/;
+function ModBelongingsManifest(Form akItem, int aiDelta)
+    if (!akItem || GetInt("Belongings Manifest") != 1)
+        return
+    endif
+
+    string refKey = self.__GetRefKey()
+    string category = self.GetScriptVarCategory("Actor")
+    Form[] forms = RPB_StorageVars.GetFormsOnReference("Belongings Forms", refKey, category)
+    int[] counts = RPB_StorageVars.GetIntsOnReference("Belongings Counts", refKey, category)
+
+    int index = -1
+    if (forms)
+        index = forms.Find(akItem)
+    endif
+
+    if (index >= 0)
+        counts[index] = counts[index] + aiDelta
+    elseIf (aiDelta > 0 && (!forms || forms.Length < BELONGINGS_MANIFEST_MAX))
+        int oldLength = 0
+        if (forms)
+            oldLength = forms.Length
+        endif
+        Form[] grownForms = Utility.CreateFormArray(oldLength + 1)
+        int[] grownCounts = Utility.CreateIntArray(oldLength + 1)
+        int i = 0
+        while (i < oldLength)
+            grownForms[i] = forms[i]
+            grownCounts[i] = counts[i]
+            i += 1
+        endWhile
+        grownForms[oldLength] = akItem
+        grownCounts[oldLength] = aiDelta
+        forms = grownForms
+        counts = grownCounts
+    else
+        return
+    endif
+
+    RPB_StorageVars.SetFormsOnReference("Belongings Forms", refKey, forms, category)
+    RPB_StorageVars.SetIntsOnReference("Belongings Counts", refKey, counts, category)
+endFunction
+
 function ReturnBelongings()
-    PrisonerBelongingsContainer.RemoveAllItems(this, false, true)
+    if (!PrisonerBelongingsContainer)
+        return
+    endif
+
+    if (GetInt("Belongings Manifest") != 1)
+        ; No (or an incomplete) manifest: return everything in the container, as before
+        PrisonerBelongingsContainer.RemoveAllItems(this, false, true)
+        return
+    endif
+
+    string refKey = self.__GetRefKey()
+    string category = self.GetScriptVarCategory("Actor")
+    Form[] forms = RPB_StorageVars.GetFormsOnReference("Belongings Forms", refKey, category)
+    int[] counts = RPB_StorageVars.GetIntsOnReference("Belongings Counts", refKey, category)
+
+    int returned = 0
+    int i = 0
+    while (forms && i < forms.Length)
+        int inContainer = PrisonerBelongingsContainer.GetItemCount(forms[i])
+        int amount = counts[i]
+        if (inContainer < amount)
+            amount = inContainer
+        endif
+        if (amount > 0)
+            PrisonerBelongingsContainer.RemoveItem(forms[i], amount, true, this)
+            returned += 1
+        endif
+        i += 1
+    endWhile
+
+    Remove("Belongings Manifest")
+    EventManager.SendInfo("Returned " + returned + " kinds of belongings to " + self.Name, "["+ Name +"] Prisoner::ReturnBelongings")
 endFunction
 
 ;                        Imprisonment
@@ -3268,18 +3419,13 @@ endFunction
     Must be called BEFORE the NPC is unequipped and emptied.
 /;
 int[] function __NPC_WornArmorSlots()
-    int[] slots = new int[11]
-    slots[0] = 30 ; head
-    slots[1] = 32 ; body
-    slots[2] = 33 ; hands
-    slots[3] = 34 ; forearms
-    slots[4] = 35 ; amulet
-    slots[5] = 36 ; ring
-    slots[6] = 37 ; feet
-    slots[7] = 38 ; calves
-    slots[8] = 39 ; shield
-    slots[9] = 42 ; circlet
-    slots[10] = 43 ; ears
+    ; Every armor occupies at least one of the 32 body slots (30..61), so scanning all of them is complete for any NPC or mod list
+    int[] slots = new int[32]
+    int i = 0
+    while (i < 32)
+        slots[i] = 30 + i
+        i += 1
+    endWhile
     return slots
 endFunction
 
@@ -3289,12 +3435,14 @@ function NPC_SaveWornArmor()
     endif
 
     int[] slots = self.__NPC_WornArmorSlots()
+    Form[] seen = new Form[32] ; an armor covering several slots is stored once
     int saved = 0
     int i = 0
     while (i < slots.Length)
         string wornKey = "NPC Worn Armor " + slots[i]
         Armor worn = this.GetWornForm(Math.LeftShift(1, slots[i] - 30)) as Armor
-        if (worn)
+        if (worn && seen.Find(worn) < 0)
+            seen[saved] = worn
             SetForm(wornKey, worn)
             saved += 1
         elseIf (GetForm(wornKey))

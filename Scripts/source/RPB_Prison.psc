@@ -183,6 +183,7 @@ scriptname RPB_Prison extends RPB_Entity
     bool function HasFemaleCellMates(RPB_Prisoner apPrisoner)
     bool function HasMaleCellMates(RPB_Prisoner apPrisoner)
     Form[] function GetPrisonersWithSentenceLessThan(float afSentence, float afPadding = 0.0)
+    Form[] function GetPrisonersReleasedNoLaterThan(float afTimeLeft)
     Form[] function GetPrisonersWithCurrentSentenceLessThan(float afSentence, float afPadding = 0.0)
     Form[] function GetPrisoners(RPB_JailCell akPrisonCell = none)
     Form[] function GetFemalePrisoners(RPB_JailCell akPrisonCell = none)
@@ -2028,6 +2029,29 @@ Form[] function GetPrisonersWithSentenceLessThan(float afSentence, float afPaddi
 endFunction
 
 ;/
+    Returns a list of all prisoners with the same or less time left in their sentence than @afTimeLeft (no padding),
+    i.e. everyone that is released no later than that. The player's own entry is included when it matches.
+
+    returns (Form[]): The prisoners' actors.
+/;
+Form[] function GetPrisonersReleasedNoLaterThan(float afTimeLeft)
+    int prisonersArray = FastArray("<Form>")
+
+    int i = 0
+    while (i < Prisoners.Count)
+        RPB_Prisoner prisoner = Prisoners.AtIndex(i)
+
+        if (prisoner.TimeLeftInSentence <= afTimeLeft)
+            FastArray_AddForm(prisonersArray, prisoner.GetActor())
+        endif
+
+        i += 1
+    endWhile
+
+    return FastArray_ToFormArray(prisonersArray)
+endFunction
+
+;/
     Returns a list of all prisoners with a Current Sentence less than @afSentence, with a padding of @afPadding.
 
     float  @afSentence: The sentence to compare against.
@@ -2301,9 +2325,8 @@ endFunction
     returns (int): the days passed here (the caller passes the rest for the player).
 /;
 int function ReleaseDueNPCsInOrder(float afPlayerTimeLeft)
-    ;/ const /; int PADDING_ONE_DAY = 1
-
-    Form[] due = self.GetPrisonersWithCurrentSentenceLessThan(afPlayerTimeLeft, PADDING_ONE_DAY)
+    ; Equal or less time left: an NPC with the same sentence that was imprisoned earlier is released before the player
+    Form[] due = self.GetPrisonersReleasedNoLaterThan(afPlayerTimeLeft)
     int count = due.Length
     if (count == 0)
         return 0
