@@ -202,8 +202,29 @@ endProperty
 ; Builds the package mapping only when it does not exist (yet, or any more): the handle is a script variable and can be 0 after a
 ; script reload or stale (the JContainers object is gone), which made every read of it warn "non-existing object".
 function __EnsureCellPackageMapping()
-    if (__cellPackageMapping && Object_Exists(__cellPackageMapping) && Object_Exists(FastMap_GetObject(__cellPackageMapping, "S")))
+    ; Papyrus && does not short-circuit: every JContainers call on a handle is made only after the handle was proven to exist
+    int mapping = __cellPackageMapping
+    bool mappingExists = false
+    bool childExists = false
+    int sChild = 0
+    if (mapping)
+        mappingExists = Object_Exists(mapping)
+        if (mappingExists)
+            sChild = FastMap_GetObject(mapping, "S")
+            if (sChild)
+                childExists = Object_Exists(sChild)
+            endif
+        endif
+    endif
+
+    if (mappingExists && childExists)
         return
+    endif
+
+    if (mapping)
+        ; A broken mapping is abandoned, not released (releasing it touches the missing children and warns)
+        EventManager.SendWarning("The cell package mapping is broken (mapping handle " + mapping + " exists: " + mappingExists + ", 'S' group handle " + sChild + " exists: " + childExists + "), rebuilding it", "PrisonManager::__EnsureCellPackageMapping")
+        __cellPackageMapping = 0
     endif
 
     self.PrisonManager()

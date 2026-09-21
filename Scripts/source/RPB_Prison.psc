@@ -2345,7 +2345,22 @@ function TeleportPrisonerToRelease(RPB_Prisoner apPrisoner)
             while (restoreItems && k < restoreItems.Length)
                 Form checkedItem = restoreItems[k]
                 if (checkedItem && releasedActor.GetItemCount(checkedItem) > 0 && !releasedActor.IsEquipped(checkedItem))
-                    stillOff += 1
+                    ; Not worn although carried: an NPC that carries the item more than once did not take the equip. Remove the extra
+                    ; copies (duplicates of an outfit item) and equip it again.
+                    int carriedCount = releasedActor.GetItemCount(checkedItem)
+                    if (carriedCount > 1)
+                        releasedActor.RemoveItem(checkedItem, carriedCount - 1, true)
+                    endif
+                    releasedActor.EquipItem(checkedItem)
+                    Utility.Wait(0.2)
+                    bool retryWorn = releasedActor.IsEquipped(checkedItem)
+                    string retryMsg = "Still off after the equip: " + checkedItem.GetName() + " " + checkedItem + " (carried " + carriedCount + ") on " + releasedActor.GetDisplayName() + " " + releasedActor + ", retry worn: " + retryWorn
+                    DebugInfo("["+ Name +"] Prison::TeleportPrisonerToRelease", retryMsg)
+                    Info(retryMsg)
+                    if (!retryWorn)
+                        stillOff += 1
+                    endif
+                    releasedActor.QueueNiNodeUpdate()
                 endif
                 k += 1
             endWhile
