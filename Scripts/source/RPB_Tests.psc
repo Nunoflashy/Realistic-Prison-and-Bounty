@@ -7183,11 +7183,13 @@ state Test_Prisoner_OwnBelongingsReturned
         p2.SetForm("Prisoner Belongings Container", sharedBox)
 
         Form itemA = Game.GetFormEx(0xF) ; gold
-        Form itemB = Game.GetFormEx(0x2F) ; lockpick
+        Form itemB = Game.GetFormEx(0xA) ; lockpick
         a1.RemoveAllItems()
         a2.RemoveAllItems()
         a1.AddItem(itemA, 7, true)
         a2.AddItem(itemB, 3, true)
+        step = assert_true(a1.GetItemCount(itemA) == 7 && a2.GetItemCount(itemB) == 3, "The test items could not be added to the dummies")
+        ok = ok && step
         int containerA = sharedBox.GetItemCount(itemA)
         int containerB = sharedBox.GetItemCount(itemB)
 

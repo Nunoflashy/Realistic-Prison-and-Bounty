@@ -2156,6 +2156,8 @@ function ReturnBelongings()
     endWhile
 
     Remove("Belongings Manifest")
+    Remove("Belongings Forms")
+    Remove("Belongings Counts")
     EventManager.SendInfo("Returned " + returned + " kinds of belongings to " + self.Name, "["+ Name +"] Prisoner::ReturnBelongings")
 endFunction
 
