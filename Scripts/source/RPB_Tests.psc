@@ -7332,28 +7332,49 @@ string function __MassOutfitParts(Actor akActor)
 endFunction
 
 bool function __MassIsDressed(Actor akActor)
+    ; Fully dressed = every outfit part the actor carries is worn (one worn boot is not "dressed": the dress is what you see)
     Outfit worn = akActor.GetActorBase().GetOutfit()
-    bool hasArmorParts = false
+    int carried = 0
+    int equippedParts = 0
     if (worn)
         int n = worn.GetNumParts()
         int k = 0
         while (k < n)
             Armor part = worn.GetNthPart(k) as Armor
-            if (part)
-                hasArmorParts = true
+            if (part && akActor.GetItemCount(part) > 0)
+                carried += 1
                 if (akActor.IsEquipped(part))
-                    return true
+                    equippedParts += 1
                 endif
             endif
             k += 1
         endWhile
     endif
 
-    ; The underwear occupies the body slot too, so a body armor only counts for an NPC whose outfit has no armor parts to check
-    if (hasArmorParts)
-        return false
+    if (carried > 0)
+        return equippedParts == carried
     endif
+    ; The underwear occupies the body slot too: a body armor only counts for an NPC whose outfit has no carried armor parts
     return akActor.GetWornForm(0x4) != none
+endFunction
+
+; Per part status of an actor that is not fully dressed: what stands in the way
+string function __MassPartsDump(Actor akActor)
+    string dump = "parts:"
+    Outfit worn = akActor.GetActorBase().GetOutfit()
+    if (worn)
+        int n = worn.GetNumParts()
+        int k = 0
+        while (k < n)
+            Armor part = worn.GetNthPart(k) as Armor
+            if (part)
+                dump += " [" + part + " carried " + akActor.GetItemCount(part) + " worn " + akActor.IsEquipped(part) + "]"
+            endif
+            k += 1
+        endWhile
+    endif
+    dump += " | body slot " + akActor.GetWornForm(0x4) + ", pelvis slot " + akActor.GetWornForm(0x8000)
+    return dump
 endFunction
 
 int function __MassCountImprisoned(Actor[] akActors, int aiCount)
@@ -7706,7 +7727,7 @@ bool function __MassRun(bool abNoOvercrowding)
                 dressed += 1
             else
                 underwearOnly += 1
-                log("MASS bare actor " + i + " (" + all[i] + "): items " + all[i].GetNumItems() + ", base outfit " + all[i].GetActorBase().GetOutfit() + ", outfit parts " + self.__MassOutfitParts(all[i]))
+                log("MASS bare actor " + i + " (" + all[i] + "): items " + all[i].GetNumItems() + ", base outfit " + all[i].GetActorBase().GetOutfit() + ", outfit parts " + self.__MassOutfitParts(all[i]) + " | " + self.__MassPartsDump(all[i]))
             endif
         endif
         i += 1

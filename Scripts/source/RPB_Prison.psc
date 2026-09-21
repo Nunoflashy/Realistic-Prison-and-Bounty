@@ -2319,6 +2319,13 @@ function TeleportPrisonerToRelease(RPB_Prisoner apPrisoner)
 
         ; The equip before the move runs while the NPC is still in its cell with its 3D unloaded and does not always take: equip
         ; again now that it is out, only what it was dressed with (its outfit and the armor it wore before being stripped)
+        ; An equip on an actor whose 3D is not loaded yet can be dropped: give it a moment (bounded)
+        float loadWaited = 0.0
+        while (!releasedActor.Is3DLoaded() && loadWaited < 1.5)
+            Utility.Wait(0.1)
+            loadWaited += 0.1
+        endWhile
+
         int equippedNow = 0
         int k = 0
         while (restoreItems && k < restoreItems.Length)
@@ -2330,7 +2337,18 @@ function TeleportPrisonerToRelease(RPB_Prisoner apPrisoner)
             k += 1
         endWhile
         if (equippedNow > 0)
-            string equipMsg = "Equipped " + equippedNow + " of the pre-strip items on " + releasedActor.GetDisplayName() + " after the move"
+            ; Verify: how many are still not worn after the equip
+            Utility.Wait(0.3)
+            int stillOff = 0
+            k = 0
+            while (restoreItems && k < restoreItems.Length)
+                Form checkedItem = restoreItems[k]
+                if (checkedItem && releasedActor.GetItemCount(checkedItem) > 0 && !releasedActor.IsEquipped(checkedItem))
+                    stillOff += 1
+                endif
+                k += 1
+            endWhile
+            string equipMsg = "Equipped " + equippedNow + " of the pre-strip items on " + releasedActor.GetDisplayName() + " after the move (3D loaded: " + releasedActor.Is3DLoaded() + "), " + stillOff + " still not worn"
             DebugInfo("["+ Name +"] Prison::TeleportPrisonerToRelease", equipMsg)
             Info(equipMsg)
         endif

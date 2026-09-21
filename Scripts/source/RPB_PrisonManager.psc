@@ -199,6 +199,16 @@ endProperty
 
 ; ==========================================================
 
+; Builds the package mapping only when it does not exist (yet, or any more): the handle is a script variable and can be 0 after a
+; script reload or stale (the JContainers object is gone), which made every read of it warn "non-existing object".
+function __EnsureCellPackageMapping()
+    if (__cellPackageMapping && Object_Exists(__cellPackageMapping))
+        return
+    endif
+
+    self.PrisonManager()
+endFunction
+
 function PrisonManager()
     __cellPackages_S_01         = RPB_Utility.GetCellPackageGroup("CellPackages_S_01")
     __cellPackages_M_01         = RPB_Utility.GetCellPackageGroup("CellPackages_M_01")
@@ -218,6 +228,10 @@ function PrisonManager()
     FastArray_AddForm(cellPackageGroup_XL, __cellPackages_XL_01)
     FastArray_AddForm(cellPackageGroup_2XL, __cellPackages_2XL_01)
     
+    ; The old mapping was overwritten on every call (one retained object per cell package request, all kept in the save)
+    if (__cellPackageMapping && Object_Exists(__cellPackageMapping))
+        FastMap_Release(__cellPackageMapping)
+    endif
     __cellPackageMapping = FastMap("<string>", retain = true)
 
     FastMap_SetObject(__cellPackageMapping, "S", cellPackageGroup_S)
@@ -811,7 +825,7 @@ Quest __cellPackages_2XL_01
     returns (ReferenceAlias): The actual cell package ReferenceAlias (with an AI Package bound to it).
 /;
 ReferenceAlias function GetCellPackageOfTypeEx(string asCellPackageType = "S")
-    self.PrisonManager()
+    self.__EnsureCellPackageMapping()
     Form[] cellPackageGroupsOfSize = self.GetCellPackageGroupsOfSize(asCellPackageType)
 
     if (!cellPackageGroupsOfSize)
@@ -890,6 +904,7 @@ endFunction
 /;
 Form[] function GetCellPackageGroupsOfSize(string asCellPackageSize)
     ; TODO: Validate if package group size exists (S, M, L, XL, 2XL)
+    self.__EnsureCellPackageMapping()
 
     int cellPackageGroupsOfSize = \
     FastMap_GetObject( \ 
@@ -897,9 +912,10 @@ Form[] function GetCellPackageGroupsOfSize(string asCellPackageSize)
         asCellPackageSize \
     )
 
-    Debug("PrisonManager::GetCellPackageGroupsOfSize", "Cell Package Size: " + asCellPackageSize + " | Cell Package Groups: " + FastArray_ToFormArray(cellPackageGroupsOfSize))
+    Form[] groups = FastArray_ToFormArray(cellPackageGroupsOfSize)
+    Debug("PrisonManager::GetCellPackageGroupsOfSize", "Cell Package Size: " + asCellPackageSize + " | Cell Package Groups: " + groups)
 
-    return FastArray_ToFormArray(cellPackageGroupsOfSize)
+    return groups
 endFunction
 
 ;/
