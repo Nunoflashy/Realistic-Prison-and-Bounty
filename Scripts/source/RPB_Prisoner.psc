@@ -2768,8 +2768,11 @@ RPB_Prison function GetPrison()
     string prisonUUID = self.GetString("Prison UUID")
 
     if (!prisonUUID)
-        ; Not sticky anymore: a read that happens before the binding is written used to fail the prisoner for good
-        EventManager.SendError("There was an error retrieving the Prison belonging to Prisoner: " + self.Name, "["+ Name +"] Prisoner::GetPrison")
+        ; Not sticky anymore: a read that happens before the binding is written used to fail the prisoner for good.
+        ; Only an error while the effect is running: a finishing effect (state already cleaned up) asks for its Prison too.
+        if (self.IsEffectActive)
+            EventManager.SendError("There was an error retrieving the Prison belonging to Prisoner: " + self.Name, "["+ Name +"] Prisoner::GetPrison")
+        endif
         return none
     endif
 

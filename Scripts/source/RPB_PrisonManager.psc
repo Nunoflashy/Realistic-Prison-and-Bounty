@@ -85,10 +85,24 @@ endProperty
 bool property PrisonInfamyRecognizedThresholdNotification auto
 bool property PrisonInfamyKnownThresholdNotification auto
 
-int __prisonsWithPrisonersCount
+;/
+    How many prisons currently hold at least one prisoner. Derived on every read: it used to be a counter that the
+    register/unregister events incremented and decremented by looking at the list size at that moment, which drifts under
+    concurrency (two threads both see the "0 prisoners" boundary), leaving the MCM's "Check Prisoner" page visible with no
+    prisoners left.
+/;
 int property PrisonsWithPrisonersCount
     int function get()
-        return __prisonsWithPrisonersCount
+        int withPrisoners = 0
+        int i = 0
+        while (i < PrisonSlots)
+            RPB_Prison prison = self.GetNthAlias(i) as RPB_Prison
+            if (prison && prison.Active && prison.Prisoners.Count > 0)
+                withPrisoners += 1
+            endif
+            i += 1
+        endWhile
+        return withPrisoners
     endFunction
 endProperty
 
@@ -146,22 +160,10 @@ endEvent
 
 event OnPrisonRegisteredPrisoner(RPB_Prison apPrison, RPB_Prisoner apPrisoner)
     self.AddPrisonerToPrisonRegistry(apPrisoner)
-
-    ;/ const /; int PRISONERS_BEFORE_EVENT = (apPrison.Prisoners.Count - 1)
-
-    if (PRISONERS_BEFORE_EVENT == 0)
-        __prisonsWithPrisonersCount += 1
-    endif
 endEvent
 
 event OnPrisonUnregisteredPrisoner(RPB_Prison apPrison, RPB_Prisoner apPrisoner)
     self.RemovePrisonerFromPrisonRegistry(apPrisoner)
-
-    ;/ const /; int PRISONERS_AFTER_EVENT = apPrison.Prisoners.Count
-
-    if (PRISONERS_AFTER_EVENT == 0)
-        __prisonsWithPrisonersCount -= 1
-    endif
 endEvent
 
 ; ==========================================================

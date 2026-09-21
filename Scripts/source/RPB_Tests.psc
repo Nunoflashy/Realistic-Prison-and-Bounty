@@ -5996,6 +5996,25 @@ endState
 ; ==========================================================
 
 ; Waits (bounded, polling) until the actor is imprisoned; returns the ms it took, or -1 on timeout
+;/
+    After the test actors were torn down: nothing may be left behind. The prisoner list is back to its size before the
+    test, its index maps are consistent, and the manager's "prisons with prisoners" number matches (it used to be an
+    event-driven counter that drifted under concurrency and left the MCM's "Check Prisoner" page visible).
+/;
+bool function __StressAssertNoLeaks(RPB_Prison akPrison, RPB_PrisonManager akManager, int aiBaseCount, int aiBasePrisons)
+    Utility.Wait(1.0)
+    bool ok = true
+    bool step = assert_true(akPrison.Prisoners.Count == aiBaseCount, "The prisoner list holds " + akPrison.Prisoners.Count + " entries after the test, expected " + aiBaseCount + " (leaked entries)")
+    ok = ok && step
+    string consistency = akPrison.Prisoners.ValidateIndexConsistency()
+    step = assert_true(consistency == "", "The prisoner list's index maps are inconsistent: " + consistency)
+    ok = ok && step
+    step = assert_true(akManager.PrisonsWithPrisonersCount == aiBasePrisons, "PrisonsWithPrisonersCount is " + akManager.PrisonsWithPrisonersCount + " after the test, expected " + aiBasePrisons)
+    ok = ok && step
+    log("STRESS leak check: prisoner list " + akPrison.Prisoners.Count + " (was " + aiBaseCount + "), consistency '" + consistency + "', prisons with prisoners " + akManager.PrisonsWithPrisonersCount + " (was " + aiBasePrisons + ")")
+    return ok
+endFunction
+
 int function __StressWaitImprisoned(Actor akActor, float afTimeout)
     float t0 = Utility.GetCurrentRealTime()
     while ((Utility.GetCurrentRealTime() - t0) < afTimeout)
@@ -6235,6 +6254,10 @@ state Test_ArrestStress_Burst
             return
         endif
 
+        RPB_PrisonManager stressManager = RPB_API.GetPrisonManager()
+        int baseCount = prison.Prisoners.Count
+        int basePrisons = stressManager.PrisonsWithPrisonersCount
+
         self.__StressProfilerOff()
         int failures3 = self.__StressRunBurst(prison, guard, 3)
         step = assert_true(failures3 == 0, failures3 + " failures in the N=3 burst (arrest, imprison, release, re-arrest)")
@@ -6245,6 +6268,8 @@ state Test_ArrestStress_Burst
         int failures6 = self.__StressRunBurst(prison, guard, 6)
         step = assert_true(failures6 == 0, failures6 + " failures in the N=6 burst (arrest, imprison, release, re-arrest)")
         ok = ok && step
+
+        ok = ok && self.__StressAssertNoLeaks(prison, stressManager, baseCount, basePrisons)
 
         self.__StressProfilerRestore()
         display_result(ok)
@@ -6275,6 +6300,10 @@ state Test_ArrestStress_Staggered
             return
         endif
 
+        RPB_PrisonManager stressManager = RPB_API.GetPrisonManager()
+        int baseCount = prison.Prisoners.Count
+        int basePrisons = stressManager.PrisonsWithPrisonersCount
+
         self.__StressProfilerOff()
         int total = 0
         int run = 1
@@ -6287,6 +6316,8 @@ state Test_ArrestStress_Staggered
         endWhile
         step = assert_true(total == 0, total + " failures over 3 staggered N=6 runs (arrest, imprison, release, re-arrest)")
         ok = ok && step
+
+        ok = ok && self.__StressAssertNoLeaks(prison, stressManager, baseCount, basePrisons)
 
         self.__StressProfilerRestore()
         display_result(ok)
@@ -6391,9 +6422,11 @@ state Test_PrisonMonitor_ScheduleMaths
         int i = 0
         while (i < 10)
             left[i] = 60.0 + i
+            excluded[i] = false ; CreateBoolArray's fill cannot be trusted: assign every element
             i += 1
         endWhile
         left[10] = 20.0
+        excluded[10] = false
         float hours = RPB_PrisonMonitor.ComputeNextWakeHours(left, excluded)
         step = assert_true(self.__Near(hours, 480.1), "ten long sentences and one with 20 days left: expected 480.1 hours (20 days + 0.1 buffer), got " + hours)
         ok = ok && step
@@ -6481,22 +6514,26 @@ state Test_PrisonMonitor_AwayPrisoner
             return
         endif
 
+        RPB_Utility.EnableCrumbs()
+        RPB_Utility.ClearCrumbs(a)
+
         a.MoveTo(farPlace)
-        float t0 = Utility.GetCurrentRealTime()
-        while (!p.IsEffectActive == false && (Utility.GetCurrentRealTime() - t0) < 30.0)
-            Utility.Wait(0.5)
-        endWhile
-        log("AWAY after MoveTo(jail cell): waited " + ((Utility.GetCurrentRealTime() - t0) as int) + "s, 3D loaded=" + a.Is3DLoaded() + ", entry for the actor present=" + (prison.Prisoners.AtKey(a) != none) + ", list Count=" + prison.Prisoners.Count + ", GetActors().Length=" + prison.Prisoners.GetActors().Length + ", cell=" + a.GetParentCell())
+        Utility.Wait(20.0) ; fixed: the cell unloads a few seconds after the player is not there (an early-exit condition made the first version useless)
+        RPB_Prisoner whileAway = prison.Prisoners.AtKey(a)
+        log("AWAY 20s after MoveTo(jail cell): 3D loaded=" + a.Is3DLoaded() + ", entry for the actor present=" + (whileAway != none) + ", list Count=" + prison.Prisoners.Count + ", GetActors().Length=" + prison.Prisoners.GetActors().Length + ", cell=" + a.GetParentCell() + ", consistency='" + prison.Prisoners.ValidateIndexConsistency() + "'")
+        log("AWAY " + RPB_Utility.DumpCrumbs(a))
 
         ; Back near the player: the effect starts again
         a.MoveTo(player)
-        t0 = Utility.GetCurrentRealTime()
-        while (prison.Prisoners.AtKey(a) == none && (Utility.GetCurrentRealTime() - t0) < 30.0)
-            Utility.Wait(0.5)
-        endWhile
-        Utility.Wait(1.0)
+        Utility.Wait(6.0)
         RPB_Prisoner again = prison.Prisoners.AtKey(a)
-        log("AWAY after coming back: waited " + ((Utility.GetCurrentRealTime() - t0) as int) + "s, entry present=" + (again != none) + ", list Count=" + prison.Prisoners.Count + ", state=" + again.GetState() + ", 3D loaded=" + a.Is3DLoaded())
+        string stateBack = ""
+        if (again)
+            stateBack = again.GetState()
+        endif
+        log("AWAY 6s after coming back: entry present=" + (again != none) + ", list Count=" + prison.Prisoners.Count + ", state='" + stateBack + "', 3D loaded=" + a.Is3DLoaded())
+        log("AWAY " + RPB_Utility.DumpCrumbs(a))
+        RPB_Utility.DisableCrumbs()
 
         display_result(ok)
     endFunction

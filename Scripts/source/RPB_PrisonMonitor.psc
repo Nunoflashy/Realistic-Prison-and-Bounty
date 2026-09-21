@@ -166,7 +166,7 @@ function Reschedule()
     endif
 
     float[] daysLeft = Utility.CreateFloatArray(count)
-    bool[] excluded = Utility.CreateBoolArray(count, false) ; the default fill is true: every prisoner would count as excluded
+    bool[] excluded = Utility.CreateBoolArray(count, false) ; the fill argument is NOT reliable here: every element is assigned below
     bool hasUnknown = false
 
     int i = 0
@@ -180,6 +180,7 @@ function Reschedule()
         elseif (prisoner.IsPlayer() || prisoner.IsUndeterminedSentence)
             excluded[i] = true
         else
+            excluded[i] = false
             daysLeft[i] = prisoner.TimeLeftInSentence
         endif
         i += 1
