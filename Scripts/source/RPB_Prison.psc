@@ -2491,9 +2491,34 @@ bool function AssignCell(RPB_Prisoner apPrisoner)
         return false
     endif
 
+    ; An NPC needs a cell AI package to stay in its cell, and the package aliases are finite: when they are all in use the prison is
+    ; full for NPCs whatever the cells allow. (Counted by prisoner: the alias is only occupied at bind time, later than this.)
+    if (apPrisoner.IsNPC())
+        int packageCapacity = PrisonManager.GetCellPackageCapacity(assignedCell.PackageSize)
+        if (packageCapacity > 0 && self.__CountNPCPrisonersInCells(apPrisoner) >= packageCapacity)
+            RPB_ThreadLock.Release(cellLock)
+            EventManager.SendWarning("No cell package left for " + apPrisoner.Name + " (" + packageCapacity + " in use), the prison cannot hold more NPCs", "("+ Name +") Prison::AssignCell")
+            return false
+        endif
+    endif
+
     self.BindCellToPrisoner(assignedCell, apPrisoner) ; Actually bind this jail cell to the prisoner, it has been assigned.
     RPB_ThreadLock.Release(cellLock)
     return apPrisoner.JailCell != none
+endFunction
+
+; NPC prisoners (other than @apExcept) that hold a cell: each one holds or is about to hold a cell package
+int function __CountNPCPrisonersInCells(RPB_Prisoner apExcept)
+    int count = 0
+    int i = 0
+    while (i < Prisoners.Count)
+        RPB_Prisoner other = Prisoners.AtIndex(i)
+        if (other && other != apExcept && other.IsNPC() && other.JailCell != none)
+            count += 1
+        endif
+        i += 1
+    endWhile
+    return count
 endFunction
 
 function RemoveFromCell(RPB_Prisoner apPrisoner)

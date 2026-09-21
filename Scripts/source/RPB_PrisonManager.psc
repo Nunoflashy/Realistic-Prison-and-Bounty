@@ -48,6 +48,7 @@ Scriptname RPB_PrisonManager extends Quest
     ReferenceAlias function GetCellPackageByNameEx(Quest akCellPackageGroup, string asCellPackageName)
     ReferenceAlias function GetCellPackageByIndexEx(Quest akCellPackageGroup, int aiCellPackageIndex)
     Form[] function GetCellPackageGroupsOfSize(string asCellPackageSize)
+    int function GetCellPackageCapacity(string asCellPackageSize = "S")
 @events:
     event OnPrisonConfigured(RPB_Prison apPrison)
     event OnPrisonInitializationFailed(RPB_Prison apPrisonSlot, string asHold, int apRootHoldObject, int apRootPrisonObject, string asReason = "")
@@ -899,6 +900,25 @@ Form[] function GetCellPackageGroupsOfSize(string asCellPackageSize)
     Debug("PrisonManager::GetCellPackageGroupsOfSize", "Cell Package Size: " + asCellPackageSize + " | Cell Package Groups: " + FastArray_ToFormArray(cellPackageGroupsOfSize))
 
     return FastArray_ToFormArray(cellPackageGroupsOfSize)
+endFunction
+
+;/
+    How many NPC prisoners can be held by cell packages of this size: the aliases of the group GetCellPackageOfTypeEx() picks
+    (the first group of that size that has any). An NPC without a package has nothing keeping it in its cell, so this is a
+    capacity limit as real as the beds. 0 when unknown (no group).
+/;
+int function GetCellPackageCapacity(string asCellPackageSize = "S")
+    Form[] groups = self.GetCellPackageGroupsOfSize(asCellPackageSize)
+    int i = 0
+    while (groups && i < groups.Length)
+        Quest group = groups[i] as Quest
+        if (group && group.GetNumAliases() > 0)
+            return group.GetNumAliases()
+        endif
+        i += 1
+    endWhile
+
+    return 0
 endFunction
 
 
