@@ -1,4 +1,63 @@
 Scriptname RPB_PrisonManager extends Quest
+{
+    @property RPB_API API
+    @property RPB_Config Config
+    @property RPB_EventManager EventManager
+    @property RPB_SceneManager SceneManager
+    @property int PrisonSlots
+    @property RPB_Prison AvailableSlot
+    @property bool HasPrisonsWithPrisoners
+    @property Message ServeTimeMessage
+    @property bool PrisonInfamyRecognizedThresholdNotification
+    @property bool PrisonInfamyKnownThresholdNotification
+    @property int PrisonsWithPrisonersCount
+}
+
+;/
+@functions:
+    function PrisonManager()
+    function AddPrisonerToPrisonRegistry(RPB_Prisoner apPrisoner)
+    function RemovePrisonerFromPrisonRegistry(RPB_Prisoner apPrisoner)
+    RPB_Prison function FindPrisonByPrisoner(Actor akPrisonerActor)
+    RPB_Prison function FindPrisonByHold(string asHold)
+    Alias[] function GetPrisons()
+    RPB_Prison function GetPrison(string asHold)
+    Alias[] function GetPrisonsForHold(string asHold)
+    RPB_Prison function GetNthPrison(int index)
+    RPB_Prison function GetPrisonByID(int aiPrisonID)
+    RPB_Prison function GetPrisonByUUID(string uuid)
+    int function GetActivePrisonCount()
+    RPB_Prison function GetAvailablePrisonSlot()
+    ReferenceAlias function GetEmptySlot()
+    int function GetNumberOfAvailableSlots()
+    bool function IsSamePrison(RPB_Prison apPrisonOne, RPB_Prison apPrisonTwo) global
+    bool function IsValidPrison(RPB_Prison apPrison) global
+    bool function PrisonExists_FromObject(int apRootPrisonObject, int apRootHoldObject = 0)
+    bool function InitializePrison(string asHold)
+    bool function InitializePrisonInSlot(string asHold, int aiSlot)
+    function InitializePrisons()
+    function ReloadPrisonConfig(RPB_Prison apPrison)
+    function AttachMonitoringObject(RPB_Prison apPrison, ObjectReference akMonitoringObject = none)
+    function AssignPrisonRootObject(RPB_Prison apPrison, int apRootObject)
+    bool function AssignPrisonHoldProperties(RPB_Prison apPrison, string asHold, int apHoldRootObject) global
+    bool function DeletePrison(RPB_Prison apPrison)
+    function UninitializePrisons()
+    int function UninitializeNthPrison(int index)
+    function VerifyIntegrity()
+    function RemoveDuplicatePrisons()
+    ReferenceAlias function GetCellPackageOfTypeEx(string asCellPackageType = "S")
+    ReferenceAlias function GetCellPackageByNameEx(Quest akCellPackageGroup, string asCellPackageName)
+    ReferenceAlias function GetCellPackageByIndexEx(Quest akCellPackageGroup, int aiCellPackageIndex)
+    Form[] function GetCellPackageGroupsOfSize(string asCellPackageSize)
+@events:
+    event OnPrisonConfigured(RPB_Prison apPrison)
+    event OnPrisonInitializationFailed(RPB_Prison apPrisonSlot, string asHold, int apRootHoldObject, int apRootPrisonObject, string asReason = "")
+    event OnPrisonRemove(RPB_Prison apPrison)
+    event OnPrisonRemoved(RPB_Prison apPrison)
+    event OnPrisonRegisteredPrisoner(RPB_Prison apPrison, RPB_Prisoner apPrisoner)
+    event OnPrisonUnregisteredPrisoner(RPB_Prison apPrison, RPB_Prisoner apPrisoner)
+    event OnInit()
+/;
 
 import RPB_Utility
 import RPB_Memory

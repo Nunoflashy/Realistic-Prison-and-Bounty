@@ -3,6 +3,97 @@ scriptname RPB_Data hidden
     Script responsible of handling anything related to the data required for static configuration of the Mod.
 }
 
+;/
+@functions:
+    int function PRESET_INVALID_FILE() global
+    int function PRESET_NOT_FOUND() global
+    int function PRESET_INVALID_REGISTRANT() global
+    int function PRESET_NO_REGISTRANTS() global
+    string function Preset_GetDirectory() global
+    string function Preset_Extension() global
+    int function Preset_GetAll() global
+    string[] function Preset_List() global
+    int function Preset_Load(string asPresetFile) global
+    function Preset_Save(int apBucketsData, string asPresetFile) global
+    function Preset_ApplyBucket(string asBucket, int apSrcBucketData, int apDstDataContent, bool abVerbose = true, bool abDryRun = false) global
+    string function MCM_GetRootPropertyOfTypeString(string asMcmObjectName, string asProperty) global
+    string[] function MCM_GetRootPropertyOfTypeStringArray(string asMcmObjectName, string asProperty) global
+    int function MCM_GetOptionObject() global
+    int function MCM_GetDefaultsObject() global
+    int function MCM_GetMaximumsObject() global
+    string[] function MCM_GetChildPropertyOfTypeStringArray(string asMcmObjectName, string asChildName, string asProperty) global
+    int function MCM_GetRootPropertyOfTypeObject(string asMcmObjectName, string asProperty) global
+    string function MCM_GetPrisonTemplate() global
+    string function MCM_GetArrestTemplate() global
+    int function GetPrisonObject(string asPath = "/") global
+    string[] function GetRootObjectInPath(string asPath = "/") global
+    int function GetObjectInPath(string asPath) global
+    string function GetModDataDirectory() global
+    string function GetDataFile() global
+    int function GetRootObject(string asHold = "/") global
+    bool function SetRootContainer(int apRootContainer) global
+    bool function BindContainerToKey(string asKey, int apContainerToBind) global
+    function Serialize(int apContainer) global
+    int function Unserialize() global
+    int function RefreshRootObject() global
+    int function LoadData() global
+    function SaveRoot() global
+    int function TraversePathToFinalObject(int apRootObject, string[] akExplodedPath, int aiIterations = 0) global
+    int function GetObjectFromContainer(int apRootObject, string asElementKey, int apDefaultObjectOnFail = -1) global
+    int function Hold_GetJailObject(int apHoldRootObject) global
+    bool function HasProperty(int apRootObject, string asPropertyPath, string asPathDelimiter = "//", bool abCheckEmpty = false) global
+    bool function GetPropertyOfTypeBool(int apRootObject, string asPropertyPath, bool abDefaultInvalidValue = false, bool abCheckExists = true, string asPathDelimiter = "//") global
+    int function GetPropertyOfTypeInteger(int apRootObject, string asPropertyPath, int aiDefaultInvalidValue = -1, bool abCheckExists = true, string asPathDelimiter = "//") global
+    float function GetPropertyOfTypeFloat(int apRootObject, string asPropertyPath, float afDefaultInvalidValue = -1.0, bool abCheckExists = true, string asPathDelimiter = "//") global
+    string function GetPropertyOfTypeString(int apRootObject, string asPropertyPath, string asDefaultInvalidValue = "", bool abCheckExists = true, string asPathDelimiter = "//") global
+    Form function GetPropertyOfTypeForm(int apRootObject, string asPropertyPath, Form akDefaultInvalidValue = none, bool abCheckExists = true, string asPathDelimiter = "//") global
+    int[] function GetPropertyOfTypeIntegerArray(int apRootObject, string asPropertyPath, int[] akDefaultInvalidValue = none, bool abCheckExists = true, string asPathDelimiter = "//") global
+    float[] function GetPropertyOfTypeFloatArray(int apRootObject, string asPropertyPath, float[] akDefaultInvalidValue = none, bool abCheckExists = true, string asPathDelimiter = "//") global
+    string[] function GetPropertyOfTypeStringArray(int apRootObject, string asPropertyPath, string[] akDefaultInvalidValue = none, bool abCheckExists = true, string asPathDelimiter = "//") global
+    Form[] function GetPropertyOfTypeFormArray(int apRootObject, string asPropertyPath, Form[] akDefaultInvalidValue = none, bool abCheckExists = true, string asPathDelimiter = "//") global
+    int function GetPropertyOfTypeObject(int apRootObject, string asPropertyPath, int apDefaultObject = -1, bool abCheckExists = true, string asPathDelimiter = "//") global
+    bool function FindPropertyOfTypeBool(int apRootObject, string asPropertyPath, string apFindConditions = "[]", bool abDefaultValue = false, bool abCheckExists = true, string asPathDelimiter = "//") global
+    int function FindPropertyOfTypeInteger(int apRootObject, string asPropertyPath, string apFindConditions = "[]", int aiDefaultValue = -1, bool abCheckExists = true, string asPathDelimiter = "//") global
+    float function FindPropertyOfTypeFloat(int apRootObject, string asPropertyPath, string apFindConditions = "[]", float afDefaultValue = -1.0, bool abCheckExists = true, string asPathDelimiter = "//") global
+    string function FindPropertyOfTypeString(int apRootObject, string asPropertyPath, string apFindConditions = "[]", string asDefaultValue = "", bool abCheckExists = true, string asPathDelimiter = "//") global
+    Form function FindPropertyOfTypeForm(int apRootObject, string asPropertyPath, string apFindConditions = "[]", Form akDefaultValue = none, bool abCheckExists = true, string asPathDelimiter = "//") global
+    int[] function FindPropertyOfTypeIntegerArray(int apRootObject, string asPropertyPath, string apFindConditions = "[]", int[] akDefaultValue = none, bool abCheckExists = true, string asPathDelimiter = "//") global
+    float[] function FindPropertyOfTypeFloatArray(int apRootObject, string asPropertyPath, string apFindConditions = "[]", float[] akDefaultValue = none, bool abCheckExists = true, string asPathDelimiter = "//") global
+    string[] function FindPropertyOfTypeStringArray(int apRootObject, string asPropertyPath, string apFindConditions = "[]", string[] akDefaultValue = none, bool abCheckExists = true, string asPathDelimiter = "//") global
+    string function QueryString(int apRootObject, string asSelect = "*", string apFindConditions = "[]", string asDefaultValue = "", bool abCheckExists = true, string asPathDelimiter = "//") global
+    Form[] function QueryFormArray(int apRootObject, string asSelect = "*", string apFindConditions = "[]", Form[] akDefaultValue = none, bool abCheckExists = true, string asPathDelimiter = "//") global
+    Form[] function FindPropertyOfTypeFormArray(int apRootObject, string asPropertyPath, string apFindConditions = "[]", Form[] akDefaultValue = none, bool abCheckExists = true, string asPathDelimiter = "//") global
+    bool function Integer_CheckFindConditions(int apObject, int apConditionObject, string asConditionKey, int conditionValue) global
+    bool function Float_CheckFindConditions(int apObject, int apConditionObject, string asConditionKey, float conditionValue) global
+    bool function String_CheckFindConditions(int apObject, int apConditionObject, string asConditionKey, string asConditionValue, int aiOverrideValueType = 0) global
+    bool function CompareIntValues(int apObject, int conditionValue, string conditionKey, int actualValueType) global
+    bool function CompareFloatValues(int apObject, float conditionValue, string conditionKey, int actualValueType) global
+    bool function CompareStringValues(int apObject, string conditionValue, string conditionKey, int actualValueType) global
+    function LogComparison(int conditionValueType, string conditionKey, string conditionValue, int apObject) global
+    bool function CheckFindConditions(int apObject, string apFindConditions, bool abCheckMissingKeys = true) global
+    bool function CompareOnValueType(int apObject, int apConditionObject, string asConditionKey) global
+    bool function CheckMapConditions(int apActualMap, int apConditionMap, bool abCheckMissingKeys = true) global
+    bool function CheckIntegerMapConditions(int apActualMap, int apConditionMap, bool abCheckMissingKeys = true) global
+    bool function CheckFormMapConditions(int apActualMap, int apConditionMap, bool abCheckMissingKeys = true) global
+    bool function CheckArrayConditions(int apActualArray, int apConditionArray, bool abCheckMissingKeys = true) global
+    bool function CheckConditionsRecursively(int apObject, int apConditionObject, bool abCheckMissingKeys = true) global
+    Form[] function Hold_GetLocations(int apHoldRootObject) global
+    Faction function Hold_GetCrimeFaction(int apHoldRootObject) global
+    string function Hold_GetCity(int apHoldRootObject) global
+    int function Jail_GetCellsObject(int apHoldJailObject) global
+    RPB_JailCell function Jail_GetJailCellByID(int apHoldJailObject, string asCellID) global
+    Form[] function JailCell_GetParents(int apPrisonCellsObject, bool abOnlyActiveCells = true) global
+    bool function JailCell_HasOption(int apPrisonCellsObject, RPB_JailCell akJailCell, string asOption, string asOptionCategory = "null", bool abCheckEmptyContent = false) global
+    bool function JailCell_HasObjects(int apPrisonCellsObject, RPB_JailCell akJailCell, string asObjectCategory, bool abCheckEmptyContent = false) global
+    Form[] function private_JailCell_GetActiveParents(int apPrisonCellsObject, int apCellKeysArray) global
+    Form[] function GetJailCellParentMarkers(int apHoldJailObject, string asInteriorOrExterior = "Interior") global
+    Form[] function GetJailCellChildMarkers(int apHoldJailObject, Form akParentForm, string asInteriorOrExterior = "Interior") global
+    function testSerializeAll() global
+    Form[] function GetJailMarkers(string asHold) global
+    string function NormalizeJSON(string asJSON) global
+@events:
+/;
+
 import RPB_Utility
 import RPB_Memory
 

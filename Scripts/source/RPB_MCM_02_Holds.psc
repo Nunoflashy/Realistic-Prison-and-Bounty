@@ -1,5 +1,21 @@
 Scriptname RPB_MCM_02_Holds hidden
 
+;/
+@functions:
+    bool function ShouldHandleEvent(RPB_MCM_02 mcm) global
+    function RenderPrisonLeft(RPB_MCM_02 mcm, RPB_Prison apPrison, Actor akActor) global
+    function RenderPrisonRight(RPB_MCM_02 mcm, RPB_Prison apPrison, Actor akActor) global
+    function RenderPrisonsEx(RPB_MCM_02 mcm, Faction akCrimeFaction = none, Actor akActor = none) global
+    function RenderPrisons(RPB_MCM_02 mcm) global
+    function Render(RPB_MCM_02 mcm) global
+    function NPC_RenderPrisons(RPB_MCM_02 mcm, RPB_Prisoner apPrisoner) global
+    function DisplayHoldInfo(RPB_MCM_02 mcm, Actor akActor, RPB_Prison apPrison = none) global
+    function DisplayHoldStats(RPB_MCM_02 mcm, Actor akActor, Faction akHoldCrimeFaction) global
+    function RefreshPrisonerUI(RPB_Prisoner apPrisoner) global
+    function RefreshActorUI(RPB_Prison apPrison, Actor akActor) global
+@events:
+/;
+
 import RPB_Utility
 import RPB_MCM_02
 

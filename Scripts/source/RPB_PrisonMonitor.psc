@@ -1,4 +1,48 @@
 scriptname RPB_PrisonMonitor extends ReferenceAlias
+{
+    @property RPB_API API
+    @property RPB_Prison Prison
+    @property RPB_PrisonerList Prisoners
+    @property bool IsMonitoring
+    @property float NextWakeAt
+    @property ObjectReference MonitorOn
+    @property bool DebugDryRunReleases
+    @property int ReleaseQueueLength
+}
+
+;/
+@functions:
+    function SendRequest()
+    function EnterForeground()
+    function EnterBackground()
+    function EnableMonitoring()
+    function DisableMonitoring()
+    float function ComputeNextWakeHours(float[] afDaysLeft, bool[] abExcluded, bool abHasUnknown = false, float afBufferHours = 0.1, float afMinHours = 1.0, float afUnknownPollHours = 24.0) global
+    function Reschedule()
+    function RegisterPrisoner(RPB_Prisoner apPrisoner)
+    function UpdatePrisonersStats()
+    function PassDaysForPrisoner(RPB_Prisoner apPrisoner, int aiDays)
+    bool function AwaitPrisonerImprisonment(RPB_Prisoner apPrisoner)
+    bool function AwaitPrisonerForRelease(RPB_Prisoner apPrisoner)
+    float function GetDryRunReleaseTime(Actor akActor)
+    Form[] function GetDryRunReleaseOrder()
+    function ClearDryRunReleaseOrder()
+    function QueueRelease(RPB_Prisoner apPrisoner)
+    function ReleaseQueued(RPB_Prisoner apPrisoner)
+    function ReleaseNPC(RPB_Prisoner apPrisoner)
+    function ProcessReleaseQueue()
+    function AwaitPrisoners()
+    function RegisterForMonitoring()
+    function UpdateMonitorTime()
+    function NPC_UpdateCellIntegrity(RPB_Prisoner apPrisoner)
+    function UpdatePrisonersStrippingAndClothingStates()
+    function UpdatePrisonerStrippingAndClothingStates(RPB_Prisoner apPrisoner)
+@events:
+    event OnUpdate()
+    event OnUpdateGameTime()
+    event OnCellAttach()
+    event OnCellDetach()
+/;
 
 import Math
 import RPB_Config

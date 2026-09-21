@@ -1,4 +1,108 @@
 scriptname RPB_JailCell extends RPB_SerializableObjectReference
+{
+    @property RPB_API API
+    @property RPB_EventManager EventManager
+    @property string Name
+    @property RPB_Prison Prison
+    @property RPB_CellDoor CellDoor
+    @property Form[] InteriorMarkers
+    @property Form[] ExteriorMarkers
+    @property bool HasInteriorMarkers
+    @property bool HasExteriorMarkers
+    @property Form[] Prisoners
+    @property Form[] FemalePrisoners
+    @property Form[] MalePrisoners
+    @property Form[] Beds
+    @property Form[] Containers
+    @property Form[] OtherProps
+    @property bool HasPrisoners
+    @property bool HasBeds
+    @property bool HasContainers
+    @property bool HasOtherProps
+    @property bool IsEmpty
+    @property bool IsFull
+    @property bool IsOvercrowded
+    @property bool AllowOvercrowding
+    @property bool IsAvailable
+    @property bool IsFemaleOnly
+    @property bool IsMaleOnly
+    @property bool IsGenderExclusive
+    @property float CellRadius
+    @property int ScanIterations
+    @property int MaxPrisoners
+    @property string DefaultPackageSize
+    @property string PackageSize
+    @property int PrisonerCount
+}
+
+;/
+@functions:
+    function JailCell()
+    ReferenceAlias function GetSuitableCellPackage()
+    function DetermineGoodies()
+    function DetermineMarkers()
+    function RefreshOptions()
+    function SetAsFemaleOnly()
+    function SetAsMaleOnly()
+    function SetExclusiveToPrisonerSex(RPB_Prisoner apPrisoner)
+    function RemoveGenderExclusiveness()
+    string function GetAcceptedGender()
+    function ScanCellDoor(bool abForceAssignment = false)
+    function ScanBeds()
+    function ScanContainers()
+    function ScanMiscProps()
+    ObjectReference function GetNthMarker(int aiIndex, string asInteriorOrExterior = "Interior")
+    ObjectReference function GetRandomMarker(string asInteriorOrExterior = "Interior")
+    bool function HasPrisoner(RPB_Prisoner apPrisoner)
+    bool function HasPrisonersOfGender(string asGender, bool abOnlySpecifiedGender = false)
+    bool function HasFemales(bool abStrictlyFemales = false)
+    bool function HasMales(bool abStrictlyMales = false)
+    Form[] function GetFemalePrisoners()
+    Form[] function GetMalePrisoners()
+    function RemovePrisoner(RPB_Prisoner apPrisoner)
+    bool function ShouldPerformScan(string asScanTarget)
+    string function GetName()
+    bool function IsInitialized()
+    function Initialize(RPB_Prison apPrison)
+    function Uninitialize()
+    function BindPrison(RPB_Prison apPrison)
+    function BindCellDoor(RPB_CellDoor akCellDoor)
+    function DisableOwnership()
+    function RegisterPrisoner(RPB_Prisoner apPrisoner)
+    function UnregisterPrisoner(RPB_Prisoner apPrisoner)
+    function DetermineCellParameters()
+    function RegisterForSanityChecking(float afPreCheckUpdateTime = 4.0, float afPostCheckUpdateTime = 1.0, int aiUpdateTries = 10, RPB_Prisoner apPrisoner = none)
+    function ResetSanityChecking()
+    bool function PerformPrisonerSanityCheck(RPB_Prisoner apPrisoner)
+    bool function PerformPrisonersSanityCheck()
+    int function GetSerializableRootObject()
+    bool function HasOption(string asOption)
+    bool function GetOptionOfTypeBool(string asOption)
+    int function GetOptionOfTypeInt(string asOption)
+    float function GetOptionOfTypeFloat(string asOption)
+    string function GetOptionOfTypeString(string asOption)
+    Form function GetOptionOfTypeForm(string asOption)
+    Form[] function GetConfigObjects(string asObjectCategory)
+    bool function HasObjects(string asObjectCategory, bool abCheckEmpty = true)
+    string function GetIdentifier()
+    string function DEBUG_ShowPrisonerSentenceInfo(RPB_Prisoner apPrisoner)
+    string function DEBUG_GetPrisoners()
+    string function DEBUG_GetCellProperties()
+@events:
+    event OnPrisonerRegister(RPB_Prisoner apPrisoner)
+    event OnPrisonerUnregister(RPB_Prisoner apPrisoner)
+    event OnPrisonerOpenCellDoor(RPB_CellDoor akCellDoor, RPB_Prisoner apPrisoner)
+    event OnGuardOpenCellDoor(RPB_CellDoor akCellDoor, Actor akGuard)
+    event OnTriggerEnter(ObjectReference akObjectRef)
+    event OnTriggerLeave(ObjectReference akObjectRef)
+    event OnInit()
+    event OnCellDetach()
+    event OnCellAttach()
+    event OnAttachedToCell()
+    event OnDetachedFromCell()
+    event OnUpdate()
+    event OnEndState()
+/;
 
 import Math
 import RPB_Config

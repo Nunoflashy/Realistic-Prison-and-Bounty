@@ -1,5 +1,41 @@
 Scriptname RPB_MCM_Stats hidden
 
+;/
+@functions:
+    bool function ShouldHandleEvent(RPB_MCM mcm) global
+    function RenderPrisonLeft(RPB_MCM mcm, string asPrisonName) global
+    function RenderPrisonRight(RPB_MCM mcm, string asPrisonName) global
+    function RenderTest(RPB_MCM mcm) global
+    function Render(RPB_MCM mcm) global
+    function Left(RPB_MCM mcm) global
+    function Right(RPB_MCM mcm) global
+    function OnOptionHighlight(RPB_MCM mcm, string option) global
+    function OnOptionDefault(RPB_MCM mcm, string option) global
+    function OnOptionSelect(RPB_MCM mcm, string option) global
+    function OnOptionSliderOpen(RPB_MCM mcm, string option) global
+    function OnOptionSliderAccept(RPB_MCM mcm, string option, float value) global
+    function OnOptionMenuOpen(RPB_MCM mcm, string option) global
+    function OnOptionMenuAccept(RPB_MCM mcm, string option, int menuIndex) global
+    function OnOptionColorOpen(RPB_MCM mcm, string option) global
+    function OnOptionColorAccept(RPB_MCM mcm, string option, int color) global
+    function OnOptionInputOpen(RPB_MCM mcm, string option) global
+    function OnOptionInputAccept(RPB_MCM mcm, string option, string input) global
+    function OnOptionKeymapChange(RPB_MCM mcm, string option, int keyCode, string conflictControl, string conflictName) global
+    function OnHighlight(RPB_MCM mcm, int oid) global
+    function OnDefault(RPB_MCM mcm, int oid) global
+    function OnSelect(RPB_MCM mcm, int oid) global
+    function OnSliderOpen(RPB_MCM mcm, int oid) global
+    function OnSliderAccept(RPB_MCM mcm, int oid, float value) global
+    function OnMenuOpen(RPB_MCM mcm, int oid) global
+    function OnMenuAccept(RPB_MCM mcm, int oid, int menuIndex) global
+    function OnColorOpen(RPB_MCM mcm, int oid) global
+    function OnColorAccept(RPB_MCM mcm, int oid, int color) global
+    function OnKeymapChange(RPB_MCM mcm, int oid, int keycode, string conflictControl, string conflictName) global
+    function OnInputOpen(RPB_MCM mcm, int oid) global
+    function OnInputAccept(RPB_MCM mcm, int oid, string inputValue) global
+@events:
+/;
+
 import RPB_Utility
 import RPB_MCM
 

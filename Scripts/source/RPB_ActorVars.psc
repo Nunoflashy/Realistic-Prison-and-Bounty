@@ -1,5 +1,73 @@
 scriptname RPB_ActorVars hidden
 
+;/
+@functions:
+    function SetStat(string asStatName, Faction akFaction, Actor akActor, int aiValue) global
+    function SetStatFloat(string asStatName, Faction akFaction, Actor akActor, float afValue) global
+    function SetCrimeGold(Faction akFaction, Actor akActor, int value) global
+    function SetCrimeGoldViolent(Faction akFaction, Actor akActor, int value) global
+    function SetLatentCrimeGold(Faction akFaction, Actor akActor, int value) global
+    function SetLatentCrimeGoldViolent(Faction akFaction, Actor akActor, int value) global
+    function SetLargestBounty(Faction akFaction, Actor akActor, int value) global
+    function SetTotalBounty(Faction akFaction, Actor akActor, int value) global
+    function SetTimesArrested(Faction akFaction, Actor akActor, int value) global
+    function SetTimesFrisked(Faction akFaction, Actor akActor, int value) global
+    function SetTimeJailed(Faction akFaction, Actor akActor, float value) global
+    function SetLongestSentence(Faction akFaction, Actor akActor, int value) global
+    function SetLastSentence(Faction akFaction, Actor akActor, int value) global
+    function SetTimesJailed(Faction akFaction, Actor akActor, int value) global
+    function SetTimesEscaped(Faction akFaction, Actor akActor, int value) global
+    function SetTimesStripped(Faction akFaction, Actor akActor, int value) global
+    function SetTimesStrippedInPrison(RPB_Prison apPrison, Actor akActor, int value) global
+    function SetCurrentInfamy(Faction akFaction, Actor akActor, int value) global
+    function ModStat(string asStatName, Faction akFaction, Actor akActor, int value) global
+    function ModCrimeGold(Faction akFaction, Actor akActor, int value, bool abViolent = false) global
+    function ModCrimeGoldViolent(Faction akFaction, Actor akActor, int value) global
+    function ModLatentCrimeGold(Faction akFaction, Actor akActor, int value, bool abViolent = false) global
+    function ModLargestBounty(Faction akFaction, Actor akActor, int value) global
+    function ModTotalBounty(Faction akFaction, Actor akActor, int value) global
+    function ModTimesArrested(Faction akFaction, Actor akActor, int value) global
+    function ModTimesFrisked(Faction akFaction, Actor akActor, int value) global
+    function ModTimeJailed(Faction akFaction, Actor akActor, float value) global
+    function ModLongestSentence(Faction akFaction, Actor akActor, int value) global
+    function ModLastSentence(Faction akFaction, Actor akActor, int value) global
+    function ModTimesJailed(Faction akFaction, Actor akActor, int value) global
+    function ModTimesEscaped(Faction akFaction, Actor akActor, int value) global
+    function ModTimesStripped(Faction akFaction, Actor akActor, int value) global
+    function ModCurrentInfamy(Faction akFaction, Actor akActor, int value) global
+    function IncrementStat(string asStatName, Faction akFaction, Actor akActor, int aiIncrementBy = 1) global
+    function DecrementStat(string asStatName, Faction akFaction, Actor akActor, int aiDecrementBy = 1) global
+    function ModifyStat(string asStatName, Faction akFaction, Actor akActor, float modifyBy) global
+    function SetTimeJailedInPrison(RPB_Prison apPrison, RPB_Prisoner apPrisoner, float value) global
+    float function GetTimeJailedInPrison(RPB_Prison apPrison, Actor akActor) global
+    int function GetStat(string asStatName, Faction akFaction, Actor akActor) global
+    float function GetStatFloat(string asStatName, Faction akFaction, Actor akActor) global
+    int function GetCrimeGold(Faction akFaction, Actor akActor) global
+    int function GetCrimeGoldNonViolent(Faction akFaction, Actor akActor) global
+    int function GetCrimeGoldViolent(Faction akFaction, Actor akActor) global
+    int function GetLatentCrimeGold(Faction akFaction, Actor akActor) global
+    int function GetLatentCrimeGoldNonViolent(Faction akFaction, Actor akActor) global
+    int function GetLatentCrimeGoldViolent(Faction akFaction, Actor akActor) global
+    int function GetLargestBounty(Faction akFaction, Actor akActor) global
+    int function GetTotalBounty(Faction akFaction, Actor akActor) global
+    int function GetTimesArrested(Faction akFaction, Actor akActor) global
+    int function GetTimesFrisked(Faction akFaction, Actor akActor) global
+    int function GetArrestsEluded(Faction akFaction, Actor akActor) global
+    int function GetArrestsResisted(Faction akFaction, Actor akActor) global
+    int function GetBountiesPaid(Faction akFaction, Actor akActor) global
+    float function GetTimeJailed(Faction akFaction, Actor akActor) global
+    int function GetLongestSentence(Faction akFaction, Actor akActor) global
+    int function GetLastSentence(Faction akFaction, Actor akActor) global
+    int function GetTimesJailed(Faction akFaction, Actor akActor) global
+    int function GetTimesEscaped(Faction akFaction, Actor akActor) global
+    int function GetTimesStripped(Faction akFaction, Actor akActor) global
+    int function GetCurrentInfamy(Faction akFaction, Actor akActor) global
+    function DeleteActorVars() global
+    function DeleteFromForm(Form akForm) global
+    function Unset(string asVarKey, Form akForm = none) global
+@events:
+/;
+
 import RPB_StorageVars
 import RPB_Utility
 

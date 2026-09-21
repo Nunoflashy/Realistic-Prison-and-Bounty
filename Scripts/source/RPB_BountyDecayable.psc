@@ -2,10 +2,44 @@ scriptname RPB_BountyDecayable extends RPB_ActorScript
 {
     Bounty Decay script: An Actor that has this script attached to them
     has the bounty decay functionality enabled to them and is considered a BountyDecayable.
-
     Additionally, if the Actor is registered as a RPB_Actor, this script's state
     can be retrieved by calling GetScriptState(RPB_BountyDecayable.className()) on the Actor.
+    @property float UpdateInterval
+    @property float CurrentTime
 }
+
+;/
+@functions:
+    string function className() global
+    string function typeName()
+    function Attach(Actor akActor) global
+    function Detach(Actor akActor) global
+    function UpdateBountyLost(Faction akCrimeFaction)
+    function RegisterBountyLost(Faction akCrimeFaction)
+    function StartDecayUpdates()
+    int function GetBountyLostDaily(string asHold)
+    int function GetBountyLostPerUpdate(string asHold)
+    float function GetLastBountyUpdateTime(string asHold)
+    function RegisterLastUpdateInHold(string asHold)
+    function UpdateBountyDecaying()
+    function UpdateBountyDecayForHold(string asHold)
+    function DecayBountyForHold(string asHold)
+    function UpdateBountyDecayTimers(Location akOldLocation, Location akNewLocation)
+    function InitializeTimers()
+    function SetHoldTimer(string asHold, float afValue)
+    function IncrementHoldTimer(string asHold, float afIncrementBy = 1.0)
+    function DecrementHoldTimer(string asHold, float afDecrementBy = 1.0)
+    function ResetHoldTimer(string asHold)
+    float function GetHoldTimer(string asHold)
+    bool function HasTimerElapsed(string asHold)
+    Spell function ScriptSpell() global
+@events:
+    event OnAttachScript()
+    event OnDetachScript()
+    event OnBountyLost(Faction akFaction, int aiBountyLost)
+    event OnUpdateGameTime()
+    event OnLocationChange(Location akOldLocation, Location akNewLocation)
+/;
 
 import Math
 import RPB_Memory

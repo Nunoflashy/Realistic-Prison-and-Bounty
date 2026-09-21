@@ -1,4 +1,26 @@
 scriptname RPB_UIInterface extends ObjectReference
+{
+    @property UILIB_1 UILib
+    @property RPB_API API
+}
+
+;/
+@functions:
+    int function ShowList(string asTitle = "", string[] asOptions, int aiStartIndex = 0, int aiDefaultIndex = 0)
+    string function ShowList_ReturnElement(string asTitle = "", string[] asOptions, int aiStartIndex = 0, int aiDefaultIndex = 0)
+    string function ShowInput(string asTitle = "", string asInitialText = "")
+    string function ShowStringList(string asTitle = "", string asOptions, string asOptionSeparator = ",", int aiStartIndex = 0, int aiDefaultIndex = 0)
+    Form function ShowFormArrayList(string asListTitle = "", Form[] akOptions)
+    string function ShowHoldList(bool abMustHaveArrestees = false, bool abSkipListOnSingleResult = false, string asListTitle = "Select Hold")
+    RPB_Arrestee function ShowArresteeList(string asArrestHold, string asListTitle = "Select Arrestee")
+    RPB_Captor function ShowCaptorList(string asArrestHold, string asListTitle = "Select Captor")
+    RPB_Prison function ShowPrisonList(bool abNotEmpty = true, bool abSkipListOnSingleResult = false, bool abShowCity = true, bool abShowHold = false, bool abShowPrisonerCount = true, string asListTitle = "Select Prison")
+    RPB_Prisoner function ShowPrisonerList(RPB_Prison apPrison, bool abOnlyImprisoned = false, string asListTitle = "Select Prisoner")
+    RPB_JailCell function ShowCellList(RPB_Prison apPrison, bool abOnlyEmpty = false, bool abOnlyGenderExclusive = false, string asListTitle = "Select Cell")
+    RPB_CellDoor function ShowCellDoorList(RPB_JailCell akCell, string asListTitle = "Select Cell Door")
+    Form function ShowPrisonContainerList(RPB_Prison apPrison, string asListTitle = "Select Container")
+@events:
+/;
 
 import RPB_Utility
 import RPB_Memory

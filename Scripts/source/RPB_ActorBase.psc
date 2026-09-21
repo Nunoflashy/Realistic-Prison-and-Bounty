@@ -1,5 +1,134 @@
 scriptname RPB_ActorBase extends ActiveMagicEffect
-{Base Actor script for RPB_ActorBase, must be inherited from to be used}
+{
+    Base Actor script for RPB_ActorBase, must be inherited from to be used
+    @property RPB_API API
+    @property RPB_Config Config
+    @property string Name
+    @property string Sex
+    @property bool IsFemale
+    @property bool IsMale
+    @property string Gender
+    @property string Pronoun
+    @property string PronounObject
+    @property string PronounPossessive
+    @property string PronounPossessiveObject
+    @property string PronounReflexive
+    @property string PronounIntensive
+    @property Actor this
+    @property bool TrackStats
+    @property bool RegisterSleepEvents
+    @property string CurrentState
+    @property bool IsEffectActive
+    @property bool IsInitialized
+}
+
+;/
+@functions:
+    int function GetCurrentActiveAndLatentBountyForFaction(Actor akActor, Faction akFaction, bool abNonViolent = true, bool abViolent = true) global
+    function BindAlias(ReferenceAlias apAlias)
+    function UnbindAlias(ReferenceAlias apAlias)
+    bool function HasAlias(ReferenceAlias apAlias)
+    function EnableAI(bool abEnable = true)
+    function DisableAI()
+    bool function HasAI()
+    function AddSpell(Spell akSpell, bool abVerbose = true)
+    function RemoveSpell(Spell akSpell)
+    bool function HasSpell(Spell akSpell)
+    function EquipItem(Form akItem, bool abPreventRemoval = false, bool abSilent = true, bool abCondition = true)
+    function EquipOutfit(Armor[] akOutfit, bool abPreventRemoval = false)
+    function UnequipHands()
+    function UnequipItemSlot(int aiSlot)
+    function UndressUpperBody()
+    function UndressLowerBody()
+    function UnequipAll()
+    function RemoveItem(Form akItemToRemove, int aiCount = 1, bool abSilent = true, ObjectReference akOtherContainer = none)
+    function RemoveAllItems(ObjectReference akTransferTo = none, bool abKeepOwnership = false, bool abRemoveQuestItems = true)
+    function SheatheWeapon()
+    function StopCombat(bool abStopCombatAlarm = true)
+    function SetAttackActorOnSight(bool abAttackOnSight = true)
+    function MoveTo(ObjectReference akTarget, float afXOffset = 0.0, float afYOffset = 0.0, float afZOffset = 0.0, bool abMatchRotation = true)
+    Cell function GetCurrentCell()
+    function PlayAnimation(string asAnimationKey)
+    float function GetDistance(ObjectReference akObject)
+    function OrientRelativeTo(ObjectReference akObject, float afRotX = 0.0, float afRotY = 0.0, float afRotZ = 0.0)
+    bool function IsFarFromPlayer()
+    string function GetSex(bool abShortValue = false)
+    bool function IsNaked()
+    bool function IsInUnderwear()
+    bool function HasUnderwear()
+    Armor function GetUnderwear(string asUnderwearPart)
+    bool function IsWearingOutfit(Armor[] akOutfit)
+    function SyncLargestBountyForFaction(Faction akFaction)
+    function SyncTotalBountyForFaction(Faction akFaction)
+    function ModTotalBountyForFaction(Faction akFaction, int aiAmountBy)
+    bool function HasActiveBountyForFaction(Faction akFaction)
+    bool function HasLatentBountyForFaction(Faction akFaction)
+    function SetCrimeGoldForFaction(Faction akFaction, int aiGold)
+    function SetCrimeGoldViolentForFaction(Faction akFaction, int aiGold)
+    function ModCrimeGoldForFaction(Faction akFaction, int aiAmount, bool abViolent = false)
+    int function GetActiveBountyForFaction(Faction akFaction, bool abNonViolent = true, bool abViolent = true)
+    int function GetLatentBountyForFaction(Faction akFaction, bool abNonViolent = true, bool abViolent = true)
+    function HideBountyForFaction(Faction akFaction)
+    function RestoreBountyForFaction(Faction akFaction)
+    function ClearActiveBountyForFaction(Faction akFaction, bool abNonViolent = true, bool abViolent = true)
+    function ClearLatentBountyForFaction(Faction akFaction, bool abNonViolent = true, bool abViolent = true)
+    int function QueryFactionStat(string asStatName, Faction akFaction)
+    function SetFactionStat(string asStatName, Faction akFaction, int aiValue)
+    int function QueryStat(string statName)
+    function SetStat(string statName, int value)
+    function IncrementStat(string statName, int incrementBy = 1)
+    function DecrementStat(string statName, int decrementBy = 1)
+    function ModifyStat(string statName, float modifyBy)
+    function SetStateForScene(string asSceneName, string asSceneState)
+    bool function HasSceneState(string asSceneName, string asSceneState)
+    function DeleteSceneStates()
+    string function GetScriptVarCategory(string asVarCategory = "Actor")
+    string function DestroyPropertyOnState(string asStateName)
+    bool function GetBool(string asVarName, string asVarCategory = "Actor")
+    bool function Is(string asVarName, string asVarCategory = "Actor")
+    bool function Has(string asVarName, string asVarCategory = "Actor")
+    bool function Was(string asVarName, string asVarCategory = "Actor")
+    bool function Should(string asVarName, string asVarCategory = "Actor")
+    bool function Must(string asVarName, string asVarCategory = "Actor")
+    int function GetInt(string asVarName, string asVarCategory = "Actor")
+    float function GetFloat(string asVarName, string asVarCategory = "Actor")
+    string function GetString(string asVarName, string asVarCategory = "Actor")
+    Form function GetForm(string asVarName, string asVarCategory = "Actor")
+    ObjectReference function GetReference(string asVarName, string asVarCategory = "Actor")
+    function SetBool(string asVarName, bool abValue, string asVarCategory = "Actor")
+    function SetInt(string asVarName, int aiValue, string asVarCategory = "Actor", int aiMinValue = -99999999, int aiMaxValue = 99999999)
+    function ModInt(string asVarName, int aiValue, string asVarCategory = "Actor")
+    function SetFloat(string asVarName, float afValue, string asVarCategory = "Actor", float afMinValue = -99999999.0, float afMaxValue = 99999999.0)
+    function ModFloat(string asVarName, float afValue, string asVarCategory = "Actor")
+    function SetString(string asVarName, string asValue, string asVarCategory = "Actor")
+    function SetForm(string asVarName, Form akValue, string asVarCategory = "Actor")
+    function SetReference(string asVarName, ObjectReference akValue, string asVarCategory = "Actor")
+    function SetPairs(int aiSourceMap, string asVarCategory = "Actor")
+    function Remove(string asVarName, string asVarCategory = "Actor")
+    function RemoveAll(string asVarCategory = "Actor")
+    function Destroy()
+    function RegisterForTrackedStats()
+    function UnregisterForTrackedStats()
+    function UnregisterForUpdates()
+    Actor function GetActor()
+    Faction function GetFaction()
+    string function GetExtends()
+    string function GetName()
+    string function GetIdentifier()
+    int function GetFormID()
+    bool function IsPlayer()
+    bool function IsNPC()
+@events:
+    event OnEffectStart(Actor akTarget, Actor akCaster)
+    event OnEffectFinish(Actor akTarget, Actor akCaster)
+    event OnDetach()
+    event OnTrackedStatsEvent(string asStatFilter, int aiValue)
+    event OnStatChanged(string asStatName, float afValue)
+    event OnBountyGained()
+    event OnInitialize()
+    event OnRestore()
+    event OnDestroy()
+/;
 
 import RPB_Utility
 

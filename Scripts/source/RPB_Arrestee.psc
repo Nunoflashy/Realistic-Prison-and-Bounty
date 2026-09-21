@@ -1,4 +1,91 @@
 Scriptname RPB_Arrestee extends RPB_ActorBase
+{
+    @property RPB_Arrest Arrest
+    @property RPB_SceneManager SceneManager
+    @property RPB_Captor Captor
+    @property Faction ArrestFaction
+    @property string Hold
+    @property string ArrestType
+    @property float CurrentTime
+    @property int BountyNonViolent
+    @property int BountyViolent
+    @property int Bounty
+    @property float TimeOfArrest
+    @property int MinuteOfArrest
+    @property int HourOfArrest
+    @property int DayOfArrest
+    @property int MonthOfArrest
+    @property int YearOfArrest
+    @property float TimeArrested
+    @property bool Defeated
+    @property int DefeatedBounty
+    @property bool IsArrested
+    @property bool IsImprisoned
+}
+
+;/
+@functions:
+    RPB_Arrestee function GetStateForPrisoner(RPB_Prisoner apPrisoner) global
+    RPB_Prison function GetPotentialPrison()
+    string function GetTimeOfArrestFormatted()
+    string function GetTimeElapsedSinceArrest()
+    function Frisk()
+    function AssignCaptor(RPB_Captor apCaptor)
+    function SetArrestParameters(string asArrestType, RPB_Captor apCaptor, Faction akCrimeFaction)
+    function Free()
+    function Release()
+    function Restrain()
+    function Cuff()
+    function Uncuff()
+    RPB_Prisoner function MakePrisoner()
+    function TransferArrestPropertiesToPrisoner(RPB_Prison apPrison)
+    bool function ShouldPayBounty()
+    function PayCrimeGold()
+    function PayBounty()
+    function SetArrestTime()
+    function SetArrestGoal(string asArrestGoal)
+    function RevertArrest()
+    function Arrest()
+    function EscortToPrison(bool abEscortDirectlyToCell = false)
+    function MoveToPrison(bool abMoveDirectlyToCell = false)
+    function ChangeEscort(Actor akNewEscort)
+    function SetTimeOfArrest()
+    function MoveToCaptor()
+    bool function HasActiveBounty()
+    bool function HasLatentBounty()
+    function SetCrimeGold(int aiGold)
+    function SetCrimeGoldViolent(int aiGold)
+    function ModCrimeGold(int aiAmount, bool abViolent = false)
+    int function GetActiveBounty(bool abNonViolent = true, bool abViolent = true)
+    int function GetLatentBounty(bool abNonViolent = true, bool abViolent = true)
+    function HideBounty()
+    function RestoreBounty()
+    function ClearLatentBounty(bool abNonViolent = true, bool abViolent = true)
+    int function QueryStat(string asStatName)
+    function SetStat(string asStatName, int aiValue)
+    function Destroy()
+    string function GetScriptVarCategory(string asVarCategory = "Actor")
+    bool function InitializeState()
+    function RevertState()
+    Actor function GetArrestedActor()
+    Actor function GetActor()
+    RPB_Captor function GetCaptor()
+    Faction function GetFaction()
+    string function GetHold()
+    string function GetArrestType()
+@events:
+    event OnInitialize()
+    event OnDestroy()
+    event OnBountyGained()
+    event OnStatChanged(string asStatName, float afValue)
+    event OnObjectUnequipped(Form akBaseObject, ObjectReference akReference)
+    event OnDeath(Actor akKiller)
+    event OnRestrained()
+    event OnArrestBegin()
+    event OnArrestEnd()
+    event OnArrestFailed(string asReason)
+    event OnUpdate()
+/;
 
 import RPB_Utility
 import RPB_Config

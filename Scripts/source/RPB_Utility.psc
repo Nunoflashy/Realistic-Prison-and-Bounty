@@ -1,5 +1,251 @@
 scriptname RPB_Utility hidden
 
+;/
+@functions:
+    string function ModName() global
+    string function PluginName() global
+    Form function GetFormFromMod(int formId) global
+    GlobalVariable function RPB_ArrestGlobal(string asGlobal) global
+    Quest function GetCellPackageGroup(string questPackageID) global
+    RPB_PackageGroup function GetCellPackageGroupEx(string questPackageID) global
+    WICourierScript function GetCourierQuest() global
+    Message function ServeTimeMessage() global
+    Spell function RPB_ActorSpell() global
+    Spell function RPB_ArresteeSpell() global
+    Spell function RPB_PrisonerSpell() global
+    Spell function RPB_CaptorSpell() global
+    Idle function BoundHandsBehindBack() global
+    Armor function RPB_PrisonerHandCuffs() global
+    Outfit function RPB_GetOutfit(string asOutfit) global
+    bool function IsTracingEnabled() global
+    bool function IsDebuggingEnabled() global
+    bool function IsLoggingEnabled() global
+    function EnableDebugging() global
+    function DisableDebugging() global
+    function EnableLogging() global
+    function DisableLogging() global
+    function SetLoggingEnabled(string asLogType, bool abEnabled) global
+    function base_log(string asLogType = "DEBUG", string asLogInfo, string asCaller = "", string asCallerArgs = "") global
+    function Trace(string asCaller, string asLogInfo, bool abCondition = true) global
+    function Debug(string asCaller, string asLogInfo, bool abCondition = true) global
+    function NotImplemented(string asCaller, bool abCondition = true) global
+    function FunctionNotImplemented(string asCaller, bool abCondition = true) global
+    function EventNotImplemented(string asCaller, bool abCondition = true) global
+    function DebugInfo(string asCaller, string asLogInfo, bool abCondition = true) global
+    function DebugWarn(string asCaller, string asLogInfo, bool abCondition = true) global
+    function DebugError(string asCaller, string asLogInfo, bool abCondition = true) global
+    function DebugWithArgs(string asCaller, string asArgs, string asLogInfo, bool abCondition = true) global
+    function DebugParams(string params, string paramNames = "", string caller = "", bool condition = true) global
+    function LogNoType(string asLogInfo, string asCaller = "", bool abCondition = true) global
+    function LogException(string asExceptionType, string asExceptionMessage, string asCaller = "", bool abCondition = true) global
+    function Info(string asLogInfo, bool abCondition = true) global
+    function Warn(string asLogInfo, bool abCondition = true) global
+    function Error(string asLogInfo, bool abCondition = true) global
+    function Fatal(string asLogInfo, bool abCondition = true) global
+    function LogProperty(string prop, string asLogInfo, bool condition = true) global
+    function ErrorProperty(string asProperty, string asLogInfo, bool condition = true) global
+    float function Max(float a, float b) global
+    float function Min(float a, float b) global
+    int function Round(float value) global
+    int function ClampInt(int value, int min, int max) global
+    float function ClampFloat(float value, float min, float max) global
+    float function PercentToDecimal(float percentToConvert) global
+    float function float_if(bool condition, float afTrue, float afFalse = 0.0) global
+    int function int_if(bool condition, int aiTrue, int aiFalse = 0) global
+    bool function bool_if(bool condition, bool abTrue, bool abFalse = false) global
+    string function string_if(bool condition, string asTrue, string asFalse = "") global
+    Form function form_if(bool condition, Form akTrue, Form akFalse = none) global
+    ActiveMagicEffect function ame_if (bool condition, ActiveMagicEffect apTrue, ActiveMagicEffect apFalse) global
+    string function GetFormattedAsParams(string values, string keys = "", string keyPrefixes = "", string keySuffixes = "", string valuePrefixes = "", string valueSuffixes = "") global
+    bool function String_StartsWith(string str, string needle) global
+    bool function String_EndsWith(string str, string needle) global
+    bool function String_StartsEndsWith(string str, string startChar, string endChar) global
+    bool function String_Contains(string str, string needle) global
+    string function String_Implode(string[] akStrArray, string asDelimiter = ",") global
+    string[] function String_Explode(string asStr, string asDelimiter = ",") global
+    string function ReplaceString(string str, string toFind, string replacement) global
+    string[] function StringArray_Merge(string[] asArrayOne, string[] asArrayTwo) global
+    string function Replace(string asTemplate, string[] akPlaceholders, string[] akReplacements) global
+    function Array_ClearForms(Form[] akArray) global
+    string function OR(int[] elements) global
+    string function XOR(int[] elements) global
+    string function AND(int[] elements) global
+    int function BitwiseExpr(string bitfield) global
+    function RetainAI(bool condition = true) global
+    function ReleaseAI(bool condition = true) global
+    function SetGameStat(string asStatName, int aiValue) global
+    bool function IsActorArrested(Actor akActor) global
+    bool function IsActorImprisoned(Actor akActor) global
+    bool function IsPlayerArrested() global
+    bool function IsPlayerImprisoned() global
+    Faction function GetCrimeFactionByHold(string asHold) global
+    bool function WasPlayerLastJailedInHold(Faction akCrimeFaction) global
+    int function GetPlayerPrisonLastJailedTime(string asTimeType, Faction akCrimeFaction) global
+    int function GetPlayerPrisonLastReleasedTime(string asTimeType, Faction akCrimeFaction) global
+    int function GetPlayerPrisonLastEscapedTime(string asTimeType, Faction akCrimeFaction) global
+    function UnequipHandsForActor(Actor akActor) global
+    function UnequipWeaponForActor(Actor akActor, bool abLeftHand = false, bool abPreventEquip = false, bool abSilentUnequip = true) global
+    function UnequipShieldForActor(Actor akActor, bool abPreventEquip = false, bool abSilentUnequip = true) global
+    function UnequipSpellForActor(Actor akActor) global
+    function UnequipShoutForActor(Actor akActor) global
+    bool function ActorHasClothing(Actor akActor) global
+    bool function IsActorMale(Actor akActor) global
+    bool function IsActorFemale(Actor akActor) global
+    bool function IsActorOfGender(Actor akActor, string asGender) global
+    bool function HasActorsOfGenderInList(Form[] akActors, string asGender, bool abStrictlyMatchGender = false) global
+    bool function HasMalesInList(Form[] akActors, bool abStrictlyMales = false) global
+    bool function HasFemalesInList(Form[] akActors, bool abStrictlyFemales = false) global
+    Form[] function GetActorsOfGenderInList(Form[] akActors, string asGender) global
+    Form[] function GetMalesInList(Form[] akActors) global
+    Form[] function GetFemalesInList(Form[] akActors) global
+    RPB_ActorBase function AwaitEntityReference( Actor akEntity, RPB_ActorList apEntityList, RPB_Entity apEntity = none, int aiMaxTries = 120, float afInitialTimeBetweenTries = 0.05, float afMaxTimeBetweenTries = 0.1 ) global
+    RPB_ActorBase function AwaitExistingEntityReference( Actor akEntity, RPB_ActorList apEntityList, RPB_Entity apEntity = none, int aiMaxTries = 120, float afInitialTimeBetweenTries = 0.05, float afMaxTimeBetweenTries = 0.1 ) global
+    function EnsureArresteeSpellAndBinding(Actor akArrestee, RPB_Hold apHold) global
+    function EnsurePrisonerSpellAndBinding(Actor akPrisoner, RPB_Prison apPrison) global
+    function EnsureCaptorSpellAndBinding(Actor akCaptor) global
+    Form[] function ActorToFormArray(Actor[] akActors) global
+    function AddIntIfNotNone(int aiElement, int arr) global
+    function AddFormIfNotNone(Form akForm, int arr) global
+    int[] function IntList( int aiElement1, int aiElement2 = 0, int aiElement3 = 0, int aiElement4 = 0, int aiElement5 = 0, int aiElement6 = 0, int aiElement7 = 0, int aiElement8 = 0, int aiElement9 = 0, int aiElement10 = 0, int aiElement11 = 0, int aiElement12 = 0, int aiElement13 = 0, int aiElement14 = 0, int aiElement15 = 0, int aiElement16 = 0, int aiElement17 = 0, int aiElement18 = 0, int aiElement19 = 0, int aiElement20 = 0 ) global
+    Form[] function BuildParamsObjectReference( ObjectReference akRef1, ObjectReference akRef2 = none, ObjectReference akRef3 = none, ObjectReference akRef4 = none, ObjectReference akRef5 = none, ObjectReference akRef6 = none, ObjectReference akRef7 = none, ObjectReference akRef8 = none, ObjectReference akRef9 = none, ObjectReference akRef10 = none, ObjectReference akRef11 = none, ObjectReference akRef12 = none, ObjectReference akRef13 = none, ObjectReference akRef14 = none, ObjectReference akRef15 = none, ObjectReference akRef16 = none, ObjectReference akRef17 = none, ObjectReference akRef18 = none, ObjectReference akRef19 = none, ObjectReference akRef20 = none ) global
+    Form[] function BuildParamsActor( Actor akRef1, Actor akRef2 = none, Actor akRef3 = none, Actor akRef4 = none, Actor akRef5 = none, Actor akRef6 = none, Actor akRef7 = none, Actor akRef8 = none, Actor akRef9 = none, Actor akRef10 = none, Actor akRef11 = none, Actor akRef12 = none, Actor akRef13 = none, Actor akRef14 = none, Actor akRef15 = none, Actor akRef16 = none, Actor akRef17 = none, Actor akRef18 = none, Actor akRef19 = none, Actor akRef20 = none ) global
+    function BindAliasTo(ReferenceAlias akAlias, ObjectReference akObjectReference) global
+    function UnbindAlias(ReferenceAlias akAlias) global
+    float function GetInfinityDistance() global
+    float function UnitsToCM(int unit)
+    float function UnitsToM(int unit)
+    function OrientRelative(ObjectReference akObjA, ObjectReference akObjB, Float afRotX = 0.0, Float afRotY = 0.0, Float afRotZ = 0.0) Global
+    bool function IsFarAwayFromObject(ObjectReference akObjectOne, ObjectReference akObjectTwo) global
+    bool function IsActorFarAwayFromPlayer(Actor akActor) global
+    string function GenerateUUIDSection(int aiLength) global
+    string function GenerateUUID() global
+    int[] function Pair(int n1, int n2) global
+    Form function GetFormFromString(string asFormIdentifier) global
+    string function ExtractReferenceType(string asReference) global
+    string function ExtractReferenceID(string asReference) global
+    int function ParseInt(string asNumber) global
+    int function ParseBinary(string asBin) global
+    int function HexStringToInt(string asHexString) global
+    int function BinStringToInt(string asBinString) global
+    string function IntToHex(int i) global
+    string function GetRandomHex() global
+    Form function GetFormOfType(string asFormType) global
+    int function GetSlotMask(string bodyPart) global
+    bool function IsFlowProfilingEnabled() global
+    function EnableFlowProfiling() global
+    function DisableFlowProfiling() global
+    bool function IsCrumbsEnabled() global
+    function EnableCrumbs() global
+    function DisableCrumbs() global
+    function Crumb(Actor akActor, string asStage) global
+    function ClearCrumbs(Actor akActor) global
+    string function DumpCrumbs(Actor akActor) global
+    int function GetMaxDayEventsPerUpdate() global
+    function SetMaxDayEventsPerUpdate(int aiDays) global
+    float function GetMonitorOverrideHours() global
+    function SetMonitorOverrideHours(float afHours) global
+    function FlowBegin(string asFlow) global
+    function FlowEnsure(string asFlow) global
+    function FlowMark(string asPhase) global
+    function FlowEnd(string asPhase = "end") global
+    string function GetFormNameCached(Form akForm) global
+    int function GetSlotMaskValue(int slotMask) global
+    string function YesNo(bool abValue) global
+    int function EnsureTrue(bool condition, string messageWhenFalse, int failedConditionList = 0) global
+    int function EnsureFalse(bool condition, string messageWhenTrue, int failedConditionList = 0) global
+    string[] function GetAllSkillNames(bool abIncludeStatSkills = true, bool abIncludePerkSkills = true) global
+    string function GetSkillName(string asSkillInternalReference) global
+    string[] function GetAllSkills(bool abIncludeStatSkills = true, bool abIncludePerkSkills = true) global
+    string[] function GetStatSkills() global
+    string[] function GetPerkSkills() global
+    bool function IsStatSkill(string asSkillName) global
+    bool function IsPerkSkill(string asSkillName) global
+    string function GetRandomSkill(string asSkillType = "Stat") global
+    string[] function GetLockLevels() global
+    string function GetDateTimeNow() global
+    float function now() global
+    float function GetCurrentTime() global
+    int function GetDaysOfMonth(int aiMonth) global
+    int function GetCurrentMinute() global
+    int function GetCurrentHour() global
+    float function GetCurrentHourFloat() global
+    int function GetCurrentDay() global
+    int function GetCurrentMonth() global
+    int function GetCurrentYear() global
+    int function GetDaysPassed() global
+    int function GetLastDayOfMonth(int aiMonth) global
+    float function GetElapsedTimeBetweenTimes(float afStartTime, float afEndTime) global
+    float function GetElapsedTimeSincePointInTime(float afPointInTime) global
+    bool function IsLastDayOfMonth() global
+    bool function IsLastDayOfYear() global
+    bool function SetGameHour(int aiGameHour) global
+    bool function ModGameHour(float afIncrementByHours) global
+    int function GetMinutesFromHour(float aiHour) global
+    string function GetClockFormat(int aiHour, int aiMinutes = 0, string format = "12 Hour") global
+    string function GetTimeAs12Hour(int aiHour, int aiMinutes = 0) global
+    bool function IsLeapYear(int aiYear) global
+    bool function IsWeekend(int aiDay, int aiMonth, int aiYear) global
+    bool function IsLoredas(int aiDay, int aiMonth, int aiYear) global
+    bool function IsSundas(int aiDay, int aiMonth, int aiYear) global
+    bool function IsWeekday(int aiDay, int aiMonth, int aiYear) global
+    int function CalculateDaysPassedFromDate(int aiDay, int aiMonth, int aiYear) global
+    int function GetDayOfWeekByName(string asDayOfWeekName) global
+    string function GetDayOfWeekName(int aiDayOfWeek) global
+    string function GetDayOfWeekGregorianName(int aiDayOfWeek) global
+    int function GetFirstDayOfWeek(int aiYear) global
+    int function CalculateDayOfWeek(int aiDay, int aiMonth, int aiYear) global
+    int function GetDateFromDaysPassed(int aiDay, int aiMonth, int aiYear, int aiDaysPassed) global
+    string function GetDateFormat(int aiDay, int aiMonth, int aiYear, int aiHour = 0, int aiMinute = 0, string format = "d/m/Y") global
+    int function GetPreviousDayOfWeekFromDate(int aiDay, int aiMonth, int aiYear, int aiDayOfWeek) global
+    int function GetNextDayOfWeekFromDate(int aiDay, int aiMonth, int aiYear, int aiDayOfWeek) global
+    string function GetMonthName(int aiMonth) global
+    int function GetMonthByName(string asMonthName) global
+    bool function Is28DayMonth(int aiMonth) global
+    bool function Is30DayMonth(int aiMonth) global
+    bool function Is31DayMonth(int aiMonth) global
+    string function ToOrdinalNthDay(int aiDay) global
+    string function GetDayOrdinality(int aiDay) global
+    string function GetTimeFormatted(float afTime, bool abIncludeMinutes = false, bool abIncludeHours = true, bool abIncludeDays = true, bool abIncludeWeeks = true, bool abIncludeMonths = true, bool abIncludeYears = true, string asNullValue = "") global
+    string function GetFormattedDate(int aiDay, int aiMonth, int aiYear, int aiHour = 0, int aiMinute = 0, bool abShowDayOfWeek = true, bool abShowDay = true, bool abShowTime = true, bool abShowYear = true) global
+    string function GetFormattedDate24Hours(int aiDay, int aiMonth, int aiYear, int aiHour = 0, int aiMinute = 0) global
+    string function GetCurrentDateFormatted() global
+    string function GetNextDayOfWeekDateFormatted(string asDayOfWeek, bool abShowTime = false) global
+    string function GetPreviousDayOfWeekDateFormatted(string asDayOfWeek, bool abShowTime = false) global
+    bool function PassTimeInDays(int aiPassByDays) global
+    string function FormatFloat(float number) global
+    function SendCourierDelivery(ReferenceAlias apItemAlias, Form akItem) global
+    function ScheduleCourierDeliveryInGameTime(ReferenceAlias apItemAlias, Form akItem, float afTimeFromNow) global
+    int function new_struct(bool abRetain = false, string asStructType = "") global
+    bool function GetStructMemberBool(int apStructObject, string asMemberName) global
+    int function GetStructMemberInt(int apStructObject, string asMemberName) global
+    float function GetStructMemberFloat(int apStructObject, string asMemberName) global
+    string function GetStructMemberString(int apStructObject, string asMemberName) global
+    Form function GetStructMemberForm(int apStructObject, string asMemberName) global
+    function SetStructMemberBool(int apStructObject, string asMemberName, bool value) global
+    function SetStructMemberInt(int apStructObject, string asMemberName, int value) global
+    function SetStructMemberFloat(int apStructObject, string asMemberName, float value) global
+    function SetStructMemberString(int apStructObject, string asMemberName, string value) global
+    function SetStructMemberForm(int apStructObject, string asMemberName, Form value) global
+    function DestroyStruct(int apStructObject) global
+    function DestroyStructsOfType(string asStructType) global
+    float function StartBenchmark(bool condition = true) global
+    int function EndBenchmark(float startTime, string _message = "", bool condition = true) global
+    int function GetJailBaseDoorID(string hold) global
+    ObjectReference function GetNearestJailDoorOfType(int jailBaseDoorId, ObjectReference centerRef, float radius) global
+    ObjectReference function GetNearestJailDoorOfTypeEx(Form akJailBaseDoor, ObjectReference akCenterRef, float afRadius) global
+    ObjectReference function GetRandomJailDoorOfType(int jailBaseDoorId, ObjectReference centerRef, float radius) global
+    function OpenMultipleDoorsOfType(int jailBaseDoorId, ObjectReference scanFromWhere, float radius) global
+    Actor function GetNearestActor(ObjectReference centerRef, float radius) global
+    Actor function GetNearestActorFromList(Actor akRef, Form[] akRefs) global
+    Actor function GetNearbyActorFromRefWithPrototype(ObjectReference akCenterRef, ActorBase akPrototype, float afMaxRadius = 1000.0) global
+    Actor function GetNearbyGuardForFactionFromRef( ObjectReference akCenterRef, Faction akCrimeFaction = none, float afMinRadius = 50.0, float afMaxRadius = 1000.0, float afIncreaseRadiusBy = 100.0, int aiMaxScans = 30 ) global
+    Actor function GetNearestGuard(ObjectReference centerRef, float radius, ObjectReference exclude) global
+    bool function IsActorNearReference(Actor akActor, ObjectReference akReference, float radius = 80.0) global
+    bool function IsWithin(int aiValue, int aiMin, int aiMax, bool abMinInclusive = true, bool abMaxInclusive = true) global
+    string function GetContainerList( int _container, string includeStringFilter = "", string excludeStringFilter = "", int includeIntegerFilter = -1, int excludeIntegerFilter = -1, Form includeFormFilter = none, Form excludeFormFilter = none, int indentLevel = 1 ) global
+@events:
+/;
+
 import Math
 import RPB_Memory
 

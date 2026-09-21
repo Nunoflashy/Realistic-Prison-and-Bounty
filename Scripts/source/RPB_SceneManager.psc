@@ -1,4 +1,173 @@
 scriptname RPB_SceneManager extends Quest
+{
+    @property RPB_API API
+    @property RPB_Config Config
+    @property RPB_EventManager EventManager
+    @property GlobalVariable RPB_SceneBlockNormalExecution
+    @property GlobalVariable RPB_SceneStartAtPhase
+    @property Scene UnlockCell
+    @property Scene LockCell
+    @property int PHASE_START
+    @property int PHASE_END
+    @property string EVENT_RESTRAIN_BEGIN
+    @property string EVENT_RESTRAINING
+    @property string EVENT_RESTRAIN_END
+    @property string EVENT_ARREST_BEGIN
+    @property string EVENT_ARRESTING
+    @property string EVENT_ARREST_END
+    @property string EVENT_SURRENDER_BEGIN
+    @property string EVENT_SURRENDERING
+    @property string EVENT_SURRENDER_END
+    @property string EVENT_ESCORT_BEGIN
+    @property string EVENT_ESCORTING
+    @property string EVENT_ESCORT_END
+    @property string EVENT_FRISK_BEGIN
+    @property string EVENT_FRISKING
+    @property string EVENT_FRISK_END
+    @property string EVENT_STRIP_BEGIN
+    @property string EVENT_STRIPPING
+    @property string EVENT_STRIP_END
+    @property string EVENT_CLOTHING_BEGIN
+    @property string EVENT_CLOTHING
+    @property string EVENT_CLOTHING_END
+    @property string EVENT_FORCED_STRIP_BEGIN
+    @property string EVENT_FORCED_STRIPPING
+    @property string EVENT_FORCED_STRIP_END
+    @property string EVENT_ELUDE_BEGIN
+    @property string EVENT_ARREST_PAYING_BOUNTY
+    @property string EVENT_ARREST_PAY_BOUNTY_END
+    @property string CATEGORY_ARREST_START
+    @property string CATEGORY_SURRENDER
+    @property string CATEGORY_ESCORT_TO_JAIL
+    @property string CATEGORY_ESCORT_TO_CELL
+    @property string CATEGORY_ESCORT_FROM_CELL
+    @property string CATEGORY_FRISKING
+    @property string CATEGORY_STRIPPING
+    @property string CATEGORY_CLOTHING
+    @property string CATEGORY_NO_CLOTHING
+    @property string CATEGORY_PAYMENT_FAIL
+    @property string CATEGORY_ELUDING
+    @property string CATEGORY_RESTRAIN
+    @property string CATEGORY_PAY_BOUNTY
+    @property string SCENE_ARREST_START_01
+    @property string SCENE_ARREST_START_02
+    @property string SCENE_ARREST_START_03
+    @property string SCENE_ARREST_START_04
+    @property string SCENE_ARREST_START_PRISON_01
+    @property string SCENE_SURRENDER_01
+    @property string SCENE_GENERIC_ESCORT
+    @property string SCENE_ESCORT_FROM_CELL
+    @property string SCENE_ESCORT_TO_JAIL_01
+    @property string SCENE_ESCORT_TO_JAIL_02
+    @property string SCENE_ESCORT_TO_CELL_01
+    @property string SCENE_ESCORT_TO_CELL_02
+    @property string SCENE_ESCORT_TO_CELL_03
+    @property string SCENE_STRIPPING_01
+    @property string SCENE_STRIPPING_02
+    @property string SCENE_FORCED_STRIPPING_START_01
+    @property string SCENE_FORCED_STRIPPING_01
+    @property string SCENE_FORCED_STRIPPING_02
+    @property string SCENE_STRIPPING_START_01
+    @property string SCENE_FRISKING
+    @property string SCENE_GIVE_CLOTHING
+    @property string SCENE_UNLOCK_CELL
+    @property string SCENE_PAYMENT_FAIL
+    @property string SCENE_NO_CLOTHING
+    @property string SCENE_ELUDING_ARREST_01
+    @property string SCENE_RESTRAIN_PRISONER_01
+    @property string SCENE_RESTRAIN_PRISONER_02
+    @property string SCENE_ARREST_PAY_BOUNTY_FOLLOW_WILLINGLY
+    @property string SCENE_ARREST_PAY_BOUNTY_FOLLOW_BY_FORCE
+}
+
+;/
+@functions:
+    function SceneManager()
+    function AddGlobal(string asGlobalName, int aiGlobalFormID, int aiDefaultValue = 0)
+    bool function HasGlobal(string asGlobal)
+    GlobalVariable function GetGlobal(string asGlobal)
+    function SetGlobal(string asGlobal, int aiValue)
+    function ResetGlobal(string asGlobal)
+    function SetupGlobals()
+    function ResetGlobals()
+    function StartSceneAtPhase(int phase)
+    function ResetSceneOverride()
+    function ResumeSceneBlocked()
+    function AddScene(string asSceneName, int aiSceneFormID, string asSceneCategory = "null")
+    string function GetSceneNameByIndex(int aiIndex)
+    int function GetSceneFormID(string asSceneName)
+    string function GetSceneNameByFormID(int aiSceneFormID)
+    bool function SceneExists(string asSceneName)
+    bool function IsSceneOfType(string asSceneName, string asCategory)
+    string function GetSceneType(string asSceneName)
+    function SetupScenes()
+    function CreateSceneRefTypeConfig(string asScene, string asRefType, int aiAliasCount, int aiAliasStartIndex)
+    function CacheSceneRefType(string asScene, string asRefType, int aiRefTypeIndex, int aiRefTypeID)
+    function InvalidateSceneAliases(string asScene, string asRefType)
+    function RemoveSceneRefType(string asScene, string asRefType)
+    int function GetSceneRefTypesConfig(string asScene)
+    int function GetSceneRefsOfTypeObject(string asScene, string asRefType)
+    Alias[] function GetSceneAliasesOfType(string asScene, string asRefType, bool abOnlyIncludeAliasesInUse = false)
+    ReferenceAlias function GetSceneNthAliasOfType(string asScene, string asRefType, int aiIndex = 0)
+    string[] function GetSceneRefTypes(string asScene)
+    Alias[] function GetSceneAliases(string asScene, bool abOnlyIncludeAliasesInUse = false)
+    Form[] function GetSceneReferences(string asScene)
+    Form[] function GetSceneReferencesOfType(string asScene, string asRefType)
+    ObjectReference function GetSceneNthReferenceOfType(string asScene, string asRefType, int aiIndex = 0)
+    function CreateSceneConfig()
+    Scene function GetScene(string asSceneName)
+    bool function HasQueuedScenes()
+    function PushScene(string asSceneName)
+    string function PopScene()
+    function QueueOrPlay(string asSceneName)
+    function PlayQueued()
+    ReferenceAlias function GetRefAlias(string aliasGroup, int index = 0)
+    string function GetAliasName(string aliasName, int aliasIndex, bool checkForExistence = false)
+    function SetPackageLockOnActor(Actor akActor)
+    function UnsetPackageLockOnActor(Actor akActor)
+    function ReleaseAlias(string aliasName, int aliasIndex = 0)
+    function UnbindAliases(string asScene)
+    function QueueAlias(ReferenceAlias apRefAlias, ObjectReference akRef, bool abBindAlias = true)
+    function BindSceneAliasGroup(string asScene, string asAliasRefType, Form[] akRefs)
+    function BindSceneAlias(string asScene, string asAliasRefType, ObjectReference akRef)
+    function RestoreAliases()
+    function HandleSceneGlobalControlFlow(string asSceneType, string asScene)
+    function StartScene(string asSceneName, int akSceneParameters, int aiStartingPhase = 1, bool abForceStart = false)
+    function StartEscortToCell(Actor akEscortLeader, Actor akEscortedPrisoner, ObjectReference akJailCellMarker, RPB_CellDoor akJailCellDoor, ObjectReference akEscortWaitingMarker)
+    function StartEscortToCell_02(Actor akEscortLeader, Actor akEscortedPrisoner, ObjectReference akJailCellMarker, ObjectReference akJailCellDoor, ObjectReference akEscortWaitingMarker)
+    function StartEscortFromCell(Actor akGuard, Actor akPrisoner, ObjectReference akJailCellDoor, ObjectReference akJailChest)
+    function StartEscortToJail(Actor akEscortLeader, Actor akEscortedPrisoner, ObjectReference akPrisonerChest)
+    function EscortToJail(Actor akEscort, Form[] akEscortees, Form[] akDestinations)
+    function StartStrippingStart(Actor akStripperGuard, Actor akStrippedPrisoner)
+    function StartStripping(Actor akStripperGuard, Actor akStrippedPrisoner)
+    function StartStripping_02(Actor akStripperGuard, Actor akStrippedPrisoner, ObjectReference akStripMarker = none)
+    function StartFrisking(Actor akFriskerGuard, Actor akFriskedPrisoner)
+    function StartGiveClothing(Actor akGuard, Actor akPrisoner)
+    function StartBountyPaymentFail(Actor akGuard, Actor akPrisoner)
+    function StartArrestStart01(Actor akGuard, Actor akPrisoner)
+    function StartArrestStart02(Actor akGuard, Actor akPrisoner)
+    function StartArrestStart03(Actor akGuard, Actor akPrisoner)
+    function StartArrestStart04(Actor akGuard, Actor akPrisoner)
+    function StartSurrenderScene(Actor akSurrenderer, Actor[] akSurrendererCaptors, string asScene)
+    function StartArrestScene(Actor akGuard, Actor akArrestee, string asScene)
+    function StartEscortToJailScene(Actor akGuard, Actor akArrestee, string asScene)
+    function StartArrestStartPrison_01(Actor akGuard, Actor akPrisoner, int aiStartingPhase = 1)
+    function StartRestrainPrisoner_01(Actor akGuard, Actor akPrisoner, int aiStartingPhase = 1)
+    function StartRestrainPrisoner_02(Actor akGuard, Actor akPrisoner, int aiStartingPhase = 1)
+    function StartNoClothing(Actor akGuard, Actor akPrisoner)
+    function StartForcedStripping(Actor akGuard, Actor akPrisoner)
+    function StartForcedStripping02(Actor akGuard, Actor akPrisoner)
+    function StartEludingArrest(Actor akGuard, Actor akEluder)
+    function StartArrestBountyPaymentFollowWillingly(Actor akEscort, Actor akEscortee, ObjectReference akEscortLocation)
+    function StartArrestPayBountyFollowByForce(Actor akEscort, Actor akEscortee, ObjectReference akEscortLocation)
+    string function GetSceneParametersDebugInfo(Scene sender, string sceneName)
+@events:
+    event OnResumeSceneBlocked()
+    event OnSceneStart(string name, Scene sender)
+    event OnScenePlaying(string name, int phaseEvent, int phase, Scene sender)
+    event OnSceneEnd(string name, Scene sender)
+    event OnAllScenesFinished()
+/;
 
 import RPB_Config
 import RPB_Utility

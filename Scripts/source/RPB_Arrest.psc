@@ -1,4 +1,142 @@
 scriptname RPB_Arrest extends Quest
+{
+    @property RPB_API API
+    @property RPB_Config Config
+    @property RPB_EventManager EventManager
+    @property RPB_SceneManager SceneManager
+    @property int TOPIC_START
+    @property int TOPIC_END
+    @property int TOPIC_TYPE_ARREST_SUSPICIOUS
+    @property int TOPIC_TYPE_ARREST_DIALOGUE_ELUDING
+    @property int TOPIC_TYPE_ARREST_PURSUIT_ELUDING
+    @property int TOPIC_TYPE_ARREST_CONFRONT
+    @property int TOPIC_TYPE_ARREST_PAY_BOUNTY_ON_SPOT
+    @property int TOPIC_TYPE_ARREST_PAY_BOUNTY_ESCORT_WILLINGLY
+    @property int TOPIC_TYPE_ARREST_PAY_BOUNTY_ESCORT_ARRESTED
+    @property int TOPIC_TYPE_ARREST_PAY_BOUNTY_MAX
+    @property int TOPIC_TYPE_ARREST_RESIST
+    @property int TOPIC_TYPE_COMBAT_YIELD
+    @property int TOPIC_TYPE_ARREST_GO_TO_JAIL
+    @property string ARREST_PAY_BOUNTY_ON_SPOT
+    @property string ARREST_PAY_BOUNTY_ESCORT_WILLINGLY
+    @property string ARREST_PAY_BOUNTY_ESCORT_BY_FORCE
+    @property string ARREST_TYPE_TELEPORT_TO_JAIL
+    @property string ARREST_TYPE_TELEPORT_TO_CELL
+    @property string ARREST_TYPE_ESCORT_TO_JAIL
+    @property string ARREST_TYPE_ESCORT_TO_CELL
+    @property string ARREST_GOAL_IMPRISONMENT
+    @property string ARREST_GOAL_BOUNTY_PAYMENT
+    @property string ARREST_GOAL_TEMPORARY_HOLD
+    @property int CAN_BE_ARRESTED
+    @property int ALREADY_ARRESTED
+    @property int ALREADY_IMPRISONED
+    @property int CAN_ARREST
+    @property int ALREADY_ARRESTING
+    @property RPB_ArresteeList Arrestees
+    @property RPB_CaptorList Captors
+    @property bool ShouldDisplayArrestNotifications
+    @property bool ShouldDisplayBountyDecayNotifications
+}
+
+;/
+@functions:
+    function SetReferenceStateInt(string asReference, string asStateProperty, int aiValue)
+    function SetReferenceStateFloat(string asReference, string asStateProperty, float afValue)
+    function SetReferenceStateString(string asReference, string asStateProperty, string asValue)
+    int function GetReferenceStateInt(string asReference, string asStateProperty)
+    float function GetReferenceStateFloat(string asReference, string asStateProperty)
+    string function GetReferenceStateString(string asReference, string asStateProperty)
+    function RemoveReferenceState(string asReference, string asStateProperty)
+    RPB_Arrestee function AwaitArresteeReference(Actor akArrestee, int aiMaxTries = 120, float afInitialTimeBetweenTries = 0.05, float afMaxTimeBetweenTries = 0.1)
+    bool function RegisterArrestee(RPB_Arrestee apArrestee)
+    function UnregisterArrestee(RPB_Arrestee apArrestee)
+    RPB_Captor function AwaitCaptorReference(Actor akCaptor, int aiMaxTries = 120, float afInitialTimeBetweenTries = 0.05, float afMaxTimeBetweenTries = 0.1)
+    bool function RegisterCaptor(RPB_Captor apCaptor)
+    function UnregisterCaptor(RPB_Captor apCaptor, bool abRemoveFromList = false)
+    function SetArrestScene(Actor akArrestee, string asSceneName)
+    function SetArrestGoal(Actor akArrestee, string asArrestGoal)
+    function ArrestActor(Actor akArrester, Actor akArrestee, string asArrestType)
+    function ArrestActorForFaction(Faction akCrimeFaction, Actor akArrestee, string asArrestType)
+    function ArrestActors(Actor akArrester, Actor[] akArrestees, string asArrestType, bool abEnsureAllArrested = true, float afWaitTimeBetweenArrests = 0.3)
+    function SetAsEluding(Actor akEludedGuard, Actor akEluder, string asEludeType)
+    function SetAsResisting(Actor akGuard, Actor akResister)
+    function SetAsYielding(Actor akSparerGuard, Actor akYieldedArrestee)
+    function StartBountyPayment(Actor akGuard, Actor akPayerArrestee, string asBountyPaymentScenario)
+    function Surrender(Actor akSurrenderer)
+    bool function CanActorSurrender(Actor akSurrenderer, Actor[] akSurrendererCaptors)
+    function PrepareSurrenderer(Actor akSurrenderer)
+    function InitiateSurrenderScene(Actor akSurrenderer, Actor[] akSurrendererCaptors)
+    int function GetActorArrestStatus(Actor akActor)
+    function BeginArrest(RPB_Arrestee apArresteeRef)
+    function PunishPaymentEvader(Actor akGuard, Actor akPayerArrestee)
+    function ChangeArrestEscort(Actor akNewEscort, Actor akDetainee)
+    function ApplyArrestResistedPenalty(Faction akArrestFaction)
+    function SetAsDefeated(Faction akCrimeFaction)
+    function SetResistedFlag(Faction akFaction)
+    function SetEludedFlag(Faction akFaction)
+    function ResetResistedFlag()
+    function ResetEludedFlag()
+    function ApplyArrestEludedPenalty(Faction akArrestFaction)
+    function ApplyArrestDefeatedPenalty(Faction akArrestFaction)
+    bool function MeetsPursuitEludeRequirements(Actor akEluder)
+    bool function HasResistedArrestRecently(Faction akArrestFaction)
+    bool function HasEludedArrestRecently(Faction akArrestFaction)
+    function SetEludedGuard(Actor akEludedGuard, string asEludeType)
+    function TriggerForcegreetEluding(Actor akEludedGuard)
+    function TriggerPursuitEluding(Actor akEludedGuard)
+    function SetActorWantsToPayBounty(Actor akPayerArrestee, bool abWantsToPay = true)
+    bool function GetActorIsPayingBounty(Actor akPayerArrestee)
+    string function GetArrestScene(Actor akArrestee, string asFallbackScene = "RPB_ArrestStart02")
+    string function GetArrestGoal(Actor akArrestee)
+    bool function IsActorToBeImprisoned(Actor akArrestee)
+    bool function IsActorToPayBounty(Actor akArrestee)
+    function PayCrimeGold(Actor akPayer, Faction akCrimeFaction)
+    function ResetArrest(string reason = "")
+    function RegisterForDelayedEvent(string stateName, float delaySeconds)
+    function RegisterForDelayedEventGameTime(string stateName, float delayGameTime)
+    function RestrainArrestee(Actor akArrestee)
+    function UnrestrainArrestee(Actor akRestrainedArrestee)
+    function RegisterHotkeys()
+    function EnableForcedArrestDialogue() global
+    function DisableForcedArrestDialogue() global
+    function AllowArrestForcegreets(bool allow = true) global
+    function SetupArrestPayableBountyVars(Faction akCrimeFaction)
+    function ResetDiceRollForMaxPayableBounty() global
+    bool function IsValidArrestGoal(string asArrestGoal)
+    bool function ValidateArrestType(string arrestType)
+    string function GetValidArrestTypes()
+    function NotifyArrest(string msg, bool condition = true)
+    function NotifyBounty(string msg, bool condition = true)
+@events:
+    event OnInit()
+    event OnKeyDown(int keyCode)
+    event OnArresting(Actor akCaptor, Actor akArrestee)
+    event OnArrestDialogue(int aiTopicInfoEvent, int aiTopicInfoType, string asTopicInfoDialogue, Actor akSpeakerArrester, Actor akSpokenToArrestee)
+    event OnSurrenderBegin(Actor akSurrenderer, Actor[] akSurrendererCaptors)
+    event OnSurrenderEnd(Actor akSurrenderer, Actor akCaptor)
+    event OnArrestPreparing(Actor akArrestee, Actor akCaptor, Faction akCrimeFaction, string asArrestType)
+    event OnArrestBegin(RPB_Arrestee apArrestee, RPB_Captor apCaptor, Faction akCrimeFaction, string asArrestType)
+    event OnArrestEnd(RPB_Arrestee apArrestee, RPB_Captor apCaptor, Faction akCrimeFaction)
+    event OnArrestEludeStart(Actor akEludedGuard, string asEludeType)
+    event OnArrestEludeTriggered(Actor akEludedGuard, string asEludeType)
+    event OnArrestResist(Actor akArrestResister, Actor akGuard, Faction akCrimeFaction)
+    event OnArrestPayBounty(Actor akArresterGuard, Actor akPayerArrestee, Faction akCrimeFaction, string asPayBountyScenario)
+    event OnArrestDefeat(Actor akAttacker)
+    event OnArrestCaptorDeath(Actor akCaptor, Actor akCaptorKiller)
+    event OnCombatYield(Actor akGuard, Actor akYieldedArrestee)
+    event OnArrestPayBountyEnd(Actor akArresterGuard, Actor akPayerArrestee, Faction akCrimeFaction, bool abEscortedForcefully)
+    event OnArrestSceneChanged(Actor akArrestee, string asSceneName)
+    event OnArrestGoalChanged(Actor akArrestee, string asOldArrestGoal, string asNewArrestGoal)
+    event OnArrestFailed(Actor akCaptor, Actor akArrestee, string asFailReason)
+    event OnUpdateGameTime()
+    event OnActorArrested(RPB_Arrestee apArrestee, RPB_Captor apArrestGuard)
+    event OnArresteeDeath(RPB_Arrestee apArrestee, RPB_Captor apArrestGuard, Actor akKiller)
+    event OnArresteeRestrained(RPB_Arrestee apArrestee)
+    event OnArresteeFreed(RPB_Arrestee apArrestee, RPB_Captor apCaptor)
+    event OnBeginState()
+    event OnUpdate()
+    event OnEndState()
+/;
 
 import Math
 import RPB_Config

@@ -1,4 +1,69 @@
 Scriptname RPB_MCM_02 extends SKI_ConfigBase  
+{
+    @property bool IS_DEBUG
+    @property bool ENABLE_TRACE
+    @property int OPTION_ENABLED
+    @property int OPTION_DISABLED
+    @property string MCM_PAGE_CHECK_ARRESTEE_INFO
+    @property string MCM_PAGE_CHECK_PRISONER_INFO
+    @property string MCM_PAGE_CHECK_HOLD_INFO_FOR_ACTOR
+    @property RPB_API API
+    @property RPB_PrisonManager PrisonManager
+    @property string[] Holds
+    @property string[] HoldStatsTemplate
+    @property string[] HoldStatsPlaceholders
+    @property string ArrestHeaderTemplate
+    @property string[] ArrestHeaderPlaceholders
+    @property string PrisonHeaderTemplate
+    @property string[] PrisonHeaderPlaceholders
+    @property int PLAYER_INFO_NONE
+    @property int PLAYER_INFO_ARRESTED
+    @property int PLAYER_INFO_PRISONER
+}
+
+;/
+@functions:
+    string[] function ConstructHoldStatValues( int aiBounty, int aiViolentBounty, int aiLargestBounty, int aiTotalBounty, int aiTimesArrested, int aiTimesFrisked, int aiArrestsEluded, int aiArrestsResisted, int aiBountiesPaid )
+    string[] function ConstructArrestHeaderValues( string asArrestHold, string asArrestCity, string asPotentialPrisonName, string asArresteeName )
+    string[] function ConstructPrisonHeaderValues( string asPrisonHold, string asPrisonCity, string asPrisonName, string asPrisonCell, string asPrisonerName )
+    bool function IsHoldCurrentPage()
+    function InitializePages()
+    int function GetPlayerArrestStatus()
+    function RenderDefaultPage()
+    function RenderSelectedActorHoldInfo()
+    function RenderSelectedArresteeInfo()
+    function RenderSelectedPrisonerInfo()
+    int function AddOptionCategoryKey(string text, string _key, int flags = 0)
+    int function AddOptionCategory(string text, int flags = 0)
+    int function AddOptionToggleKey(string displayedText, string _key, int defaultValueOverride = -1, int defaultFlags = 0)
+    int function AddOptionToggle(string text, int defaultValueOverride = -1, int defaultFlags = 0)
+    int function AddOptionTextKey(string displayedText, string _key, string defaultValueOverride = "", int defaultFlags = 0)
+    int function AddOptionText(string text, string defaultValueOverride = "", int defaultFlags = 0)
+    int function AddOptionStatKey(string displayedText, string _key, int defaultValueOverride = -1, string formatString = "{0}", int defaultFlags = 0)
+    int function AddOptionStat(string text, int defaultValueOverride = -1, string formatString = "{0}", int defaultFlags = 0)
+    int function AddOptionSliderKey(string displayedText, string _key, string formatString = "{0}", float defaultValueOverride = -1.0, int defaultFlags = 0)
+    int function AddOptionSlider(string text, string formatString = "{0}", float defaultValueOverride = -1.0, int defaultFlags = 0)
+    int function AddOptionMenuKey(string displayedText, string _key, string defaultValueOverride = "", int defaultFlags = 0)
+    int function AddOptionMenu(string text, string defaultValueOverride = "", int defaultFlags = 0)
+    int function AddOptionInputKey(string displayedText, string _key, string defaultValueOverride = "-", int defaultFlags = 0)
+    int function AddOptionInput(string text, string defaultValueOverride = "", int defaultFlags = 0)
+    function SetOptionSliderValue(string option, float value, string formatString = "{0}")
+    function SetOptionMenuValue(string option, string value)
+    function SetOptionInputValue(string option, string value)
+@events:
+    event OnConfigInit()
+    event OnConfigOpen()
+    event OnPageReset(string page)
+    event OnOptionHighlight(int option)
+    event OnOptionDefault(int option)
+    event OnOptionSelect(int option)
+    event OnOptionSliderOpen(int option)
+    event OnOptionSliderAccept(int option, float value)
+    event OnOptionMenuOpen(int option)
+    event OnOptionMenuAccept(int option, int index)
+    event OnOptionInputOpen(int option)
+    event OnOptionInputAccept(int option, string inputValue)
+/;
 
 import RPB_Utility
 import RPB_Memory

@@ -1,4 +1,40 @@
 scriptname RPB_Logger extends ReferenceAlias
+{
+    @property bool Logging
+    @property bool Tracing
+    @property bool Debugging
+}
+
+;/
+@functions:
+    function SendError(string msg, string caller = "", bool condition = true)
+    function SendWarning(string msg, string caller = "", bool condition = true)
+    function SendInfo(string msg, string caller = "", bool condition = true)
+    function TraceParams(string params, string paramNames = "", string caller = "")
+    function base_log(string asLogType = "DEBUG", string asLogInfo, string asCaller = "", string asCallerArgs = "") global
+    function Trace(string asCaller, string asLogInfo, bool abCondition = true)
+    function Debug(string asCaller, string asLogInfo, bool abCondition = true)
+    function DebugInfo(string asCaller, string asLogInfo, bool abCondition = true)
+    function DebugWarn(string asCaller, string asLogInfo, bool abCondition = true)
+    function DebugError(string asCaller, string asLogInfo, bool abCondition = true)
+    function DebugWithArgs(string asCaller, string asArgs, string asLogInfo, bool abCondition = true)
+    function DebugParams(string params, string paramNames = "", string caller = "", bool abCondition = true)
+    function LogNoType(string asLogInfo, string asCaller = "", bool abCondition = true)
+    function Info(string asLogInfo, bool abCondition = true)
+    function Warn(string asLogInfo, bool abCondition = true)
+    function Error(string asLogInfo, bool abCondition = true)
+    function Fatal(string asLogInfo, bool abCondition = true)
+    function LogProperty(string prop, string asLogInfo, bool condition = true)
+    function ErrorProperty(string asProperty, string asLogInfo, bool condition = true)
+    function NotImplemented(string asCaller, bool abCondition = true)
+    function FunctionNotImplemented(string asCaller, bool abCondition = true)
+    function EventNotImplemented(string asCaller, bool abCondition = true)
+@events:
+    event OnTrace(string msg, string caller)
+    event OnInfo(string msg, string caller, bool condition)
+    event OnWarn(string msg, string caller, bool condition)
+    event OnError(string msg, string caller, bool condition)
+/;
 
 import RPB_Utility
 

@@ -1,4 +1,50 @@
 scriptname RPB_EventManager extends Quest
+{
+    @property RPB_API API
+    @property RPB_Config Config
+    @property RPB_Arrest Arrest
+    @property RPB_SceneManager SceneManager
+}
+
+;/
+@functions:
+    function RegisterEvents()
+    function SendSurrenderSceneEvent(string asScene, string asSceneEvent, Actor akSurrenderer, Actor akSurrendererCaptor, string asSceneSecondaryEvent = "null", Form[] akParams = none, Form[] akParams2 = none)
+    function SendArrestSceneEvent(string asScene, string asSceneEvent, Actor akArrestee, Actor akAuthority, string asSceneSecondaryEvent = "null")
+    function SendArrestSceneBulkEvent(string asScene, string asSceneEvent, Form[] akArrestees, Actor akAuthority, string asSceneSecondaryEvent = "null")
+    function SendPrisonSceneEvent(string asScene, string asSceneEvent, Actor akPrisoner, Actor akAuthority, string asSceneSecondaryEvent = "null")
+    function SendPrisonSceneBulkEvent(string asScene, string asSceneEvent, Form[] akPrisoners, Actor akAuthority, string asSceneSecondaryEvent = "null")
+    function SendError(string msg, string caller = "", bool condition = true)
+    function SendWarning(string msg, string caller = "", bool condition = true)
+    function SendInfo(string msg, string caller = "", bool condition = true)
+    function TraceParams(string params, string paramNames = "", string caller = "")
+@events:
+    event OnTrace(string msg, string caller)
+    event OnInfo(string msg, string caller, bool condition)
+    event OnWarn(string msg, string caller, bool condition)
+    event OnError(string msg, string caller, bool condition)
+    event OnArrestBegin(string eventName, string arrestType, float arresteeIdFlt, Form sender)
+    event OnArrestResist(string eventName, string unusedStr, float arrestResisterIdFlt, Form sender)
+    event OnArrestDefeat(string eventName, string unusedStr, float unusedFlt, Form sender)
+    event OnArrestEludeStart(string eventName, string eludeType, float unusedFlt, Form sender)
+    event OnCombatYield(string eventName, string unusedStr, float unusedFlt, Form sender)
+    event OnArrestSceneChanged(string eventName, string sceneName, float unusedFlt, Form sender)
+    event OnArrestGoalChanged(string eventName, string newArrestGoal, float unusedFlt, Form sender)
+    event OnPayBounty(string eventName, string categoryPayBounty, float arresteeFormIdFlt, Form sender)
+    event OnArrestScene(string asScene, string asSceneEvent, RPB_Arrestee apArrestee, Actor akAuthority, string asSceneSecondaryEvent)
+    event OnPrisonScene(string asScene, string asSceneEvent, RPB_Prison apPrison, RPB_Prisoner apPrisoner, Actor akAuthority, string asSceneSecondaryEvent)
+    event OnSurrenderPreparing(Form akSurrenderer)
+    event OnSurrenderScene(string asScene, string asSceneEvent, Actor akSurrenderer, Actor akSurrendererCaptor, string asSceneSecondaryEvent, Form[] akParams, Form[] akParams2)
+    event OnSceneStart(string eventName, string sceneName, float unusedFlt, Form sender)
+    event OnScenePlayingStart(string eventName, string sceneName, float scenePhaseFlt, Form sender)
+    event OnScenePlayingEnd(string eventName, string sceneName, float scenePhaseFlt, Form sender)
+    event OnSceneEnd(string eventName, string sceneName, float unusedFlt, Form sender)
+    event OnDialogueTopicStart(string eventName, string topicInfoDialogue, float topicInfoTypeFlt, Form sender)
+    event OnDialogueTopicEnd(string eventName, string topicInfoDialogue, float topicInfoTypeFlt, Form sender)
+    event OnPackageStart(string eventName, string packageName, float unusedFlt, Form sender)
+    event AIPackageManager_OnPackageStart(string packageName, ObjectReference[] data, Form sender)
+    event AIPackageManager_OnPackageEnd(string packageName, ObjectReference[] data, Package sender)
+/;
 
 import RPB_Config
 import RPB_Utility

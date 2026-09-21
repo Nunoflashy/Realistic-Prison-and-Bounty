@@ -1,5 +1,308 @@
 scriptname RPB_Memory hidden
 
+;/
+@functions:
+    int function PersistObjectInMemory(int object, string identifier = "") global
+    int function Object_Retain(int object, string tag) global
+    bool function Object_IsTypeSafe(int object) global
+    bool function Object_IsArray(int object) global
+    bool function Object_IsMap(int object) global
+    bool function Object_IsFormMap(int object) global
+    bool function Object_IsIntMap(int object) global
+    int function Object_ReadData(string filepath) global
+    int function Object_Conditionally(int object, bool condition) global
+    function Object_WriteData(int object, string filepath) global
+    int function Object_FromJSON(string json) global
+    int function StaticStorage(string path = "") global
+    bool function StaticStorage_HasPath(string path) global
+    float function StaticStorage_GetFloatInPath(string path, float default = 0.0) global
+    int function StaticStorage_GetIntInPath(string path, int default = 0) global
+    string function StaticStorage_GetStringInPath(string path, string default = "") global
+    int function StaticStorage_GetObjectInPath(string path, int default = 0) global
+    Form function StaticStorage_GetFormInPath(string path, Form default = none) global
+    bool function StaticStorage_SetFloatInPath(string path, float value, bool createMissingKeys = false) global
+    bool function StaticStorage_SetIntInPath(string path, int value, bool createMissingKeys = false) global
+    bool function StaticStorage_SetStringInPath(string path, string value, bool createMissingKeys = false) global
+    bool function StaticStorage_SetObjectInPath(string path, int value, bool createMissingKeys = false) global
+    bool function StaticStorage_SetFormInPath(string path, Form value, bool createMissingKeys = false) global
+    int function Object_Size(int object) global
+    int function Size(int object) global
+    function Object_Clear(int object) global
+    bool function Object_Empty(int object) global
+    int function FastArray(string elements = "", bool retain = false) global
+    int function FastMap(string keyType = "<string>", bool retain = false) global
+    int function FastArray_Size(int array) global
+    bool function FastArray_Empty(int array) global
+    function FastArray_Clear(int array) global
+    function FastArray_SetInt(int array, int index, int element, bool condition = true) global
+    function FastArray_SetFloat(int array, int index, float element, bool condition = true) global
+    function FastArray_SetString(int array, int index, string element, bool condition = true) global
+    function FastArray_SetObject(int array, int index, int element, bool condition = true) global
+    function FastArray_SetForm(int array, int index, Form element, bool condition = true) global
+    function FastArray_AddInt(int array, int element, bool condition = true) global
+    function FastArray_AddFloat(int array, float element, bool condition = true) global
+    function FastArray_AddString(int array, string element, bool condition = true) global
+    function FastArray_AddObject(int array, int element, bool condition = true) global
+    function FastArray_AddForm(int array, Form element, bool condition = true) global
+    function FastArray_AddFromArray(int array, int otherArray, bool condition = true) global
+    int function FastArray_GetInt(int array, int index) global
+    float function FastArray_GetFloat(int array, int index) global
+    string function FastArray_GetString(int array, int index) global
+    Form function FastArray_GetForm(int array, int index) global
+    int function FastArray_GetObject(int array, int index) global
+    int function FastArray_FindInt(int array, int elementToSearch) global
+    int function FastArray_FindString(int array, string elementToSearch) global
+    int function FastArray_FindForm(int array, Form elementToSearch) global
+    int function FastArray_FindObject(int array, int elementToSearch) global
+    function FastArray_Remove(int array, int index) global
+    int[] function FastArray_ToIntArray(int array) global
+    float[] function FastArray_ToFloatArray(int array) global
+    string[] function FastArray_ToStringArray(int array) global
+    Form[] function FastArray_ToFormArray(int array) global
+    int function FastArray_FromBoolArray(bool[] array) global
+    int function FastArray_FromIntArray(int[] array) global
+    int function FastArray_FromFloatArray(float[] array) global
+    int function FastArray_FromStringArray(string[] array) global
+    int function FastArray_FromFormArray(Form[] array) global
+    int function FastMap_Size(int map) global
+    bool function FastMap_Empty(int map) global
+    function FastMap_Clear(int map) global
+    function FastMap_Release(int map) global
+    string function FastMap_GetNthKey(int map, int index) global
+    bool function FastMap_HasKey(int map, string _key) global
+    int function FastMap_ValueType(int map, string _key) global
+    bool function FastMap_RemoveKey(int map, string _key) global
+    int function FastMap_Values(int map) global
+    int function FastMap_Keys(int map) global
+    string[] function FastMap_KeysAsPapyrusArray(int map) global
+    string function FastMap_KeyFromValueString(int map, string value) global
+    string function FastMap_GetString(int map, string _key) global
+    int function FastMap_GetInt(int map, string _key) global
+    float function FastMap_GetFloat(int map, string _key) global
+    Form function FastMap_GetForm(int map, string _key) global
+    int function FastMap_GetObject(int map, string _key) global
+    int function FastMap_GetObjectOfType(int map, string objectType, string _key) global
+    string function FastMap_SetString(int map, string _key, string value, bool condition = true) global
+    int function FastMap_SetInt(int map, string _key, int value, bool condition = true) global
+    float function FastMap_SetFloat(int map, string _key, float value, bool condition = true) global
+    Form function FastMap_SetForm(int map, string _key, Form value, bool condition = true) global
+    int function FastMap_SetObject(int map, string _key, int value, bool condition = true) global
+    function FastMap_AddPairs(int map, int sourceMap, bool overwrite = true) global
+    int function FastMap_FromFile(string path) global
+    int function FastMap_FromDirectory(string path, string extension = "") global
+    string function FastIntMap_GetNthKey(int map, int index) global
+    bool function FastIntMap_HasKey(int map, int _key) global
+    bool function FastIntMap_RemoveKey(int map, int _key) global
+    int function FastIntMap_Values(int map) global
+    int function FastIntMap_Keys(int map) global
+    int[] function FastIntMap_KeysAsPapyrusArray(int map) global
+    string function FastIntMap_GetString(int map, int _key) global
+    int function FastIntMap_GetInt(int map, int _key) global
+    float function FastIntMap_GetFloat(int map, int _key) global
+    Form function FastIntMap_GetForm(int map, int _key) global
+    int function FastIntMap_GetObject(int map, int _key) global
+    function FastIntMap_SetString(int map, int _key, string value) global
+    function FastIntMap_SetInt(int map, int _key, int value) global
+    function FastIntMap_SetFloat(int map, int _key, float value) global
+    function FastIntMap_SetForm(int map, int _key, Form value) global
+    function FastIntMap_SetObject(int map, int _key, int value) global
+    int function Array(string signature, string elements = "", bool retain = false) global
+    int function Object(string signature, string params = "") global
+    int function Map(string signature, bool retain = false) global
+    int function Queue(string signature, bool retain = false) global
+    int function Deque(string signature, bool retain = false) global
+    int function Stack(string signature, bool retain = false) global
+    int function Pair(string signature = "", bool retain = false) global
+    int function Vector(string signature, bool retain = false) global
+    int function Delete(int object) global
+    function DeleteWithIdentifier(string identifier) global
+    int function Array_Size(int array) global
+    bool function Array_Empty(int array) global
+    function Array_Clear(int array) global
+    int function Array_FromObject(int object) global
+    function Array_AddInt(int array, int element) global
+    function Array_AddString(int array, string element) global
+    function Array_AddObject(int array, int element) global
+    function Array_AddForm(int array, Form element) global
+    int function Array_GetInt(int array, int index) global
+    int function Array_FindInt(int array, int elementToSearch) global
+    string function Array_GetString(int array, int index) global
+    Form function Array_GetForm(int array, int index) global
+    int function Array_GetObject(int array, int index) global
+    function Array_Remove(int array, int index) global
+    string[] function Array_ToPapyrusStringArray(int array) global
+    Form[] function Array_ToPapyrusFormArray(int array) global
+    int function Map_Size(int map) global
+    bool function Map_Empty(int map) global
+    function Map_Clear(int map) global
+    string function Map_GetNthKey(int map, int index) global
+    bool function Map_HasKey(int map, string _key) global
+    bool function Map_RemoveKey(int map, string _key) global
+    int function Map_Values(int map) global
+    int function Map_Keys(int map) global
+    string[] function Map_KeysAsPapyrusArray(int map) global
+    string function Map_GetString(int map, string _key) global
+    int function Map_GetInt(int map, string _key) global
+    float function Map_GetFloat(int map, string _key) global
+    Form function Map_GetForm(int map, string _key) global
+    int function Map_GetObject(int map, string _key) global
+    int function Map_GetObjectOfType(int map, string objectType, string _key) global
+    function Map_SetString(int map, string _key, string value) global
+    function Map_SetInt(int map, string _key, int value) global
+    function Map_SetFloat(int map, string _key, float value) global
+    function Map_SetForm(int map, string _key, Form value) global
+    function Map_SetObject(int map, string _key, int value) global
+    string function IntMap_GetNthKey(int map, int index) global
+    bool function IntMap_HasKey(int map, int _key) global
+    bool function IntMap_RemoveKey(int map, int _key) global
+    int function IntMap_Values(int map) global
+    int function IntMap_Keys(int map) global
+    int[] function IntMap_KeysAsPapyrusArray(int map) global
+    string function IntMap_GetString(int map, int _key) global
+    int function IntMap_GetInt(int map, int _key) global
+    float function IntMap_GetFloat(int map, int _key) global
+    Form function IntMap_GetForm(int map, int _key) global
+    int function IntMap_GetObject(int map, int _key) global
+    int function IntMap_GetObjectOfType(int map, string objectType, int _key) global
+    function IntMap_SetString(int map, int _key, string value) global
+    function IntMap_SetInt(int map, int _key, int value) global
+    function IntMap_SetFloat(int map, int _key, float value) global
+    function IntMap_SetForm(int map, int _key, Form value) global
+    function IntMap_SetObject(int map, int _key, int value) global
+    int function Deque_Size(int deque) global
+    bool function Deque_Empty(int deque) global
+    function Deque_Clear(int deque) global
+    function Deque_PushFrontInt(int deque, int value) global
+    function Deque_PushFrontFloat(int deque, float value) global
+    function Deque_PushFrontString(int deque, string value) global
+    function Deque_PushFrontForm(int deque, Form value) global
+    function Deque_PushFrontObject(int deque, int value) global
+    function Deque_PushBackInt(int deque, int value) global
+    function Deque_PushBackFloat(int deque, float value) global
+    function Deque_PushBackString(int deque, string value) global
+    function Deque_PushBackForm(int deque, Form value) global
+    function Deque_PushBackObject(int deque, int value) global
+    function Deque_PopFront(int deque) global
+    function Deque_PopBack(int deque) global
+    int function Deque_PopFrontInt(int deque) global
+    float function Deque_PopFrontFloat(int deque) global
+    string function Deque_PopFrontString(int deque) global
+    Form function Deque_PopFrontForm(int deque) global
+    int function Deque_PopFrontObject(int deque) global
+    int function Deque_PopBackInt(int deque) global
+    float function Deque_PopBackFloat(int deque) global
+    string function Deque_PopBackString(int deque) global
+    Form function Deque_PopBackForm(int deque) global
+    int function Deque_PopBackObject(int deque) global
+    int function Deque_FrontInt(int deque) global
+    float function Deque_FrontFloat(int deque) global
+    string function Deque_FrontString(int deque) global
+    Form function Deque_FrontForm(int deque) global
+    int function Deque_FrontObject(int deque) global
+    int function Deque_BackInt(int deque) global
+    float function Deque_BackFloat(int deque) global
+    string function Deque_BackString(int deque) global
+    Form function Deque_BackForm(int deque) global
+    int function Deque_BackObject(int deque) global
+    int function Queue_Size(int queue) global
+    bool function Queue_Empty(int queue) global
+    function Queue_Clear(int queue) global
+    function Queue_PushInt(int queue, int value) global
+    function Queue_PushFloat(int queue, float value) global
+    function Queue_PushString(int queue, string value) global
+    function Queue_PushForm(int queue, Form value) global
+    function Queue_PushObject(int queue, int value) global
+    function Queue_Pop(int queue) global
+    int function Queue_PopInt(int queue) global
+    float function Queue_PopFloat(int queue) global
+    string function Queue_PopString(int queue) global
+    Form function Queue_PopForm(int queue) global
+    int function Queue_PopObject(int queue) global
+    int function Queue_FrontInt(int queue) global
+    float function Queue_FrontFloat(int queue) global
+    string function Queue_FrontString(int queue) global
+    Form function Queue_FrontForm(int queue) global
+    int function Queue_FrontObject(int queue) global
+    int function Queue_BackInt(int queue) global
+    float function Queue_BackFloat(int queue) global
+    string function Queue_BackString(int queue) global
+    Form function Queue_BackForm(int queue) global
+    int function Queue_BackObject(int queue) global
+    int function Stack_Size(int stack) global
+    bool function Stack_Empty(int stack) global
+    function Stack_Clear(int stack) global
+    function Stack_Swap(int stack1, int stack2) global
+    int function Stack_TopInt(int stack) global
+    string function Stack_TopString(int stack) global
+    float function Stack_TopFloat(int stack) global
+    Form function Stack_TopForm(int stack) global
+    int function Stack_TopObject(int stack) global
+    function Stack_PushInt(int stack, int value) global
+    function Stack_PushString(int stack, string value) global
+    function Stack_PushFloat(int stack, float value) global
+    function Stack_PushForm(int stack, Form value) global
+    function Stack_PushObject(int stack, int value) global
+    int function Stack_PopInt(int stack) global
+    string function Stack_PopString(int stack) global
+    float function Stack_PopFloat(int stack) global
+    Form function Stack_PopForm(int stack) global
+    int function Stack_PopObject(int stack) global
+    int function Stack_Count(int stack) global
+    int function Pair_First() global
+    int function Pair_Second() global
+    int function Pair_Size(int pair) global
+    int function Pair_MakeIntPair(int value1, int value2) global
+    int function Pair_MakeFloatPair(float value1, float value2) global
+    int function Pair_MakeStringPair(string value1, string value2) global
+    int function Pair_MakeFormPair(Form value1, Form value2) global
+    int function Pair_MakeObjectPair(int value1, int value2) global
+    function Pair_SetInt(int pairElement, int value, int pair) global
+    function Pair_SetFloat(int pairElement, float value, int pair) global
+    function Pair_SetString(int pairElement, string value, int pair) global
+    function Pair_SetForm(int pairElement, Form value, int pair) global
+    function Pair_SetObject(int pairElement, int value, int pair) global
+    int function Pair_Int(int pairElement, int pair) global
+    float function Pair_Float(int pairElement, int pair) global
+    string function Pair_String(int pairElement, int pair) global
+    Form function Pair_Form(int pairElement, int pair) global
+    int function Pair_Object(int pairElement, int pair) global
+    int function Vector_Size(int vector) global
+    function Vector_SetX(int vector, float value) global
+    function Vector_SetY(int vector, float value) global
+    function Vector_SetZ(int vector, float value) global
+    function Vector_SetW(int vector, float value) global
+    float function Vector_X(int vector) global
+    float function Vector_Y(int vector) global
+    float function Vector_Z(int vector) global
+    float function Vector_W(int vector) global
+    string function DebugObject(int object) global
+    int function Object_CreateIfNotExists(int object, int objectFn) global
+    bool function Object_Exists(int object) global
+    int function Copy(int sourceObject, bool deepCopy = true, string params = "{}") global
+    int function Move(int sourceObject, string params = "") global
+    string function typeof(int object) global
+    function throw(int exception, string caller = "") global
+    int function throwAndReturn(int object, int exception) global
+    int function GetException(int object) global
+    int function Exceptions(int object) global
+    bool function CatchException(int object, string exceptionId) global
+    int function ExceptionCode(int exception) global
+    string function ExceptionMessage(int exception) global
+    int function Exception(string type, string msg, int code) global
+    int function InvalidObjectException(string msg) global
+    int function InvalidObjectParamsException(string msg) global
+    int function InvalidParamException(string msg) global
+    int function ResourceNotFoundException(string msg) global
+    int function NullReferenceException(string msg) global
+    int function InvalidStateException(string msg) global
+    int function MemoryException(string msg) global
+    int function PathNotFoundException(string msg) global
+    int function AttributeNotFoundException(string msg) global
+    int function IndexOutOfBoundsException(string msg) global
+    int function InvalidKeyException(string msg) global
+@events:
+/;
+
 bool function __isTypeSafe(int object) global
     return JValue.isMap(object) && JMap.hasKey(object, "data")
 endFunction

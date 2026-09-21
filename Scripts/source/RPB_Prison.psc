@@ -2,30 +2,141 @@ scriptname RPB_Prison extends RPB_Entity
 {
     @property int ID
     @property string UUID
-    @property string Name
     @property bool Active
-
-    @property RPB_PrisonMonitor Monitor
+    @property RPB_PrisonManager PrisonManager
+    @property RPB_API API
+    @property RPB_Config Config
+    @property RPB_SceneManager SceneManager
+    @property RPB_EventManager EventManager
+    @property string Name
     @property Location PrisonLocation
     @property Faction PrisonFaction
     @property string Hold
     @property string City
+    @property int GuaranteedPayableBounty
+    @property int MaximumPayableBounty
+    @property int MaximumPayableBountyChance
+    @property int BountyExchange
+    @property int BountyToSentence
+    @property int MinimumSentence
+    @property int MaximumSentence
+    @property int CellSearchThoroughness
+    @property string CellLockLevel
+    @property int ReleaseTimeMinimumHour
+    @property int ReleaseTimeMaximumHour
+    @property bool AllowReleaseOnWeekends
+    @property bool FastForward
+    @property int DayToFastForwardFrom
+    @property string HandleSkillLoss
+    @property int DayToStartLosingSkillsStat
+    @property int DayToStartLosingSkillsPerk
+    @property int ChanceToLoseSkillsStat
+    @property int ChanceToLoseSkillsPerk
+    @property float RecognizedCriminalPenalty
+    @property float KnownCriminalPenalty
+    @property int MinimumBountyToTriggerCriminalPenalty
+    @property bool EnableReleaseFees
+    @property int ReleaseFeesChanceForEvent
+    @property int MinimumBountyToOweReleaseFees
+    @property float ReleaseFeesOfCurrentBounty
+    @property int ReleaseFees
+    @property int DaysGivenToPayReleaseFees
+    @property bool EnableItemRetention
+    @property int MinimumBountyToRetainItems
+    @property bool AutoRedressOnRelease
+    @property string HandleEscapeOn
+    @property float EscapeBountyOfCurrentBounty
+    @property int EscapeBounty
+    @property float EscapeBountySentenceMultiplier
+    @property int EscapeBountySentenceDays
+    @property int EscapeBountyCondition
+    @property int EscapeBountySentenceCondition
+    @property int EscapeBountyFallbackBounty
+    @property bool AccountForTimeServedOnEscape
+    @property bool FriskUponCapturedOnEscape
+    @property bool StripUponCapturedOnEscape
+    @property bool EnableInfamy
+    @property int InfamyRecognizedThreshold
+    @property int InfamyKnownThreshold
+    @property float InfamyGainedDailyOfCurrentBounty
+    @property int InfamyGainedDaily
+    @property float InfamyGainModifierRecognized
+    @property float InfamyGainModifierKnown
+    @property float InfamyLostDailyOfCurrentInfamy
+    @property int InfamyLostDaily
+    @property bool AllowFrisking
+    @property int MinimumBountyForFrisking
+    @property int FriskingThoroughness
+    @property bool ConfiscateStolenItemsOnFrisk
+    @property bool StripIfStolenItemsFoundOnFrisk
+    @property int MinimumNumberOfStolenItemsRequiredToStripOnFrisk
+    @property bool AllowStripping
+    @property string HandleStrippingOn
+    @property int MinimumBountyToStrip
+    @property int MinimumViolentBountyToStrip
+    @property int MinimumSentenceToStrip
+    @property int StrippingThoroughness
+    @property int StrippingThoroughnessModifier
+    @property bool AllowClothing
+    @property string HandleClothingOn
+    @property int MaximumBountyClothing
+    @property int MaximumViolentBountyClothing
+    @property int MaximumSentenceClothing
+    @property bool ClotheWhenDefeated
+    @property string ClothingOutfit
+    @property bool UseDefaultOutfitAsFallback
+    @property string OutfitName
+    @property Armor OutfitPartHead
+    @property Armor OutfitPartBody
+    @property Armor OutfitPartHands
+    @property Armor OutfitPartFeet
+    @property bool IsOutfitConditional
+    @property int OutfitMinimumBounty
+    @property int OutfitMaximumBounty
+    @property Message ServeTimeMessage
+    @property int SERVE_TIME_YES
+    @property bool IsPlayerFastForwardingToRelease
+    @property bool PrioritizeEmptyCells
+    @property bool PrioritizeGenderCells
+    @property bool AllowOnlyEmptyCells
+    @property bool AllowOnlyGenderExclusiveCells
+    @property bool AllowOnlyEmptyOrGenderCells
+    @property RPB_PrisonMonitor Monitor
     @property RPB_PrisonerList Prisoners
     @property Form[] JailCells
     @property Form[] EmptyJailCells
+    @property Form[] OccupiedJailCells
     @property Form[] AvailableJailCells
     @property Form[] FemaleJailCells
     @property Form[] MaleJailCells
+    @property bool HasInfamyRecognizedNotificationFired
+    @property bool HasInfamyKnownNotificationFired
+    @property string InfamyRecognizedSentenceAppliedNotification
+    @property string InfamyKnownSentenceAppliedNotification
+    @property int SettingsSnapshotBuilds
 }
 
 ;/
 @functions:
+    function ResetCachedHold()
+    bool function ActiveByDefault()
+    RPB_Prison function GetPrisonForHold(string asHold) global
+    RPB_Prison function GetLastJailedPrison(Faction akCrimeFaction) global
+    function SetupCells()
+    function NotifyInfamyRecognizedThresholdMet(bool asNotification = false)
+    function NotifyInfamyKnownThresholdMet(bool asNotification = false)
     bool function HasFemaleOnlyCells()
     bool function HasMaleOnlyCells()
     bool function ShouldActivelyMonitorPrisoner(RPB_Prisoner apPrisoner)
+    RPB_Prisoner function AwaitPrisonerReference(Actor akPrisoner, int aiMaxTries = 120, float afInitialTimeBetweenTries = 0.05, float afMaxTimeBetweenTries = 0.1)
+    RPB_Prisoner function GetPrisoner(Actor akPrisoner, int aiMaxTries = 120, float afInitialTimeBetweenTries = 0.05, float afMaxTimeBetweenTries = 0.1)
+    RPB_Prisoner function GetPrisonerReference(Actor akPrisoner)
+    RPB_Prisoner function MakePrisoner(Actor akActor, bool abDelayExecution = true)
     int function GetRandomSentence(int aiMinSentence, int aiMaxSentence)
-    int function GetCurrentLowestSentence()
-    int function GetCurrentHighestSentence()
+    int function GetPrisonCapacity()
+    float function GetCurrentLowestSentence()
+    float function GetCurrentHighestSentence()
+    Armor[] function GetDefaultOutfit()
     Form[] function GetJailCells()
     Form[] function GetEmptyJailCells()
     Form[] function GetOccupiedJailCells()
@@ -37,20 +148,46 @@ scriptname RPB_Prison extends RPB_Entity
     RPB_JailCell function GetGenderExclusiveCell(string asGender, bool abCanBeEmpty = true, bool abCanBeOvercrowded = false)
     RPB_JailCell function RequestCell(RPB_Prisoner apPrisoner)
     Form[] function GetEscortLocations()
+    Form[] function GetReleaseMarkers(string asReleaseMarkerType = "Teleport")
+    Form[] function GetSearchMarkers(string asSearchType = "Frisking")
+    Form[] function GetPrisonerContainers(string asPrisonerContainerType = "Belongings")
+    Form[] function GetGenderExclusiveCells(string asGender, bool abAvailable = true, bool abCanBeOvercrowded = false)
     ObjectReference function GetRandomEscortLocation()
+    Form function GetRandomSearchMarker(string asSearchType = "Frisking")
+    Form function GetRandomReleaseMarker(string asReleaseMarkerType = "Teleport")
+    Form function GetRandomPrisonerContainer(string asPrisonerContainerType = "Belongings")
+    Form function GetPrisonerContainerLinkedWithOppositeType(Form akOppositeTypePrisonerContainer, string asPrisonerContainerType)
+    RPB_JailCell function GetRandomJailCell(bool abPrioritizeEmptyCells = true)
+    RPB_JailCell function GetRandomAvailableJailCell(bool abPrioritizeEmptyCells = true)
+    RPB_JailCell function GetEmptyJailCell()
+    RPB_JailCell function GetJailCellOfGender(string asSex, bool abAvailable = true, bool abCanBeOvercrowded = false)
+    RPB_JailCell function GetFemaleJailCell()
+    RPB_JailCell function GetMaleJailCell()
+    function SetPlayerFastForwardingToRelease(bool abFastForward)
+    function QueueRelease(RPB_Prisoner apPrisoner)
+    function RebindPrisoner(RPB_Prisoner apPrisoner)
+    bool function RegisterPrisoner(RPB_Prisoner apPrisoner)
+    function UnregisterPrisoner(RPB_Prisoner apPrisoner)
+    function BindAllPrisonersToCell()
+    function Notify(string asMessage, bool abCondition = true)
+    function SendMonitoringReschedule()
+    bool function SendMonitoringRequest()
     bool function ShouldPrisonerBeInGenderExclusiveCell(RPB_Prisoner apPrisoner)
     bool function IsPrisoner(RPB_Prisoner apPrisoner)
+    bool function IsActorPrisoner(Actor akActor)
     bool function HasPrisoners(RPB_JailCell akPrisonCell = none)
-    bool function HasFemalePrisoners(RPB_JailCell akPrisonCell = none, bool abOnlyFemales = false)
+    bool function HasFemalePrisoners(RPB_JailCell akPrisonCell = none, bool abStrictlyFemales = false)
     bool function HasMalePrisoners(RPB_JailCell akPrisonCell = none, bool abOnlyMales = false)
     bool function HasPrisonersOfGender(RPB_JailCell akPrisonCell = none, string asGender, bool abOnlySpecifiedGender = false)
     bool function HasCellMates(RPB_Prisoner apPrisoner)
+    bool function HasCellMatesOfGender(RPB_Prisoner apPrisoner, string asGender)
+    bool function HasFemaleCellMates(RPB_Prisoner apPrisoner)
+    bool function HasMaleCellMates(RPB_Prisoner apPrisoner)
+    Form[] function GetPrisonersWithSentenceLessThan(float afSentence, float afPadding = 0.0)
+    Form[] function GetPrisonersWithCurrentSentenceLessThan(float afSentence, float afPadding = 0.0)
     Form[] function GetPrisoners(RPB_JailCell akPrisonCell = none)
     Form[] function GetFemalePrisoners(RPB_JailCell akPrisonCell = none)
     Form[] function GetMalePrisoners(RPB_JailCell akPrisonCell = none)
-    Form[] function GetPrisonersWithSentenceLessThan(float afSentence, float afPadding = 0.0)
-    Form[] function GetPrisonersWithCurrentSentenceLessThan(float afSentence, float afPadding = 0.0)
-    function ReleasePrisonersWithSentenceLessThan(float afTimeLeftInSentence, bool abPassTime = true)
     Form[] function GetCellMates(RPB_Prisoner apPrisoner)
     string function GetTimeOfArrestFormatted(RPB_Prisoner apPrisoner)
     string function GetTimeOfImprisonmentFormatted(RPB_Prisoner apPrisoner)
@@ -66,7 +203,8 @@ scriptname RPB_Prison extends RPB_Entity
     function TeleportPrisonerToRelease(RPB_Prisoner apPrisoner)
     function EscortPrisonerToRelease(RPB_Prisoner apPrisoner)
     bool function SendReleaseRequest(RPB_Prisoner apPrisoner)
-    bool function SendMonitoringRequest()
+    int function ReleaseDueNPCsInOrder(float afPlayerTimeLeft)
+    function ReleasePrisonersWithSentenceLessThan(float afTimeLeftInSentence, bool abPassTime = true)
     function TriggerEscape(RPB_Prisoner apPrisoner)
     function SendEscortPrisonerToCellRequest(RPB_Prisoner apPrisoner)
     function SendEscortPrisonerFromCellRequest(RPB_Prisoner apPrisoner, ObjectReference akDestination)
@@ -76,6 +214,9 @@ scriptname RPB_Prison extends RPB_Entity
     function RemoveFromCell(RPB_Prisoner apPrisoner)
     function ClearPrisonerBounty(RPB_ActorBase apActor)
     bool function AssignPrisonerToCell(RPB_Prisoner apPrisoner, RPB_JailCell akJailCell)
+    function RegisterPrisonerLastJailedStats(RPB_Prisoner apPrisoner)
+    function RegisterPrisonerReleaseTimeStats(RPB_Prisoner apPrisoner)
+    function RegisterPrisonerEscapeTimeStats(RPB_Prisoner apPrisoner)
     function EscortPrisonerToJail(RPB_Prisoner apPrisoner, Actor akEscort)
     function EscortPrisonerToCell(RPB_Prisoner apPrisoner, Actor akEscort)
     function EscortPrisonerFromJail(RPB_Prisoner apPrisoner, Actor akEscort)
@@ -84,32 +225,30 @@ scriptname RPB_Prison extends RPB_Entity
     function StartFriskingPrisoner(RPB_Prisoner apPrisoner, Actor akSearcherGuard)
     function StartStrippingPrisoner(RPB_Prisoner apPrisoner, Actor akSearcherGuard)
     function StartGivingPrisonerClothing(RPB_Prisoner apPrisoner, Actor akSearcherGuard)
-    Form[] function GetReleaseMarkers(string asReleaseMarkerType = "Teleport")
-    Form[] function GetSearchMarkers(string asSearchType = "Frisking")
-    Form function GetRandomSearchMarker(string asSearchType = "Frisking")
-    Form function GetRandomReleaseMarker(string asReleaseMarkerType = "Teleport")
-    Form[] function GetPrisonerContainers(string asPrisonerContainerType = "Belongings")
-    Form function GetRandomPrisonerContainer(string asPrisonerContainerType = "Belongings")
-    Form function GetPrisonerContainerLinkedWithOppositeType(Form akOppositeTypePrisonerContainer, string asPrisonerContainerType)
-    Form[] function GetGenderExclusiveCells(string asGender, bool abAvailable = true, bool abCanBeOvercrowded = false)
-    RPB_JailCell function GetRandomJailCell(bool abPrioritizeEmptyCells = true)
-    RPB_JailCell function GetRandomAvailableJailCell(bool abPrioritizeEmptyCells = true)
-    RPB_JailCell function GetEmptyJailCell()
-    RPB_JailCell function GetJailCellOfGender(string asSex, bool abAvailable = true, bool abCanBeOvercrowded = false)
-    RPB_JailCell function GetFemaleJailCell()
-    RPB_JailCell function GetMaleJailCell()
-    bool function RegisterPrisoner(RPB_Prisoner apPrisoner)
-    function RegisterPrisonerLastJailedStats(RPB_Prisoner apPrisoner)
-    function RegisterPrisonerReleaseTimeStats(RPB_Prisoner apPrisoner)
-    function RegisterPrisonerEscapeTimeStats(RPB_Prisoner apPrisoner)
-    function UnregisterPrisoner(RPB_Prisoner apPrisoner)
-    RPB_Prisoner function GetPrisonerReference(Actor akPrisoner)
-
+    function RegisterInfamyLost(Actor akActor)
+    function UpdateInfamyLost(Actor akActor)
+    function ClearActorInfamyState(Actor akActor)
+    bool function BindCellToPrisoner(ObjectReference akJailCell, RPB_Prisoner apPrisoner)
+    bool function Global_GetPropertyOfTypeBool(int apRootObject, string asPropertyName) global
+    int function Global_GetPropertyOfTypeInt(int apRootObject, string asPropertyName) global
+    float function Global_GetPropertyOfTypeFloat(int apRootObject, string asPropertyName) global
+    string function Global_GetPropertyOfTypeString(int apRootObject, string asPropertyName) global
+    Form function Global_GetPropertyOfTypeForm(int apRootObject, string asPropertyName) global
+    int[] function Global_GetPropertyOfTypeIntegerArray(int apRootObject, string asPropertyName) global
+    float[] function Global_GetPropertyOfTypeFloatArray(int apRootObject, string asPropertyName) global
+    string[] function Global_GetPropertyOfTypeStringArray(int apRootObject, string asPropertyName) global
+    Form[] function Global_GetPropertyOfTypeFormArray(int apRootObject, string asPropertyName) global
+    function ImprisonActorImmediately(Actor akActor)
+    function DEBUG_ShowPrisonerSentenceInfo(RPB_Prisoner apPrisoner, bool abShort = false)
+    int function GetSettingsSnapshot()
+    function InvalidateSettingsSnapshot()
 @events:
+    event OnReferenceDeleted()
     event OnPrisonerImprisonmentFail(RPB_Prisoner apPrisoner, string reason)
     event OnPrisonerRegistered(RPB_Prisoner apPrisoner)
     event OnPrisonerUnregistered(RPB_Prisoner apPrisoner)
     event OnPrisonerReleased(RPB_Prisoner apPrisoner)
+    event OnPrisonerLeave(RPB_Prisoner apPrisoner)
     event OnPrisonerEscaped(RPB_Prisoner apPrisoner)
     event OnPrisonerTeleportedToPrison(RPB_Prisoner apPrisoner)
     event OnPrisonerTeleportedToCell(RPB_Prisoner apPrisoner, bool abImprisonPrisoner)
@@ -125,13 +264,17 @@ scriptname RPB_Prison extends RPB_Entity
     event OnPrisonerStripBegin(RPB_Prisoner apPrisoner, Actor akStripper)
     event OnPrisonerStripping(RPB_Prisoner apPrisoner, Actor akStripper, string asSceneEvent)
     event OnPrisonerStripEnd(RPB_Prisoner apPrisoner, Actor akStripper)
+    event OnPrisonerClothingBegin(RPB_Prisoner apPrisoner, Actor akClothingGiver)
+    event OnPrisonerClothingOngoing(RPB_Prisoner apPrisoner, Actor akClothingGiver)
+    event OnPrisonerClothingStep(RPB_Prisoner apPrisoner, Actor akClothingGiver, int aiStep)
+    event OnPrisonerClothingEnd(RPB_Prisoner apPrisoner, Actor akClothingGiver)
     event OnCellDoorOpen(RPB_JailCell akPrisonCell, Actor akOpener)
     event OnCellDoorClosed(RPB_JailCell akPrisonCell, Actor akCloser)
     event OnJailCellAssigned(RPB_JailCell akJailCell, RPB_Prisoner apPrisoner)
     event OnPrisonerCellAssigned(RPB_Prisoner apPrisoner, RPB_JailCell akJailCell)
     event OnPrisonerCellAssignFail(RPB_Prisoner apPrisoner, RPB_JailCell akJailCell)
     event OnPrisonerEnterCell(RPB_Prisoner apPrisoner, RPB_JailCell akJailCell)
-    event OnPrisonerLeaveCell(RPB_Prisoner apPrisoner, RPB_JailCell akJailCell)    
+    event OnPrisonerLeaveCell(RPB_Prisoner apPrisoner, RPB_JailCell akJailCell)
 /;
 
 import Math
@@ -2510,6 +2653,9 @@ event OnPrisonerUnregistered(RPB_Prisoner apPrisoner)
 endEvent
 
 event OnPrisonerReleased(RPB_Prisoner apPrisoner)
+    ; INFO level (visible with debug logging off): the MCM cannot show a released NPC's Time Jailed, the log can
+    Info("["+ Name +"] Released " + apPrisoner.Name + ": sentence " + apPrisoner.Sentence + " days, time jailed " + apPrisoner.QueryStat("Time Jailed") + " days, time served " + apPrisoner.TimeServed + " days, released at game time " + Utility.GetCurrentGameTime())
+
     self.RegisterPrisonerReleaseTimeStats(apPrisoner)
     self.ClearPrisonerBounty(apPrisoner)
 

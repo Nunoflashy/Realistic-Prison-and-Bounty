@@ -1,5 +1,54 @@
 Scriptname RPB_MCM_Clothing hidden
 
+;/
+@functions:
+    bool function ShouldHandleEvent(RPB_MCM mcm) global
+    function Render(RPB_MCM mcm) global
+    function RenderOutfitOptions(RPB_MCM mcm, int aiOutfitNumber) global
+    function Left(RPB_MCM mcm) global
+    function Right(RPB_MCM mcm) global
+    function HandleDependencies(RPB_MCM mcm) global
+    function HandleSliderOptionDependency(RPB_MCM mcm, string option, float value) global
+    function LoadSliderOptions(RPB_MCM mcm, string option, float currentSliderValue) global
+    int function GetOutfitIndex(string outfitId) global
+    int function GetSlotMaskForBodyPart(string asBodyPart) global
+    bool function HasSlotMaskOverlap(int aiSlotMaskOne, int aiSlotMaskTwo) global
+    Armor function GetActorEquippedClothingForBodyPart(Actor akActor, string asBodyPart) global
+    bool function IsValidClothingForBodyPart(string asBodyPart, int aiSlotMask) global
+    function AddOutfit(RPB_MCM mcm, string outfitId, Armor headClothing, Armor bodyClothing, Armor handsClothing, Armor feetClothing) global
+    function EnsureValidOutfit(RPB_MCM mcm, string outfitId) global
+    function EquipOutfitOnActor(RPB_MCM mcm, Actor akActor, string outfitId, bool unequipAllItems = true) global
+    function OnOptionHighlight(RPB_MCM mcm, string option) global
+    function OnOptionDefault(RPB_MCM mcm, string option) global
+    function OnOptionSelect(RPB_MCM mcm, string option) global
+    function OnOptionSliderOpen(RPB_MCM mcm, string option) global
+    function OnOptionSliderAccept(RPB_MCM mcm, string option, float value) global
+    function OnOptionMenuOpen(RPB_MCM mcm, string option) global
+    function OnOptionMenuAccept(RPB_MCM mcm, string option, int menuIndex) global
+    function OnOptionColorOpen(RPB_MCM mcm, string option) global
+    function OnOptionColorAccept(RPB_MCM mcm, string option, int color) global
+    function OnOptionInputOpen(RPB_MCM mcm, string option) global
+    function OnOptionInputAccept(RPB_MCM mcm, string option, string inputValue) global
+    function OnOptionKeymapChange(RPB_MCM mcm, string option, int keyCode, string conflictControl, string conflictName) global
+    function OnOutfitPieceAdd(RPB_MCM mcm, string outfitId, string outfitBodyPartName, Armor outfitBodyPart) global
+    function OnOutfitPieceRemove(RPB_MCM mcm, string outfitId, string outfitBodyPartName) global
+    function OnOutfitNameChange(RPB_MCM mcm, string outfitId, string outfitOldName, string outfitNewName) global
+    function OnOutfitCopyActorEquippedClothing(RPB_MCM mcm, string outfitId, Actor akActor) global
+    function OnHighlight(RPB_MCM mcm, int oid) global
+    function OnDefault(RPB_MCM mcm, int oid) global
+    function OnSelect(RPB_MCM mcm, int oid) global
+    function OnSliderOpen(RPB_MCM mcm, int oid) global
+    function OnSliderAccept(RPB_MCM mcm, int oid, float value) global
+    function OnMenuOpen(RPB_MCM mcm, int oid) global
+    function OnMenuAccept(RPB_MCM mcm, int oid, int menuIndex) global
+    function OnColorOpen(RPB_MCM mcm, int oid) global
+    function OnColorAccept(RPB_MCM mcm, int oid, int color) global
+    function OnKeymapChange(RPB_MCM mcm, int oid, int keycode, string conflictControl, string conflictName) global
+    function OnInputOpen(RPB_MCM mcm, int oid) global
+    function OnInputAccept(RPB_MCM mcm, int oid, string inputValue) global
+@events:
+/;
+
 import RPB_Utility
 import RPB_Memory
 import RPB_MCM

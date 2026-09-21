@@ -1,4 +1,25 @@
 Scriptname RPB_ConfigAlias extends ReferenceAlias  
+{
+    @property RPB_API API
+    @property RPB_Config Config
+    @property RPB_PrisonManager PrisonManager
+    @property RPB_SceneManager SceneManager
+    @property RPB_EventManager EventManager
+}
+
+;/
+@functions:
+    function PerformSetup()
+    function PerformMaintenance()
+    function RegisterHotkeys()
+    function Info(string logInfo, bool condition = true, bool hideCall = false) global
+@events:
+    event OnBeginState()
+    event OnUpdate()
+    event OnInit()
+    event OnPlayerLoadGame()
+    event OnKeyDown(int keyCode)
+/;
 
 import RPB_Utility
 import RPB_Config

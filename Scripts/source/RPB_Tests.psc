@@ -6948,13 +6948,23 @@ state Test_Prisoner_OutfitSurvivesInstanceReplacement
             return
         endif
 
-        Armor top = Game.GetFormEx(0x12E49) as Armor ; any two armors will do as stand-ins for the underwear
-        Armor bottom = Game.GetFormEx(0x12E4B) as Armor
         p.NPC_SaveOriginalOutfit()
-        p.NPC_SaveUnderwear(top, bottom)
         Outfit saved = p.NPC_OriginalOutfit
         step = assert_true(saved != none, "The original outfit was not saved (the dummy's base outfit may be the naked one)")
         ok = ok && step
+
+        ; Stand-ins for the underwear: two parts of the saved outfit (any two armors will do). Not every NPC has underwear, so the
+        ; "no underwear" case (two empty entries) is checked too, further down.
+        Armor top = none
+        Armor bottom = none
+        if (saved && saved.GetNumParts() > 0)
+            top = saved.GetNthPart(0) as Armor
+            bottom = saved.GetNthPart(saved.GetNumParts() - 1) as Armor
+        endif
+        step = assert_true(top != none, "Could not take a stand-in armor from the saved outfit")
+        ok = ok && step
+
+        p.NPC_SaveUnderwear(top, bottom)
         step = assert_true(p.NPC_Underwear != none && p.NPC_Underwear[p.NPC_UNDERWEAR_TOP_INDEX] == top, "The underwear was not saved")
         ok = ok && step
 
@@ -6972,6 +6982,12 @@ state Test_Prisoner_OutfitSurvivesInstanceReplacement
             step = assert_true(again.NPC_OriginalOutfit == saved, "The original outfit did not survive the effect being replaced")
             ok = ok && step
             step = assert_true(again.NPC_Underwear != none && again.NPC_Underwear[again.NPC_UNDERWEAR_TOP_INDEX] == top && again.NPC_Underwear[again.NPC_UNDERWEAR_BOTTOM_INDEX] == bottom, "The underwear did not survive the effect being replaced")
+            ok = ok && step
+
+            ; An NPC without underwear: two empty entries. The property must still return an array (its consumers index it)
+            again.NPC_SaveUnderwear(none, none)
+            Armor[] none_underwear = again.NPC_Underwear
+            step = assert_true(none_underwear != none && none_underwear.Length == 2 && none_underwear[0] == none && none_underwear[1] == none, "An NPC without underwear should read back a two element array of empty entries")
             ok = ok && step
         endif
 

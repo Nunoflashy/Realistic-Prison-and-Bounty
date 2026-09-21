@@ -3,7 +3,16 @@ scriptname RPB_Entity extends RPB_SerializableReferenceAlias hidden
     @property int ID
     @property string UUID
     @property bool Active
+    @property int Root
 }
+
+;/
+@functions:
+    int function GetObjectAt(int apObject, int index)
+    int function Children(string asObjectPath, string apConditions = "null")
+    int function GetSerializableRootObject()
+@events:
+/;
 
 import RPB_Utility
 

@@ -1,4 +1,31 @@
 scriptname RPB_ActiveMagicEffectContainer extends ReferenceAlias
+{
+    @property int Count
+}
+
+;/
+@functions:
+    bool function HasKey(string asKey)
+    ActiveMagicEffect function GetAt(string asKey)
+    ActiveMagicEffect function FromIndex(int aiIndex)
+    int function GetSize()
+    bool function IsEmpty()
+    string[] function GetKeys()
+    function AddElement(ActiveMagicEffect element, string elementKey)
+    function ReplaceElement(ActiveMagicEffect element, string elementKey)
+    function RemoveElement(string elementKey, bool dispel = true)
+    function protected_remove(string asKey, bool dispel = true)
+    string function GetKeyAtIndex(int aiIndex)
+    string function ValidateIndexConsistency()
+    function DebugSimulateStuckLock()
+    int function DebugGetThreadLockHandle()
+    function DebugSimulateMissingReverseIndex()
+    int function DebugGetKeyToIndexHandle()
+    int function DebugGetIndexToKeyHandle()
+    function DebugForceReset()
+@events:
+    event OnInit()
+/;
 
 ;/
     Dynamic map of ActiveMagicEffect -> string key, built on fixed-size native Papyrus arrays

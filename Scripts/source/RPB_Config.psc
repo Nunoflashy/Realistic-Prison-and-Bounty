@@ -1,4 +1,172 @@
 Scriptname RPB_Config extends Quest
+{
+    @property bool IS_DEBUG
+    @property bool ENABLE_BENCHMARK
+    @property RPB_API API
+    @property RPB_MCM MCM
+    @property RPB_Arrest Arrest
+    @property string[] Holds
+    @property string[] Cities
+    @property Actor Player
+    @property int FreeTimescale
+    @property int PrisonTimescale
+    @property float BountyDecayUpdateInterval
+    @property float InfamyDecayUpdateInterval
+    @property int ArrestEludeWarningTime
+    @property bool ShouldDisplayArrestNotifications
+    @property bool ShouldDisplayJailNotifications
+    @property bool ShouldDisplayBountyDecayNotifications
+    @property bool ShouldDisplayInfamyNotifications
+    @property bool HasNudeBodyModInstalled
+    @property bool HasUnderwearBodyModInstalled
+    @property int UnderwearTopSlot
+    @property int UnderwearBottomSlot
+}
+
+;/
+@functions:
+    float function GetVersion() global
+    string function GetPluginName() global
+    string function GetModName() global
+    bool function IsActorInLocationFromHold(Actor akActor, string asHold = "", int apHoldObject = 0)
+    bool function IsLocationFromHold(Location akLocation, string asHold = "", int apHoldObject = 0)
+    bool function IsInLocationFromHold(string hold)
+    string function GetCurrentPlayerHoldLocationEx()
+    string function GetCurrentPlayerHoldLocation()
+    string function GetHold(string city)
+    string function GetCity(string asHold)
+    string function GetCityNameFromHold(string hold)
+    string function GetHoldNameFromCity(string city)
+    Form function GetJailTeleportReleaseMarker(string hold)
+    Form function GetJailPrisonerItemsContainer(string hold)
+    ObjectReference function GetRandomJailMarker(string hold)
+    Faction function GetFaction(string hold)
+    Faction function GetCrimeFaction(string hold)
+    int function GetDelevelingSkillValue(string skillName)
+    int function GetSkillLevelCap(string skillName)
+    int function GetArrestRequiredBounty(string hold)
+    int function GetArrestGuaranteedPayableBounty(string hold)
+    int function GetArrestMaximumPayableBounty(string hold)
+    int function GetArrestMaximumPayableChance(string hold)
+    float function GetArrestAdditionalBountyEludingFromCurrentBounty(string hold)
+    int function GetArrestAdditionalBountyEludingFlat(string hold)
+    float function GetArrestAdditionalBountyResistingFromCurrentBounty(string hold)
+    int function GetArrestAdditionalBountyResistingFlat(string hold)
+    int function GetArrestAdditionalBountyResisting(string hold)
+    float function GetArrestAdditionalBountyDefeatedFromCurrentBounty(string hold)
+    int function GetArrestAdditionalBountyDefeatedFlat(string hold)
+    int function GetArrestAdditionalBountyDefeated(string hold)
+    bool function IsFriskingEnabled(string hold)
+    bool function IsFriskingUnconditional(string hold)
+    int function GetFriskingBountyRequired(string hold)
+    int function GetFriskingThoroughness(string hold)
+    bool function IsFriskingStolenItemsConfiscated(string hold)
+    bool function IsFriskingStripSearchWhenStolenItemsFound(string hold)
+    int function GetFriskingStolenItemsRequiredForStripping(string hold)
+    bool function IsStrippingEnabled(string hold)
+    string function GetStrippingHandlingCondition(string hold)
+    bool function IsStrippingUnconditional(string hold)
+    bool function IsStrippingBasedOnSentence(string hold)
+    bool function IsStrippingBasedOnBounty(string hold)
+    int function GetStrippingMinimumSentence(string hold)
+    int function GetStrippingMinimumBounty(string hold)
+    int function GetStrippingMinimumViolentBounty(string hold)
+    bool function IsStrippedOnDefeat(string hold)
+    int function GetStrippingThoroughness(string hold)
+    int function GetStrippingThoroughnessBountyModifier(string hold)
+    bool function IsClothingEnabled(string hold)
+    string function GetClothingHandlingCondition(string hold)
+    bool function IsClothingUnconditional(string hold)
+    bool function IsClothingBasedOnSentence(string hold)
+    bool function IsClothingBasedOnBounty(string hold)
+    int function GetClothingMaximumSentence(string hold)
+    int function GetClothingMaximumBounty(string hold)
+    int function GetClothingMaximumViolentBounty(string hold)
+    bool function IsClothedOnDefeat(string hold)
+    string function GetClothingOutfitIdentifier(string hold)
+    string function GetClothingOutfitName(string hold)
+    bool function UseDefaultOutfitAsFallback(string hold)
+    bool function IsClothingOutfitConditional(string hold)
+    bool function IsClothingOutfitConditionalFromID(string outfitId)
+    int function GetClothingOutfitMinimumBountyFromID(string outfitId)
+    int function GetClothingOutfitMaximumBountyFromID(string outfitId)
+    int function GetClothingOutfitMinimumBounty(string hold)
+    int function GetClothingOutfitMaximumBounty(string hold)
+    bool function IsInfamyEnabled(string hold)
+    float function GetInfamyGainedDailyFromArrestBounty(string hold)
+    int function GetInfamyGainedDaily(string hold)
+    float function GetInfamyLostFromCurrentInfamy(string hold)
+    int function GetInfamyLost(string hold)
+    int function GetInfamyRecognizedThreshold(string hold)
+    int function GetInfamyKnownThreshold(string hold)
+    int function GetInfamyGainModifier(string hold, string infamyLevel = "Recognized")
+    bool function IsBountyDecayEnabled(string hold)
+    bool function IsBountyDecayableAsCriminal(string hold)
+    float function GetBountyDecayLostFromCurrentBounty(string hold)
+    int function GetBountyDecayLostBounty(string hold)
+    float function GetAdditionalCharge(string hold, string charge)
+    bool function IsJailUnconditional(string hold)
+    int function GetJailGuaranteedPayableBounty(string hold)
+    int function GetJailMaximumPayableBounty(string hold)
+    int function GetJailMaximumPayableChance(string hold)
+    int function GetJailBountyExchange(string hold)
+    int function GetJailBountyToSentence(string hold)
+    int function GetJailMinimumSentence(string hold)
+    int function GetJailMaximumSentence(string hold)
+    int function GetJailCellSearchThoroughness(string hold)
+    string function GetJailCellDoorLockLevel(string hold)
+    int function GetJailReleaseTimeMinimumHour(string hold)
+    int function GetJailReleaseTimeMaximumHour(string hold)
+    bool function IsReleaseAllowedOnWeekends(string hold)
+    bool function IsJailFastForwardEnabled(string hold)
+    int function GetJailFastForwardDay(string hold)
+    string function GetJailHandleSkillLoss(string hold)
+    int function GetJailDayToStartLosingSkillsOfType(string hold, string skillType)
+    int function GetJailChanceToLoseSkillsDailyOfType(string hold, string skillType)
+    float function GetJailRecognizedCriminalPenalty(string hold)
+    float function GetJailKnownCriminalPenalty(string hold)
+    int function GetJailBountyToTriggerCriminalPenalty(string hold)
+    bool function IsJailReleaseFeesEnabled(string hold)
+    int function GetReleaseChanceForReleaseFeesEvent(string hold)
+    int function GetReleaseBountyToOweFees(string hold)
+    float function GetReleaseReleaseFeesFromBounty(string hold)
+    int function GetReleaseReleaseFeesFlat(string hold)
+    int function GetReleaseDaysGivenToPayReleaseFees(string hold)
+    bool function IsItemRetentionEnabledOnRelease(string hold)
+    int function GetReleaseBountyToRetainItems(string hold)
+    bool function IsAutoDressingEnabledOnRelease(string hold)
+    string function GetEscapeHandlingCondition(string hold)
+    float function GetEscapedBountyFromCurrentArrest(string hold)
+    int function GetEscapedBountyFlat(string hold)
+    float function GetEscapedBountySentenceMultiplier(string hold)
+    int function GetEscapeBountySentenceDays(string hold)
+    int function GetEscapeBountyCondition(string hold)
+    int function GetEscapeBountySentenceCondition(string hold)
+    int function GetEscapeBountyFallbackBounty(string hold)
+    bool function IsTimeServedAccountedForOnEscape(string hold)
+    bool function IsSurrenderEnabledOnEscape(string hold)
+    bool function ShouldFriskOnEscape(string hold)
+    bool function ShouldStripOnEscape(string hold)
+    float function GetChargeBountyForImpersonation(string hold)
+    float function GetChargeBountyForEnemyOfHold(string hold)
+    float function GetChargeBountyForStolenItems(string hold)
+    float function GetChargeBountyForStolenItemFromItemValue(string hold)
+    float function GetChargeBountyForContraband(string hold)
+    float function GetChargeBountyForCellKey(string hold)
+    function IncrementInfamy(string hold, int incrementBy)
+    function DecrementInfamy(string hold, int decrementBy)
+    int function GetInfamyGained(string hold)
+    bool function IsInfamyRecognized(string hold)
+    bool function IsInfamyKnown(string hold)
+    bool function HasBountyInHold(string hold)
+    function NotifyArrest(string msg, bool condition = true)
+    function NotifyJail(string msg, bool condition = true)
+    function NotifyBounty(string msg, bool condition = true)
+    function NotifyInfamy(string msg, bool condition = true)
+    bool function IsBountyDecayable(string hold)
+    Armor function GetOutfitPart(string hold, string bodyPart)
+@events:
+/;
 
 import RPB_Utility
 import RPB_Memory

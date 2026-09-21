@@ -1,4 +1,240 @@
 Scriptname RPB_Prisoner extends RPB_ActorBase
+{
+    @property int SKILL_LOSS_HANDLING_ALL_SKILLS
+    @property int SKILL_LOSS_HANDLING_ALL_STAT_SKILLS
+    @property int SKILL_LOSS_HANDLING_ALL_PERK_SKILLS
+    @property int SKILL_LOSS_HANDLING_RANDOM_STAT_SKILL
+    @property int SKILL_LOSS_HANDLING_RANDOM_PERK_SKILL
+    @property int SKILL_LOSS_HANDLING_RANDOM
+    @property RPB_EventManager EventManager
+    @property bool HasStateRequiredForImprisonment
+    @property bool ShouldProcessImprisonmentEvents
+    @property int MinuteOfArrest
+    @property int HourOfArrest
+    @property int DayOfArrest
+    @property int MonthOfArrest
+    @property int YearOfArrest
+    @property int MinuteOfImprisonment
+    @property int HourOfImprisonment
+    @property int DayOfImprisonment
+    @property int MonthOfImprisonment
+    @property int YearOfImprisonment
+    @property int ReleaseHour
+    @property int ReleaseMinute
+    @property Actor Captor
+    @property RPB_Prison Prison
+    @property RPB_JailCell JailCell
+    @property float CurrentTime
+    @property int BountyNonViolent
+    @property int BountyViolent
+    @property int Bounty
+    @property int Infamy
+    @property bool Defeated
+    @property int DefeatedBounty
+    @property bool ShouldBeFrisked
+    @property bool ShouldBeStripped
+    @property bool ShouldBeStrippedSilently
+    @property int StrippingThoroughness
+    @property bool ShouldBeClothed
+    @property bool UseDefaultOutfitAsFallback
+    @property ObjectReference PrisonerBelongingsContainer
+    @property ObjectReference TeleportReleaseLocation
+    @property bool IsImprisoned
+    @property bool IsInCell
+    @property bool ShouldBeInCell
+    @property float LastUpdate
+    @property float TimeSinceLastUpdate
+    @property float TimeOfArrest
+    @property float TimeOfImprisonment
+    @property float TimeServed
+    @property float TimeArrested
+    @property int Sentence
+    @property bool IsUndeterminedSentence
+    @property float ReleaseTime
+    @property bool ShowReleaseTime
+    @property bool ShowSentence
+    @property bool ShowTimeServed
+    @property bool ShowTimeLeftInSentence
+    @property bool ShowBounty
+    @property float TimeLeftInSentence
+    @property int DaysSinceTimeOfImprisonment
+    @property bool IsSentenceServed
+    @property bool ShouldFastForwardToRelease
+    @property int CurrentInfamy
+    @property bool IsInfamyEnabled
+    @property bool IsInfamyRecognized
+    @property bool IsInfamyKnown
+    @property int InfamyGainedDaily
+    @property float InfamyGainedPerUpdate
+    @property bool IsSentenceSet
+    @property ReferenceAlias CellPackage
+    @property bool HasCellPackage
+    @property bool HasCriminalPenalty
+    @property int CriminalPenaltySentence
+    @property bool WillBeStrippedNaked
+    @property bool WillBeStrippedToUnderwear
+    @property bool IsStrippedNaked
+    @property bool IsStrippedToUnderwear
+    @property bool IsStripped
+    @property bool IsClothed
+    @property Armor[] PrisonOutfit
+    @property float PreviousUpdateTimeServed
+    @property Outfit NPC_OriginalOutfit
+    @property Armor[] NPC_Underwear
+    @property int NPC_UNDERWEAR_TOP_INDEX
+    @property int NPC_UNDERWEAR_BOTTOM_INDEX
+}
+
+;/
+@functions:
+    function RestoreBounty()
+    function StartRestraining(Actor akRestrainer)
+    function StartFrisking(Actor akSearcherGuard)
+    function StartStripping(Actor akStripperGuard)
+    function StartGiveClothing(Actor akClothingGiver)
+    function EscortToJail(Actor akEscort)
+    function EscortToCell(Actor akEscort)
+    bool function HasDayElapsed()
+    function SetEscaped()
+    function SetEscapePenalty()
+    function MoveToPrison(Actor akCaptor)
+    function MoveToCell(bool abBeginImprisonment = true)
+    function TriggerInfamyPenalty()
+    bool function IsRestrained()
+    function Cuff(bool abCuffInFront = false)
+    function Uncuff()
+    function Restrain()
+    bool function ShouldFrisk()
+    function Frisk()
+    bool function EvaluateStrippingCriteria()
+    bool function ShouldStrip()
+    bool function ShouldSilentlyStrip()
+    int function ResolveStrippingType(bool abNudeBodyMod, bool abUnderwearBodyMod, bool abHasUnderwearWorn, int aiThoroughness) global
+    function DetermineStrippingType()
+    function Strip(bool abRemoveUnderwear = true)
+    function StripSilently()
+    function RemoveUnderwear()
+    bool function ShouldClothe()
+    bool function Outfit_MeetsConditions()
+    bool function Outfit_IsValid(int aiPieceCountToCheck = 4, Armor[] akOutfit = none)
+    Armor[] function GetConfiguredOutfit()
+    Armor[] function GetOutfit()
+    function DetermineClothingOutfit()
+    function Clothe()
+    int function GetTimeServed(string timeUnit)
+    int function GetTimeLeftInSentence(string timeUnit)
+    int function GetSentenceFromBounty()
+    function RegisterTimeOfImprisonment()
+    function UndetermineSentence()
+    function SetSentenceFromTimeServed(int aiSentenceInDays, bool abShouldAffectBounty = false)
+    function SetSentence(int aiSentenceInDays = 0, bool abShouldAffectBounty = true)
+    function IncreaseSentence(int aiDaysToIncreaseBy, bool abShouldAffectBounty = true)
+    function DecreaseSentence(int aiDaysToDecreaseBy, bool abShouldAffectBounty = true)
+    bool function IsReleaseOnWeekend()
+    bool function IsReleaseOnLoredas()
+    bool function IsReleaseOnSundas()
+    bool function HasReleaseTimeExtraHours()
+    float function GetReleaseTime(bool abIncludeMinutes = true)
+    int function GetReleaseTimeHour()
+    float function GetIndefiniteReleaseTime()
+    float function GetReleaseTimeExtraHours()
+    function FastForwardToRelease()
+    function DetermineReleaseTimeAdditionalHours()
+    function ReturnBelongings()
+    function NotifySentence()
+    function NotifyReleaseDate()
+    function Imprison()
+    Form[] function GetCellMates()
+    bool function HasActiveBounty()
+    bool function HasLatentBounty()
+    int function GetActiveBounty(bool abNonViolent = true, bool abViolent = true)
+    int function GetLatentBounty(bool abNonViolent = true, bool abViolent = true)
+    function SetCrimeGold(int aiGold)
+    function SetCrimeGoldViolent(int aiGold)
+    function ModCrimeGold(int aiAmount, bool abViolent = false)
+    function HideBounty()
+    function UpdateInfamyLost()
+    bool function ShouldDelevelSkillOfType(string asSkillType)
+    int function GetSkillLossHandlingType()
+    int function GetMinimumSkillValue(string asSkill)
+    bool function DelevelSkill(string asSkill)
+    function PerformDeleveling()
+    function UpdateInfamy()
+    function UpdateTimeJailed()
+    function UpdateDayEvents()
+    function UpdateLongestSentence()
+    function UpdateSentence()
+    RPB_Prisoner function Initialize()
+    function Destroy()
+    function InitializeState()
+    function RevertState()
+    function DestroyArrestState()
+    function RemoveFromCell()
+    function SetBelongingsContainer()
+    bool function AssignCell()
+    function SetReleaseLocation(bool abIsTeleportLocation = true)
+    function SetAsShowable(string asPropertyName, bool abValue = true)
+    RPB_Arrestee function MakeArrestee()
+    string function GetScriptVarCategory(string asVarCategory = "Actor")
+    function RegisterLastUpdate()
+    function LockPrisonerSettings()
+    function NoteStateEntered()
+    Actor function GetPrisoner()
+    Actor function GetActor()
+    Faction function GetFaction()
+    Faction function GetPrisonFaction()
+    string function GetHold()
+    string function GetPrisonHold()
+    RPB_Prison function GetPrison()
+    RPB_JailCell function GetCell()
+    bool function NPC_ShouldMonitorActively()
+    function NPC_KeepMonitoring()
+    function NPC_BindToCell()
+    function NPC_UnbindFromCell()
+    function NPC_ResumeImprisonment()
+    function NPC_SaveUnderwear(Armor akUnderwearTop, Armor akUnderwearBottom)
+    function NPC_SaveOriginalOutfit()
+    function NPC_RestoreOriginalOutfit()
+    function NPC_SetPersistentOutfit(string asOutfit)
+    function NPC_RemovePresetItems()
+    function NPC_UpdateStripping()
+    function NPC_UpdateUnderwear()
+    function NPC_UpdateClothing()
+    function DEBUG_ShowHoldStats()
+@events:
+    event OnUpdateGameTime()
+    event OnBeginState()
+    event OnBountyGained()
+    event OnTeleportedToPrison()
+    event OnTeleportedToCell(bool abBeginImprisonment)
+    event OnEscortToPrison(Actor akEscort)
+    event OnEscortedToPrison(Actor akEscort)
+    event OnEscortToCell(Actor akEscort)
+    event OnEscortedToCell(Actor akEscort)
+    event OnEscortFromJail(Actor akEscort)
+    event OnEscortedFromJail(Actor akEscort)
+    event OnEscortFromCell(Actor akEscort)
+    event OnEscortedFromCell(Actor akEscort)
+    event OnClothed()
+    event OnStripped()
+    event OnUnderwearRemoved(Armor akUnderwearTop, Armor akUnderwearBottom)
+    event OnObjectUnequipped(Form akBaseObject, ObjectReference akReference)
+    event OnDying(Actor akKiller)
+    event OnDeath(Actor akKiller)
+    event OnSentenceSet(int aiSentence, float afAtWhatTime)
+    event OnSentenceChanged(int aiOldSentence, int aiNewSentence, bool abHasSentenceIncreased, bool abSentenceAffectsBounty)
+    event OnStatChanged(string asStatName, float afValue)
+    event OnDayPassed()
+    event OnSleepStart(float afSleepStartTime, float afSleepEndTime)
+    event OnImprisoned()
+    event OnReleased()
+    event OnEscaped()
+    event OnInitialize()
+    event OnRestore()
+    event OnDestroy()
+    event OnImprisonmentFail(string asReason)
+    event NPC_OnResumeImprisonment()
+/;
 
 import RPB_Config
 import RPB_Utility
@@ -2924,11 +3160,9 @@ endProperty
 
 Armor[] property NPC_Underwear
     Armor[] function get()
+        ; Not every NPC has underwear: always a two element array (entries may be none), the consumers index it
         Armor top = GetForm("NPC Underwear Top") as Armor
         Armor bottom = GetForm("NPC Underwear Bottom") as Armor
-        if (!top && !bottom)
-            return none
-        endif
 
         Armor[] underwear = new Armor[2]
         underwear[NPC_UNDERWEAR_TOP_INDEX] = top

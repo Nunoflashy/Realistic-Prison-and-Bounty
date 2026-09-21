@@ -1,5 +1,15 @@
 Scriptname RPB_MCM_02_Prison hidden
 
+;/
+@functions:
+    function RenderArrest(RPB_MCM_02 mcm, RPB_Arrestee apArrestee) global
+    function DisplayArrestHeader(RPB_MCM_02 mcm, string asArrestHold, RPB_Arrestee apArrestee) global
+    function Render(RPB_MCM_02 mcm, RPB_Prisoner apPrisoner) global
+    function DisplayTimeHeader(RPB_MCM_02 mcm) global
+    function DisplayPrisonHeader(RPB_MCM_02 mcm, RPB_Prison apPrison, RPB_Prisoner apPrisoner) global
+@events:
+/;
+
 import RPB_Utility
 
 ; ==========================================================

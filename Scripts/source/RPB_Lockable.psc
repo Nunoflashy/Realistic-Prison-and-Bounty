@@ -1,4 +1,35 @@
 scriptname RPB_Lockable extends RPB_SerializableObjectReference
+{
+    @property bool IsOpen
+    @property bool IsClosed
+    @property bool IsUnlocked
+    @property bool IsLocked
+    @property bool HasDecayableLock
+    @property bool IsLockBroken
+    @property int LockLevelWear
+    @property string MinimumLockLevel
+    @property string CurrentLockLevel
+}
+
+;/
+@functions:
+    function Open()
+    function Close()
+    function Lock(bool abLock = true, bool abAsOwner = false)
+    function Unlock()
+    function Initialize()
+    int function LockLevelAsInteger(string asLockLevel) global
+    string function LockLevelAsString(int aiLockLevel) global
+    string function GetOpenStateAsString()
+    bool function _shouldProcessLockable()
+@events:
+    event OnLockStateChanged()
+    event OnLock()
+    event OnUnlock()
+    event OnLocked()
+    event OnUnlocked()
+    event OnInit()
+/;
 
 import Math
 import RPB_Utility

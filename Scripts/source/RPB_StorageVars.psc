@@ -1,5 +1,87 @@
 scriptname RPB_StorageVars hidden
 
+;/
+@functions:
+    string function GetRootPath() global
+    int function GetObjectHandle(string asCategory = "null") global
+    int function GetObjectHandleOnReference(string asReference, string asCategory = "null") global
+    string function GetVarPath(string asKey, string asCategory = "null") global
+    string function GetCategoryPath(string asCategory) global
+    bool function GetBool(string asKey, string asCategory = "null", bool abDefault = false) global
+    int function GetInt(string asKey, string asCategory = "null") global
+    float function GetFloat(string asKey, string asCategory = "null") global
+    string function GetString(string asKey, string asCategory = "null") global
+    Form function GetForm(string asKey, string asCategory = "null") global
+    int[] function GetInts(string asKey, string asCategory = "null") global
+    float[] function GetFloats(string asKey, string asCategory = "null") global
+    string[] function GetStrings(string asKey, string asCategory = "null") global
+    Form[] function GetForms(string asKey, string asCategory = "null") global
+    function SetBool(string asKey, bool abValue, string asCategory = "null") global
+    function SetInt(string asKey, int aiValue, string asCategory = "null") global
+    function SetFloat(string asKey, float afValue, string asCategory = "null") global
+    function SetString(string asKey, string asValue, string asCategory = "null") global
+    function SetForm(string asKey, Form akValue, string asCategory = "null") global
+    function SetInts(string asKey, int[] aiValues, string asCategory = "null") global
+    function SetFloats(string asKey, float[] afValues, string asCategory = "null") global
+    function SetStrings(string asKey, string[] asValues, string asCategory = "null") global
+    function SetForms(string asKey, Form[] akValues, string asCategory = "null") global
+    function SetObject(string asKey, int akObject, string asCategory = "null") global
+    function CreateObject(string asKey, string asCategory = "null") global
+    function ModInt(string asKey, int aiValue, string asCategory = "null")
+    function ModFloat(string asKey, float afValue, string asCategory = "null")
+    function DeleteVariable(string asKey, string asCategory = "null") global
+    function DeleteCategory(string asCategory) global
+    function DeleteAll() global
+    string function GetVarPathOnReference(string asKey, string apReference, string asCategory = "null") global
+    string function GetReferenceKey(string apReference) global
+    string function GetPathPrefixOnReference(string apReference, string asCategory = "null") global
+    bool function GetBoolAtPath(string asPath) global
+    int function GetIntAtPath(string asPath) global
+    float function GetFloatAtPath(string asPath) global
+    string function GetStringAtPath(string asPath) global
+    Form function GetFormAtPath(string asPath) global
+    function SetBoolAtPath(string asPath, bool abValue) global
+    function SetIntAtPath(string asPath, int aiValue) global
+    function SetFloatAtPath(string asPath, float afValue) global
+    function SetStringAtPath(string asPath, string asValue) global
+    function SetFormAtPath(string asPath, Form akValue) global
+    bool function GetBoolOnReference(string asKey, string apReference, string asCategory = "null") global
+    int function GetIntOnReference(string asKey, string apReference, string asCategory = "null") global
+    float function GetFloatOnReference(string asKey, string apReference, string asCategory = "null") global
+    string function GetStringOnReference(string asKey, string apReference, string asCategory = "null") global
+    Form function GetFormOnReference(string asKey, string apReference, string asCategory = "null") global
+    int[] function GetIntsOnReference(string asKey, string apReference, string asCategory = "null") global
+    float[] function GetFloatsOnReference(string asKey, string apReference, string asCategory = "null") global
+    string[] function GetStringsOnReference(string asKey, string apReference, string asCategory = "null") global
+    Form[] function GetFormsOnReference(string asKey, string apReference, string asCategory = "null") global
+    function SetBoolOnReference(string asKey, string apReference, bool abValue, string asCategory = "null") global
+    function SetIntOnReference(string asKey, string apReference, int aiValue, string asCategory = "null", bool abDeleteOnNull = false) global
+    function SetFloatOnReference(string asKey, string apReference, float afValue, string asCategory = "null") global
+    function SetStringOnReference(string asKey, string apReference, string asValue, string asCategory = "null") global
+    function SetFormOnReference(string asKey, string apReference, Form akValue, string asCategory = "null") global
+    function SetIntsOnReference(string asKey, string apReference, int[] aiValues, string asCategory = "null") global
+    function SetFloatsOnReference(string asKey, string apReference, float[] afValues, string asCategory = "null") global
+    function SetStringsOnReference(string asKey, string apReference, string[] asValues, string asCategory = "null") global
+    function SetFormsOnReference(string asKey, string apReference, Form[] akValues, string asCategory = "null") global
+    function ModIntOnReference(string asKey, string apReference, int aiValue, string asCategory = "null") global
+    function ModFloatOnReference(string asKey, string apReference, float afValue, string asCategory = "null") global
+    function DeleteVariableOnReference(string asKey, string apReference, string asCategory = "null") global
+    function DeleteCategoryOnReference(string apReference, string asCategory) global
+    function DeleteAllOnReference(string apReference) global
+    function AddPairsOnReference(int aiSourceMap, string apReference, string asCategory = "null") global
+    bool function HasVarOnReference(string asKey, string apReference, string asCategory = "null") global
+    bool function HasVarsOnReference(string apReference, string asCategory = "null") global
+    string function GetList(string asCategory = "null") global
+    string function GetListOnForm(Form akForm, string asCategory = "null") global
+    function Serialize(string asFilePath, string asCategory = "null") global
+    function SerializeForm(string asFilePath, Form akForm, string asCategory = "null") global
+    int function Unserialize(string asFilePath, string asCategory = "null") global
+    int function UnserializeForm(string asFilePath, Form akForm, string asCategory = "null") global
+    bool function HasOverride(string asParamKey) global
+    string function GetKeyInUse(string asParamKey, bool abAllowOverriding) global
+@events:
+/;
+
 import RPB_Utility
 
 string function GetRootPath() global

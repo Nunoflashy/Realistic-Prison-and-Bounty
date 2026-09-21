@@ -1,4 +1,61 @@
 scriptname RPB_Actions extends ObjectReference
+{
+    @property RPB_API API
+}
+
+;/
+@functions:
+    string[] function GetActions()
+    function ShowActionsMenu()
+    function Action_ToggleFlowProfiling()
+    function Action_ResetStuckPrisonState()
+    function Action_ToggleFastMonitor()
+    function Action_ToggleDebugLogging()
+    function Action_DeleteAllStates(RPB_UIInterface uilib)
+    function Action_LogActorStateVariables(RPB_UIInterface uilib)
+    function Action_DeleteActorState(RPB_UIInterface uilib)
+    function Action_CheckItemStolen(RPB_UIInterface uilib)
+    function Action_VerifyJailCellsIntegrity(RPB_UIInterface uilib)
+    function Action_DistanceBetweenTwoObjects(RPB_UIInterface uilib)
+    function Action_PlayAnimationOnActor(RPB_UIInterface uilib)
+    function Action_ClearOwnership(RPB_UIInterface uilib)
+    function Action_MonitoringApplyActorScript(RPB_UIInterface uilib)
+    function Action_MonitoringRemoveActorScript(RPB_UIInterface uilib)
+    function Action_MonitoringApplyBountyScript(RPB_UIInterface uilib)
+    function Action_MonitoringRemoveBountyScript(RPB_UIInterface uilib)
+    function Action_SetBountyForActor(RPB_UIInterface uilib, bool abViolentBounty = false)
+    function Action_SetBountyForPrisoner(RPB_UIInterface uilib, bool abViolentBounty = false)
+    function Action_ConfigurePrisonInSlot(RPB_UIInterface uilib)
+    function Action_BindAllPrisoners(RPB_UIInterface uilib)
+    function Action_RefreshCellOptions(RPB_UIInterface uilib)
+    function Action_PreAssignCellToPrisoner(RPB_UIInterface uilib)
+    function Action_TogglePrisonStats(RPB_UIInterface uilib, bool abSentence = false, bool abReleaseTime = false, bool abTimeLeft = false, bool abTimeServed = false, bool abBounty = false)
+    function Action_ReleasePrisoner(RPB_UIInterface uilib)
+    function Action_TestReindexing(RPB_UIInterface uilib)
+    function Action_BindCellPackageToReference(RPB_UIInterface uilib)
+    function Action_TogglePrisonerEffectOnSelectedActor(RPB_UIInterface uilib)
+    function Action_BindActorToCellPackage(RPB_UIInterface uilib, bool abByName = false)
+    function Action_TestActorHandcuffing(RPB_UIInterface uilib)
+    function Action_ArrestSelectedActor(RPB_UIInterface uilib, bool abEscortArrestee = true, bool abShowCaptorInputField = false)
+    function Action_AddSelectedActorToArrest(RPB_UIInterface uilib)
+    function Action_InitializePrisons(RPB_UIInterface uilib)
+    function Action_UninitializePrisons(RPB_UIInterface uilib)
+    function Action_ArrestSelectedActorForFaction(RPB_UIInterface uilib)
+    function Action_ImprisonSelectedActor(RPB_UIInterface uilib)
+    function Action_CheckPrisonersAI(RPB_UIInterface uilib)
+    function Action_ShowPrisonContainer(RPB_UIInterface uilib)
+    function Action_ShowPrisonerInventory(RPB_UIInterface uilib)
+    function Action_ShowPrisonMarkers(RPB_UIInterface uilib)
+    function Action_ShowCells(RPB_UIInterface uilib)
+    function Action_ShowCellDoors(RPB_UIInterface uilib)
+    function Action_ReturnPrisonerBelongings(RPB_UIInterface uilib)
+    function Action_StripPrisoner(RPB_UIInterface uilib, bool abStripToUnderwear = false)
+    function Action_ClothePrisoner(RPB_UIInterface uilib)
+    function Action_SetPrisonerStateProperty(RPB_UIInterface uilib)
+    function Action_ImprisonNearbyActors(RPB_UIInterface uilib)
+    function Prisoner_Strip(RPB_Prisoner apPrisoner, bool abKeepUnderwear = false)
+@events:
+/;
 
 import RPB_Utility
 import RPB_Memory

@@ -1,4 +1,197 @@
 Scriptname RPB_MCM extends SKI_ConfigBase  
+{
+    @property RPB_API API
+    @property RPB_Config Config
+    @property bool IS_DEBUG
+    @property bool ENABLE_TRACE
+    @property int CACHED_OPTION_INDEX
+    @property int CACHED_OPTION_NAME
+    @property int GENERAL_ERROR
+    @property int ARRAY_NOT_EXIST
+    @property int OPTION_NOT_EXIST
+    @property int INVALID_VALUE
+    @property int OPTION_ENABLED
+    @property int OPTION_DISABLED
+    @property int TYPE_NO_VALUE
+    @property int TYPE_NONE
+    @property int TYPE_INT
+    @property int TYPE_FLOAT
+    @property int TYPE_FORM
+    @property int TYPE_OBJECT
+    @property int TYPE_STRING
+    @property int OUTFIT_COUNT
+    @property string[] PrisonSkillHandlingOptions
+    @property string[] EscapeHandlingOptions
+    @property string[] UndressingHandlingOptions
+    @property string[] ClothingHandlingOptions
+    @property string[] ClothingOutfits
+    @property string[] LockLevels
+    @property string[] SkillNames
+    @property string[] Skills
+    @property string[] Holds
+    @property string CurrentRenderedCategory
+    @property string RPB_CurrentPage
+    @property string CurrentPageConfig
+}
+
+;/
+@functions:
+    string[] function GetPresetBuckets()
+    string[] function GetPresetPageBuckets()
+    string[] function GetExistingPresets()
+    string function GetBucketConfigKey(string asBucket)
+    string[] function GetBucketOptionKeys(string asBucket, int aiOptionsObj = 0)
+    function RegisterPages()
+    int function GetBucketEffectiveValues(string asBucket, int aiOptionsObj = 0)
+    function RefreshOptionDefaultsForCurrentPage()
+    function EnsureAllOptionDefaults()
+    function DebugReplaceOptionDefaultsMap()
+    function DebugClearOptionDefaults()
+    bool function CopyBucketOptions(string asSrcBucket, string asDstBucket)
+    function SavePreset(string asPresetFile, string[] akBuckets)
+    function LoadPreset(string asPresetFile, string[] akBuckets)
+    function SetTrackedPreset(string asPresetFile, string[] akBuckets)
+    function MarkBucketPossiblyDirty(string asPage)
+    bool function BucketValuesEqual(int apA, int apB)
+    bool function HasTrackedPresetChanged()
+    string function GetTrackedPresetDisplayName()
+    int function GetPageObject(int parentContainer, string page = "", string objectFnType = "<string>")
+    int function GetOptionIndexFromKey(string[] _array, string _key) global
+    bool function IsOptionInCategory(string asOptionName, string asCategory) global
+    bool function IsOptionOfSpecificity(string option, string optionSpecificity) global
+    function AddOutfitPiece(string outfitId, string outfitBodyPart, Armor outfitObject)
+    bool function OutfitHasBodyParts(string outfitId)
+    function RemoveOutfitPiece(string outfitId, string outfitBodyPart)
+    Armor function GetOutfitPart(string outfitId, string outfitBodyPart)
+    string function GetOutfitIdentifier(string outfitName)
+    function SetOutfitName(string outfitId, string outfitName)
+    function SetRenderedCategory(string categoryName)
+    string function GetOptionNameNoCategory(string option) global
+    string function GetOptionCategory(string optionWithCategory) global
+    bool function IsHoldCurrentPage()
+    function InitializePages()
+    function SetOptionDependencyBool(string option, bool dependency, bool storePersistently = true)
+    bool function GetOptionToggleState(string option, string page = "")
+    float function GetOptionSliderValue(string option, string page = "")
+    string function GetOptionMenuValue(string option, string page = "")
+    string function GetOptionInputValue(string option, string page = "")
+    function SetSliderOptions(float minRange, float maxRange, float intervalSteps = 1.0, float defaultValue = 1.0, float startValue = 1.0)
+    string function GetOptionAsStored(string optionKey, string page = "")
+    int function GetPageObjectFromIDToKey(int parentContainer, string page = "")
+    function ToggleOption(string _key, bool storePersistently = true)
+    function ResetPresetScopeChecked()
+    bool function IsPresetBucketChecked(string asBucket)
+    function SetPresetBucketChecked(string asBucket, int aiOptionId, bool abChecked)
+    function SetPresetMenuOptionsCache(string asOption, string[] akOptions)
+    string[] function GetPresetMenuOptionsCache(string asOption)
+    function AddOptionCategoryKey(string text, string _key, int flags = 0)
+    function AddOptionCategory(string text, int flags = 0)
+    int function ResolveOptionFlags(string optionKey, int defaultFlags)
+    bool function ResolveOptionValueBool(string optionKey, int defaultValueOverride)
+    float function ResolveOptionValueFloat(string optionKey, float defaultValueOverride)
+    string function ResolveOptionValueString(string optionKey, string defaultValueOverride)
+    int function AddOptionToggleKey(string displayedText, string _key, int defaultValueOverride = -1, int defaultFlags = 0)
+    int function AddOptionToggle(string text, int defaultValueOverride = -1, int defaultFlags = 0)
+    int function AddOptionTextKey(string displayedText, string _key, string defaultValueOverride = "", int defaultFlags = 0)
+    int function AddOptionText(string text, string defaultValueOverride = "", int defaultFlags = 0)
+    int function AddOptionStatKey(string displayedText, string _key, int defaultValueOverride = -1, string formatString = "{0}", int defaultFlags = 0)
+    int function AddOptionStat(string text, int defaultValueOverride = -1, string formatString = "{0}", int defaultFlags = 0)
+    int function AddOptionSliderKey(string displayedText, string _key, string formatString = "{0}", float defaultValueOverride = -1.0, int defaultFlags = 0)
+    int function AddOptionSlider(string text, string formatString = "{0}", float defaultValueOverride = -1.0, int defaultFlags = 0)
+    int function AddOptionMenuKey(string displayedText, string _key, string defaultValueOverride = "", int defaultFlags = 0)
+    int function AddOptionMenu(string text, string defaultValueOverride = "", int defaultFlags = 0)
+    int function AddOptionInputKey(string displayedText, string _key, string defaultValueOverride = "-", int defaultFlags = 0)
+    int function AddOptionInput(string text, string defaultValueOverride = "", int defaultFlags = 0)
+    function SetOptionSliderValue(string option, float value, string formatString = "{0}", string page = "")
+    function SetOptionMenuValue(string option, string value, string page = "")
+    function SetOptionInputValue(string option, string value, string page = "")
+    function SerializeOptions()
+    function RegisterEvents()
+    function LoadOptionProperties(string asOption)
+    function ValidateOption(string asOption)
+    function ValidateOptions()
+    bool function IsValidPropertyType(string asPropertyType)
+    string[] function GetPropertyTypes()
+    int function DeterminePropertyValueType(int apOptionMap, string asPropertyType)
+    int function GetOptionValueTypeFromConfig(string asOptionKey, bool abVerifyEveryProperty = true, string asReturnedPropertyTypeIfNotAllEqual = "")
+    function LoadOptionValues(string asPropertyType)
+    function LoadDefaults()
+    function LoadMinimums()
+    function LoadMaximums()
+    function LoadSteps()
+    function SetStringOptionPropertyValue(string asOptionKey, string asProperty, string asValue)
+    function SetBoolOptionPropertyValue(string asOptionKey, string asProperty, bool abValue)
+    function SetNumberOptionPropertyValue(string asOptionKey, string asProperty, float afValue)
+    bool function GetBoolOptionPropertyValue(string asOptionKey, string asPropertyType)
+    float function GetNumberOptionPropertyValue(string asOptionKey, string asProperty)
+    string function GetStringOptionPropertyValue(string asOptionKey, string asProperty)
+    bool function IsPropertyValueOfTypeBool(int apOptionMap, string asPropertyType)
+    function LoadPropertyForOption(string asOptionKey, string asPropertyType)
+    function EnsureOptionValueComparison(string asOptionKey, string asValuePropertyType, float afConditionValue, string asComparisonOperator = "<", float afValueToSet = 0.0, string asCallerName = "")
+    function EnsureOptionNotNull(string asOptionKey, string asValuePropertyType = "")
+    function EnsureOptionIsNull(string asOptionKey, string asValuePropertyType = "")
+    function EnsureOptionIsOfType(string asOptionKey, int aiOptionValueType, string asValuePropertyType = "")
+    function EnsureOptionIsNotOfType(string asOptionKey, int aiOptionValueType, string asValuePropertyType = "")
+    function EnsureOptionValueEqualTo(string asOptionKey, float afConditionValue, float afValueToSet = 0.0, string asValuePropertyType = "")
+    function EnsureOptionValueNotEqualTo(string asOptionKey, float afConditionValue, float afValueToSet = 0.0, string asValuePropertyType = "")
+    function EnsureOptionValueLessThan(string asOptionKey, float afConditionValue, float afValueToSet = 0.0, string asValuePropertyType = "")
+    function EnsureOptionValueLessThanOrEqualTo(string asOptionKey, float afConditionValue, float afValueToSet = 0.0, string asValuePropertyType = "")
+    function EnsureOptionValueGreaterThan(string asOptionKey, float afConditionValue, float afValueToSet = 0.0, string asValuePropertyType = "")
+    function EnsureOptionValueGreaterThanOrEqualTo(string asOptionKey, float afConditionValue, float afValueToSet = 0.0, string asValuePropertyType = "")
+    function EnsureOptionValueLessThanOptionValue(string asOptionOneKey, string asOptionTwoKey, float afValueToSet = 0.0, string asValuePropertyType = "")
+    function EnsureOptionValueLessThanOrEqualToOptionValue(string asOptionOneKey, string asOptionTwoKey, float afValueToSet = 0.0, string asValuePropertyType = "")
+    function EnsureOptionValueGreaterThanOptionValue(string asOptionOneKey, string asOptionTwoKey, float afValueToSet = 0.0, string asValuePropertyType = "")
+    function EnsureOptionValueGreaterThanOrEqualToOptionValue(string asOptionOneKey, string asOptionTwoKey, float afValueToSet = 0.0, string asValuePropertyType = "")
+    function InitializeOptions()
+    function MCM()
+    function SetHardcodedDefaults()
+    string function GetKeyFromOption(int optionId, bool includePageInKey = true)
+    int function GetOptionID(string optionKey)
+    int function GetSettingsVersion(string asPage)
+    function SetOptionValueBool(string optionKey, bool value, string page = "")
+    function SetOptionValueInt(string optionKey, int value, string page = "")
+    function SetOptionValueFloat(string optionKey, float value, string page = "")
+    function SetOptionValueString(string optionKey, string value, string page = "")
+    bool function OptionExists(string optionKey, string page = "")
+    bool function OptionHasValue(string optionKey, string page = "")
+    bool function OptionHasState(string optionKey, string page = "")
+    function RegisterOption(string optionKey, int optionId, string page = "")
+    function SetOptionState(string optionKey, int optionState, string page = "")
+    bool function GetOptionValueBool(string optionKey, string page = "")
+    int function GetOptionValueInt(string optionKey, string page = "")
+    float function GetOptionValueFloat(string optionKey, string page = "")
+    string function GetOptionValueString(string optionKey, string page = "")
+    int function GetOptionState(string optionKey, string page = "")
+    function SetOptionDefaultBool(string optionKey, bool value)
+    function SetOptionDefaultInt(string optionKey, int value)
+    function SetOptionDefaultFloat(string optionKey, float value)
+    function SetOptionDefaultString(string optionKey, string value)
+    bool function GetOptionDefaultBool(string optionKey)
+    int function GetOptionDefaultInt(string optionKey)
+    float function GetOptionDefaultFloat(string optionKey)
+    string function GetOptionDefaultString(string optionKey)
+    function SetOptionMinimum(string optionKey, float value)
+    function SetOptionMaximum(string optionKey, float value)
+    function SetOptionSteps(string optionKey, float value)
+    float function GetOptionMinimum(string optionKey)
+    float function GetOptionMaximum(string optionKey)
+    float function GetOptionSteps(string optionKey)
+@events:
+    event OnConfigInit()
+    event OnConfigOpen()
+    event OnPageReset(string page)
+    event OnUpdate()
+    event OnOptionHighlight(int option)
+    event OnOptionDefault(int option)
+    event OnOptionSelect(int option)
+    event OnOptionSliderOpen(int option)
+    event OnOptionSliderAccept(int option, float value)
+    event OnOptionMenuOpen(int option)
+    event OnOptionMenuAccept(int option, int index)
+    event OnOptionInputOpen(int option)
+    event OnOptionInputAccept(int option, string inputValue)
+    event OnSliderOptionChanged(string eventName, string optionName, float optionValue, Form sender)
+/;
 
 import RPB_Utility
 import RPB_Config
