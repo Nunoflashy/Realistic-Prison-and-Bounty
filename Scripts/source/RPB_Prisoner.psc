@@ -202,6 +202,7 @@ Scriptname RPB_Prisoner extends RPB_ActorBase
     function NPC_RestoreOriginalOutfit()
     function NPC_ReequipAfterRelease()
     function NPC_EnsureDressed()
+    Form[] function NPC_GetRestoreItems()
     function NPC_SaveWornArmor()
     int function NPC_ReequipSavedWornArmor()
     function NPC_SetPersistentOutfit(string asOutfit)
@@ -3479,6 +3480,43 @@ function NPC_EnsureDressed()
     if (fixed > 0)
         EventManager.SendInfo("Equipped " + fixed + " items that were still off after the release on " + self.Name, "["+ Name +"] Prisoner::NPC_EnsureDressed")
     endif
+endFunction
+
+;/
+    What this NPC is dressed with again on release, and nothing else it carries (it may carry several armors): the plain armor
+    parts of its saved original outfit and the armor it wore before it was stripped. Read it while the prisoner still exists
+    (the release destroys the storage it comes from).
+/;
+Form[] function NPC_GetRestoreItems()
+    Form[] items = new Form[64]
+    int count = 0
+
+    Outfit original = NPC_OriginalOutfit
+    if (original)
+        int parts = original.GetNumParts()
+        int i = 0
+        while (i < parts && count < 64)
+            Armor part = original.GetNthPart(i) as Armor
+            if (part && items.Find(part) < 0)
+                items[count] = part
+                count += 1
+            endif
+            i += 1
+        endWhile
+    endif
+
+    int[] slots = self.__NPC_WornArmorSlots()
+    int j = 0
+    while (j < slots.Length && count < 64)
+        Armor wornBefore = GetForm("NPC Worn Armor " + slots[j]) as Armor
+        if (wornBefore && items.Find(wornBefore) < 0)
+            items[count] = wornBefore
+            count += 1
+        endif
+        j += 1
+    endWhile
+
+    return self.__TrimForms(items, count)
 endFunction
 
 int[] function __NPC_WornArmorSlots()

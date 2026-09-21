@@ -7333,16 +7333,25 @@ endFunction
 
 bool function __MassIsDressed(Actor akActor)
     Outfit worn = akActor.GetActorBase().GetOutfit()
+    bool hasArmorParts = false
     if (worn)
         int n = worn.GetNumParts()
         int k = 0
         while (k < n)
             Armor part = worn.GetNthPart(k) as Armor
-            if (part && akActor.IsEquipped(part))
-                return true
+            if (part)
+                hasArmorParts = true
+                if (akActor.IsEquipped(part))
+                    return true
+                endif
             endif
             k += 1
         endWhile
+    endif
+
+    ; The underwear occupies the body slot too, so a body armor only counts for an NPC whose outfit has no armor parts to check
+    if (hasArmorParts)
+        return false
     endif
     return akActor.GetWornForm(0x4) != none
 endFunction

@@ -2300,6 +2300,12 @@ function TeleportPrisonerToRelease(RPB_Prisoner apPrisoner)
     ; An NPC is moved only AFTER its prisoner state is destroyed and its spell removed: moving it loads its 3D, which starts a new
     ; prisoner effect instance while the spell is still on it, and that instance registered the released NPC in the prison
     ; again (a "ghost" prisoner the monitor then stripped and clothed as if it were still imprisoned).
+    ; What the NPC is dressed with again: read before the release destroys the storage it comes from
+    Form[] restoreItems = none
+    if (releasedIsNPC)
+        restoreItems = apPrisoner.NPC_GetRestoreItems()
+    endif
+
     self.OnPrisonerReleased(apPrisoner)
     RPB_Utility.Crumb(releasedActor, "Release: OnPrisonerReleased done")
 
@@ -2310,6 +2316,24 @@ function TeleportPrisonerToRelease(RPB_Prisoner apPrisoner)
         RPB_Utility.Crumb(releasedActor, "Release: moved")
         releasedActor.EnableAI(true)
         RPB_Utility.Crumb(releasedActor, "Release: AI enabled")
+
+        ; The equip before the move runs while the NPC is still in its cell with its 3D unloaded and does not always take: equip
+        ; again now that it is out, only what it was dressed with (its outfit and the armor it wore before being stripped)
+        int equippedNow = 0
+        int k = 0
+        while (restoreItems && k < restoreItems.Length)
+            Form restoreItem = restoreItems[k]
+            if (restoreItem && releasedActor.GetItemCount(restoreItem) > 0 && !releasedActor.IsEquipped(restoreItem))
+                releasedActor.EquipItem(restoreItem)
+                equippedNow += 1
+            endif
+            k += 1
+        endWhile
+        if (equippedNow > 0)
+            string equipMsg = "Equipped " + equippedNow + " of the pre-strip items on " + releasedActor.GetDisplayName() + " after the move"
+            DebugInfo("["+ Name +"] Prison::TeleportPrisonerToRelease", equipMsg)
+            Info(equipMsg)
+        endif
     endif
 endFunction
 
