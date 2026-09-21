@@ -1551,7 +1551,8 @@ RPB_JailCell function RequestCell(RPB_Prisoner apPrisoner)
     if (returnedCell == none)
         returnedCell = self.GetRandomAvailableJailCell()
 
-        if (returnedCell.IsGenderExclusive || (!returnedCell.IsGenderExclusive && prisonerMustBeInGenderExclusiveCell))
+        ; A full prison has no available cell: returnedCell is none here (a None dereference raised script errors per overflow arrest)
+        if (returnedCell && (returnedCell.IsGenderExclusive || prisonerMustBeInGenderExclusiveCell))
             returnedCell = none
         endif
     endif

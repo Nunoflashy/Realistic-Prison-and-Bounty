@@ -121,6 +121,8 @@ function SetTests()
     self.AddTest("89 - Prisoner: Worn Armor Is Snapshotted Before Stripping and Re-equipped After Release (Guards Have No Outfit)", "Test_Prisoner_WornArmorRestored", abChainable = false)
     self.AddTest("90 - Time Skip: An NPC With the Same Sentence Imprisoned Earlier Is Released Before the Player (Dry Run)", "Test_Prison_EqualSentenceOrder", abChainable = false)
     self.AddTest("91 - Prisoner: Only the Prisoner's Own Belongings Are Returned From a Shared Container", "Test_Prisoner_OwnBelongingsReturned", abChainable = false)
+    self.AddTest("92 - Mass Imprisonment: 45 NPCs In Waves Into a Full Prison (No Overcrowding), Overflow, Recovery, Mass Release", "Test_MassImprisonment", abChainable = false)
+    self.AddTest("93 - Mass Time Skip: 40 Prisoners, Release Order and Cost (Dry Run, Passes ~10 Game Days)", "Test_TimeSkipManyPrisoners", abChainable = false)
     self.AddTest("41 - ActiveMagicEffectContainer: Stuck Lock Self-Heals", "Test_ActiveMagicEffectContainer_StuckLockSelfHeals")
     self.AddTest("42 - ThreadLock: JAtomic Primitive Semantics and Registry", "Test_ThreadLock_PrimitiveSemantics")
     ; Not chainable: fires concurrent worker threads
@@ -7222,6 +7224,413 @@ state Test_Prisoner_OwnBelongingsReturned
 endState
 
 ;/
+    Mass scenarios (civil war arrests: a whole faction is captured at once). Helpers.
+/;
+int function __MassCapacity(RPB_Prison akPrison)
+    Form[] cells = akPrison.JailCells
+    int total = 0
+    int i = 0
+    while (cells && i < cells.Length)
+        RPB_JailCell jailCell = cells[i] as RPB_JailCell
+        if (jailCell)
+            total += jailCell.MaxPrisoners
+        endif
+        i += 1
+    endWhile
+    return total
+endFunction
+
+int function __MassOccupied(RPB_Prison akPrison)
+    Form[] cells = akPrison.JailCells
+    int total = 0
+    int i = 0
+    while (cells && i < cells.Length)
+        RPB_JailCell jailCell = cells[i] as RPB_JailCell
+        if (jailCell)
+            total += jailCell.PrisonerCount
+        endif
+        i += 1
+    endWhile
+    return total
+endFunction
+
+; The cells holding more prisoners than they may (only cells that do not allow overcrowding), "" when none
+string function __MassOvercrowded(RPB_Prison akPrison)
+    Form[] cells = akPrison.JailCells
+    string bad = ""
+    int i = 0
+    while (cells && i < cells.Length)
+        RPB_JailCell jailCell = cells[i] as RPB_JailCell
+        if (jailCell && !jailCell.AllowOvercrowding && jailCell.PrisonerCount > jailCell.MaxPrisoners)
+            bad += " [" + jailCell + " holds " + jailCell.PrisonerCount + " of " + jailCell.MaxPrisoners + "]"
+        endif
+        i += 1
+    endWhile
+    return bad
+endFunction
+
+int function __MassCountImprisoned(Actor[] akActors, int aiCount)
+    int n = 0
+    int i = 0
+    while (i < aiCount)
+        if (akActors[i] && RPB_Utility.IsActorImprisoned(akActors[i]))
+            n += 1
+        endif
+        i += 1
+    endWhile
+    return n
+endFunction
+
+;/
+    Waits until every actor in [0, aiCount) has settled: imprisoned, or no longer in a transitional state (a registered
+    arrestee, or a registered prisoner that is not imprisoned yet) for 3 seconds in a row, after at least 5 seconds. Bounded.
+    Also reports the slowest poll: a poll that should take 0.5 s and takes seconds is what a stalled script engine looks like.
+    returns (int): ms taken.
+/;
+int function __MassSettle(RPB_Prison akPrison, Actor[] akActors, int aiCount, float afTimeout)
+    RPB_Arrest arrest = RPB_API.GetArrest()
+    float t0 = Utility.GetCurrentRealTime()
+    float stableSince = -1.0
+    float maxPollMs = 0.0
+    while ((Utility.GetCurrentRealTime() - t0) < afTimeout)
+        float pollStart = Utility.GetCurrentRealTime()
+        int transitional = 0
+        int i = 0
+        while (i < aiCount)
+            Actor a = akActors[i]
+            if (a && !RPB_Utility.IsActorImprisoned(a) && (arrest.Arrestees.AtKey(a) != none || akPrison.Prisoners.AtKey(a) != none))
+                transitional += 1
+            endif
+            i += 1
+        endWhile
+
+        float elapsed = Utility.GetCurrentRealTime() - t0
+        if (elapsed >= 5.0 && transitional == 0)
+            if (stableSince < 0.0)
+                stableSince = elapsed
+            elseIf (elapsed - stableSince >= 3.0)
+                log("MASS settled after " + self.__Ms(elapsed) + " ms, slowest poll " + (maxPollMs as int) + " ms over its 500 ms wait")
+                return self.__Ms(elapsed)
+            endif
+        else
+            stableSince = -1.0
+        endif
+
+        Utility.Wait(0.5)
+        float overMs = (Utility.GetCurrentRealTime() - pollStart) * 1000.0 - 500.0
+        if (overMs > maxPollMs)
+            maxPollMs = overMs
+        endif
+    endWhile
+    log("MASS DID NOT SETTLE within " + (afTimeout as int) + " s, slowest poll " + (maxPollMs as int) + " ms over its 500 ms wait")
+    return self.__Ms(Utility.GetCurrentRealTime() - t0)
+endFunction
+
+function __MassPutBack(Actor akActor)
+    Actor massPlayer = Game.GetFormEx(0x14) as Actor
+    akActor.EnableAI(false)
+    akActor.MoveTo(massPlayer)
+    float loadWait = Utility.GetCurrentRealTime()
+    while (!akActor.Is3DLoaded() && (Utility.GetCurrentRealTime() - loadWait) < 5.0)
+        Utility.Wait(0.1)
+    endWhile
+endFunction
+
+;/
+    Civil war scenario: 45 NPCs (base 0x132AE) are arrested in waves of 10 (0.3 s apart, what Arrest.ArrestActors does) into a
+    prison that cannot hold them all (cells do not allow overcrowding). Every actor must end in exactly one of two states:
+    imprisoned, or cleanly reverted (arrest undone, nothing left behind); none may be stuck half way, no cell may exceed its
+    maximum, and imprisoned actors may not exceed the free capacity. Then two prisoners are released and two of the reverted
+    NPCs are arrested again (the freed cells must be reused), then everybody is released at once and the list must end clean.
+    What to do with the overflow (transfer to another prison, a holding area, overcrowding) is a design question; this test
+    pins what must hold whatever is chosen: no stuck state, no leaks, no over-capacity.
+    NOTE: the free cells of Haafingar are used, run it somewhere with an empty prison (only the player stands near Solitude).
+/;
+state Test_MassImprisonment
+    function Setup()
+        RPB_Prison prison = (RPB_API.GetPrisonManager()).GetPrison("Haafingar")
+        Actor player = Game.GetFormEx(0x14) as Actor
+        Actor guard = RPB_Utility.GetNearestGuard(player, 3000.0, player)
+        bool ok = true
+        bool step = false
+
+        step = assert_true(guard != none, "No guard near the player to perform the arrests (stand near a guard in Solitude)")
+        ok = ok && step
+        if (!guard)
+            display_result(false)
+            return
+        endif
+
+        int TOTAL = 45
+        int WAVE = 10
+        int BASE = 0x132AE
+
+        RPB_PrisonManager massManager = RPB_API.GetPrisonManager()
+        int baseCount = prison.Prisoners.Count
+        int basePrisons = massManager.PrisonsWithPrisonersCount
+        int capacity = self.__MassCapacity(prison)
+        int occupiedBefore = self.__MassOccupied(prison)
+        int free = capacity - occupiedBefore
+        log("MASS capacity " + capacity + " (occupied before " + occupiedBefore + ", free " + free + "), arresting " + TOTAL + " in waves of " + WAVE + ", overcrowding allowed on none of the cells: " + (self.__MassOvercrowded(prison) == ""))
+
+        self.__StressProfilerOff()
+        float tStart = Utility.GetCurrentRealTime()
+
+        Actor[] all = new Actor[64]
+        int spawned = 0
+        int spawnFailures = 0
+        int waveNumber = 1
+        while (spawned < TOTAL)
+            int waveEnd = spawned + WAVE
+            if (waveEnd > TOTAL)
+                waveEnd = TOTAL
+            endif
+
+            int k = spawned
+            while (k < waveEnd)
+                all[k] = __SpawnTempActorOf(BASE)
+                if (!all[k])
+                    spawnFailures += 1
+                endif
+                k += 1
+            endWhile
+
+            float tWave = Utility.GetCurrentRealTime()
+            k = spawned
+            while (k < waveEnd)
+                if (all[k])
+                    self.__StressArrest(guard, all[k])
+                    Utility.Wait(0.3)
+                endif
+                k += 1
+            endWhile
+            int settleMs = self.__MassSettle(prison, all, waveEnd, 90.0)
+            log("MASS wave " + waveNumber + ": actors " + spawned + ".." + (waveEnd - 1) + " arrested, imprisoned so far " + self.__MassCountImprisoned(all, waveEnd) + ", cells hold " + self.__MassOccupied(prison) + " of " + capacity + ", wave took " + self.__Ms(Utility.GetCurrentRealTime() - tWave) + " ms")
+            spawned = waveEnd
+            waveNumber += 1
+        endWhile
+
+        ; Classify: imprisoned / cleanly reverted / stuck
+        int imprisoned = 0
+        int reverted = 0
+        int stuck = 0
+        int placed = 0
+        int i = 0
+        while (i < TOTAL)
+            if (all[i])
+                placed += 1
+                if (RPB_Utility.IsActorImprisoned(all[i]))
+                    imprisoned += 1
+                elseIf (self.__StressLeftovers(all[i], prison) == "")
+                    reverted += 1
+                else
+                    stuck += 1
+                    if (stuck <= 5)
+                        log("MASS stuck actor " + i + " (" + all[i] + "):" + self.__StressLeftovers(all[i], prison) + " | " + self.__StressDiagnose(all[i], prison, guard))
+                    endif
+                endif
+            endif
+            i += 1
+        endWhile
+        int totalMs = self.__Ms(Utility.GetCurrentRealTime() - tStart)
+        log("MASS RESULT placed " + placed + " (spawn failures " + spawnFailures + "): imprisoned " + imprisoned + ", cleanly reverted " + reverted + ", stuck " + stuck + "; free capacity was " + free + "; cells now hold " + self.__MassOccupied(prison) + "; " + totalMs + " ms")
+
+        step = assert_true(spawnFailures == 0, spawnFailures + " NPCs could not be placed, the scenario is incomplete")
+        ok = ok && step
+        step = assert_true(stuck == 0, stuck + " NPCs are stuck half way (neither imprisoned nor cleanly reverted)")
+        ok = ok && step
+        step = assert_true(imprisoned <= free, "Imprisoned " + imprisoned + " NPCs but only " + free + " places were free")
+        ok = ok && step
+        string overcrowded = self.__MassOvercrowded(prison)
+        step = assert_true(overcrowded == "", "Cells over their maximum:" + overcrowded)
+        ok = ok && step
+        if (imprisoned < free && imprisoned < placed)
+            log("MASS NOTE: " + imprisoned + " imprisoned although " + free + " places were free and " + (placed - imprisoned) + " NPCs were left out (gender exclusive cell rules?)")
+        endif
+
+        ; Recovery: free two places, arrest two of the NPCs that were turned away, they must get those places
+        if (imprisoned >= 2 && reverted >= 2)
+            int released2 = 0
+            i = 0
+            while (i < TOTAL && released2 < 2)
+                if (all[i] && RPB_Utility.IsActorImprisoned(all[i]))
+                    RPB_Prisoner freeing = prison.Prisoners.AtKey(all[i])
+                    if (freeing)
+                        prison.SendReleaseRequest(freeing)
+                        step = assert_true(self.__StressWaitReleased(all[i], prison, 30.0) >= 0, "Prisoner " + i + " was not released while making room")
+                        ok = ok && step
+                        released2 += 1
+                    endif
+                endif
+                i += 1
+            endWhile
+
+            int retried = 0
+            int retriedImprisoned = 0
+            i = 0
+            while (i < TOTAL && retried < 2)
+                if (all[i] && !RPB_Utility.IsActorImprisoned(all[i]) && self.__StressLeftovers(all[i], prison) == "")
+                    self.__MassPutBack(all[i])
+                    self.__StressArrest(guard, all[i])
+                    retried += 1
+                endif
+                i += 1
+            endWhile
+            self.__MassSettle(prison, all, TOTAL, 60.0)
+            i = 0
+            while (i < TOTAL)
+                if (all[i] && RPB_Utility.IsActorImprisoned(all[i]))
+                    retriedImprisoned += 1
+                endif
+                i += 1
+            endWhile
+            log("MASS RECOVERY freed " + released2 + ", re-arrested " + retried + " turned away NPCs, imprisoned now " + retriedImprisoned + " (was " + (imprisoned - released2) + " after the releases)")
+            step = assert_true(retriedImprisoned >= (imprisoned - released2) + retried, "The freed cells were not reused: " + retriedImprisoned + " imprisoned, expected " + ((imprisoned - released2) + retried))
+            ok = ok && step
+        else
+            log("MASS RECOVERY skipped (imprisoned " + imprisoned + ", reverted " + reverted + "): the prison did not overflow, raise TOTAL")
+        endif
+
+        ; Mass release: everybody at once
+        float tRelease = Utility.GetCurrentRealTime()
+        int toRelease = 0
+        i = 0
+        while (i < TOTAL)
+            if (all[i])
+                RPB_Prisoner leaving = prison.Prisoners.AtKey(all[i])
+                if (leaving)
+                    prison.SendReleaseRequest(leaving)
+                    toRelease += 1
+                endif
+            endif
+            i += 1
+        endWhile
+
+        int releasedAll = 0
+        float releaseDeadline = Utility.GetCurrentRealTime() + 120.0
+        while (releasedAll < toRelease && Utility.GetCurrentRealTime() < releaseDeadline)
+            releasedAll = 0
+            i = 0
+            while (i < TOTAL)
+                if (all[i] && !RPB_Utility.IsActorImprisoned(all[i]) && prison.Prisoners.AtKey(all[i]) == none)
+                    releasedAll += 1
+                endif
+                i += 1
+            endWhile
+            Utility.Wait(0.5)
+        endWhile
+        ; the actors that were never prisoners count as released above, subtract them
+        releasedAll -= (placed - toRelease)
+        log("MASS RELEASE " + releasedAll + " of " + toRelease + " released in " + self.__Ms(Utility.GetCurrentRealTime() - tRelease) + " ms")
+        step = assert_true(releasedAll >= toRelease, "Only " + releasedAll + " of " + toRelease + " prisoners were released in 120 s")
+        ok = ok && step
+
+        __TeardownAllTempActors()
+        ok = ok && self.__StressAssertNoLeaks(prison, massManager, baseCount, basePrisons)
+        step = assert_true(self.__MassOccupied(prison) == occupiedBefore, "The cells hold " + self.__MassOccupied(prison) + " prisoners after the test, expected " + occupiedBefore)
+        ok = ok && step
+
+        self.__StressProfilerRestore()
+        display_result(ok)
+    endFunction
+
+    function Teardown()
+        self.__StressProfilerRestore()
+        __TeardownAllTempActors()
+    endFunction
+endState
+
+;/
+    The time skip with a crowded prison: 40 NPC prisoners with sentences of 1 to 10 days (base 0x132AE, registered without
+    the arrest flow, so the cell capacity does not apply) and ReleaseDueNPCsInOrder() as a dry run, which passes ~10 game
+    days with all of them running their hourly and daily updates. Every prisoner must be recorded once, in order of
+    release time, each at about the end of its own sentence, and the whole thing must finish (bounded, reported in ms).
+    NOTE: this really advances the game clock by ~10 days.
+/;
+state Test_TimeSkipManyPrisoners
+    function Setup()
+        RPB_Prison prison = (RPB_API.GetPrisonManager()).GetPrison("Haafingar")
+        RPB_PrisonMonitor mon = prison.Monitor
+        bool ok = true
+        bool step = false
+
+        int TOTAL = 40
+        Actor[] all = new Actor[64]
+        int[] sentence = new int[64]
+        float start = Utility.GetCurrentGameTime()
+        int registered = 0
+        int i = 0
+        while (i < TOTAL)
+            Actor a = __SpawnTempActorOf(0x132AE)
+            RPB_Prisoner p = none
+            if (a)
+                p = __RegisterPrisonerAndWait(a, prison)
+            endif
+            if (p)
+                all[registered] = a
+                sentence[registered] = (i % 10) + 1
+                p.SetInt("Sentence", sentence[registered])
+                p.SetFloat("Time of Imprisonment", start)
+                registered += 1
+            endif
+            i += 1
+        endWhile
+        log("TIMESKIP registered " + registered + " of " + TOTAL + " prisoners")
+        step = assert_true(registered == TOTAL, "Only " + registered + " of " + TOTAL + " prisoners could be registered")
+        ok = ok && step
+
+        mon.DebugDryRunReleases = true
+        mon.ClearDryRunReleaseOrder()
+        float t0 = Utility.GetCurrentRealTime()
+        int passed = prison.ReleaseDueNPCsInOrder(11.0)
+        int ms = self.__Ms(Utility.GetCurrentRealTime() - t0)
+        Form[] order = mon.GetDryRunReleaseOrder()
+        mon.DebugDryRunReleases = false
+        log("TIMESKIP passed " + passed + " days with " + registered + " prisoners in " + ms + " ms real time, " + order.Length + " releases recorded")
+
+        step = assert_true(order.Length == registered, "Expected " + registered + " releases, saw " + order.Length)
+        ok = ok && step
+        step = assert_true(ms < 300000, "The time skip took " + ms + " ms")
+        ok = ok && step
+
+        ; each at about the end of its own sentence, in non-decreasing order of release time
+        float previous = -1.0
+        int outOfOrder = 0
+        int wrongTime = 0
+        i = 0
+        while (i < registered)
+            float releasedAt = mon.GetDryRunReleaseTime(all[i])
+            float expectedDays = sentence[i] as float
+            if (releasedAt < 0.0 || (releasedAt - start) < expectedDays - 0.01 || (releasedAt - start) > expectedDays + 1.5)
+                wrongTime += 1
+            endif
+            i += 1
+        endWhile
+        i = 0
+        while (i < order.Length)
+            float t = mon.GetDryRunReleaseTime(order[i] as Actor)
+            if (t + 0.0001 < previous)
+                outOfOrder += 1
+            endif
+            previous = t
+            i += 1
+        endWhile
+        step = assert_true(outOfOrder == 0, outOfOrder + " releases were recorded out of order of release time")
+        ok = ok && step
+        step = assert_true(wrongTime == 0, wrongTime + " prisoners were released at a time that is not the end of their sentence")
+        ok = ok && step
+
+        display_result(ok)
+    endFunction
+
+    function Teardown()
+        RPB_Prison prison = (RPB_API.GetPrisonManager()).GetPrison("Haafingar")
+        prison.Monitor.DebugDryRunReleases = false
+        __TeardownAllTempActors()
+    endFunction
+endState
+
+;/
     A failed imprisonment ("Assign Cell") used to unregister the prisoner without Destroy(), leaving its
     "Initialized" state behind: a later re-arrest of the same NPC then could not register (OnInitialize
     returns early on a stale flag) or would have kept the previous sentence and release location. Calls the
@@ -8461,11 +8870,16 @@ int __testTempActorCount = 0
     can clean it up afterward. Up to 32 per test (between teardowns).
 /;
 Actor function __SpawnTempActor()
+    return self.__SpawnTempActorOf(0x132A1)
+endFunction
+
+;/ Same, from any ActorBase (mass tests use 0x132AE, an NPC that behaves), up to 64 per test. Returns none when it cannot be placed. /;
+Actor function __SpawnTempActorOf(int aiBaseFormId)
     if (!__testTempActors)
-        __testTempActors = new Actor[32]
+        __testTempActors = new Actor[64]
     endif
 
-    ActorBase npcBase = Game.GetFormEx(0x132A1) as ActorBase
+    ActorBase npcBase = Game.GetFormEx(aiBaseFormId) as ActorBase
     Actor player = Game.GetFormEx(0x14) as Actor
     ; Signature: ObjectReference.PlaceActorAtMe(ActorBase akActorToPlace, int aiLevelMod = 4,
     ; EncounterZone akZone = None) - only 3 params, no abForcePersist (that's PlaceAtMe, a
@@ -8476,6 +8890,10 @@ Actor function __SpawnTempActor()
     ; unnecessary anyway - the real fix for the 23/24/25 stalls was spacing successive
     ; registrations out with Utility.Wait(), not reference persistence.
     Actor temp = player.PlaceActorAtMe(npcBase, 1)
+    if (!temp)
+        log("TEMP ACTOR COULD NOT BE PLACED from base " + aiBaseFormId)
+        return none
+    endif
 
     __testTempActors[__testTempActorCount] = temp
     __testTempActorCount += 1
