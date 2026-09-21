@@ -2149,6 +2149,76 @@ bool function SendReleaseRequest(RPB_Prisoner apPrisoner)
 endFunction
 
 ;/
+    The NPC side of the player's time skip, as a chronological timeline: every NPC prisoner with less time left than
+    @afPlayerTimeLeft is released in order of release time, and game time is passed only by the DIFFERENCE since the
+    previous event before each release, so an NPC is released at its own release time (its Time Jailed and infamy are its
+    sentence, not the moment a background stack happened to run) and the player is released after them. Each release is
+    synchronous with a bounded wait (Monitor.ReleaseNPC), so it can delay but never freeze the time skip.
+
+    returns (int): the days passed here (the caller passes the rest for the player).
+/;
+int function ReleaseDueNPCsInOrder(float afPlayerTimeLeft)
+    ;/ const /; int PADDING_ONE_DAY = 1
+
+    Form[] due = self.GetPrisonersWithCurrentSentenceLessThan(afPlayerTimeLeft, PADDING_ONE_DAY)
+    int count = due.Length
+    if (count == 0)
+        return 0
+    endif
+
+    float[] left = Utility.CreateFloatArray(count)
+    bool[] done = Utility.CreateBoolArray(count, false) ; the fill argument is unreliable: every element is assigned below
+
+    int pending = 0
+    int i = 0
+    while (i < count)
+        RPB_Prisoner prisoner = Prisoners.AtKey(due[i] as Actor)
+        if (prisoner && !prisoner.IsPlayer())
+            left[i] = prisoner.TimeLeftInSentence
+            done[i] = false
+            pending += 1
+        else
+            left[i] = 0.0
+            done[i] = true
+        endif
+        i += 1
+    endWhile
+
+    int passed = 0
+    while (pending > 0)
+        int pick = -1
+        int j = 0
+        while (j < count)
+            if (!done[j] && (pick == -1 || left[j] < left[pick]))
+                pick = j
+            endif
+            j += 1
+        endWhile
+
+        if (pick == -1)
+            pending = 0
+        else
+            float delta = left[pick] - passed
+            if (delta > 0.0)
+                int daysToPass = Ceiling(delta)
+                RPB_Utility.PassTimeInDays(daysToPass)
+                passed += daysToPass
+            endif
+
+            RPB_Prisoner releasing = Prisoners.AtKey(due[pick] as Actor)
+            if (releasing)
+                Monitor.ReleaseNPC(releasing)
+            endif
+
+            done[pick] = true
+            pending -= 1
+        endif
+    endWhile
+
+    return passed
+endFunction
+
+;/
     Queues the release of every NPC prisoner with less time left than @afTimeLeftInSentence (+ one day of padding) in the
     monitor's ordered release queue and returns immediately. It used to release each one inline (passing game time between
     them and calling into every prisoner), so a slow release delayed the player's own fast-forward. @abPassTime is kept

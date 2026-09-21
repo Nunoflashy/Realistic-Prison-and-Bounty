@@ -283,6 +283,7 @@ bool __releaseQueueRunning
 ; Test hook: when true ReleaseQueued() only records the order instead of releasing
 bool property DebugDryRunReleases auto
 int __releasedLog ; JArray of actor Forms in the order ReleaseQueued() saw them (dry run only)
+int __releasedAt  ; JFormMap actor -> game time the release happened at (dry run only)
 
 function __EnsureReleaseQueue()
     if (!__releaseQueue || !JValue.isExists(__releaseQueue))
@@ -294,6 +295,14 @@ function __EnsureReleaseQueue()
     if (!__releasedLog || !JValue.isExists(__releasedLog))
         __releasedLog = JValue.retain(JArray.object())
     endif
+    if (!__releasedAt || !JValue.isExists(__releasedAt))
+        __releasedAt = JValue.retain(JFormMap.object())
+    endif
+endFunction
+
+float function GetDryRunReleaseTime(Actor akActor)
+    self.__EnsureReleaseQueue()
+    return JFormMap.getFlt(__releasedAt, akActor, -1.0)
 endFunction
 
 int property ReleaseQueueLength
@@ -320,6 +329,7 @@ endFunction
 function ClearDryRunReleaseOrder()
     self.__EnsureReleaseQueue()
     JArray.clear(__releasedLog)
+    JFormMap.clear(__releasedAt)
 endFunction
 
 function QueueRelease(RPB_Prisoner apPrisoner)
@@ -352,11 +362,38 @@ endFunction
 ; The release strategy for one queued prisoner (see the comment on the queue)
 function ReleaseQueued(RPB_Prisoner apPrisoner)
     if (self.DebugDryRunReleases)
-        JArray.addForm(__releasedLog, apPrisoner.GetActor())
+        self.__RecordDryRun(apPrisoner)
         return
     endif
 
     Prison.SendReleaseRequest(apPrisoner)
+endFunction
+
+function __RecordDryRun(RPB_Prisoner apPrisoner)
+    self.__EnsureReleaseQueue()
+    JArray.addForm(__releasedLog, apPrisoner.GetActor())
+    JFormMap.setFlt(__releasedAt, apPrisoner.GetActor(), Utility.GetCurrentGameTime())
+endFunction
+
+;/
+    Releases one NPC prisoner NOW and waits (bounded, ~20 s real time) until it has left the prison's list. Used by the
+    player's time skip, where every NPC must be released at its own release time, in order, before time moves on. The
+    bounded wait means a slow NPC release can delay the time skip but never freeze it. This is the seam for the release
+    mode (instant teleport today, an escort scene the player can watch later: see ROADMAP).
+/;
+function ReleaseNPC(RPB_Prisoner apPrisoner)
+    if (self.DebugDryRunReleases)
+        self.__RecordDryRun(apPrisoner)
+        return
+    endif
+
+    Actor releasing = apPrisoner.GetActor()
+    Prison.SendReleaseRequest(apPrisoner)
+
+    float t0 = Utility.GetCurrentRealTime()
+    while (Prisoners.AtKey(releasing) != none && (Utility.GetCurrentRealTime() - t0) < 20.0)
+        Utility.Wait(0.2)
+    endWhile
 endFunction
 
 function ProcessReleaseQueue()

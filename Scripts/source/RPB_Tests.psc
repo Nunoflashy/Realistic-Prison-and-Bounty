@@ -116,6 +116,8 @@ function SetTests()
     self.AddTest("84 - PrisonMonitor: Releases an Away Prisoner Whose Sentence Is Served (Headless)", "Test_PrisonMonitor_HeadlessRelease", abChainable = false)
     self.AddTest("85 - Prisoner: Day Events Per Update Are Bounded (Extreme Elapsed Time)", "Test_Prisoner_DayEventBound", abChainable = false)
     self.AddTest("86 - PrisonMonitor: Release Queue Order, No Duplicates, One Per Wake (Dry Run)", "Test_PrisonMonitor_ReleaseQueue", abChainable = false)
+    self.AddTest("87 - Time Skip: NPCs Are Released in Order, Each at Its Own Release Time (Dry Run, Passes Game Days)", "Test_Prison_ReleaseTimeline", abChainable = false)
+    self.AddTest("88 - Prisoner: The NPC's Original Outfit and Underwear Survive the Effect Being Replaced", "Test_Prisoner_OutfitSurvivesInstanceReplacement", abChainable = false)
     self.AddTest("41 - ActiveMagicEffectContainer: Stuck Lock Self-Heals", "Test_ActiveMagicEffectContainer_StuckLockSelfHeals")
     self.AddTest("42 - ThreadLock: JAtomic Primitive Semantics and Registry", "Test_ThreadLock_PrimitiveSemantics")
     ; Not chainable: fires concurrent worker threads
@@ -6858,6 +6860,125 @@ state Test_PrisonMonitor_ReleaseQueue
     function Teardown()
         RPB_Prison prison = (RPB_API.GetPrisonManager()).GetPrison("Haafingar")
         prison.Monitor.DebugDryRunReleases = false
+        __TeardownAllTempActors()
+    endFunction
+endState
+
+
+;/
+    The NPC side of the player's time skip is a chronological timeline: two NPC prisoners with 2 and 4 days left and a
+    player with 6 days left. They must be released in order of release time, each when ITS time comes (game time passes by
+    the difference, not the whole time left each time), and 4 days pass in total here. Dry run (only the order and the game
+    time of each release are recorded). NOTE: this really advances the game clock by ~4 days.
+/;
+state Test_Prison_ReleaseTimeline
+    function Setup()
+        RPB_Prison prison = (RPB_API.GetPrisonManager()).GetPrison("Haafingar")
+        RPB_PrisonMonitor mon = prison.Monitor
+        bool ok = true
+        bool step = false
+
+        Actor a1 = __SpawnTempActor()
+        RPB_Prisoner p1 = __RegisterPrisonerAndWait(a1, prison)
+        Actor a2 = __SpawnTempActor()
+        RPB_Prisoner p2 = __RegisterPrisonerAndWait(a2, prison)
+        step = assert_true(p1 != none && p2 != none, "Could not register the two prisoners used for this test")
+        ok = ok && step
+        if (!p1 || !p2)
+            display_result(false)
+            return
+        endif
+
+        float start = Utility.GetCurrentGameTime()
+        p1.SetInt("Sentence", 4)
+        p1.SetFloat("Time of Imprisonment", start)
+        p2.SetInt("Sentence", 2)
+        p2.SetFloat("Time of Imprisonment", start)
+
+        mon.DebugDryRunReleases = true
+        mon.ClearDryRunReleaseOrder()
+
+        int passed = prison.ReleaseDueNPCsInOrder(6.0)
+
+        Form[] order = mon.GetDryRunReleaseOrder()
+        float t1 = mon.GetDryRunReleaseTime(a1)
+        float t2 = mon.GetDryRunReleaseTime(a2)
+        mon.DebugDryRunReleases = false
+        log("TIMELINE passed " + passed + " days; a2 (2 day sentence) released at +" + (t2 - start) + ", a1 (4 day sentence) at +" + (t1 - start))
+
+        step = assert_true(order.Length == 2 && order[0] == a2 as Form && order[1] == a1 as Form, "Expected the 2 day sentence released before the 4 day sentence")
+        ok = ok && step
+        step = assert_true(t2 >= 0.0 && t1 > t2 + 0.9, "The second release should come at least a day after the first (t2 +" + (t2 - start) + ", t1 +" + (t1 - start) + ")")
+        ok = ok && step
+        ; Not cumulative: the 4 day NPC is released about 4 days in (a cumulative pass would put it around 6)
+        step = assert_true((t1 - start) < 5.5 && (t1 - start) >= 3.0, "The 4 day NPC should be released about 4 days in, was +" + (t1 - start))
+        ok = ok && step
+        step = assert_true(passed >= 3 && passed <= 5, "Expected about 4 days passed by the NPC timeline, passed " + passed)
+        ok = ok && step
+
+        display_result(ok)
+    endFunction
+
+    function Teardown()
+        RPB_Prison prison = (RPB_API.GetPrisonManager()).GetPrison("Haafingar")
+        prison.Monitor.DebugDryRunReleases = false
+        __TeardownAllTempActors()
+    endFunction
+endState
+
+;/
+    The NPC's original outfit and underwear used to be script variables of the RPB_Prisoner effect instance: an unload ends
+    the effect, a reload starts a new instance with empty variables, and the NPC never got his outfit back on release.
+    They live in the storage on the actor now. Saves the outfit (and two armors as underwear), sends the actor away and
+    back so a new instance starts, and checks the new instance still has them.
+/;
+state Test_Prisoner_OutfitSurvivesInstanceReplacement
+    function Setup()
+        RPB_Prison prison = (RPB_API.GetPrisonManager()).GetPrison("Haafingar")
+        Actor player = Game.GetFormEx(0x14) as Actor
+        bool ok = true
+        bool step = false
+
+        Actor a = __SpawnTempActor()
+        RPB_Prisoner p = __RegisterPrisonerAndWait(a, prison)
+        step = assert_true(p != none, "Could not register the prisoner used for this test")
+        ok = ok && step
+        if (!p)
+            display_result(false)
+            return
+        endif
+
+        Armor top = Game.GetFormEx(0x12E49) as Armor ; any two armors will do as stand-ins for the underwear
+        Armor bottom = Game.GetFormEx(0x12E4B) as Armor
+        p.NPC_SaveOriginalOutfit()
+        p.NPC_SaveUnderwear(top, bottom)
+        Outfit saved = p.NPC_OriginalOutfit
+        step = assert_true(saved != none, "The original outfit was not saved (the dummy's base outfit may be the naked one)")
+        ok = ok && step
+        step = assert_true(p.NPC_Underwear != none && p.NPC_Underwear[p.NPC_UNDERWEAR_TOP_INDEX] == top, "The underwear was not saved")
+        ok = ok && step
+
+        ObjectReference farPlace = prison.JailCells[0] as ObjectReference
+        a.MoveTo(farPlace)
+        Utility.Wait(20.0)
+        a.MoveTo(player)
+        Utility.Wait(6.0)
+
+        RPB_Prisoner again = prison.Prisoners.AtKey(a)
+        step = assert_true(again != none, "The prisoner is not in the list after coming back")
+        ok = ok && step
+        if (again)
+            log("OUTFIT new instance: " + (again != p) + ", saved outfit " + saved + ", after " + again.NPC_OriginalOutfit)
+            step = assert_true(again.NPC_OriginalOutfit == saved, "The original outfit did not survive the effect being replaced")
+            ok = ok && step
+            step = assert_true(again.NPC_Underwear != none && again.NPC_Underwear[again.NPC_UNDERWEAR_TOP_INDEX] == top && again.NPC_Underwear[again.NPC_UNDERWEAR_BOTTOM_INDEX] == bottom, "The underwear did not survive the effect being replaced")
+            ok = ok && step
+        endif
+
+        display_result(ok)
+    endFunction
+
+    function Teardown()
         __TeardownAllTempActors()
     endFunction
 endState

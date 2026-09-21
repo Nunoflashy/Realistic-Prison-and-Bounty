@@ -301,10 +301,10 @@ bool property ShouldBeInCell
     endFunction
 endProperty
 
-float __lastUpdate
+; Stored on the actor reference (not in a variable of this effect instance, which is replaced when the actor unloads and loads again)
 float property LastUpdate
     float function get()
-        return __lastUpdate
+        return GetFloat("Last Update")
     endFunction
 endProperty
 
@@ -584,10 +584,9 @@ bool property HasCriminalPenalty
     endFunction
 endProperty
 
-int __criminalPenaltySentence
 int property CriminalPenaltySentence
     int function get()
-        return __criminalPenaltySentence
+        return GetInt("Criminal Penalty Sentence")
     endFunction
 endProperty
 
@@ -651,6 +650,11 @@ state Released
     event OnBeginState()
         ; Debug("{Released} ("+ Name +") Prisoner::OnBeginState", "this: " + this + ", HasCellPackage: " + self.HasCellPackage + ", Cell Package: " + self.CellPackage + ", Cell Package Actor Reference: " + CellPackage.GetActorReference())
 
+        ; The hourly update registered while imprisoned would keep firing (an error every game hour during a time skip)
+        if (self.IsEffectActive)
+            self.UnregisterForUpdates()
+        endif
+
         if (self.IsNPC())
             self.NPC_RestoreOriginalOutfit()
         endif
@@ -664,7 +668,7 @@ state Released
     endEvent
 
     event OnUpdateGameTime()
-        EventManager.SendError("Updating in the Released state, should not happen!", "{Released} ["+ Name +"] Prisoner::OnUpdateGameTime")
+        ; Already unregistered when entering the state; a tick that was already in flight is harmless
     endEvent
 endState
 
@@ -967,7 +971,7 @@ function TriggerInfamyPenalty()
 
     ; Infamy shouldn't touch the Bounty, add to the Sentence instead
     int penaltyAsSentence = Round(penaltyAsBounty / Prison.BountyToSentence)
-    __criminalPenaltySentence = penaltyAsSentence
+    SetInt("Criminal Penalty Sentence", penaltyAsSentence)
 
     Debug("("+ Name +") Prisoner::TriggerInfamyPenalty", "currentInfamyType: " + currentInfamyType + ", penaltyAsBounty: " + penaltyAsBounty + ", penaltyAsSentence: " + penaltyAsSentence)
 
@@ -1666,9 +1670,8 @@ bool function IsReleaseOnSundas()
     return RPB_Utility.IsSundas(releaseDay, releaseMonth, releaseYear)
 endFunction
 
-bool __hasExtraReleaseTimeHours
 bool function HasReleaseTimeExtraHours()
-    return __hasExtraReleaseTimeHours
+    return GetBool("Has Extra Release Hours")
 endFunction
 
 ;                      Release - Getters
@@ -1720,9 +1723,10 @@ function FastForwardToRelease()
         Debug("["+ Name +"] Prisoner::FastForwardToRelease", "Setting Game Hour to Release Time Minimum Hour: " + RPB_Utility.GetTimeAs12Hour(Prison.ReleaseTimeMinimumHour))
     endif
 
-    ; Process all NPC Prisoners that have a Sentence less than the Player's
+    ; Process all NPC Prisoners that have a Sentence less than the Player's, chronologically: each one is released at its own
+    ; release time (time is passed by the difference between them), the player's own time is passed after that.
     ; This should probably be processed globally for all Prisons, but just for testing it's done with the same one the Player is in.
-    Prison.ReleasePrisonersWithSentenceLessThan(TimeLeftInSentence)
+    Prison.ReleaseDueNPCsInOrder(TimeLeftInSentence)
 
     ; Pass the time
     int timeLeft = Math.Ceiling(TimeLeftInSentence)
@@ -1753,7 +1757,7 @@ function DetermineReleaseTimeAdditionalHours()
     Debug("["+ Name +"] Prisoner::DetermineReleaseTimeAdditionalHours", "Prison.ReleaseTimeMinimumHour: " + Prison.ReleaseTimeMinimumHour + ", Prison.ReleaseTimeMaximumHour: " + Prison.ReleaseTimeMaximumHour)
     ; If the release time window has already passed
     if (currentGameHour > Prison.ReleaseTimeMaximumHour)
-        __hasExtraReleaseTimeHours = true
+        SetBool("Has Extra Release Hours", true)
     endif
 endFunction
 
@@ -2343,7 +2347,7 @@ endFunction
     this is a crucial variable used to determine updated sentences, infamy gained, and so on...
 /;
 function RegisterLastUpdate()
-    __lastUpdate = Utility.GetCurrentGameTime()
+    SetFloat("Last Update", Utility.GetCurrentGameTime())
 endFunction
 
 
@@ -2909,17 +2913,27 @@ endFunction
 ; ==========================================================
 ;                    Clothing / Undressing
 
-Outfit __npcOriginalOutfit
+; The original outfit and the underwear live in the storage on the actor reference (not in script variables of this effect
+; instance): an unload ends the effect and a reload starts a NEW instance, whose variables are empty, so the NPC could never
+; get his outfit back.
 Outfit property NPC_OriginalOutfit
     Outfit function get()
-        return __npcOriginalOutfit
+        return GetForm("NPC Original Outfit") as Outfit
     endFunction
 endProperty
 
-Armor[] __npcUnderwear
 Armor[] property NPC_Underwear
     Armor[] function get()
-        return __npcUnderwear
+        Armor top = GetForm("NPC Underwear Top") as Armor
+        Armor bottom = GetForm("NPC Underwear Bottom") as Armor
+        if (!top && !bottom)
+            return none
+        endif
+
+        Armor[] underwear = new Armor[2]
+        underwear[NPC_UNDERWEAR_TOP_INDEX] = top
+        underwear[NPC_UNDERWEAR_BOTTOM_INDEX] = bottom
+        return underwear
     endFunction
 endProperty
 
@@ -2928,9 +2942,8 @@ int property NPC_UNDERWEAR_BOTTOM_INDEX = 1 autoreadonly
 
 function NPC_SaveUnderwear(Armor akUnderwearTop, Armor akUnderwearBottom)
     if (self.IsNPC())
-        __npcUnderwear = new Armor[2]
-        __npcUnderwear[NPC_UNDERWEAR_TOP_INDEX]     = akUnderwearTop
-        __npcUnderwear[NPC_UNDERWEAR_BOTTOM_INDEX]  = akUnderwearBottom
+        SetForm("NPC Underwear Top", akUnderwearTop)
+        SetForm("NPC Underwear Bottom", akUnderwearBottom)
     endif
 endFunction
 
@@ -2940,7 +2953,7 @@ function NPC_SaveOriginalOutfit()
 
         ; Ensure we don't save a 'naked' outfit.
         if (npcBaseOutfit != RPB_GetOutfit("Naked"))
-            __npcOriginalOutfit = npcBaseOutfit
+            SetForm("NPC Original Outfit", npcBaseOutfit)
         endif
     endif
 endFunction
