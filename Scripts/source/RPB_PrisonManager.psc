@@ -14,6 +14,7 @@ Scriptname RPB_PrisonManager extends Quest
     bool PrisonInfamyKnownThresholdNotification
     int PrisonsWithPrisonersCount
 @functions:
+    function DebugProbeCapacity(string asCellPackageSize = "S")
     function PrisonManager()
     function AddPrisonerToPrisonRegistry(RPB_Prisoner apPrisoner)
     function RemovePrisonerFromPrisonRegistry(RPB_Prisoner apPrisoner)
@@ -228,6 +229,30 @@ function __EnsureCellPackageMapping()
     endif
 
     self.PrisonManager()
+endFunction
+
+;/
+    Dev only: the steps of GetCellPackageCapacity() one at a time, each announced on the in-game console first, so a JContainers
+    "non-existing object" warning shows up right after the step that causes it (with the handles involved).
+/;
+function DebugProbeCapacity(string asCellPackageSize = "S")
+    MiscUtil.PrintConsole("PROBE 8a: mapping handle " + __cellPackageMapping)
+    bool mappingExists = Object_Exists(__cellPackageMapping)
+    MiscUtil.PrintConsole("PROBE 8b: mapping exists " + mappingExists)
+    if (mappingExists)
+        MiscUtil.PrintConsole("PROBE 8c: reading the child of size " + asCellPackageSize)
+        int groupsHandle = FastMap_GetObject(__cellPackageMapping, asCellPackageSize)
+        MiscUtil.PrintConsole("PROBE 8d: child handle " + groupsHandle)
+        MiscUtil.PrintConsole("PROBE 8e: child exists " + Object_Exists(groupsHandle))
+    endif
+
+    MiscUtil.PrintConsole("PROBE 8f: GetCellPackageGroupsOfSize")
+    Form[] groups = self.GetCellPackageGroupsOfSize(asCellPackageSize)
+    MiscUtil.PrintConsole("PROBE 8g: groups " + groups)
+
+    MiscUtil.PrintConsole("PROBE 8h: GetCellPackageCapacity")
+    int capacity = self.GetCellPackageCapacity(asCellPackageSize)
+    MiscUtil.PrintConsole("PROBE 8i: capacity " + capacity)
 endFunction
 
 function PrisonManager()

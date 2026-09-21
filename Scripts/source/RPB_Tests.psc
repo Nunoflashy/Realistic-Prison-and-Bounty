@@ -7730,7 +7730,11 @@ bool function __MassRun(bool abNoOvercrowding)
                 dressed += 1
             else
                 underwearOnly += 1
-                log("MASS bare actor " + i + " (" + all[i] + "): items " + all[i].GetNumItems() + ", base outfit " + all[i].GetActorBase().GetOutfit() + ", outfit parts " + self.__MassOutfitParts(all[i]) + " | " + self.__MassPartsDump(all[i]))
+                string bareCrumbs = ""
+                if (underwearOnly <= 3)
+                    bareCrumbs = " | crumbs: " + RPB_Utility.DumpCrumbs(all[i])
+                endif
+                log("MASS bare actor " + i + " (" + all[i] + "): items " + all[i].GetNumItems() + ", base outfit " + all[i].GetActorBase().GetOutfit() + ", outfit parts " + self.__MassOutfitParts(all[i]) + " | " + self.__MassPartsDump(all[i]) + bareCrumbs)
             endif
         endif
         i += 1
@@ -7839,8 +7843,8 @@ state Test_ConsoleProbe
             i += 1
         endWhile
 
-        MiscUtil.PrintConsole("PROBE 8: PrisonManager.GetCellPackageCapacity(S)")
-        n = probeManager.GetCellPackageCapacity("S")
+        MiscUtil.PrintConsole("PROBE 8: PrisonManager.GetCellPackageCapacity(S), step by step")
+        probeManager.DebugProbeCapacity("S")
         MiscUtil.PrintConsole("PROBE 9: RPB_Utility.IsOvercrowdingDisabled")
         bool disabled = RPB_Utility.IsOvercrowdingDisabled()
         MiscUtil.PrintConsole("PROBE 10: RPB_Utility.SetOvercrowdingDisabled true then false")

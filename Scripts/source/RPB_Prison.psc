@@ -2306,6 +2306,8 @@ function TeleportPrisonerToRelease(RPB_Prisoner apPrisoner)
         restoreItems = apPrisoner.NPC_GetRestoreItems()
     endif
 
+    RPB_Utility.Crumb(releasedActor, "Release: restore list, " + self.__DressTrace(releasedActor, restoreItems))
+
     self.OnPrisonerReleased(apPrisoner)
     RPB_Utility.Crumb(releasedActor, "Release: OnPrisonerReleased done")
 
@@ -2325,6 +2327,8 @@ function TeleportPrisonerToRelease(RPB_Prisoner apPrisoner)
             Utility.Wait(0.1)
             loadWaited += 0.1
         endWhile
+
+        RPB_Utility.Crumb(releasedActor, "Release: T1 before the equip, 3D loaded " + releasedActor.Is3DLoaded() + ", " + self.__DressTrace(releasedActor, restoreItems))
 
         int equippedNow = 0
         int k = 0
@@ -2368,7 +2372,31 @@ function TeleportPrisonerToRelease(RPB_Prisoner apPrisoner)
             DebugInfo("["+ Name +"] Prison::TeleportPrisonerToRelease", equipMsg)
             Info(equipMsg)
         endif
+        RPB_Utility.Crumb(releasedActor, "Release: T2 after the equip (equipped " + equippedNow + "), " + self.__DressTrace(releasedActor, restoreItems))
     endif
+endFunction
+
+; What the dress-up looks at, per listed item: name, how many the actor carries and whether it is worn. Only while crumbs are enabled
+; (the stress tests), it costs natives.
+string function __DressTrace(Actor akActor, Form[] akItems)
+    if (!RPB_Utility.IsCrumbsEnabled())
+        return ""
+    endif
+
+    if (!akItems)
+        return "list none"
+    endif
+
+    string trace = "list " + akItems.Length + ":"
+    int i = 0
+    while (i < akItems.Length && i < 8)
+        Form item = akItems[i]
+        if (item)
+            trace += " [" + item.GetName() + " c" + akActor.GetItemCount(item) + " w" + akActor.IsEquipped(item) + "]"
+        endif
+        i += 1
+    endWhile
+    return trace
 endFunction
 
 function EscortPrisonerToRelease(RPB_Prisoner apPrisoner)
