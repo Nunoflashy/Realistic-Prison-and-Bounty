@@ -7732,7 +7732,13 @@ bool function __MassRun(bool abNoOvercrowding)
                 underwearOnly += 1
                 string bareCrumbs = ""
                 if (underwearOnly <= 3)
-                    bareCrumbs = " | crumbs: " + RPB_Utility.DumpCrumbs(all[i])
+                    ; only the release part: a log line is cut at about 4100 characters, before it reaches the release entries
+        string bareDump = RPB_Utility.DumpCrumbs(all[i])
+        int releaseAt = StringUtil.Find(bareDump, "Release: start")
+        if (releaseAt >= 0)
+            bareDump = StringUtil.Substring(bareDump, releaseAt)
+        endif
+        bareCrumbs = " | release crumbs: " + bareDump
                 endif
                 log("MASS bare actor " + i + " (" + all[i] + "): items " + all[i].GetNumItems() + ", base outfit " + all[i].GetActorBase().GetOutfit() + ", outfit parts " + self.__MassOutfitParts(all[i]) + " | " + self.__MassPartsDump(all[i]) + bareCrumbs)
             endif
@@ -9309,6 +9315,10 @@ endFunction
     resets tracking. Call from every test's Teardown() that used __SpawnTempActor().
 /;
 function __TeardownAllTempActors()
+    if (!__testTempActors)
+        return ; nothing tracked (already torn down)
+    endif
+
     RPB_Prison solitudePrison = (RPB_API.GetPrisonManager()).GetPrison("Haafingar")
     RPB_Arrest arrest = RPB_API.GetArrest()
 

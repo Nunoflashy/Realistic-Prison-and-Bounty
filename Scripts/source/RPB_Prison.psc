@@ -2340,6 +2340,15 @@ function TeleportPrisonerToRelease(RPB_Prisoner apPrisoner)
             endif
             k += 1
         endWhile
+        ; Diagnostic (one line per NPC release): did the dress-up loop run, and what did it find
+        int listLength = 0
+        if (restoreItems)
+            listLength = restoreItems.Length
+        endif
+        string checkMsg = "Dress check on " + releasedActor.GetDisplayName() + " " + releasedActor + ": restore list " + listLength + ", carried and not worn (equipped now) " + equippedNow + ", 3D loaded " + releasedActor.Is3DLoaded()
+        DebugInfo("["+ Name +"] Prison::TeleportPrisonerToRelease", checkMsg)
+        Info(checkMsg)
+
         if (equippedNow > 0)
             releasedActor.QueueNiNodeUpdate() ; make the 3D show the new equipment
             ; Verify: how many are still not worn after the equip
