@@ -166,7 +166,7 @@ function Reschedule()
     endif
 
     float[] daysLeft = Utility.CreateFloatArray(count)
-    bool[] excluded = Utility.CreateBoolArray(count)
+    bool[] excluded = Utility.CreateBoolArray(count, false) ; the default fill is true: every prisoner would count as excluded
     bool hasUnknown = false
 
     int i = 0
@@ -188,6 +188,12 @@ function Reschedule()
     float hours = ComputeNextWakeHours(daysLeft, excluded, hasUnknown)
     if (hours < 0.0)
         return
+    endif
+
+    ; Dev override (F4 -> [Debug] Toggle Fast Monitor): a short fixed interval to test the monitor without waiting out a sentence
+    float overrideHours = RPB_Utility.GetMonitorOverrideHours()
+    if (overrideHours > 0.0)
+        hours = overrideHours
     endif
 
     RegisterForSingleUpdateGameTime(hours)

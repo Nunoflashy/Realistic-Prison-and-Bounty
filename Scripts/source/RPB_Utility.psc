@@ -1299,13 +1299,15 @@ endFunction
 /;
 function EnsureArresteeSpellAndBinding(Actor akArrestee, RPB_Hold apHold) global
     if (!akArrestee.HasSpell(RPB_ArresteeSpell()))
-        ; Cast the Arrestee spell (to bind the RPB_Arrestee instance script)
-        akArrestee.AddSpell(RPB_ArresteeSpell(), false)
-
+        ; Bind this Hold to the Arrestee (to retrieve it from RPB_Arrestee) BEFORE the spell is added: the effect starts on
+        ; another thread as soon as AddSpell returns and reads this value in its OnInitialize (it used to be written after,
+        ; so under load the effect could start without it).
         if (apHold)
-            ; Bind this Hold to the Arrestee (to retrieve it from RPB_Arrestee)
             RPB_StorageVars.SetStringOnReference("Hold UUID", akArrestee, apHold.UUID, "Arrest")
         endif
+
+        ; Cast the Arrestee spell (to bind the RPB_Arrestee instance script)
+        akArrestee.AddSpell(RPB_ArresteeSpell(), false)
     endif
 endFunction
 
@@ -1317,14 +1319,17 @@ endFunction
 /;
 function EnsurePrisonerSpellAndBinding(Actor akPrisoner, RPB_Prison apPrison) global
     if (!akPrisoner.HasSpell(RPB_PrisonerSpell()))
+        ; Bind this Prison to the Prisoner (to retrieve it from RPB_Prisoner) BEFORE the spell is added. The effect starts on
+        ; another thread as soon as AddSpell returns and resolves its Prison from this value in OnInitialize; written after the
+        ; spell, under load the effect could start first, find no Prison and never register (found by the stress test breadcrumbs:
+        ; "Prisoner.OnInitialize: enter ... Prison: None").
+        if (apPrison)
+            RPB_StorageVars.SetStringOnReference("Prison UUID", akPrisoner, apPrison.UUID, "Jail")
+        endif
+
         ; Cast the Prisoner spell (to bind the RPB_Prisoner instance script)
         Crumb(akPrisoner, "EnsurePrisonerSpellAndBinding: AddSpell prisoner")
         akPrisoner.AddSpell(RPB_PrisonerSpell(), false)
-
-        if (apPrison)
-            ; Bind this Prison to the Prisoner (to retrieve it from RPB_Prisoner)
-            RPB_StorageVars.SetStringOnReference("Prison UUID", akPrisoner, apPrison.UUID, "Jail")        
-        endif
     endif
 endFunction
 
@@ -1919,6 +1924,18 @@ string function DumpCrumbs(Actor akActor) global
         i += 1
     endWhile
     return trail
+endFunction
+
+;/
+    Dev override for the prison monitor's wake: when > 0 the monitor wakes every that many game hours instead of at the
+    earliest release, so its behavior can be tested without waiting out a sentence. 0 (default) = the real schedule.
+/;
+float function GetMonitorOverrideHours() global
+    return JDB.solveFlt(".rpb_root.storage.Profile.MONITOR_HOURS")
+endFunction
+
+function SetMonitorOverrideHours(float afHours) global
+    RPB_StorageVars.SetFloat("MONITOR_HOURS", afHours, "Profile")
 endFunction
 
 function FlowBegin(string asFlow) global

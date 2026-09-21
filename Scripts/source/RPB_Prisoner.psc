@@ -2662,8 +2662,16 @@ event OnInitialize()
     ; DebugInfo("("+ Name +") Prisoner::OnInitialize", "State: " + self.GetState())
     ; DebugInfo("("+ Name +") Prisoner::OnInitialize", "IsInitialized: " + self.IsInitialized)
 
+    ; The Prison UUID is written before the spell is added, but keep a bounded wait as a safety net (the effect starts on
+    ; another thread): without a Prison this prisoner can never register.
+    int bindingTries = 0
+    while (self.GetString("Prison UUID") == "" && bindingTries < 20)
+        Utility.Wait(0.1)
+        bindingTries += 1
+    endWhile
+
     if (RPB_Utility.IsCrumbsEnabled())
-        RPB_Utility.Crumb(this, "Prisoner.OnInitialize: enter (Was Initialized: " + self.Was("Initialized") + ", IsImprisoned: " + self.IsImprisoned + ", Prison: " + Prison + ")")
+        RPB_Utility.Crumb(this, "Prisoner.OnInitialize: enter (Was Initialized: " + self.Was("Initialized") + ", IsImprisoned: " + self.IsImprisoned + ", binding waits: " + bindingTries + ", Prison: " + Prison + ")")
     endif
 
     if (self.IsNPC() && self.IsImprisoned)
@@ -2760,8 +2768,8 @@ RPB_Prison function GetPrison()
     string prisonUUID = self.GetString("Prison UUID")
 
     if (!prisonUUID)
+        ; Not sticky anymore: a read that happens before the binding is written used to fail the prisoner for good
         EventManager.SendError("There was an error retrieving the Prison belonging to Prisoner: " + self.Name, "["+ Name +"] Prisoner::GetPrison")
-        __prisonFailedInitialization = true
         return none
     endif
 

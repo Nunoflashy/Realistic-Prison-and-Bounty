@@ -27,6 +27,7 @@ string[] function GetActions()
         "Quit to Main Menu," + \
         "[Debug] Toggle Flow Profiling," + \
         "[Debug] Toggle Debug Logging," + \
+        "[Debug] Toggle Fast Monitor (3h)," + \
         "[MCM] Validate Options," + \
         "[State] Delete All States," + \
         "[Actor] Log Selected Actor State Variables," + \
@@ -98,6 +99,9 @@ function ShowActionsMenu()
 
     elseif (actionToPerform == "[Debug] Toggle Debug Logging")
         Action_ToggleDebugLogging()
+
+    elseif (actionToPerform == "[Debug] Toggle Fast Monitor (3h)")
+        Action_ToggleFastMonitor()
 
     elseif (actionToPerform == "[MCM] Validate Options")
         API.MCM.ValidateOptions()
@@ -286,6 +290,20 @@ endFunction
     Flips the mod's debug logging (RPB_Utility.IsDebuggingEnabled(), ON by default). Every logged Debug() line costs a
     frame (debug.trace is a vanilla native), so this is also a way to measure what the logging costs a flow.
 /;
+;/
+    Flips the prison monitor's dev override: wake every 3 game hours instead of at the earliest release (test aid).
+    Applies from the next reschedule (imprison an NPC, or leave the prison cell).
+/;
+function Action_ToggleFastMonitor()
+    if (RPB_Utility.GetMonitorOverrideHours() > 0.0)
+        RPB_Utility.SetMonitorOverrideHours(0.0)
+        debug.notification("RPB fast monitor: OFF (real schedule)")
+    else
+        RPB_Utility.SetMonitorOverrideHours(3.0)
+        debug.notification("RPB fast monitor: ON (wakes every 3 game hours)")
+    endif
+endFunction
+
 function Action_ToggleDebugLogging()
     if (RPB_Utility.IsDebuggingEnabled())
         RPB_Utility.DisableDebugging()

@@ -6387,7 +6387,7 @@ state Test_PrisonMonitor_ScheduleMaths
 
         ; The example from the design: ten prisoners with two months or more, one with 20 days left -> 20 days + buffer
         float[] left = Utility.CreateFloatArray(11)
-        bool[] excluded = Utility.CreateBoolArray(11)
+        bool[] excluded = Utility.CreateBoolArray(11, false)
         int i = 0
         while (i < 10)
             left[i] = 60.0 + i
@@ -6400,7 +6400,7 @@ state Test_PrisonMonitor_ScheduleMaths
 
         ; Nothing eligible: only the Player / an undetermined sentence -> nothing to monitor
         float[] one = Utility.CreateFloatArray(1)
-        bool[] oneExcluded = Utility.CreateBoolArray(1)
+        bool[] oneExcluded = Utility.CreateBoolArray(1, false)
         one[0] = 5.0
         oneExcluded[0] = true
         hours = RPB_PrisonMonitor.ComputeNextWakeHours(one, oneExcluded)
@@ -6449,13 +6449,15 @@ state Test_PrisonMonitor_ScheduleMaths
 endState
 
 ;/
-    Characterization (no assumption asserted beyond registration): what does the prison's prisoner list hold for an NPC
-    prisoner whose actor unloads (its effect ends) and then loads again. The monitor's background processing has no
-    RPB_Prisoner object to work with for an away prisoner if the entry goes None. Results are logged.
+    Characterization: what does the prison's prisoner list hold for an NPC prisoner whose actor goes away (its cell
+    unloads, so its effect ends: Disable() does NOT do that) and comes back. The monitor's background processing has no
+    RPB_Prisoner object to work with for an away prisoner if the entry goes None. Only registration is asserted; the rest is
+    logged: entry / list count / effect state while away, and whether the imprisonment resumed after it loaded again.
 /;
 state Test_PrisonMonitor_AwayPrisoner
     function Setup()
         RPB_Prison prison = (RPB_API.GetPrisonManager()).GetPrison("Haafingar")
+        Actor player = Game.GetFormEx(0x14) as Actor
         bool ok = true
         bool step = false
 
@@ -6470,20 +6472,31 @@ state Test_PrisonMonitor_AwayPrisoner
 
         log("AWAY before: list Count=" + prison.Prisoners.Count + ", entry for the actor=" + (prison.Prisoners.AtKey(a) != none) + ", effect active=" + p.IsEffectActive + ", GetActors().Length=" + prison.Prisoners.GetActors().Length)
 
-        a.Disable()
-        float t0 = Utility.GetCurrentRealTime()
-        while (prison.Prisoners.AtKey(a) != none && (Utility.GetCurrentRealTime() - t0) < 10.0)
-            Utility.Wait(0.2)
-        endWhile
-        bool entryGone = (prison.Prisoners.AtKey(a) == none)
-        log("AWAY after Disable(): waited " + ((Utility.GetCurrentRealTime() - t0) as int) + "s, entry for the actor gone=" + entryGone + ", list Count=" + prison.Prisoners.Count + ", GetActors().Length=" + prison.Prisoners.GetActors().Length + ", stored Initialized flag=" + RPB_StorageVars.GetBoolOnReference("Initialized", a, "Jail"))
+        ; Away: into a jail cell (another cell than the player's, so it unloads)
+        ObjectReference farPlace = prison.JailCells[0] as ObjectReference
+        step = assert_true(farPlace != none, "The prison has no jail cell to send the actor away to")
+        ok = ok && step
+        if (!farPlace)
+            display_result(false)
+            return
+        endif
 
-        a.Enable()
-        t0 = Utility.GetCurrentRealTime()
-        while (prison.Prisoners.AtKey(a) == none && (Utility.GetCurrentRealTime() - t0) < 10.0)
-            Utility.Wait(0.2)
+        a.MoveTo(farPlace)
+        float t0 = Utility.GetCurrentRealTime()
+        while (!p.IsEffectActive == false && (Utility.GetCurrentRealTime() - t0) < 30.0)
+            Utility.Wait(0.5)
         endWhile
-        log("AWAY after Enable(): waited " + ((Utility.GetCurrentRealTime() - t0) as int) + "s, entry for the actor back=" + (prison.Prisoners.AtKey(a) != none) + ", list Count=" + prison.Prisoners.Count)
+        log("AWAY after MoveTo(jail cell): waited " + ((Utility.GetCurrentRealTime() - t0) as int) + "s, 3D loaded=" + a.Is3DLoaded() + ", entry for the actor present=" + (prison.Prisoners.AtKey(a) != none) + ", list Count=" + prison.Prisoners.Count + ", GetActors().Length=" + prison.Prisoners.GetActors().Length + ", cell=" + a.GetParentCell())
+
+        ; Back near the player: the effect starts again
+        a.MoveTo(player)
+        t0 = Utility.GetCurrentRealTime()
+        while (prison.Prisoners.AtKey(a) == none && (Utility.GetCurrentRealTime() - t0) < 30.0)
+            Utility.Wait(0.5)
+        endWhile
+        Utility.Wait(1.0)
+        RPB_Prisoner again = prison.Prisoners.AtKey(a)
+        log("AWAY after coming back: waited " + ((Utility.GetCurrentRealTime() - t0) as int) + "s, entry present=" + (again != none) + ", list Count=" + prison.Prisoners.Count + ", state=" + again.GetState() + ", 3D loaded=" + a.Is3DLoaded())
 
         display_result(ok)
     endFunction
