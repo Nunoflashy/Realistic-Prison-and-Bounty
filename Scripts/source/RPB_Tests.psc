@@ -118,6 +118,7 @@ function SetTests()
     self.AddTest("86 - PrisonMonitor: Release Queue Order, No Duplicates, One Per Wake (Dry Run)", "Test_PrisonMonitor_ReleaseQueue", abChainable = false)
     self.AddTest("87 - Time Skip: NPCs Are Released in Order, Each at Its Own Release Time (Dry Run, Passes Game Days)", "Test_Prison_ReleaseTimeline", abChainable = false)
     self.AddTest("88 - Prisoner: The NPC's Original Outfit and Underwear Survive the Effect Being Replaced", "Test_Prisoner_OutfitSurvivesInstanceReplacement", abChainable = false)
+    self.AddTest("89 - Prisoner: Worn Armor Is Snapshotted Before Stripping and Re-equipped After Release (Guards Have No Outfit)", "Test_Prisoner_WornArmorRestored", abChainable = false)
     self.AddTest("41 - ActiveMagicEffectContainer: Stuck Lock Self-Heals", "Test_ActiveMagicEffectContainer_StuckLockSelfHeals")
     self.AddTest("42 - ThreadLock: JAtomic Primitive Semantics and Registry", "Test_ThreadLock_PrimitiveSemantics")
     ; Not chainable: fires concurrent worker threads
@@ -7019,6 +7020,67 @@ state Test_Prisoner_OutfitSurvivesInstanceReplacement
             step = assert_true(none_underwear != none && none_underwear.Length == 2, "NPC_GetUnderwear() should always return a two element array")
             ok = ok && step
         endif
+
+        display_result(ok)
+    endFunction
+
+    function Teardown()
+        __TeardownAllTempActors()
+    endFunction
+endState
+
+;/
+    Guards wear their gear through templates: their base Outfit is none, so restoring the Outfit gives them nothing back.
+    The armor an NPC wears is snapshotted before the strip and equipped again after the release. The test dresses the dummy,
+    takes the snapshot, undresses it, and checks NPC_ReequipSavedWornArmor() puts the armor on again.
+/;
+state Test_Prisoner_WornArmorRestored
+    function Setup()
+        RPB_Prison prison = (RPB_API.GetPrisonManager()).GetPrison("Haafingar")
+        Actor player = Game.GetFormEx(0x14) as Actor
+        bool ok = true
+        bool step = false
+
+        Actor a = __SpawnTempActor()
+        RPB_Prisoner p = __RegisterPrisonerAndWait(a, prison)
+        step = assert_true(p != none, "Could not register the prisoner used for this test")
+        ok = ok && step
+        if (!p)
+            display_result(false)
+            return
+        endif
+
+        ; Any body armor will do: the player's, or one from the dummy's own outfit
+        Armor body = player.GetWornForm(0x4) as Armor
+        Outfit o = a.GetActorBase().GetOutfit()
+        if (!body && o)
+            int n = o.GetNumParts()
+            int k = 0
+            while (k < n && !body)
+                body = o.GetNthPart(k) as Armor
+                k += 1
+            endWhile
+        endif
+        if (!body)
+            log("INCONCLUSIVE: no armor found to dress the dummy with")
+            display_result(ok)
+            return
+        endif
+
+        a.AddItem(body, 1, true)
+        a.EquipItem(body, false, true)
+        Utility.Wait(1.0)
+        p.NPC_SaveWornArmor()
+        a.UnequipAll()
+        Utility.Wait(1.0)
+        log("WORN before re-equip: " + a.IsEquipped(body))
+
+        int count = p.NPC_ReequipSavedWornArmor()
+        Utility.Wait(1.0)
+        step = assert_true(count >= 1, "No saved worn armor was re-equipped, count " + count)
+        ok = ok && step
+        step = assert_true(a.IsEquipped(body), "The armor is not worn after the re-equip")
+        ok = ok && step
 
         display_result(ok)
     endFunction

@@ -198,6 +198,8 @@ Scriptname RPB_Prisoner extends RPB_ActorBase
     function NPC_SaveOriginalOutfit()
     function NPC_RestoreOriginalOutfit()
     function NPC_ReequipAfterRelease()
+    function NPC_SaveWornArmor()
+    int function NPC_ReequipSavedWornArmor()
     function NPC_SetPersistentOutfit(string asOutfit)
     function NPC_RemovePresetItems()
     function NPC_UpdateStripping()
@@ -1447,6 +1449,7 @@ function Strip(bool abRemoveUnderwear = true)
         NPC_SaveUnderwear(underwearTop, underwearBottom)
     endif
 
+    self.NPC_SaveWornArmor()
     self.UnequipAll()
     self.RemoveAllItems(PrisonerBelongingsContainer, true, true) ; Remove and put all the items in the prisoner's possession in the assigned prisoner container
     self.UnequipHands()
@@ -1487,6 +1490,7 @@ function StripSilently()
 
     NPC_SaveUnderwear(underwearTop, underwearBottom)
 
+    self.NPC_SaveWornArmor()
     self.UnequipAll()
     self.RemoveAllItems(PrisonerBelongingsContainer, true, true) ; Remove and put all the items in the prisoner's possession in the assigned prisoner container
     self.UnequipHands()
@@ -3230,31 +3234,90 @@ function NPC_ReequipAfterRelease()
         return
     endif
 
+    ; Guards and other template based NPCs have no Outfit of their own (nothing saved): the worn armor snapshot covers them
     Outfit original = NPC_OriginalOutfit
-    if (!original)
-        EventManager.SendInfo("No original outfit saved for " + self.Name + ", nothing to re-equip", "["+ Name +"] Prisoner::NPC_ReequipAfterRelease")
+    int parts = 0
+    int equipped = 0
+    int skipped = 0
+    if (original)
+        if (this.GetActorBase().GetOutfit() != original)
+            this.SetOutfit(original)
+        endif
+
+        parts = original.GetNumParts()
+        int i = 0
+        while (i < parts)
+            Armor part = original.GetNthPart(i) as Armor
+            if (!part)
+                skipped += 1
+            elseIf (this.GetItemCount(part) > 0)
+                this.EquipItem(part)
+                equipped += 1
+            endif
+            i += 1
+        endWhile
+    endif
+
+    int wornEquipped = self.NPC_ReequipSavedWornArmor()
+    EventManager.SendInfo("Re-equipped " + equipped + " of " + parts + " outfit parts (" + skipped + " not plain armors, saved outfit " + original + ") and " + wornEquipped + " saved worn armors on " + self.Name + ", worn body: " + this.GetWornForm(0x4), "["+ Name +"] Prisoner::NPC_ReequipAfterRelease")
+endFunction
+
+;/
+    The armor the NPC wears when it is stripped, per slot, in the storage on the actor. Needed for NPCs whose gear does not
+    come from their own default Outfit (guards use templates: GetOutfit() is none), so the outfit alone cannot dress them again.
+    Must be called BEFORE the NPC is unequipped and emptied.
+/;
+int[] function __NPC_WornArmorSlots()
+    int[] slots = new int[11]
+    slots[0] = 30 ; head
+    slots[1] = 32 ; body
+    slots[2] = 33 ; hands
+    slots[3] = 34 ; forearms
+    slots[4] = 35 ; amulet
+    slots[5] = 36 ; ring
+    slots[6] = 37 ; feet
+    slots[7] = 38 ; calves
+    slots[8] = 39 ; shield
+    slots[9] = 42 ; circlet
+    slots[10] = 43 ; ears
+    return slots
+endFunction
+
+function NPC_SaveWornArmor()
+    if (!self.IsNPC())
         return
     endif
 
-    if (this.GetActorBase().GetOutfit() != original)
-        this.SetOutfit(original)
-    endif
-
-    int parts = original.GetNumParts()
-    int equipped = 0
-    int skipped = 0
+    int[] slots = self.__NPC_WornArmorSlots()
+    int saved = 0
     int i = 0
-    while (i < parts)
-        Armor part = original.GetNthPart(i) as Armor
-        if (!part)
-            skipped += 1
-        elseIf (this.GetItemCount(part) > 0)
-            this.EquipItem(part)
+    while (i < slots.Length)
+        string wornKey = "NPC Worn Armor " + slots[i]
+        Armor worn = this.GetWornForm(Math.LeftShift(1, slots[i] - 30)) as Armor
+        if (worn)
+            SetForm(wornKey, worn)
+            saved += 1
+        elseIf (GetForm(wornKey))
+            Remove(wornKey)
+        endif
+        i += 1
+    endWhile
+    EventManager.SendInfo("Saved " + saved + " worn armor slots of " + self.Name + " before stripping", "["+ Name +"] Prisoner::NPC_SaveWornArmor")
+endFunction
+
+int function NPC_ReequipSavedWornArmor()
+    int[] slots = self.__NPC_WornArmorSlots()
+    int equipped = 0
+    int i = 0
+    while (i < slots.Length)
+        Armor saved = GetForm("NPC Worn Armor " + slots[i]) as Armor
+        if (saved && this.GetItemCount(saved) > 0 && !this.IsEquipped(saved))
+            this.EquipItem(saved)
             equipped += 1
         endif
         i += 1
     endWhile
-    EventManager.SendInfo("Re-equipped " + equipped + " of " + parts + " outfit parts on " + self.Name + " (" + skipped + " not plain armors), worn body: " + this.GetWornForm(0x4), "["+ Name +"] Prisoner::NPC_ReequipAfterRelease")
+    return equipped
 endFunction
 
 function NPC_SetPersistentOutfit(string asOutfit)
