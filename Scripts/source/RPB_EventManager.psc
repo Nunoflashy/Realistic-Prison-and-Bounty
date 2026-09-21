@@ -266,14 +266,17 @@ event OnArrestBegin(string eventName, string arrestType, float arresteeIdFlt, Fo
     endif
 
     RPB_Utility.FlowMark("OnArrestBegin: validated (type, arrest status)")
+    RPB_Utility.Crumb(arrestee, "OnArrestBegin: validated (type, arrest status)")
 
     ; Handle Before Arrest event
     Arrest.OnArrestPreparing(arrestee, captor, crimeFaction, arrestType)
     RPB_Utility.FlowMark("Arrest.OnArrestPreparing done")
+    RPB_Utility.Crumb(arrestee, "Arrest.OnArrestPreparing done")
 
     RPB_Arrestee arresteeRef = Arrest.AwaitArresteeReference(arrestee)  ; Mark this Actor as one that is to be arrested (Cast the spell in order to have Arrestee related functions on them through RPB_Arrestee)
 
     RPB_Utility.FlowMark("AwaitArresteeReference done (spell, effect start, register)")
+    RPB_Utility.Crumb(arrestee, "AwaitArresteeReference done (spell, effect start, register)")
 
     if (!arresteeRef.InitializeState())
         Config.NotifyArrest("Could not arrest " + arresteeRef.Name)
@@ -282,6 +285,7 @@ event OnArrestBegin(string eventName, string arrestType, float arresteeIdFlt, Fo
     endif
 
     RPB_Utility.FlowMark("Arrestee.InitializeState done")
+    RPB_Utility.Crumb(arrestee, "Arrestee.InitializeState done")
 
     ; Faction Arrest
     if (captor == none)
@@ -291,6 +295,7 @@ event OnArrestBegin(string eventName, string arrestType, float arresteeIdFlt, Fo
 
     RPB_Captor captorRef = Arrest.AwaitCaptorReference(captor)
     RPB_Utility.FlowMark("AwaitCaptorReference done")
+    RPB_Utility.Crumb(arrestee, "AwaitCaptorReference done")
 
     ; Captor Arrest
     Arrest.OnArrestBegin(arresteeRef, captorRef, crimeFaction, arrestType)

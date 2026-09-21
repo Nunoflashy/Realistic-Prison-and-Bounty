@@ -2204,8 +2204,10 @@ bool function AssignCell(RPB_Prisoner apPrisoner)
     endif
 
     RPB_Utility.FlowMark("AssignCell: start")
+    RPB_Utility.Crumb(apPrisoner.GetActor(), "AssignCell: start")
     RPB_JailCell assignedCell = self.RequestCell(apPrisoner)
     RPB_Utility.FlowMark("AssignCell: RequestCell")
+    RPB_Utility.Crumb(apPrisoner.GetActor(), "AssignCell: RequestCell")
     ; RPB_JailCell assignedCell = GetFormFromMod(0x388D) as RPB_JaiLCell
 
 
@@ -2456,16 +2458,19 @@ event OnPrisonerTeleportedToCell(RPB_Prisoner apPrisoner, bool abImprisonPrisone
     endif
 
     RPB_Utility.FlowMark("Teleported: AI + NPC_BindToCell")
+    RPB_Utility.Crumb(apPrisoner.GetActor(), "Teleported: AI + NPC_BindToCell")
     if (!apPrisoner.PrisonerBelongingsContainer)
         self.AssignBelongingsContainer(apPrisoner)
     endif
 
     RPB_Utility.FlowMark("Teleported: belongings container")
+    RPB_Utility.Crumb(apPrisoner.GetActor(), "Teleported: belongings container")
     if (apPrisoner.ShouldBeFrisked)
         apPrisoner.Frisk()
     endif
 
     RPB_Utility.FlowMark("Teleported: frisk")
+    RPB_Utility.Crumb(apPrisoner.GetActor(), "Teleported: frisk")
     if (apPrisoner.ShouldBeStripped)
         apPrisoner.Strip(abRemoveUnderwear = apPrisoner.WillBeStrippedNaked)
 
@@ -2474,12 +2479,14 @@ event OnPrisonerTeleportedToCell(RPB_Prisoner apPrisoner, bool abImprisonPrisone
     endif
 
     RPB_Utility.FlowMark("Teleported: strip")
+    RPB_Utility.Crumb(apPrisoner.GetActor(), "Teleported: strip")
     if (apPrisoner.ShouldBeClothed)
         apPrisoner.DetermineClothingOutfit()
         apPrisoner.Clothe()
     endif
 
     RPB_Utility.FlowMark("Teleported: clothe")
+    RPB_Utility.Crumb(apPrisoner.GetActor(), "Teleported: clothe")
     if (abImprisonPrisoner)
         apPrisoner.Imprison()
     endif
@@ -2758,10 +2765,13 @@ bool function BindCellToPrisoner(ObjectReference akJailCell, RPB_Prisoner apPris
 
     ; Register the prisoner into the cell
     RPB_Utility.FlowMark("Bind: init/ScanCellDoor")
+    RPB_Utility.Crumb(apPrisoner.GetActor(), "Bind: init/ScanCellDoor")
     jailCell.RegisterPrisoner(apPrisoner)
     RPB_Utility.FlowMark("Bind: RegisterPrisoner")
+    RPB_Utility.Crumb(apPrisoner.GetActor(), "Bind: RegisterPrisoner")
     jailCell.DetermineGoodies()
     RPB_Utility.FlowMark("Bind: DetermineGoodies")
+    RPB_Utility.Crumb(apPrisoner.GetActor(), "Bind: DetermineGoodies")
 
     return true
 endFunction

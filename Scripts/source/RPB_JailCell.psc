@@ -793,6 +793,7 @@ function RegisterPrisoner(RPB_Prisoner apPrisoner)
     RPB_Utility.FlowMark("RegisterPrisoner: map + identifier")
     apPrisoner.SetForm("Cell", self, "Jail")
     RPB_Utility.FlowMark("RegisterPrisoner: SetForm Cell")
+    RPB_Utility.Crumb(apPrisoner.GetActor(), "RegisterPrisoner: SetForm Cell")
 
     self.OnPrisonerRegister(apPrisoner)
 endFunction

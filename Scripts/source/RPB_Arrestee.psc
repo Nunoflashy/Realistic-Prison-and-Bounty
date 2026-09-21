@@ -320,6 +320,7 @@ RPB_Prisoner function MakePrisoner()
     RPB_Prison prison  = self.GetPotentialPrison()
     self.TransferArrestPropertiesToPrisoner(prison)
     RPB_Utility.FlowMark("MakePrisoner: GetPotentialPrison + TransferArrestPropertiesToPrisoner")
+    RPB_Utility.Crumb(this, "MakePrisoner: GetPotentialPrison + TransferArrestPropertiesToPrisoner")
 
     return prison.AwaitPrisonerReference(this)
 endFunction
@@ -446,10 +447,12 @@ endFunction
 function MoveToPrison(bool abMoveDirectlyToCell = false)
     RPB_Prisoner prisoner   = self.MakePrisoner()
     RPB_Utility.FlowMark("MoveToPrison: MakePrisoner done (await prisoner incl. Initialize)")
+    RPB_Utility.Crumb(this, "MoveToPrison: MakePrisoner done (await prisoner incl. Initialize)")
     RPB_Prison prison       = prisoner.Prison
 
     bool hasAssignedCell = prisoner.AssignCell()
     RPB_Utility.FlowMark("MoveToPrison: AssignCell done")
+    RPB_Utility.Crumb(this, "MoveToPrison: AssignCell done")
 
     if (abMoveDirectlyToCell)
         if (!hasAssignedCell)
@@ -460,6 +463,7 @@ function MoveToPrison(bool abMoveDirectlyToCell = false)
 
         prisoner.MoveToCell()
         RPB_Utility.FlowMark("MoveToPrison: prisoner.MoveToCell returned")
+        RPB_Utility.Crumb(this, "MoveToPrison: prisoner.MoveToCell returned")
     else
         if (!hasAssignedCell)
             DebugWarn("["+ Name +"] Arrestee::MoveToPrison", "Arrestee hasn't been assigned a cell yet since it failed, the arrest may not work!")
@@ -662,7 +666,9 @@ function Destroy()
     ; Unset all properties related to this Arrestee
     ; Stop the escort loop first (OnUpdate reads the Captor, which RemoveAll deletes). This used to be a blind
     ; Utility.Wait(0.5) between RemoveAll and UnregisterArrestee, which blocked every imprisonment for half a second.
-    UnregisterForUpdate()
+    if (self.IsEffectActive) ; on a dead effect the native errors out (no native object bound)
+        UnregisterForUpdate()
+    endif
     self.RemoveAll()
     Arrest.UnregisterArrestee(self)
 endFunction

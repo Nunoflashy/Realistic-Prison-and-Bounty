@@ -1876,6 +1876,49 @@ function DisableFlowProfiling() global
     RPB_StorageVars.SetInt("Active", 0, "Profile")
 endFunction
 
+;/
+    Dev-only per-actor breadcrumbs. Unlike the flow profiler (one global flow), every actor gets its own trail, stored on the
+    reference (so it survives an ActiveMagicEffect script that has died), which makes it possible to see exactly where one
+    actor's arrest -> imprison stopped when several run at once. Off by default; the stress tests turn it on.
+    Crumb() when off costs one JDB read.
+/;
+bool function IsCrumbsEnabled() global
+    return JDB.solveInt(".rpb_root.storage.Profile.CRUMBS") != 0
+endFunction
+
+function EnableCrumbs() global
+    RPB_StorageVars.SetBool("CRUMBS", true, "Profile")
+endFunction
+
+function DisableCrumbs() global
+    RPB_StorageVars.SetBool("CRUMBS", false, "Profile")
+endFunction
+
+function Crumb(Actor akActor, string asStage) global
+    if (!akActor || JDB.solveInt(".rpb_root.storage.Profile.CRUMBS") == 0)
+        return
+    endif
+
+    int count = RPB_StorageVars.GetIntOnReference("Count", akActor, "Crumbs") + 1
+    RPB_StorageVars.SetIntOnReference("Count", akActor, count, "Crumbs")
+    RPB_StorageVars.SetStringOnReference("s" + count, akActor, asStage + " [3D " + akActor.Is3DLoaded() + ", t=" + Utility.GetCurrentRealTime() + "]", "Crumbs")
+endFunction
+
+function ClearCrumbs(Actor akActor) global
+    RPB_StorageVars.DeleteCategoryOnReference(akActor, "Crumbs")
+endFunction
+
+string function DumpCrumbs(Actor akActor) global
+    int count = RPB_StorageVars.GetIntOnReference("Count", akActor, "Crumbs")
+    string trail = "crumbs(" + count + "):"
+    int i = 1
+    while (i <= count)
+        trail += " | " + RPB_StorageVars.GetStringOnReference("s" + i, akActor, "Crumbs")
+        i += 1
+    endWhile
+    return trail
+endFunction
+
 function FlowBegin(string asFlow) global
     if (!IsFlowProfilingEnabled())
         return

@@ -680,11 +680,13 @@ state Imprisoned
         ; At this point, we can delete the prisoner's arrest state
         self.DestroyArrestState()
         RPB_Utility.FlowMark("Imprisoned: DestroyArrestState")
+        RPB_Utility.Crumb(this, "Imprisoned: DestroyArrestState")
 
         self.RegisterLastUpdate()
         RPB_Utility.FlowMark("Imprisoned: RegisterLastUpdate")
         RegisterForUpdateGameTime(1.0)
         RPB_Utility.FlowMark("Imprisoned: RegisterForUpdateGameTime")
+        RPB_Utility.Crumb(this, "Imprisoned: RegisterForUpdateGameTime")
         SetBool("Imprisoned", true)
     endEvent
 
@@ -928,8 +930,10 @@ function MoveToCell(bool abBeginImprisonment = true)
 
     self.MoveTo(JailCell)
     RPB_Utility.FlowMark("Prisoner.MoveToCell: MoveTo(JailCell) done")
+    RPB_Utility.Crumb(this, "Prisoner.MoveToCell: MoveTo(JailCell) done")
     Prison.OnPrisonerTeleportedToCell(self, abBeginImprisonment)
     RPB_Utility.FlowMark("Prisoner.MoveToCell: Prison.OnPrisonerTeleportedToCell returned")
+    RPB_Utility.Crumb(this, "Prisoner.MoveToCell: Prison.OnPrisonerTeleportedToCell returned")
 endFunction
 
 function TriggerInfamyPenalty()
@@ -1791,6 +1795,7 @@ function Imprison()
     float startBench = StartBenchmark()
     self.OnImprisoned()
     RPB_Utility.FlowMark("Imprison: OnImprisoned done")
+    RPB_Utility.Crumb(this, "Imprison: OnImprisoned done")
     GotoState("Imprisoned") ; State when the prisoner is in the cell, check for updates for sentence, etc...
     RPB_Utility.FlowEnd("Imprison: GotoState(Imprisoned) done")
     EndBenchmark(startBench, "Ended ["+ Name +"] Prisoner::Imprison")

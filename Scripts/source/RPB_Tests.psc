@@ -6017,6 +6017,7 @@ endFunction
 
 ; Gives the actor a bounty and starts a teleport-to-cell arrest through the real event flow
 function __StressArrest(Actor akGuard, Actor akActor)
+    RPB_Utility.ClearCrumbs(akActor)
     RPB_ActorVars.SetCrimeGold(akGuard.GetCrimeFaction(), akActor, 2000)
     RPB_API.GetArrest().ArrestActor(akGuard, akActor, RPB_API.GetArrest().ARREST_TYPE_TELEPORT_TO_CELL)
 endFunction
@@ -6112,7 +6113,8 @@ string function __StressDiagnose(Actor akActor, RPB_Prison akPrison, Actor akGua
     d += " Imprisoned=" + RPB_StorageVars.GetBoolOnReference("Imprisoned", akActor, "Jail") + "}"
     d += " hasArresteeSpell=" + akActor.HasSpell(RPB_Utility.RPB_ArresteeSpell())
     d += " hasPrisonerSpell=" + akActor.HasSpell(RPB_Utility.RPB_PrisonerSpell())
-    d += " 3DLoaded=" + akActor.Is3DLoaded()
+    d += " 3DLoaded=" + akActor.Is3DLoaded() + " cell=" + akActor.GetParentCell() + " effects{arrestee/prisoner spells above}"
+    d += " " + RPB_Utility.DumpCrumbs(akActor)
     return d
 endFunction
 
@@ -6120,6 +6122,7 @@ bool __stressProfilerWasOn
 
 ; The flow profiler is a single global flow: concurrent arrests would interleave its marks, so it is off for the stress bursts
 function __StressProfilerOff()
+    RPB_Utility.EnableCrumbs()
     __stressProfilerWasOn = RPB_Utility.IsFlowProfilingEnabled()
     if (__stressProfilerWasOn)
         RPB_Utility.DisableFlowProfiling()
@@ -6127,6 +6130,7 @@ function __StressProfilerOff()
 endFunction
 
 function __StressProfilerRestore()
+    RPB_Utility.DisableCrumbs()
     if (__stressProfilerWasOn)
         RPB_Utility.EnableFlowProfiling()
         __stressProfilerWasOn = false

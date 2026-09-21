@@ -402,6 +402,7 @@ endEvent
     string          @asArrestType: The type of the arrest, whether to escort or to move to jail, etc... (for more info, see ARREST_TYPES)
 /;
 event OnArrestBegin(RPB_Arrestee apArrestee, RPB_Captor apCaptor, Faction akCrimeFaction, string asArrestType)
+    RPB_Utility.Crumb(apArrestee.GetActor(), "Arrest.OnArrestBegin: enter")
     apArrestee.SetArrestParameters(asArrestType, apCaptor, akCrimeFaction)
 
     ; Debug("Arrest::OnArrestBegin", "ArresteeRef: [\n" + \
@@ -416,6 +417,7 @@ event OnArrestBegin(RPB_Arrestee apArrestee, RPB_Captor apCaptor, Faction akCrim
     if (!apArrestee.HasLatentBounty() && !apArrestee.HasActiveBounty())
         Config.NotifyArrest("You can't be arrested in " + RPB_Utility.GetFormNameCached(akCrimeFaction) + " since you do not have a bounty in the hold", apArrestee.IsPlayer())
         EventManager.SendError(apArrestee.Name + " has no bounty, cannot arrest for "+ RPB_Utility.GetFormNameCached(akCrimeFaction) +", aborting!", "Arrest::OnArrestBegin")
+        RPB_Utility.Crumb(apArrestee.GetActor(), "Arrest.OnArrestBegin: ABORT no bounty")
         apArrestee.Destroy()
         return
     endif
@@ -432,6 +434,7 @@ event OnArrestBegin(RPB_Arrestee apArrestee, RPB_Captor apCaptor, Faction akCrim
     endif
 
     RPB_Utility.FlowMark("Arrest.OnArrestBegin: parameters, bounty check, captor assigned")
+    RPB_Utility.Crumb(apArrestee.GetActor(), "Arrest.OnArrestBegin: parameters, bounty check, captor assigned")
     self.BeginArrest(apArrestee)
 endEvent
 
@@ -906,17 +909,20 @@ function BeginArrest(RPB_Arrestee apArresteeRef)
     apArresteeRef.HideBounty()
     apArresteeRef.StopCombat()
     RPB_Utility.FlowMark("BeginArrest: HideBounty + StopCombat")
+    RPB_Utility.Crumb(arrestee, "BeginArrest: HideBounty + StopCombat")
     ; apArresteeRef.SheatheWeapon()
     ; apArresteeRef.UnequipHands()
 
     ; Actually consider the actor Arrested
     apArresteeRef.Arrest()
     RPB_Utility.FlowMark("BeginArrest: Arrestee.Arrest() done")
+    RPB_Utility.Crumb(arrestee, "BeginArrest: Arrestee.Arrest() done")
 
     ; Next step, escort/move to prison
     if (arrestType == ARREST_TYPE_TELEPORT_TO_CELL)
         apArresteeRef.MoveToPrison(abMoveDirectlyToCell = true)
         RPB_Utility.FlowMark("BeginArrest: MoveToPrison returned")
+        RPB_Utility.Crumb(arrestee, "BeginArrest: MoveToPrison returned")
         return
         ; Handled on OnArresteeRestrained()
         SceneManager.StartArrestScene( \

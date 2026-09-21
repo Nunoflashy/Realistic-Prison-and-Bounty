@@ -917,6 +917,7 @@ event OnEffectStart(Actor akTarget, Actor akCaster)
     __pathPrefix = ""
     __cachedName = ""
     __isEffectActive = true
+    RPB_Utility.Crumb(akTarget, "OnEffectStart " + (self as string))
 
     ; Assigns the actor for this script, differentiating between Player and NPC to avoid retrieving properties, instead caching it in a local variable to this script
     self.__assignActor()
@@ -931,6 +932,7 @@ endEvent
 event OnEffectFinish(Actor akTarget, Actor akCaster)
     Debug("RPB_ActorBase::OnEffectFinish", this + " is no longer bound to " + self as string + ", detaching script!")
 
+    RPB_Utility.Crumb(akTarget, "OnEffectFinish " + (self as string))
     __isEffectActive = false
     self.OnDestroy()
 endEvent
