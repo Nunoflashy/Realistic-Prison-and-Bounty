@@ -1,10 +1,9 @@
 scriptname RPB_SerializableObjectReference extends ObjectReference
-{
-    @property bool Active
-    @property string ID
-}
 
 ;/
+@properties:
+    bool Active
+    string ID
 @functions:
     bool function ActiveByDefault()
     string function Rules(string rule)

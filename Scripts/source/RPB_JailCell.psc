@@ -1,41 +1,40 @@
 scriptname RPB_JailCell extends RPB_SerializableObjectReference
-{
-    @property RPB_API API
-    @property RPB_EventManager EventManager
-    @property string Name
-    @property RPB_Prison Prison
-    @property RPB_CellDoor CellDoor
-    @property Form[] InteriorMarkers
-    @property Form[] ExteriorMarkers
-    @property bool HasInteriorMarkers
-    @property bool HasExteriorMarkers
-    @property Form[] Prisoners
-    @property Form[] FemalePrisoners
-    @property Form[] MalePrisoners
-    @property Form[] Beds
-    @property Form[] Containers
-    @property Form[] OtherProps
-    @property bool HasPrisoners
-    @property bool HasBeds
-    @property bool HasContainers
-    @property bool HasOtherProps
-    @property bool IsEmpty
-    @property bool IsFull
-    @property bool IsOvercrowded
-    @property bool AllowOvercrowding
-    @property bool IsAvailable
-    @property bool IsFemaleOnly
-    @property bool IsMaleOnly
-    @property bool IsGenderExclusive
-    @property float CellRadius
-    @property int ScanIterations
-    @property int MaxPrisoners
-    @property string DefaultPackageSize
-    @property string PackageSize
-    @property int PrisonerCount
-}
 
 ;/
+@properties:
+    RPB_API API
+    RPB_EventManager EventManager
+    string Name
+    RPB_Prison Prison
+    RPB_CellDoor CellDoor
+    Form[] InteriorMarkers
+    Form[] ExteriorMarkers
+    bool HasInteriorMarkers
+    bool HasExteriorMarkers
+    Form[] Prisoners
+    Form[] FemalePrisoners
+    Form[] MalePrisoners
+    Form[] Beds
+    Form[] Containers
+    Form[] OtherProps
+    bool HasPrisoners
+    bool HasBeds
+    bool HasContainers
+    bool HasOtherProps
+    bool IsEmpty
+    bool IsFull
+    bool IsOvercrowded
+    bool AllowOvercrowding
+    bool IsAvailable
+    bool IsFemaleOnly
+    bool IsMaleOnly
+    bool IsGenderExclusive
+    float CellRadius
+    int ScanIterations
+    int MaxPrisoners
+    string DefaultPackageSize
+    string PackageSize
+    int PrisonerCount
 @functions:
     function JailCell()
     ReferenceAlias function GetSuitableCellPackage()

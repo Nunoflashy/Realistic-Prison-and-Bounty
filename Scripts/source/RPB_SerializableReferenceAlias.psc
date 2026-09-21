@@ -1,11 +1,10 @@
 scriptname RPB_SerializableReferenceAlias extends ReferenceAlias
-{
-    @property bool Active
-    @property int ID
-    @property string UUID
-}
 
 ;/
+@properties:
+    bool Active
+    int ID
+    string UUID
 @functions:
     string function Rules(string rule)
     function Delete()

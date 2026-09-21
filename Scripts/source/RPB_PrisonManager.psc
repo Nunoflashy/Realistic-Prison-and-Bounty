@@ -1,19 +1,18 @@
 Scriptname RPB_PrisonManager extends Quest
-{
-    @property RPB_API API
-    @property RPB_Config Config
-    @property RPB_EventManager EventManager
-    @property RPB_SceneManager SceneManager
-    @property int PrisonSlots
-    @property RPB_Prison AvailableSlot
-    @property bool HasPrisonsWithPrisoners
-    @property Message ServeTimeMessage
-    @property bool PrisonInfamyRecognizedThresholdNotification
-    @property bool PrisonInfamyKnownThresholdNotification
-    @property int PrisonsWithPrisonersCount
-}
 
 ;/
+@properties:
+    RPB_API API
+    RPB_Config Config
+    RPB_EventManager EventManager
+    RPB_SceneManager SceneManager
+    int PrisonSlots
+    RPB_Prison AvailableSlot
+    bool HasPrisonsWithPrisoners
+    Message ServeTimeMessage
+    bool PrisonInfamyRecognizedThresholdNotification
+    bool PrisonInfamyKnownThresholdNotification
+    int PrisonsWithPrisonersCount
 @functions:
     function PrisonManager()
     function AddPrisonerToPrisonRegistry(RPB_Prisoner apPrisoner)

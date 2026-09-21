@@ -1,40 +1,39 @@
 Scriptname RPB_MCM extends SKI_ConfigBase  
-{
-    @property RPB_API API
-    @property RPB_Config Config
-    @property bool IS_DEBUG
-    @property bool ENABLE_TRACE
-    @property int CACHED_OPTION_INDEX
-    @property int CACHED_OPTION_NAME
-    @property int GENERAL_ERROR
-    @property int ARRAY_NOT_EXIST
-    @property int OPTION_NOT_EXIST
-    @property int INVALID_VALUE
-    @property int OPTION_ENABLED
-    @property int OPTION_DISABLED
-    @property int TYPE_NO_VALUE
-    @property int TYPE_NONE
-    @property int TYPE_INT
-    @property int TYPE_FLOAT
-    @property int TYPE_FORM
-    @property int TYPE_OBJECT
-    @property int TYPE_STRING
-    @property int OUTFIT_COUNT
-    @property string[] PrisonSkillHandlingOptions
-    @property string[] EscapeHandlingOptions
-    @property string[] UndressingHandlingOptions
-    @property string[] ClothingHandlingOptions
-    @property string[] ClothingOutfits
-    @property string[] LockLevels
-    @property string[] SkillNames
-    @property string[] Skills
-    @property string[] Holds
-    @property string CurrentRenderedCategory
-    @property string RPB_CurrentPage
-    @property string CurrentPageConfig
-}
 
 ;/
+@properties:
+    RPB_API API
+    RPB_Config Config
+    bool IS_DEBUG
+    bool ENABLE_TRACE
+    int CACHED_OPTION_INDEX
+    int CACHED_OPTION_NAME
+    int GENERAL_ERROR
+    int ARRAY_NOT_EXIST
+    int OPTION_NOT_EXIST
+    int INVALID_VALUE
+    int OPTION_ENABLED
+    int OPTION_DISABLED
+    int TYPE_NO_VALUE
+    int TYPE_NONE
+    int TYPE_INT
+    int TYPE_FLOAT
+    int TYPE_FORM
+    int TYPE_OBJECT
+    int TYPE_STRING
+    int OUTFIT_COUNT
+    string[] PrisonSkillHandlingOptions
+    string[] EscapeHandlingOptions
+    string[] UndressingHandlingOptions
+    string[] ClothingHandlingOptions
+    string[] ClothingOutfits
+    string[] LockLevels
+    string[] SkillNames
+    string[] Skills
+    string[] Holds
+    string CurrentRenderedCategory
+    string RPB_CurrentPage
+    string CurrentPageConfig
 @functions:
     string[] function GetPresetBuckets()
     string[] function GetPresetPageBuckets()

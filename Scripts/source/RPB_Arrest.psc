@@ -1,44 +1,43 @@
 scriptname RPB_Arrest extends Quest
-{
-    @property RPB_API API
-    @property RPB_Config Config
-    @property RPB_EventManager EventManager
-    @property RPB_SceneManager SceneManager
-    @property int TOPIC_START
-    @property int TOPIC_END
-    @property int TOPIC_TYPE_ARREST_SUSPICIOUS
-    @property int TOPIC_TYPE_ARREST_DIALOGUE_ELUDING
-    @property int TOPIC_TYPE_ARREST_PURSUIT_ELUDING
-    @property int TOPIC_TYPE_ARREST_CONFRONT
-    @property int TOPIC_TYPE_ARREST_PAY_BOUNTY_ON_SPOT
-    @property int TOPIC_TYPE_ARREST_PAY_BOUNTY_ESCORT_WILLINGLY
-    @property int TOPIC_TYPE_ARREST_PAY_BOUNTY_ESCORT_ARRESTED
-    @property int TOPIC_TYPE_ARREST_PAY_BOUNTY_MAX
-    @property int TOPIC_TYPE_ARREST_RESIST
-    @property int TOPIC_TYPE_COMBAT_YIELD
-    @property int TOPIC_TYPE_ARREST_GO_TO_JAIL
-    @property string ARREST_PAY_BOUNTY_ON_SPOT
-    @property string ARREST_PAY_BOUNTY_ESCORT_WILLINGLY
-    @property string ARREST_PAY_BOUNTY_ESCORT_BY_FORCE
-    @property string ARREST_TYPE_TELEPORT_TO_JAIL
-    @property string ARREST_TYPE_TELEPORT_TO_CELL
-    @property string ARREST_TYPE_ESCORT_TO_JAIL
-    @property string ARREST_TYPE_ESCORT_TO_CELL
-    @property string ARREST_GOAL_IMPRISONMENT
-    @property string ARREST_GOAL_BOUNTY_PAYMENT
-    @property string ARREST_GOAL_TEMPORARY_HOLD
-    @property int CAN_BE_ARRESTED
-    @property int ALREADY_ARRESTED
-    @property int ALREADY_IMPRISONED
-    @property int CAN_ARREST
-    @property int ALREADY_ARRESTING
-    @property RPB_ArresteeList Arrestees
-    @property RPB_CaptorList Captors
-    @property bool ShouldDisplayArrestNotifications
-    @property bool ShouldDisplayBountyDecayNotifications
-}
 
 ;/
+@properties:
+    RPB_API API
+    RPB_Config Config
+    RPB_EventManager EventManager
+    RPB_SceneManager SceneManager
+    int TOPIC_START
+    int TOPIC_END
+    int TOPIC_TYPE_ARREST_SUSPICIOUS
+    int TOPIC_TYPE_ARREST_DIALOGUE_ELUDING
+    int TOPIC_TYPE_ARREST_PURSUIT_ELUDING
+    int TOPIC_TYPE_ARREST_CONFRONT
+    int TOPIC_TYPE_ARREST_PAY_BOUNTY_ON_SPOT
+    int TOPIC_TYPE_ARREST_PAY_BOUNTY_ESCORT_WILLINGLY
+    int TOPIC_TYPE_ARREST_PAY_BOUNTY_ESCORT_ARRESTED
+    int TOPIC_TYPE_ARREST_PAY_BOUNTY_MAX
+    int TOPIC_TYPE_ARREST_RESIST
+    int TOPIC_TYPE_COMBAT_YIELD
+    int TOPIC_TYPE_ARREST_GO_TO_JAIL
+    string ARREST_PAY_BOUNTY_ON_SPOT
+    string ARREST_PAY_BOUNTY_ESCORT_WILLINGLY
+    string ARREST_PAY_BOUNTY_ESCORT_BY_FORCE
+    string ARREST_TYPE_TELEPORT_TO_JAIL
+    string ARREST_TYPE_TELEPORT_TO_CELL
+    string ARREST_TYPE_ESCORT_TO_JAIL
+    string ARREST_TYPE_ESCORT_TO_CELL
+    string ARREST_GOAL_IMPRISONMENT
+    string ARREST_GOAL_BOUNTY_PAYMENT
+    string ARREST_GOAL_TEMPORARY_HOLD
+    int CAN_BE_ARRESTED
+    int ALREADY_ARRESTED
+    int ALREADY_IMPRISONED
+    int CAN_ARREST
+    int ALREADY_ARRESTING
+    RPB_ArresteeList Arrestees
+    RPB_CaptorList Captors
+    bool ShouldDisplayArrestNotifications
+    bool ShouldDisplayBountyDecayNotifications
 @functions:
     function SetReferenceStateInt(string asReference, string asStateProperty, int aiValue)
     function SetReferenceStateFloat(string asReference, string asStateProperty, float afValue)

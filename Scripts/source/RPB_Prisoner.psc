@@ -1,91 +1,90 @@
 Scriptname RPB_Prisoner extends RPB_ActorBase
-{
-    @property int SKILL_LOSS_HANDLING_ALL_SKILLS
-    @property int SKILL_LOSS_HANDLING_ALL_STAT_SKILLS
-    @property int SKILL_LOSS_HANDLING_ALL_PERK_SKILLS
-    @property int SKILL_LOSS_HANDLING_RANDOM_STAT_SKILL
-    @property int SKILL_LOSS_HANDLING_RANDOM_PERK_SKILL
-    @property int SKILL_LOSS_HANDLING_RANDOM
-    @property RPB_EventManager EventManager
-    @property bool HasStateRequiredForImprisonment
-    @property bool ShouldProcessImprisonmentEvents
-    @property int MinuteOfArrest
-    @property int HourOfArrest
-    @property int DayOfArrest
-    @property int MonthOfArrest
-    @property int YearOfArrest
-    @property int MinuteOfImprisonment
-    @property int HourOfImprisonment
-    @property int DayOfImprisonment
-    @property int MonthOfImprisonment
-    @property int YearOfImprisonment
-    @property int ReleaseHour
-    @property int ReleaseMinute
-    @property Actor Captor
-    @property RPB_Prison Prison
-    @property RPB_JailCell JailCell
-    @property float CurrentTime
-    @property int BountyNonViolent
-    @property int BountyViolent
-    @property int Bounty
-    @property int Infamy
-    @property bool Defeated
-    @property int DefeatedBounty
-    @property bool ShouldBeFrisked
-    @property bool ShouldBeStripped
-    @property bool ShouldBeStrippedSilently
-    @property int StrippingThoroughness
-    @property bool ShouldBeClothed
-    @property bool UseDefaultOutfitAsFallback
-    @property ObjectReference PrisonerBelongingsContainer
-    @property ObjectReference TeleportReleaseLocation
-    @property bool IsImprisoned
-    @property bool IsInCell
-    @property bool ShouldBeInCell
-    @property float LastUpdate
-    @property float TimeSinceLastUpdate
-    @property float TimeOfArrest
-    @property float TimeOfImprisonment
-    @property float TimeServed
-    @property float TimeArrested
-    @property int Sentence
-    @property bool IsUndeterminedSentence
-    @property float ReleaseTime
-    @property bool ShowReleaseTime
-    @property bool ShowSentence
-    @property bool ShowTimeServed
-    @property bool ShowTimeLeftInSentence
-    @property bool ShowBounty
-    @property float TimeLeftInSentence
-    @property int DaysSinceTimeOfImprisonment
-    @property bool IsSentenceServed
-    @property bool ShouldFastForwardToRelease
-    @property int CurrentInfamy
-    @property bool IsInfamyEnabled
-    @property bool IsInfamyRecognized
-    @property bool IsInfamyKnown
-    @property int InfamyGainedDaily
-    @property float InfamyGainedPerUpdate
-    @property bool IsSentenceSet
-    @property ReferenceAlias CellPackage
-    @property bool HasCellPackage
-    @property bool HasCriminalPenalty
-    @property int CriminalPenaltySentence
-    @property bool WillBeStrippedNaked
-    @property bool WillBeStrippedToUnderwear
-    @property bool IsStrippedNaked
-    @property bool IsStrippedToUnderwear
-    @property bool IsStripped
-    @property bool IsClothed
-    @property Armor[] PrisonOutfit
-    @property float PreviousUpdateTimeServed
-    @property Outfit NPC_OriginalOutfit
-    @property Armor[] NPC_Underwear
-    @property int NPC_UNDERWEAR_TOP_INDEX
-    @property int NPC_UNDERWEAR_BOTTOM_INDEX
-}
 
 ;/
+@properties:
+    int SKILL_LOSS_HANDLING_ALL_SKILLS
+    int SKILL_LOSS_HANDLING_ALL_STAT_SKILLS
+    int SKILL_LOSS_HANDLING_ALL_PERK_SKILLS
+    int SKILL_LOSS_HANDLING_RANDOM_STAT_SKILL
+    int SKILL_LOSS_HANDLING_RANDOM_PERK_SKILL
+    int SKILL_LOSS_HANDLING_RANDOM
+    RPB_EventManager EventManager
+    bool HasStateRequiredForImprisonment
+    bool ShouldProcessImprisonmentEvents
+    int MinuteOfArrest
+    int HourOfArrest
+    int DayOfArrest
+    int MonthOfArrest
+    int YearOfArrest
+    int MinuteOfImprisonment
+    int HourOfImprisonment
+    int DayOfImprisonment
+    int MonthOfImprisonment
+    int YearOfImprisonment
+    int ReleaseHour
+    int ReleaseMinute
+    Actor Captor
+    RPB_Prison Prison
+    RPB_JailCell JailCell
+    float CurrentTime
+    int BountyNonViolent
+    int BountyViolent
+    int Bounty
+    int Infamy
+    bool Defeated
+    int DefeatedBounty
+    bool ShouldBeFrisked
+    bool ShouldBeStripped
+    bool ShouldBeStrippedSilently
+    int StrippingThoroughness
+    bool ShouldBeClothed
+    bool UseDefaultOutfitAsFallback
+    ObjectReference PrisonerBelongingsContainer
+    ObjectReference TeleportReleaseLocation
+    bool IsImprisoned
+    bool IsInCell
+    bool ShouldBeInCell
+    float LastUpdate
+    float TimeSinceLastUpdate
+    float TimeOfArrest
+    float TimeOfImprisonment
+    float TimeServed
+    float TimeArrested
+    int Sentence
+    bool IsUndeterminedSentence
+    float ReleaseTime
+    bool ShowReleaseTime
+    bool ShowSentence
+    bool ShowTimeServed
+    bool ShowTimeLeftInSentence
+    bool ShowBounty
+    float TimeLeftInSentence
+    int DaysSinceTimeOfImprisonment
+    bool IsSentenceServed
+    bool ShouldFastForwardToRelease
+    int CurrentInfamy
+    bool IsInfamyEnabled
+    bool IsInfamyRecognized
+    bool IsInfamyKnown
+    int InfamyGainedDaily
+    float InfamyGainedPerUpdate
+    bool IsSentenceSet
+    ReferenceAlias CellPackage
+    bool HasCellPackage
+    bool HasCriminalPenalty
+    int CriminalPenaltySentence
+    bool WillBeStrippedNaked
+    bool WillBeStrippedToUnderwear
+    bool IsStrippedNaked
+    bool IsStrippedToUnderwear
+    bool IsStripped
+    bool IsClothed
+    Armor[] PrisonOutfit
+    float PreviousUpdateTimeServed
+    Outfit NPC_OriginalOutfit
+    Armor[] NPC_Underwear
+    int NPC_UNDERWEAR_TOP_INDEX
+    int NPC_UNDERWEAR_BOTTOM_INDEX
 @functions:
     function RestoreBounty()
     function StartRestraining(Actor akRestrainer)

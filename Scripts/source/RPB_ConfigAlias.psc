@@ -1,13 +1,12 @@
 Scriptname RPB_ConfigAlias extends ReferenceAlias  
-{
-    @property RPB_API API
-    @property RPB_Config Config
-    @property RPB_PrisonManager PrisonManager
-    @property RPB_SceneManager SceneManager
-    @property RPB_EventManager EventManager
-}
 
 ;/
+@properties:
+    RPB_API API
+    RPB_Config Config
+    RPB_PrisonManager PrisonManager
+    RPB_SceneManager SceneManager
+    RPB_EventManager EventManager
 @functions:
     function PerformSetup()
     function PerformMaintenance()

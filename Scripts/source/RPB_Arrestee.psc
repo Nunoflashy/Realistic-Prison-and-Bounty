@@ -1,29 +1,28 @@
 Scriptname RPB_Arrestee extends RPB_ActorBase
-{
-    @property RPB_Arrest Arrest
-    @property RPB_SceneManager SceneManager
-    @property RPB_Captor Captor
-    @property Faction ArrestFaction
-    @property string Hold
-    @property string ArrestType
-    @property float CurrentTime
-    @property int BountyNonViolent
-    @property int BountyViolent
-    @property int Bounty
-    @property float TimeOfArrest
-    @property int MinuteOfArrest
-    @property int HourOfArrest
-    @property int DayOfArrest
-    @property int MonthOfArrest
-    @property int YearOfArrest
-    @property float TimeArrested
-    @property bool Defeated
-    @property int DefeatedBounty
-    @property bool IsArrested
-    @property bool IsImprisoned
-}
 
 ;/
+@properties:
+    RPB_Arrest Arrest
+    RPB_SceneManager SceneManager
+    RPB_Captor Captor
+    Faction ArrestFaction
+    string Hold
+    string ArrestType
+    float CurrentTime
+    int BountyNonViolent
+    int BountyViolent
+    int Bounty
+    float TimeOfArrest
+    int MinuteOfArrest
+    int HourOfArrest
+    int DayOfArrest
+    int MonthOfArrest
+    int YearOfArrest
+    float TimeArrested
+    bool Defeated
+    int DefeatedBounty
+    bool IsArrested
+    bool IsImprisoned
 @functions:
     RPB_Arrestee function GetStateForPrisoner(RPB_Prisoner apPrisoner) global
     RPB_Prison function GetPotentialPrison()

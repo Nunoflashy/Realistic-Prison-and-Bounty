@@ -1,12 +1,11 @@
 scriptname RPB_EventManager extends Quest
-{
-    @property RPB_API API
-    @property RPB_Config Config
-    @property RPB_Arrest Arrest
-    @property RPB_SceneManager SceneManager
-}
 
 ;/
+@properties:
+    RPB_API API
+    RPB_Config Config
+    RPB_Arrest Arrest
+    RPB_SceneManager SceneManager
 @functions:
     function RegisterEvents()
     function SendSurrenderSceneEvent(string asScene, string asSceneEvent, Actor akSurrenderer, Actor akSurrendererCaptor, string asSceneSecondaryEvent = "null", Form[] akParams = none, Form[] akParams2 = none)

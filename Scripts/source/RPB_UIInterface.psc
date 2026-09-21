@@ -1,10 +1,9 @@
 scriptname RPB_UIInterface extends ObjectReference
-{
-    @property UILIB_1 UILib
-    @property RPB_API API
-}
 
 ;/
+@properties:
+    UILIB_1 UILib
+    RPB_API API
 @functions:
     int function ShowList(string asTitle = "", string[] asOptions, int aiStartIndex = 0, int aiDefaultIndex = 0)
     string function ShowList_ReturnElement(string asTitle = "", string[] asOptions, int aiStartIndex = 0, int aiDefaultIndex = 0)

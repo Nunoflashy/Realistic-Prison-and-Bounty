@@ -1,9 +1,8 @@
 scriptname RPB_Actions extends ObjectReference
-{
-    @property RPB_API API
-}
 
 ;/
+@properties:
+    RPB_API API
 @functions:
     string[] function GetActions()
     function ShowActionsMenu()

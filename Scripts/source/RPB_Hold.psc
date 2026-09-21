@@ -1,17 +1,49 @@
 scriptname RPB_Hold extends RPB_Entity
-{
-    @property int ID
-    @property string UUID
-    @property string Name
-    @property bool Active
 
-    @property Faction CrimeFaction
-    @property Form[] Locations
-    @property string[] Cities
-    @property Alias[] Prisons
-    @property RPB_ArresteeList Arrestees
-    @property RPB_CaptorList Captors
-}
+;/
+@properties:
+    int ID
+    string UUID
+    bool Active
+    RPB_API API
+    RPB_Config Config
+    RPB_SceneManager SceneManager
+    string Name
+    Faction CrimeFaction
+    Form[] Locations
+    string[] Cities
+    Alias[] Prisons
+    RPB_ArresteeList Arrestees
+    RPB_CaptorList Captors
+    int TOPIC_START
+    int TOPIC_END
+    int TOPIC_TYPE_ARREST_SUSPICIOUS
+    int TOPIC_TYPE_ARREST_DIALOGUE_ELUDING
+    int TOPIC_TYPE_ARREST_PURSUIT_ELUDING
+    int TOPIC_TYPE_ARREST_CONFRONT
+    int TOPIC_TYPE_ARREST_PAY_BOUNTY_ON_SPOT
+    int TOPIC_TYPE_ARREST_PAY_BOUNTY_ESCORT_WILLINGLY
+    int TOPIC_TYPE_ARREST_PAY_BOUNTY_ESCORT_ARRESTED
+    int TOPIC_TYPE_ARREST_PAY_BOUNTY_MAX
+    int TOPIC_TYPE_ARREST_RESIST
+    int TOPIC_TYPE_COMBAT_YIELD
+    int TOPIC_TYPE_ARREST_GO_TO_JAIL
+    string ARREST_PAY_BOUNTY_ON_SPOT
+    string ARREST_PAY_BOUNTY_ESCORT_WILLINGLY
+    string ARREST_PAY_BOUNTY_ESCORT_BY_FORCE
+    string ARREST_TYPE_TELEPORT_TO_JAIL
+    string ARREST_TYPE_TELEPORT_TO_CELL
+    string ARREST_TYPE_ESCORT_TO_JAIL
+    string ARREST_TYPE_ESCORT_TO_CELL
+    string ARREST_GOAL_IMPRISONMENT
+    string ARREST_GOAL_BOUNTY_PAYMENT
+    string ARREST_GOAL_TEMPORARY_HOLD
+@functions:
+    RPB_Arrestee function AwaitArresteeReference(Actor akArrestee, int aiMaxTries = 120, float afInitialTimeBetweenTries = 0.05, float afMaxTimeBetweenTries = 0.1)
+    RPB_Hold function GetHoldForCrimeFaction(Faction akCrimeFaction) global
+@events:
+    event OnArrestBegin(RPB_Arrestee apArrestee, RPB_Captor apCaptor, string asArrestType)
+/;
 
 import Math
 import RPB_Config

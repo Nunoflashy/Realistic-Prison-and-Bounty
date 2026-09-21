@@ -1,16 +1,15 @@
 scriptname RPB_PrisonMonitor extends ReferenceAlias
-{
-    @property RPB_API API
-    @property RPB_Prison Prison
-    @property RPB_PrisonerList Prisoners
-    @property bool IsMonitoring
-    @property float NextWakeAt
-    @property ObjectReference MonitorOn
-    @property bool DebugDryRunReleases
-    @property int ReleaseQueueLength
-}
 
 ;/
+@properties:
+    RPB_API API
+    RPB_Prison Prison
+    RPB_PrisonerList Prisoners
+    bool IsMonitoring
+    float NextWakeAt
+    ObjectReference MonitorOn
+    bool DebugDryRunReleases
+    int ReleaseQueueLength
 @functions:
     function SendRequest()
     function EnterForeground()

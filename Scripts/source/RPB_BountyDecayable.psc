@@ -4,11 +4,12 @@ scriptname RPB_BountyDecayable extends RPB_ActorScript
     has the bounty decay functionality enabled to them and is considered a BountyDecayable.
     Additionally, if the Actor is registered as a RPB_Actor, this script's state
     can be retrieved by calling GetScriptState(RPB_BountyDecayable.className()) on the Actor.
-    @property float UpdateInterval
-    @property float CurrentTime
 }
 
 ;/
+@properties:
+    float UpdateInterval
+    float CurrentTime
 @functions:
     string function className() global
     string function typeName()

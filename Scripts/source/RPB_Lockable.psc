@@ -1,17 +1,16 @@
 scriptname RPB_Lockable extends RPB_SerializableObjectReference
-{
-    @property bool IsOpen
-    @property bool IsClosed
-    @property bool IsUnlocked
-    @property bool IsLocked
-    @property bool HasDecayableLock
-    @property bool IsLockBroken
-    @property int LockLevelWear
-    @property string MinimumLockLevel
-    @property string CurrentLockLevel
-}
 
 ;/
+@properties:
+    bool IsOpen
+    bool IsClosed
+    bool IsUnlocked
+    bool IsLocked
+    bool HasDecayableLock
+    bool IsLockBroken
+    int LockLevelWear
+    string MinimumLockLevel
+    string CurrentLockLevel
 @functions:
     function Open()
     function Close()

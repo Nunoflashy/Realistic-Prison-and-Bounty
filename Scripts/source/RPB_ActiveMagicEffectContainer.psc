@@ -1,9 +1,8 @@
 scriptname RPB_ActiveMagicEffectContainer extends ReferenceAlias
-{
-    @property int Count
-}
 
 ;/
+@properties:
+    int Count
 @functions:
     bool function HasKey(string asKey)
     ActiveMagicEffect function GetAt(string asKey)

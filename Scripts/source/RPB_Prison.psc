@@ -1,122 +1,121 @@
 scriptname RPB_Prison extends RPB_Entity  
-{
-    @property int ID
-    @property string UUID
-    @property bool Active
-    @property RPB_PrisonManager PrisonManager
-    @property RPB_API API
-    @property RPB_Config Config
-    @property RPB_SceneManager SceneManager
-    @property RPB_EventManager EventManager
-    @property string Name
-    @property Location PrisonLocation
-    @property Faction PrisonFaction
-    @property string Hold
-    @property string City
-    @property int GuaranteedPayableBounty
-    @property int MaximumPayableBounty
-    @property int MaximumPayableBountyChance
-    @property int BountyExchange
-    @property int BountyToSentence
-    @property int MinimumSentence
-    @property int MaximumSentence
-    @property int CellSearchThoroughness
-    @property string CellLockLevel
-    @property int ReleaseTimeMinimumHour
-    @property int ReleaseTimeMaximumHour
-    @property bool AllowReleaseOnWeekends
-    @property bool FastForward
-    @property int DayToFastForwardFrom
-    @property string HandleSkillLoss
-    @property int DayToStartLosingSkillsStat
-    @property int DayToStartLosingSkillsPerk
-    @property int ChanceToLoseSkillsStat
-    @property int ChanceToLoseSkillsPerk
-    @property float RecognizedCriminalPenalty
-    @property float KnownCriminalPenalty
-    @property int MinimumBountyToTriggerCriminalPenalty
-    @property bool EnableReleaseFees
-    @property int ReleaseFeesChanceForEvent
-    @property int MinimumBountyToOweReleaseFees
-    @property float ReleaseFeesOfCurrentBounty
-    @property int ReleaseFees
-    @property int DaysGivenToPayReleaseFees
-    @property bool EnableItemRetention
-    @property int MinimumBountyToRetainItems
-    @property bool AutoRedressOnRelease
-    @property string HandleEscapeOn
-    @property float EscapeBountyOfCurrentBounty
-    @property int EscapeBounty
-    @property float EscapeBountySentenceMultiplier
-    @property int EscapeBountySentenceDays
-    @property int EscapeBountyCondition
-    @property int EscapeBountySentenceCondition
-    @property int EscapeBountyFallbackBounty
-    @property bool AccountForTimeServedOnEscape
-    @property bool FriskUponCapturedOnEscape
-    @property bool StripUponCapturedOnEscape
-    @property bool EnableInfamy
-    @property int InfamyRecognizedThreshold
-    @property int InfamyKnownThreshold
-    @property float InfamyGainedDailyOfCurrentBounty
-    @property int InfamyGainedDaily
-    @property float InfamyGainModifierRecognized
-    @property float InfamyGainModifierKnown
-    @property float InfamyLostDailyOfCurrentInfamy
-    @property int InfamyLostDaily
-    @property bool AllowFrisking
-    @property int MinimumBountyForFrisking
-    @property int FriskingThoroughness
-    @property bool ConfiscateStolenItemsOnFrisk
-    @property bool StripIfStolenItemsFoundOnFrisk
-    @property int MinimumNumberOfStolenItemsRequiredToStripOnFrisk
-    @property bool AllowStripping
-    @property string HandleStrippingOn
-    @property int MinimumBountyToStrip
-    @property int MinimumViolentBountyToStrip
-    @property int MinimumSentenceToStrip
-    @property int StrippingThoroughness
-    @property int StrippingThoroughnessModifier
-    @property bool AllowClothing
-    @property string HandleClothingOn
-    @property int MaximumBountyClothing
-    @property int MaximumViolentBountyClothing
-    @property int MaximumSentenceClothing
-    @property bool ClotheWhenDefeated
-    @property string ClothingOutfit
-    @property bool UseDefaultOutfitAsFallback
-    @property string OutfitName
-    @property Armor OutfitPartHead
-    @property Armor OutfitPartBody
-    @property Armor OutfitPartHands
-    @property Armor OutfitPartFeet
-    @property bool IsOutfitConditional
-    @property int OutfitMinimumBounty
-    @property int OutfitMaximumBounty
-    @property Message ServeTimeMessage
-    @property int SERVE_TIME_YES
-    @property bool IsPlayerFastForwardingToRelease
-    @property bool PrioritizeEmptyCells
-    @property bool PrioritizeGenderCells
-    @property bool AllowOnlyEmptyCells
-    @property bool AllowOnlyGenderExclusiveCells
-    @property bool AllowOnlyEmptyOrGenderCells
-    @property RPB_PrisonMonitor Monitor
-    @property RPB_PrisonerList Prisoners
-    @property Form[] JailCells
-    @property Form[] EmptyJailCells
-    @property Form[] OccupiedJailCells
-    @property Form[] AvailableJailCells
-    @property Form[] FemaleJailCells
-    @property Form[] MaleJailCells
-    @property bool HasInfamyRecognizedNotificationFired
-    @property bool HasInfamyKnownNotificationFired
-    @property string InfamyRecognizedSentenceAppliedNotification
-    @property string InfamyKnownSentenceAppliedNotification
-    @property int SettingsSnapshotBuilds
-}
 
 ;/
+@properties:
+    int ID
+    string UUID
+    bool Active
+    RPB_PrisonManager PrisonManager
+    RPB_API API
+    RPB_Config Config
+    RPB_SceneManager SceneManager
+    RPB_EventManager EventManager
+    string Name
+    Location PrisonLocation
+    Faction PrisonFaction
+    string Hold
+    string City
+    int GuaranteedPayableBounty
+    int MaximumPayableBounty
+    int MaximumPayableBountyChance
+    int BountyExchange
+    int BountyToSentence
+    int MinimumSentence
+    int MaximumSentence
+    int CellSearchThoroughness
+    string CellLockLevel
+    int ReleaseTimeMinimumHour
+    int ReleaseTimeMaximumHour
+    bool AllowReleaseOnWeekends
+    bool FastForward
+    int DayToFastForwardFrom
+    string HandleSkillLoss
+    int DayToStartLosingSkillsStat
+    int DayToStartLosingSkillsPerk
+    int ChanceToLoseSkillsStat
+    int ChanceToLoseSkillsPerk
+    float RecognizedCriminalPenalty
+    float KnownCriminalPenalty
+    int MinimumBountyToTriggerCriminalPenalty
+    bool EnableReleaseFees
+    int ReleaseFeesChanceForEvent
+    int MinimumBountyToOweReleaseFees
+    float ReleaseFeesOfCurrentBounty
+    int ReleaseFees
+    int DaysGivenToPayReleaseFees
+    bool EnableItemRetention
+    int MinimumBountyToRetainItems
+    bool AutoRedressOnRelease
+    string HandleEscapeOn
+    float EscapeBountyOfCurrentBounty
+    int EscapeBounty
+    float EscapeBountySentenceMultiplier
+    int EscapeBountySentenceDays
+    int EscapeBountyCondition
+    int EscapeBountySentenceCondition
+    int EscapeBountyFallbackBounty
+    bool AccountForTimeServedOnEscape
+    bool FriskUponCapturedOnEscape
+    bool StripUponCapturedOnEscape
+    bool EnableInfamy
+    int InfamyRecognizedThreshold
+    int InfamyKnownThreshold
+    float InfamyGainedDailyOfCurrentBounty
+    int InfamyGainedDaily
+    float InfamyGainModifierRecognized
+    float InfamyGainModifierKnown
+    float InfamyLostDailyOfCurrentInfamy
+    int InfamyLostDaily
+    bool AllowFrisking
+    int MinimumBountyForFrisking
+    int FriskingThoroughness
+    bool ConfiscateStolenItemsOnFrisk
+    bool StripIfStolenItemsFoundOnFrisk
+    int MinimumNumberOfStolenItemsRequiredToStripOnFrisk
+    bool AllowStripping
+    string HandleStrippingOn
+    int MinimumBountyToStrip
+    int MinimumViolentBountyToStrip
+    int MinimumSentenceToStrip
+    int StrippingThoroughness
+    int StrippingThoroughnessModifier
+    bool AllowClothing
+    string HandleClothingOn
+    int MaximumBountyClothing
+    int MaximumViolentBountyClothing
+    int MaximumSentenceClothing
+    bool ClotheWhenDefeated
+    string ClothingOutfit
+    bool UseDefaultOutfitAsFallback
+    string OutfitName
+    Armor OutfitPartHead
+    Armor OutfitPartBody
+    Armor OutfitPartHands
+    Armor OutfitPartFeet
+    bool IsOutfitConditional
+    int OutfitMinimumBounty
+    int OutfitMaximumBounty
+    Message ServeTimeMessage
+    int SERVE_TIME_YES
+    bool IsPlayerFastForwardingToRelease
+    bool PrioritizeEmptyCells
+    bool PrioritizeGenderCells
+    bool AllowOnlyEmptyCells
+    bool AllowOnlyGenderExclusiveCells
+    bool AllowOnlyEmptyOrGenderCells
+    RPB_PrisonMonitor Monitor
+    RPB_PrisonerList Prisoners
+    Form[] JailCells
+    Form[] EmptyJailCells
+    Form[] OccupiedJailCells
+    Form[] AvailableJailCells
+    Form[] FemaleJailCells
+    Form[] MaleJailCells
+    bool HasInfamyRecognizedNotificationFired
+    bool HasInfamyKnownNotificationFired
+    string InfamyRecognizedSentenceAppliedNotification
+    string InfamyKnownSentenceAppliedNotification
+    int SettingsSnapshotBuilds
 @functions:
     function ResetCachedHold()
     bool function ActiveByDefault()

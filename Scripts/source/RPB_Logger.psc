@@ -1,11 +1,10 @@
 scriptname RPB_Logger extends ReferenceAlias
-{
-    @property bool Logging
-    @property bool Tracing
-    @property bool Debugging
-}
 
 ;/
+@properties:
+    bool Logging
+    bool Tracing
+    bool Debugging
 @functions:
     function SendError(string msg, string caller = "", bool condition = true)
     function SendWarning(string msg, string caller = "", bool condition = true)

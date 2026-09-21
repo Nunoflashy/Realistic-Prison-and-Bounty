@@ -1,28 +1,29 @@
 scriptname RPB_ActorBase extends ActiveMagicEffect
 {
     Base Actor script for RPB_ActorBase, must be inherited from to be used
-    @property RPB_API API
-    @property RPB_Config Config
-    @property string Name
-    @property string Sex
-    @property bool IsFemale
-    @property bool IsMale
-    @property string Gender
-    @property string Pronoun
-    @property string PronounObject
-    @property string PronounPossessive
-    @property string PronounPossessiveObject
-    @property string PronounReflexive
-    @property string PronounIntensive
-    @property Actor this
-    @property bool TrackStats
-    @property bool RegisterSleepEvents
-    @property string CurrentState
-    @property bool IsEffectActive
-    @property bool IsInitialized
 }
 
 ;/
+@properties:
+    RPB_API API
+    RPB_Config Config
+    string Name
+    string Sex
+    bool IsFemale
+    bool IsMale
+    string Gender
+    string Pronoun
+    string PronounObject
+    string PronounPossessive
+    string PronounPossessiveObject
+    string PronounReflexive
+    string PronounIntensive
+    Actor this
+    bool TrackStats
+    bool RegisterSleepEvents
+    string CurrentState
+    bool IsEffectActive
+    bool IsInitialized
 @functions:
     int function GetCurrentActiveAndLatentBountyForFaction(Actor akActor, Faction akFaction, bool abNonViolent = true, bool abViolent = true) global
     function BindAlias(ReferenceAlias apAlias)

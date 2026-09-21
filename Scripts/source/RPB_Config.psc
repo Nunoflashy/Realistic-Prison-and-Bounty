@@ -1,29 +1,28 @@
 Scriptname RPB_Config extends Quest
-{
-    @property bool IS_DEBUG
-    @property bool ENABLE_BENCHMARK
-    @property RPB_API API
-    @property RPB_MCM MCM
-    @property RPB_Arrest Arrest
-    @property string[] Holds
-    @property string[] Cities
-    @property Actor Player
-    @property int FreeTimescale
-    @property int PrisonTimescale
-    @property float BountyDecayUpdateInterval
-    @property float InfamyDecayUpdateInterval
-    @property int ArrestEludeWarningTime
-    @property bool ShouldDisplayArrestNotifications
-    @property bool ShouldDisplayJailNotifications
-    @property bool ShouldDisplayBountyDecayNotifications
-    @property bool ShouldDisplayInfamyNotifications
-    @property bool HasNudeBodyModInstalled
-    @property bool HasUnderwearBodyModInstalled
-    @property int UnderwearTopSlot
-    @property int UnderwearBottomSlot
-}
 
 ;/
+@properties:
+    bool IS_DEBUG
+    bool ENABLE_BENCHMARK
+    RPB_API API
+    RPB_MCM MCM
+    RPB_Arrest Arrest
+    string[] Holds
+    string[] Cities
+    Actor Player
+    int FreeTimescale
+    int PrisonTimescale
+    float BountyDecayUpdateInterval
+    float InfamyDecayUpdateInterval
+    int ArrestEludeWarningTime
+    bool ShouldDisplayArrestNotifications
+    bool ShouldDisplayJailNotifications
+    bool ShouldDisplayBountyDecayNotifications
+    bool ShouldDisplayInfamyNotifications
+    bool HasNudeBodyModInstalled
+    bool HasUnderwearBodyModInstalled
+    int UnderwearTopSlot
+    int UnderwearBottomSlot
 @functions:
     float function GetVersion() global
     string function GetPluginName() global

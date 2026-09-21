@@ -1,12 +1,11 @@
 scriptname RPB_Entity extends RPB_SerializableReferenceAlias hidden
-{
-    @property int ID
-    @property string UUID
-    @property bool Active
-    @property int Root
-}
 
 ;/
+@properties:
+    int ID
+    string UUID
+    bool Active
+    int Root
 @functions:
     int function GetObjectAt(int apObject, int index)
     int function Children(string asObjectPath, string apConditions = "null")

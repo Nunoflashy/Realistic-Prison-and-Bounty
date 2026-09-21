@@ -1,86 +1,85 @@
 scriptname RPB_SceneManager extends Quest
-{
-    @property RPB_API API
-    @property RPB_Config Config
-    @property RPB_EventManager EventManager
-    @property GlobalVariable RPB_SceneBlockNormalExecution
-    @property GlobalVariable RPB_SceneStartAtPhase
-    @property Scene UnlockCell
-    @property Scene LockCell
-    @property int PHASE_START
-    @property int PHASE_END
-    @property string EVENT_RESTRAIN_BEGIN
-    @property string EVENT_RESTRAINING
-    @property string EVENT_RESTRAIN_END
-    @property string EVENT_ARREST_BEGIN
-    @property string EVENT_ARRESTING
-    @property string EVENT_ARREST_END
-    @property string EVENT_SURRENDER_BEGIN
-    @property string EVENT_SURRENDERING
-    @property string EVENT_SURRENDER_END
-    @property string EVENT_ESCORT_BEGIN
-    @property string EVENT_ESCORTING
-    @property string EVENT_ESCORT_END
-    @property string EVENT_FRISK_BEGIN
-    @property string EVENT_FRISKING
-    @property string EVENT_FRISK_END
-    @property string EVENT_STRIP_BEGIN
-    @property string EVENT_STRIPPING
-    @property string EVENT_STRIP_END
-    @property string EVENT_CLOTHING_BEGIN
-    @property string EVENT_CLOTHING
-    @property string EVENT_CLOTHING_END
-    @property string EVENT_FORCED_STRIP_BEGIN
-    @property string EVENT_FORCED_STRIPPING
-    @property string EVENT_FORCED_STRIP_END
-    @property string EVENT_ELUDE_BEGIN
-    @property string EVENT_ARREST_PAYING_BOUNTY
-    @property string EVENT_ARREST_PAY_BOUNTY_END
-    @property string CATEGORY_ARREST_START
-    @property string CATEGORY_SURRENDER
-    @property string CATEGORY_ESCORT_TO_JAIL
-    @property string CATEGORY_ESCORT_TO_CELL
-    @property string CATEGORY_ESCORT_FROM_CELL
-    @property string CATEGORY_FRISKING
-    @property string CATEGORY_STRIPPING
-    @property string CATEGORY_CLOTHING
-    @property string CATEGORY_NO_CLOTHING
-    @property string CATEGORY_PAYMENT_FAIL
-    @property string CATEGORY_ELUDING
-    @property string CATEGORY_RESTRAIN
-    @property string CATEGORY_PAY_BOUNTY
-    @property string SCENE_ARREST_START_01
-    @property string SCENE_ARREST_START_02
-    @property string SCENE_ARREST_START_03
-    @property string SCENE_ARREST_START_04
-    @property string SCENE_ARREST_START_PRISON_01
-    @property string SCENE_SURRENDER_01
-    @property string SCENE_GENERIC_ESCORT
-    @property string SCENE_ESCORT_FROM_CELL
-    @property string SCENE_ESCORT_TO_JAIL_01
-    @property string SCENE_ESCORT_TO_JAIL_02
-    @property string SCENE_ESCORT_TO_CELL_01
-    @property string SCENE_ESCORT_TO_CELL_02
-    @property string SCENE_ESCORT_TO_CELL_03
-    @property string SCENE_STRIPPING_01
-    @property string SCENE_STRIPPING_02
-    @property string SCENE_FORCED_STRIPPING_START_01
-    @property string SCENE_FORCED_STRIPPING_01
-    @property string SCENE_FORCED_STRIPPING_02
-    @property string SCENE_STRIPPING_START_01
-    @property string SCENE_FRISKING
-    @property string SCENE_GIVE_CLOTHING
-    @property string SCENE_UNLOCK_CELL
-    @property string SCENE_PAYMENT_FAIL
-    @property string SCENE_NO_CLOTHING
-    @property string SCENE_ELUDING_ARREST_01
-    @property string SCENE_RESTRAIN_PRISONER_01
-    @property string SCENE_RESTRAIN_PRISONER_02
-    @property string SCENE_ARREST_PAY_BOUNTY_FOLLOW_WILLINGLY
-    @property string SCENE_ARREST_PAY_BOUNTY_FOLLOW_BY_FORCE
-}
 
 ;/
+@properties:
+    RPB_API API
+    RPB_Config Config
+    RPB_EventManager EventManager
+    GlobalVariable RPB_SceneBlockNormalExecution
+    GlobalVariable RPB_SceneStartAtPhase
+    Scene UnlockCell
+    Scene LockCell
+    int PHASE_START
+    int PHASE_END
+    string EVENT_RESTRAIN_BEGIN
+    string EVENT_RESTRAINING
+    string EVENT_RESTRAIN_END
+    string EVENT_ARREST_BEGIN
+    string EVENT_ARRESTING
+    string EVENT_ARREST_END
+    string EVENT_SURRENDER_BEGIN
+    string EVENT_SURRENDERING
+    string EVENT_SURRENDER_END
+    string EVENT_ESCORT_BEGIN
+    string EVENT_ESCORTING
+    string EVENT_ESCORT_END
+    string EVENT_FRISK_BEGIN
+    string EVENT_FRISKING
+    string EVENT_FRISK_END
+    string EVENT_STRIP_BEGIN
+    string EVENT_STRIPPING
+    string EVENT_STRIP_END
+    string EVENT_CLOTHING_BEGIN
+    string EVENT_CLOTHING
+    string EVENT_CLOTHING_END
+    string EVENT_FORCED_STRIP_BEGIN
+    string EVENT_FORCED_STRIPPING
+    string EVENT_FORCED_STRIP_END
+    string EVENT_ELUDE_BEGIN
+    string EVENT_ARREST_PAYING_BOUNTY
+    string EVENT_ARREST_PAY_BOUNTY_END
+    string CATEGORY_ARREST_START
+    string CATEGORY_SURRENDER
+    string CATEGORY_ESCORT_TO_JAIL
+    string CATEGORY_ESCORT_TO_CELL
+    string CATEGORY_ESCORT_FROM_CELL
+    string CATEGORY_FRISKING
+    string CATEGORY_STRIPPING
+    string CATEGORY_CLOTHING
+    string CATEGORY_NO_CLOTHING
+    string CATEGORY_PAYMENT_FAIL
+    string CATEGORY_ELUDING
+    string CATEGORY_RESTRAIN
+    string CATEGORY_PAY_BOUNTY
+    string SCENE_ARREST_START_01
+    string SCENE_ARREST_START_02
+    string SCENE_ARREST_START_03
+    string SCENE_ARREST_START_04
+    string SCENE_ARREST_START_PRISON_01
+    string SCENE_SURRENDER_01
+    string SCENE_GENERIC_ESCORT
+    string SCENE_ESCORT_FROM_CELL
+    string SCENE_ESCORT_TO_JAIL_01
+    string SCENE_ESCORT_TO_JAIL_02
+    string SCENE_ESCORT_TO_CELL_01
+    string SCENE_ESCORT_TO_CELL_02
+    string SCENE_ESCORT_TO_CELL_03
+    string SCENE_STRIPPING_01
+    string SCENE_STRIPPING_02
+    string SCENE_FORCED_STRIPPING_START_01
+    string SCENE_FORCED_STRIPPING_01
+    string SCENE_FORCED_STRIPPING_02
+    string SCENE_STRIPPING_START_01
+    string SCENE_FRISKING
+    string SCENE_GIVE_CLOTHING
+    string SCENE_UNLOCK_CELL
+    string SCENE_PAYMENT_FAIL
+    string SCENE_NO_CLOTHING
+    string SCENE_ELUDING_ARREST_01
+    string SCENE_RESTRAIN_PRISONER_01
+    string SCENE_RESTRAIN_PRISONER_02
+    string SCENE_ARREST_PAY_BOUNTY_FOLLOW_WILLINGLY
+    string SCENE_ARREST_PAY_BOUNTY_FOLLOW_BY_FORCE
 @functions:
     function SceneManager()
     function AddGlobal(string asGlobalName, int aiGlobalFormID, int aiDefaultValue = 0)
