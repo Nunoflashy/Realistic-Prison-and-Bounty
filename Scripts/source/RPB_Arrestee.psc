@@ -700,6 +700,11 @@ bool function InitializeState()
     endif
 
     self.SetBool("Initialized", true) ; Prevent further initializations
+
+    ; Both the effect's OnInitialize() and EventManager.OnArrestBegin() call this, and whichever runs first executes the body.
+    ; The function used to fall off the end (a bool function then returns false), so when the event handler won the race
+    ; it aborted the arrest and left the actor stuck as an arrestee. The body is idempotent, so a double run is harmless.
+    return !hasErrors
 endFunction
 
 function RevertState()

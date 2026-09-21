@@ -108,6 +108,7 @@ function SetTests()
     self.AddTest("76 - Arrest Flow Stress: One Actor, Three Full Cycles (Arrest -> Imprison -> Release)", "Test_ArrestStress_SingleCycles", abChainable = false)
     self.AddTest("77 - Arrest Flow Stress: Concurrent Burst (N = 3, then 6) Arrested, Imprisoned and Released Together", "Test_ArrestStress_Burst", abChainable = false)
     self.AddTest("78 - Arrest Flow Stress: Staggered Arrests (N = 6, 0.3s apart, like ArrestActors) and Repeated Bursts", "Test_ArrestStress_Staggered", abChainable = false)
+    self.AddTest("79 - Arrestee: InitializeState() Returns true for Every Caller (First-Caller Race)", "Test_Arrestee_InitializeStateReturnsTrue", abChainable = false)
     self.AddTest("41 - ActiveMagicEffectContainer: Stuck Lock Self-Heals", "Test_ActiveMagicEffectContainer_StuckLockSelfHeals")
     self.AddTest("42 - ThreadLock: JAtomic Primitive Semantics and Registry", "Test_ThreadLock_PrimitiveSemantics")
     ; Not chainable: fires concurrent worker threads
@@ -6066,7 +6067,7 @@ state Test_ArrestStress_SingleCycles
         int cycle = 1
         while (cycle <= 3 && ok)
             self.__StressArrest(guard, a)
-            int msImprison = self.__StressWaitImprisoned(a, 60.0)
+            int msImprison = self.__StressWaitImprisoned(a, 30.0)
             step = assert_true(msImprison >= 0, "Cycle " + cycle + ": the actor never reached Imprisoned (60 s)" + self.__StressLeftovers(a, prison))
             ok = ok && step
             if (!step)
@@ -6161,7 +6162,7 @@ int function __StressRunBurst(RPB_Prison akPrison, Actor akGuard, int aiCount, f
         int imprisoned = 0
         i = 0
         while (i < aiCount)
-            int ms = self.__StressWaitImprisoned(burst[i], 90.0)
+            int ms = self.__StressWaitImprisoned(burst[i], 30.0)
             if (ms >= 0)
                 imprisoned += 1
             else
@@ -6186,7 +6187,7 @@ int function __StressRunBurst(RPB_Prison akPrison, Actor akGuard, int aiCount, f
         int released = 0
         i = 0
         while (i < aiCount)
-            if (self.__StressWaitReleased(burst[i], akPrison, 60.0) >= 0)
+            if (self.__StressWaitReleased(burst[i], akPrison, 30.0) >= 0)
                 released += 1
             else
                 failures += 1
@@ -6276,6 +6277,73 @@ state Test_ArrestStress_Staggered
 
     function Teardown()
         self.__StressProfilerRestore()
+        __TeardownAllTempActors()
+    endFunction
+endState
+
+
+;/
+    Two callers run RPB_Arrestee.InitializeState() for a fresh arrestee: the effect's own OnInitialize() and
+    EventManager.OnArrestBegin(). Whoever ran the body first used to get false (the function fell off the end without a
+    return), so when the event handler won the race it aborted the arrest and left the actor stuck as an arrestee (found
+    by the stress test 77 breadcrumbs). Proof: forget the "Initialized" flag, then call it twice; both must return true
+    and the flag must be set. The second half calls it while a second arrestee is still starting up.
+/;
+state Test_Arrestee_InitializeStateReturnsTrue
+    function Setup()
+        RPB_Arrest arrest = RPB_API.GetArrest()
+        bool ok = true
+        bool step = false
+
+        Actor a = __SpawnTempActor()
+        RPB_Arrestee arrestee = arrest.AwaitArresteeReference(a)
+        step = assert_true(arrestee != none, "Could not register the arrestee used for this test")
+        ok = ok && step
+        if (!arrestee)
+            display_result(false)
+            return
+        endif
+
+        ; The effect's own call has already run: make the state look fresh again
+        arrestee.Remove("Initialized")
+        step = assert_false(arrestee.Was("Initialized"), "Precondition: the Initialized flag should be gone")
+        ok = ok && step
+
+        bool first = arrestee.InitializeState()
+        bool second = arrestee.InitializeState()
+        step = assert_true(first, "The first InitializeState() call returned false (missing return): the event handler would abort the arrest")
+        ok = ok && step
+        step = assert_true(second, "The second InitializeState() call returned false")
+        ok = ok && step
+        step = assert_true(arrestee.Was("Initialized"), "The Initialized flag was not set")
+        ok = ok && step
+
+        ; Second half: an arrestee whose effect is still starting up, called immediately from here (the handler's position)
+        Actor b = __SpawnTempActor()
+        RPB_Arrest arrestRef = RPB_API.GetArrest()
+        Spell arresteeSpell = RPB_Utility.RPB_ArresteeSpell()
+        b.AddSpell(arresteeSpell, false)
+        RPB_Arrestee raced = none
+        float t0 = Utility.GetCurrentRealTime()
+        while (!raced && (Utility.GetCurrentRealTime() - t0) < 15.0)
+            raced = arrestRef.Arrestees.AtKey(b)
+            if (!raced)
+                Utility.Wait(0.01)
+            endif
+        endWhile
+        step = assert_true(raced != none, "The second arrestee did not register")
+        ok = ok && step
+        if (raced)
+            step = assert_true(raced.InitializeState(), "InitializeState() returned false right after registration (race with the effect's own call)")
+            ok = ok && step
+            step = assert_true(raced.InitializeState(), "A repeated InitializeState() returned false")
+            ok = ok && step
+        endif
+
+        display_result(ok)
+    endFunction
+
+    function Teardown()
         __TeardownAllTempActors()
     endFunction
 endState
