@@ -2274,22 +2274,26 @@ function TeleportPrisonerToRelease(RPB_Prisoner apPrisoner)
     Actor releasedActor = apPrisoner.GetActor()
     ObjectReference releaseLocation = apPrisoner.TeleportReleaseLocation
     bool releasedIsNPC = apPrisoner.IsNPC()
-    RPB_Utility.Crumb(releasedActor, "Release: start")
+    Outfit dressOutfit = none
+    if (releasedIsNPC && RPB_Utility.IsCrumbsEnabled())
+        dressOutfit = apPrisoner.NPC_OriginalOutfit
+    endif
+    RPB_Utility.Crumb(releasedActor, "Release: start, " + self.__PartsTrace(releasedActor, dressOutfit))
 
     ; A prisoner effect instance that starts while the release runs (the actor's 3D loads when it is moved) must not register
     ; it again: see Prisoner.OnInitialize. Destroy() wipes this flag together with the rest of the state.
     apPrisoner.SetBool("Releasing", true)
 
     apPrisoner.GotoState("Released")
-    RPB_Utility.Crumb(releasedActor, "Release: Released state entered")
+    RPB_Utility.Crumb(releasedActor, "Release: Released state entered, " + self.__PartsTrace(releasedActor, dressOutfit))
     Debug("["+ Name +"] Prison::TeleportPrisonerToRelease", "Released " + apPrisoner.Name + ".")
 
     apPrisoner.Remove("Imprisoned")
 
     apPrisoner.ReturnBelongings()
-    RPB_Utility.Crumb(releasedActor, "Release: belongings returned")
+    RPB_Utility.Crumb(releasedActor, "Release: belongings returned, " + self.__PartsTrace(releasedActor, dressOutfit))
     apPrisoner.NPC_ReequipAfterRelease()
-    RPB_Utility.Crumb(releasedActor, "Release: outfit re-equipped")
+    RPB_Utility.Crumb(releasedActor, "Release: outfit re-equipped, " + self.__PartsTrace(releasedActor, dressOutfit))
     apPrisoner.RemoveFromCell()
     RPB_Utility.Crumb(releasedActor, "Release: removed from cell")
 
@@ -2315,7 +2319,7 @@ function TeleportPrisonerToRelease(RPB_Prisoner apPrisoner)
         if (releaseLocation)
             releasedActor.MoveTo(releaseLocation)
         endif
-        RPB_Utility.Crumb(releasedActor, "Release: moved")
+        RPB_Utility.Crumb(releasedActor, "Release: moved, " + self.__PartsTrace(releasedActor, dressOutfit))
         releasedActor.EnableAI(true)
         RPB_Utility.Crumb(releasedActor, "Release: AI enabled")
 
@@ -2383,6 +2387,25 @@ function TeleportPrisonerToRelease(RPB_Prisoner apPrisoner)
         endif
         RPB_Utility.Crumb(releasedActor, "Release: T2 after the equip (equipped " + equippedNow + "), " + self.__DressTrace(releasedActor, restoreItems))
     endif
+endFunction
+
+; The NPC's outfit parts: how many it carries and whether each is worn, to see where a part is doubled or lost during the release.
+string function __PartsTrace(Actor akActor, Outfit akOutfit)
+    if (!akOutfit || !RPB_Utility.IsCrumbsEnabled())
+        return ""
+    endif
+
+    string trace = "parts:"
+    int n = akOutfit.GetNumParts()
+    int i = 0
+    while (i < n)
+        Armor part = akOutfit.GetNthPart(i) as Armor
+        if (part)
+            trace += " [" + part.GetName() + " c" + akActor.GetItemCount(part) + " w" + akActor.IsEquipped(part) + "]"
+        endif
+        i += 1
+    endWhile
+    return trace
 endFunction
 
 ; What the dress-up looks at, per listed item: name, how many the actor carries and whether it is worn. Only while crumbs are enabled

@@ -3516,7 +3516,10 @@ Form[] function NPC_GetRestoreItems()
         j += 1
     endWhile
 
-    return self.__TrimForms(items, count)
+    ; Not trimmed: a zero length array from Utility.CreateFormArray(0) is None in Papyrus (the release got "list none" and equipped
+    ; nothing). The consumers skip the empty entries.
+    RPB_Utility.Crumb(self.GetActor(), "GetRestoreItems: outfit " + original + ", " + count + " items listed")
+    return items
 endFunction
 
 int[] function __NPC_WornArmorSlots()

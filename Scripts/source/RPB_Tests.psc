@@ -7719,6 +7719,7 @@ bool function __MassRun(bool abNoOvercrowding)
     ; How many left dressed: body armor worn, or (when the engine has unloaded them) unknown. Reported, not asserted.
     Utility.Wait(3.0)
     int dressed = 0
+    int bareNoBoots = 0
     int underwearOnly = 0
     int unloaded = 0
     i = 0
@@ -7730,17 +7731,23 @@ bool function __MassRun(bool abNoOvercrowding)
                 dressed += 1
             else
                 underwearOnly += 1
-                string bareCrumbs = ""
-                if (underwearOnly <= 3)
-                    ; only the release part: a log line is cut at about 4100 characters, before it reaches the release entries
-        string bareDump = RPB_Utility.DumpCrumbs(all[i])
-        int releaseAt = StringUtil.Find(bareDump, "Release: start")
-        if (releaseAt >= 0)
-            bareDump = StringUtil.Substring(bareDump, releaseAt)
-        endif
-        bareCrumbs = " | release crumbs: " + bareDump
+                string partsDump = self.__MassPartsDump(all[i])
+                bool wantCrumbs = underwearOnly <= 3
+                if (!wantCrumbs && bareNoBoots < 2 && StringUtil.Find(partsDump, "carried 0") >= 0)
+                    wantCrumbs = true ; a part is missing altogether (the other pattern: tunic worn, boots lost)
+                    bareNoBoots += 1
                 endif
-                log("MASS bare actor " + i + " (" + all[i] + "): items " + all[i].GetNumItems() + ", base outfit " + all[i].GetActorBase().GetOutfit() + ", outfit parts " + self.__MassOutfitParts(all[i]) + " | " + self.__MassPartsDump(all[i]) + bareCrumbs)
+                string bareCrumbs = ""
+                if (wantCrumbs)
+                    ; only the release part: a log line is cut at about 4100 characters, before it reaches the release entries
+                    string bareDump = RPB_Utility.DumpCrumbs(all[i])
+                    int releaseAt = StringUtil.Find(bareDump, "Release: start")
+                    if (releaseAt >= 0)
+                        bareDump = StringUtil.Substring(bareDump, releaseAt)
+                    endif
+                    bareCrumbs = " | release crumbs: " + bareDump
+                endif
+                log("MASS bare actor " + i + " (" + all[i] + "): items " + all[i].GetNumItems() + ", base outfit " + all[i].GetActorBase().GetOutfit() + ", outfit parts " + self.__MassOutfitParts(all[i]) + " | " + partsDump + bareCrumbs)
             endif
         endif
         i += 1
