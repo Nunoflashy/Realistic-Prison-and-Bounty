@@ -128,6 +128,7 @@ function SetTests()
     self.AddTest("96 - Mass Imprisonment of Imperial Soldiers (0xBED96, Real Cell Data)", "Test_MassSoldiers", abChainable = false)
     self.AddTest("97 - Mass Imprisonment of Bandits (0x37BFF, Real Cell Data)", "Test_MassBandits", abChainable = false)
     self.AddTest("98 - Imperial Soldier Fodder Smoke Test: Can 0xE77F9 Be Imprisoned At All? (3 Clones)", "Test_MassSoldiersSmokeTest", abChainable = false)
+    self.AddTest("99 - Hostile Prisoner: Neutralized While Imprisoned, Hostility Restored a While After Release", "Test_HostilePrisoner_NeutralizedThenRestored", abChainable = false)
     self.AddTest("41 - ActiveMagicEffectContainer: Stuck Lock Self-Heals", "Test_ActiveMagicEffectContainer_StuckLockSelfHeals")
     self.AddTest("42 - ThreadLock: JAtomic Primitive Semantics and Registry", "Test_ThreadLock_PrimitiveSemantics")
     ; Not chainable: fires concurrent worker threads
@@ -7909,6 +7910,133 @@ state Test_MassSoldiersSmokeTest
     function Teardown()
         RPB_Utility.SetOvercrowdingDisabled(false)
         self.__StressProfilerRestore()
+        __TeardownAllTempActors()
+    endFunction
+endState
+
+;/
+    Hostile prisoners (bandits, Civil War soldiers, Forsworn) are neutralized while imprisoned: NPC_NeutralizeWhileImprisoned
+    removes them from whatever faction in RPB_Utility.RPB_GetHostileFactions() they belong to (so guards stop treating them as
+    a target) and Prison's delayed queue restores it some time after release. Arrests a bandit, checks its hostile factions are
+    gone while imprisoned, releases it, checks they are still gone right after release, then uses the dev override to skip most
+    of the delay and checks they come back.
+    Needs RPB_HostileFactions to actually list a faction the test bandit belongs to (a Creation Kit step, see KNOWN_ISSUES): the
+    whole feature is a harmless no-op until that FormList exists, so this logs INCONCLUSIVE rather than failing when it's empty.
+/;
+state Test_HostilePrisoner_NeutralizedThenRestored
+    function Setup()
+        RPB_Prison prison = (RPB_API.GetPrisonManager()).GetPrison("Haafingar")
+        Actor player = Game.GetFormEx(0x14) as Actor
+        Actor guard = RPB_Utility.GetNearestGuard(player, 3000.0, player)
+        bool ok = true
+        bool step = false
+
+        step = assert_true(guard != none, "No guard near the player to perform the arrest (stand near a guard in Solitude)")
+        ok = ok && step
+        if (!guard)
+            display_result(false)
+            return
+        endif
+
+        FormList hostileFactions = RPB_Utility.RPB_GetHostileFactions()
+        if (!hostileFactions || hostileFactions.GetSize() == 0)
+            log("INCONCLUSIVE: RPB_HostileFactions is empty or not set up yet (CK step pending); the neutralize/restore feature is a no-op until then")
+            display_result(ok)
+            return
+        endif
+
+        Actor a = __SpawnTempActorOf(0x37BFF) ; the bandit base used by test 97
+        step = assert_true(a != none, "Could not spawn the test bandit")
+        ok = ok && step
+        if (!a)
+            display_result(false)
+            return
+        endif
+
+        Faction[] originalHostile = new Faction[16]
+        int originalCount = 0
+        int i = 0
+        int n = hostileFactions.GetSize()
+        while (i < n && originalCount < 16)
+            Faction f = hostileFactions.GetAt(i) as Faction
+            if (f && a.IsInFaction(f))
+                originalHostile[originalCount] = f
+                originalCount += 1
+            endif
+            i += 1
+        endWhile
+
+        if (originalCount == 0)
+            log("INCONCLUSIVE: the test bandit (0x37BFF) is not a member of any faction in RPB_HostileFactions, nothing to neutralize")
+            display_result(ok)
+            return
+        endif
+
+        RPB_Utility.SetHostilityRestoreOverrideHours(0.05) ; a few real seconds at the default time scale, not a real 24 game-hour wait
+        Actor[] all = new Actor[1]
+        all[0] = a
+        self.__StressArrest(guard, a)
+        self.__MassSettle(prison, all, 1, 60.0)
+
+        RPB_Prisoner p = prison.Prisoners.AtKey(a)
+        step = assert_true(p != none, "The test bandit was not imprisoned")
+        ok = ok && step
+        if (!p)
+            display_result(false)
+            return
+        endif
+
+        i = 0
+        int stillHostile = 0
+        while (i < originalCount)
+            if (a.IsInFaction(originalHostile[i]))
+                stillHostile += 1
+            endif
+            i += 1
+        endWhile
+        step = assert_true(stillHostile == 0, stillHostile + " of " + originalCount + " hostile factions were not removed while imprisoned")
+        ok = ok && step
+        log("HOSTILE while imprisoned: " + originalCount + " factions found before arrest, " + stillHostile + " still present, Aggression now " + a.GetActorValue("Aggression"))
+
+        prison.SendReleaseRequest(p)
+        int releasedMs = self.__StressWaitReleased(a, prison, 30.0)
+        step = assert_true(releasedMs >= 0, "The test bandit was not released")
+        ok = ok && step
+
+        i = 0
+        int hostileRightAfter = 0
+        while (i < originalCount)
+            if (a.IsInFaction(originalHostile[i]))
+                hostileRightAfter += 1
+            endif
+            i += 1
+        endWhile
+        step = assert_true(hostileRightAfter == 0, hostileRightAfter + " of " + originalCount + " hostile factions came back immediately on release (should stay neutral for a while)")
+        ok = ok && step
+
+        ; Wait past the (overridden) restore delay
+        float waitStart = Utility.GetCurrentRealTime()
+        while (prison.PendingHostilityRestoreCount() > 0 && (Utility.GetCurrentRealTime() - waitStart) < 30.0)
+            Utility.Wait(0.5)
+        endWhile
+
+        i = 0
+        int restored = 0
+        while (i < originalCount)
+            if (a.IsInFaction(originalHostile[i]))
+                restored += 1
+            endif
+            i += 1
+        endWhile
+        step = assert_true(restored == originalCount, "Only " + restored + " of " + originalCount + " hostile factions were restored after the delay")
+        ok = ok && step
+        log("HOSTILE restored: " + restored + " of " + originalCount + " factions back, Aggression now " + a.GetActorValue("Aggression") + ", still queued " + prison.PendingHostilityRestoreCount())
+
+        display_result(ok)
+    endFunction
+
+    function Teardown()
+        RPB_Utility.SetHostilityRestoreOverrideHours(0.0)
         __TeardownAllTempActors()
     endFunction
 endState

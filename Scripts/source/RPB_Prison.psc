@@ -115,6 +115,7 @@ scriptname RPB_Prison extends RPB_Entity
     bool HasInfamyKnownNotificationFired
     string InfamyRecognizedSentenceAppliedNotification
     string InfamyKnownSentenceAppliedNotification
+    float HOSTILITY_RESTORE_DELAY_HOURS
     int SettingsSnapshotBuilds
 @functions:
     function ResetCachedHold()
@@ -204,6 +205,7 @@ scriptname RPB_Prison extends RPB_Entity
     int function PendingDressCount()
     function ResetDressCost()
     string function DressCostSummary()
+    int function PendingHostilityRestoreCount()
     function EscortPrisonerToRelease(RPB_Prisoner apPrisoner)
     bool function SendReleaseRequest(RPB_Prisoner apPrisoner)
     int function ReleaseDueNPCsInOrder(float afPlayerTimeLeft)
@@ -248,6 +250,7 @@ scriptname RPB_Prison extends RPB_Entity
 @events:
     event OnReferenceDeleted()
     event OnUpdate()
+    event OnUpdateGameTime()
     event OnPrisonerImprisonmentFail(RPB_Prisoner apPrisoner, string reason)
     event OnPrisonerRegistered(RPB_Prisoner apPrisoner)
     event OnPrisonerUnregistered(RPB_Prisoner apPrisoner)
@@ -2311,6 +2314,7 @@ function TeleportPrisonerToRelease(RPB_Prisoner apPrisoner)
     ; What the NPC is dressed with again is queued before the release destroys the storage it comes from (see __QueueDress).
     if (releasedIsNPC)
         self.__QueueDress(releasedActor)
+        self.__QueueHostilityRestore(releasedActor)
     endif
 
     self.OnPrisonerReleased(apPrisoner)
@@ -2536,6 +2540,179 @@ string function DressCostSummary()
         average = __dressCostMs / __dressCostCount
     endif
     return (__dressCostMs as int) + " ms over " + __dressCostCount + " NPCs (" + (average as int) + " ms each)"
+endFunction
+
+; ==========================================================
+;                    Hostile prisoners
+; ==========================================================
+; A hostile NPC (bandit, Civil War soldier, Forsworn) is made neutral while imprisoned (Prisoner.NPC_NeutralizeWhileImprisoned,
+; called from Imprison): its hostile faction memberships are stripped, so guards no longer see it as a target in the cell. What
+; was stripped is read from the storage BEFORE the release destroys it (same reasoning as __QueueDress) and queued here, keyed
+; by an absolute game-time due date rather than a real-time poll: the delay is measured in hours, and real time restarts every
+; session and must not be persisted (see the re-dress pass above). Restoring several prisoners released around the same time is
+; supported (one JFormMap entry per actor); the wake is a single game-time timer for whichever entry is due soonest.
+
+int __pendingHostility ; JFormMap actor -> JMap { factions: JArray of Faction, ranks: JArray of int (parallel), aggression: float, dueAt: float (game time) }, retained
+float property HOSTILITY_RESTORE_DELAY_HOURS = 24.0 autoreadonly ; "a good while" after release before a neutralized prisoner turns hostile again
+
+function __EnsurePendingHostility()
+    if (!__pendingHostility || !JValue.isExists(__pendingHostility))
+        __pendingHostility = JValue.retain(JFormMap.object())
+    endif
+endFunction
+
+int function PendingHostilityRestoreCount()
+    if (!__pendingHostility || !JValue.isExists(__pendingHostility))
+        return 0
+    endif
+
+    return JFormMap.count(__pendingHostility)
+endFunction
+
+; Reads what Prisoner.NPC_NeutralizeWhileImprisoned saved (nothing, for the common non-hostile prisoner) and queues it to be
+; restored HOSTILITY_RESTORE_DELAY_HOURS after release.
+function __QueueHostilityRestore(Actor akActor)
+    Form[] savedFactions = RPB_StorageVars.GetFormsOnReference("NPC Hostile Factions", akActor, "Jail")
+    if (!savedFactions || savedFactions.Length == 0)
+        return ; the common case: this prisoner was never hostile, nothing to restore
+    endif
+
+    self.__EnsurePendingHostility()
+
+    int[] savedRanks = RPB_StorageVars.GetIntsOnReference("NPC Hostile Ranks", akActor, "Jail")
+    int factions = JArray.object()
+    int ranks = JArray.object()
+    int i = 0
+    while (i < savedFactions.Length)
+        JArray.addForm(factions, savedFactions[i])
+        JArray.addInt(ranks, savedRanks[i])
+        i += 1
+    endWhile
+
+    int entry = JMap.object()
+    JMap.setObj(entry, "factions", factions)
+    JMap.setObj(entry, "ranks", ranks)
+    JMap.setFlt(entry, "aggression", RPB_StorageVars.GetFloatOnReference("NPC Original Aggression", akActor, "Jail"))
+    float delayHours = RPB_Utility.GetHostilityRestoreOverrideHours()
+    if (delayHours <= 0.0)
+        delayHours = HOSTILITY_RESTORE_DELAY_HOURS
+    endif
+    float dueAt = Utility.GetCurrentGameTime() + (delayHours / 24.0)
+    JMap.setFlt(entry, "dueAt", dueAt)
+    JFormMap.setObj(__pendingHostility, akActor, entry)
+    RPB_Utility.Crumb(akActor, "Hostility restore queued: " + savedFactions.Length + " factions, due at game time " + dueAt)
+
+    self.__RescheduleHostilityRestore()
+endFunction
+
+; Finds the earliest due entry and arms a single game-time wake for it (mirrors RPB_PrisonMonitor.Reschedule()).
+function __RescheduleHostilityRestore()
+    if (!__pendingHostility || !JValue.isExists(__pendingHostility) || JFormMap.count(__pendingHostility) == 0)
+        return
+    endif
+
+    int keys = JFormMap.allKeys(__pendingHostility)
+    int n = JArray.count(keys)
+    float earliest = 0.0
+    bool found = false
+    int i = 0
+    while (i < n)
+        int entry = JFormMap.getObj(__pendingHostility, JArray.getForm(keys, i))
+        if (entry)
+            float dueAt = JMap.getFlt(entry, "dueAt")
+            if (!found || dueAt < earliest)
+                earliest = dueAt
+                found = true
+            endif
+        endif
+        i += 1
+    endWhile
+
+    if (found)
+        float hours = (earliest - Utility.GetCurrentGameTime()) * 24.0
+        if (hours < 0.01)
+            hours = 0.01 ; already due (e.g. after a long time skip): wake almost immediately, not schedule into the past
+        endif
+        self.RegisterForSingleUpdateGameTime(hours)
+    endif
+endFunction
+
+event OnUpdateGameTime()
+    self.__ProcessHostilityRestore()
+endEvent
+
+; Restores every entry whose due date has passed, then re-arms for whatever is due next.
+function __ProcessHostilityRestore()
+    if (!__pendingHostility || !JValue.isExists(__pendingHostility))
+        return
+    endif
+
+    int keys = JFormMap.allKeys(__pendingHostility)
+    int n = JArray.count(keys)
+
+    ; Same dead-key rebuild as __ProcessPendingDress: a key of a form that no longer exists reads as None and cannot be removed
+    ; by a None form.
+    bool dead = false
+    int i = 0
+    while (i < n)
+        if (!(JArray.getForm(keys, i) as Actor))
+            dead = true
+        endif
+        i += 1
+    endWhile
+
+    if (dead)
+        int fresh = JValue.retain(JFormMap.object())
+        int kept = 0
+        i = 0
+        while (i < n)
+            Actor liveActor = JArray.getForm(keys, i) as Actor
+            if (liveActor)
+                int liveEntry = JFormMap.getObj(__pendingHostility, liveActor)
+                if (liveEntry)
+                    JFormMap.setObj(fresh, liveActor, liveEntry)
+                    kept += 1
+                endif
+            endif
+            i += 1
+        endWhile
+        JValue.release(__pendingHostility)
+        __pendingHostility = fresh
+        EventManager.SendWarning("Dropped " + (n - kept) + " hostility-restore entries of NPCs that no longer exist", "["+ Name +"] Prison::__ProcessHostilityRestore")
+        keys = JFormMap.allKeys(__pendingHostility)
+        n = JArray.count(keys)
+    endif
+
+    float now = Utility.GetCurrentGameTime()
+    i = 0
+    while (i < n)
+        Actor restoreActor = JArray.getForm(keys, i) as Actor
+        int entry = JFormMap.getObj(__pendingHostility, restoreActor)
+        if (entry && JMap.getFlt(entry, "dueAt") <= now)
+            int factions = JMap.getObj(entry, "factions")
+            int ranks = JMap.getObj(entry, "ranks")
+            int k = 0
+            int factionCount = JArray.count(factions)
+            while (k < factionCount)
+                Faction restoreFaction = JArray.getForm(factions, k) as Faction
+                if (restoreFaction)
+                    restoreActor.AddToFaction(restoreFaction)
+                    restoreActor.SetFactionRank(restoreFaction, JArray.getInt(ranks, k))
+                endif
+                k += 1
+            endWhile
+            restoreActor.SetActorValue("Aggression", JMap.getFlt(entry, "aggression"))
+
+            string restoreMsg = "Hostility restored on " + restoreActor.GetDisplayName() + " " + restoreActor + ": " + factionCount + " factions"
+            DebugInfo("["+ Name +"] Prison::__ProcessHostilityRestore", restoreMsg)
+            Info(restoreMsg)
+            RPB_Utility.Crumb(restoreActor, "Hostility restored: " + factionCount + " factions")
+            JFormMap.removeKey(__pendingHostility, restoreActor)
+        endif
+        i += 1
+    endWhile
+
+    self.__RescheduleHostilityRestore()
 endFunction
 
 ; The NPC's outfit parts: how many it carries and whether each is worn, to see where a part is doubled or lost during the release.

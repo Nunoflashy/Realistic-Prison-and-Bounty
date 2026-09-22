@@ -17,6 +17,7 @@ scriptname RPB_Utility hidden
     Idle function BoundHandsBehindBack() global
     Armor function RPB_PrisonerHandCuffs() global
     Outfit function RPB_GetOutfit(string asOutfit) global
+    FormList function RPB_GetHostileFactions() global
     bool function IsTracingEnabled() global
     bool function IsDebuggingEnabled() global
     bool function IsLoggingEnabled() global
@@ -146,6 +147,8 @@ scriptname RPB_Utility hidden
     function SetOvercrowdingDisabled(bool abDisabled) global
     float function GetMonitorOverrideHours() global
     function SetMonitorOverrideHours(float afHours) global
+    float function GetHostilityRestoreOverrideHours() global
+    function SetHostilityRestoreOverrideHours(float afHours) global
     function FlowBegin(string asFlow) global
     function FlowEnsure(string asFlow) global
     function FlowMark(string asPhase) global
@@ -373,6 +376,18 @@ Outfit function RPB_GetOutfit(string asOutfit) global
     elseif (asOutfit == "Default 2 no Shoes")
         return GetFormFromMod(0x259D8) as Outfit
     endif
+endFunction
+
+;/
+    The factions Prisoner.NPC_IsHostilePrisoner()/NPC_NeutralizeWhileImprisoned() check against: an NPC belonging to one of these
+    is a hostile prisoner (a bandit, a Civil War soldier, Forsworn) that guards would otherwise attack in its cell. Built and
+    filled in by the mod author in the Creation Kit (v1: BanditFaction, CWImperialFaction, CWStormcloakFaction, ForswornFaction);
+    add more entries there later, no script change needed.
+
+    TODO(mod author): create the RPB_HostileFactions FormList in the CK and replace 0x0 below with its FormID.
+/;
+FormList function RPB_GetHostileFactions() global
+    return GetFormFromMod(0x0) as FormList
 endFunction
 
 ; ==========================================================
@@ -2215,6 +2230,18 @@ endFunction
 
 function SetMonitorOverrideHours(float afHours) global
     RPB_StorageVars.SetFloat("MONITOR_HOURS", afHours, "Profile")
+endFunction
+
+;/
+    Dev override for how long a neutralized hostile prisoner stays neutral after release: when > 0, used instead of
+    Prison.HOSTILITY_RESTORE_DELAY_HOURS, so a test doesn't have to wait out the real delay. 0 (default) = the real schedule.
+/;
+float function GetHostilityRestoreOverrideHours() global
+    return JDB.solveFlt(".rpb_root.storage.Profile.HOSTILITY_RESTORE_HOURS")
+endFunction
+
+function SetHostilityRestoreOverrideHours(float afHours) global
+    RPB_StorageVars.SetFloat("HOSTILITY_RESTORE_HOURS", afHours, "Profile")
 endFunction
 
 function FlowBegin(string asFlow) global
