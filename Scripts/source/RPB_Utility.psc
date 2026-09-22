@@ -379,11 +379,12 @@ Outfit function RPB_GetOutfit(string asOutfit) global
 endFunction
 
 ;/
-    The factions Prisoner.NPC_IsHostilePrisoner()/NPC_NeutralizeWhileImprisoned() check against: an NPC belonging to one of these
-    is a hostile prisoner (a bandit, a Civil War soldier, Forsworn) that guards would otherwise attack in its cell. Resolved by
+    The factions Prisoner.IsHostilePrisoner()/NeutralizeWhileImprisoned() check against: an Actor (NPC or the player) belonging
+    to one of these is a hostile prisoner (a bandit, a Civil War soldier, Forsworn - or the player disguised via a mod like
+    Master of Disguise, which adds the player to the same factions) that guards would otherwise attack in its cell. Resolved by
     editor ID through PO3 Papyrus Extender (already a dependency of this profile) rather than a Creation Kit FormList: no new
     ESP record, and extending the list later is a one-line edit here, not a CK session. An editor ID that fails to resolve
-    (typo, or the load order lacks that vanilla record) is skipped, not a crash; NPC_NeutralizeWhileImprisoned logs how many
+    (typo, or the load order lacks that vanilla record) is skipped, not a crash; NeutralizeWhileImprisoned logs how many
     resolved.
 /;
 string[] function __HostileFactionEditorIDs() global

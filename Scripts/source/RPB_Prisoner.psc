@@ -204,8 +204,8 @@ Scriptname RPB_Prisoner extends RPB_ActorBase
     function NPC_EnsureDressed()
     function NPC_SaveWornArmor()
     int function NPC_ReequipSavedWornArmor()
-    bool function NPC_IsHostilePrisoner()
-    function NPC_NeutralizeWhileImprisoned()
+    bool function IsHostilePrisoner()
+    function NeutralizeWhileImprisoned()
     function NPC_SetPersistentOutfit(string asOutfit)
     function NPC_RemovePresetItems()
     function NPC_UpdateStripping()
@@ -2208,7 +2208,7 @@ function Imprison()
     self.OnImprisoned()
     RPB_Utility.FlowMark("Imprison: OnImprisoned done")
     RPB_Utility.Crumb(this, "Imprison: OnImprisoned done")
-    self.NPC_NeutralizeWhileImprisoned() ; no-op for the common (non-hostile) prisoner; see NPC_IsHostilePrisoner
+    self.NeutralizeWhileImprisoned() ; no-op for the common (non-hostile) prisoner; see IsHostilePrisoner. Player or NPC alike.
     GotoState("Imprisoned") ; State when the prisoner is in the cell, check for updates for sentence, etc...
     RPB_Utility.FlowEnd("Imprison: GotoState(Imprisoned) done")
     EndBenchmark(startBench, "Ended ["+ Name +"] Prisoner::Imprison")
@@ -3552,15 +3552,13 @@ int function NPC_ReequipSavedWornArmor()
 endFunction
 
 ;/
-    Hostile prisoners (bandits, Civil War soldiers, Forsworn): guards attack them on sight because of a faction relationship,
-    not because of their own Aggression stat, so IsHostileToActor has to read false for the imprisonment to be peaceful. True if
-    this NPC belongs to any faction in RPB_Utility.RPB_GetHostileFactions() (resolved by editor ID through PO3 Papyrus Extender).
+    Hostile prisoners: guards attack them on sight because of a faction relationship, not because of their own Aggression stat,
+    so IsHostileToActor has to read false for the imprisonment to be peaceful. Applies to NPCs (bandits, Civil War soldiers,
+    Forsworn) and to the player (a disguise mod such as fireundubh's Master of Disguise adds the PLAYER to the same kind of
+    faction while disguised, e.g. BanditFaction, with the same real-world effect: nearby guards attack). True if this Actor
+    belongs to any faction in RPB_Utility.RPB_GetHostileFactions() (resolved by editor ID through PO3 Papyrus Extender).
 /;
-bool function NPC_IsHostilePrisoner()
-    if (!self.IsNPC())
-        return false
-    endif
-
+bool function IsHostilePrisoner()
     Form[] hostileFactions = RPB_Utility.RPB_GetHostileFactions()
     if (!hostileFactions)
         return false
@@ -3578,13 +3576,14 @@ bool function NPC_IsHostilePrisoner()
 endFunction
 
 ;/
-    Called once from Imprison() for a hostile prisoner (see NPC_IsHostilePrisoner): removes it from every hostile faction it
+    Called once from Imprison() for a hostile prisoner (see IsHostilePrisoner): removes it from every hostile faction it
     belongs to (saving faction + rank so Prison can restore both after release, see __QueueHostilityRestore) and zeroes its
     Aggression so it does not throw the first punch either. Guard-initiated combat is faction-driven, so this alone is enough
-    to keep guards from attacking it in the cell; nothing changes for the common (non-hostile) prisoner.
+    to keep guards from attacking it in the cell; nothing changes for the common (non-hostile) prisoner. Works the same for
+    the player as for an NPC (see IsHostilePrisoner's doc comment).
 /;
-function NPC_NeutralizeWhileImprisoned()
-    if (!self.NPC_IsHostilePrisoner())
+function NeutralizeWhileImprisoned()
+    if (!self.IsHostilePrisoner())
         return
     endif
 
@@ -3609,14 +3608,14 @@ function NPC_NeutralizeWhileImprisoned()
 
     string refKey = self.__GetRefKey()
     string category = self.GetScriptVarCategory("Actor")
-    RPB_StorageVars.SetFormsOnReference("NPC Hostile Factions", refKey, self.__TrimForms(removedFactions, removed), category)
-    RPB_StorageVars.SetIntsOnReference("NPC Hostile Ranks", refKey, self.__TrimInts(removedRanks, removed), category)
-    SetFloat("NPC Original Aggression", this.GetActorValue("Aggression"))
+    RPB_StorageVars.SetFormsOnReference("Hostile Factions", refKey, self.__TrimForms(removedFactions, removed), category)
+    RPB_StorageVars.SetIntsOnReference("Hostile Ranks", refKey, self.__TrimInts(removedRanks, removed), category)
+    SetFloat("Original Aggression", this.GetActorValue("Aggression"))
     this.SetActorValue("Aggression", 0.0)
     this.StopCombat()
     this.StopCombatAlarm()
 
-    EventManager.SendInfo("Neutralized " + self.Name + " while imprisoned (removed from " + removed + " hostile factions:" + ranksLogged + ")", "["+ Name +"] Prisoner::NPC_NeutralizeWhileImprisoned")
+    EventManager.SendInfo("Neutralized " + self.Name + " while imprisoned (removed from " + removed + " hostile factions:" + ranksLogged + ")", "["+ Name +"] Prisoner::NeutralizeWhileImprisoned")
 endFunction
 
 function NPC_SetPersistentOutfit(string asOutfit)

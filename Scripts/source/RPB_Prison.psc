@@ -2314,8 +2314,10 @@ function TeleportPrisonerToRelease(RPB_Prisoner apPrisoner)
     ; What the NPC is dressed with again is queued before the release destroys the storage it comes from (see __QueueDress).
     if (releasedIsNPC)
         self.__QueueDress(releasedActor)
-        self.__QueueHostilityRestore(releasedActor)
     endif
+    ; Hostility restore (unlike dressing) applies to the player too: a disguise mod can neutralize the same way an NPC does.
+    ; No-ops cheaply when nothing was saved (the common case).
+    self.__QueueHostilityRestore(releasedActor)
 
     self.OnPrisonerReleased(apPrisoner)
     RPB_Utility.Crumb(releasedActor, "Release: OnPrisonerReleased done, " + self.__PartsTrace(releasedActor, dressOutfit))
@@ -2545,12 +2547,14 @@ endFunction
 ; ==========================================================
 ;                    Hostile prisoners
 ; ==========================================================
-; A hostile NPC (bandit, Civil War soldier, Forsworn) is made neutral while imprisoned (Prisoner.NPC_NeutralizeWhileImprisoned,
-; called from Imprison): its hostile faction memberships are stripped, so guards no longer see it as a target in the cell. What
-; was stripped is read from the storage BEFORE the release destroys it (same reasoning as __QueueDress) and queued here, keyed
-; by an absolute game-time due date rather than a real-time poll: the delay is measured in hours, and real time restarts every
-; session and must not be persisted (see the re-dress pass above). Restoring several prisoners released around the same time is
-; supported (one JFormMap entry per actor); the wake is a single game-time timer for whichever entry is due soonest.
+; A hostile prisoner (a bandit/Civil-War-soldier/Forsworn NPC, or the player disguised via a mod like Master of Disguise) is made
+; neutral while imprisoned (Prisoner.NeutralizeWhileImprisoned, called from Imprison): its hostile faction memberships are
+; stripped, so guards no longer see it as a target in the cell. What was stripped is read from the storage BEFORE the release
+; destroys it (same reasoning as __QueueDress) and queued here, keyed by an absolute game-time due date rather than a real-time
+; poll: the delay is measured in hours, and real time restarts every session and must not be persisted (see the re-dress pass
+; above). Restoring several prisoners released around the same time is supported (one JFormMap entry per actor); the wake is a
+; single game-time timer for whichever entry is due soonest. Unlike the re-dress pass, this queues for the player too (see
+; TeleportPrisonerToRelease) since the player can be neutralized the same way an NPC can.
 
 int __pendingHostility ; JFormMap actor -> JMap { factions: JArray of Faction, ranks: JArray of int (parallel), aggression: float, dueAt: float (game time) }, retained
 float property HOSTILITY_RESTORE_DELAY_HOURS = 24.0 autoreadonly ; "a good while" after release before a neutralized prisoner turns hostile again
@@ -2569,17 +2573,17 @@ int function PendingHostilityRestoreCount()
     return JFormMap.count(__pendingHostility)
 endFunction
 
-; Reads what Prisoner.NPC_NeutralizeWhileImprisoned saved (nothing, for the common non-hostile prisoner) and queues it to be
+; Reads what Prisoner.NeutralizeWhileImprisoned saved (nothing, for the common non-hostile prisoner) and queues it to be
 ; restored HOSTILITY_RESTORE_DELAY_HOURS after release.
 function __QueueHostilityRestore(Actor akActor)
-    Form[] savedFactions = RPB_StorageVars.GetFormsOnReference("NPC Hostile Factions", akActor, "Jail")
+    Form[] savedFactions = RPB_StorageVars.GetFormsOnReference("Hostile Factions", akActor, "Jail")
     if (!savedFactions || savedFactions.Length == 0)
         return ; the common case: this prisoner was never hostile, nothing to restore
     endif
 
     self.__EnsurePendingHostility()
 
-    int[] savedRanks = RPB_StorageVars.GetIntsOnReference("NPC Hostile Ranks", akActor, "Jail")
+    int[] savedRanks = RPB_StorageVars.GetIntsOnReference("Hostile Ranks", akActor, "Jail")
     int factions = JArray.object()
     int ranks = JArray.object()
     int i = 0
@@ -2592,7 +2596,7 @@ function __QueueHostilityRestore(Actor akActor)
     int entry = JMap.object()
     JMap.setObj(entry, "factions", factions)
     JMap.setObj(entry, "ranks", ranks)
-    JMap.setFlt(entry, "aggression", RPB_StorageVars.GetFloatOnReference("NPC Original Aggression", akActor, "Jail"))
+    JMap.setFlt(entry, "aggression", RPB_StorageVars.GetFloatOnReference("Original Aggression", akActor, "Jail"))
     float delayHours = RPB_Utility.GetHostilityRestoreOverrideHours()
     if (delayHours <= 0.0)
         delayHours = HOSTILITY_RESTORE_DELAY_HOURS

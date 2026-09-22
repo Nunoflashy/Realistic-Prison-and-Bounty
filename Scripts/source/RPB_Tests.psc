@@ -129,6 +129,7 @@ function SetTests()
     self.AddTest("97 - Mass Imprisonment of Bandits (0x37BFF, Real Cell Data)", "Test_MassBandits", abChainable = false)
     self.AddTest("98 - Imperial Soldier Fodder Smoke Test: Can 0xE77F9 Be Imprisoned At All? (3 Clones)", "Test_MassSoldiersSmokeTest", abChainable = false)
     self.AddTest("99 - Hostile Prisoner: Neutralized While Imprisoned, Hostility Restored a While After Release", "Test_HostilePrisoner_NeutralizedThenRestored", abChainable = false)
+    self.AddTest("100 - Hostile Player (Disguise Mod): Neutralized While Imprisoned, Hostility Restored a While After Release", "Test_HostilePlayer_NeutralizedThenRestored", abChainable = false)
     self.AddTest("41 - ActiveMagicEffectContainer: Stuck Lock Self-Heals", "Test_ActiveMagicEffectContainer_StuckLockSelfHeals")
     self.AddTest("42 - ThreadLock: JAtomic Primitive Semantics and Registry", "Test_ThreadLock_PrimitiveSemantics")
     ; Not chainable: fires concurrent worker threads
@@ -7915,7 +7916,7 @@ state Test_MassSoldiersSmokeTest
 endState
 
 ;/
-    Hostile prisoners (bandits, Civil War soldiers, Forsworn) are neutralized while imprisoned: NPC_NeutralizeWhileImprisoned
+    Hostile prisoners (bandits, Civil War soldiers, Forsworn) are neutralized while imprisoned: NeutralizeWhileImprisoned
     removes them from whatever faction in RPB_Utility.RPB_GetHostileFactions() they belong to (so guards stop treating them as
     a target) and Prison's delayed queue restores it some time after release. Arrests a bandit, checks its hostile factions are
     gone while imprisoned, releases it, checks they are still gone right after release, then uses the dev override to skip most
@@ -8039,6 +8040,113 @@ state Test_HostilePrisoner_NeutralizedThenRestored
         __TeardownAllTempActors()
     endFunction
 endState
+
+;/
+    The player gets the same treatment as an NPC (see test 99): a disguise mod such as Master of Disguise adds the PLAYER to a
+    hostile faction while disguised (confirmed against its real source: Player.AddToFaction(disguiseFaction), no rank), and
+    nearby guards then attack the disguised player the same way they'd attack a real bandit. Manually adds the player to a
+    resolved hostile faction (standing in for what a disguise mod would already have done), imprisons the player through the
+    real Imprison() (MakePrisoner + the same manual sentence/cell setup as Test_Imprison_Player_Without_Arresting_Required_Bounty),
+    checks the faction is gone while imprisoned, releases through the real release path, checks it stays gone right after, then
+    uses the dev override to skip most of the delay and checks it comes back - exactly test 99's shape, on the player instead
+    of a temp bandit.
+    Needs RPB_GetHostileFactions() to resolve at least one faction (same PO3/CK-free dependency as test 99): logs INCONCLUSIVE,
+    not a failure, if it doesn't.
+/;
+state Test_HostilePlayer_NeutralizedThenRestored
+    function Setup()
+        RPB_Prison prison = (RPB_API.GetPrisonManager()).GetPrison("Haafingar")
+        Actor player = Game.GetFormEx(0x14) as Actor
+        bool ok = true
+        bool step = false
+
+        Form[] hostileFactions = RPB_Utility.RPB_GetHostileFactions()
+        if (!hostileFactions || hostileFactions.Length == 0)
+            log("INCONCLUSIVE: RPB_GetHostileFactions resolved no factions (PO3 Papyrus Extender missing, or every editor ID failed - check the WARN lines); the neutralize/restore feature is a no-op until then")
+            display_result(ok)
+            return
+        endif
+
+        Faction disguiseFaction = hostileFactions[0] as Faction
+        step = assert_true(disguiseFaction != none, "The first resolved hostile faction did not cast to Faction")
+        ok = ok && step
+        if (!disguiseFaction)
+            display_result(false)
+            return
+        endif
+
+        ; Stand in for what a disguise mod (e.g. Master of Disguise) already does while the player wears a disguise
+        bool wasAlreadyInFaction = player.IsInFaction(disguiseFaction)
+        if (!wasAlreadyInFaction)
+            player.AddToFaction(disguiseFaction)
+        endif
+        float originalAggression = player.GetActorValue("Aggression")
+
+        RPB_Utility.SetHostilityRestoreOverrideHours(0.05) ; a few real seconds at the default time scale, not a real 24 game-hour wait
+
+        RPB_Prisoner prisonerRef = prison.MakePrisoner(player)
+        step = assert_true(prisonerRef != none, "Could not make the player a prisoner")
+        ok = ok && step
+        if (!prisonerRef)
+            self.__CleanupHostilePlayerTest(player, disguiseFaction, wasAlreadyInFaction, originalAggression)
+            display_result(false)
+            return
+        endif
+
+        prisonerRef.IsUndeterminedSentence = true
+        prisonerRef.HideBounty()
+        prisonerRef.SetSentence()
+        prisonerRef.IsUndeterminedSentence = false
+        prisonerRef.AssignCell()
+        prisonerRef.MoveToCell()
+
+        prisonerRef.Imprison()
+        step = assert_true(prisonerRef.IsImprisoned, "The player was not imprisoned (HasStateRequiredForImprisonment likely false)")
+        ok = ok && step
+        if (!prisonerRef.IsImprisoned)
+            self.__CleanupHostilePlayerTest(player, disguiseFaction, wasAlreadyInFaction, originalAggression)
+            display_result(false)
+            return
+        endif
+
+        step = assert_true(!player.IsInFaction(disguiseFaction), "The player's disguise faction was not removed while imprisoned")
+        ok = ok && step
+        log("HOSTILE PLAYER while imprisoned: still in faction " + player.IsInFaction(disguiseFaction) + ", Aggression now " + player.GetActorValue("Aggression"))
+
+        prison.SendReleaseRequest(prisonerRef)
+        int releasedMs = self.__StressWaitReleased(player, prison, 30.0)
+        step = assert_true(releasedMs >= 0, "The player was not released")
+        ok = ok && step
+
+        step = assert_true(!player.IsInFaction(disguiseFaction), "The player's disguise faction came back immediately on release (should stay neutral for a while)")
+        ok = ok && step
+
+        float waitStart = Utility.GetCurrentRealTime()
+        while (prison.PendingHostilityRestoreCount() > 0 && (Utility.GetCurrentRealTime() - waitStart) < 30.0)
+            Utility.Wait(0.5)
+        endWhile
+
+        bool restored = player.IsInFaction(disguiseFaction)
+        step = assert_true(restored, "The player's disguise faction was not restored after the delay")
+        ok = ok && step
+        log("HOSTILE PLAYER restored: in faction " + restored + ", Aggression now " + player.GetActorValue("Aggression") + ", still queued " + prison.PendingHostilityRestoreCount())
+
+        self.__CleanupHostilePlayerTest(player, disguiseFaction, wasAlreadyInFaction, originalAggression)
+        display_result(ok)
+    endFunction
+
+    function Teardown()
+        RPB_Utility.SetHostilityRestoreOverrideHours(0.0)
+    endFunction
+endState
+
+; However the test above ends (pass, fail, or an early return), the dev's own player must not stay faction-flagged/Aggression-changed.
+function __CleanupHostilePlayerTest(Actor akPlayer, Faction akDisguiseFaction, bool abWasAlreadyInFaction, float afOriginalAggression)
+    if (!abWasAlreadyInFaction)
+        akPlayer.RemoveFromFaction(akDisguiseFaction)
+    endif
+    akPlayer.SetActorValue("Aggression", afOriginalAggression)
+endFunction
 
 ;/
     Finds the source of the console warning "access to non-existing object with id 0x64": it prints a marker to the in-game console
