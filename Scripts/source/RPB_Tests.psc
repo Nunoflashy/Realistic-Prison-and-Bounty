@@ -125,6 +125,8 @@ function SetTests()
     self.AddTest("93 - Mass Time Skip: 40 Prisoners, Release Order and Cost (Dry Run, Passes ~10 Game Days)", "Test_TimeSkipManyPrisoners", abChainable = false)
     self.AddTest("94 - Mass Imprisonment With the Real Cell Data (Overcrowding As Configured): Package Pool Limit", "Test_MassImprisonmentRealData", abChainable = false)
     self.AddTest("95 - Console Probe: A Marker Before Each Read the Mass Tests Do at Their Start (Find the JContainers Warning)", "Test_ConsoleProbe", abChainable = false)
+    self.AddTest("96 - Mass Imprisonment of Imperial Soldiers (0xE77F9, Real Cell Data)", "Test_MassSoldiers", abChainable = false)
+    self.AddTest("97 - Mass Imprisonment of Bandits (0x37C00, Real Cell Data)", "Test_MassBandits", abChainable = false)
     self.AddTest("41 - ActiveMagicEffectContainer: Stuck Lock Self-Heals", "Test_ActiveMagicEffectContainer_StuckLockSelfHeals")
     self.AddTest("42 - ThreadLock: JAtomic Primitive Semantics and Registry", "Test_ThreadLock_PrimitiveSemantics")
     ; Not chainable: fires concurrent worker threads
@@ -7445,7 +7447,7 @@ function __MassPutBack(Actor akActor)
     endWhile
 endFunction
 
-bool function __MassRun(bool abNoOvercrowding)
+bool function __MassRun(bool abNoOvercrowding, int aiBaseFormId = 0x132AE, int aiTotal = 45)
     RPB_Prison prison = (RPB_API.GetPrisonManager()).GetPrison("Haafingar")
     Actor player = Game.GetFormEx(0x14) as Actor
     Actor guard = RPB_Utility.GetNearestGuard(player, 3000.0, player)
@@ -7458,9 +7460,13 @@ bool function __MassRun(bool abNoOvercrowding)
         return false
     endif
 
-    int TOTAL = 45
+    int TOTAL = aiTotal
     int WAVE = 10
-    int BASE = 0x132AE
+    int BASE = aiBaseFormId
+    if (TOTAL > 64)
+        TOTAL = 64 ; the actor arrays hold 64
+    endif
+    log("MASS base actor " + Game.GetFormEx(BASE) + ", " + TOTAL + " clones")
 
     RPB_PrisonManager massManager = RPB_API.GetPrisonManager()
     int baseCount = prison.Prisoners.Count
@@ -7843,6 +7849,38 @@ endState
 state Test_MassImprisonmentRealData
     function Setup()
         display_result(self.__MassRun(false))
+    endFunction
+
+    function Teardown()
+        RPB_Utility.SetOvercrowdingDisabled(false)
+        self.__StressProfilerRestore()
+        __TeardownAllTempActors()
+    endFunction
+endState
+
+;/
+    Same scenario as test 94 with Imperial Soldiers (dunCGImperialSoldierFodderC01, 0xE77F9): generic actors whose outfit comes from
+    a template (the base outfit is none), so what they wear again depends on the worn-armor snapshot and the re-dress pass alone.
+/;
+state Test_MassSoldiers
+    function Setup()
+        display_result(self.__MassRun(false, 0xE77F9, 45))
+    endFunction
+
+    function Teardown()
+        RPB_Utility.SetOvercrowdingDisabled(false)
+        self.__StressProfilerRestore()
+        __TeardownAllTempActors()
+    endFunction
+endState
+
+;/
+    Same scenario as test 94 with Bandits (EncBandit01MissileNordM, 0x37C00): template outfit like the soldiers, plus weapons and
+    gear in the belongings.
+/;
+state Test_MassBandits
+    function Setup()
+        display_result(self.__MassRun(false, 0x37C00, 45))
     endFunction
 
     function Teardown()
