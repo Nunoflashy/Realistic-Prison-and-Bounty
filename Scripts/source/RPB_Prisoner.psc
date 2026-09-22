@@ -950,7 +950,15 @@ state Imprisoned
 
         self.UpdateInfamy()
         self.UpdateTimeJailed() ; Must be updated in some other way, otherwise it will reset to 0 on next imprisonment
- 
+
+        ; A prisoner is normally only neutralized once, at Imprison() time - but a disguise mod (Master of Disguise and
+        ; similar) keeps re-evaluating the player's faction membership against currently worn gear, and if this prisoner
+        ; isn't actually stripped (ShouldBeStripped off, a valid lighter-prison configuration), the disguise item never
+        ; comes off, so such a mod could re-add the faction sometime during the sentence. Re-checking hourly bounds that
+        ; window instead of leaving it neutral only until the first re-evaluation. IsHostilePrisoner() already makes this
+        ; a near-free no-op for the common case (not currently in a listed hostile faction).
+        self.NeutralizeWhileImprisoned()
+
         if (self.IsSentenceServed)
             Prison.SendReleaseRequest(self)
             return

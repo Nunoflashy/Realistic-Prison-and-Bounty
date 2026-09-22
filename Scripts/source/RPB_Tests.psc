@@ -8093,10 +8093,13 @@ state Test_HostilePlayer_NeutralizedThenRestored
             return
         endif
 
+        ; Left true (not reset to false): HasStateRequiredForImprisonment needs Sentence || Bounty || IsUndeterminedSentence,
+        ; and SetSentence() itself never sets a numeric Sentence while IsUndeterminedSentence is true (it just logs and
+        ; returns) - that flag staying true IS how an undetermined sentence satisfies the precondition. SendReleaseRequest
+        ; (used below) doesn't check sentence-served status, so a real Sentence value was never actually needed here.
         prisonerRef.IsUndeterminedSentence = true
         prisonerRef.HideBounty()
         prisonerRef.SetSentence()
-        prisonerRef.IsUndeterminedSentence = false
         prisonerRef.AssignCell()
         prisonerRef.MoveToCell()
 
