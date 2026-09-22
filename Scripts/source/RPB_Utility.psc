@@ -390,12 +390,18 @@ endFunction
     (typo, or the load order lacks that vanilla record) is skipped, not a crash; NeutralizeWhileImprisoned logs how many
     resolved.
 /;
+; Verified against the actual load order (zEdit), not recalled: "CWStormcloakFaction" (an earlier guess) does not exist - the
+; real editor ID, following the same pattern as CWImperialFaction, is "CWSonsFaction" (in-lore "Sons of Skyrim"). The two
+; "...FactionNPC" entries are separate records, explicitly authored "NPC faction (creates hostility to enemy)" - plausibly
+; the actual drivers of guard hostility toward a Civil War soldier NPC, more so than the plain membership factions.
 string[] function __HostileFactionEditorIDs() global
-    string[] ids = new string[4]
+    string[] ids = new string[6]
     ids[0] = "BanditFaction"
     ids[1] = "CWImperialFaction"
-    ids[2] = "CWStormcloakFaction"
-    ids[3] = "ForswornFaction"
+    ids[2] = "CWImperialFactionNPC"
+    ids[3] = "CWSonsFaction"
+    ids[4] = "CWSonsFactionNPC"
+    ids[5] = "ForswornFaction"
     return ids
 endFunction
 
@@ -403,7 +409,7 @@ endFunction
 ; resolved goes through Utility.CreateFormArray (the same convention RPB_Prisoner.__TrimForms uses). Callers cast each element.
 Form[] function RPB_GetHostileFactions() global
     string[] ids = __HostileFactionEditorIDs()
-    Form[] factions = new Form[4]
+    Form[] factions = new Form[6] ; must match __HostileFactionEditorIDs()'s count
     int resolved = 0
     int i = 0
     while (i < ids.Length)
@@ -534,16 +540,18 @@ endFunction
 
     Called from BeginArrest alongside NeutralizeHostileActor: stops combat on the known captor directly (the actor whose
     scene actually needs to run), and on every actor PO3_SKSEFunctions.GetCombatTargets(@akArrestee) returns, to also catch
-    any OTHER guard(s) that independently detected the same disguise and are separately still fighting. GetCombatTargets'
-    exact direction (opponents-of vs opponents-targeting) is unverified in-game as of this writing - the INFO log states
-    what it found so a real test can confirm it is actually catching the attacking guard(s).
+    any OTHER guard(s) that independently detected the same disguise and are separately still fighting. Confirmed the same
+    function already works for this exact purpose in the Surrender system (EventManager.OnSurrenderPreparing) - read it
+    BEFORE calling StopCombat on anyone (stopping one combatant first can tear down the shared combat group/instance the
+    query itself reads from, which is why an earlier version of this function that stopped the captor first always found 0).
 /;
 function BreakOffCombatForArrest(Actor akArrestee, Actor akCaptor) global
+    Actor[] combatTargets = PO3_SKSEFunctions.GetCombatTargets(akArrestee)
+
     if (akCaptor)
         akCaptor.StopCombat()
     endif
 
-    Actor[] combatTargets = PO3_SKSEFunctions.GetCombatTargets(akArrestee)
     int stopped = 0
     string stoppedLogged = ""
     if (combatTargets)
