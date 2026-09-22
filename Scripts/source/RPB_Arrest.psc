@@ -1051,6 +1051,10 @@ function BeginArrest(RPB_Arrestee apArresteeRef)
     ; walk, teleport, arrival, strip, Imprison() - would otherwise happen while a nearby guard could still evaluate this
     ; actor as hostile and break the scripted flow. See RPB_Utility.NeutralizeHostileActor's doc comment.
     RPB_Utility.NeutralizeHostileActor(arrestee)
+    ; A hostile faction is only half of it: a disguise mod can have already put the CAPTOR (or another nearby guard) into
+    ; active combat directly, and removing the arrestee's own faction does not make an already-fighting guard disengage.
+    ; See RPB_Utility.BreakOffCombatForArrest's doc comment.
+    RPB_Utility.BreakOffCombatForArrest(arrestee, captor)
     RPB_Utility.FlowMark("BeginArrest: HideBounty + StopCombat")
     RPB_Utility.Crumb(arrestee, "BeginArrest: HideBounty + StopCombat")
     ; apArresteeRef.SheatheWeapon()

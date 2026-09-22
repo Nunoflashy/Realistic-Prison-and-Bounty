@@ -20,6 +20,7 @@ scriptname RPB_Utility hidden
     Form[] function RPB_GetHostileFactions() global
     bool function IsHostileActor(Actor akActor) global
     function NeutralizeHostileActor(Actor akActor) global
+    function BreakOffCombatForArrest(Actor akArrestee, Actor akCaptor) global
     bool function IsTracingEnabled() global
     bool function IsDebuggingEnabled() global
     bool function IsLoggingEnabled() global
@@ -518,6 +519,47 @@ function NeutralizeHostileActor(Actor akActor) global
     akActor.StopCombatAlarm()
 
     Info("Neutralized " + akActor.GetDisplayName() + " " + akActor + " (removed from " + removed + " hostile factions:" + ranksLogged + ")")
+endFunction
+
+;/
+    A hostile faction (see NeutralizeHostileActor) is only half the story: a disguise mod such as Master of Disguise attaches
+    its OWN ability effect to a nearby guard the moment it detects the disguise, and that effect puts the GUARD directly into
+    an active, alerted combat stance (SetAlert/DrawWeapon) - confirmed by reading Master of Disguise's real source
+    (dubhFactionEnemyScript.psc): removing the arrestee's faction does not, by itself, make an already-fighting guard
+    disengage (the guard's own AI has already committed to combat; the disguise mod's own polling only reacts to
+    IsHostileToActor going false, and even then it never calls StopCombat on itself). Skyrim also generally can't run a scene
+    on an actor that's still actively in combat, which is why an arrest attempted mid-fight produced a broken half state
+    (both effects attached, no escort scene, no cuffs): the arresting guard was still fighting when the scene should have
+    started.
+
+    Called from BeginArrest alongside NeutralizeHostileActor: stops combat on the known captor directly (the actor whose
+    scene actually needs to run), and on every actor PO3_SKSEFunctions.GetCombatTargets(@akArrestee) returns, to also catch
+    any OTHER guard(s) that independently detected the same disguise and are separately still fighting. GetCombatTargets'
+    exact direction (opponents-of vs opponents-targeting) is unverified in-game as of this writing - the INFO log states
+    what it found so a real test can confirm it is actually catching the attacking guard(s).
+/;
+function BreakOffCombatForArrest(Actor akArrestee, Actor akCaptor) global
+    if (akCaptor)
+        akCaptor.StopCombat()
+    endif
+
+    Actor[] combatTargets = PO3_SKSEFunctions.GetCombatTargets(akArrestee)
+    int stopped = 0
+    string stoppedLogged = ""
+    if (combatTargets)
+        int i = 0
+        while (i < combatTargets.Length)
+            Actor combatant = combatTargets[i]
+            if (combatant && combatant != akCaptor)
+                combatant.StopCombat()
+                stoppedLogged += " " + combatant.GetDisplayName() + " " + combatant
+                stopped += 1
+            endif
+            i += 1
+        endWhile
+    endif
+
+    Info("BreakOffCombatForArrest on " + akArrestee.GetDisplayName() + " " + akArrestee + ": captor " + akCaptor + " stopped, GetCombatTargets found " + stopped + " more:" + stoppedLogged)
 endFunction
 
 ; ==========================================================
