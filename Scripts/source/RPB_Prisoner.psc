@@ -3554,22 +3554,21 @@ endFunction
 ;/
     Hostile prisoners (bandits, Civil War soldiers, Forsworn): guards attack them on sight because of a faction relationship,
     not because of their own Aggression stat, so IsHostileToActor has to read false for the imprisonment to be peaceful. True if
-    this NPC belongs to any faction in RPB_Utility.RPB_GetHostileFactions() (a FormList the mod author maintains in the CK).
+    this NPC belongs to any faction in RPB_Utility.RPB_GetHostileFactions() (resolved by editor ID through PO3 Papyrus Extender).
 /;
 bool function NPC_IsHostilePrisoner()
     if (!self.IsNPC())
         return false
     endif
 
-    FormList hostileFactions = RPB_Utility.RPB_GetHostileFactions()
+    Form[] hostileFactions = RPB_Utility.RPB_GetHostileFactions()
     if (!hostileFactions)
         return false
     endif
 
     int i = 0
-    int n = hostileFactions.GetSize()
-    while (i < n)
-        Faction hostileFaction = hostileFactions.GetAt(i) as Faction
+    while (i < hostileFactions.Length)
+        Faction hostileFaction = hostileFactions[i] as Faction
         if (hostileFaction && this.IsInFaction(hostileFaction))
             return true
         endif
@@ -3589,14 +3588,13 @@ function NPC_NeutralizeWhileImprisoned()
         return
     endif
 
-    FormList hostileFactions = RPB_Utility.RPB_GetHostileFactions()
+    Form[] hostileFactions = RPB_Utility.RPB_GetHostileFactions()
     Form[] removedFactions = new Form[128]
     int[] removedRanks = new int[128]
     int removed = 0
     int i = 0
-    int n = hostileFactions.GetSize()
-    while (i < n && removed < 128)
-        Faction hostileFaction = hostileFactions.GetAt(i) as Faction
+    while (i < hostileFactions.Length && removed < 128)
+        Faction hostileFaction = hostileFactions[i] as Faction
         if (hostileFaction && this.IsInFaction(hostileFaction))
             removedFactions[removed] = hostileFaction
             removedRanks[removed] = this.GetFactionRank(hostileFaction)

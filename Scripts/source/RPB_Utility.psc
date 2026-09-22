@@ -17,7 +17,7 @@ scriptname RPB_Utility hidden
     Idle function BoundHandsBehindBack() global
     Armor function RPB_PrisonerHandCuffs() global
     Outfit function RPB_GetOutfit(string asOutfit) global
-    FormList function RPB_GetHostileFactions() global
+    Form[] function RPB_GetHostileFactions() global
     bool function IsTracingEnabled() global
     bool function IsDebuggingEnabled() global
     bool function IsLoggingEnabled() global
@@ -380,14 +380,53 @@ endFunction
 
 ;/
     The factions Prisoner.NPC_IsHostilePrisoner()/NPC_NeutralizeWhileImprisoned() check against: an NPC belonging to one of these
-    is a hostile prisoner (a bandit, a Civil War soldier, Forsworn) that guards would otherwise attack in its cell. Built and
-    filled in by the mod author in the Creation Kit (v1: BanditFaction, CWImperialFaction, CWStormcloakFaction, ForswornFaction);
-    add more entries there later, no script change needed.
-
-    TODO(mod author): create the RPB_HostileFactions FormList in the CK and replace 0x0 below with its FormID.
+    is a hostile prisoner (a bandit, a Civil War soldier, Forsworn) that guards would otherwise attack in its cell. Resolved by
+    editor ID through PO3 Papyrus Extender (already a dependency of this profile) rather than a Creation Kit FormList: no new
+    ESP record, and extending the list later is a one-line edit here, not a CK session. An editor ID that fails to resolve
+    (typo, or the load order lacks that vanilla record) is skipped, not a crash; NPC_NeutralizeWhileImprisoned logs how many
+    resolved.
 /;
-FormList function RPB_GetHostileFactions() global
-    return GetFormFromMod(0x0) as FormList
+string[] function __HostileFactionEditorIDs() global
+    string[] ids = new string[4]
+    ids[0] = "BanditFaction"
+    ids[1] = "CWImperialFaction"
+    ids[2] = "CWStormcloakFaction"
+    ids[3] = "ForswornFaction"
+    return ids
+endFunction
+
+; Form[], not Faction[]: a Papyrus array literal needs a compile-time constant size, so trimming to how many editor IDs actually
+; resolved goes through Utility.CreateFormArray (the same convention RPB_Prisoner.__TrimForms uses). Callers cast each element.
+Form[] function RPB_GetHostileFactions() global
+    string[] ids = __HostileFactionEditorIDs()
+    Form[] factions = new Form[4]
+    int resolved = 0
+    int i = 0
+    while (i < ids.Length)
+        Faction hostileFaction = PO3_SKSEFunctions.GetFormFromEditorID(ids[i]) as Faction
+        if (hostileFaction)
+            factions[resolved] = hostileFaction
+            resolved += 1
+        else
+            Warn("RPB_GetHostileFactions could not resolve editor ID '" + ids[i] + "' to a Faction (PO3 Papyrus Extender missing, or the load order lacks that record)")
+        endif
+        i += 1
+    endWhile
+
+    if (resolved == ids.Length)
+        return factions
+    endif
+    if (resolved == 0)
+        return none ; nothing resolved (PO3 missing, or every editor ID failed): callers treat this like "no hostile factions"
+    endif
+
+    Form[] trimmed = Utility.CreateFormArray(resolved)
+    i = 0
+    while (i < resolved)
+        trimmed[i] = factions[i]
+        i += 1
+    endWhile
+    return trimmed
 endFunction
 
 ; ==========================================================

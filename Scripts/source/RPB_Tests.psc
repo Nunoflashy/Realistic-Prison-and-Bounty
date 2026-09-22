@@ -7938,9 +7938,9 @@ state Test_HostilePrisoner_NeutralizedThenRestored
             return
         endif
 
-        FormList hostileFactions = RPB_Utility.RPB_GetHostileFactions()
-        if (!hostileFactions || hostileFactions.GetSize() == 0)
-            log("INCONCLUSIVE: RPB_HostileFactions is empty or not set up yet (CK step pending); the neutralize/restore feature is a no-op until then")
+        Form[] hostileFactions = RPB_Utility.RPB_GetHostileFactions()
+        if (!hostileFactions || hostileFactions.Length == 0)
+            log("INCONCLUSIVE: RPB_GetHostileFactions resolved no factions (PO3 Papyrus Extender missing, or every editor ID failed - check the WARN lines); the neutralize/restore feature is a no-op until then")
             display_result(ok)
             return
         endif
@@ -7956,9 +7956,8 @@ state Test_HostilePrisoner_NeutralizedThenRestored
         Faction[] originalHostile = new Faction[16]
         int originalCount = 0
         int i = 0
-        int n = hostileFactions.GetSize()
-        while (i < n && originalCount < 16)
-            Faction f = hostileFactions.GetAt(i) as Faction
+        while (i < hostileFactions.Length && originalCount < 16)
+            Faction f = hostileFactions[i] as Faction
             if (f && a.IsInFaction(f))
                 originalHostile[originalCount] = f
                 originalCount += 1
