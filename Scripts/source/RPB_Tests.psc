@@ -14,127 +14,127 @@ bool property DISPLAY_ASSERT_IN_GAME    = false autoreadonly
 bool property DISPLAY_RESULT_IN_GAME    = true autoreadonly
 
 function SetTests()
-    self.AddTest("00 - Run All Tests", "__RUN_ALL__")
-    self.AddTest("00 - No Test", "")
-    self.AddTest("01 - 25 Days after 26th Frostfall is 20th of Sun's Dusk", "Test_25Days_After_26th_Frostfall_Is_20th_Suns_Dusk")
-    self.AddTest("02 - Get Prison For Actor Globally", "Test_Can_Get_Prison_For_Actor_Globally")
-    self.AddTest("03 - Imprison Actor without Arresting", "Test_Can_Imprison_Actor_Without_Arresting")
+    self.AddTest("000 - Run All Tests", "__RUN_ALL__")
+    self.AddTest("000 - No Test", "")
+    self.AddTest("001 - 25 Days after 26th Frostfall is 20th of Sun's Dusk", "Test_25Days_After_26th_Frostfall_Is_20th_Suns_Dusk")
+    self.AddTest("002 - Get Prison For Actor Globally", "Test_Can_Get_Prison_For_Actor_Globally")
+    self.AddTest("003 - Imprison Actor without Arresting", "Test_Can_Imprison_Actor_Without_Arresting")
     ; Not chainable: spawns 4 permanent NPCs with no cleanup - see KNOWN_ISSUES.md
-    self.AddTest("04 - Imprison Multiple Actors", "Test_Imprison_Multiple_Actors", abChainable = false)
+    self.AddTest("004 - Imprison Multiple Actors", "Test_Imprison_Multiple_Actors", abChainable = false)
     ; Not chainable: a real arrest/escort Scene, not something to fire unattended in a chain
-    self.AddTest("05 - Arrest and Imprison Multiple Actors with Scene", "Test_Arrest_And_Imprison_Multiple_Actors_With_Scene", abChainable = false)
+    self.AddTest("005 - Arrest and Imprison Multiple Actors with Scene", "Test_Arrest_And_Imprison_Multiple_Actors_With_Scene", abChainable = false)
     ; Not chainable: hangs when run as part of "00 - Run All Tests" - root cause not yet
     ; diagnosed (unlike 09's), mitigated here until there's evidence to chase further
-    self.AddTest("06 - Imprisonment In Cell Should Not Allow Overcrowding", "Test_Imprisonment_In_Cell_Should_Not_Allow_Overcrowding", abChainable = false)
-    self.AddTest("07 - Imprison Player Without Arresting - Required Bounty", "Test_Imprison_Player_Without_Arresting_Required_Bounty")
-    self.AddTest("08 - Can Add Prisoners to PrisonerList", "Test_Can_Add_Prisoners_To_PrisonerList")
+    self.AddTest("006 - Imprisonment In Cell Should Not Allow Overcrowding", "Test_Imprisonment_In_Cell_Should_Not_Allow_Overcrowding", abChainable = false)
+    self.AddTest("007 - Imprison Player Without Arresting - Required Bounty", "Test_Imprison_Player_Without_Arresting_Required_Bounty")
+    self.AddTest("008 - Can Add Prisoners to PrisonerList", "Test_Can_Add_Prisoners_To_PrisonerList")
     ; Not chainable: unsets all prison slots with nothing in this suite to reconfigure them
     ; afterward (Test_Configure_Prisons' own reconfiguration call is dead) - see KNOWN_ISSUES.md
-    self.AddTest("09 - Unset Prisons", "Test_Unset_Prisons", abChainable = false)
-    self.AddTest("10 - Configure Prisons", "Test_Configure_Prisons")
+    self.AddTest("009 - Unset Prisons", "Test_Unset_Prisons", abChainable = false)
+    self.AddTest("010 - Configure Prisons", "Test_Configure_Prisons")
     ; Not chainable: a real arrest/escort Scene, not something to fire unattended in a chain
-    self.AddTest("11 - Arrest Selected NPC with Escort Scene", "Test_Arrest_Selected_NPC_Escort_Scene", abChainable = false)
-    self.AddTest("12 - ActiveMagicEffectContainer: Page-Boundary Crossing", "Test_ActiveMagicEffectContainer_PageBoundary")
+    self.AddTest("011 - Arrest Selected NPC with Escort Scene", "Test_Arrest_Selected_NPC_Escort_Scene", abChainable = false)
+    self.AddTest("012 - ActiveMagicEffectContainer: Page-Boundary Crossing", "Test_ActiveMagicEffectContainer_PageBoundary")
     ; Not chainable: stalls "00 - Run All Tests" with no log detail captured yet - root cause
     ; not diagnosed, mitigated here until there's evidence to chase further (same pattern as 06)
-    self.AddTest("13 - Test Prisoner Has Bounty in Prison", "Test_PrisonerHasBountyInPrison", abChainable = false)
-    self.AddTest("14 - Test Prisoner Gets Correct Escape Penalty", "Test_PrisonerEscapeGetsCorrectPenalty")
-    self.AddTest("15 - Test List Algorithms", "Test_ListAlgorithms")
-    self.AddTest("17 - Test New Serialization - Compare with Old", "Test_NewSerializationCompareWithOld")
-    self.AddTest("18 - Test Prison Root Objects", "Test_PrisonRootObjects")
-    self.AddTest("19 - Test JSON Conditions", "Test_JSONConditions")
-    self.AddTest("20 - Test Data Structures", "Test_DataStructures")
+    self.AddTest("013 - Test Prisoner Has Bounty in Prison", "Test_PrisonerHasBountyInPrison", abChainable = false)
+    self.AddTest("014 - Test Prisoner Gets Correct Escape Penalty", "Test_PrisonerEscapeGetsCorrectPenalty")
+    self.AddTest("015 - Test List Algorithms", "Test_ListAlgorithms")
+    self.AddTest("017 - Test New Serialization - Compare with Old", "Test_NewSerializationCompareWithOld")
+    self.AddTest("018 - Test Prison Root Objects", "Test_PrisonRootObjects")
+    self.AddTest("019 - Test JSON Conditions", "Test_JSONConditions")
+    self.AddTest("020 - Test Data Structures", "Test_DataStructures")
     ; Not chainable: 1600 iterations, a benchmark not a correctness test - heavy for a routine chain
-    self.AddTest("21 - Benchmark StorageVars", "Benchmark_StorageVars", abChainable = false)
-    self.AddTest("22 - ActorList: Add and Retrieve (Prisoner/Arrestee/Captor)", "Test_ActorList_Add_And_Retrieve")
-    self.AddTest("23 - ActorList: Multiple Adds and GetKeys()", "Test_ActorList_Multiple_And_GetKeys")
-    self.AddTest("24 - ActorList: Remove and Reindex", "Test_ActorList_Remove_And_Reindex")
-    self.AddTest("25 - ActiveMagicEffectContainer: Dense Packing After Interleaved Add/Remove", "Test_ActiveMagicEffectContainer_DensePacking")
-    self.AddTest("26 - CaptorList: Remove Path (protected_remove)", "Test_CaptorList_Remove_Path")
+    self.AddTest("021 - Benchmark StorageVars", "Benchmark_StorageVars", abChainable = false)
+    self.AddTest("022 - ActorList: Add and Retrieve (Prisoner/Arrestee/Captor)", "Test_ActorList_Add_And_Retrieve")
+    self.AddTest("023 - ActorList: Multiple Adds and GetKeys()", "Test_ActorList_Multiple_And_GetKeys")
+    self.AddTest("024 - ActorList: Remove and Reindex", "Test_ActorList_Remove_And_Reindex")
+    self.AddTest("025 - ActiveMagicEffectContainer: Dense Packing After Interleaved Add/Remove", "Test_ActiveMagicEffectContainer_DensePacking")
+    self.AddTest("026 - CaptorList: Remove Path (protected_remove)", "Test_CaptorList_Remove_Path")
     ; Not chainable: a benchmark, not a correctness test - same treatment as 21
-    self.AddTest("27 - Benchmark: Raw JMap vs RPB_Memory FastMap", "Benchmark_RawJMap_vs_FastMap", abChainable = false)
+    self.AddTest("027 - Benchmark: Raw JMap vs RPB_Memory FastMap", "Benchmark_RawJMap_vs_FastMap", abChainable = false)
     ; Not chainable: a benchmark, not a correctness test - same treatment as 21/27
-    self.AddTest("28 - Benchmark: 32x32 vs 128x8 Page Dispatch at ~1000 Entries", "Benchmark_PageDispatch_32x32_vs_128x8", abChainable = false)
+    self.AddTest("028 - Benchmark: 32x32 vs 128x8 Page Dispatch at ~1000 Entries", "Benchmark_PageDispatch_32x32_vs_128x8", abChainable = false)
     ; Not chainable: a benchmark, not a correctness test - same treatment as 21/27/28
-    self.AddTest("29 - Benchmark: FindKeyForIndex Scan Cost at 150 Entries", "Benchmark_FindKeyForIndexScanCost", abChainable = false)
-    self.AddTest("30 - ActiveMagicEffectContainer: Forward/Reverse Index Maps Stay In Sync", "Test_ActiveMagicEffectContainer_IndexMapsInSync")
-    self.AddTest("31 - ActiveMagicEffectContainer: Reverse Map Rebuilds After Missing (Old-Save Migration)", "Test_ActiveMagicEffectContainer_ReverseMapMigration")
+    self.AddTest("029 - Benchmark: FindKeyForIndex Scan Cost at 150 Entries", "Benchmark_FindKeyForIndexScanCost", abChainable = false)
+    self.AddTest("030 - ActiveMagicEffectContainer: Forward/Reverse Index Maps Stay In Sync", "Test_ActiveMagicEffectContainer_IndexMapsInSync")
+    self.AddTest("031 - ActiveMagicEffectContainer: Reverse Map Rebuilds After Missing (Old-Save Migration)", "Test_ActiveMagicEffectContainer_ReverseMapMigration")
     ; Not chainable: a benchmark, not a correctness test - same treatment as 21/27/28/29
-    self.AddTest("32 - Benchmark: Scan-Based vs Reverse-Index Removal", "Benchmark_ScanVsReverseIndexRemoval", abChainable = false)
+    self.AddTest("032 - Benchmark: Scan-Based vs Reverse-Index Removal", "Benchmark_ScanVsReverseIndexRemoval", abChainable = false)
     ; Not chainable: a benchmark, not a correctness test - same treatment as 21/27/28/29/32
-    self.AddTest("33 - Benchmark: Container Per-Operation Overhead Breakdown", "Benchmark_ContainerOverheadBreakdown", abChainable = false)
+    self.AddTest("033 - Benchmark: Container Per-Operation Overhead Breakdown", "Benchmark_ContainerOverheadBreakdown", abChainable = false)
     ; Not chainable: a benchmark, not a correctness test - same treatment as 21/27/28/29/32/33
-    self.AddTest("34 - Benchmark: Page Allocation/Free Cost", "Benchmark_PageAllocationCost", abChainable = false)
+    self.AddTest("034 - Benchmark: Page Allocation/Free Cost", "Benchmark_PageAllocationCost", abChainable = false)
     ; Not chainable: a benchmark, not a correctness test - same treatment as 21/27/28/29/32/33/34
-    self.AddTest("35 - Benchmark: Function Size vs Call Cost", "Benchmark_FunctionSizeCallCost", abChainable = false)
+    self.AddTest("035 - Benchmark: Function Size vs Call Cost", "Benchmark_FunctionSizeCallCost", abChainable = false)
     ; Not chainable: fills the container to its full 1024-entry capacity, takes a while
-    self.AddTest("36 - ActiveMagicEffectContainer: Full Capacity (All 32 Pages)", "Test_ActiveMagicEffectContainer_FullCapacity", abChainable = false)
-    self.AddTest("37 - ActiveMagicEffectContainer: Real Payload Identity Through Swaps", "Test_ActiveMagicEffectContainer_PayloadIdentity")
-    self.AddTest("38 - ActiveMagicEffectContainer: Duplicate and Missing Keys", "Test_ActiveMagicEffectContainer_DuplicateAndMissingKeys")
+    self.AddTest("036 - ActiveMagicEffectContainer: Full Capacity (All 32 Pages)", "Test_ActiveMagicEffectContainer_FullCapacity", abChainable = false)
+    self.AddTest("037 - ActiveMagicEffectContainer: Real Payload Identity Through Swaps", "Test_ActiveMagicEffectContainer_PayloadIdentity")
+    self.AddTest("038 - ActiveMagicEffectContainer: Duplicate and Missing Keys", "Test_ActiveMagicEffectContainer_DuplicateAndMissingKeys")
     ; Not chainable: fires concurrent worker threads at the live ArresteeList, must start empty
-    self.AddTest("39 - ActiveMagicEffectContainer: Concurrent Access (8 Worker Threads)", "Test_ActiveMagicEffectContainer_ConcurrentAccess", abChainable = false)
-    self.AddTest("40 - ActiveMagicEffectContainer: No Per-Operation JContainers Allocation", "Test_ActiveMagicEffectContainer_HandleStability")
+    self.AddTest("039 - ActiveMagicEffectContainer: Concurrent Access (8 Worker Threads)", "Test_ActiveMagicEffectContainer_ConcurrentAccess", abChainable = false)
+    self.AddTest("040 - ActiveMagicEffectContainer: No Per-Operation JContainers Allocation", "Test_ActiveMagicEffectContainer_HandleStability")
     ; Await<T>Reference investigation (47-51): measure where the ~1.7s per await goes, how registration behaves with several
     ; actors at once, and what the effect start needs. All spawn real temp actors and can take a while, so not chainable.
-    self.AddTest("47 - Await: Latency Breakdown (prisoner/arrestee/captor)", "Test_Await_LatencyBreakdown", abChainable = false)
-    self.AddTest("48 - Await: Burst Registration Stress (prisoners, K=3/6/10)", "Test_Await_BurstPrisoners", abChainable = false)
-    self.AddTest("49 - Await: Burst Arrestees/Captors and Spaced Prisoners (K=6)", "Test_Await_BurstOtherKinds", abChainable = false)
-    self.AddTest("50 - Await: What the Effect Start Needs (settle / disabled)", "Test_Await_EffectStartPrerequisites", abChainable = false)
-    self.AddTest("51 - Await: Group Flow, Sequential API vs Burst (N=5)", "Test_Await_GroupFlow", abChainable = false)
-    self.AddTest("52 - Await: After the Fast-Polling / Unloaded-Actor / None-Safety Fixes", "Test_Await_AfterFixes", abChainable = false)
-    self.AddTest("53 - Await: A Stale 'Initialized' Flag Blocks Prisoner Registration", "Test_Await_StaleInitializedFlag", abChainable = false)
-    self.AddTest("54 - Prisoner.Initialize(): Per-Step Profile", "Test_Prisoner_InitializeProfile", abChainable = false)
-    self.AddTest("55 - Prison: A Failed Imprisonment Cleans the Prisoner's State Up", "Test_Prison_ImprisonmentFailCleansUp", abChainable = false)
-    self.AddTest("56 - LockPrisonerSettings: Per-Operation Cost Split (Reads vs Writes)", "Test_LockPrisonerSettings_CostSplit", abChainable = false)
-    self.AddTest("57 - StorageVars: Cached Reference Key and Cached Hold Give Identical Data", "Test_StorageVars_CachedKeyEquivalence", abChainable = false)
-    self.AddTest("58 - StorageVars: Deletes Work With the Cached Reference Key (Second Arrest Regression)", "Test_StorageVars_DeletesWithCachedKey", abChainable = false)
-    self.AddTest("59 - Prison Settings Snapshot: Locking From the Snapshot Equals the Direct Way", "Test_SettingsSnapshot_EqualsDirect", abChainable = false)
-    self.AddTest("60 - Prison Settings Snapshot: An MCM Change Invalidates It, Earlier Prisoners Keep Their Values", "Test_SettingsSnapshot_McmChange", abChainable = false)
-    self.AddTest("61 - Prison Settings Snapshot: A Prisoner Gets the Snapshot's Data, Not a Recomputation", "Test_SettingsSnapshot_ComesFromSnapshot", abChainable = false)
-    self.AddTest("62 - Prison Settings Snapshot: Per-Hold Versions (Another Hold Does Not Invalidate It)", "Test_SettingsSnapshot_PerHoldVersion", abChainable = false)
-    self.AddTest("63 - Prisoner.DetermineStrippingType(): Cost Breakdown", "Test_Prisoner_StrippingTypeBreakdown", abChainable = false)
-    self.AddTest("64 - Prisoner.DetermineStrippingType(): Decision Table and New Equals the Original", "Test_Prisoner_StrippingTypeEquivalence", abChainable = false)
-    self.AddTest("65 - Utility.GetSlotMaskValue(): Closed Form Equals the Original Loop", "Test_Utility_SlotMaskEquivalence", abChainable = false)
-    self.AddTest("66 - StorageVars: Cheaper Path/Key Building Equals the Original Byte for Byte", "Test_StorageVars_PathEquivalence", abChainable = false)
-    self.AddTest("67 - Prisoner.StrippingThoroughness: Uses the Locked Setting (Bug Fix)", "Test_Prisoner_ThoroughnessUsesLockedSetting", abChainable = false)
-    self.AddTest("68 - Prisoner.Name and Message Building: Cost Breakdown", "Test_Prisoner_NameCostBreakdown", abChainable = false)
-    self.AddTest("69 - Native Call Census: Which Natives Cost a Frame", "Test_Natives_Census", abChainable = false)
-    self.AddTest("70 - ActorBase.Name: Cached Name Equals the Native One", "Test_ActorBase_CachedName", abChainable = false)
-    self.AddTest("71 - Utility.GetFormNameCached(): Equals Faction.GetName() and Makes Bounty Reads Cheap", "Test_Utility_FormNameCache", abChainable = false)
-    self.AddTest("72 - Native Cost Probe: Distribution, Back-to-Back, and Parallel Stacks", "Test_Natives_Probe", abChainable = false)
-    self.AddTest("73 - MCM: Every Option Default Exists Without Visiting an MCM Page (New Save)", "Test_MCM_DefaultsWithoutPageVisit", abChainable = false)
-    self.AddTest("74 - MCM: Defaults Are Rebuilt After the Default Map Is Replaced (OnConfigInit Order)", "Test_MCM_DefaultsAfterMapReplaced", abChainable = false)
-    self.AddTest("75 - Flow Profiler: Off Records Nothing, On Records and Reports", "Test_FlowProfiler", abChainable = false)
-    self.AddTest("76 - Arrest Flow Stress: One Actor, Three Full Cycles (Arrest -> Imprison -> Release)", "Test_ArrestStress_SingleCycles", abChainable = false)
-    self.AddTest("77 - Arrest Flow Stress: Concurrent Burst (N = 3, then 6) Arrested, Imprisoned and Released Together", "Test_ArrestStress_Burst", abChainable = false)
-    self.AddTest("78 - Arrest Flow Stress: Staggered Arrests (N = 6, 0.3s apart, like ArrestActors) and Repeated Bursts", "Test_ArrestStress_Staggered", abChainable = false)
-    self.AddTest("79 - Arrestee: InitializeState() Returns true for Every Caller (First-Caller Race)", "Test_Arrestee_InitializeStateReturnsTrue", abChainable = false)
-    self.AddTest("80 - PrisonMonitor: Next Wake Schedule Maths (Lowest Sentence, Empty, Away, Served)", "Test_PrisonMonitor_ScheduleMaths", abChainable = false)
-    self.AddTest("81 - PrisonMonitor: What an Away Prisoner Looks Like (Effect Gone, List Entry, Restore)", "Test_PrisonMonitor_AwayPrisoner", abChainable = false)
-    self.AddTest("82 - PrisonMonitor: Foreground / Background Handoff State", "Test_PrisonMonitor_Handoff", abChainable = false)
-    self.AddTest("83 - PrisonManager: Prisons-With-Prisoners Count Is Cheap and Matches a Slow Recount", "Test_PrisonManager_CountIsCheap", abChainable = false)
-    self.AddTest("84 - PrisonMonitor: Releases an Away Prisoner Whose Sentence Is Served (Headless)", "Test_PrisonMonitor_HeadlessRelease", abChainable = false)
-    self.AddTest("85 - Prisoner: Day Events Per Update Are Bounded (Extreme Elapsed Time)", "Test_Prisoner_DayEventBound", abChainable = false)
-    self.AddTest("86 - PrisonMonitor: Release Queue Order, No Duplicates, One Per Wake (Dry Run)", "Test_PrisonMonitor_ReleaseQueue", abChainable = false)
-    self.AddTest("87 - Time Skip: NPCs Are Released in Order, Each at Its Own Release Time (Dry Run, Passes Game Days)", "Test_Prison_ReleaseTimeline", abChainable = false)
-    self.AddTest("88 - Prisoner: The NPC's Original Outfit and Underwear Survive the Effect Being Replaced", "Test_Prisoner_OutfitSurvivesInstanceReplacement", abChainable = false)
-    self.AddTest("89 - Prisoner: Worn Armor Is Snapshotted Before Stripping and Re-equipped After Release (Guards Have No Outfit)", "Test_Prisoner_WornArmorRestored", abChainable = false)
-    self.AddTest("90 - Time Skip: An NPC With the Same Sentence Imprisoned Earlier Is Released Before the Player (Dry Run)", "Test_Prison_EqualSentenceOrder", abChainable = false)
-    self.AddTest("91 - Prisoner: Only the Prisoner's Own Belongings Are Returned From a Shared Container", "Test_Prisoner_OwnBelongingsReturned", abChainable = false)
-    self.AddTest("92 - Mass Imprisonment: 45 NPCs In Waves Into a Full Prison (No Overcrowding), Overflow, Recovery, Mass Release", "Test_MassImprisonment", abChainable = false)
-    self.AddTest("93 - Mass Time Skip: 40 Prisoners, Release Order and Cost (Dry Run, Passes ~10 Game Days)", "Test_TimeSkipManyPrisoners", abChainable = false)
-    self.AddTest("94 - Mass Imprisonment With the Real Cell Data (Overcrowding As Configured): Package Pool Limit", "Test_MassImprisonmentRealData", abChainable = false)
-    self.AddTest("95 - Console Probe: A Marker Before Each Read the Mass Tests Do at Their Start (Find the JContainers Warning)", "Test_ConsoleProbe", abChainable = false)
-    self.AddTest("96 - Mass Imprisonment of Imperial Soldiers (0xBED96, Real Cell Data)", "Test_MassSoldiers", abChainable = false)
-    self.AddTest("97 - Mass Imprisonment of Bandits (0x37BFF, Real Cell Data)", "Test_MassBandits", abChainable = false)
-    self.AddTest("98 - Imperial Soldier Fodder Smoke Test: Can 0xE77F9 Be Imprisoned At All? (3 Clones)", "Test_MassSoldiersSmokeTest", abChainable = false)
-    self.AddTest("99 - Hostile Prisoner: Neutralized While Imprisoned, Hostility Restored a While After Release", "Test_HostilePrisoner_NeutralizedThenRestored", abChainable = false)
+    self.AddTest("047 - Await: Latency Breakdown (prisoner/arrestee/captor)", "Test_Await_LatencyBreakdown", abChainable = false)
+    self.AddTest("048 - Await: Burst Registration Stress (prisoners, K=3/6/10)", "Test_Await_BurstPrisoners", abChainable = false)
+    self.AddTest("049 - Await: Burst Arrestees/Captors and Spaced Prisoners (K=6)", "Test_Await_BurstOtherKinds", abChainable = false)
+    self.AddTest("050 - Await: What the Effect Start Needs (settle / disabled)", "Test_Await_EffectStartPrerequisites", abChainable = false)
+    self.AddTest("051 - Await: Group Flow, Sequential API vs Burst (N=5)", "Test_Await_GroupFlow", abChainable = false)
+    self.AddTest("052 - Await: After the Fast-Polling / Unloaded-Actor / None-Safety Fixes", "Test_Await_AfterFixes", abChainable = false)
+    self.AddTest("053 - Await: A Stale 'Initialized' Flag Blocks Prisoner Registration", "Test_Await_StaleInitializedFlag", abChainable = false)
+    self.AddTest("054 - Prisoner.Initialize(): Per-Step Profile", "Test_Prisoner_InitializeProfile", abChainable = false)
+    self.AddTest("055 - Prison: A Failed Imprisonment Cleans the Prisoner's State Up", "Test_Prison_ImprisonmentFailCleansUp", abChainable = false)
+    self.AddTest("056 - LockPrisonerSettings: Per-Operation Cost Split (Reads vs Writes)", "Test_LockPrisonerSettings_CostSplit", abChainable = false)
+    self.AddTest("057 - StorageVars: Cached Reference Key and Cached Hold Give Identical Data", "Test_StorageVars_CachedKeyEquivalence", abChainable = false)
+    self.AddTest("058 - StorageVars: Deletes Work With the Cached Reference Key (Second Arrest Regression)", "Test_StorageVars_DeletesWithCachedKey", abChainable = false)
+    self.AddTest("059 - Prison Settings Snapshot: Locking From the Snapshot Equals the Direct Way", "Test_SettingsSnapshot_EqualsDirect", abChainable = false)
+    self.AddTest("060 - Prison Settings Snapshot: An MCM Change Invalidates It, Earlier Prisoners Keep Their Values", "Test_SettingsSnapshot_McmChange", abChainable = false)
+    self.AddTest("061 - Prison Settings Snapshot: A Prisoner Gets the Snapshot's Data, Not a Recomputation", "Test_SettingsSnapshot_ComesFromSnapshot", abChainable = false)
+    self.AddTest("062 - Prison Settings Snapshot: Per-Hold Versions (Another Hold Does Not Invalidate It)", "Test_SettingsSnapshot_PerHoldVersion", abChainable = false)
+    self.AddTest("063 - Prisoner.DetermineStrippingType(): Cost Breakdown", "Test_Prisoner_StrippingTypeBreakdown", abChainable = false)
+    self.AddTest("064 - Prisoner.DetermineStrippingType(): Decision Table and New Equals the Original", "Test_Prisoner_StrippingTypeEquivalence", abChainable = false)
+    self.AddTest("065 - Utility.GetSlotMaskValue(): Closed Form Equals the Original Loop", "Test_Utility_SlotMaskEquivalence", abChainable = false)
+    self.AddTest("066 - StorageVars: Cheaper Path/Key Building Equals the Original Byte for Byte", "Test_StorageVars_PathEquivalence", abChainable = false)
+    self.AddTest("067 - Prisoner.StrippingThoroughness: Uses the Locked Setting (Bug Fix)", "Test_Prisoner_ThoroughnessUsesLockedSetting", abChainable = false)
+    self.AddTest("068 - Prisoner.Name and Message Building: Cost Breakdown", "Test_Prisoner_NameCostBreakdown", abChainable = false)
+    self.AddTest("069 - Native Call Census: Which Natives Cost a Frame", "Test_Natives_Census", abChainable = false)
+    self.AddTest("070 - ActorBase.Name: Cached Name Equals the Native One", "Test_ActorBase_CachedName", abChainable = false)
+    self.AddTest("071 - Utility.GetFormNameCached(): Equals Faction.GetName() and Makes Bounty Reads Cheap", "Test_Utility_FormNameCache", abChainable = false)
+    self.AddTest("072 - Native Cost Probe: Distribution, Back-to-Back, and Parallel Stacks", "Test_Natives_Probe", abChainable = false)
+    self.AddTest("073 - MCM: Every Option Default Exists Without Visiting an MCM Page (New Save)", "Test_MCM_DefaultsWithoutPageVisit", abChainable = false)
+    self.AddTest("074 - MCM: Defaults Are Rebuilt After the Default Map Is Replaced (OnConfigInit Order)", "Test_MCM_DefaultsAfterMapReplaced", abChainable = false)
+    self.AddTest("075 - Flow Profiler: Off Records Nothing, On Records and Reports", "Test_FlowProfiler", abChainable = false)
+    self.AddTest("076 - Arrest Flow Stress: One Actor, Three Full Cycles (Arrest -> Imprison -> Release)", "Test_ArrestStress_SingleCycles", abChainable = false)
+    self.AddTest("077 - Arrest Flow Stress: Concurrent Burst (N = 3, then 6) Arrested, Imprisoned and Released Together", "Test_ArrestStress_Burst", abChainable = false)
+    self.AddTest("078 - Arrest Flow Stress: Staggered Arrests (N = 6, 0.3s apart, like ArrestActors) and Repeated Bursts", "Test_ArrestStress_Staggered", abChainable = false)
+    self.AddTest("079 - Arrestee: InitializeState() Returns true for Every Caller (First-Caller Race)", "Test_Arrestee_InitializeStateReturnsTrue", abChainable = false)
+    self.AddTest("080 - PrisonMonitor: Next Wake Schedule Maths (Lowest Sentence, Empty, Away, Served)", "Test_PrisonMonitor_ScheduleMaths", abChainable = false)
+    self.AddTest("081 - PrisonMonitor: What an Away Prisoner Looks Like (Effect Gone, List Entry, Restore)", "Test_PrisonMonitor_AwayPrisoner", abChainable = false)
+    self.AddTest("082 - PrisonMonitor: Foreground / Background Handoff State", "Test_PrisonMonitor_Handoff", abChainable = false)
+    self.AddTest("083 - PrisonManager: Prisons-With-Prisoners Count Is Cheap and Matches a Slow Recount", "Test_PrisonManager_CountIsCheap", abChainable = false)
+    self.AddTest("084 - PrisonMonitor: Releases an Away Prisoner Whose Sentence Is Served (Headless)", "Test_PrisonMonitor_HeadlessRelease", abChainable = false)
+    self.AddTest("085 - Prisoner: Day Events Per Update Are Bounded (Extreme Elapsed Time)", "Test_Prisoner_DayEventBound", abChainable = false)
+    self.AddTest("086 - PrisonMonitor: Release Queue Order, No Duplicates, One Per Wake (Dry Run)", "Test_PrisonMonitor_ReleaseQueue", abChainable = false)
+    self.AddTest("087 - Time Skip: NPCs Are Released in Order, Each at Its Own Release Time (Dry Run, Passes Game Days)", "Test_Prison_ReleaseTimeline", abChainable = false)
+    self.AddTest("088 - Prisoner: The NPC's Original Outfit and Underwear Survive the Effect Being Replaced", "Test_Prisoner_OutfitSurvivesInstanceReplacement", abChainable = false)
+    self.AddTest("089 - Prisoner: Worn Armor Is Snapshotted Before Stripping and Re-equipped After Release (Guards Have No Outfit)", "Test_Prisoner_WornArmorRestored", abChainable = false)
+    self.AddTest("090 - Time Skip: An NPC With the Same Sentence Imprisoned Earlier Is Released Before the Player (Dry Run)", "Test_Prison_EqualSentenceOrder", abChainable = false)
+    self.AddTest("091 - Prisoner: Only the Prisoner's Own Belongings Are Returned From a Shared Container", "Test_Prisoner_OwnBelongingsReturned", abChainable = false)
+    self.AddTest("092 - Mass Imprisonment: 45 NPCs In Waves Into a Full Prison (No Overcrowding), Overflow, Recovery, Mass Release", "Test_MassImprisonment", abChainable = false)
+    self.AddTest("093 - Mass Time Skip: 40 Prisoners, Release Order and Cost (Dry Run, Passes ~10 Game Days)", "Test_TimeSkipManyPrisoners", abChainable = false)
+    self.AddTest("094 - Mass Imprisonment With the Real Cell Data (Overcrowding As Configured): Package Pool Limit", "Test_MassImprisonmentRealData", abChainable = false)
+    self.AddTest("095 - Console Probe: A Marker Before Each Read the Mass Tests Do at Their Start (Find the JContainers Warning)", "Test_ConsoleProbe", abChainable = false)
+    self.AddTest("096 - Mass Imprisonment of Imperial Soldiers (0xBED96, Real Cell Data)", "Test_MassSoldiers", abChainable = false)
+    self.AddTest("097 - Mass Imprisonment of Bandits (0x37BFF, Real Cell Data)", "Test_MassBandits", abChainable = false)
+    self.AddTest("098 - Imperial Soldier Fodder Smoke Test: Can 0xE77F9 Be Imprisoned At All? (3 Clones)", "Test_MassSoldiersSmokeTest", abChainable = false)
+    self.AddTest("099 - Hostile Prisoner: Neutralized While Imprisoned, Hostility Restored a While After Release", "Test_HostilePrisoner_NeutralizedThenRestored", abChainable = false)
     self.AddTest("100 - Hostile Player (Disguise Mod): Neutralized While Imprisoned, Hostility Restored a While After Release", "Test_HostilePlayer_NeutralizedThenRestored", abChainable = false)
-    self.AddTest("41 - ActiveMagicEffectContainer: Stuck Lock Self-Heals", "Test_ActiveMagicEffectContainer_StuckLockSelfHeals")
-    self.AddTest("42 - ThreadLock: JAtomic Primitive Semantics and Registry", "Test_ThreadLock_PrimitiveSemantics")
+    self.AddTest("041 - ActiveMagicEffectContainer: Stuck Lock Self-Heals", "Test_ActiveMagicEffectContainer_StuckLockSelfHeals")
+    self.AddTest("042 - ThreadLock: JAtomic Primitive Semantics and Registry", "Test_ThreadLock_PrimitiveSemantics")
     ; Not chainable: fires concurrent worker threads
-    self.AddTest("43 - ThreadLock: Mutual Exclusion Proof (control vs locked)", "Test_ThreadLock_MutualExclusion", abChainable = false)
-    self.AddTest("44 - ThreadLock: Concurrent Registry Creation and Stuck-Lock Recovery", "Test_ThreadLock_RegistryAndStuckLock", abChainable = false)
+    self.AddTest("043 - ThreadLock: Mutual Exclusion Proof (control vs locked)", "Test_ThreadLock_MutualExclusion", abChainable = false)
+    self.AddTest("044 - ThreadLock: Concurrent Registry Creation and Stuck-Lock Recovery", "Test_ThreadLock_RegistryAndStuckLock", abChainable = false)
 endFunction
 
 state Test_25Days_After_26th_Frostfall_Is_20th_Suns_Dusk
@@ -7916,13 +7916,15 @@ state Test_MassSoldiersSmokeTest
 endState
 
 ;/
-    Hostile prisoners (bandits, Civil War soldiers, Forsworn) are neutralized while imprisoned: NeutralizeWhileImprisoned
-    removes them from whatever faction in RPB_Utility.RPB_GetHostileFactions() they belong to (so guards stop treating them as
-    a target) and Prison's delayed queue restores it some time after release. Arrests a bandit, checks its hostile factions are
-    gone while imprisoned, releases it, checks they are still gone right after release, then uses the dev override to skip most
-    of the delay and checks they come back.
-    Needs RPB_HostileFactions to actually list a faction the test bandit belongs to (a Creation Kit step, see KNOWN_ISSUES): the
-    whole feature is a harmless no-op until that FormList exists, so this logs INCONCLUSIVE rather than failing when it's empty.
+    Hostile prisoners (bandits, Civil War soldiers, Forsworn) are neutralized the moment their arrest is confirmed
+    (RPB_Arrest.BeginArrest, via RPB_Utility.NeutralizeHostileActor - covers confrontation/escort/teleport, not just the cell),
+    removed from whatever faction RPB_Utility.RPB_GetHostileFactions() resolves (so guards stop treating them as a target), and
+    Prison's delayed queue restores it some time after release. Arrests a bandit, checks its hostile factions are already gone
+    right after the arrest (before imprisonment even settles - proves BeginArrest's neutralize fired, not just Imprison()'s),
+    checks they're still gone once imprisoned, releases it, checks they stay gone right after release, then uses the dev
+    override to skip most of the delay and checks they come back.
+    Needs RPB_GetHostileFactions() to resolve at least one faction (PO3 Papyrus Extender): logs INCONCLUSIVE, not a failure, if
+    it doesn't (see test 100's header comment for the same note).
 /;
 state Test_HostilePrisoner_NeutralizedThenRestored
     function Setup()
@@ -7967,7 +7969,7 @@ state Test_HostilePrisoner_NeutralizedThenRestored
         endWhile
 
         if (originalCount == 0)
-            log("INCONCLUSIVE: the test bandit (0x37BFF) is not a member of any faction in RPB_HostileFactions, nothing to neutralize")
+            log("INCONCLUSIVE: the test bandit (0x37BFF) is not a member of any faction RPB_GetHostileFactions() resolved, nothing to neutralize")
             display_result(ok)
             return
         endif
@@ -7976,6 +7978,29 @@ state Test_HostilePrisoner_NeutralizedThenRestored
         Actor[] all = new Actor[1]
         all[0] = a
         self.__StressArrest(guard, a)
+
+        ; Neutralize now happens at arrest time (RPB_Arrest.BeginArrest), well before Imprison() - the arrest events dispatch
+        ; through a mod event, so poll briefly rather than asserting the instant __StressArrest returns.
+        i = 0
+        int stillHostileAtArrest = originalCount
+        float arrestWaitStart = Utility.GetCurrentRealTime()
+        while (stillHostileAtArrest > 0 && (Utility.GetCurrentRealTime() - arrestWaitStart) < 10.0)
+            stillHostileAtArrest = 0
+            i = 0
+            while (i < originalCount)
+                if (a.IsInFaction(originalHostile[i]))
+                    stillHostileAtArrest += 1
+                endif
+                i += 1
+            endWhile
+            if (stillHostileAtArrest > 0)
+                Utility.Wait(0.2)
+            endif
+        endWhile
+        step = assert_true(stillHostileAtArrest == 0, stillHostileAtArrest + " of " + originalCount + " hostile factions were still present right after arrest (BeginArrest's neutralize did not fire)")
+        ok = ok && step
+        log("HOSTILE at arrest time (before imprisonment settles): " + stillHostileAtArrest + " of " + originalCount + " factions still present")
+
         self.__MassSettle(prison, all, 1, 60.0)
 
         RPB_Prisoner p = prison.Prisoners.AtKey(a)

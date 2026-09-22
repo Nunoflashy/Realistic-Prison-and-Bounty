@@ -3560,70 +3560,21 @@ int function NPC_ReequipSavedWornArmor()
 endFunction
 
 ;/
-    Hostile prisoners: guards attack them on sight because of a faction relationship, not because of their own Aggression stat,
-    so IsHostileToActor has to read false for the imprisonment to be peaceful. Applies to NPCs (bandits, Civil War soldiers,
-    Forsworn) and to the player (a disguise mod such as fireundubh's Master of Disguise adds the PLAYER to the same kind of
-    faction while disguised, e.g. BanditFaction, with the same real-world effect: nearby guards attack). True if this Actor
-    belongs to any faction in RPB_Utility.RPB_GetHostileFactions() (resolved by editor ID through PO3 Papyrus Extender).
+    Delegates to RPB_Utility.IsHostileActor(this) - see there for why this is Actor-based (not just this instance's storage):
+    the same check also has to run from RPB_Arrest.BeginArrest, before an RPB_Prisoner instance exists at all.
 /;
 bool function IsHostilePrisoner()
-    Form[] hostileFactions = RPB_Utility.RPB_GetHostileFactions()
-    if (!hostileFactions)
-        return false
-    endif
-
-    int i = 0
-    while (i < hostileFactions.Length)
-        Faction hostileFaction = hostileFactions[i] as Faction
-        if (hostileFaction && this.IsInFaction(hostileFaction))
-            return true
-        endif
-        i += 1
-    endWhile
-    return false
+    return RPB_Utility.IsHostileActor(this)
 endFunction
 
 ;/
-    Called once from Imprison() for a hostile prisoner (see IsHostilePrisoner): removes it from every hostile faction it
-    belongs to (saving faction + rank so Prison can restore both after release, see __QueueHostilityRestore) and zeroes its
-    Aggression so it does not throw the first punch either. Guard-initiated combat is faction-driven, so this alone is enough
-    to keep guards from attacking it in the cell; nothing changes for the common (non-hostile) prisoner. Works the same for
-    the player as for an NPC (see IsHostilePrisoner's doc comment).
+    Delegates to RPB_Utility.NeutralizeHostileActor(this) - kept as a same-named instance method so Imprison() and the hourly
+    Imprisoned-state tick don't need to change; see RPB_Utility.NeutralizeHostileActor's doc comment for why the real logic
+    (and its storage) lives there instead of here, and for the other two places this same actor gets neutralized (arrest time,
+    hourly while imprisoned).
 /;
 function NeutralizeWhileImprisoned()
-    if (!self.IsHostilePrisoner())
-        return
-    endif
-
-    Form[] hostileFactions = RPB_Utility.RPB_GetHostileFactions()
-    Form[] removedFactions = new Form[128]
-    int[] removedRanks = new int[128]
-    int removed = 0
-    string ranksLogged = ""
-    int i = 0
-    while (i < hostileFactions.Length && removed < 128)
-        Faction hostileFaction = hostileFactions[i] as Faction
-        if (hostileFaction && this.IsInFaction(hostileFaction))
-            int rank = this.GetFactionRank(hostileFaction)
-            removedFactions[removed] = hostileFaction
-            removedRanks[removed] = rank
-            this.RemoveFromFaction(hostileFaction)
-            ranksLogged += " " + hostileFaction + "=r" + rank
-            removed += 1
-        endif
-        i += 1
-    endWhile
-
-    string refKey = self.__GetRefKey()
-    string category = self.GetScriptVarCategory("Actor")
-    RPB_StorageVars.SetFormsOnReference("Hostile Factions", refKey, self.__TrimForms(removedFactions, removed), category)
-    RPB_StorageVars.SetIntsOnReference("Hostile Ranks", refKey, self.__TrimInts(removedRanks, removed), category)
-    SetFloat("Original Aggression", this.GetActorValue("Aggression"))
-    this.SetActorValue("Aggression", 0.0)
-    this.StopCombat()
-    this.StopCombatAlarm()
-
-    EventManager.SendInfo("Neutralized " + self.Name + " while imprisoned (removed from " + removed + " hostile factions:" + ranksLogged + ")", "["+ Name +"] Prisoner::NeutralizeWhileImprisoned")
+    RPB_Utility.NeutralizeHostileActor(this)
 endFunction
 
 function NPC_SetPersistentOutfit(string asOutfit)

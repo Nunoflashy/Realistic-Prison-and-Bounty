@@ -1045,6 +1045,12 @@ function BeginArrest(RPB_Arrestee apArresteeRef)
 
     apArresteeRef.HideBounty()
     apArresteeRef.StopCombat()
+    ; A hostile actor (a bandit/CW-soldier/Forsworn NPC, or the player disguised via a mod like Master of Disguise) is
+    ; neutralized here, not only at Imprison() time: the arrest is confirmed at this point (the bounty check that can abort
+    ; the whole arrest already passed, in OnArrestBegin), and everything from here on - confrontation if any, the escort
+    ; walk, teleport, arrival, strip, Imprison() - would otherwise happen while a nearby guard could still evaluate this
+    ; actor as hostile and break the scripted flow. See RPB_Utility.NeutralizeHostileActor's doc comment.
+    RPB_Utility.NeutralizeHostileActor(arrestee)
     RPB_Utility.FlowMark("BeginArrest: HideBounty + StopCombat")
     RPB_Utility.Crumb(arrestee, "BeginArrest: HideBounty + StopCombat")
     ; apArresteeRef.SheatheWeapon()

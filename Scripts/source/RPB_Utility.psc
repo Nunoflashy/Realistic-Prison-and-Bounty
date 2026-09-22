@@ -18,6 +18,8 @@ scriptname RPB_Utility hidden
     Armor function RPB_PrisonerHandCuffs() global
     Outfit function RPB_GetOutfit(string asOutfit) global
     Form[] function RPB_GetHostileFactions() global
+    bool function IsHostileActor(Actor akActor) global
+    function NeutralizeHostileActor(Actor akActor) global
     bool function IsTracingEnabled() global
     bool function IsDebuggingEnabled() global
     bool function IsLoggingEnabled() global
@@ -428,6 +430,94 @@ Form[] function RPB_GetHostileFactions() global
         i += 1
     endWhile
     return trimmed
+endFunction
+
+;/
+    Hostile prisoners: guards attack them on sight because of a faction relationship, not because of their own Aggression stat,
+    so IsHostileToActor has to read false for the imprisonment (and the arrest/escort leading up to it) to be peaceful. Applies
+    to NPCs (bandits, Civil War soldiers, Forsworn) and to the player (a disguise mod such as fireundubh's Master of Disguise
+    adds the PLAYER to the same kind of faction while disguised, e.g. BanditFaction). True if @akActor belongs to any faction
+    in RPB_GetHostileFactions().
+
+    Global and Actor-based (not a Prisoner/Arrestee instance method) on purpose: this needs to run from RPB_Arrest.BeginArrest,
+    which only has a bare Actor and an RPB_Arrestee (not yet an RPB_Prisoner) - see NeutralizeHostileActor for why the storage
+    is also Actor-keyed with a fixed category rather than going through the RPB_ActorBase per-subclass wrapper.
+/;
+bool function IsHostileActor(Actor akActor) global
+    Form[] hostileFactions = RPB_GetHostileFactions()
+    if (!hostileFactions)
+        return false
+    endif
+
+    int i = 0
+    while (i < hostileFactions.Length)
+        Faction hostileFaction = hostileFactions[i] as Faction
+        if (hostileFaction && akActor.IsInFaction(hostileFaction))
+            return true
+        endif
+        i += 1
+    endWhile
+    return false
+endFunction
+
+;/
+    Removes @akActor from every hostile faction it belongs to (saving faction + rank so it can be restored later, see
+    Prison.__QueueHostilityRestore) and zeroes its Aggression so it does not throw the first punch either. A no-op for the
+    common (non-hostile) actor (see IsHostileActor).
+
+    Called from three places, all meant to converge on the same storage: RPB_Arrest.BeginArrest (the moment an arrest is
+    confirmed - covers confrontation/escort/teleport, before Imprison() ever runs), Prisoner.Imprison (a fallback for any path
+    that reaches imprisonment without going through BeginArrest, e.g. a direct MakePrisoner() call in a test), and the hourly
+    Imprisoned-state tick (in case a disguise mod re-flags the actor mid-sentence and it wasn't actually stripped - see
+    KNOWN_ISSUES). Each call is idempotent: once removed, IsHostileActor reads false and the next call no-ops.
+
+    Storage is written straight through RPB_StorageVars.*OnReference with a literal "Jail" category - deliberately NOT through
+    the RPB_ActorBase SetForm/GetForm wrapper, whose default category resolves differently per subclass (GetScriptVarCategory:
+    "Jail" on RPB_Prisoner, "Arrest" on RPB_Arrestee). Using the wrapper would mean a snapshot taken during arrest (as an
+    Arrestee) lands in a different bucket than the one Prison.__QueueHostilityRestore reads on release (as a Prisoner) - the
+    restore would silently find nothing. A literal category is the same regardless of which class (or none) calls this.
+/;
+function NeutralizeHostileActor(Actor akActor) global
+    if (!IsHostileActor(akActor))
+        return
+    endif
+
+    Form[] hostileFactions = RPB_GetHostileFactions()
+    Form[] removedFactions = new Form[128]
+    int[] removedRanks = new int[128]
+    int removed = 0
+    string ranksLogged = ""
+    int i = 0
+    while (i < hostileFactions.Length && removed < 128)
+        Faction hostileFaction = hostileFactions[i] as Faction
+        if (hostileFaction && akActor.IsInFaction(hostileFaction))
+            int rank = akActor.GetFactionRank(hostileFaction)
+            removedFactions[removed] = hostileFaction
+            removedRanks[removed] = rank
+            akActor.RemoveFromFaction(hostileFaction)
+            ranksLogged += " " + hostileFaction + "=r" + rank
+            removed += 1
+        endif
+        i += 1
+    endWhile
+
+    Form[] trimmedFactions = Utility.CreateFormArray(removed)
+    int[] trimmedRanks = Utility.CreateIntArray(removed)
+    i = 0
+    while (i < removed)
+        trimmedFactions[i] = removedFactions[i]
+        trimmedRanks[i] = removedRanks[i]
+        i += 1
+    endWhile
+
+    RPB_StorageVars.SetFormsOnReference("Hostile Factions", akActor, trimmedFactions, "Jail")
+    RPB_StorageVars.SetIntsOnReference("Hostile Ranks", akActor, trimmedRanks, "Jail")
+    RPB_StorageVars.SetFloatOnReference("Original Aggression", akActor, akActor.GetActorValue("Aggression"), "Jail")
+    akActor.SetActorValue("Aggression", 0.0)
+    akActor.StopCombat()
+    akActor.StopCombatAlarm()
+
+    Info("Neutralized " + akActor.GetDisplayName() + " " + akActor + " (removed from " + removed + " hostile factions:" + ranksLogged + ")")
 endFunction
 
 ; ==========================================================
