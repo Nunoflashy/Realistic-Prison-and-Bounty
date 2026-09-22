@@ -2693,17 +2693,27 @@ function __ProcessHostilityRestore()
             int ranks = JMap.getObj(entry, "ranks")
             int k = 0
             int factionCount = JArray.count(factions)
+            string ranksLogged = ""
             while (k < factionCount)
                 Faction restoreFaction = JArray.getForm(factions, k) as Faction
                 if (restoreFaction)
+                    int savedRank = JArray.getInt(ranks, k)
                     restoreActor.AddToFaction(restoreFaction)
-                    restoreActor.SetFactionRank(restoreFaction, JArray.getInt(ranks, k))
+                    ; SetFactionRank(faction, -1) REMOVES the actor from the faction (that is the documented behavior, not a
+                    ; quirk): most combat factions (BanditFaction included) store their members at rank -1 since rank is
+                    ; meaningless for them, so calling it unconditionally undid the AddToFaction() right above it (test 99:
+                    ; the restore ran, the queue emptied, but the faction never came back). AddToFaction() alone already
+                    ; restores plain membership; only set a rank when one was actually meaningful.
+                    if (savedRank >= 0)
+                        restoreActor.SetFactionRank(restoreFaction, savedRank)
+                    endif
+                    ranksLogged += " " + restoreFaction + "=r" + savedRank
                 endif
                 k += 1
             endWhile
             restoreActor.SetActorValue("Aggression", JMap.getFlt(entry, "aggression"))
 
-            string restoreMsg = "Hostility restored on " + restoreActor.GetDisplayName() + " " + restoreActor + ": " + factionCount + " factions"
+            string restoreMsg = "Hostility restored on " + restoreActor.GetDisplayName() + " " + restoreActor + ": " + factionCount + " factions:" + ranksLogged
             DebugInfo("["+ Name +"] Prison::__ProcessHostilityRestore", restoreMsg)
             Info(restoreMsg)
             RPB_Utility.Crumb(restoreActor, "Hostility restored: " + factionCount + " factions")

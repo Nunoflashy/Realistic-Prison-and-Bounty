@@ -3592,13 +3592,16 @@ function NPC_NeutralizeWhileImprisoned()
     Form[] removedFactions = new Form[128]
     int[] removedRanks = new int[128]
     int removed = 0
+    string ranksLogged = ""
     int i = 0
     while (i < hostileFactions.Length && removed < 128)
         Faction hostileFaction = hostileFactions[i] as Faction
         if (hostileFaction && this.IsInFaction(hostileFaction))
+            int rank = this.GetFactionRank(hostileFaction)
             removedFactions[removed] = hostileFaction
-            removedRanks[removed] = this.GetFactionRank(hostileFaction)
+            removedRanks[removed] = rank
             this.RemoveFromFaction(hostileFaction)
+            ranksLogged += " " + hostileFaction + "=r" + rank
             removed += 1
         endif
         i += 1
@@ -3613,7 +3616,7 @@ function NPC_NeutralizeWhileImprisoned()
     this.StopCombat()
     this.StopCombatAlarm()
 
-    EventManager.SendInfo("Neutralized " + self.Name + " while imprisoned (removed from " + removed + " hostile factions)", "["+ Name +"] Prisoner::NPC_NeutralizeWhileImprisoned")
+    EventManager.SendInfo("Neutralized " + self.Name + " while imprisoned (removed from " + removed + " hostile factions:" + ranksLogged + ")", "["+ Name +"] Prisoner::NPC_NeutralizeWhileImprisoned")
 endFunction
 
 function NPC_SetPersistentOutfit(string asOutfit)
