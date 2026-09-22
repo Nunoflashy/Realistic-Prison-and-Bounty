@@ -544,10 +544,35 @@ endFunction
     function already works for this exact purpose in the Surrender system (EventManager.OnSurrenderPreparing) - read it
     BEFORE calling StopCombat on anyone (stopping one combatant first can tear down the shared combat group/instance the
     query itself reads from, which is why an earlier version of this function that stopped the captor first always found 0).
+
+    A single sweep isn't reliably enough against several independently-hostile guards (confirmed in a real test: a guard
+    stopped this way went hostile again shortly after) - the real, sustainable fix is Surrender's approach (bind every
+    hostile actor into a scene GROUP alias, "SurrendererCaptor", so the scene itself pacifies all of them; the arrest
+    scenes only ever bind a single "Escort" guard, see ROADMAP.md) but that needs Creation Kit work, not just a script
+    change. As a Papyrus-only mitigation, this repeats the sweep every 0.5 s for up to 5 s (mirrors Master of Disguise's own
+    Suspend(5.0) reaction window in dubhFactionEnemyScript.psc) instead of a single instant call a guard's very next AI
+    tick can undo, stopping early once a pass finds nobody left to stop. Costs nothing extra for the ordinary (non-hostile)
+    arrest: one pass, finds nothing, returns immediately.
 /;
 function BreakOffCombatForArrest(Actor akArrestee, Actor akCaptor) global
+    float startTime = Utility.GetCurrentRealTime()
+    int passNumber = 0
+    bool keepGoing = true
+    while (keepGoing && (Utility.GetCurrentRealTime() - startTime) < 5.0)
+        passNumber += 1
+        keepGoing = __BreakOffCombatPass(akArrestee, akCaptor, passNumber)
+        if (keepGoing)
+            Utility.Wait(0.5)
+        endif
+    endWhile
+endFunction
+
+; One sweep: stops combat on the captor and everyone GetCombatTargets(@akArrestee) currently returns. Returns true if
+; anyone needed stopping this pass (the caller keeps sweeping while true, up to its own time budget).
+bool function __BreakOffCombatPass(Actor akArrestee, Actor akCaptor, int aiPassNumber) global
     Actor[] combatTargets = PO3_SKSEFunctions.GetCombatTargets(akArrestee)
 
+    bool captorWasFighting = akCaptor && akCaptor.IsInCombat()
     if (akCaptor)
         akCaptor.StopCombat()
     endif
@@ -567,7 +592,8 @@ function BreakOffCombatForArrest(Actor akArrestee, Actor akCaptor) global
         endWhile
     endif
 
-    Info("BreakOffCombatForArrest on " + akArrestee.GetDisplayName() + " " + akArrestee + ": captor " + akCaptor + " stopped, GetCombatTargets found " + stopped + " more:" + stoppedLogged)
+    Info("BreakOffCombatForArrest pass " + aiPassNumber + " on " + akArrestee.GetDisplayName() + " " + akArrestee + ": captor " + akCaptor + " was fighting " + captorWasFighting + ", GetCombatTargets found " + stopped + " more:" + stoppedLogged)
+    return captorWasFighting || stopped > 0
 endFunction
 
 ; ==========================================================
