@@ -125,8 +125,9 @@ function SetTests()
     self.AddTest("93 - Mass Time Skip: 40 Prisoners, Release Order and Cost (Dry Run, Passes ~10 Game Days)", "Test_TimeSkipManyPrisoners", abChainable = false)
     self.AddTest("94 - Mass Imprisonment With the Real Cell Data (Overcrowding As Configured): Package Pool Limit", "Test_MassImprisonmentRealData", abChainable = false)
     self.AddTest("95 - Console Probe: A Marker Before Each Read the Mass Tests Do at Their Start (Find the JContainers Warning)", "Test_ConsoleProbe", abChainable = false)
-    self.AddTest("96 - Mass Imprisonment of Imperial Soldiers (0xE77F9, Real Cell Data)", "Test_MassSoldiers", abChainable = false)
-    self.AddTest("97 - Mass Imprisonment of Bandits (0x37C00, Real Cell Data)", "Test_MassBandits", abChainable = false)
+    self.AddTest("96 - Mass Imprisonment of Imperial Soldiers (0xBED96, Real Cell Data)", "Test_MassSoldiers", abChainable = false)
+    self.AddTest("97 - Mass Imprisonment of Bandits (0x37BFF, Real Cell Data)", "Test_MassBandits", abChainable = false)
+    self.AddTest("98 - Imperial Soldier Fodder Smoke Test: Can 0xE77F9 Be Imprisoned At All? (3 Clones)", "Test_MassSoldiersSmokeTest", abChainable = false)
     self.AddTest("41 - ActiveMagicEffectContainer: Stuck Lock Self-Heals", "Test_ActiveMagicEffectContainer_StuckLockSelfHeals")
     self.AddTest("42 - ThreadLock: JAtomic Primitive Semantics and Registry", "Test_ThreadLock_PrimitiveSemantics")
     ; Not chainable: fires concurrent worker threads
@@ -7859,12 +7860,16 @@ state Test_MassImprisonmentRealData
 endState
 
 ;/
-    Same scenario as test 94 with Imperial Soldiers (dunCGImperialSoldierFodderC01, 0xE77F9): generic actors whose outfit comes from
+    Same scenario as test 94 with Imperial Soldiers (GuardSolitudeImperialJail, 0xBED96): generic actors whose outfit comes from
     a template (the base outfit is none), so what they wear again depends on the worn-armor snapshot and the re-dress pass alone.
+    Not dunCGImperialSoldierFodderC01 (0xE77F9, test 96 originally): that base crashed the game twice during wave 1 (10 clones
+    spawned/arrested at once), with no Papyrus error and no crash dump available to explain it. dunCG is the Civil War radiant
+    dungeon-assault actor template; whether the crash is that actor's own quest scripting/data or a spawn-concurrency/asset
+    spike unrelated to it is untested (see test 98, a small-scale run of the original base, and KNOWN_ISSUES.md).
 /;
 state Test_MassSoldiers
     function Setup()
-        display_result(self.__MassRun(false, 0xE77F9, 45))
+        display_result(self.__MassRun(false, 0xBED96, 45))
     endFunction
 
     function Teardown()
@@ -7875,12 +7880,30 @@ state Test_MassSoldiers
 endState
 
 ;/
-    Same scenario as test 94 with Bandits (EncBandit01MissileNordM, 0x37C00): template outfit like the soldiers, plus weapons and
+    Same scenario as test 94 with Bandits (EncBandit01MissileNordF, 0x37BFF): template outfit like the soldiers, plus weapons and
     gear in the belongings.
 /;
 state Test_MassBandits
     function Setup()
-        display_result(self.__MassRun(false, 0x37C00, 45))
+        display_result(self.__MassRun(false, 0x37BFF, 45))
+    endFunction
+
+    function Teardown()
+        RPB_Utility.SetOvercrowdingDisabled(false)
+        self.__StressProfilerRestore()
+        __TeardownAllTempActors()
+    endFunction
+endState
+
+;/
+    Smoke test for the base that crashed the game in test 96 (dunCGImperialSoldierFodderC01, 0xE77F9), at a scale (3 clones, one
+    wave) far below the 10 that preceded both crashes. If this alone crashes, the actor's own data/scripting is implicated
+    regardless of concurrency; if it passes, the crash in test 96 was more likely a spawn-concurrency/asset-loading spike from
+    10 heavy-geared clones loading at once, not something about this specific actor.
+/;
+state Test_MassSoldiersSmokeTest
+    function Setup()
+        display_result(self.__MassRun(false, 0xE77F9, 3))
     endFunction
 
     function Teardown()
