@@ -122,6 +122,7 @@ scriptname RPB_Utility hidden
     float function UnitsToM(int unit)
     function OrientRelative(ObjectReference akObjA, ObjectReference akObjB, Float afRotX = 0.0, Float afRotY = 0.0, Float afRotZ = 0.0) Global
     bool function IsFarAwayFromObject(ObjectReference akObjectOne, ObjectReference akObjectTwo) global
+    bool function IsWedgedTogether(Actor akActorOne, Actor akActorTwo, float afStuckDistance = 60.0) global
     bool function IsActorFarAwayFromPlayer(Actor akActor) global
     string function GenerateUUIDSection(int aiLength) global
     string function GenerateUUID() global
@@ -604,9 +605,9 @@ endFunction
     the mod's own polling keeps RE-ADDING the hostile faction every time any nearby guard's independent effect instance
     decides its own chase is over (several guards each running their own instance can re-arm the faction while another is
     still fighting - matches the oscillating pass counts seen in testing). Removing the faction once, or even stopping
-    combat repeatedly, does not help if a live external system keeps putting the faction back. Since the mod author does
-    not want to ship a compatibility patch that redistributes a modified copy of another author's script without their
-    permission, this stays a self-contained RPB mitigation instead: every pass also re-runs NeutralizeHostileActor, so even
+    combat repeatedly, does not help if a live external system keeps putting the faction back. I'm not shipping a
+    compatibility patch that redistributes a modified copy of another author's script without their permission, so this
+    stays a self-contained RPB mitigation instead: every pass also re-runs NeutralizeHostileActor, so even
     though the faction keeps getting reapplied, the window during which the actor actually reads hostile is kept to well
     under a second at a time - usually too short for a guard to newly acquire them as a combat target. The loop runs for up
     to PACIFICATION_TIME_BUDGET_SECONDS (a safety ceiling, not a fixed wait - it exits the moment a pass finds nothing left
@@ -2147,6 +2148,21 @@ endFunction
 bool function IsFarAwayFromObject(ObjectReference akObjectOne, ObjectReference akObjectTwo) global
     float infinityDistance = 340282346638528859811 ; Obtained from GetDistance in another cell different from @akObjectOne
     return akObjectOne.GetDistance(akObjectTwo) >= infinityDistance
+endFunction
+
+;/
+    A vanilla Skyrim AI-package pathing problem, not specific to this mod: an Actor walking up to approach another one
+    (e.g. a guard closing in to cuff an arrestee) can end up physically wedged inside the target's own collision, and
+    the package can never resolve out of it on its own. This is just the plain distance check used to detect that -
+    the actual fix (teleporting one of the two a short distance apart) belongs with whichever caller knows which of the
+    two Actors it's safe to move (see RPB_Arrestee.AwaitConfrontationScene).
+/;
+bool function IsWedgedTogether(Actor akActorOne, Actor akActorTwo, float afStuckDistance = 60.0) global
+    if (!akActorOne || !akActorTwo)
+        return false
+    endif
+
+    return akActorOne.GetDistance(akActorTwo) < afStuckDistance
 endFunction
 
 bool function IsActorFarAwayFromPlayer(Actor akActor) global

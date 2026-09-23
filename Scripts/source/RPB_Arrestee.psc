@@ -45,6 +45,8 @@ Scriptname RPB_Arrestee extends RPB_ActorBase
     function SetArrestGoal(string asArrestGoal)
     function RevertArrest()
     function Arrest()
+    function DeclareArrestSuccess()
+    bool function AwaitConfrontationScene(string asScene)
     function EscortToPrison(bool abEscortDirectlyToCell = false)
     function MoveToPrison(bool abMoveDirectlyToCell = false)
     function ChangeEscort(Actor akNewEscort)
@@ -496,21 +498,117 @@ function Arrest()
     SetBool("Arrested", true)
     SetBool("Captured", true) ; Used to avoid further arrest resists after being arrested, may change name or implementation
     self.IncrementStat("Times Arrested")
+endFunction
 
+;/
+    The actual "you/this Actor have been arrested" declaration - split out of Arrest() so it only fires once I know the
+    arrest is real, not just attempted. Arrest() itself still runs immediately and unconditionally (other systems, like
+    arrest-resist suppression, need "Captured"/"Arrested" set right away), but this only gets called once a confrontation
+    Scene is actually confirmed (EscortToPrison, via AwaitConfrontationScene) or, for the arrest types that never touch a
+    Scene at all, right where Arrest() used to declare success immediately (BeginArrest's teleport branches).
+/;
+function DeclareArrestSuccess()
     Config.NotifyArrest("You have been arrested in " + Hold, self.IsPlayer())
     Info(self.Name + " has been arrested in " + Hold + " at " + CurrentTime)
-    ; Debug("Arrestee::Arrest", self.Name + " has been arrested in " + Hold + " at " + CurrentTime)
+    ; Debug("Arrestee::DeclareArrestSuccess", self.Name + " has been arrested in " + Hold + " at " + CurrentTime)
 
     Arrest.OnActorArrested(self, Captor)
 endFunction
 
+;/
+    Starts the confrontation Scene and waits for real confirmation it's actually progressing, instead of the old
+    fire-and-forget StartArrestScene() call that never checked anything. Confirmation is the Scene's own first phase cue
+    ("Hands Behind Back", which OnArrestBegin() below marks by setting "Scene Confirmed") - the earliest point anywhere
+    in this codebase that a confrontation Scene can be observed to be doing something real. Found the hard way in a real
+    test with a live disguise mod installed: the confrontation Scene silently never started once, and nothing noticed -
+    "Prisoner has been arrested" still got logged, leaving the Actor half arrested (RPB_Arrestee + RPB_Prisoner both
+    attached, no scene, no cuffs) with no way to recover short of a whole new arrest attempt.
+
+    While waiting, this also watches for the guard getting physically wedged inside the Arrestee - a known vanilla
+    Skyrim AI-package pathing problem (not specific to this mod) where the guard's own approach can get stuck with
+    nothing able to path it back out, silently stalling the confrontation the same way a Scene that never started does.
+    A wedge just gets nudged apart in place (same attempt, same Scene, no retry spent); only a whole attempt producing
+    no phase cue at all costs a retry.
+
+    string  @asScene: The confrontation Scene to start.
+
+    returns (bool): true once the Scene is confirmed to be progressing, false if every attempt was exhausted.
+/;
+bool function AwaitConfrontationScene(string asScene)
+    int MAX_ATTEMPTS = 3
+    float PER_ATTEMPT_TIMEOUT_SECONDS = 8.0   ; tunable - no real playtest numbers behind this yet
+    float POLL_INTERVAL_SECONDS = 1.0
+    float STUCK_DISTANCE_UNITS = 60.0         ; tunable - should stay comfortably smaller than the nudge offset below
+    int STUCK_CONSECUTIVE_CHECKS = 2          ; debounce so one transient close frame doesn't trigger a nudge
+    float NUDGE_OFFSET_UNITS = 120.0          ; tunable - just needs to clear collision, not a real measured distance
+
+    Actor guard = Captor.GetActor()
+    int attempt = 1
+
+    while (attempt <= MAX_ATTEMPTS)
+        self.Remove("Scene Confirmed") ; clean slate for this attempt
+        SceneManager.StartArrestScene( \
+            akGuard     = guard, \
+            akArrestee  = this, \
+            asScene     = asScene \
+        )
+
+        float attemptStart = Utility.GetCurrentRealTime()
+        int stuckStreak = 0
+        bool confirmed = false
+
+        while (!confirmed && (Utility.GetCurrentRealTime() - attemptStart) < PER_ATTEMPT_TIMEOUT_SECONDS)
+            if (!self.IsEffectActive) ; the Arrestee itself is gone mid-wait (e.g. died) - OnDeath already handles that
+                return false
+            endif
+
+            Utility.Wait(POLL_INTERVAL_SECONDS)
+            confirmed = self.GetBool("Scene Confirmed")
+
+            if (!confirmed)
+                if (RPB_Utility.IsWedgedTogether(self.GetActor(), guard, STUCK_DISTANCE_UNITS))
+                    stuckStreak += 1
+                else
+                    stuckStreak = 0
+                endif
+
+                if (stuckStreak >= STUCK_CONSECUTIVE_CHECKS)
+                    DebugWarn("["+ Name +"] Arrestee::AwaitConfrontationScene", "Guard wedged against " + Name + " during the approach, nudging aside")
+                    Captor.MoveTo(self.GetActor(), afXOffset = NUDGE_OFFSET_UNITS)
+                    stuckStreak = 0 ; give the package a fresh window to resolve after the nudge
+                endif
+            endif
+        endWhile
+
+        if (confirmed)
+            return true
+        endif
+
+        DebugWarn("["+ Name +"] Arrestee::AwaitConfrontationScene", "Attempt " + attempt + "/" + MAX_ATTEMPTS + " of " + asScene + " for " + Name + " never confirmed, retrying")
+
+        Scene sceneObject = SceneManager.GetScene(asScene)
+        if (sceneObject && sceneObject.IsPlaying())
+            sceneObject.Stop()
+            Utility.Wait(0.5) ; let OnSceneEnd land and clear the SceneManager's own "is playing" flag before retrying
+        endif
+
+        attempt += 1
+    endWhile
+
+    DebugError("["+ Name +"] Arrestee::AwaitConfrontationScene", "Gave up on " + asScene + " for " + Name + " after " + MAX_ATTEMPTS + " attempts")
+    SceneManager.ForceResetSceneState() ; last resort: a stalled Start() may have left the Scene queue wedged for everyone
+    return false
+endFunction
+
 function EscortToPrison(bool abEscortDirectlyToCell = false)
     string sceneSet = string_if (self.GetString("Scene"), self.GetString("Scene"), Arrest.SceneManager.SCENE_ARREST_START_02)
-    SceneManager.StartArrestScene( \
-        akGuard     = Captor.GetActor(), \
-        akArrestee  = this, \
-        asScene     = sceneSet \
-    )
+
+    if (!self.AwaitConfrontationScene(sceneSet))
+        self.OnArrestFailed("Confrontation Scene")
+        return
+    endif
+
+    self.DeclareArrestSuccess()
 
     RPB_Prisoner prisoner   = self.MakePrisoner()
     RPB_Prison prison       = prisoner.Prison
@@ -727,7 +825,11 @@ event OnRestrained()
 endEvent
 
 event OnArrestBegin()
-    
+    ; Fired unconditionally by RPB_EventManager.OnArrestScene on every confrontation phase cue (Hands Behind Back,
+    ; Kneel Down, Lie Down, Handcuff) - the earliest one to land is "Hands Behind Back", which makes this the first real
+    ; signal anywhere that the confrontation Scene is actually doing something. AwaitConfrontationScene() above polls
+    ; this flag to confirm the Scene instead of assuming StartArrestScene() worked just because it was called.
+    self.SetBool("Scene Confirmed", true)
 endEvent
 
 event OnArrestEnd()

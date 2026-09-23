@@ -1072,6 +1072,10 @@ function BeginArrest(RPB_Arrestee apArresteeRef)
 
     ; Next step, escort/move to prison
     if (arrestType == ARREST_TYPE_TELEPORT_TO_CELL)
+        ; No confrontation Scene in this arrest type (straight to the cell) - nothing to confirm first, so I declare
+        ; success right here, same timing as before this was split out of Arrestee.Arrest() (see DeclareArrestSuccess's
+        ; own doc comment for why the escort types below don't do this immediately any more).
+        apArresteeRef.DeclareArrestSuccess()
         apArresteeRef.MoveToPrison(abMoveDirectlyToCell = true)
         RPB_Utility.FlowMark("BeginArrest: MoveToPrison returned")
         RPB_Utility.Crumb(arrestee, "BeginArrest: MoveToPrison returned")

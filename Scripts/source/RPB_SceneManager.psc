@@ -120,6 +120,7 @@ scriptname RPB_SceneManager extends Quest
     string function PopScene()
     function QueueOrPlay(string asSceneName)
     function PlayQueued()
+    function ForceResetSceneState()
     ReferenceAlias function GetRefAlias(string aliasGroup, int index = 0)
     string function GetAliasName(string aliasName, int aliasIndex, bool checkForExistence = false)
     function SetPackageLockOnActor(Actor akActor)
@@ -1031,6 +1032,22 @@ function PlayQueued()
         self.GetScene(nextScene).Start() ; Play the Scene
         currentScene = nextScene
     endif
+endFunction
+
+;/
+    Last-resort safety valve for a Scene that stalled and was never confirmed to actually be playing (no OnSceneStart/
+    OnScenePlaying/OnSceneEnd ever arrived for it). __isScenePlaying only ever clears in OnSceneEnd, so a Start() that
+    silently failed can wedge it true forever, quietly blocking every future QueueOrPlay call mod-wide. I only call this
+    after a caller (see RPB_Arrestee.AwaitConfrontationScene) has already exhausted its own retry attempts - never in the
+    middle of a retry, since this also drops anything still queued behind the stalled Scene, including Scenes that have
+    nothing to do with the stalled one.
+/;
+function ForceResetSceneState()
+    Error("SceneManager::ForceResetSceneState", "Force-resetting scene state (was: '" + currentScene + "', playing: " + __isScenePlaying + ", " + JArray.count(__queuedScenes) + " queued) after a stalled Scene exhausted its retries")
+    __isScenePlaying = false
+    currentScene = ""
+    __queuedScenes = JArray.object()
+    JValue.retain(__queuedScenes, "RPB_SceneManager")
 endFunction
 
 ; ==========================================================
