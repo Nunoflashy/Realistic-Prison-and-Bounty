@@ -1054,12 +1054,12 @@ function BeginArrest(RPB_Arrestee apArresteeRef)
     ; neutralized here, not only at Imprison() time: the arrest is confirmed at this point (the bounty check that can abort
     ; the whole arrest already passed, in OnArrestBegin), and everything from here on - confrontation if any, the escort
     ; walk, teleport, arrival, strip, Imprison() - would otherwise happen while a nearby guard could still evaluate this
-    ; actor as hostile and break the scripted flow. See RPB_Utility.NeutralizeHostileActor's doc comment.
-    RPB_Utility.NeutralizeHostileActor(arrestee)
-    ; A hostile faction is only half of it: a disguise mod can have already put the CAPTOR (or another nearby guard) into
-    ; active combat directly, and removing the arrestee's own faction does not make an already-fighting guard disengage.
-    ; See RPB_Utility.BreakOffCombatForArrest's doc comment.
-    RPB_Utility.BreakOffCombatForArrest(arrestee, captor)
+    ; actor as hostile and break the scripted flow. A hostile faction is only half of it: a disguise mod can also have
+    ; already put the CAPTOR (or another nearby guard) into active combat directly, and - confirmed in a real test - can
+    ; keep RE-adding the faction as long as the disguise stays equipped, so a single removal doesn't stick on its own.
+    ; See RPB_Utility.SustainArrestPacification's doc comment (it repeats both the faction check and the combat-break for
+    ; a bounded window, not just once).
+    RPB_Utility.SustainArrestPacification(arrestee, captor)
     RPB_Utility.FlowMark("BeginArrest: HideBounty + StopCombat")
     RPB_Utility.Crumb(arrestee, "BeginArrest: HideBounty + StopCombat")
     ; apArresteeRef.SheatheWeapon()

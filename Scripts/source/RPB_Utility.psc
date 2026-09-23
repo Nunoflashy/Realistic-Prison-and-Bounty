@@ -20,7 +20,8 @@ scriptname RPB_Utility hidden
     Form[] function RPB_GetHostileFactions() global
     bool function IsHostileActor(Actor akActor) global
     function NeutralizeHostileActor(Actor akActor) global
-    function BreakOffCombatForArrest(Actor akArrestee, Actor akCaptor) global
+    float function PACIFICATION_TIME_BUDGET_SECONDS() global
+    function SustainArrestPacification(Actor akArrestee, Actor akCaptor) global
     bool function IsTracingEnabled() global
     bool function IsDebuggingEnabled() global
     bool function IsLoggingEnabled() global
@@ -532,44 +533,58 @@ endFunction
     its OWN ability effect to a nearby guard the moment it detects the disguise, and that effect puts the GUARD directly into
     an active, alerted combat stance (SetAlert/DrawWeapon) - confirmed by reading Master of Disguise's real source
     (dubhFactionEnemyScript.psc): removing the arrestee's faction does not, by itself, make an already-fighting guard
-    disengage (the guard's own AI has already committed to combat; the disguise mod's own polling only reacts to
-    IsHostileToActor going false, and even then it never calls StopCombat on itself). Skyrim also generally can't run a scene
-    on an actor that's still actively in combat, which is why an arrest attempted mid-fight produced a broken half state
-    (both effects attached, no escort scene, no cuffs): the arresting guard was still fighting when the scene should have
-    started.
+    disengage. Skyrim also generally can't run a scene on an actor that's still actively in combat, which is why an arrest
+    attempted mid-fight produced a broken half state (both effects attached, no escort scene, no cuffs): the arresting guard
+    was still fighting when the scene should have started.
 
-    Called from BeginArrest alongside NeutralizeHostileActor: stops combat on the known captor directly (the actor whose
-    scene actually needs to run), and on every actor PO3_SKSEFunctions.GetCombatTargets(@akArrestee) returns, to also catch
-    any OTHER guard(s) that independently detected the same disguise and are separately still fighting. Confirmed the same
-    function already works for this exact purpose in the Surrender system (EventManager.OnSurrenderPreparing) - read it
-    BEFORE calling StopCombat on anyone (stopping one combatant first can tear down the shared combat group/instance the
-    query itself reads from, which is why an earlier version of this function that stopped the captor first always found 0).
+    Called from BeginArrest alongside/after NeutralizeHostileActor's first pass: stops combat on the known captor directly
+    (the actor whose scene actually needs to run) and on every actor PO3_SKSEFunctions.GetCombatTargets(@akArrestee) returns,
+    to also catch any OTHER guard(s) independently still fighting. Confirmed the same function already works for this exact
+    purpose in the Surrender system (EventManager.OnSurrenderPreparing) - read it BEFORE calling StopCombat on anyone
+    (stopping one combatant first can tear down the shared combat group/instance the query itself reads from).
 
-    A single sweep isn't reliably enough against several independently-hostile guards (confirmed in a real test: a guard
-    stopped this way went hostile again shortly after) - the real, sustainable fix is Surrender's approach (bind every
-    hostile actor into a scene GROUP alias, "SurrendererCaptor", so the scene itself pacifies all of them; the arrest
-    scenes only ever bind a single "Escort" guard, see ROADMAP.md) but that needs Creation Kit work, not just a script
-    change. As a Papyrus-only mitigation, this repeats the sweep every 0.5 s for up to 5 s (mirrors Master of Disguise's own
-    Suspend(5.0) reaction window in dubhFactionEnemyScript.psc) instead of a single instant call a guard's very next AI
-    tick can undo, stopping early once a pass finds nobody left to stop. Costs nothing extra for the ordinary (non-hostile)
-    arrest: one pass, finds nothing, returns immediately.
+    Root cause found in a real test with Master of Disguise actually installed: as long as the disguise stays equipped,
+    the mod's own polling keeps RE-ADDING the hostile faction every time any nearby guard's independent effect instance
+    decides its own chase is over (several guards each running their own instance can re-arm the faction while another is
+    still fighting - matches the oscillating pass counts seen in testing). Removing the faction once, or even stopping
+    combat repeatedly, does not help if a live external system keeps putting the faction back. Since the mod author does
+    not want to ship a compatibility patch that redistributes a modified copy of another author's script without their
+    permission, this stays a self-contained RPB mitigation instead: every pass also re-runs NeutralizeHostileActor, so even
+    though the faction keeps getting reapplied, the window during which the actor actually reads hostile is kept to well
+    under a second at a time - usually too short for a guard to newly acquire them as a combat target. The loop runs for up
+    to PACIFICATION_TIME_BUDGET_SECONDS (a safety ceiling, not a fixed wait - it exits the moment a pass finds nothing left
+    to do), longer than Master of Disguise's own initial-detection Suspend(5.0) window, since the ongoing chase (its
+    State Alive, ~1 s polling) can run well past that.
 /;
-function BreakOffCombatForArrest(Actor akArrestee, Actor akCaptor) global
+; A plain function, not a Property: RPB_Utility is a hidden, instance-less script, and a global function (no self) can't
+; reference an instance property even when it's autoreadonly - matches the Warn/Info/RPB_GetOutfit convention already used
+; for constants elsewhere in this file.
+float function PACIFICATION_TIME_BUDGET_SECONDS() global
+    return 30.0
+endFunction
+
+function SustainArrestPacification(Actor akArrestee, Actor akCaptor) global
     float startTime = Utility.GetCurrentRealTime()
     int passNumber = 0
     bool keepGoing = true
-    while (keepGoing && (Utility.GetCurrentRealTime() - startTime) < 5.0)
+    while (keepGoing && (Utility.GetCurrentRealTime() - startTime) < PACIFICATION_TIME_BUDGET_SECONDS())
         passNumber += 1
-        keepGoing = __BreakOffCombatPass(akArrestee, akCaptor, passNumber)
+        keepGoing = __ArrestPacificationPass(akArrestee, akCaptor, passNumber)
         if (keepGoing)
             Utility.Wait(0.5)
         endif
     endWhile
 endFunction
 
-; One sweep: stops combat on the captor and everyone GetCombatTargets(@akArrestee) currently returns. Returns true if
-; anyone needed stopping this pass (the caller keeps sweeping while true, up to its own time budget).
-bool function __BreakOffCombatPass(Actor akArrestee, Actor akCaptor, int aiPassNumber) global
+; One sweep: strips whatever hostile faction is currently on the arrestee (no-op if none - the ordinary, non-hostile arrest
+; costs nothing here), stops combat on the captor and everyone GetCombatTargets(@akArrestee) currently returns. Returns
+; true if anything needed doing this pass (the caller keeps sweeping while true, up to its own time budget).
+bool function __ArrestPacificationPass(Actor akArrestee, Actor akCaptor, int aiPassNumber) global
+    bool wasHostile = IsHostileActor(akArrestee)
+    if (wasHostile)
+        NeutralizeHostileActor(akArrestee)
+    endif
+
     Actor[] combatTargets = PO3_SKSEFunctions.GetCombatTargets(akArrestee)
 
     bool captorWasFighting = akCaptor && akCaptor.IsInCombat()
@@ -592,8 +607,8 @@ bool function __BreakOffCombatPass(Actor akArrestee, Actor akCaptor, int aiPassN
         endWhile
     endif
 
-    Info("BreakOffCombatForArrest pass " + aiPassNumber + " on " + akArrestee.GetDisplayName() + " " + akArrestee + ": captor " + akCaptor + " was fighting " + captorWasFighting + ", GetCombatTargets found " + stopped + " more:" + stoppedLogged)
-    return captorWasFighting || stopped > 0
+    Info("SustainArrestPacification pass " + aiPassNumber + " on " + akArrestee.GetDisplayName() + " " + akArrestee + ": faction reapplied " + wasHostile + ", captor " + akCaptor + " was fighting " + captorWasFighting + ", GetCombatTargets found " + stopped + " more:" + stoppedLogged)
+    return wasHostile || captorWasFighting || stopped > 0
 endFunction
 
 ; ==========================================================
