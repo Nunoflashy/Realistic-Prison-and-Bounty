@@ -1,5 +1,37 @@
 Scriptname RPB_Captor extends RPB_ActorBase
 
+;/
+@properties:
+    RPB_Arrest Arrest
+    RPB_SceneManager SceneManager
+    bool IsGuard
+    bool IsBountyHunter
+    bool IsEscorting
+    RPB_ArresteeList ArresteesList
+    Form[] Arrestees
+    Actor Arrestee
+    string Test
+@functions:
+    RPB_Arrestee[] function GetArrestees()
+    function AssignArrestee(Actor akArrestee)
+    function RemoveArrestee(RPB_Arrestee apArrestee)
+    function AddArrestee(RPB_Arrestee akArresteeRef)
+    function FriskArrestee(RPB_Arrestee akArrestee)
+    function ArrestActor(Actor akActor)
+    function FreeArrestee(RPB_Arrestee akArrestee)
+    function RestrainActor(Actor akActor)
+    function SetEscorting()
+    function StopEscorting()
+    Actor function GetActor()
+    function Destroy()
+@events:
+    event OnUpdate()
+    event OnBeginState()
+    event OnInitialize()
+    event OnDeath(Actor akKiller)
+    event OnDestroy()
+/;
+
 import RPB_Utility
 import RPB_Memory
 import RPB_Arrest
@@ -67,13 +99,6 @@ event OnUpdate()
     if (!Arrestee)
         return
     endif
-    
-    ; if (this.GetDistance(Arrestee) >= 700)
-    ;     Arrestee.MoveTo(this)
-    ;     Debug("Captor::OnUpdate", "Moved Arrestee to " + Name)
-
-    ; endif
-    ; RegisterForSingleUpdate(5.0)
 
     ; Keep track of the arrestee's distance to the captor,
     ; only if we are in the Bounty Payment scenario
@@ -201,5 +226,9 @@ function Destroy()
     _test = "Gata"
     self.RemoveAll()
     Utility.Wait(0.5)
-    API.Arrest.UnregisterCaptor(self)
+    ; abRemoveFromList = true: without it the registry keeps a stale entry keyed to this guard's FormID (this was never
+    ; actually reached in production before, so the gap never mattered until Destroy() itself got wired up - see
+    ; RPB_Prisoner.psc's Imprisoned.OnBeginState()). A guard reused for a later arrest would then find a key that
+    ; "already exists," silently keep pointing at this dead instance, and the new one would never get registered.
+    API.Arrest.UnregisterCaptor(self, abRemoveFromList = true)
 endFunction

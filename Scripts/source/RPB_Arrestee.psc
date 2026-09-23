@@ -849,22 +849,18 @@ event OnArrestFailed(string asReason)
 endEvent
 
 event OnUpdate()
+    ; The hostile-faction re-check that used to live here (MaintainArrestPacification) was mitigating a symptom -
+    ; a disguise mod reapplying a hostile faction mid-escort - of what turned out to be RPB checking the wrong faction
+    ; entirely (see RPB_Compat_MasterOfDisguise.psc). With the actual root cause fixed, this per-tick recheck was no
+    ; longer earning its keep: every arrestee paid a per-tick cost for a problem that no longer exists, and I'm trying
+    ; to keep OnUpdate usage to what's actually necessary, not run it "just in case" - it's real overhead multiplied by
+    ; however many arrestees are being escorted at once, and a script left registered is exactly what bloats a save.
     if (this.GetDistance(Captor.GetActor()) >= 700)
         this.MoveTo(Captor.GetActor())
         Debug("["+ Name +"] Arrestee::OnUpdate", "Moved Arrestee to " + Captor.Name)
     endif
 
-    ; BeginArrest's own pacification only covers a bounded window at the very start of the arrest (see
-    ; RPB_Utility.SustainArrestPacification); this loop already runs for the WHOLE escort, so it also re-checks hostility
-    ; here - a disguise mod can reapply a hostile faction well after that initial window closed (confirmed in a real test:
-    ; the initial check came back clean, then the actor was attacked once nothing was watching any more). Cheap for the
-    ; ordinary arrest: MaintainArrestPacification's only cost when nothing is wrong is one cached IsHostileActor() check.
-    bool neededPacifying = RPB_Utility.MaintainArrestPacification(this, Captor.GetActor())
-    if (neededPacifying)
-        RegisterForSingleUpdate(1.0) ; something was actually reapplied - recheck sooner instead of the normal 5 s pace
-    else
-        RegisterForSingleUpdate(5.0)
-    endif
+    RegisterForSingleUpdate(5.0)
 endEvent
 
 ; ==========================================================

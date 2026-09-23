@@ -689,6 +689,11 @@ event OnPrisonScene(string asScene, string asSceneEvent, RPB_Prison apPrison, RP
                 jailCell.CellDoor.Lock()
                 Debug.SendAnimationEvent(escort, "IdleLockpick") ; Lock animation
 
+                ; The door is genuinely closed/locked for real at this point - the last confirmed checkpoint before the
+                ; Scene's own native End, which is what actually unlocks the guard's package and calls Imprison(). Arms
+                ; a failsafe in case that End never arrives (see RPB_Prisoner.OnUpdate's own doc comment).
+                apPrisoner.ArmEscortToCellStallCheck()
+
             elseif (asSceneSecondaryEvent == "Unlock Cell")
                 Debug.SendAnimationEvent(escort, "IdleLockpick")
                 jailCell.CellDoor.Unlock()

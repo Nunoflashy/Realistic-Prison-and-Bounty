@@ -782,7 +782,12 @@ event OnActorArrested(RPB_Arrestee apArrestee, RPB_Captor apArrestGuard)
 endEvent
 
 event OnArresteeDeath(RPB_Arrestee apArrestee, RPB_Captor apArrestGuard, Actor akKiller)
-
+    ; This was an empty stub: an ActiveMagicEffect doesn't end itself just because its target actor died, so with
+    ; nothing here to tear the arrest state down, RPB_Arrestee.OnUpdate()'s escort-catch-up loop kept re-registering
+    ; every 5s forever - a real, guaranteed leak on every arrestee death mid-arrest. RevertArrest() is the same, already-
+    ; proven full teardown a failed arrest already uses (uncuffs, restores bounty, clears storage, unregisters, and
+    ; Destroy()s, which is what actually stops the OnUpdate loop).
+    apArrestee.RevertArrest()
 endEvent
 
 event OnArresteeRestrained(RPB_Arrestee apArrestee)

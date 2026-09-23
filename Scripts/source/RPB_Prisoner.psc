@@ -94,6 +94,7 @@ Scriptname RPB_Prisoner extends RPB_ActorBase
     function StartGiveClothing(Actor akClothingGiver)
     function EscortToJail(Actor akEscort)
     function EscortToCell(Actor akEscort)
+    function ArmEscortToCellStallCheck(float afTimeoutSeconds = 30.0)
     bool function HasDayElapsed()
     function SetEscaped()
     function SetEscapePenalty()
@@ -222,6 +223,7 @@ Scriptname RPB_Prisoner extends RPB_ActorBase
     event OnEscortedToPrison(Actor akEscort)
     event OnEscortToCell(Actor akEscort)
     event OnEscortedToCell(Actor akEscort)
+    event OnUpdate()
     event OnEscortFromJail(Actor akEscort)
     event OnEscortedFromJail(Actor akEscort)
     event OnEscortFromCell(Actor akEscort)
@@ -924,9 +926,14 @@ state Imprisoned
     event OnBeginState()
         ; Debug("[state: "+ self.GetState() +"] ["+ Name +"] Prisoner::OnBeginState", self.Name + "'s Bounty: " + Bounty)
 
-        ; Captor should probably be destroyed in RPB_Captor, because more Prisoners/Arrestees may depend on it
-        ; we could check if that Captor has any prisoners left to escort, if not, destroy the reference.
-        ; Captor.Destroy()
+        ; A Captor is meant to eventually support 1:N Arrestees (one guard escorting several) - that isn't built yet,
+        ; Captor.Arrestee is still a single value, so "does this Captor still have anyone to escort" just means "is
+        ; their one Arrestee still me". Only destroy when that holds, so a guard who's already been reassigned to a
+        ; new arrest isn't torn down out from under it.
+        RPB_Captor captorRef = API.Arrest.AwaitCaptorReference(Captor)
+        if (captorRef && captorRef.Arrestee == this)
+            captorRef.Destroy()
+        endif
 
         ; At this point, we can delete the prisoner's arrest state
         self.DestroyArrestState()
@@ -978,7 +985,6 @@ state Imprisoned
 
         self.RegisterLastUpdate()
         RegisterForSingleUpdateGameTime(1.0)
-        RegisterForSingleUpdate(10.0)
         ; Debug("[state: Imprisoned] ["+ Name +"] Prisoner::OnUpdateGameTime", self.Name + "'s Bounty: " + Bounty)
         ; self.DEBUG_ShowHoldStats()
 
@@ -1044,6 +1050,19 @@ endFunction
 
 function EscortToCell(Actor akEscort)
     Prison.EscortPrisonerToCell(self, akEscort)
+endFunction
+
+;/
+    Arms a single one-shot stall-recovery check for the Escort-to-Cell Scene - not a recurring poll, never re-arms.
+    Called from RPB_EventManager's "Lock Cell" handler once the door is genuinely closed/locked for real, the last
+    confirmed checkpoint before the Scene's own native End trigger (which is what actually unlocks the guard's package
+    and calls Imprison() - see OnUpdate() below). Both following the arrest and a full game restart make this always
+    complete normally; this is a failsafe for when it doesn't, not a replacement for the Scene.
+
+    float   @afTimeoutSeconds: how long to wait for the Scene's own End to arrive before treating it as stalled.
+/;
+function ArmEscortToCellStallCheck(float afTimeoutSeconds = 30.0)
+    RegisterForSingleUpdate(afTimeoutSeconds)
 endFunction
 
 ; ==========================================================
@@ -2890,6 +2909,26 @@ event OnEscortToCell(Actor akEscort)
 endEvent
 
 event OnEscortedToCell(Actor akEscort)
+endEvent
+
+;/
+    Fires once, at most, from ArmEscortToCellStallCheck()'s single-shot timer. If the Escort-to-Cell Scene's own native
+    End already ran OnEscortPrisonerToCellEnd() (the normal path) by the time this ticks, IsImprisoned is already true
+    and this is a single harmless no-op - it never re-registers either way. If it hasn't, the Scene's tail end stalled
+    (the guard's final phase, locking the door then leaving, is Package-driven and can silently never resolve - see
+    KNOWN_ISSUES.md), so this runs the exact same completion the Scene would have, directly: OnEscortPrisonerToCellEnd()
+    itself already guards every step it takes (strip/belongings/Imprison()) on "hasn't this already happened", so it's
+    safe even if the Scene does eventually still finish and call it a second time.
+/;
+event OnUpdate()
+    if (self.IsImprisoned)
+        return
+    endif
+
+    Actor guard = Captor
+    Warn("["+ Name +"] Prisoner::OnUpdate", "Escort-to-Cell stalled for " + Name + " (the Scene never confirmed) - recovering directly")
+    API.SceneManager.UnsetPackageLockOnActor(guard)
+    Prison.OnEscortPrisonerToCellEnd(self, self.JailCell, guard)
 endEvent
 
 ; When should this happen?

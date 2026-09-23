@@ -992,6 +992,7 @@ endEvent
 float __npcSanityCheckPreCheckUpdateTime
 float __npcSanityCheckPostCheckUpdateTime
 int   __npcSanityCheckUpdateTries
+int   __npcSanityCheckAttemptsMade ; safety net: aiUpdateTries was accepted but never actually enforced anywhere
 float __npcSanityCheckElapsedTime
 bool __npcSanityCheckIsCellAttachedOrDetached
 bool __npcSanityCheckAllPrisoners
@@ -1011,6 +1012,8 @@ function RegisterForSanityChecking(float afPreCheckUpdateTime = 4.0, float afPos
     __npcSanityCheckSelectedPrisoner    = apPrisoner
     __npcSanityCheckReset               = false
     __npcSanityCheckPreCheckUpdateTime  = afPreCheckUpdateTime
+    __npcSanityCheckUpdateTries         = aiUpdateTries
+    __npcSanityCheckAttemptsMade        = 0
 
     GotoState("NPC_SanityChecking")
     RegisterForSingleUpdate(afPreCheckUpdateTime)
@@ -1143,8 +1146,17 @@ bool function __performPrisonerSanityCheck(RPB_Prisoner apPrisoner)
         if (apPrisoner.ShouldBeInCell && !apPrisoner.IsInCell)
             apPrisoner.MoveTo(self)                                           ; Move the prisoner to this jail cell
             apPrisoner.NPC_BindToCell()                                       ; Prisoner should already be bound to cell, but just in case they aren't
-            RegisterForSingleUpdate(__npcSanityCheckPostCheckUpdateTime)      ; Keep updating until the prisoner is in the cell
-            isStateValid = false
+
+            __npcSanityCheckAttemptsMade += 1
+            ; __npcSanityCheckUpdateTries <= 0 means "no cap given" (e.g. a caller going straight through
+            ; PerformPrisonerSanityCheck() without RegisterForSanityChecking() first) - keep the old unbounded
+            ; behavior for that case rather than capping at 0 tries.
+            if (__npcSanityCheckUpdateTries > 0 && __npcSanityCheckAttemptsMade >= __npcSanityCheckUpdateTries)
+                DebugWarn("(-) " + self + " JailCell::PerformPrisonerSanityCheck", apPrisoner.Name + " never settled into their cell after " + __npcSanityCheckAttemptsMade + " tries, giving up instead of retrying forever")
+            else
+                RegisterForSingleUpdate(__npcSanityCheckPostCheckUpdateTime)  ; Keep updating until the prisoner is in the cell
+                isStateValid = false
+            endif
         endif
     endif
 
