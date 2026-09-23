@@ -752,7 +752,17 @@ event OnUpdate()
         Debug("["+ Name +"] Arrestee::OnUpdate", "Moved Arrestee to " + Captor.Name)
     endif
 
-    RegisterForSingleUpdate(5.0)
+    ; BeginArrest's own pacification only covers a bounded window at the very start of the arrest (see
+    ; RPB_Utility.SustainArrestPacification); this loop already runs for the WHOLE escort, so it also re-checks hostility
+    ; here - a disguise mod can reapply a hostile faction well after that initial window closed (confirmed in a real test:
+    ; the initial check came back clean, then the actor was attacked once nothing was watching any more). Cheap for the
+    ; ordinary arrest: MaintainArrestPacification's only cost when nothing is wrong is one cached IsHostileActor() check.
+    bool neededPacifying = RPB_Utility.MaintainArrestPacification(this, Captor.GetActor())
+    if (neededPacifying)
+        RegisterForSingleUpdate(1.0) ; something was actually reapplied - recheck sooner instead of the normal 5 s pace
+    else
+        RegisterForSingleUpdate(5.0)
+    endif
 endEvent
 
 ; ==========================================================

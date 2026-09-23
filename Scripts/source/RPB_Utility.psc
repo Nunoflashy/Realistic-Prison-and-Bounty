@@ -22,6 +22,7 @@ scriptname RPB_Utility hidden
     function NeutralizeHostileActor(Actor akActor) global
     float function PACIFICATION_TIME_BUDGET_SECONDS() global
     function SustainArrestPacification(Actor akArrestee, Actor akCaptor) global
+    bool function MaintainArrestPacification(Actor akArrestee, Actor akCaptor) global
     bool function IsTracingEnabled() global
     bool function IsDebuggingEnabled() global
     bool function IsLoggingEnabled() global
@@ -385,11 +386,11 @@ endFunction
 ;/
     The factions Prisoner.IsHostilePrisoner()/NeutralizeWhileImprisoned() check against: an Actor (NPC or the player) belonging
     to one of these is a hostile prisoner (a bandit, a Civil War soldier, Forsworn - or the player disguised via a mod like
-    Master of Disguise, which adds the player to the same factions) that guards would otherwise attack in its cell. Resolved by
-    editor ID through PO3 Papyrus Extender (already a dependency of this profile) rather than a Creation Kit FormList: no new
-    ESP record, and extending the list later is a one-line edit here, not a CK session. An editor ID that fails to resolve
-    (typo, or the load order lacks that vanilla record) is skipped, not a crash; NeutralizeWhileImprisoned logs how many
-    resolved.
+    Master of Disguise, which adds the player to its OWN factions while disguised - see RPB_Compat_MasterOfDisguise, unioned
+    in below) that guards would otherwise attack in its cell. Resolved by editor ID through PO3 Papyrus Extender (already a
+    dependency of this profile) rather than a Creation Kit FormList: no new ESP record, and extending the list later is a
+    one-line edit here, not a CK session. An editor ID that fails to resolve (typo, or the load order lacks that record) is
+    skipped, not a crash; NeutralizeWhileImprisoned logs how many resolved.
 /;
 ; Verified against the actual load order (zEdit), not recalled: "CWStormcloakFaction" (an earlier guess) does not exist - the
 ; real editor ID, following the same pattern as CWImperialFaction, is "CWSonsFaction" (in-lore "Sons of Skyrim"). The two
@@ -406,9 +407,10 @@ string[] function __HostileFactionEditorIDs() global
     return ids
 endFunction
 
-; Form[], not Faction[]: a Papyrus array literal needs a compile-time constant size, so trimming to how many editor IDs actually
-; resolved goes through Utility.CreateFormArray (the same convention RPB_Prisoner.__TrimForms uses). Callers cast each element.
-Form[] function RPB_GetHostileFactions() global
+; RPB's own vanilla hostile factions only (not the union) - Form[], not Faction[]: a Papyrus array literal needs a
+; compile-time constant size, so trimming to how many editor IDs actually resolved goes through Utility.CreateFormArray
+; (the same convention RPB_Prisoner.__TrimForms uses). Callers cast each element.
+Form[] function __ResolveVanillaHostileFactions() global
     string[] ids = __HostileFactionEditorIDs()
     Form[] factions = new Form[6] ; must match __HostileFactionEditorIDs()'s count
     int resolved = 0
@@ -428,7 +430,7 @@ Form[] function RPB_GetHostileFactions() global
         return factions
     endif
     if (resolved == 0)
-        return none ; nothing resolved (PO3 missing, or every editor ID failed): callers treat this like "no hostile factions"
+        return none
     endif
 
     Form[] trimmed = Utility.CreateFormArray(resolved)
@@ -438,6 +440,61 @@ Form[] function RPB_GetHostileFactions() global
         i += 1
     endWhile
     return trimmed
+endFunction
+
+int function __AppendFormsToJArray(int aiJArray, Form[] akForms) global
+    int added = 0
+    if (!akForms)
+        return added
+    endif
+
+    int i = 0
+    while (i < akForms.Length)
+        if (akForms[i])
+            JArray.addForm(aiJArray, akForms[i])
+            added += 1
+        endif
+        i += 1
+    endWhile
+    return added
+endFunction
+
+Form[] function __FormsFromJArray(int aiJArray) global
+    int count = JArray.count(aiJArray)
+    if (count == 0)
+        return none
+    endif
+
+    Form[] forms = Utility.CreateFormArray(count)
+    int i = 0
+    while (i < count)
+        forms[i] = JArray.getForm(aiJArray, i)
+        i += 1
+    endWhile
+    return forms
+endFunction
+
+;/
+    The union RPB's own vanilla hostile factions and RPB_Compat_MasterOfDisguise's 31 - resolved once (up to 37 editor-ID
+    lookups) and cached via JDB thereafter (mirrors RPB_ThreadLock.__GetRegistry()'s "resolve once, read the cached handle
+    after" shape), so every later IsHostileActor()/NeutralizeHostileActor() call - on every arrest, every hourly imprisoned
+    tick - reads the cache instead of re-resolving 37 editor IDs each time. The cache persists in the save (the underlying
+    Faction records don't change between sessions unless the load order itself changes, which is the same assumption every
+    editor-ID resolution here already makes).
+/;
+Form[] function RPB_GetHostileFactions() global
+    int cached = JDB.solveInt(".RPB_HostileFactionsCache")
+    if (cached && JValue.isExists(cached))
+        return __FormsFromJArray(cached)
+    endif
+
+    int combined = JValue.retain(JArray.object())
+    int fromVanilla = __AppendFormsToJArray(combined, __ResolveVanillaHostileFactions())
+    int fromModCompat = __AppendFormsToJArray(combined, RPB_Compat_MasterOfDisguise.GetFactions())
+    JDB.solveIntSetter(".RPB_HostileFactionsCache", combined, true)
+
+    Info("RPB_GetHostileFactions resolved and cached " + (fromVanilla + fromModCompat) + " hostile factions (" + fromVanilla + " vanilla, " + fromModCompat + " from Master of Disguise compat)")
+    return __FormsFromJArray(combined)
 endFunction
 
 ;/
@@ -609,6 +666,43 @@ bool function __ArrestPacificationPass(Actor akArrestee, Actor akCaptor, int aiP
 
     Info("SustainArrestPacification pass " + aiPassNumber + " on " + akArrestee.GetDisplayName() + " " + akArrestee + ": faction reapplied " + wasHostile + ", captor " + akCaptor + " was fighting " + captorWasFighting + ", GetCombatTargets found " + stopped + " more:" + stoppedLogged)
     return wasHostile || captorWasFighting || stopped > 0
+endFunction
+
+;/
+    Called from RPB_Arrestee.OnUpdate() every tick for the WHOLE arrest/escort duration (unlike SustainArrestPacification's
+    bounded burst at BeginArrest, which only covers the first ~30 s) - the actual fix for "half arrested": a real test
+    showed BeginArrest's own check come back clean (nothing hostile yet) and stop watching, only for the faction to be
+    reapplied later during the escort with nothing left monitoring for it.
+
+    Deliberately cheap for the ordinary (ATTOW: non-hostile) arrest: the only cost every tick is one IsHostileActor() check
+    (itself now cached, see RPB_GetHostileFactions) - the combat-side work (GetCombatTargets, StopCombat) only runs when
+    that check is actually true, so an ordinary escort never pays for it. Returns true if it found and fixed something (the
+    caller re-checks sooner next time instead of falling back to its normal pace).
+/;
+bool function MaintainArrestPacification(Actor akArrestee, Actor akCaptor) global
+    if (!IsHostileActor(akArrestee))
+        return false
+    endif
+
+    NeutralizeHostileActor(akArrestee)
+
+    if (akCaptor)
+        akCaptor.StopCombat()
+    endif
+    Actor[] combatTargets = PO3_SKSEFunctions.GetCombatTargets(akArrestee)
+    if (combatTargets)
+        int i = 0
+        while (i < combatTargets.Length)
+            Actor combatant = combatTargets[i]
+            if (combatant && combatant != akCaptor)
+                combatant.StopCombat()
+            endif
+            i += 1
+        endWhile
+    endif
+
+    Info("MaintainArrestPacification re-neutralized " + akArrestee.GetDisplayName() + " " + akArrestee + " mid-arrest (a hostile faction was reapplied after the initial check)")
+    return true
 endFunction
 
 ; ==========================================================
