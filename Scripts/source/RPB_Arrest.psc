@@ -1044,6 +1044,11 @@ function BeginArrest(RPB_Arrestee apArresteeRef)
     string hold             = apArresteeRef.GetHold()
 
     apArresteeRef.HideBounty()
+    ; Diagnostic (2026-09-23): HideBounty() -> ClearActiveBountyForFaction() should zero the native CrimeGold for the player
+    ; (RPB_ActorBase.psc:702-759). Logged to confirm that's actually happening and whether combat was already under way
+    ; before this function ever ran - a real in-game test kept showing guards re-engaging over several seconds despite
+    ; every pacification step below running, with no Master of Disguise ability effect present on them by that point.
+    EventManager.SendInfo("BeginArrest bounty/combat check on " + arrestee.GetDisplayName() + " " + arrestee + ": crime gold now " + arrestFaction.GetCrimeGold() + ", arrestee in combat " + arrestee.IsInCombat(), "Arrest::BeginArrest")
     apArresteeRef.StopCombat()
     ; A hostile actor (a bandit/CW-soldier/Forsworn NPC, or the player disguised via a mod like Master of Disguise) is
     ; neutralized here, not only at Imprison() time: the arrest is confirmed at this point (the bounty check that can abort
