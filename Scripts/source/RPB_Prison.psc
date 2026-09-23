@@ -203,6 +203,7 @@ scriptname RPB_Prison extends RPB_Entity
     function RestrainPrisoner(RPB_Prisoner apPrisoner, bool abRestrainInFront = false)
     function TeleportPrisonerToRelease(RPB_Prisoner apPrisoner)
     int function PendingDressCount()
+    function QueueEscortToCellStallCheck(Actor akPrisoner, float afTimeoutSeconds = 75.0)
     function ResetDressCost()
     string function DressCostSummary()
     int function PendingHostilityRestoreCount()
@@ -2443,6 +2444,7 @@ endFunction
 
 event OnUpdate()
     self.__ProcessPendingDress()
+    self.__ProcessEscortStallChecks()
 endEvent
 
 ; The delayed pass: every queued NPC is looked at again 3 s (or more) after its release; it stays queued until two passes in a row
@@ -2527,6 +2529,110 @@ function __ProcessPendingDress()
         endif
     else
         __pendingPasses = 0
+    endif
+endFunction
+
+; JFormMap actor -> JMap { dueAt: float (real time) }, retained. Owns the Escort-to-Cell stall failsafe (see
+; QueueEscortToCellStallCheck/__ProcessEscortStallChecks below) - deliberately NOT on RPB_Prisoner (an ActiveMagicEffect):
+; its RegisterForSingleUpdate doesn't survive the escorted actor's 3D unloading (OnEffectFinish tears the instance down,
+; and a reload starts a fresh one with no memory of the old timer) - confirmed against this exact codebase's own test-81
+; evidence and the PrisonMonitor redesign note, and exactly the condition ("player didn't follow") this bug needs to
+; survive. RPB_Prison is a Quest-bound ReferenceAlias, so its own timer has no such dependency.
+int __pendingEscortStallChecks
+
+function __EnsurePendingEscortStallChecks()
+    if (!__pendingEscortStallChecks || !JValue.isExists(__pendingEscortStallChecks))
+        __pendingEscortStallChecks = JValue.retain(JFormMap.object())
+    endif
+endFunction
+
+;/
+    Arms a failsafe for one prisoner's Escort-to-Cell Scene: if it hasn't confirmed (become Imprisoned) within
+    afTimeoutSeconds, __ProcessEscortStallChecks() runs the same completion the Scene's own End would have, directly.
+    Shares RPB_Prison's existing 3s real-time heartbeat (the same one __ProcessPendingDress already uses) rather than
+    computing an exact wake time - Papyrus only gives one pending RegisterForSingleUpdate per event per object, and a
+    ~3s granularity is more than precise enough for a 75s-scale timeout.
+
+    Actor   @akPrisoner: the prisoner whose Escort-to-Cell Scene to watch.
+    float   @afTimeoutSeconds: how long to wait for the Scene to confirm before treating it as stalled.
+/;
+function QueueEscortToCellStallCheck(Actor akPrisoner, float afTimeoutSeconds = 75.0)
+    self.__EnsurePendingEscortStallChecks()
+
+    int entry = JMap.object()
+    JMap.setFlt(entry, "dueAt", Utility.GetCurrentRealTime() + afTimeoutSeconds)
+    JFormMap.setObj(__pendingEscortStallChecks, akPrisoner, entry)
+    RPB_Utility.Crumb(akPrisoner, "Escort-to-Cell stall check queued, due in " + afTimeoutSeconds + "s")
+
+    self.RegisterForSingleUpdate(3.0)
+endFunction
+
+; Recovers every entry whose due time has passed and is still not Imprisoned, then re-arms if anything's left pending.
+function __ProcessEscortStallChecks()
+    if (!__pendingEscortStallChecks || !JValue.isExists(__pendingEscortStallChecks))
+        return
+    endif
+
+    int keys = JFormMap.allKeys(__pendingEscortStallChecks)
+    int n = JArray.count(keys)
+
+    ; Same dead-key rebuild as __ProcessPendingDress/__ProcessHostilityRestore: a key of a form that no longer exists
+    ; reads as None and cannot be removed by a None form.
+    bool dead = false
+    int i = 0
+    while (i < n)
+        if (!(JArray.getForm(keys, i) as Actor))
+            dead = true
+        endif
+        i += 1
+    endWhile
+
+    if (dead)
+        int fresh = JValue.retain(JFormMap.object())
+        int kept = 0
+        i = 0
+        while (i < n)
+            Actor liveActor = JArray.getForm(keys, i) as Actor
+            if (liveActor)
+                int liveEntry = JFormMap.getObj(__pendingEscortStallChecks, liveActor)
+                if (liveEntry)
+                    JFormMap.setObj(fresh, liveActor, liveEntry)
+                    kept += 1
+                endif
+            endif
+            i += 1
+        endWhile
+        JValue.release(__pendingEscortStallChecks)
+        __pendingEscortStallChecks = fresh
+        EventManager.SendWarning("Dropped " + (n - kept) + " Escort-to-Cell stall checks of NPCs that no longer exist", "["+ Name +"] Prison::__ProcessEscortStallChecks")
+        keys = JFormMap.allKeys(__pendingEscortStallChecks)
+        n = JArray.count(keys)
+    endif
+
+    float now = Utility.GetCurrentRealTime()
+    i = 0
+    while (i < n)
+        Actor checkActor = JArray.getForm(keys, i) as Actor
+        int entry = JFormMap.getObj(__pendingEscortStallChecks, checkActor)
+        if (entry && JMap.getFlt(entry, "dueAt") <= now)
+            RPB_Prisoner prisoner = self.AwaitPrisonerReference(checkActor)
+            if (prisoner && !prisoner.IsImprisoned)
+                ; The Scene's own End never confirmed within the timeout - a Package-driven phase (the guard's approach,
+                ; or its final phase after locking the door) can silently never resolve. Run the exact same completion
+                ; the Scene would have, directly: OnEscortPrisonerToCellEnd()'s own steps are already idempotent, so
+                ; this is safe even if the Scene does eventually still finish on its own afterward.
+                Actor guard = prisoner.Captor
+                Warn("["+ Name +"] Prison::__ProcessEscortStallChecks", "Escort-to-Cell stalled for " + checkActor.GetDisplayName() + " " + checkActor + " (the Scene never confirmed) - recovering directly")
+                self.SceneManager.UnsetPackageLockOnActor(guard)
+                self.OnEscortPrisonerToCellEnd(prisoner, prisoner.JailCell, guard)
+            endif
+            JFormMap.removeKey(__pendingEscortStallChecks, checkActor)
+        endif
+        i += 1
+    endWhile
+
+    if (JFormMap.count(__pendingEscortStallChecks) > 0)
+        self.RegisterForSingleUpdate(3.0)
     endif
 endFunction
 

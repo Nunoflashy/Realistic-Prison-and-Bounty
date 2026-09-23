@@ -671,8 +671,10 @@ event OnPrisonScene(string asScene, string asSceneEvent, RPB_Prison apPrison, RP
 
             ; Arms a failsafe for the whole Scene, right as it starts - a real test showed the stall can happen well
             ; before "Lock Cell" (the guard's own approach never completing at all), so arming this any later than the
-            ; Scene's own start risks never arming it at all. See RPB_Prisoner's state EscortToCellStallCheck.
-            apPrisoner.ArmEscortToCellStallCheck()
+            ; Scene's own start risks never arming it at all. Lives on RPB_Prison, not the escorted RPB_Prisoner itself
+            ; (an ActiveMagicEffect whose own timer doesn't survive the actor's 3D unloading - see
+            ; RPB_Prison.QueueEscortToCellStallCheck's own doc comment).
+            apPrison.QueueEscortToCellStallCheck(apPrisoner.GetActor())
 
         elseif (asSceneEvent == SceneManager.EVENT_ESCORTING)
             if (asSceneSecondaryEvent == "Release from Captor") ; May be refactored into OnArrestScene

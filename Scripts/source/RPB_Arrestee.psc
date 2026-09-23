@@ -538,7 +538,7 @@ bool function AwaitConfrontationScene(string asScene)
     int MAX_ATTEMPTS = 3
     float PER_ATTEMPT_TIMEOUT_SECONDS = 8.0   ; tunable - no real playtest numbers behind this yet
     float POLL_INTERVAL_SECONDS = 1.0
-    float STUCK_DISTANCE_UNITS = 60.0         ; tunable - should stay comfortably smaller than the nudge offset below
+    float STUCK_DISTANCE_UNITS = 90.0         ; tunable - a real measured wedge came in at ~52 units; stay comfortably smaller than the nudge offset below
     int STUCK_CONSECUTIVE_CHECKS = 2          ; debounce so one transient close frame doesn't trigger a nudge
     float NUDGE_OFFSET_UNITS = 120.0          ; tunable - just needs to clear collision, not a real measured distance
 
@@ -855,9 +855,19 @@ event OnUpdate()
     ; longer earning its keep: every arrestee paid a per-tick cost for a problem that no longer exists, and I'm trying
     ; to keep OnUpdate usage to what's actually necessary, not run it "just in case" - it's real overhead multiplied by
     ; however many arrestees are being escorted at once, and a script left registered is exactly what bloats a save.
-    if (this.GetDistance(Captor.GetActor()) >= 700)
-        this.MoveTo(Captor.GetActor())
+    Actor guard = Captor.GetActor()
+    if (this.GetDistance(guard) >= 700)
+        this.MoveTo(guard)
         Debug("["+ Name +"] Arrestee::OnUpdate", "Moved Arrestee to " + Captor.Name)
+
+    ; The confrontation Scene's own wedge-nudge (AwaitConfrontationScene) only ever runs during that one Scene - a real
+    ; report confirmed the guard can get wedged well past it too, during the Escort-to-Jail walk ("the problem has
+    ; always been here"), which nothing was watching for. This loop already runs for the whole escort, so it's the
+    ; natural place for the same check: no consecutive-checks debounce needed here, unlike the confrontation Scene's
+    ; tight ~1s polling - this loop's own 5s cadence is already coarse enough on its own.
+    elseif (RPB_Utility.IsWedgedTogether(self.GetActor(), guard))
+        Debug("["+ Name +"] Arrestee::OnUpdate", "Guard wedged against " + Name + " mid-escort, nudging aside")
+        Captor.MoveTo(self.GetActor(), afXOffset = 120.0)
     endif
 
     RegisterForSingleUpdate(5.0)

@@ -122,7 +122,7 @@ scriptname RPB_Utility hidden
     float function UnitsToM(int unit)
     function OrientRelative(ObjectReference akObjA, ObjectReference akObjB, Float afRotX = 0.0, Float afRotY = 0.0, Float afRotZ = 0.0) Global
     bool function IsFarAwayFromObject(ObjectReference akObjectOne, ObjectReference akObjectTwo) global
-    bool function IsWedgedTogether(Actor akActorOne, Actor akActorTwo, float afStuckDistance = 60.0) global
+    bool function IsWedgedTogether(Actor akActorOne, Actor akActorTwo, float afStuckDistance = 90.0) global
     bool function IsActorFarAwayFromPlayer(Actor akActor) global
     string function GenerateUUIDSection(int aiLength) global
     string function GenerateUUID() global
@@ -2157,7 +2157,7 @@ endFunction
     the actual fix (teleporting one of the two a short distance apart) belongs with whichever caller knows which of the
     two Actors it's safe to move (see RPB_Arrestee.AwaitConfrontationScene).
 /;
-bool function IsWedgedTogether(Actor akActorOne, Actor akActorTwo, float afStuckDistance = 60.0) global
+bool function IsWedgedTogether(Actor akActorOne, Actor akActorTwo, float afStuckDistance = 90.0) global
     if (!akActorOne || !akActorTwo)
         return false
     endif
