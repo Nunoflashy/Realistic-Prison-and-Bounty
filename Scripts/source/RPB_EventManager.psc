@@ -669,6 +669,11 @@ event OnPrisonScene(string asScene, string asSceneEvent, RPB_Prison apPrison, RP
             RetainAI(apPrisoner.IsPlayer())
             apPrison.OnEscortPrisonerToCellBegin(apPrisoner, escort)
 
+            ; Arms a failsafe for the whole Scene, right as it starts - a real test showed the stall can happen well
+            ; before "Lock Cell" (the guard's own approach never completing at all), so arming this any later than the
+            ; Scene's own start risks never arming it at all. See RPB_Prisoner's state EscortToCellStallCheck.
+            apPrisoner.ArmEscortToCellStallCheck()
+
         elseif (asSceneEvent == SceneManager.EVENT_ESCORTING)
             if (asSceneSecondaryEvent == "Release from Captor") ; May be refactored into OnArrestScene
                 RPB_Captor captor = Arrest.AwaitCaptorReference(escort)
@@ -688,11 +693,6 @@ event OnPrisonScene(string asScene, string asSceneEvent, RPB_Prison apPrison, RP
                 jailCell.CellDoor.Close()
                 jailCell.CellDoor.Lock()
                 Debug.SendAnimationEvent(escort, "IdleLockpick") ; Lock animation
-
-                ; The door is genuinely closed/locked for real at this point - the last confirmed checkpoint before the
-                ; Scene's own native End, which is what actually unlocks the guard's package and calls Imprison(). Arms
-                ; a failsafe in case that End never arrives (see RPB_Prisoner.OnUpdate's own doc comment).
-                apPrisoner.ArmEscortToCellStallCheck()
 
             elseif (asSceneSecondaryEvent == "Unlock Cell")
                 Debug.SendAnimationEvent(escort, "IdleLockpick")

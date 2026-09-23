@@ -94,7 +94,7 @@ Scriptname RPB_Prisoner extends RPB_ActorBase
     function StartGiveClothing(Actor akClothingGiver)
     function EscortToJail(Actor akEscort)
     function EscortToCell(Actor akEscort)
-    function ArmEscortToCellStallCheck(float afTimeoutSeconds = 30.0)
+    function ArmEscortToCellStallCheck(float afTimeoutSeconds = 75.0)
     bool function HasDayElapsed()
     function SetEscaped()
     function SetEscapePenalty()
@@ -216,6 +216,7 @@ Scriptname RPB_Prisoner extends RPB_ActorBase
 @events:
     event OnUpdateGameTime()
     event OnBeginState()
+    event OnUpdate()
     event OnBountyGained()
     event OnTeleportedToPrison()
     event OnTeleportedToCell(bool abBeginImprisonment)
@@ -223,7 +224,6 @@ Scriptname RPB_Prisoner extends RPB_ActorBase
     event OnEscortedToPrison(Actor akEscort)
     event OnEscortToCell(Actor akEscort)
     event OnEscortedToCell(Actor akEscort)
-    event OnUpdate()
     event OnEscortFromJail(Actor akEscort)
     event OnEscortedFromJail(Actor akEscort)
     event OnEscortFromCell(Actor akEscort)
@@ -921,6 +921,33 @@ state Released
     endEvent
 endState
 
+;/
+    Owns exactly one thing: the Escort-to-Cell stall failsafe armed by ArmEscortToCellStallCheck(). Kept as its own
+    state (not a bare default-level OnUpdate()) so a later, unrelated one-shot check doesn't end up sharing this same
+    handler and fighting over what it should do on any given tick - each gets its own named state instead.
+/;
+state EscortToCellStallCheck
+    event OnUpdate()
+        if (self.IsImprisoned)
+            ; The Scene's own native End already ran OnEscortPrisonerToCellEnd() normally in the meantime - nothing
+            ; to recover, just stop watching.
+            GotoState("")
+            return
+        endif
+
+        ; The Scene never confirmed within the timeout - the guard's approach/positioning, or its final phase after
+        ; locking the door, is Package-driven and can silently never resolve (see KNOWN_ISSUES.md). Run the exact same
+        ; completion the Scene would have, directly. No explicit GotoState("") after this: OnEscortPrisonerToCellEnd()
+        ; calls Imprison(), which already does GotoState("Imprisoned") itself once it succeeds. OnEscortPrisonerToCellEnd()
+        ; already guards every step it takes (strip/belongings/Imprison()) on "hasn't this already happened", so it's
+        ; safe even if the Scene does eventually still finish on its own and call it a second time.
+        Actor guard = Captor
+        Warn("["+ Name +"] Prisoner::EscortToCellStallCheck::OnUpdate", "Escort-to-Cell stalled for " + Name + " (the Scene never confirmed) - recovering directly")
+        API.SceneManager.UnsetPackageLockOnActor(guard)
+        Prison.OnEscortPrisonerToCellEnd(self, self.JailCell, guard)
+    endEvent
+endState
+
 ; While this Prisoner is imprisoned in their cell
 state Imprisoned
     event OnBeginState()
@@ -1053,15 +1080,18 @@ function EscortToCell(Actor akEscort)
 endFunction
 
 ;/
-    Arms a single one-shot stall-recovery check for the Escort-to-Cell Scene - not a recurring poll, never re-arms.
-    Called from RPB_EventManager's "Lock Cell" handler once the door is genuinely closed/locked for real, the last
-    confirmed checkpoint before the Scene's own native End trigger (which is what actually unlocks the guard's package
-    and calls Imprison() - see OnUpdate() below). Both following the arrest and a full game restart make this always
-    complete normally; this is a failsafe for when it doesn't, not a replacement for the Scene.
+    Arms a single one-shot stall-recovery check for the whole Escort-to-Cell Scene - not a recurring poll, never
+    re-arms. Called from RPB_EventManager's EVENT_ESCORT_BEGIN handler for this Scene, right as it starts - not from a
+    later checkpoint like "Lock Cell": a real test showed the stall can happen well before that (the guard's approach
+    never completing at all), so arming late enough to only guard the tail end never even got armed. See state
+    EscortToCellStallCheck's OnUpdate() for what happens on timeout - it's its own state, not a bare OnUpdate() here,
+    so a later, unrelated one-shot need doesn't end up sharing (and fighting over) the same handler.
 
-    float   @afTimeoutSeconds: how long to wait for the Scene's own End to arrive before treating it as stalled.
+    float   @afTimeoutSeconds: how long to wait for the Scene's own End to arrive before treating it as stalled - has
+    to cover the whole walk-to-cell-and-lock now, not just its last leg, so it's longer than it was.
 /;
-function ArmEscortToCellStallCheck(float afTimeoutSeconds = 30.0)
+function ArmEscortToCellStallCheck(float afTimeoutSeconds = 75.0)
+    GotoState("EscortToCellStallCheck")
     RegisterForSingleUpdate(afTimeoutSeconds)
 endFunction
 
@@ -2909,26 +2939,6 @@ event OnEscortToCell(Actor akEscort)
 endEvent
 
 event OnEscortedToCell(Actor akEscort)
-endEvent
-
-;/
-    Fires once, at most, from ArmEscortToCellStallCheck()'s single-shot timer. If the Escort-to-Cell Scene's own native
-    End already ran OnEscortPrisonerToCellEnd() (the normal path) by the time this ticks, IsImprisoned is already true
-    and this is a single harmless no-op - it never re-registers either way. If it hasn't, the Scene's tail end stalled
-    (the guard's final phase, locking the door then leaving, is Package-driven and can silently never resolve - see
-    KNOWN_ISSUES.md), so this runs the exact same completion the Scene would have, directly: OnEscortPrisonerToCellEnd()
-    itself already guards every step it takes (strip/belongings/Imprison()) on "hasn't this already happened", so it's
-    safe even if the Scene does eventually still finish and call it a second time.
-/;
-event OnUpdate()
-    if (self.IsImprisoned)
-        return
-    endif
-
-    Actor guard = Captor
-    Warn("["+ Name +"] Prisoner::OnUpdate", "Escort-to-Cell stalled for " + Name + " (the Scene never confirmed) - recovering directly")
-    API.SceneManager.UnsetPackageLockOnActor(guard)
-    Prison.OnEscortPrisonerToCellEnd(self, self.JailCell, guard)
 endEvent
 
 ; When should this happen?
