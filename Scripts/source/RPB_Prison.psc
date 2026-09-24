@@ -203,7 +203,7 @@ scriptname RPB_Prison extends RPB_Entity
     function RestrainPrisoner(RPB_Prisoner apPrisoner, bool abRestrainInFront = false)
     function TeleportPrisonerToRelease(RPB_Prisoner apPrisoner)
     int function PendingDressCount()
-    function QueueEscortToCellStallCheck(Actor akPrisoner, float afTimeoutSeconds = 75.0)
+    function QueueEscortToCellStallCheck(Actor akPrisoner, float afTimeoutSeconds = 45.0)
     function ResetDressCost()
     string function DressCostSummary()
     int function PendingHostilityRestoreCount()
@@ -2551,12 +2551,12 @@ endFunction
     afTimeoutSeconds, __ProcessEscortStallChecks() runs the same completion the Scene's own End would have, directly.
     Shares RPB_Prison's existing 3s real-time heartbeat (the same one __ProcessPendingDress already uses) rather than
     computing an exact wake time - Papyrus only gives one pending RegisterForSingleUpdate per event per object, and a
-    ~3s granularity is more than precise enough for a 75s-scale timeout.
+    ~3s granularity is more than precise enough for a 45s-scale timeout.
 
     Actor   @akPrisoner: the prisoner whose Escort-to-Cell Scene to watch.
     float   @afTimeoutSeconds: how long to wait for the Scene to confirm before treating it as stalled.
 /;
-function QueueEscortToCellStallCheck(Actor akPrisoner, float afTimeoutSeconds = 75.0)
+function QueueEscortToCellStallCheck(Actor akPrisoner, float afTimeoutSeconds = 45.0)
     self.__EnsurePendingEscortStallChecks()
 
     int entry = JMap.object()
@@ -2623,6 +2623,19 @@ function __ProcessEscortStallChecks()
                 ; this is safe even if the Scene does eventually still finish on its own afterward.
                 Actor guard = prisoner.Captor
                 Warn("["+ Name +"] Prison::__ProcessEscortStallChecks", "Escort-to-Cell stalled for " + checkActor.GetDisplayName() + " " + checkActor + " (the Scene never confirmed) - recovering directly")
+
+                ; The Scene itself is still technically "playing" from the engine's perspective - a first attempt at
+                ; this recovery skipped this step and left both Actors still bound to the Scene's own Reference Aliases
+                ; (confirmed in a real test: the guard AND the prisoner were both still stuck on RPB_StayInPlace
+                ; afterward, the prisoner should have had RPB_Wander_S). Stopping it explicitly, the same way
+                ; AwaitConfrontationScene already does for a stalled confrontation Scene, is what actually releases
+                ; whatever Forced Package the Scene's own aliases still hold on both of them.
+                Scene stalledScene = self.SceneManager.GetScene(self.SceneManager.SCENE_ESCORT_TO_CELL_01)
+                if (stalledScene && stalledScene.IsPlaying())
+                    stalledScene.Stop()
+                    Utility.Wait(0.5) ; let OnSceneEnd land and clear the SceneManager's own "is playing" flag
+                endif
+
                 self.SceneManager.UnsetPackageLockOnActor(guard)
                 self.OnEscortPrisonerToCellEnd(prisoner, prisoner.JailCell, guard)
             endif

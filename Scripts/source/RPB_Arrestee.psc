@@ -836,7 +836,19 @@ event OnArrestEnd()
     Debug("Arrest::OnArrestEnd", "Arrest, captor should be escorting now")
 
     ; Captor.SetEscorting()
-    
+
+    ; A real report confirmed the guard can end up wedged against the arrestee right here, at the start of the
+    ; Escort-to-Jail walk (the cuffs are already on by now - "Handcuff" fires earlier in the confrontation Scene this
+    ; event is dispatched from) - not something a recurring check should watch for over and over throughout a
+    ; potentially long escort, just once, right at the moment the guard's approach package is about to take over.
+    ; A gentler nudge than the confrontation Scene's own (that one clears a Package genuinely stuck fighting for a
+    ; position; this is just breaking up incidental overlap before the walk begins).
+    Actor guard = Captor.GetActor()
+    if (RPB_Utility.IsWedgedTogether(self.GetActor(), guard))
+        Debug("["+ Name +"] Arrestee::OnArrestEnd", "Guard wedged against " + Name + " right after cuffing, nudging aside")
+        Captor.MoveTo(self.GetActor(), afXOffset = 40.0)
+    endif
+
     RegisterForSingleUpdate(1.0)
 endEvent
 
@@ -855,19 +867,12 @@ event OnUpdate()
     ; longer earning its keep: every arrestee paid a per-tick cost for a problem that no longer exists, and I'm trying
     ; to keep OnUpdate usage to what's actually necessary, not run it "just in case" - it's real overhead multiplied by
     ; however many arrestees are being escorted at once, and a script left registered is exactly what bloats a save.
-    Actor guard = Captor.GetActor()
-    if (this.GetDistance(guard) >= 700)
-        this.MoveTo(guard)
+    ; The guard-wedge nudge that briefly lived here too (round 3) doesn't belong in a recurring check either - it only
+    ; ever needs to happen once, right as the confrontation ends (see OnArrestEnd()), not re-evaluated against normal
+    ; walking proximity every 5s for the rest of a potentially long escort.
+    if (this.GetDistance(Captor.GetActor()) >= 700)
+        this.MoveTo(Captor.GetActor())
         Debug("["+ Name +"] Arrestee::OnUpdate", "Moved Arrestee to " + Captor.Name)
-
-    ; The confrontation Scene's own wedge-nudge (AwaitConfrontationScene) only ever runs during that one Scene - a real
-    ; report confirmed the guard can get wedged well past it too, during the Escort-to-Jail walk ("the problem has
-    ; always been here"), which nothing was watching for. This loop already runs for the whole escort, so it's the
-    ; natural place for the same check: no consecutive-checks debounce needed here, unlike the confrontation Scene's
-    ; tight ~1s polling - this loop's own 5s cadence is already coarse enough on its own.
-    elseif (RPB_Utility.IsWedgedTogether(self.GetActor(), guard))
-        Debug("["+ Name +"] Arrestee::OnUpdate", "Guard wedged against " + Name + " mid-escort, nudging aside")
-        Captor.MoveTo(self.GetActor(), afXOffset = 120.0)
     endif
 
     RegisterForSingleUpdate(5.0)
