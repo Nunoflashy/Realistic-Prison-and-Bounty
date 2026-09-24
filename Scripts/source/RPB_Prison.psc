@@ -2554,7 +2554,9 @@ endFunction
     ~3s granularity is more than precise enough for a 45s-scale timeout.
 
     Actor   @akPrisoner: the prisoner whose Escort-to-Cell Scene to watch.
-    float   @afTimeoutSeconds: how long to wait for the Scene to confirm before treating it as stalled.
+    float   @afTimeoutSeconds: how long to wait for the Scene to confirm before treating it as stalled. The real caller
+    (RPB_EventManager's EVENT_ESCORT_BEGIN handler) picks a shorter one when the prisoner is confirmed far from the
+    player - the default here only applies if this is ever called without one.
 /;
 function QueueEscortToCellStallCheck(Actor akPrisoner, float afTimeoutSeconds = 45.0)
     self.__EnsurePendingEscortStallChecks()
@@ -3455,7 +3457,11 @@ endEvent
 event OnEscortPrisonerToCellEnd(RPB_Prisoner apPrisoner, RPB_JailCell akJailCell, Actor akEscort)
     ; TODO: Fix NPC not staying in cell if they are stripped OnEscortToCellEnd
     if (!apPrisoner.IsStripped && apPrisoner.ShouldBeStripped)
-        apPrisoner.Strip()
+        ; abRemoveUnderwear defaults to true - unlike OnPrisonerTeleportedToCell's own Strip() call, this one was
+        ; leaving it at that default instead of passing WillBeStrippedNaked, so a prisoner configured to keep their
+        ; underwear never got it saved/re-equipped by Strip() itself on this path - NPC_UpdateUnderwear()'s retry loop
+        ; was left as the only chance, and a real regression there (now fixed) meant it sometimes never happened at all.
+        apPrisoner.Strip(abRemoveUnderwear = apPrisoner.WillBeStrippedNaked)
         ; apPrisoner.StartStripping(akEscort)
         ; SceneManager.ResumeSceneBlocked()
     endif

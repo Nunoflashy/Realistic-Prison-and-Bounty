@@ -224,11 +224,17 @@ endProperty
 function Destroy()
     ; Unset all properties related to this captor
     _test = "Gata"
-    self.RemoveAll()
-    Utility.Wait(0.5)
+
     ; abRemoveFromList = true: without it the registry keeps a stale entry keyed to this guard's FormID (this was never
     ; actually reached in production before, so the gap never mattered until Destroy() itself got wired up - see
     ; RPB_Prisoner.psc's Imprisoned.OnBeginState()). A guard reused for a later arrest would then find a key that
     ; "already exists," silently keep pointing at this dead instance, and the new one would never get registered.
+    ; This has to run FIRST, before anything else here - a real, reproduced test confirmed a guard reused quickly
+    ; enough could still hit that exact error when this ran last, after the Wait(0.5) below: RemoveAll()/the wait don't
+    ; need to happen before the registry is cleared, so there's no reason to make a new arrest's registration race the
+    ; tail end of this cleanup instead of something that already finished.
     API.Arrest.UnregisterCaptor(self, abRemoveFromList = true)
+
+    self.RemoveAll()
+    Utility.Wait(0.5)
 endFunction

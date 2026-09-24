@@ -3712,12 +3712,17 @@ function NPC_UpdateUnderwear()
 
     bool hasUnderwearInInventory    = this.GetItemCount(underwearTop) >= 1 || this.GetItemCount(underwearBottom) >= 1
     bool wasStrippedToUnderwear     = self.Was("Stripped") && self.IsStrippedToUnderwear
-    ; IsNaked() only ever checks body slot 32 - equipping underwear (a different, configurable slot, see HasUnderwear())
-    ; never changes what it sees, so shouldBeInUnderwear never turns false on its own once true. Without the
-    ; !self.HasUnderwear() check below, every call re-"equips" (a harmless no-op once already worn) and re-logs
-    ; "Equipped underwear" regardless of whether anything actually needed doing - confirmed in a real test, where a
-    ; repeated sanity-check retry logged this line 10 times in a row for an already-correctly-dressed prisoner.
-    bool shouldBeInUnderwear        = self.IsNaked() && wasStrippedToUnderwear && hasUnderwearInInventory && !self.HasUnderwear()
+    ; IsNaked() only ever checks body slot 32 - equipping underwear (a different, configurable slot) never changes what
+    ; it sees, so shouldBeInUnderwear never turns false on its own once true. Without an already-equipped check, every
+    ; call re-"equips" (a harmless no-op once already worn) and re-logs "Equipped underwear" regardless of whether
+    ; anything actually needed doing - confirmed in a real test, where a repeated sanity-check retry logged this line
+    ; 10 times in a row for an already-correctly-dressed prisoner. I first tried self.HasUnderwear() here, but that
+    ; only checks whether the configured slot is occupied by ANYTHING, not specifically by this prisoner's own
+    ; designated underwear - a real regression followed: with something else able to occupy that slot, this read false
+    ; from the very first check and the prisoner never got dressed at all. Checking the specific items directly (the
+    ; same "carried but not worn" idiom already used elsewhere in this file, e.g. NPC_EnsureDressed) avoids that.
+    bool isUnderwearAlreadyWorn     = (underwearTop == none || this.IsEquipped(underwearTop)) && (underwearBottom == none || this.IsEquipped(underwearBottom))
+    bool shouldBeInUnderwear        = self.IsNaked() && wasStrippedToUnderwear && hasUnderwearInInventory && !isUnderwearAlreadyWorn
 
     if (shouldBeInUnderwear)
         self.EquipItem(underwearTop,    abCondition = underwearTop != none)

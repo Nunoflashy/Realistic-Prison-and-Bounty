@@ -674,7 +674,17 @@ event OnPrisonScene(string asScene, string asSceneEvent, RPB_Prison apPrison, RP
             ; Scene's own start risks never arming it at all. Lives on RPB_Prison, not the escorted RPB_Prisoner itself
             ; (an ActiveMagicEffect whose own timer doesn't survive the actor's 3D unloading - see
             ; RPB_Prison.QueueEscortToCellStallCheck's own doc comment).
-            apPrison.QueueEscortToCellStallCheck(apPrisoner.GetActor())
+            ;
+            ; The confirmed root cause of the actual stalls seen so far (a Scene reference that never resolves until
+            ; the player has physically visited that location) only shows up when the player isn't there to see the
+            ; Scene anyway - so when that's confirmed the case, there's no cost to recovering quickly instead of
+            ; waiting out the full window. When it's not confirmed (the player could plausibly still be watching),
+            ; keep the longer window so a genuinely-progressing, player-visible Scene doesn't get cut short.
+            float stallTimeoutSeconds = 45.0
+            if (apPrisoner.IsFarFromPlayer())
+                stallTimeoutSeconds = 10.0
+            endif
+            apPrison.QueueEscortToCellStallCheck(apPrisoner.GetActor(), stallTimeoutSeconds)
 
         elseif (asSceneEvent == SceneManager.EVENT_ESCORTING)
             if (asSceneSecondaryEvent == "Release from Captor") ; May be refactored into OnArrestScene
