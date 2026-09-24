@@ -1001,6 +1001,20 @@ endFunction
     string  @asSceneName: The name of the Scene to queue up or play.
 /;
 function QueueOrPlay(string asSceneName)
+    ; __isScenePlaying can drift from reality if an earlier Scene's flow was interrupted in a way that never reached
+    ; OnSceneEnd (a real, recurring failure mode across this codebase's own history - stalled escorts, guard deaths,
+    ; multi-guard dialogue races, each fixed on its own, but any one of them, before its fix landed, could leave this
+    ; flag stuck true forever - it only ever clears in OnSceneEnd or ForceResetSceneState()). Left unchecked, every
+    ; future arrest just silently queues behind a Scene that isn't actually running anymore, with no error and no
+    ; log - confirmed as a real, reproduced cause of confrontation Scenes intermittently never starting at all.
+    ; Self-heal here instead of trusting the tracked flag blindly.
+    if (__isScenePlaying && currentScene != "" && !self.GetScene(currentScene).IsPlaying())
+        EventManager.SendWarning("SceneManager: __isScenePlaying said '" + currentScene + "' was still playing, but it wasn't - self-healing before queuing " + asSceneName, "SceneManager::QueueOrPlay")
+        __isScenePlaying = false
+        __queuedScenes = JArray.object() ; also clear whatever stale entries piled up behind the desynced flag
+        JValue.retain(__queuedScenes, "RPB_SceneManager")
+    endif
+
     int queuedSceneCount = JArray.count(__queuedScenes)
 
     ; Queue Scene
