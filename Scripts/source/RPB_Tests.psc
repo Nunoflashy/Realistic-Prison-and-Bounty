@@ -1,5 +1,50 @@
 scriptname RPB_Tests extends ObjectReference hidden
 
+;/
+@properties:
+    bool ENABLE_TRACING
+    bool ENABLE_DEBUGGING
+    bool ENABLE_LOGGING
+    bool DISPLAY_ASSERT_IN_GAME
+    bool DISPLAY_RESULT_IN_GAME
+    RPB_API API
+@functions:
+    function SetTests()
+    function Setup()
+    function Teardown()
+    int function JC_Flat(int parentContainer, int object, int objectCount)
+    int function RPB_Flat(int parentContainer, int object, int objectCount)
+    int function JC_Nested(int nestingDepth)
+    int function RPB_Nested(int nestingDepth)
+    int function RPB_Fast_Flat(int parentContainer, int object, int objectCount)
+    int function RPB_Fast_Nested(int nestingDepth)
+    function AddTestElementsToContainer(int parentObject, string library = "RPB")
+    function ImprisonActor(RPB_Prison apPrison)
+    function AddTest(string asName, string asTestMethodName, bool abChainable = true)
+    string[] function GetTestNames()
+    bool function IsTestChainable(string asTestName)
+    string[] function GetTestMethodNames()
+    string function GetTest(string asTestName)
+    string function GetCurrentTest()
+    function ExecuteTest(string asTestKeyName)
+    function RunAllTests()
+    function start_test(string testName = "")
+    function begin_step(string stepName, string msg = "")
+    function end_step(string stepName, bool condition, string additionalInfoOnFail = "")
+    function display_step(string stepName, bool condition, string additionalInfoOnFail = "")
+    function display_result(bool condition, bool showTimeElapsed = true)
+    bool function assert_true(bool condition, string failMessage = "")
+    bool function assert_false(bool condition, string failMessage = "")
+    bool function assert_equals(string expectedValue, string gottenValue, string failMessage = "", bool showResult = false)
+    bool function assert_not_equals(string expectedValue, string gottenValue, string failMessage = "", bool showResult = false)
+    function log(string msg, bool condition = true)
+@events:
+    event OnConcurrencyWorker(string asEventName, string asMode, float afWorkerIndex, Form akSender)
+    event OnThreadLockProbeWorker(string asEventName, string asMode, float afWorkerIndex, Form akSender)
+    event OnNativeProbeWorker(string asEventName, string asMode, float afWorker, Form akSender)
+    event OnInit()
+/;
+
 import RPB_Utility
 import RPB_Memory
 
@@ -130,6 +175,9 @@ function SetTests()
     self.AddTest("098 - Imperial Soldier Fodder Smoke Test: Can 0xE77F9 Be Imprisoned At All? (3 Clones)", "Test_MassSoldiersSmokeTest", abChainable = false)
     self.AddTest("099 - Hostile Prisoner: Neutralized While Imprisoned, Hostility Restored a While After Release", "Test_HostilePrisoner_NeutralizedThenRestored", abChainable = false)
     self.AddTest("100 - Hostile Player (Disguise Mod): Neutralized While Imprisoned, Hostility Restored a While After Release", "Test_HostilePlayer_NeutralizedThenRestored", abChainable = false)
+    ; Not chainable: genuinely moves the player far away for real (no dev override exists for IsFarFromPlayer()),
+    ; not something to fire unattended in a chain
+    self.AddTest("101 - Multi-Prisoner Off-Screen Escort: AI Disabled and Correctly Placed for All of Them", "Test_MultiPrisonerOffScreenAIAndPlacement", abChainable = false)
     self.AddTest("041 - ActiveMagicEffectContainer: Stuck Lock Self-Heals", "Test_ActiveMagicEffectContainer_StuckLockSelfHeals")
     self.AddTest("042 - ThreadLock: JAtomic Primitive Semantics and Registry", "Test_ThreadLock_PrimitiveSemantics")
     ; Not chainable: fires concurrent worker threads
@@ -7911,6 +7959,96 @@ state Test_MassSoldiersSmokeTest
     function Teardown()
         RPB_Utility.SetOvercrowdingDisabled(false)
         self.__StressProfilerRestore()
+        __TeardownAllTempActors()
+    endFunction
+endState
+
+;/
+    Escorts several NPCs to their cells with the player genuinely moved far away (there is no dev override for
+    IsFarFromPlayer() - it's a real distance check, so this actually relocates the player rather than faking it),
+    then checks every one of them for the two things round 9's off-screen fix was about: AI disabled, and physically
+    placed in their own jail cell. Exists so this gets checked with one F1 run instead of a manual retest each time.
+
+    Uses ARREST_TYPE_ESCORT_TO_CELL specifically (unlike __StressArrest/__MassRun's ARREST_TYPE_TELEPORT_TO_CELL,
+    which deliberately skips the escort/off-screen question entirely) since the real Escort-to-Cell Scene path is
+    exactly what's being checked here.
+
+    Deliberately does not assert on IsInCell: already known (round 5/9) to be GetDistance-blind for an off-screen
+    actor, so it isn't a meaningful pass/fail signal for this test - only logged, for visibility, same as
+    Action_CheckPrisonersAI (RPB_Actions.psc) already does. That function itself can't be called headlessly (it
+    always opens an interactive prison-picker menu), so its exact log line is reproduced here inline instead.
+/;
+; Scratch state for Test_MultiPrisonerOffScreenAIAndPlacement, shared between its Setup() and Teardown() - a Papyrus
+; state block can't itself declare member variables, so these live at script scope instead.
+Actor[] __test101Actors
+Actor __test101Player
+Actor __test101Guard
+
+state Test_MultiPrisonerOffScreenAIAndPlacement
+    function Setup()
+        int COUNT = 5
+        int BASE = 0x37BFF ; Bandit - the same base test 097 already uses
+
+        __test101Player = Game.GetFormEx(0x14) as Actor
+        __test101Guard  = RPB_Utility.GetNearestGuard(__test101Player, 3000.0, __test101Player)
+
+        bool step = assert_true(__test101Guard != none, "No guard near the player to perform the arrests (stand near a guard)")
+        if (!__test101Guard)
+            return
+        endif
+
+        __test101Actors = new Actor[5]
+        int i = 0
+        while (i < COUNT)
+            __test101Actors[i] = __SpawnTempActorOf(BASE)
+            if (__test101Actors[i])
+                RPB_Utility.ClearCrumbs(__test101Actors[i])
+                RPB_ActorVars.SetCrimeGold(__test101Guard.GetCrimeFaction(), __test101Actors[i], 2000)
+                RPB_API.GetArrest().ArrestActor(__test101Guard, __test101Actors[i], RPB_API.GetArrest().ARREST_TYPE_ESCORT_TO_CELL)
+                Utility.Wait(0.3)
+            endif
+            i += 1
+        endWhile
+
+        ; Genuinely leave - a huge offset relative to the guard puts the player many cells away in the same
+        ; worldspace, well beyond load range, without needing a hardcoded marker reference.
+        __test101Player.MoveTo(__test101Guard, afXOffset = 50000.0, afYOffset = 50000.0)
+
+        RPB_Prison prison = (RPB_API.GetPrisonManager()).GetPrison("Haafingar")
+        int settleMs = self.__MassSettle(prison, __test101Actors, COUNT, 90.0)
+        log("101 settled after " + settleMs + " ms")
+
+        int passed = 0
+        i = 0
+        while (i < COUNT)
+            if (__test101Actors[i])
+                RPB_Prisoner prisoner = prison.Prisoners.AtKey(__test101Actors[i])
+                if (prisoner)
+                    int nameLength  = StringUtil.GetLength(prisoner.Name)
+                    string tabs     = string_if (nameLength >= 10, "\t", "\t\t")
+                    LogNoType("["+ prisoner.Name +"] "+ tabs + prisoner.GetActor() +"\t{ AI: " + YesNo(prisoner.HasAI()) + " | In Cell: "+ YesNo(prisoner.IsInCell) +" | " + prisoner.JailCell.ID +" ("+ prisoner.JailCell + " [Package: "+ prisoner.CellPackage.GetName() +"]) | " + "Location: "+ prisoner.GetCurrentCell() +"}")
+
+                    bool aiCorrect       = !prisoner.HasAI()
+                    bool locationCorrect = prisoner.GetCurrentCell() == prisoner.JailCell.GetParentCell()
+                    step = assert_true(aiCorrect, prisoner.Name + " should have AI disabled while the player is away")
+                    step = assert_true(locationCorrect, prisoner.Name + " should be physically located in their jail cell") && step
+                    if (aiCorrect && locationCorrect)
+                        passed += 1
+                    endif
+                else
+                    assert_true(false, __test101Actors[i].GetDisplayName() + " never became a tracked prisoner")
+                endif
+            endif
+            i += 1
+        endWhile
+
+        display_result(passed == COUNT)
+    endFunction
+
+    function Teardown()
+        if (__test101Player && __test101Guard)
+            __test101Player.MoveTo(__test101Guard) ; bring the player back rather than leaving them 50000 units out in the wilderness
+        endif
         __TeardownAllTempActors()
     endFunction
 endState

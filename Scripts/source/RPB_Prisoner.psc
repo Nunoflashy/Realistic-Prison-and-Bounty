@@ -3729,8 +3729,17 @@ function NPC_UpdateUnderwear()
         self.EquipItem(underwearBottom, abCondition = underwearBottom != none)
     endif
 
+    ; Unlike shouldBeInUnderwear above, "genuinely has none" has no already-worn term to turn it false on its own -
+    ; it's a stable fact about this prisoner, so without a latch it logged on every single sanity-check pass forever
+    ; (confirmed in a real test: 10 repeats in one capture for a prisoner with no underwear at all). Was("Warned No
+    ; Underwear") gates it to once, the same shape as the Was("Stripped") flag already read above.
+    bool hasNoUnderwearAtAll = wasStrippedToUnderwear && !hasUnderwearInInventory && !self.Was("Warned No Underwear")
+    if (hasNoUnderwearAtAll)
+        self.SetBool("Warned No Underwear", true)
+    endif
+
     EventManager.SendInfo("Equipped underwear on " + self.Name, "["+ Name +"] Prisoner::NPC_UpdateUnderwear", shouldBeInUnderwear)
-    EventManager.SendInfo("Tried to equip underwear on " + self.Name + ", but " + self.Pronoun + " does not have any!", "["+ Name +"] Prisoner::NPC_UpdateUnderwear", wasStrippedToUnderwear && !hasUnderwearInInventory)
+    EventManager.SendInfo("Tried to equip underwear on " + self.Name + ", but " + self.Pronoun + " does not have any!", "["+ Name +"] Prisoner::NPC_UpdateUnderwear", hasNoUnderwearAtAll)
 endFunction
 
 function NPC_UpdateClothing()

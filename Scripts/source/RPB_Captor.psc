@@ -195,9 +195,38 @@ event OnInitialize()
     RegisterForSingleUpdate(5.0)
 endEvent
 
+;/
+    Fails the arrest immediately when the guard dies before the arrestee is ever confirmed neutralized, instead of
+    leaving her stuck for the ~24s AwaitConfrontationScene()'s own unrelated retry timeout takes to notice and clean
+    up on its own (that loop only watches for the arrestee's own death, never the captor's). A real, reproduced test
+    hit this: a hostile bandit killed her arresting guard before she was pacified, and kept the RPB_Arrestee effect
+    for the full ~24s before ForceResetSceneState() indirectly cleared it.
+/;
 event OnDeath(Actor akKiller)
     Debug("Captor::OnDeath", "Captor died, releasing arrestees")
-    API.Arrest.AwaitArresteeReference(Arrestee).RevertArrest()
+
+    if (!Arrestee)
+        ; Died before AssignArrestee ever ran - a narrow window right at the very start of the arrest, before the
+        ; link between this Captor and its Arrestee is even made. Nothing to resolve yet; AwaitConfrontationScene()'s
+        ; own timeout still eventually reverts the arrest in this rarer case - a known, smaller residual gap.
+        return
+    endif
+
+    RPB_Arrestee arresteeRef = API.Arrest.AwaitArresteeReference(Arrestee)
+    ; arresteeRef.Captor == this doubles today as "no other captors remain for this arrestee" under the current
+    ; one-captor-per-arrestee model - the natural place to widen this check once multiple Captors per Arrestee exist.
+    if (arresteeRef && arresteeRef.Captor == self)
+        ; The confrontation/escort Scene this arrest is running is still technically "playing" and would otherwise
+        ; sit there until AwaitConfrontationScene()'s own ~24s retry budget gives up on it - stop it explicitly now,
+        ; the same way AwaitConfrontationScene() already stops a stalled attempt between its own retries, instead of
+        ; leaving the arrestee waiting on a guard that's already dead.
+        Scene arrestScene = self.SceneManager.GetScene(arresteeRef.GetString("Scene"))
+        if (arrestScene && arrestScene.IsPlaying())
+            arrestScene.Stop()
+        endif
+
+        arresteeRef.RevertArrest()
+    endif
 endEvent
 
 event OnDestroy()
@@ -237,5 +266,8 @@ function Destroy()
 
     self.RemoveAll()
     parent.Destroy() ; clears the base "Actor"/"Temporary" categories too - RPB_Prisoner.Destroy() does the same, this never did
-    Utility.Wait(0.5)
+    ; A trailing Utility.Wait(0.5) used to sit here, unexplained since a July 2024 refactor - nothing below it ever
+    ; existed to protect, and nothing above it needs it either (the registry cleanup above already runs to completion
+    ; on its own). It only became a real cost once this function started actually running on every Imprison() (the
+    ; CaptorList fix made AwaitCaptorReference/Arrestee==this reliably true instead of hit-or-miss) - removed.
 endFunction

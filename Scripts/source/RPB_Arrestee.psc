@@ -603,6 +603,11 @@ endFunction
 function EscortToPrison(bool abEscortDirectlyToCell = false)
     string sceneSet = string_if (self.GetString("Scene"), self.GetString("Scene"), Arrest.SceneManager.SCENE_ARREST_START_02)
 
+    ; Persisted so anything resolving "which Scene is this arrest actually running" later (Captor.OnDeath, so it can
+    ; stop this Scene if the guard dies before it confirms) has a reliable value to read back - "Scene" itself was
+    ; only ever read here before, never written, so it always fell through to the fallback above.
+    self.SetString("Scene", sceneSet)
+
     if (!self.AwaitConfrontationScene(sceneSet))
         self.OnArrestFailed("Confrontation Scene")
         return
