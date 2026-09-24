@@ -669,23 +669,6 @@ event OnPrisonScene(string asScene, string asSceneEvent, RPB_Prison apPrison, RP
             RetainAI(apPrisoner.IsPlayer())
             apPrison.OnEscortPrisonerToCellBegin(apPrisoner, escort)
 
-            ; Arms a failsafe for the whole Scene, right as it starts - a real test showed the stall can happen well
-            ; before "Lock Cell" (the guard's own approach never completing at all), so arming this any later than the
-            ; Scene's own start risks never arming it at all. Lives on RPB_Prison, not the escorted RPB_Prisoner itself
-            ; (an ActiveMagicEffect whose own timer doesn't survive the actor's 3D unloading - see
-            ; RPB_Prison.QueueEscortToCellStallCheck's own doc comment).
-            ;
-            ; The confirmed root cause of the actual stalls seen so far (a Scene reference that never resolves until
-            ; the player has physically visited that location) only shows up when the player isn't there to see the
-            ; Scene anyway - so when that's confirmed the case, there's no cost to recovering quickly instead of
-            ; waiting out the full window. When it's not confirmed (the player could plausibly still be watching),
-            ; keep the longer window so a genuinely-progressing, player-visible Scene doesn't get cut short.
-            float stallTimeoutSeconds = 45.0
-            if (apPrisoner.IsFarFromPlayer())
-                stallTimeoutSeconds = 10.0
-            endif
-            apPrison.QueueEscortToCellStallCheck(apPrisoner.GetActor(), stallTimeoutSeconds)
-
         elseif (asSceneEvent == SceneManager.EVENT_ESCORTING)
             if (asSceneSecondaryEvent == "Release from Captor") ; May be refactored into OnArrestScene
                 RPB_Captor captor = Arrest.AwaitCaptorReference(escort)
@@ -705,6 +688,14 @@ event OnPrisonScene(string asScene, string asSceneEvent, RPB_Prison apPrison, RP
                 jailCell.CellDoor.Close()
                 jailCell.CellDoor.Lock()
                 Debug.SendAnimationEvent(escort, "IdleLockpick") ; Lock animation
+
+                ; Arms the Escort-to-Cell stall failsafe here, not at the Scene's own start: a real debug-level log
+                ; confirmed this is the last phase cue that reliably fires in a stalled run - phase 4/5/6 end and this
+                ; one (phase 7 start) always arrive, nothing after it ever does, in both the successful and the
+                ; stalled case. A short, universal timeout from here is safe regardless of player distance, unlike a
+                ; longer one guessed from the Scene's own start (round 6's now-removed distance-based split) - lives
+                ; on RPB_Prison, not the escorted RPB_Prisoner itself (see QueueEscortToCellStallCheck's own comment).
+                apPrison.QueueEscortToCellStallCheck(apPrisoner.GetActor(), 8.0)
 
             elseif (asSceneSecondaryEvent == "Unlock Cell")
                 Debug.SendAnimationEvent(escort, "IdleLockpick")

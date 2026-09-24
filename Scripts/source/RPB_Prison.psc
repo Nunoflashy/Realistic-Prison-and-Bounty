@@ -203,7 +203,7 @@ scriptname RPB_Prison extends RPB_Entity
     function RestrainPrisoner(RPB_Prisoner apPrisoner, bool abRestrainInFront = false)
     function TeleportPrisonerToRelease(RPB_Prisoner apPrisoner)
     int function PendingDressCount()
-    function QueueEscortToCellStallCheck(Actor akPrisoner, float afTimeoutSeconds = 45.0)
+    function QueueEscortToCellStallCheck(Actor akPrisoner, float afTimeoutSeconds = 8.0)
     function ResetDressCost()
     string function DressCostSummary()
     int function PendingHostilityRestoreCount()
@@ -2551,14 +2551,19 @@ endFunction
     afTimeoutSeconds, __ProcessEscortStallChecks() runs the same completion the Scene's own End would have, directly.
     Shares RPB_Prison's existing 3s real-time heartbeat (the same one __ProcessPendingDress already uses) rather than
     computing an exact wake time - Papyrus only gives one pending RegisterForSingleUpdate per event per object, and a
-    ~3s granularity is more than precise enough for a 45s-scale timeout.
+    ~3s granularity is more than precise enough for an 8s-scale timeout.
+
+    The real caller (RPB_EventManager's "Lock Cell" handler) arms this from a confirmed, evidence-backed last
+    checkpoint - a real debug-level log showed the Scene reliably reaches this exact phase cue every time, and in a
+    stalled run, nothing after it ever arrives - rather than from the Scene's own start (an earlier, less precise
+    design that needed a much longer, player-distance-dependent guess to avoid cutting a still-progressing Scene
+    short). Arming this close to the real failure point means a short, universal timeout is safe regardless of
+    whether the player is nearby.
 
     Actor   @akPrisoner: the prisoner whose Escort-to-Cell Scene to watch.
-    float   @afTimeoutSeconds: how long to wait for the Scene to confirm before treating it as stalled. The real caller
-    (RPB_EventManager's EVENT_ESCORT_BEGIN handler) picks a shorter one when the prisoner is confirmed far from the
-    player - the default here only applies if this is ever called without one.
+    float   @afTimeoutSeconds: how long to wait for the Scene to confirm before treating it as stalled.
 /;
-function QueueEscortToCellStallCheck(Actor akPrisoner, float afTimeoutSeconds = 45.0)
+function QueueEscortToCellStallCheck(Actor akPrisoner, float afTimeoutSeconds = 8.0)
     self.__EnsurePendingEscortStallChecks()
 
     int entry = JMap.object()
