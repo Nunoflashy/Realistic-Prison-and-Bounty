@@ -7999,51 +7999,75 @@ state Test_MultiPrisonerOffScreenAIAndPlacement
             return
         endif
 
+        ; __test101Guard itself is never used to make an arrest below - only as the base to clone disposable guards
+        ; from, and as a stable "player, come back near here" anchor between bandits. See the loop comment for why.
+        int guardBaseFormId = __test101Guard.GetBaseObject().GetFormID()
         RPB_Prison prison = (RPB_API.GetPrisonManager()).GetPrison("Haafingar")
+        RPB_Arrest arrest = RPB_API.GetArrest()
 
         __test101Actors = new Actor[5]
         int i = 0
         while (i < COUNT)
+            ; Every bandit gets her own disposable guard (a temp clone of the real nearby guard's base, mirroring
+            ; test 102's already-proven pattern - never the real persistent NPC), instead of reusing one real guard
+            ; for all 5. Confrontation Scenes have exactly one "Escort" alias slot (ROADMAP.md) - binding it to a
+            ; NEW arrest reassigns whatever Forced Package it was already driving for a PREVIOUS, still-in-progress
+            ; arrest using the same guard, with no protection at the native alias level, regardless of any Papyrus-
+            ; side queue timing. A real test watched this happen live: guard arrests bandit 1 (cuffed), bandit 2
+            ; spawns, the SAME guard arrests her too, and bandit 1 is left stranded - cuffed, no Scene, nowhere to
+            ; go. Separate guards remove this collision risk structurally instead of hoping a timeout is long enough.
+            Actor guard = __SpawnTempActorOf(guardBaseFormId)
             __test101Actors[i] = __SpawnTempActorOf(BASE)
-            if (__test101Actors[i])
+
+            if (guard && __test101Actors[i])
                 ; __SpawnTempActorOf() disables AI to freeze the dummy in place - fine for every other consumer
                 ; (they all use ARREST_TYPE_TELEPORT_TO_CELL, no confrontation Scene involved), but a Scene cannot
-                ; make progress on an actor whose AI is disabled. Confirmed as the real cause of confrontation Scenes
-                ; never confirming here: nothing else re-enables it before this actor is fed into a real Scene.
+                ; make progress on an actor whose AI is disabled. Confirmed as the real cause of confrontation
+                ; Scenes never confirming here: nothing else re-enables it before these actors are fed into a real
+                ; Scene. Both Scene participants need it.
+                guard.EnableAI(true)
                 __test101Actors[i].EnableAI(true)
 
                 RPB_Utility.ClearCrumbs(__test101Actors[i])
-                RPB_ActorVars.SetCrimeGold(__test101Guard.GetCrimeFaction(), __test101Actors[i], 2000)
-                RPB_API.GetArrest().ArrestActor(__test101Guard, __test101Actors[i], RPB_API.GetArrest().ARREST_TYPE_ESCORT_TO_CELL)
+                RPB_ActorVars.SetCrimeGold(guard.GetCrimeFaction(), __test101Actors[i], 2000)
+                arrest.ArrestActor(guard, __test101Actors[i], arrest.ARREST_TYPE_ESCORT_TO_CELL)
 
-                ; The confrontation Scene is one singleton form shared by every arrestee - only one can actually play
-                ; at a time (RPB_SceneManager's own queue), and that queue extends to every Scene the arrest goes
-                ; through afterward too, not just the confrontation. Waiting only for "tracked as a prisoner"
-                ; (Prisoners.AtKey) understated how far along this actor actually was - that becomes true the moment
-                ; MakePrisoner() registers it, before its own Escort-to-Cell Scene has even been queued, so the next
-                ; bandit could get arrested (and this whole loop finish, and Teardown() run) while an earlier
-                ; bandit's Escort-to-Cell request was still genuinely, legitimately sitting in that shared queue - a
-                ; real test run hit exactly this: a Scene for an already-deleted temp actor started and errored well
-                ; after the test itself had already finished. Waiting for the same, stronger signal __MassSettle
-                ; already trusts (IsActorImprisoned) genuinely serializes bandits through the shared queue instead of
-                ; racing them into it.
-                float waitStart = Utility.GetCurrentRealTime()
-                while (!RPB_Utility.IsActorImprisoned(__test101Actors[i]) && (Utility.GetCurrentRealTime() - waitStart) < 30.0)
+                ; Wait for the confrontation to actually confirm (cuffed - Arrestees.AtKey) before moving the player
+                ; away: moving away any earlier can break the Scene outright (round 11 - a Scene needs the player
+                ; nearby at least long enough to get through its first real phase).
+                float confirmWaitStart = Utility.GetCurrentRealTime()
+                while (arrest.Arrestees.AtKey(__test101Actors[i]) == none && (Utility.GetCurrentRealTime() - confirmWaitStart) < 30.0)
+                    Utility.Wait(0.5)
+                endWhile
+
+                ; Now genuinely leave for the rest of THIS bandit's escort - the actual scenario round 9's fix is
+                ; about: player present when the arrest started, then leaves mid-escort. Without this, every bandit
+                ; would finish her WHOLE escort with the player still nearby, and round 9's off-screen correction
+                ; (gated on IsFarFromPlayer() at the exact moment escort completes) would never even trigger - a
+                ; real run confirmed exactly that: two bandits that did get imprisoned still failed "AI disabled".
+                ; A huge offset relative to THIS bandit's own guard puts the player many cells away in the same
+                ; worldspace, well beyond load range, without needing a hardcoded marker reference.
+                __test101Player.MoveTo(guard, afXOffset = 50000.0, afYOffset = 50000.0)
+
+                ; Raised from 30s to 120s: the earlier, weaker signal (just "tracked") only needed to survive to
+                ; confrontation-confirm, but IsActorImprisoned needs a full confrontation+cuff+walk+strip+walk+lock
+                ; cycle to complete, which a flat 30s wasn't enough time for - a real run's early timeouts were very
+                ; likely genuinely-still-in-progress escorts, not stuck ones, misread as failures.
+                float imprisonWaitStart = Utility.GetCurrentRealTime()
+                while (!RPB_Utility.IsActorImprisoned(__test101Actors[i]) && (Utility.GetCurrentRealTime() - imprisonWaitStart) < 120.0)
                     Utility.Wait(0.5)
                 endWhile
 
                 if (!RPB_Utility.IsActorImprisoned(__test101Actors[i]))
-                    log("101 " + __test101Actors[i].GetDisplayName() + " never confirmed the confrontation Scene within 30s")
+                    log("101 " + __test101Actors[i].GetDisplayName() + " never confirmed the confrontation Scene within 120s")
                 endif
+
+                ; Back near the original guard's spot, ready for the next bandit's own confrontation to actually
+                ; start (a fresh guard clone spawns at the player's current position).
+                __test101Player.MoveTo(__test101Guard)
             endif
             i += 1
         endWhile
-
-        ; Genuinely leave - a huge offset relative to the guard puts the player many cells away in the same
-        ; worldspace, well beyond load range, without needing a hardcoded marker reference. Only now, once every
-        ; arrestee is genuinely mid-escort (not before any of them had a real chance to start) - that's the actual
-        ; scenario round 9's fix is about: player present when the arrest started, then leaves.
-        __test101Player.MoveTo(__test101Guard, afXOffset = 50000.0, afYOffset = 50000.0)
 
         ; Scaled with COUNT, not a flat budget: total settle time is roughly linear in how many prisoners are
         ; sharing one serialized Scene queue.
