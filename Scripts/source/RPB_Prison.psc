@@ -2639,7 +2639,11 @@ function __ProcessEscortStallChecks()
                 ; the Scene would have, directly: OnEscortPrisonerToCellEnd()'s own steps are already idempotent, so
                 ; this is safe even if the Scene does eventually still finish on its own afterward.
                 Actor guard = prisoner.Captor
-                Warn("["+ Name +"] Prison::__ProcessEscortStallChecks", "Escort-to-Cell stalled for " + checkActor.GetDisplayName() + " " + checkActor + " (the Scene never confirmed) - recovering directly")
+                ; Warn() only takes one message string plus a bool condition - passing a second string here silently
+                ; got cast to that bool, discarding this whole detail message (confirmed by decompiling the actual
+                ; running bytecode). Both this and the escalation warning below printed the same bare fallback text,
+                ; which is why what were really two different, legitimate warnings looked like one line logged twice.
+                Warn("["+ Name +"] Prison::__ProcessEscortStallChecks: Escort-to-Cell stalled for " + checkActor.GetDisplayName() + " " + checkActor + " (the Scene never confirmed) - recovering directly")
 
                 ; The Scene itself is still technically "playing" from the engine's perspective - a first attempt at
                 ; this recovery skipped this step and left both Actors still bound to the Scene's own Reference Aliases
@@ -2663,7 +2667,7 @@ function __ProcessEscortStallChecks()
                 ; cascade alone, with the manual completion only as a genuine last resort if that didn't happen.
                 prisoner = self.AwaitPrisonerReference(checkActor)
                 if (prisoner && !prisoner.IsImprisoned)
-                    Warn("["+ Name +"] Prison::__ProcessEscortStallChecks", "Stop() didn't drive " + checkActor.GetDisplayName() + " " + checkActor + " through its own completion either - falling back to a manual finish")
+                    Warn("["+ Name +"] Prison::__ProcessEscortStallChecks: Stop() didn't drive " + checkActor.GetDisplayName() + " " + checkActor + " through its own completion either - falling back to a manual finish")
                     self.SceneManager.UnsetPackageLockOnActor(guard)
                     self.OnEscortPrisonerToCellEnd(prisoner, prisoner.JailCell, guard)
                 endif

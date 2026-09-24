@@ -531,14 +531,24 @@ endProperty
         and it fails on StripEnd because of that, since even when the Actor is outside the cell,
         the condition is being met because there's no rule checking if the Prisoner is inside the cell,
         need to think of a way to do that check
+
+    The GetDistance() check above is fine-grained and correct while I'm loaded, but both distances collapse to the
+    same sentinel when I'm not (confirmed: an off-screen prisoner who's genuinely, correctly placed in their cell
+    still read IsInCell false, unlike a normal, non-stalled escort, which always read true). GetParentCell() is a
+    persisted Cell-record comparison with no load-state dependency - coarser (it can't tell one cell from another if
+    a prison's cells happen to share one interior Cell record), but only while unloaded, which is exactly where the
+    distance check couldn't tell anything at all.
 /;
 bool property IsInCell
     bool function get()
-        float distanceFromCellDoor      = self.GetDistance(JailCell.CellDoor)
-        float distanceFromOutsideCell   = self.GetDistance(JailCell.ExteriorMarkers[0] as ObjectReference)
-        bool isOutOfCell                = distanceFromCellDoor >= distanceFromOutsideCell
+        if (this.Is3DLoaded())
+            float distanceFromCellDoor      = self.GetDistance(JailCell.CellDoor)
+            float distanceFromOutsideCell   = self.GetDistance(JailCell.ExteriorMarkers[0] as ObjectReference)
 
-        return !isOutOfCell
+            return distanceFromCellDoor < distanceFromOutsideCell
+        endif
+
+        return self.GetCurrentCell() == JailCell.GetParentCell()
     endFunction
 endProperty
 
@@ -935,7 +945,11 @@ state Imprisoned
         ; Captor.Arrestee is still a single value, so "does this Captor still have anyone to escort" just means "is
         ; their one Arrestee still me". Only destroy when that holds, so a guard who's already been reassigned to a
         ; new arrest isn't torn down out from under it.
-        RPB_Captor captorRef = API.Arrest.AwaitCaptorReference(Captor)
+        ; GetCaptor(), not AwaitCaptorReference(): this only ever wants "tear down the existing Captor if there is
+        ; one" - AwaitCaptorReference()'s create-if-missing semantics would force a fresh registration attempt if the
+        ; guard's own 3D happened to be unloaded right now, which can never complete off-screen (a real test hit
+        ; exactly this: "<Guard> is not loaded, cannot be registered right now!" right after an off-screen imprisonment).
+        RPB_Captor captorRef = API.Arrest.GetCaptor(Captor)
         if (captorRef && captorRef.Arrestee == this)
             captorRef.Destroy()
         endif

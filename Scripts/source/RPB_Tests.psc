@@ -178,6 +178,8 @@ function SetTests()
     ; Not chainable: genuinely moves the player far away for real (no dev override exists for IsFarFromPlayer()),
     ; not something to fire unattended in a chain
     self.AddTest("101 - Multi-Prisoner Off-Screen Escort: AI Disabled and Correctly Placed for All of Them", "Test_MultiPrisonerOffScreenAIAndPlacement", abChainable = false)
+    ; Not chainable: kills a real guard NPC, not something to fire unattended in a chain
+    self.AddTest("102 - Captor Dies Mid-Arrest: Arrest Reverts Quickly Instead of the Old ~24s Stall", "Test_CaptorDeathRevertsArrestQuickly", abChainable = false)
     self.AddTest("041 - ActiveMagicEffectContainer: Stuck Lock Self-Heals", "Test_ActiveMagicEffectContainer_StuckLockSelfHeals")
     self.AddTest("042 - ThreadLock: JAtomic Primitive Semantics and Registry", "Test_ThreadLock_PrimitiveSemantics")
     ; Not chainable: fires concurrent worker threads
@@ -7997,6 +7999,8 @@ state Test_MultiPrisonerOffScreenAIAndPlacement
             return
         endif
 
+        RPB_Prison prison = (RPB_API.GetPrisonManager()).GetPrison("Haafingar")
+
         __test101Actors = new Actor[5]
         int i = 0
         while (i < COUNT)
@@ -8005,16 +8009,30 @@ state Test_MultiPrisonerOffScreenAIAndPlacement
                 RPB_Utility.ClearCrumbs(__test101Actors[i])
                 RPB_ActorVars.SetCrimeGold(__test101Guard.GetCrimeFaction(), __test101Actors[i], 2000)
                 RPB_API.GetArrest().ArrestActor(__test101Guard, __test101Actors[i], RPB_API.GetArrest().ARREST_TYPE_ESCORT_TO_CELL)
-                Utility.Wait(0.3)
+
+                ; The confrontation Scene is one singleton form shared by every arrestee - only one can actually play
+                ; at a time (RPB_SceneManager's own queue). Firing all 5 arrests in a tight loop left every one of
+                ; them queued behind the first, unable to ever confirm (a real test run: all 5 reverted, none ever
+                ; tracked). Waiting for THIS actor to genuinely become a tracked prisoner before arresting the next
+                ; one respects that real throughput instead of racing it.
+                float waitStart = Utility.GetCurrentRealTime()
+                while (prison.Prisoners.AtKey(__test101Actors[i]) == none && (Utility.GetCurrentRealTime() - waitStart) < 30.0)
+                    Utility.Wait(0.5)
+                endWhile
+
+                if (prison.Prisoners.AtKey(__test101Actors[i]) == none)
+                    log("101 " + __test101Actors[i].GetDisplayName() + " never confirmed the confrontation Scene within 30s")
+                endif
             endif
             i += 1
         endWhile
 
         ; Genuinely leave - a huge offset relative to the guard puts the player many cells away in the same
-        ; worldspace, well beyond load range, without needing a hardcoded marker reference.
+        ; worldspace, well beyond load range, without needing a hardcoded marker reference. Only now, once every
+        ; arrestee is genuinely mid-escort (not before any of them had a real chance to start) - that's the actual
+        ; scenario round 9's fix is about: player present when the arrest started, then leaves.
         __test101Player.MoveTo(__test101Guard, afXOffset = 50000.0, afYOffset = 50000.0)
 
-        RPB_Prison prison = (RPB_API.GetPrisonManager()).GetPrison("Haafingar")
         int settleMs = self.__MassSettle(prison, __test101Actors, COUNT, 90.0)
         log("101 settled after " + settleMs + " ms")
 
@@ -8049,6 +8067,83 @@ state Test_MultiPrisonerOffScreenAIAndPlacement
         if (__test101Player && __test101Guard)
             __test101Player.MoveTo(__test101Guard) ; bring the player back rather than leaving them 50000 units out in the wilderness
         endif
+        __TeardownAllTempActors()
+    endFunction
+endState
+
+;/
+    Kills the escorting guard shortly after a real arrest begins, and confirms round 10's RPB_Captor.OnDeath fix
+    actually reverts the arrest quickly instead of the old ~24s stall (AwaitConfrontationScene's own unrelated retry
+    timeout, which only watches for the arrestee's own death, not the captor's). Couldn't be tested by hand - too
+    hard to reproduce reliably - hence this test.
+
+    The "guard" is a temp clone of a real nearby guard's base (same faction/behavior), never the real, persistent
+    NPC itself - Kill() is permanent, and this test has no business leaving a lasting kill on the player's save.
+/;
+Actor __test102Actor
+Actor __test102Guard
+
+state Test_CaptorDeathRevertsArrestQuickly
+    function Setup()
+        int BASE = 0x37BFF ; Bandit - same base test 097/101 already use
+
+        Actor player = Game.GetFormEx(0x14) as Actor
+        Actor realGuard = RPB_Utility.GetNearestGuard(player, 3000.0, player)
+        bool step = assert_true(realGuard != none, "No guard near the player to find a guard base to clone")
+        if (!realGuard)
+            return
+        endif
+
+        __test102Guard = __SpawnTempActorOf(realGuard.GetBaseObject().GetFormID())
+        step = assert_true(__test102Guard != none, "Failed to spawn a temp clone of the nearby guard") && step
+        if (!__test102Guard)
+            return
+        endif
+
+        __test102Actor = __SpawnTempActorOf(BASE)
+        step = assert_true(__test102Actor != none, "Failed to spawn the test actor") && step
+        if (!__test102Actor)
+            return
+        endif
+
+        RPB_Utility.ClearCrumbs(__test102Actor)
+        RPB_ActorVars.SetCrimeGold(__test102Guard.GetCrimeFaction(), __test102Actor, 2000)
+        RPB_API.GetArrest().ArrestActor(__test102Guard, __test102Actor, RPB_API.GetArrest().ARREST_TYPE_ESCORT_TO_CELL)
+
+        ; Wait for the arrest to genuinely begin (the RPB_Arrestee effect attached) before killing the guard - killing
+        ; before this point would hit the narrow pre-AssignArrestee window OnDeath's own fix deliberately doesn't
+        ; chase (see RPB_Captor.OnDeath's doc comment).
+        RPB_Arrest arrest = RPB_API.GetArrest()
+        float waitStart = Utility.GetCurrentRealTime()
+        while (arrest.Arrestees.AtKey(__test102Actor) == none && (Utility.GetCurrentRealTime() - waitStart) < 10.0)
+            Utility.Wait(0.2)
+        endWhile
+
+        step = assert_true(arrest.Arrestees.AtKey(__test102Actor) != none, "Arrest never actually began within 10s") && step
+        if (arrest.Arrestees.AtKey(__test102Actor) == none)
+            display_result(false)
+            return
+        endif
+
+        float killTime = Utility.GetCurrentRealTime()
+        __test102Guard.Kill()
+
+        ; The old bug left the arrestee stuck for ~24s (3 retries x 8s, AwaitConfrontationScene's own unrelated
+        ; timeout). Give the fix a generous few seconds, well short of that, to prove it's actually event-driven.
+        float revertWaitStart = Utility.GetCurrentRealTime()
+        while (arrest.Arrestees.AtKey(__test102Actor) != none && (Utility.GetCurrentRealTime() - revertWaitStart) < 8.0)
+            Utility.Wait(0.2)
+        endWhile
+
+        float revertedAfter = Utility.GetCurrentRealTime() - killTime
+        bool reverted = arrest.Arrestees.AtKey(__test102Actor) == none
+        log("102 arrest reverted: " + reverted + ", " + revertedAfter + "s after the guard died")
+
+        step = assert_true(reverted, "The arrest should have reverted quickly after the guard died, not stayed stuck") && step
+        display_result(reverted)
+    endFunction
+
+    function Teardown()
         __TeardownAllTempActors()
     endFunction
 endState

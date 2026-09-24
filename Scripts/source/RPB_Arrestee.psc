@@ -586,8 +586,14 @@ bool function AwaitConfrontationScene(string asScene)
 
         DebugWarn("["+ Name +"] Arrestee::AwaitConfrontationScene", "Attempt " + attempt + "/" + MAX_ATTEMPTS + " of " + asScene + " for " + Name + " never confirmed, retrying")
 
+        ; asScene is one singleton Scene form shared by every arrestee using it, not a per-arrestee instance - only
+        ; one can actually be playing at a time (SceneManager's own queue). Checking IsPlaying() alone isn't enough:
+        ; if I was only ever queued behind a DIFFERENT arrestee's attempt (never actually started), GetScene(asScene)
+        ; still resolves to that same shared Scene, still playing, and I'd stop THEIR legitimate confrontation on my
+        ; own timeout instead of my own (a real, reproduced bug - confirmed no code anywhere checked whose Scene it
+        ; actually was). Verifying the currently-bound Escortee is really me closes that.
         Scene sceneObject = SceneManager.GetScene(asScene)
-        if (sceneObject && sceneObject.IsPlaying())
+        if (sceneObject && sceneObject.IsPlaying() && SceneManager.GetSceneNthReferenceOfType(asScene, "Escortee") == self.GetActor())
             sceneObject.Stop()
             Utility.Wait(0.5) ; let OnSceneEnd land and clear the SceneManager's own "is playing" flag before retrying
         endif

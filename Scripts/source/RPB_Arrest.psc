@@ -50,6 +50,7 @@ scriptname RPB_Arrest extends Quest
     bool function RegisterArrestee(RPB_Arrestee apArrestee)
     function UnregisterArrestee(RPB_Arrestee apArrestee)
     RPB_Captor function AwaitCaptorReference(Actor akCaptor, int aiMaxTries = 120, float afInitialTimeBetweenTries = 0.05, float afMaxTimeBetweenTries = 0.1)
+    RPB_Captor function GetCaptor(Actor akCaptor)
     bool function RegisterCaptor(RPB_Captor apCaptor)
     function UnregisterCaptor(RPB_Captor apCaptor, bool abRemoveFromList = false)
     function SetArrestScene(Actor akArrestee, string asSceneName)
@@ -369,6 +370,24 @@ endFunction
 /;
 RPB_Captor function AwaitCaptorReference(Actor akCaptor, int aiMaxTries = 120, float afInitialTimeBetweenTries = 0.05, float afMaxTimeBetweenTries = 0.1)
     return RPB_Utility.AwaitEntityReference(akCaptor, Captors, none, aiMaxTries, afInitialTimeBetweenTries, afMaxTimeBetweenTries) as RPB_Captor
+endFunction
+
+;/
+    Looks up an already-registered Captor without ever creating one - unlike AwaitCaptorReference(), which always
+    calls EnsureCaptorSpellAndBinding() first (create-if-missing semantics). That's right for a genuine new arrest,
+    but wrong for a caller that only wants to know "is this guard still a live Captor" (e.g. tearing one down once a
+    prisoner it escorted is imprisoned): if the guard's own 3D happens to be unloaded at that exact moment, forcing a
+    fresh registration attempt can never complete off-screen and burns a real multi-second grace window before
+    erroring - confirmed by a real test ("<Guard> is not loaded, cannot be registered right now!") right after an
+    off-screen imprisonment. Mirrors RPB_Prison.GetPrisoner(), which already uses AwaitExistingEntityReference() for
+    the identical reason.
+
+    Actor @akCaptor: the guard to look up.
+
+    returns (RPB_Captor): the guard's live Captor instance, or none if they aren't currently one.
+/;
+RPB_Captor function GetCaptor(Actor akCaptor)
+    return RPB_Utility.AwaitExistingEntityReference(akCaptor, Captors) as RPB_Captor
 endFunction
 
 ;/
@@ -1064,7 +1083,10 @@ function BeginArrest(RPB_Arrestee apArresteeRef)
     ; keep RE-adding the faction as long as the disguise stays equipped, so a single removal doesn't stick on its own.
     ; See RPB_Utility.SustainArrestPacification's doc comment (it repeats both the faction check and the combat-break for
     ; a bounded window, not just once).
-    RPB_Utility.SustainArrestPacification(arrestee, captor)
+    ; Commented out for a retest (2026-09-24): possibly redundant now that NeutralizeHostileActor checks the actor's
+    ; real hostile factions directly (including Master of Disguise's own, see changelog) - if a disguised arrest
+    ; breaks again without this, restore the line below.
+    ; RPB_Utility.SustainArrestPacification(arrestee, captor)
     RPB_Utility.FlowMark("BeginArrest: HideBounty + StopCombat")
     RPB_Utility.Crumb(arrestee, "BeginArrest: HideBounty + StopCombat")
     ; apArresteeRef.SheatheWeapon()
