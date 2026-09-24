@@ -8006,21 +8006,33 @@ state Test_MultiPrisonerOffScreenAIAndPlacement
         while (i < COUNT)
             __test101Actors[i] = __SpawnTempActorOf(BASE)
             if (__test101Actors[i])
+                ; __SpawnTempActorOf() disables AI to freeze the dummy in place - fine for every other consumer
+                ; (they all use ARREST_TYPE_TELEPORT_TO_CELL, no confrontation Scene involved), but a Scene cannot
+                ; make progress on an actor whose AI is disabled. Confirmed as the real cause of confrontation Scenes
+                ; never confirming here: nothing else re-enables it before this actor is fed into a real Scene.
+                __test101Actors[i].EnableAI(true)
+
                 RPB_Utility.ClearCrumbs(__test101Actors[i])
                 RPB_ActorVars.SetCrimeGold(__test101Guard.GetCrimeFaction(), __test101Actors[i], 2000)
                 RPB_API.GetArrest().ArrestActor(__test101Guard, __test101Actors[i], RPB_API.GetArrest().ARREST_TYPE_ESCORT_TO_CELL)
 
                 ; The confrontation Scene is one singleton form shared by every arrestee - only one can actually play
-                ; at a time (RPB_SceneManager's own queue). Firing all 5 arrests in a tight loop left every one of
-                ; them queued behind the first, unable to ever confirm (a real test run: all 5 reverted, none ever
-                ; tracked). Waiting for THIS actor to genuinely become a tracked prisoner before arresting the next
-                ; one respects that real throughput instead of racing it.
+                ; at a time (RPB_SceneManager's own queue), and that queue extends to every Scene the arrest goes
+                ; through afterward too, not just the confrontation. Waiting only for "tracked as a prisoner"
+                ; (Prisoners.AtKey) understated how far along this actor actually was - that becomes true the moment
+                ; MakePrisoner() registers it, before its own Escort-to-Cell Scene has even been queued, so the next
+                ; bandit could get arrested (and this whole loop finish, and Teardown() run) while an earlier
+                ; bandit's Escort-to-Cell request was still genuinely, legitimately sitting in that shared queue - a
+                ; real test run hit exactly this: a Scene for an already-deleted temp actor started and errored well
+                ; after the test itself had already finished. Waiting for the same, stronger signal __MassSettle
+                ; already trusts (IsActorImprisoned) genuinely serializes bandits through the shared queue instead of
+                ; racing them into it.
                 float waitStart = Utility.GetCurrentRealTime()
-                while (prison.Prisoners.AtKey(__test101Actors[i]) == none && (Utility.GetCurrentRealTime() - waitStart) < 30.0)
+                while (!RPB_Utility.IsActorImprisoned(__test101Actors[i]) && (Utility.GetCurrentRealTime() - waitStart) < 30.0)
                     Utility.Wait(0.5)
                 endWhile
 
-                if (prison.Prisoners.AtKey(__test101Actors[i]) == none)
+                if (!RPB_Utility.IsActorImprisoned(__test101Actors[i]))
                     log("101 " + __test101Actors[i].GetDisplayName() + " never confirmed the confrontation Scene within 30s")
                 endif
             endif
@@ -8033,7 +8045,9 @@ state Test_MultiPrisonerOffScreenAIAndPlacement
         ; scenario round 9's fix is about: player present when the arrest started, then leaves.
         __test101Player.MoveTo(__test101Guard, afXOffset = 50000.0, afYOffset = 50000.0)
 
-        int settleMs = self.__MassSettle(prison, __test101Actors, COUNT, 90.0)
+        ; Scaled with COUNT, not a flat budget: total settle time is roughly linear in how many prisoners are
+        ; sharing one serialized Scene queue.
+        int settleMs = self.__MassSettle(prison, __test101Actors, COUNT, COUNT * 30.0)
         log("101 settled after " + settleMs + " ms")
 
         int passed = 0
@@ -8099,12 +8113,17 @@ state Test_CaptorDeathRevertsArrestQuickly
         if (!__test102Guard)
             return
         endif
+        ; __SpawnTempActorOf() disables AI to freeze the dummy in place - fine for every other consumer (they all
+        ; use ARREST_TYPE_TELEPORT_TO_CELL, no confrontation Scene involved), but a Scene cannot make progress on an
+        ; actor whose AI is disabled. Both Scene participants need it re-enabled here.
+        __test102Guard.EnableAI(true)
 
         __test102Actor = __SpawnTempActorOf(BASE)
         step = assert_true(__test102Actor != none, "Failed to spawn the test actor") && step
         if (!__test102Actor)
             return
         endif
+        __test102Actor.EnableAI(true)
 
         RPB_Utility.ClearCrumbs(__test102Actor)
         RPB_ActorVars.SetCrimeGold(__test102Guard.GetCrimeFaction(), __test102Actor, 2000)
