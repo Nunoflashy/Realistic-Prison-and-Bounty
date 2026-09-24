@@ -22,7 +22,15 @@ endFunction
 
 bool function Add(RPB_Captor apCaptorRef)
     string elementKey = self.GetCaptorID(apCaptorRef.GetActor())
-    parent.AddElement(apCaptorRef, elementKey)
+
+    ; A key that already exists holds the instance of an effect that ended (the actor unloaded and loaded again, which starts
+    ; a new instance): point it at this live one instead of refusing the duplicate. Mirrors RPB_PrisonerList.Add() - a guard's
+    ; RPB_Captor instance is torn down and restarted by the same 3D-unload mechanism a prisoner's instance is.
+    if (parent.HasKey(elementKey))
+        parent.ReplaceElement(apCaptorRef, elementKey)
+    else
+        parent.AddElement(apCaptorRef, elementKey)
+    endif
 endFunction
 
 function Remove(RPB_Captor apCaptor)

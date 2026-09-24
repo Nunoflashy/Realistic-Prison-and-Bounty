@@ -23,7 +23,15 @@ endFunction
 
 bool function Add(RPB_Arrestee apArrestee)
     string elementKey = self.GetArresteeID(apArrestee.GetActor())
-    parent.AddElement(apArrestee, elementKey)
+
+    ; A key that already exists holds the instance of an effect that ended (the actor unloaded and loaded again, which starts
+    ; a new instance): point it at this live one instead of refusing the duplicate. Mirrors RPB_PrisonerList.Add() - this list
+    ; had the same unconditional-add gap that RPB_CaptorList did, just not yet reported as its own error.
+    if (parent.HasKey(elementKey))
+        parent.ReplaceElement(apArrestee, elementKey)
+    else
+        parent.AddElement(apArrestee, elementKey)
+    endif
 endFunction
 
 function Remove(RPB_Arrestee apArrestee)

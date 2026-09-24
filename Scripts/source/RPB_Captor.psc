@@ -236,5 +236,6 @@ function Destroy()
     API.Arrest.UnregisterCaptor(self, abRemoveFromList = true)
 
     self.RemoveAll()
+    parent.Destroy() ; clears the base "Actor"/"Temporary" categories too - RPB_Prisoner.Destroy() does the same, this never did
     Utility.Wait(0.5)
 endFunction
