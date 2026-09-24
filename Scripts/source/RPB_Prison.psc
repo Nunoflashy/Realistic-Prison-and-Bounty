@@ -2636,8 +2636,20 @@ function __ProcessEscortStallChecks()
                     Utility.Wait(0.5) ; let OnSceneEnd land and clear the SceneManager's own "is playing" flag
                 endif
 
-                self.SceneManager.UnsetPackageLockOnActor(guard)
-                self.OnEscortPrisonerToCellEnd(prisoner, prisoner.JailCell, guard)
+                ; Stop() fires the Scene's own End Fragment - the exact same signal a natural completion sends - which
+                ; drives UnsetPackageLockOnActor/OnEscortPrisonerToCellEnd through the real native path on its own. A
+                ; first attempt at this recovery called both manually right here regardless, which double-dispatched
+                ; the completion (harmless by itself, both are idempotent) but also freed the guard early via a
+                ; redundant UnsetPackageLockOnActor, widening the real window before Captor.Destroy()'s own cleanup
+                ; actually finishes - a guard reused for a new arrest in that window could race the still-in-flight
+                ; teardown of the old one. Re-checking here means the common case goes through Stop()'s own real
+                ; cascade alone, with the manual completion only as a genuine last resort if that didn't happen.
+                prisoner = self.AwaitPrisonerReference(checkActor)
+                if (prisoner && !prisoner.IsImprisoned)
+                    Warn("["+ Name +"] Prison::__ProcessEscortStallChecks", "Stop() didn't drive " + checkActor.GetDisplayName() + " " + checkActor + " through its own completion either - falling back to a manual finish")
+                    self.SceneManager.UnsetPackageLockOnActor(guard)
+                    self.OnEscortPrisonerToCellEnd(prisoner, prisoner.JailCell, guard)
+                endif
             endif
             JFormMap.removeKey(__pendingEscortStallChecks, checkActor)
         endif

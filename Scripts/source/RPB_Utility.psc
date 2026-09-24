@@ -123,6 +123,7 @@ scriptname RPB_Utility hidden
     function OrientRelative(ObjectReference akObjA, ObjectReference akObjB, Float afRotX = 0.0, Float afRotY = 0.0, Float afRotZ = 0.0) Global
     bool function IsFarAwayFromObject(ObjectReference akObjectOne, ObjectReference akObjectTwo) global
     bool function IsWedgedTogether(Actor akActorOne, Actor akActorTwo, float afStuckDistance = 90.0) global
+    function PushActorAwayFrom(Actor akActorToMove, Actor akAnchor, float afDistance) global
     bool function IsActorFarAwayFromPlayer(Actor akActor) global
     string function GenerateUUIDSection(int aiLength) global
     string function GenerateUUID() global
@@ -2163,6 +2164,38 @@ bool function IsWedgedTogether(Actor akActorOne, Actor akActorTwo, float afStuck
     endif
 
     return akActorOne.GetDistance(akActorTwo) < afStuckDistance
+endFunction
+
+;/
+    Moves akActorToMove to a point afDistance units further out, along the line already connecting it to akAnchor - a
+    genuine "push directly away from wherever it actually was" position. Deliberately not ObjectReference.MoveTo's own
+    offset parameters: those are relative to akAnchor's own local/facing space, not a function of akActorToMove's real
+    prior position, which is why a MoveTo(afXOffset=...) nudge visibly moved a guard to the arrestee's side instead of
+    straight back (confirmed in a real test) - and MoveTo's abMatchRotation also snaps the mover's facing to match the
+    anchor's, an extra unwanted side effect this avoids by using SetPosition directly instead. No trigonometry needed:
+    just the direction vector between the two current positions, normalized by their real distance.
+
+    Actor   @akActorToMove: the Actor to reposition.
+    Actor   @akAnchor: the point to push directly away from.
+    float   @afDistance: how far to push, in the same units GetDistance() reports.
+/;
+function PushActorAwayFrom(Actor akActorToMove, Actor akAnchor, float afDistance) global
+    if (!akActorToMove || !akAnchor)
+        return
+    endif
+
+    float currentDistance = akActorToMove.GetDistance(akAnchor)
+    if (currentDistance <= 0.0)
+        return ; exactly co-located: no direction to push along (shouldn't happen given the wedge check that gates this)
+    endif
+
+    float deltaX = akActorToMove.GetPositionX() - akAnchor.GetPositionX()
+    float deltaY = akActorToMove.GetPositionY() - akAnchor.GetPositionY()
+
+    float newX = akActorToMove.GetPositionX() + (deltaX / currentDistance) * afDistance
+    float newY = akActorToMove.GetPositionY() + (deltaY / currentDistance) * afDistance
+
+    akActorToMove.SetPosition(newX, newY, akActorToMove.GetPositionZ())
 endFunction
 
 bool function IsActorFarAwayFromPlayer(Actor akActor) global

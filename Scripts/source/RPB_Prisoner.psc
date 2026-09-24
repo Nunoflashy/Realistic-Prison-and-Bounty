@@ -3712,7 +3712,12 @@ function NPC_UpdateUnderwear()
 
     bool hasUnderwearInInventory    = this.GetItemCount(underwearTop) >= 1 || this.GetItemCount(underwearBottom) >= 1
     bool wasStrippedToUnderwear     = self.Was("Stripped") && self.IsStrippedToUnderwear
-    bool shouldBeInUnderwear        = self.IsNaked() && wasStrippedToUnderwear && hasUnderwearInInventory
+    ; IsNaked() only ever checks body slot 32 - equipping underwear (a different, configurable slot, see HasUnderwear())
+    ; never changes what it sees, so shouldBeInUnderwear never turns false on its own once true. Without the
+    ; !self.HasUnderwear() check below, every call re-"equips" (a harmless no-op once already worn) and re-logs
+    ; "Equipped underwear" regardless of whether anything actually needed doing - confirmed in a real test, where a
+    ; repeated sanity-check retry logged this line 10 times in a row for an already-correctly-dressed prisoner.
+    bool shouldBeInUnderwear        = self.IsNaked() && wasStrippedToUnderwear && hasUnderwearInInventory && !self.HasUnderwear()
 
     if (shouldBeInUnderwear)
         self.EquipItem(underwearTop,    abCondition = underwearTop != none)

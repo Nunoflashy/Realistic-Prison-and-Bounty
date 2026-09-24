@@ -846,7 +846,7 @@ event OnArrestEnd()
     Actor guard = Captor.GetActor()
     if (RPB_Utility.IsWedgedTogether(self.GetActor(), guard))
         Debug("["+ Name +"] Arrestee::OnArrestEnd", "Guard wedged against " + Name + " right after cuffing, nudging aside")
-        Captor.MoveTo(self.GetActor(), afXOffset = 40.0)
+        RPB_Utility.PushActorAwayFrom(guard, self.GetActor(), 40.0)
     endif
 
     RegisterForSingleUpdate(1.0)
