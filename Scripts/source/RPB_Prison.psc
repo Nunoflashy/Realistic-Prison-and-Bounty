@@ -2622,6 +2622,16 @@ function __ProcessEscortStallChecks()
         Actor checkActor = JArray.getForm(keys, i) as Actor
         int entry = JFormMap.getObj(__pendingEscortStallChecks, checkActor)
         if (entry && JMap.getFlt(entry, "dueAt") <= now)
+            ; Dequeued immediately, before anything below can yield (AwaitPrisonerReference/Scene.Stop()/Wait) - a real
+            ; test showed the WARN just below logging twice for one recovery: this shares its 3s heartbeat with other
+            ; queues on this same object, so a second OnUpdate() dispatch could land while this one was still suspended
+            ; mid-Wait, find this same still-present due entry, and log its own copy of the same WARN before either
+            ; pass had removed it (only one ever got far enough to still see !IsImprisoned and actually recover). Once
+            ; the key's gone, a second dispatch's own lookup simply won't find it - the same protection
+            ; RPB_JailCell.__onCellAttachAndDetachEvent() already gives itself (via __attachEventLockedUntil) against
+            ; the equivalent risk for its own event.
+            JFormMap.removeKey(__pendingEscortStallChecks, checkActor)
+
             RPB_Prisoner prisoner = self.AwaitPrisonerReference(checkActor)
             if (prisoner && !prisoner.IsImprisoned)
                 ; The Scene's own End never confirmed within the timeout - a Package-driven phase (the guard's approach,
@@ -2658,7 +2668,6 @@ function __ProcessEscortStallChecks()
                     self.OnEscortPrisonerToCellEnd(prisoner, prisoner.JailCell, guard)
                 endif
             endif
-            JFormMap.removeKey(__pendingEscortStallChecks, checkActor)
         endif
         i += 1
     endWhile
@@ -3482,9 +3491,18 @@ event OnEscortPrisonerToCellEnd(RPB_Prisoner apPrisoner, RPB_JailCell akJailCell
     endif
 
     if (apPrisoner.IsNPC())
-        ; Ensures the Prisoner stays in the cell since we update it 10s later after the initial check,
-        ; delaying it enough for all actions to finish before the check.
         if (apPrisoner.IsFarFromPlayer())
+            ; The player isn't here to see whether the Scene's own native package actually finished walking this NPC
+            ; in and locking the door - exactly the class of thing that can stall the Scene in the first place. I
+            ; react now, since the Scene already had its full chance to play, instead of only reacting once the
+            ; player eventually visits this cell: PerformPrisonerSanityCheck() runs the same EnableAI/MoveTo
+            ; correction __onCellAttachAndDetachEvent() uses, but as a plain function call it has no load-state
+            ; requirement (only native event dispatch - RegisterForSingleUpdate's OnUpdate, OnCellAttach - does),
+            ; so it isn't left waiting on this JailCell reference's own cell being loaded to ever run.
+            apPrisoner.JailCell.PerformPrisonerSanityCheck(apPrisoner)
+
+            ; Ensures the Prisoner stays in the cell since we update it 10s later after the initial check, delaying
+            ; it enough for all actions to finish before the check - kept as a backup for whenever the player visits.
             apPrisoner.JailCell.RegisterForSanityChecking(10.0, apPrisoner = apPrisoner)
         endif
     endif
