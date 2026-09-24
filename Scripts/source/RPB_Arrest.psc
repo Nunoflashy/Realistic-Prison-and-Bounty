@@ -494,10 +494,32 @@ endEvent
 event OnArrestDialogue(int aiTopicInfoEvent, int aiTopicInfoType, string asTopicInfoDialogue, Actor akSpeakerArrester, Actor akSpokenToArrestee)
     if (aiTopicInfoEvent == TOPIC_START)
         if (aiTopicInfoType == TOPIC_TYPE_ARREST_CONFRONT)
+            ; Several nearby guards can independently reach their own arrest dialogue for the same target at once -
+            ; EventManager.OnDialogueTopicStart's own "many guards talked at once" comment already acknowledges this.
+            ; If another guard's flow already confirmed this arrest, don't re-roll these shared (not per-arrestee)
+            ; bounty-payment globals out from under it - just let this guard's own dialogue disengage.
+            if (RPB_Utility.IsActorArrested(akSpokenToArrestee))
+                akSpeakerArrester.EvaluatePackage()
+                return
+            endif
+
             self.SetupArrestPayableBountyVars(akSpeakerArrester.GetCrimeFaction()) ; Setup arrest payable bounty vars
             self.SetActorWantsToPayBounty(akSpokenToArrestee, false) ; Reset any possibility of paying the bounty, before actually selecting it
 
         elseif (aiTopicInfoType == TOPIC_TYPE_ARREST_RESIST)
+            ; Same multi-guard race as above, checked here (before SetAsResisting/the RPB_ResistArrest round-trip)
+            ; rather than only after the fact in OnArrestResist - by the time that event's own "Captured" check ran,
+            ; this guard had already spoken its hostile line with no code left to disengage it (a real, reproduced
+            ; test: "no arrest was resisted [BUG]" fired, and the losing guard was left stuck - OnArrestResist's own
+            ; comment on SetPlayerResistingArrest says that call is "needed... otherwise they will loop arrest
+            ; dialogue", and the early-return there skips it). Don't touch the player's global resisting-arrest flag
+            ; here either, for the same reason - it could re-arm hostility against an arrestee already being escorted
+            ; in cuffs by the guard who actually won.
+            if (RPB_Utility.IsActorArrested(akSpokenToArrestee))
+                akSpeakerArrester.EvaluatePackage()
+                return
+            endif
+
             self.SetAsResisting(akSpeakerArrester, akSpokenToArrestee)
 
         elseif (aiTopicInfoType == TOPIC_TYPE_COMBAT_YIELD)
@@ -1083,9 +1105,18 @@ function BeginArrest(RPB_Arrestee apArresteeRef)
     ; keep RE-adding the faction as long as the disguise stays equipped, so a single removal doesn't stick on its own.
     ; See RPB_Utility.SustainArrestPacification's doc comment (it repeats both the faction check and the combat-break for
     ; a bounded window, not just once).
-    ; Commented out for a retest (2026-09-24): possibly redundant now that NeutralizeHostileActor checks the actor's
-    ; real hostile factions directly (including Master of Disguise's own, see changelog) - if a disguised arrest
-    ; breaks again without this, restore the line below.
+    ;
+    ; This one-time removal is unconditional and direct - it used to be, before an earlier commit fused it together
+    ; with the sustained/repeated combat-break loop into SustainArrestPacification below. Commenting out that single
+    ; fused line for a retest (round 11) silently removed BOTH jobs, not just the sustained one: with the hostile
+    ; faction never stripped at all, the confrontation Scene can never confirm while nearby guards still see the
+    ; actor as hostile, so Imprison()'s own documented "fallback" re-neutralize is never reached either - a real,
+    ; reproduced regression (guards wouldn't stop attacking, the confrontation Scene never confirmed). Restored here,
+    ; split back out from the sustained loop, so the two jobs can be tested independently again.
+    RPB_Utility.NeutralizeHostileActor(arrestee)
+    ; Commented out for a retest (2026-09-24): possibly redundant now that the direct NeutralizeHostileActor call
+    ; above already covers the one-time removal - if a disguise mod keeps re-adding the faction faster than that
+    ; sticks, restore this too.
     ; RPB_Utility.SustainArrestPacification(arrestee, captor)
     RPB_Utility.FlowMark("BeginArrest: HideBounty + StopCombat")
     RPB_Utility.Crumb(arrestee, "BeginArrest: HideBounty + StopCombat")
