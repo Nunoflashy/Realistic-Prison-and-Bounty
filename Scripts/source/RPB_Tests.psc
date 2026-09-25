@@ -180,6 +180,9 @@ function SetTests()
     self.AddTest("101 - Multi-Prisoner Off-Screen Escort: AI Disabled and Correctly Placed for All of Them", "Test_MultiPrisonerOffScreenAIAndPlacement", abChainable = false)
     ; Not chainable: kills a real guard NPC, not something to fire unattended in a chain
     self.AddTest("102 - Captor Dies Mid-Arrest: Arrest Reverts Quickly Instead of the Old ~24s Stall", "Test_CaptorDeathRevertsArrestQuickly", abChainable = false)
+    ; Not chainable: deliberately runs the SceneManager's give-up path (ForceResetSceneState wipes the whole queue),
+    ; not something to fire unattended alongside other Scene-driven tests in a chain
+    self.AddTest("103 - Confrontation Scene Never Confirms (AI Disabled): TeleportToCell Fallback Still Imprisons the Bandit", "Test_ConfrontationSceneNeverConfirmsFallsBackToTeleport", abChainable = false)
     self.AddTest("041 - ActiveMagicEffectContainer: Stuck Lock Self-Heals", "Test_ActiveMagicEffectContainer_StuckLockSelfHeals")
     self.AddTest("042 - ThreadLock: JAtomic Primitive Semantics and Registry", "Test_ThreadLock_PrimitiveSemantics")
     ; Not chainable: fires concurrent worker threads
@@ -8235,6 +8238,98 @@ state Test_CaptorDeathRevertsArrestQuickly
 
         step = assert_true(reverted, "The arrest should have reverted quickly after the guard died, not stayed stuck") && step
         display_result(reverted)
+    endFunction
+
+    function Teardown()
+        __TeardownAllTempActors()
+    endFunction
+endState
+
+;/
+    Deliberately forces round 17's EscortToPrison() TeleportToCell fallback (RPB_Arrestee.psc) instead of reverting:
+    the bandit's AI is left disabled (unlike every other Scene-driving test, which explicitly re-enables it) so
+    "Hands Behind Back" can never fire - confirmed by round 14's own investigation as the real, already-proven cause
+    of a Scene never progressing at all. AwaitConfrontationScene() will exhaust all 3 retries (~24-26s) and give up;
+    EscortToPrison() should then fall back to DeclareArrestSuccess() + MoveToPrison(abMoveDirectlyToCell = true) -
+    the same Scene-free path ARREST_TYPE_TELEPORT_TO_CELL already uses - instead of reverting the arrest. No test
+    exercised this path before now.
+/;
+Actor __test103Guard
+Actor __test103Actor
+
+state Test_ConfrontationSceneNeverConfirmsFallsBackToTeleport
+    function Setup()
+        int BASE = 0x37BFF ; Bandit - same base tests 097/101/102 already use
+
+        RPB_Utility.EnableCrumbs()
+
+        Actor player = Game.GetFormEx(0x14) as Actor
+        Actor realGuard = RPB_Utility.GetNearestGuard(player, 3000.0, player)
+        bool step = assert_true(realGuard != none, "No guard near the player to find a guard base to clone")
+        if (!realGuard)
+            return
+        endif
+
+        __test103Guard = __SpawnTempActorOf(realGuard.GetBaseObject().GetFormID())
+        step = assert_true(__test103Guard != none, "Failed to spawn a temp clone of the nearby guard") && step
+        if (!__test103Guard)
+            return
+        endif
+        __test103Guard.EnableAI(true) ; the guard still needs to function normally - only the arrestee's AI stays off
+
+        __test103Actor = __SpawnTempActorOf(BASE)
+        step = assert_true(__test103Actor != none, "Failed to spawn the test actor") && step
+        if (!__test103Actor)
+            return
+        endif
+        ; Deliberately NOT calling EnableAI(true) here, unlike every other Scene-driving test (101, 102) - this is
+        ; the whole point of this test. __SpawnTempActorOf() leaves AI disabled by default, and round 14 already
+        ; confirmed a Scene cannot progress on an actor whose AI is disabled - "Hands Behind Back" will never fire,
+        ; so AwaitConfrontationScene() is guaranteed to exhaust its 3 retries instead of confirming.
+
+        RPB_Utility.ClearCrumbs(__test103Actor)
+        RPB_ActorVars.SetCrimeGold(__test103Guard.GetCrimeFaction(), __test103Actor, 2000)
+        RPB_Arrest arrest = RPB_API.GetArrest()
+        arrest.ArrestActor(__test103Guard, __test103Actor, arrest.ARREST_TYPE_ESCORT_TO_CELL)
+
+        RPB_Arrestee arresteeRef = arrest.Arrestees.AtKey(__test103Actor)
+        float beginWaitStart = Utility.GetCurrentRealTime()
+        while (!arresteeRef && (Utility.GetCurrentRealTime() - beginWaitStart) < 10.0)
+            Utility.Wait(0.2)
+            arresteeRef = arrest.Arrestees.AtKey(__test103Actor)
+        endWhile
+
+        step = assert_true(arresteeRef != none, "Arrest never actually began within 10s") && step
+        if (!arresteeRef)
+            display_result(false)
+            return
+        endif
+
+        ; AwaitConfrontationScene() (a separate, independently-suspended thread inside EscortToPrison()) will spend
+        ; ~24-26s exhausting its 3 retries before giving up and falling back to MoveToPrison(abMoveDirectlyToCell =
+        ; true) - the same path a real ARREST_TYPE_TELEPORT_TO_CELL arrest takes. 90s is a generous margin over that
+        ; plus the fallback's own completion time. Track whether "Scene Confirmed" is ever seen true along the way -
+        ; if it is, the AI-disable trick didn't work this run and the fallback wasn't genuinely exercised.
+        bool sceneConfirmedAtAnyPoint = false
+        float waitStart = Utility.GetCurrentRealTime()
+        while (!RPB_Utility.IsActorImprisoned(__test103Actor) && (Utility.GetCurrentRealTime() - waitStart) < 90.0)
+            Utility.Wait(0.5)
+            if (arresteeRef.GetBool("Scene Confirmed"))
+                sceneConfirmedAtAnyPoint = true
+            endif
+        endWhile
+
+        bool imprisoned = RPB_Utility.IsActorImprisoned(__test103Actor)
+        log("103 imprisoned: " + imprisoned + ", scene confirmed at any point: " + sceneConfirmedAtAnyPoint)
+
+        step = assert_true(!sceneConfirmedAtAnyPoint, "The confrontation Scene should never have confirmed (AI deliberately left disabled) - if it did, this test can't verify the fallback") && step
+        step = assert_true(imprisoned, "The bandit should have been imprisoned via the TeleportToCell fallback despite the confrontation Scene never confirming") && step
+
+        if (!imprisoned)
+            log("103 " + __test103Actor.GetDisplayName() + " " + RPB_Utility.DumpCrumbs(__test103Actor))
+        endif
+
+        display_result(step)
     endFunction
 
     function Teardown()
