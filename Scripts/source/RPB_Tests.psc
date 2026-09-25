@@ -10019,6 +10019,15 @@ function __TeardownAllTempActors()
         if (tempActor)
             RPB_Prisoner prisonerRef = solitudePrison.Prisoners.AtKey(tempActor)
             if (prisonerRef)
+                ; UnregisterPrisoner() only removes the registry entry - it doesn't release the CellPackage alias
+                ; that real prisoners only ever free via NPC_UnbindFromCell(), called from Released.OnBeginState().
+                ; A temp actor torn down straight from Imprisoned (skipping a real release cycle, as test 101 does)
+                ; never reaches that state, so its alias stayed permanently bound to a now-deleted Actor - confirmed
+                ; live: 5 test-101 runs left S_0000-S_0004 stuck, and the next manual arrest had to skip to S_0005.
+                ; NPC_UnbindFromCell() already no-ops safely if nothing is actually bound.
+                if (prisonerRef.HasCellPackage)
+                    prisonerRef.NPC_UnbindFromCell()
+                endif
                 solitudePrison.UnregisterPrisoner(prisonerRef)
             endif
 
