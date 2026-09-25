@@ -574,7 +574,11 @@ bool function AwaitConfrontationScene(string asScene)
 
                 if (stuckStreak >= STUCK_CONSECUTIVE_CHECKS)
                     DebugWarn("["+ Name +"] Arrestee::AwaitConfrontationScene", "Guard wedged against " + Name + " during the approach, nudging aside")
-                    Captor.MoveTo(self.GetActor(), afXOffset = NUDGE_OFFSET_UNITS)
+                    ; PushActorAwayFrom, not MoveTo(afXOffset=...): that offset is relative to the TARGET's own local/
+                    ; facing space, not a function of the mover's actual prior position - already proven buggy by a real
+                    ; test elsewhere in this file (OnArrestEnd's own wedge check, fixed the same way) that visibly moved a
+                    ; guard to the arrestee's side instead of straight back. This call site was missed when that landed.
+                    RPB_Utility.PushActorAwayFrom(guard, self.GetActor(), NUDGE_OFFSET_UNITS)
                     stuckStreak = 0 ; give the package a fresh window to resolve after the nudge
                 endif
             endif
@@ -615,7 +619,16 @@ function EscortToPrison(bool abEscortDirectlyToCell = false)
     self.SetString("Scene", sceneSet)
 
     if (!self.AwaitConfrontationScene(sceneSet))
-        self.OnArrestFailed("Confrontation Scene")
+        ; The confrontation Scene never confirmed - rather than reverting an arrest that already legitimately started
+        ; (pacification already applied, intent already committed), fall back to the same Scene-free path
+        ; ARREST_TYPE_TELEPORT_TO_CELL already uses (DeclareArrestSuccess + MoveToPrison(abMoveDirectlyToCell = true),
+        ; see BeginArrest's own teleport branch) instead of undoing the arrest outright. Applies uniformly whether this
+        ; was an Escort-to-Jail or Escort-to-Cell request - once witnessing anything is off the table, the simplest
+        ; safe outcome is to finish the job, not preserve the jail-first distinction. No separate cleanup needed here:
+        ; AwaitConfrontationScene's own give-up path already calls ForceResetSceneState() before returning false.
+        DebugWarn("["+ Name +"] Arrestee::EscortToPrison", "Confrontation Scene never confirmed for " + Name + " - falling back to a direct teleport-to-cell arrest instead of reverting")
+        self.DeclareArrestSuccess()
+        self.MoveToPrison(abMoveDirectlyToCell = true)
         return
     endif
 

@@ -8028,6 +8028,13 @@ state Test_MultiPrisonerOffScreenAIAndPlacement
                 guard.EnableAI(true)
                 __test101Actors[i].EnableAI(true)
 
+                ; __SpawnTempActorOf() places every actor at the player's current position, so two calls back-to-back
+                ; can land the guard and bandit essentially on top of each other, relying entirely on the confrontation
+                ; Scene's own wedge-nudge to separate them. Not the real cause of the confrontation Scene never
+                ; confirming (that was the captor's own uncleared combat state - see BeginArrest), but cheap to avoid
+                ; regardless of cause.
+                __test101Actors[i].MoveTo(guard, afXOffset = 100.0, abMatchRotation = false)
+
                 RPB_Utility.ClearCrumbs(__test101Actors[i])
                 RPB_ActorVars.SetCrimeGold(guard.GetCrimeFaction(), __test101Actors[i], 2000)
                 arrest.ArrestActor(guard, __test101Actors[i], arrest.ARREST_TYPE_ESCORT_TO_CELL)
@@ -8047,26 +8054,34 @@ state Test_MultiPrisonerOffScreenAIAndPlacement
                     arresteeRef = arrest.Arrestees.AtKey(__test101Actors[i])
                 endWhile
 
-                ; Now genuinely leave for the rest of THIS bandit's escort - the actual scenario round 9's fix is
-                ; about: player present when the arrest started, then leaves mid-escort. Without this, every bandit
-                ; would finish her WHOLE escort with the player still nearby, and round 9's off-screen correction
-                ; (gated on IsFarFromPlayer() at the exact moment escort completes) would never even trigger - a
-                ; real run confirmed exactly that: two bandits that did get imprisoned still failed "AI disabled".
-                ; A huge offset relative to THIS bandit's own guard puts the player many cells away in the same
-                ; worldspace, well beyond load range, without needing a hardcoded marker reference.
-                __test101Player.MoveTo(guard, afXOffset = 50000.0, afYOffset = 50000.0)
+                bool sceneConfirmed = arresteeRef && arresteeRef.GetBool("Scene Confirmed")
+                ; The MoveTo below used to run unconditionally here regardless of whether the wait above actually
+                ; succeeded - so the player was still being moved away even when the Scene never confirmed at all,
+                ; exactly the "I can't see the scene start" symptom a real test reported. Only move on if it did.
+                if (sceneConfirmed)
+                    ; Now genuinely leave for the rest of THIS bandit's escort - the actual scenario round 9's fix is
+                    ; about: player present when the arrest started, then leaves mid-escort. Without this, every
+                    ; bandit would finish her WHOLE escort with the player still nearby, and round 9's off-screen
+                    ; correction (gated on IsFarFromPlayer() at the exact moment escort completes) would never even
+                    ; trigger - a real run confirmed exactly that: two bandits that did get imprisoned still failed
+                    ; "AI disabled". A huge offset relative to THIS bandit's own guard puts the player many cells away
+                    ; in the same worldspace, well beyond load range, without needing a hardcoded marker reference.
+                    __test101Player.MoveTo(guard, afXOffset = 50000.0, afYOffset = 50000.0)
 
-                ; Raised from 30s to 120s: the earlier, weaker signal (just "tracked") only needed to survive to
-                ; confrontation-confirm, but IsActorImprisoned needs a full confrontation+cuff+walk+strip+walk+lock
-                ; cycle to complete, which a flat 30s wasn't enough time for - a real run's early timeouts were very
-                ; likely genuinely-still-in-progress escorts, not stuck ones, misread as failures.
-                float imprisonWaitStart = Utility.GetCurrentRealTime()
-                while (!RPB_Utility.IsActorImprisoned(__test101Actors[i]) && (Utility.GetCurrentRealTime() - imprisonWaitStart) < 120.0)
-                    Utility.Wait(0.5)
-                endWhile
+                    ; Raised from 30s to 120s: the earlier, weaker signal (just "tracked") only needed to survive to
+                    ; confrontation-confirm, but IsActorImprisoned needs a full confrontation+cuff+walk+strip+walk+lock
+                    ; cycle to complete, which a flat 30s wasn't enough time for - a real run's early timeouts were
+                    ; very likely genuinely-still-in-progress escorts, not stuck ones, misread as failures.
+                    float imprisonWaitStart = Utility.GetCurrentRealTime()
+                    while (!RPB_Utility.IsActorImprisoned(__test101Actors[i]) && (Utility.GetCurrentRealTime() - imprisonWaitStart) < 120.0)
+                        Utility.Wait(0.5)
+                    endWhile
 
-                if (!RPB_Utility.IsActorImprisoned(__test101Actors[i]))
-                    log("101 " + __test101Actors[i].GetDisplayName() + " never confirmed the confrontation Scene within 120s")
+                    if (!RPB_Utility.IsActorImprisoned(__test101Actors[i]))
+                        log("101 " + __test101Actors[i].GetDisplayName() + " never confirmed imprisonment within 120s")
+                    endif
+                else
+                    log("101 " + __test101Actors[i].GetDisplayName() + " never confirmed the confrontation Scene within 30s")
                 endif
 
                 ; Back near the original guard's spot, ready for the next bandit's own confrontation to actually

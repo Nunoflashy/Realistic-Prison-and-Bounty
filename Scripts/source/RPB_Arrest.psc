@@ -1114,6 +1114,15 @@ function BeginArrest(RPB_Arrestee apArresteeRef)
     ; reproduced regression (guards wouldn't stop attacking, the confrontation Scene never confirmed). Restored here,
     ; split back out from the sustained loop, so the two jobs can be tested independently again.
     RPB_Utility.NeutralizeHostileActor(arrestee)
+    ; Skyrim generally can't run a Scene on an actor that's still actively in combat (RPB_Utility.SustainArrestPacification's
+    ; own doc comment already says so) - the arrestee's own combat is stopped above, but nothing here ever stopped the
+    ; CAPTOR's. Normal gameplay never notices, because a real arrest almost always happens after Surrender (which already
+    ; stops combat on both sides first) - but any arrest reached without going through Surrender first can leave the guard
+    ; actively fighting the arrestee, which silently blocks the confrontation Scene's first phase from ever completing,
+    ; regardless of player presence. Confirmed as the real cause of a real test's confrontation Scene never confirming.
+    if (captor)
+        captor.StopCombat()
+    endif
     ; Commented out for a retest (2026-09-24): possibly redundant now that the direct NeutralizeHostileActor call
     ; above already covers the one-time removal - if a disguise mod keeps re-adding the faction faster than that
     ; sticks, restore this too.
