@@ -3429,15 +3429,25 @@ function NPC_SaveOriginalOutfit()
         ; "Naked" and the others would find nothing to save. So the real outfit is also remembered per base, and an NPC stripped
         ; while the base is "Naked" takes the remembered one.
         string baseOutfitKey = "Original Outfit " + this.GetActorBase().GetFormID()
-        if (npcBaseOutfit != RPB_GetOutfit("Naked"))
-            ; Ensure we don't save a 'naked' outfit.
-            SetForm("NPC Original Outfit", npcBaseOutfit)
-            RPB_StorageVars.SetForm(baseOutfitKey, npcBaseOutfit, "BaseOutfits")
-        else
+        if (npcBaseOutfit == RPB_GetOutfit("Naked"))
             Form rememberedOutfit = RPB_StorageVars.GetForm(baseOutfitKey, "BaseOutfits")
             if (rememberedOutfit)
                 SetForm("NPC Original Outfit", rememberedOutfit)
+                self.SetBool("NPC Original Outfit Captured", true)
             endif
+            ; else: every sharer of this base was already Naked before any of them got a chance to save the real value -
+            ; "Captured" stays false, same as before this fix; there is nothing safe to restore later.
+        else
+            ; A genuine value, including none itself - a template-based NPC (guards, and the shared Bandit base test 101/103
+            ; use) whose appearance was never driven by a direct Outfit record to begin with. SetForm(key, none) silently
+            ; deletes the variable instead of saving it (the same storage quirk NPC_SaveUnderwear above works around) - that
+            ; used to be indistinguishable from "nothing was ever captured," leaving these NPCs stuck on "Naked" forever
+            ; after release (see NPC_RestoreOriginalOutfit/NPC_ReequipAfterRelease below). The "Captured" flag remembers that
+            ; a real capture happened even when the captured value is legitimately none, so the restore side can tell "never
+            ; captured" apart from "captured as none" and call SetOutfit(none) instead of skipping the restore entirely.
+            SetForm("NPC Original Outfit", npcBaseOutfit)
+            RPB_StorageVars.SetForm(baseOutfitKey, npcBaseOutfit, "BaseOutfits")
+            self.SetBool("NPC Original Outfit Captured", true)
         endif
     endif
 endFunction
@@ -3447,11 +3457,15 @@ function NPC_RestoreOriginalOutfit()
         return
     endif
 
-    Outfit original = NPC_OriginalOutfit
-    EventManager.SendInfo("Restoring outfit of " + self.Name + ": saved " + original + ", base outfit now " + this.GetActorBase().GetOutfit(), "["+ Name +"] Prisoner::NPC_RestoreOriginalOutfit")
-    if (original)
-        this.SetOutfit(original)
+    if (!self.GetBool("NPC Original Outfit Captured"))
+        ; Nothing was ever actually captured for this arrest - leave the ActorBase's outfit alone rather than guessing.
+        return
     endif
+
+    Outfit original = NPC_OriginalOutfit ; may legitimately be none (a template-based NPC) - SetOutfit(none) is the correct
+                                          ; way to clear the "Naked" override back to no outfit, not a case to skip.
+    EventManager.SendInfo("Restoring outfit of " + self.Name + ": saved " + original + ", base outfit now " + this.GetActorBase().GetOutfit(), "["+ Name +"] Prisoner::NPC_RestoreOriginalOutfit")
+    this.SetOutfit(original)
 endFunction
 
 ;/
@@ -3464,34 +3478,39 @@ function NPC_ReequipAfterRelease()
         return
     endif
 
-    ; Guards and other template based NPCs have no Outfit of their own (nothing saved): the worn armor snapshot covers them
+    ; Guards and other template based NPCs have no Outfit of their own - NPC_OriginalOutfit is legitimately none for them,
+    ; not "nothing saved" (see NPC_SaveOriginalOutfit/NPC_RestoreOriginalOutfit) - the worn armor snapshot below covers their
+    ; actual gear, but the ActorBase's own outfit override (forced to "Naked" while stripped) still needs clearing for them too.
+    bool hasOriginal = self.GetBool("NPC Original Outfit Captured")
     Outfit original = NPC_OriginalOutfit
     int parts = 0
     int equipped = 0
     int skipped = 0
     int reissued = 0
-    if (original)
+    if (hasOriginal)
         if (this.GetActorBase().GetOutfit() != original)
             this.SetOutfit(original)
         endif
 
-        parts = original.GetNumParts()
-        int i = 0
-        while (i < parts)
-            Armor part = original.GetNthPart(i) as Armor
-            if (!part)
-                skipped += 1
-            else
-                if (this.GetItemCount(part) == 0)
-                    ; The belongings did not bring this part back: outfit items are generic, issue it again instead of leaving the NPC bare
-                    this.AddItem(part, 1, true)
-                    reissued += 1
+        if (original)
+            parts = original.GetNumParts()
+            int i = 0
+            while (i < parts)
+                Armor part = original.GetNthPart(i) as Armor
+                if (!part)
+                    skipped += 1
+                else
+                    if (this.GetItemCount(part) == 0)
+                        ; The belongings did not bring this part back: outfit items are generic, issue it again instead of leaving the NPC bare
+                        this.AddItem(part, 1, true)
+                        reissued += 1
+                    endif
+                    this.EquipItem(part)
+                    equipped += 1
                 endif
-                this.EquipItem(part)
-                equipped += 1
-            endif
-            i += 1
-        endWhile
+                i += 1
+            endWhile
+        endif
     endif
 
     int wornEquipped = self.NPC_ReequipSavedWornArmor()
