@@ -3438,8 +3438,18 @@ event OnEscortPrisonerToJailEnd(RPB_ActorBase apActor, Actor akEscort)
     endif
 
     ; TODO: Review if a prisoner should be both frisked and stripped, or only stripped if they were going to be stripped
+    ; This used to skip straight from ShouldBeStripped to ShouldBeFrisked, missing the ShouldBeStrippedSilently tier
+    ; OnPrisonerTeleportedToCell already checks correctly - ShouldStrip() deliberately returns false once the
+    ; prisoner already reads as naked (e.g. the shared ActorBase was already left "Naked" by an earlier prisoner of
+    ; the same base), but ShouldSilentlyStrip() has the opposite guard specifically to still catch anything left
+    ; equipped (a weapon, say) in that case. Since Frisking has no real effect (ShouldFrisk() is hardcoded true and
+    ; the Frisking Scene has no code hookup to actually remove anything), a prisoner who fell through both of the
+    ; first two checks was silently keeping whatever she still had equipped.
     if (prisonerRef.ShouldBeStripped)
         self.StartStrippingPrisoner(prisonerRef, akEscort)
+
+    elseif (prisonerRef.ShouldBeStrippedSilently)
+        prisonerRef.StripSilently()
 
     elseif (prisonerRef.ShouldBeFrisked)
         self.StartFriskingPrisoner(prisonerRef, akEscort)

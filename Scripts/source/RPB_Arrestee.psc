@@ -636,23 +636,34 @@ function EscortToPrison(bool abEscortDirectlyToCell = false)
     if (!self.AwaitConfrontationScene(sceneSet))
         ; AwaitConfrontationScene() returns false for two different reasons, and they need different handling here.
         ; (1) all retries exhausted, arrestee still alive - the case this fallback is for. (2) !self.IsEffectActive
-        ; fired inside its own wait loop because this Arrestee was already torn down by something else entirely (e.g.
-        ; the captor died and RPB_Captor.OnDeath's own fast-revert already called RevertArrest() on a separate call
-        ; stack, while this call stack was still suspended in the confrontation wait from before the kill). Confirmed
-        ; by a real test: proceeding here in that second case tried to DeclareArrestSuccess()/MoveToPrison() an Actor
-        ; already disabled by the revert that already ran, producing "not loaded, disabled: TRUE" then "Could not
-        ; turn bandit into a prisoner" - a doomed, redundant salvage attempt on an arrest that's already been reverted.
-        if (!self.IsEffectActive)
+        ; fired inside its own wait loop - but round 19's own original assumption here (this only ever means someone
+        ; else already reverted the arrest, e.g. RPB_Captor.OnDeath's fast revert) turned out to be incomplete: round
+        ; 32 confirmed via test 104 that IsEffectActive can also go false simply because the arrestee's own Actor went
+        ; 3D-unloaded (e.g. the player left far enough away), with NOTHING else reverting anything - silently
+        ; returning here in that case abandoned the arrest forever (round 32's own retest: neither imprisoned nor
+        ; reverted, stuck for the rest of the test). Arrest.Arrestees.AtKey(this) tells the two apart directly -
+        ; Destroy() (called from RevertArrest()) always empties this entry when something genuinely reverted the
+        ; arrest; it's still present if nothing did.
+        if (!self.IsEffectActive && Arrest.Arrestees.AtKey(this) == none)
+            ; Genuinely already reverted by something else while this wait was in flight (e.g. the captor died and
+            ; RPB_Captor.OnDeath's own fast-revert already called RevertArrest() -> Destroy() -> UnregisterArrestee()
+            ; on a separate call stack) - nothing left to salvage. Confirmed by a real test: proceeding here in this
+            ; case tried to DeclareArrestSuccess()/MoveToPrison() an Actor already disabled by the revert that already
+            ; ran, producing "not loaded, disabled: TRUE" then "Could not turn bandit into a prisoner" - a doomed,
+            ; redundant salvage attempt on an arrest that's already been reverted.
             return
         endif
 
-        ; The confrontation Scene never confirmed - rather than reverting an arrest that already legitimately started
-        ; (pacification already applied, intent already committed), fall back to the same Scene-free path
+        ; The confrontation Scene never confirmed (or confirmed too late to matter - the arrestee's own Actor already
+        ; went 3D-unloaded with nothing else reverting it) - rather than reverting an arrest that already legitimately
+        ; started (pacification already applied, intent already committed), fall back to the same Scene-free path
         ; ARREST_TYPE_TELEPORT_TO_CELL already uses (DeclareArrestSuccess + MoveToPrison(abMoveDirectlyToCell = true),
         ; see BeginArrest's own teleport branch) instead of undoing the arrest outright. Applies uniformly whether this
         ; was an Escort-to-Jail or Escort-to-Cell request - once witnessing anything is off the table, the simplest
-        ; safe outcome is to finish the job, not preserve the jail-first distinction. No separate cleanup needed here:
-        ; AwaitConfrontationScene's own give-up path already calls ForceResetSceneState() before returning false.
+        ; safe outcome is to finish the job, not preserve the jail-first distinction. Safe to attempt regardless of
+        ; the actor's current load state: MakePrisoner() below already handles a still-unloaded actor safely (round
+        ; 20's null-check). No separate Scene cleanup needed here: AwaitConfrontationScene's own give-up path already
+        ; calls ForceResetSceneState() before returning false.
         DebugWarn("["+ Name +"] Arrestee::EscortToPrison", "Confrontation Scene never confirmed for " + Name + " - falling back to a direct teleport-to-cell arrest instead of reverting")
         self.DeclareArrestSuccess()
         self.MoveToPrison(abMoveDirectlyToCell = true)
