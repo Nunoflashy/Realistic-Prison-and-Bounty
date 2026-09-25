@@ -7991,6 +7991,12 @@ state Test_MultiPrisonerOffScreenAIAndPlacement
         int COUNT = 5
         int BASE = 0x37BFF ; Bandit - the same base test 097 already uses
 
+        ; Round 19: round 17 fixed the confrontation Scene never confirming, but off-screen bandits still fail to
+        ; confirm imprisonment - and the Escort-to-Cell Scene's own phase transitions had no Crumb() coverage at all
+        ; to show how far a stalled escort actually got. Enabling crumbs here so the failure log below can dump a
+        ; real trail instead of guessing another fix blind.
+        RPB_Utility.EnableCrumbs()
+
         __test101Player = Game.GetFormEx(0x14) as Actor
         __test101Guard  = RPB_Utility.GetNearestGuard(__test101Player, 3000.0, __test101Player)
 
@@ -8079,6 +8085,7 @@ state Test_MultiPrisonerOffScreenAIAndPlacement
 
                     if (!RPB_Utility.IsActorImprisoned(__test101Actors[i]))
                         log("101 " + __test101Actors[i].GetDisplayName() + " never confirmed imprisonment within 120s")
+                        log("101 " + __test101Actors[i].GetDisplayName() + " " + RPB_Utility.DumpCrumbs(__test101Actors[i]))
                     endif
                 else
                     log("101 " + __test101Actors[i].GetDisplayName() + " never confirmed the confrontation Scene within 30s")

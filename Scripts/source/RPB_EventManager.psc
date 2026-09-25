@@ -668,6 +668,11 @@ event OnPrisonScene(string asScene, string asSceneEvent, RPB_Prison apPrison, RP
         if (asSceneEvent == SceneManager.EVENT_ESCORT_BEGIN)
             RetainAI(apPrisoner.IsPlayer())
             apPrison.OnEscortPrisonerToCellBegin(apPrisoner, escort)
+            ; No Crumb() coverage existed anywhere in this Scene's own phase transitions before round 19 - the
+            ; confrontation flow (OnArrestBegin, MoveToPrison, etc.) is densely instrumented, but a stalled off-screen
+            ; Escort-to-Cell walk had no trail at all to show how far it actually got. Added specifically to diagnose
+            ; test 101's continued off-screen stall with real evidence instead of another guessed fix.
+            RPB_Utility.Crumb(apPrisoner.GetActor(), "EscortToCell: Begin")
 
         elseif (asSceneEvent == SceneManager.EVENT_ESCORTING)
             if (asSceneSecondaryEvent == "Release from Captor") ; May be refactored into OnArrestScene
@@ -676,6 +681,8 @@ event OnPrisonScene(string asScene, string asSceneEvent, RPB_Prison apPrison, RP
                 ; Arrest.OnCaptorEscortPrisonerEnd()
                 ; Arrest.OnCaptorEscortedPrisoner()
             endif
+
+            RPB_Utility.Crumb(apPrisoner.GetActor(), "EscortToCell: Escorting" + RPB_Utility.string_if(handlingSecondaryEvent, " (" + asSceneSecondaryEvent + ")", ""))
 
             if (handlingSecondaryEvent)
                 return
@@ -688,6 +695,7 @@ event OnPrisonScene(string asScene, string asSceneEvent, RPB_Prison apPrison, RP
                 jailCell.CellDoor.Close()
                 jailCell.CellDoor.Lock()
                 Debug.SendAnimationEvent(escort, "IdleLockpick") ; Lock animation
+                RPB_Utility.Crumb(apPrisoner.GetActor(), "EscortToCell: Lock Cell")
 
                 ; Arms the Escort-to-Cell stall failsafe here, not at the Scene's own start: a real debug-level log
                 ; confirmed this is the last phase cue that reliably fires in a stalled run - phase 4/5/6 end and this

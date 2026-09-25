@@ -619,6 +619,18 @@ function EscortToPrison(bool abEscortDirectlyToCell = false)
     self.SetString("Scene", sceneSet)
 
     if (!self.AwaitConfrontationScene(sceneSet))
+        ; AwaitConfrontationScene() returns false for two different reasons, and they need different handling here.
+        ; (1) all retries exhausted, arrestee still alive - the case this fallback is for. (2) !self.IsEffectActive
+        ; fired inside its own wait loop because this Arrestee was already torn down by something else entirely (e.g.
+        ; the captor died and RPB_Captor.OnDeath's own fast-revert already called RevertArrest() on a separate call
+        ; stack, while this call stack was still suspended in the confrontation wait from before the kill). Confirmed
+        ; by a real test: proceeding here in that second case tried to DeclareArrestSuccess()/MoveToPrison() an Actor
+        ; already disabled by the revert that already ran, producing "not loaded, disabled: TRUE" then "Could not
+        ; turn bandit into a prisoner" - a doomed, redundant salvage attempt on an arrest that's already been reverted.
+        if (!self.IsEffectActive)
+            return
+        endif
+
         ; The confrontation Scene never confirmed - rather than reverting an arrest that already legitimately started
         ; (pacification already applied, intent already committed), fall back to the same Scene-free path
         ; ARREST_TYPE_TELEPORT_TO_CELL already uses (DeclareArrestSuccess + MoveToPrison(abMoveDirectlyToCell = true),
