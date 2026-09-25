@@ -8247,12 +8247,26 @@ endState
 
 ;/
     Deliberately forces round 17's EscortToPrison() TeleportToCell fallback (RPB_Arrestee.psc) instead of reverting:
-    the bandit's AI is left disabled (unlike every other Scene-driving test, which explicitly re-enables it) so
-    "Hands Behind Back" can never fire - confirmed by round 14's own investigation as the real, already-proven cause
-    of a Scene never progressing at all. AwaitConfrontationScene() will exhaust all 3 retries (~24-26s) and give up;
-    EscortToPrison() should then fall back to DeclareArrestSuccess() + MoveToPrison(abMoveDirectlyToCell = true) -
-    the same Scene-free path ARREST_TYPE_TELEPORT_TO_CELL already uses - instead of reverting the arrest. No test
-    exercised this path before now.
+    the GUARD's AI is left disabled (round 23 - round 22's original version disabled the bandit's instead, and a real
+    retest disproved that: "Scene Confirmed" is set by RPB_Arrestee.OnArrestBegin() reacting to a native Scene
+    phase-end callback via Debug.SendAnimationEvent, which pushes straight into the animation graph regardless of the
+    bandit's own AI state - confirmed AI-independent, not just unconfirmed. The guard's own approach/cuff package
+    (the "Escort" alias) is the only remaining, evidence-consistent lever - consistent with round 17's own finding
+    that the captor's state, not the arrestee's, is what actually gates confrontation Scene progress. Leaving the
+    bandit's own AI enabled this time also avoids round 22's actual failure mode: a bandit that sails through a
+    confirmed confrontation Scene but then stalls forever on the AI/package-driven Escort-to-Cell walk that follows).
+    AwaitConfrontationScene() should exhaust all 3 retries (~24-26s) and give up; EscortToPrison() should then fall
+    back to DeclareArrestSuccess() + MoveToPrison(abMoveDirectlyToCell = true) - the same Scene-free path
+    ARREST_TYPE_TELEPORT_TO_CELL already uses - instead of reverting the arrest. No test exercised this path before
+    round 22.
+
+    The CK's actual Phase-1-end condition isn't visible from Papyrus source, so this is the best remaining
+    evidence-consistent hypothesis, not a certainty - hence the defensive ForceResetSceneState() call at the end of
+    Setup(): if this guess is also wrong and the Scene confirms unexpectedly again, this test still can't leave
+    RPB_SceneManager's shared queue in a bad state for whatever runs after it (confirmed as the actual mechanism
+    that corrupted test 101's very next run, round 22 - a queued-but-unplayed Escort-to-Cell Scene outliving this
+    test's own Teardown() and erroring against an already-deleted actor; see ROADMAP.md's already-tracked
+    "RPB_SceneManager's queue can't invalidate a queued-but-unplayed Scene if its bound actor is destroyed first").
 /;
 Actor __test103Guard
 Actor __test103Actor
@@ -8275,17 +8289,17 @@ state Test_ConfrontationSceneNeverConfirmsFallsBackToTeleport
         if (!__test103Guard)
             return
         endif
-        __test103Guard.EnableAI(true) ; the guard still needs to function normally - only the arrestee's AI stays off
+        ; Deliberately NOT calling EnableAI(true) here, unlike every other Scene-driving test (101, 102) - round 23's
+        ; whole point. __SpawnTempActorOf() leaves AI disabled by default; the guard's own approach/cuff package is
+        ; the evidence-consistent lever for blocking confrontation-Scene progress (see this state's own doc comment
+        ; above for why round 22's bandit-AI-disabled version was wrong).
 
         __test103Actor = __SpawnTempActorOf(BASE)
         step = assert_true(__test103Actor != none, "Failed to spawn the test actor") && step
         if (!__test103Actor)
             return
         endif
-        ; Deliberately NOT calling EnableAI(true) here, unlike every other Scene-driving test (101, 102) - this is
-        ; the whole point of this test. __SpawnTempActorOf() leaves AI disabled by default, and round 14 already
-        ; confirmed a Scene cannot progress on an actor whose AI is disabled - "Hands Behind Back" will never fire,
-        ; so AwaitConfrontationScene() is guaranteed to exhaust its 3 retries instead of confirming.
+        __test103Actor.EnableAI(true) ; the bandit needs to function normally - only the guard's AI stays off
 
         RPB_Utility.ClearCrumbs(__test103Actor)
         RPB_ActorVars.SetCrimeGold(__test103Guard.GetCrimeFaction(), __test103Actor, 2000)
@@ -8322,12 +8336,22 @@ state Test_ConfrontationSceneNeverConfirmsFallsBackToTeleport
         bool imprisoned = RPB_Utility.IsActorImprisoned(__test103Actor)
         log("103 imprisoned: " + imprisoned + ", scene confirmed at any point: " + sceneConfirmedAtAnyPoint)
 
-        step = assert_true(!sceneConfirmedAtAnyPoint, "The confrontation Scene should never have confirmed (AI deliberately left disabled) - if it did, this test can't verify the fallback") && step
+        step = assert_true(!sceneConfirmedAtAnyPoint, "The confrontation Scene should never have confirmed (guard's AI deliberately left disabled) - if it did, this test can't verify the fallback") && step
         step = assert_true(imprisoned, "The bandit should have been imprisoned via the TeleportToCell fallback despite the confrontation Scene never confirming") && step
 
         if (!imprisoned)
             log("103 " + __test103Actor.GetDisplayName() + " " + RPB_Utility.DumpCrumbs(__test103Actor))
         endif
+
+        ; Defense in depth, independent of whether the guard-AI-disabled hypothesis above actually held this run:
+        ; if the Scene confirmed anyway (sceneConfirmedAtAnyPoint), a real Escort-to-Cell Scene may now be queued
+        ; against this bandit - about to be deleted by Teardown() below. Round 22's version of this test hit exactly
+        ; that (its own bandit-AI-disabled bandit sailed through confirmation, then stalled the AI-dependent walk
+        ; forever), leaving a queued Scene that outlived Teardown() and corrupted test 101's very next run when it
+        ; finally errored against an already-deleted actor. Force-resetting here, unconditionally, before Teardown()
+        ; runs means this test can't leave RPB_SceneManager's shared queue in a bad state for whatever runs after it,
+        ; regardless of which hypothesis about this run's own confirmation turned out right.
+        RPB_API.GetSceneManager().ForceResetSceneState()
 
         display_result(step)
     endFunction
