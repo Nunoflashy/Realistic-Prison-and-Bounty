@@ -10260,6 +10260,29 @@ function __TeardownAllTempActors()
                 if (prisonerRef.HasCellPackage)
                     prisonerRef.NPC_UnbindFromCell()
                 endif
+
+                ; Round 28: same leak shape, two more release-only side effects that skipping straight from Imprisoned
+                ; to teardown never reaches, confirmed live the same way the CellPackage leak above was.
+
+                ; NPC_RestoreOriginalOutfit() only ever runs from the real Released state - without it, the shared
+                ; ActorBase's outfit (forced to "Naked" while stripped) stays "Naked" forever, and every future spawn
+                ; of that base looks naked on sight (confirmed: releasing one real bandit through the normal flow
+                ; fixed it for every later spawn, proving the base's real outfit is a real, restorable value, not the
+                ; none case rounds 25-27 were investigating - the bug was always just that nothing called this).
+                ; Safe to call unconditionally - it already no-ops correctly when there's nothing real to restore.
+                prisonerRef.NPC_RestoreOriginalOutfit()
+
+                ; RemoveFromCell() releases this JailCell's own separate roster slot (RPB_JailCell.__prisonersInCell,
+                ; independent of solitudePrison.Prisoners below) - only the real release flow calls it otherwise, so
+                ; a torn-down temp prisoner stayed permanently counted against that cell's real capacity even though
+                ; solitudePrison.UnregisterPrisoner() below already makes it vanish from the Prison-level roster and
+                ; printed prisoner list. Confirmed live: a cell reported "Prisoners: 2" with only one real prisoner
+                ; ever listed or shown in the MCM. Guarded on JailCell purely to avoid a spurious warning log for a
+                ; temp actor torn down before ever being assigned a cell - RemoveFromCell() no-ops safely either way.
+                if (prisonerRef.JailCell)
+                    prisonerRef.RemoveFromCell()
+                endif
+
                 solitudePrison.UnregisterPrisoner(prisonerRef)
             endif
 
