@@ -183,6 +183,8 @@ function SetTests()
     ; Not chainable: deliberately runs the SceneManager's give-up path (ForceResetSceneState wipes the whole queue),
     ; not something to fire unattended alongside other Scene-driven tests in a chain
     self.AddTest("103 - Confrontation Scene Never Confirms (AI Disabled): TeleportToCell Fallback Still Imprisons the Bandit", "Test_ConfrontationSceneNeverConfirmsFallsBackToTeleport", abChainable = false)
+    ; Not chainable: genuinely moves the player away for real, same rationale as test 101
+    self.AddTest("104 - Player Leaves Before the Confrontation Scene Can Start: TeleportToCell Fallback Still Imprisons the Bandit", "Test_PlayerLeavesBeforeConfrontationScene_FallsBackToTeleport", abChainable = false)
     self.AddTest("041 - ActiveMagicEffectContainer: Stuck Lock Self-Heals", "Test_ActiveMagicEffectContainer_StuckLockSelfHeals")
     self.AddTest("042 - ThreadLock: JAtomic Primitive Semantics and Registry", "Test_ThreadLock_PrimitiveSemantics")
     ; Not chainable: fires concurrent worker threads
@@ -8348,6 +8350,113 @@ state Test_ConfrontationSceneNeverConfirmsFallsBackToTeleport
         ; failure, or success), or this debug flag would silently force every subsequent confrontation Scene in
         ; this session (real gameplay included) to fail too.
         RPB_Utility.SetConfrontationSceneForcedToFail(false)
+        __TeardownAllTempActors()
+    endFunction
+endState
+
+;/
+    The other real trigger for round 17's EscortToPrison() TeleportToCell fallback, alongside test 103's "the Scene got
+    bugged somehow": the player leaves before the confrontation Scene ever gets a chance to start. Round 11 already proved
+    moving the player away before a Scene has a chance to start kills it outright - applied here deliberately as the trigger,
+    instead of guessing at CK-internal Scene conditions (rounds 22-24's AI-toggle attempts, all disproven).
+
+    Deliberately a modest ~3000 unit move, not test 101's 50,000-unit off-screen-escort distance - round 26's own real F7
+    retest (KNOWN_ISSUES.md) showed a genuine hard 3D-unload isn't a realistic outcome within this fallback's own ~24-26s
+    retry window (the confrontation Scene had to have started, meaning the player was close by to begin with), so this
+    aims for the realistic "stepped just out of Scene range" case, not a maximal teleport. Accepts either a clean fallback
+    success (imprisoned) or a clean revert (the narrow, accepted outcome if the actor happens to genuinely unload anyway) -
+    getting stuck in neither is the only real failure this test cares about.
+/;
+Actor __test104Guard
+Actor __test104Actor
+Actor __test104Player
+
+state Test_PlayerLeavesBeforeConfrontationScene_FallsBackToTeleport
+    function Setup()
+        int BASE = 0x37BFF ; Bandit - same base tests 097/101/102/103 already use
+
+        RPB_Utility.EnableCrumbs()
+
+        __test104Player = Game.GetFormEx(0x14) as Actor
+        Actor realGuard = RPB_Utility.GetNearestGuard(__test104Player, 3000.0, __test104Player)
+        bool step = assert_true(realGuard != none, "No guard near the player to find a guard base to clone")
+        if (!realGuard)
+            return
+        endif
+
+        __test104Guard = __SpawnTempActorOf(realGuard.GetBaseObject().GetFormID())
+        step = assert_true(__test104Guard != none, "Failed to spawn a temp clone of the nearby guard") && step
+        if (!__test104Guard)
+            return
+        endif
+        __test104Guard.EnableAI(true)
+
+        __test104Actor = __SpawnTempActorOf(BASE)
+        step = assert_true(__test104Actor != none, "Failed to spawn the test actor") && step
+        if (!__test104Actor)
+            return
+        endif
+        __test104Actor.EnableAI(true)
+
+        RPB_Utility.ClearCrumbs(__test104Actor)
+        RPB_ActorVars.SetCrimeGold(__test104Guard.GetCrimeFaction(), __test104Actor, 2000)
+        RPB_Arrest arrest = RPB_API.GetArrest()
+        arrest.ArrestActor(__test104Guard, __test104Actor, arrest.ARREST_TYPE_ESCORT_TO_CELL)
+
+        RPB_Arrestee arresteeRef = arrest.Arrestees.AtKey(__test104Actor)
+        float beginWaitStart = Utility.GetCurrentRealTime()
+        while (!arresteeRef && (Utility.GetCurrentRealTime() - beginWaitStart) < 10.0)
+            Utility.Wait(0.2)
+            arresteeRef = arrest.Arrestees.AtKey(__test104Actor)
+        endWhile
+
+        step = assert_true(arresteeRef != none, "Arrest never actually began within 10s") && step
+        if (!arresteeRef)
+            display_result(false)
+            return
+        endif
+
+        ; The trigger: leave right now, before the confrontation Scene has any chance to start, let alone confirm - round
+        ; 11's own already-proven mechanism. A modest distance (see this state's own doc comment above for why), not
+        ; test 101's maximal off-screen teleport.
+        __test104Player.MoveTo(__test104Guard, afXOffset = 3000.0, afYOffset = 3000.0)
+
+        ; AwaitConfrontationScene() (a separate, independently-suspended thread inside EscortToPrison()) will spend the
+        ; real ~24-26s exhausting its 3 retries before giving up and falling back to MoveToPrison(abMoveDirectlyToCell =
+        ; true). 60s is a generous margin over that plus the fallback's own completion time. Accept either a clean
+        ; fallback success (imprisoned) or a clean revert (Arrestees entry gone) - either is a real, clean outcome;
+        ; getting stuck in neither is the only failure this test cares about.
+        bool sceneConfirmedAtAnyPoint = false
+        float waitStart = Utility.GetCurrentRealTime()
+        bool imprisoned = false
+        bool reverted = false
+        while (!imprisoned && !reverted && (Utility.GetCurrentRealTime() - waitStart) < 60.0)
+            Utility.Wait(0.5)
+            if (arresteeRef.GetBool("Scene Confirmed"))
+                sceneConfirmedAtAnyPoint = true
+            endif
+            imprisoned = RPB_Utility.IsActorImprisoned(__test104Actor)
+            reverted = arrest.Arrestees.AtKey(__test104Actor) == none
+        endWhile
+
+        __test104Player.MoveTo(__test104Guard) ; bring the player back before Teardown() tears down the guard it's standing near
+
+        log("104 imprisoned: " + imprisoned + ", reverted: " + reverted + ", scene confirmed at any point: " + sceneConfirmedAtAnyPoint)
+
+        step = assert_true(!sceneConfirmedAtAnyPoint, "The confrontation Scene should never have confirmed (player left before it could start) - if it did, this test can't verify the real trigger") && step
+        step = assert_true(imprisoned || reverted, "The arrest should have reached a clean end state (imprisoned via the TeleportToCell fallback, or a clean revert) instead of staying stuck") && step
+
+        if (!imprisoned && !reverted)
+            log("104 " + __test104Actor.GetDisplayName() + " " + RPB_Utility.DumpCrumbs(__test104Actor))
+        endif
+
+        display_result(step)
+    endFunction
+
+    function Teardown()
+        if (__test104Player && __test104Guard)
+            __test104Player.MoveTo(__test104Guard) ; bring the player back rather than leaving them out where the test moved them
+        endif
         __TeardownAllTempActors()
     endFunction
 endState
