@@ -535,6 +535,21 @@ endFunction
     returns (bool): true once the Scene is confirmed to be progressing, false if every attempt was exhausted.
 /;
 bool function AwaitConfrontationScene(string asScene)
+    if (RPB_Utility.IsConfrontationSceneForcedToFail())
+        ; Test-only override (RPB_Utility.SetConfrontationSceneForcedToFail) for exercising EscortToPrison()'s
+        ; TeleportToCell fallback deterministically (test 103). Real confrontation Scenes turned out to be
+        ; untestable through actor-state sabotage - two rounds tried disabling one participant's AI or the other's,
+        ; and both still let the Scene's first phase confirm within seconds regardless of which actor was frozen
+        ; (see KNOWN_ISSUES.md, rounds 22-24) - so this returns false without ever calling
+        ; SceneManager.StartArrestScene() at all, which also structurally guarantees this path can never leave
+        ; anything queued/dangling in SceneManager's shared queue, unlike the two earlier attempts. Deliberately not
+        ; calling SceneManager.ForceResetSceneState() here (unlike the real exhausted-retries give-up path below) -
+        ; nothing of ours was ever started or queued in this branch, and resetting anyway would risk wiping a
+        ; different, genuinely in-progress arrest's scene state if one happened to be running concurrently.
+        DebugWarn("["+ Name +"] Arrestee::AwaitConfrontationScene", "Forced failure for " + asScene + " on " + Name + " (RPB_Utility debug flag, not a real timeout)")
+        return false
+    endif
+
     int MAX_ATTEMPTS = 3
     float PER_ATTEMPT_TIMEOUT_SECONDS = 8.0   ; tunable - no real playtest numbers behind this yet
     float POLL_INTERVAL_SECONDS = 1.0

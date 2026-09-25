@@ -152,6 +152,8 @@ scriptname RPB_Utility hidden
     function SetMaxDayEventsPerUpdate(int aiDays) global
     bool function IsOvercrowdingDisabled() global
     function SetOvercrowdingDisabled(bool abDisabled) global
+    bool function IsConfrontationSceneForcedToFail() global
+    function SetConfrontationSceneForcedToFail(bool abForced) global
     float function GetMonitorOverrideHours() global
     function SetMonitorOverrideHours(float afHours) global
     float function GetHostilityRestoreOverrideHours() global
@@ -2582,6 +2584,22 @@ endFunction
 
 function SetOvercrowdingDisabled(bool abDisabled) global
     RPB_StorageVars.SetInt("NO_OVERCROWDING", abDisabled as int, "Profile")
+endFunction
+
+;/
+    Dev override (Profile.FORCE_CONFRONTATION_FAIL): when set, Arrestee.AwaitConfrontationScene() returns false
+    immediately instead of ever starting a real confrontation Scene, for testing EscortToPrison()'s TeleportToCell
+    fallback deterministically (test 103). Real confrontation Scenes turned out to be untestable via actor-state
+    sabotage - disabling either participant's AI (tried both ways) still let the Scene's first phase confirm within
+    seconds regardless, since that phase's completion isn't gated on either actor's AI-driven behavior at all (see
+    KNOWN_ISSUES.md, rounds 22-24). Off (0) by default = the real Scene flow, untouched.
+/;
+bool function IsConfrontationSceneForcedToFail() global
+    return JDB.solveInt(".rpb_root.storage.Profile.FORCE_CONFRONTATION_FAIL") != 0
+endFunction
+
+function SetConfrontationSceneForcedToFail(bool abForced) global
+    RPB_StorageVars.SetInt("FORCE_CONFRONTATION_FAIL", abForced as int, "Profile")
 endFunction
 
 ;/
