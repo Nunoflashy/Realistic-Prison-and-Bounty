@@ -8360,12 +8360,14 @@ endState
     moving the player away before a Scene has a chance to start kills it outright - applied here deliberately as the trigger,
     instead of guessing at CK-internal Scene conditions (rounds 22-24's AI-toggle attempts, all disproven).
 
-    Deliberately a modest ~3000 unit move, not test 101's 50,000-unit off-screen-escort distance - round 26's own real F7
-    retest (KNOWN_ISSUES.md) showed a genuine hard 3D-unload isn't a realistic outcome within this fallback's own ~24-26s
-    retry window (the confrontation Scene had to have started, meaning the player was close by to begin with), so this
-    aims for the realistic "stepped just out of Scene range" case, not a maximal teleport. Accepts either a clean fallback
-    success (imprisoned) or a clean revert (the narrow, accepted outcome if the actor happens to genuinely unload anyway) -
-    getting stuck in neither is the only real failure this test cares about.
+    Round 27: an earlier version of this test used a modest ~3000 unit move, reasoning that round 26's own F7 retest
+    showed a genuine hard 3D-unload isn't realistic within this fallback's own ~24-26s window. A real retest disproved
+    that distance choice on a different axis: 3000 units wasn't far enough to make the Scene treat the player as
+    off-screen at all - the confrontation Scene (and the full Escort-to-Cell Scene afterward) played out completely
+    normally, just slowly, since a Scene only resolves near-instantly once its participants are genuinely off-screen.
+    Now reuses test 101's own proven 50,000-unit distance instead. Accepts either a clean fallback success (imprisoned)
+    or a clean revert (the narrow, accepted outcome if the actor happens to genuinely unload) - getting stuck in
+    neither is the only real failure this test cares about.
 /;
 Actor __test104Guard
 Actor __test104Actor
@@ -8417,15 +8419,21 @@ state Test_PlayerLeavesBeforeConfrontationScene_FallsBackToTeleport
         endif
 
         ; The trigger: leave right now, before the confrontation Scene has any chance to start, let alone confirm - round
-        ; 11's own already-proven mechanism. A modest distance (see this state's own doc comment above for why), not
-        ; test 101's maximal off-screen teleport.
-        __test104Player.MoveTo(__test104Guard, afXOffset = 3000.0, afYOffset = 3000.0)
+        ; 11's own already-proven mechanism. Round 27: a modest ~3000 unit move turned out NOT to be far enough - a real
+        ; retest showed the confrontation Scene (and the full Escort-to-Cell Scene afterward) still played out completely
+        ; normally, just slowly, because a Scene only resolves near-instantly once its participants are genuinely
+        ; off-screen; at a distance the player could still meaningfully perceive it, it plays out in full real time
+        ; instead (confirmed by comparing against test 101, which only moves the player away AFTER "Scene Confirmed" -
+        ; by the time ITS OWN Escort-to-Cell Scene runs, the player is already at this same proven distance, off-screen,
+        ; which is why it calls Imprison() almost instantly). Reusing test 101's own proven distance here instead of a
+        ; smaller guess.
+        __test104Player.MoveTo(__test104Guard, afXOffset = 50000.0, afYOffset = 50000.0)
 
         ; AwaitConfrontationScene() (a separate, independently-suspended thread inside EscortToPrison()) will spend the
         ; real ~24-26s exhausting its 3 retries before giving up and falling back to MoveToPrison(abMoveDirectlyToCell =
         ; true). 60s is a generous margin over that plus the fallback's own completion time. Accept either a clean
-        ; fallback success (imprisoned) or a clean revert (Arrestees entry gone) - either is a real, clean outcome;
-        ; getting stuck in neither is the only failure this test cares about.
+        ; fallback success (imprisoned) or a clean revert - either is a real, clean outcome; getting stuck in neither is
+        ; the only failure this test cares about.
         bool sceneConfirmedAtAnyPoint = false
         float waitStart = Utility.GetCurrentRealTime()
         bool imprisoned = false
@@ -8436,7 +8444,12 @@ state Test_PlayerLeavesBeforeConfrontationScene_FallsBackToTeleport
                 sceneConfirmedAtAnyPoint = true
             endif
             imprisoned = RPB_Utility.IsActorImprisoned(__test104Actor)
-            reverted = arrest.Arrestees.AtKey(__test104Actor) == none
+            ; Arrestees.AtKey becoming none is NOT by itself a revert signal - it's also the normal, expected side
+            ; effect of a SUCCESSFUL Arrestee-to-Prisoner transition (the registry entry moves). Only count it as a
+            ; genuine revert when imprisonment did NOT also happen - confirmed as a real bug this round: an earlier
+            ; version of this check logged "imprisoned: TRUE, reverted: TRUE" simultaneously on a run that actually
+            ; succeeded normally.
+            reverted = !imprisoned && (arrest.Arrestees.AtKey(__test104Actor) == none)
         endWhile
 
         __test104Player.MoveTo(__test104Guard) ; bring the player back before Teardown() tears down the guard it's standing near
