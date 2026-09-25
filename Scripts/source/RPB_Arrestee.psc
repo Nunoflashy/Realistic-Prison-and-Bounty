@@ -682,6 +682,27 @@ function EscortToPrison(bool abEscortDirectlyToCell = false)
         return
     endif
 
+    if (!this.Is3DLoaded() || !Captor.GetActor().Is3DLoaded())
+        ; The confrontation Scene can confirm even when one of us has already gone 3D-unloaded - Phase 1 has no CK
+        ; condition at all (confirmed directly), so "Scene Confirmed" reads true almost unconditionally, regardless of
+        ; either participant's load state. Starting a Package-driven Escort Scene against an unloaded actor doesn't
+        ; fail cleanly: SceneManager only checks the bound reference for None, never Is3DLoaded(), so the Scene binds
+        ; and "starts" successfully while its own phase machine can never actually evaluate Phase 1 (the Escort walk,
+        ; unlike the confrontation Scene, genuinely is Package/AI-driven - see rounds 22-23) - no event ever fires to
+        ; advance or revert the arrest, and the one existing stall check (QueueEscortToCellStallCheck) only arms from
+        ; the Escort-to-Cell Scene's own last phase cue, never reached if it can't get moving at all; Escort-to-Jail
+        ; has no stall check whatsoever. Confirmed as a real, reachable gap, not just a test artifact - test 104's own
+        ; crumb trail showed exactly this sequence once its own timing bug was fixed. Skip the Scene entirely and
+        ; finish the same way the confrontation-Scene fallback above already does, reusing MoveToPrison()'s own
+        ; already-proven direct-teleport calls instead of a doomed Scene attempt.
+        if (!abEscortDirectlyToCell)
+            prisoner.MoveToPrison(Captor.GetActor())
+        else
+            prisoner.MoveToCell()
+        endif
+        return
+    endif
+
     if (!abEscortDirectlyToCell)
         prisoner.EscortToJail(Captor.GetActor())
     else
