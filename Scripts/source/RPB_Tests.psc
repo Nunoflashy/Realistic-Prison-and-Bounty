@@ -8065,6 +8065,21 @@ state Test_MultiPrisonerOffScreenAIAndPlacement
                 ; succeeded - so the player was still being moved away even when the Scene never confirmed at all,
                 ; exactly the "I can't see the scene start" symptom a real test reported. Only move on if it did.
                 if (sceneConfirmed)
+                    ; "Scene Confirmed" only means the confrontation Scene's first phase fired - it says nothing about
+                    ; whether MakePrisoner() has actually finished registering the new Prisoner spell yet, which still
+                    ; needs the actor loaded to do at all. Confirmed by a real run's crumb trail: for two temp actors
+                    ; spawned right next to each other, "Scene Confirmed" can fire almost instantly (no real walk
+                    ; needed), racing the very next line below against EscortToPrison()'s own still-in-flight
+                    ; MakePrisoner() call on a separate thread - moving the player away first can unload the actor
+                    ; before that registration completes, permanently failing it (AwaitEntityReference's own 5s
+                    ; load-grace-period gives up, MakePrisoner() returns none, and the arrest silently reverts via a
+                    ; misattributed "Assign Cell" failure). Wait for the real signal instead of racing on the same
+                    ; trigger both sides are already polling.
+                    float registerWaitStart = Utility.GetCurrentRealTime()
+                    while (prison.Prisoners.AtKey(__test101Actors[i]) == none && (Utility.GetCurrentRealTime() - registerWaitStart) < 15.0)
+                        Utility.Wait(0.2)
+                    endWhile
+
                     ; Now genuinely leave for the rest of THIS bandit's escort - the actual scenario round 9's fix is
                     ; about: player present when the arrest started, then leaves mid-escort. Without this, every
                     ; bandit would finish her WHOLE escort with the player still nearby, and round 9's off-screen

@@ -647,6 +647,16 @@ function EscortToPrison(bool abEscortDirectlyToCell = false)
     self.DeclareArrestSuccess()
 
     RPB_Prisoner prisoner   = self.MakePrisoner()
+    if (!prisoner)
+        ; MakePrisoner()'s own registration never completed (AwaitEntityReference timed out - most likely the actor's
+        ; 3D went away at exactly the wrong moment, see round 20's investigation). Fail explicitly and legibly instead
+        ; of letting a None prisoner/prison cascade through AssignCell()/OnPrisonerImprisonmentFail()'s own silent
+        ; "cannot call on a None object" native errors and land in RevertArrest() below with the wrong failure
+        ; attributed - the same explicit guard MoveToPrison() already has for this identical failure mode.
+        DebugError("["+ Name +"] Arrestee::EscortToPrison", "Could not turn " + Name + " into a prisoner (registration timed out), aborting the arrest!")
+        self.OnArrestFailed("Prisoner Registration")
+        return
+    endif
     RPB_Prison prison       = prisoner.Prison
 
     bool hasAssignedCell = prisoner.AssignCell()
