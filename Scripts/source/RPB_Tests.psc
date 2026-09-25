@@ -8032,12 +8032,19 @@ state Test_MultiPrisonerOffScreenAIAndPlacement
                 RPB_ActorVars.SetCrimeGold(guard.GetCrimeFaction(), __test101Actors[i], 2000)
                 arrest.ArrestActor(guard, __test101Actors[i], arrest.ARREST_TYPE_ESCORT_TO_CELL)
 
-                ; Wait for the confrontation to actually confirm (cuffed - Arrestees.AtKey) before moving the player
-                ; away: moving away any earlier can break the Scene outright (round 11 - a Scene needs the player
-                ; nearby at least long enough to get through its first real phase).
+                ; Wait for the confrontation Scene to actually confirm before moving the player away - moving away any
+                ; earlier can break the Scene outright (round 11 - a Scene needs the player nearby at least long
+                ; enough to get through its first real phase). Arrestees.AtKey(actor) != none is NOT that signal: it
+                ; becomes true as soon as the Arrestee effect attaches (EventManager.OnArrestBegin's very first step),
+                ; well before the confrontation Scene is even asked to start - a real run confirmed every single
+                ; bandit failing "never confirmed" once every bandit's own player-departure landed that early. The
+                ; real signal is the same one AwaitConfrontationScene() itself polls: "Scene Confirmed", set the
+                ; moment "Hands Behind Back" (the Scene's own first real phase cue) fires.
+                RPB_Arrestee arresteeRef = arrest.Arrestees.AtKey(__test101Actors[i])
                 float confirmWaitStart = Utility.GetCurrentRealTime()
-                while (arrest.Arrestees.AtKey(__test101Actors[i]) == none && (Utility.GetCurrentRealTime() - confirmWaitStart) < 30.0)
+                while ((!arresteeRef || !arresteeRef.GetBool("Scene Confirmed")) && (Utility.GetCurrentRealTime() - confirmWaitStart) < 30.0)
                     Utility.Wait(0.5)
+                    arresteeRef = arrest.Arrestees.AtKey(__test101Actors[i])
                 endWhile
 
                 ; Now genuinely leave for the rest of THIS bandit's escort - the actual scenario round 9's fix is
@@ -8153,17 +8160,24 @@ state Test_CaptorDeathRevertsArrestQuickly
         RPB_ActorVars.SetCrimeGold(__test102Guard.GetCrimeFaction(), __test102Actor, 2000)
         RPB_API.GetArrest().ArrestActor(__test102Guard, __test102Actor, RPB_API.GetArrest().ARREST_TYPE_ESCORT_TO_CELL)
 
-        ; Wait for the arrest to genuinely begin (the RPB_Arrestee effect attached) before killing the guard - killing
-        ; before this point would hit the narrow pre-AssignArrestee window OnDeath's own fix deliberately doesn't
-        ; chase (see RPB_Captor.OnDeath's doc comment).
+        ; Wait for AssignArrestee to have actually run (the Captor's own Arrestee field set) before killing the guard.
+        ; Arrestees.AtKey(actor) != none is NOT that signal: it becomes true as soon as the Arrestee effect attaches
+        ; (EventManager.OnArrestBegin's very first step), well before AwaitCaptorReference/AssignArrestee (several
+        ; steps later in that same event) ever run - killing right after that first signal lands squarely in the
+        ; narrow pre-AssignArrestee window OnDeath's own fix deliberately doesn't chase (see RPB_Captor.OnDeath's doc
+        ; comment), instead of the common case that fix targets (guard dies well after the link is made). A real run
+        ; confirmed exactly this: OnDeath never fired, and the arrest only ever reverted via AwaitConfrontationScene's
+        ; unrelated ~24s timeout. GetCaptor() (round 11, never force-registers) confirms the real, later signal.
         RPB_Arrest arrest = RPB_API.GetArrest()
+        RPB_Captor captorRef = arrest.GetCaptor(__test102Guard)
         float waitStart = Utility.GetCurrentRealTime()
-        while (arrest.Arrestees.AtKey(__test102Actor) == none && (Utility.GetCurrentRealTime() - waitStart) < 10.0)
+        while ((!captorRef || captorRef.Arrestee != __test102Actor) && (Utility.GetCurrentRealTime() - waitStart) < 10.0)
             Utility.Wait(0.2)
+            captorRef = arrest.GetCaptor(__test102Guard)
         endWhile
 
-        step = assert_true(arrest.Arrestees.AtKey(__test102Actor) != none, "Arrest never actually began within 10s") && step
-        if (arrest.Arrestees.AtKey(__test102Actor) == none)
+        step = assert_true(captorRef != none && captorRef.Arrestee == __test102Actor, "Arrest never actually began within 10s") && step
+        if (!captorRef || captorRef.Arrestee != __test102Actor)
             display_result(false)
             return
         endif
