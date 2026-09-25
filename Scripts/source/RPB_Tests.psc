@@ -8405,18 +8405,26 @@ state Test_PlayerLeavesBeforeConfrontationScene_FallsBackToTeleport
         RPB_Arrest arrest = RPB_API.GetArrest()
         arrest.ArrestActor(__test104Guard, __test104Actor, arrest.ARREST_TYPE_ESCORT_TO_CELL)
 
-        RPB_Arrestee arresteeRef = arrest.Arrestees.AtKey(__test104Actor)
+        ; Round 29: wait for the Captor's own Arrestee field to actually be set (AssignArrestee/OnArrestBegin genuinely
+        ; complete), not merely for Arrestees.AtKey(actor) != none - that becomes true the instant the Arrestee effect
+        ; attaches, well before AwaitCaptorReference/BeginArrest even run (round 16's own already-diagnosed lesson,
+        ; reused correctly here from test 102 after this test reintroduced the exact same too-early signal it fixed:
+        ; a real retest showed the player being moved away while the arrest's own internal setup was still in flight,
+        ; unloading the bandit's 3D mid-setup rather than merely before the confrontation Scene could start).
+        RPB_Captor captorRef = arrest.GetCaptor(__test104Guard)
         float beginWaitStart = Utility.GetCurrentRealTime()
-        while (!arresteeRef && (Utility.GetCurrentRealTime() - beginWaitStart) < 10.0)
+        while ((!captorRef || captorRef.Arrestee != __test104Actor) && (Utility.GetCurrentRealTime() - beginWaitStart) < 10.0)
             Utility.Wait(0.2)
-            arresteeRef = arrest.Arrestees.AtKey(__test104Actor)
+            captorRef = arrest.GetCaptor(__test104Guard)
         endWhile
 
-        step = assert_true(arresteeRef != none, "Arrest never actually began within 10s") && step
-        if (!arresteeRef)
+        step = assert_true(captorRef != none && captorRef.Arrestee == __test104Actor, "Arrest never actually began within 10s") && step
+        if (!captorRef || captorRef.Arrestee != __test104Actor)
             display_result(false)
             return
         endif
+
+        RPB_Arrestee arresteeRef = arrest.Arrestees.AtKey(__test104Actor)
 
         ; The trigger: leave right now, before the confrontation Scene has any chance to start, let alone confirm - round
         ; 11's own already-proven mechanism. Round 27: a modest ~3000 unit move turned out NOT to be far enough - a real
