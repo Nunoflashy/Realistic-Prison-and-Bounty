@@ -387,7 +387,14 @@ endFunction
     returns (RPB_Captor): the guard's live Captor instance, or none if they aren't currently one.
 /;
 RPB_Captor function GetCaptor(Actor akCaptor)
-    return RPB_Utility.AwaitExistingEntityReference(akCaptor, Captors) as RPB_Captor
+    ; A direct, instant presence check - not AwaitExistingEntityReference(), whose only difference is polling for up
+    ; to 12s if the very first lookup misses. There's no "still registering" race for this function to wait out: by
+    ; the time anything calls GetCaptor(), the entry either still exists or it's already gone (the guard was
+    ; reassigned, or its own AME instance was torn down while off-screen) - waiting can't make an absent entry
+    ; reappear, only stall the caller. Confirmed as the cause of real ~12-13s Prisoner::Imprison stalls (test 94):
+    ; Imprisoned.OnBeginState() calls this near the top of the same event whose last line sets the "Imprisoned" flag
+    ; every mass-run/settle test polls, so a stall here shows up directly as an imprisonment stall.
+    return Captors.AtKeyEx(akCaptor) as RPB_Captor
 endFunction
 
 ;/
