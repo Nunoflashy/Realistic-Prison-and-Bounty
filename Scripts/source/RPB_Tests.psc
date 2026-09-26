@@ -8368,6 +8368,14 @@ endState
     Now reuses test 101's own proven 50,000-unit distance instead. Accepts either a clean fallback success (imprisoned)
     or a clean revert (the narrow, accepted outcome if the actor happens to genuinely unload) - getting stuck in
     neither is the only real failure this test cares about.
+
+    Round 30: the mod author confirmed directly, from the CK itself, that the confrontation Scene's Phase 1 has no
+    condition at all - it will read "Scene Confirmed" true almost unconditionally, regardless of anything this test
+    (or any Papyrus code) can control. "Scene Confirmed" is therefore only ever logged here now, not asserted on -
+    it's expected to read true most runs, and that's fine. Round 31/32 hardened EscortToPrison() itself for exactly
+    this case (a confirmed Scene racing ahead of the arrestee's own 3D dropping): the only thing this test still
+    actually verifies is that the arrest reaches a clean end state either way (imprisoned via the fallback, or a
+    clean revert if the actor genuinely can't be registered) - never stuck in neither.
 /;
 Actor __test104Guard
 Actor __test104Actor
@@ -8462,9 +8470,12 @@ state Test_PlayerLeavesBeforeConfrontationScene_FallsBackToTeleport
 
         __test104Player.MoveTo(__test104Guard) ; bring the player back before Teardown() tears down the guard it's standing near
 
+        ; "Scene Confirmed" is logged, not asserted on - round 30 confirmed directly from the CK that Phase 1 has no
+        ; condition at all, so it reads true almost unconditionally regardless of anything this test can control.
+        ; What actually matters, and what round 31/32 hardened EscortToPrison() for, is that the arrest still reaches
+        ; a clean end state either way.
         log("104 imprisoned: " + imprisoned + ", reverted: " + reverted + ", scene confirmed at any point: " + sceneConfirmedAtAnyPoint)
 
-        step = assert_true(!sceneConfirmedAtAnyPoint, "The confrontation Scene should never have confirmed (player left before it could start) - if it did, this test can't verify the real trigger") && step
         step = assert_true(imprisoned || reverted, "The arrest should have reached a clean end state (imprisoned via the TeleportToCell fallback, or a clean revert) instead of staying stuck") && step
 
         if (!imprisoned && !reverted)
