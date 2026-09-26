@@ -2243,7 +2243,14 @@ function Imprison()
     self.OnImprisoned()
     RPB_Utility.FlowMark("Imprison: OnImprisoned done")
     RPB_Utility.Crumb(this, "Imprison: OnImprisoned done")
-    self.NeutralizeWhileImprisoned() ; no-op for the common (non-hostile) prisoner; see IsHostilePrisoner. Player or NPC alike.
+    ; Only a fallback for paths that reach Imprison() without RPB_Arrest.BeginArrest (e.g. a direct MakePrisoner() call in a
+    ; test). BeginArrest already neutralized this actor seconds ago; repeating it re-checks every hostile faction at a frame
+    ; each, for nothing. Consumed here, so a later imprisonment that didn't go through BeginArrest still gets checked.
+    if (RPB_StorageVars.GetBoolOnReference("Hostility Checked At Arrest", this, "Jail"))
+        RPB_StorageVars.DeleteVariableOnReference("Hostility Checked At Arrest", this, "Jail")
+    else
+        self.NeutralizeWhileImprisoned() ; no-op for the common (non-hostile) prisoner; see IsHostilePrisoner. Player or NPC alike.
+    endif
     GotoState("Imprisoned") ; State when the prisoner is in the cell, check for updates for sentence, etc...
     RPB_Utility.FlowEnd("Imprison: GotoState(Imprisoned) done")
     EndBenchmark(startBench, "Ended ["+ Name +"] Prisoner::Imprison")
@@ -3560,16 +3567,10 @@ function NPC_SaveWornArmor()
         return
     endif
 
-    ; Called right after OnPrisonerTeleportedToCell's own MoveTo(JailCell), with no wait of its own - GetWornForm() read
-    ; immediately after a teleport can come back empty even when the actor genuinely has gear equipped (confirmed real
-    ; log: 0 saved worn armor slots for an arrested bandit that should have had gear). The release side already learned
-    ; this exact lesson for equipping (RPB_Prison.psc's own "equip on an actor whose 3D is not loaded yet can be
-    ; dropped" wait) - apply the same bounded wait here, on the read side, before trusting GetWornForm().
-    float loadWaited = 0.0
-    while (!this.Is3DLoaded() && loadWaited < 1.5)
-        Utility.Wait(0.1)
-        loadWaited += 0.1
-    endWhile
+    ; No load wait before reading worn items: I tried a bounded Is3DLoaded() wait here (up to 1.5s) and it never helped.
+    ; After OnPrisonerTeleportedToCell's MoveTo(JailCell) the prisoner lands in an interior the player isn't in, so it
+    ; never loads - and GetWornForm() still read all of its worn slots correctly while unloaded (a real log: 5 saved,
+    ; after a full 1.5s wait with 3D still false). The wait only added 1.5s to every teleported arrest.
 
     int[] slots = self.__NPC_WornArmorSlots()
     Form[] seen = new Form[32] ; an armor covering several slots is stored once
@@ -3626,6 +3627,9 @@ endFunction
 function NPC_SetPersistentOutfit(string asOutfit)
     if (self.IsNPC())
         Outfit persistentOutfit = RPB_GetOutfit(asOutfit)
+        ; Timeline marker for test 97's "effect never applies" investigation: SetOutfit resets an NPC's inventory from its
+        ; ActorBase, and temp bandits share one - checking whether it lines up with other bandits' effects failing
+        RPB_Utility.Crumb(this, "SetOutfit " + asOutfit + " (base " + this.GetActorBase() + ")")
         this.SetOutfit(persistentOutfit)
 
         ; NPCs will recover their ActorBase inventory when the Outfit is changed, remove them.

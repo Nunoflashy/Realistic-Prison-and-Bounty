@@ -1067,7 +1067,15 @@ endEvent
 event OnEffectFinish(Actor akTarget, Actor akCaster)
     Debug("RPB_ActorBase::OnEffectFinish", this + " is no longer bound to " + self as string + ", detaching script!")
 
-    RPB_Utility.Crumb(this, "OnEffectFinish " + (self as string) + " (akTarget is none: " + (akTarget == none) + ")")
+    ; Guarded, not string_if: its arguments are evaluated either way, and IsDead/GetActorValue cost a frame each. Dead or
+    ; alive matters here - an effect without "No Death Dispel" ends when its actor dies, with nothing calling RemoveSpell.
+    if (RPB_Utility.IsCrumbsEnabled())
+        string lifeState = ""
+        if (akTarget)
+            lifeState = ", dead: " + akTarget.IsDead() + ", health: " + akTarget.GetActorValue("Health")
+        endif
+        RPB_Utility.Crumb(this, "OnEffectFinish " + (self as string) + " (akTarget is none: " + (akTarget == none) + lifeState + ")")
+    endif
     __isEffectActive = false
     self.OnDestroy()
 endEvent

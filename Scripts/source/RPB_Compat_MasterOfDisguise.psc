@@ -2,6 +2,7 @@ scriptname RPB_Compat_MasterOfDisguise hidden
 
 ;/
 @functions:
+    bool function IsInstalled() global
     Form[] function GetFactions() global
 @events:
 /;
@@ -33,7 +34,17 @@ scriptname RPB_Compat_MasterOfDisguise hidden
     Not yet configurable - I've hardcoded this to this one mod, deliberately, for now, until a second disguise mod actually
     needs supporting.
 /;
+; SKSE's Game.GetModByName returns 255 when the plugin isn't loaded
+bool function IsInstalled() global
+    return Game.GetModByName("Master of Disguise - Special Edition.esp") != 255
+endFunction
+
 Form[] function GetFactions() global
+    ; Checked first, so a load order without MoD (most users) skips 31 editor-ID lookups and 31 warnings entirely
+    if (!IsInstalled())
+        return none
+    endif
+
     int count = 31
     Form[] factions = new Form[31]
     int resolved = 0

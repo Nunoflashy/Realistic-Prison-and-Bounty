@@ -323,6 +323,18 @@ event OnArrestBegin(string eventName, string arrestType, float arresteeIdFlt, Fo
     RPB_Utility.FlowMark("AwaitArresteeReference done (spell, effect start, register)")
     RPB_Utility.Crumb(arrestee, "AwaitArresteeReference done (spell, effect start, register)")
 
+    if (!arresteeRef)
+        ; The Arrestee never registered - e.g. the actor died before its effect could start (a corpse can't take it).
+        ; Nothing else has run yet, so undo the only things that did happen - the spell and its Hold binding - instead
+        ; of leaving the actor half-arrested with a spell no script will ever answer for.
+        arrestee.RemoveSpell(RPB_Utility.RPB_ArresteeSpell())
+        RPB_StorageVars.DeleteVariableOnReference("Hold UUID", arrestee, "Arrest")
+        RPB_Utility.Crumb(arrestee, "OnArrestBegin: arrestee never registered, spell removed (reverted)")
+        Config.NotifyArrest("Could not arrest " + arrestee.GetDisplayName())
+        self.SendError("Could not arrest " + arrestee + " for "+ RPB_Utility.GetFormNameCached(crimeFaction) +", the Arrestee never registered! (reverted)", "EventManager::OnArrestBegin")
+        return
+    endif
+
     if (!arresteeRef.InitializeState())
         Config.NotifyArrest("Could not arrest " + arresteeRef.Name)
         self.SendError("Could not arrest " + arresteeRef.Name + " for "+ RPB_Utility.GetFormNameCached(crimeFaction) +", the state was invalid! (aborting)", "EventManager::OnArrestBegin")
@@ -340,7 +352,8 @@ event OnArrestBegin(string eventName, string arrestType, float arresteeIdFlt, Fo
 
     RPB_Captor captorRef = Arrest.AwaitCaptorReference(captor)
     RPB_Utility.FlowMark("AwaitCaptorReference done")
-    RPB_Utility.Crumb(arrestee, "AwaitCaptorReference done")
+    RPB_Utility.Crumb(arrestee, "AwaitCaptorReference done" + RPB_Utility.string_if(!captorRef, " - NO CAPTOR (" + captor + " never registered)", ""))
+    RPB_Utility.Crumb(captor, "Captor await for " + arrestee + ": " + captorRef)
 
     ; Captor Arrest
     Arrest.OnArrestBegin(arresteeRef, captorRef, crimeFaction, arrestType)

@@ -18,6 +18,7 @@ scriptname RPB_Utility hidden
     Armor function RPB_PrisonerHandCuffs() global
     Outfit function RPB_GetOutfit(string asOutfit) global
     Form[] function RPB_GetHostileFactions() global
+    Form[] function RPB_GetHostileFactionsFor(Actor akActor) global
     bool function IsHostileActor(Actor akActor) global
     function NeutralizeHostileActor(Actor akActor) global
     float function PACIFICATION_TIME_BUDGET_SECONDS() global
@@ -479,26 +480,51 @@ Form[] function __FormsFromJArray(int aiJArray) global
 endFunction
 
 ;/
-    The union RPB's own vanilla hostile factions and RPB_Compat_MasterOfDisguise's 31 - resolved once (up to 37 editor-ID
-    lookups) and cached via JDB thereafter (mirrors RPB_ThreadLock.__GetRegistry()'s "resolve once, read the cached handle
-    after" shape), so every later IsHostileActor()/NeutralizeHostileActor() call - on every arrest, every hourly imprisoned
-    tick - reads the cache instead of re-resolving 37 editor IDs each time. The cache persists in the save (the underlying
-    Faction records don't change between sessions unless the load order itself changes, which is the same assumption every
-    editor-ID resolution here already makes).
+    The union RPB's own vanilla hostile factions and RPB_Compat_MasterOfDisguise's 31 - resolved once and cached via JDB
+    thereafter (mirrors RPB_ThreadLock.__GetRegistry()'s "resolve once, read the cached handle after" shape), so later calls
+    read the cache instead of re-resolving editor IDs. Rebuilt only when Master of Disguise's installed state changes (it used
+    to be cached forever, so installing MoD mid-save was never picked up). The vanilla-only half is cached alongside it, for
+    RPB_GetHostileFactionsFor().
 /;
 Form[] function RPB_GetHostileFactions() global
-    int cached = JDB.solveInt(".RPB_HostileFactionsCache")
-    if (cached && JValue.isExists(cached))
-        return __FormsFromJArray(cached)
+    __EnsureHostileFactionsCached()
+    return __FormsFromJArray(JDB.solveObj(".RPB_HostileFactionsCache"))
+endFunction
+
+;/
+    The hostile factions worth checking for @akActor: every one for the player, only RPB's vanilla ones for an NPC. Master of
+    Disguise only ever puts the PLAYER into its 31 disguise factions, and each membership check is a vanilla native that costs a
+    frame - checking all 37 made every arrest ~0.5s slower per check for nothing on an NPC.
+/;
+Form[] function RPB_GetHostileFactionsFor(Actor akActor) global
+    __EnsureHostileFactionsCached()
+    if (akActor == Game.GetPlayer())
+        return __FormsFromJArray(JDB.solveObj(".RPB_HostileFactionsCache"))
+    endif
+    return __FormsFromJArray(JDB.solveObj(".RPB_HostileFactionsVanillaCache"))
+endFunction
+
+function __EnsureHostileFactionsCached() global
+    int modInstalled = RPB_Compat_MasterOfDisguise.IsInstalled() as int
+    ; Objects, not ints: JDB owns (keeps alive) what it holds as an object. An older save holds the union as a plain int
+    ; (retained by hand) - solveObj reads that as 0, so it gets rebuilt once here and replaced.
+    int cached = JDB.solveObj(".RPB_HostileFactionsCache")
+    int cachedVanilla = JDB.solveObj(".RPB_HostileFactionsVanillaCache")
+    if (cached && cachedVanilla && JDB.solveInt(".RPB_HostileFactionsCacheMoD", -1) == modInstalled)
+        return
     endif
 
-    int combined = JValue.retain(JArray.object())
-    int fromVanilla = __AppendFormsToJArray(combined, __ResolveVanillaHostileFactions())
+    int vanilla = JArray.object()
+    int fromVanilla = __AppendFormsToJArray(vanilla, __ResolveVanillaHostileFactions())
+    int combined = JArray.object()
+    JArray.addFromArray(combined, vanilla)
     int fromModCompat = __AppendFormsToJArray(combined, RPB_Compat_MasterOfDisguise.GetFactions())
-    JDB.solveIntSetter(".RPB_HostileFactionsCache", combined, true)
 
-    Info("RPB_GetHostileFactions resolved and cached " + (fromVanilla + fromModCompat) + " hostile factions (" + fromVanilla + " vanilla, " + fromModCompat + " from Master of Disguise compat)")
-    return __FormsFromJArray(combined)
+    JDB.solveObjSetter(".RPB_HostileFactionsVanillaCache", vanilla, true)
+    JDB.solveObjSetter(".RPB_HostileFactionsCache", combined, true)
+    JDB.solveIntSetter(".RPB_HostileFactionsCacheMoD", modInstalled, true)
+
+    Info("RPB_GetHostileFactions resolved and cached " + (fromVanilla + fromModCompat) + " hostile factions (" + fromVanilla + " vanilla, " + fromModCompat + " from Master of Disguise compat, installed: " + (modInstalled as bool) + ")")
 endFunction
 
 ;/
@@ -506,14 +532,14 @@ endFunction
     so IsHostileToActor has to read false for the imprisonment (and the arrest/escort leading up to it) to be peaceful. Applies
     to NPCs (bandits, Civil War soldiers, Forsworn) and to the player (a disguise mod such as fireundubh's Master of Disguise
     adds the PLAYER to the same kind of faction while disguised, e.g. BanditFaction). True if @akActor belongs to any faction
-    in RPB_GetHostileFactions().
+    in RPB_GetHostileFactionsFor(@akActor).
 
     Global and Actor-based (not a Prisoner/Arrestee instance method) on purpose: this needs to run from RPB_Arrest.BeginArrest,
     which only has a bare Actor and an RPB_Arrestee (not yet an RPB_Prisoner) - see NeutralizeHostileActor for why the storage
     is also Actor-keyed with a fixed category rather than going through the RPB_ActorBase per-subclass wrapper.
 /;
 bool function IsHostileActor(Actor akActor) global
-    Form[] hostileFactions = RPB_GetHostileFactions()
+    Form[] hostileFactions = RPB_GetHostileFactionsFor(akActor)
     if (!hostileFactions)
         return false
     endif
@@ -538,7 +564,8 @@ endFunction
     confirmed - covers confrontation/escort/teleport, before Imprison() ever runs), Prisoner.Imprison (a fallback for any path
     that reaches imprisonment without going through BeginArrest, e.g. a direct MakePrisoner() call in a test), and the hourly
     Imprisoned-state tick (in case a disguise mod re-flags the actor mid-sentence and it wasn't actually stripped - see
-    KNOWN_ISSUES). Each call is idempotent: once removed, IsHostileActor reads false and the next call no-ops.
+    KNOWN_ISSUES). Each call is idempotent: once removed, nothing matches and the next call no-ops without touching the storage.
+    One pass over the factions, not IsHostileActor() first and then a second pass: every membership check costs a frame.
 
     Storage is written straight through RPB_StorageVars.*OnReference with a literal "Jail" category - deliberately NOT through
     the RPB_ActorBase SetForm/GetForm wrapper, whose default category resolves differently per subclass (GetScriptVarCategory:
@@ -547,11 +574,11 @@ endFunction
     restore would silently find nothing. A literal category is the same regardless of which class (or none) calls this.
 /;
 function NeutralizeHostileActor(Actor akActor) global
-    if (!IsHostileActor(akActor))
+    Form[] hostileFactions = RPB_GetHostileFactionsFor(akActor)
+    if (!hostileFactions)
         return
     endif
 
-    Form[] hostileFactions = RPB_GetHostileFactions()
     Form[] removedFactions = new Form[128]
     int[] removedRanks = new int[128]
     int removed = 0
@@ -569,6 +596,10 @@ function NeutralizeHostileActor(Actor akActor) global
         endif
         i += 1
     endWhile
+
+    if (removed == 0)
+        return ; not hostile (the common case) - must not overwrite a snapshot an earlier call saved
+    endif
 
     Form[] trimmedFactions = Utility.CreateFormArray(removed)
     int[] trimmedRanks = Utility.CreateIntArray(removed)
@@ -1754,6 +1785,9 @@ RPB_ActorBase function AwaitEntityReference(\
     float afInitialTimeBetweenTries = 0.05, \
     float afMaxTimeBetweenTries = 0.1 \
 ) global
+    ; Only set for the Arrestee list, the one the diagnostic below is for
+    Spell diagnosedSpell
+
     if (apEntityList as RPB_PrisonerList)
         EnsurePrisonerSpellAndBinding(akEntity, apEntity as RPB_Prison)
         ; Debug("Utility::AwaitEntityReference", "("+ akEntity +") apEntityList: " + apEntityList)
@@ -1761,6 +1795,7 @@ RPB_ActorBase function AwaitEntityReference(\
 
     elseif (apEntityList as RPB_ArresteeList)
         EnsureArresteeSpellAndBinding(akEntity, apEntity as RPB_Hold)
+        diagnosedSpell = RPB_ArresteeSpell()
         ; Debug("Utility::AwaitEntityReference", "(RPB_ArresteeList) ("+ akEntity +") apEntityList Keys: " + apEntityList.GetKeys())
 
      elseif (apEntityList as RPB_CaptorList)
@@ -1800,6 +1835,12 @@ RPB_ActorBase function AwaitEntityReference(\
         ;/ const /; float POLL_FIRST_SECONDS = 0.05
         ;/ const /; float POLL_MAX_SECONDS = 0.1
         ;/ const /; float MAX_WAIT_SECONDS = 12.0
+        ; An Arrestee effect normally registers within ~0.16-0.3s. Past this point, record why it hasn't (crumbs only).
+        ; The one cause actually seen: the actor is dead - the Arrestee effect has no "No Death Dispel", so a corpse
+        ; can't take it and a death ends it (test 97's hostile bandits getting killed by the guard while they waited).
+        ; Re-casting doesn't help a corpse; the caller's clean revert handles the timeout.
+        ;/ const /; float DIAGNOSE_AFTER_SECONDS = 3.0
+        bool diagnosed = false
         float delay = POLL_FIRST_SECONDS
         float startTime = Utility.GetCurrentRealTime()
 
@@ -1810,6 +1851,13 @@ RPB_ActorBase function AwaitEntityReference(\
             delay *= 1.5
             if (delay > POLL_MAX_SECONDS)
                 delay = POLL_MAX_SECONDS
+            endif
+
+            if (!entityRef && !diagnosed && diagnosedSpell && (Utility.GetCurrentRealTime() - startTime) >= DIAGNOSE_AFTER_SECONDS)
+                diagnosed = true
+                if (IsCrumbsEnabled())
+                    Crumb(akEntity, "AwaitEntityReference: not registered after " + DIAGNOSE_AFTER_SECONDS + "s [" + apEntityList.ListIdentifier() + "] (HasMagicEffect: " + akEntity.HasMagicEffect(diagnosedSpell.GetNthEffectMagicEffect(0)) + ", HasSpell: " + akEntity.HasSpell(diagnosedSpell) + ", dead: " + akEntity.IsDead() + ", health: " + akEntity.GetActorValue("Health") + ")")
+                endif
             endif
         endWhile
     endif

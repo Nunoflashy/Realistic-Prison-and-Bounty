@@ -1123,6 +1123,10 @@ function BeginArrest(RPB_Arrestee apArresteeRef)
     ; reproduced regression (guards wouldn't stop attacking, the confrontation Scene never confirmed). Restored here,
     ; split back out from the sustained loop, so the two jobs can be tested independently again.
     RPB_Utility.NeutralizeHostileActor(arrestee)
+    ; Tells Prisoner.Imprison() this arrest already did it, so it doesn't repeat the same per-faction check (a frame per
+    ; faction) seconds later. "Jail", the same bucket NeutralizeHostileActor's own snapshot lives in, so it survives into the
+    ; prisoner.
+    RPB_StorageVars.SetBoolOnReference("Hostility Checked At Arrest", arrestee, true, "Jail")
     ; Skyrim generally can't run a Scene on an actor that's still actively in combat (RPB_Utility.SustainArrestPacification's
     ; own doc comment already says so) - the arrestee's own combat is stopped above, but nothing here ever stopped the
     ; CAPTOR's. Normal gameplay never notices, because a real arrest almost always happens after Surrender (which already

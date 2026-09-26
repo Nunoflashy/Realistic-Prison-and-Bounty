@@ -7539,6 +7539,8 @@ bool function __MassRun(bool abNoOvercrowding, int aiBaseFormId = 0x132AE, int a
     self.__MassDumpCells(prison, "before")
 
     self.__StressProfilerOff()
+    ; The guard's own trail: every arrest's Captor await (and any re-registration of his Captor effect) lands on him
+    RPB_Utility.ClearCrumbs(guard)
     float tStart = Utility.GetCurrentRealTime()
 
     Actor[] all = new Actor[64]
@@ -7590,6 +7592,14 @@ bool function __MassRun(bool abNoOvercrowding, int aiBaseFormId = 0x132AE, int a
                 everImprisoned[i] = true
             elseIf (self.__StressLeftovers(all[i], prison) == "")
                 reverted += 1
+                ; A clean revert passes, but not every revert is the prison turning someone away - a run once reverted 20
+                ; of 45 because the guard's Captor never came back. Logs are silent during tests, so the trail is
+                ; the only way to tell the reasons apart.
+                if (reverted <= 5)
+                    ; Dead or alive: the guard attacks these hostile bandits while they wait, and an effect without "No Death
+                    ; Dispel" can't stay on (or be applied to) a corpse
+                    log("MASS reverted actor " + i + " (" + all[i] + ", dead: " + all[i].IsDead() + ", health: " + all[i].GetActorValue("Health") + "): " + RPB_Utility.DumpCrumbs(all[i]))
+                endif
             else
                 stuck += 1
                 if (stuck <= 5)
@@ -7600,6 +7610,7 @@ bool function __MassRun(bool abNoOvercrowding, int aiBaseFormId = 0x132AE, int a
         i += 1
     endWhile
     int totalMs = self.__Ms(Utility.GetCurrentRealTime() - tStart)
+    log("MASS guard " + guard + " " + RPB_Utility.DumpCrumbs(guard))
     self.__MassDumpCells(prison, "after the arrests")
 
     ; Every imprisoned NPC needs an AI package that keeps it in its cell; the package groups are finite
