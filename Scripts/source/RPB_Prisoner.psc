@@ -913,17 +913,22 @@ state Released
         if (self.IsEffectActive)
             self.UnregisterForUpdates()
         endif
+        RPB_Utility.FlowMark("Released: UnregisterForUpdates")
 
         if (self.IsNPC())
             self.NPC_RestoreOriginalOutfit()
         endif
+        RPB_Utility.FlowMark("Released: NPC_RestoreOriginalOutfit")
 
         if (self.IsNPC() && self.HasCellPackage)
             self.NPC_UnbindFromCell()
         endif
+        RPB_Utility.FlowMark("Released: NPC_UnbindFromCell")
 
         self.UpdateTimeJailed()
-        self.UpdateInfamy()    
+        RPB_Utility.FlowMark("Released: UpdateTimeJailed")
+        self.UpdateInfamy()
+        RPB_Utility.FlowMark("Released: UpdateInfamy")    
     endEvent
 
     event OnUpdateGameTime()
@@ -2205,11 +2210,9 @@ function ReturnBelongings()
     int returned = 0
     int i = 0
     while (forms && i < forms.Length)
-        int inContainer = PrisonerBelongingsContainer.GetItemCount(forms[i])
+        ; No GetItemCount clamp first: RemoveItem never moves more than the container actually holds, so the clamp only
+        ; cost a native (a frame) per item - ~0.25s on a 23-item release
         int amount = counts[i]
-        if (inContainer < amount)
-            amount = inContainer
-        endif
         if (amount > 0)
             PrisonerBelongingsContainer.RemoveItem(forms[i], amount, true, this)
             returned += 1

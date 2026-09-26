@@ -575,6 +575,7 @@ endFunction
 /;
 function NeutralizeHostileActor(Actor akActor) global
     Form[] hostileFactions = RPB_GetHostileFactionsFor(akActor)
+    FlowMark("Neutralize: faction list")
     if (!hostileFactions)
         return
     endif
@@ -596,6 +597,7 @@ function NeutralizeHostileActor(Actor akActor) global
         endif
         i += 1
     endWhile
+    FlowMark("Neutralize: faction loop")
 
     if (removed == 0)
         return ; not hostile (the common case) - must not overwrite a snapshot an earlier call saved
@@ -613,11 +615,17 @@ function NeutralizeHostileActor(Actor akActor) global
     RPB_StorageVars.SetFormsOnReference("Hostile Factions", akActor, trimmedFactions, "Jail")
     RPB_StorageVars.SetIntsOnReference("Hostile Ranks", akActor, trimmedRanks, "Jail")
     RPB_StorageVars.SetFloatOnReference("Original Aggression", akActor, akActor.GetActorValue("Aggression"), "Jail")
+    FlowMark("Neutralize: snapshot saved")
     akActor.SetActorValue("Aggression", 0.0)
     akActor.StopCombat()
     akActor.StopCombatAlarm()
+    FlowMark("Neutralize: AV + StopCombat")
 
-    Info("Neutralized " + akActor.GetDisplayName() + " " + akActor + " (removed from " + removed + " hostile factions:" + ranksLogged + ")")
+    ; Guarded with Info()'s own condition: the message calls GetDisplayName(), built before Info() could skip it
+    if (IsLoggingEnabled() && !IsDebuggingEnabled())
+        Info("Neutralized " + akActor.GetDisplayName() + " " + akActor + " (removed from " + removed + " hostile factions:" + ranksLogged + ")")
+    endif
+    FlowMark("Neutralize: Info")
 endFunction
 
 ;/

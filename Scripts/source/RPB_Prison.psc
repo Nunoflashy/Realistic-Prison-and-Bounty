@@ -2297,6 +2297,7 @@ function TeleportPrisonerToRelease(RPB_Prisoner apPrisoner)
         dressOutfit = RPB_StorageVars.GetFormOnReference("NPC Original Outfit", releasedActor, "Jail") as Outfit
     endif
     RPB_Utility.Crumb(releasedActor, "Release: start, " + self.__PartsTrace(releasedActor, dressOutfit))
+    RPB_Utility.FlowMark("Release: start")
 
     ; A prisoner effect instance that starts while the release runs (the actor's 3D loads when it is moved) must not register
     ; it again: see Prisoner.OnInitialize. Destroy() wipes this flag together with the rest of the state.
@@ -2304,16 +2305,20 @@ function TeleportPrisonerToRelease(RPB_Prisoner apPrisoner)
 
     apPrisoner.GotoState("Released")
     RPB_Utility.Crumb(releasedActor, "Release: Released state entered, " + self.__PartsTrace(releasedActor, dressOutfit))
+    RPB_Utility.FlowMark("Release: Released state entered")
     Debug("["+ Name +"] Prison::TeleportPrisonerToRelease", "Released " + apPrisoner.Name + ".")
 
     apPrisoner.Remove("Imprisoned")
 
     apPrisoner.ReturnBelongings()
     RPB_Utility.Crumb(releasedActor, "Release: belongings returned, " + self.__PartsTrace(releasedActor, dressOutfit))
+    RPB_Utility.FlowMark("Release: belongings returned")
     apPrisoner.NPC_ReequipAfterRelease()
     RPB_Utility.Crumb(releasedActor, "Release: outfit re-equipped, " + self.__PartsTrace(releasedActor, dressOutfit))
+    RPB_Utility.FlowMark("Release: outfit re-equipped")
     apPrisoner.RemoveFromCell()
     RPB_Utility.Crumb(releasedActor, "Release: removed from cell")
+    RPB_Utility.FlowMark("Release: removed from cell")
 
     if (!releasedIsNPC && releaseLocation)
         apPrisoner.MoveTo(releaseLocation)
@@ -2326,20 +2331,25 @@ function TeleportPrisonerToRelease(RPB_Prisoner apPrisoner)
     if (releasedIsNPC)
         self.__QueueDress(releasedActor)
     endif
+    RPB_Utility.FlowMark("Release: dress queued")
     ; Hostility restore (unlike dressing) applies to the player too: a disguise mod can neutralize the same way an NPC does.
     ; No-ops cheaply when nothing was saved (the common case).
     self.__QueueHostilityRestore(releasedActor)
+    RPB_Utility.FlowMark("Release: hostility queued")
 
     self.OnPrisonerReleased(apPrisoner)
     RPB_Utility.Crumb(releasedActor, "Release: OnPrisonerReleased done, " + self.__PartsTrace(releasedActor, dressOutfit))
+    RPB_Utility.FlowMark("Release: OnPrisonerReleased done")
 
     if (releasedIsNPC)
         if (releaseLocation)
             releasedActor.MoveTo(releaseLocation)
         endif
         RPB_Utility.Crumb(releasedActor, "Release: moved, " + self.__PartsTrace(releasedActor, dressOutfit))
+        RPB_Utility.FlowMark("Release: moved")
         releasedActor.EnableAI(true)
         RPB_Utility.Crumb(releasedActor, "Release: AI enabled")
+        RPB_Utility.FlowMark("Release: AI enabled")
 
         ; An equip on an actor whose 3D is not loaded yet can be dropped: give it a moment (bounded)
         float loadWaited = 0.0
@@ -2347,6 +2357,7 @@ function TeleportPrisonerToRelease(RPB_Prisoner apPrisoner)
             Utility.Wait(0.1)
             loadWaited += 0.1
         endWhile
+        RPB_Utility.FlowMark("Release: 3D wait")
 
         ; The equipment of an NPC released while its cell was unloaded can be right and still not be drawn: refresh the 3D
         float dressStart = Utility.GetCurrentRealTime()
@@ -2354,15 +2365,20 @@ function TeleportPrisonerToRelease(RPB_Prisoner apPrisoner)
         int equippedNow = self.__DressActor(releasedActor)
         __dressCostMs += (Utility.GetCurrentRealTime() - dressStart) * 1000.0
         __dressCostCount += 1
+        RPB_Utility.FlowMark("Release: dress-up")
         if (RPB_Utility.IsCrumbsEnabled()) ; its message calls Is3DLoaded(), built before Crumb() could return early
             RPB_Utility.Crumb(releasedActor, "Release: after the dress-up (equipped " + equippedNow + "), 3D loaded " + releasedActor.Is3DLoaded() + ", " + self.__PartsTrace(releasedActor, dressOutfit))
         endif
 
-        ; Diagnostic (one line per NPC release)
-        string checkMsg = "Dress check on " + releasedActor.GetDisplayName() + " " + releasedActor + ": equipped now " + equippedNow + ", 3D loaded " + releasedActor.Is3DLoaded()
-        DebugInfo("["+ Name +"] Prison::TeleportPrisonerToRelease", checkMsg)
-        Info(checkMsg)
+        ; Diagnostic (one line per NPC release). Only built when it can print: its message calls GetDisplayName() and
+        ; Is3DLoaded(), a frame each, and was built on every NPC release before DebugInfo()/Info() could skip it.
+        if (IsDebuggingEnabled() || IsLoggingEnabled())
+            string checkMsg = "Dress check on " + releasedActor.GetDisplayName() + " " + releasedActor + ": equipped now " + equippedNow + ", 3D loaded " + releasedActor.Is3DLoaded()
+            DebugInfo("["+ Name +"] Prison::TeleportPrisonerToRelease", checkMsg)
+            Info(checkMsg)
+        endif
     endif
+    RPB_Utility.FlowEnd("Release: done")
 endFunction
 
 ; ==========================================================
@@ -2778,7 +2794,7 @@ endFunction
 ; monitor is now the only one registering game-time updates on this alias: it takes the earliest of its own release wake
 ; and NextHostilityRestoreHours(), and runs __ProcessHostilityRestore() whenever it wakes.
 function __RescheduleHostilityRestore()
-    Monitor.Reschedule()
+    Monitor.ArmHostilityRestore() ; not a full Reschedule(): that reads every prisoner's sentence, on every release
 endFunction
 
 ;/
@@ -2929,6 +2945,7 @@ function EscortPrisonerToRelease(RPB_Prisoner apPrisoner)
 endFunction
 
 bool function SendReleaseRequest(RPB_Prisoner apPrisoner)
+    RPB_Utility.FlowBegin("Release")
     if (apPrisoner.IsNPC() && apPrisoner.IsFarFromPlayer())
         apPrisoner.SetBool("Teleport to Release", true)
 
@@ -2938,6 +2955,7 @@ bool function SendReleaseRequest(RPB_Prisoner apPrisoner)
     endif
 
     ; TODO: Maybe add some conditions for instances where the Release request should be denied.
+    RPB_Utility.FlowMark("Release: request routed")
 
     if (apPrisoner.Should("Teleport to Release"))
         self.TeleportPrisonerToRelease(apPrisoner)
@@ -3341,16 +3359,24 @@ endEvent
 
 event OnPrisonerReleased(RPB_Prisoner apPrisoner)
     ; INFO level (visible with debug logging off): the MCM cannot show a released NPC's Time Jailed, the log can
-    ; Info() is silent while debug logging is on (only the Debug* variants print then): call both, exactly one prints
-    string releasedMsg = "["+ Name +"] Released " + apPrisoner.Name + ": sentence " + apPrisoner.Sentence + " days, time jailed " + apPrisoner.QueryStat("Time Jailed") + " days, time served " + apPrisoner.TimeServed + " days, released at game time " + Utility.GetCurrentGameTime()
-    DebugInfo("["+ Name +"] Prison::OnPrisonerReleased", releasedMsg)
-    Info(releasedMsg)
+    ; Info() is silent while debug logging is on (only the Debug* variants print then): call both, exactly one prints.
+    ; Only built when one of them can print: the message reads stats and the game time (natives) on every release.
+    if (IsDebuggingEnabled() || IsLoggingEnabled())
+        string releasedMsg = "["+ Name +"] Released " + apPrisoner.Name + ": sentence " + apPrisoner.Sentence + " days, time jailed " + apPrisoner.QueryStat("Time Jailed") + " days, time served " + apPrisoner.TimeServed + " days, released at game time " + Utility.GetCurrentGameTime()
+        DebugInfo("["+ Name +"] Prison::OnPrisonerReleased", releasedMsg)
+        Info(releasedMsg)
+    endif
+    RPB_Utility.FlowMark("OnPrisonerReleased: message")
 
     self.RegisterPrisonerReleaseTimeStats(apPrisoner)
+    RPB_Utility.FlowMark("OnPrisonerReleased: release time stats")
     self.ClearPrisonerBounty(apPrisoner)
+    RPB_Utility.FlowMark("OnPrisonerReleased: ClearPrisonerBounty")
 
     self.OnPrisonerLeave(apPrisoner)
+    RPB_Utility.FlowMark("OnPrisonerReleased: OnPrisonerLeave")
     apPrisoner.Destroy()
+    RPB_Utility.FlowMark("OnPrisonerReleased: Destroy")
 endEvent
 
 event OnPrisonerLeave(RPB_Prisoner apPrisoner)

@@ -7740,6 +7740,11 @@ bool function __MassRun(bool abNoOvercrowding, int aiBaseFormId = 0x132AE, int a
     log("MASS restore data before the release: original outfit saved for " + outfitSaved + " actors, body armor saved for " + bodySaved + " actors")
 
     ; Mass release: everybody at once
+    ; Profile the releases if profiling was on before the test: __StressProfilerOff() turned it off for the concurrent
+    ; arrests (their flows would interleave), but the releases below run one at a time, so each logs a clean flow.
+    if (__stressProfilerWasOn)
+        RPB_Utility.EnableFlowProfiling()
+    endif
     prison.ResetDressCost()
     float tRelease = Utility.GetCurrentRealTime()
     int toRelease = 0
@@ -7768,6 +7773,9 @@ bool function __MassRun(bool abNoOvercrowding, int aiBaseFormId = 0x132AE, int a
     endWhile
 
     log("MASS release requests: " + toRelease + " sent, " + (sendTotalMs as int) + " ms in total, slowest " + (sendSlowestMs as int) + " ms")
+    if (__stressProfilerWasOn)
+        RPB_Utility.DisableFlowProfiling() ; back to off for the rest of the run; Teardown restores it as before
+    endif
 
     ; Only the actors that were sent for release count (the reverted ones are not prisoners either, and used to be counted)
     int releasedAll = 0

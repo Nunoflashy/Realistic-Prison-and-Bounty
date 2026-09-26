@@ -19,6 +19,7 @@ scriptname RPB_PrisonMonitor extends ReferenceAlias
     function DisableMonitoring()
     float function ComputeNextWakeHours(float[] afDaysLeft, bool[] abExcluded, bool abHasUnknown = false, float afBufferHours = 0.1, float afMinHours = 1.0, float afUnknownPollHours = 24.0) global
     function Reschedule()
+    function ArmHostilityRestore()
     function RegisterPrisoner(RPB_Prisoner apPrisoner)
     function UpdatePrisonersStats()
     function PassDaysForPrisoner(RPB_Prisoner apPrisoner, int aiDays)
@@ -86,6 +87,10 @@ endProperty
 
 ; Absolute game time (days) of the pending background wake, -1 when none is registered
 float __nextWakeAt = -1.0
+
+; Absolute game time (days) of whatever single game-time wake is registered right now (release, hostility restore or the
+; foreground heartbeat), -1 when none: lets ArmHostilityRestore() move the wake earlier without a full Reschedule()
+float __armedWakeAt = -1.0
 float property NextWakeAt
     float function get()
         return __nextWakeAt
@@ -123,6 +128,7 @@ endFunction
 /;
 function EnterForeground()
     UnregisterForUpdateGameTime()
+    __armedWakeAt = -1.0
     __isMonitoring = false
     __nextWakeAt = -1.0
     self.GotoState("Inactive")
@@ -201,6 +207,7 @@ endFunction
 /;
 function Reschedule()
     UnregisterForUpdateGameTime()
+    __armedWakeAt = -1.0
     __nextWakeAt = -1.0
     __isMonitoring = false
 
@@ -219,12 +226,33 @@ function Reschedule()
     endif
 
     RegisterForSingleUpdateGameTime(hours)
+    __armedWakeAt = Utility.GetCurrentGameTime() + (hours / 24.0)
 
     ; IsMonitoring / NextWakeAt describe the release wake only, as before
     if (releaseHours >= 0.0)
         __nextWakeAt = Utility.GetCurrentGameTime() + (releaseHours / 24.0)
         __isMonitoring = true
         Debug("["+ Prison.Name +"] PrisonMonitor::Reschedule", "Prison Monitor - next wake in " + releaseHours + " game hours (" + RPB_Utility.GetTimeFormatted(releaseHours / 24.0, abIncludeMinutes = true) + ")")
+    endif
+endFunction
+
+;/
+    A hostility restore was queued: make sure the wake comes no later than it, WITHOUT a full Reschedule() - that one
+    reads every prisoner's sentence (natives per prisoner), which made every hostile prisoner's release cost O(prisoners).
+    Registering a single game-time update replaces the pending one, so the wake is only moved when the restore is due
+    before whatever is armed now; otherwise the armed wake comes first, and every wake processes due restores and then
+    re-arms fully. Works in both states (in Inactive the armed wake is the heartbeat).
+/;
+function ArmHostilityRestore()
+    float restoreHours = Prison.NextHostilityRestoreHours()
+    if (restoreHours < 0.0)
+        return
+    endif
+
+    float restoreAt = Utility.GetCurrentGameTime() + (restoreHours / 24.0)
+    if (__armedWakeAt < 0.0 || restoreAt < __armedWakeAt)
+        RegisterForSingleUpdateGameTime(restoreHours)
+        __armedWakeAt = restoreAt
     endif
 endFunction
 
@@ -542,15 +570,18 @@ state Inactive
     ; the default Reschedule), so a restore due while the player is in the prison would otherwise wait up to 12h
     function Reschedule()
         UnregisterForUpdateGameTime()
+        __armedWakeAt = -1.0
         float hours = 12.0
         float restoreHours = Prison.NextHostilityRestoreHours()
         if (restoreHours >= 0.0 && restoreHours < hours)
             hours = restoreHours
         endif
         RegisterForSingleUpdateGameTime(hours)
+        __armedWakeAt = Utility.GetCurrentGameTime() + (hours / 24.0)
     endFunction
 
     event OnUpdateGameTime()
+        __armedWakeAt = -1.0 ; a single update is used up once it fires
         Prison.__ProcessHostilityRestore()
 
         ObjectReference monitored = self.GetReference()
@@ -581,6 +612,7 @@ endFunction
 ; The single background wake: the earliest release has (probably) arrived
 event OnUpdateGameTime()
     Debug("["+ Prison.Name +"] PrisonMonitor::OnUpdateGameTime", "Prison Monitor - Updating")
+    __armedWakeAt = -1.0 ; a single update is used up once it fires
     Prison.__ProcessHostilityRestore() ; only acts on restores that are due (this wake may be for a release)
     __isMonitoring = false
     __nextWakeAt = -1.0
