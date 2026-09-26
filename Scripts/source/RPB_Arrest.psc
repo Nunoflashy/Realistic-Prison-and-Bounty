@@ -1097,14 +1097,21 @@ function BeginArrest(RPB_Arrestee apArresteeRef)
     Faction arrestFaction   = apArresteeRef.GetFaction()
     string arrestType       = apArresteeRef.GetArrestType()
     string hold             = apArresteeRef.GetHold()
+    RPB_Utility.FlowMark("BeginArrest: getters")
 
     apArresteeRef.HideBounty()
+    RPB_Utility.FlowMark("BeginArrest: HideBounty")
     ; Diagnostic (2026-09-23): HideBounty() -> ClearActiveBountyForFaction() should zero the native CrimeGold for the player
     ; (RPB_ActorBase.psc:702-759). Logged to confirm that's actually happening and whether combat was already under way
     ; before this function ever ran - a real in-game test kept showing guards re-engaging over several seconds despite
     ; every pacification step below running, with no Master of Disguise ability effect present on them by that point.
-    EventManager.SendInfo("BeginArrest bounty/combat check on " + arrestee.GetDisplayName() + " " + arrestee + ": crime gold now " + arrestFaction.GetCrimeGold() + ", arrestee in combat " + arrestee.IsInCombat(), "Arrest::BeginArrest")
+    ; Only when logging is on: the message calls three natives, and it's built before SendInfo could skip it
+    if (RPB_Utility.IsLoggingEnabled())
+        EventManager.SendInfo("BeginArrest bounty/combat check on " + arrestee.GetDisplayName() + " " + arrestee + ": crime gold now " + arrestFaction.GetCrimeGold() + ", arrestee in combat " + arrestee.IsInCombat(), "Arrest::BeginArrest")
+    endif
+    RPB_Utility.FlowMark("BeginArrest: bounty/combat diagnostic")
     apArresteeRef.StopCombat()
+    RPB_Utility.FlowMark("BeginArrest: arrestee StopCombat")
     ; A hostile actor (a bandit/CW-soldier/Forsworn NPC, or the player disguised via a mod like Master of Disguise) is
     ; neutralized here, not only at Imprison() time: the arrest is confirmed at this point (the bounty check that can abort
     ; the whole arrest already passed, in OnArrestBegin), and everything from here on - confrontation if any, the escort
@@ -1127,6 +1134,7 @@ function BeginArrest(RPB_Arrestee apArresteeRef)
     ; faction) seconds later. "Jail", the same bucket NeutralizeHostileActor's own snapshot lives in, so it survives into the
     ; prisoner.
     RPB_StorageVars.SetBoolOnReference("Hostility Checked At Arrest", arrestee, true, "Jail")
+    RPB_Utility.FlowMark("BeginArrest: NeutralizeHostileActor")
     ; Skyrim generally can't run a Scene on an actor that's still actively in combat (RPB_Utility.SustainArrestPacification's
     ; own doc comment already says so) - the arrestee's own combat is stopped above, but nothing here ever stopped the
     ; CAPTOR's. Normal gameplay never notices, because a real arrest almost always happens after Surrender (which already

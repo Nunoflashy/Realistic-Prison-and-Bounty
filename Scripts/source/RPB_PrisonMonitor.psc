@@ -126,7 +126,7 @@ function EnterForeground()
     __isMonitoring = false
     __nextWakeAt = -1.0
     self.GotoState("Inactive")
-    RegisterForSingleUpdateGameTime(12.0)
+    self.Reschedule() ; Inactive's version: the 12h heartbeat, or sooner if a hostility restore is due first
 endFunction
 
 ;/
@@ -204,9 +204,35 @@ function Reschedule()
     __nextWakeAt = -1.0
     __isMonitoring = false
 
+    ; I'm the only script on this alias that registers game-time updates: RPB_Prison shares the alias, and two scripts
+    ; registering on one object replaced or cancelled each other's wake (the hostility restore got lost, depending on the
+    ; order of events). So this one registration covers both: the earliest release, and the earliest hostility restore.
+    float releaseHours = self.__NextReleaseWakeHours()
+    float restoreHours = Prison.NextHostilityRestoreHours()
+
+    float hours = releaseHours
+    if (restoreHours >= 0.0 && (hours < 0.0 || restoreHours < hours))
+        hours = restoreHours
+    endif
+    if (hours < 0.0)
+        return ; nothing to wake for
+    endif
+
+    RegisterForSingleUpdateGameTime(hours)
+
+    ; IsMonitoring / NextWakeAt describe the release wake only, as before
+    if (releaseHours >= 0.0)
+        __nextWakeAt = Utility.GetCurrentGameTime() + (releaseHours / 24.0)
+        __isMonitoring = true
+        Debug("["+ Prison.Name +"] PrisonMonitor::Reschedule", "Prison Monitor - next wake in " + releaseHours + " game hours (" + RPB_Utility.GetTimeFormatted(releaseHours / 24.0, abIncludeMinutes = true) + ")")
+    endif
+endFunction
+
+; Hours until the earliest release that needs a background wake (+ buffer, or the dev override), or -1.0 when none does
+float function __NextReleaseWakeHours()
     int count = Prisoners.Count
     if (count == 0)
-        return
+        return -1.0
     endif
 
     float[] daysLeft = Utility.CreateFloatArray(count)
@@ -232,7 +258,7 @@ function Reschedule()
 
     float hours = ComputeNextWakeHours(daysLeft, excluded, hasUnknown)
     if (hours < 0.0)
-        return
+        return -1.0
     endif
 
     ; Dev override (F4 -> [Debug] Toggle Fast Monitor): a short fixed interval to test the monitor without waiting out a sentence
@@ -241,10 +267,7 @@ function Reschedule()
         hours = overrideHours
     endif
 
-    RegisterForSingleUpdateGameTime(hours)
-    __nextWakeAt = Utility.GetCurrentGameTime() + (hours / 24.0)
-    __isMonitoring = true
-    Debug("["+ Prison.Name +"] PrisonMonitor::Reschedule", "Prison Monitor - next wake in " + hours + " game hours (" + RPB_Utility.GetTimeFormatted(hours / 24.0, abIncludeMinutes = true) + ")")
+    return hours
 endFunction
 
 ; ==========================================================
@@ -515,7 +538,21 @@ endState
     background.
 /;
 state Inactive
+    ; The heartbeat, or sooner if a hostility restore is due first - this is the alias's only game-time registration (see
+    ; the default Reschedule), so a restore due while the player is in the prison would otherwise wait up to 12h
+    function Reschedule()
+        UnregisterForUpdateGameTime()
+        float hours = 12.0
+        float restoreHours = Prison.NextHostilityRestoreHours()
+        if (restoreHours >= 0.0 && restoreHours < hours)
+            hours = restoreHours
+        endif
+        RegisterForSingleUpdateGameTime(hours)
+    endFunction
+
     event OnUpdateGameTime()
+        Prison.__ProcessHostilityRestore()
+
         ObjectReference monitored = self.GetReference()
         Cell monitoredCell = none
         if (monitored)
@@ -526,7 +563,7 @@ state Inactive
             Debug("["+ Prison.Name +"] PrisonMonitor::Inactive.OnUpdateGameTime", "The monitoring object is not attached anymore (missed detach), going back to the background")
             self.EnterBackground()
         else
-            RegisterForSingleUpdateGameTime(12.0)
+            self.Reschedule()
         endif
     endEvent
 endState
@@ -544,6 +581,7 @@ endFunction
 ; The single background wake: the earliest release has (probably) arrived
 event OnUpdateGameTime()
     Debug("["+ Prison.Name +"] PrisonMonitor::OnUpdateGameTime", "Prison Monitor - Updating")
+    Prison.__ProcessHostilityRestore() ; only acts on restores that are due (this wake may be for a release)
     __isMonitoring = false
     __nextWakeAt = -1.0
     self.AwaitPrisoners()

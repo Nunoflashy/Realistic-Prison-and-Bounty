@@ -209,6 +209,7 @@ scriptname RPB_Prison extends RPB_Entity
     function ResetDressCost()
     string function DressCostSummary()
     int function PendingHostilityRestoreCount()
+    float function NextHostilityRestoreHours()
     function EscortPrisonerToRelease(RPB_Prisoner apPrisoner)
     bool function SendReleaseRequest(RPB_Prisoner apPrisoner)
     int function ReleaseDueNPCsInOrder(float afPlayerTimeLeft)
@@ -253,7 +254,6 @@ scriptname RPB_Prison extends RPB_Entity
 @events:
     event OnReferenceDeleted()
     event OnUpdate()
-    event OnUpdateGameTime()
     event OnPrisonerImprisonmentFail(RPB_Prisoner apPrisoner, string reason)
     event OnPrisonerRegistered(RPB_Prisoner apPrisoner)
     event OnPrisonerUnregistered(RPB_Prisoner apPrisoner)
@@ -1187,6 +1187,7 @@ endFunction
 RPB_Prisoner function AwaitPrisonerReference(Actor akPrisoner, int aiMaxTries = 120, float afInitialTimeBetweenTries = 0.05, float afMaxTimeBetweenTries = 0.1)
     ; RPB_StorageVars.SetBoolOnReference("Is Initialized", akPrisoner, true, "Actor")
     RPB_Prisoner prisonerRef = RPB_Utility.AwaitEntityReference(akPrisoner, Prisoners, self, aiMaxTries, afInitialTimeBetweenTries, afMaxTimeBetweenTries) as RPB_Prisoner
+    RPB_Utility.FlowMark("AwaitPrisoner: registered")
     if (!prisonerRef)
         ; AwaitEntityReference has already logged why (not loaded / never registered); never call Initialize() on None
         return none
@@ -1833,7 +1834,10 @@ endFunction
 /;
 function RebindPrisoner(RPB_Prisoner apPrisoner)
     Prisoners.Add(apPrisoner)
-    RPB_Utility.Crumb(apPrisoner.GetActor(), "Prison.RebindPrisoner: list holds this instance: " + (Prisoners.AtKey(apPrisoner.GetActor()) == apPrisoner))
+    ; Guarded: Crumb() returns early when crumbs are off, but its message (and the native inside it) is built before the call
+    if (RPB_Utility.IsCrumbsEnabled())
+        RPB_Utility.Crumb(apPrisoner.GetActor(), "Prison.RebindPrisoner: list holds this instance: " + (Prisoners.AtKey(apPrisoner.GetActor()) == apPrisoner))
+    endif
 endFunction
 
 bool function RegisterPrisoner(RPB_Prisoner apPrisoner)
@@ -1843,8 +1847,12 @@ bool function RegisterPrisoner(RPB_Prisoner apPrisoner)
     endif
     
     Prisoners.Add(apPrisoner)
-    RPB_Utility.Crumb(apPrisoner.GetActor(), "Prison.RegisterPrisoner: Prisoners.Add done (list holds this instance: " + (Prisoners.AtKey(apPrisoner.GetActor()) == apPrisoner) + ")")
+    ; Guarded: Crumb() returns early when crumbs are off, but its message (and the native inside it) is built before the call
+    if (RPB_Utility.IsCrumbsEnabled())
+        RPB_Utility.Crumb(apPrisoner.GetActor(), "Prison.RegisterPrisoner: Prisoners.Add done (list holds this instance: " + (Prisoners.AtKey(apPrisoner.GetActor()) == apPrisoner) + ")")
+    endif
     self.OnPrisonerRegistered(apPrisoner)
+    RPB_Utility.FlowMark("RegisterPrisoner: OnPrisonerRegistered")
     return Prisoners.Exists(apPrisoner)
 endFunction
 
@@ -2346,7 +2354,9 @@ function TeleportPrisonerToRelease(RPB_Prisoner apPrisoner)
         int equippedNow = self.__DressActor(releasedActor)
         __dressCostMs += (Utility.GetCurrentRealTime() - dressStart) * 1000.0
         __dressCostCount += 1
-        RPB_Utility.Crumb(releasedActor, "Release: after the dress-up (equipped " + equippedNow + "), 3D loaded " + releasedActor.Is3DLoaded() + ", " + self.__PartsTrace(releasedActor, dressOutfit))
+        if (RPB_Utility.IsCrumbsEnabled()) ; its message calls Is3DLoaded(), built before Crumb() could return early
+            RPB_Utility.Crumb(releasedActor, "Release: after the dress-up (equipped " + equippedNow + "), 3D loaded " + releasedActor.Is3DLoaded() + ", " + self.__PartsTrace(releasedActor, dressOutfit))
+        endif
 
         ; Diagnostic (one line per NPC release)
         string checkMsg = "Dress check on " + releasedActor.GetDisplayName() + " " + releasedActor + ": equipped now " + equippedNow + ", 3D loaded " + releasedActor.Is3DLoaded()
@@ -2762,10 +2772,22 @@ function __QueueHostilityRestore(Actor akActor)
     self.__RescheduleHostilityRestore()
 endFunction
 
-; Finds the earliest due entry and arms a single game-time wake for it (mirrors RPB_PrisonMonitor.Reschedule()).
+; I don't register the restore's game-time wake here: this script shares its alias with RPB_PrisonMonitor, and the two used
+; to register on the same object - a monitor reschedule (a release, the player entering or leaving the prison cell) could
+; cancel or replace the pending restore wake, so tests 99/100 passed or failed depending on the order of events. The
+; monitor is now the only one registering game-time updates on this alias: it takes the earliest of its own release wake
+; and NextHostilityRestoreHours(), and runs __ProcessHostilityRestore() whenever it wakes.
 function __RescheduleHostilityRestore()
+    Monitor.Reschedule()
+endFunction
+
+;/
+    Hours until the earliest pending hostility restore is due (at least 0.01, so an overdue one wakes almost immediately
+    instead of being scheduled into the past), or -1.0 when nothing is pending. Read by RPB_PrisonMonitor.Reschedule().
+/;
+float function NextHostilityRestoreHours()
     if (!__pendingHostility || !JValue.isExists(__pendingHostility) || JFormMap.count(__pendingHostility) == 0)
-        return
+        return -1.0
     endif
 
     int keys = JFormMap.allKeys(__pendingHostility)
@@ -2785,20 +2807,19 @@ function __RescheduleHostilityRestore()
         i += 1
     endWhile
 
-    if (found)
-        float hours = (earliest - Utility.GetCurrentGameTime()) * 24.0
-        if (hours < 0.01)
-            hours = 0.01 ; already due (e.g. after a long time skip): wake almost immediately, not schedule into the past
-        endif
-        self.RegisterForSingleUpdateGameTime(hours)
+    if (!found)
+        return -1.0
     endif
+
+    float hours = (earliest - Utility.GetCurrentGameTime()) * 24.0
+    if (hours < 0.01)
+        hours = 0.01 ; already due (e.g. after a long time skip): wake almost immediately, not schedule into the past
+    endif
+    return hours
 endFunction
 
-event OnUpdateGameTime()
-    self.__ProcessHostilityRestore()
-endEvent
-
-; Restores every entry whose due date has passed, then re-arms for whatever is due next.
+; Restores every entry whose due date has passed. Called from RPB_PrisonMonitor's game-time wake, which re-arms itself
+; afterwards (see __RescheduleHostilityRestore for why this script no longer registers its own wake).
 function __ProcessHostilityRestore()
     if (!__pendingHostility || !JValue.isExists(__pendingHostility))
         return
@@ -2878,8 +2899,6 @@ function __ProcessHostilityRestore()
         endif
         i += 1
     endWhile
-
-    self.__RescheduleHostilityRestore()
 endFunction
 
 ; The NPC's outfit parts: how many it carries and whether each is worn, to see where a part is doubled or lost during the release.

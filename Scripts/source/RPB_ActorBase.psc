@@ -279,13 +279,25 @@ int function GetCurrentActiveAndLatentBountyForFaction(Actor akActor, Faction ak
     bool isPlayer = akActor.GetFormID() == 0x14
 
     if (abNonViolent)
-        int activeNonViolentBounty = int_if (isPlayer, akFaction.GetCrimeGoldNonViolent(), RPB_ActorVars.GetCrimeGoldNonViolent(akFaction, akActor))
+        ; if/else, not int_if: int_if evaluates both branches, so the Faction natives (player-only, a frame each) also ran
+        ; for every NPC and were thrown away
+        int activeNonViolentBounty
+        if (isPlayer)
+            activeNonViolentBounty = akFaction.GetCrimeGoldNonViolent()
+        else
+            activeNonViolentBounty = RPB_ActorVars.GetCrimeGoldNonViolent(akFaction, akActor)
+        endif
         int latentNonViolentBounty = RPB_ActorVars.GetLatentCrimeGoldNonViolent(akFaction, akActor)
         totalBounty += activeNonViolentBounty + latentNonViolentBounty
     endif
 
     if (abViolent)
-        int activeViolentBounty = int_if (isPlayer, akFaction.GetCrimeGoldViolent(), RPB_ActorVars.GetCrimeGoldViolent(akFaction, akActor))
+        int activeViolentBounty
+        if (isPlayer)
+            activeViolentBounty = akFaction.GetCrimeGoldViolent()
+        else
+            activeViolentBounty = RPB_ActorVars.GetCrimeGoldViolent(akFaction, akActor)
+        endif
         int latentViolentBounty = RPB_ActorVars.GetLatentCrimeGoldViolent(akFaction, akActor)
         totalBounty += activeViolentBounty + latentViolentBounty
     endif
@@ -662,13 +674,24 @@ endFunction
 /;
 int function GetActiveBountyForFaction(Faction akFaction, bool abNonViolent = true, bool abViolent = true)
     int totalBounty = 0
-    
+    ; if/else, not int_if: int_if evaluates both branches, so the Faction natives (player-only, a frame each) also ran for
+    ; every NPC and were thrown away - 6 times per arrest through HideBountyForFaction alone
+    bool isPlayer = self.IsPlayer()
+
     if (abNonViolent)
-        totalBounty += int_if (self.IsPlayer(), akFaction.GetCrimeGoldNonViolent(), RPB_ActorVars.GetCrimeGoldNonViolent(akFaction, this))
+        if (isPlayer)
+            totalBounty += akFaction.GetCrimeGoldNonViolent()
+        else
+            totalBounty += RPB_ActorVars.GetCrimeGoldNonViolent(akFaction, this)
+        endif
     endif
 
     if (abViolent)
-        totalBounty += int_if (self.IsPlayer(), akFaction.GetCrimeGoldViolent(), RPB_ActorVars.GetCrimeGoldViolent(akFaction, this))
+        if (isPlayer)
+            totalBounty += akFaction.GetCrimeGoldViolent()
+        else
+            totalBounty += RPB_ActorVars.GetCrimeGoldViolent(akFaction, this)
+        endif
     endif
 
     return totalBounty

@@ -1489,15 +1489,20 @@ function Strip(bool abRemoveUnderwear = true)
 
         NPC_SaveUnderwear(underwearTop, underwearBottom)
     endif
+    RPB_Utility.FlowMark("Strip: underwear read")
 
     self.NPC_SaveWornArmor()
+    RPB_Utility.FlowMark("Strip: NPC_SaveWornArmor")
     self.SaveBelongingsManifest()
+    RPB_Utility.FlowMark("Strip: SaveBelongingsManifest")
     self.UnequipAll()
     self.RemoveAllItems(PrisonerBelongingsContainer, true, true) ; Remove and put all the items in the prisoner's possession in the assigned prisoner container
     self.UnequipHands()
     self.SheatheWeapon()
+    RPB_Utility.FlowMark("Strip: unequip + RemoveAllItems")
 
     self.OnStripped()
+    RPB_Utility.FlowMark("Strip: OnStripped")
 
     ; ObjectReference evidenceChest = Game.GetForm(0x108D37) as ObjectReference ; temp
     ; evidenceChest.SetDisplayName("Vivienne Onis' Belongings") ; temp
@@ -1533,14 +1538,19 @@ function StripSilently()
     Armor underwearBottom   = self.GetUnderwear("Bottom")
 
     NPC_SaveUnderwear(underwearTop, underwearBottom)
+    RPB_Utility.FlowMark("StripSilently: underwear read")
 
     self.NPC_SaveWornArmor()
+    RPB_Utility.FlowMark("StripSilently: NPC_SaveWornArmor")
     self.SaveBelongingsManifest()
+    RPB_Utility.FlowMark("StripSilently: SaveBelongingsManifest")
     self.UnequipAll()
     self.RemoveAllItems(PrisonerBelongingsContainer, true, true) ; Remove and put all the items in the prisoner's possession in the assigned prisoner container
     self.UnequipHands()
     self.SheatheWeapon()
+    RPB_Utility.FlowMark("StripSilently: unequip + RemoveAllItems")
     self.OnStripped() ; Maybe use OnStrippedSilently?
+    RPB_Utility.FlowMark("StripSilently: OnStripped")
 
     PrisonerBelongingsContainer.RemoveItem(underwearTop, abSilent = true, akOtherContainer = this)
     PrisonerBelongingsContainer.RemoveItem(underwearBottom, abSilent = true, akOtherContainer = this)
@@ -2063,7 +2073,14 @@ endFunction
 int property BELONGINGS_MANIFEST_MAX = 120 autoreadonly
 
 function SaveBelongingsManifest()
-    int total = this.GetNumItems()
+    ; One PO3 call for the whole inventory (equipped, favorited and quest items included, like the full GetNthForm walk
+    ; it replaces) instead of GetNumItems + GetNthForm per item - a frame each. GetItemCount per item stays: there is no
+    ; bulk count.
+    Form[] items = PO3_SKSEFunctions.AddAllItemsToArray(this, false, false, false)
+    int total = 0
+    if (items)
+        total = items.Length
+    endif
     int count = total
     int manifestState = 1 ; 1 = complete, 2 = incomplete
     if (count > BELONGINGS_MANIFEST_MAX)
@@ -2075,7 +2092,7 @@ function SaveBelongingsManifest()
     int[] counts = new int[120]
     int i = 0
     while (i < count)
-        Form item = this.GetNthForm(i)
+        Form item = items[i]
         forms[i] = item
         counts[i] = this.GetItemCount(item)
         i += 1
@@ -2622,14 +2639,18 @@ RPB_Prisoner function Initialize()
     if (!Prison.IsPrisoner(self))
         Prison.RegisterPrisoner(self)
     endif
+    RPB_Utility.FlowMark("Initialize: register check")
 
     if (!self.Sentence)
         self.SetSentence()
     endif
+    RPB_Utility.FlowMark("Initialize: SetSentence")
 
     self.RegisterSleepEvents = true
     self.RegisterForTrackedStats()
+    RPB_Utility.FlowMark("Initialize: RegisterForTrackedStats")
     self.LockPrisonerSettings()
+    RPB_Utility.FlowMark("Initialize: LockPrisonerSettings")
 
     self.InitializeState()
 
@@ -2665,11 +2686,17 @@ function InitializeState()
     ShowTimeServed = true
     ShowBounty = true
 
+    RPB_Utility.FlowMark("InitializeState: Show* flags")
     self.DetermineStrippingType()
+    RPB_Utility.FlowMark("InitializeState: DetermineStrippingType")
     self.DetermineClothingOutfit()
+    RPB_Utility.FlowMark("InitializeState: DetermineClothingOutfit")
     self.SetReleaseLocation() ; to be refactored (needs to take into account whether to use Escort or Teleport markers)
+    RPB_Utility.FlowMark("InitializeState: SetReleaseLocation")
     self.UpdateInfamyLost()
+    RPB_Utility.FlowMark("InitializeState: UpdateInfamyLost")
     self.TriggerInfamyPenalty()
+    RPB_Utility.FlowMark("InitializeState: TriggerInfamyPenalty")
 
     int errors = RPB_Memory.FastArray("<string>")
 
@@ -2690,6 +2717,7 @@ function InitializeState()
     endif
 
     self.SetBool("Initialized", true) ; Prevent further initializations
+    RPB_Utility.FlowMark("InitializeState: error checks + Initialized")
 endFunction
 
 ; NOT WORKING: We shouldn't process anything if this fails, the execution should stop here for this script
@@ -3172,6 +3200,7 @@ event OnInitialize()
         Utility.Wait(0.1)
         bindingTries += 1
     endWhile
+    RPB_Utility.FlowMark("Prisoner.OnInitialize: enter")
 
     if (RPB_Utility.IsCrumbsEnabled())
         RPB_Utility.Crumb(this, "Prisoner.OnInitialize: enter (Was Initialized: " + self.Was("Initialized") + ", IsImprisoned: " + self.IsImprisoned + ", binding waits: " + bindingTries + ", Prison: " + Prison + ")")
@@ -3188,6 +3217,7 @@ event OnInitialize()
     endif
 
     Prison.RegisterPrisoner(self)
+    RPB_Utility.FlowMark("Prisoner.OnInitialize: registered")
     RPB_Utility.Crumb(this, "Prisoner.OnInitialize: RegisterPrisoner returned")
     ; DebugInfo("("+ Name +") Prisoner::OnInitialize", "Initialized: " + self.Was("Initialized"))
 endEvent
@@ -3432,12 +3462,14 @@ endFunction
 
 function NPC_SaveOriginalOutfit()
     if (self.IsNPC())
-        Outfit npcBaseOutfit = this.GetActorBase().GetOutfit()
+        ; Read once into a function local (it lives on this call's stack, not on the effect): GetActorBase is a frame
+        ActorBase npcBase = this.GetActorBase()
+        Outfit npcBaseOutfit = npcBase.GetOutfit()
 
         ; The outfit belongs to the ActorBase, shared by every NPC of that base: once the first of them is stripped the base outfit is
         ; "Naked" and the others would find nothing to save. So the real outfit is also remembered per base, and an NPC stripped
         ; while the base is "Naked" takes the remembered one.
-        string baseOutfitKey = "Original Outfit " + this.GetActorBase().GetFormID()
+        string baseOutfitKey = "Original Outfit " + npcBase.GetFormID()
         if (npcBaseOutfit != RPB_GetOutfit("Naked"))
             ; Ensure we don't save a 'naked' outfit.
             SetForm("NPC Original Outfit", npcBaseOutfit)
@@ -3572,17 +3604,35 @@ function NPC_SaveWornArmor()
     ; never loads - and GetWornForm() still read all of its worn slots correctly while unloaded (a real log: 5 saved,
     ; after a full 1.5s wait with 3D still false). The wait only added 1.5s to every teleported arrest.
 
-    int[] slots = self.__NPC_WornArmorSlots()
-    Form[] seen = new Form[32] ; an armor covering several slots is stored once
+    ; One PO3 call for everything equipped, instead of GetWornForm on each of the 32 slots (a frame each, ~0.35s per
+    ; NPC). Each armor is stored under its lowest slot's key - the same key the old ascending 30..61 slot scan produced
+    ; (an armor covering several slots was found at its lowest one first), so NPC_ReequipSavedWornArmor and
+    ; Prison's dress check read it unchanged. Works on an unloaded actor, like GetWornForm did.
+    Form[] equipped = PO3_SKSEFunctions.AddAllEquippedItemsToArray(this)
+    Form[] bySlot = new Form[32] ; index = slot - 30
     int saved = 0
     int i = 0
-    while (i < slots.Length)
-        string wornKey = "NPC Worn Armor " + slots[i]
-        Armor worn = this.GetWornForm(Math.LeftShift(1, slots[i] - 30)) as Armor
-        if (worn && seen.Find(worn) < 0)
-            seen[saved] = worn
-            SetForm(wornKey, worn)
-            saved += 1
+    while (equipped && i < equipped.Length)
+        Armor worn = equipped[i] as Armor
+        if (worn)
+            int mask = worn.GetSlotMask()
+            int bit = 0
+            while (bit < 32 && Math.LogicalAnd(mask, Math.LeftShift(1, bit)) == 0)
+                bit += 1
+            endWhile
+            if (bit < 32 && !bySlot[bit])
+                bySlot[bit] = worn
+                saved += 1
+            endif
+        endif
+        i += 1
+    endWhile
+
+    i = 0
+    while (i < 32)
+        string wornKey = "NPC Worn Armor " + (30 + i)
+        if (bySlot[i])
+            SetForm(wornKey, bySlot[i])
         elseIf (GetForm(wornKey))
             Remove(wornKey)
         endif
@@ -3627,9 +3677,6 @@ endFunction
 function NPC_SetPersistentOutfit(string asOutfit)
     if (self.IsNPC())
         Outfit persistentOutfit = RPB_GetOutfit(asOutfit)
-        ; Timeline marker for test 97's "effect never applies" investigation: SetOutfit resets an NPC's inventory from its
-        ; ActorBase, and temp bandits share one - checking whether it lines up with other bandits' effects failing
-        RPB_Utility.Crumb(this, "SetOutfit " + asOutfit + " (base " + this.GetActorBase() + ")")
         this.SetOutfit(persistentOutfit)
 
         ; NPCs will recover their ActorBase inventory when the Outfit is changed, remove them.

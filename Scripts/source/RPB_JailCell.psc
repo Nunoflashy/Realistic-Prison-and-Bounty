@@ -764,7 +764,11 @@ event OnPrisonerRegister(RPB_Prisoner apPrisoner)
         Debug("["+ ID +"] JailCell::OnPrisonerRegister", "Rebinding Cell Door!")
     endif
     self.DetermineCellParameters()
-    Debug("JailCell::OnPrisonerRegister", "Cell Properties: " + self.DEBUG_GetCellProperties())
+    ; Guarded, not left to Debug(): the message is built before Debug() gets to check, and building it looks up every
+    ; prisoner in this cell (with name/sex natives) - on every registration, seconds for a crowded cell, logging or not.
+    if (IsDebuggingEnabled())
+        Debug("JailCell::OnPrisonerRegister", "Cell Properties: " + self.DEBUG_GetCellProperties())
+    endif
 endEvent
 
 event OnPrisonerUnregister(RPB_Prisoner apPrisoner)
@@ -947,12 +951,15 @@ endFunction
 function DetermineCellParameters()
     if (self.PrisonerCount > 0)
         Form prisonerForm = FastMap_GetForm(__prisonersInCell, FastMap_GetNthKey(__prisonersInCell, 0)) ; Get the first prisoner reference
-        RPB_Prisoner prisonerRef = Prison.GetPrisonerReference(prisonerForm as Actor)
+        ; A plain list lookup: this only reads the first cellmate's stripping flags. GetPrisonerReference is the full
+        ; AwaitPrisonerReference path (ensure the spell, Initialize()) - several frames, and it could re-add the Prisoner
+        ; spell to a stale entry.
+        RPB_Prisoner prisonerRef = Prison.Prisoners.AtKey(prisonerForm as Actor)
 
         ; If the first prisoner will be/is stripped naked / to underwear, set this cell as gender exclusive for them if the cell is not yet gender exclusive,
         ; this means that the first prisoner has not been stripped naked or to underwear.
         ; (Not implemented yet): We should probably make the first prisoner strip off (maybe in some condition, such as having more than a day left of sentence for example.)
-        if (!self.IsGenderExclusive && ((prisonerRef.WillBeStrippedNaked || prisonerRef.WillBeStrippedToUnderwear) || (prisonerRef.IsStrippedNaked || prisonerRef.IsStrippedToUnderwear)))
+        if (prisonerRef && !self.IsGenderExclusive && ((prisonerRef.WillBeStrippedNaked || prisonerRef.WillBeStrippedToUnderwear) || (prisonerRef.IsStrippedNaked || prisonerRef.IsStrippedToUnderwear)))
             self.SetExclusiveToPrisonerSex(prisonerRef)
         endif
 
@@ -1357,7 +1364,7 @@ string function DEBUG_GetPrisoners()
     int i = 0
     while (i < Prisoners.Length)
         Form ref = Prisoners[i]
-        RPB_Prisoner prisonerRef = Prison.GetPrisonerReference(ref as Actor)
+        RPB_Prisoner prisonerRef = Prison.Prisoners.AtKey(ref as Actor) ; debug output must never trigger awaits/Initialize()
         ; string sentence = DEBUG_ShowPrisonerSentenceInfo(prisonerRef)
         ; Debug("["+ ID +"] JailCell::DEBUG_GetPrisoners", "Sentence: " + sentence)
         if (prisonerRef)
