@@ -1,12 +1,14 @@
 Scriptname RPB_Config extends Quest
 
 ;/
-@properties:
+@constants:
     bool IS_DEBUG
     bool ENABLE_BENCHMARK
+@references:
     RPB_API API
     RPB_MCM MCM
     RPB_Arrest Arrest
+@properties:
     string[] Holds
     string[] Cities
     Actor Player

@@ -1,5 +1,19 @@
 scriptname RealisticPrisonAndBounty_Clothing extends Quest
 
+;/
+@references:
+    RPB_Config config
+    RealisticPrisonAndBounty_Outfit _outfit
+@functions:
+    bool function validate()
+    function WearOutfit(Actor actorToClothe, RealisticPrisonAndBounty_Outfit outfitToWear, bool undressActor = true)
+    function UnwearOutfit(Actor actorToUndress, bool preventEquip = false)
+    RealisticPrisonAndBounty_Outfit function GetOutfit(string outfitName)
+    RealisticPrisonAndBounty_Outfit function GetCurrentOutfit()
+    RealisticPrisonAndBounty_Outfit function GetDefaultOutfit(bool includeFeetClothing = true)
+@events:
+/;
+
 import RPB_Utility
 import RPB_Config
 

@@ -1,10 +1,11 @@
 Scriptname RPB_Arrestee extends RPB_ActorBase
 
 ;/
-@properties:
+@references:
     RPB_Arrest Arrest
     RPB_SceneManager SceneManager
     RPB_Captor Captor
+@properties:
     Faction ArrestFaction
     string Hold
     string ArrestType

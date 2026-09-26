@@ -1,7 +1,7 @@
 scriptname RPB_Actions extends ObjectReference
 
 ;/
-@properties:
+@references:
     RPB_API API
 @functions:
     string[] function GetActions()

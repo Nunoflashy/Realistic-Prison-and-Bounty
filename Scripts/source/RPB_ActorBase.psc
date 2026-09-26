@@ -4,9 +4,10 @@ scriptname RPB_ActorBase extends ActiveMagicEffect
 }
 
 ;/
-@properties:
+@references:
     RPB_API API
     RPB_Config Config
+@properties:
     string Name
     string Sex
     bool IsFemale

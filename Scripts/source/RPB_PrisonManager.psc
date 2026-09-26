@@ -1,13 +1,14 @@
 Scriptname RPB_PrisonManager extends Quest
 
 ;/
-@properties:
+@references:
     RPB_API API
     RPB_Config Config
     RPB_EventManager EventManager
     RPB_SceneManager SceneManager
-    int PrisonSlots
     RPB_Prison AvailableSlot
+@properties:
+    int PrisonSlots
     bool HasPrisonsWithPrisoners
     Message ServeTimeMessage
     bool PrisonInfamyRecognizedThresholdNotification

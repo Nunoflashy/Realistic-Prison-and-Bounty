@@ -1,7 +1,7 @@
 Scriptname RPB_MCM_02 extends SKI_ConfigBase  
 
 ;/
-@properties:
+@constants:
     bool IS_DEBUG
     bool ENABLE_TRACE
     int OPTION_ENABLED
@@ -9,8 +9,13 @@ Scriptname RPB_MCM_02 extends SKI_ConfigBase
     string MCM_PAGE_CHECK_ARRESTEE_INFO
     string MCM_PAGE_CHECK_PRISONER_INFO
     string MCM_PAGE_CHECK_HOLD_INFO_FOR_ACTOR
+    int PLAYER_INFO_NONE
+    int PLAYER_INFO_ARRESTED
+    int PLAYER_INFO_PRISONER
+@references:
     RPB_API API
     RPB_PrisonManager PrisonManager
+@properties:
     string[] Holds
     string[] HoldStatsTemplate
     string[] HoldStatsPlaceholders
@@ -18,9 +23,6 @@ Scriptname RPB_MCM_02 extends SKI_ConfigBase
     string[] ArrestHeaderPlaceholders
     string PrisonHeaderTemplate
     string[] PrisonHeaderPlaceholders
-    int PLAYER_INFO_NONE
-    int PLAYER_INFO_ARRESTED
-    int PLAYER_INFO_PRISONER
 @functions:
     string[] function ConstructHoldStatValues( int aiBounty, int aiViolentBounty, int aiLargestBounty, int aiTotalBounty, int aiTimesArrested, int aiTimesFrisked, int aiArrestsEluded, int aiArrestsResisted, int aiBountiesPaid )
     string[] function ConstructArrestHeaderValues( string asArrestHold, string asArrestCity, string asPotentialPrisonName, string asArresteeName )

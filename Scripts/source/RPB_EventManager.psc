@@ -1,7 +1,7 @@
 scriptname RPB_EventManager extends Quest
 
 ;/
-@properties:
+@references:
     RPB_API API
     RPB_Config Config
     RPB_Arrest Arrest

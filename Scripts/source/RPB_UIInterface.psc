@@ -1,7 +1,7 @@
 scriptname RPB_UIInterface extends ObjectReference
 
 ;/
-@properties:
+@references:
     UILIB_1 UILib
     RPB_API API
 @functions:

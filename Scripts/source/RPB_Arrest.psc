@@ -1,11 +1,7 @@
 scriptname RPB_Arrest extends Quest
 
 ;/
-@properties:
-    RPB_API API
-    RPB_Config Config
-    RPB_EventManager EventManager
-    RPB_SceneManager SceneManager
+@constants:
     int TOPIC_START
     int TOPIC_END
     int TOPIC_TYPE_ARREST_SUSPICIOUS
@@ -34,8 +30,14 @@ scriptname RPB_Arrest extends Quest
     int ALREADY_IMPRISONED
     int CAN_ARREST
     int ALREADY_ARRESTING
+@references:
+    RPB_API API
+    RPB_Config Config
+    RPB_EventManager EventManager
+    RPB_SceneManager SceneManager
     RPB_ArresteeList Arrestees
     RPB_CaptorList Captors
+@properties:
     bool ShouldDisplayArrestNotifications
     bool ShouldDisplayBountyDecayNotifications
 @functions:

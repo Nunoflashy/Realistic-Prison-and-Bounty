@@ -1,14 +1,7 @@
 scriptname RPB_SceneManager extends Quest
 
 ;/
-@properties:
-    RPB_API API
-    RPB_Config Config
-    RPB_EventManager EventManager
-    GlobalVariable RPB_SceneBlockNormalExecution
-    GlobalVariable RPB_SceneStartAtPhase
-    Scene UnlockCell
-    Scene LockCell
+@constants:
     int PHASE_START
     int PHASE_END
     string EVENT_RESTRAIN_BEGIN
@@ -80,6 +73,15 @@ scriptname RPB_SceneManager extends Quest
     string SCENE_RESTRAIN_PRISONER_02
     string SCENE_ARREST_PAY_BOUNTY_FOLLOW_WILLINGLY
     string SCENE_ARREST_PAY_BOUNTY_FOLLOW_BY_FORCE
+@references:
+    RPB_API API
+    RPB_Config Config
+    RPB_EventManager EventManager
+@properties:
+    GlobalVariable RPB_SceneBlockNormalExecution
+    GlobalVariable RPB_SceneStartAtPhase
+    Scene UnlockCell
+    Scene LockCell
 @functions:
     function SceneManager()
     function AddGlobal(string asGlobalName, int aiGlobalFormID, int aiDefaultValue = 0)

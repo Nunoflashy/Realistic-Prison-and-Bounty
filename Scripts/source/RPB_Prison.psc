@@ -1,15 +1,21 @@
 scriptname RPB_Prison extends RPB_Entity  
 
 ;/
-@properties:
-    int ID
-    string UUID
-    bool Active
+@constants:
+    int SERVE_TIME_YES
+    float HOSTILITY_RESTORE_DELAY_HOURS
+@references:
     RPB_PrisonManager PrisonManager
     RPB_API API
     RPB_Config Config
     RPB_SceneManager SceneManager
     RPB_EventManager EventManager
+    RPB_PrisonMonitor Monitor
+    RPB_PrisonerList Prisoners
+@properties:
+    int ID
+    string UUID
+    bool Active
     string Name
     Location PrisonLocation
     Faction PrisonFaction
@@ -96,15 +102,12 @@ scriptname RPB_Prison extends RPB_Entity
     int OutfitMinimumBounty
     int OutfitMaximumBounty
     Message ServeTimeMessage
-    int SERVE_TIME_YES
     bool IsPlayerFastForwardingToRelease
     bool PrioritizeEmptyCells
     bool PrioritizeGenderCells
     bool AllowOnlyEmptyCells
     bool AllowOnlyGenderExclusiveCells
     bool AllowOnlyEmptyOrGenderCells
-    RPB_PrisonMonitor Monitor
-    RPB_PrisonerList Prisoners
     Form[] JailCells
     Form[] EmptyJailCells
     Form[] OccupiedJailCells
@@ -115,7 +118,6 @@ scriptname RPB_Prison extends RPB_Entity
     bool HasInfamyKnownNotificationFired
     string InfamyRecognizedSentenceAppliedNotification
     string InfamyKnownSentenceAppliedNotification
-    float HOSTILITY_RESTORE_DELAY_HOURS
     int SettingsSnapshotBuilds
 @functions:
     function ResetCachedHold()

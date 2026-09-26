@@ -1,7 +1,7 @@
 Scriptname RPB_ConfigAlias extends ReferenceAlias  
 
 ;/
-@properties:
+@references:
     RPB_API API
     RPB_Config Config
     RPB_PrisonManager PrisonManager

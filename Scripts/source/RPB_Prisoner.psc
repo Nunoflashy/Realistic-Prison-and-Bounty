@@ -1,15 +1,22 @@
 Scriptname RPB_Prisoner extends RPB_ActorBase
 
 ;/
-@properties:
-    Armor[] NPC_Underwear
+@constants:
     int SKILL_LOSS_HANDLING_ALL_SKILLS
     int SKILL_LOSS_HANDLING_ALL_STAT_SKILLS
     int SKILL_LOSS_HANDLING_ALL_PERK_SKILLS
     int SKILL_LOSS_HANDLING_RANDOM_STAT_SKILL
     int SKILL_LOSS_HANDLING_RANDOM_PERK_SKILL
     int SKILL_LOSS_HANDLING_RANDOM
+    int BELONGINGS_MANIFEST_MAX
+    int NPC_UNDERWEAR_TOP_INDEX
+    int NPC_UNDERWEAR_BOTTOM_INDEX
+@references:
     RPB_EventManager EventManager
+    RPB_Prison Prison
+    RPB_JailCell JailCell
+@properties:
+    Armor[] NPC_Underwear
     bool HasStateRequiredForImprisonment
     bool ShouldProcessImprisonmentEvents
     int MinuteOfArrest
@@ -25,8 +32,6 @@ Scriptname RPB_Prisoner extends RPB_ActorBase
     int ReleaseHour
     int ReleaseMinute
     Actor Captor
-    RPB_Prison Prison
-    RPB_JailCell JailCell
     float CurrentTime
     int BountyNonViolent
     int BountyViolent
@@ -81,11 +86,8 @@ Scriptname RPB_Prisoner extends RPB_ActorBase
     bool IsStripped
     bool IsClothed
     Armor[] PrisonOutfit
-    int BELONGINGS_MANIFEST_MAX
     float PreviousUpdateTimeServed
     Outfit NPC_OriginalOutfit
-    int NPC_UNDERWEAR_TOP_INDEX
-    int NPC_UNDERWEAR_BOTTOM_INDEX
 @functions:
     function RestoreBounty()
     function StartRestraining(Actor akRestrainer)

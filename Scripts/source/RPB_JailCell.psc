@@ -1,12 +1,13 @@
 scriptname RPB_JailCell extends RPB_SerializableObjectReference
 
 ;/
-@properties:
+@references:
     RPB_API API
     RPB_EventManager EventManager
-    string Name
     RPB_Prison Prison
     RPB_CellDoor CellDoor
+@properties:
+    string Name
     Form[] InteriorMarkers
     Form[] ExteriorMarkers
     bool HasInteriorMarkers

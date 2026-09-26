@@ -1,13 +1,14 @@
 Scriptname RPB_Captor extends RPB_ActorBase
 
 ;/
-@properties:
+@references:
     RPB_Arrest Arrest
     RPB_SceneManager SceneManager
+    RPB_ArresteeList ArresteesList
+@properties:
     bool IsGuard
     bool IsBountyHunter
     bool IsEscorting
-    RPB_ArresteeList ArresteesList
     Form[] Arrestees
     Actor Arrestee
     string Test

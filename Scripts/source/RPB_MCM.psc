@@ -1,9 +1,7 @@
 Scriptname RPB_MCM extends SKI_ConfigBase  
 
 ;/
-@properties:
-    RPB_API API
-    RPB_Config Config
+@constants:
     bool IS_DEBUG
     bool ENABLE_TRACE
     int CACHED_OPTION_INDEX
@@ -22,6 +20,10 @@ Scriptname RPB_MCM extends SKI_ConfigBase
     int TYPE_OBJECT
     int TYPE_STRING
     int OUTFIT_COUNT
+@references:
+    RPB_API API
+    RPB_Config Config
+@properties:
     string[] PrisonSkillHandlingOptions
     string[] EscapeHandlingOptions
     string[] UndressingHandlingOptions

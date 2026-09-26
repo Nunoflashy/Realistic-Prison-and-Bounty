@@ -1,10 +1,11 @@
 scriptname RPB_PrisonMonitor extends ReferenceAlias
 
 ;/
-@properties:
+@references:
     RPB_API API
     RPB_Prison Prison
     RPB_PrisonerList Prisoners
+@properties:
     bool IsMonitoring
     float NextWakeAt
     ObjectReference MonitorOn
