@@ -119,6 +119,7 @@ scriptname RPB_SceneManager extends Quest
     Scene function GetScene(string asSceneName)
     bool function HasQueuedScenes()
     bool function IsIdle()
+    function EndSceneEarly(string asScene, string asReason)
     function PushScene(string asSceneName)
     string function PopScene()
     function QueueOrPlay(string asSceneName)
@@ -133,7 +134,7 @@ scriptname RPB_SceneManager extends Quest
     function QueueAlias(ReferenceAlias apRefAlias, ObjectReference akRef, bool abBindAlias = true)
     function BindSceneAliasGroup(string asScene, string asAliasRefType, Form[] akRefs)
     function BindSceneAlias(string asScene, string asAliasRefType, ObjectReference akRef)
-    function RestoreAliases()
+    function RestoreAliases(int aiAliases)
     function HandleSceneGlobalControlFlow(string asSceneType, string asScene)
     function StartScene(string asSceneName, int akSceneParameters, int aiStartingPhase = 1, bool abForceStart = false)
     function StartEscortToCell(Actor akEscortLeader, Actor akEscortedPrisoner, ObjectReference akJailCellMarker, RPB_CellDoor akJailCellDoor, ObjectReference akEscortWaitingMarker)
@@ -213,8 +214,9 @@ int __globals           ; FastMap<string>
 int __sceneContainer    ; FastMap<string>
 int __sceneToCategory   ; FastMap<string>
 int __sceneConfig       ; FastMap<string>
-int __queuedAliases     ; FastMap<int>
+int __queuedAliases     ; FastMap<int> - the aliases recorded for the Scene about to be queued
 int __queuedScenes      ; Queue<string>
+int __queuedSceneAliases ; JArray of FastMap<int>, in step with __queuedScenes: each queued Scene's own aliases
 
 function SceneManager()
     __sceneContainer    = delete(__sceneContainer)
@@ -984,8 +986,45 @@ function PushScene(string asSceneName)
         JValue.retain(__queuedScenes, "RPB_SceneManager")
     endif
 
+    if (!__queuedSceneAliases)
+        __queuedSceneAliases = JArray.object()
+        JValue.retain(__queuedSceneAliases, "RPB_SceneManager")
+    endif
+
     Debug("Scene DEBUG: ["+ currentScene +"] SceneManager::PushScene", "Pushing Scene: " + asSceneName)
     JArray.addStr(__queuedScenes, asSceneName)
+
+    ; This Scene's own aliases travel with it, so a later queue call can't overwrite them (they used to live in one
+    ; shared map, bound on the spot, even into a Scene still playing for someone else)
+    JArray.addObj(__queuedSceneAliases, JValue.shallowCopy(__queuedAliases))
+    Object_Clear(__queuedAliases)
+endFunction
+
+; Takes the oldest queued Scene's aliases out of the queue (retained: the caller releases it), 0 if there are none
+int function __PopSceneAliases()
+    if (JArray.count(__queuedSceneAliases) == 0)
+        return 0
+    endif
+
+    int aliases = JArray.getObj(__queuedSceneAliases, 0)
+    JValue.retain(aliases, "RPB_SceneManager_Popped")
+    JArray.eraseIndex(__queuedSceneAliases, 0)
+    return aliases
+endFunction
+
+; Empties the Scene queue together with each entry's aliases
+function __ClearSceneQueue()
+    if (__queuedScenes)
+        JValue.release(__queuedScenes)
+    endif
+    __queuedScenes = JArray.object()
+    JValue.retain(__queuedScenes, "RPB_SceneManager")
+
+    if (__queuedSceneAliases)
+        JValue.release(__queuedSceneAliases)
+    endif
+    __queuedSceneAliases = JArray.object()
+    JValue.retain(__queuedSceneAliases, "RPB_SceneManager")
 endFunction
 
 ;/
@@ -1021,8 +1060,7 @@ function QueueOrPlay(string asSceneName)
     if (__isScenePlaying && currentScene != "" && !self.GetScene(currentScene).IsPlaying())
         EventManager.SendWarning("SceneManager: __isScenePlaying said '" + currentScene + "' was still playing, but it wasn't - self-healing before queuing " + asSceneName, "SceneManager::QueueOrPlay")
         __isScenePlaying = false
-        __queuedScenes = JArray.object() ; also clear whatever stale entries piled up behind the desynced flag
-        JValue.retain(__queuedScenes, "RPB_SceneManager")
+        self.__ClearSceneQueue() ; also clear whatever stale entries piled up behind the desynced flag
     endif
 
     int queuedSceneCount = JArray.count(__queuedScenes)
@@ -1048,10 +1086,11 @@ function PlayQueued()
     ; Scene is now playing
     __isScenePlaying = true
 
+    int nextAliases = self.__PopSceneAliases()
     string nextScene = self.PopScene()
 
     if (nextScene != "")
-        self.RestoreAliases()
+        self.RestoreAliases(nextAliases)
         Debug("Scene DEBUG: ["+ currentScene +"] SceneManager::PlayQueued", "Playing Scene: " + nextScene)
         Scene sceneObject = self.GetScene(nextScene)
 
@@ -1072,6 +1111,40 @@ function PlayQueued()
         sceneObject.Start() ; Play the Scene
         currentScene = nextScene
     endif
+
+    if (nextAliases)
+        JValue.release(nextAliases)
+    endif
+endFunction
+
+bool __endingEarly
+
+;/
+    Ends @asScene now, through the same path as its natural end (OnSceneEnd: its end event, the next queued Scene,
+    the flags and globals), for a Scene whose remaining phases no longer matter. Only if it's the Scene I'm playing
+    and the engine still has it playing.
+/;
+function EndSceneEarly(string asScene, string asReason)
+    if (__endingEarly || !__isScenePlaying || asScene != currentScene)
+        return
+    endif
+
+    Scene sceneObject = self.GetScene(asScene)
+    if (!sceneObject || !sceneObject.IsPlaying())
+        return
+    endif
+
+    __endingEarly = true
+    Debug("SceneManager::EndSceneEarly", "Ending " + asScene + " early: " + asReason)
+    sceneObject.Stop()
+    float stopWaitStart = Utility.GetCurrentRealTime()
+    while (sceneObject.IsPlaying() && (Utility.GetCurrentRealTime() - stopWaitStart) < 1.0)
+        Utility.Wait(0.1)
+    endWhile
+
+    ; A stopped Scene never reaches the phase that sends its end, so this is its only end
+    self.OnSceneEnd(asScene, sceneObject)
+    __endingEarly = false
 endFunction
 
 ;/
@@ -1086,8 +1159,7 @@ function ForceResetSceneState()
     Error("SceneManager::ForceResetSceneState", "Force-resetting scene state (was: '" + currentScene + "', playing: " + __isScenePlaying + ", " + JArray.count(__queuedScenes) + " queued) after a stalled Scene exhausted its retries")
     __isScenePlaying = false
     currentScene = ""
-    __queuedScenes = JArray.object()
-    JValue.retain(__queuedScenes, "RPB_SceneManager")
+    self.__ClearSceneQueue()
 endFunction
 
 ; ==========================================================
@@ -1221,13 +1293,12 @@ function QueueAlias(ReferenceAlias apRefAlias, ObjectReference akRef, bool abBin
         return
     endif
 
+    ; Only recorded: the Scene's own entry in the queue takes it (PushScene), and it's bound right before that Scene starts
+    ; (PlayQueued). Binding here filled the aliases of the same Scene while it was still playing for someone else, so
+    ; that Scene's end reported the wrong actors (abBindAlias is kept so existing calls compile; it no longer binds).
     int id = apRefAlias.GetID()
     FastIntMap_SetForm(__queuedAliases, id, akRef)
-    Debug("SceneManager::QueueAlias", "Bound " + apRefAlias.GetName() + " (id: "+ apRefAlias.GetID() +") with reference: " + FastIntMap_GetForm(__queuedAliases, id))
-
-    if (abBindAlias)
-        RPB_Utility.BindAliasTo(apRefAlias, akRef)
-    endif
+    Debug("SceneManager::QueueAlias", "Queued " + apRefAlias.GetName() + " (id: "+ apRefAlias.GetID() +") with reference: " + FastIntMap_GetForm(__queuedAliases, id))
 
     Debug("SceneManager::QueueAlias", "__queuedAliases: " + GetContainerList(__queuedAliases))
 
@@ -1299,9 +1370,13 @@ endFunction
         since the 2nd scene will have the Aliases queued from the first call, but then cleared for the 3rd (which were already queued)), needs to be tested
     Confirmed ISSUE: It is indeed the case, the 3rd scene doesn't get the Aliases (if they were the same as the 2nd scene), and therefore fails to run.
 /;
-function RestoreAliases()
-    int aliasIds    = FastIntMap_Keys(__queuedAliases)   ; FastArray<int>
-    int aliasRefs   = FastIntMap_Values(__queuedAliases) ; FastArray<Form>
+function RestoreAliases(int aiAliases)
+    if (!aiAliases)
+        return
+    endif
+
+    int aliasIds    = FastIntMap_Keys(aiAliases)   ; FastArray<int>
+    int aliasRefs   = FastIntMap_Values(aiAliases) ; FastArray<Form>
 
     Debug("SceneManager::RestoreAliases", "Restoring " + FastArray_Size(aliasIds) + " Aliases (ids: "+ GetContainerList(aliasIds) +") with references: " + GetContainerList(aliasRefs))
     
@@ -1316,9 +1391,6 @@ function RestoreAliases()
         RPB_Utility.BindAliasTo(refAlias, ref)
         i += 1
     endWhile
-
-    ; Possible ISSUE: Might clear the Aliases of the Scene after the queued scene (3rd Scene in the queue, since the 2nd scene will have the Aliases queued from the first call), needs to be tested
-    Object_Clear(__queuedAliases)
 endFunction
 
 ; ==========================================================

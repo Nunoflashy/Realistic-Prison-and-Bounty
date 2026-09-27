@@ -123,6 +123,7 @@ endFunction
 
 function SendArrestSceneEvent(string asScene, string asSceneEvent, Actor akArrestee, Actor akAuthority, string asSceneSecondaryEvent = "null")
     if (self.__ArrestAlreadyEndedInPrison(akArrestee, asSceneSecondaryEvent))
+        self.__EndSceneIfArresteeGone(asScene, akArrestee)
         return
     endif
 
@@ -144,7 +145,11 @@ function SendArrestSceneBulkEvent(string asScene, string asSceneEvent, Form[] ak
 
     int i = 0
     while (i < akArrestees.Length)
-        if (!self.__ArrestAlreadyEndedInPrison(akArrestees[i] as Actor, asSceneSecondaryEvent))
+        if (self.__ArrestAlreadyEndedInPrison(akArrestees[i] as Actor, asSceneSecondaryEvent))
+            if (akArrestees.Length == 1)
+                self.__EndSceneIfArresteeGone(asScene, akArrestees[i] as Actor)
+            endif
+        else
             RPB_Arrestee arrestee = Arrest.AwaitArresteeReference(akArrestees[i] as Actor)
 
             if (arrestee == none)
@@ -178,6 +183,18 @@ bool function __ArrestAlreadyEndedInPrison(Actor akActor, string asSceneSecondar
 
     Debug("EventManager::__ArrestAlreadyEndedInPrison", akActor + "'s arrest already ended in imprisonment, ignoring the Scene's '" + asSceneSecondaryEvent + "' event")
     return true
+endFunction
+
+;/
+    The rest of an arrest Scene is only for whoever can see it: once its only arrestee is already imprisoned and not even
+    loaded (the player left, the off-screen path imprisoned them), it would otherwise keep playing for up to ~50s and
+    hold up every Scene queued behind it. Only called after the arrest has fully ended, so it never cuts a Scene short
+    while it still matters.
+/;
+function __EndSceneIfArresteeGone(string asScene, Actor akArrestee)
+    if (akArrestee && !akArrestee.Is3DLoaded())
+        SceneManager.EndSceneEarly(asScene, akArrestee + " is already imprisoned and not loaded")
+    endif
 endFunction
 
 function SendPrisonSceneEvent(string asScene, string asSceneEvent, Actor akPrisoner, Actor akAuthority, string asSceneSecondaryEvent = "null")
