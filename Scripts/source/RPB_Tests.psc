@@ -8743,6 +8743,9 @@ state Test_HostilePlayer_NeutralizedThenRestored
         bool wasAlreadyInFaction = player.IsInFaction(disguiseFaction)
         if (!wasAlreadyInFaction)
             player.AddToFaction(disguiseFaction)
+        else
+            ; The cleanup then leaves the faction on, so a player stuck in it from an earlier run stays hostile to its members
+            log("WARNING: the player was already in " + disguiseFaction + " before the test (a leftover from an earlier run, or a real disguise?) - it won't be removed afterwards")
         endif
         float originalAggression = player.GetActorValue("Aggression")
 
@@ -8810,6 +8813,8 @@ endState
 
 ; However the test above ends (pass, fail, or an early return), the dev's own player must not stay faction-flagged/Aggression-changed.
 function __CleanupHostilePlayerTest(Actor akPlayer, Faction akDisguiseFaction, bool abWasAlreadyInFaction, float afOriginalAggression)
+    ; First, so a restore still queued (a lost or late wake) can't put the faction back after the test has removed it
+    (RPB_API.GetPrisonManager()).GetPrison("Haafingar").ForgetPendingRestores(akPlayer)
     if (!abWasAlreadyInFaction)
         akPlayer.RemoveFromFaction(akDisguiseFaction)
     endif
