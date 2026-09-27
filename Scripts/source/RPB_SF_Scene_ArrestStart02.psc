@@ -1,5 +1,5 @@
 ;BEGIN FRAGMENT CODE - Do not edit anything between this and the end comment
-;NEXT FRAGMENT INDEX 12
+;NEXT FRAGMENT INDEX 20
 Scriptname RPB_SF_Scene_ArrestStart02 Extends Scene Hidden
 
 ;BEGIN FRAGMENT Fragment_0
@@ -18,14 +18,6 @@ self.SendModEvent("RPB_SceneStart", "RPB_ArrestStart02")
 EndFunction
 ;END FRAGMENT
 
-;BEGIN FRAGMENT Fragment_2
-Function Fragment_2()
-;BEGIN CODE
-self.SendModEvent("RPB_SceneEnd", "RPB_ArrestStart02")
-;END CODE
-EndFunction
-;END FRAGMENT
-
 ;BEGIN FRAGMENT Fragment_4
 Function Fragment_4()
 ;BEGIN CODE
@@ -34,10 +26,42 @@ self.SendModEvent("RPB_ScenePlayingStart", "RPB_ArrestStart02", 3)
 EndFunction
 ;END FRAGMENT
 
+;BEGIN FRAGMENT Fragment_2
+Function Fragment_2()
+;BEGIN CODE
+self.SendModEvent("RPB_ScenePlayingEnd", "RPB_ArrestStart02", 3)
+;END CODE
+EndFunction
+;END FRAGMENT
+
+;BEGIN FRAGMENT Fragment_12
+Function Fragment_12()
+;BEGIN CODE
+self.SendModEvent("RPB_SceneEnd", "RPB_ArrestStart02")
+;END CODE
+EndFunction
+;END FRAGMENT
+
+;BEGIN FRAGMENT Fragment_18
+Function Fragment_18()
+;BEGIN CODE
+self.SendModEvent("RPB_ScenePlayingStart", "RPB_ArrestStart02", 4)
+;END CODE
+EndFunction
+;END FRAGMENT
+
 ;BEGIN FRAGMENT Fragment_8
 Function Fragment_8()
 ;BEGIN CODE
-;
+self.SendModEvent("RPB_ScenePlayingEnd", "RPB_ArrestStart02", 2)
+;END CODE
+EndFunction
+;END FRAGMENT
+
+;BEGIN FRAGMENT Fragment_16
+Function Fragment_16()
+;BEGIN CODE
+self.SendModEvent("RPB_ScenePlayingStart", "RPB_ArrestStart02", 2)
 ;END CODE
 EndFunction
 ;END FRAGMENT
