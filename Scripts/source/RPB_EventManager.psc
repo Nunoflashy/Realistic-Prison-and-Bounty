@@ -122,6 +122,10 @@ function SendSurrenderSceneEvent(string asScene, string asSceneEvent, Actor akSu
 endFunction
 
 function SendArrestSceneEvent(string asScene, string asSceneEvent, Actor akArrestee, Actor akAuthority, string asSceneSecondaryEvent = "null")
+    if (self.__ArrestAlreadyEndedInPrison(akArrestee, asSceneSecondaryEvent))
+        return
+    endif
+
     RPB_Arrestee arrestee = Arrest.AwaitArresteeReference(akArrestee)
 
     if (arrestee == none)
@@ -140,17 +144,40 @@ function SendArrestSceneBulkEvent(string asScene, string asSceneEvent, Form[] ak
 
     int i = 0
     while (i < akArrestees.Length)
-        RPB_Arrestee arrestee = Arrest.AwaitArresteeReference(akArrestees[i] as Actor)
+        if (!self.__ArrestAlreadyEndedInPrison(akArrestees[i] as Actor, asSceneSecondaryEvent))
+            RPB_Arrestee arrestee = Arrest.AwaitArresteeReference(akArrestees[i] as Actor)
 
-        if (arrestee == none)
-            self.SendError("Could not retrieve the Arrestee reference from the actor, cannot proceed with the scene!")
-            return
+            if (arrestee == none)
+                self.SendError("Could not retrieve the Arrestee reference from the actor, cannot proceed with the scene!")
+                return
+            endif
+
+            Debug("EventManager::SendArrestSceneBulkEvent", "Entering OnArrestScene (Arrestee: "+ arrestee +") (Event: "+ asSceneEvent +", "+ asSceneSecondaryEvent +")")
+            self.OnArrestScene(asScene, asSceneEvent, arrestee, akAuthority, asSceneSecondaryEvent)
         endif
-
-        Debug("EventManager::SendArrestSceneBulkEvent", "Entering OnArrestScene (Arrestee: "+ arrestee +") (Event: "+ asSceneEvent +", "+ asSceneSecondaryEvent +")")
-        self.OnArrestScene(asScene, asSceneEvent, arrestee, akAuthority, asSceneSecondaryEvent)
         i += 1
     endWhile
+endFunction
+
+;/
+    True if @akActor's arrest has already ended in imprisonment: no longer an Arrestee, already a Prisoner. A confrontation
+    Scene keeps playing its later phases after that when the arrest finishes first (the player leaves right after the
+    confirmation, and the off-screen path imprisons in about a second while the Scene is still before "Handcuff").
+    Awaiting the Arrestee then would put the Arrestee spell back on the prisoner (AwaitEntityReference ensures the spell
+    first), and a new Arrestee effect would start on them once they load. So the event is ignored instead.
+    The Arrestee lookup comes first and is the only cost for a normal arrest.
+/;
+bool function __ArrestAlreadyEndedInPrison(Actor akActor, string asSceneSecondaryEvent)
+    if (!akActor || Arrest.Arrestees.AtKey(akActor))
+        return false
+    endif
+
+    if (!akActor.HasSpell(RPB_Utility.RPB_PrisonerSpell()))
+        return false
+    endif
+
+    Debug("EventManager::__ArrestAlreadyEndedInPrison", akActor + "'s arrest already ended in imprisonment, ignoring the Scene's '" + asSceneSecondaryEvent + "' event")
+    return true
 endFunction
 
 function SendPrisonSceneEvent(string asScene, string asSceneEvent, Actor akPrisoner, Actor akAuthority, string asSceneSecondaryEvent = "null")

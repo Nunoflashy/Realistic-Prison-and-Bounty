@@ -8053,6 +8053,10 @@ Actor __test101Guard
 
 state Test_MultiPrisonerOffScreenAIAndPlacement
     function Setup()
+        ; Temporary: I re-enable the user's own logging here to trace the confrontation Scene's phases (does each Phase 3
+        ; only start once the player comes back for the next pair?). Remove once that's confirmed.
+        self.__UseUserLogging()
+
         int COUNT = 5
         int BASE = 0x37BFF ; Bandit - the same base test 097 already uses
 
@@ -8183,6 +8187,27 @@ state Test_MultiPrisonerOffScreenAIAndPlacement
         int settleMs = self.__MassSettle(prison, __test101Actors, COUNT, COUNT * 30.0)
         log("101 settled after " + settleMs + " ms")
 
+        ; A confrontation Scene keeps playing after an off-screen imprisonment, and its "Handcuff" step used to put the
+        ; Arrestee spell back on the prisoner. Let the last Scene finish, then check no prisoner carries it.
+        RPB_SceneManager sceneManager = RPB_API.GetSceneManager()
+        Scene arrestScene = sceneManager.GetScene(sceneManager.SCENE_ARREST_START_02)
+        float sceneWaitStart = Utility.GetCurrentRealTime()
+        while ((arrestScene.IsPlaying() || sceneManager.HasQueuedScenes()) && (Utility.GetCurrentRealTime() - sceneWaitStart) < 30.0)
+            Utility.Wait(0.5)
+        endWhile
+
+        int withArresteeSpell = 0
+        i = 0
+        while (i < COUNT)
+            if (__test101Actors[i] && __test101Actors[i].HasSpell(RPB_Utility.RPB_ArresteeSpell()))
+                withArresteeSpell += 1
+                log("101 " + __test101Actors[i] + " is a prisoner but has the Arrestee spell again")
+            endif
+            i += 1
+        endWhile
+        log("101 Arrestee spell on " + withArresteeSpell + " prisoners (Scene still playing: " + arrestScene.IsPlaying() + ")")
+        bool noStrayArrestee = assert_true(withArresteeSpell == 0, withArresteeSpell + " prisoners got the Arrestee spell back from their confrontation Scene")
+
         int passed = 0
         i = 0
         while (i < COUNT)
@@ -8207,7 +8232,7 @@ state Test_MultiPrisonerOffScreenAIAndPlacement
             i += 1
         endWhile
 
-        display_result(passed == COUNT)
+        display_result(passed == COUNT && noStrayArrestee)
     endFunction
 
     function Teardown()
@@ -10526,12 +10551,7 @@ function ExecuteTest(string asTestKeyName)
     endif
 
     if (testToExecute != "")
-        ; Silence logs - DEBUG was previously commented out here (its restore line below
-        ; wasn't), so production DEBUG:-prefixed logging was never actually silenced during
-        ; a test run. Mirrors the already-working TRACE/LOG pattern now.
-        SetLoggingEnabled("TRACE",  IsTracingEnabled()   && ENABLE_TRACING)
-        SetLoggingEnabled("DEBUG",  IsDebuggingEnabled() && ENABLE_DEBUGGING)
-        SetLoggingEnabled("LOG",    IsLoggingEnabled()   && ENABLE_LOGGING)
+        self.__SilenceLogs()
 
         start_test(testToExecute)   ; Log test start
         GotoState(testToExecute)
@@ -10539,11 +10559,43 @@ function ExecuteTest(string asTestKeyName)
         Teardown()
         GotoState("")
 
-        ; Return logs
-        SetLoggingEnabled("TRACE",  IsTracingEnabled()   || !ENABLE_TRACING)
-        SetLoggingEnabled("DEBUG",  IsDebuggingEnabled() || !ENABLE_DEBUGGING)
-        SetLoggingEnabled("LOG",    IsLoggingEnabled()   || !ENABLE_LOGGING)
+        self.__RestoreLogs()
     endif
+endFunction
+
+; The user's own log levels, saved by __SilenceLogs() before a test runs
+bool __userTrace = false
+bool __userDebug = false
+bool __userLog = true
+
+;/
+    Silences production logging for a test (only the UNIT lines stay), saving the user's own levels first so
+    __RestoreLogs() can put back exactly those. The restore used to compute "enabled || !ENABLE_X", which is always
+    true right after silencing, so every test left DEBUG and LOG switched on even when the user had them off.
+    TRACE is saved as its raw flag: IsTracingEnabled() also folds in DEBUG.
+/;
+function __SilenceLogs()
+    __userTrace = RPB_StorageVars.GetBool("TRACE", "Log", true)
+    __userDebug = IsDebuggingEnabled()
+    __userLog   = IsLoggingEnabled()
+
+    SetLoggingEnabled("TRACE",  __userTrace && ENABLE_TRACING)
+    SetLoggingEnabled("DEBUG",  __userDebug && ENABLE_DEBUGGING)
+    SetLoggingEnabled("LOG",    __userLog   && ENABLE_LOGGING)
+endFunction
+
+function __RestoreLogs()
+    SetLoggingEnabled("TRACE",  __userTrace)
+    SetLoggingEnabled("DEBUG",  __userDebug)
+    SetLoggingEnabled("LOG",    __userLog)
+endFunction
+
+; For a test that needs the production logs: switches back to the user's own levels for the rest of the test (whatever
+; they had on before pressing F1), with no recompile. __RestoreLogs() still runs afterwards as usual.
+function __UseUserLogging()
+    SetLoggingEnabled("TRACE",  __userTrace)
+    SetLoggingEnabled("DEBUG",  __userDebug)
+    SetLoggingEnabled("LOG",    __userLog)
 endFunction
 
 ;/
@@ -10577,9 +10629,7 @@ function RunAllTests()
                 skipped += 1
                 skippedNames += testName + "; "
             else
-                SetLoggingEnabled("TRACE",  IsTracingEnabled()   && ENABLE_TRACING)
-                SetLoggingEnabled("DEBUG",  IsDebuggingEnabled() && ENABLE_DEBUGGING)
-                SetLoggingEnabled("LOG",    IsLoggingEnabled()   && ENABLE_LOGGING)
+                self.__SilenceLogs()
 
                 start_test(stateName)
                 GotoState(stateName)
@@ -10587,9 +10637,7 @@ function RunAllTests()
                 Teardown()
                 GotoState("")
 
-                SetLoggingEnabled("TRACE",  IsTracingEnabled()   || !ENABLE_TRACING)
-                SetLoggingEnabled("DEBUG",  IsDebuggingEnabled() || !ENABLE_DEBUGGING)
-                SetLoggingEnabled("LOG",    IsLoggingEnabled()   || !ENABLE_LOGGING)
+                self.__RestoreLogs()
 
                 if (__lastResultState == 1)
                     passed += 1
