@@ -3647,8 +3647,15 @@ event OnPrisonerStripping(RPB_Prisoner apPrisoner, Actor akStripper, string asSc
         apPrisoner.Strip(false)
 
     elseif (asSceneEvent == "Remove Underwear")
-        ; Remove Underwear, prisoner must be unclothed already
-        apPrisoner.RemoveUnderwear()
+        ; Remove Underwear, prisoner must be unclothed already.
+        ; The stripping Scenes send this step whatever the stripping type is, so I filter it here: only a prisoner being
+        ; stripped naked loses the underwear (the same rule every direct Strip() call follows). WillBeStrippedNaked also
+        ; requires a nude body mod, so removing it otherwise is never right.
+        if (apPrisoner.WillBeStrippedNaked)
+            apPrisoner.RemoveUnderwear()
+        else
+            Debug("Prison::OnPrisonerStripping", "Keeping " + apPrisoner.Name + "'s underwear: not being stripped naked")
+        endif
     endif
 endEvent
 
