@@ -24,11 +24,15 @@ import RPB_Memory
     Keep the critical section short, and do anything that triggers callbacks (Dispel(), spells,
     events) AFTER releasing.
 
-    Acquire() waits with a randomized sleep (so waiters don't all resume in the same instant) for
-    a bounded time, then force-takes the lock and logs an error, so a thread that died while
-    holding it can never deadlock the system. The lock word lives in a JContainers object that
-    is saved with the game, so a save taken while it is held leaves it held; the bounded wait
-    recovers that with a single ~5s stall on next use.
+    Acquire() waits with a randomized sleep (so waiters don't all resume in the same instant) and
+    force-takes the lock (logging an error) only when it looks STUCK, so a thread that died while
+    holding it can never deadlock the system. Stuck means nobody has acquired it for a while - not
+    that this waiter has waited long: every acquire bumps a ticket on the lock, and a waiter only
+    counts the waits during which the ticket didn't move. A long queue that keeps moving (ten
+    arrests assigning cells one after another) therefore never force-takes, which would put two
+    threads in the critical section at once. The lock word lives in a JContainers object that is
+    saved with the game, so a save taken while it is held leaves it held; that is recovered with a
+    single ~5s stall on next use.
 /;
 
 ;/
@@ -146,24 +150,73 @@ endFunction
 
 ;/
     Waits for the lock and takes it. Returns true if it was acquired normally, false if it had to
-    be force-taken after @aiMaxTries waits (~0.04s each on average) because a previous holder
-    never released it. Either way the caller holds the lock when this returns.
+    be force-taken because nobody acquired it for @aiMaxTries waits in a row (~0.04s each on
+    average): a previous holder never released it. Waits during which another thread did acquire
+    it don't count - the queue is moving. Either way the caller holds the lock when this returns.
 /;
 bool function Acquire(int aiLock, int aiMaxTries = 120) global
-    int tries = 0
+    int tries = 0 ; every wait (stats only)
+    int stalled = 0 ; waits in a row during which nobody acquired the lock
+    int seenTicket = JValue.solveInt(aiLock, ".ticket")
 
-    while (tries < aiMaxTries)
+    while (stalled < aiMaxTries)
         if (JAtomic.compareExchangeInt(aiLock, ".locked", 1, 0, false, 1) == 0)
+            JAtomic.fetchAddInt(aiLock, ".ticket", 1, 0, true) ; progress, for whoever is still waiting
+            if (tries > 0)
+                __RecordWait(tries, stalled)
+            endif
             return true
         endif
 
         Utility.WaitMenuMode(Utility.RandomFloat(0.02, 0.06))
         tries += 1
+
+        int ticket = JValue.solveInt(aiLock, ".ticket")
+        if (ticket != seenTicket)
+            seenTicket = ticket
+            stalled = 0
+        else
+            stalled += 1
+        endif
     endWhile
 
-    Error("RPB_ThreadLock: lock " + aiLock + " was still held after " + tries + " waits - a previous holder never released it. Force-taking it.")
+    Error("RPB_ThreadLock: lock " + aiLock + " was not acquired by anyone for " + stalled + " waits - a previous holder never released it. Force-taking it.")
+    ; Counted where the tests can read it (Error() is silent while they run): a force-take lets two threads into the same
+    ; critical section if the holder was in fact alive, so only a lock with no progress at all may reach it
+    JAtomic.fetchAddInt(JDB.root(), ".RPB_ThreadLockForceTakes", 1, 0, true)
+    __RecordWait(tries, stalled)
     JAtomic.exchangeInt(aiLock, ".locked", 1)
+    JAtomic.fetchAddInt(aiLock, ".ticket", 1, 0, true)
     return false
+endFunction
+
+; Diagnostics only (plain maxes, not atomic): the longest total wait and the longest no-progress stretch, in tries
+function __RecordWait(int aiTries, int aiStalled) global
+    if (aiTries > JDB.solveInt(".RPB_ThreadLockMaxWaitTries"))
+        JDB.solveIntSetter(".RPB_ThreadLockMaxWaitTries", aiTries, true)
+    endif
+    if (aiStalled > JDB.solveInt(".RPB_ThreadLockMaxStallTries"))
+        JDB.solveIntSetter(".RPB_ThreadLockMaxStallTries", aiStalled, true)
+    endif
+endFunction
+
+; For the tests: force-takes, the longest total wait and the longest no-progress stretch, since ResetStats()
+int function ForceTakeCount() global
+    return JDB.solveInt(".RPB_ThreadLockForceTakes")
+endFunction
+
+int function MaxWaitTries() global
+    return JDB.solveInt(".RPB_ThreadLockMaxWaitTries")
+endFunction
+
+int function MaxStallTries() global
+    return JDB.solveInt(".RPB_ThreadLockMaxStallTries")
+endFunction
+
+function ResetStats() global
+    JDB.solveIntSetter(".RPB_ThreadLockForceTakes", 0, true)
+    JDB.solveIntSetter(".RPB_ThreadLockMaxWaitTries", 0, true)
+    JDB.solveIntSetter(".RPB_ThreadLockMaxStallTries", 0, true)
 endFunction
 
 function Release(int aiLock) global

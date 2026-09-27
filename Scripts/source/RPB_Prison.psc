@@ -2359,6 +2359,9 @@ function TeleportPrisonerToRelease(RPB_Prisoner apPrisoner)
         endWhile
         RPB_Utility.FlowMark("Release: 3D wait")
 
+        ; This is the equip of the release (NPC_ReequipAfterRelease only restores the outfit and issues missing parts): it
+        ; happens here, at the release location with the 3D loaded, because an equip done in the cell didn't survive the move.
+        ; An escorted release must do the same at its dressing spot - see NPC_ReequipAfterRelease for the order.
         ; The equipment of an NPC released while its cell was unloaded can be right and still not be drawn: refresh the 3D
         float dressStart = Utility.GetCurrentRealTime()
         releasedActor.QueueNiNodeUpdate()
@@ -3125,6 +3128,10 @@ bool function AssignCell(RPB_Prisoner apPrisoner)
     ; Picking a cell and registering the prisoner in it must be one step: arrests that start together used to all see the same
     ; cell as free (nobody was registered in it yet) and filled cells past their maximum. The lock is per prison and short.
     int cellLock = RPB_ThreadLock.Get("AssignCell_" + Name)
+    ; Arrests that start together queue here one after another, each holding the lock through the cell's binding (up to
+    ; ~0.5s), so a waiter can wait well over 5s. Acquire() only force-takes a lock nobody has acquired for ~5s, so a moving
+    ; queue never does: a force-take would put two arrests in here at once, both seeing the same cell as not full (test
+    ; 92 once imprisoned 10 NPCs in 9 places, a cell at 3 of 2, while the bound still counted each waiter's own wait).
     RPB_ThreadLock.Acquire(cellLock)
 
     RPB_JailCell assignedCell = self.RequestCell(apPrisoner)

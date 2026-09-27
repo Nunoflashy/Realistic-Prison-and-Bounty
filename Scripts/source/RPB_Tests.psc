@@ -7539,6 +7539,7 @@ bool function __MassRun(bool abNoOvercrowding, int aiBaseFormId = 0x132AE, int a
     self.__MassDumpCells(prison, "before")
 
     self.__StressProfilerOff()
+    RPB_ThreadLock.ResetStats() ; the "MASS lock" line below reports what the arrests' lock waits looked like
     ; The guard's own trail: every arrest's Captor await (and any re-registration of his Captor effect) lands on him
     RPB_Utility.ClearCrumbs(guard)
     float tStart = Utility.GetCurrentRealTime()
@@ -7611,6 +7612,8 @@ bool function __MassRun(bool abNoOvercrowding, int aiBaseFormId = 0x132AE, int a
     endWhile
     int totalMs = self.__Ms(Utility.GetCurrentRealTime() - tStart)
     log("MASS guard " + guard + " " + RPB_Utility.DumpCrumbs(guard))
+    ; The wait can exceed 120 tries with a long queue; only the stall (waits with no progress) decides a force-take
+    log("MASS lock: force-takes " + RPB_ThreadLock.ForceTakeCount() + ", longest wait " + RPB_ThreadLock.MaxWaitTries() + " tries, longest stall (no progress) " + RPB_ThreadLock.MaxStallTries() + " tries (force-take at 120)")
     self.__MassDumpCells(prison, "after the arrests")
 
     ; Every imprisoned NPC needs an AI package that keeps it in its cell; the package groups are finite

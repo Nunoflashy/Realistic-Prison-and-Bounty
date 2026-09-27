@@ -3500,8 +3500,19 @@ endFunction
 
 ;/
     SetOutfit() only changes the default outfit, it does not equip what the actor already carries, and the belongings are
-    returned after the Released state starts. Called once they are back: sets the outfit again if needed and equips every
-    armor part of the original outfit the actor carries (leveled list parts cannot be resolved here and are skipped).
+    returned after the Released state starts. Called once they are back: sets the outfit again if needed and issues again
+    any armor part of the original outfit the belongings didn't bring back (leveled list parts cannot be resolved here and
+    are skipped), so that everything the NPC should wear is carried.
+
+    It doesn't equip anything. The NPC is still in its (unloaded) cell here, and I found an equip done here doesn't survive
+    the move out (a tunic worn in the cell was no longer worn at the release location). The equip happens where the NPC
+    should appear dressed, after it got there and its 3D loaded: Prison.__DressActor(), then the delayed re-dress passes.
+    Any release path has to keep this order:
+      1. ReturnBelongings()
+      2. NPC_ReequipAfterRelease()        - outfit restored, missing parts issued again (carried, not yet worn)
+      3. Prison.__QueueDress(actor)       - BEFORE OnPrisonerReleased/Destroy() wipes the saved outfit and worn armor
+      4. Prison.__DressActor(actor)       - where the NPC should appear dressed (the release location when teleported, the
+                                            dressing spot for an escorted release), once its 3D is loaded
 /;
 function NPC_ReequipAfterRelease()
     if (!self.IsNPC())
@@ -3519,7 +3530,6 @@ function NPC_ReequipAfterRelease()
     ; looks - it takes priority over whatever the "default outfit" says regardless of that record's own stuck value.
     Outfit original = NPC_OriginalOutfit
     int parts = 0
-    int equipped = 0
     int skipped = 0
     int reissued = 0
     if (original)
@@ -3539,15 +3549,13 @@ function NPC_ReequipAfterRelease()
                     this.AddItem(part, 1, true)
                     reissued += 1
                 endif
-                this.EquipItem(part)
-                equipped += 1
             endif
             i += 1
         endWhile
     endif
 
-    int wornEquipped = self.NPC_ReequipSavedWornArmor()
-    EventManager.SendInfo("Re-equipped " + equipped + " of " + parts + " outfit parts (" + skipped + " not plain armors, " + reissued + " issued again because the belongings did not have them, saved outfit " + original + ") and " + wornEquipped + " saved worn armors on " + self.Name + ", worn body: " + this.GetWornForm(0x4), "["+ Name +"] Prisoner::NPC_ReequipAfterRelease")
+    ; No NPC_ReequipSavedWornArmor() here either: the saved worn armor is on the same dress list (see the comment above)
+    EventManager.SendInfo("Restored outfit " + original + " on " + self.Name + ": " + parts + " parts (" + skipped + " not plain armors, " + reissued + " issued again because the belongings did not have them)", "["+ Name +"] Prisoner::NPC_ReequipAfterRelease")
 endFunction
 
 ;/
