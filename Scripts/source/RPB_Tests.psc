@@ -8192,7 +8192,9 @@ state Test_MultiPrisonerOffScreenAIAndPlacement
         RPB_SceneManager sceneManager = RPB_API.GetSceneManager()
         Scene arrestScene = sceneManager.GetScene(sceneManager.SCENE_ARREST_START_02)
         float sceneWaitStart = Utility.GetCurrentRealTime()
-        while ((arrestScene.IsPlaying() || sceneManager.HasQueuedScenes()) && (Utility.GetCurrentRealTime() - sceneWaitStart) < 30.0)
+        ; The queue's own state, not the engine's IsPlaying(): the engine can still report the Scene as playing long after
+        ; it sent its end (logged below as a diagnostic)
+        while (!sceneManager.IsIdle() && (Utility.GetCurrentRealTime() - sceneWaitStart) < 30.0)
             Utility.Wait(0.5)
         endWhile
 
@@ -8205,7 +8207,7 @@ state Test_MultiPrisonerOffScreenAIAndPlacement
             endif
             i += 1
         endWhile
-        log("101 Arrestee spell on " + withArresteeSpell + " prisoners (Scene still playing: " + arrestScene.IsPlaying() + ")")
+        log("101 Arrestee spell on " + withArresteeSpell + " prisoners (queue idle after " + self.__Ms(Utility.GetCurrentRealTime() - sceneWaitStart) + "ms, engine Scene still playing: " + arrestScene.IsPlaying() + ")")
         bool noStrayArrestee = assert_true(withArresteeSpell == 0, withArresteeSpell + " prisoners got the Arrestee spell back from their confrontation Scene")
 
         int passed = 0

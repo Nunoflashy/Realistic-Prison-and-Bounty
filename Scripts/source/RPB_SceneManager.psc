@@ -118,6 +118,7 @@ scriptname RPB_SceneManager extends Quest
     function CreateSceneConfig()
     Scene function GetScene(string asSceneName)
     bool function HasQueuedScenes()
+    bool function IsIdle()
     function PushScene(string asSceneName)
     string function PopScene()
     function QueueOrPlay(string asSceneName)
@@ -959,6 +960,13 @@ string property SCENE_ARREST_PAY_BOUNTY_FOLLOW_BY_FORCE     = "RPB_ArrestPayBoun
 
 bool __isScenePlaying
 string currentScene
+string __lastEndedScene ; the last Scene whose end I received, see PlayQueued()
+
+; Nothing playing through the queue and nothing waiting in it. My own state: the engine can still report a Scene as
+; playing after it sent its end (see PlayQueued()).
+bool function IsIdle()
+    return !__isScenePlaying && JArray.count(__queuedScenes) == 0
+endFunction
 
 bool function HasQueuedScenes()
     Debug("Scene DEBUG: ["+ currentScene +"] SceneManager::HasQueuedScenes", "HasQueuedScenes: " + (JArray.count(__queuedScenes) > 0) + " ("+ JArray.count(__queuedScenes) +" scenes)")
@@ -1045,7 +1053,23 @@ function PlayQueued()
     if (nextScene != "")
         self.RestoreAliases()
         Debug("Scene DEBUG: ["+ currentScene +"] SceneManager::PlayQueued", "Playing Scene: " + nextScene)
-        self.GetScene(nextScene).Start() ; Play the Scene
+        Scene sceneObject = self.GetScene(nextScene)
+
+        ; The engine can still report a Scene as playing after it sent me its end (seen with the confrontation Scene when
+        ; its escortee was already imprisoned and unloaded: still playing 38s later). Start() on it is then silently
+        ; ignored, and the arrest waiting on it only recovered ~9s later through its own retry (which stops the Scene and
+        ; tries again). I do the same right away, and only for the Scene whose end I already received, so a Scene still
+        ; genuinely running is never touched.
+        if (nextScene == __lastEndedScene && sceneObject.IsPlaying())
+            Debug("SceneManager::PlayQueued", nextScene + " still counts as playing after its end, stopping that instance before starting it again")
+            sceneObject.Stop()
+            float stopWaitStart = Utility.GetCurrentRealTime()
+            while (sceneObject.IsPlaying() && (Utility.GetCurrentRealTime() - stopWaitStart) < 1.0)
+                Utility.Wait(0.1)
+            endWhile
+        endif
+
+        sceneObject.Start() ; Play the Scene
         currentScene = nextScene
     endif
 endFunction
@@ -1674,6 +1698,7 @@ event OnSceneEnd(string name, Scene sender)
     Alias[] aliases = self.GetSceneAliases(name, true)
     Debug("SceneManager::OnSceneEnd", self.GetSceneParametersDebugInfo(sender, name))
     Debug("SceneManager::OnSceneEnd", "Ended Scene: " + name)
+    __lastEndedScene = name
 
     ; self.UnbindAliases(name) ; (Need to fix this, since they get unbound after they should, for now, uncommented) ERROR: EventManager::SendPrisonSceneBulkEvent() -> No prisoners provided for bulk scene event!
     self.PlayQueued()
