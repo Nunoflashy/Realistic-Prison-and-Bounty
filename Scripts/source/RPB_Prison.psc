@@ -210,6 +210,8 @@ scriptname RPB_Prison extends RPB_Entity
     string function DressCostSummary()
     int function PendingHostilityRestoreCount()
     float function NextHostilityRestoreHours()
+    bool function HasPendingHostilityRestore(Actor akActor)
+    function ForgetPendingRestores(Actor akActor)
     function EscortPrisonerToRelease(RPB_Prisoner apPrisoner)
     bool function SendReleaseRequest(RPB_Prisoner apPrisoner)
     int function ReleaseDueNPCsInOrder(float afPlayerTimeLeft)
@@ -2756,6 +2758,23 @@ int function PendingHostilityRestoreCount()
     endif
 
     return JFormMap.count(__pendingHostility)
+endFunction
+
+bool function HasPendingHostilityRestore(Actor akActor)
+    return __pendingHostility && JValue.isExists(__pendingHostility) && JFormMap.hasKey(__pendingHostility, akActor)
+endFunction
+
+;/
+    Drops @akActor from the queued hostility restores and re-dress passes. For test teardown: a temp actor is deleted
+    right after, and its entries would otherwise linger until due (a hostility restore waits a full day).
+/;
+function ForgetPendingRestores(Actor akActor)
+    if (__pendingHostility && JValue.isExists(__pendingHostility))
+        JFormMap.removeKey(__pendingHostility, akActor)
+    endif
+    if (__pendingDress && JValue.isExists(__pendingDress))
+        JFormMap.removeKey(__pendingDress, akActor)
+    endif
 endFunction
 
 ; Reads what Prisoner.NeutralizeWhileImprisoned saved (nothing, for the common non-hostile prisoner) and queues it to be

@@ -3368,7 +3368,10 @@ function NPC_BindToCell()
 
     self.BindAlias(cellPackageAlias)
     RPB_ThreadLock.Release(packageLock)
-    MiscUtil.PrintConsole("["+ Name +"] Bound to Package " + CellPackage.GetName())
+    ; Console line only with debug logging on, like "Unbound from Package": GetName() is a native, on every imprisonment
+    if (IsDebuggingEnabled())
+        MiscUtil.PrintConsole("["+ Name +"] Bound to Package " + CellPackage.GetName())
+    endif
     Debug("[Prison: "+ self.Prison.Name +"] ["+ Name +"] Prisoner::NPC_BindToCell", "[Package: "+ CellPackage.GetName() +"] Bound " + Name + " to "+ self.PronounPossessiveObject +" Cell.")
 endFunction
 

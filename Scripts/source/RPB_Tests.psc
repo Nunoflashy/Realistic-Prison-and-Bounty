@@ -8679,7 +8679,8 @@ state Test_HostilePrisoner_NeutralizedThenRestored
 
         ; Wait past the (overridden) restore delay
         float waitStart = Utility.GetCurrentRealTime()
-        while (prison.PendingHostilityRestoreCount() > 0 && (Utility.GetCurrentRealTime() - waitStart) < 30.0)
+        ; Its own restore, not the whole queue: other tests (97's 45 bandits) can leave restores queued with the real delay
+        while (prison.HasPendingHostilityRestore(a) && (Utility.GetCurrentRealTime() - waitStart) < 30.0)
             Utility.Wait(0.5)
         endWhile
 
@@ -8788,7 +8789,8 @@ state Test_HostilePlayer_NeutralizedThenRestored
         ok = ok && step
 
         float waitStart = Utility.GetCurrentRealTime()
-        while (prison.PendingHostilityRestoreCount() > 0 && (Utility.GetCurrentRealTime() - waitStart) < 30.0)
+        ; Its own restore, not the whole queue (see test 99)
+        while (prison.HasPendingHostilityRestore(player) && (Utility.GetCurrentRealTime() - waitStart) < 30.0)
             Utility.Wait(0.5)
         endWhile
 
@@ -10364,6 +10366,10 @@ function __TeardownAllTempActors()
 
                 solitudePrison.UnregisterPrisoner(prisonerRef)
             endif
+
+            ; Released ones too: a queued hostility restore / re-dress pass for an actor about to be deleted would linger
+            ; until due (a restore waits a full day) - and tests that wait on the queue would wait on it
+            solitudePrison.ForgetPendingRestores(tempActor)
 
             RPB_Arrestee arresteeRef = arrest.Arrestees.AtKey(tempActor)
             if (arresteeRef)
