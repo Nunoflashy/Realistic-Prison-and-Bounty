@@ -253,7 +253,6 @@ scriptname RPB_Prison extends RPB_Entity
     function InvalidateSettingsSnapshot()
 @events:
     event OnReferenceDeleted()
-    event OnUpdate()
     event OnPrisonerImprisonmentFail(RPB_Prisoner apPrisoner, string reason)
     event OnPrisonerRegistered(RPB_Prisoner apPrisoner)
     event OnPrisonerUnregistered(RPB_Prisoner apPrisoner)
@@ -2297,6 +2296,11 @@ function TeleportPrisonerToRelease(RPB_Prisoner apPrisoner)
         dressOutfit = RPB_StorageVars.GetFormOnReference("NPC Original Outfit", releasedActor, "Jail") as Outfit
     endif
     RPB_Utility.Crumb(releasedActor, "Release: start, " + self.__PartsTrace(releasedActor, dressOutfit))
+    if (RPB_Utility.IsCrumbsEnabled())
+        ; The JContainers handles this release reads, so a console "access to non-existing object with id N" during a test
+        ; can be matched to what it was (a cell package once stayed bound after such warnings)
+        RPB_Utility.Crumb(releasedActor, "Release: handles jail " + RPB_StorageVars.GetObjectHandleOnReference(releasedActor, "Jail") + ", actor " + RPB_StorageVars.GetObjectHandleOnReference(releasedActor, "Actor") + ", pending dress " + __pendingDress + ", pending hostility " + __pendingHostility + ", has cell package " + apPrisoner.HasCellPackage + " (" + apPrisoner.CellPackage + ")")
+    endif
     RPB_Utility.FlowMark("Release: start")
 
     ; A prisoner effect instance that starts while the release runs (the actor's 3D loads when it is moved) must not register
@@ -2444,7 +2448,7 @@ function __QueueDress(Actor akActor)
     JFormMap.setObj(__pendingDress, akActor, entry)
     RPB_Utility.Crumb(akActor, "Dress queued: outfit " + original + ", " + JArray.count(items) + " items")
 
-    self.RegisterForSingleUpdate(3.0)
+    Monitor.RequestRealTimeWake("Dress", 3.0)
 endFunction
 
 ; Equips what the actor carries and does not wear from its queued list. returns (int): how many items it equipped.
@@ -2473,10 +2477,9 @@ int function __DressActor(Actor akActor)
     return equipped
 endFunction
 
-event OnUpdate()
-    self.__ProcessPendingDress()
-    self.__ProcessEscortStallChecks()
-endEvent
+; No OnUpdate here: RPB_PrisonMonitor shares this alias and owns its one real-time update. The re-dress pass and the
+; Escort-to-Cell stall checks ask it for a wake (Monitor.RequestRealTimeWake), and it calls __ProcessPendingDress() and
+; __ProcessEscortStallChecks() when each one is due.
 
 ; The delayed pass: every queued NPC is looked at again 3 s (or more) after its release; it stays queued until two passes in a row
 ; found nothing left to equip, or after 5 passes.
@@ -2556,7 +2559,7 @@ function __ProcessPendingDress()
             JFormMap.clear(__pendingDress)
             __pendingPasses = 0
         else
-            self.RegisterForSingleUpdate(3.0)
+            Monitor.RequestRealTimeWake("Dress", 3.0)
         endif
     else
         __pendingPasses = 0
@@ -2602,7 +2605,7 @@ function QueueEscortToCellStallCheck(Actor akPrisoner, float afTimeoutSeconds = 
     JFormMap.setObj(__pendingEscortStallChecks, akPrisoner, entry)
     RPB_Utility.Crumb(akPrisoner, "Escort-to-Cell stall check queued, due in " + afTimeoutSeconds + "s")
 
-    self.RegisterForSingleUpdate(3.0)
+    Monitor.RequestRealTimeWake("EscortStall", 3.0)
 endFunction
 
 ; Recovers every entry whose due time has passed and is still not Imprisoned, then re-arms if anything's left pending.
@@ -2708,7 +2711,7 @@ function __ProcessEscortStallChecks()
     endWhile
 
     if (JFormMap.count(__pendingEscortStallChecks) > 0)
-        self.RegisterForSingleUpdate(3.0)
+        Monitor.RequestRealTimeWake("EscortStall", 3.0)
     endif
 endFunction
 

@@ -3387,7 +3387,10 @@ function NPC_UnbindFromCell()
     endif
 
     self.UnbindAlias(CellPackage)
-    MiscUtil.PrintConsole("["+ Name +"] Unbound from Package " + CellPackage.GetName())
+    ; Console line only with debug logging on: it printed on every NPC release in normal play (and GetName() is a native)
+    if (IsDebuggingEnabled())
+        MiscUtil.PrintConsole("["+ Name +"] Unbound from Package " + CellPackage.GetName())
+    endif
     Debug("[Prison: "+ self.Prison.Name +"] ["+ Name +"] Prisoner::NPC_UnbindFromCell", "[Package: "+ CellPackage.GetName() +"] Unbound " + Name + " from "+ self.PronounPossessiveObject +" Cell.")
 endFunction
 

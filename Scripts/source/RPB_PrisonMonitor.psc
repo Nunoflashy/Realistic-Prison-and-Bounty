@@ -20,6 +20,7 @@ scriptname RPB_PrisonMonitor extends ReferenceAlias
     float function ComputeNextWakeHours(float[] afDaysLeft, bool[] abExcluded, bool abHasUnknown = false, float afBufferHours = 0.1, float afMinHours = 1.0, float afUnknownPollHours = 24.0) global
     function Reschedule()
     function ArmHostilityRestore()
+    function RequestRealTimeWake(string asQueue, float afSeconds)
     function RegisterPrisoner(RPB_Prisoner apPrisoner)
     function UpdatePrisonersStats()
     function PassDaysForPrisoner(RPB_Prisoner apPrisoner, int aiDays)
@@ -450,7 +451,7 @@ function QueueRelease(RPB_Prisoner apPrisoner)
 
     if (!__releaseQueueRunning)
         __releaseQueueRunning = true
-        RegisterForSingleUpdate(0.1)
+        self.RequestRealTimeWake("Release", 0.1)
     endif
 endFunction
 
@@ -511,14 +512,98 @@ function ProcessReleaseQueue()
     endif
 
     if (JArray.count(__releaseQueue) > 0)
-        RegisterForSingleUpdate(0.5)
+        self.RequestRealTimeWake("Release", 0.5)
     else
         __releaseQueueRunning = false
     endif
 endFunction
 
+; ==========================================================
+;           The alias's one real-time update (OnUpdate)
+; ==========================================================
+; RPB_Prison shares this alias, and two scripts registering single updates on one object replaced each other's: the
+; release queue's 0.5s wakes ran the prison's re-dress pass early (it counts a pass per call and drops an NPC after two
+; empty ones, so NPCs could leave the queue ~1s after their release, before the engine settled their outfit), and the
+; prison's 3s wakes slowed the release queue. So I'm the only one registering it here, and every queue has its own due
+; time: a wake runs only the queues that are due, each at its own pace. Same one-owner rule as the game-time wake.
+; Real-time seconds (Utility.GetCurrentRealTime), -1 = nothing pending.
+float __dressDueAt = -1.0
+float __stallDueAt = -1.0
+float __releaseDueAt = -1.0
+float __armedRealTimeAt = -1.0
+
+;/
+    Asks for @asQueue ("Dress", "EscortStall" or "Release") to be processed in @afSeconds. Keeps the sooner of that and
+    what the queue already had pending, and only re-registers the single update when this comes before the armed one.
+/;
+function RequestRealTimeWake(string asQueue, float afSeconds)
+    float at = Utility.GetCurrentRealTime() + afSeconds
+
+    if (asQueue == "Dress")
+        if (__dressDueAt < 0.0 || at < __dressDueAt)
+            __dressDueAt = at
+        endif
+    elseIf (asQueue == "EscortStall")
+        if (__stallDueAt < 0.0 || at < __stallDueAt)
+            __stallDueAt = at
+        endif
+    elseIf (asQueue == "Release")
+        if (__releaseDueAt < 0.0 || at < __releaseDueAt)
+            __releaseDueAt = at
+        endif
+    else
+        RPB_Utility.Warn("PrisonMonitor::RequestRealTimeWake: unknown queue '" + asQueue + "'")
+        return
+    endif
+
+    if (__armedRealTimeAt < 0.0 || at < __armedRealTimeAt)
+        RegisterForSingleUpdate(afSeconds)
+        __armedRealTimeAt = at
+    endif
+endFunction
+
+; Due now, or saved in an earlier session: GetCurrentRealTime() restarts every session, so a stored time far in the future
+; is stale, not a real wait
+bool function __IsRealTimeDue(float afDueAt, float afNow)
+    return afDueAt >= 0.0 && (afDueAt <= afNow + 0.05 || afDueAt - afNow > 60.0)
+endFunction
+
 event OnUpdate()
-    self.ProcessReleaseQueue()
+    __armedRealTimeAt = -1.0 ; a single update is used up once it fires
+    float now = Utility.GetCurrentRealTime()
+
+    if (self.__IsRealTimeDue(__dressDueAt, now))
+        __dressDueAt = -1.0
+        Prison.__ProcessPendingDress()
+    endif
+    if (self.__IsRealTimeDue(__stallDueAt, now))
+        __stallDueAt = -1.0
+        Prison.__ProcessEscortStallChecks()
+    endif
+    if (self.__IsRealTimeDue(__releaseDueAt, now))
+        __releaseDueAt = -1.0
+        self.ProcessReleaseQueue()
+    endif
+
+    ; Re-arm for whatever is still pending (the processors above re-request what they need, which may already have armed)
+    float nextAt = -1.0
+    if (__dressDueAt >= 0.0 && (nextAt < 0.0 || __dressDueAt < nextAt))
+        nextAt = __dressDueAt
+    endif
+    if (__stallDueAt >= 0.0 && (nextAt < 0.0 || __stallDueAt < nextAt))
+        nextAt = __stallDueAt
+    endif
+    if (__releaseDueAt >= 0.0 && (nextAt < 0.0 || __releaseDueAt < nextAt))
+        nextAt = __releaseDueAt
+    endif
+    if (nextAt >= 0.0 && (__armedRealTimeAt < 0.0 || nextAt < __armedRealTimeAt))
+        float seconds = nextAt - Utility.GetCurrentRealTime()
+        if (seconds < 0.05)
+            seconds = 0.05
+        endif
+        RegisterForSingleUpdate(seconds)
+        __armedRealTimeAt = nextAt
+    endif
 endEvent
 
 function AwaitPrisoners()

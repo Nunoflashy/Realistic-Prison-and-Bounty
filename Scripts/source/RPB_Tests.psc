@@ -7505,6 +7505,33 @@ function __MassPutBack(Actor akActor)
     endWhile
 endFunction
 
+; Cell package aliases of @asSize still holding a reference; with @abLog, logs each one and what it holds
+int function __MassBoundCellPackages(string asSize, bool abLog)
+    Form[] groups = RPB_API.GetPrisonManager().GetCellPackageGroupsOfSize(asSize)
+    int bound = 0
+    int g = 0
+    while (groups && g < groups.Length)
+        Quest group = groups[g] as Quest
+        int n = 0
+        if (group)
+            n = group.GetNumAliases()
+        endif
+        int k = 0
+        while (k < n)
+            ReferenceAlias packageAlias = group.GetNthAlias(k) as ReferenceAlias
+            if (packageAlias && packageAlias.GetReference())
+                bound += 1
+                if (abLog)
+                    log("MASS package still bound after the release: " + packageAlias.GetName() + " -> " + packageAlias.GetReference() + " | " + RPB_Utility.DumpCrumbs(packageAlias.GetReference() as Actor))
+                endif
+            endif
+            k += 1
+        endWhile
+        g += 1
+    endWhile
+    return bound
+endFunction
+
 bool function __MassRun(bool abNoOvercrowding, int aiBaseFormId = 0x132AE, int aiTotal = 45)
     RPB_Prison prison = (RPB_API.GetPrisonManager()).GetPrison("Haafingar")
     Actor player = Game.GetFormEx(0x14) as Actor
@@ -7529,6 +7556,7 @@ bool function __MassRun(bool abNoOvercrowding, int aiBaseFormId = 0x132AE, int a
     RPB_PrisonManager massManager = RPB_API.GetPrisonManager()
     int baseCount = prison.Prisoners.Count
     int basePrisons = massManager.PrisonsWithPrisonersCount
+    int basePackagesBound = self.__MassBoundCellPackages("S", false) ; bound before the test (e.g. a real prisoner): not ours
     ; A cell that allows overcrowding never fills up, so the prison would never overflow: switch overcrowding off for this test
     RPB_Utility.SetOvercrowdingDisabled(abNoOvercrowding)
     int capacity = self.__MassCapacity(prison)
@@ -7811,6 +7839,16 @@ bool function __MassRun(bool abNoOvercrowding, int aiBaseFormId = 0x132AE, int a
         i += 1
     endWhile
     log("MASS ghosts: " + ghosts + " released actors are registered as prisoners again")
+
+    ; Every release must unbind its cell package alias: a leaked one silently shrinks the pool (a later arrest takes
+    ; S_0005 instead of S_0000...). The tests only checked that each prisoner HELD one before the release.
+    int packagesBoundAfter = self.__MassBoundCellPackages("S", false)
+    log("MASS packages bound after the release: " + packagesBoundAfter + " (" + basePackagesBound + " before the test)")
+    if (packagesBoundAfter > basePackagesBound)
+        self.__MassBoundCellPackages("S", true)
+    endif
+    step = assert_true(packagesBoundAfter <= basePackagesBound, (packagesBoundAfter - basePackagesBound) + " cell package aliases are still bound after the release (leaked)")
+    ok = ok && step
     step = assert_true(ghosts == 0, ghosts + " released NPCs were registered as prisoners again")
     ok = ok && step
 
