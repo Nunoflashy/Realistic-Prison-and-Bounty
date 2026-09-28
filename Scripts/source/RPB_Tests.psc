@@ -8764,7 +8764,7 @@ state Test_ArrestWaitsWhileGuardFights
             aTargetsLogged += " " + aTargets[t]
             t += 1
         endWhile
-        log("108 held: A's combat targets [" + aTargetsLogged + " ], weapon drawn " + banditA.IsWeaponDrawn() + ", right hand " + banditA.GetEquippedWeapon(false) + ", hold package alias " + RPB_StorageVars.GetIntOnReference("Pending Hold Alias", banditA) + " (B = " + banditB + ", guard = " + guard + ")")
+        log("108 held: A's combat targets [" + aTargetsLogged + " ], weapon drawn " + banditA.IsWeaponDrawn() + ", right hand " + banditA.GetEquippedWeapon(false) + ", draw events while held " + arresteeRef.GetInt("Pending Draws") + ", hold package alias " + RPB_StorageVars.GetIntOnReference("Pending Hold Alias", banditA) + " (B = " + banditB + ", guard = " + guard + ")")
         step = assert_true(!banditA.IsWeaponDrawn(), "A has her weapon drawn while cuffed")
         ok = ok && step
 
@@ -11197,7 +11197,7 @@ function __TeardownScenario()
     endif
 
     if (__playerScenario)
-        RPB_Recovery.ResetActor(player)
+        RPB_Recovery.ResetActor(player) ; also calms guards still fighting the player
         if (__scenarioBountyFaction)
             __scenarioBountyFaction.SetCrimeGold(__savedPlayerBounty)
             __scenarioBountyFaction.SetCrimeGoldViolent(__savedPlayerBountyViolent)
@@ -11205,6 +11205,7 @@ function __TeardownScenario()
         player.ModActorValue("Health", -5000.0)
         player.SetRestrained(false)
         player.SetDontMove(false)
+        player.EnableAI(true)
         RPB_Utility.ReleaseAI(true)
         if (__scenarioReturnMarker)
             player.MoveTo(__scenarioReturnMarker)
@@ -11321,23 +11322,14 @@ bool function __Scenario_EscortNotFollowing(bool abPlayer, string asTest)
         return false
     endif
 
-    ; The prisoner stops following: the guard walks off, the leash pulls them back, they stay behind again
-    if (abPlayer)
-        arrestee.SetRestrained(true)
-        arrestee.SetDontMove(true)
-    else
-        arrestee.EnableAI(false)
-    endif
+    ; The prisoner stops following: the guard walks off, they stay behind (an AI-driven player ignores SetRestrained/
+    ; SetDontMove, so both are frozen by their AI)
+    arrestee.EnableAI(false)
     float start = Utility.GetCurrentRealTime()
 
     bool moved = __WaitMovedToPrison(arrestee, 45.0)
     log(asTest + ": fell back " + moved + " after " + __Ms(Utility.GetCurrentRealTime() - start) + "ms (cell " + arrestee.GetParentCell() + ")")
-    if (abPlayer)
-        arrestee.SetRestrained(false)
-        arrestee.SetDontMove(false)
-    else
-        arrestee.EnableAI(true)
-    endif
+    arrestee.EnableAI(true)
     bool ok = assert_true(moved, asTest + ": a prisoner not following the escort did not fall back to the prison")
     __ScenarioWaitImprisoned(arrestee, asTest)
     return ok

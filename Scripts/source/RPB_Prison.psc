@@ -2284,8 +2284,8 @@ endFunction
 ;/
     Releases @apPrisoner where they stand: the whole release (belongings, outfit, cell, hostility restore, leftover arrest
     state), without the move to the release location. For RPB_Recovery.ResetActor.
-/;
-function ReleaseInPlace(RPB_Prisoner apPrisoner)
+/;function ReleaseInPlace(RPB_Prisoner apPrisoner)
+    apPrisoner.StopEscortAssist() ; a raised walking speed must not outlive the escort
     self.TeleportPrisonerToRelease(apPrisoner, abMoveToReleaseLocation = false)
 endFunction
 
@@ -2302,6 +2302,7 @@ function CancelImprisonment(RPB_Prisoner apPrisoner, string asReason)
     endif
 
     Actor prisonerActor = apPrisoner.GetActor()
+    apPrisoner.StopEscortAssist() ; a raised walking speed must not outlive the escort
     Info("["+ Name +"] Imprisonment of " + apPrisoner.Name + " " + prisonerActor + " cancelled (" + asReason + "), not released: no time jailed, no infamy")
 
     if (apPrisoner.IsStripped)
@@ -2749,7 +2750,14 @@ function __ProcessEscortStallChecks()
                 if (prisoner && !prisoner.IsImprisoned)
                     Warn("["+ Name +"] Prison::__ProcessEscortStallChecks: Stop() didn't drive " + checkActor.GetDisplayName() + " " + checkActor + " through its own completion either - falling back to a manual finish")
                     self.SceneManager.UnsetPackageLockOnActor(guard)
-                    self.OnEscortPrisonerToCellEnd(prisoner, prisoner.JailCell, guard)
+                    prisoner.StopEscortAssist()
+                    if (!prisoner.IsInCell)
+                        ; Not in the cell (the player stuck on the stairs): imprisoned where they stood before. Moved in,
+                        ; which begins the imprisonment itself.
+                        prisoner.MoveToCell()
+                    else
+                        self.OnEscortPrisonerToCellEnd(prisoner, prisoner.JailCell, guard)
+                    endif
                 endif
             endif
         endif
@@ -3540,15 +3548,19 @@ endEvent
 event OnPrisonerDeath(RPB_Prisoner apPrisoner, Actor akKiller)
 
 endEvent
-
 event OnEscortPrisonerToJailBegin(RPB_ActorBase apActor, Actor akEscort)
-    EventNotImplemented("Prison::OnEscortPrisonerToJailBegin")
+    ; The player's stairs assist for the walk (RPB_Prisoner's Escorting state)
+    RPB_Prisoner prisonerRef = self.Prisoners.AtKey(apActor.GetActor())
+    if (prisonerRef)
+        prisonerRef.StartEscortAssist(akEscort, abToCell = false)
+    endif
 endEvent
 
 ; TODO: Possibly rename this to OnEscortedPrisonerToPrison
 event OnEscortPrisonerToJailEnd(RPB_ActorBase apActor, Actor akEscort)
     ; Retrieve or make the Actor a Prisoner
     RPB_Prisoner prisonerRef = RPB_Utility.ame_if (apActor as RPB_Prisoner, apActor, (apActor as RPB_Arrestee).MakePrisoner()) as RPB_Prisoner
+    prisonerRef.StopEscortAssist()
 
     self.AssignReleaseLocation(prisonerRef)    ; Set the teleport release location for this prisoner
 
@@ -3603,6 +3615,7 @@ event OnEscortPrisonerToCellBegin(RPB_Prisoner apPrisoner, Actor akEscort)
     if (!RPB_Utility.IsCuffed(apPrisoner.GetActor()))
         apPrisoner.Restrain()
     endif
+    apPrisoner.StartEscortAssist(akEscort, abToCell = true) ; the player's stairs assist (Castle Dour's stairs)
     apPrisoner.OnEscortToCell(akEscort)
 endEvent
 
@@ -3611,6 +3624,7 @@ endEvent
 
 ; TODO: Remove RPB_JailCell from params. since a Prisoner already has a jail cell assigned to them
 event OnEscortPrisonerToCellEnd(RPB_Prisoner apPrisoner, RPB_JailCell akJailCell, Actor akEscort)
+    apPrisoner.StopEscortAssist()
     ; TODO: Fix NPC not staying in cell if they are stripped OnEscortToCellEnd
     if (!apPrisoner.IsStripped && apPrisoner.ShouldBeStripped)
         ; abRemoveUnderwear defaults to true - unlike OnPrisonerTeleportedToCell's own Strip() call, this one was

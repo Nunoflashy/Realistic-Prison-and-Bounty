@@ -93,6 +93,12 @@ if (prisonerRef)
     akActor.SetRestrained(false)
     akActor.SetDontMove(false)
     sceneManager.UnsetPendingHoldOnActor(akActor) ; the pending hold's package alias, if one is recorded
+    if (akActor == Game.GetPlayer())
+        int calmed = RPB_Utility.CalmGuardsAgainstPlayer()
+        if (calmed > 0)
+            done += calmed + " guard(s) calmed; "
+        endif
+    endif
     if (RPB_Utility.RemoveCuffs(akActor) > 0)
         done += "cuffs removed; "
     endif

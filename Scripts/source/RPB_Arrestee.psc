@@ -834,6 +834,12 @@ function __BeginPendingArrest(bool abEscortDirectlyToCell, Actor akOtherHostile,
         ; and my AI still reacted to them), no running off. SetRestrained alone still let me drift 75-240 units in 3s,
         ; so SetDontMove pins me too and the package is re-evaluated to drop whatever was walking me.
         this.SetActorValue("Aggression", 0) ; restored with the hostility restore
+        ; Sheathed before being restrained: restraining in the same frame interrupted the sheathe, and a weapon drawn in
+        ; the fight stayed drawn for the whole hold
+        float sheatheStart = Utility.GetCurrentRealTime()
+        while (this.IsWeaponDrawn() && (Utility.GetCurrentRealTime() - sheatheStart) < 1.5)
+            Utility.Wait(0.1)
+        endWhile
         this.SetRestrained(true)
         this.SetDontMove(true)
         ; Out of combat, my AI still drew my weapons at the fight next to me, on and off: the hold package (Ignore Combat,
@@ -842,6 +848,9 @@ function __BeginPendingArrest(bool abEscortDirectlyToCell, Actor akOtherHostile,
         if (!Arrest.SceneManager.SetPendingHoldOnActor(this))
             this.EvaluatePackage()
         endif
+        ; Neither the script calls nor the hold package (Ignore Combat, No Combat Alert) stopped my AI drawing my weapon at
+        ; the fight next to me: every draw is answered with a sheathe (SKSE action 8, "unsheathe end"; events only)
+        RegisterForActorAction(8)
     endif
     self.SetBool("Pending Hold", true)
     Debug("["+ Name +"] Arrestee::__BeginPendingArrest", "hold on at (" + (this.GetPositionX() as int) + ", " + (this.GetPositionY() as int) + ")")
@@ -899,9 +908,30 @@ function __ReleasePendingHold(bool abReverted = false)
     endif
 
     Arrest.SceneManager.UnsetPendingHoldOnActor(this) ; before the escort Scene binds me
+    UnregisterForActorAction(8)
     this.SetRestrained(false)
     this.SetDontMove(false)
 endFunction
+
+; While held (pending, NPC): a weapon drawn is put away again
+event OnActorAction(int actionType, Actor akActor, Form source, int slot)
+    if (akActor != this || actionType != 8 || !self.GetBool("Pending Hold"))
+        return
+    endif
+
+    self.SetInt("Pending Draws", self.GetInt("Pending Draws") + 1)
+    Debug("["+ Name +"] Arrestee::OnActorAction", Name + " drew a weapon while held, sheathing it")
+    ; A restrained actor can't finish a sheathe: unrestrained for it (SetDontMove still pins me)
+    this.SetRestrained(false)
+    this.SheatheWeapon()
+    float sheatheStart = Utility.GetCurrentRealTime()
+    while (this.IsWeaponDrawn() && (Utility.GetCurrentRealTime() - sheatheStart) < 1.5)
+        Utility.Wait(0.1)
+    endWhile
+    if (self.GetBool("Pending Hold"))
+        this.SetRestrained(true)
+    endif
+endEvent
 
 ; The arrest from its confirmation on: I become a prisoner, get a cell, and am escorted there (or moved, off-screen)
 ; The escort of the prisoner I already am (a fight after the cuffs made the arrest wait): the tail of __ContinueToPrison
@@ -1295,6 +1325,13 @@ event OnUpdate()
         ; 3 pulls in a row (~15s), the same fallback as an escort that never starts
         int pulls = self.GetInt("Leash Pulls") + 1
         self.SetInt("Leash Pulls", pulls)
+        ; The player's escort assist (RPB_Prisoner) handles a player falling behind: raised speed on stairs, then its own
+        ; last-resort move and fallback. Pulled here, they skipped the stairs by teleport.
+        if (self.IsPlayer() && self.__PlayerEscortAssisted())
+            RegisterForSingleUpdate(5.0)
+            return
+        endif
+
         if (pulls >= 3 && !self.GetBool("Arrest Pending") && self.__EscortBroken())
             return
         endif
@@ -1344,6 +1381,15 @@ bool function __EscortStalled()
 
     self.SetInt("Stall Ticks", 0)
     return self.__FallBackToPrison("the escort isn't moving (" + string_if(current == "", "no Scene playing", current) + ")")
+endFunction
+
+bool function __PlayerEscortAssisted()
+    RPB_Prison prison = API.PrisonManager.FindPrisonByPrisoner(this)
+    if (!prison)
+        return false
+    endif
+    RPB_Prisoner prisoner = prison.Prisoners.AtKey(this)
+    return prisoner && prisoner.EscortAssistActive
 endFunction
 
 ; My escort to jail is playing but I'm not following it. False when it isn't an escort to jail that's playing.

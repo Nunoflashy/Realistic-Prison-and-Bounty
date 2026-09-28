@@ -22,6 +22,7 @@ scriptname RPB_Utility hidden
     int function RemoveCuffs(Actor akActor) global
     bool function IsCuffed(Actor akActor) global
     function EquipCuffs(Actor akActor, bool abFront = false) global
+    int function CalmGuardsAgainstPlayer() global
     int function RestoreNeutralizedHostility(Actor akActor) global
     Form[] function RPB_GetHostileFactions() global
     Form[] function RPB_GetHostileFactionsFor(Actor akActor) global
@@ -516,6 +517,26 @@ function EquipCuffs(Actor akActor, bool abFront = false) global
     RemoveCuffs(akActor)
     akActor.SheatheWeapon()
     akActor.EquipItem(cuffs, true, true)
+endFunction
+
+; Stops every loaded guard fighting (repeated resists leave them attacking the player for good, even with the bounty
+; cleared; only a combat stop on each one calms them). For the player's Reset. Returns how many were calmed.
+int function CalmGuardsAgainstPlayer() global
+    Actor player = Game.GetPlayer()
+    Actor[] nearby = PO3_SKSEFunctions.GetActorsByProcessingLevel(0)
+    int calmed = 0
+    int i = 0
+    while (i < nearby.Length)
+        Actor candidate = nearby[i]
+        if (candidate && candidate != player && candidate.IsGuard() && candidate.IsInCombat())
+            candidate.StopCombat()
+            candidate.StopCombatAlarm()
+            calmed += 1
+        endif
+        i += 1
+    endWhile
+    player.StopCombatAlarm()
+    return calmed
 endFunction
 
 ;/

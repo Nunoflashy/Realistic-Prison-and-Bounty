@@ -894,8 +894,85 @@ state Awaiting
     endEvent
 endState
 
-; While this Prisoner is being escorted
+;/
+    While the player is being escorted (the escort assist, see StartEscortAssist): once a second, stuck while the guard
+    walks away means stairs or a slope the AI-driven walk can't climb (an engine limit, Castle Dour Dungeon's stairs):
+    the walking speed is raised until they move again, then restored. Still stuck, they're moved to the guard (the old
+    leash, now the last resort); three of those and the escort is broken: they go on to the prison or cell without it.
+/;
 state Escorting
+    event OnUpdate()
+        if (!__assistOn || !__assistEscort)
+            return
+        endif
+
+        float x = this.GetPositionX()
+        float y = this.GetPositionY()
+        float moved = Math.sqrt(Math.pow(x - __assistLastX, 2.0) + Math.pow(y - __assistLastY, 2.0))
+        __assistLastX = x
+        __assistLastY = y
+        float distance = this.GetDistance(__assistEscort)
+        ; The guard through a load door reads as another cell (and an overflowed distance): far
+        bool far = distance > 300.0 || distance < 0.0 || this.GetParentCell() != __assistEscort.GetParentCell()
+        float nextTick = 1.0
+
+        if (__assistBoosted)
+            ; At 1000 an unstuck player is far too fast: checked twice a second, and back to normal once they're caught up or
+            ; running free. Climbing at the raised speed is slow, steady progress: the boost stays for the whole flight (it
+            ; used to drop at the first step and flip back and forth all the way up Castle Dour's stairs).
+            nextTick = 0.5
+            if (!far || moved >= 200.0)
+                self.__RestoreEscortSpeed()
+                __assistStuckTicks = 0
+                EventManager.SendInfo(Name + " is moving again in the escort, walking speed restored", "["+ Name +"] Prisoner::EscortAssist")
+            elseif (moved >= 30.0)
+                __assistStuckTicks = 0 ; climbing: not stuck, not free yet
+            else
+                __assistStuckTicks += 1
+                if (__assistStuckTicks >= 12) ; ~6s at the raised speed and still stuck
+                    __assistStuckTicks = 0
+                    self.__RestoreEscortSpeed()
+                    __assistTeleports += 1 ; never reset during one escort: three means it's not the stairs
+                    if (__assistTeleports >= 3)
+                        EventManager.SendInfo("Escort of " + Name + " broken: still stuck after 3 moves to the guard, going on without the Scene", "["+ Name +"] Prisoner::EscortAssist")
+                        bool toCell = __assistToCell
+                        Actor escort = __assistEscort
+                        self.StopEscortAssist()
+                        RPB_API.GetSceneManager().EndSceneWithActor(this, "the player can't follow the escort")
+                        if (toCell)
+                            self.MoveToCell()
+                        else
+                            self.MoveToPrison(escort)
+                        endif
+                        return
+                    endif
+                    this.MoveTo(__assistEscort)
+                    ; From where the move put them: the teleport itself isn't the player moving again
+                    __assistLastX = this.GetPositionX()
+                    __assistLastY = this.GetPositionY()
+                    nextTick = 1.0
+                    EventManager.SendInfo(Name + " still stuck in the escort with raised speed, moved to the guard (" + __assistTeleports + "/3)", "["+ Name +"] Prisoner::EscortAssist")
+                endif
+            endif
+
+        elseif (far && moved < 30.0)
+            __assistStuckTicks += 1
+            if (__assistStuckTicks >= 2)
+                __assistStuckTicks = 0
+                __assistSavedSpeed = this.GetActorValue("SpeedMult")
+                this.SetActorValue("SpeedMult", 1000.0) ; 250 wasn't enough for the stairs
+                this.ModActorValue("CarryWeight", 0.1) ; a speed change only applies once the movement is re-evaluated
+                this.ModActorValue("CarryWeight", -0.1)
+                __assistBoosted = true
+                nextTick = 0.5
+                EventManager.SendInfo(Name + " is stuck in the escort (" + (distance as int) + " units behind), walking speed raised", "["+ Name +"] Prisoner::EscortAssist")
+            endif
+        else
+            __assistStuckTicks = 0
+        endif
+
+        RegisterForSingleUpdate(nextTick)
+    endEvent
 endState
 
 state Releasing
@@ -2084,6 +2161,72 @@ endFunction
 /;
 int property BELONGINGS_MANIFEST_MAX = 120 autoreadonly
 
+; ==========================================================
+;                     Player Escort Assist
+; ==========================================================
+
+bool __assistOn
+bool __assistToCell
+bool __assistBoosted
+Actor __assistEscort
+string __assistPreviousState
+float __assistLastX
+float __assistLastY
+float __assistSavedSpeed
+int __assistStuckTicks
+int __assistTeleports
+
+bool property EscortAssistActive
+    bool function get()
+        return __assistOn
+    endFunction
+endProperty
+
+; Starts watching the player's escort by @akEscort (to the cell if @abToCell): see the Escorting state. Player only: NPCs
+; climb stairs at their walking speed.
+function StartEscortAssist(Actor akEscort, bool abToCell)
+    if (!self.IsPlayer() || !akEscort)
+        return
+    endif
+
+    if (!__assistOn)
+        __assistPreviousState = self.GetState()
+    endif
+    __assistOn = true
+    __assistToCell = abToCell
+    __assistEscort = akEscort
+    __assistStuckTicks = 0
+    __assistTeleports = 0
+    __assistLastX = this.GetPositionX()
+    __assistLastY = this.GetPositionY()
+    GotoState("Escorting")
+    RegisterForSingleUpdate(1.0)
+endFunction
+
+function StopEscortAssist()
+    if (!__assistOn)
+        return
+    endif
+
+    __assistOn = false
+    __assistEscort = none
+    self.__RestoreEscortSpeed()
+    UnregisterForUpdate()
+    if (self.GetState() == "Escorting")
+        GotoState(__assistPreviousState)
+    endif
+endFunction
+
+function __RestoreEscortSpeed()
+    if (!__assistBoosted)
+        return
+    endif
+    this.SetActorValue("SpeedMult", __assistSavedSpeed)
+    this.ModActorValue("CarryWeight", 0.1)
+    this.ModActorValue("CarryWeight", -0.1)
+    __assistBoosted = false
+endFunction
+
 function SaveBelongingsManifest()
     ; One PO3 call for the whole inventory (equipped, favorited and quest items included, like the full GetNthForm walk
     ; it replaces) instead of GetNumItems + GetNthForm per item - a frame each. GetItemCount per item stays: there is no
@@ -2098,6 +2241,22 @@ function SaveBelongingsManifest()
     if (count > BELONGINGS_MANIFEST_MAX)
         count = BELONGINGS_MANIFEST_MAX
         manifestState = 2
+    endif
+
+    ; A second strip (the teleport path and a Scene both stripping) ran on an already-emptied inventory and replaced the
+    ; manifest with nothing: the first strip's items stayed in the shared chest, and the release returned none. What a
+    ; later strip takes is added to the manifest instead (cleared at the release, see ReturnBelongings).
+    if (GetInt("Belongings Manifest") > 0)
+        int j = 0
+        while (j < count)
+            self.ModBelongingsManifest(items[j], this.GetItemCount(items[j]))
+            j += 1
+        endWhile
+        if (manifestState == 2)
+            SetInt("Belongings Manifest", 2)
+        endif
+        EventManager.SendInfo("Added " + count + " of " + total + " belongings of " + self.Name + " to the existing manifest (stripped again)", "["+ Name +"] Prisoner::SaveBelongingsManifest")
+        return
     endif
 
     Form[] forms = new Form[120]

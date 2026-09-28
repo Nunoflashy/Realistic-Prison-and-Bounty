@@ -1152,7 +1152,7 @@ function PlayQueued()
         __lastStartedScene = ""
         string nextSceneType = self.GetSceneType(nextScene)
         bool isEscortScene = nextSceneType == CATEGORY_ESCORT_TO_JAIL || nextSceneType == CATEGORY_ESCORT_TO_CELL
-        if (!(isEscortScene && RPB_Utility.IsEscortStartForcedToFail())) ; test-only: an escort that never starts
+        if (!(nextSceneType == CATEGORY_ESCORT_TO_JAIL && RPB_Utility.IsEscortStartForcedToFail())) ; test-only: an escort to jail that never starts
             sceneObject.Start() ; Play the Scene
         endif
         currentScene = nextScene
