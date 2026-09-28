@@ -173,6 +173,7 @@ Scriptname RPB_Prisoner extends RPB_ActorBase
     function InitializeState()
     function RevertState()
     function DestroyArrestState()
+    function ClearArrest()
     function RemoveFromCell()
     function SetBelongingsContainer()
     bool function AssignCell()
@@ -956,13 +957,8 @@ state Imprisoned
         ; one" - AwaitCaptorReference()'s create-if-missing semantics would force a fresh registration attempt if the
         ; guard's own 3D happened to be unloaded right now, which can never complete off-screen (a real test hit
         ; exactly this: "<Guard> is not loaded, cannot be registered right now!" right after an off-screen imprisonment).
-        RPB_Captor captorRef = API.Arrest.GetCaptor(Captor)
-        if (captorRef && captorRef.Arrestee == this)
-            captorRef.Destroy()
-        endif
-
-        ; At this point, we can delete the prisoner's arrest state
-        self.DestroyArrestState()
+        ; At this point, we can delete the prisoner's arrest state (and the Captor, if its Arrestee is still me)
+        self.ClearArrest()
         RPB_Utility.FlowMark("Imprisoned: DestroyArrestState")
         RPB_Utility.Crumb(this, "Imprisoned: DestroyArrestState")
 
@@ -972,6 +968,11 @@ state Imprisoned
         RPB_Utility.FlowMark("Imprisoned: RegisterForUpdateGameTime")
         RPB_Utility.Crumb(this, "Imprisoned: RegisterForUpdateGameTime")
         SetBool("Imprisoned", true)
+
+        ; My sentence starts now: the background monitor didn't count me while I was being escorted
+        if (self.IsNPC())
+            Prison.Monitor.ArmPrisonerRelease(self)
+        endif
     endEvent
 
     event OnUpdateGameTime()
@@ -2739,6 +2740,28 @@ endFunction
 ;/
     Destroys the prisoner's arrest state, as they are now a prisoner and the arrest state is not required anymore.
 /;
+;/
+    Tears down what's left of my arrest: the Captor, if its Arrestee is still me, then the arrest state itself. Called when
+    I'm imprisoned, and when I'm released (a prisoner released before ever reaching the cell kept the Arrestee, whose escort
+    loop kept teleporting them to their guard).
+
+    A Captor is meant to eventually support 1:N Arrestees (one guard escorting several) - that isn't built yet,
+    Captor.Arrestee is still a single value, so "does this Captor still have anyone to escort" just means "is their one
+    Arrestee still me". Only destroyed when that holds, so a guard who's already been reassigned to a new arrest isn't torn
+    down out from under it. GetCaptor(), not AwaitCaptorReference(): this only ever wants "tear down the existing Captor if
+    there is one" - AwaitCaptorReference()'s create-if-missing semantics would force a fresh registration attempt if the
+    guard's own 3D happened to be unloaded right now, which can never complete off-screen (a real test hit exactly this:
+    "<Guard> is not loaded, cannot be registered right now!" right after an off-screen imprisonment).
+/;
+function ClearArrest()
+    RPB_Captor captorRef = API.Arrest.GetCaptor(Captor)
+    if (captorRef && captorRef.Arrestee == this)
+        captorRef.Destroy()
+    endif
+
+    self.DestroyArrestState()
+endFunction
+
 function DestroyArrestState()
     if (!RPB_Utility.IsActorArrested(this))
         return

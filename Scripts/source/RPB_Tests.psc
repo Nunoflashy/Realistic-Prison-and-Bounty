@@ -48,6 +48,7 @@ scriptname RPB_Tests extends ObjectReference hidden
 import RPB_Utility
 import RPB_Memory
 
+; No longer used to silence anything: tests run with the user's own log levels (see __SilenceLogs)
 bool property ENABLE_TRACING            = false autoreadonly
 bool property ENABLE_DEBUGGING          = false autoreadonly
 bool property ENABLE_LOGGING            = false autoreadonly
@@ -185,6 +186,10 @@ function SetTests()
     self.AddTest("103 - Confrontation Scene Never Confirms (AI Disabled): TeleportToCell Fallback Still Imprisons the Bandit", "Test_ConfrontationSceneNeverConfirmsFallsBackToTeleport", abChainable = false)
     ; Not chainable: genuinely moves the player away for real, same rationale as test 101
     self.AddTest("104 - Player Leaves Before the Confrontation Scene Can Start: TeleportToCell Fallback Still Imprisons the Bandit", "Test_PlayerLeavesBeforeConfrontationScene_FallsBackToTeleport", abChainable = false)
+    self.AddTest("105 - Prison Monitor: A Prisoner Not Yet Imprisoned (Still Being Escorted) Is Never Released", "Test_MonitorSkipsNotYetImprisoned", abChainable = false)
+    ; Not chainable: a real escort arrest with its Scenes
+    self.AddTest("106 - Released Mid-Escort: The Arrest (Arrestee, Captor) Is Cleared Too", "Test_ReleaseMidEscortClearsArrest", abChainable = false)
+    self.AddTest("107 - Recovery: Reset Unsticks a Half-Arrested, Half-Imprisoned Actor", "Test_ResetUnsticksActor", abChainable = false)
     self.AddTest("041 - ActiveMagicEffectContainer: Stuck Lock Self-Heals", "Test_ActiveMagicEffectContainer_StuckLockSelfHeals")
     self.AddTest("042 - ThreadLock: JAtomic Primitive Semantics and Registry", "Test_ThreadLock_PrimitiveSemantics")
     ; Not chainable: fires concurrent worker threads
@@ -8053,10 +8058,6 @@ Actor __test101Guard
 
 state Test_MultiPrisonerOffScreenAIAndPlacement
     function Setup()
-        ; Temporary: I re-enable the user's own logging here to trace the confrontation Scene's phases (does each Phase 3
-        ; only start once the player comes back for the next pair?). Remove once that's confirmed.
-        self.__UseUserLogging()
-
         int COUNT = 5
         int BASE = 0x37BFF ; Bandit - the same base test 097 already uses
 
@@ -8467,6 +8468,226 @@ endState
 Actor __test104Guard
 Actor __test104Actor
 Actor __test104Player
+
+;/
+    A prisoner is registered at arrest start, before the escort, and the background monitor used to judge every registered
+    prisoner: an NPC still walking to the prison, far from the player, was released halfway (a real manual arrest: "Released
+    ... sentence 12 days, time jailed 69 days"). Registers a bandit without imprisoning them and runs the monitor's release
+    check on them: they must stay a (not yet imprisoned) prisoner.
+/;
+;/
+    Starts a real escort arrest of a temp bandit by a temp guard (clone of the nearest guard), and returns the bandit once
+    they're a registered prisoner still on their way (not imprisoned): the half-state two real manual arrests got stuck
+    in. None if the arrest never got that far.
+/;
+Actor function __StartEscortArrestUntilRegistered(RPB_Prison apPrison)
+    Actor player = Game.GetFormEx(0x14) as Actor
+    Actor realGuard = RPB_Utility.GetNearestGuard(player, 3000.0, player)
+    if (!realGuard)
+        log("No guard near the player to clone (stand near a guard in Solitude)")
+        return none
+    endif
+
+    Actor guard = __SpawnTempActorOf(realGuard.GetBaseObject().GetFormID())
+    Actor bandit = __SpawnTempActorOf(0x37BFF) ; the bandit base used by test 97
+    if (!guard || !bandit)
+        return none
+    endif
+
+    ; Scene participants need their AI (__SpawnTempActorOf disables it), and not on top of each other (see test 101)
+    guard.EnableAI(true)
+    bandit.EnableAI(true)
+    bandit.MoveTo(guard, afXOffset = 100.0, abMatchRotation = false)
+
+    RPB_Arrest arrest = RPB_API.GetArrest()
+    RPB_ActorVars.SetCrimeGold(guard.GetCrimeFaction(), bandit, 2000)
+    arrest.ArrestActor(guard, bandit, arrest.ARREST_TYPE_ESCORT_TO_JAIL)
+
+    ; Registered is not enough: MakePrisoner() registers them while Arrestee.EscortToPrison() is still setting the arrest
+    ; up on its own thread. The half-state a real stuck arrest was in is the walk itself: the escort Scene playing.
+    RPB_SceneManager sceneManager = RPB_API.GetSceneManager()
+    bool registered = false
+    bool escorting = false
+    float waitStart = Utility.GetCurrentRealTime()
+    while (!(registered && escorting) && (Utility.GetCurrentRealTime() - waitStart) < 60.0)
+        Utility.Wait(0.5)
+        registered = apPrison.Prisoners.AtKey(bandit) != none
+        escorting = sceneManager.IsSceneOfType(sceneManager.GetCurrentScene(), sceneManager.CATEGORY_ESCORT_TO_JAIL)
+    endWhile
+
+    if (!(registered && escorting))
+        log("The bandit never reached the escort within 60s: registered " + registered + ", current Scene '" + sceneManager.GetCurrentScene() + "', imprisoned " + RPB_Utility.IsActorImprisoned(bandit) + ", arrestee " + (RPB_API.GetArrest().Arrestees.AtKey(bandit) != none) + ", dead " + bandit.IsDead() + ", 3D loaded " + bandit.Is3DLoaded() + ", guard dead " + guard.IsDead())
+        return none
+    endif
+
+    return bandit
+endFunction
+
+; Nothing of the arrest or the imprisonment is left on @akActor: no effects, in neither registry, and (if given) no Captor left on the guard
+bool function __AssertActorFree(Actor akActor, RPB_Prison apPrison, Actor akGuard, string asLabel)
+    RPB_Arrest arrest = RPB_API.GetArrest()
+    bool ok = true
+    bool step = false
+
+    step = assert_true(!akActor.HasSpell(RPB_Utility.RPB_ArresteeSpell()), asLabel + ": still has the Arrestee effect")
+    ok = ok && step
+    step = assert_true(arrest.Arrestees.AtKey(akActor) == none, asLabel + ": still registered as an arrestee")
+    ok = ok && step
+    step = assert_true(!akActor.HasSpell(RPB_Utility.RPB_PrisonerSpell()), asLabel + ": still has the Prisoner effect")
+    ok = ok && step
+    step = assert_true(apPrison.Prisoners.AtKey(akActor) == none, asLabel + ": still registered as a prisoner")
+    ok = ok && step
+    if (akGuard)
+        step = assert_true(arrest.GetCaptor(akGuard) == none, asLabel + ": the guard is still a Captor")
+        ok = ok && step
+    endif
+
+    return ok
+endFunction
+
+;/
+    A prisoner released before reaching their cell kept their Arrestee: its escort loop kept teleporting them to their
+    guard, and the guard kept following (a real save, after the prison monitor released an NPC mid-escort). A release
+    now also clears what's left of the arrest.
+/;
+state Test_ReleaseMidEscortClearsArrest
+    function Setup()
+        RPB_Prison prison = (RPB_API.GetPrisonManager()).GetPrison("Haafingar")
+        bool ok = true
+        bool step = false
+
+        Actor bandit = self.__StartEscortArrestUntilRegistered(prison)
+        step = assert_true(bandit != none, "Could not get a bandit into the escort half-state")
+        ok = ok && step
+        if (!bandit)
+            display_result(false)
+            return
+        endif
+
+        RPB_Prisoner prisonerRef = prison.Prisoners.AtKey(bandit)
+        Actor guard = prisonerRef.Captor
+        log("106 before release: imprisoned " + prisonerRef.IsImprisoned + ", arrestee " + (RPB_API.GetArrest().Arrestees.AtKey(bandit) != none) + ", guard " + guard)
+
+        prison.SendReleaseRequest(prisonerRef)
+        ; Right after: tells "never cleared" apart from "put back later by something still running"
+        log("106 right after release: arrestee " + (RPB_API.GetArrest().Arrestees.AtKey(bandit) != none) + ", Arrestee spell " + bandit.HasSpell(RPB_Utility.RPB_ArresteeSpell()) + ", guard still a Captor " + (RPB_API.GetArrest().GetCaptor(guard) != none))
+
+        float waitStart = Utility.GetCurrentRealTime()
+        while (prison.Prisoners.AtKey(bandit) != none && (Utility.GetCurrentRealTime() - waitStart) < 20.0)
+            Utility.Wait(0.5)
+        endWhile
+        Utility.Wait(2.0) ; the effects' finish handlers
+        log("106 at the end: arrestee " + (RPB_API.GetArrest().Arrestees.AtKey(bandit) != none) + ", Arrestee spell " + bandit.HasSpell(RPB_Utility.RPB_ArresteeSpell()) + ", current Scene '" + RPB_API.GetSceneManager().GetCurrentScene() + "'")
+
+        step = self.__AssertActorFree(bandit, prison, guard, "After the release")
+        ok = ok && step
+
+        display_result(ok)
+    endFunction
+
+    function Teardown()
+        __TeardownAllTempActors()
+    endFunction
+endState
+
+;/
+    The manual way out (F4 / MCM "Reset This Actor"): the same half-state as a real stuck arrest - registered prisoner,
+    Arrestee still on, not imprisoned - plus stripped belongings in the shared container. The reset must leave nothing
+    behind and give the belongings back.
+/;
+state Test_ResetUnsticksActor
+    function Setup()
+        RPB_Prison prison = (RPB_API.GetPrisonManager()).GetPrison("Haafingar")
+        bool ok = true
+        bool step = false
+
+        Actor bandit = self.__StartEscortArrestUntilRegistered(prison)
+        step = assert_true(bandit != none, "Could not get a bandit into the escort half-state")
+        ok = ok && step
+        if (!bandit)
+            display_result(false)
+            return
+        endif
+
+        RPB_Prisoner prisonerRef = prison.Prisoners.AtKey(bandit)
+        Actor guard = prisonerRef.Captor
+
+        int itemsBefore = bandit.GetNumItems()
+        prisonerRef.SetBelongingsContainer()
+        prisonerRef.Strip()
+        int itemsStripped = bandit.GetNumItems()
+        log("107 before reset: items " + itemsBefore + " -> " + itemsStripped + " after the strip, imprisoned " + prisonerRef.IsImprisoned + ", guard " + guard)
+
+        string done = RPB_Recovery.ResetActor(bandit)
+        log("107 reset: " + done)
+        Utility.Wait(2.0) ; the effects' finish handlers
+
+        step = self.__AssertActorFree(bandit, prison, guard, "After the reset")
+        ok = ok && step
+
+        int itemsAfter = bandit.GetNumItems()
+        log("107 after reset: items " + itemsAfter + " (had " + itemsBefore + ")")
+        step = assert_true(itemsAfter >= itemsBefore, "The belongings were not given back (" + itemsAfter + " of " + itemsBefore + " kinds of items)")
+        ok = ok && step
+
+        step = assert_true(bandit.IsAIEnabled(), "The actor's AI is still off")
+        ok = ok && step
+
+        display_result(ok)
+    endFunction
+
+    function Teardown()
+        __TeardownAllTempActors()
+    endFunction
+endState
+
+state Test_MonitorSkipsNotYetImprisoned
+    function Setup()
+        RPB_Prison prison = (RPB_API.GetPrisonManager()).GetPrison("Haafingar")
+        bool ok = true
+        bool step = false
+
+        Actor a = __SpawnTempActorOf(0x37BFF) ; the bandit base used by test 97
+        step = assert_true(a != none, "Could not spawn the test bandit")
+        ok = ok && step
+        if (!a)
+            display_result(false)
+            return
+        endif
+
+        RPB_Prisoner prisonerRef = prison.MakePrisoner(a)
+        step = assert_true(prisonerRef != none, "Could not make the bandit a prisoner")
+        ok = ok && step
+        if (!prisonerRef)
+            display_result(false)
+            return
+        endif
+
+        prisonerRef.IsUndeterminedSentence = false
+        prisonerRef.SetSentence(1, false)
+        log("105 before: imprisoned " + prisonerRef.IsImprisoned + ", sentence served by the old check " + prisonerRef.IsSentenceServed)
+
+        step = assert_true(!prisonerRef.IsImprisoned, "The bandit is already imprisoned, the test needs one that isn't")
+        ok = ok && step
+
+        prison.Monitor.AwaitPrisonerForRelease(prisonerRef)
+        prison.Monitor.AwaitPrisoners()
+
+        ; A release is queued and processed asynchronously: give it the time one takes
+        Utility.Wait(3.0)
+
+        bool stillRegistered = prison.Prisoners.AtKey(a) != none
+        log("105 after: still a prisoner " + stillRegistered)
+        step = assert_true(stillRegistered, "The monitor released a prisoner who was never imprisoned")
+        ok = ok && step
+
+        display_result(ok)
+    endFunction
+
+    function Teardown()
+        __TeardownAllTempActors()
+    endFunction
+endState
 
 state Test_PlayerLeavesBeforeConfrontationScene_FallsBackToTeleport
     function Setup()
@@ -10355,6 +10576,7 @@ function __TeardownAllTempActors()
 
     RPB_Prison solitudePrison = (RPB_API.GetPrisonManager()).GetPrison("Haafingar")
     RPB_Arrest arrest = RPB_API.GetArrest()
+    RPB_SceneManager sceneManager = RPB_API.GetSceneManager()
 
     ; Pass 1: unregister, and take the spells off so the effects finish
     int i = 0
@@ -10362,6 +10584,10 @@ function __TeardownAllTempActors()
         Actor tempActor = __testTempActors[i]
 
         if (tempActor)
+            ; A Scene still playing with a deleted actor kept the queue busy into the next test (107 once lost its
+            ; confrontation that way, behind 106's escort)
+            sceneManager.EndSceneWithActor(tempActor, "test teardown")
+
             RPB_Prisoner prisonerRef = solitudePrison.Prisoners.AtKey(tempActor)
             if (prisonerRef)
                 ; UnregisterPrisoner() only removes the registry entry - it doesn't release the CellPackage alias
@@ -10373,6 +10599,11 @@ function __TeardownAllTempActors()
                 if (prisonerRef.HasCellPackage)
                     prisonerRef.NPC_UnbindFromCell()
                 endif
+
+                ; The belongings container is shared by the whole prison: a prisoner deleted without its release left its
+                ; stripped items in it for good (a real save's chest held 14 items after a single real arrest). Given back
+                ; here, they're deleted with the actor.
+                prisonerRef.ReturnBelongings()
 
                 ; Round 28: same leak shape, two more release-only side effects that skipping straight from Imprisoned
                 ; to teardown never reaches, confirmed live the same way the CellPackage leak above was.
@@ -10571,30 +10802,18 @@ bool __userDebug = false
 bool __userLog = true
 
 ;/
-    Silences production logging for a test (only the UNIT lines stay), saving the user's own levels first so
-    __RestoreLogs() can put back exactly those. The restore used to compute "enabled || !ENABLE_X", which is always
-    true right after silencing, so every test left DEBUG and LOG switched on even when the user had them off.
-    TRACE is saved as its raw flag: IsTracingEnabled() also folds in DEBUG.
+    Records the user's own log levels before a test, so __RestoreLogs() can put back exactly those if the test changes
+    them. It used to also silence production logging for every test, which hid exactly the lines a failing test needed
+    (a DEBUG run showed nothing of why an arrest fell back). Tests now run with whatever TRACE/DEBUG/LOG the user has set;
+    with DEBUG on, timing-sensitive tests run slower. TRACE is saved as its raw flag: IsTracingEnabled() also folds in DEBUG.
 /;
 function __SilenceLogs()
     __userTrace = RPB_StorageVars.GetBool("TRACE", "Log", true)
     __userDebug = IsDebuggingEnabled()
     __userLog   = IsLoggingEnabled()
-
-    SetLoggingEnabled("TRACE",  __userTrace && ENABLE_TRACING)
-    SetLoggingEnabled("DEBUG",  __userDebug && ENABLE_DEBUGGING)
-    SetLoggingEnabled("LOG",    __userLog   && ENABLE_LOGGING)
 endFunction
 
 function __RestoreLogs()
-    SetLoggingEnabled("TRACE",  __userTrace)
-    SetLoggingEnabled("DEBUG",  __userDebug)
-    SetLoggingEnabled("LOG",    __userLog)
-endFunction
-
-; For a test that needs the production logs: switches back to the user's own levels for the rest of the test (whatever
-; they had on before pressing F1), with no recompile. __RestoreLogs() still runs afterwards as usual.
-function __UseUserLogging()
     SetLoggingEnabled("TRACE",  __userTrace)
     SetLoggingEnabled("DEBUG",  __userDebug)
     SetLoggingEnabled("LOG",    __userLog)

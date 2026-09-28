@@ -127,6 +127,11 @@ function SendArrestSceneEvent(string asScene, string asSceneEvent, Actor akArres
         return
     endif
 
+    if (self.__ArrestGone(akArrestee, asSceneSecondaryEvent))
+        SceneManager.EndSceneEarly(asScene, akArrestee + "'s arrest no longer exists", abRunEndEvents = false)
+        return
+    endif
+
     RPB_Arrestee arrestee = Arrest.AwaitArresteeReference(akArrestee)
 
     if (arrestee == none)
@@ -148,6 +153,10 @@ function SendArrestSceneBulkEvent(string asScene, string asSceneEvent, Form[] ak
         if (self.__ArrestAlreadyEndedInPrison(akArrestees[i] as Actor, asSceneSecondaryEvent))
             if (akArrestees.Length == 1)
                 self.__EndSceneIfArresteeGone(asScene, akArrestees[i] as Actor)
+            endif
+        elseif (self.__ArrestGone(akArrestees[i] as Actor, asSceneSecondaryEvent))
+            if (akArrestees.Length == 1)
+                SceneManager.EndSceneEarly(asScene, akArrestees[i] + "'s arrest no longer exists", abRunEndEvents = false)
             endif
         else
             RPB_Arrestee arrestee = Arrest.AwaitArresteeReference(akArrestees[i] as Actor)
@@ -186,6 +195,62 @@ bool function __ArrestAlreadyEndedInPrison(Actor akActor, string asSceneSecondar
 endFunction
 
 ;/
+    @asScene was started but never began playing (the engine silently refuses a Start() it can't run, e.g. an actor still
+    in combat). Nothing else will ever move that arrest on, so for an escort I finish it the way the unloaded case in
+    Arrestee.EscortToPrison already does: straight to the prison, or to the cell, without the Scene. Only a prisoner that
+    isn't imprisoned yet: anything else has already moved on.
+/;
+function OnSceneStartFailed(string asScene)
+    string sceneType = SceneManager.GetSceneType(asScene)
+    if (sceneType != SceneManager.CATEGORY_ESCORT_TO_JAIL && sceneType != SceneManager.CATEGORY_ESCORT_TO_CELL)
+        return
+    endif
+
+    Actor escort    = SceneManager.GetSceneNthReferenceOfType(asScene, "Escort") as Actor
+    Actor escortee  = SceneManager.GetSceneNthReferenceOfType(asScene, "Escortee") as Actor
+    if (!escortee)
+        return
+    endif
+
+    RPB_Prison prison = API.PrisonManager.FindPrisonByPrisoner(escortee)
+    if (!prison)
+        return
+    endif
+
+    RPB_Prisoner prisoner = prison.Prisoners.AtKey(escortee)
+    if (!prisoner || prisoner.IsImprisoned)
+        return
+    endif
+
+    DebugWarn("EventManager::OnSceneStartFailed", asScene + " never started for " + escortee + ", moving them without the Scene")
+    if (sceneType == SceneManager.CATEGORY_ESCORT_TO_JAIL && escort)
+        prisoner.MoveToPrison(escort)
+    else
+        prisoner.MoveToCell()
+    endif
+endFunction
+
+;/
+    True if @akActor's arrest doesn't exist anymore at all: not an arrestee (no entry, no Arrestee spell) and not a
+    prisoner either (no Prisoner spell) - released, reverted or reset while its Scene was still playing. Awaiting the
+    Arrestee would put the arrest back on them (AwaitEntityReference ensures the spell first): a prisoner released
+    mid-arrest got the Arrestee spell again from the confrontation Scene's next step. A live arrest always passes: the
+    Arrestee spell is added first thing in OnArrestBegin, before any Scene starts.
+/;
+bool function __ArrestGone(Actor akActor, string asSceneSecondaryEvent)
+    if (!akActor || Arrest.Arrestees.AtKey(akActor))
+        return false
+    endif
+
+    if (akActor.HasSpell(RPB_Utility.RPB_ArresteeSpell()) || akActor.HasSpell(RPB_Utility.RPB_PrisonerSpell()))
+        return false
+    endif
+
+    Debug("EventManager::__ArrestGone", akActor + "'s arrest no longer exists, ignoring the Scene's '" + asSceneSecondaryEvent + "' event")
+    return true
+endFunction
+
+;/
     The rest of an arrest Scene is only for whoever can see it: once its only arrestee is already imprisoned and not even
     loaded (the player left, the off-screen path imprisoned them), it would otherwise keep playing for up to ~50s and
     hold up every Scene queued behind it. Only called after the arrest has fully ended, so it never cuts a Scene short
@@ -205,7 +270,11 @@ function SendPrisonSceneEvent(string asScene, string asSceneEvent, Actor akPriso
         return
     endif
 
-    RPB_Prisoner prisoner = prison.AwaitPrisonerReference(akPrisoner) 
+    if (self.__PrisonerAlreadyGone(prison, akPrisoner, asSceneSecondaryEvent))
+        return
+    endif
+
+    RPB_Prisoner prisoner = prison.AwaitPrisonerReference(akPrisoner)
 
     if (prisoner == none)
         self.SendError("Could not retrieve the prisoner from the scene event, cannot proceed with the scene!")
@@ -230,16 +299,37 @@ function SendPrisonSceneBulkEvent(string asScene, string asSceneEvent, Form[] ak
 
     int i = 0
     while (i < akPrisoners.Length)
-        RPB_Prisoner prisoner = prison.AwaitPrisonerReference(akPrisoners[i] as Actor) 
+        if (!self.__PrisonerAlreadyGone(prison, akPrisoners[i] as Actor, asSceneSecondaryEvent))
+            RPB_Prisoner prisoner = prison.AwaitPrisonerReference(akPrisoners[i] as Actor)
 
-        if (prisoner == none)
-            self.SendError("Could not retrieve the prisoner from the scene event, cannot proceed with the scene!", "EventManager::SendPrisonSceneBulkEvent")
-            return
+            if (prisoner == none)
+                self.SendError("Could not retrieve the prisoner from the scene event, cannot proceed with the scene!", "EventManager::SendPrisonSceneBulkEvent")
+                return
+            endif
+
+            self.OnPrisonScene(asScene, asSceneEvent, prison, prisoner, akAuthority, asSceneSecondaryEvent)
         endif
-
-        self.OnPrisonScene(asScene, asSceneEvent, prison, prisoner, akAuthority, asSceneSecondaryEvent)
         i += 1
     endWhile
+endFunction
+
+;/
+    True if @akActor is no longer a prisoner of @apPrison (released, or reset): neither registered nor carrying the Prisoner
+    spell (checked second: an away prisoner isn't in the list but keeps the spell). A Scene can still be running for them,
+    and awaiting the prisoner would make them one again (AwaitEntityReference ensures the spell first) and run its step on
+    them anyway: a prisoner released mid-escort got stripped a second later by the escort's own end.
+/;
+bool function __PrisonerAlreadyGone(RPB_Prison apPrison, Actor akActor, string asSceneSecondaryEvent)
+    if (!akActor || apPrison.Prisoners.AtKey(akActor))
+        return false
+    endif
+
+    if (akActor.HasSpell(RPB_Utility.RPB_PrisonerSpell()))
+        return false
+    endif
+
+    Debug("EventManager::__PrisonerAlreadyGone", akActor + " is no longer a prisoner of " + apPrison.Name + ", ignoring the Scene's '" + asSceneSecondaryEvent + "' event")
+    return true
 endFunction
 
 ; ==========================================================

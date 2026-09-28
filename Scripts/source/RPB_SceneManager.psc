@@ -119,7 +119,9 @@ scriptname RPB_SceneManager extends Quest
     Scene function GetScene(string asSceneName)
     bool function HasQueuedScenes()
     bool function IsIdle()
-    function EndSceneEarly(string asScene, string asReason)
+    string function GetCurrentScene()
+    function EndSceneEarly(string asScene, string asReason, bool abRunEndEvents = true)
+    bool function EndSceneWithActor(Actor akActor, string asReason)
     function PushScene(string asSceneName)
     string function PopScene()
     function QueueOrPlay(string asSceneName)
@@ -970,6 +972,23 @@ bool function IsIdle()
     return !__isScenePlaying && JArray.count(__queuedScenes) == 0
 endFunction
 
+; The Scene I'm playing through the queue, "" when none
+string function GetCurrentScene()
+    if (__isScenePlaying || self.__IsCurrentSceneRunning())
+        return currentScene
+    endif
+    return ""
+endFunction
+
+; The engine's word for the Scene I last started (the flag alone once said "nothing" while an escort Scene still ran)
+bool function __IsCurrentSceneRunning()
+    if (currentScene == "")
+        return false
+    endif
+    Scene sceneObject = self.GetScene(currentScene)
+    return sceneObject && sceneObject.IsPlaying()
+endFunction
+
 bool function HasQueuedScenes()
     Debug("Scene DEBUG: ["+ currentScene +"] SceneManager::HasQueuedScenes", "HasQueuedScenes: " + (JArray.count(__queuedScenes) > 0) + " ("+ JArray.count(__queuedScenes) +" scenes)")
     return JArray.count(__queuedScenes) > 0
@@ -1108,8 +1127,29 @@ function PlayQueued()
             endWhile
         endif
 
+        __lastStartedScene = ""
         sceneObject.Start() ; Play the Scene
         currentScene = nextScene
+
+        ; The engine can refuse a Start() silently (seen with an escort Scene whose arrestee was still in combat: no start,
+        ; ever), which used to leave the arrest stuck and this queue waiting for an end that never comes. A Scene that
+        ; starts is playing within a frame or two; give it a few seconds, then treat it as failed.
+        float startWaitStart = Utility.GetCurrentRealTime()
+        while (!sceneObject.IsPlaying() && __lastStartedScene != nextScene && (Utility.GetCurrentRealTime() - startWaitStart) < 3.0)
+            Utility.Wait(0.1)
+        endWhile
+
+        if (!sceneObject.IsPlaying() && __lastStartedScene != nextScene && currentScene == nextScene)
+            DebugWarn("SceneManager::PlayQueued", nextScene + " never started, moving on")
+            EventManager.OnSceneStartFailed(nextScene)
+            __isScenePlaying = false
+            currentScene = ""
+            if (nextAliases)
+                JValue.release(nextAliases)
+            endif
+            self.PlayQueued()
+            return
+        endif
     endif
 
     if (nextAliases)
@@ -1119,13 +1159,32 @@ endFunction
 
 bool __endingEarly
 
+; Ends the Scene I'm playing if @akActor is one of its references (RPB_Recovery). True if one was ended.
+; Its end events are not run: a reset or a test teardown must not trigger what the Scene's end would (an escort's end strips
+; the prisoner at the jail - that once overwrote the belongings manifest of an actor being reset).
+bool function EndSceneWithActor(Actor akActor, string asReason)
+    if (!akActor || !self.__IsCurrentSceneRunning())
+        return false
+    endif
+
+    string sceneName = currentScene
+    Form[] refs = self.GetSceneReferences(sceneName)
+    if (!refs || refs.Find(akActor) < 0)
+        return false
+    endif
+
+    self.EndSceneEarly(sceneName, asReason, abRunEndEvents = false)
+    return true
+endFunction
+string __lastStartedScene ; the last Scene whose start I received, see PlayQueued()
+
 ;/
     Ends @asScene now, through the same path as its natural end (OnSceneEnd: its end event, the next queued Scene,
     the flags and globals), for a Scene whose remaining phases no longer matter. Only if it's the Scene I'm playing
     and the engine still has it playing.
 /;
-function EndSceneEarly(string asScene, string asReason)
-    if (__endingEarly || !__isScenePlaying || asScene != currentScene)
+function EndSceneEarly(string asScene, string asReason, bool abRunEndEvents = true)
+    if (__endingEarly || asScene != currentScene)
         return
     endif
 
@@ -1142,8 +1201,13 @@ function EndSceneEarly(string asScene, string asReason)
         Utility.Wait(0.1)
     endWhile
 
-    ; A stopped Scene never reaches the phase that sends its end, so this is its only end
-    self.OnSceneEnd(asScene, sceneObject)
+    ; A stopped Scene never reaches the phase that sends its end, so this is its only end. Without its end events when the
+    ; caller says so: only the queue moves on.
+    if (abRunEndEvents)
+        self.OnSceneEnd(asScene, sceneObject)
+    else
+        self.__FinishScene(asScene)
+    endif
     __endingEarly = false
 endFunction
 
@@ -1438,6 +1502,7 @@ endFunction
 
 
 event OnSceneStart(string name, Scene sender)
+    __lastStartedScene = name
     Form[] params   = self.GetSceneReferences(name)
     string type     = self.GetSceneType(name)
 
@@ -1763,21 +1828,31 @@ event OnSceneEnd(string name, Scene sender)
         EventManager.SendArrestSceneEvent(name, EVENT_ARREST_PAY_BOUNTY_END, escortee, escort, secondaryEvent)
     endif
 
-    self.ResetSceneOverride()
-    float paramsBenchmark = StartBenchmark()
-    Form[] params = self.GetSceneReferences(name)
-    EndBenchmark(paramsBenchmark, "SceneManager::OnSceneEnd::GetSceneReferences() NEW")
-    Alias[] aliases = self.GetSceneAliases(name, true)
-    Debug("SceneManager::OnSceneEnd", self.GetSceneParametersDebugInfo(sender, name))
+    ; Only for the debug line: reading every alias costs 43-360ms per Scene end, and ran with DEBUG off too
+    if (IsDebuggingEnabled())
+        Debug("SceneManager::OnSceneEnd", self.GetSceneParametersDebugInfo(sender, name))
+    endif
     Debug("SceneManager::OnSceneEnd", "Ended Scene: " + name)
-    __lastEndedScene = name
 
     ; self.UnbindAliases(name) ; (Need to fix this, since they get unbound after they should, for now, uncommented) ERROR: EventManager::SendPrisonSceneBulkEvent() -> No prisoners provided for bulk scene event!
-    self.PlayQueued()
-    __isScenePlaying = false ; Scene has finished playing
-    self.ResetGlobals()
-    self.OnResumeSceneBlocked()
+    self.__FinishScene(name)
 endEvent
+
+;/
+    The queue's side of a Scene ending: the flag and the control-flow globals are reset BEFORE the next queued Scene
+    starts. The flag used to be cleared after PlayQueued(), so a Scene started from another's end (confrontation -> escort)
+    was marked "not playing" while it ran: the next arrest's Scene started on top of it, on the same shared aliases, and
+    the leftover escort Scene walked the new pair off (tests 106/107 polluting each other). The globals were likewise reset
+    after the next Scene had started, wiping what it had just been given.
+/;
+function __FinishScene(string asScene)
+    self.ResetSceneOverride()
+    __lastEndedScene = asScene
+    __isScenePlaying = false
+    self.ResetGlobals()
+    self.PlayQueued()
+    self.OnResumeSceneBlocked()
+endFunction
 
 event OnAllScenesFinished()
     Debug("SceneManager::OnAllScenesFinished", "Resetting current scene!")

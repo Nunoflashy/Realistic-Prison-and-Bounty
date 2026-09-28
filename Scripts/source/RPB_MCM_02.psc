@@ -328,6 +328,7 @@ function RenderSelectedArresteeInfo()
         return
     endif
 
+    self.__AddResetOption(selectedArrestee.GetActor())
     RPB_MCM_02_Prison.RenderArrest(self, selectedArrestee)
 endFunction
 
@@ -344,7 +345,18 @@ function RenderSelectedPrisonerInfo()
         return
     endif
 
+    self.__AddResetOption(selectedPrisoner.GetActor())
     RPB_MCM_02_Prison.Render(self, selectedPrisoner)
+endFunction
+
+int __resetOption = -1
+Actor __resetTarget
+
+; First on the page, so it's there even when the rest can't render (a stuck actor's page used to be empty)
+function __AddResetOption(Actor akActor)
+    __resetTarget = akActor
+    SetCursorFillMode(TOP_TO_BOTTOM)
+    __resetOption = AddTextOption("Reset This Actor", "Unstick")
 endFunction
 
 
@@ -365,6 +377,8 @@ event OnConfigOpen()
 endEvent
 
 event OnPageReset(string page)
+    __resetOption = -1
+
     if (page == "")
         self.RenderDefaultPage()
         return
@@ -387,12 +401,22 @@ event OnPageReset(string page)
 endEvent
 
 event OnOptionHighlight(int option)
+    if (option == __resetOption)
+        SetInfoText("For an arrest or imprisonment that got stuck: frees this actor from everything the mod left on them. If they are imprisoned, they are released where they stand, with their belongings.")
+    endif
 endEvent
 
 event OnOptionDefault(int option)
 endEvent
 
 event OnOptionSelect(int option)
+    if (option == __resetOption && __resetTarget)
+        if (ShowMessage("Free " + __resetTarget.GetDisplayName() + " from everything Realistic Prison and Bounty left on them? If imprisoned, they are released where they stand.", true, "Reset", "Cancel"))
+            string done = RPB_Recovery.ResetActor(__resetTarget)
+            ShowMessage(RPB_Utility.string_if(done == "", "Nothing to reset.", "Done: " + done), false)
+            ForcePageReset()
+        endif
+    endif
 endEvent
 
 event OnOptionSliderOpen(int option)

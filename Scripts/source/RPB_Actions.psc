@@ -30,6 +30,7 @@ scriptname RPB_Actions extends ObjectReference
     function Action_PreAssignCellToPrisoner(RPB_UIInterface uilib)
     function Action_TogglePrisonStats(RPB_UIInterface uilib, bool abSentence = false, bool abReleaseTime = false, bool abTimeLeft = false, bool abTimeServed = false, bool abBounty = false)
     function Action_ReleasePrisoner(RPB_UIInterface uilib)
+    function Action_ResetSelectedActor()
     function Action_TestReindexing(RPB_UIInterface uilib)
     function Action_BindCellPackageToReference(RPB_UIInterface uilib)
     function Action_TogglePrisonerEffectOnSelectedActor(RPB_UIInterface uilib)
@@ -128,6 +129,7 @@ string[] function GetActions()
         "[Prison] Clothe Prisoner," + \
         "[Prison] Set Prisoner State Property," + \
         "[Prison] Release Prisoner from Prison," + \
+        "[Recovery] Reset Selected Actor (Unstick)," + \
         "[Prison] Bind Cell Package to Reference," + \
         "[Prison] Bind Actor to Cell Package," + \
         "[Prison] Toggle Show Prison Sentence," + \
@@ -291,6 +293,9 @@ function ShowActionsMenu()
 
     elseif (actionToPerform == "[Prison] Release Prisoner from Prison")
         Action_ReleasePrisoner(uilib)
+
+    elseif (actionToPerform == "[Recovery] Reset Selected Actor (Unstick)")
+        Action_ResetSelectedActor()
 
     elseif (actionToPerform == "[Prison] Bind Cell Package to Reference")
         Action_BindCellPackageToReference(uilib)
@@ -802,6 +807,21 @@ function Action_TogglePrisonStats(RPB_UIInterface uilib, bool abSentence = false
     if (abBounty)
         prisoner.ShowBounty = !prisoner.ShowBounty
     endif
+endFunction
+
+;/
+    Frees the console-selected actor from anything RPB left on them (RPB_Recovery.ResetActor): for an arrest or imprisonment
+    that got stuck.
+/;
+function Action_ResetSelectedActor()
+    Actor selectedActor = Game.GetCurrentConsoleRef() as Actor
+    if (!selectedActor)
+        Debug.MessageBox("Select an actor in the console first (click them with the console open).")
+        return
+    endif
+
+    string done = RPB_Recovery.ResetActor(selectedActor)
+    Debug.MessageBox(selectedActor.GetDisplayName() + ": " + string_if(done == "", "nothing to reset.", done))
 endFunction
 
 function Action_ReleasePrisoner(RPB_UIInterface uilib)

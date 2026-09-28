@@ -203,7 +203,8 @@ scriptname RPB_Prison extends RPB_Entity
     string function GetTimeServedFormatted(RPB_Prisoner apPrisoner)
     function SetSentence(RPB_Prisoner apPrisoner, int aiSentence = 0)
     function RestrainPrisoner(RPB_Prisoner apPrisoner, bool abRestrainInFront = false)
-    function TeleportPrisonerToRelease(RPB_Prisoner apPrisoner)
+    function TeleportPrisonerToRelease(RPB_Prisoner apPrisoner, bool abMoveToReleaseLocation = true)
+    function ReleaseInPlace(RPB_Prisoner apPrisoner)
     int function PendingDressCount()
     function QueueEscortToCellStallCheck(Actor akPrisoner, float afTimeoutSeconds = 8.0)
     function ResetDressCost()
@@ -2288,10 +2289,21 @@ function RestrainPrisoner(RPB_Prisoner apPrisoner, bool abRestrainInFront = fals
     apPrisoner.GetActor().EquipItem(cuffs, true, true)
 endFunction
 
-function TeleportPrisonerToRelease(RPB_Prisoner apPrisoner)
+;/
+    Releases @apPrisoner where they stand: the whole release (belongings, outfit, cell, hostility restore, leftover arrest
+    state), without the move to the release location. For RPB_Recovery.ResetActor.
+/;
+function ReleaseInPlace(RPB_Prisoner apPrisoner)
+    self.TeleportPrisonerToRelease(apPrisoner, abMoveToReleaseLocation = false)
+endFunction
+
+function TeleportPrisonerToRelease(RPB_Prisoner apPrisoner, bool abMoveToReleaseLocation = true)
     ; Crumbs (only recorded while the dev flag is on): a release that stalls shows the last step it completed
     Actor releasedActor = apPrisoner.GetActor()
-    ObjectReference releaseLocation = apPrisoner.TeleportReleaseLocation
+    ObjectReference releaseLocation = none
+    if (abMoveToReleaseLocation)
+        releaseLocation = apPrisoner.TeleportReleaseLocation
+    endif
     bool releasedIsNPC = apPrisoner.IsNPC()
     Outfit dressOutfit = none
     if (releasedIsNPC && RPB_Utility.IsCrumbsEnabled())
@@ -3404,6 +3416,9 @@ event OnPrisonerReleased(RPB_Prisoner apPrisoner)
 
     self.OnPrisonerLeave(apPrisoner)
     RPB_Utility.FlowMark("OnPrisonerReleased: OnPrisonerLeave")
+    ; Normally already gone (imprisonment tears it down); only a prisoner released before reaching the cell still has one
+    apPrisoner.ClearArrest()
+    RPB_Utility.FlowMark("OnPrisonerReleased: ClearArrest")
     apPrisoner.Destroy()
     RPB_Utility.FlowMark("OnPrisonerReleased: Destroy")
 endEvent

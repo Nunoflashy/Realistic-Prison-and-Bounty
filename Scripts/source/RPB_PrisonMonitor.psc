@@ -20,6 +20,7 @@ scriptname RPB_PrisonMonitor extends ReferenceAlias
     float function ComputeNextWakeHours(float[] afDaysLeft, bool[] abExcluded, bool abHasUnknown = false, float afBufferHours = 0.1, float afMinHours = 1.0, float afUnknownPollHours = 24.0) global
     function Reschedule()
     function ArmHostilityRestore()
+    function ArmPrisonerRelease(RPB_Prisoner apPrisoner)
     function RequestRealTimeWake(string asQueue, float afSeconds)
     function RegisterPrisoner(RPB_Prisoner apPrisoner)
     function UpdatePrisonersStats()
@@ -244,6 +245,42 @@ endFunction
     before whatever is armed now; otherwise the armed wake comes first, and every wake processes due restores and then
     re-arms fully. Works in both states (in Inactive the armed wake is the heartbeat).
 /;
+function ArmPrisonerRelease(RPB_Prisoner apPrisoner)
+    if (!apPrisoner || apPrisoner.IsPlayer() || apPrisoner.IsUndeterminedSentence)
+        return
+    endif
+
+    ; Same computation as a full Reschedule(), for this one prisoner
+    float[] daysLeft = new float[1]
+    bool[] excluded = new bool[1]
+    daysLeft[0] = apPrisoner.TimeLeftInSentence
+    excluded[0] = false
+    float releaseHours = ComputeNextWakeHours(daysLeft, excluded)
+    if (releaseHours < 0.0)
+        return
+    endif
+
+    float overrideHours = RPB_Utility.GetMonitorOverrideHours()
+    if (overrideHours > 0.0)
+        releaseHours = overrideHours
+    endif
+
+    float releaseAt = Utility.GetCurrentGameTime() + (releaseHours / 24.0)
+    if (__armedWakeAt < 0.0 || releaseAt < __armedWakeAt)
+        RegisterForSingleUpdateGameTime(releaseHours)
+        __armedWakeAt = releaseAt
+        if (__nextWakeAt < 0.0 || releaseAt < __nextWakeAt)
+            __nextWakeAt = releaseAt
+            __isMonitoring = true
+        endif
+    endif
+endFunction
+
+;/
+    A prisoner was just imprisoned: their sentence starts now, so make sure the wake comes no later than their release.
+    Same idea as ArmHostilityRestore() (no full Reschedule(), which reads every prisoner's sentence): they didn't count
+    before, since a prisoner still being escorted has no running sentence.
+/;
 function ArmHostilityRestore()
     float restoreHours = Prison.NextHostilityRestoreHours()
     if (restoreHours < 0.0)
@@ -278,6 +315,11 @@ float function __NextReleaseWakeHours()
             hasUnknown = true
         elseif (prisoner.IsPlayer() || prisoner.IsUndeterminedSentence)
             excluded[i] = true
+        elseif (!prisoner.IsImprisoned)
+            ; Registered at arrest start, before the escort: the sentence only starts at Imprison(), which arms its own wake
+            ; (ArmPrisonerRelease). Until then it counts as unknown, like an away prisoner.
+            excluded[i] = true
+            hasUnknown = true
         else
             excluded[i] = false
             daysLeft[i] = prisoner.TimeLeftInSentence
@@ -352,6 +394,12 @@ bool function AwaitPrisonerImprisonment(RPB_Prisoner apPrisoner)
 endFunction
 
 bool function AwaitPrisonerForRelease(RPB_Prisoner apPrisoner)
+    ; Registered at arrest start, before the escort: a prisoner not imprisoned yet has no running sentence, and judging one
+    ; released an NPC halfway through their escort to the prison
+    if (!apPrisoner.IsImprisoned)
+        return false
+    endif
+
     if (apPrisoner.IsSentenceServed)
         Debug("PrisonMonitor::AwaitPrisonerForRelease", "Released Prisoner:  " + apPrisoner + apPrisoner.GetPrisoner())
         self.QueueRelease(apPrisoner) ; asynchronous, ordered: never blocks this pass on a release
@@ -619,7 +667,8 @@ function AwaitPrisoners()
         RPB_Prisoner prisoner = Prisoners.AtKey(actors[i] as Actor)
 
         ; Foreground prisoners and the Player run themselves; only NPCs that are not actively monitored are processed here
-        if (prisoner && prisoner.IsNPC() && !Prison.ShouldActivelyMonitorPrisoner(prisoner))
+        ; Only imprisoned ones: a prisoner is registered at arrest start, and one still being escorted has no sentence running
+        if (prisoner && prisoner.IsNPC() && prisoner.IsImprisoned && !Prison.ShouldActivelyMonitorPrisoner(prisoner))
             self.AwaitPrisonerImprisonment(prisoner)
 
             if (self.AwaitPrisonerForRelease(prisoner))
@@ -651,6 +700,10 @@ endState
     background.
 /;
 state Inactive
+    ; The player is in the prison: prisoners are handled in the foreground, only the heartbeat is armed
+    function ArmPrisonerRelease(RPB_Prisoner apPrisoner)
+    endFunction
+
     ; The heartbeat, or sooner if a hostility restore is due first - this is the alias's only game-time registration (see
     ; the default Reschedule), so a restore due while the player is in the prison would otherwise wait up to 12h
     function Reschedule()
