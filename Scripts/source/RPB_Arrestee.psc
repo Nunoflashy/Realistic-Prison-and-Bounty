@@ -48,7 +48,8 @@ Scriptname RPB_Arrestee extends RPB_ActorBase
     function Arrest()
     function DeclareArrestSuccess()
     bool function AwaitConfrontationScene(string asScene)
-    function EscortToPrison(bool abEscortDirectlyToCell = false)
+    function EscortToPrison(bool abEscortDirectlyToCell = false, bool abCombatAtArrest = false, Actor akOtherHostile = none)
+    function ResumePendingArrest()
     function MoveToPrison(bool abMoveDirectlyToCell = false)
     function ChangeEscort(Actor akNewEscort)
     function SetTimeOfArrest()
@@ -87,6 +88,7 @@ Scriptname RPB_Arrestee extends RPB_ActorBase
     event OnArrestEnd()
     event OnArrestFailed(string asReason)
     event OnUpdate()
+    event OnCombatStateChanged(Actor akTarget, int aeCombatState)
 /;
 
 import RPB_Utility
@@ -375,8 +377,7 @@ endFunction
 function Cuff()
     Form cuffs = Game.GetFormFromFile(0x81D2F, "ZaZAnimationPack.esm")
 
-    self.SheatheWeapon()
-    UnequipHandsForActor(this)
+    self.SheatheWeapon() ; sheathed, not taken: the weapons stay on me until the strip
     self.EquipItem(cuffs, true, true)
 endFunction
 
@@ -393,13 +394,9 @@ endFunction
 ; endFunction
 
 function Uncuff()
-    int cuffsItemSlot = 59
-
-    Form cuffs = this.GetEquippedArmorInSlot(cuffsItemSlot)
-
-    this.UnequipItemSlot(cuffsItemSlot)
-    this.RemoveItem(cuffs)
-    Debug("Arrestee::Uncuff", "Uncuffed " + this)
+    ; By form, worn or carried, and deleted (the worn-slot lookup left unworn cuffs behind)
+    int removed = RPB_Utility.RemoveCuffs(this)
+    Debug("Arrestee::Uncuff", "Uncuffed " + this + " (" + removed + " removed)")
 endFunction
 
 ;/
@@ -467,6 +464,8 @@ function SetArrestGoal(string asArrestGoal)
 endFunction
 
 function RevertArrest()
+    self.__ReleasePendingHold(abReverted = true) ; a pending arrest reverted (a death on either side, or a reset) must not leave me frozen
+
     ; Unbind from Cuffs
     self.Uncuff()
 
@@ -626,13 +625,26 @@ bool function AwaitConfrontationScene(string asScene)
     return false
 endFunction
 
-function EscortToPrison(bool abEscortDirectlyToCell = false)
+function EscortToPrison(bool abEscortDirectlyToCell = false, bool abCombatAtArrest = false, Actor akOtherHostile = none)
     string sceneSet = string_if (self.GetString("Scene"), self.GetString("Scene"), Arrest.SceneManager.SCENE_ARREST_START_02)
 
     ; Persisted so anything resolving "which Scene is this arrest actually running" later (Captor.OnDeath, so it can
     ; stop this Scene if the guard dies before it confirms) has a reliable value to read back - "Scene" itself was
     ; only ever read here before, never written, so it always fell through to the fallback above.
     self.SetString("Scene", sceneSet)
+
+    ; My guard is still fighting someone else (another hostile nearby keeps every guard in combat): the confrontation
+    ; Scene can't play in a fight. I'm cuffed right away and wait, the escort starts once the fight is over.
+    ; The main signal is who the guard was fighting at the arrest (@akOtherHostile, from BeginArrest); the settle check only
+    ; covers a guard that ends up back in combat without one having been read
+    if (akOtherHostile)
+        Debug("["+ Name +"] Arrestee::EscortToPrison", "other hostile " + akOtherHostile + " keeps " + Captor.GetActor() + " busy -> pending arrest")
+        self.__BeginPendingArrest(abEscortDirectlyToCell, akOtherHostile)
+        return
+    elseif (self.__CaptorStillFighting(abCombatAtArrest))
+        self.__BeginPendingArrest(abEscortDirectlyToCell, none)
+        return
+    endif
 
     if (!self.AwaitConfrontationScene(sceneSet))
         ; AwaitConfrontationScene() returns false for two different reasons, and they need different handling here.
@@ -668,6 +680,130 @@ function EscortToPrison(bool abEscortDirectlyToCell = false)
         DebugWarn("["+ Name +"] Arrestee::EscortToPrison", "Confrontation Scene never confirmed for " + Name + " - falling back to a direct teleport-to-cell arrest instead of reverting")
         self.DeclareArrestSuccess()
         self.MoveToPrison(abMoveDirectlyToCell = true)
+        return
+    endif
+
+    self.__ContinueToPrison(abEscortDirectlyToCell)
+endFunction
+
+;/
+    True if my guard is still in combat after BeginArrest's own combat break, once things settle. BeginArrest stops the
+    combat of both of us, so right after it neither reads as fighting even when another hostile is about to pull the
+    guard straight back in: an arrest made in a fight (@abCombatAtArrest, read by BeginArrest before its StopCombat) waits
+    a moment for that before looking. A guard that was only fighting me is free by then; one back in combat is fighting
+    someone else. A peaceful arrest skips all of it.
+/;
+bool function __CaptorStillFighting(bool abCombatAtArrest)
+    Actor guard = Captor.GetActor()
+    if (!guard)
+        return false
+    endif
+
+    if (!abCombatAtArrest && !guard.IsInCombat())
+        return false
+    endif
+
+    Utility.Wait(1.5) ; another hostile re-engages the guard
+
+    float waitStart = Utility.GetCurrentRealTime()
+    while (guard.IsInCombat() && (Utility.GetCurrentRealTime() - waitStart) < 1.5)
+        Utility.Wait(0.25)
+    endWhile
+
+    bool fighting = guard.IsInCombat()
+    Debug("["+ Name +"] Arrestee::__CaptorStillFighting", "combat at arrest " + abCombatAtArrest + ", guard " + guard + " still in combat after settling " + fighting + " -> " + string_if(fighting, "pending arrest", "normal confrontation"))
+    return fighting
+endFunction
+
+;/
+    The arrest while my guard is busy fighting: I'm taken out of the fight and cuffed now (never left standing armed), and
+    the rest - becoming a prisoner and the escort - waits until the guard's combat ends. The Captor resumes me
+    (RPB_Captor.OnCombatStateChanged, with a slow re-check as a safety net). A death on either side reverts it through the
+    existing handlers.
+/;
+function __BeginPendingArrest(bool abEscortDirectlyToCell, Actor akOtherHostile)
+    Actor guard = Captor.GetActor()
+    bool isPlayer = self.IsPlayer()
+    self.SetForm("Pending Hostile", akOtherHostile) ; the Captor resumes me once it's dealt with
+
+    this.StopCombat()
+    this.StopCombatAlarm()
+    this.SheatheWeapon()
+    if (isPlayer)
+        ; A leash, not a freeze: SetRestrained locked the camera too. Cuffed hands can't fight or activate anything, but
+        ; the camera, movement and menus stay free; the leash (OnUpdate) keeps me near my guard.
+        Game.DisablePlayerControls(abMovement = false, abFighting = true, abCamSwitch = false, abLooking = false, abSneaking = false, abMenu = false, abActivate = true, abJournalTabs = false, aiDisablePOVType = 0)
+    else
+        ; Out of the fight and held where I am: no fighting anyone (neutralized, I'm no longer the other hostiles' ally
+        ; and my AI still reacted to them), no running off. SetRestrained alone still let me drift 75-240 units in 3s,
+        ; so SetDontMove pins me too and the package is re-evaluated to drop whatever was walking me.
+        this.SetActorValue("Aggression", 0) ; restored with the hostility restore
+        this.SetRestrained(true)
+        this.SetDontMove(true)
+        ; Out of combat, my AI still drew my weapons at the fight next to me, on and off: the hold package (Ignore Combat,
+        ; No Combat Alert) keeps me out of it. My weapons stay on me, sheathed.
+        this.SetAlert(false)
+        if (!Arrest.SceneManager.SetPendingHoldOnActor(this))
+            this.EvaluatePackage()
+        endif
+    endif
+    self.SetBool("Pending Hold", true)
+    Debug("["+ Name +"] Arrestee::__BeginPendingArrest", "hold on at (" + (this.GetPositionX() as int) + ", " + (this.GetPositionY() as int) + ")")
+
+    ; What the confrontation Scene's "Handcuff" step does (the Scene itself can't start in a fight)
+    self.Restrain()
+    Arrest.OnArresteeRestrained(self)
+
+    self.SetBool("Arrest Pending", true)
+    self.SetBool("Pending Directly To Cell", abEscortDirectlyToCell)
+    Info("Arrest of " + Name + " " + this + " is pending: cuffed, waiting for " + guard + " to deal with " + akOtherHostile + " before the escort")
+
+    Captor.WatchPendingArrest()
+    RegisterForSingleUpdate(5.0) ; the leash: pulled back to my guard if I end up (or walk) too far
+
+    ; The fight may have ended while I was being cuffed: no combat change would come for it
+    Captor.__ResumePendingArrestIfDone()
+endFunction
+
+; The guard's fight is over: the arrest goes on from where the confrontation Scene would have left it (I'm already cuffed)
+function ResumePendingArrest()
+    if (!self.GetBool("Arrest Pending"))
+        return ; already resumed (the event and the re-check can both get here)
+    endif
+    self.SetBool("Arrest Pending", false)
+    self.__ReleasePendingHold() ; the escort has to walk me
+    ; The player is AI-driven from here, as after the confrontation Scene (its RetainAI never ran on this path)
+    RetainAI(self.IsPlayer())
+
+    Info("Pending arrest of " + Name + " " + this + " resumed: the fight is over, escorting")
+    self.__ContinueToPrison(self.GetBool("Pending Directly To Cell"))
+    self.OnArrestEnd() ; what the confrontation Scene's end does: the escort leash, and the wedge check
+endFunction
+
+; Lifts what __BeginPendingArrest put on me to hold me in place (Aggression comes back with the hostility restore).
+; @abReverted: the arrest is over, so the player gets their controls back; a resume keeps them AI-driven for the escort.
+function __ReleasePendingHold(bool abReverted = false)
+    if (!self.GetBool("Pending Hold"))
+        return
+    endif
+    self.SetBool("Pending Hold", false)
+
+    if (self.IsPlayer())
+        if (abReverted)
+            ReleaseAI(true)
+        endif
+        return
+    endif
+
+    Arrest.SceneManager.UnsetPendingHoldOnActor(this) ; before the escort Scene binds me
+    this.SetRestrained(false)
+    this.SetDontMove(false)
+endFunction
+
+; The arrest from its confirmation on: I become a prisoner, get a cell, and am escorted there (or moved, off-screen)
+function __ContinueToPrison(bool abEscortDirectlyToCell)
+    if (this.IsDisabled())
+        Debug("["+ Name +"] Arrestee::__ContinueToPrison", Name + " is disabled, not continuing the arrest")
         return
     endif
 
@@ -723,6 +859,12 @@ function EscortToPrison(bool abEscortDirectlyToCell = false)
 endFunction
 
 function MoveToPrison(bool abMoveDirectlyToCell = false)
+    if (this.IsDisabled())
+        ; Gone while this arrest was still in flight (a test's teardown disables before deleting)
+        Debug("["+ Name +"] Arrestee::MoveToPrison", Name + " is disabled, not moving them to prison")
+        return
+    endif
+
     RPB_Prisoner prisoner   = self.MakePrisoner()
 
     if (!prisoner)
@@ -954,6 +1096,43 @@ event OnArrestFailed(string asReason)
     self.RevertArrest()
 endEvent
 
+; While my arrest is pending I'm cuffed and out of every fight, but a single StopCombat didn't last: I was pulled back
+; into combat within seconds and drew my weapons. Every time I re-enter combat while pending, I'm taken out again; a guard
+; that picked me as a target drops me (he picks the other hostile back up on his own, and the resume waits for that one).
+event OnCombatStateChanged(Actor akTarget, int aeCombatState)
+    if (!self.GetBool("Arrest Pending"))
+        return
+    endif
+
+    ; The escort can't start while I'm in combat (a player still fought by the other hostiles): out of it, the arrest can
+    ; go on if the guard's fight is over too
+    if (aeCombatState == 0)
+        Captor.__ResumePendingArrestIfDone()
+        return
+    endif
+
+    if (self.IsPlayer())
+        return ; the player's combat isn't mine to stop: they wait it out, cuffed and leashed
+    endif
+
+    Actor guard = none
+    if (Captor)
+        guard = Captor.GetActor()
+    endif
+    Debug("["+ Name +"] Arrestee::OnCombatStateChanged", Name + " re-entered combat with " + akTarget + " (state " + aeCombatState + ") while the arrest is pending, taking them out again" + string_if(akTarget && akTarget == guard, " (the guard)", ""))
+
+    this.StopCombat()
+    this.StopCombatAlarm()
+    this.SheatheWeapon()
+    if (akTarget && akTarget == guard)
+        guard.StopCombat()
+    endif
+endEvent
+
+; How far I can get from my guard before the leash (OnUpdate) moves me back to them
+float property ESCORT_LEASH_DISTANCE = 700.0 autoreadonly
+float property PENDING_LEASH_DISTANCE = 2500.0 autoreadonly
+
 event OnUpdate()
     ; The hostile-faction re-check that used to live here (MaintainArrestPacification) was mitigating a symptom -
     ; a disguise mod reapplying a hostile faction mid-escort - of what turned out to be RPB checking the wrong faction
@@ -964,7 +1143,12 @@ event OnUpdate()
     ; The guard-wedge nudge that briefly lived here too (round 3) doesn't belong in a recurring check either - it only
     ; ever needs to happen once, right as the confrontation ends (see OnArrestEnd()), not re-evaluated against normal
     ; walking proximity every 5s for the rest of a potentially long escort.
-    if (this.GetDistance(Captor.GetActor()) >= 700)
+    ; A pending arrest leaves room to take cover from the fight; an escort keeps me close
+    float leash = ESCORT_LEASH_DISTANCE
+    if (self.GetBool("Arrest Pending"))
+        leash = PENDING_LEASH_DISTANCE
+    endif
+    if (this.GetDistance(Captor.GetActor()) >= leash)
         this.MoveTo(Captor.GetActor())
         Debug("["+ Name +"] Arrestee::OnUpdate", "Moved Arrestee to " + Captor.Name)
     endif

@@ -2284,8 +2284,7 @@ function RestrainPrisoner(RPB_Prisoner apPrisoner, bool abRestrainInFront = fals
         cuffs = Game.GetFormFromFile(0x81D33, "ZaZAnimationPack.esm")
     endif
 
-    apPrisoner.GetActor().SheatheWeapon()
-    UnequipHandsForActor(apPrisoner.GetActor())
+    apPrisoner.GetActor().SheatheWeapon() ; sheathed, not taken: the weapons stay on them until the strip
     apPrisoner.GetActor().EquipItem(cuffs, true, true)
 endFunction
 
@@ -2329,6 +2328,9 @@ function TeleportPrisonerToRelease(RPB_Prisoner apPrisoner, bool abMoveToRelease
     apPrisoner.Remove("Imprisoned")
 
     apPrisoner.ReturnBelongings()
+    ; Cuffs stripped into the container before strips deleted them come back with the belongings, and a reset prisoner
+    ; can still wear them
+    RPB_Utility.RemoveCuffs(releasedActor)
     RPB_Utility.Crumb(releasedActor, "Release: belongings returned, " + self.__PartsTrace(releasedActor, dressOutfit))
     RPB_Utility.FlowMark("Release: belongings returned")
     apPrisoner.NPC_ReequipAfterRelease()
@@ -3565,7 +3567,8 @@ event OnEscortPrisonerToCellBegin(RPB_Prisoner apPrisoner, Actor akEscort)
         ; Process escort to cell after escape
     endif
 
-    EventNotImplemented("Prison::OnEscortPrisonerToCellBegin")
+    ; No cuffing here: the arrest's cuffs are still on unless a strip took them, and the strip puts them back (see
+    ; OnPrisonerStripEnd). The cell end uncuffs.
     apPrisoner.OnEscortToCell(akEscort)
 endEvent
 
@@ -3679,7 +3682,10 @@ event OnPrisonerStripEnd(RPB_Prisoner apPrisoner, Actor akStripper)
     if (apPrisoner.HasSceneState("OnPrisonerStripEnd", "Escort to Cell"))
         ; Process Escorting to Cell
     endif
+    ; The strip took the cuffs off (you can't undress cuffed, and they're never a belonging): back on for the walk to the
+    ; cell. A strip in the cell leaves them off.
     if (!apPrisoner.IsInCell)
+        apPrisoner.Restrain()
         ; apPrisoner.StartRestraining(akStripper)
     endif
     ; apPrisoner.EscortToCell(akStripper)

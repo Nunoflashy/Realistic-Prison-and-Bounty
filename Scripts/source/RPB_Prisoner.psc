@@ -1285,12 +1285,9 @@ function Cuff(bool abCuffInFront = false)
 endFunction
 
 function Uncuff()
-    int cuffsItemSlot = 59
-    Form cuffs = this.GetEquippedArmorInSlot(cuffsItemSlot)
-
-    this.UnequipItemSlot(cuffsItemSlot)
-    this.RemoveItem(cuffs)
-    Debug("["+ Name +"] Prisoner::Uncuff", "Uncuffed " + this)
+    ; By form, worn or carried, and deleted (the worn-slot lookup left unworn cuffs behind, or removed None)
+    int removed = RPB_Utility.RemoveCuffs(this)
+    Debug("["+ Name +"] Prisoner::Uncuff", "Uncuffed " + this + " (" + removed + " removed)")
 endFunction
 
 function Restrain()
@@ -1464,6 +1461,17 @@ endFunction
 ; ==========================================================
 
 function Strip(bool abRemoveUnderwear = true)
+    if (this.IsDisabled())
+        ; Gone (a test's teardown disables before deleting): an arrest still in flight must not strip it, that left the
+        ; shared base "Naked" for good
+        Debug("["+ Name +"] Prisoner::Strip", Name + " is disabled, not stripping")
+        return
+    endif
+
+    ; The cuffs are the mod's, not a belonging: deleted before the manifest, never put in the prison's container (the
+    ; escort to the cell cuffs again)
+    RPB_Utility.RemoveCuffs(this)
+
     if (!self.PrisonerBelongingsContainer)
         EventManager.SendError("The prisoner " + Name + " hasn't had a belongings container assigned to "+ PronounObject +", therefore cannot strip!", "["+ Name +"] Prisoner::Strip")
         return
@@ -1535,6 +1543,13 @@ function Strip(bool abRemoveUnderwear = true)
 endFunction
 
 function StripSilently()
+    if (this.IsDisabled())
+        Debug("["+ Name +"] Prisoner::StripSilently", Name + " is disabled, not stripping")
+        return
+    endif
+
+    RPB_Utility.RemoveCuffs(this) ; the mod's, not a belonging (see Strip)
+
     if (!self.PrisonerBelongingsContainer)
         EventManager.SendError("The prisoner " + Name + " hasn't had a belongings container assigned to "+ PronounObject +", therefore cannot strip silently!", "["+ Name +"] Prisoner::StripSilently")
         return
@@ -3524,6 +3539,9 @@ function NPC_RestoreOriginalOutfit()
     EventManager.SendInfo("Restoring outfit of " + self.Name + ": saved " + original + ", base outfit now " + this.GetActorBase().GetOutfit(), "["+ Name +"] Prisoner::NPC_RestoreOriginalOutfit")
     if (original)
         this.SetOutfit(original)
+    else
+        ; Nothing saved for me, but my base may still be "Naked" from another NPC of it (one stripped and never released)
+        RPB_Utility.HealNakedBaseOutfit(this)
     endif
 endFunction
 

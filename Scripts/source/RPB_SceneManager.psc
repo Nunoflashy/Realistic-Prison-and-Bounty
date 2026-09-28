@@ -122,6 +122,7 @@ scriptname RPB_SceneManager extends Quest
     string function GetCurrentScene()
     function EndSceneEarly(string asScene, string asReason, bool abRunEndEvents = true)
     bool function EndSceneWithActor(Actor akActor, string asReason)
+    int function RemoveQueuedScenesWithActor(Actor akActor)
     function PushScene(string asSceneName)
     string function PopScene()
     function QueueOrPlay(string asSceneName)
@@ -131,6 +132,8 @@ scriptname RPB_SceneManager extends Quest
     string function GetAliasName(string aliasName, int aliasIndex, bool checkForExistence = false)
     function SetPackageLockOnActor(Actor akActor)
     function UnsetPackageLockOnActor(Actor akActor)
+    bool function SetPendingHoldOnActor(Actor akActor)
+    function UnsetPendingHoldOnActor(Actor akActor)
     function ReleaseAlias(string aliasName, int aliasIndex = 0)
     function UnbindAliases(string asScene)
     function QueueAlias(ReferenceAlias apRefAlias, ObjectReference akRef, bool abBindAlias = true)
@@ -1139,6 +1142,32 @@ function PlayQueued()
             Utility.Wait(0.1)
         endWhile
 
+        ; A Scene refused because its actors are still fighting isn't a failure yet: a large fight can take minutes, and
+        ; teleporting past it would skip a Scene that can still play. Start() is re-sent every second while either actor
+        ; is in combat (a refused Start() is never retried by the engine), up to a cap; then the usual few seconds.
+        if (!sceneObject.IsPlaying() && __lastStartedScene != nextScene && currentScene == nextScene)
+            Actor escort    = self.GetSceneNthReferenceOfType(nextScene, "Escort") as Actor
+            Actor escortee  = self.GetSceneNthReferenceOfType(nextScene, "Escortee") as Actor
+            float combatWaitStart = Utility.GetCurrentRealTime()
+            bool waitedForCombat = false
+            while (!sceneObject.IsPlaying() && __lastStartedScene != nextScene && currentScene == nextScene && ((escort && escort.IsInCombat()) || (escortee && escortee.IsInCombat())) && (Utility.GetCurrentRealTime() - combatWaitStart) < SCENE_START_COMBAT_CAP_SECONDS)
+                if (!waitedForCombat)
+                    Info("SceneManager: " + nextScene + " can't start while " + escort + " / " + escortee + " are in combat, waiting for the fight to end")
+                    waitedForCombat = true
+                endif
+                Utility.Wait(1.0)
+                sceneObject.Start()
+            endWhile
+
+            if (waitedForCombat)
+                startWaitStart = Utility.GetCurrentRealTime()
+                while (!sceneObject.IsPlaying() && __lastStartedScene != nextScene && currentScene == nextScene && (Utility.GetCurrentRealTime() - startWaitStart) < 3.0)
+                    Utility.Wait(0.1)
+                endWhile
+                Info("SceneManager: " + nextScene + " after waiting " + ((Utility.GetCurrentRealTime() - combatWaitStart) as int) + "s for the fight: started " + (sceneObject.IsPlaying() || __lastStartedScene == nextScene))
+            endif
+        endif
+
         if (!sceneObject.IsPlaying() && __lastStartedScene != nextScene && currentScene == nextScene)
             DebugWarn("SceneManager::PlayQueued", nextScene + " never started, moving on")
             EventManager.OnSceneStartFailed(nextScene)
@@ -1163,20 +1192,49 @@ bool __endingEarly
 ; Its end events are not run: a reset or a test teardown must not trigger what the Scene's end would (an escort's end strips
 ; the prisoner at the jail - that once overwrote the belongings manifest of an actor being reset).
 bool function EndSceneWithActor(Actor akActor, string asReason)
-    if (!akActor || !self.__IsCurrentSceneRunning())
+    if (!akActor)
         return false
+    endif
+
+    ; Its queued Scenes first: ending the current one starts the next in line, which could be one of theirs (a test's
+    ; teardown once started the escort of an actor it was deleting)
+    int removed = self.RemoveQueuedScenesWithActor(akActor)
+
+    ; Current by my flag or by the engine: one just started may not report IsPlaying() yet
+    if (currentScene == "" || !(__isScenePlaying || self.__IsCurrentSceneRunning()))
+        return removed > 0
     endif
 
     string sceneName = currentScene
     Form[] refs = self.GetSceneReferences(sceneName)
     if (!refs || refs.Find(akActor) < 0)
-        return false
+        return removed > 0
     endif
 
     self.EndSceneEarly(sceneName, asReason, abRunEndEvents = false)
     return true
 endFunction
+
+; Drops every queued (not yet started) Scene that has @akActor among its aliases. Returns how many.
+int function RemoveQueuedScenesWithActor(Actor akActor)
+    int removed = 0
+    int i = JArray.count(__queuedSceneAliases) - 1
+    while (i >= 0)
+        int aliases = JArray.getObj(__queuedSceneAliases, i)
+        if (aliases && JArray.findForm(FastIntMap_Values(aliases), akActor) >= 0)
+            Debug("SceneManager::RemoveQueuedScenesWithActor", "Dropping queued " + JArray.getStr(__queuedScenes, i) + ": " + akActor + " is leaving the Scenes")
+            JArray.eraseIndex(__queuedScenes, i)
+            JArray.eraseIndex(__queuedSceneAliases, i)
+            removed += 1
+        endif
+        i -= 1
+    endWhile
+    return removed
+endFunction
 string __lastStartedScene ; the last Scene whose start I received, see PlayQueued()
+
+; How long PlayQueued() keeps re-sending Start() to a Scene refused because its actors are in combat
+float property SCENE_START_COMBAT_CAP_SECONDS = 120.0 autoreadonly
 
 ;/
     Ends @asScene now, through the same path as its natural end (OnSceneEnd: its end event, the next queued Scene,
@@ -1189,17 +1247,25 @@ function EndSceneEarly(string asScene, string asReason, bool abRunEndEvents = tr
     endif
 
     Scene sceneObject = self.GetScene(asScene)
-    if (!sceneObject || !sceneObject.IsPlaying())
+    if (!sceneObject)
         return
+    endif
+
+    bool enginePlaying = sceneObject.IsPlaying()
+    if (!enginePlaying && !__isScenePlaying)
+        return ; neither I nor the engine has it running: nothing to end
     endif
 
     __endingEarly = true
     Debug("SceneManager::EndSceneEarly", "Ending " + asScene + " early: " + asReason)
-    sceneObject.Stop()
-    float stopWaitStart = Utility.GetCurrentRealTime()
-    while (sceneObject.IsPlaying() && (Utility.GetCurrentRealTime() - stopWaitStart) < 1.0)
-        Utility.Wait(0.1)
-    endWhile
+    ; One the engine doesn't report yet (just started) is only finished on my side; Stop() is for a running one
+    if (enginePlaying)
+        sceneObject.Stop()
+        float stopWaitStart = Utility.GetCurrentRealTime()
+        while (sceneObject.IsPlaying() && (Utility.GetCurrentRealTime() - stopWaitStart) < 1.0)
+            Utility.Wait(0.1)
+        endWhile
+    endif
 
     ; A stopped Scene never reaches the phase that sends its end, so this is its only end. Without its end events when the
     ; caller says so: only the queue moves on.
@@ -1315,6 +1381,52 @@ function UnsetPackageLockOnActor(Actor akActor)
     EventManager.SendInfo("Unbound package lock from Actor " + akActor + " successfully!", "SceneManager::UnsetPackageLockOnActor")
 endFunction
 
+
+;/
+    Binds @akActor to a free PendingHold_0N alias (N = 1..3), whose package (RPB_PendingHoldPackage: stay in place, Ignore
+    Combat, No Combat Alert) holds a pending arrestee still and out of the fight next to them - script calls alone
+    couldn't stop their AI drawing weapons at it. False if no alias is free (or the aliases don't exist yet), in which
+    case the script-only hold is all there is.
+/;
+bool function SetPendingHoldOnActor(Actor akActor)
+    if (!akActor)
+        return false
+    endif
+
+    int i = 1
+    while (i <= 3)
+        ReferenceAlias hold = self.GetRefAlias("PendingHold_0", i)
+        if (hold && !hold.GetReference())
+            BindAliasTo(hold, akActor)
+            RPB_StorageVars.SetIntOnReference("Pending Hold Alias", akActor, hold.GetID())
+            akActor.EvaluatePackage()
+            return true
+        endif
+        i += 1
+    endWhile
+
+    EventManager.SendWarning("No free PendingHold alias for " + akActor + " (all in use, or not in the plugin), holding it by script only", "SceneManager::SetPendingHoldOnActor")
+    return false
+endFunction
+
+; Unbinds @akActor's PendingHold alias. Only when one is recorded: an unrecorded id reads 0, a Scene alias.
+function UnsetPendingHoldOnActor(Actor akActor)
+    if (!akActor)
+        return
+    endif
+
+    int holdId = RPB_StorageVars.GetIntOnReference("Pending Hold Alias", akActor)
+    if (!holdId)
+        return
+    endif
+
+    ReferenceAlias hold = self.GetAliasByID(holdId) as ReferenceAlias
+    if (hold && hold.GetReference() == akActor)
+        UnbindAlias(hold)
+    endif
+    RPB_StorageVars.DeleteVariableOnReference("Pending Hold Alias", akActor)
+    akActor.EvaluatePackage()
+endFunction
 
 function ReleaseAlias(string aliasName, int aliasIndex = 0)
     string finalName = self.GetAliasName(aliasName, aliasIndex , true)

@@ -78,6 +78,14 @@ string function ResetActor(Actor akActor) global
         done += "package lock removed; "
     endif
 
+    ; A pending arrest holds its arrestee with SetRestrained and SetDontMove (the revert above lifts them, this covers an
+    ; arrest state that was already gone)
+    akActor.SetRestrained(false)
+    akActor.SetDontMove(false)
+    sceneManager.UnsetPendingHoldOnActor(akActor) ; the pending hold's package alias, if one is recorded
+    if (RPB_Utility.RemoveCuffs(akActor) > 0)
+        done += "cuffs removed; "
+    endif
     akActor.EnableAI(true)
     akActor.EvaluatePackage()
 

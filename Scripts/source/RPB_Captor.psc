@@ -27,6 +27,7 @@ Scriptname RPB_Captor extends RPB_ActorBase
     function Destroy()
 @events:
     event OnUpdate()
+    event OnCombatStateChanged(Actor akTarget, int aeCombatState)
     event OnBeginState()
     event OnInitialize()
     event OnDeath(Actor akKiller)
@@ -95,9 +96,70 @@ endProperty
 ;     API.Arrest.OnArrestCaptorDeath(this, akKiller)
 ; endEvent
 
+;/
+    My arrestee is cuffed and waiting for my fight to end (RPB_Arrestee.__BeginPendingArrest). The combat change below
+    resumes it; this slow re-check is the safety net for a change I didn't get (one that happened while unloaded).
+/;
+function WatchPendingArrest()
+    RegisterForSingleUpdate(5.0)
+endFunction
+
+;/
+    Resumes my arrestee's pending arrest once the hostile that kept me busy is dealt with: gone (dead, disabled, unloaded),
+    or both of us out of combat. Not on "I'm out of combat" alone: a lull, or a StopCombat, reads the same for a moment
+    while the fight goes on. With no hostile recorded (the settle check made it pending), my own combat is all there is.
+    The arrestee must be out of combat too: the escort Scene can't start on them otherwise (a player still fought by the
+    other hostiles waits, cuffed, until they're dealt with). True if it resumed.
+/;
+bool function __ResumePendingArrestIfDone()
+    RPB_Arrestee arresteeRef = API.Arrest.Arrestees.AtKey(Arrestee)
+    if (!arresteeRef || !arresteeRef.GetBool("Arrest Pending"))
+        return false
+    endif
+
+    Actor hostile = arresteeRef.GetForm("Pending Hostile") as Actor
+    string why = ""
+    if (hostile)
+        if (hostile.IsDead())
+            why = "the hostile is dead"
+        elseif (hostile.IsDisabled())
+            why = "the hostile is disabled"
+        elseif (!hostile.Is3DLoaded())
+            why = "the hostile is unloaded"
+        elseif (!this.IsInCombat() && !hostile.IsInCombat())
+            why = "the guard and the hostile are both out of combat"
+        endif
+    elseif (!this.IsInCombat())
+        why = "the guard is out of combat"
+    endif
+
+    if (why == "" || Arrestee.IsInCombat())
+        return false
+    endif
+
+    RPB_Utility.Info("Resuming the pending arrest of " + Arrestee + ": " + why)
+
+    arresteeRef.ResumePendingArrest()
+    return true
+endFunction
+
+event OnCombatStateChanged(Actor akTarget, int aeCombatState)
+    if (aeCombatState == 0 && Arrestee)
+        self.__ResumePendingArrestIfDone()
+    endif
+endEvent
+
 ; Needs to be revised. (Where is the RegisterForSingleUpdate()?)
 event OnUpdate()
     if (!Arrestee)
+        return
+    endif
+
+    RPB_Arrestee pendingRef = API.Arrest.Arrestees.AtKey(Arrestee)
+    if (pendingRef && pendingRef.GetBool("Arrest Pending"))
+        if (!self.__ResumePendingArrestIfDone())
+            RegisterForSingleUpdate(5.0)
+        endif
         return
     endif
 

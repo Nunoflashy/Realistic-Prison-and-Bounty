@@ -17,6 +17,9 @@ scriptname RPB_Utility hidden
     Idle function BoundHandsBehindBack() global
     Armor function RPB_PrisonerHandCuffs() global
     Outfit function RPB_GetOutfit(string asOutfit) global
+    bool function HealNakedBaseOutfit(Actor akActor) global
+    Actor function GetOtherCombatTarget(Actor akActor, Actor akExcept) global
+    int function RemoveCuffs(Actor akActor) global
     Form[] function RPB_GetHostileFactions() global
     Form[] function RPB_GetHostileFactionsFor(Actor akActor) global
     bool function IsHostileActor(Actor akActor) global
@@ -386,6 +389,83 @@ Outfit function RPB_GetOutfit(string asOutfit) global
     elseif (asOutfit == "Default 2 no Shoes")
         return GetFormFromMod(0x259D8) as Outfit
     endif
+endFunction
+;/
+    Stripping sets the Outfit of the NPC's base to "Naked", and the base is shared by every NPC of it: if the stripped one
+    goes away without its release (deleted, or a release that had nothing saved to restore), every later NPC of that base
+    shows up naked. NPC_SaveOriginalOutfit remembers each base's real Outfit ("BaseOutfits"); this puts it back when the
+    base is "Naked". True if it did.
+/;
+bool function HealNakedBaseOutfit(Actor akActor) global
+    if (!akActor)
+        return false
+    endif
+
+    ActorBase npcBase = akActor.GetActorBase()
+    if (!npcBase || npcBase.GetOutfit() != RPB_GetOutfit("Naked"))
+        return false
+    endif
+
+    Outfit remembered = RPB_StorageVars.GetForm("Original Outfit " + npcBase.GetFormID(), "BaseOutfits") as Outfit
+    if (!remembered)
+        return false
+    endif
+
+    akActor.SetOutfit(remembered)
+    Debug("Utility::HealNakedBaseOutfit", "The base of " + akActor + " was left Naked, restored " + remembered)
+    return true
+endFunction
+
+; Someone @akActor is fighting other than @akExcept (alive, enabled), or none. A guard arresting one bandit while another
+; one keeps him busy: the arrest can't play its confrontation in that fight.
+Actor function GetOtherCombatTarget(Actor akActor, Actor akExcept) global
+    if (!akActor)
+        return none
+    endif
+
+    Actor[] targets = PO3_SKSEFunctions.GetCombatTargets(akActor)
+    int i = 0
+    while (i < targets.Length)
+        Actor target = targets[i]
+        if (target && target != akExcept && !target.IsDead() && !target.IsDisabled())
+            return target
+        endif
+        i += 1
+    endWhile
+    return none
+endFunction
+
+;/
+    Takes every pair of the cuffs this mod puts on (ZaZ Animation Pack: backside rusty, front rusty, front shiny) off
+    @akActor and deletes them - worn or just carried. They're the mod's, never the actor's: stripped into the prison's
+    container they came back with the belongings at the release, and an uncuff that only looked at the worn slot left
+    them in the inventory (or tried to remove None). Returns how many were removed.
+/;
+int function RemoveCuffs(Actor akActor) global
+    if (!akActor)
+        return 0
+    endif
+
+    int removed = 0
+    int[] cuffIds = new int[3]
+    cuffIds[0] = 0x81D2F
+    cuffIds[1] = 0x81D33
+    cuffIds[2] = 0x81D34
+
+    int i = 0
+    while (i < cuffIds.Length)
+        Form cuffs = Game.GetFormFromFile(cuffIds[i], "ZaZAnimationPack.esm")
+        if (cuffs)
+            int count = akActor.GetItemCount(cuffs)
+            if (count > 0)
+                akActor.UnequipItem(cuffs, false, true)
+                akActor.RemoveItem(cuffs, count, true) ; no container: deleted
+                removed += count
+            endif
+        endif
+        i += 1
+    endWhile
+    return removed
 endFunction
 
 ;/

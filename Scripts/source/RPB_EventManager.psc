@@ -222,7 +222,7 @@ function OnSceneStartFailed(string asScene)
         return
     endif
 
-    DebugWarn("EventManager::OnSceneStartFailed", asScene + " never started for " + escortee + ", moving them without the Scene")
+    Info("EventManager: " + asScene + " never started for " + escortee + " (in combat " + escortee.IsInCombat() + ", escort " + escort + " in combat " + (escort && escort.IsInCombat()) + "), moving them without the Scene")
     if (sceneType == SceneManager.CATEGORY_ESCORT_TO_JAIL && escort)
         prisoner.MoveToPrison(escort)
     else

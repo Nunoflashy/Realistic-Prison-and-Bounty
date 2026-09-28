@@ -13,10 +13,87 @@ function Render(RPB_MCM mcm) global
     endif
 
     mcm.SetCursorFillMode(mcm.TOP_TO_BOTTOM)
-    Left(mcm)
+    ; Left()/Right() below were never wired to the MCM (this page used to render empty); their options have no storage
+    ; behind them yet. Only the Recovery section is shown for now.
+    Recovery(mcm)
+endFunction
 
-    mcm.SetCursorPosition(1)
-    Right(mcm)
+; For an arrest or imprisonment that got stuck (RPB_Recovery.ResetActor)
+function Recovery(RPB_MCM mcm) global
+    mcm.AddOptionCategory("Recovery")
+    mcm.AddOptionMenuKey("Reset Stuck Actor", "ResetStuckActor", "Choose...")
+endFunction
+
+; Who the "Reset Stuck Actor" menu offers, index for index: the console-selected actor first, then every arrestee, then
+; every prisoner not in a cell yet
+string function __RecoveryCandidatesPath() global
+    return ".RPB_Recovery.Candidates"
+endFunction
+
+function __OpenResetMenu(RPB_MCM mcm) global
+    int candidates = JArray.object()
+    JDB.solveObjSetter(__RecoveryCandidatesPath(), candidates, true)
+    int names = JArray.object()
+
+    JArray.addForm(candidates, none)
+    JArray.addStr(names, "Console-selected actor")
+
+    Form[] arrestees = RPB_API.GetArrest().Arrestees.GetActors()
+    int i = 0
+    while (i < arrestees.Length)
+        Actor a = arrestees[i] as Actor
+        if (a)
+            JArray.addForm(candidates, a)
+            JArray.addStr(names, a.GetDisplayName() + " (arrestee)")
+        endif
+        i += 1
+    endWhile
+
+    RPB_PrisonManager prisonManager = RPB_API.GetPrisonManager()
+    int slot = 0
+    while (slot < prisonManager.PrisonSlots)
+        RPB_Prison prison = prisonManager.GetNthAlias(slot) as RPB_Prison
+        if (prison && prison.Active)
+            Form[] prisoners = prison.Prisoners.GetActors()
+            int p = 0
+            while (p < prisoners.Length)
+                Actor pa = prisoners[p] as Actor
+                if (pa && !RPB_Utility.IsActorImprisoned(pa) && JArray.findForm(candidates, pa) < 0)
+                    JArray.addForm(candidates, pa)
+                    JArray.addStr(names, pa.GetDisplayName() + " (prisoner, not in a cell)")
+                endif
+                p += 1
+            endWhile
+        endif
+        slot += 1
+    endWhile
+
+    mcm.SetMenuDialogOptions(JArray.asStringArray(names))
+    mcm.SetMenuDialogStartIndex(0)
+    mcm.SetMenuDialogDefaultIndex(0)
+endFunction
+
+function __AcceptResetMenu(RPB_MCM mcm, int menuIndex) global
+    int candidates = JDB.solveObj(__RecoveryCandidatesPath())
+    if (menuIndex < 0 || !candidates || menuIndex >= JArray.count(candidates))
+        return
+    endif
+
+    Actor target = JArray.getForm(candidates, menuIndex) as Actor
+    if (menuIndex == 0)
+        target = Game.GetCurrentConsoleRef() as Actor
+    endif
+
+    if (!target)
+        mcm.ShowMessage("No actor selected: click one with the console open first.", false)
+        return
+    endif
+
+    if (mcm.ShowMessage("Free " + target.GetDisplayName() + " from everything Realistic Prison and Bounty left on them? If imprisoned, they are released where they stand.", true, "Reset", "Cancel"))
+        string done = RPB_Recovery.ResetActor(target)
+        mcm.ShowMessage(string_if(done == "", "Nothing to reset.", "Done: " + done), false)
+        mcm.ForcePageReset()
+    endif
 endFunction
 
 function Left(RPB_MCM mcm) global
@@ -101,6 +178,9 @@ function OnOptionHighlight(RPB_MCM mcm, string option) global
 
     elseif (option == "General::Arrest Elude Warning Time")
         mcm.SetInfoText("Determines the time after pursuit that guards will wait for you to stop and surrender before they consider you as being eluding arrest and start attacking.")
+
+    elseif (option == "Recovery::ResetStuckActor")
+        mcm.SetInfoText("For an arrest or imprisonment that got stuck: frees the chosen actor from everything the mod left on them. A prisoner is released where they stand, with their belongings.")
     endif
  
     Debug("OnOptionHighlight", option + ", find: " + StringUtil.Find(option, "Deleveling") + ", optionName: " + optionName)
@@ -252,11 +332,15 @@ function OnOptionSliderAccept(RPB_MCM mcm, string option, float value) global
 endFunction
 
 function OnOptionMenuOpen(RPB_MCM mcm, string option) global
-
+    if (option == "Recovery::ResetStuckActor")
+        __OpenResetMenu(mcm)
+    endif
 endFunction
 
 function OnOptionMenuAccept(RPB_MCM mcm, string option, int menuIndex) global
-
+    if (option == "Recovery::ResetStuckActor")
+        __AcceptResetMenu(mcm, menuIndex)
+    endif
 endFunction
 
 function OnOptionColorOpen(RPB_MCM mcm, string option) global

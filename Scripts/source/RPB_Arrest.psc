@@ -1110,6 +1110,14 @@ function BeginArrest(RPB_Arrestee apArresteeRef)
         EventManager.SendInfo("BeginArrest bounty/combat check on " + arrestee.GetDisplayName() + " " + arrestee + ": crime gold now " + arrestFaction.GetCrimeGold() + ", arrestee in combat " + arrestee.IsInCombat(), "Arrest::BeginArrest")
     endif
     RPB_Utility.FlowMark("BeginArrest: bounty/combat diagnostic")
+    ; Read before the StopCombat below clears it, and passed on as-is (a stored flag didn't reach EscortToPrison): an arrest
+    ; made in a fight has its guard checked again once things settle (Arrestee.__CaptorStillFighting), a peaceful one skips
+    ; that wait
+    bool combatAtArrest = arrestee.IsInCombat() || (captor && captor.IsInCombat())
+    ; Who the guard is actually fighting, read before anything is stopped: another hostile keeping him busy means the
+    ; confrontation Scene can't play, so the arrest waits (Arrestee.__BeginPendingArrest). A timed IsInCombat check after
+    ; the StopCombat below fell in the gap before that hostile pulled him back in.
+    Actor otherHostile = RPB_Utility.GetOtherCombatTarget(captor, arrestee)
     apArresteeRef.StopCombat()
     RPB_Utility.FlowMark("BeginArrest: arrestee StopCombat")
     ; A hostile actor (a bandit/CW-soldier/Forsworn NPC, or the player disguised via a mod like Master of Disguise) is
@@ -1141,7 +1149,9 @@ function BeginArrest(RPB_Arrestee apArresteeRef)
     ; stops combat on both sides first) - but any arrest reached without going through Surrender first can leave the guard
     ; actively fighting the arrestee, which silently blocks the confrontation Scene's first phase from ever completing,
     ; regardless of player presence. Confirmed as the real cause of a real test's confrontation Scene never confirming.
-    if (captor)
+    ; Only a guard fighting nobody else: one still busy with another hostile keeps fighting it (stopping him only made him
+    ; look free for a moment)
+    if (captor && !otherHostile)
         captor.StopCombat()
     endif
     ; Commented out for a retest (2026-09-24): possibly redundant now that the direct NeutralizeHostileActor call
@@ -1186,11 +1196,11 @@ function BeginArrest(RPB_Arrestee apArresteeRef)
 
     ; Will most likely be used when the arrestee has no chance to pay their bounty, and therefore will get immediately escorted into the cell
     elseif (arrestType == ARREST_TYPE_ESCORT_TO_CELL)
-        apArresteeRef.EscortToPrison(abEscortDirectlyToCell = true)
+        apArresteeRef.EscortToPrison(abEscortDirectlyToCell = true, abCombatAtArrest = combatAtArrest, akOtherHostile = otherHostile)
         apArresteeRef.SetStateForScene("OnEscortPrisonerToCellEnd", "Arrest")
 
     elseif (arrestType == ARREST_TYPE_ESCORT_TO_JAIL)
-        apArresteeRef.EscortToPrison()
+        apArresteeRef.EscortToPrison(abCombatAtArrest = combatAtArrest, akOtherHostile = otherHostile)
 
         ; Reset Arrest scene for future arrests
         self.SetArrestScene(arrestee, SceneManager.SCENE_ARREST_START_02)
@@ -1515,8 +1525,7 @@ function RestrainArrestee(Actor akArrestee)
     ; Form cuffs = Game.GetFormEx(0xA081D2F)
     Form cuffs = Game.GetFormFromFile(0x81D2F, "ZaZAnimationPack.esm")
 
-    akArrestee.SheatheWeapon()
-    UnequipHandsForActor(akArrestee)
+    akArrestee.SheatheWeapon() ; sheathed, not taken: the weapons stay on them until the strip
     akArrestee.EquipItem(cuffs, true, true)
 endFunction
 

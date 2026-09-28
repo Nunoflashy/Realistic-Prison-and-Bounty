@@ -190,6 +190,7 @@ function SetTests()
     ; Not chainable: a real escort arrest with its Scenes
     self.AddTest("106 - Released Mid-Escort: The Arrest (Arrestee, Captor) Is Cleared Too", "Test_ReleaseMidEscortClearsArrest", abChainable = false)
     self.AddTest("107 - Recovery: Reset Unsticks a Half-Arrested, Half-Imprisoned Actor", "Test_ResetUnsticksActor", abChainable = false)
+    self.AddTest("108 - Hostile Group: Arrestee Is Cuffed and Waits While Her Guard Fights Another Bandit", "Test_ArrestWaitsWhileGuardFights", abChainable = false)
     self.AddTest("041 - ActiveMagicEffectContainer: Stuck Lock Self-Heals", "Test_ActiveMagicEffectContainer_StuckLockSelfHeals")
     self.AddTest("042 - ThreadLock: JAtomic Primitive Semantics and Registry", "Test_ThreadLock_PrimitiveSemantics")
     ; Not chainable: fires concurrent worker threads
@@ -8489,7 +8490,7 @@ Actor function __StartEscortArrestUntilRegistered(RPB_Prison apPrison)
     endif
 
     Actor guard = __SpawnTempActorOf(realGuard.GetBaseObject().GetFormID())
-    Actor bandit = __SpawnTempActorOf(0x37BFF) ; the bandit base used by test 97
+    Actor bandit = __SpawnTempActorOf(0x37C46) ; Bandit Marauder: a plain bandit dies in seconds if a fight breaks out
     if (!guard || !bandit)
         return none
     endif
@@ -8641,13 +8642,143 @@ state Test_ResetUnsticksActor
     endFunction
 endState
 
+;/
+    Two bandits and a guard: B keeps fighting the guard while A gets arrested. Every guard around stays in combat with B,
+    so A's confrontation Scene can't play. A must be taken out of the fight and cuffed right away, wait (not reverted,
+    not a prisoner yet), and be escorted once the fight is over (B dies here).
+/;
+state Test_ArrestWaitsWhileGuardFights
+    function Setup()
+        RPB_Prison prison = (RPB_API.GetPrisonManager()).GetPrison("Haafingar")
+        RPB_Arrest arrest = RPB_API.GetArrest()
+        Actor player = Game.GetFormEx(0x14) as Actor
+        bool ok = true
+        bool step = false
+
+        Actor realGuard = RPB_Utility.GetNearestGuard(player, 3000.0, player)
+        step = assert_true(realGuard != none, "No guard near the player to clone (stand near a guard in Solitude)")
+        if (!realGuard)
+            display_result(false)
+            return
+        endif
+
+        Actor guard = __SpawnTempActorOf(realGuard.GetBaseObject().GetFormID())
+        ; Bandit Marauders, with a lot of health: B must hold the guard until the test ends the fight (a plain bandit died
+        ; in seconds and the guard was free before the arrest decision), and A must survive the fight around her
+        Actor banditA = __SpawnTempActorOf(0x37C46)
+        Actor banditB = __SpawnTempActorOf(0x37C46)
+        step = assert_true(guard && banditA && banditB, "Could not spawn the guard and the two bandits")
+        if (!(guard && banditA && banditB))
+            display_result(false)
+            return
+        endif
+
+        guard.EnableAI(true)
+        banditA.EnableAI(true)
+        banditB.EnableAI(true)
+        banditA.SetActorValue("Health", 2000.0)
+        banditB.SetActorValue("Health", 5000.0)
+        banditA.MoveTo(guard, afXOffset = 150.0, abMatchRotation = false)
+        banditB.MoveTo(guard, afYOffset = 200.0, abMatchRotation = false)
+
+        ; B stays hostile and keeps the guard busy
+        banditB.StartCombat(guard)
+        guard.StartCombat(banditB)
+        Utility.Wait(2.0)
+        log("108 before the arrest: guard in combat " + guard.IsInCombat() + ", B in combat " + banditB.IsInCombat())
+
+        RPB_ActorVars.SetCrimeGold(guard.GetCrimeFaction(), banditA, 2000)
+        arrest.ArrestActor(guard, banditA, arrest.ARREST_TYPE_ESCORT_TO_JAIL)
+
+        ; Pending: cuffed, out of the fight, still an arrestee, not a prisoner
+        Form cuffs = Game.GetFormFromFile(0x81D2F, "ZaZAnimationPack.esm")
+        RPB_Arrestee arresteeRef = none
+        bool pending = false
+        float waitStart = Utility.GetCurrentRealTime()
+        while (!pending && (Utility.GetCurrentRealTime() - waitStart) < 15.0)
+            Utility.Wait(0.5)
+            arresteeRef = arrest.Arrestees.AtKey(banditA)
+            pending = arresteeRef && arresteeRef.GetBool("Arrest Pending")
+        endWhile
+
+        log("108 pending: " + pending + " after " + self.__Ms(Utility.GetCurrentRealTime() - waitStart) + "ms, cuffed " + banditA.IsEquipped(cuffs) + ", A in combat " + banditA.IsInCombat() + ", guard in combat " + guard.IsInCombat() + ", prisoner " + (prison.Prisoners.AtKey(banditA) != none))
+        step = assert_true(pending, "The arrest never went pending while the guard was fighting B")
+        ok = ok && step
+        step = assert_true(banditA.IsEquipped(cuffs), "A is not cuffed while the arrest waits")
+        ok = ok && step
+        step = assert_true(prison.Prisoners.AtKey(banditA) == none, "A became a prisoner before the fight was over")
+        ok = ok && step
+
+        ; Held in place while pending: restrained, and not moving
+        ; Sampled every 0.5s: an initial slide (momentum, stagger) reads as one big first step, walking as steady steps
+        float startX = banditA.GetPositionX()
+        float startY = banditA.GetPositionY()
+        float lastX = startX
+        float lastY = startY
+        string steps = ""
+        int sample = 0
+        while (sample < 6)
+            Utility.Wait(0.5)
+            float x = banditA.GetPositionX()
+            float y = banditA.GetPositionY()
+            steps += (Math.sqrt(Math.pow(x - lastX, 2.0) + Math.pow(y - lastY, 2.0)) as int) + " "
+            lastX = x
+            lastY = y
+            sample += 1
+        endWhile
+        float moved = Math.sqrt(Math.pow(banditA.GetPositionX() - startX, 2.0) + Math.pow(banditA.GetPositionY() - startY, 2.0))
+        log("108 held: steps per 0.5s [" + steps + "], now at (" + (banditA.GetPositionX() as int) + ", " + (banditA.GetPositionY() as int) + ")")
+        log("108 held: hold on " + (arresteeRef && arresteeRef.GetBool("Pending Hold")) + ", moved " + (moved as int) + " units in 3s, A in combat " + banditA.IsInCombat() + ", guard in combat " + guard.IsInCombat())
+        step = assert_true(arresteeRef && arresteeRef.GetBool("Pending Hold"), "A is not held in place (no pending hold) while the arrest waits")
+        ok = ok && step
+        step = assert_true(moved < 150.0, "A moved " + (moved as int) + " units while the arrest waited")
+        ok = ok && step
+        step = assert_true(!banditA.IsInCombat(), "A is fighting while the arrest waits")
+        ok = ok && step
+        Actor[] aTargets = PO3_SKSEFunctions.GetCombatTargets(banditA)
+        string aTargetsLogged = ""
+        int t = 0
+        while (t < aTargets.Length)
+            aTargetsLogged += " " + aTargets[t]
+            t += 1
+        endWhile
+        log("108 held: A's combat targets [" + aTargetsLogged + " ], weapon drawn " + banditA.IsWeaponDrawn() + ", right hand " + banditA.GetEquippedWeapon(false) + ", hold package alias " + RPB_StorageVars.GetIntOnReference("Pending Hold Alias", banditA) + " (B = " + banditB + ", guard = " + guard + ")")
+        step = assert_true(!banditA.IsWeaponDrawn(), "A has her weapon drawn while cuffed")
+        ok = ok && step
+
+        ; End the fight
+        banditB.Kill()
+        float fightEnd = Utility.GetCurrentRealTime()
+
+        ; On the way = the escort Scene is playing, or already imprisoned (off-screen). Not just registered: that happens
+        ; before the escort starts, and ending the test there raced the resume (its escort started after the teardown)
+        RPB_SceneManager sceneManager = RPB_API.GetSceneManager()
+        bool onTheWay = false
+        while (!onTheWay && (Utility.GetCurrentRealTime() - fightEnd) < 60.0)
+            Utility.Wait(0.5)
+            onTheWay = RPB_Utility.IsActorImprisoned(banditA) || (prison.Prisoners.AtKey(banditA) != none && sceneManager.IsSceneOfType(sceneManager.GetCurrentScene(), sceneManager.CATEGORY_ESCORT_TO_JAIL))
+        endWhile
+
+        arresteeRef = arrest.Arrestees.AtKey(banditA)
+        log("108 after the fight: prisoner/imprisoned " + onTheWay + " after " + self.__Ms(Utility.GetCurrentRealTime() - fightEnd) + "ms, guard in combat " + guard.IsInCombat() + ", still pending " + (arresteeRef && arresteeRef.GetBool("Arrest Pending")) + ", current Scene '" + RPB_API.GetSceneManager().GetCurrentScene() + "'")
+        step = assert_true(onTheWay, "A was never taken to prison after the fight ended")
+        ok = ok && step
+
+        display_result(ok)
+    endFunction
+
+    function Teardown()
+        __TeardownAllTempActors()
+    endFunction
+endState
+
 state Test_MonitorSkipsNotYetImprisoned
     function Setup()
         RPB_Prison prison = (RPB_API.GetPrisonManager()).GetPrison("Haafingar")
         bool ok = true
         bool step = false
 
-        Actor a = __SpawnTempActorOf(0x37BFF) ; the bandit base used by test 97
+        Actor a = __SpawnTempActorOf(0x37C46) ; Bandit Marauder
         step = assert_true(a != none, "Could not spawn the test bandit")
         ok = ok && step
         if (!a)
@@ -10485,6 +10616,11 @@ Actor function __SpawnTempActorOf(int aiBaseFormId)
     __testTempActors[__testTempActorCount] = temp
     __testTempActorCount += 1
 
+    ; A base left "Naked" by an earlier run (a stripped actor deleted without its release) would spawn everyone naked
+    if (!RPB_Utility.HealNakedBaseOutfit(temp) && (temp.GetActorBase().GetOutfit() == RPB_Utility.RPB_GetOutfit("Naked")))
+        log("WARNING: " + temp + "'s base outfit is Naked and no real outfit is remembered for it - it will look naked")
+    endif
+
     ; This base has an AI package that walks the NPC off to Castle Dour, where its 3D unloads (and an
     ; unloaded actor can't get its spell effect started). Freeze it in place: it is only a test dummy.
     temp.EnableAI(false)
@@ -10656,6 +10792,13 @@ function __TeardownAllTempActors()
         ; Let the effects' finish/destroy handlers run before wiping (they can write state themselves)
         Utility.Wait(0.5)
     endif
+
+    ; A stripped temp actor leaves its (shared) base "Naked"
+    i = 0
+    while (i < __testTempActorCount)
+        RPB_Utility.HealNakedBaseOutfit(__testTempActors[i])
+        i += 1
+    endWhile
 
     ; Pass 2: wipe every StorageVars category for the temp actor and delete it. UnregisterPrisoner() alone
     ; never called Destroy(), so an initialized prisoner's "Initialized" flag survived the deleted actor and

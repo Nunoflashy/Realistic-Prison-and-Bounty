@@ -962,10 +962,18 @@ function Action_ArrestSelectedActor(RPB_UIInterface uilib, bool abEscortArrestee
         guard = Game.GetFormEx(formId) as Actor
     else
         guard = RPB_Utility.GetNearbyGuardForFactionFromRef(selectedActor)
+        if (!guard)
+            ; None within ~1000 units of them (the only one around may be escorting someone, or walking back to his post)
+            Actor player = Game.GetFormEx(0x14) as Actor
+            guard = RPB_Utility.GetNearestGuard(player, 3000.0, player)
+        endif
     endif
 
     if (!guard)
-        API.Config.NotifyArrest("There isn't any nearby guard to perform the Arrest!")
+        ; Always said: the dev menu used to just close when arrest notifications were off, which read as "this actor can't
+        ; be arrested anymore"
+        DebugWarn("Actions::Action_ArrestSelectedActor", "No guard near " + selectedActor + " or the player, cannot arrest")
+        Debug.Notification("No guard nearby to arrest " + selectedActor.GetDisplayName())
         return
     endif
 
