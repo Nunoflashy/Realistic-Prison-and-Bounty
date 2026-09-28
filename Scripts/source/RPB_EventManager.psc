@@ -417,6 +417,13 @@ event OnArrestBegin(string eventName, string arrestType, float arresteeIdFlt, Fo
         return
     endif
 
+    ; A dead guard can't arrest anyone. Rejected here, before any arrest state exists: later, the Captor effect can't even
+    ; start on a dead actor, and the arrest only got cancelled after that wait timed out (~10s)
+    if (captor && (captor.IsDead() || captor.IsDisabled()))
+        Info("Arrest by " + captor + " rejected: the guard is dead or gone")
+        return
+    endif
+
     int actorPlayerId = 0x14
     bool isPlayer = (arresteeIdFlt as int) == actorPlayerId
     Actor arrestee = Game.GetFormEx(int_if (isPlayer, actorPlayerId, arresteeIdFlt as int)) as Actor
@@ -913,9 +920,8 @@ event OnPrisonScene(string asScene, string asSceneEvent, RPB_Prison apPrison, RP
 
         elseif (asSceneEvent == SceneManager.EVENT_STRIP_END)
             if (asSceneSecondaryEvent == "Restrain Prisoner")
-                Form cuffs = Game.GetFormEx(0xA081D33)
-                apPrisoner.SheatheWeapon()
-                apPrisoner.EquipItem(cuffs, true, true)
+                ; Front cuffs; any other pair comes off first (and no load-order-dependent FormID)
+                RPB_Utility.EquipCuffs(apPrisoner.GetActor(), abFront = true)
 
             elseif (asSceneSecondaryEvent == "Stand Up (Kneel)")
                 apPrisoner.PlayAnimation("IdleKneelExit") ; TODO: Not working

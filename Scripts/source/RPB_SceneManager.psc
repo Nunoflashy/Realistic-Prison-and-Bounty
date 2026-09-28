@@ -128,12 +128,14 @@ scriptname RPB_SceneManager extends Quest
     function QueueOrPlay(string asSceneName)
     function PlayQueued()
     function ForceResetSceneState()
+    function StopAllScenes(string asReason)
     ReferenceAlias function GetRefAlias(string aliasGroup, int index = 0)
     string function GetAliasName(string aliasName, int aliasIndex, bool checkForExistence = false)
     function SetPackageLockOnActor(Actor akActor)
     function UnsetPackageLockOnActor(Actor akActor)
     bool function SetPendingHoldOnActor(Actor akActor)
     function UnsetPendingHoldOnActor(Actor akActor)
+    bool function HasQueuedSceneWithActor(Actor akActor)
     function ReleaseAlias(string aliasName, int aliasIndex = 0)
     function UnbindAliases(string asScene)
     function QueueAlias(ReferenceAlias apRefAlias, ObjectReference akRef, bool abBindAlias = true)
@@ -1113,6 +1115,23 @@ function PlayQueued()
 
     if (nextScene != "")
         self.RestoreAliases(nextAliases)
+
+        ; An escort for an actor who is gone (deleted, disabled, dead) never ends, and since every Scene shares these
+        ; aliases it keeps driving whoever the next ones bind (a test's teardown deleted a prisoner mid prison flow: its
+        ; queued escort to the cell started anyway, and every confrontation after it stalled). Not started at all.
+        string queuedType = self.GetSceneType(nextScene)
+        if (queuedType == CATEGORY_ESCORT_TO_JAIL || queuedType == CATEGORY_ESCORT_TO_CELL)
+            Actor queuedEscortee = self.GetSceneNthReferenceOfType(nextScene, "Escortee") as Actor
+            if (!queuedEscortee || queuedEscortee.IsDeleted() || queuedEscortee.IsDisabled() || queuedEscortee.IsDead())
+                Info("SceneManager: " + nextScene + " dropped: its escortee " + queuedEscortee + " is gone")
+                __isScenePlaying = false
+                if (nextAliases)
+                    JValue.release(nextAliases)
+                endif
+                self.PlayQueued()
+                return
+            endif
+        endif
         Debug("Scene DEBUG: ["+ currentScene +"] SceneManager::PlayQueued", "Playing Scene: " + nextScene)
         Scene sceneObject = self.GetScene(nextScene)
 
@@ -1131,7 +1150,11 @@ function PlayQueued()
         endif
 
         __lastStartedScene = ""
-        sceneObject.Start() ; Play the Scene
+        string nextSceneType = self.GetSceneType(nextScene)
+        bool isEscortScene = nextSceneType == CATEGORY_ESCORT_TO_JAIL || nextSceneType == CATEGORY_ESCORT_TO_CELL
+        if (!(isEscortScene && RPB_Utility.IsEscortStartForcedToFail())) ; test-only: an escort that never starts
+            sceneObject.Start() ; Play the Scene
+        endif
         currentScene = nextScene
 
         ; The engine can refuse a Start() silently (seen with an escort Scene whose arrestee was still in combat: no start,
@@ -1143,28 +1166,66 @@ function PlayQueued()
         endWhile
 
         ; A Scene refused because its actors are still fighting isn't a failure yet: a large fight can take minutes, and
-        ; teleporting past it would skip a Scene that can still play. Start() is re-sent every second while either actor
-        ; is in combat (a refused Start() is never retried by the engine), up to a cap; then the usual few seconds.
-        if (!sceneObject.IsPlaying() && __lastStartedScene != nextScene && currentScene == nextScene)
+        ; teleporting past it would skip a Scene that can still play. I wait while either actor is in combat, up to a cap,
+        ; then start it again (a refused Start() is never retried by the engine) and give it the usual few seconds.
+        ; Escort Scenes only: the confrontation handles a fight itself (Arrestee.AwaitConfrontationScene goes pending).
+        if (isEscortScene && !sceneObject.IsPlaying() && __lastStartedScene != nextScene && currentScene == nextScene)
             Actor escort    = self.GetSceneNthReferenceOfType(nextScene, "Escort") as Actor
             Actor escortee  = self.GetSceneNthReferenceOfType(nextScene, "Escortee") as Actor
             float combatWaitStart = Utility.GetCurrentRealTime()
             bool waitedForCombat = false
-            while (!sceneObject.IsPlaying() && __lastStartedScene != nextScene && currentScene == nextScene && ((escort && escort.IsInCombat()) || (escortee && escortee.IsInCombat())) && (Utility.GetCurrentRealTime() - combatWaitStart) < SCENE_START_COMBAT_CAP_SECONDS)
+            bool uncuffedInFight = false
+            while (!uncuffedInFight && !sceneObject.IsPlaying() && __lastStartedScene != nextScene && currentScene == nextScene && ((escort && escort.IsInCombat()) || (escortee && escortee.IsInCombat())) && (Utility.GetCurrentRealTime() - combatWaitStart) < SCENE_START_COMBAT_CAP_SECONDS)
                 if (!waitedForCombat)
-                    Info("SceneManager: " + nextScene + " can't start while " + escort + " / " + escortee + " are in combat, waiting for the fight to end")
                     waitedForCombat = true
+                    ; An arrestee never cuffed: the fight stopped the confrontation (the engine ends it when combat starts)
+                    ; before its "Handcuff" step. Nothing was done to them yet, so they go free rather than be escorted
+                    ; uncuffed once the fight is over. Escort to jail only: at the prison a stripped prisoner is uncuffed on
+                    ; purpose.
+                    if (escortee && nextSceneType == CATEGORY_ESCORT_TO_JAIL && RPB_API.GetArrest().Arrestees.AtKey(escortee) && !RPB_Utility.IsCuffed(escortee))
+                        uncuffedInFight = true
+                    else
+                        Info("SceneManager: " + nextScene + " can't start while " + escort + " / " + escortee + " are in combat, waiting for the fight to end")
+                        if (escortee && escortee == Game.GetPlayer())
+                            RPB_Utility.HoldPlayerCuffed() ; cuffed and waiting: free to take cover, not locked in place
+                        endif
+                    endif
                 endif
-                Utility.Wait(1.0)
-                sceneObject.Start()
+                if (!uncuffedInFight)
+                    Utility.Wait(1.0)
+                endif
             endWhile
 
-            if (waitedForCombat)
+            if (uncuffedInFight)
+                Info("SceneManager: " + nextScene + " dropped: " + escortee + " was never cuffed and a fight broke out, the arrest is cancelled")
+                ; The queue's own state first, as for a Scene that never started, so the cancel below only drops this actor's
+                ; queued Scenes instead of ending "the current one" from inside this call
+                __isScenePlaying = false
+                currentScene = ""
+                if (nextAliases)
+                    JValue.release(nextAliases)
+                endif
+                RPB_Recovery.CancelArrest(escortee, "a fight broke out before the cuffs")
+                self.PlayQueued()
+                return
+            endif
+
+            bool fightOver = !((escort && escort.IsInCombat()) || (escortee && escortee.IsInCombat()))
+            if (waitedForCombat && fightOver && currentScene == nextScene)
+                ; The player back under AI before the Scene starts: started while they weren't AI-driven, its package never
+                ; applied to them and they stood still while the guard walked off
+                if (escortee && escortee == Game.GetPlayer())
+                    RetainAI(true)
+                    escortee.EvaluatePackage()
+                endif
+                sceneObject.Start()
                 startWaitStart = Utility.GetCurrentRealTime()
                 while (!sceneObject.IsPlaying() && __lastStartedScene != nextScene && currentScene == nextScene && (Utility.GetCurrentRealTime() - startWaitStart) < 3.0)
                     Utility.Wait(0.1)
                 endWhile
                 Info("SceneManager: " + nextScene + " after waiting " + ((Utility.GetCurrentRealTime() - combatWaitStart) as int) + "s for the fight: started " + (sceneObject.IsPlaying() || __lastStartedScene == nextScene))
+            elseif (waitedForCombat)
+                Info("SceneManager: " + nextScene + " gave up after " + ((Utility.GetCurrentRealTime() - combatWaitStart) as int) + "s, the fight is still on")
             endif
         endif
 
@@ -1213,6 +1274,19 @@ bool function EndSceneWithActor(Actor akActor, string asReason)
 
     self.EndSceneEarly(sceneName, asReason, abRunEndEvents = false)
     return true
+endFunction
+
+; Whether a queued (not yet started) Scene has @akActor among its aliases: an escort waiting its turn, not a stalled one
+bool function HasQueuedSceneWithActor(Actor akActor)
+    int i = JArray.count(__queuedSceneAliases) - 1
+    while (i >= 0)
+        int aliases = JArray.getObj(__queuedSceneAliases, i)
+        if (aliases && JArray.findForm(FastIntMap_Values(aliases), akActor) >= 0)
+            return true
+        endif
+        i -= 1
+    endWhile
+    return false
 endFunction
 
 ; Drops every queued (not yet started) Scene that has @akActor among its aliases. Returns how many.
@@ -1290,6 +1364,34 @@ function ForceResetSceneState()
     __isScenePlaying = false
     currentScene = ""
     self.__ClearSceneQueue()
+endFunction
+
+;/
+    Stops every RPB Scene the engine still plays and forgets the queue: for tests' teardown and recovery, when a Scene may
+    be left driving the shared aliases for an actor who is gone (one was, and every later confrontation stalled behind it).
+    The queue goes first, so a stopped Scene's end can't start the next one.
+/;
+function StopAllScenes(string asReason)
+    __isScenePlaying = false
+    currentScene = ""
+    self.__ClearSceneQueue()
+
+    string[] sceneNames = FastMap_KeysAsPapyrusArray(__sceneToCategory)
+    int stopped = 0
+    int i = 0
+    while (i < sceneNames.Length)
+        Scene sceneObject = self.GetScene(sceneNames[i])
+        if (sceneObject && sceneObject.IsPlaying())
+            sceneObject.Stop()
+            stopped += 1
+        endif
+        i += 1
+    endWhile
+
+    __isScenePlaying = false
+    currentScene = ""
+    self.ResetGlobals()
+    Info("SceneManager: stopped " + stopped + " Scene(s) still playing (" + asReason + ")")
 endFunction
 
 ; ==========================================================

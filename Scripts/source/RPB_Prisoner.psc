@@ -1272,16 +1272,7 @@ bool function IsRestrained()
 endFunction
 
 function Cuff(bool abCuffInFront = false)
-    ; Form cuffs = Game.GetFormEx(0xA081D2F)
-    Form cuffs = Game.GetFormFromFile(0x81D2F, "ZaZAnimationPack.esm")
-
-    if (abCuffInFront)
-        ; cuffs = Game.GetFormEx(0xA081D33)
-        cuffs = Game.GetFormFromFile(0x81D33, "ZaZAnimationPack.esm")
-    endif
-
-    this.SheatheWeapon()
-    this.EquipItem(cuffs, true, true)
+    RPB_Utility.EquipCuffs(this, abCuffInFront) ; a different pair already on comes off first
 endFunction
 
 function Uncuff()

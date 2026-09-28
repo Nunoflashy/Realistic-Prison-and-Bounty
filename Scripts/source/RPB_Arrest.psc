@@ -515,6 +515,10 @@ event OnArrestDialogue(int aiTopicInfoEvent, int aiTopicInfoType, string asTopic
             self.SetupArrestPayableBountyVars(akSpeakerArrester.GetCrimeFaction()) ; Setup arrest payable bounty vars
             self.SetActorWantsToPayBounty(akSpokenToArrestee, false) ; Reset any possibility of paying the bounty, before actually selecting it
 
+            ; The guard handling this arrest: another guard's resist line meanwhile isn't a resist (see TOPIC_TYPE_ARREST_RESIST)
+            RPB_StorageVars.SetFormOnReference("Arrest Dialogue Guard", akSpokenToArrestee, akSpeakerArrester, "Pre-Arrest")
+            RPB_StorageVars.SetFloatOnReference("Arrest Dialogue Time", akSpokenToArrestee, Utility.GetCurrentRealTime(), "Pre-Arrest")
+
         elseif (aiTopicInfoType == TOPIC_TYPE_ARREST_RESIST)
             ; Same multi-guard race as above, checked here (before SetAsResisting/the RPB_ResistArrest round-trip)
             ; rather than only after the fact in OnArrestResist - by the time that event's own "Captured" check ran,
@@ -529,6 +533,23 @@ event OnArrestDialogue(int aiTopicInfoEvent, int aiTopicInfoType, string asTopic
                 return
             endif
 
+            ; A guard who breaks the dialogue off to fight (or talks to someone already fighting another hostile) isn't
+            ; being resisted: leaving the dialogue then used to add the resisting-arrest bounty
+            if (akSpeakerArrester.IsInCombat() || RPB_Utility.GetOtherCombatTarget(akSpokenToArrestee, akSpeakerArrester))
+                EventManager.SendInfo("Not resisting arrest: " + akSpeakerArrester + " left the arrest dialogue in a fight", "Arrest::OnArrestDialogue")
+                akSpeakerArrester.EvaluatePackage()
+                return
+            endif
+
+            ; Another guard's dialogue while one is already handling the arrest (several guards around: they come to talk
+            ; while the first one still is, and their resist line counted as the player resisting, without them ever
+            ; leaving the first dialogue). Only the guard handling it can be resisted.
+            if (self.__OtherGuardHandlesArrestDialogue(akSpeakerArrester, akSpokenToArrestee))
+                EventManager.SendInfo("Not resisting arrest: " + akSpeakerArrester + " spoke while another guard handles the arrest dialogue", "Arrest::OnArrestDialogue")
+                akSpeakerArrester.EvaluatePackage()
+                return
+            endif
+
             self.SetAsResisting(akSpeakerArrester, akSpokenToArrestee)
 
         elseif (aiTopicInfoType == TOPIC_TYPE_COMBAT_YIELD)
@@ -536,6 +557,11 @@ event OnArrestDialogue(int aiTopicInfoEvent, int aiTopicInfoType, string asTopic
         endif
 
     elseif (aiTopicInfoEvent == TOPIC_END)
+        ; An outcome ends the arrest dialogue: nobody is handling it any more
+        if (aiTopicInfoType == TOPIC_TYPE_ARREST_DIALOGUE_ELUDING || aiTopicInfoType == TOPIC_TYPE_ARREST_PURSUIT_ELUDING || aiTopicInfoType == TOPIC_TYPE_ARREST_GO_TO_JAIL || (aiTopicInfoType >= TOPIC_TYPE_ARREST_PAY_BOUNTY_ON_SPOT && aiTopicInfoType <= TOPIC_TYPE_ARREST_PAY_BOUNTY_ESCORT_ARRESTED))
+            RPB_StorageVars.DeleteVariableOnReference("Arrest Dialogue Guard", akSpokenToArrestee, "Pre-Arrest")
+        endif
+
         if (aiTopicInfoType == TOPIC_TYPE_ARREST_DIALOGUE_ELUDING)
             self.SetAsEluding(akSpeakerArrester, akSpokenToArrestee, "Dialogue")
 
@@ -556,6 +582,19 @@ event OnArrestDialogue(int aiTopicInfoEvent, int aiTopicInfoType, string asTopic
         endif
     endif
 endEvent
+
+; Whether a guard other than @akSpeaker is handling @akArrestee's arrest dialogue right now: recorded at its confrontation
+; line, still alive, and either still in the dialogue with the player or recorded less than 30s ago (the dialogue target
+; can't always be read with several guards talking)
+bool function __OtherGuardHandlesArrestDialogue(Actor akSpeaker, Actor akArrestee)
+    Actor handler = RPB_StorageVars.GetFormOnReference("Arrest Dialogue Guard", akArrestee, "Pre-Arrest") as Actor
+    if (!handler || handler == akSpeaker || handler.IsDead())
+        return false
+    endif
+
+    float since = Utility.GetCurrentRealTime() - RPB_StorageVars.GetFloatOnReference("Arrest Dialogue Time", akArrestee, "Pre-Arrest")
+    return (akArrestee == Config.Player && handler.IsInDialogueWithPlayer()) || since < 30.0
+endFunction
 
 event OnSurrenderBegin(Actor akSurrenderer, Actor[] akSurrendererCaptors)
     self.PrepareSurrenderer(akSurrenderer)
@@ -1099,6 +1138,12 @@ function BeginArrest(RPB_Arrestee apArresteeRef)
     string hold             = apArresteeRef.GetHold()
     RPB_Utility.FlowMark("BeginArrest: getters")
 
+    ; A dead guard can't arrest anyone (an F4 arrest once picked one that had just died, and the arrest "resumed" at once)
+    if (!captor || captor.IsDead() || captor.IsDisabled())
+        RPB_Recovery.CancelArrest(arrestee, "the captor " + captor + " is dead or gone")
+        return
+    endif
+
     apArresteeRef.HideBounty()
     RPB_Utility.FlowMark("BeginArrest: HideBounty")
     ; Diagnostic (2026-09-23): HideBounty() -> ClearActiveBountyForFaction() should zero the native CrimeGold for the player
@@ -1117,7 +1162,13 @@ function BeginArrest(RPB_Arrestee apArresteeRef)
     ; Who the guard is actually fighting, read before anything is stopped: another hostile keeping him busy means the
     ; confrontation Scene can't play, so the arrest waits (Arrestee.__BeginPendingArrest). A timed IsInCombat check after
     ; the StopCombat below fell in the gap before that hostile pulled him back in.
-    Actor otherHostile = RPB_Utility.GetOtherCombatTarget(captor, arrestee)
+    Actor captorBusyWith = RPB_Utility.GetOtherCombatTarget(captor, arrestee)
+    Actor otherHostile = captorBusyWith
+    if (!otherHostile)
+        ; The arrestee fought by someone else while the guard is free: the player attacked by bandits when a second guard
+        ; came to arrest them (the first one died). The confrontation can't play in that fight either.
+        otherHostile = RPB_Utility.GetOtherCombatTarget(arrestee, captor)
+    endif
     apArresteeRef.StopCombat()
     RPB_Utility.FlowMark("BeginArrest: arrestee StopCombat")
     ; A hostile actor (a bandit/CW-soldier/Forsworn NPC, or the player disguised via a mod like Master of Disguise) is
@@ -1151,7 +1202,7 @@ function BeginArrest(RPB_Arrestee apArresteeRef)
     ; regardless of player presence. Confirmed as the real cause of a real test's confrontation Scene never confirming.
     ; Only a guard fighting nobody else: one still busy with another hostile keeps fighting it (stopping him only made him
     ; look free for a moment)
-    if (captor && !otherHostile)
+    if (captor && !captorBusyWith)
         captor.StopCombat()
     endif
     ; Commented out for a retest (2026-09-24): possibly redundant now that the direct NeutralizeHostileActor call
@@ -1522,11 +1573,7 @@ function RestrainArrestee(Actor akArrestee)
     ; Hand Cuffs Crossed Front 01 - 0xA033D9D
     ; Hands Crossed Front in Scarfs - 0xA073A14
     ; Hands in Irons Front Black - 0xA033D9E
-    ; Form cuffs = Game.GetFormEx(0xA081D2F)
-    Form cuffs = Game.GetFormFromFile(0x81D2F, "ZaZAnimationPack.esm")
-
-    akArrestee.SheatheWeapon() ; sheathed, not taken: the weapons stay on them until the strip
-    akArrestee.EquipItem(cuffs, true, true)
+    RPB_Utility.EquipCuffs(akArrestee) ; behind the back; weapons sheathed, not taken (they stay on until the strip)
 endFunction
 
 function UnrestrainArrestee(Actor akRestrainedArrestee)

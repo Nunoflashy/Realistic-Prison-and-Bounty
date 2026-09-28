@@ -375,10 +375,7 @@ endFunction
 ; Form cuffs = Game.GetFormEx(0xA081D2F) ; Back
 
 function Cuff()
-    Form cuffs = Game.GetFormFromFile(0x81D2F, "ZaZAnimationPack.esm")
-
-    self.SheatheWeapon() ; sheathed, not taken: the weapons stay on me until the strip
-    self.EquipItem(cuffs, true, true)
+    RPB_Utility.EquipCuffs(this) ; behind the back; weapons sheathed, not taken (they stay on me until the strip)
 endFunction
 
 ; Dependency-free attempt (no ZaZAnimationPack) - currently broken, animation doesn't play
@@ -534,6 +531,28 @@ endFunction
 
     returns (bool): true once the Scene is confirmed to be progressing, false if every attempt was exhausted.
 /;
+; Someone other than my guard is fighting me or my guard, or I'm the player and in combat with no readable targets (my
+; StopCombat at the arrest doesn't stop whoever attacks me). The hostile, if known, is kept for the pending arrest.
+bool function __FightBrokeOut(Actor akGuard)
+    Actor hostile = RPB_Utility.GetOtherCombatTarget(akGuard, this)
+    if (!hostile)
+        hostile = RPB_Utility.GetOtherCombatTarget(this, akGuard)
+    endif
+
+    bool fight = hostile != none
+    if (!fight && self.IsPlayer() && this.IsInCombat())
+        Actor[] targets = PO3_SKSEFunctions.GetCombatTargets(this)
+        fight = !targets || targets.Length == 0
+    endif
+
+    if (fight)
+        ; Known (a real combat target) acts on the first read; none (the player in combat, no readable targets) waits for a
+        ; second one, so one stray frame doesn't end an arrest
+        self.SetForm("Interrupting Hostile", hostile)
+    endif
+    return fight
+endFunction
+
 bool function AwaitConfrontationScene(string asScene)
     if (RPB_Utility.IsConfrontationSceneForcedToFail())
         ; Test-only override (RPB_Utility.SetConfrontationSceneForcedToFail) for exercising EscortToPrison()'s
@@ -570,6 +589,7 @@ bool function AwaitConfrontationScene(string asScene)
 
         float attemptStart = Utility.GetCurrentRealTime()
         int stuckStreak = 0
+        int fightStreak = 0
         bool confirmed = false
 
         while (!confirmed && (Utility.GetCurrentRealTime() - attemptStart) < PER_ATTEMPT_TIMEOUT_SECONDS)
@@ -581,6 +601,20 @@ bool function AwaitConfrontationScene(string asScene)
             confirmed = self.GetBool("Scene Confirmed")
 
             if (!confirmed)
+                ; A fight around us (two reads in a row, not one stray frame): the Scene can't play in it
+                if (self.__FightBrokeOut(guard))
+                    fightStreak += 1
+                else
+                    fightStreak = 0
+                endif
+
+                if (fightStreak >= 2 || (fightStreak >= 1 && self.GetForm("Interrupting Hostile")))
+                    Info("Confrontation of " + Name + " " + this + " interrupted by a fight (" + self.GetForm("Interrupting Hostile") + ") before the cuffs, the arrest is cancelled")
+                    SceneManager.EndSceneWithActor(this, "a fight broke out during the confrontation")
+                    self.SetBool("Confrontation Interrupted", true)
+                    return false
+                endif
+
                 if (RPB_Utility.IsWedgedTogether(self.GetActor(), guard, STUCK_DISTANCE_UNITS))
                     stuckStreak += 1
                 else
@@ -647,6 +681,14 @@ function EscortToPrison(bool abEscortDirectlyToCell = false, bool abCombatAtArre
     endif
 
     if (!self.AwaitConfrontationScene(sceneSet))
+        ; A fight broke out before the confrontation got anywhere: nothing has been done to me yet, so I'm let go (the
+        ; bounty and my hostility come back, guards will come for me again), rather than retrying a Scene that can't play
+        ; and teleporting me to a cell
+        if (self.GetBool("Confrontation Interrupted"))
+            RPB_Recovery.CancelArrest(this, "a fight broke out before the cuffs")
+            return
+        endif
+
         ; AwaitConfrontationScene() returns false for two different reasons, and they need different handling here.
         ; (1) all retries exhausted, arrestee still alive - the case this fallback is for. (2) !self.IsEffectActive
         ; fired inside its own wait loop - but round 19's own original assumption here (this only ever means someone
@@ -684,6 +726,55 @@ function EscortToPrison(bool abEscortDirectlyToCell = false, bool abCombatAtArre
     endif
 
     self.__ContinueToPrison(abEscortDirectlyToCell)
+
+    ; The confrontation confirms early (at "Hands Behind Back", ~2s in) and plays on for a while: a fight breaking out now
+    ; used to freeze it with me locked in it. Watched from my updates, not this thread (BeginArrest's caller waits on it).
+    if (SceneManager.GetCurrentScene() == sceneSet)
+        self.SetString("Watched Confrontation", sceneSet)
+        self.SetFloat("Confrontation Watch Start", Utility.GetCurrentRealTime())
+        self.SetBool("Pending Directly To Cell", abEscortDirectlyToCell)
+        RegisterForSingleUpdate(1.0)
+    endif
+endFunction
+
+;/
+    One read of the confrontation watch (see EscortToPrison): a fight around us two reads in a row, while my
+    confrontation is still the current Scene. Before the cuffs I'm let go (nothing was done to me yet); cuffed, the arrest
+    waits the fight out (pending), then only the escort is left. True while the watch goes on. Bounded: 1 read a second,
+    at most 30s, and it ends with the confrontation.
+/;
+bool function __WatchConfrontationTick()
+    string watched = self.GetString("Watched Confrontation")
+    if (watched == "")
+        return false
+    endif
+
+    if (SceneManager.GetCurrentScene() != watched || (Utility.GetCurrentRealTime() - self.GetFloat("Confrontation Watch Start")) > 30.0)
+        self.Remove("Watched Confrontation")
+        return false
+    endif
+
+    Actor guard = Captor.GetActor()
+    int fightStreak = 0
+    if (self.__FightBrokeOut(guard))
+        fightStreak = self.GetInt("Confrontation Fight Streak") + 1
+    endif
+    self.SetInt("Confrontation Fight Streak", fightStreak)
+    if (fightStreak < 2 && !(fightStreak >= 1 && self.GetForm("Interrupting Hostile")))
+        return true
+    endif
+
+    self.Remove("Watched Confrontation")
+    self.Remove("Confrontation Fight Streak")
+    if (RPB_Utility.IsCuffed(this))
+        Info("Confrontation of " + Name + " " + this + " interrupted by a fight (" + self.GetForm("Interrupting Hostile") + ") after the cuffs, the arrest goes pending")
+        SceneManager.EndSceneWithActor(this, "a fight broke out after the cuffs") ; my queued escort goes with it
+        self.__BeginPendingArrest(self.GetBool("Pending Directly To Cell"), self.GetForm("Interrupting Hostile") as Actor, abEscortOnly = true)
+    else
+        Info("Confrontation of " + Name + " " + this + " interrupted by a fight (" + self.GetForm("Interrupting Hostile") + ") before the cuffs, the arrest is cancelled")
+        RPB_Recovery.CancelArrest(this, "a fight broke out before the cuffs")
+    endif
+    return false
 endFunction
 
 ;/
@@ -710,7 +801,9 @@ bool function __CaptorStillFighting(bool abCombatAtArrest)
         Utility.Wait(0.25)
     endWhile
 
-    bool fighting = guard.IsInCombat()
+    ; The player still in combat after the settle is being fought by someone (their StopCombat doesn't stop the others,
+    ; and combat targets may not be readable on the player)
+    bool fighting = guard.IsInCombat() || (self.IsPlayer() && this.IsInCombat())
     Debug("["+ Name +"] Arrestee::__CaptorStillFighting", "combat at arrest " + abCombatAtArrest + ", guard " + guard + " still in combat after settling " + fighting + " -> " + string_if(fighting, "pending arrest", "normal confrontation"))
     return fighting
 endFunction
@@ -721,8 +814,10 @@ endFunction
     (RPB_Captor.OnCombatStateChanged, with a slow re-check as a safety net). A death on either side reverts it through the
     existing handlers.
 /;
-function __BeginPendingArrest(bool abEscortDirectlyToCell, Actor akOtherHostile)
+function __BeginPendingArrest(bool abEscortDirectlyToCell, Actor akOtherHostile, bool abEscortOnly = false)
     Actor guard = Captor.GetActor()
+    ; Already a prisoner, cuffed by the confrontation: only the escort is left once the fight is over
+    self.SetBool("Pending Escort Only", abEscortOnly)
     bool isPlayer = self.IsPlayer()
     self.SetForm("Pending Hostile", akOtherHostile) ; the Captor resumes me once it's dealt with
 
@@ -732,7 +827,8 @@ function __BeginPendingArrest(bool abEscortDirectlyToCell, Actor akOtherHostile)
     if (isPlayer)
         ; A leash, not a freeze: SetRestrained locked the camera too. Cuffed hands can't fight or activate anything, but
         ; the camera, movement and menus stay free; the leash (OnUpdate) keeps me near my guard.
-        Game.DisablePlayerControls(abMovement = false, abFighting = true, abCamSwitch = false, abLooking = false, abSneaking = false, abMenu = false, abActivate = true, abJournalTabs = false, aiDisablePOVType = 0)
+        ; Also clears a confrontation's full RetainAI lock (a fight that broke out mid-confrontation lands here)
+        RPB_Utility.HoldPlayerCuffed()
     else
         ; Out of the fight and held where I am: no fighting anyone (neutralized, I'm no longer the other hostiles' ally
         ; and my AI still reacted to them), no running off. SetRestrained alone still let me drift 75-240 units in 3s,
@@ -751,8 +847,10 @@ function __BeginPendingArrest(bool abEscortDirectlyToCell, Actor akOtherHostile)
     Debug("["+ Name +"] Arrestee::__BeginPendingArrest", "hold on at (" + (this.GetPositionX() as int) + ", " + (this.GetPositionY() as int) + ")")
 
     ; What the confrontation Scene's "Handcuff" step does (the Scene itself can't start in a fight)
-    self.Restrain()
-    Arrest.OnArresteeRestrained(self)
+    if (!abEscortOnly)
+        self.Restrain()
+        Arrest.OnArresteeRestrained(self)
+    endif
 
     self.SetBool("Arrest Pending", true)
     self.SetBool("Pending Directly To Cell", abEscortDirectlyToCell)
@@ -776,7 +874,12 @@ function ResumePendingArrest()
     RetainAI(self.IsPlayer())
 
     Info("Pending arrest of " + Name + " " + this + " resumed: the fight is over, escorting")
-    self.__ContinueToPrison(self.GetBool("Pending Directly To Cell"))
+    if (self.GetBool("Pending Escort Only"))
+        self.Remove("Pending Escort Only")
+        self.__ResumeEscort(self.GetBool("Pending Directly To Cell"))
+    else
+        self.__ContinueToPrison(self.GetBool("Pending Directly To Cell"))
+    endif
     self.OnArrestEnd() ; what the confrontation Scene's end does: the escort leash, and the wedge check
 endFunction
 
@@ -801,6 +904,36 @@ function __ReleasePendingHold(bool abReverted = false)
 endFunction
 
 ; The arrest from its confirmation on: I become a prisoner, get a cell, and am escorted there (or moved, off-screen)
+; The escort of the prisoner I already am (a fight after the cuffs made the arrest wait): the tail of __ContinueToPrison
+function __ResumeEscort(bool abEscortDirectlyToCell)
+    RPB_Prison prison = API.PrisonManager.FindPrisonByPrisoner(this)
+    RPB_Prisoner prisoner = none
+    if (prison)
+        prisoner = prison.Prisoners.AtKey(this)
+    endif
+    if (!prisoner)
+        DebugError("["+ Name +"] Arrestee::__ResumeEscort", "No prisoner to escort for " + Name + ", cancelling the arrest")
+        RPB_Recovery.CancelArrest(this, "no prisoner left to escort")
+        return
+    endif
+
+    Actor guard = Captor.GetActor()
+    if (!this.Is3DLoaded() || !guard.Is3DLoaded())
+        if (!abEscortDirectlyToCell)
+            prisoner.MoveToPrison(guard)
+        else
+            prisoner.MoveToCell()
+        endif
+        return
+    endif
+
+    if (!abEscortDirectlyToCell)
+        prisoner.EscortToJail(guard)
+    else
+        prisoner.EscortToCell(guard)
+    endif
+endFunction
+
 function __ContinueToPrison(bool abEscortDirectlyToCell)
     if (this.IsDisabled())
         Debug("["+ Name +"] Arrestee::__ContinueToPrison", Name + " is disabled, not continuing the arrest")
@@ -1144,17 +1277,103 @@ event OnUpdate()
     ; ever needs to happen once, right as the confrontation ends (see OnArrestEnd()), not re-evaluated against normal
     ; walking proximity every 5s for the rest of a potentially long escort.
     ; A pending arrest leaves room to take cover from the fight; an escort keeps me close
+    if (self.__WatchConfrontationTick())
+        RegisterForSingleUpdate(1.0)
+        return
+    endif
+
+    if (!Captor || !Captor.GetActor())
+        return ; the arrest is gone (cancelled by the watch above, or reverted)
+    endif
+
     float leash = ESCORT_LEASH_DISTANCE
     if (self.GetBool("Arrest Pending"))
         leash = PENDING_LEASH_DISTANCE
     endif
     if (this.GetDistance(Captor.GetActor()) >= leash)
+        ; An escort I keep falling behind of is broken (seen: the player left standing while the guard walked off): after
+        ; 3 pulls in a row (~15s), the same fallback as an escort that never starts
+        int pulls = self.GetInt("Leash Pulls") + 1
+        self.SetInt("Leash Pulls", pulls)
+        if (pulls >= 3 && !self.GetBool("Arrest Pending") && self.__EscortBroken())
+            return
+        endif
+
         this.MoveTo(Captor.GetActor())
         Debug("["+ Name +"] Arrestee::OnUpdate", "Moved Arrestee to " + Captor.Name)
+    else
+        self.SetInt("Leash Pulls", 0)
+    endif
+
+    if (self.__EscortStalled())
+        return
     endif
 
     RegisterForSingleUpdate(5.0)
 endEvent
+
+;/
+    An escort where nothing moves: its Scene never took hold (seen: the guard back on his own package after a resumed
+    arrest, both standing there for good). Nobody drifts apart, so the leash never pulls. Counted on these 5s ticks from
+    my position; 4 still ticks in a row (~20s) fall back to the prison without the Scene. Not while pending, in a fight,
+    during another Scene than an escort to jail (a strip or frisk at the prison keeps me still on purpose), or while my
+    escort is still queued behind other Scenes. True if it fell back.
+/;
+bool function __EscortStalled()
+    float x = this.GetPositionX()
+    float y = this.GetPositionY()
+    float moved = Math.sqrt(Math.pow(x - self.GetFloat("Stall X"), 2.0) + Math.pow(y - self.GetFloat("Stall Y"), 2.0))
+    self.SetFloat("Stall X", x)
+    self.SetFloat("Stall Y", y)
+
+    string current = SceneManager.GetCurrentScene()
+    Actor guard = Captor.GetActor()
+    if (moved >= 64.0 || self.GetBool("Arrest Pending") || this.IsInCombat() || (guard && guard.IsInCombat()) || (current != "" && !SceneManager.IsSceneOfType(current, SceneManager.CATEGORY_ESCORT_TO_JAIL)))
+        self.SetInt("Stall Ticks", 0)
+        return false
+    endif
+
+    int ticks = self.GetInt("Stall Ticks") + 1
+    if (ticks >= 2 && SceneManager.HasQueuedSceneWithActor(this))
+        ticks = 0 ; waiting its turn in the Scene queue, not stalled
+    endif
+    self.SetInt("Stall Ticks", ticks)
+    if (ticks < 4)
+        return false
+    endif
+
+    self.SetInt("Stall Ticks", 0)
+    return self.__FallBackToPrison("the escort isn't moving (" + string_if(current == "", "no Scene playing", current) + ")")
+endFunction
+
+; My escort to jail is playing but I'm not following it. False when it isn't an escort to jail that's playing.
+bool function __EscortBroken()
+    string current = SceneManager.GetCurrentScene()
+    if (!SceneManager.IsSceneOfType(current, SceneManager.CATEGORY_ESCORT_TO_JAIL))
+        return false
+    endif
+
+    self.SetInt("Leash Pulls", 0)
+    return self.__FallBackToPrison("kept falling behind " + Captor.GetActor() + " (" + current + ")")
+endFunction
+
+; The escort's fallback: any Scene with me ended without its end events, and I'm moved to the prison without it (as for an
+; escort that never starts). False when there's no prisoner of mine to move (or it's already imprisoned).
+bool function __FallBackToPrison(string asReason)
+    RPB_Prison prison = API.PrisonManager.FindPrisonByPrisoner(this)
+    RPB_Prisoner prisoner = none
+    if (prison)
+        prisoner = prison.Prisoners.AtKey(this)
+    endif
+    if (!prisoner || prisoner.IsImprisoned)
+        return false
+    endif
+
+    Info("Escort of " + Name + " " + this + " broken: " + asReason + ", moving them to the prison without the Scene")
+    SceneManager.EndSceneWithActor(this, "the escort broke")
+    prisoner.MoveToPrison(Captor.GetActor())
+    return true
+endFunction
 
 ; ==========================================================
 ;                           Management

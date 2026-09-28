@@ -205,6 +205,7 @@ scriptname RPB_Prison extends RPB_Entity
     function RestrainPrisoner(RPB_Prisoner apPrisoner, bool abRestrainInFront = false)
     function TeleportPrisonerToRelease(RPB_Prisoner apPrisoner, bool abMoveToReleaseLocation = true)
     function ReleaseInPlace(RPB_Prisoner apPrisoner)
+    function CancelImprisonment(RPB_Prisoner apPrisoner, string asReason)
     int function PendingDressCount()
     function QueueEscortToCellStallCheck(Actor akPrisoner, float afTimeoutSeconds = 8.0)
     function ResetDressCost()
@@ -2276,16 +2277,8 @@ function RestrainPrisoner(RPB_Prisoner apPrisoner, bool abRestrainInFront = fals
     ; Hands Crossed Front in Scarfs - 0xA073A14
     ; Hands in Irons Front Black - 0xA033D9E
 
-    Form cuffs = Game.GetFormFromFile(0x81D2F, "ZaZAnimationPack.esm")
-
-    ; Form cuffs = Game.GetFormEx(0xA081D2F)
-    if (abRestrainInFront)
-        ; cuffs = Game.GetFormEx(0xA081D33)
-        cuffs = Game.GetFormFromFile(0x81D33, "ZaZAnimationPack.esm")
-    endif
-
-    apPrisoner.GetActor().SheatheWeapon() ; sheathed, not taken: the weapons stay on them until the strip
-    apPrisoner.GetActor().EquipItem(cuffs, true, true)
+    ; A different pair already on comes off first (front over back locked the animation); weapons sheathed, not taken
+    RPB_Utility.EquipCuffs(apPrisoner.GetActor(), abRestrainInFront)
 endFunction
 
 ;/
@@ -2294,6 +2287,43 @@ endFunction
 /;
 function ReleaseInPlace(RPB_Prisoner apPrisoner)
     self.TeleportPrisonerToRelease(apPrisoner, abMoveToReleaseLocation = false)
+endFunction
+
+;/
+    Undoes a prisoner an arrest registered but never got to prison (the captor died, a fight broke out, a reset) - without
+    a release: a release counts all game time since the start as time jailed (a reset outside prison once took the Time
+    Jailed stat from 19 to 88 days, with a sentence of 12, and added infamy). The same teardown as a failed cell assignment
+    (OnPrisonerImprisonmentFail): out of the cell, the latent bounty back to active, the state destroyed (which also
+    removes the spell). An imprisoned prisoner is never cancelled: that's a release.
+/;
+function CancelImprisonment(RPB_Prisoner apPrisoner, string asReason)
+    if (!apPrisoner || apPrisoner.IsImprisoned)
+        return
+    endif
+
+    Actor prisonerActor = apPrisoner.GetActor()
+    Info("["+ Name +"] Imprisonment of " + apPrisoner.Name + " " + prisonerActor + " cancelled (" + asReason + "), not released: no time jailed, no infamy")
+
+    if (apPrisoner.IsStripped)
+        apPrisoner.ReturnBelongings()
+        if (apPrisoner.IsNPC())
+            apPrisoner.NPC_RestoreOriginalOutfit()
+        endif
+    endif
+    if (apPrisoner.HasCellPackage)
+        apPrisoner.NPC_UnbindFromCell()
+    endif
+    if (apPrisoner.JailCell)
+        apPrisoner.RemoveFromCell()
+    endif
+
+    apPrisoner.RestoreBountyForFaction(PrisonFaction) ; no-op when the arrest already gave it back
+
+    RPB_Arrestee arrestState = RPB_Arrestee.GetStateForPrisoner(apPrisoner)
+    if (arrestState != none)
+        arrestState.Destroy()
+    endif
+    apPrisoner.Destroy()
 endFunction
 
 function TeleportPrisonerToRelease(RPB_Prisoner apPrisoner, bool abMoveToReleaseLocation = true)
@@ -3567,8 +3597,12 @@ event OnEscortPrisonerToCellBegin(RPB_Prisoner apPrisoner, Actor akEscort)
         ; Process escort to cell after escape
     endif
 
-    ; No cuffing here: the arrest's cuffs are still on unless a strip took them, and the strip puts them back (see
-    ; OnPrisonerStripEnd). The cell end uncuffs.
+    ; Only when nothing is on: the arrest's cuffs are still on unless a strip took them, and the strip Scenes cuff again
+    ; themselves (my own re-cuff at the strip's end added back cuffs under their front ones and locked the prisoner at the
+    ; belongings chest). The cell end uncuffs.
+    if (!RPB_Utility.IsCuffed(apPrisoner.GetActor()))
+        apPrisoner.Restrain()
+    endif
     apPrisoner.OnEscortToCell(akEscort)
 endEvent
 
@@ -3682,10 +3716,9 @@ event OnPrisonerStripEnd(RPB_Prisoner apPrisoner, Actor akStripper)
     if (apPrisoner.HasSceneState("OnPrisonerStripEnd", "Escort to Cell"))
         ; Process Escorting to Cell
     endif
-    ; The strip took the cuffs off (you can't undress cuffed, and they're never a belonging): back on for the walk to the
-    ; cell. A strip in the cell leaves them off.
+    ; No re-cuffing here: the strip Scenes put the cuffs back on themselves ("Restrain Prisoner", "Stand Up (Kneel)"), and
+    ; a second pair from here locked the prisoner's animation (see OnEscortPrisonerToCellBegin)
     if (!apPrisoner.IsInCell)
-        apPrisoner.Restrain()
         ; apPrisoner.StartRestraining(akStripper)
     endif
     ; apPrisoner.EscortToCell(akStripper)

@@ -117,6 +117,11 @@ bool function __ResumePendingArrestIfDone()
         return false
     endif
 
+    ; A dead guard reads as out of combat: OnDeath cancels the arrest instead
+    if (this.IsDead())
+        return false
+    endif
+
     Actor hostile = arresteeRef.GetForm("Pending Hostile") as Actor
     string why = ""
     if (hostile)
@@ -279,16 +284,10 @@ event OnDeath(Actor akKiller)
     ; arresteeRef.Captor == this doubles today as "no other captors remain for this arrestee" under the current
     ; one-captor-per-arrestee model - the natural place to widen this check once multiple Captors per Arrestee exist.
     if (arresteeRef && arresteeRef.Captor == self)
-        ; The confrontation/escort Scene this arrest is running is still technically "playing" and would otherwise
-        ; sit there until AwaitConfrontationScene()'s own ~24s retry budget gives up on it - stop it explicitly now,
-        ; the same way AwaitConfrontationScene() already stops a stalled attempt between its own retries, instead of
-        ; leaving the arrestee waiting on a guard that's already dead.
-        Scene arrestScene = self.SceneManager.GetScene(arresteeRef.GetString("Scene"))
-        if (arrestScene && arrestScene.IsPlaying())
-            arrestScene.Stop()
-        endif
-
-        arresteeRef.RevertArrest()
+        ; Nobody takes the arrest over (yet): the arrestee is free, whatever stage it was at. CancelArrest ends their Scenes
+        ; (confrontation or escort) without end events and also undoes a prisoner already registered for the escort - a
+        ; revert alone left the RPB_Prisoner on them, and that leftover blocked every later arrest ("already arrested").
+        RPB_Recovery.CancelArrest(Arrestee, "the captor died")
     endif
 endEvent
 

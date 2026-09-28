@@ -20,6 +20,9 @@ scriptname RPB_Utility hidden
     bool function HealNakedBaseOutfit(Actor akActor) global
     Actor function GetOtherCombatTarget(Actor akActor, Actor akExcept) global
     int function RemoveCuffs(Actor akActor) global
+    bool function IsCuffed(Actor akActor) global
+    function EquipCuffs(Actor akActor, bool abFront = false) global
+    int function RestoreNeutralizedHostility(Actor akActor) global
     Form[] function RPB_GetHostileFactions() global
     Form[] function RPB_GetHostileFactionsFor(Actor akActor) global
     bool function IsHostileActor(Actor akActor) global
@@ -83,6 +86,7 @@ scriptname RPB_Utility hidden
     int function BitwiseExpr(string bitfield) global
     function RetainAI(bool condition = true) global
     function ReleaseAI(bool condition = true) global
+    function HoldPlayerCuffed() global
     function SetGameStat(string asStatName, int aiValue) global
     bool function IsActorArrested(Actor akActor) global
     bool function IsActorImprisoned(Actor akActor) global
@@ -158,6 +162,8 @@ scriptname RPB_Utility hidden
     function SetOvercrowdingDisabled(bool abDisabled) global
     bool function IsConfrontationSceneForcedToFail() global
     function SetConfrontationSceneForcedToFail(bool abForced) global
+    bool function IsEscortStartForcedToFail() global
+    function SetEscortStartForcedToFail(bool abForced) global
     float function GetMonitorOverrideHours() global
     function SetMonitorOverrideHours(float afHours) global
     float function GetHostilityRestoreOverrideHours() global
@@ -468,6 +474,50 @@ int function RemoveCuffs(Actor akActor) global
     return removed
 endFunction
 
+; Whether @akActor wears any of the cuffs this mod puts on (see RemoveCuffs)
+bool function IsCuffed(Actor akActor) global
+    if (!akActor)
+        return false
+    endif
+
+    int[] cuffIds = new int[3]
+    cuffIds[0] = 0x81D2F
+    cuffIds[1] = 0x81D33
+    cuffIds[2] = 0x81D34
+
+    int i = 0
+    while (i < cuffIds.Length)
+        Form cuffs = Game.GetFormFromFile(cuffIds[i], "ZaZAnimationPack.esm")
+        if (cuffs && akActor.IsEquipped(cuffs))
+            return true
+        endif
+        i += 1
+    endWhile
+    return false
+endFunction
+
+; Puts @akActor in the mod's cuffs, behind the back or @abFront. A different pair already worn comes off first: front cuffs
+; equipped over back ones (the strip Scene cuffs in front after the arrest's back cuffs) locked the prisoner's animation,
+; stuck at the belongings chest. Already wearing that pair: nothing to do. Weapons sheathed, not taken.
+function EquipCuffs(Actor akActor, bool abFront = false) global
+    if (!akActor)
+        return
+    endif
+
+    int cuffsId = 0x81D2F ; backside rusty
+    if (abFront)
+        cuffsId = 0x81D33 ; front rusty
+    endif
+    Form cuffs = Game.GetFormFromFile(cuffsId, "ZaZAnimationPack.esm")
+    if (!cuffs || akActor.IsEquipped(cuffs))
+        return
+    endif
+
+    RemoveCuffs(akActor)
+    akActor.SheatheWeapon()
+    akActor.EquipItem(cuffs, true, true)
+endFunction
+
 ;/
     The factions Prisoner.IsHostilePrisoner()/NeutralizeWhileImprisoned() check against: an Actor (NPC or the player) belonging
     to one of these is a hostile prisoner (a bandit, a Civil War soldier, Forsworn - or the player disguised via a mod like
@@ -706,6 +756,47 @@ function NeutralizeHostileActor(Actor akActor) global
         Info("Neutralized " + akActor.GetDisplayName() + " " + akActor + " (removed from " + removed + " hostile factions:" + ranksLogged + ")")
     endif
     FlowMark("Neutralize: Info")
+endFunction
+
+;/
+    Undoes NeutralizeHostileActor right away, for an arrest that was cancelled rather than ending in prison (the prison's
+    own restore waits a day after the release): the hostile factions (with their ranks) and the aggression come back from
+    the "Jail" snapshot, which is then cleared. Guards react to them again, instead of ignoring an actor whose arrest
+    simply stopped. Returns how many factions were restored (0 when they were never hostile).
+/;
+int function RestoreNeutralizedHostility(Actor akActor) global
+    if (!akActor)
+        return 0
+    endif
+
+    Form[] savedFactions = RPB_StorageVars.GetFormsOnReference("Hostile Factions", akActor, "Jail")
+    if (!savedFactions || savedFactions.Length == 0)
+        return 0
+    endif
+
+    int[] savedRanks = RPB_StorageVars.GetIntsOnReference("Hostile Ranks", akActor, "Jail")
+    int restored = 0
+    int i = 0
+    while (i < savedFactions.Length)
+        Faction hostileFaction = savedFactions[i] as Faction
+        if (hostileFaction)
+            akActor.AddToFaction(hostileFaction)
+            ; SetFactionRank(faction, -1) removes the actor again (see Prison.__ProcessHostilityRestore)
+            if (savedRanks && i < savedRanks.Length && savedRanks[i] >= 0)
+                akActor.SetFactionRank(hostileFaction, savedRanks[i])
+            endif
+            restored += 1
+        endif
+        i += 1
+    endWhile
+    akActor.SetActorValue("Aggression", RPB_StorageVars.GetFloatOnReference("Original Aggression", akActor, "Jail"))
+
+    RPB_StorageVars.DeleteVariableOnReference("Hostile Factions", akActor, "Jail")
+    RPB_StorageVars.DeleteVariableOnReference("Hostile Ranks", akActor, "Jail")
+    RPB_StorageVars.DeleteVariableOnReference("Original Aggression", akActor, "Jail")
+    RPB_StorageVars.DeleteVariableOnReference("Hostility Checked At Arrest", akActor, "Jail")
+    Info("Hostility restored on " + akActor.GetDisplayName() + " " + akActor + " (arrest cancelled): " + restored + " factions")
+    return restored
 endFunction
 
 ;/
@@ -1574,6 +1665,15 @@ function ReleaseAI(bool condition = true) global
         Game.SetPlayerAIDriven(false)
         Game.EnablePlayerControls()
     endif
+endFunction
+
+; The player cuffed but not walked anywhere yet (a pending arrest, an escort waiting for a fight to end): not AI-driven,
+; camera and movement free (to take cover), but no fighting and no activating (doors, items). Clears a full RetainAI lock
+; first: DisablePlayerControls only ever disables.
+function HoldPlayerCuffed() global
+    Game.SetPlayerAIDriven(false)
+    Game.EnablePlayerControls()
+    Game.DisablePlayerControls(abMovement = false, abFighting = true, abCamSwitch = false, abLooking = false, abSneaking = false, abMenu = false, abActivate = true, abJournalTabs = false, aiDisablePOVType = 0)
 endFunction
 
 function SetGameStat(string asStatName, int aiValue) global
@@ -2736,6 +2836,15 @@ endFunction
 
 function SetConfrontationSceneForcedToFail(bool abForced) global
     RPB_StorageVars.SetInt("FORCE_CONFRONTATION_FAIL", abForced as int, "Profile")
+endFunction
+
+; Test-only: escort Scenes are never started (SceneManager.PlayQueued), to exercise the "escort never starts" fallback
+bool function IsEscortStartForcedToFail() global
+    return JDB.solveInt(".rpb_root.storage.Profile.FORCE_ESCORT_START_FAIL") != 0
+endFunction
+
+function SetEscortStartForcedToFail(bool abForced) global
+    RPB_StorageVars.SetInt("FORCE_ESCORT_START_FAIL", abForced as int, "Profile")
 endFunction
 
 ;/
@@ -4022,23 +4131,32 @@ Actor function GetNearbyGuardForFactionFromRef( \
     return none
 endFunction
 
+;/
+    The guard closest to @centerRef, within 8000 units: alive, enabled, not a child, not the player, not @exclude. This
+    used to take a random guard (Game.FindRandomActorFromRef) within @radius, doubling it up to 8000 - an F4 arrest got a
+    guard from across the area, and the leash then teleported the arrestee to him. The loaded, high-process actors are few,
+    and this is only called for an arrest's guard and by tests. @radius is kept for the callers; the nearest wins anyway.
+    A dead guard is still a guard: the F4 arrest once picked one that had just died, and the arrest "resumed" at once.
+/;
 Actor function GetNearestGuard(ObjectReference centerRef, float radius, ObjectReference exclude) global
-    int i = 30
+    Actor[] nearby = PO3_SKSEFunctions.GetActorsByProcessingLevel(0)
+    Actor nearest = none
+    float nearestDistance = 8000.0
 
-    while (i > 0)
-        Actor _actor = Game.FindRandomActorFromRef(centerRef, radius)
-        bool notPlayer = _actor.GetFormID() != 0x14
-        if (_actor && notPlayer && !_actor.IsChild() && _actor.IsGuard() && _actor != exclude)
-            return _actor
+    int i = 0
+    while (i < nearby.Length)
+        Actor candidate = nearby[i]
+        if (candidate && candidate != exclude && candidate.GetFormID() != 0x14 && candidate.IsGuard() && !candidate.IsDead() && !candidate.IsDisabled() && !candidate.IsChild())
+            float distance = candidate.GetDistance(centerRef)
+            if (distance < nearestDistance)
+                nearest = candidate
+                nearestDistance = distance
+            endif
         endif
-
-        if (radius < 8000)
-            radius *= 2
-        endif
-        i -= 1
+        i += 1
     endWhile
 
-    return none
+    return nearest
 endFunction
 
 bool function IsActorNearReference(Actor akActor, ObjectReference akReference, float radius = 80.0) global
