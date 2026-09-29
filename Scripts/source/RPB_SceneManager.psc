@@ -1973,6 +1973,8 @@ endEvent
 
 event OnSceneEnd(string name, Scene sender)
     string type = self.GetSceneType(name)
+    Actor lockAfterFinish = none ; the escort to jail's guard, locked once this Scene is fully over (see below)
+    self.__EndSceneBookkeeping(name) ; over before its events start the next one (see __EndSceneBookkeeping)
 
     if (type == CATEGORY_ARREST_START)
         Actor escort     = self.GetSceneNthReferenceOfType(name, "Escort") as Actor
@@ -1986,7 +1988,10 @@ event OnSceneEnd(string name, Scene sender)
         Actor escort     = self.GetSceneNthReferenceOfType(name, "Escort") as Actor
         Form[] arrestees = self.GetSceneReferencesOfType(name, "Escortee")
         
-        self.SetPackageLockOnActor(escort) ; When do we unset it? Is this Escort the one that takes to cell? Or should we unbind it in some other way? OnUpdate?
+        ; The package lock (unset at the escort to the cell's end) goes on after __FinishScene below, not here: bound here,
+        ; the guard was forced into it while still in this Scene's Escort alias mid-end, and in two reproductions he turned
+        ; uncallable within that same second (every call on him then waits forever)
+        lockAfterFinish = escort
         EventManager.SendPrisonSceneBulkEvent(name, EVENT_ESCORT_END, arrestees, escort)
 
     elseif (type == CATEGORY_ESCORT_TO_CELL)
@@ -2065,7 +2070,13 @@ event OnSceneEnd(string name, Scene sender)
     Debug("SceneManager::OnSceneEnd", "Ended Scene: " + name)
 
     ; self.UnbindAliases(name) ; (Need to fix this, since they get unbound after they should, for now, uncommented) ERROR: EventManager::SendPrisonSceneBulkEvent() -> No prisoners provided for bulk scene event!
-    self.__FinishScene(name)
+    self.__PlayNextIfIdle()
+
+    if (lockAfterFinish)
+        RPB_Utility.GuardMark(lockAfterFinish, "binding the package lock (escort to jail over)")
+        self.SetPackageLockOnActor(lockAfterFinish)
+        RPB_Utility.GuardMark(lockAfterFinish, "package lock bound")
+    endif
 endEvent
 
 ;/
@@ -2076,11 +2087,32 @@ endEvent
     after the next Scene had started, wiping what it had just been given.
 /;
 function __FinishScene(string asScene)
+    self.__EndSceneBookkeeping(asScene)
+    self.__PlayNextIfIdle()
+endFunction
+
+;/
+    A Scene is over: marked so before its end events run (OnSceneEnd), so what those events start is the current Scene.
+    They used to run first: the escort to jail's end started the strip and queued the escort to the cell, then the end's
+    own bookkeeping cleared the flag and popped the escort to the cell on top of the strip (the guard in two Scenes, the
+    escort stalling at the cell door). The engine usually refused that second Start() while the strip had the guard; with
+    the game paused at that moment both took hold. The flag only clears for this Scene (or none): another Scene started
+    meanwhile stays playing.
+/;
+function __EndSceneBookkeeping(string asScene)
     self.ResetSceneOverride()
     __lastEndedScene = asScene
-    __isScenePlaying = false
+    if (currentScene == asScene || currentScene == "")
+        __isScenePlaying = false
+    endif
     self.ResetGlobals()
-    self.PlayQueued()
+endFunction
+
+; The next queued Scene, unless the ending Scene's own events already started one
+function __PlayNextIfIdle()
+    if (!__isScenePlaying)
+        self.PlayQueued()
+    endif
     self.OnResumeSceneBlocked()
 endFunction
 
@@ -2369,22 +2401,18 @@ string function GetSceneParametersDebugInfo(Scene sender, string sceneName)
     string debugInfo = ""
     bool emptyParams = true
 
+    ; The refs only, no calls on them (form IDs, base, names used to be read here): a Scene actor gone uncallable made this
+    ; debug line wait forever, in OnSceneEnd before __FinishScene, and the next Scene never started. The ref's own text
+    ; already carries its form ID.
     int i = 0
     while (i < params.Length)
         ObjectReference param = params[i] as ObjectReference
         if (param != none)
             ReferenceAlias paramBinder = aliases[i] as ReferenceAlias
             string paramBinderSignature = "["+ paramBinder.GetName() +" < ("+ paramBinder.GetID() +")>]"
-            string baseId     = "[BaseID: " + param.GetBaseObject().GetFormID() + "] "
-            string formId     = "[FormID: " + param.GetFormID() + "] "
-            
-            string objectBaseName   = param.GetBaseObject().GetName()
-            string objectClassName  = param.GetName()
-            string whichNameProperty = string_if (objectClassName != "", objectClassName, objectBaseName)
-            string objectName = "[Name: " + whichNameProperty + "] "
             emptyParams = false
 
-            debugInfo += "\t["+i+"]: " + paramBinderSignature + " " + param + " " + formId + baseId + string_if (objectName != "[Name: ] ", objectName) + "\n"
+            debugInfo += "\t["+i+"]: " + paramBinderSignature + " " + param + "\n"
         endif
         i += 1
     endWhile

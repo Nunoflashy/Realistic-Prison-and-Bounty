@@ -18,6 +18,7 @@ scriptname RPB_Utility hidden
     Armor function RPB_PrisonerHandCuffs() global
     Outfit function RPB_GetOutfit(string asOutfit) global
     bool function HealNakedBaseOutfit(Actor akActor) global
+    function GuardMark(Actor akGuard, string asStep) global
     Actor function GetOtherHostileTarget(Actor akActor, Actor akExcept, Actor akCaptor) global
     Actor function GetOtherCombatTarget(Actor akActor, Actor akExcept) global
     int function RemoveCuffs(Actor akActor) global
@@ -424,6 +425,14 @@ bool function HealNakedBaseOutfit(Actor akActor) global
     akActor.SetOutfit(remembered)
     Debug("Utility::HealNakedBaseOutfit", "The base of " + akActor + " was left Naked, restored " + remembered)
     return true
+endFunction
+
+; A mark on an escorting guard's timeline (DEBUG only). A guard can turn uncallable (every call on him waits forever), and
+; the last mark before the silence names the moment. Nothing is called on him here: a ref's text is safe on a broken one.
+function GuardMark(Actor akGuard, string asStep) global
+    if (IsDebuggingEnabled())
+        Debug("Guard", akGuard + ": " + asStep)
+    endif
 endFunction
 
 ; GetOtherCombatTarget without @akCaptor's fellow guards (guards of his crime faction): a guard still attacking the arrestee

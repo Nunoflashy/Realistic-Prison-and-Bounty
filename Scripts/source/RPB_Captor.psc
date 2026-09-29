@@ -29,6 +29,10 @@ Scriptname RPB_Captor extends RPB_ActorBase
     event OnUpdate()
     event OnCombatStateChanged(Actor akTarget, int aeCombatState)
     event OnBeginState()
+    event OnCellDetach()
+    event OnCellAttach()
+    event OnUnload()
+    event OnLoad()
     event OnInitialize()
     event OnDeath(Actor akKiller)
     event OnDestroy()
@@ -249,6 +253,24 @@ endState
 ; ==========================================================
 ;                           Events
 ; ==========================================================
+
+; My guard's cell and 3D changes, as marks (DEBUG): a guard has turned uncallable during escorts (every call on him waits
+; forever), and these give the moments around it. Nothing is called on him here.
+event OnCellDetach()
+    GuardMark(this, "left a cell (cell detach)")
+endEvent
+
+event OnCellAttach()
+    GuardMark(this, "entered a cell (cell attach)")
+endEvent
+
+event OnUnload()
+    GuardMark(this, "3D unloaded")
+endEvent
+
+event OnLoad()
+    GuardMark(this, "3D loaded")
+endEvent
 
 event OnInitialize()
     API.Arrest.RegisterCaptor(self)

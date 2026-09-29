@@ -3609,6 +3609,7 @@ event OnEscortPrisonerToJailEnd(RPB_ActorBase apActor, Actor akEscort)
     ; equipped (a weapon, say) in that case. Since Frisking has no real effect (ShouldFrisk() is hardcoded true and
     ; the Frisking Scene has no code hookup to actually remove anything), a prisoner who fell through both of the
     ; first two checks was silently keeping whatever she still had equipped.
+    GuardMark(akEscort, "escort to jail ended, the prison flow starts with him")
     if (prisonerRef.ShouldBeStripped)
         self.StartStrippingPrisoner(prisonerRef, akEscort)
 
@@ -3628,6 +3629,7 @@ event OnEscortPrisonerToJailEnd(RPB_ActorBase apActor, Actor akEscort)
         ; Need to check if the prisoner is not in the cell later, IsInCell doesn't work as it should
         self.EscortPrisonerToCell(prisonerRef, akEscort)
     endif
+    GuardMark(akEscort, "prison flow queued (strip, clothing, escort to the cell)")
 
     prisonerRef.OnEscortedToPrison(akEscort)
 endEvent

@@ -1427,6 +1427,7 @@ endFunction
     and (DEBUG) lists who stands near the guard, in case someone blocks the doorway.
 /;
 function __NudgeStalledEscort(Actor akGuard, string asScene)
+    GuardMark(akGuard, "stalled escort: reading his package")
     Info("Escort of " + Name + " " + this + " still for ~10s (" + string_if(asScene == "", "no Scene playing", asScene) + "), nudging it: guard " + akGuard + " on package " + akGuard.GetCurrentPackage() + ", " + Name + " on " + this.GetCurrentPackage() + ", " + (this.GetDistance(akGuard) as int) + " units apart, guard in " + akGuard.GetParentCell())
 
     if (IsDebuggingEnabled())

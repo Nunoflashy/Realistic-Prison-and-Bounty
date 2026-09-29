@@ -928,6 +928,22 @@ state Escorting
             return
         endif
 
+        ; The starting positions, on this update stack instead of the Scene's (StartEscortAssist)
+        if (__assistNeedsFirstRead)
+            __assistNeedsFirstRead = false
+            Actor escort = __assistEscort
+            GuardMark(escort, "escort assist: first read")
+            __assistLastDistance = this.GetDistance(escort)
+            __assistGuardLastX = escort.GetPositionX()
+            __assistGuardLastY = escort.GetPositionY()
+            __assistLastX = this.GetPositionX()
+            __assistLastY = this.GetPositionY()
+            __assistLastZ = this.GetPositionZ()
+            GuardMark(escort, "escort assist: guard readable")
+            RegisterForSingleUpdate(1.0)
+            return
+        endif
+
         float elapsed = __assistTick
         float x = this.GetPositionX()
         float y = this.GetPositionY()
@@ -2327,6 +2343,7 @@ int __assistTeleports
 float __assistAwayTime
 int __assistFlatTicks
 float __assistLastDistance
+bool __assistNeedsFirstRead ; the starting positions are read on the first tick (see StartEscortAssist)
 
 bool property EscortAssistActive
     bool function get()
@@ -2366,15 +2383,13 @@ function StartEscortAssist(Actor akEscort, bool abToCell)
     __assistTeleports = 0
     __assistAwayTime = 0.0
     __assistFlatTicks = 0
-    __assistLastDistance = this.GetDistance(akEscort)
-    __assistLastX = this.GetPositionX()
-    __assistLastY = this.GetPositionY()
-    __assistLastZ = this.GetPositionZ()
-    __assistGuardLastX = akEscort.GetPositionX()
-    __assistGuardLastY = akEscort.GetPositionY()
+    ; Nothing is read from the guard here: this runs on the Scene's start event, and a guard gone uncallable (every call on
+    ; him waits forever) froze that event and the whole prison flow with it. The first tick reads him, on my own update
+    ; stack: if he's broken, only the assist waits.
+    __assistNeedsFirstRead = true
     __assistTick = 1.0
     GotoState("Escorting")
-    RegisterForSingleUpdate(1.0)
+    RegisterForSingleUpdate(0.1)
     Debug("["+ Name +"] Prisoner::EscortAssist", "assist started: escort by " + akEscort + ", to cell " + abToCell + ", previous state '" + __assistPreviousState + "'")
 endFunction
 
