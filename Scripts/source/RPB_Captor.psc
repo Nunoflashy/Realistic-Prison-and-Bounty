@@ -325,8 +325,10 @@ function Destroy()
     ; need to happen before the registry is cleared, so there's no reason to make a new arrest's registration race the
     ; tail end of this cleanup instead of something that already finished.
     API.Arrest.UnregisterCaptor(self, abRemoveFromList = true)
+    RPB_Recovery.__Step(self.GetActor(), "Captor.Destroy: unregistered")
 
     self.RemoveAll()
+    RPB_Recovery.__Step(self.GetActor(), "Captor.Destroy: variables removed")
     parent.Destroy() ; clears the base "Actor"/"Temporary" categories too - RPB_Prisoner.Destroy() does the same, this never did
     ; A trailing Utility.Wait(0.5) used to sit here, unexplained since a July 2024 refactor - nothing below it ever
     ; existed to protect, and nothing above it needs it either (the registry cleanup above already runs to completion

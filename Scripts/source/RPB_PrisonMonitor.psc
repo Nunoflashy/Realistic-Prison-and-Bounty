@@ -754,8 +754,16 @@ event OnUpdateGameTime()
     Prison.__ProcessHostilityRestore() ; only acts on restores that are due (this wake may be for a release)
     __isMonitoring = false
     __nextWakeAt = -1.0
+    int restoresBefore = Prison.PendingHostilityRestoreCount()
     self.AwaitPrisoners()
     self.Reschedule()
+    ; Why I woke and what's left, so a lone wake explains itself (a leftover one in a save once looked like every prison
+    ; polling)
+    string nextWake = "nothing left to wake for"
+    if (__armedWakeAt >= 0.0)
+        nextWake = "next wake in " + (((__armedWakeAt - Utility.GetCurrentGameTime()) * 24.0) as int) + " game hours"
+    endif
+    Info("["+ Prison.Name +"] Prison monitor woke: " + Prisoners.Count + " prisoners, hostility restores pending " + restoresBefore + " -> " + Prison.PendingHostilityRestoreCount() + ", " + nextWake)
 endEvent
 
 event OnCellAttach()

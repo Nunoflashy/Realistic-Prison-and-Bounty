@@ -18,6 +18,7 @@ scriptname RPB_Utility hidden
     Armor function RPB_PrisonerHandCuffs() global
     Outfit function RPB_GetOutfit(string asOutfit) global
     bool function HealNakedBaseOutfit(Actor akActor) global
+    Actor function GetOtherHostileTarget(Actor akActor, Actor akExcept, Actor akCaptor) global
     Actor function GetOtherCombatTarget(Actor akActor, Actor akExcept) global
     int function RemoveCuffs(Actor akActor) global
     bool function IsCuffed(Actor akActor) global
@@ -165,6 +166,8 @@ scriptname RPB_Utility hidden
     function SetConfrontationSceneForcedToFail(bool abForced) global
     bool function IsEscortStartForcedToFail() global
     function SetEscortStartForcedToFail(bool abForced) global
+    bool function IsPendingHoldPackageDisabled() global
+    function SetPendingHoldPackageDisabled(bool abDisabled) global
     float function GetMonitorOverrideHours() global
     function SetMonitorOverrideHours(float afHours) global
     float function GetHostilityRestoreOverrideHours() global
@@ -421,6 +424,32 @@ bool function HealNakedBaseOutfit(Actor akActor) global
     akActor.SetOutfit(remembered)
     Debug("Utility::HealNakedBaseOutfit", "The base of " + akActor + " was left Naked, restored " + remembered)
     return true
+endFunction
+
+; GetOtherCombatTarget without @akCaptor's fellow guards (guards of his crime faction): a guard still attacking the arrestee
+; is part of the arrest, not another fight. After a fight with the guards, the player's other combat targets were the other
+; guards, so a yield went pending (cuffed at once, no confrontation) and resumed straight to the escort.
+Actor function GetOtherHostileTarget(Actor akActor, Actor akExcept, Actor akCaptor) global
+    if (!akActor)
+        return none
+    endif
+
+    Faction captorFaction = none
+    if (akCaptor)
+        captorFaction = akCaptor.GetCrimeFaction()
+    endif
+    Actor[] targets = PO3_SKSEFunctions.GetCombatTargets(akActor)
+    int i = 0
+    while (i < targets.Length)
+        Actor target = targets[i]
+        if (target && target != akExcept && !target.IsDead() && !target.IsDisabled())
+            if (!(target.IsGuard() && (!captorFaction || target.GetCrimeFaction() == captorFaction)))
+                return target
+            endif
+        endif
+        i += 1
+    endWhile
+    return none
 endFunction
 
 ; Someone @akActor is fighting other than @akExcept (alive, enabled), or none. A guard arresting one bandit while another
@@ -1678,6 +1707,7 @@ function RetainAI(bool condition = true) global
             abJournalTabs = false, \
             aiDisablePOVType = 0 \
         )
+        Debug("Utility::RetainAI", "player AI-driven, movement/fighting/sneaking/menu/activate disabled")
     endif
 endFunction
 
@@ -1685,6 +1715,7 @@ function ReleaseAI(bool condition = true) global
     if (condition)
         Game.SetPlayerAIDriven(false)
         Game.EnablePlayerControls()
+        Debug("Utility::ReleaseAI", "player AI released, controls enabled")
     endif
 endFunction
 
@@ -1695,6 +1726,7 @@ function HoldPlayerCuffed() global
     Game.SetPlayerAIDriven(false)
     Game.EnablePlayerControls()
     Game.DisablePlayerControls(abMovement = false, abFighting = true, abCamSwitch = false, abLooking = false, abSneaking = false, abMenu = false, abActivate = true, abJournalTabs = false, aiDisablePOVType = 0)
+    Debug("Utility::HoldPlayerCuffed", "player held cuffed: not AI-driven, fighting/activate disabled")
 endFunction
 
 function SetGameStat(string asStatName, int aiValue) global
@@ -2866,6 +2898,16 @@ endFunction
 
 function SetEscortStartForcedToFail(bool abForced) global
     RPB_StorageVars.SetInt("FORCE_ESCORT_START_FAIL", abForced as int, "Profile")
+endFunction
+
+; Test-only: pending holds without the hold package (SceneManager's PendingHold aliases), only the script-side hold, to
+; find out whether the package does anything the script calls don't
+bool function IsPendingHoldPackageDisabled() global
+    return JDB.solveInt(".rpb_root.storage.Profile.DISABLE_PENDING_HOLD_PACKAGE") != 0
+endFunction
+
+function SetPendingHoldPackageDisabled(bool abDisabled) global
+    RPB_StorageVars.SetInt("DISABLE_PENDING_HOLD_PACKAGE", abDisabled as int, "Profile")
 endFunction
 
 ;/

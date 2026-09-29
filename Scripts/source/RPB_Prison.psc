@@ -208,6 +208,7 @@ scriptname RPB_Prison extends RPB_Entity
     function CancelImprisonment(RPB_Prisoner apPrisoner, string asReason)
     int function PendingDressCount()
     function QueueEscortToCellStallCheck(Actor akPrisoner, float afTimeoutSeconds = 8.0)
+    function CancelEscortToCellStallCheck(Actor akPrisoner)
     function ResetDressCost()
     string function DressCostSummary()
     int function PendingHostilityRestoreCount()
@@ -2286,6 +2287,7 @@ endFunction
     state), without the move to the release location. For RPB_Recovery.ResetActor.
 /;function ReleaseInPlace(RPB_Prisoner apPrisoner)
     apPrisoner.StopEscortAssist() ; a raised walking speed must not outlive the escort
+    self.CancelEscortToCellStallCheck(apPrisoner.GetActor())
     self.TeleportPrisonerToRelease(apPrisoner, abMoveToReleaseLocation = false)
 endFunction
 
@@ -2303,12 +2305,16 @@ function CancelImprisonment(RPB_Prisoner apPrisoner, string asReason)
 
     Actor prisonerActor = apPrisoner.GetActor()
     apPrisoner.StopEscortAssist() ; a raised walking speed must not outlive the escort
+    ; Left queued, it fired long after (126's teardown, then an hour waited) on someone no longer a prisoner
+    self.CancelEscortToCellStallCheck(prisonerActor)
     Info("["+ Name +"] Imprisonment of " + apPrisoner.Name + " " + prisonerActor + " cancelled (" + asReason + "), not released: no time jailed, no infamy")
 
     if (apPrisoner.IsStripped)
         apPrisoner.ReturnBelongings()
         if (apPrisoner.IsNPC())
             apPrisoner.NPC_RestoreOriginalOutfit()
+        else
+            apPrisoner.Player_ReequipAfterRelease() ; as if it never happened: dressed again, not just given their things back
         endif
     endif
     if (apPrisoner.HasCellPackage)
@@ -2365,6 +2371,7 @@ function TeleportPrisonerToRelease(RPB_Prisoner apPrisoner, bool abMoveToRelease
     RPB_Utility.Crumb(releasedActor, "Release: belongings returned, " + self.__PartsTrace(releasedActor, dressOutfit))
     RPB_Utility.FlowMark("Release: belongings returned")
     apPrisoner.NPC_ReequipAfterRelease()
+    apPrisoner.Player_ReequipAfterRelease() ; the player too, on a teleport release (an escort release is meant to get a clothing Scene)
     RPB_Utility.Crumb(releasedActor, "Release: outfit re-equipped, " + self.__PartsTrace(releasedActor, dressOutfit))
     RPB_Utility.FlowMark("Release: outfit re-equipped")
     apPrisoner.RemoveFromCell()
@@ -2655,6 +2662,17 @@ function QueueEscortToCellStallCheck(Actor akPrisoner, float afTimeoutSeconds = 
     Monitor.RequestRealTimeWake("EscortStall", 3.0)
 endFunction
 
+; The escort to the cell is over some other way (cancelled, released): nothing left to watch
+function CancelEscortToCellStallCheck(Actor akPrisoner)
+    if (!akPrisoner || !__pendingEscortStallChecks || !JValue.isExists(__pendingEscortStallChecks))
+        return
+    endif
+    if (JFormMap.hasKey(__pendingEscortStallChecks, akPrisoner))
+        JFormMap.removeKey(__pendingEscortStallChecks, akPrisoner)
+        RPB_Utility.Crumb(akPrisoner, "Escort-to-Cell stall check cancelled")
+    endif
+endFunction
+
 ; Recovers every entry whose due time has passed and is still not Imprisoned, then re-arms if anything's left pending.
 function __ProcessEscortStallChecks()
     if (!__pendingEscortStallChecks || !JValue.isExists(__pendingEscortStallChecks))
@@ -2713,7 +2731,13 @@ function __ProcessEscortStallChecks()
             ; the equivalent risk for its own event.
             JFormMap.removeKey(__pendingEscortStallChecks, checkActor)
 
-            RPB_Prisoner prisoner = self.AwaitPrisonerReference(checkActor)
+            ; Only a prisoner still registered here, with a cell: awaiting one that's gone (a cancelled imprisonment) found a
+            ; blank Prisoner with no cell and "recovered" it
+            RPB_Prisoner prisoner = Prisoners.AtKey(checkActor)
+            if (prisoner && !prisoner.JailCell)
+                Warn("["+ Name +"] Prison::__ProcessEscortStallChecks: dropped the stall check of " + checkActor + ": no cell assigned (the imprisonment is gone)")
+                prisoner = none
+            endif
             if (prisoner && !prisoner.IsImprisoned)
                 ; The Scene's own End never confirmed within the timeout - a Package-driven phase (the guard's approach,
                 ; or its final phase after locking the door) can silently never resolve. Run the exact same completion
@@ -3559,8 +3583,13 @@ endEvent
 ; TODO: Possibly rename this to OnEscortedPrisonerToPrison
 event OnEscortPrisonerToJailEnd(RPB_ActorBase apActor, Actor akEscort)
     ; Retrieve or make the Actor a Prisoner
-    RPB_Prisoner prisonerRef = RPB_Utility.ame_if (apActor as RPB_Prisoner, apActor, (apActor as RPB_Arrestee).MakePrisoner()) as RPB_Prisoner
+    ; An if, not ame_if: its arguments are all evaluated, so MakePrisoner() ran on a None Arrestee for a prisoner already
+    RPB_Prisoner prisonerRef = apActor as RPB_Prisoner
+    if (!prisonerRef)
+        prisonerRef = (apActor as RPB_Arrestee).MakePrisoner()
+    endif
     prisonerRef.StopEscortAssist()
+    prisonerRef.EndArrestEscortWatch() ; the arrest's own escort watch sent me back here mid escort to the cell
 
     self.AssignReleaseLocation(prisonerRef)    ; Set the teleport release location for this prisoner
 

@@ -1495,20 +1495,32 @@ bool function SetPendingHoldOnActor(Actor akActor)
         return false
     endif
 
+    ; The package is needed: without it the held NPC drew her weapon in 4 of 5 runs (test 130). One actor per alias
+    ; (Skyrim has no collection aliases), so every PendingHold_NN the plugin has is used: PendingHold_01, _02 and so on,
+    ; up to the first number missing. More holds at once = more aliases in the CK, no script change.
     int i = 1
-    while (i <= 3)
-        ReferenceAlias hold = self.GetRefAlias("PendingHold_0", i)
-        if (hold && !hold.GetReference())
+    ReferenceAlias hold = self.__PendingHoldAlias(i)
+    while (hold)
+        if (!hold.GetReference())
             BindAliasTo(hold, akActor)
             RPB_StorageVars.SetIntOnReference("Pending Hold Alias", akActor, hold.GetID())
             akActor.EvaluatePackage()
             return true
         endif
         i += 1
+        hold = self.__PendingHoldAlias(i)
     endWhile
 
-    EventManager.SendWarning("No free PendingHold alias for " + akActor + " (all in use, or not in the plugin), holding it by script only", "SceneManager::SetPendingHoldOnActor")
+    EventManager.SendWarning("No free PendingHold alias for " + akActor + " (all " + (i - 1) + " in use), holding it by script only", "SceneManager::SetPendingHoldOnActor")
     return false
+endFunction
+
+; PendingHold_01 .. PendingHold_09, PendingHold_10 ..
+ReferenceAlias function __PendingHoldAlias(int aiNumber)
+    if (aiNumber < 10)
+        return self.GetAliasByName("PendingHold_0" + aiNumber) as ReferenceAlias
+    endif
+    return self.GetAliasByName("PendingHold_" + aiNumber) as ReferenceAlias
 endFunction
 
 ; Unbinds @akActor's PendingHold alias. Only when one is recorded: an unrecorded id reads 0, a Scene alias.
@@ -1776,7 +1788,11 @@ event OnSceneStart(string name, Scene sender)
         EventManager.SendArrestSceneEvent(name, EVENT_ELUDE_BEGIN, eluder, guard, "Dialogue")
     endif
 
-    Debug("SceneManager::OnSceneStart", self.GetSceneParametersDebugInfo(sender, name))
+    ; Only with DEBUG on: the text is built before Debug() checks, with native calls on every Scene actor (a broken one
+    ; blocked the Scene flow right here)
+    if (IsDebuggingEnabled())
+        Debug("SceneManager::OnSceneStart", self.GetSceneParametersDebugInfo(sender, name))
+    endif
 endEvent
 
 event OnScenePlaying(string name, int phaseEvent, int phase, Scene sender)

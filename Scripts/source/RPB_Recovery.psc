@@ -37,11 +37,13 @@ string function ResetActor(Actor akActor) global
         endif
     endif
 
+    RPB_Recovery.__Step(akActor, "ResetActor: pending arrest cancel done")
     ; A Scene still playing with them in it would keep driving them (and its guard) after everything below
     if (sceneManager.EndSceneWithActor(akActor, "the actor is being reset"))
         done += "Scene ended; "
     endif
 
+    RPB_Recovery.__Step(akActor, "ResetActor: Scenes done")
     ; Prisoner: released in place, the same release as the prison's own minus the move (this also clears a leftover arrest)
     RPB_Prison prison = prisonManager.FindPrisonByPrisoner(akActor)
     RPB_Prisoner prisonerRef = none
@@ -57,6 +59,7 @@ if (prisonerRef)
         done += "stray Prisoner effect removed; "
     endif
 
+    RPB_Recovery.__Step(akActor, "ResetActor: prisoner done")
     ; Arrestee: whatever the release didn't already clear. Its Captor goes first, if it's still escorting them.
     RPB_Arrestee arresteeRef = arrest.Arrestees.AtKey(akActor)
     if (arresteeRef)
@@ -75,6 +78,7 @@ if (prisonerRef)
         done += "stray Arrestee effect removed; "
     endif
 
+    RPB_Recovery.__Step(akActor, "ResetActor: arrestee done")
     ; A guard: its own Captor and a package lock left on it
     RPB_Captor ownCaptor = arrest.GetCaptor(akActor)
     if (ownCaptor)
@@ -88,20 +92,27 @@ if (prisonerRef)
         done += "package lock removed; "
     endif
 
+    RPB_Recovery.__Step(akActor, "ResetActor: captor done")
     ; A pending arrest holds its arrestee with SetRestrained and SetDontMove (the revert above lifts them, this covers an
     ; arrest state that was already gone)
     akActor.SetRestrained(false)
     akActor.SetDontMove(false)
     sceneManager.UnsetPendingHoldOnActor(akActor) ; the pending hold's package alias, if one is recorded
+    RPB_Recovery.__Step(akActor, "ResetActor: holds done")
     if (akActor == Game.GetPlayer())
         int calmed = RPB_Utility.CalmGuardsAgainstPlayer()
         if (calmed > 0)
             done += calmed + " guard(s) calmed; "
         endif
+        ; A Reset always hands control back: a player left locked by an arrest (AI-driven, movement and menus off)
+        ; with no arrest state left got "nothing to reset" and stayed stuck
+        RPB_Utility.ReleaseAI(true)
     endif
     if (RPB_Utility.RemoveCuffs(akActor) > 0)
         done += "cuffs removed; "
     endif
+    ; A pose left over from an arrest Scene (a looping idle), even when there was no arrest state left to reset
+    Debug.SendAnimationEvent(akActor, "IdleForceDefaultState")
     akActor.EnableAI(true)
     akActor.EvaluatePackage()
 
@@ -147,27 +158,42 @@ string function CancelArrest(Actor akActor, string asReason) global
     if (sceneManager.EndSceneWithActor(akActor, asReason))
         done += "Scene ended; "
     endif
+    RPB_Recovery.__Step(akActor, "CancelArrest: hostility and Scenes done")
 
     RPB_Arrestee arresteeRef = arrest.Arrestees.AtKey(akActor)
+    RPB_Recovery.__Step(akActor, "CancelArrest: arrestee looked up (" + arresteeRef + ")")
     if (arresteeRef)
         RPB_Captor captorRef = arresteeRef.Captor
-        if (captorRef && captorRef.Arrestee == akActor)
+        RPB_Recovery.__Step(akActor, "CancelArrest: read the arrestee's Captor (" + captorRef + ")")
+        Actor captorArrestee = none
+        if (captorRef)
+            captorArrestee = captorRef.Arrestee
+            RPB_Recovery.__Step(akActor, "CancelArrest: read the Captor's Arrestee (" + captorArrestee + ")")
+        endif
+        if (captorRef && captorArrestee == akActor)
             Actor guard = captorRef.GetActor()
+            RPB_Recovery.__Step(akActor, "CancelArrest: read the Captor's guard (" + guard + ")")
             ; A dead guard's Captor ends with its effect (its OnDeath is what called me)
             if (guard && !guard.IsDead())
+                RPB_Recovery.__Step(akActor, "CancelArrest: destroying the captor of " + guard)
                 captorRef.Destroy()
+                RPB_Recovery.__Step(akActor, "CancelArrest: captor destroyed, freeing the guard")
                 RPB_Recovery.__FreeGuard(guard, sceneManager)
                 done += "guard freed; "
             endif
         endif
+        RPB_Recovery.__Step(akActor, "CancelArrest: reverting the arrest")
         arresteeRef.RevertArrest()
         done += "arrest reverted; "
     endif
+
+    RPB_Recovery.__Step(akActor, "CancelArrest: captor and arrest done")
 
     if (prisonerRef)
         prison.CancelImprisonment(prisonerRef, asReason)
         done += "imprisonment cancelled; "
     endif
+    RPB_Recovery.__Step(akActor, "CancelArrest: imprisonment done")
 
     akActor.SetRestrained(false)
     akActor.SetDontMove(false)
@@ -175,15 +201,27 @@ string function CancelArrest(Actor akActor, string asReason) global
     if (RPB_Utility.RemoveCuffs(akActor) > 0)
         done += "cuffs removed; "
     endif
+    ; The confrontation's pose ("Hands Behind Back" is a looping idle) outlives the Scene ended above: a fight before the
+    ; cuffs left the player holding it, free to go but stuck in the pose
+    Debug.SendAnimationEvent(akActor, "IdleForceDefaultState")
+    RPB_Recovery.__Step(akActor, "CancelArrest: holds and cuffs done")
     if (akActor == Game.GetPlayer())
         RPB_Utility.ReleaseAI(true)
     else
         akActor.EnableAI(true)
     endif
     akActor.EvaluatePackage()
+    RPB_Recovery.__Step(akActor, "CancelArrest: AI and controls released")
 
     RPB_Utility.Info("Arrest of " + akActor.GetDisplayName() + " " + akActor + " cancelled (" + asReason + "): " + RPB_Utility.string_if(done == "", "nothing left to undo", done))
     return done
+endFunction
+
+; A step mark (DEBUG only, built only then): a reset that never finished (126's teardown) left no trace of where it stopped
+function __Step(Actor akActor, string asStep) global
+    if (RPB_Utility.IsDebuggingEnabled())
+        RPB_Utility.Debug("Recovery", akActor + ": " + asStep)
+    endif
 endFunction
 
 ; Removes a package lock left on @akGuard. Only when one is recorded: UnsetPackageLockOnActor() on an actor without one

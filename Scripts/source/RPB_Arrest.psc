@@ -423,10 +423,12 @@ function UnregisterCaptor(RPB_Captor apCaptor, bool abRemoveFromList = false)
     if (apCaptor.HasSpell(captorSpell))
         apCaptor.RemoveSpell(captorSpell)
     endif
+    RPB_Recovery.__Step(apCaptor.GetActor(), "UnregisterCaptor: spell removed")
 
     if (abRemoveFromList && Captors.Exists(apCaptor))
         Captors.Remove(apCaptor)
     endif
+    RPB_Recovery.__Step(apCaptor.GetActor(), "UnregisterCaptor: list done")
 endFunction
 
 ; ==========================================================
@@ -1162,12 +1164,13 @@ function BeginArrest(RPB_Arrestee apArresteeRef)
     ; Who the guard is actually fighting, read before anything is stopped: another hostile keeping him busy means the
     ; confrontation Scene can't play, so the arrest waits (Arrestee.__BeginPendingArrest). A timed IsInCombat check after
     ; the StopCombat below fell in the gap before that hostile pulled him back in.
-    Actor captorBusyWith = RPB_Utility.GetOtherCombatTarget(captor, arrestee)
+    Actor captorBusyWith = RPB_Utility.GetOtherHostileTarget(captor, arrestee, captor)
     Actor otherHostile = captorBusyWith
     if (!otherHostile)
         ; The arrestee fought by someone else while the guard is free: the player attacked by bandits when a second guard
         ; came to arrest them (the first one died). The confrontation can't play in that fight either.
-        otherHostile = RPB_Utility.GetOtherCombatTarget(arrestee, captor)
+        ; Not the other guards still attacking them after a fight with the guards: that's this arrest (GetOtherHostileTarget)
+        otherHostile = RPB_Utility.GetOtherHostileTarget(arrestee, captor, captor)
     endif
     apArresteeRef.StopCombat()
     RPB_Utility.FlowMark("BeginArrest: arrestee StopCombat")

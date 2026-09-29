@@ -27,6 +27,8 @@ scriptname RPB_Tests extends ObjectReference hidden
     string function GetTest(string asTestName)
     string function GetCurrentTest()
     function ExecuteTest(string asTestKeyName)
+    function ExecuteTestRepeated(string asTestKeyName, int aiTimes)
+    function RequestRepeatStop()
     function RunAllTests()
     function start_test(string testName = "")
     function begin_step(string stepName, string msg = "")
@@ -213,6 +215,12 @@ function SetTests()
     self.AddTest("127 - Resist: Leaving the Arrest Dialogue of a Guard Who Is Fighting Is Not Resisting (PLAYER)", "Test_NoResistWhileGuardFights", abChainable = false)
     self.AddTest("128 - Resist: Another Guard's Resist Line While One Handles the Arrest Dialogue Is Not Resisting (PLAYER)", "Test_NoResistFromSecondGuard", abChainable = false)
     self.AddTest("129 - Fallback: The Confrontation Never Confirms, TeleportToCell (PLAYER - arrests you, you're brought back)", "Test_FallbackConfrontationNeverConfirms_Player", abChainable = false)
+    self.AddTest("130 - Hostile Group Without the Hold Package: 108 With Only the Script-Side Hold (Compare With 108)", "Test_ArrestWaitsWhileGuardFights_NoPackage", abChainable = false)
+    self.AddTest("131 - Diagnostic: Castle Dour's Cell Doors While Unloaded / Loaded (Logs Only; Run Away From and After Visiting)", "Test_CellDoorsDiagnostic", abChainable = false)
+    self.AddTest("132 - Long Absence 1/3: Imprison a Bandit in Castle Dour for 120 Days, Snapshot (Run in Solitude)", "Test_LongAbsenceSetup", abChainable = false)
+    self.AddTest("133 - Long Absence 2/3: 40 Days Pass (Run Away From Castle Dour)", "Test_LongAbsenceAdvance", abChainable = false)
+    self.AddTest("134 - Long Absence 3/3: Verify Against the Snapshot (Run Inside Castle Dour, After Travelling There)", "Test_LongAbsenceVerify", abChainable = false)
+    self.AddTest("135 - Fallback: The Prisoner Stops in the Escort to the Cell, Moved Into the Cell and Locked In (PLAYER - arrests you, you're brought back)", "Test_FallbackEscortToCellStopped_Player", abChainable = false)
     self.AddTest("041 - ActiveMagicEffectContainer: Stuck Lock Self-Heals", "Test_ActiveMagicEffectContainer_StuckLockSelfHeals")
     self.AddTest("042 - ThreadLock: JAtomic Primitive Semantics and Registry", "Test_ThreadLock_PrimitiveSemantics")
     ; Not chainable: fires concurrent worker threads
@@ -7126,7 +7134,7 @@ endState
 ;/
     Guards wear their gear through templates: their base Outfit is none, so restoring the Outfit gives them nothing back.
     The armor an NPC wears is snapshotted before the strip and equipped again after the release. The test dresses the dummy,
-    takes the snapshot, undresses it, and checks NPC_ReequipSavedWornArmor() puts the armor on again.
+    takes the snapshot, undresses it, and checks Release_ReequipWornGear() puts the armor on again.
 /;
 state Test_Prisoner_WornArmorRestored
     function Setup()
@@ -7164,12 +7172,12 @@ state Test_Prisoner_WornArmorRestored
         a.AddItem(body, 1, true)
         a.EquipItem(body, false, true)
         Utility.Wait(1.0)
-        p.NPC_SaveWornArmor()
+        p.Stripping_SaveWornGear()
         a.UnequipAll()
         Utility.Wait(1.0)
         log("WORN before re-equip: " + a.IsEquipped(body))
 
-        int count = p.NPC_ReequipSavedWornArmor()
+        int count = p.Release_ReequipWornGear()
         Utility.Wait(1.0)
         step = assert_true(count >= 1, "No saved worn armor was re-equipped, count " + count)
         ok = ok && step
@@ -8671,122 +8679,7 @@ endState
 /;
 state Test_ArrestWaitsWhileGuardFights
     function Setup()
-        RPB_Prison prison = (RPB_API.GetPrisonManager()).GetPrison("Haafingar")
-        RPB_Arrest arrest = RPB_API.GetArrest()
-        Actor player = Game.GetFormEx(0x14) as Actor
-        bool ok = true
-        bool step = false
-
-        Actor realGuard = RPB_Utility.GetNearestGuard(player, 3000.0, player)
-        step = assert_true(realGuard != none, "No guard near the player to clone (stand near a guard in Solitude)")
-        if (!realGuard)
-            display_result(false)
-            return
-        endif
-
-        Actor guard = __SpawnTempActorOf(realGuard.GetBaseObject().GetFormID())
-        ; Bandit Marauders, with a lot of health: B must hold the guard until the test ends the fight (a plain bandit died
-        ; in seconds and the guard was free before the arrest decision), and A must survive the fight around her
-        Actor banditA = __SpawnTempActorOf(0x37C46)
-        Actor banditB = __SpawnTempActorOf(0x37C46)
-        step = assert_true(guard && banditA && banditB, "Could not spawn the guard and the two bandits")
-        if (!(guard && banditA && banditB))
-            display_result(false)
-            return
-        endif
-
-        guard.EnableAI(true)
-        banditA.EnableAI(true)
-        banditB.EnableAI(true)
-        banditA.SetActorValue("Health", 2000.0)
-        banditB.SetActorValue("Health", 5000.0)
-        banditA.MoveTo(guard, afXOffset = 150.0, abMatchRotation = false)
-        banditB.MoveTo(guard, afYOffset = 200.0, abMatchRotation = false)
-
-        ; B stays hostile and keeps the guard busy
-        banditB.StartCombat(guard)
-        guard.StartCombat(banditB)
-        Utility.Wait(2.0)
-        log("108 before the arrest: guard in combat " + guard.IsInCombat() + ", B in combat " + banditB.IsInCombat())
-
-        RPB_ActorVars.SetCrimeGold(guard.GetCrimeFaction(), banditA, 2000)
-        arrest.ArrestActor(guard, banditA, arrest.ARREST_TYPE_ESCORT_TO_JAIL)
-
-        ; Pending: cuffed, out of the fight, still an arrestee, not a prisoner
-        Form cuffs = Game.GetFormFromFile(0x81D2F, "ZaZAnimationPack.esm")
-        RPB_Arrestee arresteeRef = none
-        bool pending = false
-        float waitStart = Utility.GetCurrentRealTime()
-        while (!pending && (Utility.GetCurrentRealTime() - waitStart) < 15.0)
-            Utility.Wait(0.5)
-            arresteeRef = arrest.Arrestees.AtKey(banditA)
-            pending = arresteeRef && arresteeRef.GetBool("Arrest Pending")
-        endWhile
-
-        log("108 pending: " + pending + " after " + self.__Ms(Utility.GetCurrentRealTime() - waitStart) + "ms, cuffed " + banditA.IsEquipped(cuffs) + ", A in combat " + banditA.IsInCombat() + ", guard in combat " + guard.IsInCombat() + ", prisoner " + (prison.Prisoners.AtKey(banditA) != none))
-        step = assert_true(pending, "The arrest never went pending while the guard was fighting B")
-        ok = ok && step
-        step = assert_true(banditA.IsEquipped(cuffs), "A is not cuffed while the arrest waits")
-        ok = ok && step
-        step = assert_true(prison.Prisoners.AtKey(banditA) == none, "A became a prisoner before the fight was over")
-        ok = ok && step
-
-        ; Held in place while pending: restrained, and not moving
-        ; Sampled every 0.5s: an initial slide (momentum, stagger) reads as one big first step, walking as steady steps
-        float startX = banditA.GetPositionX()
-        float startY = banditA.GetPositionY()
-        float lastX = startX
-        float lastY = startY
-        string steps = ""
-        int sample = 0
-        while (sample < 6)
-            Utility.Wait(0.5)
-            float x = banditA.GetPositionX()
-            float y = banditA.GetPositionY()
-            steps += (Math.sqrt(Math.pow(x - lastX, 2.0) + Math.pow(y - lastY, 2.0)) as int) + " "
-            lastX = x
-            lastY = y
-            sample += 1
-        endWhile
-        float moved = Math.sqrt(Math.pow(banditA.GetPositionX() - startX, 2.0) + Math.pow(banditA.GetPositionY() - startY, 2.0))
-        log("108 held: steps per 0.5s [" + steps + "], now at (" + (banditA.GetPositionX() as int) + ", " + (banditA.GetPositionY() as int) + ")")
-        log("108 held: hold on " + (arresteeRef && arresteeRef.GetBool("Pending Hold")) + ", moved " + (moved as int) + " units in 3s, A in combat " + banditA.IsInCombat() + ", guard in combat " + guard.IsInCombat())
-        step = assert_true(arresteeRef && arresteeRef.GetBool("Pending Hold"), "A is not held in place (no pending hold) while the arrest waits")
-        ok = ok && step
-        step = assert_true(moved < 150.0, "A moved " + (moved as int) + " units while the arrest waited")
-        ok = ok && step
-        step = assert_true(!banditA.IsInCombat(), "A is fighting while the arrest waits")
-        ok = ok && step
-        Actor[] aTargets = PO3_SKSEFunctions.GetCombatTargets(banditA)
-        string aTargetsLogged = ""
-        int t = 0
-        while (t < aTargets.Length)
-            aTargetsLogged += " " + aTargets[t]
-            t += 1
-        endWhile
-        log("108 held: A's combat targets [" + aTargetsLogged + " ], weapon drawn " + banditA.IsWeaponDrawn() + ", right hand " + banditA.GetEquippedWeapon(false) + ", draw events while held " + arresteeRef.GetInt("Pending Draws") + ", hold package alias " + RPB_StorageVars.GetIntOnReference("Pending Hold Alias", banditA) + " (B = " + banditB + ", guard = " + guard + ")")
-        step = assert_true(!banditA.IsWeaponDrawn(), "A has her weapon drawn while cuffed")
-        ok = ok && step
-
-        ; End the fight
-        banditB.Kill()
-        float fightEnd = Utility.GetCurrentRealTime()
-
-        ; On the way = the escort Scene is playing, or already imprisoned (off-screen). Not just registered: that happens
-        ; before the escort starts, and ending the test there raced the resume (its escort started after the teardown)
-        RPB_SceneManager sceneManager = RPB_API.GetSceneManager()
-        bool onTheWay = false
-        while (!onTheWay && (Utility.GetCurrentRealTime() - fightEnd) < 60.0)
-            Utility.Wait(0.5)
-            onTheWay = RPB_Utility.IsActorImprisoned(banditA) || (prison.Prisoners.AtKey(banditA) != none && sceneManager.IsSceneOfType(sceneManager.GetCurrentScene(), sceneManager.CATEGORY_ESCORT_TO_JAIL))
-        endWhile
-
-        arresteeRef = arrest.Arrestees.AtKey(banditA)
-        log("108 after the fight: prisoner/imprisoned " + onTheWay + " after " + self.__Ms(Utility.GetCurrentRealTime() - fightEnd) + "ms, guard in combat " + guard.IsInCombat() + ", still pending " + (arresteeRef && arresteeRef.GetBool("Arrest Pending")) + ", current Scene '" + RPB_API.GetSceneManager().GetCurrentScene() + "'")
-        step = assert_true(onTheWay, "A was never taken to prison after the fight ended")
-        ok = ok && step
-
-        display_result(ok)
+        display_result(__Scenario_ArrestWaitsWhileGuardFights("108"))
     endFunction
 
     function Teardown()
@@ -10833,6 +10726,7 @@ int __savedPlayerBounty
 int __savedPlayerBountyViolent
 bool __playerScenario
 ObjectReference __scenarioReturnMarker ; where a player scenario started: fallbacks teleport them to the prison
+Actor __scenarioRealGuard ; a real guard a scenario used instead of a clone: reset by the teardown, never deleted
 bool __scenarioEscortStartForced
 bool __scenarioConfrontationForced
 bool __scenarioResistFlagWasSet
@@ -10846,11 +10740,24 @@ Actor function __ScenarioGuard()
         return none
     endif
 
-    Actor guard = __SpawnTempActorOf(realGuard.GetBaseObject().GetFormID())
+    ; Persistent: it walks the escort through the prison's load doors (see __SpawnTempActorOf)
+    Actor guard = __SpawnTempActorOf(realGuard.GetBaseObject().GetFormID(), abPersist = true)
     if (guard)
         guard.EnableAI(true)
     endif
     return guard
+endFunction
+
+; The nearest real guard, for a scenario that must not use a clone (see 135): never added to the temp actor list, so
+; never deleted; __TeardownScenario resets him instead
+Actor function __ScenarioRealGuard()
+    Actor player = Game.GetFormEx(0x14) as Actor
+    Actor realGuard = RPB_Utility.GetNearestGuard(player, 3000.0, player)
+    if (!assert_true(realGuard != none, "No guard near the player (stand near a guard in Solitude)"))
+        return none
+    endif
+    __scenarioRealGuard = realGuard
+    return realGuard
 endFunction
 
 ; The arrestee, with a bounty in @akGuard's Hold: the player (their own bounty and health saved first, restored by
@@ -10875,7 +10782,7 @@ Actor function __ScenarioArrestee(bool abPlayer, Actor akGuard)
     endif
 
     __playerScenario = false
-    Actor npc = __SpawnTempActorOf(0x37C46) ; Bandit Marauder: survives the fight around her
+    Actor npc = __SpawnTempActorOf(0x37C46, abPersist = true) ; Bandit Marauder: survives the fight around her; persistent, escorted into the prison
     if (npc)
         npc.EnableAI(true)
         npc.SetActorValue("Health", 2000.0)
@@ -10909,6 +10816,59 @@ function __ScenarioAttack(Actor akHostile, Actor akTarget)
     if (akTarget != Game.GetFormEx(0x14) as Actor)
         akTarget.StartCombat(akHostile)
     endif
+endFunction
+
+; The arrest of @akArrestee by @akGuard, for the scenarios meant to start out of combat: a Marauder spawned next to the
+; real Solitude guards got attacked by one of them before the arrest (111 went pending instead of confronting)
+function __ScenarioArrest(Actor akGuard, Actor akArrestee, string asTest)
+    RPB_Arrest arrest = RPB_API.GetArrest()
+    ; Both sides, repeatedly: calming the arrestee alone left her "in combat" with no targets (the guard clone reacting to
+    ; a bandit next to him), and the arrest went pending instead of confronting
+    Actor player = Game.GetFormEx(0x14) as Actor
+    float start = Utility.GetCurrentRealTime()
+    int rounds = 0
+    while ((akArrestee.IsInCombat() || akGuard.IsInCombat()) && (Utility.GetCurrentRealTime() - start) < 5.0)
+        Actor[] targets = PO3_SKSEFunctions.GetCombatTargets(akArrestee)
+        int i = 0
+        while (i < targets.Length)
+            if (targets[i] && targets[i] != player)
+                targets[i].StopCombat()
+            endif
+            i += 1
+        endWhile
+        akArrestee.StopCombat()
+        akArrestee.StopCombatAlarm()
+        akGuard.StopCombat()
+        akGuard.StopCombatAlarm()
+        rounds += 1
+        Utility.Wait(0.5)
+    endWhile
+    if (rounds > 0)
+        if (akArrestee.IsInCombat() || akGuard.IsInCombat())
+            log(asTest + ": still in combat after " + rounds + " calm rounds (arrestee " + akArrestee.IsInCombat() + ", guard " + akGuard.IsInCombat() + "), the test runs anyway")
+        else
+            log(asTest + ": the arrestee or the guard was fighting before the arrest, calmed in " + __Ms(Utility.GetCurrentRealTime() - start) + "ms (" + rounds + " rounds)")
+        endif
+    endif
+    arrest.ArrestActor(akGuard, akArrestee, arrest.ARREST_TYPE_ESCORT_TO_JAIL)
+endFunction
+
+; Keeps a pending arrest visible for @afSeconds (the tests used to end it at once), logging what the arrestee looks like
+; each second: cuffs, weapon, draws answered
+function __ScenarioObservePending(Actor akArrestee, string asTest, float afSeconds = 5.0)
+    RPB_Arrest arrest = RPB_API.GetArrest()
+    float start = Utility.GetCurrentRealTime()
+    while ((Utility.GetCurrentRealTime() - start) < afSeconds)
+        Utility.Wait(1.0)
+        RPB_Arrestee arresteeRef = arrest.Arrestees.AtKey(akArrestee)
+        int draws = 0
+        bool pending = false
+        if (arresteeRef)
+            draws = arresteeRef.GetInt("Pending Draws")
+            pending = arresteeRef.GetBool("Arrest Pending")
+        endif
+        log(asTest + " pending +" + __Ms(Utility.GetCurrentRealTime() - start) + "ms: pending " + pending + ", cuffed " + RPB_Utility.IsCuffed(akArrestee) + ", weapon drawn " + akArrestee.IsWeaponDrawn() + ", in combat " + akArrestee.IsInCombat() + ", draws answered " + draws)
+    endWhile
 endFunction
 
 bool function __WaitPending(Actor akActor, float afTimeout)
@@ -10998,7 +10958,7 @@ bool function __Scenario_DeadGuard(bool abPlayer, string asTest)
     endWhile
     bool ok = assert_true(!pickedDead, asTest + ": GetNearestGuard picked the dead guard")
 
-    arrest.ArrestActor(guard, arrestee, arrest.ARREST_TYPE_ESCORT_TO_JAIL)
+    __ScenarioArrest(guard, arrestee, asTest)
     Utility.Wait(3.0)
     return __AssertArrestCancelled(arrestee, asTest) && ok
 endFunction
@@ -11019,7 +10979,7 @@ bool function __Scenario_FightBeforeCuffs(bool abPlayer, string asTest)
         return false
     endif
 
-    arrest.ArrestActor(guard, arrestee, arrest.ARREST_TYPE_ESCORT_TO_JAIL)
+    __ScenarioArrest(guard, arrestee, asTest)
 
     ; The fight once the confrontation is running: sent before BeginArrest, the guard was already fighting and the arrest
     ; went pending (correct, but the case of 117-120)
@@ -11061,7 +11021,7 @@ bool function __Scenario_FightAfterCuffs(bool abPlayer, string asTest)
         return false
     endif
 
-    arrest.ArrestActor(guard, arrestee, arrest.ARREST_TYPE_ESCORT_TO_JAIL)
+    __ScenarioArrest(guard, arrestee, asTest)
 
     float start = Utility.GetCurrentRealTime()
     while (!RPB_Utility.IsCuffed(arrestee) && (Utility.GetCurrentRealTime() - start) < 20.0)
@@ -11078,6 +11038,7 @@ bool function __Scenario_FightAfterCuffs(bool abPlayer, string asTest)
     log(asTest + ": pending " + pending + ", still cuffed " + RPB_Utility.IsCuffed(arrestee) + ", current Scene '" + RPB_API.GetSceneManager().GetCurrentScene() + "'")
     bool ok = assert_true(pending, asTest + ": a fight after the cuffs did not make the arrest pending (if the Scene above is the escort, it had already started)")
     ok = assert_true(RPB_Utility.IsCuffed(arrestee), asTest + ": not cuffed while pending") && ok
+    __ScenarioObservePending(arrestee, asTest)
 
     hostile.Kill()
     bool onTheWay = __WaitOnTheWay(arrestee, 60.0)
@@ -11099,7 +11060,7 @@ bool function __Scenario_CaptorDiesMidEscort(bool abPlayer, string asTest)
         return false
     endif
 
-    arrest.ArrestActor(guard, arrestee, arrest.ARREST_TYPE_ESCORT_TO_JAIL)
+    __ScenarioArrest(guard, arrestee, asTest)
 
     ; Registered as a prisoner: the arrest is past its confirmation, on its way to the escort
     float start = Utility.GetCurrentRealTime()
@@ -11107,8 +11068,10 @@ bool function __Scenario_CaptorDiesMidEscort(bool abPlayer, string asTest)
         Utility.Wait(0.25)
     endWhile
     bool registered = prison.Prisoners.AtKey(arrestee) != none
-    Utility.Wait(2.0) ; into the escort, or the end of the confrontation
-    log(asTest + ": registered as a prisoner " + registered + ", current Scene '" + RPB_API.GetSceneManager().GetCurrentScene() + "' when the guard dies")
+    ; Into the escort (2s after the registration was still the confrontation: 116 killed the guard there)
+    bool escorting = registered && __ScenarioWaitEscortToJail(arrestee, 20.0)
+    Utility.Wait(1.0) ; a few steps into it
+    log(asTest + ": registered as a prisoner " + registered + ", escorting " + escorting + ", current Scene '" + RPB_API.GetSceneManager().GetCurrentScene() + "' when the guard dies")
     if (!assert_true(registered, asTest + ": the arrestee never became a prisoner"))
         return false
     endif
@@ -11139,6 +11102,7 @@ bool function __Scenario_CaptorDiesWhilePending(bool abPlayer, string asTest)
     if (!assert_true(pending, asTest + ": the arrest never went pending while the guard was fighting"))
         return false
     endif
+    __ScenarioObservePending(arrestee, asTest)
 
     guard.Kill()
     return __AssertArrestCancelled(arrestee, asTest)
@@ -11197,7 +11161,28 @@ function __TeardownScenario()
     endif
 
     if (__playerScenario)
-        RPB_Recovery.ResetActor(player) ; also calms guards still fighting the player
+        ; On its own thread (also calms guards still fighting the player): 126's reset never finished once, and everything
+        ; after it (bounty, the move back) was skipped, leaving the player jailed with the test's bounty
+        __teardownResetDone = false
+        self.RegisterForModEvent("RPB_TestTeardownReset", "OnTestTeardownReset")
+        self.SendModEvent("RPB_TestTeardownReset")
+        float resetStart = Utility.GetCurrentRealTime()
+        while (!__teardownResetDone && (Utility.GetCurrentRealTime() - resetStart) < 15.0)
+            Utility.Wait(0.25)
+        endWhile
+        self.UnregisterForModEvent("RPB_TestTeardownReset")
+        if (__teardownResetDone)
+            log("teardown: the player's reset finished in " + __Ms(Utility.GetCurrentRealTime() - resetStart) + "ms")
+        else
+            log("teardown: the player's reset still running after 15s, restoring the player anyway (see the Recovery step marks)")
+            ; The cancel that gives stripped belongings back comes after the step that stalled: given back here
+            RPB_Prison haafingar = (RPB_API.GetPrisonManager()).GetPrison("Haafingar")
+            RPB_Prisoner stalledPrisoner = haafingar.Prisoners.AtKey(player)
+            if (stalledPrisoner && stalledPrisoner.IsStripped)
+                stalledPrisoner.ReturnBelongings()
+                log("teardown: belongings given back without the reset")
+            endif
+        endif
         if (__scenarioBountyFaction)
             __scenarioBountyFaction.SetCrimeGold(__savedPlayerBounty)
             __scenarioBountyFaction.SetCrimeGoldViolent(__savedPlayerBountyViolent)
@@ -11216,12 +11201,25 @@ function __TeardownScenario()
         __scenarioReturnMarker.Delete()
         __scenarioReturnMarker = none
     endif
+    if (__scenarioRealGuard)
+        ; A real guard is never deleted: his arrest role, package lock and AI are reset instead
+        RPB_Recovery.ResetActor(__scenarioRealGuard)
+        __scenarioRealGuard = none
+    endif
     __TeardownAllTempActors()
 
     ; Nothing of this test may keep playing into the next one (a prison-flow Scene left for a deleted prisoner stalled every
     ; later confrontation)
     RPB_API.GetSceneManager().StopAllScenes("test teardown")
 endFunction
+
+bool __teardownResetDone = false
+
+; The teardown's reset of the player, on its own thread (see __TeardownScenario)
+event OnTestTeardownReset(string asEventName, string asStrArg, float afNumArg, Form akSender)
+    RPB_Recovery.ResetActor(Game.GetFormEx(0x14) as Actor)
+    __teardownResetDone = true
+endEvent
 
 ; After a fallback, let the prison flow it started finish before the teardown cuts it (logged, not asserted)
 function __ScenarioWaitImprisoned(Actor akActor, string asTest)
@@ -11247,7 +11245,7 @@ bool function __Scenario_ConfrontationNeverConfirms(bool abPlayer, string asTest
     RPB_Utility.SetConfrontationSceneForcedToFail(true)
     __scenarioConfrontationForced = true
     float start = Utility.GetCurrentRealTime()
-    arrest.ArrestActor(guard, arrestee, arrest.ARREST_TYPE_ESCORT_TO_JAIL)
+    __ScenarioArrest(guard, arrestee, asTest)
 
     bool moved = __WaitMovedToPrison(arrestee, 45.0)
     log(asTest + ": moved to the prison " + moved + " after " + __Ms(Utility.GetCurrentRealTime() - start) + "ms (cell " + arrestee.GetParentCell() + ")")
@@ -11296,7 +11294,7 @@ bool function __Scenario_EscortNeverStarts(bool abPlayer, string asTest)
     RPB_Utility.SetEscortStartForcedToFail(true)
     __scenarioEscortStartForced = true
     float start = Utility.GetCurrentRealTime()
-    arrest.ArrestActor(guard, arrestee, arrest.ARREST_TYPE_ESCORT_TO_JAIL)
+    __ScenarioArrest(guard, arrestee, asTest)
 
     bool moved = __WaitMovedToPrison(arrestee, 45.0)
     log(asTest + ": moved to the prison " + moved + " after " + __Ms(Utility.GetCurrentRealTime() - start) + "ms (cell " + arrestee.GetParentCell() + ")")
@@ -11317,7 +11315,7 @@ bool function __Scenario_EscortNotFollowing(bool abPlayer, string asTest)
         return false
     endif
 
-    arrest.ArrestActor(guard, arrestee, arrest.ARREST_TYPE_ESCORT_TO_JAIL)
+    __ScenarioArrest(guard, arrestee, asTest)
     if (!assert_true(__ScenarioWaitEscortToJail(arrestee, 40.0), asTest + ": the escort to jail never became the current Scene"))
         return false
     endif
@@ -11327,7 +11325,7 @@ bool function __Scenario_EscortNotFollowing(bool abPlayer, string asTest)
     arrestee.EnableAI(false)
     float start = Utility.GetCurrentRealTime()
 
-    bool moved = __WaitMovedToPrison(arrestee, 45.0)
+    bool moved = __WaitMovedToPrison(arrestee, 60.0) ; the player: 3 moves to the guard, 12s standing still each
     log(asTest + ": fell back " + moved + " after " + __Ms(Utility.GetCurrentRealTime() - start) + "ms (cell " + arrestee.GetParentCell() + ")")
     arrestee.EnableAI(true)
     bool ok = assert_true(moved, asTest + ": a prisoner not following the escort did not fall back to the prison")
@@ -11347,7 +11345,7 @@ bool function __Scenario_EscortStalled(bool abPlayer, string asTest)
         return false
     endif
 
-    arrest.ArrestActor(guard, arrestee, arrest.ARREST_TYPE_ESCORT_TO_JAIL)
+    __ScenarioArrest(guard, arrestee, asTest)
     if (!assert_true(__ScenarioWaitEscortToJail(arrestee, 40.0), asTest + ": the escort to jail never became the current Scene"))
         return false
     endif
@@ -11361,6 +11359,439 @@ bool function __Scenario_EscortStalled(bool abPlayer, string asTest)
     guard.EnableAI(true)
     bool ok = assert_true(moved, asTest + ": a stalled escort did not fall back to the prison")
     __ScenarioWaitImprisoned(arrestee, asTest)
+    return ok
+endFunction
+
+; 131: what each Castle Dour cell's configured door resolves to right now. The door script sits on the base door, so the
+; theory is that a door whose cell was never loaded has no script instance (the cast is None, "Cell Door is null") until
+; the player has been there once. Logs only.
+bool function __CellDoorsDiagnostic()
+    Actor player = Game.GetFormEx(0x14) as Actor
+    RPB_Prison prison = (RPB_API.GetPrisonManager()).GetPrison("Haafingar")
+    Form[] cells = prison.JailCells
+    log("131: player in " + player.GetParentCell() + ", " + cells.Length + " cells")
+    int i = 0
+    while (cells && i < cells.Length)
+        RPB_JailCell jailCell = cells[i] as RPB_JailCell
+        if (jailCell)
+            Form[] doors = jailCell.GetPropertyOfTypeFormArray("Cell Doors")
+            Form rawDoor = none
+            if (doors && doors.Length > 0)
+                rawDoor = doors[0]
+            endif
+            ObjectReference doorRef = rawDoor as ObjectReference
+            string refInfo = "no reference"
+            if (doorRef)
+                refInfo = "3D loaded " + doorRef.Is3DLoaded() + ", locked " + doorRef.IsLocked() + ", lock level " + doorRef.GetLockLevel() + ", cell " + doorRef.GetParentCell()
+            endif
+            int doorMap = JMap.getObj(jailCell.GetSerializableRootObject(), "Cell Doors")
+            log("131: " + jailCell.ID + ": configured door " + rawDoor + " (" + (doors != none) + "), config door map keys " + JValue.count(doorMap) + ", as RPB_CellDoor " + (rawDoor as RPB_CellDoor) + ", " + refInfo + ", bound door " + jailCell.CellDoor)
+        endif
+        i += 1
+    endWhile
+
+    ; data.json read again now: if a door's key comes back here (inside Castle Dour) but not in the config loaded at game
+    ; start, JContainers dropped the form keys it couldn't resolve while those doors weren't loaded
+    int fresh = JValue.retain(JValue.readFromFile("Data/RPB_Data/data.json"))
+    int cellsMap = JValue.solveObj(fresh, ".Haafingar.Jail.Cells")
+    int cellValues = 0
+    if (JValue.isFormMap(cellsMap))
+        cellValues = JFormMap.allValues(cellsMap)
+    elseif (JValue.isMap(cellsMap))
+        cellValues = JMap.allValues(cellsMap)
+    endif
+    log("131: data.json read now: Haafingar cells " + JValue.count(cellsMap) + " (form map " + JValue.isFormMap(cellsMap) + ")")
+    int c = 0
+    while (c < JValue.count(cellValues))
+        int cellObject = JArray.getObj(cellValues, c)
+        int freshDoors = JMap.getObj(cellObject, "Cell Doors")
+        string freshKeys = ""
+        if (JValue.isFormMap(freshDoors))
+            int keys = JFormMap.allKeys(freshDoors)
+            int k = 0
+            while (k < JArray.count(keys))
+                freshKeys += " " + JArray.getForm(keys, k)
+                k += 1
+            endWhile
+        endif
+        log("131: data.json read now: " + JMap.getStr(cellObject, "ID") + ": door keys " + JValue.count(freshDoors) + " [" + freshKeys + " ]")
+        c += 1
+    endWhile
+    JValue.release(fresh)
+    return true
+endFunction
+
+; 135: the player stops in the escort to the cell (frozen): the assist moves them into the cell (the Scene's destination,
+; not the guard), and the Scene locks the door
+bool function __Scenario_EscortToCellStopped(string asTest)
+    RPB_Prison prison = (RPB_API.GetPrisonManager()).GetPrison("Haafingar")
+    RPB_SceneManager sceneManager = RPB_API.GetSceneManager()
+    ; A real guard, not a clone: cloned guards walking into the jail ahead of the player went uncallable (every native
+    ; call on them waited forever, held outside Papyrus: dps, 2026-09-29), which stalled the flow and the teardown
+    Actor guard = __ScenarioRealGuard()
+    if (!guard)
+        return false
+    endif
+    log(asTest + ": using the real guard " + guard + " (" + guard.GetDisplayName() + ")")
+    Actor player = __ScenarioArrestee(true, guard)
+    __ScenarioArrest(guard, player, asTest)
+
+    ; The assist starts with the escort to the cell's own start: the current-scene name already said so while the strip
+    ; was still playing (the first run froze the player during Stripping02)
+    float start = Utility.GetCurrentRealTime()
+    RPB_Prisoner assisted = prison.Prisoners.AtKey(player)
+    while (!(assisted && assisted.EscortAssistToCell) && (Utility.GetCurrentRealTime() - start) < 120.0)
+        Utility.Wait(0.5)
+        assisted = prison.Prisoners.AtKey(player)
+    endWhile
+    if (!assert_true(assisted && assisted.EscortAssistToCell, asTest + ": the escort to the cell never started (no assist on it)"))
+        return false
+    endif
+    Utility.Wait(2.0) ; a few steps into it
+
+    ; Frozen only once outside the cell: IsInCell reads "in" from near the cell's door, and a player frozen there needed no
+    ; move at all (a second run passed that way without the fallback ever running)
+    float outsideWait = Utility.GetCurrentRealTime()
+    while (assisted && assisted.IsInCell && (Utility.GetCurrentRealTime() - outsideWait) < 60.0)
+        Utility.Wait(0.25)
+    endWhile
+    if (!assert_true(assisted && !assisted.IsInCell, asTest + ": the player never left the cell's surroundings during the escort (can't freeze them outside it)"))
+        return false
+    endif
+    log(asTest + ": escort to the cell playing after " + __Ms(Utility.GetCurrentRealTime() - start) + "ms, freezing the player outside the cell (" + (player.GetDistance(assisted.JailCell) as int) + " units from it)")
+
+    ; Frozen (an AI-driven player ignores SetRestrained/SetDontMove): standing still outside the cell
+    player.EnableAI(false)
+    RPB_Prisoner prisonerRef = prison.Prisoners.AtKey(player)
+    float frozen = Utility.GetCurrentRealTime()
+    while (prisonerRef && !prisonerRef.IsInCell && (Utility.GetCurrentRealTime() - frozen) < 30.0)
+        Utility.Wait(0.5)
+        prisonerRef = prison.Prisoners.AtKey(player)
+    endWhile
+    bool movedIn = prisonerRef && prisonerRef.IsInCell
+    int moves = 0
+    if (prisonerRef)
+        moves = prisonerRef.EscortAssistMoves
+    endif
+    log(asTest + ": moved into the cell " + movedIn + " after " + __Ms(Utility.GetCurrentRealTime() - frozen) + "ms frozen (assist moves " + moves + ")")
+    player.EnableAI(true)
+    bool ok = assert_true(movedIn, asTest + ": a player standing still in the escort to the cell was not moved into the cell")
+    ok = assert_true(moves >= 1, asTest + ": in the cell without a move by the assist (the fallback didn't run)") && ok
+
+    float waitStart = Utility.GetCurrentRealTime()
+    while (!RPB_Utility.IsActorImprisoned(player) && (Utility.GetCurrentRealTime() - waitStart) < 60.0)
+        Utility.Wait(0.5)
+    endWhile
+    prisonerRef = prison.Prisoners.AtKey(player)
+    bool imprisoned = RPB_Utility.IsActorImprisoned(player)
+    bool inCell = prisonerRef && prisonerRef.IsInCell
+    bool locked = false
+    RPB_CellDoor cellDoor = none
+    if (prisonerRef && prisonerRef.JailCell)
+        cellDoor = prisonerRef.JailCell.CellDoor
+        locked = cellDoor && cellDoor.IsLocked()
+    endif
+    log(asTest + ": imprisoned " + imprisoned + " (" + __Ms(Utility.GetCurrentRealTime() - waitStart) + "ms), in the cell " + inCell + ", door " + cellDoor + " locked " + locked)
+    ok = assert_true(imprisoned, asTest + ": never imprisoned after the move into the cell") && ok
+    ok = assert_true(inCell, asTest + ": not in the cell at the end") && ok
+    ok = assert_true(locked, asTest + ": the cell door is not locked") && ok
+    return ok
+endFunction
+
+; ==========================================================
+;              132-134: Long Absence (40 days away)
+; ==========================================================
+
+; The engine resets a cell the player has been away from for 30 days (iHoursToRespawnCell 720h): 40 days away, then
+; back, checks that an imprisoned NPC and everything RPB keeps about them (cell, cell package, belongings, sentence) and
+; the cells' doors survive it. The snapshot lives in JDB (the save's co-save) between the three steps.
+
+bool function __InCastleDour()
+    Actor player = Game.GetFormEx(0x14) as Actor
+    Form[] cells = ((RPB_API.GetPrisonManager()).GetPrison("Haafingar")).JailCells
+    int i = 0
+    while (cells && i < cells.Length)
+        ObjectReference cellRef = cells[i] as ObjectReference
+        if (cellRef && cellRef.GetParentCell() == player.GetParentCell())
+            return true
+        endif
+        i += 1
+    endWhile
+    return false
+endFunction
+
+bool function __LongAbsenceSetup()
+    Actor player = Game.GetFormEx(0x14) as Actor
+    RPB_Prison prison = (RPB_API.GetPrisonManager()).GetPrison("Haafingar")
+    Actor guard = RPB_Utility.GetNearestGuard(player, 3000.0, player)
+    if (!assert_true(guard != none, "132: no guard near the player (run it in Solitude)"))
+        return false
+    endif
+
+    ; Not a tracked temp actor: the teardown of any later test would delete it, and it has to outlive the 40 days
+    Actor npc = player.PlaceActorAtMe(Game.GetFormEx(0x37C46) as ActorBase, 1)
+    if (!assert_true(npc != none, "132: could not place the bandit"))
+        return false
+    endif
+    npc.EnableAI(true)
+    __StressArrest(guard, npc)
+
+    float start = Utility.GetCurrentRealTime()
+    while (!RPB_Utility.IsActorImprisoned(npc) && (Utility.GetCurrentRealTime() - start) < 60.0)
+        Utility.Wait(0.5)
+    endWhile
+    RPB_Prisoner prisonerRef = prison.Prisoners.AtKey(npc)
+    if (!assert_true(prisonerRef && RPB_Utility.IsActorImprisoned(npc), "132: the bandit was never imprisoned"))
+        return false
+    endif
+    ; SetSentence refuses a second call (the arrest set one, ~20 days) and clamps to the prison's maximum: increased instead,
+    ; to 90 days (40 must pass with plenty left)
+    if (!assert_true(prison.MaximumSentence >= 45, "132: the prison's maximum sentence is " + prison.MaximumSentence + " days, raise it to at least 45 for this test"))
+        return false
+    endif
+    int target = 90
+    if (prison.MaximumSentence < target)
+        target = prison.MaximumSentence
+    endif
+    if (prisonerRef.Sentence < target)
+        prisonerRef.IncreaseSentence(target - prisonerRef.Sentence, false)
+    endif
+    prison.Monitor.Reschedule()
+    Utility.Wait(1.0)
+
+    int snapshot = JMap.object()
+    JMap.setForm(snapshot, "actor", npc)
+    JMap.setStr(snapshot, "cell", prisonerRef.JailCell.ID)
+    JMap.setInt(snapshot, "in cell", prisonerRef.IsInCell as int)
+    JMap.setInt(snapshot, "cell package", prisonerRef.HasCellPackage as int)
+    JMap.setInt(snapshot, "manifest", RPB_StorageVars.GetFormsOnReference("Belongings Forms", npc, "Jail").Length)
+    int chestItems = -1
+    if (prisonerRef.PrisonerBelongingsContainer)
+        chestItems = prisonerRef.PrisonerBelongingsContainer.GetNumItems()
+    endif
+    JMap.setInt(snapshot, "chest items", chestItems)
+    JMap.setFlt(snapshot, "time left", prisonerRef.TimeLeftInSentence)
+    JMap.setFlt(snapshot, "game time", Utility.GetCurrentGameTime())
+    int doors = JMap.object()
+    Form[] cells = prison.JailCells
+    int i = 0
+    while (cells && i < cells.Length)
+        RPB_JailCell jailCell = cells[i] as RPB_JailCell
+        if (jailCell)
+            JMap.setForm(doors, jailCell.ID, jailCell.CellDoor)
+        endif
+        i += 1
+    endWhile
+    JMap.setObj(snapshot, "doors", doors)
+    JDB.setObj("rpbLongAbsence", snapshot)
+    bool ok = true
+
+    ok = assert_true(prisonerRef.TimeLeftInSentence > 45.0, "132: the sentence left is only " + prisonerRef.TimeLeftInSentence + " days")
+    log("132: " + npc + " imprisoned in " + prisonerRef.JailCell.ID + " (in cell " + prisonerRef.IsInCell + ", cell package " + prisonerRef.HasCellPackage + "), sentence left " + prisonerRef.TimeLeftInSentence + " days, manifest " + JMap.getInt(snapshot, "manifest") + " items, chest " + chestItems + " items, doors bound " + JValue.count(doors))
+    log("132: next: travel away from Castle Dour, run 133 (40 days pass), travel back into Castle Dour, run 134")
+    return ok
+endFunction
+
+bool function __LongAbsenceAdvance()
+    int snapshot = JDB.solveObj(".rpbLongAbsence")
+    if (!assert_true(snapshot != 0, "133: no snapshot, run 132 first"))
+        return false
+    endif
+    if (!assert_true(!__InCastleDour(), "133: you're in Castle Dour, leave it first (the cell must be unloaded for its reset)"))
+        return false
+    endif
+
+    ; The Release on Sleep way (GameHour +24 per day): writing GameDaysPassed itself didn't move the clock
+    GlobalVariable daysPassed = Game.GetFormEx(0x39) as GlobalVariable
+    float before = daysPassed.GetValue()
+    RPB_Utility.PassTimeInDays(40)
+    Utility.Wait(1.0)
+    log("133: game days passed " + before + " -> " + daysPassed.GetValue() + " (game time now " + Utility.GetCurrentGameTime() + "); now travel into Castle Dour and run 134")
+    return true
+endFunction
+
+bool function __LongAbsenceVerify()
+    int snapshot = JDB.solveObj(".rpbLongAbsence")
+    if (!assert_true(snapshot != 0, "134: no snapshot, run 132 first"))
+        return false
+    endif
+    if (!__InCastleDour())
+        log("134: WARNING: not inside Castle Dour, the cell may not have been loaded since the 40 days (run it inside)")
+    endif
+
+    RPB_Prison prison = (RPB_API.GetPrisonManager()).GetPrison("Haafingar")
+    Actor npc = JMap.getForm(snapshot, "actor") as Actor
+    float daysGone = Utility.GetCurrentGameTime() - JMap.getFlt(snapshot, "game time")
+    log("134: " + daysGone + " days since the snapshot, the bandit " + npc)
+    bool ok = assert_true(npc != none, "134: the bandit no longer exists (deleted by the reset)")
+    if (!npc)
+        return false
+    endif
+
+    RPB_Prisoner prisonerRef = prison.Prisoners.AtKey(npc)
+    ok = assert_true(prisonerRef != none, "134: no longer a registered prisoner") && ok
+    ok = assert_true(RPB_Utility.IsActorImprisoned(npc), "134: no longer imprisoned") && ok
+    if (prisonerRef)
+        string cellNow = "none"
+        if (prisonerRef.JailCell)
+            cellNow = prisonerRef.JailCell.ID
+        endif
+        int manifestNow = RPB_StorageVars.GetFormsOnReference("Belongings Forms", npc, "Jail").Length
+        int chestNow = -1
+        if (prisonerRef.PrisonerBelongingsContainer)
+            chestNow = prisonerRef.PrisonerBelongingsContainer.GetNumItems()
+        endif
+        float expectedLeft = JMap.getFlt(snapshot, "time left") - daysGone
+        log("134: cell " + JMap.getStr(snapshot, "cell") + " -> " + cellNow + ", in cell " + JMap.getInt(snapshot, "in cell") + " -> " + prisonerRef.IsInCell + ", cell package " + JMap.getInt(snapshot, "cell package") + " -> " + prisonerRef.HasCellPackage + ", manifest " + JMap.getInt(snapshot, "manifest") + " -> " + manifestNow + ", chest " + JMap.getInt(snapshot, "chest items") + " -> " + chestNow + ", sentence left " + prisonerRef.TimeLeftInSentence + " (expected ~" + expectedLeft + "), 3D " + npc.Is3DLoaded() + ", distance to the cell " + (npc.GetDistance(prisonerRef.JailCell) as int))
+        ok = assert_true(cellNow == JMap.getStr(snapshot, "cell"), "134: the cell changed") && ok
+        ok = assert_true(prisonerRef.IsInCell, "134: not in the cell") && ok
+        ok = assert_true(prisonerRef.HasCellPackage == (JMap.getInt(snapshot, "cell package") as bool), "134: the cell package changed") && ok
+        ok = assert_true(manifestNow == JMap.getInt(snapshot, "manifest"), "134: the belongings manifest changed") && ok
+        ; GetNumItems counts kinds of items, the manifest counts forms: compared with the chest's own count at the snapshot
+        ok = assert_true(chestNow >= JMap.getInt(snapshot, "chest items"), "134: the belongings chest holds fewer kinds of items than at the snapshot (emptied by the reset?)") && ok
+        ok = assert_true(Math.abs(prisonerRef.TimeLeftInSentence - expectedLeft) < 1.5, "134: the sentence left is off") && ok
+    endif
+
+    int doors = JMap.getObj(snapshot, "doors")
+    Form[] cells = prison.JailCells
+    int i = 0
+    while (cells && i < cells.Length)
+        RPB_JailCell jailCell = cells[i] as RPB_JailCell
+        if (jailCell)
+            Form before = JMap.getForm(doors, jailCell.ID)
+            log("134: " + jailCell.ID + ": door before " + before + ", now " + jailCell.CellDoor)
+            if (before)
+                ok = assert_true(jailCell.CellDoor != none, "134: " + jailCell.ID + " lost its door") && ok
+            endif
+        endif
+        i += 1
+    endWhile
+
+    ; Cleanup: the bandit out and gone, the snapshot cleared
+    RPB_Recovery.ResetActor(npc)
+    Utility.Wait(2.0)
+    npc.Disable()
+    npc.Delete()
+    JDB.setObj("rpbLongAbsence", 0)
+    return ok
+endFunction
+
+; 108/130: a guard fighting bandit B arrests bandit A: pending, A cuffed and held (not moving, weapon sheathed), escorted
+; once B is dead
+bool function __Scenario_ArrestWaitsWhileGuardFights(string asTest)
+    RPB_Prison prison = (RPB_API.GetPrisonManager()).GetPrison("Haafingar")
+    RPB_Arrest arrest = RPB_API.GetArrest()
+    Actor player = Game.GetFormEx(0x14) as Actor
+    bool ok = true
+    bool step = false
+
+    Actor realGuard = RPB_Utility.GetNearestGuard(player, 3000.0, player)
+    step = assert_true(realGuard != none, "No guard near the player to clone (stand near a guard in Solitude)")
+    if (!realGuard)
+        return false
+    endif
+
+    Actor guard = __SpawnTempActorOf(realGuard.GetBaseObject().GetFormID())
+    ; Bandit Marauders, with a lot of health: B must hold the guard until the test ends the fight (a plain bandit died
+    ; in seconds and the guard was free before the arrest decision), and A must survive the fight around her
+    Actor banditA = __SpawnTempActorOf(0x37C46)
+    Actor banditB = __SpawnTempActorOf(0x37C46)
+    step = assert_true(guard && banditA && banditB, "Could not spawn the guard and the two bandits")
+    if (!(guard && banditA && banditB))
+        return false
+    endif
+
+    guard.EnableAI(true)
+    banditA.EnableAI(true)
+    banditB.EnableAI(true)
+    banditA.SetActorValue("Health", 2000.0)
+    banditB.SetActorValue("Health", 5000.0)
+    banditA.MoveTo(guard, afXOffset = 150.0, abMatchRotation = false)
+    banditB.MoveTo(guard, afYOffset = 200.0, abMatchRotation = false)
+
+    ; B stays hostile and keeps the guard busy
+    banditB.StartCombat(guard)
+    guard.StartCombat(banditB)
+    Utility.Wait(2.0)
+    log(asTest + " before the arrest: guard in combat " + guard.IsInCombat() + ", B in combat " + banditB.IsInCombat())
+
+    RPB_ActorVars.SetCrimeGold(guard.GetCrimeFaction(), banditA, 2000)
+    arrest.ArrestActor(guard, banditA, arrest.ARREST_TYPE_ESCORT_TO_JAIL)
+
+    ; Pending: cuffed, out of the fight, still an arrestee, not a prisoner
+    Form cuffs = Game.GetFormFromFile(0x81D2F, "ZaZAnimationPack.esm")
+    RPB_Arrestee arresteeRef = none
+    bool pending = false
+    float waitStart = Utility.GetCurrentRealTime()
+    while (!pending && (Utility.GetCurrentRealTime() - waitStart) < 15.0)
+        Utility.Wait(0.5)
+        arresteeRef = arrest.Arrestees.AtKey(banditA)
+        pending = arresteeRef && arresteeRef.GetBool("Arrest Pending")
+    endWhile
+
+    log(asTest + " pending: " + pending + " after " + self.__Ms(Utility.GetCurrentRealTime() - waitStart) + "ms, cuffed " + banditA.IsEquipped(cuffs) + ", A in combat " + banditA.IsInCombat() + ", guard in combat " + guard.IsInCombat() + ", prisoner " + (prison.Prisoners.AtKey(banditA) != none))
+    step = assert_true(pending, "The arrest never went pending while the guard was fighting B")
+    ok = ok && step
+    step = assert_true(banditA.IsEquipped(cuffs), "A is not cuffed while the arrest waits")
+    ok = ok && step
+    step = assert_true(prison.Prisoners.AtKey(banditA) == none, "A became a prisoner before the fight was over")
+    ok = ok && step
+
+    ; Held in place while pending: restrained, and not moving
+    ; Sampled every 0.5s: an initial slide (momentum, stagger) reads as one big first step, walking as steady steps
+    float startX = banditA.GetPositionX()
+    float startY = banditA.GetPositionY()
+    float lastX = startX
+    float lastY = startY
+    string steps = ""
+    int sample = 0
+    while (sample < 6)
+        Utility.Wait(0.5)
+        float x = banditA.GetPositionX()
+        float y = banditA.GetPositionY()
+        steps += (Math.sqrt(Math.pow(x - lastX, 2.0) + Math.pow(y - lastY, 2.0)) as int) + " "
+        lastX = x
+        lastY = y
+        sample += 1
+    endWhile
+    float moved = Math.sqrt(Math.pow(banditA.GetPositionX() - startX, 2.0) + Math.pow(banditA.GetPositionY() - startY, 2.0))
+    log(asTest + " held: steps per 0.5s [" + steps + "], now at (" + (banditA.GetPositionX() as int) + ", " + (banditA.GetPositionY() as int) + ")")
+    log(asTest + " held: hold on " + (arresteeRef && arresteeRef.GetBool("Pending Hold")) + ", moved " + (moved as int) + " units in 3s, A in combat " + banditA.IsInCombat() + ", guard in combat " + guard.IsInCombat())
+    step = assert_true(arresteeRef && arresteeRef.GetBool("Pending Hold"), "A is not held in place (no pending hold) while the arrest waits")
+    ok = ok && step
+    step = assert_true(moved < 150.0, "A moved " + (moved as int) + " units while the arrest waited")
+    ok = ok && step
+    step = assert_true(!banditA.IsInCombat(), "A is fighting while the arrest waits")
+    ok = ok && step
+    Actor[] aTargets = PO3_SKSEFunctions.GetCombatTargets(banditA)
+    string aTargetsLogged = ""
+    int t = 0
+    while (t < aTargets.Length)
+        aTargetsLogged += " " + aTargets[t]
+        t += 1
+    endWhile
+    log(asTest + " held: A's combat targets [" + aTargetsLogged + " ], weapon drawn " + banditA.IsWeaponDrawn() + ", right hand " + banditA.GetEquippedWeapon(false) + ", draw events while held " + arresteeRef.GetInt("Pending Draws") + ", hold package alias " + RPB_StorageVars.GetIntOnReference("Pending Hold Alias", banditA) + " (B = " + banditB + ", guard = " + guard + ")")
+    step = assert_true(!banditA.IsWeaponDrawn(), "A has her weapon drawn while cuffed")
+    ok = ok && step
+
+    ; End the fight
+    banditB.Kill()
+    float fightEnd = Utility.GetCurrentRealTime()
+
+    ; On the way = the escort Scene is playing, or already imprisoned (off-screen). Not just registered: that happens
+    ; before the escort starts, and ending the test there raced the resume (its escort started after the teardown)
+    RPB_SceneManager sceneManager = RPB_API.GetSceneManager()
+    bool onTheWay = false
+    while (!onTheWay && (Utility.GetCurrentRealTime() - fightEnd) < 60.0)
+        Utility.Wait(0.5)
+        onTheWay = RPB_Utility.IsActorImprisoned(banditA) || (prison.Prisoners.AtKey(banditA) != none && sceneManager.IsSceneOfType(sceneManager.GetCurrentScene(), sceneManager.CATEGORY_ESCORT_TO_JAIL))
+    endWhile
+
+    arresteeRef = arrest.Arrestees.AtKey(banditA)
+    log(asTest + " after the fight: prisoner/imprisoned " + onTheWay + " after " + self.__Ms(Utility.GetCurrentRealTime() - fightEnd) + "ms, guard in combat " + guard.IsInCombat() + ", still pending " + (arresteeRef && arresteeRef.GetBool("Arrest Pending")) + ", current Scene '" + RPB_API.GetSceneManager().GetCurrentScene() + "'")
+    step = assert_true(onTheWay, "A was never taken to prison after the fight ended")
+    ok = ok && step
+
     return ok
 endFunction
 
@@ -11430,7 +11861,10 @@ bool function __Scenario_NoResistFromSecondGuard(bool abPlayer, string asTest)
     return __AssertNotResisted(crimeFaction, bountyBefore, asTest)
 endFunction
 
-Actor function __SpawnTempActorOf(int aiBaseFormId)
+; @abPersist: a persistent reference (PlaceAtMe with abForcePersist). For actors a test walks through load doors: a
+; non-persistent clone that went into an unloaded cell ahead of the player came back with script data the game couldn't
+; read ("Failed to read basic script data"), and every native call on it waited forever (135's stalls, 2026-09-29).
+Actor function __SpawnTempActorOf(int aiBaseFormId, bool abPersist = false)
     if (!__testTempActors)
         __testTempActors = new Actor[64]
     endif
@@ -11445,7 +11879,12 @@ Actor function __SpawnTempActorOf(int aiBaseFormId)
     ; assumed a param that doesn't exist on this native and was removed; turned out
     ; unnecessary anyway - the real fix for the 23/24/25 stalls was spacing successive
     ; registrations out with Utility.Wait(), not reference persistence.
-    Actor temp = player.PlaceActorAtMe(npcBase, 1)
+    Actor temp = none
+    if (abPersist)
+        temp = player.PlaceAtMe(npcBase, 1, abForcePersist = true) as Actor
+    else
+        temp = player.PlaceActorAtMe(npcBase, 1)
+    endif
     if (!temp)
         log("TEMP ACTOR COULD NOT BE PLACED from base " + aiBaseFormId)
         return none
@@ -11753,6 +12192,9 @@ string function GetTest(string asTestName)
 endFunction
 
 string function GetCurrentTest()
+    if (__statelessTest != "")
+        return __statelessTest
+    endif
     return self.GetState()
 endFunction
 
@@ -11761,6 +12203,10 @@ function ExecuteTest(string asTestKeyName)
 
     if (testToExecute == "__RUN_ALL__")
         self.RunAllTests()
+        return
+    endif
+
+    if (self.__RunStatelessTest(testToExecute))
         return
     endif
 
@@ -11775,6 +12221,108 @@ function ExecuteTest(string asTestKeyName)
 
         self.__RestoreLogs()
     endif
+endFunction
+
+; ==========================================================
+;                     Repeated runs
+; ==========================================================
+
+bool __repeating = false
+bool __repeatStopRequested = false
+
+; A repeated run is going (F1 then offers to stop it)
+bool property IsRepeating
+    bool function get()
+        return __repeating
+    endFunction
+endProperty
+
+; Ends a repeated run after the run in progress
+function RequestRepeatStop()
+    __repeatStopRequested = true
+endFunction
+
+;/
+    Runs a test @aiTimes times in a row (F1: pick the test, then how many times), counting passes and fails from each
+    run's display_result(). Each run is logged ("[UNIT REPEAT] Run i/N"), then a summary with one letter per run
+    (P pass, F fail, ? no result). F1 during the runs offers to stop after the current one.
+/;
+function ExecuteTestRepeated(string asTestKeyName, int aiTimes)
+    if (aiTimes <= 1)
+        self.ExecuteTest(asTestKeyName)
+        return
+    endif
+
+    __repeating = true
+    __repeatStopRequested = false
+    float repeatStart = Utility.GetCurrentRealTime()
+    int passed = 0
+    int failed = 0
+    int unknown = 0
+    string results = ""
+    int run = 0
+    while (run < aiTimes && !__repeatStopRequested)
+        base_log("[UNIT REPEAT]", "Run " + (run + 1) + "/" + aiTimes + ": " + asTestKeyName, "Tests::Repeat")
+        self.ExecuteTest(asTestKeyName)
+        if (__lastResultState == 1)
+            passed += 1
+            results += "P"
+        elseif (__lastResultState == 0)
+            failed += 1
+            results += "F"
+        else
+            unknown += 1
+            results += "?"
+        endif
+        run += 1
+        Debug.Notification("Repeat " + run + "/" + aiTimes + ": " + passed + " passed, " + failed + " failed")
+        if (run < aiTimes && !__repeatStopRequested)
+            Utility.Wait(5.0) ; what the teardown left settles before the next run (Scenes ending, actors deleted)
+        endif
+    endWhile
+
+    string summary = asTestKeyName + ": " + passed + " passed, " + failed + " failed" + string_if(unknown > 0, ", " + unknown + " without a result", "") + " of " + run + " runs [" + results + "] in " + __Ms(Utility.GetCurrentRealTime() - repeatStart) + "ms" + string_if(__repeatStopRequested, " (stopped early)", "")
+    base_log("[UNIT REPEAT RESULT]", summary, "Tests::Repeat")
+    Debug.Notification("Repeat done: " + passed + "/" + run + " passed")
+    __repeating = false
+    __repeatStopRequested = false
+endFunction
+
+; Tests without a state of their own. A script can have at most 128 states (the empty one included): at 129 the game
+; refused to load this script at all ("Unable to get type rpb_tests", empty test list), and even the fixed build only
+; loaded again after a game restart, not a reloadscript. This one is at 127, so every new test goes here.
+string __statelessTest = ""
+
+bool function __RunStatelessTest(string asTest)
+    if (asTest != "Test_ArrestWaitsWhileGuardFights_NoPackage" && asTest != "Test_CellDoorsDiagnostic" && asTest != "Test_LongAbsenceSetup" && asTest != "Test_LongAbsenceAdvance" && asTest != "Test_LongAbsenceVerify" && asTest != "Test_FallbackEscortToCellStopped_Player")
+        return false
+    endif
+
+    __statelessTest = asTest
+    self.__SilenceLogs()
+    start_test(asTest)
+    if (asTest == "Test_ArrestWaitsWhileGuardFights_NoPackage")
+        ; 130: 108 with only the script-side hold (SetRestrained, SetDontMove, sheathe on every draw). As green as 108
+        ; (moved, draw events) means the PendingHold package does nothing the script doesn't
+        RPB_Utility.SetPendingHoldPackageDisabled(true)
+        display_result(__Scenario_ArrestWaitsWhileGuardFights("130"))
+        RPB_Utility.SetPendingHoldPackageDisabled(false)
+        __TeardownAllTempActors()
+    elseif (asTest == "Test_CellDoorsDiagnostic")
+        display_result(__CellDoorsDiagnostic())
+    elseif (asTest == "Test_LongAbsenceSetup")
+        display_result(__LongAbsenceSetup())
+    elseif (asTest == "Test_LongAbsenceAdvance")
+        display_result(__LongAbsenceAdvance())
+    elseif (asTest == "Test_LongAbsenceVerify")
+        display_result(__LongAbsenceVerify())
+    elseif (asTest == "Test_FallbackEscortToCellStopped_Player")
+        display_result(__Scenario_EscortToCellStopped("135"))
+        __TeardownScenario()
+    endif
+    __statelessTest = ""
+    self.__RestoreLogs()
+    return true
 endFunction
 
 ; The user's own log levels, saved by __SilenceLogs() before a test runs

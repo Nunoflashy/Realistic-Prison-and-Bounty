@@ -168,8 +168,25 @@ event OnKeyDown(int keyCode)
         RPB_UIInterface uilib   = (self.GetReference() as Form) as RPB_UIInterface
         RPB_Tests unitTest      = (self.GetReference() as Form) as RPB_Tests
         
+        ; A repeated run going: F1 offers to stop it after the current run instead
+        if (unitTest.IsRepeating)
+            string[] repeatChoices = new string[2]
+            repeatChoices[0] = "Keep repeating"
+            repeatChoices[1] = "Stop after this run"
+            if (uilib.ShowList("A test is repeating", repeatChoices, 0, 0) == 1)
+                unitTest.RequestRepeatStop()
+            endif
+            return
+        endif
+
         string testName = uilib.ShowList_ReturnElement("Tests", unitTest.GetTestNames(), 0, 0)
-        unitTest.ExecuteTest(testName)
+
+        ; How many times in a row (the summary lands in the Papyrus log as "[UNIT REPEAT RESULT]"); empty or not a number = once
+        int times = uilib.ShowInput("Run how many times?", "1") as int
+        if (times < 1)
+            times = 1
+        endif
+        unitTest.ExecuteTestRepeated(testName, times)
 
     elseif (keyCode == 0x3C)    ; F2
         ; Config.SetPrisons()

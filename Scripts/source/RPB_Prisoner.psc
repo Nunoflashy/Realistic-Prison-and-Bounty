@@ -205,8 +205,9 @@ Scriptname RPB_Prisoner extends RPB_ActorBase
     function NPC_RestoreOriginalOutfit()
     function NPC_ReequipAfterRelease()
     function NPC_EnsureDressed()
-    function NPC_SaveWornArmor()
-    int function NPC_ReequipSavedWornArmor()
+    function Stripping_SaveWornGear()
+    int function Release_ReequipWornGear()
+    function Player_ReequipAfterRelease()
     bool function IsHostilePrisoner()
     function NeutralizeWhileImprisoned()
     function NPC_SetPersistentOutfit(string asOutfit)
@@ -544,11 +545,29 @@ endProperty
 /;
 bool property IsInCell
     bool function get()
-        if (this.Is3DLoaded())
-            float distanceFromCellDoor      = self.GetDistance(JailCell.CellDoor)
-            float distanceFromOutsideCell   = self.GetDistance(JailCell.ExteriorMarkers[0] as ObjectReference)
+        if (!JailCell)
+            return false
+        endif
 
-            return distanceFromCellDoor < distanceFromOutsideCell
+        if (this.Is3DLoaded())
+            ; At the cell first: "closer to the door than to the exterior marker" alone read "in" on Castle Dour's stairs,
+            ; far from any cell (the escort assist then stopped helping, and the stall check could have finished the
+            ; escort there). The cell's marker is inside the cell (MoveToCell teleports to it).
+            float distanceFromCell = self.GetDistance(JailCell)
+            if (distanceFromCell < 0.0 || distanceFromCell > 400.0)
+                return false
+            endif
+
+            ObjectReference cellDoor = JailCell.CellDoor
+            ObjectReference outsideMarker = none
+            if (JailCell.HasExteriorMarkers)
+                outsideMarker = JailCell.ExteriorMarkers[0] as ObjectReference
+            endif
+            if (!cellDoor || !outsideMarker)
+                return true ; nothing to tell inside from just outside: at the cell is as close as it gets
+            endif
+
+            return self.GetDistance(cellDoor) < self.GetDistance(outsideMarker)
         endif
 
         return self.GetCurrentCell() == JailCell.GetParentCell()
@@ -895,10 +914,13 @@ state Awaiting
 endState
 
 ;/
-    While the player is being escorted (the escort assist, see StartEscortAssist): once a second, stuck while the guard
-    walks away means stairs or a slope the AI-driven walk can't climb (an engine limit, Castle Dour Dungeon's stairs):
-    the walking speed is raised until they move again, then restored. Still stuck, they're moved to the guard (the old
-    leash, now the last resort); three of those and the escort is broken: they go on to the prison or cell without it.
+    While the player is being escorted (the escort assist, see StartEscortAssist): once a second, not getting anywhere
+    while the guard is far and still walking on means stairs or a slope the AI-driven walk can't climb (an engine limit,
+    Castle Dour Dungeon's stairs): the walking speed is raised in steps (400, 700, 1000) while still stuck, kept up for
+    the climb, and restored on the first flat stretch, once caught up, or once the guard stops too. Still stuck at the
+    top step, they're moved to the guard (the old leash, now the last resort). Both standing still while the guard is far
+    (a Scene phase making them wait) never raises the speed: after a while they're moved to the guard instead. Three
+    moves and the escort is broken: they go on to the prison or cell without it.
 /;
 state Escorting
     event OnUpdate()
@@ -906,72 +928,174 @@ state Escorting
             return
         endif
 
+        float elapsed = __assistTick
         float x = this.GetPositionX()
         float y = this.GetPositionY()
+        float z = this.GetPositionZ()
         float moved = Math.sqrt(Math.pow(x - __assistLastX, 2.0) + Math.pow(y - __assistLastY, 2.0))
+        float climbed = Math.abs(z - __assistLastZ)
         __assistLastX = x
         __assistLastY = y
+        __assistLastZ = z
+        float guardX = __assistEscort.GetPositionX()
+        float guardY = __assistEscort.GetPositionY()
+        float guardMoved = Math.sqrt(Math.pow(guardX - __assistGuardLastX, 2.0) + Math.pow(guardY - __assistGuardLastY, 2.0))
+        __assistGuardLastX = guardX
+        __assistGuardLastY = guardY
         float distance = this.GetDistance(__assistEscort)
         ; The guard through a load door reads as another cell (and an overflowed distance): far
         bool far = distance > 300.0 || distance < 0.0 || this.GetParentCell() != __assistEscort.GetParentCell()
-        float nextTick = 1.0
+        ; The escort is going on: the guard walks on (units per second, ticks are 1s or 0.25s). Stopped, a Scene phase is
+        ; making us wait, and a raised speed then flew me to the cell on the next move. The walk animation's "Speed" was
+        ; tried first: it never read above 20 on the AI-driven player, so the boost never started.
+        float guardSpeed = guardMoved / elapsed
+        bool escortMoving = guardSpeed >= 40.0
+        ; Under 30 units a second at normal speed (the ticks are 0.5s while far); boosted ticks keep 30 per 0.25s
+        float stuckUnder = 30.0
+        if (__assistLevel == 0)
+            stuckUnder = 30.0 * elapsed
+        endif
+        bool stuck = moved < stuckUnder
+        bool sameCell = this.GetParentCell() == __assistEscort.GetParentCell()
+        ; Pushing: stuck but jittering (a few units, or up and down a step): a player waiting in a Scene doesn't move at all
+        ; (moved 0, dz 0). On Castle Dour's stairs the player crept 4-5 units a tick behind a guard waiting at the top, and
+        ; no boost started because the guard wasn't walking on.
+        bool pushing = stuck && (moved >= 2.0 || climbed >= 2.0)
+        ; The guard walking on counts in the same cell only: from another cell his position is another cell's coordinates
+        ; (his "speed" flickered 0 / 725 a second and kept resetting the idle timer)
+        bool guardWalksOn = sameCell && escortMoving
+        ; Walking away from a guard who has stopped (the AI walked me backwards from my cell, 232 -> 944 units)
+        if (sameCell && !escortMoving && !stuck && distance > __assistLastDistance + 20.0 * elapsed)
+            __assistAwayTime += elapsed
+        else
+            __assistAwayTime = 0.0
+        endif
+        __assistLastDistance = distance
+        __assistTick = 1.0
+        string branch = "moving" ; for the trace below
 
-        if (__assistBoosted)
-            ; At 1000 an unstuck player is far too fast: checked twice a second, and back to normal once they're caught up or
-            ; running free. Climbing at the raised speed is slow, steady progress: the boost stays for the whole flight (it
-            ; used to drop at the first step and flip back and forth all the way up Castle Dour's stairs).
-            nextTick = 0.5
-            if (!far || moved >= 200.0)
+        if (__assistToCell && self.__AssistInCell())
+            ; In the cell is where this escort ends: nothing to move me for (135: moved into the cell again, while already
+            ; in it waiting for the guard). The Scene has its guard and its own stall check for the rest.
+            branch = "in the cell"
+            __assistStuckTime = 0.0
+            __assistIdleTime = 0.0
+            __assistAwayTime = 0.0
+            if (__assistLevel > 0)
                 self.__RestoreEscortSpeed()
-                __assistStuckTicks = 0
-                EventManager.SendInfo(Name + " is moving again in the escort, walking speed restored", "["+ Name +"] Prisoner::EscortAssist")
-            elseif (moved >= 30.0)
-                __assistStuckTicks = 0 ; climbing: not stuck, not free yet
-            else
-                __assistStuckTicks += 1
-                if (__assistStuckTicks >= 12) ; ~6s at the raised speed and still stuck
-                    __assistStuckTicks = 0
-                    self.__RestoreEscortSpeed()
-                    __assistTeleports += 1 ; never reset during one escort: three means it's not the stairs
-                    if (__assistTeleports >= 3)
-                        EventManager.SendInfo("Escort of " + Name + " broken: still stuck after 3 moves to the guard, going on without the Scene", "["+ Name +"] Prisoner::EscortAssist")
-                        bool toCell = __assistToCell
-                        Actor escort = __assistEscort
-                        self.StopEscortAssist()
-                        RPB_API.GetSceneManager().EndSceneWithActor(this, "the player can't follow the escort")
-                        if (toCell)
-                            self.MoveToCell()
-                        else
-                            self.MoveToPrison(escort)
-                        endif
+                EventManager.SendInfo(Name + " is in the cell, walking speed restored", "["+ Name +"] Prisoner::EscortAssist")
+            endif
+
+        elseif (!far)
+            branch = "near"
+            __assistStuckTime = 0.0
+            if (__assistLevel > 0)
+                self.__RestoreEscortSpeed()
+                EventManager.SendInfo(Name + " caught up with the escort, walking speed restored", "["+ Name +"] Prisoner::EscortAssist")
+            endif
+            ; Next to the guard but not in my cell and not moving: the escort to the cell waits for me to get in
+            if (__assistToCell && stuck && !self.__AssistInCell())
+                branch = "near, outside the cell"
+                __assistIdleTime += elapsed
+                if (__assistIdleTime >= 12.0)
+                    __assistIdleTime = 0.0
+                    if (self.__AssistMoveToGuard("standing outside the cell for 12s"))
                         return
                     endif
-                    this.MoveTo(__assistEscort)
-                    ; From where the move put them: the teleport itself isn't the player moving again
-                    __assistLastX = this.GetPositionX()
-                    __assistLastY = this.GetPositionY()
-                    nextTick = 1.0
-                    EventManager.SendInfo(Name + " still stuck in the escort with raised speed, moved to the guard (" + __assistTeleports + "/3)", "["+ Name +"] Prisoner::EscortAssist")
+                endif
+            else
+                __assistIdleTime = 0.0
+            endif
+
+        elseif (stuck && !pushing && !guardWalksOn && __assistLevel == 0)
+            ; Not while boosted: the guard stops to wait for a player stuck behind him, and dropping the boost right there
+            ; left the player crawling up the stairs at walking speed (raised, then "both stopped", restored, tick after tick)
+            branch = "both stopped"
+            __assistStuckTime = 0.0
+            if (__assistLevel > 0)
+                self.__RestoreEscortSpeed()
+                EventManager.SendInfo(Name + " and the guard both stopped in the escort, walking speed restored", "["+ Name +"] Prisoner::EscortAssist")
+            endif
+            __assistIdleTime += elapsed
+            if (__assistIdleTime >= 12.0)
+                __assistIdleTime = 0.0
+                if (self.__AssistMoveToGuard("standing still " + (distance as int) + " units behind for 12s"))
+                    return
                 endif
             endif
 
-        elseif (far && moved < 30.0)
-            __assistStuckTicks += 1
-            if (__assistStuckTicks >= 2)
-                __assistStuckTicks = 0
+        elseif (__assistLevel > 0)
+            branch = "boosted"
+            __assistIdleTime = 0.0
+            __assistTick = 0.25 ; at the raised speed a free player is far too fast: checked four times a second
+            ; Flat = walking without climbing (a slope under 15%): the first flat stretch past the stairs, up or down
+            if (moved >= 30.0 && climbed < moved * 0.15)
+                __assistStuckTime = 0.0
+                ; Twice in a row: a single flat tick was a slide at the foot of the stairs, restored before the climb
+                ; The first flat tick steps down to 400, the second restores: waiting a whole tick at 1000 on flat ground flew
+                ; the player 300 units past the top of the stairs, and a slide at the foot of them only costs a step down
+                __assistFlatTicks += 1
+                if (__assistFlatTicks >= 2)
+                    __assistFlatTicks = 0
+                    self.__RestoreEscortSpeed()
+                    EventManager.SendInfo(Name + " is past the stairs in the escort, walking speed restored", "["+ Name +"] Prisoner::EscortAssist")
+                elseif (__assistLevel > 1)
+                    self.__SetEscortSpeedLevel(1)
+                    EventManager.SendInfo(Name + " is on flat ground in the escort, walking speed lowered to " + (self.__EscortSpeedForLevel(1) as int), "["+ Name +"] Prisoner::EscortAssist")
+                endif
+            elseif (moved >= 30.0)
+                __assistFlatTicks = 0
+                __assistStuckTime = 0.0 ; climbing: keeps this speed for the whole flight
+            else
+                __assistFlatTicks = 0
+                __assistStuckTime += elapsed
+                if (__assistLevel < 3 && __assistStuckTime >= 0.5 * __assistLevel)
+                    self.__SetEscortSpeedLevel(__assistLevel + 1)
+                    EventManager.SendInfo(Name + " still stuck in the escort, walking speed raised to " + (self.__EscortSpeedForLevel(__assistLevel) as int) + " (" + self.__AssistTrace(guardSpeed) + ")", "["+ Name +"] Prisoner::EscortAssist")
+                elseif (__assistLevel >= 3 && __assistStuckTime >= 6.0)
+                    __assistStuckTime = 0.0
+                    self.__RestoreEscortSpeed()
+                    if (self.__AssistMoveToGuard("still stuck with raised speed"))
+                        return
+                    endif
+                endif
+            endif
+
+        elseif (stuck && (pushing || guardWalksOn))
+            ; Pushing against something, or left behind by a guard walking on in the same cell
+            branch = "stuck"
+            __assistIdleTime = 0.0
+            __assistStuckTime += elapsed
+            if (__assistStuckTime >= 1.0) ; was 2s on 1s ticks: 2-3s stuck at the foot of the stairs before any help
+                __assistStuckTime = 0.0
                 __assistSavedSpeed = this.GetActorValue("SpeedMult")
-                this.SetActorValue("SpeedMult", 1000.0) ; 250 wasn't enough for the stairs
-                this.ModActorValue("CarryWeight", 0.1) ; a speed change only applies once the movement is re-evaluated
-                this.ModActorValue("CarryWeight", -0.1)
-                __assistBoosted = true
-                nextTick = 0.5
-                EventManager.SendInfo(Name + " is stuck in the escort (" + (distance as int) + " units behind), walking speed raised", "["+ Name +"] Prisoner::EscortAssist")
+                self.__SetEscortSpeedLevel(1)
+                __assistTick = 0.25
+                EventManager.SendInfo(Name + " is stuck in the escort (" + (distance as int) + " units behind, " + self.__AssistTrace(guardSpeed) + "), walking speed raised to " + (self.__EscortSpeedForLevel(1) as int), "["+ Name +"] Prisoner::EscortAssist")
             endif
         else
-            __assistStuckTicks = 0
+            __assistStuckTime = 0.0
+            __assistIdleTime = 0.0
         endif
 
-        RegisterForSingleUpdate(nextTick)
+        if (__assistAwayTime >= 6.0 && __assistLevel == 0)
+            __assistAwayTime = 0.0
+            branch = "walking away"
+            if (self.__AssistMoveToGuard("walking away from the stopped guard (" + (distance as int) + " units)"))
+                return
+            endif
+        endif
+
+        ; Twice a second while far at normal speed: stuck is noticed in 1s
+        if (__assistLevel == 0 && far && __assistTick > 0.5)
+            __assistTick = 0.5
+        endif
+
+        ; Every tick, with DEBUG on (built only then): what the assist saw and which branch it took
+        if (IsDebuggingEnabled())
+            Debug("["+ Name +"] Prisoner::EscortAssist", "tick (to cell " + __assistToCell + "): " + branch + ", distance " + (distance as int) + ", far " + far + ", moved " + (moved as int) + ", dz " + (climbed as int) + ", guard " + (guardSpeed as int) + "/s (moving " + escortMoving + "), pushing " + pushing + ", level " + __assistLevel + ", stuck " + __assistStuckTime + "s, idle " + __assistIdleTime + "s, moves " + __assistTeleports + ", away " + __assistAwayTime + "s, same cell " + sameCell + ", to the cell marker " + (this.GetDistance(JailCell) as int))
+        endif
+        RegisterForSingleUpdate(__assistTick)
     endEvent
 endState
 
@@ -1264,7 +1388,17 @@ function SetEscapePenalty()
 endFunction
 
 ; Moves this prisoner to Prison (To be processed)
+; The arrest state (if any) stops watching the escort to jail: I'm at the prison. A lookup, not an await: an NPC moved
+; straight to prison may have no arrest state at all.
+function EndArrestEscortWatch()
+    RPB_Arrestee arrestState = RPB_API.GetArrest().Arrestees.AtKey(this)
+    if (arrestState)
+        arrestState.EndEscortWatch()
+    endif
+endFunction
+
 function MoveToPrison(Actor akCaptor)
+    self.EndArrestEscortWatch()
     ObjectReference escortLocation = Prison.GetRandomEscortLocation()
 
     ; Assign a container for this prisoner's belongings (if applicable)
@@ -1297,7 +1431,17 @@ function MoveToCell(bool abBeginImprisonment = true)
         return
     endif
 
+    self.EndArrestEscortWatch()
     self.MoveTo(JailCell)
+    ; Locked behind me, as the escort Scene's "Lock Cell" step does: a fallback into the cell (the escort broke before the
+    ; guard got to the door) left it open
+    RPB_CellDoor cellDoor = JailCell.CellDoor
+    if (cellDoor)
+        cellDoor.Close()
+        cellDoor.Lock()
+    else
+        EventManager.SendWarning("Moved " + Name + " into " + JailCell.ID + ", but its door isn't bound (the cell wasn't loaded yet), left as it is", "["+ Name +"] Prisoner::MoveToCell")
+    endif
     RPB_Utility.FlowMark("Prisoner.MoveToCell: MoveTo(JailCell) done")
     RPB_Utility.Crumb(this, "Prisoner.MoveToCell: MoveTo(JailCell) done")
     Prison.OnPrisonerTeleportedToCell(self, abBeginImprisonment)
@@ -1573,8 +1717,8 @@ function Strip(bool abRemoveUnderwear = true)
     endif
     RPB_Utility.FlowMark("Strip: underwear read")
 
-    self.NPC_SaveWornArmor()
-    RPB_Utility.FlowMark("Strip: NPC_SaveWornArmor")
+    self.Stripping_SaveWornGear()
+    RPB_Utility.FlowMark("Strip: Stripping_SaveWornGear")
     self.SaveBelongingsManifest()
     RPB_Utility.FlowMark("Strip: SaveBelongingsManifest")
     self.UnequipAll()
@@ -1629,8 +1773,8 @@ function StripSilently()
     NPC_SaveUnderwear(underwearTop, underwearBottom)
     RPB_Utility.FlowMark("StripSilently: underwear read")
 
-    self.NPC_SaveWornArmor()
-    RPB_Utility.FlowMark("StripSilently: NPC_SaveWornArmor")
+    self.Stripping_SaveWornGear()
+    RPB_Utility.FlowMark("StripSilently: Stripping_SaveWornGear")
     self.SaveBelongingsManifest()
     RPB_Utility.FlowMark("StripSilently: SaveBelongingsManifest")
     self.UnequipAll()
@@ -2167,18 +2311,40 @@ int property BELONGINGS_MANIFEST_MAX = 120 autoreadonly
 
 bool __assistOn
 bool __assistToCell
-bool __assistBoosted
 Actor __assistEscort
 string __assistPreviousState
 float __assistLastX
 float __assistLastY
+float __assistLastZ
+float __assistGuardLastX
+float __assistGuardLastY
 float __assistSavedSpeed
-int __assistStuckTicks
+float __assistTick
+float __assistStuckTime
+float __assistIdleTime
+int __assistLevel ; 0 = normal speed, 1-3 = raised (see __EscortSpeedForLevel)
 int __assistTeleports
+float __assistAwayTime
+int __assistFlatTicks
+float __assistLastDistance
 
 bool property EscortAssistActive
     bool function get()
         return __assistOn
+    endFunction
+endProperty
+
+; How many times the assist moved me in this escort (to the guard, or into the cell)
+int property EscortAssistMoves
+    int function get()
+        return __assistTeleports
+    endFunction
+endProperty
+
+; The assist is watching an escort to the cell (the escort's Scene has really started, not just been queued)
+bool property EscortAssistToCell
+    bool function get()
+        return __assistOn && __assistToCell
     endFunction
 endProperty
 
@@ -2195,12 +2361,21 @@ function StartEscortAssist(Actor akEscort, bool abToCell)
     __assistOn = true
     __assistToCell = abToCell
     __assistEscort = akEscort
-    __assistStuckTicks = 0
+    __assistStuckTime = 0.0
+    __assistIdleTime = 0.0
     __assistTeleports = 0
+    __assistAwayTime = 0.0
+    __assistFlatTicks = 0
+    __assistLastDistance = this.GetDistance(akEscort)
     __assistLastX = this.GetPositionX()
     __assistLastY = this.GetPositionY()
+    __assistLastZ = this.GetPositionZ()
+    __assistGuardLastX = akEscort.GetPositionX()
+    __assistGuardLastY = akEscort.GetPositionY()
+    __assistTick = 1.0
     GotoState("Escorting")
     RegisterForSingleUpdate(1.0)
+    Debug("["+ Name +"] Prisoner::EscortAssist", "assist started: escort by " + akEscort + ", to cell " + abToCell + ", previous state '" + __assistPreviousState + "'")
 endFunction
 
 function StopEscortAssist()
@@ -2208,6 +2383,7 @@ function StopEscortAssist()
         return
     endif
 
+    Debug("["+ Name +"] Prisoner::EscortAssist", "assist stopped (to cell " + __assistToCell + ", moves " + __assistTeleports + ")")
     __assistOn = false
     __assistEscort = none
     self.__RestoreEscortSpeed()
@@ -2218,13 +2394,93 @@ function StopEscortAssist()
 endFunction
 
 function __RestoreEscortSpeed()
-    if (!__assistBoosted)
+    if (__assistLevel == 0)
         return
     endif
     this.SetActorValue("SpeedMult", __assistSavedSpeed)
-    this.ModActorValue("CarryWeight", 0.1)
+    this.ModActorValue("CarryWeight", 0.1) ; a speed change only applies once the movement is re-evaluated
     this.ModActorValue("CarryWeight", -0.1)
-    __assistBoosted = false
+    __assistLevel = 0
+endFunction
+
+; What the assist saw, for its log lines: the guard's speed, and the walk animation's own values (logged only: "Speed"
+; never rose above 20 on the AI-driven player)
+string function __AssistTrace(float afGuardSpeed)
+    return "guard moving " + (afGuardSpeed as int) + "/s, anim Speed " + (this.GetAnimationVariableFloat("Speed") as int) + ", SpeedSampled " + (this.GetAnimationVariableFloat("SpeedSampled") as int)
+endFunction
+
+; The raised walking speeds, in steps: small stairs never need the top one, which overshot at the end of a flight
+float function __EscortSpeedForLevel(int aiLevel)
+    if (aiLevel <= 1)
+        return 400.0
+    elseif (aiLevel == 2)
+        return 700.0
+    endif
+    return 1000.0 ; what Castle Dour's stairs need (250 wasn't enough)
+endFunction
+
+function __SetEscortSpeedLevel(int aiLevel)
+    __assistLevel = aiLevel
+    this.SetActorValue("SpeedMult", self.__EscortSpeedForLevel(aiLevel))
+    this.ModActorValue("CarryWeight", 0.1) ; a speed change only applies once the movement is re-evaluated
+    this.ModActorValue("CarryWeight", -0.1)
+endFunction
+
+; Moves me to my guard (@asWhy is logged); the third time the escort is broken and I go on to the prison or cell without
+; it. Returns true when it broke (the assist is over).
+bool function __AssistMoveToGuard(string asWhy)
+    __assistTeleports += 1 ; never reset during one escort: three means it's not the stairs
+
+    ; The escort to the cell ends in the cell: moved in, there's nothing left to escort. Left playing, the Scene walked the
+    ; guard over to unlock and open the door on a player already inside, then close and lock it again. Finished here the
+    ; same way as a broken escort (the door is locked by MoveToCell).
+    if (__assistToCell && JailCell)
+        EventManager.SendInfo(Name + " " + asWhy + " in the escort, moved into the cell, the escort ends here (" + __assistTeleports + ")", "["+ Name +"] Prisoner::EscortAssist")
+        Actor cellEscort = __assistEscort
+        self.StopEscortAssist()
+        RPB_SceneManager sceneManager = RPB_API.GetSceneManager()
+        sceneManager.EndSceneWithActor(this, "moved into the cell")
+        RPB_Recovery.__FreeGuard(cellEscort, sceneManager)
+        self.MoveToCell()
+        return true
+    endif
+    if (__assistTeleports >= 3)
+        EventManager.SendInfo("Escort of " + Name + " broken (" + asWhy + ", 3 moves), going on without the Scene", "["+ Name +"] Prisoner::EscortAssist")
+        bool toCell = __assistToCell
+        Actor escort = __assistEscort
+        self.StopEscortAssist()
+        RPB_API.GetSceneManager().EndSceneWithActor(this, "the player can't follow the escort")
+        if (toCell)
+            self.MoveToCell()
+        else
+            self.MoveToPrison(escort)
+        endif
+        return true
+    endif
+
+    ; The escort to the cell ends in the cell: moved there, the Scene goes on (the guard locks the door). Moved to the guard,
+    ; I stood next to him outside the cell with the Scene still waiting for me.
+    string moveTarget = "to the guard"
+    if (__assistToCell && JailCell)
+        this.MoveTo(JailCell)
+        moveTarget = "into the cell"
+    else
+        this.MoveTo(__assistEscort)
+    endif
+    ; From where the move put me: the teleport itself isn't me moving again
+    __assistLastX = this.GetPositionX()
+    __assistLastY = this.GetPositionY()
+    __assistLastZ = this.GetPositionZ()
+    __assistLastDistance = this.GetDistance(__assistEscort)
+    __assistAwayTime = 0.0
+    __assistTick = 1.0
+    EventManager.SendInfo(Name + " " + asWhy + " in the escort, moved " + moveTarget + " (" + __assistTeleports + "/3)", "["+ Name +"] Prisoner::EscortAssist")
+    return false
+endFunction
+
+; In my cell, for the escort to the cell (IsInCell: at the cell, and on the inside of its door)
+bool function __AssistInCell()
+    return self.IsInCell
 endFunction
 
 function SaveBelongingsManifest()
@@ -2919,12 +3175,22 @@ endFunction
     "<Guard> is not loaded, cannot be registered right now!" right after an off-screen imprisonment).
 /;
 function ClearArrest()
+    ; Step marks (DEBUG): an imprisonment once never got past here, with the reset and the MCM stuck on the same objects
+    RPB_Recovery.__Step(this, "ClearArrest: looking up the Captor of " + Captor)
     RPB_Captor captorRef = API.Arrest.GetCaptor(Captor)
-    if (captorRef && captorRef.Arrestee == this)
+    RPB_Recovery.__Step(this, "ClearArrest: Captor looked up (" + captorRef + ")")
+    Actor captorArrestee = none
+    if (captorRef)
+        captorArrestee = captorRef.Arrestee
+        RPB_Recovery.__Step(this, "ClearArrest: read the Captor's Arrestee (" + captorArrestee + ")")
+    endif
+    if (captorRef && captorArrestee == this)
         captorRef.Destroy()
+        RPB_Recovery.__Step(this, "ClearArrest: Captor destroyed")
     endif
 
     self.DestroyArrestState()
+    RPB_Recovery.__Step(this, "ClearArrest: arrest state destroyed")
 endFunction
 
 function DestroyArrestState()
@@ -2935,6 +3201,7 @@ function DestroyArrestState()
     RPB_Utility.FlowMark("DestroyArrestState: IsActorArrested")
     RPB_Arrestee arrestState = RPB_Arrestee.GetStateForPrisoner(self)
     RPB_Utility.FlowMark("DestroyArrestState: GetStateForPrisoner")
+    RPB_Recovery.__Step(this, "DestroyArrestState: arrest state found (" + arrestState + "), destroying it")
     arrestState.Destroy()
     RPB_Utility.FlowMark("DestroyArrestState: Arrestee.Destroy")
 endFunction
@@ -3751,7 +4018,7 @@ function NPC_ReequipAfterRelease()
         endWhile
     endif
 
-    ; No NPC_ReequipSavedWornArmor() here either: the saved worn armor is on the same dress list (see the comment above)
+    ; No Release_ReequipWornGear() here either: the saved worn armor is on the same dress list (see the comment above)
     EventManager.SendInfo("Restored outfit " + original + " on " + self.Name + ": " + parts + " parts (" + skipped + " not plain armors, " + reissued + " issued again because the belongings did not have them)", "["+ Name +"] Prisoner::NPC_ReequipAfterRelease")
 endFunction
 
@@ -3784,14 +4051,14 @@ function NPC_EnsureDressed()
             i += 1
         endWhile
     endif
-    fixed += self.NPC_ReequipSavedWornArmor()
+    fixed += self.Release_ReequipWornGear()
 
     if (fixed > 0)
         EventManager.SendInfo("Equipped " + fixed + " items that were still off after the release on " + self.Name, "["+ Name +"] Prisoner::NPC_EnsureDressed")
     endif
 endFunction
 
-int[] function __NPC_WornArmorSlots()
+int[] function __WornArmorSlots()
     ; Every armor occupies at least one of the 32 body slots (30..61), so scanning all of them is complete for any NPC or mod list
     int[] slots = new int[32]
     int i = 0
@@ -3802,9 +4069,25 @@ int[] function __NPC_WornArmorSlots()
     return slots
 endFunction
 
-function NPC_SaveWornArmor()
-    if (!self.IsNPC())
-        return
+;/
+    What the prisoner wore when stripped, for Release_ReequipWornGear to put back on: each worn armor under its lowest
+    body slot ("NPC Worn Armor 30..61", NPCs and the player alike despite the key), plus the player's weapons in hand.
+
+    Adds, never wipes: a later strip of the same imprisonment (a move into the cell strips again, with nothing left on)
+    replaced the first snapshot with an empty one, and the release had nothing to put back. The keys go with the
+    prisoner state at the release (Destroy), so nothing carries over to another arrest.
+/;
+function Stripping_SaveWornGear()
+    ; An NPC's weapons are never taken off its outfit: the player's only
+    if (self.IsPlayer())
+        Weapon right = this.GetEquippedWeapon(false)
+        Weapon left = this.GetEquippedWeapon(true)
+        if (right)
+            SetForm("Player Worn Weapon Right", right)
+        endif
+        if (left)
+            SetForm("Player Worn Weapon Left", left)
+        endif
     endif
 
     ; No load wait before reading worn items: I tried a bounded Is3DLoaded() wait here (up to 1.5s) and it never helped.
@@ -3814,8 +4097,8 @@ function NPC_SaveWornArmor()
 
     ; One PO3 call for everything equipped, instead of GetWornForm on each of the 32 slots (a frame each, ~0.35s per
     ; NPC). Each armor is stored under its lowest slot's key - the same key the old ascending 30..61 slot scan produced
-    ; (an armor covering several slots was found at its lowest one first), so NPC_ReequipSavedWornArmor and
-    ; Prison's dress check read it unchanged. Works on an unloaded actor, like GetWornForm did.
+    ; (an armor covering several slots was found at its lowest one first), so Release_ReequipWornGear and Prison's dress
+    ; check read it unchanged. Works on an unloaded actor, like GetWornForm did.
     Form[] equipped = PO3_SKSEFunctions.AddAllEquippedItemsToArray(this)
     Form[] bySlot = new Form[32] ; index = slot - 30
     int saved = 0
@@ -3836,21 +4119,37 @@ function NPC_SaveWornArmor()
         i += 1
     endWhile
 
+    int total = 0
     i = 0
     while (i < 32)
         string wornKey = "NPC Worn Armor " + (30 + i)
         if (bySlot[i])
             SetForm(wornKey, bySlot[i])
-        elseIf (GetForm(wornKey))
-            Remove(wornKey)
+        endif
+        if (GetForm(wornKey))
+            total += 1
         endif
         i += 1
     endWhile
-    EventManager.SendInfo("Saved " + saved + " worn armor slots of " + self.Name + " before stripping", "["+ Name +"] Prisoner::NPC_SaveWornArmor")
+    EventManager.SendInfo("Saved " + saved + " worn armor slots of " + self.Name + " before stripping (" + total + " in all)", "["+ Name +"] Prisoner::Stripping_SaveWornGear")
 endFunction
 
-int function NPC_ReequipSavedWornArmor()
-    int[] slots = self.__NPC_WornArmorSlots()
+; Dresses the player again with what they wore when stripped: a teleport release or a cancelled arrest. Before, only
+; their belongings came back, and the player had to equip everything again by hand. An escort release is meant to get a
+; clothing Scene instead. No-op for NPCs (NPC_ReequipAfterRelease dresses them).
+function Player_ReequipAfterRelease()
+    if (!self.IsPlayer())
+        return
+    endif
+
+    int pieces = self.Release_ReequipWornGear()
+    EventManager.SendInfo("Dressed " + Name + " again: " + pieces + " pieces of gear put back on", "["+ Name +"] Prisoner::Player_ReequipAfterRelease")
+endFunction
+
+; Puts back on what Stripping_SaveWornGear saved (worn armor; the player's weapons too), from what's back in the
+; inventory. Returns how many items it equipped.
+int function Release_ReequipWornGear()
+    int[] slots = self.__WornArmorSlots()
     int equipped = 0
     int i = 0
     while (i < slots.Length)
@@ -3861,6 +4160,20 @@ int function NPC_ReequipSavedWornArmor()
         endif
         i += 1
     endWhile
+
+    if (self.IsPlayer())
+        Weapon right = GetForm("Player Worn Weapon Right") as Weapon
+        Weapon left = GetForm("Player Worn Weapon Left") as Weapon
+        if (right && this.GetItemCount(right) > 0 && this.GetEquippedWeapon(false) != right)
+            this.EquipItemEx(right, 1)
+            equipped += 1
+        endif
+        ; The same weapon in both hands needs two of it
+        if (left && this.GetItemCount(left) > (left == right) as int && this.GetEquippedWeapon(true) != left)
+            this.EquipItemEx(left, 2)
+            equipped += 1
+        endif
+    endif
     return equipped
 endFunction
 

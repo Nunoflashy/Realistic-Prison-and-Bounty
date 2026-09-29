@@ -534,9 +534,10 @@ endFunction
 ; Someone other than my guard is fighting me or my guard, or I'm the player and in combat with no readable targets (my
 ; StopCombat at the arrest doesn't stop whoever attacks me). The hostile, if known, is kept for the pending arrest.
 bool function __FightBrokeOut(Actor akGuard)
-    Actor hostile = RPB_Utility.GetOtherCombatTarget(akGuard, this)
+    ; A fellow guard still attacking me is the arrest, not a fight (GetOtherHostileTarget)
+    Actor hostile = RPB_Utility.GetOtherHostileTarget(akGuard, this, akGuard)
     if (!hostile)
-        hostile = RPB_Utility.GetOtherCombatTarget(this, akGuard)
+        hostile = RPB_Utility.GetOtherHostileTarget(this, akGuard, akGuard)
     endif
 
     bool fight = hostile != none
@@ -845,7 +846,7 @@ function __BeginPendingArrest(bool abEscortDirectlyToCell, Actor akOtherHostile,
         ; Out of combat, my AI still drew my weapons at the fight next to me, on and off: the hold package (Ignore Combat,
         ; No Combat Alert) keeps me out of it. My weapons stay on me, sheathed.
         this.SetAlert(false)
-        if (!Arrest.SceneManager.SetPendingHoldOnActor(this))
+        if (RPB_Utility.IsPendingHoldPackageDisabled() || !Arrest.SceneManager.SetPendingHoldOnActor(this))
             this.EvaluatePackage()
         endif
         ; Neither the script calls nor the hold package (Ignore Combat, No Combat Alert) stopped my AI drawing my weapon at
@@ -908,14 +909,31 @@ function __ReleasePendingHold(bool abReverted = false)
     endif
 
     Arrest.SceneManager.UnsetPendingHoldOnActor(this) ; before the escort Scene binds me
-    UnregisterForActorAction(8)
+    if (abReverted)
+        UnregisterForActorAction(8)
+    else
+        ; Resumed: the fight can still be going on next to me (the other hostile dying), and I drew my weapon at it with
+        ; the cuffs on. Draws are still answered while I'm cuffed, until my arrest state ends (Destroy).
+        self.SetBool("Sheathe While Cuffed", true)
+    endif
     this.SetRestrained(false)
     this.SetDontMove(false)
 endFunction
 
-; While held (pending, NPC): a weapon drawn is put away again
+; While held (pending, NPC), and cuffed after a resume: a weapon drawn is put away again
 event OnActorAction(int actionType, Actor akActor, Form source, int slot)
-    if (akActor != this || actionType != 8 || !self.GetBool("Pending Hold"))
+    if (akActor != this || actionType != 8)
+        return
+    endif
+
+    if (!self.GetBool("Pending Hold"))
+        ; Resumed and walking to the escort: only sheathed (no restraint, the escort walks me), and only while I'm still
+        ; cuffed and not in a fight of my own
+        if (self.GetBool("Sheathe While Cuffed") && RPB_Utility.IsCuffed(this) && !this.IsInCombat())
+            self.SetInt("Resumed Draws", self.GetInt("Resumed Draws") + 1)
+            Debug("["+ Name +"] Arrestee::OnActorAction", Name + " drew a weapon while cuffed after the resume, sheathing it")
+            this.SheatheWeapon()
+        endif
         return
     endif
 
@@ -1311,9 +1329,21 @@ event OnUpdate()
         RegisterForSingleUpdate(1.0)
         return
     endif
+    ; The watch above may have just cancelled the arrest and removed me: my variables still read on a dead effect, and the
+    ; leash below then moved the freed player back to their guard
+    if (!self.IsEffectActive)
+        return
+    endif
 
     if (!Captor || !Captor.GetActor())
         return ; the arrest is gone (cancelled by the watch above, or reverted)
+    endif
+
+    ; At the prison the escort to jail is over: the prison flow (strip, escort to the cell) has its own checks. Left
+    ; running, this watch read "no Scene playing" between two prison Scenes as a stalled escort and sent me back to the
+    ; prison entrance in the middle of the escort to my cell (Frisking all over again).
+    if (self.GetBool("Escort Arrived"))
+        return
     endif
 
     float leash = ESCORT_LEASH_DISTANCE
@@ -1367,6 +1397,7 @@ bool function __EscortStalled()
     Actor guard = Captor.GetActor()
     if (moved >= 64.0 || self.GetBool("Arrest Pending") || this.IsInCombat() || (guard && guard.IsInCombat()) || (current != "" && !SceneManager.IsSceneOfType(current, SceneManager.CATEGORY_ESCORT_TO_JAIL)))
         self.SetInt("Stall Ticks", 0)
+        self.SetBool("Stall Nudged", false)
         return false
     endif
 
@@ -1375,12 +1406,52 @@ bool function __EscortStalled()
         ticks = 0 ; waiting its turn in the Scene queue, not stalled
     endif
     self.SetInt("Stall Ticks", ticks)
+    if (ticks == 2 && guard && !self.GetBool("Stall Nudged"))
+        self.SetBool("Stall Nudged", true)
+        self.__NudgeStalledEscort(guard, current)
+    endif
     if (ticks < 4)
         return false
     endif
 
     self.SetInt("Stall Ticks", 0)
+    self.SetBool("Stall Nudged", false)
     return self.__FallBackToPrison("the escort isn't moving (" + string_if(current == "", "no Scene playing", current) + ")")
+endFunction
+
+;/
+    Halfway to the stall fallback (~10s still): what the guard and I are running, then both packages re-evaluated. Seen at
+    Castle Dour's door into SolitudeJail01 with real guards too (2 of 10 escorts fell back, one more walked on by itself
+    after ~17s). The guard's escort package is a plain Travel with no wait for me, and he stopped there before I had even
+    caught up, so it isn't the two of us waiting on each other. The report tells a lost Scene package from a stuck Travel,
+    and (DEBUG) lists who stands near the guard, in case someone blocks the doorway.
+/;
+function __NudgeStalledEscort(Actor akGuard, string asScene)
+    Info("Escort of " + Name + " " + this + " still for ~10s (" + string_if(asScene == "", "no Scene playing", asScene) + "), nudging it: guard " + akGuard + " on package " + akGuard.GetCurrentPackage() + ", " + Name + " on " + this.GetCurrentPackage() + ", " + (this.GetDistance(akGuard) as int) + " units apart, guard in " + akGuard.GetParentCell())
+
+    if (IsDebuggingEnabled())
+        Cell guardCell = akGuard.GetParentCell()
+        string nearby = ""
+        int count = 0
+        if (guardCell)
+            count = guardCell.GetNumRefs(62)
+        endif
+        int i = 0
+        while (i < count)
+            Actor other = guardCell.GetNthRef(i, 62) as Actor
+            if (other && other != akGuard && other != this)
+                float apart = other.GetDistance(akGuard)
+                if (apart < 256.0)
+                    nearby += other.GetDisplayName() + " " + other + " at " + (apart as int) + "; "
+                endif
+            endif
+            i += 1
+        endWhile
+        Debug("["+ Name +"] Arrestee::__NudgeStalledEscort", "Actors within 256 units of " + akGuard + ": " + string_if(nearby == "", "none", nearby))
+    endif
+
+    akGuard.EvaluatePackage()
+    this.EvaluatePackage()
 endFunction
 
 bool function __PlayerEscortAssisted()
@@ -1406,6 +1477,10 @@ endFunction
 ; The escort's fallback: any Scene with me ended without its end events, and I'm moved to the prison without it (as for an
 ; escort that never starts). False when there's no prisoner of mine to move (or it's already imprisoned).
 bool function __FallBackToPrison(string asReason)
+    if (self.GetBool("Escort Arrived"))
+        return false ; already at the prison (see EndEscortWatch)
+    endif
+
     RPB_Prison prison = API.PrisonManager.FindPrisonByPrisoner(this)
     RPB_Prisoner prisoner = none
     if (prison)
@@ -1421,6 +1496,15 @@ bool function __FallBackToPrison(string asReason)
     return true
 endFunction
 
+; I've arrived at the prison (the escort to jail ended, or I was moved there or into my cell): the escort watch in
+; OnUpdate (leash, stall, broken escort) stops at its next tick
+function EndEscortWatch()
+    self.SetBool("Escort Arrived", true)
+    self.SetInt("Stall Ticks", 0)
+    self.SetBool("Stall Nudged", false)
+    self.SetInt("Leash Pulls", 0)
+endFunction
+
 ; ==========================================================
 ;                           Management
 ; ==========================================================
@@ -1431,6 +1515,7 @@ function Destroy()
     ; Utility.Wait(0.5) between RemoveAll and UnregisterArrestee, which blocked every imprisonment for half a second.
     if (self.IsEffectActive) ; on a dead effect the native errors out (no native object bound)
         UnregisterForUpdate()
+        UnregisterForActorAction(8) ; the draws answered while held or cuffed after a resume
     endif
     self.RemoveAll()
     Arrest.UnregisterArrestee(self)
