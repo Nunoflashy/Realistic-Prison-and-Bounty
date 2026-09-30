@@ -155,8 +155,31 @@ endFunction
 event OnCombatStateChanged(Actor akTarget, int aeCombatState)
     if (aeCombatState == 0 && Arrestee)
         self.__ResumePendingArrestIfDone()
+    elseif (aeCombatState == 1 && Arrestee)
+        self.__PauseEscortIfFighting(akTarget)
     endif
 endEvent
+
+;/
+    I went into a fight while escorting my arrestee to jail: the arrest waits (escort-only pending), as a fight after the
+    cuffs does during the confrontation. Before, nothing handled it: I ran off to the fight, the escort assist read me
+    running as the player being stuck, boosted them and moved them to me, into the fight. Not for the arrestee, nor a
+    guard of my own hold (the arrest itself, see RPB_Utility.GetOtherHostileTarget).
+/;
+function __PauseEscortIfFighting(Actor akTarget)
+    if (!akTarget || akTarget == Arrestee)
+        return
+    endif
+    Faction ownFaction = this.GetCrimeFaction()
+    if (akTarget.IsGuard() && (!ownFaction || akTarget.GetCrimeFaction() == ownFaction))
+        return
+    endif
+
+    RPB_Arrestee arresteeRef = API.Arrest.Arrestees.AtKey(Arrestee)
+    if (arresteeRef)
+        arresteeRef.PauseEscortForFight(akTarget)
+    endif
+endFunction
 
 ; Needs to be revised. (Where is the RegisterForSingleUpdate()?)
 event OnUpdate()
@@ -305,10 +328,19 @@ event OnDeath(Actor akKiller)
     RPB_Arrestee arresteeRef = API.Arrest.AwaitArresteeReference(Arrestee)
     ; arresteeRef.Captor == this doubles today as "no other captors remain for this arrestee" under the current
     ; one-captor-per-arrestee model - the natural place to widen this check once multiple Captors per Arrestee exist.
-    if (arresteeRef && arresteeRef.Captor == self)
-        ; Nobody takes the arrest over (yet): the arrestee is free, whatever stage it was at. CancelArrest ends their Scenes
-        ; (confrontation or escort) without end events and also undoes a prisoner already registered for the escort - a
-        ; revert alone left the RPB_Prisoner on them, and that leftover blocked every later arrest ("already arrested").
+    ; By actor, not by instance: my effect is started again at every load door (3D reload), and the arrestee's instance was
+    ; then an older one - the death of a guard who had walked through Castle Dour's doors went unnoticed (test 139)
+    if (arresteeRef && arresteeRef.GetCaptorActor() == this)
+        ; Inside the prison (arrived): another guard of the prison takes over, or with none left the prisoner is free inside,
+        ; stripped (RPB_Arrestee.HandOverInPrison)
+        if (arresteeRef.GetBool("Escort Arrived"))
+            arresteeRef.HandOverInPrison(this)
+            return
+        endif
+        ; Outside it nobody takes the arrest over (yet): the arrestee is free, whatever stage it was at. CancelArrest ends
+        ; their Scenes (confrontation or escort) without end events and also undoes a prisoner already registered for the
+        ; escort - a revert alone left the RPB_Prisoner on them, and that leftover blocked every later arrest ("already
+        ; arrested").
         RPB_Recovery.CancelArrest(Arrestee, "the captor died")
     endif
 endEvent

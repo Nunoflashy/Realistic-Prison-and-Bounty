@@ -990,7 +990,19 @@ state Escorting
         __assistTick = 1.0
         string branch = "moving" ; for the trace below
 
-        if (__assistToCell && self.__AssistInCell())
+        if (__assistEscort.IsInCombat())
+            ; He's gone to a fight (the escort pauses: RPB_Captor.__PauseEscortIfFighting). Him running off isn't me being
+            ; stuck: boosted and moved to him, the player landed in the fight.
+            branch = "guard fighting"
+            __assistStuckTime = 0.0
+            __assistIdleTime = 0.0
+            __assistAwayTime = 0.0
+            if (__assistLevel > 0)
+                self.__RestoreEscortSpeed()
+                EventManager.SendInfo(Name + "'s guard is fighting, walking speed restored", "["+ Name +"] Prisoner::EscortAssist")
+            endif
+
+        elseif (__assistToCell && self.__AssistInCell())
             ; In the cell is where this escort ends: nothing to move me for (135: moved into the cell again, while already
             ; in it waiting for the guard). The Scene has its guard and its own stall check for the rest.
             branch = "in the cell"

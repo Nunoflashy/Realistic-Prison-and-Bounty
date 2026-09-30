@@ -50,6 +50,8 @@ Scriptname RPB_Arrestee extends RPB_ActorBase
     bool function AwaitConfrontationScene(string asScene)
     function EscortToPrison(bool abEscortDirectlyToCell = false, bool abCombatAtArrest = false, Actor akOtherHostile = none)
     function ResumePendingArrest()
+    function PauseEscortForFight(Actor akHostile)
+    function HandOverInPrison(Actor akDeadGuard)
     function MoveToPrison(bool abMoveDirectlyToCell = false)
     function ChangeEscort(Actor akNewEscort)
     function SetTimeOfArrest()
@@ -73,6 +75,7 @@ Scriptname RPB_Arrestee extends RPB_ActorBase
     Actor function GetArrestedActor()
     Actor function GetActor()
     RPB_Captor function GetCaptor()
+    Actor function GetCaptorActor()
     Faction function GetFaction()
     string function GetHold()
     string function GetArrestType()
@@ -132,9 +135,28 @@ endProperty
 RPB_Captor __captor
 RPB_Captor property Captor
     RPB_Captor function get()
+        ; The guard's Captor effect is started again each time his 3D reloads (every load door of the escort), and the
+        ; instance set at the arrest is then dead ("[rpb_captor <None>]"): his death went unnoticed (a dead instance never
+        ; matched the live one), and anything reading my captor read nothing. The live one is looked up by the guard.
+        if (__captor && __captor.IsEffectActive)
+            return __captor
+        endif
+        Actor guard = self.GetCaptorActor()
+        if (guard)
+            RPB_Captor live = Arrest.GetCaptor(guard)
+            if (live)
+                __captor = live
+                return live
+            endif
+        endif
         return __captor
     endFunction
 endProperty
+
+; My guard, by actor (the Captor instance changes with his 3D reloads, he doesn't)
+Actor function GetCaptorActor()
+    return self.GetReference("Arresting Guard") as Actor
+endFunction
 
 ;/
     The Arresting Faction to this Arrestee (The faction that arrested this Actor).
@@ -740,7 +762,7 @@ endFunction
 
 ;/
     One read of the confrontation watch (see EscortToPrison): a fight around us two reads in a row, while my
-    confrontation is still the current Scene. Before the cuffs I'm let go (nothing was done to me yet); cuffed, the arrest
+    confrontation is still the current Scene (or, while I'm not cuffed yet, no Scene or my own escort to jail). Before the cuffs I'm let go (nothing was done to me yet); cuffed, the arrest
     waits the fight out (pending), then only the escort is left. True while the watch goes on. Bounded: 1 read a second,
     at most 30s, and it ends with the confrontation.
 /;
@@ -750,7 +772,16 @@ bool function __WatchConfrontationTick()
         return false
     endif
 
-    if (SceneManager.GetCurrentScene() != watched || (Utility.GetCurrentRealTime() - self.GetFloat("Confrontation Watch Start")) > 30.0)
+    ; Still watched when the confrontation is no longer the current Scene but I'm not cuffed yet: a fight makes the engine
+    ; stop the confrontation (no end event), and my escort to jail, queued at the confirmation, was then started in its
+    ; place (or refused and dropped). The watch stopped there, and the fight left me in limbo: an uncuffed prisoner with no
+    ; Scene, never cancelled (tests 111/112).
+    string current = SceneManager.GetCurrentScene()
+    bool stillMine = current == watched
+    if (!stillMine && !RPB_Utility.IsCuffed(this))
+        stillMine = current == "" || (SceneManager.IsSceneOfType(current, SceneManager.CATEGORY_ESCORT_TO_JAIL) && SceneManager.GetSceneNthReferenceOfType(current, "Escortee") == this)
+    endif
+    if (!stillMine || (Utility.GetCurrentRealTime() - self.GetFloat("Confrontation Watch Start")) > 30.0)
         self.Remove("Watched Confrontation")
         return false
     endif
@@ -879,6 +910,8 @@ function ResumePendingArrest()
         return ; already resumed (the event and the re-check can both get here)
     endif
     self.SetBool("Arrest Pending", false)
+    __pausingEscort = false
+    self.SetBool("Stall Primed", false)
     self.__ReleasePendingHold() ; the escort has to walk me
     ; The player is AI-driven from here, as after the confrontation Scene (its RetainAI never ran on this path)
     RetainAI(self.IsPlayer())
@@ -1342,7 +1375,8 @@ event OnUpdate()
     ; At the prison the escort to jail is over: the prison flow (strip, escort to the cell) has its own checks. Left
     ; running, this watch read "no Scene playing" between two prison Scenes as a stalled escort and sent me back to the
     ; prison entrance in the middle of the escort to my cell (Frisking all over again).
-    if (self.GetBool("Escort Arrived"))
+    ; Except a pending escort to my cell (a fight inside the prison, PauseEscortForFight): the leash still holds me there
+    if (self.GetBool("Escort Arrived") && !self.GetBool("Arrest Pending"))
         return
     endif
 
@@ -1366,6 +1400,9 @@ event OnUpdate()
             return
         endif
 
+        ; Pulled back even while he's fighting: held off (round 40), a prisoner waiting out the fight could walk away as far as
+        ; they liked, and the resumed escort then played out oddly from there. Running off while pending is meant to become
+        ; an escape attempt with its own charge instead of a pull.
         this.MoveTo(Captor.GetActor())
         Debug("["+ Name +"] Arrestee::OnUpdate", "Moved Arrestee to " + Captor.Name)
     else
@@ -1389,6 +1426,14 @@ endEvent
 bool function __EscortStalled()
     float x = this.GetPositionX()
     float y = this.GetPositionY()
+    ; The first tick only records where I am: measured from a position left over from before this escort (an earlier
+    ; arrest, or 0,0), it always read "moved" and set the nudge's gate at the escort's start
+    if (!self.GetBool("Stall Primed"))
+        self.SetFloat("Stall X", x)
+        self.SetFloat("Stall Y", y)
+        self.SetBool("Stall Primed", true)
+        return false
+    endif
     float moved = Math.sqrt(Math.pow(x - self.GetFloat("Stall X"), 2.0) + Math.pow(y - self.GetFloat("Stall Y"), 2.0))
     self.SetFloat("Stall X", x)
     self.SetFloat("Stall Y", y)
@@ -1396,6 +1441,9 @@ bool function __EscortStalled()
     string current = SceneManager.GetCurrentScene()
     Actor guard = Captor.GetActor()
     if (moved >= 64.0 || self.GetBool("Arrest Pending") || this.IsInCombat() || (guard && guard.IsInCombat()) || (current != "" && !SceneManager.IsSceneOfType(current, SceneManager.CATEGORY_ESCORT_TO_JAIL)))
+        if (moved >= 64.0 && SceneManager.IsSceneOfType(current, SceneManager.CATEGORY_ESCORT_TO_JAIL))
+            self.SetBool("Stall Escort Moved", true) ; the escort got going: a stop from here on is worth a nudge
+        endif
         self.SetInt("Stall Ticks", 0)
         self.SetBool("Stall Nudged", false)
         return false
@@ -1406,7 +1454,9 @@ bool function __EscortStalled()
         ticks = 0 ; waiting its turn in the Scene queue, not stalled
     endif
     self.SetInt("Stall Ticks", ticks)
-    if (ticks == 2 && guard && !self.GetBool("Stall Nudged"))
+    ; Not before the escort got going: its opening phases hold both of us still (~10s), and a nudge fired there with the
+    ; guard already setting off. The fallback below still counts from the start (a Scene that never took hold).
+    if (ticks == 2 && guard && !self.GetBool("Stall Nudged") && self.GetBool("Stall Escort Moved"))
         self.SetBool("Stall Nudged", true)
         self.__NudgeStalledEscort(guard, current)
     endif
@@ -1497,12 +1547,113 @@ bool function __FallBackToPrison(string asReason)
     return true
 endFunction
 
+;/
+    My guard went into a fight with someone else during my escort to jail, or to my cell inside the prison
+    (RPB_Captor.OnCombatStateChanged): the escort stops and the arrest waits for the fight to end, as a fight after the
+    cuffs does during the confrontation. I'm already cuffed and a prisoner, so only the escort is left: the resume walks me
+    on from wherever I am, to the jail or to my cell (__ResumeEscort). Before, the escort just lost its guard to the fight,
+    and the player's stairs assist moved them to him, into it.
+/;
+bool __pausingEscort ; set and checked with no call between: two combat events at once both paused the escort (an NPC then held two PendingHold aliases, one released)
+
+function PauseEscortForFight(Actor akHostile)
+    if (__pausingEscort)
+        return
+    endif
+    __pausingEscort = true
+
+    if (self.GetBool("Arrest Pending") || !Captor)
+        __pausingEscort = false
+        return
+    endif
+    ; My escort to jail (not arrived yet) or to my cell (the arrest state lasts until I'm imprisoned). The escort to the cell
+    ; 02 names me Prisoner, the others Escortee. Anything else (still the confrontation: its own watch handles a fight).
+    string current = SceneManager.GetCurrentScene()
+    bool toJail = SceneManager.IsSceneOfType(current, SceneManager.CATEGORY_ESCORT_TO_JAIL) && !self.GetBool("Escort Arrived")
+    bool toCell = SceneManager.IsSceneOfType(current, SceneManager.CATEGORY_ESCORT_TO_CELL)
+    string escorteeType = string_if(current == SceneManager.SCENE_ESCORT_TO_CELL_02, "Prisoner", "Escortee")
+    if (!(toJail || toCell) || SceneManager.GetSceneNthReferenceOfType(current, escorteeType) != this)
+        __pausingEscort = false
+        return
+    endif
+    self.SetBool("Stall Primed", false) ; the resumed escort measures from where it starts again
+
+    Actor guard = Captor.GetActor()
+    Info("Escort of " + Name + " " + this + " paused: " + guard + " is fighting " + akHostile + ", the arrest waits for the fight to end")
+
+    RPB_Prison prison = API.PrisonManager.FindPrisonByPrisoner(this)
+    if (prison)
+        RPB_Prisoner prisoner = prison.Prisoners.AtKey(this)
+        if (prisoner)
+            prisoner.StopEscortAssist() ; it would move the player to the guard, into the fight
+        endif
+    endif
+
+    SceneManager.EndSceneWithActor(this, "the guard is fighting")
+    self.__BeginPendingArrest(toCell, akHostile, abEscortOnly = true) ; resumed to the cell when it was the escort to the cell
+endFunction
+
+;/
+    My guard died inside the prison (RPB_Captor.OnDeath, after my arrival): the nearest living guard in the prison's
+    interior takes over, as a full Captor (a fight during his escort pauses it too, his own death hands over again), and
+    the rest of the prison flow goes on with him. With none left, no imprisonment: I'm free inside the prison, stripped,
+    and my belongings stay in the chest (nobody to hand them over), where an escape can begin. Before, the arrest was
+    cancelled here and I got my belongings back, freed inside the jail with my gear.
+/;
+function HandOverInPrison(Actor akDeadGuard)
+    RPB_Prison prison = API.PrisonManager.FindPrisonByPrisoner(this)
+    RPB_Prisoner prisoner = none
+    if (prison)
+        prisoner = prison.Prisoners.AtKey(this)
+    endif
+    if (!prisoner || prisoner.IsImprisoned)
+        return
+    endif
+
+    ; First, before the 1-2s of finding and making the next guard: the dead guard's Scene went on meanwhile and stripped
+    ; and cuffed the prisoner with nobody there. Whatever of mine was playing or queued (strip, clothing, the escort to the
+    ; cell) stops now; the new guard starts it again.
+    SceneManager.EndSceneWithActor(this, "the guard died")
+    prisoner.StopEscortAssist()
+
+    RPB_Recovery.__FreeGuard(akDeadGuard, SceneManager) ; his package lock, if the escort to jail left one on him
+    Actor newGuard = RPB_Utility.GetNearestGuardInCell(this, akDeadGuard)
+    if (!newGuard)
+        Info("No guard left in " + prison.Name + " to take over from " + akDeadGuard + ": " + Name + " " + this + " is free inside, stripped; their belongings stay in the chest")
+        RPB_Recovery.CancelArrest(this, "no guard left in the prison", abReturnBelongings = false)
+        return
+    endif
+
+    RPB_Captor newCaptor = Arrest.AwaitCaptorReference(newGuard)
+    if (!newCaptor)
+        Info("Could not make " + newGuard + " the captor of " + Name + " " + this + " after " + akDeadGuard + " died: free inside, stripped")
+        RPB_Recovery.CancelArrest(this, "no guard could take over in the prison", abReturnBelongings = false)
+        return
+    endif
+    newCaptor.AssignArrestee(this)
+    self.AssignCaptor(newCaptor)
+    __captor = newCaptor ; the Captor property (set once by SetArrestParameters at the arrest)
+    Info("Arrest of " + Name + " " + this + " handed over to " + newGuard + " in " + prison.Name + ": " + akDeadGuard + " died")
+
+    if (self.GetBool("Arrest Pending"))
+        self.SetBool("Arrest Pending", false)
+        __pausingEscort = false
+        self.SetBool("Stall Primed", false)
+        self.__ReleasePendingHold()
+    endif
+    RetainAI(self.IsPlayer()) ; the escort walks me, as after the confrontation
+    prison.ResumePrisonFlowWith(prisoner, newGuard)
+endFunction
+
 ; I've arrived at the prison (the escort to jail ended, or I was moved there or into my cell): the escort watch in
 ; OnUpdate (leash, stall, broken escort) stops at its next tick
 function EndEscortWatch()
     self.SetBool("Escort Arrived", true)
     self.SetInt("Stall Ticks", 0)
     self.SetBool("Stall Nudged", false)
+    self.SetBool("Stall Escort Moved", false)
+    self.SetBool("Stall Primed", false)
+    __pausingEscort = false
     self.SetInt("Leash Pulls", 0)
 endFunction
 

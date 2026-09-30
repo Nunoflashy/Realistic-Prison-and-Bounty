@@ -205,7 +205,8 @@ scriptname RPB_Prison extends RPB_Entity
     function RestrainPrisoner(RPB_Prisoner apPrisoner, bool abRestrainInFront = false)
     function TeleportPrisonerToRelease(RPB_Prisoner apPrisoner, bool abMoveToReleaseLocation = true)
     function ReleaseInPlace(RPB_Prisoner apPrisoner)
-    function CancelImprisonment(RPB_Prisoner apPrisoner, string asReason)
+    function CancelImprisonment(RPB_Prisoner apPrisoner, string asReason, bool abReturnBelongings = true)
+    function ResumePrisonFlowWith(RPB_Prisoner apPrisoner, Actor akGuard)
     int function PendingDressCount()
     function QueueEscortToCellStallCheck(Actor akPrisoner, float afTimeoutSeconds = 8.0)
     function CancelEscortToCellStallCheck(Actor akPrisoner)
@@ -2298,7 +2299,7 @@ endFunction
     (OnPrisonerImprisonmentFail): out of the cell, the latent bounty back to active, the state destroyed (which also
     removes the spell). An imprisoned prisoner is never cancelled: that's a release.
 /;
-function CancelImprisonment(RPB_Prisoner apPrisoner, string asReason)
+function CancelImprisonment(RPB_Prisoner apPrisoner, string asReason, bool abReturnBelongings = true)
     if (!apPrisoner || apPrisoner.IsImprisoned)
         return
     endif
@@ -2309,7 +2310,9 @@ function CancelImprisonment(RPB_Prisoner apPrisoner, string asReason)
     self.CancelEscortToCellStallCheck(prisonerActor)
     Info("["+ Name +"] Imprisonment of " + apPrisoner.Name + " " + prisonerActor + " cancelled (" + asReason + "), not released: no time jailed, no infamy")
 
-    if (apPrisoner.IsStripped)
+    ; Not when nobody is left to hand them over (the guard died inside the prison, no other guard to take over): the
+    ; prisoner is free inside, stripped, and gets their things back from the belongings chest themselves
+    if (apPrisoner.IsStripped && abReturnBelongings)
         apPrisoner.ReturnBelongings()
         if (apPrisoner.IsNPC())
             apPrisoner.NPC_RestoreOriginalOutfit()
@@ -3419,6 +3422,25 @@ function StartGivingPrisonerClothing(RPB_Prisoner apPrisoner, Actor akSearcherGu
         akGuard     = akSearcherGuard, \
         akPrisoner  = apPrisoner.GetActor() \
     )
+endFunction
+
+; What's left of the prison flow (strip, clothing, escort to the cell), from where it stands, with @akGuard: another guard
+; took over after the first one died inside the prison (RPB_Arrestee.HandOverInPrison). The cell and the belongings
+; container were already assigned at the arrival. The queue plays them in order.
+function ResumePrisonFlowWith(RPB_Prisoner apPrisoner, Actor akGuard)
+    ; He comes to the prisoner first and cuffs them (RPB_RestrainPrisoner02: a Travel to the prisoner, then the restrain):
+    ; the strip Scene has no approach and strips at its start, since its guard normally escorted the prisoner there. A
+    ; take-over guard from across the prison stripped them with nobody there, then had them walk over to him.
+    self.StartRestrainingPrisoner(apPrisoner, akGuard)
+    if (!apPrisoner.IsStripped && apPrisoner.ShouldBeStripped)
+        self.StartStrippingPrisoner(apPrisoner, akGuard)
+    endif
+    if (apPrisoner.ShouldBeClothed && !apPrisoner.IsClothed)
+        self.StartGivingPrisonerClothing(apPrisoner, akGuard)
+    endif
+    if (apPrisoner.Should("Go to Cell"))
+        self.EscortPrisonerToCell(apPrisoner, akGuard)
+    endif
 endFunction
 
 ; ==========================================================

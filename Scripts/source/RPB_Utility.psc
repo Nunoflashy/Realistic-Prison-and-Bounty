@@ -169,6 +169,8 @@ scriptname RPB_Utility hidden
     function SetEscortStartForcedToFail(bool abForced) global
     bool function IsPendingHoldPackageDisabled() global
     function SetPendingHoldPackageDisabled(bool abDisabled) global
+    bool function IsPackageLockDisabled() global
+    function SetPackageLockDisabled(bool abDisabled) global
     float function GetMonitorOverrideHours() global
     function SetMonitorOverrideHours(float afHours) global
     float function GetHostilityRestoreOverrideHours() global
@@ -269,6 +271,7 @@ scriptname RPB_Utility hidden
     Actor function GetNearbyActorFromRefWithPrototype(ObjectReference akCenterRef, ActorBase akPrototype, float afMaxRadius = 1000.0) global
     Actor function GetNearbyGuardForFactionFromRef( ObjectReference akCenterRef, Faction akCrimeFaction = none, float afMinRadius = 50.0, float afMaxRadius = 1000.0, float afIncreaseRadiusBy = 100.0, int aiMaxScans = 30 ) global
     Actor function GetNearestGuard(ObjectReference centerRef, float radius, ObjectReference exclude) global
+    Actor function GetNearestGuardInCell(Actor akCenter, Actor akExclude) global
     bool function IsActorNearReference(Actor akActor, ObjectReference akReference, float radius = 80.0) global
     bool function IsWithin(int aiValue, int aiMin, int aiMax, bool abMinInclusive = true, bool abMaxInclusive = true) global
     string function GetContainerList( int _container, string includeStringFilter = "", string excludeStringFilter = "", int includeIntegerFilter = -1, int excludeIntegerFilter = -1, Form includeFormFilter = none, Form excludeFormFilter = none, int indentLevel = 1 ) global
@@ -2919,6 +2922,16 @@ function SetPendingHoldPackageDisabled(bool abDisabled) global
     RPB_StorageVars.SetInt("DISABLE_PENDING_HOLD_PACKAGE", abDisabled as int, "Profile")
 endFunction
 
+; Test-only: no package lock on the escort to jail's guard (test 140). Guards froze right around that binding at the escort
+; to jail's end; with it off, a freeze that still happens isn't the binding.
+bool function IsPackageLockDisabled() global
+    return JDB.solveInt(".rpb_root.storage.Profile.DISABLE_PACKAGE_LOCK") != 0
+endFunction
+
+function SetPackageLockDisabled(bool abDisabled) global
+    RPB_StorageVars.SetInt("DISABLE_PACKAGE_LOCK", abDisabled as int, "Profile")
+endFunction
+
 ;/
     Dev override for the prison monitor's wake: when > 0 the monitor wakes every that many game hours instead of at the
     earliest release, so its behavior can be tested without waiting out a sentence. 0 (default) = the real schedule.
@@ -4228,6 +4241,32 @@ Actor function GetNearestGuard(ObjectReference centerRef, float radius, ObjectRe
         i += 1
     endWhile
 
+    return nearest
+endFunction
+
+; The nearest living guard in @akCenter's own cell (not @akExclude): the one to take over a prisoner inside the prison when
+; their guard dies there. Guards outside that interior don't count. Only the actors in high process are scanned (a few
+; dozen), once per death.
+Actor function GetNearestGuardInCell(Actor akCenter, Actor akExclude) global
+    Cell centerCell = akCenter.GetParentCell()
+    if (!centerCell)
+        return none
+    endif
+    Actor[] nearby = PO3_SKSEFunctions.GetActorsByProcessingLevel(0)
+    Actor nearest = none
+    float nearestDistance = 0.0
+    int i = 0
+    while (i < nearby.Length)
+        Actor candidate = nearby[i]
+        if (candidate && candidate != akExclude && candidate != akCenter && candidate.GetFormID() != 0x14 && candidate.IsGuard() && !candidate.IsDead() && !candidate.IsDisabled() && !candidate.IsChild() && candidate.GetParentCell() == centerCell)
+            float distance = candidate.GetDistance(akCenter)
+            if (!nearest || distance < nearestDistance)
+                nearest = candidate
+                nearestDistance = distance
+            endif
+        endif
+        i += 1
+    endWhile
     return nearest
 endFunction
 

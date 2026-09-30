@@ -804,6 +804,14 @@ event OnPrisonScene(string asScene, string asSceneEvent, RPB_Prison apPrison, RP
     ; Return right before calling the event handler for the main event if we're processing a secondary event
     bool handlingSecondaryEvent = asSceneSecondaryEvent != "null"
 
+    ; Nothing is done to the prisoner by a dead guard: a phase event already on its way when he died (the handover ends his
+    ; Scene, RPB_Arrestee.HandOverInPrison) still stripped and cuffed the prisoner with nobody there. The next guard's own
+    ; Scene does it.
+    if ((sceneType == SceneManager.CATEGORY_STRIPPING || sceneType == SceneManager.CATEGORY_RESTRAIN || sceneType == SceneManager.CATEGORY_CLOTHING) && akAuthority && akAuthority.IsDead())
+        Debug("EventManager::OnPrisonScene", asScene + " " + asSceneEvent + " (" + asSceneSecondaryEvent + ") skipped: " + akAuthority + " is dead")
+        return
+    endif
+
     if (sceneType == SceneManager.CATEGORY_ESCORT_TO_JAIL)
         Actor escort = akAuthority
 

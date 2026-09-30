@@ -1442,6 +1442,10 @@ endFunction
     Actor   @akActor: The actor to set the package lock on.
 /;
 function SetPackageLockOnActor(Actor akActor)
+    if (RPB_Utility.IsPackageLockDisabled())
+        Debug("SceneManager::SetPackageLockOnActor", "Package lock disabled (test 140), not binding " + akActor)
+        return
+    endif
     string packageAliasGroup = "PKG_Lock_0"
     int packageIndex = 1
     ReferenceAlias packageLock = self.GetRefAlias(packageAliasGroup, packageIndex)

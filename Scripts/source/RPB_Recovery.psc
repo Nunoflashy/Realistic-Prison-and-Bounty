@@ -3,7 +3,7 @@ scriptname RPB_Recovery hidden
 ;/
 @functions:
     string function ResetActor(Actor akActor) global
-    string function CancelArrest(Actor akActor, string asReason) global
+    string function CancelArrest(Actor akActor, string asReason, bool abReturnBelongings = true) global
 /;
 
 ;/
@@ -126,10 +126,11 @@ endFunction
     events, the arrest is reverted (hold lifted, uncuffed, bounty back), a prisoner not yet in prison is cancelled without
     a release (Prison.CancelImprisonment), their guard is freed, and their hostility comes back at once, so guards react to
     them again instead of ignoring them. An actor already imprisoned is left alone (that's a release, not a cancel).
+    @abReturnBelongings false: a stripped prisoner's things stay in the belongings chest (nobody left to hand them over).
 
     Returns what was done ("" when there was nothing to do).
 /;
-string function CancelArrest(Actor akActor, string asReason) global
+string function CancelArrest(Actor akActor, string asReason, bool abReturnBelongings = true) global
     if (!akActor)
         return ""
     endif
@@ -190,7 +191,7 @@ string function CancelArrest(Actor akActor, string asReason) global
     RPB_Recovery.__Step(akActor, "CancelArrest: captor and arrest done")
 
     if (prisonerRef)
-        prison.CancelImprisonment(prisonerRef, asReason)
+        prison.CancelImprisonment(prisonerRef, asReason, abReturnBelongings)
         done += "imprisonment cancelled; "
     endif
     RPB_Recovery.__Step(akActor, "CancelArrest: imprisonment done")

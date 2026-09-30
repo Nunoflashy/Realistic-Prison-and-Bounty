@@ -221,6 +221,11 @@ function SetTests()
     self.AddTest("133 - Long Absence 2/3: 40 Days Pass (Run Away From Castle Dour)", "Test_LongAbsenceAdvance", abChainable = false)
     self.AddTest("134 - Long Absence 3/3: Verify Against the Snapshot (Run Inside Castle Dour, After Travelling There)", "Test_LongAbsenceVerify", abChainable = false)
     self.AddTest("135 - Fallback: The Prisoner Stops in the Escort to the Cell, Moved Into the Cell and Locked In (PLAYER - arrests you, you're brought back)", "Test_FallbackEscortToCellStopped_Player", abChainable = false)
+    self.AddTest("136 - Fallback: The Prisoner Stops in the Escort to the Cell, with a Clone Guard (PLAYER - arrests you, you're brought back)", "Test_FallbackEscortToCellStopped_CloneGuard", abChainable = false)
+    self.AddTest("137 - A Fight Breaks Out During the Escort to Jail: the Arrest Waits, then Resumes (NPC)", "Test_FightDuringEscort_NPC", abChainable = false)
+    self.AddTest("138 - A Fight Breaks Out During the Escort to Jail: the Arrest Waits, then Resumes (PLAYER - arrests you, you're brought back)", "Test_FightDuringEscort_Player", abChainable = false)
+    self.AddTest("139 - The Guard Dies Inside the Prison: Another Guard Takes Over, or the Prisoner is Free Inside (PLAYER - arrests you, you're brought back)", "Test_GuardDiesInPrison_Player", abChainable = false)
+    self.AddTest("140 - 136 Without the Package Lock (Clone Guard; does the guard still freeze?) (PLAYER - arrests you, you're brought back)", "Test_EscortToCellStopped_NoPackageLock", abChainable = false)
     self.AddTest("041 - ActiveMagicEffectContainer: Stuck Lock Self-Heals", "Test_ActiveMagicEffectContainer_StuckLockSelfHeals")
     self.AddTest("042 - ThreadLock: JAtomic Primitive Semantics and Registry", "Test_ThreadLock_PrimitiveSemantics")
     ; Not chainable: fires concurrent worker threads
@@ -10788,6 +10793,10 @@ Actor function __ScenarioArrestee(bool abPlayer, Actor akGuard)
         npc.SetActorValue("Health", 2000.0)
         npc.MoveTo(akGuard, afXOffset = 150.0, abMatchRotation = false)
         RPB_ActorVars.SetCrimeGold(crimeFaction, npc, 2000)
+        ; Not hostile to the real Solitude guards around the test spot: they attacked her before the arrest, the arrest went
+        ; pending at its start, and 111 never got the confrontation it tests. The arrest's own snapshot of this hostility
+        ; restores it at a cancel or release, as for a hostile NPC arrested in the world.
+        RPB_Utility.NeutralizeHostileActor(npc)
     endif
     return npc
 endFunction
@@ -10872,14 +10881,16 @@ function __ScenarioObservePending(Actor akArrestee, string asTest, float afSecon
 endFunction
 
 bool function __WaitPending(Actor akActor, float afTimeout)
-    RPB_Arrest arrest = RPB_API.GetArrest()
+    ; The flag on the actor's own storage (what the Arrestee writes), not through the arrestee list: its lookup crawled once
+    ; (114: a 12s timeout took 17s) and read "not pending" a whole arrest after it was
+    string refKey = RPB_StorageVars.GetReferenceKey(akActor)
     float start = Utility.GetCurrentRealTime()
     while ((Utility.GetCurrentRealTime() - start) < afTimeout)
-        RPB_Arrestee arresteeRef = arrest.Arrestees.AtKey(akActor)
-        if (arresteeRef && arresteeRef.GetBool("Arrest Pending"))
+        if (RPB_StorageVars.GetBoolOnReference("Arrest Pending", refKey, "Arrest"))
+            log("pending after " + __Ms(Utility.GetCurrentRealTime() - start) + "ms")
             return true
         endif
-        Utility.Wait(0.5)
+        Utility.Wait(0.25)
     endWhile
     return false
 endFunction
@@ -10983,11 +10994,23 @@ bool function __Scenario_FightBeforeCuffs(bool abPlayer, string asTest)
 
     ; The fight once the confrontation is running: sent before BeginArrest, the guard was already fighting and the arrest
     ; went pending (correct, but the case of 117-120)
+    ; Found by the Scene (a confrontation with this arrestee in it), not the arrestee list: its lookup answered late once and
+    ; the confrontation was over (cuffed) before the fight was sent
     RPB_SceneManager sceneManager = RPB_API.GetSceneManager()
     float sceneWait = Utility.GetCurrentRealTime()
-    while (!(arrest.Arrestees.AtKey(arrestee) && sceneManager.IsSceneOfType(sceneManager.GetCurrentScene(), sceneManager.CATEGORY_ARREST_START)) && (Utility.GetCurrentRealTime() - sceneWait) < 10.0)
-        Utility.Wait(0.25)
+    bool confronting = false
+    while (!confronting && (Utility.GetCurrentRealTime() - sceneWait) < 10.0)
+        string current = sceneManager.GetCurrentScene()
+        confronting = sceneManager.IsSceneOfType(current, sceneManager.CATEGORY_ARREST_START) && sceneManager.GetSceneNthReferenceOfType(current, "Escortee") == arrestee
+        if (!confronting)
+            Utility.Wait(0.1)
+        endif
     endWhile
+    if (!confronting)
+        bool pendingAtStart = RPB_StorageVars.GetBoolOnReference("Arrest Pending", RPB_StorageVars.GetReferenceKey(arrestee), "Arrest")
+        log(asTest + ": setup: no confrontation to interrupt (current Scene '" + sceneManager.GetCurrentScene() + "', pending at the start " + pendingAtStart + ", cuffed " + RPB_Utility.IsCuffed(arrestee) + ")")
+        return assert_true(false, asTest + ": setup: the confrontation was never seen, so no fight before the cuffs could be sent")
+    endif
     log(asTest + ": confrontation '" + sceneManager.GetCurrentScene() + "' running after " + __Ms(Utility.GetCurrentRealTime() - sceneWait) + "ms, sending the fight")
     __ScenarioAttack(hostile, guard)
 
@@ -11078,6 +11101,115 @@ bool function __Scenario_CaptorDiesMidEscort(bool abPlayer, string asTest)
 
     guard.Kill()
     return __AssertArrestCancelled(arrestee, asTest)
+endFunction
+
+; 137/138: a hostile attacks the guard during the escort to jail: the arrest waits (escort-only pending), the prisoner
+; held nearby (the player not AI-driven, free to take cover), and the escort resumes once the hostile is dead
+bool function __Scenario_FightDuringEscort(bool abPlayer, string asTest)
+    RPB_Arrest arrest = RPB_API.GetArrest()
+    RPB_Prison prison = (RPB_API.GetPrisonManager()).GetPrison("Haafingar")
+    Actor guard = __ScenarioGuard()
+    if (!guard)
+        return false
+    endif
+    Actor arrestee = __ScenarioArrestee(abPlayer, guard)
+    Actor hostile = __ScenarioHostile(guard, false)
+    if (!assert_true(arrestee && hostile, "Could not spawn the arrestee and the hostile"))
+        return false
+    endif
+
+    __ScenarioArrest(guard, arrestee, asTest)
+    bool escorting = __ScenarioWaitEscortToJail(arrestee, 40.0)
+    if (!assert_true(escorting && prison.Prisoners.AtKey(arrestee) != none, asTest + ": the escort to jail never started"))
+        return false
+    endif
+    Utility.Wait(2.0) ; a few steps into it
+
+    hostile.MoveTo(guard, afYOffset = 250.0, abMatchRotation = false)
+    __ScenarioAttack(hostile, guard)
+    bool pending = __WaitPending(arrestee, 10.0)
+    RPB_Prisoner prisonerRef = prison.Prisoners.AtKey(arrestee)
+    int moves = 0
+    if (prisonerRef)
+        moves = prisonerRef.EscortAssistMoves
+    endif
+    bool free = !abPlayer || Game.IsMovementControlsEnabled()
+    log(asTest + ": pending " + pending + " (guard in combat " + guard.IsInCombat() + "), current Scene '" + RPB_API.GetSceneManager().GetCurrentScene() + "', player movement enabled " + free + ", assist moves " + moves)
+    bool ok = assert_true(pending, asTest + ": the arrest never went pending when the guard went into a fight during the escort")
+    ok = assert_true(free, asTest + ": the player was left AI-driven while the arrest waits") && ok
+    ok = assert_true(moves == 0, asTest + ": the escort assist moved the player during the fight") && ok
+    if (!pending)
+        return false
+    endif
+    __ScenarioObservePending(arrestee, asTest)
+
+    hostile.Kill()
+    float resumeStart = Utility.GetCurrentRealTime()
+    RPB_Arrestee arresteeRef = arrest.Arrestees.AtKey(arrestee)
+    while (arresteeRef && arresteeRef.GetBool("Arrest Pending") && (Utility.GetCurrentRealTime() - resumeStart) < 30.0)
+        Utility.Wait(0.5)
+        arresteeRef = arrest.Arrestees.AtKey(arrestee)
+    endWhile
+    bool onTheWay = __WaitOnTheWay(arrestee, 20.0)
+    log(asTest + ": resumed after the hostile died: pending " + (arresteeRef && arresteeRef.GetBool("Arrest Pending")) + ", on the way " + onTheWay + " (" + __Ms(Utility.GetCurrentRealTime() - resumeStart) + "ms)")
+    ok = assert_true(onTheWay, asTest + ": the escort never resumed after the fight") && ok
+    return ok
+endFunction
+
+; 139: the player's guard dies during the escort to the cell: another guard of the prison takes over as the captor and the
+; escort goes on to the cell; with none left, the player is free inside, stripped, the belongings left in the chest
+bool function __Scenario_GuardDiesInPrison(string asTest)
+    RPB_Arrest arrest = RPB_API.GetArrest()
+    RPB_Prison prison = (RPB_API.GetPrisonManager()).GetPrison("Haafingar")
+    Actor guard = __ScenarioRealGuard()
+    if (!guard)
+        return false
+    endif
+    Actor player = __ScenarioArrestee(true, guard)
+    __ScenarioArrest(guard, player, asTest)
+
+    float start = Utility.GetCurrentRealTime()
+    RPB_Prisoner assisted = prison.Prisoners.AtKey(player)
+    while (!(assisted && assisted.EscortAssistToCell) && (Utility.GetCurrentRealTime() - start) < 150.0)
+        Utility.Wait(0.5)
+        assisted = prison.Prisoners.AtKey(player)
+    endWhile
+    if (!assert_true(assisted && assisted.EscortAssistToCell, asTest + ": the escort to the cell never started"))
+        return false
+    endif
+    Utility.Wait(2.0) ; a few steps into it
+
+    int itemsBefore = player.GetNumItems()
+    log(asTest + ": killing the guard " + guard + " during the escort to the cell (player items " + itemsBefore + ")")
+    guard.Kill()
+    Utility.Wait(3.0)
+
+    RPB_Arrestee arresteeRef = arrest.Arrestees.AtKey(player)
+    Actor newGuard = none
+    if (arresteeRef && arresteeRef.Captor)
+        newGuard = arresteeRef.Captor.GetActor()
+    endif
+    bool handedOver = newGuard && newGuard != guard && !newGuard.IsDead()
+    if (handedOver)
+        log(asTest + ": handed over to " + newGuard + " (" + newGuard.GetDisplayName() + ")")
+        float waitStart = Utility.GetCurrentRealTime()
+        while (!RPB_Utility.IsActorImprisoned(player) && (Utility.GetCurrentRealTime() - waitStart) < 120.0)
+            Utility.Wait(1.0)
+        endWhile
+        bool imprisoned = RPB_Utility.IsActorImprisoned(player)
+        log(asTest + ": imprisoned " + imprisoned + " after " + __Ms(Utility.GetCurrentRealTime() - waitStart) + "ms with the new guard")
+        return assert_true(imprisoned, asTest + ": the new guard never got the player imprisoned")
+    endif
+
+    ; No guard left: free inside, stripped, the belongings still in the chest
+    bool prisoner = prison.Prisoners.AtKey(player) != none
+    bool cuffed = RPB_Utility.IsCuffed(player)
+    int itemsAfter = player.GetNumItems()
+    log(asTest + ": no guard took over: prisoner " + prisoner + ", cuffed " + cuffed + ", player items " + itemsBefore + " -> " + itemsAfter)
+    bool ok = assert_true(!prisoner, asTest + ": still a prisoner with no guard left")
+    ok = assert_true(!cuffed, asTest + ": still cuffed with no guard left") && ok
+    ok = assert_true(itemsAfter <= itemsBefore, asTest + ": the belongings were handed back with nobody to hand them over") && ok
+    return ok
 endFunction
 
 ; 117/118
@@ -11202,7 +11334,10 @@ function __TeardownScenario()
         __scenarioReturnMarker = none
     endif
     if (__scenarioRealGuard)
-        ; A real guard is never deleted: his arrest role, package lock and AI are reset instead
+        ; A real guard is never deleted: his arrest role, package lock and AI are reset instead (139 kills him first)
+        if (__scenarioRealGuard.IsDead())
+            __scenarioRealGuard.Resurrect()
+        endif
         RPB_Recovery.ResetActor(__scenarioRealGuard)
         __scenarioRealGuard = none
     endif
@@ -11422,17 +11557,23 @@ bool function __CellDoorsDiagnostic()
 endFunction
 
 ; 135: the player stops in the escort to the cell (frozen): the assist moves them into the cell (the Scene's destination,
-; not the guard), and the Scene locks the door
-bool function __Scenario_EscortToCellStopped(string asTest)
+; not the guard), and the Scene locks the door. 136: the same with a clone guard (@abCloneGuard).
+bool function __Scenario_EscortToCellStopped(string asTest, bool abCloneGuard = false)
     RPB_Prison prison = (RPB_API.GetPrisonManager()).GetPrison("Haafingar")
     RPB_SceneManager sceneManager = RPB_API.GetSceneManager()
-    ; A real guard, not a clone: cloned guards walking into the jail ahead of the player went uncallable (every native
-    ; call on them waited forever, held outside Papyrus: dps, 2026-09-29), which stalled the flow and the teardown
-    Actor guard = __ScenarioRealGuard()
+    ; 135 uses a real guard: cloned guards walking into the jail ahead of the player went uncallable (every native call on
+    ; them waited forever, held outside Papyrus: dps, 2026-09-29). Real guards turned out to do it too, right as the
+    ; package lock was bound mid Scene end; 136 runs a clone again to test the fixes where it happened most.
+    Actor guard = none
+    if (abCloneGuard)
+        guard = __ScenarioGuard()
+    else
+        guard = __ScenarioRealGuard()
+    endif
     if (!guard)
         return false
     endif
-    log(asTest + ": using the real guard " + guard + " (" + guard.GetDisplayName() + ")")
+    log(asTest + ": using " + string_if(abCloneGuard, "a clone guard ", "the real guard ") + guard + " (" + guard.GetDisplayName() + ")")
     Actor player = __ScenarioArrestee(true, guard)
     __ScenarioArrest(guard, player, asTest)
 
@@ -12294,7 +12435,7 @@ endFunction
 string __statelessTest = ""
 
 bool function __RunStatelessTest(string asTest)
-    if (asTest != "Test_ArrestWaitsWhileGuardFights_NoPackage" && asTest != "Test_CellDoorsDiagnostic" && asTest != "Test_LongAbsenceSetup" && asTest != "Test_LongAbsenceAdvance" && asTest != "Test_LongAbsenceVerify" && asTest != "Test_FallbackEscortToCellStopped_Player")
+    if (asTest != "Test_ArrestWaitsWhileGuardFights_NoPackage" && asTest != "Test_CellDoorsDiagnostic" && asTest != "Test_LongAbsenceSetup" && asTest != "Test_LongAbsenceAdvance" && asTest != "Test_LongAbsenceVerify" && asTest != "Test_FallbackEscortToCellStopped_Player" && asTest != "Test_FallbackEscortToCellStopped_CloneGuard" && asTest != "Test_FightDuringEscort_NPC" && asTest != "Test_FightDuringEscort_Player" && asTest != "Test_GuardDiesInPrison_Player" && asTest != "Test_EscortToCellStopped_NoPackageLock")
         return false
     endif
 
@@ -12318,6 +12459,25 @@ bool function __RunStatelessTest(string asTest)
         display_result(__LongAbsenceVerify())
     elseif (asTest == "Test_FallbackEscortToCellStopped_Player")
         display_result(__Scenario_EscortToCellStopped("135"))
+        __TeardownScenario()
+    elseif (asTest == "Test_FallbackEscortToCellStopped_CloneGuard")
+        display_result(__Scenario_EscortToCellStopped("136", abCloneGuard = true))
+        __TeardownScenario()
+    elseif (asTest == "Test_FightDuringEscort_NPC")
+        display_result(__Scenario_FightDuringEscort(false, "137"))
+        __TeardownScenario()
+    elseif (asTest == "Test_FightDuringEscort_Player")
+        display_result(__Scenario_FightDuringEscort(true, "138"))
+        __TeardownScenario()
+    elseif (asTest == "Test_GuardDiesInPrison_Player")
+        display_result(__Scenario_GuardDiesInPrison("139"))
+        __TeardownScenario()
+    elseif (asTest == "Test_EscortToCellStopped_NoPackageLock")
+        ; 140: 136 with no package lock bound at the escort to jail's end. Clone guards froze around that moment (the lock
+        ; bound, then the strip); still freezing without it means the binding isn't the cause.
+        RPB_Utility.SetPackageLockDisabled(true)
+        display_result(__Scenario_EscortToCellStopped("140", abCloneGuard = true))
+        RPB_Utility.SetPackageLockDisabled(false)
         __TeardownScenario()
     endif
     __statelessTest = ""
