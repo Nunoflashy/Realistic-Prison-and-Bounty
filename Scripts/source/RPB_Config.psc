@@ -56,6 +56,9 @@ Scriptname RPB_Config extends Quest
     int function GetArrestAdditionalBountyResisting(string hold)
     float function GetArrestAdditionalBountySurrenderingFromCurrentBounty(string hold)
     int function GetArrestAdditionalBountySurrenderingFlat(string hold)
+    float function GetArrestAdditionalBountyFakingSurrenderFromCurrentBounty(string hold)
+    int function GetArrestAdditionalBountyFakingSurrenderFlat(string hold)
+    float function GetArrestFakeSurrenderMemory(string hold)
     float function GetArrestAdditionalBountyDefeatedFromCurrentBounty(string hold)
     int function GetArrestAdditionalBountyDefeatedFlat(string hold)
     int function GetArrestAdditionalBountyDefeated(string hold)
@@ -263,6 +266,7 @@ Actor property Player
         endif
 
         __player = Game.GetPlayer()
+        return __player ; without it the first read returned None (the first F8 of a session surrendered no one)
     endFunction
 endProperty
 
@@ -630,6 +634,19 @@ endFunction
 
 int function GetArrestAdditionalBountySurrenderingFlat(string hold)
     return MCM.GetOptionSliderValue("Arrest::Additional Bounty when Surrendering", hold) as int
+endFunction
+
+float function GetArrestAdditionalBountyFakingSurrenderFromCurrentBounty(string hold)
+    return MCM.GetOptionSliderValue("Arrest::Additional Bounty when Faking Surrender (%)", hold)
+endFunction
+
+int function GetArrestAdditionalBountyFakingSurrenderFlat(string hold)
+    return MCM.GetOptionSliderValue("Arrest::Additional Bounty when Faking Surrender", hold) as int
+endFunction
+
+; How many days a hold's guards remember a fake surrender (and won't take another)
+float function GetArrestFakeSurrenderMemory(string hold)
+    return MCM.GetOptionSliderValue("Arrest::Fake Surrender Memory", hold)
 endFunction
 
 float function GetArrestAdditionalBountyDefeatedFromCurrentBounty(string hold)

@@ -3026,7 +3026,7 @@ function SetEscortStartForcedToFail(bool abForced) global
     RPB_StorageVars.SetInt("FORCE_ESCORT_START_FAIL", abForced as int, "Profile")
 endFunction
 
-; Test-only (144): the Surrender Scene is never started, so only the surrender's watchdog can end it
+; Test-only (144, 149): the Surrender Scene is never started, so no guard ever comes to take the surrender
 bool function IsSurrenderSceneForcedToFail() global
     return JDB.solveInt(".rpb_root.storage.Profile.FORCE_SURRENDER_SCENE_FAIL") != 0
 endFunction

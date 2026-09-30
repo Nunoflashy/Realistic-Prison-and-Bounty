@@ -94,19 +94,18 @@ function Left(RPB_MCM mcm) global
     mcm.AddOptionSlider("Maximum Payable Bounty (Chance)", "{0}%")
     ; mcm.AddOptionToggle("Always Arrest for Violent Crimes") ; Temporarily Removed
     mcm.AddEmptyOption()
-    mcm.AddTextOption("", "When Eluding", mcm.OPTION_DISABLED)
     mcm.AddOptionSliderKey("Additional Bounty when Eluding", "Additional Bounty when Eluding (%)", "{1}% of Bounty")
     mcm.AddOptionSlider("Additional Bounty when Eluding", "{0} Bounty")
     mcm.AddEmptyOption()
-    mcm.AddTextOption("", "When Resisting", mcm.OPTION_DISABLED)
     mcm.AddOptionSliderKey("Additional Bounty when Resisting", "Additional Bounty when Resisting (%)", "{1}% of Bounty")
     mcm.AddOptionSlider("Additional Bounty when Resisting", "{0} Bounty")
     mcm.AddEmptyOption()
-    mcm.AddTextOption("", "When Surrendering", mcm.OPTION_DISABLED)
     mcm.AddOptionSliderKey("Additional Bounty when Surrendering", "Additional Bounty when Surrendering (%)", "{1}% of Bounty")
     mcm.AddOptionSlider("Additional Bounty when Surrendering", "{0} Bounty")
+    mcm.AddOptionSliderKey("Additional Bounty when Faking Surrender", "Additional Bounty when Faking Surrender (%)", "{1}% of Bounty")
+    mcm.AddOptionSlider("Additional Bounty when Faking Surrender", "{0} Bounty")
+    mcm.AddOptionSlider("Fake Surrender Memory", "{0} Days")
     mcm.AddEmptyOption()
-    mcm.AddTextOption("", "When Defeated", mcm.OPTION_DISABLED)
     mcm.AddOptionSliderKey("Additional Bounty when Defeated", "Additional Bounty when Defeated (%)", "{1}% of Bounty")
     mcm.AddOptionSlider("Additional Bounty when Defeated", "{0} Bounty")
     ; mcm.AddOptionToggle("Allow Civilian Capture") ; Temporarily Removed
@@ -138,9 +137,6 @@ function Left(RPB_MCM mcm) global
     mcm.AddOptionToggle("Decay if Known as Criminal")
     mcm.AddOptionSliderKey("Bounty Lost", "Bounty Lost (%)", "{1}% of Bounty")
     mcm.AddOptionSlider("Bounty Lost", "{0} Bounty")
-
-    mcm.AddEmptyOption()
-    mcm.AddEmptyOption()
 
     mcm.AddEmptyOption()
 
@@ -526,6 +522,15 @@ function OnOptionHighlight(RPB_MCM mcm, string option) global
 
     elseif (option == "Arrest::Additional Bounty when Surrendering")
         mcm.SetInfoText("The bounty that will be added when surrendering to the guards in " + mcm.CurrentPage + ". Also applies with no bounty at all (e.g. hostile to the guards), so the arrest can go ahead.")
+
+    elseif (option == "Arrest::Additional Bounty when Faking Surrender (%)")
+        mcm.SetInfoText("The bounty that will be added as a percentage of your current bounty, when faking a surrender to the guards in " + mcm.CurrentPage + " (moving away or drawing a weapon while a guard is still coming to take it).")
+
+    elseif (option == "Arrest::Additional Bounty when Faking Surrender")
+        mcm.SetInfoText("The bounty that will be added when faking a surrender to the guards in " + mcm.CurrentPage + " (moving away or drawing a weapon while a guard is still coming to take it).")
+
+    elseif (option == "Arrest::Fake Surrender Memory")
+        mcm.SetInfoText("How many days the guards in " + mcm.CurrentPage + " remember a fake surrender. Until then they won't accept another one, nor a yield.")
 
     elseif (option == "Arrest::Additional Bounty when Defeated (%)")
         mcm.SetInfoText("The bounty that will be added as a percentage of your current bounty, when defeated and arrested in " + mcm.CurrentPage + ".")
@@ -935,6 +940,14 @@ function OnOptionSliderAccept(RPB_MCM mcm, string option, float value) global
         formatString = "{1}% of Bounty"
 
     elseif (option == "Arrest::Additional Bounty when Surrendering")
+
+    elseif (option == "Arrest::Additional Bounty when Faking Surrender (%)")
+        formatString = "{1}% of Bounty"
+
+    elseif (option == "Arrest::Additional Bounty when Faking Surrender")
+
+    elseif (option == "Arrest::Fake Surrender Memory")
+        formatString = "{0} Days"
 
     elseif (option == "Arrest::Additional Bounty when Defeated (%)")
         formatString = "{1}% of Bounty"

@@ -230,10 +230,8 @@ function OnSceneStartFailed(string asScene)
     if (sceneType == SceneManager.CATEGORY_SURRENDER)
         Actor surrenderer = SceneManager.GetSceneNthReferenceOfType(asScene, "Surrenderer") as Actor
         if (surrenderer)
-            if (Arrest.IsSurrendering(surrenderer))
-                Arrest.LastSurrenderOutcome = "Scene never started"
-            endif
-            Arrest.AbortSurrender(surrenderer, "the Surrender Scene never started", abEndScene = false)
+            ; The surrender's watch starts it again (a guard back in combat), and undoes it after the last retry
+            Arrest.OnSurrenderSceneFailed(surrenderer)
         endif
         return
     endif
@@ -1033,12 +1031,14 @@ endEvent
 
 event OnSurrenderPreparing(Form akSurrenderer)
     Actor surrenderer = akSurrenderer as Actor
+    Debug("EventManager::OnSurrenderPreparing", "RPB_Surrender received for " + akSurrenderer)
     if (!surrenderer)
         return
     endif
 
     ; The captors that will surround the surrenderer
     Actor[] surrendererCaptors = PO3_SKSEFunctions.GetCombatTargets(surrenderer)
+    Debug("EventManager::OnSurrenderPreparing", "combat targets of " + surrenderer + ": " + surrendererCaptors + " (in combat " + surrenderer.IsInCombat() + ")")
 
     if (!Arrest.CanActorSurrender(surrenderer, surrendererCaptors))
         return
