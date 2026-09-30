@@ -19,6 +19,12 @@ scriptname RPB_Utility hidden
     Outfit function RPB_GetOutfit(string asOutfit) global
     bool function HealNakedBaseOutfit(Actor akActor) global
     function GuardMark(Actor akGuard, string asStep) global
+    function ProbeGuard(Actor akGuard, string asStep) global
+    bool function IsFrozenGuard(Actor akActor) global
+    function MarkGuardFrozen(Actor akGuard, string asStep) global
+    function ClearFrozenGuards() global
+    int function FrozenGuardsForScan() global
+    bool function IsListedFrozen(int aiFrozenMap, Actor akActor) global
     Actor function GetOtherHostileTarget(Actor akActor, Actor akExcept, Actor akCaptor) global
     Actor function GetOtherCombatTarget(Actor akActor, Actor akExcept) global
     int function RemoveCuffs(Actor akActor) global
@@ -166,6 +172,11 @@ scriptname RPB_Utility hidden
     bool function IsConfrontationSceneForcedToFail() global
     function SetConfrontationSceneForcedToFail(bool abForced) global
     bool function IsEscortStartForcedToFail() global
+    bool function IsSurrenderSceneForcedToFail() global
+    function SetSurrenderSceneForcedToFail(bool abForced) global
+    bool function IsTakeoverBlindForTest() global
+    function SetTakeoverBlindForTest(bool abBlind) global
+    Actor function GetGuardSeeing(Actor akPrisoner, Actor akExclude) global
     function SetEscortStartForcedToFail(bool abForced) global
     bool function IsPendingHoldPackageDisabled() global
     function SetPendingHoldPackageDisabled(bool abDisabled) global
@@ -438,6 +449,108 @@ function GuardMark(Actor akGuard, string asStep) global
     endif
 endFunction
 
+;/
+    Frozen guards. An escorting guard's Papyrus object sometimes stops answering (his AI goes on normally): every call on
+    him, even GetFormID(), waits forever, and so does every stack that makes one - an imprisonment, the MCM, a scan over
+    nearby guards. Nothing in Papyrus can time a call out, so I find out from the side: ProbeGuard() makes one trivial call
+    on him on its own stack, with the time it started written down first; a probe still open after a few seconds means
+    he's frozen. Comparing a Form against the list (JFormMap keys) never calls into him, so it's safe on a frozen one.
+    Session-only: a game load drops the broken object (seen with reloadscript), so the list is cleared on load.
+    Values: > 0 the real time a probe started, -1 known frozen (already reported).
+/;
+string function __FrozenGuardsPath() global
+    return ".rpb_root.frozenGuardProbes"
+endFunction
+
+int function __FrozenGuardsMap(bool abCreate = false) global
+    int map = JDB.solveObj(__FrozenGuardsPath())
+    if (!map && abCreate)
+        map = JFormMap.object()
+        JDB.solveObjSetter(__FrozenGuardsPath(), map, true)
+    endif
+    return map
+endFunction
+
+; Sends the probe (RPB_EventManager.OnGuardProbe) and returns at once
+function ProbeGuard(Actor akGuard, string asStep) global
+    if (!akGuard)
+        return
+    endif
+    int handle = ModEvent.Create("RPB_GuardProbe")
+    if (handle)
+        ModEvent.PushString(handle, asStep)
+        ModEvent.PushForm(handle, akGuard)
+        ModEvent.Send(handle)
+    endif
+    ; And a look a few seconds later (RPB_EventManager.OnGuardProbeCheck): a probe that never came back is reported then,
+    ; not only when something happens to ask (148's freeze went unreported: nothing asked)
+    handle = ModEvent.Create("RPB_GuardProbeCheck")
+    if (handle)
+        ModEvent.PushForm(handle, akGuard)
+        ModEvent.Send(handle)
+    endif
+endFunction
+
+; The probe itself, on the mod event's own stack: never returns on a frozen guard, which is the point
+function __RunGuardProbe(Actor akGuard, string asStep) global
+    int map = __FrozenGuardsMap(abCreate = true)
+    if (JFormMap.getFlt(map, akGuard) < 0.0)
+        return ; already known frozen: another probe would only add another stuck stack
+    endif
+    JFormMap.setFlt(map, akGuard, Utility.GetCurrentRealTime())
+    JFormMap.setStr(JDB.solveObj(".rpb_root.frozenGuardSteps"), akGuard, asStep)
+    akGuard.GetFormID()
+    JFormMap.removeKey(map, akGuard)
+endFunction
+
+bool function IsFrozenGuard(Actor akActor) global
+    int map = JDB.solveObj(__FrozenGuardsPath())
+    if (!map || !akActor || !JFormMap.hasKey(map, akActor))
+        return false
+    endif
+    float started = JFormMap.getFlt(map, akActor)
+    if (started < 0.0)
+        return true
+    endif
+    if ((Utility.GetCurrentRealTime() - started) < 3.0)
+        return false ; the probe may simply not have run yet
+    endif
+    MarkGuardFrozen(akActor, "probe open " + ((Utility.GetCurrentRealTime() - started) as int) + "s")
+    return true
+endFunction
+
+function MarkGuardFrozen(Actor akGuard, string asStep) global
+    int map = __FrozenGuardsMap(abCreate = true)
+    JFormMap.setFlt(map, akGuard, -1.0)
+    string probedAt = ""
+    int steps = JDB.solveObj(".rpb_root.frozenGuardSteps")
+    if (steps)
+        probedAt = JFormMap.getStr(steps, akGuard)
+    endif
+    ; Warn, not Info: this must show with DEBUG on too. The actor prints without calling into him.
+    Warn("FROZEN GUARD " + akGuard + " (" + asStep + "; probed at: " + probedAt + "): his Papyrus object doesn't answer, RPB skips him until the next game load")
+endFunction
+
+; For the scans: the list's handle when it has anyone in it, 0 otherwise (one native per scan instead of one per candidate;
+; a probe that answered removes its entry, so the list is empty unless a guard is frozen or a probe is still running)
+int function FrozenGuardsForScan() global
+    int map = JDB.solveObj(__FrozenGuardsPath())
+    if (map && JFormMap.count(map) > 0)
+        return map
+    endif
+    return 0
+endFunction
+
+; @akActor is on the scan's list (FrozenGuardsForScan) and frozen
+bool function IsListedFrozen(int aiFrozenMap, Actor akActor) global
+    return aiFrozenMap && JFormMap.hasKey(aiFrozenMap, akActor) && IsFrozenGuard(akActor)
+endFunction
+
+function ClearFrozenGuards() global
+    JDB.solveObjSetter(__FrozenGuardsPath(), JFormMap.object(), true)
+    JDB.solveObjSetter(".rpb_root.frozenGuardSteps", JFormMap.object(), true)
+endFunction
+
 ; GetOtherCombatTarget without @akCaptor's fellow guards (guards of his crime faction): a guard still attacking the arrestee
 ; is part of the arrest, not another fight. After a fight with the guards, the player's other combat targets were the other
 ; guards, so a yield went pending (cuffed at once, no confrontation) and resumed straight to the escort.
@@ -565,11 +678,12 @@ endFunction
 int function CalmGuardsAgainstPlayer() global
     Actor player = Game.GetPlayer()
     Actor[] nearby = PO3_SKSEFunctions.GetActorsByProcessingLevel(0)
+    int frozenMap = FrozenGuardsForScan()
     int calmed = 0
     int i = 0
     while (i < nearby.Length)
         Actor candidate = nearby[i]
-        if (candidate && candidate != player && candidate.IsGuard() && candidate.IsInCombat())
+        if (candidate && candidate != player && !IsListedFrozen(frozenMap, candidate) && candidate.IsGuard() && candidate.IsInCombat())
             candidate.StopCombat()
             candidate.StopCombatAlarm()
             calmed += 1
@@ -2912,6 +3026,24 @@ function SetEscortStartForcedToFail(bool abForced) global
     RPB_StorageVars.SetInt("FORCE_ESCORT_START_FAIL", abForced as int, "Profile")
 endFunction
 
+; Test-only (144): the Surrender Scene is never started, so only the surrender's watchdog can end it
+bool function IsSurrenderSceneForcedToFail() global
+    return JDB.solveInt(".rpb_root.storage.Profile.FORCE_SURRENDER_SCENE_FAIL") != 0
+endFunction
+
+function SetSurrenderSceneForcedToFail(bool abForced) global
+    RPB_StorageVars.SetInt("FORCE_SURRENDER_SCENE_FAIL", abForced as int, "Profile")
+endFunction
+
+; Test-only (148): no guard "sees" a prisoner waiting for a take-over, whatever the distance
+bool function IsTakeoverBlindForTest() global
+    return JDB.solveInt(".rpb_root.storage.Profile.FORCE_TAKEOVER_BLIND") != 0
+endFunction
+
+function SetTakeoverBlindForTest(bool abBlind) global
+    RPB_StorageVars.SetInt("FORCE_TAKEOVER_BLIND", abBlind as int, "Profile")
+endFunction
+
 ; Test-only: pending holds without the hold package (SceneManager's PendingHold aliases), only the script-side hold, to
 ; find out whether the package does anything the script calls don't
 bool function IsPendingHoldPackageDisabled() global
@@ -4225,13 +4357,14 @@ endFunction
 /;
 Actor function GetNearestGuard(ObjectReference centerRef, float radius, ObjectReference exclude) global
     Actor[] nearby = PO3_SKSEFunctions.GetActorsByProcessingLevel(0)
+    int frozenMap = FrozenGuardsForScan()
     Actor nearest = none
     float nearestDistance = 8000.0
 
     int i = 0
     while (i < nearby.Length)
         Actor candidate = nearby[i]
-        if (candidate && candidate != exclude && candidate.GetFormID() != 0x14 && candidate.IsGuard() && !candidate.IsDead() && !candidate.IsDisabled() && !candidate.IsChild())
+        if (candidate && candidate != exclude && !IsListedFrozen(frozenMap, candidate) && candidate.GetFormID() != 0x14 && candidate.IsGuard() && !candidate.IsDead() && !candidate.IsDisabled() && !candidate.IsChild())
             float distance = candidate.GetDistance(centerRef)
             if (distance < nearestDistance)
                 nearest = candidate
@@ -4247,18 +4380,51 @@ endFunction
 ; The nearest living guard in @akCenter's own cell (not @akExclude): the one to take over a prisoner inside the prison when
 ; their guard dies there. Guards outside that interior don't count. Only the actors in high process are scanned (a few
 ; dozen), once per death.
+;/
+    The guard who can see @akPrisoner and take them over inside the prison: a living guard in the same cell, within 1000
+    units, with line of sight to them (or right next to them, 256 units, where a wall or the cell bars can block the ray).
+    The nearest such guard, or none. HasLOS only runs for the guards already that close (a few at most).
+/;
+Actor function GetGuardSeeing(Actor akPrisoner, Actor akExclude) global
+    if (IsTakeoverBlindForTest())
+        return none
+    endif
+    Cell prisonerCell = akPrisoner.GetParentCell()
+    if (!prisonerCell)
+        return none
+    endif
+    Actor[] nearby = PO3_SKSEFunctions.GetActorsByProcessingLevel(0)
+    int frozenMap = FrozenGuardsForScan()
+    Actor seeing = none
+    float seeingDistance = 0.0
+    int i = 0
+    while (i < nearby.Length)
+        Actor candidate = nearby[i]
+        if (candidate && candidate != akExclude && candidate != akPrisoner && !IsListedFrozen(frozenMap, candidate) && candidate.GetFormID() != 0x14 && candidate.IsGuard() && !candidate.IsDead() && !candidate.IsDisabled() && !candidate.IsChild() && candidate.GetParentCell() == prisonerCell)
+            float distance = candidate.GetDistance(akPrisoner)
+            if (distance <= 1000.0 && (!seeing || distance < seeingDistance) && (distance <= 256.0 || candidate.HasLOS(akPrisoner)))
+                seeing = candidate
+                seeingDistance = distance
+            endif
+        endif
+        i += 1
+    endWhile
+    return seeing
+endFunction
+
 Actor function GetNearestGuardInCell(Actor akCenter, Actor akExclude) global
     Cell centerCell = akCenter.GetParentCell()
     if (!centerCell)
         return none
     endif
     Actor[] nearby = PO3_SKSEFunctions.GetActorsByProcessingLevel(0)
+    int frozenMap = FrozenGuardsForScan()
     Actor nearest = none
     float nearestDistance = 0.0
     int i = 0
     while (i < nearby.Length)
         Actor candidate = nearby[i]
-        if (candidate && candidate != akExclude && candidate != akCenter && candidate.GetFormID() != 0x14 && candidate.IsGuard() && !candidate.IsDead() && !candidate.IsDisabled() && !candidate.IsChild() && candidate.GetParentCell() == centerCell)
+        if (candidate && candidate != akExclude && candidate != akCenter && !IsListedFrozen(frozenMap, candidate) && candidate.GetFormID() != 0x14 && candidate.IsGuard() && !candidate.IsDead() && !candidate.IsDisabled() && !candidate.IsChild() && candidate.GetParentCell() == centerCell)
             float distance = candidate.GetDistance(akCenter)
             if (!nearest || distance < nearestDistance)
                 nearest = candidate

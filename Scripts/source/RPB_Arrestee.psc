@@ -1348,6 +1348,11 @@ float property ESCORT_LEASH_DISTANCE = 700.0 autoreadonly
 float property PENDING_LEASH_DISTANCE = 2500.0 autoreadonly
 
 event OnUpdate()
+    ; Waiting in the prison for a guard who can see me (my guard died there): no Captor to watch or leash to
+    if (self.GetBool("Awaiting Guard"))
+        self.__AwaitGuardTick()
+        return
+    endif
     ; The hostile-faction re-check that used to live here (MaintainArrestPacification) was mitigating a symptom -
     ; a disguise mod reapplying a hostile faction mid-escort - of what turned out to be RPB checking the wrong faction
     ; entirely (see RPB_Compat_MasterOfDisguise.psc). With the actual root cause fixed, this per-tick recheck was no
@@ -1616,33 +1621,129 @@ function HandOverInPrison(Actor akDeadGuard)
     SceneManager.EndSceneWithActor(this, "the guard died")
     prisoner.StopEscortAssist()
 
-    RPB_Recovery.__FreeGuard(akDeadGuard, SceneManager) ; his package lock, if the escort to jail left one on him
-    Actor newGuard = RPB_Utility.GetNearestGuardInCell(this, akDeadGuard)
-    if (!newGuard)
+    ; His package lock (if the escort to jail left one on him) on its own stack: a call on the dead guard held the whole
+    ; handover once (148, 0010C06C: nothing after his lock was unbound)
+    int handle = ModEvent.Create("RPB_FreeGuard")
+    if (handle)
+        ModEvent.PushForm(handle, akDeadGuard)
+        ModEvent.Send(handle)
+    endif
+    RPB_Recovery.__Step(this, "HandOverInPrison: freeing " + akDeadGuard + " sent")
+    Actor anyGuard = RPB_Utility.GetNearestGuardInCell(this, akDeadGuard)
+    RPB_Recovery.__Step(this, "HandOverInPrison: a guard left in the prison: " + anyGuard)
+    if (!anyGuard)
         Info("No guard left in " + prison.Name + " to take over from " + akDeadGuard + ": " + Name + " " + this + " is free inside, stripped; their belongings stay in the chest")
         RPB_Recovery.CancelArrest(this, "no guard left in the prison", abReturnBelongings = false)
         return
     endif
 
-    RPB_Captor newCaptor = Arrest.AwaitCaptorReference(newGuard)
+    ; Only a guard who can see me takes over. The nearest one in the prison, from across it, restrained me with nobody
+    ; there (the pose held for a minute until he walked over) or posed me over the cuffs I already had on.
+    Actor seeing = RPB_Utility.GetGuardSeeing(this, akDeadGuard)
+    RPB_Recovery.__Step(this, "HandOverInPrison: a guard who sees me: " + seeing)
+    if (seeing)
+        self.__TakeOverInPrison(seeing, prison, prisoner, akDeadGuard)
+    else
+        self.__AwaitGuardInPrison(akDeadGuard, prison)
+    endif
+endFunction
+
+; @akNewGuard becomes my Captor and the prison flow goes on with him from where it stopped
+function __TakeOverInPrison(Actor akNewGuard, RPB_Prison apPrison, RPB_Prisoner apPrisoner, Actor akOldGuard)
+    RPB_Captor newCaptor = Arrest.AwaitCaptorReference(akNewGuard)
     if (!newCaptor)
-        Info("Could not make " + newGuard + " the captor of " + Name + " " + this + " after " + akDeadGuard + " died: free inside, stripped")
+        Info("Could not make " + akNewGuard + " the captor of " + Name + " " + this + " after " + akOldGuard + " died: free inside, stripped")
+        self.SetBool("Awaiting Guard", false)
         RPB_Recovery.CancelArrest(this, "no guard could take over in the prison", abReturnBelongings = false)
         return
     endif
     newCaptor.AssignArrestee(this)
     self.AssignCaptor(newCaptor)
     __captor = newCaptor ; the Captor property (set once by SetArrestParameters at the arrest)
-    Info("Arrest of " + Name + " " + this + " handed over to " + newGuard + " in " + prison.Name + ": " + akDeadGuard + " died")
+    ; The prisoner's side too: the imprisonment releases "Arrest Captor", which still named the dead guard (the new one
+    ; kept his Captor for good)
+    self.SetForm("Arrest Captor", akNewGuard, "Jail")
+
+    string waited = ""
+    if (self.GetBool("Awaiting Guard"))
+        self.SetBool("Awaiting Guard", false)
+        waited = ", after waiting " + ((Utility.GetCurrentRealTime() - self.GetFloat("Awaiting Guard Since")) as int) + "s for a guard to see them"
+    endif
+    Info("Arrest of " + Name + " " + this + " handed over to " + akNewGuard + " in " + apPrison.Name + ": " + akOldGuard + " died" + waited)
 
     if (self.GetBool("Arrest Pending"))
         self.SetBool("Arrest Pending", false)
         __pausingEscort = false
         self.SetBool("Stall Primed", false)
-        self.__ReleasePendingHold()
     endif
+    self.__ReleasePendingHold()
     RetainAI(self.IsPlayer()) ; the escort walks me, as after the confrontation
-    prison.ResumePrisonFlowWith(prisoner, newGuard)
+    apPrison.ResumePrisonFlowWith(apPrisoner, akNewGuard)
+endFunction
+
+;/
+    No guard sees me after mine died inside the prison: the arrest waits until one does (OnUpdate, __AwaitGuardTick).
+    Cuffed, the player walks free with the cuffs on (no fighting, no activating); uncuffed, they're simply free to move. An
+    NPC is held where they are. Leaving the prison's cell doesn't count: guards elsewhere don't take over (escaping while
+    an arrest waits is its own design).
+/;
+function __AwaitGuardInPrison(Actor akDeadGuard, RPB_Prison apPrison)
+    self.SetBool("Awaiting Guard", true)
+    self.SetForm("Awaiting Guard Dead", akDeadGuard)
+    self.SetForm("Awaiting Guard Cell", this.GetParentCell())
+    self.SetFloat("Awaiting Guard Since", Utility.GetCurrentRealTime())
+    apPrison.CancelEscortToCellStallCheck(this) ; nothing is escorting me now
+
+    bool cuffed = RPB_Utility.IsCuffed(this)
+    if (self.IsPlayer())
+        if (cuffed)
+            RPB_Utility.HoldPlayerCuffed()
+        else
+            ReleaseAI(true)
+        endif
+    else
+        this.SheatheWeapon()
+        this.SetDontMove(true)
+        if (!RPB_Utility.IsPendingHoldPackageDisabled())
+            Arrest.SceneManager.SetPendingHoldOnActor(this)
+        endif
+        self.SetBool("Pending Hold", true) ; lifted by the take-over (__ReleasePendingHold)
+    endif
+    Info(Name + " " + this + " waits in " + apPrison.Name + " (cuffed " + cuffed + ") for a guard who can see them: " + akDeadGuard + " died")
+    RegisterForSingleUpdate(2.0)
+endFunction
+
+function __AwaitGuardTick()
+    Actor deadGuard = self.GetForm("Awaiting Guard Dead") as Actor
+    RPB_Prison prison = API.PrisonManager.FindPrisonByPrisoner(this)
+    RPB_Prisoner prisoner = none
+    if (prison)
+        prisoner = prison.Prisoners.AtKey(this)
+    endif
+    if (!prisoner || prisoner.IsImprisoned)
+        self.SetBool("Awaiting Guard", false)
+        return
+    endif
+
+    ; Outside the prison's cell nobody takes over, and nobody lets me go either
+    if (this.GetParentCell() != self.GetForm("Awaiting Guard Cell") as Cell)
+        RegisterForSingleUpdate(2.0)
+        return
+    endif
+
+    if (!RPB_Utility.GetNearestGuardInCell(this, deadGuard))
+        self.SetBool("Awaiting Guard", false)
+        Info("No guard left in " + prison.Name + " while " + Name + " " + this + " waited: free inside, stripped; their belongings stay in the chest")
+        RPB_Recovery.CancelArrest(this, "no guard left in the prison", abReturnBelongings = false)
+        return
+    endif
+
+    Actor seeing = RPB_Utility.GetGuardSeeing(this, deadGuard)
+    if (seeing)
+        self.__TakeOverInPrison(seeing, prison, prisoner, deadGuard)
+        return
+    endif
+    RegisterForSingleUpdate(2.0)
 endFunction
 
 ; I've arrived at the prison (the escort to jail ended, or I was moved there or into my cell): the escort watch in

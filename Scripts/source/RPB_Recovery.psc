@@ -164,23 +164,18 @@ string function CancelArrest(Actor akActor, string asReason, bool abReturnBelong
     RPB_Arrestee arresteeRef = arrest.Arrestees.AtKey(akActor)
     RPB_Recovery.__Step(akActor, "CancelArrest: arrestee looked up (" + arresteeRef + ")")
     if (arresteeRef)
-        RPB_Captor captorRef = arresteeRef.Captor
-        RPB_Recovery.__Step(akActor, "CancelArrest: read the arrestee's Captor (" + captorRef + ")")
-        Actor captorArrestee = none
-        if (captorRef)
-            captorArrestee = captorRef.Arrestee
-            RPB_Recovery.__Step(akActor, "CancelArrest: read the Captor's Arrestee (" + captorArrestee + ")")
-        endif
-        if (captorRef && captorArrestee == akActor)
-            Actor guard = captorRef.GetActor()
-            RPB_Recovery.__Step(akActor, "CancelArrest: read the Captor's guard (" + guard + ")")
-            ; A dead guard's Captor ends with its effect (its OnDeath is what called me)
-            if (guard && !guard.IsDead())
-                RPB_Recovery.__Step(akActor, "CancelArrest: destroying the captor of " + guard)
-                captorRef.Destroy()
-                RPB_Recovery.__Step(akActor, "CancelArrest: captor destroyed, freeing the guard")
-                RPB_Recovery.__FreeGuard(guard, sceneManager)
-                done += "guard freed; "
+        ; The guard's side (his Captor, his package lock) on its own stack (Arrest.ReleaseCaptorOf): looking the Captor up
+        ; calls into him, and a frozen guard held this cancel there (148's teardown: the player left cuffed). The guard is
+        ; read from my storage, which doesn't call him.
+        Actor guard = arresteeRef.GetCaptorActor()
+        if (guard)
+            int handle = ModEvent.Create("RPB_ReleaseCaptor")
+            if (handle)
+                ModEvent.PushForm(handle, guard)
+                ModEvent.PushForm(handle, akActor)
+                ModEvent.PushBool(handle, true)
+                ModEvent.Send(handle)
+                done += "guard release sent; "
             endif
         endif
         RPB_Recovery.__Step(akActor, "CancelArrest: reverting the arrest")
@@ -208,6 +203,9 @@ string function CancelArrest(Actor akActor, string asReason, bool abReturnBelong
     RPB_Recovery.__Step(akActor, "CancelArrest: holds and cuffs done")
     if (akActor == Game.GetPlayer())
         RPB_Utility.ReleaseAI(true)
+        ; A surrender keeps the forced arrest dialogue off until BeginArrest's end: an arrest cancelled before that would
+        ; leave it off for good
+        RPB_Arrest.EnableForcedArrestDialogue()
     else
         akActor.EnableAI(true)
     endif
@@ -233,6 +231,8 @@ bool function __FreeGuard(Actor akGuard, RPB_SceneManager apSceneManager) global
     endif
 
     apSceneManager.UnsetPackageLockOnActor(akGuard)
-    akGuard.EvaluatePackage()
+    if (!akGuard.IsDead()) ; nothing to evaluate on a corpse (the handover of a dead guard hung around here once)
+        akGuard.EvaluatePackage()
+    endif
     return true
 endFunction

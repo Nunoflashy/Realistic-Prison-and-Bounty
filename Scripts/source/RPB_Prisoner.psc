@@ -3202,18 +3202,19 @@ endFunction
     "<Guard> is not loaded, cannot be registered right now!" right after an off-screen imprisonment).
 /;
 function ClearArrest()
-    ; Step marks (DEBUG): an imprisonment once never got past here, with the reset and the MCM stuck on the same objects
-    RPB_Recovery.__Step(this, "ClearArrest: looking up the Captor of " + Captor)
-    RPB_Captor captorRef = API.Arrest.GetCaptor(Captor)
-    RPB_Recovery.__Step(this, "ClearArrest: Captor looked up (" + captorRef + ")")
-    Actor captorArrestee = none
-    if (captorRef)
-        captorArrestee = captorRef.Arrestee
-        RPB_Recovery.__Step(this, "ClearArrest: read the Captor's Arrestee (" + captorArrestee + ")")
-    endif
-    if (captorRef && captorArrestee == this)
-        captorRef.Destroy()
-        RPB_Recovery.__Step(this, "ClearArrest: Captor destroyed")
+    ; The guard's Captor is torn down on its own stack (Arrest.ReleaseCaptorOf): looking it up calls into the guard, and a
+    ; frozen guard (2026-09-30, 0002E1BB: his Papyrus object stopped answering) hung this imprisonment right here - locked
+    ; in the cell, never imprisoned, the Stats page blank. Nothing below needs the guard.
+    Actor captorActor = Captor
+    if (captorActor)
+        int handle = ModEvent.Create("RPB_ReleaseCaptor")
+        if (handle)
+            ModEvent.PushForm(handle, captorActor)
+            ModEvent.PushForm(handle, this)
+            ModEvent.PushBool(handle, false)
+            ModEvent.Send(handle)
+        endif
+        RPB_Recovery.__Step(this, "ClearArrest: Captor release sent for " + captorActor)
     endif
 
     self.DestroyArrestState()

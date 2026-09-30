@@ -2776,7 +2776,12 @@ function __ProcessEscortStallChecks()
                 prisoner = self.AwaitPrisonerReference(checkActor)
                 if (prisoner && !prisoner.IsImprisoned)
                     Warn("["+ Name +"] Prison::__ProcessEscortStallChecks: Stop() didn't drive " + checkActor.GetDisplayName() + " " + checkActor + " through its own completion either - falling back to a manual finish")
-                    self.SceneManager.UnsetPackageLockOnActor(guard)
+                    ; A frozen guard is left alone: any call on him never returns (FROZEN GUARD)
+                    if (RPB_Utility.IsFrozenGuard(guard))
+                        guard = none
+                    else
+                        self.SceneManager.UnsetPackageLockOnActor(guard)
+                    endif
                     prisoner.StopEscortAssist()
                     if (!prisoner.IsInCell)
                         ; Not in the cell (the player stuck on the stairs): imprisoned where they stood before. Moved in,
@@ -3431,7 +3436,10 @@ function ResumePrisonFlowWith(RPB_Prisoner apPrisoner, Actor akGuard)
     ; He comes to the prisoner first and cuffs them (RPB_RestrainPrisoner02: a Travel to the prisoner, then the restrain):
     ; the strip Scene has no approach and strips at its start, since its guard normally escorted the prisoner there. A
     ; take-over guard from across the prison stripped them with nobody there, then had them walk over to him.
-    self.StartRestrainingPrisoner(apPrisoner, akGuard)
+    ; Not when already cuffed (the guard died after the strip): its hands-behind-back pose over the cuffs broke the animation
+    if (!RPB_Utility.IsCuffed(apPrisoner.GetActor()))
+        self.StartRestrainingPrisoner(apPrisoner, akGuard)
+    endif
     if (!apPrisoner.IsStripped && apPrisoner.ShouldBeStripped)
         self.StartStrippingPrisoner(apPrisoner, akGuard)
     endif
@@ -3632,6 +3640,7 @@ event OnEscortPrisonerToJailEnd(RPB_ActorBase apActor, Actor akEscort)
     ; the Frisking Scene has no code hookup to actually remove anything), a prisoner who fell through both of the
     ; first two checks was silently keeping whatever she still had equipped.
     GuardMark(akEscort, "escort to jail ended, the prison flow starts with him")
+    RPB_Utility.ProbeGuard(akEscort, "escort to jail ended")
     if (prisonerRef.ShouldBeStripped)
         self.StartStrippingPrisoner(prisonerRef, akEscort)
 
@@ -3677,6 +3686,7 @@ endEvent
 
 ; TODO: Remove RPB_JailCell from params. since a Prisoner already has a jail cell assigned to them
 event OnEscortPrisonerToCellEnd(RPB_Prisoner apPrisoner, RPB_JailCell akJailCell, Actor akEscort)
+    RPB_Utility.ProbeGuard(akEscort, "escort to the cell ended")
     apPrisoner.StopEscortAssist()
     ; TODO: Fix NPC not staying in cell if they are stripped OnEscortToCellEnd
     if (!apPrisoner.IsStripped && apPrisoner.ShouldBeStripped)

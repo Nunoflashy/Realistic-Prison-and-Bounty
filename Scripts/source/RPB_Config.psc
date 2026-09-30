@@ -54,6 +54,8 @@ Scriptname RPB_Config extends Quest
     float function GetArrestAdditionalBountyResistingFromCurrentBounty(string hold)
     int function GetArrestAdditionalBountyResistingFlat(string hold)
     int function GetArrestAdditionalBountyResisting(string hold)
+    float function GetArrestAdditionalBountySurrenderingFromCurrentBounty(string hold)
+    int function GetArrestAdditionalBountySurrenderingFlat(string hold)
     float function GetArrestAdditionalBountyDefeatedFromCurrentBounty(string hold)
     int function GetArrestAdditionalBountyDefeatedFlat(string hold)
     int function GetArrestAdditionalBountyDefeated(string hold)
@@ -620,6 +622,14 @@ int function GetArrestAdditionalBountyResisting(string hold)
     int bounty                  = floor(crimeFaction.GetCrimeGold() * bountyPercentModifier) + bountyFlat
 
     return bounty
+endFunction
+
+float function GetArrestAdditionalBountySurrenderingFromCurrentBounty(string hold)
+    return MCM.GetOptionSliderValue("Arrest::Additional Bounty when Surrendering (%)", hold)
+endFunction
+
+int function GetArrestAdditionalBountySurrenderingFlat(string hold)
+    return MCM.GetOptionSliderValue("Arrest::Additional Bounty when Surrendering", hold) as int
 endFunction
 
 float function GetArrestAdditionalBountyDefeatedFromCurrentBounty(string hold)

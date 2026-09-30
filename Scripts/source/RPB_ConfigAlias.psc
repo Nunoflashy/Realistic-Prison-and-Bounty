@@ -86,6 +86,7 @@ endFunction
 function PerformMaintenance()
     API.MCM.EnsureAllOptionDefaults() ; repairs saves that never visited every page
     EventManager.RegisterEvents()
+    RPB_Utility.ClearFrozenGuards() ; a load drops a frozen guard's broken object: he answers again
     SceneManager.SceneManager()
     PrisonManager.VerifyIntegrity()
     API.Arrest.RegisterForKey(0x42)

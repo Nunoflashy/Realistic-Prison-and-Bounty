@@ -226,6 +226,14 @@ function SetTests()
     self.AddTest("138 - A Fight Breaks Out During the Escort to Jail: the Arrest Waits, then Resumes (PLAYER - arrests you, you're brought back)", "Test_FightDuringEscort_Player", abChainable = false)
     self.AddTest("139 - The Guard Dies Inside the Prison: Another Guard Takes Over, or the Prisoner is Free Inside (PLAYER - arrests you, you're brought back)", "Test_GuardDiesInPrison_Player", abChainable = false)
     self.AddTest("140 - 136 Without the Package Lock (Clone Guard; does the guard still freeze?) (PLAYER - arrests you, you're brought back)", "Test_EscortToCellStopped_NoPackageLock", abChainable = false)
+    self.AddTest("141 - Surrender (F8): Only a Bandit Fighting, No One to Surrender To, Nothing Locked (PLAYER)", "Test_Surrender_NoOneToSurrenderTo", abChainable = false)
+    self.AddTest("142 - Surrender (F8): A Hostile Guard, No Bounty: Arrested for the Surrender Bounty (PLAYER - arrests you, you're brought back)", "Test_Surrender_HostileGuardNoBounty", abChainable = false)
+    self.AddTest("143 - Surrender (F8): A Guard, Bounty 1000: Surrender Bounty Added, Arrested (PLAYER - arrests you, you're brought back)", "Test_Surrender_GuardWithBounty", abChainable = false)
+    self.AddTest("144 - Surrender (F8): The Guard Never Comes, Undone After the Timeout (PLAYER, ~35s)", "Test_Surrender_NoGuardComes", abChainable = false)
+    self.AddTest("145 - Surrender (F8): A Guard and a Bandit Fighting, Refused While Attacked (PLAYER)", "Test_Surrender_OtherHostilesAttacking", abChainable = false)
+    self.AddTest("146 - Surrender (F8): Disguised (Hostile Faction), a Guard Fighting: Calmed, Arrested (PLAYER - arrests you, you're brought back)", "Test_Surrender_Disguised", abChainable = false)
+    self.AddTest("147 - A Guard Marked Frozen is Skipped by the Guard Scans and Can't Arrest (NPC)", "Test_FrozenGuardSkipped", abChainable = false)
+    self.AddTest("148 - The Guard Dies Inside the Prison and No Guard Sees the Prisoner: the Arrest Waits, Cuffed, Until One Does (PLAYER - arrests you, you're brought back)", "Test_GuardDiesInPrison_NobodySees", abChainable = false)
     self.AddTest("041 - ActiveMagicEffectContainer: Stuck Lock Self-Heals", "Test_ActiveMagicEffectContainer_StuckLockSelfHeals")
     self.AddTest("042 - ThreadLock: JAtomic Primitive Semantics and Registry", "Test_ThreadLock_PrimitiveSemantics")
     ; Not chainable: fires concurrent worker threads
@@ -11158,7 +11166,7 @@ endFunction
 
 ; 139: the player's guard dies during the escort to the cell: another guard of the prison takes over as the captor and the
 ; escort goes on to the cell; with none left, the player is free inside, stripped, the belongings left in the chest
-bool function __Scenario_GuardDiesInPrison(string asTest)
+bool function __Scenario_GuardDiesInPrison(string asTest, bool abForceWait = false)
     RPB_Arrest arrest = RPB_API.GetArrest()
     RPB_Prison prison = (RPB_API.GetPrisonManager()).GetPrison("Haafingar")
     Actor guard = __ScenarioRealGuard()
@@ -11180,11 +11188,43 @@ bool function __Scenario_GuardDiesInPrison(string asTest)
     Utility.Wait(2.0) ; a few steps into it
 
     int itemsBefore = player.GetNumItems()
-    log(asTest + ": killing the guard " + guard + " during the escort to the cell (player items " + itemsBefore + ")")
+    if (abForceWait)
+        RPB_Utility.SetTakeoverBlindForTest(true) ; no guard sees the player until the test says so
+    endif
+    log(asTest + ": killing the guard " + guard + " during the escort to the cell (player items " + itemsBefore + ", cuffed " + RPB_Utility.IsCuffed(player) + ")")
     guard.Kill()
     Utility.Wait(3.0)
 
     RPB_Arrestee arresteeRef = arrest.Arrestees.AtKey(player)
+    ; No guard saw the player: the arrest waits for one. 148 forces this; in 139 it happens when every guard in the prison
+    ; is out of sight. Either way a guard is then brought next to the player, and must take over within a few seconds.
+    if (arresteeRef && arresteeRef.GetBool("Awaiting Guard"))
+        bool movable = Game.IsMovementControlsEnabled()
+        bool cuffedWaiting = RPB_Utility.IsCuffed(player)
+        log(asTest + ": waiting for a guard to see the player (cuffed " + cuffedWaiting + ", movement enabled " + movable + ", imprisoned " + RPB_Utility.IsActorImprisoned(player) + ")")
+        Utility.Wait(4.0)
+        bool stillWaiting = arresteeRef.GetBool("Awaiting Guard") && !RPB_Utility.IsActorImprisoned(player)
+        RPB_Utility.SetTakeoverBlindForTest(false)
+        Actor witness = RPB_Utility.GetNearestGuardInCell(player, guard)
+        if (!assert_true(witness != none, asTest + ": no guard left in the prison to bring over"))
+            return false
+        endif
+        witness.MoveTo(player, afXOffset = 150.0, abMatchRotation = false)
+        float seenStart = Utility.GetCurrentRealTime()
+        while (arresteeRef.GetBool("Awaiting Guard") && (Utility.GetCurrentRealTime() - seenStart) < 8.0)
+            Utility.Wait(0.25)
+        endWhile
+        log(asTest + ": " + witness + " brought next to the player; taken over after " + __Ms(Utility.GetCurrentRealTime() - seenStart) + "ms (still waiting " + arresteeRef.GetBool("Awaiting Guard") + "), restrain Scene current " + (RPB_API.GetSceneManager().GetCurrentScene() == RPB_API.GetSceneManager().SCENE_RESTRAIN_PRISONER_02))
+        bool waitOk = assert_true(stillWaiting, asTest + ": the arrest didn't keep waiting while no guard could see the player")
+        waitOk = assert_true(movable, asTest + ": the player couldn't move while waiting") && waitOk
+        waitOk = assert_false(arresteeRef.GetBool("Awaiting Guard"), asTest + ": the guard next to the player never took over") && waitOk
+        if (!waitOk)
+            return false
+        endif
+    elseif (abForceWait)
+        RPB_Utility.SetTakeoverBlindForTest(false)
+        return assert_true(false, asTest + ": the arrest never waited for a guard (no guard could see the player)")
+    endif
     Actor newGuard = none
     if (arresteeRef && arresteeRef.Captor)
         newGuard = arresteeRef.Captor.GetActor()
@@ -11314,6 +11354,8 @@ function __TeardownScenario()
                 stalledPrisoner.ReturnBelongings()
                 log("teardown: belongings given back without the reset")
             endif
+            ; The cancel that uncuffs never got there either (148: the player walked out cuffed)
+            RPB_Utility.RemoveCuffs(player)
         endif
         if (__scenarioBountyFaction)
             __scenarioBountyFaction.SetCrimeGold(__savedPlayerBounty)
@@ -11334,11 +11376,25 @@ function __TeardownScenario()
         __scenarioReturnMarker = none
     endif
     if (__scenarioRealGuard)
-        ; A real guard is never deleted: his arrest role, package lock and AI are reset instead (139 kills him first)
-        if (__scenarioRealGuard.IsDead())
-            __scenarioRealGuard.Resurrect()
+        ; A real guard is never deleted: his arrest role, package lock and AI are reset instead (139 kills him first). On its
+        ; own stack, bounded: 139's third run hung here at the first call on the dead 0010C06C (a frozen guard), and the
+        ; repeat never ended
+        __teardownGuardDone = false
+        self.RegisterForModEvent("RPB_TestTeardownGuard", "OnTestTeardownGuard")
+        int handle = ModEvent.Create("RPB_TestTeardownGuard")
+        if (handle)
+            ModEvent.PushForm(handle, __scenarioRealGuard)
+            ModEvent.Send(handle)
         endif
-        RPB_Recovery.ResetActor(__scenarioRealGuard)
+        float guardResetStart = Utility.GetCurrentRealTime()
+        while (!__teardownGuardDone && (Utility.GetCurrentRealTime() - guardResetStart) < 15.0)
+            Utility.Wait(0.25)
+        endWhile
+        self.UnregisterForModEvent("RPB_TestTeardownGuard")
+        if (!__teardownGuardDone)
+            log("teardown: the real guard " + __scenarioRealGuard + "'s reset still running after 15s (frozen? see FROZEN GUARD), going on without it")
+            RPB_Utility.ProbeGuard(__scenarioRealGuard, "test teardown")
+        endif
         __scenarioRealGuard = none
     endif
     __TeardownAllTempActors()
@@ -11349,6 +11405,17 @@ function __TeardownScenario()
 endFunction
 
 bool __teardownResetDone = false
+bool __teardownGuardDone = false
+
+; The teardown's reset of a real guard, on its own thread (see __TeardownScenario)
+event OnTestTeardownGuard(Form akGuard)
+    Actor guard = akGuard as Actor
+    if (guard.IsDead())
+        guard.Resurrect()
+    endif
+    RPB_Recovery.ResetActor(guard)
+    __teardownGuardDone = true
+endEvent
 
 ; The teardown's reset of the player, on its own thread (see __TeardownScenario)
 event OnTestTeardownReset(string asEventName, string asStrArg, float afNumArg, Form akSender)
@@ -11363,6 +11430,178 @@ function __ScenarioWaitImprisoned(Actor akActor, string asTest)
         Utility.Wait(0.5)
     endWhile
     log(asTest + ": imprisoned after the fallback " + RPB_Utility.IsActorImprisoned(akActor) + " (" + __Ms(Utility.GetCurrentRealTime() - start) + "ms)")
+endFunction
+
+;/
+    141-146: the player surrenders (F8's Arrest.Surrender) in a fight. Each mode checks Arrest.LastSurrenderOutcome, so a
+    refusal for another reason (no combat targets yet: 144 and 145 passed that way once) fails.
+    @aiMode 1: only a bandit fights them, no bounty: refused ("no guard"), nothing disabled
+            2: a guard clone fights them, no bounty: arrested, bounty = the surrender flat amount
+            3: the same with a bounty of 1000: bounty = 1000 + its share + the flat amount
+            4: the guard is held in place: the surrender is undone at the timeout ("no guard came")
+            5: a guard and a bandit fight them: refused while attacked ("attacked"), nothing disabled
+            6: disguised (in BanditFaction, a vanilla stand-in for a disguise mod), a guard fights them: arrested, the
+               faction off during the arrest (the Surrender Scene "never started" while the guards kept fighting)
+/;
+bool function __Scenario_Surrender(string asTest, int aiMode)
+    RPB_Arrest arrest = RPB_API.GetArrest()
+    RPB_Config config = API.Config
+    Actor player = Game.GetFormEx(0x14) as Actor
+    Actor guard = __ScenarioGuard()
+    if (!guard)
+        return false
+    endif
+    __ScenarioArrestee(true, guard) ; the player's bounty and health saved, restored by the teardown
+    Faction crimeFaction = __scenarioBountyFaction
+    int startBounty = 0
+    if (aiMode == 3)
+        startBounty = 1000
+    endif
+    crimeFaction.SetCrimeGold(startBounty)
+    crimeFaction.SetCrimeGoldViolent(0)
+    RPB_ActorVars.SetLatentCrimeGold(crimeFaction, player, 0)
+    RPB_ActorVars.SetLatentCrimeGoldViolent(crimeFaction, player, 0)
+
+    Faction banditFaction = Game.GetFormFromFile(0x1BCC0, "Skyrim.esm") as Faction
+    if (aiMode == 6)
+        __surrenderDisguiseAdded = !player.IsInFaction(banditFaction)
+        player.AddToFaction(banditFaction)
+    endif
+
+    Actor hostile = none
+    if (aiMode == 1 || aiMode == 5)
+        hostile = __ScenarioHostile(player, true)
+        if (!assert_true(hostile != none, asTest + ": could not spawn the bandit"))
+            return false
+        endif
+        __ScenarioAttack(hostile, player)
+    endif
+    if (aiMode == 1)
+        guard.Disable() ; not part of this fight
+    else
+        if (aiMode == 4)
+            ; The Scene never starts, so only the watchdog can end the surrender (a guard held far away got the real guards
+            ; around the test spot joining in, and the surrender went to them)
+            RPB_Utility.SetSurrenderSceneForcedToFail(true)
+        endif
+        guard.StartCombat(player)
+    endif
+
+    ; F8 only works on who is fighting the player: wait until the engine lists them
+    Actor needed = guard
+    if (aiMode == 1)
+        needed = hostile
+    endif
+    float start = Utility.GetCurrentRealTime()
+    bool ready = false
+    while (!ready && (Utility.GetCurrentRealTime() - start) < 10.0)
+        Actor[] targets = PO3_SKSEFunctions.GetCombatTargets(player)
+        ready = player.IsInCombat() && targets && (targets.Find(needed) >= 0 || (aiMode == 4 && arrest.HasSurrenderGuard(targets))) && (aiMode != 5 || targets.Find(hostile) >= 0)
+        if (!ready)
+            Utility.Wait(0.25)
+        endif
+    endWhile
+    if (!assert_true(ready, asTest + ": setup: the player's combat targets never listed " + needed + " (in combat " + player.IsInCombat() + ")"))
+        RPB_Utility.SetSurrenderSceneForcedToFail(false)
+        return false
+    endif
+    log(asTest + ": in combat with the expected actors after " + __Ms(Utility.GetCurrentRealTime() - start) + "ms")
+
+    string hold = RPB_Utility.GetFormNameCached(crimeFaction)
+    int expected = startBounty + Math.Floor(startBounty * PercentToDecimal(config.GetArrestAdditionalBountySurrenderingFromCurrentBounty(hold))) + config.GetArrestAdditionalBountySurrenderingFlat(hold)
+    arrest.LastSurrenderOutcome = ""
+    start = Utility.GetCurrentRealTime()
+    arrest.Surrender(player)
+    bool ok = true
+
+    if (aiMode == 1 || aiMode == 5)
+        Utility.Wait(6.0)
+        string expectedOutcome = "no guard"
+        if (aiMode == 5)
+            expectedOutcome = "attacked"
+        endif
+        log(asTest + ": outcome '" + arrest.LastSurrenderOutcome + "'")
+        ok = assert_true(arrest.LastSurrenderOutcome == expectedOutcome, asTest + ": refused as '" + arrest.LastSurrenderOutcome + "', expected '" + expectedOutcome + "'") && ok
+        ok = assert_false(arrest.IsSurrendering(player), asTest + ": the refused surrender is still marked as under way") && ok
+        ok = assert_false(RPB_Utility.IsActorArrested(player), asTest + ": arrested although the surrender was refused") && ok
+    elseif (aiMode == 2 || aiMode == 3 || aiMode == 6)
+        while (!RPB_Utility.IsActorArrested(player) && (Utility.GetCurrentRealTime() - start) < 45.0)
+            Utility.Wait(0.5)
+        endWhile
+        int bounty = RPB_ActorBase.GetCurrentActiveAndLatentBountyForFaction(player, crimeFaction)
+        log(asTest + ": outcome '" + arrest.LastSurrenderOutcome + "', arrested " + RPB_Utility.IsActorArrested(player) + " after " + __Ms(Utility.GetCurrentRealTime() - start) + "ms, bounty " + bounty + " (expected " + expected + "), in BanditFaction " + player.IsInFaction(banditFaction) + ", forced dialogue off " + (RPB_Utility.RPB_ArrestGlobal("No Dialogue").GetValueInt() == 1))
+        ok = assert_true(RPB_Utility.IsActorArrested(player), asTest + ": the surrender never led to an arrest (outcome '" + arrest.LastSurrenderOutcome + "')") && ok
+        ok = assert_true(bounty == expected, asTest + ": bounty " + bounty + " after surrendering, expected " + expected) && ok
+        if (aiMode == 6)
+            ok = assert_false(player.IsInFaction(banditFaction), asTest + ": still in BanditFaction during the arrest") && ok
+        endif
+        return ok
+    else
+        ; Surrender() only sends the event: the flag is set a moment later (the loop below once ended before it started)
+        while (!arrest.IsSurrendering(player) && arrest.LastSurrenderOutcome == "" && (Utility.GetCurrentRealTime() - start) < 8.0)
+            Utility.Wait(0.25)
+        endWhile
+        ok = assert_true(arrest.IsSurrendering(player) || arrest.LastSurrenderOutcome != "", asTest + ": the surrender never started") && ok
+        while (arrest.IsSurrendering(player) && (Utility.GetCurrentRealTime() - start) < arrest.SURRENDER_TIMEOUT_SECONDS + 15.0)
+            Utility.Wait(0.5)
+        endWhile
+        Utility.Wait(1.0)
+        RPB_Utility.SetSurrenderSceneForcedToFail(false)
+        RPB_SceneManager sceneManager = RPB_API.GetSceneManager()
+        log(asTest + ": outcome '" + arrest.LastSurrenderOutcome + "' after " + __Ms(Utility.GetCurrentRealTime() - start) + "ms, arrested " + RPB_Utility.IsActorArrested(player) + ", current Scene '" + sceneManager.GetCurrentScene() + "'")
+        ok = assert_true(arrest.LastSurrenderOutcome == "no guard came" || arrest.LastSurrenderOutcome == "Scene never started", asTest + ": ended as '" + arrest.LastSurrenderOutcome + "', expected the timeout (or a Scene that never started)") && ok
+        ok = assert_false(arrest.IsSurrendering(player), asTest + ": still surrendering past the timeout") && ok
+        ok = assert_false(RPB_Utility.IsActorArrested(player), asTest + ": arrested although no guard came") && ok
+        ok = assert_true(sceneManager.GetCurrentScene() != sceneManager.SCENE_SURRENDER_01, asTest + ": the Surrender Scene is still playing") && ok
+    endif
+
+    ok = assert_true(Game.IsMovementControlsEnabled() && Game.IsFightingControlsEnabled(), asTest + ": the player's controls were left disabled") && ok
+    ok = assert_true(RPB_Utility.RPB_ArrestGlobal("No Dialogue").GetValueInt() == 0, asTest + ": the forced arrest dialogue was left switched off") && ok
+    return ok
+endFunction
+
+;/
+    147: a guard on the frozen list (marked by hand: a real freeze can't be made on demand) is skipped by the guard scans and
+    can't start an arrest. Comparing against the list never calls into him, which is what makes it safe on a real frozen one.
+/;
+bool function __Scenario_FrozenGuardSkipped(string asTest)
+    Actor player = Game.GetFormEx(0x14) as Actor
+    Actor guard = __ScenarioGuard()
+    if (!guard)
+        return false
+    endif
+    Actor arrestee = __ScenarioArrestee(false, guard)
+    if (!assert_true(arrestee != none, asTest + ": could not spawn the arrestee"))
+        return false
+    endif
+    Utility.Wait(1.0)
+
+    Actor nearestBefore = RPB_Utility.GetNearestGuard(guard, 3000.0, none)
+    RPB_Utility.MarkGuardFrozen(guard, "test " + asTest)
+    Actor nearestAfter = RPB_Utility.GetNearestGuard(guard, 3000.0, none)
+    log(asTest + ": nearest guard to the clone " + guard + ": before the mark " + nearestBefore + ", after " + nearestAfter)
+    bool ok = assert_true(RPB_Utility.IsFrozenGuard(guard), asTest + ": the marked guard doesn't read frozen")
+    ok = assert_true(nearestAfter != guard, asTest + ": GetNearestGuard still returned the frozen guard") && ok
+
+    RPB_API.GetArrest().ArrestActor(guard, arrestee, RPB_API.GetArrest().ARREST_TYPE_ESCORT_TO_JAIL)
+    Utility.Wait(4.0)
+    log(asTest + ": arrested by the frozen guard " + RPB_Utility.IsActorArrested(arrestee))
+    ok = assert_false(RPB_Utility.IsActorArrested(arrestee), asTest + ": a frozen guard's arrest went ahead") && ok
+    return ok
+endFunction
+
+bool __surrenderDisguiseAdded = false
+
+; 146's teardown: the arrest's cancel gives the player's hostility back (the "Jail" snapshot); the test's stand-in disguise goes
+function __TeardownSurrenderDisguise()
+    Actor player = Game.GetFormEx(0x14) as Actor
+    RPB_Utility.RestoreNeutralizedHostility(player)
+    if (__surrenderDisguiseAdded)
+        player.RemoveFromFaction(Game.GetFormFromFile(0x1BCC0, "Skyrim.esm") as Faction)
+        __surrenderDisguiseAdded = false
+    endif
+    player.StopCombatAlarm()
+    RPB_Utility.CalmGuardsAgainstPlayer()
 endFunction
 
 ; 129 (and 103's scenario for the player)
@@ -11581,7 +11820,9 @@ bool function __Scenario_EscortToCellStopped(string asTest, bool abCloneGuard = 
     ; was still playing (the first run froze the player during Stripping02)
     float start = Utility.GetCurrentRealTime()
     RPB_Prisoner assisted = prison.Prisoners.AtKey(player)
-    while (!(assisted && assisted.EscortAssistToCell) && (Utility.GetCurrentRealTime() - start) < 120.0)
+    ; 180s: the escort to jail's known stall at Castle Dour's door can take ~80s on its own (135 ran out at 120s once, 3s
+    ; after the escort to the cell began)
+    while (!(assisted && assisted.EscortAssistToCell) && (Utility.GetCurrentRealTime() - start) < 180.0)
         Utility.Wait(0.5)
         assisted = prison.Prisoners.AtKey(player)
     endWhile
@@ -12378,9 +12619,16 @@ bool property IsRepeating
     endFunction
 endProperty
 
-; Ends a repeated run after the run in progress
+int __repeatRun = 0
+
+; Ends a repeated run after the run in progress. The "repeating" state clears now: a run stuck inside (139's teardown hung on
+; a frozen guard) never got back to the loop, and F1 kept saying a test was repeating
 function RequestRepeatStop()
     __repeatStopRequested = true
+    if (__repeating)
+        base_log("[UNIT REPEAT]", "stop requested (run " + __repeatRun + " in progress)", "Tests::Repeat")
+    endif
+    __repeating = false
 endFunction
 
 ;/
@@ -12403,6 +12651,7 @@ function ExecuteTestRepeated(string asTestKeyName, int aiTimes)
     string results = ""
     int run = 0
     while (run < aiTimes && !__repeatStopRequested)
+        __repeatRun = run + 1
         base_log("[UNIT REPEAT]", "Run " + (run + 1) + "/" + aiTimes + ": " + asTestKeyName, "Tests::Repeat")
         self.ExecuteTest(asTestKeyName)
         if (__lastResultState == 1)
@@ -12435,7 +12684,7 @@ endFunction
 string __statelessTest = ""
 
 bool function __RunStatelessTest(string asTest)
-    if (asTest != "Test_ArrestWaitsWhileGuardFights_NoPackage" && asTest != "Test_CellDoorsDiagnostic" && asTest != "Test_LongAbsenceSetup" && asTest != "Test_LongAbsenceAdvance" && asTest != "Test_LongAbsenceVerify" && asTest != "Test_FallbackEscortToCellStopped_Player" && asTest != "Test_FallbackEscortToCellStopped_CloneGuard" && asTest != "Test_FightDuringEscort_NPC" && asTest != "Test_FightDuringEscort_Player" && asTest != "Test_GuardDiesInPrison_Player" && asTest != "Test_EscortToCellStopped_NoPackageLock")
+    if (asTest != "Test_ArrestWaitsWhileGuardFights_NoPackage" && asTest != "Test_CellDoorsDiagnostic" && asTest != "Test_LongAbsenceSetup" && asTest != "Test_LongAbsenceAdvance" && asTest != "Test_LongAbsenceVerify" && asTest != "Test_FallbackEscortToCellStopped_Player" && asTest != "Test_FallbackEscortToCellStopped_CloneGuard" && asTest != "Test_FightDuringEscort_NPC" && asTest != "Test_FightDuringEscort_Player" && asTest != "Test_GuardDiesInPrison_Player" && asTest != "Test_EscortToCellStopped_NoPackageLock" && StringUtil.Find(asTest, "Test_Surrender_") != 0 && asTest != "Test_FrozenGuardSkipped" && asTest != "Test_GuardDiesInPrison_NobodySees")
         return false
     endif
 
@@ -12478,6 +12727,33 @@ bool function __RunStatelessTest(string asTest)
         RPB_Utility.SetPackageLockDisabled(true)
         display_result(__Scenario_EscortToCellStopped("140", abCloneGuard = true))
         RPB_Utility.SetPackageLockDisabled(false)
+        __TeardownScenario()
+    elseif (asTest == "Test_Surrender_NoOneToSurrenderTo")
+        display_result(__Scenario_Surrender("141", 1))
+        __TeardownScenario()
+    elseif (asTest == "Test_Surrender_HostileGuardNoBounty")
+        display_result(__Scenario_Surrender("142", 2))
+        __TeardownScenario()
+    elseif (asTest == "Test_Surrender_GuardWithBounty")
+        display_result(__Scenario_Surrender("143", 3))
+        __TeardownScenario()
+    elseif (asTest == "Test_Surrender_NoGuardComes")
+        display_result(__Scenario_Surrender("144", 4))
+        __TeardownScenario()
+    elseif (asTest == "Test_Surrender_OtherHostilesAttacking")
+        display_result(__Scenario_Surrender("145", 5))
+        __TeardownScenario()
+    elseif (asTest == "Test_Surrender_Disguised")
+        display_result(__Scenario_Surrender("146", 6))
+        __TeardownScenario()
+        __TeardownSurrenderDisguise()
+    elseif (asTest == "Test_GuardDiesInPrison_NobodySees")
+        display_result(__Scenario_GuardDiesInPrison("148", abForceWait = true))
+        RPB_Utility.SetTakeoverBlindForTest(false)
+        __TeardownScenario()
+    elseif (asTest == "Test_FrozenGuardSkipped")
+        display_result(__Scenario_FrozenGuardSkipped("147"))
+        RPB_Utility.ClearFrozenGuards()
         __TeardownScenario()
     endif
     __statelessTest = ""

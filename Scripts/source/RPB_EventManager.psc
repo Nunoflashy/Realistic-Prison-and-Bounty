@@ -111,7 +111,32 @@ function RegisterEvents()
     ; Package Event Handlers
     RegisterForModEvent("RPB_PackageEnd", "OnPackageEnd")
     RegisterForModEvent("RPB_PackageStart", "OnPackageStart")
+
+    ; Guard side stacks: a frozen guard only ever holds these (RPB_Utility.ProbeGuard, Prisoner.ClearArrest)
+    RegisterForModEvent("RPB_GuardProbe", "OnGuardProbe")
+    RegisterForModEvent("RPB_GuardProbeCheck", "OnGuardProbeCheck")
+    RegisterForModEvent("RPB_ReleaseCaptor", "OnReleaseCaptor")
+    RegisterForModEvent("RPB_FreeGuard", "OnFreeGuard")
 endFunction
+
+event OnGuardProbe(string asStep, Form akGuard)
+    RPB_Utility.__RunGuardProbe(akGuard as Actor, asStep)
+endEvent
+
+; The probe's answer should be in by now: IsFrozenGuard only reads the list, and reports a probe that never came back
+event OnGuardProbeCheck(Form akGuard)
+    Utility.Wait(3.5)
+    RPB_Utility.IsFrozenGuard(akGuard as Actor)
+endEvent
+
+event OnReleaseCaptor(Form akGuard, Form akArrestee, bool abFreeGuard)
+    Arrest.ReleaseCaptorOf(akGuard as Actor, akArrestee as Actor, abFreeGuard)
+endEvent
+
+; A guard's package lock and package, on their own stack (a dead or frozen guard held the handover there)
+event OnFreeGuard(Form akGuard)
+    RPB_Recovery.__FreeGuard(akGuard as Actor, SceneManager)
+endEvent
 
 ; ==========================================================
 ;                      Event Dispatchers
@@ -202,6 +227,17 @@ endFunction
 /;
 function OnSceneStartFailed(string asScene)
     string sceneType = SceneManager.GetSceneType(asScene)
+    if (sceneType == SceneManager.CATEGORY_SURRENDER)
+        Actor surrenderer = SceneManager.GetSceneNthReferenceOfType(asScene, "Surrenderer") as Actor
+        if (surrenderer)
+            if (Arrest.IsSurrendering(surrenderer))
+                Arrest.LastSurrenderOutcome = "Scene never started"
+            endif
+            Arrest.AbortSurrender(surrenderer, "the Surrender Scene never started", abEndScene = false)
+        endif
+        return
+    endif
+
     if (sceneType != SceneManager.CATEGORY_ESCORT_TO_JAIL && sceneType != SceneManager.CATEGORY_ESCORT_TO_CELL)
         return
     endif
@@ -410,6 +446,11 @@ event OnArrestBegin(string eventName, string arrestType, float arresteeIdFlt, Fo
     RPB_Utility.FlowMark("EventManager.OnArrestBegin: mod event delivered")
 
     Actor captor = (sender as Actor)
+    ; Before any call on him: a frozen guard's first call never returns, and this arrest would hang with it
+    if (captor && RPB_Utility.IsFrozenGuard(captor))
+        Warn("Arrest by " + captor + " rejected: the guard is frozen (see FROZEN GUARD)")
+        return
+    endif
     Faction crimeFaction = form_if ((sender as Faction), (sender as Faction), captor.GetCrimeFaction()) as Faction
 
     if (captor == none && crimeFaction == none)
@@ -1022,12 +1063,13 @@ event OnSurrenderScene(string asScene, string asSceneEvent, Actor akSurrenderer,
             Debug("EventManager::OnSurrenderScene", "akParams: " + akParams + ", akSurrenderer: " + akSurrenderer)
 
         elseif (asSceneEvent == SceneManager.EVENT_SURRENDER_END)
-            RetainAI(akSurrenderer.GetFormID() == 0x14)
+            ; Not for a surrender already undone: that would lock the player again, with nothing left to release them
+            RetainAI(akSurrenderer.GetFormID() == 0x14 && Arrest.IsSurrendering(akSurrenderer))
 
+            ; The forced arrest dialogue stays off from here: turned back on at BeginArrest's end (Arrest.OnArrestEnd), once
+            ; the bounty is hidden, or by an undone surrender. Turned on here, an alerted guard force-greeted the player in
+            ; the seconds the surrender bounty was still active, and leaving that dialogue counted as resisting.
             Arrest.OnSurrenderEnd(akSurrenderer, akSurrendererCaptor)
-            
-            ; Re-enable forced arrest dialogue for next times (Actor has surrendered)
-            RPB_Arrest.EnableForcedArrestDialogue()
         endif
     endif
 endEvent

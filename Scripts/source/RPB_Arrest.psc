@@ -66,6 +66,14 @@ scriptname RPB_Arrest extends Quest
     function StartBountyPayment(Actor akGuard, Actor akPayerArrestee, string asBountyPaymentScenario)
     function Surrender(Actor akSurrenderer)
     bool function CanActorSurrender(Actor akSurrenderer, Actor[] akSurrendererCaptors)
+    bool function IsSurrenderGuard(Actor akActor)
+    function ReleaseCaptorOf(Actor akGuard, Actor akArrestee, bool abFreeGuard = false)
+    bool function HasSurrenderGuard(Actor[] akCombatTargets)
+    Actor function GetNonGuardCombatTarget(Actor[] akCombatTargets)
+    Actor[] function GetSurrenderGuards(Actor[] akCombatTargets)
+    bool function IsSurrendering(Actor akActor)
+    function AbortSurrender(Actor akSurrenderer, string asReason, bool abEndScene = true)
+    function ApplySurrenderPenalty(Actor akSurrenderer, Faction akFaction)
     function PrepareSurrenderer(Actor akSurrenderer)
     function InitiateSurrenderScene(Actor akSurrenderer, Actor[] akSurrendererCaptors)
     int function GetActorArrestStatus(Actor akActor)
@@ -417,6 +425,30 @@ endFunction
     RPB_Captor  @apCaptor: The Captor to unregister.
     bool?       @abRemoveFromList: Whether to also remove the Captor from the list.
 /;
+;/
+    Tears down @akGuard's Captor if its Arrestee is still @akArrestee (Prisoner.ClearArrest, at the imprisonment). On the
+    RPB_ReleaseCaptor event's own stack: the lookup calls into the guard, and a frozen guard (his Papyrus object never
+    answers) used to hang the imprisonment right there - locked in the cell, never imprisoned, the Stats page blank.
+/;
+function ReleaseCaptorOf(Actor akGuard, Actor akArrestee, bool abFreeGuard = false)
+    if (!akGuard || RPB_Utility.IsFrozenGuard(akGuard))
+        return
+    endif
+    RPB_Recovery.__Step(akArrestee, "ReleaseCaptor: looking up the Captor of " + akGuard)
+    RPB_Captor captorRef = self.GetCaptor(akGuard)
+    RPB_Recovery.__Step(akArrestee, "ReleaseCaptor: Captor looked up (" + captorRef + ")")
+    ; A guard already given a new arrest (a handover, a quick re-arrest) keeps his Captor. A cancel (@abFreeGuard) leaves a
+    ; dead guard's alone: it ends with his effect (his OnDeath is what cancelled)
+    if (captorRef && captorRef.Arrestee == akArrestee && (!abFreeGuard || !akGuard.IsDead()))
+        captorRef.Destroy()
+        RPB_Recovery.__Step(akArrestee, "ReleaseCaptor: Captor destroyed")
+    endif
+    if (abFreeGuard)
+        RPB_Recovery.__FreeGuard(akGuard, SceneManager)
+        RPB_Recovery.__Step(akArrestee, "ReleaseCaptor: guard freed")
+    endif
+endFunction
+
 function UnregisterCaptor(RPB_Captor apCaptor, bool abRemoveFromList = false)
     ; Remove the spell from the Captor
     Spell captorSpell = RPB_Utility.RPB_CaptorSpell()
@@ -599,11 +631,38 @@ bool function __OtherGuardHandlesArrestDialogue(Actor akSpeaker, Actor akArreste
 endFunction
 
 event OnSurrenderBegin(Actor akSurrenderer, Actor[] akSurrendererCaptors)
+    self.__BeginSurrender(akSurrenderer)
+    Actor[] guards = self.GetSurrenderGuards(akSurrendererCaptors)
     self.PrepareSurrenderer(akSurrenderer)
-    self.InitiateSurrenderScene(akSurrenderer, akSurrendererCaptors)
+    self.__PacifyForSurrender(akSurrenderer, guards)
+    self.InitiateSurrenderScene(akSurrenderer, guards)
+    ; Runs on this event's own stack until the Scene's end takes the surrender over (or undoes it after the timeout)
+    self.__WatchSurrender(akSurrenderer)
 endEvent
 
 event OnSurrenderEnd(Actor akSurrenderer, Actor akCaptor)
+    ; Already undone (the watchdog, an abort): a Scene end arriving late must not arrest anyone
+    if (!self.__ClaimSurrender(akSurrenderer))
+        Info("Surrender Scene of " + akSurrenderer + " ended after the surrender was already over, ignored")
+        return
+    endif
+
+    if (!self.IsSurrenderGuard(akCaptor))
+        LastSurrenderOutcome = "no guard at the end"
+        self.__UndoSurrender(akSurrenderer, "the Scene ended without a guard (captor " + akCaptor + ")")
+        return
+    endif
+
+    Faction crimeFaction = akCaptor.GetCrimeFaction()
+    self.ApplySurrenderPenalty(akSurrenderer, crimeFaction)
+    ; The arrest rejects an actor with no bounty, and nothing would give the player back their controls after that
+    if (RPB_ActorBase.GetCurrentActiveAndLatentBountyForFaction(akSurrenderer, crimeFaction) <= 0)
+        LastSurrenderOutcome = "no bounty"
+        self.__UndoSurrender(akSurrenderer, "no bounty in " + RPB_Utility.GetFormNameCached(crimeFaction) + " and no bounty for surrendering is set")
+        return
+    endif
+
+    LastSurrenderOutcome = "arrest"
     self.ArrestActor(akCaptor, akSurrenderer, ARREST_TYPE_ESCORT_TO_JAIL)
 endEvent
 
@@ -1074,10 +1133,16 @@ endFunction
 ;                      Surrender-Specific
 
 bool function CanActorSurrender(Actor akSurrenderer, Actor[] akSurrendererCaptors)
+    bool isPlayer = akSurrenderer == Config.Player
+    ; A second F8 while the first one is still on its way (the prepare alone takes 4s) started a second surrender
+    if (self.IsSurrendering(akSurrenderer))
+        return false
+    endif
+
     int arrestStatus = self.GetActorArrestStatus(akSurrenderer)
 
     if (arrestStatus != CAN_BE_ARRESTED)
-        EventManager.SendError("Actor " + akSurrenderer.GetBaseObject().GetName() + " is not able to be arrested! ("+ string_if (ALREADY_ARRESTED, "Currently Arrested", "Currently Imprisoned") +")")
+        EventManager.SendError("Actor " + akSurrenderer.GetBaseObject().GetName() + " is not able to be arrested! ("+ string_if (arrestStatus == ALREADY_ARRESTED, "Currently Arrested", "Currently Imprisoned") +")")
         return false
     endif
 
@@ -1091,12 +1156,208 @@ bool function CanActorSurrender(Actor akSurrenderer, Actor[] akSurrendererCaptor
         return false
     endif
 
+    ; Nobody fighting them yet (the combat targets fill in a moment after the fight starts)
     if (!akSurrendererCaptors)
-        EventManager.SendError("Could not retrieve the surrenderer's captors, unable to surrender!")
+        LastSurrenderOutcome = "no captors"
+        Config.NotifyArrest("There's no one here to surrender to", isPlayer)
+        Info("Surrender of " + akSurrenderer + " refused: in combat, but with no combat targets")
+        return false
+    endif
+
+    ; Only the law takes a surrender. Bandits and creatures used to be bound as captors too: one walked up, the arrest was
+    ; rejected (no crime faction, or no bounty) and nothing ever gave the player back their controls
+    Actor otherHostile = self.GetNonGuardCombatTarget(akSurrendererCaptors)
+    if (!self.HasSurrenderGuard(akSurrendererCaptors))
+        LastSurrenderOutcome = "no guard"
+        Config.NotifyArrest("There's no one here to surrender to", isPlayer)
+        Info("Surrender of " + akSurrenderer + " refused: none of their " + akSurrendererCaptors.Length + " combat targets is a guard")
+        return false
+    endif
+
+    ; Surrendering locks the player in place, cowering: not while someone who won't take it is still attacking
+    if (otherHostile)
+        LastSurrenderOutcome = "attacked"
+        Config.NotifyArrest("You can't surrender while you're still being attacked", isPlayer)
+        Info("Surrender of " + akSurrenderer + " refused: " + otherHostile + " is still attacking them")
         return false
     endif
 
     return true
+endFunction
+
+; A combat target that can take a surrender: a living guard of a hold
+bool function IsSurrenderGuard(Actor akActor)
+    return akActor && !RPB_Utility.IsFrozenGuard(akActor) && !akActor.IsDead() && !akActor.IsDisabled() && akActor.IsGuard() && akActor.GetCrimeFaction()
+endFunction
+
+bool function HasSurrenderGuard(Actor[] akCombatTargets)
+    int i = 0
+    while (i < akCombatTargets.Length)
+        if (self.IsSurrenderGuard(akCombatTargets[i]))
+            return true
+        endif
+        i += 1
+    endWhile
+    return false
+endFunction
+
+; A living combat target that isn't a guard (a bandit, a creature), or none
+Actor function GetNonGuardCombatTarget(Actor[] akCombatTargets)
+    int i = 0
+    while (i < akCombatTargets.Length)
+        Actor target = akCombatTargets[i]
+        if (target && !RPB_Utility.IsFrozenGuard(target) && !target.IsDead() && !target.IsDisabled() && !target.IsGuard())
+            return target
+        endif
+        i += 1
+    endWhile
+    return none
+endFunction
+
+; The guards among @akCombatTargets, at most the Surrender Scene's 6 captor slots (empty slots stay none, the binding skips them)
+Actor[] function GetSurrenderGuards(Actor[] akCombatTargets)
+    Actor[] guards = new Actor[6]
+    int count = 0
+    int i = 0
+    while (i < akCombatTargets.Length && count < guards.Length)
+        if (self.IsSurrenderGuard(akCombatTargets[i]))
+            guards[count] = akCombatTargets[i]
+            count += 1
+        endif
+        i += 1
+    endWhile
+    return guards
+endFunction
+
+; ==========================================================
+;               Surrender state (one way in, one way out)
+
+; How long a surrender waits for a guard to come and take it before it's undone
+float property SURRENDER_TIMEOUT_SECONDS = 30.0 autoreadonly
+
+; How the last surrender ended or was refused ("no captors", "no guard", "attacked", "no guard came", "Scene never
+; started", "no guard at the end", "no bounty", "arrest"): for the tests and the log
+string property LastSurrenderOutcome auto hidden
+
+;/
+    Stops the fight on the guards' side before the Surrender Scene: the engine refuses to start a Scene whose actors are
+    still in combat, and a disguised surrenderer (a hostile faction on them) kept the guards fighting after the player's
+    own StopCombat (the Scene "never started"). Their hostile factions are removed as the arrest would (the snapshot lets
+    an undone surrender give them back); a disguise mod re-adds its faction, so I sweep until the guards stay calm, 5s at most.
+/;
+function __PacifyForSurrender(Actor akSurrenderer, Actor[] akGuards)
+    float start = Utility.GetCurrentRealTime()
+    int passes = 0
+    bool fighting = true
+    while (fighting && (Utility.GetCurrentRealTime() - start) < 5.0)
+        passes += 1
+        if (RPB_Utility.IsHostileActor(akSurrenderer))
+            RPB_Utility.NeutralizeHostileActor(akSurrenderer)
+        endif
+        akSurrenderer.StopCombat()
+        akSurrenderer.StopCombatAlarm()
+        fighting = false
+        int i = 0
+        while (i < akGuards.Length)
+            if (akGuards[i] && akGuards[i].IsInCombat())
+                akGuards[i].StopCombat()
+                akGuards[i].StopCombatAlarm()
+                fighting = true
+            endif
+            i += 1
+        endWhile
+        if (fighting)
+            Utility.Wait(0.5)
+        endif
+    endWhile
+    Info("Surrender of " + akSurrenderer + ": guards calmed in " + passes + " passes, still fighting " + fighting)
+endFunction
+
+;/
+    Whether @akActor has a surrender under way. A flag saved in the middle of one and loaded later has no one left to
+    clear it, so it only counts for an in-game hour.
+/;
+bool function IsSurrendering(Actor akActor)
+    if (!RPB_StorageVars.GetBoolOnReference("Surrendering", akActor, "Surrender"))
+        return false
+    endif
+    return (Utility.GetCurrentGameTime() - RPB_StorageVars.GetFloatOnReference("Surrender Started", akActor, "Surrender")) < (1.0 / 24.0)
+endFunction
+
+function __BeginSurrender(Actor akActor)
+    RPB_StorageVars.SetBoolOnReference("Surrendering", akActor, true, "Surrender")
+    RPB_StorageVars.SetFloatOnReference("Surrender Started", akActor, Utility.GetCurrentGameTime(), "Surrender")
+endFunction
+
+; Takes the surrender over: true for the one caller that gets it (the Scene's end, the watchdog, an abort), false for the rest
+bool function __ClaimSurrender(Actor akActor)
+    bool surrendering = self.IsSurrendering(akActor)
+    RPB_StorageVars.DeleteCategoryOnReference(akActor, "Surrender")
+    return surrendering
+endFunction
+
+;/
+    Undoes what a surrender did to @akSurrenderer, for every way it can end without an arrest: the Surrender Scene
+    (current or queued), the player's AI and controls, the cowering, the forced arrest dialogue switch.
+    Call it after __ClaimSurrender() returned true. @abEndScene false from inside the Scene queue itself (a Scene that
+    never started is already being dropped there).
+/;
+function __UndoSurrender(Actor akSurrenderer, string asReason, bool abEndScene = true)
+    bool isPlayer = akSurrenderer == Config.Player
+    Info("Surrender of " + akSurrenderer + " undone: " + asReason)
+    if (abEndScene)
+        SceneManager.EndSceneWithActor(akSurrenderer, "the surrender is over: " + asReason)
+    endif
+    RPB_Utility.ReleaseAI(isPlayer)
+    Debug.SendAnimationEvent(akSurrenderer, "IdleForceDefaultState")
+    ; The hostility __PacifyForSurrender removed (nothing when they weren't hostile)
+    RPB_Utility.RestoreNeutralizedHostility(akSurrenderer)
+    RPB_Arrest.EnableForcedArrestDialogue()
+    Config.NotifyArrest("No one took your surrender", isPlayer)
+endFunction
+
+function AbortSurrender(Actor akSurrenderer, string asReason, bool abEndScene = true)
+    if (self.__ClaimSurrender(akSurrenderer))
+        self.__UndoSurrender(akSurrenderer, asReason, abEndScene)
+    endif
+endFunction
+
+; Waits on the surrender's own stack for the Scene's end to take it over; undoes it if no guard ever does
+function __WatchSurrender(Actor akSurrenderer)
+    float start = Utility.GetCurrentRealTime()
+    while (self.IsSurrendering(akSurrenderer) && (Utility.GetCurrentRealTime() - start) < SURRENDER_TIMEOUT_SECONDS)
+        Utility.Wait(1.0)
+    endWhile
+    if (self.__ClaimSurrender(akSurrenderer))
+        LastSurrenderOutcome = "no guard came"
+        self.__UndoSurrender(akSurrenderer, "no guard came to take it in " + (SURRENDER_TIMEOUT_SECONDS as int) + "s")
+    endif
+endFunction
+
+;/
+    The bounty for surrendering to @akFaction's guards: a flat amount plus a share of the current bounty (active and
+    latent), set per hold in the MCM. With no bounty only the flat part applies, so a hostile actor who had none is
+    still arrested for something.
+/;
+function ApplySurrenderPenalty(Actor akSurrenderer, Faction akFaction)
+    string hold = RPB_Utility.GetFormNameCached(akFaction)
+    bool isPlayer = akSurrenderer == Config.Player
+
+    int currentBounty   = RPB_ActorBase.GetCurrentActiveAndLatentBountyForFaction(akSurrenderer, akFaction)
+    float percent       = PercentToDecimal(Config.GetArrestAdditionalBountySurrenderingFromCurrentBounty(hold))
+    int penalty         = floor(currentBounty * percent) + Config.GetArrestAdditionalBountySurrenderingFlat(hold)
+
+    if (penalty > 0)
+        if (isPlayer)
+            akFaction.ModCrimeGold(penalty)
+        else
+            RPB_ActorVars.ModCrimeGold(akFaction, akSurrenderer, penalty)
+        endif
+        Config.NotifyArrest("You have gained " + penalty + " Bounty in " + hold + " for surrendering", isPlayer)
+    endif
+
+    RPB_ActorVars.IncrementStat("Arrests Surrendered", akFaction, akSurrenderer)
+    Info("Surrender of " + akSurrenderer + " to " + hold + ": bounty " + currentBounty + " + " + penalty)
 endFunction
 
 function PrepareSurrenderer(Actor akSurrenderer)
@@ -1115,6 +1376,9 @@ function PrepareSurrenderer(Actor akSurrenderer)
 endFunction
 
 function InitiateSurrenderScene(Actor akSurrenderer, Actor[] akSurrendererCaptors)
+    if (RPB_Utility.IsSurrenderSceneForcedToFail())
+        return ; test 144: only the watchdog can end this surrender
+    endif
     SceneManager.StartSurrenderScene(akSurrenderer, akSurrendererCaptors, SceneManager.SCENE_SURRENDER_01)
 endFunction
 
