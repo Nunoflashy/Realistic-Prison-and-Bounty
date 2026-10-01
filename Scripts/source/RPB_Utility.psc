@@ -186,6 +186,10 @@ scriptname RPB_Utility hidden
     function SetPendingHoldPackageDisabled(bool abDisabled) global
     bool function IsPackageLockDisabled() global
     function SetPackageLockDisabled(bool abDisabled) global
+    bool function IsFreeWalkDisabledForTest() global
+    function SetFreeWalkDisabledForTest(bool abDisabled) global
+    bool function IsTestTeardownRunning() global
+    function SetTestTeardownRunning(bool abRunning) global
     float function GetMonitorOverrideHours() global
     function SetMonitorOverrideHours(float afHours) global
     float function GetHostilityRestoreOverrideHours() global
@@ -3144,6 +3148,26 @@ endFunction
 
 function SetPackageLockDisabled(bool abDisabled) global
     RPB_StorageVars.SetInt("DISABLE_PACKAGE_LOCK", abDisabled as int, "Profile")
+endFunction
+
+; Test-only (135, 136, 140): the player's escort stays AI-led, never a free walk. They test the led fallbacks (the move
+; into the cell); free walk takes a stop over first and those never get their turn.
+bool function IsFreeWalkDisabledForTest() global
+    return JDB.solveInt(".rpb_root.storage.Profile.DISABLE_FREE_WALK") != 0
+endFunction
+
+function SetFreeWalkDisabledForTest(bool abDisabled) global
+    RPB_StorageVars.SetInt("DISABLE_FREE_WALK", abDisabled as int, "Profile")
+endFunction
+
+; Test-only: a test's teardown is running. Its reset gives the test's bounty back (RevertArrest) and a guard nearby opens
+; the arrest confront; the move home then cut the dialogue, read as resisting arrest.
+bool function IsTestTeardownRunning() global
+    return JDB.solveInt(".rpb_root.storage.Profile.TEST_TEARDOWN") != 0
+endFunction
+
+function SetTestTeardownRunning(bool abRunning) global
+    RPB_StorageVars.SetInt("TEST_TEARDOWN", abRunning as int, "Profile")
 endFunction
 
 ;/

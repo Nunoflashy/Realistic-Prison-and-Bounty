@@ -2492,6 +2492,9 @@ function __SetFreeWalk(bool abFree, string asReason)
     if (!__assistOn || !__assistEscort)
         return
     endif
+    if (abFree && RPB_Utility.IsFreeWalkDisabledForTest())
+        return
+    endif
     __freeWalk = abFree
     __freeFarTicks = 0
     __freeBothStillTime = 0.0

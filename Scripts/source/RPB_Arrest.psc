@@ -623,6 +623,13 @@ event OnArrestDialogue(int aiTopicInfoEvent, int aiTopicInfoType, string asTopic
                 return
             endif
 
+            ; Test-only: the teardown's move home cuts a confront its own reset set off (the test's bounty given back)
+            if (RPB_Utility.IsTestTeardownRunning())
+                EventManager.SendInfo("Not resisting arrest: a test's teardown cut " + akSpeakerArrester + "'s arrest dialogue", "Arrest::OnArrestDialogue")
+                akSpeakerArrester.EvaluatePackage()
+                return
+            endif
+
             ; Another guard's dialogue while one is already handling the arrest (several guards around: they come to talk
             ; while the first one still is, and their resist line counted as the player resisting, without them ever
             ; leaving the first dialogue). Only the guard handling it can be resisted.
