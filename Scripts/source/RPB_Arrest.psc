@@ -84,7 +84,7 @@ scriptname RPB_Arrest extends Quest
     function ForgetFakeSurrenders(Actor akActor)
     function ApplySurrenderPenalty(Actor akSurrenderer, Faction akFaction)
     function ApplyFakeSurrenderPenalty(Actor akSurrenderer, Faction akFaction)
-    function PrepareSurrenderer(Actor akSurrenderer)
+    function PrepareSurrenderer(Actor akSurrenderer, Actor[] akGuards = none)
     function InitiateSurrenderScene(Actor akSurrenderer, Actor[] akSurrendererCaptors)
     int function GetActorArrestStatus(Actor akActor)
     function BeginArrest(RPB_Arrestee apArresteeRef)
@@ -644,7 +644,14 @@ event OnArrestDialogue(int aiTopicInfoEvent, int aiTopicInfoType, string asTopic
             RPB_StorageVars.DeleteVariableOnReference("Arrest Dialogue Guard", akSpokenToArrestee, "Pre-Arrest")
         endif
 
-        if (aiTopicInfoType == TOPIC_TYPE_ARREST_DIALOGUE_ELUDING)
+        ; An eluding line closed on someone already arrested (or surrendering) isn't eluding: the arresting guard's own
+        ; "Wait... I know you" greeting, closed by the arrest starting, queued the Eluding Scene ahead of the escort to
+        ; jail, and the escort never played
+        if ((aiTopicInfoType == TOPIC_TYPE_ARREST_DIALOGUE_ELUDING || aiTopicInfoType == TOPIC_TYPE_ARREST_PURSUIT_ELUDING) && self.__IsBeyondEluding(akSpokenToArrestee))
+            EventManager.SendInfo("Not eluding arrest: " + akSpokenToArrestee + " is already arrested, imprisoned or surrendering (" + akSpeakerArrester + "'s line)", "Arrest::OnArrestDialogue")
+            akSpeakerArrester.EvaluatePackage()
+
+        elseif (aiTopicInfoType == TOPIC_TYPE_ARREST_DIALOGUE_ELUDING)
             self.SetAsEluding(akSpeakerArrester, akSpokenToArrestee, "Dialogue")
 
         elseif (aiTopicInfoType == TOPIC_TYPE_ARREST_PURSUIT_ELUDING)
@@ -665,6 +672,11 @@ event OnArrestDialogue(int aiTopicInfoEvent, int aiTopicInfoType, string asTopic
     endif
 endEvent
 
+; Past the point where eluding means anything: already arrested, imprisoned, or surrendering
+bool function __IsBeyondEluding(Actor akActor)
+    return RPB_Utility.IsActorArrested(akActor) || RPB_Utility.IsActorImprisoned(akActor) || self.IsSurrendering(akActor)
+endFunction
+
 ; Whether a guard other than @akSpeaker is handling @akArrestee's arrest dialogue right now: recorded at its confrontation
 ; line, still alive, and either still in the dialogue with the player or recorded less than 30s ago (the dialogue target
 ; can't always be read with several guards talking)
@@ -682,7 +694,7 @@ event OnSurrenderBegin(Actor akSurrenderer, Actor[] akSurrendererCaptors)
     self.__BeginSurrender(akSurrenderer)
     Actor[] guards = self.GetSurrenderGuards(akSurrendererCaptors)
     __surrenderGuards = guards
-    self.PrepareSurrenderer(akSurrenderer)
+    self.PrepareSurrenderer(akSurrenderer, guards)
     self.__PacifyForSurrender(akSurrenderer, guards)
     self.InitiateSurrenderScene(akSurrenderer, guards)
     ; Runs on this event's own stack until the Scene's end takes the surrender over, or the surrenderer leaves
@@ -800,6 +812,15 @@ endEvent
         "In the name of the Jarl, I command you to stop!", or "Come quietly or face the Jarl's justice!"
 /;
 event OnArrestEludeStart(Actor akEludedGuard, string asEludeType)
+    ; Eluding is the player's (TriggerForcegreetEluding/TriggerPursuitEluding act on them)
+    if (self.__IsBeyondEluding(Config.Player))
+        EventManager.SendInfo("Not eluding arrest: the player is already arrested, imprisoned or surrendering (" + asEludeType + ", " + akEludedGuard + ")", "Arrest::OnArrestEludeStart")
+        if (akEludedGuard)
+            akEludedGuard.EvaluatePackage()
+        endif
+        return
+    endif
+
     Debug("Arrest::OnArrestEludeStart", "Started Eluding Arrest with Elude Type: " + asEludeType + ", akEludedGuard: " + akEludedGuard)
 
     if (asEludeType == "Dialogue")
@@ -1454,8 +1475,13 @@ function __WatchSurrender(Actor akSurrenderer, Actor[] akGuards)
     float originX = akSurrenderer.GetPositionX()
     float originY = akSurrenderer.GetPositionY()
     float originZ = akSurrenderer.GetPositionZ()
-    float nearest = self.__NearestGuardDistance(akSurrenderer, akGuards)
-    float lastProgress = Utility.GetCurrentRealTime()
+    ; Per tick (a vanilla native costs about a frame): the position, the weapon and one guard's distance. The nearest guard
+    ; is re-scanned every 4th tick, the heartbeat written every 10th, and the time counted in ticks (a late Wait only
+    ; makes the expiry later)
+    int tracked = self.__NearestGuardIndex(akSurrenderer, akGuards)
+    float nearest = self.__GuardDistance(akSurrenderer, akGuards, tracked)
+    int ticks = 0
+    int lastProgressTick = 0
     int sceneRetries = 0
     bool expired = false
     bool watching = true
@@ -1473,7 +1499,7 @@ function __WatchSurrender(Actor akSurrenderer, Actor[] akGuards)
                 __SurrenderLog("Surrender of " + akSurrenderer + ": the Surrender Scene didn't start (" + self.__GuardsInCombat(akGuards) + "), retry " + sceneRetries)
                 self.__PacifyForSurrender(akSurrenderer, akGuards)
                 self.InitiateSurrenderScene(akSurrenderer, akGuards)
-                lastProgress = Utility.GetCurrentRealTime()
+                lastProgressTick = ticks
             else
                 watching = false
                 if (self.__ClaimSurrender(akSurrenderer))
@@ -1482,14 +1508,23 @@ function __WatchSurrender(Actor akSurrenderer, Actor[] akGuards)
                 endif
             endif
         else
-            RPB_StorageVars.SetFloatOnReference("Surrender Heartbeat", akSurrenderer, Utility.GetCurrentGameTime(), "Surrender")
-            float distance = self.__NearestGuardDistance(akSurrenderer, akGuards)
+            ticks += 1
+            if (ticks % 10 == 0)
+                RPB_StorageVars.SetFloatOnReference("Surrender Heartbeat", akSurrenderer, Utility.GetCurrentGameTime(), "Surrender")
+            endif
+            if (ticks % 4 == 0 || tracked < 0 || !akGuards[tracked])
+                tracked = self.__NearestGuardIndex(akSurrenderer, akGuards)
+            endif
+            float distance = self.__GuardDistance(akSurrenderer, akGuards, tracked)
             float dx = akSurrenderer.GetPositionX() - originX
             float dy = akSurrenderer.GetPositionY() - originY
             float dz = akSurrenderer.GetPositionZ() - originZ
             float movedSquared = dx * dx + dy * dy + dz * dz
             bool weaponDrawn = akSurrenderer.IsWeaponDrawn()
-            if ((movedSquared > leaveSquared || weaponDrawn) && distance > SURRENDER_TAKEN_DISTANCE)
+            ; A close guard only "takes" it while the Surrender Scene plays (its end is the take-over): without the Scene,
+            ; a guard standing next to them would hold the surrender on forever
+            bool beingTaken = distance <= SURRENDER_TAKEN_DISTANCE && SceneManager.GetCurrentScene() == SceneManager.SCENE_SURRENDER_01
+            if ((movedSquared > leaveSquared || weaponDrawn) && !beingTaken)
                 watching = false
                 __SurrenderLog("Surrender of " + akSurrenderer + ": they left (moved " + (Math.sqrt(movedSquared) as int) + ", weapon drawn " + weaponDrawn + ", nearest guard " + (distance as int) + ", expired " + expired + ")")
                 if (expired)
@@ -1498,11 +1533,10 @@ function __WatchSurrender(Actor akSurrenderer, Actor[] akGuards)
                     self.__FakeSurrender(akSurrenderer, akGuards)
                 endif
             elseif (!expired)
-                float now = Utility.GetCurrentRealTime()
                 if (distance < nearest - 32.0)
                     nearest = distance
-                    lastProgress = now
-                elseif ((now - lastProgress) >= SURRENDER_EXPIRE_SECONDS)
+                    lastProgressTick = ticks
+                elseif (((ticks - lastProgressTick) * 0.5) >= SURRENDER_EXPIRE_SECONDS)
                     expired = true
                     LastSurrenderOutcome = "expired"
                     __SurrenderLog("Surrender of " + akSurrenderer + " expired: no guard came closer in " + (SURRENDER_EXPIRE_SECONDS as int) + "s (nearest " + (nearest as int) + ")")
@@ -1542,20 +1576,30 @@ string function __GuardsInCombat(Actor[] akGuards)
     return "in combat:" + fighting
 endFunction
 
-; The distance from @akSurrenderer to the nearest of @akGuards (a huge one with none)
-float function __NearestGuardDistance(Actor akSurrenderer, Actor[] akGuards)
-    float nearest = 1000000000.0
+; The index of the nearest of @akGuards to @akSurrenderer, -1 with none
+int function __NearestGuardIndex(Actor akSurrenderer, Actor[] akGuards)
+    int best = -1
+    float bestDistance = 0.0
     int i = 0
     while (i < akGuards.Length)
         if (akGuards[i])
             float distance = akSurrenderer.GetDistance(akGuards[i])
-            if (distance < nearest)
-                nearest = distance
+            if (best < 0 || distance < bestDistance)
+                best = i
+                bestDistance = distance
             endif
         endif
         i += 1
     endWhile
-    return nearest
+    return best
+endFunction
+
+; The distance from @akSurrenderer to @akGuards[@aiIndex] (a huge one with none)
+float function __GuardDistance(Actor akSurrenderer, Actor[] akGuards, int aiIndex)
+    if (aiIndex < 0 || !akGuards[aiIndex])
+        return 1000000000.0
+    endif
+    return akSurrenderer.GetDistance(akGuards[aiIndex])
 endFunction
 
 ; The nearest of @akGuards that can still take the surrender, or @akFallback
@@ -1685,7 +1729,7 @@ endFunction
     Sheathes and plays the surrender and cower idles. The surrenderer keeps their controls: they aren't arrested yet, and
     moving or drawing a weapon ends the surrender (the watch). The arrest takes the controls at the Scene's end.
 /;
-function PrepareSurrenderer(Actor akSurrenderer)
+function PrepareSurrenderer(Actor akSurrenderer, Actor[] akGuards = none)
     ; Sheathe weapons, animations won't play otherwise
     akSurrenderer.SheatheWeapon()
 
@@ -1695,6 +1739,16 @@ function PrepareSurrenderer(Actor akSurrenderer)
     ; Stop all combat
     akSurrenderer.StopCombat()
     akSurrenderer.StopCombatAlarm()
+
+    ; A guard already this close takes the surrender at once: hands up, straight into the arrest, no cowering first
+    if (akGuards)
+        float distance = self.__GuardDistance(akSurrenderer, akGuards, self.__NearestGuardIndex(akSurrenderer, akGuards))
+        if (distance <= SURRENDER_TAKEN_DISTANCE)
+            __SurrenderLog("Surrender of " + akSurrenderer + ": a guard is close (" + (distance as int) + "): hands up, no cower")
+            return
+        endif
+    endif
+
     Utility.Wait(1.0)
     Debug.SendAnimationEvent(akSurrenderer, "IdleCowerEnter")
 endFunction

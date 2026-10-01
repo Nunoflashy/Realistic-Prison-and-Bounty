@@ -11501,13 +11501,22 @@ bool function __Scenario_Surrender(string asTest, int aiMode)
     endif
     float start = Utility.GetCurrentRealTime()
     bool ready = false
+    float lastAttack = start
     while (!ready && (Utility.GetCurrentRealTime() - start) < 10.0)
         Actor[] targets = PO3_SKSEFunctions.GetCombatTargets(player)
         ready = player.IsInCombat() && targets && (targets.Find(needed) >= 0 || ((aiMode == 4 || aiMode == 7) && arrest.HasSurrenderGuard(targets))) && (aiMode != 5 || targets.Find(hostile) >= 0)
         if (!ready)
+            ; The bandit can turn on the guard (or the real guards around) instead: send it at the player again
+            if (hostile && (Utility.GetCurrentRealTime() - lastAttack) >= 1.0)
+                hostile.StartCombat(player)
+                lastAttack = Utility.GetCurrentRealTime()
+            endif
             Utility.Wait(0.25)
         endif
     endWhile
+    if (!ready && hostile)
+        log(asTest + ": the bandit " + hostile + ": dead " + hostile.IsDead() + ", in combat " + hostile.IsInCombat() + ", fighting " + hostile.GetCombatTarget() + ", " + (hostile.GetDistance(player) as int) + " from the player")
+    endif
     if (!assert_true(ready, asTest + ": setup: the player's combat targets never listed " + needed + " (in combat " + player.IsInCombat() + ")"))
         RPB_Utility.SetSurrenderSceneForcedToFail(false)
         return false
@@ -11585,7 +11594,14 @@ bool function __Scenario_Surrender(string asTest, int aiMode)
             ok = assert_true(bounty == bountyBefore, asTest + ": walking away after it expired cost bounty (" + bountyBefore + " -> " + bounty + ")") && ok
         else
             int expectedFake = startBounty + Math.Floor(startBounty * PercentToDecimal(config.GetArrestAdditionalBountyFakingSurrenderFromCurrentBounty(hold))) + config.GetArrestAdditionalBountyFakingSurrenderFlat(hold)
+            ; The surrender is claimed (IsSurrendering false) a moment before the penalty is added
             float waitStart = Utility.GetCurrentRealTime()
+            while (bounty != expectedFake && (Utility.GetCurrentRealTime() - waitStart) < 3.0)
+                Utility.Wait(0.25)
+                bounty = RPB_ActorBase.GetCurrentActiveAndLatentBountyForFaction(player, crimeFaction)
+            endWhile
+            log(asTest + ": bounty " + bounty + " " + __Ms(Utility.GetCurrentRealTime() - waitStart) + "ms after the surrender ended")
+            waitStart = Utility.GetCurrentRealTime()
             while (!guard.IsInCombat() && (Utility.GetCurrentRealTime() - waitStart) < 3.0)
                 Utility.Wait(0.25)
             endWhile
@@ -12800,6 +12816,7 @@ bool function __RunStatelessTest(string asTest)
         __TeardownScenario()
     elseif (asTest == "Test_Surrender_NoGuardComes")
         display_result(__Scenario_Surrender("144", 4))
+        RPB_API.GetArrest().AbortSurrender(Game.GetFormEx(0x14) as Actor, "test teardown")
         __TeardownScenario()
     elseif (asTest == "Test_Surrender_OtherHostilesAttacking")
         display_result(__Scenario_Surrender("145", 5))
@@ -12811,6 +12828,7 @@ bool function __RunStatelessTest(string asTest)
     elseif (asTest == "Test_Surrender_Faked")
         display_result(__Scenario_Surrender("149", 7))
         RPB_Utility.SetSurrenderSceneForcedToFail(false)
+        RPB_API.GetArrest().AbortSurrender(Game.GetFormEx(0x14) as Actor, "test teardown")
         RPB_API.GetArrest().ForgetFakeSurrenders(Game.GetFormEx(0x14) as Actor)
         __TeardownScenario()
     elseif (asTest == "Test_GuardDiesInPrison_NobodySees")
