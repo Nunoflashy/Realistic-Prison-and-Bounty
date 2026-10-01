@@ -48,7 +48,7 @@ function OnHighlight(RPB_MCM mcm, int oid) global
     endif
     string bindAction = __ActionOf(mcm, oid)
     if (bindAction != "")
-        mcm.SetInfoText(RPB_Keybindings.GetInfo(bindAction) + "\nDefault: " + RPB_Keybindings.GetDefault(bindAction))
+        mcm.SetInfoText(RPB_Keybindings.GetInfo(bindAction) + "\nDefault: " + RPB_Keybindings.KeyName(RPB_Keybindings.GetDefault(bindAction)))
     endif
 endFunction
 

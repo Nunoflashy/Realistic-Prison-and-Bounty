@@ -9,6 +9,7 @@ Scriptname RPB_Keybindings hidden
     string function GetInfo(string asAction) global
     function SetKey(string asAction, int aiKeyCode) global
     function RegisterSurrenderKey() global
+    string function KeyName(int aiKeyCode) global
 /;
 
 ; The keys the player can rebind (the MCM's Keybindings page). Their defaults, names and descriptions are in
@@ -60,6 +61,18 @@ function SetKey(string asAction, int aiKeyCode) global
         endif
         RegisterSurrenderKey()
     endif
+endFunction
+
+; A key's name ("F8", "K") from RPB_Data/keycodes.json (DirectX scan codes, mouse 256+, gamepad 266+)
+string function KeyName(int aiKeyCode) global
+    if (aiKeyCode < 0)
+        return "Unbound"
+    endif
+    string keyName = JMap.getStr(JValue.readFromFile("Data/RPB_Data/keycodes.json"), aiKeyCode as string)
+    if (keyName == "")
+        return "Key " + aiKeyCode
+    endif
+    return keyName
 endFunction
 
 function RegisterSurrenderKey() global
