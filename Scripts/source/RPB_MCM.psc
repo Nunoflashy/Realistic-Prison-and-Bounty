@@ -1193,6 +1193,7 @@ function InitializePages()
         String_Implode(Holds) + "," + \
         PAGE_SEPARATOR + \
         "Presets," + \
+        "Keybindings," + \
         PAGE_SEPARATOR + \
         "Maintenance," + \
         "Debug" \
@@ -1834,6 +1835,7 @@ event OnPageReset(string page)
     RPB_MCM_Maintenance.Render(self)
     RPB_MCM_Stats.Render(self)
     RPB_MCM_Presets.Render(self)
+    RPB_MCM_Keybindings.Render(self)
 
     ; Debug("MCM::OnPageReset", "Content: " + GetContainerList(optionsValueMap))
 
@@ -1887,6 +1889,7 @@ event OnOptionHighlight(int option)
     RPB_MCM_Stats.OnHighlight(self, option)
     RPB_MCM_Sentence.OnHighlight(self, option)
     RPB_MCM_Presets.OnHighlight(self, option)
+    RPB_MCM_Keybindings.OnHighlight(self, option)
 endEvent
 
 event OnOptionDefault(int option)
@@ -1898,6 +1901,11 @@ event OnOptionDefault(int option)
     RPB_MCM_Stats.OnDefault(self, option)
     RPB_MCM_Sentence.OnDefault(self, option)
     RPB_MCM_Presets.OnDefault(self, option)
+    RPB_MCM_Keybindings.OnDefault(self, option)
+endEvent
+
+event OnOptionKeyMapChange(int option, int keyCode, string conflictControl, string conflictName)
+    RPB_MCM_Keybindings.OnKeymapChange(self, option, keyCode, conflictControl, conflictName)
 endEvent
 
 event OnOptionSelect(int option)

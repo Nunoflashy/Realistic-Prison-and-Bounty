@@ -89,7 +89,7 @@ function PerformMaintenance()
     RPB_Utility.ClearFrozenGuards() ; a load drops a frozen guard's broken object: he answers again
     SceneManager.SceneManager()
     PrisonManager.VerifyIntegrity()
-    API.Arrest.RegisterForKey(0x42)
+    RPB_Keybindings.RegisterSurrenderKey()
 
     API.MCM.InitializePages()
 endFunction

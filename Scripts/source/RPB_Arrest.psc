@@ -481,8 +481,8 @@ event OnInit()
 endEvent
 
 event OnKeyDown(int keyCode)
-    if (keyCode == 0x42) ; F8
-        Debug("Arrest::OnKeyDown", "F8 pressed (state '" + self.GetState() + "'), sending the surrender")
+    if (keyCode == RPB_Keybindings.GetKey("Surrender") && !Utility.IsInMenuMode())
+        Debug("Arrest::OnKeyDown", "the surrender key pressed (state '" + self.GetState() + "'), sending the surrender")
         self.Surrender(Config.Player)
     endif
 endEvent
@@ -2238,13 +2238,9 @@ endFunction
 ; ==========================================================
 ;                  Validation & Maintenance
 
+; The surrender key (rebindable on the MCM's Keybindings page)
 function RegisterHotkeys()
-    RegisterForKey(0x58) ; F12
-    RegisterForKey(0x57) ; F11
-    RegisterForKey(0x44) ; F10
-    RegisterForKey(0x42) ; F8
-    RegisterForKey(0x41) ; F7
-    RegisterForKey(0x40) ; F6
+    RPB_Keybindings.RegisterSurrenderKey()
 endFunction
 
 function EnableForcedArrestDialogue() global

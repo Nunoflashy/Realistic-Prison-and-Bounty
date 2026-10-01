@@ -1219,6 +1219,26 @@ state Escorting
         endif
         RegisterForSingleUpdate(__assistTick)
     endEvent
+
+    ; The escort key: led for the rest of the arrest, or back to walking on my own once the free walk's rules allow it
+    event OnKeyDown(int keyCode)
+        if (keyCode != __escortToggleKey || !__assistOn || Utility.IsInMenuMode())
+            return
+        endif
+        if (__freeWalk)
+            __preferLed = true
+            self.__SetFreeWalk(false, "asked to be led")
+            Config.NotifyArrest("The guard leads you", true)
+        else
+            __preferLed = !__preferLed
+            if (__preferLed)
+                Config.NotifyArrest("The guard leads you", true)
+            else
+                Config.NotifyArrest("You'll walk on your own when you can", true)
+            endif
+        endif
+        EventManager.SendInfo(Name + " pressed the escort key: " + string_if(__preferLed, "led until pressed again", "walking on their own when allowed"), "["+ Name +"] Prisoner::EscortAssist")
+    endEvent
 endState
 
 state Releasing
@@ -2477,6 +2497,10 @@ float __lastGuardInCellY
 int __runTicks
 bool __runWarned
 int __walkInFarTicks
+; The player asked to be led (the escort key): no free walk until they ask again. Kept for the whole arrest (the escort
+; to jail and to the cell), not reset by an assist start.
+bool __preferLed
+int __escortToggleKey
 
 ; Whether the player is walking on their own in the escort right now (the tests)
 bool property EscortFreeWalking
@@ -2492,7 +2516,7 @@ function __SetFreeWalk(bool abFree, string asReason)
     if (!__assistOn || !__assistEscort)
         return
     endif
-    if (abFree && RPB_Utility.IsFreeWalkDisabledForTest())
+    if (abFree && (__preferLed || RPB_Utility.IsFreeWalkDisabledForTest()))
         return
     endif
     __freeWalk = abFree
@@ -2804,6 +2828,13 @@ function StartEscortAssist(Actor akEscort, bool abToCell)
     ; stack: if he's broken, only the assist waits.
     __assistNeedsFirstRead = true
     __assistTick = 1.0
+    if (__escortToggleKey > 0)
+        UnregisterForKey(__escortToggleKey)
+    endif
+    __escortToggleKey = RPB_Keybindings.GetKey("EscortToggle")
+    if (__escortToggleKey > 0)
+        RegisterForKey(__escortToggleKey)
+    endif
     GotoState("Escorting")
     RegisterForSingleUpdate(0.1)
     Debug("["+ Name +"] Prisoner::EscortAssist", "assist started: escort by " + akEscort + ", to cell " + abToCell + ", previous state '" + __assistPreviousState + "'")
@@ -2823,6 +2854,10 @@ function StopEscortAssist()
     endif
     __assistOn = false
     __assistEscort = none
+    if (__escortToggleKey > 0)
+        UnregisterForKey(__escortToggleKey)
+        __escortToggleKey = 0
+    endif
     self.__RestoreEscortSpeed()
     UnregisterForUpdate()
     if (self.GetState() == "Escorting")

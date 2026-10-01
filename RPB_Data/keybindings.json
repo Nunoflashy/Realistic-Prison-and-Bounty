@@ -1,0 +1,12 @@
+{
+    "Surrender": {
+        "Name": "Surrender",
+        "Default": 66,
+        "Info": "Surrender to the guards nearby: hands up, and the guard arrests you once he comes. Moving away or readying a weapon before he arrives is a fake surrender."
+    },
+    "EscortToggle": {
+        "Name": "Escort: Walk on My Own / Be Led",
+        "Default": 37,
+        "Info": "While being escorted: switch between walking on your own beside the guard and being led by him. Led, he takes you the rest of the way until you press it again; walking on your own resumes once you're close to him."
+    }
+}
