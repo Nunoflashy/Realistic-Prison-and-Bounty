@@ -1326,6 +1326,35 @@ state Imprisoned
         if (self.IsNPC())
             Prison.Monitor.ArmPrisonerRelease(self)
         endif
+
+        ; The AI key, in the cell: the prison routine (the cell's own package) or my own control
+        if (self.IsPlayer())
+            __cellToggleKey = RPB_Keybindings.GetKey("EscortToggle")
+            if (__cellToggleKey > 0)
+                RegisterForKey(__cellToggleKey)
+            endif
+        endif
+    endEvent
+
+    event OnEndState()
+        ; Leaving the cell's state (release, the sleep's fast-forward, a cancel, the escort out): my control back first, before
+        ; any Scene of theirs takes the AI
+        if (self.IsPlayer())
+            if (__cellAI)
+                self.__SetCellAI(false, "left the cell")
+            endif
+            if (__cellToggleKey > 0)
+                UnregisterForKey(__cellToggleKey)
+                __cellToggleKey = 0
+            endif
+        endif
+    endEvent
+
+    event OnKeyDown(int keyCode)
+        if (keyCode != __cellToggleKey || !self.IsPlayer() || Utility.IsInMenuMode())
+            return
+        endif
+        self.__SetCellAI(!__cellAI, "the AI key")
     endEvent
 
     event OnUpdateGameTime()
@@ -2511,6 +2540,32 @@ int __walkInFarTicks
 ; to jail and to the cell), not reset by an assist start.
 bool __preferLed
 int __escortToggleKey
+; The AI key in the cell: following the prison routine (the cell's package, AI-driven) or in my own control
+bool __cellAI
+int __cellToggleKey
+
+function __SetCellAI(bool abOn, string asWhy)
+    if (abOn)
+        RetainAI(true)
+        self.__BindCellPackage()
+        if (!self.HasCellPackage)
+            RPB_Utility.ReleaseAI()
+            Config.NotifyArrest("No routine for this cell", true)
+            EventManager.SendWarning(Name + "'s cell routine: no free package for the cell (" + JailCell + ")", "["+ Name +"] Prisoner::CellAI")
+            return
+        endif
+        __cellAI = true
+        this.EvaluatePackage()
+        Config.NotifyArrest("You follow the prison routine", true)
+    else
+        __cellAI = false
+        self.__UnbindCellPackage()
+        this.EvaluatePackage()
+        RPB_Utility.ReleaseAI()
+        Config.NotifyArrest("You're on your own in the cell", abOn == false && asWhy == "the AI key")
+    endif
+    EventManager.SendInfo(Name + "'s cell routine " + string_if(abOn, "on", "off") + " (" + asWhy + ")", "["+ Name +"] Prisoner::CellAI")
+endFunction
 
 ; Whether the player is walking on their own in the escort right now (the tests)
 bool property EscortFreeWalking
@@ -4194,6 +4249,10 @@ event OnDestroy()
     self.UnregisterForTrackedStats()
 
     if (self.IsPlayer())
+        if (__cellAI)
+            __cellAI = false
+            self.__UnbindCellPackage()
+        endif
         ; If for some reason AI is disabled, re-enable it
         ReleaseAI()
     endif
@@ -4285,7 +4344,11 @@ function NPC_BindToCell()
     if (!self.IsNPC())
         return
     endif
+    self.__BindCellPackage()
+endFunction
 
+; The cell's package alias, chosen and bound (NPCs on imprisonment; the player through the AI key, see __SetCellAI)
+function __BindCellPackage()
     ; Choosing a free package alias and binding to it must be one step for the whole game: an alias only holds one actor, and two
     ; prisoners choosing the same free one meant the second bind took the package away from the first.
     int packageLock = RPB_ThreadLock.Get("CellPackages")
@@ -4323,7 +4386,10 @@ function NPC_UnbindFromCell()
     if (!self.IsNPC())
         return
     endif
+    self.__UnbindCellPackage()
+endFunction
 
+function __UnbindCellPackage()
     if (!self.HasCellPackage)
         return
     endif
