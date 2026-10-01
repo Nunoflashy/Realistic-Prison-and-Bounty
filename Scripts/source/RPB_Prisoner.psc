@@ -2517,6 +2517,12 @@ float property LOAD_DOOR_FOLLOW_DISTANCE = 600.0 autoreadonly
 float property FREE_WALK_RADIUS_TO_CELL = 400.0 autoreadonly
 float property WALK_IN_RADIUS = 300.0 autoreadonly
 float property HANDBACK_RADIUS = 300.0 autoreadonly
+; A guard stopped for me, with me farther than this: warned after GUARD_WAIT_WARN seconds, led after GUARD_WAIT_TAKEOVER
+float property GUARD_WAIT_RADIUS = 200.0 autoreadonly
+float property GUARD_WAIT_WARN = 4.0 autoreadonly
+float property GUARD_WAIT_TAKEOVER = 10.0 autoreadonly
+float __guardWaitTime
+bool __guardWaitWarned
 bool __freeWalk
 int __freeFarTicks
 float __freeBothStillTime
@@ -2588,6 +2594,8 @@ function __SetFreeWalk(bool abFree, string asReason)
     __freeFarTicks = 0
     __freeBothStillTime = 0.0
     __freeStillTime = 0.0
+    __guardWaitTime = 0.0
+    __guardWaitWarned = false
     __handbackTicks = 0
     if (abFree)
         RPB_Utility.HoldPlayerCuffed()
@@ -2678,6 +2686,32 @@ bool function __SamePlaceAs(ObjectReference akOther)
 endFunction
 
 ; One free-walk tick: hands the walk to the AI when needed. Returns the branch, for the trace.
+;/
+    A guard stopped for me while I walk on my own (the escort to jail's end before the strip, or him waiting for me to catch
+    up): he doesn't wait forever. Warned at GUARD_WAIT_WARN, led to him at GUARD_WAIT_TAKEOVER, so the phase waiting on
+    me completes. Free again only once he walks on. Returns the trace's branch when it acted, "" otherwise. The place a
+    later charge for keeping him waiting (a bounty, or him coming to take me) would hook in.
+/;
+string function __GuardWaitTick(bool abGuardMoving, float afDistance, float afElapsed)
+    if (abGuardMoving || (afDistance >= 0.0 && afDistance <= GUARD_WAIT_RADIUS))
+        __guardWaitTime = 0.0
+        __guardWaitWarned = false
+        return ""
+    endif
+    __guardWaitTime += afElapsed
+    if (__guardWaitTime >= GUARD_WAIT_TAKEOVER)
+        self.__SetFreeWalk(false, "kept the guard waiting (" + (afDistance as int) + " away)")
+        __escortUnderway = false
+        __underwayTicks = 0
+        return "free -> led (kept the guard waiting)"
+    endif
+    if (__guardWaitTime >= GUARD_WAIT_WARN && !__guardWaitWarned)
+        __guardWaitWarned = true
+        Config.NotifyArrest("The guard is waiting for you", true)
+    endif
+    return ""
+endFunction
+
 string function __FreeWalkTick(float afDistance, bool abSameCell, bool abGuardMoving, bool abStuck, float afElapsed, bool abGuardFighting, float afMoved)
     if (abGuardFighting)
         return "free, guard fighting" ; the fight pause takes the escort over
@@ -2714,6 +2748,11 @@ string function __FreeWalkTick(float afDistance, bool abSameCell, bool abGuardMo
         endif
     else
         __freeFarTicks = 0
+    endif
+
+    string waited = self.__GuardWaitTick(abGuardMoving, afDistance, afElapsed)
+    if (waited != "")
+        return waited
     endif
 
     ; Both still: a Scene phase waits on them, or the walk is over (the AI walks them the rest of the way, into the cell).
@@ -2878,6 +2917,8 @@ function StartEscortAssist(Actor akEscort, bool abToCell)
     __assistFlatTicks = 0
     __freeWarned = false
     __freeControlsLogged = false
+    __guardWaitTime = 0.0
+    __guardWaitWarned = false
     __escortUnderway = false
     __underwayTicks = 0
     __freeWalk = false
