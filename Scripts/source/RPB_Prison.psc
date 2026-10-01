@@ -2759,7 +2759,7 @@ function __ProcessEscortStallChecks()
                 ; afterward, the prisoner should have had RPB_Wander_S). Stopping it explicitly, the same way
                 ; AwaitConfrontationScene already does for a stalled confrontation Scene, is what actually releases
                 ; whatever Forced Package the Scene's own aliases still hold on both of them.
-                Scene stalledScene = self.SceneManager.GetScene(self.SceneManager.SCENE_ESCORT_TO_CELL_01)
+                Scene stalledScene = self.SceneManager.GetScene(self.SceneManager.EscortToCellSceneName())
                 if (stalledScene && stalledScene.IsPlaying())
                     stalledScene.Stop()
                     Utility.Wait(0.5) ; let OnSceneEnd land and clear the SceneManager's own "is playing" flag

@@ -1,6 +1,9 @@
 Scriptname RPB_Arrestee extends RPB_ActorBase
 
 ;/
+@constants:
+    float ESCORT_LEASH_DISTANCE
+    float PENDING_LEASH_DISTANCE
 @references:
     RPB_Arrest Arrest
     RPB_SceneManager SceneManager
@@ -25,6 +28,7 @@ Scriptname RPB_Arrestee extends RPB_ActorBase
     bool IsArrested
     bool IsImprisoned
 @functions:
+    Actor function GetCaptorActor()
     RPB_Arrestee function GetStateForPrisoner(RPB_Prisoner apPrisoner) global
     RPB_Prison function GetPotentialPrison()
     string function GetTimeOfArrestFormatted()
@@ -50,8 +54,6 @@ Scriptname RPB_Arrestee extends RPB_ActorBase
     bool function AwaitConfrontationScene(string asScene)
     function EscortToPrison(bool abEscortDirectlyToCell = false, bool abCombatAtArrest = false, Actor akOtherHostile = none)
     function ResumePendingArrest()
-    function PauseEscortForFight(Actor akHostile)
-    function HandOverInPrison(Actor akDeadGuard)
     function MoveToPrison(bool abMoveDirectlyToCell = false)
     function ChangeEscort(Actor akNewEscort)
     function SetTimeOfArrest()
@@ -68,6 +70,9 @@ Scriptname RPB_Arrestee extends RPB_ActorBase
     function ClearLatentBounty(bool abNonViolent = true, bool abViolent = true)
     int function QueryStat(string asStatName)
     function SetStat(string asStatName, int aiValue)
+    function PauseEscortForFight(Actor akHostile)
+    function HandOverInPrison(Actor akDeadGuard)
+    function EndEscortWatch()
     function Destroy()
     string function GetScriptVarCategory(string asVarCategory = "Actor")
     bool function InitializeState()
@@ -75,11 +80,11 @@ Scriptname RPB_Arrestee extends RPB_ActorBase
     Actor function GetArrestedActor()
     Actor function GetActor()
     RPB_Captor function GetCaptor()
-    Actor function GetCaptorActor()
     Faction function GetFaction()
     string function GetHold()
     string function GetArrestType()
 @events:
+    event OnActorAction(int actionType, Actor akActor, Form source, int slot)
     event OnInitialize()
     event OnDestroy()
     event OnBountyGained()
@@ -90,8 +95,8 @@ Scriptname RPB_Arrestee extends RPB_ActorBase
     event OnArrestBegin()
     event OnArrestEnd()
     event OnArrestFailed(string asReason)
-    event OnUpdate()
     event OnCombatStateChanged(Actor akTarget, int aeCombatState)
+    event OnUpdate()
 /;
 
 import RPB_Utility
@@ -1548,6 +1553,9 @@ bool function __FallBackToPrison(string asReason)
 
     Info("Escort of " + Name + " " + this + " broken: " + asReason + ", moving them to the prison without the Scene")
     SceneManager.EndSceneWithActor(this, "the escort broke")
+    ; The Scene ended without its end events, and those stop the player's escort assist: left on, it free-walked the player
+    ; through the frisk and the strip, and the strip never ended
+    prisoner.StopEscortAssist()
     prisoner.MoveToPrison(Captor.GetActor())
     return true
 endFunction

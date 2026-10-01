@@ -9,6 +9,12 @@ Scriptname RPB_Prisoner extends RPB_ActorBase
     int SKILL_LOSS_HANDLING_RANDOM_PERK_SKILL
     int SKILL_LOSS_HANDLING_RANDOM
     int BELONGINGS_MANIFEST_MAX
+    float FREE_WALK_RADIUS
+    float FREE_WALK_WARNING_RADIUS
+    float LOAD_DOOR_FOLLOW_DISTANCE
+    float FREE_WALK_RADIUS_TO_CELL
+    float WALK_IN_RADIUS
+    float HANDBACK_RADIUS
     int NPC_UNDERWEAR_TOP_INDEX
     int NPC_UNDERWEAR_BOTTOM_INDEX
 @references:
@@ -86,6 +92,10 @@ Scriptname RPB_Prisoner extends RPB_ActorBase
     bool IsStripped
     bool IsClothed
     Armor[] PrisonOutfit
+    bool EscortFreeWalking
+    bool EscortAssistActive
+    int EscortAssistMoves
+    bool EscortAssistToCell
     float PreviousUpdateTimeServed
     Outfit NPC_OriginalOutfit
 @functions:
@@ -99,6 +109,7 @@ Scriptname RPB_Prisoner extends RPB_ActorBase
     bool function HasDayElapsed()
     function SetEscaped()
     function SetEscapePenalty()
+    function EndArrestEscortWatch()
     function MoveToPrison(Actor akCaptor)
     function MoveToCell(bool abBeginImprisonment = true)
     function TriggerInfamyPenalty()
@@ -142,6 +153,8 @@ Scriptname RPB_Prisoner extends RPB_ActorBase
     float function GetReleaseTimeExtraHours()
     function FastForwardToRelease()
     function DetermineReleaseTimeAdditionalHours()
+    function StartEscortAssist(Actor akEscort, bool abToCell)
+    function StopEscortAssist()
     function SaveBelongingsManifest()
     function ModBelongingsManifest(Form akItem, int aiDelta)
     function ReturnBelongings()
@@ -172,8 +185,8 @@ Scriptname RPB_Prisoner extends RPB_ActorBase
     function Destroy()
     function InitializeState()
     function RevertState()
-    function DestroyArrestState()
     function ClearArrest()
+    function DestroyArrestState()
     function RemoveFromCell()
     function SetBelongingsContainer()
     bool function AssignCell()
@@ -206,8 +219,8 @@ Scriptname RPB_Prisoner extends RPB_ActorBase
     function NPC_ReequipAfterRelease()
     function NPC_EnsureDressed()
     function Stripping_SaveWornGear()
-    int function Release_ReequipWornGear()
     function Player_ReequipAfterRelease()
+    int function Release_ReequipWornGear()
     bool function IsHostilePrisoner()
     function NeutralizeWhileImprisoned()
     function NPC_SetPersistentOutfit(string asOutfit)
@@ -218,6 +231,7 @@ Scriptname RPB_Prisoner extends RPB_ActorBase
     function DEBUG_ShowHoldStats()
 @events:
     event OnUpdateGameTime()
+    event OnUpdate()
     event OnBeginState()
     event OnBountyGained()
     event OnTeleportedToPrison()
@@ -921,6 +935,15 @@ endState
     top step, they're moved to the guard (the old leash, now the last resort). Both standing still while the guard is far
     (a Scene phase making them wait) never raises the speed: after a while they're moved to the guard instead. Three
     moves and the escort is broken: they go on to the prison or cell without it.
+
+    Free walk: once the escort is under way (the guard has walked 2 ticks: the Scene took hold), the player walks on their
+    own (cuffed: no fighting, no activating), not AI-driven. Not before: a Scene phase waiting on the escortee's own package
+    never ended with the player not AI-driven, and the guard never left (he kept RPB_StayInPlace).
+    The AI leads them (everything above) once they're more than FREE_WALK_RADIUS away for 5s, stand still 8s while the guard
+    walks on, the guard stops at the cell (to open it), both stand still 6s (a Scene waiting on them, or the walk's end: the AI walks them into the cell), or he goes
+    through a load door. A guard who just stops is waiting for them: that doesn't count. They get their controls back once
+    close to him again (HANDBACK_RADIUS, 2 ticks), walking or not (led, the AI trails a jogging guard by 300-550 and only
+    gets close when he stops), but only while the escort is under way: after "both still", once he has walked again.
 /;
 state Escorting
     event OnUpdate()
@@ -944,6 +967,16 @@ state Escorting
             return
         endif
 
+        ; A frisk, strip, restrain or clothing Scene with me in it: no escort to assist (a broken escort's fallback once left
+        ; me free walking through the frisk and the strip, and the strip never ended)
+        RPB_SceneManager scenes = API.SceneManager
+        string current = scenes.GetCurrentScene()
+        if (current != "" && !scenes.IsSceneOfType(current, scenes.CATEGORY_ESCORT_TO_JAIL) && !scenes.IsSceneOfType(current, scenes.CATEGORY_ESCORT_TO_CELL))
+            EventManager.SendInfo(Name + "'s escort assist stopped: '" + current + "' is playing, not an escort", "["+ Name +"] Prisoner::EscortAssist")
+            self.StopEscortAssist()
+            return
+        endif
+
         float elapsed = __assistTick
         float x = this.GetPositionX()
         float y = this.GetPositionY()
@@ -960,7 +993,8 @@ state Escorting
         __assistGuardLastY = guardY
         float distance = this.GetDistance(__assistEscort)
         ; The guard through a load door reads as another cell (and an overflowed distance): far
-        bool far = distance > 300.0 || distance < 0.0 || this.GetParentCell() != __assistEscort.GetParentCell()
+        bool sameCell = self.__SamePlaceAs(__assistEscort)
+        bool far = distance > 300.0 || distance < 0.0 || !sameCell
         ; The escort is going on: the guard walks on (units per second, ticks are 1s or 0.25s). Stopped, a Scene phase is
         ; making us wait, and a raised speed then flew me to the cell on the next move. The walk animation's "Speed" was
         ; tried first: it never read above 20 on the AI-driven player, so the boost never started.
@@ -972,7 +1006,25 @@ state Escorting
             stuckUnder = 30.0 * elapsed
         endif
         bool stuck = moved < stuckUnder
-        bool sameCell = this.GetParentCell() == __assistEscort.GetParentCell()
+
+        ; Through the load door he just took, the way a follower goes: following him through one door, the AI-led player came
+        ; out with the guard already at the next one. Moved to him instead, they landed wherever the engine had moved him once
+        ; out of the loaded area (straight at the prison, or the strip area). Both go to the door's other side. Not one of
+        ; the three last-resort moves.
+        if (!sameCell && __lastSameCell && __assistLastDistance >= 0.0 && __assistLastDistance <= LOAD_DOOR_FOLLOW_DISTANCE && !__assistEscort.IsInCombat() && self.__FollowThroughLoadDoor())
+            __assistLastX = this.GetPositionX()
+            __assistLastY = this.GetPositionY()
+            __assistLastZ = this.GetPositionZ()
+            __assistGuardLastX = __assistEscort.GetPositionX()
+            __assistGuardLastY = __assistEscort.GetPositionY()
+            __assistLastDistance = this.GetDistance(__assistEscort)
+            __lastSameCell = true
+            RegisterForSingleUpdate(__assistTick)
+            return
+        endif
+        __lastSameCell = sameCell
+        __lastGuardInCellX = __assistGuardLastX
+        __lastGuardInCellY = __assistGuardLastY
         ; Pushing: stuck but jittering (a few units, or up and down a step): a player waiting in a Scene doesn't move at all
         ; (moved 0, dz 0). On Castle Dour's stairs the player crept 4-5 units a tick behind a guard waiting at the top, and
         ; no boost started because the guard wasn't walking on.
@@ -989,8 +1041,38 @@ state Escorting
         __assistLastDistance = distance
         __assistTick = 1.0
         string branch = "moving" ; for the trace below
+        bool guardFighting = __assistEscort.IsInCombat()
 
-        if (__assistEscort.IsInCombat())
+        ; The walk into the cell (RPB_EscortToCell01 from phase 5: the door is open, and the phase waits on my own
+        ; RPB_TravelTo into the cell, which only runs AI-driven)
+        if (__assistToCell && current == scenes.EscortToCellSceneName() && scenes.GetCurrentPhase(current) >= 5)
+            branch = self.__WalkInTick(stuck, elapsed, distance)
+            if (IsDebuggingEnabled())
+                Debug("["+ Name +"] Prisoner::EscortAssist", "tick (walk-in): " + branch + ", moved " + (moved as int) + ", in the cell " + self.__AssistInCell())
+            endif
+            RegisterForSingleUpdate(__assistTick)
+            return
+        endif
+        ; Under way once he has walked 2 ticks in my cell: the Scene took hold
+        if (sameCell && escortMoving)
+            __underwayTicks += 1
+            if (__underwayTicks >= 2)
+                __escortUnderway = true
+            endif
+        else
+            __underwayTicks = 0
+        endif
+
+        if (__freeWalk)
+            branch = self.__FreeWalkTick(distance, sameCell, escortMoving, stuck, elapsed, guardFighting, moved)
+            if (IsDebuggingEnabled())
+                Debug("["+ Name +"] Prisoner::EscortAssist", "tick (to cell " + __assistToCell + "): " + branch + ", distance " + (distance as int) + ", moved " + (moved as int) + ", guard " + (guardSpeed as int) + "/s (moving " + escortMoving + "), same cell " + sameCell)
+            endif
+            RegisterForSingleUpdate(__assistTick)
+            return
+        endif
+
+        if (guardFighting)
             ; He's gone to a fight (the escort pauses: RPB_Captor.__PauseEscortIfFighting). Him running off isn't me being
             ; stuck: boosted and moved to him, the player landed in the fight.
             branch = "guard fighting"
@@ -1117,6 +1199,18 @@ state Escorting
         ; Twice a second while far at normal speed: stuck is noticed in 1s
         if (__assistLevel == 0 && far && __assistTick > 0.5)
             __assistTick = 0.5
+        endif
+
+        ; Led, and close to the guard again (not mid-stairs, not at the cell): their controls back. Walking or not: led, the
+        ; AI trails a jogging guard by 300-550 and only gets close when he stops
+        if (__escortUnderway && __assistLevel == 0 && sameCell && !guardFighting && distance <= HANDBACK_RADIUS && !(__assistToCell && self.__AssistInCell()))
+            __handbackTicks += 1
+            if (__handbackTicks >= 2)
+                self.__SetFreeWalk(true, "close to the guard again (" + (distance as int) + ")")
+                branch = "led -> free"
+            endif
+        else
+            __handbackTicks = 0
         endif
 
         ; Every tick, with DEBUG on (built only then): what the assist saw and which branch it took
@@ -2357,6 +2451,301 @@ int __assistFlatTicks
 float __assistLastDistance
 bool __assistNeedsFirstRead ; the starting positions are read on the first tick (see StartEscortAssist)
 
+; Free walk (see the Escorting state)
+float property FREE_WALK_RADIUS = 1200.0 autoreadonly
+float property FREE_WALK_WARNING_RADIUS = 900.0 autoreadonly
+float property LOAD_DOOR_FOLLOW_DISTANCE = 600.0 autoreadonly
+float property FREE_WALK_RADIUS_TO_CELL = 400.0 autoreadonly
+float property WALK_IN_RADIUS = 300.0 autoreadonly
+float property HANDBACK_RADIUS = 300.0 autoreadonly
+bool __freeWalk
+int __freeFarTicks
+float __freeBothStillTime
+float __freeStillTime
+int __handbackTicks
+bool __freeWarned
+bool __freeControlsLogged
+bool __escortUnderway
+int __underwayTicks
+bool __walkInStarted
+float __walkInStillTime
+bool __lastSameCell
+int __paceBand
+int __paceTicks
+float __lastGuardInCellX
+float __lastGuardInCellY
+int __runTicks
+bool __runWarned
+int __walkInFarTicks
+
+; Whether the player is walking on their own in the escort right now (the tests)
+bool property EscortFreeWalking
+    bool function get()
+        return __assistOn && __freeWalk
+    endFunction
+endProperty
+
+; Free walk on (HoldPlayerCuffed: they walk, cuffed) or off (the AI leads them), with the counters reset
+function __SetFreeWalk(bool abFree, string asReason)
+    ; A tick still running after StopEscortAssist (the fight pause, a broken escort) must not touch the controls: they
+    ; belong to whatever stopped the assist (the pending hold left the player AI-driven once)
+    if (!__assistOn || !__assistEscort)
+        return
+    endif
+    __freeWalk = abFree
+    __freeFarTicks = 0
+    __freeBothStillTime = 0.0
+    __freeStillTime = 0.0
+    __handbackTicks = 0
+    if (abFree)
+        RPB_Utility.HoldPlayerCuffed()
+    else
+        RetainAI(true)
+    endif
+    EventManager.SendInfo(Name + " " + string_if(abFree, "walks on their own", "is led by the AI") + " in the escort: " + asReason, "["+ Name +"] Prisoner::EscortAssist")
+endFunction
+
+;/
+    The guard went through a load door: the one nearest to where he last stood in my cell. Moves me to its other side, and
+    him there too when the engine has already taken him on (another cell, or more than 300 from it). False when no load
+    door is found there (the AI follows as before).
+/;
+bool function __FollowThroughLoadDoor()
+    ObjectReference[] doors = PO3_SKSEFunctions.FindAllReferencesOfFormType(this, 29, __assistLastDistance + 600.0) ; 29 = Door
+    ObjectReference loadDoor = none
+    float best = 0.0
+    int i = 0
+    while (i < doors.Length)
+        if (doors[i] && PO3_SKSEFunctions.IsLoadDoor(doors[i]))
+            float dx = doors[i].GetPositionX() - __lastGuardInCellX
+            float dy = doors[i].GetPositionY() - __lastGuardInCellY
+            float d = dx * dx + dy * dy
+            if (!loadDoor || d < best)
+                loadDoor = doors[i]
+                best = d
+            endif
+        endif
+        i += 1
+    endWhile
+    ObjectReference destination = none
+    if (loadDoor)
+        destination = PO3_SKSEFunctions.GetDoorDestination(loadDoor)
+    endif
+    if (!destination)
+        EventManager.SendInfo(Name + ": the guard went through a load door, but none was found near him (" + doors.Length + " doors around): the AI follows", "["+ Name +"] Prisoner::EscortAssist")
+        return false
+    endif
+
+    ; Through the door itself: activated, a load door puts whoever uses it at its teleport marker on the other side, as
+    ; walking through does. MoveTo(destination) put them on the door mesh (in a house's wall, on top of a door frame).
+    Utility.Wait(0.5)
+    Actor guard = __assistEscort
+    if (!__assistOn || !guard)
+        return true ; stopped meanwhile (a fight, a broken escort): nothing of mine to do
+    endif
+    bool guardAhead = !RPB_Utility.InSamePlace(guard, destination) || guard.GetDistance(destination) > 300.0
+    if (guardAhead)
+        loadDoor.Activate(guard)
+    endif
+    ; My activation is off while cuffed or led, and that refused the scripted activation too (5 of 6 follows): on for this
+    ; one call, then my controls as the mode wants them
+    Game.EnablePlayerControls(abMovement = false, abFighting = false, abCamSwitch = false, abLooking = false, abSneaking = false, abMenu = false, abActivate = true, abJournalTabs = false)
+    RPB_Utility.BlockPlayerActivation(false)
+    loadDoor.Activate(this)
+    RPB_Utility.BlockPlayerActivation(RPB_Utility.IsCuffed(this))
+    if (__freeWalk)
+        RPB_Utility.HoldPlayerCuffed()
+    else
+        RetainAI(true)
+    endif
+    Utility.Wait(2.0)
+    if (!__assistOn)
+        return true
+    endif
+    string how = "through the door"
+    if (!RPB_Utility.InSamePlace(this, destination))
+        ; The door refused it (locked): next to its other side, snapped onto walkable ground (on the door itself, the
+        ; player stood in a wall, on a door frame, once fell to their death)
+        this.MoveTo(destination)
+        PO3_SKSEFunctions.MoveToNearestNavmeshLocation(this)
+        how = "moved to the walkable ground by the other side (the door didn't take me)"
+    endif
+    if (guardAhead && (!RPB_Utility.InSamePlace(guard, this) || guard.GetDistance(this) > 600.0))
+        guard.MoveTo(this) ; the door didn't take him (out of the loaded area): beside me
+        PO3_SKSEFunctions.MoveToNearestNavmeshLocation(guard)
+        how += ", the guard moved beside me"
+    endif
+    EventManager.SendInfo(Name + " followed the guard through " + loadDoor + " (" + (__assistLastDistance as int) + " behind him) to " + destination + ": " + how + string_if(guardAhead, " (he had gone on)", ""), "["+ Name +"] Prisoner::EscortAssist")
+    return true
+endFunction
+
+; In the same place as @akOther: the same cell, or both outside in the same worldspace. Outside, every grid square is its
+; own cell, and a guard crossing one read as "through a load door" (into the Solitude sewers, by a manhole)
+bool function __SamePlaceAs(ObjectReference akOther)
+    return RPB_Utility.InSamePlace(this, akOther)
+endFunction
+
+; One free-walk tick: hands the walk to the AI when needed. Returns the branch, for the trace.
+string function __FreeWalkTick(float afDistance, bool abSameCell, bool abGuardMoving, bool abStuck, float afElapsed, bool abGuardFighting, float afMoved)
+    if (abGuardFighting)
+        return "free, guard fighting" ; the fight pause takes the escort over
+    endif
+    if (!abSameCell)
+        self.__SetFreeWalk(false, "the guard went through a load door")
+        return "free -> led (another cell)"
+    endif
+    if (__assistToCell && self.__AssistInCell())
+        return "free, in the cell"
+    endif
+
+    ; At the cell: he has stopped there to open it, and the phases before the door wait on my own (AI-driven) package. Led
+    ; at once (he only opened it after 6s of "both still"); the walk-in gives the controls back once it's open.
+    if (__assistToCell && !abGuardMoving && JailCell && __assistEscort.GetDistance(JailCell) <= 400.0)
+        self.__SetFreeWalk(false, "at the cell: the guard opens the door")
+        __escortUnderway = false
+        __underwayTicks = 0
+        return "free -> led (at the cell)"
+    endif
+
+    ; Inside the prison, on the way to the cell, the guard walks: they stay close
+    float radius = FREE_WALK_RADIUS
+    int farTicks = 5
+    if (__assistToCell)
+        radius = FREE_WALK_RADIUS_TO_CELL
+        farTicks = 2
+    endif
+    if (afDistance > radius)
+        __freeFarTicks += 1
+        if (__freeFarTicks >= farTicks)
+            self.__SetFreeWalk(false, "too far from the guard (" + (afDistance as int) + ")")
+            return "free -> led (too far)"
+        endif
+    else
+        __freeFarTicks = 0
+    endif
+
+    ; Both still: a Scene phase waits on them, or the walk is over (the AI walks them the rest of the way, into the cell).
+    ; The guard stopping alone is him waiting for them (he stops a lot): that handed the walk away 3s into the escort.
+    if (abStuck && !abGuardMoving)
+        __freeBothStillTime += afElapsed
+        if (__freeBothStillTime >= 6.0)
+            self.__SetFreeWalk(false, "both standing still for 6s")
+            ; Back only once he walks on again: given back right away, it flipped every ~10s at a guard who never left
+            __escortUnderway = false
+            __underwayTicks = 0
+            return "free -> led (both still)"
+        endif
+    else
+        __freeBothStillTime = 0.0
+    endif
+
+    if (abStuck && abGuardMoving)
+        __freeStillTime += afElapsed
+        if (__freeStillTime >= 8.0)
+            self.__SetFreeWalk(false, "standing still while the guard walks on")
+            return "free -> led (standing still)"
+        endif
+    else
+        __freeStillTime = 0.0
+    endif
+
+    ; His pace follows mine (the escort's package list in the CK: Jog while I run, Walk otherwise): re-checked when I change,
+    ; at most every 3 ticks, instead of at the engine's next re-check
+    int band = 0
+    if (afMoved / afElapsed > 150.0)
+        band = 1
+    endif
+    ; Running while he walks to the cell: no. Warned once, then the AI takes over after 2 running ticks (the player can't be
+    ; held to a walk; this is what running costs)
+    if (__assistToCell && abGuardMoving && band == 1)
+        __runTicks += 1
+        if (!__runWarned)
+            __runWarned = true
+            Config.NotifyArrest("Walk, don't run", true)
+        endif
+        if (__runTicks >= 2)
+            __runTicks = 0
+            self.__SetFreeWalk(false, "running while the guard walks to the cell")
+            return "free -> led (running)"
+        endif
+    else
+        __runTicks = 0
+    endif
+
+    if (band != __paceBand)
+        __paceBand = band
+        Debug("["+ Name +"] Prisoner::EscortAssist", "pace changed to " + string_if(band == 1, "running", "walking") + " (" + ((afMoved / afElapsed) as int) + "/s)")
+    endif
+
+    if (afDistance > FREE_WALK_WARNING_RADIUS && !__freeWarned)
+        __freeWarned = true
+        Config.NotifyArrest("Stay close to the guard", true)
+    endif
+
+    self.__KeepFreeControls()
+    return "free"
+endFunction
+
+; Something gave them their controls back, or took their movement (another mod's EnablePlayerControls, a Scene event's
+; RetainAI): held cuffed again
+function __KeepFreeControls()
+    if (!__assistOn || !__freeWalk)
+        return
+    endif
+    if (!Game.IsMovementControlsEnabled())
+        if (!__freeControlsLogged)
+            __freeControlsLogged = true
+            EventManager.SendInfo(Name + "'s controls changed during the free walk (movement " + Game.IsMovementControlsEnabled() + ", activate " + Game.IsActivateControlsEnabled() + "), held cuffed again", "["+ Name +"] Prisoner::EscortAssist")
+        endif
+        RPB_Utility.HoldPlayerCuffed()
+    endif
+endFunction
+
+;/
+    The walk into the cell, once the door is open: they walk in on their own. In the cell, the AI takes over at once (its
+    RPB_TravelTo then completes on the spot and the Scene goes on to lock the door); not moving for 5s, the AI walks them
+    in. No distance rules at the door, and no handback.
+/;
+string function __WalkInTick(bool abStuck, float afElapsed, float afDistance)
+    __assistTick = 0.5
+    if (!__walkInStarted)
+        __walkInStarted = true
+        __walkInStillTime = 0.0
+        if (!__freeWalk)
+            self.__SetFreeWalk(true, "the cell door is open: walk in")
+        endif
+        return "walk-in started"
+    endif
+    if (!__freeWalk)
+        return "walk-in, led"
+    endif
+    if (self.__AssistInCell())
+        self.__SetFreeWalk(false, "in the cell: the AI finishes the walk-in")
+        return "walk-in -> led (in the cell)"
+    endif
+    ; The walk-in is a few steps from the guard at the door: walking off around the prison is not (it had no limit)
+    if (afDistance > WALK_IN_RADIUS || afDistance < 0.0)
+        __walkInFarTicks += 1
+        if (__walkInFarTicks >= 2)
+            self.__SetFreeWalk(false, "too far from the cell door (" + (afDistance as int) + ")")
+            return "walk-in -> led (too far)"
+        endif
+    else
+        __walkInFarTicks = 0
+    endif
+    if (abStuck)
+        __walkInStillTime += afElapsed
+        if (__walkInStillTime >= 5.0)
+            self.__SetFreeWalk(false, "not walking into the cell for 5s")
+            return "walk-in -> led (not moving)"
+        endif
+    else
+        __walkInStillTime = 0.0
+    endif
+    self.__KeepFreeControls()
+    return "walk-in, free"
+endFunction
+
 bool property EscortAssistActive
     bool function get()
         return __assistOn
@@ -2395,6 +2784,18 @@ function StartEscortAssist(Actor akEscort, bool abToCell)
     __assistTeleports = 0
     __assistAwayTime = 0.0
     __assistFlatTicks = 0
+    __freeWarned = false
+    __freeControlsLogged = false
+    __escortUnderway = false
+    __underwayTicks = 0
+    __freeWalk = false
+    __walkInStarted = false
+    __lastSameCell = true
+    __paceBand = 0
+    __paceTicks = 0
+    __runTicks = 0
+    __runWarned = false
+    __walkInFarTicks = 0
     ; Nothing is read from the guard here: this runs on the Scene's start event, and a guard gone uncallable (every call on
     ; him waits forever) froze that event and the whole prison flow with it. The first tick reads him, on my own update
     ; stack: if he's broken, only the assist waits.
@@ -2410,7 +2811,13 @@ function StopEscortAssist()
         return
     endif
 
-    Debug("["+ Name +"] Prisoner::EscortAssist", "assist stopped (to cell " + __assistToCell + ", moves " + __assistTeleports + ")")
+    Debug("["+ Name +"] Prisoner::EscortAssist", "assist stopped (to cell " + __assistToCell + ", moves " + __assistTeleports + ", free walk " + __freeWalk + ")")
+    ; AI-driven again, as the rest of the flow (the strip, the cell, a fight's pending hold) expects after an escort; every
+    ; caller sets its own controls right after
+    if (__freeWalk)
+        __freeWalk = false
+        RetainAI(true)
+    endif
     __assistOn = false
     __assistEscort = none
     self.__RestoreEscortSpeed()

@@ -22,20 +22,22 @@ scriptname RPB_Utility hidden
     function ProbeGuard(Actor akGuard, string asStep) global
     bool function IsFrozenGuard(Actor akActor) global
     function MarkGuardFrozen(Actor akGuard, string asStep) global
-    function ClearFrozenGuards() global
     int function FrozenGuardsForScan() global
     bool function IsListedFrozen(int aiFrozenMap, Actor akActor) global
+    function ClearFrozenGuards() global
     Actor function GetOtherHostileTarget(Actor akActor, Actor akExcept, Actor akCaptor) global
     Actor function GetOtherCombatTarget(Actor akActor, Actor akExcept) global
     int function RemoveCuffs(Actor akActor) global
+    Perk function CuffedNoActivatePerk() global
+    function BlockPlayerActivation(bool abBlock) global
     bool function IsCuffed(Actor akActor) global
     function EquipCuffs(Actor akActor, bool abFront = false) global
     int function CalmGuardsAgainstPlayer() global
-    int function RestoreNeutralizedHostility(Actor akActor) global
     Form[] function RPB_GetHostileFactions() global
     Form[] function RPB_GetHostileFactionsFor(Actor akActor) global
     bool function IsHostileActor(Actor akActor) global
     function NeutralizeHostileActor(Actor akActor) global
+    int function RestoreNeutralizedHostility(Actor akActor) global
     float function PACIFICATION_TIME_BUDGET_SECONDS() global
     function SustainArrestPacification(Actor akArrestee, Actor akCaptor) global
     bool function MaintainArrestPacification(Actor akArrestee, Actor akCaptor) global
@@ -95,6 +97,7 @@ scriptname RPB_Utility hidden
     int function BitwiseExpr(string bitfield) global
     function RetainAI(bool condition = true) global
     function ReleaseAI(bool condition = true) global
+    bool function InSamePlace(ObjectReference akA, ObjectReference akB) global
     function HoldPlayerCuffed() global
     function SetGameStat(string asStatName, int aiValue) global
     bool function IsActorArrested(Actor akActor) global
@@ -172,12 +175,13 @@ scriptname RPB_Utility hidden
     bool function IsConfrontationSceneForcedToFail() global
     function SetConfrontationSceneForcedToFail(bool abForced) global
     bool function IsEscortStartForcedToFail() global
+    function SetEscortStartForcedToFail(bool abForced) global
     bool function IsSurrenderSceneForcedToFail() global
     function SetSurrenderSceneForcedToFail(bool abForced) global
+    bool function IsEscortToCell04ForTest() global
+    function SetEscortToCell04ForTest(bool abOn) global
     bool function IsTakeoverBlindForTest() global
     function SetTakeoverBlindForTest(bool abBlind) global
-    Actor function GetGuardSeeing(Actor akPrisoner, Actor akExclude) global
-    function SetEscortStartForcedToFail(bool abForced) global
     bool function IsPendingHoldPackageDisabled() global
     function SetPendingHoldPackageDisabled(bool abDisabled) global
     bool function IsPackageLockDisabled() global
@@ -282,6 +286,7 @@ scriptname RPB_Utility hidden
     Actor function GetNearbyActorFromRefWithPrototype(ObjectReference akCenterRef, ActorBase akPrototype, float afMaxRadius = 1000.0) global
     Actor function GetNearbyGuardForFactionFromRef( ObjectReference akCenterRef, Faction akCrimeFaction = none, float afMinRadius = 50.0, float afMaxRadius = 1000.0, float afIncreaseRadiusBy = 100.0, int aiMaxScans = 30 ) global
     Actor function GetNearestGuard(ObjectReference centerRef, float radius, ObjectReference exclude) global
+    Actor function GetGuardSeeing(Actor akPrisoner, Actor akExclude) global
     Actor function GetNearestGuardInCell(Actor akCenter, Actor akExclude) global
     bool function IsActorNearReference(Actor akActor, ObjectReference akReference, float radius = 80.0) global
     bool function IsWithin(int aiValue, int aiMin, int aiMax, bool abMinInclusive = true, bool abMaxInclusive = true) global
@@ -626,7 +631,39 @@ int function RemoveCuffs(Actor akActor) global
         endif
         i += 1
     endWhile
+    ; The player held cuffed (walking, no fighting or activating) gets everything back once the cuffs are off. Not while
+    ; AI-driven (movement off): whatever drives them hands the controls back itself.
+    if (akActor == Game.GetPlayer())
+        BlockPlayerActivation(false)
+        if (removed > 0 && Game.IsMovementControlsEnabled())
+            Game.EnablePlayerControls()
+        endif
+    endif
     return removed
+endFunction
+
+; RPB_CuffedNoActivate: an Activate entry point that replaces the activation with nothing, run immediately
+Perk function CuffedNoActivatePerk() global
+    return Game.GetFormFromFile(0x02C061, "RealisticPrisonAndBounty.esp") as Perk
+endFunction
+
+;/
+    While cuffed the player can't open doors, take items or pickpocket. DisablePlayerControls' activation flag didn't hold
+    it: something re-enabled it within a second, every time (ZaZ's ReapplyPlayerControls is a suspect). A perk can't be
+    flipped back by another mod's control calls.
+/;
+function BlockPlayerActivation(bool abBlock) global
+    Actor player = Game.GetPlayer()
+    Perk blocker = CuffedNoActivatePerk()
+    if (!blocker)
+        return
+    endif
+    bool has = player.HasPerk(blocker)
+    if (abBlock && !has)
+        player.AddPerk(blocker)
+    elseif (!abBlock && has)
+        player.RemovePerk(blocker)
+    endif
 endFunction
 
 ; Whether @akActor wears any of the cuffs this mod puts on (see RemoveCuffs)
@@ -664,13 +701,22 @@ function EquipCuffs(Actor akActor, bool abFront = false) global
         cuffsId = 0x81D33 ; front rusty
     endif
     Form cuffs = Game.GetFormFromFile(cuffsId, "ZaZAnimationPack.esm")
-    if (!cuffs || akActor.IsEquipped(cuffs))
+    if (!cuffs)
+        return
+    endif
+    if (akActor.IsEquipped(cuffs))
+        if (akActor == Game.GetPlayer())
+            BlockPlayerActivation(true) ; already on (a save from before the perk)
+        endif
         return
     endif
 
     RemoveCuffs(akActor)
     akActor.SheatheWeapon()
     akActor.EquipItem(cuffs, true, true)
+    if (akActor == Game.GetPlayer())
+        BlockPlayerActivation(true)
+    endif
 endFunction
 
 ; Stops every loaded guard fighting (repeated resists leave them attacking the player for good, even with the bounty
@@ -1253,7 +1299,8 @@ function LogException(string asExceptionType, string asExceptionMessage, string 
 endFunction
 
 function Info(string asLogInfo, bool abCondition = true) global
-    if (!abCondition || IsDebuggingEnabled() || !IsLoggingEnabled())
+    ; With DEBUG on too: the arrest's state lines (pending, resumed, fallbacks) were missing from every DEBUG log
+    if (!abCondition || (!IsLoggingEnabled() && !IsDebuggingEnabled()))
         return
     endif
 
@@ -1838,6 +1885,12 @@ function RetainAI(bool condition = true) global
 endFunction
 
 function ReleaseAI(bool condition = true) global
+    ; Still cuffed: walking, not fighting or activating (doors, containers, items). Every release used to hand everything
+    ; back, cuffs or not.
+    if (condition && IsCuffed(Game.GetPlayer()))
+        HoldPlayerCuffed()
+        return
+    endif
     if (condition)
         Game.SetPlayerAIDriven(false)
         Game.EnablePlayerControls()
@@ -1848,11 +1901,31 @@ endFunction
 ; The player cuffed but not walked anywhere yet (a pending arrest, an escort waiting for a fight to end): not AI-driven,
 ; camera and movement free (to take cover), but no fighting and no activating (doors, items). Clears a full RetainAI lock
 ; first: DisablePlayerControls only ever disables.
+; Whether @akA and @akB are in the same place: the same cell, or both outside in the same worldspace (outside, every grid
+; square is its own cell). Reads the worldspaces only when the cells differ.
+bool function InSamePlace(ObjectReference akA, ObjectReference akB) global
+    Cell cellA = akA.GetParentCell()
+    Cell cellB = akB.GetParentCell()
+    if (cellA == cellB)
+        return true
+    endif
+    ; An unloaded actor has no cell: unknown, not "through a door" (the guard read as gone through one, 0 doors found)
+    if (!cellA || !cellB)
+        return true
+    endif
+    if (cellA.IsInterior() || cellB.IsInterior())
+        return false
+    endif
+    return akA.GetWorldSpace() == akB.GetWorldSpace()
+endFunction
+
 function HoldPlayerCuffed() global
     Game.SetPlayerAIDriven(false)
     Game.EnablePlayerControls()
     Game.DisablePlayerControls(abMovement = false, abFighting = true, abCamSwitch = false, abLooking = false, abSneaking = false, abMenu = false, abActivate = true, abJournalTabs = false, aiDisablePOVType = 0)
-    Debug("Utility::HoldPlayerCuffed", "player held cuffed: not AI-driven, fighting/activate disabled")
+    ; Activation stayed usable while cuffed: read right after the disable, whether it took at all (the free walk's next tick
+    ; reads it again a second later)
+    Debug("Utility::HoldPlayerCuffed", "player held cuffed: not AI-driven, fighting/activate disabled (right after: activate enabled " + Game.IsActivateControlsEnabled() + ", fighting enabled " + Game.IsFightingControlsEnabled() + ")")
 endFunction
 
 function SetGameStat(string asStatName, int aiValue) global
@@ -3033,6 +3106,15 @@ endFunction
 
 function SetSurrenderSceneForcedToFail(bool abForced) global
     RPB_StorageVars.SetInt("FORCE_SURRENDER_SCENE_FAIL", abForced as int, "Profile")
+endFunction
+
+; Test-only (151): the escort to the cell plays RPB_EscortToCell04, the copy of 01 made without the CK
+bool function IsEscortToCell04ForTest() global
+    return JDB.solveInt(".rpb_root.storage.Profile.USE_ESCORT_TO_CELL_04") != 0
+endFunction
+
+function SetEscortToCell04ForTest(bool abOn) global
+    RPB_StorageVars.SetInt("USE_ESCORT_TO_CELL_04", abOn as int, "Profile")
 endFunction
 
 ; Test-only (148): no guard "sees" a prisoner waiting for a take-over, whatever the distance

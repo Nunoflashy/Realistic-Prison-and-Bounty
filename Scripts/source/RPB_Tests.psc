@@ -235,6 +235,8 @@ function SetTests()
     self.AddTest("147 - A Guard Marked Frozen is Skipped by the Guard Scans and Can't Arrest (NPC)", "Test_FrozenGuardSkipped", abChainable = false)
     self.AddTest("148 - The Guard Dies Inside the Prison and No Guard Sees the Prisoner: the Arrest Waits, Cuffed, Until One Does (PLAYER - arrests you, you're brought back)", "Test_GuardDiesInPrison_NobodySees", abChainable = false)
     self.AddTest("149 - Surrender (F8): Walking Away While a Guard is Coming is a Fake: Bounty, the Guard Fights, the Next Surrender Refused (PLAYER)", "Test_Surrender_Faked", abChainable = false)
+    self.AddTest("150 - Escort: the Player Walks on Their Own, the AI Takes Over Far Away and Hands Back When Close (PLAYER - arrests you, you're brought back)", "Test_Escort_FreeWalk", abChainable = false)
+    self.AddTest("151 - Toggle: the Escort to the Cell Plays RPB_EscortToCell04 (the Copy of 01 Made Without the CK)", "Test_ToggleEscortToCell04", abChainable = false)
     self.AddTest("041 - ActiveMagicEffectContainer: Stuck Lock Self-Heals", "Test_ActiveMagicEffectContainer_StuckLockSelfHeals")
     self.AddTest("042 - ThreadLock: JAtomic Primitive Semantics and Registry", "Test_ThreadLock_PrimitiveSemantics")
     ; Not chainable: fires concurrent worker threads
@@ -11667,6 +11669,59 @@ bool function __Scenario_FrozenGuardSkipped(string asTest)
     return ok
 endFunction
 
+;/
+    150: the player's escort to jail is a free walk: not AI-driven a few seconds in; moved 900 away, the AI takes over;
+    moved next to the guard (walking on), their controls come back.
+/;
+bool function __Scenario_EscortFreeWalk(string asTest)
+    RPB_Prison prison = (RPB_API.GetPrisonManager()).GetPrison("Haafingar")
+    Actor guard = __ScenarioGuard()
+    if (!guard)
+        return false
+    endif
+    Actor player = __ScenarioArrestee(true, guard)
+    __ScenarioArrest(guard, player, asTest)
+    bool escorting = __ScenarioWaitEscortToJail(player, 40.0)
+    RPB_Prisoner prisonerRef = prison.Prisoners.AtKey(player)
+    if (!assert_true(escorting && prisonerRef != none, asTest + ": the escort to jail never started"))
+        return false
+    endif
+
+    float start = Utility.GetCurrentRealTime()
+    while (!prisonerRef.EscortFreeWalking && (Utility.GetCurrentRealTime() - start) < 5.0)
+        Utility.Wait(0.25)
+    endWhile
+    bool free = prisonerRef.EscortFreeWalking
+    log(asTest + ": free walk " + free + " after " + __Ms(Utility.GetCurrentRealTime() - start) + "ms (movement " + Game.IsMovementControlsEnabled() + ", activate " + Game.IsActivateControlsEnabled() + ", fighting " + Game.IsFightingControlsEnabled() + ")")
+    bool ok = assert_true(free, asTest + ": the escort didn't start as a free walk")
+    ok = assert_true(Game.IsMovementControlsEnabled(), asTest + ": no movement controls in the free walk") && ok
+    ok = assert_false(Game.IsActivateControlsEnabled(), asTest + ": the cuffed player can activate in the free walk") && ok
+    ok = assert_false(Game.IsFightingControlsEnabled(), asTest + ": the cuffed player can fight in the free walk") && ok
+    if (!free)
+        return false
+    endif
+
+    player.MoveTo(guard, afXOffset = 900.0, abMatchRotation = false)
+    start = Utility.GetCurrentRealTime()
+    while (prisonerRef.EscortFreeWalking && (Utility.GetCurrentRealTime() - start) < 5.0)
+        Utility.Wait(0.25)
+    endWhile
+    bool led = prisonerRef.EscortAssistActive && !prisonerRef.EscortFreeWalking
+    log(asTest + ": 900 away: led by the AI " + led + " after " + __Ms(Utility.GetCurrentRealTime() - start) + "ms (distance " + (player.GetDistance(guard) as int) + ", movement " + Game.IsMovementControlsEnabled() + ")")
+    ok = assert_true(led, asTest + ": the AI didn't take over 900 units from the guard") && ok
+    ok = assert_false(Game.IsMovementControlsEnabled(), asTest + ": led by the AI, yet the movement controls are on") && ok
+
+    ; Right behind him: he walks on, and the controls come back
+    player.MoveTo(guard, afXOffset = -80.0, abMatchRotation = false)
+    start = Utility.GetCurrentRealTime()
+    while (!prisonerRef.EscortFreeWalking && prisonerRef.EscortAssistActive && (Utility.GetCurrentRealTime() - start) < 8.0)
+        Utility.Wait(0.25)
+    endWhile
+    log(asTest + ": next to the guard: free walk " + prisonerRef.EscortFreeWalking + " after " + __Ms(Utility.GetCurrentRealTime() - start) + "ms (distance " + (player.GetDistance(guard) as int) + ", guard in combat " + guard.IsInCombat() + ")")
+    ok = assert_true(prisonerRef.EscortFreeWalking, asTest + ": the controls never came back next to the guard") && ok
+    return ok
+endFunction
+
 bool __surrenderDisguiseAdded = false
 
 ; 146's teardown: the arrest's cancel gives the player's hostility back (the "Jail" snapshot); the test's stand-in disguise goes
@@ -12761,7 +12816,7 @@ endFunction
 string __statelessTest = ""
 
 bool function __RunStatelessTest(string asTest)
-    if (asTest != "Test_ArrestWaitsWhileGuardFights_NoPackage" && asTest != "Test_CellDoorsDiagnostic" && asTest != "Test_LongAbsenceSetup" && asTest != "Test_LongAbsenceAdvance" && asTest != "Test_LongAbsenceVerify" && asTest != "Test_FallbackEscortToCellStopped_Player" && asTest != "Test_FallbackEscortToCellStopped_CloneGuard" && asTest != "Test_FightDuringEscort_NPC" && asTest != "Test_FightDuringEscort_Player" && asTest != "Test_GuardDiesInPrison_Player" && asTest != "Test_EscortToCellStopped_NoPackageLock" && StringUtil.Find(asTest, "Test_Surrender_") != 0 && asTest != "Test_FrozenGuardSkipped" && asTest != "Test_GuardDiesInPrison_NobodySees")
+    if (asTest != "Test_ArrestWaitsWhileGuardFights_NoPackage" && asTest != "Test_CellDoorsDiagnostic" && asTest != "Test_LongAbsenceSetup" && asTest != "Test_LongAbsenceAdvance" && asTest != "Test_LongAbsenceVerify" && asTest != "Test_FallbackEscortToCellStopped_Player" && asTest != "Test_FallbackEscortToCellStopped_CloneGuard" && asTest != "Test_FightDuringEscort_NPC" && asTest != "Test_FightDuringEscort_Player" && asTest != "Test_GuardDiesInPrison_Player" && asTest != "Test_EscortToCellStopped_NoPackageLock" && StringUtil.Find(asTest, "Test_Surrender_") != 0 && asTest != "Test_FrozenGuardSkipped" && asTest != "Test_GuardDiesInPrison_NobodySees" && asTest != "Test_Escort_FreeWalk" && asTest != "Test_ToggleEscortToCell04")
         return false
     endif
 
@@ -12834,6 +12889,15 @@ bool function __RunStatelessTest(string asTest)
     elseif (asTest == "Test_GuardDiesInPrison_NobodySees")
         display_result(__Scenario_GuardDiesInPrison("148", abForceWait = true))
         RPB_Utility.SetTakeoverBlindForTest(false)
+        __TeardownScenario()
+    elseif (asTest == "Test_ToggleEscortToCell04")
+        bool useFour = !RPB_Utility.IsEscortToCell04ForTest()
+        RPB_Utility.SetEscortToCell04ForTest(useFour)
+        log("151: the escort to the cell now plays " + (RPB_API.GetSceneManager()).EscortToCellSceneName() + " (its form " + (RPB_API.GetSceneManager()).GetScene((RPB_API.GetSceneManager()).EscortToCellSceneName()) + ")")
+        Debug.Notification("Escort to the cell: " + (RPB_API.GetSceneManager()).EscortToCellSceneName())
+        display_result(RPB_Utility.IsEscortToCell04ForTest() == useFour)
+    elseif (asTest == "Test_Escort_FreeWalk")
+        display_result(__Scenario_EscortFreeWalk("150"))
         __TeardownScenario()
     elseif (asTest == "Test_FrozenGuardSkipped")
         display_result(__Scenario_FrozenGuardSkipped("147"))

@@ -73,6 +73,7 @@ scriptname RPB_SceneManager extends Quest
     string SCENE_RESTRAIN_PRISONER_02
     string SCENE_ARREST_PAY_BOUNTY_FOLLOW_WILLINGLY
     string SCENE_ARREST_PAY_BOUNTY_FOLLOW_BY_FORCE
+    float SCENE_START_COMBAT_CAP_SECONDS
 @references:
     RPB_API API
     RPB_Config Config
@@ -117,16 +118,18 @@ scriptname RPB_SceneManager extends Quest
     ObjectReference function GetSceneNthReferenceOfType(string asScene, string asRefType, int aiIndex = 0)
     function CreateSceneConfig()
     Scene function GetScene(string asSceneName)
-    bool function HasQueuedScenes()
     bool function IsIdle()
+    int function GetCurrentPhase(string asScene)
     string function GetCurrentScene()
-    function EndSceneEarly(string asScene, string asReason, bool abRunEndEvents = true)
-    bool function EndSceneWithActor(Actor akActor, string asReason)
-    int function RemoveQueuedScenesWithActor(Actor akActor)
+    bool function HasQueuedScenes()
     function PushScene(string asSceneName)
     string function PopScene()
     function QueueOrPlay(string asSceneName)
     function PlayQueued()
+    bool function EndSceneWithActor(Actor akActor, string asReason)
+    bool function HasQueuedSceneWithActor(Actor akActor)
+    int function RemoveQueuedScenesWithActor(Actor akActor)
+    function EndSceneEarly(string asScene, string asReason, bool abRunEndEvents = true)
     function ForceResetSceneState()
     function StopAllScenes(string asReason)
     ReferenceAlias function GetRefAlias(string aliasGroup, int index = 0)
@@ -135,7 +138,6 @@ scriptname RPB_SceneManager extends Quest
     function UnsetPackageLockOnActor(Actor akActor)
     bool function SetPendingHoldOnActor(Actor akActor)
     function UnsetPendingHoldOnActor(Actor akActor)
-    bool function HasQueuedSceneWithActor(Actor akActor)
     function ReleaseAlias(string aliasName, int aliasIndex = 0)
     function UnbindAliases(string asScene)
     function QueueAlias(ReferenceAlias apRefAlias, ObjectReference akRef, bool abBindAlias = true)
@@ -435,6 +437,7 @@ function SetupScenes()
     self.AddScene(SCENE_ESCORT_TO_JAIL_01,                      0xF532, CATEGORY_ESCORT_TO_JAIL)    ; Escort to Jail
     self.AddScene(SCENE_ESCORT_TO_JAIL_02,                      0x17CDA, CATEGORY_ESCORT_TO_JAIL)   ; Escort to Jail 02
     self.AddScene(SCENE_ESCORT_TO_CELL_01,                      0xCF58, CATEGORY_ESCORT_TO_CELL)    ; Escort to Cell 01
+    self.AddScene(SCENE_ESCORT_TO_CELL_04,                      0x2BAFF, CATEGORY_ESCORT_TO_CELL)   ; Escort to Cell 04 (a copy of 01, made without the CK)
     self.AddScene(SCENE_ESCORT_TO_CELL_02,                      0x1367D, CATEGORY_ESCORT_TO_CELL)   ; Escort to Cell 02
     self.AddScene(SCENE_ESCORT_FROM_CELL,                       0x115E6, CATEGORY_ESCORT_FROM_CELL) ; Escort from Cell
     ; self.AddScene(SCENE_SEARCH_START,                         0xF55C)     ; SearchStart
@@ -817,6 +820,11 @@ function CreateSceneConfig()
     ; self.CreateSceneRefTypeConfig(SCENE_ESCORT_TO_CELL_01, "ExteriorCell",  1, 0)
     self.CreateSceneRefTypeConfig(SCENE_ESCORT_TO_CELL_01, "Player_EscortLocation", 1, 0)
     self.CreateSceneRefTypeConfig(SCENE_ESCORT_TO_CELL_01, "Guard_EscortLocation",  1, 0)
+    self.CreateSceneRefTypeConfig(SCENE_ESCORT_TO_CELL_04, "Escort",   1, 0)
+    self.CreateSceneRefTypeConfig(SCENE_ESCORT_TO_CELL_04, "Escortee", 3, 0)
+    self.CreateSceneRefTypeConfig(SCENE_ESCORT_TO_CELL_04, "CellDoor", 1, 0)
+    self.CreateSceneRefTypeConfig(SCENE_ESCORT_TO_CELL_04, "Player_EscortLocation", 1, 0)
+    self.CreateSceneRefTypeConfig(SCENE_ESCORT_TO_CELL_04, "Guard_EscortLocation",  1, 0)
     self.CreateSceneRefTypeConfig(SCENE_ESCORT_TO_CELL_02, "Guard",    1, 0)
     self.CreateSceneRefTypeConfig(SCENE_ESCORT_TO_CELL_02, "Prisoner", 1, 0)
 
@@ -944,6 +952,15 @@ string property SCENE_ESCORT_FROM_CELL                      = "RPB_EscortFromCel
 string property SCENE_ESCORT_TO_JAIL_01                     = "RPB_EscortToJail01" autoreadonly
 string property SCENE_ESCORT_TO_JAIL_02                     = "RPB_EscortToJail02" autoreadonly
 string property SCENE_ESCORT_TO_CELL_01                     = "RPB_EscortToCell01" autoreadonly
+string property SCENE_ESCORT_TO_CELL_04                     = "RPB_EscortToCell04" autoreadonly
+
+; The escort to the cell in use: 01, or its CK-free copy 04 while the test switch is on (test 151)
+string function EscortToCellSceneName()
+    if (RPB_Utility.IsEscortToCell04ForTest())
+        return SCENE_ESCORT_TO_CELL_04
+    endif
+    return SCENE_ESCORT_TO_CELL_01
+endFunction
 string property SCENE_ESCORT_TO_CELL_02                     = "RPB_EscortToCell02" autoreadonly
 string property SCENE_ESCORT_TO_CELL_03                     = "RPB_EscortToCell03" autoreadonly
 string property SCENE_STRIPPING_01                          = "RPB_Stripping01" autoreadonly
@@ -978,6 +995,16 @@ bool function IsIdle()
 endFunction
 
 ; The Scene I'm playing through the queue, "" when none
+; The last phase @asScene started (1-based, as OnScenePlaying numbers them), 0 if it isn't the Scene that last started one
+string __phaseScene
+int __phase
+int function GetCurrentPhase(string asScene)
+    if (asScene != __phaseScene)
+        return 0
+    endif
+    return __phase
+endFunction
+
 string function GetCurrentScene()
     if (__isScenePlaying || self.__IsCurrentSceneRunning())
         return currentScene
@@ -1804,6 +1831,14 @@ endEvent
 
 event OnScenePlaying(string name, int phaseEvent, int phase, Scene sender)
     string type = self.GetSceneType(name)
+    ; A phase's end is the next one's start: some Scenes only report ends (RPB_EscortToCell01 has no start event for its
+    ; walk into the cell), and counting starts only put the walk-in at the lock
+    __phaseScene = name
+    if (phaseEvent == PHASE_START)
+        __phase = phase
+    else
+        __phase = phase + 1
+    endif
 
     Debug("SceneManager::OnScenePlaying", name + " " + sender + ": " + string_if (phaseEvent == PHASE_START, "(Start)", "(End)") + " Phase " + phase)
 
@@ -1857,7 +1892,7 @@ event OnScenePlaying(string name, int phaseEvent, int phase, Scene sender)
         Actor escort     = self.GetSceneNthReferenceOfType(name, "Escort") as Actor
         Form[] prisoners = self.GetSceneReferencesOfType(name, "Escortee")
 
-        if (name == SCENE_ESCORT_TO_CELL_01)
+        if (name == SCENE_ESCORT_TO_CELL_01 || name == SCENE_ESCORT_TO_CELL_04)
             if (phase == 7 && phaseEvent == PHASE_START)
                 EventManager.SendPrisonSceneBulkEvent(name, EVENT_ESCORT_END, prisoners, escort, "Lock Cell")
 
@@ -2167,9 +2202,9 @@ function StartEscortToCell(Actor akEscortLeader, Actor akEscortedPrisoner, Objec
         waitingEscortMarker = akJailCellDoor
     endif
 
-    Debug("SceneManager::StartEscortToCell", "akEscortLeader: " + akEscortLeader + ", akEscortedPrisoner: " + akEscortedPrisoner)
+    string name = self.EscortToCellSceneName()
+    Debug("SceneManager::StartEscortToCell", name + ": akEscortLeader: " + akEscortLeader + ", akEscortedPrisoner: " + akEscortedPrisoner)
 
-    string name = SCENE_ESCORT_TO_CELL_01
     self.BindSceneAlias(name, "Escort", akEscortLeader)
     self.BindSceneAlias(name, "Escortee", akEscortedPrisoner)
     self.BindSceneAlias(name, "CellDoor", akJailCellDoor)
