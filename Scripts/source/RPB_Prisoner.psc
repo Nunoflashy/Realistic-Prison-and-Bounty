@@ -994,6 +994,16 @@ state Escorting
         float distance = this.GetDistance(__assistEscort)
         ; The guard through a load door reads as another cell (and an overflowed distance): far
         bool sameCell = self.__SamePlaceAs(__assistEscort)
+        ; Stopped while these reads ran (about a frame each): nothing of mine to do. A tick past the top check boosted the
+        ; player after the stop once, and nothing restored it (150's teardown: SpeedMult left at 400).
+        if (!__assistOn)
+            return
+        endif
+        ; An overflowed distance in the same place isn't a door: the guard is being deleted or unloaded. No reading, no tick.
+        if (distance < 0.0 && sameCell)
+            RegisterForSingleUpdate(__assistTick)
+            return
+        endif
         bool far = distance > 300.0 || distance < 0.0 || !sameCell
         ; The escort is going on: the guard walks on (units per second, ticks are 1s or 0.25s). Stopped, a Scene phase is
         ; making us wait, and a raised speed then flew me to the cell on the next move. The walk animation's "Speed" was
@@ -2892,6 +2902,9 @@ float function __EscortSpeedForLevel(int aiLevel)
 endFunction
 
 function __SetEscortSpeedLevel(int aiLevel)
+    if (!__assistOn)
+        return ; a tick still running after the stop: the speed stays restored
+    endif
     __assistLevel = aiLevel
     this.SetActorValue("SpeedMult", self.__EscortSpeedForLevel(aiLevel))
     this.ModActorValue("CarryWeight", 0.1) ; a speed change only applies once the movement is re-evaluated
@@ -2901,6 +2914,9 @@ endFunction
 ; Moves me to my guard (@asWhy is logged); the third time the escort is broken and I go on to the prison or cell without
 ; it. Returns true when it broke (the assist is over).
 bool function __AssistMoveToGuard(string asWhy)
+    if (!__assistOn || !__assistEscort)
+        return true ; stopped meanwhile: no move after the escort
+    endif
     __assistTeleports += 1 ; never reset during one escort: three means it's not the stairs
 
     ; The escort to the cell ends in the cell: moved in, there's nothing left to escort. Left playing, the Scene walked the
