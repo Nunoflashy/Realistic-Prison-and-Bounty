@@ -20,6 +20,7 @@ scriptname RPB_Utility hidden
     bool function HealNakedBaseOutfit(Actor akActor) global
     function GuardMark(Actor akGuard, string asStep) global
     function ProbeGuard(Actor akGuard, string asStep, float afDelay = 0.0) global
+    function ProbeNPC(Actor akActor, string asStep) global
     bool function IsGuardProbeOpen(Actor akActor) global
     bool function IsFrozenGuard(Actor akActor) global
     function MarkGuardFrozen(Actor akGuard, string asStep) global
@@ -508,6 +509,7 @@ function ProbeGuard(Actor akGuard, string asStep, float afDelay = 0.0) global
     if (!akGuard)
         return
     endif
+    __SetProbedRole(akGuard, "GUARD")
     if (afDelay > 0.0)
         asStep += " +" + (afDelay as int) + "s"
     endif
@@ -529,11 +531,88 @@ function ProbeGuard(Actor akGuard, string asStep, float afDelay = 0.0) global
     endif
 endFunction
 
+; Test-only: probes counted per step (ran, answered), so a test can show they ran at all (an answered probe logs nothing).
+; Off in normal play: nothing is counted then
+bool function IsProbeCountingForTest() global
+    return JDB.solveInt(".rpb_root.storage.Profile.PROBE_COUNTING") != 0
+endFunction
+
+function SetProbeCountingForTest(bool abOn) global
+    RPB_StorageVars.SetInt("PROBE_COUNTING", abOn as int, "Profile")
+    if (abOn)
+        JDB.solveObjSetter(".rpb_root.probeCounts", JMap.object(), true)
+    endif
+endFunction
+
+function __CountProbe(string asStep, string asWhat) global
+    int counts = JDB.solveObj(".rpb_root.probeCounts")
+    if (!counts)
+        counts = JMap.object()
+        JDB.solveObjSetter(".rpb_root.probeCounts", counts, true)
+    endif
+    string countKey = asStep + "|" + asWhat
+    JMap.setInt(counts, countKey, JMap.getInt(counts, countKey) + 1)
+endFunction
+
+; "<step>: N ran, M answered; ..." for every step counted since the counting was turned on
+string function ProbeCountSummary() global
+    int counts = JDB.solveObj(".rpb_root.probeCounts")
+    if (!counts || JMap.count(counts) == 0)
+        return "no probes counted"
+    endif
+    string summary = ""
+    string countKey = JMap.nextKey(counts)
+    while (countKey != "")
+        int bar = StringUtil.Find(countKey, "|")
+        if (StringUtil.Substring(countKey, bar + 1) == "ran")
+            string step = StringUtil.Substring(countKey, 0, bar)
+            summary += step + ": " + JMap.getInt(counts, countKey) + " ran, " + JMap.getInt(counts, step + "|answered") + " answered; "
+        endif
+        countKey = JMap.nextKey(counts, countKey)
+    endWhile
+    return summary
+endFunction
+
+; A prisoner's (or any NPC's) key moment: probed now, +1s and +3s, the way a guard is after his Captor comes off. Prisoners
+; go through the same bursts (the strip, the outfit, the release) and were never probed, so a frozen one was never reported
+function ProbeNPC(Actor akActor, string asStep) global
+    if (!akActor || akActor == Game.GetPlayer())
+        return
+    endif
+    ProbeGuard(akActor, asStep)
+    ProbeGuard(akActor, asStep, 1.0)
+    ProbeGuard(akActor, asStep, 3.0)
+    __SetProbedRole(akActor, "PRISONER") ; after ProbeGuard, which marks a guard
+endFunction
+
+; What the report calls him (FROZEN GUARD / FROZEN PRISONER), from whoever probed him last: nothing asks the actor
+function __SetProbedRole(Actor akActor, string asRole) global
+    int roles = JDB.solveObj(".rpb_root.frozenActorRoles")
+    if (!roles)
+        roles = JFormMap.object()
+        JDB.solveObjSetter(".rpb_root.frozenActorRoles", roles, true)
+    endif
+    JFormMap.setStr(roles, akActor, asRole)
+endFunction
+
+string function __ProbedRole(Actor akActor) global
+    int roles = JDB.solveObj(".rpb_root.frozenActorRoles")
+    if (roles && JFormMap.hasKey(roles, akActor))
+        return JFormMap.getStr(roles, akActor)
+    endif
+    return "NPC"
+endFunction
+
 ; The probe itself, on the mod event's own stack: never returns on a frozen guard, which is the point
 function __RunGuardProbe(Actor akGuard, string asStep, float afDueAt = 0.0) global
     int map = __FrozenGuardsMap(abCreate = true)
     if (JFormMap.getFlt(map, akGuard) < 0.0)
         return ; already known frozen: another probe would only add another stuck stack
+    endif
+    bool counting = IsProbeCountingForTest()
+    string countedStep = asStep
+    if (counting)
+        __CountProbe(countedStep, "ran")
     endif
     ; A probe that ran well after it was due says so: 14:37's Scene-stop probes ran ~3s late, after the Captor came off,
     ; and named the wrong step
@@ -556,6 +635,9 @@ function __RunGuardProbe(Actor akGuard, string asStep, float afDueAt = 0.0) glob
         JFormMap.setStr(JDB.solveObj(".rpb_root.frozenGuardSteps"), akGuard, asStep)
     endif
     akGuard.GetFormID()
+    if (counting)
+        __CountProbe(countedStep, "answered")
+    endif
     JMap.removeKey(open, probeKey)
     if (JFormMap.getFlt(map, akGuard) < 0.0)
         return ; marked frozen meanwhile (another probe hung): the report stands
@@ -636,8 +718,9 @@ function MarkGuardFrozen(Actor akGuard, string asStep) global
     if (steps)
         probedAt = JFormMap.getStr(steps, akGuard)
     endif
+    string frozenAs = "FROZEN " + __ProbedRole(akGuard)
     ; Warn, not Info: this must show with DEBUG on too. The actor prints without calling into him.
-    Warn("FROZEN GUARD " + akGuard + " (" + asStep + "; probed at: " + probedAt + "): his Papyrus object doesn't answer, RPB skips him until the next game load")
+    Warn(frozenAs + " " + akGuard + " (" + asStep + "; probed at: " + probedAt + "): his Papyrus object doesn't answer, RPB skips him until the next game load")
     ; The magic effects on him (other mods' effects were stuck starting/finishing on a frozen clone): PO3 reads them engine
     ; side, without calling into his scripts
     MagicEffect[] effects = PO3_SKSEFunctions.GetActiveEffects(akGuard, true)
@@ -649,7 +732,7 @@ function MarkGuardFrozen(Actor akGuard, string asStep) global
         endif
         i += 1
     endWhile
-    Warn("FROZEN GUARD " + akGuard + ": " + effects.Length + " magic effects on him: " + names)
+    Warn(frozenAs + " " + akGuard + ": " + effects.Length + " magic effects on him: " + names)
 
     ; While testing (DEBUG on), on screen too: nothing in game shows a frozen guard (his AI goes on), and a notification
     ; gets lost among the others, teleports and load doors. Where and when, to find it in the log; nothing calls into him
@@ -664,11 +747,11 @@ function MarkGuardFrozen(Actor akGuard, string asStep) global
         if (playerLocation)
             where += " (" + playerLocation.GetName() + ")"
         endif
-        Debug.MessageBox("RPB: FROZEN GUARD\n\n" + \
+        Debug.MessageBox("RPB: " + frozenAs + "\n\n" + \
             "Guard: " + akGuard + "\n" + \
             "First probe left hanging: " + probedAt + "\n" + \
             "Found by: " + asStep + "\n" + \
-            "Time: " + GetDateTimeNow() + " (search Papyrus.0.log for FROZEN GUARD)\n" + \
+            "Time: " + GetDateTimeNow() + " (search Papyrus.0.log for " + frozenAs + ")\n" + \
             "Player in: " + where + "\n" + \
             "Effects on him: " + names + "\n\n" + \
             "Loading a save clears it.")
@@ -696,6 +779,7 @@ function ClearFrozenGuards() global
     __ClearFormMapAt(__FrozenGuardsPath())
     __ClearFormMapAt(".rpb_root.frozenGuardSteps")
     __ClearFormMapAt(".rpb_root.guardOpenProbes")
+    __ClearFormMapAt(".rpb_root.frozenActorRoles")
 endFunction
 
 function __ClearFormMapAt(string asPath) global

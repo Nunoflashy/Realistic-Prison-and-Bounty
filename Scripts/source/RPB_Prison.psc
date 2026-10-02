@@ -2442,6 +2442,7 @@ function TeleportPrisonerToRelease(RPB_Prisoner apPrisoner, bool abMoveToRelease
             Info(checkMsg)
         endif
     endif
+    RPB_Utility.ProbeNPC(releasedActor, "prisoner released")
     RPB_Utility.FlowEnd("Release: done")
 endFunction
 
@@ -2594,6 +2595,7 @@ function __ProcessPendingDress()
             if (passActor.Is3DLoaded())
                 passActor.QueueNiNodeUpdate()
                 int equippedNow = self.__DressActor(passActor)
+                RPB_Utility.ProbeNPC(passActor, "released NPC re-dressed")
                 string passMsg = "Re-dress pass on " + passActor.GetDisplayName() + " " + passActor + ": equipped " + equippedNow + " (pass " + tries + ")"
                 DebugInfo("["+ Name +"] Prison::__ProcessPendingDress", passMsg)
                 Info(passMsg)
@@ -2700,6 +2702,11 @@ function __WatchEscortAssist(Actor akPrisoner, int aiEntry, float afNow)
     int still = 0
     if (ticks == JMap.getInt(aiEntry, "ticks"))
         still = JMap.getInt(aiEntry, "still") + 1
+    else
+        ; Still ticking: the escort is going on, so the deadline moves with it. A long escort (Castle Dour's, 2026-10-02)
+        ; reached the 90s from its start while walking in and was finished by hand; only a stop in the ticks (or a frozen
+        ; guard) ends it early now
+        JMap.setFlt(aiEntry, "dueAt", RPB_Utility.Max(JMap.getFlt(aiEntry, "dueAt"), afNow + 60.0))
     endif
     JMap.setInt(aiEntry, "ticks", ticks)
     JMap.setInt(aiEntry, "still", still)
@@ -2826,6 +2833,13 @@ function __ProcessEscortStallChecks()
                         ; which begins the imprisonment itself.
                         prisoner.MoveToCell()
                     else
+                        ; Already in the cell: locked behind them, as the Scene's "Lock Cell" step and MoveToCell do (this
+                        ; finish left the door open, 2026-10-02)
+                        RPB_CellDoor stalledDoor = prisoner.JailCell.CellDoor
+                        if (stalledDoor)
+                            stalledDoor.Close()
+                            stalledDoor.Lock()
+                        endif
                         self.OnEscortPrisonerToCellEnd(prisoner, prisoner.JailCell, guard)
                     endif
                 endif

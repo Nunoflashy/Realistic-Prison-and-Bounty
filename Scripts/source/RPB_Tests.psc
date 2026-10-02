@@ -8059,7 +8059,13 @@ endState
 /;
 state Test_MassBandits
     function Setup()
-        display_result(self.__MassRun(false, 0x37BFF, 45))
+        ; The prisoner probes counted (test-only): an answered probe logs nothing, so this shows they ran
+        RPB_Utility.SetProbeCountingForTest(true)
+        bool result = self.__MassRun(false, 0x37BFF, 45)
+        Utility.Wait(4.0) ; the last +3s probes
+        log("MASS probes: " + RPB_Utility.ProbeCountSummary())
+        RPB_Utility.SetProbeCountingForTest(false)
+        display_result(result)
     endFunction
 
     function Teardown()

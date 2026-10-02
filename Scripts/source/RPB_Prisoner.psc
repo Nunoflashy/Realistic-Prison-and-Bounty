@@ -2171,6 +2171,7 @@ function Clothe()
     ; Debug("["+ Name +"] Prisoner::Clothe", "Applied Outfit: " + self.PrisonOutfit)
 
     self.OnClothed()
+    RPB_Utility.ProbeNPC(this, "prisoner clothed")
 endFunction
 
 ;                      Sentence - Checkers
@@ -4121,6 +4122,7 @@ event OnStripped()
 
     IncrementStat("Times Stripped")
     SetBool("Stripped", true)
+    RPB_Utility.ProbeNPC(this, "prisoner stripped")
 endEvent
 
 event OnUnderwearRemoved(Armor akUnderwearTop, Armor akUnderwearBottom)
@@ -4272,6 +4274,7 @@ event OnSleepStart(float afSleepStartTime, float afSleepEndTime)
 endEvent
 
 event OnImprisoned()
+    RPB_Utility.ProbeNPC(this, "prisoner imprisoned")
     self.RegisterTimeOfImprisonment()
     RPB_Utility.FlowMark("OnImprisoned: RegisterTimeOfImprisonment")
     self.DetermineReleaseTimeAdditionalHours() ; For Release Time (Minimum, Maximum) intervals
@@ -4341,6 +4344,7 @@ event OnInitialize()
 
     Prison.RegisterPrisoner(self)
     RPB_Utility.FlowMark("Prisoner.OnInitialize: registered")
+    RPB_Utility.ProbeNPC(this, "prisoner registered")
     RPB_Utility.Crumb(this, "Prisoner.OnInitialize: RegisterPrisoner returned")
     ; DebugInfo("("+ Name +") Prisoner::OnInitialize", "Initialized: " + self.Was("Initialized"))
 endEvent
