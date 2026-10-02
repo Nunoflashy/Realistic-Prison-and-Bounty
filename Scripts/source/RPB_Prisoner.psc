@@ -923,7 +923,7 @@ endState
 
 state Awaiting
     event OnUpdateGameTime()
-        EventManager.SendError("Updating in the Awaiting state, should not happen!", "{Awaiting} ["+ Name +"] Prisoner::OnUpdateGameTime")
+        RPB_Utility.LogError("Updating in the Awaiting state, should not happen!", "{Awaiting} ["+ Name +"] Prisoner::OnUpdateGameTime")
     endEvent
 endState
 
@@ -950,6 +950,7 @@ state Escorting
         if (!__assistOn || !__assistEscort)
             return
         endif
+        __assistTicks += 1 ; before any call on the guard: a tick stuck on a frozen one stops counting (the Prison watches it)
 
         ; The starting positions, on this update stack instead of the Scene's (StartEscortAssist)
         if (__assistNeedsFirstRead)
@@ -972,7 +973,7 @@ state Escorting
         RPB_SceneManager scenes = API.SceneManager
         string current = scenes.GetCurrentScene()
         if (current != "" && !scenes.IsSceneOfType(current, scenes.CATEGORY_ESCORT_TO_JAIL) && !scenes.IsSceneOfType(current, scenes.CATEGORY_ESCORT_TO_CELL))
-            EventManager.SendInfo(Name + "'s escort assist stopped: '" + current + "' is playing, not an escort", "["+ Name +"] Prisoner::EscortAssist")
+            RPB_Utility.LogInfo(Name + "'s escort assist stopped: '" + current + "' is playing, not an escort", "["+ Name +"] Prisoner::EscortAssist")
             self.StopEscortAssist()
             return
         endif
@@ -1091,7 +1092,7 @@ state Escorting
             __assistAwayTime = 0.0
             if (__assistLevel > 0)
                 self.__RestoreEscortSpeed()
-                EventManager.SendInfo(Name + "'s guard is fighting, walking speed restored", "["+ Name +"] Prisoner::EscortAssist")
+                RPB_Utility.LogInfo(Name + "'s guard is fighting, walking speed restored", "["+ Name +"] Prisoner::EscortAssist")
             endif
 
         elseif (__assistToCell && self.__AssistInCell())
@@ -1103,7 +1104,7 @@ state Escorting
             __assistAwayTime = 0.0
             if (__assistLevel > 0)
                 self.__RestoreEscortSpeed()
-                EventManager.SendInfo(Name + " is in the cell, walking speed restored", "["+ Name +"] Prisoner::EscortAssist")
+                RPB_Utility.LogInfo(Name + " is in the cell, walking speed restored", "["+ Name +"] Prisoner::EscortAssist")
             endif
 
         elseif (!far)
@@ -1111,7 +1112,7 @@ state Escorting
             __assistStuckTime = 0.0
             if (__assistLevel > 0)
                 self.__RestoreEscortSpeed()
-                EventManager.SendInfo(Name + " caught up with the escort, walking speed restored", "["+ Name +"] Prisoner::EscortAssist")
+                RPB_Utility.LogInfo(Name + " caught up with the escort, walking speed restored", "["+ Name +"] Prisoner::EscortAssist")
             endif
             ; Next to the guard but not in my cell and not moving: the escort to the cell waits for me to get in
             if (__assistToCell && stuck && !self.__AssistInCell())
@@ -1134,7 +1135,7 @@ state Escorting
             __assistStuckTime = 0.0
             if (__assistLevel > 0)
                 self.__RestoreEscortSpeed()
-                EventManager.SendInfo(Name + " and the guard both stopped in the escort, walking speed restored", "["+ Name +"] Prisoner::EscortAssist")
+                RPB_Utility.LogInfo(Name + " and the guard both stopped in the escort, walking speed restored", "["+ Name +"] Prisoner::EscortAssist")
             endif
             __assistIdleTime += elapsed
             if (__assistIdleTime >= 12.0)
@@ -1158,10 +1159,10 @@ state Escorting
                 if (__assistFlatTicks >= 2)
                     __assistFlatTicks = 0
                     self.__RestoreEscortSpeed()
-                    EventManager.SendInfo(Name + " is past the stairs in the escort, walking speed restored", "["+ Name +"] Prisoner::EscortAssist")
+                    RPB_Utility.LogInfo(Name + " is past the stairs in the escort, walking speed restored", "["+ Name +"] Prisoner::EscortAssist")
                 elseif (__assistLevel > 1)
                     self.__SetEscortSpeedLevel(1)
-                    EventManager.SendInfo(Name + " is on flat ground in the escort, walking speed lowered to " + (self.__EscortSpeedForLevel(1) as int), "["+ Name +"] Prisoner::EscortAssist")
+                    RPB_Utility.LogInfo(Name + " is on flat ground in the escort, walking speed lowered to " + (self.__EscortSpeedForLevel(1) as int), "["+ Name +"] Prisoner::EscortAssist")
                 endif
             elseif (moved >= 30.0)
                 __assistFlatTicks = 0
@@ -1171,7 +1172,7 @@ state Escorting
                 __assistStuckTime += elapsed
                 if (__assistLevel < 3 && __assistStuckTime >= 0.5 * __assistLevel)
                     self.__SetEscortSpeedLevel(__assistLevel + 1)
-                    EventManager.SendInfo(Name + " still stuck in the escort, walking speed raised to " + (self.__EscortSpeedForLevel(__assistLevel) as int) + " (" + self.__AssistTrace(guardSpeed) + ")", "["+ Name +"] Prisoner::EscortAssist")
+                    RPB_Utility.LogInfo(Name + " still stuck in the escort, walking speed raised to " + (self.__EscortSpeedForLevel(__assistLevel) as int) + " (" + self.__AssistTrace(guardSpeed) + ")", "["+ Name +"] Prisoner::EscortAssist")
                 elseif (__assistLevel >= 3 && __assistStuckTime >= 6.0)
                     __assistStuckTime = 0.0
                     self.__RestoreEscortSpeed()
@@ -1191,7 +1192,7 @@ state Escorting
                 __assistSavedSpeed = this.GetActorValue("SpeedMult")
                 self.__SetEscortSpeedLevel(1)
                 __assistTick = 0.25
-                EventManager.SendInfo(Name + " is stuck in the escort (" + (distance as int) + " units behind, " + self.__AssistTrace(guardSpeed) + "), walking speed raised to " + (self.__EscortSpeedForLevel(1) as int), "["+ Name +"] Prisoner::EscortAssist")
+                RPB_Utility.LogInfo(Name + " is stuck in the escort (" + (distance as int) + " units behind, " + self.__AssistTrace(guardSpeed) + "), walking speed raised to " + (self.__EscortSpeedForLevel(1) as int), "["+ Name +"] Prisoner::EscortAssist")
             endif
         else
             __assistStuckTime = 0.0
@@ -1247,7 +1248,29 @@ state Escorting
                 Config.NotifyArrest("You'll walk on your own when you can", true)
             endif
         endif
-        EventManager.SendInfo(Name + " pressed the escort key: " + string_if(__preferLed, "led until pressed again", "walking on their own when allowed"), "["+ Name +"] Prisoner::EscortAssist")
+        RPB_Utility.LogInfo(Name + " pressed the escort key: " + string_if(__preferLed, "led until pressed again", "walking on their own when allowed"), "["+ Name +"] Prisoner::EscortAssist")
+    endEvent
+
+    event OnMenuOpen(string asMenuName)
+        if (asMenuName != "Sleep/Wait Menu" || !__assistOn)
+            return
+        endif
+        __waitOpenedAt = Utility.GetCurrentGameTime()
+        if (!__waitAllowed)
+            ; ZaZ's player slot reapplies its own SetInChargen every 0.5s while its items are worn: the block can't hold then
+            RPB_Utility.LogWarn(Name + "'s Wait menu opened in the escort although waiting is blocked (another mod re-enabled it, ZaZ does): the catch-up keeps them with the guard", "["+ Name +"] Prisoner::EscortAssist")
+        endif
+    endEvent
+
+    event OnMenuClose(string asMenuName)
+        if (asMenuName != "Sleep/Wait Menu" || !__assistOn || __waitOpenedAt <= 0.0)
+            return
+        endif
+        float hours = (Utility.GetCurrentGameTime() - __waitOpenedAt) * 24.0
+        __waitOpenedAt = 0.0
+        if (hours >= 0.17) ; ~10 game minutes
+            self.__CatchUpAfterWait(hours)
+        endif
     endEvent
 endState
 
@@ -1597,17 +1620,17 @@ endFunction
 
 function MoveToCell(bool abBeginImprisonment = true)
     if (self.IsImprisoned)
-        EventManager.SendError(self.GetName() + " is already imprisoned in "+ Prison.Name + "!", "["+ Name +"] Prisoner::MoveToCell")
+        RPB_Utility.LogError(self.GetName() + " is already imprisoned in "+ Prison.Name + "!", "["+ Name +"] Prisoner::MoveToCell")
         return
     endif
 
     if (self.ShouldBeInCell && self.IsInCell)
-        EventManager.SendError(self.GetName() + " is already in "+ self.PronounPossessiveObject +" cell: " + JailCell + "!", "["+ Name +"] Prisoner::MoveToCell")
+        RPB_Utility.LogError(self.GetName() + " is already in "+ self.PronounPossessiveObject +" cell: " + JailCell + "!", "["+ Name +"] Prisoner::MoveToCell")
         return
     endif
 
     if (!self.JailCell)
-        EventManager.SendError("The prisoner " + Name + " has not been assigned a jail cell!", "["+ Name +"] Prisoner::MoveToCell")
+        RPB_Utility.LogError("The prisoner " + Name + " has not been assigned a jail cell!", "["+ Name +"] Prisoner::MoveToCell")
         Prison.OnPrisonerImprisonmentFail(self, "Assign Cell")
         return
     endif
@@ -1621,7 +1644,7 @@ function MoveToCell(bool abBeginImprisonment = true)
         cellDoor.Close()
         cellDoor.Lock()
     else
-        EventManager.SendWarning("Moved " + Name + " into " + JailCell.ID + ", but its door isn't bound (the cell wasn't loaded yet), left as it is", "["+ Name +"] Prisoner::MoveToCell")
+        RPB_Utility.LogWarn("Moved " + Name + " into " + JailCell.ID + ", but its door isn't bound (the cell wasn't loaded yet), left as it is", "["+ Name +"] Prisoner::MoveToCell")
     endif
     RPB_Utility.FlowMark("Prisoner.MoveToCell: MoveTo(JailCell) done")
     RPB_Utility.Crumb(this, "Prisoner.MoveToCell: MoveTo(JailCell) done")
@@ -1821,7 +1844,7 @@ function DetermineStrippingType()
 
     ; Assert (WIP): the message is only built when something is wrong
     if (self.WillBeStrippedNaked == self.WillBeStrippedToUnderwear)
-        EventManager.SendError("An error has occurred, cannot strip prisoner both naked and to underwear, logic error!", "("+ Name +") Prisoner::DetermineStrippingType")
+        RPB_Utility.LogError("An error has occurred, cannot strip prisoner both naked and to underwear, logic error!", "("+ Name +") Prisoner::DetermineStrippingType")
     endif
 endFunction
 
@@ -1843,7 +1866,7 @@ function __DetermineStrippingTypeReference()
     ; )
 
     ; Assert (WIP)
-    EventManager.SendError( \ 
+    RPB_Utility.LogError( \ 
         "An error has occurred, cannot strip prisoner both naked and to underwear, logic error!", \ 
         "("+ Name +") Prisoner::DetermineStrippingType", \ 
         self.WillBeStrippedNaked == self.WillBeStrippedToUnderwear \
@@ -1866,7 +1889,7 @@ function Strip(bool abRemoveUnderwear = true)
     RPB_Utility.RemoveCuffs(this)
 
     if (!self.PrisonerBelongingsContainer)
-        EventManager.SendError("The prisoner " + Name + " hasn't had a belongings container assigned to "+ PronounObject +", therefore cannot strip!", "["+ Name +"] Prisoner::Strip")
+        RPB_Utility.LogError("The prisoner " + Name + " hasn't had a belongings container assigned to "+ PronounObject +", therefore cannot strip!", "["+ Name +"] Prisoner::Strip")
         return
     endif
 
@@ -1944,7 +1967,7 @@ function StripSilently()
     RPB_Utility.RemoveCuffs(this) ; the mod's, not a belonging (see Strip)
 
     if (!self.PrisonerBelongingsContainer)
-        EventManager.SendError("The prisoner " + Name + " hasn't had a belongings container assigned to "+ PronounObject +", therefore cannot strip silently!", "["+ Name +"] Prisoner::StripSilently")
+        RPB_Utility.LogError("The prisoner " + Name + " hasn't had a belongings container assigned to "+ PronounObject +", therefore cannot strip silently!", "["+ Name +"] Prisoner::StripSilently")
         return
     endif
 
@@ -1977,7 +2000,7 @@ endFunction
 
 function RemoveUnderwear()
     if (!self.PrisonerBelongingsContainer)
-        EventManager.SendError("The prisoner " + Name + " hasn't had a belongings container assigned to "+ PronounObject +", therefore cannot remove underwear!", "["+ Name +"] Prisoner::RemoveUnderwear")
+        RPB_Utility.LogError("The prisoner " + Name + " hasn't had a belongings container assigned to "+ PronounObject +", therefore cannot remove underwear!", "["+ Name +"] Prisoner::RemoveUnderwear")
         return
     endif
 
@@ -2124,7 +2147,7 @@ function DetermineClothingOutfit()
         outfitType = OUTFIT_FALLBACK
     endif
 
-    ; EventManager.SendInfo("Determining Clothing Outfit" "("+ Name +") Prisoner::DetermineClothingOutfit")
+    ; RPB_Utility.LogInfo("Determining Clothing Outfit" "("+ Name +") Prisoner::DetermineClothingOutfit")
     Config.NotifyJail("Determining Clothing Outfit")
 
 
@@ -2133,14 +2156,14 @@ function DetermineClothingOutfit()
     ;     "\n\tprisonerMeetsOutfitCondition: "+ prisonerMeetsOutfitCondition +" \n\tconfiguredOutfit: "+ configuredOutfit +" \n\toutfitType: "+ outfitType +" \n\tUseDefaultOutfitAsFallback: "+ UseDefaultOutfitAsFallback +" \n\tSentence: "+ Sentence + "\n" \
     ; )
  
-    ; EventManager.SendInfo("Determined Configured Outfit: " + self.PrisonOutfit, "("+ Name +") Prisoner::DetermineClothingOutfit",  outfitType == OUTFIT_CONFIGURED)
-    ; EventManager.SendInfo("Determined Fallback Outfit: " + self.PrisonOutfit, "("+ Name +") Prisoner::DetermineClothingOutfit",    outfitType == OUTFIT_FALLBACK)
-    ; EventManager.SendInfo("No outfit is currently configured, and no fallback option!", "("+ Name +") Prisoner::DetermineClothingOutfit", outfitType == OUTFIT_NONE)
+    ; RPB_Utility.LogInfo("Determined Configured Outfit: " + self.PrisonOutfit, "("+ Name +") Prisoner::DetermineClothingOutfit",  outfitType == OUTFIT_CONFIGURED)
+    ; RPB_Utility.LogInfo("Determined Fallback Outfit: " + self.PrisonOutfit, "("+ Name +") Prisoner::DetermineClothingOutfit",    outfitType == OUTFIT_FALLBACK)
+    ; RPB_Utility.LogInfo("No outfit is currently configured, and no fallback option!", "("+ Name +") Prisoner::DetermineClothingOutfit", outfitType == OUTFIT_NONE)
 endFunction
 
 function Clothe()
     if (!self.PrisonOutfit)
-        EventManager.SendWarning("Tried to clothe prisoner " + Name + ", but there's no outfit configured!", "("+ Name +") Prisoner::Clothe")
+        RPB_Utility.LogWarn("Tried to clothe prisoner " + Name + ", but there's no outfit configured!", "("+ Name +") Prisoner::Clothe")
         return
     endif
 
@@ -2287,17 +2310,17 @@ endFunction
 
 function SetSentence(int aiSentenceInDays = 0, bool abShouldAffectBounty = true)
     if (Has("Sentence Set"))
-        EventManager.SendWarning("A sentence has already been set for this prisoner ("+ self.GetIdentifier() +"). \nConsider using IncreaseSentence() or DecreaseSentence() instead.", "["+ Name +"] Prisoner::SetSentence")
+        RPB_Utility.LogWarn("A sentence has already been set for this prisoner ("+ self.GetIdentifier() +"). \nConsider using IncreaseSentence() or DecreaseSentence() instead.", "["+ Name +"] Prisoner::SetSentence")
         return
     endif
 
     if (self.IsUndeterminedSentence && aiSentenceInDays == 0)
-        EventManager.SendInfo("Setting an undetermined sentence for prisoner " + self.GetActor(), "["+ Name +"] Prisoner::SetSentence")
+        RPB_Utility.LogInfo("Setting an undetermined sentence for prisoner " + self.GetActor(), "["+ Name +"] Prisoner::SetSentence")
         return
     endif
 
     if (aiSentenceInDays <= 0 && !self.Bounty)
-        EventManager.SendWarning("Sentence must be greater than 0 days. (Sentence not set)", "["+ Name +"] Prisoner::SetSentence")
+        RPB_Utility.LogWarn("Sentence must be greater than 0 days. (Sentence not set)", "["+ Name +"] Prisoner::SetSentence")
         return
     endif
 
@@ -2546,6 +2569,39 @@ int __walkInFarTicks
 ; to jail and to the cell), not reset by an assist start.
 bool __preferLed
 int __escortToggleKey
+bool __waitAllowed
+float __waitOpenedAt
+
+; Waited while escorted (allowed in the MCM): the engine walked the guard on during the wait. Beside him again, on walkable
+; ground, with the tick's baselines reset so the jump doesn't read as moving or far. Free or led stays as it was.
+function __CatchUpAfterWait(float afHours)
+    Actor guard = __assistEscort
+    if (!__assistOn || !guard)
+        return
+    endif
+    float angle = guard.GetAngleZ()
+    this.MoveTo(guard, -100.0 * Math.sin(angle), -100.0 * Math.cos(angle), 0.0, false)
+    PO3_SKSEFunctions.MoveToNearestNavmeshLocation(this)
+    __assistLastX = this.GetPositionX()
+    __assistLastY = this.GetPositionY()
+    __assistLastZ = this.GetPositionZ()
+    __assistGuardLastX = guard.GetPositionX()
+    __assistGuardLastY = guard.GetPositionY()
+    __assistLastDistance = this.GetDistance(guard)
+    __lastSameCell = true
+    __assistStuckTime = 0.0
+    __assistIdleTime = 0.0
+    __assistAwayTime = 0.0
+    __guardWaitTime = 0.0
+    __guardWaitWarned = false
+    __freeFarTicks = 0
+    __freeBothStillTime = 0.0
+    __freeStillTime = 0.0
+    if (!__freeWalk)
+        this.EvaluatePackage()
+    endif
+    RPB_Utility.LogInfo(Name + " waited " + ((afHours * 10.0) as int) / 10.0 + "h in the escort: moved beside the guard " + guard + " (" + (__assistLastDistance as int) + " away), " + string_if(__freeWalk, "walking on their own", "led"), "["+ Name +"] Prisoner::EscortAssist")
+endFunction
 ; The AI key in the cell: following the prison routine (the cell's package, AI-driven) or in my own control
 bool __cellAI
 int __cellToggleKey
@@ -2557,7 +2613,7 @@ function __SetCellAI(bool abOn, string asWhy)
         if (!self.HasCellPackage)
             RPB_Utility.ReleaseAI()
             Config.NotifyArrest("No routine for this cell", true)
-            EventManager.SendWarning(Name + "'s cell routine: no free package for the cell (" + JailCell + ")", "["+ Name +"] Prisoner::CellAI")
+            RPB_Utility.LogWarn(Name + "'s cell routine: no free package for the cell (" + JailCell + ")", "["+ Name +"] Prisoner::CellAI")
             return
         endif
         __cellAI = true
@@ -2570,7 +2626,7 @@ function __SetCellAI(bool abOn, string asWhy)
         RPB_Utility.ReleaseAI()
         Config.NotifyArrest("You're on your own in the cell", abOn == false && asWhy == "the AI key")
     endif
-    EventManager.SendInfo(Name + "'s cell routine " + string_if(abOn, "on", "off") + " (" + asWhy + ")", "["+ Name +"] Prisoner::CellAI")
+    RPB_Utility.LogInfo(Name + "'s cell routine " + string_if(abOn, "on", "off") + " (" + asWhy + ")", "["+ Name +"] Prisoner::CellAI")
 endFunction
 
 ; Whether the player is walking on their own in the escort right now (the tests)
@@ -2601,8 +2657,11 @@ function __SetFreeWalk(bool abFree, string asReason)
         RPB_Utility.HoldPlayerCuffed()
     else
         RetainAI(true)
+        ; The phase's package for me applies only once re-evaluated: led after the guard-wait, "Prisoner on None" stood still
+        ; until the stall fallback took over
+        this.EvaluatePackage()
     endif
-    EventManager.SendInfo(Name + " " + string_if(abFree, "walks on their own", "is led by the AI") + " in the escort: " + asReason, "["+ Name +"] Prisoner::EscortAssist")
+    RPB_Utility.LogInfo(Name + " " + string_if(abFree, "walks on their own", "is led by the AI") + " in the escort: " + asReason, "["+ Name +"] Prisoner::EscortAssist")
 endFunction
 
 ;/
@@ -2632,7 +2691,7 @@ bool function __FollowThroughLoadDoor()
         destination = PO3_SKSEFunctions.GetDoorDestination(loadDoor)
     endif
     if (!destination)
-        EventManager.SendInfo(Name + ": the guard went through a load door, but none was found near him (" + doors.Length + " doors around): the AI follows", "["+ Name +"] Prisoner::EscortAssist")
+        RPB_Utility.LogInfo(Name + ": the guard went through a load door, but none was found near him (" + doors.Length + " doors around): the AI follows", "["+ Name +"] Prisoner::EscortAssist")
         return false
     endif
 
@@ -2675,7 +2734,7 @@ bool function __FollowThroughLoadDoor()
         PO3_SKSEFunctions.MoveToNearestNavmeshLocation(guard)
         how += ", the guard moved beside me"
     endif
-    EventManager.SendInfo(Name + " followed the guard through " + loadDoor + " (" + (__assistLastDistance as int) + " behind him) to " + destination + ": " + how + string_if(guardAhead, " (he had gone on)", ""), "["+ Name +"] Prisoner::EscortAssist")
+    RPB_Utility.LogInfo(Name + " followed the guard through " + loadDoor + " (" + (__assistLastDistance as int) + " behind him) to " + destination + ": " + how + string_if(guardAhead, " (he had gone on)", ""), "["+ Name +"] Prisoner::EscortAssist")
     return true
 endFunction
 
@@ -2826,7 +2885,7 @@ function __KeepFreeControls()
     if (!Game.IsMovementControlsEnabled())
         if (!__freeControlsLogged)
             __freeControlsLogged = true
-            EventManager.SendInfo(Name + "'s controls changed during the free walk (movement " + Game.IsMovementControlsEnabled() + ", activate " + Game.IsActivateControlsEnabled() + "), held cuffed again", "["+ Name +"] Prisoner::EscortAssist")
+            RPB_Utility.LogInfo(Name + "'s controls changed during the free walk (movement " + Game.IsMovementControlsEnabled() + ", activate " + Game.IsActivateControlsEnabled() + "), held cuffed again", "["+ Name +"] Prisoner::EscortAssist")
         endif
         RPB_Utility.HoldPlayerCuffed()
     endif
@@ -2890,6 +2949,14 @@ int property EscortAssistMoves
     endFunction
 endProperty
 
+; Ticks the escort assist has started (the Prison's stall watch: a count that stops moving is a stuck tick)
+int property EscortAssistTicks
+    int function get()
+        return __assistTicks
+    endFunction
+endProperty
+int __assistTicks
+
 ; The assist is watching an escort to the cell (the escort's Scene has really started, not just been queued)
 bool property EscortAssistToCell
     bool function get()
@@ -2941,6 +3008,17 @@ function StartEscortAssist(Actor akEscort, bool abToCell)
     if (__escortToggleKey > 0)
         RegisterForKey(__escortToggleKey)
     endif
+    ; Waiting: blocked (our own message on the Wait key), or allowed and caught up with the guard after it
+    __waitAllowed = Config.AllowWaitWhileEscorted
+    if (!__waitAllowed)
+        RPB_Utility.SetEscortWaitBlocked(true)
+    endif
+    RegisterForMenu("Sleep/Wait Menu")
+    ; A guard frozen before the cell door left the player led and stuck for good (2026-10-02): the stall check only armed
+    ; at "Lock Cell". Armed now too, watching the assist's ticks (the Prison's existing heartbeat, no loop of mine).
+    if (abToCell)
+        Prison.QueueEscortToCellStallCheck(this, 90.0, abWatchAssist = true)
+    endif
     GotoState("Escorting")
     RegisterForSingleUpdate(0.1)
     Debug("["+ Name +"] Prisoner::EscortAssist", "assist started: escort by " + akEscort + ", to cell " + abToCell + ", previous state '" + __assistPreviousState + "'")
@@ -2960,6 +3038,8 @@ function StopEscortAssist()
     endif
     __assistOn = false
     __assistEscort = none
+    RPB_Utility.SetEscortWaitBlocked(false)
+    UnregisterForMenu("Sleep/Wait Menu")
     if (__escortToggleKey > 0)
         UnregisterForKey(__escortToggleKey)
         __escortToggleKey = 0
@@ -3019,7 +3099,7 @@ bool function __AssistMoveToGuard(string asWhy)
     ; guard over to unlock and open the door on a player already inside, then close and lock it again. Finished here the
     ; same way as a broken escort (the door is locked by MoveToCell).
     if (__assistToCell && JailCell)
-        EventManager.SendInfo(Name + " " + asWhy + " in the escort, moved into the cell, the escort ends here (" + __assistTeleports + ")", "["+ Name +"] Prisoner::EscortAssist")
+        RPB_Utility.LogInfo(Name + " " + asWhy + " in the escort, moved into the cell, the escort ends here (" + __assistTeleports + ")", "["+ Name +"] Prisoner::EscortAssist")
         Actor cellEscort = __assistEscort
         self.StopEscortAssist()
         RPB_SceneManager sceneManager = RPB_API.GetSceneManager()
@@ -3029,7 +3109,7 @@ bool function __AssistMoveToGuard(string asWhy)
         return true
     endif
     if (__assistTeleports >= 3)
-        EventManager.SendInfo("Escort of " + Name + " broken (" + asWhy + ", 3 moves), going on without the Scene", "["+ Name +"] Prisoner::EscortAssist")
+        RPB_Utility.LogInfo("Escort of " + Name + " broken (" + asWhy + ", 3 moves), going on without the Scene", "["+ Name +"] Prisoner::EscortAssist")
         bool toCell = __assistToCell
         Actor escort = __assistEscort
         self.StopEscortAssist()
@@ -3058,7 +3138,7 @@ bool function __AssistMoveToGuard(string asWhy)
     __assistLastDistance = this.GetDistance(__assistEscort)
     __assistAwayTime = 0.0
     __assistTick = 1.0
-    EventManager.SendInfo(Name + " " + asWhy + " in the escort, moved " + moveTarget + " (" + __assistTeleports + "/3)", "["+ Name +"] Prisoner::EscortAssist")
+    RPB_Utility.LogInfo(Name + " " + asWhy + " in the escort, moved " + moveTarget + " (" + __assistTeleports + "/3)", "["+ Name +"] Prisoner::EscortAssist")
     return false
 endFunction
 
@@ -3095,7 +3175,7 @@ function SaveBelongingsManifest()
         if (manifestState == 2)
             SetInt("Belongings Manifest", 2)
         endif
-        EventManager.SendInfo("Added " + count + " of " + total + " belongings of " + self.Name + " to the existing manifest (stripped again)", "["+ Name +"] Prisoner::SaveBelongingsManifest")
+        RPB_Utility.LogInfo("Added " + count + " of " + total + " belongings of " + self.Name + " to the existing manifest (stripped again)", "["+ Name +"] Prisoner::SaveBelongingsManifest")
         return
     endif
 
@@ -3114,7 +3194,7 @@ function SaveBelongingsManifest()
     RPB_StorageVars.SetFormsOnReference("Belongings Forms", refKey, self.__TrimForms(forms, count), category)
     RPB_StorageVars.SetIntsOnReference("Belongings Counts", refKey, self.__TrimInts(counts, count), category)
     SetInt("Belongings Manifest", manifestState)
-    EventManager.SendInfo("Recorded " + count + " of " + total + " belongings of " + self.Name + " (manifest " + string_if (manifestState == 1, "complete", "incomplete") + ")", "["+ Name +"] Prisoner::SaveBelongingsManifest")
+    RPB_Utility.LogInfo("Recorded " + count + " of " + total + " belongings of " + self.Name + " (manifest " + string_if (manifestState == 1, "complete", "incomplete") + ")", "["+ Name +"] Prisoner::SaveBelongingsManifest")
 endFunction
 
 Form[] function __TrimForms(Form[] akForms, int aiCount)
@@ -3199,7 +3279,7 @@ function ReturnBelongings()
         if (self.IsNPC())
             ; The container is shared: RemoveAllItems() here handed one NPC the belongings of everybody else (55 tunics for one NPC in the
             ; mass test) and left the next ones with nothing. An NPC without a manifest gets nothing back, its outfit is issued again.
-            EventManager.SendInfo("No belongings manifest for " + self.Name + ", nothing is returned from the shared container (the outfit is issued again)", "["+ Name +"] Prisoner::ReturnBelongings")
+            RPB_Utility.LogInfo("No belongings manifest for " + self.Name + ", nothing is returned from the shared container (the outfit is issued again)", "["+ Name +"] Prisoner::ReturnBelongings")
             return
         endif
 
@@ -3229,7 +3309,7 @@ function ReturnBelongings()
     Remove("Belongings Manifest")
     Remove("Belongings Forms")
     Remove("Belongings Counts")
-    EventManager.SendInfo("Returned " + returned + " kinds of belongings to " + self.Name, "["+ Name +"] Prisoner::ReturnBelongings")
+    RPB_Utility.LogInfo("Returned " + returned + " kinds of belongings to " + self.Name, "["+ Name +"] Prisoner::ReturnBelongings")
 endFunction
 
 ;                        Imprisonment
@@ -3256,12 +3336,12 @@ endFunction
 /;
 function Imprison()
     if (!self.HasStateRequiredForImprisonment)
-        EventManager.SendError(Name + " does not have the required state for "+ self.PronounPossessiveObject +" imprisonment, cannot continue!", "["+ Name +"] Prisoner::Imprison")
+        RPB_Utility.LogError(Name + " does not have the required state for "+ self.PronounPossessiveObject +" imprisonment, cannot continue!", "["+ Name +"] Prisoner::Imprison")
         return
     endif
 
     if (self.IsImprisoned)
-        EventManager.SendError(self.GetName() + " is already imprisoned in "+ Prison.Name + "!", "["+ Name +"] Prisoner::Imprison")
+        RPB_Utility.LogError(self.GetName() + " is already imprisoned in "+ Prison.Name + "!", "["+ Name +"] Prisoner::Imprison")
         return
     endif
 
@@ -4174,7 +4254,7 @@ event OnSleepStart(float afSleepStartTime, float afSleepEndTime)
     endif
 
     if (self.IsUndeterminedSentence)
-        EventManager.SendInfo(Name + " currently has an undetermined sentence, cannot serve time.", "["+ Name +"] Prisoner::OnSleepStart")
+        RPB_Utility.LogInfo(Name + " currently has an undetermined sentence, cannot serve time.", "["+ Name +"] Prisoner::OnSleepStart")
         return
     endif
 
@@ -4294,6 +4374,7 @@ event OnDestroy()
             __cellAI = false
             self.__UnbindCellPackage()
         endif
+        RPB_Utility.SetEscortWaitBlocked(false)
         ; If for some reason AI is disabled, re-enable it
         ReleaseAI()
     endif
@@ -4352,7 +4433,7 @@ RPB_Prison function GetPrison()
         ; Not sticky anymore: a read that happens before the binding is written used to fail the prisoner for good.
         ; Only an error while the effect is running: a finishing effect (state already cleaned up) asks for its Prison too.
         if (self.IsEffectActive)
-            EventManager.SendError("There was an error retrieving the Prison belonging to Prisoner: " + self.Name, "["+ Name +"] Prisoner::GetPrison")
+            RPB_Utility.LogError("There was an error retrieving the Prison belonging to Prisoner: " + self.Name, "["+ Name +"] Prisoner::GetPrison")
         endif
         return none
     endif
@@ -4410,7 +4491,7 @@ function __BindCellPackage()
 
     if (!cellPackageAlias)
         RPB_ThreadLock.Release(packageLock)
-        EventManager.SendError("There was an error retrieving the Cell Package belonging to Prisoner: " + self.Name, "["+ Name +"] Prisoner::NPC_BindToCell")
+        RPB_Utility.LogError("There was an error retrieving the Cell Package belonging to Prisoner: " + self.Name, "["+ Name +"] Prisoner::NPC_BindToCell")
         return
     endif
 
@@ -4436,7 +4517,7 @@ function __UnbindCellPackage()
     endif
 
     if (!self.CellPackage)
-        EventManager.SendError("There was an error retrieving the Cell Package belonging to Prisoner: " + self.Name, "["+ Name +"] Prisoner::NPC_UnbindFromCell")
+        RPB_Utility.LogError("There was an error retrieving the Cell Package belonging to Prisoner: " + self.Name, "["+ Name +"] Prisoner::NPC_UnbindFromCell")
         return
     endif
 
@@ -4549,7 +4630,7 @@ function NPC_RestoreOriginalOutfit()
     endif
 
     Outfit original = NPC_OriginalOutfit
-    EventManager.SendInfo("Restoring outfit of " + self.Name + ": saved " + original + ", base outfit now " + this.GetActorBase().GetOutfit(), "["+ Name +"] Prisoner::NPC_RestoreOriginalOutfit")
+    RPB_Utility.LogInfo("Restoring outfit of " + self.Name + ": saved " + original + ", base outfit now " + this.GetActorBase().GetOutfit(), "["+ Name +"] Prisoner::NPC_RestoreOriginalOutfit")
     if (original)
         this.SetOutfit(original)
     else
@@ -4615,7 +4696,7 @@ function NPC_ReequipAfterRelease()
     endif
 
     ; No Release_ReequipWornGear() here either: the saved worn armor is on the same dress list (see the comment above)
-    EventManager.SendInfo("Restored outfit " + original + " on " + self.Name + ": " + parts + " parts (" + skipped + " not plain armors, " + reissued + " issued again because the belongings did not have them)", "["+ Name +"] Prisoner::NPC_ReequipAfterRelease")
+    RPB_Utility.LogInfo("Restored outfit " + original + " on " + self.Name + ": " + parts + " parts (" + skipped + " not plain armors, " + reissued + " issued again because the belongings did not have them)", "["+ Name +"] Prisoner::NPC_ReequipAfterRelease")
 endFunction
 
 ;/
@@ -4650,7 +4731,7 @@ function NPC_EnsureDressed()
     fixed += self.Release_ReequipWornGear()
 
     if (fixed > 0)
-        EventManager.SendInfo("Equipped " + fixed + " items that were still off after the release on " + self.Name, "["+ Name +"] Prisoner::NPC_EnsureDressed")
+        RPB_Utility.LogInfo("Equipped " + fixed + " items that were still off after the release on " + self.Name, "["+ Name +"] Prisoner::NPC_EnsureDressed")
     endif
 endFunction
 
@@ -4727,7 +4808,7 @@ function Stripping_SaveWornGear()
         endif
         i += 1
     endWhile
-    EventManager.SendInfo("Saved " + saved + " worn armor slots of " + self.Name + " before stripping (" + total + " in all)", "["+ Name +"] Prisoner::Stripping_SaveWornGear")
+    RPB_Utility.LogInfo("Saved " + saved + " worn armor slots of " + self.Name + " before stripping (" + total + " in all)", "["+ Name +"] Prisoner::Stripping_SaveWornGear")
 endFunction
 
 ; Dresses the player again with what they wore when stripped: a teleport release or a cancelled arrest. Before, only
@@ -4739,7 +4820,7 @@ function Player_ReequipAfterRelease()
     endif
 
     int pieces = self.Release_ReequipWornGear()
-    EventManager.SendInfo("Dressed " + Name + " again: " + pieces + " pieces of gear put back on", "["+ Name +"] Prisoner::Player_ReequipAfterRelease")
+    RPB_Utility.LogInfo("Dressed " + Name + " again: " + pieces + " pieces of gear put back on", "["+ Name +"] Prisoner::Player_ReequipAfterRelease")
 endFunction
 
 ; Puts back on what Stripping_SaveWornGear saved (worn armor; the player's weapons too), from what's back in the
@@ -4941,8 +5022,8 @@ function NPC_UpdateUnderwear()
         self.SetBool("Warned No Underwear", true)
     endif
 
-    EventManager.SendInfo("Equipped underwear on " + self.Name, "["+ Name +"] Prisoner::NPC_UpdateUnderwear", shouldBeInUnderwear)
-    EventManager.SendInfo("Tried to equip underwear on " + self.Name + ", but " + self.Pronoun + " does not have any!", "["+ Name +"] Prisoner::NPC_UpdateUnderwear", hasNoUnderwearAtAll)
+    RPB_Utility.LogInfo("Equipped underwear on " + self.Name, "["+ Name +"] Prisoner::NPC_UpdateUnderwear", shouldBeInUnderwear)
+    RPB_Utility.LogInfo("Tried to equip underwear on " + self.Name + ", but " + self.Pronoun + " does not have any!", "["+ Name +"] Prisoner::NPC_UpdateUnderwear", hasNoUnderwearAtAll)
 endFunction
 
 function NPC_UpdateClothing()

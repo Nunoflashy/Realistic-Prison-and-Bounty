@@ -479,7 +479,7 @@ function CreateSceneRefTypeConfig(string asScene, string asRefType, int aiAliasC
     int sceneRefTypesObj = FastMap_SetObject(__sceneConfig, asScene, FastMap("<string>"), condition = !sceneExists) ; FastMap<string>
 
     if (!sceneRefTypesObj)
-        EventManager.SendError("Cannot create the scene config for scene " + asScene + " (object does not exist!)", "SceneManager::CreateSceneRefTypeConfig")
+        RPB_Utility.LogError("Cannot create the scene config for scene " + asScene + " (object does not exist!)", "SceneManager::CreateSceneRefTypeConfig")
         return
     endif
 
@@ -669,7 +669,7 @@ Alias[] function GetSceneAliases(string asScene, bool abOnlyIncludeAliasesInUse 
     endWhile
 
     if (aliasIndex <= 0)
-        EventManager.SendError("Could not retrieve any scene aliases for Scene " + asScene + " (no aliases found!)", "SceneManager::GetSceneAliases")
+        RPB_Utility.LogError("Could not retrieve any scene aliases for Scene " + asScene + " (no aliases found!)", "SceneManager::GetSceneAliases")
         return none
     endif
 
@@ -1109,7 +1109,7 @@ function QueueOrPlay(string asSceneName)
     ; log - confirmed as a real, reproduced cause of confrontation Scenes intermittently never starting at all.
     ; Self-heal here instead of trusting the tracked flag blindly.
     if (__isScenePlaying && currentScene != "" && !self.GetScene(currentScene).IsPlaying())
-        EventManager.SendWarning("SceneManager: __isScenePlaying said '" + currentScene + "' was still playing, but it wasn't - self-healing before queuing " + asSceneName, "SceneManager::QueueOrPlay")
+        RPB_Utility.LogWarn("SceneManager: __isScenePlaying said '" + currentScene + "' was still playing, but it wasn't - self-healing before queuing " + asSceneName, "SceneManager::QueueOrPlay")
         __isScenePlaying = false
         self.__ClearSceneQueue() ; also clear whatever stale entries piled up behind the desynced flag
     endif
@@ -1485,7 +1485,7 @@ function SetPackageLockOnActor(Actor akActor)
 
     if (packageLock.GetReference()) ; Package already in use
         ; Error
-        EventManager.SendWarning("There was a problem assigning a package lock to the Actor " + akActor + "!", "SceneManager::SetPackageLockOnActor")
+        RPB_Utility.LogWarn("There was a problem assigning a package lock to the Actor " + akActor + "!", "SceneManager::SetPackageLockOnActor")
         return
     endif
 
@@ -1494,7 +1494,7 @@ function SetPackageLockOnActor(Actor akActor)
     BindAliasTo(packageLock, akActor)
     RPB_StorageVars.SetIntOnReference("Package Lock", akActor, packageLock.GetID())
     RPB_Utility.ProbeGuard(akActor, "package lock bound")
-    EventManager.SendInfo("Bound package lock to Actor " + akActor + " successfully!", "SceneManager::SetPackageLockOnActor")
+    RPB_Utility.LogInfo("Bound package lock to Actor " + akActor + " successfully!", "SceneManager::SetPackageLockOnActor")
 endFunction
 
 ;/
@@ -1506,13 +1506,13 @@ function UnsetPackageLockOnActor(Actor akActor)
     ReferenceAlias packageLock = self.GetAliasByID(packageId) as ReferenceAlias
 
     if (packageId && !packageLock)
-        EventManager.SendError("There was an error unsetting the package lock for Actor " + akActor + ", the package does not exist!", "SceneManager::UnsetPackageLockOnActor")
+        RPB_Utility.LogError("There was an error unsetting the package lock for Actor " + akActor + ", the package does not exist!", "SceneManager::UnsetPackageLockOnActor")
         return
     endif
 
     UnbindAlias(packageLock)
     RPB_StorageVars.DeleteVariableOnReference("Package Lock", akActor)
-    EventManager.SendInfo("Unbound package lock from Actor " + akActor + " successfully!", "SceneManager::UnsetPackageLockOnActor")
+    RPB_Utility.LogInfo("Unbound package lock from Actor " + akActor + " successfully!", "SceneManager::UnsetPackageLockOnActor")
     ; Guards froze around this moment (every freeze so far): a probe tells when one does
     RPB_Utility.ProbeGuard(akActor, "package lock unbound")
 endFunction
@@ -1545,7 +1545,7 @@ bool function SetPendingHoldOnActor(Actor akActor)
         hold = self.__PendingHoldAlias(i)
     endWhile
 
-    EventManager.SendWarning("No free PendingHold alias for " + akActor + " (all " + (i - 1) + " in use), holding it by script only", "SceneManager::SetPendingHoldOnActor")
+    RPB_Utility.LogWarn("No free PendingHold alias for " + akActor + " (all " + (i - 1) + " in use), holding it by script only", "SceneManager::SetPendingHoldOnActor")
     return false
 endFunction
 
@@ -1613,7 +1613,7 @@ endFunction
 /;
 function QueueAlias(ReferenceAlias apRefAlias, ObjectReference akRef, bool abBindAlias = true)
     if (!akRef)
-        EventManager.SendError("The reference received is none! (cannot queue Alias)", "SceneManager::QueueAlias")
+        RPB_Utility.LogError("The reference received is none! (cannot queue Alias)", "SceneManager::QueueAlias")
         return
     endif
 
@@ -1626,7 +1626,7 @@ function QueueAlias(ReferenceAlias apRefAlias, ObjectReference akRef, bool abBin
 
     Debug("SceneManager::QueueAlias", "__queuedAliases: " + GetContainerList(__queuedAliases))
 
-    EventManager.SendWarning("Alias " + apRefAlias.GetName() + " (id: "+ apRefAlias.GetID() +") has not been assigned to any reference!", "SceneManager::QueueAlias", akRef == none)
+    RPB_Utility.LogWarn("Alias " + apRefAlias.GetName() + " (id: "+ apRefAlias.GetID() +") has not been assigned to any reference!", "SceneManager::QueueAlias", akRef == none)
 endFunction
 
 ;/
@@ -1640,7 +1640,7 @@ function BindSceneAliasGroup(string asScene, string asAliasRefType, Form[] akRef
     Alias[] aliasesInGroup = self.GetSceneAliasesOfType(asScene, asAliasRefType)
 
     if (!aliasesInGroup)
-        EventManager.SendError("Could not retrieve the Scene's Aliases of type " + asAliasRefType + ", cannot bind!", "SceneManager::BindSceneAliasGroup")
+        RPB_Utility.LogError("Could not retrieve the Scene's Aliases of type " + asAliasRefType + ", cannot bind!", "SceneManager::BindSceneAliasGroup")
         return
     endif
 
@@ -1656,8 +1656,8 @@ function BindSceneAliasGroup(string asScene, string asAliasRefType, Form[] akRef
         i += 1
     endWhile
 
-    EventManager.SendWarning("Received references are more than the available Aliases in the Scene! (Scene: "+ asScene +") (Alias Group: "+ asAliasRefType +") (Received: "+ refCount +", Available Aliases: "+ aliasCount +")", "SceneManager::BindSceneAliasGroup", refCount > aliasCount)
-    EventManager.SendInfo("Received less references than the available Aliases in the Scene. (Scene: "+ asScene +") (Alias Group: "+ asAliasRefType +") (Received: "+ refCount +", Available Aliases: "+ aliasCount +")", "SceneManager::BindSceneAliasGroup", aliasCount > refCount)
+    RPB_Utility.LogWarn("Received references are more than the available Aliases in the Scene! (Scene: "+ asScene +") (Alias Group: "+ asAliasRefType +") (Received: "+ refCount +", Available Aliases: "+ aliasCount +")", "SceneManager::BindSceneAliasGroup", refCount > aliasCount)
+    RPB_Utility.LogInfo("Received less references than the available Aliases in the Scene. (Scene: "+ asScene +") (Alias Group: "+ asAliasRefType +") (Received: "+ refCount +", Available Aliases: "+ aliasCount +")", "SceneManager::BindSceneAliasGroup", aliasCount > refCount)
 endFunction
 
 ;/
@@ -1671,7 +1671,7 @@ function BindSceneAlias(string asScene, string asAliasRefType, ObjectReference a
     Alias[] aliasesInGroup = self.GetSceneAliasesOfType(asScene, asAliasRefType)
 
     if (!aliasesInGroup)
-        EventManager.SendError("Could not retrieve the Scene's Aliases of type " + asAliasRefType + ", cannot bind!", "SceneManager::BindSceneAlias")
+        RPB_Utility.LogError("Could not retrieve the Scene's Aliases of type " + asAliasRefType + ", cannot bind!", "SceneManager::BindSceneAlias")
         return
     endif
 

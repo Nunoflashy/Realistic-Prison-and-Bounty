@@ -156,10 +156,67 @@ string function CancelArrest(Actor akActor, string asReason, bool abReturnBelong
         done += "hostility restored; "
     endif
 
-    if (sceneManager.EndSceneWithActor(akActor, asReason))
+    bool sceneStopped = sceneManager.EndSceneWithActor(akActor, asReason)
+    if (sceneStopped)
         done += "Scene ended; "
     endif
     RPB_Recovery.__Step(akActor, "CancelArrest: hostility and Scenes done")
+    ; Freeze experiment E: the kept guard's probe series starts right at the Scene stop (before experiment C's wait, if on)
+    bool probeSeriesSent = false
+    if (sceneStopped && RPB_Utility.IsCaptorKeptForTest())
+        RPB_Arrestee keptArrestee = arrest.Arrestees.AtKey(akActor)
+        Actor keptGuard = none
+        if (keptArrestee)
+            keptGuard = keptArrestee.GetCaptorActor()
+        endif
+        if (keptGuard)
+            int series = ModEvent.Create("RPB_TestProbeSeries")
+            if (series)
+                ModEvent.PushForm(series, keptGuard)
+                ModEvent.PushFloat(series, Utility.GetCurrentRealTime())
+                ModEvent.Send(series)
+                probeSeriesSent = true
+            endif
+        endif
+    endif
+    bool imprisonmentCancelled = false
+    if (prisonerRef && RPB_Utility.IsImprisonmentCancelFirstForTest())
+        ; Freeze experiment G3: the imprisonment cancelled now, before the gap below (the block after skips it then)
+        prison.CancelImprisonment(prisonerRef, asReason, abReturnBelongings)
+        imprisonmentCancelled = true
+        done += "imprisonment cancelled (experiment G3); "
+        RPB_Recovery.__Step(akActor, "CancelArrest: the imprisonment cancelled right after the Scene stop (experiment G3)")
+    endif
+    if (RPB_Utility.IsRevertFirstForTest())
+        ; Freeze experiment G2: the arrest reverted now (the uncuff, the Arrestee effect), before the gap below. The probe
+        ; series above already has the guard; with the arrestee gone the block below skips his release (E keeps him)
+        RPB_Arrestee earlyArrestee = arrest.Arrestees.AtKey(akActor)
+        if (earlyArrestee)
+            earlyArrestee.RevertArrest()
+            done += "arrest reverted (experiment G2); "
+        endif
+        RPB_Recovery.__Step(akActor, "CancelArrest: the arrest reverted right after the Scene stop (experiment G2)")
+    endif
+    if (RPB_Utility.IsAIFlipFirstForTest())
+        ; Freeze experiment G1: the player's AI side of the revert now, before the gap below (the rest after it)
+        if (prisonerRef)
+            prisonerRef.StopEscortAssist()
+        endif
+        if (akActor == Game.GetPlayer())
+            RPB_Utility.ReleaseAI(true)
+        endif
+        RPB_Recovery.__Step(akActor, "CancelArrest: the escort assist stopped and the AI released right after the Scene stop (experiment G1)")
+    endif
+    if (RPB_Utility.IsSceneEndSpacedForTest())
+        ; Freeze experiment C: the Scene's end settles on the guard before the rest. With E too (experiment F), 10s: the
+        ; Scene stop alone, the player's arrest not reverted yet and the Captor on, under the 0.5s probes
+        float spacing = 3.0
+        if (RPB_Utility.IsCaptorKeptForTest())
+            spacing = 10.0
+        endif
+        Utility.Wait(spacing)
+        RPB_Recovery.__Step(akActor, "CancelArrest: " + (spacing as int) + "s after the Scene end (experiment C/F)")
+    endif
 
     RPB_Arrestee arresteeRef = arrest.Arrestees.AtKey(akActor)
     RPB_Recovery.__Step(akActor, "CancelArrest: arrestee looked up (" + arresteeRef + ")")
@@ -168,7 +225,40 @@ string function CancelArrest(Actor akActor, string asReason, bool abReturnBelong
         ; calls into him, and a frozen guard held this cancel there (148's teardown: the player left cuffed). The guard is
         ; read from my storage, which doesn't call him.
         Actor guard = arresteeRef.GetCaptorActor()
-        if (guard)
+        ; A guard froze with his Captor still on, right after his Scene was stopped here (round 102): probes from now,
+        ; so a freeze in that window is reported and marked (the teardown then leaves him alone instead of hanging on him)
+        if (guard && sceneStopped)
+            RPB_Utility.ProbeGuard(guard, "his Scene stopped")
+            RPB_Utility.ProbeGuard(guard, "his Scene stopped", 1.0)
+            RPB_Utility.ProbeGuard(guard, "his Scene stopped", 3.0)
+        endif
+        if (guard && RPB_Utility.IsCaptorKeptForTest())
+            ; Freeze experiment E: his Captor stays on (the test's teardown takes it off later), probed every 0.5s (the
+            ; series sent at the Scene stop above; here only if there was no Scene to stop)
+            if (!probeSeriesSent)
+                int lateSeries = ModEvent.Create("RPB_TestProbeSeries")
+                if (lateSeries)
+                    ModEvent.PushForm(lateSeries, guard)
+                    ModEvent.PushFloat(lateSeries, Utility.GetCurrentRealTime())
+                    ModEvent.Send(lateSeries)
+                endif
+            endif
+            done += "guard kept (experiment E); "
+            RPB_Recovery.__Step(akActor, "CancelArrest: the Captor of " + guard + " kept on, probed every 0.5s (experiment E)")
+        elseif (guard && RPB_Utility.IsReleaseOnPackageChangeForTest())
+            ; Freeze experiment D: his Captor releases him on his package change (RPB_Captor.OnPackageChange), a one-shot
+            ; backstop if none comes
+            RPB_StorageVars.SetFormOnReference("Release Pending", guard, akActor, "Captor")
+            int backstop = ModEvent.Create("RPB_ReleaseCaptorBackstop")
+            if (backstop)
+                ModEvent.PushForm(backstop, guard)
+                ModEvent.PushForm(backstop, akActor)
+                ModEvent.PushFloat(backstop, 5.0)
+                ModEvent.Send(backstop)
+            endif
+            done += "guard release pending; "
+            RPB_Recovery.__Step(akActor, "CancelArrest: release of " + guard + " pending on his package change (experiment D)")
+        elseif (guard)
             int handle = ModEvent.Create("RPB_ReleaseCaptor")
             if (handle)
                 ModEvent.PushForm(handle, guard)
@@ -185,7 +275,7 @@ string function CancelArrest(Actor akActor, string asReason, bool abReturnBelong
 
     RPB_Recovery.__Step(akActor, "CancelArrest: captor and arrest done")
 
-    if (prisonerRef)
+    if (prisonerRef && !imprisonmentCancelled)
         prison.CancelImprisonment(prisonerRef, asReason, abReturnBelongings)
         done += "imprisonment cancelled; "
     endif

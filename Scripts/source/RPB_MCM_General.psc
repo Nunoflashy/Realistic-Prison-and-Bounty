@@ -84,6 +84,7 @@ function Right(RPB_MCM mcm) global
     mcm.AddOptionToggleKey("Display Jail Notifications", "JailedNotifications")
     mcm.AddOptionToggleKey("Display Bounty Decay Notifications", "BountyDecayNotifications")
     mcm.AddOptionToggleKey("Display Infamy Notifications", "InfamyNotifications")
+    mcm.AddOptionToggleKey("Allow Waiting While Escorted", "AllowWaitEscorted")
 
     mcm.AddEmptyOption()
 
@@ -116,6 +117,9 @@ function OnOptionHighlight(RPB_MCM mcm, string option) global
     ; Deleveling Stats
     if (StringUtil.Find(option, "Deleveling") != -1)
         mcm.SetInfoText("Sets how much progress you will lose in " + optionName + " for each day in jail.")
+
+    elseif (option == "General::AllowWaitEscorted")
+        mcm.SetInfoText("Whether you can wait while a guard escorts you.\nOff: the game refuses to wait.\nOn: you can, and when the wait is over you're beside the guard, wherever he got to.\nAnother mod may re-enable waiting (ZaZ does): you're then still brought beside the guard.")
 
     elseif (option == "General::Timescale")
         int timescaleValue = mcm.GetOptionSliderValue(option) as int

@@ -33,6 +33,7 @@ Scriptname RPB_Captor extends RPB_ActorBase
     event OnCellAttach()
     event OnUnload()
     event OnLoad()
+    event OnPackageChange(Package akOldPackage)
     event OnInitialize()
     event OnDeath(Actor akKiller)
     event OnDestroy()
@@ -295,6 +296,24 @@ event OnLoad()
     GuardMark(this, "3D loaded")
 endEvent
 
+; Freeze experiment D: a cancel ended my Scene and left my release for now, my AI off the Scene's package. The release on
+; its own stack (the RPB_ReleaseCaptor event), not from inside my own effect's event
+event OnPackageChange(Package akOldPackage)
+    Actor pendingArrestee = RPB_StorageVars.GetFormOnReference("Release Pending", this, "Captor") as Actor
+    if (!pendingArrestee)
+        return
+    endif
+    RPB_StorageVars.DeleteVariableOnReference("Release Pending", this, "Captor")
+    RPB_Utility.LogInfo(this + " released on his package change (old package " + akOldPackage + ", experiment D)", "Captor::OnPackageChange")
+    int handle = ModEvent.Create("RPB_ReleaseCaptor")
+    if (handle)
+        ModEvent.PushForm(handle, this)
+        ModEvent.PushForm(handle, pendingArrestee)
+        ModEvent.PushBool(handle, true)
+        ModEvent.Send(handle)
+    endif
+endEvent
+
 event OnInitialize()
     API.Arrest.RegisterCaptor(self)
     Debug("Captor::OnInitialize", "Initialized Captor, this: " + this)
@@ -346,6 +365,9 @@ event OnDeath(Actor akKiller)
 endEvent
 
 event OnDestroy()
+    if (RPB_Utility.IsCaptorFinishCallsDisabledForTest())
+        return ; freeze experiment A: no call on the actor from inside his finishing effect
+    endif
     if (this.IsDead())
         OnDeath(none)
     endif

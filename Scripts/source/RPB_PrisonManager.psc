@@ -225,7 +225,7 @@ function __EnsureCellPackageMapping()
 
     if (mapping)
         ; A broken mapping is abandoned, not released (releasing it touches the missing children and warns)
-        EventManager.SendWarning("The cell package mapping is broken (mapping handle " + mapping + " exists: " + mappingExists + ", 'S' group handle " + sChild + " exists: " + childExists + "), rebuilding it", "PrisonManager::__EnsureCellPackageMapping")
+        RPB_Utility.LogWarn("The cell package mapping is broken (mapping handle " + mapping + " exists: " + mappingExists + ", 'S' group handle " + sChild + " exists: " + childExists + "), rebuilding it", "PrisonManager::__EnsureCellPackageMapping")
         __cellPackageMapping = 0
     endif
 
@@ -704,13 +704,13 @@ function AttachMonitoringObject(RPB_Prison apPrison, ObjectReference akMonitorin
     ObjectReference defaultMonitoringObject = apPrison.JailCells[0] as ObjectReference
     
     if (!akMonitoringObject && !defaultMonitoringObject)
-        EventManager.SendError("Could not attach a monitoring object to Prison " + apPrison.Name + ". (The monitoring object is null)", "PrisonManager::AttachMonitoringObject")
+        RPB_Utility.LogError("Could not attach a monitoring object to Prison " + apPrison.Name + ". (The monitoring object is null)", "PrisonManager::AttachMonitoringObject")
         return
     endif
 
     if (!akMonitoringObject && defaultMonitoringObject)
         monitoringObject = defaultMonitoringObject
-        EventManager.SendInfo("Could not attach a monitoring object to Prison " + apPrison.Name + ". (using the default monitoring object).", "PrisonManager::AttachMonitoringObject")
+        RPB_Utility.LogInfo("Could not attach a monitoring object to Prison " + apPrison.Name + ". (using the default monitoring object).", "PrisonManager::AttachMonitoringObject")
     endif
 
     BindAliasTo(apPrison, monitoringObject)
@@ -876,7 +876,7 @@ ReferenceAlias function GetCellPackageOfTypeEx(string asCellPackageType = "S")
     Form[] cellPackageGroupsOfSize = self.GetCellPackageGroupsOfSize(asCellPackageType)
 
     if (!cellPackageGroupsOfSize)
-        EventManager.SendError("There are no Cell Package Groups of size: " + asCellPackageType, "PrisonManager::GetCellPackageOfTypeEx")
+        RPB_Utility.LogError("There are no Cell Package Groups of size: " + asCellPackageType, "PrisonManager::GetCellPackageOfTypeEx")
         Debug("PrisonManager::GetCellPackageOfTypeEx", "Cell Package Type: " + asCellPackageType + " | Cell Package Groups: " + cellPackageGroupsOfSize)
         return none
     endif
@@ -902,7 +902,7 @@ ReferenceAlias function GetCellPackageOfTypeEx(string asCellPackageType = "S")
     endWhile
 
     if (selectedCellPackageGroup == none)
-        EventManager.SendError("Could not select a Cell Package Group of size: " + asCellPackageType, "PrisonManager::GetCellPackageOfTypeEx")
+        RPB_Utility.LogError("Could not select a Cell Package Group of size: " + asCellPackageType, "PrisonManager::GetCellPackageOfTypeEx")
         return none
     endif
 
@@ -930,7 +930,7 @@ ReferenceAlias function GetCellPackageOfTypeEx(string asCellPackageType = "S")
         i += 1
     endWhile
 
-    EventManager.SendWarning("There are no available AI Cell packages to assign!", "PrisonManager::GetCellPackageOfTypeEx")
+    RPB_Utility.LogWarn("There are no available AI Cell packages to assign!", "PrisonManager::GetCellPackageOfTypeEx")
     return none
 endFunction
 

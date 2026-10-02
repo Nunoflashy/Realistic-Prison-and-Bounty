@@ -458,13 +458,13 @@ function DetermineMarkers()
 
     if (!exteriorChildMarkers)
         ; Important, these markers are used in Scenes, where the guard will be standing
-        EventManager.SendError("Failed to determine exterior markers for " + ID, "["+ Prison.Name +"] ["+ ID +"] JailCell::DetermineMarkers")
+        RPB_Utility.LogError("Failed to determine exterior markers for " + ID, "["+ Prison.Name +"] ["+ ID +"] JailCell::DetermineMarkers")
         return
     endif
 
     if (!interiorChildMarkers)
         ; Not as important as Exterior, Main Interior is used most of the time, this is unused for now
-        ; EventManager.SendWarning("Failed to determine interior markers for " + ID, "["+ Prison.Name +"] ["+ ID +"] JailCell::DetermineMarkers")
+        ; RPB_Utility.LogWarn("Failed to determine interior markers for " + ID, "["+ Prison.Name +"] ["+ ID +"] JailCell::DetermineMarkers")
     endif
 
     int arrayInteriorChildMarkers = FastArray_FromFormArray(interiorChildMarkers)

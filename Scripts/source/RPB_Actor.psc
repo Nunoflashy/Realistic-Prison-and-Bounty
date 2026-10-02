@@ -113,7 +113,7 @@ function RemoveScriptStateFromTag(string asScriptStateTag)
     RPB_ActorScript scriptState = self.GetScriptState(asScriptStateTag)
 
     if (!scriptState)
-        API.EventManager.SendError("Could not find script state with tag " + asScriptStateTag, "["+ self +"] Actor::RemoveScriptStateFromTag")
+        RPB_Utility.LogError("Could not find script state with tag " + asScriptStateTag, "["+ self +"] Actor::RemoveScriptStateFromTag")
         return
     endif
 

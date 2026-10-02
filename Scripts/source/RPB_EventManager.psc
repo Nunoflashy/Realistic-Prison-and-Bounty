@@ -13,15 +13,9 @@ scriptname RPB_EventManager extends Quest
     function SendArrestSceneBulkEvent(string asScene, string asSceneEvent, Form[] akArrestees, Actor akAuthority, string asSceneSecondaryEvent = "null")
     function SendPrisonSceneEvent(string asScene, string asSceneEvent, Actor akPrisoner, Actor akAuthority, string asSceneSecondaryEvent = "null")
     function SendPrisonSceneBulkEvent(string asScene, string asSceneEvent, Form[] akPrisoners, Actor akAuthority, string asSceneSecondaryEvent = "null")
-    function SendError(string msg, string caller = "", bool condition = true)
-    function SendWarning(string msg, string caller = "", bool condition = true)
-    function SendInfo(string msg, string caller = "", bool condition = true)
     function TraceParams(string params, string paramNames = "", string caller = "")
 @events:
     event OnTrace(string msg, string caller)
-    event OnInfo(string msg, string caller, bool condition)
-    event OnWarn(string msg, string caller, bool condition)
-    event OnError(string msg, string caller, bool condition)
     event OnArrestBegin(string eventName, string arrestType, float arresteeIdFlt, Form sender)
     event OnArrestResist(string eventName, string unusedStr, float arrestResisterIdFlt, Form sender)
     event OnArrestDefeat(string eventName, string unusedStr, float unusedFlt, Form sender)
@@ -38,6 +32,7 @@ scriptname RPB_EventManager extends Quest
     event OnScenePlayingStart(string eventName, string sceneName, float scenePhaseFlt, Form sender)
     event OnScenePlayingEnd(string eventName, string sceneName, float scenePhaseFlt, Form sender)
     event OnSceneEnd(string eventName, string sceneName, float unusedFlt, Form sender)
+    Actor function __DialogueTargetOf(Actor akSpeaker, string asCaller)
     event OnDialogueTopicStart(string eventName, string topicInfoDialogue, float topicInfoTypeFlt, Form sender)
     event OnDialogueTopicEnd(string eventName, string topicInfoDialogue, float topicInfoTypeFlt, Form sender)
     event OnPackageStart(string eventName, string packageName, float unusedFlt, Form sender)
@@ -116,21 +111,48 @@ function RegisterEvents()
     RegisterForModEvent("RPB_GuardProbe", "OnGuardProbe")
     RegisterForModEvent("RPB_GuardProbeCheck", "OnGuardProbeCheck")
     RegisterForModEvent("RPB_ReleaseCaptor", "OnReleaseCaptor")
+    RegisterForModEvent("RPB_ReleaseCaptorBackstop", "OnReleaseCaptorBackstop")
     RegisterForModEvent("RPB_FreeGuard", "OnFreeGuard")
 endFunction
 
-event OnGuardProbe(string asStep, Form akGuard)
-    RPB_Utility.__RunGuardProbe(akGuard as Actor, asStep)
+event OnGuardProbe(string asStep, Form akGuard, float afDelay, float afDueAt)
+    if (afDelay > 0.0)
+        Utility.Wait(afDelay)
+    endif
+    RPB_Utility.__RunGuardProbe(akGuard as Actor, asStep, afDueAt)
 endEvent
 
 ; The probe's answer should be in by now: IsFrozenGuard only reads the list, and reports a probe that never came back
-event OnGuardProbeCheck(Form akGuard)
-    Utility.Wait(3.5)
-    RPB_Utility.IsFrozenGuard(akGuard as Actor)
+; A look at the probe a few seconds on, again while it's still open: one look only missed the 2026-10-02 freeze (the check
+; ran before the probe had written itself down, read "no probe", and never looked again)
+event OnGuardProbeCheck(Form akGuard, float afDelay)
+    Actor guard = akGuard as Actor
+    if (afDelay > 0.0)
+        Utility.Wait(afDelay)
+    endif
+    int looks = 0
+    while (looks < 3)
+        Utility.Wait(3.5)
+        if (RPB_Utility.IsFrozenGuard(guard) || (looks > 0 && !RPB_Utility.IsGuardProbeOpen(guard)))
+            return
+        endif
+        looks += 1
+    endWhile
 endEvent
 
 event OnReleaseCaptor(Form akGuard, Form akArrestee, bool abFreeGuard)
     Arrest.ReleaseCaptorOf(akGuard as Actor, akArrestee as Actor, abFreeGuard)
+endEvent
+
+; Freeze experiment D: the guard's release if his package change never came (RPB_Captor.OnPackageChange clears the mark)
+event OnReleaseCaptorBackstop(Form akGuard, Form akArrestee, float afDelay)
+    Utility.Wait(afDelay)
+    if (!RPB_StorageVars.GetFormOnReference("Release Pending", akGuard, "Captor"))
+        return
+    endif
+    RPB_StorageVars.DeleteVariableOnReference("Release Pending", akGuard, "Captor")
+    RPB_Utility.LogWarn(akGuard + ": no package change within " + afDelay + "s, released by the backstop (experiment D)", "EventManager::OnReleaseCaptorBackstop")
+    Arrest.ReleaseCaptorOf(akGuard as Actor, akArrestee as Actor, true)
 endEvent
 
 ; A guard's package lock and package, on their own stack (a dead or frozen guard held the handover there)
@@ -160,7 +182,7 @@ function SendArrestSceneEvent(string asScene, string asSceneEvent, Actor akArres
     RPB_Arrestee arrestee = Arrest.AwaitArresteeReference(akArrestee)
 
     if (arrestee == none)
-        self.SendError("Could not retrieve the Arrestee reference from the actor, cannot proceed with the scene!")
+        RPB_Utility.LogError("Could not retrieve the Arrestee reference from the actor, cannot proceed with the scene!")
         return
     endif
 
@@ -169,7 +191,7 @@ endFunction
 
 function SendArrestSceneBulkEvent(string asScene, string asSceneEvent, Form[] akArrestees, Actor akAuthority, string asSceneSecondaryEvent = "null")
     if (!akArrestees || akArrestees.Length == 0)
-        self.SendError("No Arrestees provided for bulk scene event!")
+        RPB_Utility.LogError("No Arrestees provided for bulk scene event!")
         return
     endif
 
@@ -187,7 +209,7 @@ function SendArrestSceneBulkEvent(string asScene, string asSceneEvent, Form[] ak
             RPB_Arrestee arrestee = Arrest.AwaitArresteeReference(akArrestees[i] as Actor)
 
             if (arrestee == none)
-                self.SendError("Could not retrieve the Arrestee reference from the actor, cannot proceed with the scene!")
+                RPB_Utility.LogError("Could not retrieve the Arrestee reference from the actor, cannot proceed with the scene!")
                 return
             endif
 
@@ -300,7 +322,7 @@ function SendPrisonSceneEvent(string asScene, string asSceneEvent, Actor akPriso
     RPB_Prison prison = API.PrisonManager.FindPrisonByPrisoner(akPrisoner)
 
     if (prison == none)
-        self.SendError("Could not retrieve the prison from " + akPrisoner + ", cannot proceed with the scene!")
+        RPB_Utility.LogError("Could not retrieve the prison from " + akPrisoner + ", cannot proceed with the scene!")
         return
     endif
 
@@ -311,7 +333,7 @@ function SendPrisonSceneEvent(string asScene, string asSceneEvent, Actor akPriso
     RPB_Prisoner prisoner = prison.AwaitPrisonerReference(akPrisoner)
 
     if (prisoner == none)
-        self.SendError("Could not retrieve the prisoner from the scene event, cannot proceed with the scene!")
+        RPB_Utility.LogError("Could not retrieve the prisoner from the scene event, cannot proceed with the scene!")
         return
     endif
 
@@ -320,14 +342,14 @@ endFunction
 
 function SendPrisonSceneBulkEvent(string asScene, string asSceneEvent, Form[] akPrisoners, Actor akAuthority, string asSceneSecondaryEvent = "null")
     if (!akPrisoners || akPrisoners.Length == 0)
-        self.SendError("No prisoners provided for bulk scene event!", "EventManager::SendPrisonSceneBulkEvent")
+        RPB_Utility.LogError("No prisoners provided for bulk scene event!", "EventManager::SendPrisonSceneBulkEvent")
         return
     endif
 
     RPB_Prison prison = API.PrisonManager.FindPrisonByPrisoner(akPrisoners[0] as Actor)
 
     if (prison == none)
-        self.SendError("Could not retrieve the prison from " + akPrisoners[0] + ", cannot proceed with the scene!", "EventManager::SendPrisonSceneBulkEvent")
+        RPB_Utility.LogError("Could not retrieve the prison from " + akPrisoners[0] + ", cannot proceed with the scene!", "EventManager::SendPrisonSceneBulkEvent")
         return
     endif
 
@@ -337,7 +359,7 @@ function SendPrisonSceneBulkEvent(string asScene, string asSceneEvent, Form[] ak
             RPB_Prisoner prisoner = prison.AwaitPrisonerReference(akPrisoners[i] as Actor)
 
             if (prisoner == none)
-                self.SendError("Could not retrieve the prisoner from the scene event, cannot proceed with the scene!", "EventManager::SendPrisonSceneBulkEvent")
+                RPB_Utility.LogError("Could not retrieve the prisoner from the scene event, cannot proceed with the scene!", "EventManager::SendPrisonSceneBulkEvent")
                 return
             endif
 
@@ -374,47 +396,7 @@ event OnTrace(string msg, string caller)
     Trace(caller, msg)
 endEvent
 
-event OnInfo(string msg, string caller, bool condition)
-    DebugInfo(caller, msg, condition)
-    Info(msg, condition)
-endEvent
-
-event OnWarn(string msg, string caller, bool condition)
-    DebugWarn(caller, msg, condition)
-    Warn(msg, condition)
-endEvent
-
-event OnError(string msg, string caller, bool condition)
-    DebugError(caller, msg, condition)
-    Error(msg, condition)
-endEvent
-
-function SendError(string msg, string caller = "", bool condition = true)
-    ; The handlers log/notify only when the condition is true, so skip them (and their string work) otherwise
-    if (!condition)
-        return
-    endif
-
-    self.OnError(msg, caller, condition)
-endFunction
-
-function SendWarning(string msg, string caller = "", bool condition = true)
-    ; The handlers log/notify only when the condition is true, so skip them (and their string work) otherwise
-    if (!condition)
-        return
-    endif
-
-    self.OnWarn(msg, caller, condition)
-endFunction
-
-function SendInfo(string msg, string caller = "", bool condition = true)
-    ; The handlers log/notify only when the condition is true, so skip them (and their string work) otherwise
-    if (!condition)
-        return
-    endif
-
-    self.OnInfo(msg, caller, condition)
-endFunction
+; Logging: RPB_Utility.LogInfo/LogWarn/LogError (the leveled log); the SendInfo/SendWarning/SendError copies here are gone
 
 function TraceParams(string params, string paramNames = "", string caller = "")
     string[] splitParams    = StringUtil.Split(params, ",")
@@ -452,7 +434,7 @@ event OnArrestBegin(string eventName, string arrestType, float arresteeIdFlt, Fo
     Faction crimeFaction = form_if ((sender as Faction), (sender as Faction), captor.GetCrimeFaction()) as Faction
 
     if (captor == none && crimeFaction == none)
-        self.SendError("Either there's no Captor, or no Crime Faction! (["+ "Captor: "+ captor + ", Faction: " + crimeFaction +"])", "EventManager::OnArrestBegin")
+        RPB_Utility.LogError("Either there's no Captor, or no Crime Faction! (["+ "Captor: "+ captor + ", Faction: " + crimeFaction +"])", "EventManager::OnArrestBegin")
         return
     endif
 
@@ -468,12 +450,12 @@ event OnArrestBegin(string eventName, string arrestType, float arresteeIdFlt, Fo
     Actor arrestee = Game.GetFormEx(int_if (isPlayer, actorPlayerId, arresteeIdFlt as int)) as Actor
 
     if (!arrestee)
-        self.SendError("There's no one to be arrested! (Arrestee is "+ arrestee +")", "EventManager::OnArrestBegin")
+        RPB_Utility.LogError("There's no one to be arrested! (Arrestee is "+ arrestee +")", "EventManager::OnArrestBegin")
         return
     endif
 
     if (!Arrest.ValidateArrestType(arrestType))
-        self.SendError("Arrest Type is invalid, got: " + arrestType + ". (valid options: "+ Arrest.GetValidArrestTypes() +") ", "EventManager::OnArrestBegin")
+        RPB_Utility.LogError("Arrest Type is invalid, got: " + arrestType + ". (valid options: "+ Arrest.GetValidArrestTypes() +") ", "EventManager::OnArrestBegin")
         return
     endif
 
@@ -481,12 +463,12 @@ event OnArrestBegin(string eventName, string arrestType, float arresteeIdFlt, Fo
 
     if (arrestStatus == Arrest.ALREADY_ARRESTED)
         Config.NotifyArrest("You are already under arrest.", isPlayer) ; Might be removed
-        self.SendError(arrestee.GetBaseObject().GetName() + " has already been arrested, cannot arrest for "+ RPB_Utility.GetFormNameCached(crimeFaction) +", aborting!", "EventManager::OnArrestBegin")
+        RPB_Utility.LogError(arrestee.GetBaseObject().GetName() + " has already been arrested, cannot arrest for "+ RPB_Utility.GetFormNameCached(crimeFaction) +", aborting!", "EventManager::OnArrestBegin")
         return
 
     elseif (arrestStatus == Arrest.ALREADY_IMPRISONED)
         Config.NotifyArrest("You are already in prison.", isPlayer) ; Might be removed
-        self.SendError(arrestee.GetBaseObject().GetName() + " has already been arrested, and is currently in prison. Cannot arrest for "+ RPB_Utility.GetFormNameCached(crimeFaction) +", aborting!", "EventManager::OnArrestBegin")
+        RPB_Utility.LogError(arrestee.GetBaseObject().GetName() + " has already been arrested, and is currently in prison. Cannot arrest for "+ RPB_Utility.GetFormNameCached(crimeFaction) +", aborting!", "EventManager::OnArrestBegin")
         return
     endif
 
@@ -511,13 +493,13 @@ event OnArrestBegin(string eventName, string arrestType, float arresteeIdFlt, Fo
         RPB_StorageVars.DeleteVariableOnReference("Hold UUID", arrestee, "Arrest")
         RPB_Utility.Crumb(arrestee, "OnArrestBegin: arrestee never registered, spell removed (reverted)")
         Config.NotifyArrest("Could not arrest " + arrestee.GetDisplayName())
-        self.SendError("Could not arrest " + arrestee + " for "+ RPB_Utility.GetFormNameCached(crimeFaction) +", the Arrestee never registered! (reverted)", "EventManager::OnArrestBegin")
+        RPB_Utility.LogError("Could not arrest " + arrestee + " for "+ RPB_Utility.GetFormNameCached(crimeFaction) +", the Arrestee never registered! (reverted)", "EventManager::OnArrestBegin")
         return
     endif
 
     if (!arresteeRef.InitializeState())
         Config.NotifyArrest("Could not arrest " + arresteeRef.Name)
-        self.SendError("Could not arrest " + arresteeRef.Name + " for "+ RPB_Utility.GetFormNameCached(crimeFaction) +", the state was invalid! (aborting)", "EventManager::OnArrestBegin")
+        RPB_Utility.LogError("Could not arrest " + arresteeRef.Name + " for "+ RPB_Utility.GetFormNameCached(crimeFaction) +", the state was invalid! (aborting)", "EventManager::OnArrestBegin")
         return
     endif
 
@@ -544,14 +526,14 @@ event OnArrestResist(string eventName, string unusedStr, float arrestResisterIdF
     Faction crimeFaction = form_if ((sender as Faction), (sender as Faction), guard.GetCrimeFaction()) as Faction
 
     if (guard == none && crimeFaction == none)
-        self.SendError("Either there's no Guard, or no Crime Faction! (["+ "Lead Captor: "+ guard + ", Faction: " + crimeFaction +"])", "EventManager::OnArrestResist")
+        RPB_Utility.LogError("Either there's no Guard, or no Crime Faction! (["+ "Lead Captor: "+ guard + ", Faction: " + crimeFaction +"])", "EventManager::OnArrestResist")
         return
     endif
 
     ; Not the player
     Actor arrestResister = Game.GetFormEx(arrestResisterIdFlt as int) as Actor
     if (arrestResister.GetFormID() != 0x14)
-        self.SendError("Someone other than the player ("+ arrestResister +") has resisted arrest (how?), returning...", "EventManager::OnArrestResist")
+        RPB_Utility.LogError("Someone other than the player ("+ arrestResister +") has resisted arrest (how?), returning...", "EventManager::OnArrestResist")
         return
     endif
 
@@ -563,7 +545,7 @@ event OnArrestDefeat(string eventName, string unusedStr, float unusedFlt, Form s
     Faction crimeFaction = attacker.GetCrimeFaction()
 
     if (!attacker)
-        self.SendError("sender is not an Actor, failed check! [sender: "+ sender +"]", "EventManager::OnArrestDefeat")
+        RPB_Utility.LogError("sender is not an Actor, failed check! [sender: "+ sender +"]", "EventManager::OnArrestDefeat")
         return
     endif
 
@@ -590,12 +572,12 @@ event OnArrestEludeStart(string eventName, string eludeType, float unusedFlt, Fo
     Actor eludedGuard = (sender as Actor)
 
     if (!eludeType)
-        self.SendError("There is no Elude Type, failed check!", "EventManager::OnArrestEludeStart")
+        RPB_Utility.LogError("There is no Elude Type, failed check!", "EventManager::OnArrestEludeStart")
         return
     endif
 
     if (!eludedGuard)
-        self.SendError("sender is not an Actor, failed check! [sender: "+ sender +"]", "EventManager::OnArrestEludeStart")
+        RPB_Utility.LogError("sender is not an Actor, failed check! [sender: "+ sender +"]", "EventManager::OnArrestEludeStart")
         return
     endif
 
@@ -613,25 +595,20 @@ event OnCombatYield(string eventName, string unusedStr, float unusedFlt, Form se
     Actor guard = (sender as Actor)
 
     if (!guard)
-        self.SendError("sender is not an Actor, failed check! [sender: "+ sender +"]", "EventManager::OnCombatYield")
+        RPB_Utility.LogError("sender is not an Actor, failed check! [sender: "+ sender +"]", "EventManager::OnCombatYield")
         return
     endif
 
     if (!guard.IsGuard())
-        self.SendError("Actor is not a guard, the event will not proceed!", "EventManager::OnCombatYield")
+        RPB_Utility.LogError("Actor is not a guard, the event will not proceed!", "EventManager::OnCombatYield")
         return
     endif
 
-    Actor yieldedArrestee = guard.GetDialogueTarget()
-
-    ; Fallback to Player if nearby, since GetDialogueTarget() fails if there are many guards talking at once, yieldedArrestee will be none
-    if (!yieldedArrestee && guard.GetDistance(Config.Player) <= 1000)
-        self.SendError("Could not get the dialogue target of " + guard + ", falling back to Player since they are nearby.", "EventManager::OnCombatYield")
-    endif
+    Actor yieldedArrestee = self.__DialogueTargetOf(guard, "EventManager::OnCombatYield")
 
     ; Failed to get dialogue target even with fallback, player must not be near
     if (!yieldedArrestee)
-        self.SendError("Could not get the dialogue target of " + guard + ", returning...", "EventManager::OnCombatYield")
+        RPB_Utility.LogError("Could not get the dialogue target of " + guard + ", returning...", "EventManager::OnCombatYield")
         Trace("EventManager::OnCombatYield", "Stack Trace: [\n" + \
             "\teventName: " + eventName + "\n" + \
             "\tsender: " + sender + "\n" + \
@@ -648,22 +625,22 @@ event OnArrestSceneChanged(string eventName, string sceneName, float unusedFlt, 
     Actor arrestee = (sender as Actor)
 
     if (sceneName == "")
-        self.SendError("There was no Scene passed in to the request.", "EventManager::OnArrestSceneChanged")
+        RPB_Utility.LogError("There was no Scene passed in to the request.", "EventManager::OnArrestSceneChanged")
         return
     endif
 
     if (!arrestee)
-        self.SendError("sender is not an Actor, failed check! [sender: "+ sender +"]", "EventManager::OnArrestSceneChanged")
+        RPB_Utility.LogError("sender is not an Actor, failed check! [sender: "+ sender +"]", "EventManager::OnArrestSceneChanged")
         return
     endif
 
     if (!SceneManager.SceneExists(sceneName))
-        self.SendError("The Scene " + sceneName + " does not exist, returning...", "EventManager::OnArrestSceneChanged")
+        RPB_Utility.LogError("The Scene " + sceneName + " does not exist, returning...", "EventManager::OnArrestSceneChanged")
         return
     endif
 
     if (!SceneManager.IsSceneOfType(sceneName, SceneManager.CATEGORY_ARREST_START))
-        self.SendError("The Scene " + sceneName + " is not a valid Scene for the type "+ SceneManager.CATEGORY_ARREST_START +", returning...", "EventManager::OnArrestSceneChanged")
+        RPB_Utility.LogError("The Scene " + sceneName + " is not a valid Scene for the type "+ SceneManager.CATEGORY_ARREST_START +", returning...", "EventManager::OnArrestSceneChanged")
         return
     endif
 
@@ -674,24 +651,24 @@ event OnArrestGoalChanged(string eventName, string newArrestGoal, float unusedFl
     Actor arrestee = (sender as Actor)
     
     if (newArrestGoal == "")
-        self.SendError("There was no Arrest Goal passed in to the request.", "EventManager::OnArrestGoalChanged")
+        RPB_Utility.LogError("There was no Arrest Goal passed in to the request.", "EventManager::OnArrestGoalChanged")
         return
     endif
 
     string currentArrestGoal = Arrest.GetArrestGoal(arrestee)
 
     if (newArrestGoal == currentArrestGoal)
-        self.SendError("The requested arrest goal is the same as the current one set, returning...", "EventManager::OnArrestGoalChanged")
+        RPB_Utility.LogError("The requested arrest goal is the same as the current one set, returning...", "EventManager::OnArrestGoalChanged")
         return
     endif
 
     if (!arrestee)
-        self.SendError("sender is not an Actor, failed check! [sender: "+ sender +"]", "EventManager::OnArrestGoalChanged")
+        RPB_Utility.LogError("sender is not an Actor, failed check! [sender: "+ sender +"]", "EventManager::OnArrestGoalChanged")
         return
     endif
 
     if (!Arrest.IsValidArrestGoal(newArrestGoal))
-        self.SendError("The Arrest Goal Type " + newArrestGoal + " is not a valid goal, returning...", "EventManager::OnArrestGoalChanged")
+        RPB_Utility.LogError("The Arrest Goal Type " + newArrestGoal + " is not a valid goal, returning...", "EventManager::OnArrestGoalChanged")
         return
     endif
 
@@ -702,26 +679,20 @@ event OnPayBounty(string eventName, string categoryPayBounty, float arresteeForm
     Actor guard = (sender as Actor)
 
     if (!guard)
-        self.SendError("sender is not an Actor, failed check! [sender: "+ sender +"]", "EventManager::OnPayBounty")
+        RPB_Utility.LogError("sender is not an Actor, failed check! [sender: "+ sender +"]", "EventManager::OnPayBounty")
         return
     endif
 
     if (!guard.IsGuard())
-        self.SendError("Actor is not a Guard, the event will not proceed!", "EventManager::OnPayBounty")
+        RPB_Utility.LogError("Actor is not a Guard, the event will not proceed!", "EventManager::OnPayBounty")
         return
     endif
 
-    Actor arrestee = guard.GetDialogueTarget()
-
-    ; Fallback to Player if nearby, since GetDialogueTarget() fails if there are many guards talking at once, arrestee will be none
-    if (!arrestee && guard.GetDistance(Config.Player) <= 1000)
-        arrestee = Config.Player
-        self.SendError("Could not get the dialogue target of " + guard + ", falling back to Player since they are nearby.", "EventManager::OnPayBounty")
-    endif
+    Actor arrestee = self.__DialogueTargetOf(guard, "EventManager::OnPayBounty")
 
     ; Failed to get dialogue target even with fallback, player must not be near
     if (!arrestee)
-        self.SendError("Could not get the dialogue target of " + guard + ", returning...", "EventManager::OnPayBounty")
+        RPB_Utility.LogError("Could not get the dialogue target of " + guard + ", returning...", "EventManager::OnPayBounty")
         Trace("EventManager::OnPayBounty", "Stack Trace: [\n" + \
             "\teventName: " + eventName + "\n" + \
             "\tsender: " + sender + "\n" + \
@@ -779,7 +750,7 @@ event OnArrestScene(string asScene, string asSceneEvent, RPB_Arrestee apArrestee
     elseif (sceneType == SceneManager.CATEGORY_ESCORT_TO_JAIL)
         RPB_Prison prison = apArrestee.GetPotentialPrison()
         Actor escort = akAuthority
-        self.SendInfo("Prison: " + prison + ", Escort: " + escort + ", Arrestee: " + apArrestee.GetActor(), "EventManager::OnArrestScene")
+        RPB_Utility.LogInfo("Prison: " + prison + ", Escort: " + escort + ", Arrestee: " + apArrestee.GetActor(), "EventManager::OnArrestScene")
 
         if (asSceneEvent == SceneManager.EVENT_ESCORT_BEGIN)
             prison.OnEscortPrisonerToJailBegin(apArrestee, escort)
@@ -788,7 +759,7 @@ event OnArrestScene(string asScene, string asSceneEvent, RPB_Arrestee apArrestee
             prison.OnEscortPrisonerToJailEnd(apArrestee, escort)
         endif
 
-        self.SendInfo("Arrestee -> " + asScene + ": " + asSceneEvent, "EventManager::OnArrestScene")
+        RPB_Utility.LogInfo("Arrestee -> " + asScene + ": " + asSceneEvent, "EventManager::OnArrestScene")
 
     elseif (sceneType == SceneManager.CATEGORY_ELUDING)
         Actor guard = akAuthority
@@ -1080,7 +1051,7 @@ endEvent
 
 event OnSceneStart(string eventName, string sceneName, float unusedFlt, Form sender)
     if (sceneName == "" || !(sender as Scene))
-        self.SendError("There's either no Scene Name, or the event sender is not a Scene, returning!", "EventManager::OnSceneStart")
+        RPB_Utility.LogError("There's either no Scene Name, or the event sender is not a Scene, returning!", "EventManager::OnSceneStart")
         return
     endif
 
@@ -1089,12 +1060,12 @@ endEvent
 
 event OnScenePlayingStart(string eventName, string sceneName, float scenePhaseFlt, Form sender)
     if (sceneName == "" || !(sender as Scene))
-        self.SendError("[" + sceneName + ": PHASE_START] There's either no Scene Name, or the event sender is not a Scene, returning!", "EventManager::OnScenePlayingStart")
+        RPB_Utility.LogError("[" + sceneName + ": PHASE_START] There's either no Scene Name, or the event sender is not a Scene, returning!", "EventManager::OnScenePlayingStart")
         return
     endif
 
     if ((scenePhaseFlt as int) < 1 || !scenePhaseFlt)
-        self.SendError("[" + sceneName + ": PHASE_START] There's no passed in Scene Phase as a parameter, returning!", "EventManager::OnScenePlayingStart")
+        RPB_Utility.LogError("[" + sceneName + ": PHASE_START] There's no passed in Scene Phase as a parameter, returning!", "EventManager::OnScenePlayingStart")
         return
     endif
     
@@ -1103,12 +1074,12 @@ endEvent
 
 event OnScenePlayingEnd(string eventName, string sceneName, float scenePhaseFlt, Form sender)
     if (sceneName == "" || !(sender as Scene))
-        self.SendError("[" + sceneName + ": PHASE_END] There's either no Scene Name, or the event sender is not a Scene, returning!", "EventManager::OnScenePlayingEnd")
+        RPB_Utility.LogError("[" + sceneName + ": PHASE_END] There's either no Scene Name, or the event sender is not a Scene, returning!", "EventManager::OnScenePlayingEnd")
         return
     endif
 
     if ((scenePhaseFlt as int) < 1 || !scenePhaseFlt)
-        self.SendError("[" + sceneName + ": PHASE_END] There's no passed in Scene Phase as a parameter, returning!", "EventManager::OnScenePlayingEnd")
+        RPB_Utility.LogError("[" + sceneName + ": PHASE_END] There's no passed in Scene Phase as a parameter, returning!", "EventManager::OnScenePlayingEnd")
         return
     endif
     
@@ -1117,7 +1088,7 @@ endEvent
 
 event OnSceneEnd(string eventName, string sceneName, float unusedFlt, Form sender)
     if (sceneName == "" || !(sender as Scene))
-        self.SendError("There's either no Scene Name, or the event sender is not a Scene, returning!", "EventManager::OnSceneEnd")
+        RPB_Utility.LogError("There's either no Scene Name, or the event sender is not a Scene, returning!", "EventManager::OnSceneEnd")
         return
     endif
 
@@ -1128,31 +1099,44 @@ endEvent
 ;                                                   Topic Dialogue Events
 ; ====================================================================================================================
 
+;/
+    Who @akSpeaker is talking to, for his dialogue fragments' events. GetDialogueTarget() returns none when many guards talk
+    at once, and sometimes the speaker himself: a guard who had been fighting next to the player confronted "himself", and
+    his go-to-jail line then arrested him instead of the player (2026-10-02). Either way, the player is the fallback when
+    nearby: for now these crime lines are only spoken to the player. When NPCs get them too (NPC Bounty Detection), this
+    fallback has to know the real target instead.
+/;
+Actor function __DialogueTargetOf(Actor akSpeaker, string asCaller)
+    Actor target = akSpeaker.GetDialogueTarget()
+    if (target && target != akSpeaker)
+        return target
+    endif
+    if (akSpeaker.GetDistance(Config.Player) <= 1000)
+        RPB_Utility.LogWarn("The dialogue target of " + akSpeaker + " came back as " + target + ", falling back to the player since they are nearby", asCaller)
+        return Config.Player
+    endif
+    return none
+endFunction
+
 event OnDialogueTopicStart(string eventName, string topicInfoDialogue, float topicInfoTypeFlt, Form sender)
     int topicInfoType = (topicInfoTypeFlt as int)
     Actor akSpeaker = (sender as Actor)
 
     if (!topicInfoType)
-        self.SendError("Topic Info Type is none or invalid, returning...", "EventManager::OnDialogueTopicStart")
+        RPB_Utility.LogError("Topic Info Type is none or invalid, returning...", "EventManager::OnDialogueTopicStart")
         return
     endif
 
     if (!akSpeaker)
-        self.SendError("sender is not an Actor, failed check! [sender: "+ sender +"]", "EventManager::OnDialogueTopicStart")
+        RPB_Utility.LogError("sender is not an Actor, failed check! [sender: "+ sender +"]", "EventManager::OnDialogueTopicStart")
         return
     endif
 
-    Actor akSpokenTo = akSpeaker.GetDialogueTarget()
-
-    ; Fallback to Player if nearby, since GetDialogueTarget() fails if there are many guards talking at once, akSpokenTo will be none
-    if (!akSpokenTo && akSpeaker.GetDistance(Config.Player) <= 1000)
-        akSpokenTo = Config.Player
-        self.SendError("Could not get the dialogue target of " + akSpeaker + ", falling back to Player since they are nearby.", "EventManager::OnDialogueTopicStart")
-    endif
+    Actor akSpokenTo = self.__DialogueTargetOf(akSpeaker, "EventManager::OnDialogueTopicStart")
 
     ; Failed to get dialogue target even with fallback, player must not be near
     if (!akSpokenTo)
-        self.SendError("Could not get the dialogue target of " + akSpeaker + ", returning...", "EventManager::OnDialogueTopicStart")
+        RPB_Utility.LogError("Could not get the dialogue target of " + akSpeaker + ", returning...", "EventManager::OnDialogueTopicStart")
         Trace("EventManager::OnDialogueTopicStart", "Stack Trace: [\n" + \
             "\teventName: " + eventName + "\n" + \
             "\ttopicInfoDialogue: " + topicInfoDialogue + "\n" + \
@@ -1175,26 +1159,20 @@ event OnDialogueTopicEnd(string eventName, string topicInfoDialogue, float topic
     Actor akSpeaker     = (sender as Actor)
 
     if (!topicInfoType)
-        self.SendError("Topic Info Type is none or invalid, returning...", "EventManager::OnDialogueTopicEnd")
+        RPB_Utility.LogError("Topic Info Type is none or invalid, returning...", "EventManager::OnDialogueTopicEnd")
         return
     endif
 
     if (!akSpeaker)
-        self.SendError("sender is not an Actor, failed check! [sender: "+ sender +"]", "EventManager::OnDialogueTopicEnd")
+        RPB_Utility.LogError("sender is not an Actor, failed check! [sender: "+ sender +"]", "EventManager::OnDialogueTopicEnd")
         return
     endif
 
-    Actor akSpokenTo = akSpeaker.GetDialogueTarget()
-
-    ; Fallback to Player if nearby, since GetDialogueTarget() fails if there are many guards talking at once, akSpokenTo will be none
-    if (!akSpokenTo && akSpeaker.GetDistance(Config.Player) <= 1000)
-        akSpokenTo = Config.Player
-        self.SendInfo("Could not get the dialogue target of " + akSpeaker + ", falling back to Player since they are nearby.", "EventManager::OnDialogueTopicStart")
-    endif
+    Actor akSpokenTo = self.__DialogueTargetOf(akSpeaker, "EventManager::OnDialogueTopicEnd")
 
     ; Failed to get dialogue target even with fallback, player must not be near
     if (!akSpokenTo)
-        self.SendError("Could not get the dialogue target of " + akSpeaker + ", returning...", "EventManager::OnDialogueTopicEnd")
+        RPB_Utility.LogError("Could not get the dialogue target of " + akSpeaker + ", returning...", "EventManager::OnDialogueTopicEnd")
         TraceParams(eventName + "," + topicInfoDialogue +","+topicInfoType, "eventName, topicInfoDialogue, topicInfoType")
         Trace("EventManager::OnDialogueTopicEnd", "Stack Trace: [\n" + \
             "\teventName: " + eventName + "\n" + \

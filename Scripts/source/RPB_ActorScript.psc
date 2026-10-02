@@ -25,7 +25,7 @@ endFunction
 ;         __actorState = RPB_Actor.GetActorStateReference(this)
 
 ;         if (!__actorState)
-;             ; API.EventManager.SendError("Could not find ActorState for Actor " + this + " (RPB_Actor was not bound!)", "BountyDecayable::ActorState")
+;             ; RPB_Utility.LogError("Could not find ActorState for Actor " + this + " (RPB_Actor was not bound!)", "BountyDecayable::ActorState")
 ;             throw(ResourceNotFoundException("Could not find State for Actor " + this + " (RPB_Actor was not bound!)"), "ActorScript::ActorState")
 ;             return none
 ;         endif
@@ -151,7 +151,7 @@ function AttachOfType(Actor akActor, string className) global
         Debug("ActorScript::AttachOfType", "Attached script " + className + " to Actor " + akActor)
     endif
 
-    RPB_API.GetSelf().EventManager.SendWarning("Tried to attach script " + className + " to Actor " + akActor + " but it was already attached!", "ActorScript::AttachOfType", isScriptAttached)
+    RPB_Utility.LogWarn("Tried to attach script " + className + " to Actor " + akActor + " but it was already attached!", "ActorScript::AttachOfType", isScriptAttached)
 endFunction
 
 ;/
@@ -186,7 +186,7 @@ function DetachOfType(Actor akActor, string className) global
         Debug("ActorScript::DetachOfType", "Detached script " + className + " from Actor " + akActor)
     endif
 
-    RPB_API.GetSelf().EventManager.SendWarning("Tried to detach script " + className + " from Actor " + akActor + " but it was not attached!", "ActorScript::DetachOfType", !isScriptAttached)
+    RPB_Utility.LogWarn("Tried to detach script " + className + " from Actor " + akActor + " but it was not attached!", "ActorScript::DetachOfType", !isScriptAttached)
 endFunction
 
 ; ==========================================================

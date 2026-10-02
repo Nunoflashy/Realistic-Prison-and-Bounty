@@ -19,7 +19,8 @@ scriptname RPB_Utility hidden
     Outfit function RPB_GetOutfit(string asOutfit) global
     bool function HealNakedBaseOutfit(Actor akActor) global
     function GuardMark(Actor akGuard, string asStep) global
-    function ProbeGuard(Actor akGuard, string asStep) global
+    function ProbeGuard(Actor akGuard, string asStep, float afDelay = 0.0) global
+    bool function IsGuardProbeOpen(Actor akActor) global
     bool function IsFrozenGuard(Actor akActor) global
     function MarkGuardFrozen(Actor akGuard, string asStep) global
     int function FrozenGuardsForScan() global
@@ -49,6 +50,11 @@ scriptname RPB_Utility hidden
     function EnableLogging() global
     function DisableLogging() global
     function SetLoggingEnabled(string asLogType, bool abEnabled) global
+    int function LogLevel() global
+    bool function ShouldLog(int aiLevel) global
+    function LogInfo(string asLogInfo, string asCaller = "", bool abCondition = true) global
+    function LogWarn(string asLogInfo, string asCaller = "", bool abCondition = true) global
+    function LogError(string asLogInfo, string asCaller = "", bool abCondition = true) global
     function base_log(string asLogType = "DEBUG", string asLogInfo, string asCaller = "", string asCallerArgs = "") global
     function Trace(string asCaller, string asLogInfo, bool abCondition = true) global
     function Debug(string asCaller, string asLogInfo, bool abCondition = true) global
@@ -188,6 +194,22 @@ scriptname RPB_Utility hidden
     function SetPackageLockDisabled(bool abDisabled) global
     bool function IsFreeWalkDisabledForTest() global
     function SetFreeWalkDisabledForTest(bool abDisabled) global
+    function SetEscortWaitBlocked(bool abBlocked) global
+    bool function IsEscortWaitBlocked() global
+    bool function IsCaptorFinishCallsDisabledForTest() global
+    function SetCaptorFinishCallsDisabledForTest(bool abDisabled) global
+    bool function IsSceneEndSpacedForTest() global
+    bool function IsReleaseOnPackageChangeForTest() global
+    bool function IsCaptorKeptForTest() global
+    bool function IsAIFlipFirstForTest() global
+    bool function IsRevertFirstForTest() global
+    bool function IsImprisonmentCancelFirstForTest() global
+    function SetImprisonmentCancelFirstForTest(bool abFirst) global
+    function SetRevertFirstForTest(bool abFirst) global
+    function SetAIFlipFirstForTest(bool abFirst) global
+    function SetCaptorKeptForTest(bool abKept) global
+    function SetReleaseOnPackageChangeForTest(bool abOn) global
+    function SetSceneEndSpacedForTest(bool abSpaced) global
     bool function IsTestTeardownRunning() global
     function SetTestTeardownRunning(bool abRunning) global
     float function GetMonitorOverrideHours() global
@@ -480,15 +502,21 @@ int function __FrozenGuardsMap(bool abCreate = false) global
     return map
 endFunction
 
-; Sends the probe (RPB_EventManager.OnGuardProbe) and returns at once
-function ProbeGuard(Actor akGuard, string asStep) global
+; Sends the probe (RPB_EventManager.OnGuardProbe) and returns at once. @afDelay: the probe (and its check) wait that long
+; first: guards froze within a second after their Captor effect ended, after the immediate probes had answered.
+function ProbeGuard(Actor akGuard, string asStep, float afDelay = 0.0) global
     if (!akGuard)
         return
+    endif
+    if (afDelay > 0.0)
+        asStep += " +" + (afDelay as int) + "s"
     endif
     int handle = ModEvent.Create("RPB_GuardProbe")
     if (handle)
         ModEvent.PushString(handle, asStep)
         ModEvent.PushForm(handle, akGuard)
+        ModEvent.PushFloat(handle, afDelay)
+        ModEvent.PushFloat(handle, Utility.GetCurrentRealTime() + afDelay) ; when it's due: a late probe says so
         ModEvent.Send(handle)
     endif
     ; And a look a few seconds later (RPB_EventManager.OnGuardProbeCheck): a probe that never came back is reported then,
@@ -496,20 +524,92 @@ function ProbeGuard(Actor akGuard, string asStep) global
     handle = ModEvent.Create("RPB_GuardProbeCheck")
     if (handle)
         ModEvent.PushForm(handle, akGuard)
+        ModEvent.PushFloat(handle, afDelay)
         ModEvent.Send(handle)
     endif
 endFunction
 
 ; The probe itself, on the mod event's own stack: never returns on a frozen guard, which is the point
-function __RunGuardProbe(Actor akGuard, string asStep) global
+function __RunGuardProbe(Actor akGuard, string asStep, float afDueAt = 0.0) global
     int map = __FrozenGuardsMap(abCreate = true)
     if (JFormMap.getFlt(map, akGuard) < 0.0)
         return ; already known frozen: another probe would only add another stuck stack
     endif
-    JFormMap.setFlt(map, akGuard, Utility.GetCurrentRealTime())
-    JFormMap.setStr(JDB.solveObj(".rpb_root.frozenGuardSteps"), akGuard, asStep)
+    ; A probe that ran well after it was due says so: 14:37's Scene-stop probes ran ~3s late, after the Captor came off,
+    ; and named the wrong step
+    if (afDueAt > 0.0)
+        float late = Utility.GetCurrentRealTime() - afDueAt
+        if (late > 0.5)
+            asStep += " (ran " + (((late * 10.0) as int) as float / 10.0) + "s late)"
+            Debug("Utility::__RunGuardProbe", "probe on " + akGuard + " ran late: " + asStep)
+        endif
+    endif
+    ; Every probe out on him is kept (step and start), and the report names the earliest one still open: the one that hung
+    ; is the first left open, later ones only hang behind it. A single entry used to name the last probe written, and an
+    ; earlier probe answering cleared it while a later one hung (2026-10-02)
+    float started = Utility.GetCurrentRealTime()
+    int open = __OpenProbesOf(akGuard, abCreate = true)
+    string probeKey = asStep + " @" + started
+    JMap.setFlt(open, probeKey, started)
+    if (!JFormMap.hasKey(map, akGuard))
+        JFormMap.setFlt(map, akGuard, started)
+        JFormMap.setStr(JDB.solveObj(".rpb_root.frozenGuardSteps"), akGuard, asStep)
+    endif
     akGuard.GetFormID()
-    JFormMap.removeKey(map, akGuard)
+    JMap.removeKey(open, probeKey)
+    if (JFormMap.getFlt(map, akGuard) < 0.0)
+        return ; marked frozen meanwhile (another probe hung): the report stands
+    endif
+    if (JMap.count(open) == 0)
+        JFormMap.removeKey(map, akGuard)
+    else
+        __TrackEarliestOpenProbe(map, akGuard, open)
+    endif
+endFunction
+
+; The probes still out on @akGuard: their keys are "<step> @<start time>", their values the start time
+int function __OpenProbesOf(Actor akGuard, bool abCreate = false) global
+    int perGuard = JDB.solveObj(".rpb_root.guardOpenProbes")
+    if (!perGuard)
+        if (!abCreate)
+            return 0
+        endif
+        perGuard = JFormMap.object()
+        JDB.solveObjSetter(".rpb_root.guardOpenProbes", perGuard, true)
+    endif
+    int open = JFormMap.getObj(perGuard, akGuard)
+    if (!open && abCreate)
+        open = JMap.object()
+        JFormMap.setObj(perGuard, akGuard, open)
+    endif
+    return open
+endFunction
+
+; The earliest probe still out on @akGuard becomes the one his entry times and names
+function __TrackEarliestOpenProbe(int aiMap, Actor akGuard, int aiOpen) global
+    string earliestKey = ""
+    float earliest = 0.0
+    string probeKey = JMap.nextKey(aiOpen)
+    while (probeKey != "")
+        float probeStart = JMap.getFlt(aiOpen, probeKey)
+        if (earliestKey == "" || probeStart < earliest)
+            earliestKey = probeKey
+            earliest = probeStart
+        endif
+        probeKey = JMap.nextKey(aiOpen, probeKey)
+    endWhile
+    if (earliestKey == "")
+        JFormMap.removeKey(aiMap, akGuard)
+        return
+    endif
+    JFormMap.setFlt(aiMap, akGuard, earliest)
+    JFormMap.setStr(JDB.solveObj(".rpb_root.frozenGuardSteps"), akGuard, StringUtil.Substring(earliestKey, 0, StringUtil.Find(earliestKey, " @")))
+endFunction
+
+; A probe on @akActor started and hasn't come back (or he's known frozen)
+bool function IsGuardProbeOpen(Actor akActor) global
+    int map = JDB.solveObj(__FrozenGuardsPath())
+    return map && akActor && JFormMap.hasKey(map, akActor)
 endFunction
 
 bool function IsFrozenGuard(Actor akActor) global
@@ -538,6 +638,41 @@ function MarkGuardFrozen(Actor akGuard, string asStep) global
     endif
     ; Warn, not Info: this must show with DEBUG on too. The actor prints without calling into him.
     Warn("FROZEN GUARD " + akGuard + " (" + asStep + "; probed at: " + probedAt + "): his Papyrus object doesn't answer, RPB skips him until the next game load")
+    ; The magic effects on him (other mods' effects were stuck starting/finishing on a frozen clone): PO3 reads them engine
+    ; side, without calling into his scripts
+    MagicEffect[] effects = PO3_SKSEFunctions.GetActiveEffects(akGuard, true)
+    string names = ""
+    int i = 0
+    while (i < effects.Length)
+        if (effects[i])
+            names += effects[i].GetName() + " " + effects[i] + "; "
+        endif
+        i += 1
+    endWhile
+    Warn("FROZEN GUARD " + akGuard + ": " + effects.Length + " magic effects on him: " + names)
+
+    ; While testing (DEBUG on), on screen too: nothing in game shows a frozen guard (his AI goes on), and a notification
+    ; gets lost among the others, teleports and load doors. Where and when, to find it in the log; nothing calls into him
+    if (IsDebuggingEnabled())
+        Actor player = Game.GetPlayer()
+        string where = ""
+        Cell playerCell = player.GetParentCell()
+        if (playerCell)
+            where = playerCell.GetName()
+        endif
+        Location playerLocation = player.GetCurrentLocation()
+        if (playerLocation)
+            where += " (" + playerLocation.GetName() + ")"
+        endif
+        Debug.MessageBox("RPB: FROZEN GUARD\n\n" + \
+            "Guard: " + akGuard + "\n" + \
+            "First probe left hanging: " + probedAt + "\n" + \
+            "Found by: " + asStep + "\n" + \
+            "Time: " + GetDateTimeNow() + " (search Papyrus.0.log for FROZEN GUARD)\n" + \
+            "Player in: " + where + "\n" + \
+            "Effects on him: " + names + "\n\n" + \
+            "Loading a save clears it.")
+    endif
 endFunction
 
 ; For the scans: the list's handle when it has anyone in it, 0 otherwise (one native per scan instead of one per candidate;
@@ -555,9 +690,21 @@ bool function IsListedFrozen(int aiFrozenMap, Actor akActor) global
     return aiFrozenMap && JFormMap.hasKey(aiFrozenMap, akActor) && IsFrozenGuard(akActor)
 endFunction
 
+; Emptied in place, not replaced: probes saved stuck on a frozen guard resume after the load, holding these maps' handles,
+; and a replaced map was gone under them (the console's "access to non-existing object with id 0x1682", 2026-10-02)
 function ClearFrozenGuards() global
-    JDB.solveObjSetter(__FrozenGuardsPath(), JFormMap.object(), true)
-    JDB.solveObjSetter(".rpb_root.frozenGuardSteps", JFormMap.object(), true)
+    __ClearFormMapAt(__FrozenGuardsPath())
+    __ClearFormMapAt(".rpb_root.frozenGuardSteps")
+    __ClearFormMapAt(".rpb_root.guardOpenProbes")
+endFunction
+
+function __ClearFormMapAt(string asPath) global
+    int map = JDB.solveObj(asPath)
+    if (map)
+        JFormMap.clear(map)
+    else
+        JDB.solveObjSetter(asPath, JFormMap.object(), true)
+    endif
 endFunction
 
 ; GetOtherCombatTarget without @akCaptor's fellow guards (guards of his crime faction): a guard still attacking the arrestee
@@ -1182,6 +1329,45 @@ function SetLoggingEnabled(string asLogType, bool abEnabled) global
     RPB_StorageVars.SetBool(asLogType, abEnabled, "Log")
 endFunction
 
+;/
+    Log levels: TRACE 0 < DEBUG 1 < INFO 2 < WARN 3 < ERROR 4 < FATAL 5 (OFF 6). A line prints when its level is at or above
+    the threshold, so no setting can hide a higher level while showing a lower one (Warn/Error used to return whenever
+    DEBUG was on: every FROZEN GUARD report of 2026-10-02 was lost that way). The threshold comes from the Log switches:
+    DEBUG on = DEBUG (TRACE lines still need their own TRACE flag), else LOG on = INFO, else OFF.
+/;
+int function LogLevel() global
+    if (IsDebuggingEnabled())
+        return 1
+    elseif (IsLoggingEnabled())
+        return 2
+    endif
+    return 6
+endFunction
+
+bool function ShouldLog(int aiLevel) global
+    return aiLevel >= LogLevel()
+endFunction
+
+function __LogAt(int aiLevel, string asLogType, string asLogInfo, string asCaller, bool abCondition) global
+    if (!abCondition || aiLevel < LogLevel())
+        return
+    endif
+    base_log(asLogType, asLogInfo, asCaller)
+endFunction
+
+; The leveled loggers with a caller (what EventManager.SendInfo/SendWarning/SendError were)
+function LogInfo(string asLogInfo, string asCaller = "", bool abCondition = true) global
+    __LogAt(2, "INFO:", asLogInfo, asCaller, abCondition)
+endFunction
+
+function LogWarn(string asLogInfo, string asCaller = "", bool abCondition = true) global
+    __LogAt(3, "WARN:", asLogInfo, asCaller, abCondition)
+endFunction
+
+function LogError(string asLogInfo, string asCaller = "", bool abCondition = true) global
+    __LogAt(4, "ERROR:", asLogInfo, asCaller, abCondition)
+endFunction
+
 function base_log(string asLogType = "DEBUG", string asLogInfo, string asCaller = "", string asCallerArgs = "") global
     if (asCaller)
         debug.trace("["+ ModName() +"] " + asLogType + " " + asCaller + "("+ asCallerArgs +")" + " -> " + asLogInfo)
@@ -1231,27 +1417,15 @@ function EventNotImplemented(string asCaller, bool abCondition = true) global
 endFunction
 
 function DebugInfo(string asCaller, string asLogInfo, bool abCondition = true) global
-    if (!abCondition || !IsDebuggingEnabled())
-        return
-    endif
-
-    base_log("INFO:", asLogInfo, asCaller)
+    __LogAt(2, "INFO:", asLogInfo, asCaller, abCondition)
 endFunction
 
 function DebugWarn(string asCaller, string asLogInfo, bool abCondition = true) global
-    if (!abCondition || !IsDebuggingEnabled())
-        return
-    endif
-
-    base_log("WARN:", asLogInfo, asCaller)
+    __LogAt(3, "WARN:", asLogInfo, asCaller, abCondition)
 endFunction
 
 function DebugError(string asCaller, string asLogInfo, bool abCondition = true) global
-    if (!abCondition || !IsDebuggingEnabled())
-        return
-    endif
-
-    base_log("ERROR:", asLogInfo, asCaller)
+    __LogAt(4, "ERROR:", asLogInfo, asCaller, abCondition)
 endFunction
 
 function DebugWithArgs(string asCaller, string asArgs, string asLogInfo, bool abCondition = true) global
@@ -1303,52 +1477,27 @@ function LogException(string asExceptionType, string asExceptionMessage, string 
 endFunction
 
 function Info(string asLogInfo, bool abCondition = true) global
-    ; With DEBUG on too: the arrest's state lines (pending, resumed, fallbacks) were missing from every DEBUG log
-    if (!abCondition || (!IsLoggingEnabled() && !IsDebuggingEnabled()))
-        return
-    endif
-
-    base_log("INFO:", asLogInfo)
+    __LogAt(2, "INFO:", asLogInfo, "", abCondition)
 endFunction
 
 function Warn(string asLogInfo, bool abCondition = true) global
-    if (!abCondition || IsDebuggingEnabled() || !IsLoggingEnabled())
-        return
-    endif
-
-    base_log("WARN:", asLogInfo)
+    __LogAt(3, "WARN:", asLogInfo, "", abCondition)
 endFunction
 
 function Error(string asLogInfo, bool abCondition = true) global
-    if (!abCondition || IsDebuggingEnabled() || !IsLoggingEnabled())
-        return
-    endif
-
-    base_log("ERROR:", asLogInfo)
+    __LogAt(4, "ERROR:", asLogInfo, "", abCondition)
 endFunction
 
 function Fatal(string asLogInfo, bool abCondition = true) global
-    if (!abCondition || IsDebuggingEnabled() || !IsLoggingEnabled())
-        return
-    endif
-
-    base_log("FATAL:", asLogInfo)
+    __LogAt(5, "FATAL:", asLogInfo, "", abCondition)
 endFunction
 
 function LogProperty(string prop, string asLogInfo, bool condition = true) global
-    if (!condition || IsDebuggingEnabled() || !IsLoggingEnabled())
-        return
-    endif
-    
-    base_log("PROPERTY:", asLogInfo)
+    __LogAt(3, "PROPERTY:", asLogInfo, "", condition)
 endFunction
 
 function ErrorProperty(string asProperty, string asLogInfo, bool condition = true) global
-    if (!condition || IsDebuggingEnabled() || !IsLoggingEnabled())
-        return
-    endif
-
-    base_log("ERROR (PROPERTY):", asLogInfo)
+    __LogAt(4, "ERROR (PROPERTY):", asLogInfo, "", condition)
 endFunction
 
 ; ==========================================================
@@ -3158,6 +3307,101 @@ endFunction
 
 function SetFreeWalkDisabledForTest(bool abDisabled) global
     RPB_StorageVars.SetInt("DISABLE_FREE_WALK", abDisabled as int, "Profile")
+endFunction
+
+;/
+    No waiting while the player is escorted: during a wait the engine walked the guard on to the jail and left the player
+    in the wild. The vanilla chargen switch (Helgen, the carriages): saving and the other menus stay. Unblocking only
+    clears what I set, never another mod's or the game's own chargen state.
+/;
+function SetEscortWaitBlocked(bool abBlocked) global
+    bool blocked = IsEscortWaitBlocked()
+    if (abBlocked == blocked)
+        return
+    endif
+    Game.SetInChargen(false, abBlocked, false) ; the game says "You cannot wait in this location" either way
+    RPB_StorageVars.SetInt("ESCORT_WAIT_BLOCKED", abBlocked as int, "Profile")
+    Debug("Utility::SetEscortWaitBlocked", "waiting " + string_if(abBlocked, "blocked for the escort", "allowed again"))
+endFunction
+
+bool function IsEscortWaitBlocked() global
+    return JDB.solveInt(".rpb_root.storage.Profile.ESCORT_WAIT_BLOCKED") != 0
+endFunction
+
+; Test-only (freeze experiment A, round 96): the Captor effect's finish makes no call on its actor (OnDestroy's IsDead()).
+; Four frozen clones froze within a second of their Captor effect finishing; this tells our call apart from the other
+; scripted effects on him (XPMSE, IDA)
+bool function IsCaptorFinishCallsDisabledForTest() global
+    return JDB.solveInt(".rpb_root.storage.Profile.DISABLE_CAPTOR_FINISH_CALLS") != 0
+endFunction
+
+function SetCaptorFinishCallsDisabledForTest(bool abDisabled) global
+    RPB_StorageVars.SetInt("DISABLE_CAPTOR_FINISH_CALLS", abDisabled as int, "Profile")
+endFunction
+
+; Test-only (freeze experiment C, round 100): a cancel waits 3s between ending the guard's Scene and releasing him (his
+; Captor spell off). Every freeze came within a second or two of the two together, often right after he changed cells;
+; this tells whether the two meeting on him is what freezes him
+bool function IsSceneEndSpacedForTest() global
+    return JDB.solveInt(".rpb_root.storage.Profile.SPACE_SCENE_END") != 0
+endFunction
+
+function SetSceneEndSpacedForTest(bool abSpaced) global
+    RPB_StorageVars.SetInt("SPACE_SCENE_END", abSpaced as int, "Profile")
+endFunction
+
+; Test-only (freeze experiment D, round 102): a cancel releases the guard on his own package change (his AI off the
+; Scene's package) instead of right after ending his Scene: C's 3s apart never froze, and this is the signal a release
+; could wait for without a fixed delay. A one-shot backstop releases him if no change comes.
+bool function IsReleaseOnPackageChangeForTest() global
+    return JDB.solveInt(".rpb_root.storage.Profile.RELEASE_ON_PACKAGE_CHANGE") != 0
+endFunction
+
+function SetReleaseOnPackageChangeForTest(bool abOn) global
+    RPB_StorageVars.SetInt("RELEASE_ON_PACKAGE_CHANGE", abOn as int, "Profile")
+endFunction
+
+; Test-only (freeze experiment E, round 104): a cancel leaves the guard's Captor on (the test's teardown takes it off ~10s
+; later) and probes him every 0.5s meanwhile. A freeze in that window needs no Captor removal; none = the removal is it
+bool function IsCaptorKeptForTest() global
+    return JDB.solveInt(".rpb_root.storage.Profile.KEEP_CAPTOR") != 0
+endFunction
+
+function SetCaptorKeptForTest(bool abKept) global
+    RPB_StorageVars.SetInt("KEEP_CAPTOR", abKept as int, "Profile")
+endFunction
+
+; Test-only (freeze experiment G1, round 106): with F's 10s gap, the player's side of the AI is done right after the Scene
+; stop (the escort assist stopped: AI-driven again, then released with the controls), the rest of the revert after the
+; gap. F (the whole revert after 10s) went 20/20 clean, E (all of it right away) froze
+bool function IsAIFlipFirstForTest() global
+    return JDB.solveInt(".rpb_root.storage.Profile.AI_FLIP_FIRST") != 0
+endFunction
+
+function SetAIFlipFirstForTest(bool abFirst) global
+    RPB_StorageVars.SetInt("AI_FLIP_FIRST", abFirst as int, "Profile")
+endFunction
+
+; Test-only (freeze experiment G2, round 107): with F's 10s gap, the arrest's revert (RevertArrest: the uncuff, the Arrestee
+; effect finishing) right after the Scene stop, the rest (the imprisonment cancel, the AI) after the gap. G1 (the AI
+; first) went 11 clean
+bool function IsRevertFirstForTest() global
+    return JDB.solveInt(".rpb_root.storage.Profile.REVERT_FIRST") != 0
+endFunction
+
+function SetRevertFirstForTest(bool abFirst) global
+    RPB_StorageVars.SetInt("REVERT_FIRST", abFirst as int, "Profile")
+endFunction
+
+; Test-only (freeze experiment G3, round 108): with F's 10s gap, the imprisonment cancel (the Prisoner effect finishing,
+; the cell unregistered, the escort assist stopped) right after the Scene stop, the rest after the gap. G1 (the AI) and
+; G2 (the arrest's revert) first both went clean
+bool function IsImprisonmentCancelFirstForTest() global
+    return JDB.solveInt(".rpb_root.storage.Profile.IMPRISONMENT_CANCEL_FIRST") != 0
+endFunction
+
+function SetImprisonmentCancelFirstForTest(bool abFirst) global
+    RPB_StorageVars.SetInt("IMPRISONMENT_CANCEL_FIRST", abFirst as int, "Profile")
 endFunction
 
 ; Test-only: a test's teardown is running. Its reset gives the test's bounty back (RevertArrest) and a guard nearby opens

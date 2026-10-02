@@ -90,6 +90,13 @@ function PerformMaintenance()
     SceneManager.SceneManager()
     PrisonManager.VerifyIntegrity()
     RPB_Keybindings.RegisterSurrenderKey()
+    ; Waiting blocked by an escort this save no longer has: allowed again (a save made mid-escort keeps it until its end)
+    if (RPB_Utility.IsEscortWaitBlocked())
+        string current = SceneManager.GetCurrentScene()
+        if (!SceneManager.IsSceneOfType(current, SceneManager.CATEGORY_ESCORT_TO_JAIL) && !SceneManager.IsSceneOfType(current, SceneManager.CATEGORY_ESCORT_TO_CELL))
+            RPB_Utility.SetEscortWaitBlocked(false)
+        endif
+    endif
 
     API.MCM.InitializePages()
 endFunction

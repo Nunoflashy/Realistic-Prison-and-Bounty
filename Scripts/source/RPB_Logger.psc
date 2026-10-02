@@ -228,7 +228,7 @@ function LogNoType(string asLogInfo, string asCaller = "", bool abCondition = tr
 endFunction
 
 function Info(string asLogInfo, bool abCondition = true)
-    if (!abCondition || Debugging || !Logging)
+    if (!abCondition || (!Logging && !Debugging))
         return
     endif
 
@@ -236,7 +236,7 @@ function Info(string asLogInfo, bool abCondition = true)
 endFunction
 
 function Warn(string asLogInfo, bool abCondition = true)
-    if (!abCondition || Debugging || !Logging)
+    if (!abCondition || (!Logging && !Debugging))
         return
     endif
 
@@ -244,7 +244,7 @@ function Warn(string asLogInfo, bool abCondition = true)
 endFunction
 
 function Error(string asLogInfo, bool abCondition = true)
-    if (!abCondition || Debugging || !Logging)
+    if (!abCondition || (!Logging && !Debugging))
         return
     endif
 
@@ -252,7 +252,7 @@ function Error(string asLogInfo, bool abCondition = true)
 endFunction
 
 function Fatal(string asLogInfo, bool abCondition = true)
-    if (!abCondition || Debugging || !Logging)
+    if (!abCondition || (!Logging && !Debugging))
         return
     endif
 
@@ -260,7 +260,7 @@ function Fatal(string asLogInfo, bool abCondition = true)
 endFunction
 
 function LogProperty(string prop, string asLogInfo, bool condition = true)
-    if (!condition || Debugging || !Logging)
+    if (!condition || (!Logging && !Debugging))
         return
     endif
     
@@ -268,7 +268,7 @@ function LogProperty(string prop, string asLogInfo, bool condition = true)
 endFunction
 
 function ErrorProperty(string asProperty, string asLogInfo, bool condition = true)
-    if (!condition || Debugging || !Logging)
+    if (!condition || (!Logging && !Debugging))
         return
     endif
 

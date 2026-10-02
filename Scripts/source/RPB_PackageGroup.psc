@@ -98,7 +98,7 @@ endFunction
 /;
 ReferenceAlias function GetPackage()
     if (!Initialized)
-        Logger.SendError("Could not initialize Package Group, unable to retrieve Package! (Identifier: "+ self +")", "PackageGroup::GetPackage")
+        RPB_Utility.LogError("Could not initialize Package Group, unable to retrieve Package! (Identifier: "+ self +")", "PackageGroup::GetPackage")
         return none
     endif
 
@@ -107,7 +107,7 @@ endFunction
 
 function BindPackage(ReferenceAlias apPackage, ObjectReference akDestination)
     if (!Initialized)
-        Logger.SendError("Could not initialize Package Group, unable to bind Package! (Identifier: "+ self +")", "PackageGroup::BindPackage")
+        RPB_Utility.LogError("Could not initialize Package Group, unable to bind Package! (Identifier: "+ self +")", "PackageGroup::BindPackage")
         return none
     endif
 
@@ -117,7 +117,7 @@ endFunction
 
 function BindAvailablePackage(ObjectReference akDestination)
     if (!Initialized)
-        Logger.SendError("Could not initialize Package Group, unable to bind Package! (Identifier: "+ self +")", "PackageGroup::BindAvailablePackage")
+        RPB_Utility.LogError("Could not initialize Package Group, unable to bind Package! (Identifier: "+ self +")", "PackageGroup::BindAvailablePackage")
         return none
     endif
 
@@ -128,7 +128,7 @@ endFunction
 
 function UnbindPackage(ReferenceAlias apPackage)
     if (!Initialized)
-        Logger.SendError("Could not initialize Package Group, unable to unbind Package! (Identifier: "+ self +")", "PackageGroup::UnbindPackage")
+        RPB_Utility.LogError("Could not initialize Package Group, unable to unbind Package! (Identifier: "+ self +")", "PackageGroup::UnbindPackage")
         return none
     endif
 

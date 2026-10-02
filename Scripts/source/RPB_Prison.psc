@@ -208,7 +208,7 @@ scriptname RPB_Prison extends RPB_Entity
     function CancelImprisonment(RPB_Prisoner apPrisoner, string asReason, bool abReturnBelongings = true)
     function ResumePrisonFlowWith(RPB_Prisoner apPrisoner, Actor akGuard)
     int function PendingDressCount()
-    function QueueEscortToCellStallCheck(Actor akPrisoner, float afTimeoutSeconds = 8.0)
+    function QueueEscortToCellStallCheck(Actor akPrisoner, float afTimeoutSeconds = 8.0, bool abWatchAssist = false)
     function CancelEscortToCellStallCheck(Actor akPrisoner)
     function ResetDressCost()
     string function DressCostSummary()
@@ -2575,7 +2575,7 @@ function __ProcessPendingDress()
         endWhile
         JValue.release(__pendingDress)
         __pendingDress = fresh
-        EventManager.SendWarning("Dropped " + (n - kept) + " re-dress entries of NPCs that no longer exist", "["+ Name +"] Prison::__ProcessPendingDress")
+        RPB_Utility.LogWarn("Dropped " + (n - kept) + " re-dress entries of NPCs that no longer exist", "["+ Name +"] Prison::__ProcessPendingDress")
         keys = JFormMap.allKeys(__pendingDress)
         n = JArray.count(keys)
     endif
@@ -2612,7 +2612,7 @@ function __ProcessPendingDress()
         __pendingPasses += 1
         if (__pendingPasses > 40)
             ; more than two minutes of updates and the queue is still not empty: something is wrong, do not loop for ever
-            EventManager.SendWarning("The re-dress queue did not empty after " + __pendingPasses + " updates, clearing it", "["+ Name +"] Prison::__ProcessPendingDress")
+            RPB_Utility.LogWarn("The re-dress queue did not empty after " + __pendingPasses + " updates, clearing it", "["+ Name +"] Prison::__ProcessPendingDress")
             JFormMap.clear(__pendingDress)
             __pendingPasses = 0
         else
@@ -2654,11 +2654,15 @@ endFunction
     Actor   @akPrisoner: the prisoner whose Escort-to-Cell Scene to watch.
     float   @afTimeoutSeconds: how long to wait for the Scene to confirm before treating it as stalled.
 /;
-function QueueEscortToCellStallCheck(Actor akPrisoner, float afTimeoutSeconds = 8.0)
+function QueueEscortToCellStallCheck(Actor akPrisoner, float afTimeoutSeconds = 8.0, bool abWatchAssist = false)
     self.__EnsurePendingEscortStallChecks()
 
     int entry = JMap.object()
     JMap.setFlt(entry, "dueAt", Utility.GetCurrentRealTime() + afTimeoutSeconds)
+    ; The player's escort from its start: due early when the escort assist's ticks stop (a tick stuck on a frozen guard)
+    ; or the guard is known frozen; otherwise only at the timeout
+    JMap.setInt(entry, "watchAssist", abWatchAssist as int)
+    JMap.setInt(entry, "ticks", -1)
     JFormMap.setObj(__pendingEscortStallChecks, akPrisoner, entry)
     RPB_Utility.Crumb(akPrisoner, "Escort-to-Cell stall check queued, due in " + afTimeoutSeconds + "s")
 
@@ -2673,6 +2677,37 @@ function CancelEscortToCellStallCheck(Actor akPrisoner)
     if (JFormMap.hasKey(__pendingEscortStallChecks, akPrisoner))
         JFormMap.removeKey(__pendingEscortStallChecks, akPrisoner)
         RPB_Utility.Crumb(akPrisoner, "Escort-to-Cell stall check cancelled")
+    endif
+endFunction
+
+;/
+    The player's escort to the cell, watched from its start: every heartbeat pass (3s) compares the escort assist's tick
+    count. Five passes (~15s) without a new tick, or the guard known frozen, make the check due now, and the recovery
+    below moves them into the cell without calling him. Imprisoned or gone: the watch ends. Heartbeat passes don't run
+    while the game is paused, so a menu never counts as a stuck tick.
+/;
+function __WatchEscortAssist(Actor akPrisoner, int aiEntry, float afNow)
+    RPB_Prisoner watched = Prisoners.AtKey(akPrisoner)
+    if (!watched || watched.IsImprisoned)
+        JFormMap.removeKey(__pendingEscortStallChecks, akPrisoner)
+        return
+    endif
+    if (!watched.EscortAssistActive)
+        JMap.setInt(aiEntry, "still", 0) ; paused (a fight) or between escorts: nothing to judge
+        return
+    endif
+    int ticks = watched.EscortAssistTicks
+    int still = 0
+    if (ticks == JMap.getInt(aiEntry, "ticks"))
+        still = JMap.getInt(aiEntry, "still") + 1
+    endif
+    JMap.setInt(aiEntry, "ticks", ticks)
+    JMap.setInt(aiEntry, "still", still)
+    bool frozen = RPB_Utility.IsFrozenGuard(watched.Captor)
+    if (still >= 5 || frozen)
+        JMap.setInt(aiEntry, "watchAssist", 0)
+        JMap.setFlt(aiEntry, "dueAt", afNow)
+        Warn("["+ Name +"] Prison::__WatchEscortAssist: " + akPrisoner + "'s escort to the cell is stuck (" + string_if(frozen, "the guard is frozen", "the escort assist hasn't ticked for ~" + (still * 3) + "s") + "): recovering")
     endif
 endFunction
 
@@ -2713,7 +2748,7 @@ function __ProcessEscortStallChecks()
         endWhile
         JValue.release(__pendingEscortStallChecks)
         __pendingEscortStallChecks = fresh
-        EventManager.SendWarning("Dropped " + (n - kept) + " Escort-to-Cell stall checks of NPCs that no longer exist", "["+ Name +"] Prison::__ProcessEscortStallChecks")
+        RPB_Utility.LogWarn("Dropped " + (n - kept) + " Escort-to-Cell stall checks of NPCs that no longer exist", "["+ Name +"] Prison::__ProcessEscortStallChecks")
         keys = JFormMap.allKeys(__pendingEscortStallChecks)
         n = JArray.count(keys)
     endif
@@ -2723,6 +2758,9 @@ function __ProcessEscortStallChecks()
     while (i < n)
         Actor checkActor = JArray.getForm(keys, i) as Actor
         int entry = JFormMap.getObj(__pendingEscortStallChecks, checkActor)
+        if (entry && JMap.getInt(entry, "watchAssist") == 1)
+            self.__WatchEscortAssist(checkActor, entry, now)
+        endif
         if (entry && JMap.getFlt(entry, "dueAt") <= now)
             ; Dequeued immediately, before anything below can yield (AwaitPrisonerReference/Scene.Stop()/Wait) - a real
             ; test showed the WARN just below logging twice for one recovery: this shares its 3s heartbeat with other
@@ -2981,7 +3019,7 @@ function __ProcessHostilityRestore()
         endWhile
         JValue.release(__pendingHostility)
         __pendingHostility = fresh
-        EventManager.SendWarning("Dropped " + (n - kept) + " hostility-restore entries of NPCs that no longer exist", "["+ Name +"] Prison::__ProcessHostilityRestore")
+        RPB_Utility.LogWarn("Dropped " + (n - kept) + " hostility-restore entries of NPCs that no longer exist", "["+ Name +"] Prison::__ProcessHostilityRestore")
         keys = JFormMap.allKeys(__pendingHostility)
         n = JArray.count(keys)
     endif
@@ -3247,7 +3285,7 @@ bool function AssignCell(RPB_Prisoner apPrisoner)
 
     if (assignedCell == none)
         RPB_ThreadLock.Release(cellLock)
-        EventManager.SendError("Could not assign a cell for prisoner " + apPrisoner.Name, "("+ Name +") Prison::AssignCell")
+        RPB_Utility.LogError("Could not assign a cell for prisoner " + apPrisoner.Name, "("+ Name +") Prison::AssignCell")
         return false
     endif
 
@@ -3257,7 +3295,7 @@ bool function AssignCell(RPB_Prisoner apPrisoner)
         int packageCapacity = PrisonManager.GetCellPackageCapacity(assignedCell.PackageSize)
         if (packageCapacity > 0 && self.__CountNPCPrisonersInCells(apPrisoner) >= packageCapacity)
             RPB_ThreadLock.Release(cellLock)
-            EventManager.SendWarning("No cell package left for " + apPrisoner.Name + " (" + packageCapacity + " in use), the prison cannot hold more NPCs", "("+ Name +") Prison::AssignCell")
+            RPB_Utility.LogWarn("No cell package left for " + apPrisoner.Name + " (" + packageCapacity + " in use), the prison cannot hold more NPCs", "("+ Name +") Prison::AssignCell")
             return false
         endif
     endif
@@ -3285,7 +3323,7 @@ function RemoveFromCell(RPB_Prisoner apPrisoner)
     RPB_JailCell jailCell = apPrisoner.JailCell
 
     if (!jailCell)
-        EventManager.SendWarning("The prisoner " + apPrisoner.Name + " is not bound to any jail cell!", "["+ Name +"] Prisoner::RemoveFromCell")
+        RPB_Utility.LogWarn("The prisoner " + apPrisoner.Name + " is not bound to any jail cell!", "["+ Name +"] Prisoner::RemoveFromCell")
         return
     endif
     

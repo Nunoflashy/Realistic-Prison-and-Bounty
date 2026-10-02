@@ -1511,6 +1511,21 @@ function __NudgeStalledEscort(Actor akGuard, string asScene)
         Debug("["+ Name +"] Arrestee::__NudgeStalledEscort", "Actors within 256 units of " + akGuard + ": " + string_if(nearby == "", "none", nearby))
     endif
 
+    ; Playing in the engine, or a phase waiting on its conditions: the escort to jail's "Reached Jail" needs the guard within
+    ; 300 of the jail marker and within 150 of me (once stuck with the guard on his own quest package at the door)
+    Scene stalledScene = none
+    if (asScene != "")
+        stalledScene = SceneManager.GetScene(asScene)
+    endif
+    if (stalledScene)
+        string marker = "no marker"
+        ReferenceAlias markerAlias = stalledScene.GetOwningQuest().GetAliasByName("Player_EscortLocation") as ReferenceAlias
+        if (markerAlias && markerAlias.GetReference())
+            marker = "guard " + (akGuard.GetDistance(markerAlias.GetReference()) as int) + " from the escort marker"
+        endif
+        Info("Stalled escort of " + Name + ": " + asScene + " playing " + stalledScene.IsPlaying() + ", " + marker + ", " + (this.GetDistance(akGuard) as int) + " from me")
+    endif
+
     akGuard.EvaluatePackage()
     this.EvaluatePackage()
 endFunction

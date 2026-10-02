@@ -527,6 +527,13 @@ int property ArrestEludeWarningTime
     endFunction
 endProperty
 
+; Waiting allowed while the player is escorted (the escort catches up after it), or blocked
+bool property AllowWaitWhileEscorted
+    bool function get()
+        return MCM.GetOptionToggleState("General::AllowWaitEscorted", "General")
+    endFunction
+endProperty
+
 bool property ShouldDisplayArrestNotifications
     bool function get()
         return MCM.GetOptionToggleState("General::ArrestNotifications", "General")

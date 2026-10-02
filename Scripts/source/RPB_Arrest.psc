@@ -467,6 +467,10 @@ function UnregisterCaptor(RPB_Captor apCaptor, bool abRemoveFromList = false)
         apCaptor.RemoveSpell(captorSpell)
     endif
     RPB_Recovery.__Step(apCaptor.GetActor(), "UnregisterCaptor: spell removed")
+    ; Guards froze right after things of mine came off them (150's clone: this, then his package lock): a probe says when
+    RPB_Utility.ProbeGuard(apCaptor.GetActor(), "captor spell removed")
+    RPB_Utility.ProbeGuard(apCaptor.GetActor(), "captor spell removed", 1.0)
+    RPB_Utility.ProbeGuard(apCaptor.GetActor(), "captor spell removed", 3.0)
 
     if (abRemoveFromList && Captors.Exists(apCaptor))
         Captors.Remove(apCaptor)
@@ -594,6 +598,8 @@ event OnArrestDialogue(int aiTopicInfoEvent, int aiTopicInfoType, string asTopic
                 return
             endif
 
+            ; Who forcegreets matters for the guard-freeze hunt: every freeze so far came with a confront 1-3s after a Captor came off
+            RPB_Utility.LogInfo("Arrest confront by " + akSpeakerArrester + " to " + akSpokenToArrestee + " (probe open on the speaker: " + RPB_Utility.IsGuardProbeOpen(akSpeakerArrester) + ")", "Arrest::OnArrestDialogue")
             self.SetupArrestPayableBountyVars(akSpeakerArrester.GetCrimeFaction()) ; Setup arrest payable bounty vars
             self.SetActorWantsToPayBounty(akSpokenToArrestee, false) ; Reset any possibility of paying the bounty, before actually selecting it
 
@@ -618,14 +624,14 @@ event OnArrestDialogue(int aiTopicInfoEvent, int aiTopicInfoType, string asTopic
             ; A guard who breaks the dialogue off to fight (or talks to someone already fighting another hostile) isn't
             ; being resisted: leaving the dialogue then used to add the resisting-arrest bounty
             if (akSpeakerArrester.IsInCombat() || RPB_Utility.GetOtherCombatTarget(akSpokenToArrestee, akSpeakerArrester))
-                EventManager.SendInfo("Not resisting arrest: " + akSpeakerArrester + " left the arrest dialogue in a fight", "Arrest::OnArrestDialogue")
+                RPB_Utility.LogInfo("Not resisting arrest: " + akSpeakerArrester + " left the arrest dialogue in a fight", "Arrest::OnArrestDialogue")
                 akSpeakerArrester.EvaluatePackage()
                 return
             endif
 
             ; Test-only: the teardown's move home cuts a confront its own reset set off (the test's bounty given back)
             if (RPB_Utility.IsTestTeardownRunning())
-                EventManager.SendInfo("Not resisting arrest: a test's teardown cut " + akSpeakerArrester + "'s arrest dialogue", "Arrest::OnArrestDialogue")
+                RPB_Utility.LogInfo("Not resisting arrest: a test's teardown cut " + akSpeakerArrester + "'s arrest dialogue", "Arrest::OnArrestDialogue")
                 akSpeakerArrester.EvaluatePackage()
                 return
             endif
@@ -634,7 +640,7 @@ event OnArrestDialogue(int aiTopicInfoEvent, int aiTopicInfoType, string asTopic
             ; while the first one still is, and their resist line counted as the player resisting, without them ever
             ; leaving the first dialogue). Only the guard handling it can be resisted.
             if (self.__OtherGuardHandlesArrestDialogue(akSpeakerArrester, akSpokenToArrestee))
-                EventManager.SendInfo("Not resisting arrest: " + akSpeakerArrester + " spoke while another guard handles the arrest dialogue", "Arrest::OnArrestDialogue")
+                RPB_Utility.LogInfo("Not resisting arrest: " + akSpeakerArrester + " spoke while another guard handles the arrest dialogue", "Arrest::OnArrestDialogue")
                 akSpeakerArrester.EvaluatePackage()
                 return
             endif
@@ -655,7 +661,7 @@ event OnArrestDialogue(int aiTopicInfoEvent, int aiTopicInfoType, string asTopic
         ; "Wait... I know you" greeting, closed by the arrest starting, queued the Eluding Scene ahead of the escort to
         ; jail, and the escort never played
         if ((aiTopicInfoType == TOPIC_TYPE_ARREST_DIALOGUE_ELUDING || aiTopicInfoType == TOPIC_TYPE_ARREST_PURSUIT_ELUDING) && self.__IsBeyondEluding(akSpokenToArrestee))
-            EventManager.SendInfo("Not eluding arrest: " + akSpokenToArrestee + " is already arrested, imprisoned or surrendering (" + akSpeakerArrester + "'s line)", "Arrest::OnArrestDialogue")
+            RPB_Utility.LogInfo("Not eluding arrest: " + akSpokenToArrestee + " is already arrested, imprisoned or surrendering (" + akSpeakerArrester + "'s line)", "Arrest::OnArrestDialogue")
             akSpeakerArrester.EvaluatePackage()
 
         elseif (aiTopicInfoType == TOPIC_TYPE_ARREST_DIALOGUE_ELUDING)
@@ -776,7 +782,7 @@ event OnArrestBegin(RPB_Arrestee apArrestee, RPB_Captor apCaptor, Faction akCrim
 
     if (!apArrestee.HasLatentBounty() && !apArrestee.HasActiveBounty())
         Config.NotifyArrest("You can't be arrested in " + RPB_Utility.GetFormNameCached(akCrimeFaction) + " since you do not have a bounty in the hold", apArrestee.IsPlayer())
-        EventManager.SendError(apArrestee.Name + " has no bounty, cannot arrest for "+ RPB_Utility.GetFormNameCached(akCrimeFaction) +", aborting!", "Arrest::OnArrestBegin")
+        RPB_Utility.LogError(apArrestee.Name + " has no bounty, cannot arrest for "+ RPB_Utility.GetFormNameCached(akCrimeFaction) +", aborting!", "Arrest::OnArrestBegin")
         RPB_Utility.Crumb(apArrestee.GetActor(), "Arrest.OnArrestBegin: ABORT no bounty")
         apArrestee.Destroy()
         return
@@ -821,7 +827,7 @@ endEvent
 event OnArrestEludeStart(Actor akEludedGuard, string asEludeType)
     ; Eluding is the player's (TriggerForcegreetEluding/TriggerPursuitEluding act on them)
     if (self.__IsBeyondEluding(Config.Player))
-        EventManager.SendInfo("Not eluding arrest: the player is already arrested, imprisoned or surrendering (" + asEludeType + ", " + akEludedGuard + ")", "Arrest::OnArrestEludeStart")
+        RPB_Utility.LogInfo("Not eluding arrest: the player is already arrested, imprisoned or surrendering (" + asEludeType + ", " + akEludedGuard + ")", "Arrest::OnArrestEludeStart")
         if (akEludedGuard)
             akEludedGuard.EvaluatePackage()
         endif
@@ -839,7 +845,7 @@ event OnArrestEludeStart(Actor akEludedGuard, string asEludeType)
         return
     endif
 
-    EventManager.SendError("The passed in Elude Type is invalid, the event failed!", "Arrest::OnArrestEludeStart")
+    RPB_Utility.LogError("The passed in Elude Type is invalid, the event failed!", "Arrest::OnArrestEludeStart")
 endEvent
 
 event OnArrestEludeTriggered(Actor akEludedGuard, string asEludeType)
@@ -857,14 +863,14 @@ endEvent
 event OnArrestResist(Actor akArrestResister, Actor akGuard, Faction akCrimeFaction)
     bool isCaptured = RPB_StorageVars.GetBoolOnReference("Captured", akArrestResister, "Arrest")
     if (isCaptured)
-        EventManager.SendWarning(akArrestResister.GetBaseObject().GetName() + " was arrested, no arrest was resisted (maybe multiple guards talked at once and triggered resist arrest?) [BUG]", "Arrest::OnArrestResist")
+        RPB_Utility.LogWarn(akArrestResister.GetBaseObject().GetName() + " was arrested, no arrest was resisted (maybe multiple guards talked at once and triggered resist arrest?) [BUG]", "Arrest::OnArrestResist")
         return
     endif
 
     akGuard.SetPlayerResistingArrest() ; Needed to make the guards attack the player, otherwise they will loop arrest dialogue
 
     if (self.HasResistedArrestRecently(akCrimeFaction))
-        EventManager.SendInfo("You have already resisted arrest recently, no bounty will be added as it most likely is the same arrest.")
+        RPB_Utility.LogInfo("You have already resisted arrest recently, no bounty will be added as it most likely is the same arrest.")
         return
     endif
 
@@ -1234,19 +1240,19 @@ bool function CanActorSurrender(Actor akSurrenderer, Actor[] akSurrendererCaptor
 
     if (arrestStatus != CAN_BE_ARRESTED)
         __SurrenderLog("Surrender of " + akSurrenderer + " refused: arrest status " + arrestStatus)
-        EventManager.SendError("Actor " + akSurrenderer.GetBaseObject().GetName() + " is not able to be arrested! ("+ string_if (arrestStatus == ALREADY_ARRESTED, "Currently Arrested", "Currently Imprisoned") +")")
+        RPB_Utility.LogError("Actor " + akSurrenderer.GetBaseObject().GetName() + " is not able to be arrested! ("+ string_if (arrestStatus == ALREADY_ARRESTED, "Currently Arrested", "Currently Imprisoned") +")")
         return false
     endif
 
     if (!akSurrenderer.IsInCombat())
         __SurrenderLog("Surrender of " + akSurrenderer + " refused: not in combat")
-        EventManager.SendWarning("Unable to surrender! (Actor " + akSurrenderer.GetBaseObject().GetName() + " is not in combat)")
+        RPB_Utility.LogWarn("Unable to surrender! (Actor " + akSurrenderer.GetBaseObject().GetName() + " is not in combat)")
         return false
     endif
 
     if (akSurrenderer.IsDead())
         __SurrenderLog("Surrender of " + akSurrenderer + " refused: dead")
-        EventManager.SendWarning("Unable to surrender! (Actor " + akSurrenderer.GetBaseObject().GetName() + " is dead)")
+        RPB_Utility.LogWarn("Unable to surrender! (Actor " + akSurrenderer.GetBaseObject().GetName() + " is dead)")
         return false
     endif
 
@@ -1803,7 +1809,7 @@ function BeginArrest(RPB_Arrestee apArresteeRef)
     ; every pacification step below running, with no Master of Disguise ability effect present on them by that point.
     ; Only when logging is on: the message calls three natives, and it's built before SendInfo could skip it
     if (RPB_Utility.IsLoggingEnabled())
-        EventManager.SendInfo("BeginArrest bounty/combat check on " + arrestee.GetDisplayName() + " " + arrestee + ": crime gold now " + arrestFaction.GetCrimeGold() + ", arrestee in combat " + arrestee.IsInCombat(), "Arrest::BeginArrest")
+        RPB_Utility.LogInfo("BeginArrest bounty/combat check on " + arrestee.GetDisplayName() + " " + arrestee + ": crime gold now " + arrestFaction.GetCrimeGold() + ", arrestee in combat " + arrestee.IsInCombat(), "Arrest::BeginArrest")
     endif
     RPB_Utility.FlowMark("BeginArrest: bounty/combat diagnostic")
     ; Read before the StopCombat below clears it, and passed on as-is (a stored flag didn't reach EscortToPrison): an arrest
@@ -2004,7 +2010,7 @@ endFunction
 function SetResistedFlag(Faction akFaction)
     string referenceKey = "Actor FormID(" + Config.Player.GetFormID() + ")"
     RPB_StorageVars.SetBoolOnReference(RPB_Utility.GetFormNameCached(akFaction) + "::Arrest Resisted", referenceKey, true, "Pre-Arrest") ; Set arrest resisted flag
-    EventManager.SendInfo("Set resisted flag for " + RPB_Utility.GetFormNameCached(akFaction), "Arrest::SetResistedFlag")
+    RPB_Utility.LogInfo("Set resisted flag for " + RPB_Utility.GetFormNameCached(akFaction), "Arrest::SetResistedFlag")
 endFunction
 
 ;/
@@ -2036,21 +2042,21 @@ function ResetResistedFlag()
     string referenceKey = "Actor FormID(" + Config.Player.GetFormID() + ")"
     Debug("Arrest::ResetResistedFlag", "This is called")
     RPB_StorageVars.DeleteCategoryOnReference(referenceKey, "Pre-Arrest")
-    EventManager.SendInfo("The resist arrest flags have been reset.")
+    RPB_Utility.LogInfo("The resist arrest flags have been reset.")
 endFunction
 
 function ResetEludedFlag()
     string referenceKey = "Actor FormID(" + Config.Player.GetFormID() + ")"
     Debug("Arrest::ResetEludedFlag", "This is called")
     RPB_StorageVars.DeleteCategoryOnReference(referenceKey, "Pre-Arrest")
-    EventManager.SendInfo("The eluding arrest flags have been reset.")
-    EventManager.SendInfo("Elude Arrest: " + GetContainerList(RPB_StorageVars.GetObjectHandleOnReference(Config.Player, "Pre-Arrest")))
+    RPB_Utility.LogInfo("The eluding arrest flags have been reset.")
+    RPB_Utility.LogInfo("Elude Arrest: " + GetContainerList(RPB_StorageVars.GetObjectHandleOnReference(Config.Player, "Pre-Arrest")))
 
 endFunction
 
 function ApplyArrestEludedPenalty(Faction akArrestFaction)
     if (self.HasEludedArrestRecently(akArrestFaction))
-        EventManager.SendInfo("You have already eluded arrest recently, no bounty will be added as it most likely is the same arrest.")
+        RPB_Utility.LogInfo("You have already eluded arrest recently, no bounty will be added as it most likely is the same arrest.")
         return
     endif
 

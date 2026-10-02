@@ -237,6 +237,11 @@ function SetTests()
     self.AddTest("149 - Surrender (F8): Walking Away While a Guard is Coming is a Fake: Bounty, the Guard Fights, the Next Surrender Refused (PLAYER)", "Test_Surrender_Faked", abChainable = false)
     self.AddTest("150 - Escort: the Player Walks on Their Own, the AI Takes Over Far Away and Hands Back When Close (PLAYER - arrests you, you're brought back)", "Test_Escort_FreeWalk", abChainable = false)
     self.AddTest("151 - Toggle: the Escort to the Cell Plays RPB_EscortToCell04 (the Copy of 01 Made Without the CK)", "Test_ToggleEscortToCell04", abChainable = false)
+    self.AddTest("152 - Freeze Isolation: the Captor Spell Added and Removed on a Clone Guard, Up to 30 Cycles (its finish calls IsDead on him)", "Test_CaptorFinishCycles_Calls", abChainable = false)
+    self.AddTest("153 - Freeze Isolation: the Same Cycles With No Call on Him From the Finishing Effect (experiment A)", "Test_CaptorFinishCycles_NoCalls", abChainable = false)
+    self.AddTest("154 - Freeze Isolation: 152's Cycles, the Clone Moved Into the (Unloaded) Prison as the Spell Comes Off, Then Back", "Test_CaptorFinishDetach_Calls", abChainable = false)
+    self.AddTest("155 - Freeze Isolation: 154 With No Call on Him From the Finishing Effect (experiment A)", "Test_CaptorFinishDetach_NoCalls", abChainable = false)
+    self.AddTest("156 - Freeze Control: 150 With the Normal Release Order (no experiment on)", "Test_Escort_FreeWalk_Control", abChainable = false)
     self.AddTest("041 - ActiveMagicEffectContainer: Stuck Lock Self-Heals", "Test_ActiveMagicEffectContainer_StuckLockSelfHeals")
     self.AddTest("042 - ThreadLock: JAtomic Primitive Semantics and Registry", "Test_ThreadLock_PrimitiveSemantics")
     ; Not chainable: fires concurrent worker threads
@@ -4781,7 +4786,7 @@ state Test_Prisoner_StrippingTypeBreakdown
         t = Utility.GetCurrentRealTime()
         i = 0
         while (i < R)
-            p.EventManager.SendError("An error has occurred, cannot strip prisoner both naked and to underwear, logic error!", "("+ p.Name +") Prisoner::DetermineStrippingType", false)
+            RPB_Utility.LogError("An error has occurred, cannot strip prisoner both naked and to underwear, logic error!", "("+ p.Name +") Prisoner::DetermineStrippingType", false)
             i += 1
         endWhile
         totals[6] = self.__Ms(Utility.GetCurrentRealTime() - t)
@@ -5236,7 +5241,7 @@ state Test_Prisoner_NameCostBreakdown
         t = Utility.GetCurrentRealTime()
         i = 0
         while (i < R)
-            em.SendError(msg, "(x) Prisoner::DetermineStrippingType", false)
+            RPB_Utility.LogError(msg, "(x) Prisoner::DetermineStrippingType", false)
             i += 1
         endWhile
         totals[6] = self.__Ms(Utility.GetCurrentRealTime() - t)
@@ -5252,7 +5257,7 @@ state Test_Prisoner_NameCostBreakdown
         t = Utility.GetCurrentRealTime()
         i = 0
         while (i < R)
-            p.EventManager.SendError("An error has occurred, cannot strip prisoner both naked and to underwear, logic error!", "("+ p.Name +") Prisoner::DetermineStrippingType", false)
+            RPB_Utility.LogError("An error has occurred, cannot strip prisoner both naked and to underwear, logic error!", "("+ p.Name +") Prisoner::DetermineStrippingType", false)
             i += 1
         endWhile
         totals[8] = self.__Ms(Utility.GetCurrentRealTime() - t)
@@ -11344,14 +11349,14 @@ function __TeardownScenario()
         self.RegisterForModEvent("RPB_TestTeardownReset", "OnTestTeardownReset")
         self.SendModEvent("RPB_TestTeardownReset")
         float resetStart = Utility.GetCurrentRealTime()
-        while (!__teardownResetDone && (Utility.GetCurrentRealTime() - resetStart) < 15.0)
+        while (!__teardownResetDone && (Utility.GetCurrentRealTime() - resetStart) < 25.0) ; 25s: freeze experiment F waits 10s inside it
             Utility.Wait(0.25)
         endWhile
         self.UnregisterForModEvent("RPB_TestTeardownReset")
         if (__teardownResetDone)
             log("teardown: the player's reset finished in " + __Ms(Utility.GetCurrentRealTime() - resetStart) + "ms")
         else
-            log("teardown: the player's reset still running after 15s, restoring the player anyway (see the Recovery step marks)")
+            log("teardown: the player's reset still running after 25s, restoring the player anyway (see the Recovery step marks)")
             ; The cancel that gives stripped belongings back comes after the step that stalled: given back here
             RPB_Prison haafingar = (RPB_API.GetPrisonManager()).GetPrison("Haafingar")
             RPB_Prisoner stalledPrisoner = haafingar.Prisoners.AtKey(player)
@@ -11418,6 +11423,41 @@ function __TeardownScenario()
 endFunction
 
 bool __teardownResetDone = false
+
+; Freeze experiment E: the guard whose Captor the cancel kept on, probed every 0.5s from the Scene stop for 10s. Each probe on
+; its own stack (RPB_TestProbeOnce), straight away; this loop only sends them and looks whether one hung (IsFrozenGuard
+; marks and reports him once a probe has been open 3s)
+bool __probeSeriesRunning = false
+event OnTestProbeSeries(Form akGuard, float afSceneStoppedAt)
+    Actor guard = akGuard as Actor
+    if (!guard)
+        return
+    endif
+    __probeSeriesRunning = true
+    float elapsed = Utility.GetCurrentRealTime() - afSceneStoppedAt
+    while (elapsed < 14.0 && !RPB_Utility.IsFrozenGuard(guard)) ; past F's 10s wait: the revert's first seconds too
+        int handle = ModEvent.Create("RPB_TestProbeOnce")
+        if (handle)
+            ModEvent.PushForm(handle, guard)
+            ModEvent.PushString(handle, "Captor kept, " + (((elapsed * 10.0) as int) as float / 10.0) + "s after the Scene stop")
+            ModEvent.PushFloat(handle, Utility.GetCurrentRealTime())
+            ModEvent.Send(handle)
+        endif
+        Utility.Wait(0.5)
+        elapsed = Utility.GetCurrentRealTime() - afSceneStoppedAt
+    endWhile
+    ; The last probes' answers (a hung one is reported once it's been open 3s)
+    float tail = Utility.GetCurrentRealTime()
+    while (!RPB_Utility.IsFrozenGuard(guard) && RPB_Utility.IsGuardProbeOpen(guard) && (Utility.GetCurrentRealTime() - tail) < 4.0)
+        Utility.Wait(0.25)
+    endWhile
+    log("150: probe series on " + guard + " done after " + ((Utility.GetCurrentRealTime() - afSceneStoppedAt) as int) + "s, frozen " + RPB_Utility.IsFrozenGuard(guard) + " (experiment E)")
+    __probeSeriesRunning = false
+endEvent
+
+event OnTestProbeOnce(Form akGuard, string asStep, float afDueAt)
+    RPB_Utility.__RunGuardProbe(akGuard as Actor, asStep, afDueAt)
+endEvent
 bool __teardownGuardDone = false
 
 ; The teardown's reset of a real guard, on its own thread (see __TeardownScenario)
@@ -11677,6 +11717,70 @@ bool function __Scenario_FrozenGuardSkipped(string asTest)
     log(asTest + ": arrested by the frozen guard " + RPB_Utility.IsActorArrested(arrestee))
     ok = assert_false(RPB_Utility.IsActorArrested(arrestee), asTest + ": a frozen guard's arrest went ahead") && ok
     return ok
+endFunction
+
+;/
+    152/153: freeze isolation. Every guard freeze caught so far came within a second of his Captor effect finishing, while
+    other mods' scripted effects on him (XPMSE, IDA) were mid-change. This repeats only that part on one clone guard: the
+    Captor spell added, then taken off the way an arrest's end does (UnregisterCaptor: the spell, the list, the probes),
+    and a look 4.5s later whether a probe on him is still open (frozen). 152 keeps the finish's call on him
+    (RPB_Captor.OnDestroy -> IsDead), 153 skips it (experiment A). Up to 30 cycles, stopping at the first freeze; green =
+    no freeze. 154/155 (@abDetach): the clone is also moved into the prison (an unloaded interior) right as the spell
+    comes off, so his cell detaches while the effect finishes (the stuck XPMSE stack on FF000D54 was OnDetachedFromCell),
+    then brought back beside the player for the next cycle.
+/;
+bool function __Scenario_CaptorFinishCycles(string asTest, bool abCallsOff, bool abDetach = false)
+    Actor guard = __ScenarioGuard()
+    if (!guard)
+        return false
+    endif
+    Actor player = Game.GetFormEx(0x14) as Actor
+    ObjectReference away = none
+    if (abDetach)
+        away = (RPB_API.GetPrisonManager()).GetPrison("Haafingar").GetRandomJailCell(false)
+        if (!assert_true(away != none, asTest + ": no jail cell to send the clone to"))
+            return false
+        endif
+    endif
+    RPB_Utility.SetCaptorFinishCallsDisabledForTest(abCallsOff)
+    RPB_Arrest arrest = RPB_API.GetArrest()
+    Spell captorSpell = RPB_Utility.RPB_CaptorSpell()
+    log(asTest + ": clone guard " + guard + ", captor-finish calls " + string_if(abCallsOff, "off", "on"))
+
+    int cycle = 0
+    bool frozen = false
+    while (cycle < 30 && !frozen)
+        cycle += 1
+        guard.AddSpell(captorSpell, false)
+        Utility.Wait(0.5)
+        RPB_Captor captor = arrest.AwaitCaptorReference(guard, aiMaxTries = 20)
+        if (captor)
+            arrest.UnregisterCaptor(captor, abRemoveFromList = true) ; the spell off, the list, the 0/+1s/+3s probes
+        else
+            guard.RemoveSpell(captorSpell)
+            RPB_Utility.ProbeGuard(guard, asTest + " cycle " + cycle, 1.0)
+        endif
+        if (abDetach)
+            guard.MoveTo(away) ; his cell detaches while the Captor effect finishes
+        endif
+        ; By now the probes have answered and closed, unless he froze: then one is still open
+        Utility.Wait(4.5)
+        if (RPB_Utility.IsGuardProbeOpen(guard))
+            Utility.Wait(2.0) ; the +3s probe may just be running: a second look
+            frozen = RPB_Utility.IsGuardProbeOpen(guard)
+        endif
+        if (abDetach && !frozen)
+            guard.MoveTo(player, 200.0, 0.0, 0.0, false) ; back, loaded again, for the next cycle
+            Utility.Wait(1.5)
+        endif
+    endWhile
+    RPB_Utility.SetCaptorFinishCallsDisabledForTest(false)
+
+    if (frozen)
+        RPB_Utility.MarkGuardFrozen(guard, asTest + " cycle " + cycle) ; the report, with the effects on him
+    endif
+    log(asTest + ": " + string_if(frozen, "FROZE on cycle " + cycle, "no freeze in " + cycle + " cycles") + " (captor-finish calls " + string_if(abCallsOff, "off", "on") + ")")
+    return assert_false(frozen, asTest + ": the clone froze on cycle " + cycle)
 endFunction
 
 ;/
@@ -12517,16 +12621,42 @@ function __TeardownAllTempActors()
         return ; nothing tracked (already torn down)
     endif
 
+    ; Experiment E: the probe series on the kept guard runs out first (it ends early on a freeze)
+    float seriesWait = Utility.GetCurrentRealTime()
+    while (__probeSeriesRunning && (Utility.GetCurrentRealTime() - seriesWait) < 20.0)
+        Utility.Wait(0.25)
+    endWhile
+
     RPB_Prison solitudePrison = (RPB_API.GetPrisonManager()).GetPrison("Haafingar")
     RPB_Arrest arrest = RPB_API.GetArrest()
     RPB_SceneManager sceneManager = RPB_API.GetSceneManager()
 
-    ; Pass 1: unregister, and take the spells off so the effects finish
+    ; A probe still open on a temp actor (a Captor just came off him): its answer first. A frozen one is left alone below:
+    ; every call on him waits forever (150's teardown hung on one each time)
     int i = 0
+    while (i < __testTempActorCount)
+        ; Experiment D: a guard whose release waits for his package change gets it first (the spell coming off below
+        ; would skip it)
+        float releaseWait = Utility.GetCurrentRealTime()
+        while (__testTempActors[i] && RPB_StorageVars.GetFormOnReference("Release Pending", __testTempActors[i], "Captor") && (Utility.GetCurrentRealTime() - releaseWait) < 8.0)
+            Utility.Wait(0.25)
+        endWhile
+        float probeWait = Utility.GetCurrentRealTime()
+        while (__testTempActors[i] && RPB_Utility.IsGuardProbeOpen(__testTempActors[i]) && !RPB_Utility.IsFrozenGuard(__testTempActors[i]) && (Utility.GetCurrentRealTime() - probeWait) < 6.0)
+            Utility.Wait(0.25)
+        endWhile
+        if (__testTempActors[i] && RPB_Utility.IsFrozenGuard(__testTempActors[i]))
+            log("teardown: " + __testTempActors[i] + " is frozen, left alone (gone with the next load)")
+        endif
+        i += 1
+    endWhile
+
+    ; Pass 1: unregister, and take the spells off so the effects finish
+    i = 0
     while (i < __testTempActorCount)
         Actor tempActor = __testTempActors[i]
 
-        if (tempActor)
+        if (tempActor && !RPB_Utility.IsFrozenGuard(tempActor))
             ; A Scene still playing with a deleted actor kept the queue busy into the next test (107 once lost its
             ; confrontation that way, behind 106's escort)
             sceneManager.EndSceneWithActor(tempActor, "test teardown")
@@ -12603,7 +12733,9 @@ function __TeardownAllTempActors()
     ; A stripped temp actor leaves its (shared) base "Naked"
     i = 0
     while (i < __testTempActorCount)
-        RPB_Utility.HealNakedBaseOutfit(__testTempActors[i])
+        if (!RPB_Utility.IsFrozenGuard(__testTempActors[i]))
+            RPB_Utility.HealNakedBaseOutfit(__testTempActors[i])
+        endif
         i += 1
     endWhile
 
@@ -12616,8 +12748,10 @@ function __TeardownAllTempActors()
 
         if (tempActor2)
             RPB_StorageVars.DeleteAllOnReference(tempActor2)
-            tempActor2.Disable()
-            tempActor2.Delete()
+            if (!RPB_Utility.IsFrozenGuard(tempActor2))
+                tempActor2.Disable()
+                tempActor2.Delete()
+            endif
         endif
 
         i += 1
@@ -12832,7 +12966,7 @@ endFunction
 string __statelessTest = ""
 
 bool function __RunStatelessTest(string asTest)
-    if (asTest != "Test_ArrestWaitsWhileGuardFights_NoPackage" && asTest != "Test_CellDoorsDiagnostic" && asTest != "Test_LongAbsenceSetup" && asTest != "Test_LongAbsenceAdvance" && asTest != "Test_LongAbsenceVerify" && asTest != "Test_FallbackEscortToCellStopped_Player" && asTest != "Test_FallbackEscortToCellStopped_CloneGuard" && asTest != "Test_FightDuringEscort_NPC" && asTest != "Test_FightDuringEscort_Player" && asTest != "Test_GuardDiesInPrison_Player" && asTest != "Test_EscortToCellStopped_NoPackageLock" && StringUtil.Find(asTest, "Test_Surrender_") != 0 && asTest != "Test_FrozenGuardSkipped" && asTest != "Test_GuardDiesInPrison_NobodySees" && asTest != "Test_Escort_FreeWalk" && asTest != "Test_ToggleEscortToCell04")
+    if (asTest != "Test_ArrestWaitsWhileGuardFights_NoPackage" && asTest != "Test_CellDoorsDiagnostic" && asTest != "Test_LongAbsenceSetup" && asTest != "Test_LongAbsenceAdvance" && asTest != "Test_LongAbsenceVerify" && asTest != "Test_FallbackEscortToCellStopped_Player" && asTest != "Test_FallbackEscortToCellStopped_CloneGuard" && asTest != "Test_FightDuringEscort_NPC" && asTest != "Test_FightDuringEscort_Player" && asTest != "Test_GuardDiesInPrison_Player" && asTest != "Test_EscortToCellStopped_NoPackageLock" && StringUtil.Find(asTest, "Test_Surrender_") != 0 && asTest != "Test_FrozenGuardSkipped" && asTest != "Test_GuardDiesInPrison_NobodySees" && asTest != "Test_Escort_FreeWalk" && asTest != "Test_ToggleEscortToCell04" && asTest != "Test_CaptorFinishCycles_Calls" && asTest != "Test_CaptorFinishCycles_NoCalls" && asTest != "Test_CaptorFinishDetach_Calls" && asTest != "Test_CaptorFinishDetach_NoCalls" && asTest != "Test_Escort_FreeWalk_Control")
         return false
     endif
 
@@ -12920,7 +13054,46 @@ bool function __RunStatelessTest(string asTest)
         Debug.Notification("Escort to the cell: " + (RPB_API.GetSceneManager()).EscortToCellSceneName())
         display_result(RPB_Utility.IsEscortToCell04ForTest() == useFour)
     elseif (asTest == "Test_Escort_FreeWalk")
+        ; Freeze experiment F (round 105): E (the Captor kept on, probed every 0.5s on my own stacks) and C (a wait right
+        ; after the Scene stop, 10s with E): the Scene stop alone for 10s, the player's arrest reverted only after. E froze
+        ; within 0.5s of the stop with the Captor on, while the cancel was reverting the player's arrest
+        __probeSeriesRunning = false
+        self.RegisterForModEvent("RPB_TestProbeSeries", "OnTestProbeSeries")
+        self.RegisterForModEvent("RPB_TestProbeOnce", "OnTestProbeOnce")
+        ; Back to F (round 111): G1-G3 ran in a session that froze nowhere (round 110); F against 156 in batches in a
+        ; session that does freeze. The G switches stay in the code, off
+        RPB_Utility.SetCaptorKeptForTest(true)
+        RPB_Utility.SetSceneEndSpacedForTest(true)
+        log("150: the Scene stop alone for 10s (Captor on, arrest not reverted), probed every 0.5s (freeze experiment F)")
         display_result(__Scenario_EscortFreeWalk("150"))
+        __TeardownScenario()
+        RPB_Utility.SetSceneEndSpacedForTest(false)
+        RPB_Utility.SetCaptorKeptForTest(false)
+    elseif (asTest == "Test_CaptorFinishCycles_Calls")
+        display_result(__Scenario_CaptorFinishCycles("152", abCallsOff = false))
+        __TeardownScenario()
+    elseif (asTest == "Test_CaptorFinishCycles_NoCalls")
+        display_result(__Scenario_CaptorFinishCycles("153", abCallsOff = true))
+        __TeardownScenario()
+    elseif (asTest == "Test_CaptorFinishDetach_Calls")
+        display_result(__Scenario_CaptorFinishCycles("154", abCallsOff = false, abDetach = true))
+        __TeardownScenario()
+    elseif (asTest == "Test_CaptorFinishDetach_NoCalls")
+        display_result(__Scenario_CaptorFinishCycles("155", abCallsOff = true, abDetach = true))
+        __TeardownScenario()
+    elseif (asTest == "Test_Escort_FreeWalk_Control")
+        ; Freeze control (round 109): 150 as it was before the experiments, the normal release order: the Scene stop, the
+        ; guard's release and the player's revert all at once. Every experiment switch off, in case one was left on; the
+        ; Scene-stop and Captor-removal probes are production code and stay
+        RPB_Utility.SetCaptorFinishCallsDisabledForTest(false)
+        RPB_Utility.SetSceneEndSpacedForTest(false)
+        RPB_Utility.SetReleaseOnPackageChangeForTest(false)
+        RPB_Utility.SetCaptorKeptForTest(false)
+        RPB_Utility.SetAIFlipFirstForTest(false)
+        RPB_Utility.SetRevertFirstForTest(false)
+        RPB_Utility.SetImprisonmentCancelFirstForTest(false)
+        log("156: 150 with the normal release order, no experiment on (freeze control)")
+        display_result(__Scenario_EscortFreeWalk("156"))
         __TeardownScenario()
     elseif (asTest == "Test_FrozenGuardSkipped")
         display_result(__Scenario_FrozenGuardSkipped("147"))
