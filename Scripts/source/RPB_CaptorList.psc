@@ -9,7 +9,7 @@ string function GetCaptorID(Actor akActor)
 endFunction
 
 RPB_Captor function AtKey(Actor akActor)
-    return parent.GetAt("Captor["+ akActor.GetFormID() +"]") as RPB_Captor
+    return self.__EntryOf(akActor) as RPB_Captor ; the actor index: no call into him
 endFunction
 
 RPB_Captor function AtIndex(int aiIndex)
@@ -21,7 +21,11 @@ bool function Exists(RPB_Captor apCaptor)
 endFunction
 
 bool function Add(RPB_Captor apCaptorRef)
-    string elementKey = self.GetCaptorID(apCaptorRef.GetActor())
+    Actor captorActor = apCaptorRef.GetActor()
+    string elementKey = self.KeyOf(captorActor)
+    if (elementKey == "")
+        elementKey = self.GetCaptorID(captorActor) ; a new entry: his key built once
+    endif
 
     ; A key that already exists holds the instance of an effect that ended (the actor unloaded and loaded again, which starts
     ; a new instance): point it at this live one instead of refusing the duplicate. Mirrors RPB_PrisonerList.Add() - a guard's
@@ -31,10 +35,17 @@ bool function Add(RPB_Captor apCaptorRef)
     else
         parent.AddElement(apCaptorRef, elementKey)
     endif
+    self.__IndexActor(captorActor, elementKey)
 endFunction
 
 function Remove(RPB_Captor apCaptor)
-    protected_remove(self.GetCaptorID(apCaptor.GetActor()))
+    Actor captorActor = apCaptor.GetActor()
+    string elementKey = self.KeyOf(captorActor)
+    if (elementKey == "")
+        elementKey = self.GetCaptorID(captorActor)
+    endif
+    protected_remove(elementKey)
+    self.__UnindexActor(captorActor)
 endFunction
 
 
@@ -44,6 +55,5 @@ string function GetActorIdentifier(Actor akActor) ; override
 endFunction
 
 RPB_ActorBase function AtKeyEx(Actor akActor)
-    string elementKey = self.GetActorIdentifier(akActor)
-    return parent.GetAt(elementKey) as RPB_ActorBase
+    return self.__EntryOf(akActor)
 endFunction

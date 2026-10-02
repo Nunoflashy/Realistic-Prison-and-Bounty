@@ -242,6 +242,7 @@ function SetTests()
     self.AddTest("154 - Freeze Isolation: 152's Cycles, the Clone Moved Into the (Unloaded) Prison as the Spell Comes Off, Then Back", "Test_CaptorFinishDetach_Calls", abChainable = false)
     self.AddTest("155 - Freeze Isolation: 154 With No Call on Him From the Finishing Effect (experiment A)", "Test_CaptorFinishDetach_NoCalls", abChainable = false)
     self.AddTest("156 - Freeze Control: 150 With the Normal Release Order (no experiment on)", "Test_Escort_FreeWalk_Control", abChainable = false)
+    self.AddTest("157 - Diagnostic: Actor Keys Without Calling the Actor (string, JDB path, JFormMap; timings)", "Test_ActorKeys", abChainable = false)
     self.AddTest("041 - ActiveMagicEffectContainer: Stuck Lock Self-Heals", "Test_ActiveMagicEffectContainer_StuckLockSelfHeals")
     self.AddTest("042 - ThreadLock: JAtomic Primitive Semantics and Registry", "Test_ThreadLock_PrimitiveSemantics")
     ; Not chainable: fires concurrent worker threads
@@ -11726,6 +11727,120 @@ bool function __Scenario_FrozenGuardSkipped(string asTest)
 endFunction
 
 ;/
+    157: can the actor lists be keyed without calling the actor (today's keys come from GetFormID(), a call into him that
+    hangs on a frozen one)? For the player and a nearby NPC: the actor as a string through a Form, an ObjectReference and
+    an Actor variable (the logs show the same actor as [Actor <...>], [ObjectReference <...>] or a script name); a JMap
+    keyed by that string, written, read and iterated back; the same string inside a JDB path (its "." and "[]" are path
+    syntax); a JFormMap keyed by the actor, read through a differently typed variable; and the cost of each against
+    GetFormID(). Green = a direct string key and a JFormMap both work; the rest is logged for the decision.
+/;
+bool function __Scenario_ActorKeys(string asTest)
+    Actor player = Game.GetPlayer()
+    Actor npc = none
+    Actor[] nearby = PO3_SKSEFunctions.GetActorsByProcessingLevel(0)
+    int i = 0
+    while (!npc && i < nearby.Length)
+        if (nearby[i] && nearby[i] != player)
+            npc = nearby[i]
+        endif
+        i += 1
+    endWhile
+    if (!npc)
+        log(asTest + ": no NPC nearby, stand near one and run it again")
+        return false
+    endif
+
+    ; 1. The string forms
+    Form npcForm = npc
+    ObjectReference npcRef = npc
+    Actor npcActor = npc
+    Form playerForm = player
+    ObjectReference playerRef = player
+    string npcAsForm = npcForm as string
+    string npcAsRef = npcRef as string
+    string npcAsActor = npcActor as string
+    string playerAsForm = playerForm as string
+    string playerAsRef = playerRef as string
+    string playerAsActor = player as string
+    bool npcStringsSame = npcAsForm == npcAsRef && npcAsRef == npcAsActor
+    bool playerStringsSame = playerAsForm == playerAsRef && playerAsRef == playerAsActor
+    log(asTest + ": NPC as Form '" + npcAsForm + "', as ObjectReference '" + npcAsRef + "', as Actor '" + npcAsActor + "' (same: " + npcStringsSame + ")")
+    log(asTest + ": player as Form '" + playerAsForm + "', as ObjectReference '" + playerAsRef + "', as Actor '" + playerAsActor + "' (same: " + playerStringsSame + ")")
+
+    ; 2. A JMap keyed by the string, directly
+    int byString = JValue.retain(JMap.object())
+    JMap.setInt(byString, npcAsActor, 7)
+    JMap.setInt(byString, playerAsActor, 8)
+    bool stringRead = JMap.getInt(byString, npcAsActor) == 7 && JMap.getInt(byString, playerAsActor) == 8
+    bool stringHas = JMap.hasKey(byString, npcAsActor) && JMap.hasKey(byString, playerAsActor)
+    string firstKey = JMap.nextKey(byString)
+    string secondKey = JMap.nextKey(byString, firstKey)
+    bool stringIterates = (firstKey == npcAsActor || firstKey == playerAsActor) && (secondKey == npcAsActor || secondKey == playerAsActor) && firstKey != secondKey
+    bool stringCrossType = JMap.getInt(byString, npcAsRef) == 7 ; read with the ObjectReference-typed string
+    log(asTest + ": JMap string key: read " + stringRead + ", hasKey " + stringHas + ", iterates back " + stringIterates + " ('" + firstKey + "', '" + secondKey + "'), read with the ObjectReference string " + stringCrossType)
+
+    ; 3. The same string inside a JDB path
+    JDB.solveIntSetter(".rpbKeyTest." + npcAsActor, 7, true)
+    int viaPath = JDB.solveInt(".rpbKeyTest." + npcAsActor)
+    JDB.solveIntSetter(".rpbKeyTest.plain", 5, true)
+    int plainPath = JDB.solveInt(".rpbKeyTest.plain")
+    log(asTest + ": JDB path with the string: wrote and read " + viaPath + " (7 expected); a plain key in the same path read " + plainPath + " (5 expected)")
+    JDB.setObj("rpbKeyTest", 0)
+
+    ; 4. A JFormMap keyed by the actor
+    int byForm = JValue.retain(JFormMap.object())
+    JFormMap.setInt(byForm, npc, 7)
+    JFormMap.setInt(byForm, player, 8)
+    bool formRead = JFormMap.getInt(byForm, npc) == 7 && JFormMap.getInt(byForm, player) == 8
+    bool formCrossType = JFormMap.getInt(byForm, npcRef) == 7 && JFormMap.getInt(byForm, npcForm) == 7 && JFormMap.getInt(byForm, playerRef) == 8
+    bool formHas = JFormMap.hasKey(byForm, npc) && JFormMap.count(byForm) == 2
+    Form formFirst = JFormMap.nextKey(byForm)
+    Form formSecond = JFormMap.nextKey(byForm, formFirst)
+    bool formIterates = (formFirst == npc || formFirst == player) && (formSecond == npc || formSecond == player) && formFirst != formSecond
+    log(asTest + ": JFormMap: read " + formRead + ", read through ObjectReference/Form variables " + formCrossType + ", hasKey/count " + formHas + ", iterates back " + formIterates)
+
+    ; 5. The cost of each, 300 calls
+    int n = 300
+    float t0 = Utility.GetCurrentRealTime()
+    i = 0
+    while (i < n)
+        npc.GetFormID()
+        i += 1
+    endWhile
+    float msFormID = (Utility.GetCurrentRealTime() - t0) * 1000.0 / n
+    t0 = Utility.GetCurrentRealTime()
+    i = 0
+    while (i < n)
+        JFormMap.getInt(byForm, npc)
+        i += 1
+    endWhile
+    float msFormMap = (Utility.GetCurrentRealTime() - t0) * 1000.0 / n
+    t0 = Utility.GetCurrentRealTime()
+    i = 0
+    string cast = ""
+    while (i < n)
+        cast = npcActor as string
+        i += 1
+    endWhile
+    float msCast = (Utility.GetCurrentRealTime() - t0) * 1000.0 / n
+    t0 = Utility.GetCurrentRealTime()
+    i = 0
+    while (i < n)
+        JMap.getInt(byString, npcAsActor)
+        i += 1
+    endWhile
+    float msStringMap = (Utility.GetCurrentRealTime() - t0) * 1000.0 / n
+    log(asTest + ": per call (" + n + " each): GetFormID " + msFormID + " ms, JFormMap.getInt " + msFormMap + " ms, the string cast " + msCast + " ms, JMap.getInt by string " + msStringMap + " ms")
+
+    JValue.release(byString)
+    JValue.release(byForm)
+
+    bool ok = assert_true(stringRead && stringHas && stringIterates, asTest + ": a JMap keyed by the actor's string didn't round-trip")
+    ok = assert_true(formRead && formCrossType && formHas && formIterates, asTest + ": a JFormMap keyed by the actor didn't round-trip") && ok
+    return ok
+endFunction
+
+;/
     152/153: freeze isolation. Every guard freeze caught so far came within a second of his Captor effect finishing, while
     other mods' scripted effects on him (XPMSE, IDA) were mid-change. This repeats only that part on one clone guard: the
     Captor spell added, then taken off the way an arrest's end does (UnregisterCaptor: the spell, the list, the probes),
@@ -12972,7 +13087,7 @@ endFunction
 string __statelessTest = ""
 
 bool function __RunStatelessTest(string asTest)
-    if (asTest != "Test_ArrestWaitsWhileGuardFights_NoPackage" && asTest != "Test_CellDoorsDiagnostic" && asTest != "Test_LongAbsenceSetup" && asTest != "Test_LongAbsenceAdvance" && asTest != "Test_LongAbsenceVerify" && asTest != "Test_FallbackEscortToCellStopped_Player" && asTest != "Test_FallbackEscortToCellStopped_CloneGuard" && asTest != "Test_FightDuringEscort_NPC" && asTest != "Test_FightDuringEscort_Player" && asTest != "Test_GuardDiesInPrison_Player" && asTest != "Test_EscortToCellStopped_NoPackageLock" && StringUtil.Find(asTest, "Test_Surrender_") != 0 && asTest != "Test_FrozenGuardSkipped" && asTest != "Test_GuardDiesInPrison_NobodySees" && asTest != "Test_Escort_FreeWalk" && asTest != "Test_ToggleEscortToCell04" && asTest != "Test_CaptorFinishCycles_Calls" && asTest != "Test_CaptorFinishCycles_NoCalls" && asTest != "Test_CaptorFinishDetach_Calls" && asTest != "Test_CaptorFinishDetach_NoCalls" && asTest != "Test_Escort_FreeWalk_Control")
+    if (asTest != "Test_ArrestWaitsWhileGuardFights_NoPackage" && asTest != "Test_CellDoorsDiagnostic" && asTest != "Test_LongAbsenceSetup" && asTest != "Test_LongAbsenceAdvance" && asTest != "Test_LongAbsenceVerify" && asTest != "Test_FallbackEscortToCellStopped_Player" && asTest != "Test_FallbackEscortToCellStopped_CloneGuard" && asTest != "Test_FightDuringEscort_NPC" && asTest != "Test_FightDuringEscort_Player" && asTest != "Test_GuardDiesInPrison_Player" && asTest != "Test_EscortToCellStopped_NoPackageLock" && StringUtil.Find(asTest, "Test_Surrender_") != 0 && asTest != "Test_FrozenGuardSkipped" && asTest != "Test_GuardDiesInPrison_NobodySees" && asTest != "Test_Escort_FreeWalk" && asTest != "Test_ToggleEscortToCell04" && asTest != "Test_CaptorFinishCycles_Calls" && asTest != "Test_CaptorFinishCycles_NoCalls" && asTest != "Test_CaptorFinishDetach_Calls" && asTest != "Test_CaptorFinishDetach_NoCalls" && asTest != "Test_Escort_FreeWalk_Control" && asTest != "Test_ActorKeys")
         return false
     endif
 
@@ -13087,6 +13202,8 @@ bool function __RunStatelessTest(string asTest)
     elseif (asTest == "Test_CaptorFinishDetach_NoCalls")
         display_result(__Scenario_CaptorFinishCycles("155", abCallsOff = true, abDetach = true))
         __TeardownScenario()
+    elseif (asTest == "Test_ActorKeys")
+        display_result(__Scenario_ActorKeys("157"))
     elseif (asTest == "Test_Escort_FreeWalk_Control")
         ; Freeze control (round 109): 150 as it was before the experiments, the normal release order: the Scene stop, the
         ; guard's release and the player's revert all at once. Every experiment switch off, in case one was left on; the

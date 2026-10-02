@@ -84,6 +84,8 @@ function PerformSetup()
 endFunction
 
 function PerformMaintenance()
+    ; Every load gets its own stamp: the actor lists rebuild their actor index once when it changes (RPB_ActorList)
+    JDB.solveFltSetter(".rpb_root.loadStamp", Utility.GetCurrentRealTime(), true)
     API.MCM.EnsureAllOptionDefaults() ; repairs saves that never visited every page
     EventManager.RegisterEvents()
     RPB_Utility.ClearFrozenGuards() ; a load drops a frozen guard's broken object: he answers again

@@ -9,8 +9,7 @@ string function GetPrisonerID(Actor akActor)
 endFunction
 
 RPB_Prisoner function AtKey(Actor akActor)
-    string elementKey = self.GetPrisonerID(akActor)
-    return parent.GetAt(elementKey) as RPB_Prisoner
+    return self.__EntryOf(akActor) as RPB_Prisoner ; the actor index: no call into him
 endFunction
 
 RPB_Prisoner function AtIndex(int aiIndex)
@@ -22,7 +21,11 @@ bool function Exists(RPB_Prisoner apPrisoner)
 endFunction
 
 bool function Add(RPB_Prisoner apPrisonerRef)
-    string elementKey = self.GetPrisonerID(apPrisonerRef.GetActor())
+    Actor prisonerActor = apPrisonerRef.GetActor()
+    string elementKey = self.KeyOf(prisonerActor)
+    if (elementKey == "")
+        elementKey = self.GetPrisonerID(prisonerActor) ; a new entry: his key built once
+    endif
 
     ; A key that already exists holds the instance of an effect that ended (the actor unloaded and loaded again, which starts
     ; a new instance): point it at this live one instead of refusing the duplicate.
@@ -31,10 +34,15 @@ bool function Add(RPB_Prisoner apPrisonerRef)
     else
         parent.AddElement(apPrisonerRef, elementKey)
     endif
+    self.__IndexActor(prisonerActor, elementKey)
 endFunction
 
 function Remove(RPB_Prisoner apPrisoner)
-    string elementKey = self.GetPrisonerID(apPrisoner.GetActor())
+    Actor prisonerActor = apPrisoner.GetActor()
+    string elementKey = self.KeyOf(prisonerActor)
+    if (elementKey == "")
+        elementKey = self.GetPrisonerID(prisonerActor)
+    endif
 
     RPB_Utility.Debug("PrisonerList::Remove", "Removed Prisoner " + apPrisoner + " ["+ apPrisoner.Name +"]")
 
@@ -45,6 +53,7 @@ function Remove(RPB_Prisoner apPrisoner)
     ; apPrisoner.RemoveAll("Arrest") ; Needs to be reviewed, do we really want to delete Arrest-related category for Prisoners?
 
     parent.RemoveElement(elementKey)
+    self.__UnindexActor(prisonerActor)
 endFunction
 
 
@@ -54,8 +63,7 @@ string function GetActorIdentifier(Actor akActor) ; override
 endFunction
 
 RPB_ActorBase function AtKeyEx(Actor akActor)
-    string elementKey = self.GetActorIdentifier(akActor)
-    return parent.GetAt(elementKey) as RPB_ActorBase
+    return self.__EntryOf(akActor)
 endFunction
 
 ; function Remove(RPB_ActorBase apPrisoner)

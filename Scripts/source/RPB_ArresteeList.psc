@@ -9,8 +9,7 @@ string function GetArresteeID(Actor akActor)
 endFunction
 
 RPB_Arrestee function AtKey(Actor akActor)
-    string elementKey = self.GetArresteeID(akActor)
-    return parent.GetAt(elementKey) as RPB_Arrestee
+    return self.__EntryOf(akActor) as RPB_Arrestee ; the actor index: no call into him
 endFunction
 
 RPB_Arrestee function AtIndex(int aiIndex)
@@ -22,7 +21,11 @@ bool function Exists(RPB_Arrestee apArrestee)
 endFunction
 
 bool function Add(RPB_Arrestee apArrestee)
-    string elementKey = self.GetArresteeID(apArrestee.GetActor())
+    Actor arresteeActor = apArrestee.GetActor()
+    string elementKey = self.KeyOf(arresteeActor)
+    if (elementKey == "")
+        elementKey = self.GetArresteeID(arresteeActor) ; a new entry: his key built once
+    endif
 
     ; A key that already exists holds the instance of an effect that ended (the actor unloaded and loaded again, which starts
     ; a new instance): point it at this live one instead of refusing the duplicate. Mirrors RPB_PrisonerList.Add() - this list
@@ -32,11 +35,17 @@ bool function Add(RPB_Arrestee apArrestee)
     else
         parent.AddElement(apArrestee, elementKey)
     endif
+    self.__IndexActor(arresteeActor, elementKey)
 endFunction
 
 function Remove(RPB_Arrestee apArrestee)
-    string elementKey = self.GetArresteeID(apArrestee.GetActor())
+    Actor arresteeActor = apArrestee.GetActor()
+    string elementKey = self.KeyOf(arresteeActor)
+    if (elementKey == "")
+        elementKey = self.GetArresteeID(arresteeActor)
+    endif
     parent.RemoveElement(elementKey)
+    self.__UnindexActor(arresteeActor)
 
     Spell arresteeSpell = RPB_Utility.RPB_ArresteeSpell()
     apArrestee.RemoveSpell(arresteeSpell)
@@ -50,8 +59,7 @@ string function GetActorIdentifier(Actor akActor) ; override
 endFunction
 
 RPB_ActorBase function AtKeyEx(Actor akActor)
-    string elementKey = self.GetActorIdentifier(akActor)
-    return parent.GetAt(elementKey) as RPB_ActorBase
+    return self.__EntryOf(akActor)
 endFunction
 
 ; function Remove(RPB_ActorBase apArrestee)
