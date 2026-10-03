@@ -100,6 +100,7 @@ function RegisterEvents()
     ; Topic Info Event Handlers (TIF Scripts)
     RegisterForModEvent("RPB_TopicInfoStart", "OnDialogueTopicStart")
     RegisterForModEvent("RPB_TopicInfoEnd", "OnDialogueTopicEnd")
+    RegisterForModEvent("RPB_CrimeLineBegan", "OnCrimeLineBegan")
 
     RegisterForModEvent("RPB_PayBounty", "OnPayBounty")                 ; Happens when the player is about to pay their bounty
 
@@ -605,11 +606,16 @@ event OnCombatYield(string eventName, string unusedStr, float unusedFlt, Form se
         return
     endif
 
-    Actor yieldedArrestee = self.__DialogueTargetOf(guard, "EventManager::OnCombatYield")
+    ; A real dialogue target only, not __DialogueTargetOf's nearby-player fallback: a yield bark ("All right, you've had
+    ; enough") has none, and with the fallback (0.13.1) every yield arrested the player on the spot. Without it, as before,
+    ; the guard's own forcegreet follows and the arrest dialogue decides
+    Actor yieldedArrestee = guard.GetDialogueTarget()
+    if (yieldedArrestee == guard)
+        yieldedArrestee = none
+    endif
 
-    ; Failed to get dialogue target even with fallback, player must not be near
     if (!yieldedArrestee)
-        RPB_Utility.LogError("Could not get the dialogue target of " + guard + ", returning...", "EventManager::OnCombatYield")
+        RPB_Utility.Debug("EventManager::OnCombatYield", guard + "'s yield line has no dialogue target: left to his forcegreet")
         Trace("EventManager::OnCombatYield", "Stack Trace: [\n" + \
             "\teventName: " + eventName + "\n" + \
             "\tsender: " + sender + "\n" + \
@@ -1121,13 +1127,18 @@ Actor function __DialogueTargetOf(Actor akSpeaker, string asCaller)
     return none
 endFunction
 
+; A crime line began (RPB_Utility.ProbeSpeaker): a speaker whose earlier line is still stuck is probed
+event OnCrimeLineBegan(Form akSpeaker)
+    RPB_Utility.__NoteCrimeLine(akSpeaker as Actor)
+endEvent
+
 event OnDialogueTopicStart(string topicInfoDialogue, float topicInfoTypeFlt, Form sender, float afStartedAt)
     string eventName = "RPB_TopicInfoStart"
     int topicInfoType = (topicInfoTypeFlt as int)
     Actor akSpeaker = (sender as Actor)
 
     if (!RPB_Utility.IsTopicInfoFresh(afStartedAt))
-        RPB_Utility.LogWarn("Ignored a crime line by " + akSpeaker + " that began " + ((Utility.GetCurrentRealTime() - afStartedAt) as int) + "s ago (a replay after a load): '" + topicInfoDialogue + "'", "EventManager::OnDialogueTopicStart")
+        RPB_Utility.LogWarn("Ignored a crime line by " + akSpeaker + " that began before the last load (a replay): '" + topicInfoDialogue + "'", "EventManager::OnDialogueTopicStart")
         return
     endif
 
@@ -1169,7 +1180,7 @@ event OnDialogueTopicEnd(string topicInfoDialogue, float topicInfoTypeFlt, Form 
     Actor akSpeaker     = (sender as Actor)
 
     if (!RPB_Utility.IsTopicInfoFresh(afStartedAt))
-        RPB_Utility.LogWarn("Ignored a crime line by " + akSpeaker + " that began " + ((Utility.GetCurrentRealTime() - afStartedAt) as int) + "s ago (a replay after a load): '" + topicInfoDialogue + "'", "EventManager::OnDialogueTopicEnd")
+        RPB_Utility.LogWarn("Ignored a crime line by " + akSpeaker + " that began before the last load (a replay): '" + topicInfoDialogue + "'", "EventManager::OnDialogueTopicEnd")
         return
     endif
 

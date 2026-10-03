@@ -251,6 +251,7 @@ function SetTests()
     self.AddTest("163 - Start an Escort to Jail by a Freezable Guard (Player; left running for the freeze key)", "Test_FreezableEscort_Player", abChainable = false)
     self.AddTest("164 - Start an Escort to Jail by a Freezable Guard (NPC; left running for the freeze key)", "Test_FreezableEscort_NPC", abChainable = false)
     self.AddTest("165 - Diagnostic: Does a Light Hold Still Freeze Him (a call on himself per frame, not a busy loop)", "Test_LightHold", abChainable = false)
+    self.AddTest("166 - Kill the Nearest Frozen Freezable Guard (the teardown's test-only kill; freeze him first)", "Test_KillFrozenGuard", abChainable = false)
     self.AddTest("041 - ActiveMagicEffectContainer: Stuck Lock Self-Heals", "Test_ActiveMagicEffectContainer_StuckLockSelfHeals")
     self.AddTest("042 - ThreadLock: JAtomic Primitive Semantics and Registry", "Test_ThreadLock_PrimitiveSemantics")
     ; Not chainable: fires concurrent worker threads
@@ -10778,11 +10779,10 @@ function __KillFrozenClone(Actor akClone)
         log("teardown: " + akClone + " is frozen, left alone (no RPB_TestKillSpell in the plugin)")
         return
     endif
-    ObjectReference marker = Game.GetPlayer().PlaceAtMe(Game.GetFormEx(0x3B)) ; XMarker
-    marker.MoveTo(akClone)
-    killSpell.Cast(marker, akClone)
-    Utility.Wait(1.0)
-    marker.Delete()
+    ; Cast by himself: an XMarker has no 3D and cast nothing (10 of 10 survived, 2026-10-03), and cast by the player the
+    ; kill would be the player's crime. Spell.Cast is a call on the spell, not on him
+    killSpell.Cast(akClone, akClone)
+    Utility.Wait(2.0)
     log("teardown: " + akClone + " is frozen, killed (test-only spell; dead now: " + RPB_Utility.IsDeadNoCall(akClone) + ")")
 endFunction
 bool __scenarioEscortStartForced
@@ -12240,6 +12240,20 @@ bool function __HoldFreezesHim(Actor akGuard, bool abLight)
     return held && !answeredDuring && answeredAfter
 endFunction
 
+; 166: the teardown's kill (__KillFrozenClone) on a frozen freezable guard: freeze one with the freeze key (161 spawns one)
+; and wait for RPB's FROZEN report first. Green = he's dead
+bool function __Scenario_KillFrozenGuard(string asTest)
+    Actor target = __NearestFreezableGuard(4000.0)
+    if (!assert_true(target != none, asTest + ": no freezable guard nearby (161 spawns one)"))
+        return false
+    endif
+    if (!assert_true(RPB_Utility.IsFrozenGuard(target), asTest + ": " + target + " isn't marked frozen yet (freeze key, then wait for the FROZEN report)"))
+        return false
+    endif
+    self.__KillFrozenClone(target)
+    return assert_true(RPB_Utility.IsDeadNoCall(target), asTest + ": " + target + " survived the kill")
+endFunction
+
 ; Passes of a loop making one global call each, over @afSeconds
 int function __VMThroughput(float afSeconds)
     int passes = 0
@@ -12349,7 +12363,9 @@ function ToggleManualFreeze()
         RPB_Utility.ClearFrozenGuards()
         __manualFreezeGuard = none
         log("freeze key: released " + released + " after " + __Ms(holdTime) + "ms (RPB had marked him frozen: " + wasMarked + ")")
-        Debug.Notification("RPB test: guard released (" + (holdTime as int) + "s frozen)")
+        if (IsDebuggingEnabled())
+            Debug.Notification("RPB test: guard released (" + (holdTime as int) + "s frozen)")
+        endif    
         return
     endif
 
@@ -12370,7 +12386,10 @@ function ToggleManualFreeze()
     ; Found the way RPB finds a real one (a probe, a few seconds later), so what follows a freeze RPB knows of can be tested
     RPB_Utility.ProbeGuardAfterBurst(target, "freeze key")
     log("freeze key: froze " + target + " (player " + (Game.GetPlayer().GetDistance(target) as int) + " away, in " + Game.GetPlayer().GetParentCell() + ")")
-    Debug.Notification("RPB test: guard frozen (press again to release)")
+    
+    if (IsDebuggingEnabled())
+        Debug.Notification("RPB test: guard frozen (press again to release)")
+    endif
 endFunction
 
 ; Casts and the player's distance only: no call on any of them
@@ -13759,7 +13778,7 @@ endFunction
 string __statelessTest = ""
 
 bool function __RunStatelessTest(string asTest)
-    if (asTest != "Test_ArrestWaitsWhileGuardFights_NoPackage" && asTest != "Test_CellDoorsDiagnostic" && asTest != "Test_LongAbsenceSetup" && asTest != "Test_LongAbsenceAdvance" && asTest != "Test_LongAbsenceVerify" && asTest != "Test_FallbackEscortToCellStopped_Player" && asTest != "Test_FallbackEscortToCellStopped_CloneGuard" && asTest != "Test_FightDuringEscort_NPC" && asTest != "Test_FightDuringEscort_Player" && asTest != "Test_GuardDiesInPrison_Player" && asTest != "Test_EscortToCellStopped_NoPackageLock" && StringUtil.Find(asTest, "Test_Surrender_") != 0 && asTest != "Test_FrozenGuardSkipped" && asTest != "Test_GuardDiesInPrison_NobodySees" && asTest != "Test_Escort_FreeWalk" && asTest != "Test_ToggleEscortToCell04" && asTest != "Test_CaptorFinishCycles_Calls" && asTest != "Test_CaptorFinishCycles_NoCalls" && asTest != "Test_CaptorFinishDetach_Calls" && asTest != "Test_CaptorFinishDetach_NoCalls" && asTest != "Test_Escort_FreeWalk_Control" && asTest != "Test_ActorKeys" && asTest != "Test_FrozenGuardCalls" && asTest != "Test_SimulatedFreezeCalls" && asTest != "Test_SimulatedFreezeAtCancel" && asTest != "Test_SpawnFreezableGuard" && asTest != "Test_AliasPackageControl" && asTest != "Test_FreezableEscort_Player" && asTest != "Test_FreezableEscort_NPC" && asTest != "Test_LightHold")
+    if (asTest != "Test_ArrestWaitsWhileGuardFights_NoPackage" && asTest != "Test_CellDoorsDiagnostic" && asTest != "Test_LongAbsenceSetup" && asTest != "Test_LongAbsenceAdvance" && asTest != "Test_LongAbsenceVerify" && asTest != "Test_FallbackEscortToCellStopped_Player" && asTest != "Test_FallbackEscortToCellStopped_CloneGuard" && asTest != "Test_FightDuringEscort_NPC" && asTest != "Test_FightDuringEscort_Player" && asTest != "Test_GuardDiesInPrison_Player" && asTest != "Test_EscortToCellStopped_NoPackageLock" && StringUtil.Find(asTest, "Test_Surrender_") != 0 && asTest != "Test_FrozenGuardSkipped" && asTest != "Test_GuardDiesInPrison_NobodySees" && asTest != "Test_Escort_FreeWalk" && asTest != "Test_ToggleEscortToCell04" && asTest != "Test_CaptorFinishCycles_Calls" && asTest != "Test_CaptorFinishCycles_NoCalls" && asTest != "Test_CaptorFinishDetach_Calls" && asTest != "Test_CaptorFinishDetach_NoCalls" && asTest != "Test_Escort_FreeWalk_Control" && asTest != "Test_ActorKeys" && asTest != "Test_FrozenGuardCalls" && asTest != "Test_SimulatedFreezeCalls" && asTest != "Test_SimulatedFreezeAtCancel" && asTest != "Test_SpawnFreezableGuard" && asTest != "Test_AliasPackageControl" && asTest != "Test_FreezableEscort_Player" && asTest != "Test_FreezableEscort_NPC" && asTest != "Test_LightHold" && asTest != "Test_KillFrozenGuard")
         return false
     endif
 
@@ -13892,6 +13911,8 @@ bool function __RunStatelessTest(string asTest)
         display_result(__StartFreezableEscort("164", false))
     elseif (asTest == "Test_LightHold")
         display_result(__Scenario_LightHold("165"))
+    elseif (asTest == "Test_KillFrozenGuard")
+        display_result(__Scenario_KillFrozenGuard("166"))
     elseif (asTest == "Test_Escort_FreeWalk_Control")
         ; Freeze control (round 109): 150 as it was before the experiments, the normal release order: the Scene stop, the
         ; guard's release and the player's revert all at once. Every experiment switch off, in case one was left on; the

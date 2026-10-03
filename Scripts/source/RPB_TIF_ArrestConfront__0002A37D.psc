@@ -6,7 +6,7 @@ Scriptname RPB_TIF_ArrestConfront__0002A37D Extends TopicInfo Hidden
 Function Fragment_2(ObjectReference akSpeakerRef)
 Actor akSpeaker = akSpeakerRef as Actor
 ;BEGIN CODE
-float rpbStartedAt = Utility.GetCurrentRealTime() ; when this line began: a replay after a load is dropped
+float rpbStartedAt = RPB_Utility.CrimeLineStamp() ; the load this line began in: a replay after a load is dropped
 RPB_Utility.ProbeSpeaker(akSpeaker) ; before any call into him: a frozen speaker gets found, then silenced
 pCGS.GuildDiscount(akSpeaker)
 RPB_Utility.SendTopicInfoEvent("RPB_TopicInfoStart", "You have committed crimes against Skyrim and her people. What say you in your defense?", 10, akSpeaker, rpbStartedAt)

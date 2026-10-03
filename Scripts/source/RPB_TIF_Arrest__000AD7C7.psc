@@ -16,7 +16,7 @@ EndFunction
 Function Fragment_4(ObjectReference akSpeakerRef)
 Actor akSpeaker = akSpeakerRef as Actor
 ;BEGIN CODE
-float rpbStartedAt = Utility.GetCurrentRealTime() ; when this line began: a replay after a load is dropped
+float rpbStartedAt = RPB_Utility.CrimeLineStamp() ; the load this line began in: a replay after a load is dropped
 RPB_Utility.ProbeSpeaker(akSpeaker) ; before any call into him: a frozen speaker gets found, then silenced
 RPB_Utility.SendTopicInfoEvent("RPB_TopicInfoEnd", "You're going to rot in the Dragonsreach Dungeon.", 20, akSpeaker, rpbStartedAt)
 ;END CODE

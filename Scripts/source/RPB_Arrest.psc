@@ -627,6 +627,17 @@ event OnArrestDialogue(int aiTopicInfoEvent, int aiTopicInfoType, string asTopic
                 return
             endif
 
+            ; Just submitted ("I'll go to jail"): the arrest is on its way but not registered yet, and the guard's forcegreet came
+            ; straight back (the bounty isn't cleared until the arrest starts), was cut off by the arrest, and vanilla had him
+            ; speak a resist line for it (2026-10-03: the player resisted on every submission). Any guard, a few seconds
+            float submittedAt = RPB_StorageVars.GetFloatOnReference("Submitted At", akSpokenToArrestee, "Pre-Arrest")
+            float sinceSubmitted = Utility.GetCurrentRealTime() - submittedAt
+            if (submittedAt > 0.0 && sinceSubmitted >= 0.0 && sinceSubmitted < 10.0)
+                RPB_Utility.LogInfo("Not resisting arrest: " + akSpokenToArrestee + " submitted " + (sinceSubmitted as int) + "s ago (" + akSpeakerArrester + "'s line came from the dialogue the arrest cut off)", "Arrest::OnArrestDialogue")
+                akSpeakerArrester.EvaluatePackage()
+                return
+            endif
+
             ; Test-only: the teardown's move home cuts a confront its own reset set off (the test's bounty given back)
             if (RPB_Utility.IsTestTeardownRunning())
                 RPB_Utility.LogInfo("Not resisting arrest: a test's teardown cut " + akSpeakerArrester + "'s arrest dialogue", "Arrest::OnArrestDialogue")
@@ -678,6 +689,8 @@ event OnArrestDialogue(int aiTopicInfoEvent, int aiTopicInfoType, string asTopic
             self.StartBountyPayment(akSpeakerArrester, akSpokenToArrestee, ARREST_PAY_BOUNTY_ESCORT_BY_FORCE)
 
         elseif (aiTopicInfoType == TOPIC_TYPE_ARREST_GO_TO_JAIL)
+            ; Noted first: a resist line from the dialogue this arrest cuts off isn't the player resisting (TOPIC_TYPE_ARREST_RESIST)
+            RPB_StorageVars.SetFloatOnReference("Submitted At", akSpokenToArrestee, Utility.GetCurrentRealTime(), "Pre-Arrest")
             self.ArrestActor(akSpeakerArrester, akSpokenToArrestee, ARREST_TYPE_ESCORT_TO_JAIL)
         endif
     endif

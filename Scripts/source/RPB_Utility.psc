@@ -574,6 +574,17 @@ function ProbeSpeaker(Actor akSpeaker) global
     if (!akSpeaker)
         return
     endif
+    ; The bookkeeping reads the clock, which waits a frame: on its own stack (RPB_EventManager.OnCrimeLineBegan), not the
+    ; fragment's
+    int handle = ModEvent.Create("RPB_CrimeLineBegan")
+    if (handle)
+        ModEvent.PushForm(handle, akSpeaker)
+        ModEvent.Send(handle)
+    endif
+endFunction
+
+; RPB_EventManager.OnCrimeLineBegan: the bookkeeping of ProbeSpeaker
+function __NoteCrimeLine(Actor akSpeaker) global
     int pending = JDB.solveObj(".rpb_root.pendingCrimeLines")
     if (!pending)
         pending = JFormMap.object()
@@ -590,11 +601,17 @@ function ProbeSpeaker(Actor akSpeaker) global
     JFormMap.setFlt(pending, akSpeaker, now)
 endFunction
 
-; A crime line that began @afStartedAt: false if it's a replay (it began over 30s ago in this session, or in another session:
-; the real time counts from the game's launch, so a line from before a restart reads as in the future)
+; The first line of every crime fragment: which load the line began in (RPB_ConfigAlias stamps each load). JContainers
+; only: a fragment must not wait a frame before it sends its event. With Utility.GetCurrentRealTime() here, the jail line's
+; event came a frame late, the guard's forcegreet came back first, and the arrest started against a "resisting" player
+; (2026-10-03)
+float function CrimeLineStamp() global
+    return JDB.solveFlt(".rpb_root.loadStamp")
+endFunction
+
+; A crime line stamped @afStartedAt (CrimeLineStamp): false if it began before the current load, a stuck line replayed
 bool function IsTopicInfoFresh(float afStartedAt) global
-    float now = Utility.GetCurrentRealTime()
-    return afStartedAt <= now && (now - afStartedAt) <= 30.0
+    return afStartedAt == CrimeLineStamp()
 endFunction
 
 ; Dead or dying, read by PO3 engine side: no call into him, so it's safe on a frozen NPC (where IsDead() waits forever)
