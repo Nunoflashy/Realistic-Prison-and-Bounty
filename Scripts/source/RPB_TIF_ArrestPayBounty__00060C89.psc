@@ -6,7 +6,9 @@ Scriptname RPB_TIF_ArrestPayBounty__00060C89 Extends TopicInfo Hidden
 Function Fragment_0(ObjectReference akSpeakerRef)
 Actor akSpeaker = akSpeakerRef as Actor
 ;BEGIN CODE
-akSpeaker.SendModEvent("RPB_TopicInfoEnd", "Smart woman. Now come along with us. We'll take any stolen goods, and you'll be free to go. After you pay the fine, of course.", 12)
+float rpbStartedAt = Utility.GetCurrentRealTime() ; when this line began: a replay after a load is dropped
+RPB_Utility.ProbeSpeaker(akSpeaker) ; before any call into him: a frozen speaker gets found, then silenced
+RPB_Utility.SendTopicInfoEvent("RPB_TopicInfoEnd", "Smart woman. Now come along with us. We'll take any stolen goods, and you'll be free to go. After you pay the fine, of course.", 12, akSpeaker, rpbStartedAt)
 ;END CODE
 EndFunction
 ;END FRAGMENT

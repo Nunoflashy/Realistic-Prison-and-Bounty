@@ -33,8 +33,8 @@ scriptname RPB_EventManager extends Quest
     event OnScenePlayingEnd(string eventName, string sceneName, float scenePhaseFlt, Form sender)
     event OnSceneEnd(string eventName, string sceneName, float unusedFlt, Form sender)
     Actor function __DialogueTargetOf(Actor akSpeaker, string asCaller)
-    event OnDialogueTopicStart(string eventName, string topicInfoDialogue, float topicInfoTypeFlt, Form sender)
-    event OnDialogueTopicEnd(string eventName, string topicInfoDialogue, float topicInfoTypeFlt, Form sender)
+    event OnDialogueTopicStart(string topicInfoDialogue, float topicInfoTypeFlt, Form sender, float afStartedAt)
+    event OnDialogueTopicEnd(string topicInfoDialogue, float topicInfoTypeFlt, Form sender, float afStartedAt)
     event OnPackageStart(string eventName, string packageName, float unusedFlt, Form sender)
     event AIPackageManager_OnPackageStart(string packageName, ObjectReference[] data, Form sender)
     event AIPackageManager_OnPackageEnd(string packageName, ObjectReference[] data, Package sender)
@@ -1121,9 +1121,15 @@ Actor function __DialogueTargetOf(Actor akSpeaker, string asCaller)
     return none
 endFunction
 
-event OnDialogueTopicStart(string eventName, string topicInfoDialogue, float topicInfoTypeFlt, Form sender)
+event OnDialogueTopicStart(string topicInfoDialogue, float topicInfoTypeFlt, Form sender, float afStartedAt)
+    string eventName = "RPB_TopicInfoStart"
     int topicInfoType = (topicInfoTypeFlt as int)
     Actor akSpeaker = (sender as Actor)
+
+    if (!RPB_Utility.IsTopicInfoFresh(afStartedAt))
+        RPB_Utility.LogWarn("Ignored a crime line by " + akSpeaker + " that began " + ((Utility.GetCurrentRealTime() - afStartedAt) as int) + "s ago (a replay after a load): '" + topicInfoDialogue + "'", "EventManager::OnDialogueTopicStart")
+        return
+    endif
 
     if (!topicInfoType)
         RPB_Utility.LogError("Topic Info Type is none or invalid, returning...", "EventManager::OnDialogueTopicStart")
@@ -1157,9 +1163,15 @@ event OnDialogueTopicStart(string eventName, string topicInfoDialogue, float top
     endif
 endEvent
 
-event OnDialogueTopicEnd(string eventName, string topicInfoDialogue, float topicInfoTypeFlt, Form sender)
+event OnDialogueTopicEnd(string topicInfoDialogue, float topicInfoTypeFlt, Form sender, float afStartedAt)
+    string eventName    = "RPB_TopicInfoEnd"
     int topicInfoType   = (topicInfoTypeFlt as int)
     Actor akSpeaker     = (sender as Actor)
+
+    if (!RPB_Utility.IsTopicInfoFresh(afStartedAt))
+        RPB_Utility.LogWarn("Ignored a crime line by " + akSpeaker + " that began " + ((Utility.GetCurrentRealTime() - afStartedAt) as int) + "s ago (a replay after a load): '" + topicInfoDialogue + "'", "EventManager::OnDialogueTopicEnd")
+        return
+    endif
 
     if (!topicInfoType)
         RPB_Utility.LogError("Topic Info Type is none or invalid, returning...", "EventManager::OnDialogueTopicEnd")

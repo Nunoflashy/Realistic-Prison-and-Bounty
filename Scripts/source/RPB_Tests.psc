@@ -10764,6 +10764,27 @@ bool __playerScenario
 ObjectReference __scenarioReturnMarker ; where a player scenario started: fallbacks teleport them to the prison
 Actor __scenarioRealGuard ; a real guard a scenario used instead of a clone: reset by the teardown, never deleted
 ActorBase __scenarioGuardBase ; when set, __ScenarioGuard spawns this base instead of the nearest guard's (159)
+bool __keepFrozenClones ; 158/160 study the frozen clone after the teardown: it isn't killed then
+
+;/
+    A frozen clone left in the world kept confronting the wanted player each later run (crime dialogue whose fragments call
+    into him) and collecting XPMSE's cell-change stacks: over the night of 2026-10-03 they drowned the VM by run ~50
+    (KNOWN_ISSUES round 116). Every way of removing him is a call on him, so he's killed instead: RPB_TestKillSpell (test-only,
+    not hostile) cast at him from a marker, which is no call into him and no crime of the player's.
+/;
+function __KillFrozenClone(Actor akClone)
+    Spell killSpell = Game.GetFormFromFile(0x0002C064, "RealisticPrisonAndBounty.esp") as Spell
+    if (!killSpell)
+        log("teardown: " + akClone + " is frozen, left alone (no RPB_TestKillSpell in the plugin)")
+        return
+    endif
+    ObjectReference marker = Game.GetPlayer().PlaceAtMe(Game.GetFormEx(0x3B)) ; XMarker
+    marker.MoveTo(akClone)
+    killSpell.Cast(marker, akClone)
+    Utility.Wait(1.0)
+    marker.Delete()
+    log("teardown: " + akClone + " is frozen, killed (test-only spell; dead now: " + RPB_Utility.IsDeadNoCall(akClone) + ")")
+endFunction
 bool __scenarioEscortStartForced
 bool __scenarioConfrontationForced
 bool __scenarioResistFlagWasSet
@@ -11829,6 +11850,7 @@ Actor function __FirstFrozenGuard()
 endFunction
 
 bool function __Scenario_FrozenGuardCalls(string asTest)
+    __keepFrozenClones = true ; set back by the next test that kills them: only 158/160 keep one
     RPB_Utility.SetCaptorFinishCallsDisabledForTest(false)
     RPB_Utility.SetSceneEndSpacedForTest(false)
     RPB_Utility.SetReleaseOnPackageChangeForTest(false)
@@ -12258,6 +12280,7 @@ event OnTestFreezeNow(Form akGuard, string asStep)
 endEvent
 
 bool function __Scenario_SimulatedFreezeAtCancel(string asTest)
+    __keepFrozenClones = true
     RPB_Utility.SetCaptorFinishCallsDisabledForTest(false)
     RPB_Utility.SetSceneEndSpacedForTest(false)
     RPB_Utility.SetReleaseOnPackageChangeForTest(false)
@@ -12344,6 +12367,8 @@ function ToggleManualFreeze()
         return
     endif
     __manualFreezeGuard = target
+    ; Found the way RPB finds a real one (a probe, a few seconds later), so what follows a freeze RPB knows of can be tested
+    RPB_Utility.ProbeGuardAfterBurst(target, "freeze key")
     log("freeze key: froze " + target + " (player " + (Game.GetPlayer().GetDistance(target) as int) + " away, in " + Game.GetPlayer().GetParentCell() + ")")
     Debug.Notification("RPB test: guard frozen (press again to release)")
 endFunction
@@ -12551,6 +12576,7 @@ endFunction
     (past FREE_WALK_RADIUS), the AI takes over; moved next to the guard (walking on), their controls come back.
 /;
 bool function __Scenario_EscortFreeWalk(string asTest)
+    __keepFrozenClones = (asTest == "158" || asTest == "160")
     RPB_Prison prison = (RPB_API.GetPrisonManager()).GetPrison("Haafingar")
     Actor guard = __ScenarioGuard()
     if (!guard)
@@ -13409,7 +13435,11 @@ function __TeardownAllTempActors()
             Utility.Wait(0.25)
         endWhile
         if (__testTempActors[i] && RPB_Utility.IsFrozenGuard(__testTempActors[i]))
-            log("teardown: " + __testTempActors[i] + " is frozen, left alone (gone with the next load)")
+            if (__keepFrozenClones)
+                log("teardown: " + __testTempActors[i] + " is frozen, left alone (gone with the next load)")
+            else
+                self.__KillFrozenClone(__testTempActors[i])
+            endif
         endif
         i += 1
     endWhile

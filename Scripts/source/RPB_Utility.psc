@@ -540,6 +540,63 @@ endFunction
     still called into him at 0s and +1s (2026-10-03). A freeze lasts until the next load, so a probe a few seconds later
     finds it just the same; RPB only learns of it a few seconds later.
 /;
+;/
+    A crime line's event (RPB_TopicInfoStart/End, RPB_EventManager.OnDialogueTopicStart/End), sent from the line's fragment.
+    Through ModEvent, not akSpeaker.SendModEvent: that was a call into the speaker, which waited forever on a frozen guard.
+    @afStartedAt: when the fragment began (Utility.GetCurrentRealTime() as its first line). A fragment left waiting on a
+    frozen guard is saved with the game and resumes after a load: on 2026-10-03 some 175 of them replayed within 20s of a
+    load and arrested the player out of nowhere (KNOWN_ISSUES round 116). The handlers drop a line that began long ago.
+/;
+function SendTopicInfoEvent(string asEvent, string asText, int aiType, Actor akSpeaker, float afStartedAt) global
+    int pending = JDB.solveObj(".rpb_root.pendingCrimeLines")
+    if (pending)
+        JFormMap.removeKey(pending, akSpeaker) ; his line got through (ProbeSpeaker)
+    endif
+    int handle = ModEvent.Create(asEvent)
+    if (handle)
+        ModEvent.PushString(handle, asText)
+        ModEvent.PushFloat(handle, aiType as float)
+        ModEvent.PushForm(handle, akSpeaker)
+        ModEvent.PushFloat(handle, afStartedAt)
+        ModEvent.Send(handle)
+    endif
+endFunction
+
+;/
+    Called first in every crime line's fragment. A guard frozen away from any escort step was never probed, so never marked,
+    and kept confronting the player: each line's fragment hung on him (vanilla's GuildDiscount) before RPB heard of it, and
+    the next line came a few seconds later (2026-10-03). So a line that never got through is the sign: each line is noted
+    here and cleared when its event is sent (SendTopicInfoEvent); a speaker whose earlier line is still uncleared after 5s
+    is probed, and once found frozen he's on RPB_FrozenActors and the lines' conditions silence him. A healthy guard is
+    never probed here (a probe calls into him, and an arrest start right after the line is a busy moment). No call into him.
+/;
+function ProbeSpeaker(Actor akSpeaker) global
+    if (!akSpeaker)
+        return
+    endif
+    int pending = JDB.solveObj(".rpb_root.pendingCrimeLines")
+    if (!pending)
+        pending = JFormMap.object()
+        JDB.solveObjSetter(".rpb_root.pendingCrimeLines", pending, true)
+    endif
+    float now = Utility.GetCurrentRealTime()
+    float earlier = JFormMap.getFlt(pending, akSpeaker)
+    if (earlier > 0.0 && earlier <= now && (now - earlier) > 5.0)
+        if (!IsGuardProbeOpen(akSpeaker) && !IsFrozenGuard(akSpeaker))
+            ProbeGuardAfterBurst(akSpeaker, "crime line stuck " + ((now - earlier) as int) + "s")
+        endif
+        return ; the stuck line's time stays: still stuck
+    endif
+    JFormMap.setFlt(pending, akSpeaker, now)
+endFunction
+
+; A crime line that began @afStartedAt: false if it's a replay (it began over 30s ago in this session, or in another session:
+; the real time counts from the game's launch, so a line from before a restart reads as in the future)
+bool function IsTopicInfoFresh(float afStartedAt) global
+    float now = Utility.GetCurrentRealTime()
+    return afStartedAt <= now && (now - afStartedAt) <= 30.0
+endFunction
+
 ; Dead or dying, read by PO3 engine side: no call into him, so it's safe on a frozen NPC (where IsDead() waits forever)
 bool function IsDeadNoCall(Actor akActor) global
     if (!akActor)
@@ -670,6 +727,10 @@ function __RunGuardProbe(Actor akGuard, string asStep, float afDueAt = 0.0) glob
     if (JFormMap.getFlt(map, akGuard) < 0.0)
         return ; already known frozen: another probe would only add another stuck stack
     endif
+    ; The load this probe belongs to: one left waiting on a frozen guard is saved with the game and resumes after a load, when
+    ; the probe maps were emptied, and it must not write its old start time back into them (FF000F9F, 2026-10-03: "probe
+    ; open 30573s" on a guard who was fine, a probe from 09:11 resuming after the 13:48 load)
+    float loadStamp = JDB.solveFlt(".rpb_root.loadStamp")
     bool counting = IsProbeCountingForTest()
     string countedStep = asStep
     if (counting)
@@ -696,6 +757,9 @@ function __RunGuardProbe(Actor akGuard, string asStep, float afDueAt = 0.0) glob
         JFormMap.setStr(JDB.solveObj(".rpb_root.frozenGuardSteps"), akGuard, asStep)
     endif
     akGuard.GetFormID()
+    if (JDB.solveFlt(".rpb_root.loadStamp") != loadStamp)
+        return ; answered after a load: the maps it knew are gone
+    endif
     if (counting)
         __CountProbe(countedStep, "answered")
     endif
@@ -765,8 +829,16 @@ bool function IsFrozenGuard(Actor akActor) global
     if (started < 0.0)
         return true
     endif
-    if ((Utility.GetCurrentRealTime() - started) < 3.0)
+    float openFor = Utility.GetCurrentRealTime() - started
+    if (openFor < 3.0 && openFor >= 0.0)
         return false ; the probe may simply not have run yet
+    endif
+    if (openFor > 300.0 || openFor < 0.0)
+        ; Not a probe of now: a real freeze is marked within ~10s (RPB_EventManager.OnGuardProbeCheck; 5 minutes leaves room for an overloaded VM), so this is a stale
+        ; entry (a probe from before a load, or another session's time), not a frozen guard
+        JFormMap.removeKey(map, akActor)
+        LogWarn("Dropped a stale probe entry on " + akActor + " (open " + (openFor as int) + "s): not counted as frozen", "Utility::IsFrozenGuard")
+        return false
     endif
     MarkGuardFrozen(akActor, "probe open " + ((Utility.GetCurrentRealTime() - started) as int) + "s")
     return true
@@ -775,6 +847,23 @@ endFunction
 function MarkGuardFrozen(Actor akGuard, string asStep) global
     int map = __FrozenGuardsMap(abCreate = true)
     JFormMap.setFlt(map, akGuard, -1.0)
+    ; Silent in crime dialogue from now: each line's fragments call into the speaker and would wait forever, a new stuck stack
+    ; every time he confronts a wanted player. The lines check for RPB_FrozenMarkerEffect on the speaker (a list was no use:
+    ; IsInList compares his base, not him). Cast at him, and a call on the list: no call into him
+    Spell marker = FrozenMarkerSpell()
+    if (marker)
+        marker.Cast(Game.GetPlayer(), akGuard)
+        int marked = JDB.solveObj(".rpb_root.frozenMarked")
+        if (!marked)
+            marked = JFormMap.object()
+            JDB.solveObjSetter(".rpb_root.frozenMarked", marked, true)
+        endif
+        JFormMap.setInt(marked, akGuard, 1)
+    endif
+    FormList frozenActors = FrozenActorsList()
+    if (frozenActors)
+        frozenActors.AddForm(akGuard)
+    endif
     string probedAt = ""
     int steps = JDB.solveObj(".rpb_root.frozenGuardSteps")
     if (steps)
@@ -838,11 +927,38 @@ endFunction
 ; Emptied in place, not replaced: probes saved stuck on a frozen guard resume after the load, holding these maps' handles,
 ; and a replaced map was gone under them (the console's "access to non-existing object with id 0x1682", 2026-10-02)
 function ClearFrozenGuards() global
+    ; The marker off everyone who got it (a load drops the freeze, so they answer again): kept apart from the maps below, a
+    ; marked NPC must lose it even if he's out of every other list
+    int marked = JDB.solveObj(".rpb_root.frozenMarked")
+    Spell marker = FrozenMarkerSpell()
+    if (marked && marker)
+        Form markedActor = JFormMap.nextKey(marked)
+        while (markedActor)
+            (markedActor as Actor).DispelSpell(marker)
+            markedActor = JFormMap.nextKey(marked, markedActor)
+        endWhile
+        JFormMap.clear(marked)
+    endif
+    FormList frozenActors = FrozenActorsList()
+    if (frozenActors)
+        frozenActors.Revert() ; what scripts added: everyone, the plugin's list is empty
+    endif
     __ClearFormMapAt(__FrozenGuardsPath())
     __ClearFormMapAt(".rpb_root.frozenGuardSteps")
     __ClearFormMapAt(".rpb_root.guardOpenProbes")
     __ClearFormMapAt(".rpb_root.frozenActorRoles")
     __ClearFormMapAt(".rpb_root.guardPendingProbes")
+    __ClearFormMapAt(".rpb_root.pendingCrimeLines")
+endFunction
+
+; RPB_FrozenMarkerSpell: the hidden effect a frozen NPC gets, for the crime dialogue's conditions
+Spell function FrozenMarkerSpell() global
+    return Game.GetFormFromFile(0x0002C066, "RealisticPrisonAndBounty.esp") as Spell
+endFunction
+
+; RPB_FrozenActors (the plugin's, empty there): the frozen NPCs, for the crime dialogue's conditions
+FormList function FrozenActorsList() global
+    return Game.GetFormFromFile(0x0002C063, "RealisticPrisonAndBounty.esp") as FormList
 endFunction
 
 function __ClearFormMapAt(string asPath) global

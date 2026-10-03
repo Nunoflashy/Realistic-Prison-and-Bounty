@@ -6,7 +6,9 @@ Scriptname RPB_TIF_ArrestResist__000267E2 Extends TopicInfo Hidden
 Function Fragment_0(ObjectReference akSpeakerRef)
 Actor akSpeaker = akSpeakerRef as Actor
 ;BEGIN CODE
-akSpeaker.SendModEvent("RPB_TopicInfoStart", "Then pay with your blood.", 15)
+float rpbStartedAt = Utility.GetCurrentRealTime() ; when this line began: a replay after a load is dropped
+RPB_Utility.ProbeSpeaker(akSpeaker) ; before any call into him: a frozen speaker gets found, then silenced
+RPB_Utility.SendTopicInfoEvent("RPB_TopicInfoStart", "Then pay with your blood.", 15, akSpeaker, rpbStartedAt)
 ;END CODE
 EndFunction
 ;END FRAGMENT

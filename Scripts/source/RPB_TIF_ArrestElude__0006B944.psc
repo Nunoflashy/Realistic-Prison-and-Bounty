@@ -6,7 +6,9 @@ Scriptname RPB_TIF_ArrestElude__0006B944 Extends TopicInfo Hidden
 Function Fragment_0(ObjectReference akSpeakerRef)
 Actor akSpeaker = akSpeakerRef as Actor
 ;BEGIN CODE
-akSpeaker.SendModEvent("RPB_TopicInfoEnd", "I thought it was finally going to be a quiet day.", 7)
+float rpbStartedAt = Utility.GetCurrentRealTime() ; when this line began: a replay after a load is dropped
+RPB_Utility.ProbeSpeaker(akSpeaker) ; before any call into him: a frozen speaker gets found, then silenced
+RPB_Utility.SendTopicInfoEvent("RPB_TopicInfoEnd", "I thought it was finally going to be a quiet day.", 7, akSpeaker, rpbStartedAt)
 ;END CODE
 EndFunction
 ;END FRAGMENT
