@@ -366,6 +366,10 @@ event OnKeyDown(int keyCode)
     elseif (keyCode == 0x40) ; F6
         mcm.InitializeOptions()
 
+    elseif (keyCode == 0x44) ; F10: test-only, freezes the freezable guard under the crosshair or nearest (again: releases him)
+        RPB_Tests freezeTests = (self.GetReference() as Form) as RPB_Tests
+        freezeTests.ToggleManualFreeze()
+
     elseif (keyCode == 0x3E || keyCode == 0x3D)
         mcm.SerializeOptions()
     endif

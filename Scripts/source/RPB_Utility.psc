@@ -509,6 +509,9 @@ function ProbeGuard(Actor akGuard, string asStep, float afDelay = 0.0) global
     if (!akGuard)
         return
     endif
+    if (afDelay == 0.0)
+        __TestFreezeAtStep(akGuard, asStep)
+    endif
     __SetProbedRole(akGuard, "GUARD")
     if (afDelay > 0.0)
         asStep += " +" + (afDelay as int) + "s"
@@ -527,6 +530,26 @@ function ProbeGuard(Actor akGuard, string asStep, float afDelay = 0.0) global
     if (handle)
         ModEvent.PushForm(handle, akGuard)
         ModEvent.PushFloat(handle, afDelay)
+        ModEvent.Send(handle)
+    endif
+endFunction
+
+; Test-only: a simulated freeze (RPB_TestFreezable) armed for a step starts when a probe reaches that step, so a test can
+; freeze a guard at the moment the real freezes came (RPB_Tests 160). One JDB read per probed step otherwise
+function SetTestFreezeAtStep(string asStep) global
+    JDB.solveStrSetter(".rpb_root.testFreezeAtStep", asStep, true)
+endFunction
+
+function __TestFreezeAtStep(Actor akGuard, string asStep) global
+    string armed = JDB.solveStr(".rpb_root.testFreezeAtStep")
+    if (armed == "" || armed != asStep)
+        return
+    endif
+    SetTestFreezeAtStep("") ; once
+    int handle = ModEvent.Create("RPB_TestFreezeNow")
+    if (handle)
+        ModEvent.PushForm(handle, akGuard)
+        ModEvent.PushString(handle, asStep)
         ModEvent.Send(handle)
     endif
 endFunction
