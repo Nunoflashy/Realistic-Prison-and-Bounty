@@ -118,6 +118,7 @@ endFunction
 event OnGuardProbe(string asStep, Form akGuard, float afDelay, float afDueAt)
     if (afDelay > 0.0)
         Utility.Wait(afDelay)
+        RPB_Utility.__AddPendingProbe(akGuard as Actor, -1) ; out now
     endif
     RPB_Utility.__RunGuardProbe(akGuard as Actor, asStep, afDueAt)
 endEvent
@@ -817,7 +818,9 @@ event OnPrisonScene(string asScene, string asSceneEvent, RPB_Prison apPrison, RP
     ; Nothing is done to the prisoner by a dead guard: a phase event already on its way when he died (the handover ends his
     ; Scene, RPB_Arrestee.HandOverInPrison) still stripped and cuffed the prisoner with nobody there. The next guard's own
     ; Scene does it.
-    if ((sceneType == SceneManager.CATEGORY_STRIPPING || sceneType == SceneManager.CATEGORY_RESTRAIN || sceneType == SceneManager.CATEGORY_CLOTHING) && akAuthority && akAuthority.IsDead())
+    ; Asked without calling into him (PO3 reads it engine side): this runs inside SceneManager's own Scene events, and a
+    ; frozen guard's IsDead() held them there, so a stripping never started nor the escort to the cell after it (2026-10-03)
+    if ((sceneType == SceneManager.CATEGORY_STRIPPING || sceneType == SceneManager.CATEGORY_RESTRAIN || sceneType == SceneManager.CATEGORY_CLOTHING) && RPB_Utility.IsDeadNoCall(akAuthority))
         Debug("EventManager::OnPrisonScene", asScene + " " + asSceneEvent + " (" + asSceneSecondaryEvent + ") skipped: " + akAuthority + " is dead")
         return
     endif

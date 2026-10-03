@@ -247,6 +247,10 @@ function SetTests()
     self.AddTest("159 - Diagnostic: What Still Works on a Simulated Frozen Guard (his lock held on demand, mid escort)", "Test_SimulatedFreezeCalls", abChainable = false)
     self.AddTest("160 - Diagnostic: 158 on a Simulated Freeze at the Real Freezes' Moment (his Scene stopped)", "Test_SimulatedFreezeAtCancel", abChainable = false)
     self.AddTest("161 - Spawn a Freezable Guard Here (kept: the freeze key freezes/releases him)", "Test_SpawnFreezableGuard", abChainable = false)
+    self.AddTest("162 - Diagnostic: Does an Alias Package Stop a Guard Who Isn't Frozen (158's movement checks as a control)", "Test_AliasPackageControl", abChainable = false)
+    self.AddTest("163 - Start an Escort to Jail by a Freezable Guard (Player; left running for the freeze key)", "Test_FreezableEscort_Player", abChainable = false)
+    self.AddTest("164 - Start an Escort to Jail by a Freezable Guard (NPC; left running for the freeze key)", "Test_FreezableEscort_NPC", abChainable = false)
+    self.AddTest("165 - Diagnostic: Does a Light Hold Still Freeze Him (a call on himself per frame, not a busy loop)", "Test_LightHold", abChainable = false)
     self.AddTest("041 - ActiveMagicEffectContainer: Stuck Lock Self-Heals", "Test_ActiveMagicEffectContainer_StuckLockSelfHeals")
     self.AddTest("042 - ThreadLock: JAtomic Primitive Semantics and Registry", "Test_ThreadLock_PrimitiveSemantics")
     ; Not chainable: fires concurrent worker threads
@@ -11768,6 +11772,8 @@ event OnTestFrozenCall(Form akGuard, string asCall)
         endif
     elseif (asCall == "PO3 GetActiveEffects(guard)")
         PO3_SKSEFunctions.GetActiveEffects(guard, true)
+    elseif (asCall == "PO3 GetActorState(guard)")
+        PO3_SKSEFunctions.GetActorState(guard)
     elseif (asCall == "PO3 MoveToNearestNavmeshLocation(guard)")
         PO3_SKSEFunctions.MoveToNearestNavmeshLocation(guard)
     elseif (asCall == "player.DoCombatSpellApply(Healing, guard)")
@@ -11861,20 +11867,23 @@ string function __TryCallsOnFrozen(string asTest, Actor frozen)
     endif
     __frozenCallResults = JValue.retain(JMap.object())
     self.RegisterForModEvent("RPB_TestFrozenCall", "OnTestFrozenCall")
-    string[] calls = new string[13]
+    string[] calls = new string[14]
     calls[0] = "player.GetDistance(guard)"
     calls[1] = "guard as string"
     calls[2] = "Debug.SendAnimationEvent(guard)"
     calls[3] = "alias.ForceRefTo(guard) + GetActorRef() + Clear()"
     calls[4] = "PO3 GetActiveEffects(guard)"
-    calls[5] = "PO3 MoveToNearestNavmeshLocation(guard)"
-    calls[6] = "player.DoCombatSpellApply(Healing, guard)"
-    calls[7] = "his Captor effect: GetActor() + GetState() (not him)"
-    calls[8] = "player.GetFormID() (another actor)"
-    calls[9] = "player.MoveTo(guard)"
+    ; The navmesh snap after the player's move to him: it once put him high outside the walls, and the player, moved to
+    ; him after it, fell to death (160, 2026-10-03)
+    calls[5] = "player.DoCombatSpellApply(Healing, guard)"
+    calls[6] = "his Captor effect: GetActor() + GetState() (not him)"
+    calls[7] = "player.GetFormID() (another actor)"
+    calls[8] = "player.MoveTo(guard)"
+    calls[9] = "PO3 MoveToNearestNavmeshLocation(guard)"
     calls[10] = "guard.IsDead() (on him)"
     calls[11] = "guard.GetActorBase() (on him)"
-    calls[12] = "guard.GetFormID() (control)"
+    calls[12] = "PO3 GetActorState(guard)"
+    calls[13] = "guard.GetFormID() (control)"
     string summary = ""
     int i = 0
     while (i < calls.Length)
@@ -11904,7 +11913,7 @@ endFunction
 
 ; From a marker left where he stands: his distance from it over 5s, free; then with a PendingHold alias (stay in place)
 ; on him. Only calls on the marker and the alias, never on him
-string function __FrozenMovementChecks(string asTest, Actor frozen)
+string function __FrozenMovementChecks(string asTest, Actor frozen, bool abEvaluate = false)
     Actor player = Game.GetPlayer()
     ObjectReference marker = player.PlaceAtMe(Game.GetFormEx(0x3B)) ; XMarker
     marker.MoveTo(frozen)
@@ -11928,12 +11937,78 @@ string function __FrozenMovementChecks(string asTest, Actor frozen)
         return result + "hold alias: no free alias; "
     endif
     hold.ForceRefTo(frozen)
+    if (abEvaluate)
+        frozen.EvaluatePackage() ; a call on him: 162 only, on a guard who isn't frozen
+    endif
     marker.MoveTo(frozen)
     float movedHeld = __MaxDistanceOver(marker, frozen, 5.0)
     hold.Clear()
     marker.Delete()
-    log(asTest + ": with a PendingHold alias (stay in place) on him: moved " + (movedHeld as int) + " in 5s (moving: " + (movedHeld > 30.0) + ")")
-    return result + "moving with the hold alias on him: " + (movedHeld > 30.0) + " (" + (movedHeld as int) + "); "
+    string how = "without EvaluatePackage"
+    if (abEvaluate)
+        how = "with EvaluatePackage"
+    endif
+    log(asTest + ": with a PendingHold alias (stay in place) on him, " + how + ": moved " + (movedHeld as int) + " in 5s (moving: " + (movedHeld > 30.0) + ")")
+    return result + "moving with the hold alias on him (" + how + "): " + (movedHeld > 30.0) + " (" + (movedHeld as int) + "); "
+endFunction
+
+;/
+    162: 158's movement checks on a guard who isn't frozen, as their control: in 158's real freeze he walked on with the
+    stay-in-place alias on him, and this tells whether that's the freeze or an alias package bound without EvaluatePackage
+    (the only way open on a frozen guard). Mid escort (his Scene's package may outrank an alias's): the alias without
+    EvaluatePackage, then with it. Green = the checks ran; the answers are in the SUMMARY.
+/;
+bool function __Scenario_AliasPackageControl(string asTest)
+    ActorBase freezableBase = Game.GetFormFromFile(0x0002C062, "RealisticPrisonAndBounty.esp") as ActorBase
+    __scenarioGuardBase = freezableBase ; any guard would do; this one is the same as 159-161's
+    Actor guard = __ScenarioGuard()
+    __scenarioGuardBase = none
+    if (!guard)
+        return false
+    endif
+    Actor player = __ScenarioArrestee(true, guard)
+    __ScenarioArrest(guard, player, asTest)
+    RPB_Prisoner prisonerRef = (RPB_API.GetPrisonManager()).GetPrison("Haafingar").Prisoners.AtKey(player)
+    bool escorting = __ScenarioWaitEscortToJail(player, 40.0)
+    prisonerRef = (RPB_API.GetPrisonManager()).GetPrison("Haafingar").Prisoners.AtKey(player)
+    if (!assert_true(escorting && prisonerRef != none, asTest + ": the escort to jail never started"))
+        return false
+    endif
+    ; Right away, while he leads (a free-walking prisoner standing still makes him wait)
+    string summary = "escort: " + __FrozenMovementChecks(asTest + " escort", guard, false)
+    summary += __FrozenMovementChecks(asTest + " escort", guard, true)
+    __TeardownScenario()
+
+    ; And out of any Scene, like 158's guard after the cancel: a fresh one on his own package
+    Actor idleGuard = __SpawnFreezableGuard(asTest)
+    Utility.Wait(5.0)
+    summary += "idle: " + __FrozenMovementChecks(asTest + " idle", idleGuard, false)
+    summary += __FrozenMovementChecks(asTest + " idle", idleGuard, true)
+    idleGuard.Delete()
+    log(asTest + ": SUMMARY (not frozen) " + summary)
+    return assert_true(true, asTest + ": done")
+endFunction
+
+;/
+    163/164: an escort to jail by a freezable guard, left running (no teardown), for the freeze key: the player (163) or a
+    bandit (164) is arrested and escorted to Castle Dour as normal. Green = the escort started.
+/;
+bool function __StartFreezableEscort(string asTest, bool abPlayer)
+    ActorBase freezableBase = Game.GetFormFromFile(0x0002C062, "RealisticPrisonAndBounty.esp") as ActorBase
+    if (!assert_true(freezableBase != none, asTest + ": no RPB_TestFreezableGuard in the plugin"))
+        return false
+    endif
+    __scenarioGuardBase = freezableBase
+    Actor guard = __ScenarioGuard()
+    __scenarioGuardBase = none
+    if (!guard)
+        return false
+    endif
+    Actor arrestee = __ScenarioArrestee(abPlayer, guard)
+    __ScenarioArrest(guard, arrestee, asTest)
+    bool escorting = __ScenarioWaitEscortToJail(arrestee, 40.0)
+    log(asTest + ": " + guard + " escorting " + arrestee + " to jail: " + escorting + " (the freeze key freezes/releases him)")
+    return assert_true(escorting, asTest + ": the escort to jail never started")
 endFunction
 
 float function __MaxDistanceOver(ObjectReference akFrom, Actor akActor, float afSeconds)
@@ -11956,11 +12031,13 @@ endFunction
     by mine, and it ends. Green = the control waited for the hold, and he answered after it.
 /;
 bool[] __holdRelease
+bool __busyHold ; the old busy loop instead of the light hold (a call on himself each frame), which 165 showed freezes him
+; just the same (2026-10-03) without the busy loop's load on the VM: only 165 still runs the busy loop, to compare
 
 event OnTestHoldLock(Form akGuard)
     RPB_TestFreezable freezable = akGuard as RPB_TestFreezable
     JDB.solveFltSetter(".rpbTest.holdStart", Utility.GetCurrentRealTime(), true)
-    freezable.HoldLock(__holdRelease, 2000000) ; the cap only if the test never releases it (minutes)
+    freezable.HoldLock(__holdRelease, 2000000, !__busyHold) ; the cap only if the test never releases it (minutes)
     JDB.solveFltSetter(".rpbTest.holdEnd", Utility.GetCurrentRealTime(), true)
 endEvent
 
@@ -12097,6 +12174,58 @@ bool function __Scenario_SimulatedFreezeCalls(string asTest)
     log(asTest + ": SUMMARY " + summary)
     self.__EndSimulatedFreeze()
     return assert_true(answersAfter, asTest + ": he didn't answer after the hold")
+endFunction
+
+;/
+    165: the light hold (a call on himself each frame) against the busy loop. For each: a 2s hold with a GetFormID() on him
+    sent into it, which must wait for the release (it still freezes him), and the VM's throughput meanwhile (passes of a
+    loop making one global call each, on this stack, over 2s), against none; that measure turned out to be one pass a frame
+    either way (180 in 2s), so the VM monitor in game is the better judge. The light hold is the default. Green = the light
+    hold freezes him.
+/;
+bool function __Scenario_LightHold(string asTest)
+    ActorBase freezableBase = Game.GetFormFromFile(0x0002C062, "RealisticPrisonAndBounty.esp") as ActorBase
+    __scenarioGuardBase = freezableBase
+    Actor guard = __ScenarioGuard()
+    __scenarioGuardBase = none
+    if (!guard)
+        return false
+    endif
+    self.RegisterForModEvent("RPB_TestHoldLock", "OnTestHoldLock")
+    self.RegisterForModEvent("RPB_TestTimedFormID", "OnTestTimedFormID")
+    int baseline = __VMThroughput(2.0)
+    bool busyHolds = __HoldFreezesHim(guard, false)
+    int busyThroughput = JDB.solveInt(".rpbTest.throughput")
+    bool lightHolds = __HoldFreezesHim(guard, true)
+    int lightThroughput = JDB.solveInt(".rpbTest.throughput")
+    log(asTest + ": SUMMARY busy loop: freezes him " + busyHolds + ", VM throughput " + busyThroughput + "; light hold: freezes him " + lightHolds + ", throughput " + lightThroughput + "; no hold: " + baseline + " (passes in 2s)")
+    self.__EndSimulatedFreeze()
+    __TeardownScenario()
+    return assert_true(lightHolds, asTest + ": a call on himself gave his lock up: the light hold doesn't freeze him")
+endFunction
+
+; A 2s hold (@abLight or the busy loop), a GetFormID() on him sent into it: true if it waited for the release. The VM's
+; throughput during the hold goes to .rpbTest.throughput
+bool function __HoldFreezesHim(Actor akGuard, bool abLight)
+    __busyHold = !abLight
+    bool held = __StartHold(akGuard)
+    __SendTimedFormID(akGuard)
+    JDB.solveIntSetter(".rpbTest.throughput", __VMThroughput(2.0), true)
+    bool answeredDuring = JDB.solveFlt(".rpbTest.formIdAnswered") > 0.0
+    __ReleaseHold()
+    __busyHold = false
+    bool answeredAfter = __WaitAnswered(akGuard, 10.0)
+    return held && !answeredDuring && answeredAfter
+endFunction
+
+; Passes of a loop making one global call each, over @afSeconds
+int function __VMThroughput(float afSeconds)
+    int passes = 0
+    float start = Utility.GetCurrentRealTime()
+    while ((Utility.GetCurrentRealTime() - start) < afSeconds)
+        passes += 1
+    endWhile
+    return passes
 endFunction
 
 ; Any hold released, and RPB's mark taken off him (he isn't frozen any more; the teardown leaves a marked clone in the
@@ -13276,7 +13405,7 @@ function __TeardownAllTempActors()
             Utility.Wait(0.25)
         endWhile
         float probeWait = Utility.GetCurrentRealTime()
-        while (__testTempActors[i] && RPB_Utility.IsGuardProbeOpen(__testTempActors[i]) && !RPB_Utility.IsFrozenGuard(__testTempActors[i]) && (Utility.GetCurrentRealTime() - probeWait) < 6.0)
+        while (__testTempActors[i] && RPB_Utility.IsGuardProbeOpen(__testTempActors[i]) && !RPB_Utility.IsFrozenGuard(__testTempActors[i]) && (Utility.GetCurrentRealTime() - probeWait) < 12.0) ; the probes run at +5s and +8s
             Utility.Wait(0.25)
         endWhile
         if (__testTempActors[i] && RPB_Utility.IsFrozenGuard(__testTempActors[i]))
@@ -13600,7 +13729,7 @@ endFunction
 string __statelessTest = ""
 
 bool function __RunStatelessTest(string asTest)
-    if (asTest != "Test_ArrestWaitsWhileGuardFights_NoPackage" && asTest != "Test_CellDoorsDiagnostic" && asTest != "Test_LongAbsenceSetup" && asTest != "Test_LongAbsenceAdvance" && asTest != "Test_LongAbsenceVerify" && asTest != "Test_FallbackEscortToCellStopped_Player" && asTest != "Test_FallbackEscortToCellStopped_CloneGuard" && asTest != "Test_FightDuringEscort_NPC" && asTest != "Test_FightDuringEscort_Player" && asTest != "Test_GuardDiesInPrison_Player" && asTest != "Test_EscortToCellStopped_NoPackageLock" && StringUtil.Find(asTest, "Test_Surrender_") != 0 && asTest != "Test_FrozenGuardSkipped" && asTest != "Test_GuardDiesInPrison_NobodySees" && asTest != "Test_Escort_FreeWalk" && asTest != "Test_ToggleEscortToCell04" && asTest != "Test_CaptorFinishCycles_Calls" && asTest != "Test_CaptorFinishCycles_NoCalls" && asTest != "Test_CaptorFinishDetach_Calls" && asTest != "Test_CaptorFinishDetach_NoCalls" && asTest != "Test_Escort_FreeWalk_Control" && asTest != "Test_ActorKeys" && asTest != "Test_FrozenGuardCalls" && asTest != "Test_SimulatedFreezeCalls" && asTest != "Test_SimulatedFreezeAtCancel" && asTest != "Test_SpawnFreezableGuard")
+    if (asTest != "Test_ArrestWaitsWhileGuardFights_NoPackage" && asTest != "Test_CellDoorsDiagnostic" && asTest != "Test_LongAbsenceSetup" && asTest != "Test_LongAbsenceAdvance" && asTest != "Test_LongAbsenceVerify" && asTest != "Test_FallbackEscortToCellStopped_Player" && asTest != "Test_FallbackEscortToCellStopped_CloneGuard" && asTest != "Test_FightDuringEscort_NPC" && asTest != "Test_FightDuringEscort_Player" && asTest != "Test_GuardDiesInPrison_Player" && asTest != "Test_EscortToCellStopped_NoPackageLock" && StringUtil.Find(asTest, "Test_Surrender_") != 0 && asTest != "Test_FrozenGuardSkipped" && asTest != "Test_GuardDiesInPrison_NobodySees" && asTest != "Test_Escort_FreeWalk" && asTest != "Test_ToggleEscortToCell04" && asTest != "Test_CaptorFinishCycles_Calls" && asTest != "Test_CaptorFinishCycles_NoCalls" && asTest != "Test_CaptorFinishDetach_Calls" && asTest != "Test_CaptorFinishDetach_NoCalls" && asTest != "Test_Escort_FreeWalk_Control" && asTest != "Test_ActorKeys" && asTest != "Test_FrozenGuardCalls" && asTest != "Test_SimulatedFreezeCalls" && asTest != "Test_SimulatedFreezeAtCancel" && asTest != "Test_SpawnFreezableGuard" && asTest != "Test_AliasPackageControl" && asTest != "Test_FreezableEscort_Player" && asTest != "Test_FreezableEscort_NPC" && asTest != "Test_LightHold")
         return false
     endif
 
@@ -13725,6 +13854,14 @@ bool function __RunStatelessTest(string asTest)
         display_result(__Scenario_SimulatedFreezeAtCancel("160"))
     elseif (asTest == "Test_SpawnFreezableGuard")
         display_result(__SpawnFreezableGuard("161") != none)
+    elseif (asTest == "Test_AliasPackageControl")
+        display_result(__Scenario_AliasPackageControl("162"))
+    elseif (asTest == "Test_FreezableEscort_Player")
+        display_result(__StartFreezableEscort("163", true))
+    elseif (asTest == "Test_FreezableEscort_NPC")
+        display_result(__StartFreezableEscort("164", false))
+    elseif (asTest == "Test_LightHold")
+        display_result(__Scenario_LightHold("165"))
     elseif (asTest == "Test_Escort_FreeWalk_Control")
         ; Freeze control (round 109): 150 as it was before the experiments, the normal release order: the Scene stop, the
         ; guard's release and the player's revert all at once. Every experiment switch off, in case one was left on; the

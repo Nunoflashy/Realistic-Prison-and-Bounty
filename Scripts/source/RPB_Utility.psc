@@ -509,12 +509,11 @@ function ProbeGuard(Actor akGuard, string asStep, float afDelay = 0.0) global
     if (!akGuard)
         return
     endif
-    if (afDelay == 0.0)
-        __TestFreezeAtStep(akGuard, asStep)
-    endif
+    __TestFreezeAtStep(akGuard, asStep)
     __SetProbedRole(akGuard, "GUARD")
     if (afDelay > 0.0)
         asStep += " +" + (afDelay as int) + "s"
+        __AddPendingProbe(akGuard, 1) ; waiting its delay: the probe isn't out yet, but he still counts as probed
     endif
     int handle = ModEvent.Create("RPB_GuardProbe")
     if (handle)
@@ -532,6 +531,47 @@ function ProbeGuard(Actor akGuard, string asStep, float afDelay = 0.0) global
         ModEvent.PushFloat(handle, afDelay)
         ModEvent.Send(handle)
     endif
+endFunction
+
+;/
+    Probes for a moment that comes with a burst of changes on him (an effect of mine coming off, his Scene stopped, a
+    prisoner stripped or dressed): +5s and +8s, after it. The burst is when a native call on him can freeze him: the list
+    lookups' GetFormID() at his escort's cancel did it about one run in four, and freezes stayed (rarer) while the probes
+    still called into him at 0s and +1s (2026-10-03). A freeze lasts until the next load, so a probe a few seconds later
+    finds it just the same; RPB only learns of it a few seconds later.
+/;
+; Dead or dying, read by PO3 engine side: no call into him, so it's safe on a frozen NPC (where IsDead() waits forever)
+bool function IsDeadNoCall(Actor akActor) global
+    if (!akActor)
+        return false
+    endif
+    int lifeState = PO3_SKSEFunctions.GetActorState(akActor)
+    return lifeState == 1 || lifeState == 2 ; dying, dead
+endFunction
+
+function ProbeGuardAfterBurst(Actor akGuard, string asStep) global
+    ProbeGuard(akGuard, asStep, 5.0)
+    ProbeGuard(akGuard, asStep, 8.0)
+endFunction
+
+; Probes sent with a delay and not out yet, per actor (a test's teardown waits for them before deleting him)
+function __AddPendingProbe(Actor akActor, int aiDelta) global
+    int pending = JDB.solveObj(".rpb_root.guardPendingProbes")
+    if (!pending)
+        pending = JFormMap.object()
+        JDB.solveObjSetter(".rpb_root.guardPendingProbes", pending, true)
+    endif
+    int count = JFormMap.getInt(pending, akActor) + aiDelta
+    if (count > 0)
+        JFormMap.setInt(pending, akActor, count)
+    else
+        JFormMap.removeKey(pending, akActor)
+    endif
+endFunction
+
+bool function __HasPendingProbe(Actor akActor) global
+    int pending = JDB.solveObj(".rpb_root.guardPendingProbes")
+    return pending && JFormMap.hasKey(pending, akActor)
 endFunction
 
 ; Test-only: a simulated freeze (RPB_TestFreezable) armed for a step starts when a probe reaches that step, so a test can
@@ -602,9 +642,7 @@ function ProbeNPC(Actor akActor, string asStep) global
     if (!akActor || akActor == Game.GetPlayer())
         return
     endif
-    ProbeGuard(akActor, asStep)
-    ProbeGuard(akActor, asStep, 1.0)
-    ProbeGuard(akActor, asStep, 3.0)
+    ProbeGuardAfterBurst(akActor, asStep)
     __SetProbedRole(akActor, "PRISONER") ; after ProbeGuard, which marks a guard
 endFunction
 
@@ -712,9 +750,10 @@ function __TrackEarliestOpenProbe(int aiMap, Actor akGuard, int aiOpen) global
 endFunction
 
 ; A probe on @akActor started and hasn't come back (or he's known frozen)
+; A probe out on him, or one sent and still waiting its delay
 bool function IsGuardProbeOpen(Actor akActor) global
     int map = JDB.solveObj(__FrozenGuardsPath())
-    return map && akActor && JFormMap.hasKey(map, akActor)
+    return akActor && ((map && JFormMap.hasKey(map, akActor)) || __HasPendingProbe(akActor))
 endFunction
 
 bool function IsFrozenGuard(Actor akActor) global
@@ -803,6 +842,7 @@ function ClearFrozenGuards() global
     __ClearFormMapAt(".rpb_root.frozenGuardSteps")
     __ClearFormMapAt(".rpb_root.guardOpenProbes")
     __ClearFormMapAt(".rpb_root.frozenActorRoles")
+    __ClearFormMapAt(".rpb_root.guardPendingProbes")
 endFunction
 
 function __ClearFormMapAt(string asPath) global

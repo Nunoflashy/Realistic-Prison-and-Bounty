@@ -467,10 +467,8 @@ function UnregisterCaptor(RPB_Captor apCaptor, bool abRemoveFromList = false)
         apCaptor.RemoveSpell(captorSpell)
     endif
     RPB_Recovery.__Step(apCaptor.GetActor(), "UnregisterCaptor: spell removed")
-    ; Guards froze right after things of mine came off them (150's clone: this, then his package lock): a probe says when
-    RPB_Utility.ProbeGuard(apCaptor.GetActor(), "captor spell removed")
-    RPB_Utility.ProbeGuard(apCaptor.GetActor(), "captor spell removed", 1.0)
-    RPB_Utility.ProbeGuard(apCaptor.GetActor(), "captor spell removed", 3.0)
+    ; Guards froze right after things of mine came off them (150's clone: this, then his package lock): probes after it
+    RPB_Utility.ProbeGuardAfterBurst(apCaptor.GetActor(), "captor spell removed")
 
     if (abRemoveFromList && Captors.Exists(apCaptor))
         Captors.Remove(apCaptor)

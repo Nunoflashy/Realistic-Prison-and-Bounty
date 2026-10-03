@@ -3692,7 +3692,7 @@ event OnEscortPrisonerToJailEnd(RPB_ActorBase apActor, Actor akEscort)
     ; the Frisking Scene has no code hookup to actually remove anything), a prisoner who fell through both of the
     ; first two checks was silently keeping whatever she still had equipped.
     GuardMark(akEscort, "escort to jail ended, the prison flow starts with him")
-    RPB_Utility.ProbeGuard(akEscort, "escort to jail ended")
+    RPB_Utility.ProbeGuardAfterBurst(akEscort, "escort to jail ended")
     if (prisonerRef.ShouldBeStripped)
         self.StartStrippingPrisoner(prisonerRef, akEscort)
 
@@ -3738,7 +3738,7 @@ endEvent
 
 ; TODO: Remove RPB_JailCell from params. since a Prisoner already has a jail cell assigned to them
 event OnEscortPrisonerToCellEnd(RPB_Prisoner apPrisoner, RPB_JailCell akJailCell, Actor akEscort)
-    RPB_Utility.ProbeGuard(akEscort, "escort to the cell ended")
+    RPB_Utility.ProbeGuardAfterBurst(akEscort, "escort to the cell ended")
     apPrisoner.StopEscortAssist()
     ; TODO: Fix NPC not staying in cell if they are stripped OnEscortToCellEnd
     if (!apPrisoner.IsStripped && apPrisoner.ShouldBeStripped)

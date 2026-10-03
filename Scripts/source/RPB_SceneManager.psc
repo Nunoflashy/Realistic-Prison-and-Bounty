@@ -1493,7 +1493,7 @@ function SetPackageLockOnActor(Actor akActor)
 
     BindAliasTo(packageLock, akActor)
     RPB_StorageVars.SetIntOnReference("Package Lock", akActor, packageLock.GetID())
-    RPB_Utility.ProbeGuard(akActor, "package lock bound")
+    RPB_Utility.ProbeGuardAfterBurst(akActor, "package lock bound")
     RPB_Utility.LogInfo("Bound package lock to Actor " + akActor + " successfully!", "SceneManager::SetPackageLockOnActor")
 endFunction
 
@@ -1514,7 +1514,7 @@ function UnsetPackageLockOnActor(Actor akActor)
     RPB_StorageVars.DeleteVariableOnReference("Package Lock", akActor)
     RPB_Utility.LogInfo("Unbound package lock from Actor " + akActor + " successfully!", "SceneManager::UnsetPackageLockOnActor")
     ; Guards froze around this moment (every freeze so far): a probe tells when one does
-    RPB_Utility.ProbeGuard(akActor, "package lock unbound")
+    RPB_Utility.ProbeGuardAfterBurst(akActor, "package lock unbound")
 endFunction
 
 

@@ -11,10 +11,21 @@ scriptname RPB_TestFreezable extends Actor
     @abRelease[0], an array element the test sets from its own stack (reading one is no call). A pass count bounded by time
     wouldn't do either: the VM ran 2575 passes/s with the game idle and far fewer mid escort (a 45s hold took minutes).
     @aiMaxPasses only stops it if the test never releases it.
+
+    @abLight: a native call on himself each pass instead of spinning: it waits a frame, so the loop costs one call per frame
+    instead of the VM's whole time slice (the busy loop made the VM "overstressed"; a real frozen actor runs nothing). It
+    only simulates a freeze if a call on himself keeps his lock while it waits: test 165 checks that.
 /;
 
-function HoldLock(bool[] abRelease, int aiMaxPasses)
+function HoldLock(bool[] abRelease, int aiMaxPasses, bool abLight = false)
     int pass = 0
+    if (abLight)
+        while (!abRelease[0] && pass < aiMaxPasses)
+            self.GetFormID()
+            pass += 1
+        endWhile
+        return
+    endif
     while (!abRelease[0] && pass < aiMaxPasses)
         pass += 1
     endWhile

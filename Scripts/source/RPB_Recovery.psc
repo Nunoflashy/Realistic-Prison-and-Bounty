@@ -228,9 +228,7 @@ string function CancelArrest(Actor akActor, string asReason, bool abReturnBelong
         ; A guard froze with his Captor still on, right after his Scene was stopped here (round 102): probes from now,
         ; so a freeze in that window is reported and marked (the teardown then leaves him alone instead of hanging on him)
         if (guard && sceneStopped)
-            RPB_Utility.ProbeGuard(guard, "his Scene stopped")
-            RPB_Utility.ProbeGuard(guard, "his Scene stopped", 1.0)
-            RPB_Utility.ProbeGuard(guard, "his Scene stopped", 3.0)
+            RPB_Utility.ProbeGuardAfterBurst(guard, "his Scene stopped")
         endif
         if (guard && RPB_Utility.IsCaptorKeptForTest())
             ; Freeze experiment E: his Captor stays on (the test's teardown takes it off later), probed every 0.5s (the
