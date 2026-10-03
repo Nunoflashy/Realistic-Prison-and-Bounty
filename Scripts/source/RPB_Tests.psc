@@ -243,6 +243,8 @@ function SetTests()
     self.AddTest("155 - Freeze Isolation: 154 With No Call on Him From the Finishing Effect (experiment A)", "Test_CaptorFinishDetach_NoCalls", abChainable = false)
     self.AddTest("156 - Freeze Control: 150 With the Normal Release Order (no experiment on)", "Test_Escort_FreeWalk_Control", abChainable = false)
     self.AddTest("157 - Diagnostic: Actor Keys Without Calling the Actor (string, JDB path, JFormMap; timings)", "Test_ActorKeys", abChainable = false)
+    self.AddTest("158 - Diagnostic: What Still Works on a Frozen Guard (runs 156 until one freezes, up to 40 runs)", "Test_FrozenGuardCalls", abChainable = false)
+    self.AddTest("159 - Diagnostic: What Still Works on a Simulated Frozen Guard (his lock held on demand, mid escort)", "Test_SimulatedFreezeCalls", abChainable = false)
     self.AddTest("041 - ActiveMagicEffectContainer: Stuck Lock Self-Heals", "Test_ActiveMagicEffectContainer_StuckLockSelfHeals")
     self.AddTest("042 - ThreadLock: JAtomic Primitive Semantics and Registry", "Test_ThreadLock_PrimitiveSemantics")
     ; Not chainable: fires concurrent worker threads
@@ -10755,6 +10757,7 @@ int __savedPlayerBountyViolent
 bool __playerScenario
 ObjectReference __scenarioReturnMarker ; where a player scenario started: fallbacks teleport them to the prison
 Actor __scenarioRealGuard ; a real guard a scenario used instead of a clone: reset by the teardown, never deleted
+ActorBase __scenarioGuardBase ; when set, __ScenarioGuard spawns this base instead of the nearest guard's (159)
 bool __scenarioEscortStartForced
 bool __scenarioConfrontationForced
 bool __scenarioResistFlagWasSet
@@ -10769,7 +10772,11 @@ Actor function __ScenarioGuard()
     endif
 
     ; Persistent: it walks the escort through the prison's load doors (see __SpawnTempActorOf)
-    Actor guard = __SpawnTempActorOf(realGuard.GetBaseObject().GetFormID(), abPersist = true)
+    int baseId = realGuard.GetBaseObject().GetFormID()
+    if (__scenarioGuardBase)
+        baseId = __scenarioGuardBase.GetFormID() ; 159's freezable guard
+    endif
+    Actor guard = __SpawnTempActorOf(baseId, abPersist = true)
     if (guard)
         guard.EnableAI(true)
     endif
@@ -11724,6 +11731,306 @@ bool function __Scenario_FrozenGuardSkipped(string asTest)
     log(asTest + ": arrested by the frozen guard " + RPB_Utility.IsActorArrested(arrestee))
     ok = assert_false(RPB_Utility.IsActorArrested(arrestee), asTest + ": a frozen guard's arrest went ahead") && ok
     return ok
+endFunction
+
+;/
+    158: what still works on a frozen guard. 156's escort (the normal order) runs until a guard freezes (up to 40 runs;
+    the teardown leaves a frozen clone alone, so he stays in the world). Then each call that only passes him as an
+    argument, the kind the escort needs from a guard who goes on walking, is tried on its own stack, and the test looks
+    after 2s whether it returned: the player's GetDistance to him, his string, an animation event on him, binding him to
+    an alias and clearing it, PO3's effect list and navmesh snap, a spell applied to him by the player, and the player
+    moved to him. Then whether he still moves (the player's distance to him over 5s), and, as the control, a call on him
+    (GetFormID), which should hang. Green = a guard froze and the results were logged.
+/;
+int __frozenCallResults
+event OnTestFrozenCall(Form akGuard, string asCall)
+    Actor guard = akGuard as Actor
+    Actor player = Game.GetPlayer()
+    JMap.setStr(__frozenCallResults, asCall, "started")
+    if (asCall == "player.GetDistance(guard)")
+        player.GetDistance(guard)
+    elseif (asCall == "guard as string")
+        string asText = guard as string
+    elseif (asCall == "Debug.SendAnimationEvent(guard)")
+        Debug.SendAnimationEvent(guard, "IdleForceDefaultState")
+    elseif (asCall == "alias.ForceRefTo(guard) + Clear()")
+        ReferenceAlias testAlias = (RPB_API.GetSceneManager()).GetRefAlias("Guard", 3)
+        if (testAlias)
+            testAlias.ForceRefTo(guard)
+            testAlias.Clear()
+        else
+            JMap.setStr(__frozenCallResults, asCall, "no alias Guard3")
+            return
+        endif
+    elseif (asCall == "PO3 GetActiveEffects(guard)")
+        PO3_SKSEFunctions.GetActiveEffects(guard, true)
+    elseif (asCall == "PO3 MoveToNearestNavmeshLocation(guard)")
+        PO3_SKSEFunctions.MoveToNearestNavmeshLocation(guard)
+    elseif (asCall == "player.DoCombatSpellApply(Healing, guard)")
+        Spell healing = Game.GetFormFromFile(0x00012FCC, "Skyrim.esm") as Spell
+        player.DoCombatSpellApply(healing, guard)
+    elseif (asCall == "player.MoveTo(guard)")
+        player.MoveTo(guard, 0.0, 120.0, 0.0)
+    elseif (asCall == "guard.GetFormID() (control)")
+        guard.GetFormID()
+    endif
+    JMap.setStr(__frozenCallResults, asCall, "returned")
+endEvent
+
+Actor function __FirstFrozenGuard()
+    int map = JDB.solveObj(".rpb_root.frozenGuardProbes")
+    if (!map)
+        return none
+    endif
+    Form candidate = JFormMap.nextKey(map)
+    while (candidate)
+        if (JFormMap.getFlt(map, candidate) < 0.0)
+            return candidate as Actor
+        endif
+        candidate = JFormMap.nextKey(map, candidate)
+    endWhile
+    return none
+endFunction
+
+bool function __Scenario_FrozenGuardCalls(string asTest)
+    RPB_Utility.SetCaptorFinishCallsDisabledForTest(false)
+    RPB_Utility.SetSceneEndSpacedForTest(false)
+    RPB_Utility.SetReleaseOnPackageChangeForTest(false)
+    RPB_Utility.SetCaptorKeptForTest(false)
+    RPB_Utility.SetAIFlipFirstForTest(false)
+    RPB_Utility.SetRevertFirstForTest(false)
+    RPB_Utility.SetImprisonmentCancelFirstForTest(false)
+
+    Actor frozen = self.__FirstFrozenGuard()
+    int run = 0
+    while (!frozen && run < 40)
+        run += 1
+        log(asTest + ": run " + run + " of 156's escort, waiting for a guard to freeze")
+        __Scenario_EscortFreeWalk(asTest)
+        __TeardownScenario()
+        frozen = self.__FirstFrozenGuard()
+    endWhile
+    if (!frozen)
+        log(asTest + ": no guard froze in " + run + " runs, nothing to try")
+        return assert_true(false, asTest + ": no frozen guard")
+    endif
+    log(asTest + ": " + frozen + " froze (after " + run + " runs); trying calls that pass him as an argument")
+    log(asTest + ": SUMMARY " + __TryCallsOnFrozen(asTest, frozen))
+    return assert_true(true, asTest + ": done")
+endFunction
+
+; Each call on its own stack, 2s to return; "<call>: returned|HUNG|...; " for each, and whether he still moves
+string function __TryCallsOnFrozen(string asTest, Actor frozen)
+    ; The last run's map only goes now: its control call may have answered long after that run (159's hold ending)
+    if (__frozenCallResults)
+        JValue.release(__frozenCallResults)
+    endif
+    __frozenCallResults = JValue.retain(JMap.object())
+    self.RegisterForModEvent("RPB_TestFrozenCall", "OnTestFrozenCall")
+    string[] calls = new string[9]
+    calls[0] = "player.GetDistance(guard)"
+    calls[1] = "guard as string"
+    calls[2] = "Debug.SendAnimationEvent(guard)"
+    calls[3] = "alias.ForceRefTo(guard) + Clear()"
+    calls[4] = "PO3 GetActiveEffects(guard)"
+    calls[5] = "PO3 MoveToNearestNavmeshLocation(guard)"
+    calls[6] = "player.DoCombatSpellApply(Healing, guard)"
+    calls[7] = "player.MoveTo(guard)"
+    calls[8] = "guard.GetFormID() (control)"
+    string summary = ""
+    int i = 0
+    while (i < calls.Length)
+        int handle = ModEvent.Create("RPB_TestFrozenCall")
+        if (handle)
+            ModEvent.PushForm(handle, frozen)
+            ModEvent.PushString(handle, calls[i])
+            ModEvent.Send(handle)
+        endif
+        Utility.Wait(2.0)
+        string outcome = JMap.getStr(__frozenCallResults, calls[i])
+        if (outcome == "started")
+            outcome = "HUNG"
+        elseif (outcome == "")
+            outcome = "never started"
+        endif
+        log(asTest + ": " + calls[i] + " -> " + outcome)
+        summary += calls[i] + ": " + outcome + "; "
+        if (calls[i] == "player.MoveTo(guard)" && JMap.getStr(__frozenCallResults, calls[0]) == "returned") ; GetDistance is safe here
+            ; Beside him now: does he still move on his own (his AI goes on while his scripts don't)?
+            Actor player = Game.GetPlayer()
+            float first = player.GetDistance(frozen)
+            float lowest = first
+            float highest = first
+            int sample = 0
+            while (sample < 10)
+                Utility.Wait(0.5)
+                float now = player.GetDistance(frozen)
+                lowest = RPB_Utility.Min(lowest, now)
+                highest = RPB_Utility.Max(highest, now)
+                sample += 1
+            endWhile
+            log(asTest + ": the player's distance to him over 5s: " + (lowest as int) + " to " + (highest as int) + " (moving: " + ((highest - lowest) > 30.0) + ")")
+            summary += "moving over 5s: " + ((highest - lowest) > 30.0) + "; "
+        endif
+        i += 1
+    endWhile
+    ; Still registered and the map kept: the control call writes "returned" when he answers
+    return summary
+endFunction
+
+;/
+    159: 158 without waiting for a real freeze. RPB_TestFreezableGuard is a Solitude guard whose only script is
+    RPB_TestFreezable, so the actor is that object, and its HoldLock keeps his lock until I release it: every other call on
+    him waits meanwhile, like on a real frozen guard. First a short hold checks the model: a GetFormID() on him sent
+    during it must wait for the release. Then the escort (156's, up to the free walk), a hold mid-way, 158's calls, the
+    release, and whether he answers again and what the escort did meanwhile.
+    The difference with a real freeze: there the lock is held by no stack (the engine's own, by all appearances); here
+    by mine, and it ends. Green = the control waited for the hold, and he answered after it.
+/;
+bool[] __holdRelease
+
+event OnTestHoldLock(Form akGuard)
+    RPB_TestFreezable freezable = akGuard as RPB_TestFreezable
+    JDB.solveFltSetter(".rpbTest.holdStart", Utility.GetCurrentRealTime(), true)
+    freezable.HoldLock(__holdRelease, 2000000) ; the cap only if the test never releases it (minutes)
+    JDB.solveFltSetter(".rpbTest.holdEnd", Utility.GetCurrentRealTime(), true)
+endEvent
+
+event OnTestTimedFormID(Form akGuard)
+    (akGuard as Actor).GetFormID()
+    JDB.solveFltSetter(".rpbTest.formIdAnswered", Utility.GetCurrentRealTime(), true)
+endEvent
+
+; Starts a hold, and returns once it has (his lock is the holding stack's)
+bool function __StartHold(Actor akGuard)
+    __holdRelease = new bool[1]
+    JDB.solveFltSetter(".rpbTest.holdStart", 0.0, true)
+    JDB.solveFltSetter(".rpbTest.holdEnd", 0.0, true)
+    int handle = ModEvent.Create("RPB_TestHoldLock")
+    if (handle)
+        ModEvent.PushForm(handle, akGuard)
+        ModEvent.Send(handle)
+    endif
+    float start = Utility.GetCurrentRealTime()
+    while (JDB.solveFlt(".rpbTest.holdStart") == 0.0 && (Utility.GetCurrentRealTime() - start) < 5.0)
+        Utility.Wait(0.1)
+    endWhile
+    Utility.Wait(0.2) ; into the loop
+    return JDB.solveFlt(".rpbTest.holdStart") > 0.0
+endFunction
+
+; Releases the hold and waits for it to end: its length in seconds, or -1.0 if it didn't end within @afTimeout
+float function __ReleaseHold(float afTimeout = 10.0)
+    if (__holdRelease)
+        __holdRelease[0] = true ; an array element: read by the loop without a call, so it never gives the lock up
+    endif
+    float start = Utility.GetCurrentRealTime()
+    while (JDB.solveFlt(".rpbTest.holdEnd") == 0.0 && (Utility.GetCurrentRealTime() - start) < afTimeout)
+        Utility.Wait(0.1)
+    endWhile
+    float holdEnd = JDB.solveFlt(".rpbTest.holdEnd")
+    if (holdEnd == 0.0)
+        return -1.0
+    endif
+    return holdEnd - JDB.solveFlt(".rpbTest.holdStart")
+endFunction
+
+function __SendTimedFormID(Actor akGuard)
+    JDB.solveFltSetter(".rpbTest.formIdAnswered", 0.0, true)
+    int handle = ModEvent.Create("RPB_TestTimedFormID")
+    if (handle)
+        ModEvent.PushForm(handle, akGuard)
+        ModEvent.Send(handle)
+    endif
+endFunction
+
+bool function __Scenario_SimulatedFreezeCalls(string asTest)
+    RPB_Utility.SetCaptorFinishCallsDisabledForTest(false)
+    RPB_Utility.SetSceneEndSpacedForTest(false)
+    RPB_Utility.SetReleaseOnPackageChangeForTest(false)
+    RPB_Utility.SetCaptorKeptForTest(false)
+    RPB_Utility.SetAIFlipFirstForTest(false)
+    RPB_Utility.SetRevertFirstForTest(false)
+    RPB_Utility.SetImprisonmentCancelFirstForTest(false)
+
+    ActorBase freezableBase = Game.GetFormFromFile(0x0002C062, "RealisticPrisonAndBounty.esp") as ActorBase
+    if (!assert_true(freezableBase != none, asTest + ": no RPB_TestFreezableGuard in the plugin (the patched .esp isn't in?)"))
+        return false
+    endif
+    __scenarioGuardBase = freezableBase
+    Actor guard = __ScenarioGuard()
+    __scenarioGuardBase = none
+    if (!guard)
+        return false
+    endif
+    if (!assert_true((guard as RPB_TestFreezable) != none, asTest + ": " + guard + " isn't an RPB_TestFreezable (a new script needs a game restart)"))
+        return false
+    endif
+    self.RegisterForModEvent("RPB_TestHoldLock", "OnTestHoldLock")
+    self.RegisterForModEvent("RPB_TestTimedFormID", "OnTestTimedFormID")
+
+    ; 1. The model: a GetFormID() sent into a 2s hold must answer only after the release
+    bool held = __StartHold(guard)
+    __SendTimedFormID(guard)
+    Utility.Wait(2.0)
+    bool answeredDuring = JDB.solveFlt(".rpbTest.formIdAnswered") > 0.0
+    float holdTime = __ReleaseHold()
+    Utility.Wait(0.5)
+    float answeredAfter = JDB.solveFlt(".rpbTest.formIdAnswered") - JDB.solveFlt(".rpbTest.holdEnd")
+    bool controlWaited = held && !answeredDuring && JDB.solveFlt(".rpbTest.formIdAnswered") > 0.0
+    log(asTest + ": MODEL: hold started " + held + ", lasted " + __Ms(holdTime) + "ms; the GetFormID() sent into it answered during it " + answeredDuring + ", " + __Ms(answeredAfter) + "ms after the release (waited for the hold: " + controlWaited + ")")
+    if (!controlWaited)
+        self.__EndSimulatedFreeze()
+        return assert_true(false, asTest + ": a call on him didn't wait for the held lock: the simulation doesn't model a freeze")
+    endif
+
+    ; 2. The escort, up to the free walk (156's start)
+    RPB_Prison prison = (RPB_API.GetPrisonManager()).GetPrison("Haafingar")
+    Actor player = __ScenarioArrestee(true, guard)
+    __ScenarioArrest(guard, player, asTest)
+    bool escorting = __ScenarioWaitEscortToJail(player, 40.0)
+    RPB_Prisoner prisonerRef = prison.Prisoners.AtKey(player)
+    if (!assert_true(escorting && prisonerRef != none, asTest + ": the escort to jail never started"))
+        self.__EndSimulatedFreeze()
+        return false
+    endif
+    float start = Utility.GetCurrentRealTime()
+    while (!prisonerRef.EscortFreeWalking && (Utility.GetCurrentRealTime() - start) < 40.0)
+        Utility.Wait(0.25)
+    endWhile
+    log(asTest + ": free walk " + prisonerRef.EscortFreeWalking + ", freezing him now")
+
+    ; 3. Frozen mid escort: 158's calls
+    if (!__StartHold(guard))
+        self.__EndSimulatedFreeze()
+        return assert_true(false, asTest + ": the hold mid escort never started")
+    endif
+    string summary = __TryCallsOnFrozen(asTest, guard)
+    log(asTest + ": during the hold: frozen by RPB's probes " + RPB_Utility.IsFrozenGuard(guard) + ", escort assist " + prisonerRef.EscortAssistActive + ", free walk " + prisonerRef.EscortFreeWalking)
+
+    ; 4. Released: does he answer, and the control call left waiting on him?
+    float longHold = __ReleaseHold()
+    __SendTimedFormID(guard)
+    Utility.Wait(2.0)
+    bool answersAfter = JDB.solveFlt(".rpbTest.formIdAnswered") > 0.0
+    string controlAfter = JMap.getStr(__frozenCallResults, "guard.GetFormID() (control)")
+    log(asTest + ": the hold lasted " + __Ms(longHold) + "ms; after the release he answers " + answersAfter + ", the control call left waiting on him: " + controlAfter + "; escort assist " + prisonerRef.EscortAssistActive + ", free walk " + prisonerRef.EscortFreeWalking)
+    summary += "hold " + (longHold as int) + "s; answers after: " + answersAfter + "; RPB marked him frozen: " + RPB_Utility.IsFrozenGuard(guard) + "; "
+    log(asTest + ": SUMMARY " + summary)
+    self.__EndSimulatedFreeze()
+    return assert_true(answersAfter, asTest + ": he didn't answer after the hold")
+endFunction
+
+; Any hold released, and RPB's mark taken off him (he isn't frozen any more; the teardown leaves a marked clone in the
+; world)
+function __EndSimulatedFreeze()
+    if (__holdRelease)
+        __ReleaseHold()
+    endif
+    self.UnregisterForModEvent("RPB_TestHoldLock")
+    self.UnregisterForModEvent("RPB_TestTimedFormID")
+    RPB_Utility.ClearFrozenGuards()
+    JDB.setObj("rpbTest", 0)
 endFunction
 
 ;/
@@ -13087,7 +13394,7 @@ endFunction
 string __statelessTest = ""
 
 bool function __RunStatelessTest(string asTest)
-    if (asTest != "Test_ArrestWaitsWhileGuardFights_NoPackage" && asTest != "Test_CellDoorsDiagnostic" && asTest != "Test_LongAbsenceSetup" && asTest != "Test_LongAbsenceAdvance" && asTest != "Test_LongAbsenceVerify" && asTest != "Test_FallbackEscortToCellStopped_Player" && asTest != "Test_FallbackEscortToCellStopped_CloneGuard" && asTest != "Test_FightDuringEscort_NPC" && asTest != "Test_FightDuringEscort_Player" && asTest != "Test_GuardDiesInPrison_Player" && asTest != "Test_EscortToCellStopped_NoPackageLock" && StringUtil.Find(asTest, "Test_Surrender_") != 0 && asTest != "Test_FrozenGuardSkipped" && asTest != "Test_GuardDiesInPrison_NobodySees" && asTest != "Test_Escort_FreeWalk" && asTest != "Test_ToggleEscortToCell04" && asTest != "Test_CaptorFinishCycles_Calls" && asTest != "Test_CaptorFinishCycles_NoCalls" && asTest != "Test_CaptorFinishDetach_Calls" && asTest != "Test_CaptorFinishDetach_NoCalls" && asTest != "Test_Escort_FreeWalk_Control" && asTest != "Test_ActorKeys")
+    if (asTest != "Test_ArrestWaitsWhileGuardFights_NoPackage" && asTest != "Test_CellDoorsDiagnostic" && asTest != "Test_LongAbsenceSetup" && asTest != "Test_LongAbsenceAdvance" && asTest != "Test_LongAbsenceVerify" && asTest != "Test_FallbackEscortToCellStopped_Player" && asTest != "Test_FallbackEscortToCellStopped_CloneGuard" && asTest != "Test_FightDuringEscort_NPC" && asTest != "Test_FightDuringEscort_Player" && asTest != "Test_GuardDiesInPrison_Player" && asTest != "Test_EscortToCellStopped_NoPackageLock" && StringUtil.Find(asTest, "Test_Surrender_") != 0 && asTest != "Test_FrozenGuardSkipped" && asTest != "Test_GuardDiesInPrison_NobodySees" && asTest != "Test_Escort_FreeWalk" && asTest != "Test_ToggleEscortToCell04" && asTest != "Test_CaptorFinishCycles_Calls" && asTest != "Test_CaptorFinishCycles_NoCalls" && asTest != "Test_CaptorFinishDetach_Calls" && asTest != "Test_CaptorFinishDetach_NoCalls" && asTest != "Test_Escort_FreeWalk_Control" && asTest != "Test_ActorKeys" && asTest != "Test_FrozenGuardCalls" && asTest != "Test_SimulatedFreezeCalls")
         return false
     endif
 
@@ -13204,6 +13511,10 @@ bool function __RunStatelessTest(string asTest)
         __TeardownScenario()
     elseif (asTest == "Test_ActorKeys")
         display_result(__Scenario_ActorKeys("157"))
+    elseif (asTest == "Test_FrozenGuardCalls")
+        display_result(__Scenario_FrozenGuardCalls("158"))
+    elseif (asTest == "Test_SimulatedFreezeCalls")
+        display_result(__Scenario_SimulatedFreezeCalls("159"))
     elseif (asTest == "Test_Escort_FreeWalk_Control")
         ; Freeze control (round 109): 150 as it was before the experiments, the normal release order: the Scene stop, the
         ; guard's release and the player's revert all at once. Every experiment switch off, in case one was left on; the
