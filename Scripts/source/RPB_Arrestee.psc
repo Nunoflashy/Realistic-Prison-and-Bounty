@@ -1255,6 +1255,9 @@ event OnDestroy()
 endEvent
 
 event OnBountyGained()
+    if (self.GetBool("Hiding Bounty"))
+        return ; RPB_Arrest.BeginArrest is hiding it (a submission's set-aside bounty given back): hidden once, not twice
+    endif
     self.HideBounty()
 endEvent
 

@@ -2094,9 +2094,14 @@ function BeginArrest(RPB_Arrestee apArresteeRef)
         return
     endif
 
-    ; Back from where submitting set it aside, then hidden as the arrest's own, in one go
+    ; Back from where submitting set it aside, then hidden as the arrest's own, in one go. Giving it back raises the hold's
+    ; bounty stat, and my OnBountyGained (RPB_Arrestee) hid it too, at the same time as this: both read the same bounty
+    ; before either cleared it, and the hidden bounty doubled at every arrest after a submission (1200 -> 2400 -> 4800,
+    ; the captor's death giving it all back, 2026-10-04). It stands aside until this one is done
+    apArresteeRef.SetBool("Hiding Bounty", true)
     RPB_Arrest.GiveBackSetAsideBounty(arrestee, "the arrest hides it")
     apArresteeRef.HideBounty()
+    apArresteeRef.SetBool("Hiding Bounty", false)
     RPB_Utility.FlowMark("BeginArrest: HideBounty")
     ; Diagnostic (2026-09-23): HideBounty() -> ClearActiveBountyForFaction() should zero the native CrimeGold for the player
     ; (RPB_ActorBase.psc:702-759). Logged to confirm that's actually happening and whether combat was already under way
