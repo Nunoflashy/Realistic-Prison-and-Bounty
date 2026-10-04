@@ -256,6 +256,7 @@ function SetTests()
     self.AddTest("168 - Experiment: the Nearest Freezable Guard Faints, Alone (stays down until the next load; freeze him first)", "Test_FaintFrozenGuard", abChainable = false)
     self.AddTest("169 - Experiment: the Nearest Freezable Guard Faints, Guards Around (15s, as if helped up; freeze him first)", "Test_FaintFrozenGuardShort", abChainable = false)
     self.AddTest("170 - Escort Fallback With a Frozen Guard (Player; a freezable guard, frozen, then the stall fallback)", "Test_FrozenEscortFallback", abChainable = false)
+    self.AddTest("171 - Experiment: Hide and Stop the Nearest Freezable Guard With PO3 (no call into him; freeze him first)", "Test_HideFrozenGuard", abChainable = false)
     self.AddTest("041 - ActiveMagicEffectContainer: Stuck Lock Self-Heals", "Test_ActiveMagicEffectContainer_StuckLockSelfHeals")
     self.AddTest("042 - ThreadLock: JAtomic Primitive Semantics and Registry", "Test_ThreadLock_PrimitiveSemantics")
     ; Not chainable: fires concurrent worker threads
@@ -12408,11 +12409,11 @@ bool function __Scenario_FrozenEscortFallback(string asTest)
         endif
     endif
 
-    ; Another guard's prison flow (strip, clothing, the escort to the cell): up to 120s for the imprisonment
+    ; Another guard's prison flow (strip, clothing, the escort to the cell): up to 180s for the imprisonment (89s in one run, one ran out at 120s on the stairs)
     bool imprisoned = false
     if (captorNow && captorNow != guard)
         float waitStart = Utility.GetCurrentRealTime()
-        while (!imprisoned && (Utility.GetCurrentRealTime() - waitStart) < 120.0)
+        while (!imprisoned && (Utility.GetCurrentRealTime() - waitStart) < 180.0)
             Utility.Wait(1.0)
             imprisoned = RPB_Utility.IsActorImprisoned(player)
         endWhile
@@ -12427,6 +12428,79 @@ bool function __Scenario_FrozenEscortFallback(string asTest)
     bool handedOver = captorNow && captorNow != guard && imprisoned
     return assert_true(fellBack && marked && waitOk && handedOver, asTest + ": fallback " + fellBack + ", marked frozen " + marked + ", the wait for a guard (if nobody saw them) " + waitOk + ", imprisoned by another guard " + handedOver)
 endFunction
+
+; 171: the mod author's "double" idea (2026-10-04) needs the frozen escort guard gone from sight without a call into him
+; (Disable, Delete and MoveTo are calls on him, and hang). PO3's globals take him as an argument, as GetActorState does
+; (which works on a frozen guard): his root node hidden (ToggleChildNode), his AI stopped (FreezeActor type 0), then both
+; undone. Each call on its own stack, with a 5s timeout: one that hangs is reported, not waited on. His movement is read
+; from the player (a call on the player, him as an argument). Judged in game: does he vanish, does he stop walking.
+; Not frozen works as a control.
+bool function __Scenario_HideFrozenGuard(string asTest)
+    Actor target = __NearestFreezableGuard(4000.0)
+    if (!assert_true(target != none, asTest + ": no freezable guard nearby (161 spawns one)"))
+        return false
+    endif
+    Actor player = Game.GetFormEx(0x14) as Actor
+    log(asTest + ": " + target + " (marked frozen: " + RPB_Utility.IsFrozenGuard(target) + "), " + __Metres(player.GetDistance(target)) + " from the player")
+    self.RegisterForModEvent("RPB_TestPO3Call", "OnTestPO3Call")
+    __LogMovement(asTest, player, target, "before")
+    bool hidden = __TimedPO3Call(asTest, target, 0, true)
+    Utility.Wait(3.0)
+    log(asTest + ": hidden (ToggleChildNode NPC Root off) returned " + hidden + ": is he gone from sight?")
+    bool stopped = __TimedPO3Call(asTest, target, 1, true)
+    __LogMovement(asTest, player, target, "AI stopped (FreezeActor 0)")
+    bool shown = __TimedPO3Call(asTest, target, 0, false)
+    bool started = __TimedPO3Call(asTest, target, 1, false)
+    Utility.Wait(1.0)
+    __LogMovement(asTest, player, target, "both undone")
+    self.UnregisterForModEvent("RPB_TestPO3Call")
+    log(asTest + ": SUMMARY hide " + hidden + ", stop " + stopped + ", show " + shown + ", AI back " + started + " (TRUE = the call came back)")
+    return assert_true(hidden && stopped && shown && started, asTest + ": a PO3 call hung on him")
+endFunction
+
+; His distance from the player every second for 5s (how far he walked meanwhile)
+function __LogMovement(string asTest, Actor akPlayer, Actor akTarget, string asWhen)
+    float first = akPlayer.GetDistance(akTarget)
+    float last = first
+    float moved = 0.0
+    int i = 0
+    while (i < 5)
+        Utility.Wait(1.0)
+        float now = akPlayer.GetDistance(akTarget)
+        moved += Math.abs(now - last)
+        last = now
+        i += 1
+    endWhile
+    log(asTest + ": " + asWhen + ": distance from the player " + __Metres(first) + " -> " + __Metres(last) + ", changed by " + (moved as int) + " units over 5s")
+endFunction
+
+; 0 = ToggleChildNode(NPC Root [Root]), 1 = FreezeActor(type 0); on its own stack, waited up to 5s
+bool function __TimedPO3Call(string asTest, Actor akTarget, int aiWhich, bool abOn)
+    JDB.solveIntSetter(".rpbTest.po3Done", 0, true)
+    int handle = ModEvent.Create("RPB_TestPO3Call")
+    if (handle)
+        ModEvent.PushForm(handle, akTarget)
+        ModEvent.PushInt(handle, aiWhich)
+        ModEvent.PushBool(handle, abOn)
+        ModEvent.Send(handle)
+    endif
+    float start = Utility.GetCurrentRealTime()
+    while (JDB.solveInt(".rpbTest.po3Done") == 0 && (Utility.GetCurrentRealTime() - start) < 5.0)
+        Utility.Wait(0.1)
+    endWhile
+    bool done = JDB.solveInt(".rpbTest.po3Done") != 0
+    log(asTest + ": call " + aiWhich + " (" + abOn + ") came back " + done + " after " + __Ms(Utility.GetCurrentRealTime() - start) + "ms")
+    return done
+endFunction
+
+event OnTestPO3Call(Form akTarget, int aiWhich, bool abOn)
+    if (aiWhich == 0)
+        PO3_SKSEFunctions.ToggleChildNode(akTarget as ObjectReference, "NPC Root [Root]", abOn)
+    else
+        PO3_SKSEFunctions.FreezeActor(akTarget as Actor, 0, abOn)
+    endif
+    JDB.solveIntSetter(".rpbTest.po3Done", 1, true)
+endEvent
 
 ; 168: the faint experiment (the mod author's idea, 2026-10-04): a frozen guard nobody can take over from "faints", a
 ; collapse that covers the freeze up and gives the player an escape window. RPB_TestFaintSpell (plugin patch 009, DEV):
@@ -14020,7 +14094,7 @@ endFunction
 string __statelessTest = ""
 
 bool function __RunStatelessTest(string asTest)
-    if (asTest != "Test_ArrestWaitsWhileGuardFights_NoPackage" && asTest != "Test_CellDoorsDiagnostic" && asTest != "Test_LongAbsenceSetup" && asTest != "Test_LongAbsenceAdvance" && asTest != "Test_LongAbsenceVerify" && asTest != "Test_FallbackEscortToCellStopped_Player" && asTest != "Test_FallbackEscortToCellStopped_CloneGuard" && asTest != "Test_FightDuringEscort_NPC" && asTest != "Test_FightDuringEscort_Player" && asTest != "Test_GuardDiesInPrison_Player" && asTest != "Test_EscortToCellStopped_NoPackageLock" && StringUtil.Find(asTest, "Test_Surrender_") != 0 && asTest != "Test_FrozenGuardSkipped" && asTest != "Test_GuardDiesInPrison_NobodySees" && asTest != "Test_Escort_FreeWalk" && asTest != "Test_ToggleEscortToCell04" && asTest != "Test_CaptorFinishCycles_Calls" && asTest != "Test_CaptorFinishCycles_NoCalls" && asTest != "Test_CaptorFinishDetach_Calls" && asTest != "Test_CaptorFinishDetach_NoCalls" && asTest != "Test_Escort_FreeWalk_Control" && asTest != "Test_ActorKeys" && asTest != "Test_FrozenGuardCalls" && asTest != "Test_SimulatedFreezeCalls" && asTest != "Test_SimulatedFreezeAtCancel" && asTest != "Test_SpawnFreezableGuard" && asTest != "Test_AliasPackageControl" && asTest != "Test_FreezableEscort_Player" && asTest != "Test_FreezableEscort_NPC" && asTest != "Test_LightHold" && asTest != "Test_KillFrozenGuard" && asTest != "Test_LifetimeBountyStat" && asTest != "Test_FaintFrozenGuard" && asTest != "Test_FaintFrozenGuardShort" && asTest != "Test_FrozenEscortFallback")
+    if (asTest != "Test_ArrestWaitsWhileGuardFights_NoPackage" && asTest != "Test_CellDoorsDiagnostic" && asTest != "Test_LongAbsenceSetup" && asTest != "Test_LongAbsenceAdvance" && asTest != "Test_LongAbsenceVerify" && asTest != "Test_FallbackEscortToCellStopped_Player" && asTest != "Test_FallbackEscortToCellStopped_CloneGuard" && asTest != "Test_FightDuringEscort_NPC" && asTest != "Test_FightDuringEscort_Player" && asTest != "Test_GuardDiesInPrison_Player" && asTest != "Test_EscortToCellStopped_NoPackageLock" && StringUtil.Find(asTest, "Test_Surrender_") != 0 && asTest != "Test_FrozenGuardSkipped" && asTest != "Test_GuardDiesInPrison_NobodySees" && asTest != "Test_Escort_FreeWalk" && asTest != "Test_ToggleEscortToCell04" && asTest != "Test_CaptorFinishCycles_Calls" && asTest != "Test_CaptorFinishCycles_NoCalls" && asTest != "Test_CaptorFinishDetach_Calls" && asTest != "Test_CaptorFinishDetach_NoCalls" && asTest != "Test_Escort_FreeWalk_Control" && asTest != "Test_ActorKeys" && asTest != "Test_FrozenGuardCalls" && asTest != "Test_SimulatedFreezeCalls" && asTest != "Test_SimulatedFreezeAtCancel" && asTest != "Test_SpawnFreezableGuard" && asTest != "Test_AliasPackageControl" && asTest != "Test_FreezableEscort_Player" && asTest != "Test_FreezableEscort_NPC" && asTest != "Test_LightHold" && asTest != "Test_KillFrozenGuard" && asTest != "Test_LifetimeBountyStat" && asTest != "Test_FaintFrozenGuard" && asTest != "Test_FaintFrozenGuardShort" && asTest != "Test_FrozenEscortFallback" && asTest != "Test_HideFrozenGuard")
         return false
     endif
 
@@ -14159,6 +14233,8 @@ bool function __RunStatelessTest(string asTest)
         display_result(__Scenario_LifetimeBountyStat("167"))
     elseif (asTest == "Test_FaintFrozenGuard")
         display_result(__Scenario_FaintFrozenGuard("168", 0x0002C069))
+    elseif (asTest == "Test_HideFrozenGuard")
+        display_result(__Scenario_HideFrozenGuard("171"))
     elseif (asTest == "Test_FrozenEscortFallback")
         display_result(__Scenario_FrozenEscortFallback("170"))
     elseif (asTest == "Test_FaintFrozenGuardShort")
