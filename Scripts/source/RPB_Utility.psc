@@ -316,7 +316,9 @@ scriptname RPB_Utility hidden
     Actor function GetNearestGuard(ObjectReference centerRef, float radius, ObjectReference exclude) global
     Actor function GetGuardSeeing(Actor akPrisoner, Actor akExclude) global
     Actor function GetNearestGuardInCell(Actor akCenter, Actor akExclude) global
-    Actor function GetNearestFreeGuardOfFaction(Actor akCenter, Faction akCrimeFaction, float afMaxDistance, Actor akExclude) global
+    Actor function FindTakeoverGuard(Actor akCenter, Faction akCrimeFaction, Actor akExclude, float afNearDistance, float afFarDistance) global
+    function FaintFrozenGuard(Actor akGuard, bool abAlone) global
+    function PushFromMarker(Actor akActor, float afForce) global
     bool function IsActorNearReference(Actor akActor, ObjectReference akReference, float radius = 80.0) global
     bool function IsWithin(int aiValue, int aiMin, int aiMax, bool abMinInclusive = true, bool abMaxInclusive = true) global
     string function GetContainerList( int _container, string includeStringFilter = "", string excludeStringFilter = "", int includeIntegerFilter = -1, int excludeIntegerFilter = -1, Form includeFormFilter = none, Form excludeFormFilter = none, int indentLevel = 1 ) global
@@ -953,9 +955,14 @@ function ClearFrozenGuards() global
     int marked = JDB.solveObj(".rpb_root.frozenMarked")
     Spell marker = FrozenMarkerSpell()
     if (marked && marker)
+        ; And the faint (the experiment of test 168): the long one lasts until this load, when the freeze ends
+        Spell faint = Game.GetFormFromFile(0x0002C069, "RealisticPrisonAndBounty.esp") as Spell
         Form markedActor = JFormMap.nextKey(marked)
         while (markedActor)
             (markedActor as Actor).DispelSpell(marker)
+            if (faint)
+                (markedActor as Actor).DispelSpell(faint)
+            endif
             markedActor = JFormMap.nextKey(marked, markedActor)
         endWhile
         JFormMap.clear(marked)
@@ -5055,29 +5062,86 @@ Actor function GetGuardSeeing(Actor akPrisoner, Actor akExclude) global
     return seeing
 endFunction
 
-; The nearest guard of @akCrimeFaction within @afMaxDistance of @akCenter who can take an arrest over: alive, enabled, not
-; known frozen, not @akExclude, and not already a captor (no RPB_Captor spell) or arrested himself. None if there's no such
-; guard. A call on each guard close enough (his crime faction): run it on a stack of its own, in case one is frozen
-; without RPB knowing yet.
-Actor function GetNearestFreeGuardOfFaction(Actor akCenter, Faction akCrimeFaction, float afMaxDistance, Actor akExclude) global
+; The guard of @akCrimeFaction to take @akCenter's arrest over from @akExclude (frozen), or none: the nearest who has
+; noticed @akCenter (the game's own detection) within @afNearDistance, else the nearest within @afFarDistance who has
+; noticed them and has them in line of sight. Free guards only: alive, enabled, not known frozen, not already a captor,
+; not arrested himself. One scan of the high-process actors when a freeze is found (rare), no polling. Calls into each
+; guard close enough (crime faction, line of sight): run it on a stack of its own, a guard may be frozen without RPB
+; knowing yet. Detection is read from @akCenter's side (IsDetectedBy, the guard as an argument)
+Actor function FindTakeoverGuard(Actor akCenter, Faction akCrimeFaction, Actor akExclude, float afNearDistance, float afFarDistance) global
     Actor[] nearby = PO3_SKSEFunctions.GetActorsByProcessingLevel(0)
     int frozenMap = FrozenGuardsForScan()
     Spell captorSpell = RPB_CaptorSpell()
-    Actor nearest = none
-    float nearestDistance = afMaxDistance
+    Actor nearGuard = none
+    float nearDistance = afNearDistance
+    Actor farGuard = none
+    float farDistance = afFarDistance
     int i = 0
     while (i < nearby.Length)
         Actor candidate = nearby[i]
         if (candidate && candidate != akExclude && candidate != akCenter && !IsListedFrozen(frozenMap, candidate) && candidate.GetFormID() != 0x14)
             float distance = akCenter.GetDistance(candidate)
-            if (distance < nearestDistance && candidate.IsGuard() && !candidate.IsDead() && !candidate.IsDisabled() && !candidate.IsChild() && candidate.GetCrimeFaction() == akCrimeFaction && !candidate.HasSpell(captorSpell) && !IsActorArrested(candidate))
-                nearest = candidate
-                nearestDistance = distance
+            if (distance < farDistance && candidate.IsGuard() && !candidate.IsDead() && !candidate.IsDisabled() && !candidate.IsChild() && candidate.GetCrimeFaction() == akCrimeFaction && !candidate.HasSpell(captorSpell) && !IsActorArrested(candidate) && akCenter.IsDetectedBy(candidate))
+                if (distance < nearDistance)
+                    nearGuard = candidate
+                    nearDistance = distance
+                elseif (distance >= afNearDistance && candidate.HasLOS(akCenter))
+                    farGuard = candidate
+                    farDistance = distance
+                endif
             endif
         endif
         i += 1
     endWhile
-    return nearest
+    if (nearGuard)
+        return nearGuard
+    endif
+    return farGuard
+endFunction
+
+;/
+    A frozen guard collapses (the mod author's idea, 2026-10-04): a rare, visible reason for his arrest to stop, and the
+    arrestee's escape window. Each step without a call on him: the bleedout animation (Debug's global, him as an argument),
+    Paralysis +1 (the spell he casts on himself, like SetAV Paralysis 1),
+    then a push to ragdoll (from a marker, PushFromMarker): paralysed first, he stays down. @abAlone: nobody else took the arrest over, he stays down
+    until the next load (ClearFrozenGuards dispels it, the freeze ends there too); else 15s, as if the others helped him up.
+    On its own stack (RPB_EventManager.OnFaintFrozenGuard): it waits 3s.
+/;
+function FaintFrozenGuard(Actor akGuard, bool abAlone) global
+    int handle = ModEvent.Create("RPB_FaintFrozenGuard")
+    if (handle)
+        ModEvent.PushForm(handle, akGuard)
+        ModEvent.PushBool(handle, abAlone)
+        ModEvent.Send(handle)
+    endif
+endFunction
+
+function __FaintFrozenGuard(Actor akGuard, bool abAlone) global
+    Spell faint = Game.GetFormFromFile(int_if (abAlone, 0x0002C069, 0x0002C06A), "RealisticPrisonAndBounty.esp") as Spell
+    if (!akGuard || !faint)
+        return
+    endif
+    LogInfo(akGuard + " (frozen) faints, " + string_if(abAlone, "until the next load (nobody took his arrest over)", "for 15s (another guard took his arrest over)"), "Utility::FaintFrozenGuard")
+    Debug.SendAnimationEvent(akGuard, "BleedoutStart")
+    Utility.Wait(1.5)
+    ; Paralysis first, then the push: the mod author's order (SetAV Paralysis 1, then the push, keeps an actor on the
+    ; ground); pushed first, he was getting up when the paralysis came, and stood paralysed
+    faint.Cast(akGuard, akGuard)
+    Utility.Wait(0.3)
+    PushFromMarker(akGuard, 3.0)
+endFunction
+
+; Ragdolls @akActor with a push from a marker moved onto him, not from the player: pushed by the player, a guard counted it
+; as an attack, and the guards around fought the player ("Sheathe your weapons and come quietly!", 2026-10-04). Moving
+; the marker to him and pushing from it are calls on the marker, him only as an argument (works on a frozen NPC)
+function PushFromMarker(Actor akActor, float afForce) global
+    ObjectReference marker = Game.GetPlayer().PlaceAtMe(Game.GetFormEx(0x3B)) ; XMarker (invisible in game; a disabled one may not push)
+    if (!marker)
+        return
+    endif
+    marker.MoveTo(akActor, 0.0, 0.0, 0.0, false)
+    marker.PushActorAway(akActor, afForce)
+    marker.Delete()
 endFunction
 
 Actor function GetNearestGuardInCell(Actor akCenter, Actor akExclude) global

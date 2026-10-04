@@ -65,6 +65,7 @@ scriptname RPB_Arrest extends Quest
     function SetArrestGoal(Actor akArrestee, string asArrestGoal)
     function ArrestActor(Actor akArrester, Actor akArrestee, string asArrestType)
     function SetAsideBountyOnSubmission(Actor akActor, Actor akGuard) global
+    function __SetAsideBounty(Actor akActor, Actor akGuard, Faction akCrimeFaction) global
     bool function HasSetAsideBounty(Actor akActor) global
     bool function GiveBackSetAsideBounty(Actor akActor, string asWhy) global
     function RequestSubmissionTakeover(Actor akFrozenGuard) global
@@ -715,8 +716,13 @@ function SetAsideBountyOnSubmission(Actor akActor, Actor akGuard) global
         return
     endif
 
-    Faction crimeFaction = akGuard.GetCrimeFaction()
-    if (!crimeFaction)
+    RPB_Arrest.__SetAsideBounty(akActor, akGuard, akGuard.GetCrimeFaction())
+endFunction
+
+; The set-aside itself, @akCrimeFaction given (no call into @akGuard: he may be frozen)
+function __SetAsideBounty(Actor akActor, Actor akGuard, Faction akCrimeFaction) global
+    Faction crimeFaction = akCrimeFaction
+    if (!crimeFaction || HasSetAsideBounty(akActor))
         return
     endif
     int nonViolent  = crimeFaction.GetCrimeGoldNonViolent()
@@ -774,7 +780,13 @@ endFunction
 ; arrest over, on a stack of its own (the search calls into the guards around, and one of them may be frozen too)
 function RequestSubmissionTakeover(Actor akFrozenGuard) global
     Actor player = Game.GetPlayer()
-    if (!akFrozenGuard || RPB_StorageVars.GetFormOnReference("Guard", player, "Set-Aside Bounty") != akFrozenGuard)
+    if (!akFrozenGuard)
+        return
+    endif
+    ; His submission (not started yet), or his arrest of the player (started, the escort not yet): the arrest stores its
+    ; guard, so neither check calls into him
+    RPB_Arrestee arrestee = (RPB_API.GetArrest()).Arrestees.AtKey(player)
+    if (RPB_StorageVars.GetFormOnReference("Guard", player, "Set-Aside Bounty") != akFrozenGuard && !(arrestee && arrestee.GetCaptorActor() == akFrozenGuard))
         return
     endif
     int handle = ModEvent.Create("RPB_SubmissionTakeover")
@@ -784,33 +796,143 @@ function RequestSubmissionTakeover(Actor akFrozenGuard) global
     endif
 endFunction
 
-; The player had submitted to @akFrozenGuard ("I'll go to jail"), and he froze before his arrest could start: the nearest
-; free guard of the same hold (within 3000 units) arrests them straight away, no new dialogue, with the bounty still set
-; aside (the arrest takes it as usual). Asking again would only repeat what the player already chose. No such guard: the
-; bounty goes back, and the guards around come to arrest them the vanilla way. An arrest already under way (the Arrestee
-; effect is on) isn't this case: that's a guard frozen mid-arrest.
+; How far a guard taking over a frozen guard's arrest may be (game units, ~70 per metre): within TAKEOVER_ARREST_DISTANCE
+; (15m) a guard who noticed the player arrests them directly; up to TAKEOVER_APPROACH_DISTANCE (40m), noticed and in line
+; of sight, he walks over first (surrender-like, running is eluding). Placeholders until the mod author settles them
+float property TAKEOVER_ARREST_DISTANCE = 1050.0 autoreadonly
+float property TAKEOVER_APPROACH_DISTANCE = 2800.0 autoreadonly
+
+;/
+    The player had submitted to @akFrozenGuard ("I'll go to jail") and he froze before his arrest could start. The mod
+    author's rule (2026-10-04), by the guards of the same hold who noticed the player (RPB_Utility.FindTakeoverGuard):
+    - one within 15m: he arrests them straight away, no new dialogue (asking again would only repeat their choice);
+    - one within 40m, in line of sight: he walks over through the Surrender Scene, the player in a surrender-like state
+      (they can still move: leaving is eluding arrest), and arrests them when he gets there;
+    - nobody: the arrest is off, the bounty comes back, and the player can go.
+    The frozen guard faints either way (RPB_Utility.FaintFrozenGuard), for 15s when another guard took over, until the next
+    load when nobody did: the visible reason his arrest stopped. The bounty stays set aside while another guard comes (the
+    arrest takes it as usual). An arrest already under way (the Arrestee effect is on) isn't this case: that's a guard
+    frozen mid-arrest.
+/;
 function TakeOverSubmission(Actor akFrozenGuard)
     Actor player = Config.Player
     if (RPB_StorageVars.GetFormOnReference("Guard", player, "Set-Aside Bounty") != akFrozenGuard)
-        return ; the arrest took the bounty meanwhile, or another takeover already did this
+        ; Not a submission waiting for its arrest: his arrest of the player may have started already
+        if (!self.__CancelArrestByFrozenGuard(player, akFrozenGuard))
+            return ; the arrest took the bounty meanwhile, or another takeover already did this
+        endif
     endif
-    if (RPB_Utility.IsActorArrested(player) || RPB_Utility.IsActorImprisoned(player) || player.HasSpell(RPB_Utility.RPB_ArresteeSpell()))
+    ; His arrest only half set up: it froze between making the player the arrestee and making him the captor (the Captor
+    ; await calls into him), so the player has the Arrestee spell and no captor, or him (2026-10-04: "already under way",
+    ; and the bounty came back 30s later). That arrest is cancelled; the bounty stays set aside for the takeover
+    RPB_Arrestee halfArrestee = Arrestees.AtKey(player)
+    Actor halfCaptor = none
+    if (halfArrestee)
+        halfCaptor = halfArrestee.GetCaptorActor()
+    endif
+    if (player.HasSpell(RPB_Utility.RPB_ArresteeSpell()) && !RPB_Utility.IsActorArrested(player) && !RPB_Utility.IsActorImprisoned(player) && (!halfCaptor || halfCaptor == akFrozenGuard))
+        RPB_Utility.LogInfo(akFrozenGuard + " froze while his arrest of " + player + " was being set up: that arrest is cancelled for the takeover", "Arrest::TakeOverSubmission")
+        RPB_Recovery.CancelArrest(player, "the guard they submitted to froze while the arrest was being set up")
+        if (player.HasSpell(RPB_Utility.RPB_ArresteeSpell())) ; no Arrestee registered yet to revert: the spell alone
+            player.RemoveSpell(RPB_Utility.RPB_ArresteeSpell())
+        endif
+    endif
+    if (RPB_Utility.IsActorArrested(player) || RPB_Utility.IsActorImprisoned(player) || player.HasSpell(RPB_Utility.RPB_ArresteeSpell()) || self.IsSurrendering(player))
         RPB_Utility.LogWarn("No takeover for " + akFrozenGuard + ": " + player + "'s arrest is already under way", "Arrest::TakeOverSubmission")
         return
     endif
 
+    ; Frozen during his own jail line, he leaves the player in his dialogue, and no Scene plays while it's open (2026-10-04:
+    ; the takeover's cuffing Scene never got its first phase). It closes on its own once the line is over
+    int waits = 0
+    while (UI.IsMenuOpen("Dialogue Menu") && waits < 20)
+        Utility.WaitMenuMode(0.5)
+        waits += 1
+    endWhile
+    if (waits > 0)
+        RPB_Utility.LogInfo("Takeover of " + akFrozenGuard + "'s arrest waited " + (waits / 2) + "s for the dialogue to close (open still: " + UI.IsMenuOpen("Dialogue Menu") + ")", "Arrest::TakeOverSubmission")
+    endif
+
     Faction crimeFaction = RPB_StorageVars.GetFormOnReference("Faction", player, "Set-Aside Bounty") as Faction
-    Actor guard = RPB_Utility.GetNearestFreeGuardOfFaction(player, crimeFaction, 3000.0, akFrozenGuard)
+    Actor guard = RPB_Utility.FindTakeoverGuard(player, crimeFaction, akFrozenGuard, TAKEOVER_ARREST_DISTANCE, TAKEOVER_APPROACH_DISTANCE)
+    RPB_Utility.FaintFrozenGuard(akFrozenGuard, abAlone = !guard)
     if (!guard)
-        RPB_Arrest.GiveBackSetAsideBounty(player, "the guard they submitted to (" + akFrozenGuard + ") is frozen and no other guard of the hold is near")
+        RPB_Arrest.GiveBackSetAsideBounty(player, "the guard they submitted to (" + akFrozenGuard + ") is frozen and no other guard of the hold noticed them")
         return
     endif
 
     RPB_StorageVars.SetFormOnReference("Guard", player, guard, "Set-Aside Bounty")
-    RPB_Utility.LogInfo(guard + " takes over the arrest of " + player + " from " + akFrozenGuard + " (frozen)", "Arrest::TakeOverSubmission")
-    self.ArrestActor(guard, player, ARREST_TYPE_ESCORT_TO_JAIL)
+    float distance = player.GetDistance(guard)
     ; Watched like the first one: if he freezes too, the next takeover (or the bounty back) follows the same way
     RPB_Utility.ProbeGuardAfterBurst(guard, "took over a submission")
+    if (distance < TAKEOVER_ARREST_DISTANCE)
+        RPB_Utility.LogInfo(guard + " takes over the arrest of " + player + " from " + akFrozenGuard + " (frozen), " + ((distance * 0.01428) as int) + "m away: arrests them", "Arrest::TakeOverSubmission")
+        self.ArrestActor(guard, player, ARREST_TYPE_ESCORT_TO_JAIL)
+        return
+    endif
+
+    RPB_Utility.LogInfo(guard + " takes over the arrest of " + player + " from " + akFrozenGuard + " (frozen), " + ((distance * 0.01428) as int) + "m away: walks over first", "Arrest::TakeOverSubmission")
+    Actor[] guards = new Actor[1]
+    guards[0] = guard
+    __surrenderGuards = guards
+    self.__BeginSurrender(player)
+    RPB_StorageVars.SetBoolOnReference("Takeover", player, true, "Surrender")
+    ; The surrender's poses (hands up, then cowering): without them the player couldn't tell they were held, and a step
+    ; ended it as eluding (2026-10-04). The same as a surrender's for now; poses of its own later
+    self.PrepareSurrenderer(player, guards)
+    self.InitiateSurrenderScene(player, guards)
+    ; On this event's own stack until the Scene's end arrests them, or they leave (eluding)
+    self.__WatchSurrender(player, guards)
+endFunction
+
+;/
+    @akFrozenGuard froze after his arrest of @akActor started (the submission's bounty was already hidden by it), before the
+    escort: the arrest can't go on (its flow is stuck on a call into him, and his confrontation Scene waits on him). It's
+    cancelled (RPB_Recovery.CancelArrest: the guard's side on its own stack, the rest only calls on @akActor; the bounty
+    comes back), and the bounty is set aside again as at the submission, so the takeover rule goes on from there. Not once
+    the escort is walking (its own fallbacks handle a frozen escort). Returns whether it was this case.
+    The arrest's stuck stack stays stuck until the next load, waiting on him (and is a stale replay then: KNOWN_ISSUES G5).
+/;
+bool function __CancelArrestByFrozenGuard(Actor akActor, Actor akFrozenGuard)
+    RPB_Arrestee arrestee = Arrestees.AtKey(akActor)
+    if (!arrestee || arrestee.GetCaptorActor() != akFrozenGuard || RPB_Utility.IsActorImprisoned(akActor))
+        return false
+    endif
+    RPB_Prison prison = (RPB_API.GetPrisonManager()).FindPrisonByPrisoner(akActor)
+    if (prison)
+        RPB_Prisoner prisoner = prison.Prisoners.AtKey(akActor)
+        if (prisoner && prisoner.EscortAssistActive)
+            RPB_Utility.LogInfo("No takeover for " + akFrozenGuard + ": " + akActor + "'s escort is already walking (its own fallbacks take it)", "Arrest::TakeOverSubmission")
+            return false
+        endif
+    endif
+    Faction crimeFaction = arrestee.GetFaction()
+    RPB_Utility.LogInfo(akFrozenGuard + " froze during his arrest of " + akActor + ", before the escort: the arrest is cancelled for another guard to take it over", "Arrest::TakeOverSubmission")
+    RPB_Recovery.CancelArrest(akActor, "the guard arresting them froze before the escort")
+    RPB_Arrest.__SetAsideBounty(akActor, akFrozenGuard, crimeFaction)
+    return RPB_StorageVars.GetFormOnReference("Guard", akActor, "Set-Aside Bounty") == akFrozenGuard
+endFunction
+
+; A takeover's approach (TakeOverSubmission), not a surrender the player chose: leaving is eluding, its end arrests with
+; the set-aside bounty and no surrender penalty
+bool function __IsTakeoverApproach(Actor akActor)
+    return RPB_StorageVars.GetBoolOnReference("Takeover", akActor, "Surrender")
+endFunction
+
+; They left while the takeover guard was coming: they had agreed to go to jail, so that's eluding arrest. The bounty comes
+; back with the eluding penalty on top, and the guards deal with it the vanilla way
+function __EludeTakeover(Actor akActor)
+    if (!self.__ClaimSurrender(akActor))
+        return
+    endif
+    Actor[] noGuards
+    __surrenderGuards = noGuards
+    LastSurrenderOutcome = "eluded a takeover"
+    Faction crimeFaction = RPB_StorageVars.GetFormOnReference("Faction", akActor, "Set-Aside Bounty") as Faction
+    self.__UndoSurrender(akActor, "they left while the guard taking over their arrest was coming (eluding)", abNotify = false)
+    if (crimeFaction)
+        self.ApplyArrestEludedPenalty(crimeFaction)
+    endif
 endFunction
 
 ; Past the point where eluding means anything: already arrested, imprisoned, or surrendering
@@ -843,6 +965,7 @@ event OnSurrenderBegin(Actor akSurrenderer, Actor[] akSurrendererCaptors)
 endEvent
 
 event OnSurrenderEnd(Actor akSurrenderer, Actor akCaptor)
+    bool takeover = self.__IsTakeoverApproach(akSurrenderer) ; read before the claim clears it
     ; Already over (they left, an abort): a Scene end arriving late must not arrest anyone
     if (!self.__ClaimSurrender(akSurrenderer))
         __SurrenderLog("Surrender Scene of " + akSurrenderer + " ended after the surrender was already over, ignored")
@@ -861,9 +984,11 @@ event OnSurrenderEnd(Actor akSurrenderer, Actor akCaptor)
     endif
 
     Faction crimeFaction = akCaptor.GetCrimeFaction()
-    self.ApplySurrenderPenalty(akSurrenderer, crimeFaction)
+    if (!takeover) ; a takeover's arrest is the player's own submission, set aside: no surrender penalty
+        self.ApplySurrenderPenalty(akSurrenderer, crimeFaction)
+    endif
     ; The arrest rejects an actor with no bounty, and nothing would give the player back their controls after that
-    if (RPB_ActorBase.GetCurrentActiveAndLatentBountyForFaction(akSurrenderer, crimeFaction) <= 0)
+    if (RPB_ActorBase.GetCurrentActiveAndLatentBountyForFaction(akSurrenderer, crimeFaction) <= 0 && !RPB_Arrest.HasSetAsideBounty(akSurrenderer))
         LastSurrenderOutcome = "no bounty"
         self.__UndoSurrender(akSurrenderer, "no bounty in " + RPB_Utility.GetFormNameCached(crimeFaction) + " and no bounty for surrendering is set")
         return
@@ -925,6 +1050,11 @@ event OnArrestBegin(RPB_Arrestee apArrestee, RPB_Captor apCaptor, Faction akCrim
 
     if (apArrestee.IsPlayer())
         RPB_Arrest.AllowArrestForcegreets(false)
+        ; Watched until the escort: a guard freezing now leaves the arrest stuck on him, and the probe that finds him has
+        ; another guard take it over (TakeOverSubmission). A submission probes him already; a yield or a surrender didn't
+        if (apCaptor)
+            RPB_Utility.ProbeGuardAfterBurst(apArrestee.GetCaptorActor(), "his arrest started") ; stored, no call into him
+        endif
     endif
 
     RPB_Utility.FlowMark("Arrest.OnArrestBegin: parameters, bounty check, captor assigned")
@@ -1592,6 +1722,8 @@ function __UndoSurrender(Actor akSurrenderer, string asReason, bool abEndScene =
     if (abNotify)
         Config.NotifyArrest("No one took your surrender", isPlayer)
     endif
+    ; A takeover's approach ending without an arrest: the submission's bounty back (nothing set aside for a real surrender)
+    RPB_Arrest.GiveBackSetAsideBounty(akSurrenderer, "the takeover's approach ended without an arrest: " + asReason)
 endFunction
 
 function AbortSurrender(Actor akSurrenderer, string asReason, bool abEndScene = true)
@@ -1668,7 +1800,9 @@ function __WatchSurrender(Actor akSurrenderer, Actor[] akGuards)
             if ((movedSquared > leaveSquared || weaponDrawn) && !beingTaken)
                 watching = false
                 __SurrenderLog("Surrender of " + akSurrenderer + ": they left (moved " + (Math.sqrt(movedSquared) as int) + ", weapon drawn " + weaponDrawn + ", nearest guard " + (distance as int) + ", expired " + expired + ")")
-                if (expired)
+                if (self.__IsTakeoverApproach(akSurrenderer))
+                    self.__EludeTakeover(akSurrenderer)
+                elseif (expired)
                     self.__WithdrawSurrender(akSurrenderer)
                 else
                     self.__FakeSurrender(akSurrenderer, akGuards)

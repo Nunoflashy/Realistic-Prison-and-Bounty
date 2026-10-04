@@ -253,6 +253,8 @@ function SetTests()
     self.AddTest("165 - Diagnostic: Does a Light Hold Still Freeze Him (a call on himself per frame, not a busy loop)", "Test_LightHold", abChainable = false)
     self.AddTest("166 - Kill the Nearest Frozen Freezable Guard (the teardown's test-only kill; freeze him first)", "Test_KillFrozenGuard", abChainable = false)
     self.AddTest("167 - Diagnostic: How the Total Lifetime Bounty Stat Follows Each Bounty Change (Haafingar; restored after)", "Test_LifetimeBountyStat", abChainable = false)
+    self.AddTest("168 - Experiment: the Nearest Freezable Guard Faints, Alone (stays down until the next load; freeze him first)", "Test_FaintFrozenGuard", abChainable = false)
+    self.AddTest("169 - Experiment: the Nearest Freezable Guard Faints, Guards Around (15s, as if helped up; freeze him first)", "Test_FaintFrozenGuardShort", abChainable = false)
     self.AddTest("041 - ActiveMagicEffectContainer: Stuck Lock Self-Heals", "Test_ActiveMagicEffectContainer_StuckLockSelfHeals")
     self.AddTest("042 - ThreadLock: JAtomic Primitive Semantics and Registry", "Test_ThreadLock_PrimitiveSemantics")
     ; Not chainable: fires concurrent worker threads
@@ -12323,6 +12325,49 @@ bool function __Scenario_LifetimeBountyStat(string asTest)
     return assert_true(endStat == savedStat && endLargest == savedLargest && haafingar.GetCrimeGoldNonViolent() == savedNonViolent && haafingar.GetCrimeGoldViolent() == savedViolent, asTest + ": the bounty or a stat wasn't put back")
 endFunction
 
+; 168: the faint experiment (the mod author's idea, 2026-10-04): a frozen guard nobody can take over from "faints", a
+; collapse that covers the freeze up and gives the player an escape window. RPB_TestFaintSpell (plugin patch 009, DEV):
+; 60s of paralysis (no shader or sound), cast by the guard on himself (Spell.Cast is a call on the spell, not on him; no crime against the
+; player). Then where he is, every 5s for 30s, read without a call on him (the player's distance to him), to see what his
+; AI does when he gets up while his scripts stay frozen. Not frozen works as a control. Judged in game: green = cast
+bool function __Scenario_FaintFrozenGuard(string asTest, int aiSpellId)
+    Actor target = __NearestFreezableGuard(4000.0)
+    if (!assert_true(target != none, asTest + ": no freezable guard nearby (161 spawns one)"))
+        return false
+    endif
+    Spell faint = Game.GetFormFromFile(aiSpellId, "RealisticPrisonAndBounty.esp") as Spell
+    if (!assert_true(faint != none, asTest + ": no RPB_TestFaintSpell in the plugin (patch 009)"))
+        return false
+    endif
+    Actor player = Game.GetFormEx(0x14) as Actor
+    log(asTest + ": " + target + " (marked frozen: " + RPB_Utility.IsFrozenGuard(target) + ") faints, " + __Metres(player.GetDistance(target)) + " from the player")
+    ; The mod author's three steps (2026-10-04), each without a call on him: the bleedout animation (Debug's global, him as
+    ; an argument), paralysis (the spell he casts on himself drives the Paralysis actor value), a push to ragdoll (a call
+    ; on the player, him as an argument)
+    Debug.SendAnimationEvent(target, "BleedoutStart")
+    log(asTest + ": bleedout animation sent")
+    Utility.Wait(1.5)
+    ; The push before the paralysis, and time to fall: cast half a second after the push, the paralysis froze him before
+    ; the ragdoll showed (2026-10-04). Force 0 didn't visibly ragdoll him either; the mod author suggested 2-4
+    faint.Cast(target, target)
+    log(asTest + ": paralysis cast (Paralysis +1, like SetAV Paralysis 1)")
+    Utility.Wait(0.3)
+    RPB_Utility.PushFromMarker(target, 3.0) ; from the player it counted as an attack on the guard
+    log(asTest + ": pushed (force 3, from a marker; paralysed first, so he stays down)")
+    int t = 0
+    while (t < 30)
+        Utility.Wait(5.0)
+        t += 5
+        log(asTest + ": +" + t + "s: " + __Metres(player.GetDistance(target)) + " from the player, dead " + RPB_Utility.IsDeadNoCall(target))
+    endWhile
+    return true
+endFunction
+
+; A distance in game units as metres (70 units are about 1 m)
+string function __Metres(float afUnits)
+    return ((afUnits * 0.01428) as int) + "m"
+endFunction
+
 int __lifetimeLast = -1
 int __largestLast = -1
 function __LifetimeStep(string asTest, string asStep, string asStat)
@@ -13872,7 +13917,7 @@ endFunction
 string __statelessTest = ""
 
 bool function __RunStatelessTest(string asTest)
-    if (asTest != "Test_ArrestWaitsWhileGuardFights_NoPackage" && asTest != "Test_CellDoorsDiagnostic" && asTest != "Test_LongAbsenceSetup" && asTest != "Test_LongAbsenceAdvance" && asTest != "Test_LongAbsenceVerify" && asTest != "Test_FallbackEscortToCellStopped_Player" && asTest != "Test_FallbackEscortToCellStopped_CloneGuard" && asTest != "Test_FightDuringEscort_NPC" && asTest != "Test_FightDuringEscort_Player" && asTest != "Test_GuardDiesInPrison_Player" && asTest != "Test_EscortToCellStopped_NoPackageLock" && StringUtil.Find(asTest, "Test_Surrender_") != 0 && asTest != "Test_FrozenGuardSkipped" && asTest != "Test_GuardDiesInPrison_NobodySees" && asTest != "Test_Escort_FreeWalk" && asTest != "Test_ToggleEscortToCell04" && asTest != "Test_CaptorFinishCycles_Calls" && asTest != "Test_CaptorFinishCycles_NoCalls" && asTest != "Test_CaptorFinishDetach_Calls" && asTest != "Test_CaptorFinishDetach_NoCalls" && asTest != "Test_Escort_FreeWalk_Control" && asTest != "Test_ActorKeys" && asTest != "Test_FrozenGuardCalls" && asTest != "Test_SimulatedFreezeCalls" && asTest != "Test_SimulatedFreezeAtCancel" && asTest != "Test_SpawnFreezableGuard" && asTest != "Test_AliasPackageControl" && asTest != "Test_FreezableEscort_Player" && asTest != "Test_FreezableEscort_NPC" && asTest != "Test_LightHold" && asTest != "Test_KillFrozenGuard" && asTest != "Test_LifetimeBountyStat")
+    if (asTest != "Test_ArrestWaitsWhileGuardFights_NoPackage" && asTest != "Test_CellDoorsDiagnostic" && asTest != "Test_LongAbsenceSetup" && asTest != "Test_LongAbsenceAdvance" && asTest != "Test_LongAbsenceVerify" && asTest != "Test_FallbackEscortToCellStopped_Player" && asTest != "Test_FallbackEscortToCellStopped_CloneGuard" && asTest != "Test_FightDuringEscort_NPC" && asTest != "Test_FightDuringEscort_Player" && asTest != "Test_GuardDiesInPrison_Player" && asTest != "Test_EscortToCellStopped_NoPackageLock" && StringUtil.Find(asTest, "Test_Surrender_") != 0 && asTest != "Test_FrozenGuardSkipped" && asTest != "Test_GuardDiesInPrison_NobodySees" && asTest != "Test_Escort_FreeWalk" && asTest != "Test_ToggleEscortToCell04" && asTest != "Test_CaptorFinishCycles_Calls" && asTest != "Test_CaptorFinishCycles_NoCalls" && asTest != "Test_CaptorFinishDetach_Calls" && asTest != "Test_CaptorFinishDetach_NoCalls" && asTest != "Test_Escort_FreeWalk_Control" && asTest != "Test_ActorKeys" && asTest != "Test_FrozenGuardCalls" && asTest != "Test_SimulatedFreezeCalls" && asTest != "Test_SimulatedFreezeAtCancel" && asTest != "Test_SpawnFreezableGuard" && asTest != "Test_AliasPackageControl" && asTest != "Test_FreezableEscort_Player" && asTest != "Test_FreezableEscort_NPC" && asTest != "Test_LightHold" && asTest != "Test_KillFrozenGuard" && asTest != "Test_LifetimeBountyStat" && asTest != "Test_FaintFrozenGuard" && asTest != "Test_FaintFrozenGuardShort")
         return false
     endif
 
@@ -14009,6 +14054,10 @@ bool function __RunStatelessTest(string asTest)
         display_result(__Scenario_KillFrozenGuard("166"))
     elseif (asTest == "Test_LifetimeBountyStat")
         display_result(__Scenario_LifetimeBountyStat("167"))
+    elseif (asTest == "Test_FaintFrozenGuard")
+        display_result(__Scenario_FaintFrozenGuard("168", 0x0002C069))
+    elseif (asTest == "Test_FaintFrozenGuardShort")
+        display_result(__Scenario_FaintFrozenGuard("169", 0x0002C06A))
     elseif (asTest == "Test_Escort_FreeWalk_Control")
         ; Freeze control (round 109): 150 as it was before the experiments, the normal release order: the Scene stop, the
         ; guard's release and the player's revert all at once. Every experiment switch off, in case one was left on; the

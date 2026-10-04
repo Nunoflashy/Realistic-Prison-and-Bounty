@@ -118,7 +118,12 @@ function RegisterEvents()
     ; A bounty set aside on submitting, given back if no arrest took it (RPB_Arrest.SetAsideBountyOnSubmission)
     RegisterForModEvent("RPB_SetAsideBountyCheck", "OnSetAsideBountyCheck")
     RegisterForModEvent("RPB_SubmissionTakeover", "OnSubmissionTakeover")
+    RegisterForModEvent("RPB_FaintFrozenGuard", "OnFaintFrozenGuard")
 endFunction
+
+event OnFaintFrozenGuard(Form akGuard, bool abAlone)
+    RPB_Utility.__FaintFrozenGuard(akGuard as Actor, abAlone)
+endEvent
 
 event OnSubmissionTakeover(Form akFrozenGuard)
     Arrest.TakeOverSubmission(akFrozenGuard as Actor)
@@ -126,6 +131,10 @@ endEvent
 
 event OnSetAsideBountyCheck(Form akActor, float afDelay)
     Utility.Wait(afDelay)
+    ; A takeover guard still walking over (a surrender-like approach): its own end gives the bounty back or arrests
+    while (Arrest.IsSurrendering(akActor as Actor))
+        Utility.Wait(5.0)
+    endWhile
     if (RPB_Arrest.GiveBackSetAsideBounty(akActor as Actor, "no arrest took it within " + (afDelay as int) + "s"))
         RPB_Utility.LogWarn("A submission's arrest never started: " + akActor + "'s bounty is back", "EventManager::OnSetAsideBountyCheck")
     endif
