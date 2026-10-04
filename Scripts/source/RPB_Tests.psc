@@ -10762,6 +10762,8 @@ endFunction
 Faction __scenarioBountyFaction
 int __savedPlayerBounty
 int __savedPlayerBountyViolent
+int __savedLifetimeBounty ; the game's General stats: raised by every bounty a test gives the player (test 167)
+int __savedLargestBounty
 bool __playerScenario
 ObjectReference __scenarioReturnMarker ; where a player scenario started: fallbacks teleport them to the prison
 Actor __scenarioRealGuard ; a real guard a scenario used instead of a clone: reset by the teardown, never deleted
@@ -10835,6 +10837,8 @@ Actor function __ScenarioArrestee(bool abPlayer, Actor akGuard)
         ; and a violent one gained during the test (a hit in the fight) stayed, with guards after the player for good
         __savedPlayerBounty = crimeFaction.GetCrimeGoldNonViolent()
         __savedPlayerBountyViolent = crimeFaction.GetCrimeGoldViolent()
+        __savedLifetimeBounty = Game.QueryStat("Total Lifetime Bounty")
+        __savedLargestBounty = Game.QueryStat("Largest Bounty")
         crimeFaction.SetCrimeGold(2000)
         player.ModActorValue("Health", 5000.0)
         if (!__scenarioReturnMarker)
@@ -11412,6 +11416,9 @@ function __TeardownScenario()
         if (__scenarioBountyFaction)
             __scenarioBountyFaction.SetCrimeGold(__savedPlayerBounty)
             __scenarioBountyFaction.SetCrimeGoldViolent(__savedPlayerBountyViolent)
+            ; After the bounty: putting it back counts as bounty gained again
+            RPB_Utility.SetGameStat("Total Lifetime Bounty", __savedLifetimeBounty)
+            RPB_Utility.SetGameStat("Largest Bounty", __savedLargestBounty)
         endif
         player.ModActorValue("Health", -5000.0)
         player.SetRestrained(false)
@@ -12265,8 +12272,10 @@ bool function __Scenario_LifetimeBountyStat(string asTest)
     int savedNonViolent = haafingar.GetCrimeGoldNonViolent()
     int savedViolent = haafingar.GetCrimeGoldViolent()
     int savedStat = Game.QueryStat(stat)
+    int savedLargest = Game.QueryStat("Largest Bounty")
     __lifetimeLast = savedStat
-    log(asTest + ": start: bounty " + savedNonViolent + " non-violent, " + savedViolent + " violent; stat " + savedStat)
+    __largestLast = savedLargest
+    log(asTest + ": start: bounty " + savedNonViolent + " non-violent, " + savedViolent + " violent; stat " + savedStat + "; Largest Bounty " + savedLargest + ", RPB's for Haafingar " + RPB_ActorVars.GetLargestBounty(haafingar, Game.GetPlayer()))
 
     haafingar.SetCrimeGold(0)
     haafingar.SetCrimeGoldViolent(0)
@@ -12291,22 +12300,37 @@ bool function __Scenario_LifetimeBountyStat(string asTest)
     __LifetimeStep(asTest, "IncrementStat(+250)", stat)
     RPB_Utility.SetGameStat(stat, savedStat + 7)
     __LifetimeStep(asTest, "SetGameStat(saved + 7)", stat)
+    ; Largest Bounty: does a bounty above it raise it on its own, and can it be set (raised, lowered)?
+    haafingar.SetCrimeGoldViolent(0)
+    haafingar.SetCrimeGold(savedLargest + 1500)
+    __LifetimeStep(asTest, "SetCrimeGold(Largest + 1500), violent 0", stat)
+    haafingar.ModCrimeGold(500, true)
+    __LifetimeStep(asTest, "ModCrimeGold(+500, violent): total Largest + 2000", stat)
+    RPB_Utility.SetGameStat("Largest Bounty", savedLargest + 5000)
+    __LifetimeStep(asTest, "SetGameStat(Largest Bounty, saved + 5000)", stat)
+    RPB_Utility.SetGameStat("Largest Bounty", savedLargest)
+    __LifetimeStep(asTest, "SetGameStat(Largest Bounty, saved): lowered back", stat)
 
     haafingar.SetCrimeGold(savedNonViolent)
     haafingar.SetCrimeGoldViolent(savedViolent)
     __LifetimeStep(asTest, "bounty restored", stat)
     RPB_Utility.SetGameStat(stat, savedStat)
+    RPB_Utility.SetGameStat("Largest Bounty", savedLargest)
     Utility.Wait(0.5)
     int endStat = Game.QueryStat(stat)
-    log(asTest + ": end: bounty " + haafingar.GetCrimeGoldNonViolent() + " non-violent, " + haafingar.GetCrimeGoldViolent() + " violent; stat " + endStat + " (was " + savedStat + ")")
-    return assert_true(endStat == savedStat && haafingar.GetCrimeGoldNonViolent() == savedNonViolent && haafingar.GetCrimeGoldViolent() == savedViolent, asTest + ": the bounty or the stat wasn't put back")
+    int endLargest = Game.QueryStat("Largest Bounty")
+    log(asTest + ": end: bounty " + haafingar.GetCrimeGoldNonViolent() + " non-violent, " + haafingar.GetCrimeGoldViolent() + " violent; stat " + endStat + " (was " + savedStat + "); Largest Bounty " + endLargest + " (was " + savedLargest + ")")
+    return assert_true(endStat == savedStat && endLargest == savedLargest && haafingar.GetCrimeGoldNonViolent() == savedNonViolent && haafingar.GetCrimeGoldViolent() == savedViolent, asTest + ": the bounty or a stat wasn't put back")
 endFunction
 
 int __lifetimeLast = -1
+int __largestLast = -1
 function __LifetimeStep(string asTest, string asStep, string asStat)
     int now = Game.QueryStat(asStat)
+    int largestNow = Game.QueryStat("Largest Bounty")
     Utility.Wait(0.3)
     int later = Game.QueryStat(asStat)
+    int largestLater = Game.QueryStat("Largest Bounty")
     string lag = ""
     if (later != now)
         lag = " (" + later + " after 0.3s)"
@@ -12315,8 +12339,13 @@ function __LifetimeStep(string asTest, string asStep, string asStat)
     if (__lifetimeLast >= 0)
         change = ", change " + (later - __lifetimeLast)
     endif
-    log(asTest + ": " + asStep + ": stat " + now + lag + change)
+    string largestLag = ""
+    if (largestLater != largestNow)
+        largestLag = " (" + largestLater + " after 0.3s)"
+    endif
+    log(asTest + ": " + asStep + ": stat " + now + lag + change + "; Largest Bounty " + largestNow + largestLag + ", change " + (largestLater - __largestLast))
     __lifetimeLast = later
+    __largestLast = largestLater
 endFunction
 
 ; Passes of a loop making one global call each, over @afSeconds
