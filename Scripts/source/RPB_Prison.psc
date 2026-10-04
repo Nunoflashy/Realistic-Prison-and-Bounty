@@ -3655,6 +3655,8 @@ event OnPrisonerDeath(RPB_Prisoner apPrisoner, Actor akKiller)
 
 endEvent
 event OnEscortPrisonerToJailBegin(RPB_ActorBase apActor, Actor akEscort)
+    ; Watched as the walk starts: a guard found frozen now hands the escort to a guard who sees it (RPB_Arrest.__HandOverEscort)
+    RPB_Utility.ProbeGuardAfterBurst(akEscort, "escort to jail began")
     ; The player's stairs assist for the walk (RPB_Prisoner's Escorting state)
     RPB_Prisoner prisonerRef = self.Prisoners.AtKey(apActor.GetActor())
     if (prisonerRef)

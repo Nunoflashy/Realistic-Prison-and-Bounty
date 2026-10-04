@@ -901,8 +901,8 @@ bool function __CancelArrestByFrozenGuard(Actor akActor, Actor akFrozenGuard)
     RPB_Prison prison = (RPB_API.GetPrisonManager()).FindPrisonByPrisoner(akActor)
     if (prison)
         RPB_Prisoner prisoner = prison.Prisoners.AtKey(akActor)
-        if (prisoner && prisoner.EscortAssistActive)
-            RPB_Utility.LogInfo("No takeover for " + akFrozenGuard + ": " + akActor + "'s escort is already walking (its own fallbacks take it)", "Arrest::TakeOverSubmission")
+        if (prisoner && (prisoner.EscortAssistActive || arrestee.GetBool("Escort Arrived")))
+            self.__HandOverEscort(akActor, akFrozenGuard, arrestee, prison)
             return false
         endif
     endif
@@ -911,6 +911,37 @@ bool function __CancelArrestByFrozenGuard(Actor akActor, Actor akFrozenGuard)
     RPB_Recovery.CancelArrest(akActor, "the guard arresting them froze before the escort")
     RPB_Arrest.__SetAsideBounty(akActor, akFrozenGuard, crimeFaction)
     return RPB_StorageVars.GetFormOnReference("Guard", akActor, "Set-Aside Bounty") == akFrozenGuard
+endFunction
+
+;/
+    @akFrozenGuard froze while escorting @akActor (the mod author's rule, 2026-10-04): a guard of the hold who sees them
+    (line of sight, within 40m) takes the escort over, and the frozen one faints for 15s (as if the others helped him up).
+    One scan when he's found frozen, no polling. Nobody sees them: he goes on escorting, frozen (his AI still walks; the
+    escort's helpers read him through calls, so they're blind on him). Inside the prison, after the escort's arrival, it's
+    the handover RPB already does when an escort guard dies there (RPB_Arrestee.HandOverInPrison), only when a guard there
+    sees them.
+/;
+function __HandOverEscort(Actor akActor, Actor akFrozenGuard, RPB_Arrestee apArrestee, RPB_Prison apPrison)
+    if (apArrestee.GetBool("Escort Arrived"))
+        if (!RPB_Utility.GetGuardSeeing(akActor, akFrozenGuard))
+            RPB_Utility.LogInfo(akFrozenGuard + " froze in " + apPrison.Name + " with " + akActor + ": no guard there sees them, he carries on", "Arrest::HandOverEscort")
+            return
+        endif
+        RPB_Utility.LogInfo(akFrozenGuard + " froze in " + apPrison.Name + " with " + akActor + ": a guard there takes over", "Arrest::HandOverEscort")
+        RPB_Utility.FaintFrozenGuard(akFrozenGuard, abAlone = false)
+        apArrestee.HandOverInPrison(akFrozenGuard)
+        return
+    endif
+
+    Actor guard = RPB_Utility.FindTakeoverGuard(akActor, apArrestee.GetFaction(), akFrozenGuard, 0.0, TAKEOVER_APPROACH_DISTANCE, abSightOnly = true)
+    if (!guard)
+        RPB_Utility.LogInfo(akFrozenGuard + " froze escorting " + akActor + ": no guard of the hold sees them within 40m, he carries on", "Arrest::HandOverEscort")
+        return
+    endif
+    RPB_Utility.LogInfo(akFrozenGuard + " froze escorting " + akActor + ": " + guard + " (" + ((akActor.GetDistance(guard) * 0.01428) as int) + "m, sees them) takes the escort over", "Arrest::HandOverEscort")
+    RPB_Utility.FaintFrozenGuard(akFrozenGuard, abAlone = false)
+    apArrestee.HandOverEscort(akFrozenGuard, guard)
+    RPB_Utility.ProbeGuardAfterBurst(guard, "took over an escort")
 endFunction
 
 ; A takeover's approach (TakeOverSubmission), not a surrender the player chose: leaving is eluding, its end arrests with

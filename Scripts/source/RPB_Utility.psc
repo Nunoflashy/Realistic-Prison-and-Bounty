@@ -316,7 +316,7 @@ scriptname RPB_Utility hidden
     Actor function GetNearestGuard(ObjectReference centerRef, float radius, ObjectReference exclude) global
     Actor function GetGuardSeeing(Actor akPrisoner, Actor akExclude) global
     Actor function GetNearestGuardInCell(Actor akCenter, Actor akExclude) global
-    Actor function FindTakeoverGuard(Actor akCenter, Faction akCrimeFaction, Actor akExclude, float afNearDistance, float afFarDistance) global
+    Actor function FindTakeoverGuard(Actor akCenter, Faction akCrimeFaction, Actor akExclude, float afNearDistance, float afFarDistance, bool abSightOnly = false) global
     function FaintFrozenGuard(Actor akGuard, bool abAlone) global
     function PushFromMarker(Actor akActor, float afForce) global
     bool function IsActorNearReference(Actor akActor, ObjectReference akReference, float radius = 80.0) global
@@ -5068,7 +5068,9 @@ endFunction
 ; not arrested himself. One scan of the high-process actors when a freeze is found (rare), no polling. Calls into each
 ; guard close enough (crime faction, line of sight): run it on a stack of its own, a guard may be frozen without RPB
 ; knowing yet. Detection is read from @akCenter's side (IsDetectedBy, the guard as an argument)
-Actor function FindTakeoverGuard(Actor akCenter, Faction akCrimeFaction, Actor akExclude, float afNearDistance, float afFarDistance) global
+; @abSightOnly: only line of sight counts, at any distance up to @afFarDistance (an escort handover: the guards around
+; have to see the escort collapse, the mod author 2026-10-04)
+Actor function FindTakeoverGuard(Actor akCenter, Faction akCrimeFaction, Actor akExclude, float afNearDistance, float afFarDistance, bool abSightOnly = false) global
     Actor[] nearby = PO3_SKSEFunctions.GetActorsByProcessingLevel(0)
     int frozenMap = FrozenGuardsForScan()
     Spell captorSpell = RPB_CaptorSpell()
@@ -5081,8 +5083,13 @@ Actor function FindTakeoverGuard(Actor akCenter, Faction akCrimeFaction, Actor a
         Actor candidate = nearby[i]
         if (candidate && candidate != akExclude && candidate != akCenter && !IsListedFrozen(frozenMap, candidate) && candidate.GetFormID() != 0x14)
             float distance = akCenter.GetDistance(candidate)
-            if (distance < farDistance && candidate.IsGuard() && !candidate.IsDead() && !candidate.IsDisabled() && !candidate.IsChild() && candidate.GetCrimeFaction() == akCrimeFaction && !candidate.HasSpell(captorSpell) && !IsActorArrested(candidate) && akCenter.IsDetectedBy(candidate))
-                if (distance < nearDistance)
+            if (distance < farDistance && candidate.IsGuard() && !candidate.IsDead() && !candidate.IsDisabled() && !candidate.IsChild() && candidate.GetCrimeFaction() == akCrimeFaction && !candidate.HasSpell(captorSpell) && !IsActorArrested(candidate) && (abSightOnly || akCenter.IsDetectedBy(candidate)))
+                if (abSightOnly)
+                    if (candidate.HasLOS(akCenter))
+                        farGuard = candidate
+                        farDistance = distance
+                    endif
+                elseif (distance < nearDistance)
                     nearGuard = candidate
                     nearDistance = distance
                 elseif (distance >= afNearDistance && candidate.HasLOS(akCenter))

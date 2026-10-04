@@ -72,6 +72,7 @@ Scriptname RPB_Arrestee extends RPB_ActorBase
     function SetStat(string asStatName, int aiValue)
     function PauseEscortForFight(Actor akHostile)
     function HandOverInPrison(Actor akDeadGuard)
+    function HandOverEscort(Actor akFrozenGuard, Actor akNewGuard)
     function EndEscortWatch()
     function Destroy()
     string function GetScriptVarCategory(string asVarCategory = "Actor")
@@ -1669,6 +1670,45 @@ function HandOverInPrison(Actor akDeadGuard)
     else
         self.__AwaitGuardInPrison(akDeadGuard, prison)
     endif
+endFunction
+
+;/
+    My escort guard froze on the way to the prison (RPB_Arrest.__HandOverEscort): @akNewGuard becomes my Captor and the
+    escort to jail starts again with him. Nothing is called on @akFrozenGuard here: his Scene is stopped from my side, his
+    package lock is freed on its own stack, and his Captor stays on him (ReleaseCaptorOf leaves a frozen guard alone)
+    until the next load.
+/;
+function HandOverEscort(Actor akFrozenGuard, Actor akNewGuard)
+    RPB_Prison prison = API.PrisonManager.FindPrisonByPrisoner(this)
+    RPB_Prisoner prisoner = none
+    if (prison)
+        prisoner = prison.Prisoners.AtKey(this)
+    endif
+    if (!prisoner || prisoner.IsImprisoned)
+        return
+    endif
+
+    SceneManager.EndSceneWithActor(this, "the escort guard froze")
+    prisoner.StopEscortAssist()
+    int handle = ModEvent.Create("RPB_FreeGuard")
+    if (handle)
+        ModEvent.PushForm(handle, akFrozenGuard)
+        ModEvent.Send(handle)
+    endif
+
+    RPB_Captor newCaptor = Arrest.AwaitCaptorReference(akNewGuard)
+    if (!newCaptor)
+        Info("Could not make " + akNewGuard + " the captor of " + Name + " " + this + " after " + akFrozenGuard + " froze: the escort goes on without a Scene")
+        prisoner.MoveToPrison(akNewGuard)
+        return
+    endif
+    newCaptor.AssignArrestee(this)
+    self.AssignCaptor(newCaptor)
+    __captor = newCaptor
+    self.SetForm("Arrest Captor", akNewGuard, "Jail")
+    Info("Escort of " + Name + " " + this + " handed over to " + akNewGuard + ": " + akFrozenGuard + " froze")
+    RetainAI(self.IsPlayer()) ; the escort walks me
+    self.__ResumeEscort(false)
 endFunction
 
 ; @akNewGuard becomes my Captor and the prison flow goes on with him from where it stopped
