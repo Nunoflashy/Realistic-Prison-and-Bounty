@@ -148,6 +148,7 @@ scriptname RPB_Utility hidden
     float function UnitsToCM(int unit)
     float function UnitsToM(int unit)
     function OrientRelative(ObjectReference akObjA, ObjectReference akObjB, Float afRotX = 0.0, Float afRotY = 0.0, Float afRotZ = 0.0) Global
+    function TurnBackTo(Actor akActor, ObjectReference akFrom) global
     bool function IsFarAwayFromObject(ObjectReference akObjectOne, ObjectReference akObjectTwo) global
     bool function IsWedgedTogether(Actor akActorOne, Actor akActorTwo, float afStuckDistance = 90.0) global
     function PushActorAwayFrom(Actor akActorToMove, Actor akAnchor, float afDistance) global
@@ -862,6 +863,8 @@ bool function IsFrozenGuard(Actor akActor) global
 endFunction
 
 function MarkGuardFrozen(Actor akGuard, string asStep) global
+    ; The player submitted to him: his arrest won't come, the bounty set aside for it goes back (other guards take over)
+    RPB_Arrest.GiveBackSetAsideBountyFromGuard(akGuard, "the guard they submitted to is frozen")
     int map = __FrozenGuardsMap(abCreate = true)
     JFormMap.setFlt(map, akGuard, -1.0)
     ; Silent in crime dialogue from now: each line's fragments call into the speaker and would wait forever, a new stuck stack
@@ -3067,6 +3070,15 @@ function OrientRelative(ObjectReference akObjA, ObjectReference akObjB, Float af
 	Float rotZ = akObjB.GetAngleZ()
 
 	akObjA.SetAngle(rotX, rotY, rotZ)
+endFunction
+
+; Turns @akActor's back to @akFrom (the guard behind them, to cuff). Only calls on @akActor, @akFrom is just an argument: a
+; frozen guard answers no call, and OrientRelative reads his angles
+function TurnBackTo(Actor akActor, ObjectReference akFrom) global
+    if (!akActor || !akFrom)
+        return
+    endif
+    akActor.SetAngle(0.0, 0.0, akActor.GetAngleZ() + akActor.GetHeadingAngle(akFrom) + 180.0)
 endFunction
 
 bool function IsFarAwayFromObject(ObjectReference akObjectOne, ObjectReference akObjectTwo) global

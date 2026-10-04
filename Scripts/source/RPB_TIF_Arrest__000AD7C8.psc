@@ -6,6 +6,7 @@ Scriptname RPB_TIF_Arrest__000AD7C8 Extends TopicInfo Hidden
 Function Fragment_6(ObjectReference akSpeakerRef)
 Actor akSpeaker = akSpeakerRef as Actor
 ;BEGIN CODE
+RPB_Arrest.SetAsideBountyOnSubmission(Game.GetPlayer(), akSpeaker) ; first: no guard may see the bounty once this line ends
 pTGRSS.TGArrestedCheck()
 akSpeaker.SendModEvent("RPB_SendArrestWaitStop")
 ;END CODE

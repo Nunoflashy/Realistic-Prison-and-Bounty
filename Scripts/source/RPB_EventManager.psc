@@ -114,7 +114,17 @@ function RegisterEvents()
     RegisterForModEvent("RPB_ReleaseCaptor", "OnReleaseCaptor")
     RegisterForModEvent("RPB_ReleaseCaptorBackstop", "OnReleaseCaptorBackstop")
     RegisterForModEvent("RPB_FreeGuard", "OnFreeGuard")
+
+    ; A bounty set aside on submitting, given back if no arrest took it (RPB_Arrest.SetAsideBountyOnSubmission)
+    RegisterForModEvent("RPB_SetAsideBountyCheck", "OnSetAsideBountyCheck")
 endFunction
+
+event OnSetAsideBountyCheck(Form akActor, float afDelay)
+    Utility.Wait(afDelay)
+    if (RPB_Arrest.GiveBackSetAsideBounty(akActor as Actor, "no arrest took it within " + (afDelay as int) + "s"))
+        RPB_Utility.LogWarn("A submission's arrest never started: " + akActor + "'s bounty is back", "EventManager::OnSetAsideBountyCheck")
+    endif
+endEvent
 
 event OnGuardProbe(string asStep, Form akGuard, float afDelay, float afDueAt)
     if (afDelay > 0.0)
@@ -431,12 +441,14 @@ event OnArrestBegin(string eventName, string arrestType, float arresteeIdFlt, Fo
     ; Before any call on him: a frozen guard's first call never returns, and this arrest would hang with it
     if (captor && RPB_Utility.IsFrozenGuard(captor))
         Warn("Arrest by " + captor + " rejected: the guard is frozen (see FROZEN GUARD)")
+        RPB_Arrest.GiveBackSetAsideBounty(Game.GetFormEx(arresteeIdFlt as int) as Actor, "the arrest was rejected")
         return
     endif
     Faction crimeFaction = form_if ((sender as Faction), (sender as Faction), captor.GetCrimeFaction()) as Faction
 
     if (captor == none && crimeFaction == none)
         RPB_Utility.LogError("Either there's no Captor, or no Crime Faction! (["+ "Captor: "+ captor + ", Faction: " + crimeFaction +"])", "EventManager::OnArrestBegin")
+        RPB_Arrest.GiveBackSetAsideBounty(Game.GetFormEx(arresteeIdFlt as int) as Actor, "the arrest was rejected")
         return
     endif
 
@@ -444,6 +456,7 @@ event OnArrestBegin(string eventName, string arrestType, float arresteeIdFlt, Fo
     ; start on a dead actor, and the arrest only got cancelled after that wait timed out (~10s)
     if (captor && (captor.IsDead() || captor.IsDisabled()))
         Info("Arrest by " + captor + " rejected: the guard is dead or gone")
+        RPB_Arrest.GiveBackSetAsideBounty(Game.GetFormEx(arresteeIdFlt as int) as Actor, "the arrest was rejected")
         return
     endif
 
@@ -453,11 +466,13 @@ event OnArrestBegin(string eventName, string arrestType, float arresteeIdFlt, Fo
 
     if (!arrestee)
         RPB_Utility.LogError("There's no one to be arrested! (Arrestee is "+ arrestee +")", "EventManager::OnArrestBegin")
+        RPB_Arrest.GiveBackSetAsideBounty(Game.GetFormEx(arresteeIdFlt as int) as Actor, "the arrest was rejected")
         return
     endif
 
     if (!Arrest.ValidateArrestType(arrestType))
         RPB_Utility.LogError("Arrest Type is invalid, got: " + arrestType + ". (valid options: "+ Arrest.GetValidArrestTypes() +") ", "EventManager::OnArrestBegin")
+        RPB_Arrest.GiveBackSetAsideBounty(Game.GetFormEx(arresteeIdFlt as int) as Actor, "the arrest was rejected")
         return
     endif
 
@@ -466,11 +481,13 @@ event OnArrestBegin(string eventName, string arrestType, float arresteeIdFlt, Fo
     if (arrestStatus == Arrest.ALREADY_ARRESTED)
         Config.NotifyArrest("You are already under arrest.", isPlayer) ; Might be removed
         RPB_Utility.LogError(arrestee.GetBaseObject().GetName() + " has already been arrested, cannot arrest for "+ RPB_Utility.GetFormNameCached(crimeFaction) +", aborting!", "EventManager::OnArrestBegin")
+        RPB_Arrest.GiveBackSetAsideBounty(Game.GetFormEx(arresteeIdFlt as int) as Actor, "the arrest was rejected")
         return
 
     elseif (arrestStatus == Arrest.ALREADY_IMPRISONED)
         Config.NotifyArrest("You are already in prison.", isPlayer) ; Might be removed
         RPB_Utility.LogError(arrestee.GetBaseObject().GetName() + " has already been arrested, and is currently in prison. Cannot arrest for "+ RPB_Utility.GetFormNameCached(crimeFaction) +", aborting!", "EventManager::OnArrestBegin")
+        RPB_Arrest.GiveBackSetAsideBounty(Game.GetFormEx(arresteeIdFlt as int) as Actor, "the arrest was rejected")
         return
     endif
 
@@ -734,7 +751,9 @@ event OnArrestScene(string asScene, string asSceneEvent, RPB_Arrestee apArrestee
 
             if (asSceneSecondaryEvent == "Hands Behind Back")
                 Debug("EventManager::OnArrestScene", "Arrestee: " + apArrestee + ", Secondary Event: " + asSceneSecondaryEvent)
-                apArrestee.OrientRelativeTo(escort)
+                ; Back turned to him, read from the arrestee alone: copying his angle was a call into him, and a frozen guard
+                ; held the pose back until he answered, after the cuffs were on (2026-10-04)
+                RPB_Utility.TurnBackTo(apArrestee.GetActor(), escort)
                 apArrestee.PlayAnimation("IdleHandsBehindBack")
             
             elseif (asSceneSecondaryEvent == "Handcuff")

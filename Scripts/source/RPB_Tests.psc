@@ -252,6 +252,7 @@ function SetTests()
     self.AddTest("164 - Start an Escort to Jail by a Freezable Guard (NPC; left running for the freeze key)", "Test_FreezableEscort_NPC", abChainable = false)
     self.AddTest("165 - Diagnostic: Does a Light Hold Still Freeze Him (a call on himself per frame, not a busy loop)", "Test_LightHold", abChainable = false)
     self.AddTest("166 - Kill the Nearest Frozen Freezable Guard (the teardown's test-only kill; freeze him first)", "Test_KillFrozenGuard", abChainable = false)
+    self.AddTest("167 - Diagnostic: How the Total Lifetime Bounty Stat Follows Each Bounty Change (Haafingar; restored after)", "Test_LifetimeBountyStat", abChainable = false)
     self.AddTest("041 - ActiveMagicEffectContainer: Stuck Lock Self-Heals", "Test_ActiveMagicEffectContainer_StuckLockSelfHeals")
     self.AddTest("042 - ThreadLock: JAtomic Primitive Semantics and Registry", "Test_ThreadLock_PrimitiveSemantics")
     ; Not chainable: fires concurrent worker threads
@@ -12254,6 +12255,70 @@ bool function __Scenario_KillFrozenGuard(string asTest)
     return assert_true(RPB_Utility.IsDeadNoCall(target), asTest + ": " + target + " survived the kill")
 endFunction
 
+; 167: what each bounty change does to the game's "Total Lifetime Bounty" stat, the player's Haafingar bounty as the
+; subject. RPB moves bounty out and back (hidden while arrested, set aside on submitting), and every move back counted it
+; again; a negative IncrementStat after it didn't always undo that. Each step logs the stat's change, read at once and
+; again after a short wait (in case the stat lags). The bounty and the stat are put back at the end. Green = all restored
+bool function __Scenario_LifetimeBountyStat(string asTest)
+    Faction haafingar = Game.GetFormEx(0x29DB0) as Faction
+    string stat = "Total Lifetime Bounty"
+    int savedNonViolent = haafingar.GetCrimeGoldNonViolent()
+    int savedViolent = haafingar.GetCrimeGoldViolent()
+    int savedStat = Game.QueryStat(stat)
+    __lifetimeLast = savedStat
+    log(asTest + ": start: bounty " + savedNonViolent + " non-violent, " + savedViolent + " violent; stat " + savedStat)
+
+    haafingar.SetCrimeGold(0)
+    haafingar.SetCrimeGoldViolent(0)
+    __LifetimeStep(asTest, "SetCrimeGold(0) + SetCrimeGoldViolent(0)", stat)
+    haafingar.ModCrimeGold(1000)
+    __LifetimeStep(asTest, "ModCrimeGold(+1000)", stat)
+    haafingar.ModCrimeGold(500, true)
+    __LifetimeStep(asTest, "ModCrimeGold(+500, violent)", stat)
+    haafingar.ModCrimeGold(-300)
+    __LifetimeStep(asTest, "ModCrimeGold(-300)", stat)
+    haafingar.SetCrimeGold(0)
+    __LifetimeStep(asTest, "SetCrimeGold(0) (from 700)", stat)
+    haafingar.SetCrimeGold(1000)
+    __LifetimeStep(asTest, "SetCrimeGold(1000) (from 0)", stat)
+    haafingar.SetCrimeGold(1200)
+    __LifetimeStep(asTest, "SetCrimeGold(1200) (from 1000)", stat)
+    haafingar.SetCrimeGoldViolent(800)
+    __LifetimeStep(asTest, "SetCrimeGoldViolent(800) (from 500)", stat)
+    Game.IncrementStat(stat, -1000)
+    __LifetimeStep(asTest, "IncrementStat(-1000)", stat)
+    Game.IncrementStat(stat, 250)
+    __LifetimeStep(asTest, "IncrementStat(+250)", stat)
+    RPB_Utility.SetGameStat(stat, savedStat + 7)
+    __LifetimeStep(asTest, "SetGameStat(saved + 7)", stat)
+
+    haafingar.SetCrimeGold(savedNonViolent)
+    haafingar.SetCrimeGoldViolent(savedViolent)
+    __LifetimeStep(asTest, "bounty restored", stat)
+    RPB_Utility.SetGameStat(stat, savedStat)
+    Utility.Wait(0.5)
+    int endStat = Game.QueryStat(stat)
+    log(asTest + ": end: bounty " + haafingar.GetCrimeGoldNonViolent() + " non-violent, " + haafingar.GetCrimeGoldViolent() + " violent; stat " + endStat + " (was " + savedStat + ")")
+    return assert_true(endStat == savedStat && haafingar.GetCrimeGoldNonViolent() == savedNonViolent && haafingar.GetCrimeGoldViolent() == savedViolent, asTest + ": the bounty or the stat wasn't put back")
+endFunction
+
+int __lifetimeLast = -1
+function __LifetimeStep(string asTest, string asStep, string asStat)
+    int now = Game.QueryStat(asStat)
+    Utility.Wait(0.3)
+    int later = Game.QueryStat(asStat)
+    string lag = ""
+    if (later != now)
+        lag = " (" + later + " after 0.3s)"
+    endif
+    string change = ""
+    if (__lifetimeLast >= 0)
+        change = ", change " + (later - __lifetimeLast)
+    endif
+    log(asTest + ": " + asStep + ": stat " + now + lag + change)
+    __lifetimeLast = later
+endFunction
+
 ; Passes of a loop making one global call each, over @afSeconds
 int function __VMThroughput(float afSeconds)
     int passes = 0
@@ -13778,7 +13843,7 @@ endFunction
 string __statelessTest = ""
 
 bool function __RunStatelessTest(string asTest)
-    if (asTest != "Test_ArrestWaitsWhileGuardFights_NoPackage" && asTest != "Test_CellDoorsDiagnostic" && asTest != "Test_LongAbsenceSetup" && asTest != "Test_LongAbsenceAdvance" && asTest != "Test_LongAbsenceVerify" && asTest != "Test_FallbackEscortToCellStopped_Player" && asTest != "Test_FallbackEscortToCellStopped_CloneGuard" && asTest != "Test_FightDuringEscort_NPC" && asTest != "Test_FightDuringEscort_Player" && asTest != "Test_GuardDiesInPrison_Player" && asTest != "Test_EscortToCellStopped_NoPackageLock" && StringUtil.Find(asTest, "Test_Surrender_") != 0 && asTest != "Test_FrozenGuardSkipped" && asTest != "Test_GuardDiesInPrison_NobodySees" && asTest != "Test_Escort_FreeWalk" && asTest != "Test_ToggleEscortToCell04" && asTest != "Test_CaptorFinishCycles_Calls" && asTest != "Test_CaptorFinishCycles_NoCalls" && asTest != "Test_CaptorFinishDetach_Calls" && asTest != "Test_CaptorFinishDetach_NoCalls" && asTest != "Test_Escort_FreeWalk_Control" && asTest != "Test_ActorKeys" && asTest != "Test_FrozenGuardCalls" && asTest != "Test_SimulatedFreezeCalls" && asTest != "Test_SimulatedFreezeAtCancel" && asTest != "Test_SpawnFreezableGuard" && asTest != "Test_AliasPackageControl" && asTest != "Test_FreezableEscort_Player" && asTest != "Test_FreezableEscort_NPC" && asTest != "Test_LightHold" && asTest != "Test_KillFrozenGuard")
+    if (asTest != "Test_ArrestWaitsWhileGuardFights_NoPackage" && asTest != "Test_CellDoorsDiagnostic" && asTest != "Test_LongAbsenceSetup" && asTest != "Test_LongAbsenceAdvance" && asTest != "Test_LongAbsenceVerify" && asTest != "Test_FallbackEscortToCellStopped_Player" && asTest != "Test_FallbackEscortToCellStopped_CloneGuard" && asTest != "Test_FightDuringEscort_NPC" && asTest != "Test_FightDuringEscort_Player" && asTest != "Test_GuardDiesInPrison_Player" && asTest != "Test_EscortToCellStopped_NoPackageLock" && StringUtil.Find(asTest, "Test_Surrender_") != 0 && asTest != "Test_FrozenGuardSkipped" && asTest != "Test_GuardDiesInPrison_NobodySees" && asTest != "Test_Escort_FreeWalk" && asTest != "Test_ToggleEscortToCell04" && asTest != "Test_CaptorFinishCycles_Calls" && asTest != "Test_CaptorFinishCycles_NoCalls" && asTest != "Test_CaptorFinishDetach_Calls" && asTest != "Test_CaptorFinishDetach_NoCalls" && asTest != "Test_Escort_FreeWalk_Control" && asTest != "Test_ActorKeys" && asTest != "Test_FrozenGuardCalls" && asTest != "Test_SimulatedFreezeCalls" && asTest != "Test_SimulatedFreezeAtCancel" && asTest != "Test_SpawnFreezableGuard" && asTest != "Test_AliasPackageControl" && asTest != "Test_FreezableEscort_Player" && asTest != "Test_FreezableEscort_NPC" && asTest != "Test_LightHold" && asTest != "Test_KillFrozenGuard" && asTest != "Test_LifetimeBountyStat")
         return false
     endif
 
@@ -13913,6 +13978,8 @@ bool function __RunStatelessTest(string asTest)
         display_result(__Scenario_LightHold("165"))
     elseif (asTest == "Test_KillFrozenGuard")
         display_result(__Scenario_KillFrozenGuard("166"))
+    elseif (asTest == "Test_LifetimeBountyStat")
+        display_result(__Scenario_LifetimeBountyStat("167"))
     elseif (asTest == "Test_Escort_FreeWalk_Control")
         ; Freeze control (round 109): 150 as it was before the experiments, the normal release order: the Scene stop, the
         ; guard's release and the player's revert all at once. Every experiment switch off, in case one was left on; the

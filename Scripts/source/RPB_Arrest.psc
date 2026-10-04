@@ -64,6 +64,10 @@ scriptname RPB_Arrest extends Quest
     function SetArrestScene(Actor akArrestee, string asSceneName)
     function SetArrestGoal(Actor akArrestee, string asArrestGoal)
     function ArrestActor(Actor akArrester, Actor akArrestee, string asArrestType)
+    function SetAsideBountyOnSubmission(Actor akActor, Actor akGuard) global
+    bool function HasSetAsideBounty(Actor akActor) global
+    bool function GiveBackSetAsideBounty(Actor akActor, string asWhy) global
+    function GiveBackSetAsideBountyFromGuard(Actor akGuard, string asWhy) global
     function ArrestActorForFaction(Faction akCrimeFaction, Actor akArrestee, string asArrestType)
     function ArrestActors(Actor akArrester, Actor[] akArrestees, string asArrestType, bool abEnsureAllArrested = true, float afWaitTimeBetweenArrests = 0.3)
     function SetAsEluding(Actor akEludedGuard, Actor akEluder, string asEludeType)
@@ -691,10 +695,88 @@ event OnArrestDialogue(int aiTopicInfoEvent, int aiTopicInfoType, string asTopic
         elseif (aiTopicInfoType == TOPIC_TYPE_ARREST_GO_TO_JAIL)
             ; Noted first: a resist line from the dialogue this arrest cuts off isn't the player resisting (TOPIC_TYPE_ARREST_RESIST)
             RPB_StorageVars.SetFloatOnReference("Submitted At", akSpokenToArrestee, Utility.GetCurrentRealTime(), "Pre-Arrest")
+            ; The bounty is set aside when this line starts (its begin fragment); again here in case that one didn't run
+            RPB_Arrest.SetAsideBountyOnSubmission(akSpokenToArrestee, akSpeakerArrester)
             self.ArrestActor(akSpeakerArrester, akSpokenToArrestee, ARREST_TYPE_ESCORT_TO_JAIL)
         endif
     endif
 endEvent
+
+; The player's bounty, set aside the moment they submit: called when the guard's "go to jail" line starts (its begin
+; fragment), so no guard sees it while the arrest gets going. The vanilla forcegreet goes by the bounty alone: set aside at
+; the line's end, it was a few frames late, the guard's forcegreet had already come back, and the arrest cutting it off had
+; him speak a resist line ("Then pay with your blood", 2026-10-04). The arrest takes it back right before hiding it itself
+; (BeginArrest), so its stats and latent bounty work as always. Given back at once when the arrest is rejected
+; (RPB_EventManager.OnArrestBegin) or the guard is found frozen (RPB_Utility.MarkGuardFrozen), and after 30s if nothing
+; took it (RPB_EventManager.OnSetAsideBountyCheck). Only the player: an NPC's bounty is RPB's own and no forcegreet reads it.
+function SetAsideBountyOnSubmission(Actor akActor, Actor akGuard) global
+    if (!akActor || !akGuard || akActor.GetFormID() != 0x14 || HasSetAsideBounty(akActor) || RPB_Utility.IsFrozenGuard(akGuard))
+        return
+    endif
+
+    Faction crimeFaction = akGuard.GetCrimeFaction()
+    if (!crimeFaction)
+        return
+    endif
+    int nonViolent  = crimeFaction.GetCrimeGoldNonViolent()
+    int violent     = crimeFaction.GetCrimeGoldViolent()
+    if (nonViolent + violent <= 0)
+        return
+    endif
+
+    RPB_StorageVars.SetFormOnReference("Faction", akActor, crimeFaction, "Set-Aside Bounty")
+    RPB_StorageVars.SetFormOnReference("Guard", akActor, akGuard, "Set-Aside Bounty")
+    RPB_StorageVars.SetIntOnReference("Non-Violent", akActor, nonViolent, "Set-Aside Bounty")
+    RPB_StorageVars.SetIntOnReference("Violent", akActor, violent, "Set-Aside Bounty")
+    crimeFaction.SetCrimeGold(0)
+    crimeFaction.SetCrimeGoldViolent(0)
+    RPB_Utility.LogInfo("Set aside " + akActor + "'s bounty in " + RPB_Utility.GetFormNameCached(crimeFaction) + " on submitting to " + akGuard + " (" + nonViolent + " non-violent, " + violent + " violent)", "Arrest::SetAsideBountyOnSubmission")
+
+    ; A guard freezing now never sends his arrest: the probe finds him, and MarkGuardFrozen gives the bounty back
+    RPB_Utility.ProbeGuardAfterBurst(akGuard, "submitted to him")
+
+    int handle = ModEvent.Create("RPB_SetAsideBountyCheck")
+    if (handle)
+        ModEvent.PushForm(handle, akActor)
+        ModEvent.PushFloat(handle, 30.0)
+        ModEvent.Send(handle)
+    endif
+endFunction
+
+bool function HasSetAsideBounty(Actor akActor) global
+    return RPB_StorageVars.GetFormOnReference("Faction", akActor, "Set-Aside Bounty") != none
+endFunction
+
+; Puts a set-aside bounty back where it was. Added to what's there, so a bounty gained meanwhile is kept. Returns whether
+; there was one
+bool function GiveBackSetAsideBounty(Actor akActor, string asWhy) global
+    if (!akActor)
+        return false
+    endif
+    Faction crimeFaction = RPB_StorageVars.GetFormOnReference("Faction", akActor, "Set-Aside Bounty") as Faction
+    if (!crimeFaction)
+        return false
+    endif
+
+    int nonViolent  = RPB_StorageVars.GetIntOnReference("Non-Violent", akActor, "Set-Aside Bounty")
+    int violent     = RPB_StorageVars.GetIntOnReference("Violent", akActor, "Set-Aside Bounty")
+    RPB_StorageVars.DeleteCategoryOnReference(akActor, "Set-Aside Bounty")
+    crimeFaction.ModCrimeGold(nonViolent)
+    crimeFaction.ModCrimeGold(violent, true)
+    ; Already counted when it was gained: giving it back mustn't count it again (RPB_ActorBase.RestoreBountyForFaction)
+    Game.IncrementStat("Total Lifetime Bounty", -(nonViolent + violent))
+    RPB_Utility.LogInfo("Gave back " + akActor + "'s set-aside bounty in " + RPB_Utility.GetFormNameCached(crimeFaction) + " (" + nonViolent + " non-violent, " + violent + " violent): " + asWhy, "Arrest::GiveBackSetAsideBounty")
+    return true
+endFunction
+
+; The player's set-aside bounty back if @akGuard is the guard they submitted to (he froze: his arrest won't come). The
+; other guards around then see the bounty again and come to arrest, as they would have
+function GiveBackSetAsideBountyFromGuard(Actor akGuard, string asWhy) global
+    Actor player = Game.GetPlayer()
+    if (akGuard && RPB_StorageVars.GetFormOnReference("Guard", player, "Set-Aside Bounty") == akGuard)
+        GiveBackSetAsideBounty(player, asWhy)
+    endif
+endFunction
 
 ; Past the point where eluding means anything: already arrested, imprisoned, or surrendering
 bool function __IsBeyondEluding(Actor akActor)
@@ -791,7 +873,7 @@ event OnArrestBegin(RPB_Arrestee apArrestee, RPB_Captor apCaptor, Faction akCrim
     ;     "\t apArrestee.GetFaction(): " + apArrestee.GetFaction() + "\n" + \
     ; "]")
 
-    if (!apArrestee.HasLatentBounty() && !apArrestee.HasActiveBounty())
+    if (!apArrestee.HasLatentBounty() && !apArrestee.HasActiveBounty() && !RPB_Arrest.HasSetAsideBounty(apArrestee.GetActor()))
         Config.NotifyArrest("You can't be arrested in " + RPB_Utility.GetFormNameCached(akCrimeFaction) + " since you do not have a bounty in the hold", apArrestee.IsPlayer())
         RPB_Utility.LogError(apArrestee.Name + " has no bounty, cannot arrest for "+ RPB_Utility.GetFormNameCached(akCrimeFaction) +", aborting!", "Arrest::OnArrestBegin")
         RPB_Utility.Crumb(apArrestee.GetActor(), "Arrest.OnArrestBegin: ABORT no bounty")
@@ -1812,6 +1894,8 @@ function BeginArrest(RPB_Arrestee apArresteeRef)
         return
     endif
 
+    ; Back from where submitting set it aside, then hidden as the arrest's own, in one go
+    RPB_Arrest.GiveBackSetAsideBounty(arrestee, "the arrest hides it")
     apArresteeRef.HideBounty()
     RPB_Utility.FlowMark("BeginArrest: HideBounty")
     ; Diagnostic (2026-09-23): HideBounty() -> ClearActiveBountyForFaction() should zero the native CrimeGold for the player
