@@ -150,6 +150,8 @@ scriptname RPB_Prison extends RPB_Entity
     RPB_JailCell function GetGenderExclusiveCell(string asGender, bool abCanBeEmpty = true, bool abCanBeOvercrowded = false)
     RPB_JailCell function RequestCell(RPB_Prisoner apPrisoner)
     Form[] function GetEscortLocations()
+    bool function IsInsideJail(Actor akActor)
+    function PrepareArrival(RPB_Prisoner apPrisoner)
     Form[] function GetReleaseMarkers(string asReleaseMarkerType = "Teleport")
     Form[] function GetSearchMarkers(string asSearchType = "Frisking")
     Form[] function GetPrisonerContainers(string asPrisonerContainerType = "Belongings")
@@ -1581,6 +1583,38 @@ Form[] function GetEscortLocations()
     return self.GetPropertyOfTypeFormArray("Markers//Jail//Escort")
 endFunction
 
+; @akActor is inside this prison's jail: the cell its escort markers stand in (the escort to jail's destination)
+bool function IsInsideJail(Actor akActor)
+    Cell here = akActor.GetParentCell()
+    Form[] markers = self.GetEscortLocations()
+    if (!here || !markers)
+        return false
+    endif
+    int i = 0
+    while (i < markers.Length)
+        ObjectReference marker = markers[i] as ObjectReference
+        if (marker && marker.GetParentCell() == here)
+            return true
+        endif
+        i += 1
+    endWhile
+    return false
+endFunction
+
+; The arrival's setup (where the prisoner is released to, their belongings chest, their cell): at the escort to jail's
+; end, or when the guard dies inside the jail before it (RPB_Captor.OnDeath)
+function PrepareArrival(RPB_Prisoner apPrisoner)
+    self.AssignReleaseLocation(apPrisoner)    ; Set the teleport release location for this prisoner
+
+    if (!apPrisoner.PrisonerBelongingsContainer)
+        self.AssignBelongingsContainer(apPrisoner) ; Set the container of where the prisoner's items will be confiscated to
+    endif
+
+    if (!apPrisoner.JailCell)
+        self.AssignCell(apPrisoner) ; Assign a prison cell to this prisoner
+    endif
+endFunction
+
 Form[] function GetReleaseMarkers(string asReleaseMarkerType = "Teleport")
     if (asReleaseMarkerType != "Teleport" && asReleaseMarkerType != "Escort")
         Error("["+ Name +"] The release marker type specified ("+ asReleaseMarkerType +") is invalid!")
@@ -2684,8 +2718,10 @@ endFunction
 
 ;/
     The player's escort to the cell, watched from its start: every heartbeat pass (3s) compares the escort assist's tick
-    count. Five passes (~15s) without a new tick, or the guard known frozen, make the check due now, and the recovery
-    below moves them into the cell without calling him. Imprisoned or gone: the watch ends. Heartbeat passes don't run
+    count. Five passes (~15s) without a new tick make the check due now, and the recovery below moves them into the cell
+    without calling him. A frozen guard alone no longer does: his AI walks the escort on, and the assist reads him through
+    a marker (RPB_Prisoner.__AssistGuardRef); its own moves take over if he stops (2026-10-04: recovered 10s after he was
+    found frozen, the player teleported into the cell for nothing). Imprisoned or gone: the watch ends. Heartbeat passes don't run
     while the game is paused, so a menu never counts as a stuck tick.
 /;
 function __WatchEscortAssist(Actor akPrisoner, int aiEntry, float afNow)
@@ -2710,11 +2746,11 @@ function __WatchEscortAssist(Actor akPrisoner, int aiEntry, float afNow)
     endif
     JMap.setInt(aiEntry, "ticks", ticks)
     JMap.setInt(aiEntry, "still", still)
-    bool frozen = RPB_Utility.IsFrozenGuard(watched.Captor)
-    if (still >= 5 || frozen)
+    if (still >= 5)
+        bool frozen = RPB_Utility.IsFrozenGuard(watched.Captor)
         JMap.setInt(aiEntry, "watchAssist", 0)
         JMap.setFlt(aiEntry, "dueAt", afNow)
-        Warn("["+ Name +"] Prison::__WatchEscortAssist: " + akPrisoner + "'s escort to the cell is stuck (" + string_if(frozen, "the guard is frozen", "the escort assist hasn't ticked for ~" + (still * 3) + "s") + "): recovering")
+        Warn("["+ Name +"] Prison::__WatchEscortAssist: " + akPrisoner + "'s escort to the cell is stuck (the escort assist hasn't ticked for ~" + (still * 3) + "s, guard frozen " + frozen + "): recovering")
     endif
 endFunction
 
@@ -3675,15 +3711,7 @@ event OnEscortPrisonerToJailEnd(RPB_ActorBase apActor, Actor akEscort)
     prisonerRef.StopEscortAssist()
     prisonerRef.EndArrestEscortWatch() ; the arrest's own escort watch sent me back here mid escort to the cell
 
-    self.AssignReleaseLocation(prisonerRef)    ; Set the teleport release location for this prisoner
-
-    if (!prisonerRef.PrisonerBelongingsContainer)
-        self.AssignBelongingsContainer(prisonerRef) ; Set the container of where the prisoner's items will be confiscated to
-    endif
-
-    if (!prisonerRef.JailCell)
-        self.AssignCell(prisonerRef) ; Assign a prison cell to this prisoner
-    endif
+    self.PrepareArrival(prisonerRef)
 
     ; TODO: Review if a prisoner should be both frisked and stripped, or only stripped if they were going to be stripped
     ; This used to skip straight from ShouldBeStripped to ShouldBeFrisked, missing the ShouldBeStrippedSilently tier
@@ -3693,6 +3721,12 @@ event OnEscortPrisonerToJailEnd(RPB_ActorBase apActor, Actor akEscort)
     ; equipped (a weapon, say) in that case. Since Frisking has no real effect (ShouldFrisk() is hardcoded true and
     ; the Frisking Scene has no code hookup to actually remove anything), a prisoner who fell through both of the
     ; first two checks was silently keeping whatever she still had equipped.
+    ; He died as the escort ended: his death's handover (RPB_Arrestee.HandOverInPrison) gives the prison flow to another
+    ; guard. Queued with him, its Scenes never started, and one teleported the player into the cell (2026-10-04)
+    if (RPB_Utility.IsDeadNoCall(akEscort))
+        GuardMark(akEscort, "escort to jail ended with him dead: no prison flow queued with him")
+        return
+    endif
     GuardMark(akEscort, "escort to jail ended, the prison flow starts with him")
     RPB_Utility.ProbeGuardAfterBurst(akEscort, "escort to jail ended")
     if (prisonerRef.ShouldBeStripped)
