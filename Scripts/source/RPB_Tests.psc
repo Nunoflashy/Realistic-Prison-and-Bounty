@@ -257,6 +257,7 @@ function SetTests()
     self.AddTest("169 - Experiment: the Nearest Freezable Guard Faints, Guards Around (15s, as if helped up; freeze him first)", "Test_FaintFrozenGuardShort", abChainable = false)
     self.AddTest("170 - Escort Fallback With a Frozen Guard (Player; a freezable guard, frozen, then the stall fallback)", "Test_FrozenEscortFallback", abChainable = false)
     self.AddTest("171 - Experiment: Hide and Stop the Nearest Freezable Guard With PO3 (no call into him; freeze him first)", "Test_HideFrozenGuard", abChainable = false)
+    self.AddTest("172 - Escort to the Cell: the Guard Held Still at Its Start (no move) and Mid-Way (nudge, then the move at 20s) (PLAYER)", "Test_EscortToCellGuardHeld", abChainable = false)
     self.AddTest("041 - ActiveMagicEffectContainer: Stuck Lock Self-Heals", "Test_ActiveMagicEffectContainer_StuckLockSelfHeals")
     self.AddTest("042 - ThreadLock: JAtomic Primitive Semantics and Registry", "Test_ThreadLock_PrimitiveSemantics")
     ; Not chainable: fires concurrent worker threads
@@ -12429,6 +12430,83 @@ bool function __Scenario_FrozenEscortFallback(string asTest)
     return assert_true(fellBack && marked && waitOk && handedOver, asTest + ": fallback " + fellBack + ", marked frozen " + marked + ", the wait for a guard (if nobody saw them) " + waitOk + ", imprisoned by another guard " + handedOver)
 endFunction
 
+; 172: the escort assist's "standing outside the cell" move (RPB_Prisoner) with the guard held still (SetDontMove), as a
+; real guard sometimes stands at the escort to the cell's start, or stops on the way. At the start (before he has walked)
+; the player must not be moved into the cell (it moved them from the stripping area after 12s, 2026-10-04); mid-way (after
+; he has walked, the player next to him) a nudge comes at 10s and the move into the cell at ~20s. Green = no move at the
+; start over 25s, and a move mid-way no sooner than 18s, then the imprisonment.
+bool function __Scenario_EscortToCellGuardHeld(string asTest)
+    RPB_Prison prison = (RPB_API.GetPrisonManager()).GetPrison("Haafingar")
+    Actor guard = __ScenarioRealGuard()
+    if (!guard)
+        return false
+    endif
+    Actor player = __ScenarioArrestee(true, guard)
+    __ScenarioArrest(guard, player, asTest)
+    float start = Utility.GetCurrentRealTime()
+    RPB_Prisoner assisted = prison.Prisoners.AtKey(player)
+    while (!(assisted && assisted.EscortAssistToCell) && (Utility.GetCurrentRealTime() - start) < 180.0)
+        Utility.Wait(0.25)
+        assisted = prison.Prisoners.AtKey(player)
+    endWhile
+    if (!assert_true(assisted && assisted.EscortAssistToCell, asTest + ": the escort to the cell never started (no assist on it)"))
+        return false
+    endif
+
+    ; 1. At the start: held before he walks
+    Actor escort = guard
+    if (assisted.Captor)
+        escort = assisted.Captor
+    endif
+    escort.SetDontMove(true)
+    bool walkedAlready = assisted.EscortAssistGuardWalked
+    log(asTest + ": escort to the cell started, " + escort + " held still at its start (walked already " + walkedAlready + "), " + (player.GetDistance(assisted.JailCell) as int) + " units from the cell")
+    float held = Utility.GetCurrentRealTime()
+    while (assisted.EscortAssistMoves == 0 && !assisted.IsInCell && (Utility.GetCurrentRealTime() - held) < 25.0)
+        Utility.Wait(0.5)
+    endWhile
+    bool noMoveAtStart = assisted.EscortAssistMoves == 0 && !assisted.IsInCell
+    log(asTest + ": at the start, held " + __Ms(Utility.GetCurrentRealTime() - held) + "ms: moves " + assisted.EscortAssistMoves + ", in the cell " + assisted.IsInCell + " (expected none)")
+    escort.SetDontMove(false)
+    escort.EvaluatePackage()
+    if (walkedAlready || !noMoveAtStart)
+        return assert_true(false, asTest + ": moved at the escort's start (or the guard had walked before the hold: " + walkedAlready + ")")
+    endif
+
+    ; 2. Mid-way: once he has walked, held again with the player next to him
+    float walkWait = Utility.GetCurrentRealTime()
+    while (!assisted.EscortAssistGuardWalked && (Utility.GetCurrentRealTime() - walkWait) < 30.0)
+        Utility.Wait(0.25)
+    endWhile
+    Utility.Wait(2.0) ; a few steps
+    if (assisted.IsInCell || !assisted.EscortAssistGuardWalked)
+        return assert_true(false, asTest + ": couldn't hold him mid-way (walked " + assisted.EscortAssistGuardWalked + ", already in the cell " + assisted.IsInCell + ")")
+    endif
+    escort.SetDontMove(true)
+    int movesBefore = assisted.EscortAssistMoves
+    log(asTest + ": " + escort + " held still mid-way, " + (player.GetDistance(escort) as int) + " from the player, " + (player.GetDistance(assisted.JailCell) as int) + " from the cell")
+    held = Utility.GetCurrentRealTime()
+    while (assisted.EscortAssistMoves == movesBefore && !assisted.IsInCell && (Utility.GetCurrentRealTime() - held) < 40.0)
+        Utility.Wait(0.25)
+    endWhile
+    float movedAfter = Utility.GetCurrentRealTime() - held
+    bool movedMidway = assisted.EscortAssistMoves > movesBefore || assisted.IsInCell
+    log(asTest + ": mid-way, moved " + movedMidway + " after " + __Ms(movedAfter) + "ms (moves " + assisted.EscortAssistMoves + ", in the cell " + assisted.IsInCell + "; the nudge's line comes at 10s)")
+    escort.SetDontMove(false)
+    escort.EvaluatePackage()
+
+    float waitStart = Utility.GetCurrentRealTime()
+    while (!RPB_Utility.IsActorImprisoned(player) && (Utility.GetCurrentRealTime() - waitStart) < 90.0)
+        Utility.Wait(0.5)
+    endWhile
+    bool imprisoned = RPB_Utility.IsActorImprisoned(player)
+    log(asTest + ": imprisoned " + imprisoned + " after " + __Ms(Utility.GetCurrentRealTime() - waitStart) + "ms")
+    bool ok = assert_true(movedMidway, asTest + ": not moved mid-way within 40s")
+    ok = assert_true(movedAfter >= 18.0, asTest + ": moved mid-way after " + (movedAfter as int) + "s, before the 20s") && ok
+    ok = assert_true(imprisoned, asTest + ": never imprisoned") && ok
+    return ok
+endFunction
+
 ; 171: the mod author's "double" idea (2026-10-04) needs the frozen escort guard gone from sight without a call into him
 ; (Disable, Delete and MoveTo are calls on him, and hang). PO3's globals take him as an argument, as GetActorState does
 ; (which works on a frozen guard): his root node hidden (ToggleChildNode), his AI stopped (FreezeActor type 0), then both
@@ -14094,7 +14172,7 @@ endFunction
 string __statelessTest = ""
 
 bool function __RunStatelessTest(string asTest)
-    if (asTest != "Test_ArrestWaitsWhileGuardFights_NoPackage" && asTest != "Test_CellDoorsDiagnostic" && asTest != "Test_LongAbsenceSetup" && asTest != "Test_LongAbsenceAdvance" && asTest != "Test_LongAbsenceVerify" && asTest != "Test_FallbackEscortToCellStopped_Player" && asTest != "Test_FallbackEscortToCellStopped_CloneGuard" && asTest != "Test_FightDuringEscort_NPC" && asTest != "Test_FightDuringEscort_Player" && asTest != "Test_GuardDiesInPrison_Player" && asTest != "Test_EscortToCellStopped_NoPackageLock" && StringUtil.Find(asTest, "Test_Surrender_") != 0 && asTest != "Test_FrozenGuardSkipped" && asTest != "Test_GuardDiesInPrison_NobodySees" && asTest != "Test_Escort_FreeWalk" && asTest != "Test_ToggleEscortToCell04" && asTest != "Test_CaptorFinishCycles_Calls" && asTest != "Test_CaptorFinishCycles_NoCalls" && asTest != "Test_CaptorFinishDetach_Calls" && asTest != "Test_CaptorFinishDetach_NoCalls" && asTest != "Test_Escort_FreeWalk_Control" && asTest != "Test_ActorKeys" && asTest != "Test_FrozenGuardCalls" && asTest != "Test_SimulatedFreezeCalls" && asTest != "Test_SimulatedFreezeAtCancel" && asTest != "Test_SpawnFreezableGuard" && asTest != "Test_AliasPackageControl" && asTest != "Test_FreezableEscort_Player" && asTest != "Test_FreezableEscort_NPC" && asTest != "Test_LightHold" && asTest != "Test_KillFrozenGuard" && asTest != "Test_LifetimeBountyStat" && asTest != "Test_FaintFrozenGuard" && asTest != "Test_FaintFrozenGuardShort" && asTest != "Test_FrozenEscortFallback" && asTest != "Test_HideFrozenGuard")
+    if (asTest != "Test_ArrestWaitsWhileGuardFights_NoPackage" && asTest != "Test_CellDoorsDiagnostic" && asTest != "Test_LongAbsenceSetup" && asTest != "Test_LongAbsenceAdvance" && asTest != "Test_LongAbsenceVerify" && asTest != "Test_FallbackEscortToCellStopped_Player" && asTest != "Test_FallbackEscortToCellStopped_CloneGuard" && asTest != "Test_FightDuringEscort_NPC" && asTest != "Test_FightDuringEscort_Player" && asTest != "Test_GuardDiesInPrison_Player" && asTest != "Test_EscortToCellStopped_NoPackageLock" && StringUtil.Find(asTest, "Test_Surrender_") != 0 && asTest != "Test_FrozenGuardSkipped" && asTest != "Test_GuardDiesInPrison_NobodySees" && asTest != "Test_Escort_FreeWalk" && asTest != "Test_ToggleEscortToCell04" && asTest != "Test_CaptorFinishCycles_Calls" && asTest != "Test_CaptorFinishCycles_NoCalls" && asTest != "Test_CaptorFinishDetach_Calls" && asTest != "Test_CaptorFinishDetach_NoCalls" && asTest != "Test_Escort_FreeWalk_Control" && asTest != "Test_ActorKeys" && asTest != "Test_FrozenGuardCalls" && asTest != "Test_SimulatedFreezeCalls" && asTest != "Test_SimulatedFreezeAtCancel" && asTest != "Test_SpawnFreezableGuard" && asTest != "Test_AliasPackageControl" && asTest != "Test_FreezableEscort_Player" && asTest != "Test_FreezableEscort_NPC" && asTest != "Test_LightHold" && asTest != "Test_KillFrozenGuard" && asTest != "Test_LifetimeBountyStat" && asTest != "Test_FaintFrozenGuard" && asTest != "Test_FaintFrozenGuardShort" && asTest != "Test_FrozenEscortFallback" && asTest != "Test_HideFrozenGuard" && asTest != "Test_EscortToCellGuardHeld")
         return false
     endif
 
@@ -14233,6 +14311,11 @@ bool function __RunStatelessTest(string asTest)
         display_result(__Scenario_LifetimeBountyStat("167"))
     elseif (asTest == "Test_FaintFrozenGuard")
         display_result(__Scenario_FaintFrozenGuard("168", 0x0002C069))
+    elseif (asTest == "Test_EscortToCellGuardHeld")
+        RPB_Utility.SetFreeWalkDisabledForTest(true) ; led, as in 135: the assist's "near, outside the cell" rule
+        display_result(__Scenario_EscortToCellGuardHeld("172"))
+        RPB_Utility.SetFreeWalkDisabledForTest(false)
+        __TeardownScenario()
     elseif (asTest == "Test_HideFrozenGuard")
         display_result(__Scenario_HideFrozenGuard("171"))
     elseif (asTest == "Test_FrozenEscortFallback")

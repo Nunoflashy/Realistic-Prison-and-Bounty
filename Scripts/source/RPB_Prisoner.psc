@@ -95,6 +95,7 @@ Scriptname RPB_Prisoner extends RPB_ActorBase
     bool EscortFreeWalking
     bool EscortAssistActive
     int EscortAssistMoves
+    bool EscortAssistGuardWalked
     bool EscortAssistToCell
     float PreviousUpdateTimeServed
     Outfit NPC_OriginalOutfit
@@ -1011,6 +1012,9 @@ state Escorting
         ; tried first: it never read above 20 on the AI-driven player, so the boost never started.
         float guardSpeed = guardMoved / elapsed
         bool escortMoving = guardSpeed >= 40.0
+        if (escortMoving)
+            __assistGuardWalked = true
+        endif
         ; Under 30 units a second at normal speed (the ticks are 0.5s while far); boosted ticks keep 30 per 0.25s
         float stuckUnder = 30.0
         if (__assistLevel == 0)
@@ -1114,13 +1118,22 @@ state Escorting
                 self.__RestoreEscortSpeed()
                 RPB_Utility.LogInfo(Name + " caught up with the escort, walking speed restored", "["+ Name +"] Prisoner::EscortAssist")
             endif
-            ; Next to the guard but not in my cell and not moving: the escort to the cell waits for me to get in
-            if (__assistToCell && stuck && !self.__AssistInCell())
+            ; Next to the guard but not in my cell and not moving: the escort to the cell waits for me to get in. Only once he
+            ; has walked: at the escort's start we both stand still while its opening plays, and this moved the player into
+            ; the cell from the stripping area after 12s, with the guard just setting off (11s, 2026-10-04). A nudge first
+            ; (both packages re-evaluated), the move after 20s
+            if (__assistToCell && stuck && !self.__AssistInCell() && __assistGuardWalked)
                 branch = "near, outside the cell"
+                float idleBefore = __assistIdleTime
                 __assistIdleTime += elapsed
-                if (__assistIdleTime >= 12.0)
+                if (idleBefore < 10.0 && __assistIdleTime >= 10.0)
+                    RPB_Utility.LogInfo(Name + " standing outside the cell for 10s in the escort, nudging it (both packages re-evaluated)", "["+ Name +"] Prisoner::EscortAssist")
+                    __assistEscort.EvaluatePackage()
+                    this.EvaluatePackage()
+                endif
+                if (__assistIdleTime >= 20.0)
                     __assistIdleTime = 0.0
-                    if (self.__AssistMoveToGuard("standing outside the cell for 12s"))
+                    if (self.__AssistMoveToGuard("standing outside the cell for 20s"))
                         return
                     endif
                 endif
@@ -2540,6 +2553,7 @@ float __assistSavedSpeed
 float __assistTick
 float __assistStuckTime
 float __assistIdleTime
+bool __assistGuardWalked ; the guard has walked in this escort (StartEscortAssist resets it)
 int __assistLevel ; 0 = normal speed, 1-3 = raised (see __EscortSpeedForLevel)
 int __assistTeleports
 float __assistAwayTime
@@ -2963,6 +2977,13 @@ int property EscortAssistMoves
     endFunction
 endProperty
 
+; The guard has walked in this escort (the "outside the cell" move only counts after that)
+bool property EscortAssistGuardWalked
+    bool function get()
+        return __assistGuardWalked
+    endFunction
+endProperty
+
 ; Ticks the escort assist has started (the Prison's stall watch: a count that stops moving is a stuck tick)
 int property EscortAssistTicks
     int function get()
@@ -2993,6 +3014,7 @@ function StartEscortAssist(Actor akEscort, bool abToCell)
     __assistEscort = akEscort
     __assistStuckTime = 0.0
     __assistIdleTime = 0.0
+    __assistGuardWalked = false
     __assistTeleports = 0
     __assistAwayTime = 0.0
     __assistFlatTicks = 0
