@@ -96,6 +96,7 @@ Scriptname RPB_Prisoner extends RPB_ActorBase
     bool EscortAssistActive
     int EscortAssistMoves
     bool EscortAssistGuardWalked
+    float EscortAssistAge
     bool EscortAssistToCell
     float PreviousUpdateTimeServed
     Outfit NPC_OriginalOutfit
@@ -126,7 +127,7 @@ Scriptname RPB_Prisoner extends RPB_ActorBase
     int function ResolveStrippingType(bool abNudeBodyMod, bool abUnderwearBodyMod, bool abHasUnderwearWorn, int aiThoroughness) global
     function DetermineStrippingType()
     function Strip(bool abRemoveUnderwear = true)
-    function StripSilently()
+    function StripSilently(bool abKeepCuffs = true)
     function RemoveUnderwear()
     bool function ShouldClothe()
     bool function Outfit_MeetsConditions()
@@ -1073,8 +1074,9 @@ state Escorting
             RegisterForSingleUpdate(__assistTick)
             return
         endif
-        ; Under way once he has walked 2 ticks in my cell: the Scene took hold
-        if (sameCell && escortMoving)
+        ; Under way once he has walked 2 ticks in my cell: the Scene took hold. With the early hand-back switch (test 175),
+        ; under way from the start
+        if (sameCell && (escortMoving || RPB_Utility.IsEarlyHandbackForTest()))
             __underwayTicks += 1
             if (__underwayTicks >= 2)
                 __escortUnderway = true
@@ -1202,7 +1204,9 @@ state Escorting
                 endif
             endif
 
-        elseif (stuck && (pushing || guardWalksOn))
+        ; Pushing alone (the guard stopped) not on the way to the cell: walking only there (over-encumbered), the slow walk up to
+        ; a guard waiting at the cell door read as pushing, and the boost flew the player to it at 1000 (2026-10-04)
+        elseif (stuck && (guardWalksOn || (pushing && !__assistToCell)))
             ; Pushing against something, or left behind by a guard walking on in the same cell
             branch = "stuck"
             __assistIdleTime = 0.0
@@ -1237,7 +1241,7 @@ state Escorting
         if (__escortUnderway && __assistLevel == 0 && sameCell && !guardFighting && distance <= HANDBACK_RADIUS && !(__assistToCell && self.__AssistInCell()))
             __handbackTicks += 1
             if (__handbackTicks >= 2)
-                self.__SetFreeWalk(true, "close to the guard again (" + (distance as int) + ")")
+                self.__SetFreeWalk(true, "close to the guard again (" + (distance as int) + ", " + (((Utility.GetCurrentRealTime() - __assistStartedAt) * 1000.0) as int) + "ms into the escort, the guard walked " + __assistGuardWalked + ")")
                 branch = "led -> free"
             endif
         else
@@ -1917,9 +1921,9 @@ function Strip(bool abRemoveUnderwear = true)
         return
     endif
 
-    ; The cuffs are the mod's, not a belonging: deleted before the manifest, never put in the prison's container (the
-    ; escort to the cell cuffs again)
-    RPB_Utility.RemoveCuffs(this)
+    ; The cuffs are the mod's, not a belonging: they stay on, never put in the prison's container (__MoveBelongingsToChest).
+    ; They were deleted here and put back by the escort to the cell; the mod author: cuffs come off only when RPB takes
+    ; them off on purpose (2026-10-04)
 
     if (!self.PrisonerBelongingsContainer)
         RPB_Utility.LogError("The prisoner " + Name + " hasn't had a belongings container assigned to "+ PronounObject +", therefore cannot strip!", "["+ Name +"] Prisoner::Strip")
@@ -1958,8 +1962,7 @@ function Strip(bool abRemoveUnderwear = true)
     RPB_Utility.FlowMark("Strip: Stripping_SaveWornGear")
     self.SaveBelongingsManifest()
     RPB_Utility.FlowMark("Strip: SaveBelongingsManifest")
-    self.UnequipAll()
-    self.RemoveAllItems(PrisonerBelongingsContainer, true, true) ; Remove and put all the items in the prisoner's possession in the assigned prisoner container
+    self.__MoveBelongingsToChest()
     self.UnequipHands()
     self.SheatheWeapon()
     RPB_Utility.FlowMark("Strip: unequip + RemoveAllItems")
@@ -1991,13 +1994,49 @@ function Strip(bool abRemoveUnderwear = true)
     ; Debug("["+ Name +"] Prisoner::Strip", "Stripped "+ Name + " to underwear.", self.IsStrippedToUnderwear)
 endFunction
 
-function StripSilently()
+; The cuffs stay on, never unequipped, as in Strip (@abKeepCuffs is kept for its callers: it's always so now)
+;/
+    Everything I carry into my belongings chest except the cuffs, which stay on, never unequipped (they're the mod's, not a
+    belonging). Item by item: removing a worn item takes it off, so nothing is unequipped first. Without cuffs, the one
+    call it always was (RemoveAllItems). Timed in the log: a big inventory is many calls.
+/;
+function __MoveBelongingsToChest()
+    if (!RPB_Utility.IsCuffed(this))
+        self.UnequipAll()
+        self.RemoveAllItems(PrisonerBelongingsContainer, true, true)
+        return
+    endif
+    float started = Utility.GetCurrentRealTime()
+    ; What shows first: everything worn but the cuffs taken off (a few calls), then the slow part, the items moved one by
+    ; one, while they stand there stripped (the mod author: the move can take its time, as long as nothing reaches the cell)
+    Form[] worn = PO3_SKSEFunctions.AddAllEquippedItemsToArray(this)
+    int w = 0
+    while (worn && w < worn.Length)
+        if (worn[w] && !RPB_Utility.IsCuffsForm(worn[w]))
+            this.UnequipItem(worn[w], false, true)
+        endif
+        w += 1
+    endWhile
+    float unequipped = Utility.GetCurrentRealTime()
+    int moved = 0
+    int i = this.GetNumItems() - 1
+    while (i >= 0)
+        Form item = this.GetNthForm(i)
+        if (item && !RPB_Utility.IsCuffsForm(item))
+            this.RemoveItem(item, this.GetItemCount(item), true, PrisonerBelongingsContainer)
+            moved += 1
+        endif
+        i -= 1
+    endWhile
+    Debug("["+ Name +"] Prisoner::__MoveBelongingsToChest", "moved " + moved + " kinds of items to the chest, the cuffs kept on: unequipped in " + (((unequipped - started) * 1000.0) as int) + "ms, moved in " + (((Utility.GetCurrentRealTime() - unequipped) * 1000.0) as int) + "ms")
+endFunction
+
+function StripSilently(bool abKeepCuffs = true)
     if (this.IsDisabled())
         Debug("["+ Name +"] Prisoner::StripSilently", Name + " is disabled, not stripping")
         return
     endif
 
-    RPB_Utility.RemoveCuffs(this) ; the mod's, not a belonging (see Strip)
 
     if (!self.PrisonerBelongingsContainer)
         RPB_Utility.LogError("The prisoner " + Name + " hasn't had a belongings container assigned to "+ PronounObject +", therefore cannot strip silently!", "["+ Name +"] Prisoner::StripSilently")
@@ -2014,8 +2053,7 @@ function StripSilently()
     RPB_Utility.FlowMark("StripSilently: Stripping_SaveWornGear")
     self.SaveBelongingsManifest()
     RPB_Utility.FlowMark("StripSilently: SaveBelongingsManifest")
-    self.UnequipAll()
-    self.RemoveAllItems(PrisonerBelongingsContainer, true, true) ; Remove and put all the items in the prisoner's possession in the assigned prisoner container
+    self.__MoveBelongingsToChest()
     self.UnequipHands()
     self.SheatheWeapon()
     RPB_Utility.FlowMark("StripSilently: unequip + RemoveAllItems")
@@ -2561,6 +2599,7 @@ float __assistTick
 float __assistStuckTime
 float __assistIdleTime
 bool __assistGuardWalked ; the guard has walked in this escort (StartEscortAssist resets it)
+float __assistStartedAt ; when this escort's assist started (the hand-back's timing, test 175)
 ObjectReference __assistGuardMarker ; stands in for a frozen guard's position (__AssistGuardRef)
 int __assistLevel ; 0 = normal speed, 1-3 = raised (see __EscortSpeedForLevel)
 int __assistTeleports
@@ -2748,24 +2787,42 @@ bool function __FollowThroughLoadDoor()
     ; one call, then my controls as the mode wants them
     Game.EnablePlayerControls(abMovement = false, abFighting = false, abCamSwitch = false, abLooking = false, abSneaking = false, abMenu = false, abActivate = true, abJournalTabs = false)
     RPB_Utility.BlockPlayerActivation(false)
-    loadDoor.Activate(this)
+    ; Default processing only: the door's own handling, without the activation blocks (my cuffs' perk) that refused it
+    ; every time in the 2026-10-04 logs ("the door didn't take me": put in Castle Dour's door mesh, stuck a while)
+    ; A locked door only "tries the lock" on a scripted activation, and never takes me through: Castle Dour's inner door
+    ; refused most follows (2026-10-04). Unlocked for the crossing, locked again after
+    bool wasLocked = loadDoor.IsLocked()
+    if (wasLocked)
+        loadDoor.Lock(false)
+    endif
+    loadDoor.Activate(this, true)
     RPB_Utility.BlockPlayerActivation(RPB_Utility.IsCuffed(this))
     if (__freeWalk)
         RPB_Utility.HoldPlayerCuffed()
     else
         RetainAI(true)
     endif
-    Utility.Wait(2.0)
+    ; Through once I'm on its other side: up to 8s. A fixed 2s judged a slow cell load "refused" (2026-10-04: through at
+    ; 01:07:29, judged at :28), and the fallback below then put me on the door, stuck behind it
+    float waited = 0.0
+    while (waited < 5.0 && __assistOn && !RPB_Utility.InSamePlace(this, destination))
+        Utility.Wait(0.25)
+        waited += 0.25
+    endWhile
+    if (wasLocked)
+        loadDoor.Lock(true)
+    endif
     if (!__assistOn)
         return true
     endif
-    string how = "through the door"
+    string how = "through the door (" + ((waited * 1000.0) as int) + "ms" + string_if(wasLocked, ", it was locked", "") + ")"
     if (!RPB_Utility.InSamePlace(this, destination))
-        ; The door refused it (locked): next to its other side, snapped onto walkable ground (on the door itself, the
-        ; player stood in a wall, on a door frame, once fell to their death)
-        this.MoveTo(destination)
-        PO3_SKSEFunctions.MoveToNearestNavmeshLocation(this)
-        how = "moved to the walkable ground by the other side (the door didn't take me)"
+        ; The door refused it (locked): in front of its other side, on walkable ground (on the door itself, the player stood
+        ; in a wall, on a door frame, once fell to their death, or behind the door; beside the guard, near the stripping
+        ; area, the guard long gone on, 2026-10-04). Which side of the door is the room isn't known: one side, snapped to the
+        ; navmesh, and the other if that landed far from it (the wall side)
+        self.__MoveInFrontOfDoor(destination)
+        how = "moved in front of the door on the other side (the door didn't take me)"
     endif
     if (guardAhead && !guardFrozen && (!RPB_Utility.InSamePlace(guard, this) || guard.GetDistance(this) > 600.0))
         guard.MoveTo(this) ; the door didn't take him (out of the loaded area): beside me
@@ -2774,6 +2831,19 @@ bool function __FollowThroughLoadDoor()
     endif
     RPB_Utility.LogInfo(Name + " followed the guard through " + loadDoor + " (" + (__assistLastDistance as int) + " behind him) to " + destination + ": " + how + string_if(guardAhead, " (he had gone on)", ""), "["+ Name +"] Prisoner::EscortAssist")
     return true
+endFunction
+
+; In front of @akDoor on walkable ground: 120 units out along its facing, or the other way if that snapped far from it
+function __MoveInFrontOfDoor(ObjectReference akDoor)
+    float angle = akDoor.GetAngleZ()
+    float dx = Math.sin(angle) * 120.0
+    float dy = Math.cos(angle) * 120.0
+    this.MoveTo(akDoor, afXOffset = dx, afYOffset = dy, abMatchRotation = false)
+    PO3_SKSEFunctions.MoveToNearestNavmeshLocation(this)
+    if (this.GetDistance(akDoor) > 300.0)
+        this.MoveTo(akDoor, afXOffset = -dx, afYOffset = -dy, abMatchRotation = false)
+        PO3_SKSEFunctions.MoveToNearestNavmeshLocation(this)
+    endif
 endFunction
 
 ; In the same place as @akOther: the same cell, or both outside in the same worldspace. Outside, every grid square is its
@@ -3006,6 +3076,13 @@ int property EscortAssistMoves
     endFunction
 endProperty
 
+; How long this escort's assist has run (seconds)
+float property EscortAssistAge
+    float function get()
+        return Utility.GetCurrentRealTime() - __assistStartedAt
+    endFunction
+endProperty
+
 ; The guard has walked in this escort (the "outside the cell" move only counts after that)
 bool property EscortAssistGuardWalked
     bool function get()
@@ -3040,10 +3117,16 @@ function StartEscortAssist(Actor akEscort, bool abToCell)
     endif
     __assistOn = true
     __assistToCell = abToCell
+    ; Walking only, inside the prison on the way to the cell (the mod author, 2026-10-04: running drops the cuffed pose;
+    ; out in the hold the escort to jail keeps running allowed). Off again in StopEscortAssist
+    if (abToCell && self.IsPlayer())
+        RPB_Utility.LimitCuffedMovement_Encumbrance(true)
+    endif
     __assistEscort = akEscort
     __assistStuckTime = 0.0
     __assistIdleTime = 0.0
     __assistGuardWalked = false
+    __assistStartedAt = Utility.GetCurrentRealTime()
     __assistTeleports = 0
     __assistAwayTime = 0.0
     __assistFlatTicks = 0
@@ -3098,6 +3181,9 @@ function StopEscortAssist()
     if (__assistGuardMarker)
         __assistGuardMarker.Delete()
         __assistGuardMarker = none
+    endif
+    if (self.IsPlayer())
+        RPB_Utility.LimitCuffedMovement_Encumbrance(false)
     endif
     ; AI-driven again, as the rest of the flow (the strip, the cell, a fight's pending hold) expects after an escort; every
     ; caller sets its own controls right after
@@ -3221,6 +3307,8 @@ function SaveBelongingsManifest()
     ; it replaces) instead of GetNumItems + GetNthForm per item - a frame each. GetItemCount per item stays: there is no
     ; bulk count.
     Form[] items = PO3_SKSEFunctions.AddAllItemsToArray(this, false, false, false)
+    ; Not the cuffs: they stay on through the strip, never a belonging in the chest
+    items = RPB_Utility.WithoutCuffs(items)
     int total = 0
     if (items)
         total = items.Length
@@ -4854,7 +4942,8 @@ function Stripping_SaveWornGear()
     int i = 0
     while (equipped && i < equipped.Length)
         Armor worn = equipped[i] as Armor
-        if (worn)
+        ; Not the cuffs: they stay on through the strip, and saved here the release put them back on after taking them off
+        if (worn && !RPB_Utility.IsCuffsForm(worn))
             int mask = worn.GetSlotMask()
             int bit = 0
             while (bit < 32 && Math.LogicalAnd(mask, Math.LeftShift(1, bit)) == 0)

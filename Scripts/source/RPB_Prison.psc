@@ -1583,22 +1583,15 @@ Form[] function GetEscortLocations()
     return self.GetPropertyOfTypeFormArray("Markers//Jail//Escort")
 endFunction
 
-; @akActor is inside this prison's jail: the cell its escort markers stand in (the escort to jail's destination)
+; @akActor is inside this prison's jail: the cell its jail cells stand in
 bool function IsInsideJail(Actor akActor)
     Cell here = akActor.GetParentCell()
-    Form[] markers = self.GetEscortLocations()
-    if (!here || !markers)
+    Form[] cellsOfJail = self.JailCells
+    if (!here || !cellsOfJail || cellsOfJail.Length == 0)
         return false
     endif
-    int i = 0
-    while (i < markers.Length)
-        ObjectReference marker = markers[i] as ObjectReference
-        if (marker && marker.GetParentCell() == here)
-            return true
-        endif
-        i += 1
-    endWhile
-    return false
+    ObjectReference jailCell = cellsOfJail[0] as ObjectReference
+    return jailCell && jailCell.GetParentCell() == here
 endFunction
 
 ; The arrival's setup (where the prisoner is released to, their belongings chest, their cell): at the escort to jail's
@@ -3525,10 +3518,18 @@ function ResumePrisonFlowWith(RPB_Prisoner apPrisoner, Actor akGuard)
     ; the strip Scene has no approach and strips at its start, since its guard normally escorted the prisoner there. A
     ; take-over guard from across the prison stripped them with nobody there, then had them walk over to him.
     ; Not when already cuffed (the guard died after the strip): its hands-behind-back pose over the cuffs broke the animation
+    ; Nothing worn to strip (the player took it all off), but their things still on them: taken silently, as at the
+    ; arrival. Without it they went to the cell with everything they had (2026-10-04). The cuffs stay on (as in every
+    ; strip), so the restrain below doesn't play over them
+    bool strippedSilently = false
+    if (!apPrisoner.IsStripped && !apPrisoner.ShouldBeStripped && apPrisoner.ShouldBeStrippedSilently)
+        apPrisoner.StripSilently()
+        strippedSilently = true
+    endif
     if (!RPB_Utility.IsCuffed(apPrisoner.GetActor()))
         self.StartRestrainingPrisoner(apPrisoner, akGuard)
     endif
-    if (!apPrisoner.IsStripped && apPrisoner.ShouldBeStripped)
+    if (!strippedSilently && !apPrisoner.IsStripped && apPrisoner.ShouldBeStripped)
         self.StartStrippingPrisoner(apPrisoner, akGuard)
     endif
     if (apPrisoner.ShouldBeClothed && !apPrisoner.IsClothed)

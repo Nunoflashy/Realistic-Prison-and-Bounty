@@ -8,6 +8,7 @@ scriptname RPB_EventManager extends Quest
     RPB_SceneManager SceneManager
 @functions:
     function RegisterEvents()
+    function WatchCuffedJumps(bool abOn)
     function SendSurrenderSceneEvent(string asScene, string asSceneEvent, Actor akSurrenderer, Actor akSurrendererCaptor, string asSceneSecondaryEvent = "null", Form[] akParams = none, Form[] akParams2 = none)
     function SendArrestSceneEvent(string asScene, string asSceneEvent, Actor akArrestee, Actor akAuthority, string asSceneSecondaryEvent = "null")
     function SendArrestSceneBulkEvent(string asScene, string asSceneEvent, Form[] akArrestees, Actor akAuthority, string asSceneSecondaryEvent = "null")
@@ -120,7 +121,71 @@ function RegisterEvents()
     RegisterForModEvent("RPB_SubmissionTakeover", "OnSubmissionTakeover")
     RegisterForModEvent("RPB_FaintFrozenGuard", "OnFaintFrozenGuard")
     RegisterForModEvent("RPB_MoveGuard", "OnMoveGuard")
+
+    ; The cuffed restrictions as the cuffs are now (animation events don't survive a load either)
+    RPB_Utility.SyncCuffedRestrictions()
 endFunction
+
+; The player's jumps while cuffed: a jump drops the cuffed pose (ZaZ's), and Papyrus can't block jumping. The player
+; sends JumpUp on every jump and JumpFall only on a long fall (once in several jumps), no landing event (2026-10-05)
+function WatchCuffedJumps(bool abOn)
+    Actor player = Game.GetPlayer()
+    bool registered = false
+    if (abOn)
+        registered = RegisterForAnimationEvent(player, "JumpUp")
+    else
+        UnregisterForAnimationEvent(player, "JumpUp")
+        UnregisterForAnimationEvent(player, "JumpFall") ; the first version's
+    endif
+    __watchingLanding = false
+    Debug("EventManager::WatchCuffedJumps", "cuffed jump watch " + string_if(abOn, "on (JumpUp registered " + registered + ")", "off"))
+endFunction
+
+bool __watchingLanding ; one landing watch at a time (a second JumpFall mid-air)
+
+; A jump while cuffed: once they've left the ground and landed again (their height still for 0.2s; no event says so),
+; the cuffs are put on again (off and on), which plays their pose again
+event OnAnimationEvent(ObjectReference akSource, string asEventName)
+    Actor player = Game.GetPlayer()
+    if (akSource != player || asEventName != "JumpUp" || __watchingLanding || !RPB_Utility.IsCuffed(player))
+        return
+    endif
+    __watchingLanding = true
+    float startZ = player.GetPositionZ()
+    float waited = 0.0
+    ; Up first (the event comes as the jump starts, still on the ground)
+    while (Math.abs(player.GetPositionZ() - startZ) < 5.0 && waited < 0.6)
+        Utility.Wait(0.05)
+        waited += 0.05
+    endWhile
+    float lastZ = player.GetPositionZ()
+    int still = 0
+    while (still < 2 && waited < 4.0)
+        Utility.Wait(0.1)
+        waited += 0.1
+        float z = player.GetPositionZ()
+        if (Math.abs(z - lastZ) < 1.0)
+            still += 1
+        else
+            still = 0
+        endif
+        lastZ = z
+    endWhile
+    __watchingLanding = false
+    if (!RPB_Utility.IsCuffed(player))
+        return
+    endif
+    bool front = RPB_Utility.IsCuffedInFront(player)
+    Form cuffs = Game.GetFormFromFile(0x81D2F, "ZaZAnimationPack.esm")
+    if (front)
+        cuffs = Game.GetFormFromFile(0x81D33, "ZaZAnimationPack.esm")
+    endif
+    if (cuffs)
+        player.UnequipItem(cuffs, false, true)
+        player.EquipItem(cuffs, true, true)
+        Debug("EventManager::OnAnimationEvent", "landed from a jump while cuffed (" + ((waited * 1000.0) as int) + "ms after it started): the cuffs put on again")
+    endif
+endEvent
 
 event OnFaintFrozenGuard(Form akGuard, bool abAlone)
     RPB_Utility.__FaintFrozenGuard(akGuard as Actor, abAlone)

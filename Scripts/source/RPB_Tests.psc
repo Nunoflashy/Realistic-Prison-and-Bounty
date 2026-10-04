@@ -258,6 +258,9 @@ function SetTests()
     self.AddTest("170 - Escort Fallback With a Frozen Guard (Player; a freezable guard, frozen, then the stall fallback)", "Test_FrozenEscortFallback", abChainable = false)
     self.AddTest("171 - Experiment: Hide and Stop the Nearest Freezable Guard With PO3 (no call into him; freeze him first)", "Test_HideFrozenGuard", abChainable = false)
     self.AddTest("172 - Escort to the Cell: the Guard Held Still at Its Start (no move) and Mid-Way (nudge, then the move at 20s) (PLAYER)", "Test_EscortToCellGuardHeld", abChainable = false)
+    self.AddTest("173 - Experiment: Cuffed Movement Limit A, Encumbrance (30s: try to run, sprint and jump)", "Test_CuffedLimitEncumbrance", abChainable = false)
+    self.AddTest("174 - Experiment: Cuffed Movement Limit B, Settings (30s: try to jump)", "Test_CuffedLimitSettings", abChainable = false)
+    self.AddTest("175 - Experiment: the Walk Handed Back at the Escort's Start (to jail and to the cell; does the guard still set off?) (PLAYER)", "Test_EarlyHandback", abChainable = false)
     self.AddTest("041 - ActiveMagicEffectContainer: Stuck Lock Self-Heals", "Test_ActiveMagicEffectContainer_StuckLockSelfHeals")
     self.AddTest("042 - ThreadLock: JAtomic Primitive Semantics and Registry", "Test_ThreadLock_PrimitiveSemantics")
     ; Not chainable: fires concurrent worker threads
@@ -12430,6 +12433,83 @@ bool function __Scenario_FrozenEscortFallback(string asTest)
     return assert_true(fellBack && marked && waitOk && handedOver, asTest + ": fallback " + fellBack + ", marked frozen " + marked + ", the wait for a guard (if nobody saw them) " + waitOk + ", imprisoned by another guard " + handedOver)
 endFunction
 
+; 175: the early hand-back (RPB_Utility.SetEarlyHandbackForTest): an arrest by a real guard through both escorts, each
+; watched from its assist's start: when the player got their walk back, and whether the guard set off (walked) within
+; 30s of it, or stood still as when the walk was handed back too early before. Green = in both escorts the walk came
+; back and the guard walked, then the imprisonment
+bool function __Scenario_EarlyHandback(string asTest)
+    RPB_Prison prison = (RPB_API.GetPrisonManager()).GetPrison("Haafingar")
+    Actor guard = __ScenarioRealGuard()
+    if (!guard)
+        return false
+    endif
+    Actor player = __ScenarioArrestee(true, guard)
+    __ScenarioArrest(guard, player, asTest)
+    bool jailOk = __WatchHandback(asTest, prison, player, false)
+    bool cellOk = __WatchHandback(asTest, prison, player, true)
+    float waitStart = Utility.GetCurrentRealTime()
+    while (!RPB_Utility.IsActorImprisoned(player) && (Utility.GetCurrentRealTime() - waitStart) < 120.0)
+        Utility.Wait(0.5)
+    endWhile
+    bool imprisoned = RPB_Utility.IsActorImprisoned(player)
+    log(asTest + ": imprisoned " + imprisoned)
+    return assert_true(jailOk && cellOk && imprisoned, asTest + ": escort to jail " + jailOk + ", escort to the cell " + cellOk + ", imprisoned " + imprisoned)
+endFunction
+
+; One escort (@abToCell: the escort to the cell, else to jail), from its assist's start
+bool function __WatchHandback(string asTest, RPB_Prison apPrison, Actor akPlayer, bool abToCell)
+    string which = string_if(abToCell, "escort to the cell", "escort to jail")
+    float start = Utility.GetCurrentRealTime()
+    RPB_Prisoner assisted = apPrison.Prisoners.AtKey(akPlayer)
+    while (!(assisted && assisted.EscortAssistActive && assisted.EscortAssistToCell == abToCell) && (Utility.GetCurrentRealTime() - start) < 180.0)
+        Utility.Wait(0.25)
+        assisted = apPrison.Prisoners.AtKey(akPlayer)
+    endWhile
+    if (!(assisted && assisted.EscortAssistActive && assisted.EscortAssistToCell == abToCell))
+        log(asTest + ": the " + which + " never started")
+        return false
+    endif
+    float freeAt = -1.0
+    float walkedAt = -1.0
+    float watch = Utility.GetCurrentRealTime()
+    while ((freeAt < 0.0 || walkedAt < 0.0) && assisted.EscortAssistActive && (Utility.GetCurrentRealTime() - watch) < 45.0)
+        if (freeAt < 0.0 && assisted.EscortFreeWalking)
+            freeAt = assisted.EscortAssistAge
+        endif
+        if (walkedAt < 0.0 && assisted.EscortAssistGuardWalked)
+            walkedAt = assisted.EscortAssistAge
+        endif
+        Utility.Wait(0.25)
+    endWhile
+    log(asTest + ": " + which + ": walk handed back at " + __Ms(freeAt) + "ms, the guard set off at " + __Ms(walkedAt) + "ms (-1: never within 45s)")
+    return freeAt >= 0.0 && walkedAt >= 0.0
+endFunction
+
+; 173/174: a cuffed movement limit (RPB_Utility.LimitCuffedMovement_*) on for 30s, then off: judged in game (try to run,
+; sprint and jump). The player's speed and running state are logged every 5s; green = it went on and off again
+bool function __Scenario_CuffedLimit(string asTest, bool abEncumbrance)
+    Actor player = Game.GetFormEx(0x14) as Actor
+    if (abEncumbrance)
+        RPB_Utility.LimitCuffedMovement_Encumbrance(true)
+    else
+        RPB_Utility.LimitCuffedMovement_Settings(true)
+    endif
+    log(asTest + ": limit on (" + string_if(abEncumbrance, "encumbrance", "settings") + "), carry weight " + player.GetActorValue("CarryWeight") + ", jump height " + Game.GetGameSettingFloat("fJumpHeightMin") + ": try to run, sprint and jump for 30s")
+    int t = 0
+    while (t < 30)
+        Utility.Wait(5.0)
+        t += 5
+        log(asTest + ": +" + t + "s: running " + player.IsRunning() + ", sprinting " + player.IsSprinting() + ", overencumbered " + player.IsOverEncumbered())
+    endWhile
+    if (abEncumbrance)
+        RPB_Utility.LimitCuffedMovement_Encumbrance(false)
+    else
+        RPB_Utility.LimitCuffedMovement_Settings(false)
+    endif
+    log(asTest + ": limit off, carry weight " + player.GetActorValue("CarryWeight") + ", jump height " + Game.GetGameSettingFloat("fJumpHeightMin"))
+    return assert_true(true, asTest + ": done (judged in game)")
+endFunction
+
 ; 172: the escort assist's "standing outside the cell" move (RPB_Prisoner) with the guard held still (SetDontMove), as a
 ; real guard sometimes stands at the escort to the cell's start, or stops on the way. At the start (before he has walked)
 ; the player must not be moved into the cell (it moved them from the stripping area after 12s, 2026-10-04); mid-way (after
@@ -14172,7 +14252,7 @@ endFunction
 string __statelessTest = ""
 
 bool function __RunStatelessTest(string asTest)
-    if (asTest != "Test_ArrestWaitsWhileGuardFights_NoPackage" && asTest != "Test_CellDoorsDiagnostic" && asTest != "Test_LongAbsenceSetup" && asTest != "Test_LongAbsenceAdvance" && asTest != "Test_LongAbsenceVerify" && asTest != "Test_FallbackEscortToCellStopped_Player" && asTest != "Test_FallbackEscortToCellStopped_CloneGuard" && asTest != "Test_FightDuringEscort_NPC" && asTest != "Test_FightDuringEscort_Player" && asTest != "Test_GuardDiesInPrison_Player" && asTest != "Test_EscortToCellStopped_NoPackageLock" && StringUtil.Find(asTest, "Test_Surrender_") != 0 && asTest != "Test_FrozenGuardSkipped" && asTest != "Test_GuardDiesInPrison_NobodySees" && asTest != "Test_Escort_FreeWalk" && asTest != "Test_ToggleEscortToCell04" && asTest != "Test_CaptorFinishCycles_Calls" && asTest != "Test_CaptorFinishCycles_NoCalls" && asTest != "Test_CaptorFinishDetach_Calls" && asTest != "Test_CaptorFinishDetach_NoCalls" && asTest != "Test_Escort_FreeWalk_Control" && asTest != "Test_ActorKeys" && asTest != "Test_FrozenGuardCalls" && asTest != "Test_SimulatedFreezeCalls" && asTest != "Test_SimulatedFreezeAtCancel" && asTest != "Test_SpawnFreezableGuard" && asTest != "Test_AliasPackageControl" && asTest != "Test_FreezableEscort_Player" && asTest != "Test_FreezableEscort_NPC" && asTest != "Test_LightHold" && asTest != "Test_KillFrozenGuard" && asTest != "Test_LifetimeBountyStat" && asTest != "Test_FaintFrozenGuard" && asTest != "Test_FaintFrozenGuardShort" && asTest != "Test_FrozenEscortFallback" && asTest != "Test_HideFrozenGuard" && asTest != "Test_EscortToCellGuardHeld")
+    if (asTest != "Test_ArrestWaitsWhileGuardFights_NoPackage" && asTest != "Test_CellDoorsDiagnostic" && asTest != "Test_LongAbsenceSetup" && asTest != "Test_LongAbsenceAdvance" && asTest != "Test_LongAbsenceVerify" && asTest != "Test_FallbackEscortToCellStopped_Player" && asTest != "Test_FallbackEscortToCellStopped_CloneGuard" && asTest != "Test_FightDuringEscort_NPC" && asTest != "Test_FightDuringEscort_Player" && asTest != "Test_GuardDiesInPrison_Player" && asTest != "Test_EscortToCellStopped_NoPackageLock" && StringUtil.Find(asTest, "Test_Surrender_") != 0 && asTest != "Test_FrozenGuardSkipped" && asTest != "Test_GuardDiesInPrison_NobodySees" && asTest != "Test_Escort_FreeWalk" && asTest != "Test_ToggleEscortToCell04" && asTest != "Test_CaptorFinishCycles_Calls" && asTest != "Test_CaptorFinishCycles_NoCalls" && asTest != "Test_CaptorFinishDetach_Calls" && asTest != "Test_CaptorFinishDetach_NoCalls" && asTest != "Test_Escort_FreeWalk_Control" && asTest != "Test_ActorKeys" && asTest != "Test_FrozenGuardCalls" && asTest != "Test_SimulatedFreezeCalls" && asTest != "Test_SimulatedFreezeAtCancel" && asTest != "Test_SpawnFreezableGuard" && asTest != "Test_AliasPackageControl" && asTest != "Test_FreezableEscort_Player" && asTest != "Test_FreezableEscort_NPC" && asTest != "Test_LightHold" && asTest != "Test_KillFrozenGuard" && asTest != "Test_LifetimeBountyStat" && asTest != "Test_FaintFrozenGuard" && asTest != "Test_FaintFrozenGuardShort" && asTest != "Test_FrozenEscortFallback" && asTest != "Test_HideFrozenGuard" && asTest != "Test_EscortToCellGuardHeld" && asTest != "Test_CuffedLimitEncumbrance" && asTest != "Test_CuffedLimitSettings" && asTest != "Test_EarlyHandback")
         return false
     endif
 
@@ -14316,6 +14396,15 @@ bool function __RunStatelessTest(string asTest)
         display_result(__Scenario_EscortToCellGuardHeld("172"))
         RPB_Utility.SetFreeWalkDisabledForTest(false)
         __TeardownScenario()
+    elseif (asTest == "Test_EarlyHandback")
+        RPB_Utility.SetEarlyHandbackForTest(true)
+        display_result(__Scenario_EarlyHandback("175"))
+        RPB_Utility.SetEarlyHandbackForTest(false)
+        __TeardownScenario()
+    elseif (asTest == "Test_CuffedLimitEncumbrance")
+        display_result(__Scenario_CuffedLimit("173", true))
+    elseif (asTest == "Test_CuffedLimitSettings")
+        display_result(__Scenario_CuffedLimit("174", false))
     elseif (asTest == "Test_HideFrozenGuard")
         display_result(__Scenario_HideFrozenGuard("171"))
     elseif (asTest == "Test_FrozenEscortFallback")

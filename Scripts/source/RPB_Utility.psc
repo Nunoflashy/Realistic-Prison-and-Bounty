@@ -36,6 +36,13 @@ scriptname RPB_Utility hidden
     function BlockPlayerActivation(bool abBlock) global
     bool function IsCuffed(Actor akActor) global
     function EquipCuffs(Actor akActor, bool abFront = false) global
+    bool function IsCuffedInFront(Actor akActor) global
+    bool function IsCuffsForm(Form akForm) global
+    Form[] function WithoutCuffs(Form[] akForms) global
+    function LimitCuffedMovement_Encumbrance(bool abOn) global
+    function LimitCuffedMovement_Settings(bool abOn) global
+    function SetCuffedRestrictions(bool abOn) global
+    function SyncCuffedRestrictions() global
     int function CalmGuardsAgainstPlayer() global
     Form[] function RPB_GetHostileFactions() global
     Form[] function RPB_GetHostileFactionsFor(Actor akActor) global
@@ -197,6 +204,8 @@ scriptname RPB_Utility hidden
     bool function IsPackageLockDisabled() global
     function SetPackageLockDisabled(bool abDisabled) global
     bool function IsFreeWalkDisabledForTest() global
+    bool function IsEarlyHandbackForTest() global
+    function SetEarlyHandbackForTest(bool abOn) global
     function SetFreeWalkDisabledForTest(bool abDisabled) global
     function SetEscortWaitBlocked(bool abBlocked) global
     bool function IsEscortWaitBlocked() global
@@ -1166,6 +1175,9 @@ int function RemoveCuffs(Actor akActor) global
     ; AI-driven (movement off): whatever drives them hands the controls back itself.
     if (akActor == Game.GetPlayer())
         BlockPlayerActivation(false)
+        if (removed > 0)
+            SetCuffedRestrictions(false)
+        endif
         if (removed > 0 && Game.IsMovementControlsEnabled())
             Game.EnablePlayerControls()
         endif
@@ -1222,6 +1234,123 @@ endFunction
 ; Puts @akActor in the mod's cuffs, behind the back or @abFront. A different pair already worn comes off first: front cuffs
 ; equipped over back ones (the strip Scene cuffs in front after the arrest's back cuffs) locked the prisoner's animation,
 ; stuck at the belongings chest. Already wearing that pair: nothing to do. Weapons sheathed, not taken.
+;/
+    Cuffed movement limits, two interchangeable ways (the mod author, 2026-10-04: no running or jumping with cuffs on,
+    both broke the cuffed pose; Papyrus can't unbind keys). Experiments for now (tests 173/174), maybe an MCM choice later.
+    Each is applied once and undone once (a JDB flag), so a second call is harmless. Player only.
+    Encumbrance: carry weight at -1 (below an empty inventory's 0), the engine's own over-encumbered state: walking only
+    (no running, no sprinting). Speed isn't touched, so the escort's stairs boost (SpeedMult) still works. A modifier taken
+    off and put back by the same amount, so whatever else changes the carry weight meanwhile (a mod, a potion) stays.
+    Its "You are carrying too much to be able to run." can't be silenced: the engine reads that text once at startup.
+    Settings: the jump height game setting at 0 (game-wide while on: NPCs can't jump either); running isn't covered.
+/;
+function LimitCuffedMovement_Encumbrance(bool abOn) global
+    bool isOn = JDB.solveInt(".rpb_root.cuffedLimit.encumbrance") != 0
+    if (abOn == isOn)
+        return
+    endif
+    Actor player = Game.GetPlayer()
+    float amount = 0.0
+    if (abOn)
+        amount = -(player.GetActorValue("CarryWeight") + 1.0)
+        JDB.solveFltSetter(".rpb_root.cuffedLimit.carryWeightTaken", amount, true)
+    else
+        float taken = JDB.solveFlt(".rpb_root.cuffedLimit.carryWeightTaken")
+        if (taken == 0.0)
+            taken = -100000.0 ; put on by the first version (a fixed amount, nothing stored)
+        endif
+        amount = -taken
+    endif
+    player.ModActorValue("CarryWeight", amount)
+    JDB.solveIntSetter(".rpb_root.cuffedLimit.encumbrance", abOn as int, true)
+    Debug("Utility::LimitCuffedMovement_Encumbrance", "walking only (encumbrance) " + string_if(abOn, "on", "off") + ": carry weight changed by " + amount + ", now " + player.GetActorValue("CarryWeight"))
+endFunction
+
+function LimitCuffedMovement_Settings(bool abOn) global
+    bool isOn = JDB.solveInt(".rpb_root.cuffedLimit.settings") != 0
+    if (abOn == isOn)
+        return
+    endif
+    if (abOn)
+        JDB.solveFltSetter(".rpb_root.cuffedLimit.jumpHeight", Game.GetGameSettingFloat("fJumpHeightMin"), true)
+        Game.SetGameSettingFloat("fJumpHeightMin", 0.0)
+    else
+        float saved = JDB.solveFlt(".rpb_root.cuffedLimit.jumpHeight")
+        if (saved <= 0.0)
+            saved = 76.0 ; the game's default
+        endif
+        Game.SetGameSettingFloat("fJumpHeightMin", saved)
+    endif
+    JDB.solveIntSetter(".rpb_root.cuffedLimit.settings", abOn as int, true)
+    Debug("Utility::LimitCuffedMovement_Settings", "cuffed movement limit (settings) " + string_if(abOn, "on", "off") + ", fJumpHeightMin now " + Game.GetGameSettingFloat("fJumpHeightMin"))
+endFunction
+
+;/
+    What the player can't do with cuffs on, on with the cuffs and off with them (EquipCuffs, RemoveCuffs): no jumping high
+    (LimitCuffedMovement_Settings) and, since a jump drops the cuffed pose and Papyrus can't block it, the cuffs put on
+    again when they land (RPB_EventManager.OnAnimationEvent). Walking only is the escort to the cell's alone (the mod
+    author: in the prison, not out in the hold), RPB_Prisoner's escort assist; taken off with the cuffs too, in case.
+/;
+function SetCuffedRestrictions(bool abOn) global
+    if (!abOn)
+        LimitCuffedMovement_Encumbrance(false)
+    endif
+    LimitCuffedMovement_Settings(abOn) ; no jumping high (the mod author: kept, though it doesn't stop the jump)
+    RPB_EventManager events = RPB_API.GetEventManager()
+    if (events)
+        events.WatchCuffedJumps(abOn)
+    endif
+endFunction
+
+; On load: the restrictions as the cuffs are (a save from before them, or one where they were left on)
+function SyncCuffedRestrictions() global
+    SetCuffedRestrictions(IsCuffed(Game.GetPlayer()))
+endFunction
+
+; One of the cuffs RemoveCuffs knows (the ZaZ placeholders)
+bool function IsCuffsForm(Form akForm) global
+    if (!akForm)
+        return false
+    endif
+    int formId = Math.LogicalAnd(akForm.GetFormID(), 0x00FFFFFF)
+    return (formId == 0x81D2F || formId == 0x81D33 || formId == 0x81D34) && akForm == Game.GetFormFromFile(formId, "ZaZAnimationPack.esm")
+endFunction
+
+; @akForms without the cuffs (the same array when it has none)
+Form[] function WithoutCuffs(Form[] akForms) global
+    if (!akForms)
+        return akForms
+    endif
+    int kept = 0
+    int i = 0
+    while (i < akForms.Length)
+        if (!IsCuffsForm(akForms[i]))
+            kept += 1
+        endif
+        i += 1
+    endWhile
+    if (kept == akForms.Length)
+        return akForms
+    endif
+    Form[] result = Utility.CreateFormArray(kept)
+    int j = 0
+    i = 0
+    while (i < akForms.Length)
+        if (!IsCuffsForm(akForms[i]))
+            result[j] = akForms[i]
+            j += 1
+        endif
+        i += 1
+    endWhile
+    return result
+endFunction
+
+; Cuffed with the front pair (EquipCuffs' abFront)
+bool function IsCuffedInFront(Actor akActor) global
+    Form frontCuffs = Game.GetFormFromFile(0x81D33, "ZaZAnimationPack.esm")
+    return akActor && frontCuffs && akActor.IsEquipped(frontCuffs)
+endFunction
+
 function EquipCuffs(Actor akActor, bool abFront = false) global
     if (!akActor)
         return
@@ -1238,6 +1367,7 @@ function EquipCuffs(Actor akActor, bool abFront = false) global
     if (akActor.IsEquipped(cuffs))
         if (akActor == Game.GetPlayer())
             BlockPlayerActivation(true) ; already on (a save from before the perk)
+            SetCuffedRestrictions(true)
         endif
         return
     endif
@@ -1247,6 +1377,7 @@ function EquipCuffs(Actor akActor, bool abFront = false) global
     akActor.EquipItem(cuffs, true, true)
     if (akActor == Game.GetPlayer())
         BlockPlayerActivation(true)
+        SetCuffedRestrictions(true)
     endif
 endFunction
 
@@ -3692,6 +3823,17 @@ endFunction
 
 ; Test-only (135, 136, 140): the player's escort stays AI-led, never a free walk. They test the led fallbacks (the move
 ; into the cell); free walk takes a stop over first and those never get their turn.
+; Test switch (175): the player's walk handed back as soon as the escort Scene is under the assist (its start), not once
+; the guard has walked 2 ticks (the mod author, 2026-10-05: it would feel more natural; the old wait exists because a
+; phase waiting on the escortee's own package never ended once they weren't AI-driven)
+bool function IsEarlyHandbackForTest() global
+    return JDB.solveInt(".rpb_root.storage.Profile.EARLY_HANDBACK") != 0
+endFunction
+
+function SetEarlyHandbackForTest(bool abOn) global
+    RPB_StorageVars.SetInt("EARLY_HANDBACK", abOn as int, "Profile")
+endFunction
+
 bool function IsFreeWalkDisabledForTest() global
     return JDB.solveInt(".rpb_root.storage.Profile.DISABLE_FREE_WALK") != 0
 endFunction
