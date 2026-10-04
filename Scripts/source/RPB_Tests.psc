@@ -255,6 +255,7 @@ function SetTests()
     self.AddTest("167 - Diagnostic: How the Total Lifetime Bounty Stat Follows Each Bounty Change (Haafingar; restored after)", "Test_LifetimeBountyStat", abChainable = false)
     self.AddTest("168 - Experiment: the Nearest Freezable Guard Faints, Alone (stays down until the next load; freeze him first)", "Test_FaintFrozenGuard", abChainable = false)
     self.AddTest("169 - Experiment: the Nearest Freezable Guard Faints, Guards Around (15s, as if helped up; freeze him first)", "Test_FaintFrozenGuardShort", abChainable = false)
+    self.AddTest("170 - Escort Fallback With a Frozen Guard (Player; a freezable guard, frozen, then the stall fallback)", "Test_FrozenEscortFallback", abChainable = false)
     self.AddTest("041 - ActiveMagicEffectContainer: Stuck Lock Self-Heals", "Test_ActiveMagicEffectContainer_StuckLockSelfHeals")
     self.AddTest("042 - ThreadLock: JAtomic Primitive Semantics and Registry", "Test_ThreadLock_PrimitiveSemantics")
     ; Not chainable: fires concurrent worker threads
@@ -12325,6 +12326,84 @@ bool function __Scenario_LifetimeBountyStat(string asTest)
     return assert_true(endStat == savedStat && endLargest == savedLargest && haafingar.GetCrimeGoldNonViolent() == savedNonViolent && haafingar.GetCrimeGoldViolent() == savedViolent, asTest + ": the bounty or a stat wasn't put back")
 endFunction
 
+;/
+    170: the stall fallback with a frozen escort guard (156 x1000's run 159, 2026-10-04: its MoveTo on him hung and left the
+    player cuffed in the prison). An escort by a freezable guard, frozen (the hold) once it's walking, then the fallback
+    run straight away, as the stall check would. RPB_Prisoner.MoveToPrison should move the player, find him frozen (his
+    move hangs, then a probe), and hand the arrest to a guard of the prison (or wait for one who sees the player): green =
+    the fallback came back, he was marked frozen, and the player isn't left with him (imprisoned by another guard within
+    the wait, or waiting for one). Then the hold is released and the scenario torn down.
+/;
+bool function __Scenario_FrozenEscortFallback(string asTest)
+    __keepFrozenClones = false
+    ActorBase freezableBase = Game.GetFormFromFile(0x0002C062, "RealisticPrisonAndBounty.esp") as ActorBase
+    if (!assert_true(freezableBase != none, asTest + ": no RPB_TestFreezableGuard in the plugin"))
+        return false
+    endif
+    __scenarioGuardBase = freezableBase
+    Actor guard = __ScenarioGuard()
+    __scenarioGuardBase = none
+    if (!guard)
+        return false
+    endif
+    if (!assert_true((guard as RPB_TestFreezable) != none, asTest + ": " + guard + " isn't an RPB_TestFreezable (a new script needs a game restart)"))
+        __TeardownScenario()
+        return false
+    endif
+    Actor player = __ScenarioArrestee(true, guard)
+    __ScenarioArrest(guard, player, asTest)
+    if (!__ScenarioWaitEscortToJail(player, 40.0))
+        __TeardownScenario()
+        return assert_true(false, asTest + ": the escort to jail never started")
+    endif
+    Utility.Wait(3.0) ; walking
+    RPB_Arrestee arrestState = (RPB_API.GetArrest()).Arrestees.AtKey(player)
+    if (!arrestState)
+        __TeardownScenario()
+        return assert_true(false, asTest + ": no arrest state on the player")
+    endif
+
+    self.RegisterForModEvent("RPB_TestHoldLock", "OnTestHoldLock")
+    self.RegisterForModEvent("RPB_TestTimedFormID", "OnTestTimedFormID")
+    bool held = __StartHold(guard)
+    log(asTest + ": " + guard + " frozen (hold) " + held + ", " + (player.GetDistance(guard) as int) + " from the player; the stall fallback now")
+    if (!held)
+        self.__EndSimulatedFreeze()
+        __TeardownScenario()
+        return assert_true(false, asTest + ": the hold never started")
+    endif
+
+    float start = Utility.GetCurrentRealTime()
+    bool fellBack = arrestState.__FallBackToPrison("test " + asTest + ": a stalled escort with a frozen guard")
+    float took = Utility.GetCurrentRealTime() - start
+    bool marked = RPB_Utility.IsFrozenGuard(guard)
+    Actor captorNow = none
+    if (arrestState.Captor)
+        captorNow = arrestState.Captor.GetActor()
+    endif
+    bool awaiting = arrestState.GetBool("Awaiting Guard")
+    log(asTest + ": fallback returned " + fellBack + " after " + __Ms(took) + "ms; marked frozen " + marked + "; captor now " + captorNow + " (frozen one " + guard + "); awaiting a guard " + awaiting + "; player in " + player.GetParentCell())
+
+    ; Another guard's prison flow (strip, clothing, the escort to the cell): up to 120s for the imprisonment
+    bool imprisoned = false
+    if (captorNow && captorNow != guard)
+        float waitStart = Utility.GetCurrentRealTime()
+        while (!imprisoned && (Utility.GetCurrentRealTime() - waitStart) < 120.0)
+            Utility.Wait(1.0)
+            imprisoned = RPB_Utility.IsActorImprisoned(player)
+        endWhile
+        log(asTest + ": imprisoned by " + captorNow + ": " + imprisoned + " after " + ((Utility.GetCurrentRealTime() - waitStart) as int) + "s")
+    endif
+
+    float holdTime = __ReleaseHold()
+    bool answersAfter = __WaitAnswered(guard, 10.0)
+    log(asTest + ": hold " + (holdTime as int) + "s; he answers after the release: " + answersAfter)
+    self.__EndSimulatedFreeze()
+    __TeardownScenario()
+    bool handedOver = (captorNow && captorNow != guard && imprisoned) || awaiting
+    return assert_true(fellBack && marked && handedOver, asTest + ": fallback " + fellBack + ", marked frozen " + marked + ", handed over (imprisoned by another guard, or waiting for one) " + handedOver)
+endFunction
+
 ; 168: the faint experiment (the mod author's idea, 2026-10-04): a frozen guard nobody can take over from "faints", a
 ; collapse that covers the freeze up and gives the player an escape window. RPB_TestFaintSpell (plugin patch 009, DEV):
 ; 60s of paralysis (no shader or sound), cast by the guard on himself (Spell.Cast is a call on the spell, not on him; no crime against the
@@ -13917,7 +13996,7 @@ endFunction
 string __statelessTest = ""
 
 bool function __RunStatelessTest(string asTest)
-    if (asTest != "Test_ArrestWaitsWhileGuardFights_NoPackage" && asTest != "Test_CellDoorsDiagnostic" && asTest != "Test_LongAbsenceSetup" && asTest != "Test_LongAbsenceAdvance" && asTest != "Test_LongAbsenceVerify" && asTest != "Test_FallbackEscortToCellStopped_Player" && asTest != "Test_FallbackEscortToCellStopped_CloneGuard" && asTest != "Test_FightDuringEscort_NPC" && asTest != "Test_FightDuringEscort_Player" && asTest != "Test_GuardDiesInPrison_Player" && asTest != "Test_EscortToCellStopped_NoPackageLock" && StringUtil.Find(asTest, "Test_Surrender_") != 0 && asTest != "Test_FrozenGuardSkipped" && asTest != "Test_GuardDiesInPrison_NobodySees" && asTest != "Test_Escort_FreeWalk" && asTest != "Test_ToggleEscortToCell04" && asTest != "Test_CaptorFinishCycles_Calls" && asTest != "Test_CaptorFinishCycles_NoCalls" && asTest != "Test_CaptorFinishDetach_Calls" && asTest != "Test_CaptorFinishDetach_NoCalls" && asTest != "Test_Escort_FreeWalk_Control" && asTest != "Test_ActorKeys" && asTest != "Test_FrozenGuardCalls" && asTest != "Test_SimulatedFreezeCalls" && asTest != "Test_SimulatedFreezeAtCancel" && asTest != "Test_SpawnFreezableGuard" && asTest != "Test_AliasPackageControl" && asTest != "Test_FreezableEscort_Player" && asTest != "Test_FreezableEscort_NPC" && asTest != "Test_LightHold" && asTest != "Test_KillFrozenGuard" && asTest != "Test_LifetimeBountyStat" && asTest != "Test_FaintFrozenGuard" && asTest != "Test_FaintFrozenGuardShort")
+    if (asTest != "Test_ArrestWaitsWhileGuardFights_NoPackage" && asTest != "Test_CellDoorsDiagnostic" && asTest != "Test_LongAbsenceSetup" && asTest != "Test_LongAbsenceAdvance" && asTest != "Test_LongAbsenceVerify" && asTest != "Test_FallbackEscortToCellStopped_Player" && asTest != "Test_FallbackEscortToCellStopped_CloneGuard" && asTest != "Test_FightDuringEscort_NPC" && asTest != "Test_FightDuringEscort_Player" && asTest != "Test_GuardDiesInPrison_Player" && asTest != "Test_EscortToCellStopped_NoPackageLock" && StringUtil.Find(asTest, "Test_Surrender_") != 0 && asTest != "Test_FrozenGuardSkipped" && asTest != "Test_GuardDiesInPrison_NobodySees" && asTest != "Test_Escort_FreeWalk" && asTest != "Test_ToggleEscortToCell04" && asTest != "Test_CaptorFinishCycles_Calls" && asTest != "Test_CaptorFinishCycles_NoCalls" && asTest != "Test_CaptorFinishDetach_Calls" && asTest != "Test_CaptorFinishDetach_NoCalls" && asTest != "Test_Escort_FreeWalk_Control" && asTest != "Test_ActorKeys" && asTest != "Test_FrozenGuardCalls" && asTest != "Test_SimulatedFreezeCalls" && asTest != "Test_SimulatedFreezeAtCancel" && asTest != "Test_SpawnFreezableGuard" && asTest != "Test_AliasPackageControl" && asTest != "Test_FreezableEscort_Player" && asTest != "Test_FreezableEscort_NPC" && asTest != "Test_LightHold" && asTest != "Test_KillFrozenGuard" && asTest != "Test_LifetimeBountyStat" && asTest != "Test_FaintFrozenGuard" && asTest != "Test_FaintFrozenGuardShort" && asTest != "Test_FrozenEscortFallback")
         return false
     endif
 
@@ -14056,6 +14135,8 @@ bool function __RunStatelessTest(string asTest)
         display_result(__Scenario_LifetimeBountyStat("167"))
     elseif (asTest == "Test_FaintFrozenGuard")
         display_result(__Scenario_FaintFrozenGuard("168", 0x0002C069))
+    elseif (asTest == "Test_FrozenEscortFallback")
+        display_result(__Scenario_FrozenEscortFallback("170"))
     elseif (asTest == "Test_FaintFrozenGuardShort")
         display_result(__Scenario_FaintFrozenGuard("169", 0x0002C06A))
     elseif (asTest == "Test_Escort_FreeWalk_Control")
