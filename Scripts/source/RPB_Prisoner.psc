@@ -1611,7 +1611,20 @@ function MoveToPrison(Actor akCaptor)
 
      ; Later maybe the captor shouldn't go, and instead there should be guards waiting in the prison
      ; They shouldn't go especially if they are not a guard (e.g: Bounty Hunter or other NPC)
-    akCaptor.MoveTo(escortLocation)
+    ; Not a call on him from here: every caller has just stopped his Scene, and a call into him in that burst is what
+    ; freezes a guard. Run 159 of 156 x1000 (2026-10-04): the stall fallback's MoveTo on him hung right after his Scene
+    ; stopped, and left the player cuffed in the prison with nobody there. He moves on his own stack once the burst is
+    ; over; if he froze, a guard of the prison takes over, as when an escort guard dies there.
+    if (!RPB_Utility.MoveGuardAfterBurst(akCaptor, escortLocation, "moved to the prison"))
+        RPB_Arrestee arrestState = RPB_API.GetArrest().Arrestees.AtKey(this)
+        if (arrestState)
+            RPB_Utility.LogInfo(akCaptor + " froze when " + Name + " " + this + " was moved to " + Prison.Name + ": a guard of the prison takes over", "["+ Name +"] Prisoner::MoveToPrison")
+            SetBool("Go to Cell", true)
+            RPB_Utility.FaintFrozenGuard(akCaptor, abAlone = true) ; out of sight, in the town he stood in
+            arrestState.HandOverInPrison(akCaptor)
+            return
+        endif
+    endif
 
     Prison.OnPrisonerTeleportedToPrison(self)
 

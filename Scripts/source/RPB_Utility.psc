@@ -24,6 +24,8 @@ scriptname RPB_Utility hidden
     bool function IsGuardProbeOpen(Actor akActor) global
     bool function IsFrozenGuard(Actor akActor) global
     function MarkGuardFrozen(Actor akGuard, string asStep) global
+    bool function MoveGuardAfterBurst(Actor akGuard, ObjectReference akTarget, string asStep, float afDelay = 5.0) global
+    function __GuardMoved(Actor akGuard) global
     int function FrozenGuardsForScan() global
     bool function IsListedFrozen(int aiFrozenMap, Actor akActor) global
     function ClearFrozenGuards() global
@@ -752,6 +754,17 @@ function __RunGuardProbe(Actor akGuard, string asStep, float afDueAt = 0.0) glob
     ; the probe maps were emptied, and it must not write its old start time back into them (FF000F9F, 2026-10-03: "probe
     ; open 30573s" on a guard who was fine, a probe from 09:11 resuming after the 13:48 load)
     float loadStamp = JDB.solveFlt(".rpb_root.loadStamp")
+    ; One probe calls into him at a time. Every frozen guard of 156 x1000 (2026-10-04) held four: two steps (his Scene
+    ; stopped, his Captor removed), +5s and +8s each, all out before the first was found hanging. The earliest one out goes
+    ; on; a later one would only hang behind it, and if the earliest answers, he answered after this one was due too
+    float started = Utility.GetCurrentRealTime()
+    int open = __OpenProbesOf(akGuard, abCreate = true)
+    string probeKey = asStep + " @" + started
+    JMap.setFlt(open, probeKey, started)
+    if (JMap.count(open) > 1 && __FirstOpenProbe(open) != probeKey)
+        JMap.removeKey(open, probeKey)
+        return
+    endif
     bool counting = IsProbeCountingForTest()
     string countedStep = asStep
     if (counting)
@@ -769,10 +782,6 @@ function __RunGuardProbe(Actor akGuard, string asStep, float afDueAt = 0.0) glob
     ; Every probe out on him is kept (step and start), and the report names the earliest one still open: the one that hung
     ; is the first left open, later ones only hang behind it. A single entry used to name the last probe written, and an
     ; earlier probe answering cleared it while a later one hung (2026-10-02)
-    float started = Utility.GetCurrentRealTime()
-    int open = __OpenProbesOf(akGuard, abCreate = true)
-    string probeKey = asStep + " @" + started
-    JMap.setFlt(open, probeKey, started)
     if (!JFormMap.hasKey(map, akGuard))
         JFormMap.setFlt(map, akGuard, started)
         JFormMap.setStr(JDB.solveObj(".rpb_root.frozenGuardSteps"), akGuard, asStep)
@@ -811,6 +820,23 @@ int function __OpenProbesOf(Actor akGuard, bool abCreate = false) global
         JFormMap.setObj(perGuard, akGuard, open)
     endif
     return open
+endFunction
+
+; The earliest probe in @aiOpen (the first in the map's order among the earliest): every probe reading the same map picks
+; the same one, so two written in the same frame don't both step aside
+string function __FirstOpenProbe(int aiOpen) global
+    string firstKey = ""
+    float first = 0.0
+    string probeKey = JMap.nextKey(aiOpen)
+    while (probeKey != "")
+        float probeStart = JMap.getFlt(aiOpen, probeKey)
+        if (firstKey == "" || probeStart < first)
+            firstKey = probeKey
+            first = probeStart
+        endif
+        probeKey = JMap.nextKey(aiOpen, probeKey)
+    endWhile
+    return firstKey
 endFunction
 
 ; The earliest probe still out on @akGuard becomes the one his entry times and names
@@ -932,6 +958,68 @@ function MarkGuardFrozen(Actor akGuard, string asStep) global
     endif
 endFunction
 
+;/
+    @akGuard moved to @akTarget on his own stack (RPB_EventManager.OnMoveGuard), @afDelay after: a Scene of his was just
+    stopped, and a call into him in that burst is what freezes a guard. I wait here for it, so the caller goes on with him
+    where he should be. False when he's frozen (known already, or his move hung and a probe then hung too): the caller
+    goes on without him. A move that's only slow (a cell to load, a busy VM) is waited out, never taken for a freeze.
+    True with no guard (nothing to move).
+/;
+bool function MoveGuardAfterBurst(Actor akGuard, ObjectReference akTarget, string asStep, float afDelay = 5.0) global
+    if (!akGuard || !akTarget)
+        return true
+    endif
+    if (IsFrozenGuard(akGuard))
+        return false
+    endif
+    int moves = JDB.solveObj(".rpb_root.guardMoves")
+    if (!moves)
+        moves = JFormMap.object()
+        JDB.solveObjSetter(".rpb_root.guardMoves", moves, true)
+    endif
+    JFormMap.setInt(moves, akGuard, 1) ; removed by __GuardMoved once his MoveTo is back
+    int handle = ModEvent.Create("RPB_MoveGuard")
+    if (!handle)
+        JFormMap.removeKey(moves, akGuard)
+        return true
+    endif
+    ModEvent.PushForm(handle, akGuard)
+    ModEvent.PushForm(handle, akTarget)
+    ModEvent.PushFloat(handle, afDelay)
+    ModEvent.Send(handle)
+
+    float waited = 0.0
+    while (waited < afDelay + 8.0)
+        Utility.Wait(0.25)
+        waited += 0.25
+        if (!JFormMap.hasKey(moves, akGuard))
+            return true
+        endif
+    endWhile
+    ; Not back yet: a probe tells a frozen guard (it hangs too, and he's marked within a few seconds) from a slow move
+    ProbeGuard(akGuard, asStep + ", his move not back after " + (waited as int) + "s")
+    waited = 0.0
+    while (waited < 6.0)
+        Utility.Wait(0.5)
+        waited += 0.5
+        if (!JFormMap.hasKey(moves, akGuard))
+            return true
+        endif
+        if (IsFrozenGuard(akGuard))
+            return false
+        endif
+    endWhile
+    return !IsFrozenGuard(akGuard)
+endFunction
+
+; RPB_EventManager.OnMoveGuard: his MoveTo came back
+function __GuardMoved(Actor akGuard) global
+    int moves = JDB.solveObj(".rpb_root.guardMoves")
+    if (moves)
+        JFormMap.removeKey(moves, akGuard)
+    endif
+endFunction
+
 ; For the scans: the list's handle when it has anyone in it, 0 otherwise (one native per scan instead of one per candidate;
 ; a probe that answered removes its entry, so the list is empty unless a guard is frozen or a probe is still running)
 int function FrozenGuardsForScan() global
@@ -977,6 +1065,7 @@ function ClearFrozenGuards() global
     __ClearFormMapAt(".rpb_root.frozenActorRoles")
     __ClearFormMapAt(".rpb_root.guardPendingProbes")
     __ClearFormMapAt(".rpb_root.pendingCrimeLines")
+    __ClearFormMapAt(".rpb_root.guardMoves")
 endFunction
 
 ; RPB_FrozenMarkerSpell: the hidden effect a frozen NPC gets, for the crime dialogue's conditions
@@ -1166,12 +1255,14 @@ endFunction
 int function CalmGuardsAgainstPlayer() global
     Actor player = Game.GetPlayer()
     Actor[] nearby = PO3_SKSEFunctions.GetActorsByProcessingLevel(0)
-    int frozenMap = FrozenGuardsForScan()
     int calmed = 0
     int i = 0
     while (i < nearby.Length)
         Actor candidate = nearby[i]
-        if (candidate && candidate != player && !IsListedFrozen(frozenMap, candidate) && candidate.IsGuard() && candidate.IsInCombat())
+        ; Not a guard with a probe out or waiting either (IsGuardProbeOpen, no call into him): the reset runs right after
+        ; the arrest released its guard, in his burst. On all 12 frozen guards of 156 x1000 (2026-10-04) this scan's
+        ; IsGuard() hung on him, before his probes had marked him
+        if (candidate && candidate != player && !IsGuardProbeOpen(candidate) && candidate.IsGuard() && candidate.IsInCombat())
             candidate.StopCombat()
             candidate.StopCombatAlarm()
             calmed += 1

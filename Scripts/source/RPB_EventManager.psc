@@ -119,10 +119,20 @@ function RegisterEvents()
     RegisterForModEvent("RPB_SetAsideBountyCheck", "OnSetAsideBountyCheck")
     RegisterForModEvent("RPB_SubmissionTakeover", "OnSubmissionTakeover")
     RegisterForModEvent("RPB_FaintFrozenGuard", "OnFaintFrozenGuard")
+    RegisterForModEvent("RPB_MoveGuard", "OnMoveGuard")
 endFunction
 
 event OnFaintFrozenGuard(Form akGuard, bool abAlone)
     RPB_Utility.__FaintFrozenGuard(akGuard as Actor, abAlone)
+endEvent
+
+; RPB_Utility.MoveGuardAfterBurst: his move on its own stack, after the burst; a frozen guard holds only this
+event OnMoveGuard(Form akGuard, Form akTarget, float afDelay)
+    if (afDelay > 0.0)
+        Utility.Wait(afDelay)
+    endif
+    (akGuard as Actor).MoveTo(akTarget as ObjectReference)
+    RPB_Utility.__GuardMoved(akGuard as Actor)
 endEvent
 
 event OnSubmissionTakeover(Form akFrozenGuard)
