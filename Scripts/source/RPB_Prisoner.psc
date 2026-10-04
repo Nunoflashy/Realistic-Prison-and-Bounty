@@ -958,9 +958,10 @@ state Escorting
             __assistNeedsFirstRead = false
             Actor escort = __assistEscort
             GuardMark(escort, "escort assist: first read")
+            ObjectReference firstRef = self.__AssistGuardRef()
             __assistLastDistance = this.GetDistance(escort)
-            __assistGuardLastX = escort.GetPositionX()
-            __assistGuardLastY = escort.GetPositionY()
+            __assistGuardLastX = firstRef.GetPositionX()
+            __assistGuardLastY = firstRef.GetPositionY()
             __assistLastX = this.GetPositionX()
             __assistLastY = this.GetPositionY()
             __assistLastZ = this.GetPositionZ()
@@ -988,14 +989,17 @@ state Escorting
         __assistLastX = x
         __assistLastY = y
         __assistLastZ = z
-        float guardX = __assistEscort.GetPositionX()
-        float guardY = __assistEscort.GetPositionY()
+        ; Where he is, read on him, or on a marker moved onto him once he's known frozen (__AssistGuardRef)
+        ObjectReference guardRef = self.__AssistGuardRef()
+        bool guardFrozen = guardRef != __assistEscort
+        float guardX = guardRef.GetPositionX()
+        float guardY = guardRef.GetPositionY()
         float guardMoved = Math.sqrt(Math.pow(guardX - __assistGuardLastX, 2.0) + Math.pow(guardY - __assistGuardLastY, 2.0))
         __assistGuardLastX = guardX
         __assistGuardLastY = guardY
         float distance = this.GetDistance(__assistEscort)
         ; The guard through a load door reads as another cell (and an overflowed distance): far
-        bool sameCell = self.__SamePlaceAs(__assistEscort)
+        bool sameCell = self.__SamePlaceAs(guardRef)
         ; Stopped while these reads ran (about a frame each): nothing of mine to do. A tick past the top check boosted the
         ; player after the stop once, and nothing restored it (150's teardown: SpeedMult left at 400).
         if (!__assistOn)
@@ -1026,12 +1030,13 @@ state Escorting
         ; out with the guard already at the next one. Moved to him instead, they landed wherever the engine had moved him once
         ; out of the loaded area (straight at the prison, or the strip area). Both go to the door's other side. Not one of
         ; the three last-resort moves.
-        if (!sameCell && __lastSameCell && __assistLastDistance >= 0.0 && __assistLastDistance <= LOAD_DOOR_FOLLOW_DISTANCE && !__assistEscort.IsInCombat() && self.__FollowThroughLoadDoor())
+        if (!sameCell && __lastSameCell && __assistLastDistance >= 0.0 && __assistLastDistance <= LOAD_DOOR_FOLLOW_DISTANCE && (guardFrozen || !__assistEscort.IsInCombat()) && self.__FollowThroughLoadDoor())
             __assistLastX = this.GetPositionX()
             __assistLastY = this.GetPositionY()
             __assistLastZ = this.GetPositionZ()
-            __assistGuardLastX = __assistEscort.GetPositionX()
-            __assistGuardLastY = __assistEscort.GetPositionY()
+            guardRef = self.__AssistGuardRef()
+            __assistGuardLastX = guardRef.GetPositionX()
+            __assistGuardLastY = guardRef.GetPositionY()
             __assistLastDistance = this.GetDistance(__assistEscort)
             __lastSameCell = true
             RegisterForSingleUpdate(__assistTick)
@@ -1056,7 +1061,7 @@ state Escorting
         __assistLastDistance = distance
         __assistTick = 1.0
         string branch = "moving" ; for the trace below
-        bool guardFighting = __assistEscort.IsInCombat()
+        bool guardFighting = !guardFrozen && __assistEscort.IsInCombat()
 
         ; The walk into the cell (RPB_EscortToCell01 from phase 5: the door is open, and the phase waits on my own
         ; RPB_TravelTo into the cell, which only runs AI-driven)
@@ -1128,7 +1133,9 @@ state Escorting
                 __assistIdleTime += elapsed
                 if (idleBefore < 10.0 && __assistIdleTime >= 10.0)
                     RPB_Utility.LogInfo(Name + " standing outside the cell for 10s in the escort, nudging it (both packages re-evaluated)", "["+ Name +"] Prisoner::EscortAssist")
-                    __assistEscort.EvaluatePackage()
+                    if (!guardFrozen)
+                        __assistEscort.EvaluatePackage()
+                    endif
                     this.EvaluatePackage()
                 endif
                 if (__assistIdleTime >= 20.0)
@@ -2554,6 +2561,7 @@ float __assistTick
 float __assistStuckTime
 float __assistIdleTime
 bool __assistGuardWalked ; the guard has walked in this escort (StartEscortAssist resets it)
+ObjectReference __assistGuardMarker ; stands in for a frozen guard's position (__AssistGuardRef)
 int __assistLevel ; 0 = normal speed, 1-3 = raised (see __EscortSpeedForLevel)
 int __assistTeleports
 float __assistAwayTime
@@ -2730,7 +2738,9 @@ bool function __FollowThroughLoadDoor()
     if (!__assistOn || !guard)
         return true ; stopped meanwhile (a fight, a broken escort): nothing of mine to do
     endif
-    bool guardAhead = !RPB_Utility.InSamePlace(guard, destination) || guard.GetDistance(destination) > 300.0
+    ObjectReference guardRef = self.__AssistGuardRef() ; a marker on him if he's frozen
+    bool guardFrozen = guardRef != guard
+    bool guardAhead = !RPB_Utility.InSamePlace(guardRef, destination) || destination.GetDistance(guard) > 300.0
     if (guardAhead)
         loadDoor.Activate(guard)
     endif
@@ -2757,7 +2767,7 @@ bool function __FollowThroughLoadDoor()
         PO3_SKSEFunctions.MoveToNearestNavmeshLocation(this)
         how = "moved to the walkable ground by the other side (the door didn't take me)"
     endif
-    if (guardAhead && (!RPB_Utility.InSamePlace(guard, this) || guard.GetDistance(this) > 600.0))
+    if (guardAhead && !guardFrozen && (!RPB_Utility.InSamePlace(guard, this) || guard.GetDistance(this) > 600.0))
         guard.MoveTo(this) ; the door didn't take him (out of the loaded area): beside me
         PO3_SKSEFunctions.MoveToNearestNavmeshLocation(guard)
         how += ", the guard moved beside me"
@@ -2768,6 +2778,25 @@ endFunction
 
 ; In the same place as @akOther: the same cell, or both outside in the same worldspace. Outside, every grid square is its
 ; own cell, and a guard crossing one read as "through a load door" (into the Solitude sewers, by a manhole)
+;/
+    The guard for the escort assist's reads. A frozen guard (RPB_Utility.IsFrozenGuard: no call on him) answers no call on
+    himself, and each tick hung on his position: his escort then fell to the stall watch's teleport into the cell while
+    his AI was still walking it (2026-10-04). A marker moved onto him stands in (a call on the marker, him as the argument,
+    as the faint's push does): the assist reads where he is, and the escort goes on as with a guard who answers. Deleted
+    with the assist (StopEscortAssist).
+/;
+ObjectReference function __AssistGuardRef()
+    if (!RPB_Utility.IsFrozenGuard(__assistEscort))
+        return __assistEscort
+    endif
+    if (!__assistGuardMarker)
+        __assistGuardMarker = this.PlaceAtMe(Game.GetFormEx(0x3B)) ; XMarker
+        RPB_Utility.LogInfo(Name + "'s escort guard " + __assistEscort + " is frozen: the escort assist reads him through a marker", "["+ Name +"] Prisoner::EscortAssist")
+    endif
+    __assistGuardMarker.MoveTo(__assistEscort)
+    return __assistGuardMarker
+endFunction
+
 bool function __SamePlaceAs(ObjectReference akOther)
     return RPB_Utility.InSamePlace(this, akOther)
 endFunction
@@ -2813,7 +2842,7 @@ string function __FreeWalkTick(float afDistance, bool abSameCell, bool abGuardMo
 
     ; At the cell: he has stopped there to open it, and the phases before the door wait on my own (AI-driven) package. Led
     ; at once (he only opened it after 6s of "both still"); the walk-in gives the controls back once it's open.
-    if (__assistToCell && !abGuardMoving && JailCell && __assistEscort.GetDistance(JailCell) <= 400.0)
+    if (__assistToCell && !abGuardMoving && JailCell && JailCell.GetDistance(__assistEscort) <= 400.0) ; a call on the cell: he may be frozen
         self.__SetFreeWalk(false, "at the cell: the guard opens the door")
         __escortUnderway = false
         __underwayTicks = 0
@@ -3066,6 +3095,10 @@ function StopEscortAssist()
     endif
 
     Debug("["+ Name +"] Prisoner::EscortAssist", "assist stopped (to cell " + __assistToCell + ", moves " + __assistTeleports + ", free walk " + __freeWalk + ")")
+    if (__assistGuardMarker)
+        __assistGuardMarker.Delete()
+        __assistGuardMarker = none
+    endif
     ; AI-driven again, as the rest of the flow (the strip, the cell, a fight's pending hold) expects after an escort; every
     ; caller sets its own controls right after
     if (__freeWalk)

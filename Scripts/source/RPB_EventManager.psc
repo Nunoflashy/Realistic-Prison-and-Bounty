@@ -314,7 +314,15 @@ function OnSceneStartFailed(string asScene)
         return
     endif
 
-    Info("EventManager: " + asScene + " never started for " + escortee + " (in combat " + escortee.IsInCombat() + ", escort " + escort + " in combat " + (escort && escort.IsInCombat()) + "), moving them without the Scene")
+    ; Its guard dead: his death's own handling owns the arrest (inside the prison, another guard takes over, or the prisoner
+    ; waits for one who sees them; outside it, the arrest is cancelled). A Scene with him that the prison flow queued just
+    ; before he died never starts, and this teleported the player into the cell over that wait (2026-10-04)
+    if (escort && RPB_Utility.IsDeadNoCall(escort))
+        Info("EventManager: " + asScene + " never started for " + escortee + ": its guard " + escort + " is dead, his death's handover takes it")
+        return
+    endif
+    bool escortFighting = escort && !RPB_Utility.IsFrozenGuard(escort) && escort.IsInCombat() ; no call on a frozen guard
+    Info("EventManager: " + asScene + " never started for " + escortee + " (in combat " + escortee.IsInCombat() + ", escort " + escort + " in combat " + escortFighting + "), moving them without the Scene")
     if (sceneType == SceneManager.CATEGORY_ESCORT_TO_JAIL && escort)
         prisoner.MoveToPrison(escort)
     else
