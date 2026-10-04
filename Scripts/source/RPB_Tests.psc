@@ -12330,9 +12330,10 @@ endFunction
     170: the stall fallback with a frozen escort guard (156 x1000's run 159, 2026-10-04: its MoveTo on him hung and left the
     player cuffed in the prison). An escort by a freezable guard, frozen (the hold) once it's walking, then the fallback
     run straight away, as the stall check would. RPB_Prisoner.MoveToPrison should move the player, find him frozen (his
-    move hangs, then a probe), and hand the arrest to a guard of the prison (or wait for one who sees the player): green =
-    the fallback came back, he was marked frozen, and the player isn't left with him (imprisoned by another guard within
-    the wait, or waiting for one). Then the hold is released and the scenario torn down.
+    move hangs, then a probe), and hand the arrest to a guard of the prison who sees the player, or else, as when an
+    escort guard dies there, let them wait, free to move, until one does (a guard is then brought next to them). Green =
+    the fallback came back, he was marked frozen, and another guard imprisoned the player. Then the hold is released and
+    the scenario torn down.
 /;
 bool function __Scenario_FrozenEscortFallback(string asTest)
     __keepFrozenClones = false
@@ -12384,6 +12385,29 @@ bool function __Scenario_FrozenEscortFallback(string asTest)
     bool awaiting = arrestState.GetBool("Awaiting Guard")
     log(asTest + ": fallback returned " + fellBack + " after " + __Ms(took) + "ms; marked frozen " + marked + "; captor now " + captorNow + " (frozen one " + guard + "); awaiting a guard " + awaiting + "; player in " + player.GetParentCell())
 
+    ; Nobody saw the player arrive (the usual case after a teleport): the death rule, they wait, free to move, for a guard
+    ; who sees them (the mod author, 2026-10-04). A guard of the prison is then brought next to them and must take over
+    bool waitOk = true
+    if (awaiting)
+        bool movable = Game.IsMovementControlsEnabled()
+        Utility.Wait(4.0)
+        bool stillWaiting = arrestState.GetBool("Awaiting Guard") && !RPB_Utility.IsActorImprisoned(player)
+        Actor witness = RPB_Utility.GetNearestGuardInCell(player, guard)
+        log(asTest + ": waiting for a guard to see the player: movement enabled " + movable + ", still waiting after 4s " + stillWaiting + ", bringing " + witness)
+        if (witness)
+            witness.MoveTo(player, afXOffset = 150.0, abMatchRotation = false)
+            float seenStart = Utility.GetCurrentRealTime()
+            while (arrestState.GetBool("Awaiting Guard") && (Utility.GetCurrentRealTime() - seenStart) < 8.0)
+                Utility.Wait(0.25)
+            endWhile
+            log(asTest + ": " + witness + " brought next to the player; still waiting after " + __Ms(Utility.GetCurrentRealTime() - seenStart) + "ms: " + arrestState.GetBool("Awaiting Guard"))
+        endif
+        waitOk = movable && stillWaiting && witness != none && !arrestState.GetBool("Awaiting Guard")
+        if (arrestState.Captor)
+            captorNow = arrestState.Captor.GetActor()
+        endif
+    endif
+
     ; Another guard's prison flow (strip, clothing, the escort to the cell): up to 120s for the imprisonment
     bool imprisoned = false
     if (captorNow && captorNow != guard)
@@ -12400,8 +12424,8 @@ bool function __Scenario_FrozenEscortFallback(string asTest)
     log(asTest + ": hold " + (holdTime as int) + "s; he answers after the release: " + answersAfter)
     self.__EndSimulatedFreeze()
     __TeardownScenario()
-    bool handedOver = (captorNow && captorNow != guard && imprisoned) || awaiting
-    return assert_true(fellBack && marked && handedOver, asTest + ": fallback " + fellBack + ", marked frozen " + marked + ", handed over (imprisoned by another guard, or waiting for one) " + handedOver)
+    bool handedOver = captorNow && captorNow != guard && imprisoned
+    return assert_true(fellBack && marked && waitOk && handedOver, asTest + ": fallback " + fellBack + ", marked frozen " + marked + ", the wait for a guard (if nobody saw them) " + waitOk + ", imprisoned by another guard " + handedOver)
 endFunction
 
 ; 168: the faint experiment (the mod author's idea, 2026-10-04): a frozen guard nobody can take over from "faints", a
