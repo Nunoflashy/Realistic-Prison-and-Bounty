@@ -316,6 +316,7 @@ scriptname RPB_Utility hidden
     Actor function GetNearestGuard(ObjectReference centerRef, float radius, ObjectReference exclude) global
     Actor function GetGuardSeeing(Actor akPrisoner, Actor akExclude) global
     Actor function GetNearestGuardInCell(Actor akCenter, Actor akExclude) global
+    Actor function GetNearestFreeGuardOfFaction(Actor akCenter, Faction akCrimeFaction, float afMaxDistance, Actor akExclude) global
     bool function IsActorNearReference(Actor akActor, ObjectReference akReference, float radius = 80.0) global
     bool function IsWithin(int aiValue, int aiMin, int aiMax, bool abMinInclusive = true, bool abMaxInclusive = true) global
     string function GetContainerList( int _container, string includeStringFilter = "", string excludeStringFilter = "", int includeIntegerFilter = -1, int excludeIntegerFilter = -1, Form includeFormFilter = none, Form excludeFormFilter = none, int indentLevel = 1 ) global
@@ -863,8 +864,8 @@ bool function IsFrozenGuard(Actor akActor) global
 endFunction
 
 function MarkGuardFrozen(Actor akGuard, string asStep) global
-    ; The player submitted to him: his arrest won't come, the bounty set aside for it goes back (other guards take over)
-    RPB_Arrest.GiveBackSetAsideBountyFromGuard(akGuard, "the guard they submitted to is frozen")
+    ; The player submitted to him: his arrest won't come, another guard of the hold takes it over (RPB_Arrest.TakeOverSubmission)
+    RPB_Arrest.RequestSubmissionTakeover(akGuard)
     int map = __FrozenGuardsMap(abCreate = true)
     JFormMap.setFlt(map, akGuard, -1.0)
     ; Silent in crime dialogue from now: each line's fragments call into the speaker and would wait forever, a new stuck stack
@@ -5052,6 +5053,31 @@ Actor function GetGuardSeeing(Actor akPrisoner, Actor akExclude) global
         i += 1
     endWhile
     return seeing
+endFunction
+
+; The nearest guard of @akCrimeFaction within @afMaxDistance of @akCenter who can take an arrest over: alive, enabled, not
+; known frozen, not @akExclude, and not already a captor (no RPB_Captor spell) or arrested himself. None if there's no such
+; guard. A call on each guard close enough (his crime faction): run it on a stack of its own, in case one is frozen
+; without RPB knowing yet.
+Actor function GetNearestFreeGuardOfFaction(Actor akCenter, Faction akCrimeFaction, float afMaxDistance, Actor akExclude) global
+    Actor[] nearby = PO3_SKSEFunctions.GetActorsByProcessingLevel(0)
+    int frozenMap = FrozenGuardsForScan()
+    Spell captorSpell = RPB_CaptorSpell()
+    Actor nearest = none
+    float nearestDistance = afMaxDistance
+    int i = 0
+    while (i < nearby.Length)
+        Actor candidate = nearby[i]
+        if (candidate && candidate != akExclude && candidate != akCenter && !IsListedFrozen(frozenMap, candidate) && candidate.GetFormID() != 0x14)
+            float distance = akCenter.GetDistance(candidate)
+            if (distance < nearestDistance && candidate.IsGuard() && !candidate.IsDead() && !candidate.IsDisabled() && !candidate.IsChild() && candidate.GetCrimeFaction() == akCrimeFaction && !candidate.HasSpell(captorSpell) && !IsActorArrested(candidate))
+                nearest = candidate
+                nearestDistance = distance
+            endif
+        endif
+        i += 1
+    endWhile
+    return nearest
 endFunction
 
 Actor function GetNearestGuardInCell(Actor akCenter, Actor akExclude) global

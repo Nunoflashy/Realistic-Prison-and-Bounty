@@ -67,7 +67,8 @@ scriptname RPB_Arrest extends Quest
     function SetAsideBountyOnSubmission(Actor akActor, Actor akGuard) global
     bool function HasSetAsideBounty(Actor akActor) global
     bool function GiveBackSetAsideBounty(Actor akActor, string asWhy) global
-    function GiveBackSetAsideBountyFromGuard(Actor akGuard, string asWhy) global
+    function RequestSubmissionTakeover(Actor akFrozenGuard) global
+    function TakeOverSubmission(Actor akFrozenGuard)
     function ArrestActorForFaction(Faction akCrimeFaction, Actor akArrestee, string asArrestType)
     function ArrestActors(Actor akArrester, Actor[] akArrestees, string asArrestType, bool abEnsureAllArrested = true, float afWaitTimeBetweenArrests = 0.3)
     function SetAsEluding(Actor akEludedGuard, Actor akEluder, string asEludeType)
@@ -769,13 +770,47 @@ bool function GiveBackSetAsideBounty(Actor akActor, string asWhy) global
     return true
 endFunction
 
-; The player's set-aside bounty back if @akGuard is the guard they submitted to (he froze: his arrest won't come). The
-; other guards around then see the bounty again and come to arrest, as they would have
-function GiveBackSetAsideBountyFromGuard(Actor akGuard, string asWhy) global
+; The guard the player submitted to is frozen (found by a probe, or his arrest rejected for it): another guard takes the
+; arrest over, on a stack of its own (the search calls into the guards around, and one of them may be frozen too)
+function RequestSubmissionTakeover(Actor akFrozenGuard) global
     Actor player = Game.GetPlayer()
-    if (akGuard && RPB_StorageVars.GetFormOnReference("Guard", player, "Set-Aside Bounty") == akGuard)
-        GiveBackSetAsideBounty(player, asWhy)
+    if (!akFrozenGuard || RPB_StorageVars.GetFormOnReference("Guard", player, "Set-Aside Bounty") != akFrozenGuard)
+        return
     endif
+    int handle = ModEvent.Create("RPB_SubmissionTakeover")
+    if (handle)
+        ModEvent.PushForm(handle, akFrozenGuard)
+        ModEvent.Send(handle)
+    endif
+endFunction
+
+; The player had submitted to @akFrozenGuard ("I'll go to jail"), and he froze before his arrest could start: the nearest
+; free guard of the same hold (within 3000 units) arrests them straight away, no new dialogue, with the bounty still set
+; aside (the arrest takes it as usual). Asking again would only repeat what the player already chose. No such guard: the
+; bounty goes back, and the guards around come to arrest them the vanilla way. An arrest already under way (the Arrestee
+; effect is on) isn't this case: that's a guard frozen mid-arrest.
+function TakeOverSubmission(Actor akFrozenGuard)
+    Actor player = Config.Player
+    if (RPB_StorageVars.GetFormOnReference("Guard", player, "Set-Aside Bounty") != akFrozenGuard)
+        return ; the arrest took the bounty meanwhile, or another takeover already did this
+    endif
+    if (RPB_Utility.IsActorArrested(player) || RPB_Utility.IsActorImprisoned(player) || player.HasSpell(RPB_Utility.RPB_ArresteeSpell()))
+        RPB_Utility.LogWarn("No takeover for " + akFrozenGuard + ": " + player + "'s arrest is already under way", "Arrest::TakeOverSubmission")
+        return
+    endif
+
+    Faction crimeFaction = RPB_StorageVars.GetFormOnReference("Faction", player, "Set-Aside Bounty") as Faction
+    Actor guard = RPB_Utility.GetNearestFreeGuardOfFaction(player, crimeFaction, 3000.0, akFrozenGuard)
+    if (!guard)
+        RPB_Arrest.GiveBackSetAsideBounty(player, "the guard they submitted to (" + akFrozenGuard + ") is frozen and no other guard of the hold is near")
+        return
+    endif
+
+    RPB_StorageVars.SetFormOnReference("Guard", player, guard, "Set-Aside Bounty")
+    RPB_Utility.LogInfo(guard + " takes over the arrest of " + player + " from " + akFrozenGuard + " (frozen)", "Arrest::TakeOverSubmission")
+    self.ArrestActor(guard, player, ARREST_TYPE_ESCORT_TO_JAIL)
+    ; Watched like the first one: if he freezes too, the next takeover (or the bounty back) follows the same way
+    RPB_Utility.ProbeGuardAfterBurst(guard, "took over a submission")
 endFunction
 
 ; Past the point where eluding means anything: already arrested, imprisoned, or surrendering

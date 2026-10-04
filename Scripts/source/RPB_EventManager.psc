@@ -117,7 +117,12 @@ function RegisterEvents()
 
     ; A bounty set aside on submitting, given back if no arrest took it (RPB_Arrest.SetAsideBountyOnSubmission)
     RegisterForModEvent("RPB_SetAsideBountyCheck", "OnSetAsideBountyCheck")
+    RegisterForModEvent("RPB_SubmissionTakeover", "OnSubmissionTakeover")
 endFunction
+
+event OnSubmissionTakeover(Form akFrozenGuard)
+    Arrest.TakeOverSubmission(akFrozenGuard as Actor)
+endEvent
 
 event OnSetAsideBountyCheck(Form akActor, float afDelay)
     Utility.Wait(afDelay)
@@ -441,7 +446,8 @@ event OnArrestBegin(string eventName, string arrestType, float arresteeIdFlt, Fo
     ; Before any call on him: a frozen guard's first call never returns, and this arrest would hang with it
     if (captor && RPB_Utility.IsFrozenGuard(captor))
         Warn("Arrest by " + captor + " rejected: the guard is frozen (see FROZEN GUARD)")
-        RPB_Arrest.GiveBackSetAsideBounty(Game.GetFormEx(arresteeIdFlt as int) as Actor, "the arrest was rejected")
+        ; A submission to him: another guard takes it over (no-op otherwise)
+        RPB_Arrest.RequestSubmissionTakeover(captor)
         return
     endif
     Faction crimeFaction = form_if ((sender as Faction), (sender as Faction), captor.GetCrimeFaction()) as Faction
