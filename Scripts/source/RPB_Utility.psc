@@ -1396,7 +1396,7 @@ Actor function SendCaptorAfterAttacker(Actor akCaptor, Actor akArrestee) global
         Actor target = targets[i]
         if (target && target != akCaptor && !IsFrozenGuard(target) && !target.IsDead() && !target.IsDisabled() && !IsActorArrested(target))
             Faction targetFaction = target.GetCrimeFaction()
-            LogInfo(target + " attacks " + akArrestee + ": crime faction " + targetFaction + " (captor's " + captorFaction + ")", "Utility::SendCaptorAfterAttacker")
+            Debug("Utility::SendCaptorAfterAttacker", target + " attacks " + akArrestee + ": crime faction " + targetFaction + " (captor's " + captorFaction + ")")
             if (!targetFaction)
                 if (!outsider)
                     outsider = target

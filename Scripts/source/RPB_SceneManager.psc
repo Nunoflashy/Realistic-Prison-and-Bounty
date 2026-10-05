@@ -1199,10 +1199,12 @@ function PlayQueued()
         if (isEscortScene && !sceneObject.IsPlaying() && __lastStartedScene != nextScene && currentScene == nextScene)
             Actor escort    = self.GetSceneNthReferenceOfType(nextScene, "Escort") as Actor
             Actor escortee  = self.GetSceneNthReferenceOfType(nextScene, "Escortee") as Actor
-            float combatWaitStart = Utility.GetCurrentRealTime()
+            ; Counted in its own 1s steps, not real time: real time restarts every session, and a wait saved and resumed by a
+            ; load read thousands of seconds and gave up at once (2278s, 2026-10-06)
+            int combatWaited = 0
             bool waitedForCombat = false
             bool uncuffedInFight = false
-            while (!uncuffedInFight && !sceneObject.IsPlaying() && __lastStartedScene != nextScene && currentScene == nextScene && ((escort && escort.IsInCombat()) || (escortee && escortee.IsInCombat())) && (Utility.GetCurrentRealTime() - combatWaitStart) < SCENE_START_COMBAT_CAP_SECONDS)
+            while (!uncuffedInFight && !sceneObject.IsPlaying() && __lastStartedScene != nextScene && currentScene == nextScene && ((escort && escort.IsInCombat()) || (escortee && escortee.IsInCombat())) && combatWaited < (SCENE_START_COMBAT_CAP_SECONDS as int))
                 if (!waitedForCombat)
                     waitedForCombat = true
                     ; An arrestee never cuffed: the fight stopped the confrontation (the engine ends it when combat starts)
@@ -1224,10 +1226,11 @@ function PlayQueued()
                     ; moved them to the prison, 2026-10-06). The wait counts from his last such turn
                     if (escort && escortee && escortee.IsInCombat() && !RPB_Utility.IsFrozenGuard(escort) && !escort.IsInCombat())
                         if (RPB_Utility.SendCaptorAfterAttacker(escort, escortee))
-                            combatWaitStart = Utility.GetCurrentRealTime()
+                            combatWaited = 0
                         endif
                     endif
                     Utility.Wait(1.0)
+                    combatWaited += 1
                 endif
             endWhile
 
@@ -1258,9 +1261,9 @@ function PlayQueued()
                 while (!sceneObject.IsPlaying() && __lastStartedScene != nextScene && currentScene == nextScene && (Utility.GetCurrentRealTime() - startWaitStart) < 3.0)
                     Utility.Wait(0.1)
                 endWhile
-                Info("SceneManager: " + nextScene + " after waiting " + ((Utility.GetCurrentRealTime() - combatWaitStart) as int) + "s for the fight: started " + (sceneObject.IsPlaying() || __lastStartedScene == nextScene))
+                Info("SceneManager: " + nextScene + " after waiting " + combatWaited + "s for the fight: started " + (sceneObject.IsPlaying() || __lastStartedScene == nextScene))
             elseif (waitedForCombat)
-                Info("SceneManager: " + nextScene + " gave up after " + ((Utility.GetCurrentRealTime() - combatWaitStart) as int) + "s, the fight is still on")
+                Info("SceneManager: " + nextScene + " gave up after " + combatWaited + "s, the fight is still on")
             endif
 
             ; Refused with nobody fighting: seen right after a pending arrest resumed, the guard just out of his fight
