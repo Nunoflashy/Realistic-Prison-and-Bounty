@@ -13045,17 +13045,15 @@ endFunction
     Green = imprisoned.
 /;
 bool function __Scenario_SpawnFreezablePrisoner(string asTest)
-    ActorBase freezableBase = Game.GetFormFromFile(0x0002C062, "RealisticPrisonAndBounty.esp") as ActorBase
-    if (!assert_true(freezableBase != none, asTest + ": no RPB_TestFreezableGuard in the plugin"))
-        return false
-    endif
     Actor guard = __ScenarioRealGuard()
     if (!guard)
         return false
     endif
     __scenarioRealGuard = none ; kept as he is (no teardown resets him)
-    Actor npc = Game.GetPlayer().PlaceAtMe(freezableBase, 1, abForcePersist = true) as Actor
-    npc.MoveTo(guard, afXOffset = 150.0, abMatchRotation = false)
+    Actor npc = __SpawnFreezablePrisonerNPC(asTest, guard)
+    if (!assert_true(npc != none, asTest + ": couldn't spawn the freezable NPC (plugin patch 010 in?)"))
+        return false
+    endif
     RPB_API.GetArrest().ArrestActor(guard, npc, RPB_API.GetArrest().ARREST_TYPE_TELEPORT_TO_CELL)
     float start = Utility.GetCurrentRealTime()
     while (!RPB_Utility.IsActorImprisoned(npc) && (Utility.GetCurrentRealTime() - start) < 60.0)
@@ -13064,6 +13062,25 @@ bool function __Scenario_SpawnFreezablePrisoner(string asTest)
     bool imprisoned = RPB_Utility.IsActorImprisoned(npc)
     log(asTest + ": " + npc + " imprisoned " + imprisoned + " (" + __Ms(Utility.GetCurrentRealTime() - start) + "ms), in " + npc.GetParentCell() + "; the prisoner freeze key freezes or releases him")
     return assert_true(imprisoned, asTest + ": " + npc + " never imprisoned")
+endFunction
+
+; RPB_TestFreezablePrisoner (plugin patch 010: a freezable bandit, not a guard) by the player, or by @akNear when given: a
+; Haafingar bounty, and not hostile to the guards around (they attacked a bandit before the arrest, as in __ScenarioArrestee)
+Actor function __SpawnFreezablePrisonerNPC(string asTest, Actor akNear)
+    ActorBase freezableBase = Game.GetFormFromFile(0x0002C06B, "RealisticPrisonAndBounty.esp") as ActorBase
+    if (!freezableBase)
+        log(asTest + ": no RPB_TestFreezablePrisoner in the plugin (patch 010)")
+        return none
+    endif
+    Actor npc = Game.GetPlayer().PlaceAtMe(freezableBase, 1, abForcePersist = true) as Actor
+    if (akNear)
+        npc.MoveTo(akNear, afXOffset = 150.0, abMatchRotation = false)
+    endif
+    npc.EnableAI(true)
+    RPB_Prison haafingar = (RPB_API.GetPrisonManager()).GetPrison("Haafingar")
+    RPB_ActorVars.SetCrimeGold(haafingar.PrisonFaction, npc, 2000)
+    RPB_Utility.NeutralizeHostileActor(npc)
+    return npc
 endFunction
 
 ;/
@@ -14683,10 +14700,9 @@ bool function __RunStatelessTest(string asTest)
         RPB_Utility.SetFreeWalkDisabledForTest(false)
         __TeardownScenario()
     elseif (asTest == "Test_SpawnFreezableArrestee")
-        ActorBase freezableArresteeBase = Game.GetFormFromFile(0x0002C062, "RealisticPrisonAndBounty.esp") as ActorBase
-        Actor freezableArrestee = Game.GetPlayer().PlaceAtMe(freezableArresteeBase, 1, abForcePersist = true) as Actor
-        log("181: spawned " + freezableArrestee + " (not imprisoned): arrest him (F4), then the prisoner freeze key freezes or releases him")
-        display_result(assert_true(freezableArrestee != none, "181: couldn't spawn the freezable NPC"))
+        Actor freezableArrestee = __SpawnFreezablePrisonerNPC("181", none)
+        log("181: spawned " + freezableArrestee + " (not imprisoned, a Haafingar bounty): arrest him (F4), then the prisoner freeze key freezes or releases him")
+        display_result(assert_true(freezableArrestee != none, "181: couldn't spawn the freezable NPC (plugin patch 010 in?)"))
     elseif (asTest == "Test_SpawnFreezablePrisoner")
         display_result(__Scenario_SpawnFreezablePrisoner("180"))
     elseif (asTest == "Test_NpcEscortCancelControl")
