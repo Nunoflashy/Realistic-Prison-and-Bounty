@@ -8,6 +8,9 @@ Actor akSpeaker = akSpeakerRef as Actor
 ;BEGIN CODE
 float rpbStartedAt = RPB_Utility.CrimeLineStamp() ; the load this line began in: a replay after a load is dropped
 RPB_Utility.ProbeSpeaker(akSpeaker) ; before any call into him: a frozen speaker gets found, then silenced
+if (RPB_Utility.IsFrozenGuard(akSpeaker)) ; already marked frozen: a call into him below hangs (a killed frozen clone kept talking, 2026-10-05)
+    return
+endif
 ; take stolen goods, but don't send to jail
 ; akSpeaker.GetCrimeFaction().PlayerPayCrimeGold(True, False)
 RPB_Utility.SendTopicInfoEvent("RPB_TopicInfoEnd", "Good enough. I'll just confiscate any stolen goods you're carrying, then you're free to go.", 11, akSpeaker, rpbStartedAt)

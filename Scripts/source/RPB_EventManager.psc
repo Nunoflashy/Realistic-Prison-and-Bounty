@@ -1247,8 +1247,13 @@ endEvent
     fallback has to know the real target instead.
 /;
 Actor function __DialogueTargetOf(Actor akSpeaker, string asCaller)
+    if (RPB_Utility.IsFrozenGuard(akSpeaker))
+        return none ; GetDialogueTarget() on him hangs
+    endif
     Actor target = akSpeaker.GetDialogueTarget()
-    if (target && target != akSpeaker)
+    ; A frozen NPC isn't who a crime line is for: a live guard's target read as a killed frozen clone lying next to him, and
+    ; the confrontation went to the clone (2026-10-05, the overnight run)
+    if (target && target != akSpeaker && !RPB_Utility.IsFrozenGuard(target))
         return target
     endif
     if (akSpeaker.GetDistance(Config.Player) <= 1000)

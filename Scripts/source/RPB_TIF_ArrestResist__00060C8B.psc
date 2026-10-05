@@ -8,6 +8,9 @@ Actor akSpeaker = akSpeakerRef as Actor
 ;BEGIN CODE
 float rpbStartedAt = RPB_Utility.CrimeLineStamp() ; the load this line began in: a replay after a load is dropped
 RPB_Utility.ProbeSpeaker(akSpeaker) ; before any call into him: a frozen speaker gets found, then silenced
+if (RPB_Utility.IsFrozenGuard(akSpeaker)) ; already marked frozen: a call into him below hangs (a killed frozen clone kept talking, 2026-10-05)
+    return
+endif
 RPB_Utility.SendTopicInfoEvent("RPB_TopicInfoStart", "Then let me speed your passage to Sovngarde!", 15, akSpeaker, rpbStartedAt)
 ;END CODE
 EndFunction
