@@ -13170,7 +13170,7 @@ function ToggleManualFreeze()
         Actor released = __manualFreezeGuard
         float holdTime = __ReleaseHold()
         bool wasMarked = RPB_Utility.IsFrozenGuard(released)
-        RPB_Utility.ClearFrozenGuards()
+        RPB_Utility.ClearFrozenActor(released) ; him only: another one may still be frozen
         __manualFreezeGuard = none
         log("freeze key: released " + released + " after " + __Ms(holdTime) + "ms (RPB had marked him frozen: " + wasMarked + ")")
         if (IsDebuggingEnabled())
@@ -13191,6 +13191,7 @@ function ToggleManualFreeze()
         Debug.Notification("RPB test: no freezable guard nearby (test 161 spawns one)")
         return
     endif
+    RPB_Utility.RememberActorName(target) ; while he answers: the Frozen NPCs page names him (a clone has no RPB role yet)
     self.RegisterForModEvent("RPB_TestHoldLock", "OnTestHoldLock")
     if (!__StartHold(target))
         Debug.Notification("RPB test: the freeze didn't start")
@@ -13270,7 +13271,7 @@ function ToggleManualFreezePrisoner()
         endWhile
         float holdTime = JDB.solveFlt(".rpbTest.prisonerHoldEnd") - JDB.solveFlt(".rpbTest.prisonerHoldStart")
         bool wasMarked = RPB_Utility.IsFrozenGuard(released)
-        RPB_Utility.ClearFrozenGuards()
+        RPB_Utility.ClearFrozenActor(released) ; him only: ClearFrozenGuards called into a guard still frozen and hung
         __manualFreezePrisoner = none
         log("prisoner freeze key: released " + released + " after " + (holdTime as int) + "s (RPB had marked him frozen: " + wasMarked + ")")
         Debug.Notification("RPB dev: prisoner released (" + (holdTime as int) + "s frozen)")
@@ -13302,6 +13303,7 @@ function ToggleManualFreezePrisoner()
         log("prisoner freeze key: none taken; console " + Game.GetCurrentConsoleRef() + ", crosshair " + Game.GetCurrentCrosshairRef() + "; freezable actors in high process: " + string_if(found == "", "none", found) + " (" + seen.Length + " actors in high process)")
         return
     endif
+    RPB_Utility.RememberActorName(target) ; while she answers: the Frozen NPCs page names her
     __prisonerHoldRelease = new bool[1]
     JDB.solveFltSetter(".rpbTest.prisonerHoldStart", 0.0, true)
     JDB.solveFltSetter(".rpbTest.prisonerHoldEnd", 0.0, true)

@@ -14,10 +14,15 @@ function Render(RPB_MCM_02 mcm, Actor akFrozen) global
     int report = FrozenReport(akFrozen)
     mcm.SetCursorFillMode(mcm.TOP_TO_BOTTOM)
 
+    ; "NPC" and "Frozen as", not "Name" and "Role": the menu showed those two lowercased (translated, it seems)
+    string name = ActorNameNoCall(akFrozen)
+    if (name == "")
+        name = "(not known)"
+    endif
     mcm.AddOptionCategory("Frozen NPC")
-    mcm.AddOptionText("Name", ActorNameNoCall(akFrozen), defaultFlags = mcm.OPTION_DISABLED)
-    mcm.AddOptionText("Role", JMap.getStr(report, "role"), defaultFlags = mcm.OPTION_DISABLED)
-    mcm.AddOptionText("Form ID", akFrozen as string, defaultFlags = mcm.OPTION_DISABLED)
+    mcm.AddOptionText("NPC", name, defaultFlags = mcm.OPTION_DISABLED)
+    mcm.AddOptionText("Frozen as", JMap.getStr(report, "role"), defaultFlags = mcm.OPTION_DISABLED)
+    mcm.AddOptionText("Form ID", FormIdNoCall(akFrozen), defaultFlags = mcm.OPTION_DISABLED)
     string prison = JMap.getStr(report, "prison")
     if (prison != "")
         mcm.AddOptionText("Prisoner in", prison, defaultFlags = mcm.OPTION_DISABLED)
@@ -26,8 +31,8 @@ function Render(RPB_MCM_02 mcm, Actor akFrozen) global
 
     mcm.AddOptionCategory("When and where")
     mcm.AddOptionText("Found", JMap.getStr(report, "foundAt"), defaultFlags = mcm.OPTION_DISABLED)
+    mcm.AddOptionText("Real time", JMap.getStr(report, "realTime"), defaultFlags = mcm.OPTION_DISABLED)
     mcm.AddOptionText("Doing", JMap.getStr(report, "probedAt"), defaultFlags = mcm.OPTION_DISABLED)
-    mcm.AddOptionText("Found by", JMap.getStr(report, "foundBy"), defaultFlags = mcm.OPTION_DISABLED)
     mcm.AddOptionText("Player was in", JMap.getStr(report, "where"), defaultFlags = mcm.OPTION_DISABLED)
     mcm.AddOptionText("Distance", JMap.getStr(report, "distance"), defaultFlags = mcm.OPTION_DISABLED)
 

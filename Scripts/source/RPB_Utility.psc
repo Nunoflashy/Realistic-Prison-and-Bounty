@@ -26,6 +26,9 @@ scriptname RPB_Utility hidden
     function RememberActorName(Actor akActor) global
     function ForgetActorName(Actor akActor) global
     string function ActorNameNoCall(Actor akActor) global
+    string function FormIdNoCall(Form akForm) global
+    string function ActorLabelNoCall(Actor akActor) global
+    function ClearFrozenActor(Actor akActor) global
     int function FrozenCount() global
     Form[] function FrozenActorsMarked() global
     int function FrozenReport(Actor akActor) global
@@ -961,7 +964,11 @@ function MarkGuardFrozen(Actor akGuard, string asStep) global
     i = 0
     while (i < effects.Length)
         if (effects[i])
-            JArray.addStr(effectNames, effects[i].GetName() + " " + effects[i])
+            string effectName = effects[i].GetName()
+            if (effectName == "")
+                effectName = "Unnamed effect (" + FormIdNoCall(effects[i]) + ")"
+            endif
+            JArray.addStr(effectNames, effectName)
         endif
         i += 1
     endWhile
@@ -1102,6 +1109,45 @@ function ClearFrozenGuards() global
     __ClearFormMapAt(".rpb_root.guardMoves")
 endFunction
 
+;/
+    One NPC's frozen state off, for the dev freeze keys' release (he answers again): the marker and the faint off him
+    alone, his entries out of every map. ClearFrozenGuards does it for everyone, which is right on a load (nobody is
+    frozen any more) but a call into each: releasing the frozen prisoner hung on a guard still frozen (2026-10-05).
+/;
+function ClearFrozenActor(Actor akActor) global
+    if (!akActor)
+        return
+    endif
+    Spell marker = FrozenMarkerSpell()
+    if (marker)
+        akActor.DispelSpell(marker)
+    endif
+    Spell faint = Game.GetFormFromFile(0x0002C069, "RealisticPrisonAndBounty.esp") as Spell
+    if (faint)
+        akActor.DispelSpell(faint)
+    endif
+    FormList frozenActors = FrozenActorsList()
+    if (frozenActors)
+        frozenActors.RemoveAddedForm(akActor)
+    endif
+    __RemoveKeyAt(".rpb_root.frozenMarked", akActor)
+    __RemoveKeyAt(__FrozenGuardsPath(), akActor)
+    __RemoveKeyAt(".rpb_root.frozenGuardSteps", akActor)
+    __RemoveKeyAt(".rpb_root.frozenReports", akActor)
+    __RemoveKeyAt(".rpb_root.guardOpenProbes", akActor)
+    __RemoveKeyAt(".rpb_root.frozenActorRoles", akActor)
+    __RemoveKeyAt(".rpb_root.guardPendingProbes", akActor)
+    __RemoveKeyAt(".rpb_root.pendingCrimeLines", akActor)
+    __RemoveKeyAt(".rpb_root.guardMoves", akActor)
+endFunction
+
+function __RemoveKeyAt(string asPath, Form akKey) global
+    int map = JDB.solveObj(asPath)
+    if (map)
+        JFormMap.removeKey(map, akKey)
+    endif
+endFunction
+
 ; RPB_FrozenMarkerSpell: the hidden effect a frozen NPC gets, for the crime dialogue's conditions
 Spell function FrozenMarkerSpell() global
     return Game.GetFormFromFile(0x0002C066, "RealisticPrisonAndBounty.esp") as Spell
@@ -1141,13 +1187,28 @@ function ForgetActorName(Actor akActor) global
     JFormMap.removeKey(names, akActor)
 endFunction
 
-; His stored name, or his FormID when none was stored: no call into him
+; His stored name, or "" when none was stored: no call into him
 string function ActorNameNoCall(Actor akActor) global
-    string name = JFormMap.getStr(JDB.solveObj(".rpb_root.actorNames"), akActor)
-    if (name == "")
-        return akActor as string
+    return JFormMap.getStr(JDB.solveObj(".rpb_root.actorNames"), akActor)
+endFunction
+
+; The 8 hex digits of @akForm's FormID, read from its printed form ("[Actor < (FF000D8C)>]"): no call into it
+string function FormIdNoCall(Form akForm) global
+    string printed = akForm as string
+    int open = StringUtil.Find(printed, "(")
+    if (open < 0)
+        return printed
     endif
-    return name
+    return StringUtil.Substring(printed, open + 1, 8)
+endFunction
+
+; His stored name with his FormID ("Bandit Marauder FF000D8C"), or the FormID alone
+string function ActorLabelNoCall(Actor akActor) global
+    string name = ActorNameNoCall(akActor)
+    if (name == "")
+        return FormIdNoCall(akActor)
+    endif
+    return name + " " + FormIdNoCall(akActor)
 endFunction
 
 ; The frozen NPCs RPB marked this session (the Frozen NPCs page shows while there's one)
@@ -1188,8 +1249,21 @@ int function __NewFrozenReport(Actor akActor, string asFoundBy, string asProbedA
     endif
     JMap.setStr(report, "role", role)
     JMap.setStr(report, "foundBy", asFoundBy)
-    JMap.setStr(report, "probedAt", asProbedAt)
-    JMap.setStr(report, "foundAt", GetFormattedDate(GetCurrentDay(), GetCurrentMonth(), GetCurrentYear(), GetCurrentHour(), GetCurrentMinute(), abShowDayOfWeek = false) + " (real time " + GetDateTimeNow() + ")")
+    ; The step without the probe's delay ("prisoner freeze key +5S" -> "prisoner freeze key")
+    string doing = asProbedAt
+    int delayAt = StringUtil.Find(doing, " +")
+    if (delayAt > 0)
+        doing = StringUtil.Substring(doing, 0, delayAt)
+    endif
+    JMap.setStr(report, "probedAt", doing)
+    ; Short enough for an MCM row: the game time and day, and the real time of day apart
+    JMap.setStr(report, "foundAt", GetFormattedDate(GetCurrentDay(), GetCurrentMonth(), GetCurrentYear(), GetCurrentHour(), GetCurrentMinute(), abShowDayOfWeek = false, abShowYear = false))
+    int[] systemTime = PO3_SKSEFunctions.GetSystemTime()
+    string minutes = systemTime[5] as string
+    if (systemTime[5] < 10)
+        minutes = "0" + minutes
+    endif
+    JMap.setStr(report, "realTime", systemTime[4] + ":" + minutes)
     ; Where the player was, and how far he was: calls on the player, him only as an argument
     Actor player = Game.GetPlayer()
     string where = ""
@@ -1198,7 +1272,7 @@ int function __NewFrozenReport(Actor akActor, string asFoundBy, string asProbedA
         where = playerLocation.GetName()
     endif
     Cell playerCell = player.GetParentCell()
-    if (playerCell)
+    if (playerCell && playerCell.GetName() != "" && playerCell.GetName() != where)
         where += " (" + playerCell.GetName() + ")"
     endif
     JMap.setStr(report, "where", where)

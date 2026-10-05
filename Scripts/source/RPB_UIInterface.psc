@@ -306,7 +306,13 @@ Actor function ShowFrozenList(string asListTitle = "Select Frozen NPC")
     int i = 0
     while (i < frozen.Length)
         Actor frozenActor = frozen[i] as Actor
-        lines[i + 1] = RPB_Utility.ActorNameNoCall(frozenActor) + " (" + JMap.getStr(RPB_Utility.FrozenReport(frozenActor), "role") + ") - " + frozenActor
+        string role = " (" + JMap.getStr(RPB_Utility.FrozenReport(frozenActor), "role") + ")"
+        string name = RPB_Utility.ActorNameNoCall(frozenActor)
+        if (name == "")
+            lines[i + 1] = RPB_Utility.FormIdNoCall(frozenActor) + role
+        else
+            lines[i + 1] = name + role + " - " + RPB_Utility.FormIdNoCall(frozenActor)
+        endif
         i += 1
     endWhile
     int line = self.ShowList(asListTitle, lines, 0, 0)

@@ -1065,6 +1065,10 @@ event OnEffectStart(Actor akTarget, Actor akCaster)
 
     ; Debug("("+ self as string +") RPB_ActorBase::OnEffectStart", this + ": IsInitialized: " + self.IsInitialized)
 
+    ; His name for the Frozen NPCs page, on a resumed role too (a load, his cell loading again): a role started before this
+    ; was stored only once he took another
+    RPB_Utility.RememberActorName(akTarget)
+
     if (self.IsInitialized)
         OnRestore()
         return
@@ -1075,7 +1079,6 @@ event OnEffectStart(Actor akTarget, Actor akCaster)
     __pathPrefix = ""
     __cachedName = ""
     __isEffectActive = true
-    RPB_Utility.RememberActorName(akTarget) ; readable without a call into him later (the Frozen NPCs page, the logs)
     RPB_Utility.Crumb(akTarget, "OnEffectStart " + (self as string))
 
     ; Assigns the actor for this script, differentiating between Player and NPC to avoid retrieving properties, instead caching it in a local variable to this script
