@@ -70,6 +70,7 @@ scriptname RPB_Arrest extends Quest
     bool function GiveBackSetAsideBounty(Actor akActor, string asWhy) global
     function RequestSubmissionTakeover(Actor akFrozenGuard) global
     function TakeOverSubmission(Actor akFrozenGuard)
+    function TakeOverStalledEscort(Actor akActor, string asReason)
     function ArrestActorForFaction(Faction akCrimeFaction, Actor akArrestee, string asArrestType)
     function ArrestActors(Actor akArrester, Actor[] akArrestees, string asArrestType, bool abEnsureAllArrested = true, float afWaitTimeBetweenArrests = 0.3)
     function SetAsEluding(Actor akEludedGuard, Actor akEluder, string asEludeType)
@@ -942,6 +943,32 @@ function __HandOverEscort(Actor akActor, Actor akFrozenGuard, RPB_Arrestee apArr
     RPB_Utility.FaintFrozenGuard(akFrozenGuard, abAlone = false)
     apArrestee.HandOverEscort(akFrozenGuard, guard)
     RPB_Utility.ProbeGuardAfterBurst(guard, "took over an escort")
+endFunction
+
+;/
+    @akActor's escort to jail stalled (~20s without moving: RPB_Arrestee.__EscortStalled). Another guard of the hold takes it
+    over, by the takeover rule (noticed within 15m, or seen within 40m), as for a frozen escort guard, and the escort
+    starts again with him; the old guard is released (his Captor off, his package lock freed). With none around, the
+    fallback to the prison without the Scene, as before. On RPB_StalledEscortTakeover's own stack (the search calls into
+    the guards around).
+/;
+function TakeOverStalledEscort(Actor akActor, string asReason)
+    RPB_Arrestee arrestee = Arrestees.AtKey(akActor)
+    if (!arrestee)
+        return
+    endif
+    Actor oldGuard = arrestee.GetCaptorActor()
+    Actor guard = RPB_Utility.FindTakeoverGuard(akActor, arrestee.GetFaction(), oldGuard, TAKEOVER_ARREST_DISTANCE, TAKEOVER_APPROACH_DISTANCE)
+    arrestee.SetBool("Stall Takeover Pending", false)
+    if (!guard || arrestee.GetBool("Escort Arrived"))
+        RPB_Utility.LogInfo(akActor + "'s escort stalled (" + asReason + "): " + string_if(guard == none, "no guard of the hold around to take it over", "already at the prison") + ", the fallback", "Arrest::TakeOverStalledEscort")
+        arrestee.__FallBackToPrison(asReason)
+        return
+    endif
+    arrestee.SetInt("Stall Takeovers", arrestee.GetInt("Stall Takeovers") + 1)
+    RPB_Utility.LogInfo(akActor + "'s escort stalled (" + asReason + "): " + guard + " (" + ((akActor.GetDistance(guard) * 0.01428) as int) + "m) takes it over from " + oldGuard + " (takeover " + arrestee.GetInt("Stall Takeovers") + "/" + arrestee.STALL_TAKEOVERS_MAX + ")", "Arrest::TakeOverStalledEscort")
+    arrestee.HandOverEscort(oldGuard, guard, "the escort stalled", abReleaseOld = !RPB_Utility.IsFrozenGuard(oldGuard))
+    RPB_Utility.ProbeGuardAfterBurst(guard, "took over a stalled escort")
 endFunction
 
 ; A takeover's approach (TakeOverSubmission), not a surrender the player chose: leaving is eluding, its end arrests with

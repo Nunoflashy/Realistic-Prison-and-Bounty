@@ -121,6 +121,7 @@ function RegisterEvents()
     RegisterForModEvent("RPB_SubmissionTakeover", "OnSubmissionTakeover")
     RegisterForModEvent("RPB_FaintFrozenGuard", "OnFaintFrozenGuard")
     RegisterForModEvent("RPB_MoveGuard", "OnMoveGuard")
+    RegisterForModEvent("RPB_StalledEscortTakeover", "OnStalledEscortTakeover")
 
     ; The cuffed restrictions as the cuffs are now (animation events don't survive a load either)
     RPB_Utility.SyncCuffedRestrictions()
@@ -198,6 +199,11 @@ event OnMoveGuard(Form akGuard, Form akTarget, float afDelay)
     endif
     (akGuard as Actor).MoveTo(akTarget as ObjectReference)
     RPB_Utility.__GuardMoved(akGuard as Actor)
+endEvent
+
+; RPB_Arrestee.__EscortStalled: another guard of the hold for a stalled escort, or its fallback
+event OnStalledEscortTakeover(Form akArrestee, string asReason)
+    Arrest.TakeOverStalledEscort(akArrestee as Actor, asReason)
 endEvent
 
 event OnSubmissionTakeover(Form akFrozenGuard)

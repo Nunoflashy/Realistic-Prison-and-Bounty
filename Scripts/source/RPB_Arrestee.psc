@@ -72,7 +72,7 @@ Scriptname RPB_Arrestee extends RPB_ActorBase
     function SetStat(string asStatName, int aiValue)
     function PauseEscortForFight(Actor akHostile)
     function HandOverInPrison(Actor akDeadGuard)
-    function HandOverEscort(Actor akFrozenGuard, Actor akNewGuard)
+    function HandOverEscort(Actor akFrozenGuard, Actor akNewGuard, string asReason = "the escort guard froze", bool abReleaseOld = false)
     function EndEscortWatch()
     function Destroy()
     string function GetScriptVarCategory(string asVarCategory = "Actor")
@@ -1433,11 +1433,18 @@ endEvent
 ;/
     An escort where nothing moves: its Scene never took hold (seen: the guard back on his own package after a resumed
     arrest, both standing there for good). Nobody drifts apart, so the leash never pulls. Counted on these 5s ticks from
-    my position; 4 still ticks in a row (~20s) fall back to the prison without the Scene. Not while pending, in a fight,
-    during another Scene than an escort to jail (a strip or frisk at the prison keeps me still on purpose), or while my
-    escort is still queued behind other Scenes. True if it fell back.
+    my position; 4 still ticks in a row (~20s): another guard of the hold takes the escort over (RPB_Arrest.
+    TakeOverStalledEscort, up to STALL_TAKEOVERS_MAX per escort), and only with none, or after that many, the fallback to
+    the prison without the Scene. Not while pending, in a fight, during another Scene than an escort to jail (a strip or
+    frisk at the prison keeps me still on purpose), or while my escort is still queued behind other Scenes. True if it
+    fell back.
 /;
+int property STALL_TAKEOVERS_MAX = 2 autoreadonly
+
 bool function __EscortStalled()
+    if (self.GetBool("Stall Takeover Pending"))
+        return false ; a guard is being looked for (RPB_Arrest.TakeOverStalledEscort): its own fallback follows
+    endif
     float x = this.GetPositionX()
     float y = this.GetPositionY()
     ; The first tick only records where I am: measured from a position left over from before this escort (an earlier
@@ -1480,7 +1487,22 @@ bool function __EscortStalled()
 
     self.SetInt("Stall Ticks", 0)
     self.SetBool("Stall Nudged", false)
-    return self.__FallBackToPrison("the escort isn't moving (" + string_if(current == "", "no Scene playing", current) + ")")
+    string reason = "the escort isn't moving (" + string_if(current == "", "no Scene playing", current) + ")"
+    ; Another guard of the hold first (the mod author, 2026-10-05): the teleport only with none around, or once
+    ; STALL_TAKEOVERS_MAX guards in a row stalled too. The search calls into the guards around (one may be frozen): on its
+    ; own stack
+    if (self.GetInt("Stall Takeovers") < STALL_TAKEOVERS_MAX)
+        self.SetBool("Stall Takeover Pending", true)
+        int handle = ModEvent.Create("RPB_StalledEscortTakeover")
+        if (handle)
+            ModEvent.PushForm(handle, this)
+            ModEvent.PushString(handle, reason)
+            ModEvent.Send(handle)
+            return false
+        endif
+        self.SetBool("Stall Takeover Pending", false)
+    endif
+    return self.__FallBackToPrison(reason)
 endFunction
 
 ;/
@@ -1676,12 +1698,13 @@ function HandOverInPrison(Actor akDeadGuard)
 endFunction
 
 ;/
-    My escort guard froze on the way to the prison (RPB_Arrest.__HandOverEscort): @akNewGuard becomes my Captor and the
-    escort to jail starts again with him. Nothing is called on @akFrozenGuard here: his Scene is stopped from my side, his
-    package lock is freed on its own stack, and his Captor stays on him (ReleaseCaptorOf leaves a frozen guard alone)
-    until the next load.
+    My escort guard froze on the way to the prison (RPB_Arrest.__HandOverEscort), or my escort stalled (RPB_Arrest.
+    TakeOverStalledEscort): @akNewGuard becomes my Captor and the escort to jail starts again with him. Nothing is called
+    on @akFrozenGuard here: his Scene is stopped from my side, his package lock is freed on its own stack, and his Captor
+    stays on him (ReleaseCaptorOf leaves a frozen guard alone) until the next load. @abReleaseOld: a guard who answers
+    (a stall) has his Captor taken off too, on its own stack, once the new one is mine.
 /;
-function HandOverEscort(Actor akFrozenGuard, Actor akNewGuard)
+function HandOverEscort(Actor akFrozenGuard, Actor akNewGuard, string asReason = "the escort guard froze", bool abReleaseOld = false)
     RPB_Prison prison = API.PrisonManager.FindPrisonByPrisoner(this)
     RPB_Prisoner prisoner = none
     if (prison)
@@ -1691,7 +1714,7 @@ function HandOverEscort(Actor akFrozenGuard, Actor akNewGuard)
         return
     endif
 
-    SceneManager.EndSceneWithActor(this, "the escort guard froze")
+    SceneManager.EndSceneWithActor(this, asReason)
     prisoner.StopEscortAssist()
     int handle = ModEvent.Create("RPB_FreeGuard")
     if (handle)
@@ -1709,7 +1732,21 @@ function HandOverEscort(Actor akFrozenGuard, Actor akNewGuard)
     self.AssignCaptor(newCaptor)
     __captor = newCaptor
     self.SetForm("Arrest Captor", akNewGuard, "Jail")
-    Info("Escort of " + Name + " " + this + " handed over to " + akNewGuard + ": " + akFrozenGuard + " froze")
+    Info("Escort of " + Name + " " + this + " handed over to " + akNewGuard + " from " + akFrozenGuard + ": " + asReason)
+    if (abReleaseOld)
+        handle = ModEvent.Create("RPB_ReleaseCaptor")
+        if (handle)
+            ModEvent.PushForm(handle, akFrozenGuard)
+            ModEvent.PushForm(handle, this)
+            ModEvent.PushBool(handle, true)
+            ModEvent.Send(handle)
+        endif
+    endif
+    ; The stall watch starts over with him
+    self.SetBool("Stall Primed", false)
+    self.SetInt("Stall Ticks", 0)
+    self.SetBool("Stall Nudged", false)
+    self.SetBool("Stall Escort Moved", false)
     RetainAI(self.IsPlayer()) ; the escort walks me
     self.__ResumeEscort(false)
 endFunction

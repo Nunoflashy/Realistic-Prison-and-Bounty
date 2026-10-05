@@ -261,6 +261,8 @@ function SetTests()
     self.AddTest("173 - Experiment: Cuffed Movement Limit A, Encumbrance (30s: try to run, sprint and jump)", "Test_CuffedLimitEncumbrance", abChainable = false)
     self.AddTest("174 - Experiment: Cuffed Movement Limit B, Settings (30s: try to jump)", "Test_CuffedLimitSettings", abChainable = false)
     self.AddTest("175 - Experiment: the Walk Handed Back at the Escort's Start (to jail and to the cell; does the guard still set off?) (PLAYER)", "Test_EarlyHandback", abChainable = false)
+    self.AddTest("176 - A Stalled Escort to Jail Taken Over by Another Guard of the Hold (the guard held still; PLAYER)", "Test_StalledEscortTakeover", abChainable = false)
+    self.AddTest("177 - A Stalled Escort to Jail: Every Guard Held Still, 2 Takeovers, Then the Fallback (PLAYER)", "Test_StalledEscortTakeoverLimit", abChainable = false)
     self.AddTest("041 - ActiveMagicEffectContainer: Stuck Lock Self-Heals", "Test_ActiveMagicEffectContainer_StuckLockSelfHeals")
     self.AddTest("042 - ThreadLock: JAtomic Primitive Semantics and Registry", "Test_ThreadLock_PrimitiveSemantics")
     ; Not chainable: fires concurrent worker threads
@@ -12433,6 +12435,76 @@ bool function __Scenario_FrozenEscortFallback(string asTest)
     return assert_true(fellBack && marked && waitOk && handedOver, asTest + ": fallback " + fellBack + ", marked frozen " + marked + ", the wait for a guard (if nobody saw them) " + waitOk + ", imprisoned by another guard " + handedOver)
 endFunction
 
+; 176: a stalled escort to jail (RPB_Arrestee.__EscortStalled -> RPB_Arrest.TakeOverStalledEscort): the escort guard held
+; still (SetDontMove) once the escort is walking, the player led beside him, so nothing moves. After ~20s another guard of
+; the hold should take the escort over (if one is around: Solitude's streets), else the fallback teleports the player to
+; the prison. Green = one of the two (logged which) and the imprisonment after it. 177 (@abHoldEvery): every guard who
+; takes over is held still too, so after 2 takeovers the fallback must come. Green = 2 takeovers, then the fallback
+bool function __Scenario_StalledEscortTakeover(string asTest, bool abHoldEvery = false)
+    RPB_Prison prison = (RPB_API.GetPrisonManager()).GetPrison("Haafingar")
+    Actor guard = __ScenarioRealGuard()
+    if (!guard)
+        return false
+    endif
+    Actor player = __ScenarioArrestee(true, guard)
+    __ScenarioArrest(guard, player, asTest)
+    if (!__ScenarioWaitEscortToJail(player, 90.0)) ; 40s ran out once with the VM stalled ~20s mid confrontation
+        return assert_true(false, asTest + ": the escort to jail never started")
+    endif
+    Utility.Wait(6.0) ; under way
+    RPB_Arrestee arrestState = (RPB_API.GetArrest()).Arrestees.AtKey(player)
+    if (!arrestState)
+        return assert_true(false, asTest + ": no arrest state")
+    endif
+    Actor escort = arrestState.GetCaptorActor()
+    escort.SetDontMove(true)
+    log(asTest + ": " + escort + " held still on the way to jail; waiting for the stall (~20s)")
+    float held = Utility.GetCurrentRealTime()
+    Actor captorNow = escort
+    Actor heldGuard = escort
+    Actor[] heldGuards = new Actor[4]
+    heldGuards[0] = escort
+    int takeovers = 0
+    bool fellBack = false
+    while (!fellBack && (takeovers == 0 || abHoldEvery) && (Utility.GetCurrentRealTime() - held) < 150.0)
+        Utility.Wait(0.5)
+        arrestState = (RPB_API.GetArrest()).Arrestees.AtKey(player)
+        if (arrestState)
+            captorNow = arrestState.GetCaptorActor()
+            fellBack = arrestState.GetBool("Escort Arrived")
+            if (captorNow && captorNow != heldGuard && !fellBack)
+                takeovers += 1
+                log(asTest + ": takeover " + takeovers + " by " + captorNow + " after " + __Ms(Utility.GetCurrentRealTime() - held) + "ms")
+                heldGuard = captorNow
+                if (abHoldEvery && takeovers < 4)
+                    captorNow.SetDontMove(true)
+                    heldGuards[takeovers] = captorNow
+                endif
+            endif
+        endif
+    endWhile
+    int i = 0
+    while (i < heldGuards.Length)
+        if (heldGuards[i])
+            heldGuards[i].SetDontMove(false)
+            heldGuards[i].EvaluatePackage()
+        endif
+        i += 1
+    endWhile
+    bool tookOver = takeovers > 0
+    log(asTest + ": after " + __Ms(Utility.GetCurrentRealTime() - held) + "ms: " + takeovers + " takeover(s), fell back to the prison " + fellBack)
+    float waitStart = Utility.GetCurrentRealTime()
+    while (!RPB_Utility.IsActorImprisoned(player) && (Utility.GetCurrentRealTime() - waitStart) < 240.0)
+        Utility.Wait(1.0)
+    endWhile
+    bool imprisoned = RPB_Utility.IsActorImprisoned(player)
+    log(asTest + ": imprisoned " + imprisoned + " after " + __Ms(Utility.GetCurrentRealTime() - waitStart) + "ms")
+    if (abHoldEvery)
+        return assert_true(takeovers == 2 && fellBack && imprisoned, asTest + ": " + takeovers + " takeover(s) (2 expected), fell back " + fellBack + ", imprisoned " + imprisoned)
+    endif
+    return assert_true((tookOver || fellBack) && imprisoned, asTest + ": taken over " + tookOver + ", fell back " + fellBack + ", imprisoned " + imprisoned)
+endFunction
+
 ; 175: the early hand-back (RPB_Utility.SetEarlyHandbackForTest): an arrest by a real guard through both escorts, each
 ; watched from its assist's start: when the player got their walk back, and whether the guard set off (walked) within
 ; 30s of it, or stood still as when the walk was handed back too early before. Green = in both escorts the walk came
@@ -14252,7 +14324,7 @@ endFunction
 string __statelessTest = ""
 
 bool function __RunStatelessTest(string asTest)
-    if (asTest != "Test_ArrestWaitsWhileGuardFights_NoPackage" && asTest != "Test_CellDoorsDiagnostic" && asTest != "Test_LongAbsenceSetup" && asTest != "Test_LongAbsenceAdvance" && asTest != "Test_LongAbsenceVerify" && asTest != "Test_FallbackEscortToCellStopped_Player" && asTest != "Test_FallbackEscortToCellStopped_CloneGuard" && asTest != "Test_FightDuringEscort_NPC" && asTest != "Test_FightDuringEscort_Player" && asTest != "Test_GuardDiesInPrison_Player" && asTest != "Test_EscortToCellStopped_NoPackageLock" && StringUtil.Find(asTest, "Test_Surrender_") != 0 && asTest != "Test_FrozenGuardSkipped" && asTest != "Test_GuardDiesInPrison_NobodySees" && asTest != "Test_Escort_FreeWalk" && asTest != "Test_ToggleEscortToCell04" && asTest != "Test_CaptorFinishCycles_Calls" && asTest != "Test_CaptorFinishCycles_NoCalls" && asTest != "Test_CaptorFinishDetach_Calls" && asTest != "Test_CaptorFinishDetach_NoCalls" && asTest != "Test_Escort_FreeWalk_Control" && asTest != "Test_ActorKeys" && asTest != "Test_FrozenGuardCalls" && asTest != "Test_SimulatedFreezeCalls" && asTest != "Test_SimulatedFreezeAtCancel" && asTest != "Test_SpawnFreezableGuard" && asTest != "Test_AliasPackageControl" && asTest != "Test_FreezableEscort_Player" && asTest != "Test_FreezableEscort_NPC" && asTest != "Test_LightHold" && asTest != "Test_KillFrozenGuard" && asTest != "Test_LifetimeBountyStat" && asTest != "Test_FaintFrozenGuard" && asTest != "Test_FaintFrozenGuardShort" && asTest != "Test_FrozenEscortFallback" && asTest != "Test_HideFrozenGuard" && asTest != "Test_EscortToCellGuardHeld" && asTest != "Test_CuffedLimitEncumbrance" && asTest != "Test_CuffedLimitSettings" && asTest != "Test_EarlyHandback")
+    if (asTest != "Test_ArrestWaitsWhileGuardFights_NoPackage" && asTest != "Test_CellDoorsDiagnostic" && asTest != "Test_LongAbsenceSetup" && asTest != "Test_LongAbsenceAdvance" && asTest != "Test_LongAbsenceVerify" && asTest != "Test_FallbackEscortToCellStopped_Player" && asTest != "Test_FallbackEscortToCellStopped_CloneGuard" && asTest != "Test_FightDuringEscort_NPC" && asTest != "Test_FightDuringEscort_Player" && asTest != "Test_GuardDiesInPrison_Player" && asTest != "Test_EscortToCellStopped_NoPackageLock" && StringUtil.Find(asTest, "Test_Surrender_") != 0 && asTest != "Test_FrozenGuardSkipped" && asTest != "Test_GuardDiesInPrison_NobodySees" && asTest != "Test_Escort_FreeWalk" && asTest != "Test_ToggleEscortToCell04" && asTest != "Test_CaptorFinishCycles_Calls" && asTest != "Test_CaptorFinishCycles_NoCalls" && asTest != "Test_CaptorFinishDetach_Calls" && asTest != "Test_CaptorFinishDetach_NoCalls" && asTest != "Test_Escort_FreeWalk_Control" && asTest != "Test_ActorKeys" && asTest != "Test_FrozenGuardCalls" && asTest != "Test_SimulatedFreezeCalls" && asTest != "Test_SimulatedFreezeAtCancel" && asTest != "Test_SpawnFreezableGuard" && asTest != "Test_AliasPackageControl" && asTest != "Test_FreezableEscort_Player" && asTest != "Test_FreezableEscort_NPC" && asTest != "Test_LightHold" && asTest != "Test_KillFrozenGuard" && asTest != "Test_LifetimeBountyStat" && asTest != "Test_FaintFrozenGuard" && asTest != "Test_FaintFrozenGuardShort" && asTest != "Test_FrozenEscortFallback" && asTest != "Test_HideFrozenGuard" && asTest != "Test_EscortToCellGuardHeld" && asTest != "Test_CuffedLimitEncumbrance" && asTest != "Test_CuffedLimitSettings" && asTest != "Test_EarlyHandback" && asTest != "Test_StalledEscortTakeover" && asTest != "Test_StalledEscortTakeoverLimit")
         return false
     endif
 
@@ -14394,6 +14466,11 @@ bool function __RunStatelessTest(string asTest)
     elseif (asTest == "Test_EscortToCellGuardHeld")
         RPB_Utility.SetFreeWalkDisabledForTest(true) ; led, as in 135: the assist's "near, outside the cell" rule
         display_result(__Scenario_EscortToCellGuardHeld("172"))
+        RPB_Utility.SetFreeWalkDisabledForTest(false)
+        __TeardownScenario()
+    elseif (asTest == "Test_StalledEscortTakeover" || asTest == "Test_StalledEscortTakeoverLimit")
+        RPB_Utility.SetFreeWalkDisabledForTest(true) ; led: the player stands still with the held guard
+        display_result(__Scenario_StalledEscortTakeover(string_if(asTest == "Test_StalledEscortTakeover", "176", "177"), asTest == "Test_StalledEscortTakeoverLimit"))
         RPB_Utility.SetFreeWalkDisabledForTest(false)
         __TeardownScenario()
     elseif (asTest == "Test_EarlyHandback")

@@ -2736,6 +2736,12 @@ function __SetFreeWalk(bool abFree, string asReason)
     __guardWaitTime = 0.0
     __guardWaitWarned = false
     __handbackTicks = 0
+    ; Walking only while they walk on their own to the cell (the mod author: running drops the cuffed pose; out in the hold
+    ; the escort to jail keeps running allowed). Not while led: the slow over-encumbered walk couldn't climb the stairs
+    ; even boosted, and the assist moved them into the cell (2026-10-05). Off in StopEscortAssist too
+    if (__assistToCell)
+        RPB_Utility.LimitCuffedMovement_Encumbrance(abFree)
+    endif
     if (abFree)
         RPB_Utility.HoldPlayerCuffed()
     else
@@ -2803,17 +2809,18 @@ bool function __FollowThroughLoadDoor()
     if (wasLocked)
         loadDoor.Lock(false)
     endif
-    loadDoor.Activate(this, true)
+    loadDoor.Activate(this)
     RPB_Utility.BlockPlayerActivation(RPB_Utility.IsCuffed(this))
     if (__freeWalk)
         RPB_Utility.HoldPlayerCuffed()
     else
         RetainAI(true)
     endif
-    ; Through once I'm on its other side: up to 8s. A fixed 2s judged a slow cell load "refused" (2026-10-04: through at
-    ; 01:07:29, judged at :28), and the fallback below then put me on the door, stuck behind it
+    ; Through once I'm on its other side: up to 3s. A fixed 2s judged a slow cell load "refused" (2026-10-04: through at
+    ; 01:07:29, judged at :28), and the fallback then put me on the door, stuck behind it; 5s made every refusal a long wait,
+    ; and a slow load judged refused is harmless now (the fallback puts me in front of the door on the same side)
     float waited = 0.0
-    while (waited < 5.0 && __assistOn && !RPB_Utility.InSamePlace(this, destination))
+    while (waited < 3.0 && __assistOn && !RPB_Utility.InSamePlace(this, destination))
         Utility.Wait(0.25)
         waited += 0.25
     endWhile
@@ -2841,11 +2848,28 @@ bool function __FollowThroughLoadDoor()
     return true
 endFunction
 
-; In front of @akDoor on walkable ground: 120 units out along its facing, or the other way if that snapped far from it
+; In front of @akDoor on walkable ground: 120 units out along its facing, on the side the guard is (he went through it, so
+; he's on the room's side; a marker on him if he's frozen), else the side that snaps to walkable ground near it. Castle
+; Dour's outer door has floor on both sides: the first side tried put the player behind it (2026-10-05)
 function __MoveInFrontOfDoor(ObjectReference akDoor)
     float angle = akDoor.GetAngleZ()
     float dx = Math.sin(angle) * 120.0
     float dy = Math.cos(angle) * 120.0
+    ObjectReference guardRef = none
+    if (__assistEscort)
+        guardRef = self.__AssistGuardRef()
+    endif
+    if (guardRef && RPB_Utility.InSamePlace(guardRef, akDoor))
+        float gx = guardRef.GetPositionX() - akDoor.GetPositionX()
+        float gy = guardRef.GetPositionY() - akDoor.GetPositionY()
+        if (gx * dx + gy * dy < 0.0)
+            dx = -dx ; he's on the other side
+            dy = -dy
+        endif
+        this.MoveTo(akDoor, afXOffset = dx, afYOffset = dy, abMatchRotation = false)
+        PO3_SKSEFunctions.MoveToNearestNavmeshLocation(this)
+        return
+    endif
     this.MoveTo(akDoor, afXOffset = dx, afYOffset = dy, abMatchRotation = false)
     PO3_SKSEFunctions.MoveToNearestNavmeshLocation(this)
     if (this.GetDistance(akDoor) > 300.0)
@@ -3125,11 +3149,6 @@ function StartEscortAssist(Actor akEscort, bool abToCell)
     endif
     __assistOn = true
     __assistToCell = abToCell
-    ; Walking only, inside the prison on the way to the cell (the mod author, 2026-10-04: running drops the cuffed pose;
-    ; out in the hold the escort to jail keeps running allowed). Off again in StopEscortAssist
-    if (abToCell && self.IsPlayer())
-        RPB_Utility.LimitCuffedMovement_Encumbrance(true)
-    endif
     __assistEscort = akEscort
     __assistStuckTime = 0.0
     __assistIdleTime = 0.0
