@@ -122,6 +122,7 @@ function RegisterEvents()
     RegisterForModEvent("RPB_FaintFrozenGuard", "OnFaintFrozenGuard")
     RegisterForModEvent("RPB_MoveGuard", "OnMoveGuard")
     RegisterForModEvent("RPB_StalledEscortTakeover", "OnStalledEscortTakeover")
+    RegisterForModEvent("RPB_EncumbranceCheck", "OnEncumbranceCheck")
 
     ; The cuffed restrictions as the cuffs are now (animation events don't survive a load either)
     RPB_Utility.SyncCuffedRestrictions()
@@ -134,6 +135,14 @@ function RegisterEvents()
         RPB_Utility.LogWarn("The forced arrest dialogue was left off with no arrest or surrender under way: turned back on", "EventManager::RegisterEvents")
     endif
 endFunction
+
+; A second after the walking-only limit went on: still over-encumbered, still running? (RPB_Utility.LimitCuffedMovement_Encumbrance)
+event OnEncumbranceCheck(string asEventName, string asStringArg, float afNumArg, Form akSender)
+    Utility.Wait(1.0)
+    if (JDB.solveInt(".rpb_root.cuffedLimit.encumbrance") != 0)
+        RPB_Utility.LogInfo("Walking only, 1s later: " + RPB_Utility.EncumbranceTrace(Game.GetPlayer()), "EventManager::OnEncumbranceCheck")
+    endif
+endEvent
 
 ; The player's jumps while cuffed: a jump drops the cuffed pose (ZaZ's), and Papyrus can't block jumping. The player
 ; sends JumpUp on every jump and JumpFall only on a long fall (once in several jumps), no landing event (2026-10-05)

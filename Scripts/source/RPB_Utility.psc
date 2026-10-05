@@ -40,6 +40,7 @@ scriptname RPB_Utility hidden
     bool function IsCuffsForm(Form akForm) global
     Form[] function WithoutCuffs(Form[] akForms) global
     function LimitCuffedMovement_Encumbrance(bool abOn) global
+    string function EncumbranceTrace(Actor akPlayer) global
     function LimitCuffedMovement_Settings(bool abOn) global
     function SetCuffedRestrictions(bool abOn) global
     function SyncCuffedRestrictions() global
@@ -1266,6 +1267,19 @@ function LimitCuffedMovement_Encumbrance(bool abOn) global
     player.ModActorValue("CarryWeight", amount)
     JDB.solveIntSetter(".rpb_root.cuffedLimit.encumbrance", abOn as int, true)
     Debug("Utility::LimitCuffedMovement_Encumbrance", "walking only (encumbrance) " + string_if(abOn, "on", "off") + ": carry weight changed by " + amount + ", now " + player.GetActorValue("CarryWeight"))
+    if (abOn)
+        ; The player still ran with it on (the 441-run save, 2026-10-05): whether the engine saw them over-encumbered, and
+        ; whether they were already running, now and a second later (RPB_EventManager.OnEncumbranceCheck)
+        LogInfo("Walking only on: " + EncumbranceTrace(player), "Utility::LimitCuffedMovement_Encumbrance")
+        int handle = ModEvent.Create("RPB_EncumbranceCheck")
+        if (handle)
+            ModEvent.Send(handle)
+        endif
+    endif
+endFunction
+
+string function EncumbranceTrace(Actor akPlayer) global
+    return "carry weight " + (akPlayer.GetActorValue("CarryWeight") as int) + ", items " + (akPlayer.GetTotalItemWeight() as int) + ", over-encumbered " + akPlayer.IsOverEncumbered() + ", running " + akPlayer.IsRunning() + ", sprinting " + akPlayer.IsSprinting()
 endFunction
 
 function LimitCuffedMovement_Settings(bool abOn) global
