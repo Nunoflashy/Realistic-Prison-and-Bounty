@@ -2098,6 +2098,7 @@ Form[] function GetPrisonersReleasedNoLaterThan(float afTimeLeft)
         Actor candidate = actors[i] as Actor
         if (frozenMap && RPB_Utility.IsListedFrozen(frozenMap, candidate))
             RPB_Utility.LogWarn(candidate + " is frozen: left out of the time skip's releases until the next load", "["+ Name +"] Prison::GetPrisonersReleasedNoLaterThan")
+            RPB_Utility.NoteFrozenAction(candidate, "Left out of the time skip's releases: released after the next load")
         else
             RPB_Prisoner prisoner = Prisoners.AtKey(candidate)
             if (prisoner && prisoner.TimeLeftInSentence <= afTimeLeft)

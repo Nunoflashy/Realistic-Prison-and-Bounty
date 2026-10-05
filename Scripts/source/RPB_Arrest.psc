@@ -868,11 +868,13 @@ function TakeOverSubmission(Actor akFrozenGuard)
     RPB_Utility.ProbeGuardAfterBurst(guard, "took over a submission")
     if (distance < TAKEOVER_ARREST_DISTANCE)
         RPB_Utility.LogInfo(guard + " takes over the arrest of " + player + " from " + akFrozenGuard + " (frozen), " + ((distance * 0.01428) as int) + "m away: arrests them", "Arrest::TakeOverSubmission")
+        RPB_Utility.NoteFrozenAction(akFrozenGuard, "The player's submission to him was taken over by " + guard + " (an arrest)")
         self.ArrestActor(guard, player, ARREST_TYPE_ESCORT_TO_JAIL)
         return
     endif
 
     RPB_Utility.LogInfo(guard + " takes over the arrest of " + player + " from " + akFrozenGuard + " (frozen), " + ((distance * 0.01428) as int) + "m away: walks over first", "Arrest::TakeOverSubmission")
+    RPB_Utility.NoteFrozenAction(akFrozenGuard, "The player's submission to him was taken over by " + guard + " (walking over)")
     Actor[] guards = new Actor[1]
     guards[0] = guard
     __surrenderGuards = guards
@@ -926,9 +928,11 @@ function __HandOverEscort(Actor akActor, Actor akFrozenGuard, RPB_Arrestee apArr
     if (apArrestee.GetBool("Escort Arrived"))
         if (!RPB_Utility.GetGuardSeeing(akActor, akFrozenGuard))
             RPB_Utility.LogInfo(akFrozenGuard + " froze in " + apPrison.Name + " with " + akActor + ": no guard there sees them, he carries on", "Arrest::HandOverEscort")
+            RPB_Utility.NoteFrozenAction(akFrozenGuard, "Froze in " + apPrison.Name + " with his prisoner: no guard there saw it, he carried on")
             return
         endif
         RPB_Utility.LogInfo(akFrozenGuard + " froze in " + apPrison.Name + " with " + akActor + ": a guard there takes over", "Arrest::HandOverEscort")
+        RPB_Utility.NoteFrozenAction(akFrozenGuard, "His prisoner was taken over by a guard of " + apPrison.Name)
         RPB_Utility.FaintFrozenGuard(akFrozenGuard, abAlone = false)
         apArrestee.HandOverInPrison(akFrozenGuard)
         return
@@ -937,9 +941,11 @@ function __HandOverEscort(Actor akActor, Actor akFrozenGuard, RPB_Arrestee apArr
     Actor guard = RPB_Utility.FindTakeoverGuard(akActor, apArrestee.GetFaction(), akFrozenGuard, 0.0, TAKEOVER_APPROACH_DISTANCE, abSightOnly = true)
     if (!guard)
         RPB_Utility.LogInfo(akFrozenGuard + " froze escorting " + akActor + ": no guard of the hold sees them within 40m, he carries on", "Arrest::HandOverEscort")
+        RPB_Utility.NoteFrozenAction(akFrozenGuard, "Froze mid-escort: no guard saw it within 40 m, he carried on")
         return
     endif
     RPB_Utility.LogInfo(akFrozenGuard + " froze escorting " + akActor + ": " + guard + " (" + ((akActor.GetDistance(guard) * 0.01428) as int) + "m, sees them) takes the escort over", "Arrest::HandOverEscort")
+    RPB_Utility.NoteFrozenAction(akFrozenGuard, "His escort was taken over by " + RPB_Utility.ActorNameNoCall(guard) + " " + guard)
     RPB_Utility.FaintFrozenGuard(akFrozenGuard, abAlone = false)
     apArrestee.HandOverEscort(akFrozenGuard, guard)
     RPB_Utility.ProbeGuardAfterBurst(guard, "took over an escort")

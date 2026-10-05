@@ -295,6 +295,27 @@ RPB_Prisoner function ShowPrisonerList(RPB_Prison apPrison, bool abOnlyImprisone
     return selectedPrisoner
 endFunction
 
+; The NPCs RPB found frozen this session, by their stored names (no call into any of them); none if cancelled
+Actor function ShowFrozenList(string asListTitle = "Select Frozen NPC")
+    Form[] frozen = RPB_Utility.FrozenActorsMarked()
+    if (!frozen || frozen.Length == 0)
+        return none
+    endif
+    string[] lines = Utility.CreateStringArray(frozen.Length + 1)
+    lines[0] = "<None>"
+    int i = 0
+    while (i < frozen.Length)
+        Actor frozenActor = frozen[i] as Actor
+        lines[i + 1] = RPB_Utility.ActorNameNoCall(frozenActor) + " (" + JMap.getStr(RPB_Utility.FrozenReport(frozenActor), "role") + ") - " + frozenActor
+        i += 1
+    endWhile
+    int line = self.ShowList(asListTitle, lines, 0, 0)
+    if (line <= 0 || line > frozen.Length)
+        return none
+    endif
+    return frozen[line - 1] as Actor
+endFunction
+
 ; TODO: Implement logic for @abOnlyEmpty and @abOnlyGenderExclusive
 RPB_JailCell function ShowCellList(RPB_Prison apPrison, bool abOnlyEmpty = false, bool abOnlyGenderExclusive = false, string asListTitle = "Select Cell")
     RPB_Prison prison = apPrison

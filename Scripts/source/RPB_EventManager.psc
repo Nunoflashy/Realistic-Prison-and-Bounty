@@ -503,6 +503,7 @@ function SendPrisonSceneBulkEvent(string asScene, string asSceneEvent, Form[] ak
     int first = 0
     while (first < akPrisoners.Length && frozenMap && RPB_Utility.IsListedFrozen(frozenMap, akPrisoners[first] as Actor))
         RPB_Utility.LogWarn(akPrisoners[first] + " is frozen: left out of " + asScene + "'s " + asSceneEvent + " until the next load", "EventManager::SendPrisonSceneBulkEvent")
+        RPB_Utility.NoteFrozenAction(akPrisoners[first] as Actor, "Left out of the prison's " + asScene + " (" + asSceneEvent + ")")
         first += 1
     endWhile
     if (first >= akPrisoners.Length)

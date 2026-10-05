@@ -1075,6 +1075,7 @@ event OnEffectStart(Actor akTarget, Actor akCaster)
     __pathPrefix = ""
     __cachedName = ""
     __isEffectActive = true
+    RPB_Utility.RememberActorName(akTarget) ; readable without a call into him later (the Frozen NPCs page, the logs)
     RPB_Utility.Crumb(akTarget, "OnEffectStart " + (self as string))
 
     ; Assigns the actor for this script, differentiating between Player and NPC to avoid retrieving properties, instead caching it in a local variable to this script
@@ -1100,6 +1101,7 @@ event OnEffectFinish(Actor akTarget, Actor akCaster)
         RPB_Utility.Crumb(this, "OnEffectFinish " + (self as string) + " (akTarget is none: " + (akTarget == none) + lifeState + ")")
     endif
     __isEffectActive = false
+    RPB_Utility.ForgetActorName(akTarget) ; kept while he's frozen (his page needs it)
     self.OnDestroy()
 endEvent
 

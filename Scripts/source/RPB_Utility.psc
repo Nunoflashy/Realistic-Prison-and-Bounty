@@ -23,6 +23,13 @@ scriptname RPB_Utility hidden
     function ProbeNPC(Actor akActor, string asStep) global
     bool function IsGuardProbeOpen(Actor akActor) global
     bool function IsFrozenGuard(Actor akActor) global
+    function RememberActorName(Actor akActor) global
+    function ForgetActorName(Actor akActor) global
+    string function ActorNameNoCall(Actor akActor) global
+    int function FrozenCount() global
+    Form[] function FrozenActorsMarked() global
+    int function FrozenReport(Actor akActor) global
+    function NoteFrozenAction(Actor akActor, string asAction) global
     function MarkGuardFrozen(Actor akGuard, string asStep) global
     bool function MoveGuardAfterBurst(Actor akGuard, ObjectReference akTarget, string asStep, float afDelay = 5.0) global
     function __GuardMoved(Actor akGuard) global
@@ -934,6 +941,7 @@ function MarkGuardFrozen(Actor akGuard, string asStep) global
         probedAt = JFormMap.getStr(steps, akGuard)
     endif
     string frozenAs = "FROZEN " + __ProbedRole(akGuard)
+    int report = __NewFrozenReport(akGuard, asStep, probedAt)
     ; Warn, not Info: this must show with DEBUG on too. The actor prints without calling into him.
     Warn(frozenAs + " " + akGuard + " (" + asStep + "; probed at: " + probedAt + "): his Papyrus object doesn't answer, RPB skips him until the next game load")
     ; The magic effects on him (other mods' effects were stuck starting/finishing on a frozen clone): PO3 reads them engine
@@ -948,6 +956,16 @@ function MarkGuardFrozen(Actor akGuard, string asStep) global
         i += 1
     endWhile
     Warn(frozenAs + " " + akGuard + ": " + effects.Length + " magic effects on him: " + names)
+    JMap.setInt(report, "effectCount", effects.Length)
+    int effectNames = JArray.object()
+    i = 0
+    while (i < effects.Length)
+        if (effects[i])
+            JArray.addStr(effectNames, effects[i].GetName() + " " + effects[i])
+        endif
+        i += 1
+    endWhile
+    JMap.setObj(report, "effects", effectNames)
 
     ; While testing (DEBUG on), on screen too: nothing in game shows a frozen guard (his AI goes on), and a notification
     ; gets lost among the others, teleports and load doors. Where and when, to find it in the log; nothing calls into him
@@ -1076,6 +1094,7 @@ function ClearFrozenGuards() global
     endif
     __ClearFormMapAt(__FrozenGuardsPath())
     __ClearFormMapAt(".rpb_root.frozenGuardSteps")
+    __ClearFormMapAt(".rpb_root.frozenReports")
     __ClearFormMapAt(".rpb_root.guardOpenProbes")
     __ClearFormMapAt(".rpb_root.frozenActorRoles")
     __ClearFormMapAt(".rpb_root.guardPendingProbes")
@@ -1091,6 +1110,136 @@ endFunction
 ; RPB_FrozenActors (the plugin's, empty there): the frozen NPCs, for the crime dialogue's conditions
 FormList function FrozenActorsList() global
     return Game.GetFormFromFile(0x0002C063, "RealisticPrisonAndBounty.esp") as FormList
+endFunction
+
+; ==========================================================
+;      Frozen NPCs: what RPB - Stats' page shows (no call into him)
+; ==========================================================
+
+;/
+    His name, while he still answers: stored when he gets an RPB role (RPB_ActorBase.OnEffectStart), dropped when it ends
+    unless he's frozen. A frozen NPC's name can't be read (a call into him), and the Frozen NPCs page and the logs need it.
+    Kept across loads (a prisoner from before a load still needs it), bounded by the actors RPB is handling.
+/;
+function RememberActorName(Actor akActor) global
+    if (!akActor || akActor == Game.GetPlayer())
+        return
+    endif
+    int names = JDB.solveObj(".rpb_root.actorNames")
+    if (!names)
+        names = JFormMap.object()
+        JDB.solveObjSetter(".rpb_root.actorNames", names, true)
+    endif
+    JFormMap.setStr(names, akActor, akActor.GetDisplayName())
+endFunction
+
+function ForgetActorName(Actor akActor) global
+    int names = JDB.solveObj(".rpb_root.actorNames")
+    if (!names || !akActor || IsFrozenGuard(akActor))
+        return
+    endif
+    JFormMap.removeKey(names, akActor)
+endFunction
+
+; His stored name, or his FormID when none was stored: no call into him
+string function ActorNameNoCall(Actor akActor) global
+    string name = JFormMap.getStr(JDB.solveObj(".rpb_root.actorNames"), akActor)
+    if (name == "")
+        return akActor as string
+    endif
+    return name
+endFunction
+
+; The frozen NPCs RPB marked this session (the Frozen NPCs page shows while there's one)
+int function FrozenCount() global
+    int marked = JDB.solveObj(".rpb_root.frozenMarked")
+    if (!marked)
+        return 0
+    endif
+    return JFormMap.count(marked)
+endFunction
+
+Form[] function FrozenActorsMarked() global
+    return JArray.asFormArray(JFormMap.allKeys(JDB.solveObj(".rpb_root.frozenMarked")))
+endFunction
+
+int function FrozenReport(Actor akActor) global
+    return JFormMap.getObj(JDB.solveObj(".rpb_root.frozenReports"), akActor)
+endFunction
+
+; Written by MarkGuardFrozen: who he was (stored before), what he was doing, when and where, without a call into him
+int function __NewFrozenReport(Actor akActor, string asFoundBy, string asProbedAt) global
+    int reports = JDB.solveObj(".rpb_root.frozenReports")
+    if (!reports)
+        reports = JFormMap.object()
+        JDB.solveObjSetter(".rpb_root.frozenReports", reports, true)
+    endif
+    int report = JFormMap.getObj(reports, akActor)
+    if (report)
+        return report ; marked again (a second probe): the first report stays
+    endif
+    report = JMap.object()
+    JFormMap.setObj(reports, akActor, report)
+    string role = __ProbedRole(akActor)
+    if (role == "PRISONER")
+        role = "Prisoner"
+    else
+        role = "Guard"
+    endif
+    JMap.setStr(report, "role", role)
+    JMap.setStr(report, "foundBy", asFoundBy)
+    JMap.setStr(report, "probedAt", asProbedAt)
+    JMap.setStr(report, "foundAt", GetFormattedDate(GetCurrentDay(), GetCurrentMonth(), GetCurrentYear(), GetCurrentHour(), GetCurrentMinute(), abShowDayOfWeek = false) + " (real time " + GetDateTimeNow() + ")")
+    ; Where the player was, and how far he was: calls on the player, him only as an argument
+    Actor player = Game.GetPlayer()
+    string where = ""
+    Location playerLocation = player.GetCurrentLocation()
+    if (playerLocation)
+        where = playerLocation.GetName()
+    endif
+    Cell playerCell = player.GetParentCell()
+    if (playerCell)
+        where += " (" + playerCell.GetName() + ")"
+    endif
+    JMap.setStr(report, "where", where)
+    float distance = player.GetDistance(akActor)
+    if (distance < 0.0 || distance > 1000000.0)
+        JMap.setStr(report, "distance", "in another cell")
+    else
+        JMap.setStr(report, "distance", ((distance * 0.01428) as int) + " m from the player")
+    endif
+    ; A prisoner's prison, from each prison's list index (no call into him)
+    RPB_PrisonManager prisons = RPB_API.GetPrisonManager()
+    int i = 0
+    while (prisons && i < prisons.PrisonSlots)
+        RPB_Prison prison = prisons.GetNthPrison(i)
+        if (prison && prison.Prisoners.AtKey(akActor))
+            JMap.setStr(report, "prison", prison.Name)
+            i = prisons.PrisonSlots
+        endif
+        i += 1
+    endWhile
+    JMap.setObj(report, "actions", JArray.object())
+    return report
+endFunction
+
+;/
+    What RPB did about a frozen NPC, for the Frozen NPCs page: a line added to his report (once: a loop that skips him on
+    every pass notes it the first time only). Nothing while he isn't marked frozen.
+/;
+function NoteFrozenAction(Actor akActor, string asAction) global
+    int report = FrozenReport(akActor)
+    if (!report)
+        return
+    endif
+    int actions = JMap.getObj(report, "actions")
+    if (!actions)
+        actions = JArray.object()
+        JMap.setObj(report, "actions", actions)
+    endif
+    if (JArray.findStr(actions, asAction) == -1)
+        JArray.addStr(actions, asAction)
+    endif
 endFunction
 
 function __ClearFormMapAt(string asPath) global
@@ -5438,6 +5587,7 @@ endFunction
     On its own stack (RPB_EventManager.OnFaintFrozenGuard): it waits 3s.
 /;
 function FaintFrozenGuard(Actor akGuard, bool abAlone) global
+    NoteFrozenAction(akGuard, string_if(abAlone, "Made to faint, out of sight (until the next load)", "Made to faint while another guard took over"))
     int handle = ModEvent.Create("RPB_FaintFrozenGuard")
     if (handle)
         ModEvent.PushForm(handle, akGuard)

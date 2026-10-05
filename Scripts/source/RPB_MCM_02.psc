@@ -84,6 +84,7 @@ int property OPTION_DISABLED = 0x01 autoreadonly
 string property MCM_PAGE_CHECK_ARRESTEE_INFO = "Check Arrestee" autoreadonly
 string property MCM_PAGE_CHECK_PRISONER_INFO = "Check Prisoner" autoreadonly
 string property MCM_PAGE_CHECK_HOLD_INFO_FOR_ACTOR = "Check Hold Info for Actor" autoreadonly
+string property MCM_PAGE_FROZEN_NPCS = "Frozen NPCs" autoreadonly
 
 ; ==========================================================
 ;                     Script References
@@ -247,12 +248,15 @@ endFunction
 
 function InitializePages()
     string PAGE_SEPARATOR = " ,"
+    ; Frozen NPCs: only while RPB found one this session (the mod author: the page, no notification)
+    bool anyFrozen = RPB_Utility.FrozenCount() > 0
     Pages = String_Explode( \ 
         String_Implode(Holds) + "," + \
-        string_if (API.Arrest.Arrestees.Count > 0 || API.PrisonManager.HasPrisonsWithPrisoners, PAGE_SEPARATOR) + \
+        string_if (API.Arrest.Arrestees.Count > 0 || API.PrisonManager.HasPrisonsWithPrisoners || anyFrozen, PAGE_SEPARATOR) + \
         string_if (API.Arrest.Arrestees.Count > 0, MCM_PAGE_CHECK_ARRESTEE_INFO + ",")+ \
         string_if (API.PrisonManager.HasPrisonsWithPrisoners, MCM_PAGE_CHECK_PRISONER_INFO + ",")+ \
-        string_if (API.PrisonManager.HasPrisonsWithPrisoners, MCM_PAGE_CHECK_HOLD_INFO_FOR_ACTOR) \
+        string_if (API.PrisonManager.HasPrisonsWithPrisoners, MCM_PAGE_CHECK_HOLD_INFO_FOR_ACTOR + ",") + \
+        string_if (anyFrozen, MCM_PAGE_FROZEN_NPCS) \
     )
 endFunction
 
@@ -380,6 +384,14 @@ event OnPageReset(string page)
 
     elseif (page == MCM_PAGE_CHECK_HOLD_INFO_FOR_ACTOR)
         self.RenderSelectedActorHoldInfo()
+        return
+
+    elseif (page == MCM_PAGE_FROZEN_NPCS)
+        RPB_UIInterface uilib = (Game.GetForm(0x14) as Form) as RPB_UIInterface
+        Actor frozen = uilib.ShowFrozenList()
+        if (frozen)
+            RPB_MCM_02_Frozen.Render(self, frozen)
+        endif
         return
     endif
 

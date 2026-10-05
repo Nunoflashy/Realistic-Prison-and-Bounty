@@ -597,6 +597,7 @@ function ProcessReleaseQueue()
         ; Kept a prisoner: AwaitPrisoners queues him again once he answers (after the next load). Not put back in the queue:
         ; alone in it, he'd be retried every half second until then
         RPB_Utility.LogWarn("Queued prisoner " + next + " is frozen: not released until the next load", "["+ Prison.Name +"] PrisonMonitor::ProcessReleaseQueue")
+        RPB_Utility.NoteFrozenAction(next as Actor, "His release was held back: released after the next load")
     else
         prisoner = Prisoners.AtKey(next as Actor)
     endif

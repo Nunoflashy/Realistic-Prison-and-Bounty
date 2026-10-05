@@ -1657,6 +1657,7 @@ function MoveToPrison(Actor akCaptor)
         RPB_Arrestee arrestState = RPB_API.GetArrest().Arrestees.AtKey(this)
         if (arrestState)
             RPB_Utility.LogInfo(akCaptor + " froze when " + Name + " " + this + " was moved to " + Prison.Name + ": a guard of the prison takes over", "["+ Name +"] Prisoner::MoveToPrison")
+            RPB_Utility.NoteFrozenAction(akCaptor, "Froze when moved to " + Prison.Name + " with his prisoner: a guard there took over")
             SetBool("Go to Cell", true)
             RPB_Utility.FaintFrozenGuard(akCaptor, abAlone = true) ; out of sight, in the town he stood in
             arrestState.HandOverInPrison(akCaptor)
