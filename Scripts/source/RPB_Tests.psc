@@ -13111,7 +13111,7 @@ function ToggleManualFreezePrisoner()
     endif
 
     Actor target = Game.GetCurrentCrosshairRef() as Actor
-    if (!(target as RPB_TestFreezable) || !(RPB_Utility.IsActorImprisoned(target) || RPB_Utility.IsActorArrested(target)))
+    if (!__IsFreezablePrisoner(target))
         target = __NearestFreezablePrisoner(4000.0)
     endif
     if (!target)
@@ -13148,8 +13148,20 @@ event OnTestHoldLockPrisoner(Form akPrisoner)
     JDB.solveFltSetter(".rpbTest.prisonerHoldEnd", Utility.GetCurrentRealTime(), true)
 endEvent
 
-; A freezable actor who is arrested or a prisoner (an escort by hand: 181), nearest within @afRadius (casts, storage and
-; the player's distance: no call on them)
+; A freezable actor the prisoner key takes: arrested or a prisoner, or one of patch 010's freezable NPCs at any time (181
+; spawns one to arrest by hand: unarrested, he wasn't found, 2026-10-05). Not one frozen already (another key's): his
+; base is a call on him
+bool function __IsFreezablePrisoner(Actor akActor)
+    if (!(akActor as RPB_TestFreezable) || RPB_Utility.IsFrozenGuard(akActor) || akActor == __manualFreezeGuard)
+        return false
+    endif
+    if (RPB_Utility.IsActorImprisoned(akActor) || RPB_Utility.IsActorArrested(akActor))
+        return true
+    endif
+    return akActor.GetBaseObject() == Game.GetFormFromFile(0x0002C06B, "RealisticPrisonAndBounty.esp")
+endFunction
+
+; The nearest actor within @afRadius the prisoner key takes (__IsFreezablePrisoner)
 Actor function __NearestFreezablePrisoner(float afRadius)
     Actor player = Game.GetPlayer()
     Actor[] nearby = PO3_SKSEFunctions.GetActorsByProcessingLevel(0)
@@ -13157,7 +13169,7 @@ Actor function __NearestFreezablePrisoner(float afRadius)
     float nearestDistance = afRadius
     int i = 0
     while (i < nearby.Length)
-        if ((nearby[i] as RPB_TestFreezable) && (RPB_Utility.IsActorImprisoned(nearby[i]) || RPB_Utility.IsActorArrested(nearby[i])))
+        if (__IsFreezablePrisoner(nearby[i]))
             float distance = player.GetDistance(nearby[i])
             if (distance < nearestDistance)
                 nearest = nearby[i]
