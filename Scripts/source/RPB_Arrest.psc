@@ -1716,6 +1716,10 @@ int property SURRENDER_SCENE_RETRIES = 2 autoreadonly
 ; before stepping away counts as leaving: dodging a blow isn't faking the surrender
 int property SURRENDER_DODGES = 3 autoreadonly
 
+; How long a surrender waits for its guards to finish a fight with someone else (bandits) before it's given up. Meanwhile
+; it stays on (the pose kept), and leaving costs nothing: nobody has come for it yet
+float property SURRENDER_FIGHT_WAIT_SECONDS = 180.0 autoreadonly
+
 ; How the last surrender ended or was refused ("no captors", "no guard", "attacked", "fooled", "expired" (still on),
 ; "faked", "withdrawn", "Scene never started", "no guard at the end", "no bounty", "arrest"): for the tests and the log
 string property LastSurrenderOutcome auto hidden
@@ -1745,7 +1749,9 @@ function __PacifyForSurrender(Actor akSurrenderer, Actor[] akGuards)
         stillFighting = ""
         int i = 0
         while (i < akGuards.Length)
-            if (akGuards[i] && akGuards[i].IsInCombat())
+            ; A guard fighting someone else (bandits) is left to it: stopping him every pass pulled him out of that fight
+            ; for nothing (he went straight back in), and the surrender waits for him instead (__WatchSurrender)
+            if (akGuards[i] && akGuards[i].IsInCombat() && !self.__IsFightingOthers(akGuards[i], akSurrenderer))
                 akGuards[i].StopCombat()
                 akGuards[i].StopCombatAlarm()
                 fighting = true
@@ -1758,6 +1764,27 @@ function __PacifyForSurrender(Actor akSurrenderer, Actor[] akGuards)
         endif
     endWhile
     __SurrenderLog("Surrender of " + akSurrenderer + ": guards calmed in " + passes + " passes, still fighting " + fighting + string_if(fighting, " (in combat at the last pass:" + stillFighting + ")", "") + ", surrenderer in combat " + akSurrenderer.IsInCombat())
+endFunction
+
+; @akGuard is in combat with someone other than @akSurrenderer
+bool function __IsFightingOthers(Actor akGuard, Actor akSurrenderer)
+    if (!akGuard || !akGuard.IsInCombat())
+        return false
+    endif
+    Actor target = akGuard.GetCombatTarget()
+    return target && target != akSurrenderer
+endFunction
+
+; Whether any living bound guard is busy fighting someone other than @akSurrenderer
+bool function __GuardsFightingOthers(Actor akSurrenderer, Actor[] akGuards)
+    int i = 0
+    while (i < akGuards.Length)
+        if (self.IsSurrenderGuard(akGuards[i]) && self.__IsFightingOthers(akGuards[i], akSurrenderer))
+            return true
+        endif
+        i += 1
+    endWhile
+    return false
 endFunction
 
 ; Surrender lines reach the log whether DEBUG is on (Info is silent then) or off
@@ -1848,6 +1875,8 @@ function __WatchSurrender(Actor akSurrenderer, Actor[] akGuards)
     int sceneRetries = 0
     int dodges = 0
     Actor outsider = RPB_StorageVars.GetFormOnReference("Outsider", akSurrenderer, "Surrender") as Actor
+    bool waitingForFight = false
+    int fightWaitTick = 0
     bool expired = false
     bool watching = true
     if (isPlayer)
@@ -1859,6 +1888,16 @@ function __WatchSurrender(Actor akSurrenderer, Actor[] akGuards)
             watching = false ; the Scene's end (or an abort) took it over
         elseif (RPB_StorageVars.GetBoolOnReference("Scene Failed", akSurrenderer, "Surrender"))
             RPB_StorageVars.DeleteVariableOnReference("Scene Failed", akSurrenderer, "Surrender")
+            ; The guards are busy with someone else (bandits): not a failed surrender yet. It waits for them, kept on, and
+            ; a retry starts the Scene once they're done (the mod author, 2026-10-05: a long fight used to undo it after 2
+            ; retries with the guards all around)
+            if (self.__GuardsFightingOthers(akSurrenderer, akGuards))
+                if (!waitingForFight)
+                    waitingForFight = true
+                    fightWaitTick = ticks
+                    __SurrenderLog("Surrender of " + akSurrenderer + ": the guards are fighting someone else (" + self.__GuardsInCombat(akGuards) + "), waiting for them; leaving meanwhile costs nothing")
+                endif
+            else
             sceneRetries += 1
             if (sceneRetries <= SURRENDER_SCENE_RETRIES)
                 __SurrenderLog("Surrender of " + akSurrenderer + ": the Surrender Scene didn't start (" + self.__GuardsInCombat(akGuards) + "), retry " + sceneRetries)
@@ -1872,8 +1911,26 @@ function __WatchSurrender(Actor akSurrenderer, Actor[] akGuards)
                     self.__UndoSurrender(akSurrenderer, "the Surrender Scene never started after " + SURRENDER_SCENE_RETRIES + " retries (" + self.__GuardsInCombat(akGuards) + ")", abEndScene = false)
                 endif
             endif
+            endif
+        elseif (waitingForFight && (ticks - fightWaitTick) * 0.5 >= SURRENDER_FIGHT_WAIT_SECONDS)
+            watching = false
+            if (self.__ClaimSurrender(akSurrenderer))
+                LastSurrenderOutcome = "fight too long"
+                self.__UndoSurrender(akSurrenderer, "the guards' fight with someone else lasted over " + (SURRENDER_FIGHT_WAIT_SECONDS as int) + "s (" + self.__GuardsInCombat(akGuards) + ")", abEndScene = false)
+            endif
         else
             ticks += 1
+            ; Waiting for the guards' other fight: every 2s, once none is fighting anyone else, the Scene again (calmed first)
+            if (waitingForFight)
+                lastProgressTick = ticks ; no expiry while they're busy
+                if (ticks % 4 == 0 && !self.__GuardsFightingOthers(akSurrenderer, akGuards))
+                    waitingForFight = false
+                    sceneRetries = 0
+                    __SurrenderLog("Surrender of " + akSurrenderer + ": the guards' fight is over after " + (((ticks - fightWaitTick) * 0.5) as int) + "s, the Surrender Scene again")
+                    self.__PacifyForSurrender(akSurrenderer, akGuards)
+                    self.InitiateSurrenderScene(akSurrenderer, akGuards)
+                endif
+            endif
             if (ticks % 10 == 0)
                 RPB_StorageVars.SetFloatOnReference("Surrender Heartbeat", akSurrenderer, Utility.GetCurrentGameTime(), "Surrender")
             endif
@@ -1898,10 +1955,10 @@ function __WatchSurrender(Actor akSurrenderer, Actor[] akGuards)
                 __SurrenderLog("Surrender of " + akSurrenderer + ": stepped away with " + outsider + " still fighting, a dodge (" + dodges + "/" + SURRENDER_DODGES + ")")
             elseif ((movedSquared > leaveSquared || weaponDrawn) && !beingTaken)
                 watching = false
-                __SurrenderLog("Surrender of " + akSurrenderer + ": they left (moved " + (Math.sqrt(movedSquared) as int) + ", weapon drawn " + weaponDrawn + ", nearest guard " + (distance as int) + ", expired " + expired + ")")
+                __SurrenderLog("Surrender of " + akSurrenderer + ": they left (moved " + (Math.sqrt(movedSquared) as int) + ", weapon drawn " + weaponDrawn + ", nearest guard " + (distance as int) + ", expired " + expired + ", waiting for the guards' fight " + waitingForFight + string_if(outsider != none, ", outsider " + outsider + " dead " + outsider.IsDead() + " in combat " + outsider.IsInCombat() + " " + (akSurrenderer.GetDistance(outsider) as int) + " away, dodges " + dodges, "") + ")")
                 if (self.__IsTakeoverApproach(akSurrenderer))
                     self.__EludeTakeover(akSurrenderer)
-                elseif (expired)
+                elseif (expired || waitingForFight)
                     self.__WithdrawSurrender(akSurrenderer)
                 else
                     self.__FakeSurrender(akSurrenderer, akGuards)
