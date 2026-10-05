@@ -1113,6 +1113,9 @@ event OnArrestBegin(RPB_Arrestee apArrestee, RPB_Captor apCaptor, Faction akCrim
         if (apCaptor)
             RPB_Utility.ProbeGuardAfterBurst(apArrestee.GetCaptorActor(), "his arrest started") ; stored, no call into him
         endif
+    else
+        ; An NPC arrestee goes through the confrontation's burst too: probed, to learn whether NPC prisoners freeze (2026-10-05)
+        RPB_Utility.ProbeNPC(apArrestee.GetActor(), "arrest started")
     endif
 
     RPB_Utility.FlowMark("Arrest.OnArrestBegin: parameters, bounty check, captor assigned")

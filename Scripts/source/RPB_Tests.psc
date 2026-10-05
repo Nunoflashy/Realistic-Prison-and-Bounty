@@ -263,6 +263,8 @@ function SetTests()
     self.AddTest("175 - Experiment: the Walk Handed Back at the Escort's Start (to jail and to the cell; does the guard still set off?) (PLAYER)", "Test_EarlyHandback", abChainable = false)
     self.AddTest("176 - A Stalled Escort to Jail Taken Over by Another Guard of the Hold (the guard held still; PLAYER)", "Test_StalledEscortTakeover", abChainable = false)
     self.AddTest("177 - A Stalled Escort to Jail: Every Guard Held Still, 2 Takeovers, Then the Fallback (PLAYER)", "Test_StalledEscortTakeoverLimit", abChainable = false)
+    self.AddTest("178 - Freeze Control, NPC: an NPC's Escort to Jail Cancelled Mid-Way, Guard and Prisoner Probed (156's NPC twin; repeat it)", "Test_NpcEscortCancelControl", abChainable = false)
+    self.AddTest("179 - Diagnostic: a Frozen NPC Prisoner in the Time Skip (another prisoner due after him; the current code, before any fix)", "Test_FrozenPrisonerTimeSkip", abChainable = false)
     self.AddTest("041 - ActiveMagicEffectContainer: Stuck Lock Self-Heals", "Test_ActiveMagicEffectContainer_StuckLockSelfHeals")
     self.AddTest("042 - ThreadLock: JAtomic Primitive Semantics and Registry", "Test_ThreadLock_PrimitiveSemantics")
     ; Not chainable: fires concurrent worker threads
@@ -12435,6 +12437,103 @@ bool function __Scenario_FrozenEscortFallback(string asTest)
     return assert_true(fellBack && marked && waitOk && handedOver, asTest + ": fallback " + fellBack + ", marked frozen " + marked + ", the wait for a guard (if nobody saw them) " + waitOk + ", imprisoned by another guard " + handedOver)
 endFunction
 
+; 178: 156's NPC twin. A bandit arrested by a clone guard, the escort to jail under way, then cancelled as 156's teardown
+; cancels the player's (RPB_Recovery.CancelArrest): the guard is probed at his Scene's stop (as in 156) and the NPC too
+; ("arrest cancelled"). Logs which froze; always green (a count, repeat it and compare FROZEN GUARD with FROZEN PRISONER)
+bool function __Scenario_NpcEscortCancel(string asTest)
+    Actor guard = __ScenarioGuard()
+    if (!guard)
+        return false
+    endif
+    Actor npc = __ScenarioArrestee(false, guard)
+    if (!assert_true(npc != none, asTest + ": no NPC arrestee"))
+        return false
+    endif
+    __ScenarioArrest(guard, npc, asTest)
+    if (!__ScenarioWaitEscortToJail(npc, 90.0))
+        return assert_true(false, asTest + ": the NPC's escort to jail never started")
+    endif
+    Utility.Wait(10.0) ; under way
+    RPB_Recovery.CancelArrest(npc, "test " + asTest + ": the escort cancelled mid-way (freeze control, NPC)")
+    Utility.Wait(12.0) ; the probes' +5s and +8s, and their checks
+    bool guardFrozen = RPB_Utility.IsFrozenGuard(guard)
+    bool npcFrozen = RPB_Utility.IsFrozenGuard(npc)
+    log(asTest + ": SUMMARY guard " + guard + " frozen " + guardFrozen + ", NPC prisoner " + npc + " frozen " + npcFrozen)
+    return assert_true(true, asTest + ": guard frozen " + guardFrozen + ", NPC frozen " + npcFrozen)
+endFunction
+
+;/
+    179: what a frozen NPC prisoner does to the time skip, with the current code. Two NPC prisoners in Castle Dour,
+    registered without the arrest flow (as the time-skip tests do): a freezable one (RPB_TestFreezableGuard) with 1 day left,
+    held (frozen), and a normal one with 1.5 days. Then the NPC side of the player's time skip
+    (Prison.ReleaseDueNPCsInOrder(2.0), real releases), on its own stack, watched for 60s: did it finish, and was the normal
+    one released? Then the hold is released and it's watched again. NOTE: advances the game clock ~2 days.
+/;
+bool function __Scenario_FrozenPrisonerTimeSkip(string asTest)
+    RPB_Prison prison = (RPB_API.GetPrisonManager()).GetPrison("Haafingar")
+    ActorBase freezableBase = Game.GetFormFromFile(0x0002C062, "RealisticPrisonAndBounty.esp") as ActorBase
+    if (!assert_true(freezableBase != none, asTest + ": no RPB_TestFreezableGuard in the plugin"))
+        return false
+    endif
+    Actor player = Game.GetFormEx(0x14) as Actor
+    Actor frozen = __SpawnTempActorOf(freezableBase.GetFormID())
+    Actor other = __SpawnTempActorOf(0x132AE)
+    if (!assert_true(frozen && other, asTest + ": couldn't spawn the two prisoners"))
+        return false
+    endif
+    float now = Utility.GetCurrentGameTime()
+    RPB_Prisoner frozenPrisoner = __RegisterPrisonerAndWait(frozen, prison)
+    RPB_Prisoner otherPrisoner = __RegisterPrisonerAndWait(other, prison)
+    if (!assert_true(frozenPrisoner && otherPrisoner, asTest + ": couldn't register both as prisoners"))
+        return false
+    endif
+    frozenPrisoner.SetInt("Sentence", 1)
+    frozenPrisoner.SetFloat("Time of Imprisonment", now)
+    otherPrisoner.SetInt("Sentence", 1)
+    otherPrisoner.SetFloat("Time of Imprisonment", now + 0.5) ; due half a day after him
+    log(asTest + ": " + frozen + " (1 day left, to be frozen) and " + other + " (1.5 days left) registered in " + prison.Name)
+
+    self.RegisterForModEvent("RPB_TestHoldLock", "OnTestHoldLock")
+    self.RegisterForModEvent("RPB_TestTimedFormID", "OnTestTimedFormID")
+    self.RegisterForModEvent("RPB_TestTimeSkip", "OnTestTimeSkip")
+    if (!assert_true(__StartHold(frozen), asTest + ": the hold never started"))
+        self.__EndSimulatedFreeze()
+        return false
+    endif
+    log(asTest + ": " + frozen + " frozen (hold); the NPC side of the time skip now, on its own stack")
+
+    JDB.solveIntSetter(".rpbTest.timeSkipDone", 0, true)
+    int handle = ModEvent.Create("RPB_TestTimeSkip")
+    if (handle)
+        ModEvent.PushFloat(handle, 2.0)
+        ModEvent.Send(handle)
+    endif
+    float start = Utility.GetCurrentRealTime()
+    while (JDB.solveInt(".rpbTest.timeSkipDone") == 0 && (Utility.GetCurrentRealTime() - start) < 60.0)
+        Utility.Wait(0.5)
+    endWhile
+    bool finishedFrozen = JDB.solveInt(".rpbTest.timeSkipDone") != 0
+    bool otherReleasedFrozen = prison.Prisoners.AtKey(other) == none
+    log(asTest + ": with him frozen: the time skip finished " + finishedFrozen + " (" + __Ms(Utility.GetCurrentRealTime() - start) + "ms), the other prisoner released " + otherReleasedFrozen + ", he's still a prisoner " + (prison.Prisoners.AtKey(frozen) != none))
+
+    float holdTime = __ReleaseHold()
+    start = Utility.GetCurrentRealTime()
+    while (JDB.solveInt(".rpbTest.timeSkipDone") == 0 && (Utility.GetCurrentRealTime() - start) < 30.0)
+        Utility.Wait(0.5)
+    endWhile
+    log(asTest + ": after the release (" + (holdTime as int) + "s held): the time skip finished " + (JDB.solveInt(".rpbTest.timeSkipDone") != 0) + ", the other prisoner released " + (prison.Prisoners.AtKey(other) == none) + ", he's still a prisoner " + (prison.Prisoners.AtKey(frozen) != none))
+    log(asTest + ": SUMMARY with a frozen NPC prisoner, the time skip finished " + finishedFrozen + " and the other was released " + otherReleasedFrozen + " (FALSE = blocked by him)")
+    self.UnregisterForModEvent("RPB_TestTimeSkip")
+    self.__EndSimulatedFreeze()
+    __TeardownAllTempActors()
+    return assert_true(true, asTest + ": diagnostic (see SUMMARY)")
+endFunction
+
+event OnTestTimeSkip(float afPlayerTimeLeft)
+    ((RPB_API.GetPrisonManager()).GetPrison("Haafingar")).ReleaseDueNPCsInOrder(afPlayerTimeLeft)
+    JDB.solveIntSetter(".rpbTest.timeSkipDone", 1, true)
+endEvent
+
 ; 176: a stalled escort to jail (RPB_Arrestee.__EscortStalled -> RPB_Arrest.TakeOverStalledEscort): the escort guard held
 ; still (SetDontMove) once the escort is walking, the player led beside him, so nothing moves. After ~20s another guard of
 ; the hold should take the escort over (if one is around: Solitude's streets), else the fallback teleports the player to
@@ -14324,7 +14423,7 @@ endFunction
 string __statelessTest = ""
 
 bool function __RunStatelessTest(string asTest)
-    if (asTest != "Test_ArrestWaitsWhileGuardFights_NoPackage" && asTest != "Test_CellDoorsDiagnostic" && asTest != "Test_LongAbsenceSetup" && asTest != "Test_LongAbsenceAdvance" && asTest != "Test_LongAbsenceVerify" && asTest != "Test_FallbackEscortToCellStopped_Player" && asTest != "Test_FallbackEscortToCellStopped_CloneGuard" && asTest != "Test_FightDuringEscort_NPC" && asTest != "Test_FightDuringEscort_Player" && asTest != "Test_GuardDiesInPrison_Player" && asTest != "Test_EscortToCellStopped_NoPackageLock" && StringUtil.Find(asTest, "Test_Surrender_") != 0 && asTest != "Test_FrozenGuardSkipped" && asTest != "Test_GuardDiesInPrison_NobodySees" && asTest != "Test_Escort_FreeWalk" && asTest != "Test_ToggleEscortToCell04" && asTest != "Test_CaptorFinishCycles_Calls" && asTest != "Test_CaptorFinishCycles_NoCalls" && asTest != "Test_CaptorFinishDetach_Calls" && asTest != "Test_CaptorFinishDetach_NoCalls" && asTest != "Test_Escort_FreeWalk_Control" && asTest != "Test_ActorKeys" && asTest != "Test_FrozenGuardCalls" && asTest != "Test_SimulatedFreezeCalls" && asTest != "Test_SimulatedFreezeAtCancel" && asTest != "Test_SpawnFreezableGuard" && asTest != "Test_AliasPackageControl" && asTest != "Test_FreezableEscort_Player" && asTest != "Test_FreezableEscort_NPC" && asTest != "Test_LightHold" && asTest != "Test_KillFrozenGuard" && asTest != "Test_LifetimeBountyStat" && asTest != "Test_FaintFrozenGuard" && asTest != "Test_FaintFrozenGuardShort" && asTest != "Test_FrozenEscortFallback" && asTest != "Test_HideFrozenGuard" && asTest != "Test_EscortToCellGuardHeld" && asTest != "Test_CuffedLimitEncumbrance" && asTest != "Test_CuffedLimitSettings" && asTest != "Test_EarlyHandback" && asTest != "Test_StalledEscortTakeover" && asTest != "Test_StalledEscortTakeoverLimit")
+    if (asTest != "Test_ArrestWaitsWhileGuardFights_NoPackage" && asTest != "Test_CellDoorsDiagnostic" && asTest != "Test_LongAbsenceSetup" && asTest != "Test_LongAbsenceAdvance" && asTest != "Test_LongAbsenceVerify" && asTest != "Test_FallbackEscortToCellStopped_Player" && asTest != "Test_FallbackEscortToCellStopped_CloneGuard" && asTest != "Test_FightDuringEscort_NPC" && asTest != "Test_FightDuringEscort_Player" && asTest != "Test_GuardDiesInPrison_Player" && asTest != "Test_EscortToCellStopped_NoPackageLock" && StringUtil.Find(asTest, "Test_Surrender_") != 0 && asTest != "Test_FrozenGuardSkipped" && asTest != "Test_GuardDiesInPrison_NobodySees" && asTest != "Test_Escort_FreeWalk" && asTest != "Test_ToggleEscortToCell04" && asTest != "Test_CaptorFinishCycles_Calls" && asTest != "Test_CaptorFinishCycles_NoCalls" && asTest != "Test_CaptorFinishDetach_Calls" && asTest != "Test_CaptorFinishDetach_NoCalls" && asTest != "Test_Escort_FreeWalk_Control" && asTest != "Test_ActorKeys" && asTest != "Test_FrozenGuardCalls" && asTest != "Test_SimulatedFreezeCalls" && asTest != "Test_SimulatedFreezeAtCancel" && asTest != "Test_SpawnFreezableGuard" && asTest != "Test_AliasPackageControl" && asTest != "Test_FreezableEscort_Player" && asTest != "Test_FreezableEscort_NPC" && asTest != "Test_LightHold" && asTest != "Test_KillFrozenGuard" && asTest != "Test_LifetimeBountyStat" && asTest != "Test_FaintFrozenGuard" && asTest != "Test_FaintFrozenGuardShort" && asTest != "Test_FrozenEscortFallback" && asTest != "Test_HideFrozenGuard" && asTest != "Test_EscortToCellGuardHeld" && asTest != "Test_CuffedLimitEncumbrance" && asTest != "Test_CuffedLimitSettings" && asTest != "Test_EarlyHandback" && asTest != "Test_StalledEscortTakeover" && asTest != "Test_StalledEscortTakeoverLimit" && asTest != "Test_NpcEscortCancelControl" && asTest != "Test_FrozenPrisonerTimeSkip")
         return false
     endif
 
@@ -14468,6 +14567,11 @@ bool function __RunStatelessTest(string asTest)
         display_result(__Scenario_EscortToCellGuardHeld("172"))
         RPB_Utility.SetFreeWalkDisabledForTest(false)
         __TeardownScenario()
+    elseif (asTest == "Test_NpcEscortCancelControl")
+        display_result(__Scenario_NpcEscortCancel("178"))
+        __TeardownScenario()
+    elseif (asTest == "Test_FrozenPrisonerTimeSkip")
+        display_result(__Scenario_FrozenPrisonerTimeSkip("179"))
     elseif (asTest == "Test_StalledEscortTakeover" || asTest == "Test_StalledEscortTakeoverLimit")
         RPB_Utility.SetFreeWalkDisabledForTest(true) ; led: the player stands still with the held guard
         display_result(__Scenario_StalledEscortTakeover(string_if(asTest == "Test_StalledEscortTakeover", "176", "177"), asTest == "Test_StalledEscortTakeoverLimit"))

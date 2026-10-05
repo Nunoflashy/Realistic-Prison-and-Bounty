@@ -230,6 +230,11 @@ string function CancelArrest(Actor akActor, string asReason, bool abReturnBelong
         if (guard && sceneStopped)
             RPB_Utility.ProbeGuardAfterBurst(guard, "his Scene stopped")
         endif
+        ; An NPC arrestee goes through the same burst (the same Scene stopped, the arrest's effects coming off): probed too,
+        ; to learn whether NPC prisoners freeze the way the guards do (test 178, 2026-10-05)
+        if (sceneStopped && akActor != Game.GetPlayer())
+            RPB_Utility.ProbeNPC(akActor, "arrest cancelled")
+        endif
         if (guard && RPB_Utility.IsCaptorKeptForTest())
             ; Freeze experiment E: his Captor stays on (the test's teardown takes it off later), probed every 0.5s (the
             ; series sent at the Scene stop above; here only if there was no Scene to stop)

@@ -3694,6 +3694,7 @@ endEvent
 event OnEscortPrisonerToJailBegin(RPB_ActorBase apActor, Actor akEscort)
     ; Watched as the walk starts: a guard found frozen now hands the escort to a guard who sees it (RPB_Arrest.__HandOverEscort)
     RPB_Utility.ProbeGuardAfterBurst(akEscort, "escort to jail began")
+    RPB_Utility.ProbeNPC(apActor.GetActor(), "escort to jail began") ; an NPC prisoner through the same burst (the player isn't probed)
     ; The player's stairs assist for the walk (RPB_Prisoner's Escorting state)
     RPB_Prisoner prisonerRef = self.Prisoners.AtKey(apActor.GetActor())
     if (prisonerRef)
@@ -3730,6 +3731,7 @@ event OnEscortPrisonerToJailEnd(RPB_ActorBase apActor, Actor akEscort)
     endif
     GuardMark(akEscort, "escort to jail ended, the prison flow starts with him")
     RPB_Utility.ProbeGuardAfterBurst(akEscort, "escort to jail ended")
+    RPB_Utility.ProbeNPC(prisonerRef.GetActor(), "escort to jail ended")
     if (prisonerRef.ShouldBeStripped)
         self.StartStrippingPrisoner(prisonerRef, akEscort)
 
@@ -3776,6 +3778,7 @@ endEvent
 ; TODO: Remove RPB_JailCell from params. since a Prisoner already has a jail cell assigned to them
 event OnEscortPrisonerToCellEnd(RPB_Prisoner apPrisoner, RPB_JailCell akJailCell, Actor akEscort)
     RPB_Utility.ProbeGuardAfterBurst(akEscort, "escort to the cell ended")
+    RPB_Utility.ProbeNPC(apPrisoner.GetActor(), "escort to the cell ended")
     apPrisoner.StopEscortAssist()
     ; TODO: Fix NPC not staying in cell if they are stripped OnEscortToCellEnd
     if (!apPrisoner.IsStripped && apPrisoner.ShouldBeStripped)
