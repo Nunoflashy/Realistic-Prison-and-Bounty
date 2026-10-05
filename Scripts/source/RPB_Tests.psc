@@ -13163,7 +13163,11 @@ function ToggleManualFreeze()
         return
     endif
 
-    Actor target = Game.GetCurrentCrosshairRef() as Actor
+    ; The console's selected actor first (prid <id> selects one anywhere, another cell too), then the crosshair, then the nearest
+    Actor target = Game.GetCurrentConsoleRef() as Actor
+    if (!(target as RPB_TestFreezable) || RPB_Utility.IsFrozenGuard(target) || target == __manualFreezePrisoner)
+        target = Game.GetCurrentCrosshairRef() as Actor
+    endif
     if (!(target as RPB_TestFreezable))
         target = __NearestFreezableGuard(4000.0)
     endif
@@ -13257,7 +13261,12 @@ function ToggleManualFreezePrisoner()
         return
     endif
 
-    Actor target = Game.GetCurrentCrosshairRef() as Actor
+    ; The console's selected actor first (prid <id> selects one anywhere: a prisoner in her cell while the player is outside
+    ; the prison, 2026-10-05), then the crosshair, then the nearest
+    Actor target = Game.GetCurrentConsoleRef() as Actor
+    if (!__IsFreezablePrisoner(target))
+        target = Game.GetCurrentCrosshairRef() as Actor
+    endif
     if (!__IsFreezablePrisoner(target))
         target = __NearestFreezablePrisoner(4000.0)
     endif
@@ -13274,7 +13283,7 @@ function ToggleManualFreezePrisoner()
             endif
             k += 1
         endWhile
-        log("prisoner freeze key: none taken; crosshair " + Game.GetCurrentCrosshairRef() + "; freezable actors in high process: " + string_if(found == "", "none", found) + " (" + seen.Length + " actors in high process)")
+        log("prisoner freeze key: none taken; console " + Game.GetCurrentConsoleRef() + ", crosshair " + Game.GetCurrentCrosshairRef() + "; freezable actors in high process: " + string_if(found == "", "none", found) + " (" + seen.Length + " actors in high process)")
         return
     endif
     __prisonerHoldRelease = new bool[1]
