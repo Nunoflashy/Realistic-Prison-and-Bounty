@@ -1074,9 +1074,16 @@ state Escorting
             RegisterForSingleUpdate(__assistTick)
             return
         endif
-        ; Under way once he has walked 2 ticks in my cell: the Scene took hold. With the early hand-back switch (test 175),
-        ; under way from the start
-        if (sameCell && (escortMoving || RPB_Utility.IsEarlyHandbackForTest()))
+        ; Under way once he has walked 2 ticks in my cell: the Scene took hold. The escort to the cell is under way from its
+        ; start (the walk back right away: the mod author, 2026-10-05, "much more natural", the guard sets off all the same),
+        ; once per escort (re-armed every tick, it handed the walk back 4s after each "at the cell" lead, and the guard never
+        ; opened the cell door, which needs me AI-driven). Not the escort to jail: its first phase only takes hold with me
+        ; AI-driven (the guard stayed on his own package until the player asked to be led); the test switch tries it there
+        if (!__earlyHandbackSpent && sameCell && (__assistToCell || RPB_Utility.IsEarlyHandbackForTest()))
+            __earlyHandbackSpent = true
+            __escortUnderway = true
+        endif
+        if (sameCell && escortMoving)
             __underwayTicks += 1
             if (__underwayTicks >= 2)
                 __escortUnderway = true
@@ -2600,6 +2607,7 @@ float __assistStuckTime
 float __assistIdleTime
 bool __assistGuardWalked ; the guard has walked in this escort (StartEscortAssist resets it)
 float __assistStartedAt ; when this escort's assist started (the hand-back's timing, test 175)
+bool __earlyHandbackSpent ; the early hand-back (test switch) used in this escort
 ObjectReference __assistGuardMarker ; stands in for a frozen guard's position (__AssistGuardRef)
 int __assistLevel ; 0 = normal speed, 1-3 = raised (see __EscortSpeedForLevel)
 int __assistTeleports
@@ -3127,6 +3135,7 @@ function StartEscortAssist(Actor akEscort, bool abToCell)
     __assistIdleTime = 0.0
     __assistGuardWalked = false
     __assistStartedAt = Utility.GetCurrentRealTime()
+    __earlyHandbackSpent = false
     __assistTeleports = 0
     __assistAwayTime = 0.0
     __assistFlatTicks = 0
