@@ -10824,6 +10824,14 @@ Actor function __ScenarioGuard()
     Actor guard = __SpawnTempActorOf(baseId, abPersist = true)
     if (guard)
         guard.EnableAI(true)
+        ; A clone gets its base's crime faction, not the one the real guard was given in the world: Castle Dour's Imperial
+        ; soldiers read Haafingar (test 182), their base Imperial Legion, and 156's clones arrested "in Imperial Legion"
+        ; (no prison, 108 runs lost, 2026-10-05). The real guard's own, unless it's 159's freezable base
+        Faction realCrimeFaction = realGuard.GetCrimeFaction()
+        if (!__scenarioGuardBase && realCrimeFaction && guard.GetCrimeFaction() != realCrimeFaction)
+            log("scenario guard: " + guard + " had crime faction " + guard.GetCrimeFaction() + " from its base, given " + realCrimeFaction + " as the real guard " + realGuard)
+            guard.SetCrimeFaction(realCrimeFaction)
+        endif
     endif
     return guard
 endFunction
