@@ -1219,6 +1219,14 @@ function PlayQueued()
                     endif
                 endif
                 if (!uncuffedInFight)
+                    ; The escortee still attacked by someone outside the law while the guard isn't fighting: he goes after
+                    ; them (a bounty hunter kept at the cuffed player, the guard stood by, and this gave up after the cap and
+                    ; moved them to the prison, 2026-10-06). The wait counts from his last such turn
+                    if (escort && escortee && escortee.IsInCombat() && !RPB_Utility.IsFrozenGuard(escort) && !escort.IsInCombat())
+                        if (RPB_Utility.SendCaptorAfterAttacker(escort, escortee))
+                            combatWaitStart = Utility.GetCurrentRealTime()
+                        endif
+                    endif
                     Utility.Wait(1.0)
                 endif
             endWhile

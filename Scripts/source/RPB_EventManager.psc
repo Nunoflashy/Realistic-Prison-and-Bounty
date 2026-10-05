@@ -429,6 +429,12 @@ function OnSceneStartFailed(string asScene)
         return
     endif
     bool escortFighting = escort && !RPB_Utility.IsFrozenGuard(escort) && escort.IsInCombat() ; no call on a frozen guard
+    ; TEMPORARY (2026-10-06, the mod author testing a bounty hunter's attack on an arrested player): in development mode an
+    ; escort to jail that never started leaves them where they are, so what led to it can be watched. Remove after that test
+    if (sceneType == SceneManager.CATEGORY_ESCORT_TO_JAIL && RPB_Utility.IsDevelopmentMode())
+        Info("EventManager: " + asScene + " never started for " + escortee + " (in combat " + escortee.IsInCombat() + ", escort " + escort + " in combat " + escortFighting + "): development mode, NOT moved to the prison (temporary)")
+        return
+    endif
     Info("EventManager: " + asScene + " never started for " + escortee + " (in combat " + escortee.IsInCombat() + ", escort " + escort + " in combat " + escortFighting + "), moving them without the Scene")
     if (sceneType == SceneManager.CATEGORY_ESCORT_TO_JAIL && escort)
         prisoner.MoveToPrison(escort)
