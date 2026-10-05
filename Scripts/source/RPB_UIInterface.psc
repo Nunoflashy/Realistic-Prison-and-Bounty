@@ -242,15 +242,33 @@ RPB_Prisoner function ShowPrisonerList(RPB_Prison apPrison, bool abOnlyImprisone
     FastArray_AddString(prisonerNames, "<No Prisoner>")
     Debug("Actions::ShowPrisonerList", "Prisoners: " + prisoners.GetKeys())
 
+    ; A prisoner RPB found frozen is listed by his FormID, with no call into him (his name, sex and cell would each hang the
+    ; menu) and can't be opened. Each line keeps its prisoner's index: the list used to pick by the line's position, which
+    ; drifted once a prisoner was left out (abOnlyImprisoned)
+    int frozenMap = RPB_Utility.FrozenGuardsForScan()
+    int lineIndexes = FastArray("<int>")
+    FastArray_AddInt(lineIndexes, -1)
     int i = 0
     while (i < prisoners.Count)
+        Actor frozenActor = none
+        if (frozenMap)
+            frozenActor = prisoners.ActorAtIndexNoCall(i)
+            if (!RPB_Utility.IsListedFrozen(frozenMap, frozenActor))
+                frozenActor = none
+            endif
+        endif
         RPB_Prisoner prisoner = prisoners.AtIndex(i)
-        if ((abOnlyImprisoned && prisoner.IsImprisoned) || !abOnlyImprisoned)
+        if (frozenActor)
+            FastArray_AddString(prisonerNames, "(frozen until the next load) " + frozenActor)
+            FastArray_AddInt(lineIndexes, -2)
+            activePrisonerCount += 1
+        elseif (prisoner && ((abOnlyImprisoned && prisoner.IsImprisoned) || !abOnlyImprisoned))
             string prisonerName = prisoner.Name
             ; string sentenceFormatted = prison.GetSentenceFormatted(prisoner)
             ; string prisonerLine = "("+ prisoner.GetSex(true) +") " + prisoner.Name + " - " + prisoner.JailCell.ID + " | Sentence: " + sentenceFormatted
             string prisonerLine = "("+ prisoner.GetSex(true) +") " + prisonerName + " - " + prisoner.JailCell.ID
             FastArray_AddString(prisonerNames, prisonerLine)
+            FastArray_AddInt(lineIndexes, i)
             activePrisonerCount += 1
         endif
         i += 1
@@ -263,12 +281,17 @@ RPB_Prisoner function ShowPrisonerList(RPB_Prison apPrison, bool abOnlyImprisone
  
     string[] prisonerNamesAsArray = FastArray_ToStringArray(prisonerNames)
 
-    int index = self.ShowList(asListTitle, prisonerNamesAsArray, 0, 0) - 1
-    if (index == -1)
+    int line = self.ShowList(asListTitle, prisonerNamesAsArray, 0, 0)
+    int[] indexes = FastArray_ToIntArray(lineIndexes)
+    if (line <= 0 || line >= indexes.Length)
+        return none
+    endif
+    if (indexes[line] == -2)
+        Debug.Notification("That prisoner is frozen: nothing can be read from him until the next load")
         return none
     endif
 
-    RPB_Prisoner selectedPrisoner = prisoners.AtIndex(index)
+    RPB_Prisoner selectedPrisoner = prisoners.AtIndex(indexes[line])
     return selectedPrisoner
 endFunction
 

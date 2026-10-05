@@ -269,6 +269,7 @@ function SetTests()
     self.AddTest("181 - Spawn a Freezable NPC Here to Arrest Yourself (the prisoner freeze key freezes/releases him once arrested; development mode)", "Test_SpawnFreezableArrestee", abChainable = false)
     self.AddTest("182 - Diagnostic: the Guards Around and Their Crime Factions (does each have a prison? stand inside and outside Castle Dour)", "Test_GuardCrimeFactions", abChainable = false)
     self.AddTest("183 - Freeze Control, PLAYER: the Player's Escort to Jail Cancelled 10s In, the Guard Probed (178's player twin; repeat it)", "Test_PlayerEscortCancelControl", abChainable = false)
+    self.AddTest("184 - Benchmark: the Time Skip's NPC Releases on Its Own Stack vs by Event (6 bandits each; advances the clock a few days)", "Test_ReleaseByEventBenchmark", abChainable = false)
     self.AddTest("041 - ActiveMagicEffectContainer: Stuck Lock Self-Heals", "Test_ActiveMagicEffectContainer_StuckLockSelfHeals")
     self.AddTest("042 - ThreadLock: JAtomic Primitive Semantics and Registry", "Test_ThreadLock_PrimitiveSemantics")
     ; Not chainable: fires concurrent worker threads
@@ -12508,21 +12509,24 @@ bool function __Scenario_NpcEscortCancel(string asTest, bool abPlayer = false)
 endFunction
 
 ;/
-    179: what a frozen NPC prisoner does to the time skip, with the current code. Two NPC prisoners in Castle Dour,
-    registered without the arrest flow (as the time-skip tests do): a freezable one (RPB_TestFreezableGuard) with 1 day left,
-    held (frozen), and a normal one with 1.5 days. Then the NPC side of the player's time skip
+    179: what a frozen NPC prisoner does to the time skip. Two bandit prisoners in Castle Dour, registered without the
+    arrest flow (as the time-skip tests do): a freezable one (RPB_TestFreezablePrisoner, patch 010) with 1 day left, held
+    (frozen; RPB marks him at his registration probe), and a Bandit Marauder with 1.5 days. Until 0.16.0 the skip hung on
+    him; now a marked one is left out of it (GetPrisonersReleasedNoLaterThan), so it should finish and release the other.
+    Bandits, not a guard and a named citizen (the mod author, 2026-10-05: talking to the citizen during the hold locked the
+    dialogue, still unexplained). Then the NPC side of the player's time skip
     (Prison.ReleaseDueNPCsInOrder(2.0), real releases), on its own stack, watched for 60s: did it finish, and was the normal
     one released? Then the hold is released and it's watched again. NOTE: advances the game clock ~2 days.
 /;
 bool function __Scenario_FrozenPrisonerTimeSkip(string asTest)
     RPB_Prison prison = (RPB_API.GetPrisonManager()).GetPrison("Haafingar")
-    ActorBase freezableBase = Game.GetFormFromFile(0x0002C062, "RealisticPrisonAndBounty.esp") as ActorBase
-    if (!assert_true(freezableBase != none, asTest + ": no RPB_TestFreezableGuard in the plugin"))
+    ActorBase freezableBase = Game.GetFormFromFile(0x0002C06B, "RealisticPrisonAndBounty.esp") as ActorBase
+    if (!assert_true(freezableBase != none, asTest + ": no RPB_TestFreezablePrisoner in the plugin (patch 010)"))
         return false
     endif
     Actor player = Game.GetFormEx(0x14) as Actor
     Actor frozen = __SpawnTempActorOf(freezableBase.GetFormID())
-    Actor other = __SpawnTempActorOf(0x132AE)
+    Actor other = __SpawnTempActorOf(0x37C46) ; Bandit Marauder
     if (!assert_true(frozen && other, asTest + ": couldn't spawn the two prisoners"))
         return false
     endif
@@ -12567,11 +12571,76 @@ bool function __Scenario_FrozenPrisonerTimeSkip(string asTest)
         Utility.Wait(0.5)
     endWhile
     log(asTest + ": after the release (" + (holdTime as int) + "s held): the time skip finished " + (JDB.solveInt(".rpbTest.timeSkipDone") != 0) + ", the other prisoner released " + (prison.Prisoners.AtKey(other) == none) + ", he's still a prisoner " + (prison.Prisoners.AtKey(frozen) != none))
-    log(asTest + ": SUMMARY with a frozen NPC prisoner, the time skip finished " + finishedFrozen + " and the other was released " + otherReleasedFrozen + " (FALSE = blocked by him)")
+    log(asTest + ": SUMMARY with a frozen NPC prisoner, the time skip finished " + finishedFrozen + " and the other was released " + otherReleasedFrozen + " (FALSE = blocked by him), release by event " + RPB_Utility.IsNpcReleaseByEvent())
     self.UnregisterForModEvent("RPB_TestTimeSkip")
     self.__EndSimulatedFreeze()
     __TeardownAllTempActors()
     return assert_true(true, asTest + ": diagnostic (see SUMMARY)")
+endFunction
+
+;/
+    184: the NPC side of the player's time skip (Prison.ReleaseDueNPCsInOrder, on its own stack as in 179), twice: 6 bandit
+    prisoners due within the skip, released on the skip's stack (the original), then 6 more released each on a stack of its
+    own (RPB_Utility.SetNpcReleaseByEvent). Logs each run's total and per-release time (RPB_PrisonMonitor.ReleaseNPC's wait
+    included); green when both released all 6. The release mode is put back as it was.
+/;
+bool function __Scenario_ReleaseBenchmark(string asTest)
+    RPB_Prison prison = (RPB_API.GetPrisonManager()).GetPrison("Haafingar")
+    int count = 6
+    bool savedMode = RPB_Utility.IsNpcReleaseByEvent()
+    float[] took = new float[2]
+    int[] released = new int[2]
+    self.RegisterForModEvent("RPB_TestTimeSkip", "OnTestTimeSkip")
+    int mode = 0
+    while (mode < 2)
+        RPB_Utility.SetNpcReleaseByEvent(mode == 1)
+        Actor[] bandits = new Actor[6]
+        float now = Utility.GetCurrentGameTime()
+        int i = 0
+        while (i < count)
+            bandits[i] = __SpawnTempActorOf(0x37C46)
+            RPB_Prisoner prisoner = none
+            if (bandits[i])
+                prisoner = __RegisterPrisonerAndWait(bandits[i], prison)
+            endif
+            if (prisoner)
+                ; 1 day, imprisoned a day ago minus i tenths: due now, then one every ~2.4 game hours
+                prisoner.SetInt("Sentence", 1)
+                prisoner.SetFloat("Time of Imprisonment", now - 1.0 + (i * 0.1))
+            endif
+            i += 1
+        endWhile
+        Utility.Wait(1.0)
+
+        JDB.solveIntSetter(".rpbTest.timeSkipDone", 0, true)
+        float start = Utility.GetCurrentRealTime()
+        int handle = ModEvent.Create("RPB_TestTimeSkip")
+        if (handle)
+            ModEvent.PushFloat(handle, 2.0)
+            ModEvent.Send(handle)
+        endif
+        while (JDB.solveInt(".rpbTest.timeSkipDone") == 0 && (Utility.GetCurrentRealTime() - start) < 180.0)
+            Utility.Wait(0.1)
+        endWhile
+        took[mode] = Utility.GetCurrentRealTime() - start
+        int gone = 0
+        i = 0
+        while (i < count)
+            if (bandits[i] && prison.Prisoners.AtKey(bandits[i]) == none)
+                gone += 1
+            endif
+            i += 1
+        endWhile
+        released[mode] = gone
+        log(asTest + ": " + string_if(mode == 1, "by event", "on the skip's stack") + ": " + gone + "/" + count + " released in " + __Ms(took[mode]) + "ms (" + __Ms(took[mode] / count) + "ms per release, the days passed between them included)")
+        __TeardownAllTempActors()
+        Utility.Wait(2.0)
+        mode += 1
+    endWhile
+    RPB_Utility.SetNpcReleaseByEvent(savedMode)
+    self.UnregisterForModEvent("RPB_TestTimeSkip")
+    log(asTest + ": SUMMARY on the skip's stack " + __Ms(took[0]) + "ms (" + released[0] + " released), by event " + __Ms(took[1]) + "ms (" + released[1] + " released): by event takes " + __Ms(took[1] - took[0]) + "ms more for " + count + " releases")
+    return assert_true(released[0] == count && released[1] == count, asTest + ": released " + released[0] + " and " + released[1] + " of " + count)
 endFunction
 
 event OnTestTimeSkip(float afPlayerTimeLeft)
@@ -14672,7 +14741,7 @@ endFunction
 string __statelessTest = ""
 
 bool function __RunStatelessTest(string asTest)
-    if (asTest != "Test_ArrestWaitsWhileGuardFights_NoPackage" && asTest != "Test_CellDoorsDiagnostic" && asTest != "Test_LongAbsenceSetup" && asTest != "Test_LongAbsenceAdvance" && asTest != "Test_LongAbsenceVerify" && asTest != "Test_FallbackEscortToCellStopped_Player" && asTest != "Test_FallbackEscortToCellStopped_CloneGuard" && asTest != "Test_FightDuringEscort_NPC" && asTest != "Test_FightDuringEscort_Player" && asTest != "Test_GuardDiesInPrison_Player" && asTest != "Test_EscortToCellStopped_NoPackageLock" && StringUtil.Find(asTest, "Test_Surrender_") != 0 && asTest != "Test_FrozenGuardSkipped" && asTest != "Test_GuardDiesInPrison_NobodySees" && asTest != "Test_Escort_FreeWalk" && asTest != "Test_ToggleEscortToCell04" && asTest != "Test_CaptorFinishCycles_Calls" && asTest != "Test_CaptorFinishCycles_NoCalls" && asTest != "Test_CaptorFinishDetach_Calls" && asTest != "Test_CaptorFinishDetach_NoCalls" && asTest != "Test_Escort_FreeWalk_Control" && asTest != "Test_ActorKeys" && asTest != "Test_FrozenGuardCalls" && asTest != "Test_SimulatedFreezeCalls" && asTest != "Test_SimulatedFreezeAtCancel" && asTest != "Test_SpawnFreezableGuard" && asTest != "Test_AliasPackageControl" && asTest != "Test_FreezableEscort_Player" && asTest != "Test_FreezableEscort_NPC" && asTest != "Test_LightHold" && asTest != "Test_KillFrozenGuard" && asTest != "Test_LifetimeBountyStat" && asTest != "Test_FaintFrozenGuard" && asTest != "Test_FaintFrozenGuardShort" && asTest != "Test_FrozenEscortFallback" && asTest != "Test_HideFrozenGuard" && asTest != "Test_EscortToCellGuardHeld" && asTest != "Test_CuffedLimitEncumbrance" && asTest != "Test_CuffedLimitSettings" && asTest != "Test_EarlyHandback" && asTest != "Test_StalledEscortTakeover" && asTest != "Test_StalledEscortTakeoverLimit" && asTest != "Test_NpcEscortCancelControl" && asTest != "Test_FrozenPrisonerTimeSkip" && asTest != "Test_SpawnFreezablePrisoner" && asTest != "Test_SpawnFreezableArrestee" && asTest != "Test_GuardCrimeFactions" && asTest != "Test_PlayerEscortCancelControl")
+    if (asTest != "Test_ArrestWaitsWhileGuardFights_NoPackage" && asTest != "Test_CellDoorsDiagnostic" && asTest != "Test_LongAbsenceSetup" && asTest != "Test_LongAbsenceAdvance" && asTest != "Test_LongAbsenceVerify" && asTest != "Test_FallbackEscortToCellStopped_Player" && asTest != "Test_FallbackEscortToCellStopped_CloneGuard" && asTest != "Test_FightDuringEscort_NPC" && asTest != "Test_FightDuringEscort_Player" && asTest != "Test_GuardDiesInPrison_Player" && asTest != "Test_EscortToCellStopped_NoPackageLock" && StringUtil.Find(asTest, "Test_Surrender_") != 0 && asTest != "Test_FrozenGuardSkipped" && asTest != "Test_GuardDiesInPrison_NobodySees" && asTest != "Test_Escort_FreeWalk" && asTest != "Test_ToggleEscortToCell04" && asTest != "Test_CaptorFinishCycles_Calls" && asTest != "Test_CaptorFinishCycles_NoCalls" && asTest != "Test_CaptorFinishDetach_Calls" && asTest != "Test_CaptorFinishDetach_NoCalls" && asTest != "Test_Escort_FreeWalk_Control" && asTest != "Test_ActorKeys" && asTest != "Test_FrozenGuardCalls" && asTest != "Test_SimulatedFreezeCalls" && asTest != "Test_SimulatedFreezeAtCancel" && asTest != "Test_SpawnFreezableGuard" && asTest != "Test_AliasPackageControl" && asTest != "Test_FreezableEscort_Player" && asTest != "Test_FreezableEscort_NPC" && asTest != "Test_LightHold" && asTest != "Test_KillFrozenGuard" && asTest != "Test_LifetimeBountyStat" && asTest != "Test_FaintFrozenGuard" && asTest != "Test_FaintFrozenGuardShort" && asTest != "Test_FrozenEscortFallback" && asTest != "Test_HideFrozenGuard" && asTest != "Test_EscortToCellGuardHeld" && asTest != "Test_CuffedLimitEncumbrance" && asTest != "Test_CuffedLimitSettings" && asTest != "Test_EarlyHandback" && asTest != "Test_StalledEscortTakeover" && asTest != "Test_StalledEscortTakeoverLimit" && asTest != "Test_NpcEscortCancelControl" && asTest != "Test_FrozenPrisonerTimeSkip" && asTest != "Test_SpawnFreezablePrisoner" && asTest != "Test_SpawnFreezableArrestee" && asTest != "Test_GuardCrimeFactions" && asTest != "Test_PlayerEscortCancelControl" && asTest != "Test_ReleaseByEventBenchmark")
         return false
     endif
 
@@ -14830,6 +14899,8 @@ bool function __RunStatelessTest(string asTest)
     elseif (asTest == "Test_NpcEscortCancelControl")
         display_result(__Scenario_NpcEscortCancel("178"))
         __TeardownScenario()
+    elseif (asTest == "Test_ReleaseByEventBenchmark")
+        display_result(__Scenario_ReleaseBenchmark("184"))
     elseif (asTest == "Test_PlayerEscortCancelControl")
         display_result(__Scenario_NpcEscortCancel("183", abPlayer = true))
         __TeardownScenario()

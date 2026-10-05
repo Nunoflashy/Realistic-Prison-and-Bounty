@@ -2089,12 +2089,20 @@ endFunction
 Form[] function GetPrisonersReleasedNoLaterThan(float afTimeLeft)
     int prisonersArray = FastArray("<Form>")
 
+    ; The actors from the list's index (no call into anyone), a prisoner RPB found frozen left out before any call into
+    ; him: the time skip hung on one, and no one after him was released (test 179). He's released after the next load
+    Form[] actors = Prisoners.GetActorsNoCall()
+    int frozenMap = RPB_Utility.FrozenGuardsForScan()
     int i = 0
-    while (i < Prisoners.Count)
-        RPB_Prisoner prisoner = Prisoners.AtIndex(i)
-
-        if (prisoner.TimeLeftInSentence <= afTimeLeft)
-            FastArray_AddForm(prisonersArray, prisoner.GetActor())
+    while (i < actors.Length)
+        Actor candidate = actors[i] as Actor
+        if (frozenMap && RPB_Utility.IsListedFrozen(frozenMap, candidate))
+            RPB_Utility.LogWarn(candidate + " is frozen: left out of the time skip's releases until the next load", "["+ Name +"] Prison::GetPrisonersReleasedNoLaterThan")
+        else
+            RPB_Prisoner prisoner = Prisoners.AtKey(candidate)
+            if (prisoner && prisoner.TimeLeftInSentence <= afTimeLeft)
+                FastArray_AddForm(prisonersArray, candidate)
+            endif
         endif
 
         i += 1
@@ -2610,6 +2618,8 @@ function __ProcessPendingDress()
 
     ; Every queued NPC is looked at on each update (it fires 3 s after the last release was queued, so each entry is at least that old):
     ; it leaves the queue after two clean passes in a row or after 5 passes. Nothing depends on a clock (real time restarts every session).
+    ; A frozen one is passed over (each call below would hang the monitor's update); his tries still count
+    int frozenMap = RPB_Utility.FrozenGuardsForScan()
     i = 0
     while (i < n)
         Actor passActor = JArray.getForm(keys, i) as Actor
@@ -2619,7 +2629,7 @@ function __ProcessPendingDress()
             JMap.setInt(entry, "tries", tries)
 
             bool finished = false
-            if (passActor.Is3DLoaded())
+            if (!(frozenMap && RPB_Utility.IsListedFrozen(frozenMap, passActor)) && passActor.Is3DLoaded())
                 passActor.QueueNiNodeUpdate()
                 int equippedNow = self.__DressActor(passActor)
                 RPB_Utility.ProbeNPC(passActor, "released NPC re-dressed")
@@ -3002,8 +3012,10 @@ float function NextHostilityRestoreHours()
     bool found = false
     int i = 0
     while (i < n)
-        int entry = JFormMap.getObj(__pendingHostility, JArray.getForm(keys, i))
-        if (entry)
+        Form entryActor = JArray.getForm(keys, i)
+        int entry = JFormMap.getObj(__pendingHostility, entryActor)
+        ; A frozen one isn't counted: overdue, he'd wake the monitor every few seconds until the next load
+        if (entry && !RPB_Utility.IsFrozenGuard(entryActor as Actor))
             float dueAt = JMap.getFlt(entry, "dueAt")
             if (!found || dueAt < earliest)
                 earliest = dueAt
@@ -3068,11 +3080,13 @@ function __ProcessHostilityRestore()
     endif
 
     float now = Utility.GetCurrentGameTime()
+    int frozenMap = RPB_Utility.FrozenGuardsForScan()
     i = 0
     while (i < n)
         Actor restoreActor = JArray.getForm(keys, i) as Actor
         int entry = JFormMap.getObj(__pendingHostility, restoreActor)
-        if (entry && JMap.getFlt(entry, "dueAt") <= now)
+        ; A frozen one keeps his entry (every call below would hang the monitor's whole wake): restored after the next load
+        if (entry && JMap.getFlt(entry, "dueAt") <= now && !(frozenMap && RPB_Utility.IsListedFrozen(frozenMap, restoreActor)))
             int factions = JMap.getObj(entry, "factions")
             int ranks = JMap.getObj(entry, "ranks")
             int k = 0
@@ -3160,7 +3174,9 @@ endFunction
     @afPlayerTimeLeft is released in order of release time, and game time is passed only by the DIFFERENCE since the
     previous event before each release, so an NPC is released at its own release time (its Time Jailed and infamy are its
     sentence, not the moment a background stack happened to run) and the player is released after them. Each release is
-    synchronous with a bounded wait (Monitor.ReleaseNPC), so it can delay but never freeze the time skip.
+    waited for, bounded (Monitor.ReleaseNPC); only the release by event (RPB_Utility.IsNpcReleaseByEvent) keeps a release
+    that hangs from hanging the skip too: on this stack, the release itself isn't bounded. A prisoner RPB found frozen
+    isn't in the list at all (GetPrisonersReleasedNoLaterThan).
 
     returns (int): the days passed here (the caller passes the rest for the player).
 /;
@@ -3213,7 +3229,7 @@ int function ReleaseDueNPCsInOrder(float afPlayerTimeLeft)
 
             RPB_Prisoner releasing = Prisoners.AtKey(due[pick] as Actor)
             if (releasing)
-                Monitor.ReleaseNPC(releasing)
+                Monitor.ReleaseNPC(releasing, due[pick] as Actor)
             endif
 
             done[pick] = true

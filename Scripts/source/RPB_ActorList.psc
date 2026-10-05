@@ -89,6 +89,34 @@ endFunction
 string function GetActorIdentifier(Actor akActor) ; virtual
 endFunction
 
+;/
+    The actors of the list, read from the actor index (one JContainers call): no call into any entry's script, so a frozen
+    prisoner can't hang the caller, and one call instead of GetActors()' one per entry. The index is rebuilt once per load
+    (calling each entry then, when nobody is frozen any more) and kept on every add and remove.
+/;
+Form[] function GetActorsNoCall()
+    self.__EnsureActorIndex()
+    return JArray.asFormArray(JFormMap.allKeys(__actorToKey))
+endFunction
+
+; The actor of the entry at @aiIndex, from the index: no call into the entry. A search of the index (a few dozen at most),
+; so the loops only use it while someone is frozen (RPB_Utility.FrozenGuardsForScan)
+Actor function ActorAtIndexNoCall(int aiIndex)
+    string elementKey = GetKeyAtIndex(aiIndex)
+    if (elementKey == "")
+        return none
+    endif
+    self.__EnsureActorIndex()
+    Form candidate = JFormMap.nextKey(__actorToKey)
+    while (candidate)
+        if (JFormMap.getStr(__actorToKey, candidate) == elementKey)
+            return candidate as Actor
+        endif
+        candidate = JFormMap.nextKey(__actorToKey, candidate)
+    endWhile
+    return none
+endFunction
+
 Form[] function GetActors()
     int actorArray = FastArray("<Form>")
 

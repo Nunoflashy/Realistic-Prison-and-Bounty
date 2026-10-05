@@ -123,6 +123,7 @@ function RegisterEvents()
     RegisterForModEvent("RPB_MoveGuard", "OnMoveGuard")
     RegisterForModEvent("RPB_StalledEscortTakeover", "OnStalledEscortTakeover")
     RegisterForModEvent("RPB_EncumbranceCheck", "OnEncumbranceCheck")
+    RegisterForModEvent("RPB_ReleaseNPC", "OnReleaseNPC")
 
     ; The cuffed restrictions as the cuffs are now (animation events don't survive a load either)
     RPB_Utility.SyncCuffedRestrictions()
@@ -135,6 +136,20 @@ function RegisterEvents()
         RPB_Utility.LogWarn("The forced arrest dialogue was left off with no arrest or surrender under way: turned back on", "EventManager::RegisterEvents")
     endif
 endFunction
+
+; One NPC release of the player's time skip on a stack of its own (RPB_PrisonMonitor.ReleaseNPC, by event): the skip waits
+; for it, bounded, so a release that hangs here doesn't hang the skip
+event OnReleaseNPC(Form akActor, int aiPrisonID)
+    RPB_Prison prison = API.PrisonManager.GetPrisonByID(aiPrisonID)
+    if (!prison)
+        RPB_Utility.LogError("No prison " + aiPrisonID + " for the release of " + akActor, "EventManager::OnReleaseNPC")
+        return
+    endif
+    RPB_Prisoner prisoner = prison.Prisoners.AtKey(akActor as Actor)
+    if (prisoner)
+        prison.SendReleaseRequest(prisoner)
+    endif
+endEvent
 
 ; A second after the walking-only limit went on: still over-encumbered, still running? (RPB_Utility.LimitCuffedMovement_Encumbrance)
 event OnEncumbranceCheck(string asEventName, string asStringArg, float afNumArg, Form akSender)
@@ -478,16 +493,30 @@ function SendPrisonSceneBulkEvent(string asScene, string asSceneEvent, Form[] ak
         return
     endif
 
-    RPB_Prison prison = API.PrisonManager.FindPrisonByPrisoner(akPrisoners[0] as Actor)
-
-    if (prison == none)
-        RPB_Utility.LogError("Could not retrieve the prison from " + akPrisoners[0] + ", cannot proceed with the scene!", "EventManager::SendPrisonSceneBulkEvent")
+    ; A prisoner RPB found frozen is left out before any call into him: the prison's lookup and his scene steps call into
+    ; him, and every scene event comes through this one object
+    int frozenMap = RPB_Utility.FrozenGuardsForScan()
+    int first = 0
+    while (first < akPrisoners.Length && frozenMap && RPB_Utility.IsListedFrozen(frozenMap, akPrisoners[first] as Actor))
+        RPB_Utility.LogWarn(akPrisoners[first] + " is frozen: left out of " + asScene + "'s " + asSceneEvent + " until the next load", "EventManager::SendPrisonSceneBulkEvent")
+        first += 1
+    endWhile
+    if (first >= akPrisoners.Length)
         return
     endif
 
-    int i = 0
+    RPB_Prison prison = API.PrisonManager.FindPrisonByPrisoner(akPrisoners[first] as Actor)
+
+    if (prison == none)
+        RPB_Utility.LogError("Could not retrieve the prison from " + akPrisoners[first] + ", cannot proceed with the scene!", "EventManager::SendPrisonSceneBulkEvent")
+        return
+    endif
+
+    int i = first
     while (i < akPrisoners.Length)
-        if (!self.__PrisonerAlreadyGone(prison, akPrisoners[i] as Actor, asSceneSecondaryEvent))
+        if (frozenMap && RPB_Utility.IsListedFrozen(frozenMap, akPrisoners[i] as Actor))
+            ; left out (logged above for the first ones)
+        elseif (!self.__PrisonerAlreadyGone(prison, akPrisoners[i] as Actor, asSceneSecondaryEvent))
             RPB_Prisoner prisoner = prison.AwaitPrisonerReference(akPrisoners[i] as Actor)
 
             if (prisoner == none)

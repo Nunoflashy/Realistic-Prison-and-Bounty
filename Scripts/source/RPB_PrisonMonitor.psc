@@ -32,7 +32,7 @@ scriptname RPB_PrisonMonitor extends ReferenceAlias
     function ClearDryRunReleaseOrder()
     function QueueRelease(RPB_Prisoner apPrisoner)
     function ReleaseQueued(RPB_Prisoner apPrisoner)
-    function ReleaseNPC(RPB_Prisoner apPrisoner)
+    function ReleaseNPC(RPB_Prisoner apPrisoner, Actor akReleasing = none)
     function ProcessReleaseQueue()
     function AwaitPrisoners()
     function RegisterForMonitoring()
@@ -304,10 +304,14 @@ float function __NextReleaseWakeHours()
     float[] daysLeft = Utility.CreateFloatArray(count)
     bool[] excluded = Utility.CreateBoolArray(count, false) ; the fill argument is NOT reliable here: every element is assigned below
     bool hasUnknown = false
+    int frozenMap = RPB_Utility.FrozenGuardsForScan() ; 0 unless someone is frozen: only then is each entry's actor looked up
 
     int i = 0
     while (i < count)
-        RPB_Prisoner prisoner = Prisoners.AtIndex(i)
+        RPB_Prisoner prisoner = none
+        if (!frozenMap || !RPB_Utility.IsListedFrozen(frozenMap, Prisoners.ActorAtIndexNoCall(i)))
+            prisoner = Prisoners.AtIndex(i)
+        endif
 
         if (!prisoner)
             ; Away: no effect script, its stored state cannot be read through RPB_Prisoner (see ROADMAP: persistent roster)
@@ -521,23 +525,51 @@ endFunction
 
 ;/
     Releases one NPC prisoner NOW and waits (bounded, ~20 s real time) until it has left the prison's list. Used by the
-    player's time skip, where every NPC must be released at its own release time, in order, before time moves on. The
-    bounded wait means a slow NPC release can delay the time skip but never freeze it. This is the seam for the release
-    mode (instant teleport today, an escort scene the player can watch later: see ROADMAP).
+    player's time skip, where every NPC must be released at its own release time, in order, before time moves on. This is
+    the seam for the release mode (instant teleport today, an escort scene the player can watch later).
+
+    Two ways, switched by RPB_Utility.IsNpcReleaseByEvent (test 184 benchmarks them):
+    - on this stack (the original): the release runs here, and only the wait after it is bounded. A release that hangs
+      (a frozen prisoner not detected yet) hangs the whole time skip with it;
+    - on a stack of its own (RPB_ReleaseNPC, RPB_EventManager.OnReleaseNPC), this one waiting for it as before: a hang
+      costs the skip the 20s wait, it goes on with the next, and the stuck release finishes after the next load.
+    @akReleasing: the actor, read by the caller from the list's index (no call into him); read from him when none.
 /;
-function ReleaseNPC(RPB_Prisoner apPrisoner)
+function ReleaseNPC(RPB_Prisoner apPrisoner, Actor akReleasing = none)
     if (self.DebugDryRunReleases)
         self.__RecordDryRun(apPrisoner)
         return
     endif
 
-    Actor releasing = apPrisoner.GetActor()
-    Prison.SendReleaseRequest(apPrisoner)
-
+    Actor releasing = akReleasing
+    if (!releasing)
+        releasing = apPrisoner.GetActor()
+    endif
+    bool byEvent = RPB_Utility.IsNpcReleaseByEvent()
     float t0 = Utility.GetCurrentRealTime()
+    if (byEvent)
+        int handle = ModEvent.Create("RPB_ReleaseNPC")
+        if (handle)
+            ModEvent.PushForm(handle, releasing)
+            ModEvent.PushInt(handle, Prison.ID)
+            ModEvent.Send(handle)
+        else
+            byEvent = false
+        endif
+    endif
+    if (!byEvent)
+        Prison.SendReleaseRequest(apPrisoner)
+    endif
+
     while (Prisoners.AtKey(releasing) != none && (Utility.GetCurrentRealTime() - t0) < 20.0)
         Utility.Wait(0.2)
     endWhile
+    float took = Utility.GetCurrentRealTime() - t0
+    if (Prisoners.AtKey(releasing) != none)
+        RPB_Utility.LogWarn("The release of " + releasing + " didn't finish in 20s (" + string_if(byEvent, "on its own stack: the time skip goes on, it finishes by itself", "on the time skip's stack") + ")", "["+ Prison.Name +"] PrisonMonitor::ReleaseNPC")
+        RPB_Utility.ProbeNPC(releasing, "release stalled")
+    endif
+    JDB.solveFltSetter(".rpb_root.lastNpcReleaseSeconds", took, true) ; for test 184
 endFunction
 
 function ProcessReleaseQueue()
@@ -552,10 +584,17 @@ function ProcessReleaseQueue()
     JArray.eraseIndex(__releaseQueue, 0)
     JFormMap.removeKey(__releaseAt, next)
 
-    RPB_Prisoner prisoner = Prisoners.AtKey(next as Actor)
+    RPB_Prisoner prisoner = none
+    if (RPB_Utility.IsFrozenGuard(next as Actor))
+        ; Kept a prisoner: AwaitPrisoners queues him again once he answers (after the next load). Not put back in the queue:
+        ; alone in it, he'd be retried every half second until then
+        RPB_Utility.LogWarn("Queued prisoner " + next + " is frozen: not released until the next load", "["+ Prison.Name +"] PrisonMonitor::ProcessReleaseQueue")
+    else
+        prisoner = Prisoners.AtKey(next as Actor)
+    endif
     if (prisoner)
         self.ReleaseQueued(prisoner)
-    else
+    elseif (!RPB_Utility.IsFrozenGuard(next as Actor))
         Debug("["+ Prison.Name +"] PrisonMonitor::ProcessReleaseQueue", "Queued prisoner " + next + " is not in the prison anymore, skipping.")
     endif
 
@@ -658,13 +697,24 @@ function AwaitPrisoners()
     int prisonersAwaitingRelease = 0
     int prisonersAway = 0
 
-    ; Snapshot of the actors first: a release removes the prisoner from the list, which used to shift the indexes under this loop
-    Form[] actors = Prisoners.GetActors()
-    prisonersAway = Prisoners.Count - actors.Length ; entries whose effect is not running (away)
+    ; Snapshot of the actors first: a release removes the prisoner from the list, which used to shift the indexes under this
+    ; loop. From the list's index: no call into anyone (GetActors() called every entry's script), and a prisoner RPB found
+    ; frozen is skipped before any call into him (his release waits for the next load, when the freeze is gone)
+    Form[] actors = Prisoners.GetActorsNoCall()
+    int frozenMap = RPB_Utility.FrozenGuardsForScan()
+    int live = 0
 
     int i = 0
     while (i < actors.Length)
-        RPB_Prisoner prisoner = Prisoners.AtKey(actors[i] as Actor)
+        RPB_Prisoner prisoner = none
+        if (frozenMap && RPB_Utility.IsListedFrozen(frozenMap, actors[i] as Actor))
+            Debug("PrisonMonitor::AwaitPrisoners", actors[i] + " is frozen: skipped until the next load")
+        else
+            prisoner = Prisoners.AtKey(actors[i] as Actor)
+        endif
+        if (prisoner)
+            live += 1
+        endif
 
         ; Foreground prisoners and the Player run themselves; only NPCs that are not actively monitored are processed here
         ; Only imprisoned ones: a prisoner is registered at arrest start, and one still being escorted has no sentence running
@@ -679,6 +729,7 @@ function AwaitPrisoners()
         i += 1
     endWhile
 
+    prisonersAway = Prisoners.Count - live ; entries whose effect is not running (away), or frozen
     if (prisonersAway > 0)
         Debug("PrisonMonitor::AwaitPrisoners", prisonersAway + " prisoner(s) in " + Prison.Name + " are away (no effect running): their release cannot be evaluated in the background yet")
     endif

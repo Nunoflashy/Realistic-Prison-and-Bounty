@@ -188,6 +188,8 @@ scriptname RPB_Utility hidden
     function ClearCrumbs(Actor akActor) global
     string function DumpCrumbs(Actor akActor) global
     int function GetMaxDayEventsPerUpdate() global
+    bool function IsNpcReleaseByEvent() global
+    function SetNpcReleaseByEvent(bool abOn) global
     function SetMaxDayEventsPerUpdate(int aiDays) global
     bool function IsOvercrowdingDisabled() global
     function SetOvercrowdingDisabled(bool abDisabled) global
@@ -3785,6 +3787,20 @@ endFunction
     the player's release included. Long sentences are legitimate (NPCs that are only ever free by escaping), but one
     update must stay bounded. A dev value (Profile.MAX_DAY_EVENTS, 0 = default) lets a test lower it.
 /;
+;/
+    How the player's time skip releases each NPC prisoner due (RPB_PrisonMonitor.ReleaseNPC): on the skip's own stack
+    (off, the original), or on a stack of its own through an event, the skip waiting for it as before (on). On its own
+    stack, a release that hangs on a frozen prisoner no one has detected yet costs the skip its 20s wait, not the skip.
+    Test 184 benchmarks the two (JDB Profile NPC_RELEASE_BY_EVENT, 2026-10-05).
+/;
+bool function IsNpcReleaseByEvent() global
+    return JDB.solveInt(".rpb_root.storage.Profile.NPC_RELEASE_BY_EVENT") != 0
+endFunction
+
+function SetNpcReleaseByEvent(bool abOn) global
+    JDB.solveIntSetter(".rpb_root.storage.Profile.NPC_RELEASE_BY_EVENT", abOn as int, true)
+endFunction
+
 int function GetMaxDayEventsPerUpdate() global
     int configured = JDB.solveInt(".rpb_root.storage.Profile.MAX_DAY_EVENTS")
     if (configured > 0)
