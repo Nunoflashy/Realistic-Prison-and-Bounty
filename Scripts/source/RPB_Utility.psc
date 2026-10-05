@@ -1384,12 +1384,16 @@ Actor function SendCaptorAfterAttacker(Actor akCaptor, Actor akArrestee) global
     endif
     Faction captorFaction = akCaptor.GetCrimeFaction()
     Actor outsider = none
-    Actor[] targets = PO3_SKSEFunctions.GetCombatTargets(akArrestee)
+    Actor[] targets = __AttackersOf(akArrestee)
+    if (targets.Length == 0)
+        LogInfo(akArrestee + " is in combat " + akArrestee.IsInCombat() + " but nobody loaded has them as a target", "Utility::SendCaptorAfterAttacker")
+    endif
     int i = 0
     while (i < targets.Length)
         Actor target = targets[i]
         if (target && target != akCaptor && !IsFrozenGuard(target) && !target.IsDead() && !target.IsDisabled() && !IsActorArrested(target))
             Faction targetFaction = target.GetCrimeFaction()
+            LogInfo(target + " attacks " + akArrestee + ": crime faction " + targetFaction + " (captor's " + captorFaction + ")", "Utility::SendCaptorAfterAttacker")
             if (!targetFaction)
                 if (!outsider)
                     outsider = target
@@ -1410,6 +1414,42 @@ Actor function SendCaptorAfterAttacker(Actor akCaptor, Actor akArrestee) global
         LogInfo(akCaptor + " goes after " + outsider + ", who keeps attacking his prisoner " + akArrestee, "Utility::SendCaptorAfterAttacker")
     endif
     return outsider
+endFunction
+
+;/
+    Who is attacking @akArrestee: every loaded actor whose combat target they are, plus their own combat targets. The
+    player's own list didn't name the bounty hunter attacking them (2026-10-06), so it's read from the attackers' side
+    (a call on each loaded actor, none on a frozen one). Only while an arrestee is in combat: the escort watch and the
+    pending re-check every 5s, the escort's fight-wait once a second.
+/;
+Actor[] function __AttackersOf(Actor akArrestee) global
+    int found = JArray.object()
+    Actor[] own = PO3_SKSEFunctions.GetCombatTargets(akArrestee)
+    int i = 0
+    while (i < own.Length)
+        if (own[i])
+            JArray.addForm(found, own[i])
+        endif
+        i += 1
+    endWhile
+    Actor[] nearby = PO3_SKSEFunctions.GetActorsByProcessingLevel(0)
+    int frozenMap = FrozenGuardsForScan()
+    i = 0
+    while (i < nearby.Length)
+        Actor candidate = nearby[i]
+        if (candidate && candidate != akArrestee && !IsListedFrozen(frozenMap, candidate) && candidate.GetCombatTarget() == akArrestee && JArray.findForm(found, candidate) == -1)
+            JArray.addForm(found, candidate)
+        endif
+        i += 1
+    endWhile
+    Form[] forms = JArray.asFormArray(found)
+    Actor[] attackers = PapyrusUtil.ActorArray(forms.Length)
+    i = 0
+    while (i < forms.Length)
+        attackers[i] = forms[i] as Actor
+        i += 1
+    endWhile
+    return attackers
 endFunction
 
 ; A citizen (someone with a crime faction, not the captor's law) attacking a prisoner: arrested by another guard of the
