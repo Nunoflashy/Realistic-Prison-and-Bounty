@@ -13116,6 +13116,18 @@ function ToggleManualFreezePrisoner()
     endif
     if (!target)
         Debug.Notification("RPB dev: no freezable prisoner nearby (test 180 imprisons one)")
+        ; What it saw: every freezable actor loaded nearby and why none was taken (no call on a frozen one)
+        Actor player = Game.GetPlayer()
+        Actor[] seen = PO3_SKSEFunctions.GetActorsByProcessingLevel(0)
+        string found = ""
+        int k = 0
+        while (k < seen.Length)
+            if (seen[k] as RPB_TestFreezable)
+                found += seen[k] + " (imprisoned " + RPB_Utility.IsActorImprisoned(seen[k]) + ", arrested " + RPB_Utility.IsActorArrested(seen[k]) + ", frozen " + RPB_Utility.IsFrozenGuard(seen[k]) + ", " + (player.GetDistance(seen[k]) as int) + " away); "
+            endif
+            k += 1
+        endWhile
+        log("prisoner freeze key: none taken; crosshair " + Game.GetCurrentCrosshairRef() + "; freezable actors in high process: " + string_if(found == "", "none", found) + " (" + seen.Length + " actors in high process)")
         return
     endif
     __prisonerHoldRelease = new bool[1]
