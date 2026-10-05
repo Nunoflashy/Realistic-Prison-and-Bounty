@@ -5232,7 +5232,10 @@ Actor function GetNearbyGuardForFactionFromRef( \
     while (scans < aiMaxScans)
         Actor scannedActor = Game.FindRandomActorFromRef(akCenterRef, radius)
 
+        ; A frozen guard first, with no call on him (him as an argument only): IsGuard() on one hung F4's Arrest Actor
+        ; (2026-10-05, the overnight run's save with 8 frozen guards around)
         bool conditions = \ 
+            scannedActor && !IsFrozenGuard(scannedActor) && \
             scannedActor.GetFormID() != 0x14 && \
             !scannedActor.IsChild() && \
             scannedActor.IsGuard()

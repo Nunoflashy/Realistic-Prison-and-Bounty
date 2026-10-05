@@ -952,9 +952,6 @@ function Action_ArrestSelectedActor(RPB_UIInterface uilib, bool abEscortArrestee
     float startBench = StartBenchmark()
     Actor selectedActor = Game.GetCurrentConsoleRef() as Actor
 
-    GlobalVariable RPB_Surrender = RPB_Utility.RPB_ArrestGlobal("No Dialogue")
-    RPB_Surrender.SetValueInt(1)
-
     Actor guard = none
 
     if (abShowCaptorInputField)
@@ -1008,7 +1005,11 @@ function Action_ArrestSelectedActor(RPB_UIInterface uilib, bool abEscortArrestee
     else
         guard.GetCrimeFaction().SetCrimeGold(arrestBounty)
     endif
-    
+
+    ; The forced arrest dialogue off only now, right before the arrest (its end turns it back on): set at the top, an
+    ; action that stopped on the way (no guard, no bounty, or hung on a frozen guard) left it off, and no guard could
+    ; arrest the player any more, their forcegreets back to their everyday lines (2026-10-05)
+    RPB_Utility.RPB_ArrestGlobal("No Dialogue").SetValueInt(1)
     API.Arrest.ArrestActor(guard, selectedActor, arrestType)
     EndBenchmark(startBench, "Actions::Action_ArrestSelectedActor")
 endFunction

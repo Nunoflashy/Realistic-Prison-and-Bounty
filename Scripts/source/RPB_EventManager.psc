@@ -125,6 +125,14 @@ function RegisterEvents()
 
     ; The cuffed restrictions as the cuffs are now (animation events don't survive a load either)
     RPB_Utility.SyncCuffedRestrictions()
+
+    ; The forced arrest dialogue back on unless an arrest or surrender of the player is under way: left off (a dev arrest
+    ; that stopped on the way), no guard could arrest the player again in that save (2026-10-05)
+    Actor player = Game.GetPlayer()
+    if (RPB_Utility.RPB_ArrestGlobal("No Dialogue").GetValueInt() != 0 && !RPB_Utility.IsActorArrested(player) && !RPB_Utility.IsActorImprisoned(player) && !(Arrest && Arrest.IsSurrendering(player)))
+        RPB_Arrest.EnableForcedArrestDialogue()
+        RPB_Utility.LogWarn("The forced arrest dialogue was left off with no arrest or surrender under way: turned back on", "EventManager::RegisterEvents")
+    endif
 endFunction
 
 ; The player's jumps while cuffed: a jump drops the cuffed pose (ZaZ's), and Papyrus can't block jumping. The player
