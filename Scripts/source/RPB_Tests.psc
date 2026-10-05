@@ -12608,6 +12608,9 @@ bool function __Scenario_ReleaseBenchmark(string asTest)
             bandits[i] = __SpawnTempActorOf(0x37C46)
             RPB_Prisoner prisoner = none
             if (bandits[i])
+                ; Neutral, as an arrest makes them: registered straight in, they came out of prison still hostile, and the
+                ; guards and they fought (and killed the player) at the release point
+                RPB_Utility.NeutralizeHostileActor(bandits[i])
                 prisoner = __RegisterPrisonerAndWait(bandits[i], prison)
             endif
             if (prisoner)
