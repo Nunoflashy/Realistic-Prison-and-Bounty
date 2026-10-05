@@ -1103,6 +1103,7 @@ function ClearFrozenGuards() global
     __ClearFormMapAt(__FrozenGuardsPath())
     __ClearFormMapAt(".rpb_root.frozenGuardSteps")
     __ClearFormMapAt(".rpb_root.frozenReports")
+    __ClearFormMapAt(".rpb_root.toldToStop")
     __ClearFormMapAt(".rpb_root.guardOpenProbes")
     __ClearFormMapAt(".rpb_root.frozenActorRoles")
     __ClearFormMapAt(".rpb_root.guardPendingProbes")
@@ -1372,10 +1373,12 @@ endFunction
 ;/
     The rules for who attacks an arrested prisoner (temporary, until the Scene refactor's; the mod author 2026-10-06: in a
     town the citizens join in too, and the guard must not kill them all):
-    - the law of the captor's hold (his crime faction, guard or not, Captain Aldis): called off (CalmOwnLawAttackers);
-    - anyone else with a crime faction (citizens, another hold's people): arrested by another guard of the hold who sees
-      them (a small bounty for the assault first), or only told to stop when no guard is free;
-    - nobody's (bandits, bounty hunters, creatures): the captor goes after them.
+    - a guard of the captor's hold: called off (CalmOwnLawAttackers);
+    - anyone else with a crime faction, the hold's own included (citizens, Captain Aldis, a bounty hunter: the hunter
+      carried Haafingar's and was only ever told to stop, attacking again each time): told to stop first; still at it on
+      a later check (4s on) -> arrested by another guard of the hold who sees them (a placeholder assault bounty), or told
+      to stop again when no guard is free. Never fought;
+    - nobody's (bandits, creatures): the captor goes after them.
     Returns the one the captor went after, or none.
 /;
 Actor function SendCaptorAfterAttacker(Actor akCaptor, Actor akArrestee) global
@@ -1398,10 +1401,13 @@ Actor function SendCaptorAfterAttacker(Actor akCaptor, Actor akArrestee) global
                 if (!outsider)
                     outsider = target
                 endif
-            elseif (captorFaction && targetFaction == captorFaction)
-                target.StopCombat() ; his own law (CalmOwnLawAttackers' rule)
-            else
+            elseif (captorFaction && targetFaction == captorFaction && target.IsGuard())
+                target.StopCombat() ; a guard of his hold: the arrest is his too, only called off
+            elseif (__ToldToStopAndKeptOn(target))
                 __ArrestPrisonerAttacker(target, akCaptor, captorFaction, akArrestee)
+            else
+                target.StopCombat()
+                LogInfo(target + " attacked " + akCaptor + "'s prisoner " + akArrestee + ": told to stop (arrested if they keep on)", "Utility::SendCaptorAfterAttacker")
             endif
         endif
         i += 1
@@ -1450,6 +1456,25 @@ Actor[] function __AttackersOf(Actor akArrestee) global
         i += 1
     endWhile
     return attackers
+endFunction
+
+;/
+    Whether @akActor was told to stop attacking a prisoner and is at it again: the first call notes the time (false), a
+    later one at least 4s on is true. A note older than a minute starts over. Cleared on load (ClearFrozenGuards).
+/;
+bool function __ToldToStopAndKeptOn(Actor akActor) global
+    int told = JDB.solveObj(".rpb_root.toldToStop")
+    if (!told)
+        told = JFormMap.object()
+        JDB.solveObjSetter(".rpb_root.toldToStop", told, true)
+    endif
+    float now = Utility.GetCurrentRealTime()
+    float at = JFormMap.getFlt(told, akActor)
+    if (at <= 0.0 || at > now || (now - at) > 60.0)
+        JFormMap.setFlt(told, akActor, now)
+        return false
+    endif
+    return (now - at) >= 4.0
 endFunction
 
 ; A citizen (someone with a crime faction, not the captor's law) attacking a prisoner: arrested by another guard of the
