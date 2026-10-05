@@ -1838,6 +1838,9 @@ endFunction
 function SetPlayerFastForwardingToRelease(bool abFastForward)
     __isPlayerFastForwardingToRelease = abFastForward
     __fastForwardSetAt = Utility.GetCurrentRealTime()
+    if (!abFastForward)
+        self.__RebaseSkippedHostilityRestores() ; the world is back: their neutral time starts now
+    endif
 endFunction
 
 ; Hands a due NPC prisoner to the monitor's ordered release queue (asynchronous: never blocks the caller)
@@ -2966,16 +2969,52 @@ function __QueueHostilityRestore(Actor akActor)
     JMap.setObj(entry, "factions", factions)
     JMap.setObj(entry, "ranks", ranks)
     JMap.setFlt(entry, "aggression", RPB_StorageVars.GetFloatOnReference("Original Aggression", akActor, "Jail"))
-    float delayHours = RPB_Utility.GetHostilityRestoreOverrideHours()
-    if (delayHours <= 0.0)
-        delayHours = HOSTILITY_RESTORE_DELAY_HOURS
-    endif
-    float dueAt = Utility.GetCurrentGameTime() + (delayHours / 24.0)
+    float dueAt = Utility.GetCurrentGameTime() + self.__HostilityRestoreDelayDays()
     JMap.setFlt(entry, "dueAt", dueAt)
+    ; Released inside the player's time skip, at their own release time: the rest of the player's sentence passes after
+    ; it, so the window was over before the world came back, and the guards attacked them at the prison door (2026-10-05).
+    ; Held until the skip ends, then counted from there (__RebaseSkippedHostilityRestores)
+    if (__isPlayerFastForwardingToRelease)
+        JMap.setInt(entry, "afterSkip", 1)
+    endif
     JFormMap.setObj(__pendingHostility, akActor, entry)
     RPB_Utility.Crumb(akActor, "Hostility restore queued: " + savedFactions.Length + " factions, due at game time " + dueAt)
 
     self.__RescheduleHostilityRestore()
+endFunction
+
+float function __HostilityRestoreDelayDays()
+    float delayHours = RPB_Utility.GetHostilityRestoreOverrideHours()
+    if (delayHours <= 0.0)
+        delayHours = HOSTILITY_RESTORE_DELAY_HOURS
+    endif
+    return delayHours / 24.0
+endFunction
+
+; The restores queued during the player's time skip, due from now (the skip's end) instead of from their release. Also run
+; from __ProcessHostilityRestore, in case the skip ended without clearing them
+function __RebaseSkippedHostilityRestores()
+    if (!__pendingHostility || !JValue.isExists(__pendingHostility))
+        return
+    endif
+    int keys = JFormMap.allKeys(__pendingHostility)
+    int n = JArray.count(keys)
+    float dueAt = Utility.GetCurrentGameTime() + self.__HostilityRestoreDelayDays()
+    int rebased = 0
+    int i = 0
+    while (i < n)
+        int entry = JFormMap.getObj(__pendingHostility, JArray.getForm(keys, i))
+        if (entry && JMap.getInt(entry, "afterSkip") != 0)
+            JMap.setFlt(entry, "dueAt", dueAt)
+            JMap.removeKey(entry, "afterSkip")
+            rebased += 1
+        endif
+        i += 1
+    endWhile
+    if (rebased > 0)
+        Info("[" + Name + "] " + rebased + " NPC(s) released during the player's time skip stay neutral until game time " + dueAt)
+        self.__RescheduleHostilityRestore()
+    endif
 endFunction
 
 ; I don't register the restore's game-time wake here: this script shares its alias with RPB_PrisonMonitor, and the two used
@@ -3003,7 +3042,7 @@ float function NextHostilityRestoreHours()
     int i = 0
     while (i < n)
         int entry = JFormMap.getObj(__pendingHostility, JArray.getForm(keys, i))
-        if (entry)
+        if (entry && JMap.getInt(entry, "afterSkip") == 0)
             float dueAt = JMap.getFlt(entry, "dueAt")
             if (!found || dueAt < earliest)
                 earliest = dueAt
@@ -3029,6 +3068,9 @@ endFunction
 function __ProcessHostilityRestore()
     if (!__pendingHostility || !JValue.isExists(__pendingHostility))
         return
+    endif
+    if (!__isPlayerFastForwardingToRelease)
+        self.__RebaseSkippedHostilityRestores()
     endif
 
     int keys = JFormMap.allKeys(__pendingHostility)
@@ -3072,7 +3114,7 @@ function __ProcessHostilityRestore()
     while (i < n)
         Actor restoreActor = JArray.getForm(keys, i) as Actor
         int entry = JFormMap.getObj(__pendingHostility, restoreActor)
-        if (entry && JMap.getFlt(entry, "dueAt") <= now)
+        if (entry && JMap.getFlt(entry, "dueAt") <= now && JMap.getInt(entry, "afterSkip") == 0)
             int factions = JMap.getObj(entry, "factions")
             int ranks = JMap.getObj(entry, "ranks")
             int k = 0

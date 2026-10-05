@@ -1270,7 +1270,15 @@ endFunction
 
 function LimitCuffedMovement_Settings(bool abOn) global
     bool isOn = JDB.solveInt(".rpb_root.cuffedLimit.settings") != 0
-    if (abOn == isOn)
+    ; The flag comes back with a save, the game setting doesn't (it lasts the whole game session): cuffed, then a save from
+    ; before the cuffs loaded, the flag read off and fJumpHeightMin stayed 0 (2026-10-05). The setting itself decides
+    float current = Game.GetGameSettingFloat("fJumpHeightMin")
+    if (abOn == isOn && (current <= 0.0) == abOn)
+        return
+    endif
+    if (abOn && isOn)
+        Game.SetGameSettingFloat("fJumpHeightMin", 0.0) ; the flag's already on, the saved height with it
+        Debug("Utility::LimitCuffedMovement_Settings", "cuffed movement limit (settings) on again after a load, fJumpHeightMin was " + current)
         return
     endif
     if (abOn)

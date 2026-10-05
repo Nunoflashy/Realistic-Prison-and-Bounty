@@ -1254,6 +1254,26 @@ function PlayQueued()
             elseif (waitedForCombat)
                 Info("SceneManager: " + nextScene + " gave up after " + ((Utility.GetCurrentRealTime() - combatWaitStart) as int) + "s, the fight is still on")
             endif
+
+            ; Refused with nobody fighting: seen right after a pending arrest resumed, the guard just out of his fight
+            ; (2026-10-05: the escort to jail never started, and the player was moved to the prison without it). One more
+            ; try a moment later, the player under AI with their package re-evaluated, before the fallback below
+            if (!waitedForCombat && !sceneObject.IsPlaying() && __lastStartedScene != nextScene && currentScene == nextScene)
+                Info("SceneManager: " + nextScene + " refused to start with nobody fighting (" + escort + " / " + escortee + "), trying once more in 2s")
+                Utility.Wait(2.0)
+                if (!sceneObject.IsPlaying() && __lastStartedScene != nextScene && currentScene == nextScene)
+                    if (escortee && escortee == Game.GetPlayer())
+                        RetainAI(true)
+                        escortee.EvaluatePackage()
+                    endif
+                    sceneObject.Start()
+                    startWaitStart = Utility.GetCurrentRealTime()
+                    while (!sceneObject.IsPlaying() && __lastStartedScene != nextScene && currentScene == nextScene && (Utility.GetCurrentRealTime() - startWaitStart) < 3.0)
+                        Utility.Wait(0.1)
+                    endWhile
+                endif
+                Info("SceneManager: " + nextScene + " on the second try: started " + (sceneObject.IsPlaying() || __lastStartedScene == nextScene))
+            endif
         endif
 
         if (!sceneObject.IsPlaying() && __lastStartedScene != nextScene && currentScene == nextScene)

@@ -1224,6 +1224,13 @@ state Escorting
                 self.__SetEscortSpeedLevel(1)
                 __assistTick = 0.25
                 RPB_Utility.LogInfo(Name + " is stuck in the escort (" + (distance as int) + " units behind, " + self.__AssistTrace(guardSpeed) + "), walking speed raised to " + (self.__EscortSpeedForLevel(1) as int), "["+ Name +"] Prisoner::EscortAssist")
+                ; Led and not walking at all (no walk animation): a raised speed can't help a package that isn't running. After
+                ; a pending arrest resumed, the player stood still through every boost and 3 moves to the guard, and the
+                ; escort was given up (2026-10-05). Their package re-evaluated, once per stuck spell
+                if (!__freeWalk && this.GetAnimationVariableFloat("Speed") < 1.0)
+                    this.EvaluatePackage()
+                    RPB_Utility.LogInfo(Name + " is led but not walking at all in the escort, their package re-evaluated (now " + this.GetCurrentPackage() + ")", "["+ Name +"] Prisoner::EscortAssist")
+                endif
             endif
         else
             __assistStuckTime = 0.0
@@ -3252,7 +3259,7 @@ endFunction
 ; What the assist saw, for its log lines: the guard's speed, and the walk animation's own values (logged only: "Speed"
 ; never rose above 20 on the AI-driven player)
 string function __AssistTrace(float afGuardSpeed)
-    return "guard moving " + (afGuardSpeed as int) + "/s, anim Speed " + (this.GetAnimationVariableFloat("Speed") as int) + ", SpeedSampled " + (this.GetAnimationVariableFloat("SpeedSampled") as int)
+    return "guard moving " + (afGuardSpeed as int) + "/s, anim Speed " + (this.GetAnimationVariableFloat("Speed") as int) + ", SpeedSampled " + (this.GetAnimationVariableFloat("SpeedSampled") as int) + ", package " + this.GetCurrentPackage()
 endFunction
 
 ; The raised walking speeds, in steps: small stairs never need the top one, which overshot at the end of a flight

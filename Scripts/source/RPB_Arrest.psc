@@ -1644,17 +1644,38 @@ bool function HasSurrenderGuard(Actor[] akCombatTargets)
     return false
 endFunction
 
-; A living combat target that isn't a guard (a bandit, a creature), or none
+;/
+    A living combat target that isn't the law (a bandit, a creature), or none. The law is a guard, or anyone of the same
+    crime faction as one of the guards fighting them: Captain Aldis (Castle Dour, not flagged a guard) blocked a surrender
+    to Solitude's guards as if he were a bandit (2026-10-05). The surrender's StopCombatAlarm calls off that crime
+    faction's whole alarm, him included
+/;
 Actor function GetNonGuardCombatTarget(Actor[] akCombatTargets)
     int i = 0
     while (i < akCombatTargets.Length)
         Actor target = akCombatTargets[i]
-        if (target && !RPB_Utility.IsFrozenGuard(target) && !target.IsDead() && !target.IsDisabled() && !target.IsGuard())
+        if (target && !RPB_Utility.IsFrozenGuard(target) && !target.IsDead() && !target.IsDisabled() && !target.IsGuard() && !self.__IsOfAGuardsCrimeFaction(target, akCombatTargets))
             return target
         endif
         i += 1
     endWhile
     return none
+endFunction
+
+; @akActor belongs to the crime faction of one of the surrender guards among @akCombatTargets (his own, or a member of it)
+bool function __IsOfAGuardsCrimeFaction(Actor akActor, Actor[] akCombatTargets)
+    Faction ownCrimeFaction = akActor.GetCrimeFaction()
+    int i = 0
+    while (i < akCombatTargets.Length)
+        if (akCombatTargets[i] != akActor && self.IsSurrenderGuard(akCombatTargets[i]))
+            Faction guardCrimeFaction = akCombatTargets[i].GetCrimeFaction()
+            if (guardCrimeFaction && (guardCrimeFaction == ownCrimeFaction || akActor.IsInFaction(guardCrimeFaction)))
+                return true
+            endif
+        endif
+        i += 1
+    endWhile
+    return false
 endFunction
 
 ; The guards among @akCombatTargets, at most the Surrender Scene's 6 captor slots (empty slots stay none, the binding skips them)
