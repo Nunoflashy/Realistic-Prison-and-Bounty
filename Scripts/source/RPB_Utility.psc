@@ -1369,19 +1369,66 @@ endFunction
     went pending "waiting for the guard to deal with None" and resumed into an escort that couldn't go on; arresting the
     attacker too waits for the Scene refactor. The attacker, or none (nobody, or the captor can't: dead or frozen).
 /;
+;/
+    The rules for who attacks an arrested prisoner (temporary, until the Scene refactor's; the mod author 2026-10-06: in a
+    town the citizens join in too, and the guard must not kill them all):
+    - the law of the captor's hold (his crime faction, guard or not, Captain Aldis): called off (CalmOwnLawAttackers);
+    - anyone else with a crime faction (citizens, another hold's people): arrested by another guard of the hold who sees
+      them (a small bounty for the assault first), or only told to stop when no guard is free;
+    - nobody's (bandits, bounty hunters, creatures): the captor goes after them.
+    Returns the one the captor went after, or none.
+/;
 Actor function SendCaptorAfterAttacker(Actor akCaptor, Actor akArrestee) global
     if (!akCaptor || !akArrestee || IsFrozenGuard(akCaptor) || akCaptor.IsDead())
         return none
     endif
-    Actor attacker = GetOtherHostileTarget(akArrestee, akCaptor, akCaptor)
-    if (!attacker)
+    Faction captorFaction = akCaptor.GetCrimeFaction()
+    Actor outsider = none
+    Actor[] targets = PO3_SKSEFunctions.GetCombatTargets(akArrestee)
+    int i = 0
+    while (i < targets.Length)
+        Actor target = targets[i]
+        if (target && target != akCaptor && !IsFrozenGuard(target) && !target.IsDead() && !target.IsDisabled() && !IsActorArrested(target))
+            Faction targetFaction = target.GetCrimeFaction()
+            if (!targetFaction)
+                if (!outsider)
+                    outsider = target
+                endif
+            elseif (captorFaction && targetFaction == captorFaction)
+                target.StopCombat() ; his own law (CalmOwnLawAttackers' rule)
+            else
+                __ArrestPrisonerAttacker(target, akCaptor, captorFaction, akArrestee)
+            endif
+        endif
+        i += 1
+    endWhile
+    if (!outsider)
         return none
     endif
-    if (akCaptor.GetCombatTarget() != attacker)
-        akCaptor.StartCombat(attacker)
-        LogInfo(akCaptor + " goes after " + attacker + ", who keeps attacking his prisoner " + akArrestee, "Utility::SendCaptorAfterAttacker")
+    if (akCaptor.GetCombatTarget() != outsider)
+        akCaptor.StartCombat(outsider)
+        LogInfo(akCaptor + " goes after " + outsider + ", who keeps attacking his prisoner " + akArrestee, "Utility::SendCaptorAfterAttacker")
     endif
-    return attacker
+    return outsider
+endFunction
+
+; A citizen (someone with a crime faction, not the captor's law) attacking a prisoner: arrested by another guard of the
+; captor's hold who sees them, for a small bounty, or only told to stop. Once each (arrested ones are skipped above)
+function __ArrestPrisonerAttacker(Actor akAttacker, Actor akCaptor, Faction akCaptorFaction, Actor akArrestee) global
+    akAttacker.StopCombat()
+    Actor guard = none
+    if (akCaptorFaction)
+        guard = FindTakeoverGuard(akAttacker, akCaptorFaction, akCaptor, 0.0, 3000.0, abSightOnly = true)
+    endif
+    if (!guard)
+        LogInfo(akAttacker + " attacked " + akCaptor + "'s prisoner " + akArrestee + ": no other guard to arrest them, told to stop", "Utility::SendCaptorAfterAttacker")
+        return
+    endif
+    if (RPB_ActorVars.GetCrimeGold(akCaptorFaction, akAttacker) <= 0)
+        RPB_ActorVars.SetCrimeGold(akCaptorFaction, akAttacker, 40) ; assault
+    endif
+    LogInfo(akAttacker + " attacked " + akCaptor + "'s prisoner " + akArrestee + ": arrested by " + guard, "Utility::SendCaptorAfterAttacker")
+    RPB_API.GetArrest().ArrestActor(guard, akAttacker, RPB_API.GetArrest().ARREST_TYPE_ESCORT_TO_JAIL)
 endFunction
 
 ;/
@@ -1558,9 +1605,21 @@ function LimitCuffedMovement_Encumbrance(bool abOn) global
     JDB.solveIntSetter(".rpb_root.cuffedLimit.encumbrance", abOn as int, true)
     Debug("Utility::LimitCuffedMovement_Encumbrance", "walking only (encumbrance) " + string_if(abOn, "on", "off") + ": carry weight changed by " + amount + ", now " + player.GetActorValue("CarryWeight"))
     if (abOn)
-        ; The player still ran with it on (the 441-run save, 2026-10-05): whether the engine saw them over-encumbered, and
-        ; whether they were already running, now and a second later (RPB_EventManager.OnEncumbranceCheck)
-        LogInfo("Walking only on: " + EncumbranceTrace(player), "Utility::LimitCuffedMovement_Encumbrance")
+        ; The diagnostics showed both (2026-10-06): (a) carry weight -1, an empty inventory, and the engine NOT reading the
+        ; player over-encumbered (it re-checks on an inventory change); (b) over-encumbered, but already running, and the run
+        ; went on. (a): a coin in and out of the inventory, silently; (b): movement off for a moment, so the next one walks
+        string before = EncumbranceTrace(player)
+        if (!player.IsOverEncumbered())
+            Form gold = Game.GetFormEx(0xF)
+            player.AddItem(gold, 1, true)
+            player.RemoveItem(gold, 1, true)
+        endif
+        if (player.IsRunning() || player.IsSprinting())
+            Game.DisablePlayerControls(abMovement = true, abFighting = false, abCamSwitch = false, abLooking = false, abSneaking = false, abMenu = false, abActivate = false, abJournalTabs = false)
+            Utility.Wait(0.2)
+            Game.EnablePlayerControls(abMovement = true, abFighting = false, abCamSwitch = false, abLooking = false, abSneaking = false, abMenu = false, abActivate = false, abJournalTabs = false)
+        endif
+        LogInfo("Walking only on: before " + before + "; after " + EncumbranceTrace(player), "Utility::LimitCuffedMovement_Encumbrance")
         int handle = ModEvent.Create("RPB_EncumbranceCheck")
         if (handle)
             ModEvent.Send(handle)
