@@ -12590,6 +12590,8 @@ bool function __Scenario_ReleaseBenchmark(string asTest)
     int count = 6
     bool savedMode = RPB_Utility.IsNpcReleaseByEvent()
     float[] took = new float[2] ; summed per mode
+    float[] work = new float[2] ; the releases' own time (SendReleaseRequest), summed per mode
+    float[] latency = new float[2] ; by event: from the event sent to its stack starting, summed
     int[] released = new int[2]
     self.RegisterForModEvent("RPB_TestTimeSkip", "OnTestTimeSkip")
     int run = 0
@@ -12609,15 +12611,18 @@ bool function __Scenario_ReleaseBenchmark(string asTest)
                 prisoner = __RegisterPrisonerAndWait(bandits[i], prison)
             endif
             if (prisoner)
-                ; 1 day, imprisoned a day ago minus i tenths: due now, then one every ~2.4 game hours
+                ; All due now: no day passes between them (the skip passes whole days, and 0.1 day apart made a day each:
+                ; the first ones' neutral window ran out and they killed the player, 2026-10-05), so this times releases only
                 prisoner.SetInt("Sentence", 1)
-                prisoner.SetFloat("Time of Imprisonment", now - 1.0 + (i * 0.1))
+                prisoner.SetFloat("Time of Imprisonment", now - 1.0)
             endif
             i += 1
         endWhile
         Utility.Wait(1.0)
 
         JDB.solveIntSetter(".rpbTest.timeSkipDone", 0, true)
+        JDB.solveFltSetter(".rpb_root.npcReleaseWork", 0.0, true)
+        JDB.solveFltSetter(".rpb_root.npcReleaseLatency", 0.0, true)
         float start = Utility.GetCurrentRealTime()
         int handle = ModEvent.Create("RPB_TestTimeSkip")
         if (handle)
@@ -12629,6 +12634,8 @@ bool function __Scenario_ReleaseBenchmark(string asTest)
         endWhile
         float runTook = Utility.GetCurrentRealTime() - start
         took[mode] = took[mode] + runTook
+        work[mode] = work[mode] + JDB.solveFlt(".rpb_root.npcReleaseWork")
+        latency[mode] = latency[mode] + JDB.solveFlt(".rpb_root.npcReleaseLatency")
         int gone = 0
         i = 0
         while (i < count)
@@ -12638,14 +12645,14 @@ bool function __Scenario_ReleaseBenchmark(string asTest)
             i += 1
         endWhile
         released[mode] = released[mode] + gone
-        log(asTest + ": run " + (run + 1) + ", " + string_if(mode == 1, "by event", "on the skip's stack") + ": " + gone + "/" + count + " released in " + __Ms(runTook) + "ms (" + __Ms(runTook / count) + "ms per release, the days passed between them included)")
+        log(asTest + ": run " + (run + 1) + ", " + string_if(mode == 1, "by event", "on the skip's stack") + ": " + gone + "/" + count + " released in " + __Ms(runTook) + "ms (" + __Ms(runTook / count) + "ms per release; the releases' own work " + __Ms(JDB.solveFlt(".rpb_root.npcReleaseWork") / count) + "ms each, the event's start delay " + __Ms(JDB.solveFlt(".rpb_root.npcReleaseLatency") / count) + "ms each)")
         __TeardownAllTempActors()
         Utility.Wait(2.0)
         run += 1
     endWhile
     RPB_Utility.SetNpcReleaseByEvent(savedMode)
     self.UnregisterForModEvent("RPB_TestTimeSkip")
-    log(asTest + ": SUMMARY per run of " + count + ": on the skip's stack " + __Ms(took[0] / 2.0) + "ms, by event " + __Ms(took[1] / 2.0) + "ms (released " + released[0] + " and " + released[1] + " of " + (count * 2) + "): by event " + __Ms((took[1] - took[0]) / (2.0 * count)) + "ms more per release")
+    log(asTest + ": SUMMARY per release: on the skip's stack " + __Ms(took[0] / (2.0 * count)) + "ms (its own work " + __Ms(work[0] / (2.0 * count)) + "ms), by event " + __Ms(took[1] / (2.0 * count)) + "ms (its own work " + __Ms(work[1] / (2.0 * count)) + "ms, start delay " + __Ms(latency[1] / (2.0 * count)) + "ms); released " + released[0] + " and " + released[1] + " of " + (count * 2) + ". Same work in both = B1 adds waiting, not load")
     return assert_true(released[0] == count * 2 && released[1] == count * 2, asTest + ": released " + released[0] + " and " + released[1] + " of " + (count * 2))
 endFunction
 

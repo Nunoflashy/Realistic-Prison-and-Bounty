@@ -147,7 +147,11 @@ event OnReleaseNPC(Form akActor, int aiPrisonID)
     endif
     RPB_Prisoner prisoner = prison.Prisoners.AtKey(akActor as Actor)
     if (prisoner)
+        ; Test 184's split: the delay before this stack started, and the release's own time (as on the skip's stack)
+        float startedAt = Utility.GetCurrentRealTime()
+        JDB.solveFltSetter(".rpb_root.npcReleaseLatency", JDB.solveFlt(".rpb_root.npcReleaseLatency") + (startedAt - JDB.solveFlt(".rpb_root.npcReleaseSentAt")), true)
         prison.SendReleaseRequest(prisoner)
+        JDB.solveFltSetter(".rpb_root.npcReleaseWork", JDB.solveFlt(".rpb_root.npcReleaseWork") + (Utility.GetCurrentRealTime() - startedAt), true)
     endif
 endEvent
 

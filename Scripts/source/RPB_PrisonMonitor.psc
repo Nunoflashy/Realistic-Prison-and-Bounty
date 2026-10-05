@@ -547,6 +547,7 @@ function ReleaseNPC(RPB_Prisoner apPrisoner, Actor akReleasing = none)
     endif
     bool byEvent = RPB_Utility.IsNpcReleaseByEvent()
     float t0 = Utility.GetCurrentRealTime()
+    JDB.solveFltSetter(".rpb_root.npcReleaseSentAt", t0, true) ; test 184: how long the event took to start the release
     if (byEvent)
         int handle = ModEvent.Create("RPB_ReleaseNPC")
         if (handle)
@@ -559,6 +560,7 @@ function ReleaseNPC(RPB_Prisoner apPrisoner, Actor akReleasing = none)
     endif
     if (!byEvent)
         Prison.SendReleaseRequest(apPrisoner)
+        JDB.solveFltSetter(".rpb_root.npcReleaseWork", JDB.solveFlt(".rpb_root.npcReleaseWork") + (Utility.GetCurrentRealTime() - t0), true)
     endif
 
     ; Checked every 0.05s by event: at 0.2s, each release paid up to 200ms of rounding (test 184: ~170ms a release, 2026-10-05).
