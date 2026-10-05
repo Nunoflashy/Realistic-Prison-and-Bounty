@@ -267,6 +267,7 @@ function SetTests()
     self.AddTest("179 - Diagnostic: a Frozen NPC Prisoner in the Time Skip (another prisoner due after him; the current code, before any fix)", "Test_FrozenPrisonerTimeSkip", abChainable = false)
     self.AddTest("180 - Imprison a Freezable Prisoner in Castle Dour (kept: the prisoner freeze key freezes/releases him; development mode)", "Test_SpawnFreezablePrisoner", abChainable = false)
     self.AddTest("181 - Spawn a Freezable NPC Here to Arrest Yourself (the prisoner freeze key freezes/releases him once arrested; development mode)", "Test_SpawnFreezableArrestee", abChainable = false)
+    self.AddTest("182 - Diagnostic: the Guards Around and Their Crime Factions (does each have a prison? stand inside and outside Castle Dour)", "Test_GuardCrimeFactions", abChainable = false)
     self.AddTest("041 - ActiveMagicEffectContainer: Stuck Lock Self-Heals", "Test_ActiveMagicEffectContainer_StuckLockSelfHeals")
     self.AddTest("042 - ThreadLock: JAtomic Primitive Semantics and Registry", "Test_ThreadLock_PrimitiveSemantics")
     ; Not chainable: fires concurrent worker threads
@@ -10810,8 +10811,8 @@ Faction __scenarioResistFaction
 ; A cloned guard next to the player, AI on (none, with a failed assert, without a guard nearby to clone)
 Actor function __ScenarioGuard()
     Actor player = Game.GetFormEx(0x14) as Actor
-    Actor realGuard = RPB_Utility.GetNearestGuard(player, 3000.0, player)
-    if (!assert_true(realGuard != none, "No guard near the player to clone (stand near a guard in Solitude)"))
+    Actor realGuard = __NearestGuardWithPrison(player, 3000.0)
+    if (!assert_true(realGuard != none, "No guard of a hold with a prison near the player to clone (stand near a guard in Solitude)"))
         return none
     endif
 
@@ -10827,12 +10828,38 @@ Actor function __ScenarioGuard()
     return guard
 endFunction
 
+;/
+    The nearest guard within @afRadius of @akCenter whose crime faction has an RPB prison. GetNearestGuard alone took an
+    Imperial soldier inside Castle Dour (crime faction "Imperial Legion", no prison) in 156's overnight run: 108 arrests
+    timed out at the prisoner's registration (2026-10-05)
+/;
+Actor function __NearestGuardWithPrison(Actor akCenter, float afRadius)
+    RPB_PrisonManager prisons = RPB_API.GetPrisonManager()
+    Actor[] nearby = PO3_SKSEFunctions.GetActorsByProcessingLevel(0)
+    Actor nearest = none
+    float nearestDistance = afRadius
+    int i = 0
+    while (i < nearby.Length)
+        Actor candidate = nearby[i]
+        if (candidate && candidate != akCenter && candidate.GetFormID() != 0x14 && !RPB_Utility.IsFrozenGuard(candidate) && candidate.IsGuard() && !candidate.IsDead() && !candidate.IsDisabled() && !candidate.IsChild())
+            float distance = candidate.GetDistance(akCenter)
+            Faction crimeFaction = candidate.GetCrimeFaction()
+            if (distance < nearestDistance && crimeFaction && prisons.GetPrison(crimeFaction.GetName()))
+                nearest = candidate
+                nearestDistance = distance
+            endif
+        endif
+        i += 1
+    endWhile
+    return nearest
+endFunction
+
 ; The nearest real guard, for a scenario that must not use a clone (see 135): never added to the temp actor list, so
 ; never deleted; __TeardownScenario resets him instead
 Actor function __ScenarioRealGuard()
     Actor player = Game.GetFormEx(0x14) as Actor
-    Actor realGuard = RPB_Utility.GetNearestGuard(player, 3000.0, player)
-    if (!assert_true(realGuard != none, "No guard near the player (stand near a guard in Solitude)"))
+    Actor realGuard = __NearestGuardWithPrison(player, 3000.0)
+    if (!assert_true(realGuard != none, "No guard of a hold with a prison near the player (stand near a guard in Solitude)"))
         return none
     endif
     __scenarioRealGuard = realGuard
@@ -12535,6 +12562,41 @@ event OnTestTimeSkip(float afPlayerTimeLeft)
     ((RPB_API.GetPrisonManager()).GetPrison("Haafingar")).ReleaseDueNPCsInOrder(afPlayerTimeLeft)
     JDB.solveIntSetter(".rpbTest.timeSkipDone", 1, true)
 endEvent
+
+;/
+    182: every guard in high process (IsGuard), nearest first is not needed: each logged with his base, crime faction,
+    whether RPB has a prison for it, his cell and distance. For the Imperial soldiers inside Castle Dour, whose arrests
+    ran in "Imperial Legion" in 156's overnight run while the soldiers outside arrest for Haafingar. Always green
+/;
+bool function __Scenario_GuardCrimeFactions(string asTest)
+    Actor player = Game.GetFormEx(0x14) as Actor
+    RPB_PrisonManager prisons = RPB_API.GetPrisonManager()
+    Actor[] nearby = PO3_SKSEFunctions.GetActorsByProcessingLevel(0)
+    log(asTest + ": the player in " + player.GetParentCell() + " (" + player.GetCurrentLocation() + ")")
+    int guards = 0
+    int withoutPrison = 0
+    int i = 0
+    while (i < nearby.Length)
+        Actor candidate = nearby[i]
+        if (candidate && candidate.GetFormID() != 0x14 && !RPB_Utility.IsFrozenGuard(candidate) && candidate.IsGuard() && !candidate.IsDead())
+            guards += 1
+            Faction crimeFaction = candidate.GetCrimeFaction()
+            string factionName = "none"
+            bool hasPrison = false
+            if (crimeFaction)
+                factionName = crimeFaction.GetName() + " " + crimeFaction
+                hasPrison = prisons.GetPrison(crimeFaction.GetName()) != none
+            endif
+            if (!hasPrison)
+                withoutPrison += 1
+            endif
+            log(asTest + ": " + candidate.GetDisplayName() + " " + candidate + " (base " + candidate.GetBaseObject() + "): crime faction " + factionName + ", prison " + hasPrison + ", cell " + candidate.GetParentCell() + ", distance " + (candidate.GetDistance(player) as int))
+        endif
+        i += 1
+    endWhile
+    log(asTest + ": SUMMARY " + guards + " guard(s), " + withoutPrison + " of a crime faction RPB has no prison for")
+    return assert_true(true, asTest + ": diagnostic (see the log)")
+endFunction
 
 ; 176: a stalled escort to jail (RPB_Arrestee.__EscortStalled -> RPB_Arrest.TakeOverStalledEscort): the escort guard held
 ; still (SetDontMove) once the escort is walking, the player led beside him, so nothing moves. After ~20s another guard of
@@ -14544,10 +14606,22 @@ function ExecuteTestRepeated(string asTestKeyName, int aiTimes)
     int failed = 0
     int unknown = 0
     string results = ""
+    ; Every run starts where the first one did: the teardown leaves the player wherever the run ended, and in 156's
+    ; overnight run (2026-10-05) the start drifted into Castle Dour, where half the runs failed on the spot, not the code
+    Actor player = Game.GetFormEx(0x14) as Actor
+    ObjectReference startMarker = player.PlaceAtMe(Game.GetFormEx(0x3B), 1, false, false)
     int run = 0
     while (run < aiTimes && !__repeatStopRequested)
         __repeatRun = run + 1
         base_log("[UNIT REPEAT]", "Run " + (run + 1) + "/" + aiTimes + ": " + asTestKeyName, "Tests::Repeat")
+        if (run > 0 && startMarker && player.GetDistance(startMarker) > 64.0)
+            player.MoveTo(startMarker)
+            float moved = Utility.GetCurrentRealTime()
+            while (!player.Is3DLoaded() && (Utility.GetCurrentRealTime() - moved) < 20.0)
+                Utility.Wait(0.5)
+            endWhile
+            Utility.Wait(2.0) ; the guards around load in
+        endif
         self.ExecuteTest(asTestKeyName)
         if (__lastResultState == 1)
             passed += 1
@@ -14568,6 +14642,9 @@ function ExecuteTestRepeated(string asTestKeyName, int aiTimes)
 
     string summary = asTestKeyName + ": " + passed + " passed, " + failed + " failed" + string_if(unknown > 0, ", " + unknown + " without a result", "") + " of " + run + " runs [" + results + "] in " + __Ms(Utility.GetCurrentRealTime() - repeatStart) + "ms" + string_if(__repeatStopRequested, " (stopped early)", "")
     base_log("[UNIT REPEAT RESULT]", summary, "Tests::Repeat")
+    if (startMarker)
+        startMarker.Delete()
+    endif
     Debug.Notification("Repeat done: " + passed + "/" + run + " passed")
     __repeating = false
     __repeatStopRequested = false
@@ -14579,7 +14656,7 @@ endFunction
 string __statelessTest = ""
 
 bool function __RunStatelessTest(string asTest)
-    if (asTest != "Test_ArrestWaitsWhileGuardFights_NoPackage" && asTest != "Test_CellDoorsDiagnostic" && asTest != "Test_LongAbsenceSetup" && asTest != "Test_LongAbsenceAdvance" && asTest != "Test_LongAbsenceVerify" && asTest != "Test_FallbackEscortToCellStopped_Player" && asTest != "Test_FallbackEscortToCellStopped_CloneGuard" && asTest != "Test_FightDuringEscort_NPC" && asTest != "Test_FightDuringEscort_Player" && asTest != "Test_GuardDiesInPrison_Player" && asTest != "Test_EscortToCellStopped_NoPackageLock" && StringUtil.Find(asTest, "Test_Surrender_") != 0 && asTest != "Test_FrozenGuardSkipped" && asTest != "Test_GuardDiesInPrison_NobodySees" && asTest != "Test_Escort_FreeWalk" && asTest != "Test_ToggleEscortToCell04" && asTest != "Test_CaptorFinishCycles_Calls" && asTest != "Test_CaptorFinishCycles_NoCalls" && asTest != "Test_CaptorFinishDetach_Calls" && asTest != "Test_CaptorFinishDetach_NoCalls" && asTest != "Test_Escort_FreeWalk_Control" && asTest != "Test_ActorKeys" && asTest != "Test_FrozenGuardCalls" && asTest != "Test_SimulatedFreezeCalls" && asTest != "Test_SimulatedFreezeAtCancel" && asTest != "Test_SpawnFreezableGuard" && asTest != "Test_AliasPackageControl" && asTest != "Test_FreezableEscort_Player" && asTest != "Test_FreezableEscort_NPC" && asTest != "Test_LightHold" && asTest != "Test_KillFrozenGuard" && asTest != "Test_LifetimeBountyStat" && asTest != "Test_FaintFrozenGuard" && asTest != "Test_FaintFrozenGuardShort" && asTest != "Test_FrozenEscortFallback" && asTest != "Test_HideFrozenGuard" && asTest != "Test_EscortToCellGuardHeld" && asTest != "Test_CuffedLimitEncumbrance" && asTest != "Test_CuffedLimitSettings" && asTest != "Test_EarlyHandback" && asTest != "Test_StalledEscortTakeover" && asTest != "Test_StalledEscortTakeoverLimit" && asTest != "Test_NpcEscortCancelControl" && asTest != "Test_FrozenPrisonerTimeSkip" && asTest != "Test_SpawnFreezablePrisoner" && asTest != "Test_SpawnFreezableArrestee")
+    if (asTest != "Test_ArrestWaitsWhileGuardFights_NoPackage" && asTest != "Test_CellDoorsDiagnostic" && asTest != "Test_LongAbsenceSetup" && asTest != "Test_LongAbsenceAdvance" && asTest != "Test_LongAbsenceVerify" && asTest != "Test_FallbackEscortToCellStopped_Player" && asTest != "Test_FallbackEscortToCellStopped_CloneGuard" && asTest != "Test_FightDuringEscort_NPC" && asTest != "Test_FightDuringEscort_Player" && asTest != "Test_GuardDiesInPrison_Player" && asTest != "Test_EscortToCellStopped_NoPackageLock" && StringUtil.Find(asTest, "Test_Surrender_") != 0 && asTest != "Test_FrozenGuardSkipped" && asTest != "Test_GuardDiesInPrison_NobodySees" && asTest != "Test_Escort_FreeWalk" && asTest != "Test_ToggleEscortToCell04" && asTest != "Test_CaptorFinishCycles_Calls" && asTest != "Test_CaptorFinishCycles_NoCalls" && asTest != "Test_CaptorFinishDetach_Calls" && asTest != "Test_CaptorFinishDetach_NoCalls" && asTest != "Test_Escort_FreeWalk_Control" && asTest != "Test_ActorKeys" && asTest != "Test_FrozenGuardCalls" && asTest != "Test_SimulatedFreezeCalls" && asTest != "Test_SimulatedFreezeAtCancel" && asTest != "Test_SpawnFreezableGuard" && asTest != "Test_AliasPackageControl" && asTest != "Test_FreezableEscort_Player" && asTest != "Test_FreezableEscort_NPC" && asTest != "Test_LightHold" && asTest != "Test_KillFrozenGuard" && asTest != "Test_LifetimeBountyStat" && asTest != "Test_FaintFrozenGuard" && asTest != "Test_FaintFrozenGuardShort" && asTest != "Test_FrozenEscortFallback" && asTest != "Test_HideFrozenGuard" && asTest != "Test_EscortToCellGuardHeld" && asTest != "Test_CuffedLimitEncumbrance" && asTest != "Test_CuffedLimitSettings" && asTest != "Test_EarlyHandback" && asTest != "Test_StalledEscortTakeover" && asTest != "Test_StalledEscortTakeoverLimit" && asTest != "Test_NpcEscortCancelControl" && asTest != "Test_FrozenPrisonerTimeSkip" && asTest != "Test_SpawnFreezablePrisoner" && asTest != "Test_SpawnFreezableArrestee" && asTest != "Test_GuardCrimeFactions")
         return false
     endif
 
@@ -14729,6 +14806,8 @@ bool function __RunStatelessTest(string asTest)
         display_result(assert_true(freezableArrestee != none, "181: couldn't spawn the freezable NPC (plugin patch 010 in?)"))
     elseif (asTest == "Test_SpawnFreezablePrisoner")
         display_result(__Scenario_SpawnFreezablePrisoner("180"))
+    elseif (asTest == "Test_GuardCrimeFactions")
+        display_result(__Scenario_GuardCrimeFactions("182"))
     elseif (asTest == "Test_NpcEscortCancelControl")
         display_result(__Scenario_NpcEscortCancel("178"))
         __TeardownScenario()
