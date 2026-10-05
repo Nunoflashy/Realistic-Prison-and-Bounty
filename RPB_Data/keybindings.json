@@ -8,5 +8,15 @@
         "Name": "AI Control (Escort / Cell)",
         "Default": 37,
         "Info": "Escorted: switch between walking on your own beside the guard and being led by him (led until you press it again). In your cell: switch between your own control and following the prison routine, wandering your cell like the other prisoners."
+    },
+    "FreezeGuard": {
+        "Name": "[Dev] Freeze/Release Test Guard",
+        "Default": 68,
+        "Info": "Development only: freezes the freezable test guard under the crosshair or the nearest one (test 161 spawns one); again: releases him."
+    },
+    "FreezePrisoner": {
+        "Name": "[Dev] Freeze/Release Test Prisoner",
+        "Default": 67,
+        "Info": "Development only: freezes the freezable NPC under the crosshair or the nearest one, once he's arrested or a prisoner (test 180 imprisons one, test 181 spawns one to arrest yourself); again: releases him."
     }
 }

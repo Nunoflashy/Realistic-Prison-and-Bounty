@@ -205,6 +205,8 @@ scriptname RPB_Utility hidden
     function SetPackageLockDisabled(bool abDisabled) global
     bool function IsFreeWalkDisabledForTest() global
     bool function IsEarlyHandbackForTest() global
+    bool function IsDevelopmentMode() global
+    function SetDevelopmentMode(bool abOn) global
     function SetEarlyHandbackForTest(bool abOn) global
     function SetFreeWalkDisabledForTest(bool abDisabled) global
     function SetEscortWaitBlocked(bool abBlocked) global
@@ -3823,6 +3825,16 @@ endFunction
 
 ; Test-only (135, 136, 140): the player's escort stays AI-led, never a free walk. They test the led fallbacks (the move
 ; into the cell); free walk takes a stop over first and those never get their turn.
+; Development mode (the MCM's Debug page): the development keys (freezing a test guard or prisoner) are on, and listed on
+; the Keybindings page. Off for players
+bool function IsDevelopmentMode() global
+    return JDB.solveInt(".rpb_root.storage.Profile.DEVELOPMENT") != 0
+endFunction
+
+function SetDevelopmentMode(bool abOn) global
+    RPB_StorageVars.SetInt("DEVELOPMENT", abOn as int, "Profile")
+endFunction
+
 ; Test switch (175): the player's walk handed back as soon as the escort Scene is under the assist (its start), not once
 ; the guard has walked 2 ticks (the mod author, 2026-10-05: it would feel more natural; the old wait exists because a
 ; phase waiting on the escortee's own package never ended once they weren't AI-driven)

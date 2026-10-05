@@ -20,6 +20,15 @@ string function DataPath() global
 endFunction
 
 string[] function Actions() global
+    ; The development keys too in development mode (RPB_Utility.IsDevelopmentMode): freezing a test guard or prisoner
+    if (RPB_Utility.IsDevelopmentMode())
+        string[] devActions = new string[4]
+        devActions[0] = "Surrender"
+        devActions[1] = "EscortToggle"
+        devActions[2] = "FreezeGuard"
+        devActions[3] = "FreezePrisoner"
+        return devActions
+    endif
     string[] actions = new string[2]
     actions[0] = "Surrender"
     actions[1] = "EscortToggle"

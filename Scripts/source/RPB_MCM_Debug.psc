@@ -85,7 +85,8 @@ function Left(RPB_MCM mcm) global
 endFunction
 
 function Right(RPB_MCM mcm) global
-    
+    mcm.AddOptionCategory("Development")
+    mcm.AddOptionTextKey("Development Mode", "DevelopmentMode", string_if(RPB_Utility.IsDevelopmentMode(), "ON", "OFF"))
 endFunction
 
 function HandleDependencies(RPB_MCM mcm) global
@@ -154,6 +155,12 @@ function OnOptionSelect(RPB_MCM mcm, string option) global
         RPB_MCM_Clothing.EquipOutfitOnActor(mcm, player, outfitId)
         return
     
+    elseif (IsOptionInCategory(option, "DevelopmentMode"))
+        ; The development keys and their Keybindings entries (RPB_Keybindings)
+        RPB_Utility.SetDevelopmentMode(!RPB_Utility.IsDevelopmentMode())
+        mcm.ForcePageReset()
+        return
+
     elseif (IsOptionInCategory(option, "TeleportJailCell"))
         string hold = StringUtil.Substring(option, StringUtil.Find(option, "TeleportJailCell") + 16)
         ObjectReference jailCellRef = mcm.config.GetRandomJailMarker(hold)

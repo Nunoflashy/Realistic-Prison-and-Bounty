@@ -171,6 +171,17 @@ endEvent
 event OnKeyDown(int keyCode)
     RPB_MCM mcm = Config.MCM
 
+    ; The development keys (RPB_Keybindings: FreezeGuard, FreezePrisoner), development mode only
+    if (RPB_Utility.IsDevelopmentMode())
+        if (keyCode == RPB_Keybindings.GetKey("FreezeGuard"))
+            ((self.GetReference() as Form) as RPB_Tests).ToggleManualFreeze()
+            return
+        elseif (keyCode == RPB_Keybindings.GetKey("FreezePrisoner"))
+            ((self.GetReference() as Form) as RPB_Tests).ToggleManualFreezePrisoner()
+            return
+        endif
+    endif
+
     if (keyCode == 0x3B)    ; F1
         ; PrisonManager.VerifyIntegrity()
 
@@ -366,10 +377,6 @@ event OnKeyDown(int keyCode)
     elseif (keyCode == 0x40) ; F6
         mcm.InitializeOptions()
 
-    elseif (keyCode == 0x44) ; F10: test-only, freezes the freezable guard under the crosshair or nearest (again: releases him)
-        RPB_Tests freezeTests = (self.GetReference() as Form) as RPB_Tests
-        freezeTests.ToggleManualFreeze()
-
     elseif (keyCode == 0x3E || keyCode == 0x3D)
         mcm.SerializeOptions()
     endif
@@ -388,6 +395,15 @@ function RegisterHotkeys()
 
     RegisterForKey(F11)
     RegisterForKey(F12)
+    ; The development keys, wherever they're bound (a rebinding takes effect at the next load)
+    int devKey = RPB_Keybindings.GetKey("FreezeGuard")
+    if (devKey > 0)
+        RegisterForKey(devKey)
+    endif
+    devKey = RPB_Keybindings.GetKey("FreezePrisoner")
+    if (devKey > 0)
+        RegisterForKey(devKey)
+    endif
 endFunction
 
 function Info(string logInfo, bool condition = true, bool hideCall = false) global

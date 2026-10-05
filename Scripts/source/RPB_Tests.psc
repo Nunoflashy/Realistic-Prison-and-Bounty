@@ -265,6 +265,8 @@ function SetTests()
     self.AddTest("177 - A Stalled Escort to Jail: Every Guard Held Still, 2 Takeovers, Then the Fallback (PLAYER)", "Test_StalledEscortTakeoverLimit", abChainable = false)
     self.AddTest("178 - Freeze Control, NPC: an NPC's Escort to Jail Cancelled Mid-Way, Guard and Prisoner Probed (156's NPC twin; repeat it)", "Test_NpcEscortCancelControl", abChainable = false)
     self.AddTest("179 - Diagnostic: a Frozen NPC Prisoner in the Time Skip (another prisoner due after him; the current code, before any fix)", "Test_FrozenPrisonerTimeSkip", abChainable = false)
+    self.AddTest("180 - Imprison a Freezable Prisoner in Castle Dour (kept: the prisoner freeze key freezes/releases him; development mode)", "Test_SpawnFreezablePrisoner", abChainable = false)
+    self.AddTest("181 - Spawn a Freezable NPC Here to Arrest Yourself (the prisoner freeze key freezes/releases him once arrested; development mode)", "Test_SpawnFreezableArrestee", abChainable = false)
     self.AddTest("041 - ActiveMagicEffectContainer: Stuck Lock Self-Heals", "Test_ActiveMagicEffectContainer_StuckLockSelfHeals")
     self.AddTest("042 - ThreadLock: JAtomic Primitive Semantics and Registry", "Test_ThreadLock_PrimitiveSemantics")
     ; Not chainable: fires concurrent worker threads
@@ -13037,6 +13039,119 @@ function ToggleManualFreeze()
     endif
 endFunction
 
+;/
+    180: a freezable NPC (RPB_TestFreezableGuard, his only script RPB_TestFreezable) arrested by a real guard with the
+    teleport-to-cell arrest type: a real prisoner in a Castle Dour cell, kept (no teardown), for the prisoner freeze key.
+    Green = imprisoned.
+/;
+bool function __Scenario_SpawnFreezablePrisoner(string asTest)
+    ActorBase freezableBase = Game.GetFormFromFile(0x0002C062, "RealisticPrisonAndBounty.esp") as ActorBase
+    if (!assert_true(freezableBase != none, asTest + ": no RPB_TestFreezableGuard in the plugin"))
+        return false
+    endif
+    Actor guard = __ScenarioRealGuard()
+    if (!guard)
+        return false
+    endif
+    __scenarioRealGuard = none ; kept as he is (no teardown resets him)
+    Actor npc = Game.GetPlayer().PlaceAtMe(freezableBase, 1, abForcePersist = true) as Actor
+    npc.MoveTo(guard, afXOffset = 150.0, abMatchRotation = false)
+    RPB_API.GetArrest().ArrestActor(guard, npc, RPB_API.GetArrest().ARREST_TYPE_TELEPORT_TO_CELL)
+    float start = Utility.GetCurrentRealTime()
+    while (!RPB_Utility.IsActorImprisoned(npc) && (Utility.GetCurrentRealTime() - start) < 60.0)
+        Utility.Wait(0.5)
+    endWhile
+    bool imprisoned = RPB_Utility.IsActorImprisoned(npc)
+    log(asTest + ": " + npc + " imprisoned " + imprisoned + " (" + __Ms(Utility.GetCurrentRealTime() - start) + "ms), in " + npc.GetParentCell() + "; the prisoner freeze key freezes or releases him")
+    return assert_true(imprisoned, asTest + ": " + npc + " never imprisoned")
+endFunction
+
+;/
+    The prisoner freeze key (development mode): freezes the freezable prisoner under the crosshair, or else the nearest one
+    within 4000 units who is a prisoner, with its own hold (a guard can be frozen at the same time); again: releases him
+    and takes RPB's frozen mark off him. Found by RPB the way a real one is (a prisoner probe, a few seconds later).
+/;
+Actor __manualFreezePrisoner
+bool[] __prisonerHoldRelease
+
+function ToggleManualFreezePrisoner()
+    if (__manualFreezePrisoner)
+        Actor released = __manualFreezePrisoner
+        if (__prisonerHoldRelease)
+            __prisonerHoldRelease[0] = true
+        endif
+        float waitStart = Utility.GetCurrentRealTime()
+        while (JDB.solveFlt(".rpbTest.prisonerHoldEnd") == 0.0 && (Utility.GetCurrentRealTime() - waitStart) < 10.0)
+            Utility.Wait(0.1)
+        endWhile
+        float holdTime = JDB.solveFlt(".rpbTest.prisonerHoldEnd") - JDB.solveFlt(".rpbTest.prisonerHoldStart")
+        bool wasMarked = RPB_Utility.IsFrozenGuard(released)
+        RPB_Utility.ClearFrozenGuards()
+        __manualFreezePrisoner = none
+        log("prisoner freeze key: released " + released + " after " + (holdTime as int) + "s (RPB had marked him frozen: " + wasMarked + ")")
+        Debug.Notification("RPB dev: prisoner released (" + (holdTime as int) + "s frozen)")
+        return
+    endif
+
+    Actor target = Game.GetCurrentCrosshairRef() as Actor
+    if (!(target as RPB_TestFreezable) || !(RPB_Utility.IsActorImprisoned(target) || RPB_Utility.IsActorArrested(target)))
+        target = __NearestFreezablePrisoner(4000.0)
+    endif
+    if (!target)
+        Debug.Notification("RPB dev: no freezable prisoner nearby (test 180 imprisons one)")
+        return
+    endif
+    __prisonerHoldRelease = new bool[1]
+    JDB.solveFltSetter(".rpbTest.prisonerHoldStart", 0.0, true)
+    JDB.solveFltSetter(".rpbTest.prisonerHoldEnd", 0.0, true)
+    self.RegisterForModEvent("RPB_TestHoldLockPrisoner", "OnTestHoldLockPrisoner")
+    int handle = ModEvent.Create("RPB_TestHoldLockPrisoner")
+    if (handle)
+        ModEvent.PushForm(handle, target)
+        ModEvent.Send(handle)
+    endif
+    float start = Utility.GetCurrentRealTime()
+    while (JDB.solveFlt(".rpbTest.prisonerHoldStart") == 0.0 && (Utility.GetCurrentRealTime() - start) < 5.0)
+        Utility.Wait(0.1)
+    endWhile
+    if (JDB.solveFlt(".rpbTest.prisonerHoldStart") == 0.0)
+        Debug.Notification("RPB dev: the prisoner's freeze didn't start")
+        return
+    endif
+    __manualFreezePrisoner = target
+    RPB_Utility.ProbeNPC(target, "prisoner freeze key")
+    log("prisoner freeze key: froze " + target + " (player " + (Game.GetPlayer().GetDistance(target) as int) + " away)")
+    Debug.Notification("RPB dev: prisoner frozen (press again to release)")
+endFunction
+
+event OnTestHoldLockPrisoner(Form akPrisoner)
+    RPB_TestFreezable freezable = akPrisoner as RPB_TestFreezable
+    JDB.solveFltSetter(".rpbTest.prisonerHoldStart", Utility.GetCurrentRealTime(), true)
+    freezable.HoldLock(__prisonerHoldRelease, 2000000, true)
+    JDB.solveFltSetter(".rpbTest.prisonerHoldEnd", Utility.GetCurrentRealTime(), true)
+endEvent
+
+; A freezable actor who is arrested or a prisoner (an escort by hand: 181), nearest within @afRadius (casts, storage and
+; the player's distance: no call on them)
+Actor function __NearestFreezablePrisoner(float afRadius)
+    Actor player = Game.GetPlayer()
+    Actor[] nearby = PO3_SKSEFunctions.GetActorsByProcessingLevel(0)
+    Actor nearest = none
+    float nearestDistance = afRadius
+    int i = 0
+    while (i < nearby.Length)
+        if ((nearby[i] as RPB_TestFreezable) && (RPB_Utility.IsActorImprisoned(nearby[i]) || RPB_Utility.IsActorArrested(nearby[i])))
+            float distance = player.GetDistance(nearby[i])
+            if (distance < nearestDistance)
+                nearest = nearby[i]
+                nearestDistance = distance
+            endif
+        endif
+        i += 1
+    endWhile
+    return nearest
+endFunction
+
 ; Casts and the player's distance only: no call on any of them
 Actor function __NearestFreezableGuard(float afRadius)
     Actor player = Game.GetPlayer()
@@ -14423,7 +14538,7 @@ endFunction
 string __statelessTest = ""
 
 bool function __RunStatelessTest(string asTest)
-    if (asTest != "Test_ArrestWaitsWhileGuardFights_NoPackage" && asTest != "Test_CellDoorsDiagnostic" && asTest != "Test_LongAbsenceSetup" && asTest != "Test_LongAbsenceAdvance" && asTest != "Test_LongAbsenceVerify" && asTest != "Test_FallbackEscortToCellStopped_Player" && asTest != "Test_FallbackEscortToCellStopped_CloneGuard" && asTest != "Test_FightDuringEscort_NPC" && asTest != "Test_FightDuringEscort_Player" && asTest != "Test_GuardDiesInPrison_Player" && asTest != "Test_EscortToCellStopped_NoPackageLock" && StringUtil.Find(asTest, "Test_Surrender_") != 0 && asTest != "Test_FrozenGuardSkipped" && asTest != "Test_GuardDiesInPrison_NobodySees" && asTest != "Test_Escort_FreeWalk" && asTest != "Test_ToggleEscortToCell04" && asTest != "Test_CaptorFinishCycles_Calls" && asTest != "Test_CaptorFinishCycles_NoCalls" && asTest != "Test_CaptorFinishDetach_Calls" && asTest != "Test_CaptorFinishDetach_NoCalls" && asTest != "Test_Escort_FreeWalk_Control" && asTest != "Test_ActorKeys" && asTest != "Test_FrozenGuardCalls" && asTest != "Test_SimulatedFreezeCalls" && asTest != "Test_SimulatedFreezeAtCancel" && asTest != "Test_SpawnFreezableGuard" && asTest != "Test_AliasPackageControl" && asTest != "Test_FreezableEscort_Player" && asTest != "Test_FreezableEscort_NPC" && asTest != "Test_LightHold" && asTest != "Test_KillFrozenGuard" && asTest != "Test_LifetimeBountyStat" && asTest != "Test_FaintFrozenGuard" && asTest != "Test_FaintFrozenGuardShort" && asTest != "Test_FrozenEscortFallback" && asTest != "Test_HideFrozenGuard" && asTest != "Test_EscortToCellGuardHeld" && asTest != "Test_CuffedLimitEncumbrance" && asTest != "Test_CuffedLimitSettings" && asTest != "Test_EarlyHandback" && asTest != "Test_StalledEscortTakeover" && asTest != "Test_StalledEscortTakeoverLimit" && asTest != "Test_NpcEscortCancelControl" && asTest != "Test_FrozenPrisonerTimeSkip")
+    if (asTest != "Test_ArrestWaitsWhileGuardFights_NoPackage" && asTest != "Test_CellDoorsDiagnostic" && asTest != "Test_LongAbsenceSetup" && asTest != "Test_LongAbsenceAdvance" && asTest != "Test_LongAbsenceVerify" && asTest != "Test_FallbackEscortToCellStopped_Player" && asTest != "Test_FallbackEscortToCellStopped_CloneGuard" && asTest != "Test_FightDuringEscort_NPC" && asTest != "Test_FightDuringEscort_Player" && asTest != "Test_GuardDiesInPrison_Player" && asTest != "Test_EscortToCellStopped_NoPackageLock" && StringUtil.Find(asTest, "Test_Surrender_") != 0 && asTest != "Test_FrozenGuardSkipped" && asTest != "Test_GuardDiesInPrison_NobodySees" && asTest != "Test_Escort_FreeWalk" && asTest != "Test_ToggleEscortToCell04" && asTest != "Test_CaptorFinishCycles_Calls" && asTest != "Test_CaptorFinishCycles_NoCalls" && asTest != "Test_CaptorFinishDetach_Calls" && asTest != "Test_CaptorFinishDetach_NoCalls" && asTest != "Test_Escort_FreeWalk_Control" && asTest != "Test_ActorKeys" && asTest != "Test_FrozenGuardCalls" && asTest != "Test_SimulatedFreezeCalls" && asTest != "Test_SimulatedFreezeAtCancel" && asTest != "Test_SpawnFreezableGuard" && asTest != "Test_AliasPackageControl" && asTest != "Test_FreezableEscort_Player" && asTest != "Test_FreezableEscort_NPC" && asTest != "Test_LightHold" && asTest != "Test_KillFrozenGuard" && asTest != "Test_LifetimeBountyStat" && asTest != "Test_FaintFrozenGuard" && asTest != "Test_FaintFrozenGuardShort" && asTest != "Test_FrozenEscortFallback" && asTest != "Test_HideFrozenGuard" && asTest != "Test_EscortToCellGuardHeld" && asTest != "Test_CuffedLimitEncumbrance" && asTest != "Test_CuffedLimitSettings" && asTest != "Test_EarlyHandback" && asTest != "Test_StalledEscortTakeover" && asTest != "Test_StalledEscortTakeoverLimit" && asTest != "Test_NpcEscortCancelControl" && asTest != "Test_FrozenPrisonerTimeSkip" && asTest != "Test_SpawnFreezablePrisoner" && asTest != "Test_SpawnFreezableArrestee")
         return false
     endif
 
@@ -14567,6 +14682,13 @@ bool function __RunStatelessTest(string asTest)
         display_result(__Scenario_EscortToCellGuardHeld("172"))
         RPB_Utility.SetFreeWalkDisabledForTest(false)
         __TeardownScenario()
+    elseif (asTest == "Test_SpawnFreezableArrestee")
+        ActorBase freezableArresteeBase = Game.GetFormFromFile(0x0002C062, "RealisticPrisonAndBounty.esp") as ActorBase
+        Actor freezableArrestee = Game.GetPlayer().PlaceAtMe(freezableArresteeBase, 1, abForcePersist = true) as Actor
+        log("181: spawned " + freezableArrestee + " (not imprisoned): arrest him (F4), then the prisoner freeze key freezes or releases him")
+        display_result(assert_true(freezableArrestee != none, "181: couldn't spawn the freezable NPC"))
+    elseif (asTest == "Test_SpawnFreezablePrisoner")
+        display_result(__Scenario_SpawnFreezablePrisoner("180"))
     elseif (asTest == "Test_NpcEscortCancelControl")
         display_result(__Scenario_NpcEscortCancel("178"))
         __TeardownScenario()
