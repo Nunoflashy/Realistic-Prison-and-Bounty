@@ -2844,6 +2844,11 @@ bool function __FollowThroughLoadDoor()
         PO3_SKSEFunctions.MoveToNearestNavmeshLocation(guard)
         how += ", the guard moved beside me"
     endif
+    ; His AI settling in the new cell: he stood ~16s after Castle Dour's door with me led beside him (2026-10-05), close to
+    ; the stall's takeover. His package re-evaluated once (not a frozen guard: a call on him)
+    if (!guardFrozen)
+        guard.EvaluatePackage()
+    endif
     RPB_Utility.LogInfo(Name + " followed the guard through " + loadDoor + " (" + (__assistLastDistance as int) + " behind him) to " + destination + ": " + how + string_if(guardAhead, " (he had gone on)", ""), "["+ Name +"] Prisoner::EscortAssist")
     return true
 endFunction
