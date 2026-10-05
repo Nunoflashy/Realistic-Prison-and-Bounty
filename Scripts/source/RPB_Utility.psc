@@ -1257,7 +1257,13 @@ int function __NewFrozenReport(Actor akActor, string asFoundBy, string asProbedA
     endif
     JMap.setStr(report, "probedAt", doing)
     ; Short enough for an MCM row: the game time and day, and the real time of day apart
-    JMap.setStr(report, "foundAt", GetFormattedDate(GetCurrentDay(), GetCurrentMonth(), GetCurrentYear(), GetCurrentHour(), GetCurrentMinute(), abShowDayOfWeek = false, abShowYear = false))
+    string foundAt = GetFormattedDate(GetCurrentDay(), GetCurrentMonth(), GetCurrentYear(), GetCurrentHour(), GetCurrentMinute(), abShowDayOfWeek = false, abShowYear = false)
+    ; Without the year the date kept its separator ("17th of Last Seed,")
+    int lastAt = StringUtil.GetLength(foundAt) - 1
+    while (lastAt >= 0 && (StringUtil.GetNthChar(foundAt, lastAt) == "," || StringUtil.GetNthChar(foundAt, lastAt) == " "))
+        lastAt -= 1
+    endWhile
+    JMap.setStr(report, "foundAt", StringUtil.Substring(foundAt, 0, lastAt + 1))
     int[] systemTime = PO3_SKSEFunctions.GetSystemTime()
     string minutes = systemTime[5] as string
     if (systemTime[5] < 10)

@@ -33,6 +33,8 @@ function Render(RPB_MCM_02 mcm, Actor akFrozen) global
     mcm.AddOptionText("Found", JMap.getStr(report, "foundAt"), defaultFlags = mcm.OPTION_DISABLED)
     mcm.AddOptionText("Real time", JMap.getStr(report, "realTime"), defaultFlags = mcm.OPTION_DISABLED)
     mcm.AddOptionText("Doing", JMap.getStr(report, "probedAt"), defaultFlags = mcm.OPTION_DISABLED)
+    ; What found him (the probe that hung, or the check that read it): kept for test runs (the mod author: a troubleshooting tool)
+    mcm.AddOptionText("Found by", JMap.getStr(report, "foundBy"), defaultFlags = mcm.OPTION_DISABLED)
     mcm.AddOptionText("Player was in", JMap.getStr(report, "where"), defaultFlags = mcm.OPTION_DISABLED)
     mcm.AddOptionText("Distance", JMap.getStr(report, "distance"), defaultFlags = mcm.OPTION_DISABLED)
 
