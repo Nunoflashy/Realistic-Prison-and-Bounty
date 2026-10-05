@@ -30,6 +30,7 @@ scriptname RPB_Utility hidden
     bool function IsListedFrozen(int aiFrozenMap, Actor akActor) global
     function ClearFrozenGuards() global
     Actor function GetOtherHostileTarget(Actor akActor, Actor akExcept, Actor akCaptor) global
+    int function CalmOwnLawAttackers(Actor akArrestee, Actor akCaptor) global
     Actor function GetOtherCombatTarget(Actor akActor, Actor akExcept) global
     int function RemoveCuffs(Actor akActor) global
     Perk function CuffedNoActivatePerk() global
@@ -1099,9 +1100,11 @@ function __ClearFormMapAt(string asPath) global
     endif
 endFunction
 
-; GetOtherCombatTarget without @akCaptor's fellow guards (guards of his crime faction): a guard still attacking the arrestee
+; GetOtherCombatTarget without @akCaptor's own law (anyone of his crime faction): a guard still attacking the arrestee
 ; is part of the arrest, not another fight. After a fight with the guards, the player's other combat targets were the other
-; guards, so a yield went pending (cuffed at once, no confrontation) and resumed straight to the escort.
+; guards, so a yield went pending (cuffed at once, no confrontation) and resumed straight to the escort. Not only guards:
+; Captain Aldis (Haafingar's, not flagged a guard) still attacking a surrendered, cuffed player was taken for an outside
+; fight, the arrest went pending waiting for the guard to deal with his own captain, and the player was killed (2026-10-05)
 Actor function GetOtherHostileTarget(Actor akActor, Actor akExcept, Actor akCaptor) global
     if (!akActor)
         return none
@@ -1115,14 +1118,47 @@ Actor function GetOtherHostileTarget(Actor akActor, Actor akExcept, Actor akCapt
     int i = 0
     while (i < targets.Length)
         Actor target = targets[i]
-        if (target && target != akExcept && !target.IsDead() && !target.IsDisabled())
-            if (!(target.IsGuard() && (!captorFaction || target.GetCrimeFaction() == captorFaction)))
+        if (target && target != akExcept && !IsFrozenGuard(target) && !target.IsDead() && !target.IsDisabled())
+            Faction targetFaction = target.GetCrimeFaction()
+            bool ownLaw = (captorFaction && targetFaction == captorFaction) || (!captorFaction && target.IsGuard())
+            if (!ownLaw)
                 return target
             endif
         endif
         i += 1
     endWhile
     return none
+endFunction
+
+;/
+    Calls off @akCaptor's own law (anyone of his crime faction but him) still fighting @akArrestee: the arrest is theirs too.
+    For the confrontation's watch, once a second while it plays, so a captain or a soldier who kept attacking a cuffed,
+    surrendered player stops. Returns how many were calmed.
+/;
+int function CalmOwnLawAttackers(Actor akArrestee, Actor akCaptor) global
+    if (!akArrestee || !akCaptor || IsFrozenGuard(akCaptor))
+        return 0
+    endif
+    Faction captorFaction = akCaptor.GetCrimeFaction()
+    if (!captorFaction)
+        return 0
+    endif
+    int calmed = 0
+    Actor[] targets = PO3_SKSEFunctions.GetCombatTargets(akArrestee)
+    int i = 0
+    while (i < targets.Length)
+        Actor target = targets[i]
+        if (target && target != akCaptor && !IsFrozenGuard(target) && !target.IsDead() && target.GetCrimeFaction() == captorFaction)
+            target.StopCombat()
+            calmed += 1
+        endif
+        i += 1
+    endWhile
+    if (calmed > 0)
+        akArrestee.StopCombatAlarm()
+        LogInfo("Calmed " + calmed + " of " + akCaptor + "'s own law still fighting " + akArrestee + " in the arrest", "Utility::CalmOwnLawAttackers")
+    endif
+    return calmed
 endFunction
 
 ; Someone @akActor is fighting other than @akExcept (alive, enabled), or none. A guard arresting one bandit while another

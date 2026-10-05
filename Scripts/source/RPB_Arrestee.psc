@@ -562,7 +562,8 @@ endFunction
 ; Someone other than my guard is fighting me or my guard, or I'm the player and in combat with no readable targets (my
 ; StopCombat at the arrest doesn't stop whoever attacks me). The hostile, if known, is kept for the pending arrest.
 bool function __FightBrokeOut(Actor akGuard)
-    ; A fellow guard still attacking me is the arrest, not a fight (GetOtherHostileTarget)
+    ; A fellow guard still attacking me is the arrest, not a fight (GetOtherHostileTarget): called off here
+    RPB_Utility.CalmOwnLawAttackers(this, akGuard)
     Actor hostile = RPB_Utility.GetOtherHostileTarget(akGuard, this, akGuard)
     if (!hostile)
         hostile = RPB_Utility.GetOtherHostileTarget(this, akGuard, akGuard)

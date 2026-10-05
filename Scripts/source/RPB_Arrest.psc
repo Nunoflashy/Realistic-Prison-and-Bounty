@@ -1775,8 +1775,17 @@ bool function __IsFightingOthers(Actor akGuard, Actor akSurrenderer)
     return target && target != akSurrenderer
 endFunction
 
-; Whether any living bound guard is busy fighting someone other than @akSurrenderer
+; Whether the Surrender Scene has to wait for a fight it isn't part of: a living bound guard busy fighting someone other
+; than @akSurrenderer, or the surrenderer still fought by someone outside the law (the engine refuses the Scene while
+; they're in combat: "never started (no bound guard in combat)" with bandits on the player, undone after 2 retries,
+; 2026-10-05)
 bool function __GuardsFightingOthers(Actor akSurrenderer, Actor[] akGuards)
+    if (akSurrenderer.IsInCombat())
+        Actor[] targets = PO3_SKSEFunctions.GetCombatTargets(akSurrenderer)
+        if (targets && self.GetNonGuardCombatTarget(targets))
+            return true
+        endif
+    endif
     int i = 0
     while (i < akGuards.Length)
         if (self.IsSurrenderGuard(akGuards[i]) && self.__IsFightingOthers(akGuards[i], akSurrenderer))
