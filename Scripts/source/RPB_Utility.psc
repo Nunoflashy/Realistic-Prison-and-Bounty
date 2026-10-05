@@ -41,6 +41,7 @@ scriptname RPB_Utility hidden
     function ClearFrozenGuards() global
     Actor function GetOtherHostileTarget(Actor akActor, Actor akExcept, Actor akCaptor) global
     int function CalmOwnLawAttackers(Actor akArrestee, Actor akCaptor) global
+    Actor function SendCaptorAfterAttacker(Actor akCaptor, Actor akArrestee) global
     Actor function GetOtherCombatTarget(Actor akActor, Actor akExcept) global
     int function RemoveCuffs(Actor akActor) global
     Perk function CuffedNoActivatePerk() global
@@ -1359,6 +1360,28 @@ Actor function GetOtherHostileTarget(Actor akActor, Actor akExcept, Actor akCapt
         i += 1
     endWhile
     return none
+endFunction
+
+;/
+    Someone outside the law (a bounty hunter, a bandit) still attacking @akArrestee once arrested: @akCaptor goes after
+    them, and his fight pauses the escort until they're dealt with (RPB_Captor.OnCombatStateChanged -> PauseEscortForFight,
+    the pending arrest's resume). The mod author, 2026-10-05: a bounty hunter kept attacking the cuffed player, the arrest
+    went pending "waiting for the guard to deal with None" and resumed into an escort that couldn't go on; arresting the
+    attacker too waits for the Scene refactor. The attacker, or none (nobody, or the captor can't: dead or frozen).
+/;
+Actor function SendCaptorAfterAttacker(Actor akCaptor, Actor akArrestee) global
+    if (!akCaptor || !akArrestee || IsFrozenGuard(akCaptor) || akCaptor.IsDead())
+        return none
+    endif
+    Actor attacker = GetOtherHostileTarget(akArrestee, akCaptor, akCaptor)
+    if (!attacker)
+        return none
+    endif
+    if (akCaptor.GetCombatTarget() != attacker)
+        akCaptor.StartCombat(attacker)
+        LogInfo(akCaptor + " goes after " + attacker + ", who keeps attacking his prisoner " + akArrestee, "Utility::SendCaptorAfterAttacker")
+    endif
+    return attacker
 endFunction
 
 ;/

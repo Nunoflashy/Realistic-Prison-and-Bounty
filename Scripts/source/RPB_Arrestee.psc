@@ -858,6 +858,10 @@ function __BeginPendingArrest(bool abEscortDirectlyToCell, Actor akOtherHostile,
     ; Already a prisoner, cuffed by the confrontation: only the escort is left once the fight is over
     self.SetBool("Pending Escort Only", abEscortOnly)
     bool isPlayer = self.IsPlayer()
+    ; Nobody known, but someone outside the law attacking me: my guard goes after them, and the arrest waits for that one
+    if (!akOtherHostile)
+        akOtherHostile = RPB_Utility.SendCaptorAfterAttacker(guard, this)
+    endif
     self.SetForm("Pending Hostile", akOtherHostile) ; the Captor resumes me once it's dealt with
 
     this.StopCombat()
@@ -1393,6 +1397,15 @@ event OnUpdate()
     ; Except a pending escort to my cell (a fight inside the prison, PauseEscortForFight): the leash still holds me there
     if (self.GetBool("Escort Arrived") && !self.GetBool("Arrest Pending"))
         return
+    endif
+
+    ; Attacked mid-escort by someone outside the law: my guard goes after them, and his fight pauses the escort
+    ; (RPB_Captor.OnCombatStateChanged); paused here too in case that event comes late
+    if (!self.GetBool("Arrest Pending") && this.IsInCombat())
+        Actor attacker = RPB_Utility.SendCaptorAfterAttacker(Captor.GetActor(), this)
+        if (attacker)
+            self.PauseEscortForFight(attacker)
+        endif
     endif
 
     float leash = ESCORT_LEASH_DISTANCE

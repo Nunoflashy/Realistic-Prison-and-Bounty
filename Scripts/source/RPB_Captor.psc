@@ -144,6 +144,14 @@ bool function __ResumePendingArrestIfDone()
     endif
 
     if (why == "" || Arrestee.IsInCombat())
+        ; My arrestee still attacked by someone outside the law, with me out of the fight: I go after them, and the arrest
+        ; waits for that one (it stayed pending for good, or resumed into an escort that couldn't go on, 2026-10-05)
+        if (Arrestee.IsInCombat() && !this.IsInCombat())
+            Actor attacker = RPB_Utility.SendCaptorAfterAttacker(this, Arrestee)
+            if (attacker && !hostile)
+                arresteeRef.SetForm("Pending Hostile", attacker)
+            endif
+        endif
         return false
     endif
 
