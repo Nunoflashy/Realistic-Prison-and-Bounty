@@ -561,8 +561,14 @@ function ReleaseNPC(RPB_Prisoner apPrisoner, Actor akReleasing = none)
         Prison.SendReleaseRequest(apPrisoner)
     endif
 
+    ; Checked every 0.05s by event: at 0.2s, each release paid up to 200ms of rounding (test 184: ~170ms a release, 2026-10-05).
+    ; On the skip's stack the release is over before the first check, so the interval doesn't matter there
+    float pollEvery = 0.2
+    if (byEvent)
+        pollEvery = 0.05
+    endif
     while (Prisoners.AtKey(releasing) != none && (Utility.GetCurrentRealTime() - t0) < 20.0)
-        Utility.Wait(0.2)
+        Utility.Wait(pollEvery)
     endWhile
     float took = Utility.GetCurrentRealTime() - t0
     if (Prisoners.AtKey(releasing) != none)

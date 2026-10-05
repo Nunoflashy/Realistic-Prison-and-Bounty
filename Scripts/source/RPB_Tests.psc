@@ -12579,20 +12579,25 @@ bool function __Scenario_FrozenPrisonerTimeSkip(string asTest)
 endFunction
 
 ;/
-    184: the NPC side of the player's time skip (Prison.ReleaseDueNPCsInOrder, on its own stack as in 179), twice: 6 bandit
-    prisoners due within the skip, released on the skip's stack (the original), then 6 more released each on a stack of its
-    own (RPB_Utility.SetNpcReleaseByEvent). Logs each run's total and per-release time (RPB_PrisonMonitor.ReleaseNPC's wait
-    included); green when both released all 6. The release mode is put back as it was.
+    184: the NPC side of the player's time skip (Prison.ReleaseDueNPCsInOrder, on its own stack as in 179), four runs of 6
+    bandit prisoners due within the skip, in ABBA order (on the skip's stack, by event, by event, on the skip's stack) so the
+    first run's warm-up falls on each mode once: released on the skip's stack (the original) or each on a stack of its own
+    (RPB_Utility.SetNpcReleaseByEvent). Logs each run and both modes' averages (RPB_PrisonMonitor.ReleaseNPC's wait
+    included); green when every run released all 6. The release mode is put back as it was.
 /;
 bool function __Scenario_ReleaseBenchmark(string asTest)
     RPB_Prison prison = (RPB_API.GetPrisonManager()).GetPrison("Haafingar")
     int count = 6
     bool savedMode = RPB_Utility.IsNpcReleaseByEvent()
-    float[] took = new float[2]
+    float[] took = new float[2] ; summed per mode
     int[] released = new int[2]
     self.RegisterForModEvent("RPB_TestTimeSkip", "OnTestTimeSkip")
-    int mode = 0
-    while (mode < 2)
+    int run = 0
+    while (run < 4)
+        int mode = 0
+        if (run == 1 || run == 2)
+            mode = 1
+        endif
         RPB_Utility.SetNpcReleaseByEvent(mode == 1)
         Actor[] bandits = new Actor[6]
         float now = Utility.GetCurrentGameTime()
@@ -12622,7 +12627,8 @@ bool function __Scenario_ReleaseBenchmark(string asTest)
         while (JDB.solveInt(".rpbTest.timeSkipDone") == 0 && (Utility.GetCurrentRealTime() - start) < 180.0)
             Utility.Wait(0.1)
         endWhile
-        took[mode] = Utility.GetCurrentRealTime() - start
+        float runTook = Utility.GetCurrentRealTime() - start
+        took[mode] = took[mode] + runTook
         int gone = 0
         i = 0
         while (i < count)
@@ -12631,16 +12637,16 @@ bool function __Scenario_ReleaseBenchmark(string asTest)
             endif
             i += 1
         endWhile
-        released[mode] = gone
-        log(asTest + ": " + string_if(mode == 1, "by event", "on the skip's stack") + ": " + gone + "/" + count + " released in " + __Ms(took[mode]) + "ms (" + __Ms(took[mode] / count) + "ms per release, the days passed between them included)")
+        released[mode] = released[mode] + gone
+        log(asTest + ": run " + (run + 1) + ", " + string_if(mode == 1, "by event", "on the skip's stack") + ": " + gone + "/" + count + " released in " + __Ms(runTook) + "ms (" + __Ms(runTook / count) + "ms per release, the days passed between them included)")
         __TeardownAllTempActors()
         Utility.Wait(2.0)
-        mode += 1
+        run += 1
     endWhile
     RPB_Utility.SetNpcReleaseByEvent(savedMode)
     self.UnregisterForModEvent("RPB_TestTimeSkip")
-    log(asTest + ": SUMMARY on the skip's stack " + __Ms(took[0]) + "ms (" + released[0] + " released), by event " + __Ms(took[1]) + "ms (" + released[1] + " released): by event takes " + __Ms(took[1] - took[0]) + "ms more for " + count + " releases")
-    return assert_true(released[0] == count && released[1] == count, asTest + ": released " + released[0] + " and " + released[1] + " of " + count)
+    log(asTest + ": SUMMARY per run of " + count + ": on the skip's stack " + __Ms(took[0] / 2.0) + "ms, by event " + __Ms(took[1] / 2.0) + "ms (released " + released[0] + " and " + released[1] + " of " + (count * 2) + "): by event " + __Ms((took[1] - took[0]) / (2.0 * count)) + "ms more per release")
+    return assert_true(released[0] == count * 2 && released[1] == count * 2, asTest + ": released " + released[0] + " and " + released[1] + " of " + (count * 2))
 endFunction
 
 event OnTestTimeSkip(float afPlayerTimeLeft)
