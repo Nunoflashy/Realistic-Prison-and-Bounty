@@ -230,7 +230,7 @@ function SetTests()
     self.AddTest("142 - Surrender (F8): A Hostile Guard, No Bounty: Arrested for the Surrender Bounty (PLAYER - arrests you, you're brought back)", "Test_Surrender_HostileGuardNoBounty", abChainable = false)
     self.AddTest("143 - Surrender (F8): A Guard, Bounty 1000: Surrender Bounty Added, Arrested (PLAYER - arrests you, you're brought back)", "Test_Surrender_GuardWithBounty", abChainable = false)
     self.AddTest("144 - Surrender (F8): The Guard Never Comes: Expires, Then Walking Away is Free (PLAYER, ~25s)", "Test_Surrender_NoGuardComes", abChainable = false)
-    self.AddTest("145 - Surrender (F8): A Guard and a Bandit Fighting, Refused While Attacked (PLAYER)", "Test_Surrender_OtherHostilesAttacking", abChainable = false)
+    self.AddTest("145 - Surrender (F8): A Guard and a Bandit Fighting, Goes Ahead Anyway (PLAYER)", "Test_Surrender_OtherHostilesAttacking", abChainable = false)
     self.AddTest("146 - Surrender (F8): Disguised (Hostile Faction), a Guard Fighting: Calmed, Arrested (PLAYER - arrests you, you're brought back)", "Test_Surrender_Disguised", abChainable = false)
     self.AddTest("147 - A Guard Marked Frozen is Skipped by the Guard Scans and Can't Arrest (NPC)", "Test_FrozenGuardSkipped", abChainable = false)
     self.AddTest("148 - The Guard Dies Inside the Prison and No Guard Sees the Prisoner: the Arrest Waits, Cuffed, Until One Does (PLAYER - arrests you, you're brought back)", "Test_GuardDiesInPrison_NobodySees", abChainable = false)
@@ -11583,7 +11583,8 @@ endFunction
             3: the same with a bounty of 1000: bounty = 1000 + its share + the flat amount
             4: no guard comes (no Surrender Scene): it expires ("expired", still on, controls on), then the player moves
                away: over at no cost ("withdrawn")
-            5: a guard and a bandit fight them: refused while attacked ("attacked"), nothing disabled
+            5: a guard and a bandit fight them: the surrender goes ahead anyway (it was refused as "attacked" until
+               2026-10-05; the mod author: whatever the bandit does then is the surrenderer's choice)
             6: disguised (in BanditFaction, a vanilla stand-in for a disguise mod), a guard fights them: arrested, the
                faction off during the arrest (the Surrender Scene "never started" while the guards kept fighting)
             7: a bounty of 500, no Surrender Scene (so it never ends by itself), and the player moves away before it
@@ -11672,12 +11673,15 @@ bool function __Scenario_Surrender(string asTest, int aiMode)
     arrest.Surrender(player)
     bool ok = true
 
-    if (aiMode == 1 || aiMode == 5)
+    if (aiMode == 5)
+        while (!arrest.IsSurrendering(player) && arrest.LastSurrenderOutcome == "" && (Utility.GetCurrentRealTime() - start) < 8.0)
+            Utility.Wait(0.25)
+        endWhile
+        log(asTest + ": outcome '" + arrest.LastSurrenderOutcome + "', surrendering " + arrest.IsSurrendering(player) + " after " + __Ms(Utility.GetCurrentRealTime() - start) + "ms")
+        return assert_true(arrest.IsSurrendering(player) || RPB_Utility.IsActorArrested(player), asTest + ": the surrender with a bandit in the fight didn't go ahead (outcome '" + arrest.LastSurrenderOutcome + "')")
+    elseif (aiMode == 1)
         Utility.Wait(6.0)
         string expectedOutcome = "no guard"
-        if (aiMode == 5)
-            expectedOutcome = "attacked"
-        endif
         log(asTest + ": outcome '" + arrest.LastSurrenderOutcome + "'")
         ok = assert_true(arrest.LastSurrenderOutcome == expectedOutcome, asTest + ": refused as '" + arrest.LastSurrenderOutcome + "', expected '" + expectedOutcome + "'") && ok
         ok = assert_false(arrest.IsSurrendering(player), asTest + ": the refused surrender is still marked as under way") && ok

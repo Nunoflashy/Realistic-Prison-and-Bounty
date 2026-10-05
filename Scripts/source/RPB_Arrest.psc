@@ -1013,6 +1013,10 @@ endFunction
 
 event OnSurrenderBegin(Actor akSurrenderer, Actor[] akSurrendererCaptors)
     self.__BeginSurrender(akSurrenderer)
+    Actor outsider = self.GetNonGuardCombatTarget(akSurrendererCaptors)
+    if (outsider)
+        RPB_StorageVars.SetFormOnReference("Outsider", akSurrenderer, outsider, "Surrender") ; the watch's leeway
+    endif
     Actor[] guards = self.GetSurrenderGuards(akSurrendererCaptors)
     __surrenderGuards = guards
     self.PrepareSurrenderer(akSurrenderer, guards)
@@ -1593,12 +1597,12 @@ bool function CanActorSurrender(Actor akSurrenderer, Actor[] akSurrendererCaptor
         return false
     endif
 
-    ; Surrendering locks the player in place, cowering: not while someone who won't take it is still attacking
+    ; Someone who won't take it is still in the fight (bandits fighting the guards, hostile to the player too): the
+    ; surrender goes ahead, whatever happens then is the surrenderer's choice (the mod author, 2026-10-05). It used to be
+    ; refused, which left nothing to do but run. The watch gives them a few steps of leeway while that one still fights
+    ; (SURRENDER_DODGES)
     if (otherHostile)
-        LastSurrenderOutcome = "attacked"
-        Config.NotifyArrest("You can't surrender while you're still being attacked", isPlayer)
-        __SurrenderLog("Surrender of " + akSurrenderer + " refused: " + otherHostile + " (" + RPB_Utility.GetFormNameCached(otherHostile.GetBaseObject()) + ", " + (akSurrenderer.GetDistance(otherHostile) as int) + " away, in combat " + otherHostile.IsInCombat() + ") is still in their combat targets")
-        return false
+        __SurrenderLog("Surrender of " + akSurrenderer + " with " + otherHostile + " (" + RPB_Utility.GetFormNameCached(otherHostile.GetBaseObject()) + ", " + (akSurrenderer.GetDistance(otherHostile) as int) + " away, in combat " + otherHostile.IsInCombat() + ") still in the fight: allowed, with leeway")
     endif
 
     ; They faked one to these guards' hold not long ago
@@ -1707,6 +1711,10 @@ float property SURRENDER_TAKEN_DISTANCE = 300.0 autoreadonly
 
 ; How many times a Surrender Scene the engine refused to start (a guard back in combat) is started again
 int property SURRENDER_SCENE_RETRIES = 2 autoreadonly
+
+; How many times a surrenderer can step away while someone outside the law (a bandit) is still fighting next to them,
+; before stepping away counts as leaving: dodging a blow isn't faking the surrender
+int property SURRENDER_DODGES = 3 autoreadonly
 
 ; How the last surrender ended or was refused ("no captors", "no guard", "attacked", "fooled", "expired" (still on),
 ; "faked", "withdrawn", "Scene never started", "no guard at the end", "no bounty", "arrest"): for the tests and the log
@@ -1838,6 +1846,8 @@ function __WatchSurrender(Actor akSurrenderer, Actor[] akGuards)
     int ticks = 0
     int lastProgressTick = 0
     int sceneRetries = 0
+    int dodges = 0
+    Actor outsider = RPB_StorageVars.GetFormOnReference("Outsider", akSurrenderer, "Surrender") as Actor
     bool expired = false
     bool watching = true
     if (isPlayer)
@@ -1879,7 +1889,14 @@ function __WatchSurrender(Actor akSurrenderer, Actor[] akGuards)
             ; A close guard only "takes" it while the Surrender Scene plays (its end is the take-over): without the Scene,
             ; a guard standing next to them would hold the surrender on forever
             bool beingTaken = distance <= SURRENDER_TAKEN_DISTANCE && SceneManager.GetCurrentScene() == SceneManager.SCENE_SURRENDER_01
-            if ((movedSquared > leaveSquared || weaponDrawn) && !beingTaken)
+            ; Stepped away with the outsider still fighting nearby: a dodge, the spot they hold moves with them
+            if (movedSquared > leaveSquared && !weaponDrawn && !beingTaken && outsider && dodges < SURRENDER_DODGES && !outsider.IsDead() && outsider.IsInCombat() && akSurrenderer.GetDistance(outsider) < 3000.0)
+                dodges += 1
+                originX = akSurrenderer.GetPositionX()
+                originY = akSurrenderer.GetPositionY()
+                originZ = akSurrenderer.GetPositionZ()
+                __SurrenderLog("Surrender of " + akSurrenderer + ": stepped away with " + outsider + " still fighting, a dodge (" + dodges + "/" + SURRENDER_DODGES + ")")
+            elseif ((movedSquared > leaveSquared || weaponDrawn) && !beingTaken)
                 watching = false
                 __SurrenderLog("Surrender of " + akSurrenderer + ": they left (moved " + (Math.sqrt(movedSquared) as int) + ", weapon drawn " + weaponDrawn + ", nearest guard " + (distance as int) + ", expired " + expired + ")")
                 if (self.__IsTakeoverApproach(akSurrenderer))
