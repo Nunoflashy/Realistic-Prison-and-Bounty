@@ -1675,9 +1675,11 @@ function LimitCuffedMovement_Encumbrance(bool abOn) global
         ; went on. (a): a coin in and out of the inventory, silently; (b): movement off for a moment, so the next one walks
         string before = EncumbranceTrace(player)
         if (!player.IsOverEncumbered())
-            Form gold = Game.GetFormEx(0xF)
-            player.AddItem(gold, 1, true)
-            player.RemoveItem(gold, 1, true)
+            ; Something with weight: a gold coin (no weight) changed nothing, the engine read them not over-encumbered before
+            ; and after it (2026-10-06), so it seems to recount only when the weight changes. An iron dagger (2), in and out
+            Form dagger = Game.GetFormEx(0x1397E)
+            player.AddItem(dagger, 1, true)
+            player.RemoveItem(dagger, 1, true)
         endif
         if (player.IsRunning() || player.IsSprinting())
             Game.DisablePlayerControls(abMovement = true, abFighting = false, abCamSwitch = false, abLooking = false, abSneaking = false, abMenu = false, abActivate = false, abJournalTabs = false)
