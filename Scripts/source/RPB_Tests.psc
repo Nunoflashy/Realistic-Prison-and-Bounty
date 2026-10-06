@@ -14745,7 +14745,10 @@ function ExecuteTest(string asTestKeyName)
         return
     endif
 
+    ; RPB's rules that only make sense in real play (the player hitting a prisoner) stay off while a test runs
+    RPB_Utility.SetTestRunning(true)
     if (self.__RunStatelessTest(testToExecute))
+        RPB_Utility.SetTestRunning(false)
         return
     endif
 
@@ -14760,6 +14763,7 @@ function ExecuteTest(string asTestKeyName)
 
         self.__RestoreLogs()
     endif
+    RPB_Utility.SetTestRunning(false)
 endFunction
 
 ; ==========================================================

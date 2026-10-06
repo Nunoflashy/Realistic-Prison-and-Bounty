@@ -62,6 +62,8 @@ scriptname RPB_Utility hidden
     bool function IsHostileActor(Actor akActor) global
     function NeutralizeHostileActor(Actor akActor) global
     int function RestoreNeutralizedHostility(Actor akActor) global
+    int function TakeHostilitySnapshot(Actor akActor) global
+    int function ApplyHostilitySnapshot(Actor akActor, int aiSnapshot) global
     float function PACIFICATION_TIME_BUDGET_SECONDS() global
     function SustainArrestPacification(Actor akArrestee, Actor akCaptor) global
     bool function MaintainArrestPacification(Actor akArrestee, Actor akCaptor) global
@@ -1385,6 +1387,13 @@ Actor function SendCaptorAfterAttacker(Actor akCaptor, Actor akArrestee) global
     if (!akCaptor || !akArrestee || IsFrozenGuard(akCaptor) || akCaptor.IsDead())
         return none
     endif
+    ; No longer in custody (the arrest cancelled while the escort watch was on its way here): their fights are their own.
+    ; 178's bandit, hostile again after its cancel, was fighting the player, and the guard was sent after the player
+    ; (2026-10-06); the next runs' guards were still at war with the player
+    if (!IsActorArrested(akArrestee) && !IsActorImprisoned(akArrestee))
+        return none
+    endif
+    Actor player = Game.GetFormEx(0x14) as Actor
     Faction captorFaction = akCaptor.GetCrimeFaction()
     Actor outsider = none
     Actor[] targets = __AttackersOf(akArrestee)
@@ -1394,7 +1403,11 @@ Actor function SendCaptorAfterAttacker(Actor akCaptor, Actor akArrestee) global
     int i = 0
     while (i < targets.Length)
         Actor target = targets[i]
-        if (target && target != akCaptor && !IsFrozenGuard(target) && !target.IsDead() && !target.IsDisabled() && !IsActorArrested(target))
+        ; Never the player here: they have no crime faction, so they read as an outsider to fight, and being in combat with
+        ; the prisoner isn't attacking (178's bandit attacked them). The player's own hits are PlayerHitPrisoner's
+        ; And only someone with a weapon (or spell) out: a citizen who runs from a fight is in combat too, with a target, and
+        ; Jaree-Ra, fleeing near the cuffed player in Solitude, was told to stop and arrested for it (2026-10-06)
+        if (target && target != akCaptor && target != player && !IsFrozenGuard(target) && !target.IsDead() && !target.IsDisabled() && !IsActorArrested(target) && target.IsWeaponDrawn())
             Faction targetFaction = target.GetCrimeFaction()
             Debug("Utility::SendCaptorAfterAttacker", target + " attacks " + akArrestee + ": crime faction " + targetFaction + " (captor's " + captorFaction + ")")
             if (!targetFaction)
@@ -1477,8 +1490,41 @@ bool function __ToldToStopAndKeptOn(Actor akActor) global
     return (now - at) >= 4.0
 endFunction
 
-; A citizen (someone with a crime faction, not the captor's law) attacking a prisoner: arrested by another guard of the
-; captor's hold who sees them, for a small bounty, or only told to stop. Once each (arrested ones are skipped above)
+; Tests set this while they run (RPB_Tests.ExecuteTest), cleared on load: a test's player standing by its prisoners isn't
+; arrested for a stray hit
+bool function IsTestRunning() global
+    return JDB.solveInt(".rpb_root.testRunning") != 0
+endFunction
+
+function SetTestRunning(bool abRunning) global
+    JDB.solveIntSetter(".rpb_root.testRunning", abRunning as int, true)
+endFunction
+
+;/
+    The player hitting someone in custody (RPB_Arrestee.OnHit, only the player's hits): the citizens' rule, told to stop
+    first (a notification, until the guard's "Stand down!" line), then, hitting again 4s or more later, arrested by
+    another guard of the hold who sees them, for the placeholder assault bounty. Never during a test (IsTestRunning), never
+    when the player is in custody themselves (mod author, 2026-10-06: the rule applies to the player too).
+/;
+function PlayerHitPrisoner(Actor akCaptor, Actor akArrestee) global
+    if (IsTestRunning() || !akCaptor || !akArrestee || IsFrozenGuard(akCaptor) || (!IsActorArrested(akArrestee) && !IsActorImprisoned(akArrestee)))
+        return
+    endif
+    Actor player = Game.GetFormEx(0x14) as Actor
+    if (IsActorArrested(player) || IsActorImprisoned(player) || akCaptor.IsDead())
+        return
+    endif
+    if (__ToldToStopAndKeptOn(player))
+        __ArrestPrisonerAttacker(player, akCaptor, akCaptor.GetCrimeFaction(), akArrestee)
+    else
+        Debug.Notification("The guard warns you to leave his prisoner alone")
+        LogInfo("the player hit " + akCaptor + "'s prisoner " + akArrestee + ": told to stop (arrested if they hit again)", "Utility::PlayerHitPrisoner")
+    endif
+endFunction
+
+; A citizen (someone with a crime faction, not the captor's law) or the player attacking a prisoner: arrested by another
+; guard of the captor's hold who sees them (the scan is from the attacker, 3000 units), for a small bounty, or only told
+; to stop. Once each (arrested ones are skipped above)
 function __ArrestPrisonerAttacker(Actor akAttacker, Actor akCaptor, Faction akCaptorFaction, Actor akArrestee) global
     akAttacker.StopCombat()
     Actor guard = none
@@ -1489,11 +1535,18 @@ function __ArrestPrisonerAttacker(Actor akAttacker, Actor akCaptor, Faction akCa
         LogInfo(akAttacker + " attacked " + akCaptor + "'s prisoner " + akArrestee + ": no other guard to arrest them, told to stop", "Utility::SendCaptorAfterAttacker")
         return
     endif
-    if (RPB_ActorVars.GetCrimeGold(akCaptorFaction, akAttacker) <= 0)
+    if (akAttacker == Game.GetFormEx(0x14) as Actor)
+        if (akCaptorFaction.GetCrimeGold() <= 0)
+            akCaptorFaction.ModCrimeGold(40, true) ; assault
+        endif
+    elseif (RPB_ActorVars.GetCrimeGold(akCaptorFaction, akAttacker) <= 0)
         RPB_ActorVars.SetCrimeGold(akCaptorFaction, akAttacker, 40) ; assault
     endif
     LogInfo(akAttacker + " attacked " + akCaptor + "'s prisoner " + akArrestee + ": arrested by " + guard, "Utility::SendCaptorAfterAttacker")
-    RPB_API.GetArrest().ArrestActor(guard, akAttacker, RPB_API.GetArrest().ARREST_TYPE_ESCORT_TO_JAIL)
+    ; Straight to a cell, no Scenes of their own, the player included, until the Scene refactor: an escort arrest shares
+    ; the one Scene queue with the prisoner's, and two arrests in it kept breaking (escorts taking each other's actors, a
+    ; stalled escort to a cell holding the other arrest for good, a strip played outside; 2026-10-06, rounds 147-153)
+    RPB_API.GetArrest().ArrestActor(guard, akAttacker, RPB_API.GetArrest().ARREST_TYPE_TELEPORT_TO_CELL)
 endFunction
 
 ;/
@@ -2093,16 +2146,48 @@ endFunction
     simply stopped. Returns how many factions were restored (0 when they were never hostile).
 /;
 int function RestoreNeutralizedHostility(Actor akActor) global
+    return ApplyHostilitySnapshot(akActor, TakeHostilitySnapshot(akActor))
+endFunction
+
+;/
+    The two halves of RestoreNeutralizedHostility, for a caller that wipes the "Jail" storage before it can give the
+    hostility back (CancelArrest: restored first, a cancelled bandit attacked with the cuffs still on, 2026-10-06).
+    Take: the snapshot read and cleared (a retained JMap, 0 when they were never hostile). Apply: given back, released.
+/;
+int function TakeHostilitySnapshot(Actor akActor) global
     if (!akActor)
         return 0
     endif
-
     Form[] savedFactions = RPB_StorageVars.GetFormsOnReference("Hostile Factions", akActor, "Jail")
     if (!savedFactions || savedFactions.Length == 0)
         return 0
     endif
-
+    int snapshot = JMap.object()
+    JValue.retain(snapshot, "RPB_HostilitySnapshot")
+    JMap.setObj(snapshot, "factions", JArray.objectWithForms(savedFactions))
     int[] savedRanks = RPB_StorageVars.GetIntsOnReference("Hostile Ranks", akActor, "Jail")
+    if (savedRanks)
+        JMap.setObj(snapshot, "ranks", JArray.objectWithInts(savedRanks))
+    endif
+    JMap.setFlt(snapshot, "aggression", RPB_StorageVars.GetFloatOnReference("Original Aggression", akActor, "Jail"))
+    RPB_StorageVars.DeleteVariableOnReference("Hostile Factions", akActor, "Jail")
+    RPB_StorageVars.DeleteVariableOnReference("Hostile Ranks", akActor, "Jail")
+    RPB_StorageVars.DeleteVariableOnReference("Original Aggression", akActor, "Jail")
+    RPB_StorageVars.DeleteVariableOnReference("Hostility Checked At Arrest", akActor, "Jail")
+    return snapshot
+endFunction
+
+int function ApplyHostilitySnapshot(Actor akActor, int aiSnapshot) global
+    if (!akActor || !aiSnapshot)
+        return 0
+    endif
+    Form[] savedFactions = JArray.asFormArray(JMap.getObj(aiSnapshot, "factions"))
+    int[] savedRanks = none
+    if (JMap.hasKey(aiSnapshot, "ranks"))
+        savedRanks = JArray.asIntArray(JMap.getObj(aiSnapshot, "ranks"))
+    endif
+    float aggression = JMap.getFlt(aiSnapshot, "aggression")
+    JValue.release(aiSnapshot)
     int restored = 0
     int i = 0
     while (i < savedFactions.Length)
@@ -2117,12 +2202,7 @@ int function RestoreNeutralizedHostility(Actor akActor) global
         endif
         i += 1
     endWhile
-    akActor.SetActorValue("Aggression", RPB_StorageVars.GetFloatOnReference("Original Aggression", akActor, "Jail"))
-
-    RPB_StorageVars.DeleteVariableOnReference("Hostile Factions", akActor, "Jail")
-    RPB_StorageVars.DeleteVariableOnReference("Hostile Ranks", akActor, "Jail")
-    RPB_StorageVars.DeleteVariableOnReference("Original Aggression", akActor, "Jail")
-    RPB_StorageVars.DeleteVariableOnReference("Hostility Checked At Arrest", akActor, "Jail")
+    akActor.SetActorValue("Aggression", aggression)
     Info("Hostility restored on " + akActor.GetDisplayName() + " " + akActor + " (arrest cancelled): " + restored + " factions")
     return restored
 endFunction

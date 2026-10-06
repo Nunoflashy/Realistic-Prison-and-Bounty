@@ -158,11 +158,10 @@ string function CancelArrest(Actor akActor, string asReason, bool abReturnBelong
     endif
 
     string done = ""
-    ; First: the snapshot lives in the actor's "Jail" storage, which cancelling the prisoner below wipes (a freed bandit
-    ; stayed neutral, and guards ignored it)
-    if (RPB_Utility.RestoreNeutralizedHostility(akActor) > 0)
-        done += "hostility restored; "
-    endif
+    ; Taken first: the snapshot lives in the actor's "Jail" storage, which cancelling the prisoner below wipes (a freed
+    ; bandit stayed neutral, and guards ignored it). Given back last, once the cuffs and holds are off: restored here, a
+    ; cancelled bandit attacked the player with the cuffs still on (2026-10-06)
+    int hostility = RPB_Utility.TakeHostilitySnapshot(akActor)
 
     bool sceneStopped = sceneManager.EndSceneWithActor(akActor, asReason)
     if (sceneStopped)
@@ -313,6 +312,9 @@ string function CancelArrest(Actor akActor, string asReason, bool abReturnBelong
     akActor.EvaluatePackage()
     RPB_Recovery.__Step(akActor, "CancelArrest: AI and controls released")
 
+    if (RPB_Utility.ApplyHostilitySnapshot(akActor, hostility) > 0)
+        done += "hostility restored; "
+    endif
     RPB_Utility.Info("Arrest of " + akActor.GetDisplayName() + " " + akActor + " cancelled (" + asReason + "): " + RPB_Utility.string_if(done == "", "nothing left to undo", done))
     return done
 endFunction

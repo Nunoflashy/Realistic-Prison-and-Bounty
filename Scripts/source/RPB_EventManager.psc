@@ -1039,6 +1039,12 @@ event OnPrisonScene(string asScene, string asSceneEvent, RPB_Prison apPrison, RP
             ; Escort-to-Cell walk had no trail at all to show how far it actually got. Added specifically to diagnose
             ; test 101's continued off-screen stall with real evidence instead of another guessed fix.
             RPB_Utility.Crumb(apPrisoner.GetActor(), "EscortToCell: Begin")
+            ; An NPC's escort watched from its start too, with a long timeout ("Lock Cell" below re-arms it short): Taarie's,
+            ; with no door bound, never reached "Lock Cell", so nothing watched it and the player's Scenes queued behind it
+            ; waited for good (2026-10-06). The player's is armed from the escort assist (Prisoner, 90s)
+            if (!apPrisoner.IsPlayer())
+                apPrison.QueueEscortToCellStallCheck(apPrisoner.GetActor(), 120.0)
+            endif
 
         elseif (asSceneEvent == SceneManager.EVENT_ESCORTING)
             if (asSceneSecondaryEvent == "Release from Captor") ; May be refactored into OnArrestScene

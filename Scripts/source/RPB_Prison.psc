@@ -2889,6 +2889,15 @@ function __ProcessEscortStallChecks()
                         self.OnEscortPrisonerToCellEnd(prisoner, prisoner.JailCell, guard)
                     endif
                 endif
+                ; And the Scene queue moves on: neither Stop() nor the manual finish told the SceneManager this escort was
+                ; over, so whatever waited behind it never played (the player's strip and escort to the cell, queued behind
+                ; Vivienne Onis's stalled escort: the player left cuffed at the stripping area for good, 2026-10-06). Does
+                ; nothing if the Scene's own end already moved it on (another Scene is current then), and only while the escort
+                ; is still this prisoner's: the next one queued can be the same Scene for someone else
+                string stalledName = self.SceneManager.EscortToCellSceneName()
+                if (self.SceneManager.GetSceneNthReferenceOfType(stalledName, "Escortee") == checkActor)
+                    self.SceneManager.EndSceneEarly(stalledName, "the escort to the cell stalled, finished directly", abRunEndEvents = false)
+                endif
             endif
         endif
         i += 1
@@ -3489,11 +3498,13 @@ function EscortPrisonerToCell(RPB_Prisoner apPrisoner, Actor akEscort)
     ObjectReference outsideCellGuardWaitingMarker = jailCell.GetRandomMarker("Exterior")
     apPrisoner.NPC_BindToCell()
 
+    ; The door looked up again: bound while the cell wasn't loaded it stayed None, the Scene got no CellDoor and its last
+    ; phase (the door) never ended (Vivienne Onis, 2026-10-06: the stall that left the player waiting behind her)
     SceneManager.StartEscortToCell( \
         akEscortLeader              = akEscort, \
         akEscortedPrisoner          = apPrisoner.GetActor(), \
         akJailCellMarker            = jailCell, \
-        akJailCellDoor              = jailCell.CellDoor, \
+        akJailCellDoor              = jailCell.EnsureCellDoor(), \
         akEscortWaitingMarker       = outsideCellGuardWaitingMarker \ 
     )
 endFunction

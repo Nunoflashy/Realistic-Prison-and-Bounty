@@ -140,7 +140,7 @@ scriptname RPB_SceneManager extends Quest
     function UnsetPendingHoldOnActor(Actor akActor)
     function ReleaseAlias(string aliasName, int aliasIndex = 0)
     function UnbindAliases(string asScene)
-    function QueueAlias(ReferenceAlias apRefAlias, ObjectReference akRef, bool abBindAlias = true)
+    function QueueAlias(ReferenceAlias apRefAlias, ObjectReference akRef, bool abBindAlias = true, string asScene = "")
     function BindSceneAliasGroup(string asScene, string asAliasRefType, Form[] akRefs)
     function BindSceneAlias(string asScene, string asAliasRefType, ObjectReference akRef)
     function RestoreAliases(int aiAliases)
@@ -226,6 +226,26 @@ int __sceneConfig       ; FastMap<string>
 int __queuedAliases     ; FastMap<int> - the aliases recorded for the Scene about to be queued
 int __queuedScenes      ; Queue<string>
 int __queuedSceneAliases ; JArray of FastMap<int>, in step with __queuedScenes: each queued Scene's own aliases
+; Scene name -> its aliases recorded so far, until its PushScene takes them. One shared record let two arrests starting at
+; once mix their actors: Taarie's resumed escort to jail took the player's Escort/Escortee, recorded at the same moment for
+; the player's own confrontation, and played with the player in it (2026-10-06)
+int __stagedAliases
+
+int function __StagingFor(string asScene)
+    if (asScene == "")
+        return __queuedAliases
+    endif
+    if (!__stagedAliases)
+        __stagedAliases = JMap.object()
+        JValue.retain(__stagedAliases, "RPB_SceneManager")
+    endif
+    int staged = JMap.getObj(__stagedAliases, asScene)
+    if (!staged)
+        staged = FastMap("<int>")
+        JMap.setObj(__stagedAliases, asScene, staged)
+    endif
+    return staged
+endFunction
 
 function SceneManager()
     __sceneContainer    = delete(__sceneContainer)
@@ -1047,8 +1067,13 @@ function PushScene(string asSceneName)
 
     ; This Scene's own aliases travel with it, so a later queue call can't overwrite them (they used to live in one
     ; shared map, bound on the spot, even into a Scene still playing for someone else)
-    JArray.addObj(__queuedSceneAliases, JValue.shallowCopy(__queuedAliases))
-    Object_Clear(__queuedAliases)
+    if (__stagedAliases && JMap.hasKey(__stagedAliases, asSceneName))
+        JArray.addObj(__queuedSceneAliases, JValue.shallowCopy(JMap.getObj(__stagedAliases, asSceneName)))
+        JMap.removeKey(__stagedAliases, asSceneName)
+    else
+        JArray.addObj(__queuedSceneAliases, JValue.shallowCopy(__queuedAliases))
+        Object_Clear(__queuedAliases)
+    endif
 endFunction
 
 ; Takes the oldest queued Scene's aliases out of the queue (retained: the caller releases it), 0 if there are none
@@ -1569,10 +1594,27 @@ bool function SetPendingHoldOnActor(Actor akActor)
     ; The package is needed: without it the held NPC drew her weapon in 4 of 5 runs (test 130). One actor per alias
     ; (Skyrim has no collection aliases), so every PendingHold_NN the plugin has is used: PendingHold_01, _02 and so on,
     ; up to the first number missing. More holds at once = more aliases in the CK, no script change.
+    ; Already holding one (a pause during the escort and a pending arrest both hold): kept, not a second one
+    int heldId = RPB_StorageVars.GetIntOnReference("Pending Hold Alias", akActor)
+    if (heldId)
+        ReferenceAlias held = self.GetAliasByID(heldId) as ReferenceAlias
+        if (held && held.GetReference() == akActor)
+            return true
+        endif
+    endif
+
     int i = 1
     ReferenceAlias hold = self.__PendingHoldAlias(i)
     while (hold)
-        if (!hold.GetReference())
+        ; An alias still filled by someone whose record no longer points at it was left behind (178, one bandit at a time,
+        ; found all 3 in use, 2026-10-06): free. The record is read with him as an argument, no call into him
+        ObjectReference holder = hold.GetReference()
+        if (holder && RPB_StorageVars.GetIntOnReference("Pending Hold Alias", holder) != hold.GetID())
+            RPB_Utility.LogWarn(hold + " was still holding " + holder + ", who no longer had it recorded: freed", "SceneManager::SetPendingHoldOnActor")
+            UnbindAlias(hold)
+            holder = none
+        endif
+        if (!holder)
             BindAliasTo(hold, akActor)
             RPB_StorageVars.SetIntOnReference("Pending Hold Alias", akActor, hold.GetID())
             akActor.EvaluatePackage()
@@ -1648,20 +1690,21 @@ endFunction
     ObjectReference @akRef: The reference to bind to the Alias.
     bool?           @abBindAlias: Whether to directly bind the reference to the Alias.
 /;
-function QueueAlias(ReferenceAlias apRefAlias, ObjectReference akRef, bool abBindAlias = true)
+function QueueAlias(ReferenceAlias apRefAlias, ObjectReference akRef, bool abBindAlias = true, string asScene = "")
     if (!akRef)
         RPB_Utility.LogError("The reference received is none! (cannot queue Alias)", "SceneManager::QueueAlias")
         return
     endif
+    int staging = __StagingFor(asScene)
 
     ; Only recorded: the Scene's own entry in the queue takes it (PushScene), and it's bound right before that Scene starts
     ; (PlayQueued). Binding here filled the aliases of the same Scene while it was still playing for someone else, so
     ; that Scene's end reported the wrong actors (abBindAlias is kept so existing calls compile; it no longer binds).
     int id = apRefAlias.GetID()
-    FastIntMap_SetForm(__queuedAliases, id, akRef)
-    Debug("SceneManager::QueueAlias", "Queued " + apRefAlias.GetName() + " (id: "+ apRefAlias.GetID() +") with reference: " + FastIntMap_GetForm(__queuedAliases, id))
+    FastIntMap_SetForm(staging, id, akRef)
+    Debug("SceneManager::QueueAlias", "Queued " + apRefAlias.GetName() + " (id: "+ apRefAlias.GetID() +") with reference: " + FastIntMap_GetForm(staging, id) + " for " + asScene)
 
-    Debug("SceneManager::QueueAlias", "__queuedAliases: " + GetContainerList(__queuedAliases))
+    Debug("SceneManager::QueueAlias", "__queuedAliases: " + GetContainerList(staging))
 
     RPB_Utility.LogWarn("Alias " + apRefAlias.GetName() + " (id: "+ apRefAlias.GetID() +") has not been assigned to any reference!", "SceneManager::QueueAlias", akRef == none)
 endFunction
@@ -1688,7 +1731,7 @@ function BindSceneAliasGroup(string asScene, string asAliasRefType, Form[] akRef
     int i = 0
     while (i < iterations)
         if (akRefs[i])
-            self.QueueAlias(aliasesInGroup[i] as ReferenceAlias, akRefs[i] as ObjectReference)
+            self.QueueAlias(aliasesInGroup[i] as ReferenceAlias, akRefs[i] as ObjectReference, asScene = asScene)
         endif
         i += 1
     endWhile
@@ -1717,7 +1760,7 @@ function BindSceneAlias(string asScene, string asAliasRefType, ObjectReference a
     int i = 0
     while (i < iterations)
         if (akRef)
-            self.QueueAlias(aliasesInGroup[i] as ReferenceAlias, akRef)
+            self.QueueAlias(aliasesInGroup[i] as ReferenceAlias, akRef, asScene = asScene)
         endif
         i += 1
     endWhile

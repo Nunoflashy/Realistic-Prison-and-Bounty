@@ -94,6 +94,7 @@ function PerformMaintenance()
     if (devTests)
         devTests.ReleaseDevHoldsOnLoad() ; returns once each hold has ended (10s at most)
     endif
+    RPB_Utility.SetTestRunning(false) ; a test saved mid-run isn't running after the load
     RPB_Utility.ClearFrozenGuards() ; a load drops a frozen guard's broken object: he answers again
     SceneManager.SceneManager()
     PrisonManager.VerifyIntegrity()

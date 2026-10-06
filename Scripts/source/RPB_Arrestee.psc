@@ -1284,6 +1284,13 @@ event OnDeath(Actor akKiller)
     Arrest.OnArresteeDeath(self, Captor, akKiller)
 endEvent
 
+; Only the player's hits go on (the rule for the others reads their combat; the player has no combat target to read)
+event OnHit(ObjectReference akAggressor, Form akSource, Projectile akProjectile, bool abPowerAttack, bool abSneakAttack, bool abBashAttack, bool abHitBlocked)
+    if (akAggressor == Game.GetFormEx(0x14) && Captor)
+        RPB_Utility.PlayerHitPrisoner(Captor.GetActor(), this)
+    endif
+endEvent
+
 event OnRestrained()
     
 endEvent

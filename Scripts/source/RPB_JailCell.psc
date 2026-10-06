@@ -67,6 +67,7 @@ scriptname RPB_JailCell extends RPB_SerializableObjectReference
     function Uninitialize()
     function BindPrison(RPB_Prison apPrison)
     function BindCellDoor(RPB_CellDoor akCellDoor)
+    RPB_CellDoor function EnsureCellDoor()
     function DisableOwnership()
     function RegisterPrisoner(RPB_Prisoner apPrisoner)
     function UnregisterPrisoner(RPB_Prisoner apPrisoner)
@@ -757,12 +758,18 @@ endFunction
 ;                          Events
 ; =========================================================
 
-event OnPrisonerRegister(RPB_Prisoner apPrisoner)
+; Binds the configured cell door if none is bound: a door read while its cell wasn't loaded stays None (Path to 1.0 item 8)
+RPB_CellDoor function EnsureCellDoor()
     if (!self.CellDoor)
         RPB_CellDoor configuredCellDoor = self.GetPropertyOfTypeFormArray("Cell Doors")[0] as RPB_CellDoor ; Index is temporary, for now only use 1st cell door
         self.BindCellDoor(configuredCellDoor)
-        Debug("["+ ID +"] JailCell::OnPrisonerRegister", "Rebinding Cell Door!")
+        Debug("["+ ID +"] JailCell::EnsureCellDoor", "Rebinding Cell Door! (now " + self.CellDoor + ")")
     endif
+    return self.CellDoor
+endFunction
+
+event OnPrisonerRegister(RPB_Prisoner apPrisoner)
+    self.EnsureCellDoor()
     self.DetermineCellParameters()
     ; Guarded, not left to Debug(): the message is built before Debug() gets to check, and building it looks up every
     ; prisoner in this cell (with name/sex natives) - on every registration, seconds for a crowded cell, logging or not.
@@ -1051,10 +1058,20 @@ endFunction
 ;/
     Performs the actions when OnCellAttach() / OnAttachedToCell() and OnCellDetach() / OnDetachedFromCell() events happen.
 /;
-function __onCellAttachAndDetachEvent()
-    if (__npcSanityCheckIsCellAttachedOrDetached || Utility.GetCurrentRealTime() < __attachEventLockedUntil)
+bool __lastPassAttached
+
+;/
+    @abAttached: the jail cell came into the player's cell (attach) or left it (detach). An attach turns its prisoners' AI
+    on: the distance check alone read Jaree-Ra as far (teleported to his cell while the player was outside, AI off), the
+    attach as the player came in left it off, and the move into the cell with his AI off left him invisible but talkable
+    there for good (2026-10-06; likely round 142's T-posed prisoner too). And an attach right after a detach is no longer
+    dropped by the pass lock (only a pass of the same kind is).
+/;
+function __onCellAttachAndDetachEvent(bool abAttached)
+    if (__npcSanityCheckIsCellAttachedOrDetached || (abAttached == __lastPassAttached && Utility.GetCurrentRealTime() < __attachEventLockedUntil))
         return
     endif
+    __lastPassAttached = abAttached
 
     ; A cellmate RPB found frozen is passed over (each call below goes into him); the list is the cell's own, no call to read
     int frozenMap = RPB_Utility.FrozenGuardsForScan()
@@ -1067,7 +1084,9 @@ function __onCellAttachAndDetachEvent()
             apPrisoner = Prison.Prisoners.AtKey(Prisoners[i] as Actor)
         endif
         if (apPrisoner && apPrisoner.IsImprisoned)
-            apPrisoner.EnableAI(!apPrisoner.IsFarFromPlayer())
+            bool aiOn = abAttached || !apPrisoner.IsFarFromPlayer()
+            apPrisoner.EnableAI(aiOn)
+            RPB_Utility.Debug("JailCell::OnCellAttachAndDetachEvent", self + string_if(abAttached, " attached", " detached") + ": " + Prisoners[i] + " AI " + aiOn)
             
             apPrisoner.NPC_UpdateStripping()
             apPrisoner.NPC_UpdateClothing()
@@ -1105,23 +1124,23 @@ endFunction
 
 ; When the player leaves the location of this jail cell
 event OnCellDetach()
-    __onCellAttachAndDetachEvent()
+    __onCellAttachAndDetachEvent(false)
 endEvent
 
 ; When the player is in the same cell as this jail cell
 event OnCellAttach()
     ; Debug("["+ self +"] JailCell::OnCellAttach", "Cell: (ID: " + self.ID + ") (" + self + ") (Markers: "+ self.InteriorMarkers +") (Prison: "+ self.Prison.Name +") (Prisoners: "+ self.Prisoners +") (CellDoor: "+ self.CellDoor +")")
-    __onCellAttachAndDetachEvent()
+    __onCellAttachAndDetachEvent(true)
 endEvent
 
 ; When this jail cell is in the same cell as the player
 event OnAttachedToCell()
-    __onCellAttachAndDetachEvent()
+    __onCellAttachAndDetachEvent(true)
 endEvent
 
 ; When this jail cell is not in the cell the player is in
 event OnDetachedFromCell()
-    __onCellAttachAndDetachEvent()
+    __onCellAttachAndDetachEvent(false)
 endEvent
 
 bool function PerformPrisonerSanityCheck(RPB_Prisoner apPrisoner)
