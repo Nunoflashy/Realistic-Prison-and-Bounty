@@ -1833,7 +1833,9 @@ int function CalmGuardsAgainstPlayer() global
         ; Not a guard with a probe out or waiting either (IsGuardProbeOpen, no call into him): the reset runs right after
         ; the arrest released its guard, in his burst. On all 12 frozen guards of 156 x1000 (2026-10-04) this scan's
         ; IsGuard() hung on him, before his probes had marked him
-        if (candidate && candidate != player && !IsGuardProbeOpen(candidate) && candidate.IsGuard() && candidate.IsInCombat())
+        ; And the law that isn't flagged a guard (anyone with a crime faction fighting the player: Captain Aldis kept attacking
+        ; after test 145's teardown and killed the player, 2026-10-06); the extra reads only on those in combat
+        if (candidate && candidate != player && !IsGuardProbeOpen(candidate) && !IsFrozenGuard(candidate) && candidate.IsInCombat() && (candidate.IsGuard() || (candidate.GetCombatTarget() == player && candidate.GetCrimeFaction())))
             candidate.StopCombat()
             candidate.StopCombatAlarm()
             calmed += 1
