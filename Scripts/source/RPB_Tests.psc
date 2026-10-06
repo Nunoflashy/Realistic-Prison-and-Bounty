@@ -12501,6 +12501,12 @@ bool function __Scenario_NpcEscortCancel(string asTest, bool abPlayer = false)
     endif
     Utility.Wait(10.0) ; under way
     RPB_Recovery.CancelArrest(npc, "test " + asTest + ": the escort cancelled mid-way (freeze control, " + string_if(abPlayer, "PLAYER", "NPC") + ")")
+    ; The player's bounty back at once (178's bandit has none to restore): left until the teardown, a guard nearby forcegreeted
+    ; the freed player with the arrest dialogue in the very window this measures, a difference from 178 (2026-10-06)
+    if (abPlayer && __scenarioBountyFaction)
+        __scenarioBountyFaction.SetCrimeGold(__savedPlayerBounty)
+        __scenarioBountyFaction.SetCrimeGoldViolent(__savedPlayerBountyViolent)
+    endif
     Utility.Wait(12.0) ; the probes' +5s and +8s, and their checks
     bool guardFrozen = RPB_Utility.IsFrozenGuard(guard)
     bool npcFrozen = RPB_Utility.IsFrozenGuard(npc)
