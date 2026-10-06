@@ -88,6 +88,12 @@ function PerformMaintenance()
     JDB.solveFltSetter(".rpb_root.loadStamp", Utility.GetCurrentRealTime(), true)
     API.MCM.EnsureAllOptionDefaults() ; repairs saves that never visited every page
     EventManager.RegisterEvents()
+    ; The dev freeze keys' holds go first: unlike a real freeze they survive the load, and the cleanup below would call into
+    ; a still-held NPC and hang (the rest of this maintenance with it)
+    RPB_Tests devTests = (Game.GetPlayer() as Form) as RPB_Tests
+    if (devTests && devTests.ReleaseDevHoldsOnLoad())
+        Utility.Wait(0.5) ; each hold ends on its next pass
+    endif
     RPB_Utility.ClearFrozenGuards() ; a load drops a frozen guard's broken object: he answers again
     SceneManager.SceneManager()
     PrisonManager.VerifyIntegrity()

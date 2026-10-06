@@ -1419,6 +1419,12 @@ state Imprisoned
     endEvent
 
     event OnUpdateGameTime()
+        ; A prisoner RPB found frozen: every call below goes into him, and this fired every game hour, a new stuck stack each
+        ; time (38 in one dump, 2026-10-06). `this` is the cached actor, reading it is no call; the monitor takes him again
+        ; after the next load
+        if (RPB_Utility.IsFrozenGuard(this))
+            return
+        endif
         ; Dont update if the player is not nearby, let Prison Monitor handle it
         if (!Prison.ShouldActivelyMonitorPrisoner(self))
             Prison.SendMonitoringRequest()

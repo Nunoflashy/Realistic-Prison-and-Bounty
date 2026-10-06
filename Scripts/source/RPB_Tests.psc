@@ -13259,6 +13259,30 @@ endFunction
 Actor __manualFreezePrisoner
 bool[] __prisonerHoldRelease
 
+;/
+    The dev freeze keys' holds outlive a save (a running stack, saved and resumed by the load), while the load clears RPB's
+    frozen marks: the load's own cleanup then called into the held NPCs and hung (ClearFrozenGuards on a held guard, the
+    prison's checks on a held prisoner; RPB - Stats wouldn't open, 2026-10-06). RPB_ConfigAlias calls this first on every
+    load: each hold told to end. True if one was held.
+/;
+bool function ReleaseDevHoldsOnLoad()
+    bool any = false
+    if (__holdRelease && __holdRelease.Length > 0 && !__holdRelease[0])
+        __holdRelease[0] = true
+        any = true
+    endif
+    if (__prisonerHoldRelease && __prisonerHoldRelease.Length > 0 && !__prisonerHoldRelease[0])
+        __prisonerHoldRelease[0] = true
+        any = true
+    endif
+    if (any)
+        log("load: released the dev freeze holds still running from the save (guard " + __manualFreezeGuard + ", prisoner " + __manualFreezePrisoner + ")")
+    endif
+    __manualFreezeGuard = none
+    __manualFreezePrisoner = none
+    return any
+endFunction
+
 function ToggleManualFreezePrisoner()
     if (__manualFreezePrisoner)
         Actor released = __manualFreezePrisoner
