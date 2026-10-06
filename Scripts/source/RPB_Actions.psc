@@ -955,7 +955,11 @@ function Action_ArrestSelectedActor(RPB_UIInterface uilib, bool abEscortArrestee
     Actor guard = none
 
     if (abShowCaptorInputField)
-        int formId = PO3_SKSEFunctions.StringToInt(uilib.ShowInput("Captor Form ID", "0x10C06D"))
+        string captorId = uilib.ShowInput("Captor Form ID", "0x10C06D")
+        if (uilib.WasCancelled())
+            return
+        endif
+        int formId = PO3_SKSEFunctions.StringToInt(captorId)
         guard = Game.GetFormEx(formId) as Actor
     else
         guard = RPB_Utility.GetNearbyGuardForFactionFromRef(selectedActor)
@@ -981,6 +985,9 @@ function Action_ArrestSelectedActor(RPB_UIInterface uilib, bool abEscortArrestee
             API.Arrest.ARREST_TYPE_ESCORT_TO_JAIL + "," + \
             API.Arrest.ARREST_TYPE_ESCORT_TO_CELL \
         )
+        if (uilib.WasCancelled() || arrestType == "")
+            return
+        endif
     endif
 
     string actorName    = selectedActor.GetBaseObject().GetName()
@@ -995,6 +1002,9 @@ function Action_ArrestSelectedActor(RPB_UIInterface uilib, bool abEscortArrestee
     endif
 
     int arrestBounty = int_if (currentBounty == 0, (uilib.ShowInput(holdName + " - Bounty to set for " + actorName, "1200") as int), currentBounty)
+    if (uilib.WasCancelled())
+        return
+    endif
 
     if (arrestBounty == 0)
         return

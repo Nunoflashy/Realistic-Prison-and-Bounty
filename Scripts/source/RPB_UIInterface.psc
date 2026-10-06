@@ -8,6 +8,7 @@ scriptname RPB_UIInterface extends ObjectReference
     int function ShowList(string asTitle = "", string[] asOptions, int aiStartIndex = 0, int aiDefaultIndex = 0)
     string function ShowList_ReturnElement(string asTitle = "", string[] asOptions, int aiStartIndex = 0, int aiDefaultIndex = 0)
     string function ShowInput(string asTitle = "", string asInitialText = "")
+    bool function WasCancelled()
     string function ShowStringList(string asTitle = "", string asOptions, string asOptionSeparator = ",", int aiStartIndex = 0, int aiDefaultIndex = 0)
     Form function ShowFormArrayList(string asListTitle = "", Form[] akOptions)
     string function ShowHoldList(bool abMustHaveArrestees = false, bool abSkipListOnSingleResult = false, string asListTitle = "Select Hold")
@@ -46,17 +47,97 @@ endProperty
 ;                          UI Base
 ; ==========================================================
 
+;/
+    How SkyUILib's menus close (its swfs, 2026-10-06):
+    - the list: Enter (or a click) marks a line, Tab closes the menu and sends back the marked line; with none marked, the
+      line it opened marked (@aiDefaultIndex). There's no separate cancel: Tab with nothing marked is the cancel, and the
+      Default button (Ready Weapon) marks the default line again. A list whose first line isn't already a "<No ...>" line
+      gets a "<Cancel>" line on top, marked when it opens, so closing it without a choice returns nothing: the dev menu's
+      arrest went ahead after a cancel (its escort list opened on Escort to Jail), and a test list ran its first line;
+    - the text box: Enter accepts, Tab cancels, but its result alone doesn't say which, so I listen for the cancel keys
+      while it's open (listening during a list read every Tab, the list's only close key, as a cancel).
+    WasCancelled() says whether the last menu was closed without a choice.
+/;
+bool __menuCancelled
+
+bool function WasCancelled()
+    return __menuCancelled
+endFunction
+
+int function __TweenMenuKey()
+    return Input.GetMappedKey("Tween Menu")
+endFunction
+
+function __WatchCancelKeys(bool abOn)
+    int tween = __TweenMenuKey()
+    if (abOn)
+        __menuCancelled = false
+        RegisterForKey(0x0F)  ; Tab
+        RegisterForKey(0x01)  ; Esc
+        RegisterForKey(0x115) ; gamepad B
+        if (tween > 0)
+            RegisterForKey(tween)
+        endif
+    else
+        ; The key event comes in before the menu's close event, but it's a separate event: a moment for it to land
+        Utility.WaitMenuMode(0.05)
+        UnregisterForKey(0x0F)
+        UnregisterForKey(0x01)
+        UnregisterForKey(0x115)
+        if (tween > 0)
+            UnregisterForKey(tween)
+        endif
+    endif
+endFunction
+
+event OnKeyDown(int aiKeyCode)
+    if (aiKeyCode == 0x0F || aiKeyCode == 0x01 || aiKeyCode == 0x115 || aiKeyCode == __TweenMenuKey())
+        __menuCancelled = true
+    endif
+endEvent
+
+; The marked line's index; closed without a choice, @aiDefaultIndex (my lists open on their "<No ...>" line, index 0)
 int function ShowList(string asTitle = "", string[] asOptions, int aiStartIndex = 0, int aiDefaultIndex = 0)
-    return UILib.ShowList(asTitle, asOptions, aiStartIndex, aiDefaultIndex)
-endFunction
-
-string function ShowList_ReturnElement(string asTitle = "", string[] asOptions, int aiStartIndex = 0, int aiDefaultIndex = 0)
     int selectedIndex = UILib.ShowList(asTitle, asOptions, aiStartIndex, aiDefaultIndex)
-    return asOptions[selectedIndex]
+    __menuCancelled = selectedIndex < 0 || (selectedIndex == aiDefaultIndex && asOptions.Length > aiDefaultIndex && StringUtil.GetNthChar(asOptions[aiDefaultIndex], 0) == "<")
+    return selectedIndex
 endFunction
 
+; The marked line, or "" when closed without a choice
+string function ShowList_ReturnElement(string asTitle = "", string[] asOptions, int aiStartIndex = 0, int aiDefaultIndex = 0)
+    if (asOptions.Length == 0)
+        __menuCancelled = true
+        return ""
+    endif
+    if (StringUtil.GetNthChar(asOptions[0], 0) == "<")
+        int index = self.ShowList(asTitle, asOptions, aiStartIndex, aiDefaultIndex)
+        if (__menuCancelled || index < 0 || index >= asOptions.Length)
+            return ""
+        endif
+        return asOptions[index]
+    endif
+
+    ; A "<Cancel>" line on top, marked when it opens; the cursor still starts on @aiStartIndex's line
+    int withCancel = FastArray("<string>")
+    FastArray_AddString(withCancel, "<Cancel>")
+    FastArray_AddFromArray(withCancel, FastArray_FromStringArray(asOptions))
+    int marked = UILib.ShowList(asTitle, FastArray_ToStringArray(withCancel), aiStartIndex + 1, 0)
+    __menuCancelled = marked <= 0 || marked > asOptions.Length
+    if (__menuCancelled)
+        return ""
+    endif
+    return asOptions[marked - 1]
+endFunction
+
+; The text accepted, or "" when cancelled
 string function ShowInput(string asTitle = "", string asInitialText = "")
-    return UILib.ShowTextInput(asTitle, asInitialText)
+    __WatchCancelKeys(true)
+    string text = UILib.ShowTextInput(asTitle, asInitialText)
+    __WatchCancelKeys(false)
+    if (__menuCancelled)
+        return ""
+    endif
+    return text
 endFunction
 
 ; ==========================================================
@@ -65,9 +146,7 @@ endFunction
 
 string function ShowStringList(string asTitle = "", string asOptions, string asOptionSeparator = ",", int aiStartIndex = 0, int aiDefaultIndex = 0)
     string[] options = StringUtil.Split(asOptions, asOptionSeparator)
-
-    int selectedIndex = UILib.ShowList(asTitle, options, aiStartIndex, aiDefaultIndex)
-    return options[selectedIndex]
+    return self.ShowList_ReturnElement(asTitle, options, aiStartIndex, aiDefaultIndex)
 endFunction
 
 Form function ShowFormArrayList(string asListTitle = "", Form[] akOptions)

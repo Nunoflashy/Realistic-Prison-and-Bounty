@@ -207,9 +207,17 @@ event OnKeyDown(int keyCode)
         endif
 
         string testName = uilib.ShowList_ReturnElement("Tests", unitTest.GetTestNames(), 0, 0)
+        ; Cancelled (the <Cancel> line): nothing to run, so no count asked either
+        if (uilib.WasCancelled() || testName == "" || unitTest.GetTest(testName) == "")
+            return
+        endif
 
         ; How many times in a row (the summary lands in the Papyrus log as "[UNIT REPEAT RESULT]"); empty or not a number = once
-        int times = uilib.ShowInput("Run how many times?", "1") as int
+        string timesText = uilib.ShowInput("Run how many times?", "1")
+        if (uilib.WasCancelled())
+            return
+        endif
+        int times = timesText as int
         if (times < 1)
             times = 1
         endif

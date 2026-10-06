@@ -62,8 +62,8 @@ bool property DISPLAY_ASSERT_IN_GAME    = false autoreadonly
 bool property DISPLAY_RESULT_IN_GAME    = true autoreadonly
 
 function SetTests()
-    self.AddTest("000 - Run All Tests", "__RUN_ALL__")
-    self.AddTest("000 - No Test", "")
+    ; No "Run All Tests" or "No Test" entries any more: the menu's <Cancel> line replaces "No Test", and a full run waits
+    ; for tests that can run on their own end to end (RunAllTests is kept for that)
     self.AddTest("001 - 25 Days after 26th Frostfall is 20th of Sun's Dusk", "Test_25Days_After_26th_Frostfall_Is_20th_Suns_Dusk")
     self.AddTest("002 - Get Prison For Actor Globally", "Test_Can_Get_Prison_For_Actor_Globally")
     self.AddTest("003 - Imprison Actor without Arresting", "Test_Can_Imprison_Actor_Without_Arresting")
