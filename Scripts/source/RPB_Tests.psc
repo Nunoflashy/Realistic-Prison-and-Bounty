@@ -10847,12 +10847,15 @@ endFunction
 Actor function __NearestGuardWithPrison(Actor akCenter, float afRadius)
     RPB_PrisonManager prisons = RPB_API.GetPrisonManager()
     Actor[] nearby = PO3_SKSEFunctions.GetActorsByProcessingLevel(0)
+    Actor player = Game.GetFormEx(0x14) as Actor
     Actor nearest = none
     float nearestDistance = afRadius
     int i = 0
     while (i < nearby.Length)
         Actor candidate = nearby[i]
-        if (candidate && candidate != akCenter && candidate.GetFormID() != 0x14 && !RPB_Utility.IsFrozenGuard(candidate) && candidate.IsGuard() && !candidate.IsDead() && !candidate.IsDisabled() && !candidate.IsChild())
+        ; The frozen check before any call on him: GetFormID() came first, and run 697 of 183 x1000 hung on the frozen clone
+        ; of run 696, dead next to the start (the stack dump, 2026-10-06)
+        if (candidate && candidate != akCenter && candidate != player && !RPB_Utility.IsFrozenGuard(candidate) && candidate.IsGuard() && !candidate.IsDead() && !candidate.IsDisabled() && !candidate.IsChild())
             float distance = candidate.GetDistance(akCenter)
             Faction crimeFaction = candidate.GetCrimeFaction()
             if (distance < nearestDistance && crimeFaction && prisons.GetPrison(crimeFaction.GetName()))
@@ -12689,7 +12692,7 @@ bool function __Scenario_GuardCrimeFactions(string asTest)
     int i = 0
     while (i < nearby.Length)
         Actor candidate = nearby[i]
-        if (candidate && candidate.GetFormID() != 0x14 && !RPB_Utility.IsFrozenGuard(candidate) && candidate.IsGuard() && !candidate.IsDead())
+        if (candidate && candidate != player && !RPB_Utility.IsFrozenGuard(candidate) && candidate.IsGuard() && !candidate.IsDead())
             guards += 1
             Faction crimeFaction = candidate.GetCrimeFaction()
             string factionName = "none"
