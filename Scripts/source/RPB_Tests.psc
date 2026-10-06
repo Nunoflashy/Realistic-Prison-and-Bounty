@@ -270,6 +270,7 @@ function SetTests()
     self.AddTest("182 - Diagnostic: the Guards Around and Their Crime Factions (does each have a prison? stand inside and outside Castle Dour)", "Test_GuardCrimeFactions", abChainable = false)
     self.AddTest("183 - Freeze Control, PLAYER: the Player's Escort to Jail Cancelled 10s In, the Guard Probed (178's player twin; repeat it)", "Test_PlayerEscortCancelControl", abChainable = false)
     self.AddTest("184 - Benchmark: the Time Skip's NPC Releases on Its Own Stack vs by Event (6 bandits each; advances the clock a few days)", "Test_ReleaseByEventBenchmark", abChainable = false)
+    self.AddTest("185 - Two Prisoners in Cells: a Freezable Bandit and Vivienne Onis (freeze him with the prisoner key, then talk to her: does the dialogue lock?)", "Test_FrozenPrisonerDialogue", abChainable = false)
     self.AddTest("041 - ActiveMagicEffectContainer: Stuck Lock Self-Heals", "Test_ActiveMagicEffectContainer_StuckLockSelfHeals")
     self.AddTest("042 - ThreadLock: JAtomic Primitive Semantics and Registry", "Test_ThreadLock_PrimitiveSemantics")
     ; Not chainable: fires concurrent worker threads
@@ -12536,6 +12537,9 @@ bool function __Scenario_FrozenPrisonerTimeSkip(string asTest)
     if (!assert_true(frozen && other, asTest + ": couldn't spawn the two prisoners"))
         return false
     endif
+    ; Neutral, as an arrest makes them: registered straight in, the guards around killed them (the mod author needed tcai)
+    RPB_Utility.NeutralizeHostileActor(frozen)
+    RPB_Utility.NeutralizeHostileActor(other)
     float now = Utility.GetCurrentGameTime()
     RPB_Prisoner frozenPrisoner = __RegisterPrisonerAndWait(frozen, prison)
     RPB_Prisoner otherPrisoner = __RegisterPrisonerAndWait(other, prison)
@@ -13236,6 +13240,48 @@ bool function __Scenario_SpawnFreezablePrisoner(string asTest)
     bool imprisoned = RPB_Utility.IsActorImprisoned(npc)
     log(asTest + ": " + npc + " imprisoned " + imprisoned + " (" + __Ms(Utility.GetCurrentRealTime() - start) + "ms), in " + npc.GetParentCell() + "; the prisoner freeze key freezes or releases him")
     return assert_true(imprisoned, asTest + ": " + npc + " never imprisoned")
+endFunction
+
+;/
+    185: the dialogue lock of 179 (2026-10-05: talking to the other prisoner, Vivienne Onis, while one was held frozen locked
+    the game in the dialogue until the hold ended; 179's skip was hanging on him then). Both put in Castle Dour cells by a
+    real guard, kept (no teardown): 180's freezable bandit and a copy of Vivienne (0x132AE, her own dialogue). Then, by
+    hand: freeze the bandit with the prisoner key (prid <his id>), talk to her, and see whether it locks with no time skip
+    running. Green = both imprisoned.
+/;
+bool function __Scenario_FrozenPrisonerDialogue(string asTest)
+    Actor guard = __ScenarioRealGuard()
+    if (!guard)
+        return false
+    endif
+    __scenarioRealGuard = none ; kept as he is
+    Actor bandit = __SpawnFreezablePrisonerNPC(asTest, guard)
+    Actor vivienne = Game.GetPlayer().PlaceAtMe(Game.GetFormEx(0x132AE), 1, abForcePersist = true) as Actor
+    if (!assert_true(bandit && vivienne, asTest + ": couldn't spawn the two (plugin patch 010 in?)"))
+        return false
+    endif
+    vivienne.MoveTo(guard, afXOffset = -150.0, abMatchRotation = false)
+    vivienne.EnableAI(true)
+    RPB_ActorVars.SetCrimeGold(((RPB_API.GetPrisonManager()).GetPrison("Haafingar")).PrisonFaction, vivienne, 2000)
+    RPB_Utility.NeutralizeHostileActor(vivienne)
+
+    bool bothIn = true
+    Actor[] arrestees = new Actor[2]
+    arrestees[0] = bandit
+    arrestees[1] = vivienne
+    int i = 0
+    while (i < 2)
+        RPB_API.GetArrest().ArrestActor(guard, arrestees[i], RPB_API.GetArrest().ARREST_TYPE_TELEPORT_TO_CELL)
+        float start = Utility.GetCurrentRealTime()
+        while (!RPB_Utility.IsActorImprisoned(arrestees[i]) && (Utility.GetCurrentRealTime() - start) < 60.0)
+            Utility.Wait(0.5)
+        endWhile
+        bothIn = bothIn && RPB_Utility.IsActorImprisoned(arrestees[i])
+        log(asTest + ": " + arrestees[i] + " imprisoned " + RPB_Utility.IsActorImprisoned(arrestees[i]) + ", in " + arrestees[i].GetParentCell())
+        i += 1
+    endWhile
+    log(asTest + ": now freeze the bandit " + bandit + " with the prisoner key (prid " + RPB_Utility.FormIdNoCall(bandit) + "), then talk to Vivienne " + vivienne)
+    return assert_true(bothIn, asTest + ": not both imprisoned")
 endFunction
 
 ; RPB_TestFreezablePrisoner (plugin patch 010: a freezable bandit, not a guard) by the player, or by @akNear when given: a
@@ -14807,7 +14853,7 @@ endFunction
 string __statelessTest = ""
 
 bool function __RunStatelessTest(string asTest)
-    if (asTest != "Test_ArrestWaitsWhileGuardFights_NoPackage" && asTest != "Test_CellDoorsDiagnostic" && asTest != "Test_LongAbsenceSetup" && asTest != "Test_LongAbsenceAdvance" && asTest != "Test_LongAbsenceVerify" && asTest != "Test_FallbackEscortToCellStopped_Player" && asTest != "Test_FallbackEscortToCellStopped_CloneGuard" && asTest != "Test_FightDuringEscort_NPC" && asTest != "Test_FightDuringEscort_Player" && asTest != "Test_GuardDiesInPrison_Player" && asTest != "Test_EscortToCellStopped_NoPackageLock" && StringUtil.Find(asTest, "Test_Surrender_") != 0 && asTest != "Test_FrozenGuardSkipped" && asTest != "Test_GuardDiesInPrison_NobodySees" && asTest != "Test_Escort_FreeWalk" && asTest != "Test_ToggleEscortToCell04" && asTest != "Test_CaptorFinishCycles_Calls" && asTest != "Test_CaptorFinishCycles_NoCalls" && asTest != "Test_CaptorFinishDetach_Calls" && asTest != "Test_CaptorFinishDetach_NoCalls" && asTest != "Test_Escort_FreeWalk_Control" && asTest != "Test_ActorKeys" && asTest != "Test_FrozenGuardCalls" && asTest != "Test_SimulatedFreezeCalls" && asTest != "Test_SimulatedFreezeAtCancel" && asTest != "Test_SpawnFreezableGuard" && asTest != "Test_AliasPackageControl" && asTest != "Test_FreezableEscort_Player" && asTest != "Test_FreezableEscort_NPC" && asTest != "Test_LightHold" && asTest != "Test_KillFrozenGuard" && asTest != "Test_LifetimeBountyStat" && asTest != "Test_FaintFrozenGuard" && asTest != "Test_FaintFrozenGuardShort" && asTest != "Test_FrozenEscortFallback" && asTest != "Test_HideFrozenGuard" && asTest != "Test_EscortToCellGuardHeld" && asTest != "Test_CuffedLimitEncumbrance" && asTest != "Test_CuffedLimitSettings" && asTest != "Test_EarlyHandback" && asTest != "Test_StalledEscortTakeover" && asTest != "Test_StalledEscortTakeoverLimit" && asTest != "Test_NpcEscortCancelControl" && asTest != "Test_FrozenPrisonerTimeSkip" && asTest != "Test_SpawnFreezablePrisoner" && asTest != "Test_SpawnFreezableArrestee" && asTest != "Test_GuardCrimeFactions" && asTest != "Test_PlayerEscortCancelControl" && asTest != "Test_ReleaseByEventBenchmark")
+    if (asTest != "Test_ArrestWaitsWhileGuardFights_NoPackage" && asTest != "Test_CellDoorsDiagnostic" && asTest != "Test_LongAbsenceSetup" && asTest != "Test_LongAbsenceAdvance" && asTest != "Test_LongAbsenceVerify" && asTest != "Test_FallbackEscortToCellStopped_Player" && asTest != "Test_FallbackEscortToCellStopped_CloneGuard" && asTest != "Test_FightDuringEscort_NPC" && asTest != "Test_FightDuringEscort_Player" && asTest != "Test_GuardDiesInPrison_Player" && asTest != "Test_EscortToCellStopped_NoPackageLock" && StringUtil.Find(asTest, "Test_Surrender_") != 0 && asTest != "Test_FrozenGuardSkipped" && asTest != "Test_GuardDiesInPrison_NobodySees" && asTest != "Test_Escort_FreeWalk" && asTest != "Test_ToggleEscortToCell04" && asTest != "Test_CaptorFinishCycles_Calls" && asTest != "Test_CaptorFinishCycles_NoCalls" && asTest != "Test_CaptorFinishDetach_Calls" && asTest != "Test_CaptorFinishDetach_NoCalls" && asTest != "Test_Escort_FreeWalk_Control" && asTest != "Test_ActorKeys" && asTest != "Test_FrozenGuardCalls" && asTest != "Test_SimulatedFreezeCalls" && asTest != "Test_SimulatedFreezeAtCancel" && asTest != "Test_SpawnFreezableGuard" && asTest != "Test_AliasPackageControl" && asTest != "Test_FreezableEscort_Player" && asTest != "Test_FreezableEscort_NPC" && asTest != "Test_LightHold" && asTest != "Test_KillFrozenGuard" && asTest != "Test_LifetimeBountyStat" && asTest != "Test_FaintFrozenGuard" && asTest != "Test_FaintFrozenGuardShort" && asTest != "Test_FrozenEscortFallback" && asTest != "Test_HideFrozenGuard" && asTest != "Test_EscortToCellGuardHeld" && asTest != "Test_CuffedLimitEncumbrance" && asTest != "Test_CuffedLimitSettings" && asTest != "Test_EarlyHandback" && asTest != "Test_StalledEscortTakeover" && asTest != "Test_StalledEscortTakeoverLimit" && asTest != "Test_NpcEscortCancelControl" && asTest != "Test_FrozenPrisonerTimeSkip" && asTest != "Test_SpawnFreezablePrisoner" && asTest != "Test_SpawnFreezableArrestee" && asTest != "Test_GuardCrimeFactions" && asTest != "Test_PlayerEscortCancelControl" && asTest != "Test_ReleaseByEventBenchmark" && asTest != "Test_FrozenPrisonerDialogue")
         return false
     endif
 
@@ -14965,6 +15011,8 @@ bool function __RunStatelessTest(string asTest)
     elseif (asTest == "Test_NpcEscortCancelControl")
         display_result(__Scenario_NpcEscortCancel("178"))
         __TeardownScenario()
+    elseif (asTest == "Test_FrozenPrisonerDialogue")
+        display_result(__Scenario_FrozenPrisonerDialogue("185"))
     elseif (asTest == "Test_ReleaseByEventBenchmark")
         display_result(__Scenario_ReleaseBenchmark("184"))
     elseif (asTest == "Test_PlayerEscortCancelControl")

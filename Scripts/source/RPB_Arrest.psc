@@ -1026,7 +1026,16 @@ event OnSurrenderBegin(Actor akSurrenderer, Actor[] akSurrendererCaptors)
     Actor[] guards = self.GetSurrenderGuards(akSurrendererCaptors)
     __surrenderGuards = guards
     self.PrepareSurrenderer(akSurrenderer, guards)
+    ; Ended while the pose was being prepared (2s; test 145's teardown, or the surrenderer leaving): it stops here. It went on
+    ; to calm the guards and start the Surrender Scene with nothing surrendering any more, a guard left running to the player
+    ; (2026-10-06)
+    if (!self.IsSurrendering(akSurrenderer))
+        return
+    endif
     self.__PacifyForSurrender(akSurrenderer, guards)
+    if (!self.IsSurrendering(akSurrenderer))
+        return
+    endif
     self.InitiateSurrenderScene(akSurrenderer, guards)
     ; Runs on this event's own stack until the Scene's end takes the surrender over, or the surrenderer leaves
     self.__WatchSurrender(akSurrenderer, guards)
