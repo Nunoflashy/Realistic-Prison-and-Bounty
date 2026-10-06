@@ -312,6 +312,10 @@ function SendSurrenderSceneEvent(string asScene, string asSceneEvent, Actor akSu
 endFunction
 
 function SendArrestSceneEvent(string asScene, string asSceneEvent, Actor akArrestee, Actor akAuthority, string asSceneSecondaryEvent = "null")
+    if (RPB_Utility.IsFrozenGuard(akArrestee)) ; every step below calls into him
+        RPB_Utility.LogWarn(akArrestee + " is frozen: left out of " + asScene + "'s " + asSceneEvent + " until the next load", "EventManager::SendArrestSceneEvent")
+        return
+    endif
     if (self.__ArrestAlreadyEndedInPrison(akArrestee, asSceneSecondaryEvent))
         self.__EndSceneIfArresteeGone(asScene, akArrestee)
         return
@@ -338,9 +342,12 @@ function SendArrestSceneBulkEvent(string asScene, string asSceneEvent, Form[] ak
         return
     endif
 
+    int frozenMap = RPB_Utility.FrozenGuardsForScan() ; a frozen arrestee left out: every step below calls into him
     int i = 0
     while (i < akArrestees.Length)
-        if (self.__ArrestAlreadyEndedInPrison(akArrestees[i] as Actor, asSceneSecondaryEvent))
+        if (frozenMap && RPB_Utility.IsListedFrozen(frozenMap, akArrestees[i] as Actor))
+            RPB_Utility.LogWarn(akArrestees[i] + " is frozen: left out of " + asScene + "'s " + asSceneEvent + " until the next load", "EventManager::SendArrestSceneBulkEvent")
+        elseif (self.__ArrestAlreadyEndedInPrison(akArrestees[i] as Actor, asSceneSecondaryEvent))
             if (akArrestees.Length == 1)
                 self.__EndSceneIfArresteeGone(asScene, akArrestees[i] as Actor)
             endif
@@ -470,6 +477,10 @@ function __EndSceneIfArresteeGone(string asScene, Actor akArrestee)
 endFunction
 
 function SendPrisonSceneEvent(string asScene, string asSceneEvent, Actor akPrisoner, Actor akAuthority, string asSceneSecondaryEvent = "null")
+    if (RPB_Utility.IsFrozenGuard(akPrisoner)) ; the prison's lookup and his steps call into him
+        RPB_Utility.LogWarn(akPrisoner + " is frozen: left out of " + asScene + "'s " + asSceneEvent + " until the next load", "EventManager::SendPrisonSceneEvent")
+        return
+    endif
     RPB_Prison prison = API.PrisonManager.FindPrisonByPrisoner(akPrisoner)
 
     if (prison == none)

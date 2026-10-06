@@ -74,16 +74,35 @@ function __EnsureActorIndex()
     int i = 0
     int total = Count
     while (i < total)
-        RPB_ActorBase entry = FromIndex(i) as RPB_ActorBase
         string elementKey = GetKeyAtIndex(i)
-        if (entry && elementKey != "")
-            Actor entryActor = entry.GetActor()
+        if (elementKey != "")
+            ; The actor read from the key ("Prisoner[<FormID>]"), no call into the entry: this ran into every prisoner on the
+            ; first lookup after each load, a frozen one included (the call audit, 2026-10-06). The entry's own GetActor()
+            ; only for a key that doesn't parse
+            Actor entryActor = __ActorFromKey(elementKey)
+            if (!entryActor)
+                RPB_ActorBase entry = FromIndex(i) as RPB_ActorBase
+                if (entry)
+                    entryActor = entry.GetActor()
+                endif
+            endif
             if (entryActor)
                 JFormMap.setStr(__actorToKey, entryActor, elementKey)
             endif
         endif
         i += 1
     endWhile
+endFunction
+
+; The actor named by an element key ("Prisoner[20]", "Prisoner[-16773748]": the FormID, signed decimal), or none
+Actor function __ActorFromKey(string asKey)
+    int open = StringUtil.Find(asKey, "[")
+    int close = StringUtil.Find(asKey, "]", open + 1)
+    if (open < 0 || close <= open + 1)
+        return none
+    endif
+    string digits = StringUtil.Substring(asKey, open + 1, close - open - 1)
+    return Game.GetForm(digits as int) as Actor
 endFunction
 
 string function GetActorIdentifier(Actor akActor) ; virtual

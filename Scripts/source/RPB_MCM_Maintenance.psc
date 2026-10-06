@@ -38,13 +38,20 @@ function __OpenResetMenu(RPB_MCM mcm) global
     JArray.addForm(candidates, none)
     JArray.addStr(names, "Console-selected actor")
 
-    Form[] arrestees = RPB_API.GetArrest().Arrestees.GetActors()
+    ; The actors read from the lists' index, and a frozen one named from storage: this is the tool for a stuck actor, and it
+    ; called into each one (GetActors, GetDisplayName), a frozen one hanging the menu (the call audit, 2026-10-06)
+    int frozenMap = RPB_Utility.FrozenGuardsForScan()
+    Form[] arrestees = RPB_API.GetArrest().Arrestees.GetActorsNoCall()
     int i = 0
     while (i < arrestees.Length)
         Actor a = arrestees[i] as Actor
         if (a)
             JArray.addForm(candidates, a)
-            JArray.addStr(names, a.GetDisplayName() + " (arrestee)")
+            if (frozenMap && RPB_Utility.IsListedFrozen(frozenMap, a))
+                JArray.addStr(names, RPB_Utility.ActorLabelNoCall(a) + " (arrestee, frozen)")
+            else
+                JArray.addStr(names, a.GetDisplayName() + " (arrestee)")
+            endif
         endif
         i += 1
     endWhile
@@ -54,13 +61,17 @@ function __OpenResetMenu(RPB_MCM mcm) global
     while (slot < prisonManager.PrisonSlots)
         RPB_Prison prison = prisonManager.GetNthAlias(slot) as RPB_Prison
         if (prison && prison.Active)
-            Form[] prisoners = prison.Prisoners.GetActors()
+            Form[] prisoners = prison.Prisoners.GetActorsNoCall()
             int p = 0
             while (p < prisoners.Length)
                 Actor pa = prisoners[p] as Actor
                 if (pa && !RPB_Utility.IsActorImprisoned(pa) && JArray.findForm(candidates, pa) < 0)
                     JArray.addForm(candidates, pa)
-                    JArray.addStr(names, pa.GetDisplayName() + " (prisoner, not in a cell)")
+                    if (frozenMap && RPB_Utility.IsListedFrozen(frozenMap, pa))
+                        JArray.addStr(names, RPB_Utility.ActorLabelNoCall(pa) + " (prisoner, not in a cell, frozen)")
+                    else
+                        JArray.addStr(names, pa.GetDisplayName() + " (prisoner, not in a cell)")
+                    endif
                 endif
                 p += 1
             endWhile

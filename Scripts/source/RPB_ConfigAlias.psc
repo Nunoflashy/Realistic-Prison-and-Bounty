@@ -91,8 +91,8 @@ function PerformMaintenance()
     ; The dev freeze keys' holds go first: unlike a real freeze they survive the load, and the cleanup below would call into
     ; a still-held NPC and hang (the rest of this maintenance with it)
     RPB_Tests devTests = (Game.GetPlayer() as Form) as RPB_Tests
-    if (devTests && devTests.ReleaseDevHoldsOnLoad())
-        Utility.Wait(0.5) ; each hold ends on its next pass
+    if (devTests)
+        devTests.ReleaseDevHoldsOnLoad() ; returns once each hold has ended (10s at most)
     endif
     RPB_Utility.ClearFrozenGuards() ; a load drops a frozen guard's broken object: he answers again
     SceneManager.SceneManager()

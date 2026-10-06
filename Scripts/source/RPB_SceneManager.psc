@@ -1204,14 +1204,14 @@ function PlayQueued()
             int combatWaited = 0
             bool waitedForCombat = false
             bool uncuffedInFight = false
-            while (!uncuffedInFight && !sceneObject.IsPlaying() && __lastStartedScene != nextScene && currentScene == nextScene && ((escort && escort.IsInCombat()) || (escortee && escortee.IsInCombat())) && combatWaited < (SCENE_START_COMBAT_CAP_SECONDS as int))
+            while (!uncuffedInFight && !sceneObject.IsPlaying() && __lastStartedScene != nextScene && currentScene == nextScene && (self.__FightingNoFreeze(escort) || self.__FightingNoFreeze(escortee)) && combatWaited < (SCENE_START_COMBAT_CAP_SECONDS as int))
                 if (!waitedForCombat)
                     waitedForCombat = true
                     ; An arrestee never cuffed: the fight stopped the confrontation (the engine ends it when combat starts)
                     ; before its "Handcuff" step. Nothing was done to them yet, so they go free rather than be escorted
                     ; uncuffed once the fight is over. Escort to jail only: at the prison a stripped prisoner is uncuffed on
                     ; purpose.
-                    if (escortee && nextSceneType == CATEGORY_ESCORT_TO_JAIL && RPB_API.GetArrest().Arrestees.AtKey(escortee) && !RPB_Utility.IsCuffed(escortee))
+                    if (escortee && !RPB_Utility.IsFrozenGuard(escortee) && nextSceneType == CATEGORY_ESCORT_TO_JAIL && RPB_API.GetArrest().Arrestees.AtKey(escortee) && !RPB_Utility.IsCuffed(escortee))
                         uncuffedInFight = true
                     else
                         Info("SceneManager: " + nextScene + " can't start while " + escort + " / " + escortee + " are in combat, waiting for the fight to end")
@@ -1248,7 +1248,7 @@ function PlayQueued()
                 return
             endif
 
-            bool fightOver = !((escort && escort.IsInCombat()) || (escortee && escortee.IsInCombat()))
+            bool fightOver = !(self.__FightingNoFreeze(escort) || self.__FightingNoFreeze(escortee))
             if (waitedForCombat && fightOver && currentScene == nextScene)
                 ; The player back under AI before the Scene starts: started while they weren't AI-driven, its package never
                 ; applied to them and they stood still while the guard walked off
@@ -1367,6 +1367,12 @@ string __lastStartedScene ; the last Scene whose start I received, see PlayQueue
 
 ; How long PlayQueued() keeps re-sending Start() to a Scene refused because its actors are in combat
 float property SCENE_START_COMBAT_CAP_SECONDS = 120.0 autoreadonly
+
+; In combat, read only on someone not found frozen: a frozen one counts as out of the fight, so a refused Scene falls through
+; to its fallback instead of this queue (every later RPB Scene) waiting on him for good (the call audit, 2026-10-06)
+bool function __FightingNoFreeze(Actor akActor)
+    return akActor && !RPB_Utility.IsFrozenGuard(akActor) && akActor.IsInCombat()
+endFunction
 
 ;/
     Ends @asScene now, through the same path as its natural end (OnSceneEnd: its end event, the next queued Scene,

@@ -13267,16 +13267,25 @@ bool[] __prisonerHoldRelease
 /;
 bool function ReleaseDevHoldsOnLoad()
     bool any = false
+    bool guardHeld = false
+    bool prisonerHeld = false
     if (__holdRelease && __holdRelease.Length > 0 && !__holdRelease[0])
         __holdRelease[0] = true
-        any = true
+        guardHeld = true
     endif
     if (__prisonerHoldRelease && __prisonerHoldRelease.Length > 0 && !__prisonerHoldRelease[0])
         __prisonerHoldRelease[0] = true
-        any = true
+        prisonerHeld = true
     endif
+    any = guardHeld || prisonerHeld
     if (any)
-        log("load: released the dev freeze holds still running from the save (guard " + __manualFreezeGuard + ", prisoner " + __manualFreezePrisoner + ")")
+        ; Until each hold has really ended (it stamps its end): the cleanup after this calls into the held NPCs, and a blind
+        ; 0.5s wasn't always enough with the VM busy right after a load. 10s at most
+        float start = Utility.GetCurrentRealTime()
+        while (((guardHeld && JDB.solveFlt(".rpbTest.holdEnd") == 0.0) || (prisonerHeld && JDB.solveFlt(".rpbTest.prisonerHoldEnd") == 0.0)) && (Utility.GetCurrentRealTime() - start) < 10.0)
+            Utility.Wait(0.1)
+        endWhile
+        log("load: released the dev freeze holds still running from the save (guard " + __manualFreezeGuard + ", prisoner " + __manualFreezePrisoner + "), ended after " + __Ms(Utility.GetCurrentRealTime() - start) + "ms")
     endif
     __manualFreezeGuard = none
     __manualFreezePrisoner = none

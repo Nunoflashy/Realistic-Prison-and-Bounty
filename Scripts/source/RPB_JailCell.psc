@@ -954,7 +954,10 @@ function DetermineCellParameters()
         ; A plain list lookup: this only reads the first cellmate's stripping flags. GetPrisonerReference is the full
         ; AwaitPrisonerReference path (ensure the spell, Initialize()) - several frames, and it could re-add the Prisoner
         ; spell to a stale entry.
-        RPB_Prisoner prisonerRef = Prison.Prisoners.AtKey(prisonerForm as Actor)
+        RPB_Prisoner prisonerRef = none
+        if (!RPB_Utility.IsFrozenGuard(prisonerForm as Actor)) ; his stripping flags are calls into him
+            prisonerRef = Prison.Prisoners.AtKey(prisonerForm as Actor)
+        endif
 
         ; If the first prisoner will be/is stripped naked / to underwear, set this cell as gender exclusive for them if the cell is not yet gender exclusive,
         ; this means that the first prisoner has not been stripped naked or to underwear.
@@ -1053,11 +1056,16 @@ function __onCellAttachAndDetachEvent()
         return
     endif
 
+    ; A cellmate RPB found frozen is passed over (each call below goes into him); the list is the cell's own, no call to read
+    int frozenMap = RPB_Utility.FrozenGuardsForScan()
     int i = 0
     while (i < Prisoners.Length)
         ; A lookup, not AwaitPrisonerReference: that blocks up to 12 s per prisoner, and a prisoner whose effect is not running
         ; (away) resumes by itself when the effect starts again (Prisoner.OnRestore). It also used the variable below before assigning it.
-        RPB_Prisoner apPrisoner = Prison.Prisoners.AtKey(Prisoners[i] as Actor)
+        RPB_Prisoner apPrisoner = none
+        if (!(frozenMap && RPB_Utility.IsListedFrozen(frozenMap, Prisoners[i] as Actor)))
+            apPrisoner = Prison.Prisoners.AtKey(Prisoners[i] as Actor)
+        endif
         if (apPrisoner && apPrisoner.IsImprisoned)
             apPrisoner.EnableAI(!apPrisoner.IsFarFromPlayer())
             

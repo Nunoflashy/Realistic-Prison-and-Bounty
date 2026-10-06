@@ -63,7 +63,15 @@ if (prisonerRef)
     ; Arrestee: whatever the release didn't already clear. Its Captor goes first, if it's still escorting them.
     RPB_Arrestee arresteeRef = arrest.Arrestees.AtKey(akActor)
     if (arresteeRef)
-        RPB_Captor captorRef = arresteeRef.Captor
+        ; The guard read from storage first: one RPB found frozen is left as he is (his Captor and his package are calls
+        ; into him; a load frees him anyway)
+        Actor storedGuard = arresteeRef.GetCaptorActor()
+        RPB_Captor captorRef = none
+        if (storedGuard && RPB_Utility.IsFrozenGuard(storedGuard))
+            done += "their guard " + storedGuard + " is frozen, left as he is; "
+        else
+            captorRef = arresteeRef.Captor
+        endif
         if (captorRef && captorRef.Arrestee == akActor)
             Actor guard = captorRef.GetActor()
             captorRef.Destroy()
@@ -324,7 +332,9 @@ bool function __FreeGuard(Actor akGuard, RPB_SceneManager apSceneManager) global
     endif
 
     apSceneManager.UnsetPackageLockOnActor(akGuard)
-    if (!akGuard.IsDead()) ; nothing to evaluate on a corpse (the handover of a dead guard hung around here once)
+    ; Nothing to evaluate on a corpse (the handover of a dead guard hung around here once), nor on a frozen guard: read
+    ; without a call into him
+    if (!RPB_Utility.IsDeadNoCall(akGuard) && !RPB_Utility.IsFrozenGuard(akGuard))
         akGuard.EvaluatePackage()
     endif
     return true

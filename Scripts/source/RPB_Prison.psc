@@ -2801,10 +2801,16 @@ function __ProcessEscortStallChecks()
     endif
 
     float now = Utility.GetCurrentRealTime()
+    ; A prisoner RPB found frozen keeps his entry and is passed over: every check below calls into him, and one hanging here
+    ; stalled this prison's re-dress and release queues too (they share the monitor's update)
+    int frozenMap = RPB_Utility.FrozenGuardsForScan()
     i = 0
     while (i < n)
         Actor checkActor = JArray.getForm(keys, i) as Actor
         int entry = JFormMap.getObj(__pendingEscortStallChecks, checkActor)
+        if (frozenMap && RPB_Utility.IsListedFrozen(frozenMap, checkActor))
+            entry = 0
+        endif
         if (entry && JMap.getInt(entry, "watchAssist") == 1)
             self.__WatchEscortAssist(checkActor, entry, now)
         endif
@@ -3367,12 +3373,19 @@ endFunction
 
 ; NPC prisoners (other than @apExcept) that hold a cell: each one holds or is about to hold a cell package
 int function __CountNPCPrisonersInCells(RPB_Prisoner apExcept)
+    ; A prisoner RPB found frozen counts as in a cell without a call into him (this runs inside the cell assignment's lock:
+    ; one hanging here held up every later imprisonment in this prison). His actor read only while someone is frozen
+    int frozenMap = RPB_Utility.FrozenGuardsForScan()
     int count = 0
     int i = 0
     while (i < Prisoners.Count)
-        RPB_Prisoner other = Prisoners.AtIndex(i)
-        if (other && other != apExcept && other.IsNPC() && other.JailCell != none)
+        if (frozenMap && RPB_Utility.IsListedFrozen(frozenMap, Prisoners.ActorAtIndexNoCall(i)))
             count += 1
+        else
+            RPB_Prisoner other = Prisoners.AtIndex(i)
+            if (other && other != apExcept && other.IsNPC() && other.JailCell != none)
+                count += 1
+            endif
         endif
         i += 1
     endWhile

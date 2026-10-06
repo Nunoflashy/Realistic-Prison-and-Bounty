@@ -104,16 +104,22 @@ string function ShowHoldList(bool abMustHaveArrestees = false, bool abSkipListOn
 
     if (abMustHaveArrestees)
         RPB_ArresteeList arrestees  = API.Arrest.Arrestees
+        ; An arrestee RPB found frozen is left out (his hold is a call into him); he's on RPB - Stats' Frozen NPCs page
+        int frozenMap = RPB_Utility.FrozenGuardsForScan()
 
         int i = 0
         while (i < arrestees.Count)
-            RPB_Arrestee arrestee = arrestees.AtIndex(i)
-            string hold = arrestee.Hold
-            bool holdHasArrestee = FastArray_FindString(holdsArr, hold) != -1
-            if (!holdHasArrestee)
-                FastArray_AddString(holdsArr, hold)
+            if (!(frozenMap && RPB_Utility.IsListedFrozen(frozenMap, arrestees.ActorAtIndexNoCall(i))))
+                RPB_Arrestee arrestee = arrestees.AtIndex(i)
+                if (arrestee)
+                    string hold = arrestee.Hold
+                    bool holdHasArrestee = FastArray_FindString(holdsArr, hold) != -1
+                    if (!holdHasArrestee)
+                        FastArray_AddString(holdsArr, hold)
+                    endif
+                endif
             endif
-    
+
             i += 1
         endWhile
     else
@@ -142,11 +148,15 @@ RPB_Arrestee function ShowArresteeList(string asArrestHold, string asListTitle =
     FastArray_AddString(arresteesArr, "<No Arrestee>")
 
     RPB_ArresteeList arrestees = arrest.Arrestees
+    int frozenMap = RPB_Utility.FrozenGuardsForScan() ; a frozen arrestee left out (each read below is a call into him)
     int i = 0
     while (i < arrestees.Count)
-        RPB_Arrestee arrestee = arrestees.AtIndex(i)
+        RPB_Arrestee arrestee = none
+        if (!(frozenMap && RPB_Utility.IsListedFrozen(frozenMap, arrestees.ActorAtIndexNoCall(i))))
+            arrestee = arrestees.AtIndex(i)
+        endif
 
-        if (arrestee.Hold == asArrestHold)
+        if (arrestee && arrestee.Hold == asArrestHold)
             string arresteeLine = arrestee.Name
             FastArray_AddString(arresteesArr, arresteeLine)
             FastArray_AddInt(arresteesIds, arrestee.GetFormID())
@@ -230,7 +240,7 @@ endFunction
 
 RPB_Prisoner function ShowPrisonerList(RPB_Prison apPrison, bool abOnlyImprisoned = false, string asListTitle = "Select Prisoner")
     RPB_Prison prison = apPrison
-    
+
     if (!prison)
         return none
     endif
@@ -278,7 +288,7 @@ RPB_Prisoner function ShowPrisonerList(RPB_Prison apPrison, bool abOnlyImprisone
     if (activePrisonerCount == 0)
         return none
     endif
- 
+
     string[] prisonerNamesAsArray = FastArray_ToStringArray(prisonerNames)
 
     int line = self.ShowList(asListTitle, prisonerNamesAsArray, 0, 0)
@@ -325,7 +335,7 @@ endFunction
 ; TODO: Implement logic for @abOnlyEmpty and @abOnlyGenderExclusive
 RPB_JailCell function ShowCellList(RPB_Prison apPrison, bool abOnlyEmpty = false, bool abOnlyGenderExclusive = false, string asListTitle = "Select Cell")
     RPB_Prison prison = apPrison
-    
+
     if (!prison)
         return none
     endif
@@ -351,7 +361,7 @@ RPB_JailCell function ShowCellList(RPB_Prison apPrison, bool abOnlyEmpty = false
 
         if (!jailcell.IsGenderExclusive && jailCell.HasMales(true))
             cellLine += " (M)"
-        
+
         elseif (!jailcell.IsGenderExclusive && jailCell.HasFemales(true))
             cellLine += " (F)"
         endif
@@ -421,7 +431,7 @@ Form function ShowPrisonContainerList(RPB_Prison apPrison, string asListTitle = 
     int prisonerEvidenceObj     = FastArray_FromFormArray(prisonerEvidenceContainers)
     int allContainersArr        = FastArray("<object>")
     int containerNames          = FastArray("<string>")
-    
+
     FastArray_AddFromArray(allContainersArr, prisonerBelongingsObj)
     FastArray_AddFromArray(allContainersArr, prisonerEvidenceObj)
     FastArray_AddString(containerNames, "<No Container>")

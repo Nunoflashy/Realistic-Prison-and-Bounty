@@ -1387,6 +1387,15 @@ event OnUpdate()
         return
     endif
 
+    ; My guard found frozen: no call into him or his Captor (the leash, the stall checks and the attacker rules all call into
+    ; him). His freeze was handled when he was found (another guard took the escort over if one saw it, or he carries on, his
+    ; AI still walking); this watch just keeps ticking until he's gone from my arrest or a load frees him
+    Actor watchedGuard = self.GetCaptorActor()
+    if (watchedGuard && RPB_Utility.IsFrozenGuard(watchedGuard))
+        RegisterForSingleUpdate(5.0)
+        return
+    endif
+
     if (!Captor || !Captor.GetActor())
         return ; the arrest is gone (cancelled by the watch above, or reverted)
     endif
