@@ -449,7 +449,7 @@ endFunction
     answers) used to hang the imprisonment right there - locked in the cell, never imprisoned, the Stats page blank.
 /;
 function ReleaseCaptorOf(Actor akGuard, Actor akArrestee, bool abFreeGuard = false)
-    if (!akGuard || RPB_Utility.IsFrozenGuard(akGuard))
+    if (!akGuard || RPB_Utility.IsFrozenNPC(akGuard))
         return
     endif
     RPB_Recovery.__Step(akArrestee, "ReleaseCaptor: looking up the Captor of " + akGuard)
@@ -475,7 +475,7 @@ function UnregisterCaptor(RPB_Captor apCaptor, bool abRemoveFromList = false)
     endif
     RPB_Recovery.__Step(apCaptor.GetActor(), "UnregisterCaptor: spell removed")
     ; Guards froze right after things of mine came off them (150's clone: this, then his package lock): probes after it
-    RPB_Utility.ProbeGuardAfterBurst(apCaptor.GetActor(), "captor spell removed")
+    RPB_Utility.ProbeAfterBurst(apCaptor.GetActor(), "captor spell removed")
 
     if (abRemoveFromList && Captors.Exists(apCaptor))
         Captors.Remove(apCaptor)
@@ -604,7 +604,7 @@ event OnArrestDialogue(int aiTopicInfoEvent, int aiTopicInfoType, string asTopic
             endif
 
             ; Who forcegreets matters for the guard-freeze hunt: every freeze so far came with a confront 1-3s after a Captor came off
-            RPB_Utility.LogInfo("Arrest confront by " + akSpeakerArrester + " to " + akSpokenToArrestee + " (probe open on the speaker: " + RPB_Utility.IsGuardProbeOpen(akSpeakerArrester) + ")", "Arrest::OnArrestDialogue")
+            RPB_Utility.LogInfo("Arrest confront by " + akSpeakerArrester + " to " + akSpokenToArrestee + " (probe open on the speaker: " + RPB_Utility.IsNPCProbeOpen(akSpeakerArrester) + ")", "Arrest::OnArrestDialogue")
             self.SetupArrestPayableBountyVars(akSpeakerArrester.GetCrimeFaction()) ; Setup arrest payable bounty vars
             self.SetActorWantsToPayBounty(akSpokenToArrestee, false) ; Reset any possibility of paying the bounty, before actually selecting it
 
@@ -710,10 +710,10 @@ endEvent
 ; the line's end, it was a few frames late, the guard's forcegreet had already come back, and the arrest cutting it off had
 ; him speak a resist line ("Then pay with your blood", 2026-10-04). The arrest takes it back right before hiding it itself
 ; (BeginArrest), so its stats and latent bounty work as always. Given back at once when the arrest is rejected
-; (RPB_EventManager.OnArrestBegin) or the guard is found frozen (RPB_Utility.MarkGuardFrozen), and after 30s if nothing
+; (RPB_EventManager.OnArrestBegin) or the guard is found frozen (RPB_Utility.MarkNPCFrozen), and after 30s if nothing
 ; took it (RPB_EventManager.OnSetAsideBountyCheck). Only the player: an NPC's bounty is RPB's own and no forcegreet reads it.
 function SetAsideBountyOnSubmission(Actor akActor, Actor akGuard) global
-    if (!akActor || !akGuard || akActor.GetFormID() != 0x14 || HasSetAsideBounty(akActor) || RPB_Utility.IsFrozenGuard(akGuard))
+    if (!akActor || !akGuard || akActor.GetFormID() != 0x14 || HasSetAsideBounty(akActor) || RPB_Utility.IsFrozenNPC(akGuard))
         return
     endif
 
@@ -740,8 +740,8 @@ function __SetAsideBounty(Actor akActor, Actor akGuard, Faction akCrimeFaction) 
     crimeFaction.SetCrimeGoldViolent(0)
     RPB_Utility.LogInfo("Set aside " + akActor + "'s bounty in " + RPB_Utility.GetFormNameCached(crimeFaction) + " on submitting to " + akGuard + " (" + nonViolent + " non-violent, " + violent + " violent)", "Arrest::SetAsideBountyOnSubmission")
 
-    ; A guard freezing now never sends his arrest: the probe finds him, and MarkGuardFrozen gives the bounty back
-    RPB_Utility.ProbeGuardAfterBurst(akGuard, "submitted to him")
+    ; A guard freezing now never sends his arrest: the probe finds him, and MarkNPCFrozen gives the bounty back
+    RPB_Utility.ProbeAfterBurst(akGuard, "submitted to him")
 
     int handle = ModEvent.Create("RPB_SetAsideBountyCheck")
     if (handle)
@@ -865,7 +865,7 @@ function TakeOverSubmission(Actor akFrozenGuard)
     RPB_StorageVars.SetFormOnReference("Guard", player, guard, "Set-Aside Bounty")
     float distance = player.GetDistance(guard)
     ; Watched like the first one: if he freezes too, the next takeover (or the bounty back) follows the same way
-    RPB_Utility.ProbeGuardAfterBurst(guard, "took over a submission")
+    RPB_Utility.ProbeAfterBurst(guard, "took over a submission")
     if (distance < TAKEOVER_ARREST_DISTANCE)
         RPB_Utility.LogInfo(guard + " takes over the arrest of " + player + " from " + akFrozenGuard + " (frozen), " + ((distance * 0.01428) as int) + "m away: arrests them", "Arrest::TakeOverSubmission")
         RPB_Utility.NoteFrozenAction(akFrozenGuard, "The player's submission to him was taken over by " + guard + " (an arrest)")
@@ -948,7 +948,7 @@ function __HandOverEscort(Actor akActor, Actor akFrozenGuard, RPB_Arrestee apArr
     RPB_Utility.NoteFrozenAction(akFrozenGuard, "His escort was taken over by " + RPB_Utility.ActorNameNoCall(guard) + " " + guard)
     RPB_Utility.FaintFrozenGuard(akFrozenGuard, abAlone = false)
     apArrestee.HandOverEscort(akFrozenGuard, guard)
-    RPB_Utility.ProbeGuardAfterBurst(guard, "took over an escort")
+    RPB_Utility.ProbeAfterBurst(guard, "took over an escort")
 endFunction
 
 ;/
@@ -973,8 +973,8 @@ function TakeOverStalledEscort(Actor akActor, string asReason)
     endif
     arrestee.SetInt("Stall Takeovers", arrestee.GetInt("Stall Takeovers") + 1)
     RPB_Utility.LogInfo(akActor + "'s escort stalled (" + asReason + "): " + guard + " (" + ((akActor.GetDistance(guard) * 0.01428) as int) + "m) takes it over from " + oldGuard + " (takeover " + arrestee.GetInt("Stall Takeovers") + "/" + arrestee.STALL_TAKEOVERS_MAX + ")", "Arrest::TakeOverStalledEscort")
-    arrestee.HandOverEscort(oldGuard, guard, "the escort stalled", abReleaseOld = !RPB_Utility.IsFrozenGuard(oldGuard))
-    RPB_Utility.ProbeGuardAfterBurst(guard, "took over a stalled escort")
+    arrestee.HandOverEscort(oldGuard, guard, "the escort stalled", abReleaseOld = !RPB_Utility.IsFrozenNPC(oldGuard))
+    RPB_Utility.ProbeAfterBurst(guard, "took over a stalled escort")
 endFunction
 
 ; A takeover's approach (TakeOverSubmission), not a surrender the player chose: leaving is eluding, its end arrests with
@@ -1135,11 +1135,11 @@ event OnArrestBegin(RPB_Arrestee apArrestee, RPB_Captor apCaptor, Faction akCrim
         ; Watched until the escort: a guard freezing now leaves the arrest stuck on him, and the probe that finds him has
         ; another guard take it over (TakeOverSubmission). A submission probes him already; a yield or a surrender didn't
         if (apCaptor)
-            RPB_Utility.ProbeGuardAfterBurst(apArrestee.GetCaptorActor(), "his arrest started") ; stored, no call into him
+            RPB_Utility.ProbeAfterBurst(apArrestee.GetCaptorActor(), "his arrest started") ; stored, no call into him
         endif
     else
         ; An NPC arrestee goes through the confrontation's burst too: probed, to learn whether NPC prisoners freeze (2026-10-05)
-        RPB_Utility.ProbeNPC(apArrestee.GetActor(), "arrest started")
+        RPB_Utility.ProbeAfterBurst(apArrestee.GetActor(), "arrest started", "PRISONER")
     endif
 
     RPB_Utility.FlowMark("Arrest.OnArrestBegin: parameters, bounty check, captor assigned")
@@ -1657,7 +1657,7 @@ endFunction
 
 ; A combat target that can take a surrender: a living guard of a hold
 bool function IsSurrenderGuard(Actor akActor)
-    return akActor && !RPB_Utility.IsFrozenGuard(akActor) && !akActor.IsDead() && !akActor.IsDisabled() && akActor.IsGuard() && akActor.GetCrimeFaction()
+    return akActor && !RPB_Utility.IsFrozenNPC(akActor) && !akActor.IsDead() && !akActor.IsDisabled() && akActor.IsGuard() && akActor.GetCrimeFaction()
 endFunction
 
 bool function HasSurrenderGuard(Actor[] akCombatTargets)
@@ -1681,7 +1681,7 @@ Actor function GetNonGuardCombatTarget(Actor[] akCombatTargets)
     int i = 0
     while (i < akCombatTargets.Length)
         Actor target = akCombatTargets[i]
-        if (target && !RPB_Utility.IsFrozenGuard(target) && !target.IsDead() && !target.IsDisabled() && !target.IsGuard() && !self.__IsOfAGuardsCrimeFaction(target, akCombatTargets))
+        if (target && !RPB_Utility.IsFrozenNPC(target) && !target.IsDead() && !target.IsDisabled() && !target.IsGuard() && !self.__IsOfAGuardsCrimeFaction(target, akCombatTargets))
             return target
         endif
         i += 1

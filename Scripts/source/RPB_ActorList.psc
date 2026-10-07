@@ -119,7 +119,7 @@ Form[] function GetActorsNoCall()
 endFunction
 
 ; The actor of the entry at @aiIndex, from the index: no call into the entry. A search of the index (a few dozen at most),
-; so the loops only use it while someone is frozen (RPB_Utility.FrozenGuardsForScan)
+; so the loops only use it while someone is frozen (RPB_Utility.FrozenNPCsForScan)
 Actor function ActorAtIndexNoCall(int aiIndex)
     string elementKey = GetKeyAtIndex(aiIndex)
     if (elementKey == "")

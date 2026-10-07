@@ -19,10 +19,10 @@ scriptname RPB_Utility hidden
     Outfit function RPB_GetOutfit(string asOutfit) global
     bool function HealNakedBaseOutfit(Actor akActor) global
     function GuardMark(Actor akGuard, string asStep) global
-    function ProbeGuard(Actor akGuard, string asStep, float afDelay = 0.0) global
-    function ProbeNPC(Actor akActor, string asStep) global
-    bool function IsGuardProbeOpen(Actor akActor) global
-    bool function IsFrozenGuard(Actor akActor) global
+    function ProbeNPC(Actor akActor, string asStep, float afDelay = 0.0, string asRole = "GUARD") global
+    function ProbeAfterBurst(Actor akActor, string asStep, string asRole = "GUARD") global
+    bool function IsNPCProbeOpen(Actor akActor) global
+    bool function IsFrozenNPC(Actor akActor) global
     function RememberActorName(Actor akActor) global
     function ForgetActorName(Actor akActor) global
     string function ActorNameNoCall(Actor akActor) global
@@ -33,12 +33,12 @@ scriptname RPB_Utility hidden
     Form[] function FrozenActorsMarked() global
     int function FrozenReport(Actor akActor) global
     function NoteFrozenAction(Actor akActor, string asAction) global
-    function MarkGuardFrozen(Actor akGuard, string asStep) global
+    function MarkNPCFrozen(Actor akGuard, string asStep) global
     bool function MoveGuardAfterBurst(Actor akGuard, ObjectReference akTarget, string asStep, float afDelay = 5.0) global
     function __GuardMoved(Actor akGuard) global
-    int function FrozenGuardsForScan() global
+    int function FrozenNPCsForScan() global
     bool function IsListedFrozen(int aiFrozenMap, Actor akActor) global
-    function ClearFrozenGuards() global
+    function ClearFrozenNPCs() global
     Actor function GetOtherHostileTarget(Actor akActor, Actor akExcept, Actor akCaptor) global
     int function CalmOwnLawAttackers(Actor akArrestee, Actor akCaptor) global
     Actor function SendCaptorAfterAttacker(Actor akCaptor, Actor akArrestee) global
@@ -516,64 +516,58 @@ function GuardMark(Actor akGuard, string asStep) global
 endFunction
 
 ;/
-    Frozen guards. An escorting guard's Papyrus object sometimes stops answering (his AI goes on normally): every call on
-    him, even GetFormID(), waits forever, and so does every stack that makes one - an imprisonment, the MCM, a scan over
-    nearby guards. Nothing in Papyrus can time a call out, so I find out from the side: ProbeGuard() makes one trivial call
+    Frozen NPCs (guards first, prisoners too). An escorting guard's Papyrus object sometimes stops answering (his AI goes on
+    normally): every call on him, even GetFormID(), waits forever, and so does every stack that makes one - an imprisonment,
+    the MCM, a scan over nearby guards. Nothing in Papyrus can time a call out, so I find out from the side: ProbeNPC() makes one trivial call
     on him on its own stack, with the time it started written down first; a probe still open after a few seconds means
     he's frozen. Comparing a Form against the list (JFormMap keys) never calls into him, so it's safe on a frozen one.
     Session-only: a game load drops the broken object (seen with reloadscript), so the list is cleared on load.
     Values: > 0 the real time a probe started, -1 known frozen (already reported).
 /;
-string function __FrozenGuardsPath() global
-    return ".rpb_root.frozenGuardProbes"
+string function __FrozenNPCsPath() global
+    return ".rpb_root.frozenProbes"
 endFunction
 
-int function __FrozenGuardsMap(bool abCreate = false) global
-    int map = JDB.solveObj(__FrozenGuardsPath())
+int function __FrozenNPCsMap(bool abCreate = false) global
+    int map = JDB.solveObj(__FrozenNPCsPath())
     if (!map && abCreate)
         map = JFormMap.object()
-        JDB.solveObjSetter(__FrozenGuardsPath(), map, true)
+        JDB.solveObjSetter(__FrozenNPCsPath(), map, true)
     endif
     return map
 endFunction
 
-; Sends the probe (RPB_EventManager.OnGuardProbe) and returns at once. @afDelay: the probe (and its check) wait that long
-; first: guards froze within a second after their Captor effect ended, after the immediate probes had answered.
-function ProbeGuard(Actor akGuard, string asStep, float afDelay = 0.0) global
-    if (!akGuard)
+; Sends the probe (RPB_EventManager.OnNPCProbe) and returns at once. @afDelay: the probe (and its check) wait that long
+; first: guards froze within a second after their Captor effect ended, after the immediate probes had answered. @asRole:
+; what a report calls him (GUARD, PRISONER). The player is never probed.
+function ProbeNPC(Actor akActor, string asStep, float afDelay = 0.0, string asRole = "GUARD") global
+    if (!akActor || akActor == Game.GetPlayer())
         return
     endif
-    __TestFreezeAtStep(akGuard, asStep)
-    __SetProbedRole(akGuard, "GUARD")
+    __TestFreezeAtStep(akActor, asStep)
+    __SetProbedRole(akActor, asRole)
     if (afDelay > 0.0)
         asStep += " +" + (afDelay as int) + "s"
-        __AddPendingProbe(akGuard, 1) ; waiting its delay: the probe isn't out yet, but he still counts as probed
+        __AddPendingProbe(akActor, 1) ; waiting its delay: the probe isn't out yet, but he still counts as probed
     endif
-    int handle = ModEvent.Create("RPB_GuardProbe")
+    int handle = ModEvent.Create("RPB_NPCProbe")
     if (handle)
         ModEvent.PushString(handle, asStep)
-        ModEvent.PushForm(handle, akGuard)
+        ModEvent.PushForm(handle, akActor)
         ModEvent.PushFloat(handle, afDelay)
         ModEvent.PushFloat(handle, Utility.GetCurrentRealTime() + afDelay) ; when it's due: a late probe says so
         ModEvent.Send(handle)
     endif
-    ; And a look a few seconds later (RPB_EventManager.OnGuardProbeCheck): a probe that never came back is reported then,
+    ; And a look a few seconds later (RPB_EventManager.OnNPCProbeCheck): a probe that never came back is reported then,
     ; not only when something happens to ask (148's freeze went unreported: nothing asked)
-    handle = ModEvent.Create("RPB_GuardProbeCheck")
+    handle = ModEvent.Create("RPB_NPCProbeCheck")
     if (handle)
-        ModEvent.PushForm(handle, akGuard)
+        ModEvent.PushForm(handle, akActor)
         ModEvent.PushFloat(handle, afDelay)
         ModEvent.Send(handle)
     endif
 endFunction
 
-;/
-    Probes for a moment that comes with a burst of changes on him (an effect of mine coming off, his Scene stopped, a
-    prisoner stripped or dressed): +5s and +8s, after it. The burst is when a native call on him can freeze him: the list
-    lookups' GetFormID() at his escort's cancel did it about one run in four, and freezes stayed (rarer) while the probes
-    still called into him at 0s and +1s (2026-10-03). A freeze lasts until the next load, so a probe a few seconds later
-    finds it just the same; RPB only learns of it a few seconds later.
-/;
 ;/
     A crime line's event (RPB_TopicInfoStart/End, RPB_EventManager.OnDialogueTopicStart/End), sent from the line's fragment.
     Through ModEvent, not akSpeaker.SendModEvent: that was a call into the speaker, which waited forever on a frozen guard.
@@ -627,8 +621,8 @@ function __NoteCrimeLine(Actor akSpeaker) global
     float now = Utility.GetCurrentRealTime()
     float earlier = JFormMap.getFlt(pending, akSpeaker)
     if (earlier > 0.0 && earlier <= now && (now - earlier) > 5.0)
-        if (!IsGuardProbeOpen(akSpeaker) && !IsFrozenGuard(akSpeaker))
-            ProbeGuardAfterBurst(akSpeaker, "crime line stuck " + ((now - earlier) as int) + "s")
+        if (!IsNPCProbeOpen(akSpeaker) && !IsFrozenNPC(akSpeaker))
+            ProbeAfterBurst(akSpeaker, "crime line stuck " + ((now - earlier) as int) + "s")
         endif
         return ; the stuck line's time stays: still stuck
     endif
@@ -657,17 +651,24 @@ bool function IsDeadNoCall(Actor akActor) global
     return lifeState == 1 || lifeState == 2 ; dying, dead
 endFunction
 
-function ProbeGuardAfterBurst(Actor akGuard, string asStep) global
-    ProbeGuard(akGuard, asStep, 5.0)
-    ProbeGuard(akGuard, asStep, 8.0)
+;/
+    Probes for a moment that comes with a burst of changes on him (an effect of mine coming off, his Scene stopped, a
+    prisoner stripped or dressed), a guard's or a prisoner's (@asRole): +5s and +8s, after it. The burst is when a native
+    call on him can freeze him: the list lookups' GetFormID() at his escort's cancel did it about one run in four, and
+    freezes stayed (rarer) while the probes still called into him at 0s and +1s (2026-10-03). A freeze lasts until the next
+    load, so a probe a few seconds later finds it just the same; RPB only learns of it a few seconds later.
+/;
+function ProbeAfterBurst(Actor akActor, string asStep, string asRole = "GUARD") global
+    ProbeNPC(akActor, asStep, 5.0, asRole)
+    ProbeNPC(akActor, asStep, 8.0, asRole)
 endFunction
 
 ; Probes sent with a delay and not out yet, per actor (a test's teardown waits for them before deleting him)
 function __AddPendingProbe(Actor akActor, int aiDelta) global
-    int pending = JDB.solveObj(".rpb_root.guardPendingProbes")
+    int pending = JDB.solveObj(".rpb_root.pendingProbes")
     if (!pending)
         pending = JFormMap.object()
-        JDB.solveObjSetter(".rpb_root.guardPendingProbes", pending, true)
+        JDB.solveObjSetter(".rpb_root.pendingProbes", pending, true)
     endif
     int count = JFormMap.getInt(pending, akActor) + aiDelta
     if (count > 0)
@@ -678,7 +679,7 @@ function __AddPendingProbe(Actor akActor, int aiDelta) global
 endFunction
 
 bool function __HasPendingProbe(Actor akActor) global
-    int pending = JDB.solveObj(".rpb_root.guardPendingProbes")
+    int pending = JDB.solveObj(".rpb_root.pendingProbes")
     return pending && JFormMap.hasKey(pending, akActor)
 endFunction
 
@@ -744,16 +745,6 @@ string function ProbeCountSummary() global
     return summary
 endFunction
 
-; A prisoner's (or any NPC's) key moment: probed now, +1s and +3s, the way a guard is after his Captor comes off. Prisoners
-; go through the same bursts (the strip, the outfit, the release) and were never probed, so a frozen one was never reported
-function ProbeNPC(Actor akActor, string asStep) global
-    if (!akActor || akActor == Game.GetPlayer())
-        return
-    endif
-    ProbeGuardAfterBurst(akActor, asStep)
-    __SetProbedRole(akActor, "PRISONER") ; after ProbeGuard, which marks a guard
-endFunction
-
 ; What the report calls him (FROZEN GUARD / FROZEN PRISONER), from whoever probed him last: nothing asks the actor
 function __SetProbedRole(Actor akActor, string asRole) global
     int roles = JDB.solveObj(".rpb_root.frozenActorRoles")
@@ -773,8 +764,8 @@ string function __ProbedRole(Actor akActor) global
 endFunction
 
 ; The probe itself, on the mod event's own stack: never returns on a frozen guard, which is the point
-function __RunGuardProbe(Actor akGuard, string asStep, float afDueAt = 0.0) global
-    int map = __FrozenGuardsMap(abCreate = true)
+function __RunNPCProbe(Actor akGuard, string asStep, float afDueAt = 0.0) global
+    int map = __FrozenNPCsMap(abCreate = true)
     if (JFormMap.getFlt(map, akGuard) < 0.0)
         return ; already known frozen: another probe would only add another stuck stack
     endif
@@ -804,7 +795,7 @@ function __RunGuardProbe(Actor akGuard, string asStep, float afDueAt = 0.0) glob
         float late = Utility.GetCurrentRealTime() - afDueAt
         if (late > 0.5)
             asStep += " (ran " + (((late * 10.0) as int) as float / 10.0) + "s late)"
-            Debug("Utility::__RunGuardProbe", "probe on " + akGuard + " ran late: " + asStep)
+            Debug("Utility::__RunNPCProbe", "probe on " + akGuard + " ran late: " + asStep)
         endif
     endif
     ; Every probe out on him is kept (step and start), and the report names the earliest one still open: the one that hung
@@ -812,7 +803,7 @@ function __RunGuardProbe(Actor akGuard, string asStep, float afDueAt = 0.0) glob
     ; earlier probe answering cleared it while a later one hung (2026-10-02)
     if (!JFormMap.hasKey(map, akGuard))
         JFormMap.setFlt(map, akGuard, started)
-        JFormMap.setStr(JDB.solveObj(".rpb_root.frozenGuardSteps"), akGuard, asStep)
+        JFormMap.setStr(JDB.solveObj(".rpb_root.frozenProbeSteps"), akGuard, asStep)
     endif
     akGuard.GetFormID()
     if (JDB.solveFlt(".rpb_root.loadStamp") != loadStamp)
@@ -834,13 +825,13 @@ endFunction
 
 ; The probes still out on @akGuard: their keys are "<step> @<start time>", their values the start time
 int function __OpenProbesOf(Actor akGuard, bool abCreate = false) global
-    int perGuard = JDB.solveObj(".rpb_root.guardOpenProbes")
+    int perGuard = JDB.solveObj(".rpb_root.openProbes")
     if (!perGuard)
         if (!abCreate)
             return 0
         endif
         perGuard = JFormMap.object()
-        JDB.solveObjSetter(".rpb_root.guardOpenProbes", perGuard, true)
+        JDB.solveObjSetter(".rpb_root.openProbes", perGuard, true)
     endif
     int open = JFormMap.getObj(perGuard, akGuard)
     if (!open && abCreate)
@@ -885,18 +876,18 @@ function __TrackEarliestOpenProbe(int aiMap, Actor akGuard, int aiOpen) global
         return
     endif
     JFormMap.setFlt(aiMap, akGuard, earliest)
-    JFormMap.setStr(JDB.solveObj(".rpb_root.frozenGuardSteps"), akGuard, StringUtil.Substring(earliestKey, 0, StringUtil.Find(earliestKey, " @")))
+    JFormMap.setStr(JDB.solveObj(".rpb_root.frozenProbeSteps"), akGuard, StringUtil.Substring(earliestKey, 0, StringUtil.Find(earliestKey, " @")))
 endFunction
 
 ; A probe on @akActor started and hasn't come back (or he's known frozen)
 ; A probe out on him, or one sent and still waiting its delay
-bool function IsGuardProbeOpen(Actor akActor) global
-    int map = JDB.solveObj(__FrozenGuardsPath())
+bool function IsNPCProbeOpen(Actor akActor) global
+    int map = JDB.solveObj(__FrozenNPCsPath())
     return akActor && ((map && JFormMap.hasKey(map, akActor)) || __HasPendingProbe(akActor))
 endFunction
 
-bool function IsFrozenGuard(Actor akActor) global
-    int map = JDB.solveObj(__FrozenGuardsPath())
+bool function IsFrozenNPC(Actor akActor) global
+    int map = JDB.solveObj(__FrozenNPCsPath())
     if (!map || !akActor || !JFormMap.hasKey(map, akActor))
         return false
     endif
@@ -909,20 +900,20 @@ bool function IsFrozenGuard(Actor akActor) global
         return false ; the probe may simply not have run yet
     endif
     if (openFor > 300.0 || openFor < 0.0)
-        ; Not a probe of now: a real freeze is marked within ~10s (RPB_EventManager.OnGuardProbeCheck; 5 minutes leaves room for an overloaded VM), so this is a stale
+        ; Not a probe of now: a real freeze is marked within ~10s (RPB_EventManager.OnNPCProbeCheck; 5 minutes leaves room for an overloaded VM), so this is a stale
         ; entry (a probe from before a load, or another session's time), not a frozen guard
         JFormMap.removeKey(map, akActor)
-        LogWarn("Dropped a stale probe entry on " + akActor + " (open " + (openFor as int) + "s): not counted as frozen", "Utility::IsFrozenGuard")
+        LogWarn("Dropped a stale probe entry on " + akActor + " (open " + (openFor as int) + "s): not counted as frozen", "Utility::IsFrozenNPC")
         return false
     endif
-    MarkGuardFrozen(akActor, "probe open " + ((Utility.GetCurrentRealTime() - started) as int) + "s")
+    MarkNPCFrozen(akActor, "probe open " + ((Utility.GetCurrentRealTime() - started) as int) + "s")
     return true
 endFunction
 
-function MarkGuardFrozen(Actor akGuard, string asStep) global
+function MarkNPCFrozen(Actor akGuard, string asStep) global
     ; The player submitted to him: his arrest won't come, another guard of the hold takes it over (RPB_Arrest.TakeOverSubmission)
     RPB_Arrest.RequestSubmissionTakeover(akGuard)
-    int map = __FrozenGuardsMap(abCreate = true)
+    int map = __FrozenNPCsMap(abCreate = true)
     JFormMap.setFlt(map, akGuard, -1.0)
     ; Silent in crime dialogue from now: each line's fragments call into the speaker and would wait forever, a new stuck stack
     ; every time he confronts a wanted player. The lines check for RPB_FrozenMarkerEffect on the speaker (a list was no use:
@@ -942,7 +933,7 @@ function MarkGuardFrozen(Actor akGuard, string asStep) global
         frozenActors.AddForm(akGuard)
     endif
     string probedAt = ""
-    int steps = JDB.solveObj(".rpb_root.frozenGuardSteps")
+    int steps = JDB.solveObj(".rpb_root.frozenProbeSteps")
     if (steps)
         probedAt = JFormMap.getStr(steps, akGuard)
     endif
@@ -1012,7 +1003,7 @@ bool function MoveGuardAfterBurst(Actor akGuard, ObjectReference akTarget, strin
     if (!akGuard || !akTarget)
         return true
     endif
-    if (IsFrozenGuard(akGuard))
+    if (IsFrozenNPC(akGuard))
         return false
     endif
     int moves = JDB.solveObj(".rpb_root.guardMoves")
@@ -1040,7 +1031,7 @@ bool function MoveGuardAfterBurst(Actor akGuard, ObjectReference akTarget, strin
         endif
     endWhile
     ; Not back yet: a probe tells a frozen guard (it hangs too, and he's marked within a few seconds) from a slow move
-    ProbeGuard(akGuard, asStep + ", his move not back after " + (waited as int) + "s")
+    ProbeNPC(akGuard, asStep + ", his move not back after " + (waited as int) + "s")
     waited = 0.0
     while (waited < 6.0)
         Utility.Wait(0.5)
@@ -1048,11 +1039,11 @@ bool function MoveGuardAfterBurst(Actor akGuard, ObjectReference akTarget, strin
         if (!JFormMap.hasKey(moves, akGuard))
             return true
         endif
-        if (IsFrozenGuard(akGuard))
+        if (IsFrozenNPC(akGuard))
             return false
         endif
     endWhile
-    return !IsFrozenGuard(akGuard)
+    return !IsFrozenNPC(akGuard)
 endFunction
 
 ; RPB_EventManager.OnMoveGuard: his MoveTo came back
@@ -1065,22 +1056,22 @@ endFunction
 
 ; For the scans: the list's handle when it has anyone in it, 0 otherwise (one native per scan instead of one per candidate;
 ; a probe that answered removes its entry, so the list is empty unless a guard is frozen or a probe is still running)
-int function FrozenGuardsForScan() global
-    int map = JDB.solveObj(__FrozenGuardsPath())
+int function FrozenNPCsForScan() global
+    int map = JDB.solveObj(__FrozenNPCsPath())
     if (map && JFormMap.count(map) > 0)
         return map
     endif
     return 0
 endFunction
 
-; @akActor is on the scan's list (FrozenGuardsForScan) and frozen
+; @akActor is on the scan's list (FrozenNPCsForScan) and frozen
 bool function IsListedFrozen(int aiFrozenMap, Actor akActor) global
-    return aiFrozenMap && JFormMap.hasKey(aiFrozenMap, akActor) && IsFrozenGuard(akActor)
+    return aiFrozenMap && JFormMap.hasKey(aiFrozenMap, akActor) && IsFrozenNPC(akActor)
 endFunction
 
 ; Emptied in place, not replaced: probes saved stuck on a frozen guard resume after the load, holding these maps' handles,
 ; and a replaced map was gone under them (the console's "access to non-existing object with id 0x1682", 2026-10-02)
-function ClearFrozenGuards() global
+function ClearFrozenNPCs() global
     ; The marker off everyone who got it (a load drops the freeze, so they answer again): kept apart from the maps below, a
     ; marked NPC must lose it even if he's out of every other list
     int marked = JDB.solveObj(".rpb_root.frozenMarked")
@@ -1102,20 +1093,20 @@ function ClearFrozenGuards() global
     if (frozenActors)
         frozenActors.Revert() ; what scripts added: everyone, the plugin's list is empty
     endif
-    __ClearFormMapAt(__FrozenGuardsPath())
-    __ClearFormMapAt(".rpb_root.frozenGuardSteps")
+    __ClearFormMapAt(__FrozenNPCsPath())
+    __ClearFormMapAt(".rpb_root.frozenProbeSteps")
     __ClearFormMapAt(".rpb_root.frozenReports")
     __ClearFormMapAt(".rpb_root.toldToStop")
-    __ClearFormMapAt(".rpb_root.guardOpenProbes")
+    __ClearFormMapAt(".rpb_root.openProbes")
     __ClearFormMapAt(".rpb_root.frozenActorRoles")
-    __ClearFormMapAt(".rpb_root.guardPendingProbes")
+    __ClearFormMapAt(".rpb_root.pendingProbes")
     __ClearFormMapAt(".rpb_root.pendingCrimeLines")
     __ClearFormMapAt(".rpb_root.guardMoves")
 endFunction
 
 ;/
     One NPC's frozen state off, for the dev freeze keys' release (he answers again): the marker and the faint off him
-    alone, his entries out of every map. ClearFrozenGuards does it for everyone, which is right on a load (nobody is
+    alone, his entries out of every map. ClearFrozenNPCs does it for everyone, which is right on a load (nobody is
     frozen any more) but a call into each: releasing the frozen prisoner hung on a guard still frozen (2026-10-05).
 /;
 function ClearFrozenActor(Actor akActor) global
@@ -1135,12 +1126,12 @@ function ClearFrozenActor(Actor akActor) global
         frozenActors.RemoveAddedForm(akActor)
     endif
     __RemoveKeyAt(".rpb_root.frozenMarked", akActor)
-    __RemoveKeyAt(__FrozenGuardsPath(), akActor)
-    __RemoveKeyAt(".rpb_root.frozenGuardSteps", akActor)
+    __RemoveKeyAt(__FrozenNPCsPath(), akActor)
+    __RemoveKeyAt(".rpb_root.frozenProbeSteps", akActor)
     __RemoveKeyAt(".rpb_root.frozenReports", akActor)
-    __RemoveKeyAt(".rpb_root.guardOpenProbes", akActor)
+    __RemoveKeyAt(".rpb_root.openProbes", akActor)
     __RemoveKeyAt(".rpb_root.frozenActorRoles", akActor)
-    __RemoveKeyAt(".rpb_root.guardPendingProbes", akActor)
+    __RemoveKeyAt(".rpb_root.pendingProbes", akActor)
     __RemoveKeyAt(".rpb_root.pendingCrimeLines", akActor)
     __RemoveKeyAt(".rpb_root.guardMoves", akActor)
 endFunction
@@ -1185,7 +1176,7 @@ endFunction
 
 function ForgetActorName(Actor akActor) global
     int names = JDB.solveObj(".rpb_root.actorNames")
-    if (!names || !akActor || IsFrozenGuard(akActor))
+    if (!names || !akActor || IsFrozenNPC(akActor))
         return
     endif
     JFormMap.removeKey(names, akActor)
@@ -1232,7 +1223,7 @@ int function FrozenReport(Actor akActor) global
     return JFormMap.getObj(JDB.solveObj(".rpb_root.frozenReports"), akActor)
 endFunction
 
-; Written by MarkGuardFrozen: who he was (stored before), what he was doing, when and where, without a call into him
+; Written by MarkNPCFrozen: who he was (stored before), what he was doing, when and where, without a call into him
 int function __NewFrozenReport(Actor akActor, string asFoundBy, string asProbedAt) global
     int reports = JDB.solveObj(".rpb_root.frozenReports")
     if (!reports)
@@ -1353,7 +1344,7 @@ Actor function GetOtherHostileTarget(Actor akActor, Actor akExcept, Actor akCapt
     int i = 0
     while (i < targets.Length)
         Actor target = targets[i]
-        if (target && target != akExcept && !IsFrozenGuard(target) && !target.IsDead() && !target.IsDisabled())
+        if (target && target != akExcept && !IsFrozenNPC(target) && !target.IsDead() && !target.IsDisabled())
             Faction targetFaction = target.GetCrimeFaction()
             bool ownLaw = (captorFaction && targetFaction == captorFaction) || (!captorFaction && target.IsGuard())
             if (!ownLaw)
@@ -1384,7 +1375,7 @@ endFunction
     Returns the one the captor went after, or none.
 /;
 Actor function SendCaptorAfterAttacker(Actor akCaptor, Actor akArrestee) global
-    if (!akCaptor || !akArrestee || IsFrozenGuard(akCaptor) || akCaptor.IsDead())
+    if (!akCaptor || !akArrestee || IsFrozenNPC(akCaptor) || akCaptor.IsDead())
         return none
     endif
     ; No longer in custody (the arrest cancelled while the escort watch was on its way here): their fights are their own.
@@ -1407,7 +1398,7 @@ Actor function SendCaptorAfterAttacker(Actor akCaptor, Actor akArrestee) global
         ; the prisoner isn't attacking (178's bandit attacked them). The player's own hits are PlayerHitPrisoner's
         ; And only someone with a weapon (or spell) out: a citizen who runs from a fight is in combat too, with a target, and
         ; Jaree-Ra, fleeing near the cuffed player in Solitude, was told to stop and arrested for it (2026-10-06)
-        if (target && target != akCaptor && target != player && !IsFrozenGuard(target) && !target.IsDead() && !target.IsDisabled() && !IsActorArrested(target) && target.IsWeaponDrawn())
+        if (target && target != akCaptor && target != player && !IsFrozenNPC(target) && !target.IsDead() && !target.IsDisabled() && !IsActorArrested(target) && target.IsWeaponDrawn())
             Faction targetFaction = target.GetCrimeFaction()
             Debug("Utility::SendCaptorAfterAttacker", target + " attacks " + akArrestee + ": crime faction " + targetFaction + " (captor's " + captorFaction + ")")
             if (!targetFaction)
@@ -1452,7 +1443,7 @@ Actor[] function __AttackersOf(Actor akArrestee) global
         i += 1
     endWhile
     Actor[] nearby = PO3_SKSEFunctions.GetActorsByProcessingLevel(0)
-    int frozenMap = FrozenGuardsForScan()
+    int frozenMap = FrozenNPCsForScan()
     i = 0
     while (i < nearby.Length)
         Actor candidate = nearby[i]
@@ -1473,7 +1464,7 @@ endFunction
 
 ;/
     Whether @akActor was told to stop attacking a prisoner and is at it again: the first call notes the time (false), a
-    later one at least 4s on is true. A note older than a minute starts over. Cleared on load (ClearFrozenGuards).
+    later one at least 4s on is true. A note older than a minute starts over. Cleared on load (ClearFrozenNPCs).
 /;
 bool function __ToldToStopAndKeptOn(Actor akActor, float afMinGap = 4.0) global
     int told = JDB.solveObj(".rpb_root.toldToStop")
@@ -1507,7 +1498,7 @@ endFunction
     when the player is in custody themselves (mod author, 2026-10-06: the rule applies to the player too).
 /;
 function PlayerHitPrisoner(Actor akCaptor, Actor akArrestee) global
-    if (IsTestRunning() || !akCaptor || !akArrestee || IsFrozenGuard(akCaptor) || (!IsActorArrested(akArrestee) && !IsActorImprisoned(akArrestee)))
+    if (IsTestRunning() || !akCaptor || !akArrestee || IsFrozenNPC(akCaptor) || (!IsActorArrested(akArrestee) && !IsActorImprisoned(akArrestee)))
         return
     endif
     Actor player = Game.GetFormEx(0x14) as Actor
@@ -1572,7 +1563,7 @@ endFunction
     surrendered player stops. Returns how many were calmed.
 /;
 int function CalmOwnLawAttackers(Actor akArrestee, Actor akCaptor) global
-    if (!akArrestee || !akCaptor || IsFrozenGuard(akCaptor))
+    if (!akArrestee || !akCaptor || IsFrozenNPC(akCaptor))
         return 0
     endif
     Faction captorFaction = akCaptor.GetCrimeFaction()
@@ -1584,7 +1575,7 @@ int function CalmOwnLawAttackers(Actor akArrestee, Actor akCaptor) global
     int i = 0
     while (i < targets.Length)
         Actor target = targets[i]
-        if (target && target != akCaptor && !IsFrozenGuard(target) && !target.IsDead() && target.GetCrimeFaction() == captorFaction)
+        if (target && target != akCaptor && !IsFrozenNPC(target) && !target.IsDead() && target.GetCrimeFaction() == captorFaction)
             target.StopCombat()
             calmed += 1
         endif
@@ -1888,12 +1879,12 @@ int function CalmGuardsAgainstPlayer() global
     int i = 0
     while (i < nearby.Length)
         Actor candidate = nearby[i]
-        ; Not a guard with a probe out or waiting either (IsGuardProbeOpen, no call into him): the reset runs right after
+        ; Not a guard with a probe out or waiting either (IsNPCProbeOpen, no call into him): the reset runs right after
         ; the arrest released its guard, in his burst. On all 12 frozen guards of 156 x1000 (2026-10-04) this scan's
         ; IsGuard() hung on him, before his probes had marked him
         ; And the law that isn't flagged a guard (anyone with a crime faction fighting the player: Captain Aldis kept attacking
         ; after test 145's teardown and killed the player, 2026-10-06); the extra reads only on those in combat
-        if (candidate && candidate != player && !IsGuardProbeOpen(candidate) && !IsFrozenGuard(candidate) && candidate.IsInCombat() && (candidate.IsGuard() || (candidate.GetCombatTarget() == player && candidate.GetCrimeFaction())))
+        if (candidate && candidate != player && !IsNPCProbeOpen(candidate) && !IsFrozenNPC(candidate) && candidate.IsInCombat() && (candidate.IsGuard() || (candidate.GetCombatTarget() == player && candidate.GetCrimeFaction())))
             candidate.StopCombat()
             candidate.StopCombatAlarm()
             calmed += 1
@@ -5767,7 +5758,7 @@ Actor function GetNearbyGuardForFactionFromRef( \
         ; A frozen guard first, with no call on him (him as an argument only): IsGuard() on one hung F4's Arrest Actor
         ; (2026-10-05, the overnight run's save with 8 frozen guards around)
         bool conditions = \ 
-            scannedActor && !IsFrozenGuard(scannedActor) && \
+            scannedActor && !IsFrozenNPC(scannedActor) && \
             scannedActor.GetFormID() != 0x14 && \
             !scannedActor.IsChild() && \
             scannedActor.IsGuard()
@@ -5795,7 +5786,7 @@ endFunction
 /;
 Actor function GetNearestGuard(ObjectReference centerRef, float radius, ObjectReference exclude) global
     Actor[] nearby = PO3_SKSEFunctions.GetActorsByProcessingLevel(0)
-    int frozenMap = FrozenGuardsForScan()
+    int frozenMap = FrozenNPCsForScan()
     Actor nearest = none
     float nearestDistance = 8000.0
 
@@ -5832,7 +5823,7 @@ Actor function GetGuardSeeing(Actor akPrisoner, Actor akExclude) global
         return none
     endif
     Actor[] nearby = PO3_SKSEFunctions.GetActorsByProcessingLevel(0)
-    int frozenMap = FrozenGuardsForScan()
+    int frozenMap = FrozenNPCsForScan()
     Actor seeing = none
     float seeingDistance = 0.0
     int i = 0
@@ -5860,7 +5851,7 @@ endFunction
 ; have to see the escort collapse, the mod author 2026-10-04)
 Actor function FindTakeoverGuard(Actor akCenter, Faction akCrimeFaction, Actor akExclude, float afNearDistance, float afFarDistance, bool abSightOnly = false) global
     Actor[] nearby = PO3_SKSEFunctions.GetActorsByProcessingLevel(0)
-    int frozenMap = FrozenGuardsForScan()
+    int frozenMap = FrozenNPCsForScan()
     Spell captorSpell = RPB_CaptorSpell()
     Actor nearGuard = none
     float nearDistance = afNearDistance
@@ -5899,7 +5890,7 @@ endFunction
     arrestee's escape window. Each step without a call on him: the bleedout animation (Debug's global, him as an argument),
     Paralysis +1 (the spell he casts on himself, like SetAV Paralysis 1),
     then a push to ragdoll (from a marker, PushFromMarker): paralysed first, he stays down. @abAlone: nobody else took the arrest over, he stays down
-    until the next load (ClearFrozenGuards dispels it, the freeze ends there too); else 15s, as if the others helped him up.
+    until the next load (ClearFrozenNPCs dispels it, the freeze ends there too); else 15s, as if the others helped him up.
     On its own stack (RPB_EventManager.OnFaintFrozenGuard): it waits 3s.
 /;
 function FaintFrozenGuard(Actor akGuard, bool abAlone) global
@@ -5946,7 +5937,7 @@ Actor function GetNearestGuardInCell(Actor akCenter, Actor akExclude) global
         return none
     endif
     Actor[] nearby = PO3_SKSEFunctions.GetActorsByProcessingLevel(0)
-    int frozenMap = FrozenGuardsForScan()
+    int frozenMap = FrozenNPCsForScan()
     Actor nearest = none
     float nearestDistance = 0.0
     int i = 0

@@ -1425,7 +1425,7 @@ state Imprisoned
         ; A prisoner RPB found frozen: every call below goes into him, and this fired every game hour, a new stuck stack each
         ; time (38 in one dump, 2026-10-06). `this` is the cached actor, reading it is no call; the monitor takes him again
         ; after the next load
-        if (RPB_Utility.IsFrozenGuard(this))
+        if (RPB_Utility.IsFrozenNPC(this))
             return
         endif
         ; Dont update if the player is not nearby, let Prison Monitor handle it
@@ -2277,7 +2277,7 @@ function Clothe()
     ; Debug("["+ Name +"] Prisoner::Clothe", "Applied Outfit: " + self.PrisonOutfit)
 
     self.OnClothed()
-    RPB_Utility.ProbeNPC(this, "prisoner clothed")
+    RPB_Utility.ProbeAfterBurst(this, "prisoner clothed", "PRISONER")
 endFunction
 
 ;                      Sentence - Checkers
@@ -2921,14 +2921,14 @@ endFunction
 ; In the same place as @akOther: the same cell, or both outside in the same worldspace. Outside, every grid square is its
 ; own cell, and a guard crossing one read as "through a load door" (into the Solitude sewers, by a manhole)
 ;/
-    The guard for the escort assist's reads. A frozen guard (RPB_Utility.IsFrozenGuard: no call on him) answers no call on
+    The guard for the escort assist's reads. A frozen guard (RPB_Utility.IsFrozenNPC: no call on him) answers no call on
     himself, and each tick hung on his position: his escort then fell to the stall watch's teleport into the cell while
     his AI was still walking it (2026-10-04). A marker moved onto him stands in (a call on the marker, him as the argument,
     as the faint's push does): the assist reads where he is, and the escort goes on as with a guard who answers. Deleted
     with the assist (StopEscortAssist).
 /;
 ObjectReference function __AssistGuardRef()
-    if (!RPB_Utility.IsFrozenGuard(__assistEscort))
+    if (!RPB_Utility.IsFrozenNPC(__assistEscort))
         return __assistEscort
     endif
     if (!__assistGuardMarker)
@@ -4346,7 +4346,7 @@ event OnStripped()
 
     IncrementStat("Times Stripped")
     SetBool("Stripped", true)
-    RPB_Utility.ProbeNPC(this, "prisoner stripped")
+    RPB_Utility.ProbeAfterBurst(this, "prisoner stripped", "PRISONER")
 endEvent
 
 event OnUnderwearRemoved(Armor akUnderwearTop, Armor akUnderwearBottom)
@@ -4498,7 +4498,7 @@ event OnSleepStart(float afSleepStartTime, float afSleepEndTime)
 endEvent
 
 event OnImprisoned()
-    RPB_Utility.ProbeNPC(this, "prisoner imprisoned")
+    RPB_Utility.ProbeAfterBurst(this, "prisoner imprisoned", "PRISONER")
     self.RegisterTimeOfImprisonment()
     RPB_Utility.FlowMark("OnImprisoned: RegisterTimeOfImprisonment")
     self.DetermineReleaseTimeAdditionalHours() ; For Release Time (Minimum, Maximum) intervals
@@ -4568,7 +4568,7 @@ event OnInitialize()
 
     Prison.RegisterPrisoner(self)
     RPB_Utility.FlowMark("Prisoner.OnInitialize: registered")
-    RPB_Utility.ProbeNPC(this, "prisoner registered")
+    RPB_Utility.ProbeAfterBurst(this, "prisoner registered", "PRISONER")
     RPB_Utility.Crumb(this, "Prisoner.OnInitialize: RegisterPrisoner returned")
     ; DebugInfo("("+ Name +") Prisoner::OnInitialize", "Initialized: " + self.Was("Initialized"))
 endEvent

@@ -1236,7 +1236,7 @@ function PlayQueued()
                     ; before its "Handcuff" step. Nothing was done to them yet, so they go free rather than be escorted
                     ; uncuffed once the fight is over. Escort to jail only: at the prison a stripped prisoner is uncuffed on
                     ; purpose.
-                    if (escortee && !RPB_Utility.IsFrozenGuard(escortee) && nextSceneType == CATEGORY_ESCORT_TO_JAIL && RPB_API.GetArrest().Arrestees.AtKey(escortee) && !RPB_Utility.IsCuffed(escortee))
+                    if (escortee && !RPB_Utility.IsFrozenNPC(escortee) && nextSceneType == CATEGORY_ESCORT_TO_JAIL && RPB_API.GetArrest().Arrestees.AtKey(escortee) && !RPB_Utility.IsCuffed(escortee))
                         uncuffedInFight = true
                     else
                         Info("SceneManager: " + nextScene + " can't start while " + escort + " / " + escortee + " are in combat, waiting for the fight to end")
@@ -1249,7 +1249,7 @@ function PlayQueued()
                     ; The escortee still attacked by someone outside the law while the guard isn't fighting: he goes after
                     ; them (a bounty hunter kept at the cuffed player, the guard stood by, and this gave up after the cap and
                     ; moved them to the prison, 2026-10-06). The wait counts from his last such turn
-                    if (escort && escortee && escortee.IsInCombat() && !RPB_Utility.IsFrozenGuard(escort) && !escort.IsInCombat())
+                    if (escort && escortee && escortee.IsInCombat() && !RPB_Utility.IsFrozenNPC(escort) && !escort.IsInCombat())
                         if (RPB_Utility.SendCaptorAfterAttacker(escort, escortee))
                             combatWaited = 0
                         endif
@@ -1396,7 +1396,7 @@ float property SCENE_START_COMBAT_CAP_SECONDS = 120.0 autoreadonly
 ; In combat, read only on someone not found frozen: a frozen one counts as out of the fight, so a refused Scene falls through
 ; to its fallback instead of this queue (every later RPB Scene) waiting on him for good (the call audit, 2026-10-06)
 bool function __FightingNoFreeze(Actor akActor)
-    return akActor && !RPB_Utility.IsFrozenGuard(akActor) && akActor.IsInCombat()
+    return akActor && !RPB_Utility.IsFrozenNPC(akActor) && akActor.IsInCombat()
 endFunction
 
 ;/
@@ -1555,7 +1555,7 @@ function SetPackageLockOnActor(Actor akActor)
 
     BindAliasTo(packageLock, akActor)
     RPB_StorageVars.SetIntOnReference("Package Lock", akActor, packageLock.GetID())
-    RPB_Utility.ProbeGuardAfterBurst(akActor, "package lock bound")
+    RPB_Utility.ProbeAfterBurst(akActor, "package lock bound")
     RPB_Utility.LogInfo("Bound package lock to Actor " + akActor + " successfully!", "SceneManager::SetPackageLockOnActor")
 endFunction
 
@@ -1576,7 +1576,7 @@ function UnsetPackageLockOnActor(Actor akActor)
     RPB_StorageVars.DeleteVariableOnReference("Package Lock", akActor)
     RPB_Utility.LogInfo("Unbound package lock from Actor " + akActor + " successfully!", "SceneManager::UnsetPackageLockOnActor")
     ; Guards froze around this moment (every freeze so far): a probe tells when one does
-    RPB_Utility.ProbeGuardAfterBurst(akActor, "package lock unbound")
+    RPB_Utility.ProbeAfterBurst(akActor, "package lock unbound")
 endFunction
 
 

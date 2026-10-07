@@ -109,9 +109,9 @@ function RegisterEvents()
     RegisterForModEvent("RPB_PackageEnd", "OnPackageEnd")
     RegisterForModEvent("RPB_PackageStart", "OnPackageStart")
 
-    ; Guard side stacks: a frozen guard only ever holds these (RPB_Utility.ProbeGuard, Prisoner.ClearArrest)
-    RegisterForModEvent("RPB_GuardProbe", "OnGuardProbe")
-    RegisterForModEvent("RPB_GuardProbeCheck", "OnGuardProbeCheck")
+    ; Guard side stacks: a frozen guard only ever holds these (RPB_Utility.ProbeNPC, Prisoner.ClearArrest)
+    RegisterForModEvent("RPB_NPCProbe", "OnNPCProbe")
+    RegisterForModEvent("RPB_NPCProbeCheck", "OnNPCProbeCheck")
     RegisterForModEvent("RPB_ReleaseCaptor", "OnReleaseCaptor")
     RegisterForModEvent("RPB_ReleaseCaptorBackstop", "OnReleaseCaptorBackstop")
     RegisterForModEvent("RPB_FreeGuard", "OnFreeGuard")
@@ -264,18 +264,18 @@ event OnSetAsideBountyCheck(Form akActor, float afDelay)
     endif
 endEvent
 
-event OnGuardProbe(string asStep, Form akGuard, float afDelay, float afDueAt)
+event OnNPCProbe(string asStep, Form akGuard, float afDelay, float afDueAt)
     if (afDelay > 0.0)
         Utility.Wait(afDelay)
         RPB_Utility.__AddPendingProbe(akGuard as Actor, -1) ; out now
     endif
-    RPB_Utility.__RunGuardProbe(akGuard as Actor, asStep, afDueAt)
+    RPB_Utility.__RunNPCProbe(akGuard as Actor, asStep, afDueAt)
 endEvent
 
-; The probe's answer should be in by now: IsFrozenGuard only reads the list, and reports a probe that never came back
+; The probe's answer should be in by now: IsFrozenNPC only reads the list, and reports a probe that never came back
 ; A look at the probe a few seconds on, again while it's still open: one look only missed the 2026-10-02 freeze (the check
 ; ran before the probe had written itself down, read "no probe", and never looked again)
-event OnGuardProbeCheck(Form akGuard, float afDelay)
+event OnNPCProbeCheck(Form akGuard, float afDelay)
     Actor guard = akGuard as Actor
     if (afDelay > 0.0)
         Utility.Wait(afDelay)
@@ -283,7 +283,7 @@ event OnGuardProbeCheck(Form akGuard, float afDelay)
     int looks = 0
     while (looks < 3)
         Utility.Wait(3.5)
-        if (RPB_Utility.IsFrozenGuard(guard) || (looks > 0 && !RPB_Utility.IsGuardProbeOpen(guard)))
+        if (RPB_Utility.IsFrozenNPC(guard) || (looks > 0 && !RPB_Utility.IsNPCProbeOpen(guard)))
             return
         endif
         looks += 1
@@ -319,7 +319,7 @@ function SendSurrenderSceneEvent(string asScene, string asSceneEvent, Actor akSu
 endFunction
 
 function SendArrestSceneEvent(string asScene, string asSceneEvent, Actor akArrestee, Actor akAuthority, string asSceneSecondaryEvent = "null")
-    if (RPB_Utility.IsFrozenGuard(akArrestee)) ; every step below calls into him
+    if (RPB_Utility.IsFrozenNPC(akArrestee)) ; every step below calls into him
         RPB_Utility.LogWarn(akArrestee + " is frozen: left out of " + asScene + "'s " + asSceneEvent + " until the next load", "EventManager::SendArrestSceneEvent")
         return
     endif
@@ -349,7 +349,7 @@ function SendArrestSceneBulkEvent(string asScene, string asSceneEvent, Form[] ak
         return
     endif
 
-    int frozenMap = RPB_Utility.FrozenGuardsForScan() ; a frozen arrestee left out: every step below calls into him
+    int frozenMap = RPB_Utility.FrozenNPCsForScan() ; a frozen arrestee left out: every step below calls into him
     int i = 0
     while (i < akArrestees.Length)
         if (frozenMap && RPB_Utility.IsListedFrozen(frozenMap, akArrestees[i] as Actor))
@@ -442,7 +442,7 @@ function OnSceneStartFailed(string asScene)
         Info("EventManager: " + asScene + " never started for " + escortee + ": its guard " + escort + " is dead, his death's handover takes it")
         return
     endif
-    bool escortFighting = escort && !RPB_Utility.IsFrozenGuard(escort) && escort.IsInCombat() ; no call on a frozen guard
+    bool escortFighting = escort && !RPB_Utility.IsFrozenNPC(escort) && escort.IsInCombat() ; no call on a frozen guard
     Info("EventManager: " + asScene + " never started for " + escortee + " (in combat " + escortee.IsInCombat() + ", escort " + escort + " in combat " + escortFighting + "), moving them without the Scene")
     if (sceneType == SceneManager.CATEGORY_ESCORT_TO_JAIL && escort)
         prisoner.MoveToPrison(escort)
@@ -484,7 +484,7 @@ function __EndSceneIfArresteeGone(string asScene, Actor akArrestee)
 endFunction
 
 function SendPrisonSceneEvent(string asScene, string asSceneEvent, Actor akPrisoner, Actor akAuthority, string asSceneSecondaryEvent = "null")
-    if (RPB_Utility.IsFrozenGuard(akPrisoner)) ; the prison's lookup and his steps call into him
+    if (RPB_Utility.IsFrozenNPC(akPrisoner)) ; the prison's lookup and his steps call into him
         RPB_Utility.LogWarn(akPrisoner + " is frozen: left out of " + asScene + "'s " + asSceneEvent + " until the next load", "EventManager::SendPrisonSceneEvent")
         return
     endif
@@ -517,7 +517,7 @@ function SendPrisonSceneBulkEvent(string asScene, string asSceneEvent, Form[] ak
 
     ; A prisoner RPB found frozen is left out before any call into him: the prison's lookup and his scene steps call into
     ; him, and every scene event comes through this one object
-    int frozenMap = RPB_Utility.FrozenGuardsForScan()
+    int frozenMap = RPB_Utility.FrozenNPCsForScan()
     int first = 0
     while (first < akPrisoners.Length && frozenMap && RPB_Utility.IsListedFrozen(frozenMap, akPrisoners[first] as Actor))
         RPB_Utility.LogWarn(akPrisoners[first] + " is frozen: left out of " + asScene + "'s " + asSceneEvent + " until the next load", "EventManager::SendPrisonSceneBulkEvent")
@@ -611,7 +611,7 @@ event OnArrestBegin(string eventName, string arrestType, float arresteeIdFlt, Fo
 
     Actor captor = (sender as Actor)
     ; Before any call on him: a frozen guard's first call never returns, and this arrest would hang with it
-    if (captor && RPB_Utility.IsFrozenGuard(captor))
+    if (captor && RPB_Utility.IsFrozenNPC(captor))
         Warn("Arrest by " + captor + " rejected: the guard is frozen (see FROZEN GUARD)")
         ; A submission to him: another guard takes it over (no-op otherwise)
         RPB_Arrest.RequestSubmissionTakeover(captor)
@@ -1314,13 +1314,13 @@ endEvent
     fallback has to know the real target instead.
 /;
 Actor function __DialogueTargetOf(Actor akSpeaker, string asCaller)
-    if (RPB_Utility.IsFrozenGuard(akSpeaker))
+    if (RPB_Utility.IsFrozenNPC(akSpeaker))
         return none ; GetDialogueTarget() on him hangs
     endif
     Actor target = akSpeaker.GetDialogueTarget()
     ; A frozen NPC isn't who a crime line is for: a live guard's target read as a killed frozen clone lying next to him, and
     ; the confrontation went to the clone (2026-10-05, the overnight run)
-    if (target && target != akSpeaker && !RPB_Utility.IsFrozenGuard(target))
+    if (target && target != akSpeaker && !RPB_Utility.IsFrozenNPC(target))
         return target
     endif
     if (akSpeaker.GetDistance(Config.Player) <= 1000)

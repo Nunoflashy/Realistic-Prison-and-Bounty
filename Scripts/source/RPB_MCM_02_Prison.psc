@@ -222,7 +222,7 @@ function Render(RPB_MCM_02 mcm, RPB_Prisoner apPrisoner) global
     if (prisoner.Captor)
         Actor prisonerCaptor = prisoner.Captor
         ; A frozen captor's name would hang the page (a call into him)
-        if (RPB_Utility.IsFrozenGuard(prisonerCaptor))
+        if (RPB_Utility.IsFrozenNPC(prisonerCaptor))
             mcm.AddOptionText("Captured By", "(frozen) " + prisonerCaptor, defaultFlags = mcm.OPTION_DISABLED)
         else
             mcm.AddOptionText("Captured By", prisonerCaptor.GetBaseObject().GetName(), defaultFlags = mcm.OPTION_DISABLED)

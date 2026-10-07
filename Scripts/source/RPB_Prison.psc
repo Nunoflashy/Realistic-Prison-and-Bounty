@@ -2093,7 +2093,7 @@ Form[] function GetPrisonersReleasedNoLaterThan(float afTimeLeft)
     ; The actors from the list's index (no call into anyone), a prisoner RPB found frozen left out before any call into
     ; him: the time skip hung on one, and no one after him was released (test 179). He's released after the next load
     Form[] actors = Prisoners.GetActorsNoCall()
-    int frozenMap = RPB_Utility.FrozenGuardsForScan()
+    int frozenMap = RPB_Utility.FrozenNPCsForScan()
     int i = 0
     while (i < actors.Length)
         Actor candidate = actors[i] as Actor
@@ -2482,7 +2482,7 @@ function TeleportPrisonerToRelease(RPB_Prisoner apPrisoner, bool abMoveToRelease
             Info(checkMsg)
         endif
     endif
-    RPB_Utility.ProbeNPC(releasedActor, "prisoner released")
+    RPB_Utility.ProbeAfterBurst(releasedActor, "prisoner released", "PRISONER")
     RPB_Utility.FlowEnd("Release: done")
 endFunction
 
@@ -2624,7 +2624,7 @@ function __ProcessPendingDress()
     ; Every queued NPC is looked at on each update (it fires 3 s after the last release was queued, so each entry is at least that old):
     ; it leaves the queue after two clean passes in a row or after 5 passes. Nothing depends on a clock (real time restarts every session).
     ; A frozen one is passed over (each call below would hang the monitor's update); his tries still count
-    int frozenMap = RPB_Utility.FrozenGuardsForScan()
+    int frozenMap = RPB_Utility.FrozenNPCsForScan()
     i = 0
     while (i < n)
         Actor passActor = JArray.getForm(keys, i) as Actor
@@ -2637,7 +2637,7 @@ function __ProcessPendingDress()
             if (!(frozenMap && RPB_Utility.IsListedFrozen(frozenMap, passActor)) && passActor.Is3DLoaded())
                 passActor.QueueNiNodeUpdate()
                 int equippedNow = self.__DressActor(passActor)
-                RPB_Utility.ProbeNPC(passActor, "released NPC re-dressed")
+                RPB_Utility.ProbeAfterBurst(passActor, "released NPC re-dressed", "PRISONER")
                 string passMsg = "Re-dress pass on " + passActor.GetDisplayName() + " " + passActor + ": equipped " + equippedNow + " (pass " + tries + ")"
                 DebugInfo("["+ Name +"] Prison::__ProcessPendingDress", passMsg)
                 Info(passMsg)
@@ -2755,7 +2755,7 @@ function __WatchEscortAssist(Actor akPrisoner, int aiEntry, float afNow)
     JMap.setInt(aiEntry, "ticks", ticks)
     JMap.setInt(aiEntry, "still", still)
     if (still >= 5)
-        bool frozen = RPB_Utility.IsFrozenGuard(watched.Captor)
+        bool frozen = RPB_Utility.IsFrozenNPC(watched.Captor)
         JMap.setInt(aiEntry, "watchAssist", 0)
         JMap.setFlt(aiEntry, "dueAt", afNow)
         Warn("["+ Name +"] Prison::__WatchEscortAssist: " + akPrisoner + "'s escort to the cell is stuck (the escort assist hasn't ticked for ~" + (still * 3) + "s, guard frozen " + frozen + "): recovering")
@@ -2807,7 +2807,7 @@ function __ProcessEscortStallChecks()
     float now = Utility.GetCurrentRealTime()
     ; A prisoner RPB found frozen keeps his entry and is passed over: every check below calls into him, and one hanging here
     ; stalled this prison's re-dress and release queues too (they share the monitor's update)
-    int frozenMap = RPB_Utility.FrozenGuardsForScan()
+    int frozenMap = RPB_Utility.FrozenNPCsForScan()
     i = 0
     while (i < n)
         Actor checkActor = JArray.getForm(keys, i) as Actor
@@ -2872,7 +2872,7 @@ function __ProcessEscortStallChecks()
                 if (prisoner && !prisoner.IsImprisoned)
                     Warn("["+ Name +"] Prison::__ProcessEscortStallChecks: Stop() didn't drive " + checkActor.GetDisplayName() + " " + checkActor + " through its own completion either - falling back to a manual finish")
                     ; A frozen guard is left alone: any call on him never returns (FROZEN GUARD)
-                    if (RPB_Utility.IsFrozenGuard(guard))
+                    if (RPB_Utility.IsFrozenNPC(guard))
                         guard = none
                     else
                         self.SceneManager.UnsetPackageLockOnActor(guard)
@@ -3049,7 +3049,7 @@ float function NextHostilityRestoreHours()
         Form entryActor = JArray.getForm(keys, i)
         int entry = JFormMap.getObj(__pendingHostility, entryActor)
         ; A frozen one isn't counted: overdue, he'd wake the monitor every few seconds until the next load
-        if (entry && !RPB_Utility.IsFrozenGuard(entryActor as Actor))
+        if (entry && !RPB_Utility.IsFrozenNPC(entryActor as Actor))
             float dueAt = JMap.getFlt(entry, "dueAt")
             if (!found || dueAt < earliest)
                 earliest = dueAt
@@ -3114,7 +3114,7 @@ function __ProcessHostilityRestore()
     endif
 
     float now = Utility.GetCurrentGameTime()
-    int frozenMap = RPB_Utility.FrozenGuardsForScan()
+    int frozenMap = RPB_Utility.FrozenNPCsForScan()
     i = 0
     while (i < n)
         Actor restoreActor = JArray.getForm(keys, i) as Actor
@@ -3223,7 +3223,7 @@ endFunction
 /;
 function __FinishIntakeForTimeSkip()
     Form[] actors = Prisoners.GetActorsNoCall()
-    int frozenMap = RPB_Utility.FrozenGuardsForScan()
+    int frozenMap = RPB_Utility.FrozenNPCsForScan()
     int i = 0
     while (i < actors.Length)
         Actor npc = actors[i] as Actor
@@ -3240,7 +3240,7 @@ function __FinishIntakeForTimeSkip()
                 JFormMap.setFlt(finishing, npc, Utility.GetCurrentRealTime())
                 SceneManager.EndSceneWithActor(npc, "a time skip finished the intake") ; her Scene playing and those queued
                 Actor guard = prisoner.Captor
-                if (guard && !RPB_Utility.IsFrozenGuard(guard))
+                if (guard && !RPB_Utility.IsFrozenNPC(guard))
                     SceneManager.UnsetPackageLockOnActor(guard)
                 endif
                 prisoner.StopEscortAssist()
@@ -3449,7 +3449,7 @@ endFunction
 int function __CountNPCPrisonersInCells(RPB_Prisoner apExcept)
     ; A prisoner RPB found frozen counts as in a cell without a call into him (this runs inside the cell assignment's lock:
     ; one hanging here held up every later imprisonment in this prison). His actor read only while someone is frozen
-    int frozenMap = RPB_Utility.FrozenGuardsForScan()
+    int frozenMap = RPB_Utility.FrozenNPCsForScan()
     int count = 0
     int i = 0
     while (i < Prisoners.Count)
@@ -3799,8 +3799,8 @@ event OnPrisonerDeath(RPB_Prisoner apPrisoner, Actor akKiller)
 endEvent
 event OnEscortPrisonerToJailBegin(RPB_ActorBase apActor, Actor akEscort)
     ; Watched as the walk starts: a guard found frozen now hands the escort to a guard who sees it (RPB_Arrest.__HandOverEscort)
-    RPB_Utility.ProbeGuardAfterBurst(akEscort, "escort to jail began")
-    RPB_Utility.ProbeNPC(apActor.GetActor(), "escort to jail began") ; an NPC prisoner through the same burst (the player isn't probed)
+    RPB_Utility.ProbeAfterBurst(akEscort, "escort to jail began")
+    RPB_Utility.ProbeAfterBurst(apActor.GetActor(), "escort to jail began", "PRISONER") ; an NPC prisoner through the same burst (the player isn't probed)
     ; The player's stairs assist for the walk (RPB_Prisoner's Escorting state)
     RPB_Prisoner prisonerRef = self.Prisoners.AtKey(apActor.GetActor())
     if (prisonerRef)
@@ -3818,7 +3818,7 @@ event OnEscortPrisonerToJailEnd(RPB_ActorBase apActor, Actor akEscort)
             Debug("Prison::OnEscortPrisonerToJailEnd", apActor.GetActor() + "'s escort ended after a time skip finished the intake: nothing to start")
             ; Only her prison flow is skipped. The Scene's end binds her guard's package lock right after sending this
             ; (SceneManager.OnSceneEnd), and the escort to the cell that would have taken it off isn't coming: off here
-            if (akEscort && !RPB_Utility.IsFrozenGuard(akEscort))
+            if (akEscort && !RPB_Utility.IsFrozenNPC(akEscort))
                 Utility.Wait(1.0)
                 SceneManager.UnsetPackageLockOnActor(akEscort)
             endif
@@ -3851,8 +3851,8 @@ event OnEscortPrisonerToJailEnd(RPB_ActorBase apActor, Actor akEscort)
         return
     endif
     GuardMark(akEscort, "escort to jail ended, the prison flow starts with him")
-    RPB_Utility.ProbeGuardAfterBurst(akEscort, "escort to jail ended")
-    RPB_Utility.ProbeNPC(prisonerRef.GetActor(), "escort to jail ended")
+    RPB_Utility.ProbeAfterBurst(akEscort, "escort to jail ended")
+    RPB_Utility.ProbeAfterBurst(prisonerRef.GetActor(), "escort to jail ended", "PRISONER")
     if (prisonerRef.ShouldBeStripped)
         self.StartStrippingPrisoner(prisonerRef, akEscort)
 
@@ -3898,8 +3898,8 @@ endEvent
 
 ; TODO: Remove RPB_JailCell from params. since a Prisoner already has a jail cell assigned to them
 event OnEscortPrisonerToCellEnd(RPB_Prisoner apPrisoner, RPB_JailCell akJailCell, Actor akEscort)
-    RPB_Utility.ProbeGuardAfterBurst(akEscort, "escort to the cell ended")
-    RPB_Utility.ProbeNPC(apPrisoner.GetActor(), "escort to the cell ended")
+    RPB_Utility.ProbeAfterBurst(akEscort, "escort to the cell ended")
+    RPB_Utility.ProbeAfterBurst(apPrisoner.GetActor(), "escort to the cell ended", "PRISONER")
     apPrisoner.StopEscortAssist()
     ; TODO: Fix NPC not staying in cell if they are stripped OnEscortToCellEnd
     if (!apPrisoner.IsStripped && apPrisoner.ShouldBeStripped)

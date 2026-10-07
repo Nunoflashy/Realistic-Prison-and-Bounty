@@ -184,7 +184,7 @@ string function ShowHoldList(bool abMustHaveArrestees = false, bool abSkipListOn
     if (abMustHaveArrestees)
         RPB_ArresteeList arrestees  = API.Arrest.Arrestees
         ; An arrestee RPB found frozen is left out (his hold is a call into him); he's on RPB - Stats' Frozen NPCs page
-        int frozenMap = RPB_Utility.FrozenGuardsForScan()
+        int frozenMap = RPB_Utility.FrozenNPCsForScan()
 
         int i = 0
         while (i < arrestees.Count)
@@ -227,7 +227,7 @@ RPB_Arrestee function ShowArresteeList(string asArrestHold, string asListTitle =
     FastArray_AddString(arresteesArr, "<No Arrestee>")
 
     RPB_ArresteeList arrestees = arrest.Arrestees
-    int frozenMap = RPB_Utility.FrozenGuardsForScan() ; a frozen arrestee left out (each read below is a call into him)
+    int frozenMap = RPB_Utility.FrozenNPCsForScan() ; a frozen arrestee left out (each read below is a call into him)
     int i = 0
     while (i < arrestees.Count)
         RPB_Arrestee arrestee = none
@@ -334,7 +334,7 @@ RPB_Prisoner function ShowPrisonerList(RPB_Prison apPrison, bool abOnlyImprisone
     ; A prisoner RPB found frozen is listed by his FormID, with no call into him (his name, sex and cell would each hang the
     ; menu) and can't be opened. Each line keeps its prisoner's index: the list used to pick by the line's position, which
     ; drifted once a prisoner was left out (abOnlyImprisoned)
-    int frozenMap = RPB_Utility.FrozenGuardsForScan()
+    int frozenMap = RPB_Utility.FrozenNPCsForScan()
     int lineIndexes = FastArray("<int>")
     FastArray_AddInt(lineIndexes, -1)
     int i = 0

@@ -1398,7 +1398,7 @@ event OnUpdate()
     ; him). His freeze was handled when he was found (another guard took the escort over if one saw it, or he carries on, his
     ; AI still walking); this watch just keeps ticking until he's gone from my arrest or a load frees him
     Actor watchedGuard = self.GetCaptorActor()
-    if (watchedGuard && RPB_Utility.IsFrozenGuard(watchedGuard))
+    if (watchedGuard && RPB_Utility.IsFrozenNPC(watchedGuard))
         RegisterForSingleUpdate(5.0)
         return
     endif

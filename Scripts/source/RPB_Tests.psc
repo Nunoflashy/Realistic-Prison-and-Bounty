@@ -10857,7 +10857,7 @@ Actor function __NearestGuardWithPrison(Actor akCenter, float afRadius)
         Actor candidate = nearby[i]
         ; The frozen check before any call on him: GetFormID() came first, and run 697 of 183 x1000 hung on the frozen clone
         ; of run 696, dead next to the start (the stack dump, 2026-10-06)
-        if (candidate && candidate != akCenter && candidate != player && !RPB_Utility.IsFrozenGuard(candidate) && candidate.IsGuard() && !candidate.IsDead() && !candidate.IsDisabled() && !candidate.IsChild())
+        if (candidate && candidate != akCenter && candidate != player && !RPB_Utility.IsFrozenNPC(candidate) && candidate.IsGuard() && !candidate.IsDead() && !candidate.IsDisabled() && !candidate.IsChild())
             float distance = candidate.GetDistance(akCenter)
             Faction crimeFaction = candidate.GetCrimeFaction()
             if (distance < nearestDistance && crimeFaction && prisons.GetPrison(crimeFaction.GetName()))
@@ -11513,7 +11513,7 @@ function __TeardownScenario()
         self.UnregisterForModEvent("RPB_TestTeardownGuard")
         if (!__teardownGuardDone)
             log("teardown: the real guard " + __scenarioRealGuard + "'s reset still running after 15s (frozen? see FROZEN GUARD), going on without it")
-            RPB_Utility.ProbeGuard(__scenarioRealGuard, "test teardown")
+            RPB_Utility.ProbeNPC(__scenarioRealGuard, "test teardown")
         endif
         __scenarioRealGuard = none
     endif
@@ -11535,7 +11535,7 @@ endFunction
 bool __teardownResetDone = false
 
 ; Freeze experiment E: the guard whose Captor the cancel kept on, probed every 0.5s from the Scene stop for 10s. Each probe on
-; its own stack (RPB_TestProbeOnce), straight away; this loop only sends them and looks whether one hung (IsFrozenGuard
+; its own stack (RPB_TestProbeOnce), straight away; this loop only sends them and looks whether one hung (IsFrozenNPC
 ; marks and reports him once a probe has been open 3s)
 bool __probeSeriesRunning = false
 event OnTestProbeSeries(Form akGuard, float afSceneStoppedAt)
@@ -11545,7 +11545,7 @@ event OnTestProbeSeries(Form akGuard, float afSceneStoppedAt)
     endif
     __probeSeriesRunning = true
     float elapsed = Utility.GetCurrentRealTime() - afSceneStoppedAt
-    while (elapsed < 14.0 && !RPB_Utility.IsFrozenGuard(guard)) ; past F's 10s wait: the revert's first seconds too
+    while (elapsed < 14.0 && !RPB_Utility.IsFrozenNPC(guard)) ; past F's 10s wait: the revert's first seconds too
         int handle = ModEvent.Create("RPB_TestProbeOnce")
         if (handle)
             ModEvent.PushForm(handle, guard)
@@ -11558,15 +11558,15 @@ event OnTestProbeSeries(Form akGuard, float afSceneStoppedAt)
     endWhile
     ; The last probes' answers (a hung one is reported once it's been open 3s)
     float tail = Utility.GetCurrentRealTime()
-    while (!RPB_Utility.IsFrozenGuard(guard) && RPB_Utility.IsGuardProbeOpen(guard) && (Utility.GetCurrentRealTime() - tail) < 4.0)
+    while (!RPB_Utility.IsFrozenNPC(guard) && RPB_Utility.IsNPCProbeOpen(guard) && (Utility.GetCurrentRealTime() - tail) < 4.0)
         Utility.Wait(0.25)
     endWhile
-    log("150: probe series on " + guard + " done after " + ((Utility.GetCurrentRealTime() - afSceneStoppedAt) as int) + "s, frozen " + RPB_Utility.IsFrozenGuard(guard) + " (experiment E)")
+    log("150: probe series on " + guard + " done after " + ((Utility.GetCurrentRealTime() - afSceneStoppedAt) as int) + "s, frozen " + RPB_Utility.IsFrozenNPC(guard) + " (experiment E)")
     __probeSeriesRunning = false
 endEvent
 
 event OnTestProbeOnce(Form akGuard, string asStep, float afDueAt)
-    RPB_Utility.__RunGuardProbe(akGuard as Actor, asStep, afDueAt)
+    RPB_Utility.__RunNPCProbe(akGuard as Actor, asStep, afDueAt)
 endEvent
 bool __teardownGuardDone = false
 
@@ -11820,10 +11820,10 @@ bool function __Scenario_FrozenGuardSkipped(string asTest)
     Utility.Wait(1.0)
 
     Actor nearestBefore = RPB_Utility.GetNearestGuard(guard, 3000.0, none)
-    RPB_Utility.MarkGuardFrozen(guard, "test " + asTest)
+    RPB_Utility.MarkNPCFrozen(guard, "test " + asTest)
     Actor nearestAfter = RPB_Utility.GetNearestGuard(guard, 3000.0, none)
     log(asTest + ": nearest guard to the clone " + guard + ": before the mark " + nearestBefore + ", after " + nearestAfter)
-    bool ok = assert_true(RPB_Utility.IsFrozenGuard(guard), asTest + ": the marked guard doesn't read frozen")
+    bool ok = assert_true(RPB_Utility.IsFrozenNPC(guard), asTest + ": the marked guard doesn't read frozen")
     ok = assert_true(nearestAfter != guard, asTest + ": GetNearestGuard still returned the frozen guard") && ok
 
     RPB_API.GetArrest().ArrestActor(guard, arrestee, RPB_API.GetArrest().ARREST_TYPE_ESCORT_TO_JAIL)
@@ -11908,7 +11908,7 @@ event OnTestFrozenCall(Form akGuard, string asCall)
 endEvent
 
 Actor function __FirstFrozenGuard()
-    int map = JDB.solveObj(".rpb_root.frozenGuardProbes")
+    int map = JDB.solveObj(".rpb_root.frozenProbes")
     if (!map)
         return none
     endif
@@ -12257,7 +12257,7 @@ bool function __Scenario_SimulatedFreezeCalls(string asTest)
         return assert_true(false, asTest + ": the hold mid escort never started")
     endif
     string summary = __TryCallsOnFrozen(asTest, guard)
-    log(asTest + ": during the hold: frozen by RPB's probes " + RPB_Utility.IsFrozenGuard(guard) + ", escort assist " + prisonerRef.EscortAssistActive + ", free walk " + prisonerRef.EscortFreeWalking)
+    log(asTest + ": during the hold: frozen by RPB's probes " + RPB_Utility.IsFrozenNPC(guard) + ", escort assist " + prisonerRef.EscortAssistActive + ", free walk " + prisonerRef.EscortFreeWalking)
 
     ; 4. Released: does he answer, and the control call left waiting on him?
     float longHold = __ReleaseHold()
@@ -12265,7 +12265,7 @@ bool function __Scenario_SimulatedFreezeCalls(string asTest)
     bool answersAfter = __WaitAnswered(guard, 10.0)
     string controlAfter = JMap.getStr(__frozenCallResults, "guard.GetFormID() (control)")
     log(asTest + ": the hold lasted " + __Ms(longHold) + "ms; after the release he answers " + answersAfter + ", the control call left waiting on him: " + controlAfter + "; escort assist " + prisonerRef.EscortAssistActive + ", free walk " + prisonerRef.EscortFreeWalking)
-    summary += "hold " + (longHold as int) + "s; answers after: " + answersAfter + "; RPB marked him frozen: " + RPB_Utility.IsFrozenGuard(guard) + "; "
+    summary += "hold " + (longHold as int) + "s; answers after: " + answersAfter + "; RPB marked him frozen: " + RPB_Utility.IsFrozenNPC(guard) + "; "
     log(asTest + ": SUMMARY " + summary)
     self.__EndSimulatedFreeze()
     return assert_true(answersAfter, asTest + ": he didn't answer after the hold")
@@ -12320,7 +12320,7 @@ bool function __Scenario_KillFrozenGuard(string asTest)
     if (!assert_true(target != none, asTest + ": no freezable guard nearby (161 spawns one)"))
         return false
     endif
-    if (!assert_true(RPB_Utility.IsFrozenGuard(target), asTest + ": " + target + " isn't marked frozen yet (freeze key, then wait for the FROZEN report)"))
+    if (!assert_true(RPB_Utility.IsFrozenNPC(target), asTest + ": " + target + " isn't marked frozen yet (freeze key, then wait for the FROZEN report)"))
         return false
     endif
     self.__KillFrozenClone(target)
@@ -12439,7 +12439,7 @@ bool function __Scenario_FrozenEscortFallback(string asTest)
     float start = Utility.GetCurrentRealTime()
     bool fellBack = arrestState.__FallBackToPrison("test " + asTest + ": a stalled escort with a frozen guard")
     float took = Utility.GetCurrentRealTime() - start
-    bool marked = RPB_Utility.IsFrozenGuard(guard)
+    bool marked = RPB_Utility.IsFrozenNPC(guard)
     Actor captorNow = none
     if (arrestState.Captor)
         captorNow = arrestState.Captor.GetActor()
@@ -12518,8 +12518,8 @@ bool function __Scenario_NpcEscortCancel(string asTest, bool abPlayer = false)
         __scenarioBountyFaction.SetCrimeGoldViolent(__savedPlayerBountyViolent)
     endif
     Utility.Wait(12.0) ; the probes' +5s and +8s, and their checks
-    bool guardFrozen = RPB_Utility.IsFrozenGuard(guard)
-    bool npcFrozen = RPB_Utility.IsFrozenGuard(npc)
+    bool guardFrozen = RPB_Utility.IsFrozenNPC(guard)
+    bool npcFrozen = RPB_Utility.IsFrozenNPC(npc)
     log(asTest + ": SUMMARY guard " + guard + " frozen " + guardFrozen + ", NPC prisoner " + npc + " frozen " + npcFrozen)
     return assert_true(true, asTest + ": guard frozen " + guardFrozen + ", NPC frozen " + npcFrozen)
 endFunction
@@ -12698,7 +12698,7 @@ bool function __Scenario_GuardCrimeFactions(string asTest)
     int i = 0
     while (i < nearby.Length)
         Actor candidate = nearby[i]
-        if (candidate && candidate != player && !RPB_Utility.IsFrozenGuard(candidate) && candidate.IsGuard() && !candidate.IsDead())
+        if (candidate && candidate != player && !RPB_Utility.IsFrozenNPC(candidate) && candidate.IsGuard() && !candidate.IsDead())
             guards += 1
             Faction crimeFaction = candidate.GetCrimeFaction()
             string factionName = "none"
@@ -12954,7 +12954,7 @@ bool function __Scenario_HideFrozenGuard(string asTest)
         return false
     endif
     Actor player = Game.GetFormEx(0x14) as Actor
-    log(asTest + ": " + target + " (marked frozen: " + RPB_Utility.IsFrozenGuard(target) + "), " + __Metres(player.GetDistance(target)) + " from the player")
+    log(asTest + ": " + target + " (marked frozen: " + RPB_Utility.IsFrozenNPC(target) + "), " + __Metres(player.GetDistance(target)) + " from the player")
     self.RegisterForModEvent("RPB_TestPO3Call", "OnTestPO3Call")
     __LogMovement(asTest, player, target, "before")
     bool hidden = __TimedPO3Call(asTest, target, 0, true)
@@ -13030,7 +13030,7 @@ bool function __Scenario_FaintFrozenGuard(string asTest, int aiSpellId)
         return false
     endif
     Actor player = Game.GetFormEx(0x14) as Actor
-    log(asTest + ": " + target + " (marked frozen: " + RPB_Utility.IsFrozenGuard(target) + ") faints, " + __Metres(player.GetDistance(target)) + " from the player")
+    log(asTest + ": " + target + " (marked frozen: " + RPB_Utility.IsFrozenNPC(target) + ") faints, " + __Metres(player.GetDistance(target)) + " from the player")
     ; The mod author's three steps (2026-10-04), each without a call on him: the bleedout animation (Debug's global, him as
     ; an argument), paralysis (the spell he casts on himself drives the Paralysis actor value), a push to ragdoll (a call
     ; on the player, him as an argument)
@@ -13101,7 +13101,7 @@ function __EndSimulatedFreeze()
     endif
     self.UnregisterForModEvent("RPB_TestHoldLock")
     self.UnregisterForModEvent("RPB_TestTimedFormID")
-    RPB_Utility.ClearFrozenGuards()
+    RPB_Utility.ClearFrozenNPCs()
     JDB.setObj("rpbTest", 0)
 endFunction
 
@@ -13148,7 +13148,7 @@ bool function __Scenario_SimulatedFreezeAtCancel(string asTest)
     self.UnregisterForModEvent("RPB_TestFreezeNow")
 
     bool held = JDB.solveFlt(".rpbTest.holdStart") > 0.0 && JDB.solveFlt(".rpbTest.holdEnd") == 0.0
-    log(asTest + ": " + guard + " frozen at his Scene's stop " + held + ", RPB found him frozen " + RPB_Utility.IsFrozenGuard(guard) + " (probed at: " + JFormMap.getStr(JDB.solveObj(".rpb_root.frozenGuardSteps"), guard) + ")")
+    log(asTest + ": " + guard + " frozen at his Scene's stop " + held + ", RPB found him frozen " + RPB_Utility.IsFrozenNPC(guard) + " (probed at: " + JFormMap.getStr(JDB.solveObj(".rpb_root.frozenProbeSteps"), guard) + ")")
     if (!held || !(guard as RPB_TestFreezable))
         self.__EndSimulatedFreeze()
         return assert_true(false, asTest + ": the freeze at his Scene's stop never started")
@@ -13188,7 +13188,7 @@ function ToggleManualFreeze()
     if (__manualFreezeGuard)
         Actor released = __manualFreezeGuard
         float holdTime = __ReleaseHold()
-        bool wasMarked = RPB_Utility.IsFrozenGuard(released)
+        bool wasMarked = RPB_Utility.IsFrozenNPC(released)
         RPB_Utility.ClearFrozenActor(released) ; him only: another one may still be frozen
         __manualFreezeGuard = none
         log("freeze key: released " + released + " after " + __Ms(holdTime) + "ms (RPB had marked him frozen: " + wasMarked + ")")
@@ -13200,7 +13200,7 @@ function ToggleManualFreeze()
 
     ; The console's selected actor first (prid <id> selects one anywhere, another cell too), then the crosshair, then the nearest
     Actor target = Game.GetCurrentConsoleRef() as Actor
-    if (!(target as RPB_TestFreezable) || RPB_Utility.IsFrozenGuard(target) || target == __manualFreezePrisoner)
+    if (!(target as RPB_TestFreezable) || RPB_Utility.IsFrozenNPC(target) || target == __manualFreezePrisoner)
         target = Game.GetCurrentCrosshairRef() as Actor
     endif
     if (!(target as RPB_TestFreezable))
@@ -13218,7 +13218,7 @@ function ToggleManualFreeze()
     endif
     __manualFreezeGuard = target
     ; Found the way RPB finds a real one (a probe, a few seconds later), so what follows a freeze RPB knows of can be tested
-    RPB_Utility.ProbeGuardAfterBurst(target, "freeze key")
+    RPB_Utility.ProbeAfterBurst(target, "freeze key")
     log("freeze key: froze " + target + " (player " + (Game.GetPlayer().GetDistance(target) as int) + " away, in " + Game.GetPlayer().GetParentCell() + ")")
     
     if (IsDebuggingEnabled())
@@ -13322,7 +13322,7 @@ bool[] __prisonerHoldRelease
 
 ;/
     The dev freeze keys' holds outlive a save (a running stack, saved and resumed by the load), while the load clears RPB's
-    frozen marks: the load's own cleanup then called into the held NPCs and hung (ClearFrozenGuards on a held guard, the
+    frozen marks: the load's own cleanup then called into the held NPCs and hung (ClearFrozenNPCs on a held guard, the
     prison's checks on a held prisoner; RPB - Stats wouldn't open, 2026-10-06). RPB_ConfigAlias calls this first on every
     load: each hold told to end. True if one was held.
 /;
@@ -13364,8 +13364,8 @@ function ToggleManualFreezePrisoner()
             Utility.Wait(0.1)
         endWhile
         float holdTime = JDB.solveFlt(".rpbTest.prisonerHoldEnd") - JDB.solveFlt(".rpbTest.prisonerHoldStart")
-        bool wasMarked = RPB_Utility.IsFrozenGuard(released)
-        RPB_Utility.ClearFrozenActor(released) ; him only: ClearFrozenGuards called into a guard still frozen and hung
+        bool wasMarked = RPB_Utility.IsFrozenNPC(released)
+        RPB_Utility.ClearFrozenActor(released) ; him only: ClearFrozenNPCs called into a guard still frozen and hung
         __manualFreezePrisoner = none
         log("prisoner freeze key: released " + released + " after " + (holdTime as int) + "s (RPB had marked him frozen: " + wasMarked + ")")
         Debug.Notification("RPB dev: prisoner released (" + (holdTime as int) + "s frozen)")
@@ -13390,7 +13390,7 @@ function ToggleManualFreezePrisoner()
         int k = 0
         while (k < seen.Length)
             if (seen[k] as RPB_TestFreezable)
-                found += seen[k] + " (imprisoned " + RPB_Utility.IsActorImprisoned(seen[k]) + ", arrested " + RPB_Utility.IsActorArrested(seen[k]) + ", frozen " + RPB_Utility.IsFrozenGuard(seen[k]) + ", " + (player.GetDistance(seen[k]) as int) + " away); "
+                found += seen[k] + " (imprisoned " + RPB_Utility.IsActorImprisoned(seen[k]) + ", arrested " + RPB_Utility.IsActorArrested(seen[k]) + ", frozen " + RPB_Utility.IsFrozenNPC(seen[k]) + ", " + (player.GetDistance(seen[k]) as int) + " away); "
             endif
             k += 1
         endWhile
@@ -13416,7 +13416,7 @@ function ToggleManualFreezePrisoner()
         return
     endif
     __manualFreezePrisoner = target
-    RPB_Utility.ProbeNPC(target, "prisoner freeze key")
+    RPB_Utility.ProbeAfterBurst(target, "prisoner freeze key", "PRISONER")
     log("prisoner freeze key: froze " + target + " (player " + (Game.GetPlayer().GetDistance(target) as int) + " away)")
     Debug.Notification("RPB dev: prisoner frozen (press again to release)")
 endFunction
@@ -13432,7 +13432,7 @@ endEvent
 ; spawns one to arrest by hand: unarrested, he wasn't found, 2026-10-05). Not one frozen already (another key's): his
 ; base is a call on him
 bool function __IsFreezablePrisoner(Actor akActor)
-    if (!(akActor as RPB_TestFreezable) || RPB_Utility.IsFrozenGuard(akActor) || akActor == __manualFreezeGuard)
+    if (!(akActor as RPB_TestFreezable) || RPB_Utility.IsFrozenNPC(akActor) || akActor == __manualFreezeGuard)
         return false
     endif
     if (RPB_Utility.IsActorImprisoned(akActor) || RPB_Utility.IsActorArrested(akActor))
@@ -13634,16 +13634,16 @@ bool function __Scenario_CaptorFinishCycles(string asTest, bool abCallsOff, bool
             arrest.UnregisterCaptor(captor, abRemoveFromList = true) ; the spell off, the list, the 0/+1s/+3s probes
         else
             guard.RemoveSpell(captorSpell)
-            RPB_Utility.ProbeGuard(guard, asTest + " cycle " + cycle, 1.0)
+            RPB_Utility.ProbeNPC(guard, asTest + " cycle " + cycle, 1.0)
         endif
         if (abDetach)
             guard.MoveTo(away) ; his cell detaches while the Captor effect finishes
         endif
         ; By now the probes have answered and closed, unless he froze: then one is still open
         Utility.Wait(4.5)
-        if (RPB_Utility.IsGuardProbeOpen(guard))
+        if (RPB_Utility.IsNPCProbeOpen(guard))
             Utility.Wait(2.0) ; the +3s probe may just be running: a second look
-            frozen = RPB_Utility.IsGuardProbeOpen(guard)
+            frozen = RPB_Utility.IsNPCProbeOpen(guard)
         endif
         if (abDetach && !frozen)
             guard.MoveTo(player, 200.0, 0.0, 0.0, false) ; back, loaded again, for the next cycle
@@ -13653,7 +13653,7 @@ bool function __Scenario_CaptorFinishCycles(string asTest, bool abCallsOff, bool
     RPB_Utility.SetCaptorFinishCallsDisabledForTest(false)
 
     if (frozen)
-        RPB_Utility.MarkGuardFrozen(guard, asTest + " cycle " + cycle) ; the report, with the effects on him
+        RPB_Utility.MarkNPCFrozen(guard, asTest + " cycle " + cycle) ; the report, with the effects on him
     endif
     log(asTest + ": " + string_if(frozen, "FROZE on cycle " + cycle, "no freeze in " + cycle + " cycles") + " (captor-finish calls " + string_if(abCallsOff, "off", "on") + ")")
     return assert_false(frozen, asTest + ": the clone froze on cycle " + cycle)
@@ -13711,8 +13711,8 @@ bool function __Scenario_NpcFreeWalkControl(string asTest)
     Utility.Wait(5.0)
     RPB_Recovery.ResetActor(npc)
     Utility.Wait(12.0) ; the probes' +5s and +8s, and their checks
-    bool guardFrozen = RPB_Utility.IsFrozenGuard(guard)
-    bool npcFrozen = RPB_Utility.IsFrozenGuard(npc)
+    bool guardFrozen = RPB_Utility.IsFrozenNPC(guard)
+    bool npcFrozen = RPB_Utility.IsFrozenNPC(npc)
     log(asTest + ": SUMMARY guard " + guard + " frozen " + guardFrozen + ", NPC prisoner " + npc + " frozen " + npcFrozen)
     return assert_true(true, asTest + ": guard frozen " + guardFrozen + ", NPC frozen " + npcFrozen)
 endFunction
@@ -14577,10 +14577,10 @@ function __TeardownAllTempActors()
             Utility.Wait(0.25)
         endWhile
         float probeWait = Utility.GetCurrentRealTime()
-        while (__testTempActors[i] && RPB_Utility.IsGuardProbeOpen(__testTempActors[i]) && !RPB_Utility.IsFrozenGuard(__testTempActors[i]) && (Utility.GetCurrentRealTime() - probeWait) < 12.0) ; the probes run at +5s and +8s
+        while (__testTempActors[i] && RPB_Utility.IsNPCProbeOpen(__testTempActors[i]) && !RPB_Utility.IsFrozenNPC(__testTempActors[i]) && (Utility.GetCurrentRealTime() - probeWait) < 12.0) ; the probes run at +5s and +8s
             Utility.Wait(0.25)
         endWhile
-        if (__testTempActors[i] && RPB_Utility.IsFrozenGuard(__testTempActors[i]))
+        if (__testTempActors[i] && RPB_Utility.IsFrozenNPC(__testTempActors[i]))
             if (__keepFrozenClones)
                 log("teardown: " + __testTempActors[i] + " is frozen, left alone (gone with the next load)")
             else
@@ -14595,7 +14595,7 @@ function __TeardownAllTempActors()
     while (i < __testTempActorCount)
         Actor tempActor = __testTempActors[i]
 
-        if (tempActor && !RPB_Utility.IsFrozenGuard(tempActor))
+        if (tempActor && !RPB_Utility.IsFrozenNPC(tempActor))
             ; A Scene still playing with a deleted actor kept the queue busy into the next test (107 once lost its
             ; confrontation that way, behind 106's escort)
             sceneManager.EndSceneWithActor(tempActor, "test teardown")
@@ -14672,7 +14672,7 @@ function __TeardownAllTempActors()
     ; A stripped temp actor leaves its (shared) base "Naked"
     i = 0
     while (i < __testTempActorCount)
-        if (!RPB_Utility.IsFrozenGuard(__testTempActors[i]))
+        if (!RPB_Utility.IsFrozenNPC(__testTempActors[i]))
             RPB_Utility.HealNakedBaseOutfit(__testTempActors[i])
         endif
         i += 1
@@ -14687,7 +14687,7 @@ function __TeardownAllTempActors()
 
         if (tempActor2)
             RPB_StorageVars.DeleteAllOnReference(tempActor2)
-            if (!RPB_Utility.IsFrozenGuard(tempActor2))
+            if (!RPB_Utility.IsFrozenNPC(tempActor2))
                 tempActor2.Disable()
                 tempActor2.Delete()
             endif
@@ -15128,7 +15128,7 @@ bool function __RunStatelessTest(string asTest)
         endif
     elseif (asTest == "Test_FrozenGuardSkipped")
         display_result(__Scenario_FrozenGuardSkipped("147"))
-        RPB_Utility.ClearFrozenGuards()
+        RPB_Utility.ClearFrozenNPCs()
         __TeardownScenario()
     endif
     __statelessTest = ""

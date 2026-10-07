@@ -3,7 +3,7 @@ Scriptname RPB_MCM_02_Frozen hidden
 ;/
     RPB - Stats' "Frozen NPCs" page (only listed while one is frozen, RPB_MCM_02.InitializePages): an NPC whose Papyrus
     object stopped answering, what RPB knew of him and what it did about him. Everything shown was stored before or when
-    he was found (RPB_Utility.MarkGuardFrozen, NoteFrozenAction, RememberActorName): a call into him would hang the menu.
+    he was found (RPB_Utility.MarkNPCFrozen, NoteFrozenAction, RememberActorName): a call into him would hang the menu.
 @functions:
     function Render(RPB_MCM_02 mcm, Actor akFrozen) global
 /;

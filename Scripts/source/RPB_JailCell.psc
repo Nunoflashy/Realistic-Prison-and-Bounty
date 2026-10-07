@@ -962,7 +962,7 @@ function DetermineCellParameters()
         ; AwaitPrisonerReference path (ensure the spell, Initialize()) - several frames, and it could re-add the Prisoner
         ; spell to a stale entry.
         RPB_Prisoner prisonerRef = none
-        if (!RPB_Utility.IsFrozenGuard(prisonerForm as Actor)) ; his stripping flags are calls into him
+        if (!RPB_Utility.IsFrozenNPC(prisonerForm as Actor)) ; his stripping flags are calls into him
             prisonerRef = Prison.Prisoners.AtKey(prisonerForm as Actor)
         endif
 
@@ -1074,7 +1074,7 @@ function __onCellAttachAndDetachEvent(bool abAttached)
     __lastPassAttached = abAttached
 
     ; A cellmate RPB found frozen is passed over (each call below goes into him); the list is the cell's own, no call to read
-    int frozenMap = RPB_Utility.FrozenGuardsForScan()
+    int frozenMap = RPB_Utility.FrozenNPCsForScan()
     int i = 0
     while (i < Prisoners.Length)
         ; A lookup, not AwaitPrisonerReference: that blocks up to 12 s per prisoner, and a prisoner whose effect is not running

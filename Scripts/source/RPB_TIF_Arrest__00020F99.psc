@@ -12,7 +12,7 @@ akSpeaker.SendModEvent("RPB_SendArrestWaitStop")
 ; The arrest from the line's beginning, not its end (above): the guard no longer walks off and comes back for it
 float rpbStartedAt = RPB_Utility.CrimeLineStamp() ; the load this line began in: a replay after a load is dropped
 RPB_Utility.ProbeSpeaker(akSpeaker) ; before any call into him: a frozen speaker gets found, then silenced
-if (RPB_Utility.IsFrozenGuard(akSpeaker)) ; already marked frozen: a call into him below hangs (a killed frozen clone kept talking, 2026-10-05)
+if (RPB_Utility.IsFrozenNPC(akSpeaker)) ; already marked frozen: a call into him below hangs (a killed frozen clone kept talking, 2026-10-05)
     return
 endif
 RPB_Utility.SendTopicInfoEvent("RPB_TopicInfoEnd", "Ha, enjoy The Chill.", 20, akSpeaker, rpbStartedAt)

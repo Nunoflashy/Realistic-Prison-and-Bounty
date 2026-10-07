@@ -67,7 +67,7 @@ if (prisonerRef)
         ; into him; a load frees him anyway)
         Actor storedGuard = arresteeRef.GetCaptorActor()
         RPB_Captor captorRef = none
-        if (storedGuard && RPB_Utility.IsFrozenGuard(storedGuard))
+        if (storedGuard && RPB_Utility.IsFrozenNPC(storedGuard))
             done += "their guard " + storedGuard + " is frozen, left as he is; "
         else
             captorRef = arresteeRef.Captor
@@ -235,12 +235,12 @@ string function CancelArrest(Actor akActor, string asReason, bool abReturnBelong
         ; A guard froze with his Captor still on, right after his Scene was stopped here (round 102): probes from now,
         ; so a freeze in that window is reported and marked (the teardown then leaves him alone instead of hanging on him)
         if (guard && sceneStopped)
-            RPB_Utility.ProbeGuardAfterBurst(guard, "his Scene stopped")
+            RPB_Utility.ProbeAfterBurst(guard, "his Scene stopped")
         endif
         ; An NPC arrestee goes through the same burst (the same Scene stopped, the arrest's effects coming off): probed too,
         ; to learn whether NPC prisoners freeze the way the guards do (test 178, 2026-10-05)
         if (sceneStopped && akActor != Game.GetPlayer())
-            RPB_Utility.ProbeNPC(akActor, "arrest cancelled")
+            RPB_Utility.ProbeAfterBurst(akActor, "arrest cancelled", "PRISONER")
         endif
         if (guard && RPB_Utility.IsCaptorKeptForTest())
             ; Freeze experiment E: his Captor stays on (the test's teardown takes it off later), probed every 0.5s (the
@@ -336,7 +336,7 @@ bool function __FreeGuard(Actor akGuard, RPB_SceneManager apSceneManager) global
     apSceneManager.UnsetPackageLockOnActor(akGuard)
     ; Nothing to evaluate on a corpse (the handover of a dead guard hung around here once), nor on a frozen guard: read
     ; without a call into him
-    if (!RPB_Utility.IsDeadNoCall(akGuard) && !RPB_Utility.IsFrozenGuard(akGuard))
+    if (!RPB_Utility.IsDeadNoCall(akGuard) && !RPB_Utility.IsFrozenNPC(akGuard))
         akGuard.EvaluatePackage()
     endif
     return true

@@ -40,7 +40,7 @@ function __OpenResetMenu(RPB_MCM mcm) global
 
     ; The actors read from the lists' index, and a frozen one named from storage: this is the tool for a stuck actor, and it
     ; called into each one (GetActors, GetDisplayName), a frozen one hanging the menu (the call audit, 2026-10-06)
-    int frozenMap = RPB_Utility.FrozenGuardsForScan()
+    int frozenMap = RPB_Utility.FrozenNPCsForScan()
     Form[] arrestees = RPB_API.GetArrest().Arrestees.GetActorsNoCall()
     int i = 0
     while (i < arrestees.Length)

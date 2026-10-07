@@ -304,7 +304,7 @@ float function __NextReleaseWakeHours()
     float[] daysLeft = Utility.CreateFloatArray(count)
     bool[] excluded = Utility.CreateBoolArray(count, false) ; the fill argument is NOT reliable here: every element is assigned below
     bool hasUnknown = false
-    int frozenMap = RPB_Utility.FrozenGuardsForScan() ; 0 unless someone is frozen: only then is each entry's actor looked up
+    int frozenMap = RPB_Utility.FrozenNPCsForScan() ; 0 unless someone is frozen: only then is each entry's actor looked up
 
     int i = 0
     while (i < count)
@@ -575,7 +575,7 @@ function ReleaseNPC(RPB_Prisoner apPrisoner, Actor akReleasing = none)
     float took = Utility.GetCurrentRealTime() - t0
     if (Prisoners.AtKey(releasing) != none)
         RPB_Utility.LogWarn("The release of " + releasing + " didn't finish in 20s (" + string_if(byEvent, "on its own stack: the time skip goes on, it finishes by itself", "on the time skip's stack") + ")", "["+ Prison.Name +"] PrisonMonitor::ReleaseNPC")
-        RPB_Utility.ProbeNPC(releasing, "release stalled")
+        RPB_Utility.ProbeAfterBurst(releasing, "release stalled", "PRISONER")
     endif
     JDB.solveFltSetter(".rpb_root.lastNpcReleaseSeconds", took, true) ; for test 184
 endFunction
@@ -593,7 +593,7 @@ function ProcessReleaseQueue()
     JFormMap.removeKey(__releaseAt, next)
 
     RPB_Prisoner prisoner = none
-    if (RPB_Utility.IsFrozenGuard(next as Actor))
+    if (RPB_Utility.IsFrozenNPC(next as Actor))
         ; Kept a prisoner: AwaitPrisoners queues him again once he answers (after the next load). Not put back in the queue:
         ; alone in it, he'd be retried every half second until then
         RPB_Utility.LogWarn("Queued prisoner " + next + " is frozen: not released until the next load", "["+ Prison.Name +"] PrisonMonitor::ProcessReleaseQueue")
@@ -603,7 +603,7 @@ function ProcessReleaseQueue()
     endif
     if (prisoner)
         self.ReleaseQueued(prisoner)
-    elseif (!RPB_Utility.IsFrozenGuard(next as Actor))
+    elseif (!RPB_Utility.IsFrozenNPC(next as Actor))
         Debug("["+ Prison.Name +"] PrisonMonitor::ProcessReleaseQueue", "Queued prisoner " + next + " is not in the prison anymore, skipping.")
     endif
 
@@ -710,7 +710,7 @@ function AwaitPrisoners()
     ; loop. From the list's index: no call into anyone (GetActors() called every entry's script), and a prisoner RPB found
     ; frozen is skipped before any call into him (his release waits for the next load, when the freeze is gone)
     Form[] actors = Prisoners.GetActorsNoCall()
-    int frozenMap = RPB_Utility.FrozenGuardsForScan()
+    int frozenMap = RPB_Utility.FrozenNPCsForScan()
     int live = 0
 
     int i = 0
