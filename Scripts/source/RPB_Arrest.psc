@@ -2735,6 +2735,21 @@ endFunction
     the values they had are put back after. Game settings last the whole game session and aren't saved: the load check
     (EventManager.RegisterEvents) sets this again.
 /;
+; The values from before the hold, or the game's defaults (counts above 1000 / above 1) when none were saved or the saved one
+; is the raised value itself (saved by an earlier version)
+function __RestoreArrestOnSight() global
+    int nonViolent = JDB.solveInt(".rpb_root.arrestOnSight.nonViolent", 1000)
+    int violent = JDB.solveInt(".rpb_root.arrestOnSight.violent", 1)
+    if (nonViolent == 1000000000)
+        nonViolent = 1000
+    endif
+    if (violent == 1000000000)
+        violent = 1
+    endif
+    Game.SetGameSettingInt("iArrestOnSightNonViolent", nonViolent)
+    Game.SetGameSettingInt("iArrestOnSightViolent", violent)
+endFunction
+
 function __HoldArrestOnSight(bool abHold) global
     bool held = JDB.solveInt(".rpb_root.arrestOnSight.held") != 0
     if (abHold == held)
@@ -2744,20 +2759,26 @@ function __HoldArrestOnSight(bool abHold) global
         elseif (Game.GetGameSettingInt("iArrestOnSightNonViolent") == 1000000000 || Game.GetGameSettingInt("iArrestOnSightViolent") == 1000000000)
             ; Not held by this save, but still raised: held by the save played before this one in the same game session
             ; (the settings outlive a load, the flag doesn't). The guards never approached again (2026-10-07)
-            Game.SetGameSettingInt("iArrestOnSightNonViolent", JDB.solveInt(".rpb_root.arrestOnSight.nonViolent", 1000))
-            Game.SetGameSettingInt("iArrestOnSightViolent", JDB.solveInt(".rpb_root.arrestOnSight.violent", 1))
+            RPB_Arrest.__RestoreArrestOnSight()
             RPB_Utility.Debug("Arrest::__HoldArrestOnSight", "the guards' arrest on sight was still held from another save: back to " + Game.GetGameSettingInt("iArrestOnSightNonViolent") + "/" + Game.GetGameSettingInt("iArrestOnSightViolent"))
         endif
         return
     endif
     if (abHold)
-        JDB.solveIntSetter(".rpb_root.arrestOnSight.nonViolent", Game.GetGameSettingInt("iArrestOnSightNonViolent"), true)
-        JDB.solveIntSetter(".rpb_root.arrestOnSight.violent", Game.GetGameSettingInt("iArrestOnSightViolent"), true)
+        ; Only real values saved: still raised by another save of this game session, the raised value was saved as the
+        ; original and the release "restored" it (no guard ever approached again, 2026-10-07)
+        int nonViolent = Game.GetGameSettingInt("iArrestOnSightNonViolent")
+        int violent = Game.GetGameSettingInt("iArrestOnSightViolent")
+        if (nonViolent != 1000000000)
+            JDB.solveIntSetter(".rpb_root.arrestOnSight.nonViolent", nonViolent, true)
+        endif
+        if (violent != 1000000000)
+            JDB.solveIntSetter(".rpb_root.arrestOnSight.violent", violent, true)
+        endif
         Game.SetGameSettingInt("iArrestOnSightNonViolent", 1000000000)
         Game.SetGameSettingInt("iArrestOnSightViolent", 1000000000)
     else
-        Game.SetGameSettingInt("iArrestOnSightNonViolent", JDB.solveInt(".rpb_root.arrestOnSight.nonViolent", 1000))
-        Game.SetGameSettingInt("iArrestOnSightViolent", JDB.solveInt(".rpb_root.arrestOnSight.violent", 1))
+        RPB_Arrest.__RestoreArrestOnSight()
     endif
     JDB.solveIntSetter(".rpb_root.arrestOnSight.held", abHold as int, true)
     RPB_Utility.Debug("Arrest::__HoldArrestOnSight", "the guards' arrest on sight " + RPB_Utility.string_if(abHold, "held (player in custody)", "back") + ": non-violent " + Game.GetGameSettingInt("iArrestOnSightNonViolent") + ", violent " + Game.GetGameSettingInt("iArrestOnSightViolent"))
