@@ -221,6 +221,7 @@ scriptname RPB_Prison extends RPB_Entity
     function EscortPrisonerToRelease(RPB_Prisoner apPrisoner)
     bool function SendReleaseRequest(RPB_Prisoner apPrisoner)
     int function ReleaseDueNPCsInOrder(float afPlayerTimeLeft)
+    function __FinishIntakeForTimeSkip()
     function ReleasePrisonersWithSentenceLessThan(float afTimeLeftInSentence, bool abPassTime = true)
     function TriggerEscape(RPB_Prisoner apPrisoner)
     function SendEscortPrisonerToCellRequest(RPB_Prisoner apPrisoner)
@@ -1242,7 +1243,7 @@ float function GetCurrentLowestSentence()
     int i = 0
     while (i < Prisoners.Count)
         RPB_Prisoner prisoner = Prisoners.AtIndex(i)
-        if (prisoner && !prisoner.IsPlayer() && !prisoner.IsUndeterminedSentence)
+        if (prisoner && !prisoner.IsPlayer() && !prisoner.IsUndeterminedSentence && prisoner.IsImprisoned)
             float prisonerCurrentTimeLeftInSentence = prisoner.TimeLeftInSentence
             if (currentLowestSentence == -1.0 || currentLowestSentence > prisonerCurrentTimeLeftInSentence)
                 currentLowestSentence = prisonerCurrentTimeLeftInSentence
@@ -2101,7 +2102,10 @@ Form[] function GetPrisonersReleasedNoLaterThan(float afTimeLeft)
             RPB_Utility.NoteFrozenAction(candidate, "Left out of the time skip's releases: released after the next load")
         else
             RPB_Prisoner prisoner = Prisoners.AtKey(candidate)
-            if (prisoner && prisoner.TimeLeftInSentence <= afTimeLeft)
+            ; Only one already in a cell: one still on the way (escorted, stripped) has served nothing yet, and their unset
+            ; imprisonment time read as long overdue. Taarie, released by the player's sleep mid-strip ("time jailed 82
+            ; days"), then got her cell package bound again by the strip's end, with no prisoner left (2026-10-07)
+            if (prisoner && prisoner.IsImprisoned && prisoner.TimeLeftInSentence <= afTimeLeft)
                 FastArray_AddForm(prisonersArray, candidate)
             endif
         endif
@@ -2127,7 +2131,7 @@ Form[] function GetPrisonersWithCurrentSentenceLessThan(float afSentence, float 
     while (i < Prisoners.Count)
         RPB_Prisoner prisoner = Prisoners.AtIndex(i)
 
-        if (prisoner.TimeLeftInSentence < (afSentence - afPadding))
+        if (prisoner.IsImprisoned && prisoner.TimeLeftInSentence < (afSentence - afPadding)) ; not one still on the way in
             FastArray_AddForm(prisonersArray, prisoner.GetActor())
         endif
 
@@ -2898,6 +2902,20 @@ function __ProcessEscortStallChecks()
                 if (self.SceneManager.GetSceneNthReferenceOfType(stalledName, "Escortee") == checkActor)
                     self.SceneManager.EndSceneEarly(stalledName, "the escort to the cell stalled, finished directly", abRunEndEvents = false)
                 endif
+            elseif (prisoner)
+                ; Already imprisoned, but an escort to the cell still playing with them: it has nothing left to do and would
+                ; hold the queue for good (a stray one, started for Vivienne after a time skip had put her in her cell,
+                ; played 8 minutes and timed the player's next confrontation out, 2026-10-07). Ended, the queue moves on
+                string strayName = self.SceneManager.EscortToCellSceneName()
+                ; Still playing, not only still naming them: a Scene's aliases stay filled after its end, and this fired 8s
+                ; after a normal escort to the cell had ended (a false alarm, 2026-10-07)
+                Scene strayScene = self.SceneManager.GetScene(strayName)
+                if (self.SceneManager.GetCurrentScene() == strayName && strayScene && strayScene.IsPlaying() && self.SceneManager.GetSceneNthReferenceOfType(strayName, "Escortee") == checkActor)
+                    Warn("["+ Name +"] Prison::__ProcessEscortStallChecks: " + checkActor + " is imprisoned but their escort to the cell is still playing: ended")
+                    ; With its end: that's what takes the guard's package lock off (ended without it, the player's guard
+                    ; stayed in the prison for good, 2026-10-07); the end's steps are idempotent for an imprisoned prisoner
+                    self.SceneManager.EndSceneEarly(strayName, "the prisoner was already imprisoned", abRunEndEvents = true)
+                endif
             endif
         endif
         i += 1
@@ -3196,7 +3214,54 @@ endFunction
 
     returns (int): the days passed here (the caller passes the rest for the player).
 /;
+;/
+    A time skip with an NPC still on the way in (escorted, frisked, stripped, restrained): their intake is finished
+    directly first, and they're imprisoned as of their arrest, so the skipped time counts for them too. Released in the
+    same pass if their sentence ends within it, left in their cell otherwise. Taarie, arrested the same day as the player
+    and still on the way in when they slept their sentence off, was released mid-strip with her cell package left on
+    (2026-10-07); left out of the skip instead, her sentence would have begun after the player's release.
+/;
+function __FinishIntakeForTimeSkip()
+    Form[] actors = Prisoners.GetActorsNoCall()
+    int frozenMap = RPB_Utility.FrozenGuardsForScan()
+    int i = 0
+    while (i < actors.Length)
+        Actor npc = actors[i] as Actor
+        if (npc && !(frozenMap && RPB_Utility.IsListedFrozen(frozenMap, npc)))
+            RPB_Prisoner prisoner = Prisoners.AtKey(npc)
+            if (prisoner && !prisoner.IsPlayer() && !prisoner.IsImprisoned && prisoner.TimeOfArrest > 0.0)
+                ; Noted first: the stopped Scene's own end still comes from the engine a moment later, and its escort end
+                ; started the strip and the escort to the cell on her while she was being moved in (Vivienne, 2026-10-07)
+                int finishing = JDB.solveObj(".rpb_root.timeSkipIntake")
+                if (!finishing)
+                    finishing = JFormMap.object()
+                    JDB.solveObjSetter(".rpb_root.timeSkipIntake", finishing, true)
+                endif
+                JFormMap.setFlt(finishing, npc, Utility.GetCurrentRealTime())
+                SceneManager.EndSceneWithActor(npc, "a time skip finished the intake") ; her Scene playing and those queued
+                Actor guard = prisoner.Captor
+                if (guard && !RPB_Utility.IsFrozenGuard(guard))
+                    SceneManager.UnsetPackageLockOnActor(guard)
+                endif
+                prisoner.StopEscortAssist()
+                prisoner.MoveToCell() ; into the cell: this begins the imprisonment
+                ; The later of the arrest's two records (the prisoner's own and the arrest's, seconds apart): the earlier one put
+                ; the imprisonment before the arrest on the Stats page (Vivienne, 2026-10-07)
+                float arrestedAt = prisoner.TimeOfArrest
+                float recordedAt = RPB_StorageVars.GetFloatOnReference("Time of Arrest", npc, "Jail")
+                if (recordedAt > arrestedAt)
+                    arrestedAt = recordedAt
+                endif
+                prisoner.BackdateImprisonmentTo(arrestedAt)
+                RPB_Utility.Info(prisoner.Name + "'s intake finished by a time skip, imprisoned as of the arrest (" + arrestedAt + ")")
+            endif
+        endif
+        i += 1
+    endWhile
+endFunction
+
 int function ReleaseDueNPCsInOrder(float afPlayerTimeLeft)
+    self.__FinishIntakeForTimeSkip()
     ; Equal or less time left: an NPC with the same sentence that was imprisoned earlier is released before the player
     Form[] due = self.GetPrisonersReleasedNoLaterThan(afPlayerTimeLeft)
     int count = due.Length
@@ -3745,6 +3810,21 @@ endEvent
 
 ; TODO: Possibly rename this to OnEscortedPrisonerToPrison
 event OnEscortPrisonerToJailEnd(RPB_ActorBase apActor, Actor akEscort)
+    ; A time skip just finished this intake directly (__FinishIntakeForTimeSkip): the end of the escort it stopped, late
+    int finishing = JDB.solveObj(".rpb_root.timeSkipIntake")
+    if (finishing && apActor)
+        float since = Utility.GetCurrentRealTime() - JFormMap.getFlt(finishing, apActor.GetActor())
+        if (JFormMap.hasKey(finishing, apActor.GetActor()) && since >= 0.0 && since < 30.0)
+            Debug("Prison::OnEscortPrisonerToJailEnd", apActor.GetActor() + "'s escort ended after a time skip finished the intake: nothing to start")
+            ; Only her prison flow is skipped. The Scene's end binds her guard's package lock right after sending this
+            ; (SceneManager.OnSceneEnd), and the escort to the cell that would have taken it off isn't coming: off here
+            if (akEscort && !RPB_Utility.IsFrozenGuard(akEscort))
+                Utility.Wait(1.0)
+                SceneManager.UnsetPackageLockOnActor(akEscort)
+            endif
+            return
+        endif
+    endif
     ; Retrieve or make the Actor a Prisoner
     ; An if, not ame_if: its arguments are all evaluated, so MakePrisoner() ran on a None Arrestee for a prisoner already
     RPB_Prisoner prisonerRef = apActor as RPB_Prisoner

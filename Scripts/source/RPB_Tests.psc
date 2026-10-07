@@ -10894,6 +10894,9 @@ Actor function __ScenarioArrestee(bool abPlayer, Actor akGuard)
         __savedPlayerBountyViolent = crimeFaction.GetCrimeGoldViolent()
         __savedLifetimeBounty = Game.QueryStat("Total Lifetime Bounty")
         __savedLargestBounty = Game.QueryStat("Largest Bounty")
+        ; The guards' arrest forcegreet off before the bounty: given first, a real guard nearby started it in the second
+        ; before the test's arrest (183: 29 runs stalled at the confrontation). The cancel or reset turns it back on
+        RPB_Arrest.DisableForcedArrestDialogue()
         crimeFaction.SetCrimeGold(2000)
         player.ModActorValue("Health", 5000.0)
         if (!__scenarioReturnMarker)
@@ -11480,6 +11483,7 @@ function __TeardownScenario()
         player.SetDontMove(false)
         player.EnableAI(true)
         RPB_Utility.ReleaseAI(true)
+        RPB_Arrest.EnableForcedArrestDialogue() ; switched off before the test's bounty, whether or not its arrest began
         if (__scenarioReturnMarker)
             player.MoveTo(__scenarioReturnMarker)
         endif

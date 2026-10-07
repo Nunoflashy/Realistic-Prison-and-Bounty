@@ -140,6 +140,7 @@ Scriptname RPB_Prisoner extends RPB_ActorBase
     int function GetTimeLeftInSentence(string timeUnit)
     int function GetSentenceFromBounty()
     function RegisterTimeOfImprisonment()
+    function BackdateImprisonmentTo(float afTime)
     function UndetermineSentence()
     function SetSentenceFromTimeServed(int aiSentenceInDays, bool abShouldAffectBounty = false)
     function SetSentence(int aiSentenceInDays = 0, bool abShouldAffectBounty = true)
@@ -1332,6 +1333,8 @@ state Released
 
         if (self.IsNPC())
             self.NPC_RestoreOriginalOutfit()
+        else
+            RPB_Arrest.EnableForcedArrestDialogue() ; off since the arrest began (Arrest.OnArrestBegin)
         endif
         RPB_Utility.FlowMark("Released: NPC_RestoreOriginalOutfit")
 
@@ -1983,7 +1986,7 @@ function Strip(bool abRemoveUnderwear = true)
     RPB_Utility.FlowMark("Strip: Stripping_SaveWornGear")
     self.SaveBelongingsManifest()
     RPB_Utility.FlowMark("Strip: SaveBelongingsManifest")
-    self.__MoveBelongingsToChest()
+    self.__MoveBelongingsToChest(underwearTop, underwearBottom)
     self.UnequipHands()
     self.SheatheWeapon()
     RPB_Utility.FlowMark("Strip: unequip + RemoveAllItems")
@@ -1997,14 +2000,15 @@ function Strip(bool abRemoveUnderwear = true)
 
     ; TODO: Find a way to keep the underwear without recovering NPC's body clothing (skyrim bug?), maybe filters? (FIXED: Change Actor Outfit)
     if (!abRemoveUnderwear)
-        ; Equip Underwear
-        PrisonerBelongingsContainer.RemoveItem(underwearTop, abSilent = true, akOtherContainer = this)
-        PrisonerBelongingsContainer.RemoveItem(underwearBottom, abSilent = true, akOtherContainer = this)
+        ; Never left me (__MoveBelongingsToChest): only out of the manifest, and put on if it wasn't worn
         self.ModBelongingsManifest(underwearTop, -1)
         self.ModBelongingsManifest(underwearBottom, -1)
-
-        self.EquipItem(underwearTop)
-        self.EquipItem(underwearBottom)
+        if (underwearTop && !this.IsEquipped(underwearTop))
+            self.EquipItem(underwearTop)
+        endif
+        if (underwearBottom && !this.IsEquipped(underwearBottom))
+            self.EquipItem(underwearBottom)
+        endif
     endif
 
     ; DebugWithArgs("["+ Name +"] Prisoner::Strip", "abRemoveUnderwear: " + YesNo(abRemoveUnderwear), \ 
@@ -2021,8 +2025,10 @@ endFunction
     belonging). Item by item: removing a worn item takes it off, so nothing is unequipped first. Without cuffs, the one
     call it always was (RemoveAllItems). Timed in the log: a big inventory is many calls.
 /;
-function __MoveBelongingsToChest()
-    if (!RPB_Utility.IsCuffed(this))
+; @akKeepTop / @akKeepBottom: underwear that stays on (not stripped naked): left where it is, worn, instead of going to the
+; chest and back (taken off and put on again in front of the player, as when everything moved in one call, 2026-10-07)
+function __MoveBelongingsToChest(Form akKeepTop = none, Form akKeepBottom = none)
+    if (!RPB_Utility.IsCuffed(this) && !akKeepTop && !akKeepBottom)
         self.UnequipAll()
         self.RemoveAllItems(PrisonerBelongingsContainer, true, true)
         return
@@ -2033,7 +2039,7 @@ function __MoveBelongingsToChest()
     Form[] worn = PO3_SKSEFunctions.AddAllEquippedItemsToArray(this)
     int w = 0
     while (worn && w < worn.Length)
-        if (worn[w] && !RPB_Utility.IsCuffsForm(worn[w]))
+        if (worn[w] && !RPB_Utility.IsCuffsForm(worn[w]) && worn[w] != akKeepTop && worn[w] != akKeepBottom)
             this.UnequipItem(worn[w], false, true)
         endif
         w += 1
@@ -2044,8 +2050,14 @@ function __MoveBelongingsToChest()
     while (i >= 0)
         Form item = this.GetNthForm(i)
         if (item && !RPB_Utility.IsCuffsForm(item))
-            this.RemoveItem(item, this.GetItemCount(item), true, PrisonerBelongingsContainer)
-            moved += 1
+            int count = this.GetItemCount(item)
+            if (item == akKeepTop || item == akKeepBottom)
+                count -= 1 ; the one worn stays (a spare goes with the rest)
+            endif
+            if (count > 0)
+                this.RemoveItem(item, count, true, PrisonerBelongingsContainer)
+                moved += 1
+            endif
         endif
         i -= 1
     endWhile
@@ -2074,20 +2086,22 @@ function StripSilently(bool abKeepCuffs = true)
     RPB_Utility.FlowMark("StripSilently: Stripping_SaveWornGear")
     self.SaveBelongingsManifest()
     RPB_Utility.FlowMark("StripSilently: SaveBelongingsManifest")
-    self.__MoveBelongingsToChest()
+    self.__MoveBelongingsToChest(underwearTop, underwearBottom)
     self.UnequipHands()
     self.SheatheWeapon()
     RPB_Utility.FlowMark("StripSilently: unequip + RemoveAllItems")
     self.OnStripped() ; Maybe use OnStrippedSilently?
     RPB_Utility.FlowMark("StripSilently: OnStripped")
 
-    PrisonerBelongingsContainer.RemoveItem(underwearTop, abSilent = true, akOtherContainer = this)
-    PrisonerBelongingsContainer.RemoveItem(underwearBottom, abSilent = true, akOtherContainer = this)
+    ; Never left me (__MoveBelongingsToChest): only out of the manifest, and put on if it wasn't worn
     self.ModBelongingsManifest(underwearTop, -1)
     self.ModBelongingsManifest(underwearBottom, -1)
-
-    self.EquipItem(underwearTop)
-    self.EquipItem(underwearBottom)
+    if (underwearTop && !this.IsEquipped(underwearTop))
+        self.EquipItem(underwearTop)
+    endif
+    if (underwearBottom && !this.IsEquipped(underwearBottom))
+        self.EquipItem(underwearBottom)
+    endif
 endFunction
 
 function RemoveUnderwear()
@@ -2347,6 +2361,13 @@ endFunction
 
 ;                      Sentence - Mutators
 ; ==========================================================
+
+; The sentence counted from @afTime instead of now: a time skip that finished the intake (the skipped time counts)
+function BackdateImprisonmentTo(float afTime)
+    if (afTime > 0.0 && afTime < TimeOfImprisonment)
+        SetFloat("Time of Imprisonment", afTime)
+    endif
+endFunction
 
 function RegisterTimeOfImprisonment()
     RPB_Utility.FlowMark("RTI: start")

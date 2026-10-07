@@ -131,9 +131,16 @@ function RegisterEvents()
     ; The forced arrest dialogue back on unless an arrest or surrender of the player is under way: left off (a dev arrest
     ; that stopped on the way), no guard could arrest the player again in that save (2026-10-05)
     Actor player = Game.GetPlayer()
-    if (RPB_Utility.RPB_ArrestGlobal("No Dialogue").GetValueInt() != 0 && !RPB_Utility.IsActorArrested(player) && !RPB_Utility.IsActorImprisoned(player) && !(Arrest && Arrest.IsSurrendering(player)))
+    ; Set either way: the arrest-on-sight game settings it also holds last the game session and aren't saved
+    bool inCustody = RPB_Utility.IsActorArrested(player) || RPB_Utility.IsActorImprisoned(player) || (Arrest && Arrest.IsSurrendering(player))
+    if (inCustody)
+        ; Off when the player is in custody: a save from before it was kept off through the custody had it on
+        RPB_Arrest.DisableForcedArrestDialogue()
+    else
+        if (RPB_Utility.RPB_ArrestGlobal("No Dialogue").GetValueInt() != 0)
+            RPB_Utility.LogWarn("The forced arrest dialogue was left off with no arrest or surrender under way: turned back on", "EventManager::RegisterEvents")
+        endif
         RPB_Arrest.EnableForcedArrestDialogue()
-        RPB_Utility.LogWarn("The forced arrest dialogue was left off with no arrest or surrender under way: turned back on", "EventManager::RegisterEvents")
     endif
 endFunction
 

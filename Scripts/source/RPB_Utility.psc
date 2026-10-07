@@ -1475,7 +1475,7 @@ endFunction
     Whether @akActor was told to stop attacking a prisoner and is at it again: the first call notes the time (false), a
     later one at least 4s on is true. A note older than a minute starts over. Cleared on load (ClearFrozenGuards).
 /;
-bool function __ToldToStopAndKeptOn(Actor akActor) global
+bool function __ToldToStopAndKeptOn(Actor akActor, float afMinGap = 4.0) global
     int told = JDB.solveObj(".rpb_root.toldToStop")
     if (!told)
         told = JFormMap.object()
@@ -1487,7 +1487,7 @@ bool function __ToldToStopAndKeptOn(Actor akActor) global
         JFormMap.setFlt(told, akActor, now)
         return false
     endif
-    return (now - at) >= 4.0
+    return (now - at) >= afMinGap
 endFunction
 
 ; Tests set this while they run (RPB_Tests.ExecuteTest), cleared on load: a test's player standing by its prisoners isn't
@@ -1514,7 +1514,9 @@ function PlayerHitPrisoner(Actor akCaptor, Actor akArrestee) global
     if (IsActorArrested(player) || IsActorImprisoned(player) || akCaptor.IsDead())
         return
     endif
-    if (__ToldToStopAndKeptOn(player))
+    ; The next hit a second or more later (the 4s the combat scan's re-reads need took the player 3 hits, 2026-10-07): a
+    ; second apart, so one swing reported twice doesn't count
+    if (__ToldToStopAndKeptOn(player, 1.0))
         __ArrestPrisonerAttacker(player, akCaptor, akCaptor.GetCrimeFaction(), akArrestee)
     else
         Debug.Notification("The guard warns you to leave his prisoner alone")
@@ -1526,6 +1528,19 @@ endFunction
 ; guard of the captor's hold who sees them (the scan is from the attacker, 3000 units), for a small bounty, or only told
 ; to stop. Once each (arrested ones are skipped above)
 function __ArrestPrisonerAttacker(Actor akAttacker, Actor akCaptor, Faction akCaptorFaction, Actor akArrestee) global
+    ; Once: the arrest registers them a moment later, and a hit (or a scan) in between sent a second guard after the same
+    ; attacker (the player arrested twice a second apart, both arrests stripping them: belongings lost, 2026-10-07)
+    int arresting = JDB.solveObj(".rpb_root.attackersArrested")
+    if (!arresting)
+        arresting = JFormMap.object()
+        JDB.solveObjSetter(".rpb_root.attackersArrested", arresting, true)
+    endif
+    float now = Utility.GetCurrentRealTime()
+    float startedAt = JFormMap.getFlt(arresting, akAttacker)
+    if (JFormMap.hasKey(arresting, akAttacker) && startedAt <= now && (now - startedAt) < 15.0)
+        return
+    endif
+    JFormMap.setFlt(arresting, akAttacker, now)
     akAttacker.StopCombat()
     Actor guard = none
     if (akCaptorFaction)
@@ -1536,6 +1551,8 @@ function __ArrestPrisonerAttacker(Actor akAttacker, Actor akCaptor, Faction akCa
         return
     endif
     if (akAttacker == Game.GetFormEx(0x14) as Actor)
+        ; The guards' forcegreet off first: the hit's own assault bounty brought one in the same second (2026-10-07)
+        RPB_Arrest.DisableForcedArrestDialogue()
         if (akCaptorFaction.GetCrimeGold() <= 0)
             akCaptorFaction.ModCrimeGold(40, true) ; assault
         endif
@@ -1723,23 +1740,11 @@ function LimitCuffedMovement_Encumbrance(bool abOn) global
     JDB.solveIntSetter(".rpb_root.cuffedLimit.encumbrance", abOn as int, true)
     Debug("Utility::LimitCuffedMovement_Encumbrance", "walking only (encumbrance) " + string_if(abOn, "on", "off") + ": carry weight changed by " + amount + ", now " + player.GetActorValue("CarryWeight"))
     if (abOn)
-        ; The diagnostics showed both (2026-10-06): (a) carry weight -1, an empty inventory, and the engine NOT reading the
-        ; player over-encumbered (it re-checks on an inventory change); (b) over-encumbered, but already running, and the run
-        ; went on. (a): a coin in and out of the inventory, silently; (b): movement off for a moment, so the next one walks
-        string before = EncumbranceTrace(player)
-        if (!player.IsOverEncumbered())
-            ; Something with weight: a gold coin (no weight) changed nothing, the engine read them not over-encumbered before
-            ; and after it (2026-10-06), so it seems to recount only when the weight changes. An iron dagger (2), in and out
-            Form dagger = Game.GetFormEx(0x1397E)
-            player.AddItem(dagger, 1, true)
-            player.RemoveItem(dagger, 1, true)
-        endif
-        if (player.IsRunning() || player.IsSprinting())
-            Game.DisablePlayerControls(abMovement = true, abFighting = false, abCamSwitch = false, abLooking = false, abSneaking = false, abMenu = false, abActivate = false, abJournalTabs = false)
-            Utility.Wait(0.2)
-            Game.EnablePlayerControls(abMovement = true, abFighting = false, abCamSwitch = false, abLooking = false, abSneaking = false, abMenu = false, abActivate = false, abJournalTabs = false)
-        endif
-        LogInfo("Walking only on: before " + before + "; after " + EncumbranceTrace(player), "Utility::LimitCuffedMovement_Encumbrance")
+        ; Only the trace: the iron dagger in and out (for the engine to recount the weight) and the short movement stop (for
+        ; a run under way) are gone (2026-10-07). Neither made the limit hold, both toggled on every switch between led and
+        ; free walk, and each inventory change ran other mods' equip scripts on the player (IDA): the player's controls and
+        ; menus stopped answering right after an escort with them. Walking only needs the SKSE plugin
+        LogInfo("Walking only on: " + EncumbranceTrace(player), "Utility::LimitCuffedMovement_Encumbrance")
         int handle = ModEvent.Create("RPB_EncumbranceCheck")
         if (handle)
             ModEvent.Send(handle)

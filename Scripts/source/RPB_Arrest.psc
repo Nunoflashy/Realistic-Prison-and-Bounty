@@ -1127,6 +1127,11 @@ event OnArrestBegin(RPB_Arrestee apArrestee, RPB_Captor apCaptor, Faction akCrim
 
     if (apArrestee.IsPlayer())
         RPB_Arrest.AllowArrestForcegreets(false)
+        ; The guards' arrest forcegreet off for as long as the player is in custody, whichever way the arrest began (a
+        ; guard's dialogue, the attacker rule, a test): only the dev menu's arrest and a surrender set it, and the
+        ; confrontation's end turned it back on, so other guards stopped the cuffed player on the escort with the crime
+        ; menu ("Pay Bounty (0 gold)", 2026-10-07). Back on when the custody ends (the release, a cancel, a load with none)
+        RPB_Arrest.DisableForcedArrestDialogue()
         ; Watched until the escort: a guard freezing now leaves the arrest stuck on him, and the probe that finds him has
         ; another guard take it over (TakeOverSubmission). A submission probes him already; a yield or a surrender didn't
         if (apCaptor)
@@ -1143,8 +1148,11 @@ event OnArrestBegin(RPB_Arrestee apArrestee, RPB_Captor apCaptor, Faction akCrim
 endEvent
 
 event OnArrestEnd(RPB_Arrestee apArrestee, RPB_Captor apCaptor, Faction akCrimeFaction)
-    ; Re-enable forced arrest dialogue, arrest has been processed
-    RPB_Arrest.EnableForcedArrestDialogue()
+    ; Back on once the arrest has been processed, unless the player is the one in custody (it stays off until the release)
+    Actor player = Game.GetFormEx(0x14) as Actor
+    if (!RPB_Utility.IsActorArrested(player) && !RPB_Utility.IsActorImprisoned(player) && !self.IsSurrendering(player))
+        RPB_Arrest.EnableForcedArrestDialogue()
+    endif
 endEvent
 
 ;/
@@ -1749,6 +1757,16 @@ Actor[] __surrenderGuards
     an undone surrender give them back); a disguise mod re-adds its faction, so I sweep until the guards stay calm, 5s at most.
 /;
 function __PacifyForSurrender(Actor akSurrenderer, Actor[] akGuards)
+    ; A violent crime makes the hold's guards the player's enemies (the faction's player-enemy flag), and calming them didn't
+    ; clear it: they were back in the fight within seconds, the Surrender Scene never started, the surrender was undone
+    ; (2026-10-07). Cleared as the game's own yield does (there's no reading it back, only setting it)
+    if (akSurrenderer == Game.GetFormEx(0x14) as Actor && akGuards.Length > 0 && akGuards[0])
+        Faction guardsFaction = akGuards[0].GetCrimeFaction()
+        if (guardsFaction)
+            guardsFaction.SetPlayerEnemy(false)
+            __SurrenderLog("Surrender of " + akSurrenderer + ": " + guardsFaction + "'s player-enemy flag cleared (violent bounty " + guardsFaction.GetCrimeGoldViolent() + ")")
+        endif
+    endif
     float start = Utility.GetCurrentRealTime()
     int passes = 0
     bool fighting = true
@@ -2701,11 +2719,48 @@ endFunction
 function EnableForcedArrestDialogue() global
     GlobalVariable RPB_NoArrestDialogue = RPB_Utility.RPB_ArrestGlobal("No Dialogue")
     RPB_NoArrestDialogue.SetValueInt(0)
+    RPB_Arrest.__HoldArrestOnSight(false)
 endFunction
 
 function DisableForcedArrestDialogue() global
     GlobalVariable RPB_NoArrestDialogue = RPB_Utility.RPB_ArrestGlobal("No Dialogue")
     RPB_NoArrestDialogue.SetValueInt(1)
+    RPB_Arrest.__HoldArrestOnSight(true)
+endFunction
+
+;/
+    The engine's own arrest approach: a guard walks up to a wanted player once their bounty reaches iArrestOnSightNonViolent
+    (iArrestOnSightViolent for violent crimes). With the "No Dialogue" global on, that guard still came over, with a plain
+    greeting (2026-10-07). While the player is in custody both are raised out of reach, so nobody starts the approach, and
+    the values they had are put back after. Game settings last the whole game session and aren't saved: the load check
+    (EventManager.RegisterEvents) sets this again.
+/;
+function __HoldArrestOnSight(bool abHold) global
+    bool held = JDB.solveInt(".rpb_root.arrestOnSight.held") != 0
+    if (abHold == held)
+        if (abHold)
+            Game.SetGameSettingInt("iArrestOnSightNonViolent", 1000000000) ; again: a load in the same session keeps the
+            Game.SetGameSettingInt("iArrestOnSightViolent", 1000000000)    ; flag but a restart resets the settings
+        elseif (Game.GetGameSettingInt("iArrestOnSightNonViolent") == 1000000000 || Game.GetGameSettingInt("iArrestOnSightViolent") == 1000000000)
+            ; Not held by this save, but still raised: held by the save played before this one in the same game session
+            ; (the settings outlive a load, the flag doesn't). The guards never approached again (2026-10-07)
+            Game.SetGameSettingInt("iArrestOnSightNonViolent", JDB.solveInt(".rpb_root.arrestOnSight.nonViolent", 1000))
+            Game.SetGameSettingInt("iArrestOnSightViolent", JDB.solveInt(".rpb_root.arrestOnSight.violent", 1))
+            RPB_Utility.Debug("Arrest::__HoldArrestOnSight", "the guards' arrest on sight was still held from another save: back to " + Game.GetGameSettingInt("iArrestOnSightNonViolent") + "/" + Game.GetGameSettingInt("iArrestOnSightViolent"))
+        endif
+        return
+    endif
+    if (abHold)
+        JDB.solveIntSetter(".rpb_root.arrestOnSight.nonViolent", Game.GetGameSettingInt("iArrestOnSightNonViolent"), true)
+        JDB.solveIntSetter(".rpb_root.arrestOnSight.violent", Game.GetGameSettingInt("iArrestOnSightViolent"), true)
+        Game.SetGameSettingInt("iArrestOnSightNonViolent", 1000000000)
+        Game.SetGameSettingInt("iArrestOnSightViolent", 1000000000)
+    else
+        Game.SetGameSettingInt("iArrestOnSightNonViolent", JDB.solveInt(".rpb_root.arrestOnSight.nonViolent", 1000))
+        Game.SetGameSettingInt("iArrestOnSightViolent", JDB.solveInt(".rpb_root.arrestOnSight.violent", 1))
+    endif
+    JDB.solveIntSetter(".rpb_root.arrestOnSight.held", abHold as int, true)
+    RPB_Utility.Debug("Arrest::__HoldArrestOnSight", "the guards' arrest on sight " + RPB_Utility.string_if(abHold, "held (player in custody)", "back") + ": non-violent " + Game.GetGameSettingInt("iArrestOnSightNonViolent") + ", violent " + Game.GetGameSettingInt("iArrestOnSightViolent"))
 endFunction
 
 function AllowArrestForcegreets(bool allow = true) global
