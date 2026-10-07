@@ -270,6 +270,8 @@ function SetTests()
     self.AddTest("182 - Diagnostic: the Guards Around and Their Crime Factions (does each have a prison? stand inside and outside Castle Dour)", "Test_GuardCrimeFactions", abChainable = false)
     self.AddTest("183 - Freeze Control, PLAYER: the Player's Escort to Jail Cancelled 10s In, the Guard Probed (178's player twin; repeat it)", "Test_PlayerEscortCancelControl", abChainable = false)
     self.AddTest("184 - Benchmark: the Time Skip's NPC Releases on Its Own Stack vs by Event (6 bandits each; advances the clock a few days)", "Test_ReleaseByEventBenchmark", abChainable = false)
+    self.AddTest("187 - Freeze Control, NPC: 156's Steps With a Bandit (moved 1500 away and back mid escort, ended by a reset; repeat it)", "Test_NpcFreeWalkControl", abChainable = false)
+    self.AddTest("188 - Freeze Control, Alternating: 187 (NPC) and 156 (player) by turns, the same-session comparison (repeat it)", "Test_FreezeControlAlternating", abChainable = false)
     self.AddTest("185 - Two Prisoners in Cells: a Freezable Bandit and Vivienne Onis (freeze him with the prisoner key, then talk to her: does the dialogue lock?)", "Test_FrozenPrisonerDialogue", abChainable = false)
     self.AddTest("041 - ActiveMagicEffectContainer: Stuck Lock Self-Heals", "Test_ActiveMagicEffectContainer_StuckLockSelfHeals")
     self.AddTest("042 - ThreadLock: JAtomic Primitive Semantics and Registry", "Test_ThreadLock_PrimitiveSemantics")
@@ -13657,6 +13659,64 @@ bool function __Scenario_CaptorFinishCycles(string asTest, bool abCallsOff, bool
     return assert_false(frozen, asTest + ": the clone froze on cycle " + cycle)
 endFunction
 
+int __freezeAlternateRun ; 188's turn counter
+
+; 156: 150 with every freeze experiment off (the normal release order), then the teardown
+function __RunFreeWalkControl()
+    ; Freeze control (round 109): 150 as it was before the experiments, the normal release order: the Scene stop, the
+    ; guard's release and the player's revert all at once. Every experiment switch off, in case one was left on; the
+    ; Scene-stop and Captor-removal probes are production code and stay
+    RPB_Utility.SetCaptorFinishCallsDisabledForTest(false)
+    RPB_Utility.SetSceneEndSpacedForTest(false)
+    RPB_Utility.SetReleaseOnPackageChangeForTest(false)
+    RPB_Utility.SetCaptorKeptForTest(false)
+    RPB_Utility.SetAIFlipFirstForTest(false)
+    RPB_Utility.SetRevertFirstForTest(false)
+    RPB_Utility.SetImprisonmentCancelFirstForTest(false)
+    log("156: 150 with the normal release order, no experiment on (freeze control)")
+    display_result(__Scenario_EscortFreeWalk("156"))
+    __TeardownScenario()
+endFunction
+
+; 187: 156's steps with a bandit for the escortee, for the freeze diff (ROADMAP 'Freeze diff, later')
+function __RunNpcFreeWalkControl(string asTest)
+    display_result(__Scenario_NpcFreeWalkControl(asTest))
+    __TeardownScenario()
+endFunction
+
+;/
+    187: 156's steps with an NPC prisoner. 156 (the player escorted) froze ~2.4% of its guards, 183 (the player, cancelled
+    10s in by CancelArrest) ~0.6%, 178 (a bandit, 183's steps) 0 in ~150: the steps around the end may matter more than
+    who the prisoner is. Here a bandit is escorted, moved 1500 away from the guard ~12s in and back next to him 5s later
+    (156 moves the player so), and the arrest ends through ResetActor, as 156's teardown ends the player's (not 178's
+    CancelArrest). Then 12s for the probes; the guard and the bandit are reported. Green unless the escort never starts.
+/;
+bool function __Scenario_NpcFreeWalkControl(string asTest)
+    Actor guard = __ScenarioGuard()
+    if (!guard)
+        return false
+    endif
+    Actor npc = __ScenarioArrestee(false, guard)
+    if (!assert_true(npc != none, asTest + ": no arrestee"))
+        return false
+    endif
+    __ScenarioArrest(guard, npc, asTest)
+    if (!__ScenarioWaitEscortToJail(npc, 90.0))
+        return assert_true(false, asTest + ": the NPC's escort to jail never started")
+    endif
+    Utility.Wait(12.0) ; under way, about when 156's free walk has begun
+    npc.MoveTo(guard, afXOffset = 1500.0, abMatchRotation = false)
+    Utility.Wait(5.0)
+    npc.MoveTo(guard, afXOffset = -80.0, abMatchRotation = false)
+    Utility.Wait(5.0)
+    RPB_Recovery.ResetActor(npc)
+    Utility.Wait(12.0) ; the probes' +5s and +8s, and their checks
+    bool guardFrozen = RPB_Utility.IsFrozenGuard(guard)
+    bool npcFrozen = RPB_Utility.IsFrozenGuard(npc)
+    log(asTest + ": SUMMARY guard " + guard + " frozen " + guardFrozen + ", NPC prisoner " + npc + " frozen " + npcFrozen)
+    return assert_true(true, asTest + ": guard frozen " + guardFrozen + ", NPC frozen " + npcFrozen)
+endFunction
+
 ;/
     150: the player's escort to jail is a free walk once it's underway (the guard walking, them close); moved 1500 away
     (past FREE_WALK_RADIUS), the AI takes over; moved next to the guard (walking on), their controls come back.
@@ -14864,7 +14924,7 @@ endFunction
 string __statelessTest = ""
 
 bool function __RunStatelessTest(string asTest)
-    if (asTest != "Test_ArrestWaitsWhileGuardFights_NoPackage" && asTest != "Test_CellDoorsDiagnostic" && asTest != "Test_LongAbsenceSetup" && asTest != "Test_LongAbsenceAdvance" && asTest != "Test_LongAbsenceVerify" && asTest != "Test_FallbackEscortToCellStopped_Player" && asTest != "Test_FallbackEscortToCellStopped_CloneGuard" && asTest != "Test_FightDuringEscort_NPC" && asTest != "Test_FightDuringEscort_Player" && asTest != "Test_GuardDiesInPrison_Player" && asTest != "Test_EscortToCellStopped_NoPackageLock" && StringUtil.Find(asTest, "Test_Surrender_") != 0 && asTest != "Test_FrozenGuardSkipped" && asTest != "Test_GuardDiesInPrison_NobodySees" && asTest != "Test_Escort_FreeWalk" && asTest != "Test_ToggleEscortToCell04" && asTest != "Test_CaptorFinishCycles_Calls" && asTest != "Test_CaptorFinishCycles_NoCalls" && asTest != "Test_CaptorFinishDetach_Calls" && asTest != "Test_CaptorFinishDetach_NoCalls" && asTest != "Test_Escort_FreeWalk_Control" && asTest != "Test_ActorKeys" && asTest != "Test_FrozenGuardCalls" && asTest != "Test_SimulatedFreezeCalls" && asTest != "Test_SimulatedFreezeAtCancel" && asTest != "Test_SpawnFreezableGuard" && asTest != "Test_AliasPackageControl" && asTest != "Test_FreezableEscort_Player" && asTest != "Test_FreezableEscort_NPC" && asTest != "Test_LightHold" && asTest != "Test_KillFrozenGuard" && asTest != "Test_LifetimeBountyStat" && asTest != "Test_FaintFrozenGuard" && asTest != "Test_FaintFrozenGuardShort" && asTest != "Test_FrozenEscortFallback" && asTest != "Test_HideFrozenGuard" && asTest != "Test_EscortToCellGuardHeld" && asTest != "Test_CuffedLimitEncumbrance" && asTest != "Test_CuffedLimitSettings" && asTest != "Test_EarlyHandback" && asTest != "Test_StalledEscortTakeover" && asTest != "Test_StalledEscortTakeoverLimit" && asTest != "Test_NpcEscortCancelControl" && asTest != "Test_FrozenPrisonerTimeSkip" && asTest != "Test_SpawnFreezablePrisoner" && asTest != "Test_SpawnFreezableArrestee" && asTest != "Test_GuardCrimeFactions" && asTest != "Test_PlayerEscortCancelControl" && asTest != "Test_ReleaseByEventBenchmark" && asTest != "Test_FrozenPrisonerDialogue")
+    if (asTest != "Test_ArrestWaitsWhileGuardFights_NoPackage" && asTest != "Test_CellDoorsDiagnostic" && asTest != "Test_LongAbsenceSetup" && asTest != "Test_LongAbsenceAdvance" && asTest != "Test_LongAbsenceVerify" && asTest != "Test_FallbackEscortToCellStopped_Player" && asTest != "Test_FallbackEscortToCellStopped_CloneGuard" && asTest != "Test_FightDuringEscort_NPC" && asTest != "Test_FightDuringEscort_Player" && asTest != "Test_GuardDiesInPrison_Player" && asTest != "Test_EscortToCellStopped_NoPackageLock" && StringUtil.Find(asTest, "Test_Surrender_") != 0 && asTest != "Test_FrozenGuardSkipped" && asTest != "Test_GuardDiesInPrison_NobodySees" && asTest != "Test_Escort_FreeWalk" && asTest != "Test_ToggleEscortToCell04" && asTest != "Test_CaptorFinishCycles_Calls" && asTest != "Test_CaptorFinishCycles_NoCalls" && asTest != "Test_CaptorFinishDetach_Calls" && asTest != "Test_CaptorFinishDetach_NoCalls" && asTest != "Test_Escort_FreeWalk_Control" && asTest != "Test_ActorKeys" && asTest != "Test_FrozenGuardCalls" && asTest != "Test_SimulatedFreezeCalls" && asTest != "Test_SimulatedFreezeAtCancel" && asTest != "Test_SpawnFreezableGuard" && asTest != "Test_AliasPackageControl" && asTest != "Test_FreezableEscort_Player" && asTest != "Test_FreezableEscort_NPC" && asTest != "Test_LightHold" && asTest != "Test_KillFrozenGuard" && asTest != "Test_LifetimeBountyStat" && asTest != "Test_FaintFrozenGuard" && asTest != "Test_FaintFrozenGuardShort" && asTest != "Test_FrozenEscortFallback" && asTest != "Test_HideFrozenGuard" && asTest != "Test_EscortToCellGuardHeld" && asTest != "Test_CuffedLimitEncumbrance" && asTest != "Test_CuffedLimitSettings" && asTest != "Test_EarlyHandback" && asTest != "Test_StalledEscortTakeover" && asTest != "Test_StalledEscortTakeoverLimit" && asTest != "Test_NpcEscortCancelControl" && asTest != "Test_FrozenPrisonerTimeSkip" && asTest != "Test_SpawnFreezablePrisoner" && asTest != "Test_SpawnFreezableArrestee" && asTest != "Test_GuardCrimeFactions" && asTest != "Test_PlayerEscortCancelControl" && asTest != "Test_ReleaseByEventBenchmark" && asTest != "Test_FrozenPrisonerDialogue" && asTest != "Test_NpcFreeWalkControl" && asTest != "Test_FreezeControlAlternating")
         return false
     endif
 
@@ -15052,19 +15112,20 @@ bool function __RunStatelessTest(string asTest)
     elseif (asTest == "Test_FaintFrozenGuardShort")
         display_result(__Scenario_FaintFrozenGuard("169", 0x0002C06A))
     elseif (asTest == "Test_Escort_FreeWalk_Control")
-        ; Freeze control (round 109): 150 as it was before the experiments, the normal release order: the Scene stop, the
-        ; guard's release and the player's revert all at once. Every experiment switch off, in case one was left on; the
-        ; Scene-stop and Captor-removal probes are production code and stay
-        RPB_Utility.SetCaptorFinishCallsDisabledForTest(false)
-        RPB_Utility.SetSceneEndSpacedForTest(false)
-        RPB_Utility.SetReleaseOnPackageChangeForTest(false)
-        RPB_Utility.SetCaptorKeptForTest(false)
-        RPB_Utility.SetAIFlipFirstForTest(false)
-        RPB_Utility.SetRevertFirstForTest(false)
-        RPB_Utility.SetImprisonmentCancelFirstForTest(false)
-        log("156: 150 with the normal release order, no experiment on (freeze control)")
-        display_result(__Scenario_EscortFreeWalk("156"))
-        __TeardownScenario()
+        self.__RunFreeWalkControl()
+    elseif (asTest == "Test_NpcFreeWalkControl")
+        self.__RunNpcFreeWalkControl("187")
+    elseif (asTest == "Test_FreezeControlAlternating")
+        ; 187 and 156 by turns, so both sides of the comparison run in the same session (the freeze rate moves between
+        ; sessions and over hours: 156's 7 in 120 runs after 1 in 108)
+        __freezeAlternateRun += 1
+        if (__freezeAlternateRun % 2 == 1)
+            log("188: run " + __freezeAlternateRun + ": the NPC side (187)")
+            self.__RunNpcFreeWalkControl("188 NPC")
+        else
+            log("188: run " + __freezeAlternateRun + ": the player side (156)")
+            self.__RunFreeWalkControl()
+        endif
     elseif (asTest == "Test_FrozenGuardSkipped")
         display_result(__Scenario_FrozenGuardSkipped("147"))
         RPB_Utility.ClearFrozenGuards()
