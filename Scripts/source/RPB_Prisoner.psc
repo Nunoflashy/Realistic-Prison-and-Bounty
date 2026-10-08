@@ -1107,10 +1107,27 @@ state Escorting
             return
         endif
 
+        if (!guardFighting)
+            __assistGuardFightTime = 0.0
+        endif
         if (guardFighting)
             ; He's gone to a fight (the escort pauses: RPB_Captor.__PauseEscortIfFighting). Him running off isn't me being
             ; stuck: boosted and moved to him, the player landed in the fight.
             branch = "guard fighting"
+            ; The pause never came (his fight is with me: guards pursuing a player who walked off an arrest still starting),
+            ; and I'd be held here AI-driven for good (2026-10-08, 2+ minutes, menus off): after 20s the escort is handed to
+            ; the stalled-escort takeover (another guard, or the prison without the Scene)
+            __assistGuardFightTime += __assistTick
+            if (__assistGuardFightTime >= 20.0)
+                __assistGuardFightTime = -1000.0 ; once per escort
+                RPB_Utility.LogInfo(Name + "'s guard has been fighting for 20s and the escort never paused: handed to the stalled-escort takeover", "["+ Name +"] Prisoner::EscortAssist")
+                int handle = ModEvent.Create("RPB_StalledEscortTakeover")
+                if (handle)
+                    ModEvent.PushForm(handle, this)
+                    ModEvent.PushString(handle, "the guard fought for 20s, the escort never paused")
+                    ModEvent.Send(handle)
+                endif
+            endif
             __assistStuckTime = 0.0
             __assistIdleTime = 0.0
             __assistAwayTime = 0.0
@@ -2644,6 +2661,7 @@ float __assistGuardLastY
 float __assistSavedSpeed
 float __assistTick
 float __assistStuckTime
+float __assistGuardFightTime ; how long the guard has been fighting without the escort pausing for it
 float __assistIdleTime
 bool __assistGuardWalked ; the guard has walked in this escort (StartEscortAssist resets it)
 float __assistStartedAt ; when this escort's assist started (the hand-back's timing, test 175)
@@ -2716,6 +2734,7 @@ function __CatchUpAfterWait(float afHours)
     __assistIdleTime = 0.0
     __assistAwayTime = 0.0
     __guardWaitTime = 0.0
+    __assistGuardFightTime = 0.0
     __guardWaitWarned = false
     __freeFarTicks = 0
     __freeBothStillTime = 0.0
