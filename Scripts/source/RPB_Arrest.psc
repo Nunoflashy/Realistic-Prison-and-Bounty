@@ -1087,11 +1087,13 @@ event OnArrestPreparing(Actor akArrestee, Actor akCaptor, Faction akCrimeFaction
     akArrestee.StopCombat()
     akArrestee.StopCombatAlarm()
     akArrestee.SheatheWeapon()
-    ; And no drawing it again: until the confrontation starts (RetainAI, ~1-2s, much longer when the arrest is held up) the
-    ; player's controls were all on, and a weapon drawn then broke the hands-behind-back pose later. Given back by the
-    ; confrontation's own controls, or by the arrest's revert (Arrestee.RevertArrest) if it never gets there
+    ; And no walking off or drawing it again: until the confrontation starts (RetainAI, ~1-2s, much longer when the arrest is
+    ; held up) the player's controls were all on: a weapon drawn then broke the hands-behind-back pose, and walking off
+    ; started the guards' pursuit. Given back by the confrontation's own controls, by the arrest's revert
+    ; (Arrestee.RevertArrest) if it never gets there, or by the check 30s on (EventManager.OnArrestControlsCheck)
     if (akArrestee == Game.GetPlayer())
-        Game.DisablePlayerControls(abMovement = false, abFighting = true, abCamSwitch = false, abLooking = false, abSneaking = false, abMenu = false, abActivate = false, abJournalTabs = false, aiDisablePOVType = 0)
+        RPB_Utility.ScheduleArrestControlsCheck()
+        Game.DisablePlayerControls(abMovement = true, abFighting = true, abCamSwitch = false, abLooking = false, abSneaking = false, abMenu = false, abActivate = false, abJournalTabs = false, aiDisablePOVType = 0)
     endif
 endEvent
 

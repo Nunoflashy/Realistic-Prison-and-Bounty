@@ -246,6 +246,8 @@ scriptname RPB_Utility hidden
     function SetSceneEndSpacedForTest(bool abSpaced) global
     function SetSceneRaceForTest(bool abArmed) global
     bool function IsLoadSettling() global
+    function ScheduleArrestControlsCheck() global
+    function RequestCancelArrest(Actor akActor, string asReason) global
     float function CancelSettleSeconds() global
     function SetCancelSettleSeconds(float afSeconds) global
     string function SceneRaceTakenForTest() global
@@ -4488,6 +4490,29 @@ endFunction
 
 function SetCancelSettleSeconds(float afSeconds) global
     JDB.solveFltSetter(".rpb_root.cancelSettleSeconds", afSeconds, true)
+endFunction
+
+; The player's controls taken at an arrest's first step (Arrest.OnArrestPreparing) checked 30s on, on its own stack
+; (RPB_EventManager.OnArrestControlsCheck): one waiting stack per arrest, no polling. The latest arrest's check stands
+function ScheduleArrestControlsCheck() global
+    float stamp = Utility.GetCurrentRealTime()
+    JDB.solveFltSetter(".rpb_root.arrestControlsCheck", stamp, true)
+    int handle = ModEvent.Create("RPB_ArrestControlsCheck")
+    if (handle)
+        ModEvent.PushFloat(handle, stamp)
+        ModEvent.Send(handle)
+    endif
+endFunction
+
+; RPB_Recovery.CancelArrest on its own stack (RPB_EventManager.OnCancelArrestRequest): for callers inside the Scene queue,
+; which the cancel calls back into
+function RequestCancelArrest(Actor akActor, string asReason) global
+    int handle = ModEvent.Create("RPB_CancelArrest")
+    if (handle)
+        ModEvent.PushForm(handle, akActor)
+        ModEvent.PushString(handle, asReason)
+        ModEvent.Send(handle)
+    endif
 endFunction
 
 ; The Scene the test race was taken by ("" while it hasn't been)

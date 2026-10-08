@@ -118,6 +118,8 @@ function RegisterEvents()
 
     ; A bounty set aside on submitting, given back if no arrest took it (RPB_Arrest.SetAsideBountyOnSubmission)
     RegisterForModEvent("RPB_SetAsideBountyCheck", "OnSetAsideBountyCheck")
+    RegisterForModEvent("RPB_ArrestControlsCheck", "OnArrestControlsCheck")
+    RegisterForModEvent("RPB_CancelArrest", "OnCancelArrestRequest")
     RegisterForModEvent("RPB_SubmissionTakeover", "OnSubmissionTakeover")
     RegisterForModEvent("RPB_FaintFrozenGuard", "OnFaintFrozenGuard")
     RegisterForModEvent("RPB_MoveGuard", "OnMoveGuard")
@@ -251,6 +253,30 @@ endEvent
 
 event OnSubmissionTakeover(Form akFrozenGuard)
     Arrest.TakeOverSubmission(akFrozenGuard as Actor)
+endEvent
+
+;/
+    The movement and fighting an arrest took from the player at its first step (Arrest.OnArrestPreparing), 30s on: still
+    off with no arrest Scene playing or queued for them, not cuffed (a pending arrest), not imprisoned or surrendering,
+    the arrest got stuck before its confrontation (a guard frozen in the setup) and nothing will give them back: given back
+/;
+event OnCancelArrestRequest(Form akActor, string asReason)
+    RPB_Recovery.CancelArrest(akActor as Actor, asReason)
+endEvent
+
+event OnArrestControlsCheck(float afStamp)
+    Utility.Wait(30.0)
+    if (JDB.solveFlt(".rpb_root.arrestControlsCheck") != afStamp || Game.IsMovementControlsEnabled())
+        return ; a later arrest's check stands, or the controls are already back
+    endif
+    Actor player = Config.Player
+    string current = SceneManager.GetCurrentScene()
+    bool inScene = current != "" && (SceneManager.GetSceneNthReferenceOfType(current, "Escortee") == player || SceneManager.GetSceneNthReferenceOfType(current, "Prisoner") == player)
+    if (inScene || SceneManager.HasQueuedSceneWithActor(player) || RPB_Utility.IsCuffed(player) || RPB_Utility.IsActorImprisoned(player) || Arrest.IsSurrendering(player))
+        return
+    endif
+    RPB_Utility.LogWarn("The player's controls were still off 30s after an arrest began, with no arrest Scene for them: given back", "EventManager::OnArrestControlsCheck")
+    Game.EnablePlayerControls(abMovement = true, abFighting = true, abCamSwitch = false, abLooking = false, abSneaking = false, abMenu = false, abActivate = false, abJournalTabs = false, aiDisablePOVType = 0)
 endEvent
 
 event OnSetAsideBountyCheck(Form akActor, float afDelay)
@@ -689,12 +715,18 @@ event OnArrestBegin(string eventName, string arrestType, float arresteeIdFlt, Fo
         RPB_Utility.Crumb(arrestee, "OnArrestBegin: arrestee never registered, spell removed (reverted)")
         Config.NotifyArrest("Could not arrest " + arrestee.GetDisplayName())
         RPB_Utility.LogError("Could not arrest " + arrestee + " for "+ RPB_Utility.GetFormNameCached(crimeFaction) +", the Arrestee never registered! (reverted)", "EventManager::OnArrestBegin")
+        if (isPlayer) ; the controls Arrest.OnArrestPreparing took
+            Game.EnablePlayerControls(abMovement = true, abFighting = true, abCamSwitch = false, abLooking = false, abSneaking = false, abMenu = false, abActivate = false, abJournalTabs = false, aiDisablePOVType = 0)
+        endif
         return
     endif
 
     if (!arresteeRef.InitializeState())
         Config.NotifyArrest("Could not arrest " + arresteeRef.Name)
         RPB_Utility.LogError("Could not arrest " + arresteeRef.Name + " for "+ RPB_Utility.GetFormNameCached(crimeFaction) +", the state was invalid! (aborting)", "EventManager::OnArrestBegin")
+        if (isPlayer) ; the controls Arrest.OnArrestPreparing took
+            Game.EnablePlayerControls(abMovement = true, abFighting = true, abCamSwitch = false, abLooking = false, abSneaking = false, abMenu = false, abActivate = false, abJournalTabs = false, aiDisablePOVType = 0)
+        endif
         return
     endif
 
@@ -1324,22 +1356,27 @@ endEvent
     Who @akSpeaker is talking to, for his dialogue fragments' events. GetDialogueTarget() returns none when many guards talk
     at once, and sometimes the speaker himself: a guard who had been fighting next to the player confronted "himself", and
     his go-to-jail line then arrested him instead of the player (2026-10-02). Either way, the player is the fallback when
-    nearby: for now these crime lines are only spoken to the player. When NPCs get them too (NPC Bounty Detection), this
-    fallback has to know the real target instead.
+    nearby: for now these crime lines are only spoken to the player, so with the player nearby the target is the player,
+    whoever GetDialogueTarget() names. When NPCs get them too (NPC Bounty Detection), this has to know the real target.
 /;
 Actor function __DialogueTargetOf(Actor akSpeaker, string asCaller)
     if (RPB_Utility.IsFrozenNPC(akSpeaker))
         return none ; GetDialogueTarget() on him hangs
     endif
     Actor target = akSpeaker.GetDialogueTarget()
-    ; A frozen NPC isn't who a crime line is for: a live guard's target read as a killed frozen clone lying next to him, and
-    ; the confrontation went to the clone (2026-10-05, the overnight run)
-    if (target && target != akSpeaker && !RPB_Utility.IsFrozenNPC(target))
+    if (target == Config.Player)
         return target
     endif
+    ; Anyone else nearby is a wrong read while these lines are only spoken to the player: a killed frozen clone lying next
+    ; to the guard (2026-10-05), the bandit he had just fought (2026-10-08: the player's "go to jail" arrested the bandit,
+    ; the player was never arrested and got their set-aside bounty back 30s later)
     if (akSpeaker.GetDistance(Config.Player) <= 1000)
         RPB_Utility.LogWarn("The dialogue target of " + akSpeaker + " came back as " + target + ", falling back to the player since they are nearby", asCaller)
         return Config.Player
+    endif
+    ; The player far off: the target as read, if it's someone who can be spoken to
+    if (target && target != akSpeaker && !RPB_Utility.IsFrozenNPC(target) && !RPB_Utility.IsDeadNoCall(target))
+        return target
     endif
     return none
 endFunction
