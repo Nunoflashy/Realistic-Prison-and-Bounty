@@ -953,6 +953,11 @@ state Escorting
         if (!__assistOn || !__assistEscort)
             return
         endif
+        ; No reads of the guard in the first seconds after a load (RPB_Utility.IsLoadSettling)
+        if (RPB_Utility.IsLoadSettling())
+            RegisterForSingleUpdate(1.0)
+            return
+        endif
         __assistTicks += 1 ; before any call on the guard: a tick stuck on a frozen one stops counting (the Prison watches it)
 
         ; The starting positions, on this update stack instead of the Scene's (StartEscortAssist)

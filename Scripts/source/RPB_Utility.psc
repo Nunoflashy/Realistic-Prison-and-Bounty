@@ -245,6 +245,7 @@ scriptname RPB_Utility hidden
     function SetReleaseOnPackageChangeForTest(bool abOn) global
     function SetSceneEndSpacedForTest(bool abSpaced) global
     function SetSceneRaceForTest(bool abArmed) global
+    bool function IsLoadSettling() global
     string function SceneRaceTakenForTest() global
     bool function IsTestTeardownRunning() global
     function SetTestTeardownRunning(bool abRunning) global
@@ -4448,6 +4449,18 @@ function SetSceneRaceForTest(bool abArmed) global
     if (abArmed)
         JDB.solveStrSetter(".rpb_root.testSceneRaceTaken", "", true)
     endif
+endFunction
+
+;/
+    The first seconds after a game load, while the engine still restores the actors of the save. A save made as the escort
+    to jail ended froze its guard on about half of its loads (KNOWN_ISSUES round 172): the Scene's end came right after the
+    load and RPB went on with the guard at once (the strip, the escort to the cell, his package lock); the same moment in
+    play, or a load at another Scene's end, never froze him. What touches an escort guard waits these seconds out
+    (SceneManager.OnSceneEnd, the escort assist's ticks). The load's stamp is RPB_ConfigAlias.PerformMaintenance's
+/;
+bool function IsLoadSettling() global
+    float sinceLoad = Utility.GetCurrentRealTime() - JDB.solveFlt(".rpb_root.loadStamp")
+    return sinceLoad >= 0.0 && sinceLoad < 5.0
 endFunction
 
 ; The Scene the test race was taken by ("" while it hasn't been)

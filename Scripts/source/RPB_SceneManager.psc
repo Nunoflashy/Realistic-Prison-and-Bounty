@@ -247,14 +247,28 @@ int function __StagingFor(string asScene)
     return staged
 endFunction
 
+;/
+    The Scene setup (names, form IDs, types, alias slots, globals) is the same on every load: built once, and again only
+    when SCENE_SETUP_VERSION changes (raise it with any change to SetupGlobals, SetupScenes or CreateSceneConfig). Every
+    load used to delete and rebuild it, ~2.3s with no Scene to look up, and to delete the queue: a Scene of the save ending
+    in those seconds found no actors (the strip played with nobody, the prison flow was never queued and the guard walked
+    off) and the queued intake was lost (KNOWN_ISSUES round 172). The queue and each queued Scene's actors are kept: the
+    queue drops a Scene whose actor is gone when it comes up (PlayQueued).
+/;
+int property SCENE_SETUP_VERSION = 1 autoreadonly
+int __sceneSetupVersion
+
 function SceneManager()
+    if (__sceneSetupVersion == SCENE_SETUP_VERSION && __sceneContainer && FastMap_Size(__sceneContainer) > 0 && __sceneConfig && __globals)
+        Debug("SceneManager::SceneManager", "Scene setup kept (version " + __sceneSetupVersion + "), " + JArray.count(__queuedScenes) + " Scenes queued")
+        return
+    endif
+
     __sceneContainer    = delete(__sceneContainer)
     __sceneToCategory   = delete(__sceneToCategory)
     __sceneConfig       = delete(__sceneConfig)
     __globals           = delete(__globals)
     __globalDefaults    = delete(__globalDefaults)
-    __queuedScenes      = delete(__queuedScenes)
-    __queuedAliases     = delete(__queuedAliases)
 
     __sceneContainer    = Object_CreateIfNotExists(__sceneContainer,  FastMap("<string>",   retain = true))
     __sceneToCategory   = Object_CreateIfNotExists(__sceneToCategory, FastMap("<string>",   retain = true))
@@ -267,6 +281,7 @@ function SceneManager()
     self.SetupGlobals()
     self.SetupScenes()
     self.CreateSceneConfig()
+    __sceneSetupVersion = SCENE_SETUP_VERSION
 endFunction
 
 ; ==========================================================
@@ -309,6 +324,7 @@ function ResetGlobal(string asGlobal)
     endif
 endFunction
 
+; A change here needs SCENE_SETUP_VERSION raised: loads keep the setup they built (SceneManager())
 function SetupGlobals()
     ; Control Flow - Scene Dialogue
     self.AddGlobal("RPB_Scene_Dialogue_CF01", 0x264B5)
@@ -445,6 +461,7 @@ string function GetSceneType(string asSceneName)
     return FastMap_GetString(__sceneToCategory, asSceneName)
 endFunction
 
+; A change here needs SCENE_SETUP_VERSION raised: loads keep the setup they built (SceneManager())
 function SetupScenes()
     float x = StartBenchmark()
 
@@ -792,6 +809,7 @@ endFunction
     Handles the Scenes' configuration related to the ReferenceAlias they have,
     where each one starts (index) and how many there are for every Scene.
 /;
+; A change here needs SCENE_SETUP_VERSION raised: loads keep the setup they built (SceneManager())
 function CreateSceneConfig()
     float sceneConfigBench = StartBenchmark()
 
@@ -2136,6 +2154,14 @@ event OnScenePlaying(string name, int phaseEvent, int phase, Scene sender)
 endEvent
 
 event OnSceneEnd(string name, Scene sender)
+    ; Ended right after a load: the next Scene, the guard's package lock and the probes wait until the save's actors are
+    ; restored (RPB_Utility.IsLoadSettling: the save that froze its guard on half its loads)
+    if (RPB_Utility.IsLoadSettling())
+        Info("SceneManager: " + name + " ended just after a load: handled once the load has settled")
+        while (RPB_Utility.IsLoadSettling())
+            Utility.Wait(0.5)
+        endWhile
+    endif
     string type = self.GetSceneType(name)
     Actor lockAfterFinish = none ; the escort to jail's guard, locked once this Scene is fully over (see below)
     self.__EndSceneBookkeeping(name) ; over before its events start the next one (see __EndSceneBookkeeping)
