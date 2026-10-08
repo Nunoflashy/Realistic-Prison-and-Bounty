@@ -490,6 +490,11 @@ endFunction
 
 function RevertArrest()
     self.__ReleasePendingHold(abReverted = true) ; a pending arrest reverted (a death on either side, or a reset) must not leave me frozen
+    ; The fighting controls the arrest took at its start (Arrest.OnArrestPreparing): an arrest reverted before its
+    ; confrontation never got to give them back
+    if (this == Game.GetPlayer())
+        Game.EnablePlayerControls(abMovement = false, abFighting = true, abCamSwitch = false, abLooking = false, abSneaking = false, abMenu = false, abActivate = false, abJournalTabs = false, aiDisablePOVType = 0)
+    endif
 
     ; Unbind from Cuffs
     self.Uncuff()

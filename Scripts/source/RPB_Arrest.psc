@@ -1087,6 +1087,12 @@ event OnArrestPreparing(Actor akArrestee, Actor akCaptor, Faction akCrimeFaction
     akArrestee.StopCombat()
     akArrestee.StopCombatAlarm()
     akArrestee.SheatheWeapon()
+    ; And no drawing it again: until the confrontation starts (RetainAI, ~1-2s, much longer when the arrest is held up) the
+    ; player's controls were all on, and a weapon drawn then broke the hands-behind-back pose later. Given back by the
+    ; confrontation's own controls, or by the arrest's revert (Arrestee.RevertArrest) if it never gets there
+    if (akArrestee == Game.GetPlayer())
+        Game.DisablePlayerControls(abMovement = false, abFighting = true, abCamSwitch = false, abLooking = false, abSneaking = false, abMenu = false, abActivate = false, abJournalTabs = false, aiDisablePOVType = 0)
+    endif
 endEvent
 
 ;/
