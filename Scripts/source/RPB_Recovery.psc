@@ -225,6 +225,36 @@ string function CancelArrest(Actor akActor, string asReason, bool abReturnBelong
         RPB_Recovery.__Step(akActor, "CancelArrest: " + (spacing as int) + "s after the Scene end (experiment C/F)")
     endif
 
+    ; The guard's Scene was just stopped under him: the rest of the cancel (the uncuff, the arrest's effects, the
+    ; imprisonment cancel, his release) waits RPB_Utility.CancelSettleSeconds(). All of it within a second of the stop froze
+    ; him (rounds 100-109: 1 in 4-7; a 3s gap 1 in 24, a 10s gap 0 in 51; any one part alone right after the stop was
+    ; clean), and the same burst right after a load froze save 24's guard (round 172). The player's controls and pose come
+    ; back first: nothing of theirs waits. Not for a dead or frozen guard, nor under the old experiments' own gap
+    bool poseReset = false
+    if (sceneStopped && !RPB_Utility.IsSceneEndSpacedForTest())
+        RPB_Arrestee settlingArrestee = arrest.Arrestees.AtKey(akActor)
+        Actor settlingGuard = none
+        if (settlingArrestee)
+            settlingGuard = settlingArrestee.GetCaptorActor() ; from storage, no call into him
+        endif
+        if (settlingGuard && !RPB_Utility.IsDeadNoCall(settlingGuard) && !RPB_Utility.IsFrozenNPC(settlingGuard))
+            ; Nothing of the arrest takes them back meanwhile: the escort assist (it makes the player AI-driven again when
+            ; far from the guard) and the escort watch (its leash and stall fallback) stop now
+            settlingArrestee.EndEscortWatch()
+            if (prisonerRef)
+                prisonerRef.StopEscortAssist()
+            endif
+            if (akActor == Game.GetPlayer())
+                RPB_Utility.ReleaseAI(true)
+                Debug.SendAnimationEvent(akActor, "IdleForceDefaultState")
+                poseReset = true
+            endif
+            float settle = RPB_Utility.CancelSettleSeconds()
+            RPB_Recovery.__Step(akActor, "CancelArrest: controls back, the rest in " + settle + "s (" + settlingGuard + "'s Scene stopped)")
+            Utility.Wait(settle)
+        endif
+    endif
+
     RPB_Arrestee arresteeRef = arrest.Arrestees.AtKey(akActor)
     RPB_Recovery.__Step(akActor, "CancelArrest: arrestee looked up (" + arresteeRef + ")")
     if (arresteeRef)
@@ -298,8 +328,12 @@ string function CancelArrest(Actor akActor, string asReason, bool abReturnBelong
         done += "cuffs removed; "
     endif
     ; The confrontation's pose ("Hands Behind Back" is a looping idle) outlives the Scene ended above: a fight before the
-    ; cuffs left the player holding it, free to go but stuck in the pose
-    Debug.SendAnimationEvent(akActor, "IdleForceDefaultState")
+    ; cuffs left the player holding it, free to go but stuck in the pose. Only once: sent again after the wait above, with
+    ; the player's weapon or fists drawn by then, it left them drawn but stuck in an idle (no attacks, the camera locked
+    ; at the next arrest)
+    if (!poseReset)
+        Debug.SendAnimationEvent(akActor, "IdleForceDefaultState")
+    endif
     RPB_Recovery.__Step(akActor, "CancelArrest: holds and cuffs done")
     if (akActor == Game.GetPlayer())
         RPB_Utility.ReleaseAI(true)

@@ -246,6 +246,8 @@ scriptname RPB_Utility hidden
     function SetSceneEndSpacedForTest(bool abSpaced) global
     function SetSceneRaceForTest(bool abArmed) global
     bool function IsLoadSettling() global
+    float function CancelSettleSeconds() global
+    function SetCancelSettleSeconds(float afSeconds) global
     string function SceneRaceTakenForTest() global
     bool function IsTestTeardownRunning() global
     function SetTestTeardownRunning(bool abRunning) global
@@ -4469,6 +4471,23 @@ bool function IsLoadSettling() global
     endif
     float settledAt = JDB.solveFlt(".rpb_root.loadSettledAt")
     return settledAt < loadStamp || now - settledAt < 1.0
+endFunction
+
+;/
+    How long a cancel waits between stopping the guard's Scene and the rest of it (RPB_Recovery.CancelArrest). Rounds
+    100-109: the whole cancel within a second of the stop froze him 1 time in 4-7, a 3s gap 1 in 24, a 10s gap 0 in 51.
+    10s unless the dev menu set another (test 195), to measure shorter ones
+/;
+float function CancelSettleSeconds() global
+    float seconds = JDB.solveFlt(".rpb_root.cancelSettleSeconds")
+    if (seconds <= 0.0)
+        return 10.0
+    endif
+    return seconds
+endFunction
+
+function SetCancelSettleSeconds(float afSeconds) global
+    JDB.solveFltSetter(".rpb_root.cancelSettleSeconds", afSeconds, true)
 endFunction
 
 ; The Scene the test race was taken by ("" while it hasn't been)
