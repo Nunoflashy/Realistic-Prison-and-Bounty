@@ -4,6 +4,7 @@ scriptname RPB_Recovery hidden
 @functions:
     string function ResetActor(Actor akActor) global
     string function CancelArrest(Actor akActor, string asReason, bool abReturnBelongings = true) global
+    bool function FinishCancelNow(Actor akActor) global
 /;
 
 ;/
@@ -231,6 +232,7 @@ string function CancelArrest(Actor akActor, string asReason, bool abReturnBelong
     ; clean), and the same burst right after a load froze save 24's guard (round 172). The player's controls and pose come
     ; back first: nothing of theirs waits. Not for a dead or frozen guard, nor under the old experiments' own gap
     bool poseReset = false
+    bool hostilityGivenBack = false
     if (sceneStopped && !RPB_Utility.IsSceneEndSpacedForTest())
         RPB_Arrestee settlingArrestee = arrest.Arrestees.AtKey(akActor)
         Actor settlingGuard = none
@@ -248,10 +250,29 @@ string function CancelArrest(Actor akActor, string asReason, bool abReturnBelong
                 RPB_Utility.ReleaseAI(true)
                 Debug.SendAnimationEvent(akActor, "IdleForceDefaultState")
                 poseReset = true
+                ; Their bounty, the guards' arrest on sight and their hostility come back now too: through the wait no guard
+                ; would confront them (a bounty over the arrest-on-sight threshold, 10s to walk away). Untracked first: a
+                ; bounty given back while its stat is watched gets hidden again (round 123); given back, the latent bounty is
+                ; cleared, so the revert's own give-back after the wait does nothing
+                settlingArrestee.UnregisterForTrackedStats()
+                settlingArrestee.RestoreBounty()
+                RPB_Arrest.EnableForcedArrestDialogue()
+                if (RPB_Utility.ApplyHostilitySnapshot(akActor, hostility) > 0)
+                    done += "hostility restored; "
+                endif
+                hostilityGivenBack = true
             endif
             float settle = RPB_Utility.CancelSettleSeconds()
             RPB_Recovery.__Step(akActor, "CancelArrest: controls back, the rest in " + settle + "s (" + settlingGuard + "'s Scene stopped)")
-            Utility.Wait(settle)
+            ; Noted while it waits, so a new arrest of them doesn't bounce off this one (FinishCancelNow): counted in steps,
+            ; not real time, which restarts with a new game session should this be saved mid-wait
+            int settling = __CancelsSettling()
+            JFormMap.setInt(settling, akActor, 1)
+            int steps = (settle / 0.25) as int
+            while (steps > 0 && JFormMap.getInt(settling, akActor) == 1)
+                Utility.Wait(0.25)
+                steps -= 1
+            endWhile
         endif
     endif
 
@@ -346,11 +367,56 @@ string function CancelArrest(Actor akActor, string asReason, bool abReturnBelong
     akActor.EvaluatePackage()
     RPB_Recovery.__Step(akActor, "CancelArrest: AI and controls released")
 
-    if (RPB_Utility.ApplyHostilitySnapshot(akActor, hostility) > 0)
+    if (!hostilityGivenBack && RPB_Utility.ApplyHostilitySnapshot(akActor, hostility) > 0)
         done += "hostility restored; "
     endif
     RPB_Utility.Info("Arrest of " + akActor.GetDisplayName() + " " + akActor + " cancelled (" + asReason + "): " + RPB_Utility.string_if(done == "", "nothing left to undo", done))
+    int settlingNotes = JDB.solveObj(".rpb_root.cancelsSettling")
+    if (settlingNotes)
+        JFormMap.removeKey(settlingNotes, akActor) ; FinishCancelNow waits for this
+    endif
     return done
+endFunction
+
+;/
+    A new arrest of @akActor while their last one is still being cancelled (CancelArrest's wait after the guard's Scene
+    stop): the wait is cut short and this returns once the cancel is done, so the new arrest goes on. Rejected instead
+    ("already arrested": the effects were still on), the guard forcegreeted them again and again until the wait ran out.
+    False at once when nothing is being cancelled. 15s at most
+/;
+bool function FinishCancelNow(Actor akActor) global
+    int settling = JDB.solveObj(".rpb_root.cancelsSettling")
+    if (!settling || !akActor || !JFormMap.hasKey(settling, akActor))
+        return false
+    endif
+    RPB_Utility.Info("A new arrest of " + akActor + " while their last one is being cancelled: the cancel finishes first")
+    JFormMap.setInt(settling, akActor, 2)
+    int steps = 60
+    while (steps > 0 && JFormMap.hasKey(settling, akActor))
+        Utility.Wait(0.25)
+        steps -= 1
+    endWhile
+    ; And until the old arrest's effects are off them: the new arrest casts the same spells, and cast while the old ones
+    ; were still coming off it took 16s to register (2026-10-08)
+    MagicEffect arresteeEffect = RPB_Utility.RPB_ArresteeSpell().GetNthEffectMagicEffect(0)
+    MagicEffect prisonerEffect = RPB_Utility.RPB_PrisonerSpell().GetNthEffectMagicEffect(0)
+    float start = Utility.GetCurrentRealTime()
+    steps = 12
+    while (steps > 0 && (akActor.HasMagicEffect(arresteeEffect) || akActor.HasMagicEffect(prisonerEffect)))
+        Utility.Wait(0.25)
+        steps -= 1
+    endWhile
+    RPB_Utility.Info("The cancel of " + akActor + "'s last arrest is done (its effects off after " + (((Utility.GetCurrentRealTime() - start) * 1000.0) as int) + "ms, still on: " + akActor.HasMagicEffect(arresteeEffect) + "/" + akActor.HasMagicEffect(prisonerEffect) + "), the new arrest goes on")
+    return true
+endFunction
+
+int function __CancelsSettling() global
+    int settling = JDB.solveObj(".rpb_root.cancelsSettling")
+    if (!settling)
+        settling = JFormMap.object()
+        JDB.solveObjSetter(".rpb_root.cancelsSettling", settling, true)
+    endif
+    return settling
 endFunction
 
 ; A step mark (DEBUG only, built only then): a reset that never finished (126's teardown) left no trace of where it stopped

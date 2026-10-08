@@ -649,6 +649,9 @@ event OnArrestBegin(string eventName, string arrestType, float arresteeIdFlt, Fo
         return
     endif
 
+    ; Their last arrest still being cancelled (its wait after the guard's Scene stop) would read as "already arrested"
+    RPB_Recovery.FinishCancelNow(arrestee)
+
     int arrestStatus = Arrest.GetActorArrestStatus(arrestee)
 
     if (arrestStatus == Arrest.ALREADY_ARRESTED)
@@ -927,6 +930,17 @@ event OnArrestScene(string asScene, string asSceneEvent, RPB_Arrestee apArrestee
                 ; Back turned to him, read from the arrestee alone: copying his angle was a call into him, and a frozen guard
                 ; held the pose back until he answered, after the cuffs were on (2026-10-04)
                 RPB_Utility.TurnBackTo(apArrestee.GetActor(), escort)
+                ; Sheathed again first: the arrest sheathes at its start (Arrest.OnArrestPreparing), and a weapon drawn again
+                ; before the confrontation (a delayed start) took the pose half on (a bow held in the left hand): the pose
+                ; is a raw animation event, nothing checks the actor's state
+                Actor posing = apArrestee.GetActor()
+                if (posing.IsWeaponDrawn())
+                    posing.SheatheWeapon()
+                    float sheatheStart = Utility.GetCurrentRealTime()
+                    while (posing.IsWeaponDrawn() && (Utility.GetCurrentRealTime() - sheatheStart) < 1.5)
+                        Utility.Wait(0.1)
+                    endWhile
+                endif
                 apArrestee.PlayAnimation("IdleHandsBehindBack")
             
             elseif (asSceneSecondaryEvent == "Handcuff")
