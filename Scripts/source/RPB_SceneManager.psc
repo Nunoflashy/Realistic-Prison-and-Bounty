@@ -1139,6 +1139,16 @@ function QueueOrPlay(string asSceneName)
         self.__ClearSceneQueue() ; also clear whatever stale entries piled up behind the desynced flag
     endif
 
+    ; Test-only (189, RPB_Utility.SetSceneRaceForTest): this Scene plays at once with none of its actors, whatever is
+    ; playing, as the load's race did. One JDB read otherwise
+    if (JDB.solveInt(".rpb_root.testSceneRace") != 0)
+        JDB.solveIntSetter(".rpb_root.testSceneRace", 0)
+        JDB.solveStrSetter(".rpb_root.testSceneRaceTaken", asSceneName, true)
+        Object_Clear(self.__StagingFor(asSceneName))
+        Info("SceneManager: test race: " + asSceneName + " plays at once with no actors bound (playing: '" + currentScene + "', flag " + __isScenePlaying + ")")
+        __isScenePlaying = false
+    endif
+
     int queuedSceneCount = JArray.count(__queuedScenes)
 
     ; Queue Scene
@@ -1841,12 +1851,44 @@ endFunction
 ; endFunction
 
 
+;/
+    Diagnostic (KNOWN_ISSUES round 172): the escort to jail's last-phase fragment ("Escorted to Jail") fired again on every
+    load of a save made during the strip, so the engine still had that Scene playing after its end was handled here. Which
+    of the prison flow's Scenes the engine still plays as another starts: a guard held by two Scenes is the freeze suspect.
+    About 7 IsPlaying() calls per Scene start
+/;
+function __LogScenesStillPlaying(string asStarting)
+    string[] names = new string[7]
+    names[0] = SCENE_ARREST_START_02
+    names[1] = SCENE_ESCORT_TO_JAIL_01
+    names[2] = SCENE_FRISKING
+    names[3] = SCENE_STRIPPING_02
+    names[4] = SCENE_RESTRAIN_PRISONER_02
+    names[5] = SCENE_GIVE_CLOTHING
+    names[6] = SCENE_ESCORT_TO_CELL_01
+    string playing = ""
+    int i = 0
+    while (i < names.Length)
+        if (names[i] != asStarting && self.SceneExists(names[i]))
+            Scene other = GetFormFromMod(self.GetSceneFormID(names[i])) as Scene
+            if (other && other.IsPlaying())
+                playing += names[i] + " "
+            endif
+        endif
+        i += 1
+    endWhile
+    if (playing != "")
+        Info("SceneManager: " + asStarting + " starts while the engine still plays: " + playing)
+    endif
+endFunction
+
 event OnSceneStart(string name, Scene sender)
     __lastStartedScene = name
     Form[] params   = self.GetSceneReferences(name)
     string type     = self.GetSceneType(name)
 
     Debug("SceneManager::OnSceneStart", "Starting Scene: " + name)
+    self.__LogScenesStillPlaying(name)
 
     self.HandleSceneGlobalControlFlow(type, name)
 

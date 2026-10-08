@@ -272,6 +272,12 @@ function SetTests()
     self.AddTest("184 - Benchmark: the Time Skip's NPC Releases on Its Own Stack vs by Event (6 bandits each; advances the clock a few days)", "Test_ReleaseByEventBenchmark", abChainable = false)
     self.AddTest("187 - Freeze Control, NPC: 156's Steps With a Bandit (moved 1500 away and back mid escort, ended by a reset; repeat it)", "Test_NpcFreeWalkControl", abChainable = false)
     self.AddTest("188 - Freeze Control, Alternating: 187 (NPC) and 156 (player) by turns, the same-session comparison (repeat it)", "Test_FreezeControlAlternating", abChainable = false)
+    self.AddTest("189 - Freeze Repro: the Strip Starts With No Actors as the Player's Escort to Jail Ends (the load's race, forced; repeat it)", "Test_SceneRaceAtPrison", abChainable = false)
+    self.AddTest("190 - Freeze Repro Control: 189 With the Prison Flow Queued in Order (repeat it)", "Test_SceneRaceAtPrison_Control", abChainable = false)
+    self.AddTest("191 - Freeze Repro: Arrested on the Escort's Destination, the Escort to Jail Ends at Once (stand in Castle Dour past the stairs; repeat it)", "Test_EscortEndsAtOnce", abChainable = false)
+    self.AddTest("192 - Freeze Repro: 191 With the Load's Scene Rebuild as the Escort Starts (stand in Castle Dour past the stairs; repeat it)", "Test_EscortEndsAtOnce_Rebuild", abChainable = false)
+    self.AddTest("193 - Freeze Repro: 191 Without the Confrontation (cuffed and escorted at once on the destination; stand a few steps from the marker past Castle Dour's stairs; repeat it)", "Test_EscortEndsAtOnce_NoConfront", abChainable = false)
+    self.AddTest("194 - Freeze Repro: 193 With the Load's Scene Rebuild as the Escort Starts (repeat it)", "Test_EscortEndsAtOnce_NoConfrontRebuild", abChainable = false)
     self.AddTest("185 - Two Prisoners in Cells: a Freezable Bandit and Vivienne Onis (freeze him with the prisoner key, then talk to her: does the dialogue lock?)", "Test_FrozenPrisonerDialogue", abChainable = false)
     self.AddTest("041 - ActiveMagicEffectContainer: Stuck Lock Self-Heals", "Test_ActiveMagicEffectContainer_StuckLockSelfHeals")
     self.AddTest("042 - ThreadLock: JAtomic Primitive Semantics and Registry", "Test_ThreadLock_PrimitiveSemantics")
@@ -13718,6 +13724,136 @@ bool function __Scenario_NpcFreeWalkControl(string asTest)
 endFunction
 
 ;/
+    189/190: the freeze a load reproduced (2026-10-08, KNOWN_ISSUES round 172). A save at the end of the player's escort to
+    jail, loaded 20 times: whenever the strip started at once with no actors while the escort was still ending (the load's
+    maintenance rebuilt the queue under it), the guard froze, 8 times in 14; never when the prison flow queued in order (0
+    in 5). Here a clone guard arrests the player; once the escort is under way both are moved to its destination, and with
+    @abRace the first Scene the prison flow queues plays at once with no actors (SceneManager's test race), as after the
+    load. The guard is read 15s after the escort's end (its probes' +5s and +8s, and their checks), before the teardown
+    stops anything.
+/;
+bool function __Scenario_SceneRaceAtPrison(string asTest, bool abRace)
+    RPB_SceneManager sceneManager = RPB_API.GetSceneManager()
+    Actor guard = __ScenarioGuard()
+    if (!guard)
+        return false
+    endif
+    Actor player = __ScenarioArrestee(true, guard)
+    __ScenarioArrest(guard, player, asTest)
+    if (!__ScenarioWaitEscortToJail(player, 40.0))
+        return assert_true(false, asTest + ": the escort to jail never started")
+    endif
+    string escortScene = sceneManager.GetCurrentScene()
+    ObjectReference destination = sceneManager.GetSceneNthReferenceOfType(escortScene, "Guard_EscortLocation")
+    if (!assert_true(destination != none, asTest + ": no Guard_EscortLocation in " + escortScene))
+        return false
+    endif
+
+    Utility.Wait(5.0) ; under way
+    RPB_Utility.SetSceneRaceForTest(abRace)
+    guard.MoveTo(destination)
+    player.MoveTo(guard, afXOffset = -100.0, abMatchRotation = false)
+    float start = Utility.GetCurrentRealTime()
+    while (sceneManager.GetCurrentScene() == escortScene && (Utility.GetCurrentRealTime() - start) < 40.0)
+        Utility.Wait(0.25)
+    endWhile
+    bool ended = sceneManager.GetCurrentScene() != escortScene
+    ; Armed until the prison flow queues its first Scene: it comes from the escort's end event, a moment after the escort
+    ; leaves the queue (the first runs disarmed it here, before the strip was queued, and never raced)
+    float queuedBy = Utility.GetCurrentRealTime() + 10.0
+    while (abRace && RPB_Utility.SceneRaceTakenForTest() == "" && Utility.GetCurrentRealTime() < queuedBy)
+        Utility.Wait(0.1)
+    endWhile
+    string raced = RPB_Utility.SceneRaceTakenForTest()
+    RPB_Utility.SetSceneRaceForTest(false)
+    log(asTest + ": the escort to jail left the queue " + ended + " after " + __Ms(Utility.GetCurrentRealTime() - start) + "ms (race " + abRace + ", played at once: '" + raced + "', now '" + sceneManager.GetCurrentScene() + "')")
+    if (!assert_true(ended, asTest + ": the escort to jail never ended at its destination"))
+        return false
+    endif
+
+    Utility.Wait(15.0)
+    bool guardFrozen = RPB_Utility.IsFrozenNPC(guard)
+    log(asTest + ": SUMMARY race " + abRace + " ('" + raced + "'), guard " + guard + " frozen " + guardFrozen)
+    if (abRace && !assert_true(raced != "", asTest + ": the race was never taken (no Scene queued after the escort)"))
+        return false
+    endif
+    return assert_true(true, asTest + ": guard frozen " + guardFrozen)
+endFunction
+
+;/
+    191/192: the load's freeze set up the mod author's way (KNOWN_ISSUES round 172). 189's race alone never froze (0 in 5).
+    In the save that froze 8 times in 14 loads the guard stood on the escort's destination with the player a few steps off
+    (Castle Dour, past the stairs), and the escort to jail ended as soon as it resumed, while the load's maintenance rebuilt
+    the Scene setup. Run from that spot: the clone guard is put on the nearest escort location and arrests the player there,
+    so the escort to jail starts at its own destination and ends at once. With @abRebuild the load's Scene rebuild
+    (SceneManager(), what RPB_ConfigAlias runs on every load) runs as the escort starts. The guard is read 15s after the
+    escort leaves the queue, before the teardown. 193/194 (@abSkipConfrontation): no confrontation, the player cuffed and
+    the escort to jail started at once (RPB_Utility.SetConfrontationSkippedForTest), as the save resumed it.
+/;
+bool function __Scenario_EscortEndsAtOnce(string asTest, bool abRebuild, bool abSkipConfrontation)
+    RPB_SceneManager sceneManager = RPB_API.GetSceneManager()
+    RPB_Prison prison = (RPB_API.GetPrisonManager()).GetPrison("Haafingar")
+    Actor player = Game.GetFormEx(0x14) as Actor
+    ObjectReference destination = none
+    Form[] locations = prison.GetEscortLocations()
+    int i = 0
+    while (i < locations.Length)
+        ObjectReference escortLocation = locations[i] as ObjectReference
+        if (escortLocation && (!destination || player.GetDistance(escortLocation) < player.GetDistance(destination)))
+            destination = escortLocation
+        endif
+        i += 1
+    endWhile
+    if (!assert_true(destination != none && player.GetDistance(destination) < 1500.0, asTest + ": no escort location within 1500 (stand in Castle Dour past the stairs; nearest " + destination + ")"))
+        return false
+    endif
+    ; The teardown sends the player back to the return marker: one left in Solitude by another test would take them out
+    ; of Castle Dour after the first run, so it moves here (each repeat then starts where the first did)
+    if (__scenarioReturnMarker && (__scenarioReturnMarker.GetParentCell() != player.GetParentCell() || player.GetDistance(__scenarioReturnMarker) > 300.0))
+        __scenarioReturnMarker.MoveTo(player)
+    endif
+    Actor guard = __ScenarioGuard()
+    if (!guard)
+        return false
+    endif
+    __ScenarioArrestee(true, guard)
+    guard.MoveTo(destination)
+    Utility.Wait(1.0)
+    log(asTest + ": the guard on " + destination + " (" + locations.Length + " escort locations), the player " + (player.GetDistance(destination) as int) + " away")
+    RPB_Utility.SetConfrontationSkippedForTest(abSkipConfrontation)
+    __ScenarioArrest(guard, player, asTest)
+
+    ; The escort ends right after it starts here: watched closely
+    float start = Utility.GetCurrentRealTime()
+    while (!sceneManager.IsSceneOfType(sceneManager.GetCurrentScene(), sceneManager.CATEGORY_ESCORT_TO_JAIL) && (Utility.GetCurrentRealTime() - start) < 60.0)
+        Utility.Wait(0.05)
+    endWhile
+    string escortScene = sceneManager.GetCurrentScene()
+    RPB_Utility.SetConfrontationSkippedForTest(false)
+    if (!assert_true(sceneManager.IsSceneOfType(escortScene, sceneManager.CATEGORY_ESCORT_TO_JAIL), asTest + ": the escort to jail never started (now '" + escortScene + "')"))
+        return false
+    endif
+    start = Utility.GetCurrentRealTime()
+    if (abRebuild)
+        sceneManager.SceneManager()
+        log(asTest + ": the load's Scene rebuild ran in " + __Ms(Utility.GetCurrentRealTime() - start) + "ms (now '" + sceneManager.GetCurrentScene() + "')")
+    endif
+    while (sceneManager.GetCurrentScene() == escortScene && (Utility.GetCurrentRealTime() - start) < 40.0)
+        Utility.Wait(0.25)
+    endWhile
+    bool ended = sceneManager.GetCurrentScene() != escortScene
+    log(asTest + ": the escort to jail left the queue " + ended + " after " + __Ms(Utility.GetCurrentRealTime() - start) + "ms (now '" + sceneManager.GetCurrentScene() + "')")
+    if (!assert_true(ended, asTest + ": the escort to jail never ended at its destination"))
+        return false
+    endif
+
+    Utility.Wait(15.0)
+    bool guardFrozen = RPB_Utility.IsFrozenNPC(guard)
+    log(asTest + ": SUMMARY rebuild " + abRebuild + ", guard " + guard + " frozen " + guardFrozen)
+    return assert_true(true, asTest + ": guard frozen " + guardFrozen)
+endFunction
+
+;/
     150: the player's escort to jail is a free walk once it's underway (the guard walking, them close); moved 1500 away
     (past FREE_WALK_RADIUS), the AI takes over; moved next to the guard (walking on), their controls come back.
 /;
@@ -14924,7 +15060,7 @@ endFunction
 string __statelessTest = ""
 
 bool function __RunStatelessTest(string asTest)
-    if (asTest != "Test_ArrestWaitsWhileGuardFights_NoPackage" && asTest != "Test_CellDoorsDiagnostic" && asTest != "Test_LongAbsenceSetup" && asTest != "Test_LongAbsenceAdvance" && asTest != "Test_LongAbsenceVerify" && asTest != "Test_FallbackEscortToCellStopped_Player" && asTest != "Test_FallbackEscortToCellStopped_CloneGuard" && asTest != "Test_FightDuringEscort_NPC" && asTest != "Test_FightDuringEscort_Player" && asTest != "Test_GuardDiesInPrison_Player" && asTest != "Test_EscortToCellStopped_NoPackageLock" && StringUtil.Find(asTest, "Test_Surrender_") != 0 && asTest != "Test_FrozenGuardSkipped" && asTest != "Test_GuardDiesInPrison_NobodySees" && asTest != "Test_Escort_FreeWalk" && asTest != "Test_ToggleEscortToCell04" && asTest != "Test_CaptorFinishCycles_Calls" && asTest != "Test_CaptorFinishCycles_NoCalls" && asTest != "Test_CaptorFinishDetach_Calls" && asTest != "Test_CaptorFinishDetach_NoCalls" && asTest != "Test_Escort_FreeWalk_Control" && asTest != "Test_ActorKeys" && asTest != "Test_FrozenGuardCalls" && asTest != "Test_SimulatedFreezeCalls" && asTest != "Test_SimulatedFreezeAtCancel" && asTest != "Test_SpawnFreezableGuard" && asTest != "Test_AliasPackageControl" && asTest != "Test_FreezableEscort_Player" && asTest != "Test_FreezableEscort_NPC" && asTest != "Test_LightHold" && asTest != "Test_KillFrozenGuard" && asTest != "Test_LifetimeBountyStat" && asTest != "Test_FaintFrozenGuard" && asTest != "Test_FaintFrozenGuardShort" && asTest != "Test_FrozenEscortFallback" && asTest != "Test_HideFrozenGuard" && asTest != "Test_EscortToCellGuardHeld" && asTest != "Test_CuffedLimitEncumbrance" && asTest != "Test_CuffedLimitSettings" && asTest != "Test_EarlyHandback" && asTest != "Test_StalledEscortTakeover" && asTest != "Test_StalledEscortTakeoverLimit" && asTest != "Test_NpcEscortCancelControl" && asTest != "Test_FrozenPrisonerTimeSkip" && asTest != "Test_SpawnFreezablePrisoner" && asTest != "Test_SpawnFreezableArrestee" && asTest != "Test_GuardCrimeFactions" && asTest != "Test_PlayerEscortCancelControl" && asTest != "Test_ReleaseByEventBenchmark" && asTest != "Test_FrozenPrisonerDialogue" && asTest != "Test_NpcFreeWalkControl" && asTest != "Test_FreezeControlAlternating")
+    if (asTest != "Test_ArrestWaitsWhileGuardFights_NoPackage" && asTest != "Test_CellDoorsDiagnostic" && asTest != "Test_LongAbsenceSetup" && asTest != "Test_LongAbsenceAdvance" && asTest != "Test_LongAbsenceVerify" && asTest != "Test_FallbackEscortToCellStopped_Player" && asTest != "Test_FallbackEscortToCellStopped_CloneGuard" && asTest != "Test_FightDuringEscort_NPC" && asTest != "Test_FightDuringEscort_Player" && asTest != "Test_GuardDiesInPrison_Player" && asTest != "Test_EscortToCellStopped_NoPackageLock" && StringUtil.Find(asTest, "Test_Surrender_") != 0 && asTest != "Test_FrozenGuardSkipped" && asTest != "Test_GuardDiesInPrison_NobodySees" && asTest != "Test_Escort_FreeWalk" && asTest != "Test_ToggleEscortToCell04" && asTest != "Test_CaptorFinishCycles_Calls" && asTest != "Test_CaptorFinishCycles_NoCalls" && asTest != "Test_CaptorFinishDetach_Calls" && asTest != "Test_CaptorFinishDetach_NoCalls" && asTest != "Test_Escort_FreeWalk_Control" && asTest != "Test_ActorKeys" && asTest != "Test_FrozenGuardCalls" && asTest != "Test_SimulatedFreezeCalls" && asTest != "Test_SimulatedFreezeAtCancel" && asTest != "Test_SpawnFreezableGuard" && asTest != "Test_AliasPackageControl" && asTest != "Test_FreezableEscort_Player" && asTest != "Test_FreezableEscort_NPC" && asTest != "Test_LightHold" && asTest != "Test_KillFrozenGuard" && asTest != "Test_LifetimeBountyStat" && asTest != "Test_FaintFrozenGuard" && asTest != "Test_FaintFrozenGuardShort" && asTest != "Test_FrozenEscortFallback" && asTest != "Test_HideFrozenGuard" && asTest != "Test_EscortToCellGuardHeld" && asTest != "Test_CuffedLimitEncumbrance" && asTest != "Test_CuffedLimitSettings" && asTest != "Test_EarlyHandback" && asTest != "Test_StalledEscortTakeover" && asTest != "Test_StalledEscortTakeoverLimit" && asTest != "Test_NpcEscortCancelControl" && asTest != "Test_FrozenPrisonerTimeSkip" && asTest != "Test_SpawnFreezablePrisoner" && asTest != "Test_SpawnFreezableArrestee" && asTest != "Test_GuardCrimeFactions" && asTest != "Test_PlayerEscortCancelControl" && asTest != "Test_ReleaseByEventBenchmark" && asTest != "Test_FrozenPrisonerDialogue" && asTest != "Test_NpcFreeWalkControl" && asTest != "Test_FreezeControlAlternating" && asTest != "Test_SceneRaceAtPrison" && asTest != "Test_SceneRaceAtPrison_Control" && asTest != "Test_EscortEndsAtOnce" && asTest != "Test_EscortEndsAtOnce_Rebuild" && asTest != "Test_EscortEndsAtOnce_NoConfront" && asTest != "Test_EscortEndsAtOnce_NoConfrontRebuild")
         return false
     endif
 
@@ -15126,6 +15262,26 @@ bool function __RunStatelessTest(string asTest)
             log("188: run " + __freezeAlternateRun + ": the player side (156)")
             self.__RunFreeWalkControl()
         endif
+    elseif (asTest == "Test_SceneRaceAtPrison")
+        display_result(__Scenario_SceneRaceAtPrison("189", true))
+        __TeardownScenario()
+    elseif (asTest == "Test_SceneRaceAtPrison_Control")
+        display_result(__Scenario_SceneRaceAtPrison("190", false))
+        __TeardownScenario()
+    elseif (asTest == "Test_EscortEndsAtOnce")
+        display_result(__Scenario_EscortEndsAtOnce("191", false, false))
+        __TeardownScenario()
+    elseif (asTest == "Test_EscortEndsAtOnce_Rebuild")
+        display_result(__Scenario_EscortEndsAtOnce("192", true, false))
+        __TeardownScenario()
+    elseif (asTest == "Test_EscortEndsAtOnce_NoConfront")
+        display_result(__Scenario_EscortEndsAtOnce("193", false, true))
+        RPB_Utility.SetConfrontationSkippedForTest(false)
+        __TeardownScenario()
+    elseif (asTest == "Test_EscortEndsAtOnce_NoConfrontRebuild")
+        display_result(__Scenario_EscortEndsAtOnce("194", true, true))
+        RPB_Utility.SetConfrontationSkippedForTest(false)
+        __TeardownScenario()
     elseif (asTest == "Test_FrozenGuardSkipped")
         display_result(__Scenario_FrozenGuardSkipped("147"))
         RPB_Utility.ClearFrozenNPCs()
