@@ -1211,6 +1211,20 @@ function PlayQueued()
                 self.PlayQueued()
                 return
             endif
+            ; An arrest's escort only follows the cuffs: a confrontation that stopped before them (its guard pulled into a
+            ; fight as it began) still had this escort queued (it counts as confirmed from its first phase), and it started
+            ; with the arrestee free-handed, paused for the fight as a "cuffed" pending arrest, and cuffed them out of
+            ; nowhere when it resumed (2026-10-08). The same as a fight before the cuffs: the arrest is cancelled
+            if (queuedType == CATEGORY_ESCORT_TO_JAIL && RPB_Utility.IsActorArrested(queuedEscortee) && !RPB_Utility.IsCuffed(queuedEscortee))
+                Info("SceneManager: " + nextScene + " dropped: " + queuedEscortee + " was never cuffed (the confrontation stopped before the cuffs), the arrest is cancelled")
+                __isScenePlaying = false
+                if (nextAliases)
+                    JValue.release(nextAliases)
+                endif
+                RPB_Utility.RequestCancelArrest(queuedEscortee, "the confrontation stopped before the cuffs")
+                self.PlayQueued()
+                return
+            endif
         endif
         Debug("Scene DEBUG: ["+ currentScene +"] SceneManager::PlayQueued", "Playing Scene: " + nextScene)
         Scene sceneObject = self.GetScene(nextScene)

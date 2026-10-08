@@ -3798,15 +3798,14 @@ event OnPrisonerDeath(RPB_Prisoner apPrisoner, Actor akKiller)
 
 endEvent
 event OnEscortPrisonerToJailBegin(RPB_ActorBase apActor, Actor akEscort)
-    ; Escorted only cuffed: a confrontation that stopped before the cuffs (it counts as confirmed from its first phase) still
-    ; had this escort queued, and it started with the player free-handed (2026-10-08)
+    ; Escorted only cuffed (the queue already drops an uncuffed arrestee's escort, SceneManager.PlayQueued): one that began
+    ; anyway is the same as a confrontation stopped before the cuffs, and the arrest is cancelled (cuffed here instead, the
+    ; player was cuffed out of nowhere, 2026-10-08)
     Actor escortee = apActor.GetActor()
-    if (escortee && !RPB_Utility.IsCuffed(escortee))
-        RPB_Arrestee uncuffed = (RPB_API.GetArrest()).Arrestees.AtKey(escortee)
-        if (uncuffed)
-            RPB_Utility.LogInfo(escortee + "'s escort to jail began uncuffed (the confrontation stopped before the cuffs): cuffed now", "Prison::OnEscortPrisonerToJailBegin")
-            uncuffed.Restrain()
-        endif
+    if (escortee && RPB_Utility.IsActorArrested(escortee) && !RPB_Utility.IsCuffed(escortee))
+        RPB_Utility.LogInfo(escortee + "'s escort to jail began uncuffed (the confrontation stopped before the cuffs): the arrest is cancelled", "Prison::OnEscortPrisonerToJailBegin")
+        RPB_Utility.RequestCancelArrest(escortee, "the escort began before the cuffs")
+        return
     endif
     ; Watched as the walk starts: a guard found frozen now hands the escort to a guard who sees it (RPB_Arrest.__HandOverEscort)
     RPB_Utility.ProbeAfterBurst(akEscort, "escort to jail began")
