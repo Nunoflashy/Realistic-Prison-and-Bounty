@@ -4456,11 +4456,19 @@ endFunction
     to jail ended froze its guard on about half of its loads (KNOWN_ISSUES round 172): the Scene's end came right after the
     load and RPB went on with the guard at once (the strip, the escort to the cell, his package lock); the same moment in
     play, or a load at another Scene's end, never froze him. What touches an escort guard waits these seconds out
-    (SceneManager.OnSceneEnd, the escort assist's ticks). The load's stamp is RPB_ConfigAlias.PerformMaintenance's
+    (SceneManager.OnSceneEnd, the escort assist's ticks): until the load's maintenance (RPB_ConfigAlias.PerformMaintenance)
+    has the Scenes and prisons ready, then 1s more. A fixed 5s held off freezes but left the guard on his own AI for the
+    rest of it: he walked off and the strip began wherever he was (on the stairs); the end handled right after the
+    maintenance (the game paused through it) played as it should. 15s at most, should the maintenance never get there
 /;
 bool function IsLoadSettling() global
-    float sinceLoad = Utility.GetCurrentRealTime() - JDB.solveFlt(".rpb_root.loadStamp")
-    return sinceLoad >= 0.0 && sinceLoad < 5.0
+    float loadStamp = JDB.solveFlt(".rpb_root.loadStamp")
+    float now = Utility.GetCurrentRealTime()
+    if (now < loadStamp || now - loadStamp >= 15.0)
+        return false ; not this game session's load, or long past
+    endif
+    float settledAt = JDB.solveFlt(".rpb_root.loadSettledAt")
+    return settledAt < loadStamp || now - settledAt < 1.0
 endFunction
 
 ; The Scene the test race was taken by ("" while it hasn't been)

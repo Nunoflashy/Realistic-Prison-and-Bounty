@@ -86,6 +86,7 @@ endFunction
 function PerformMaintenance()
     ; Every load gets its own stamp: the actor lists rebuild their actor index once when it changes (RPB_ActorList)
     JDB.solveFltSetter(".rpb_root.loadStamp", Utility.GetCurrentRealTime(), true)
+    JDB.solveFltSetter(".rpb_root.loadSettledAt", 0.0, true) ; set below, once the Scenes and prisons are ready (RPB_Utility.IsLoadSettling)
     API.MCM.EnsureAllOptionDefaults() ; repairs saves that never visited every page
     EventManager.RegisterEvents()
     ; The dev freeze keys' holds go first: unlike a real freeze they survive the load, and the cleanup below would call into
@@ -98,6 +99,7 @@ function PerformMaintenance()
     RPB_Utility.ClearFrozenNPCs() ; a load drops a frozen guard's broken object: he answers again
     SceneManager.SceneManager()
     PrisonManager.VerifyIntegrity()
+    JDB.solveFltSetter(".rpb_root.loadSettledAt", Utility.GetCurrentRealTime(), true)
     RPB_Keybindings.RegisterSurrenderKey()
     ; Waiting blocked by an escort this save no longer has: allowed again (a save made mid-escort keeps it until its end)
     if (RPB_Utility.IsEscortWaitBlocked())
