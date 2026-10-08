@@ -715,14 +715,6 @@ function EscortToPrison(bool abEscortDirectlyToCell = false, bool abCombatAtArre
         return
     endif
 
-    ; Test-only (RPB_Utility.SetConfrontationSkippedForTest): no confrontation, cuffed and on to the escort at once
-    if (RPB_Utility.IsConfrontationSkippedForTest())
-        Debug("["+ Name +"] Arrestee::EscortToPrison", "test: the confrontation skipped, cuffed and escorted at once")
-        self.Cuff()
-        self.__ContinueToPrison(abEscortDirectlyToCell)
-        return
-    endif
-
     if (!self.AwaitConfrontationScene(sceneSet))
         ; A fight broke out before the confrontation got anywhere: nothing has been done to me yet, so I'm let go (the
         ; bounty and my hostility come back, guards will come for me again), rather than retrying a Scene that can't play

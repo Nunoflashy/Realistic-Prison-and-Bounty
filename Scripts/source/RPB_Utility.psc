@@ -208,8 +208,6 @@ scriptname RPB_Utility hidden
     function SetOvercrowdingDisabled(bool abDisabled) global
     bool function IsConfrontationSceneForcedToFail() global
     function SetConfrontationSceneForcedToFail(bool abForced) global
-    bool function IsConfrontationSkippedForTest() global
-    function SetConfrontationSkippedForTest(bool abSkipped) global
     bool function IsEscortStartForcedToFail() global
     function SetEscortStartForcedToFail(bool abForced) global
     bool function IsSurrenderSceneForcedToFail() global
@@ -244,13 +242,11 @@ scriptname RPB_Utility hidden
     function SetCaptorKeptForTest(bool abKept) global
     function SetReleaseOnPackageChangeForTest(bool abOn) global
     function SetSceneEndSpacedForTest(bool abSpaced) global
-    function SetSceneRaceForTest(bool abArmed) global
     bool function IsLoadSettling() global
     function ScheduleArrestControlsCheck() global
     function RequestCancelArrest(Actor akActor, string asReason) global
     float function CancelSettleSeconds() global
     function SetCancelSettleSeconds(float afSeconds) global
-    string function SceneRaceTakenForTest() global
     bool function IsTestTeardownRunning() global
     function SetTestTeardownRunning(bool abRunning) global
     float function GetMonitorOverrideHours() global
@@ -4303,16 +4299,6 @@ bool function IsConfrontationSceneForcedToFail() global
     return JDB.solveInt(".rpb_root.storage.Profile.FORCE_CONFRONTATION_FAIL") != 0
 endFunction
 
-; Test-only (193/194, round 172): an escort arrest skips its confrontation: cuffed, then straight into the escort to jail
-; (Arrestee.EscortToPrison), the way a save made mid-escort resumes with the arrest already in place
-bool function IsConfrontationSkippedForTest() global
-    return JDB.solveInt(".rpb_root.testSkipConfrontation") != 0
-endFunction
-
-function SetConfrontationSkippedForTest(bool abSkipped) global
-    JDB.solveIntSetter(".rpb_root.testSkipConfrontation", abSkipped as int, true)
-endFunction
-
 function SetConfrontationSceneForcedToFail(bool abForced) global
     RPB_StorageVars.SetInt("FORCE_CONFRONTATION_FAIL", abForced as int, "Profile")
 endFunction
@@ -4445,16 +4431,6 @@ function SetSceneEndSpacedForTest(bool abSpaced) global
     RPB_StorageVars.SetInt("SPACE_SCENE_END", abSpaced as int, "Profile")
 endFunction
 
-; Test-only (189, round 172): the next Scene queued plays at once with none of its actors bound, as after a load on
-; 2026-10-08: the strip started while the escort to jail was still ending (the queue rebuilt under it by the load's
-; maintenance), and the guard froze 8 times in 14 loads. SceneManager.QueueOrPlay takes it, once
-function SetSceneRaceForTest(bool abArmed) global
-    JDB.solveIntSetter(".rpb_root.testSceneRace", abArmed as int, true)
-    if (abArmed)
-        JDB.solveStrSetter(".rpb_root.testSceneRaceTaken", "", true)
-    endif
-endFunction
-
 ;/
     The first seconds after a game load, while the engine still restores the actors of the save. A save made as the escort
     to jail ended froze its guard on about half of its loads (KNOWN_ISSUES round 172): the Scene's end came right after the
@@ -4513,11 +4489,6 @@ function RequestCancelArrest(Actor akActor, string asReason) global
         ModEvent.PushString(handle, asReason)
         ModEvent.Send(handle)
     endif
-endFunction
-
-; The Scene the test race was taken by ("" while it hasn't been)
-string function SceneRaceTakenForTest() global
-    return JDB.solveStr(".rpb_root.testSceneRaceTaken")
 endFunction
 
 ; Test-only (freeze experiment D, round 102): a cancel releases the guard on his own package change (his AI off the
