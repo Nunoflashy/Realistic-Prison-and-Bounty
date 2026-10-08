@@ -2734,7 +2734,6 @@ function __CatchUpAfterWait(float afHours)
     __assistIdleTime = 0.0
     __assistAwayTime = 0.0
     __guardWaitTime = 0.0
-    __assistGuardFightTime = 0.0
     __guardWaitWarned = false
     __freeFarTicks = 0
     __freeBothStillTime = 0.0
@@ -3225,6 +3224,7 @@ function StartEscortAssist(Actor akEscort, bool abToCell)
     __freeWarned = false
     __freeControlsLogged = false
     __guardWaitTime = 0.0
+    __assistGuardFightTime = 0.0
     __guardWaitWarned = false
     __escortUnderway = false
     __underwayTicks = 0
