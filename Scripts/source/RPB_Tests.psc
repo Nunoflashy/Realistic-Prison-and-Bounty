@@ -13205,11 +13205,16 @@ function ToggleManualFreeze()
     if (!(target as RPB_TestFreezable) || RPB_Utility.IsFrozenNPC(target) || target == __manualFreezePrisoner)
         target = Game.GetCurrentCrosshairRef() as Actor
     endif
+    ; The freezable prisoner (180/181's) is the prisoner key's: frozen here she was held and reported as a guard, and the
+    ; prisoner key then skipped her (2026-10-08)
+    if (target && target.GetBaseObject() == Game.GetFormFromFile(0x0002C06B, "RealisticPrisonAndBounty.esp"))
+        target = none
+    endif
     if (!(target as RPB_TestFreezable))
         target = __NearestFreezableGuard(4000.0)
     endif
     if (!target)
-        Debug.Notification("RPB test: no freezable guard nearby (test 161 spawns one)")
+        Debug.Notification("RPB test: no freezable guard nearby")
         return
     endif
     RPB_Utility.RememberActorName(target) ; while he answers: the Frozen NPCs page names him (a clone has no RPB role yet)
@@ -13471,7 +13476,7 @@ Actor function __NearestFreezableGuard(float afRadius)
     float nearestDistance = afRadius
     int i = 0
     while (i < nearby.Length)
-        if (nearby[i] as RPB_TestFreezable)
+        if (nearby[i] as RPB_TestFreezable && nearby[i].GetBaseObject() != Game.GetFormFromFile(0x0002C06B, "RealisticPrisonAndBounty.esp"))
             float distance = player.GetDistance(nearby[i])
             if (distance < nearestDistance)
                 nearest = nearby[i]
