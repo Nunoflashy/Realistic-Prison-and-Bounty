@@ -272,6 +272,7 @@ function SetTests()
     self.AddTest("184 - Benchmark: the Time Skip's NPC Releases on Its Own Stack vs by Event (6 bandits each; advances the clock a few days)", "Test_ReleaseByEventBenchmark", abChainable = false)
     self.AddTest("187 - Freeze Control, NPC: 156's Steps With a Bandit (moved 1500 away and back mid escort, ended by a reset; repeat it)", "Test_NpcFreeWalkControl", abChainable = false)
     self.AddTest("188 - Freeze Control, Alternating: 187 (NPC) and 156 (player) by turns, the same-session comparison (repeat it)", "Test_FreezeControlAlternating", abChainable = false)
+    self.AddTest("197 - Benchmark: RPB_Memory's Fast* Wrappers vs Direct JContainers Calls (form map and string map, 3 rounds)", "Test_FastWrapperBenchmark", abChainable = false)
     self.AddTest("196 - A Fight as the Confrontation Begins: the Arrest Is Cancelled, Never Escorted Uncuffed (PLAYER; repeat it, the fight's moment varies)", "Test_FightAtConfrontationStart", abChainable = false)
     self.AddTest("195 - Setting: the Cancel's Wait After the Guard's Scene Stop (seconds; 10 by default)", "Test_SetCancelSettle", abChainable = false)
     self.AddTest("185 - Two Prisoners in Cells: a Freezable Bandit and Vivienne Onis (freeze him with the prisoner key, then talk to her: does the dialogue lock?)", "Test_FrozenPrisonerDialogue", abChainable = false)
@@ -13734,6 +13735,89 @@ endFunction
 /;
 int __fightAtStartRun
 
+;/
+    197: what RPB_Memory's Fast* wrappers cost over the JContainers call they wrap (the mod author, 2026-10-10: new code to
+    use them instead of stray JC calls, if the abstraction is about free). Each pass: N iterations of a set, a get and a
+    has-key, direct then wrapped, on a form map and on a string map; an empty loop of the same N is subtracted. 3 rounds, the
+    order flipped each round (run-to-run noise is ~30%). Logs ms per call for each and the wrapper's overhead per call
+/;
+bool function __FastWrapperBenchmark(string asTest)
+    int iterations = 300
+    int formMap = JValue.retain(JFormMap.object())
+    int stringMap = JValue.retain(JMap.object())
+    Form k = Game.GetPlayer()
+    float directForm = 0.0
+    float wrappedForm = 0.0
+    float directString = 0.0
+    float wrappedString = 0.0
+    float emptyLoop = 0.0
+    int round = 0
+    while (round < 3)
+        float t = Utility.GetCurrentRealTime()
+        int i = 0
+        while (i < iterations)
+            i += 1
+        endWhile
+        emptyLoop += Utility.GetCurrentRealTime() - t
+        bool wrappedFirst = round == 1
+        int pass = 0
+        while (pass < 2)
+            bool wrapped = (pass == 0) == wrappedFirst
+            t = Utility.GetCurrentRealTime()
+            i = 0
+            if (wrapped)
+                while (i < iterations)
+                    FastFormMap_SetInt(formMap, k, i)
+                    FastFormMap_GetInt(formMap, k)
+                    FastFormMap_HasKey(formMap, k)
+                    i += 1
+                endWhile
+                wrappedForm += Utility.GetCurrentRealTime() - t
+            else
+                while (i < iterations)
+                    JFormMap.setInt(formMap, k, i)
+                    JFormMap.getInt(formMap, k)
+                    JFormMap.hasKey(formMap, k)
+                    i += 1
+                endWhile
+                directForm += Utility.GetCurrentRealTime() - t
+            endif
+            t = Utility.GetCurrentRealTime()
+            i = 0
+            if (wrapped)
+                while (i < iterations)
+                    FastMap_SetInt(stringMap, "ticks", i)
+                    FastMap_GetInt(stringMap, "ticks")
+                    FastMap_HasKey(stringMap, "ticks")
+                    i += 1
+                endWhile
+                wrappedString += Utility.GetCurrentRealTime() - t
+            else
+                while (i < iterations)
+                    JMap.setInt(stringMap, "ticks", i)
+                    JMap.getInt(stringMap, "ticks")
+                    JMap.hasKey(stringMap, "ticks")
+                    i += 1
+                endWhile
+                directString += Utility.GetCurrentRealTime() - t
+            endif
+            pass += 1
+        endWhile
+        round += 1
+    endWhile
+    JValue.release(formMap)
+    JValue.release(stringMap)
+    float calls = (iterations * 3 * 3) as float ; 3 calls per iteration, 3 rounds
+    float loopPerCall = emptyLoop * 1000.0 / calls
+    float directFormMs = directForm * 1000.0 / calls - loopPerCall
+    float wrappedFormMs = wrappedForm * 1000.0 / calls - loopPerCall
+    float directStringMs = directString * 1000.0 / calls - loopPerCall
+    float wrappedStringMs = wrappedString * 1000.0 / calls - loopPerCall
+    log(asTest + ": ms per call (loop subtracted, " + (calls as int) + " calls each): form map direct " + directFormMs + ", wrapped " + wrappedFormMs + " (+" + (wrappedFormMs - directFormMs) + "); string map direct " + directStringMs + ", wrapped " + wrappedStringMs + " (+" + (wrappedStringMs - directStringMs) + "); the empty loop " + loopPerCall + " per call")
+    log(asTest + ": totals in s: form direct " + directForm + ", wrapped " + wrappedForm + ", string direct " + directString + ", wrapped " + wrappedString + ", empty loops " + emptyLoop)
+    return assert_true(true, asTest + ": see the log")
+endFunction
+
 bool function __Scenario_FightAtConfrontationStart(string asTest)
     RPB_SceneManager sceneManager = RPB_API.GetSceneManager()
     RPB_Arrest arrest = RPB_API.GetArrest()
@@ -14979,7 +15063,7 @@ endFunction
 string __statelessTest = ""
 
 bool function __RunStatelessTest(string asTest)
-    if (asTest != "Test_ArrestWaitsWhileGuardFights_NoPackage" && asTest != "Test_CellDoorsDiagnostic" && asTest != "Test_LongAbsenceSetup" && asTest != "Test_LongAbsenceAdvance" && asTest != "Test_LongAbsenceVerify" && asTest != "Test_FallbackEscortToCellStopped_Player" && asTest != "Test_FallbackEscortToCellStopped_CloneGuard" && asTest != "Test_FightDuringEscort_NPC" && asTest != "Test_FightDuringEscort_Player" && asTest != "Test_GuardDiesInPrison_Player" && asTest != "Test_EscortToCellStopped_NoPackageLock" && StringUtil.Find(asTest, "Test_Surrender_") != 0 && asTest != "Test_FrozenGuardSkipped" && asTest != "Test_GuardDiesInPrison_NobodySees" && asTest != "Test_Escort_FreeWalk" && asTest != "Test_ToggleEscortToCell04" && asTest != "Test_CaptorFinishCycles_Calls" && asTest != "Test_CaptorFinishCycles_NoCalls" && asTest != "Test_CaptorFinishDetach_Calls" && asTest != "Test_CaptorFinishDetach_NoCalls" && asTest != "Test_Escort_FreeWalk_Control" && asTest != "Test_ActorKeys" && asTest != "Test_FrozenGuardCalls" && asTest != "Test_SimulatedFreezeCalls" && asTest != "Test_SimulatedFreezeAtCancel" && asTest != "Test_SpawnFreezableGuard" && asTest != "Test_AliasPackageControl" && asTest != "Test_FreezableEscort_Player" && asTest != "Test_FreezableEscort_NPC" && asTest != "Test_LightHold" && asTest != "Test_KillFrozenGuard" && asTest != "Test_LifetimeBountyStat" && asTest != "Test_FaintFrozenGuard" && asTest != "Test_FaintFrozenGuardShort" && asTest != "Test_FrozenEscortFallback" && asTest != "Test_HideFrozenGuard" && asTest != "Test_EscortToCellGuardHeld" && asTest != "Test_CuffedLimitEncumbrance" && asTest != "Test_CuffedLimitSettings" && asTest != "Test_EarlyHandback" && asTest != "Test_StalledEscortTakeover" && asTest != "Test_StalledEscortTakeoverLimit" && asTest != "Test_NpcEscortCancelControl" && asTest != "Test_FrozenPrisonerTimeSkip" && asTest != "Test_SpawnFreezablePrisoner" && asTest != "Test_SpawnFreezableArrestee" && asTest != "Test_GuardCrimeFactions" && asTest != "Test_PlayerEscortCancelControl" && asTest != "Test_ReleaseByEventBenchmark" && asTest != "Test_FrozenPrisonerDialogue" && asTest != "Test_NpcFreeWalkControl" && asTest != "Test_FreezeControlAlternating" && asTest != "Test_SetCancelSettle" && asTest != "Test_FightAtConfrontationStart")
+    if (asTest != "Test_ArrestWaitsWhileGuardFights_NoPackage" && asTest != "Test_CellDoorsDiagnostic" && asTest != "Test_LongAbsenceSetup" && asTest != "Test_LongAbsenceAdvance" && asTest != "Test_LongAbsenceVerify" && asTest != "Test_FallbackEscortToCellStopped_Player" && asTest != "Test_FallbackEscortToCellStopped_CloneGuard" && asTest != "Test_FightDuringEscort_NPC" && asTest != "Test_FightDuringEscort_Player" && asTest != "Test_GuardDiesInPrison_Player" && asTest != "Test_EscortToCellStopped_NoPackageLock" && StringUtil.Find(asTest, "Test_Surrender_") != 0 && asTest != "Test_FrozenGuardSkipped" && asTest != "Test_GuardDiesInPrison_NobodySees" && asTest != "Test_Escort_FreeWalk" && asTest != "Test_ToggleEscortToCell04" && asTest != "Test_CaptorFinishCycles_Calls" && asTest != "Test_CaptorFinishCycles_NoCalls" && asTest != "Test_CaptorFinishDetach_Calls" && asTest != "Test_CaptorFinishDetach_NoCalls" && asTest != "Test_Escort_FreeWalk_Control" && asTest != "Test_ActorKeys" && asTest != "Test_FrozenGuardCalls" && asTest != "Test_SimulatedFreezeCalls" && asTest != "Test_SimulatedFreezeAtCancel" && asTest != "Test_SpawnFreezableGuard" && asTest != "Test_AliasPackageControl" && asTest != "Test_FreezableEscort_Player" && asTest != "Test_FreezableEscort_NPC" && asTest != "Test_LightHold" && asTest != "Test_KillFrozenGuard" && asTest != "Test_LifetimeBountyStat" && asTest != "Test_FaintFrozenGuard" && asTest != "Test_FaintFrozenGuardShort" && asTest != "Test_FrozenEscortFallback" && asTest != "Test_HideFrozenGuard" && asTest != "Test_EscortToCellGuardHeld" && asTest != "Test_CuffedLimitEncumbrance" && asTest != "Test_CuffedLimitSettings" && asTest != "Test_EarlyHandback" && asTest != "Test_StalledEscortTakeover" && asTest != "Test_StalledEscortTakeoverLimit" && asTest != "Test_NpcEscortCancelControl" && asTest != "Test_FrozenPrisonerTimeSkip" && asTest != "Test_SpawnFreezablePrisoner" && asTest != "Test_SpawnFreezableArrestee" && asTest != "Test_GuardCrimeFactions" && asTest != "Test_PlayerEscortCancelControl" && asTest != "Test_ReleaseByEventBenchmark" && asTest != "Test_FrozenPrisonerDialogue" && asTest != "Test_NpcFreeWalkControl" && asTest != "Test_FreezeControlAlternating" && asTest != "Test_SetCancelSettle" && asTest != "Test_FightAtConfrontationStart" && asTest != "Test_FastWrapperBenchmark")
         return false
     endif
 
@@ -15181,6 +15265,8 @@ bool function __RunStatelessTest(string asTest)
             log("188: run " + __freezeAlternateRun + ": the player side (156)")
             self.__RunFreeWalkControl()
         endif
+    elseif (asTest == "Test_FastWrapperBenchmark")
+        display_result(__FastWrapperBenchmark("197"))
     elseif (asTest == "Test_FightAtConfrontationStart")
         display_result(__Scenario_FightAtConfrontationStart("196"))
         __TeardownScenario()

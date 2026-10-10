@@ -106,6 +106,16 @@ scriptname RPB_Memory hidden
     function FastIntMap_SetFloat(int map, int _key, float value) global
     function FastIntMap_SetForm(int map, int _key, Form value) global
     function FastIntMap_SetObject(int map, int _key, int value) global
+    int function FastFormMap_Size(int map) global
+    bool function FastFormMap_HasKey(int map, Form _key) global
+    bool function FastFormMap_RemoveKey(int map, Form _key) global
+    Form function FastFormMap_NextKey(int map, Form previousKey = none) global
+    int function FastFormMap_GetInt(int map, Form _key) global
+    Form function FastFormMap_GetForm(int map, Form _key) global
+    int function FastFormMap_GetObject(int map, Form _key) global
+    function FastFormMap_SetInt(int map, Form _key, int value) global
+    function FastFormMap_SetForm(int map, Form _key, Form value) global
+    function FastFormMap_SetObject(int map, Form _key, int value) global
     int function Array(string signature, string elements = "", bool retain = false) global
     int function Object(string signature, string params = "") global
     int function Map(string signature, bool retain = false) global
@@ -885,6 +895,51 @@ endFunction
 function FastIntMap_SetObject(int map, int _key, int value) global
     JIntMap.setObj(map, _key, value)
 endFunction
+
+;                        Fast Form Map
+; ==========================================================
+; A map keyed by forms (actors, references): FastMap("<Form>") makes one. Each wrapper is the one JFormMap call
+
+int function FastFormMap_Size(int map) global
+    return JValue.count(map)
+endFunction
+
+bool function FastFormMap_HasKey(int map, Form _key) global
+    return JFormMap.hasKey(map, _key)
+endFunction
+
+bool function FastFormMap_RemoveKey(int map, Form _key) global
+    return JFormMap.removeKey(map, _key)
+endFunction
+
+Form function FastFormMap_NextKey(int map, Form previousKey = none) global
+    return JFormMap.nextKey(map, previousKey)
+endFunction
+
+int function FastFormMap_GetInt(int map, Form _key) global
+    return JFormMap.getInt(map, _key)
+endFunction
+
+Form function FastFormMap_GetForm(int map, Form _key) global
+    return JFormMap.getForm(map, _key)
+endFunction
+
+int function FastFormMap_GetObject(int map, Form _key) global
+    return JFormMap.getObj(map, _key)
+endFunction
+
+function FastFormMap_SetInt(int map, Form _key, int value) global
+    JFormMap.setInt(map, _key, value)
+endFunction
+
+function FastFormMap_SetForm(int map, Form _key, Form value) global
+    JFormMap.setForm(map, _key, value)
+endFunction
+
+function FastFormMap_SetObject(int map, Form _key, int value) global
+    JFormMap.setObj(map, _key, value)
+endFunction
+
 
 ; ==========================================================
 ;                       Data Structures
