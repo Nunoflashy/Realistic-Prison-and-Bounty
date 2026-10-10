@@ -366,6 +366,29 @@ bool function RegisterArrestee(RPB_Arrestee apArrestee)
     return Arrestees.Exists(apArrestee)
 endFunction
 
+; The arrest side's quest-level watch (patch 013 puts it on the ArresteeList alias, as each prison alias has its monitor)
+RPB_ArrestMonitor property Monitor
+    RPB_ArrestMonitor function get()
+        return (Arrestees as ReferenceAlias) as RPB_ArrestMonitor
+    endFunction
+endProperty
+
+; An NPC's escort to jail began (RPB_Arrestee.OnArrestEnd)
+function WatchEscortToJail(Actor akEscortee)
+    RPB_ArrestMonitor arrestMonitor = Monitor
+    if (arrestMonitor)
+        arrestMonitor.WatchEscortToJail(akEscortee)
+    endif
+endFunction
+
+; Her escort to jail is over, or her arrest (RPB_Arrestee.EndEscortWatch, Destroy)
+function StopWatchingEscort(Actor akEscortee)
+    RPB_ArrestMonitor arrestMonitor = Monitor
+    if (arrestMonitor)
+        arrestMonitor.StopWatching(akEscortee)
+    endif
+endFunction
+
 ; After a game load (RPB_ConfigAlias.PerformMaintenance): every NPC arrestee's escort watch started again (RPB_Arrestee.
 ; ResumeEscortWatch). The list read without a call into anyone; the few arrestees each get one call
 function ResumeEscortWatchesAfterLoad()
