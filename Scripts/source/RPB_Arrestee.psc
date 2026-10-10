@@ -1458,12 +1458,63 @@ event OnUpdate()
         self.SetInt("Leash Pulls", 0)
     endif
 
+    if (self.__StoppedShortAtJail())
+        RegisterForSingleUpdate(5.0)
+        return
+    endif
+
     if (self.__EscortStalled())
         return
     endif
 
     RegisterForSingleUpdate(5.0)
 endEvent
+
+;/
+    The escort to jail ends when the guard is within 300 of its destination and I'm within 150 of him (its last phase's
+    conditions). An NPC escortee who stopped short of him there held the escort, and the strip after it, for minutes, the
+    guard standing at the marker and her a few steps off (2026-10-08: a nudge by the mod author ended it at once; off-screen
+    it took ~60s, or the guard drifted off and led her back outside). Two ticks like that (~10s): moved up to him. True when
+    it moved me. The player has the escort assist.
+    The distances and the marker are the Scene's own ("Reached Jail" ends on the guard within 300 of Player_EscortLocation
+    and within 150 of the escortee), the same for every prison: what differs between prisons is where their markers are
+    Copied by hand from the current Scene: the Scene refactor renames its aliases and may change these conditions, and
+    this is to read them from the Scene's config then, not keep its own copy
+/;
+float property JAIL_REACHED_GUARD_DISTANCE = 300.0 autoreadonly
+float property JAIL_REACHED_ESCORTEE_DISTANCE = 150.0 autoreadonly
+
+bool function __StoppedShortAtJail()
+    if (self.IsPlayer())
+        return false
+    endif
+    string current = SceneManager.GetCurrentScene()
+    if (!SceneManager.IsSceneOfType(current, SceneManager.CATEGORY_ESCORT_TO_JAIL) || SceneManager.GetSceneNthReferenceOfType(current, "Escortee") != this)
+        self.SetInt("Short At Jail Ticks", 0)
+        return false
+    endif
+    Actor guard = Captor.GetActor()
+    ObjectReference destination = SceneManager.GetSceneNthReferenceOfType(current, "Player_EscortLocation")
+    if (!guard || !destination)
+        self.SetInt("Short At Jail Ticks", 0)
+        return false
+    endif
+    float fromGuard = this.GetDistance(guard)
+    float guardFromDestination = destination.GetDistance(guard)
+    if (guardFromDestination >= JAIL_REACHED_GUARD_DISTANCE || fromGuard < JAIL_REACHED_ESCORTEE_DISTANCE)
+        self.SetInt("Short At Jail Ticks", 0)
+        return false
+    endif
+    int ticks = self.GetInt("Short At Jail Ticks") + 1
+    self.SetInt("Short At Jail Ticks", ticks)
+    if (ticks < 2)
+        return false
+    endif
+    self.SetInt("Short At Jail Ticks", 0)
+    this.MoveTo(guard, afXOffset = -80.0, abMatchRotation = false)
+    Info("["+ Name +"] Arrestee::__StoppedShortAtJail: " + Name + " stopped " + (fromGuard as int) + " units short of " + guard + " at the escort to jail's end: moved up to him")
+    return true
+endFunction
 
 ;/
     An escort where nothing moves: its Scene never took hold (seen: the guard back on his own package after a resumed
