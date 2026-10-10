@@ -41,6 +41,12 @@ RPB_Config property Config
     endFunction
 endProperty
 
+RPB_Arrest property Arrest
+    RPB_Arrest function get()
+        return API.Arrest
+    endFunction
+endProperty
+
 RPB_PrisonManager property PrisonManager
     RPB_PrisonManager function get()
         return API.PrisonManager
@@ -100,6 +106,7 @@ function PerformMaintenance()
     SceneManager.SceneManager()
     PrisonManager.VerifyIntegrity()
     JDB.solveFltSetter(".rpb_root.loadSettledAt", Utility.GetCurrentRealTime(), true)
+    Arrest.ResumeEscortWatchesAfterLoad() ; a save made while an escort watch was dead has none to restore
     RPB_Keybindings.RegisterSurrenderKey()
     ; Waiting blocked by an escort this save no longer has: allowed again (a save made mid-escort keeps it until its end)
     if (RPB_Utility.IsEscortWaitBlocked())

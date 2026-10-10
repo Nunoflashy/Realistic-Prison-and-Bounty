@@ -49,6 +49,7 @@ scriptname RPB_Utility hidden
     bool function IsCuffed(Actor akActor) global
     function EquipCuffs(Actor akActor, bool abFront = false) global
     bool function IsCuffedInFront(Actor akActor) global
+    bool function RefreshCuffsPose(Actor akActor) global
     bool function IsCuffsForm(Form akForm) global
     Form[] function WithoutCuffs(Form[] akForms) global
     function LimitCuffedMovement_Encumbrance(bool abOn) global
@@ -1843,6 +1844,26 @@ endFunction
 bool function IsCuffedInFront(Actor akActor) global
     Form frontCuffs = Game.GetFormFromFile(0x81D33, "ZaZAnimationPack.esm")
     return akActor && frontCuffs && akActor.IsEquipped(frontCuffs)
+endFunction
+
+;/
+    The cuffs worn put on again (off and on), which plays their pose again: a jump (the player) or a load door (an NPC's 3D
+    loading) drops it, the cuffs still on. True if they were on and put on again
+/;
+bool function RefreshCuffsPose(Actor akActor) global
+    if (!akActor || !akActor.Is3DLoaded() || !IsCuffed(akActor))
+        return false
+    endif
+    Form cuffs = Game.GetFormFromFile(0x81D2F, "ZaZAnimationPack.esm")
+    if (IsCuffedInFront(akActor))
+        cuffs = Game.GetFormFromFile(0x81D33, "ZaZAnimationPack.esm")
+    endif
+    if (!cuffs)
+        return false
+    endif
+    akActor.UnequipItem(cuffs, false, true)
+    akActor.EquipItem(cuffs, true, true)
+    return true
 endFunction
 
 function EquipCuffs(Actor akActor, bool abFront = false) global

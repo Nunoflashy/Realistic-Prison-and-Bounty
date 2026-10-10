@@ -218,17 +218,7 @@ event OnAnimationEvent(ObjectReference akSource, string asEventName)
         lastZ = z
     endWhile
     __watchingLanding = false
-    if (!RPB_Utility.IsCuffed(player))
-        return
-    endif
-    bool front = RPB_Utility.IsCuffedInFront(player)
-    Form cuffs = Game.GetFormFromFile(0x81D2F, "ZaZAnimationPack.esm")
-    if (front)
-        cuffs = Game.GetFormFromFile(0x81D33, "ZaZAnimationPack.esm")
-    endif
-    if (cuffs)
-        player.UnequipItem(cuffs, false, true)
-        player.EquipItem(cuffs, true, true)
+    if (RPB_Utility.RefreshCuffsPose(player))
         Debug("EventManager::OnAnimationEvent", "landed from a jump while cuffed (" + ((waited * 1000.0) as int) + "ms after it started): the cuffs put on again")
     endif
 endEvent

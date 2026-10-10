@@ -1248,12 +1248,36 @@ endFunction
 ; ==========================================================
 
 event OnInitialize()
+    bool reattached = self.Was("Initialized")
     Arrest.RegisterArrestee(self)
     ; Debug("Arrestee::OnInitialize", "Initialized Arrestee, this: " + this)
 
     self.RegisterForTrackedStats()
     self.InitializeState()
+    if (reattached)
+        self.ResumeEscortWatch("loaded again")
+    endif
 endEvent
+
+bool __refreshCuffsPose ; OnUpdate's first tick after a reattach: the cuffs put on again
+
+;/
+    An NPC's 3D unloading (a load door, the player elsewhere) ends this effect, and it starts again on a new instance when
+    she loads: the escort watch (OnUpdate: leash, stall, stopped short) died with the old one (its next update "no native
+    object bound", 2026-10-09) and nothing started it again, and the load dropped her cuffed pose (hands free, cuffs still
+    on). Both resumed here, the pose on the watch's first tick (her 3D just loaded). Its gates stop it where it has nothing
+    left to watch. Also after every game load (RPB_Arrest.ResumeEscortWatchesAfterLoad): a save made while the watch was
+    dead has no update to restore, and a loaded actor's effect doesn't start again (2026-10-10, a save at the stripping
+    area: no watch, no nudge). A second call while it runs only moves its next tick
+/;
+function ResumeEscortWatch(string asWhy)
+    if (self.IsPlayer() || RPB_Utility.IsFrozenNPC(this))
+        return
+    endif
+    __refreshCuffsPose = true
+    RegisterForSingleUpdate(1.0)
+    Debug("["+ Name +"] Arrestee::ResumeEscortWatch", Name + " " + asWhy + ": the escort watch resumed" + string_if(self.GetBool("Escort Arrived"), " (escort already at the prison)", ""))
+endFunction
 
 event OnDestroy()
     self.UnregisterForTrackedStats()
@@ -1374,6 +1398,12 @@ float property ESCORT_LEASH_DISTANCE = 700.0 autoreadonly
 float property PENDING_LEASH_DISTANCE = 2500.0 autoreadonly
 
 event OnUpdate()
+    if (__refreshCuffsPose)
+        __refreshCuffsPose = false
+        if (RPB_Utility.RefreshCuffsPose(this))
+            Debug("["+ Name +"] Arrestee::OnUpdate", Name + " loaded again cuffed: the cuffs put on again (their pose)")
+        endif
+    endif
     ; Waiting in the prison for a guard who can see me (my guard died there): no Captor to watch or leash to
     if (self.GetBool("Awaiting Guard"))
         self.__AwaitGuardTick()

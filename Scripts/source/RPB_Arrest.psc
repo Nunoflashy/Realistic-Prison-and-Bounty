@@ -366,6 +366,23 @@ bool function RegisterArrestee(RPB_Arrestee apArrestee)
     return Arrestees.Exists(apArrestee)
 endFunction
 
+; After a game load (RPB_ConfigAlias.PerformMaintenance): every NPC arrestee's escort watch started again (RPB_Arrestee.
+; ResumeEscortWatch). The list read without a call into anyone; the few arrestees each get one call
+function ResumeEscortWatchesAfterLoad()
+    Form[] actors = Arrestees.GetActorsNoCall()
+    int i = 0
+    while (actors && i < actors.Length)
+        Actor arresteeActor = actors[i] as Actor
+        if (arresteeActor && arresteeActor != Config.Player && !RPB_Utility.IsFrozenNPC(arresteeActor))
+            RPB_Arrestee arrestee = Arrestees.AtKey(arresteeActor)
+            if (arrestee)
+                arrestee.ResumeEscortWatch("after the game load")
+            endif
+        endif
+        i += 1
+    endWhile
+endFunction
+
 ;/
     Removes the Arrestee spell (and consequently, the MagicEffect) from this arrestee.
 /;
