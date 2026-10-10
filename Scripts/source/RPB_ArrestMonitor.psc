@@ -15,6 +15,9 @@ scriptname RPB_ArrestMonitor extends ReferenceAlias
     function WatchEscortToJail(Actor akEscortee)
     function StopWatching(Actor akEscortee)
     int function WatchedCount()
+    function NoteConfrontationStep(Actor akArrestee, string asStep)
+    function StopWatchingConfrontation(Actor akArrestee)
+    function RestartClocksAfterLoad()
 @events:
     event OnUpdate()
 /;
@@ -94,22 +97,38 @@ int function WatchedCount()
 endFunction
 
 event OnUpdate()
-    if (!__escorts || !JValue.isExists(__escorts))
-        return
+    int pending = 0
+    if (__escorts && JValue.isExists(__escorts))
+        Form escortee = FastFormMap_NextKey(__escorts)
+        while (escortee)
+            Form nextEscortee = FastFormMap_NextKey(__escorts, escortee)
+            Actor escorteeActor = escortee as Actor
+            ; Out of the arrest some way nothing told me about (the list's index: no call into her)
+            if (!escorteeActor || !Arrestees.AtKey(escorteeActor))
+                FastFormMap_RemoveKey(__escorts, escortee)
+            else
+                self.__CheckStoppedShort(escorteeActor, FastFormMap_GetObject(__escorts, escortee))
+            endif
+            escortee = nextEscortee
+        endWhile
+        pending += FastFormMap_Size(__escorts)
     endif
-    Form escortee = FastFormMap_NextKey(__escorts)
-    while (escortee)
-        Form nextEscortee = FastFormMap_NextKey(__escorts, escortee)
-        Actor escorteeActor = escortee as Actor
-        ; Out of the arrest some way nothing told me about (the list's index: no call into her)
-        if (!escorteeActor || !Arrestees.AtKey(escorteeActor))
-            FastFormMap_RemoveKey(__escorts, escortee)
-        else
-            self.__CheckStoppedShort(escorteeActor, FastFormMap_GetObject(__escorts, escortee))
-        endif
-        escortee = nextEscortee
-    endWhile
-    if (FastFormMap_Size(__escorts) > 0)
+    if (__confrontations && JValue.isExists(__confrontations))
+        float now = Utility.GetCurrentRealTime()
+        Form arrestee = FastFormMap_NextKey(__confrontations)
+        while (arrestee)
+            Form nextArrestee = FastFormMap_NextKey(__confrontations, arrestee)
+            Actor arresteeActor = arrestee as Actor
+            if (!arresteeActor || !Arrestees.AtKey(arresteeActor))
+                FastFormMap_RemoveKey(__confrontations, arrestee)
+            else
+                self.__CheckConfrontation(arresteeActor, FastFormMap_GetObject(__confrontations, arrestee), now)
+            endif
+            arrestee = nextArrestee
+        endWhile
+        pending += FastFormMap_Size(__confrontations)
+    endif
+    if (pending > 0)
         RegisterForSingleUpdate(WAKE_SECONDS)
     endif
 endEvent
@@ -144,4 +163,109 @@ function __CheckStoppedShort(Actor akEscortee, int aiEntry)
     FastMap_SetInt(aiEntry, "shortWakes", 0)
     akEscortee.MoveTo(guard, afXOffset = -80.0, abMatchRotation = false)
     Info("ArrestMonitor: " + akEscortee + " stopped " + (fromGuard as int) + " units short of " + guard + " at the escort to jail's end: moved up to him")
+endFunction
+
+;                    Stuck confrontations
+; ==========================================================
+
+;/
+    A confrontation that took hold and then stopped moving (#4: stuck after "Hands Behind Back", its guard's AI off; #9: its
+    guard frozen, nothing happened): judged from its own steps (RPB_EventManager.OnArrestScene stamps each), so it works
+    while either of them is unloaded and after a load. Stuck: no step for CONFRONTATION_APPROACH_SECONDS while the guard
+    walks up, CONFRONTATION_STEP_SECONDS after that (about double what each step takes, 2026-10-10), or its guard frozen.
+    Not judged while it isn't the current Scene (queued), or while either of them fights (the arrestee's own fight watch
+    owns that). Stuck: RPB_ConfrontationStalled, on its own stack (RPB_Arrest.TakeOverStalledConfrontation: another guard
+    of the hold replays it; with none, the arrest is cancelled, or, with nobody there to see it, she goes to the prison)
+/;
+float property CONFRONTATION_APPROACH_SECONDS = 30.0 autoreadonly
+float property CONFRONTATION_STEP_SECONDS = 20.0 autoreadonly
+
+int __confrontations ; FastMap<Form>: arrestee -> FastMap { step, since }
+
+; A step of @akArrestee's confrontation: "Begun" (it took hold), "Hands Behind Back", "Handcuff", or "Resumed" (re-armed after
+; a load or her 3D loading again, its step unknown: judged as the approach, the longest)
+function NoteConfrontationStep(Actor akArrestee, string asStep)
+    if (!akArrestee)
+        return
+    endif
+    if (!__confrontations || !JValue.isExists(__confrontations))
+        __confrontations = FastMap("<Form>", retain = true)
+    endif
+    int entry = FastFormMap_GetObject(__confrontations, akArrestee)
+    if (!entry)
+        entry = FastMap()
+        FastFormMap_SetObject(__confrontations, akArrestee, entry)
+    endif
+    FastMap_SetString(entry, "step", asStep)
+    FastMap_SetFloat(entry, "since", Utility.GetCurrentRealTime())
+    RegisterForSingleUpdate(WAKE_SECONDS)
+    Debug("ArrestMonitor::NoteConfrontationStep", akArrestee + "'s confrontation: " + asStep)
+endFunction
+
+function StopWatchingConfrontation(Actor akArrestee)
+    if (akArrestee && __confrontations && FastFormMap_HasKey(__confrontations, akArrestee))
+        FastFormMap_RemoveKey(__confrontations, akArrestee)
+        Debug("ArrestMonitor::StopWatchingConfrontation", akArrestee + "'s confrontation no longer watched")
+    endif
+endFunction
+
+; After a game load (RPB_Arrest.ResumeEscortWatchesAfterLoad): real time starts over with each session, so every clock
+; starts again from now (a load never reads as a stall)
+function RestartClocksAfterLoad()
+    if (!__confrontations || !JValue.isExists(__confrontations))
+        return
+    endif
+    float now = Utility.GetCurrentRealTime()
+    Form arrestee = FastFormMap_NextKey(__confrontations)
+    while (arrestee)
+        FastMap_SetFloat(FastFormMap_GetObject(__confrontations, arrestee), "since", now)
+        arrestee = FastFormMap_NextKey(__confrontations, arrestee)
+    endWhile
+    if (FastFormMap_Size(__confrontations) > 0)
+        RegisterForSingleUpdate(WAKE_SECONDS)
+    endif
+endFunction
+
+function __CheckConfrontation(Actor akArrestee, int aiEntry, float afNow)
+    string current = SceneManager.GetCurrentScene()
+    if (!SceneManager.IsSceneOfType(current, SceneManager.CATEGORY_ARREST_START) || SceneManager.GetSceneNthReferenceOfType(current, "Escortee") != akArrestee)
+        FastMap_SetFloat(aiEntry, "since", afNow) ; not playing (queued, or between Scenes): nothing to judge yet
+        return
+    endif
+    Actor guard = SceneManager.GetSceneNthReferenceOfType(current, "Escort") as Actor
+    if (!guard)
+        return
+    endif
+    string step = FastMap_GetString(aiEntry, "step")
+    string reason = ""
+    if (IsFrozenNPC(guard))
+        if (akArrestee == Game.GetPlayer())
+            return ; the player's own path: his freeze cancels the arrest, the bounty set aside, and another guard comes for them (RPB_Arrest.TakeOverSubmission)
+        endif
+        reason = "its guard is frozen"
+    else
+        if (guard.IsInCombat() || (!IsFrozenNPC(akArrestee) && akArrestee.IsInCombat()))
+            FastMap_SetFloat(aiEntry, "since", afNow) ; a fight: the arrestee's fight watch owns it
+            return
+        endif
+        float limit = CONFRONTATION_STEP_SECONDS
+        if (step == "Begun" || step == "Resumed")
+            limit = CONFRONTATION_APPROACH_SECONDS
+        endif
+        float stuckFor = afNow - FastMap_GetFloat(aiEntry, "since")
+        if (stuckFor < limit)
+            return
+        endif
+        reason = "no step for " + (stuckFor as int) + "s after '" + step + "'"
+    endif
+    FastFormMap_RemoveKey(__confrontations, akArrestee)
+    Info("ArrestMonitor: " + akArrestee + "'s confrontation by " + guard + " is stuck (" + reason + ")")
+    int handle = ModEvent.Create("RPB_ConfrontationStalled")
+    if (handle)
+        ModEvent.PushForm(handle, akArrestee)
+        ModEvent.PushForm(handle, guard)
+        ModEvent.PushString(handle, "the confrontation is stuck: " + reason)
+        ModEvent.PushString(handle, step)
+        ModEvent.Send(handle)
+    endif
 endFunction

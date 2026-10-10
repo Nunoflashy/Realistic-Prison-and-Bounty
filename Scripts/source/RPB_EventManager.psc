@@ -124,6 +124,7 @@ function RegisterEvents()
     RegisterForModEvent("RPB_FaintFrozenGuard", "OnFaintFrozenGuard")
     RegisterForModEvent("RPB_MoveGuard", "OnMoveGuard")
     RegisterForModEvent("RPB_StalledEscortTakeover", "OnStalledEscortTakeover")
+    RegisterForModEvent("RPB_ConfrontationStalled", "OnConfrontationStalled")
     RegisterForModEvent("RPB_EncumbranceCheck", "OnEncumbranceCheck")
     RegisterForModEvent("RPB_ReleaseNPC", "OnReleaseNPC")
 
@@ -239,6 +240,11 @@ endEvent
 ; RPB_Arrestee.__EscortStalled: another guard of the hold for a stalled escort, or its fallback
 event OnStalledEscortTakeover(Form akArrestee, string asReason)
     Arrest.TakeOverStalledEscort(akArrestee as Actor, asReason)
+endEvent
+
+; RPB_ArrestMonitor: a confrontation stopped moving
+event OnConfrontationStalled(Form akArrestee, Form akStuckGuard, string asReason, string asStep)
+    Arrest.TakeOverStalledConfrontation(akArrestee as Actor, akStuckGuard as Actor, asReason, asStep)
 endEvent
 
 event OnSubmissionTakeover(Form akFrozenGuard)
@@ -945,6 +951,12 @@ event OnArrestScene(string asScene, string asSceneEvent, RPB_Arrestee apArrestee
         Actor escort = akAuthority
         
         if (asSceneEvent == SceneManager.EVENT_ARREST_BEGIN)
+            ; Each step restarts the stuck-confrontation clock (RPB_ArrestMonitor)
+            string step = asSceneSecondaryEvent
+            if (step == "" || step == "NULL")
+                step = "Begun"
+            endif
+            Arrest.NoteConfrontationStep(apArrestee.GetActor(), step)
             RetainAI(apArrestee.IsPlayer())
 
             if (asSceneSecondaryEvent == "Hands Behind Back")
@@ -979,6 +991,7 @@ event OnArrestScene(string asScene, string asSceneEvent, RPB_Arrestee apArrestee
             apArrestee.OnArrestBegin()
 
         elseif (asSceneEvent == SceneManager.EVENT_ARREST_END)
+            Arrest.StopWatchingConfrontation(apArrestee.GetActor())
             apArrestee.OnArrestEnd()
         endif
 

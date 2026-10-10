@@ -389,9 +389,94 @@ function StopWatchingEscort(Actor akEscortee)
     endif
 endFunction
 
+; A step of a confrontation (RPB_EventManager.OnArrestScene): the stuck-confrontation watch's clock (RPB_ArrestMonitor)
+function NoteConfrontationStep(Actor akArrestee, string asStep)
+    RPB_ArrestMonitor arrestMonitor = Monitor
+    if (arrestMonitor)
+        arrestMonitor.NoteConfrontationStep(akArrestee, asStep)
+    endif
+endFunction
+
+function StopWatchingConfrontation(Actor akArrestee)
+    RPB_ArrestMonitor arrestMonitor = Monitor
+    if (arrestMonitor)
+        arrestMonitor.StopWatchingConfrontation(akArrestee)
+    endif
+endFunction
+
+;/
+    @akActor's confrontation stopped moving (RPB_ArrestMonitor: no step for its time, or @akStuckGuard frozen). Another guard
+    of the hold takes it over, by the takeover rule (noticed within 15m, or seen within 40m), up to STALL_TAKEOVERS_MAX per
+    arrest: not cuffed yet, he plays the whole confrontation again (RPB_Arrestee.HandOverConfrontation), the arrestee's pose
+    (hands behind the back, kept when its Scene stops) reset first so the replay starts from a natural stance (the mod
+    author, 2026-10-10: a walk-up with PathToReference failed at once, cuffing the player from 749 away); cuffed, only the
+    escort is left (HandOverEscort). With none: GiveUpConfrontation. On RPB_ConfrontationStalled's own stack (the search
+    calls into the guards around). A frozen arrestee is left to the next load: every step here calls into her
+/;
+function TakeOverStalledConfrontation(Actor akActor, Actor akStuckGuard, string asReason, string asStep = "")
+    RPB_Arrestee arrestee = Arrestees.AtKey(akActor)
+    if (!arrestee || RPB_Utility.IsFrozenNPC(akActor))
+        return
+    endif
+    Actor guard = none
+    if (arrestee.GetInt("Confrontation Takeovers") < arrestee.STALL_TAKEOVERS_MAX)
+        guard = RPB_Utility.FindTakeoverGuard(akActor, arrestee.GetFaction(), akStuckGuard, TAKEOVER_ARREST_DISTANCE, TAKEOVER_APPROACH_DISTANCE)
+    endif
+    if (!guard)
+        self.GiveUpConfrontation(arrestee, akStuckGuard, asReason)
+        return
+    endif
+    arrestee.SetInt("Confrontation Takeovers", arrestee.GetInt("Confrontation Takeovers") + 1)
+    bool releaseOld = !RPB_Utility.IsFrozenNPC(akStuckGuard)
+    bool cuffed = RPB_Utility.IsCuffed(akActor)
+    bool posing = !cuffed && (asStep == "Hands Behind Back" || asStep == "Handcuff")
+    string taking = ", the confrontation again"
+    if (cuffed)
+        taking = ", the escort"
+    elseif (posing)
+        taking = ", the confrontation again (their pose reset)"
+    endif
+    RPB_Utility.LogInfo(akActor + "'s " + asReason + ": " + guard + " (" + ((akActor.GetDistance(guard) * 0.01428) as int) + "m) takes it over from " + akStuckGuard + taking + " (takeover " + arrestee.GetInt("Confrontation Takeovers") + "/" + arrestee.STALL_TAKEOVERS_MAX + ")", "Arrest::TakeOverStalledConfrontation")
+    if (cuffed)
+        arrestee.HandOverEscort(akStuckGuard, guard, asReason, abReleaseOld = releaseOld)
+    else
+        arrestee.HandOverConfrontation(akStuckGuard, guard, asReason, releaseOld, abResetPose = posing)
+    endif
+    RPB_Utility.ProbeAfterBurst(guard, "took over a stuck confrontation")
+endFunction
+
+;/
+    A stuck confrontation nobody can take over (the mod author, 2026-10-10): with the player there (the arrestee, or an NPC
+    whose 3D is loaded, so in sight) the arrest is cancelled, as a fight before the cuffs is; with nobody there to see it
+    (an arrest left to run off-screen, or an NPC arrest made through the API later), she goes to the prison, cuffed
+/;
+function GiveUpConfrontation(RPB_Arrestee apArrestee, Actor akStuckGuard, string asReason)
+    Actor arresteeActor = apArrestee.GetActor()
+    if (arresteeActor == Config.Player || arresteeActor.Is3DLoaded())
+        RPB_Utility.LogInfo(arresteeActor + "'s " + asReason + ", and no guard to take it over: the arrest is cancelled", "Arrest::GiveUpConfrontation")
+        RPB_Recovery.CancelArrest(arresteeActor, asReason + ", no guard to take it over")
+        return
+    endif
+    RPB_Utility.LogInfo(arresteeActor + "'s " + asReason + ", no guard to take it over and nobody there to see it: to the prison", "Arrest::GiveUpConfrontation")
+    apArrestee.ConfrontationToPrison(akStuckGuard, asReason)
+endFunction
+
 ; After a game load (RPB_ConfigAlias.PerformMaintenance): every NPC arrestee's escort watch started again (RPB_Arrestee.
 ; ResumeEscortWatch). The list read without a call into anyone; the few arrestees each get one call
 function ResumeEscortWatchesAfterLoad()
+    ; The stuck-confrontation clocks start over (real time restarts with each session), and a confrontation playing in a save
+    ; made before it was watched is watched now (one Scene plays at a time: the current one)
+    RPB_ArrestMonitor arrestMonitor = Monitor
+    if (arrestMonitor)
+        arrestMonitor.RestartClocksAfterLoad()
+        string current = API.SceneManager.GetCurrentScene()
+        if (API.SceneManager.IsSceneOfType(current, API.SceneManager.CATEGORY_ARREST_START))
+            Actor confronted = API.SceneManager.GetSceneNthReferenceOfType(current, "Escortee") as Actor
+            if (confronted)
+                arrestMonitor.NoteConfrontationStep(confronted, "Resumed")
+            endif
+        endif
+    endif
     Form[] actors = Arrestees.GetActorsNoCall()
     int i = 0
     while (actors && i < actors.Length)

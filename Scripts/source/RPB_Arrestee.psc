@@ -701,6 +701,7 @@ function EscortToPrison(bool abEscortDirectlyToCell = false, bool abCombatAtArre
     ; stop this Scene if the guard dies before it confirms) has a reliable value to read back - "Scene" itself was
     ; only ever read here before, never written, so it always fell through to the fallback above.
     self.SetString("Scene", sceneSet)
+    self.SetBool("Escort Directly To Cell", abEscortDirectlyToCell) ; a confrontation replayed by another guard goes on the same way
 
     ; My guard is still fighting someone else (another hostile nearby keeps every guard in combat): the confrontation
     ; Scene can't play in a fight. I'm cuffed right away and wait, the escort starts once the fight is over.
@@ -1771,6 +1772,92 @@ function HandOverInPrison(Actor akDeadGuard)
     endif
 endFunction
 
+; The captor swap the takeovers share: the old guard freed (released too with @abReleaseOld), @akNewGuard my captor. False,
+; and the arrest given up, if he couldn't be made one
+bool function __TakeNewCaptor(Actor akOldGuard, Actor akNewGuard, string asReason, bool abReleaseOld)
+    int handle = ModEvent.Create("RPB_FreeGuard")
+    if (handle)
+        ModEvent.PushForm(handle, akOldGuard)
+        ModEvent.Send(handle)
+    endif
+    RPB_Captor newCaptor = Arrest.AwaitCaptorReference(akNewGuard)
+    if (!newCaptor)
+        Arrest.GiveUpConfrontation(self, akOldGuard, asReason + ", and " + akNewGuard + " couldn't be made the captor")
+        return false
+    endif
+    newCaptor.AssignArrestee(this)
+    self.AssignCaptor(newCaptor)
+    __captor = newCaptor
+    self.SetForm("Arrest Captor", akNewGuard, "Jail")
+    if (abReleaseOld)
+        handle = ModEvent.Create("RPB_ReleaseCaptor")
+        if (handle)
+            ModEvent.PushForm(handle, akOldGuard)
+            ModEvent.PushForm(handle, this)
+            ModEvent.PushBool(handle, true)
+            ModEvent.Send(handle)
+        endif
+    endif
+    return true
+endFunction
+
+;/
+    My confrontation got stuck before the cuffs (RPB_Arrest.TakeOverStalledConfrontation): @akNewGuard plays it again from
+    the start, so the cuffs go on in front of whoever watches, and then the escort, as the first one would have gone. The
+    stuck Scene and my escort queued behind it are dropped, the old guard freed (and his arrest released, unless he's
+    frozen: no call into him). His confrontation not taking hold either: RPB_Arrest.GiveUpConfrontation. @abResetPose: I was
+    posing, hands behind my back (the pose stays when its Scene stops): back to a natural stance first, so the replay
+    doesn't open with me already posing
+/;
+function HandOverConfrontation(Actor akOldGuard, Actor akNewGuard, string asReason, bool abReleaseOld, bool abResetPose = false)
+    SceneManager.EndSceneWithActor(this, asReason) ; its queued Scenes with me go first (my escort)
+    if (abResetPose)
+        Debug.SendAnimationEvent(this, "IdleForceDefaultState")
+    endif
+    if (!self.__TakeNewCaptor(akOldGuard, akNewGuard, asReason, abReleaseOld))
+        return
+    endif
+    Info("Confrontation of " + Name + " " + this + " handed over to " + akNewGuard + " from " + akOldGuard + ": " + asReason)
+
+    string sceneSet = string_if (self.GetString("Scene"), self.GetString("Scene"), Arrest.SceneManager.SCENE_ARREST_START_02)
+    if (!self.AwaitConfrontationScene(sceneSet))
+        Arrest.GiveUpConfrontation(self, akNewGuard, asReason + ", and " + akNewGuard + "'s confrontation didn't take hold either")
+        return
+    endif
+    bool toCell = self.GetBool("Escort Directly To Cell")
+    self.__ResumeEscort(toCell)
+    ; The fight watch, as the first confrontation had (EscortToPrison)
+    if (SceneManager.GetCurrentScene() == sceneSet)
+        self.SetString("Watched Confrontation", sceneSet)
+        self.SetFloat("Confrontation Watch Start", Utility.GetCurrentRealTime())
+        self.SetBool("Pending Directly To Cell", toCell)
+        RegisterForSingleUpdate(1.0)
+    endif
+endFunction
+
+;/
+    My stuck confrontation, nobody to take it over and nobody there to see it (RPB_Arrest.GiveUpConfrontation): to the prison
+    without the Scene, cuffed as the confrontation would have left me
+/;
+function ConfrontationToPrison(Actor akGuard, string asReason)
+    RPB_Prison prison = API.PrisonManager.FindPrisonByPrisoner(this)
+    RPB_Prisoner prisoner = none
+    if (prison)
+        prisoner = prison.Prisoners.AtKey(this)
+    endif
+    if (!prisoner || prisoner.IsImprisoned)
+        RPB_Recovery.CancelArrest(this, asReason + ", and no prisoner to move")
+        return
+    endif
+    SceneManager.EndSceneWithActor(this, asReason)
+    if (!RPB_Utility.IsCuffed(this))
+        self.Restrain()
+        Arrest.OnArresteeRestrained(self)
+    endif
+    Info("Confrontation of " + Name + " " + this + " stuck with nobody to take it over or see it: " + asReason + ", moved to the prison")
+    prisoner.MoveToPrison(akGuard)
+endFunction
+
 ;/
     My escort guard froze on the way to the prison (RPB_Arrest.__HandOverEscort), or my escort stalled (RPB_Arrest.
     TakeOverStalledEscort): @akNewGuard becomes my Captor and the escort to jail starts again with him. Nothing is called
@@ -1949,6 +2036,7 @@ function Destroy()
         UnregisterForActorAction(8) ; the draws answered while held or cuffed after a resume
     endif
     Arrest.StopWatchingEscort(this)
+    Arrest.StopWatchingConfrontation(this)
     self.RemoveAll()
     Arrest.UnregisterArrestee(self)
 endFunction

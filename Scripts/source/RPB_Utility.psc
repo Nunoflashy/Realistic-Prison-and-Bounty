@@ -5936,11 +5936,25 @@ endFunction
 ; @abSightOnly: only line of sight counts, at any distance up to @afFarDistance (an escort handover: the guards around
 ; have to see the escort collapse, the mod author 2026-10-04)
 Actor function FindTakeoverGuard(Actor akCenter, Faction akCrimeFaction, Actor akExclude, float afNearDistance, float afFarDistance, bool abSightOnly = false) global
+    ; An NPC can't be checked for being noticed: guards keep no detection of a non-hostile NPC, and HasLOS only answers with
+    ; the player on one side (2026-10-10: no guard was ever found for a bandit, with guards 700-1000 units away). For an NPC
+    ; the nearest guard of the hold within reach counts: @afNearDistance, or 15m when the call has no near band
+    bool npcCenter = akCenter != Game.GetPlayer()
+    float npcReach = afNearDistance
+    if (npcReach <= 0.0)
+        npcReach = 1050.0
+        if (afFarDistance < npcReach)
+            npcReach = afFarDistance
+        endif
+    endif
     Actor[] nearby = PO3_SKSEFunctions.GetActorsByProcessingLevel(0)
     int frozenMap = FrozenNPCsForScan()
     Spell captorSpell = RPB_CaptorSpell()
     Actor nearGuard = none
     float nearDistance = afNearDistance
+    if (npcCenter)
+        nearDistance = npcReach ; the sight-only calls have no near band
+    endif
     Actor farGuard = none
     float farDistance = afFarDistance
     int i = 0
@@ -5948,7 +5962,12 @@ Actor function FindTakeoverGuard(Actor akCenter, Faction akCrimeFaction, Actor a
         Actor candidate = nearby[i]
         if (candidate && candidate != akExclude && candidate != akCenter && !IsListedFrozen(frozenMap, candidate) && candidate.GetFormID() != 0x14)
             float distance = akCenter.GetDistance(candidate)
-            if (distance < farDistance && candidate.IsGuard() && !candidate.IsDead() && !candidate.IsDisabled() && !candidate.IsChild() && candidate.GetCrimeFaction() == akCrimeFaction && !candidate.HasSpell(captorSpell) && !IsActorArrested(candidate) && (abSightOnly || akCenter.IsDetectedBy(candidate)))
+            if (npcCenter)
+                if (distance < npcReach && distance < nearDistance && candidate.IsGuard() && !candidate.IsDead() && !candidate.IsDisabled() && !candidate.IsChild() && candidate.GetCrimeFaction() == akCrimeFaction && !candidate.HasSpell(captorSpell) && !IsActorArrested(candidate))
+                    nearGuard = candidate
+                    nearDistance = distance
+                endif
+            elseif (distance < farDistance && candidate.IsGuard() && !candidate.IsDead() && !candidate.IsDisabled() && !candidate.IsChild() && candidate.GetCrimeFaction() == akCrimeFaction && !candidate.HasSpell(captorSpell) && !IsActorArrested(candidate) && (abSightOnly || akCenter.IsDetectedBy(candidate)))
                 if (abSightOnly)
                     if (candidate.HasLOS(akCenter))
                         farGuard = candidate
