@@ -3782,6 +3782,12 @@ event OnPrisonerTeleportedToCell(RPB_Prisoner apPrisoner, bool abImprisonPrisone
 
     RPB_Utility.FlowMark("Teleported: clothe")
     RPB_Utility.Crumb(apPrisoner.GetActor(), "Teleported: clothe")
+    ; Uncuffed in the cell, as the escort to the cell's own end does (OnEscortPrisonerToCellEnd): every fallback that moves a
+    ; prisoner straight in came through here and left the cuffs on (the player held cuffed in the cell, no bed, no sleeping
+    ; the sentence off; 2026-10-08, a frozen guard's escort finished by the stall check)
+    if (RPB_Utility.IsCuffed(apPrisoner.GetActor()))
+        apPrisoner.Uncuff()
+    endif
     if (abImprisonPrisoner)
         apPrisoner.Imprison()
     endif
