@@ -3774,6 +3774,14 @@ event OnPrisonerTeleportedToPrison(RPB_Prisoner apPrisoner)
     apPrisoner.OnTeleportedToPrison()
 endEvent
 
+;/
+    Whether this intake already stripped @apPrisoner (her belongings recorded, cleared at the release). Only the move into the
+    cell asks: a later strip of an imprisoned prisoner (a guard's search) is its own decision, not this one's
+/;
+bool function __StrippedAtIntake(RPB_Prisoner apPrisoner)
+    return apPrisoner.GetInt("Belongings Manifest") > 0
+endFunction
+
 event OnPrisonerTeleportedToCell(RPB_Prisoner apPrisoner, bool abImprisonPrisoner)
     if (apPrisoner.IsNPC())
         apPrisoner.EnableAI(!apPrisoner.IsFarFromPlayer()) ; Disable AI if not near Player
@@ -3794,7 +3802,12 @@ event OnPrisonerTeleportedToCell(RPB_Prisoner apPrisoner, bool abImprisonPrisone
 
     RPB_Utility.FlowMark("Teleported: frisk")
     RPB_Utility.Crumb(apPrisoner.GetActor(), "Teleported: frisk")
-    if (apPrisoner.ShouldBeStripped)
+    if (self.__StrippedAtIntake(apPrisoner))
+        ; Already stripped by the intake's Scene: a fallback into the cell stripped again, by worn slots her unloaded 3D
+        ; didn't report, and took the underwear she was meant to keep (2026-10-09)
+        Debug("["+ Name +"] Prison::OnPrisonerTeleportedToCell", apPrisoner.Name + " was stripped at the intake already: not stripped again")
+
+    elseif (apPrisoner.ShouldBeStripped)
         apPrisoner.Strip(abRemoveUnderwear = apPrisoner.WillBeStrippedNaked)
 
     elseif (apPrisoner.ShouldBeStrippedSilently)
