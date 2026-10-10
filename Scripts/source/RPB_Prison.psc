@@ -3557,6 +3557,34 @@ function EscortPrisonerToJail(RPB_Prisoner apPrisoner, Actor akEscort)
     apPrisoner.SetBool("Go to Cell", true)
 endFunction
 
+;/
+    An NPC prisoner who left the prison before reaching their cell (RPB_Prisoner.OnLocationChange): the escort to the cell is
+    ended, its guard freed of his package lock, and the prisoner moved into the cell (the teleport's intake: strip, outfit,
+    uncuff, imprisonment). What was driving them is logged once, for the cause: the Scene still playing or not, and both
+    actors' packages
+/;
+function RecoverPrisonerLeftPrison(RPB_Prisoner apPrisoner, Location akWhere)
+    Actor prisonerActor = apPrisoner.GetActor()
+    string current = SceneManager.GetCurrentScene()
+    Actor guard = none
+    if (SceneManager.IsSceneOfType(current, SceneManager.CATEGORY_ESCORT_TO_CELL) && SceneManager.GetSceneNthReferenceOfType(current, "Escortee") == prisonerActor)
+        guard = SceneManager.GetSceneNthReferenceOfType(current, "Escort") as Actor
+    endif
+    string guardPackage = "none"
+    if (guard && !RPB_Utility.IsFrozenNPC(guard))
+        guardPackage = guard.GetCurrentPackage() as string
+    endif
+    bool scenePlaying = current != "" && SceneManager.GetScene(current) && SceneManager.GetScene(current).IsPlaying()
+    Warn("["+ Name +"] Prison::RecoverPrisonerLeftPrison: " + prisonerActor + " left the prison for " + akWhere + " before reaching the cell: moved into it (current Scene '" + current + "', playing " + scenePlaying + ", guard " + guard + " on " + guardPackage + ", prisoner on " + prisonerActor.GetCurrentPackage() + ")")
+    if (SceneManager.EndSceneWithActor(prisonerActor, "the prisoner left the prison before reaching the cell") && guard && !RPB_Utility.IsFrozenNPC(guard))
+        SceneManager.UnsetPackageLockOnActor(guard)
+    endif
+    apPrisoner.StopEscortAssist()
+    if (!apPrisoner.IsImprisoned)
+        apPrisoner.MoveToCell()
+    endif
+endFunction
+
 function EscortPrisonerToCell(RPB_Prisoner apPrisoner, Actor akEscort)
     RPB_JailCell jailCell = apPrisoner.JailCell
 

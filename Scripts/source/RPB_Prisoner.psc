@@ -4319,7 +4319,49 @@ endFunction
 ;             Escort / Teleport -> Prison / Cell
 ; ==========================================================
 
+;/
+    An NPC prisoner leaving the prison between their arrival and their cell: the intake broke (twice on 2026-10-08 a bandit's
+    escort to the cell never ran a phase, and its guard led her back outside, stripped and cuffed, until the 120s stall check
+    moved her into her cell). A prisoner never walks back out mid-intake: the prison finishes it at once
+    (Prison.RecoverPrisonerLeftPrison). The player has the escort assist and is left to it. One event per location change, no
+    polling. This effect isn't on an NPC whose 3D is unloaded (the player elsewhere), so a change made then never reaches me
+    (2026-10-08: moved outside by the console, led out off-screen; nothing fired): OnInitialize checks again when her 3D
+    loads, the moment anyone can see her outside
+/;
+event OnLocationChange(Location akOldLoc, Location akNewLoc)
+    if (self.IsNPC() && self.GetBool("Arrived At Prison") && !self.IsImprisoned)
+        Debug("["+ Name +"] Prisoner::OnLocationChange", Name + " went from " + akOldLoc + " to " + akNewLoc + " before reaching the cell")
+    endif
+    self.__CheckLeftPrison(akNewLoc)
+endEvent
+
+;/
+    Inside: the prison's location or one of its children (every prison's escort to jail ends inside its own, checked against
+    the plugin 2026-10-09)
+/;
+function __CheckLeftPrison(Location akWhere)
+    if (!self.IsNPC() || !self.GetBool("Arrived At Prison") || self.IsImprisoned || self.GetBool("Left Prison Handled"))
+        return
+    endif
+    Location prisonLocation = Prison.PrisonLocation
+    ; IsChild asks whether the location passed in is a child of the one it's called on: the other way round, Solitude
+    ; (the jail's grandparent) read as inside, and nothing ever fired (2026-10-09)
+    bool inside = !prisonLocation || akWhere == prisonLocation || (akWhere && prisonLocation.IsChild(akWhere))
+    ; Diagnostic (2026-10-09, pulled outside twice, nothing fired)
+    Debug("["+ Name +"] Prisoner::__CheckLeftPrison", Name + " at " + akWhere + ", the prison's " + prisonLocation + ": " + string_if(inside, "inside", "left it"))
+    if (inside)
+        return
+    endif
+    self.SetBool("Left Prison Handled", true)
+    Prison.RecoverPrisonerLeftPrison(self, akWhere)
+endFunction
+
+function __NoteArrivedAtPrison()
+    self.SetBool("Arrived At Prison", true) ; OnLocationChange: from here, leaving the prison before the cell is a broken intake
+endFunction
+
 event OnTeleportedToPrison()
+    self.__NoteArrivedAtPrison()
 endEvent
 
 event OnTeleportedToCell(bool abBeginImprisonment)
@@ -4329,6 +4371,7 @@ event OnEscortToPrison(Actor akEscort)
 endEvent
 
 event OnEscortedToPrison(Actor akEscort)
+    self.__NoteArrivedAtPrison()
 endEvent
 
 event OnEscortToCell(Actor akEscort)
@@ -4598,6 +4641,9 @@ event OnInitialize()
     if (self.Was("Initialized"))
         RPB_Utility.Crumb(this, "Prisoner.OnInitialize: already initialized, rebinding the prison list to this instance")
         Prison.RebindPrisoner(self)
+        ; Her 3D loaded again (this runs then, not OnRestore: RPB_ActorBase reads IsInitialized before it knows its actor):
+        ; she may have left the prison while I wasn't on her (OnLocationChange)
+        self.__CheckLeftPrison(this.GetCurrentLocation())
         return
     endif
 
