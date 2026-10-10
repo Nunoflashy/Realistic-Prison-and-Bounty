@@ -1219,6 +1219,13 @@ state Escorting
             elseif (moved >= 30.0)
                 __assistFlatTicks = 0
                 __assistStuckTime = 0.0 ; climbing: keeps this speed for the whole flight
+            elseif (!guardWalksOn)
+                ; Not moving, and neither is he (at the cell door): waiting for him, not stuck. Raised on, the boost reached 1000
+                ; while the guard stood at the cell, and the walk-in then flew the player into the cell (2026-10-08, the VM)
+                __assistFlatTicks = 0
+                __assistStuckTime = 0.0
+                self.__RestoreEscortSpeed()
+                RPB_Utility.LogInfo(Name + " stopped with the guard in the escort, walking speed restored", "["+ Name +"] Prisoner::EscortAssist")
             else
                 __assistFlatTicks = 0
                 __assistStuckTime += elapsed
@@ -3123,6 +3130,10 @@ string function __WalkInTick(bool abStuck, float afElapsed, float afDistance)
     if (!__walkInStarted)
         __walkInStarted = true
         __walkInStillTime = 0.0
+        ; A few steps through the door, at walking speed: a stairs boost still on flew them in (2026-10-08, the VM)
+        if (__assistLevel > 0)
+            self.__RestoreEscortSpeed()
+        endif
         if (!__freeWalk)
             self.__SetFreeWalk(true, "the cell door is open: walk in")
         endif
