@@ -179,11 +179,15 @@ endEvent
 function WatchCuffedJumps(bool abOn)
     Actor player = Game.GetPlayer()
     bool registered = false
+    ; And a load door: past its loading screen the cuffs are on but their pose is gone, as for an NPC whose 3D loads again
+    ; (her effect's reattach puts them on again; the player's never detaches). One event per loading screen while cuffed
     if (abOn)
         registered = RegisterForAnimationEvent(player, "JumpUp")
+        RegisterForMenu("Loading Menu")
     else
         UnregisterForAnimationEvent(player, "JumpUp")
         UnregisterForAnimationEvent(player, "JumpFall") ; the first version's
+        UnregisterForMenu("Loading Menu")
     endif
     __watchingLanding = false
     Debug("EventManager::WatchCuffedJumps", "cuffed jump watch " + string_if(abOn, "on (JumpUp registered " + registered + ")", "off"))
@@ -222,6 +226,24 @@ event OnAnimationEvent(ObjectReference akSource, string asEventName)
     __watchingLanding = false
     if (RPB_Utility.RefreshCuffsPose(player))
         Debug("EventManager::OnAnimationEvent", "landed from a jump while cuffed (" + ((waited * 1000.0) as int) + "ms after it started): the cuffs put on again")
+    endif
+endEvent
+
+; Past a loading screen while cuffed (a load door, or a game load): the cuffs put on again once the player stands in the new
+; cell, which plays their pose again
+event OnMenuClose(string asMenuName)
+    if (asMenuName != "Loading Menu")
+        return
+    endif
+    Actor player = Game.GetPlayer()
+    float waited = 0.0
+    while (!player.Is3DLoaded() && waited < 5.0)
+        Utility.Wait(0.25)
+        waited += 0.25
+    endWhile
+    Utility.Wait(0.5) ; the 3D just in: its animation graph settles first, or the pose played now is dropped too
+    if (RPB_Utility.RefreshCuffsPose(player))
+        Debug("EventManager::OnMenuClose", "past a loading screen while cuffed: the cuffs put on again")
     endif
 endEvent
 
