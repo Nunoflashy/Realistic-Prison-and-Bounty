@@ -483,6 +483,19 @@ function ResumeEscortWatchesAfterLoad()
             endif
         endif
     endif
+    ; An escort to jail already playing at the load began before it (the player's included: a save from before the begin
+    ; mark existed read as an escort that never started, RPB_Arrestee.__EscortNeverBegan)
+    string playing = API.SceneManager.GetCurrentScene()
+    if (API.SceneManager.IsSceneOfType(playing, API.SceneManager.CATEGORY_ESCORT_TO_JAIL))
+        Actor escorted = API.SceneManager.GetSceneNthReferenceOfType(playing, "Escortee") as Actor
+        RPB_Arrestee escortedState = none
+        if (escorted && !RPB_Utility.IsFrozenNPC(escorted))
+            escortedState = Arrestees.AtKey(escorted)
+        endif
+        if (escortedState)
+            escortedState.SetBool("Escort Begun", true)
+        endif
+    endif
     Form[] actors = Arrestees.GetActorsNoCall()
     int i = 0
     while (actors && i < actors.Length)

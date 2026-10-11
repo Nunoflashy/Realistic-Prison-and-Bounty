@@ -1091,6 +1091,18 @@ event OnPrisonScene(string asScene, string asSceneEvent, RPB_Prison apPrison, RP
         Actor escort = akAuthority
 
         if (asSceneEvent == SceneManager.EVENT_ESCORT_BEGIN)
+            ; The game started it (RPB_Arrestee.__EscortNeverBegan). Here, not in OnArrestScene: the escort to jail's begin
+            ; comes through the prison's bulk event only, and marked there it never was (every escort read as never started
+            ; after 10s, 2026-10-11). Test 198 drops it once, as if the game never started the Scene (rare, can't be provoked)
+            RPB_Arrestee escortedState = Arrest.Arrestees.AtKey(apPrisoner.GetActor())
+            if (escortedState)
+                if (JDB.solveInt(".rpb_root.testSkipEscortBegun") == 1)
+                    JDB.solveIntSetter(".rpb_root.testSkipEscortBegun", 0, true)
+                    Debug("EventManager::OnPrisonScene", "test 198: the escort's begin mark dropped for " + apPrisoner.GetActor())
+                else
+                    escortedState.SetBool("Escort Begun", true)
+                endif
+            endif
             RetainAI(apPrisoner.IsPlayer())
             apPrison.OnEscortPrisonerToJailBegin(apPrisoner, escort)
 

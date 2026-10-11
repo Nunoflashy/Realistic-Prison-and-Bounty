@@ -1292,6 +1292,12 @@ function ResumeEscortWatch(string asWhy)
     if (!self.GetBool("Escort Arrived"))
         Arrest.WatchEscortToJail(this)
     endif
+    ; Her escort to jail already playing when the game loaded or her 3D came back: it began before (a save from before the
+    ; begin mark existed read as never started, and a bandit was moved to the prison for nothing, 2026-10-11)
+    string current = SceneManager.GetCurrentScene()
+    if (SceneManager.IsSceneOfType(current, SceneManager.CATEGORY_ESCORT_TO_JAIL) && SceneManager.GetSceneNthReferenceOfType(current, "Escortee") == this)
+        self.SetBool("Escort Begun", true)
+    endif
     Debug("["+ Name +"] Arrestee::ResumeEscortWatch", Name + " " + asWhy + ": the escort watch resumed" + string_if(self.GetBool("Escort Arrived"), " (escort already at the prison)", ""))
 endFunction
 
@@ -1509,12 +1515,49 @@ event OnUpdate()
         self.SetInt("Leash Pulls", 0)
     endif
 
+    if (self.__EscortNeverBegan())
+        return
+    endif
+
     if (self.__EscortStalled())
         return
     endif
 
     RegisterForSingleUpdate(5.0)
 endEvent
+
+;/
+    My escort to jail is the current Scene but the game never started it (no begin event: its guard never left his own
+    package, and the player stood with none while the leash kept pulling them to him; each pull reset the stall check's
+    still ticks, so the takeover took ~45s, 2026-10-11). Two ticks (~10s) like that: the same takeover as a stalled escort
+    (another guard of the hold, or the fallback). True when it acted
+/;
+bool function __EscortNeverBegan()
+    string current = SceneManager.GetCurrentScene()
+    if (self.GetBool("Escort Begun") || self.GetBool("Arrest Pending") || !SceneManager.IsSceneOfType(current, SceneManager.CATEGORY_ESCORT_TO_JAIL) || SceneManager.GetSceneNthReferenceOfType(current, "Escortee") != this)
+        self.SetInt("Escort Unbegun Ticks", 0)
+        return false
+    endif
+    int ticks = self.GetInt("Escort Unbegun Ticks") + 1
+    self.SetInt("Escort Unbegun Ticks", ticks)
+    if (ticks < 2)
+        return false
+    endif
+    self.SetInt("Escort Unbegun Ticks", 0)
+    string reason = "the escort Scene never started (" + current + ")"
+    if (self.GetInt("Stall Takeovers") < STALL_TAKEOVERS_MAX)
+        self.SetBool("Stall Takeover Pending", true)
+        int handle = ModEvent.Create("RPB_StalledEscortTakeover")
+        if (handle)
+            ModEvent.PushForm(handle, this)
+            ModEvent.PushString(handle, reason)
+            ModEvent.Send(handle)
+            return true
+        endif
+        self.SetBool("Stall Takeover Pending", false)
+    endif
+    return self.__FallBackToPrison(reason)
+endFunction
 
 ;/
     An escort where nothing moves: its Scene never took hold (seen: the guard back on his own package after a resumed
@@ -1968,6 +2011,7 @@ function HandOverEscort(Actor akFrozenGuard, Actor akNewGuard, string asReason =
     self.SetBool("Stall Nudged", false)
     self.SetBool("Stall Escort Moved", false)
     RetainAI(self.IsPlayer()) ; the escort walks me
+    self.SetBool("Escort Begun", false) ; his escort's own begin event, watched by __EscortNeverBegan
     self.__ResumeEscort(false)
 endFunction
 
