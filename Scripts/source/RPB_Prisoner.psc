@@ -1248,19 +1248,29 @@ state Escorting
             branch = "stuck"
             __assistIdleTime = 0.0
             __assistStuckTime += elapsed
-            if (__assistStuckTime >= 1.0) ; was 2s on 1s ticks: 2-3s stuck at the foot of the stairs before any help
+            ; Led and not walking at all (no walk animation: the package not running yet, after a pending arrest resumed): the
+            ; speed can't help, and raised it flung the player at the guard once the package did start (2026-10-11: after
+            ; each resume, the guard running off from the fight, 400-1000 on flat ground). Their package re-evaluated each
+            ; second instead, and after 6s of that they're moved to him
+            if (__assistStuckTime >= 1.0 && !__freeWalk && this.GetAnimationVariableFloat("Speed") < 1.0)
                 __assistStuckTime = 0.0
+                __assistNotWalking += 1
+                branch = "stuck, not walking"
+                this.EvaluatePackage()
+                RPB_Utility.LogInfo(Name + " is led but not walking at all in the escort (" + (distance as int) + " units behind), their package re-evaluated (now " + this.GetCurrentPackage() + "), no speed raise", "["+ Name +"] Prisoner::EscortAssist")
+                if (__assistNotWalking >= 6)
+                    __assistNotWalking = 0
+                    if (self.__AssistMoveToGuard("led but not walking for 6s"))
+                        return
+                    endif
+                endif
+            elseif (__assistStuckTime >= 1.0) ; was 2s on 1s ticks: 2-3s stuck at the foot of the stairs before any help
+                __assistStuckTime = 0.0
+                __assistNotWalking = 0
                 __assistSavedSpeed = this.GetActorValue("SpeedMult")
                 self.__SetEscortSpeedLevel(1)
                 __assistTick = 0.25
                 RPB_Utility.LogInfo(Name + " is stuck in the escort (" + (distance as int) + " units behind, " + self.__AssistTrace(guardSpeed) + "), walking speed raised to " + (self.__EscortSpeedForLevel(1) as int), "["+ Name +"] Prisoner::EscortAssist")
-                ; Led and not walking at all (no walk animation): a raised speed can't help a package that isn't running. After
-                ; a pending arrest resumed, the player stood still through every boost and 3 moves to the guard, and the
-                ; escort was given up (2026-10-05). Their package re-evaluated, once per stuck spell
-                if (!__freeWalk && this.GetAnimationVariableFloat("Speed") < 1.0)
-                    this.EvaluatePackage()
-                    RPB_Utility.LogInfo(Name + " is led but not walking at all in the escort, their package re-evaluated (now " + this.GetCurrentPackage() + ")", "["+ Name +"] Prisoner::EscortAssist")
-                endif
             endif
         else
             __assistStuckTime = 0.0
@@ -2678,6 +2688,7 @@ int __assistLevel ; 0 = normal speed, 1-3 = raised (see __EscortSpeedForLevel)
 int __assistTeleports
 float __assistAwayTime
 int __assistFlatTicks
+int __assistNotWalking ; stuck spells led but not walking at all (no speed raise for those)
 float __assistLastDistance
 bool __assistNeedsFirstRead ; the starting positions are read on the first tick (see StartEscortAssist)
 
@@ -3234,6 +3245,7 @@ function StartEscortAssist(Actor akEscort, bool abToCell)
     __assistTeleports = 0
     __assistAwayTime = 0.0
     __assistFlatTicks = 0
+    __assistNotWalking = 0
     __freeWarned = false
     __freeControlsLogged = false
     __guardWaitTime = 0.0
