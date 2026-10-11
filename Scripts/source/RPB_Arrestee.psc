@@ -1336,8 +1336,9 @@ event OnHit(ObjectReference akAggressor, Form akSource, Projectile akProjectile,
     endif
 endEvent
 
+; The confrontation's Handcuff (or the pending arrest's): remembered, so the cuffs missing later reads as lost, not as never on
 event OnRestrained()
-    
+    self.SetBool("Restrained By Arrest", true)
 endEvent
 
 event OnArrestBegin()

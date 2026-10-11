@@ -1205,6 +1205,12 @@ function PlayQueued()
             ; fight as it began) still had this escort queued (it counts as confirmed from its first phase), and it started
             ; with the arrestee free-handed, paused for the fight as a "cuffed" pending arrest, and cuffed them out of
             ; nowhere when it resumed (2026-10-08). The same as a fight before the cuffs: the arrest is cancelled
+            ; Cuffed by the arrest and the cuffs gone since (2026-10-11: the player's went missing during a takeover, another
+            ; mod's unequip at that moment; the escort was dropped and the arrest cancelled as "never cuffed"): put back on
+            if (queuedType == CATEGORY_ESCORT_TO_JAIL && RPB_Utility.IsActorArrested(queuedEscortee) && !RPB_Utility.IsCuffed(queuedEscortee) && RPB_API.GetArrest().WasRestrainedByArrest(queuedEscortee))
+                RPB_Utility.LogWarn(queuedEscortee + "'s cuffs are gone although the arrest put them on: put back on before " + nextScene, "SceneManager::PlayQueued")
+                RPB_Utility.EquipCuffs(queuedEscortee)
+            endif
             if (queuedType == CATEGORY_ESCORT_TO_JAIL && RPB_Utility.IsActorArrested(queuedEscortee) && !RPB_Utility.IsCuffed(queuedEscortee))
                 Info("SceneManager: " + nextScene + " dropped: " + queuedEscortee + " was never cuffed (the confrontation stopped before the cuffs), the arrest is cancelled")
                 __isScenePlaying = false

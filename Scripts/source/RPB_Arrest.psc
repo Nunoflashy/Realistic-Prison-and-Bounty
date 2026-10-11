@@ -389,6 +389,12 @@ function StopWatchingEscort(Actor akEscortee)
     endif
 endFunction
 
+; Whether @akActor's arrest put the cuffs on (RPB_Arrestee.OnRestrained), whatever they wear now
+bool function WasRestrainedByArrest(Actor akActor)
+    RPB_Arrestee arrestee = Arrestees.AtKey(akActor)
+    return arrestee && arrestee.GetBool("Restrained By Arrest")
+endFunction
+
 ; A step of a confrontation (RPB_EventManager.OnArrestScene): the stuck-confrontation watch's clock (RPB_ArrestMonitor)
 function NoteConfrontationStep(Actor akArrestee, string asStep)
     RPB_ArrestMonitor arrestMonitor = Monitor
