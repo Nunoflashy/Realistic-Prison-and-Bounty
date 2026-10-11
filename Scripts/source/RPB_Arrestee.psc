@@ -936,6 +936,16 @@ function ResumePendingArrest()
     Info("Pending arrest of " + Name + " " + this + " resumed: the fight is over, escorting")
     if (self.GetBool("Pending Escort Only"))
         self.Remove("Pending Escort Only")
+        ; A fight paused my intake, and I'm stripped by now: no walk back to be stripped again (the escort to jail played
+        ; for nothing, then the escort to the cell). What's left of the intake (clothing, the escort to the cell), with him.
+        ; Read now, not when it paused: the strip's undress step, already on its way, ran in the same second as the pause
+        ; (2026-10-11)
+        bool intakePaused = self.GetBool("Pending Intake")
+        self.Remove("Pending Intake")
+        if (intakePaused && self.__StrippedForIntake())
+            self.__ResumeIntakeAfterStrip()
+            return
+        endif
         self.__ResumeEscort(self.GetBool("Pending Directly To Cell"))
     else
         self.__ContinueToPrison(self.GetBool("Pending Directly To Cell"))
@@ -1700,15 +1710,20 @@ function PauseEscortForFight(Actor akHostile)
     string current = SceneManager.GetCurrentScene()
     bool toJail = SceneManager.IsSceneOfType(current, SceneManager.CATEGORY_ESCORT_TO_JAIL) && !self.GetBool("Escort Arrived")
     bool toCell = SceneManager.IsSceneOfType(current, SceneManager.CATEGORY_ESCORT_TO_CELL)
-    string escorteeType = string_if(current == SceneManager.SCENE_ESCORT_TO_CELL_02, "Prisoner", "Escortee")
-    if (!(toJail || toCell) || SceneManager.GetSceneNthReferenceOfType(current, escorteeType) != this)
+    ; The intake too (frisk, strip, restrain, clothing: the mod author, 2026-10-11): it stopped for good when its guard
+    ; fought (#3). Paused like an escort, I can move while it lasts, and afterwards he walks me back to where the intake is
+    ; done (the escort to jail again, whose end starts the intake over), not strips me wherever he happens to stand
+    string sceneType = SceneManager.GetSceneType(current)
+    bool intake = sceneType == SceneManager.CATEGORY_FRISKING || sceneType == SceneManager.CATEGORY_STRIPPING || sceneType == SceneManager.CATEGORY_RESTRAIN || sceneType == SceneManager.CATEGORY_CLOTHING || sceneType == SceneManager.CATEGORY_NO_CLOTHING
+    string escorteeType = string_if(current == SceneManager.SCENE_ESCORT_TO_CELL_02 || intake, "Prisoner", "Escortee")
+    if (!(toJail || toCell || intake) || SceneManager.GetSceneNthReferenceOfType(current, escorteeType) != this)
         __pausingEscort = false
         return
     endif
     self.SetBool("Stall Primed", false) ; the resumed escort measures from where it starts again
 
     Actor guard = Captor.GetActor()
-    Info("Escort of " + Name + " " + this + " paused: " + guard + " is fighting " + akHostile + ", the arrest waits for the fight to end")
+    Info(string_if(intake, "Intake", "Escort") + " of " + Name + " " + this + " paused: " + guard + " is fighting " + akHostile + ", the arrest waits for the fight to end" + string_if(intake, " (then he walks me back to the intake)", ""))
 
     RPB_Prison prison = API.PrisonManager.FindPrisonByPrisoner(this)
     if (prison)
@@ -1718,8 +1733,38 @@ function PauseEscortForFight(Actor akHostile)
         endif
     endif
 
+    ; Already stripped (the strip's own step, or its record): the resume doesn't walk me back to be stripped again (the mod
+    ; author, 2026-10-11: Strip -> fight -> escort to jail -> escort to the cell). Until the Scene refactor's own Scene for
+    ; going on with the intake (RPB_ContinueIntake0N), what's left of it starts where I stand
+    self.SetBool("Pending Intake", intake) ; the resume decides then whether I was stripped (ResumePendingArrest)
     SceneManager.EndSceneWithActor(this, "the guard is fighting")
     self.__BeginPendingArrest(toCell, akHostile, abEscortOnly = true) ; resumed to the cell when it was the escort to the cell
+endFunction
+
+; My belongings recorded at the intake: the strip happened (RPB_Prison.__StrippedAtIntake's test, from the arrest side)
+bool function __StrippedForIntake()
+    RPB_Prison prison = API.PrisonManager.FindPrisonByPrisoner(this)
+    RPB_Prisoner prisoner = none
+    if (prison)
+        prisoner = prison.Prisoners.AtKey(this)
+    endif
+    return prisoner && prisoner.GetInt("Belongings Manifest") > 0
+endFunction
+
+; After a fight that paused my intake past the strip: the rest of it with my guard (RPB_Prison.ResumePrisonFlowWith: no strip
+; again, clothing if due, the escort to the cell)
+function __ResumeIntakeAfterStrip()
+    RPB_Prison prison = API.PrisonManager.FindPrisonByPrisoner(this)
+    RPB_Prisoner prisoner = none
+    if (prison)
+        prisoner = prison.Prisoners.AtKey(this)
+    endif
+    if (!prisoner || prisoner.IsImprisoned)
+        return
+    endif
+    Info("Intake of " + Name + " " + this + " goes on after the fight from where I stand (already stripped)")
+    RetainAI(self.IsPlayer())
+    prison.ResumePrisonFlowWith(prisoner, Captor.GetActor())
 endFunction
 
 ;/
@@ -1729,7 +1774,12 @@ endFunction
     and my belongings stay in the chest (nobody to hand them over), where an escape can begin. Before, the arrest was
     cancelled here and I got my belongings back, freed inside the jail with my gear.
 /;
-function HandOverInPrison(Actor akDeadGuard)
+; @asWhy: why he can't go on (default: he died); the intake watch hands over from a guard who stopped responding
+function HandOverInPrison(Actor akDeadGuard, string asWhy = "")
+    if (asWhy == "")
+        asWhy = akDeadGuard + " died"
+    endif
+    self.SetString("Handover Reason", asWhy)
     RPB_Prison prison = API.PrisonManager.FindPrisonByPrisoner(this)
     RPB_Prisoner prisoner = none
     if (prison)
@@ -1742,7 +1792,7 @@ function HandOverInPrison(Actor akDeadGuard)
     ; First, before the 1-2s of finding and making the next guard: the dead guard's Scene went on meanwhile and stripped
     ; and cuffed the prisoner with nobody there. Whatever of mine was playing or queued (strip, clothing, the escort to the
     ; cell) stops now; the new guard starts it again.
-    SceneManager.EndSceneWithActor(this, "the guard died")
+    SceneManager.EndSceneWithActor(this, asWhy)
     prisoner.StopEscortAssist()
 
     ; His package lock (if the escort to jail left one on him) on its own stack: a call on the dead guard held the whole
@@ -1753,6 +1803,14 @@ function HandOverInPrison(Actor akDeadGuard)
         ModEvent.Send(handle)
     endif
     RPB_Recovery.__Step(this, "HandOverInPrison: freeing " + akDeadGuard + " sent")
+    ; An NPC nobody can see (her 3D unloaded: the player elsewhere) goes into her cell (#7, the mod author, 2026-10-10): the
+    ; guards around her aren't loaded to be found, and the old fallback below freed her inside the prison, where she
+    ; walked out. Later the prison may keep its guards in its own state and decide from that
+    if (!self.IsPlayer() && !this.Is3DLoaded())
+        Info(akDeadGuard + " can't go on with " + Name + " " + this + "'s intake in " + prison.Name + ", and nobody's there to see: moved into the cell")
+        prisoner.MoveToCell()
+        return
+    endif
     Actor anyGuard = RPB_Utility.GetNearestGuardInCell(this, akDeadGuard)
     RPB_Recovery.__Step(this, "HandOverInPrison: a guard left in the prison: " + anyGuard)
     if (!anyGuard)
@@ -1916,7 +1974,7 @@ endFunction
 function __TakeOverInPrison(Actor akNewGuard, RPB_Prison apPrison, RPB_Prisoner apPrisoner, Actor akOldGuard)
     RPB_Captor newCaptor = Arrest.AwaitCaptorReference(akNewGuard)
     if (!newCaptor)
-        Info("Could not make " + akNewGuard + " the captor of " + Name + " " + this + " after " + akOldGuard + " died: free inside, stripped")
+        Info("Could not make " + akNewGuard + " the captor of " + Name + " " + this + " (" + self.GetString("Handover Reason") + "): free inside, stripped")
         self.SetBool("Awaiting Guard", false)
         RPB_Recovery.CancelArrest(this, "no guard could take over in the prison", abReturnBelongings = false)
         return
@@ -1933,7 +1991,7 @@ function __TakeOverInPrison(Actor akNewGuard, RPB_Prison apPrison, RPB_Prisoner 
         self.SetBool("Awaiting Guard", false)
         waited = ", after waiting " + ((Utility.GetCurrentRealTime() - self.GetFloat("Awaiting Guard Since")) as int) + "s for a guard to see them"
     endif
-    Info("Arrest of " + Name + " " + this + " handed over to " + akNewGuard + " in " + apPrison.Name + ": " + akOldGuard + " died" + waited)
+    Info("Arrest of " + Name + " " + this + " handed over to " + akNewGuard + " in " + apPrison.Name + ": " + self.GetString("Handover Reason") + waited)
 
     if (self.GetBool("Arrest Pending"))
         self.SetBool("Arrest Pending", false)
@@ -1973,7 +2031,7 @@ function __AwaitGuardInPrison(Actor akDeadGuard, RPB_Prison apPrison)
         endif
         self.SetBool("Pending Hold", true) ; lifted by the take-over (__ReleasePendingHold)
     endif
-    Info(Name + " " + this + " waits in " + apPrison.Name + " (cuffed " + cuffed + ") for a guard who can see them: " + akDeadGuard + " died")
+    Info(Name + " " + this + " waits in " + apPrison.Name + " (cuffed " + cuffed + ") for a guard who can see them: " + self.GetString("Handover Reason"))
     RegisterForSingleUpdate(2.0)
 endFunction
 

@@ -3663,7 +3663,8 @@ function ResumePrisonFlowWith(RPB_Prisoner apPrisoner, Actor akGuard)
     if (!RPB_Utility.IsCuffed(apPrisoner.GetActor()))
         self.StartRestrainingPrisoner(apPrisoner, akGuard)
     endif
-    if (!strippedSilently && !apPrisoner.IsStripped && apPrisoner.ShouldBeStripped)
+    ; Not stripped twice: IsStripped lives on her effect, lost when her 3D loads again; her belongings record doesn't
+    if (!strippedSilently && !apPrisoner.IsStripped && !self.__StrippedAtIntake(apPrisoner) && apPrisoner.ShouldBeStripped)
         self.StartStrippingPrisoner(apPrisoner, akGuard)
     endif
     if (apPrisoner.ShouldBeClothed && !apPrisoner.IsClothed)
@@ -3672,6 +3673,7 @@ function ResumePrisonFlowWith(RPB_Prisoner apPrisoner, Actor akGuard)
     if (apPrisoner.Should("Go to Cell"))
         self.EscortPrisonerToCell(apPrisoner, akGuard)
     endif
+    self.WatchIntake(apPrisoner.GetActor(), "Resumed with " + akGuard)
 endFunction
 
 ; ==========================================================
@@ -3770,6 +3772,7 @@ event OnPrisonerTeleportedToPrison(RPB_Prisoner apPrisoner)
     ; Same thing here regarding the Captor, and maybe there should be instances where the prisoner is not taken to the cell.
     self.StartRestrainingPrisoner(apPrisoner, apPrisoner.Captor)
     self.EscortPrisonerToCell(apPrisoner, apPrisoner.Captor)
+    self.WatchIntake(apPrisoner.GetActor())
 
     apPrisoner.OnTeleportedToPrison()
 endEvent
@@ -3929,6 +3932,7 @@ event OnEscortPrisonerToJailEnd(RPB_ActorBase apActor, Actor akEscort)
         self.EscortPrisonerToCell(prisonerRef, akEscort)
     endif
     GuardMark(akEscort, "prison flow queued (strip, clothing, escort to the cell)")
+    self.WatchIntake(prisonerRef.GetActor())
 
     prisonerRef.OnEscortedToPrison(akEscort)
 endEvent
@@ -4413,4 +4417,206 @@ function __BuildSettingsSnapshot(int apMap)
     FastMap_SetInt(apMap, "Outfit::Conditional", IsOutfitConditional as int)
     FastMap_SetInt(apMap, "Outfit::Minimum Bounty", OutfitMinimumBounty)
     FastMap_SetInt(apMap, "Outfit::Maximum Bounty", OutfitMaximumBounty)
+endFunction
+
+;                       The intake watch
+; ==========================================================
+
+;/
+    The intake (frisk, strip, restrain, clothing: Scenes queued one after another at the escort to jail's end) watched
+    from the prison, loaded or not (#3, 2026-10-10: a fight during the strip stopped it, the guard killed the bandit and
+    stayed on RPB_Wander_S, the player stuck; nothing watched these steps). One entry per prisoner, from the escort to
+    jail's end (or the teleport's arrival) to her escort to the cell (its own stall check takes over) or her imprisonment.
+    Each step of those Scenes restarts her clock (RPB_EventManager.OnPrisonScene). Wakes every 3s while any is watched.
+    Stuck: no step for INTAKE_STEP_SECONDS outside a fight (a fight holds the clock), her Scene's guard dead or frozen past
+    two wakes (his death's own handover, RPB_Arrestee.HandOverInPrison, goes first), or no intake Scene of hers playing or
+    queued for that long. Then RPB_IntakeStalled, on its own stack (__RecoverStalledIntake). A frozen prisoner is left
+    alone (no call into her). A load restarts the clocks (each entry keeps the load it was stamped in)
+/;
+float property INTAKE_STEP_SECONDS = 30.0 autoreadonly
+; In sight (the prisoner's 3D loaded): judged sooner (the mod author, 2026-10-11: 30s felt sluggish; a step takes 2-6s)
+float property INTAKE_STEP_SECONDS_IN_SIGHT = 15.0 autoreadonly
+int __intakeWatch ; FastMap<Form>: prisoner -> FastMap { step, since, loadStamp, replays, guardWakes }
+
+function WatchIntake(Actor akPrisoner, string asStep = "Arrived")
+    if (!akPrisoner)
+        return
+    endif
+    if (!__intakeWatch || !JValue.isExists(__intakeWatch))
+        __intakeWatch = FastMap("<Form>", retain = true)
+    endif
+    int entry = FastFormMap_GetObject(__intakeWatch, akPrisoner)
+    if (!entry)
+        entry = FastMap()
+        FastFormMap_SetObject(__intakeWatch, akPrisoner, entry)
+        Debug("["+ Name +"] Prison::WatchIntake", "watching " + akPrisoner + "'s intake (" + asStep + ")")
+    endif
+    self.__StampIntake(entry, asStep)
+    Monitor.RequestRealTimeWake("Intake", 3.0)
+endFunction
+
+; A step of one of the intake's Scenes: her clock starts again (and she's watched, if a save from before this missed it)
+function NoteIntakeStep(Actor akPrisoner, string asStep)
+    self.WatchIntake(akPrisoner, asStep)
+endFunction
+
+function StopWatchingIntake(Actor akPrisoner)
+    if (akPrisoner && __intakeWatch && FastFormMap_HasKey(__intakeWatch, akPrisoner))
+        FastFormMap_RemoveKey(__intakeWatch, akPrisoner)
+        Debug("["+ Name +"] Prison::StopWatchingIntake", akPrisoner + "'s intake no longer watched")
+    endif
+endFunction
+
+function __StampIntake(int aiEntry, string asStep)
+    FastMap_SetString(aiEntry, "step", asStep)
+    FastMap_SetFloat(aiEntry, "since", Utility.GetCurrentRealTime())
+    FastMap_SetFloat(aiEntry, "loadStamp", JDB.solveFlt(".rpb_root.loadStamp"))
+    FastMap_SetInt(aiEntry, "guardWakes", 0)
+endFunction
+
+; RPB_PrisonMonitor's "Intake" wake
+function __ProcessIntakeWatch()
+    if (!__intakeWatch || !JValue.isExists(__intakeWatch))
+        return
+    endif
+    float now = Utility.GetCurrentRealTime()
+    float loadStamp = JDB.solveFlt(".rpb_root.loadStamp")
+    Form prisoner = FastFormMap_NextKey(__intakeWatch)
+    while (prisoner)
+        Form nextPrisoner = FastFormMap_NextKey(__intakeWatch, prisoner)
+        self.__CheckIntake(prisoner as Actor, FastFormMap_GetObject(__intakeWatch, prisoner), now, loadStamp)
+        prisoner = nextPrisoner
+    endWhile
+    if (FastFormMap_Size(__intakeWatch) > 0)
+        Monitor.RequestRealTimeWake("Intake", 3.0)
+    endif
+endFunction
+
+function __CheckIntake(Actor akPrisoner, int aiEntry, float afNow, float afLoadStamp)
+    if (!akPrisoner)
+        return
+    endif
+    if (IsFrozenNPC(akPrisoner))
+        return ; no call into her until the next load
+    endif
+    RPB_Prisoner prisoner = Prisoners.AtKey(akPrisoner)
+    if (!prisoner || prisoner.IsImprisoned)
+        self.StopWatchingIntake(akPrisoner)
+        return
+    endif
+    if (FastMap_GetFloat(aiEntry, "loadStamp") != afLoadStamp)
+        self.__StampIntake(aiEntry, "Resumed") ; real time started over with this session
+        return
+    endif
+
+    string current = SceneManager.GetCurrentScene()
+    string sceneType = SceneManager.GetSceneType(current)
+    if (sceneType == SceneManager.CATEGORY_ESCORT_TO_CELL && SceneManager.GetSceneNthReferenceOfType(current, "Escortee") == akPrisoner)
+        self.StopWatchingIntake(akPrisoner) ; her escort to the cell has its own stall check
+        return
+    endif
+    ; Paused for a fight (RPB_Arrestee.PauseEscortForFight: a pending arrest), walked back to the intake after it (the
+    ; escort to jail again), or waiting for a guard who sees her (RPB_Arrestee.HandOverInPrison): the arrest's own watches
+    ; have her (handing over again each time spammed the wait), the intake starts over at that escort's end
+    RPB_Arrestee arrestState = API.Arrest.Arrestees.AtKey(akPrisoner)
+    if ((arrestState && (arrestState.GetBool("Arrest Pending") || arrestState.GetBool("Awaiting Guard"))) || (sceneType == SceneManager.CATEGORY_ESCORT_TO_JAIL && SceneManager.GetSceneNthReferenceOfType(current, "Escortee") == akPrisoner))
+        FastMap_SetFloat(aiEntry, "since", afNow)
+        return
+    endif
+    float limit = INTAKE_STEP_SECONDS
+    if (akPrisoner == Game.GetPlayer() || akPrisoner.Is3DLoaded())
+        limit = INTAKE_STEP_SECONDS_IN_SIGHT
+    endif
+    bool intakeScene = (sceneType == SceneManager.CATEGORY_FRISKING || sceneType == SceneManager.CATEGORY_STRIPPING || sceneType == SceneManager.CATEGORY_RESTRAIN || sceneType == SceneManager.CATEGORY_CLOTHING || sceneType == SceneManager.CATEGORY_NO_CLOTHING) && SceneManager.GetSceneNthReferenceOfType(current, "Prisoner") == akPrisoner
+    Actor guard = none
+    string kind = "stuck"
+    string reason = ""
+    float stuckFor = afNow - FastMap_GetFloat(aiEntry, "since")
+    if (intakeScene)
+        guard = SceneManager.GetSceneNthReferenceOfType(current, "Guard") as Actor
+        if (guard && (IsFrozenNPC(guard) || IsDeadNoCall(guard)))
+            int guardWakes = FastMap_GetInt(aiEntry, "guardWakes") + 1
+            FastMap_SetInt(aiEntry, "guardWakes", guardWakes)
+            if (guardWakes < 3)
+                return ; his death's own handover goes first
+            endif
+            kind = "guard"
+            reason = current + "'s guard is " + string_if(IsFrozenNPC(guard), "frozen", "dead")
+        elseif (guard && (guard.IsInCombat() || akPrisoner.IsInCombat()))
+            FastMap_SetFloat(aiEntry, "since", afNow) ; a fight holds the clock
+            return
+        elseif (stuckFor < limit)
+            return
+        else
+            reason = "no step for " + (stuckFor as int) + "s in " + current + " after '" + FastMap_GetString(aiEntry, "step") + "'"
+        endif
+    else
+        if (SceneManager.HasQueuedSceneWithActor(akPrisoner))
+            FastMap_SetFloat(aiEntry, "since", afNow) ; waiting for her turn
+            return
+        endif
+        if (stuckFor < limit)
+            return
+        endif
+        kind = "gap"
+        reason = "no intake Scene of hers playing or queued for " + (stuckFor as int) + "s (after '" + FastMap_GetString(aiEntry, "step") + "')"
+    endif
+    self.__StampIntake(aiEntry, "Recovering")
+    Info("["+ Name +"] Prison: " + akPrisoner + "'s intake is stuck: " + reason)
+    int handle = ModEvent.Create("RPB_IntakeStalled")
+    if (handle)
+        ModEvent.PushForm(handle, akPrisoner)
+        ModEvent.PushForm(handle, guard)
+        ModEvent.PushString(handle, "the intake is stuck: " + reason)
+        ModEvent.PushString(handle, kind)
+        ModEvent.Send(handle)
+    endif
+endFunction
+
+;/
+    A stuck intake (RPB_IntakeStalled, its own stack). First, with her guard alive and answering: the rest of the intake
+    played again with him (ResumePrisonFlowWith: the step that stopped, then what was left). Stuck again, or her guard dead,
+    frozen or gone: a guard of the prison takes over (RPB_Arrestee.HandOverInPrison: one who sees her, or waited for; with
+    none, an NPC nobody can see goes into her cell). No arrest state left to hand over (rare): into the cell, unless she's
+    an NPC in sight (the watch tries again later, once she's out of sight)
+/;
+function __RecoverStalledIntake(Actor akPrisoner, Actor akGuard, string asReason, string asKind)
+    RPB_Prisoner prisoner = Prisoners.AtKey(akPrisoner)
+    if (!prisoner || prisoner.IsImprisoned || IsFrozenNPC(akPrisoner))
+        return
+    endif
+    int entry = 0
+    if (__intakeWatch)
+        entry = FastFormMap_GetObject(__intakeWatch, akPrisoner)
+    endif
+    RPB_Arrestee arrestee = API.Arrest.Arrestees.AtKey(akPrisoner)
+    Actor captor = akGuard
+    if (arrestee)
+        captor = arrestee.GetCaptorActor()
+    endif
+    bool captorAnswers = captor && !IsFrozenNPC(captor) && !IsDeadNoCall(captor)
+    int replays = 0
+    if (entry)
+        replays = FastMap_GetInt(entry, "replays")
+    endif
+    if (asKind != "guard" && captorAnswers && replays < 1)
+        if (entry)
+            FastMap_SetInt(entry, "replays", replays + 1)
+        endif
+        Info("["+ Name +"] Prison: " + asReason + ": the rest of " + akPrisoner + "'s intake played again with " + captor)
+        SceneManager.EndSceneWithActor(akPrisoner, asReason)
+        self.ResumePrisonFlowWith(prisoner, captor)
+        return
+    endif
+    if (arrestee && captor)
+        Info("["+ Name +"] Prison: " + asReason + ": a guard of the prison takes " + akPrisoner + "'s intake over from " + captor)
+        arrestee.HandOverInPrison(captor, captor + " can't go on with it (" + asReason + ")")
+        return
+    endif
+    if (akPrisoner != Game.GetPlayer() && akPrisoner.Is3DLoaded())
+        return ; in sight: not moved in front of the player; the watch tries again
+    endif
+    Info("["+ Name +"] Prison: " + asReason + ", and nobody to take it over: " + akPrisoner + " moved into the cell")
+    SceneManager.EndSceneWithActor(akPrisoner, asReason)
+    prisoner.MoveToCell()
 endFunction

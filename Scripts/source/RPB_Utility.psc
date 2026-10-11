@@ -5917,7 +5917,9 @@ Actor function GetGuardSeeing(Actor akPrisoner, Actor akExclude) global
         Actor candidate = nearby[i]
         if (candidate && candidate != akExclude && candidate != akPrisoner && !IsListedFrozen(frozenMap, candidate) && candidate.GetFormID() != 0x14 && candidate.IsGuard() && !candidate.IsDead() && !candidate.IsDisabled() && !candidate.IsChild() && candidate.GetParentCell() == prisonerCell)
             float distance = candidate.GetDistance(akPrisoner)
-            if (distance <= 1000.0 && (!seeing || distance < seeingDistance) && (distance <= 256.0 || candidate.HasLOS(akPrisoner)))
+            ; HasLOS only answers with the player on one side: for an NPC prisoner a guard of her cell within reach counts
+            ; (2026-10-11: a bandit waited for good in the stripping area, guards around, none "seeing" her)
+            if (distance <= 1000.0 && (!seeing || distance < seeingDistance) && (distance <= 256.0 || akPrisoner != Game.GetPlayer() || candidate.HasLOS(akPrisoner)))
                 seeing = candidate
                 seeingDistance = distance
             endif

@@ -125,6 +125,7 @@ function RegisterEvents()
     RegisterForModEvent("RPB_MoveGuard", "OnMoveGuard")
     RegisterForModEvent("RPB_StalledEscortTakeover", "OnStalledEscortTakeover")
     RegisterForModEvent("RPB_ConfrontationStalled", "OnConfrontationStalled")
+    RegisterForModEvent("RPB_IntakeStalled", "OnIntakeStalled")
     RegisterForModEvent("RPB_EncumbranceCheck", "OnEncumbranceCheck")
     RegisterForModEvent("RPB_ReleaseNPC", "OnReleaseNPC")
 
@@ -240,6 +241,14 @@ endEvent
 ; RPB_Arrestee.__EscortStalled: another guard of the hold for a stalled escort, or its fallback
 event OnStalledEscortTakeover(Form akArrestee, string asReason)
     Arrest.TakeOverStalledEscort(akArrestee as Actor, asReason)
+endEvent
+
+; RPB_Prison's intake watch: a frisk, strip, restrain or clothing stopped moving
+event OnIntakeStalled(Form akPrisoner, Form akGuard, string asReason, string asKind)
+    RPB_Prison prison = API.PrisonManager.FindPrisonByPrisoner(akPrisoner as Actor)
+    if (prison)
+        prison.__RecoverStalledIntake(akPrisoner as Actor, akGuard as Actor, asReason, asKind)
+    endif
 endEvent
 
 ; RPB_ArrestMonitor: a confrontation stopped moving
@@ -1072,6 +1081,12 @@ event OnPrisonScene(string asScene, string asSceneEvent, RPB_Prison apPrison, RP
         return
     endif
 
+    ; Each step of the intake restarts the prisoner's clock in the prison's intake watch; her escort to the cell ends it
+    if (sceneType == SceneManager.CATEGORY_FRISKING || sceneType == SceneManager.CATEGORY_STRIPPING || sceneType == SceneManager.CATEGORY_RESTRAIN || sceneType == SceneManager.CATEGORY_CLOTHING || sceneType == SceneManager.CATEGORY_NO_CLOTHING)
+        apPrison.NoteIntakeStep(apPrisoner.GetActor(), asScene + ": " + asSceneEvent + RPB_Utility.string_if(handlingSecondaryEvent, " (" + asSceneSecondaryEvent + ")", ""))
+    elseif (sceneType == SceneManager.CATEGORY_ESCORT_TO_CELL && asSceneEvent == SceneManager.EVENT_ESCORT_BEGIN)
+        apPrison.StopWatchingIntake(apPrisoner.GetActor())
+    endif
     if (sceneType == SceneManager.CATEGORY_ESCORT_TO_JAIL)
         Actor escort = akAuthority
 

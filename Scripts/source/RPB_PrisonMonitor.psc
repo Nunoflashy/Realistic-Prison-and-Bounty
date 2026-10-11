@@ -626,6 +626,7 @@ endFunction
 float __dressDueAt = -1.0
 float __stallDueAt = -1.0
 float __releaseDueAt = -1.0
+float __intakeDueAt = -1.0
 float __armedRealTimeAt = -1.0
 
 ;/
@@ -646,6 +647,10 @@ function RequestRealTimeWake(string asQueue, float afSeconds)
     elseIf (asQueue == "Release")
         if (__releaseDueAt < 0.0 || at < __releaseDueAt)
             __releaseDueAt = at
+        endif
+    elseIf (asQueue == "Intake")
+        if (__intakeDueAt < 0.0 || at < __intakeDueAt)
+            __intakeDueAt = at
         endif
     else
         RPB_Utility.Warn("PrisonMonitor::RequestRealTimeWake: unknown queue '" + asQueue + "'")
@@ -680,6 +685,10 @@ event OnUpdate()
         __releaseDueAt = -1.0
         self.ProcessReleaseQueue()
     endif
+    if (self.__IsRealTimeDue(__intakeDueAt, now))
+        __intakeDueAt = -1.0
+        Prison.__ProcessIntakeWatch()
+    endif
 
     ; Re-arm for whatever is still pending (the processors above re-request what they need, which may already have armed)
     float nextAt = -1.0
@@ -691,6 +700,9 @@ event OnUpdate()
     endif
     if (__releaseDueAt >= 0.0 && (nextAt < 0.0 || __releaseDueAt < nextAt))
         nextAt = __releaseDueAt
+    endif
+    if (__intakeDueAt >= 0.0 && (nextAt < 0.0 || __intakeDueAt < nextAt))
+        nextAt = __intakeDueAt
     endif
     if (nextAt >= 0.0 && (__armedRealTimeAt < 0.0 || nextAt < __armedRealTimeAt))
         float seconds = nextAt - Utility.GetCurrentRealTime()

@@ -107,6 +107,7 @@ function PerformMaintenance()
     PrisonManager.VerifyIntegrity()
     JDB.solveFltSetter(".rpb_root.loadSettledAt", Utility.GetCurrentRealTime(), true)
     Arrest.ResumeEscortWatchesAfterLoad() ; a save made while an escort watch was dead has none to restore
+    self.__WatchIntakeAfterLoad()
     RPB_Keybindings.RegisterSurrenderKey()
     ; Waiting blocked by an escort this save no longer has: allowed again (a save made mid-escort keeps it until its end)
     if (RPB_Utility.IsEscortWaitBlocked())
@@ -117,6 +118,24 @@ function PerformMaintenance()
     endif
 
     API.MCM.InitializePages()
+endFunction
+
+; An intake Scene playing in a save made before the prison's intake watch existed: watched from now (one Scene plays at a
+; time: the current one). Entries already watched restart their own clocks (RPB_Prison.__CheckIntake)
+function __WatchIntakeAfterLoad()
+    string current = SceneManager.GetCurrentScene()
+    string sceneType = SceneManager.GetSceneType(current)
+    if (sceneType != SceneManager.CATEGORY_FRISKING && sceneType != SceneManager.CATEGORY_STRIPPING && sceneType != SceneManager.CATEGORY_RESTRAIN && sceneType != SceneManager.CATEGORY_CLOTHING && sceneType != SceneManager.CATEGORY_NO_CLOTHING)
+        return
+    endif
+    Actor prisoner = SceneManager.GetSceneNthReferenceOfType(current, "Prisoner") as Actor
+    RPB_Prison prison = none
+    if (prisoner)
+        prison = PrisonManager.FindPrisonByPrisoner(prisoner)
+    endif
+    if (prison)
+        prison.WatchIntake(prisoner, "Resumed")
+    endif
 endFunction
 
 ; function SecretFunction()
