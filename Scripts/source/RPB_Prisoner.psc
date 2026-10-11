@@ -2730,6 +2730,7 @@ function __CatchUpAfterWait(float afHours)
     float angle = guard.GetAngleZ()
     this.MoveTo(guard, -100.0 * Math.sin(angle), -100.0 * Math.cos(angle), 0.0, false)
     PO3_SKSEFunctions.MoveToNearestNavmeshLocation(this)
+    RPB_Utility.RefreshCuffsPose(this) ; a move drops the cuffs' pose (escorted cuffed with the hands at the sides, 2026-10-11)
     __assistLastX = this.GetPositionX()
     __assistLastY = this.GetPositionY()
     __assistLastZ = this.GetPositionZ()
@@ -2946,6 +2947,7 @@ function __MoveInFrontOfDoor(ObjectReference akDoor)
         this.MoveTo(akDoor, afXOffset = -dx, afYOffset = -dy, abMatchRotation = false)
         PO3_SKSEFunctions.MoveToNearestNavmeshLocation(this)
     endif
+    RPB_Utility.RefreshCuffsPose(this) ; a move drops the cuffs' pose
 endFunction
 
 ; In the same place as @akOther: the same cell, or both outside in the same worldspace. Outside, every grid square is its
@@ -3389,6 +3391,7 @@ bool function __AssistMoveToGuard(string asWhy)
     else
         this.MoveTo(__assistEscort)
     endif
+    RPB_Utility.RefreshCuffsPose(this) ; a move drops the cuffs' pose
     ; From where the move put me: the teleport itself isn't me moving again
     __assistLastX = this.GetPositionX()
     __assistLastY = this.GetPositionY()

@@ -1169,6 +1169,7 @@ endFunction
 
 function MoveToCaptor()
     this.MoveTo(Captor.GetActor())
+    RPB_Utility.RefreshCuffsPose(this) ; a move drops the cuffs' pose
 endFunction
 
 ; ==========================================================
@@ -1327,8 +1328,23 @@ event OnStatChanged(string asStatName, float afValue)
     ; Debug("Arrestee::OnStatChanged", "Stat " + asStatName + " has been changed to " + afValue)
 endEvent
 
+; The arrest's cuffs stay on until the arrest takes them off itself (RPB_Utility.RemoveCuffs marks those): anything else
+; taking them off (another mod, the console, the inventory) has them put back at once, so I'm never free-handed while
+; under arrest, pending for a fight included (the mod author, 2026-10-11: before, only noticed when the escort was played)
 event OnObjectUnequipped(Form akBaseObject, ObjectReference akReference)
-    
+    if (!RPB_Utility.IsCuffsForm(akBaseObject))
+        return
+    endif
+    if (self.GetBool("Cuffs Off On Purpose"))
+        self.Remove("Cuffs Off On Purpose")
+        return
+    endif
+    if (!self.GetBool("Restrained By Arrest") || this.IsDead() || RPB_Utility.IsCuffed(this))
+        return ; never cuffed by the arrest, or put on again already (a pose refresh, a swap of pairs)
+    endif
+    bool front = Math.LogicalAnd(akBaseObject.GetFormID(), 0x00FFFFFF) != 0x81D2F
+    RPB_Utility.LogWarn(Name + " " + this + "'s cuffs came off (" + akBaseObject + "), not by the arrest: put back on", "Arrestee::OnObjectUnequipped")
+    RPB_Utility.EquipCuffs(this, front)
 endEvent
 
 event OnDeath(Actor akKiller)
@@ -1510,6 +1526,9 @@ event OnUpdate()
         ; they liked, and the resumed escort then played out oddly from there. Running off while pending is meant to become
         ; an escape attempt with its own charge instead of a pull.
         this.MoveTo(Captor.GetActor())
+        ; The move drops the cuffs' pose as a load door does (2026-10-11: pulled to the guard right after a fight, escorted
+        ; cuffed with the hands at the sides until a jump)
+        RPB_Utility.RefreshCuffsPose(this)
         Debug("["+ Name +"] Arrestee::OnUpdate", "Moved Arrestee to " + Captor.Name)
     else
         self.SetInt("Leash Pulls", 0)

@@ -50,6 +50,9 @@ scriptname RPB_Utility hidden
     function EquipCuffs(Actor akActor, bool abFront = false) global
     bool function IsCuffedInFront(Actor akActor) global
     bool function RefreshCuffsPose(Actor akActor) global
+    bool function PutCuffsOn(Actor akActor, Form akCuffs, bool abReplay = false) global
+    bool function IsSwitchingWeapon(Actor akActor) global
+    bool function RepairWeaponState(Actor akActor) global
     bool function IsCuffsForm(Form akForm) global
     Form[] function WithoutCuffs(Form[] akForms) global
     function LimitCuffedMovement_Encumbrance(bool abOn) global
@@ -1630,6 +1633,15 @@ int function RemoveCuffs(Actor akActor) global
     cuffIds[1] = 0x81D33
     cuffIds[2] = 0x81D34
 
+    ; Taken off on purpose: an arrestee's cuffs coming off are put back on at once (RPB_Arrestee.OnObjectUnequipped), except
+    ; these. Only when worn: the unequip event that clears the mark comes only then
+    if (IsCuffed(akActor) && IsActorArrested(akActor))
+        RPB_Arrestee arrestee = RPB_API.GetArrest().Arrestees.AtKey(akActor)
+        if (arrestee)
+            arrestee.SetBool("Cuffs Off On Purpose", true)
+        endif
+    endif
+
     int i = 0
     while (i < cuffIds.Length)
         Form cuffs = Game.GetFormFromFile(cuffIds[i], "ZaZAnimationPack.esm")
@@ -1643,6 +1655,10 @@ int function RemoveCuffs(Actor akActor) global
         endif
         i += 1
     endWhile
+    ; Out from under the cuffs (cuffed mid-draw): unusable until equipped again, and for an NPC for good
+    if (removed > 0 && RepairWeaponState(akActor))
+        LogWarn(akActor + " had the weapon out under the cuffs: weapon equipped again and put away", "Utility::RemoveCuffs")
+    endif
     ; The player held cuffed (walking, no fighting or activating) gets everything back once the cuffs are off. Not while
     ; AI-driven (movement off): whatever drives them hands the controls back itself.
     if (akActor == Game.GetPlayer())
@@ -1861,9 +1877,75 @@ bool function RefreshCuffsPose(Actor akActor) global
     if (!cuffs)
         return false
     endif
-    akActor.UnequipItem(cuffs, false, true)
-    akActor.EquipItem(cuffs, true, true)
+    ; The hands emptied first, as for the cuffs going on (EquipCuffs): played again over a drawn bow (a leash pull right
+    ; after a fight, 2026-10-11) the bow stayed out between the cuffs
+    bool armed = PutCuffsOn(akActor, cuffs, abReplay = true)
+    if (armed)
+        Utility.Wait(0.5)
+        if (RepairWeaponState(akActor)) ; sheathed by then: its own pose replay here doesn't come back to this
+            LogWarn(akActor + " had the weapon out under the cuffs: weapon equipped again and put away", "Utility::RefreshCuffsPose")
+        endif
+    endif
     return true
+endFunction
+
+;/
+    Puts @akCuffs on @akActor (@abReplay: already on, off and on again to play their pose again) with the hands emptied
+    first: whatever is in them (weapons, spells) taken off, the cuffs on, then put back, sheathed. No sheathe animation to
+    wait for (the mod author's idea, 2026-10-11): a draw still going on is cut off, where waiting for one left the weapon out
+    under the cuffs, unusable until equipped again, or the sheathe's end played over their pose. The weapons stay worn, as
+    before. True if the hands were armed (drawn, or drawing or sheathing): the caller then checks for the stuck state after
+/;
+bool function PutCuffsOn(Actor akActor, Form akCuffs, bool abReplay = false) global
+    bool armed = akActor.IsWeaponDrawn() || IsSwitchingWeapon(akActor)
+    Weapon right = none
+    Weapon left = none
+    Spell rightSpell = none
+    Spell leftSpell = none
+    if (armed)
+        right = akActor.GetEquippedWeapon(false)
+        left = akActor.GetEquippedWeapon(true)
+        rightSpell = akActor.GetEquippedSpell(1)
+        leftSpell = akActor.GetEquippedSpell(0)
+        if (right)
+            akActor.UnequipItemEx(right, 1)
+        endif
+        if (left)
+            akActor.UnequipItemEx(left, 2)
+        endif
+        if (rightSpell)
+            akActor.UnequipSpell(rightSpell, 1)
+        endif
+        if (leftSpell)
+            akActor.UnequipSpell(leftSpell, 0)
+        endif
+        ; Empty hands still raised (fists): down, quick with nothing in them
+        float waited = 0.0
+        while (akActor.IsWeaponDrawn() && waited < 1.0)
+            akActor.SheatheWeapon()
+            Utility.Wait(0.1)
+            waited += 0.1
+        endWhile
+    endif
+    if (abReplay)
+        akActor.UnequipItem(akCuffs, false, true)
+    endif
+    akActor.EquipItem(akCuffs, true, true)
+    if (armed)
+        if (right)
+            akActor.EquipItemEx(right, 1, false, false)
+        endif
+        if (left)
+            akActor.EquipItemEx(left, 2, false, false)
+        endif
+        if (rightSpell)
+            akActor.EquipSpell(rightSpell, 1)
+        endif
+        if (leftSpell)
+            akActor.EquipSpell(leftSpell, 0)
+        endif
+    endif
+    return armed
 endFunction
 
 function EquipCuffs(Actor akActor, bool abFront = false) global
@@ -1888,12 +1970,54 @@ function EquipCuffs(Actor akActor, bool abFront = false) global
     endif
 
     RemoveCuffs(akActor)
-    akActor.SheatheWeapon()
-    akActor.EquipItem(cuffs, true, true)
+    ; The hands emptied first: cuffed with a weapon still drawn (the cuffs put back after a fight, 2026-10-11) the arms
+    ; played the wrong animation
+    bool armed = PutCuffsOn(akActor, cuffs)
     if (akActor == Game.GetPlayer())
         BlockPlayerActivation(true)
         SetCuffedRestrictions(true)
     endif
+    ; Armed a moment ago: still drawn under the cuffs is the stuck state, put right (only then: no wait otherwise)
+    if (armed)
+        Utility.Wait(0.5)
+        if (RepairWeaponState(akActor))
+            LogWarn(akActor + " had the weapon out under the cuffs: weapon equipped again and put away", "Utility::EquipCuffs")
+        endif
+    endif
+endFunction
+
+; Drawing or putting away a weapon right now (the behavior graph's own flags)
+bool function IsSwitchingWeapon(Actor akActor) global
+    return akActor.GetAnimationVariableBool("IsEquipping") || akActor.GetAnimationVariableBool("IsUnequipping")
+endFunction
+
+;/
+    A weapon left out where none can be (under the cuffs, or right after them): out, unusable, until equipped again. For an
+    NPC that was for good. Each hand's weapon equipped again (off and on), then put away, and the cuffs' pose played again
+    if they're on. True if it was out
+/;
+bool function RepairWeaponState(Actor akActor) global
+    if (!akActor || !akActor.Is3DLoaded() || !akActor.IsWeaponDrawn())
+        return false
+    endif
+    Weapon right = akActor.GetEquippedWeapon(false)
+    Weapon left = akActor.GetEquippedWeapon(true)
+    if (right)
+        akActor.UnequipItemEx(right, 1)
+    endif
+    if (left)
+        akActor.UnequipItemEx(left, 2)
+    endif
+    Utility.Wait(0.1)
+    if (right)
+        akActor.EquipItemEx(right, 1)
+    endif
+    if (left)
+        akActor.EquipItemEx(left, 2)
+    endif
+    akActor.SheatheWeapon()
+    RefreshCuffsPose(akActor)
+    return true
 endFunction
 
 ; Stops every loaded guard fighting (repeated resists leave them attacking the player for good, even with the bounty
