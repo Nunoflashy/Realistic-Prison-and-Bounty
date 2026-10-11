@@ -1502,6 +1502,12 @@ event OnUpdate()
         endif
     endif
 
+    ; Before the leash: a player far behind returns early there (the escort assist has them), and a dropped escort with the
+    ; guard 1400 units off went unnoticed (2026-10-11)
+    if (self.__EscortNeverBegan())
+        return
+    endif
+
     float leash = ESCORT_LEASH_DISTANCE
     if (self.GetBool("Arrest Pending"))
         leash = PENDING_LEASH_DISTANCE
@@ -1534,10 +1540,6 @@ event OnUpdate()
         self.SetInt("Leash Pulls", 0)
     endif
 
-    if (self.__EscortNeverBegan())
-        return
-    endif
-
     if (self.__EscortStalled())
         return
     endif
@@ -1549,13 +1551,25 @@ endEvent
     My escort to jail is the current Scene but the game never started it (no begin event: its guard never left his own
     package, and the player stood with none while the leash kept pulling them to him; each pull reset the stall check's
     still ticks, so the takeover took ~45s, 2026-10-11). Two ticks (~10s) like that: the same takeover as a stalled escort
-    (another guard of the hold, or the fallback). True when it acted
+    (another guard of the hold, or the fallback). True when it acted.
+    Also an escort that began and then stopped playing, still the current Scene (2026-10-11: resumed after a fight with the
+    guard 1400 units off, the game dropped the Scene within seconds, the guard back on his own package and the player with
+    none; only the stall check, ~50s later, took it over)
 /;
 bool function __EscortNeverBegan()
     string current = SceneManager.GetCurrentScene()
-    if (self.GetBool("Escort Begun") || self.GetBool("Arrest Pending") || !SceneManager.IsSceneOfType(current, SceneManager.CATEGORY_ESCORT_TO_JAIL) || SceneManager.GetSceneNthReferenceOfType(current, "Escortee") != this)
+    if (self.GetBool("Arrest Pending") || !SceneManager.IsSceneOfType(current, SceneManager.CATEGORY_ESCORT_TO_JAIL) || SceneManager.GetSceneNthReferenceOfType(current, "Escortee") != this)
         self.SetInt("Escort Unbegun Ticks", 0)
         return false
+    endif
+    bool dropped = false
+    if (self.GetBool("Escort Begun"))
+        Scene escortScene = SceneManager.GetScene(current)
+        if (!escortScene || escortScene.IsPlaying())
+            self.SetInt("Escort Unbegun Ticks", 0)
+            return false
+        endif
+        dropped = true
     endif
     int ticks = self.GetInt("Escort Unbegun Ticks") + 1
     self.SetInt("Escort Unbegun Ticks", ticks)
@@ -1564,6 +1578,9 @@ bool function __EscortNeverBegan()
     endif
     self.SetInt("Escort Unbegun Ticks", 0)
     string reason = "the escort Scene never started (" + current + ")"
+    if (dropped)
+        reason = "the escort Scene stopped playing (" + current + ")"
+    endif
     if (self.GetInt("Stall Takeovers") < STALL_TAKEOVERS_MAX)
         self.SetBool("Stall Takeover Pending", true)
         int handle = ModEvent.Create("RPB_StalledEscortTakeover")
