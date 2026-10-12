@@ -1492,7 +1492,7 @@ event OnUpdate()
     ; another guard who isn't fighting takes over
     if (self.GetBool("Arrest Pending"))
         Actor pendingGuard = Captor.GetActor()
-        if (pendingGuard.IsDead())
+        if (RPB_Utility.IsDeadNoCall(pendingGuard)) ; no call into him (a frozen guard holds the caller)
             self.OnCaptorDied(pendingGuard)
             return
         endif

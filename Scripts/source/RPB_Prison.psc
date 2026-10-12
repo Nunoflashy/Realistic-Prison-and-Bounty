@@ -4639,7 +4639,7 @@ function __CheckIntake(Actor akPrisoner, int aiEntry, float afNow, float afLoadS
     ; Pending for a guard who died meanwhile (his death event failed once: cuffed in the prison for good, 2026-10-11)
     if (arrestState && arrestState.GetBool("Arrest Pending"))
         Actor pendingGuard = arrestState.GetCaptorActor()
-        if (pendingGuard && pendingGuard.IsDead())
+        if (pendingGuard && IsDeadNoCall(pendingGuard)) ; no call into him: this loop is shared by every prisoner
             arrestState.OnCaptorDied(pendingGuard)
             return
         endif
@@ -4667,7 +4667,11 @@ function __CheckIntake(Actor akPrisoner, int aiEntry, float afNow, float afLoadS
             endif
             kind = "guard"
             reason = current + "'s guard is " + string_if(IsFrozenNPC(guard), "frozen", "dead")
-        elseif (guard && (guard.IsInCombat() || akPrisoner.IsInCombat()))
+        ; No call into him here: this loop is every prisoner's, and a guard who froze (not marked yet) held it, one stuck
+        ; stack per wake (2026-10-12, his IsInCombat during the strip, bandits spawned the same moment). His fight pauses
+        ; the arrest through his own combat event (held above while pending); one without it shows as a stuck step, whose
+        ; recovery runs on a stack of its own
+        elseif (akPrisoner.IsInCombat())
             FastMap_SetFloat(aiEntry, "since", afNow) ; a fight holds the clock
             return
         elseif (stuckFor < limit)

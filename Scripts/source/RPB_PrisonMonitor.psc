@@ -627,6 +627,7 @@ float __dressDueAt = -1.0
 float __stallDueAt = -1.0
 float __releaseDueAt = -1.0
 float __intakeDueAt = -1.0
+bool __intakeRequested ; the watch asked for its next wake during this one (else the fallback wake is dropped)
 float __armedRealTimeAt = -1.0
 
 ;/
@@ -649,6 +650,7 @@ function RequestRealTimeWake(string asQueue, float afSeconds)
             __releaseDueAt = at
         endif
     elseIf (asQueue == "Intake")
+        __intakeRequested = true
         if (__intakeDueAt < 0.0 || at < __intakeDueAt)
             __intakeDueAt = at
         endif
@@ -686,8 +688,19 @@ event OnUpdate()
         self.ProcessReleaseQueue()
     endif
     if (self.__IsRealTimeDue(__intakeDueAt, now))
-        __intakeDueAt = -1.0
+        ; A wake 5s from now first, kept unless the watch asks for an earlier one: a check stuck on a guard who froze (before
+        ; he was marked) never came back to re-arm, and no intake was watched again (2026-10-12: the strip with a frozen guard
+        ; went unrecovered). The next wake finds him marked and skips the call
+        __intakeDueAt = now + 5.0
+        if (__armedRealTimeAt < 0.0 || __intakeDueAt < __armedRealTimeAt)
+            RegisterForSingleUpdate(5.0)
+            __armedRealTimeAt = __intakeDueAt
+        endif
+        __intakeRequested = false
         Prison.__ProcessIntakeWatch()
+        if (!__intakeRequested)
+            __intakeDueAt = -1.0 ; nothing left to watch: no wake kept for it (the armed one finds nothing due)
+        endif
     endif
 
     ; Re-arm for whatever is still pending (the processors above re-request what they need, which may already have armed)
