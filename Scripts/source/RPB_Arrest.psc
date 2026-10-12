@@ -127,6 +127,7 @@ scriptname RPB_Arrest extends Quest
     function RegisterHotkeys()
     function EnableForcedArrestDialogue() global
     function DisableForcedArrestDialogue() global
+    function __WorldInteractionsInCustody(bool abInCustody) global
     function AllowArrestForcegreets(bool allow = true) global
     function SetupArrestPayableBountyVars(Faction akCrimeFaction)
     function ResetDiceRollForMaxPayableBounty() global
@@ -2888,12 +2889,40 @@ function EnableForcedArrestDialogue() global
     GlobalVariable RPB_NoArrestDialogue = RPB_Utility.RPB_ArrestGlobal("No Dialogue")
     RPB_NoArrestDialogue.SetValueInt(0)
     RPB_Arrest.__HoldArrestOnSight(false)
+    RPB_Arrest.__WorldInteractionsInCustody(false)
 endFunction
 
 function DisableForcedArrestDialogue() global
     GlobalVariable RPB_NoArrestDialogue = RPB_Utility.RPB_ArrestGlobal("No Dialogue")
     RPB_NoArrestDialogue.SetValueInt(1)
     RPB_Arrest.__HoldArrestOnSight(true)
+    RPB_Arrest.__WorldInteractionsInCustody(true)
+endFunction
+
+;/
+    No world interaction while the player is in RPB's custody (the mod author, 2026-10-12: the dead-body accusation started
+    again right after its "go to jail", its guard came back with it, and another guard had to take the arrest over). Vanilla's
+    own switch, WIEventsEnabled (Skyrim.esm 0x00035D66), checked by the Story Manager's world-interaction branches: off at the
+    custody's start, back on at its end only if RPB turned it off and it's still off (vanilla quests switch it off for their
+    own scenes; theirs is left alone). Also run on every load (RPB_EventManager.RegisterEvents)
+/;
+function __WorldInteractionsInCustody(bool abInCustody) global
+    GlobalVariable eventsEnabled = Game.GetFormFromFile(0x00035D66, "Skyrim.esm") as GlobalVariable
+    if (!eventsEnabled)
+        return
+    endif
+    bool offByUs = JDB.solveInt(".rpb_root.worldInteraction.offInCustody") == 1
+    if (abInCustody)
+        if (!offByUs && eventsEnabled.GetValueInt() == 1)
+            eventsEnabled.SetValueInt(0)
+            JDB.solveIntSetter(".rpb_root.worldInteraction.offInCustody", 1, true)
+        endif
+    elseif (offByUs)
+        JDB.solveIntSetter(".rpb_root.worldInteraction.offInCustody", 0, true)
+        if (eventsEnabled.GetValueInt() == 0)
+            eventsEnabled.SetValueInt(1)
+        endif
+    endif
 endFunction
 
 ;/

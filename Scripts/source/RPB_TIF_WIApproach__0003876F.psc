@@ -7,6 +7,12 @@ Function Fragment_0(ObjectReference akSpeakerRef)
 Actor akSpeaker = akSpeakerRef as Actor
 ;BEGIN CODE
 RPB_Utility.ProbeSpeaker(akSpeaker) ; before any call into him: a frozen speaker gets found, then silenced
+; Already in RPB's custody (the quest started in the moment before world interactions were switched off): not for them
+Actor rpbPlayer = Game.GetPlayer()
+if (RPB_Utility.IsActorArrested(rpbPlayer) || RPB_Utility.IsActorImprisoned(rpbPlayer))
+    GetOwningQuest().Stop()
+    return
+endif
 RPB_Utility.SendWorldInteractionApproach(akSpeaker, GetOwningQuest())
 ;END CODE
 EndFunction
