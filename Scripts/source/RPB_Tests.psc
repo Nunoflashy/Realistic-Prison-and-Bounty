@@ -272,6 +272,7 @@ function SetTests()
     self.AddTest("184 - Benchmark: the Time Skip's NPC Releases on Its Own Stack vs by Event (6 bandits each; advances the clock a few days)", "Test_ReleaseByEventBenchmark", abChainable = false)
     self.AddTest("187 - Freeze Control, NPC: 156's Steps With a Bandit (moved 1500 away and back mid escort, ended by a reset; repeat it)", "Test_NpcFreeWalkControl", abChainable = false)
     self.AddTest("188 - Freeze Control, Alternating: 187 (NPC) and 156 (player) by turns, the same-session comparison (repeat it)", "Test_FreezeControlAlternating", abChainable = false)
+    self.AddTest("199 - World Interaction: a Dead Body Found in Town (a townsperson killed near you, another finds her; the guard's \"go to jail\" should start RPB's arrest; needs DEV patch 015, in a hold's town)", "Test_WIDeadBody", abChainable = false)
     self.AddTest("198 - Setting: the Next Escort to Jail Reads as Never Started (its begin mark dropped once; the takeover should follow ~10s in)", "Test_SkipEscortBegun", abChainable = false)
     self.AddTest("197 - Benchmark: RPB_Memory's Fast* Wrappers vs Direct JContainers Calls (form map and string map, 3 rounds)", "Test_FastWrapperBenchmark", abChainable = false)
     self.AddTest("196 - A Fight as the Confrontation Begins: the Arrest Is Cancelled, Never Escorted Uncuffed (PLAYER; repeat it, the fight's moment varies)", "Test_FightAtConfrontationStart", abChainable = false)
@@ -14573,6 +14574,94 @@ endFunction
 ; @abPersist: a persistent reference (PlaceAtMe with abForcePersist). For actors a test walks through load doors: a
 ; non-persistent clone that went into an unloaded cell ahead of the player came back with script data the game couldn't
 ; read ("Failed to read basic script data"), and every native call on it waited forever (135's stalls, 2026-09-29).
+;/
+    199: the dead-body world interaction on demand. WIDeadBody01 (Skyrim.esm 0x0003833C) starts from the Story Manager's
+    "DEAD" event: an NPC finding a body (R1 the finder, not a guard; R2 the body, an NPC in a hold's crime faction). DEV patch
+    015 removes its 10% chance and its 24-day reset; its two globals are set here (WIEventsEnabled = 1, the cooldown
+    WINextDeadBody = 0). A townsperson of the hold is killed (no killer) beside the player and another, with AI, stands near
+    to find her; the guards around fill the quest's Guard aliases. Polls the quest for 60s and logs what filled. The actors
+    are kept: talk to the guard, and his "go to jail" (patch 014) should start RPB's arrest by him
+/;
+bool function __WIDeadBody(string asTest)
+    Actor player = Game.GetPlayer()
+    Quest deadBody = Game.GetFormFromFile(0x0003833C, "Skyrim.esm") as Quest
+    GlobalVariable eventsEnabled = Game.GetFormFromFile(0x00035D66, "Skyrim.esm") as GlobalVariable
+    GlobalVariable nextDeadBody = Game.GetFormFromFile(0x00035D6C, "Skyrim.esm") as GlobalVariable
+    if (!deadBody || !eventsEnabled || !nextDeadBody)
+        return assert_true(false, asTest + ": the dead-body quest or its globals not found")
+    endif
+    if (deadBody.IsRunning())
+        log(asTest + ": WIDeadBody01 was running (stage " + deadBody.GetStage() + "): stopped first")
+        deadBody.Stop()
+        float stopWaited = 0.0
+        while (deadBody.IsRunning() && stopWaited < 3.0)
+            Utility.Wait(0.1)
+            stopWaited += 0.1
+        endWhile
+    endif
+    log(asTest + ": WIEventsEnabled " + eventsEnabled.GetValue() + " -> 1, WINextDeadBody " + nextDeadBody.GetValue() + " -> 0 (GameDaysPassed " + Utility.GetCurrentGameTime() + ")")
+    eventsEnabled.SetValue(1.0)
+    nextDeadBody.SetValue(0.0)
+
+    string hold = API.Config.GetCurrentPlayerHoldLocationEx()
+    Faction crimeFaction = none
+    if (hold != "")
+        crimeFaction = RPB_Utility.GetCrimeFactionByHold(hold)
+    endif
+    if (!crimeFaction)
+        return assert_true(false, asTest + ": not in a hold's town (hold '" + hold + "'): the body has to be one of a hold's people")
+    endif
+
+    ; Not essential (0x132A1 is Rikke, essential: Kill() only knocked her down; Helgen's nameless civilians misbehaved,
+    ; 2026-10-12). The finder's voice is on WIDeadBody01Bystander1VoiceTypes (Vivienne's FemaleSultry isn't)
+    Actor victim = __SpawnTempActorOf(0x132AE) ; Vivienne Onis
+    Actor finder = __SpawnTempActorOf(0x13255) ; Addvar (MaleCommonerAccented)
+    if (!victim || !finder)
+        return assert_true(false, asTest + ": the townspeople could not be spawned")
+    endif
+    victim.AddToFaction(crimeFaction)
+    finder.AddToFaction(crimeFaction)
+    float angle = player.GetAngleZ()
+    victim.MoveTo(player, 150.0 * Math.sin(angle), 150.0 * Math.cos(angle), 0.0, false)
+    finder.MoveTo(player, 450.0 * Math.sin(angle + 30.0), 450.0 * Math.cos(angle + 30.0), 0.0, false)
+    finder.EnableAI(true) ; the finder has to notice the body
+    victim.EnableAI(true) ; with her AI off she's flagged dead without dying (no ragdoll, still standing)
+    Utility.Wait(1.0)
+    victim.Kill()
+    Utility.Wait(0.5)
+    if (!victim.IsDead())
+        return assert_true(false, asTest + ": " + victim + " didn't die (essential or protected?)")
+    endif
+    log(asTest + ": " + victim + " killed (no killer) in " + hold + " (" + crimeFaction + "), " + finder + " nearby to find her: waiting up to 60s for WIDeadBody01")
+
+    float waited = 0.0
+    while (!deadBody.IsRunning() && waited < 60.0)
+        Utility.Wait(0.5)
+        waited += 0.5
+    endWhile
+    if (!deadBody.IsRunning())
+        return assert_true(false, asTest + ": WIDeadBody01 never started in 60s (is DEV patch 015 in? the finder may not have seen the body: try again facing it)")
+    endif
+    Utility.Wait(1.0)
+    string filled = ""
+    string[] aliasNames = new string[5]
+    aliasNames[0] = "Corpse"
+    aliasNames[1] = "Bystander1"
+    aliasNames[2] = "Guard1"
+    aliasNames[3] = "Guard2"
+    aliasNames[4] = "Guard3"
+    int i = 0
+    while (i < aliasNames.Length)
+        ReferenceAlias found = deadBody.GetAliasByName(aliasNames[i]) as ReferenceAlias
+        if (found)
+            filled += aliasNames[i] + " " + found.GetReference() + "; "
+        endif
+        i += 1
+    endWhile
+    log(asTest + ": WIDeadBody01 started " + (waited as int) + "s after the kill, stage " + deadBody.GetStage() + ": " + filled + "talk to the guard when he comes: his \"go to jail\" should start RPB's arrest")
+    return assert_true(true)
+endFunction
+
 Actor function __SpawnTempActorOf(int aiBaseFormId, bool abPersist = false)
     if (!__testTempActors)
         __testTempActors = new Actor[64]
@@ -15064,7 +15153,7 @@ endFunction
 string __statelessTest = ""
 
 bool function __RunStatelessTest(string asTest)
-    if (asTest != "Test_ArrestWaitsWhileGuardFights_NoPackage" && asTest != "Test_CellDoorsDiagnostic" && asTest != "Test_LongAbsenceSetup" && asTest != "Test_LongAbsenceAdvance" && asTest != "Test_LongAbsenceVerify" && asTest != "Test_FallbackEscortToCellStopped_Player" && asTest != "Test_FallbackEscortToCellStopped_CloneGuard" && asTest != "Test_FightDuringEscort_NPC" && asTest != "Test_FightDuringEscort_Player" && asTest != "Test_GuardDiesInPrison_Player" && asTest != "Test_EscortToCellStopped_NoPackageLock" && StringUtil.Find(asTest, "Test_Surrender_") != 0 && asTest != "Test_FrozenGuardSkipped" && asTest != "Test_GuardDiesInPrison_NobodySees" && asTest != "Test_Escort_FreeWalk" && asTest != "Test_ToggleEscortToCell04" && asTest != "Test_CaptorFinishCycles_Calls" && asTest != "Test_CaptorFinishCycles_NoCalls" && asTest != "Test_CaptorFinishDetach_Calls" && asTest != "Test_CaptorFinishDetach_NoCalls" && asTest != "Test_Escort_FreeWalk_Control" && asTest != "Test_ActorKeys" && asTest != "Test_FrozenGuardCalls" && asTest != "Test_SimulatedFreezeCalls" && asTest != "Test_SimulatedFreezeAtCancel" && asTest != "Test_SpawnFreezableGuard" && asTest != "Test_AliasPackageControl" && asTest != "Test_FreezableEscort_Player" && asTest != "Test_FreezableEscort_NPC" && asTest != "Test_LightHold" && asTest != "Test_KillFrozenGuard" && asTest != "Test_LifetimeBountyStat" && asTest != "Test_FaintFrozenGuard" && asTest != "Test_FaintFrozenGuardShort" && asTest != "Test_FrozenEscortFallback" && asTest != "Test_HideFrozenGuard" && asTest != "Test_EscortToCellGuardHeld" && asTest != "Test_CuffedLimitEncumbrance" && asTest != "Test_CuffedLimitSettings" && asTest != "Test_EarlyHandback" && asTest != "Test_StalledEscortTakeover" && asTest != "Test_StalledEscortTakeoverLimit" && asTest != "Test_NpcEscortCancelControl" && asTest != "Test_FrozenPrisonerTimeSkip" && asTest != "Test_SpawnFreezablePrisoner" && asTest != "Test_SpawnFreezableArrestee" && asTest != "Test_GuardCrimeFactions" && asTest != "Test_PlayerEscortCancelControl" && asTest != "Test_ReleaseByEventBenchmark" && asTest != "Test_FrozenPrisonerDialogue" && asTest != "Test_NpcFreeWalkControl" && asTest != "Test_FreezeControlAlternating" && asTest != "Test_SetCancelSettle" && asTest != "Test_FightAtConfrontationStart" && asTest != "Test_FastWrapperBenchmark" && asTest != "Test_SkipEscortBegun")
+    if (asTest != "Test_ArrestWaitsWhileGuardFights_NoPackage" && asTest != "Test_CellDoorsDiagnostic" && asTest != "Test_LongAbsenceSetup" && asTest != "Test_LongAbsenceAdvance" && asTest != "Test_LongAbsenceVerify" && asTest != "Test_FallbackEscortToCellStopped_Player" && asTest != "Test_FallbackEscortToCellStopped_CloneGuard" && asTest != "Test_FightDuringEscort_NPC" && asTest != "Test_FightDuringEscort_Player" && asTest != "Test_GuardDiesInPrison_Player" && asTest != "Test_EscortToCellStopped_NoPackageLock" && StringUtil.Find(asTest, "Test_Surrender_") != 0 && asTest != "Test_FrozenGuardSkipped" && asTest != "Test_GuardDiesInPrison_NobodySees" && asTest != "Test_Escort_FreeWalk" && asTest != "Test_ToggleEscortToCell04" && asTest != "Test_CaptorFinishCycles_Calls" && asTest != "Test_CaptorFinishCycles_NoCalls" && asTest != "Test_CaptorFinishDetach_Calls" && asTest != "Test_CaptorFinishDetach_NoCalls" && asTest != "Test_Escort_FreeWalk_Control" && asTest != "Test_ActorKeys" && asTest != "Test_FrozenGuardCalls" && asTest != "Test_SimulatedFreezeCalls" && asTest != "Test_SimulatedFreezeAtCancel" && asTest != "Test_SpawnFreezableGuard" && asTest != "Test_AliasPackageControl" && asTest != "Test_FreezableEscort_Player" && asTest != "Test_FreezableEscort_NPC" && asTest != "Test_LightHold" && asTest != "Test_KillFrozenGuard" && asTest != "Test_LifetimeBountyStat" && asTest != "Test_FaintFrozenGuard" && asTest != "Test_FaintFrozenGuardShort" && asTest != "Test_FrozenEscortFallback" && asTest != "Test_HideFrozenGuard" && asTest != "Test_EscortToCellGuardHeld" && asTest != "Test_CuffedLimitEncumbrance" && asTest != "Test_CuffedLimitSettings" && asTest != "Test_EarlyHandback" && asTest != "Test_StalledEscortTakeover" && asTest != "Test_StalledEscortTakeoverLimit" && asTest != "Test_NpcEscortCancelControl" && asTest != "Test_FrozenPrisonerTimeSkip" && asTest != "Test_SpawnFreezablePrisoner" && asTest != "Test_SpawnFreezableArrestee" && asTest != "Test_GuardCrimeFactions" && asTest != "Test_PlayerEscortCancelControl" && asTest != "Test_ReleaseByEventBenchmark" && asTest != "Test_FrozenPrisonerDialogue" && asTest != "Test_NpcFreeWalkControl" && asTest != "Test_FreezeControlAlternating" && asTest != "Test_SetCancelSettle" && asTest != "Test_FightAtConfrontationStart" && asTest != "Test_FastWrapperBenchmark" && asTest != "Test_SkipEscortBegun" && asTest != "Test_WIDeadBody")
         return false
     endif
 
@@ -15266,6 +15355,8 @@ bool function __RunStatelessTest(string asTest)
             log("188: run " + __freezeAlternateRun + ": the player side (156)")
             self.__RunFreeWalkControl()
         endif
+    elseif (asTest == "Test_WIDeadBody")
+        display_result(__WIDeadBody("199"))
     elseif (asTest == "Test_SkipEscortBegun")
         ; 198: RPB_EventManager drops the next escort to jail's begin mark once (RPB_Arrestee.__EscortNeverBegan's case)
         JDB.solveIntSetter(".rpb_root.testSkipEscortBegun", 1, true)
