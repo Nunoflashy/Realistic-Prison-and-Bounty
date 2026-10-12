@@ -127,6 +127,8 @@ function RegisterEvents()
     RegisterForModEvent("RPB_ConfrontationStalled", "OnConfrontationStalled")
     RegisterForModEvent("RPB_IntakeStalled", "OnIntakeStalled")
     RegisterForModEvent("RPB_SetAsideBounty", "OnSetAsideBounty")
+    RegisterForModEvent("RPB_WorldInteractionApproach", "OnWorldInteractionApproach")
+    RegisterForModEvent("RPB_WorldInteractionArrestAnswer", "OnWorldInteractionArrestAnswer")
     RegisterForModEvent("RPB_EncumbranceCheck", "OnEncumbranceCheck")
     RegisterForModEvent("RPB_ReleaseNPC", "OnReleaseNPC")
 
@@ -230,9 +232,49 @@ event OnAnimationEvent(ObjectReference akSource, string asEventName)
     endif
 endEvent
 
+; A world interaction's guard comes to the player (WIDeadBody01's opener). A hook: logged and remembered for now; running off
+; while he comes is meant to become eluding (the mod author, 2026-10-12)
+event OnWorldInteractionApproach(Form akGuard, Form akQuest)
+    JDB.solveFormSetter(".rpb_root.worldInteraction.approachGuard", akGuard, true)
+    JDB.solveFormSetter(".rpb_root.worldInteraction.approachQuest", akQuest, true)
+    JDB.solveFltSetter(".rpb_root.worldInteraction.approachAt", Utility.GetCurrentRealTime(), true)
+    RPB_Utility.LogInfo(akGuard + " comes to the player for " + akQuest + " (a world interaction): nothing more yet (eluding later)", "EventManager::OnWorldInteractionApproach")
+endEvent
+
+; A world interaction's arrest line ended (WIDeadBody01 "you are now under arrest", @aiStage): the dialogue closing with the
+; quest still at that stage (neither go to jail nor resist answered) is resisting arrest. One watch, on the dialogue menu
+event OnWorldInteractionArrestAnswer(Form akGuard, Form akQuest, int aiStage)
+    JDB.solveFormSetter(".rpb_root.worldInteraction.answerGuard", akGuard, true)
+    JDB.solveFormSetter(".rpb_root.worldInteraction.answerQuest", akQuest, true)
+    JDB.solveIntSetter(".rpb_root.worldInteraction.answerStage", aiStage, true)
+    RegisterForMenu("Dialogue Menu")
+endEvent
+
+function __WorldInteractionDialogueClosed()
+    UnregisterForMenu("Dialogue Menu")
+    Actor guard = JDB.solveForm(".rpb_root.worldInteraction.answerGuard") as Actor
+    Quest interaction = JDB.solveForm(".rpb_root.worldInteraction.answerQuest") as Quest
+    int stage = JDB.solveInt(".rpb_root.worldInteraction.answerStage")
+    JDB.solveFormSetter(".rpb_root.worldInteraction.answerGuard", none, true)
+    JDB.solveFormSetter(".rpb_root.worldInteraction.answerQuest", none, true)
+    if (!guard || !interaction || !interaction.IsRunning() || interaction.GetStage() != stage)
+        return ; answered (go to jail or resist: their lines stopped the quest), or already over
+    endif
+    interaction.Stop()
+    if (RPB_Utility.IsFrozenNPC(guard))
+        return
+    endif
+    RPB_Utility.LogInfo("The player left " + guard + "'s arrest (" + interaction + ") without answering: resisting arrest", "EventManager::__WorldInteractionDialogueClosed")
+    RPB_Utility.SendTopicInfoEvent("RPB_TopicInfoStart", "(left the arrest without answering)", 15, guard, RPB_Utility.CrimeLineStamp())
+endFunction
+
 ; Past a loading screen while cuffed (a load door, or a game load): the cuffs put on again once the player stands in the new
-; cell, which plays their pose again
+; cell, which plays their pose again. And the dialogue closing after a world interaction's arrest line (above)
 event OnMenuClose(string asMenuName)
+    if (asMenuName == "Dialogue Menu")
+        self.__WorldInteractionDialogueClosed()
+        return
+    endif
     if (asMenuName != "Loading Menu")
         return
     endif

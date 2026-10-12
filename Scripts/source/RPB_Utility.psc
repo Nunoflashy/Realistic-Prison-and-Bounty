@@ -584,6 +584,29 @@ endFunction
     frozen guard is saved with the game and resumes after a load: on 2026-10-03 some 175 of them replayed within 20s of a
     load and arrested the player out of nowhere (KNOWN_ISSUES round 116). The handlers drop a line that began long ago.
 /;
+; A world interaction's guard coming to the player (WIDeadBody01's "You there! Wait a moment."): to RPB_EventManager, no
+; call into him (an argument only)
+function SendWorldInteractionApproach(Actor akGuard, Quest akQuest) global
+    int handle = ModEvent.Create("RPB_WorldInteractionApproach")
+    if (handle)
+        ModEvent.PushForm(handle, akGuard)
+        ModEvent.PushForm(handle, akQuest)
+        ModEvent.Send(handle)
+    endif
+endFunction
+
+; A world interaction's arrest line ended, its answers next (WIDeadBody01 at stage @aiStage): leaving the dialogue without one
+; is resisting (RPB_EventManager.OnWorldInteractionArrestAnswer)
+function SendWorldInteractionArrestAnswer(Actor akGuard, Quest akQuest, int aiStage) global
+    int handle = ModEvent.Create("RPB_WorldInteractionArrestAnswer")
+    if (handle)
+        ModEvent.PushForm(handle, akGuard)
+        ModEvent.PushForm(handle, akQuest)
+        ModEvent.PushInt(handle, aiStage)
+        ModEvent.Send(handle)
+    endif
+endFunction
+
 function SendTopicInfoEvent(string asEvent, string asText, int aiType, Actor akSpeaker, float afStartedAt) global
     int pending = JDB.solveObj(".rpb_root.pendingCrimeLines")
     if (pending)
