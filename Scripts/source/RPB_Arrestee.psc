@@ -994,8 +994,10 @@ event OnActorAction(int actionType, Actor akActor, Form source, int slot)
         ; cuffed and not in a fight of my own
         if (self.GetBool("Sheathe While Cuffed") && RPB_Utility.IsCuffed(this) && !this.IsInCombat())
             self.SetInt("Resumed Draws", self.GetInt("Resumed Draws") + 1)
-            Debug("["+ Name +"] Arrestee::OnActorAction", Name + " drew a weapon while cuffed after the resume, sheathing it")
-            this.SheatheWeapon()
+            Debug("["+ Name +"] Arrestee::OnActorAction", Name + " drew a weapon while cuffed after the resume, the hands emptied and the cuffs' pose played again")
+            ; Not a plain sheathe: the draw played over the cuffs' pose and nothing played it again (cuffed with the hands at
+            ; the sides, 2026-10-12). The hands emptied (no sheathe animation), the pose played, the weapon back sheathed
+            self.__CuffsBackAfterDraw()
         endif
         return
     endif
@@ -1004,15 +1006,48 @@ event OnActorAction(int actionType, Actor akActor, Form source, int slot)
     Debug("["+ Name +"] Arrestee::OnActorAction", Name + " drew a weapon while held, sheathing it")
     ; A restrained actor can't finish a sheathe: unrestrained for it (SetDontMove still pins me)
     this.SetRestrained(false)
-    this.SheatheWeapon()
-    float sheatheStart = Utility.GetCurrentRealTime()
-    while (this.IsWeaponDrawn() && (Utility.GetCurrentRealTime() - sheatheStart) < 1.5)
-        Utility.Wait(0.1)
-    endWhile
+    ; Cuffed: the hands emptied and the cuffs' pose played again (the draw dropped it, 2026-10-12); otherwise a sheathe
+    if (RPB_Utility.IsCuffed(this))
+        self.__CuffsBackAfterDraw()
+    else
+        this.SheatheWeapon()
+        float sheatheStart = Utility.GetCurrentRealTime()
+        while (this.IsWeaponDrawn() && (Utility.GetCurrentRealTime() - sheatheStart) < 1.5)
+            Utility.Wait(0.1)
+        endWhile
+    endif
     if (self.GetBool("Pending Hold"))
         this.SetRestrained(true)
     endif
 endEvent
+
+bool __cuffsBackAfterDraw ; one at a time: a draw often comes as two events, and two refreshes at once undid each other
+
+;/
+    I drew a weapon cuffed (OnActorAction): the hands emptied, the cuffs' pose played again, the weapon back sheathed
+    (RPB_Utility.RefreshCuffsPose). An NPC's alert lowered first (out of the fight, her AI drew again at once), and checked
+    again after: drawn again, done again, up to 3 times. Once at a time
+/;
+function __CuffsBackAfterDraw()
+    if (__cuffsBackAfterDraw)
+        return
+    endif
+    __cuffsBackAfterDraw = true
+    if (!self.IsPlayer())
+        this.SetAlert(false)
+    endif
+    int tries = 0
+    while (tries < 3)
+        RPB_Utility.RefreshCuffsPose(this)
+        Utility.Wait(0.5)
+        if (!this.IsWeaponDrawn())
+            tries = 3
+        else
+            tries += 1
+        endif
+    endWhile
+    __cuffsBackAfterDraw = false
+endFunction
 
 ; The arrest from its confirmation on: I become a prisoner, get a cell, and am escorted there (or moved, off-screen)
 ; The escort of the prisoner I already am (a fight after the cuffs made the arrest wait): the tail of __ContinueToPrison
