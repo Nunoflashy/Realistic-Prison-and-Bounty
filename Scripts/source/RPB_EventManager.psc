@@ -1174,6 +1174,14 @@ event OnPrisonScene(string asScene, string asSceneEvent, RPB_Prison apPrison, RP
                 Debug.SendAnimationEvent(escort, "IdleLockpick") ; Lock animation
                 RPB_Utility.Crumb(apPrisoner.GetActor(), "EscortToCell: Lock Cell")
 
+                ; A takeover's intake goes on in the cell (RPB_Prison.EscortToCellForIntake): the escort stops here, him at the
+                ; door (after this step the Scene walks him off), and the strip and clothing are played through the bars
+                if (apPrisoner.GetBool("Intake In Cell"))
+                    SceneManager.EndSceneWithActor(apPrisoner.GetActor(), "the rest of the intake in the cell")
+                    apPrison.ContinueIntakeInCell(apPrisoner, escort)
+                    return
+                endif
+
                 ; Arms the Escort-to-Cell stall failsafe here, not at the Scene's own start: a real debug-level log
                 ; confirmed this is the last phase cue that reliably fires in a stalled run - phase 4/5/6 end and this
                 ; one (phase 7 start) always arrive, nothing after it ever does, in both the successful and the
@@ -1196,6 +1204,13 @@ event OnPrisonScene(string asScene, string asSceneEvent, RPB_Prison apPrison, RP
             endif
 
             if (handlingSecondaryEvent)
+                return
+            endif
+
+            ; Stopped at "Lock Cell" for a takeover's intake in the cell: the Scene's own end still comes (stopping a Scene runs
+            ; its end), and its silent strip and the imprisonment ran before the strip Scene played (2026-10-12). The intake's
+            ; own end does this (RPB_Prison.__FinishIntakeInCell)
+            if (apPrisoner.GetBool("Intake In Cell"))
                 return
             endif
 

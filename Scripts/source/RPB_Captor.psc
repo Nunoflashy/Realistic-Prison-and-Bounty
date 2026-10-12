@@ -358,31 +358,7 @@ event OnDeath(Actor akKiller)
     ; By actor, not by instance: my effect is started again at every load door (3D reload), and the arrestee's instance was
     ; then an older one - the death of a guard who had walked through Castle Dour's doors went unnoticed (test 139)
     if (arresteeRef && arresteeRef.GetCaptorActor() == this)
-        ; Inside the prison (arrived): another guard of the prison takes over, or with none left the prisoner is free inside,
-        ; stripped (RPB_Arrestee.HandOverInPrison)
-        if (arresteeRef.GetBool("Escort Arrived"))
-            arresteeRef.HandOverInPrison(this)
-            return
-        endif
-        ; Already inside the jail, the escort to jail not over yet (killed at the prison's entrance): the arrest was cancelled
-        ; and the cuffs came off with the prison's guards right there (2026-10-04). Inside, it's the prison's arrest from now
-        ; on, whatever stage the escort was at: arrived, the arrival's setup done here, and handed over as after the escort
-        RPB_Prison prison = API.PrisonManager.FindPrisonByPrisoner(Arrestee)
-        if (prison && prison.IsInsideJail(Arrestee))
-            RPB_Prisoner prisoner = prison.Prisoners.AtKey(Arrestee)
-            if (prisoner && !prisoner.IsImprisoned)
-                RPB_Utility.LogInfo(this + " died escorting " + Arrestee + " inside " + prison.Name + ", before the escort's end: the prison's guards take the arrest over", "Captor::OnDeath")
-                prisoner.EndArrestEscortWatch() ; arrived
-                prison.PrepareArrival(prisoner)
-                arresteeRef.HandOverInPrison(this)
-                return
-            endif
-        endif
-        ; Outside it nobody takes the arrest over (yet): the arrestee is free, whatever stage it was at. CancelArrest ends
-        ; their Scenes (confrontation or escort) without end events and also undoes a prisoner already registered for the
-        ; escort - a revert alone left the RPB_Prisoner on them, and that leftover blocked every later arrest ("already
-        ; arrested").
-        RPB_Recovery.CancelArrest(Arrestee, "the captor died")
+        arresteeRef.OnCaptorDied(this) ; also found from the arrestee's own watch, in case this event never ran
     endif
 endEvent
 

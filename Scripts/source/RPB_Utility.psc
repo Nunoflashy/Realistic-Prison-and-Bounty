@@ -353,7 +353,7 @@ scriptname RPB_Utility hidden
     Actor function GetNearbyActorFromRefWithPrototype(ObjectReference akCenterRef, ActorBase akPrototype, float afMaxRadius = 1000.0) global
     Actor function GetNearbyGuardForFactionFromRef( ObjectReference akCenterRef, Faction akCrimeFaction = none, float afMinRadius = 50.0, float afMaxRadius = 1000.0, float afIncreaseRadiusBy = 100.0, int aiMaxScans = 30 ) global
     Actor function GetNearestGuard(ObjectReference centerRef, float radius, ObjectReference exclude) global
-    Actor function GetGuardSeeing(Actor akPrisoner, Actor akExclude) global
+    Actor function GetGuardSeeing(Actor akPrisoner, Actor akExclude, bool abNotFighting = false) global
     Actor function GetNearestGuardInCell(Actor akCenter, Actor akExclude) global
     Actor function FindTakeoverGuard(Actor akCenter, Faction akCrimeFaction, Actor akExclude, float afNearDistance, float afFarDistance, bool abSightOnly = false) global
     function FaintFrozenGuard(Actor akGuard, bool abAlone) global
@@ -6023,8 +6023,9 @@ endFunction
     The guard who can see @akPrisoner and take them over inside the prison: a living guard in the same cell, within 1000
     units, with line of sight to them (or right next to them, 256 units, where a wall or the cell bars can block the ray).
     The nearest such guard, or none. HasLOS only runs for the guards already that close (a few at most).
+    @abNotFighting: not one in combat (taking over from a guard who is)
 /;
-Actor function GetGuardSeeing(Actor akPrisoner, Actor akExclude) global
+Actor function GetGuardSeeing(Actor akPrisoner, Actor akExclude, bool abNotFighting = false) global
     if (IsTakeoverBlindForTest())
         return none
     endif
@@ -6043,7 +6044,7 @@ Actor function GetGuardSeeing(Actor akPrisoner, Actor akExclude) global
             float distance = candidate.GetDistance(akPrisoner)
             ; HasLOS only answers with the player on one side: for an NPC prisoner a guard of her cell within reach counts
             ; (2026-10-11: a bandit waited for good in the stripping area, guards around, none "seeing" her)
-            if (distance <= 1000.0 && (!seeing || distance < seeingDistance) && (distance <= 256.0 || akPrisoner != Game.GetPlayer() || candidate.HasLOS(akPrisoner)))
+            if (distance <= 1000.0 && (!seeing || distance < seeingDistance) && !(abNotFighting && candidate.IsInCombat()) && (distance <= 256.0 || akPrisoner != Game.GetPlayer() || candidate.HasLOS(akPrisoner)))
                 seeing = candidate
                 seeingDistance = distance
             endif

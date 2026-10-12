@@ -209,6 +209,10 @@ scriptname RPB_Prison extends RPB_Entity
     function ReleaseInPlace(RPB_Prisoner apPrisoner)
     function CancelImprisonment(RPB_Prisoner apPrisoner, string asReason, bool abReturnBelongings = true)
     function ResumePrisonFlowWith(RPB_Prisoner apPrisoner, Actor akGuard)
+    function EscortToCellForIntake(RPB_Prisoner apPrisoner, Actor akGuard)
+    ObjectReference function IntakeAreaNear(Actor akActor)
+    bool function FightNear(ObjectReference akCenter, Actor akPrisoner)
+    function ContinueIntakeInCell(RPB_Prisoner apPrisoner, Actor akGuard)
     int function PendingDressCount()
     function QueueEscortToCellStallCheck(Actor akPrisoner, float afTimeoutSeconds = 8.0, bool abWatchAssist = false)
     function CancelEscortToCellStallCheck(Actor akPrisoner)
@@ -3648,6 +3652,10 @@ endFunction
 ; took over after the first one died inside the prison (RPB_Arrestee.HandOverInPrison). The cell and the belongings
 ; container were already assigned at the arrival. The queue plays them in order.
 function ResumePrisonFlowWith(RPB_Prisoner apPrisoner, Actor akGuard)
+    if (apPrisoner.GetBool("Intake In Cell"))
+        self.ContinueIntakeInCell(apPrisoner, akGuard) ; a takeover's intake goes on in the cell (EscortToCellForIntake)
+        return
+    endif
     ; He comes to the prisoner first and cuffs them (RPB_RestrainPrisoner02: a Travel to the prisoner, then the restrain):
     ; the strip Scene has no approach and strips at its start, since its guard normally escorted the prisoner there. A
     ; take-over guard from across the prison stripped them with nobody there, then had them walk over to him.
@@ -3679,6 +3687,113 @@ endFunction
 ; ==========================================================
 ;                          Events
 ; ==========================================================
+
+; Where the intake is done, nearest @akActor: the escort to jail's destinations (this prison's config, anywhere in the jail),
+; or none when it has none
+ObjectReference function IntakeAreaNear(Actor akActor)
+    Form[] markers = self.GetEscortLocations()
+    ObjectReference nearest = none
+    float nearestDistance = 0.0
+    int i = 0
+    while (markers && i < markers.Length)
+        ObjectReference marker = markers[i] as ObjectReference
+        if (marker)
+            float distance = akActor.GetDistance(marker)
+            if (!nearest || distance < nearestDistance)
+                nearest = marker
+                nearestDistance = distance
+            endif
+        endif
+        i += 1
+    endWhile
+    return nearest
+endFunction
+
+; Someone still fighting within 2000 units of @akCenter (not @akPrisoner, not the player): the killers of a guard, or the
+; guards fighting them. One scan of the high-process actors, at a takeover only
+bool function FightNear(ObjectReference akCenter, Actor akPrisoner)
+    Actor player = Game.GetPlayer()
+    Actor[] nearby = PO3_SKSEFunctions.GetActorsByProcessingLevel(0)
+    int frozenMap = RPB_Utility.FrozenNPCsForScan()
+    int i = 0
+    while (i < nearby.Length)
+        Actor candidate = nearby[i]
+        if (candidate && candidate != player && candidate != akPrisoner && !RPB_Utility.IsListedFrozen(frozenMap, candidate) && !candidate.IsDead() && candidate.IsInCombat() && candidate.GetDistance(akCenter) <= 2000.0)
+            return true
+        endif
+        i += 1
+    endWhile
+    return false
+endFunction
+
+;/
+    A guard took the arrest over inside the prison (RPB_Arrestee.__TakeOverInPrison: mine died, or kept fighting): he takes
+    the prisoner to their cell first, and what's left of the intake (strip, clothing) is played in it, the door locked, him
+    at the bars (the mod author, 2026-10-11: played where they stood, he stripped them from across the room or in the middle
+    of the fight). Marked "Intake In Cell": the escort's "Lock Cell" step stops the Scene there (RPB_EventManager), and
+    ContinueIntakeInCell plays the rest. Until the Scene refactor's own Scenes for going on with an intake.
+/;
+function EscortToCellForIntake(RPB_Prisoner apPrisoner, Actor akGuard)
+    ; Nothing worn to strip, their things still on them: taken silently, as at the arrival (ResumePrisonFlowWith)
+    if (!apPrisoner.IsStripped && !apPrisoner.ShouldBeStripped && apPrisoner.ShouldBeStrippedSilently)
+        apPrisoner.StripSilently()
+    endif
+    if (self.__IntakeLeftInCell(apPrisoner))
+        apPrisoner.SetBool("Intake In Cell", true)
+        apPrisoner.SetForm("Intake In Cell Guard", akGuard)
+    endif
+    self.EscortPrisonerToCell(apPrisoner, akGuard)
+endFunction
+
+; A strip or clothing still due
+bool function __IntakeLeftInCell(RPB_Prisoner apPrisoner)
+    bool stripDue = !apPrisoner.IsStripped && !self.__StrippedAtIntake(apPrisoner) && apPrisoner.ShouldBeStripped
+    return stripDue || (apPrisoner.ShouldBeClothed && !apPrisoner.IsClothed)
+endFunction
+
+;/
+    The prisoner is in their cell, the door locked, the guard at it (the escort's "Lock Cell", or a replay after a fight or
+    a stall): the strip and the clothing still due, queued, and the imprisonment once they're done (__IntakeInCellStepDone).
+    Watched as any intake (a step that stays stuck is played again, then taken over)
+/;
+function ContinueIntakeInCell(RPB_Prisoner apPrisoner, Actor akGuard)
+    apPrisoner.StopEscortAssist()
+    apPrisoner.SetForm("Intake In Cell Guard", akGuard)
+    bool queued = false
+    if (!apPrisoner.IsStripped && !self.__StrippedAtIntake(apPrisoner) && apPrisoner.ShouldBeStripped)
+        self.StartStrippingPrisoner(apPrisoner, akGuard)
+        queued = true
+    endif
+    if (apPrisoner.ShouldBeClothed && !apPrisoner.IsClothed)
+        self.StartGivingPrisonerClothing(apPrisoner, akGuard)
+        queued = true
+    endif
+    if (!queued)
+        self.__FinishIntakeInCell(apPrisoner)
+        return
+    endif
+    RPB_Utility.LogInfo(apPrisoner.GetActor() + "'s intake goes on in the cell with " + akGuard, "Prison::ContinueIntakeInCell")
+    self.WatchIntake(apPrisoner.GetActor(), "In the cell with " + akGuard)
+endFunction
+
+; A strip or clothing Scene ended: the last of a takeover's intake in the cell (nothing of theirs queued after it) finishes it
+function __IntakeInCellStepDone(RPB_Prisoner apPrisoner)
+    if (!apPrisoner.GetBool("Intake In Cell") || SceneManager.HasQueuedSceneWithActor(apPrisoner.GetActor()))
+        return
+    endif
+    self.__FinishIntakeInCell(apPrisoner)
+endFunction
+
+; The intake done in the cell: what the escort to the cell's end does (the cuffs off, the imprisonment), the door already locked
+function __FinishIntakeInCell(RPB_Prisoner apPrisoner)
+    Actor guard = apPrisoner.GetForm("Intake In Cell Guard") as Actor
+    apPrisoner.Remove("Intake In Cell")
+    apPrisoner.Remove("Intake In Cell Guard")
+    self.StopWatchingIntake(apPrisoner.GetActor())
+    RPB_Utility.LogInfo(apPrisoner.GetActor() + "'s intake in the cell is done: imprisoned", "Prison::__FinishIntakeInCell")
+    RPB_Utility.ReleaseAI(apPrisoner.IsPlayer())
+    self.OnEscortPrisonerToCellEnd(apPrisoner, apPrisoner.JailCell, guard)
+endFunction
 
 ;/
     Handles imprisonment failures of any kind.
@@ -4072,6 +4187,7 @@ event OnPrisonerStripEnd(RPB_Prisoner apPrisoner, Actor akStripper)
         ; apPrisoner.StartRestraining(akStripper)
     endif
     ; apPrisoner.EscortToCell(akStripper)
+    self.__IntakeInCellStepDone(apPrisoner) ; a takeover's intake in the cell (ContinueIntakeInCell)
 endEvent
 
 event OnPrisonerClothingBegin(RPB_Prisoner apPrisoner, Actor akClothingGiver)
@@ -4090,6 +4206,7 @@ event OnPrisonerClothingEnd(RPB_Prisoner apPrisoner, Actor akClothingGiver)
     if (apPrisoner.ShouldBeClothed)
         apPrisoner.Clothe()
     endif
+    self.__IntakeInCellStepDone(apPrisoner)
 endEvent
 
 event OnCellDoorOpen(RPB_JailCell akPrisonCell, Actor akOpener)
@@ -4519,6 +4636,14 @@ function __CheckIntake(Actor akPrisoner, int aiEntry, float afNow, float afLoadS
     ; escort to jail again), or waiting for a guard who sees her (RPB_Arrestee.HandOverInPrison): the arrest's own watches
     ; have her (handing over again each time spammed the wait), the intake starts over at that escort's end
     RPB_Arrestee arrestState = API.Arrest.Arrestees.AtKey(akPrisoner)
+    ; Pending for a guard who died meanwhile (his death event failed once: cuffed in the prison for good, 2026-10-11)
+    if (arrestState && arrestState.GetBool("Arrest Pending"))
+        Actor pendingGuard = arrestState.GetCaptorActor()
+        if (pendingGuard && pendingGuard.IsDead())
+            arrestState.OnCaptorDied(pendingGuard)
+            return
+        endif
+    endif
     if ((arrestState && (arrestState.GetBool("Arrest Pending") || arrestState.GetBool("Awaiting Guard"))) || (sceneType == SceneManager.CATEGORY_ESCORT_TO_JAIL && SceneManager.GetSceneNthReferenceOfType(current, "Escortee") == akPrisoner))
         FastMap_SetFloat(aiEntry, "since", afNow)
         return

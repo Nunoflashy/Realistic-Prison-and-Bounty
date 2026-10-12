@@ -71,6 +71,7 @@ Scriptname RPB_Arrestee extends RPB_ActorBase
     int function QueryStat(string asStatName)
     function SetStat(string asStatName, int aiValue)
     function PauseEscortForFight(Actor akHostile)
+    function OnCaptorDied(Actor akDeadGuard)
     function HandOverInPrison(Actor akDeadGuard)
     function HandOverEscort(Actor akFrozenGuard, Actor akNewGuard, string asReason = "the escort guard froze", bool abReleaseOld = false)
     function EndEscortWatch()
@@ -936,13 +937,15 @@ function ResumePendingArrest()
     Info("Pending arrest of " + Name + " " + this + " resumed: the fight is over, escorting")
     if (self.GetBool("Pending Escort Only"))
         self.Remove("Pending Escort Only")
-        ; A fight paused my intake, and I'm stripped by now: no walk back to be stripped again (the escort to jail played
-        ; for nothing, then the escort to the cell). What's left of the intake (clothing, the escort to the cell), with him.
+        ; A fight paused my intake, and nothing left of it needs the intake area (stripped by now, or no strip due): no walk
+        ; back (the escort to jail played for nothing, then the escort to the cell). What's left of it, with him, from here.
         ; Read now, not when it paused: the strip's undress step, already on its way, ran in the same second as the pause
         ; (2026-10-11)
         bool intakePaused = self.GetBool("Pending Intake")
+        string pausedStep = self.GetString("Pending Intake Step")
         self.Remove("Pending Intake")
-        if (intakePaused && self.__StrippedForIntake())
+        self.Remove("Pending Intake Step")
+        if (intakePaused && !self.__IntakeNeedsWalkBack(pausedStep))
             self.__ResumeIntakeAfterStrip()
             return
         endif
@@ -1485,6 +1488,21 @@ event OnUpdate()
         return ; the arrest is gone (cancelled by the watch above, or reverted)
     endif
 
+    ; Waiting for my guard's fight: him dead is his death, even if its event never came (OnCaptorDied); in the prison,
+    ; another guard who isn't fighting takes over
+    if (self.GetBool("Arrest Pending"))
+        Actor pendingGuard = Captor.GetActor()
+        if (pendingGuard.IsDead())
+            self.OnCaptorDied(pendingGuard)
+            return
+        endif
+        if (self.GetBool("Escort Arrived") && self.__TryPendingTakeoverInPrison())
+            return
+        endif
+    else
+        self.SetInt("Pending Prison Ticks", 0)
+    endif
+
     ; At the prison the escort to jail is over: the prison flow (strip, escort to the cell) has its own checks. Left
     ; running, this watch read "no Scene playing" between two prison Scenes as a stalled escort and sent me back to the
     ; prison entrance in the middle of the escort to my cell (Frisking all over again).
@@ -1817,8 +1835,33 @@ function PauseEscortForFight(Actor akHostile)
     ; author, 2026-10-11: Strip -> fight -> escort to jail -> escort to the cell). Until the Scene refactor's own Scene for
     ; going on with the intake (RPB_ContinueIntake0N), what's left of it starts where I stand
     self.SetBool("Pending Intake", intake) ; the resume decides then whether I was stripped (ResumePendingArrest)
+    self.SetString("Pending Intake Step", sceneType)
     SceneManager.EndSceneWithActor(this, "the guard is fighting")
     self.__BeginPendingArrest(toCell, akHostile, abEscortOnly = true) ; resumed to the cell when it was the escort to the cell
+endFunction
+
+;/
+    After a fight that paused my intake: walked back to the intake area (it starts over there) only for what can't happen
+    where I stand: the frisk (paused in it), or a strip still due (its Scene has no approach: its guard strips me where he
+    stands). Not stripped because this arrest doesn't call for it (the prison doesn't strip, or not for this bounty or
+    sentence: the mod author, 2026-10-11): what's left goes on from here, as for one already stripped
+/;
+bool function __IntakeNeedsWalkBack(string asPausedStep)
+    RPB_Prison prison = API.PrisonManager.FindPrisonByPrisoner(this)
+    RPB_Prisoner prisoner = none
+    if (prison)
+        prisoner = prison.Prisoners.AtKey(this)
+    endif
+    if (prisoner && prisoner.GetBool("Intake In Cell"))
+        return false ; in my cell (a takeover's): it goes on there (RPB_Prison.ResumePrisonFlowWith)
+    endif
+    if (asPausedStep == SceneManager.CATEGORY_FRISKING)
+        return true
+    endif
+    if (!prisoner)
+        return true
+    endif
+    return prisoner.ShouldBeStripped && !self.__StrippedForIntake()
 endFunction
 
 ; My belongings recorded at the intake: the strip happened (RPB_Prison.__StrippedAtIntake's test, from the arrest side)
@@ -1842,9 +1885,92 @@ function __ResumeIntakeAfterStrip()
     if (!prisoner || prisoner.IsImprisoned)
         return
     endif
-    Info("Intake of " + Name + " " + this + " goes on after the fight from where I stand (already stripped)")
+    Info("Intake of " + Name + " " + this + " goes on after the fight from where I stand (stripped, or no strip due)")
     RetainAI(self.IsPlayer())
     prison.ResumePrisonFlowWith(prisoner, Captor.GetActor())
+endFunction
+
+;/
+    My guard died (RPB_Captor.OnDeath, or my own watch finding him dead while my arrest waits for his fight: his death event
+    failed once and I was left cuffed in the prison for good, guards all around, 2026-10-11). Once per guard.
+/;
+function OnCaptorDied(Actor akDeadGuard)
+    if (!akDeadGuard || self.GetForm("Captor Died") == akDeadGuard)
+        return
+    endif
+    self.SetForm("Captor Died", akDeadGuard)
+    ; Inside the prison (arrived): another guard of the prison takes over, or with none left the prisoner is free inside,
+    ; stripped (HandOverInPrison)
+    if (self.GetBool("Escort Arrived"))
+        self.HandOverInPrison(akDeadGuard)
+        return
+    endif
+    ; Already inside the jail, the escort to jail not over yet (killed at the prison's entrance): the arrest was cancelled
+    ; and the cuffs came off with the prison's guards right there (2026-10-04). Inside, it's the prison's arrest from now
+    ; on, whatever stage the escort was at: arrived, the arrival's setup done here, and handed over as after the escort
+    RPB_Prison prison = API.PrisonManager.FindPrisonByPrisoner(this)
+    if (prison && prison.IsInsideJail(this))
+        RPB_Prisoner prisoner = prison.Prisoners.AtKey(this)
+        if (prisoner && !prisoner.IsImprisoned)
+            RPB_Utility.LogInfo(akDeadGuard + " died escorting " + this + " inside " + prison.Name + ", before the escort's end: the prison's guards take the arrest over", "Arrestee::OnCaptorDied")
+            prisoner.EndArrestEscortWatch() ; arrived
+            prison.PrepareArrival(prisoner)
+            self.HandOverInPrison(akDeadGuard)
+            return
+        endif
+    endif
+    ; Outside it nobody takes the arrest over (yet): I'm free, whatever stage it was at. CancelArrest ends my Scenes
+    ; (confrontation or escort) without end events and also undoes a prisoner already registered for the escort - a revert
+    ; alone left the RPB_Prisoner on me, and that leftover blocked every later arrest ("already arrested").
+    RPB_Recovery.CancelArrest(this, "the captor died")
+endFunction
+
+;/
+    Waiting in the prison for my guard's fight to end (a fight during the intake or the escort to my cell), and another guard
+    of the prison, not fighting, sees me: he takes the arrest over (the mod author, 2026-10-11), after PENDING_TAKEOVER_TICKS
+    of the wait (a short fight just ends), and takes me to my cell, away from the fight, where what's left of the intake goes
+    on (RPB_Prison.EscortToCellForIntake). The fighting guard is let go. True when he took over
+/;
+int property PENDING_TAKEOVER_TICKS = 2 autoreadonly
+
+bool function __TryPendingTakeoverInPrison()
+    Actor fighting = Captor.GetActor()
+    int ticks = self.GetInt("Pending Prison Ticks") + 1
+    self.SetInt("Pending Prison Ticks", ticks)
+    if (ticks < PENDING_TAKEOVER_TICKS)
+        return false
+    endif
+    Actor newGuard = RPB_Utility.GetGuardSeeing(this, fighting, abNotFighting = true)
+    if (!newGuard)
+        Debug("["+ Name +"] Arrestee::__TryPendingTakeoverInPrison", "no guard of the prison sees " + Name + " without fighting himself (" + ticks + " ticks pending)")
+        return false
+    endif
+    RPB_Prison prison = API.PrisonManager.FindPrisonByPrisoner(this)
+    RPB_Prisoner prisoner = none
+    if (prison)
+        prisoner = prison.Prisoners.AtKey(this)
+    endif
+    if (!prisoner || prisoner.IsImprisoned)
+        return false
+    endif
+    self.SetInt("Pending Prison Ticks", 0)
+    self.SetString("Handover Reason", fighting + " is fighting, " + newGuard + " saw me waiting")
+    SceneManager.EndSceneWithActor(this, "another guard takes the arrest over")
+    prisoner.StopEscortAssist()
+    ; The fighting guard let go of the arrest (his Captor), on its own stack as the escort's handover does
+    int handle = ModEvent.Create("RPB_ReleaseCaptor")
+    if (handle)
+        ModEvent.PushForm(handle, fighting)
+        ModEvent.PushForm(handle, this)
+        ModEvent.PushBool(handle, true)
+        ModEvent.Send(handle)
+    endif
+    self.Remove("Pending Escort Only")
+    self.Remove("Pending Intake")
+    self.Remove("Pending Intake Step")
+    self.Remove("Pending Directly To Cell")
+    self.__TakeOverInPrison(newGuard, prison, prisoner, fighting, abFightGoesOn = true)
+    return true
 endFunction
 
 ;/
@@ -2052,7 +2178,8 @@ function HandOverEscort(Actor akFrozenGuard, Actor akNewGuard, string asReason =
 endFunction
 
 ; @akNewGuard becomes my Captor and the prison flow goes on with him from where it stopped
-function __TakeOverInPrison(Actor akNewGuard, RPB_Prison apPrison, RPB_Prisoner apPrisoner, Actor akOldGuard)
+; @abFightGoesOn: my guard is still fighting (the intake area isn't safe, whatever a scan says)
+function __TakeOverInPrison(Actor akNewGuard, RPB_Prison apPrison, RPB_Prisoner apPrisoner, Actor akOldGuard, bool abFightGoesOn = false)
     RPB_Captor newCaptor = Arrest.AwaitCaptorReference(akNewGuard)
     if (!newCaptor)
         Info("Could not make " + akNewGuard + " the captor of " + Name + " " + this + " (" + self.GetString("Handover Reason") + "): free inside, stripped")
@@ -2081,7 +2208,34 @@ function __TakeOverInPrison(Actor akNewGuard, RPB_Prison apPrison, RPB_Prisoner 
     endif
     self.__ReleasePendingHold()
     RetainAI(self.IsPlayer()) ; the escort walks me, as after the confrontation
-    apPrison.ResumePrisonFlowWith(apPrisoner, akNewGuard)
+    ; Never the intake played where we stood: he stripped me from wherever he was (the strip Scene has no approach), or in
+    ; the middle of the fight that took my guard (the strip then never started and was skipped). Where it goes on (the mod
+    ; author, 2026-10-12):
+    ; - a fight still on at the intake area (or no intake area known): to my cell, the rest of the intake in it
+    ; - the intake area safe and him nearer to it than to my cell: walked back there (the escort to jail again, whose end
+    ;   starts the intake over), as after a fight that paused it
+    ; - safe, but him nearer my cell: to the cell, the intake in it
+    ; The intake marker nearest him, not me: from mine, a farther one was compared when I stood nearer the cells (2026-10-12)
+    ObjectReference intakeArea = apPrison.IntakeAreaNear(akNewGuard)
+    string where = "to the cell, the intake in it"
+    if (abFightGoesOn || !intakeArea || !apPrisoner.JailCell)
+        where += string_if(abFightGoesOn, " (the fight goes on)", " (no intake area or cell known)")
+    elseif (apPrison.FightNear(intakeArea, this))
+        where += " (a fight still on at the intake area)"
+    else
+        ; Straight lines: stairs on the way to the cells don't count (the mod author, 2026-10-12: near the intake area, he
+        ; still read nearer the cell; to be tuned with these numbers)
+        float toIntake = akNewGuard.GetDistance(intakeArea)
+        float toCell = akNewGuard.GetDistance(apPrisoner.JailCell)
+        if (toIntake <= toCell)
+            Info("Arrest of " + Name + " " + this + " in " + apPrison.Name + ": " + akNewGuard + " walks me back to the intake area (" + intakeArea + ", " + (toIntake as int) + " away, the cell " + (toCell as int) + ")")
+            apPrisoner.EscortToJail(akNewGuard)
+            return
+        endif
+        where += " (he's nearer the cell: " + (toCell as int) + ", the intake area " + (toIntake as int) + ")"
+    endif
+    Info("Arrest of " + Name + " " + this + " in " + apPrison.Name + ": " + akNewGuard + " takes me " + where)
+    apPrison.EscortToCellForIntake(apPrisoner, akNewGuard)
 endFunction
 
 ;/
