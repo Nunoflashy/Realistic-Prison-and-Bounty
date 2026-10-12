@@ -1384,7 +1384,7 @@ endFunction
     Returns the one the captor went after, or none.
 /;
 Actor function SendCaptorAfterAttacker(Actor akCaptor, Actor akArrestee) global
-    if (!akCaptor || !akArrestee || IsFrozenNPC(akCaptor) || akCaptor.IsDead())
+    if (!akCaptor || !akArrestee || IsFrozenNPC(akCaptor) || IsDeadNoCall(akCaptor))
         return none
     endif
     ; No longer in custody (the arrest cancelled while the escort watch was on its way here): their fights are their own.
@@ -1511,7 +1511,7 @@ function PlayerHitPrisoner(Actor akCaptor, Actor akArrestee) global
         return
     endif
     Actor player = Game.GetFormEx(0x14) as Actor
-    if (IsActorArrested(player) || IsActorImprisoned(player) || akCaptor.IsDead())
+    if (IsActorArrested(player) || IsActorImprisoned(player) || IsFrozenNPC(akCaptor) || IsDeadNoCall(akCaptor))
         return
     endif
     ; The next hit a second or more later (the 4s the combat scan's re-reads need took the player 3 hits, 2026-10-07): a

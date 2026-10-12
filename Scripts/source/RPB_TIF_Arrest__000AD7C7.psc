@@ -8,7 +8,6 @@ Actor akSpeaker = akSpeakerRef as Actor
 ;BEGIN CODE
 RPB_Arrest.SetAsideBountyOnSubmission(Game.GetPlayer(), akSpeaker) ; first: no guard may see the bounty once this line ends
 pTGRSS.TGArrestedCheck()
-akSpeaker.SendModEvent("RPB_SendArrestWaitStop")
 ; The arrest from the line's beginning, not its end (above): the guard no longer walks off and comes back for it
 float rpbStartedAt = RPB_Utility.CrimeLineStamp() ; the load this line began in: a replay after a load is dropped
 RPB_Utility.ProbeSpeaker(akSpeaker) ; before any call into him: a frozen speaker gets found, then silenced

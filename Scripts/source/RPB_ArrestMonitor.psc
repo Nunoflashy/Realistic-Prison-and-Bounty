@@ -244,7 +244,10 @@ function __CheckConfrontation(Actor akArrestee, int aiEntry, float afNow)
         endif
         reason = "its guard is frozen"
     else
-        if (guard.IsInCombat() || (!IsFrozenNPC(akArrestee) && akArrestee.IsInCombat()))
+        ; No call into him: this loop is every arrest's, and a guard who froze (not marked yet) held it (the prison's intake
+        ; watch did, 2026-10-12). His fight ends the confrontation through his own combat event (no longer the current Scene
+        ; above); the arrestee's is read here
+        if (!IsFrozenNPC(akArrestee) && akArrestee.IsInCombat())
             FastMap_SetFloat(aiEntry, "since", afNow) ; a fight: the arrestee's fight watch owns it
             return
         endif

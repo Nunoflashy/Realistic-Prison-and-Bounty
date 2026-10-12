@@ -126,6 +126,7 @@ function RegisterEvents()
     RegisterForModEvent("RPB_StalledEscortTakeover", "OnStalledEscortTakeover")
     RegisterForModEvent("RPB_ConfrontationStalled", "OnConfrontationStalled")
     RegisterForModEvent("RPB_IntakeStalled", "OnIntakeStalled")
+    RegisterForModEvent("RPB_SetAsideBounty", "OnSetAsideBounty")
     RegisterForModEvent("RPB_EncumbranceCheck", "OnEncumbranceCheck")
     RegisterForModEvent("RPB_ReleaseNPC", "OnReleaseNPC")
 
@@ -263,6 +264,11 @@ endEvent
 ; RPB_Arrestee.__EscortStalled: another guard of the hold for a stalled escort, or its fallback
 event OnStalledEscortTakeover(Form akArrestee, string asReason)
     Arrest.TakeOverStalledEscort(akArrestee as Actor, asReason)
+endEvent
+
+; RPB_Arrest.SetAsideBountyOnSubmission: his crime faction read here, a frozen guard holding only this stack
+event OnSetAsideBounty(Form akActor, Form akGuard)
+    RPB_Arrest.__SetAsideBountyFrom(akActor as Actor, akGuard as Actor)
 endEvent
 
 ; RPB_Prison's intake watch: a frisk, strip, restrain or clothing stopped moving

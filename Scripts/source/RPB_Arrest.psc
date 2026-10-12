@@ -65,6 +65,7 @@ scriptname RPB_Arrest extends Quest
     function SetArrestGoal(Actor akArrestee, string asArrestGoal)
     function ArrestActor(Actor akArrester, Actor akArrestee, string asArrestType)
     function SetAsideBountyOnSubmission(Actor akActor, Actor akGuard) global
+    function __SetAsideBountyFrom(Actor akActor, Actor akGuard) global
     function __SetAsideBounty(Actor akActor, Actor akGuard, Faction akCrimeFaction) global
     bool function HasSetAsideBounty(Actor akActor) global
     bool function GiveBackSetAsideBounty(Actor akActor, string asWhy) global
@@ -856,11 +857,26 @@ endEvent
 ; (BeginArrest), so its stats and latent bounty work as always. Given back at once when the arrest is rejected
 ; (RPB_EventManager.OnArrestBegin) or the guard is found frozen (RPB_Utility.MarkNPCFrozen), and after 30s if nothing
 ; took it (RPB_EventManager.OnSetAsideBountyCheck). Only the player: an NPC's bounty is RPB's own and no forcegreet reads it.
+; His crime faction is read on a stack of its own (RPB_EventManager.OnSetAsideBounty -> __SetAsideBountyFrom): this runs
+; first in the line's fragment, before its probe, and a call into a guard who froze (not marked yet) held the fragment there,
+; the probe after it never ran (2026-10-12 audit). A frame later, still at the line's beginning
 function SetAsideBountyOnSubmission(Actor akActor, Actor akGuard) global
-    if (!akActor || !akGuard || akActor.GetFormID() != 0x14 || HasSetAsideBounty(akActor) || RPB_Utility.IsFrozenNPC(akGuard))
+    if (!akActor || !akGuard || akActor != Game.GetPlayer() || HasSetAsideBounty(akActor) || RPB_Utility.IsFrozenNPC(akGuard))
         return
     endif
+    int handle = ModEvent.Create("RPB_SetAsideBounty")
+    if (handle)
+        ModEvent.PushForm(handle, akActor)
+        ModEvent.PushForm(handle, akGuard)
+        ModEvent.Send(handle)
+    endif
+endFunction
 
+; RPB_EventManager.OnSetAsideBounty: the set-aside, with the call into him
+function __SetAsideBountyFrom(Actor akActor, Actor akGuard) global
+    if (HasSetAsideBounty(akActor) || RPB_Utility.IsFrozenNPC(akGuard))
+        return
+    endif
     RPB_Arrest.__SetAsideBounty(akActor, akGuard, akGuard.GetCrimeFaction())
 endFunction
 
