@@ -2317,6 +2317,13 @@ function __TakeOverInPrison(Actor akNewGuard, RPB_Prison apPrison, RPB_Prisoner 
     ;   starts the intake over), as after a fight that paused it
     ; - safe, but him nearer my cell: to the cell, the intake in it
     ; The intake marker nearest him, not me: from mine, a farther one was compared when I stood nearer the cells (2026-10-12)
+    ; Already in my cell with the intake left for it (a frozen prisoner's after the load, a takeover's that stalled there): he
+    ; does it there. The rules below took me out to walk me back in (an escort to the cell from inside it, 2026-10-13)
+    if (apPrisoner.IsInCell && apPrisoner.GetBool("Intake In Cell"))
+        Info("Arrest of " + Name + " " + this + " in " + apPrison.Name + ": " + akNewGuard + " goes on with my intake in my cell")
+        apPrison.ContinueIntakeInCell(apPrisoner, akNewGuard)
+        return
+    endif
     ObjectReference intakeArea = apPrison.IntakeAreaNear(akNewGuard)
     string where = "to the cell, the intake in it"
     if (abFightGoesOn || !intakeArea || !apPrisoner.JailCell)

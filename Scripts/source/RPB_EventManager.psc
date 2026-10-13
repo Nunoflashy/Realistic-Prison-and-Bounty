@@ -706,6 +706,24 @@ function __PrisonSceneForFrozen(string asScene, string asSceneEvent, Actor akPri
     self.__FrozenPrisonerSceneStep(akPrisoner, asScene, asSceneEvent, asSceneSecondaryEvent, akAuthority)
 endFunction
 
+;/
+    An intake Scene's step (frisk, strip, restrain, clothing) restarts the prisoner's clock in her prison's intake watch as
+    the Scene sends it, not when her handler gets to it: the watch asks whether her Scene moved on, and with her events in
+    order a slow handler held her later steps back, so a strip still playing read as stuck and was taken over (2026-10-13:
+    "no step for 17s" while the strip played, and the takeover escorted her to the cell from inside it). No call into her
+    (the prison lookup reads its own registry). Dispatched to a frozen member too: the watch passes over her
+/;
+function __NoteIntakeStepSent(string asScene, string asSceneEvent, string asSceneSecondaryEvent, Actor akMember)
+    string sceneType = SceneManager.GetSceneType(asScene)
+    if (sceneType != SceneManager.CATEGORY_FRISKING && sceneType != SceneManager.CATEGORY_STRIPPING && sceneType != SceneManager.CATEGORY_RESTRAIN && sceneType != SceneManager.CATEGORY_CLOTHING && sceneType != SceneManager.CATEGORY_NO_CLOTHING)
+        return
+    endif
+    RPB_Prison prison = API.PrisonManager.FindPrisonByPrisoner(akMember)
+    if (prison)
+        prison.NoteIntakeStep(akMember, asScene + ": " + asSceneEvent + RPB_Utility.string_if(asSceneSecondaryEvent != "null", " (" + asSceneSecondaryEvent + ")", ""))
+    endif
+endFunction
+
 ; A Scene event's freeze point name (RPB_Utility.FreezePoint): "<Scene> <event>", and " (<secondary event>)" if any
 string function __SceneEventPoint(string asScene, string asSceneEvent, string asSceneSecondaryEvent)
     return asScene + " " + asSceneEvent + RPB_Utility.string_if(asSceneSecondaryEvent != "null" && asSceneSecondaryEvent != "", " (" + asSceneSecondaryEvent + ")", "")
@@ -994,6 +1012,9 @@ int function __DispatchSceneEvent(int aiKind, string asScene, string asSceneEven
     int i = 0
     while (i < akMembers.Length)
         Actor member = akMembers[i] as Actor
+        if (member && abPrison)
+            self.__NoteIntakeStepSent(asScene, asSceneEvent, asSceneSecondaryEvent, member)
+        endif
         if (!member)
             ; an empty alias
         elseif (frozenMap && RPB_Utility.IsListedFrozen(frozenMap, member))
@@ -1633,10 +1654,9 @@ event OnPrisonScene(string asScene, string asSceneEvent, RPB_Prison apPrison, RP
         return
     endif
 
-    ; Each step of the intake restarts the prisoner's clock in the prison's intake watch; her escort to the cell ends it
-    if (sceneType == SceneManager.CATEGORY_FRISKING || sceneType == SceneManager.CATEGORY_STRIPPING || sceneType == SceneManager.CATEGORY_RESTRAIN || sceneType == SceneManager.CATEGORY_CLOTHING || sceneType == SceneManager.CATEGORY_NO_CLOTHING)
-        apPrison.NoteIntakeStep(apPrisoner.GetActor(), asScene + ": " + asSceneEvent + RPB_Utility.string_if(handlingSecondaryEvent, " (" + asSceneSecondaryEvent + ")", ""))
-    elseif (sceneType == SceneManager.CATEGORY_ESCORT_TO_CELL && asSceneEvent == SceneManager.EVENT_ESCORT_BEGIN)
+    ; Each step of the intake restarts the prisoner's clock in the prison's intake watch, as the Scene sends it
+    ; (__NoteIntakeStepSent); her escort to the cell ends it
+    if (sceneType == SceneManager.CATEGORY_ESCORT_TO_CELL && asSceneEvent == SceneManager.EVENT_ESCORT_BEGIN)
         apPrison.StopWatchingIntake(apPrisoner.GetActor())
     endif
     if (sceneType == SceneManager.CATEGORY_ESCORT_TO_JAIL)
