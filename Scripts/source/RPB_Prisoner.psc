@@ -101,6 +101,11 @@ Scriptname RPB_Prisoner extends RPB_ActorBase
     float PreviousUpdateTimeServed
     Outfit NPC_OriginalOutfit
 @functions:
+    bool function GetBoolOf(Actor akActor, string asVarName) global
+    int function GetIntOf(Actor akActor, string asVarName) global
+    float function GetFloatOf(Actor akActor, string asVarName) global
+    string function GetStringOf(Actor akActor, string asVarName) global
+    Form function GetFormOf(Actor akActor, string asVarName) global
     function RestoreBounty()
     function StartRestraining(Actor akRestrainer)
     function StartFrisking(Actor akSearcherGuard)
@@ -415,6 +420,32 @@ Actor property Captor
         return self.GetForm("Arrest Captor") as Actor
     endFunction
 endProperty
+
+;/
+    @akActor's prison state read from storage by her actor, not through this script: no call into her or her RPB
+    effects (a frozen one holds the caller until the next load), for shared code. The same values as GetBool/GetInt/...
+    on her RPB_Prisoner (the same storage path: both reduce the reference to "(Reference <FormID>)",
+    RPB_StorageVars.GetReferenceKey), category "Jail" built in. Called as RPB_Prisoner.GetBoolOf(actor, "...")
+/;
+bool function GetBoolOf(Actor akActor, string asVarName) global
+    return RPB_StorageVars.GetBoolOnReference(asVarName, akActor, "Jail")
+endFunction
+
+int function GetIntOf(Actor akActor, string asVarName) global
+    return RPB_StorageVars.GetIntOnReference(asVarName, akActor, "Jail")
+endFunction
+
+float function GetFloatOf(Actor akActor, string asVarName) global
+    return RPB_StorageVars.GetFloatOnReference(asVarName, akActor, "Jail")
+endFunction
+
+string function GetStringOf(Actor akActor, string asVarName) global
+    return RPB_StorageVars.GetStringOnReference(asVarName, akActor, "Jail")
+endFunction
+
+Form function GetFormOf(Actor akActor, string asVarName) global
+    return RPB_StorageVars.GetFormOnReference(asVarName, akActor, "Jail")
+endFunction
 
 RPB_Prison property Prison
     RPB_Prison function get()

@@ -29,6 +29,11 @@ Scriptname RPB_Arrestee extends RPB_ActorBase
     bool IsImprisoned
 @functions:
     Actor function GetCaptorActor()
+    bool function GetBoolOf(Actor akActor, string asVarName) global
+    int function GetIntOf(Actor akActor, string asVarName) global
+    float function GetFloatOf(Actor akActor, string asVarName) global
+    string function GetStringOf(Actor akActor, string asVarName) global
+    Form function GetFormOf(Actor akActor, string asVarName) global
     RPB_Arrestee function GetStateForPrisoner(RPB_Prisoner apPrisoner) global
     RPB_Prison function GetPotentialPrison()
     string function GetTimeOfArrestFormatted()
@@ -163,6 +168,37 @@ endProperty
 ; My guard, by actor (the Captor instance changes with his 3D reloads, he doesn't)
 Actor function GetCaptorActor()
     return self.GetReference("Arresting Guard") as Actor
+endFunction
+
+;/
+    @akActor's arrest state read from storage by her actor, not through this script: no call into her or her RPB
+    effects (a frozen one holds the caller until the next load), for shared code. The same values as GetBool/GetInt/...
+    on her RPB_Arrestee (the same storage path: both reduce the reference to "(Reference <FormID>)",
+    RPB_StorageVars.GetReferenceKey), category "Arrest" built in. Called as RPB_Arrestee.GetBoolOf(actor, "...")
+/;
+bool function GetBoolOf(Actor akActor, string asVarName) global
+    return RPB_StorageVars.GetBoolOnReference(asVarName, akActor, "Arrest")
+endFunction
+
+int function GetIntOf(Actor akActor, string asVarName) global
+    return RPB_StorageVars.GetIntOnReference(asVarName, akActor, "Arrest")
+endFunction
+
+float function GetFloatOf(Actor akActor, string asVarName) global
+    return RPB_StorageVars.GetFloatOnReference(asVarName, akActor, "Arrest")
+endFunction
+
+string function GetStringOf(Actor akActor, string asVarName) global
+    return RPB_StorageVars.GetStringOnReference(asVarName, akActor, "Arrest")
+endFunction
+
+Form function GetFormOf(Actor akActor, string asVarName) global
+    return RPB_StorageVars.GetFormOnReference(asVarName, akActor, "Arrest")
+endFunction
+
+; @akActor's arresting guard (GetCaptorActor), no call into her
+Actor function GetCaptorOf(Actor akActor) global
+    return GetFormOf(akActor, "Arresting Guard") as Actor
 endFunction
 
 ;/

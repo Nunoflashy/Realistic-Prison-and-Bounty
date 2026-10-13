@@ -3232,7 +3232,7 @@ function __FinishIntakeForTimeSkip()
         Actor npc = actors[i] as Actor
         if (npc && !(frozenMap && RPB_Utility.IsListedFrozen(frozenMap, npc)) && !RPB_Utility.IsDeadNoCall(npc))
             RPB_Prisoner prisoner = Prisoners.AtKey(npc)
-            if (prisoner && !prisoner.IsPlayer() && !prisoner.IsImprisoned && prisoner.TimeOfArrest > 0.0)
+            if (prisoner && npc != Game.GetPlayer() && !prisoner.IsImprisoned && prisoner.TimeOfArrest > 0.0)
                 ; Noted first: the stopped Scene's own end still comes from the engine a moment later, and its escort end
                 ; started the strip and the escort to the cell on her while she was being moved in (Vivienne, 2026-10-07)
                 int finishing = JDB.solveObj(".rpb_root.timeSkipIntake")
@@ -3279,7 +3279,7 @@ int function ReleaseDueNPCsInOrder(float afPlayerTimeLeft)
     int i = 0
     while (i < count)
         RPB_Prisoner prisoner = Prisoners.AtKey(due[i] as Actor)
-        if (prisoner && !prisoner.IsPlayer())
+        if (prisoner && (due[i] as Actor) != Game.GetPlayer()) ; the list's actor: no call into her
             left[i] = prisoner.TimeLeftInSentence
             done[i] = false
             pending += 1
@@ -3338,7 +3338,7 @@ function ReleasePrisonersWithSentenceLessThan(float afTimeLeftInSentence, bool a
     int i = 0
     while (i < due.Length)
         RPB_Prisoner prisoner = Prisoners.AtKey(due[i] as Actor)
-        if (prisoner && !prisoner.IsPlayer())
+        if (prisoner && (due[i] as Actor) != Game.GetPlayer()) ; the list's actor: no call into her
             self.QueueRelease(prisoner)
         endif
         i += 1
@@ -4764,15 +4764,19 @@ function __CheckIntake(Actor akPrisoner, int aiEntry, float afNow, float afLoadS
     ; escort to jail again), or waiting for a guard who sees her (RPB_Arrestee.HandOverInPrison): the arrest's own watches
     ; have her (handing over again each time spammed the wait), the intake starts over at that escort's end
     RPB_Arrestee arrestState = API.Arrest.Arrestees.AtKey(akPrisoner)
+    ; Her arrest's state read from storage by her actor (RPB_Arrestee.GetBoolOf): through her Arrestee script it was a call
+    ; into her, which a frozen one holds, in a loop shared by every prisoner
+    bool arrestPending = arrestState && RPB_Arrestee.GetBoolOf(akPrisoner, "Arrest Pending")
+    bool awaitingGuard = arrestState && RPB_Arrestee.GetBoolOf(akPrisoner, "Awaiting Guard")
     ; Pending for a guard who died meanwhile (his death event failed once: cuffed in the prison for good, 2026-10-11)
-    if (arrestState && arrestState.GetBool("Arrest Pending"))
-        Actor pendingGuard = arrestState.GetCaptorActor()
+    if (arrestPending)
+        Actor pendingGuard = RPB_Arrestee.GetCaptorOf(akPrisoner)
         if (pendingGuard && IsDeadNoCall(pendingGuard)) ; no call into him: this loop is shared by every prisoner
             arrestState.OnCaptorDied(pendingGuard)
             return
         endif
     endif
-    if ((arrestState && (arrestState.GetBool("Arrest Pending") || arrestState.GetBool("Awaiting Guard"))) || (sceneType == SceneManager.CATEGORY_ESCORT_TO_JAIL && SceneManager.GetSceneNthReferenceOfType(current, "Escortee") == akPrisoner))
+    if (arrestPending || awaitingGuard || (sceneType == SceneManager.CATEGORY_ESCORT_TO_JAIL && SceneManager.GetSceneNthReferenceOfType(current, "Escortee") == akPrisoner))
         FastMap_SetFloat(aiEntry, "since", afNow)
         return
     endif
