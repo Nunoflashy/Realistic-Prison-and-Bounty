@@ -2096,6 +2096,7 @@ event OnScenePlaying(string name, int phaseEvent, int phase, Scene sender)
 
         if (name == SCENE_SURRENDER_01)
             if (phase == 3 && phaseEvent == PHASE_START)
+                self.__BindNearestSurrenderCaptor(name, surrenderer, surrendererCaptors)
                 EventManager.SendSurrenderSceneEvent(name, EVENT_SURRENDER_BEGIN, surrenderer, none, "null", surrendererCaptors)
             endif
         endif
@@ -2235,7 +2236,10 @@ event OnSceneEnd(string name, Scene sender)
         Actor surrenderer       = self.GetSceneNthReferenceOfType(name, "Surrenderer") as Actor
         Debug("SceneManager::OnSceneEnd", "surrendererCaptor: " + surrendererCaptor + ", surrenderer: " + surrenderer)
 
-        EventManager.SendSurrenderSceneEvent(name, EVENT_SURRENDER_END, surrenderer, surrendererCaptor)
+        endBatch = EventManager.SendSurrenderSceneEvent(name, EVENT_SURRENDER_END, surrenderer, surrendererCaptor, abTrackBatch = true)
+        endMembers = new Form[1]
+        endMembers[0] = surrenderer
+        endAuthority = surrendererCaptor
 
     elseif (type == CATEGORY_PAY_BOUNTY)
         Actor escort   = self.GetSceneNthReferenceOfType(name, "Escort") as Actor
@@ -2380,6 +2384,37 @@ function __ProbeSceneEndStall(string asScene, Form[] akMembers, Actor akAuthorit
     endWhile
     if (akAuthority && !RPB_Utility.IsNPCProbeOpen(akAuthority))
         RPB_Utility.ProbeNPC(akAuthority, step, 0.0, "GUARD")
+    endif
+endFunction
+
+;/
+    The surrender's main captor (the guard nearest the surrenderer, in the first SurrendererCaptor alias), bound right here at
+    the step: it's the Scene's own setup, the guard's walk-up starts from it. Done in the begin event's handler, on her own
+    stack, it landed ~250ms late with Scene events per member, after the first alias's guard had started off (the mod author
+    felt the delay and a farther guard came, 2026-10-13). The distances are read on her (passed the guards as arguments): a
+    call into the player, who never freezes; into an NPC surrenderer it's a step's stack, not the queue.
+/;
+function __BindNearestSurrenderCaptor(string asScene, Actor akSurrenderer, Form[] akCaptors)
+    if (!akSurrenderer || !akCaptors)
+        return
+    endif
+    Actor nearest = none
+    float nearestDistance = 0.0
+    int i = 0
+    while (i < akCaptors.Length)
+        Actor captor = akCaptors[i] as Actor
+        if (captor)
+            float distance = akSurrenderer.GetDistance(captor)
+            if (!nearest || distance < nearestDistance)
+                nearest = captor
+                nearestDistance = distance
+            endif
+        endif
+        i += 1
+    endWhile
+    if (nearest)
+        RPB_Utility.BindAliasTo(self.GetSceneNthAliasOfType(asScene, "SurrendererCaptor"), nearest)
+        Debug("SceneManager::__BindNearestSurrenderCaptor", asScene + ": " + nearest + " (" + (nearestDistance as int) + " away) is " + akSurrenderer + "'s main captor")
     endif
 endFunction
 

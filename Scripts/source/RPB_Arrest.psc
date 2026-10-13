@@ -63,7 +63,7 @@ scriptname RPB_Arrest extends Quest
     function UnregisterCaptor(RPB_Captor apCaptor, bool abRemoveFromList = false)
     function SetArrestScene(Actor akArrestee, string asSceneName)
     function SetArrestGoal(Actor akArrestee, string asArrestGoal)
-    function ArrestActor(Actor akArrester, Actor akArrestee, string asArrestType)
+    function ArrestActor(Actor akArrester, Actor akArrestee, string asArrestType, bool abKeepFlow = false)
     function SetAsideBountyOnSubmission(Actor akActor, Actor akGuard) global
     function __SetAsideBountyFrom(Actor akActor, Actor akGuard) global
     function __SetAsideBounty(Actor akActor, Actor akGuard, Faction akCrimeFaction) global
@@ -1180,13 +1180,16 @@ endFunction
 
 event OnSurrenderBegin(Actor akSurrenderer, Actor[] akSurrendererCaptors)
     self.__BeginSurrender(akSurrenderer)
+    RPB_Utility.FlowMark("Surrender: begun (marked surrendering)")
     Actor outsider = self.GetNonGuardCombatTarget(akSurrendererCaptors)
     if (outsider)
         RPB_StorageVars.SetFormOnReference("Outsider", akSurrenderer, outsider, "Surrender") ; the watch's leeway
     endif
     Actor[] guards = self.GetSurrenderGuards(akSurrendererCaptors)
     __surrenderGuards = guards
+    RPB_Utility.FlowMark("Surrender: outsider and guards found (" + guards.Length + ")")
     self.PrepareSurrenderer(akSurrenderer, guards)
+    RPB_Utility.FlowMark("Surrender: surrenderer prepared (pose)")
     ; Ended while the pose was being prepared (2s; test 145's teardown, or the surrenderer leaving): it stops here. It went on
     ; to calm the guards and start the Surrender Scene with nothing surrendering any more, a guard left running to the player
     ; (2026-10-06)
@@ -1194,10 +1197,12 @@ event OnSurrenderBegin(Actor akSurrenderer, Actor[] akSurrendererCaptors)
         return
     endif
     self.__PacifyForSurrender(akSurrenderer, guards)
+    RPB_Utility.FlowMark("Surrender: guards calmed")
     if (!self.IsSurrendering(akSurrenderer))
         return
     endif
     self.InitiateSurrenderScene(akSurrenderer, guards)
+    RPB_Utility.FlowMark("Surrender: Scene bound and queued")
     ; Runs on this event's own stack until the Scene's end takes the surrender over, or the surrenderer leaves
     self.__WatchSurrender(akSurrenderer, guards)
 endEvent
@@ -1233,7 +1238,7 @@ event OnSurrenderEnd(Actor akSurrenderer, Actor akCaptor)
     endif
 
     LastSurrenderOutcome = "arrest"
-    self.ArrestActor(akCaptor, akSurrenderer, ARREST_TYPE_ESCORT_TO_JAIL)
+    self.ArrestActor(akCaptor, akSurrenderer, ARREST_TYPE_ESCORT_TO_JAIL, abKeepFlow = true)
 endEvent
 
 ;/
@@ -1614,8 +1619,13 @@ endFunction
     Actor   @akArrestee: The Actor that is to be arrested.
     string  @asArrestType: The type of the arrest, whether to escort to jail, cell, or teleport to jail or cell.
 /;
-function ArrestActor(Actor akArrester, Actor akArrestee, string asArrestType)
-    RPB_Utility.FlowBegin("Arrest -> Imprison")
+function ArrestActor(Actor akArrester, Actor akArrestee, string asArrestType, bool abKeepFlow = false)
+    ; @abKeepFlow: a surrender's arrest goes on profiling the surrender's flow (its Scene's events are in it)
+    if (abKeepFlow)
+        RPB_Utility.FlowEnsure("Arrest -> Imprison")
+    else
+        RPB_Utility.FlowBegin("Arrest -> Imprison")
+    endif
     akArrester.SendModEvent("RPB_ArrestBegin", asArrestType, akArrestee.GetFormID())
 endFunction
 
@@ -1733,6 +1743,7 @@ endFunction
     Actor   @akSurrenderer: The actor that is about to surrender.
 /;
 function Surrender(Actor akSurrenderer)
+    RPB_Utility.FlowBegin("Surrender -> Imprison") ; only with the flow profiler on
     int handle = ModEvent.Create("RPB_Surrender")
     if (handle)
         ModEvent.PushForm(handle, akSurrenderer)
@@ -2374,9 +2385,11 @@ endFunction
 function PrepareSurrenderer(Actor akSurrenderer, Actor[] akGuards = none)
     ; Sheathe weapons, animations won't play otherwise
     akSurrenderer.SheatheWeapon()
+    RPB_Utility.FlowMark("Surrender: weapon sheathed")
 
     Utility.Wait(1.0)
     Debug.SendAnimationEvent(akSurrenderer, "IdleSurrender")
+    RPB_Utility.FlowMark("Surrender: hands up (after a fixed 1s wait)")
 
     ; Stop all combat
     akSurrenderer.StopCombat()

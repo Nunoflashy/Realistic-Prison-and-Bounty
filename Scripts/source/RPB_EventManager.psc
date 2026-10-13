@@ -9,7 +9,7 @@ scriptname RPB_EventManager extends Quest
 @functions:
     function RegisterEvents()
     function WatchCuffedJumps(bool abOn)
-    function SendSurrenderSceneEvent(string asScene, string asSceneEvent, Actor akSurrenderer, Actor akSurrendererCaptor, string asSceneSecondaryEvent = "null", Form[] akParams = none, Form[] akParams2 = none)
+    int function SendSurrenderSceneEvent(string asScene, string asSceneEvent, Actor akSurrenderer, Actor akSurrendererCaptor, string asSceneSecondaryEvent = "null", Form[] akParams = none, Form[] akParams2 = none, bool abTrackBatch = false)
     int function SendArrestSceneEvent(string asScene, string asSceneEvent, Actor akArrestee, Actor akAuthority, string asSceneSecondaryEvent = "null", bool abTrackBatch = false)
     int function SendArrestSceneBulkEvent(string asScene, string asSceneEvent, Form[] akArrestees, Actor akAuthority, string asSceneSecondaryEvent = "null", bool abTrackBatch = false)
     int function SendPrisonSceneEvent(string asScene, string asSceneEvent, Actor akPrisoner, Actor akAuthority, string asSceneSecondaryEvent = "null", bool abTrackBatch = false)
@@ -32,6 +32,7 @@ scriptname RPB_EventManager extends Quest
     event OnPrisonScene(string asScene, string asSceneEvent, RPB_Prison apPrison, RPB_Prisoner apPrisoner, Actor akAuthority, string asSceneSecondaryEvent)
     event OnPrisonSceneEvent(string asScene, string asSceneEvent, string asSceneSecondaryEvent, Form akMember, Form akAuthority, int aiPrevious, int aiNumber, int aiBatch, int aiMembers)
     event OnArrestSceneEvent(string asScene, string asSceneEvent, string asSceneSecondaryEvent, Form akMember, Form akAuthority, int aiPrevious, int aiNumber, int aiBatch, int aiMembers)
+    event OnSurrenderSceneEvent(string asScene, string asSceneEvent, string asSceneSecondaryEvent, Form akMember, Form akAuthority, int aiPrevious, int aiNumber, int aiBatch, int aiMembers)
     event OnSurrenderPreparing(Form akSurrenderer)
     event OnSurrenderScene(string asScene, string asSceneEvent, Actor akSurrenderer, Actor akSurrendererCaptor, string asSceneSecondaryEvent, Form[] akParams, Form[] akParams2)
     event OnSceneStart(string eventName, string sceneName, float unusedFlt, Form sender)
@@ -135,6 +136,7 @@ function RegisterEvents()
     RegisterForModEvent("RPB_PrisonerFroze", "OnPrisonerFroze")
     RegisterForModEvent("RPB_PrisonSceneEvent", "OnPrisonSceneEvent")
     RegisterForModEvent("RPB_ArrestSceneEvent", "OnArrestSceneEvent")
+    RegisterForModEvent("RPB_SurrenderSceneEvent", "OnSurrenderSceneEvent")
     self.__ResetSceneEventOrder()
     RegisterForModEvent("RPB_WorldInteractionApproach", "OnWorldInteractionApproach")
     RegisterForModEvent("RPB_WorldInteractionArrestAnswer", "OnWorldInteractionArrestAnswer")
@@ -443,8 +445,41 @@ endEvent
 ;                      Event Dispatchers
 ; ==========================================================
 
-function SendSurrenderSceneEvent(string asScene, string asSceneEvent, Actor akSurrenderer, Actor akSurrendererCaptor, string asSceneSecondaryEvent = "null", Form[] akParams = none, Form[] akParams2 = none)
+;/
+    A surrender Scene's event to its surrenderer (@akParams: the guards she surrendered to, at its begin), as the arrest and
+    prison ones: per member, on a stack of her own, the guard lists carried on her pending event (a mod event can't carry an
+    array); @abTrackBatch (its end) returns the batch the Scene manager waits for. Otherwise the old way, while the two are
+    compared: handled here, and 0. NPCs surrender too, and group surrenders will have one event per surrenderer.
+/;
+int function SendSurrenderSceneEvent(string asScene, string asSceneEvent, Actor akSurrenderer, Actor akSurrendererCaptor, string asSceneSecondaryEvent = "null", Form[] akParams = none, Form[] akParams2 = none, bool abTrackBatch = false)
+    if (!akSurrenderer)
+        RPB_Utility.LogError("No surrenderer for " + asScene + "'s " + asSceneEvent, "EventManager::SendSurrenderSceneEvent")
+        return 0
+    endif
+    if (RPB_Utility.IsSceneEventsPerMember())
+        Form[] members = new Form[1]
+        members[0] = akSurrenderer
+        return self.__DispatchSceneEvent(SCENE_EVENT_SURRENDER, asScene, asSceneEvent, members, akSurrendererCaptor, asSceneSecondaryEvent, abTrackBatch, akParams, akParams2)
+    endif
+    self.__SurrenderSceneForMember(asScene, asSceneEvent, akSurrenderer, akSurrendererCaptor, asSceneSecondaryEvent, akParams, akParams2)
+    return 0
+endFunction
+
+; The surrenderer's part of a surrender Scene's event. @aiNumber: the event's number per member (0 the old way)
+function __SurrenderSceneForMember(string asScene, string asSceneEvent, Actor akSurrenderer, Actor akSurrendererCaptor, string asSceneSecondaryEvent, Form[] akParams, Form[] akParams2, int aiNumber = 0)
+    if (RPB_Utility.IsFrozenNPC(akSurrenderer)) ; her surrender's steps call into her
+        RPB_Utility.LogWarn(akSurrenderer + " is frozen: left out of " + asScene + "'s " + asSceneEvent + " until the next load", "EventManager::__SurrenderSceneForMember")
+        return
+    endif
+    if (RPB_Utility.IsFreezePointArmed())
+        RPB_Utility.FreezePoint(akSurrenderer, self.__SceneEventPoint(asScene, asSceneEvent, asSceneSecondaryEvent))
+    endif
+    if (!self.__IsSceneEventPending(aiNumber))
+        RPB_Utility.LogWarn(akSurrenderer + "'s " + asScene + " " + asSceneEvent + " was already handled the frozen way (or this stack waited through a load): not handled again", "EventManager::__SurrenderSceneForMember")
+        return
+    endif
     self.OnSurrenderScene(asScene, asSceneEvent, akSurrenderer, akSurrendererCaptor, asSceneSecondaryEvent, akParams, akParams2)
+    self.__FlowMarkSceneEvent(asScene, asSceneEvent, asSceneSecondaryEvent, akSurrenderer)
 endFunction
 
 int function SendArrestSceneEvent(string asScene, string asSceneEvent, Actor akArrestee, Actor akAuthority, string asSceneSecondaryEvent = "null", bool abTrackBatch = false)
@@ -465,7 +500,7 @@ int function SendArrestSceneBulkEvent(string asScene, string asSceneEvent, Form[
     endif
 
     if (RPB_Utility.IsSceneEventsPerMember())
-        return self.__DispatchSceneEvent(false, asScene, asSceneEvent, akArrestees, akAuthority, asSceneSecondaryEvent, abTrackBatch)
+        return self.__DispatchSceneEvent(SCENE_EVENT_ARREST, asScene, asSceneEvent, akArrestees, akAuthority, asSceneSecondaryEvent, abTrackBatch)
     endif
 
     int i = 0
@@ -640,7 +675,7 @@ int function SendPrisonSceneBulkEvent(string asScene, string asSceneEvent, Form[
     endif
 
     if (RPB_Utility.IsSceneEventsPerMember())
-        return self.__DispatchSceneEvent(true, asScene, asSceneEvent, akPrisoners, akAuthority, asSceneSecondaryEvent, abTrackBatch)
+        return self.__DispatchSceneEvent(SCENE_EVENT_PRISON, asScene, asSceneEvent, akPrisoners, akAuthority, asSceneSecondaryEvent, abTrackBatch)
     endif
 
     int i = 0
@@ -736,6 +771,11 @@ endFunction
       nothing queued her strip or her escort to the cell). A handler that resumes later (after a load) finds its event
       gone from the list and stops.
 /;
+; What a Scene event is for (its handler, and what its frozen way is)
+int property SCENE_EVENT_ARREST = 0 autoreadonly
+int property SCENE_EVENT_PRISON = 1 autoreadonly
+int property SCENE_EVENT_SURRENDER = 2 autoreadonly
+
 Form[] __orderMembers   ; the member each ordering slot is for
 int[] __orderSent       ; the number of her last event sent
 int[] __orderDone       ; the number of her last event handled
@@ -855,6 +895,20 @@ int function __PendingSceneEvents()
     return pending
 endFunction
 
+; A guard list carried on pending event @aiNumber (@asKey "params" or "params2"), none if it has none
+Form[] function __PendingSceneEventForms(int aiNumber, string asKey)
+    Form[] noForms ; returned unset: "return none" logs a cast error for an array
+    int entry = RPB_Memory.FastIntMap_GetObject(self.__PendingSceneEvents(), aiNumber)
+    if (aiNumber <= 0 || !entry)
+        return noForms
+    endif
+    int forms = RPB_Memory.FastMap_GetObject(entry, asKey)
+    if (!forms)
+        return noForms
+    endif
+    return RPB_Memory.FastArray_ToFormArray(forms)
+endFunction
+
 ; Event @aiNumber not handled yet (0, the old way or no ordering slot: always)
 bool function __IsSceneEventPending(int aiNumber)
     if (aiNumber <= 0)
@@ -863,14 +917,20 @@ bool function __IsSceneEventPending(int aiNumber)
     return RPB_Memory.FastIntMap_HasKey(self.__PendingSceneEvents(), aiNumber)
 endFunction
 
-function __RecordPendingSceneEvent(int aiNumber, bool abPrison, string asScene, string asSceneEvent, string asSceneSecondaryEvent, Actor akMember, Actor akAuthority, int aiBatch)
+function __RecordPendingSceneEvent(int aiNumber, int aiKind, string asScene, string asSceneEvent, string asSceneSecondaryEvent, Actor akMember, Actor akAuthority, int aiBatch, Form[] akParams, Form[] akParams2)
     int entry = JMap.object()
+    if (akParams)
+        RPB_Memory.FastMap_SetObject(entry, "params", RPB_Memory.FastArray_FromFormArray(akParams))
+    endif
+    if (akParams2)
+        RPB_Memory.FastMap_SetObject(entry, "params2", RPB_Memory.FastArray_FromFormArray(akParams2))
+    endif
     RPB_Memory.FastMap_SetString(entry, "scene", asScene)
     RPB_Memory.FastMap_SetString(entry, "event", asSceneEvent)
     RPB_Memory.FastMap_SetString(entry, "secondary", asSceneSecondaryEvent)
     RPB_Memory.FastMap_SetForm(entry, "member", akMember)
     RPB_Memory.FastMap_SetForm(entry, "authority", akAuthority)
-    RPB_Memory.FastMap_SetInt(entry, "prison", abPrison as int)
+    RPB_Memory.FastMap_SetInt(entry, "kind", aiKind)
     RPB_Memory.FastMap_SetInt(entry, "batch", aiBatch)
     RPB_Memory.FastIntMap_SetObject(self.__PendingSceneEvents(), aiNumber, entry)
 endFunction
@@ -908,7 +968,7 @@ function __TakeOverFrozenMember(Actor akMember, int aiUpTo)
             string sceneEvent = RPB_Memory.FastMap_GetString(entry, "event")
             string secondary = RPB_Memory.FastMap_GetString(entry, "secondary")
             Actor authority = RPB_Memory.FastMap_GetForm(entry, "authority") as Actor
-            bool isPrison = RPB_Memory.FastMap_GetInt(entry, "prison") != 0
+            bool isPrison = RPB_Memory.FastMap_GetInt(entry, "kind") == SCENE_EVENT_PRISON
             int batch = RPB_Memory.FastMap_GetInt(entry, "batch")
             if (RPB_Memory.FastIntMap_RemoveKey(pending, number))
                 RPB_Utility.LogWarn(akMember + " is frozen: her " + sceneName + " " + sceneEvent + " (#" + number + ") taken over, done the frozen way", "EventManager::__TakeOverFrozenMember")
@@ -943,9 +1003,15 @@ endFunction
     member already marked frozen is handled here, with no call into her. @abTrackBatch (a Scene's end): returns the batch
     the Scene manager waits for, else 0.
 /;
-int function __DispatchSceneEvent(bool abPrison, string asScene, string asSceneEvent, Form[] akMembers, Actor akAuthority, string asSceneSecondaryEvent, bool abTrackBatch)
+int function __DispatchSceneEvent(int aiKind, string asScene, string asSceneEvent, Form[] akMembers, Actor akAuthority, string asSceneSecondaryEvent, bool abTrackBatch, Form[] akParams = none, Form[] akParams2 = none)
     self.__EnsureSceneEventOrder()
-    string eventName = RPB_Utility.string_if(abPrison, "RPB_PrisonSceneEvent", "RPB_ArrestSceneEvent")
+    bool abPrison = aiKind == SCENE_EVENT_PRISON
+    string eventName = "RPB_ArrestSceneEvent"
+    if (abPrison)
+        eventName = "RPB_PrisonSceneEvent"
+    elseif (aiKind == SCENE_EVENT_SURRENDER)
+        eventName = "RPB_SurrenderSceneEvent"
+    endif
     int batch = 0
     if (abTrackBatch)
         batch = self.__NewBatch()
@@ -977,6 +1043,11 @@ int function __DispatchSceneEvent(bool abPrison, string asScene, string asSceneE
                 __orderSent[slot] = number
             else
                 RPB_Utility.LogWarn("Every ordering slot is busy: " + member + "'s " + asScene + " " + asSceneEvent + " goes unordered", "EventManager::__DispatchSceneEvent")
+                if (aiKind == SCENE_EVENT_SURRENDER)
+                    ; Its guard lists ride on the pending event, which needs a number: the old way for this one
+                    self.__SurrenderSceneForMember(asScene, asSceneEvent, member, akAuthority, asSceneSecondaryEvent, akParams, akParams2)
+                    return batch
+                endif
             endif
             if (batch)
                 int batchSlot = __batchIds.Find(batch)
@@ -985,7 +1056,7 @@ int function __DispatchSceneEvent(bool abPrison, string asScene, string asSceneE
                 endif
             endif
             if (number > 0)
-                self.__RecordPendingSceneEvent(number, abPrison, asScene, asSceneEvent, asSceneSecondaryEvent, member, akAuthority, batch)
+                self.__RecordPendingSceneEvent(number, aiKind, asScene, asSceneEvent, asSceneSecondaryEvent, member, akAuthority, batch, akParams, akParams2)
             endif
 
             int handle = ModEvent.Create(eventName)
@@ -1023,6 +1094,18 @@ event OnPrisonSceneEvent(string asScene, string asSceneEvent, string asSceneSeco
         endif
     elseif (self.__IsSceneEventPending(aiNumber))
         self.__PrisonSceneForMember(asScene, asSceneEvent, member, akAuthority as Actor, asSceneSecondaryEvent, aiNumber)
+    endif
+    self.__SceneEventDone(akMember, aiNumber, aiBatch)
+endEvent
+
+event OnSurrenderSceneEvent(string asScene, string asSceneEvent, string asSceneSecondaryEvent, Form akMember, Form akAuthority, int aiPrevious, int aiNumber, int aiBatch, int aiMembers)
+    Actor member = akMember as Actor
+    if (!self.__AwaitTurn(member, aiPrevious, asScene + " " + asSceneEvent))
+        self.__TakeOverFrozenMember(member, aiNumber)
+    elseif (self.__IsSceneEventPending(aiNumber))
+        Form[] params = self.__PendingSceneEventForms(aiNumber, "params")
+        Form[] params2 = self.__PendingSceneEventForms(aiNumber, "params2")
+        self.__SurrenderSceneForMember(asScene, asSceneEvent, member, akAuthority as Actor, asSceneSecondaryEvent, params, params2, aiNumber)
     endif
     self.__SceneEventDone(akMember, aiNumber, aiBatch)
 endEvent
@@ -1795,6 +1878,7 @@ endEvent
 ; ==========================================================
 
 event OnSurrenderPreparing(Form akSurrenderer)
+    RPB_Utility.FlowMark("Surrender: event delivered")
     Actor surrenderer = akSurrenderer as Actor
     Debug("EventManager::OnSurrenderPreparing", "RPB_Surrender received for " + akSurrenderer)
     if (!surrenderer)
@@ -1808,6 +1892,7 @@ event OnSurrenderPreparing(Form akSurrenderer)
     if (!Arrest.CanActorSurrender(surrenderer, surrendererCaptors))
         return
     endif
+    RPB_Utility.FlowMark("Surrender: combat targets read, allowed")
 
     ; Should only be for player (to avoid forced dialogue during surrender)
     RPB_Arrest.DisableForcedArrestDialogue()
@@ -1820,11 +1905,7 @@ event OnSurrenderScene(string asScene, string asSceneEvent, Actor akSurrenderer,
 
     if (sceneType == SceneManager.CATEGORY_SURRENDER)
         if (asSceneEvent == SceneManager.EVENT_SURRENDER_BEGIN)
-            ; TODO: Refactor this
-            Form[] captors = akParams
-            Actor mainCaptor = RPB_Utility.GetNearestActorFromList(akSurrenderer, captors)
-            ReferenceAlias paramBinder = SceneManager.GetSceneNthAliasOfType(asScene, "SurrendererCaptor")
-            BindAliasTo(paramBinder, mainCaptor)
+            ; The main captor is bound by the Scene manager at the step itself (RPB_SceneManager.__BindNearestSurrenderCaptor)
             Debug("EventManager::OnSurrenderScene", "akParams: " + akParams + ", akSurrenderer: " + akSurrenderer)
 
         elseif (asSceneEvent == SceneManager.EVENT_SURRENDER_END)
