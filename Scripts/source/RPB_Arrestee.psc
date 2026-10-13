@@ -985,7 +985,7 @@ endFunction
 
 ; While held (pending, NPC), and cuffed after a resume: a weapon drawn is put away again
 event OnActorAction(int actionType, Actor akActor, Form source, int slot)
-    if (akActor != this || actionType != 8)
+    if (__died || akActor != this || actionType != 8)
         return
     endif
 
@@ -1299,6 +1299,11 @@ endFunction
 
 event OnInitialize()
     bool reattached = self.Was("Initialized")
+    ; Started again on a body (its 3D loaded again) whose clean-up never finished: finished now
+    if (reattached && RPB_Utility.IsDeadNoCall(this))
+        self.OnDeath(none)
+        return
+    endif
     Arrest.RegisterArrestee(self)
     ; Debug("Arrestee::OnInitialize", "Initialized Arrestee, this: " + this)
 
@@ -1370,7 +1375,7 @@ endEvent
 ; taking them off (another mod, the console, the inventory) has them put back at once, so I'm never free-handed while
 ; under arrest, pending for a fight included (the mod author, 2026-10-11: before, only noticed when the escort was played)
 event OnObjectUnequipped(Form akBaseObject, ObjectReference akReference)
-    if (!RPB_Utility.IsCuffsForm(akBaseObject))
+    if (__died || !RPB_Utility.IsCuffsForm(akBaseObject))
         return
     endif
     if (self.GetBool("Cuffs Off On Purpose"))
@@ -1385,8 +1390,56 @@ event OnObjectUnequipped(Form akBaseObject, ObjectReference akReference)
     RPB_Utility.EquipCuffs(this, front)
 endEvent
 
+; Dying before the prison (the confrontation, the escort to jail before her prisoner was made). Once she's a prisoner her
+; RPB_Prisoner.OnDeath handles it all (the arrest included). My effect stays on the body for it (No Death Dispel, patch 017)
+bool __died
+
 event OnDeath(Actor akKiller)
-    Arrest.OnArresteeDeath(self, Captor, akKiller)
+    if (__died)
+        return
+    endif
+    __died = true
+    if (self.IsEffectActive)
+        UnregisterForUpdate()
+        UnregisterForActorAction(8)
+    endif
+    RPB_Prison prison = API.PrisonManager.FindPrisonByPrisoner(this)
+    if (prison && prison.Prisoners.AtKey(this))
+        return
+    endif
+    Actor me = this
+    int entry = JMap.object()
+    FastMap_SetString(entry, "name", Name)
+    FastMap_SetForm(entry, "actor", me)
+    FastMap_SetForm(entry, "base", me.GetActorBase())
+    FastMap_SetInt(entry, "unique", me.GetActorBase().IsUnique() as int)
+    FastMap_SetString(entry, "hold", Hold)
+    FastMap_SetString(entry, "arrestType", GetArrestType())
+    FastMap_SetFloat(entry, "endedAt", Utility.GetCurrentGameTime())
+    FastMap_SetString(entry, "end", "died during the arrest")
+    FastMap_SetForm(entry, "killer", akKiller)
+    Actor guard = none
+    if (Captor)
+        guard = Captor.GetActor()
+        FastMap_SetForm(entry, "captor", guard)
+    endif
+    RPB_Utility.AppendPrisonerHistory(entry)
+    Info(Name + " " + me + " died during the arrest (killed by " + akKiller + "): the arrest ends, the body left where it lies")
+    ; Nothing of the body's touched but its cuffs: the arrest's revert lifted the hold and the AI on the corpse, which
+    ; nudged it and left it floating (2026-10-12)
+    SceneManager.EndSceneWithActor(me, "the arrestee died")
+    SceneManager.UnsetPendingHoldOnActor(me) ; the alias only
+    RPB_Utility.RemoveCuffs(me)
+    if (guard)
+        int handle = ModEvent.Create("RPB_ReleaseCaptor")
+        if (handle)
+            ModEvent.PushForm(handle, guard)
+            ModEvent.PushForm(handle, me)
+            ModEvent.PushBool(handle, true)
+            ModEvent.Send(handle)
+        endif
+    endif
+    self.Destroy() ; off the arrestees' list, which takes my spell off the body
 endEvent
 
 ; Only the player's hits go on (the rule for the others reads their combat; the player has no combat target to read)

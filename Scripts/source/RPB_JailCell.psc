@@ -1094,7 +1094,10 @@ function __onCellAttachAndDetachEvent(bool abAttached)
 
             ; Debug("("+ ID +") (-) JailCell::OnCellAttachAndDetachEvent", "("+ apPrisoner.GetActor() +")")
 
-            if (apPrisoner.ShouldBeInCell && !apPrisoner.IsInCell)
+            ; A body isn't moved (round 172: a dead bandit read as out of her cell went to the prison's entrance); the distances
+            ; logged, as that read was wrong
+            if (apPrisoner.ShouldBeInCell && !apPrisoner.IsInCell && !RPB_Utility.IsDeadNoCall(apPrisoner.GetActor()))
+                RPB_Utility.LogInfo(apPrisoner.GetActor() + " read as out of cell " + ID + ": " + (self.GetDistance(apPrisoner.GetActor()) as int) + " units from its marker, " + (CellDoor.GetDistance(apPrisoner.GetActor()) as int) + " from its door: moved in", "JailCell::OnCellAttachAndDetachEvent")
                 apPrisoner.MoveTo(self)                                           ; Move the prisoner to this jail cell
                 apPrisoner.NPC_BindToCell()                                       ; Prisoner should already be bound to cell, but just in case they aren't
                 RegisterForSingleUpdate(__npcSanityCheckPostCheckUpdateTime)      ; Keep updating until the prisoner is in the cell
@@ -1178,7 +1181,10 @@ bool function __performPrisonerSanityCheck(RPB_Prisoner apPrisoner)
         apPrisoner.NPC_UpdateClothing()
         apPrisoner.NPC_UpdateUnderwear()
 
-        if (apPrisoner.ShouldBeInCell && !apPrisoner.IsInCell)
+        ; A body isn't moved (round 172: a dead bandit read as out of her cell went to the prison's entrance); the distances
+        ; logged, as that read was wrong
+        if (apPrisoner.ShouldBeInCell && !apPrisoner.IsInCell && !RPB_Utility.IsDeadNoCall(apPrisoner.GetActor()))
+            RPB_Utility.LogInfo(apPrisoner.GetActor() + " read as out of cell " + ID + ": " + (self.GetDistance(apPrisoner.GetActor()) as int) + " units from its marker, " + (CellDoor.GetDistance(apPrisoner.GetActor()) as int) + " from its door: moved in", "JailCell::OnCellAttachAndDetachEvent")
             apPrisoner.MoveTo(self)                                           ; Move the prisoner to this jail cell
             apPrisoner.NPC_BindToCell()                                       ; Prisoner should already be bound to cell, but just in case they aren't
 

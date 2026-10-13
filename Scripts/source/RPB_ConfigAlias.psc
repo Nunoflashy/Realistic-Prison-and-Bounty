@@ -107,6 +107,7 @@ function PerformMaintenance()
     PrisonManager.VerifyIntegrity()
     JDB.solveFltSetter(".rpb_root.loadSettledAt", Utility.GetCurrentRealTime(), true)
     Arrest.ResumeEscortWatchesAfterLoad() ; a save made while an escort watch was dead has none to restore
+    self.__FinishFrozenImprisonmentsAfterLoad()
     self.__WatchIntakeAfterLoad()
     RPB_Keybindings.RegisterSurrenderKey()
     ; Waiting blocked by an escort this save no longer has: allowed again (a save made mid-escort keeps it until its end)
@@ -122,6 +123,37 @@ endFunction
 
 ; An intake Scene playing in a save made before the prison's intake watch existed: watched from now (one Scene plays at a
 ; time: the current one). Entries already watched restart their own clocks (RPB_Prison.__CheckIntake)
+; NPC prisoners frozen in the prison flow before the load (RPB_Prison.OnPrisonerFroze): the load cleared the freeze, their
+; prison finishes their imprisonment now
+function __FinishFrozenImprisonmentsAfterLoad()
+    int pending = JDB.solveObj(".rpb_root.frozenImprisonments")
+    int count = RPB_Memory.FastFormMap_Size(pending)
+    if (!pending || count == 0)
+        return
+    endif
+    ; The keys first: each prison's call removes all of its own entries
+    Form[] prisoners = Utility.CreateFormArray(count)
+    Form pendingKey = RPB_Memory.FastFormMap_NextKey(pending)
+    int k = 0
+    while (pendingKey && k < count)
+        prisoners[k] = pendingKey
+        pendingKey = RPB_Memory.FastFormMap_NextKey(pending, pendingKey)
+        k += 1
+    endWhile
+    int i = 0
+    while (i < prisoners.Length)
+        if (prisoners[i] && RPB_Memory.FastFormMap_HasKey(pending, prisoners[i]))
+            RPB_Prison prison = API.PrisonManager.FindPrisonByPrisoner(prisoners[i] as Actor)
+            if (prison)
+                prison.__FinishFrozenImprisonments() ; all of that prison's at once
+            else
+                RPB_Memory.FastFormMap_RemoveKey(pending, prisoners[i]) ; no longer anyone's prisoner
+            endif
+        endif
+        i += 1
+    endWhile
+endFunction
+
 function __WatchIntakeAfterLoad()
     string current = SceneManager.GetCurrentScene()
     string sceneType = SceneManager.GetSceneType(current)

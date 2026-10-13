@@ -127,6 +127,7 @@ function RegisterEvents()
     RegisterForModEvent("RPB_ConfrontationStalled", "OnConfrontationStalled")
     RegisterForModEvent("RPB_IntakeStalled", "OnIntakeStalled")
     RegisterForModEvent("RPB_SetAsideBounty", "OnSetAsideBounty")
+    RegisterForModEvent("RPB_PrisonerFroze", "OnPrisonerFroze")
     RegisterForModEvent("RPB_WorldInteractionApproach", "OnWorldInteractionApproach")
     RegisterForModEvent("RPB_WorldInteractionArrestAnswer", "OnWorldInteractionArrestAnswer")
     RegisterForModEvent("RPB_EncumbranceCheck", "OnEncumbranceCheck")
@@ -306,6 +307,22 @@ endEvent
 ; RPB_Arrestee.__EscortStalled: another guard of the hold for a stalled escort, or its fallback
 event OnStalledEscortTakeover(Form akArrestee, string asReason)
     Arrest.TakeOverStalledEscort(akArrestee as Actor, asReason)
+endEvent
+
+; A frozen prisoner left out of a step of her Scene: her prison does what of it needs no call into her
+function __FrozenPrisonerSceneStep(Actor akPrisoner, string asScene, string asSceneEvent, string asSceneSecondaryEvent, Actor akAuthority)
+    RPB_Prison prison = API.PrisonManager.FindPrisonByPrisoner(akPrisoner) ; no call into her
+    if (prison)
+        prison.FrozenPrisonerSceneStep(akPrisoner, asScene, asSceneEvent, asSceneSecondaryEvent, akAuthority)
+    endif
+endFunction
+
+; RPB_Utility.MarkNPCFrozen: an NPC prisoner frozen in the prison flow, finished by her prison without a call into her
+event OnPrisonerFroze(Form akPrisoner)
+    RPB_Prison prison = API.PrisonManager.FindPrisonByPrisoner(akPrisoner as Actor)
+    if (prison)
+        prison.OnPrisonerFroze(akPrisoner as Actor)
+    endif
 endEvent
 
 ; RPB_Arrest.SetAsideBountyOnSubmission: his crime faction read here, a frozen guard holding only this stack
@@ -587,6 +604,7 @@ endFunction
 function SendPrisonSceneEvent(string asScene, string asSceneEvent, Actor akPrisoner, Actor akAuthority, string asSceneSecondaryEvent = "null")
     if (RPB_Utility.IsFrozenNPC(akPrisoner)) ; the prison's lookup and his steps call into him
         RPB_Utility.LogWarn(akPrisoner + " is frozen: left out of " + asScene + "'s " + asSceneEvent + " until the next load", "EventManager::SendPrisonSceneEvent")
+        self.__FrozenPrisonerSceneStep(akPrisoner, asScene, asSceneEvent, asSceneSecondaryEvent, akAuthority)
         return
     endif
     RPB_Prison prison = API.PrisonManager.FindPrisonByPrisoner(akPrisoner)
@@ -623,6 +641,7 @@ function SendPrisonSceneBulkEvent(string asScene, string asSceneEvent, Form[] ak
     while (first < akPrisoners.Length && frozenMap && RPB_Utility.IsListedFrozen(frozenMap, akPrisoners[first] as Actor))
         RPB_Utility.LogWarn(akPrisoners[first] + " is frozen: left out of " + asScene + "'s " + asSceneEvent + " until the next load", "EventManager::SendPrisonSceneBulkEvent")
         RPB_Utility.NoteFrozenAction(akPrisoners[first] as Actor, "Left out of the prison's " + asScene + " (" + asSceneEvent + ")")
+        self.__FrozenPrisonerSceneStep(akPrisoners[first] as Actor, asScene, asSceneEvent, asSceneSecondaryEvent, akAuthority)
         first += 1
     endWhile
     if (first >= akPrisoners.Length)
@@ -639,7 +658,9 @@ function SendPrisonSceneBulkEvent(string asScene, string asSceneEvent, Form[] ak
     int i = first
     while (i < akPrisoners.Length)
         if (frozenMap && RPB_Utility.IsListedFrozen(frozenMap, akPrisoners[i] as Actor))
-            ; left out (logged above for the first ones)
+            if (i > first)
+                self.__FrozenPrisonerSceneStep(akPrisoners[i] as Actor, asScene, asSceneEvent, asSceneSecondaryEvent, akAuthority)
+            endif
         elseif (!self.__PrisonerAlreadyGone(prison, akPrisoners[i] as Actor, asSceneSecondaryEvent))
             RPB_Prisoner prisoner = prison.AwaitPrisonerReference(akPrisoners[i] as Actor)
 

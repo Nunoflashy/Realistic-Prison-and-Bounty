@@ -4461,9 +4461,101 @@ event OnDying(Actor akKiller)
     Prison.OnPrisonerDying(self, akKiller)
 endEvent
 
+; Dying anywhere in the prison flow (the escort to jail, the intake, the escort to the cell, in the cell). My effect stays
+; on the body for it (No Death Dispel, plugin patch 017): before, it ended with the death and nothing ran, and the time skip
+; then finished a dead bandit's intake, moved into a cell and imprisoned (round 172)
 event OnDeath(Actor akKiller)
-    Prison.OnPrisonerDeath(self, akKiller)
+    self.__Died(akKiller)
 endEvent
+
+bool __died
+
+function __Died(Actor akKiller)
+    if (__died)
+        return
+    endif
+    __died = true
+    ; Nothing scheduled may tick on the body, whatever happens below
+    if (self.IsEffectActive)
+        UnregisterForUpdate()
+        UnregisterForUpdateGameTime()
+    endif
+    Actor me = this
+    RPB_SceneManager SceneManager = API.SceneManager
+    string cause = "died at the intake"
+    string current = SceneManager.GetCurrentScene()
+    RPB_Arrestee arrestState = RPB_Arrestee.GetStateForPrisoner(self)
+    if (self.IsImprisoned)
+        cause = "died in the cell"
+    elseif (SceneManager.IsSceneOfType(current, SceneManager.CATEGORY_ESCORT_TO_CELL) && (SceneManager.GetSceneNthReferenceOfType(current, "Escortee") == me || SceneManager.GetSceneNthReferenceOfType(current, "Prisoner") == me))
+        cause = "died on the way to the cell"
+    elseif (arrestState && !arrestState.GetBool("Escort Arrived"))
+        cause = "died on the way to the prison"
+    endif
+    RPB_Utility.AppendPrisonerHistory(self.__HistoryEntry(cause, akKiller))
+    Info(Name + " " + me + " " + cause + " (" + Prison.Name + ", killed by " + akKiller + "): taken off the prison, the body left where it lies")
+    ; The teardown touches nothing of the body's but its cuffs: lifting a hold, the AI or the packages on a corpse (the
+    ; arrest's cancel) nudged it forward and left it floating (2026-10-12)
+    SceneManager.EndSceneWithActor(me, cause)
+    Prison.StopWatchingIntake(me)
+    Prison.CancelEscortToCellStallCheck(me)
+    SceneManager.UnsetPendingHoldOnActor(me) ; the alias only
+    RPB_Utility.RemoveCuffs(me)
+    if (arrestState)
+        Actor guard = arrestState.GetCaptorActor()
+        if (guard)
+            int handle = ModEvent.Create("RPB_ReleaseCaptor")
+            if (handle)
+                ModEvent.PushForm(handle, guard)
+                ModEvent.PushForm(handle, me)
+                ModEvent.PushBool(handle, true)
+                ModEvent.Send(handle)
+            endif
+        endif
+    endif
+    if (!self.IsImprisoned)
+        ; The imprisonment cancelled, the arrest's state destroyed with it; no belongings back (they stay in the chest)
+        Prison.CancelImprisonment(self, cause, abReturnBelongings = false)
+        return
+    endif
+    if (self.HasCellPackage)
+        self.NPC_UnbindFromCell()
+    endif
+    if (self.JailCell)
+        self.RemoveFromCell()
+    endif
+    self.Destroy() ; off the prison's list, which takes my spell off the body
+endFunction
+
+;/
+    My entry in the prisoners' history (RPB_Utility.AppendPrisonerHistory): about 20 fields, the same for everyone
+/;
+int function __HistoryEntry(string asEnd, Actor akKiller)
+    Actor me = this
+    int entry = JMap.object()
+    FastMap_SetString(entry, "name", Name)
+    FastMap_SetForm(entry, "actor", me)
+    FastMap_SetForm(entry, "base", me.GetActorBase())
+    FastMap_SetInt(entry, "unique", me.GetActorBase().IsUnique() as int)
+    FastMap_SetString(entry, "prison", Prison.Name)
+    FastMap_SetString(entry, "hold", Prison.Hold)
+    if (JailCell)
+        FastMap_SetString(entry, "cell", JailCell.ID)
+    endif
+    FastMap_SetInt(entry, "bounty", Bounty)
+    FastMap_SetInt(entry, "bountyViolent", BountyViolent)
+    FastMap_SetInt(entry, "bountyNonViolent", BountyNonViolent)
+    FastMap_SetInt(entry, "infamy", Infamy)
+    FastMap_SetInt(entry, "sentence", Sentence)
+    FastMap_SetFloat(entry, "arrestedAt", TimeOfArrest)
+    FastMap_SetFloat(entry, "imprisonedAt", TimeOfImprisonment)
+    FastMap_SetFloat(entry, "endedAt", Utility.GetCurrentGameTime())
+    FastMap_SetFloat(entry, "timeServed", TimeServed)
+    FastMap_SetString(entry, "end", asEnd)
+    FastMap_SetForm(entry, "killer", akKiller)
+    FastMap_SetForm(entry, "captor", Captor)
+    return entry
+endFunction
 
 ;                  Bounty / Sentence / Stats
 ; ==========================================================
@@ -4628,6 +4720,11 @@ endEvent
 event OnInitialize()
     ; An instance that starts while this actor is being released (its 3D loads when it is moved out) must do nothing: it used to
     ; rebind/register the released actor in the prison again.
+    ; My effect started again on a body (its 3D loaded again) whose clean-up never finished: finished now
+    if (self.Was("Initialized") && RPB_Utility.IsDeadNoCall(this))
+        self.__Died(none)
+        return
+    endif
     if (self.GetBool("Releasing"))
         RPB_Utility.Crumb(this, "Prisoner.OnInitialize: the actor is being released, nothing to initialize")
         return

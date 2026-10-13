@@ -26,6 +26,8 @@ scriptname RPB_Utility hidden
     function RememberActorName(Actor akActor) global
     function ForgetActorName(Actor akActor) global
     string function ActorNameNoCall(Actor akActor) global
+    int function FormIdIntNoCall(Form akForm) global
+    function AppendPrisonerHistory(int aiEntry) global
     string function FormIdNoCall(Form akForm) global
     string function ActorLabelNoCall(Actor akActor) global
     function ClearFrozenActor(Actor akActor) global
@@ -973,6 +975,14 @@ function MarkNPCFrozen(Actor akGuard, string asStep) global
     int report = __NewFrozenReport(akGuard, asStep, probedAt)
     ; Warn, not Info: this must show with DEBUG on too. The actor prints without calling into him.
     Warn(frozenAs + " " + akGuard + " (" + asStep + "; probed at: " + probedAt + "): his Papyrus object doesn't answer, RPB skips him until the next game load")
+    ; An NPC prisoner (her intake or her escort to the cell): finished by her prison without a call into her (#6)
+    if (akGuard != Game.GetPlayer() && RPB_API.GetPrisonManager().FindPrisonByPrisoner(akGuard))
+        int frozeHandle = ModEvent.Create("RPB_PrisonerFroze")
+        if (frozeHandle)
+            ModEvent.PushForm(frozeHandle, akGuard)
+            ModEvent.Send(frozeHandle)
+        endif
+    endif
     ; The magic effects on him (other mods' effects were stuck starting/finishing on a frozen clone): PO3 reads them engine
     ; side, without calling into his scripts
     MagicEffect[] effects = PO3_SKSEFunctions.GetActiveEffects(akGuard, true)
@@ -1220,6 +1230,44 @@ string function ActorNameNoCall(Actor akActor) global
 endFunction
 
 ; The 8 hex digits of @akForm's FormID, read from its printed form ("[Actor < (FF000D8C)>]"): no call into it
+; @akForm's FormID as GetFormID() returns it (signed), read from its printed form: no call into it (a frozen actor's
+; GetFormID() waits for good, round 115). 0 when it can't be read
+int function FormIdIntNoCall(Form akForm) global
+    string hex = FormIdNoCall(akForm)
+    if (StringUtil.GetLength(hex) != 8)
+        return 0
+    endif
+    string digits = "0123456789ABCDEF"
+    int value = 0
+    int i = 0
+    while (i < 8)
+        int digit = StringUtil.Find(digits, StringUtil.GetNthChar(hex, i))
+        if (digit < 0)
+            return 0
+        endif
+        value = Math.LogicalOr(Math.LeftShift(value, 4), digit)
+        i += 1
+    endWhile
+    return value
+endFunction
+
+;/
+    One entry of the prisoners' history (JDB .rpb_root.prisonerHistory, an array of maps): who, where, how it ended, when.
+    Kept for the dead too (the mod author, 2026-10-12: "Died at the intake in <prison> on <date>", later "Executed on..."):
+    about 20 fields, under 1 KB each. Nothing reads it yet (the MCM's)
+/;
+function AppendPrisonerHistory(int aiEntry) global
+    if (!aiEntry)
+        return
+    endif
+    int history = JDB.solveObj(".rpb_root.prisonerHistory")
+    if (!history)
+        history = JArray.object()
+        JDB.solveObjSetter(".rpb_root.prisonerHistory", history, true)
+    endif
+    FastArray_AddObject(history, aiEntry)
+endFunction
+
 string function FormIdNoCall(Form akForm) global
     string printed = akForm as string
     int open = StringUtil.Find(printed, "(")

@@ -1192,7 +1192,10 @@ function PlayQueued()
         string queuedType = self.GetSceneType(nextScene)
         if (queuedType == CATEGORY_ESCORT_TO_JAIL || queuedType == CATEGORY_ESCORT_TO_CELL)
             Actor queuedEscortee = self.GetSceneNthReferenceOfType(nextScene, "Escortee") as Actor
-            if (!queuedEscortee || queuedEscortee.IsDeleted() || queuedEscortee.IsDisabled() || queuedEscortee.IsDead())
+            ; No call into a frozen one: this queue is every Scene's, and her IsDeleted() held it for good (her escort to the
+            ; cell never started after her strip, 2026-10-12). Her death is read without a call
+            bool escorteeFrozen = RPB_Utility.IsFrozenNPC(queuedEscortee)
+            if (!queuedEscortee || RPB_Utility.IsDeadNoCall(queuedEscortee) || (!escorteeFrozen && (queuedEscortee.IsDeleted() || queuedEscortee.IsDisabled())))
                 Info("SceneManager: " + nextScene + " dropped: its escortee " + queuedEscortee + " is gone")
                 __isScenePlaying = false
                 if (nextAliases)
@@ -1207,11 +1210,11 @@ function PlayQueued()
             ; nowhere when it resumed (2026-10-08). The same as a fight before the cuffs: the arrest is cancelled
             ; Cuffed by the arrest and the cuffs gone since (2026-10-11: the player's went missing during a takeover, another
             ; mod's unequip at that moment; the escort was dropped and the arrest cancelled as "never cuffed"): put back on
-            if (queuedType == CATEGORY_ESCORT_TO_JAIL && RPB_Utility.IsActorArrested(queuedEscortee) && !RPB_Utility.IsCuffed(queuedEscortee) && RPB_API.GetArrest().WasRestrainedByArrest(queuedEscortee))
+            if (queuedType == CATEGORY_ESCORT_TO_JAIL && !escorteeFrozen && RPB_Utility.IsActorArrested(queuedEscortee) && !RPB_Utility.IsCuffed(queuedEscortee) && RPB_API.GetArrest().WasRestrainedByArrest(queuedEscortee))
                 RPB_Utility.LogWarn(queuedEscortee + "'s cuffs are gone although the arrest put them on: put back on before " + nextScene, "SceneManager::PlayQueued")
                 RPB_Utility.EquipCuffs(queuedEscortee)
             endif
-            if (queuedType == CATEGORY_ESCORT_TO_JAIL && RPB_Utility.IsActorArrested(queuedEscortee) && !RPB_Utility.IsCuffed(queuedEscortee))
+            if (queuedType == CATEGORY_ESCORT_TO_JAIL && !escorteeFrozen && RPB_Utility.IsActorArrested(queuedEscortee) && !RPB_Utility.IsCuffed(queuedEscortee))
                 Info("SceneManager: " + nextScene + " dropped: " + queuedEscortee + " was never cuffed (the confrontation stopped before the cuffs), the arrest is cancelled")
                 __isScenePlaying = false
                 if (nextAliases)
@@ -1287,7 +1290,7 @@ function PlayQueued()
                     ; The escortee still attacked by someone outside the law while the guard isn't fighting: he goes after
                     ; them (a bounty hunter kept at the cuffed player, the guard stood by, and this gave up after the cap and
                     ; moved them to the prison, 2026-10-06). The wait counts from his last such turn
-                    if (escort && escortee && escortee.IsInCombat() && !RPB_Utility.IsFrozenNPC(escort) && !escort.IsInCombat())
+                    if (escort && escortee && !RPB_Utility.IsFrozenNPC(escortee) && escortee.IsInCombat() && !RPB_Utility.IsFrozenNPC(escort) && !escort.IsInCombat())
                         if (RPB_Utility.SendCaptorAfterAttacker(escort, escortee))
                             combatWaited = 0
                         endif

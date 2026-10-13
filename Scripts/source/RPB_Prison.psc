@@ -275,7 +275,6 @@ scriptname RPB_Prison extends RPB_Entity
     event OnPrisonerTeleportedToPrison(RPB_Prisoner apPrisoner)
     event OnPrisonerTeleportedToCell(RPB_Prisoner apPrisoner, bool abImprisonPrisoner)
     event OnPrisonerDying(RPB_Prisoner apPrisoner, Actor akKiller)
-    event OnPrisonerDeath(RPB_Prisoner apPrisoner, Actor akKiller)
     event OnEscortPrisonerToJailBegin(RPB_ActorBase apActor, Actor akEscort)
     event OnEscortPrisonerToJailEnd(RPB_ActorBase apActor, Actor akEscort)
     event OnEscortPrisonerToCellBegin(RPB_Prisoner apPrisoner, Actor akEscort)
@@ -3231,7 +3230,7 @@ function __FinishIntakeForTimeSkip()
     int i = 0
     while (i < actors.Length)
         Actor npc = actors[i] as Actor
-        if (npc && !(frozenMap && RPB_Utility.IsListedFrozen(frozenMap, npc)))
+        if (npc && !(frozenMap && RPB_Utility.IsListedFrozen(frozenMap, npc)) && !RPB_Utility.IsDeadNoCall(npc))
             RPB_Prisoner prisoner = Prisoners.AtKey(npc)
             if (prisoner && !prisoner.IsPlayer() && !prisoner.IsImprisoned && prisoner.TimeOfArrest > 0.0)
                 ; Noted first: the stopped Scene's own end still comes from the engine a moment later, and its escort end
@@ -3959,9 +3958,7 @@ event OnPrisonerDying(RPB_Prisoner apPrisoner, Actor akKiller)
     
 endEvent
 
-event OnPrisonerDeath(RPB_Prisoner apPrisoner, Actor akKiller)
 
-endEvent
 event OnEscortPrisonerToJailBegin(RPB_ActorBase apActor, Actor akEscort)
     ; Escorted only cuffed (the queue already drops an uncuffed arrestee's escort, SceneManager.PlayQueued): one that began
     ; anyway is the same as a confrontation stopped before the cuffs, and the arrest is cancelled (cuffed here instead, the
@@ -4592,6 +4589,115 @@ function __StampIntake(int aiEntry, string asStep)
 endFunction
 
 ; RPB_PrisonMonitor's "Intake" wake
+;/
+    An NPC prisoner found frozen in the prison flow (RPB_Utility.MarkNPCFrozen -> RPB_EventManager.OnPrisonerFroze; #6).
+    Her Scenes go on (the engine still plays them and her packages; only calls into her scripts hang: the mod author,
+    2026-10-12, ending them and letting her guard go left her standing where she was), so only what RPB does for her at
+    their steps is replaced (FrozenPrisonerSceneStep), and her imprisonment, which needs her scripts, waits for the next
+    load (__FinishFrozenImprisonments)
+/;
+function OnPrisonerFroze(Actor akPrisoner)
+    if (!akPrisoner || !Prisoners.AtKey(akPrisoner) || RPB_StorageVars.GetBoolOnReference("Imprisoned", akPrisoner, "Jail"))
+        return ; not this prison's, or in her cell already (the loops pass over her until the next load)
+    endif
+    int pending = JDB.solveObj(".rpb_root.frozenImprisonments")
+    if (!pending)
+        pending = JFormMap.object()
+        JDB.solveObjSetter(".rpb_root.frozenImprisonments", pending, true)
+    endif
+    FastFormMap_SetForm(pending, akPrisoner, self.GetReference())
+    Info("[" + Name + "] " + RPB_Utility.ActorLabelNoCall(akPrisoner) + " froze in the prison flow: her Scenes go on, RPB's steps for her done without calls into her, her imprisonment after the next load")
+endFunction
+
+;/
+    A step of a frozen prisoner's Scene that RPB_EventManager left her out of (it calls into her): what of it needs no call
+    into her, done here. The escort to jail's end: the intake can't be played on her (stripping her calls into her), so
+    she's escorted to her cell at once (the after-load imprisonment strips her if due). The escort to the cell's "Lock
+    Cell": the door closed and locked. Her cell, its door and the guard's waiting spot come from storage and the cell
+/;
+function FrozenPrisonerSceneStep(Actor akPrisoner, string asScene, string asSceneEvent, string asSceneSecondaryEvent, Actor akGuard)
+    string sceneType = SceneManager.GetSceneType(asScene)
+    RPB_JailCell jailCell = RPB_StorageVars.GetFormOnReference("Cell", akPrisoner, "Jail") as RPB_JailCell
+    if (sceneType == SceneManager.CATEGORY_ESCORT_TO_JAIL && asSceneEvent == SceneManager.EVENT_ESCORT_END && asSceneSecondaryEvent == "null")
+        if (!jailCell || !akGuard || RPB_Utility.IsFrozenNPC(akGuard))
+            return ; the after-load imprisonment (MoveToCell) takes her there
+        endif
+        Info("[" + Name + "] " + RPB_Utility.ActorLabelNoCall(akPrisoner) + " (frozen) reached the prison: escorted to her cell by " + akGuard + " without her intake")
+        SceneManager.StartEscortToCell( \
+            akEscortLeader          = akGuard, \
+            akEscortedPrisoner      = akPrisoner, \
+            akJailCellMarker        = jailCell, \
+            akJailCellDoor          = jailCell.EnsureCellDoor(), \
+            akEscortWaitingMarker   = jailCell.GetRandomMarker("Exterior") \
+        )
+    elseif (sceneType == SceneManager.CATEGORY_ESCORT_TO_CELL && asSceneEvent == SceneManager.EVENT_ESCORT_END && asSceneSecondaryEvent == "Unlock Cell")
+        ; The door the guard has come to open (left closed for her, the guard stood at it, 2026-10-12)
+        if (jailCell && jailCell.CellDoor)
+            if (akGuard && !RPB_Utility.IsFrozenNPC(akGuard))
+                Debug.SendAnimationEvent(akGuard, "IdleLockpick")
+            endif
+            jailCell.CellDoor.Unlock()
+            jailCell.CellDoor.Open()
+            Info("[" + Name + "] " + RPB_Utility.ActorLabelNoCall(akPrisoner) + " (frozen): her cell door unlocked and opened by the escort")
+        endif
+    elseif (sceneType == SceneManager.CATEGORY_ESCORT_TO_CELL && asSceneEvent == SceneManager.EVENT_ESCORT_END && asSceneSecondaryEvent == "Lock Cell")
+        if (jailCell && jailCell.CellDoor)
+            jailCell.CellDoor.Close()
+            jailCell.CellDoor.Lock()
+            if (akGuard && !RPB_Utility.IsFrozenNPC(akGuard))
+                Debug.SendAnimationEvent(akGuard, "IdleLockpick")
+            endif
+            Info("[" + Name + "] " + RPB_Utility.ActorLabelNoCall(akPrisoner) + " (frozen): her cell door closed and locked by the escort")
+        endif
+    endif
+endFunction
+
+; After a load (the freeze cleared): each frozen prisoner's flow goes on. A Scene of hers playing or queued (restored by the
+; load) finishes it as for anyone, now that she answers: moving her there broke it (moved into her cell, her guard's escort
+; went on to the cell and waited for her there for good, 2026-10-13). With none: in her cell, imprisoned as an escort to the
+; cell's end does; outside it, escorted there by her guard, or moved in when he can't (gone, frozen, or nobody there to see)
+function __FinishFrozenImprisonments()
+    int pending = JDB.solveObj(".rpb_root.frozenImprisonments")
+    if (!pending)
+        return
+    endif
+    Form prisonerForm = FastFormMap_NextKey(pending)
+    while (prisonerForm)
+        Form nextForm = FastFormMap_NextKey(pending, prisonerForm)
+        Actor prisonerActor = prisonerForm as Actor
+        if (FastFormMap_GetForm(pending, prisonerForm) == self.GetReference())
+            FastFormMap_RemoveKey(pending, prisonerForm)
+            RPB_Prisoner prisoner = Prisoners.AtKey(prisonerActor)
+            string current = SceneManager.GetCurrentScene()
+            Form[] inScene = SceneManager.GetSceneReferences(current)
+            bool sceneOn = (current != "" && inScene && inScene.Find(prisonerActor) >= 0) || SceneManager.HasQueuedSceneWithActor(prisonerActor)
+            if (prisoner && !RPB_Utility.IsDeadNoCall(prisonerActor) && !prisoner.IsImprisoned)
+                if (sceneOn)
+                    Info("[" + Name + "] " + prisoner.Name + " " + prisonerActor + " froze in the prison flow before the load: her Scenes go on (" + current + ")")
+                elseif (prisoner.IsInCell)
+                    Info("[" + Name + "] " + prisoner.Name + " " + prisonerActor + " froze in the prison flow before the load: imprisoned in her cell now")
+                    self.OnEscortPrisonerToCellEnd(prisoner, prisoner.JailCell, none)
+                else
+                    Actor guard = RPB_StorageVars.GetFormOnReference("Arrest Captor", prisonerActor, "Jail") as Actor
+                    if (guard && prisonerActor.Is3DLoaded() && guard.Is3DLoaded() && !RPB_Utility.IsDeadNoCall(guard) && !RPB_Utility.IsFrozenNPC(guard))
+                        Info("[" + Name + "] " + prisoner.Name + " " + prisonerActor + " froze in the prison flow before the load, outside her cell: escorted there by " + guard)
+                        self.EscortPrisonerToCell(prisoner, guard)
+                    else
+                        Info("[" + Name + "] " + prisoner.Name + " " + prisonerActor + " froze in the prison flow before the load, outside her cell, no guard to escort her: moved in")
+                        prisoner.MoveToCell()
+                    endif
+                endif
+            endif
+        endif
+        prisonerForm = nextForm
+    endWhile
+endFunction
+
+; The prison @akPrisoner is pending in (one shared map for every prison)
+RPB_Prison function FindPrisonOfPending(Actor akPrisoner)
+    return PrisonManager.FindPrisonByPrisoner(akPrisoner)
+endFunction
+
 function __ProcessIntakeWatch()
     if (!__intakeWatch || !JValue.isExists(__intakeWatch))
         return

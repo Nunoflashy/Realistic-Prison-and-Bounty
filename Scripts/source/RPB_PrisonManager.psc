@@ -348,8 +348,12 @@ endFunction
 ;                          Queries
 ; ==========================================================
 
+; No call into @akPrisonerActor (his FormID read from his printed form): this runs on frozen actors too, in shared loops
 RPB_Prison function FindPrisonByPrisoner(Actor akPrisonerActor)
-    string prisonHold = RPB_StorageVars.GetString(akPrisonerActor.GetFormID(), "PrisonManager")
+    if (!akPrisonerActor)
+        return none
+    endif
+    string prisonHold = RPB_StorageVars.GetString(RPB_Utility.FormIdIntNoCall(akPrisonerActor), "PrisonManager")
 
     if (prisonHold)
         return self.GetPrison(prisonHold)
