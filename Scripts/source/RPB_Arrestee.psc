@@ -1326,7 +1326,7 @@ bool __refreshCuffsPose ; OnUpdate's first tick after a reattach: the cuffs put 
     area: no watch, no nudge). A second call while it runs only moves its next tick
 /;
 function ResumeEscortWatch(string asWhy)
-    if (self.IsPlayer() || RPB_Utility.IsFrozenNPC(this))
+    if (self.IsPlayer() || RPB_Utility.IsFrozenNPC(this) || RPB_Utility.HasFrozenImprisonmentPending(this))
         return
     endif
     __refreshCuffsPose = true
@@ -1532,6 +1532,13 @@ float property ESCORT_LEASH_DISTANCE = 700.0 autoreadonly
 float property PENDING_LEASH_DISTANCE = 2500.0 autoreadonly
 
 event OnUpdate()
+    float startedIn = RPB_Utility.CrimeLineStamp() ; the load this tick began in (JContainers only, no frame)
+    ; Frozen in the prison flow, her imprisonment finished after the load (RPB_Prison.__FinishFrozenImprisonments): her escort
+    ; to jail ended without my hearing of it, and its leash pulled her out of her cell to her guard right after the load,
+    ; who then escorted her back in (2026-10-13, test 200 saved in the cell)
+    if (RPB_Utility.HasFrozenImprisonmentPending(this))
+        return
+    endif
     if (__refreshCuffsPose)
         __refreshCuffsPose = false
         if (RPB_Utility.RefreshCuffsPose(this))
@@ -1637,6 +1644,12 @@ event OnUpdate()
         ; Pulled back even while he's fighting: held off (round 40), a prisoner waiting out the fight could walk away as far as
         ; they liked, and the resumed escort then played out oddly from there. Running off while pending is meant to become
         ; an escape attempt with its own charge instead of a pull.
+        ; A tick stuck in a call into me when I froze is saved with the game and resumes after the load past the check above:
+        ; it pulled me out of my cell to my guard (2026-10-13, test 200 saved in the cell, the frozen imprisonment pending)
+        if (RPB_Utility.CrimeLineStamp() != startedIn || RPB_Utility.HasFrozenImprisonmentPending(this))
+            Debug("["+ Name +"] Arrestee::OnUpdate", Name + ": this tick began before a load (or my imprisonment is pending), no pull")
+            return
+        endif
         this.MoveTo(Captor.GetActor())
         ; The move drops the cuffs' pose as a load door does (2026-10-11: pulled to the guard right after a fight, escorted
         ; cuffed with the hands at the sides until a jump)

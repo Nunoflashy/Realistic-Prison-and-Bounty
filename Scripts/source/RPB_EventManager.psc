@@ -448,24 +448,20 @@ endEvent
 ;/
     A surrender Scene's event to its surrenderer (@akParams: the guards she surrendered to, at its begin), as the arrest and
     prison ones: per member, on a stack of her own, the guard lists carried on her pending event (a mod event can't carry an
-    array); @abTrackBatch (its end) returns the batch the Scene manager waits for. Otherwise the old way, while the two are
-    compared: handled here, and 0. NPCs surrender too, and group surrenders will have one event per surrenderer.
+    array); @abTrackBatch (its end) returns the batch the Scene manager waits for. NPCs surrender too, and group surrenders
+    will have one event per surrenderer.
 /;
 int function SendSurrenderSceneEvent(string asScene, string asSceneEvent, Actor akSurrenderer, Actor akSurrendererCaptor, string asSceneSecondaryEvent = "null", Form[] akParams = none, Form[] akParams2 = none, bool abTrackBatch = false)
     if (!akSurrenderer)
         RPB_Utility.LogError("No surrenderer for " + asScene + "'s " + asSceneEvent, "EventManager::SendSurrenderSceneEvent")
         return 0
     endif
-    if (RPB_Utility.IsSceneEventsPerMember())
-        Form[] members = new Form[1]
-        members[0] = akSurrenderer
-        return self.__DispatchSceneEvent(SCENE_EVENT_SURRENDER, asScene, asSceneEvent, members, akSurrendererCaptor, asSceneSecondaryEvent, abTrackBatch, akParams, akParams2)
-    endif
-    self.__SurrenderSceneForMember(asScene, asSceneEvent, akSurrenderer, akSurrendererCaptor, asSceneSecondaryEvent, akParams, akParams2)
-    return 0
+    Form[] members = new Form[1]
+    members[0] = akSurrenderer
+    return self.__DispatchSceneEvent(SCENE_EVENT_SURRENDER, asScene, asSceneEvent, members, akSurrendererCaptor, asSceneSecondaryEvent, abTrackBatch, akParams, akParams2)
 endFunction
 
-; The surrenderer's part of a surrender Scene's event. @aiNumber: the event's number per member (0 the old way)
+; The surrenderer's part of a surrender Scene's event. @aiNumber: the event's number (0: unordered, see __IsSceneEventPending)
 function __SurrenderSceneForMember(string asScene, string asSceneEvent, Actor akSurrenderer, Actor akSurrendererCaptor, string asSceneSecondaryEvent, Form[] akParams, Form[] akParams2, int aiNumber = 0)
     if (RPB_Utility.IsFrozenNPC(akSurrenderer)) ; her surrender's steps call into her
         RPB_Utility.LogWarn(akSurrenderer + " is frozen: left out of " + asScene + "'s " + asSceneEvent + " until the next load", "EventManager::__SurrenderSceneForMember")
@@ -489,9 +485,8 @@ int function SendArrestSceneEvent(string asScene, string asSceneEvent, Actor akA
 endFunction
 
 ;/
-    An arrest Scene's event to each of its arrestees. Per member (RPB_Utility.IsSceneEventsPerMember), each on a stack of her
-    own (__DispatchSceneEvent); @abTrackBatch (a Scene's end): returns the batch the Scene manager waits for. Otherwise the
-    old way, while the two are compared: each one's handler here, on the Scene manager's stack, and 0.
+    An arrest Scene's event to each of its arrestees, each on a stack of her own (__DispatchSceneEvent); @abTrackBatch (a
+    Scene's end): returns the batch the Scene manager waits for.
 /;
 int function SendArrestSceneBulkEvent(string asScene, string asSceneEvent, Form[] akArrestees, Actor akAuthority, string asSceneSecondaryEvent = "null", bool abTrackBatch = false)
     if (!akArrestees || akArrestees.Length == 0)
@@ -499,20 +494,11 @@ int function SendArrestSceneBulkEvent(string asScene, string asSceneEvent, Form[
         return 0
     endif
 
-    if (RPB_Utility.IsSceneEventsPerMember())
-        return self.__DispatchSceneEvent(SCENE_EVENT_ARREST, asScene, asSceneEvent, akArrestees, akAuthority, asSceneSecondaryEvent, abTrackBatch)
-    endif
-
-    int i = 0
-    while (i < akArrestees.Length)
-        self.__ArrestSceneForMember(asScene, asSceneEvent, akArrestees[i] as Actor, akAuthority, asSceneSecondaryEvent, akArrestees.Length == 1)
-        i += 1
-    endWhile
-    return 0
+    return self.__DispatchSceneEvent(SCENE_EVENT_ARREST, asScene, asSceneEvent, akArrestees, akAuthority, asSceneSecondaryEvent, abTrackBatch)
 endFunction
 
 ; One arrestee's part of an arrest Scene's event. @abOnlyMember: she's the Scene's only arrestee, so her arrest being over
-; ends the Scene. @aiNumber: the event's number with Scene events per member (0 the old way), see __IsSceneEventPending
+; ends the Scene. @aiNumber: the event's number (0: unordered), see __IsSceneEventPending
 function __ArrestSceneForMember(string asScene, string asSceneEvent, Actor akArrestee, Actor akAuthority, string asSceneSecondaryEvent, bool abOnlyMember, int aiNumber = 0)
     if (!akArrestee)
         return
@@ -664,30 +650,18 @@ int function SendPrisonSceneEvent(string asScene, string asSceneEvent, Actor akP
     return self.SendPrisonSceneBulkEvent(asScene, asSceneEvent, members, akAuthority, asSceneSecondaryEvent, abTrackBatch)
 endFunction
 
-;/
-    A prison Scene's event to each of its prisoners, as SendArrestSceneBulkEvent: per member on stacks of their own, or the
-    old way (each one's handler here) while the two are compared.
-/;
+; A prison Scene's event to each of its prisoners, as SendArrestSceneBulkEvent: each on a stack of her own
 int function SendPrisonSceneBulkEvent(string asScene, string asSceneEvent, Form[] akPrisoners, Actor akAuthority, string asSceneSecondaryEvent = "null", bool abTrackBatch = false)
     if (!akPrisoners || akPrisoners.Length == 0)
         RPB_Utility.LogError("No prisoners provided for bulk scene event!", "EventManager::SendPrisonSceneBulkEvent")
         return 0
     endif
 
-    if (RPB_Utility.IsSceneEventsPerMember())
-        return self.__DispatchSceneEvent(SCENE_EVENT_PRISON, asScene, asSceneEvent, akPrisoners, akAuthority, asSceneSecondaryEvent, abTrackBatch)
-    endif
-
-    int i = 0
-    while (i < akPrisoners.Length)
-        self.__PrisonSceneForMember(asScene, asSceneEvent, akPrisoners[i] as Actor, akAuthority, asSceneSecondaryEvent)
-        i += 1
-    endWhile
-    return 0
+    return self.__DispatchSceneEvent(SCENE_EVENT_PRISON, asScene, asSceneEvent, akPrisoners, akAuthority, asSceneSecondaryEvent, abTrackBatch)
 endFunction
 
-; One prisoner's part of a prison Scene's event: her prison found, and her step handled. @aiNumber: the event's number with
-; Scene events per member (0 the old way), see __IsSceneEventPending
+; One prisoner's part of a prison Scene's event: her prison found, and her step handled. @aiNumber: the event's number (0:
+; unordered), see __IsSceneEventPending
 function __PrisonSceneForMember(string asScene, string asSceneEvent, Actor akPrisoner, Actor akAuthority, string asSceneSecondaryEvent, int aiNumber = 0)
     if (!akPrisoner)
         return
@@ -742,9 +716,8 @@ function __FlowMarkSceneEvent(string asScene, string asSceneEvent, string asScen
     if (!RPB_Utility.IsFlowActive())
         return
     endif
-    string how = RPB_Utility.string_if(RPB_Utility.IsSceneEventsPerMember(), "own stack", "inline")
     string secondary = RPB_Utility.string_if(asSceneSecondaryEvent != "null" && asSceneSecondaryEvent != "", " (" + asSceneSecondaryEvent + ")", "")
-    RPB_Utility.FlowMark(asScene + " " + asSceneEvent + secondary + " handled for " + akMember + ", " + how)
+    RPB_Utility.FlowMark(asScene + " " + asSceneEvent + secondary + " handled for " + akMember)
 endFunction
 
 ; ==========================================================
@@ -909,7 +882,7 @@ Form[] function __PendingSceneEventForms(int aiNumber, string asKey)
     return RPB_Memory.FastArray_ToFormArray(forms)
 endFunction
 
-; Event @aiNumber not handled yet (0, the old way or no ordering slot: always)
+; Event @aiNumber not handled yet (0, no ordering slot: always)
 bool function __IsSceneEventPending(int aiNumber)
     if (aiNumber <= 0)
         return true
@@ -1044,7 +1017,7 @@ int function __DispatchSceneEvent(int aiKind, string asScene, string asSceneEven
             else
                 RPB_Utility.LogWarn("Every ordering slot is busy: " + member + "'s " + asScene + " " + asSceneEvent + " goes unordered", "EventManager::__DispatchSceneEvent")
                 if (aiKind == SCENE_EVENT_SURRENDER)
-                    ; Its guard lists ride on the pending event, which needs a number: the old way for this one
+                    ; Its guard lists ride on the pending event, which needs a number: handled here, on this stack
                     self.__SurrenderSceneForMember(asScene, asSceneEvent, member, akAuthority, asSceneSecondaryEvent, akParams, akParams2)
                     return batch
                 endif

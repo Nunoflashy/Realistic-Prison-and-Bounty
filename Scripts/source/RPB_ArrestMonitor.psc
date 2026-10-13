@@ -104,7 +104,8 @@ event OnUpdate()
             Form nextEscortee = FastFormMap_NextKey(__escorts, escortee)
             Actor escorteeActor = escortee as Actor
             ; Out of the arrest some way nothing told me about (the list's index: no call into her)
-            if (!escorteeActor || !Arrestees.AtKey(escorteeActor))
+            ; Or frozen in the prison flow, her imprisonment pending (her prison finishes it after the load, not her escort)
+            if (!escorteeActor || !Arrestees.AtKey(escorteeActor) || RPB_Utility.HasFrozenImprisonmentPending(escorteeActor))
                 FastFormMap_RemoveKey(__escorts, escortee)
             else
                 self.__CheckStoppedShort(escorteeActor, FastFormMap_GetObject(__escorts, escortee))

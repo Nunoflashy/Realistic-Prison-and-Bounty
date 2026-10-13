@@ -2317,7 +2317,7 @@ endFunction
     over (RPB_EventManager.TakeOverFrozenMembers: this end's step done the frozen way, the escort to the cell queued at the
     escort to jail's end) and the queue goes on without her; all answering, they're slow (a heavy script load), not frozen, and I keep waiting, up
     to the longest wait (RPB_Utility.SceneEventGiveUpAfter). The waits are counted, so time in a menu doesn't count.
-    @aiBatch 0 (the old way, or no members): nothing to wait for, the handlers already ran on this stack.
+    @aiBatch 0 (no members, or no free batch slot): nothing to wait for.
 /;
 function __AwaitSceneEndHandlers(string asScene, int aiBatch, Form[] akMembers, Actor akAuthority)
     if (!aiBatch)

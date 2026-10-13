@@ -4654,8 +4654,9 @@ endFunction
 
 ; After a load (the freeze cleared): each frozen prisoner's flow goes on. A Scene of hers playing or queued (restored by the
 ; load) finishes it as for anyone, now that she answers: moving her there broke it (moved into her cell, her guard's escort
-; went on to the cell and waited for her there for good, 2026-10-13). With none: in her cell, imprisoned as an escort to the
-; cell's end does; outside it, escorted there by her guard, or moved in when he can't (gone, frozen, or nobody there to see)
+; went on to the cell and waited for her there for good, 2026-10-13). With none: in her cell, her intake (skipped while she
+; was frozen) done there by her guard, then imprisoned; outside it, escorted there by her guard with the intake after, or
+; moved in when he can't (gone, frozen, or nobody there to see; the move strips her itself)
 function __FinishFrozenImprisonments()
     int pending = JDB.solveObj(".rpb_root.frozenImprisonments")
     if (!pending)
@@ -4666,22 +4667,43 @@ function __FinishFrozenImprisonments()
         Form nextForm = FastFormMap_NextKey(pending, prisonerForm)
         Actor prisonerActor = prisonerForm as Actor
         if (FastFormMap_GetForm(pending, prisonerForm) == self.GetReference())
+            ; Her arrest never heard her escort to jail end (no calls into her then): told now, before she leaves the pending
+            ; list, or its leash pulls her out of her cell to her guard (RPB_Arrestee.OnUpdate, 2026-10-13). Not while her
+            ; escort to jail itself is what the load restored
+            RPB_Arrestee arrestState = API.Arrest.Arrestees.AtKey(prisonerActor)
+            string restored = SceneManager.GetCurrentScene()
+            bool escortToJailOn = SceneManager.IsSceneOfType(restored, SceneManager.CATEGORY_ESCORT_TO_JAIL) && SceneManager.GetSceneReferences(restored).Find(prisonerActor) >= 0
+            if (arrestState && !escortToJailOn)
+                arrestState.EndEscortWatch() ; as the escort to jail's end does (EndArrestEscortWatch): arrived, its watch off
+            endif
             FastFormMap_RemoveKey(pending, prisonerForm)
             RPB_Prisoner prisoner = Prisoners.AtKey(prisonerActor)
             string current = SceneManager.GetCurrentScene()
             Form[] inScene = SceneManager.GetSceneReferences(current)
             bool sceneOn = (current != "" && inScene && inScene.Find(prisonerActor) >= 0) || SceneManager.HasQueuedSceneWithActor(prisonerActor)
             if (prisoner && !RPB_Utility.IsDeadNoCall(prisonerActor) && !prisoner.IsImprisoned)
+                ; The rest of the arrival the frozen way skipped (it writes to her own script, OnEscortPrisonerToJailEnd): her
+                ; belongings chest above all, or her strip fails ("hasn't had a belongings container assigned", 2026-10-13), and
+                ; her arrival noted. Only what's missing
+                if (!escortToJailOn)
+                    self.PrepareArrival(prisoner)
+                    prisoner.OnEscortedToPrison(none)
+                endif
                 if (sceneOn)
                     Info("[" + Name + "] " + prisoner.Name + " " + prisonerActor + " froze in the prison flow before the load: her Scenes go on (" + current + ")")
-                elseif (prisoner.IsInCell)
-                    Info("[" + Name + "] " + prisoner.Name + " " + prisonerActor + " froze in the prison flow before the load: imprisoned in her cell now")
-                    self.OnEscortPrisonerToCellEnd(prisoner, prisoner.JailCell, none)
                 else
                     Actor guard = RPB_StorageVars.GetFormOnReference("Arrest Captor", prisonerActor, "Jail") as Actor
-                    if (guard && prisonerActor.Is3DLoaded() && guard.Is3DLoaded() && !RPB_Utility.IsDeadNoCall(guard) && !RPB_Utility.IsFrozenNPC(guard))
-                        Info("[" + Name + "] " + prisoner.Name + " " + prisonerActor + " froze in the prison flow before the load, outside her cell: escorted there by " + guard)
-                        self.EscortPrisonerToCell(prisoner, guard)
+                    bool guardFine = guard && prisonerActor.Is3DLoaded() && guard.Is3DLoaded() && !RPB_Utility.IsDeadNoCall(guard) && !RPB_Utility.IsFrozenNPC(guard)
+                    if (prisoner.IsInCell && guardFine && self.__IntakeLeftInCell(prisoner))
+                        Info("[" + Name + "] " + prisoner.Name + " " + prisonerActor + " froze in the prison flow before the load: her intake done in her cell now by " + guard)
+                        prisoner.SetBool("Intake In Cell", true)
+                        self.ContinueIntakeInCell(prisoner, guard)
+                    elseif (prisoner.IsInCell)
+                        Info("[" + Name + "] " + prisoner.Name + " " + prisonerActor + " froze in the prison flow before the load: imprisoned in her cell now" + string_if(self.__IntakeLeftInCell(prisoner), " (her intake left undone: no guard of hers here)", ""))
+                        self.OnEscortPrisonerToCellEnd(prisoner, prisoner.JailCell, none)
+                    elseif (guardFine)
+                        Info("[" + Name + "] " + prisoner.Name + " " + prisonerActor + " froze in the prison flow before the load, outside her cell: escorted there by " + guard + ", her intake after")
+                        self.EscortToCellForIntake(prisoner, guard)
                     else
                         Info("[" + Name + "] " + prisoner.Name + " " + prisonerActor + " froze in the prison flow before the load, outside her cell, no guard to escort her: moved in")
                         prisoner.MoveToCell()
@@ -4834,13 +4856,25 @@ function __RecoverStalledIntake(Actor akPrisoner, Actor akGuard, string asReason
     if (entry)
         replays = FastMap_GetInt(entry, "replays")
     endif
+    ; Finished on another stack meanwhile (her last in-cell step's end imprisons her and stops the watch): this ran a second
+    ; later all the same, queued her strip and an escort to the cell she was already locked in, and she was escorted again
+    ; once imprisoned (2026-10-13 17:53:09)
+    if (prisoner.IsImprisoned || !__intakeWatch || !FastFormMap_HasKey(__intakeWatch, akPrisoner))
+        return
+    endif
     if (asKind != "guard" && captorAnswers && replays < 1)
         if (entry)
             FastMap_SetInt(entry, "replays", replays + 1)
         endif
         Info("["+ Name +"] Prison: " + asReason + ": the rest of " + akPrisoner + "'s intake played again with " + captor)
         SceneManager.EndSceneWithActor(akPrisoner, asReason)
-        self.ResumePrisonFlowWith(prisoner, captor)
+        ; An intake left for her cell (a takeover's, or a frozen prisoner's after the load) is played again there: the
+        ; prison flow's replay starts it over in the intake area, with an escort to the cell
+        if (prisoner.GetBool("Intake In Cell"))
+            self.ContinueIntakeInCell(prisoner, captor)
+        else
+            self.ResumePrisonFlowWith(prisoner, captor)
+        endif
         return
     endif
     if (arrestee && captor)

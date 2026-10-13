@@ -199,11 +199,10 @@ scriptname RPB_Utility hidden
     int function GetSlotMask(string bodyPart) global
     bool function IsFlowProfilingEnabled() global
     bool function IsFlowActive() global
+    bool function HasFrozenImprisonmentPending(Actor akActor) global
     bool function IsFreezePointArmed() global
     function ArmFreezePoint(string asPoint) global
     function FreezePoint(Actor akActor, string asPoint) global
-    bool function IsSceneEventsPerMember() global
-    function SetSceneEventsPerMember(bool abOn) global
     float function SceneEventProbeAfter() global
     function SetSceneEventProbeAfter(float afSeconds) global
     float function SceneEventGiveUpAfter() global
@@ -4424,6 +4423,14 @@ bool function IsFlowActive() global
     return JDB.solveInt(".rpb_root.storage.Profile.Active") != 0
 endFunction
 
+; @akActor froze in the prison flow and her imprisonment waits for the next load (RPB_Prison.OnPrisonerFroze /
+; __FinishFrozenImprisonments): her arrest's own watches (the escort to jail's leash and stall checks) stand down, nothing
+; told her arrest that her escort was over. No call into her
+bool function HasFrozenImprisonmentPending(Actor akActor) global
+    int pending = JDB.solveObj(".rpb_root.frozenImprisonments")
+    return akActor && pending && FastFormMap_HasKey(pending, akActor)
+endFunction
+
 ;/
     Freeze points (test-only), for the tests that depend on timing: a freeze has to land between two particular calls,
     which by hand (the prisoner freeze key) is luck. A test arms a point by name (ArmFreezePoint); RPB's code names its
@@ -4432,7 +4439,7 @@ endFunction
     key's hold, released by that key), and FreezePoint returns once the hold holds, so the code's next call into her waits
     on it as on a real freeze. Once per arming; a load disarms it (RPB_ConfigAlias). Unarmed, a point costs one JDB read.
     The points so far: every Scene event's member handler, "<Scene> <event>[ (<secondary event>)]"
-    (RPB_EventManager.__PrisonSceneForMember / __ArrestSceneForMember), the old way and per member alike.
+    (RPB_EventManager.__PrisonSceneForMember / __ArrestSceneForMember / __SurrenderSceneForMember).
 /;
 bool function IsFreezePointArmed() global
     return JDB.solveStr(".rpb_root.testFreezePoint") != ""
@@ -4463,16 +4470,6 @@ function FreezePoint(Actor akActor, string asPoint) global
         looks += 1
     endWhile
     LogInfo("Freeze point '" + asPoint + "': " + akActor + " frozen " + (JDB.solveFlt(".rpbTest.prisonerHoldStart") != 0.0) + " before the code's next call into her", "Utility::FreezePoint")
-endFunction
-
-; Dev switch while Scene events per member (RPB_EventManager.__DispatchSceneEvent) are compared with the old way (each
-; member's handler on the Scene manager's stack). Off by default until the comparison is done
-bool function IsSceneEventsPerMember() global
-    return JDB.solveInt(".rpb_root.dev.sceneEventsPerMember") != 0
-endFunction
-
-function SetSceneEventsPerMember(bool abOn) global
-    JDB.solveIntSetter(".rpb_root.dev.sceneEventsPerMember", abOn as int, true)
 endFunction
 
 ;/

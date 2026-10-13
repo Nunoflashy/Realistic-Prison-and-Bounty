@@ -272,7 +272,7 @@ function SetTests()
     self.AddTest("184 - Benchmark: the Time Skip's NPC Releases on Its Own Stack vs by Event (6 bandits each; advances the clock a few days)", "Test_ReleaseByEventBenchmark", abChainable = false)
     self.AddTest("187 - Freeze Control, NPC: 156's Steps With a Bandit (moved 1500 away and back mid escort, ended by a reset; repeat it)", "Test_NpcFreeWalkControl", abChainable = false)
     self.AddTest("188 - Freeze Control, Alternating: 187 (NPC) and 156 (player) by turns, the same-session comparison (repeat it)", "Test_FreezeControlAlternating", abChainable = false)
-    self.AddTest("200 - Freeze Point: a Freezable Prisoner at Her Escort to Jail's End (arms it; then arrest one from test 181. Off: the queue hangs; per member: the strip and escort to the cell go on, the frozen way)", "Test_FreezePoint_EscortToJailEnd", abChainable = false)
+    self.AddTest("200 - Freeze Point: a Freezable Prisoner at Her Escort to Jail's End (arms it; then arrest one from test 181: the strip and escort to the cell should go on, the frozen way)", "Test_FreezePoint_EscortToJailEnd", abChainable = false)
     self.AddTest("201 - Freeze Point: a Freezable Prisoner at Her Strip's End (arms it; then arrest one from test 181)", "Test_FreezePoint_StripEnd", abChainable = false)
     self.AddTest("202 - Freeze Point: a Freezable Prisoner at Her Cell's Unlock (arms it; then arrest one from test 181)", "Test_FreezePoint_UnlockCell", abChainable = false)
     self.AddTest("199 - World Interaction: a Dead Body Found in Town (a townsperson killed near you, another finds her; the guard's \"go to jail\" should start RPB's arrest; needs DEV patch 015, in a hold's town)", "Test_WIDeadBody", abChainable = false)
@@ -13369,13 +13369,13 @@ endFunction
 ;/
     200-202: a freeze point armed (RPB_Utility.FreezePoint): the next freezable prisoner to reach it is frozen right there,
     before RPB's next call into her, every time (by hand, with the prisoner freeze key, it's luck). Nothing else is set up:
-    arrest a freezable NPC (test 181) and let the flow run; with the switch "Scene Events Per Member" off and on to compare.
+    arrest a freezable NPC (test 181) and let the flow run: the Scenes should go on, hers the frozen way.
     The prisoner freeze key releases her as usual.
 /;
 bool function __ArmFreezePoint(string asTest, string asPoint)
     self.RegisterForModEvent("RPB_TestFreezePoint", "OnTestFreezePoint")
     RPB_Utility.ArmFreezePoint(asPoint)
-    log(asTest + ": freeze point armed for '" + asPoint + "' (Scene events per member " + RPB_Utility.IsSceneEventsPerMember() + "): the next freezable prisoner to reach it is frozen there")
+    log(asTest + ": freeze point armed for '" + asPoint + "': the next freezable prisoner to reach it is frozen there")
     return assert_true(true)
 endFunction
 
