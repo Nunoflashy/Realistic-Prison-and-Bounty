@@ -272,6 +272,7 @@ function SetTests()
     self.AddTest("184 - Benchmark: the Time Skip's NPC Releases on Its Own Stack vs by Event (6 bandits each; advances the clock a few days)", "Test_ReleaseByEventBenchmark", abChainable = false)
     self.AddTest("187 - Freeze Control, NPC: 156's Steps With a Bandit (moved 1500 away and back mid escort, ended by a reset; repeat it)", "Test_NpcFreeWalkControl", abChainable = false)
     self.AddTest("188 - Freeze Control, Alternating: 187 (NPC) and 156 (player) by turns, the same-session comparison (repeat it)", "Test_FreezeControlAlternating", abChainable = false)
+    self.AddTest("203 - Benchmark: the Prison Lookup (FindPrisonByPrisoner) vs an Actor-Keyed Registry (its parts too, 3 rounds)", "Test_PrisonLookupBenchmark", abChainable = false)
     self.AddTest("200 - Freeze Point: a Freezable Prisoner at Her Escort to Jail's End (arms it; then arrest one from test 181: the strip and escort to the cell should go on, the frozen way)", "Test_FreezePoint_EscortToJailEnd", abChainable = false)
     self.AddTest("201 - Freeze Point: a Freezable Prisoner at Her Strip's End (arms it; then arrest one from test 181)", "Test_FreezePoint_StripEnd", abChainable = false)
     self.AddTest("202 - Freeze Point: a Freezable Prisoner at Her Cell's Unlock (arms it; then arrest one from test 181)", "Test_FreezePoint_UnlockCell", abChainable = false)
@@ -13856,6 +13857,120 @@ bool function __FastWrapperBenchmark(string asTest)
     return assert_true(true, asTest + ": see the log")
 endFunction
 
+;/
+    203: what the prison lookup costs (RPB_PrisonManager.FindPrisonByPrisoner, called for every prison Scene event and in the
+    shared loops): the registry by hold (__FindPrisonByPrisonerByHold, the old way, its GetPrison now cached too) against the
+    actor-keyed one (FindPrisonByPrisoner: one form map read, the prison's alias from a cache). First runs: 66ms vs 10.8ms
+    (the alias fetched each time), then 9.2ms vs 1.3ms (cached). The
+    player is registered in both for the run (to Haafingar's prison; anything there before is put back), and its parts are
+    timed too: the FormID parsed from the printed form (FormIdIntNoCall), the hold's string read, GetPrison's loop over the
+    slots, and GetFormID() (the call into the actor the parse replaced). N calls each, an empty loop subtracted, 3 rounds
+    with the order rotated. Checks that both lookups find the same prison
+/;
+bool function __PrisonLookupBenchmark(string asTest)
+    RPB_PrisonManager manager = RPB_API.GetPrisonManager()
+    Actor player = Game.GetPlayer()
+    RPB_Prison prison = manager.GetPrison("Haafingar")
+    if (!assert_true(prison != none, asTest + ": no Haafingar prison"))
+        return false
+    endif
+    int slot = 0
+    while (slot < manager.PrisonSlots && (manager.GetNthAlias(slot) as RPB_Prison) != prison)
+        slot += 1
+    endWhile
+    string registryKey = player.GetFormID() as string
+    string previousHold = RPB_StorageVars.GetString(registryKey, "PrisonManager")
+    RPB_StorageVars.SetString(registryKey, "Haafingar", "PrisonManager")
+    int keyed = JDB.solveObj(".rpb_root.prisonIdOfPrisoner")
+    if (!keyed)
+        keyed = JFormMap.object()
+        JDB.solveObjSetter(".rpb_root.prisonIdOfPrisoner", keyed, true)
+    endif
+    int previousSlot = FastFormMap_GetInt(keyed, player)
+    FastFormMap_SetInt(keyed, player, prison.GetID() + 1)
+
+    bool same = manager.FindPrisonByPrisoner(player) == prison && manager.__FindPrisonByPrisonerByHold(player) == prison
+
+    int iterations = 100
+    float[] totals = new float[7] ; 0 empty, 1 today, 2 keyed, 3 parse, 4 hold string, 5 GetPrison, 6 GetFormID
+    int round = 0
+    while (round < 3)
+        int part = 0
+        while (part < 7)
+            int which = (part + round * 2) % 7 ; rotated each round
+            float t = Utility.GetCurrentRealTime()
+            int i = 0
+            if (which == 0)
+                while (i < iterations)
+                    i += 1
+                endWhile
+            elseif (which == 1)
+                while (i < iterations)
+                    manager.__FindPrisonByPrisonerByHold(player)
+                    i += 1
+                endWhile
+            elseif (which == 2)
+                while (i < iterations)
+                    manager.FindPrisonByPrisoner(player)
+                    i += 1
+                endWhile
+            elseif (which == 3)
+                while (i < iterations)
+                    RPB_Utility.FormIdIntNoCall(player)
+                    i += 1
+                endWhile
+            elseif (which == 4)
+                while (i < iterations)
+                    RPB_StorageVars.GetString(registryKey, "PrisonManager")
+                    i += 1
+                endWhile
+            elseif (which == 5)
+                while (i < iterations)
+                    manager.GetPrison("Haafingar")
+                    i += 1
+                endWhile
+            else
+                while (i < iterations)
+                    player.GetFormID()
+                    i += 1
+                endWhile
+            endif
+            totals[which] = totals[which] + (Utility.GetCurrentRealTime() - t)
+            part += 1
+        endWhile
+        round += 1
+    endWhile
+
+    ; Put back what was there
+    if (previousHold == "")
+        RPB_StorageVars.DeleteVariable(registryKey, "PrisonManager")
+    else
+        RPB_StorageVars.SetString(registryKey, previousHold, "PrisonManager")
+    endif
+    if (previousSlot > 0)
+        FastFormMap_SetInt(keyed, player, previousSlot)
+    else
+        FastFormMap_RemoveKey(keyed, player)
+    endif
+
+    float calls = (iterations * 3) as float
+    float empty = totals[0] * 1000.0 / calls
+    string[] names = new string[7]
+    names[1] = "by hold (the old way)"
+    names[2] = "FindPrisonByPrisoner (actor-keyed)"
+    names[3] = "  part: FormIdIntNoCall"
+    names[4] = "  part: the hold's string read"
+    names[5] = "  part: GetPrison(\"Haafingar\") (slot " + slot + " of " + manager.PrisonSlots + ")"
+    names[6] = "  for reference: GetFormID() (a call into the actor)"
+    int k = 1
+    while (k < 7)
+        log(asTest + ": " + names[k] + ": " + (totals[k] * 1000.0 / calls - empty) + " ms per call")
+        k += 1
+    endWhile
+    log(asTest + ": the empty loop " + empty + " ms per pass, " + (calls as int) + " calls each; both lookups found " + prison + ": " + same)
+    return assert_true(same, asTest + ": the two lookups disagree")
+endFunction
+
 bool function __Scenario_FightAtConfrontationStart(string asTest)
     RPB_SceneManager sceneManager = RPB_API.GetSceneManager()
     RPB_Arrest arrest = RPB_API.GetArrest()
@@ -15189,7 +15304,7 @@ endFunction
 string __statelessTest = ""
 
 bool function __RunStatelessTest(string asTest)
-    if (asTest != "Test_ArrestWaitsWhileGuardFights_NoPackage" && asTest != "Test_CellDoorsDiagnostic" && asTest != "Test_LongAbsenceSetup" && asTest != "Test_LongAbsenceAdvance" && asTest != "Test_LongAbsenceVerify" && asTest != "Test_FallbackEscortToCellStopped_Player" && asTest != "Test_FallbackEscortToCellStopped_CloneGuard" && asTest != "Test_FightDuringEscort_NPC" && asTest != "Test_FightDuringEscort_Player" && asTest != "Test_GuardDiesInPrison_Player" && asTest != "Test_EscortToCellStopped_NoPackageLock" && StringUtil.Find(asTest, "Test_Surrender_") != 0 && asTest != "Test_FrozenGuardSkipped" && asTest != "Test_GuardDiesInPrison_NobodySees" && asTest != "Test_Escort_FreeWalk" && asTest != "Test_ToggleEscortToCell04" && asTest != "Test_CaptorFinishCycles_Calls" && asTest != "Test_CaptorFinishCycles_NoCalls" && asTest != "Test_CaptorFinishDetach_Calls" && asTest != "Test_CaptorFinishDetach_NoCalls" && asTest != "Test_Escort_FreeWalk_Control" && asTest != "Test_ActorKeys" && asTest != "Test_FrozenGuardCalls" && asTest != "Test_SimulatedFreezeCalls" && asTest != "Test_SimulatedFreezeAtCancel" && asTest != "Test_SpawnFreezableGuard" && asTest != "Test_AliasPackageControl" && asTest != "Test_FreezableEscort_Player" && asTest != "Test_FreezableEscort_NPC" && asTest != "Test_LightHold" && asTest != "Test_KillFrozenGuard" && asTest != "Test_LifetimeBountyStat" && asTest != "Test_FaintFrozenGuard" && asTest != "Test_FaintFrozenGuardShort" && asTest != "Test_FrozenEscortFallback" && asTest != "Test_HideFrozenGuard" && asTest != "Test_EscortToCellGuardHeld" && asTest != "Test_CuffedLimitEncumbrance" && asTest != "Test_CuffedLimitSettings" && asTest != "Test_EarlyHandback" && asTest != "Test_StalledEscortTakeover" && asTest != "Test_StalledEscortTakeoverLimit" && asTest != "Test_NpcEscortCancelControl" && asTest != "Test_FrozenPrisonerTimeSkip" && asTest != "Test_SpawnFreezablePrisoner" && asTest != "Test_SpawnFreezableArrestee" && asTest != "Test_GuardCrimeFactions" && asTest != "Test_PlayerEscortCancelControl" && asTest != "Test_ReleaseByEventBenchmark" && asTest != "Test_FrozenPrisonerDialogue" && asTest != "Test_NpcFreeWalkControl" && asTest != "Test_FreezeControlAlternating" && asTest != "Test_SetCancelSettle" && asTest != "Test_FightAtConfrontationStart" && asTest != "Test_FastWrapperBenchmark" && asTest != "Test_SkipEscortBegun" && asTest != "Test_WIDeadBody" && StringUtil.Find(asTest, "Test_FreezePoint_") != 0)
+    if (asTest != "Test_ArrestWaitsWhileGuardFights_NoPackage" && asTest != "Test_CellDoorsDiagnostic" && asTest != "Test_LongAbsenceSetup" && asTest != "Test_LongAbsenceAdvance" && asTest != "Test_LongAbsenceVerify" && asTest != "Test_FallbackEscortToCellStopped_Player" && asTest != "Test_FallbackEscortToCellStopped_CloneGuard" && asTest != "Test_FightDuringEscort_NPC" && asTest != "Test_FightDuringEscort_Player" && asTest != "Test_GuardDiesInPrison_Player" && asTest != "Test_EscortToCellStopped_NoPackageLock" && StringUtil.Find(asTest, "Test_Surrender_") != 0 && asTest != "Test_FrozenGuardSkipped" && asTest != "Test_GuardDiesInPrison_NobodySees" && asTest != "Test_Escort_FreeWalk" && asTest != "Test_ToggleEscortToCell04" && asTest != "Test_CaptorFinishCycles_Calls" && asTest != "Test_CaptorFinishCycles_NoCalls" && asTest != "Test_CaptorFinishDetach_Calls" && asTest != "Test_CaptorFinishDetach_NoCalls" && asTest != "Test_Escort_FreeWalk_Control" && asTest != "Test_ActorKeys" && asTest != "Test_FrozenGuardCalls" && asTest != "Test_SimulatedFreezeCalls" && asTest != "Test_SimulatedFreezeAtCancel" && asTest != "Test_SpawnFreezableGuard" && asTest != "Test_AliasPackageControl" && asTest != "Test_FreezableEscort_Player" && asTest != "Test_FreezableEscort_NPC" && asTest != "Test_LightHold" && asTest != "Test_KillFrozenGuard" && asTest != "Test_LifetimeBountyStat" && asTest != "Test_FaintFrozenGuard" && asTest != "Test_FaintFrozenGuardShort" && asTest != "Test_FrozenEscortFallback" && asTest != "Test_HideFrozenGuard" && asTest != "Test_EscortToCellGuardHeld" && asTest != "Test_CuffedLimitEncumbrance" && asTest != "Test_CuffedLimitSettings" && asTest != "Test_EarlyHandback" && asTest != "Test_StalledEscortTakeover" && asTest != "Test_StalledEscortTakeoverLimit" && asTest != "Test_NpcEscortCancelControl" && asTest != "Test_FrozenPrisonerTimeSkip" && asTest != "Test_SpawnFreezablePrisoner" && asTest != "Test_SpawnFreezableArrestee" && asTest != "Test_GuardCrimeFactions" && asTest != "Test_PlayerEscortCancelControl" && asTest != "Test_ReleaseByEventBenchmark" && asTest != "Test_FrozenPrisonerDialogue" && asTest != "Test_NpcFreeWalkControl" && asTest != "Test_FreezeControlAlternating" && asTest != "Test_SetCancelSettle" && asTest != "Test_FightAtConfrontationStart" && asTest != "Test_FastWrapperBenchmark" && asTest != "Test_SkipEscortBegun" && asTest != "Test_WIDeadBody" && StringUtil.Find(asTest, "Test_FreezePoint_") != 0 && asTest != "Test_PrisonLookupBenchmark")
         return false
     endif
 
@@ -15406,6 +15521,8 @@ bool function __RunStatelessTest(string asTest)
         display_result(assert_true(true, "198: armed"))
     elseif (asTest == "Test_FastWrapperBenchmark")
         display_result(__FastWrapperBenchmark("197"))
+    elseif (asTest == "Test_PrisonLookupBenchmark")
+        display_result(__PrisonLookupBenchmark("203"))
     elseif (asTest == "Test_FightAtConfrontationStart")
         display_result(__Scenario_FightAtConfrontationStart("196"))
         __TeardownScenario()

@@ -293,6 +293,7 @@ endFunction
 ; ==========================================================
 
 event OnPrisonConfigured(RPB_Prison apPrison)
+    self.__RecordPrisonOfHold(apPrison.Hold, apPrison)
     apPrison.SetupCells()
     Debug("PrisonManager::OnPrisonConfigured", "Initialized " + apPrison.Name + " for Hold " + apPrison.Hold)
 endEvent
@@ -335,30 +336,123 @@ endEvent
 ;                      Prison Registry
 ; ==========================================================
 
-; When 1:N Hold to Prisons, the value should be Prison's UUID and not the Hold
+;/
+    The prison lookups read registries recorded as prisons and prisoners are set up, never a scan of the prison slots (each
+    slot's fetch and its Hold read wait a frame each: a load-time scan of 41 slots took ~80 frames, and the plugin is to get
+    400-500). Each registry holds a prison's alias ID + 1 (0: nothing recorded), fetched through a cache filled one prison
+    at a time on its first use (__PrisonById), so only the prisons in use are ever fetched:
+    - by prisoner (JDB .rpb_root.prisonIdOfPrisoner, actor -> ID + 1): FindPrisonByPrisoner, for every prison Scene event
+      and in the shared loops. No call into her.
+    - by hold (JDB .rpb_root.prisonIdOfHold, hold -> ID + 1, or -1 for a hold with no prison): GetPrison.
+    The registry by hold and FormID (StorageVars "PrisonManager") stays for saves from before these; a prisoner or hold
+    missing from them is found the old way once, then recorded. When 1:N Hold to Prisons, the value should be the Prison's
+    UUID and not the Hold
+/;
 function AddPrisonerToPrisonRegistry(RPB_Prisoner apPrisoner)
     RPB_StorageVars.SetString(apPrisoner.GetIdentifier(), apPrisoner.Prison.Hold, "PrisonManager")
+    self.__RecordPrisonOfPrisoner(apPrisoner.GetActor(), apPrisoner.Prison)
 endFunction
 
 function RemovePrisonerFromPrisonRegistry(RPB_Prisoner apPrisoner)
     RPB_StorageVars.DeleteVariable(apPrisoner.GetIdentifier(), "PrisonManager")
+    int registry = JDB.solveObj(".rpb_root.prisonIdOfPrisoner")
+    if (registry)
+        FastFormMap_RemoveKey(registry, apPrisoner.GetActor())
+    endif
+endFunction
+
+function __RecordPrisonOfPrisoner(Actor akPrisoner, RPB_Prison apPrison)
+    if (!akPrisoner || !apPrison)
+        return
+    endif
+    int registry = JDB.solveObj(".rpb_root.prisonIdOfPrisoner")
+    if (!registry)
+        registry = JFormMap.object()
+        JDB.solveObjSetter(".rpb_root.prisonIdOfPrisoner", registry, true)
+    endif
+    int id = apPrison.GetID()
+    FastFormMap_SetInt(registry, akPrisoner, id + 1)
+    self.__CachePrison(id, apPrison)
+endFunction
+
+; @apPrison none: the hold has no prison (recorded so the slot loop isn't walked again for it)
+function __RecordPrisonOfHold(string asHold, RPB_Prison apPrison)
+    if (asHold == "")
+        return
+    endif
+    int holds = JDB.solveObj(".rpb_root.prisonIdOfHold")
+    if (!holds)
+        holds = JMap.object()
+        JDB.solveObjSetter(".rpb_root.prisonIdOfHold", holds, true)
+    endif
+    if (!apPrison)
+        FastMap_SetInt(holds, asHold, -1)
+        return
+    endif
+    int id = apPrison.GetID()
+    FastMap_SetInt(holds, asHold, id + 1)
+    self.__CachePrison(id, apPrison)
+endFunction
+
+; The prisons fetched so far, by alias ID. Grown to the ID: alias IDs aren't slot numbers (Castle Dour Dungeon is in slot 2
+; with ID 43), and an array sized to the slots missed every prison past it (benchmark 203: a frame each lookup)
+Alias[] __prisonById
+
+RPB_Prison function __PrisonById(int aiId)
+    if (aiId < 0)
+        return none
+    endif
+    if (__prisonById && aiId < __prisonById.Length && __prisonById[aiId])
+        return __prisonById[aiId] as RPB_Prison
+    endif
+    RPB_Prison prison = self.GetAliasById(aiId) as RPB_Prison
+    self.__CachePrison(aiId, prison)
+    return prison
+endFunction
+
+function __CachePrison(int aiId, RPB_Prison apPrison)
+    if (aiId < 0)
+        return
+    endif
+    if (!__prisonById)
+        __prisonById = Utility.CreateAliasArray(aiId + 1)
+    elseif (aiId >= __prisonById.Length)
+        __prisonById = Utility.ResizeAliasArray(__prisonById, aiId + 1)
+    endif
+    __prisonById[aiId] = apPrison
 endFunction
 
 ; ==========================================================
 ;                          Queries
 ; ==========================================================
 
-; No call into @akPrisonerActor (his FormID read from his printed form): this runs on frozen actors too, in shared loops
+; No call into @akPrisonerActor: this runs on frozen actors too, in shared loops and for every prison Scene event. The
+; actor-keyed registry first (no frame waited); a prisoner from a save before it, by her hold (then added to it)
 RPB_Prison function FindPrisonByPrisoner(Actor akPrisonerActor)
     if (!akPrisonerActor)
         return none
     endif
-    string prisonHold = RPB_StorageVars.GetString(RPB_Utility.FormIdIntNoCall(akPrisonerActor), "PrisonManager")
+    int registry = JDB.solveObj(".rpb_root.prisonIdOfPrisoner")
+    if (registry)
+        int id = FastFormMap_GetInt(registry, akPrisonerActor) - 1
+        if (id >= 0)
+            return self.__PrisonById(id)
+        endif
+    endif
+    RPB_Prison prison = self.__FindPrisonByPrisonerByHold(akPrisonerActor)
+    if (prison)
+        self.__RecordPrisonOfPrisoner(akPrisonerActor, prison)
+    endif
+    return prison
+endFunction
 
+; The registry by hold (saves from before the actor-keyed one; benchmark 203's "before"). Her FormID read from her printed
+; form, no call into her
+RPB_Prison function __FindPrisonByPrisonerByHold(Actor akPrisonerActor)
+    string prisonHold = RPB_StorageVars.GetString(RPB_Utility.FormIdIntNoCall(akPrisonerActor), "PrisonManager")
     if (prisonHold)
         return self.GetPrison(prisonHold)
     endif
-
     return none
 endFunction
 
@@ -397,18 +491,25 @@ endFunction
 
     returns [RPB_Prison]: The RPB_Prison reference for this hold, or none if it does not exist.
 /;
+; The hold's prison from the registry by hold (no frame waited once her alias is cached: the slot loop below waited two per
+; slot, 66ms for Haafingar's slot 2, benchmark 203). A hold not recorded yet (a save from before the registry): found by
+; the loop once, then recorded; one with no prison is recorded as none, until a prison is set up for it
 RPB_Prison function GetPrison(string asHold)
+    int holds = JDB.solveObj(".rpb_root.prisonIdOfHold")
+    if (holds && FastMap_HasKey(holds, asHold))
+        return self.__PrisonById(FastMap_GetInt(holds, asHold) - 1)
+    endif
+    RPB_Prison found = none
     int i = 0
-
-    while (i < self.PrisonSlots)
+    while (i < self.PrisonSlots && !found)
         RPB_Prison currentPrison = self.GetNthAlias(i) as RPB_Prison
         if (currentPrison.Hold == asHold)
-            return currentPrison
+            found = currentPrison
         endif
         i += 1
     endWhile
-
-    return none
+    self.__RecordPrisonOfHold(asHold, found)
+    return found
 endFunction
 
 ; TODO: Add support for multiple prisons in each Hold,
@@ -752,6 +853,7 @@ endFunction
 ; ==========================================================
 
 bool function DeletePrison(RPB_Prison apPrison)
+    JDB.solveObjSetter(".rpb_root.prisonIdOfHold", JMap.object(), true) ; recorded again as they're looked up
     self.__InvalidateActivePrisonCache()
     Debug("["+ apPrison.GetName() +"] ["+ apPrison.Name +"] PrisonManager::DeletePrison", "Deleted Prison [Name: " + apPrison.Name + ", Hold: " + apPrison.Hold + ", Faction: " + apPrison.PrisonFaction + ", City: " + apPrison.City + "]")
 
