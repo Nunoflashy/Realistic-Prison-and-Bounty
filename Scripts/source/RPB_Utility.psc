@@ -198,6 +198,16 @@ scriptname RPB_Utility hidden
     Form function GetFormOfType(string asFormType) global
     int function GetSlotMask(string bodyPart) global
     bool function IsFlowProfilingEnabled() global
+    bool function IsFlowActive() global
+    bool function IsFreezePointArmed() global
+    function ArmFreezePoint(string asPoint) global
+    function FreezePoint(Actor akActor, string asPoint) global
+    bool function IsSceneEventsPerMember() global
+    function SetSceneEventsPerMember(bool abOn) global
+    float function SceneEventProbeAfter() global
+    function SetSceneEventProbeAfter(float afSeconds) global
+    float function SceneEventGiveUpAfter() global
+    function SetSceneEventGiveUpAfter(float afSeconds) global
     function EnableFlowProfiling() global
     function DisableFlowProfiling() global
     bool function IsCrumbsEnabled() global
@@ -4407,6 +4417,93 @@ endFunction
 
 function EnableFlowProfiling() global
     RPB_StorageVars.SetBool("FLOW", true, "Profile")
+endFunction
+
+; A flow being profiled right now (FlowBegin to FlowEnd): what a mark's text costs to build is only paid then
+bool function IsFlowActive() global
+    return JDB.solveInt(".rpb_root.storage.Profile.Active") != 0
+endFunction
+
+;/
+    Freeze points (test-only), for the tests that depend on timing: a freeze has to land between two particular calls,
+    which by hand (the prisoner freeze key) is luck. A test arms a point by name (ArmFreezePoint); RPB's code names its
+    points with FreezePoint(actor, name) right before its calls into that actor. The next freezable NPC (RPB_TestFreezable)
+    to reach a point whose name contains the armed text is frozen there (RPB_Tests.OnTestFreezePoint: the prisoner freeze
+    key's hold, released by that key), and FreezePoint returns once the hold holds, so the code's next call into her waits
+    on it as on a real freeze. Once per arming; a load disarms it (RPB_ConfigAlias). Unarmed, a point costs one JDB read.
+    The points so far: every Scene event's member handler, "<Scene> <event>[ (<secondary event>)]"
+    (RPB_EventManager.__PrisonSceneForMember / __ArrestSceneForMember), the old way and per member alike.
+/;
+bool function IsFreezePointArmed() global
+    return JDB.solveStr(".rpb_root.testFreezePoint") != ""
+endFunction
+
+function ArmFreezePoint(string asPoint) global
+    JDB.solveStrSetter(".rpb_root.testFreezePoint", asPoint, true)
+endFunction
+
+function FreezePoint(Actor akActor, string asPoint) global
+    string armed = JDB.solveStr(".rpb_root.testFreezePoint")
+    if (armed == "" || !akActor || StringUtil.Find(asPoint, armed) < 0 || !(akActor as RPB_TestFreezable))
+        return
+    endif
+    ArmFreezePoint("") ; once
+    JDB.solveFltSetter(".rpbTest.prisonerHoldStart", 0.0, true)
+    int handle = ModEvent.Create("RPB_TestFreezePoint")
+    if (!handle)
+        return
+    endif
+    ModEvent.PushForm(handle, akActor)
+    ModEvent.PushString(handle, asPoint)
+    ModEvent.Send(handle)
+    ; Until her hold holds (5s at most): the caller's next call into her then waits on it
+    int looks = 0
+    while (JDB.solveFlt(".rpbTest.prisonerHoldStart") == 0.0 && looks < 50)
+        Utility.Wait(0.1)
+        looks += 1
+    endWhile
+    LogInfo("Freeze point '" + asPoint + "': " + akActor + " frozen " + (JDB.solveFlt(".rpbTest.prisonerHoldStart") != 0.0) + " before the code's next call into her", "Utility::FreezePoint")
+endFunction
+
+; Dev switch while Scene events per member (RPB_EventManager.__DispatchSceneEvent) are compared with the old way (each
+; member's handler on the Scene manager's stack). Off by default until the comparison is done
+bool function IsSceneEventsPerMember() global
+    return JDB.solveInt(".rpb_root.dev.sceneEventsPerMember") != 0
+endFunction
+
+function SetSceneEventsPerMember(bool abOn) global
+    JDB.solveIntSetter(".rpb_root.dev.sceneEventsPerMember", abOn as int, true)
+endFunction
+
+;/
+    Advanced (values to tune for a load order, the MCM's Advanced page once it exists). How long a Scene event's handler may
+    take before the member (and at a Scene's end, the guard) is probed for a freeze: a probe only checks, the queue keeps
+    waiting for a member who answers, so a low value costs a probe, never Scenes out of order. Default 3s.
+/;
+float function SceneEventProbeAfter() global
+    float seconds = JDB.solveFlt(".rpb_root.storage.Advanced.SCENE_EVENT_PROBE_AFTER")
+    if (seconds <= 0.0)
+        return 3.0
+    endif
+    return seconds
+endFunction
+
+function SetSceneEventProbeAfter(float afSeconds) global
+    RPB_StorageVars.SetFloat("SCENE_EVENT_PROBE_AFTER", afSeconds, "Advanced")
+endFunction
+
+; Advanced: the longest a Scene's end (or a member's next event) waits for a handler that answers its probe but never
+; finishes (stuck on someone else, a frozen guard), before going on without it. Default 30s
+float function SceneEventGiveUpAfter() global
+    float seconds = JDB.solveFlt(".rpb_root.storage.Advanced.SCENE_EVENT_GIVE_UP_AFTER")
+    if (seconds <= 0.0)
+        return 30.0
+    endif
+    return seconds
+endFunction
+
+function SetSceneEventGiveUpAfter(float afSeconds) global
+    RPB_StorageVars.SetFloat("SCENE_EVENT_GIVE_UP_AFTER", afSeconds, "Advanced")
 endFunction
 
 function DisableFlowProfiling() global

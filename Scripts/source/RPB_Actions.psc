@@ -7,6 +7,7 @@ scriptname RPB_Actions extends ObjectReference
     string[] function GetActions()
     function ShowActionsMenu()
     function Action_ToggleFlowProfiling()
+    function Action_ToggleSceneEventsPerMember()
     function Action_ResetStuckPrisonState()
     function Action_ToggleFastMonitor()
     function Action_ToggleDebugLogging()
@@ -83,6 +84,7 @@ string[] function GetActions()
         "<No Action>," + \
         "Quit to Main Menu," + \
         "[Debug] Toggle Flow Profiling," + \
+        "[Debug] Toggle Scene Events Per Member," + \
         "[Debug] Toggle Debug Logging," + \
         "[Debug] Toggle Fast Monitor (3h)," + \
         "[Debug] Reset Stuck Prison State," + \
@@ -155,6 +157,9 @@ function ShowActionsMenu()
 
     elseif (actionToPerform == "[Debug] Toggle Flow Profiling")
         Action_ToggleFlowProfiling()
+
+    elseif (actionToPerform == "[Debug] Toggle Scene Events Per Member")
+        Action_ToggleSceneEventsPerMember()
 
     elseif (actionToPerform == "[Debug] Toggle Debug Logging")
         Action_ToggleDebugLogging()
@@ -407,6 +412,16 @@ function Action_ToggleFastMonitor()
         RPB_Utility.SetMonitorOverrideHours(3.0)
         debug.notification("RPB fast monitor: ON (wakes every 3 game hours)")
     endif
+endFunction
+
+;/
+    Flips how a Scene's events reach its members, while the two ways are compared: each on a stack of her own (per member),
+    or all on the Scene manager's (the old way). With the flow profiler on, an arrest's report shows each Scene's end, each
+    member's handler and the next Scene's start for either.
+/;
+function Action_ToggleSceneEventsPerMember()
+    RPB_Utility.SetSceneEventsPerMember(!RPB_Utility.IsSceneEventsPerMember())
+    debug.notification("RPB Scene events per member: " + RPB_Utility.string_if(RPB_Utility.IsSceneEventsPerMember(), "ON", "OFF (old way)"))
 endFunction
 
 function Action_ToggleDebugLogging()

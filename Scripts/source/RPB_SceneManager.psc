@@ -1884,6 +1884,7 @@ endFunction
 
 event OnSceneStart(string name, Scene sender)
     __lastStartedScene = name
+    RPB_Utility.FlowMark("Scene started: " + name)
     Form[] params   = self.GetSceneReferences(name)
     string type     = self.GetSceneType(name)
 
@@ -2143,9 +2144,14 @@ event OnSceneEnd(string name, Scene sender)
             Utility.Wait(0.5)
         endWhile
     endif
+    RPB_Utility.FlowMark("Scene ended: " + name)
     string type = self.GetSceneType(name)
     Actor lockAfterFinish = none ; the escort to jail's guard, locked once this Scene is fully over (see below)
     self.__EndSceneBookkeeping(name) ; over before its events start the next one (see __EndSceneBookkeeping)
+    ; Its members' end handlers, each on her own stack with Scene events per member: waited for below, before the next Scene
+    int endBatch = 0
+    Form[] endMembers
+    Actor endAuthority = none
 
     if (type == CATEGORY_ARREST_START)
         Actor escort     = self.GetSceneNthReferenceOfType(name, "Escort") as Actor
@@ -2153,7 +2159,9 @@ event OnSceneEnd(string name, Scene sender)
 
         string secondaryEvent = string_if (name == SCENE_ARREST_START_PRISON_01, "Arrest in Prison", "null")
 
-        EventManager.SendArrestSceneBulkEvent(name, EVENT_ARREST_END, arrestees, escort, secondaryEvent)
+        endBatch = EventManager.SendArrestSceneBulkEvent(name, EVENT_ARREST_END, arrestees, escort, secondaryEvent, abTrackBatch = true)
+        endMembers = arrestees
+        endAuthority = escort
 
     elseif (type == CATEGORY_ESCORT_TO_JAIL)
         Actor escort     = self.GetSceneNthReferenceOfType(name, "Escort") as Actor
@@ -2163,7 +2171,9 @@ event OnSceneEnd(string name, Scene sender)
         ; the guard was forced into it while still in this Scene's Escort alias mid-end, and in two reproductions he turned
         ; uncallable within that same second (every call on him then waits forever)
         lockAfterFinish = escort
-        EventManager.SendPrisonSceneBulkEvent(name, EVENT_ESCORT_END, arrestees, escort)
+        endBatch = EventManager.SendPrisonSceneBulkEvent(name, EVENT_ESCORT_END, arrestees, escort, abTrackBatch = true)
+        endMembers = arrestees
+        endAuthority = escort
 
     elseif (type == CATEGORY_ESCORT_TO_CELL)
         Actor escort     = self.GetSceneNthReferenceOfType(name, "Escort") as Actor
@@ -2175,13 +2185,17 @@ event OnSceneEnd(string name, Scene sender)
         endif
         
         self.UnsetPackageLockOnActor(escort) ; Needs to be reviewed, since the Escort may not be the one from the "Escort to Jail" scene, where the package is set
-        EventManager.SendPrisonSceneBulkEvent(name, EVENT_ESCORT_END, prisoners, escort)
+        endBatch = EventManager.SendPrisonSceneBulkEvent(name, EVENT_ESCORT_END, prisoners, escort, abTrackBatch = true)
+        endMembers = prisoners
+        endAuthority = escort
 
     elseif (type == CATEGORY_ESCORT_FROM_CELL)
         Actor guard      = self.GetSceneNthReferenceOfType(name, "Guard") as Actor
         Form[] prisoners = self.GetSceneReferencesOfType(name, "Prisoner")
         
-        EventManager.SendPrisonSceneBulkEvent(name, EVENT_ESCORT_END, prisoners, guard)
+        endBatch = EventManager.SendPrisonSceneBulkEvent(name, EVENT_ESCORT_END, prisoners, guard, abTrackBatch = true)
+        endMembers = prisoners
+        endAuthority = guard
 
     elseif (type == CATEGORY_STRIPPING)
         Actor guard      = self.GetSceneNthReferenceOfType(name, "Guard") as Actor
@@ -2199,7 +2213,9 @@ event OnSceneEnd(string name, Scene sender)
             secondaryEvent = "Stand Up (Kneel)"
         endif
 
-        EventManager.SendPrisonSceneBulkEvent(name, EVENT_STRIP_END, prisoners, guard, secondaryEvent)
+        endBatch = EventManager.SendPrisonSceneBulkEvent(name, EVENT_STRIP_END, prisoners, guard, secondaryEvent, abTrackBatch = true)
+        endMembers = prisoners
+        endAuthority = guard
 
     elseif (type == CATEGORY_CLOTHING)
         Actor guard      = self.GetSceneNthReferenceOfType(name, "Guard") as Actor
@@ -2209,7 +2225,10 @@ event OnSceneEnd(string name, Scene sender)
             
         endif
 
-        EventManager.SendPrisonSceneEvent(name, EVENT_CLOTHING_END, prisoner, guard)
+        endBatch = EventManager.SendPrisonSceneEvent(name, EVENT_CLOTHING_END, prisoner, guard, abTrackBatch = true)
+        endMembers = new Form[1]
+        endMembers[0] = prisoner
+        endAuthority = guard
 
     elseif (type == CATEGORY_SURRENDER)
         Actor surrendererCaptor = self.GetSceneNthReferenceOfType(name, "SurrendererCaptor") as Actor
@@ -2231,8 +2250,14 @@ event OnSceneEnd(string name, Scene sender)
             secondaryEvent = "Escort by Force"
         endif
 
-        EventManager.SendArrestSceneEvent(name, EVENT_ARREST_PAY_BOUNTY_END, escortee, escort, secondaryEvent)
+        endBatch = EventManager.SendArrestSceneEvent(name, EVENT_ARREST_PAY_BOUNTY_END, escortee, escort, secondaryEvent, abTrackBatch = true)
+        endMembers = new Form[1]
+        endMembers[0] = escortee
+        endAuthority = escort
     endif
+
+    self.__AwaitSceneEndHandlers(name, endBatch, endMembers, endAuthority)
+    RPB_Utility.FlowMark(name + "'s end handled")
 
     ; Only for the debug line: reading every alias costs 43-360ms per Scene end, and ran with DEBUG off too
     if (IsDebuggingEnabled())
@@ -2277,6 +2302,85 @@ function __EndSceneBookkeeping(string asScene)
         __isScenePlaying = false
     endif
     self.ResetGlobals()
+endFunction
+
+;/
+    A Scene's end handlers done before the next Scene plays, with Scene events per member (each member's handler on her own
+    stack, RPB_EventManager.__DispatchSceneEvent): the escort to jail's end starts the strip and queues the escort to the
+    cell, which the next queued Scene must not jump ahead of. No fixed delay: I look every frame or so, so the next Scene
+    follows the last handler by about a frame. A handler still running after the Advanced wait
+    (RPB_Utility.SceneEventProbeAfter) gets the members and the guard probed: a member found frozen has her events taken
+    over (RPB_EventManager.TakeOverFrozenMembers: this end's step done the frozen way, the escort to the cell queued at the
+    escort to jail's end) and the queue goes on without her; all answering, they're slow (a heavy script load), not frozen, and I keep waiting, up
+    to the longest wait (RPB_Utility.SceneEventGiveUpAfter). The waits are counted, so time in a menu doesn't count.
+    @aiBatch 0 (the old way, or no members): nothing to wait for, the handlers already ran on this stack.
+/;
+function __AwaitSceneEndHandlers(string asScene, int aiBatch, Form[] akMembers, Actor akAuthority)
+    if (!aiBatch)
+        return
+    endif
+    float probeAfter = RPB_Utility.SceneEventProbeAfter()
+    float giveUpAfter = RPB_Utility.SceneEventGiveUpAfter()
+    float waited = 0.0
+    bool probed = false
+    int frozenTakenOver = 0
+    int pending = EventManager.SceneEndBatchPending(aiBatch)
+    while (pending > 0)
+        int frozenNow = 0
+        if (probed)
+            frozenNow = self.__FrozenAmong(akMembers)
+        endif
+        if (frozenNow > frozenTakenOver)
+            ; Her stuck end handler's step done the frozen way; the others' handlers still waited for
+            frozenTakenOver = EventManager.TakeOverFrozenMembers(akMembers)
+            pending = EventManager.SceneEndBatchPending(aiBatch)
+            RPB_Utility.LogWarn(asScene + "'s end: " + frozenTakenOver + " member(s) found frozen, their end done the frozen way; " + pending + " handler(s) still running", "SceneManager::__AwaitSceneEndHandlers")
+        elseif (probed && akAuthority && RPB_Utility.IsFrozenNPC(akAuthority))
+            RPB_Utility.LogWarn(asScene + "'s end: its guard " + akAuthority + " is frozen, the next Scene plays without " + pending + " end handler(s) done", "SceneManager::__AwaitSceneEndHandlers")
+            pending = 0
+        elseif (waited >= giveUpAfter)
+            RPB_Utility.LogWarn(asScene + "'s end: " + pending + " end handler(s) still not done after " + (waited as int) + "s, nobody found frozen: the next Scene plays anyway", "SceneManager::__AwaitSceneEndHandlers")
+            pending = 0
+        else
+            if (!probed && waited >= probeAfter)
+                probed = true
+                self.__ProbeSceneEndStall(asScene, akMembers, akAuthority, waited)
+            endif
+            Utility.Wait(0.02)
+            waited += 0.02
+            pending = EventManager.SceneEndBatchPending(aiBatch)
+        endif
+    endWhile
+    EventManager.EndSceneEndBatch(aiBatch)
+endFunction
+
+; How many of @akMembers RPB has marked frozen (no call into them)
+int function __FrozenAmong(Form[] akMembers)
+    int frozen = 0
+    int i = 0
+    while (akMembers && i < akMembers.Length)
+        if (RPB_Utility.IsFrozenNPC(akMembers[i] as Actor))
+            frozen += 1
+        endif
+        i += 1
+    endWhile
+    return frozen
+endFunction
+
+; A Scene's end handlers taking long: its members and its guard probed (not those already marked or being probed)
+function __ProbeSceneEndStall(string asScene, Form[] akMembers, Actor akAuthority, float afWaited)
+    string step = asScene + "'s end handler not done after " + (afWaited as int) + "s"
+    int i = 0
+    while (akMembers && i < akMembers.Length)
+        Actor member = akMembers[i] as Actor
+        if (member && !RPB_Utility.IsNPCProbeOpen(member))
+            RPB_Utility.ProbeNPC(member, step, 0.0, "PRISONER")
+        endif
+        i += 1
+    endWhile
+    if (akAuthority && !RPB_Utility.IsNPCProbeOpen(akAuthority))
+        RPB_Utility.ProbeNPC(akAuthority, step, 0.0, "GUARD")
+    endif
 endFunction
 
 ; The next queued Scene, unless the ending Scene's own events already started one

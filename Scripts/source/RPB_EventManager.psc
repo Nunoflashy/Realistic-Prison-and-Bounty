@@ -10,10 +10,13 @@ scriptname RPB_EventManager extends Quest
     function RegisterEvents()
     function WatchCuffedJumps(bool abOn)
     function SendSurrenderSceneEvent(string asScene, string asSceneEvent, Actor akSurrenderer, Actor akSurrendererCaptor, string asSceneSecondaryEvent = "null", Form[] akParams = none, Form[] akParams2 = none)
-    function SendArrestSceneEvent(string asScene, string asSceneEvent, Actor akArrestee, Actor akAuthority, string asSceneSecondaryEvent = "null")
-    function SendArrestSceneBulkEvent(string asScene, string asSceneEvent, Form[] akArrestees, Actor akAuthority, string asSceneSecondaryEvent = "null")
-    function SendPrisonSceneEvent(string asScene, string asSceneEvent, Actor akPrisoner, Actor akAuthority, string asSceneSecondaryEvent = "null")
-    function SendPrisonSceneBulkEvent(string asScene, string asSceneEvent, Form[] akPrisoners, Actor akAuthority, string asSceneSecondaryEvent = "null")
+    int function SendArrestSceneEvent(string asScene, string asSceneEvent, Actor akArrestee, Actor akAuthority, string asSceneSecondaryEvent = "null", bool abTrackBatch = false)
+    int function SendArrestSceneBulkEvent(string asScene, string asSceneEvent, Form[] akArrestees, Actor akAuthority, string asSceneSecondaryEvent = "null", bool abTrackBatch = false)
+    int function SendPrisonSceneEvent(string asScene, string asSceneEvent, Actor akPrisoner, Actor akAuthority, string asSceneSecondaryEvent = "null", bool abTrackBatch = false)
+    int function SendPrisonSceneBulkEvent(string asScene, string asSceneEvent, Form[] akPrisoners, Actor akAuthority, string asSceneSecondaryEvent = "null", bool abTrackBatch = false)
+    int function SceneEndBatchPending(int aiBatch)
+    function EndSceneEndBatch(int aiBatch)
+    int function TakeOverFrozenMembers(Form[] akMembers)
     function TraceParams(string params, string paramNames = "", string caller = "")
 @events:
     event OnTrace(string msg, string caller)
@@ -27,6 +30,8 @@ scriptname RPB_EventManager extends Quest
     event OnPayBounty(string eventName, string categoryPayBounty, float arresteeFormIdFlt, Form sender)
     event OnArrestScene(string asScene, string asSceneEvent, RPB_Arrestee apArrestee, Actor akAuthority, string asSceneSecondaryEvent)
     event OnPrisonScene(string asScene, string asSceneEvent, RPB_Prison apPrison, RPB_Prisoner apPrisoner, Actor akAuthority, string asSceneSecondaryEvent)
+    event OnPrisonSceneEvent(string asScene, string asSceneEvent, string asSceneSecondaryEvent, Form akMember, Form akAuthority, int aiPrevious, int aiNumber, int aiBatch, int aiMembers)
+    event OnArrestSceneEvent(string asScene, string asSceneEvent, string asSceneSecondaryEvent, Form akMember, Form akAuthority, int aiPrevious, int aiNumber, int aiBatch, int aiMembers)
     event OnSurrenderPreparing(Form akSurrenderer)
     event OnSurrenderScene(string asScene, string asSceneEvent, Actor akSurrenderer, Actor akSurrendererCaptor, string asSceneSecondaryEvent, Form[] akParams, Form[] akParams2)
     event OnSceneStart(string eventName, string sceneName, float unusedFlt, Form sender)
@@ -128,6 +133,9 @@ function RegisterEvents()
     RegisterForModEvent("RPB_IntakeStalled", "OnIntakeStalled")
     RegisterForModEvent("RPB_SetAsideBounty", "OnSetAsideBounty")
     RegisterForModEvent("RPB_PrisonerFroze", "OnPrisonerFroze")
+    RegisterForModEvent("RPB_PrisonSceneEvent", "OnPrisonSceneEvent")
+    RegisterForModEvent("RPB_ArrestSceneEvent", "OnArrestSceneEvent")
+    self.__ResetSceneEventOrder()
     RegisterForModEvent("RPB_WorldInteractionApproach", "OnWorldInteractionApproach")
     RegisterForModEvent("RPB_WorldInteractionArrestAnswer", "OnWorldInteractionArrestAnswer")
     RegisterForModEvent("RPB_EncumbranceCheck", "OnEncumbranceCheck")
@@ -317,8 +325,11 @@ function __FrozenPrisonerSceneStep(Actor akPrisoner, string asScene, string asSc
     endif
 endFunction
 
-; RPB_Utility.MarkNPCFrozen: an NPC prisoner frozen in the prison flow, finished by her prison without a call into her
+; RPB_Utility.MarkNPCFrozen: an NPC prisoner frozen in the prison flow, finished by her prison without a call into her. Her
+; Scene events still pending are taken over first: a step stuck in a call into her has nothing after it to find her frozen
+; when the Scene waits on it (her cell's "Unlock Cell": the guard stood at the closed door, test 202)
 event OnPrisonerFroze(Form akPrisoner)
+    self.__TakeOverFrozenMember(akPrisoner as Actor, 0)
     RPB_Prison prison = API.PrisonManager.FindPrisonByPrisoner(akPrisoner as Actor)
     if (prison)
         prison.OnPrisonerFroze(akPrisoner as Actor)
@@ -436,63 +447,74 @@ function SendSurrenderSceneEvent(string asScene, string asSceneEvent, Actor akSu
     self.OnSurrenderScene(asScene, asSceneEvent, akSurrenderer, akSurrendererCaptor, asSceneSecondaryEvent, akParams, akParams2)
 endFunction
 
-function SendArrestSceneEvent(string asScene, string asSceneEvent, Actor akArrestee, Actor akAuthority, string asSceneSecondaryEvent = "null")
-    if (RPB_Utility.IsFrozenNPC(akArrestee)) ; every step below calls into him
-        RPB_Utility.LogWarn(akArrestee + " is frozen: left out of " + asScene + "'s " + asSceneEvent + " until the next load", "EventManager::SendArrestSceneEvent")
-        return
-    endif
-    if (self.__ArrestAlreadyEndedInPrison(akArrestee, asSceneSecondaryEvent))
-        self.__EndSceneIfArresteeGone(asScene, akArrestee)
-        return
+int function SendArrestSceneEvent(string asScene, string asSceneEvent, Actor akArrestee, Actor akAuthority, string asSceneSecondaryEvent = "null", bool abTrackBatch = false)
+    Form[] members = new Form[1]
+    members[0] = akArrestee
+    return self.SendArrestSceneBulkEvent(asScene, asSceneEvent, members, akAuthority, asSceneSecondaryEvent, abTrackBatch)
+endFunction
+
+;/
+    An arrest Scene's event to each of its arrestees. Per member (RPB_Utility.IsSceneEventsPerMember), each on a stack of her
+    own (__DispatchSceneEvent); @abTrackBatch (a Scene's end): returns the batch the Scene manager waits for. Otherwise the
+    old way, while the two are compared: each one's handler here, on the Scene manager's stack, and 0.
+/;
+int function SendArrestSceneBulkEvent(string asScene, string asSceneEvent, Form[] akArrestees, Actor akAuthority, string asSceneSecondaryEvent = "null", bool abTrackBatch = false)
+    if (!akArrestees || akArrestees.Length == 0)
+        RPB_Utility.LogError("No Arrestees provided for bulk scene event!")
+        return 0
     endif
 
+    if (RPB_Utility.IsSceneEventsPerMember())
+        return self.__DispatchSceneEvent(false, asScene, asSceneEvent, akArrestees, akAuthority, asSceneSecondaryEvent, abTrackBatch)
+    endif
+
+    int i = 0
+    while (i < akArrestees.Length)
+        self.__ArrestSceneForMember(asScene, asSceneEvent, akArrestees[i] as Actor, akAuthority, asSceneSecondaryEvent, akArrestees.Length == 1)
+        i += 1
+    endWhile
+    return 0
+endFunction
+
+; One arrestee's part of an arrest Scene's event. @abOnlyMember: she's the Scene's only arrestee, so her arrest being over
+; ends the Scene. @aiNumber: the event's number with Scene events per member (0 the old way), see __IsSceneEventPending
+function __ArrestSceneForMember(string asScene, string asSceneEvent, Actor akArrestee, Actor akAuthority, string asSceneSecondaryEvent, bool abOnlyMember, int aiNumber = 0)
+    if (!akArrestee)
+        return
+    endif
+    if (RPB_Utility.IsFrozenNPC(akArrestee)) ; every step below calls into him
+        RPB_Utility.LogWarn(akArrestee + " is frozen: left out of " + asScene + "'s " + asSceneEvent + " until the next load", "EventManager::__ArrestSceneForMember")
+        return
+    endif
+    if (RPB_Utility.IsFreezePointArmed())
+        RPB_Utility.FreezePoint(akArrestee, self.__SceneEventPoint(asScene, asSceneEvent, asSceneSecondaryEvent))
+    endif
+    if (self.__ArrestAlreadyEndedInPrison(akArrestee, asSceneSecondaryEvent))
+        if (abOnlyMember)
+            self.__EndSceneIfArresteeGone(asScene, akArrestee)
+        endif
+        return
+    endif
     if (self.__ArrestGone(akArrestee, asSceneSecondaryEvent))
-        SceneManager.EndSceneEarly(asScene, akArrestee + "'s arrest no longer exists", abRunEndEvents = false)
+        if (abOnlyMember)
+            SceneManager.EndSceneEarly(asScene, akArrestee + "'s arrest no longer exists", abRunEndEvents = false)
+        endif
         return
     endif
 
     RPB_Arrestee arrestee = Arrest.AwaitArresteeReference(akArrestee)
-
     if (arrestee == none)
         RPB_Utility.LogError("Could not retrieve the Arrestee reference from the actor, cannot proceed with the scene!")
         return
     endif
-
-    self.OnArrestScene(asScene, asSceneEvent, arrestee, akAuthority, asSceneSecondaryEvent)
-endFunction
-
-function SendArrestSceneBulkEvent(string asScene, string asSceneEvent, Form[] akArrestees, Actor akAuthority, string asSceneSecondaryEvent = "null")
-    if (!akArrestees || akArrestees.Length == 0)
-        RPB_Utility.LogError("No Arrestees provided for bulk scene event!")
+    if (!self.__IsSceneEventPending(aiNumber))
+        RPB_Utility.LogWarn(akArrestee + "'s " + asScene + " " + asSceneEvent + " was already handled the frozen way (or this stack waited through a load): not handled again", "EventManager::__ArrestSceneForMember")
         return
     endif
 
-    int frozenMap = RPB_Utility.FrozenNPCsForScan() ; a frozen arrestee left out: every step below calls into him
-    int i = 0
-    while (i < akArrestees.Length)
-        if (frozenMap && RPB_Utility.IsListedFrozen(frozenMap, akArrestees[i] as Actor))
-            RPB_Utility.LogWarn(akArrestees[i] + " is frozen: left out of " + asScene + "'s " + asSceneEvent + " until the next load", "EventManager::SendArrestSceneBulkEvent")
-        elseif (self.__ArrestAlreadyEndedInPrison(akArrestees[i] as Actor, asSceneSecondaryEvent))
-            if (akArrestees.Length == 1)
-                self.__EndSceneIfArresteeGone(asScene, akArrestees[i] as Actor)
-            endif
-        elseif (self.__ArrestGone(akArrestees[i] as Actor, asSceneSecondaryEvent))
-            if (akArrestees.Length == 1)
-                SceneManager.EndSceneEarly(asScene, akArrestees[i] + "'s arrest no longer exists", abRunEndEvents = false)
-            endif
-        else
-            RPB_Arrestee arrestee = Arrest.AwaitArresteeReference(akArrestees[i] as Actor)
-
-            if (arrestee == none)
-                RPB_Utility.LogError("Could not retrieve the Arrestee reference from the actor, cannot proceed with the scene!")
-                return
-            endif
-
-            Debug("EventManager::SendArrestSceneBulkEvent", "Entering OnArrestScene (Arrestee: "+ arrestee +") (Event: "+ asSceneEvent +", "+ asSceneSecondaryEvent +")")
-            self.OnArrestScene(asScene, asSceneEvent, arrestee, akAuthority, asSceneSecondaryEvent)
-        endif
-        i += 1
-    endWhile
+    Debug("EventManager::__ArrestSceneForMember", "Entering OnArrestScene (Arrestee: "+ arrestee +") (Event: "+ asSceneEvent +", "+ asSceneSecondaryEvent +")")
+    self.OnArrestScene(asScene, asSceneEvent, arrestee, akAuthority, asSceneSecondaryEvent)
+    self.__FlowMarkSceneEvent(asScene, asSceneEvent, asSceneSecondaryEvent, akArrestee)
 endFunction
 
 ;/
@@ -601,78 +623,461 @@ function __EndSceneIfArresteeGone(string asScene, Actor akArrestee)
     endif
 endFunction
 
-function SendPrisonSceneEvent(string asScene, string asSceneEvent, Actor akPrisoner, Actor akAuthority, string asSceneSecondaryEvent = "null")
-    if (RPB_Utility.IsFrozenNPC(akPrisoner)) ; the prison's lookup and his steps call into him
-        RPB_Utility.LogWarn(akPrisoner + " is frozen: left out of " + asScene + "'s " + asSceneEvent + " until the next load", "EventManager::SendPrisonSceneEvent")
-        self.__FrozenPrisonerSceneStep(akPrisoner, asScene, asSceneEvent, asSceneSecondaryEvent, akAuthority)
+int function SendPrisonSceneEvent(string asScene, string asSceneEvent, Actor akPrisoner, Actor akAuthority, string asSceneSecondaryEvent = "null", bool abTrackBatch = false)
+    Form[] members = new Form[1]
+    members[0] = akPrisoner
+    return self.SendPrisonSceneBulkEvent(asScene, asSceneEvent, members, akAuthority, asSceneSecondaryEvent, abTrackBatch)
+endFunction
+
+;/
+    A prison Scene's event to each of its prisoners, as SendArrestSceneBulkEvent: per member on stacks of their own, or the
+    old way (each one's handler here) while the two are compared.
+/;
+int function SendPrisonSceneBulkEvent(string asScene, string asSceneEvent, Form[] akPrisoners, Actor akAuthority, string asSceneSecondaryEvent = "null", bool abTrackBatch = false)
+    if (!akPrisoners || akPrisoners.Length == 0)
+        RPB_Utility.LogError("No prisoners provided for bulk scene event!", "EventManager::SendPrisonSceneBulkEvent")
+        return 0
+    endif
+
+    if (RPB_Utility.IsSceneEventsPerMember())
+        return self.__DispatchSceneEvent(true, asScene, asSceneEvent, akPrisoners, akAuthority, asSceneSecondaryEvent, abTrackBatch)
+    endif
+
+    int i = 0
+    while (i < akPrisoners.Length)
+        self.__PrisonSceneForMember(asScene, asSceneEvent, akPrisoners[i] as Actor, akAuthority, asSceneSecondaryEvent)
+        i += 1
+    endWhile
+    return 0
+endFunction
+
+; One prisoner's part of a prison Scene's event: her prison found, and her step handled. @aiNumber: the event's number with
+; Scene events per member (0 the old way), see __IsSceneEventPending
+function __PrisonSceneForMember(string asScene, string asSceneEvent, Actor akPrisoner, Actor akAuthority, string asSceneSecondaryEvent, int aiNumber = 0)
+    if (!akPrisoner)
         return
     endif
+    if (RPB_Utility.IsFrozenNPC(akPrisoner)) ; the prison's lookup and her steps call into her
+        self.__PrisonSceneForFrozen(asScene, asSceneEvent, akPrisoner, akAuthority, asSceneSecondaryEvent)
+        return
+    endif
+    if (RPB_Utility.IsFreezePointArmed())
+        RPB_Utility.FreezePoint(akPrisoner, self.__SceneEventPoint(asScene, asSceneEvent, asSceneSecondaryEvent))
+    endif
+
     RPB_Prison prison = API.PrisonManager.FindPrisonByPrisoner(akPrisoner)
-
     if (prison == none)
-        RPB_Utility.LogError("Could not retrieve the prison from " + akPrisoner + ", cannot proceed with the scene!")
+        RPB_Utility.LogError("Could not retrieve the prison from " + akPrisoner + ", cannot proceed with the scene!", "EventManager::__PrisonSceneForMember")
         return
     endif
-
     if (self.__PrisonerAlreadyGone(prison, akPrisoner, asSceneSecondaryEvent))
         return
     endif
 
     RPB_Prisoner prisoner = prison.AwaitPrisonerReference(akPrisoner)
-
     if (prisoner == none)
-        RPB_Utility.LogError("Could not retrieve the prisoner from the scene event, cannot proceed with the scene!")
+        RPB_Utility.LogError("Could not retrieve the prisoner from the scene event, cannot proceed with the scene!", "EventManager::__PrisonSceneForMember")
+        return
+    endif
+    ; Stuck in the calls above until she was found frozen (or until a load ended her freeze): her step was then done the
+    ; frozen way, by whoever found her
+    if (!self.__IsSceneEventPending(aiNumber))
+        RPB_Utility.LogWarn(akPrisoner + "'s " + asScene + " " + asSceneEvent + " was already handled the frozen way (or this stack waited through a load): not handled again", "EventManager::__PrisonSceneForMember")
         return
     endif
 
     self.OnPrisonScene(asScene, asSceneEvent, prison, prisoner, akAuthority, asSceneSecondaryEvent)
+    self.__FlowMarkSceneEvent(asScene, asSceneEvent, asSceneSecondaryEvent, akPrisoner)
 endFunction
 
-function SendPrisonSceneBulkEvent(string asScene, string asSceneEvent, Form[] akPrisoners, Actor akAuthority, string asSceneSecondaryEvent = "null")
-    if (!akPrisoners || akPrisoners.Length == 0)
-        RPB_Utility.LogError("No prisoners provided for bulk scene event!", "EventManager::SendPrisonSceneBulkEvent")
+; A prisoner RPB found frozen: left out of her Scene's step, her prison does what of it needs no call into her
+function __PrisonSceneForFrozen(string asScene, string asSceneEvent, Actor akPrisoner, Actor akAuthority, string asSceneSecondaryEvent)
+    RPB_Utility.LogWarn(akPrisoner + " is frozen: left out of " + asScene + "'s " + asSceneEvent + " until the next load", "EventManager::__PrisonSceneForFrozen")
+    RPB_Utility.NoteFrozenAction(akPrisoner, "Left out of the prison's " + asScene + " (" + asSceneEvent + ")")
+    self.__FrozenPrisonerSceneStep(akPrisoner, asScene, asSceneEvent, asSceneSecondaryEvent, akAuthority)
+endFunction
+
+; A Scene event's freeze point name (RPB_Utility.FreezePoint): "<Scene> <event>", and " (<secondary event>)" if any
+string function __SceneEventPoint(string asScene, string asSceneEvent, string asSceneSecondaryEvent)
+    return asScene + " " + asSceneEvent + RPB_Utility.string_if(asSceneSecondaryEvent != "null" && asSceneSecondaryEvent != "", " (" + asSceneSecondaryEvent + ")", "")
+endFunction
+
+; The flow profiler's mark for a member's Scene event handled (only while a flow is being profiled)
+function __FlowMarkSceneEvent(string asScene, string asSceneEvent, string asSceneSecondaryEvent, Actor akMember)
+    if (!RPB_Utility.IsFlowActive())
         return
     endif
+    string how = RPB_Utility.string_if(RPB_Utility.IsSceneEventsPerMember(), "own stack", "inline")
+    string secondary = RPB_Utility.string_if(asSceneSecondaryEvent != "null" && asSceneSecondaryEvent != "", " (" + asSceneSecondaryEvent + ")", "")
+    RPB_Utility.FlowMark(asScene + " " + asSceneEvent + secondary + " handled for " + akMember + ", " + how)
+endFunction
 
-    ; A prisoner RPB found frozen is left out before any call into him: the prison's lookup and his scene steps call into
-    ; him, and every scene event comes through this one object
-    int frozenMap = RPB_Utility.FrozenNPCsForScan()
-    int first = 0
-    while (first < akPrisoners.Length && frozenMap && RPB_Utility.IsListedFrozen(frozenMap, akPrisoners[first] as Actor))
-        RPB_Utility.LogWarn(akPrisoners[first] + " is frozen: left out of " + asScene + "'s " + asSceneEvent + " until the next load", "EventManager::SendPrisonSceneBulkEvent")
-        RPB_Utility.NoteFrozenAction(akPrisoners[first] as Actor, "Left out of the prison's " + asScene + " (" + asSceneEvent + ")")
-        self.__FrozenPrisonerSceneStep(akPrisoners[first] as Actor, asScene, asSceneEvent, asSceneSecondaryEvent, akAuthority)
-        first += 1
+; ==========================================================
+;              Scene Events, One Stack per Member
+; ==========================================================
+
+;/
+    A Scene's event reaches each of its members on a stack of her own (RPB_PrisonSceneEvent / RPB_ArrestSceneEvent, handled
+    below), no longer on the Scene manager's. A member frozen but not marked yet (the seconds before her probe found her) hung
+    the handler that called into her, and with it the Scene queue: the next Scene only played once the end's handlers had
+    returned (KNOWN_ISSUES round 187: frozen during the strip, the strip's end left both of them standing in the intake area).
+    Now only her own stack hangs.
+    - Order per member: each event is numbered as it's sent, and her handler waits for her previous one to be done (her
+      "Lock Cell" step before her escort's end). Members never wait on each other.
+    - A Scene's end: the Scene manager waits for its batch before it plays the next Scene
+      (RPB_SceneManager.__AwaitSceneEndHandlers).
+    - The bookkeeping is in plain script arrays, changed only in this script's functions with no call out in between: no
+      other stack can come in halfway (a JContainers call could let one in).
+    - Nothing here calls into a member: she's only passed along (pushed to the event, compared in an array).
+    - Every event sent is on a pending list (JDB .rpb_root.sceneEventsPending, by number) until it's handled. A member found
+      frozen has her pending events taken over (__TakeOverFrozenMember): each run the frozen way, once, in order, from
+      whoever found her (her next event's wait, or the Scene end's gate). Her handler stuck in a call into her never gets
+      to do it, and the end gate moving on without her would have left her step undone (at the escort to jail's end:
+      nothing queued her strip or her escort to the cell). A handler that resumes later (after a load) finds its event
+      gone from the list and stops.
+/;
+Form[] __orderMembers   ; the member each ordering slot is for
+int[] __orderSent       ; the number of her last event sent
+int[] __orderDone       ; the number of her last event handled
+int __orderLast         ; the last number given
+int[] __batchIds        ; a Scene end's batch, per slot (0: a free slot)
+int[] __batchPending    ; its members not handled yet
+int __batchLast
+
+function __EnsureSceneEventOrder()
+    if (!__orderMembers || __orderMembers.Length == 0)
+        __orderMembers = new Form[128]
+        __orderSent = new int[128]
+        __orderDone = new int[128]
+        __batchIds = new int[32]
+        __batchPending = new int[32]
+    endif
+endFunction
+
+; After a load (RegisterEvents): what was in flight before it is let go, an event lost with the save would hold her next
+; ones up. A handler restored with the save still runs; it no longer holds anyone up
+function __ResetSceneEventOrder()
+    self.__EnsureSceneEventOrder()
+    JDB.solveObjSetter(".rpb_root.sceneEventsPending", JIntMap.object(), true)
+    int i = 0
+    while (i < __orderMembers.Length)
+        __orderDone[i] = __orderSent[i]
+        i += 1
     endWhile
-    if (first >= akPrisoners.Length)
-        return
+    i = 0
+    while (i < __batchIds.Length)
+        __batchIds[i] = 0
+        __batchPending[i] = 0
+        i += 1
+    endWhile
+endFunction
+
+; @akMember's ordering slot, given one if she has none (a slot with nothing in flight is reused). -1 if all are busy
+int function __OrderSlot(Form akMember)
+    int slot = __orderMembers.Find(akMember)
+    if (slot >= 0)
+        return slot
     endif
-
-    RPB_Prison prison = API.PrisonManager.FindPrisonByPrisoner(akPrisoners[first] as Actor)
-
-    if (prison == none)
-        RPB_Utility.LogError("Could not retrieve the prison from " + akPrisoners[first] + ", cannot proceed with the scene!", "EventManager::SendPrisonSceneBulkEvent")
-        return
-    endif
-
-    int i = first
-    while (i < akPrisoners.Length)
-        if (frozenMap && RPB_Utility.IsListedFrozen(frozenMap, akPrisoners[i] as Actor))
-            if (i > first)
-                self.__FrozenPrisonerSceneStep(akPrisoners[i] as Actor, asScene, asSceneEvent, asSceneSecondaryEvent, akAuthority)
-            endif
-        elseif (!self.__PrisonerAlreadyGone(prison, akPrisoners[i] as Actor, asSceneSecondaryEvent))
-            RPB_Prisoner prisoner = prison.AwaitPrisonerReference(akPrisoners[i] as Actor)
-
-            if (prisoner == none)
-                RPB_Utility.LogError("Could not retrieve the prisoner from the scene event, cannot proceed with the scene!", "EventManager::SendPrisonSceneBulkEvent")
-                return
-            endif
-
-            self.OnPrisonScene(asScene, asSceneEvent, prison, prisoner, akAuthority, asSceneSecondaryEvent)
+    slot = __orderMembers.Find(none)
+    int i = 0
+    while (slot < 0 && i < __orderMembers.Length)
+        if (__orderDone[i] >= __orderSent[i])
+            slot = i
         endif
         i += 1
     endWhile
+    if (slot >= 0)
+        __orderMembers[slot] = akMember
+        __orderSent[slot] = 0
+        __orderDone[slot] = 0
+    endif
+    return slot
+endFunction
+
+; A Scene end's batch (0 if every slot is taken: that end then doesn't wait)
+int function __NewBatch()
+    int slot = __batchIds.Find(0)
+    if (slot < 0)
+        RPB_Utility.LogWarn("No free batch slot (32 Scene ends waiting at once?): this end doesn't wait for its handlers", "EventManager::__NewBatch")
+        return 0
+    endif
+    __batchLast += 1
+    __batchIds[slot] = __batchLast
+    __batchPending[slot] = 0
+    return __batchLast
+endFunction
+
+; RPB_SceneManager.__AwaitSceneEndHandlers: the members of @aiBatch not handled yet (0 for a batch no longer known)
+int function SceneEndBatchPending(int aiBatch)
+    int slot = __batchIds.Find(aiBatch)
+    if (!aiBatch || slot < 0)
+        return 0
+    endif
+    return __batchPending[slot]
+endFunction
+
+; RPB_SceneManager.__AwaitSceneEndHandlers: done waiting for @aiBatch, its slot freed
+function EndSceneEndBatch(int aiBatch)
+    int slot = __batchIds.Find(aiBatch)
+    if (aiBatch && slot >= 0)
+        __batchIds[slot] = 0
+        __batchPending[slot] = 0
+    endif
+endFunction
+
+; @akMember's event @aiSeq handled (or given up on): taken off the pending list, her next one may go, and her Scene end's
+; batch has one fewer to wait for. Only if it was still pending: one taken over meanwhile was counted then
+function __SceneEventDone(Form akMember, int aiSeq, int aiBatch)
+    bool claimed = aiSeq <= 0 || RPB_Memory.FastIntMap_RemoveKey(self.__PendingSceneEvents(), aiSeq)
+    self.__MarkSceneEventHandled(akMember, aiSeq, aiBatch, claimed)
+endFunction
+
+; No call in here (see the arrays above). @abCountForBatch: false for an event already counted (taken over)
+function __MarkSceneEventHandled(Form akMember, int aiSeq, int aiBatch, bool abCountForBatch)
+    int slot = __orderMembers.Find(akMember)
+    if (slot >= 0 && __orderDone[slot] < aiSeq)
+        __orderDone[slot] = aiSeq
+    endif
+    if (aiBatch && abCountForBatch)
+        int batchSlot = __batchIds.Find(aiBatch)
+        if (batchSlot >= 0)
+            __batchPending[batchSlot] = __batchPending[batchSlot] - 1
+        endif
+    endif
+endFunction
+
+int function __PendingSceneEvents()
+    int pending = JDB.solveObj(".rpb_root.sceneEventsPending")
+    if (!pending)
+        pending = JIntMap.object()
+        JDB.solveObjSetter(".rpb_root.sceneEventsPending", pending, true)
+    endif
+    return pending
+endFunction
+
+; Event @aiNumber not handled yet (0, the old way or no ordering slot: always)
+bool function __IsSceneEventPending(int aiNumber)
+    if (aiNumber <= 0)
+        return true
+    endif
+    return RPB_Memory.FastIntMap_HasKey(self.__PendingSceneEvents(), aiNumber)
+endFunction
+
+function __RecordPendingSceneEvent(int aiNumber, bool abPrison, string asScene, string asSceneEvent, string asSceneSecondaryEvent, Actor akMember, Actor akAuthority, int aiBatch)
+    int entry = JMap.object()
+    RPB_Memory.FastMap_SetString(entry, "scene", asScene)
+    RPB_Memory.FastMap_SetString(entry, "event", asSceneEvent)
+    RPB_Memory.FastMap_SetString(entry, "secondary", asSceneSecondaryEvent)
+    RPB_Memory.FastMap_SetForm(entry, "member", akMember)
+    RPB_Memory.FastMap_SetForm(entry, "authority", akAuthority)
+    RPB_Memory.FastMap_SetInt(entry, "prison", abPrison as int)
+    RPB_Memory.FastMap_SetInt(entry, "batch", aiBatch)
+    RPB_Memory.FastIntMap_SetObject(self.__PendingSceneEvents(), aiNumber, entry)
+endFunction
+
+;/
+    @akMember found frozen: her Scene events not handled yet (up to @aiUpTo, 0: all of them) run the frozen way, once each,
+    in the order they were sent. Their handlers are stuck in a call into her, or waiting behind one. Each is claimed first
+    (taken off the pending list), so a handler that resumes later, or another takeover, doesn't run it again. No call into her.
+/;
+function __TakeOverFrozenMember(Actor akMember, int aiUpTo)
+    int pending = JDB.solveObj(".rpb_root.sceneEventsPending")
+    if (!pending || !akMember)
+        return
+    endif
+    int[] numbers = RPB_Memory.FastIntMap_KeysAsPapyrusArray(pending)
+    ; Ascending (the order they were sent)
+    int i = 1
+    while (numbers && i < numbers.Length)
+        int current = numbers[i]
+        int j = i - 1
+        while (j >= 0 && numbers[j] > current)
+            numbers[j + 1] = numbers[j]
+            j -= 1
+        endWhile
+        numbers[j + 1] = current
+        i += 1
+    endWhile
+
+    i = 0
+    while (numbers && i < numbers.Length)
+        int number = numbers[i]
+        int entry = RPB_Memory.FastIntMap_GetObject(pending, number)
+        if ((aiUpTo <= 0 || number <= aiUpTo) && entry && RPB_Memory.FastMap_GetForm(entry, "member") == akMember)
+            string sceneName = RPB_Memory.FastMap_GetString(entry, "scene")
+            string sceneEvent = RPB_Memory.FastMap_GetString(entry, "event")
+            string secondary = RPB_Memory.FastMap_GetString(entry, "secondary")
+            Actor authority = RPB_Memory.FastMap_GetForm(entry, "authority") as Actor
+            bool isPrison = RPB_Memory.FastMap_GetInt(entry, "prison") != 0
+            int batch = RPB_Memory.FastMap_GetInt(entry, "batch")
+            if (RPB_Memory.FastIntMap_RemoveKey(pending, number))
+                RPB_Utility.LogWarn(akMember + " is frozen: her " + sceneName + " " + sceneEvent + " (#" + number + ") taken over, done the frozen way", "EventManager::__TakeOverFrozenMember")
+                if (isPrison)
+                    self.__PrisonSceneForFrozen(sceneName, sceneEvent, akMember, authority, secondary)
+                endif
+                self.__MarkSceneEventHandled(akMember, number, batch, true)
+            endif
+        endif
+        i += 1
+    endWhile
+endFunction
+
+; RPB_SceneManager.__AwaitSceneEndHandlers: the members of a Scene's end found frozen get their pending events taken over.
+; Returns how many were frozen
+int function TakeOverFrozenMembers(Form[] akMembers)
+    int frozen = 0
+    int i = 0
+    while (akMembers && i < akMembers.Length)
+        Actor member = akMembers[i] as Actor
+        if (member && RPB_Utility.IsFrozenNPC(member))
+            self.__TakeOverFrozenMember(member, 0)
+            frozen += 1
+        endif
+        i += 1
+    endWhile
+    return frozen
+endFunction
+
+;/
+    Sends @asScene's @asSceneEvent to each of @akMembers on a stack of her own (OnPrisonSceneEvent / OnArrestSceneEvent). A
+    member already marked frozen is handled here, with no call into her. @abTrackBatch (a Scene's end): returns the batch
+    the Scene manager waits for, else 0.
+/;
+int function __DispatchSceneEvent(bool abPrison, string asScene, string asSceneEvent, Form[] akMembers, Actor akAuthority, string asSceneSecondaryEvent, bool abTrackBatch)
+    self.__EnsureSceneEventOrder()
+    string eventName = RPB_Utility.string_if(abPrison, "RPB_PrisonSceneEvent", "RPB_ArrestSceneEvent")
+    int batch = 0
+    if (abTrackBatch)
+        batch = self.__NewBatch()
+    endif
+
+    int frozenMap = RPB_Utility.FrozenNPCsForScan()
+    int i = 0
+    while (i < akMembers.Length)
+        Actor member = akMembers[i] as Actor
+        if (!member)
+            ; an empty alias
+        elseif (frozenMap && RPB_Utility.IsListedFrozen(frozenMap, member))
+            self.__TakeOverFrozenMember(member, 0) ; her earlier ones first, in order (none if her mark already took them)
+            if (abPrison)
+                self.__PrisonSceneForFrozen(asScene, asSceneEvent, member, akAuthority, asSceneSecondaryEvent)
+            else
+                RPB_Utility.LogWarn(member + " is frozen: left out of " + asScene + "'s " + asSceneEvent + " until the next load", "EventManager::__DispatchSceneEvent")
+            endif
+        else
+            ; Numbered here, with nothing called in between: two Scene events sent at once (a step and the end) can't take
+            ; the same number
+            int slot = self.__OrderSlot(member)
+            int previous = 0
+            int number = 0
+            if (slot >= 0)
+                __orderLast += 1
+                number = __orderLast
+                previous = __orderSent[slot]
+                __orderSent[slot] = number
+            else
+                RPB_Utility.LogWarn("Every ordering slot is busy: " + member + "'s " + asScene + " " + asSceneEvent + " goes unordered", "EventManager::__DispatchSceneEvent")
+            endif
+            if (batch)
+                int batchSlot = __batchIds.Find(batch)
+                if (batchSlot >= 0)
+                    __batchPending[batchSlot] = __batchPending[batchSlot] + 1
+                endif
+            endif
+            if (number > 0)
+                self.__RecordPendingSceneEvent(number, abPrison, asScene, asSceneEvent, asSceneSecondaryEvent, member, akAuthority, batch)
+            endif
+
+            int handle = ModEvent.Create(eventName)
+            if (handle)
+                ModEvent.PushString(handle, asScene)
+                ModEvent.PushString(handle, asSceneEvent)
+                ModEvent.PushString(handle, asSceneSecondaryEvent)
+                ModEvent.PushForm(handle, member)
+                ModEvent.PushForm(handle, akAuthority)
+                ModEvent.PushInt(handle, previous)
+                ModEvent.PushInt(handle, number)
+                ModEvent.PushInt(handle, batch)
+                ModEvent.PushInt(handle, akMembers.Length)
+                ModEvent.Send(handle)
+            else
+                ; Never sent: counted as done, or her later events and this end would wait on it
+                RPB_Utility.LogError("Could not create " + eventName + " for " + member + " (" + asScene + " " + asSceneEvent + "): her step is skipped", "EventManager::__DispatchSceneEvent")
+                self.__SceneEventDone(member, number, batch)
+            endif
+        endif
+        i += 1
+    endWhile
+    return batch
+endFunction
+
+; A member's Scene event on her own stack. Found frozen while waiting her turn: her events up to this one done the frozen way
+; (the stuck one before it too). Already taken over meanwhile: nothing left to do
+event OnPrisonSceneEvent(string asScene, string asSceneEvent, string asSceneSecondaryEvent, Form akMember, Form akAuthority, int aiPrevious, int aiNumber, int aiBatch, int aiMembers)
+    Actor member = akMember as Actor
+    if (!self.__AwaitTurn(member, aiPrevious, asScene + " " + asSceneEvent))
+        if (aiNumber > 0)
+            self.__TakeOverFrozenMember(member, aiNumber)
+        else
+            self.__PrisonSceneForFrozen(asScene, asSceneEvent, member, akAuthority as Actor, asSceneSecondaryEvent)
+        endif
+    elseif (self.__IsSceneEventPending(aiNumber))
+        self.__PrisonSceneForMember(asScene, asSceneEvent, member, akAuthority as Actor, asSceneSecondaryEvent, aiNumber)
+    endif
+    self.__SceneEventDone(akMember, aiNumber, aiBatch)
+endEvent
+
+event OnArrestSceneEvent(string asScene, string asSceneEvent, string asSceneSecondaryEvent, Form akMember, Form akAuthority, int aiPrevious, int aiNumber, int aiBatch, int aiMembers)
+    Actor member = akMember as Actor
+    if (!self.__AwaitTurn(member, aiPrevious, asScene + " " + asSceneEvent))
+        if (aiNumber > 0)
+            self.__TakeOverFrozenMember(member, aiNumber)
+        else
+            RPB_Utility.LogWarn(member + " is frozen: left out of " + asScene + "'s " + asSceneEvent + " until the next load", "EventManager::OnArrestSceneEvent")
+        endif
+    elseif (self.__IsSceneEventPending(aiNumber))
+        self.__ArrestSceneForMember(asScene, asSceneEvent, member, akAuthority as Actor, asSceneSecondaryEvent, aiMembers == 1, aiNumber)
+    endif
+    self.__SceneEventDone(akMember, aiNumber, aiBatch)
+endEvent
+
+;/
+    @akMember's previous Scene event (@aiPrevious, 0: none) handled first. False if she's found frozen meanwhile: this one
+    then goes the frozen way. Her previous one still not done after the Advanced wait (RPB_Utility.SceneEventProbeAfter)
+    gets her probed; it may only be slow (a heavy script load), so I keep waiting, up to the longest wait
+    (RPB_Utility.SceneEventGiveUpAfter: a handler stuck on someone else, her guard frozen, never finishes). Each look waits a
+    frame or so; the waits are counted, so time in a menu doesn't count.
+/;
+bool function __AwaitTurn(Actor akMember, int aiPrevious, string asWhat)
+    if (aiPrevious <= 0)
+        return true
+    endif
+    float probeAfter = RPB_Utility.SceneEventProbeAfter()
+    float giveUpAfter = RPB_Utility.SceneEventGiveUpAfter()
+    float waited = 0.0
+    bool probed = false
+    while (true)
+        int slot = __orderMembers.Find(akMember)
+        if (slot < 0 || __orderDone[slot] >= aiPrevious)
+            return true
+        endif
+        if (RPB_Utility.IsFrozenNPC(akMember))
+            return false
+        endif
+        if (waited >= giveUpAfter)
+            RPB_Utility.LogWarn(akMember + "'s previous Scene event still not done after " + (waited as int) + "s: " + asWhat + " goes ahead of it", "EventManager::__AwaitTurn")
+            return true
+        endif
+        if (!probed && waited >= probeAfter)
+            probed = true
+            if (!RPB_Utility.IsNPCProbeOpen(akMember))
+                RPB_Utility.ProbeNPC(akMember, asWhat + ": her previous Scene event not done after " + (waited as int) + "s", 0.0, "PRISONER")
+            endif
+        endif
+        Utility.Wait(0.02)
+        waited += 0.02
+    endWhile
+    return true
 endFunction
 
 ;/

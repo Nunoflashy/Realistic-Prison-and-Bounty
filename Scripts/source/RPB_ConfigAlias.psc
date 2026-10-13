@@ -101,6 +101,7 @@ function PerformMaintenance()
     if (devTests)
         devTests.ReleaseDevHoldsOnLoad() ; returns once each hold has ended (10s at most)
     endif
+    RPB_Utility.ArmFreezePoint("") ; a freeze point armed before the save (its handler's registration didn't survive the load)
     RPB_Utility.SetTestRunning(false) ; a test saved mid-run isn't running after the load
     RPB_Utility.ClearFrozenNPCs() ; a load drops a frozen guard's broken object: he answers again
     SceneManager.SceneManager()
