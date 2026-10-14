@@ -272,6 +272,8 @@ function SetTests()
     self.AddTest("184 - Benchmark: the Time Skip's NPC Releases on Its Own Stack vs by Event (6 bandits each; advances the clock a few days)", "Test_ReleaseByEventBenchmark", abChainable = false)
     self.AddTest("187 - Freeze Control, NPC: 156's Steps With a Bandit (moved 1500 away and back mid escort, ended by a reset; repeat it)", "Test_NpcFreeWalkControl", abChainable = false)
     self.AddTest("188 - Freeze Control, Alternating: 187 (NPC) and 156 (player) by turns, the same-session comparison (repeat it)", "Test_FreezeControlAlternating", abChainable = false)
+    self.AddTest("207 - Parcels: Save Size, Remove (opens and deletes every parcel 206 made; save again after it)", "Test_ParcelSaveSizeRemove", abChainable = false)
+    self.AddTest("206 - Parcels: Save Size, Create (250 parcels of 1 gold each, their tokens in one chest; save before and after it, then run 207 and save again)", "Test_ParcelSaveSizeCreate", abChainable = false)
     self.AddTest("205 - Parcels: Prisoners' Belongings (two NPC prisoners sharing a belongings chest stripped into parcels of their own and given back their own; again with the old shared chest + manifest's dev switch on)", "Test_ParcelBelongings", abChainable = false)
     self.AddTest("204 - Parcels: the Engine Checks (tokens moved by reference, their names, a take opening one, the cost of 30 items; leaves two chests in front of you to look and take by hand; needs patch 020)", "Test_Parcels", abChainable = false)
     self.AddTest("203 - Benchmark: the Prison Lookup (FindPrisonByPrisoner) vs an Actor-Keyed Registry (its parts too, 3 rounds)", "Test_PrisonLookupBenchmark", abChainable = false)
@@ -14033,6 +14035,52 @@ bool function __ParcelBelongings(string asTest, bool abManifest)
     return ok
 endFunction
 
+;/
+    206/207: what parcels cost a save. 206 makes 250 parcels of 1 gold each (the least a parcel holds: one is only made
+    when something goes in), their tokens all in one chest out of the world (as in a prison's belongings chest); 207
+    opens them all into that chest and deletes it. Saves before 206, after 206 and after 207: the .ess and the
+    JContainers co-save's sizes, compared
+/;
+bool function __ParcelSaveSize(string asTest, bool abCreate)
+    int total = 250
+    RPB_Parcels parcels = RPB_API.GetParcels()
+    Form gold = Game.GetFormEx(0xF)
+    float started = Utility.GetCurrentRealTime()
+    if (abCreate)
+        ObjectReference chest = parcels.HoldingMarker.PlaceAtMe(parcels.ContainerBase, 1, true, false)
+        JDB.solveFormSetter(".rpb_root.tests.parcelSaveSizeChest", chest, true)
+        int i = 0
+        while (i < total)
+            ObjectReference parcel = parcels.Create(chest, "SaveSizeTest", "Save Size Test " + i)
+            parcel.AddItem(gold, 1, true)
+            parcels.GiveTo(parcel, chest)
+            i += 1
+        endWhile
+        Utility.Wait(2.0) ; the tokens' OnContainerChanged
+        float ms = (Utility.GetCurrentRealTime() - started) * 1000.0
+        log(asTest + ": made " + total + " parcels in " + (ms as int) + "ms (" + ((ms / total) as int) + "ms each), tokens in the chest " + chest.GetItemCount(parcels.TokenBase))
+        Debug.MessageBox(asTest + ": " + total + " parcels made. Save now, note the save's size (and its .skse / JContainers co-save's), then run 207 and save again.")
+        return assert_true(chest.GetItemCount(parcels.TokenBase) == total, asTest + ": the chest holds " + chest.GetItemCount(parcels.TokenBase) + " tokens, not " + total)
+    endif
+    ObjectReference chest = JDB.solveForm(".rpb_root.tests.parcelSaveSizeChest") as ObjectReference
+    if (!assert_true(chest != none, asTest + ": no chest from 206 (run 206 first)"))
+        return false
+    endif
+    int opened = 0
+    ObjectReference parcel = parcels.Find(chest, "SaveSizeTest")
+    while (parcel)
+        parcels.Open(parcel, chest)
+        opened += 1
+        parcel = parcels.Find(chest, "SaveSizeTest")
+    endWhile
+    chest.RemoveAllItems()
+    chest.Delete()
+    JDB.solveFormSetter(".rpb_root.tests.parcelSaveSizeChest", none)
+    log(asTest + ": opened " + opened + " parcels in " + (((Utility.GetCurrentRealTime() - started) * 1000.0) as int) + "ms")
+    Debug.MessageBox(asTest + ": " + opened + " parcels opened and deleted. Save again and note the sizes.")
+    return assert_true(opened > 0, asTest + ": no parcels to open")
+endFunction
+
 ; @akBase placed @afAhead units in front of @akActor and @afSide to their right, facing them
 ObjectReference function __PlaceBeside(Actor akActor, Form akBase, float afAhead, float afSide)
     ObjectReference placed = akActor.PlaceAtMe(akBase, 1, true, false)
@@ -15479,7 +15527,7 @@ endFunction
 string __statelessTest = ""
 
 bool function __RunStatelessTest(string asTest)
-    if (asTest != "Test_ArrestWaitsWhileGuardFights_NoPackage" && asTest != "Test_CellDoorsDiagnostic" && asTest != "Test_LongAbsenceSetup" && asTest != "Test_LongAbsenceAdvance" && asTest != "Test_LongAbsenceVerify" && asTest != "Test_FallbackEscortToCellStopped_Player" && asTest != "Test_FallbackEscortToCellStopped_CloneGuard" && asTest != "Test_FightDuringEscort_NPC" && asTest != "Test_FightDuringEscort_Player" && asTest != "Test_GuardDiesInPrison_Player" && asTest != "Test_EscortToCellStopped_NoPackageLock" && StringUtil.Find(asTest, "Test_Surrender_") != 0 && asTest != "Test_FrozenGuardSkipped" && asTest != "Test_GuardDiesInPrison_NobodySees" && asTest != "Test_Escort_FreeWalk" && asTest != "Test_ToggleEscortToCell04" && asTest != "Test_CaptorFinishCycles_Calls" && asTest != "Test_CaptorFinishCycles_NoCalls" && asTest != "Test_CaptorFinishDetach_Calls" && asTest != "Test_CaptorFinishDetach_NoCalls" && asTest != "Test_Escort_FreeWalk_Control" && asTest != "Test_ActorKeys" && asTest != "Test_FrozenGuardCalls" && asTest != "Test_SimulatedFreezeCalls" && asTest != "Test_SimulatedFreezeAtCancel" && asTest != "Test_SpawnFreezableGuard" && asTest != "Test_AliasPackageControl" && asTest != "Test_FreezableEscort_Player" && asTest != "Test_FreezableEscort_NPC" && asTest != "Test_LightHold" && asTest != "Test_KillFrozenGuard" && asTest != "Test_LifetimeBountyStat" && asTest != "Test_FaintFrozenGuard" && asTest != "Test_FaintFrozenGuardShort" && asTest != "Test_FrozenEscortFallback" && asTest != "Test_HideFrozenGuard" && asTest != "Test_EscortToCellGuardHeld" && asTest != "Test_CuffedLimitEncumbrance" && asTest != "Test_CuffedLimitSettings" && asTest != "Test_EarlyHandback" && asTest != "Test_StalledEscortTakeover" && asTest != "Test_StalledEscortTakeoverLimit" && asTest != "Test_NpcEscortCancelControl" && asTest != "Test_FrozenPrisonerTimeSkip" && asTest != "Test_SpawnFreezablePrisoner" && asTest != "Test_SpawnFreezableArrestee" && asTest != "Test_GuardCrimeFactions" && asTest != "Test_PlayerEscortCancelControl" && asTest != "Test_ReleaseByEventBenchmark" && asTest != "Test_FrozenPrisonerDialogue" && asTest != "Test_NpcFreeWalkControl" && asTest != "Test_FreezeControlAlternating" && asTest != "Test_SetCancelSettle" && asTest != "Test_FightAtConfrontationStart" && asTest != "Test_FastWrapperBenchmark" && asTest != "Test_SkipEscortBegun" && asTest != "Test_WIDeadBody" && StringUtil.Find(asTest, "Test_FreezePoint_") != 0 && asTest != "Test_PrisonLookupBenchmark" && asTest != "Test_Parcels" && asTest != "Test_ParcelBelongings")
+    if (asTest != "Test_ArrestWaitsWhileGuardFights_NoPackage" && asTest != "Test_CellDoorsDiagnostic" && asTest != "Test_LongAbsenceSetup" && asTest != "Test_LongAbsenceAdvance" && asTest != "Test_LongAbsenceVerify" && asTest != "Test_FallbackEscortToCellStopped_Player" && asTest != "Test_FallbackEscortToCellStopped_CloneGuard" && asTest != "Test_FightDuringEscort_NPC" && asTest != "Test_FightDuringEscort_Player" && asTest != "Test_GuardDiesInPrison_Player" && asTest != "Test_EscortToCellStopped_NoPackageLock" && StringUtil.Find(asTest, "Test_Surrender_") != 0 && asTest != "Test_FrozenGuardSkipped" && asTest != "Test_GuardDiesInPrison_NobodySees" && asTest != "Test_Escort_FreeWalk" && asTest != "Test_ToggleEscortToCell04" && asTest != "Test_CaptorFinishCycles_Calls" && asTest != "Test_CaptorFinishCycles_NoCalls" && asTest != "Test_CaptorFinishDetach_Calls" && asTest != "Test_CaptorFinishDetach_NoCalls" && asTest != "Test_Escort_FreeWalk_Control" && asTest != "Test_ActorKeys" && asTest != "Test_FrozenGuardCalls" && asTest != "Test_SimulatedFreezeCalls" && asTest != "Test_SimulatedFreezeAtCancel" && asTest != "Test_SpawnFreezableGuard" && asTest != "Test_AliasPackageControl" && asTest != "Test_FreezableEscort_Player" && asTest != "Test_FreezableEscort_NPC" && asTest != "Test_LightHold" && asTest != "Test_KillFrozenGuard" && asTest != "Test_LifetimeBountyStat" && asTest != "Test_FaintFrozenGuard" && asTest != "Test_FaintFrozenGuardShort" && asTest != "Test_FrozenEscortFallback" && asTest != "Test_HideFrozenGuard" && asTest != "Test_EscortToCellGuardHeld" && asTest != "Test_CuffedLimitEncumbrance" && asTest != "Test_CuffedLimitSettings" && asTest != "Test_EarlyHandback" && asTest != "Test_StalledEscortTakeover" && asTest != "Test_StalledEscortTakeoverLimit" && asTest != "Test_NpcEscortCancelControl" && asTest != "Test_FrozenPrisonerTimeSkip" && asTest != "Test_SpawnFreezablePrisoner" && asTest != "Test_SpawnFreezableArrestee" && asTest != "Test_GuardCrimeFactions" && asTest != "Test_PlayerEscortCancelControl" && asTest != "Test_ReleaseByEventBenchmark" && asTest != "Test_FrozenPrisonerDialogue" && asTest != "Test_NpcFreeWalkControl" && asTest != "Test_FreezeControlAlternating" && asTest != "Test_SetCancelSettle" && asTest != "Test_FightAtConfrontationStart" && asTest != "Test_FastWrapperBenchmark" && asTest != "Test_SkipEscortBegun" && asTest != "Test_WIDeadBody" && StringUtil.Find(asTest, "Test_FreezePoint_") != 0 && asTest != "Test_PrisonLookupBenchmark" && asTest != "Test_Parcels" && asTest != "Test_ParcelBelongings" && asTest != "Test_ParcelSaveSizeCreate" && asTest != "Test_ParcelSaveSizeRemove")
         return false
     endif
 
@@ -15700,6 +15748,10 @@ bool function __RunStatelessTest(string asTest)
         display_result(__PrisonLookupBenchmark("203"))
     elseif (asTest == "Test_Parcels")
         display_result(__ParcelsEngineChecks("204"))
+    elseif (asTest == "Test_ParcelSaveSizeCreate")
+        display_result(__ParcelSaveSize("206", true))
+    elseif (asTest == "Test_ParcelSaveSizeRemove")
+        display_result(__ParcelSaveSize("207", false))
     elseif (asTest == "Test_ParcelBelongings")
         bool parcelsOk = __ParcelBelongings("205", false)
         bool manifestOk = __ParcelBelongings("205 (manifest)", true)
