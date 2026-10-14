@@ -236,7 +236,7 @@ endProperty
 
 string[] property Holds
     string[] function get()
-        int rootObject = RPB_Data.Unserialize()
+        int rootObject = RPB_Data.GetRootObject()
         return FastArray_ToStringArray( \ 
             FastMap_Keys(rootObject) \
         )

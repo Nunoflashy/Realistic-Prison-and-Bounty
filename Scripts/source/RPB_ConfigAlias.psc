@@ -218,6 +218,7 @@ event OnInit()
 endEvent
 
 event OnPlayerLoadGame()
+    RPB_Data.RefreshRootObject() ; data.json read again: an updated file reaches a save, as when every lookup read it
     self.PerformMaintenance()
     self.RegisterHotkeys()
 endEvent

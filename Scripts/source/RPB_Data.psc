@@ -378,12 +378,11 @@ endFunction
     returns (JMap&): A reference to the root object containing all of the Holds, or the specified Hold if specified.
 /;
 int function GetRootObject(string asHold = "/") global
-    int configFile
-    bool rootIsLoaded = JDB.hasPath(".rpb_root.data")
-
-    if (rootIsLoaded)
-        configFile = JDB.solveObj(".rpb_root.data")
-    else
+    ; Read from data.json once (and again at every game load, RPB_ConfigAlias), not at every call: the check used to look
+    ; for a path SetRootContainer never wrote, so every call read the file again and left the previous copy behind (8,613
+    ; copies, 15.6 MB of a co-save, 2026-10-15)
+    int configFile = JDB.solveObj(".rpb_root.data")
+    if (!configFile)
         configFile = Unserialize()
     endif
     
@@ -400,7 +399,9 @@ endFunction
     Sets @apRootContainer to be the root container of the data.
 /;
 bool function SetRootContainer(int apRootContainer) global
-    JDB.setObj("rpb_root.data", apRootContainer)
+    JDB.solveObjSetter(".rpb_root.data", apRootContainer, true)
+    ; JDB.setObj takes a key, not a path: it used to write a top-level "rpb_root.data" key, never read; gone with it
+    JMap.removeKey(JDB.root(), "rpb_root.data")
 endFunction
 
 ;/
