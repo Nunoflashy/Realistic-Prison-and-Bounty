@@ -42,6 +42,30 @@ RPB_Arrest property Arrest
     endFunction
 endProperty
 
+RPB_Surrender __surrender
+RPB_Surrender property Surrender
+    RPB_Surrender function get()
+        if (__surrender)
+            return __surrender
+        endif
+
+        __surrender = GetSurrender()
+        return __surrender
+    endFunction
+endProperty
+
+RPB_Confiscation __confiscation
+RPB_Confiscation property Confiscation
+    RPB_Confiscation function get()
+        if (__confiscation)
+            return __confiscation
+        endif
+
+        __confiscation = GetConfiscation()
+        return __confiscation
+    endFunction
+endProperty
+
 RPB_ActorList __actorListTrackedActors
 RPB_ActorList property ActorListForTrackedActors
     RPB_ActorList function get()
@@ -108,6 +132,15 @@ endFunction
 
 RPB_Arrest function GetArrest() global
     return GetFormFromMod(0x3DF8) as RPB_Arrest
+endFunction
+
+; RPB_Main's other scripts, beside RPB_Arrest
+RPB_Surrender function GetSurrender() global
+    return GetFormFromMod(0x3DF8) as RPB_Surrender
+endFunction
+
+RPB_Confiscation function GetConfiscation() global
+    return GetFormFromMod(0x3DF8) as RPB_Confiscation
 endFunction
 
 RPB_ActorList function GetActorListForTrackedActors() global

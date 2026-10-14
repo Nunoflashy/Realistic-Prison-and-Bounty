@@ -5,6 +5,7 @@ scriptname RPB_EventManager extends Quest
     RPB_API API
     RPB_Config Config
     RPB_Arrest Arrest
+    RPB_Surrender Surrender
     RPB_SceneManager SceneManager
 @functions:
     function RegisterEvents()
@@ -71,6 +72,12 @@ endProperty
 RPB_Arrest property Arrest
     RPB_Arrest function get()
         return API.Arrest
+    endFunction
+endProperty
+
+RPB_Surrender property Surrender
+    RPB_Surrender function get()
+        return API.Surrender
     endFunction
 endProperty
 
@@ -150,7 +157,7 @@ function RegisterEvents()
     ; that stopped on the way), no guard could arrest the player again in that save (2026-10-05)
     Actor player = Game.GetPlayer()
     ; Set either way: the arrest-on-sight game settings it also holds last the game session and aren't saved
-    bool inCustody = RPB_Utility.IsActorArrested(player) || RPB_Utility.IsActorImprisoned(player) || (Arrest && Arrest.IsSurrendering(player))
+    bool inCustody = RPB_Utility.IsActorArrested(player) || RPB_Utility.IsActorImprisoned(player) || (Arrest && Surrender.IsSurrendering(player))
     if (inCustody)
         ; Off when the player is in custody: a save from before it was kept off through the custody had it on
         RPB_Arrest.DisableForcedArrestDialogue()
@@ -377,7 +384,7 @@ event OnArrestControlsCheck(float afStamp)
     Actor player = Config.Player
     string current = SceneManager.GetCurrentScene()
     bool inScene = current != "" && (SceneManager.GetSceneNthReferenceOfType(current, "Escortee") == player || SceneManager.GetSceneNthReferenceOfType(current, "Prisoner") == player)
-    if (inScene || SceneManager.HasQueuedSceneWithActor(player) || RPB_Utility.IsCuffed(player) || RPB_Utility.IsActorImprisoned(player) || Arrest.IsSurrendering(player))
+    if (inScene || SceneManager.HasQueuedSceneWithActor(player) || RPB_Utility.IsCuffed(player) || RPB_Utility.IsActorImprisoned(player) || Surrender.IsSurrendering(player))
         return
     endif
     RPB_Utility.LogWarn("The player's controls were still off 30s after an arrest began, with no arrest Scene for them: given back", "EventManager::OnArrestControlsCheck")
@@ -387,7 +394,7 @@ endEvent
 event OnSetAsideBountyCheck(Form akActor, float afDelay)
     Utility.Wait(afDelay)
     ; A takeover guard still walking over (a surrender-like approach): its own end gives the bounty back or arrests
-    while (Arrest.IsSurrendering(akActor as Actor))
+    while (Surrender.IsSurrendering(akActor as Actor))
         Utility.Wait(5.0)
     endWhile
     if (RPB_Arrest.GiveBackSetAsideBounty(akActor as Actor, "no arrest took it within " + (afDelay as int) + "s"))
@@ -571,7 +578,7 @@ function OnSceneStartFailed(string asScene)
         Actor surrenderer = SceneManager.GetSceneNthReferenceOfType(asScene, "Surrenderer") as Actor
         if (surrenderer)
             ; The surrender's watch starts it again (a guard back in combat), and undoes it after the last retry
-            Arrest.OnSurrenderSceneFailed(surrenderer)
+            Surrender.OnSurrenderSceneFailed(surrenderer)
         endif
         return
     endif
@@ -1882,8 +1889,8 @@ event OnSurrenderPreparing(Form akSurrenderer)
     Actor[] surrendererCaptors = PO3_SKSEFunctions.GetCombatTargets(surrenderer)
     Debug("EventManager::OnSurrenderPreparing", "combat targets of " + surrenderer + ": " + surrendererCaptors + " (in combat " + surrenderer.IsInCombat() + ")")
 
-    Arrest.SnapshotSurrenderTargets(surrenderer, surrendererCaptors) ; each target looked at once, for the checks and the begin
-    if (!Arrest.CanActorSurrender(surrenderer, surrendererCaptors))
+    Surrender.SnapshotSurrenderTargets(surrenderer, surrendererCaptors) ; each target looked at once, for the checks and the begin
+    if (!Surrender.CanActorSurrender(surrenderer, surrendererCaptors))
         return
     endif
     RPB_Utility.FlowMark("Surrender: combat targets read, allowed")
@@ -1891,7 +1898,7 @@ event OnSurrenderPreparing(Form akSurrenderer)
     ; Should only be for player (to avoid forced dialogue during surrender)
     RPB_Arrest.DisableForcedArrestDialogue()
 
-    Arrest.OnSurrenderBegin(surrenderer, surrendererCaptors)
+    Surrender.OnSurrenderBegin(surrenderer, surrendererCaptors)
 endEvent
 
 event OnSurrenderScene(string asScene, string asSceneEvent, Actor akSurrenderer, Actor akSurrendererCaptor, string asSceneSecondaryEvent, Form[] akParams, Form[] akParams2)
@@ -1904,12 +1911,12 @@ event OnSurrenderScene(string asScene, string asSceneEvent, Actor akSurrenderer,
 
         elseif (asSceneEvent == SceneManager.EVENT_SURRENDER_END)
             ; Not for a surrender already undone: that would lock the player again, with nothing left to release them
-            RetainAI(akSurrenderer.GetFormID() == 0x14 && Arrest.IsSurrendering(akSurrenderer))
+            RetainAI(akSurrenderer.GetFormID() == 0x14 && Surrender.IsSurrendering(akSurrenderer))
 
             ; The forced arrest dialogue stays off from here: turned back on at BeginArrest's end (Arrest.OnArrestEnd), once
             ; the bounty is hidden, or by an undone surrender. Turned on here, an alerted guard force-greeted the player in
             ; the seconds the surrender bounty was still active, and leaving that dialogue counted as resisting.
-            Arrest.OnSurrenderEnd(akSurrenderer, akSurrendererCaptor)
+            Surrender.OnSurrenderEnd(akSurrenderer, akSurrendererCaptor)
         endif
     endif
 endEvent

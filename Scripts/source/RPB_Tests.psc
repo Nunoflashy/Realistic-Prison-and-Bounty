@@ -11605,7 +11605,7 @@ function __ScenarioWaitImprisoned(Actor akActor, string asTest)
 endFunction
 
 ;/
-    141-146: the player surrenders (F8's Arrest.Surrender) in a fight. Each mode checks Arrest.LastSurrenderOutcome, so a
+    141-146: the player surrenders (F8's RPB_API.GetSurrender().Surrender) in a fight. Each mode checks RPB_API.GetSurrender().LastSurrenderOutcome, so a
     refusal for another reason (no combat targets yet: 144 and 145 passed that way once) fails.
     @aiMode 1: only a bandit fights them, no bounty: refused ("no guard"), nothing disabled
             2: a guard clone fights them, no bounty: arrested, bounty = the surrender flat amount
@@ -11676,7 +11676,7 @@ bool function __Scenario_Surrender(string asTest, int aiMode)
     float lastAttack = start
     while (!ready && (Utility.GetCurrentRealTime() - start) < 10.0)
         Actor[] targets = PO3_SKSEFunctions.GetCombatTargets(player)
-        ready = player.IsInCombat() && targets && (targets.Find(needed) >= 0 || ((aiMode == 4 || aiMode == 7) && arrest.HasSurrenderGuard(targets))) && (aiMode != 5 || targets.Find(hostile) >= 0)
+        ready = player.IsInCombat() && targets && (targets.Find(needed) >= 0 || ((aiMode == 4 || aiMode == 7) && RPB_API.GetSurrender().HasSurrenderGuard(targets))) && (aiMode != 5 || targets.Find(hostile) >= 0)
         if (!ready)
             ; The bandit can turn on the guard (or the real guards around) instead: send it at the player again
             if (hostile && (Utility.GetCurrentRealTime() - lastAttack) >= 1.0)
@@ -11697,31 +11697,31 @@ bool function __Scenario_Surrender(string asTest, int aiMode)
 
     string hold = RPB_Utility.GetFormNameCached(crimeFaction)
     int expected = startBounty + Math.Floor(startBounty * PercentToDecimal(config.GetArrestAdditionalBountySurrenderingFromCurrentBounty(hold))) + config.GetArrestAdditionalBountySurrenderingFlat(hold)
-    arrest.LastSurrenderOutcome = ""
+    RPB_API.GetSurrender().LastSurrenderOutcome = ""
     start = Utility.GetCurrentRealTime()
-    arrest.Surrender(player)
+    RPB_API.GetSurrender().Surrender(player)
     bool ok = true
 
     if (aiMode == 5)
-        while (!arrest.IsSurrendering(player) && arrest.LastSurrenderOutcome == "" && (Utility.GetCurrentRealTime() - start) < 8.0)
+        while (!RPB_API.GetSurrender().IsSurrendering(player) && RPB_API.GetSurrender().LastSurrenderOutcome == "" && (Utility.GetCurrentRealTime() - start) < 8.0)
             Utility.Wait(0.25)
         endWhile
-        log(asTest + ": outcome '" + arrest.LastSurrenderOutcome + "', surrendering " + arrest.IsSurrendering(player) + " after " + __Ms(Utility.GetCurrentRealTime() - start) + "ms")
-        return assert_true(arrest.IsSurrendering(player) || RPB_Utility.IsActorArrested(player), asTest + ": the surrender with a bandit in the fight didn't go ahead (outcome '" + arrest.LastSurrenderOutcome + "')")
+        log(asTest + ": outcome '" + RPB_API.GetSurrender().LastSurrenderOutcome + "', surrendering " + RPB_API.GetSurrender().IsSurrendering(player) + " after " + __Ms(Utility.GetCurrentRealTime() - start) + "ms")
+        return assert_true(RPB_API.GetSurrender().IsSurrendering(player) || RPB_Utility.IsActorArrested(player), asTest + ": the surrender with a bandit in the fight didn't go ahead (outcome '" + RPB_API.GetSurrender().LastSurrenderOutcome + "')")
     elseif (aiMode == 1)
         Utility.Wait(6.0)
         string expectedOutcome = "no guard"
-        log(asTest + ": outcome '" + arrest.LastSurrenderOutcome + "'")
-        ok = assert_true(arrest.LastSurrenderOutcome == expectedOutcome, asTest + ": refused as '" + arrest.LastSurrenderOutcome + "', expected '" + expectedOutcome + "'") && ok
-        ok = assert_false(arrest.IsSurrendering(player), asTest + ": the refused surrender is still marked as under way") && ok
+        log(asTest + ": outcome '" + RPB_API.GetSurrender().LastSurrenderOutcome + "'")
+        ok = assert_true(RPB_API.GetSurrender().LastSurrenderOutcome == expectedOutcome, asTest + ": refused as '" + RPB_API.GetSurrender().LastSurrenderOutcome + "', expected '" + expectedOutcome + "'") && ok
+        ok = assert_false(RPB_API.GetSurrender().IsSurrendering(player), asTest + ": the refused surrender is still marked as under way") && ok
         ok = assert_false(RPB_Utility.IsActorArrested(player), asTest + ": arrested although the surrender was refused") && ok
     elseif (aiMode == 2 || aiMode == 3 || aiMode == 6)
         while (!RPB_Utility.IsActorArrested(player) && (Utility.GetCurrentRealTime() - start) < 45.0)
             Utility.Wait(0.5)
         endWhile
         int bounty = RPB_ActorBase.GetCurrentActiveAndLatentBountyForFaction(player, crimeFaction)
-        log(asTest + ": outcome '" + arrest.LastSurrenderOutcome + "', arrested " + RPB_Utility.IsActorArrested(player) + " after " + __Ms(Utility.GetCurrentRealTime() - start) + "ms, bounty " + bounty + " (expected " + expected + "), in BanditFaction " + player.IsInFaction(banditFaction) + ", forced dialogue off " + (RPB_Utility.RPB_ArrestGlobal("No Dialogue").GetValueInt() == 1))
-        ok = assert_true(RPB_Utility.IsActorArrested(player), asTest + ": the surrender never led to an arrest (outcome '" + arrest.LastSurrenderOutcome + "')") && ok
+        log(asTest + ": outcome '" + RPB_API.GetSurrender().LastSurrenderOutcome + "', arrested " + RPB_Utility.IsActorArrested(player) + " after " + __Ms(Utility.GetCurrentRealTime() - start) + "ms, bounty " + bounty + " (expected " + expected + "), in BanditFaction " + player.IsInFaction(banditFaction) + ", forced dialogue off " + (RPB_Utility.RPB_ArrestGlobal("No Dialogue").GetValueInt() == 1))
+        ok = assert_true(RPB_Utility.IsActorArrested(player), asTest + ": the surrender never led to an arrest (outcome '" + RPB_API.GetSurrender().LastSurrenderOutcome + "')") && ok
         ok = assert_true(bounty == expected, asTest + ": bounty " + bounty + " after surrendering, expected " + expected) && ok
         if (aiMode == 6)
             ok = assert_false(player.IsInFaction(banditFaction), asTest + ": still in BanditFaction during the arrest") && ok
@@ -11729,10 +11729,10 @@ bool function __Scenario_Surrender(string asTest, int aiMode)
         return ok
     else
         ; Surrender() only sends the event: the flag is set a moment later (the loop below once ended before it started)
-        while (!arrest.IsSurrendering(player) && arrest.LastSurrenderOutcome == "" && (Utility.GetCurrentRealTime() - start) < 8.0)
+        while (!RPB_API.GetSurrender().IsSurrendering(player) && RPB_API.GetSurrender().LastSurrenderOutcome == "" && (Utility.GetCurrentRealTime() - start) < 8.0)
             Utility.Wait(0.25)
         endWhile
-        if (!assert_true(arrest.IsSurrendering(player), asTest + ": the surrender never started (outcome '" + arrest.LastSurrenderOutcome + "')"))
+        if (!assert_true(RPB_API.GetSurrender().IsSurrendering(player), asTest + ": the surrender never started (outcome '" + RPB_API.GetSurrender().LastSurrenderOutcome + "')"))
             RPB_Utility.SetSurrenderSceneForcedToFail(false)
             return false
         endif
@@ -11740,32 +11740,32 @@ bool function __Scenario_Surrender(string asTest, int aiMode)
 
         if (aiMode == 4)
             ; The prepare (4s) and the calming, then SURRENDER_EXPIRE_SECONDS with no guard coming closer
-            while (arrest.LastSurrenderOutcome != "expired" && arrest.IsSurrendering(player) && (Utility.GetCurrentRealTime() - start) < 30.0)
+            while (RPB_API.GetSurrender().LastSurrenderOutcome != "expired" && RPB_API.GetSurrender().IsSurrendering(player) && (Utility.GetCurrentRealTime() - start) < 30.0)
                 Utility.Wait(0.5)
             endWhile
-            log(asTest + ": outcome '" + arrest.LastSurrenderOutcome + "' after " + __Ms(Utility.GetCurrentRealTime() - start) + "ms, still surrendering " + arrest.IsSurrendering(player) + ", controls " + Game.IsMovementControlsEnabled())
-            ok = assert_true(arrest.LastSurrenderOutcome == "expired", asTest + ": outcome '" + arrest.LastSurrenderOutcome + "', expected 'expired'") && ok
-            ok = assert_true(arrest.IsSurrendering(player), asTest + ": an expired surrender must stay on until the player leaves") && ok
+            log(asTest + ": outcome '" + RPB_API.GetSurrender().LastSurrenderOutcome + "' after " + __Ms(Utility.GetCurrentRealTime() - start) + "ms, still surrendering " + RPB_API.GetSurrender().IsSurrendering(player) + ", controls " + Game.IsMovementControlsEnabled())
+            ok = assert_true(RPB_API.GetSurrender().LastSurrenderOutcome == "expired", asTest + ": outcome '" + RPB_API.GetSurrender().LastSurrenderOutcome + "', expected 'expired'") && ok
+            ok = assert_true(RPB_API.GetSurrender().IsSurrendering(player), asTest + ": an expired surrender must stay on until the player leaves") && ok
             ok = assert_true(Game.IsMovementControlsEnabled(), asTest + ": the surrendering player has no movement controls") && ok
         else
             ; Past the prepare, well before it could expire: the "guard" is still coming
             Utility.Wait(5.5)
-            ok = assert_true(arrest.IsSurrendering(player) && arrest.LastSurrenderOutcome == "", asTest + ": setup: before the move, surrendering " + arrest.IsSurrendering(player) + ", outcome '" + arrest.LastSurrenderOutcome + "'") && ok
+            ok = assert_true(RPB_API.GetSurrender().IsSurrendering(player) && RPB_API.GetSurrender().LastSurrenderOutcome == "", asTest + ": setup: before the move, surrendering " + RPB_API.GetSurrender().IsSurrendering(player) + ", outcome '" + RPB_API.GetSurrender().LastSurrenderOutcome + "'") && ok
         endif
 
         float moveStart = Utility.GetCurrentRealTime()
         player.MoveTo(player, 200.0, 0.0, 0.0)
-        while (arrest.IsSurrendering(player) && (Utility.GetCurrentRealTime() - moveStart) < 5.0)
+        while (RPB_API.GetSurrender().IsSurrendering(player) && (Utility.GetCurrentRealTime() - moveStart) < 5.0)
             Utility.Wait(0.25)
         endWhile
         RPB_Utility.SetSurrenderSceneForcedToFail(false)
         int bounty = RPB_ActorBase.GetCurrentActiveAndLatentBountyForFaction(player, crimeFaction)
-        log(asTest + ": moved away: outcome '" + arrest.LastSurrenderOutcome + "' after " + __Ms(Utility.GetCurrentRealTime() - moveStart) + "ms, bounty " + bountyBefore + " -> " + bounty + ", arrested " + RPB_Utility.IsActorArrested(player))
-        ok = assert_false(arrest.IsSurrendering(player), asTest + ": still surrendering after moving away") && ok
+        log(asTest + ": moved away: outcome '" + RPB_API.GetSurrender().LastSurrenderOutcome + "' after " + __Ms(Utility.GetCurrentRealTime() - moveStart) + "ms, bounty " + bountyBefore + " -> " + bounty + ", arrested " + RPB_Utility.IsActorArrested(player))
+        ok = assert_false(RPB_API.GetSurrender().IsSurrendering(player), asTest + ": still surrendering after moving away") && ok
         ok = assert_false(RPB_Utility.IsActorArrested(player), asTest + ": arrested although nobody took the surrender") && ok
 
         if (aiMode == 4)
-            ok = assert_true(arrest.LastSurrenderOutcome == "withdrawn", asTest + ": outcome '" + arrest.LastSurrenderOutcome + "', expected 'withdrawn'") && ok
+            ok = assert_true(RPB_API.GetSurrender().LastSurrenderOutcome == "withdrawn", asTest + ": outcome '" + RPB_API.GetSurrender().LastSurrenderOutcome + "', expected 'withdrawn'") && ok
             ok = assert_true(bounty == bountyBefore, asTest + ": walking away after it expired cost bounty (" + bountyBefore + " -> " + bounty + ")") && ok
         else
             int expectedFake = startBounty + Math.Floor(startBounty * PercentToDecimal(config.GetArrestAdditionalBountyFakingSurrenderFromCurrentBounty(hold))) + config.GetArrestAdditionalBountyFakingSurrenderFlat(hold)
@@ -11780,9 +11780,9 @@ bool function __Scenario_Surrender(string asTest, int aiMode)
             while (!guard.IsInCombat() && (Utility.GetCurrentRealTime() - waitStart) < 3.0)
                 Utility.Wait(0.25)
             endWhile
-            float fakedUntil = arrest.GetFakedSurrenderUntil(player, crimeFaction)
+            float fakedUntil = RPB_API.GetSurrender().GetFakedSurrenderUntil(player, crimeFaction)
             log(asTest + ": expected bounty " + expectedFake + ", guard in combat " + guard.IsInCombat() + ", faked until " + fakedUntil + " (now " + Utility.GetCurrentGameTime() + ")")
-            ok = assert_true(arrest.LastSurrenderOutcome == "faked", asTest + ": outcome '" + arrest.LastSurrenderOutcome + "', expected 'faked'") && ok
+            ok = assert_true(RPB_API.GetSurrender().LastSurrenderOutcome == "faked", asTest + ": outcome '" + RPB_API.GetSurrender().LastSurrenderOutcome + "', expected 'faked'") && ok
             ok = assert_true(bounty == expectedFake, asTest + ": bounty " + bounty + " after faking, expected " + expectedFake) && ok
             ok = assert_true(guard.IsInCombat(), asTest + ": the guard didn't go back to fighting") && ok
             ok = assert_true(fakedUntil > Utility.GetCurrentGameTime(), asTest + ": the hold doesn't remember the fake surrender") && ok
@@ -11792,18 +11792,18 @@ bool function __Scenario_Surrender(string asTest, int aiMode)
             bool listed = false
             while (!listed && (Utility.GetCurrentRealTime() - waitStart) < 10.0)
                 Actor[] again = PO3_SKSEFunctions.GetCombatTargets(player)
-                listed = player.IsInCombat() && again && arrest.HasSurrenderGuard(again)
+                listed = player.IsInCombat() && again && RPB_API.GetSurrender().HasSurrenderGuard(again)
                 if (!listed)
                     Utility.Wait(0.25)
                 endif
             endWhile
             ok = assert_true(listed, asTest + ": setup: no guard fighting the player for the second F8") && ok
-            arrest.LastSurrenderOutcome = ""
-            arrest.Surrender(player)
+            RPB_API.GetSurrender().LastSurrenderOutcome = ""
+            RPB_API.GetSurrender().Surrender(player)
             Utility.Wait(3.0)
-            log(asTest + ": second F8: outcome '" + arrest.LastSurrenderOutcome + "', surrendering " + arrest.IsSurrendering(player))
-            ok = assert_true(arrest.LastSurrenderOutcome == "fooled", asTest + ": the second surrender ended as '" + arrest.LastSurrenderOutcome + "', expected 'fooled'") && ok
-            ok = assert_false(arrest.IsSurrendering(player), asTest + ": the second surrender went ahead") && ok
+            log(asTest + ": second F8: outcome '" + RPB_API.GetSurrender().LastSurrenderOutcome + "', surrendering " + RPB_API.GetSurrender().IsSurrendering(player))
+            ok = assert_true(RPB_API.GetSurrender().LastSurrenderOutcome == "fooled", asTest + ": the second surrender ended as '" + RPB_API.GetSurrender().LastSurrenderOutcome + "', expected 'fooled'") && ok
+            ok = assert_false(RPB_API.GetSurrender().IsSurrendering(player), asTest + ": the second surrender went ahead") && ok
         endif
     endif
 
@@ -15366,13 +15366,13 @@ bool function __RunStatelessTest(string asTest)
         __TeardownScenario()
     elseif (asTest == "Test_Surrender_NoGuardComes")
         display_result(__Scenario_Surrender("144", 4))
-        RPB_API.GetArrest().AbortSurrender(Game.GetFormEx(0x14) as Actor, "test teardown")
+        RPB_API.GetSurrender().AbortSurrender(Game.GetFormEx(0x14) as Actor, "test teardown")
         __TeardownScenario()
     elseif (asTest == "Test_Surrender_OtherHostilesAttacking")
         display_result(__Scenario_Surrender("145", 5))
         ; It goes ahead now: still on at the end, and a step after it counted as a fake (the next runs failed on it)
-        RPB_API.GetArrest().AbortSurrender(Game.GetFormEx(0x14) as Actor, "test teardown")
-        RPB_API.GetArrest().ForgetFakeSurrenders(Game.GetFormEx(0x14) as Actor)
+        RPB_API.GetSurrender().AbortSurrender(Game.GetFormEx(0x14) as Actor, "test teardown")
+        RPB_API.GetSurrender().ForgetFakeSurrenders(Game.GetFormEx(0x14) as Actor)
         __TeardownScenario()
     elseif (asTest == "Test_Surrender_Disguised")
         display_result(__Scenario_Surrender("146", 6))
@@ -15381,8 +15381,8 @@ bool function __RunStatelessTest(string asTest)
     elseif (asTest == "Test_Surrender_Faked")
         display_result(__Scenario_Surrender("149", 7))
         RPB_Utility.SetSurrenderSceneForcedToFail(false)
-        RPB_API.GetArrest().AbortSurrender(Game.GetFormEx(0x14) as Actor, "test teardown")
-        RPB_API.GetArrest().ForgetFakeSurrenders(Game.GetFormEx(0x14) as Actor)
+        RPB_API.GetSurrender().AbortSurrender(Game.GetFormEx(0x14) as Actor, "test teardown")
+        RPB_API.GetSurrender().ForgetFakeSurrenders(Game.GetFormEx(0x14) as Actor)
         __TeardownScenario()
     elseif (asTest == "Test_GuardDiesInPrison_NobodySees")
         display_result(__Scenario_GuardDiesInPrison("148", abForceWait = true))

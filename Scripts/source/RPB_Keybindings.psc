@@ -64,9 +64,10 @@ function SetKey(string asAction, int aiKeyCode) global
     endif
     RPB_StorageVars.SetInt(asAction, aiKeyCode, "Keybindings")
     if (asAction == "Surrender")
-        RPB_Arrest arrest = RPB_API.GetArrest()
+        RPB_Surrender surrender = RPB_API.GetSurrender()
         if (oldKey > 0)
-            arrest.UnregisterForKey(oldKey)
+            surrender.UnregisterForKey(oldKey)
+            RPB_API.GetArrest().UnregisterForKey(oldKey) ; registered on RPB_Arrest before the surrender's split (2026-10-14)
         endif
         RegisterSurrenderKey()
     endif
@@ -87,6 +88,6 @@ endFunction
 function RegisterSurrenderKey() global
     int surrenderKey = GetKey("Surrender")
     if (surrenderKey > 0)
-        RPB_API.GetArrest().RegisterForKey(surrenderKey)
+        RPB_API.GetSurrender().RegisterForKey(surrenderKey)
     endif
 endFunction
