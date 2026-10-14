@@ -2005,14 +2005,14 @@ bool function __IntakeNeedsWalkBack(string asPausedStep)
     return prisoner.ShouldBeStripped && !self.__StrippedForIntake()
 endFunction
 
-; My belongings recorded at the intake: the strip happened (RPB_Prison.__StrippedAtIntake's test, from the arrest side)
+; My belongings taken at the intake: the strip happened (RPB_Prison.__StrippedAtIntake's test, from the arrest side)
 bool function __StrippedForIntake()
     RPB_Prison prison = API.PrisonManager.FindPrisonByPrisoner(this)
     RPB_Prisoner prisoner = none
     if (prison)
         prisoner = prison.Prisoners.AtKey(this)
     endif
-    return prisoner && prisoner.GetInt("Belongings Manifest") > 0
+    return prisoner && prisoner.HasBelongingsStored()
 endFunction
 
 ; After a fight that paused my intake past the strip: the rest of it with my guard (RPB_Prison.ResumePrisonFlowWith: no strip

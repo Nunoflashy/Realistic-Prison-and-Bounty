@@ -272,6 +272,7 @@ function SetTests()
     self.AddTest("184 - Benchmark: the Time Skip's NPC Releases on Its Own Stack vs by Event (6 bandits each; advances the clock a few days)", "Test_ReleaseByEventBenchmark", abChainable = false)
     self.AddTest("187 - Freeze Control, NPC: 156's Steps With a Bandit (moved 1500 away and back mid escort, ended by a reset; repeat it)", "Test_NpcFreeWalkControl", abChainable = false)
     self.AddTest("188 - Freeze Control, Alternating: 187 (NPC) and 156 (player) by turns, the same-session comparison (repeat it)", "Test_FreezeControlAlternating", abChainable = false)
+    self.AddTest("205 - Parcels: Prisoners' Belongings (two NPC prisoners sharing a belongings chest stripped into parcels of their own and given back their own; again with the old shared chest + manifest's dev switch on)", "Test_ParcelBelongings", abChainable = false)
     self.AddTest("204 - Parcels: the Engine Checks (tokens moved by reference, their names, a take opening one, the cost of 30 items; leaves two chests in front of you to look and take by hand; needs patch 020)", "Test_Parcels", abChainable = false)
     self.AddTest("203 - Benchmark: the Prison Lookup (FindPrisonByPrisoner) vs an Actor-Keyed Registry (its parts too, 3 rounds)", "Test_PrisonLookupBenchmark", abChainable = false)
     self.AddTest("200 - Freeze Point: a Freezable Prisoner at Her Escort to Jail's End (arms it; then arrest one from test 181: the strip and escort to the cell should go on, the frozen way)", "Test_FreezePoint_EscortToJailEnd", abChainable = false)
@@ -7834,7 +7835,7 @@ bool function __MassRun(bool abNoOvercrowding, int aiBaseFormId = 0x132AE, int a
     i = 0
     while (i < TOTAL)
         if (all[i] && RPB_Utility.IsActorImprisoned(all[i]))
-            if (RPB_StorageVars.GetIntOnReference("Belongings Manifest", all[i], "Jail") == 0)
+            if (RPB_StorageVars.GetIntOnReference("Belongings Manifest", all[i], "Jail") == 0 && !RPB_StorageVars.GetBoolOnReference("Belongings Taken", all[i], "Jail"))
                 manifestsMissing += 1
                 string missingDump = RPB_Utility.DumpCrumbs(all[i])
                 int strippedAt = StringUtil.Find(missingDump, "Teleported:")
@@ -7842,7 +7843,7 @@ bool function __MassRun(bool abNoOvercrowding, int aiBaseFormId = 0x132AE, int a
                     missingDump = StringUtil.Substring(missingDump, strippedAt)
                 endif
                 log("MASS manifest missing: actor " + i + " (" + all[i] + "), belongings container " + RPB_StorageVars.GetFormOnReference("Prisoner Belongings Container", all[i], "Jail") + ", Stripped " + RPB_StorageVars.GetBoolOnReference("Stripped", all[i], "Jail") + ", crumbs from the teleport: " + missingDump)
-            elseIf (RPB_StorageVars.GetFormsOnReference("Belongings Forms", all[i], "Jail").Length > 0)
+            elseIf (RPB_StorageVars.GetFormOnReference("Belongings Parcel", all[i], "Jail") || RPB_StorageVars.GetFormsOnReference("Belongings Forms", all[i], "Jail").Length > 0)
                 manifestsWithItems += 1
             else
                 manifestsEmpty += 1
@@ -13941,7 +13942,7 @@ bool function __ParcelsEngineChecks(string asTest)
     endWhile
     ObjectReference parcelD = parcels.Create(player, "Test", "Test Cost")
     float started = Utility.GetCurrentRealTime()
-    int moved = parcels.PutFrom(parcelD, source)
+    int moved = parcels.PutFrom(parcelD, source, new Form[1])
     float putMs = (Utility.GetCurrentRealTime() - started) * 1000.0
     started = Utility.GetCurrentRealTime()
     parcels.Open(parcelD, source)
@@ -13953,6 +13954,82 @@ bool function __ParcelsEngineChecks(string asTest)
     source.Delete()
 
     Debug.MessageBox(asTest + ": two chests in front of you. Chest 1 holds 'Test Owner B's Weapons', chest 2 'Test Owner A's Belongings'. Are the names shown? Take one: it should open into your inventory (A's iron sword should be Legendary).")
+    return ok
+endFunction
+
+;/
+    205: two NPC prisoners of Haafingar's sharing one belongings chest, stripped (Strip, naked) and released
+    (ReturnBelongings): each gets their own things back and nothing of the other's. With parcels: each has a parcel of their
+    own, its token in the shared chest, nothing else of theirs in it; the parcel gone after the release. With
+    @abManifest (the dev switch): the old way, their things in the shared chest and returned by the manifest
+/;
+bool function __ParcelBelongings(string asTest, bool abManifest)
+    RPB_Prison prison = (RPB_API.GetPrisonManager()).GetPrison("Haafingar")
+    RPB_Parcels parcels = RPB_API.GetParcels()
+    Actor a1 = __SpawnTempActor()
+    Actor a2 = __SpawnTempActor()
+    RPB_Prisoner p1 = __RegisterPrisonerAndWait(a1, prison)
+    RPB_Prisoner p2 = __RegisterPrisonerAndWait(a2, prison)
+    if (!assert_true(p1 && p2, asTest + ": could not register the two prisoners"))
+        return false
+    endif
+    ObjectReference sharedBox = prison.GetRandomPrisonerContainer("Belongings") as ObjectReference
+    if (!assert_true(sharedBox != none, asTest + ": the prison has no belongings chest"))
+        return false
+    endif
+    p1.SetForm("Prisoner Belongings Container", sharedBox)
+    p2.SetForm("Prisoner Belongings Container", sharedBox)
+
+    Form gold = Game.GetFormEx(0xF)
+    Form lockpick = Game.GetFormEx(0xA)
+    a1.RemoveAllItems()
+    a2.RemoveAllItems()
+    a1.AddItem(gold, 7, true)
+    a2.AddItem(lockpick, 3, true)
+    int boxGold = sharedBox.GetItemCount(gold)
+    int boxLockpicks = sharedBox.GetItemCount(lockpick)
+    int boxTokens = sharedBox.GetItemCount(parcels.TokenBase)
+
+    if (abManifest)
+        RPB_Utility.EnableBelongingsManifest()
+    endif
+    p1.Strip()
+    p2.Strip()
+    RPB_Utility.DisableBelongingsManifest()
+    Utility.Wait(1.0) ; the tokens' OnContainerChanged
+
+    bool ok = true
+    ObjectReference parcel1 = p1.BelongingsParcel
+    ObjectReference parcel2 = p2.BelongingsParcel
+    log(asTest + ": stripped: a1 gold " + a1.GetItemCount(gold) + ", a2 lockpicks " + a2.GetItemCount(lockpick) + "; parcels " + parcel1 + " / " + parcel2 + "; the shared chest: gold " + sharedBox.GetItemCount(gold) + " (was " + boxGold + "), lockpicks " + sharedBox.GetItemCount(lockpick) + " (was " + boxLockpicks + "), tokens " + sharedBox.GetItemCount(parcels.TokenBase) + " (was " + boxTokens + ")")
+    ok = assert_true(a1.GetItemCount(gold) == 0 && a2.GetItemCount(lockpick) == 0, asTest + ": the strip left them their things") && ok
+    ok = assert_true(p1.HasBelongingsStored() && p2.HasBelongingsStored(), asTest + ": HasBelongingsStored is false after the strip") && ok
+    if (abManifest)
+        ok = assert_true(!parcel1 && !parcel2, asTest + ": parcels made with the manifest's switch on") && ok
+        ok = assert_true(sharedBox.GetItemCount(gold) == boxGold + 7 && sharedBox.GetItemCount(lockpick) == boxLockpicks + 3, asTest + ": their things aren't in the shared chest") && ok
+    else
+        ok = assert_true(parcel1 && parcel2 && parcel1 != parcel2, asTest + ": not a parcel each") && ok
+        ok = assert_true(parcels.GetHolder(parcel1) == sharedBox && parcels.GetHolder(parcel2) == sharedBox, asTest + ": the tokens aren't in the shared chest (" + parcels.GetHolder(parcel1) + " / " + parcels.GetHolder(parcel2) + ")") && ok
+        ok = assert_true(sharedBox.GetItemCount(parcels.TokenBase) == boxTokens + 2, asTest + ": the shared chest holds " + (sharedBox.GetItemCount(parcels.TokenBase) - boxTokens) + " new tokens, not 2") && ok
+        ok = assert_true(sharedBox.GetItemCount(gold) == boxGold && sharedBox.GetItemCount(lockpick) == boxLockpicks, asTest + ": their things went into the shared chest") && ok
+        ok = assert_true(parcel1.GetItemCount(gold) == 7 && parcel2.GetItemCount(lockpick) == 3, asTest + ": the parcels hold gold " + parcel1.GetItemCount(gold) + " / lockpicks " + parcel2.GetItemCount(lockpick)) && ok
+        ok = assert_true(parcels.GetToken(parcel1).GetDisplayName() == p1.Name + "'s Belongings", asTest + ": the token is named '" + parcels.GetToken(parcel1).GetDisplayName() + "'") && ok
+    endif
+
+    p1.ReturnBelongings()
+    Utility.Wait(1.0)
+    log(asTest + ": a1 released: gold " + a1.GetItemCount(gold) + ", lockpicks " + a1.GetItemCount(lockpick) + ", tokens " + a1.GetItemCount(parcels.TokenBase) + "; the shared chest's tokens " + sharedBox.GetItemCount(parcels.TokenBase))
+    ok = assert_true(a1.GetItemCount(gold) == 7, asTest + ": the first prisoner got " + a1.GetItemCount(gold) + " of their 7 gold back") && ok
+    ok = assert_true(a1.GetItemCount(lockpick) == 0 && a1.GetItemCount(parcels.TokenBase) == 0, asTest + ": the first prisoner got the other's things or a token") && ok
+    ok = assert_true(!p1.BelongingsParcel && !p1.HasBelongingsStored(), asTest + ": the first prisoner's parcel or flag outlived the release") && ok
+    if (!abManifest)
+        ok = assert_true(parcels.GetOwner(parcel1) == none && parcels.GetHolder(parcel2) == sharedBox, asTest + ": the first parcel's record is still there, or the second's token moved") && ok
+    endif
+
+    p2.ReturnBelongings()
+    Utility.Wait(1.0)
+    ok = assert_true(a2.GetItemCount(lockpick) == 3 && a2.GetItemCount(gold) == 0, asTest + ": the second prisoner got lockpicks " + a2.GetItemCount(lockpick) + ", gold " + a2.GetItemCount(gold)) && ok
+    ok = assert_true(sharedBox.GetItemCount(gold) == boxGold && sharedBox.GetItemCount(lockpick) == boxLockpicks && sharedBox.GetItemCount(parcels.TokenBase) == boxTokens, asTest + ": the shared chest isn't as it was") && ok
     return ok
 endFunction
 
@@ -15402,7 +15479,7 @@ endFunction
 string __statelessTest = ""
 
 bool function __RunStatelessTest(string asTest)
-    if (asTest != "Test_ArrestWaitsWhileGuardFights_NoPackage" && asTest != "Test_CellDoorsDiagnostic" && asTest != "Test_LongAbsenceSetup" && asTest != "Test_LongAbsenceAdvance" && asTest != "Test_LongAbsenceVerify" && asTest != "Test_FallbackEscortToCellStopped_Player" && asTest != "Test_FallbackEscortToCellStopped_CloneGuard" && asTest != "Test_FightDuringEscort_NPC" && asTest != "Test_FightDuringEscort_Player" && asTest != "Test_GuardDiesInPrison_Player" && asTest != "Test_EscortToCellStopped_NoPackageLock" && StringUtil.Find(asTest, "Test_Surrender_") != 0 && asTest != "Test_FrozenGuardSkipped" && asTest != "Test_GuardDiesInPrison_NobodySees" && asTest != "Test_Escort_FreeWalk" && asTest != "Test_ToggleEscortToCell04" && asTest != "Test_CaptorFinishCycles_Calls" && asTest != "Test_CaptorFinishCycles_NoCalls" && asTest != "Test_CaptorFinishDetach_Calls" && asTest != "Test_CaptorFinishDetach_NoCalls" && asTest != "Test_Escort_FreeWalk_Control" && asTest != "Test_ActorKeys" && asTest != "Test_FrozenGuardCalls" && asTest != "Test_SimulatedFreezeCalls" && asTest != "Test_SimulatedFreezeAtCancel" && asTest != "Test_SpawnFreezableGuard" && asTest != "Test_AliasPackageControl" && asTest != "Test_FreezableEscort_Player" && asTest != "Test_FreezableEscort_NPC" && asTest != "Test_LightHold" && asTest != "Test_KillFrozenGuard" && asTest != "Test_LifetimeBountyStat" && asTest != "Test_FaintFrozenGuard" && asTest != "Test_FaintFrozenGuardShort" && asTest != "Test_FrozenEscortFallback" && asTest != "Test_HideFrozenGuard" && asTest != "Test_EscortToCellGuardHeld" && asTest != "Test_CuffedLimitEncumbrance" && asTest != "Test_CuffedLimitSettings" && asTest != "Test_EarlyHandback" && asTest != "Test_StalledEscortTakeover" && asTest != "Test_StalledEscortTakeoverLimit" && asTest != "Test_NpcEscortCancelControl" && asTest != "Test_FrozenPrisonerTimeSkip" && asTest != "Test_SpawnFreezablePrisoner" && asTest != "Test_SpawnFreezableArrestee" && asTest != "Test_GuardCrimeFactions" && asTest != "Test_PlayerEscortCancelControl" && asTest != "Test_ReleaseByEventBenchmark" && asTest != "Test_FrozenPrisonerDialogue" && asTest != "Test_NpcFreeWalkControl" && asTest != "Test_FreezeControlAlternating" && asTest != "Test_SetCancelSettle" && asTest != "Test_FightAtConfrontationStart" && asTest != "Test_FastWrapperBenchmark" && asTest != "Test_SkipEscortBegun" && asTest != "Test_WIDeadBody" && StringUtil.Find(asTest, "Test_FreezePoint_") != 0 && asTest != "Test_PrisonLookupBenchmark" && asTest != "Test_Parcels")
+    if (asTest != "Test_ArrestWaitsWhileGuardFights_NoPackage" && asTest != "Test_CellDoorsDiagnostic" && asTest != "Test_LongAbsenceSetup" && asTest != "Test_LongAbsenceAdvance" && asTest != "Test_LongAbsenceVerify" && asTest != "Test_FallbackEscortToCellStopped_Player" && asTest != "Test_FallbackEscortToCellStopped_CloneGuard" && asTest != "Test_FightDuringEscort_NPC" && asTest != "Test_FightDuringEscort_Player" && asTest != "Test_GuardDiesInPrison_Player" && asTest != "Test_EscortToCellStopped_NoPackageLock" && StringUtil.Find(asTest, "Test_Surrender_") != 0 && asTest != "Test_FrozenGuardSkipped" && asTest != "Test_GuardDiesInPrison_NobodySees" && asTest != "Test_Escort_FreeWalk" && asTest != "Test_ToggleEscortToCell04" && asTest != "Test_CaptorFinishCycles_Calls" && asTest != "Test_CaptorFinishCycles_NoCalls" && asTest != "Test_CaptorFinishDetach_Calls" && asTest != "Test_CaptorFinishDetach_NoCalls" && asTest != "Test_Escort_FreeWalk_Control" && asTest != "Test_ActorKeys" && asTest != "Test_FrozenGuardCalls" && asTest != "Test_SimulatedFreezeCalls" && asTest != "Test_SimulatedFreezeAtCancel" && asTest != "Test_SpawnFreezableGuard" && asTest != "Test_AliasPackageControl" && asTest != "Test_FreezableEscort_Player" && asTest != "Test_FreezableEscort_NPC" && asTest != "Test_LightHold" && asTest != "Test_KillFrozenGuard" && asTest != "Test_LifetimeBountyStat" && asTest != "Test_FaintFrozenGuard" && asTest != "Test_FaintFrozenGuardShort" && asTest != "Test_FrozenEscortFallback" && asTest != "Test_HideFrozenGuard" && asTest != "Test_EscortToCellGuardHeld" && asTest != "Test_CuffedLimitEncumbrance" && asTest != "Test_CuffedLimitSettings" && asTest != "Test_EarlyHandback" && asTest != "Test_StalledEscortTakeover" && asTest != "Test_StalledEscortTakeoverLimit" && asTest != "Test_NpcEscortCancelControl" && asTest != "Test_FrozenPrisonerTimeSkip" && asTest != "Test_SpawnFreezablePrisoner" && asTest != "Test_SpawnFreezableArrestee" && asTest != "Test_GuardCrimeFactions" && asTest != "Test_PlayerEscortCancelControl" && asTest != "Test_ReleaseByEventBenchmark" && asTest != "Test_FrozenPrisonerDialogue" && asTest != "Test_NpcFreeWalkControl" && asTest != "Test_FreezeControlAlternating" && asTest != "Test_SetCancelSettle" && asTest != "Test_FightAtConfrontationStart" && asTest != "Test_FastWrapperBenchmark" && asTest != "Test_SkipEscortBegun" && asTest != "Test_WIDeadBody" && StringUtil.Find(asTest, "Test_FreezePoint_") != 0 && asTest != "Test_PrisonLookupBenchmark" && asTest != "Test_Parcels" && asTest != "Test_ParcelBelongings")
         return false
     endif
 
@@ -15623,6 +15700,11 @@ bool function __RunStatelessTest(string asTest)
         display_result(__PrisonLookupBenchmark("203"))
     elseif (asTest == "Test_Parcels")
         display_result(__ParcelsEngineChecks("204"))
+    elseif (asTest == "Test_ParcelBelongings")
+        bool parcelsOk = __ParcelBelongings("205", false)
+        bool manifestOk = __ParcelBelongings("205 (manifest)", true)
+        __TeardownAllTempActors()
+        display_result(parcelsOk && manifestOk)
     elseif (asTest == "Test_FightAtConfrontationStart")
         display_result(__Scenario_FightAtConfrontationStart("196"))
         __TeardownScenario()

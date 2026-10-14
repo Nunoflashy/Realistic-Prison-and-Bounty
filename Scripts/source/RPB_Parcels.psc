@@ -23,7 +23,8 @@ import RPB_Memory
 @functions:
     ObjectReference function Create(Form akOwner, string asKind, string asName)
     function PutRef(ObjectReference akParcel, ObjectReference akItem)
-    int function PutFrom(ObjectReference akParcel, ObjectReference akSource, Form[] akKeep = none)
+    function PutAll(ObjectReference akParcel, ObjectReference akSource)
+    int function PutFrom(ObjectReference akParcel, ObjectReference akSource, Form[] akKeep)
     function GiveTo(ObjectReference akParcel, ObjectReference akHolder)
     function Open(ObjectReference akParcel, ObjectReference akDestination)
     ObjectReference function Find(Form akOwner, string asKind)
@@ -93,12 +94,17 @@ function PutRef(ObjectReference akParcel, ObjectReference akItem)
     akParcel.AddItem(akItem, 1, true)
 endFunction
 
+; Puts everything @akSource carries into @akParcel in one call (an actor's worn things taken off), the fastest move
+function PutAll(ObjectReference akParcel, ObjectReference akSource)
+    akSource.RemoveAllItems(akParcel, true, true)
+endFunction
+
 ;/
-    Puts everything @akSource carries into @akParcel, but @akKeep (worn underwear, the cuffs). All of each item goes, so
-    every copy keeps its own data (only a part of a stack moved would leave the engine to choose which copies). Returns
-    how many kinds of items went in
+    Puts everything @akSource carries into @akParcel, but @akKeep (worn underwear, the cuffs), item by item (a frame each:
+    PutAll when nothing is kept). All of each item goes, so every copy keeps its own data (only a part of a stack moved
+    would leave the engine to choose which copies). Returns how many kinds of items went in
 /;
-int function PutFrom(ObjectReference akParcel, ObjectReference akSource, Form[] akKeep = none)
+int function PutFrom(ObjectReference akParcel, ObjectReference akSource, Form[] akKeep)
     Form[] items = PO3_SKSEFunctions.AddAllItemsToArray(akSource, false, false, false)
     int moved = 0
     int i = 0
@@ -144,6 +150,7 @@ function Open(ObjectReference akParcel, ObjectReference akDestination)
     if (!record)
         return
     endif
+    float started = Utility.GetCurrentRealTime()
     Form owner = FastMap_GetForm(record, "owner")
     string kind = FastMap_GetString(record, "kind")
     ObjectReference token = FastMap_GetForm(record, "token") as ObjectReference
@@ -157,7 +164,7 @@ function Open(ObjectReference akParcel, ObjectReference akDestination)
     endif
     token.Delete()
     akParcel.Delete()
-    RPB_Utility.LogInfo("Opened " + akParcel + " (" + kind + ", " + owner + "'s) into " + akDestination + ": " + items + " kinds of items", "Parcels::Open")
+    RPB_Utility.LogInfo("Opened " + akParcel + " (" + kind + ", " + owner + "'s) into " + akDestination + ": " + items + " kinds of items in " + (((Utility.GetCurrentRealTime() - started) * 1000.0) as int) + "ms", "Parcels::Open")
     int handle = ModEvent.Create("RPB_ParcelOpened")
     if (handle)
         ModEvent.PushForm(handle, owner)

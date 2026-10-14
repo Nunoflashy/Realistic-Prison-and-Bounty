@@ -3936,11 +3936,11 @@ event OnPrisonerTeleportedToPrison(RPB_Prisoner apPrisoner)
 endEvent
 
 ;/
-    Whether this intake already stripped @apPrisoner (her belongings recorded, cleared at the release). Only the move into the
+    Whether this intake already stripped @apPrisoner (her belongings taken, cleared at the release). Only the move into the
     cell asks: a later strip of an imprisoned prisoner (a guard's search) is its own decision, not this one's
 /;
 bool function __StrippedAtIntake(RPB_Prisoner apPrisoner)
-    return apPrisoner.GetInt("Belongings Manifest") > 0
+    return apPrisoner.HasBelongingsStored()
 endFunction
 
 event OnPrisonerTeleportedToCell(RPB_Prisoner apPrisoner, bool abImprisonPrisoner)

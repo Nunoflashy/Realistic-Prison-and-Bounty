@@ -211,6 +211,9 @@ scriptname RPB_Utility hidden
     function EnableFlowProfiling() global
     function DisableFlowProfiling() global
     bool function IsCrumbsEnabled() global
+    bool function IsBelongingsManifestEnabled() global
+    function EnableBelongingsManifest() global
+    function DisableBelongingsManifest() global
     function EnableCrumbs() global
     function DisableCrumbs() global
     function Crumb(Actor akActor, string asStage) global
@@ -4524,6 +4527,22 @@ endFunction
     actor's arrest -> imprison stopped when several run at once. Off by default; the stress tests turn it on.
     Crumb() when off costs one JDB read.
 /;
+;/
+    Dev switch: a strip puts a prisoner's things in the prison's shared chest with a manifest of what was theirs (the way
+    before the parcels), instead of their own parcel. Off by default; kept for a comparison.
+/;
+bool function IsBelongingsManifestEnabled() global
+    return JDB.solveInt(".rpb_root.storage.Dev.BELONGINGS_MANIFEST") != 0
+endFunction
+
+function EnableBelongingsManifest() global
+    RPB_StorageVars.SetBool("BELONGINGS_MANIFEST", true, "Dev")
+endFunction
+
+function DisableBelongingsManifest() global
+    RPB_StorageVars.SetBool("BELONGINGS_MANIFEST", false, "Dev")
+endFunction
+
 bool function IsCrumbsEnabled() global
     return JDB.solveInt(".rpb_root.storage.Profile.CRUMBS") != 0
 endFunction

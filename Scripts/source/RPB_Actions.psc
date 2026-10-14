@@ -7,6 +7,7 @@ scriptname RPB_Actions extends ObjectReference
     string[] function GetActions()
     function ShowActionsMenu()
     function Action_ToggleFlowProfiling()
+    function Action_ToggleBelongingsManifest()
     function Action_ResetStuckPrisonState()
     function Action_ToggleFastMonitor()
     function Action_ToggleDebugLogging()
@@ -83,6 +84,7 @@ string[] function GetActions()
         "<No Action>," + \
         "Quit to Main Menu," + \
         "[Debug] Toggle Flow Profiling," + \
+        "[Debug] Toggle Belongings Manifest," + \
         "[Debug] Toggle Debug Logging," + \
         "[Debug] Toggle Fast Monitor (3h)," + \
         "[Debug] Reset Stuck Prison State," + \
@@ -155,6 +157,9 @@ function ShowActionsMenu()
 
     elseif (actionToPerform == "[Debug] Toggle Flow Profiling")
         Action_ToggleFlowProfiling()
+
+    elseif (actionToPerform == "[Debug] Toggle Belongings Manifest")
+        Action_ToggleBelongingsManifest()
 
     elseif (actionToPerform == "[Debug] Toggle Debug Logging")
         Action_ToggleDebugLogging()
@@ -341,6 +346,21 @@ endFunction
     Flips the flow profiler (RPB_Utility.FlowBegin/FlowMark/FlowEnd): when on, arrest -> imprison logs its phases
     ("FLOW:" lines in the Papyrus log) at the end of the imprisonment.
 /;
+;/
+    Flips how a strip keeps a prisoner's things: their own parcel (the default), or the old way, the prison's shared chest
+    and a manifest of what was theirs (for a comparison). Applies from the next strip; the release returns each the way
+    it was taken.
+/;
+function Action_ToggleBelongingsManifest()
+    if (RPB_Utility.IsBelongingsManifestEnabled())
+        RPB_Utility.DisableBelongingsManifest()
+        debug.notification("RPB belongings: parcels")
+    else
+        RPB_Utility.EnableBelongingsManifest()
+        debug.notification("RPB belongings: shared chest + manifest (old)")
+    endif
+endFunction
+
 function Action_ToggleFlowProfiling()
     if (RPB_Utility.IsFlowProfilingEnabled())
         RPB_Utility.DisableFlowProfiling()
@@ -1275,8 +1295,8 @@ function Action_ReturnPrisonerBelongings(RPB_UIInterface uilib)
         return none
     endif
 
-    ObjectReference prisonerContainer = prisoner.PrisonerBelongingsContainer
-    prisonerContainer.RemoveAllItems(prisoner.GetActor(), false, true)
+    ; Their own, not the whole shared chest (other prisoners' parcels' tokens would open into them)
+    prisoner.ReturnBelongings()
     prisoner.GetActor().OpenInventory(true)
 endFunction
 

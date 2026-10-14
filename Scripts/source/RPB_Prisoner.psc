@@ -52,6 +52,7 @@ Scriptname RPB_Prisoner extends RPB_ActorBase
     bool ShouldBeClothed
     bool UseDefaultOutfitAsFallback
     ObjectReference PrisonerBelongingsContainer
+    ObjectReference BelongingsParcel
     ObjectReference TeleportReleaseLocation
     bool IsImprisoned
     bool IsInCell
@@ -166,6 +167,7 @@ Scriptname RPB_Prisoner extends RPB_ActorBase
     function SaveBelongingsManifest()
     function ModBelongingsManifest(Form akItem, int aiDelta)
     function ReturnBelongings()
+    bool function HasBelongingsStored()
     function NotifySentence()
     function NotifyReleaseDate()
     function Imprison()
@@ -557,6 +559,14 @@ endProperty
 ObjectReference property PrisonerBelongingsContainer
     ObjectReference function get()
         return GetReference("Prisoner Belongings Container")
+    endFunction
+endProperty
+
+; What a strip took from me this imprisonment (RPB_Parcels), its token in PrisonerBelongingsContainer; none before anything
+; was taken, or with the belongings manifest's dev switch on
+ObjectReference property BelongingsParcel
+    ObjectReference function get()
+        return GetReference("Belongings Parcel")
     endFunction
 endProperty
 
@@ -2054,9 +2064,12 @@ function Strip(bool abRemoveUnderwear = true)
 
     self.Stripping_SaveWornGear()
     RPB_Utility.FlowMark("Strip: Stripping_SaveWornGear")
-    self.SaveBelongingsManifest()
-    RPB_Utility.FlowMark("Strip: SaveBelongingsManifest")
+    if (RPB_Utility.IsBelongingsManifestEnabled())
+        self.SaveBelongingsManifest()
+        RPB_Utility.FlowMark("Strip: SaveBelongingsManifest")
+    endif
     self.__MoveBelongingsToChest(underwearTop, underwearBottom)
+    SetBool("Belongings Taken", true)
     self.UnequipHands()
     self.SheatheWeapon()
     RPB_Utility.FlowMark("Strip: unequip + RemoveAllItems")
@@ -2097,10 +2110,13 @@ endFunction
 /;
 ; @akKeepTop / @akKeepBottom: underwear that stays on (not stripped naked): left where it is, worn, instead of going to the
 ; chest and back (taken off and put on again in front of the player, as when everything moved in one call, 2026-10-07)
+; Into my belongings parcel (__BelongingsDestination), made only once something goes in
 function __MoveBelongingsToChest(Form akKeepTop = none, Form akKeepBottom = none)
     if (!RPB_Utility.IsCuffed(this) && !akKeepTop && !akKeepBottom)
         self.UnequipAll()
-        self.RemoveAllItems(PrisonerBelongingsContainer, true, true)
+        if (this.GetNumItems() > 0)
+            self.RemoveAllItems(self.__BelongingsDestination(), true, true)
+        endif
         return
     endif
     float started = Utility.GetCurrentRealTime()
@@ -2115,6 +2131,7 @@ function __MoveBelongingsToChest(Form akKeepTop = none, Form akKeepBottom = none
         w += 1
     endWhile
     float unequipped = Utility.GetCurrentRealTime()
+    ObjectReference destination = none
     int moved = 0
     int i = this.GetNumItems() - 1
     while (i >= 0)
@@ -2125,7 +2142,10 @@ function __MoveBelongingsToChest(Form akKeepTop = none, Form akKeepBottom = none
                 count -= 1 ; the one worn stays (a spare goes with the rest)
             endif
             if (count > 0)
-                this.RemoveItem(item, count, true, PrisonerBelongingsContainer)
+                if (!destination)
+                    destination = self.__BelongingsDestination()
+                endif
+                this.RemoveItem(item, count, true, destination)
                 moved += 1
             endif
         endif
@@ -2154,9 +2174,12 @@ function StripSilently(bool abKeepCuffs = true)
 
     self.Stripping_SaveWornGear()
     RPB_Utility.FlowMark("StripSilently: Stripping_SaveWornGear")
-    self.SaveBelongingsManifest()
-    RPB_Utility.FlowMark("StripSilently: SaveBelongingsManifest")
+    if (RPB_Utility.IsBelongingsManifestEnabled())
+        self.SaveBelongingsManifest()
+        RPB_Utility.FlowMark("StripSilently: SaveBelongingsManifest")
+    endif
     self.__MoveBelongingsToChest(underwearTop, underwearBottom)
+    SetBool("Belongings Taken", true)
     self.UnequipHands()
     self.SheatheWeapon()
     RPB_Utility.FlowMark("StripSilently: unequip + RemoveAllItems")
@@ -2182,14 +2205,18 @@ function RemoveUnderwear()
 
     Armor underwearTop      = self.GetUnderwear("Top")
     Armor underwearBottom   = self.GetUnderwear("Bottom")
+    ObjectReference destination = none
+    if (underwearTop || underwearBottom)
+        destination = self.__BelongingsDestination()
+    endif
 
     if (underwearTop)
-        this.RemoveItem(underwearTop, 1, true, PrisonerBelongingsContainer)
+        this.RemoveItem(underwearTop, 1, true, destination)
         self.ModBelongingsManifest(underwearTop, 1)
     endif
 
     if (underwearBottom)
-        this.RemoveItem(underwearBottom, 1, true, PrisonerBelongingsContainer)
+        this.RemoveItem(underwearBottom, 1, true, destination)
         self.ModBelongingsManifest(underwearBottom, 1)
     endif
 
@@ -3575,12 +3602,30 @@ function ModBelongingsManifest(Form akItem, int aiDelta)
     RPB_StorageVars.SetIntsOnReference("Belongings Counts", refKey, counts, category)
 endFunction
 
+;/
+    Gives me back what the strips took: my belongings parcel opened into me, wherever its token is now (nothing when the
+    player already took it back from the chest: it opened then). What a strip put in the shared chest by the manifest (the
+    dev switch, or a prisoner stripped before the parcels) comes back by it, as before.
+/;
 function ReturnBelongings()
+    ObjectReference parcel = self.BelongingsParcel
+    if (parcel)
+        RPB_API.GetParcels().Open(parcel, this)
+        Remove("Belongings Parcel")
+    endif
+    bool taken = GetBool("Belongings Taken")
+    Remove("Belongings Taken")
+
     if (!PrisonerBelongingsContainer)
         return
     endif
 
-    if (GetInt("Belongings Manifest") != 1)
+    int manifest = GetInt("Belongings Manifest")
+    if (manifest == 0 && (parcel || taken))
+        return ; all of it was in the parcel (or there was nothing to take)
+    endif
+
+    if (manifest != 1)
         if (self.IsNPC())
             ; The container is shared: RemoveAllItems() here handed one NPC the belongings of everybody else (55 tunics for one NPC in the
             ; mass test) and left the next ones with nothing. An NPC without a manifest gets nothing back, its outfit is issued again.
@@ -3588,11 +3633,16 @@ function ReturnBelongings()
             return
         endif
 
-        ; The player: no better source for irreplaceable items, everything in the container, as before
-        PrisonerBelongingsContainer.RemoveAllItems(this, false, true)
+        ; The player: no better source for irreplaceable items, everything in the container (but the other prisoners'
+        ; parcels' tokens, which would open into them), only when a strip put them there: an incomplete manifest, or
+        ; stripped before the manifest. Never stripped, nothing of theirs is in there
+        if (manifest == 2 || self.IsStripped)
+            self.__ReturnAllButTokens()
+        endif
         return
     endif
 
+    float started = Utility.GetCurrentRealTime()
     string refKey = self.__GetRefKey()
     string category = self.GetScriptVarCategory("Actor")
     Form[] forms = RPB_StorageVars.GetFormsOnReference("Belongings Forms", refKey, category)
@@ -3614,7 +3664,50 @@ function ReturnBelongings()
     Remove("Belongings Manifest")
     Remove("Belongings Forms")
     Remove("Belongings Counts")
-    RPB_Utility.LogInfo("Returned " + returned + " kinds of belongings to " + self.Name, "["+ Name +"] Prisoner::ReturnBelongings")
+    RPB_Utility.LogInfo("Returned " + returned + " kinds of belongings to " + self.Name + " by the manifest in " + (((Utility.GetCurrentRealTime() - started) * 1000.0) as int) + "ms", "["+ Name +"] Prisoner::ReturnBelongings")
+endFunction
+
+; Whether a strip of this imprisonment took my things (into my parcel, or by the manifest), whether there was anything or not
+bool function HasBelongingsStored()
+    return GetBool("Belongings Taken") || GetInt("Belongings Manifest") > 0
+endFunction
+
+;/
+    Where a strip puts my things: my belongings parcel, made the first time (its token into the prison's belongings chest,
+    PrisonerBelongingsContainer), or the shared chest itself with the manifest's dev switch on
+/;
+ObjectReference function __BelongingsDestination()
+    if (RPB_Utility.IsBelongingsManifestEnabled())
+        return PrisonerBelongingsContainer
+    endif
+    ObjectReference parcel = self.BelongingsParcel
+    if (parcel)
+        return parcel
+    endif
+    RPB_Parcels parcels = RPB_API.GetParcels()
+    parcel = parcels.Create(this, "Belongings", self.Name + "'s Belongings")
+    if (!parcel)
+        return PrisonerBelongingsContainer ; logged by Create: the shared chest, as before the parcels
+    endif
+    SetForm("Belongings Parcel", parcel)
+    parcels.GiveTo(parcel, PrisonerBelongingsContainer)
+    return parcel
+endFunction
+
+; Everything in my belongings chest into me, item by item, but the parcels' tokens (the player's fallback, ReturnBelongings)
+function __ReturnAllButTokens()
+    Form token = RPB_API.GetParcels().TokenBase
+    int returned = 0
+    int i = PrisonerBelongingsContainer.GetNumItems() - 1
+    while (i >= 0)
+        Form item = PrisonerBelongingsContainer.GetNthForm(i)
+        if (item && item != token)
+            PrisonerBelongingsContainer.RemoveItem(item, PrisonerBelongingsContainer.GetItemCount(item), true, this)
+            returned += 1
+        endif
+        i -= 1
+    endWhile
+    RPB_Utility.LogInfo("Returned everything in the shared chest to " + self.Name + " (" + returned + " kinds of items, no manifest)", "["+ Name +"] Prisoner::ReturnBelongings")
 endFunction
 
 ;                        Imprisonment
