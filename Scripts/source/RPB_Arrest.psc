@@ -82,6 +82,7 @@ scriptname RPB_Arrest extends Quest
     function SnapshotSurrenderTargets(Actor akSurrenderer, Actor[] akCombatTargets)
     bool function CanActorSurrender(Actor akSurrenderer, Actor[] akSurrendererCaptors)
     bool function IsSurrenderGuard(Actor akActor)
+    bool function __IsStillSurrenderGuard(Actor akGuard)
     bool function HasSurrenderGuard(Actor[] akCombatTargets)
     Actor function GetNonGuardCombatTarget(Actor[] akCombatTargets)
     Actor[] function GetSurrenderGuards(Actor[] akCombatTargets)
@@ -1229,7 +1230,7 @@ event OnSurrenderEnd(Actor akSurrenderer, Actor akCaptor)
     Actor[] noGuards
     __surrenderGuards = noGuards
 
-    if (!self.IsSurrenderGuard(akCaptor))
+    if (!self.__IsStillSurrenderGuard(akCaptor)) ; one of the surrender's own guards (the nearest of them, or the Scene's)
         LastSurrenderOutcome = "no guard at the end"
         self.__UndoSurrender(akSurrenderer, "the Scene ended without a guard (captor " + akCaptor + ")")
         return
@@ -1913,9 +1914,19 @@ bool function CanActorSurrender(Actor akSurrenderer, Actor[] akSurrendererCaptor
     return true
 endFunction
 
-; A combat target that can take a surrender: a living guard of a hold
+; A combat target that can take a surrender: a living guard of a hold (death read engine side: no call, no frame)
 bool function IsSurrenderGuard(Actor akActor)
-    return akActor && !RPB_Utility.IsFrozenNPC(akActor) && !akActor.IsDead() && !akActor.IsDisabled() && akActor.IsGuard() && akActor.GetCrimeFaction()
+    return akActor && !RPB_Utility.IsFrozenNPC(akActor) && !RPB_Utility.IsDeadNoCall(akActor) && !akActor.IsDisabled() && akActor.IsGuard() && akActor.GetCrimeFaction()
+endFunction
+
+;/
+    One of the surrender's own guards (__surrenderGuards, from SnapshotSurrenderTargets: already a guard of a hold) still
+    able to take it: alive and enabled. Being a guard and his crime faction don't change during a surrender, so they aren't
+    read again: one call (IsDisabled) instead of IsSurrenderGuard's four. The Scene's end picks the nearest of them, which
+    cost ~30 frames with 6 guards (~0.4s before the arrest started, 2026-10-14)
+/;
+bool function __IsStillSurrenderGuard(Actor akGuard)
+    return akGuard && !RPB_Utility.IsFrozenNPC(akGuard) && !RPB_Utility.IsDeadNoCall(akGuard) && !akGuard.IsDisabled()
 endFunction
 
 bool function HasSurrenderGuard(Actor[] akCombatTargets)
@@ -1939,7 +1950,7 @@ Actor function GetNonGuardCombatTarget(Actor[] akCombatTargets)
     int i = 0
     while (i < akCombatTargets.Length)
         Actor target = akCombatTargets[i]
-        if (target && !RPB_Utility.IsFrozenNPC(target) && !target.IsDead() && !target.IsDisabled() && !target.IsGuard() && !self.__IsOfAGuardsCrimeFaction(target, akCombatTargets))
+        if (target && !RPB_Utility.IsFrozenNPC(target) && !RPB_Utility.IsDeadNoCall(target) && !target.IsDisabled() && !target.IsGuard() && !self.__IsOfAGuardsCrimeFaction(target, akCombatTargets))
             return target
         endif
         i += 1
@@ -2086,7 +2097,7 @@ bool function __GuardsFightingOthers(Actor akSurrenderer, Actor[] akGuards)
     endif
     int i = 0
     while (i < akGuards.Length)
-        if (self.IsSurrenderGuard(akGuards[i]) && self.__IsFightingOthers(akGuards[i], akSurrenderer))
+        if (self.__IsStillSurrenderGuard(akGuards[i]) && self.__IsFightingOthers(akGuards[i], akSurrenderer))
             return true
         endif
         i += 1
@@ -2346,7 +2357,7 @@ Actor function __NearestSurrenderGuard(Actor akSurrenderer, Actor[] akGuards, Ac
     float bestDistance = 0.0
     int i = 0
     while (i < akGuards.Length)
-        if (self.IsSurrenderGuard(akGuards[i]))
+        if (self.__IsStillSurrenderGuard(akGuards[i])) ; the surrender's own guards: only whether still alive and enabled
             float distance = akSurrenderer.GetDistance(akGuards[i])
             if (!best || distance < bestDistance)
                 best = akGuards[i]
