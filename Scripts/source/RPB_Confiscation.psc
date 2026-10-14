@@ -13,6 +13,7 @@ scriptname RPB_Confiscation extends Quest
     function RecordDroppedWeapons(Actor akOwner, int aiRefs, int aiItems)
     int function GetDroppedWeapons(Actor akOwner)
     function ForgetDroppedWeapons(Actor akOwner)
+    function UnblockDroppedWeapons(Actor akOwner)
     bool function QueueWeaponPickup(Actor akOwner, Actor akCaptor)
     function PickUpWeapons(Actor akOwner, Actor akCaptor)
     function __WatchPickup(Actor akOwner)
@@ -74,8 +75,29 @@ endFunction
 function ForgetDroppedWeapons(Actor akOwner)
     int all = JDB.solveObj(".rpb_root.droppedWeapons")
     if (all)
+        self.UnblockDroppedWeapons(akOwner) ; whatever of it is still on the ground is anybody's now
         RPB_Memory.FastFormMap_RemoveKey(all, akOwner)
     endif
+endFunction
+
+;/
+    What @akOwner dropped surrendering can be picked up again (RPB_Surrender blocks it at the drop: nobody takes it while
+    the surrender is on). The ones picked up already aren't in the world any more (nothing to unblock)
+/;
+function UnblockDroppedWeapons(Actor akOwner)
+    int record = self.GetDroppedWeapons(akOwner)
+    if (!record)
+        return
+    endif
+    int refs = RPB_Memory.FastMap_GetObject(record, "refs")
+    int i = 0
+    while (i < RPB_Memory.FastArray_Size(refs))
+        ObjectReference ref = RPB_Memory.FastArray_GetForm(refs, i) as ObjectReference
+        if (ref)
+            ref.BlockActivation(false)
+        endif
+        i += 1
+    endWhile
 endFunction
 
 ; ==========================================================
@@ -138,6 +160,7 @@ function __WatchPickup(Actor akOwner)
     endWhile
     if (sceneManager.GetCurrentScene() != pickupScene)
         RPB_Utility.LogInfo("The pickup of " + akOwner + "'s weapons never started (" + (waited as int) + "s), the weapons stay on the ground", "Confiscation::__WatchPickup")
+        self.UnblockDroppedWeapons(akOwner)
         return
     endif
     waited = 0.0
@@ -148,6 +171,7 @@ function __WatchPickup(Actor akOwner)
     if (sceneManager.GetCurrentScene() == pickupScene && !self.__PickedUp(akOwner))
         RPB_Utility.LogWarn("The captor didn't reach " + akOwner + "'s dropped weapons in " + (waited as int) + "s, the pickup is given up (they stay on the ground)", "Confiscation::__WatchPickup")
         sceneManager.EndSceneEarly(pickupScene, "the captor didn't reach the dropped weapons")
+        self.UnblockDroppedWeapons(akOwner) ; left on the ground: anybody's
     endif
 endFunction
 

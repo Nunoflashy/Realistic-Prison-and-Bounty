@@ -701,6 +701,8 @@ function __UndoSurrender(Actor akSurrenderer, string asReason, bool abEndScene =
     if (abNotify)
         Config.NotifyArrest("No one took your surrender", isPlayer)
     endif
+    ; What they dropped can be picked up again (a fake surrender's guard may still go for it first)
+    Confiscation.UnblockDroppedWeapons(akSurrenderer)
     ; A takeover's approach ending without an arrest: the submission's bounty back (nothing set aside for a real surrender)
     RPB_Arrest.GiveBackSetAsideBounty(akSurrenderer, "the takeover's approach ended without an arrest: " + asReason)
 endFunction
@@ -1141,6 +1143,10 @@ function __DropFromHand(Actor akSurrenderer, Form akItem, int aiRefs, int aiItem
     endif
     ObjectReference dropped = akSurrenderer.DropObject(akItem, 1)
     if (dropped)
+        ; Nobody picks it up until the surrender is over: the surrenderer took it back before the confrontation began, so the
+        ; surrender cost nothing (2026-10-14). Let go when it ends without an arrest (__UndoSurrender), when the pickup is
+        ; given up, or when it's forgotten (RPB_Confiscation.ForgetDroppedWeapons)
+        dropped.BlockActivation(true)
         RPB_Memory.FastArray_AddForm(aiRefs, dropped)
         RPB_Memory.FastArray_AddForm(aiItems, akItem)
     endif
