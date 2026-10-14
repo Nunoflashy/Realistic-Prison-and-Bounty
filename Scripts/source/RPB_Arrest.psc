@@ -80,6 +80,8 @@ scriptname RPB_Arrest extends Quest
     function StartBountyPayment(Actor akGuard, Actor akPayerArrestee, string asBountyPaymentScenario)
     function Surrender(Actor akSurrenderer)
     bool function CanActorSurrender(Actor akSurrenderer, Actor[] akSurrendererCaptors)
+    function SnapshotSurrenderTargets(Actor akSurrenderer, Actor[] akCombatTargets)
+    bool function CanActorSurrenderFast(Actor akSurrenderer, Actor[] akSurrendererCaptors)
     bool function IsSurrenderGuard(Actor akActor)
     bool function HasSurrenderGuard(Actor[] akCombatTargets)
     Actor function GetNonGuardCombatTarget(Actor[] akCombatTargets)
@@ -1181,11 +1183,20 @@ endFunction
 event OnSurrenderBegin(Actor akSurrenderer, Actor[] akSurrendererCaptors)
     self.__BeginSurrender(akSurrenderer)
     RPB_Utility.FlowMark("Surrender: begun (marked surrendering)")
-    Actor outsider = self.GetNonGuardCombatTarget(akSurrendererCaptors)
+    bool fast = RPB_Utility.IsFastActorChecks() && self.__SurrenderSnapshot(akSurrenderer)
+    Actor outsider = none
+    Actor[] guards
+    if (fast) ; the targets as SnapshotSurrenderTargets saw them a moment ago
+        outsider = self.__SnapshotOther(akSurrenderer)
+        guards = self.__SnapshotGuards(akSurrenderer)
+        self.__ForgetSurrenderSnapshot(akSurrenderer)
+    else
+        outsider = self.GetNonGuardCombatTarget(akSurrendererCaptors)
+        guards = self.GetSurrenderGuards(akSurrendererCaptors)
+    endif
     if (outsider)
         RPB_StorageVars.SetFormOnReference("Outsider", akSurrenderer, outsider, "Surrender") ; the watch's leeway
     endif
-    Actor[] guards = self.GetSurrenderGuards(akSurrendererCaptors)
     __surrenderGuards = guards
     RPB_Utility.FlowMark("Surrender: outsider and guards found (" + guards.Length + ")")
     self.PrepareSurrenderer(akSurrenderer, guards)
@@ -1820,6 +1831,157 @@ bool function CanActorSurrender(Actor akSurrenderer, Actor[] akSurrendererCaptor
     return true
 endFunction
 
+;/
+    Fast actor checks (RPB_Utility.IsFastActorChecks): each of @akCombatTargets looked at once, the answers kept for the
+    surrender's checks (CanActorSurrenderFast) and its begin (OnSurrenderBegin). The old way looked at every target three
+    times in CanActorSurrender (a non-guard, a guard, a fooled hold) and a fourth in GetSurrenderGuards, 4-5 calls each (a
+    frame apiece: ~1.8s with 6 guards). Here: dead read engine side (no call), disabled, guard, crime faction: 3 calls a
+    target. Kept in JDB .rpb_root.surrenderTargets (surrenderer -> { guards, factions, other }) until her surrender begins
+/;
+function SnapshotSurrenderTargets(Actor akSurrenderer, Actor[] akCombatTargets)
+    int guards = JArray.object()
+    int factions = JArray.object()
+    int others = JArray.object()        ; living non-guards, the law or not (decided below)
+    int otherFactions = JArray.object()
+    int i = 0
+    while (akCombatTargets && i < akCombatTargets.Length)
+        Actor target = akCombatTargets[i]
+        if (target && !RPB_Utility.IsFrozenNPC(target) && !RPB_Utility.IsDeadNoCall(target) && !target.IsDisabled())
+            Faction crime = target.GetCrimeFaction()
+            if (target.IsGuard())
+                if (crime) ; a guard of a hold takes a surrender (one with no crime faction neither takes it nor counts as other)
+                    JArray.addForm(guards, target)
+                    JArray.addForm(factions, crime)
+                endif
+            else
+                JArray.addForm(others, target)
+                JArray.addForm(otherFactions, crime)
+            endif
+        endif
+        i += 1
+    endWhile
+    ; The first non-guard who isn't the law: not of a guard's crime faction (Captain Aldis: not flagged a guard, Solitude's)
+    Form other = none
+    int o = 0
+    while (!other && o < JArray.count(others))
+        Actor candidate = JArray.getForm(others, o) as Actor
+        Form ownCrime = JArray.getForm(otherFactions, o)
+        bool law = false
+        int g = 0
+        while (!law && g < JArray.count(factions))
+            Faction guardCrime = JArray.getForm(factions, g) as Faction
+            law = guardCrime == ownCrime || candidate.IsInFaction(guardCrime)
+            g += 1
+        endWhile
+        if (!law)
+            other = candidate
+        endif
+        o += 1
+    endWhile
+    int snapshot = JMap.object()
+    RPB_Memory.FastMap_SetObject(snapshot, "guards", guards)
+    RPB_Memory.FastMap_SetObject(snapshot, "factions", factions)
+    RPB_Memory.FastMap_SetForm(snapshot, "other", other)
+    int all = JDB.solveObj(".rpb_root.surrenderTargets")
+    if (!all)
+        all = JFormMap.object()
+        JDB.solveObjSetter(".rpb_root.surrenderTargets", all, true)
+    endif
+    RPB_Memory.FastFormMap_SetObject(all, akSurrenderer, snapshot)
+endFunction
+
+int function __SurrenderSnapshot(Actor akSurrenderer)
+    int all = JDB.solveObj(".rpb_root.surrenderTargets")
+    if (!all)
+        return 0
+    endif
+    return RPB_Memory.FastFormMap_GetObject(all, akSurrenderer)
+endFunction
+
+function __ForgetSurrenderSnapshot(Actor akSurrenderer)
+    int all = JDB.solveObj(".rpb_root.surrenderTargets")
+    if (all)
+        RPB_Memory.FastFormMap_RemoveKey(all, akSurrenderer)
+    endif
+endFunction
+
+; The snapshot's surrender guards (6 at most, as GetSurrenderGuards)
+Actor[] function __SnapshotGuards(Actor akSurrenderer)
+    Actor[] result = new Actor[6]
+    int snapshot = self.__SurrenderSnapshot(akSurrenderer)
+    if (!snapshot)
+        return result
+    endif
+    int guards = RPB_Memory.FastMap_GetObject(snapshot, "guards")
+    int i = 0
+    while (i < JArray.count(guards) && i < result.Length)
+        result[i] = JArray.getForm(guards, i) as Actor
+        i += 1
+    endWhile
+    return result
+endFunction
+
+Actor function __SnapshotOther(Actor akSurrenderer)
+    int snapshot = self.__SurrenderSnapshot(akSurrenderer)
+    if (!snapshot)
+        return none
+    endif
+    return RPB_Memory.FastMap_GetForm(snapshot, "other") as Actor
+endFunction
+
+; CanActorSurrender with the snapshot (SnapshotSurrenderTargets first): the same checks, in the same order, the same logs
+bool function CanActorSurrenderFast(Actor akSurrenderer, Actor[] akSurrendererCaptors)
+    bool isPlayer = akSurrenderer == Config.Player
+    if (self.IsSurrendering(akSurrenderer))
+        __SurrenderLog("Surrender of " + akSurrenderer + " ignored: already surrendering")
+        return false
+    endif
+    int arrestStatus = self.GetActorArrestStatus(akSurrenderer)
+    if (arrestStatus != CAN_BE_ARRESTED)
+        __SurrenderLog("Surrender of " + akSurrenderer + " refused: arrest status " + arrestStatus)
+        return false
+    endif
+    if (!akSurrenderer.IsInCombat())
+        __SurrenderLog("Surrender of " + akSurrenderer + " refused: not in combat")
+        return false
+    endif
+    if (RPB_Utility.IsDeadNoCall(akSurrenderer))
+        __SurrenderLog("Surrender of " + akSurrenderer + " refused: dead")
+        return false
+    endif
+    if (!akSurrendererCaptors)
+        LastSurrenderOutcome = "no captors"
+        Config.NotifyArrest("There's no one here to surrender to", isPlayer)
+        __SurrenderLog("Surrender of " + akSurrenderer + " refused: in combat, but with no combat targets")
+        return false
+    endif
+    int snapshot = self.__SurrenderSnapshot(akSurrenderer)
+    int guards = RPB_Memory.FastMap_GetObject(snapshot, "guards")
+    int factions = RPB_Memory.FastMap_GetObject(snapshot, "factions")
+    if (!snapshot || JArray.count(guards) == 0)
+        LastSurrenderOutcome = "no guard"
+        Config.NotifyArrest("There's no one here to surrender to", isPlayer)
+        __SurrenderLog("Surrender of " + akSurrenderer + " refused: none of their " + akSurrendererCaptors.Length + " combat targets is a guard")
+        return false
+    endif
+    Actor otherHostile = RPB_Memory.FastMap_GetForm(snapshot, "other") as Actor
+    if (otherHostile)
+        __SurrenderLog("Surrender of " + akSurrenderer + " with " + otherHostile + " (" + RPB_Utility.GetFormNameCached(otherHostile.GetBaseObject()) + ", " + (akSurrenderer.GetDistance(otherHostile) as int) + " away, in combat " + otherHostile.IsInCombat() + ") still in the fight: allowed, with leeway")
+    endif
+    int i = 0
+    while (i < JArray.count(factions))
+        Faction crimeFaction = JArray.getForm(factions, i) as Faction
+        if (self.HasFakedSurrenderTo(akSurrenderer, crimeFaction))
+            LastSurrenderOutcome = "fooled"
+            Config.NotifyArrest("The guards won't fall for that again", isPlayer)
+            __SurrenderLog("Surrender of " + akSurrenderer + " refused: they faked a surrender to " + RPB_Utility.GetFormNameCached(crimeFaction) + " not long ago")
+            return false
+        endif
+        i += 1
+    endWhile
+    return true
+endFunction
+
 ; The crime faction of the first guard among @akCombatTargets that @akSurrenderer faked a surrender to lately, or none
 Faction function __FooledFaction(Actor akSurrenderer, Actor[] akCombatTargets)
     int i = 0
@@ -1964,7 +2126,18 @@ function __PacifyForSurrender(Actor akSurrenderer, Actor[] akGuards)
         while (i < akGuards.Length)
             ; A guard fighting someone else (bandits) is left to it: stopping him every pass pulled him out of that fight
             ; for nothing (he went straight back in), and the surrender waits for him instead (__WatchSurrender)
-            if (akGuards[i] && akGuards[i].IsInCombat() && !self.__IsFightingOthers(akGuards[i], akSurrenderer))
+            ; Fast actor checks: his combat state read once (__IsFightingOthers read IsInCombat again)
+            bool guardFighting = akGuards[i] && akGuards[i].IsInCombat()
+            bool fightingOthers = false
+            if (guardFighting)
+                if (RPB_Utility.IsFastActorChecks())
+                    Actor guardTarget = akGuards[i].GetCombatTarget()
+                    fightingOthers = guardTarget && guardTarget != akSurrenderer
+                else
+                    fightingOthers = self.__IsFightingOthers(akGuards[i], akSurrenderer)
+                endif
+            endif
+            if (guardFighting && !fightingOthers)
                 akGuards[i].StopCombat()
                 akGuards[i].StopCombatAlarm()
                 fighting = true
@@ -2383,11 +2556,20 @@ endFunction
     moving or drawing a weapon ends the surrender (the watch). The arrest takes the controls at the Scene's end.
 /;
 function PrepareSurrenderer(Actor akSurrenderer, Actor[] akGuards = none)
-    ; Sheathe weapons, animations won't play otherwise
-    akSurrenderer.SheatheWeapon()
-    RPB_Utility.FlowMark("Surrender: weapon sheathed")
-
-    Utility.Wait(1.0)
+    ; Sheathe weapons, animations won't play otherwise. Fast actor checks: no wait with nothing drawn; with a weapon drawn the
+    ; old 1s still: ending it once the weapon read as put away (0.7s) sent the hands up while the sheathe animation was
+    ; still finishing, and they never went up (2026-10-14)
+    if (RPB_Utility.IsFastActorChecks())
+        if (akSurrenderer.IsWeaponDrawn())
+            akSurrenderer.SheatheWeapon()
+            Utility.Wait(1.0)
+        endif
+        RPB_Utility.FlowMark("Surrender: weapon sheathed (waited only if drawn)")
+    else
+        akSurrenderer.SheatheWeapon()
+        RPB_Utility.FlowMark("Surrender: weapon sheathed")
+        Utility.Wait(1.0)
+    endif
     Debug.SendAnimationEvent(akSurrenderer, "IdleSurrender")
     RPB_Utility.FlowMark("Surrender: hands up (after a fixed 1s wait)")
 

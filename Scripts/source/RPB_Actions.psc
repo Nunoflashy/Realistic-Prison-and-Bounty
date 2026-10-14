@@ -7,6 +7,7 @@ scriptname RPB_Actions extends ObjectReference
     string[] function GetActions()
     function ShowActionsMenu()
     function Action_ToggleFlowProfiling()
+    function Action_ToggleFastActorChecks()
     function Action_ResetStuckPrisonState()
     function Action_ToggleFastMonitor()
     function Action_ToggleDebugLogging()
@@ -83,6 +84,7 @@ string[] function GetActions()
         "<No Action>," + \
         "Quit to Main Menu," + \
         "[Debug] Toggle Flow Profiling," + \
+        "[Debug] Toggle Fast Actor Checks," + \
         "[Debug] Toggle Debug Logging," + \
         "[Debug] Toggle Fast Monitor (3h)," + \
         "[Debug] Reset Stuck Prison State," + \
@@ -155,6 +157,9 @@ function ShowActionsMenu()
 
     elseif (actionToPerform == "[Debug] Toggle Flow Profiling")
         Action_ToggleFlowProfiling()
+
+    elseif (actionToPerform == "[Debug] Toggle Fast Actor Checks")
+        Action_ToggleFastActorChecks()
 
     elseif (actionToPerform == "[Debug] Toggle Debug Logging")
         Action_ToggleDebugLogging()
@@ -407,6 +412,12 @@ function Action_ToggleFastMonitor()
         RPB_Utility.SetMonitorOverrideHours(3.0)
         debug.notification("RPB fast monitor: ON (wakes every 3 game hours)")
     endif
+endFunction
+
+; Flips the fast actor checks (RPB_Utility.IsFastActorChecks) while they're compared with the old ones
+function Action_ToggleFastActorChecks()
+    RPB_Utility.SetFastActorChecks(!RPB_Utility.IsFastActorChecks())
+    debug.notification("RPB fast actor checks: " + RPB_Utility.string_if(RPB_Utility.IsFastActorChecks(), "ON", "OFF (old way)"))
 endFunction
 
 function Action_ToggleDebugLogging()

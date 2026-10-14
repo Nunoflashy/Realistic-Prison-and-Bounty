@@ -1882,7 +1882,12 @@ event OnSurrenderPreparing(Form akSurrenderer)
     Actor[] surrendererCaptors = PO3_SKSEFunctions.GetCombatTargets(surrenderer)
     Debug("EventManager::OnSurrenderPreparing", "combat targets of " + surrenderer + ": " + surrendererCaptors + " (in combat " + surrenderer.IsInCombat() + ")")
 
-    if (!Arrest.CanActorSurrender(surrenderer, surrendererCaptors))
+    if (RPB_Utility.IsFastActorChecks())
+        Arrest.SnapshotSurrenderTargets(surrenderer, surrendererCaptors)
+        if (!Arrest.CanActorSurrenderFast(surrenderer, surrendererCaptors))
+            return
+        endif
+    elseif (!Arrest.CanActorSurrender(surrenderer, surrendererCaptors))
         return
     endif
     RPB_Utility.FlowMark("Surrender: combat targets read, allowed")
