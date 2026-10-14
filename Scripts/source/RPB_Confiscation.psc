@@ -18,6 +18,10 @@ scriptname RPB_Confiscation extends Quest
     function __WatchPickup(Actor akOwner)
     bool function __PickedUp(Actor akOwner)
     ObjectReference function __FirstWeaponOnGround(int aiRefs)
+    function HandIn(Actor akOwner, ObjectReference akChest)
+    int function GetConfiscated(Actor akOwner)
+    function ReturnConfiscated(Actor akOwner)
+    int function __ReturnFromHolder(Actor akOwner)
 @events:
     event OnUpdate()
 /;
@@ -196,4 +200,130 @@ function PickUpWeapons(Actor akOwner, Actor akCaptor)
     RPB_Memory.FastMap_SetObject(record, "held", held)
     RPB_Memory.FastMap_SetForm(record, "holder", akCaptor)
     RPB_Utility.LogInfo(akCaptor + " picked up " + RPB_Memory.FastArray_Size(held) + " of " + RPB_Memory.FastArray_Size(refs) + " of " + akOwner + "'s dropped weapons", "Confiscation::PickUpWeapons")
+endFunction
+
+; ==========================================================
+;                The hand-in and the return
+; ==========================================================
+
+;/
+    At the prison (RPB_Prison.PrepareArrival, the arrival's setup): what was picked up of @akOwner's dropped weapons goes
+    from whoever holds it into her belongings chest @akChest, on her Confiscated list (returned at the release, whether or
+    not she was stripped). Never picked up (given up, or no pickup on the way): it stays where it fell, lost. Its holder
+    dead (he died on the way, or inside before the escort's end): it stays on his body. Its holder frozen: no call into
+    him, it stays on him, and the release or a cancel tries him again. By the item, not the reference (in an inventory
+    there's none left): with his own copy of it, which one goes is the engine's choice
+/;
+function HandIn(Actor akOwner, ObjectReference akChest)
+    int record = self.GetDroppedWeapons(akOwner)
+    if (!record)
+        return
+    endif
+    int held = RPB_Memory.FastMap_GetObject(record, "held")
+    Actor holder = RPB_Memory.FastMap_GetForm(record, "holder") as Actor
+    if (!held || !holder)
+        RPB_Utility.LogInfo(akOwner + "'s dropped weapons were never picked up, they stay where they fell", "Confiscation::HandIn")
+        self.ForgetDroppedWeapons(akOwner)
+        return
+    endif
+    if (RPB_Utility.IsDeadNoCall(holder))
+        RPB_Utility.LogInfo(holder + " died holding " + akOwner + "'s weapons, they stay on his body", "Confiscation::HandIn")
+        self.ForgetDroppedWeapons(akOwner)
+        return
+    endif
+    if (!akChest || RPB_Utility.IsFrozenNPC(holder))
+        RPB_Utility.LogWarn("Not handing in " + akOwner + "'s weapons now (chest: " + akChest + ", " + holder + " frozen: " + RPB_Utility.IsFrozenNPC(holder) + "), he keeps them until the release", "Confiscation::HandIn")
+        return
+    endif
+    int confiscated = self.GetConfiscated(akOwner)
+    if (!confiscated)
+        confiscated = JMap.object()
+        RPB_Memory.FastMap_SetObject(confiscated, "items", JArray.object())
+        int all = JDB.solveObj(".rpb_root.confiscated")
+        if (!all)
+            all = JFormMap.object()
+            JDB.solveObjSetter(".rpb_root.confiscated", all, true)
+        endif
+        RPB_Memory.FastFormMap_SetObject(all, akOwner, confiscated)
+    endif
+    RPB_Memory.FastMap_SetForm(confiscated, "chest", akChest)
+    int items = RPB_Memory.FastMap_GetObject(confiscated, "items")
+    int handedIn = 0
+    int i = 0
+    while (i < RPB_Memory.FastArray_Size(held))
+        Form item = RPB_Memory.FastArray_GetForm(held, i)
+        if (item && holder.GetItemCount(item) > 0)
+            holder.RemoveItem(item, 1, true, akChest)
+            RPB_Memory.FastArray_AddForm(items, item)
+            handedIn += 1
+        endif
+        i += 1
+    endWhile
+    self.ForgetDroppedWeapons(akOwner)
+    RPB_Utility.LogInfo(holder + " handed in " + handedIn + " of " + RPB_Memory.FastArray_Size(held) + " of " + akOwner + "'s weapons into " + akChest, "Confiscation::HandIn")
+endFunction
+
+; @akOwner's Confiscated list (a JMap: "items" the items, "chest" where they're kept), 0 with none
+int function GetConfiscated(Actor akOwner)
+    int all = JDB.solveObj(".rpb_root.confiscated")
+    if (!all)
+        return 0
+    endif
+    return RPB_Memory.FastFormMap_GetObject(all, akOwner)
+endFunction
+
+;/
+    At the release (RPB_Prison.TeleportPrisonerToRelease) or a cancelled arrest (RPB_Recovery.CancelArrest): @akOwner gets
+    back what was confiscated from her, out of the chest it was handed into, and what a living guard still holds (a cancel
+    before the prison, a hand-in a frozen guard missed). Anything gone from the chest (taken by someone) isn't returned
+/;
+function ReturnConfiscated(Actor akOwner)
+    int fromHolder = self.__ReturnFromHolder(akOwner)
+    int confiscated = self.GetConfiscated(akOwner)
+    if (!confiscated)
+        if (fromHolder > 0)
+            RPB_Utility.LogInfo("Returned " + fromHolder + " of " + akOwner + "'s weapons from the guard who held them", "Confiscation::ReturnConfiscated")
+        endif
+        return
+    endif
+    ObjectReference chest = RPB_Memory.FastMap_GetForm(confiscated, "chest") as ObjectReference
+    int items = RPB_Memory.FastMap_GetObject(confiscated, "items")
+    int returned = 0
+    int i = 0
+    while (chest && i < RPB_Memory.FastArray_Size(items))
+        Form item = RPB_Memory.FastArray_GetForm(items, i)
+        if (item && chest.GetItemCount(item) > 0)
+            chest.RemoveItem(item, 1, true, akOwner)
+            returned += 1
+        endif
+        i += 1
+    endWhile
+    RPB_Memory.FastFormMap_RemoveKey(JDB.solveObj(".rpb_root.confiscated"), akOwner)
+    RPB_Utility.LogInfo("Returned " + returned + " of " + RPB_Memory.FastArray_Size(items) + " confiscated items to " + akOwner + " from " + chest + " (" + fromHolder + " from the guard)", "Confiscation::ReturnConfiscated")
+endFunction
+
+; The dropped weapons a living, unfrozen guard still holds go back to @akOwner (dead: on his body; never picked up: where
+; they fell), the record forgotten either way. How many went back
+int function __ReturnFromHolder(Actor akOwner)
+    int record = self.GetDroppedWeapons(akOwner)
+    if (!record)
+        return 0
+    endif
+    int held = RPB_Memory.FastMap_GetObject(record, "held")
+    Actor holder = RPB_Memory.FastMap_GetForm(record, "holder") as Actor
+    self.ForgetDroppedWeapons(akOwner)
+    if (!held || !holder || RPB_Utility.IsDeadNoCall(holder) || RPB_Utility.IsFrozenNPC(holder))
+        return 0
+    endif
+    int returned = 0
+    int i = 0
+    while (i < RPB_Memory.FastArray_Size(held))
+        Form item = RPB_Memory.FastArray_GetForm(held, i)
+        if (item && holder.GetItemCount(item) > 0)
+            holder.RemoveItem(item, 1, true, akOwner)
+            returned += 1
+        endif
+        i += 1
+    endWhile
+    return returned
 endFunction

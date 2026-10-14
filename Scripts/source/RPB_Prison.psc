@@ -1610,6 +1610,9 @@ function PrepareArrival(RPB_Prisoner apPrisoner)
     if (!apPrisoner.JailCell)
         self.AssignCell(apPrisoner) ; Assign a prison cell to this prisoner
     endif
+
+    ; What her guard picked up of the weapons she dropped surrendering is handed in, into her belongings chest
+    API.Confiscation.HandIn(apPrisoner.GetActor(), apPrisoner.PrisonerBelongingsContainer)
 endFunction
 
 Form[] function GetReleaseMarkers(string asReleaseMarkerType = "Teleport")
@@ -2411,6 +2414,7 @@ function TeleportPrisonerToRelease(RPB_Prisoner apPrisoner, bool abMoveToRelease
     apPrisoner.Remove("Imprisoned")
 
     apPrisoner.ReturnBelongings()
+    API.Confiscation.ReturnConfiscated(releasedActor)
     ; Cuffs stripped into the container before strips deleted them come back with the belongings, and a reset prisoner
     ; can still wear them
     RPB_Utility.RemoveCuffs(releasedActor)

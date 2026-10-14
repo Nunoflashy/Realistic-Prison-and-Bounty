@@ -341,6 +341,9 @@ string function CancelArrest(Actor akActor, string asReason, bool abReturnBelong
         done += "imprisonment cancelled; "
     endif
     RPB_Recovery.__Step(akActor, "CancelArrest: imprisonment done")
+    if (abReturnBelongings)
+        RPB_API.GetConfiscation().ReturnConfiscated(akActor) ; what a guard took from them (a dead one keeps it on his body)
+    endif
 
     akActor.SetRestrained(false)
     akActor.SetDontMove(false)
