@@ -696,7 +696,9 @@ Alias[] function GetSceneAliases(string asScene, bool abOnlyIncludeAliasesInUse 
                     if (aliasIndex < buffer.Length) ; prevent buffer overflow
                         buffer[aliasIndex] = refAlias
                         aliasIndex += 1
-                        Debug("SceneMNager::GetSceneAliases", "id: " + id + ", refAlias: " + refAlias.GetName())
+                        if (IsDebuggingEnabled()) ; the text's GetName() waits a frame, and was built with DEBUG off too
+                            Debug("SceneMNager::GetSceneAliases", "id: " + id + ", refAlias: " + refAlias.GetName())
+                        endif
                     endif
                 endif
                 k += 1
@@ -1743,9 +1745,13 @@ function QueueAlias(ReferenceAlias apRefAlias, ObjectReference akRef, bool abBin
     ; that Scene's end reported the wrong actors (abBindAlias is kept so existing calls compile; it no longer binds).
     int id = apRefAlias.GetID()
     FastIntMap_SetForm(staging, id, akRef)
-    Debug("SceneManager::QueueAlias", "Queued " + apRefAlias.GetName() + " (id: "+ apRefAlias.GetID() +") with reference: " + FastIntMap_GetForm(staging, id) + " for " + asScene)
-
-    Debug("SceneManager::QueueAlias", "__queuedAliases: " + GetContainerList(staging))
+    ; Only with DEBUG on: these texts were built before Debug() checks, with DEBUG off too: the alias's name and ID read
+    ; again (a frame each) and the whole staging map listed, for every alias of every Scene (most of the surrender Scene's
+    ; ~1.1s setup, 2026-10-14)
+    if (IsDebuggingEnabled())
+        Debug("SceneManager::QueueAlias", "Queued " + apRefAlias.GetName() + " (id: "+ id +") with reference: " + FastIntMap_GetForm(staging, id) + " for " + asScene)
+        Debug("SceneManager::QueueAlias", "__queuedAliases: " + GetContainerList(staging))
+    endif
 
     RPB_Utility.LogWarn("Alias " + apRefAlias.GetName() + " (id: "+ apRefAlias.GetID() +") has not been assigned to any reference!", "SceneManager::QueueAlias", akRef == none)
 endFunction
@@ -1823,7 +1829,10 @@ function RestoreAliases(int aiAliases)
     int aliasIds    = FastIntMap_Keys(aiAliases)   ; FastArray<int>
     int aliasRefs   = FastIntMap_Values(aiAliases) ; FastArray<Form>
 
-    Debug("SceneManager::RestoreAliases", "Restoring " + FastArray_Size(aliasIds) + " Aliases (ids: "+ GetContainerList(aliasIds) +") with references: " + GetContainerList(aliasRefs))
+    bool debugging = IsDebuggingEnabled() ; the texts below only with DEBUG on (their reads wait a frame each)
+    if (debugging)
+        Debug("SceneManager::RestoreAliases", "Restoring " + FastArray_Size(aliasIds) + " Aliases (ids: "+ GetContainerList(aliasIds) +") with references: " + GetContainerList(aliasRefs))
+    endif
     
     int i = 0
     while (i < FastArray_Size(aliasIds))
@@ -1831,7 +1840,9 @@ function RestoreAliases(int aiAliases)
         ObjectReference ref    = FastArray_GetForm(aliasRefs, i) as ObjectReference
 
         ReferenceAlias refAlias = self.GetAliasByID(id) as ReferenceAlias
-        Debug("SceneManager::RestoreAliases", "Restored " + refAlias.GetName() + " (id: "+ refAlias.GetID() +") with reference: " + ref)
+        if (debugging)
+            Debug("SceneManager::RestoreAliases", "Restored " + refAlias.GetName() + " (id: "+ id +") with reference: " + ref)
+        endif
 
         RPB_Utility.BindAliasTo(refAlias, ref)
         i += 1
