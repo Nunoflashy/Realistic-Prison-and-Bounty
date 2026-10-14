@@ -1304,6 +1304,9 @@ event OnArrestBegin(string eventName, string arrestType, float arresteeIdFlt, Fo
         ; of leaving the actor half-arrested with a spell no script will ever answer for.
         arrestee.RemoveSpell(RPB_Utility.RPB_ArresteeSpell())
         RPB_StorageVars.DeleteVariableOnReference("Hold UUID", arrestee, "Arrest")
+        ; A surrender's dropped weapons, locked while it was on: nobody's coming for them now (a save during this arrest's
+        ; start, loaded, reverted it with the weapon still locked, 2026-10-14). Still remembered, for a later arrest's pickup
+        API.Confiscation.UnblockDroppedWeapons(arrestee)
         RPB_Utility.Crumb(arrestee, "OnArrestBegin: arrestee never registered, spell removed (reverted)")
         Config.NotifyArrest("Could not arrest " + arrestee.GetDisplayName())
         RPB_Utility.LogError("Could not arrest " + arrestee + " for "+ RPB_Utility.GetFormNameCached(crimeFaction) +", the Arrestee never registered! (reverted)", "EventManager::OnArrestBegin")
