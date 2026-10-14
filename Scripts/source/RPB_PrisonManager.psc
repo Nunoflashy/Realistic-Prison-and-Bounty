@@ -20,6 +20,7 @@ Scriptname RPB_PrisonManager extends Quest
     function AddPrisonerToPrisonRegistry(RPB_Prisoner apPrisoner)
     function RemovePrisonerFromPrisonRegistry(RPB_Prisoner apPrisoner)
     RPB_Prison function FindPrisonByPrisoner(Actor akPrisonerActor)
+    int function ReleaseDueNPCsInOrderEverywhere(float afPlayerTimeLeft)
     RPB_Prison function FindPrisonByHold(string asHold)
     Alias[] function GetPrisons()
     RPB_Prison function GetPrison(string asHold)
@@ -198,6 +199,84 @@ int property PrisonsWithPrisonersCount
         return withPrisoners
     endFunction
 endProperty
+
+;/
+    The player's sentence fast-forwarded (RPB_Prisoner.FastForwardToRelease): every NPC due before the player, in every
+    prison, released in one timeline, each at her own release time (the time passed up to it first). It was only the
+    player's prison (RPB_Prison.ReleaseDueNPCsInOrder): the others waited for their monitors, which only woke after the whole
+    skip (its days pass inside one stack), and released theirs at the player's release time ("time jailed 15 days" for a
+    20-day sentence, her hostility back 24h after that, 2026-10-13). An intake still under way in any prison is finished
+    first, as the time skip does. Returns the days passed (the player's own remainder is passed by the caller)
+/;
+int function ReleaseDueNPCsInOrderEverywhere(float afPlayerTimeLeft)
+    if (!__activePrisonCacheValid)
+        self.__BuildActivePrisonCache()
+    endif
+
+    ; Every prison's due NPCs, with their prison and time left
+    Form[] due = Utility.CreateFormArray(0)
+    Alias[] dueIn = Utility.CreateAliasArray(0)
+    float[] left = Utility.CreateFloatArray(0)
+    int count = 0
+    int p = 0
+    while (p < __activePrisonCacheCount)
+        RPB_Prison prison = __activePrisonCache[p]
+        if (prison && prison.Prisoners.Count > 0)
+            prison.__FinishIntakeForTimeSkip()
+            Form[] prisonDue = prison.GetPrisonersReleasedNoLaterThan(afPlayerTimeLeft)
+            if (prisonDue.Length > 0)
+                due = Utility.ResizeFormArray(due, count + prisonDue.Length)
+                dueIn = Utility.ResizeAliasArray(dueIn, count + prisonDue.Length)
+                left = Utility.ResizeFloatArray(left, count + prisonDue.Length)
+                int k = 0
+                while (k < prisonDue.Length)
+                    Actor npc = prisonDue[k] as Actor
+                    RPB_Prisoner prisoner = prison.Prisoners.AtKey(npc)
+                    if (prisoner && npc != Game.GetPlayer()) ; the list's actor: no call into her
+                        due[count] = npc
+                        dueIn[count] = prison
+                        left[count] = prisoner.TimeLeftInSentence
+                        count += 1
+                    endif
+                    k += 1
+                endWhile
+            endif
+        endif
+        p += 1
+    endWhile
+
+    ; The earliest first, the time passed up to each
+    bool[] done = Utility.CreateBoolArray(count, false)
+    int passed = 0
+    int released = 0
+    while (released < count)
+        int pick = -1
+        int j = 0
+        while (j < count)
+            if (!done[j] && (pick == -1 || left[j] < left[pick]))
+                pick = j
+            endif
+            j += 1
+        endWhile
+        float delta = left[pick] - passed
+        if (delta > 0.0)
+            int daysToPass = Math.Ceiling(delta)
+            RPB_Utility.PassTimeInDays(daysToPass)
+            passed += daysToPass
+        endif
+        RPB_Prison releasingIn = dueIn[pick] as RPB_Prison
+        RPB_Prisoner releasing = releasingIn.Prisoners.AtKey(due[pick] as Actor)
+        if (releasing)
+            releasingIn.Monitor.ReleaseNPC(releasing, due[pick] as Actor)
+        endif
+        done[pick] = true
+        released += 1
+    endWhile
+    if (count > 0)
+        Info("PrisonManager: the player's fast forward released " + count + " NPC prisoner(s) in order across " + __activePrisonCacheCount + " prisons, " + passed + " days passed for them")
+    endif
+    return passed
+endFunction
 
 ; ==========================================================
 

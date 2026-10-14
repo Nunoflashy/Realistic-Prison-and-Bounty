@@ -3186,6 +3186,14 @@ function EscortPrisonerToRelease(RPB_Prisoner apPrisoner)
 endFunction
 
 bool function SendReleaseRequest(RPB_Prisoner apPrisoner)
+    ; One release per NPC: the player's fast forward releases each due NPC at her own time (RPB_PrisonManager
+    ; .ReleaseDueNPCsInOrderEverywhere), and her prison's monitor, waking in the middle of that skip as her time came, queued
+    ; the same release: she was released twice (reequipped twice, the second "sentence 0 days, time served 105 days",
+    ; 2026-10-14). The first to ask releases her
+    if (apPrisoner.IsNPC() && !self.__ClaimRelease(apPrisoner.GetActor(), Utility.GetCurrentRealTime()))
+        Info("[" + Name + "] " + apPrisoner.Name + " is already being released: this release request skipped")
+        return false
+    endif
     RPB_Utility.FlowBegin("Release")
     if (apPrisoner.IsNPC() && apPrisoner.IsFarFromPlayer())
         apPrisoner.SetBool("Teleport to Release", true)
@@ -3204,6 +3212,38 @@ bool function SendReleaseRequest(RPB_Prisoner apPrisoner)
     elseif (apPrisoner.Should("Escort to Release"))
         self.EscortPrisonerToRelease(apPrisoner)
     endif
+endFunction
+
+Form[] __releaseClaims        ; the NPCs whose release was asked for in the last minute
+float[] __releaseClaimedAt
+
+; True if this caller claims @akActor's release: none asked for it within the last 60s (real time; a stamp from before a
+; game restart reads as old). No call out between the look and the claim: two release stacks can't both claim her
+bool function __ClaimRelease(Actor akActor, float afNow)
+    if (!__releaseClaims || __releaseClaims.Length == 0)
+        __releaseClaims = new Form[32]
+        __releaseClaimedAt = new float[32]
+    endif
+    int slot = __releaseClaims.Find(akActor)
+    if (slot >= 0 && afNow >= __releaseClaimedAt[slot] && (afNow - __releaseClaimedAt[slot]) < 60.0)
+        return false
+    endif
+    if (slot < 0)
+        slot = __releaseClaims.Find(none)
+    endif
+    if (slot < 0) ; all taken: the oldest claim makes room
+        slot = 0
+        int i = 1
+        while (i < __releaseClaims.Length)
+            if (__releaseClaimedAt[i] < __releaseClaimedAt[slot])
+                slot = i
+            endif
+            i += 1
+        endWhile
+    endif
+    __releaseClaims[slot] = akActor
+    __releaseClaimedAt[slot] = afNow
+    return true
 endFunction
 
 ;/

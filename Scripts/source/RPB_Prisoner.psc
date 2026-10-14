@@ -2646,10 +2646,9 @@ function FastForwardToRelease()
         Debug("["+ Name +"] Prisoner::FastForwardToRelease", "Setting Game Hour to Release Time Minimum Hour: " + RPB_Utility.GetTimeAs12Hour(Prison.ReleaseTimeMinimumHour))
     endif
 
-    ; Process all NPC Prisoners that have a Sentence less than the Player's, chronologically: each one is released at its own
-    ; release time (time is passed by the difference between them), the player's own time is passed after that.
-    ; This should probably be processed globally for all Prisons, but just for testing it's done with the same one the Player is in.
-    Prison.ReleaseDueNPCsInOrder(TimeLeftInSentence)
+    ; Every NPC prisoner due before the player, in every prison, released chronologically: each at her own release time (time
+    ; is passed by the difference between them), the player's own time is passed after that
+    Prison.PrisonManager.ReleaseDueNPCsInOrderEverywhere(TimeLeftInSentence)
 
     ; Pass the time
     int timeLeft = Math.Ceiling(TimeLeftInSentence)
