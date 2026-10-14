@@ -1109,6 +1109,8 @@ function __ResumeEscort(bool abEscortDirectlyToCell)
         return
     endif
 
+    ; What I dropped when I surrendered: my captor picks it up first (queued ahead of the escort)
+    API.Confiscation.QueueWeaponPickup(this, guard)
     if (!abEscortDirectlyToCell)
         prisoner.EscortToJail(guard)
     else
@@ -1166,6 +1168,8 @@ function __ContinueToPrison(bool abEscortDirectlyToCell)
         return
     endif
 
+    ; What I dropped when I surrendered: my captor picks it up first (queued ahead of the escort)
+    API.Confiscation.QueueWeaponPickup(this, Captor.GetActor())
     if (!abEscortDirectlyToCell)
         prisoner.EscortToJail(Captor.GetActor())
     else

@@ -33,6 +33,7 @@ scriptname RPB_SceneManager extends Quest
     string EVENT_ARREST_PAY_BOUNTY_END
     string CATEGORY_ARREST_START
     string CATEGORY_SURRENDER
+    string CATEGORY_PICK_UP_WEAPONS
     string CATEGORY_ESCORT_TO_JAIL
     string CATEGORY_ESCORT_TO_CELL
     string CATEGORY_ESCORT_FROM_CELL
@@ -50,6 +51,7 @@ scriptname RPB_SceneManager extends Quest
     string SCENE_ARREST_START_04
     string SCENE_ARREST_START_PRISON_01
     string SCENE_SURRENDER_01
+    string SCENE_PICK_UP_WEAPONS_01
     string SCENE_GENERIC_ESCORT
     string SCENE_ESCORT_FROM_CELL
     string SCENE_ESCORT_TO_JAIL_01
@@ -162,6 +164,7 @@ scriptname RPB_SceneManager extends Quest
     function StartArrestStart03(Actor akGuard, Actor akPrisoner)
     function StartArrestStart04(Actor akGuard, Actor akPrisoner)
     function StartSurrenderScene(Actor akSurrenderer, Actor[] akSurrendererCaptors, string asScene)
+    function StartPickUpWeapons(Actor akCaptor, ObjectReference akWeapon, Actor akOwner)
     function StartArrestScene(Actor akGuard, Actor akArrestee, string asScene)
     function StartEscortToJailScene(Actor akGuard, Actor akArrestee, string asScene)
     function StartArrestStartPrison_01(Actor akGuard, Actor akPrisoner, int aiStartingPhase = 1)
@@ -255,7 +258,7 @@ endFunction
     off) and the queued intake was lost (KNOWN_ISSUES round 172). The queue and each queued Scene's actors are kept: the
     queue drops a Scene whose actor is gone when it comes up (PlayQueued).
 /;
-int property SCENE_SETUP_VERSION = 1 autoreadonly
+int property SCENE_SETUP_VERSION = 2 autoreadonly ; 2: the weapon pickup (2026-10-14)
 int __sceneSetupVersion
 
 function SceneManager()
@@ -471,6 +474,7 @@ function SetupScenes()
     self.AddScene(SCENE_ARREST_START_04,                        0x13663, CATEGORY_ARREST_START)     ; Arrest Start 04
     self.AddScene(SCENE_ARREST_START_PRISON_01,                 0x14C14, CATEGORY_ARREST_START)     ; Arrest Start Prison 01
     self.AddScene(SCENE_SURRENDER_01,                           0x26A2F, CATEGORY_SURRENDER)        ; Surrender 01
+    self.AddScene(SCENE_PICK_UP_WEAPONS_01,                     0x2C06D, CATEGORY_PICK_UP_WEAPONS)  ; Pick Up Weapons 01 (built by the patcher)
     self.AddScene(SCENE_ESCORT_TO_JAIL_01,                      0xF532, CATEGORY_ESCORT_TO_JAIL)    ; Escort to Jail
     self.AddScene(SCENE_ESCORT_TO_JAIL_02,                      0x17CDA, CATEGORY_ESCORT_TO_JAIL)   ; Escort to Jail 02
     self.AddScene(SCENE_ESCORT_TO_CELL_01,                      0xCF58, CATEGORY_ESCORT_TO_CELL)    ; Escort to Cell 01
@@ -900,6 +904,11 @@ function CreateSceneConfig()
     self.CreateSceneRefTypeConfig(SCENE_SURRENDER_01, "Surrenderer",       1, 0)
     self.CreateSceneRefTypeConfig(SCENE_SURRENDER_01, "SurrendererCaptor", 6, 0)
 
+    ; Pick Up Weapons (the owner has no role in the Scene: kept for its events)
+    self.CreateSceneRefTypeConfig(SCENE_PICK_UP_WEAPONS_01, "PickUpCaptor", 1, 0)
+    self.CreateSceneRefTypeConfig(SCENE_PICK_UP_WEAPONS_01, "PickUpWeapon", 1, 0)
+    self.CreateSceneRefTypeConfig(SCENE_PICK_UP_WEAPONS_01, "PickUpOwner",  1, 0)
+
     EndBenchmark(sceneConfigBench, "SceneManager::CreateSceneConfig")
 endFunction
 
@@ -965,6 +974,7 @@ string property EVENT_ARREST_PAY_BOUNTY_END = "ArrestPayBountyEnd" autoreadonly
 
 string property CATEGORY_ARREST_START       = "RPB_ArrestStart" autoreadonly
 string property CATEGORY_SURRENDER          = "RPB_Surrender" autoreadonly
+string property CATEGORY_PICK_UP_WEAPONS    = "RPB_PickUpWeapons" autoreadonly
 string property CATEGORY_ESCORT_TO_JAIL     = "RPB_EscortToJail" autoreadonly
 string property CATEGORY_ESCORT_TO_CELL     = "RPB_EscortToCell" autoreadonly
 string property CATEGORY_ESCORT_FROM_CELL   = "RPB_EscortFromCell" autoreadonly
@@ -987,6 +997,7 @@ string property SCENE_ARREST_START_03                       = "RPB_ArrestStart03
 string property SCENE_ARREST_START_04                       = "RPB_ArrestStart04" autoreadonly
 string property SCENE_ARREST_START_PRISON_01                = "RPB_ArrestStartPrison01" autoreadonly
 string property SCENE_SURRENDER_01                          = "RPB_Surrender01" autoreadonly
+string property SCENE_PICK_UP_WEAPONS_01                    = "RPB_PickUpWeapons01" autoreadonly
 string property SCENE_GENERIC_ESCORT                        = "RPB_GenericEscort" autoreadonly
 string property SCENE_ESCORT_FROM_CELL                      = "RPB_EscortFromCell" autoreadonly
 string property SCENE_ESCORT_TO_JAIL_01                     = "RPB_EscortToJail01" autoreadonly
@@ -2112,6 +2123,18 @@ event OnScenePlaying(string name, int phaseEvent, int phase, Scene sender)
             endif
         endif
 
+    elseif (type == CATEGORY_PICK_UP_WEAPONS)
+        ; "Pick Up" (phase 2): the captor reached the weapon. The pickup runs on a stack of its own (it plays his animation
+        ; and moves the weapons), with nothing here calling into him
+        if (phase == 2 && phaseEvent == PHASE_START)
+            int handle = ModEvent.Create("RPB_PickUpWeapons")
+            if (handle)
+                ModEvent.PushForm(handle, self.GetSceneNthReferenceOfType(name, "PickUpOwner"))
+                ModEvent.PushForm(handle, self.GetSceneNthReferenceOfType(name, "PickUpCaptor"))
+                ModEvent.Send(handle)
+            endif
+        endif
+
     elseif (type == CATEGORY_PAY_BOUNTY)
         Actor escort        = self.GetSceneNthReferenceOfType(name, "Escort") as Actor
         Form[] arrestees    = self.GetSceneReferencesOfType(name, "Escortee")
@@ -2618,6 +2641,15 @@ function StartSurrenderScene(Actor akSurrenderer, Actor[] akSurrendererCaptors, 
     string name = SCENE_SURRENDER_01
     self.BindSceneAliasGroup(name, "SurrendererCaptor", RPB_Utility.ActorToFormArray(akSurrendererCaptors))
     self.BindSceneAlias(name, "Surrenderer", akSurrenderer)
+    self.QueueOrPlay(name)
+endFunction
+
+; The captor @akCaptor walks to @akWeapon (the first of @akOwner's dropped weapons) and picks up what she dropped
+function StartPickUpWeapons(Actor akCaptor, ObjectReference akWeapon, Actor akOwner)
+    string name = SCENE_PICK_UP_WEAPONS_01
+    self.BindSceneAlias(name, "PickUpCaptor", akCaptor)
+    self.BindSceneAlias(name, "PickUpWeapon", akWeapon)
+    self.BindSceneAlias(name, "PickUpOwner", akOwner)
     self.QueueOrPlay(name)
 endFunction
 

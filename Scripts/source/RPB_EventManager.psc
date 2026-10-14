@@ -35,6 +35,7 @@ scriptname RPB_EventManager extends Quest
     event OnArrestSceneEvent(string asScene, string asSceneEvent, string asSceneSecondaryEvent, Form akMember, Form akAuthority, int aiPrevious, int aiNumber, int aiBatch, int aiMembers)
     event OnSurrenderSceneEvent(string asScene, string asSceneEvent, string asSceneSecondaryEvent, Form akMember, Form akAuthority, int aiPrevious, int aiNumber, int aiBatch, int aiMembers)
     event OnSurrenderPreparing(Form akSurrenderer)
+    event OnPickUpWeapons(Form akOwner, Form akCaptor)
     event OnSurrenderScene(string asScene, string asSceneEvent, Actor akSurrenderer, Actor akSurrendererCaptor, string asSceneSecondaryEvent, Form[] akParams, Form[] akParams2)
     event OnSceneStart(string eventName, string sceneName, float unusedFlt, Form sender)
     event OnScenePlayingStart(string eventName, string sceneName, float scenePhaseFlt, Form sender)
@@ -134,6 +135,7 @@ function RegisterEvents()
     RegisterForModEvent("RPB_ArrestControlsCheck", "OnArrestControlsCheck")
     RegisterForModEvent("RPB_CancelArrest", "OnCancelArrestRequest")
     RegisterForModEvent("RPB_SubmissionTakeover", "OnSubmissionTakeover")
+    RegisterForModEvent("RPB_PickUpWeapons", "OnPickUpWeapons")
     RegisterForModEvent("RPB_FaintFrozenGuard", "OnFaintFrozenGuard")
     RegisterForModEvent("RPB_MoveGuard", "OnMoveGuard")
     RegisterForModEvent("RPB_StalledEscortTakeover", "OnStalledEscortTakeover")
@@ -365,6 +367,11 @@ endEvent
 
 event OnSubmissionTakeover(Form akFrozenGuard)
     Arrest.TakeOverSubmission(akFrozenGuard as Actor)
+endEvent
+
+; The weapon pickup Scene's "Pick Up" phase (RPB_SceneManager): the captor picks up what @akOwner dropped
+event OnPickUpWeapons(Form akOwner, Form akCaptor)
+    API.Confiscation.PickUpWeapons(akOwner as Actor, akCaptor as Actor)
 endEvent
 
 ;/
