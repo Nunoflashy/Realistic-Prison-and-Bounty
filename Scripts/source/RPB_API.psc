@@ -66,6 +66,18 @@ RPB_Confiscation property Confiscation
     endFunction
 endProperty
 
+RPB_Parcels __parcels
+RPB_Parcels property Parcels
+    RPB_Parcels function get()
+        if (__parcels)
+            return __parcels
+        endif
+
+        __parcels = GetParcels()
+        return __parcels
+    endFunction
+endProperty
+
 RPB_ActorList __actorListTrackedActors
 RPB_ActorList property ActorListForTrackedActors
     RPB_ActorList function get()
@@ -141,6 +153,10 @@ endFunction
 
 RPB_Confiscation function GetConfiscation() global
     return GetFormFromMod(0x3DF8) as RPB_Confiscation
+endFunction
+
+RPB_Parcels function GetParcels() global
+    return GetFormFromMod(0x3DF8) as RPB_Parcels
 endFunction
 
 RPB_ActorList function GetActorListForTrackedActors() global
