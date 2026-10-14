@@ -79,9 +79,8 @@ scriptname RPB_Arrest extends Quest
     function SetAsYielding(Actor akSparerGuard, Actor akYieldedArrestee)
     function StartBountyPayment(Actor akGuard, Actor akPayerArrestee, string asBountyPaymentScenario)
     function Surrender(Actor akSurrenderer)
-    bool function CanActorSurrender(Actor akSurrenderer, Actor[] akSurrendererCaptors)
     function SnapshotSurrenderTargets(Actor akSurrenderer, Actor[] akCombatTargets)
-    bool function CanActorSurrenderFast(Actor akSurrenderer, Actor[] akSurrendererCaptors)
+    bool function CanActorSurrender(Actor akSurrenderer, Actor[] akSurrendererCaptors)
     bool function IsSurrenderGuard(Actor akActor)
     bool function HasSurrenderGuard(Actor[] akCombatTargets)
     Actor function GetNonGuardCombatTarget(Actor[] akCombatTargets)
@@ -1183,10 +1182,9 @@ endFunction
 event OnSurrenderBegin(Actor akSurrenderer, Actor[] akSurrendererCaptors)
     self.__BeginSurrender(akSurrenderer)
     RPB_Utility.FlowMark("Surrender: begun (marked surrendering)")
-    bool fast = RPB_Utility.IsFastActorChecks() && self.__SurrenderSnapshot(akSurrenderer)
     Actor outsider = none
     Actor[] guards
-    if (fast) ; the targets as SnapshotSurrenderTargets saw them a moment ago
+    if (self.__SurrenderSnapshot(akSurrenderer)) ; the targets as SnapshotSurrenderTargets saw them a moment ago
         outsider = self.__SnapshotOther(akSurrenderer)
         guards = self.__SnapshotGuards(akSurrenderer)
         self.__ForgetSurrenderSnapshot(akSurrenderer)
@@ -1765,77 +1763,10 @@ endFunction
 ; ==========================================================
 ;                      Surrender-Specific
 
-bool function CanActorSurrender(Actor akSurrenderer, Actor[] akSurrendererCaptors)
-    bool isPlayer = akSurrenderer == Config.Player
-    ; A second F8 while the first one is still on its way (the prepare alone takes 2s) started a second surrender
-    if (self.IsSurrendering(akSurrenderer))
-        __SurrenderLog("Surrender of " + akSurrenderer + " ignored: already surrendering")
-        return false
-    endif
-
-    int arrestStatus = self.GetActorArrestStatus(akSurrenderer)
-
-    if (arrestStatus != CAN_BE_ARRESTED)
-        __SurrenderLog("Surrender of " + akSurrenderer + " refused: arrest status " + arrestStatus)
-        RPB_Utility.LogError("Actor " + akSurrenderer.GetBaseObject().GetName() + " is not able to be arrested! ("+ string_if (arrestStatus == ALREADY_ARRESTED, "Currently Arrested", "Currently Imprisoned") +")")
-        return false
-    endif
-
-    if (!akSurrenderer.IsInCombat())
-        __SurrenderLog("Surrender of " + akSurrenderer + " refused: not in combat")
-        RPB_Utility.LogWarn("Unable to surrender! (Actor " + akSurrenderer.GetBaseObject().GetName() + " is not in combat)")
-        return false
-    endif
-
-    if (akSurrenderer.IsDead())
-        __SurrenderLog("Surrender of " + akSurrenderer + " refused: dead")
-        RPB_Utility.LogWarn("Unable to surrender! (Actor " + akSurrenderer.GetBaseObject().GetName() + " is dead)")
-        return false
-    endif
-
-    ; Nobody fighting them yet (the combat targets fill in a moment after the fight starts)
-    if (!akSurrendererCaptors)
-        LastSurrenderOutcome = "no captors"
-        Config.NotifyArrest("There's no one here to surrender to", isPlayer)
-        __SurrenderLog("Surrender of " + akSurrenderer + " refused: in combat, but with no combat targets")
-        return false
-    endif
-
-    ; Only the law takes a surrender. Bandits and creatures used to be bound as captors too: one walked up, the arrest was
-    ; rejected (no crime faction, or no bounty) and nothing ever gave the player back their controls
-    Actor otherHostile = self.GetNonGuardCombatTarget(akSurrendererCaptors)
-    if (!self.HasSurrenderGuard(akSurrendererCaptors))
-        LastSurrenderOutcome = "no guard"
-        Config.NotifyArrest("There's no one here to surrender to", isPlayer)
-        __SurrenderLog("Surrender of " + akSurrenderer + " refused: none of their " + akSurrendererCaptors.Length + " combat targets is a guard")
-        return false
-    endif
-
-    ; Someone who won't take it is still in the fight (bandits fighting the guards, hostile to the player too): the
-    ; surrender goes ahead, whatever happens then is the surrenderer's choice (the mod author, 2026-10-05). It used to be
-    ; refused, which left nothing to do but run. The watch gives them a few steps of leeway while that one still fights
-    ; (SURRENDER_DODGES)
-    if (otherHostile)
-        __SurrenderLog("Surrender of " + akSurrenderer + " with " + otherHostile + " (" + RPB_Utility.GetFormNameCached(otherHostile.GetBaseObject()) + ", " + (akSurrenderer.GetDistance(otherHostile) as int) + " away, in combat " + otherHostile.IsInCombat() + ") still in the fight: allowed, with leeway")
-    endif
-
-    ; They faked one to these guards' hold not long ago
-    Faction fooled = self.__FooledFaction(akSurrenderer, akSurrendererCaptors)
-    if (fooled)
-        LastSurrenderOutcome = "fooled"
-        Config.NotifyArrest("The guards won't fall for that again", isPlayer)
-        __SurrenderLog("Surrender of " + akSurrenderer + " refused: they faked a surrender to " + RPB_Utility.GetFormNameCached(fooled) + " not long ago")
-        return false
-    endif
-
-    return true
-endFunction
-
 ;/
-    Fast actor checks (RPB_Utility.IsFastActorChecks): each of @akCombatTargets looked at once, the answers kept for the
-    surrender's checks (CanActorSurrenderFast) and its begin (OnSurrenderBegin). The old way looked at every target three
-    times in CanActorSurrender (a non-guard, a guard, a fooled hold) and a fourth in GetSurrenderGuards, 4-5 calls each (a
-    frame apiece: ~1.8s with 6 guards). Here: dead read engine side (no call), disabled, guard, crime faction: 3 calls a
+    Each of @akCombatTargets looked at once, the answers kept for the surrender's checks (CanActorSurrender) and its begin
+    (OnSurrenderBegin). They used to look at every target three times in CanActorSurrender (a non-guard, a guard, a fooled
+    hold) and a fourth in GetSurrenderGuards, 4-5 calls each (a frame apiece: ~1.5s with 6 guards; 2026-10-14). Here: dead read engine side (no call), disabled, guard, crime faction: 3 calls a
     target. Kept in JDB .rpb_root.surrenderTargets (surrenderer -> { guards, factions, other }) until her surrender begins
 /;
 function SnapshotSurrenderTargets(Actor akSurrenderer, Actor[] akCombatTargets)
@@ -1929,8 +1860,8 @@ Actor function __SnapshotOther(Actor akSurrenderer)
     return RPB_Memory.FastMap_GetForm(snapshot, "other") as Actor
 endFunction
 
-; CanActorSurrender with the snapshot (SnapshotSurrenderTargets first): the same checks, in the same order, the same logs
-bool function CanActorSurrenderFast(Actor akSurrenderer, Actor[] akSurrendererCaptors)
+; Whether @akSurrenderer can surrender to @akSurrendererCaptors, from the snapshot of them (SnapshotSurrenderTargets first)
+bool function CanActorSurrender(Actor akSurrenderer, Actor[] akSurrendererCaptors)
     bool isPlayer = akSurrenderer == Config.Player
     if (self.IsSurrendering(akSurrenderer))
         __SurrenderLog("Surrender of " + akSurrenderer + " ignored: already surrendering")
@@ -1980,21 +1911,6 @@ bool function CanActorSurrenderFast(Actor akSurrenderer, Actor[] akSurrendererCa
         i += 1
     endWhile
     return true
-endFunction
-
-; The crime faction of the first guard among @akCombatTargets that @akSurrenderer faked a surrender to lately, or none
-Faction function __FooledFaction(Actor akSurrenderer, Actor[] akCombatTargets)
-    int i = 0
-    while (i < akCombatTargets.Length)
-        if (self.IsSurrenderGuard(akCombatTargets[i]))
-            Faction crimeFaction = akCombatTargets[i].GetCrimeFaction()
-            if (self.HasFakedSurrenderTo(akSurrenderer, crimeFaction))
-                return crimeFaction
-            endif
-        endif
-        i += 1
-    endWhile
-    return none
 endFunction
 
 ; A combat target that can take a surrender: a living guard of a hold
@@ -2126,16 +2042,12 @@ function __PacifyForSurrender(Actor akSurrenderer, Actor[] akGuards)
         while (i < akGuards.Length)
             ; A guard fighting someone else (bandits) is left to it: stopping him every pass pulled him out of that fight
             ; for nothing (he went straight back in), and the surrender waits for him instead (__WatchSurrender)
-            ; Fast actor checks: his combat state read once (__IsFightingOthers read IsInCombat again)
+            ; His combat state read once (__IsFightingOthers reads IsInCombat again)
             bool guardFighting = akGuards[i] && akGuards[i].IsInCombat()
             bool fightingOthers = false
             if (guardFighting)
-                if (RPB_Utility.IsFastActorChecks())
-                    Actor guardTarget = akGuards[i].GetCombatTarget()
-                    fightingOthers = guardTarget && guardTarget != akSurrenderer
-                else
-                    fightingOthers = self.__IsFightingOthers(akGuards[i], akSurrenderer)
-                endif
+                Actor guardTarget = akGuards[i].GetCombatTarget()
+                fightingOthers = guardTarget && guardTarget != akSurrenderer
             endif
             if (guardFighting && !fightingOthers)
                 akGuards[i].StopCombat()
@@ -2556,20 +2468,14 @@ endFunction
     moving or drawing a weapon ends the surrender (the watch). The arrest takes the controls at the Scene's end.
 /;
 function PrepareSurrenderer(Actor akSurrenderer, Actor[] akGuards = none)
-    ; Sheathe weapons, animations won't play otherwise. Fast actor checks: no wait with nothing drawn; with a weapon drawn the
-    ; old 1s still: ending it once the weapon read as put away (0.7s) sent the hands up while the sheathe animation was
-    ; still finishing, and they never went up (2026-10-14)
-    if (RPB_Utility.IsFastActorChecks())
-        if (akSurrenderer.IsWeaponDrawn())
-            akSurrenderer.SheatheWeapon()
-            Utility.Wait(1.0)
-        endif
-        RPB_Utility.FlowMark("Surrender: weapon sheathed (waited only if drawn)")
-    else
+    ; A drawn weapon sheathed first, the animations won't play otherwise: 1s for its animation (ending the wait once the weapon
+    ; read as put away, 0.7s, sent the hands up while it was still finishing, and they never went up). Nothing drawn: no
+    ; wait (it was a fixed 1s every time; 2026-10-14)
+    if (akSurrenderer.IsWeaponDrawn())
         akSurrenderer.SheatheWeapon()
-        RPB_Utility.FlowMark("Surrender: weapon sheathed")
         Utility.Wait(1.0)
     endif
+    RPB_Utility.FlowMark("Surrender: weapon sheathed (waited only if drawn)")
     Debug.SendAnimationEvent(akSurrenderer, "IdleSurrender")
     RPB_Utility.FlowMark("Surrender: hands up (after a fixed 1s wait)")
 

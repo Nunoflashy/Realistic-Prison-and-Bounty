@@ -66,8 +66,6 @@ scriptname RPB_Utility hidden
     Form[] function RPB_GetHostileFactions() global
     Form[] function RPB_GetHostileFactionsFor(Actor akActor) global
     bool function IsHostileActor(Actor akActor) global
-    bool function IsFastActorChecks() global
-    function SetFastActorChecks(bool abOn) global
     Form[] function __HostileFactionsOfFast(Actor akActor, Form[] akHostileFactions) global
     function NeutralizeHostileActor(Actor akActor) global
     int function RestoreNeutralizedHostility(Actor akActor) global
@@ -2278,22 +2276,8 @@ endFunction
     which only has a bare Actor and an RPB_Arrestee (not yet an RPB_Prisoner) - see NeutralizeHostileActor for why the storage
     is also Actor-keyed with a fixed category rather than going through the RPB_ActorBase per-subclass wrapper.
 /;
-;/
-    Dev switch while the fast actor checks are compared with the old ones (benchmark through the flow profiler's surrender
-    and arrest reports): the surrender's combat targets looked at once (RPB_Arrest.SnapshotSurrenderTargets), the hostile
-    factions found from the actor's own faction list (one GetFactions call instead of an IsInFaction per hostile faction,
-    37 with Master of Disguise: a frame each), the hands up without a fixed 1s wait when no weapon is drawn, no second
-    IsInCombat per guard in the surrender's calming. Off by default until compared
-/;
-bool function IsFastActorChecks() global
-    return JDB.solveInt(".rpb_root.dev.fastActorChecks") != 0
-endFunction
-
-function SetFastActorChecks(bool abOn) global
-    JDB.solveIntSetter(".rpb_root.dev.fastActorChecks", abOn as int, true)
-endFunction
-
-; The hostile factions @akActor is in (rank 0 or more, as IsInFaction counts membership), from one GetFactions call
+; The hostile factions @akActor is in (rank 0 or more, as IsInFaction counts membership), from one GetFactions call: an
+; IsInFaction per hostile faction (37 with Master of Disguise) waited a frame each, ~0.45s per surrender or arrest (2026-10-14)
 Form[] function __HostileFactionsOfFast(Actor akActor, Form[] akHostileFactions) global
     Faction[] own = akActor.GetFactions(0, 127)
     Form[] found = Utility.CreateFormArray(0)
@@ -2313,19 +2297,7 @@ bool function IsHostileActor(Actor akActor) global
     if (!hostileFactions)
         return false
     endif
-    if (IsFastActorChecks())
-        return __HostileFactionsOfFast(akActor, hostileFactions).Length > 0
-    endif
-
-    int i = 0
-    while (i < hostileFactions.Length)
-        Faction hostileFaction = hostileFactions[i] as Faction
-        if (hostileFaction && akActor.IsInFaction(hostileFaction))
-            return true
-        endif
-        i += 1
-    endWhile
-    return false
+    return __HostileFactionsOfFast(akActor, hostileFactions).Length > 0
 endFunction
 
 ;/
@@ -2353,10 +2325,8 @@ function NeutralizeHostileActor(Actor akActor) global
         return
     endif
 
-    ; Fast: only the hostile factions she's in are looked at (one GetFactions call instead of an IsInFaction for each)
-    if (IsFastActorChecks())
-        hostileFactions = __HostileFactionsOfFast(akActor, hostileFactions)
-    endif
+    ; Only the hostile factions she's in are looked at (one GetFactions call instead of an IsInFaction for each)
+    hostileFactions = __HostileFactionsOfFast(akActor, hostileFactions)
     Form[] removedFactions = new Form[128]
     int[] removedRanks = new int[128]
     int removed = 0
