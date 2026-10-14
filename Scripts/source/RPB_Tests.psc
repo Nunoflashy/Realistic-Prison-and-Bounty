@@ -272,6 +272,7 @@ function SetTests()
     self.AddTest("184 - Benchmark: the Time Skip's NPC Releases on Its Own Stack vs by Event (6 bandits each; advances the clock a few days)", "Test_ReleaseByEventBenchmark", abChainable = false)
     self.AddTest("187 - Freeze Control, NPC: 156's Steps With a Bandit (moved 1500 away and back mid escort, ended by a reset; repeat it)", "Test_NpcFreeWalkControl", abChainable = false)
     self.AddTest("188 - Freeze Control, Alternating: 187 (NPC) and 156 (player) by turns, the same-session comparison (repeat it)", "Test_FreezeControlAlternating", abChainable = false)
+    self.AddTest("209 - Dev: Dump JContainers (writes the whole JDB to JCUser/rpb_jdb_dump.json and RPB's own part to rpb_root_dump.json, to see what a co-save holds)", "Test_DumpJDB", abChainable = false)
     self.AddTest("208 - Parcels: Leftovers (how many of 206's containers and tokens still exist after 207, and how many of them only flagged deleted; run after 207, and again after a save and a load)", "Test_ParcelLeftovers", abChainable = false)
     self.AddTest("207 - Parcels: Save Size, Remove (opens and deletes every parcel 206 made; save again after it)", "Test_ParcelSaveSizeRemove", abChainable = false)
     self.AddTest("206 - Parcels: Save Size, Create (250 parcels of 1 gold each, their tokens in one chest; save before and after it, then run 207 and save again)", "Test_ParcelSaveSizeCreate", abChainable = false)
@@ -14097,8 +14098,10 @@ bool function __ParcelLeftovers(string asTest)
         return false
     endif
     int total = FastArray_Size(ids)
+    RPB_Parcels parcels = RPB_API.GetParcels()
     int found = 0
     int flagged = 0
+    int ours = 0 ; found and still a parcel's container or token: not a FormID the game gave to something else since
     int i = 0
     while (i < total)
         ObjectReference ref = Game.GetFormEx(FastArray_GetInt(ids, i)) as ObjectReference
@@ -14107,10 +14110,16 @@ bool function __ParcelLeftovers(string asTest)
             if (ref.IsDeleted())
                 flagged += 1
             endif
+            Form base = ref.GetBaseObject()
+            if (base == parcels.ContainerBase || base == parcels.TokenBase)
+                ours += 1
+            else
+                log(asTest + ": " + ref + " (base " + base + ", " + ref.GetDisplayName() + ") reuses one of 206's FormIDs")
+            endif
         endif
         i += 1
     endWhile
-    log(asTest + ": of " + total + " containers and tokens 206 made, " + found + " still found (" + flagged + " flagged deleted, " + (found - flagged) + " not)")
+    log(asTest + ": of " + total + " containers and tokens 206 made, " + found + " still found (" + flagged + " flagged deleted, " + (found - flagged) + " not), " + ours + " of them still parcels'")
     Debug.MessageBox(asTest + ": of " + total + " containers and tokens, " + found + " still exist (" + flagged + " flagged deleted).")
     return true
 endFunction
@@ -15561,7 +15570,7 @@ endFunction
 string __statelessTest = ""
 
 bool function __RunStatelessTest(string asTest)
-    if (asTest != "Test_ArrestWaitsWhileGuardFights_NoPackage" && asTest != "Test_CellDoorsDiagnostic" && asTest != "Test_LongAbsenceSetup" && asTest != "Test_LongAbsenceAdvance" && asTest != "Test_LongAbsenceVerify" && asTest != "Test_FallbackEscortToCellStopped_Player" && asTest != "Test_FallbackEscortToCellStopped_CloneGuard" && asTest != "Test_FightDuringEscort_NPC" && asTest != "Test_FightDuringEscort_Player" && asTest != "Test_GuardDiesInPrison_Player" && asTest != "Test_EscortToCellStopped_NoPackageLock" && StringUtil.Find(asTest, "Test_Surrender_") != 0 && asTest != "Test_FrozenGuardSkipped" && asTest != "Test_GuardDiesInPrison_NobodySees" && asTest != "Test_Escort_FreeWalk" && asTest != "Test_ToggleEscortToCell04" && asTest != "Test_CaptorFinishCycles_Calls" && asTest != "Test_CaptorFinishCycles_NoCalls" && asTest != "Test_CaptorFinishDetach_Calls" && asTest != "Test_CaptorFinishDetach_NoCalls" && asTest != "Test_Escort_FreeWalk_Control" && asTest != "Test_ActorKeys" && asTest != "Test_FrozenGuardCalls" && asTest != "Test_SimulatedFreezeCalls" && asTest != "Test_SimulatedFreezeAtCancel" && asTest != "Test_SpawnFreezableGuard" && asTest != "Test_AliasPackageControl" && asTest != "Test_FreezableEscort_Player" && asTest != "Test_FreezableEscort_NPC" && asTest != "Test_LightHold" && asTest != "Test_KillFrozenGuard" && asTest != "Test_LifetimeBountyStat" && asTest != "Test_FaintFrozenGuard" && asTest != "Test_FaintFrozenGuardShort" && asTest != "Test_FrozenEscortFallback" && asTest != "Test_HideFrozenGuard" && asTest != "Test_EscortToCellGuardHeld" && asTest != "Test_CuffedLimitEncumbrance" && asTest != "Test_CuffedLimitSettings" && asTest != "Test_EarlyHandback" && asTest != "Test_StalledEscortTakeover" && asTest != "Test_StalledEscortTakeoverLimit" && asTest != "Test_NpcEscortCancelControl" && asTest != "Test_FrozenPrisonerTimeSkip" && asTest != "Test_SpawnFreezablePrisoner" && asTest != "Test_SpawnFreezableArrestee" && asTest != "Test_GuardCrimeFactions" && asTest != "Test_PlayerEscortCancelControl" && asTest != "Test_ReleaseByEventBenchmark" && asTest != "Test_FrozenPrisonerDialogue" && asTest != "Test_NpcFreeWalkControl" && asTest != "Test_FreezeControlAlternating" && asTest != "Test_SetCancelSettle" && asTest != "Test_FightAtConfrontationStart" && asTest != "Test_FastWrapperBenchmark" && asTest != "Test_SkipEscortBegun" && asTest != "Test_WIDeadBody" && StringUtil.Find(asTest, "Test_FreezePoint_") != 0 && asTest != "Test_PrisonLookupBenchmark" && asTest != "Test_Parcels" && asTest != "Test_ParcelBelongings" && asTest != "Test_ParcelSaveSizeCreate" && asTest != "Test_ParcelSaveSizeRemove" && asTest != "Test_ParcelLeftovers")
+    if (asTest != "Test_ArrestWaitsWhileGuardFights_NoPackage" && asTest != "Test_CellDoorsDiagnostic" && asTest != "Test_LongAbsenceSetup" && asTest != "Test_LongAbsenceAdvance" && asTest != "Test_LongAbsenceVerify" && asTest != "Test_FallbackEscortToCellStopped_Player" && asTest != "Test_FallbackEscortToCellStopped_CloneGuard" && asTest != "Test_FightDuringEscort_NPC" && asTest != "Test_FightDuringEscort_Player" && asTest != "Test_GuardDiesInPrison_Player" && asTest != "Test_EscortToCellStopped_NoPackageLock" && StringUtil.Find(asTest, "Test_Surrender_") != 0 && asTest != "Test_FrozenGuardSkipped" && asTest != "Test_GuardDiesInPrison_NobodySees" && asTest != "Test_Escort_FreeWalk" && asTest != "Test_ToggleEscortToCell04" && asTest != "Test_CaptorFinishCycles_Calls" && asTest != "Test_CaptorFinishCycles_NoCalls" && asTest != "Test_CaptorFinishDetach_Calls" && asTest != "Test_CaptorFinishDetach_NoCalls" && asTest != "Test_Escort_FreeWalk_Control" && asTest != "Test_ActorKeys" && asTest != "Test_FrozenGuardCalls" && asTest != "Test_SimulatedFreezeCalls" && asTest != "Test_SimulatedFreezeAtCancel" && asTest != "Test_SpawnFreezableGuard" && asTest != "Test_AliasPackageControl" && asTest != "Test_FreezableEscort_Player" && asTest != "Test_FreezableEscort_NPC" && asTest != "Test_LightHold" && asTest != "Test_KillFrozenGuard" && asTest != "Test_LifetimeBountyStat" && asTest != "Test_FaintFrozenGuard" && asTest != "Test_FaintFrozenGuardShort" && asTest != "Test_FrozenEscortFallback" && asTest != "Test_HideFrozenGuard" && asTest != "Test_EscortToCellGuardHeld" && asTest != "Test_CuffedLimitEncumbrance" && asTest != "Test_CuffedLimitSettings" && asTest != "Test_EarlyHandback" && asTest != "Test_StalledEscortTakeover" && asTest != "Test_StalledEscortTakeoverLimit" && asTest != "Test_NpcEscortCancelControl" && asTest != "Test_FrozenPrisonerTimeSkip" && asTest != "Test_SpawnFreezablePrisoner" && asTest != "Test_SpawnFreezableArrestee" && asTest != "Test_GuardCrimeFactions" && asTest != "Test_PlayerEscortCancelControl" && asTest != "Test_ReleaseByEventBenchmark" && asTest != "Test_FrozenPrisonerDialogue" && asTest != "Test_NpcFreeWalkControl" && asTest != "Test_FreezeControlAlternating" && asTest != "Test_SetCancelSettle" && asTest != "Test_FightAtConfrontationStart" && asTest != "Test_FastWrapperBenchmark" && asTest != "Test_SkipEscortBegun" && asTest != "Test_WIDeadBody" && StringUtil.Find(asTest, "Test_FreezePoint_") != 0 && asTest != "Test_PrisonLookupBenchmark" && asTest != "Test_Parcels" && asTest != "Test_ParcelBelongings" && asTest != "Test_ParcelSaveSizeCreate" && asTest != "Test_ParcelSaveSizeRemove" && asTest != "Test_ParcelLeftovers" && asTest != "Test_DumpJDB")
         return false
     endif
 
@@ -15788,6 +15797,13 @@ bool function __RunStatelessTest(string asTest)
         display_result(__ParcelSaveSize("207", false))
     elseif (asTest == "Test_ParcelLeftovers")
         display_result(__ParcelLeftovers("208"))
+    elseif (asTest == "Test_DumpJDB")
+        string folder = JContainers.userDirectory()
+        JDB.writeToFile(folder + "rpb_jdb_dump.json")
+        JValue.writeToFile(JDB.solveObj(".rpb_root"), folder + "rpb_root_dump.json")
+        log("209: JDB written to " + folder + "rpb_jdb_dump.json, .rpb_root to rpb_root_dump.json")
+        Debug.MessageBox("209: written to " + folder)
+        display_result(true)
     elseif (asTest == "Test_ParcelBelongings")
         bool parcelsOk = __ParcelBelongings("205", false)
         bool manifestOk = __ParcelBelongings("205 (manifest)", true)
