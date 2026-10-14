@@ -95,6 +95,12 @@ scriptname RPB_Arrest extends Quest
     function ApplySurrenderPenalty(Actor akSurrenderer, Faction akFaction)
     function ApplyFakeSurrenderPenalty(Actor akSurrenderer, Faction akFaction)
     function PrepareSurrenderer(Actor akSurrenderer, Actor[] akGuards = none)
+    int function DropWeaponsInHand(Actor akSurrenderer)
+    function __SheatheAfterDrop(Actor akSurrenderer)
+    bool function __IsTwoHanded(Form akItem)
+    function __DropFromHand(Actor akSurrenderer, Form akItem, int aiRefs, int aiItems)
+    int function GetDroppedWeapons(Actor akSurrenderer)
+    function ForgetDroppedWeapons(Actor akSurrenderer)
     function InitiateSurrenderScene(Actor akSurrenderer, Actor[] akSurrendererCaptors)
     int function GetActorArrestStatus(Actor akActor)
     function BeginArrest(RPB_Arrestee apArresteeRef)
@@ -2474,17 +2480,29 @@ function __AddSurrenderBounty(Actor akSurrenderer, Faction akFaction, float afPe
     __SurrenderLog("Surrender of " + akSurrenderer + " to " + hold + " (" + asFor + "): bounty " + currentBounty + " + " + penalty)
 endFunction
 
+
 ;/
-    Sheathes and plays the surrender and cower idles. The surrenderer keeps their controls: they aren't arrested yet, and
-    moving or drawing a weapon ends the surrender (the watch). The arrest takes the controls at the Scene's end.
+    Drops what's in hand, sheathes the rest and plays the surrender and cower idles. The surrenderer keeps their controls:
+    they aren't arrested yet, and moving or drawing a weapon ends the surrender (the watch). The arrest takes the controls
+    at the Scene's end.
 /;
 function PrepareSurrenderer(Actor akSurrenderer, Actor[] akGuards = none)
-    ; A drawn weapon sheathed first, the animations won't play otherwise: 1s for its animation (ending the wait once the weapon
-    ; read as put away, 0.7s, sent the hands up while it was still finishing, and they never went up). Nothing drawn: no
-    ; wait (it was a fixed 1s every time; 2026-10-14)
+    ; Weapons drawn: what's in hand goes to the ground (the captor picks it up after the cuffs), a spell or nothing left in
+    ; hand is sheathed. Weapons put away stay on them (a submission's, or a surrender with only a sheathed sword), until
+    ; the strip as before
     if (akSurrenderer.IsWeaponDrawn())
-        akSurrenderer.SheatheWeapon()
-        Utility.Wait(1.0)
+        int dropped = self.DropWeaponsInHand(akSurrenderer)
+        RPB_Utility.FlowMark("Surrender: " + dropped + " weapons dropped")
+        ; What's left drawn (fists after the drop, a spell) is sheathed, the animations won't play otherwise. Nothing drawn:
+        ; no wait (it was a fixed 1s every time)
+        if (dropped > 0)
+            self.__SheatheAfterDrop(akSurrenderer)
+        elseif (akSurrenderer.IsWeaponDrawn())
+            ; 1s for its animation (ending the wait once the weapon read as put away, 0.7s, sent the hands up while it was
+            ; still finishing, and they never went up)
+            akSurrenderer.SheatheWeapon()
+            Utility.Wait(1.0)
+        endif
     endif
     RPB_Utility.FlowMark("Surrender: weapon sheathed (waited only if drawn)")
     Debug.SendAnimationEvent(akSurrenderer, "IdleSurrender")
@@ -2505,6 +2523,114 @@ function PrepareSurrenderer(Actor akSurrenderer, Actor[] akGuards = none)
 
     Utility.Wait(1.0)
     Debug.SendAnimationEvent(akSurrenderer, "IdleCowerEnter")
+endFunction
+
+;/
+    Drops the weapons in @akSurrenderer's hands: a weapon in either hand, a shield, a torch (a bow too; its arrows stay on
+    them). Spells stay (nothing to drop) and so do non-playable items (bound weapons: they'd vanish; and creatures' natural
+    weapons). Each dropped reference is remembered with its item, for the captor's pickup and the custody afterwards
+    (.rpb_root.droppedWeapons, by surrenderer: a new drop replaces the last one's record). Returns how many were dropped.
+
+    Both hands are read once, before any drop: a two-handed weapon or a bow is in both hands and is dropped once (reading the
+    left hand again after the right one's drop still found the bow there, and a spare one was dropped too, 2026-10-14);
+    the same one-hander in both hands (dual daggers) is two items, both dropped. DropObject takes an item by its form, so
+    with a spare of it carried it may drop the spare: whatever of it is still equipped afterwards is unequipped (the same
+    item either way, so the hand ends empty, one copy on the ground).
+/;
+int function DropWeaponsInHand(Actor akSurrenderer)
+    int refs = JArray.object()
+    int items = JArray.object()
+    Form right = akSurrenderer.GetEquippedObject(1)
+    Form left = akSurrenderer.GetEquippedObject(0)
+    if (left && left == right && self.__IsTwoHanded(left))
+        left = none
+    endif
+    self.__DropFromHand(akSurrenderer, right, refs, items)
+    self.__DropFromHand(akSurrenderer, left, refs, items)
+    int count = RPB_Memory.FastArray_Size(refs)
+    ; A spare dropped instead of the one in hand: the one in hand is unequipped (nothing happens if it isn't equipped)
+    int i = 0
+    while (i < count)
+        akSurrenderer.UnequipItem(RPB_Memory.FastArray_GetForm(items, i), false, true)
+        i += 1
+    endWhile
+    if (count == 0)
+        self.ForgetDroppedWeapons(akSurrenderer)
+        return 0
+    endif
+    int record = JMap.object()
+    RPB_Memory.FastMap_SetObject(record, "refs", refs)
+    RPB_Memory.FastMap_SetObject(record, "items", items)
+    RPB_Memory.FastMap_SetFloat(record, "time", Utility.GetCurrentGameTime())
+    int all = JDB.solveObj(".rpb_root.droppedWeapons")
+    if (!all)
+        all = JFormMap.object()
+        JDB.solveObjSetter(".rpb_root.droppedWeapons", all, true)
+    endif
+    RPB_Memory.FastFormMap_SetObject(all, akSurrenderer, record)
+    if (RPB_Utility.IsLoggingEnabled())
+        ; Whatever is still in hand: DropObject takes the item by its form, and with a spare of the same one carried it may
+        ; have dropped that one instead (to watch for)
+        __SurrenderLog("Surrender of " + akSurrenderer + ": dropped " + count + " (" + RPB_Utility.GetContainerList(items) + "), in hand now: " + akSurrenderer.GetEquippedObject(1) + " / " + akSurrenderer.GetEquippedObject(0))
+    endif
+    return count
+endFunction
+
+;/
+    After a drop the hands are still switching to fists: a SheatheWeapon right then was ignored and the fists stayed up,
+    the hands never went up (2026-10-14, a bow), and the surrender watch read the fists as a weapon drawn. So I let the
+    switch finish, then sheathe again every 0.3s until it reads put away (2s at most), and give the sheathe animation
+    0.7s more to finish before the hands go up
+/;
+function __SheatheAfterDrop(Actor akSurrenderer)
+    Utility.Wait(0.3)
+    int tries = 0
+    while (akSurrenderer.IsWeaponDrawn() && tries < 7)
+        akSurrenderer.SheatheWeapon()
+        Utility.Wait(0.3)
+        tries += 1
+    endWhile
+    Utility.Wait(0.7)
+    __SurrenderLog("Surrender of " + akSurrenderer + ": fists sheathed after the drop (" + tries + " tries), drawn now " + akSurrenderer.IsWeaponDrawn())
+endFunction
+
+; A bow, a crossbow or a two-handed weapon (it fills both hands)
+bool function __IsTwoHanded(Form akItem)
+    Weapon weap = akItem as Weapon
+    if (!weap)
+        return false
+    endif
+    int type = weap.GetWeaponType() ; 5 greatsword, 6 battleaxe/warhammer, 7 bow, 9 crossbow
+    return type == 5 || type == 6 || type == 7 || type == 9
+endFunction
+
+; Drops @akItem from @akSurrenderer's hand, adding the reference and the item to @aiRefs/@aiItems (a spell, a non-playable
+; item or an empty hand drops nothing)
+function __DropFromHand(Actor akSurrenderer, Form akItem, int aiRefs, int aiItems)
+    if (!akItem || akItem as Spell || !akItem.IsPlayable())
+        return
+    endif
+    ObjectReference dropped = akSurrenderer.DropObject(akItem, 1)
+    if (dropped)
+        RPB_Memory.FastArray_AddForm(aiRefs, dropped)
+        RPB_Memory.FastArray_AddForm(aiItems, akItem)
+    endif
+endFunction
+
+; The record of @akSurrenderer's dropped weapons (a JMap: "refs", "items", "time"), 0 with none
+int function GetDroppedWeapons(Actor akSurrenderer)
+    int all = JDB.solveObj(".rpb_root.droppedWeapons")
+    if (!all)
+        return 0
+    endif
+    return RPB_Memory.FastFormMap_GetObject(all, akSurrenderer)
+endFunction
+
+function ForgetDroppedWeapons(Actor akSurrenderer)
+    int all = JDB.solveObj(".rpb_root.droppedWeapons")
+    if (all)
+        RPB_Memory.FastFormMap_RemoveKey(all, akSurrenderer)
+    endif
 endFunction
 
 function InitiateSurrenderScene(Actor akSurrenderer, Actor[] akSurrendererCaptors)
