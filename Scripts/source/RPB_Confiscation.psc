@@ -380,8 +380,8 @@ endFunction
 ;/
     The engine won't start a Scene with an actor in combat, and a fight ends a Scene's package at once, so a fake
     surrender's guard, fighting or not, runs to the weapon on Skyrim.esm's defaultTravelToLinkCustom04RunIgnoreCombat as a
-    package override (PapyrusUtil), his LinkCustom04 linked reference set to it (his own put back after). His own stack's
-    watch (WatchFetch) picks it up once he's there
+    package override (PapyrusUtil), his LinkCustom04 linked reference set to it (his own put back after); already
+    fighting, he's taken out of it first. His own stack's watch (WatchFetch) picks it up once he's there
 /;
 Package property FetchPackage
     Package function get()
@@ -413,8 +413,14 @@ bool function __Fetch(Actor akOwner, int aiRecord, Actor akCarrier)
     RPB_Memory.FastMap_SetFloat(aiRecord, "fetchStarted", Utility.GetCurrentRealTime())
     PO3_SKSEFunctions.SetLinkedRef(akCarrier, target, link)
     ActorUtil.AddPackageOverride(akCarrier, self.FetchPackage, 100)
+    ; Ignore Combat keeps him from entering a fight while it runs, not from one he's already in (test 212: he swung at the
+    ; air for 30s): out of it first; he goes back to it once he has the weapons
+    bool wasFighting = akCarrier.IsInCombat()
+    if (wasFighting)
+        akCarrier.StopCombat()
+    endif
     akCarrier.EvaluatePackage()
-    RPB_Utility.LogInfo(akCarrier + " runs to " + akOwner + "'s dropped weapon " + target + " (" + (akCarrier.GetDistance(target) as int) + " away, in combat " + akCarrier.IsInCombat() + ")", "Confiscation::__Fetch")
+    RPB_Utility.LogInfo(akCarrier + " runs to " + akOwner + "'s dropped weapon " + target + " (" + (akCarrier.GetDistance(target) as int) + " away, was fighting " + wasFighting + ")", "Confiscation::__Fetch")
     int handle = ModEvent.Create("RPB_WatchFetch")
     if (handle)
         ModEvent.PushForm(handle, akOwner)
@@ -457,7 +463,11 @@ function WatchFetch(Actor akOwner)
                 PO3_SKSEFunctions.SetLinkedRef(fetcher, target, link) ; the one he ran to was taken: the next
                 fetcher.EvaluatePackage()
             endif
-            RPB_Memory.FastMap_SetFloat(record, "fetchElapsedAtSave", Utility.GetCurrentRealTime() - RPB_Memory.FastMap_GetFloat(record, "fetchStarted"))
+            float elapsed = Utility.GetCurrentRealTime() - RPB_Memory.FastMap_GetFloat(record, "fetchStarted")
+            RPB_Memory.FastMap_SetFloat(record, "fetchElapsedAtSave", elapsed)
+            if ((elapsed as int) % 2 == 0 && (elapsed - (elapsed as int)) < 0.5)
+                RPB_Utility.LogInfo(fetcher + " fetching for " + (elapsed as int) + "s: " + (fetcher.GetDistance(target) as int) + " from " + target + " (loaded " + target.Is3DLoaded() + ", at " + (target.GetPositionX() as int) + "," + (target.GetPositionY() as int) + "," + (target.GetPositionZ() as int) + "; he's at " + (fetcher.GetPositionX() as int) + "," + (fetcher.GetPositionY() as int) + "," + (fetcher.GetPositionZ() as int) + "), running " + PO3_SKSEFunctions.GetRunningPackage(fetcher) + ", in combat " + fetcher.IsInCombat() + ", linked " + fetcher.GetLinkedRef(link), "Confiscation::WatchFetch")
+            endif
             Utility.Wait(0.5)
         endif
     endWhile

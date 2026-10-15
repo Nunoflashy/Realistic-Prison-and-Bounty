@@ -14275,8 +14275,7 @@ bool function __ConfiscationFakeSurrender(string asTest)
     guard1.StartCombat(bandit)
     guard2.StartCombat(bandit)
     Utility.Wait(2.0)
-    ObjectReference dropped = __PlaceBeside(player, sword, 300.0, 0.0)
-    Utility.Wait(0.5)
+    ObjectReference dropped = __DropAtFeet(owner, sword)
     __RecordDropped(confiscation, owner, dropped, sword)
     Actor[] guards = new Actor[2]
     guards[0] = guard1
@@ -14346,8 +14345,7 @@ bool function __ConfiscationFakeSurrender(string asTest)
     ; (c) Past the hold's memory: lost (left with the guard)
     carrier.MoveTo(player)
     Utility.Wait(1.0)
-    dropped = __PlaceBeside(player, sword, 120.0, 0.0)
-    Utility.Wait(0.5)
+    dropped = __DropAtFeet(owner, sword)
     __RecordDropped(confiscation, owner, dropped, sword)
     alone[0] = carrier
     confiscation.OnFakeSurrender(owner, alone, crimeFaction)
@@ -14369,6 +14367,17 @@ bool function __ConfiscationFakeSurrender(string asTest)
     chest.RemoveAllItems()
     chest.Delete()
     return ok
+endFunction
+
+;/
+    @akItem dropped by @akActor at her feet, as a surrender drops it (DropObject: on the ground she stands on; a placed one
+    300 units ahead fell off a ledge in Solitude, out of the guard's reach, test 212). Returns the dropped reference
+/;
+ObjectReference function __DropAtFeet(Actor akActor, Form akItem)
+    akActor.AddItem(akItem, 1, true)
+    ObjectReference dropped = akActor.DropObject(akItem, 1)
+    Utility.Wait(0.5) ; settled
+    return dropped
 endFunction
 
 ; @akDropped (an @akItem) recorded as what @akOwner dropped surrendering

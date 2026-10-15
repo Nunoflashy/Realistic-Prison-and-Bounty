@@ -13,6 +13,8 @@ scriptname RPB_ParcelCarrier extends ActiveMagicEffect
     event OnEffectStart(Actor akTarget, Actor akCaster)
     event OnCombatStateChanged(Actor akTarget, int aeCombatState)
     event OnUnload()
+    event OnCellDetach()
+    event OnEffectFinish(Actor akTarget, Actor akCaster)
 /;
 
 Actor __carrier
@@ -24,22 +26,36 @@ endEvent
 ; "RPB_ParcelCarrierCombatEnded": his fight is over
 event OnCombatStateChanged(Actor akTarget, int aeCombatState)
     if (aeCombatState == 0)
-        self.__Send("RPB_ParcelCarrierCombatEnded")
+        self.__Send("RPB_ParcelCarrierCombatEnded", "combat ended")
     endif
 endEvent
 
-; "RPB_ParcelCarrierUnloaded": out of sight
+; "RPB_ParcelCarrierUnloaded": out of sight. Which of these comes depends on how (the player walking away: both of the first
+; two; moved by MoveTo into an unloaded cell: neither of them, test 212), so all three send it, with where it came from; the
+; receiver acts on the first
 event OnUnload()
-    self.__Send("RPB_ParcelCarrierUnloaded")
+    self.__Send("RPB_ParcelCarrierUnloaded", "unload")
 endEvent
 
-function __Send(string asEvent)
+event OnCellDetach()
+    self.__Send("RPB_ParcelCarrierUnloaded", "cell detach")
+endEvent
+
+; My effect ending with him out of sight (an unloaded actor's abilities end, and start again with his 3D)
+event OnEffectFinish(Actor akTarget, Actor akCaster)
+    if (__carrier && !__carrier.Is3DLoaded())
+        self.__Send("RPB_ParcelCarrierUnloaded", "effect ended unloaded")
+    endif
+endEvent
+
+function __Send(string asEvent, string asCause = "")
     if (!__carrier)
         return
     endif
     int handle = ModEvent.Create(asEvent)
     if (handle)
         ModEvent.PushForm(handle, __carrier)
+        ModEvent.PushString(handle, asCause)
         ModEvent.Send(handle)
     endif
 endFunction

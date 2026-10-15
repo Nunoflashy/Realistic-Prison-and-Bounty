@@ -36,8 +36,8 @@ scriptname RPB_EventManager extends Quest
     event OnSurrenderSceneEvent(string asScene, string asSceneEvent, string asSceneSecondaryEvent, Form akMember, Form akAuthority, int aiPrevious, int aiNumber, int aiBatch, int aiMembers)
     event OnSurrenderPreparing(Form akSurrenderer)
     event OnPickUpWeapons(Form akOwner, Form akCaptor)
-    event OnParcelCarrierCombatEnded(Form akCarrier)
-    event OnParcelCarrierUnloaded(Form akCarrier)
+    event OnParcelCarrierCombatEnded(Form akCarrier, string asCause)
+    event OnParcelCarrierUnloaded(Form akCarrier, string asCause)
     event OnWatchFetch(Form akOwner)
     event OnSurrenderScene(string asScene, string asSceneEvent, Actor akSurrenderer, Actor akSurrendererCaptor, string asSceneSecondaryEvent, Form[] akParams, Form[] akParams2)
     event OnSceneStart(string eventName, string sceneName, float unusedFlt, Form sender)
@@ -381,11 +381,12 @@ event OnPickUpWeapons(Form akOwner, Form akCaptor)
 endEvent
 
 ; A parcel carrier's fight ended, or he unloaded (RPB_ParcelCarrier): to whoever gave him his job (only Confiscation yet)
-event OnParcelCarrierCombatEnded(Form akCarrier)
+event OnParcelCarrierCombatEnded(Form akCarrier, string asCause)
     API.Confiscation.OnCarrierCombatEnded(akCarrier as Actor)
 endEvent
 
-event OnParcelCarrierUnloaded(Form akCarrier)
+event OnParcelCarrierUnloaded(Form akCarrier, string asCause)
+    RPB_Utility.LogInfo(akCarrier + " out of sight (" + asCause + ")", "EventManager::OnParcelCarrierUnloaded")
     API.Confiscation.OnCarrierUnloaded(akCarrier as Actor)
 endEvent
 
