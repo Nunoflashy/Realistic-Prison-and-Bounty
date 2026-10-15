@@ -2194,6 +2194,7 @@ bool function __TakeNewCaptor(Actor akOldGuard, Actor akNewGuard, string asReaso
     self.AssignCaptor(newCaptor)
     __captor = newCaptor
     self.SetForm("Arrest Captor", akNewGuard, "Jail")
+    API.Confiscation.CaptorChanged(this, akOldGuard, akNewGuard) ; what the old one carries of mine
     if (abReleaseOld)
         handle = ModEvent.Create("RPB_ReleaseCaptor")
         if (handle)
@@ -2298,6 +2299,7 @@ function HandOverEscort(Actor akFrozenGuard, Actor akNewGuard, string asReason =
     self.AssignCaptor(newCaptor)
     __captor = newCaptor
     self.SetForm("Arrest Captor", akNewGuard, "Jail")
+    API.Confiscation.CaptorChanged(this, akFrozenGuard, akNewGuard) ; what the old one carries of mine (not from a frozen one)
     Info("Escort of " + Name + " " + this + " handed over to " + akNewGuard + " from " + akFrozenGuard + ": " + asReason)
     if (abReleaseOld)
         handle = ModEvent.Create("RPB_ReleaseCaptor")
@@ -2334,6 +2336,7 @@ function __TakeOverInPrison(Actor akNewGuard, RPB_Prison apPrison, RPB_Prisoner 
     ; The prisoner's side too: the imprisonment releases "Arrest Captor", which still named the dead guard (the new one
     ; kept his Captor for good)
     self.SetForm("Arrest Captor", akNewGuard, "Jail")
+    API.Confiscation.CaptorChanged(this, akOldGuard, akNewGuard) ; what the old one carries of mine, from his body too
 
     string waited = ""
     if (self.GetBool("Awaiting Guard"))

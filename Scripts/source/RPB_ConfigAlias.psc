@@ -221,6 +221,7 @@ event OnPlayerLoadGame()
     RPB_Data.RefreshRootObject() ; data.json read again: an updated file reaches a save, as when every lookup read it
     self.PerformMaintenance()
     self.RegisterHotkeys()
+    API.Confiscation.ResumeFetchesAfterLoad() ; a guard running for a fake surrenderer's weapons at the save
 endEvent
 
 ; event OnLocationChange(Location akOldLocation, Location akNewLocation)

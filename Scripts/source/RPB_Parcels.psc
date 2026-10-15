@@ -5,8 +5,12 @@ import RPB_Memory
 ;/
     Parcels (2026-10-14): one owner's things kept together, as the exact items (tempering, enchantments, names kept), in a
     container of their own placed out of the world (RPB_ParcelHoldingMarker, in RPB_Markers). A token stands for each
-    parcel wherever it is: in someone's inventory, in a chest. Whoever holds the token holds the parcel. The player taking
-    a token opens it into their inventory (Death Alternative's stolen-gear knapsack, made general).
+    parcel wherever it is: in someone's inventory, in a chest. Whoever holds the token holds the parcel. A token reaching
+    its owner's inventory opens there (Death Alternative's stolen-gear knapsack, made general); anyone else carries it
+    closed (a follower's belongings recovered by the player open when handed to the follower).
+
+    Carriers (RPB_ParcelCarrier, an ability): whoever is given a job around a parcel reports his fight's end and his
+    unload as mod events; the job's giver decides what they mean.
 
     Nothing here knows what a parcel is for: the owner and the kind ("Belongings", "Weapons", anything) are the caller's,
     and what a parcel's moves mean (taken back from a prison's chest, stolen) is for the callers to decide through the
@@ -20,6 +24,7 @@ import RPB_Memory
     MiscObject TokenBase
     Container ContainerBase
     ObjectReference HoldingMarker
+    Spell CarrierSpell
 @functions:
     ObjectReference function Create(Form akOwner, string asKind, string asName)
     function PutRef(ObjectReference akParcel, ObjectReference akItem)
@@ -34,6 +39,8 @@ import RPB_Memory
     string function GetKind(ObjectReference akParcel)
     ObjectReference function GetParcelOfToken(ObjectReference akToken)
     function OnTokenMoved(ObjectReference akToken, ObjectReference akNewContainer, ObjectReference akOldContainer)
+    function MakeCarrier(Actor akCarrier)
+    function UnmakeCarrier(Actor akCarrier)
     int function __Record(ObjectReference akParcel)
     int function __All(string asPath)
 /;
@@ -57,6 +64,12 @@ endProperty
 ObjectReference property HoldingMarker
     ObjectReference function get()
         return RPB_API.GetFormFromMod(0x2C070) as ObjectReference
+    endFunction
+endProperty
+
+Spell property CarrierSpell
+    Spell function get()
+        return RPB_API.GetFormFromMod(0x2C072) as Spell
     endFunction
 endProperty
 
@@ -210,8 +223,8 @@ ObjectReference function GetParcelOfToken(ObjectReference akToken)
 endFunction
 
 ;/
-    A token moved (RPB_ParcelToken.OnContainerChanged): where it is now is recorded. Taken by the player (not my own
-    GiveTo), the parcel opens into their inventory
+    A token moved (RPB_ParcelToken.OnContainerChanged): where it is now is recorded. Taken by its owner (not my own
+    GiveTo), the parcel opens into their inventory; anyone else holds it closed
 /;
 function OnTokenMoved(ObjectReference akToken, ObjectReference akNewContainer, ObjectReference akOldContainer)
     ObjectReference parcel = self.GetParcelOfToken(akToken)
@@ -223,8 +236,21 @@ function OnTokenMoved(ObjectReference akToken, ObjectReference akNewContainer, O
     bool ownMove = FastMap_GetInt(record, "moving") != 0
     FastMap_SetInt(record, "moving", 0)
     RPB_Utility.LogInfo("Token " + akToken + " of " + parcel + " moved from " + akOldContainer + " to " + akNewContainer + RPB_Utility.string_if(ownMove, " (given)", ""), "Parcels::OnTokenMoved")
-    if (!ownMove && akNewContainer && akNewContainer == Game.GetPlayer())
+    if (!ownMove && akNewContainer && akNewContainer == (FastMap_GetForm(record, "owner") as ObjectReference))
         self.Open(parcel, akNewContainer)
+    endif
+endFunction
+
+; @akCarrier reports his fight's end and his unload from now on (RPB_ParcelCarrier)
+function MakeCarrier(Actor akCarrier)
+    if (akCarrier && !akCarrier.HasSpell(self.CarrierSpell))
+        akCarrier.AddSpell(self.CarrierSpell, false)
+    endif
+endFunction
+
+function UnmakeCarrier(Actor akCarrier)
+    if (akCarrier && akCarrier.HasSpell(self.CarrierSpell))
+        akCarrier.RemoveSpell(self.CarrierSpell)
     endif
 endFunction
 

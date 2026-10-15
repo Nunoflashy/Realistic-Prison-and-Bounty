@@ -927,12 +927,17 @@ function __FakeSurrender(Actor akSurrenderer, Actor[] akGuards)
     __surrenderGuards = noGuards
     LastSurrenderOutcome = "faked"
     Actor guard = self.__NearestSurrenderGuard(akSurrenderer, akGuards, none)
+    Faction crimeFaction = none
     if (guard)
-        Faction crimeFaction = guard.GetCrimeFaction()
+        crimeFaction = guard.GetCrimeFaction()
         self.ApplyFakeSurrenderPenalty(akSurrenderer, crimeFaction)
         self.__RememberFakeSurrender(akSurrenderer, crimeFaction)
     endif
     self.__UndoSurrender(akSurrenderer, "they left while a guard was still coming (a fake surrender)", abNotify = false)
+    if (crimeFaction)
+        ; They may go after what was dropped (after the undo: ending the surrender's Scenes would take a queued pickup along)
+        Confiscation.OnFakeSurrender(akSurrenderer, akGuards, crimeFaction)
+    endif
     int i = 0
     while (i < akGuards.Length)
         if (akGuards[i] && !akGuards[i].IsDead())

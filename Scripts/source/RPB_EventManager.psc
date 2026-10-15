@@ -36,6 +36,9 @@ scriptname RPB_EventManager extends Quest
     event OnSurrenderSceneEvent(string asScene, string asSceneEvent, string asSceneSecondaryEvent, Form akMember, Form akAuthority, int aiPrevious, int aiNumber, int aiBatch, int aiMembers)
     event OnSurrenderPreparing(Form akSurrenderer)
     event OnPickUpWeapons(Form akOwner, Form akCaptor)
+    event OnParcelCarrierCombatEnded(Form akCarrier)
+    event OnParcelCarrierUnloaded(Form akCarrier)
+    event OnWatchFetch(Form akOwner)
     event OnSurrenderScene(string asScene, string asSceneEvent, Actor akSurrenderer, Actor akSurrendererCaptor, string asSceneSecondaryEvent, Form[] akParams, Form[] akParams2)
     event OnSceneStart(string eventName, string sceneName, float unusedFlt, Form sender)
     event OnScenePlayingStart(string eventName, string sceneName, float scenePhaseFlt, Form sender)
@@ -136,6 +139,9 @@ function RegisterEvents()
     RegisterForModEvent("RPB_CancelArrest", "OnCancelArrestRequest")
     RegisterForModEvent("RPB_SubmissionTakeover", "OnSubmissionTakeover")
     RegisterForModEvent("RPB_PickUpWeapons", "OnPickUpWeapons")
+    RegisterForModEvent("RPB_ParcelCarrierCombatEnded", "OnParcelCarrierCombatEnded")
+    RegisterForModEvent("RPB_ParcelCarrierUnloaded", "OnParcelCarrierUnloaded")
+    RegisterForModEvent("RPB_WatchFetch", "OnWatchFetch")
     RegisterForModEvent("RPB_FaintFrozenGuard", "OnFaintFrozenGuard")
     RegisterForModEvent("RPB_MoveGuard", "OnMoveGuard")
     RegisterForModEvent("RPB_StalledEscortTakeover", "OnStalledEscortTakeover")
@@ -372,6 +378,20 @@ endEvent
 ; The weapon pickup Scene's "Pick Up" phase (RPB_SceneManager): the captor picks up what @akOwner dropped
 event OnPickUpWeapons(Form akOwner, Form akCaptor)
     API.Confiscation.PickUpWeapons(akOwner as Actor, akCaptor as Actor)
+endEvent
+
+; A parcel carrier's fight ended, or he unloaded (RPB_ParcelCarrier): to whoever gave him his job (only Confiscation yet)
+event OnParcelCarrierCombatEnded(Form akCarrier)
+    API.Confiscation.OnCarrierCombatEnded(akCarrier as Actor)
+endEvent
+
+event OnParcelCarrierUnloaded(Form akCarrier)
+    API.Confiscation.OnCarrierUnloaded(akCarrier as Actor)
+endEvent
+
+; A fake surrender's guard running for the dropped weapons (RPB_Confiscation.__Fetch): his watch, on its own stack
+event OnWatchFetch(Form akOwner)
+    API.Confiscation.WatchFetch(akOwner as Actor)
 endEvent
 
 ;/

@@ -10,7 +10,16 @@ scriptname RPB_Confiscation extends Quest
     What's picked up goes into a parcel of hers of its own ("Weapons", RPB_Parcels, 2026-10-15): the captor carries its
     token ("Ralof's Weapons"), not the weapons, so he can't equip them and the exact items come back; at the prison the
     token goes into her belongings chest. Records from before it (the weapons themselves on the guard, a Confiscated list
-    of items) are still handed in and returned item by item.
+    of items) are still handed in and returned item by item. A guard who takes over the arrest takes the token from the
+    old one (CaptorChanged), so slipping away later means getting it back from whoever escorts her.
+
+    A fake surrender (RPB_Surrender.__FakeSurrender, OnFakeSurrender): the guards who were coming become parcel carriers
+    (RPB_ParcelCarrier), and PICKUP_AFTER_FAKE_PERCENT decides whether they go after what she dropped. With two or more,
+    the nearest runs for it at once while the others fight (a package override ignoring combat: the engine won't start a
+    Scene with an actor in combat); alone, he goes once his fight is over, or picks it up off-screen when he unloads. Carried, the token goes to his hold's prison, into its
+    belongings chest, when he unloads: .rpb_root.turnedIn by parcel ("owner", "hold", "until", "carrier", "chest").
+    Arrested in that hold before "until" (the hold's memory of the fake surrender), it's hers again (ClaimTurnedIn, at
+    the arrival): returned at the release with the rest. After that it's lost: left where it is (stealable), not returned.
 
 @references:
     RPB_API API
@@ -24,7 +33,25 @@ scriptname RPB_Confiscation extends Quest
     function __WatchPickup(Actor akOwner)
     bool function __PickedUp(Actor akOwner)
     ObjectReference function __FirstWeaponOnGround(int aiRefs)
+    function OnFakeSurrender(Actor akOwner, Actor[] akGuards, Faction akCrimeFaction)
+    function OnCarrierCombatEnded(Actor akCarrier)
+    function OnCarrierUnloaded(Actor akCarrier)
+    bool function __RollPickup(Actor akOwner, int aiRecord, string asWhen)
+    function __Claim(Actor akOwner, int aiRecord, Actor akCarrier)
+    bool function __Fetch(Actor akOwner, int aiRecord, Actor akCarrier)
+    function WatchFetch(Actor akOwner)
+    function __EndFetch(int aiRecord, Actor akFetcher)
+    function ResumeFetchesAfterLoad()
+    function __PickUpOffScreen(Actor akOwner, int aiRecord, Actor akCarrier)
+    function __TurnInPickup(Actor akOwner, int aiRecord, ObjectReference akParcel, Actor akCarrier)
+    function __TurnInCarried(Actor akCarrier)
+    function __TurnIn(ObjectReference akParcel, int aiEntry, Actor akCarrier)
+    function __DropCarriersOf(Actor akOwner, Actor akExcept)
+    int function __Map(string asPath)
+    function __DropCarrier(Actor akCarrier)
+    function CaptorChanged(Actor akOwner, Actor akOldCaptor, Actor akNewCaptor)
     function HandIn(Actor akOwner, ObjectReference akChest)
+    function ClaimTurnedIn(Actor akOwner, string asHold, ObjectReference akChest)
     int function GetConfiscated(Actor akOwner)
     function ReturnConfiscated(Actor akOwner)
     int function __ReturnFromHolder(Actor akOwner)
@@ -128,9 +155,13 @@ bool function QueueWeaponPickup(Actor akOwner, Actor akCaptor)
     if (!record || !akCaptor)
         return false
     endif
+    if (RPB_Memory.FastMap_GetForm(record, "parcel"))
+        return false ; picked up already (the hand-in takes it from whoever holds it)
+    endif
     ObjectReference target = self.__FirstWeaponOnGround(RPB_Memory.FastMap_GetObject(record, "refs"))
     if (!target)
         RPB_Utility.LogInfo("Nothing of " + akOwner + "'s dropped weapons is left on the ground, no pickup", "Confiscation::QueueWeaponPickup")
+        self.__DropCarriersOf(akOwner, none)
         self.ForgetDroppedWeapons(akOwner)
         return false
     endif
@@ -170,6 +201,7 @@ function __WatchPickup(Actor akOwner)
     if (sceneManager.GetCurrentScene() != pickupScene)
         RPB_Utility.LogInfo("The pickup of " + akOwner + "'s weapons never started (" + (waited as int) + "s), the weapons stay on the ground", "Confiscation::__WatchPickup")
         self.UnblockDroppedWeapons(akOwner)
+        self.__DropCarriersOf(akOwner, none)
         return
     endif
     waited = 0.0
@@ -181,6 +213,7 @@ function __WatchPickup(Actor akOwner)
         RPB_Utility.LogWarn("The captor didn't reach " + akOwner + "'s dropped weapons in " + (waited as int) + "s, the pickup is given up (they stay on the ground)", "Confiscation::__WatchPickup")
         sceneManager.EndSceneEarly(pickupScene, "the captor didn't reach the dropped weapons")
         self.UnblockDroppedWeapons(akOwner) ; left on the ground: anybody's
+        self.__DropCarriersOf(akOwner, none)
     endif
 endFunction
 
@@ -223,6 +256,12 @@ function PickUpWeapons(Actor akOwner, Actor akCaptor)
         RPB_Utility.LogInfo("Nothing of " + akOwner + "'s dropped weapons is left on the ground for " + akCaptor + " to pick up", "Confiscation::PickUpWeapons")
         return
     endif
+    ObjectReference nearest = self.__FirstWeaponOnGround(refs)
+    if (akCaptor.GetDistance(nearest) > PICKUP_REACH * 2.0)
+        RPB_Utility.LogWarn(akCaptor + " is too far from " + akOwner + "'s dropped weapons to pick them up (" + (akCaptor.GetDistance(nearest) as int) + " from " + nearest + ")", "Confiscation::PickUpWeapons")
+        RPB_Memory.FastMap_SetInt(record, "pickup", 0)
+        return
+    endif
     RPB_Parcels parcels = API.Parcels
     ObjectReference parcel = parcels.Create(akOwner, "Weapons", self.__OwnerName(akOwner) + "'s Weapons")
     if (!parcel)
@@ -232,7 +271,7 @@ function PickUpWeapons(Actor akOwner, Actor akCaptor)
     int i = 0
     while (i < RPB_Memory.FastArray_Size(refs))
         ObjectReference ref = RPB_Memory.FastArray_GetForm(refs, i) as ObjectReference
-        if (ref && ref.Is3DLoaded())
+        if (ref && ref.Is3DLoaded() && akCaptor.GetDistance(ref) <= PICKUP_REACH * 2.0)
             parcels.PutRef(parcel, ref)
             picked += 1
         endif
@@ -242,6 +281,432 @@ function PickUpWeapons(Actor akOwner, Actor akCaptor)
     RPB_Memory.FastMap_SetForm(record, "parcel", parcel)
     RPB_Memory.FastMap_SetForm(record, "captor", akCaptor) ; who has it: a cancel opens it from him
     RPB_Utility.LogInfo(akCaptor + " picked up " + picked + " of " + RPB_Memory.FastArray_Size(refs) + " of " + akOwner + "'s dropped weapons, into " + parcel, "Confiscation::PickUpWeapons")
+    if (RPB_Memory.FastMap_GetInt(record, "fake"))
+        self.__TurnInPickup(akOwner, record, parcel, akCaptor)
+    endif
+endFunction
+
+; ==========================================================
+;                    A fake surrender's pickup
+; ==========================================================
+
+; The chance the guards go after a fake surrenderer's dropped weapons at all (an MCM option later)
+int property PICKUP_AFTER_FAKE_PERCENT = 75 autoreadonly
+
+;/
+    @akOwner left her surrender while @akGuards were coming (RPB_Surrender.__FakeSurrender, after the surrender's undo and
+    before they fight her): with weapons dropped, each living guard becomes a parcel carrier for them
+    (.rpb_root.parcelCarriers: carrier -> owner), and the record remembers the hold (@akCrimeFaction's) and until when it
+    remembers the fake surrender. Two guards or more: the roll now, and the one nearest the weapons goes for them while the
+    others fight (the pickup's package ignores combat). One guard: he fights; the roll and the pickup come when his fight
+    is over, or off-screen when he unloads (OnCarrierCombatEnded, OnCarrierUnloaded)
+/;
+function OnFakeSurrender(Actor akOwner, Actor[] akGuards, Faction akCrimeFaction)
+    int record = self.GetDroppedWeapons(akOwner)
+    if (!record || !akCrimeFaction)
+        return
+    endif
+    RPB_Memory.FastMap_SetInt(record, "fake", 1)
+    RPB_Memory.FastMap_SetString(record, "hold", RPB_Utility.GetFormNameCached(akCrimeFaction))
+    RPB_Memory.FastMap_SetFloat(record, "until", API.Surrender.GetFakedSurrenderUntil(akOwner, akCrimeFaction))
+    RPB_Parcels parcels = API.Parcels
+    int carriers = self.__Map(".rpb_root.parcelCarriers")
+    ObjectReference target = self.__FirstWeaponOnGround(RPB_Memory.FastMap_GetObject(record, "refs"))
+    Actor nearest = none
+    float nearestDistance = 0.0
+    int made = 0
+    int i = 0
+    while (i < akGuards.Length)
+        Actor guard = akGuards[i]
+        if (guard && !RPB_Utility.IsDeadNoCall(guard) && !RPB_Utility.IsFrozenNPC(guard))
+            RPB_Memory.FastFormMap_SetForm(carriers, guard, akOwner)
+            parcels.MakeCarrier(guard)
+            made += 1
+            if (target)
+                float distance = guard.GetDistance(target)
+                if (!nearest || distance < nearestDistance)
+                    nearest = guard
+                    nearestDistance = distance
+                endif
+            endif
+        endif
+        i += 1
+    endWhile
+    RPB_Utility.LogInfo(made + " guards of " + RPB_Memory.FastMap_GetString(record, "hold") + " may go after " + akOwner + "'s dropped weapons", "Confiscation::OnFakeSurrender")
+    if (made >= 2 && nearest && self.__RollPickup(akOwner, record, "the fight"))
+        self.__Claim(akOwner, record, nearest)
+    endif
+endFunction
+
+;/
+    Whether the guards go after @akOwner's dropped weapons: rolled once per fake surrender (PICKUP_AFTER_FAKE_PERCENT), at
+    @asWhen. Not going: nobody is a carrier for them any more
+/;
+bool function __RollPickup(Actor akOwner, int aiRecord, string asWhen)
+    if (RPB_Memory.FastMap_GetInt(aiRecord, "rolled"))
+        return RPB_Memory.FastMap_GetInt(aiRecord, "going") != 0
+    endif
+    int roll = Utility.RandomInt(1, 100)
+    int forced = JDB.solveInt(".rpb_root.tests.forcePickupRoll") ; test 212: 1 always goes, 2 never
+    if (forced == 1)
+        roll = 1
+    elseif (forced == 2)
+        roll = 100
+    endif
+    bool going = roll <= PICKUP_AFTER_FAKE_PERCENT
+    RPB_Memory.FastMap_SetInt(aiRecord, "rolled", 1)
+    RPB_Memory.FastMap_SetInt(aiRecord, "going", going as int)
+    RPB_Utility.LogInfo("The guards " + RPB_Utility.string_if(going, "go", "don't go") + " after " + akOwner + "'s dropped weapons (rolled " + roll + " at " + asWhen + ", they go at " + PICKUP_AFTER_FAKE_PERCENT + " or less)", "Confiscation::__RollPickup")
+    if (!going)
+        self.__DropCarriersOf(akOwner, none)
+    endif
+    return going
+endFunction
+
+; @akCarrier goes after @akOwner's dropped weapons (the pickup Scene, as a captor's): the only carrier left for them
+function __Claim(Actor akOwner, int aiRecord, Actor akCarrier)
+    RPB_Memory.FastMap_SetForm(aiRecord, "claimed", akCarrier)
+    self.__DropCarriersOf(akOwner, akCarrier)
+    RPB_Utility.LogInfo(akCarrier + " goes after " + akOwner + "'s dropped weapons", "Confiscation::__Claim")
+    if (!self.__Fetch(akOwner, aiRecord, akCarrier))
+        self.__DropCarrier(akCarrier)
+    endif
+endFunction
+
+; ==========================================================
+;              The fetch (a guard who may be fighting)
+; ==========================================================
+
+;/
+    The engine won't start a Scene with an actor in combat, and a fight ends a Scene's package at once, so a fake
+    surrender's guard, fighting or not, runs to the weapon on Skyrim.esm's defaultTravelToLinkCustom04RunIgnoreCombat as a
+    package override (PapyrusUtil), his LinkCustom04 linked reference set to it (his own put back after). His own stack's
+    watch (WatchFetch) picks it up once he's there
+/;
+Package property FetchPackage
+    Package function get()
+        return Game.GetFormFromFile(0x09A771, "Skyrim.esm") as Package
+    endFunction
+endProperty
+
+Keyword property FetchLink
+    Keyword function get()
+        return Game.GetFormFromFile(0x05D5FE, "Skyrim.esm") as Keyword
+    endFunction
+endProperty
+
+; How long a fetch may take before it's given up (the weapons left for an off-screen pickup at his unload), and how close
+; he has to be to pick a weapon up (a fetch's arrival, and any pickup: nothing is picked up from afar)
+float property FETCH_SECONDS = 30.0 autoreadonly
+float property PICKUP_REACH = 200.0 autoreadonly
+
+; @akCarrier runs to the first of @akOwner's dropped weapons still on the ground. Whether he went
+bool function __Fetch(Actor akOwner, int aiRecord, Actor akCarrier)
+    ObjectReference target = self.__FirstWeaponOnGround(RPB_Memory.FastMap_GetObject(aiRecord, "refs"))
+    if (!target || !akCarrier || RPB_Utility.IsFrozenNPC(akCarrier))
+        RPB_Utility.LogInfo("Nothing of " + akOwner + "'s dropped weapons on the ground for " + akCarrier + " to fetch", "Confiscation::__Fetch")
+        return false
+    endif
+    Keyword link = self.FetchLink
+    RPB_Memory.FastMap_SetForm(aiRecord, "fetcher", akCarrier)
+    RPB_Memory.FastMap_SetForm(aiRecord, "fetcherLink", akCarrier.GetLinkedRef(link))
+    RPB_Memory.FastMap_SetFloat(aiRecord, "fetchStarted", Utility.GetCurrentRealTime())
+    PO3_SKSEFunctions.SetLinkedRef(akCarrier, target, link)
+    ActorUtil.AddPackageOverride(akCarrier, self.FetchPackage, 100)
+    akCarrier.EvaluatePackage()
+    RPB_Utility.LogInfo(akCarrier + " runs to " + akOwner + "'s dropped weapon " + target + " (" + (akCarrier.GetDistance(target) as int) + " away, in combat " + akCarrier.IsInCombat() + ")", "Confiscation::__Fetch")
+    int handle = ModEvent.Create("RPB_WatchFetch")
+    if (handle)
+        ModEvent.PushForm(handle, akOwner)
+        ModEvent.Send(handle)
+    endif
+    return true
+endFunction
+
+;/
+    @akOwner's fetch, on a stack of its own (RPB_EventManager): until the fetcher is within PICKUP_REACH of a weapon still
+    on the ground (re-aimed when the one he ran to is taken), then he picks them up (PickUpWeapons). Given up after
+    FETCH_SECONDS (real seconds, from the fetch's start: a load resumes it with the time left), or when he dies, freezes
+    or unloads (his unload picks them up off-screen)
+/;
+function WatchFetch(Actor akOwner)
+    int record = self.GetDroppedWeapons(akOwner)
+    Actor fetcher = RPB_Memory.FastMap_GetForm(record, "fetcher") as Actor
+    if (!fetcher)
+        return
+    endif
+    Keyword link = self.FetchLink
+    int refs = RPB_Memory.FastMap_GetObject(record, "refs")
+    string outcome = ""
+    while (outcome == "")
+        ObjectReference target = self.__FirstWeaponOnGround(refs)
+        if (RPB_Memory.FastMap_GetForm(record, "fetcher") != fetcher || self.GetDroppedWeapons(akOwner) != record)
+            outcome = "ended elsewhere"
+        elseif (RPB_Utility.IsDeadNoCall(fetcher) || RPB_Utility.IsFrozenNPC(fetcher))
+            outcome = "he died or froze"
+        elseif (!target)
+            outcome = "nothing left on the ground"
+        elseif (!fetcher.Is3DLoaded())
+            outcome = "he unloaded"
+        elseif (fetcher.GetDistance(target) <= PICKUP_REACH)
+            outcome = "there"
+        elseif (Utility.GetCurrentRealTime() - RPB_Memory.FastMap_GetFloat(record, "fetchStarted") > FETCH_SECONDS)
+            outcome = "too long"
+        else
+            if (fetcher.GetLinkedRef(link) != target)
+                PO3_SKSEFunctions.SetLinkedRef(fetcher, target, link) ; the one he ran to was taken: the next
+                fetcher.EvaluatePackage()
+            endif
+            RPB_Memory.FastMap_SetFloat(record, "fetchElapsedAtSave", Utility.GetCurrentRealTime() - RPB_Memory.FastMap_GetFloat(record, "fetchStarted"))
+            Utility.Wait(0.5)
+        endif
+    endWhile
+    RPB_Utility.LogInfo(fetcher + "'s fetch of " + akOwner + "'s weapons ended: " + outcome, "Confiscation::WatchFetch")
+    if (outcome == "ended elsewhere")
+        return
+    endif
+    self.__EndFetch(record, fetcher)
+    if (outcome == "there")
+        self.PickUpWeapons(akOwner, fetcher)
+    elseif (outcome == "nothing left on the ground")
+        self.__DropCarriersOf(akOwner, none)
+        self.ForgetDroppedWeapons(akOwner)
+    endif
+    ; "too long": still her carrier, his unload picks them up off-screen
+endFunction
+
+; The fetch's package and link taken off @akFetcher (his own LinkCustom04 back), so he goes back to what he was doing
+function __EndFetch(int aiRecord, Actor akFetcher)
+    if (!akFetcher || RPB_Memory.FastMap_GetForm(aiRecord, "fetcher") != akFetcher)
+        return
+    endif
+    RPB_Memory.FastMap_RemoveKey(aiRecord, "fetcher")
+    if (RPB_Utility.IsFrozenNPC(akFetcher))
+        return
+    endif
+    ActorUtil.RemovePackageOverride(akFetcher, self.FetchPackage)
+    PO3_SKSEFunctions.SetLinkedRef(akFetcher, RPB_Memory.FastMap_GetForm(aiRecord, "fetcherLink") as ObjectReference, self.FetchLink)
+    akFetcher.EvaluatePackage()
+endFunction
+
+;/
+    After a load (RPB_ConfigAlias): the fetches under way when the game was saved go on (their watch didn't survive it,
+    the package override did), with the time they had left
+/;
+function ResumeFetchesAfterLoad()
+    int all = JDB.solveObj(".rpb_root.droppedWeapons")
+    if (!all)
+        return
+    endif
+    Form[] owners = JFormMap.allKeysPArray(all)
+    int i = 0
+    while (owners && i < owners.Length)
+        int record = RPB_Memory.FastFormMap_GetObject(all, owners[i])
+        if (RPB_Memory.FastMap_GetForm(record, "fetcher"))
+            ; the real-time clock restarts with the game: keep the time left
+            float elapsed = RPB_Memory.FastMap_GetFloat(record, "fetchElapsedAtSave")
+            RPB_Memory.FastMap_SetFloat(record, "fetchStarted", Utility.GetCurrentRealTime() - elapsed)
+            int handle = ModEvent.Create("RPB_WatchFetch")
+            if (handle)
+                ModEvent.PushForm(handle, owners[i])
+                ModEvent.Send(handle)
+            endif
+            RPB_Utility.LogInfo("Resumed " + RPB_Memory.FastMap_GetForm(record, "fetcher") + "'s fetch of " + owners[i] + "'s weapons after the load", "Confiscation::ResumeFetchesAfterLoad")
+        endif
+        i += 1
+    endWhile
+endFunction
+
+;/
+    A carrier's fight is over (RPB_ParcelCarrier -> RPB_EventManager): nobody going after the weapons yet, he does if the
+    roll says so. She's been arrested since (the arrest's own pickup takes it), or there's nothing left to go after: no
+    longer a carrier
+/;
+function OnCarrierCombatEnded(Actor akCarrier)
+    Actor owner = RPB_Memory.FastFormMap_GetForm(self.__Map(".rpb_root.parcelCarriers"), akCarrier) as Actor
+    if (!owner)
+        return
+    endif
+    int record = self.GetDroppedWeapons(owner)
+    RPB_Utility.LogInfo(akCarrier + "'s fight is over: carrying for " + owner + ", record " + record + " (fake " + RPB_Memory.FastMap_GetInt(record, "fake") + ", parcel " + RPB_Memory.FastMap_GetForm(record, "parcel") + ", rolled " + RPB_Memory.FastMap_GetInt(record, "rolled") + ", claimed by " + RPB_Memory.FastMap_GetForm(record, "claimed") + "), she's arrested " + RPB_Utility.IsActorArrested(owner), "Confiscation::OnCarrierCombatEnded")
+    Actor claimed = RPB_Memory.FastMap_GetForm(record, "claimed") as Actor
+    if (claimed)
+        if (claimed != akCarrier)
+            self.__DropCarrier(akCarrier)
+        endif
+        return
+    endif
+    if (!record || !RPB_Memory.FastMap_GetInt(record, "fake") || RPB_Memory.FastMap_GetForm(record, "parcel") || RPB_Utility.IsActorArrested(owner))
+        self.__DropCarrier(akCarrier)
+        return
+    endif
+    if (self.__RollPickup(owner, record, "the end of " + akCarrier + "'s fight"))
+        self.__Claim(owner, record, akCarrier)
+    endif
+endFunction
+
+;/
+    A carrier unloaded (RPB_ParcelCarrier -> RPB_EventManager): what he carries for a fake surrender is turned in to his
+    hold's prison, into one of its belongings chests. Nobody got the weapons yet (one guard, fighting until now; a pickup
+    that never happened): he picks them up off-screen, if the roll says so, and they go straight to the prison. Then he's
+    no longer a carrier. Not a carrier (any more): nothing
+/;
+function OnCarrierUnloaded(Actor akCarrier)
+    Actor owner = RPB_Memory.FastFormMap_GetForm(self.__Map(".rpb_root.parcelCarriers"), akCarrier) as Actor
+    if (!owner)
+        return
+    endif
+    RPB_Utility.LogInfo(akCarrier + " unloaded, carrying for " + owner, "Confiscation::OnCarrierUnloaded")
+    self.__TurnInCarried(akCarrier)
+    int record = self.GetDroppedWeapons(owner)
+    if (record && RPB_Memory.FastMap_GetInt(record, "fake") && !RPB_Memory.FastMap_GetForm(record, "parcel") && !RPB_Utility.IsActorArrested(owner))
+        Actor claimed = RPB_Memory.FastMap_GetForm(record, "claimed") as Actor
+        if ((!claimed || claimed == akCarrier) && self.__RollPickup(owner, record, akCarrier + "'s unload"))
+            self.__EndFetch(record, akCarrier)
+            self.__PickUpOffScreen(owner, record, akCarrier)
+        endif
+    endif
+    self.__DropCarrier(akCarrier)
+endFunction
+
+;/
+    @akCarrier, out of sight, picks up what of @akOwner's dropped weapons is still lying where it fell (loaded or not: in a
+    cell, not in someone's inventory) into her "Weapons" parcel, which goes straight to his hold's prison
+/;
+function __PickUpOffScreen(Actor akOwner, int aiRecord, Actor akCarrier)
+    RPB_Parcels parcels = API.Parcels
+    int refs = RPB_Memory.FastMap_GetObject(aiRecord, "refs")
+    ObjectReference parcel = none
+    int picked = 0
+    int i = 0
+    while (i < RPB_Memory.FastArray_Size(refs))
+        ObjectReference ref = RPB_Memory.FastArray_GetForm(refs, i) as ObjectReference
+        if (ref && ref.GetParentCell())
+            if (!parcel)
+                parcel = parcels.Create(akOwner, "Weapons", self.__OwnerName(akOwner) + "'s Weapons")
+            endif
+            if (parcel)
+                parcels.PutRef(parcel, ref)
+                picked += 1
+            endif
+        endif
+        i += 1
+    endWhile
+    if (!parcel)
+        RPB_Utility.LogInfo("Nothing of " + akOwner + "'s dropped weapons is left where it fell for " + akCarrier + " to pick up", "Confiscation::__PickUpOffScreen")
+        self.ForgetDroppedWeapons(akOwner)
+        return
+    endif
+    RPB_Utility.LogInfo(akCarrier + " picked up " + picked + " of " + RPB_Memory.FastArray_Size(refs) + " of " + akOwner + "'s dropped weapons off-screen, into " + parcel, "Confiscation::__PickUpOffScreen")
+    self.__TurnInPickup(akOwner, aiRecord, parcel, none)
+endFunction
+
+;/
+    A fake surrender's parcel picked up (PickUpWeapons by @akCarrier, or __PickUpOffScreen with none): it moves from her
+    dropped-weapons record (freed for a later drop) to the turned-in ones. Carried, it stays with him until he unloads;
+    picked up off-screen, or he's out of sight already, it's turned in now
+/;
+function __TurnInPickup(Actor akOwner, int aiRecord, ObjectReference akParcel, Actor akCarrier)
+    int entry = JMap.object()
+    RPB_Memory.FastMap_SetForm(entry, "owner", akOwner)
+    RPB_Memory.FastMap_SetString(entry, "hold", RPB_Memory.FastMap_GetString(aiRecord, "hold"))
+    RPB_Memory.FastMap_SetFloat(entry, "until", RPB_Memory.FastMap_GetFloat(aiRecord, "until"))
+    RPB_Memory.FastFormMap_SetObject(self.__Map(".rpb_root.turnedIn"), akParcel, entry)
+    self.ForgetDroppedWeapons(akOwner)
+    if (akCarrier && akCarrier.Is3DLoaded())
+        RPB_Memory.FastMap_SetForm(entry, "carrier", akCarrier)
+        return
+    endif
+    self.__TurnIn(akParcel, entry, akCarrier)
+endFunction
+
+; What @akCarrier carries of the turned-in parcels goes to his hold's prison (his unload)
+function __TurnInCarried(Actor akCarrier)
+    int turnedIn = self.__Map(".rpb_root.turnedIn")
+    Form[] keys = JFormMap.allKeysPArray(turnedIn)
+    int i = 0
+    while (keys && i < keys.Length)
+        int entry = RPB_Memory.FastFormMap_GetObject(turnedIn, keys[i])
+        if (RPB_Memory.FastMap_GetForm(entry, "carrier") == akCarrier)
+            self.__TurnIn(keys[i] as ObjectReference, entry, akCarrier)
+        endif
+        i += 1
+    endWhile
+endFunction
+
+; @akParcel's token into a belongings chest of its hold's prison (from @akCarrier, or wherever it is), recorded in @aiEntry
+function __TurnIn(ObjectReference akParcel, int aiEntry, Actor akCarrier)
+    string hold = RPB_Memory.FastMap_GetString(aiEntry, "hold")
+    RPB_Prison prison = RPB_Prison.GetPrisonForHold(hold)
+    ObjectReference chest = none
+    if (prison)
+        chest = prison.GetRandomPrisonerContainer("Belongings") as ObjectReference
+    endif
+    if (!chest)
+        RPB_Utility.LogWarn(akParcel + " not turned in: no prison for " + hold, "Confiscation::__TurnIn")
+        return
+    endif
+    API.Parcels.GiveTo(akParcel, chest)
+    RPB_Memory.FastMap_SetForm(aiEntry, "chest", chest)
+    RPB_Memory.FastMap_RemoveKey(aiEntry, "carrier")
+    RPB_Utility.LogInfo(RPB_Memory.FastMap_GetForm(aiEntry, "owner") + "'s weapons (" + akParcel + ") turned in to " + hold + "'s prison, " + chest + RPB_Utility.string_if(akCarrier, " by " + akCarrier, ""), "Confiscation::__TurnIn")
+endFunction
+
+; @akOwner's carriers stop being carriers, but @akExcept
+function __DropCarriersOf(Actor akOwner, Actor akExcept)
+    int carriers = self.__Map(".rpb_root.parcelCarriers")
+    Form[] keys = JFormMap.allKeysPArray(carriers)
+    int i = 0
+    while (keys && i < keys.Length)
+        if (keys[i] != akExcept && RPB_Memory.FastFormMap_GetForm(carriers, keys[i]) == akOwner)
+            self.__DropCarrier(keys[i] as Actor)
+        endif
+        i += 1
+    endWhile
+endFunction
+
+; The JFormMap at @asPath, made the first time
+int function __Map(string asPath)
+    int all = JDB.solveObj(asPath)
+    if (!all)
+        all = JFormMap.object()
+        JDB.solveObjSetter(asPath, all, true)
+    endif
+    return all
+endFunction
+
+function __DropCarrier(Actor akCarrier)
+    RPB_Memory.FastFormMap_RemoveKey(self.__Map(".rpb_root.parcelCarriers"), akCarrier)
+    if (akCarrier && !RPB_Utility.IsFrozenNPC(akCarrier) && !RPB_Utility.IsDeadNoCall(akCarrier))
+        API.Parcels.UnmakeCarrier(akCarrier)
+    endif
+endFunction
+
+;/
+    A guard took over @akOwner's arrest from @akOldCaptor (RPB_Arrestee's takeovers): what the old one carries of hers
+    goes to @akNewCaptor, from his body too. A frozen one can't be touched: it stays on him (the release tries again)
+/;
+function CaptorChanged(Actor akOwner, Actor akOldCaptor, Actor akNewCaptor)
+    int record = self.GetDroppedWeapons(akOwner)
+    if (!record || !akNewCaptor)
+        return
+    endif
+    RPB_Memory.FastMap_SetForm(record, "captor", akNewCaptor)
+    ObjectReference parcel = RPB_Memory.FastMap_GetForm(record, "parcel") as ObjectReference
+    RPB_Parcels parcels = API.Parcels
+    if (!parcel || !parcels.GetToken(parcel))
+        return
+    endif
+    Actor holder = parcels.GetHolder(parcel) as Actor
+    if (holder == akNewCaptor)
+        return
+    endif
+    if (holder && RPB_Utility.IsFrozenNPC(holder))
+        RPB_Utility.LogWarn(akNewCaptor + " can't take " + akOwner + "'s weapons (" + parcel + ") from " + holder + ": frozen", "Confiscation::CaptorChanged")
+        return
+    endif
+    parcels.GiveTo(parcel, akNewCaptor)
+    RPB_Utility.LogInfo(akNewCaptor + " took " + akOwner + "'s weapons (" + parcel + ") from " + holder + RPB_Utility.string_if(RPB_Utility.IsDeadNoCall(holder), " (his body)", ""), "Confiscation::CaptorChanged")
 endFunction
 
 ; ==========================================================
@@ -291,6 +756,52 @@ function HandIn(Actor akOwner, ObjectReference akChest)
     RPB_Memory.FastMap_SetForm(self.__ConfiscatedRecord(akOwner, akChest), "parcel", parcel)
     self.ForgetDroppedWeapons(akOwner)
     RPB_Utility.LogInfo(holder + " handed in " + akOwner + "'s weapons (" + parcel + ") into " + akChest, "Confiscation::HandIn")
+endFunction
+
+;/
+    At the arrival in @asHold's prison (RPB_Prison.PrepareArrival, after HandIn): what a fake surrender to this hold left
+    with its guards, turned in or still carried, is hers again if the hold still remembers it ("until"): into her chest
+    @akChest, merged into what was handed in now if anything was, and returned at the release. Past "until" it's lost:
+    left where it is, not returned. A carrier who died with it: on his body. Other holds' turned-in parcels stay put
+/;
+function ClaimTurnedIn(Actor akOwner, string asHold, ObjectReference akChest)
+    RPB_Parcels parcels = API.Parcels
+    int turnedIn = JDB.solveObj(".rpb_root.turnedIn")
+    if (!turnedIn || !akChest)
+        return
+    endif
+    Form[] keys = JFormMap.allKeysPArray(turnedIn)
+    int i = 0
+    while (keys && i < keys.Length)
+        ObjectReference parcel = keys[i] as ObjectReference
+        int entry = RPB_Memory.FastFormMap_GetObject(turnedIn, parcel)
+        if (RPB_Memory.FastMap_GetForm(entry, "owner") == akOwner && RPB_Memory.FastMap_GetString(entry, "hold") == asHold)
+            Actor holder = parcels.GetHolder(parcel) as Actor
+            if (!parcels.GetToken(parcel))
+                RPB_Memory.FastFormMap_RemoveKey(turnedIn, parcel) ; opened already (taken by her)
+            elseif (Utility.GetCurrentGameTime() > RPB_Memory.FastMap_GetFloat(entry, "until"))
+                RPB_Utility.LogInfo(akOwner + "'s weapons turned in to " + asHold + " (" + parcel + ") are lost: the hold no longer remembers her fake surrender", "Confiscation::ClaimTurnedIn")
+                RPB_Memory.FastFormMap_RemoveKey(turnedIn, parcel)
+            elseif (holder && RPB_Utility.IsDeadNoCall(holder))
+                RPB_Memory.FastFormMap_RemoveKey(turnedIn, parcel) ; on his body
+            elseif (!(holder && RPB_Utility.IsFrozenNPC(holder)))
+                int confiscated = self.__ConfiscatedRecord(akOwner, akChest)
+                ObjectReference handedIn = RPB_Memory.FastMap_GetForm(confiscated, "parcel") as ObjectReference
+                if (handedIn && parcels.GetToken(handedIn))
+                    parcels.Open(parcel, handedIn) ; into what was handed in now: one parcel back
+                else
+                    parcels.GiveTo(parcel, akChest)
+                    RPB_Memory.FastMap_SetForm(confiscated, "parcel", parcel)
+                endif
+                if (holder)
+                    self.__DropCarrier(holder)
+                endif
+                RPB_Memory.FastFormMap_RemoveKey(turnedIn, parcel)
+                RPB_Utility.LogInfo(akOwner + "'s weapons turned in to " + asHold + " (" + parcel + ", held by " + holder + ") are hers again, in " + akChest + RPB_Utility.string_if(handedIn, ", merged into " + handedIn, ""), "Confiscation::ClaimTurnedIn")
+            endif
+        endif
+        i += 1
+    endWhile
 endFunction
 
 ; @akOwner's Confiscated record (a JMap: "parcel" the parcel, or "items" the items from before parcels; "chest" where

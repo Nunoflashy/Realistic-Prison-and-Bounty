@@ -1613,6 +1613,8 @@ function PrepareArrival(RPB_Prisoner apPrisoner)
 
     ; What her guard picked up of the weapons she dropped surrendering is handed in, into her belongings chest
     API.Confiscation.HandIn(apPrisoner.GetActor(), apPrisoner.PrisonerBelongingsContainer)
+    ; And what a fake surrender to this hold left with its guards, if the hold still remembers it
+    API.Confiscation.ClaimTurnedIn(apPrisoner.GetActor(), Hold, apPrisoner.PrisonerBelongingsContainer)
 endFunction
 
 Form[] function GetReleaseMarkers(string asReleaseMarkerType = "Teleport")
