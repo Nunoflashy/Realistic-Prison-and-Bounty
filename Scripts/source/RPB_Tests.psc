@@ -272,6 +272,7 @@ function SetTests()
     self.AddTest("184 - Benchmark: the Time Skip's NPC Releases on Its Own Stack vs by Event (6 bandits each; advances the clock a few days)", "Test_ReleaseByEventBenchmark", abChainable = false)
     self.AddTest("187 - Freeze Control, NPC: 156's Steps With a Bandit (moved 1500 away and back mid escort, ended by a reset; repeat it)", "Test_NpcFreeWalkControl", abChainable = false)
     self.AddTest("188 - Freeze Control, Alternating: 187 (NPC) and 156 (player) by turns, the same-session comparison (repeat it)", "Test_FreezeControlAlternating", abChainable = false)
+    self.AddTest("210 - Confiscation: Weapons in a Parcel (a guard picks up a dropped sword into its owner's parcel and carries the token; handed in to a chest and given back; given back from him at a cancel; left on his body when he dies)", "Test_ConfiscationParcel", abChainable = false)
     self.AddTest("209 - Dev: Dump JContainers (writes the whole JDB to JCUser/rpb_jdb_dump.json and RPB's own part to rpb_root_dump.json, to see what a co-save holds)", "Test_DumpJDB", abChainable = false)
     self.AddTest("208 - Parcels: Leftovers (how many of 206's containers and tokens still exist after 207, and how many of them only flagged deleted; run after 207, and again after a save and a load)", "Test_ParcelLeftovers", abChainable = false)
     self.AddTest("207 - Parcels: Save Size, Remove (opens and deletes every parcel 206 made; save again after it)", "Test_ParcelSaveSizeRemove", abChainable = false)
@@ -14124,6 +14125,84 @@ bool function __ParcelLeftovers(string asTest)
     return true
 endFunction
 
+;/
+    210: a surrenderer's dropped weapon through RPB_Confiscation on parcels, without the Scenes: the guard's pickup puts the
+    sword into the owner's "Weapons" parcel and gives him its token (his own sword of the same kind stays his, he holds
+    nothing of hers to equip); the hand-in moves the token into a chest, the release opens it into her. Then a cancel
+    before the prison (given back from the guard), and a guard who died holding it (the token stays on his body)
+/;
+bool function __ConfiscationParcel(string asTest)
+    RPB_Confiscation confiscation = RPB_API.GetConfiscation()
+    RPB_Parcels parcels = RPB_API.GetParcels()
+    Form sword = Game.GetFormEx(0x12EB7) ; Iron Sword
+    Actor player = Game.GetPlayer()
+    Actor owner = __SpawnTempActor()
+    Actor guard = __SpawnTempActor()
+    if (!assert_true(owner && guard, asTest + ": could not spawn the owner and the guard"))
+        return false
+    endif
+    owner.RemoveAllItems()
+    guard.RemoveAllItems()
+    guard.AddItem(sword, 1, true) ; his own, the same kind
+    ObjectReference chest = parcels.HoldingMarker.PlaceAtMe(parcels.ContainerBase, 1, true, false)
+    bool ok = true
+
+    ; The release: picked up, handed in, given back
+    ObjectReference parcel = __ConfiscationPickup(asTest, confiscation, parcels, owner, guard, player, sword)
+    ok = assert_true(parcel != none, asTest + ": no parcel after the pickup") && ok
+    ok = assert_true(guard.GetItemCount(sword) == 1 && guard.GetItemCount(parcels.TokenBase) == 1, asTest + ": the guard holds swords " + guard.GetItemCount(sword) + ", tokens " + guard.GetItemCount(parcels.TokenBase) + " (1 and 1)") && ok
+    ok = assert_true(parcels.GetHolder(parcel) == guard && parcel.GetItemCount(sword) == 1, asTest + ": the token is with " + parcels.GetHolder(parcel) + ", the parcel holds " + parcel.GetItemCount(sword) + " swords") && ok
+    ok = assert_true(parcels.GetToken(parcel).GetDisplayName() == owner.GetDisplayName() + "'s Weapons", asTest + ": the token is named '" + parcels.GetToken(parcel).GetDisplayName() + "'") && ok
+    confiscation.HandIn(owner, chest)
+    Utility.Wait(1.0)
+    ok = assert_true(parcels.GetHolder(parcel) == chest && guard.GetItemCount(parcels.TokenBase) == 0 && guard.GetItemCount(sword) == 1, asTest + ": after the hand-in the token is with " + parcels.GetHolder(parcel) + ", the guard holds swords " + guard.GetItemCount(sword) + ", tokens " + guard.GetItemCount(parcels.TokenBase)) && ok
+    ok = assert_true(confiscation.GetConfiscated(owner) != 0 && confiscation.GetDroppedWeapons(owner) == 0, asTest + ": after the hand-in, confiscated " + confiscation.GetConfiscated(owner) + ", dropped " + confiscation.GetDroppedWeapons(owner)) && ok
+    confiscation.ReturnConfiscated(owner)
+    Utility.Wait(1.0)
+    log(asTest + ": released: the owner's swords " + owner.GetItemCount(sword) + ", the chest's tokens " + chest.GetItemCount(parcels.TokenBase))
+    ok = assert_true(owner.GetItemCount(sword) == 1 && owner.GetItemCount(parcels.TokenBase) == 0, asTest + ": the owner got swords " + owner.GetItemCount(sword) + ", tokens " + owner.GetItemCount(parcels.TokenBase) + " (1 and 0)") && ok
+    ok = assert_true(chest.GetItemCount(parcels.TokenBase) == 0 && !parcels.GetToken(parcel) && confiscation.GetConfiscated(owner) == 0, asTest + ": the parcel or its record outlived the release") && ok
+
+    ; A cancel before the prison: given back from the guard
+    parcel = __ConfiscationPickup(asTest + " (cancel)", confiscation, parcels, owner, guard, player, sword)
+    confiscation.ReturnConfiscated(owner)
+    Utility.Wait(1.0)
+    ok = assert_true(owner.GetItemCount(sword) == 2 && guard.GetItemCount(parcels.TokenBase) == 0 && guard.GetItemCount(sword) == 1, asTest + " (cancel): the owner has swords " + owner.GetItemCount(sword) + " (2), the guard swords " + guard.GetItemCount(sword) + " (1), tokens " + guard.GetItemCount(parcels.TokenBase) + " (0)") && ok
+    ok = assert_true(!parcels.GetToken(parcel) && confiscation.GetDroppedWeapons(owner) == 0, asTest + " (cancel): the parcel or the dropped record outlived it") && ok
+
+    ; Dead holding it: the token stays on his body
+    parcel = __ConfiscationPickup(asTest + " (dead)", confiscation, parcels, owner, guard, player, sword)
+    guard.KillEssential() ; the clones are of an essential NPC
+    Utility.Wait(1.0)
+    ok = assert_true(guard.IsDead(), asTest + " (dead): the guard didn't die") && ok
+    confiscation.HandIn(owner, chest)
+    confiscation.ReturnConfiscated(owner)
+    Utility.Wait(1.0)
+    ok = assert_true(parcels.GetHolder(parcel) == guard && guard.GetItemCount(parcels.TokenBase) == 1 && owner.GetItemCount(sword) == 2, asTest + " (dead): the token is with " + parcels.GetHolder(parcel) + ", the body holds tokens " + guard.GetItemCount(parcels.TokenBase) + ", the owner swords " + owner.GetItemCount(sword) + " (2)") && ok
+    ok = assert_true(confiscation.GetDroppedWeapons(owner) == 0 && confiscation.GetConfiscated(owner) == 0, asTest + " (dead): records left behind") && ok
+    parcels.Open(parcel, chest) ; tidy up
+    chest.RemoveAllItems()
+    chest.Delete()
+    return ok
+endFunction
+
+; A sword dropped by @akOwner in front of @akPlayer, recorded and picked up by @akGuard (the pickup Scene's phase called
+; straight). Returns her "Weapons" parcel
+ObjectReference function __ConfiscationPickup(string asTest, RPB_Confiscation akConfiscation, RPB_Parcels akParcels, Actor akOwner, Actor akGuard, Actor akPlayer, Form akSword)
+    ObjectReference dropped = __PlaceBeside(akPlayer, akSword, 120.0, 0.0)
+    Utility.Wait(0.5) ; its 3D
+    int refs = JArray.object()
+    int items = JArray.object()
+    JArray.addForm(refs, dropped)
+    JArray.addForm(items, akSword)
+    akConfiscation.RecordDroppedWeapons(akOwner, refs, items)
+    akConfiscation.PickUpWeapons(akOwner, akGuard)
+    Utility.Wait(1.0) ; the token's OnContainerChanged
+    ObjectReference parcel = akParcels.Find(akOwner, "Weapons")
+    log(asTest + ": picked up: " + dropped + " loaded " + dropped.Is3DLoaded() + ", parcel " + parcel + " holding " + akParcels.GetHolder(parcel) + ", the guard's swords " + akGuard.GetItemCount(akSword) + ", tokens " + akGuard.GetItemCount(akParcels.TokenBase))
+    return parcel
+endFunction
+
 ; @akBase placed @afAhead units in front of @akActor and @afSide to their right, facing them
 ObjectReference function __PlaceBeside(Actor akActor, Form akBase, float afAhead, float afSide)
     ObjectReference placed = akActor.PlaceAtMe(akBase, 1, true, false)
@@ -15570,7 +15649,7 @@ endFunction
 string __statelessTest = ""
 
 bool function __RunStatelessTest(string asTest)
-    if (asTest != "Test_ArrestWaitsWhileGuardFights_NoPackage" && asTest != "Test_CellDoorsDiagnostic" && asTest != "Test_LongAbsenceSetup" && asTest != "Test_LongAbsenceAdvance" && asTest != "Test_LongAbsenceVerify" && asTest != "Test_FallbackEscortToCellStopped_Player" && asTest != "Test_FallbackEscortToCellStopped_CloneGuard" && asTest != "Test_FightDuringEscort_NPC" && asTest != "Test_FightDuringEscort_Player" && asTest != "Test_GuardDiesInPrison_Player" && asTest != "Test_EscortToCellStopped_NoPackageLock" && StringUtil.Find(asTest, "Test_Surrender_") != 0 && asTest != "Test_FrozenGuardSkipped" && asTest != "Test_GuardDiesInPrison_NobodySees" && asTest != "Test_Escort_FreeWalk" && asTest != "Test_ToggleEscortToCell04" && asTest != "Test_CaptorFinishCycles_Calls" && asTest != "Test_CaptorFinishCycles_NoCalls" && asTest != "Test_CaptorFinishDetach_Calls" && asTest != "Test_CaptorFinishDetach_NoCalls" && asTest != "Test_Escort_FreeWalk_Control" && asTest != "Test_ActorKeys" && asTest != "Test_FrozenGuardCalls" && asTest != "Test_SimulatedFreezeCalls" && asTest != "Test_SimulatedFreezeAtCancel" && asTest != "Test_SpawnFreezableGuard" && asTest != "Test_AliasPackageControl" && asTest != "Test_FreezableEscort_Player" && asTest != "Test_FreezableEscort_NPC" && asTest != "Test_LightHold" && asTest != "Test_KillFrozenGuard" && asTest != "Test_LifetimeBountyStat" && asTest != "Test_FaintFrozenGuard" && asTest != "Test_FaintFrozenGuardShort" && asTest != "Test_FrozenEscortFallback" && asTest != "Test_HideFrozenGuard" && asTest != "Test_EscortToCellGuardHeld" && asTest != "Test_CuffedLimitEncumbrance" && asTest != "Test_CuffedLimitSettings" && asTest != "Test_EarlyHandback" && asTest != "Test_StalledEscortTakeover" && asTest != "Test_StalledEscortTakeoverLimit" && asTest != "Test_NpcEscortCancelControl" && asTest != "Test_FrozenPrisonerTimeSkip" && asTest != "Test_SpawnFreezablePrisoner" && asTest != "Test_SpawnFreezableArrestee" && asTest != "Test_GuardCrimeFactions" && asTest != "Test_PlayerEscortCancelControl" && asTest != "Test_ReleaseByEventBenchmark" && asTest != "Test_FrozenPrisonerDialogue" && asTest != "Test_NpcFreeWalkControl" && asTest != "Test_FreezeControlAlternating" && asTest != "Test_SetCancelSettle" && asTest != "Test_FightAtConfrontationStart" && asTest != "Test_FastWrapperBenchmark" && asTest != "Test_SkipEscortBegun" && asTest != "Test_WIDeadBody" && StringUtil.Find(asTest, "Test_FreezePoint_") != 0 && asTest != "Test_PrisonLookupBenchmark" && asTest != "Test_Parcels" && asTest != "Test_ParcelBelongings" && asTest != "Test_ParcelSaveSizeCreate" && asTest != "Test_ParcelSaveSizeRemove" && asTest != "Test_ParcelLeftovers" && asTest != "Test_DumpJDB")
+    if (asTest != "Test_ArrestWaitsWhileGuardFights_NoPackage" && asTest != "Test_CellDoorsDiagnostic" && asTest != "Test_LongAbsenceSetup" && asTest != "Test_LongAbsenceAdvance" && asTest != "Test_LongAbsenceVerify" && asTest != "Test_FallbackEscortToCellStopped_Player" && asTest != "Test_FallbackEscortToCellStopped_CloneGuard" && asTest != "Test_FightDuringEscort_NPC" && asTest != "Test_FightDuringEscort_Player" && asTest != "Test_GuardDiesInPrison_Player" && asTest != "Test_EscortToCellStopped_NoPackageLock" && StringUtil.Find(asTest, "Test_Surrender_") != 0 && asTest != "Test_FrozenGuardSkipped" && asTest != "Test_GuardDiesInPrison_NobodySees" && asTest != "Test_Escort_FreeWalk" && asTest != "Test_ToggleEscortToCell04" && asTest != "Test_CaptorFinishCycles_Calls" && asTest != "Test_CaptorFinishCycles_NoCalls" && asTest != "Test_CaptorFinishDetach_Calls" && asTest != "Test_CaptorFinishDetach_NoCalls" && asTest != "Test_Escort_FreeWalk_Control" && asTest != "Test_ActorKeys" && asTest != "Test_FrozenGuardCalls" && asTest != "Test_SimulatedFreezeCalls" && asTest != "Test_SimulatedFreezeAtCancel" && asTest != "Test_SpawnFreezableGuard" && asTest != "Test_AliasPackageControl" && asTest != "Test_FreezableEscort_Player" && asTest != "Test_FreezableEscort_NPC" && asTest != "Test_LightHold" && asTest != "Test_KillFrozenGuard" && asTest != "Test_LifetimeBountyStat" && asTest != "Test_FaintFrozenGuard" && asTest != "Test_FaintFrozenGuardShort" && asTest != "Test_FrozenEscortFallback" && asTest != "Test_HideFrozenGuard" && asTest != "Test_EscortToCellGuardHeld" && asTest != "Test_CuffedLimitEncumbrance" && asTest != "Test_CuffedLimitSettings" && asTest != "Test_EarlyHandback" && asTest != "Test_StalledEscortTakeover" && asTest != "Test_StalledEscortTakeoverLimit" && asTest != "Test_NpcEscortCancelControl" && asTest != "Test_FrozenPrisonerTimeSkip" && asTest != "Test_SpawnFreezablePrisoner" && asTest != "Test_SpawnFreezableArrestee" && asTest != "Test_GuardCrimeFactions" && asTest != "Test_PlayerEscortCancelControl" && asTest != "Test_ReleaseByEventBenchmark" && asTest != "Test_FrozenPrisonerDialogue" && asTest != "Test_NpcFreeWalkControl" && asTest != "Test_FreezeControlAlternating" && asTest != "Test_SetCancelSettle" && asTest != "Test_FightAtConfrontationStart" && asTest != "Test_FastWrapperBenchmark" && asTest != "Test_SkipEscortBegun" && asTest != "Test_WIDeadBody" && StringUtil.Find(asTest, "Test_FreezePoint_") != 0 && asTest != "Test_PrisonLookupBenchmark" && asTest != "Test_Parcels" && asTest != "Test_ParcelBelongings" && asTest != "Test_ParcelSaveSizeCreate" && asTest != "Test_ParcelSaveSizeRemove" && asTest != "Test_ParcelLeftovers" && asTest != "Test_DumpJDB" && asTest != "Test_ConfiscationParcel")
         return false
     endif
 
@@ -15797,6 +15876,10 @@ bool function __RunStatelessTest(string asTest)
         display_result(__ParcelSaveSize("207", false))
     elseif (asTest == "Test_ParcelLeftovers")
         display_result(__ParcelLeftovers("208"))
+    elseif (asTest == "Test_ConfiscationParcel")
+        bool confiscationOk = __ConfiscationParcel("210")
+        __TeardownAllTempActors()
+        display_result(confiscationOk)
     elseif (asTest == "Test_DumpJDB")
         string folder = JContainers.userDirectory()
         JDB.writeToFile(folder + "rpb_jdb_dump.json")
